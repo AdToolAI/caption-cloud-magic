@@ -32,6 +32,7 @@ import { BrandDriftDossier } from "@/components/brand/BrandDriftDossier";
 import { BrandShareExport } from "@/components/brand/BrandShareExport";
 import { BrandTrendsRadar } from "@/components/brand/BrandTrendsRadar";
 import type { BrandDnaResult } from "@/hooks/useBrandDnaExtractor";
+import { tx } from "@/lib/i18nText";
 
 const BrandKit = () => {
   const { t } = useTranslation();
@@ -100,7 +101,7 @@ const BrandKit = () => {
       queryClient.invalidateQueries({ queryKey: ['brand-kits'] });
       toast({
         title: "Aktives Marken-Set geändert",
-        description: "Das neue Marken-Set wird jetzt in allen Tools verwendet"
+        description: tx({ de: "Das neue Marken-Set wird jetzt in allen Tools verwendet", en: "The new brand set is now used across all tools", es: "El nuevo set de marca ahora se usa en todas las herramientas" })
       });
     }
   });
@@ -118,7 +119,7 @@ const BrandKit = () => {
       queryClient.invalidateQueries({ queryKey: ['brand-kits'] });
       toast({
         title: "Gelöscht",
-        description: "Brand Kit wurde erfolgreich gelöscht"
+        description: tx({ de: "Brand Kit wurde erfolgreich gelöscht", en: "Brand kit deleted successfully", es: "Brand kit eliminado correctamente" })
       });
     }
   });
@@ -164,7 +165,7 @@ const BrandKit = () => {
     if (!data.brandDescription && !data.brandName) {
       toast({
         title: "Fehler",
-        description: "Bitte gib mindestens einen Markennamen oder Beschreibung ein",
+        description: tx({ de: "Bitte gib mindestens einen Markennamen oder Beschreibung ein", en: "Please enter at least a brand name or description", es: "Introduce al menos un nombre de marca o una descripción" }),
         variant: "destructive"
       });
       return;
@@ -228,7 +229,7 @@ const BrandKit = () => {
 
       toast({
         title: "Erfolgreich erstellt!",
-        description: "Dein Marken-Set wurde generiert und ist jetzt aktiv",
+        description: tx({ de: "Dein Marken-Set wurde generiert und ist jetzt aktiv", en: "Your brand set was generated and is now active", es: "Tu set de marca se generó y ya está activo" }),
         duration: 5000
       });
 
@@ -238,7 +239,7 @@ const BrandKit = () => {
     } catch (error: any) {
       console.error('Error generating brand kit:', error);
       
-      let errorMessage = "Brand Kit konnte nicht erstellt werden";
+      let errorMessage = tx({ de: "Brand Kit konnte nicht erstellt werden", en: "Brand kit could not be created", es: "No se pudo crear el brand kit" });
       let errorDetails = "";
       
       if (error.message) {
@@ -286,7 +287,7 @@ const BrandKit = () => {
     }));
     toast({
       title: "Brand DNA übernommen",
-      description: "Das Formular wurde mit den extrahierten Werten vorausgefüllt.",
+      description: tx({ de: "Das Formular wurde mit den extrahierten Werten vorausgefüllt.", en: "The form was pre-filled with the extracted values.", es: "El formulario se rellenó con los valores extraídos." }),
     });
   };
 
@@ -316,7 +317,7 @@ const BrandKit = () => {
     } catch (error) {
       toast({
         title: "Fehler",
-        description: "Konnte nicht dupliziert werden",
+        description: tx({ de: "Konnte nicht dupliziert werden", en: "Could not be duplicated", es: "No se pudo duplicar" }),
         variant: "destructive"
       });
     }
@@ -516,7 +517,7 @@ const BrandKit = () => {
                         id="description"
                         value={formData.brandDescription}
                         onChange={(e) => setFormData({ ...formData, brandDescription: e.target.value })}
-                        placeholder="Beschreibe deine Marke, ihre Werte und Mission..."
+                        placeholder={tx({ de: "Beschreibe deine Marke, ihre Werte und Mission...", en: "Describe your brand, its values and mission...", es: "Describe tu marca, sus valores y su misión..." })}
                         rows={4}
                         className="mt-2 bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
                       />

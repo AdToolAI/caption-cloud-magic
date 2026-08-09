@@ -185,6 +185,7 @@ import {
 import { useSceneRenderConfirm } from "@/lib/composer/sceneRenderConfirm";
 import { countSceneSpeakers } from "@/lib/composer/countSceneSpeakers";
 import { useOutfitLookMap } from "@/hooks/useOutfitLookMap";
+import { tx } from "@/lib/i18nText";
 
 /**
  * Wave 3.1 — compact Catalog-ID chip strip. Reads scene-level shadow IDs
@@ -488,8 +489,8 @@ export default function SceneCard({
     if (error) throw new Error(await extractFunctionsError(error));
     if ((data as any)?.status === "already_applied") {
       toast({
-        title: "Lip-Sync bereits fertig",
-        description: "Für einen neuen Versuch bitte den Clip + Lip-Sync neu rendern.",
+        title: tx({ de: "Lip-Sync bereits fertig", en: "Lip sync already done", es: "Sincronización labial ya completada" }),
+        description: tx({ de: "Für einen neuen Versuch bitte den Clip + Lip-Sync neu rendern.", en: "For a new attempt, please re-render the clip + lip sync.", es: "Para un nuevo intento, vuelve a renderizar el clip + la sincronización labial." }),
       });
       return;
     }
@@ -501,8 +502,8 @@ export default function SceneCard({
       clipError: null as any,
     });
     toast({
-      title: "Lip-Sync sauber neu gestartet",
-      description: "Alte Jobs und Pipeline-Daten sind entfernt. v69 startet automatisch neu.",
+      title: tx({ de: "Lip-Sync sauber neu gestartet", en: "Lip sync cleanly restarted", es: "Sincronización labial reiniciada correctamente" }),
+      description: tx({ de: "Alte Jobs und Pipeline-Daten sind entfernt. v69 startet automatisch neu.", en: "Old jobs and pipeline data have been removed. v69 restarts automatically.", es: "Se eliminaron trabajos y datos de pipeline antiguos. v69 se reinicia automáticamente." }),
     });
   };
 
@@ -1155,12 +1156,12 @@ export default function SceneCard({
                       />
                       {budgetCapped && (
                         <p className="text-[10px] text-amber-300/80 leading-snug">
-                          Projekt-Budget fast voll · max. {sliderMax}s für diese Szene.
+                          {tx({ de: 'Projekt-Budget fast voll · max.', en: 'Project budget almost full · max.', es: 'Presupuesto del proyecto casi agotado · máx.' })} {sliderMax}s {tx({ de: 'für diese Szene.', en: 'for this scene.', es: 'para esta escena.' })}
                         </p>
                       )}
                       {isHappyHorse && (
                         <p className="text-[10px] text-emerald-300/70 leading-snug">
-                          HappyHorse · {current}s (nativ 3–15s, jede Sekunde wählbar)
+                          HappyHorse · {current}s ({tx({ de: 'nativ 3–15s, jede Sekunde wählbar', en: 'native 3–15s, any second selectable', es: 'nativo 3–15s, cualquier segundo seleccionable' })})
                         </p>
                       )}
                     </div>
@@ -1190,7 +1191,7 @@ export default function SceneCard({
                               className="h-6 px-3 text-[10px]"
                               disabled={overBudget}
                               onClick={() => onUpdate({ durationSeconds: sec })}
-                              title={overBudget ? 'Projekt-Budget überschritten' : `${sec}s nativ`}
+                              title={overBudget ? tx({ de: 'Projekt-Budget überschritten', en: 'Project budget exceeded', es: 'Presupuesto del proyecto excedido' }) : `${sec}s ${tx({ de: 'nativ', en: 'native', es: 'nativo' })}`}
                             >
                               {sec}s
                             </Button>
@@ -1208,7 +1209,7 @@ export default function SceneCard({
                     )}
                     {isHailuoPro10 && (
                       <p className="text-[10px] text-amber-300/80 leading-snug">
-                        10s bei Hailuo nur in 768p verfügbar — Pro wird auf Standard-Auflösung reduziert.
+                        {tx({ de: '10s bei Hailuo nur in 768p verfügbar — Pro wird auf Standard-Auflösung reduziert.', en: '10s with Hailuo is only available in 768p — Pro is reduced to standard resolution.', es: '10s con Hailuo solo disponible en 768p — Pro se reduce a resolución estándar.' })}
                       </p>
                     )}
                   </div>
@@ -2057,11 +2058,11 @@ export default function SceneCard({
                   </button>
                   <button
                     type="button"
-                    title="Stoppt Lip-Sync für diese Szene, leert Sync-Daten und behält das gerenderte Basis-Video. Keine neuen Credits."
+                    title={tx({ de: "Stoppt Lip-Sync für diese Szene, leert Sync-Daten und behält das gerenderte Basis-Video. Keine neuen Credits.", en: "Stops lip sync for this scene, clears sync data, and keeps the rendered base video. No new credits.", es: "Detiene la sincronización labial de esta escena, borra los datos de sync y conserva el video base renderizado. Sin nuevos créditos." })}
                     onClick={async () => {
                       if (
                         !confirm(
-                          "Lip-Sync für diese Szene wirklich stoppen und deaktivieren?\n\nLaufende Sync.so-Jobs werden abgebrochen und Dialog-Shots geleert. Das gerenderte Basis-Video bleibt erhalten.",
+                          tx({ de: "Lip-Sync für diese Szene wirklich stoppen und deaktivieren?\n\nLaufende Sync.so-Jobs werden abgebrochen und Dialog-Shots geleert. Das gerenderte Basis-Video bleibt erhalten.", en: "Really stop and disable lip sync for this scene?\n\nRunning Sync.so jobs will be cancelled and dialog shots cleared. The rendered base video is preserved.", es: "¿Detener y desactivar realmente la sincronización labial de esta escena?\n\nLos trabajos de Sync.so en curso se cancelarán y los dialog shots se borrarán. El video base renderizado se conserva." }),
                         )
                       )
                         return;
@@ -2106,14 +2107,14 @@ export default function SceneCard({
                         if (updateError) throw updateError;
                         emitPipelineEvent({ type: "lipsync:end" });
                         toast({
-                          title: "Lip-Sync gestoppt",
+                          title: tx({ de: "Lip-Sync gestoppt", en: "Lip sync stopped", es: "Sincronización labial detenida" }),
                           description:
-                            "Sync.so wurde abgebrochen und Lip-Sync für diese Szene deaktiviert. Das Basis-Video bleibt erhalten.",
+                            tx({ de: "Sync.so wurde abgebrochen und Lip-Sync für diese Szene deaktiviert. Das Basis-Video bleibt erhalten.", en: "Sync.so was cancelled and lip sync was disabled for this scene. The base video is preserved.", es: "Se canceló Sync.so y se desactivó la sincronización labial de esta escena. El video base se conserva." }),
                         });
                       } catch (e) {
                         console.warn("[SceneCard] hard reset failed", e);
                         toast({
-                          title: "Löschen fehlgeschlagen",
+                          title: tx({ de: "Löschen fehlgeschlagen", en: "Deletion failed", es: "Error al eliminar" }),
                           description:
                             (e as any)?.message ?? "Unbekannter Fehler",
                           variant: "destructive",
@@ -2122,7 +2123,7 @@ export default function SceneCard({
                     }}
                     className="text-[10px] px-2 py-1 rounded border border-destructive/40 text-destructive hover:bg-destructive/10"
                   >
-                    🗑 Lipsync komplett zurücksetzen
+                    🗑 {tx({ de: 'Lipsync komplett zurücksetzen', en: 'Completely reset lip sync', es: 'Restablecer completamente la sincronización labial' })}
                   </button>
                   {scene.engineOverride === "cinematic-sync" && (
                     <button
@@ -2131,16 +2132,16 @@ export default function SceneCard({
                         scene.clipStatus === "generating" ||
                         scene.lipSyncStatus === "running"
                       }
-                      title="Setzt Anchor + Clip zurück und rendert beides neu — empfohlen bei 'source_clip_missing_speakers', 'anchor_missing_speakers' oder 'v153_preflight_block' (Face-Detect fehlgeschlagen)."
+                      title={tx({ de: "Setzt Anchor + Clip zurück und rendert beides neu — empfohlen bei 'source_clip_missing_speakers', 'anchor_missing_speakers' oder 'v153_preflight_block' (Face-Detect fehlgeschlagen).", en: "Resets anchor + clip and re-renders both — recommended for 'source_clip_missing_speakers', 'anchor_missing_speakers' or 'v153_preflight_block' (face detection failed).", es: "Restablece el anchor + clip y renderiza ambos de nuevo — recomendado para 'source_clip_missing_speakers', 'anchor_missing_speakers' o 'v153_preflight_block' (falló la detección facial)." })}
                       onClick={async () => {
                         // ── Schritt 1: Cost-Confirm-Gate (re-roll) ──────
                         const passes = countSceneSpeakers(scene);
                         const ok = await confirmRender({
                           scenes: [scene],
                           passes,
-                          title: 'Clip + Lip-Sync neu rendern?',
+                          title: tx({ de: 'Clip + Lip-Sync neu rendern?', en: 'Re-render clip + lip sync?', es: '¿Volver a renderizar el clip + la sincronización labial?' }),
                           description:
-                            'Anchor und Clip werden zurückgesetzt und beides neu generiert. Credits werden erneut verbraucht.',
+                            tx({ de: 'Anchor und Clip werden zurückgesetzt und beides neu generiert. Credits werden erneut verbraucht.', en: 'Anchor and clip will be reset and both regenerated. Credits will be consumed again.', es: 'El anchor y el clip se restablecerán y ambos se regenerarán. Se consumirán créditos nuevamente.' }),
                         });
                         if (!ok) return;
                         try {
@@ -2192,9 +2193,9 @@ export default function SceneCard({
                     type="button"
                     onClick={() => setAnchorPreviewOpen(true)}
                     className="text-[10px] px-2 py-1 rounded border border-emerald-400/40 text-emerald-300 hover:bg-emerald-400/10"
-                    title="Anchor-Bild komponieren und prüfen, bevor Video + Lip-Sync abgerechnet werden."
+                    title={tx({ de: "Anchor-Bild komponieren und prüfen, bevor Video + Lip-Sync abgerechnet werden.", en: "Compose and check the anchor image before video + lip sync are billed.", es: "Componer y revisar la imagen ancla antes de facturar el video + la sincronización labial." })}
                   >
-                    👁 Vorschau statt Full-Render
+                    👁 {tx({ de: 'Vorschau statt Full-Render', en: 'Preview instead of full render', es: 'Vista previa en lugar de renderizado completo' })}
                   </button>
                 </div>
               )}
@@ -2376,7 +2377,7 @@ export default function SceneCard({
                           {anchor.strategy === "first-frame-composed"
                             ? "Charakter wird in die Szenen-Komposition gerendert (Nano Banana 2)"
                             : anchor.strategy === "first-frame-direct"
-                              ? "Porträt wird als erstes Bild gesetzt — Modell startet mit Gesicht"
+                              ? tx({ de: "Porträt wird als erstes Bild gesetzt — Modell startet mit Gesicht", en: "Portrait is set as the first image — the model starts with the face", es: "El retrato se establece como primera imagen — el modelo comienza con la cara" })
                               : anchor.strategy === "subject-reference"
                                 ? "Porträt geht in den Reference-Slot — keine Komposition-Sperre"
                                 : "Kein Bild-Anker, Identität bleibt im Text-Prompt"}
@@ -2618,9 +2619,9 @@ export default function SceneCard({
                                 if (error) throw error;
                                 emitPipelineEvent({ type: "lipsync:end" });
                                 toast({
-                                  title: "Lip-Sync abgebrochen",
+                                  title: tx({ de: "Lip-Sync abgebrochen", en: "Lip sync cancelled", es: "Sincronización labial cancelada" }),
                                   description:
-                                    "Du kannst jetzt sauber neu starten — keine alten Einträge bleiben.",
+                                    tx({ de: "Du kannst jetzt sauber neu starten — keine alten Einträge bleiben.", en: "You can now start fresh — no old entries remain.", es: "Ahora puedes empezar de nuevo limpiamente — no quedan entradas antiguas." }),
                                 });
                               } catch (e) {
                                 console.warn("[SceneCard] cancel lipsync failed", e);
@@ -3023,7 +3024,7 @@ export default function SceneCard({
                       onClick={() => setStockBrowserOpen(true)}
                     >
                       <Video className="h-3 w-3" />
-                      Bibliothek öffnen
+                      {tx({ de: 'Bibliothek öffnen', en: 'Open library', es: 'Abrir biblioteca' })}
                     </Button>
                   </div>
                   <Input
@@ -3031,7 +3032,7 @@ export default function SceneCard({
                     onChange={(e) =>
                       onUpdate({ stockKeywords: e.target.value })
                     }
-                    placeholder="Optional: Suchbegriffe für AI-Auto-Pick"
+                    placeholder={tx({ de: "Optional: Suchbegriffe für AI-Auto-Pick", en: "Optional: search terms for AI auto-pick", es: "Opcional: términos de búsqueda para la selección automática de IA" })}
                     className="text-xs bg-background/50 h-7"
                   />
                 </div>

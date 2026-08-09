@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { tx } from "@/lib/i18nText";
 
 export interface CloudConnection {
   id: string;
@@ -90,7 +91,7 @@ export const useCloudStorage = () => {
       console.error('Error starting OAuth:', err);
       toast({
         title: 'Verbindungsfehler',
-        description: 'Google Drive konnte nicht verbunden werden.',
+        description: tx({ de: 'Google Drive konnte nicht verbunden werden.', en: 'Google Drive could not be connected.', es: 'No se pudo conectar Google Drive.' }),
         variant: 'destructive',
       });
     }
@@ -128,7 +129,7 @@ export const useCloudStorage = () => {
       console.error('Error exchanging code:', err);
       toast({
         title: 'Verbindungsfehler',
-        description: 'Der OAuth-Code konnte nicht verarbeitet werden.',
+        description: tx({ de: 'Der OAuth-Code konnte nicht verarbeitet werden.', en: 'The OAuth code could not be processed.', es: 'No se pudo procesar el código OAuth.' }),
         variant: 'destructive',
       });
     } finally {
@@ -157,7 +158,7 @@ export const useCloudStorage = () => {
       console.error('Error disconnecting:', err);
       toast({
         title: 'Fehler',
-        description: 'Verbindung konnte nicht getrennt werden.',
+        description: tx({ de: 'Verbindung konnte nicht getrennt werden.', en: 'The connection could not be removed.', es: 'No se pudo desconectar.' }),
         variant: 'destructive',
       });
     }
@@ -181,7 +182,7 @@ export const useCloudStorage = () => {
       console.error('Error listing cloud files:', err);
       toast({
         title: 'Fehler',
-        description: 'Cloud-Dateien konnten nicht geladen werden.',
+        description: tx({ de: 'Cloud-Dateien konnten nicht geladen werden.', en: 'Cloud files could not be loaded.', es: 'No se pudieron cargar los archivos en la nube.' }),
         variant: 'destructive',
       });
       return [];
@@ -209,7 +210,7 @@ export const useCloudStorage = () => {
 
       toast({
         title: '☁️ In Cloud hochgeladen',
-        description: `${fileName} wurde in Google Drive gespeichert.`,
+        description: tx({ de: `${fileName} wurde in Google Drive gespeichert.`, en: `${fileName} was saved to Google Drive.`, es: `${fileName} se guardó en Google Drive.` }),
       });
 
       // Refresh file list
@@ -221,7 +222,7 @@ export const useCloudStorage = () => {
       console.error('Error uploading to cloud:', err);
       toast({
         title: 'Upload-Fehler',
-        description: 'Datei konnte nicht in die Cloud hochgeladen werden.',
+        description: tx({ de: 'Datei konnte nicht in die Cloud hochgeladen werden.', en: 'File could not be uploaded to the cloud.', es: 'No se pudo subir el archivo a la nube.' }),
         variant: 'destructive',
       });
       return null;
@@ -244,13 +245,13 @@ export const useCloudStorage = () => {
       
       toast({
         title: 'Gelöscht',
-        description: 'Datei wurde aus Google Drive entfernt.',
+        description: tx({ de: 'Datei wurde aus Google Drive entfernt.', en: 'File was removed from Google Drive.', es: 'El archivo se eliminó de Google Drive.' }),
       });
     } catch (err) {
       console.error('Error deleting from cloud:', err);
       toast({
         title: 'Fehler',
-        description: 'Datei konnte nicht gelöscht werden.',
+        description: tx({ de: 'Datei konnte nicht gelöscht werden.', en: 'File could not be deleted.', es: 'No se pudo eliminar el archivo.' }),
         variant: 'destructive',
       });
     }
@@ -273,8 +274,8 @@ export const useCloudStorage = () => {
       toast({
         title: enabled ? 'Auto-Sync aktiviert' : 'Auto-Sync deaktiviert',
         description: enabled 
-          ? 'Neue Medien werden automatisch in Google Drive gespeichert.'
-          : 'Medien werden nicht mehr automatisch hochgeladen.',
+          ? tx({ de: 'Neue Medien werden automatisch in Google Drive gespeichert.', en: 'New media is automatically saved to Google Drive.', es: 'Los nuevos medios se guardan automáticamente en Google Drive.' })
+          : tx({ de: 'Medien werden nicht mehr automatisch hochgeladen.', en: 'Media is no longer uploaded automatically.', es: 'Los medios ya no se suben automáticamente.' }),
       });
     } catch (err) {
       console.error('Error toggling auto-sync:', err);

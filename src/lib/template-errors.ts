@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Template System Error Classes
  * Custom error types for better error handling and user feedback
@@ -20,7 +21,7 @@ export class TemplateMappingError extends TemplateError {
     super(
       `Field mapping not found for template ${templateId}, field ${fieldKey}`,
       'MAPPING_NOT_FOUND',
-      'Die Feldkonfiguration für dieses Template konnte nicht geladen werden. Bitte versuche es erneut oder wähle ein anderes Template.',
+      tx({ de: 'Die Feldkonfiguration für dieses Template konnte nicht geladen werden. Bitte versuche es erneut oder wähle ein anderes Template.', en: 'The field configuration for this template could not be loaded. Please try again or pick another template.', es: 'No se pudo cargar la configuración de campos de esta plantilla. Inténtalo de nuevo o elige otra.' }),
       { templateId, fieldKey, details }
     );
     this.name = 'TemplateMappingError';
@@ -37,7 +38,7 @@ export class TransformationError extends TemplateError {
     super(
       `Transformation "${transformationFunction}" failed for field "${fieldKey}" with value: ${inputValue}`,
       'TRANSFORMATION_FAILED',
-      `Der Wert für "${fieldKey}" konnte nicht verarbeitet werden. Bitte überprüfe die Eingabe.`,
+      tx({ de: `Der Wert für "${fieldKey}" konnte nicht verarbeitet werden. Bitte überprüfe die Eingabe.`, en: `The value for "${fieldKey}" could not be processed. Please check your input.`, es: `No se pudo procesar el valor de "${fieldKey}". Revisa la entrada.` }),
       {
         fieldKey,
         transformationFunction,
@@ -54,7 +55,7 @@ export class ComponentLoadError extends TemplateError {
     super(
       `Failed to load Remotion component: ${componentId}`,
       'COMPONENT_LOAD_FAILED',
-      'Die Video-Komponente konnte nicht geladen werden. Bitte lade die Seite neu.',
+      tx({ de: 'Die Video-Komponente konnte nicht geladen werden. Bitte lade die Seite neu.', en: 'The video component could not be loaded. Please reload the page.', es: 'No se pudo cargar el componente de vídeo. Recarga la página.' }),
       { componentId, details }
     );
     this.name = 'ComponentLoadError';
@@ -66,7 +67,7 @@ export class TemplateValidationError extends TemplateError {
     super(
       `Template validation failed: Missing required fields for template ${templateId}`,
       'VALIDATION_FAILED',
-      `Bitte fülle alle erforderlichen Felder aus: ${missingFields.join(', ')}`,
+      tx({ de: `Bitte fülle alle erforderlichen Felder aus: ${missingFields.join(', ')}`, en: `Please fill in all required fields: ${missingFields.join(', ')}`, es: `Rellena todos los campos obligatorios: ${missingFields.join(', ')}` }),
       { templateId, missingFields }
     );
     this.name = 'TemplateValidationError';
@@ -78,7 +79,7 @@ export class DatabaseError extends TemplateError {
     super(
       `Database operation "${operation}" failed on table "${tableName}"`,
       'DATABASE_ERROR',
-      'Es gab ein Problem beim Laden der Daten. Bitte versuche es erneut.',
+      tx({ de: 'Es gab ein Problem beim Laden der Daten. Bitte versuche es erneut.', en: 'There was a problem loading the data. Please try again.', es: 'Hubo un problema al cargar los datos. Inténtalo de nuevo.' }),
       {
         operation,
         tableName,
@@ -103,13 +104,13 @@ export class ErrorHandler {
 
     if (error instanceof Error) {
       return {
-        message: 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut.',
+        message: tx({ de: 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut.', en: 'An unexpected error occurred. Please try again.', es: 'Se ha producido un error inesperado. Inténtalo de nuevo.' }),
         details: import.meta.env.DEV ? error.message : undefined,
       };
     }
 
     return {
-      message: 'Ein unbekannter Fehler ist aufgetreten. Bitte versuche es erneut.',
+      message: tx({ de: 'Ein unbekannter Fehler ist aufgetreten. Bitte versuche es erneut.', en: 'An unknown error occurred. Please try again.', es: 'Se ha producido un error desconocido. Inténtalo de nuevo.' }),
     };
   }
 

@@ -12,6 +12,7 @@ import { SEO } from '@/components/SEO';
 import { ProfileEditorDialog } from '@/components/media-profiles/ProfileEditorDialog';
 import { MediaProfile, Platform } from '@/lib/mediaProfileSchema';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { tx } from "@/lib/i18nText";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,7 +62,7 @@ export default function MediaProfiles() {
     if (error || !data) {
       toast({
         title: 'Fehler',
-        description: 'Workspace konnte nicht geladen werden.',
+        description: tx({ de: 'Workspace konnte nicht geladen werden.', en: 'Workspace could not be loaded.', es: 'No se pudo cargar el workspace.' }),
         variant: 'destructive'
       });
       return;
@@ -89,7 +90,7 @@ export default function MediaProfiles() {
     if (error) {
       toast({
         title: 'Fehler',
-        description: 'Profile konnten nicht geladen werden.',
+        description: tx({ de: 'Profile konnten nicht geladen werden.', en: 'Profiles could not be loaded.', es: 'No se pudieron cargar los perfiles.' }),
         variant: 'destructive'
       });
       setIsLoading(false);
@@ -151,7 +152,7 @@ export default function MediaProfiles() {
     if (error) {
       toast({
         title: 'Fehler',
-        description: 'Profil konnte nicht dupliziert werden.',
+        description: tx({ de: 'Profil konnte nicht dupliziert werden.', en: 'Profile could not be duplicated.', es: 'No se pudo duplicar el perfil.' }),
         variant: 'destructive'
       });
       return;
@@ -182,7 +183,7 @@ export default function MediaProfiles() {
     if (error) {
       toast({
         title: 'Fehler',
-        description: 'Standard konnte nicht gesetzt werden.',
+        description: tx({ de: 'Standard konnte nicht gesetzt werden.', en: 'Default could not be set.', es: 'No se pudo establecer el valor predeterminado.' }),
         variant: 'destructive'
       });
       return;
@@ -190,7 +191,7 @@ export default function MediaProfiles() {
 
     toast({
       title: 'Standard gesetzt',
-      description: 'Das Profil ist jetzt der Standard für diesen Kanal.'
+      description: tx({ de: 'Das Profil ist jetzt der Standard für diesen Kanal.', en: 'This profile is now the default for this channel.', es: 'Este perfil ahora es el predeterminado para este canal.' })
     });
 
     loadProfiles();
@@ -205,7 +206,7 @@ export default function MediaProfiles() {
     if (error) {
       toast({
         title: 'Fehler',
-        description: 'Profil konnte nicht gelöscht werden.',
+        description: tx({ de: 'Profil konnte nicht gelöscht werden.', en: 'Profile could not be deleted.', es: 'No se pudo eliminar el perfil.' }),
         variant: 'destructive'
       });
       return;
@@ -213,7 +214,7 @@ export default function MediaProfiles() {
 
     toast({
       title: 'Profil gelöscht',
-      description: 'Das Profil wurde erfolgreich gelöscht.'
+      description: tx({ de: 'Das Profil wurde erfolgreich gelöscht.', en: 'Profile deleted successfully.', es: 'Perfil eliminado correctamente.' })
     });
 
     setDeleteDialog({ open: false, profileId: null });
@@ -257,7 +258,7 @@ export default function MediaProfiles() {
     <>
       <SEO
         title="Medien-Profile"
-        description="Verwalte deine Medien-Profile für verschiedene Social-Media-Kanäle."
+        description={tx({ de: "Verwalte deine Medien-Profile für verschiedene Social-Media-Kanäle.", en: "Manage your media profiles for different social channels.", es: "Gestiona tus perfiles de medios para distintos canales sociales." })}
       />
 
       <div className="container max-w-6xl py-8">

@@ -10,6 +10,7 @@ import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Sear
 import { useFrameContinuity } from '@/hooks/useFrameContinuity';
 import { useSaveSceneToLibrary } from '@/hooks/useSaveSceneToLibrary';
 import { toast } from '@/hooks/use-toast';
+import { tx } from '@/lib/i18nText';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -122,7 +123,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
   const handleApplyContinuityToNext = useCallback(
     async (currentScene: ComposerScene, nextScene: ComposerScene) => {
       if (!currentScene.clipUrl) {
-        toast({ title: 'Kein Clip vorhanden', description: 'Generiere zuerst diese Szene.' });
+        toast({ title: tx({ de: 'Kein Clip vorhanden', en: 'No clip yet', es: 'Aún no hay clip' }), description: tx({ de: 'Generiere zuerst diese Szene.', en: 'Generate this scene first.', es: 'Genera primero esta escena.' }) });
         return;
       }
       const dur = currentScene.durationSeconds || 5;
@@ -343,7 +344,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           }
         }
         if (scene.clipStatus === 'generating' && dbClipStatus === 'failed') {
-          toast({ title: `Szene ${idx + 1} fehlgeschlagen`, variant: 'destructive' });
+          toast({ title: tx({ de: `Szene ${idx + 1} fehlgeschlagen`, en: `Scene ${idx + 1} failed`, es: `Escena ${idx + 1} falló` }), variant: 'destructive' });
         }
         // Cinematic-Sync: notify when Sync.so step finishes
         if (
@@ -353,7 +354,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         ) {
           toast({
             title: `🎬 Cinematic-Sync fertig — Szene ${idx + 1}`,
-            description: 'Charakter ist jetzt in der echten Szene und lip-synct.',
+            description: tx({ de: 'Charakter ist jetzt in der echten Szene und lip-synct.', en: 'The character is now in the real scene and lip-synced.', es: 'El personaje ya está en la escena real y con sincronización labial.' }),
           });
         }
         if (
@@ -362,8 +363,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           (dbScene as any).lip_sync_status === 'failed'
         ) {
           toast({
-            title: `Cinematic-Sync Lip-Sync fehlgeschlagen`,
-            description: `Szene ${idx + 1}: Hailuo-Render ist fertig, aber Sync.so hatte einen Fehler. Credits wurden refundiert.`,
+            title: tx({ de: `Cinematic-Sync Lip-Sync fehlgeschlagen`, en: `Cinematic Sync lip sync failed`, es: `Falló la sincronización labial de Cinematic Sync` }),
+            description: tx({ de: `Szene ${idx + 1}: Hailuo-Render ist fertig, aber Sync.so hatte einen Fehler. Credits wurden refundiert.`, en: `Scene ${idx + 1}: Hailuo render is done, but Sync.so had an error. Credits were refunded.`, es: `Escena ${idx + 1}: la renderización de Hailuo terminó, pero Sync.so tuvo un error. Se reembolsaron los créditos.` }),
             variant: 'destructive',
           });
         }
@@ -374,7 +375,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         ) {
           toast({
             title: `Cinematic-Sync braucht ein Voiceover — Szene ${idx + 1}`,
-            description: 'Hailuo-Render ist fertig, aber es gibt kein Voiceover für den Lip-Sync. Bitte erst im Dialog/VO-Tab eine Stimme generieren, dann Cinematic-Sync erneut starten.',
+            description: tx({ de: 'Hailuo-Render ist fertig, aber es gibt kein Voiceover für den Lip-Sync. Bitte erst im Dialog/VO-Tab eine Stimme generieren, dann Cinematic-Sync erneut starten.', en: 'Hailuo render is done, but there is no voiceover for the lip sync. Please generate a voice in the Dialog/VO tab first, then start Cinematic Sync again.', es: 'La renderización de Hailuo terminó, pero no hay locución para la sincronización labial. Genera primero una voz en la pestaña Diálogo/VO y luego reinicia Cinematic Sync.' }),
             variant: 'destructive',
           });
         }
@@ -507,13 +508,13 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             if (reason === 'tts_failed' || reason === 'no_voiceover') {
               toast({
                 title: 'Cinematic-Sync braucht ein Voiceover',
-                description: message || 'Bitte im Voiceover-Tab eine Stimme prüfen, dann erneut starten.',
+                description: message || tx({ de: 'Bitte im Voiceover-Tab eine Stimme prüfen, dann erneut starten.', en: 'Please check a voice in the Voiceover tab, then restart.', es: 'Comprueba una voz en la pestaña de locución y vuelve a iniciar.' }),
                 variant: 'destructive',
               });
             } else if (lsErr) {
               toast({
-                title: 'Lip-Sync fehlgeschlagen',
-                description: realMsg || message || (lsErr as Error).message || 'Unbekannter Fehler.',
+                title: tx({ de: 'Lip-Sync fehlgeschlagen', en: 'Lip sync failed', es: 'Error en la sincronización labial' }),
+                description: realMsg || message || (lsErr as Error).message || tx({ de: 'Unbekannter Fehler.', en: 'Unknown error.', es: 'Error desconocido.' }),
                 variant: 'destructive',
               });
               console.warn(`[ClipsTab] lip-sync invoke failed for ${sceneId}`, lsErr);
@@ -559,7 +560,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       try {
         return await onEnsurePersisted();
       } catch (err: any) {
-        toast({ title: 'Fehler', description: err.message || 'Projekt konnte nicht gespeichert werden', variant: 'destructive' });
+        toast({ title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }), description: err.message || tx({ de: 'Projekt konnte nicht gespeichert werden', en: 'Project could not be saved', es: 'No se pudo guardar el proyecto' }), variant: 'destructive' });
         return null;
       }
     }
@@ -676,7 +677,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       });
 
       if (scenesPayload.length === 0) {
-        toast({ title: 'Alle Clips sind bereits fertig!' });
+        toast({ title: tx({ de: 'Alle Clips sind bereits fertig!', en: 'All clips are already done!', es: '¡Todos los clips ya están listos!' }) });
         setIsGeneratingAll(false);
         return;
       }
@@ -739,8 +740,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       if (failedResults.length > 0) {
         console.error('[ClipsTab] Failed clip details:', failedResults);
         toast({
-          title: `${failedResults.length} Clip(s) fehlgeschlagen`,
-          description: 'Generierung fehlgeschlagen — bitte erneut versuchen. Details in der Konsole.',
+          title: tx({ de: `${failedResults.length} Clip(s) fehlgeschlagen`, en: `${failedResults.length} clip(s) failed`, es: `${failedResults.length} clip(s) fallaron` }),
+          description: tx({ de: 'Generierung fehlgeschlagen — bitte erneut versuchen. Details in der Konsole.', en: 'Generation failed — please try again. Details in the console.', es: 'Error en la generación — inténtalo de nuevo. Detalles en la consola.' }),
           variant: 'destructive',
         });
       } else {
@@ -754,7 +755,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     } catch (err: any) {
       console.error('Generate clips error:', err);
       const realMsg = await extractFunctionsError(err);
-      toast({ title: 'Fehler', description: realMsg || 'Clip-Generierung fehlgeschlagen — bitte erneut versuchen.', variant: 'destructive' });
+      toast({ title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }), description: realMsg || tx({ de: 'Clip-Generierung fehlgeschlagen — bitte erneut versuchen.', en: 'Clip generation failed — please try again.', es: 'Error al generar el clip — inténtalo de nuevo.' }), variant: 'destructive' });
     } finally {
       setIsGeneratingAll(false);
     }
@@ -895,8 +896,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       console.error('[ClipsTab] handleGenerateSingle failed', err);
       const realMsg = await extractFunctionsError(err);
       toast({
-        title: 'Fehler',
-        description: realMsg || err?.message || 'Re-Roll fehlgeschlagen — bitte erneut versuchen.',
+        title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),
+        description: realMsg || err?.message || tx({ de: 'Re-Roll fehlgeschlagen — bitte erneut versuchen.', en: 'Re-roll failed — please try again.', es: 'Error al repetir — inténtalo de nuevo.' }),
         variant: 'destructive',
       });
     } finally {
@@ -955,7 +956,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         // Only when we truly don't have a persisted row yet do we fall back
         // to the full project save — and we re-apply our overrides afterwards.
         const persisted = await ensureProject();
-        if (!persisted) throw new Error('Projekt konnte nicht gespeichert werden');
+        if (!persisted) throw new Error(tx({ de: 'Projekt konnte nicht gespeichert werden', en: 'Project could not be saved', es: 'No se pudo guardar el proyecto' }));
         pid = persisted.projectId;
         const remapped =
           persisted.scenes.find((s) => s.orderIndex === scene.orderIndex) ?? scene;
@@ -1015,12 +1016,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
 
       const result = data?.results?.[0];
       if (result?.status === 'failed') {
-        throw new Error(result.error || 'Cinematic-Sync Render fehlgeschlagen');
+        throw new Error(result.error || tx({ de: 'Cinematic-Sync Render fehlgeschlagen', en: 'Cinematic Sync render failed', es: 'Falló la renderización de Cinematic Sync' }));
       }
 
       toast({
         title: '🎬 Cinematic-Sync gestartet',
-        description: `Szene ${(scene.orderIndex ?? 0) + 1}: Hailuo rendert die echte Szene (~60 s), danach läuft Sync.so Lip-Sync automatisch.`,
+        description: tx({ de: `Szene ${(scene.orderIndex ?? 0) + 1}: Hailuo rendert die echte Szene (~60 s), danach läuft Sync.so Lip-Sync automatisch.`, en: `Scene ${(scene.orderIndex ?? 0) + 1}: Hailuo renders the real scene (~60 s), then Sync.so lip sync runs automatically.`, es: `Escena ${(scene.orderIndex ?? 0) + 1}: Hailuo renderiza la escena real (~60 s), luego se ejecuta automáticamente la sincronización labial de Sync.so.` }),
       });
       setTimeout(pollScenes, 800);
     } catch (err: any) {
@@ -1034,8 +1035,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       (onUpdateScenesLocalOnly ?? onUpdateScenes)(rolledBack);
       const realMsg = await extractFunctionsError(err);
       toast({
-        title: 'Cinematic-Sync fehlgeschlagen',
-        description: realMsg || err?.message || 'Bitte erneut versuchen.',
+        title: tx({ de: 'Cinematic-Sync fehlgeschlagen', en: 'Cinematic Sync failed', es: 'Falló Cinematic Sync' }),
+        description: realMsg || err?.message || tx({ de: 'Bitte erneut versuchen.', en: 'Please try again.', es: 'Inténtalo de nuevo.' }),
         variant: 'destructive',
       });
     } finally {
@@ -1055,7 +1056,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       if (error) throw error;
       setStockResults(prev => ({ ...prev, [sceneId]: data?.videos || [] }));
     } catch (err) {
-      toast({ title: 'Stock-Suche fehlgeschlagen', variant: 'destructive' });
+      toast({ title: tx({ de: 'Stock-Suche fehlgeschlagen', en: 'Stock search failed', es: 'Falló la búsqueda de stock' }), variant: 'destructive' });
     } finally {
       setSearchingStock(prev => ({ ...prev, [sceneId]: false }));
     }
@@ -1067,7 +1068,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     );
     onUpdateScenes(updatedScenes);
     setStockResults(prev => ({ ...prev, [sceneId]: [] }));
-    toast({ title: 'Stock-Video ausgewählt' });
+    toast({ title: tx({ de: 'Stock-Video ausgewählt', en: 'Stock video selected', es: 'Video de stock seleccionado' }) });
   };
 
   return (
@@ -1086,13 +1087,13 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         <div className="relative p-3 rounded-lg border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-500/5 flex items-start gap-3">
           <Lightbulb className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
           <div className="flex-1 text-[11px] text-foreground/90 leading-relaxed">
-            <span className="font-semibold text-amber-300">Nicht zufrieden mit einer Szene?</span>{' '}
+            <span className="font-semibold text-amber-300">{tx({ de: 'Nicht zufrieden mit einer Szene?', en: 'Not happy with a scene?', es: '¿No te convence una escena?' })}</span>{' '}
             Klicke auf <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium"><RefreshCw className="h-2.5 w-2.5" />Neu generieren</span> bei einer fertigen Szene, um sie erneut zu erstellen — jeder Re-Roll kostet erneut Credits, aber du kannst Stil, Prompt oder Charakter-Shot vorher anpassen.
           </div>
           <button
             onClick={dismissRerollHint}
             className="flex-shrink-0 text-amber-400/60 hover:text-amber-300 transition-colors"
-            aria-label="Hinweis schließen"
+            aria-label={tx({ de: "Hinweis schließen", en: "Dismiss notice", es: "Cerrar aviso" })}
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -1209,31 +1210,28 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                       {isMultiSpeaker ? (
                         <>
                           <p className="text-emerald-300 font-semibold">
-                            🎭 Two-Shot Lip-Sync: {speakerCount} Sprecher
+                            🎭 {tx({ de: 'Two-Shot Lip-Sync:', en: 'Two-shot lip sync:', es: 'Sincronización labial two-shot:' })} {speakerCount} {tx({ de: 'Sprecher', en: 'speakers', es: 'hablantes' })}
                           </p>
                           <p>
-                            Cinematic-Sync rendert die Szene als echten Two-Shot und legt anschließend{' '}
-                            <span className="font-semibold">einen Sync.so-Pass pro Sprecher</span> über den Clip —
-                            jeder Pass wird per Gemini-Face-Lock auf das korrekte Gesicht (links/rechts) gepinnt.
-                            Die gemischte Dialog-Tonspur läuft als externe WAV synchron mit (Artlist-Pipeline).
+                            {tx({ de: 'Cinematic-Sync rendert die Szene als echten Two-Shot und legt anschließend', en: 'Cinematic Sync renders the scene as a real two-shot and then applies', es: 'Cinematic Sync renderiza la escena como un two-shot real y luego aplica' })}{' '}
+                            <span className="font-semibold">{tx({ de: 'einen Sync.so-Pass pro Sprecher', en: 'one Sync.so pass per speaker', es: 'una pasada de Sync.so por hablante' })}</span> {tx({ de: 'über den Clip —', en: 'over the clip —', es: 'sobre el clip —' })}
+                            {tx({ de: 'jeder Pass wird per Gemini-Face-Lock auf das korrekte Gesicht (links/rechts) gepinnt.', en: 'each pass is pinned to the correct face (left/right) via Gemini face lock.', es: 'cada pasada se fija a la cara correcta (izquierda/derecha) mediante Gemini face lock.' })}
+                            {tx({ de: 'Die gemischte Dialog-Tonspur läuft als externe WAV synchron mit (Artlist-Pipeline).', en: 'The mixed dialog audio track runs in sync as an external WAV (Artlist pipeline).', es: 'La pista de audio de diálogo mezclada se ejecuta sincronizada como WAV externo (pipeline de Artlist).' })}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            Kostet ca. {Math.round(14 * speakerCount)} Credits (~{speakerCount}× Sync.so lipsync-2-pro).
+                            {tx({ de: 'Kostet ca.', en: 'Costs approx.', es: 'Cuesta aprox.' })} {Math.round(14 * speakerCount)} {tx({ de: 'Credits', en: 'credits', es: 'créditos' })} (~{speakerCount}× Sync.so lipsync-2-pro).
                           </p>
                         </>
                       ) : (
                         <>
                           <p>
-                            Statt des HeyGen-Avatar-Bilds rendert <span className="font-semibold text-emerald-300">Hailuo</span> die echte
-                            Storyboard-Szene (Umgebung, Kamera, Licht). Danach wird der Charakter
-                            via <span className="font-semibold">Sync.so Lip-Sync</span> in die Szene eingebaut — wie bei Artlist.
+                            {tx({ de: 'Statt des HeyGen-Avatar-Bilds rendert', en: 'Instead of the HeyGen avatar image,', es: 'En lugar de la imagen del avatar de HeyGen,' })} <span className="font-semibold text-emerald-300">Hailuo</span> {tx({ de: 'die echte Storyboard-Szene (Umgebung, Kamera, Licht). Danach wird der Charakter via', en: 'renders the real storyboard scene (environment, camera, lighting). Then the character is placed into the scene via', es: 'renderiza la escena real del guion gráfico (entorno, cámara, luz). Luego el personaje se incorpora a la escena mediante' })} <span className="font-semibold">Sync.so Lip-Sync</span> {tx({ de: 'in die Szene eingebaut — wie bei Artlist.', en: '— just like Artlist.', es: '— igual que en Artlist.' })}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            Falls dein Voiceover länger ist als die aktuelle Szenen-Dauer, wird die Szene <span className="font-semibold">automatisch verlängert</span> (Hailuo: 6 s oder 10 s), damit das Lip-Sync vollständig läuft.
+                            {tx({ de: 'Falls dein Voiceover länger ist als die aktuelle Szenen-Dauer, wird die Szene', en: 'If your voiceover is longer than the current scene duration, the scene is', es: 'Si tu locución es más larga que la duración actual de la escena, la escena se' })} <span className="font-semibold">{tx({ de: 'automatisch verlängert', en: 'automatically extended', es: 'extiende automáticamente' })}</span> {tx({ de: '(Hailuo: 6 s oder 10 s), damit das Lip-Sync vollständig läuft.', en: '(Hailuo: 6 s or 10 s) so the lip sync runs completely.', es: '(Hailuo: 6 s o 10 s) para que la sincronización labial se ejecute por completo.' })}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            Kosten: <span className="font-semibold text-amber-400">~€0.95</span> (vs. €0.30 aktuell). Der bestehende Clip wird ersetzt.
-                            Die Pipeline läuft ~2 Minuten und refundiert automatisch bei Fehlern.
+                            {tx({ de: 'Kosten:', en: 'Cost:', es: 'Costo:' })} <span className="font-semibold text-amber-400">~€0.95</span> {tx({ de: '(vs. €0.30 aktuell). Der bestehende Clip wird ersetzt. Die Pipeline läuft ~2 Minuten und refundiert automatisch bei Fehlern.', en: '(vs. €0.30 currently). The existing clip will be replaced. The pipeline takes ~2 minutes and refunds automatically on errors.', es: '(vs. €0.30 actual). El clip existente será reemplazado. El pipeline tarda ~2 minutos y reembolsa automáticamente en caso de error.' })}
                           </p>
                         </>
                       )}
@@ -1447,7 +1445,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                         size="sm"
                         variant="outline"
                         className="gap-1 text-[10px] h-7 px-2 border-emerald-500/50 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200"
-                        title="Statt HeyGen-Avatar wird die echte Wunsch-Szene mit Hailuo gerendert und der Charakter darin lip-synct (Artlist-Pipeline). ~€0.95 statt €0.30."
+                        title={tx({ de: "Statt HeyGen-Avatar wird die echte Wunsch-Szene mit Hailuo gerendert und der Charakter darin lip-synct (Artlist-Pipeline). ~€0.95 statt €0.30.", en: "Instead of a HeyGen avatar, the real desired scene is rendered with Hailuo and the character is lip-synced in it (Artlist pipeline). ~€0.95 instead of €0.30.", es: "En lugar de un avatar de HeyGen, se renderiza la escena real deseada con Hailuo y el personaje se sincroniza labialmente en ella (pipeline de Artlist). ~€0.95 en lugar de €0.30." })}
                         disabled={isThisGenerating}
                         onClick={() => setCinematicSwitchTarget(scene)}
                       >
@@ -1463,7 +1461,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                           size="sm"
                           variant="outline"
                           className="gap-1 text-[10px] h-7 px-2 border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-60"
-                          title={isSaved ? 'Diese Szene ist bereits in deiner Mediathek' : 'Diese Szene als eigenständigen Clip in deiner Mediathek ablegen'}
+                          title={isSaved ? tx({ de: 'Diese Szene ist bereits in deiner Mediathek', en: 'This scene is already in your media library', es: 'Esta escena ya está en tu biblioteca multimedia' }) : tx({ de: 'Diese Szene als eigenständigen Clip in deiner Mediathek ablegen', en: 'Save this scene as a standalone clip in your media library', es: 'Guardar esta escena como clip independiente en tu biblioteca multimedia' })}
                           disabled={isSaving || isSaved}
                           onClick={() => saveSceneToLibrary(scene, projectId)}
                         >
@@ -1491,7 +1489,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                           size="sm"
                           variant="outline"
                           className="gap-1 text-[10px] h-7 px-2 border-primary/40 text-primary hover:bg-primary/10"
-                          title="Letzten Frame dieser Szene als Startbild der nächsten Szene nutzen — für nahtlose Übergänge."
+                          title={tx({ de: "Letzten Frame dieser Szene als Startbild der nächsten Szene nutzen — für nahtlose Übergänge.", en: "Use the last frame of this scene as the starting image of the next scene — for seamless transitions.", es: "Usar el último fotograma de esta escena como imagen inicial de la siguiente — para transiciones fluidas." })}
                           disabled={isExtracting || alreadyApplied}
                           onClick={() => handleApplyContinuityToNext(scene, next)}
                         >
@@ -1515,11 +1513,11 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                           size="sm"
                           variant="ghost"
                           className="gap-1 text-[10px] h-7 px-2 text-primary hover:bg-primary/10"
-                          title="Beliebigen Frame aus diesem Clip als Startbild der nächsten Szene wählen."
+                          title={tx({ de: "Beliebigen Frame aus diesem Clip als Startbild der nächsten Szene wählen.", en: "Choose any frame from this clip as the starting image of the next scene.", es: "Elegir cualquier fotograma de este clip como imagen inicial de la siguiente escena." })}
                           onClick={() => setFramePickerState({ source: scene, target: next, targetIndex: i + 2 })}
                         >
                           <Search className="h-3 w-3" />
-                          Frame wählen…
+                          {tx({ de: 'Frame wählen…', en: 'Choose frame…', es: 'Elegir fotograma…' })}
                         </Button>
                       );
                     })()}
@@ -1617,7 +1615,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                               className="w-full h-16 object-cover"
                             />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                              <span className="text-[9px] text-white font-medium">Auswählen</span>
+                              <span className="text-[9px] text-white font-medium">{tx({ de: 'Auswählen', en: 'Select', es: 'Seleccionar' })}</span>
                             </div>
                             <div className="absolute bottom-0.5 right-0.5">
                               <Badge variant="secondary" className="text-[8px] px-1 py-0">

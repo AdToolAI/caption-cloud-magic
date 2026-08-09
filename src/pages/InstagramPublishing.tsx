@@ -12,6 +12,7 @@ import { Loader2, Copy, CheckCircle2, Instagram, AlertCircle, RefreshCw, Shield,
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { tx } from "@/lib/i18nText";
 
 // Required Instagram API scopes
 const requiredScopes = [
@@ -58,8 +59,8 @@ export default function InstagramPublishing() {
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast({
-      title: "Kopiert!",
-      description: `${label} wurde in die Zwischenablage kopiert.`,
+      title: tx({ de: 'Kopiert!', en: 'Copied!', es: '¡Copiado!' }),
+      description: tx({ de: `${label} wurde in die Zwischenablage kopiert.`, en: `${label} was copied to the clipboard.`, es: `${label} se copió al portapapeles.` }),
     });
   };
 
@@ -71,19 +72,19 @@ export default function InstagramPublishing() {
     try {
       if (!igUserId) {
         toast({
-          title: "Fehler",
-          description: "Bitte Instagram User ID eingeben.",
+          title: tx({ de: "Fehler", en: "Error", es: "Error" }),
+          description: tx({ de: "Bitte Instagram User ID eingeben.", en: "Please enter the Instagram User ID.", es: "Por favor, introduce el ID de usuario de Instagram." }),
           variant: "destructive",
         });
         return;
       }
 
       toast({
-        title: "Einstellungen OK",
-        description: "Instagram User ID ist konfiguriert. Bereit zum Testen.",
+        title: tx({ de: "Einstellungen OK", en: "Settings OK", es: "Configuración correcta" }),
+        description: tx({ de: "Instagram User ID ist konfiguriert. Bereit zum Testen.", en: "Instagram User ID is configured. Ready to test.", es: "El ID de usuario de Instagram está configurado. Listo para probar." }),
       });
     } catch (err: any) {
-      setError(err.message || "Validierung fehlgeschlagen");
+      setError(err.message || tx({ de: "Validierung fehlgeschlagen", en: "Validation failed", es: "Error de validación" }));
     } finally {
       setTesting(false);
     }
@@ -108,22 +109,22 @@ export default function InstagramPublishing() {
       
       if (data.ok) {
         toast({
-          title: "✅ Token gültig",
-          description: `Instagram Account: @${data.user?.username || 'unknown'}`,
+          title: tx({ de: "✅ Token gültig", en: "✅ Token valid", es: "✅ Token válido" }),
+          description: `${tx({ de: "Instagram Account", en: "Instagram account", es: "Cuenta de Instagram" })}: @${data.user?.username || 'unknown'}`,
         });
       } else {
         toast({
-          title: "❌ Token ungültig",
-          description: data.error || "Token-Validierung fehlgeschlagen",
+          title: tx({ de: "❌ Token ungültig", en: "❌ Token invalid", es: "❌ Token inválido" }),
+          description: data.error || tx({ de: "Token-Validierung fehlgeschlagen", en: "Token validation failed", es: "Error al validar el token" }),
           variant: "destructive",
         });
       }
     } catch (err: any) {
       console.error('Token diagnostics error:', err);
-      const errorMessage = err.message || 'Token-Diagnose fehlgeschlagen';
+      const errorMessage = err.message || tx({ de: 'Token-Diagnose fehlgeschlagen', en: 'Token diagnostics failed', es: 'Error en el diagnóstico del token' });
       setError(errorMessage);
       toast({
-        title: "Diagnose-Fehler",
+        title: tx({ de: "Diagnose-Fehler", en: "Diagnostics error", es: "Error de diagnóstico" }),
         description: errorMessage,
         variant: "destructive",
       });
@@ -168,10 +169,10 @@ export default function InstagramPublishing() {
       if (data.ok) {
         const warnings = data.recommendations?.length > 0;
         toast({
-          title: warnings ? "⚠️ Token hat Warnungen" : "✅ Token Status OK",
+          title: warnings ? tx({ de: "⚠️ Token hat Warnungen", en: "⚠️ Token has warnings", es: "⚠️ El token tiene advertencias" }) : tx({ de: "✅ Token Status OK", en: "✅ Token status OK", es: "✅ Estado del token correcto" }),
           description: warnings 
             ? data.recommendations.join(' • ') 
-            : "Alle Scopes vorhanden, Token ist gültig",
+            : tx({ de: "Alle Scopes vorhanden, Token ist gültig", en: "All scopes present, token is valid", es: "Todos los permisos están presentes, el token es válido" }),
           variant: warnings ? "default" : "default",
         });
         
@@ -179,17 +180,17 @@ export default function InstagramPublishing() {
         await loadBackups();
       } else {
         toast({
-          title: "❌ Scope-Check fehlgeschlagen",
-          description: data.error || "Konnte Token nicht überprüfen",
+          title: tx({ de: "❌ Scope-Check fehlgeschlagen", en: "❌ Scope check failed", es: "❌ Error al comprobar los permisos" }),
+          description: data.error || tx({ de: "Konnte Token nicht überprüfen", en: "Could not verify token", es: "No se pudo verificar el token" }),
           variant: "destructive",
         });
       }
     } catch (err: any) {
       console.error('Token debug error:', err);
-      const errorMessage = err.message || 'Scope-Check fehlgeschlagen';
+      const errorMessage = err.message || tx({ de: 'Scope-Check fehlgeschlagen', en: 'Scope check failed', es: 'Error al comprobar los permisos' });
       setError(errorMessage);
       toast({
-        title: "Debug-Fehler",
+        title: tx({ de: "Debug-Fehler", en: "Debug error", es: "Error de depuración" }),
         description: errorMessage,
         variant: "destructive",
       });
@@ -199,7 +200,7 @@ export default function InstagramPublishing() {
   };
 
   const handleRestoreBackup = async (backupId: number) => {
-    if (!confirm('Möchtest du diesen Token wirklich wiederherstellen?')) {
+    if (!confirm(tx({ de: 'Möchtest du diesen Token wirklich wiederherstellen?', en: 'Do you really want to restore this token?', es: '¿Realmente quieres restaurar este token?' }))) {
       return;
     }
 
@@ -212,18 +213,18 @@ export default function InstagramPublishing() {
 
       if (data?.ok) {
         toast({
-          title: "✅ Wiederhergestellt",
-          description: "Token wurde erfolgreich wiederhergestellt",
+          title: tx({ de: "✅ Wiederhergestellt", en: "✅ Restored", es: "✅ Restaurado" }),
+          description: tx({ de: "Token wurde erfolgreich wiederhergestellt", en: "Token was successfully restored", es: "El token se restauró correctamente" }),
         });
         await checkScopesAndExpiry();
       } else {
-        throw new Error(data?.error || 'Wiederherstellung fehlgeschlagen');
+        throw new Error(data?.error || tx({ de: 'Wiederherstellung fehlgeschlagen', en: 'Restore failed', es: 'Error al restaurar' }));
       }
     } catch (err: any) {
       console.error('Restore error:', err);
       toast({
-        title: "❌ Fehler",
-        description: err.message || 'Wiederherstellung fehlgeschlagen',
+        title: tx({ de: "❌ Fehler", en: "❌ Error", es: "❌ Error" }),
+        description: err.message || tx({ de: 'Wiederherstellung fehlgeschlagen', en: 'Restore failed', es: 'Error al restaurar' }),
         variant: "destructive",
       });
     }
@@ -232,8 +233,8 @@ export default function InstagramPublishing() {
   const renewToken = async () => {
     if (!shortUserToken.trim()) {
       toast({
-        title: "Fehler",
-        description: "Bitte gib einen Access Token ein",
+        title: tx({ de: "Fehler", en: "Error", es: "Error" }),
+        description: tx({ de: "Bitte gib einen Access Token ein", en: "Please enter an access token", es: "Por favor, introduce un token de acceso" }),
         variant: "destructive"
       });
       return;
@@ -252,10 +253,10 @@ export default function InstagramPublishing() {
 
       if (data?.ok && data?.saved) {
         setRenewResult(data);
-        const backupMsg = data.backup_created ? " Backup erstellt." : "";
+        const backupMsg = data.backup_created ? tx({ de: " Backup erstellt.", en: " Backup created.", es: " Copia de seguridad creada." }) : "";
         toast({
-          title: "Erfolg!",
-          description: `Token erfolgreich erneuert und gespeichert!${backupMsg}`,
+          title: tx({ de: "Erfolg!", en: "Success!", es: "¡Éxito!" }),
+          description: `${tx({ de: "Token erfolgreich erneuert und gespeichert!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`,
         });
         
         // Automatically refresh diagnostics after successful save
@@ -269,23 +270,23 @@ export default function InstagramPublishing() {
           setShortUserToken('');
         }, 2000);
       } else {
-        throw new Error(data?.error || 'Token-Erneuerung fehlgeschlagen');
+        throw new Error(data?.error || tx({ de: 'Token-Erneuerung fehlgeschlagen', en: 'Token renewal failed', es: 'Error al renovar el token' }));
       }
     } catch (err: any) {
       console.error('Token renewal error:', err);
       
       // Map common error codes
-      let errorMessage = err.message || 'Fehler bei Token-Erneuerung';
+      let errorMessage = err.message || tx({ de: 'Fehler bei Token-Erneuerung', en: 'Error renewing token', es: 'Error al renovar el token' });
       if (err.message?.includes('190')) {
-        errorMessage = 'Token ungültig/abgelaufen – bitte neu generieren';
+        errorMessage = tx({ de: 'Token ungültig/abgelaufen – bitte neu generieren', en: 'Token invalid/expired – please regenerate', es: 'Token inválido o caducado; genera uno nuevo' });
       } else if (err.message?.includes('100') || err.message?.includes('10')) {
-        errorMessage = 'Berechtigungen fehlen – beim Generieren alle Häkchen setzen + richtige Seite auswählen';
+        errorMessage = tx({ de: 'Berechtigungen fehlen – beim Generieren alle Häkchen setzen + richtige Seite auswählen', en: 'Missing permissions – check all boxes when generating and select the correct page', es: 'Faltan permisos: marca todas las casillas al generar y selecciona la página correcta' });
       } else if (err.message?.includes('Invalid platform')) {
-        errorMessage = 'App/Website-Domain/Business-Modus in Meta Developer Console prüfen';
+        errorMessage = tx({ de: 'App/Website-Domain/Business-Modus in Meta Developer Console prüfen', en: 'Check app/website domain/business mode in Meta Developer Console', es: 'Comprueba el dominio de la app/sitio web y el modo empresarial en Meta Developer Console' });
       }
       
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Error", es: "Error" }),
         description: errorMessage,
         variant: "destructive"
       });
@@ -315,28 +316,28 @@ export default function InstagramPublishing() {
       }
 
       if (!data.ok) {
-        throw new Error(data.error || 'Unbekannter Fehler');
+        throw new Error(data.error || tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }));
       }
 
       setResult(data);
       
       if (dryRun) {
         toast({
-          title: "Dry-Run erfolgreich",
-          description: "Container wurde erstellt, aber nicht veröffentlicht.",
+          title: tx({ de: "Dry-Run erfolgreich", en: "Dry run successful", es: "Prueba en seco exitosa" }),
+          description: tx({ de: "Container wurde erstellt, aber nicht veröffentlicht.", en: "Container was created but not published.", es: "El contenedor se creó pero no se publicó." }),
         });
       } else {
         toast({
-          title: "Erfolgreich veröffentlicht! 🎉",
-          description: "Dein Post wurde auf Instagram veröffentlicht.",
+          title: tx({ de: "Erfolgreich veröffentlicht! 🎉", en: "Successfully published! 🎉", es: "¡Publicado con éxito! 🎉" }),
+          description: tx({ de: "Dein Post wurde auf Instagram veröffentlicht.", en: "Your post was published on Instagram.", es: "Tu publicación se publicó en Instagram." }),
         });
       }
     } catch (err: any) {
       console.error('Instagram publish error:', err);
-      const errorMessage = err.message || 'Fehler beim Veröffentlichen';
+      const errorMessage = err.message || tx({ de: 'Fehler beim Veröffentlichen', en: 'Error while publishing', es: 'Error al publicar' });
       setError(errorMessage);
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Error", es: "Error" }),
         description: errorMessage,
         variant: "destructive",
       });
@@ -357,9 +358,9 @@ export default function InstagramPublishing() {
           {/* Settings Card */}
           <Card>
             <CardHeader>
-              <CardTitle>Einstellungen</CardTitle>
+              <CardTitle>{tx({ de: "Einstellungen", en: "Settings", es: "Ajustes" })}</CardTitle>
               <CardDescription>
-                Konfiguriere deine Instagram API-Einstellungen
+                {tx({ de: "Konfiguriere deine Instagram API-Einstellungen", en: "Configure your Instagram API settings", es: "Configura los ajustes de la API de Instagram" })}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -372,12 +373,12 @@ export default function InstagramPublishing() {
                   placeholder="17841477402452109"
                 />
                 <p className="text-sm text-muted-foreground">
-                  Deine Instagram Business Account ID
+                  {tx({ de: "Deine Instagram Business Account ID", en: "Your Instagram Business Account ID", es: "El ID de tu cuenta profesional de Instagram" })}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="testImage">Test-Bild URL</Label>
+                <Label htmlFor="testImage">{tx({ de: "Test-Bild URL", en: "Test image URL", es: "URL de imagen de prueba" })}</Label>
                 <Input
                   id="testImage"
                   value={testImageUrl}
@@ -385,12 +386,12 @@ export default function InstagramPublishing() {
                   placeholder="https://example.com/image.jpg"
                 />
                 <p className="text-sm text-muted-foreground">
-                  Öffentlich zugängliche Bild-URL für Test-Posts
+                  {tx({ de: "Öffentlich zugängliche Bild-URL für Test-Posts", en: "Publicly accessible image URL for test posts", es: "URL de imagen accesible públicamente para publicaciones de prueba" })}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="caption">Standard-Caption</Label>
+                <Label htmlFor="caption">{tx({ de: "Standard-Caption", en: "Default caption", es: "Descripción predeterminada" })}</Label>
                 <Textarea
                   id="caption"
                   value={defaultCaption}
@@ -402,9 +403,9 @@ export default function InstagramPublishing() {
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="dryRun">Dry-Run Modus</Label>
+                  <Label htmlFor="dryRun">{tx({ de: "Dry-Run Modus", en: "Dry run mode", es: "Modo de prueba en seco" })}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Nur Container anlegen, nicht veröffentlichen
+                    {tx({ de: "Nur Container anlegen, nicht veröffentlichen", en: "Only create the container, do not publish", es: "Solo crear el contenedor, sin publicar" })}
                   </p>
                 </div>
                 <Switch
@@ -423,7 +424,7 @@ export default function InstagramPublishing() {
                   >
                     {diagnosticsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Token diagnostizieren
+                    {tx({ de: "Token diagnostizieren", en: "Diagnose token", es: "Diagnosticar token" })}
                   </Button>
                   
                   <Button 
@@ -433,7 +434,7 @@ export default function InstagramPublishing() {
                   >
                     {debugLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     <Shield className="mr-2 h-4 w-4" />
-                    Scopes & Ablauf prüfen
+                    {tx({ de: "Scopes & Ablauf prüfen", en: "Check scopes & expiry", es: "Comprobar permisos y caducidad" })}
                   </Button>
 
                   <Button 
@@ -441,7 +442,7 @@ export default function InstagramPublishing() {
                     variant="outline"
                   >
                     <RefreshCw className="mr-2 h-4 w-4" />
-                    Token erneuern
+                    {tx({ de: "Token erneuern", en: "Renew token", es: "Renovar token" })}
                   </Button>
                 </div>
                 
@@ -451,7 +452,7 @@ export default function InstagramPublishing() {
                   className="w-full"
                 >
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Test-Post jetzt veröffentlichen
+                  {tx({ de: "Test-Post jetzt veröffentlichen", en: "Publish test post now", es: "Publicar publicación de prueba ahora" })}
                 </Button>
               </div>
             </CardContent>
@@ -467,7 +468,7 @@ export default function InstagramPublishing() {
                   ) : (
                     <AlertCircle className="w-5 h-5 text-destructive" />
                   )}
-                  Token-Diagnose
+                  {tx({ de: "Token-Diagnose", en: "Token diagnostics", es: "Diagnóstico de token" })}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -475,13 +476,13 @@ export default function InstagramPublishing() {
                   <>
                     <div className="p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
                       <p className="text-sm font-medium text-green-900 dark:text-green-100">
-                        ✅ Token ist gültig und korrekt verknüpft
+                        {tx({ de: "✅ Token ist gültig und korrekt verknüpft", en: "✅ Token is valid and correctly linked", es: "✅ El token es válido y está correctamente vinculado" })}
                       </p>
                     </div>
                     {tokenDiagnostics.user?.username && (
                       <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                         <div>
-                          <p className="text-sm font-medium">Instagram Username</p>
+                          <p className="text-sm font-medium">{tx({ de: "Instagram Username", en: "Instagram username", es: "Nombre de usuario de Instagram" })}</p>
                           <p className="text-sm text-muted-foreground">
                             @{tokenDiagnostics.user.username}
                           </p>
@@ -491,7 +492,7 @@ export default function InstagramPublishing() {
                     {tokenDiagnostics.user?.id && (
                       <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                         <div>
-                          <p className="text-sm font-medium">Instagram User ID</p>
+                          <p className="text-sm font-medium">{tx({ de: "Instagram User ID", en: "Instagram user ID", es: "ID de usuario de Instagram" })}</p>
                           <p className="text-sm text-muted-foreground font-mono">
                             {tokenDiagnostics.user.id}
                           </p>
@@ -500,7 +501,7 @@ export default function InstagramPublishing() {
                     )}
                     {tokenDiagnostics.link && (
                       <div className="p-3 bg-muted rounded-lg">
-                        <p className="text-sm font-medium mb-1">Verknüpfung</p>
+                        <p className="text-sm font-medium mb-1">{tx({ de: "Verknüpfung", en: "Link", es: "Vinculación" })}</p>
                         <p className="text-xs text-muted-foreground">
                           Page: {tokenDiagnostics.link.page_id}
                         </p>
@@ -517,16 +518,16 @@ export default function InstagramPublishing() {
                     <Alert variant="destructive">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
-                        {tokenDiagnostics.error || 'Token-Validierung fehlgeschlagen'}
+                        {tokenDiagnostics.error || tx({ de: 'Token-Validierung fehlgeschlagen', en: 'Token validation failed', es: 'Error al validar el token' })}
                       </AlertDescription>
                     </Alert>
                     {tokenDiagnostics.details && (
                       <div className="p-3 bg-muted rounded-lg">
-                        <p className="text-sm font-medium mb-2">Fehlerdetails:</p>
+                        <p className="text-sm font-medium mb-2">{tx({ de: "Fehlerdetails:", en: "Error details:", es: "Detalles del error:" })}</p>
                         {tokenDiagnostics.details.code && (
                           <p className="text-xs text-muted-foreground mb-1">
                             <strong>Code:</strong> {tokenDiagnostics.details.code}
-                            {tokenDiagnostics.details.subcode && ` (Subcode: ${tokenDiagnostics.details.subcode})`}
+                            {tokenDiagnostics.details.subcode && ` (${tx({ de: "Subcode", en: "Subcode", es: "Subcódigo" })}: ${tokenDiagnostics.details.subcode})`}
                           </p>
                         )}
                         {tokenDiagnostics.details.type && (
@@ -541,14 +542,14 @@ export default function InstagramPublishing() {
                     )}
                     <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
                       <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
-                        💡 Häufige Probleme:
+                        {tx({ de: "💡 Häufige Probleme:", en: "💡 Common issues:", es: "💡 Problemas comunes:" })}
                       </p>
                       <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
-                        <li>Token ist ein User Token statt Page Token</li>
-                        <li>Token ist abgelaufen (Short-lived statt Long-lived)</li>
-                        <li>Fehlende Permissions: instagram_basic, instagram_content_publish</li>
-                        <li>Instagram Account ist kein Business Account</li>
-                        <li>Facebook Page nicht mit Instagram verknüpft</li>
+                        <li>{tx({ de: "Token ist ein User Token statt Page Token", en: "Token is a user token instead of a page token", es: "El token es un token de usuario en lugar de un token de página" })}</li>
+                        <li>{tx({ de: "Token ist abgelaufen (Short-lived statt Long-lived)", en: "Token has expired (short-lived instead of long-lived)", es: "El token ha caducado (de corta duración en lugar de larga duración)" })}</li>
+                        <li>{tx({ de: "Fehlende Permissions: instagram_basic, instagram_content_publish", en: "Missing permissions: instagram_basic, instagram_content_publish", es: "Faltan permisos: instagram_basic, instagram_content_publish" })}</li>
+                        <li>{tx({ de: "Instagram Account ist kein Business Account", en: "Instagram account is not a business account", es: "La cuenta de Instagram no es una cuenta profesional" })}</li>
+                        <li>{tx({ de: "Facebook Page nicht mit Instagram verknüpft", en: "Facebook page not linked to Instagram", es: "La página de Facebook no está vinculada a Instagram" })}</li>
                       </ul>
                     </div>
                   </>
@@ -573,19 +574,19 @@ export default function InstagramPublishing() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-green-500" />
-                  {result.dryRun ? 'Dry-Run Erfolgreich' : 'Erfolgreich Veröffentlicht'}
+                  {result.dryRun ? tx({ de: 'Dry-Run Erfolgreich', en: 'Dry Run Successful', es: 'Prueba en Seco Exitosa' }) : tx({ de: 'Erfolgreich Veröffentlicht', en: 'Successfully Published', es: 'Publicado con Éxito' })}
                 </CardTitle>
                 <CardDescription>
                   {result.dryRun 
-                    ? 'Container wurde erstellt, aber nicht veröffentlicht'
-                    : 'Dein Post ist jetzt auf Instagram live'}
+                    ? tx({ de: 'Container wurde erstellt, aber nicht veröffentlicht', en: 'Container was created but not published', es: 'El contenedor se creó pero no se publicó' })
+                    : tx({ de: 'Dein Post ist jetzt auf Instagram live', en: 'Your post is now live on Instagram', es: 'Tu publicación ya está en vivo en Instagram' })}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {result.creationId && (
                   <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div>
-                      <p className="text-sm font-medium">Creation ID</p>
+                      <p className="text-sm font-medium">{tx({ de: "Creation ID", en: "Creation ID", es: "ID de creación" })}</p>
                       <p className="text-sm text-muted-foreground font-mono">
                         {result.creationId}
                       </p>
@@ -593,7 +594,7 @@ export default function InstagramPublishing() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => copyToClipboard(result.creationId, 'Creation ID')}
+                      onClick={() => copyToClipboard(result.creationId, tx({ de: 'Creation ID', en: 'Creation ID', es: 'ID de creación' }))}
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
@@ -603,7 +604,7 @@ export default function InstagramPublishing() {
                 {result.postId && (
                   <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div>
-                      <p className="text-sm font-medium">Post ID</p>
+                      <p className="text-sm font-medium">{tx({ de: "Post ID", en: "Post ID", es: "ID de publicación" })}</p>
                       <p className="text-sm text-muted-foreground font-mono">
                         {result.postId}
                       </p>
@@ -611,7 +612,7 @@ export default function InstagramPublishing() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => copyToClipboard(result.postId, 'Post ID')}
+                      onClick={() => copyToClipboard(result.postId, tx({ de: 'Post ID', en: 'Post ID', es: 'ID de publicación' }))}
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
@@ -621,7 +622,7 @@ export default function InstagramPublishing() {
                 {result.permalink && (
                   <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">Permalink</p>
+                      <p className="text-sm font-medium">{tx({ de: "Permalink", en: "Permalink", es: "Enlace permanente" })}</p>
                       <a 
                         href={result.permalink}
                         target="_blank"
@@ -634,7 +635,7 @@ export default function InstagramPublishing() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => copyToClipboard(result.permalink, 'Permalink')}
+                      onClick={() => copyToClipboard(result.permalink, tx({ de: 'Permalink', en: 'Permalink', es: 'Enlace permanente' }))}
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
@@ -643,7 +644,7 @@ export default function InstagramPublishing() {
 
                 {result.timestamp && (
                   <div className="p-3 bg-muted rounded-lg">
-                    <p className="text-sm font-medium">Veröffentlicht</p>
+                    <p className="text-sm font-medium">{tx({ de: "Veröffentlicht", en: "Published", es: "Publicado" })}</p>
                     <p className="text-sm text-muted-foreground">
                       {new Date(result.timestamp).toLocaleString('de-DE')}
                     </p>
@@ -659,7 +660,7 @@ export default function InstagramPublishing() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Shield className="w-5 h-5 text-primary" />
-                  Token Status & Scopes
+                  {tx({ de: "Token Status & Scopes", en: "Token Status & Scopes", es: "Estado del token y permisos" })}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -668,9 +669,9 @@ export default function InstagramPublishing() {
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                       <div>
-                        <p className="text-sm font-medium">Gültigkeit</p>
+                        <p className="text-sm font-medium">{tx({ de: "Gültigkeit", en: "Validity", es: "Validez" })}</p>
                         <p className="text-sm text-muted-foreground">
-                          {debugResult.token.is_valid ? "✅ Gültig" : "❌ Ungültig"}
+                          {debugResult.token.is_valid ? tx({ de: "✅ Gültig", en: "✅ Valid", es: "✅ Válido" }) : tx({ de: "❌ Ungültig", en: "❌ Invalid", es: "❌ Inválido" })}
                         </p>
                       </div>
                       {debugResult.token.is_valid && (
@@ -687,7 +688,7 @@ export default function InstagramPublishing() {
                         <div>
                           <p className="text-sm font-medium flex items-center gap-2">
                             <Clock className="w-4 h-4" />
-                            Läuft ab
+                            {tx({ de: "Läuft ab", en: "Expires", es: "Caduca" })}
                           </p>
                           <p className="text-sm text-muted-foreground">
                             {new Date(debugResult.token.expires_at * 1000).toLocaleDateString('de-DE', {
@@ -700,12 +701,12 @@ export default function InstagramPublishing() {
                           </p>
                           {debugResult.token.days_until_expiration !== null && (
                             <p className="text-xs text-muted-foreground mt-1">
-                              In {debugResult.token.days_until_expiration} Tagen
+                              {tx({ de: "In", en: "In", es: "En" })} {debugResult.token.days_until_expiration} {tx({ de: "Tagen", en: "days", es: "días" })}
                             </p>
                           )}
                         </div>
                         {debugResult.token.expiration_warning && (
-                          <Badge variant="destructive">Warnung</Badge>
+                          <Badge variant="destructive">{tx({ de: "Warnung", en: "Warning", es: "Advertencia" })}</Badge>
                         )}
                       </div>
                     )}
@@ -714,7 +715,7 @@ export default function InstagramPublishing() {
 
                 {/* Scopes */}
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">Berechtigungen (Scopes)</p>
+                  <p className="text-sm font-medium">{tx({ de: "Berechtigungen (Scopes)", en: "Permissions (Scopes)", es: "Permisos (Scopes)" })}</p>
                   <div className="grid grid-cols-2 gap-2">
                     {['instagram_basic', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'pages_manage_metadata'].map(scope => {
                       const hasScope = debugResult.token.scopes?.includes(scope);
@@ -738,7 +739,7 @@ export default function InstagramPublishing() {
                     <Alert variant="destructive" className="mt-2">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
-                        <strong>Fehlende Scopes:</strong> {debugResult.token.missing_scopes.join(', ')}
+                        <strong>{tx({ de: "Fehlende Scopes:", en: "Missing scopes:", es: "Permisos faltantes:" })}</strong> {debugResult.token.missing_scopes.join(', ')}
                       </AlertDescription>
                     </Alert>
                   )}
@@ -767,20 +768,20 @@ export default function InstagramPublishing() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <History className="h-5 w-5" />
-                  Token-Backups
+                  {tx({ de: "Token-Backups", en: "Token backups", es: "Copias de seguridad de tokens" })}
                 </CardTitle>
                 <CardDescription>
-                  Vorherige Token-Versionen zur Wiederherstellung
+                  {tx({ de: "Vorherige Token-Versionen zur Wiederherstellung", en: "Previous token versions for restoring", es: "Versiones anteriores del token para restaurar" })}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {backupsLoading ? (
                   <div className="text-center text-muted-foreground py-4">
-                    Lade Backups...
+                    {tx({ de: "Lade Backups...", en: "Loading backups...", es: "Cargando copias de seguridad..." })}
                   </div>
                 ) : backups.length === 0 ? (
                   <div className="text-center text-muted-foreground py-4">
-                    Keine Backups vorhanden
+                    {tx({ de: "Keine Backups vorhanden", en: "No backups available", es: "No hay copias de seguridad disponibles" })}
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -800,13 +801,13 @@ export default function InstagramPublishing() {
                           </div>
                           {backup.expires_at && (
                             <div className="text-xs text-muted-foreground">
-                              Ablauf:{" "}
+                              {tx({ de: "Ablauf:", en: "Expires:", es: "Caduca:" })}{" "}
                               {new Date(backup.expires_at).toLocaleString("de-DE")}
                             </div>
                           )}
                           {backup.scopes && (
                             <div className="text-xs text-muted-foreground">
-                              {backup.scopes.length} Scopes
+                              {backup.scopes.length} {tx({ de: "Scopes", en: "scopes", es: "permisos" })}
                             </div>
                           )}
                         </div>
@@ -815,7 +816,7 @@ export default function InstagramPublishing() {
                           variant="outline"
                           onClick={() => handleRestoreBackup(backup.id)}
                         >
-                          Wiederherstellen
+                          {tx({ de: "Wiederherstellen", en: "Restore", es: "Restaurar" })}
                         </Button>
                       </div>
                     ))}
@@ -828,11 +829,11 @@ export default function InstagramPublishing() {
           {/* Info Card */}
           <Card>
             <CardHeader>
-              <CardTitle>Scopes & Berechtigungen</CardTitle>
+              <CardTitle>{tx({ de: "Scopes & Berechtigungen", en: "Scopes & Permissions", es: "Permisos y Scopes" })}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <p className="text-sm">
-                Stelle sicher, dass dein Facebook-App folgende Scopes hat:
+                {tx({ de: "Stelle sicher, dass dein Facebook-App folgende Scopes hat:", en: "Make sure your Facebook app has the following scopes:", es: "Asegúrate de que tu app de Facebook tenga los siguientes permisos:" })}
               </p>
               <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
                 <li>instagram_basic</li>
@@ -844,7 +845,7 @@ export default function InstagramPublishing() {
               </ul>
               <Alert className="mt-4">
                 <AlertDescription>
-                  <strong>Wichtig:</strong> Der PAGE_ACCESS_TOKEN wird serverseitig gespeichert und nie im Client ausgeliefert.
+                  <strong>{tx({ de: "Wichtig:", en: "Important:", es: "Importante:" })}</strong> {tx({ de: "Der PAGE_ACCESS_TOKEN wird serverseitig gespeichert und nie im Client ausgeliefert.", en: "The PAGE_ACCESS_TOKEN is stored server-side and is never delivered to the client.", es: "El PAGE_ACCESS_TOKEN se almacena en el servidor y nunca se entrega al cliente." })}
                 </AlertDescription>
               </Alert>
             </CardContent>
@@ -858,10 +859,10 @@ export default function InstagramPublishing() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <RefreshCw className="w-5 h-5" />
-              Instagram Token erneuern
+              {tx({ de: "Instagram Token erneuern", en: "Renew Instagram token", es: "Renovar token de Instagram" })}
             </DialogTitle>
             <DialogDescription>
-              Um deinen Token zu erneuern, brauchst du einen neuen <strong>User Access Token</strong> aus dem Meta Graph API Explorer.
+              {tx({ de: "Um deinen Token zu erneuern, brauchst du einen neuen", en: "To renew your token, you need a new", es: "Para renovar tu token, necesitas un nuevo" })} <strong>User Access Token</strong> {tx({ de: "aus dem Meta Graph API Explorer.", en: "from the Meta Graph API Explorer.", es: "del Meta Graph API Explorer." })}
             </DialogDescription>
           </DialogHeader>
 
@@ -869,7 +870,7 @@ export default function InstagramPublishing() {
             {/* Token Type Selection */}
             <Card className="border-2">
               <CardHeader>
-                <CardTitle className="text-base">1️⃣ Welchen Token-Typ hast du?</CardTitle>
+                <CardTitle className="text-base">1️⃣ {tx({ de: "Welchen Token-Typ hast du?", en: "Which token type do you have?", es: "¿Qué tipo de token tienes?" })}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
@@ -891,12 +892,12 @@ export default function InstagramPublishing() {
                       </div>
                       <div className="flex-1">
                         <div className="font-semibold text-base mb-1">
-                          ✅ Page Token (Empfohlen)
+                          ✅ {tx({ de: "Page Token (Empfohlen)", en: "Page Token (Recommended)", es: "Token de página (Recomendado)" })}
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          Ich habe bereits einen Page Access Token aus dem Graph API Explorer
+                          {tx({ de: "Ich habe bereits einen Page Access Token aus dem Graph API Explorer", en: "I already have a Page Access Token from the Graph API Explorer", es: "Ya tengo un token de acceso de página del Graph API Explorer" })}
                         </p>
-                        <Badge variant="secondary" className="mt-2">Einfacher & schneller</Badge>
+                        <Badge variant="secondary" className="mt-2">{tx({ de: "Einfacher & schneller", en: "Simpler & faster", es: "Más simple y rápido" })}</Badge>
                       </div>
                     </div>
                   </button>
@@ -919,12 +920,12 @@ export default function InstagramPublishing() {
                       </div>
                       <div className="flex-1">
                         <div className="font-semibold text-base mb-1">
-                          User Token (Erweitert)
+                          {tx({ de: "User Token (Erweitert)", en: "User Token (Advanced)", es: "Token de usuario (Avanzado)" })}
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          Ich habe einen User Access Token und möchte ihn in einen Page Token umwandeln
+                          {tx({ de: "Ich habe einen User Access Token und möchte ihn in einen Page Token umwandeln", en: "I have a User Access Token and want to convert it into a Page Token", es: "Tengo un token de acceso de usuario y quiero convertirlo en un token de página" })}
                         </p>
-                        <Badge variant="outline" className="mt-2">Mehr Schritte erforderlich</Badge>
+                        <Badge variant="outline" className="mt-2">{tx({ de: "Mehr Schritte erforderlich", en: "More steps required", es: "Se requieren más pasos" })}</Badge>
                       </div>
                     </div>
                   </button>
@@ -936,7 +937,7 @@ export default function InstagramPublishing() {
             {tokenTypeChoice === "page" && (
               <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
                 <CardHeader>
-                  <CardTitle className="text-base">📋 So bekommst du deinen Page Token:</CardTitle>
+                  <CardTitle className="text-base">📋 {tx({ de: "So bekommst du deinen Page Token:", en: "How to get your Page Token:", es: "Cómo obtener tu token de página:" })}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ol className="space-y-3 text-sm">
@@ -998,7 +999,7 @@ export default function InstagramPublishing() {
             {tokenTypeChoice === "user" && (
               <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
                 <CardHeader>
-                  <CardTitle className="text-base">📋 So bekommst du deinen User Token:</CardTitle>
+                  <CardTitle className="text-base">📋 {tx({ de: "So bekommst du deinen User Token:", en: "How to get your User Token:", es: "Cómo obtener tu token de usuario:" })}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ol className="space-y-3 text-sm">

@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { Facebook, Instagram, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { tx } from "@/lib/i18nText";
 
 interface FacebookPage {
   id: string;
@@ -84,10 +85,10 @@ export const FacebookPageSelectDialog = ({
     } catch (error: any) {
       console.error(`Failed to fetch ${mode} pages:`, error);
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Error", es: "Error" }),
         description: isInstagram
-          ? "Instagram-fähige Facebook-Seiten konnten nicht geladen werden."
-          : "Facebook-Seiten konnten nicht geladen werden.",
+          ? tx({ de: "Instagram-fähige Facebook-Seiten konnten nicht geladen werden.", en: "Instagram-enabled Facebook pages could not be loaded.", es: "No se pudieron cargar las páginas de Facebook habilitadas para Instagram." })
+          : tx({ de: "Facebook-Seiten konnten nicht geladen werden.", en: "Facebook pages could not be loaded.", es: "No se pudieron cargar las páginas de Facebook." }),
         variant: "destructive",
       });
     } finally {
@@ -98,8 +99,8 @@ export const FacebookPageSelectDialog = ({
   const handleSelectPage = async (page: FacebookPage) => {
     if (isInstagram && !page.has_instagram) {
       toast({
-        title: "Kein Instagram verknüpft",
-        description: `"${page.name}" hat kein verknüpftes Instagram Business-Konto.`,
+        title: tx({ de: "Kein Instagram verknüpft", en: "No Instagram linked", es: "Instagram no vinculado" }),
+        description: tx({ de: `"${page.name}" hat kein verknüpftes Instagram Business-Konto.`, en: `"${page.name}" has no linked Instagram business account.`, es: `"${page.name}" no tiene una cuenta empresarial de Instagram vinculada.` }),
         variant: "destructive",
       });
       return;
@@ -129,10 +130,10 @@ export const FacebookPageSelectDialog = ({
       if (error) throw error;
 
       toast({
-        title: isInstagram ? "Instagram verbunden" : "Seite ausgewählt",
+        title: isInstagram ? tx({ de: "Instagram verbunden", en: "Instagram connected", es: "Instagram conectado" }) : tx({ de: "Seite ausgewählt", en: "Page selected", es: "Página seleccionada" }),
         description: isInstagram
-          ? `Instagram-Konto von "${page.name}" wurde verbunden.`
-          : `"${page.name}" wurde als Facebook-Seite verbunden.`,
+          ? tx({ de: `Instagram-Konto von "${page.name}" wurde verbunden.`, en: `Instagram account of "${page.name}" was connected.`, es: `Se conectó la cuenta de Instagram de "${page.name}".` })
+          : tx({ de: `"${page.name}" wurde als Facebook-Seite verbunden.`, en: `"${page.name}" was connected as Facebook page.`, es: `"${page.name}" se conectó como página de Facebook.` }),
       });
 
       onOpenChange(false);
@@ -140,8 +141,8 @@ export const FacebookPageSelectDialog = ({
     } catch (error: any) {
       console.error("Failed to select page:", error);
       toast({
-        title: "Fehler",
-        description: error?.message || "Auswahl konnte nicht gespeichert werden.",
+        title: tx({ de: "Fehler", en: "Error", es: "Error" }),
+        description: error?.message || tx({ de: "Auswahl konnte nicht gespeichert werden.", en: "Selection could not be saved.", es: "No se pudo guardar la selección." }),
         variant: "destructive",
       });
     } finally {
@@ -170,38 +171,38 @@ export const FacebookPageSelectDialog = ({
       (resultStatus === null && diagnostics?.pages_found_count === 0);
 
     if (resultStatus === 'no_pages_access' || (missingScopes.length > 0 && pages.length === 0)) {
-      title = 'Keine Seitenfreigabe erhalten';
+      title = tx({ de: 'Keine Seitenfreigabe erhalten', en: 'No page access granted', es: 'No se concedió acceso a páginas' });
       body =
-        'Meta hat keine Facebook-Seiten freigegeben. Verbinde erneut und aktiviere im Meta-Dialog ALLE Toggles (insbesondere „Zugriff auf Seiten" und „Instagram").' +
-        (missingScopes.length ? ` Fehlende Berechtigungen: ${missingScopes.join(', ')}.` : '');
+        tx({ de: 'Meta hat keine Facebook-Seiten freigegeben. Verbinde erneut und aktiviere im Meta-Dialog ALLE Toggles (insbesondere „Zugriff auf Seiten" und „Instagram").', en: 'Meta did not grant access to any Facebook pages. Reconnect and enable ALL toggles in the Meta dialog (especially "Page access" and "Instagram").', es: 'Meta no concedió acceso a ninguna página de Facebook. Vuelve a conectar y activa TODAS las opciones en el diálogo de Meta (especialmente "Acceso a páginas" e "Instagram").' }) +
+        (missingScopes.length ? ` ${tx({ de: 'Fehlende Berechtigungen', en: 'Missing permissions', es: 'Permisos faltantes' })}: ${missingScopes.join(', ')}.` : '');
     } else if (pagesHidden) {
-      title = 'Meta hat keine Seiten an die App übergeben';
+      title = tx({ de: 'Meta hat keine Seiten an die App übergeben', en: 'Meta did not pass any pages to the app', es: 'Meta no transfirió ninguna página a la app' });
       body =
-        'Deine Berechtigungen sind erteilt, aber Meta hat deinem Token keine Seiten-Assets zugeordnet (leere Ziel-IDs). Klicke auf „Erneut verbinden" — wir fordern jetzt zusätzlich die Portfolio-Berechtigung an und erzwingen den Asset-Dialog. Prüfe dabei:';
+        tx({ de: 'Deine Berechtigungen sind erteilt, aber Meta hat deinem Token keine Seiten-Assets zugeordnet (leere Ziel-IDs). Klicke auf „Erneut verbinden" — wir fordern jetzt zusätzlich die Portfolio-Berechtigung an und erzwingen den Asset-Dialog. Prüfe dabei:', en: 'Your permissions are granted, but Meta did not assign any page assets to your token (empty target IDs). Click "Reconnect" — we now also request the portfolio permission and force the asset dialog. Please check:', es: 'Tus permisos están concedidos, pero Meta no asignó ningún activo de página a tu token (IDs de destino vacíos). Haz clic en "Reconectar" — ahora también solicitamos el permiso de portafolio y forzamos el diálogo de activos. Comprueba lo siguiente:' });
       checklist = [
-        'Im Meta-Dialog auf „Alle bearbeiten" gehen und die Seite „AdTool AI" sowie das Instagram-Konto ausdrücklich anhaken.',
-        'Dein Instagram-Konto ist ein Business- oder Creator-Konto (nicht „Privat").',
-        'Das Instagram-Konto ist mit der Facebook-Seite verknüpft (Seite → Einstellungen → Verknüpfte Konten).',
-        'Liegt die Seite in einem Business-Portfolio, muss dein Account dort Vollzugriff auf die Seite haben (Business Suite → Einstellungen → Seiten → Personen).',
+        tx({ de: 'Im Meta-Dialog auf „Alle bearbeiten" gehen und die Seite „AdTool AI" sowie das Instagram-Konto ausdrücklich anhaken.', en: 'In the Meta dialog, go to "Edit all" and explicitly check the "AdTool AI" page and the Instagram account.', es: 'En el diálogo de Meta, ve a "Editar todo" y marca explícitamente la página "AdTool AI" y la cuenta de Instagram.' }),
+        tx({ de: 'Dein Instagram-Konto ist ein Business- oder Creator-Konto (nicht „Privat").', en: 'Your Instagram account is a business or creator account (not "Private").', es: 'Tu cuenta de Instagram es una cuenta empresarial o de creador (no "Privada").' }),
+        tx({ de: 'Das Instagram-Konto ist mit der Facebook-Seite verknüpft (Seite → Einstellungen → Verknüpfte Konten).', en: 'The Instagram account is linked to the Facebook page (Page → Settings → Linked accounts).', es: 'La cuenta de Instagram está vinculada a la página de Facebook (Página → Configuración → Cuentas vinculadas).' }),
+        tx({ de: 'Liegt die Seite in einem Business-Portfolio, muss dein Account dort Vollzugriff auf die Seite haben (Business Suite → Einstellungen → Seiten → Personen).', en: 'If the page is in a business portfolio, your account must have full access to the page there (Business Suite → Settings → Pages → People).', es: 'Si la página está en un portafolio empresarial, tu cuenta debe tener acceso total a la página allí (Business Suite → Configuración → Páginas → Personas).' }),
       ];
 
     } else if (resultStatus === 'pages_found_but_verification_failed') {
-      title = 'Seiten gefunden, aber Verifikation fehlgeschlagen';
+      title = tx({ de: 'Seiten gefunden, aber Verifikation fehlgeschlagen', en: 'Pages found, but verification failed', es: 'Páginas encontradas, pero la verificación falló' });
       body =
-        'Meta hat deine Seiten zwar geliefert, aber die einzelnen Detail-Prüfungen (Page Node) wurden abgelehnt. Bitte verbinde Instagram erneut, damit ein frisches Token ausgestellt wird.';
+        tx({ de: 'Meta hat deine Seiten zwar geliefert, aber die einzelnen Detail-Prüfungen (Page Node) wurden abgelehnt. Bitte verbinde Instagram erneut, damit ein frisches Token ausgestellt wird.', en: 'Meta returned your pages, but the individual detail checks (page node) were rejected. Please reconnect Instagram so a fresh token is issued.', es: 'Meta devolvió tus páginas, pero las comprobaciones de detalle individuales (nodo de página) fueron rechazadas. Vuelve a conectar Instagram para que se emita un token nuevo.' });
     } else if (resultStatus === 'pages_found_but_no_instagram_link') {
-      title = 'Kein verknüpftes Instagram-Profil bestätigt';
+      title = tx({ de: 'Kein verknüpftes Instagram-Profil bestätigt', en: 'No linked Instagram profile confirmed', es: 'No se confirmó ningún perfil de Instagram vinculado' });
       body =
-        'Wir haben deine Facebook-Seiten gefunden und einzeln bei Meta geprüft, aber für keine Seite ein verknüpftes Instagram Business-Konto bestätigt bekommen. Öffne deine Facebook-Seite → Einstellungen → Verknüpfte Konten und verbinde dort dein Instagram (Professional-Account). Danach „Instagram erneut verbinden".';
+        tx({ de: 'Wir haben deine Facebook-Seiten gefunden und einzeln bei Meta geprüft, aber für keine Seite ein verknüpftes Instagram Business-Konto bestätigt bekommen. Öffne deine Facebook-Seite → Einstellungen → Verknüpfte Konten und verbinde dort dein Instagram (Professional-Account). Danach „Instagram erneut verbinden".', en: 'We found your Facebook pages and checked them individually with Meta, but no page had a confirmed linked Instagram business account. Open your Facebook page → Settings → Linked accounts and connect your Instagram (professional account) there. Then click "Reconnect Instagram".', es: 'Encontramos tus páginas de Facebook y las verificamos individualmente con Meta, pero ninguna página tenía una cuenta empresarial de Instagram vinculada confirmada. Abre tu página de Facebook → Configuración → Cuentas vinculadas y conecta ahí tu Instagram (cuenta profesional). Luego haz clic en "Reconectar Instagram".' });
     } else {
-      title = isInstagram ? 'Keine Instagram-fähige Seite gefunden' : 'Keine Facebook-Seiten gefunden';
+      title = isInstagram ? tx({ de: 'Keine Instagram-fähige Seite gefunden', en: 'No Instagram-enabled page found', es: 'No se encontró ninguna página habilitada para Instagram' }) : tx({ de: 'Keine Facebook-Seiten gefunden', en: 'No Facebook pages found', es: 'No se encontraron páginas de Facebook' });
       body = isInstagram
-        ? 'Verknüpfe zuerst dein Instagram Business-Konto mit einer Facebook-Seite und versuche es erneut.'
-        : 'Stelle sicher, dass dein Facebook-Konto mindestens eine Seite verwaltet.';
+        ? tx({ de: 'Verknüpfe zuerst dein Instagram Business-Konto mit einer Facebook-Seite und versuche es erneut.', en: 'First link your Instagram business account to a Facebook page and try again.', es: 'Primero vincula tu cuenta empresarial de Instagram con una página de Facebook e inténtalo de nuevo.' })
+        : tx({ de: 'Stelle sicher, dass dein Facebook-Konto mindestens eine Seite verwaltet.', en: 'Make sure your Facebook account manages at least one page.', es: 'Asegúrate de que tu cuenta de Facebook administre al menos una página.' });
     }
 
     const diagSummary = diagnostics
-      ? `${diagnostics.pages_found_count ?? 0} Seiten von Meta · ${diagnostics.verified_instagram_count ?? 0} mit IG verifiziert · ${(diagnostics.page_verify_failures?.length ?? 0)} Verifikationsfehler`
+      ? `${diagnostics.pages_found_count ?? 0} ${tx({ de: 'Seiten von Meta', en: 'pages from Meta', es: 'páginas de Meta' })} · ${diagnostics.verified_instagram_count ?? 0} ${tx({ de: 'mit IG verifiziert', en: 'verified with IG', es: 'verificadas con IG' })} · ${(diagnostics.page_verify_failures?.length ?? 0)} ${tx({ de: 'Verifikationsfehler', en: 'verification errors', es: 'errores de verificación' })}`
       : null;
 
     return (
@@ -229,7 +230,7 @@ export const FacebookPageSelectDialog = ({
                 onReconnect?.();
               }}
             >
-              {isInstagram ? 'Instagram erneut verbinden (mit Business-Berechtigung)' : 'Facebook erneut verbinden'}
+              {isInstagram ? tx({ de: 'Instagram erneut verbinden (mit Business-Berechtigung)', en: 'Reconnect Instagram (with business permission)', es: 'Reconectar Instagram (con permiso empresarial)' }) : tx({ de: 'Facebook erneut verbinden', en: 'Reconnect Facebook', es: 'Reconectar Facebook' })}
             </Button>
             {isInstagram && pagesHidden && (
               <a
@@ -238,7 +239,7 @@ export const FacebookPageSelectDialog = ({
                 rel="noopener noreferrer"
                 className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
               >
-                Meta-Hilfe: Instagram mit Facebook-Seite verbinden
+                {tx({ de: 'Meta-Hilfe: Instagram mit Facebook-Seite verbinden', en: 'Meta help: Connect Instagram with Facebook page', es: 'Ayuda de Meta: Conectar Instagram con página de Facebook' })}
               </a>
             )}
           </div>
@@ -255,28 +256,26 @@ export const FacebookPageSelectDialog = ({
             <div className={`p-1.5 rounded-lg ${iconBg}`}>
               <Icon className="h-4 w-4 text-white" />
             </div>
-            {isInstagram ? "Instagram-Konto auswählen" : "Facebook-Seite auswählen"}
+            {isInstagram ? tx({ de: "Instagram-Konto auswählen", en: "Select Instagram account", es: "Seleccionar cuenta de Instagram" }) : tx({ de: "Facebook-Seite auswählen", en: "Select Facebook page", es: "Seleccionar página de Facebook" })}
           </DialogTitle>
           <DialogDescription>
             {isInstagram
-              ? "Wähle die Facebook-Seite, deren verknüpftes Instagram Business-Konto verbunden werden soll."
-              : "Wähle die Facebook-Seite, die du mit AdTool AI verbinden möchtest."}
+              ? tx({ de: "Wähle die Facebook-Seite, deren verknüpftes Instagram Business-Konto verbunden werden soll.", en: "Select the Facebook page whose linked Instagram business account should be connected.", es: "Selecciona la página de Facebook cuya cuenta empresarial de Instagram vinculada se conectará." })
+              : tx({ de: "Wähle die Facebook-Seite, die du mit AdTool AI verbinden möchtest.", en: "Select the Facebook page you want to connect with AdTool AI.", es: "Selecciona la página de Facebook que deseas conectar con AdTool AI." })}
           </DialogDescription>
           {isInstagram && (
             <div className="text-[11px] text-muted-foreground/80 mt-2 leading-relaxed space-y-1.5 rounded-md border border-border/60 bg-muted/30 p-2.5">
               <p className="font-semibold text-foreground/90">
-                Hinweis für Meta App Review (Screencast):
+                {tx({ de: "Hinweis für Meta App Review (Screencast):", en: "Note for Meta App Review (screencast):", es: "Nota para la revisión de la app de Meta (grabación de pantalla):" })}
               </p>
               <ol className="list-decimal list-outside ml-4 space-y-1">
-                <li>Aufnahme auf der <strong>veröffentlichten App-URL</strong> starten (nicht im Preview).</li>
-                <li>Vorher bei Facebook/Meta <strong>vollständig ausloggen</strong>.</li>
-                <li>Flow im <strong>Inkognito-/Privatfenster</strong> starten.</li>
-                <li>Connect → Berechtigungen → Page-Auswahl → erfolgreiche Verbindung → echte Instagram-Nutzung im selben Take aufnehmen.</li>
+                <li>{tx({ de: "Aufnahme auf der veröffentlichten App-URL starten (nicht im Preview).", en: "Start the recording on the published app URL (not in preview).", es: "Inicia la grabación en la URL publicada de la app (no en la vista previa)." })}</li>
+                <li>{tx({ de: "Vorher bei Facebook/Meta vollständig ausloggen.", en: "Fully log out of Facebook/Meta beforehand.", es: "Cierra sesión por completo en Facebook/Meta de antemano." })}</li>
+                <li>{tx({ de: "Flow im Inkognito-/Privatfenster starten.", en: "Start the flow in an incognito/private window.", es: "Inicia el flujo en una ventana de incógnito/privada." })}</li>
+                <li>{tx({ de: "Connect → Berechtigungen → Page-Auswahl → erfolgreiche Verbindung → echte Instagram-Nutzung im selben Take aufnehmen.", en: "Connect → Permissions → Page selection → successful connection → record real Instagram usage in the same take.", es: "Conectar → Permisos → Selección de página → conexión exitosa → grabar el uso real de Instagram en la misma toma." })}</li>
               </ol>
               <p className="text-muted-foreground/70">
-                Wenn Meta nur die Kurzversion zeigt, liegt das an einer
-                bestehenden Meta-Sitzung — nicht an der App. Eine frische
-                Session erzwingt den vollständigen Dialog zuverlässig.
+                {tx({ de: "Wenn Meta nur die Kurzversion zeigt, liegt das an einer bestehenden Meta-Sitzung — nicht an der App. Eine frische Session erzwingt den vollständigen Dialog zuverlässig.", en: "If Meta only shows the short version, this is due to an existing Meta session — not the app. A fresh session reliably forces the full dialog.", es: "Si Meta solo muestra la versión corta, se debe a una sesión de Meta existente, no a la app. Una sesión nueva fuerza de forma fiable el diálogo completo." })}
               </p>
             </div>
           )}
@@ -287,8 +286,8 @@ export const FacebookPageSelectDialog = ({
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
               {isInstagram
-                ? 'Verknüpfte Instagram-Konten werden bei Meta geprüft…'
-                : 'Seiten werden geladen…'}
+                ? tx({ de: 'Verknüpfte Instagram-Konten werden bei Meta geprüft…', en: 'Checking linked Instagram accounts with Meta…', es: 'Comprobando cuentas de Instagram vinculadas con Meta…' })
+                : tx({ de: 'Seiten werden geladen…', en: 'Loading pages…', es: 'Cargando páginas…' })}
             </p>
           </div>
         ) : pages.length === 0 ? (
@@ -320,11 +319,11 @@ export const FacebookPageSelectDialog = ({
                         page.has_instagram ? (
                           <Badge variant="secondary" className="text-[10px] px-1.5 py-0 gap-1">
                             <Instagram className="h-2.5 w-2.5" />
-                            IG verknüpft
+                            {tx({ de: "IG verknüpft", en: "IG linked", es: "IG vinculado" })}
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">
-                            kein IG
+                            {tx({ de: "kein IG", en: "no IG", es: "sin IG" })}
                           </Badge>
                         )
                       )}
@@ -343,7 +342,7 @@ export const FacebookPageSelectDialog = ({
 
         <div className="flex justify-end pt-2">
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-            Abbrechen
+            {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
           </Button>
         </div>
       </DialogContent>

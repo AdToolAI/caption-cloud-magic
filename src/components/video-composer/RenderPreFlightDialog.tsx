@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import type { ComposerScene } from '@/types/video-composer';
 import { NATIVE_DIALOGUE_CLIP_SOURCES } from '@/lib/video-composer/modelMapping';
+import { tx } from '@/lib/i18nText';
 
 
 /**
@@ -124,8 +125,8 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
         severity: 'warning',
         sceneIndex: idx,
         icon: <Link2Off className="h-3.5 w-3.5" />,
-        title: `Szene ${idx}: Continuity ohne Anker`,
-        detail: 'Continuity ist aktiv, aber kein Referenz-Frame gesetzt — Bruch wahrscheinlich.',
+        title: `${tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} ${idx}: ${tx({ de: 'Continuity ohne Anker', en: 'Continuity without anchor', es: 'Continuidad sin anclaje' })}`,
+        detail: tx({ de: 'Continuity ist aktiv, aber kein Referenz-Frame gesetzt — Bruch wahrscheinlich.', en: 'Continuity is active, but no reference frame is set — a break is likely.', es: 'La continuidad está activa, pero no hay un fotograma de referencia — es probable un salto visual.' }),
       });
     }
 
@@ -137,8 +138,8 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
         severity: 'warning',
         sceneIndex: idx,
         icon: <ImageIcon className="h-3.5 w-3.5" />,
-        title: `Szene ${idx}: Hoher Drift (${drift.toFixed(0)}/100)`,
-        detail: 'Drift-Ampel meldet visuellen Bruch zur Vorgänger-Szene.',
+        title: `${tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} ${idx}: ${tx({ de: 'Hoher Drift', en: 'High drift', es: 'Alta deriva' })} (${drift.toFixed(0)}/100)`,
+        detail: tx({ de: 'Drift-Ampel meldet visuellen Bruch zur Vorgänger-Szene.', en: 'Drift indicator reports a visual break from the previous scene.', es: 'El indicador de deriva señala un salto visual respecto a la escena anterior.' }),
       });
     }
 
@@ -154,8 +155,8 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
           severity: 'blocker',
           sceneIndex: idx,
           icon: <Users className="h-3.5 w-3.5" />,
-          title: `Szene ${idx}: Dialog-Modus ohne Cast`,
-          detail: 'Kein Sprecher zugewiesen — Lip-Sync kann nicht generiert werden.',
+          title: `${tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} ${idx}: ${tx({ de: 'Dialog-Modus ohne Cast', en: 'Dialogue mode without cast', es: 'Modo de diálogo sin reparto' })}`,
+          detail: tx({ de: 'Kein Sprecher zugewiesen — Lip-Sync kann nicht generiert werden.', en: 'No speaker assigned — lip-sync cannot be generated.', es: 'No hay ningún hablante asignado — no se puede generar la sincronización labial.' }),
         });
       }
 
@@ -166,8 +167,8 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
           severity: 'blocker',
           sceneIndex: idx,
           icon: <MessageSquare className="h-3.5 w-3.5" />,
-          title: `Szene ${idx}: Dialog-Modus ohne Skript`,
-          detail: 'Skript ist leer — kein Text zum Sprechen vorhanden.',
+          title: `${tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} ${idx}: ${tx({ de: 'Dialog-Modus ohne Skript', en: 'Dialogue mode without script', es: 'Modo de diálogo sin guion' })}`,
+          detail: tx({ de: 'Skript ist leer — kein Text zum Sprechen vorhanden.', en: 'Script is empty — there is no text to speak.', es: 'El guion está vacío — no hay texto para hablar.' }),
         });
       }
 
@@ -178,8 +179,8 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
           severity: 'warning',
           sceneIndex: idx,
           icon: <Mic className="h-3.5 w-3.5" />,
-          title: `Szene ${idx}: Modell nicht dialog-fähig`,
-          detail: `${s.clipSource} unterstützt keinen nativen Dialog — beim Start wird auf HappyHorse umgeschaltet.`,
+          title: `${tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} ${idx}: ${tx({ de: 'Modell nicht dialog-fähig', en: 'Model not dialogue-capable', es: 'Modelo no compatible con diálogo' })}`,
+          detail: `${s.clipSource} ${tx({ de: 'unterstützt keinen nativen Dialog — beim Start wird auf HappyHorse umgeschaltet.', en: 'does not support native dialogue — it will switch to HappyHorse at start.', es: 'no admite diálogo nativo — cambiará a HappyHorse al iniciar.' })}`,
         });
       }
 
@@ -201,8 +202,8 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
             severity: 'warning',
             sceneIndex: idx,
             icon: <Users className="h-3.5 w-3.5" />,
-            title: `Szene ${idx}: Sprecher fehlt im Cast`,
-            detail: `Skript hat ${uniqueNames.length} Sprecher, aber nur ${cast.length} im Cast — fehlende Person zuweisen.`,
+            title: `${tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} ${idx}: ${tx({ de: 'Sprecher fehlt im Cast', en: 'Speaker missing from cast', es: 'Falta un hablante en el reparto' })}`,
+            detail: `${tx({ de: 'Skript hat', en: 'Script has', es: 'El guion tiene' })} ${uniqueNames.length} ${tx({ de: 'Sprecher, aber nur', en: 'speakers, but only', es: 'hablantes, pero solo' })} ${cast.length} ${tx({ de: 'im Cast — fehlende Person zuweisen.', en: 'in the cast — assign the missing person.', es: 'en el reparto — asigna a la persona que falta.' })}`,
           });
         }
 
@@ -216,8 +217,8 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
             severity: 'warning',
             sceneIndex: idx,
             icon: <Clock className="h-3.5 w-3.5" />,
-            title: `Szene ${idx}: Skript zu lang für Plate`,
-            detail: `Skript ~${expectedVoSec}s, Szene nur ${dur}s — Sync.so schneidet ab. Szene verlängern oder Skript kürzen.`,
+            title: `${tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} ${idx}: ${tx({ de: 'Skript zu lang für Plate', en: 'Script too long for plate', es: 'Guion demasiado largo para la placa' })}`,
+            detail: `${tx({ de: 'Skript', en: 'Script', es: 'Guion' })} ~${expectedVoSec}s, ${tx({ de: 'Szene nur', en: 'scene only', es: 'escena solo' })} ${dur}s — ${tx({ de: 'Sync.so schneidet ab. Szene verlängern oder Skript kürzen.', en: 'Sync.so will cut it off. Extend the scene or shorten the script.', es: 'Sync.so lo cortará. Alarga la escena o acorta el guion.' })}`,
           });
         }
       }
@@ -229,8 +230,8 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
       id: 'all-good',
       severity: 'ok',
       icon: <CheckCircle2 className="h-3.5 w-3.5" />,
-      title: 'Alle Szenen render-bereit',
-      detail: 'Keine Blocker, keine Warnungen — du kannst sicher rendern.',
+      title: tx({ de: 'Alle Szenen render-bereit', en: 'All scenes ready to render', es: 'Todas las escenas listas para renderizar' }),
+      detail: tx({ de: 'Keine Blocker, keine Warnungen — du kannst sicher rendern.', en: 'No blockers, no warnings — you can render safely.', es: 'Sin bloqueos ni advertencias — puedes renderizar con seguridad.' }),
     });
   }
 
@@ -256,9 +257,9 @@ export default function RenderPreFlightDialog({
 
   const summary = canRender
     ? warnings.length === 0
-      ? 'Alles klar — Pipeline bereit.'
-      : `${warnings.length} Warnung${warnings.length === 1 ? '' : 'en'} — du kannst trotzdem starten.`
-    : `${blockers.length} Problem${blockers.length === 1 ? '' : 'e'} verhindern den Render.`;
+      ? tx({ de: 'Alles klar — Pipeline bereit.', en: 'All clear — pipeline ready.', es: 'Todo listo — pipeline preparada.' })
+      : `${warnings.length} ${tx({ de: `Warnung${warnings.length === 1 ? '' : 'en'}`, en: `warning${warnings.length === 1 ? '' : 's'}`, es: `advertencia${warnings.length === 1 ? '' : 's'}` })} — ${tx({ de: 'du kannst trotzdem starten.', en: 'you can still start.', es: 'aún puedes iniciar.' })}`
+    : `${blockers.length} ${tx({ de: `Problem${blockers.length === 1 ? '' : 'e'}`, en: `issue${blockers.length === 1 ? '' : 's'}`, es: `problema${blockers.length === 1 ? '' : 's'}` })} ${tx({ de: 'verhindern den Render.', en: 'prevent rendering.', es: 'impiden el renderizado.' })}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -266,7 +267,7 @@ export default function RenderPreFlightDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Rocket className="h-4 w-4 text-primary" />
-            Pre-Flight-Check
+            {tx({ de: 'Pre-Flight-Check', en: 'Pre-flight check', es: 'Revisión previa' })}
           </DialogTitle>
           <DialogDescription>{summary}</DialogDescription>
         </DialogHeader>
@@ -297,7 +298,7 @@ export default function RenderPreFlightDialog({
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Abbrechen
+            {tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })}
           </Button>
           <Button
             onClick={() => {
@@ -309,7 +310,7 @@ export default function RenderPreFlightDialog({
             className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
           >
             <Rocket className="h-3.5 w-3.5 mr-1.5" />
-            {warnings.length > 0 ? 'Trotzdem starten' : 'Render starten'}
+            {warnings.length > 0 ? tx({ de: 'Trotzdem starten', en: 'Start anyway', es: 'Iniciar de todos modos' }) : tx({ de: 'Render starten', en: 'Start render', es: 'Iniciar renderizado' })}
           </Button>
         </DialogFooter>
       </DialogContent>

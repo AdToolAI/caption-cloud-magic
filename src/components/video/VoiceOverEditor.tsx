@@ -7,6 +7,7 @@ import { Play, Volume2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { AdvancedVoiceSettings, VoiceSettings } from './AdvancedVoiceSettings';
+import { tx } from '@/lib/i18nText';
 
 interface VoiceOverEditorProps {
   voiceStyle: string;
@@ -44,8 +45,8 @@ export const VoiceOverEditor = ({
   const handlePreview = async () => {
     if (!scriptText.trim()) {
       toast({
-        title: "Kein Text vorhanden",
-        description: "Bitte gib zuerst einen Skript-Text ein.",
+        title: tx({ de: "Kein Text vorhanden", en: "No text available", es: "No hay texto disponible" }),
+        description: tx({ de: "Bitte gib zuerst einen Skript-Text ein.", en: "Please enter script text first.", es: "Por favor, introduce primero el texto del guion." }),
         variant: "destructive",
       });
       return;
@@ -70,9 +71,9 @@ export const VoiceOverEditor = ({
 
       if (error) {
         console.error('[VoicePreview] Error details:', error);
-        const errorMsg = (error as any)?.message || (error as any)?.error || 'Hörprobe konnte nicht generiert werden.';
+        const errorMsg = (error as any)?.message || (error as any)?.error || tx({ de: 'Hörprobe konnte nicht generiert werden.', en: 'Could not generate voice preview.', es: 'No se pudo generar la muestra de voz.' });
         toast({
-          title: "Fehler bei Voice-Preview",
+          title: tx({ de: "Fehler bei Voice-Preview", en: "Voice preview error", es: "Error en la vista previa de voz" }),
           description: errorMsg,
           variant: "destructive",
         });
@@ -82,7 +83,7 @@ export const VoiceOverEditor = ({
       console.log('[VoicePreview] Received audio content, size:', data?.audioContent?.length);
 
       if (!data?.audioContent || typeof data.audioContent !== 'string' || data.audioContent.length < 100) {
-        throw new Error('Ungültige Audio-Daten von Server erhalten');
+        throw new Error(tx({ de: 'Ungültige Audio-Daten von Server erhalten', en: 'Invalid audio data received from server', es: 'Datos de audio no válidos recibidos del servidor' }));
       }
 
       if (data?.audioContent) {
@@ -107,18 +108,18 @@ export const VoiceOverEditor = ({
         };
 
         toast({
-          title: "🎧 Preview abgespielt",
-          description: "Hörprobe der Stimme erfolgreich generiert.",
+          title: tx({ de: "🎧 Preview abgespielt", en: "🎧 Preview played", es: "🎧 Vista previa reproducida" }),
+          description: tx({ de: "Hörprobe der Stimme erfolgreich generiert.", en: "Voice preview generated successfully.", es: "Muestra de voz generada correctamente." }),
         });
       }
     } catch (error) {
       console.error('[VoicePreview] Full error:', error);
       const errorMessage = error instanceof Error 
         ? error.message 
-        : (error as any)?.error || (error as any)?.message || "Hörprobe konnte nicht generiert werden. Überprüfe die Browser-Konsole für Details.";
+        : (error as any)?.error || (error as any)?.message || tx({ de: "Hörprobe konnte nicht generiert werden. Überprüfe die Browser-Konsole für Details.", en: "Could not generate voice preview. Check the browser console for details.", es: "No se pudo generar la muestra de voz. Consulta la consola del navegador para más detalles." });
       
       toast({
-        title: "Fehler bei Voice-Preview",
+        title: tx({ de: "Fehler bei Voice-Preview", en: "Voice preview error", es: "Error en la vista previa de voz" }),
         description: errorMessage,
         variant: "destructive",
       });
@@ -197,13 +198,13 @@ export const VoiceOverEditor = ({
       />
 
       <div className="p-4 bg-muted rounded-lg space-y-2">
-        <p className="text-sm font-medium">💡 Tipps für die perfekte Stimme:</p>
+        <p className="text-sm font-medium">💡 {tx({ de: "Tipps für die perfekte Stimme:", en: "Tips for the perfect voice:", es: "Consejos para la voz perfecta:" })}</p>
         <ul className="text-xs text-muted-foreground space-y-1">
-          <li>• Nutze die Hörprobe um verschiedene Stimmen zu testen</li>
-          <li>• 1.0x ist die natürliche Sprechgeschwindigkeit</li>
-          <li>• Werbung: 1.2-1.5x für mehr Energie</li>
-          <li>• Erklärvideos: 0.9-1.0x für bessere Verständlichkeit</li>
-          <li>• Erweiterte Einstellungen für Fein-Tuning der Stimme</li>
+          <li>• {tx({ de: "Nutze die Hörprobe um verschiedene Stimmen zu testen", en: "Use the preview to test different voices", es: "Usa la vista previa para probar diferentes voces" })}</li>
+          <li>• {tx({ de: "1.0x ist die natürliche Sprechgeschwindigkeit", en: "1.0x is the natural speaking speed", es: "1.0x es la velocidad de habla natural" })}</li>
+          <li>• {tx({ de: "Werbung: 1.2-1.5x für mehr Energie", en: "Advertising: 1.2-1.5x for more energy", es: "Publicidad: 1.2-1.5x para más energía" })}</li>
+          <li>• {tx({ de: "Erklärvideos: 0.9-1.0x für bessere Verständlichkeit", en: "Explainer videos: 0.9-1.0x for better clarity", es: "Videos explicativos: 0.9-1.0x para mayor claridad" })}</li>
+          <li>• {tx({ de: "Erweiterte Einstellungen für Fein-Tuning der Stimme", en: "Advanced settings for fine-tuning the voice", es: "Configuración avanzada para ajustar la voz" })}</li>
         </ul>
       </div>
     </div>

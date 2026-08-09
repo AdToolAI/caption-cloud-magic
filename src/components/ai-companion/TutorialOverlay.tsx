@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronRight, ChevronLeft, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { tx } from '@/lib/i18nText';
 
 export interface TutorialStep {
   target: string; // CSS selector
@@ -21,33 +22,33 @@ export interface Tutorial {
 export const TUTORIALS: Record<string, Tutorial> = {
   'instagram-connect': {
     id: 'instagram-connect',
-    name: 'Instagram verbinden',
+    name: tx({ de: 'Instagram verbinden', en: 'Connect Instagram', es: 'Conectar Instagram' }),
     steps: [
       {
         target: '[data-tutorial="settings-nav"]',
-        title: 'Schritt 1: Einstellungen öffnen',
-        description: 'Klicke auf "Einstellungen" in der Seitenleiste',
+        title: tx({ de: 'Schritt 1: Einstellungen öffnen', en: 'Step 1: Open settings', es: 'Paso 1: Abrir configuración' }),
+        description: tx({ de: 'Klicke auf "Einstellungen" in der Seitenleiste', en: 'Click "Settings" in the sidebar', es: 'Haz clic en "Configuración" en la barra lateral' }),
         position: 'right',
         action: 'click'
       },
       {
         target: '[data-tutorial="social-media-tab"]',
-        title: 'Schritt 2: Social Media',
-        description: 'Wähle den Tab "Social Media" aus',
+        title: tx({ de: 'Schritt 2: Social Media', en: 'Step 2: Social media', es: 'Paso 2: Redes sociales' }),
+        description: tx({ de: 'Wähle den Tab "Social Media" aus', en: 'Select the "Social Media" tab', es: 'Selecciona la pestaña "Redes sociales"' }),
         position: 'bottom',
         action: 'click'
       },
       {
         target: '[data-tutorial="platform-instagram"]',
-        title: 'Schritt 3: Instagram verbinden',
-        description: 'Klicke auf "Verbinden" bei Instagram. Du wirst zu Meta weitergeleitet.',
+        title: tx({ de: 'Schritt 3: Instagram verbinden', en: 'Step 3: Connect Instagram', es: 'Paso 3: Conectar Instagram' }),
+        description: tx({ de: 'Klicke auf "Verbinden" bei Instagram. Du wirst zu Meta weitergeleitet.', en: 'Click "Connect" next to Instagram. You will be redirected to Meta.', es: 'Haz clic en "Conectar" junto a Instagram. Serás redirigido a Meta.' }),
         position: 'left',
         action: 'click'
       },
       {
         target: '[data-tutorial="instagram-connected"]',
-        title: 'Fertig! 🎉',
-        description: 'Instagram ist jetzt verbunden. Der Token ist 60 Tage gültig.',
+        title: tx({ de: 'Fertig! 🎉', en: 'Done! 🎉', es: '¡Listo! 🎉' }),
+        description: tx({ de: 'Instagram ist jetzt verbunden. Der Token ist 60 Tage gültig.', en: 'Instagram is now connected. The token is valid for 60 days.', es: 'Instagram ahora está conectado. El token es válido durante 60 días.' }),
         position: 'left',
         action: 'observe'
       }
@@ -55,19 +56,19 @@ export const TUTORIALS: Record<string, Tutorial> = {
   },
   'youtube-connect': {
     id: 'youtube-connect',
-    name: 'YouTube verbinden',
+    name: tx({ de: 'YouTube verbinden', en: 'Connect YouTube', es: 'Conectar YouTube' }),
     steps: [
       {
         target: '[data-tutorial="settings-nav"]',
-        title: 'Schritt 1: Einstellungen öffnen',
-        description: 'Klicke auf "Einstellungen" in der Seitenleiste',
+        title: tx({ de: 'Schritt 1: Einstellungen öffnen', en: 'Step 1: Open settings', es: 'Paso 1: Abrir configuración' }),
+        description: tx({ de: 'Klicke auf "Einstellungen" in der Seitenleiste', en: 'Click "Settings" in the sidebar', es: 'Haz clic en "Configuración" en la barra lateral' }),
         position: 'right',
         action: 'click'
       },
       {
         target: '[data-tutorial="platform-youtube"]',
-        title: 'Schritt 2: YouTube verbinden',
-        description: 'Klicke auf "Verbinden" bei YouTube und melde dich mit deinem Google-Account an.',
+        title: tx({ de: 'Schritt 2: YouTube verbinden', en: 'Step 2: Connect YouTube', es: 'Paso 2: Conectar YouTube' }),
+        description: tx({ de: 'Klicke auf "Verbinden" bei YouTube und melde dich mit deinem Google-Account an.', en: 'Click "Connect" next to YouTube and sign in with your Google account.', es: 'Haz clic en "Conectar" junto a YouTube e inicia sesión con tu cuenta de Google.' }),
         position: 'left',
         action: 'click'
       }
@@ -75,19 +76,19 @@ export const TUTORIALS: Record<string, Tutorial> = {
   },
   'first-post': {
     id: 'first-post',
-    name: 'Ersten Post erstellen',
+    name: tx({ de: 'Ersten Post erstellen', en: 'Create your first post', es: 'Crear tu primera publicación' }),
     steps: [
       {
         target: '[data-tutorial="calendar-nav"]',
-        title: 'Schritt 1: Kalender öffnen',
-        description: 'Öffne den Intelligent Calendar',
+        title: tx({ de: 'Schritt 1: Kalender öffnen', en: 'Step 1: Open calendar', es: 'Paso 1: Abrir calendario' }),
+        description: tx({ de: 'Öffne den Intelligent Calendar', en: 'Open the Intelligent Calendar', es: 'Abre el Calendario Inteligente' }),
         position: 'right',
         action: 'click'
       },
       {
         target: '[data-tutorial="calendar-add-post"]',
-        title: 'Schritt 2: Post erstellen',
-        description: 'Klicke auf einen Tag, um einen neuen Post zu erstellen',
+        title: tx({ de: 'Schritt 2: Post erstellen', en: 'Step 2: Create a post', es: 'Paso 2: Crear una publicación' }),
+        description: tx({ de: 'Klicke auf einen Tag, um einen neuen Post zu erstellen', en: 'Click a day to create a new post', es: 'Haz clic en un día para crear una nueva publicación' }),
         position: 'bottom',
         action: 'click'
       }
@@ -262,7 +263,7 @@ export function TutorialOverlay({ tutorialId, onClose, onComplete }: TutorialOve
                 {currentStep + 1}
               </div>
               <span className="text-sm text-muted-foreground">
-                von {tutorial.steps.length}
+                {tx({ de: 'von', en: 'of', es: 'de' })} {tutorial.steps.length}
               </span>
             </div>
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClose}>
@@ -286,7 +287,7 @@ export function TutorialOverlay({ tutorialId, onClose, onComplete }: TutorialOve
               className="h-8"
             >
               <ChevronLeft className="w-4 h-4 mr-1" />
-              Zurück
+              {tx({ de: 'Zurück', en: 'Back', es: 'Atrás' })}
             </Button>
             <Button
               size="sm"
@@ -299,11 +300,11 @@ export function TutorialOverlay({ tutorialId, onClose, onComplete }: TutorialOve
               {isLastStep ? (
                 <>
                   <CheckCircle className="w-4 h-4 mr-1" />
-                  Fertig
+                  {tx({ de: 'Fertig', en: 'Done', es: 'Listo' })}
                 </>
               ) : (
                 <>
-                  Weiter
+                  {tx({ de: 'Weiter', en: 'Next', es: 'Siguiente' })}
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </>
               )}
