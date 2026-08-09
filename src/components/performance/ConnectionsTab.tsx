@@ -1074,7 +1074,7 @@ export const ConnectionsTab = () => {
 
                         {/* Instagram: legacy master-token migration banner */}
                         {provider.id === 'instagram' &&
-                         connection.account_name === '@captiongenie_socialmanager' &&
+                         ['@adtoolai_socialmanager', '@captiongenie_socialmanager'].includes(connection.account_name ?? '') &&
                          connection.account_metadata?.connected_via !== 'oauth_user_token' && (
                           <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-xs text-amber-800 flex items-start gap-2 mb-2 dark:bg-amber-950/30 dark:border-amber-800/50 dark:text-amber-200">
                             <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
