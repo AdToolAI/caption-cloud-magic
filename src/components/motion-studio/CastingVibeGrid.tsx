@@ -147,7 +147,7 @@ export default function CastingVibeGrid({ character, onPrimaryChanged }: Casting
         </div>
       ) : variants.length === 0 ? (
         <div className="rounded-md border border-dashed border-border/60 p-4 text-center text-[11px] text-muted-foreground">
-          Noch keine Casting-Varianten — klicke „{tx({ de: 'Casting starten', en: 'Start casting', es: 'Iniciar casting' })}" um 4 Looks zu generieren.
+          {tx({ de: 'Noch keine Casting-Varianten — klicke „Casting starten“, um 4 Looks zu generieren.', en: 'No casting variants yet — click “Start casting” to generate 4 looks.', es: 'Aún no hay variantes de casting — haz clic en «Iniciar casting» para generar 4 looks.' })}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

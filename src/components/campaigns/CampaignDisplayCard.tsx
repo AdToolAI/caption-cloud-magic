@@ -487,7 +487,7 @@ export const CampaignDisplayCard = ({
                               className="gap-1.5 text-xs hover:bg-accent/10"
                             >
                               <Eye className="h-3 w-3" />
-                              {isPreviewOpen ? tx({ de: "Vorschau schließen", en: "Close preview", es: "Cerrar vista previa" }) : "Plattform-Vorschau"}
+                              {isPreviewOpen ? tx({ de: "Vorschau schließen", en: "Close preview", es: "Cerrar vista previa" }) : tx({ de: "Plattform-Vorschau", en: "Platform preview", es: "Vista previa de plataforma" })}
                             </Button>
                             <Button
                               size="sm"

@@ -442,7 +442,7 @@ export function AITransitions({
                 onClick={() => handleApplyToAll(selectedTransition)}
               >
                 <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                "{getTransitionInfo(selectedTransition)?.name}" auf alle anwenden
+                {tx({ de: `"${getTransitionInfo(selectedTransition)?.name}" auf alle anwenden`, en: `Apply "${getTransitionInfo(selectedTransition)?.name}" to all`, es: `Aplicar "${getTransitionInfo(selectedTransition)?.name}" a todos` })}
               </Button>
             </motion.div>
           )}
