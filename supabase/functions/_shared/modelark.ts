@@ -48,9 +48,12 @@ export interface ModelArkTask {
   id: string;
   status: ModelArkTaskStatus;
   videoUrl?: string;
+  /** Actual clip length reported by the provider (used for smart duration). */
+  durationSeconds?: number;
   error?: string;
   raw: unknown;
 }
+
 
 export interface CreateSeedance25Params {
   prompt: string;
