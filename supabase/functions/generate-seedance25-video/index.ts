@@ -212,18 +212,47 @@ Deno.serve(async (req) => {
       if (refundError) console.error("[generate-seedance25-video] Refund failed:", refundError);
     };
 
+    /**
+     * Smart duration (-1) is billed at the 30 s maximum up front. Once the
+     * provider reports the real clip length, the unused seconds go straight
+     * back to the wallet.
+     */
+    const settleSmartDuration = async (actualSeconds?: number) => {
+      if (!smartDuration || !actualSeconds || actualSeconds >= billedDuration) return;
+      const actualCost = +(Math.max(MIN_DURATION, actualSeconds) * costPerSecond).toFixed(4);
+      const delta = +(totalCost - actualCost).toFixed(4);
+      if (delta <= 0.001) return;
+      const { error: refundError } = await supabaseAdmin.rpc("refund_ai_video_credits", {
+        p_user_id: user.id,
+        p_amount_euros: delta,
+        p_generation_id: generation.id,
+      });
+      if (refundError) {
+        console.error("[generate-seedance25-video] Smart-duration refund failed:", refundError);
+        return;
+      }
+      await supabaseAdmin
+        .from("ai_video_generations")
+        .update({ duration_seconds: actualSeconds, total_cost_euros: actualCost })
+        .eq("id", generation.id);
+    };
+
     let taskId: string;
     try {
       taskId = await createSeedance25Task({
         prompt,
-        duration,
+        duration: smartDuration ? -1 : duration,
         resolution,
         aspectRatio,
         firstFrameUrl: startImageUrl,
         lastFrameUrl: endImageUrl,
         referenceImageUrls,
+        referenceVideoUrls: refVideos,
+        referenceAudioUrls: refAudios,
+        generateAudio,
         seed,
       });
+
     } catch (providerError: any) {
       console.error("[generate-seedance25-video] ModelArk error:", providerError);
       await refund(`ModelArk Error: ${providerError?.message ?? "Unknown error"}`);
