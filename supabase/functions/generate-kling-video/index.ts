@@ -57,6 +57,8 @@ interface GenerateRequest {
   // Video-to-Video
   referenceVideoUrl?: string;
   videoReferenceType?: 'feature' | 'base';
+  /** Omni only: subject reference images (max 7, max 4 alongside a reference video). */
+  referenceImageUrls?: string[];
 }
 
 serve(async (req) => {
@@ -90,7 +92,7 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateRequest & { spokenLanguage?: string; suppressDialogue?: boolean };
-    const { prompt, model, duration, aspectRatio, generateAudio, dialogText, voicePreset, speakerVoices, startImageUrl, endImageUrl, referenceVideoUrl, videoReferenceType } = body;
+    const { prompt, model, duration, aspectRatio, generateAudio, dialogText, voicePreset, speakerVoices, startImageUrl, endImageUrl, referenceVideoUrl, videoReferenceType, referenceImageUrls } = body;
     const spokenLanguage = typeof body.spokenLanguage === 'string' ? body.spokenLanguage : undefined;
     const spokenLanguageKey = spokenLanguage?.trim().toLowerCase();
     const forceOmniSilent = model === 'kling-omni' && spokenLanguageKey !== 'en' && spokenLanguageKey !== 'english';
@@ -270,6 +272,12 @@ serve(async (req) => {
     if (referenceVideoUrl) {
       replicateInput.reference_video = referenceVideoUrl;
       replicateInput.video_reference_type = videoReferenceType || 'feature';
+    }
+
+    // Subject references — Omni only. Provider cap: 7 images, 4 with a reference video.
+    if (model === 'kling-omni' && Array.isArray(referenceImageUrls) && referenceImageUrls.length > 0) {
+      const cap = referenceVideoUrl ? 4 : 7;
+      replicateInput.reference_images = referenceImageUrls.slice(0, cap);
     }
 
     console.log(`[generate-kling-video] Replicate slug=${modelConfig.slug} input:`, JSON.stringify({

@@ -12,18 +12,14 @@ const corsHeaders = {
 };
 
 const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'grok-imagine': { EUR: 0.45, USD: 0.45 }, // Normalized 14.07.2026 — 3.00× cost margin
+  'grok-imagine': { EUR: 0.15, USD: 0.15 }, // $0.05/s provider cost — 3.00× margin
 };
 
 // xAI Grok Imagine — text-to-video and image-to-video with native audio
-// NOTE: Adjust the slug here once xAI publishes the official Replicate endpoint.
-const REPLICATE_MODEL_SLUG = 'x-ai/grok-imagine';
+const REPLICATE_MODEL_SLUG = 'xai/grok-imagine-video';
 
-const ASPECT_RATIO_TO_SIZE: Record<string, { width: number; height: number }> = {
-  '16:9': { width: 1280, height: 720 },
-  '9:16': { width: 720, height: 1280 },
-  '1:1': { width: 768, height: 768 },
-};
+// Provider aspect_ratio enum (plus "auto", which we never send).
+const SUPPORTED_ASPECT_RATIOS = ['16:9', '9:16', '1:1', '4:3', '3:4', '3:2', '2:3'];
 
 interface GenerateRequest {
   prompt: string;
@@ -152,14 +148,15 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const webhookUrl = appendWebhookToken(`${SUPABASE_URL}/functions/v1/replicate-webhook`);
 
-    const size = ASPECT_RATIO_TO_SIZE[aspectRatio] || ASPECT_RATIO_TO_SIZE['16:9'];
+    const ratio = SUPPORTED_ASPECT_RATIOS.includes(aspectRatio) ? aspectRatio : '16:9';
 
     const replicateInput: Record<string, any> = {
       prompt,
-      duration,
-      width: size.width,
-      height: size.height,
-      audio: enableAudio,
+      // Provider accepts 1-15 s.
+      duration: Math.min(15, Math.max(1, Math.round(duration))),
+      aspect_ratio: ratio,
+      resolution: '720p',
+      generate_audio: enableAudio !== false,
     };
 
     if (isImageToVideo) {

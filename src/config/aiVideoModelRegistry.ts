@@ -116,6 +116,22 @@ export interface ToolkitModel {
 }
 
 const sharedAspect = ['16:9', '9:16', '1:1'];
+/** Kling (all versions) exposes exactly these three ratios. */
+const klingAspect = ['16:9', '9:16', '1:1'];
+/** Wan 2.5/2.6 `size` enum only covers landscape + portrait — no square. */
+const wanLegacyAspect = ['16:9', '9:16'];
+/** Wan 2.7 `aspect_ratio` enum. */
+const wan27Aspect = ['16:9', '9:16', '1:1', '4:3', '3:4'];
+/** Seedance (Replicate) `aspect_ratio` enum. */
+const seedanceAspect = ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21'];
+/** Luma Ray 2 `aspect_ratio` enum. */
+const lumaRay2Aspect = ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21'];
+/** Luma Ray 3.2 `aspect_ratio` enum (no 9:21). */
+const lumaRay32Aspect = ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'];
+/** LTX 2.3 (fast + pro) `aspect_ratio` enum. */
+const ltxAspect = ['16:9', '9:16'];
+/** xai/grok-imagine-video `aspect_ratio` enum (minus "auto"). */
+const grokAspect = ['16:9', '9:16', '1:1', '4:3', '3:4', '3:2', '2:3'];
 
 export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
   /* ─────────── Kling family ─────────── */
@@ -127,10 +143,11 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-kling-video',
     group: 'recommended',
     icon: Film,
-    capabilities: { t2v: true, i2v: true, v2v: false, audio: false, nativeDialogue: false, anchorOnly: true },
-    durations: [5, 8, 10],
+    // kwaivgi/kling-v2.5-turbo-pro: duration enum [5,10], no reference_images.
+    capabilities: { t2v: true, i2v: true, v2v: false, audio: false, nativeDialogue: false, anchorOnly: false },
+    durations: [5, 10],
     resolution: '720p',
-    aspectRatios: sharedAspect,
+    aspectRatios: klingAspect,
     costPerSecond: KLING_VIDEO_MODELS['kling-2.5-turbo'].costPerSecond,
     badge: 'Fast',
     tagline: 'Schneller Draft · Iteration',
@@ -144,10 +161,12 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-kling-video',
     group: 'recommended',
     icon: Film,
-    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: false, anchorOnly: true },
-    durations: [5, 8, 10, 15],
+    // kwaivgi/kling-v2.6: duration enum [5,10], generate_audio, no start+end,
+    // no reference_images, no reference_video.
+    capabilities: { t2v: true, i2v: true, v2v: false, audio: true, nativeDialogue: false, anchorOnly: false },
+    durations: [5, 10],
     resolution: '1080p',
-    aspectRatios: sharedAspect,
+    aspectRatios: klingAspect,
     costPerSecond: KLING_VIDEO_MODELS['kling-2.6'].costPerSecond,
     badge: 'Ambient Audio',
     tagline: 'Sweet Spot · Ambient-Audio',
@@ -161,10 +180,12 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-kling-video',
     group: 'recommended',
     icon: Film,
-    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: true, anchorOnly: true },
+    // kwaivgi/kling-v3-video: duration 3-15, generate_audio, no dialog field
+    // (native lip-sync is Omni-only), no reference_images, no reference_video.
+    capabilities: { t2v: true, i2v: true, v2v: false, audio: true, nativeDialogue: false, anchorOnly: false },
     durations: [3, 5, 8, 10, 15],
     resolution: '1080p',
-    aspectRatios: sharedAspect,
+    aspectRatios: klingAspect,
     costPerSecond: KLING_VIDEO_MODELS['kling-3'].costPerSecond,
     badge: 'Empfohlen',
     tagline: 'Realistische Bewegungen · Native Audio',
@@ -179,10 +200,12 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-kling-video',
     group: 'premium',
     icon: Film,
-    capabilities: { t2v: true, i2v: true, v2v: false, audio: true, nativeDialogue: true, anchorOnly: false },
-    durations: [5, 8, 10, 15],
+    // kwaivgi/kling-v3-omni-video: duration 3-15, generate_audio + dialog,
+    // reference_images (max 7, max 4 with a reference_video) and reference_video.
+    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: true, anchorOnly: true, multiRef: true, maxReferences: 7 },
+    durations: [3, 5, 8, 10, 15],
     resolution: '1080p',
-    aspectRatios: sharedAspect,
+    aspectRatios: klingAspect,
     costPerSecond: KLING_VIDEO_MODELS['kling-omni'].costPerSecond,
     badge: 'Lip-Sync EN',
     tagline: 'Native Lip-Sync EN · DE/ES silent-only',
@@ -248,10 +271,13 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-grok-video',
     group: 'audio',
     icon: TrendingUp,
+    // xai/grok-imagine-video: duration 1-15, resolution 480p/720p (no 1080p),
+    // aspect_ratio enum incl. 4:3/3:4/3:2/2:3, native audio, optional image.
     capabilities: { t2v: true, i2v: true, audio: true },
-    durations: [6, 12],
-    resolution: '1080p',
-    aspectRatios: sharedAspect,
+    durations: [5, 6, 10, 12, 15],
+    resolution: '720p',
+    resolutions: ['720p', '480p'],
+    aspectRatios: grokAspect,
     costPerSecond: GROK_VIDEO_MODELS['grok-imagine'].costPerSecond,
     badge: 'Trending',
     tagline: 'Viral · Native Audio',
@@ -267,10 +293,11 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-ltx-video',
     group: 'fast',
     icon: Zap,
-    capabilities: { t2v: true, i2v: true, audio: false },
-    durations: [4, 6, 8],
-    resolution: '720p',
-    aspectRatios: sharedAspect,
+    // lightricks/ltx-2.3-fast: duration enum 6-20, 1080p+, 16:9/9:16, native audio.
+    capabilities: { t2v: true, i2v: true, audio: true },
+    durations: [6, 8, 10],
+    resolution: '1080p',
+    aspectRatios: ltxAspect,
     costPerSecond: LTX_VIDEO_MODELS['ltx-standard'].costPerSecond,
     badge: 'Schnell & Günstig',
     tagline: 'Schnellster Generator',
@@ -284,10 +311,11 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-ltx-video',
     group: 'fast',
     icon: Zap,
-    capabilities: { t2v: true, i2v: true, audio: false },
-    durations: [4, 6, 8],
+    // lightricks/ltx-2.3-pro: duration enum [6,8,10], 1080p/2k/4k, 16:9/9:16.
+    capabilities: { t2v: true, i2v: true, audio: true },
+    durations: [6, 8, 10],
     resolution: '1080p',
-    aspectRatios: sharedAspect,
+    aspectRatios: ltxAspect,
     costPerSecond: LTX_VIDEO_MODELS['ltx-pro'].costPerSecond,
     tagline: tx({ de: '1080p · sehr günstig', en: '1080p · very cheap', es: '1080p · muy barato' }),
     legacyRoute: '/ltx-video-studio',
@@ -300,10 +328,12 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-wan-video',
     group: 'fast',
     icon: Wand2,
+    // wan-2.6: duration enum [5,10,15], size enum only 16:9/9:16, audio is an
+    // upload-only input (no generation flag).
     capabilities: { t2v: true, i2v: true, audio: false },
-    durations: [5, 10],
+    durations: [5, 10, 15],
     resolution: '720p',
-    aspectRatios: sharedAspect,
+    aspectRatios: wanLegacyAspect,
     costPerSecond: WAN_VIDEO_MODELS['wan-2-6-standard'].costPerSecond,
     badge: 'Neu',
     tagline: 'Wan 2.6 · Budget-Champion',
@@ -318,9 +348,9 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     group: 'premium',
     icon: Wand2,
     capabilities: { t2v: true, i2v: true, audio: false },
-    durations: [5, 10],
+    durations: [5, 10, 15],
     resolution: '1080p',
-    aspectRatios: sharedAspect,
+    aspectRatios: wanLegacyAspect,
     costPerSecond: WAN_VIDEO_MODELS['wan-2-6-pro'].costPerSecond,
     tagline: 'Wan 2.6 · 1080p',
     legacyRoute: '/wan-video-studio',
@@ -333,10 +363,11 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-wan-video',
     group: 'recommended',
     icon: Zap,
+    // wan-2.7: duration 2-15, aspect_ratio enum 16:9/9:16/1:1/4:3/3:4, auto audio.
     capabilities: { t2v: true, i2v: true, audio: true },
-    durations: [5, 10],
+    durations: [5, 10, 15],
     resolution: '720p',
-    aspectRatios: sharedAspect,
+    aspectRatios: wan27Aspect,
     costPerSecond: WAN_VIDEO_MODELS['wan-2-7-standard'].costPerSecond,
     badge: 'Neu',
     tagline: '27B MoE · natives Audio',
@@ -351,9 +382,9 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     group: 'premium',
     icon: Zap,
     capabilities: { t2v: true, i2v: true, audio: true },
-    durations: [5, 10],
+    durations: [5, 10, 15],
     resolution: '1080p',
-    aspectRatios: sharedAspect,
+    aspectRatios: wan27Aspect,
     costPerSecond: WAN_VIDEO_MODELS['wan-2-7-pro'].costPerSecond,
     badge: 'Premium',
     tagline: '27B MoE · natives Audio · 1080p',
@@ -367,10 +398,11 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-wan-video',
     group: 'fast',
     icon: Wand2,
+    // wan-2.5: duration enum [5,10]; the `size` enum has no square option.
     capabilities: { t2v: true, i2v: true, audio: false },
     durations: [5, 10],
     resolution: '720p',
-    aspectRatios: sharedAspect,
+    aspectRatios: wanLegacyAspect,
     costPerSecond: WAN_VIDEO_MODELS['wan-standard'].costPerSecond,
     tagline: 'Wan 2.5 · stabile Klassik',
     legacyRoute: '/wan-video-studio',
@@ -424,7 +456,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
     durations: [5, 9],
     resolution: '720p',
-    aspectRatios: sharedAspect,
+    aspectRatios: lumaRay2Aspect,
     costPerSecond: LUMA_VIDEO_MODELS['luma-standard'].costPerSecond,
     tagline: 'Cinematic · Camera Concepts',
     legacyRoute: '/luma-video-studio',
@@ -440,7 +472,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
     durations: [5, 9],
     resolution: '1080p',
-    aspectRatios: sharedAspect,
+    aspectRatios: lumaRay2Aspect,
     costPerSecond: LUMA_VIDEO_MODELS['luma-pro'].costPerSecond,
     badge: 'Premium',
     tagline: 'Cinematic Pro · 1080p',
@@ -457,7 +489,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
     durations: [5],
     resolution: '720p',
-    aspectRatios: sharedAspect,
+    aspectRatios: lumaRay32Aspect,
     costPerSecond: LUMA_VIDEO_MODELS['luma-ray32-5s'].costPerSecond,
     badge: 'Neu',
     tagline: 'Ray 3.2 · neueste Luma-Generation',
@@ -474,7 +506,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
     durations: [10],
     resolution: '720p',
-    aspectRatios: sharedAspect,
+    aspectRatios: lumaRay32Aspect,
     costPerSecond: LUMA_VIDEO_MODELS['luma-ray32-10s'].costPerSecond,
     badge: 'Neu · 10s',
     tagline: tx({ de: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Sekunden am Stück', en: 'seconds straight', es: 'segundos seguidos' })}`, en: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'seconds straight', en: 'seconds straight', es: 'segundos seguidos' })}`, es: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Segundos seguidos', en: 'segundos seguidos', es: 'segundos seguidos' })}` }),
@@ -491,7 +523,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     capabilities: { t2v: true, i2v: true, audio: false },
     durations: [3, 5, 8, 10, 12, 15],
     resolution: '720p',
-    aspectRatios: sharedAspect,
+    aspectRatios: seedanceAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-mini'].costPerSecond,
     badge: 'Draft',
     tagline: 'Seedance 1 Lite · günstigster Draft-Renderer',
@@ -508,7 +540,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     capabilities: { t2v: true, i2v: true, audio: false },
     durations: [3, 5, 8, 10, 12, 15],
     resolution: '720p',
-    aspectRatios: sharedAspect,
+    aspectRatios: seedanceAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-standard'].costPerSecond,
     badge: 'Neu',
     tagline: 'Seedance 2.0 Fast · dynamische Motion',
@@ -525,7 +557,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     capabilities: { t2v: true, i2v: true, audio: false },
     durations: [3, 5, 8, 10, 12, 15],
     resolution: '720p',
-    aspectRatios: sharedAspect,
+    aspectRatios: seedanceAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-pro'].costPerSecond,
     badge: 'Premium',
     tagline: 'Seedance 2.0 Flagship · beste Motion-Kohärenz',
