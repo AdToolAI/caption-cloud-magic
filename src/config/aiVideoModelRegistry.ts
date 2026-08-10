@@ -398,10 +398,11 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-wan-video',
     group: 'fast',
     icon: Wand2,
+    // wan-2.5: duration enum [5,10]; the `size` enum has no square option.
     capabilities: { t2v: true, i2v: true, audio: false },
     durations: [5, 10],
     resolution: '720p',
-    aspectRatios: sharedAspect,
+    aspectRatios: wanLegacyAspect,
     costPerSecond: WAN_VIDEO_MODELS['wan-standard'].costPerSecond,
     tagline: 'Wan 2.5 · stabile Klassik',
     legacyRoute: '/wan-video-studio',
