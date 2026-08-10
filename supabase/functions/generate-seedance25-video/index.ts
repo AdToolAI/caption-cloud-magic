@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
         user_id: user.id,
         prompt,
         model: MODEL_ID,
-        duration_seconds: duration,
+        duration_seconds: billedDuration,
         aspect_ratio: aspectRatio,
         resolution,
         cost_per_second: costPerSecond,
