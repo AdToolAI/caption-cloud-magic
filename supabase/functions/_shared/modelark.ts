@@ -54,28 +54,62 @@ export interface ModelArkTask {
 
 export interface CreateSeedance25Params {
   prompt: string;
-  /** Clip length in seconds (Seedance 2.5 supports long-form scenes). */
+  /**
+   * Clip length in seconds (4–30) or `-1` for the provider's smart duration.
+   * Video-editing tasks are locked to `-1` by ModelArk.
+   */
   duration: number;
-  /** '480p' | '720p' | '1080p' */
+  /** '480p' | '720p' — Seedance 2.5 does not support 1080p/4K. */
   resolution?: string;
-  /** '16:9' | '9:16' | '1:1' … */
+  /** '16:9' | '4:3' | '1:1' | '3:4' | '9:16' | '21:9' | 'adaptive' */
   aspectRatio?: string;
   /** Image-to-Video: first frame. */
   firstFrameUrl?: string;
   /** Optional last frame for first/last-frame guidance. */
   lastFrameUrl?: string;
-  /** Extra reference images (multi-reference mode). */
+  /** Multi-reference images (max 30, role `reference_image`). */
   referenceImageUrls?: string[];
+  /** Reference videos (max 10, role `reference_video`). */
+  referenceVideoUrls?: string[];
+  /** Reference audio clips (max 10, role `reference_audio`). */
+  referenceAudioUrls?: string[];
+  /** Native audio generation (`generate_audio`). */
+  generateAudio?: boolean;
   /** Disable the provider watermark (default true = no watermark). */
   noWatermark?: boolean;
   /** Fixed seed for reproducible output. */
   seed?: number;
 }
 
+/** Provider-documented aspect ratio enum for Seedance 2.5. */
+export const MODELARK_RATIOS = [
+  "16:9",
+  "4:3",
+  "1:1",
+  "3:4",
+  "9:16",
+  "21:9",
+  "adaptive",
+] as const;
+
+/** Provider-documented reference-asset caps (30 images + 10 videos + 10 audio). */
+export const MODELARK_MAX_REFERENCE_IMAGES = 30;
+export const MODELARK_MAX_REFERENCE_VIDEOS = 10;
+export const MODELARK_MAX_REFERENCE_AUDIOS = 10;
+
 /**
  * Creates a Seedance 2.5 video generation task.
- * Directives (duration, resolution, ratio …) are appended to the text part —
- * this is the shape the ModelArk video API documents.
+ *
+ * Provider contract (BytePlus ModelArk docs, verified 10.08.2026):
+ *  - resolution: 480p | 720p only (1080p/4K rejected)
+ *  - duration: 4–30 s, or -1 (smart duration; forced for editing tasks)
+ *  - ratio: 16:9 | 4:3 | 1:1 | 3:4 | 9:16 | 21:9 | adaptive; forced to
+ *    `adaptive` for first-frame / first+last-frame / video-edit tasks
+ *  - reference assets: up to 30 images + 10 videos + 10 audio clips
+ *  - the three image input modes (first frame, first+last frame, multimodal
+ *    reference) are mutually exclusive
+ *  - resolution/ratio/duration/watermark/generate_audio are sent as top-level
+ *    body fields (the `--rs`/`--rt` prompt suffix is the legacy path)
  */
 export async function createSeedance25Task(params: CreateSeedance25Params): Promise<string> {
   const {
@@ -86,37 +120,36 @@ export async function createSeedance25Task(params: CreateSeedance25Params): Prom
     firstFrameUrl,
     lastFrameUrl,
     referenceImageUrls,
+    referenceVideoUrls,
+    referenceAudioUrls,
+    generateAudio = false,
     noWatermark = true,
     seed,
   } = params;
 
-  // ── Provider contract (ModelArk docs, verified 07.08.2026) ──
-  // 1. Seedance 2.5 output resolution supports 480p and 720p only —
-  //    1080p / 4K are rejected. Anything higher is clamped to 720p.
-  // 2. Duration range is 4–30 s.
-  // 3. The three input modes — first-frame, first+last-frame and
-  //    multimodal reference — are mutually exclusive and must not be mixed.
   const safeResolution = resolution === "480p" ? "480p" : "720p";
-  const safeDuration = Math.max(4, Math.min(30, Math.round(duration)));
-  // ModelArk accepts a small number of reference images per task —
-  // the UI offers 7 slots, so hard-cap here to stay inside the contract.
-  const refs = (referenceImageUrls ?? []).filter(Boolean).slice(0, 7);
-  const useReferenceMode = refs.length > 0;
+  const smartDuration = duration === -1;
+  const safeDuration = smartDuration ? -1 : Math.max(4, Math.min(30, Math.round(duration)));
 
-  const directives = [
-    `--resolution ${safeResolution}`,
-    `--duration ${safeDuration}`,
-    `--ratio ${aspectRatio}`,
-    `--watermark ${noWatermark ? "false" : "true"}`,
-  ];
-  if (typeof seed === "number" && Number.isFinite(seed)) directives.push(`--seed ${seed}`);
+  const refImages = (referenceImageUrls ?? []).filter(Boolean).slice(0, MODELARK_MAX_REFERENCE_IMAGES);
+  const refVideos = (referenceVideoUrls ?? []).filter(Boolean).slice(0, MODELARK_MAX_REFERENCE_VIDEOS);
+  const refAudios = (referenceAudioUrls ?? []).filter(Boolean).slice(0, MODELARK_MAX_REFERENCE_AUDIOS);
+  const useReferenceMode = refImages.length > 0;
+  const usesFrameGuidance = !useReferenceMode && !!firstFrameUrl;
+  // ModelArk locks the ratio to `adaptive` whenever the geometry comes from an
+  // input asset (frame guidance or a reference/edit video).
+  const ratioLocked = usesFrameGuidance || refVideos.length > 0;
+  const requestedRatio = (MODELARK_RATIOS as readonly string[]).includes(aspectRatio)
+    ? aspectRatio
+    : "16:9";
+  const safeRatio = ratioLocked ? "adaptive" : requestedRatio;
 
   const content: Array<Record<string, unknown>> = [
-    { type: "text", text: `${prompt.trim()} ${directives.join(" ")}`.trim() },
+    { type: "text", text: prompt.trim() },
   ];
 
   if (useReferenceMode) {
-    for (const ref of refs) {
+    for (const ref of refImages) {
       content.push({ type: "image_url", image_url: { url: ref }, role: "reference_image" });
     }
   } else {
@@ -127,6 +160,14 @@ export async function createSeedance25Task(params: CreateSeedance25Params): Prom
       content.push({ type: "image_url", image_url: { url: lastFrameUrl }, role: "last_frame" });
     }
   }
+
+  for (const video of refVideos) {
+    content.push({ type: "video_url", video_url: { url: video }, role: "reference_video" });
+  }
+  for (const audio of refAudios) {
+    content.push({ type: "audio_url", audio_url: { url: audio }, role: "reference_audio" });
+  }
+
 
   const res = await fetch(`${MODELARK_BASE_URL}/contents/generations/tasks`, {
     method: "POST",
