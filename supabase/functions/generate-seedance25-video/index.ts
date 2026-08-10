@@ -309,6 +309,8 @@ Deno.serve(async (req) => {
                 error_message: null,
               })
               .eq("id", generation.id);
+            await settleSmartDuration(task.durationSeconds);
+
             await trackAIGeneration("completed", user.id, {
               provider: "modelark",
               model: MODEL_ID,
