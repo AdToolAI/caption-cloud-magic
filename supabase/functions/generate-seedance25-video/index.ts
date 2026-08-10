@@ -22,15 +22,25 @@ const MAX_DURATION = 30;
 interface GenerateRequest {
   prompt: string;
   model?: string;
+  /** 4–30 s, or -1 for the provider's smart duration. */
   duration: number;
-  aspectRatio?: "16:9" | "9:16" | "1:1";
+  aspectRatio?: string;
   /** ModelArk supports 480p and 720p output for Seedance 2.5 — 1080p is rejected. */
   resolution?: "480p" | "720p";
   startImageUrl?: string;
   endImageUrl?: string;
   referenceImageUrls?: string[];
+  /** Reference clips (role `reference_video`, max 10). */
+  referenceVideoUrls?: string[];
+  /** Single reference clip sent by the shared v2v UI. */
+  referenceVideoUrl?: string;
+  /** Reference audio clips (role `reference_audio`, max 10). */
+  referenceAudioUrls?: string[];
+  /** Native audio generation (`generate_audio`). */
+  generateAudio?: boolean;
   seed?: number;
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
