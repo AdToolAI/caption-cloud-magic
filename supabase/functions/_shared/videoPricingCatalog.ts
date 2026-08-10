@@ -43,6 +43,7 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   // std   → bytedance/seedance-2.0-fast    ($0.15/s @720p)
   // pro   → bytedance/seedance-2.0         ($0.18/s @720p)
   'seedance-mini':        { id: 'seedance-mini',        label: 'Seedance 1 Lite (Draft)', unit: 'per-second', sellEUR: 0.06, sellUSD: 0.06, costEUR: 0.02,  minDuration: 3,  maxDuration: 15 },
+  'seedance-mini-1080p':  { id: 'seedance-mini-1080p',  label: 'Seedance 1 Lite 1080p',   unit: 'per-second', sellEUR: 0.135, sellUSD: 0.135, costEUR: 0.045, minDuration: 3, maxDuration: 15 },
   'seedance-standard':    { id: 'seedance-standard',    label: 'Seedance 2.0 Fast 720p',  unit: 'per-second', sellEUR: 0.45, sellUSD: 0.45, costEUR: 0.15,  minDuration: 3,  maxDuration: 15 },
   'seedance-pro':         { id: 'seedance-pro',         label: 'Seedance 2.0 720p',       unit: 'per-second', sellEUR: 0.54, sellUSD: 0.54, costEUR: 0.18,  minDuration: 3,  maxDuration: 15 },
   // Seedance 2.5 via BytePlus ModelArk (direct API, not Replicate) —
@@ -119,4 +120,4 @@ export function computeTotalCost(modelId: string, durationSeconds: number, curre
   return +(price * durationSeconds).toFixed(4);
 }
 
-export const CATALOG_VERSION = '2026-07-21';
+export const CATALOG_VERSION = '2026-08-10';
