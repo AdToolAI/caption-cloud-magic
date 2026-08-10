@@ -46,8 +46,9 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   'seedance-standard':    { id: 'seedance-standard',    label: 'Seedance 2.0 Fast 720p',  unit: 'per-second', sellEUR: 0.45, sellUSD: 0.45, costEUR: 0.15,  minDuration: 3,  maxDuration: 15 },
   'seedance-pro':         { id: 'seedance-pro',         label: 'Seedance 2.0 720p',       unit: 'per-second', sellEUR: 0.54, sellUSD: 0.54, costEUR: 0.18,  minDuration: 3,  maxDuration: 15 },
   // Seedance 2.5 via BytePlus ModelArk (direct API, not Replicate) —
-  // long-form scenes up to 30 s, 1080p. Cost estimate 0.18 $/s → 3.00× margin.
-  'seedance-2-5':         { id: 'seedance-2-5',         label: 'Seedance 2.5 (ModelArk)', unit: 'per-second', sellEUR: 0.54, sellUSD: 0.54, costEUR: 0.18,  minDuration: 4,  maxDuration: 30 },
+  // long-form scenes up to 30 s, 720p. Verified ModelArk cost: 6.50 EUR / 30 s
+  // = 0.2167 EUR/s → sell 0.663 EUR/s (19.90 EUR per 30 s clip, ~3.06x margin).
+  'seedance-2-5':         { id: 'seedance-2-5',         label: 'Seedance 2.5 (ModelArk)', unit: 'per-second', sellEUR: 0.663, sellUSD: 0.663, costEUR: 0.217, minDuration: 4,  maxDuration: 30 },
 
 
 

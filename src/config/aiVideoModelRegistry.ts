@@ -80,11 +80,23 @@ export interface ToolkitModel {
      * Vidu Q2 (referenceImages[]) and Kling 3 Std/Pro (reference_images).
      */
     anchorOnly?: boolean;
+    /**
+     * True when reference images and a start/end frame are mutually exclusive
+     * at the provider (Seedance 2.5 / ModelArk: first-frame, first+last-frame
+     * and multi-reference are three separate, non-combinable input modes).
+     */
+    refExclusive?: boolean;
   };
   /** Allowed durations in seconds (used to render the slider/select). */
   durations: number[];
-  /** Quality/resolution label for the badge. */
+  /** Quality/resolution label for the badge (default / highest option). */
   resolution: string;
+  /**
+   * All output resolutions the provider really accepts for this model.
+   * Only rendered as a selector when more than one entry exists; the first
+   * entry is the default. Omit when the model has exactly one resolution.
+   */
+  resolutions?: string[];
   /** Aspect ratios this model supports. */
   aspectRatios: string[];
   /** Cost per second per currency. */
@@ -322,7 +334,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     group: 'recommended',
     icon: Zap,
     capabilities: { t2v: true, i2v: true, audio: true },
-    durations: [5, 10, 15],
+    durations: [5, 10],
     resolution: '720p',
     aspectRatios: sharedAspect,
     costPerSecond: WAN_VIDEO_MODELS['wan-2-7-standard'].costPerSecond,
@@ -339,7 +351,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     group: 'premium',
     icon: Zap,
     capabilities: { t2v: true, i2v: true, audio: true },
-    durations: [5, 10, 15],
+    durations: [5, 10],
     resolution: '1080p',
     aspectRatios: sharedAspect,
     costPerSecond: WAN_VIDEO_MODELS['wan-2-7-pro'].costPerSecond,
@@ -375,8 +387,10 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     icon: Eye,
     capabilities: { t2v: true, i2v: true, audio: false },
     durations: [6, 10],
-    resolution: '720p',
-    aspectRatios: sharedAspect,
+    resolution: '768p',
+    // MiniMax Hailuo 02 has no aspect-ratio parameter — T2V always renders
+    // 16:9, I2V inherits the ratio of the start image.
+    aspectRatios: ['16:9'],
     costPerSecond: HAILUO_VIDEO_MODELS['hailuo-standard'].costPerSecond,
     tagline: 'Realistische Gesichter & Bewegung',
     legacyRoute: '/hailuo-video-studio',
@@ -390,9 +404,10 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     group: 'premium',
     icon: Eye,
     capabilities: { t2v: true, i2v: true, audio: false },
-    durations: [6, 10],
+    // 1080p is capped at 6 s by MiniMax; 10 s only renders at 768p.
+    durations: [6],
     resolution: '1080p',
-    aspectRatios: sharedAspect,
+    aspectRatios: ['16:9'],
     costPerSecond: HAILUO_VIDEO_MODELS['hailuo-pro'].costPerSecond,
     badge: 'Premium',
     tagline: '1080p · Realistic Pro',
@@ -474,7 +489,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     group: 'fast',
     icon: Video,
     capabilities: { t2v: true, i2v: true, audio: false },
-    durations: [5, 8, 10, 12],
+    durations: [3, 5, 8, 10, 12, 15],
     resolution: '720p',
     aspectRatios: sharedAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-mini'].costPerSecond,
@@ -491,7 +506,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     group: 'recommended',
     icon: Video,
     capabilities: { t2v: true, i2v: true, audio: false },
-    durations: [5, 8, 10, 12],
+    durations: [3, 5, 8, 10, 12, 15],
     resolution: '720p',
     aspectRatios: sharedAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-standard'].costPerSecond,
@@ -508,7 +523,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     group: 'premium',
     icon: Video,
     capabilities: { t2v: true, i2v: true, audio: false },
-    durations: [5, 8, 10, 12],
+    durations: [3, 5, 8, 10, 12, 15],
     resolution: '720p',
     aspectRatios: sharedAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-pro'].costPerSecond,
@@ -524,9 +539,12 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-seedance25-video',
     group: 'premium',
     icon: Video,
-    capabilities: { t2v: true, i2v: true, audio: false, multiRef: true, maxReferences: 30, endFrame: true },
-    durations: [5, 8, 10, 12, 15, 20, 25, 30],
+    // ModelArk contract: 4-30 s, 480p/720p, first-frame OR first+last-frame OR
+    // multi-reference (mutually exclusive). No standalone end frame, no audio.
+    capabilities: { t2v: true, i2v: true, audio: false, multiRef: true, maxReferences: 7, refExclusive: true },
+    durations: [4, 5, 8, 10, 12, 15, 20, 25, 30],
     resolution: '720p',
+    resolutions: ['720p', '480p'],
     aspectRatios: sharedAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-2-5'].costPerSecond,
     badge: 'Neu',
