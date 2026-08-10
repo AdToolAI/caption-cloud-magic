@@ -73,7 +73,7 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateRequest;
-    const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl } = body;
+    const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl, generateAudio } = body;
 
     // Snap to allowed values: 4, 6, 8
     const duration = rawDuration <= 4 ? 4 : rawDuration <= 6 ? 6 : 8;
@@ -174,8 +174,8 @@ serve(async (req) => {
       prompt,
       duration: snapDuration(model, duration),
       aspect_ratio: ratio,
-      resolution: model === 'ltx-pro' ? '1080p' : '1080p',
-      generate_audio: (await Promise.resolve(body.generateAudio)) !== false,
+      resolution: '1080p',
+      generate_audio: generateAudio !== false,
     };
 
     if (isImageToVideo) {
