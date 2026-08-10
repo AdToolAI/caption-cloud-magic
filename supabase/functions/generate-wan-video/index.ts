@@ -64,10 +64,15 @@ const ASPECT_RATIO_TO_SIZE: Record<string, string> = {
 
 interface GenerateRequest {
   prompt: string;
-  model: 'wan-standard' | 'wan-pro' | 'wan-2-6-standard' | 'wan-2-6-pro';
+  model: 'wan-standard' | 'wan-pro' | 'wan-2-6-standard' | 'wan-2-6-pro' | 'wan-2-7-standard' | 'wan-2-7-pro';
   duration: number;
-  aspectRatio: '16:9' | '9:16' | '1:1';
+  aspectRatio: '16:9' | '9:16' | '1:1' | '4:3' | '3:4';
   startImageUrl?: string;
+  /** Wan 2.7 i2v only: last frame (requires startImageUrl). */
+  endImageUrl?: string;
+  /** All Wan slugs accept these. */
+  negativePrompt?: string;
+  seed?: number;
 }
 
 serve(async (req) => {
@@ -100,10 +105,15 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateRequest;
-    const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl } = body;
+    const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl, endImageUrl, negativePrompt, seed } = body;
 
-    // Wan 2.5 only supports 5 or 10 seconds — snap to nearest valid value
-    const duration = rawDuration >= 8 ? 10 : 5;
+    // Wan 2.5 supports 5 or 10 s; Wan 2.6/2.7 additionally allow 15 s.
+    const isWan27 = model === 'wan-2-7-standard' || model === 'wan-2-7-pro';
+    const isWan26 = model === 'wan-2-6-standard' || model === 'wan-2-6-pro';
+    const allowedDurations = isWan27 || isWan26 ? [5, 10, 15] : [5, 10];
+    const duration = allowedDurations.reduce((best, value) =>
+      Math.abs(value - (rawDuration || 5)) < Math.abs(best - (rawDuration || 5)) ? value : best,
+      allowedDurations[0]);
 
     const isImageToVideo = !!startImageUrl;
     const mode = isImageToVideo ? 'Image-to-Video' : 'Text-to-Video';
@@ -157,7 +167,8 @@ serve(async (req) => {
     console.log(`[generate-wan-video] Cost: ${currencySymbol}${totalCost.toFixed(2)}, Balance: ${currencySymbol}${wallet.balance_euros.toFixed(2)}`);
 
     // Create generation record
-    const resolution = (model === 'wan-pro' || model === 'wan-2-6-pro') ? '1080p' : '720p';
+    const resolution = WAN_RESOLUTION[model]
+      ?? ((model === 'wan-pro' || model === 'wan-2-6-pro') ? '1080p' : '720p');
     const { data: generation, error: genError } = await supabaseAdmin
       .from('ai_video_generations')
       .insert({
@@ -214,7 +225,22 @@ serve(async (req) => {
       duration,
     };
 
-    if (isImageToVideo) {
+    // All Wan slugs (2.5/2.6/2.7, t2v + i2v) accept negative_prompt and seed.
+    if (negativePrompt) replicateInput.negative_prompt = negativePrompt;
+    if (typeof seed === 'number' && Number.isFinite(seed)) {
+      replicateInput.seed = Math.min(2147483647, Math.max(0, Math.round(seed)));
+    }
+
+    if (isWan27) {
+      // Wan 2.7 uses `resolution` (+ `aspect_ratio` on t2v), never `size`.
+      replicateInput.resolution = resolution;
+      if (isImageToVideo) {
+        replicateInput.first_frame = startImageUrl;
+        if (endImageUrl) replicateInput.last_frame = endImageUrl;
+      } else {
+        replicateInput.aspect_ratio = aspectRatio || '16:9';
+      }
+    } else if (isImageToVideo) {
       replicateInput.image = startImageUrl;
       replicateInput.resolution = resolution; // I2V uses "resolution" param
     } else {

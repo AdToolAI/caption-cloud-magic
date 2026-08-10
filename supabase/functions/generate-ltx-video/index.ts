@@ -42,6 +42,11 @@ interface GenerateRequest {
   duration: number;
   aspectRatio: '16:9' | '9:16' | '1:1';
   startImageUrl?: string;
+  /** LTX 2.3 last frame (needs startImageUrl). */
+  endImageUrl?: string;
+  /** 1080p | 2k | 4k — durations > 10 s require 1080p. */
+  resolution?: '1080p' | '2k' | '4k';
+  cameraMotion?: string;
   generateAudio?: boolean;
 }
 
@@ -170,17 +175,23 @@ serve(async (req) => {
     const replicateModel = REPLICATE_MODELS[model];
     const ratio = SUPPORTED_ASPECT_RATIOS.includes(aspectRatio) ? aspectRatio : '16:9';
 
+    // Provider constraint: durations above 10 s are only rendered at 1080p.
+    const requestedResolution = body.resolution ?? '1080p';
+    const ltxResolution = duration > 10 ? '1080p' : requestedResolution;
+
     const replicateInput: Record<string, any> = {
       prompt,
       duration,
       aspect_ratio: ratio,
-      resolution: '1080p',
+      resolution: ltxResolution,
       generate_audio: generateAudio !== false,
     };
 
     if (isImageToVideo) {
       replicateInput.image = startImageUrl;
+      if (body.endImageUrl) replicateInput.last_frame_image = body.endImageUrl;
     }
+    if (body.cameraMotion) replicateInput.camera_motion = body.cameraMotion;
 
     console.log(`[generate-ltx-video] Using model: ${replicateModel}`);
 
