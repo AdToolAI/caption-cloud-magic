@@ -76,8 +76,18 @@ Deno.serve(async (req) => {
       startImageUrl,
       endImageUrl,
       referenceImageUrls,
+      referenceVideoUrls,
+      referenceVideoUrl,
+      referenceAudioUrls,
+      generateAudio = false,
       seed,
     } = body;
+
+    const refVideos = [
+      ...(referenceVideoUrls ?? []),
+      ...(referenceVideoUrl ? [referenceVideoUrl] : []),
+    ].filter(Boolean).slice(0, 10);
+    const refAudios = (referenceAudioUrls ?? []).filter(Boolean).slice(0, 10);
 
     if (!prompt || !prompt.trim()) {
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
@@ -86,7 +96,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!Number.isFinite(duration) || duration < MIN_DURATION || duration > MAX_DURATION) {
+    // `-1` = provider smart duration: billed at the maximum length up front and
+    // corrected down once ModelArk reports the real clip length.
+    const smartDuration = duration === -1;
+    if (
+      !smartDuration &&
+      (!Number.isFinite(duration) || duration < MIN_DURATION || duration > MAX_DURATION)
+    ) {
       return new Response(
         JSON.stringify({
           error: `Duration must be between ${MIN_DURATION} and ${MAX_DURATION} seconds for Seedance 2.5`,
@@ -94,6 +110,8 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+    const billedDuration = smartDuration ? MAX_DURATION : duration;
+
 
     const { data: walletPreview } = await supabaseClient
       .from("ai_video_wallets")
