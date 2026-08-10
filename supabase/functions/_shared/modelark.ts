@@ -98,7 +98,9 @@ export async function createSeedance25Task(params: CreateSeedance25Params): Prom
   //    multimodal reference — are mutually exclusive and must not be mixed.
   const safeResolution = resolution === "480p" ? "480p" : "720p";
   const safeDuration = Math.max(4, Math.min(30, Math.round(duration)));
-  const refs = (referenceImageUrls ?? []).filter(Boolean).slice(0, 30);
+  // ModelArk accepts a small number of reference images per task —
+  // the UI offers 7 slots, so hard-cap here to stay inside the contract.
+  const refs = (referenceImageUrls ?? []).filter(Boolean).slice(0, 7);
   const useReferenceMode = refs.length > 0;
 
   const directives = [
