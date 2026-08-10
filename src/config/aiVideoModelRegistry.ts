@@ -564,9 +564,11 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-seedance-video',
     group: 'fast',
     icon: Video,
-    capabilities: { t2v: true, i2v: true, audio: false },
+    // bytedance/seedance-1-lite: 5 s or 10 s, 480p/720p, start + last frame.
+    capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
     durations: [5, 10],
     resolution: '720p',
+    resolutions: ['720p', '480p'],
     aspectRatios: seedanceAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-mini'].costPerSecond,
     badge: 'Draft',
