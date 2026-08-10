@@ -75,7 +75,6 @@ serve(async (req) => {
     const body = await req.json() as GenerateRequest;
     const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl, generateAudio } = body;
 
-    // Snap to allowed values: 4, 6, 8
     // LTX 2.3 duration enums start at 6 s — snap to the closest allowed value.
     const duration = snapDuration(model, Number(rawDuration) || 6);
 
