@@ -96,6 +96,56 @@ for (const root of ROOTS) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 3. Language purity of src/lib/translations.ts (+ translationsFill.ts):
+//    an automated pass once wrote Spanish strings into the `en` and `de`
+//    dictionaries. Score every literal and flag values whose language does not
+//    match the block they live in.
+// ---------------------------------------------------------------------------
+const WORDS = {
+  es: "el la los las un una unos unas de del que con para por se su sus tu tus no mas esta estan este esto puede debe crea genera sube elige elija cargar descargar guardar nuevo nueva sin lo le han fue son solo tambien cada todos todas desde hasta antes despues mientras aqui ahora bien mejor mismo otra otro pero si porque cuando donde como intenta favor correctamente video vídeo imagen escena creditos".split(" "),
+  de: "der die das den dem des ein eine einen einem eines und oder nicht ist sind wird werden wurde kann kannst dein deine du dir mit zu fuer auf von im am beim keine kein bitte hier jetzt noch nur auch alle wie was wann wo weil aber schon mehr neu neue neues erstellen laden speichern hochladen szene".split(" "),
+  en: "the a an is are was were be your you and with to for of in on at it this that not no failed please could can create start download save settings error video image new only more all from".split(" "),
+};
+const ES_MARKERS = /(ción\b|ciones\b|¿|¡|ñ|vídeo|está\b|más\b)/i;
+const DE_MARKERS = /[äößÄÖ]|(?<![gq])ü/;
+
+function scoreLanguages(value) {
+  const tokens = (value.toLowerCase().match(/[a-zà-ÿ]+/g) || []);
+  const count = (list) => tokens.filter((t) => list.includes(t)).length;
+  return {
+    es: count(WORDS.es) + 2 * (value.match(ES_MARKERS) ? 1 : 0),
+    de: count(WORDS.de) + 2 * (value.match(DE_MARKERS) ? 1 : 0),
+    en: count(WORDS.en),
+  };
+}
+
+for (const file of ["src/lib/translations.ts", "src/lib/translationsFill.ts"]) {
+  let source;
+  try {
+    source = readFileSync(file, "utf8");
+  } catch {
+    continue;
+  }
+  let block = null;
+  source.split("\n").forEach((line, i) => {
+    const head = line.match(/^\s*(?:Object\.assign\(translations\.(en|de|es),|(en|de|es):\s*\{)/);
+    if (head) block = head[1] || head[2];
+    if (!block) return;
+    const entry = line.match(/^\s*[A-Za-z0-9_]+:\s*(['"])(.{4,}?)\1,?\s*$/);
+    if (!entry) return;
+    const value = entry[2];
+    const s = scoreLanguages(value);
+    const wrong =
+      (block === "de" && s.es >= 2 && s.es > s.de + s.en && "Spanish text in the German block") ||
+      (block === "en" && s.es >= 2 && s.es > s.en + s.de && "Spanish text in the English block") ||
+      (block === "es" && s.de >= 2 && s.de > s.es && "German text in the Spanish block");
+    if (wrong) {
+      problems.push(`${file}:${i + 1} ${wrong}: ${value.slice(0, 90)}`);
+    }
+  });
+}
+
 const unique = [...new Set(problems)];
 if (unique.length) {
   console.error(`i18n consistency: ${unique.length} problem(s)`);
