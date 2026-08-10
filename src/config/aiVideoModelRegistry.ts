@@ -587,13 +587,28 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-seedance25-video',
     group: 'premium',
     icon: Video,
-    // ModelArk contract: 4-30 s, 480p/720p, first-frame OR first+last-frame OR
-    // multi-reference (mutually exclusive). No standalone end frame, no audio.
-    capabilities: { t2v: true, i2v: true, audio: false, multiRef: true, maxReferences: 7, refExclusive: true },
+    // ModelArk contract (docs verified 10.08.2026): 4-30 s or smart duration
+    // (-1), 480p/720p, first-frame OR first+last-frame OR multi-reference
+    // (mutually exclusive), up to 30 reference images + 10 reference videos +
+    // 10 reference audio clips, native audio via `generate_audio`.
+    capabilities: {
+      t2v: true,
+      i2v: true,
+      v2v: true,
+      audio: true,
+      multiRef: true,
+      maxReferences: 30,
+      maxReferenceVideos: 10,
+      maxReferenceAudios: 10,
+      refAudio: true,
+      refExclusive: true,
+      smartDuration: true,
+    },
     durations: [4, 5, 8, 10, 12, 15, 20, 25, 30],
     resolution: '720p',
     resolutions: ['720p', '480p'],
-    aspectRatios: sharedAspect,
+    aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-2-5'].costPerSecond,
     badge: 'Neu',
     tagline: tx({ de: `Seedance 2.5 · ${tx({ de: 'bis 30 s pro Szene', en: 'up to 30s per scene', es: 'hasta 30 s por escena' })} · 720p`, en: `Seedance 2.5 · ${tx({ de: 'up to 30 s per scene', en: 'up to 30s per scene', es: 'hasta 30 s por escena' })} · 720p`, es: `Seedance 2.5 · ${tx({ de: 'hasta 30 s por escena', en: 'hasta 30 s por escena', es: 'hasta 30 s por escena' })} · 720p` }),
