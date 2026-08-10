@@ -1234,9 +1234,6 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                   })}
                 </SelectItem>
               )}
-              {[].map((d: number) => (
-
-              ))}
             </SelectContent>
           </Select>
         </div>
