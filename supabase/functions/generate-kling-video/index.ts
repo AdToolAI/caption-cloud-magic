@@ -281,6 +281,10 @@ serve(async (req) => {
     if (referenceVideoUrl) {
       replicateInput.reference_video = referenceVideoUrl;
       replicateInput.video_reference_type = videoReferenceType || 'feature';
+      // Provider constraints: `generate_audio` is mutually exclusive with a
+      // reference video, and 4k mode is unavailable in video-editing mode.
+      delete replicateInput.generate_audio;
+      if (replicateInput.mode === '4k') replicateInput.mode = 'pro';
     }
 
     // Subject references — Omni only. Provider cap: 7 images, 4 with a reference video.
