@@ -328,10 +328,12 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-wan-video',
     group: 'fast',
     icon: Wand2,
+    // wan-2.6: duration enum [5,10,15], size enum only 16:9/9:16, audio is an
+    // upload-only input (no generation flag).
     capabilities: { t2v: true, i2v: true, audio: false },
-    durations: [5, 10],
+    durations: [5, 10, 15],
     resolution: '720p',
-    aspectRatios: sharedAspect,
+    aspectRatios: wanLegacyAspect,
     costPerSecond: WAN_VIDEO_MODELS['wan-2-6-standard'].costPerSecond,
     badge: 'Neu',
     tagline: 'Wan 2.6 · Budget-Champion',
