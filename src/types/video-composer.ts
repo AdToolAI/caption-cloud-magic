@@ -4,6 +4,8 @@ import { tx } from "@/lib/i18nText";
 import type { TextOverlay as DirectorCutTextOverlay } from '@/types/directors-cut';
 import type { ComposerVisualStyle } from '@/config/composerVisualStyles';
 import type { SceneEffectConfig, SceneEffectId } from '@/remotion/components/effects';
+import { buildComposerCostTable } from '@/lib/cost/composerSourceToCatalog';
+
 
 export type { ComposerVisualStyle, SceneEffectConfig, SceneEffectId };
 
