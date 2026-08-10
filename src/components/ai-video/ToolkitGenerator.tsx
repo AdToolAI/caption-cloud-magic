@@ -355,7 +355,13 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   // Canonical per-second price from server catalog (falls back to local config).
   const { getPricePerSecond } = useVideoPricingCatalog();
   const pricePerSecond = getPricePerSecond(model.id, currency) ?? model.costPerSecond[currency];
-  const cost = duration * pricePerSecond;
+  // Smart duration (-1) is reserved at the model's maximum length; the unused
+  // seconds are refunded once the provider reports the real clip length.
+  const billedSeconds = duration === -1
+    ? Math.max(...model.durations)
+    : duration;
+  const cost = billedSeconds * pricePerSecond;
+
   const symbol = currency === 'USD' ? '$' : '€';
   const isUnlimited = (wallet as any)?.is_unlimited === true;
   const canAfford = isUnlimited || (wallet?.balance_euros ?? 0) >= cost;
