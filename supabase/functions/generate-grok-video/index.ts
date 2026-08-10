@@ -25,7 +25,9 @@ interface GenerateRequest {
   prompt: string;
   model: 'grok-imagine';
   duration: number;
-  aspectRatio: '16:9' | '9:16' | '1:1';
+  aspectRatio: '16:9' | '9:16' | '1:1' | '4:3' | '3:4' | '3:2' | '2:3';
+  /** Provider supports 480p and 720p (no 1080p). */
+  resolution?: '480p' | '720p';
   startImageUrl?: string;
   enableAudio?: boolean;
 }
@@ -60,8 +62,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const body = await req.json() as GenerateRequest;
     const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl, enableAudio = true } = body;
 
-    // Snap to allowed values: 6 or 12
-    const duration = rawDuration <= 6 ? 6 : 12;
+    // Provider (xAI Grok Imagine) accepts any integer duration from 1-15 s.
+    const duration = Math.min(15, Math.max(1, Math.round(rawDuration || 6)));
+    const resolution: '480p' | '720p' = body.resolution === '480p' ? '480p' : '720p';
 
     const isImageToVideo = !!startImageUrl;
     console.log(`[generate-grok-video] Mode: ${isImageToVideo ? 'I2V' : 'T2V'}, Duration: ${duration}s, Audio: ${enableAudio}`);
@@ -114,7 +117,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         model,
         duration_seconds: duration,
         aspect_ratio: aspectRatio,
-        resolution: '1080p',
+        resolution,
         cost_per_second: costPerSecond,
         total_cost_euros: totalCost,
         status: 'pending',
@@ -153,9 +156,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const replicateInput: Record<string, any> = {
       prompt,
       // Provider accepts 1-15 s.
-      duration: Math.min(15, Math.max(1, Math.round(duration))),
+      duration,
       aspect_ratio: ratio,
-      resolution: '720p',
+      resolution,
       generate_audio: enableAudio !== false,
     };
 

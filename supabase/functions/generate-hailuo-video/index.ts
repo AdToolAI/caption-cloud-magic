@@ -24,6 +24,8 @@ interface GenerateRequest {
   duration: number;
   resolution: '768p' | '1080p';
   startImageUrl?: string;
+  /** Hailuo 2.3 supports an explicit last frame (requires startImageUrl). */
+  endImageUrl?: string;
   promptOptimizer?: boolean;
   visualStyle?: ComposerVisualStyle | null;
 }
@@ -58,7 +60,7 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateRequest;
-    const { prompt, model, duration: rawDuration, resolution, startImageUrl, promptOptimizer, visualStyle } = body;
+    const { prompt, model, duration: rawDuration, resolution, startImageUrl, endImageUrl, promptOptimizer, visualStyle } = body;
 
     // Hailuo 2.3 only supports 6 or 10 seconds.
     // STRICT (June 26 2026): only an EXACT 10 stays 10; everything else → 6.
@@ -181,6 +183,7 @@ serve(async (req) => {
 
     if (isImageToVideo) {
       replicateInput.first_frame_image = startImageUrl;
+      if (endImageUrl) replicateInput.last_frame_image = endImageUrl;
     }
 
     if (promptOptimizer !== false) {

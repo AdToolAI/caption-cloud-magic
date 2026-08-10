@@ -188,7 +188,8 @@ serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (![5, 10].includes(duration)) {
+    // Gen-4 Aleph processes at most 5 s of the source clip per call.
+    if (![5].includes(duration)) {
       return new Response(JSON.stringify({ error: "Duration must be 5 or 10 seconds." }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -276,8 +277,12 @@ serve(async (req) => {
       promptText: prompt,
       videoUri: referenceVideoUrl,
       ratio,
-      duration,
     };
+
+    // Aleph accepts a single style/subject reference image.
+    if (body.startImageUrl) {
+      runwayBody.references = [{ type: 'image', uri: body.startImageUrl }];
+    }
 
     console.log(`[generate-runway-video] Submitting Runway task:`, {
       ...runwayBody,

@@ -42,8 +42,8 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   // mini  → bytedance/seedance-1-lite      ($0.02/s)
   // std   → bytedance/seedance-2.0-fast    ($0.15/s @720p)
   // pro   → bytedance/seedance-2.0         ($0.18/s @720p)
-  'seedance-mini':        { id: 'seedance-mini',        label: 'Seedance 1 Lite (Draft)', unit: 'per-second', sellEUR: 0.06, sellUSD: 0.06, costEUR: 0.02,  minDuration: 3,  maxDuration: 15 },
-  'seedance-mini-1080p':  { id: 'seedance-mini-1080p',  label: 'Seedance 1 Lite 1080p',   unit: 'per-second', sellEUR: 0.135, sellUSD: 0.135, costEUR: 0.045, minDuration: 3, maxDuration: 15 },
+  'seedance-mini':        { id: 'seedance-mini',        label: 'Seedance 1 Lite (Draft)', unit: 'per-second', sellEUR: 0.06, sellUSD: 0.06, costEUR: 0.02,  minDuration: 5,  maxDuration: 10 },
+  'seedance-mini-1080p':  { id: 'seedance-mini-1080p',  label: 'Seedance 1 Lite 1080p',   unit: 'per-second', sellEUR: 0.135, sellUSD: 0.135, costEUR: 0.045, minDuration: 5, maxDuration: 10 },
   'seedance-standard':    { id: 'seedance-standard',    label: 'Seedance 2.0 Fast 720p',  unit: 'per-second', sellEUR: 0.45, sellUSD: 0.45, costEUR: 0.15,  minDuration: 3,  maxDuration: 15 },
   'seedance-pro':         { id: 'seedance-pro',         label: 'Seedance 2.0 720p',       unit: 'per-second', sellEUR: 0.54, sellUSD: 0.54, costEUR: 0.18,  minDuration: 3,  maxDuration: 15 },
   // Seedance 2.5 via BytePlus ModelArk (direct API, not Replicate) —
@@ -57,7 +57,7 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   // Kling
   'kling-3':              { id: 'kling-3',              label: 'Kling 3.0 1080p',      unit: 'per-second', sellEUR: 0.18, sellUSD: 0.18, costEUR: 0.06,  minDuration: 3,  maxDuration: 15 },
   'kling-2.5-turbo':      { id: 'kling-2.5-turbo',      label: 'Kling 2.5 Turbo Pro',  unit: 'per-second', sellEUR: 0.09, sellUSD: 0.09, costEUR: 0.03,  minDuration: 5,  maxDuration: 10 },
-  'kling-2.6':            { id: 'kling-2.6',            label: 'Kling 2.6',            unit: 'per-second', sellEUR: 0.12, sellUSD: 0.12, costEUR: 0.04,  minDuration: 5,  maxDuration: 15 },
+  'kling-2.6':            { id: 'kling-2.6',            label: 'Kling 2.6',            unit: 'per-second', sellEUR: 0.12, sellUSD: 0.12, costEUR: 0.04,  minDuration: 5,  maxDuration: 10 },
   'kling-omni':           { id: 'kling-omni',           label: 'Kling 3.0 Omni',       unit: 'per-second', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20,  minDuration: 3,  maxDuration: 15 },
 
   // Wan 2.5 / 2.6 / 2.7
@@ -92,7 +92,7 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   'pika-2-2-pro':         { id: 'pika-2-2-pro',         label: 'Pika 2.2 Pro',         unit: 'per-second', sellEUR: 0.27, sellUSD: 0.27, costEUR: 0.09,  minDuration: 3,  maxDuration: 10 },
 
   // Runway
-  'runway-gen4-aleph':    { id: 'runway-gen4-aleph',    label: 'Runway Gen-4 Aleph',   unit: 'per-second', sellEUR: 0.24, sellUSD: 0.24, costEUR: 0.08,  minDuration: 5,  maxDuration: 10 },
+  'runway-gen4-aleph':    { id: 'runway-gen4-aleph',    label: 'Runway Gen-4 Aleph',   unit: 'per-second', sellEUR: 0.24, sellUSD: 0.24, costEUR: 0.08,  minDuration: 5,  maxDuration: 5 },
 
   // Premium engines
   'veo-3.1-lite-720p':    { id: 'veo-3.1-lite-720p',    label: 'Veo 3.1 Lite 720p',    unit: 'per-second', sellEUR: 0.45, sellUSD: 0.45, costEUR: 0.15,  minDuration: 4,  maxDuration: 8  },

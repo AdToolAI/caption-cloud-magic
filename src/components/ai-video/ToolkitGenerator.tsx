@@ -285,6 +285,18 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
    *  V2V uploads would overwrite the anchor and produce foreign faces with
    *  the wrong voices, so we hard-lock them and clear any prior uploads. */
   const omniMediaLock = isKlingOmni && omniLines.some((r) => !!r.characterId);
+
+  // Some providers accept reference images only under specific settings
+  // (Veo 3.1: `reference_images` are honoured at 16:9 + 8 s only).
+  const refRequires = model.capabilities.refRequires;
+  const refConstraintMet =
+    !refRequires ||
+    ((!refRequires.aspectRatios || refRequires.aspectRatios.includes(aspectRatio)) &&
+      (!refRequires.durations || refRequires.durations.includes(duration)));
+  const refConstraintHint = [
+    refRequires?.aspectRatios?.join(' / '),
+    refRequires?.durations ? `${refRequires.durations.join(' / ')}s` : null,
+  ].filter(Boolean).join(' · ');
   useEffect(() => {
     if (!omniMediaLock) return;
     if (startImageUrl) setStartImageUrl(null);
@@ -707,7 +719,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           setGenerating(false);
           return;
         }
-        if (viduReferences.length > 0) {
+        if (viduReferences.length > 0 && refConstraintMet) {
           const urls = viduReferences.map((s) => s.url);
           if (model.capabilities.multiRefRequired) {
             body.referenceImages = urls;
@@ -982,18 +994,31 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </Card>
       )}
 
-      {/* ── Multi-Reference (capabilities.multiRef → Vidu Reference2V, Seedance 2.5) ── */}
+      {/* ── Multi-Reference (capabilities.multiRef → Vidu Reference2V, Seedance 2.5, Veo 3.1) ── */}
       {model.capabilities.multiRef && !omniMediaLock &&
         !(model.capabilities.refExclusive && !!startImageUrl) && (
-        <MultiReferenceUploader
-          slots={viduReferences}
-          onChange={setViduReferences}
-          maxReferences={model.capabilities.maxReferences ?? 7}
-          required={!!model.capabilities.multiRefRequired}
-          modelLabel={model.name}
-          brandCharacterUrl={brandCharacter?.reference_image_url ?? null}
-          brandCharacterName={brandCharacter?.name ?? null}
-        />
+        refConstraintMet ? (
+          <MultiReferenceUploader
+            slots={viduReferences}
+            onChange={setViduReferences}
+            maxReferences={model.capabilities.maxReferences ?? 7}
+            required={!!model.capabilities.multiRefRequired}
+            modelLabel={model.name}
+            brandCharacterUrl={brandCharacter?.reference_image_url ?? null}
+            brandCharacterName={brandCharacter?.name ?? null}
+          />
+        ) : (
+          <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              {language === 'de'
+                ? `${model.name} akzeptiert Referenzbilder nur bei ${refConstraintHint}. Stelle Format und Länge entsprechend ein, dann erscheint der Upload.`
+                : language === 'es'
+                ? `${model.name} solo acepta imágenes de referencia con ${refConstraintHint}. Ajusta el formato y la duración y aparecerá la subida.`
+                : `${model.name} only accepts reference images at ${refConstraintHint}. Set format and duration accordingly and the uploader appears.`}
+            </span>
+          </div>
+        )
       )}
 
       {/* ── Image upload (only for I2V) ── */}

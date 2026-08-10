@@ -29,14 +29,21 @@ const LUMA_SLUG: Record<string, string> = {
   'luma-ray32-10s': 'luma/ray-3.2',
 };
 
+/** Ray 2 + Ray 3.2 `aspect_ratio` enum (Ray 3.2 has no 9:21). */
+type LumaAspectRatio = '16:9' | '9:16' | '1:1' | '4:3' | '3:4' | '21:9' | '9:21';
+
 interface GenerateRequest {
   prompt: string;
   model: 'luma-standard' | 'luma-pro' | 'luma-ray32-5s' | 'luma-ray32-10s';
   duration: number;
-  aspectRatio: '16:9' | '9:16' | '1:1';
+  aspectRatio: LumaAspectRatio;
+  /** Ray 3.2 only: 540p | 720p | 1080p. Ray 2 is fixed 720p. */
+  resolution?: '540p' | '720p' | '1080p';
   startImageUrl?: string;
   endImageUrl?: string;
   loop?: boolean;
+  /** Ray 3.2 only: HDR pass (requires 720p/1080p, 5s, no loop). */
+  hdr?: boolean;
   cameraConcept?: string;
 }
 
@@ -70,14 +77,20 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateRequest;
-    const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl, endImageUrl, loop, cameraConcept } = body;
+    const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl, endImageUrl, loop, hdr, cameraConcept } = body;
 
-    // Luma Ray 2 supports 5 or 9 seconds
-    const duration = rawDuration >= 7 ? 9 : 5;
+    const isRay32 = model === 'luma-ray32-5s' || model === 'luma-ray32-10s';
+    // Ray 3.2: fixed 5 s / 10 s per tier. Ray 2: enum [5, 9].
+    const duration = isRay32
+      ? (model === 'luma-ray32-10s' ? 10 : 5)
+      : (rawDuration >= 7 ? 9 : 5);
+
+    // Ray 2 (`luma/ray-2-720p`) has no resolution input — it is 720p only.
+    const resolution = isRay32 ? (body.resolution ?? '720p') : '720p';
 
     const isImageToVideo = !!startImageUrl;
     const mode = isImageToVideo ? 'Image-to-Video' : 'Text-to-Video';
-    console.log(`[generate-luma-video] Mode: ${mode}, Duration: ${duration}s`);
+    console.log(`[generate-luma-video] Mode: ${mode}, Duration: ${duration}s, Resolution: ${resolution}`);
 
     // Get wallet currency
     const { data: walletPreview } = await supabaseClient
@@ -135,7 +148,7 @@ serve(async (req) => {
         model,
         duration_seconds: duration,
         aspect_ratio: aspectRatio,
-        resolution: '720p',
+        resolution,
         cost_per_second: costPerSecond,
         total_cost_euros: totalCost,
         status: 'pending',
@@ -173,35 +186,47 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const webhookUrl = appendWebhookToken(`${SUPABASE_URL}/functions/v1/replicate-webhook`);
 
-    // Build Replicate input for luma/ray-2-720p
+    const lumaSlug = LUMA_SLUG[model] || 'luma/ray-2-720p';
+
+    // Provider contract (Replicate schemas, verified 10.08.2026):
+    //  luma/ray-2-720p : duration [5,9], 7 ratios, start/end image, loop, concepts, fixed 720p.
+    //  luma/ray-3.2    : duration [5,10], resolution [540p,720p,1080p], 6 ratios
+    //                    (ignored when an anchor frame is set), start/end image ONLY at 5 s,
+    //                    loop NOT allowed with 10 s / hdr / end_image, hdr needs 720p+/5s/no loop,
+    //                    no `concepts` field at all.
     const replicateInput: Record<string, any> = {
       prompt,
       duration,
       aspect_ratio: aspectRatio,
     };
 
-    if (startImageUrl) {
+    const anchorAllowed = !isRay32 || duration === 5;
+
+    if (startImageUrl && anchorAllowed) {
       replicateInput.start_image = startImageUrl;
     }
 
-    if (endImageUrl) {
+    if (endImageUrl && anchorAllowed) {
       replicateInput.end_image = endImageUrl;
     }
 
-    if (loop) {
+    const loopAllowed = loop && (!isRay32 || (duration !== 10 && !hdr && !replicateInput.end_image));
+    if (loopAllowed) {
       replicateInput.loop = true;
     }
 
-    if (cameraConcept && cameraConcept !== 'none') {
+    if (!isRay32 && cameraConcept && cameraConcept !== 'none') {
+      // Camera concepts exist on Ray 2 only.
       replicateInput.concepts = [cameraConcept];
     }
 
-    const lumaSlug = LUMA_SLUG[model] || 'luma/ray-2-720p';
-    if (lumaSlug === 'luma/ray-3.2') {
-      // Ray 3.2 erwartet feste Cliplängen (5s oder 10s) und eine Auflösung.
-      replicateInput.duration = model === 'luma-ray32-10s' ? 10 : 5;
-      replicateInput.resolution = '720p';
+    if (isRay32) {
+      replicateInput.resolution = resolution;
+      if (hdr && resolution !== '540p' && duration === 5 && !replicateInput.loop) {
+        replicateInput.hdr = true;
+      }
     }
+
     console.log(`[generate-luma-video] Using model: ${lumaSlug}`);
     console.log(`[generate-luma-video] Replicate input:`, JSON.stringify({
       ...replicateInput,
@@ -229,7 +254,7 @@ serve(async (req) => {
 
       await trackAIGeneration('started', user.id, {
         provider: 'luma', model, duration_s: duration,
-        cost_eur: totalCost, aspect_ratio: aspectRatio, resolution: '720p',
+        cost_eur: totalCost, aspect_ratio: aspectRatio, resolution,
         generation_id: generation.id,
       }).catch(() => {});
 

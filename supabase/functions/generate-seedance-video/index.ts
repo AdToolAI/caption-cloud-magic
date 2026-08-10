@@ -32,6 +32,12 @@ interface GenerateRequest {
   aspectRatio: '16:9' | '9:16' | '1:1';
   // Image-to-Video
   startImageUrl?: string;
+  /** seedance-1-lite (mini): last frame, requires startImageUrl. */
+  endImageUrl?: string;
+  /** seedance-1-lite (mini): 480p or 720p. Other tiers render 720p. */
+  resolution?: '480p' | '720p';
+  cameraFixed?: boolean;
+  seed?: number;
 }
 
 serve(async (req) => {
@@ -65,7 +71,13 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateRequest;
-    const { prompt, model, duration, aspectRatio, startImageUrl } = body;
+    const { prompt, model, duration: requestedDuration, aspectRatio, startImageUrl, endImageUrl } = body;
+
+    // seedance-1-lite only renders 5 s or 10 s clips — snap to the nearest.
+    const isLite = model === 'seedance-mini';
+    const duration = isLite
+      ? (Math.abs(requestedDuration - 10) < Math.abs(requestedDuration - 5) ? 10 : 5)
+      : requestedDuration;
 
     // Validate duration (3-15 seconds)
     if (duration < 3 || duration > 15) {
@@ -129,7 +141,8 @@ serve(async (req) => {
     console.log(`[generate-seedance-video] Cost: ${currencySymbol}${totalCost.toFixed(2)}, Balance: ${currencySymbol}${wallet.balance_euros.toFixed(2)}`);
 
     // Create generation record
-    const resolution = '720p'; // Seedance 2.0 wird bei uns auf 720p bepreist/gerendert
+    // seedance-1-lite additionally offers 480p; 2.0 tiers are priced at 720p.
+    const resolution = (isLite && body.resolution === '480p') ? '480p' : '720p';
     const { data: generation, error: genError } = await supabaseAdmin
       .from('ai_video_generations')
       .insert({
@@ -181,12 +194,18 @@ serve(async (req) => {
       prompt,
       duration: Math.min(Math.max(duration, 3), 15),
       aspect_ratio: aspectRatio,
-      resolution: '720p',
+      resolution,
     };
 
     // Image-to-Video
     if (startImageUrl) {
       replicateInput.image = startImageUrl;
+      // Last-frame control exists on seedance-1-lite and requires a start image.
+      if (isLite && endImageUrl) replicateInput.last_frame_image = endImageUrl;
+    }
+    if (isLite && body.cameraFixed) replicateInput.camera_fixed = true;
+    if (typeof body.seed === 'number' && Number.isFinite(body.seed)) {
+      replicateInput.seed = Math.max(0, Math.round(body.seed));
     }
 
     console.log(`[generate-seedance-video] Replicate input:`, JSON.stringify({

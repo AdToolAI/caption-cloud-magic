@@ -96,6 +96,12 @@ export interface ToolkitModel {
     /** Max number of reference audio clips supported when refAudio is true. */
     maxReferenceAudios?: number;
     /**
+     * Provider constraints under which reference images are accepted at all.
+     * Veo 3.1 for example only honours `reference_images` at 16:9 and 8 s.
+     * The UI hides the reference uploader while the constraint is unmet.
+     */
+    refRequires?: { aspectRatios?: string[]; durations?: number[] };
+    /**
      * Provider-side smart duration (`duration: -1`): the model picks the clip
      * length itself. Billed at the maximum duration and corrected downwards
      * once the provider reports the real length.
@@ -237,7 +243,13 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-veo-video',
     group: 'audio',
     icon: Volume2,
-    capabilities: { t2v: true, i2v: true, audio: true, nativeDialogue: true },
+    // google/veo-3.1(-fast): duration [4,6,8], 16:9/9:16, generate_audio,
+    // reference_images 1-3 — provider honours them only at 16:9 + 8 s.
+    capabilities: {
+      t2v: true, i2v: true, audio: true, nativeDialogue: true,
+      multiRef: true, maxReferences: 3,
+      refRequires: { aspectRatios: ['16:9'], durations: [8] },
+    },
     durations: [4, 6, 8],
     resolution: '720p',
     aspectRatios: ['16:9', '9:16'],
@@ -254,7 +266,11 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-veo-video',
     group: 'audio',
     icon: Volume2,
-    capabilities: { t2v: true, i2v: true, audio: true, nativeDialogue: true },
+    capabilities: {
+      t2v: true, i2v: true, audio: true, nativeDialogue: true,
+      multiRef: true, maxReferences: 3,
+      refRequires: { aspectRatios: ['16:9'], durations: [8] },
+    },
     durations: [4, 6, 8],
     resolution: '1080p',
     aspectRatios: ['16:9', '9:16'],
@@ -270,7 +286,11 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-veo-video',
     group: 'premium',
     icon: Volume2,
-    capabilities: { t2v: true, i2v: true, audio: true, nativeDialogue: true },
+    capabilities: {
+      t2v: true, i2v: true, audio: true, nativeDialogue: true,
+      multiRef: true, maxReferences: 3,
+      refRequires: { aspectRatios: ['16:9'], durations: [8] },
+    },
     durations: [4, 6, 8],
     resolution: '1080p',
     aspectRatios: ['16:9', '9:16'],
@@ -309,10 +329,12 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-ltx-video',
     group: 'fast',
     icon: Zap,
-    // lightricks/ltx-2.3-fast: duration enum 6-20, 1080p+, 16:9/9:16, native audio.
-    capabilities: { t2v: true, i2v: true, audio: true },
-    durations: [6, 8, 10],
+    // lightricks/ltx-2.3-fast: duration enum 6-20 (step 2), 1080p/2k/4k,
+    // 16:9/9:16, native audio, last frame + camera motion.
+    capabilities: { t2v: true, i2v: true, audio: true, endFrame: true },
+    durations: [6, 8, 10, 12, 14, 16, 18, 20],
     resolution: '1080p',
+    resolutions: ['1080p', '2k', '4k'],
     aspectRatios: ltxAspect,
     costPerSecond: LTX_VIDEO_MODELS['ltx-standard'].costPerSecond,
     badge: 'Schnell & Günstig',
@@ -487,11 +509,12 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     icon: Camera,
     capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
     durations: [5, 9],
-    resolution: '1080p',
+    // luma/ray-2-720p has no resolution input — the model renders 720p only.
+    resolution: '720p',
     aspectRatios: lumaRay2Aspect,
     costPerSecond: LUMA_VIDEO_MODELS['luma-pro'].costPerSecond,
     badge: 'Premium',
-    tagline: 'Cinematic Pro · 1080p',
+    tagline: 'Cinematic Pro · 720p',
     legacyRoute: '/luma-video-studio',
   },
   {
@@ -503,8 +526,10 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     group: 'recommended',
     icon: Camera,
     capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
+    // luma/ray-3.2: resolution enum 540p/720p/1080p; start/end frame only at 5 s.
     durations: [5],
     resolution: '720p',
+    resolutions: ['720p', '1080p', '540p'],
     aspectRatios: lumaRay32Aspect,
     costPerSecond: LUMA_VIDEO_MODELS['luma-ray32-5s'].costPerSecond,
     badge: 'Neu',
@@ -519,9 +544,12 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-luma-video',
     group: 'premium',
     icon: Camera,
-    capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
+    // Ray 3.2 accepts start/end frames only at 5 s — the 10 s tier is text-only
+    // plus optional prompt guidance, and `loop` is rejected at 10 s.
+    capabilities: { t2v: true, i2v: false, audio: false, endFrame: false },
     durations: [10],
     resolution: '720p',
+    resolutions: ['720p', '1080p', '540p'],
     aspectRatios: lumaRay32Aspect,
     costPerSecond: LUMA_VIDEO_MODELS['luma-ray32-10s'].costPerSecond,
     badge: 'Neu · 10s',
@@ -536,9 +564,11 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-seedance-video',
     group: 'fast',
     icon: Video,
-    capabilities: { t2v: true, i2v: true, audio: false },
-    durations: [3, 5, 8, 10, 12, 15],
+    // bytedance/seedance-1-lite: 5 s or 10 s, 480p/720p, start + last frame.
+    capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
+    durations: [5, 10],
     resolution: '720p',
+    resolutions: ['720p', '480p'],
     aspectRatios: seedanceAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-mini'].costPerSecond,
     badge: 'Draft',
@@ -626,8 +656,10 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-runway-video',
     group: 'premium',
     icon: Film,
-    capabilities: { t2v: false, i2v: false, v2v: true, audio: false },
-    durations: [5, 10],
+    // Runway Gen-4 Aleph consumes at most 5 s of the source clip per call and
+    // accepts one optional reference image.
+    capabilities: { t2v: false, i2v: false, v2v: true, audio: false, multiRef: true, maxReferences: 1 },
+    durations: [5],
     resolution: '720p',
     aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
     costPerSecond: { EUR: 0.24, USD: 0.24 },

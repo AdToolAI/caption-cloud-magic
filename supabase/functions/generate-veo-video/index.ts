@@ -40,8 +40,16 @@ interface GenerateRequest {
   duration: number;
   aspectRatio: '16:9' | '9:16';
   startImageUrl?: string;
+  /** Veo 3.1 `last_frame`: end frame for interpolation (needs a start image). */
+  endImageUrl?: string;
+  /**
+   * Veo 3.1 `reference_images`: 1–3 style/subject references.
+   * Provider constraint: 16:9 + 8 s only, and `last_frame` is ignored when set.
+   */
+  referenceImageUrls?: string[];
   generateAudio?: boolean;
   negativePrompt?: string;
+  seed?: number;
 }
 
 serve(async (req) => {
@@ -83,7 +91,7 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateRequest & { spokenLanguage?: string; suppressDialogue?: boolean };
-    const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl, generateAudio = true, negativePrompt } = body;
+    const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl, endImageUrl, referenceImageUrls, generateAudio = true, negativePrompt, seed } = body;
     const spokenLanguage = typeof body.spokenLanguage === 'string' ? body.spokenLanguage : undefined;
     const suppressDialogue = body.suppressDialogue === true;
     if (generateAudio && spokenLanguage) {
@@ -225,6 +233,30 @@ serve(async (req) => {
     if (isImageToVideo) {
       replicateInput.image = startImageUrl;
     }
+
+    if (typeof seed === 'number' && Number.isFinite(seed)) {
+      replicateInput.seed = Math.trunc(seed);
+    }
+
+    // Provider contract (Replicate google/veo-3.1 schema, verified 10.08.2026):
+    // `reference_images` accepts 1–3 URIs but ONLY at 16:9 + 8 s, and it makes
+    // the provider ignore `last_frame`. So references win when both are sent.
+    const refs = Array.isArray(referenceImageUrls)
+      ? referenceImageUrls.filter((u) => typeof u === 'string' && u.trim()).slice(0, 3)
+      : [];
+    const refsAllowed = refs.length > 0 && aspectRatio === '16:9' && duration === 8;
+
+    if (refsAllowed) {
+      replicateInput.reference_images = refs;
+    } else if (endImageUrl && isImageToVideo) {
+      // `last_frame` interpolates from the start image to this end frame.
+      replicateInput.last_frame = endImageUrl;
+    }
+
+    if (refs.length > 0 && !refsAllowed) {
+      console.log('[generate-veo-video] reference_images dropped — provider allows them only at 16:9 / 8s');
+    }
+
 
     console.log(`[generate-veo-video] Using model: ${replicateModel}`);
     console.log(`[generate-veo-video] Input:`, JSON.stringify({
