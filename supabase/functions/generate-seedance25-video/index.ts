@@ -278,7 +278,7 @@ Deno.serve(async (req) => {
     await trackAIGeneration("started", user.id, {
       provider: "modelark",
       model: MODEL_ID,
-      duration_s: duration,
+      duration_s: billedDuration,
       cost_eur: totalCost,
       aspect_ratio: aspectRatio,
       resolution,
