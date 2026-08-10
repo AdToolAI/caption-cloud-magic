@@ -234,13 +234,25 @@ export async function getModelArkTask(taskId: string): Promise<ModelArkTask> {
     json?.data?.content?.video_url ??
     json?.result?.video_url ??
     undefined;
+  const rawDuration =
+    json?.duration ??
+    json?.data?.duration ??
+    json?.content?.duration ??
+    json?.data?.content?.duration ??
+    json?.usage?.duration ??
+    json?.data?.usage?.duration;
+  const durationSeconds =
+    typeof rawDuration === "number" && Number.isFinite(rawDuration) && rawDuration > 0
+      ? rawDuration
+      : undefined;
   const error =
     json?.error?.message ??
     json?.data?.error?.message ??
     (status === "failed" ? "Generation failed at provider" : undefined);
 
-  return { id: taskId, status, videoUrl, error, raw: json };
+  return { id: taskId, status, videoUrl, durationSeconds, error, raw: json };
 }
+
 
 /** Strips the `modelark:` prefix from a stored job id. */
 export function extractModelArkTaskId(jobId: string | null | undefined): string | null {
