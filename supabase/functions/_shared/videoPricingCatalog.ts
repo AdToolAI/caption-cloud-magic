@@ -78,8 +78,8 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
 
 
   // LTX
-  'ltx-standard':         { id: 'ltx-standard',         label: 'LTX 2.0 Std',          unit: 'per-second', sellEUR: 0.06, sellUSD: 0.06, costEUR: 0.02,  minDuration: 3,  maxDuration: 10 },
-  'ltx-pro':              { id: 'ltx-pro',              label: 'LTX 2.0 Pro',          unit: 'per-second', sellEUR: 0.12, sellUSD: 0.12, costEUR: 0.04,  minDuration: 3,  maxDuration: 10 },
+  'ltx-standard':         { id: 'ltx-standard',         label: 'LTX 2.3 Fast',         unit: 'per-second', sellEUR: 0.18, sellUSD: 0.18, costEUR: 0.06,  minDuration: 6,  maxDuration: 20 },
+  'ltx-pro':              { id: 'ltx-pro',              label: 'LTX 2.3 Pro',          unit: 'per-second', sellEUR: 0.24, sellUSD: 0.24, costEUR: 0.08,  minDuration: 6,  maxDuration: 10 },
 
   // Vidu — Q2-IDs bleiben aus Kompatibilität, laufen aber real auf Vidu Q3 (per-clip 5s)
   'vidu-q2-reference':    { id: 'vidu-q2-reference',    label: 'Vidu Q3 Reference (5s)', unit: 'per-clip', sellEUR: 0.66, sellUSD: 0.66, costEUR: 0.22, fixedClipSeconds: 5 },
@@ -100,7 +100,7 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   'veo-3.1-pro':          { id: 'veo-3.1-pro',          label: 'Veo 3.1 Pro 1080p',    unit: 'per-second', sellEUR: 3.30, sellUSD: 3.30, costEUR: 1.10,  minDuration: 4,  maxDuration: 8  },
   'sora-2-standard':      { id: 'sora-2-standard',      label: 'Sora 2 Standard (EOL 24.09.2026)',      unit: 'per-second', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20,  minDuration: 4,  maxDuration: 20 },
   'sora-2-pro':           { id: 'sora-2-pro',           label: 'Sora 2 Pro (EOL 24.09.2026)',           unit: 'per-second', sellEUR: 1.35, sellUSD: 1.35, costEUR: 0.45,  minDuration: 4,  maxDuration: 20 },
-  'grok-imagine':         { id: 'grok-imagine',         label: 'Grok Imagine',         unit: 'per-second', sellEUR: 0.45, sellUSD: 0.45, costEUR: 0.15,  minDuration: 4,  maxDuration: 15 },
+  'grok-imagine':         { id: 'grok-imagine',         label: 'Grok Imagine',         unit: 'per-second', sellEUR: 0.15, sellUSD: 0.15, costEUR: 0.05,  minDuration: 1,  maxDuration: 15 },
 };
 
 /** Canonical price resolver used by every generate-*-video Edge Function. */
