@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
 
     const currency = (walletPreview?.currency || "EUR") as "EUR" | "USD";
     const costPerSecond = resolveCostPerSecond(MODEL_ID, currency) ?? 0.54;
-    const totalCost = +(duration * costPerSecond).toFixed(4);
+    const totalCost = +(billedDuration * costPerSecond).toFixed(4);
 
     const { data: wallet, error: walletError } = await supabaseAdmin
       .from("ai_video_wallets")
