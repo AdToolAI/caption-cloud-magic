@@ -29,13 +29,14 @@ const KLING_MODEL_CONFIG: Record<KlingModelId, {
   supportsNativeLipSync: boolean;
   resolution: '720p' | '1080p';
 }> = {
-  'kling-3':          { slug: 'kwaivgi/kling-v3-video',                          supportsNativeAudio: true,  supportsNativeLipSync: false, resolution: '1080p' },
+  // v3 + Omni expose `mode`: standard=720p, pro=1080p, 4k. We bill 1080p → send `pro`.
+  'kling-3':          { slug: 'kwaivgi/kling-v3-video',       mode: 'pro', supportsNativeAudio: true,  supportsNativeLipSync: false, resolution: '1080p' },
   // Legacy aliases resolve to the unified v3 slug (Replicate consolidated 3.0).
-  'kling-3-standard': { slug: 'kwaivgi/kling-v3-video',                          supportsNativeAudio: true,  supportsNativeLipSync: false, resolution: '1080p' },
-  'kling-3-pro':      { slug: 'kwaivgi/kling-v3-video',                          supportsNativeAudio: true,  supportsNativeLipSync: false, resolution: '1080p' },
-  'kling-2.5-turbo':  { slug: 'kwaivgi/kling-v2.5-turbo-pro',                    supportsNativeAudio: false, supportsNativeLipSync: false, resolution: '1080p' },
-  'kling-2.6':        { slug: 'kwaivgi/kling-v2.6',                              supportsNativeAudio: true,  supportsNativeLipSync: false, resolution: '1080p' },
-  'kling-omni':       { slug: 'kwaivgi/kling-v3-omni-video',                     supportsNativeAudio: true,  supportsNativeLipSync: true,  resolution: '1080p' },
+  'kling-3-standard': { slug: 'kwaivgi/kling-v3-video',       mode: 'pro', supportsNativeAudio: true,  supportsNativeLipSync: false, resolution: '1080p' },
+  'kling-3-pro':      { slug: 'kwaivgi/kling-v3-video',       mode: 'pro', supportsNativeAudio: true,  supportsNativeLipSync: false, resolution: '1080p' },
+  'kling-2.5-turbo':  { slug: 'kwaivgi/kling-v2.5-turbo-pro',              supportsNativeAudio: false, supportsNativeLipSync: false, resolution: '1080p' },
+  'kling-2.6':        { slug: 'kwaivgi/kling-v2.6',                        supportsNativeAudio: true,  supportsNativeLipSync: false, resolution: '1080p' },
+  'kling-omni':       { slug: 'kwaivgi/kling-v3-omni-video',  mode: 'pro', supportsNativeAudio: true,  supportsNativeLipSync: true,  resolution: '1080p' },
 };
 
 interface GenerateRequest {
@@ -59,6 +60,8 @@ interface GenerateRequest {
   videoReferenceType?: 'feature' | 'base';
   /** Omni only: subject reference images (max 7, max 4 alongside a reference video). */
   referenceImageUrls?: string[];
+  /** Supported by all four Kling slugs. */
+  negativePrompt?: string;
 }
 
 serve(async (req) => {
@@ -240,24 +243,30 @@ serve(async (req) => {
       ? (LANG_MAP[spokenLanguage.toLowerCase()] ?? spokenLanguage)
       : undefined;
 
-    // Native audio (Kling 2.6 / Omni). Ambient-only fallback disables TTS.
+    // Native audio (Kling 2.6 / v3 / Omni). The provider only exposes the
+    // boolean `generate_audio` — there is no `spoken_language`, `dialog`,
+    // `voice` or `speaker_voices` input in the official Replicate schema.
     if (modelConfig.supportsNativeAudio && generateAudio && !suppressDialogue) {
       replicateInput.generate_audio = true;
-      if (klingLang) replicateInput.spoken_language = klingLang;
     }
 
-    // Native lip-sync (Omni only): if we have dialog text, hand it to Kling
-    // and skip the downstream Sync.so pipeline entirely.
+    // Native lip-sync (Omni): dialogue must be embedded as quoted speech inside
+    // the prompt — that is the documented way to drive Kling's lip-sync.
     if (modelConfig.supportsNativeLipSync && dialogText && dialogText.trim().length > 0 && !suppressDialogue) {
-      replicateInput.dialog = dialogText.trim();
-      if (voicePreset) replicateInput.voice = voicePreset;
-      if (Array.isArray(speakerVoices) && speakerVoices.length > 0) {
-        replicateInput.speaker_voices = speakerVoices
-          .slice(0, 2)
-          .map((s) => ({ name: String(s.name || '').slice(0, 40), voice: String(s.voice || 'neutral') }));
-      }
-      if (klingLang) replicateInput.spoken_language = klingLang;
-      console.log(`[generate-kling-video] Native lip-sync enabled (Omni, lang=${klingLang ?? 'auto'}, chars=${dialogText.length}, speakers=${speakerVoices?.length ?? 1})`);
+      const speakerHint = Array.isArray(speakerVoices) && speakerVoices.length > 0
+        ? ` Speakers: ${speakerVoices.slice(0, 2).map((s) => String(s.name || '').slice(0, 40)).filter(Boolean).join(', ')}.`
+        : '';
+      const langHint = klingLang ? ` Spoken language: ${klingLang}.` : '';
+      const toneHint = voicePreset ? ` Voice tone: ${voicePreset}.` : '';
+      replicateInput.prompt =
+        `${replicateInput.prompt}\n\nThe character speaks, lip-synced: "${dialogText.trim().replace(/"/g, "'")}".${langHint}${speakerHint}${toneHint}`;
+      replicateInput.generate_audio = true;
+      console.log(`[generate-kling-video] Native lip-sync via prompt (Omni, lang=${klingLang ?? 'auto'}, chars=${dialogText.length})`);
+    }
+
+    // Negative prompt is accepted by every Kling slug we call.
+    if (body.negativePrompt) {
+      replicateInput.negative_prompt = String(body.negativePrompt).slice(0, 2500);
     }
 
     // Image-to-Video
@@ -283,7 +292,6 @@ serve(async (req) => {
     console.log(`[generate-kling-video] Replicate slug=${modelConfig.slug} input:`, JSON.stringify({
       ...replicateInput,
       prompt: prompt.substring(0, 100) + (prompt.length > 100 ? '...' : ''),
-      dialog: replicateInput.dialog ? `${String(replicateInput.dialog).substring(0, 60)}…` : undefined,
     }));
 
     try {
