@@ -652,8 +652,10 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-runway-video',
     group: 'premium',
     icon: Film,
-    capabilities: { t2v: false, i2v: false, v2v: true, audio: false },
-    durations: [5, 10],
+    // Runway Gen-4 Aleph consumes at most 5 s of the source clip per call and
+    // accepts one optional reference image.
+    capabilities: { t2v: false, i2v: false, v2v: true, audio: false, multiRef: true, maxReferences: 1 },
+    durations: [5],
     resolution: '720p',
     aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
     costPerSecond: { EUR: 0.24, USD: 0.24 },
