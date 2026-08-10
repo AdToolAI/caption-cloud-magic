@@ -42,11 +42,11 @@ function parseSharedSourceMap(): Record<string, { standard: string; pro: string 
 }
 
 describe('pricing catalog — 3.00× margin policy', () => {
-  it('every model sells at 2.95×–3.10× provider cost', () => {
+  it('every model sells at 2.95×–3.12× provider cost (rounded price points)', () => {
     const offenders: string[] = [];
     for (const entry of Object.values(VIDEO_PRICING_CATALOG)) {
       const factor = entry.sellEUR / entry.costEUR;
-      if (factor < 2.95 || factor > 3.1) {
+      if (factor < 2.95 || factor > 3.12) {
         offenders.push(`${entry.id}: ${factor.toFixed(2)}×`);
       }
     }
