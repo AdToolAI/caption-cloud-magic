@@ -315,7 +315,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
   /* ── Sync settings to model capabilities when switching ── */
   useEffect(() => {
-    if (!model.durations.includes(duration)) setDuration(model.durations[0]);
+    const smartOk = duration === -1 && model.capabilities.smartDuration;
+    if (!smartOk && !model.durations.includes(duration)) setDuration(model.durations[0]);
+
     if (!model.aspectRatios.includes(aspectRatio)) setAspectRatio(model.aspectRatios[0]);
     const allowedResolutions = model.resolutions ?? [model.resolution];
     if (!allowedResolutions.includes(resolution)) setResolution(allowedResolutions[0]);
