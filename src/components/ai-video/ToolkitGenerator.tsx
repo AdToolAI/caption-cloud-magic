@@ -315,7 +315,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
   /* ── Sync settings to model capabilities when switching ── */
   useEffect(() => {
-    if (!model.durations.includes(duration)) setDuration(model.durations[0]);
+    const smartOk = duration === -1 && model.capabilities.smartDuration;
+    if (!smartOk && !model.durations.includes(duration)) setDuration(model.durations[0]);
+
     if (!model.aspectRatios.includes(aspectRatio)) setAspectRatio(model.aspectRatios[0]);
     const allowedResolutions = model.resolutions ?? [model.resolution];
     if (!allowedResolutions.includes(resolution)) setResolution(allowedResolutions[0]);
@@ -353,7 +355,13 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   // Canonical per-second price from server catalog (falls back to local config).
   const { getPricePerSecond } = useVideoPricingCatalog();
   const pricePerSecond = getPricePerSecond(model.id, currency) ?? model.costPerSecond[currency];
-  const cost = duration * pricePerSecond;
+  // Smart duration (-1) is reserved at the model's maximum length; the unused
+  // seconds are refunded once the provider reports the real clip length.
+  const billedSeconds = duration === -1
+    ? Math.max(...model.durations)
+    : duration;
+  const cost = billedSeconds * pricePerSecond;
+
   const symbol = currency === 'USD' ? '$' : '€';
   const isUnlimited = (wallet as any)?.is_unlimited === true;
   const canAfford = isUnlimited || (wallet?.balance_euros ?? 0) >= cost;
@@ -1166,40 +1174,50 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             </label>
           )}
 
-          <div className="grid sm:grid-cols-[1fr_auto] gap-3 items-end">
-            <div className="space-y-1.5">
-              <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                {language === 'de' ? 'Referenz-Typ' : 'Reference type'}
-              </Label>
-              <Select
-                value={videoReferenceType}
-                onValueChange={(v) => setVideoReferenceType(v as 'feature' | 'base')}
-                disabled={!referenceVideoUrl}
-              >
-                <SelectTrigger className="bg-background/40 border-border/40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="feature">
-                    {language === 'de'
-                      ? 'Feature — Stil & Bewegung übernehmen'
-                      : 'Feature — copy style & motion'}
-                  </SelectItem>
-                  <SelectItem value="base">
-                    {language === 'de'
-                      ? 'Base — Komposition als Grundlage'
-                      : 'Base — use composition as foundation'}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+          {model.family === 'kling' ? (
+            <div className="grid sm:grid-cols-[1fr_auto] gap-3 items-end">
+              <div className="space-y-1.5">
+                <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                  {language === 'de' ? 'Referenz-Typ' : 'Reference type'}
+                </Label>
+                <Select
+                  value={videoReferenceType}
+                  onValueChange={(v) => setVideoReferenceType(v as 'feature' | 'base')}
+                  disabled={!referenceVideoUrl}
+                >
+                  <SelectTrigger className="bg-background/40 border-border/40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="feature">
+                      {language === 'de'
+                        ? 'Feature — Stil & Bewegung übernehmen'
+                        : 'Feature — copy style & motion'}
+                    </SelectItem>
+                    <SelectItem value="base">
+                      {language === 'de'
+                        ? 'Base — Komposition als Grundlage'
+                        : 'Base — use composition as foundation'}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-start gap-1.5 text-[11px] text-muted-foreground p-2 rounded-md bg-background/40 border border-border/40 max-w-xs">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+                <span>
+                  {tx({ de: 'Referenz-Typ gilt nur für Kling 3 Standard / Pro.', en: 'Reference type only applies to Kling 3 Standard / Pro.', es: 'El tipo de referencia solo se aplica a Kling 3 Standard / Pro.' })}
+                </span>
+              </div>
             </div>
-            <div className="flex items-start gap-1.5 text-[11px] text-muted-foreground p-2 rounded-md bg-background/40 border border-border/40 max-w-xs">
+          ) : (
+            <div className="flex items-start gap-1.5 text-[11px] text-muted-foreground p-2 rounded-md bg-background/40 border border-border/40">
               <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
               <span>
-                {tx({ de: 'V2V derzeit nur für Kling 3 Standard / Pro.', en: 'V2V is currently only available for Kling 3 Standard / Pro.', es: 'V2V actualmente solo disponible para Kling 3 Standard / Pro.' })}
+                {tx({ de: 'Das Video dient als Bewegungs- und Stilreferenz für die Szene.', en: 'The clip is used as a motion and style reference for the scene.', es: 'El clip se usa como referencia de movimiento y estilo para la escena.' })}
               </span>
             </div>
-          </div>
+          )}
+
         </Card>
       )}
 
@@ -1217,6 +1235,15 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               {model.durations.map((d) => (
                 <SelectItem key={d} value={String(d)}>{d}s</SelectItem>
               ))}
+              {model.capabilities.smartDuration && (
+                <SelectItem value="-1">
+                  {tx({
+                    de: `Auto (Modell entscheidet, max. ${Math.max(...model.durations)}s)`,
+                    en: `Auto (model decides, max ${Math.max(...model.durations)}s)`,
+                    es: `Auto (el modelo decide, máx. ${Math.max(...model.durations)}s)`,
+                  })}
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>

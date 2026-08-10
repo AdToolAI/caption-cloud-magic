@@ -22,15 +22,25 @@ const MAX_DURATION = 30;
 interface GenerateRequest {
   prompt: string;
   model?: string;
+  /** 4–30 s, or -1 for the provider's smart duration. */
   duration: number;
-  aspectRatio?: "16:9" | "9:16" | "1:1";
+  aspectRatio?: string;
   /** ModelArk supports 480p and 720p output for Seedance 2.5 — 1080p is rejected. */
   resolution?: "480p" | "720p";
   startImageUrl?: string;
   endImageUrl?: string;
   referenceImageUrls?: string[];
+  /** Reference clips (role `reference_video`, max 10). */
+  referenceVideoUrls?: string[];
+  /** Single reference clip sent by the shared v2v UI. */
+  referenceVideoUrl?: string;
+  /** Reference audio clips (role `reference_audio`, max 10). */
+  referenceAudioUrls?: string[];
+  /** Native audio generation (`generate_audio`). */
+  generateAudio?: boolean;
   seed?: number;
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -66,8 +76,18 @@ Deno.serve(async (req) => {
       startImageUrl,
       endImageUrl,
       referenceImageUrls,
+      referenceVideoUrls,
+      referenceVideoUrl,
+      referenceAudioUrls,
+      generateAudio = false,
       seed,
     } = body;
+
+    const refVideos = [
+      ...(referenceVideoUrls ?? []),
+      ...(referenceVideoUrl ? [referenceVideoUrl] : []),
+    ].filter(Boolean).slice(0, 10);
+    const refAudios = (referenceAudioUrls ?? []).filter(Boolean).slice(0, 10);
 
     if (!prompt || !prompt.trim()) {
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
@@ -76,7 +96,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!Number.isFinite(duration) || duration < MIN_DURATION || duration > MAX_DURATION) {
+    // `-1` = provider smart duration: billed at the maximum length up front and
+    // corrected down once ModelArk reports the real clip length.
+    const smartDuration = duration === -1;
+    if (
+      !smartDuration &&
+      (!Number.isFinite(duration) || duration < MIN_DURATION || duration > MAX_DURATION)
+    ) {
       return new Response(
         JSON.stringify({
           error: `Duration must be between ${MIN_DURATION} and ${MAX_DURATION} seconds for Seedance 2.5`,
@@ -84,6 +110,8 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+    const billedDuration = smartDuration ? MAX_DURATION : duration;
+
 
     const { data: walletPreview } = await supabaseClient
       .from("ai_video_wallets")
@@ -93,7 +121,7 @@ Deno.serve(async (req) => {
 
     const currency = (walletPreview?.currency || "EUR") as "EUR" | "USD";
     const costPerSecond = resolveCostPerSecond(MODEL_ID, currency) ?? 0.54;
-    const totalCost = +(duration * costPerSecond).toFixed(4);
+    const totalCost = +(billedDuration * costPerSecond).toFixed(4);
 
     const { data: wallet, error: walletError } = await supabaseAdmin
       .from("ai_video_wallets")
@@ -140,7 +168,7 @@ Deno.serve(async (req) => {
         user_id: user.id,
         prompt,
         model: MODEL_ID,
-        duration_seconds: duration,
+        duration_seconds: billedDuration,
         aspect_ratio: aspectRatio,
         resolution,
         cost_per_second: costPerSecond,
@@ -184,18 +212,47 @@ Deno.serve(async (req) => {
       if (refundError) console.error("[generate-seedance25-video] Refund failed:", refundError);
     };
 
+    /**
+     * Smart duration (-1) is billed at the 30 s maximum up front. Once the
+     * provider reports the real clip length, the unused seconds go straight
+     * back to the wallet.
+     */
+    const settleSmartDuration = async (actualSeconds?: number) => {
+      if (!smartDuration || !actualSeconds || actualSeconds >= billedDuration) return;
+      const actualCost = +(Math.max(MIN_DURATION, actualSeconds) * costPerSecond).toFixed(4);
+      const delta = +(totalCost - actualCost).toFixed(4);
+      if (delta <= 0.001) return;
+      const { error: refundError } = await supabaseAdmin.rpc("refund_ai_video_credits", {
+        p_user_id: user.id,
+        p_amount_euros: delta,
+        p_generation_id: generation.id,
+      });
+      if (refundError) {
+        console.error("[generate-seedance25-video] Smart-duration refund failed:", refundError);
+        return;
+      }
+      await supabaseAdmin
+        .from("ai_video_generations")
+        .update({ duration_seconds: actualSeconds, total_cost_euros: actualCost })
+        .eq("id", generation.id);
+    };
+
     let taskId: string;
     try {
       taskId = await createSeedance25Task({
         prompt,
-        duration,
+        duration: smartDuration ? -1 : duration,
         resolution,
         aspectRatio,
         firstFrameUrl: startImageUrl,
         lastFrameUrl: endImageUrl,
         referenceImageUrls,
+        referenceVideoUrls: refVideos,
+        referenceAudioUrls: refAudios,
+        generateAudio,
         seed,
       });
+
     } catch (providerError: any) {
       console.error("[generate-seedance25-video] ModelArk error:", providerError);
       await refund(`ModelArk Error: ${providerError?.message ?? "Unknown error"}`);
@@ -221,7 +278,7 @@ Deno.serve(async (req) => {
     await trackAIGeneration("started", user.id, {
       provider: "modelark",
       model: MODEL_ID,
-      duration_s: duration,
+      duration_s: billedDuration,
       cost_eur: totalCost,
       aspect_ratio: aspectRatio,
       resolution,
@@ -252,6 +309,8 @@ Deno.serve(async (req) => {
                 error_message: null,
               })
               .eq("id", generation.id);
+            await settleSmartDuration(task.durationSeconds);
+
             await trackAIGeneration("completed", user.id, {
               provider: "modelark",
               model: MODEL_ID,
