@@ -168,6 +168,19 @@ export async function createSeedance25Task(params: CreateSeedance25Params): Prom
     content.push({ type: "audio_url", audio_url: { url: audio }, role: "reference_audio" });
   }
 
+  // Documented body parameters (preferred over the legacy `--rs/--rt/...`
+  // prompt suffix): invalid values come back as a clean 400 instead of being
+  // silently ignored inside the prompt text.
+  const payload: Record<string, unknown> = {
+    model: modelArkModelId(),
+    content,
+    resolution: safeResolution,
+    ratio: safeRatio,
+    duration: safeDuration,
+    watermark: !noWatermark,
+    generate_audio: !!generateAudio,
+  };
+  if (typeof seed === "number" && Number.isFinite(seed)) payload.seed = seed;
 
   const res = await fetch(`${MODELARK_BASE_URL}/contents/generations/tasks`, {
     method: "POST",
@@ -175,8 +188,9 @@ export async function createSeedance25Task(params: CreateSeedance25Params): Prom
       Authorization: `Bearer ${modelArkApiKey()}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ model: modelArkModelId(), content }),
+    body: JSON.stringify(payload),
   });
+
 
   const bodyText = await res.text();
   if (!res.ok) {
