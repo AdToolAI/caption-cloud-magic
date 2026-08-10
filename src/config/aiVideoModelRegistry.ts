@@ -363,10 +363,11 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-wan-video',
     group: 'recommended',
     icon: Zap,
+    // wan-2.7: duration 2-15, aspect_ratio enum 16:9/9:16/1:1/4:3/3:4, auto audio.
     capabilities: { t2v: true, i2v: true, audio: true },
-    durations: [5, 10],
+    durations: [5, 10, 15],
     resolution: '720p',
-    aspectRatios: sharedAspect,
+    aspectRatios: wan27Aspect,
     costPerSecond: WAN_VIDEO_MODELS['wan-2-7-standard'].costPerSecond,
     badge: 'Neu',
     tagline: '27B MoE · natives Audio',
