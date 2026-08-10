@@ -76,7 +76,8 @@ serve(async (req) => {
     const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl, generateAudio } = body;
 
     // Snap to allowed values: 4, 6, 8
-    const duration = rawDuration <= 4 ? 4 : rawDuration <= 6 ? 6 : 8;
+    // LTX 2.3 duration enums start at 6 s — snap to the closest allowed value.
+    const duration = snapDuration(model, Number(rawDuration) || 6);
 
     const isImageToVideo = !!startImageUrl;
     const mode = isImageToVideo ? 'Image-to-Video' : 'Text-to-Video';
@@ -172,7 +173,7 @@ serve(async (req) => {
 
     const replicateInput: Record<string, any> = {
       prompt,
-      duration: snapDuration(model, duration),
+      duration,
       aspect_ratio: ratio,
       resolution: '1080p',
       generate_audio: generateAudio !== false,
