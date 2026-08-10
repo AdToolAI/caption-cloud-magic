@@ -86,7 +86,23 @@ export interface ToolkitModel {
      * and multi-reference are three separate, non-combinable input modes).
      */
     refExclusive?: boolean;
+    /**
+     * Reference audio clips (ModelArk `reference_audio`): the model can take
+     * audio as a driving reference for the generated scene.
+     */
+    refAudio?: boolean;
+    /** Max number of reference videos supported when v2v is true. */
+    maxReferenceVideos?: number;
+    /** Max number of reference audio clips supported when refAudio is true. */
+    maxReferenceAudios?: number;
+    /**
+     * Provider-side smart duration (`duration: -1`): the model picks the clip
+     * length itself. Billed at the maximum duration and corrected downwards
+     * once the provider reports the real length.
+     */
+    smartDuration?: boolean;
   };
+
   /** Allowed durations in seconds (used to render the slider/select). */
   durations: number[];
   /** Quality/resolution label for the badge (default / highest option). */
