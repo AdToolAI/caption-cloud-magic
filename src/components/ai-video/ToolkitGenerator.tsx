@@ -104,6 +104,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   }, [prompt]);
   const [duration, setDuration] = useState<number>(model.durations[0]);
   const [aspectRatio, setAspectRatio] = useState<string>(model.aspectRatios[0]);
+  // Output resolution — only user-selectable when the provider really offers
+  // more than one option for this model (e.g. Seedance 2.5: 720p / 480p).
+  const [resolution, setResolution] = useState<string>(model.resolutions?.[0] ?? model.resolution);
   const [generateAudio, setGenerateAudio] = useState<boolean>(model.capabilities.audio);
   // Provider-side TTS (Kling / Veo / Sora) defaults to English unless the prompt
   // explicitly names a target language. We let the user override the auto-pick
@@ -314,6 +317,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   useEffect(() => {
     if (!model.durations.includes(duration)) setDuration(model.durations[0]);
     if (!model.aspectRatios.includes(aspectRatio)) setAspectRatio(model.aspectRatios[0]);
+    const allowedResolutions = model.resolutions ?? [model.resolution];
+    if (!allowedResolutions.includes(resolution)) setResolution(allowedResolutions[0]);
     if (!model.capabilities.audio) setGenerateAudio(false);
     if (!model.capabilities.i2v) setStartImageUrl(null);
     if (!model.capabilities.v2v) setReferenceVideoUrl(null);
@@ -475,6 +480,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         model: model.id,
         duration,
         aspectRatio,
+        // Providers that accept an explicit output resolution (Hailuo, Seedance 2.5)
+        // must receive exactly the quality the user is billed for.
+        resolution,
       };
 
       // Scene-Aware Anchor (Motion-Studio parity):
@@ -967,7 +975,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       )}
 
       {/* ── Multi-Reference (capabilities.multiRef → Vidu Reference2V, Seedance 2.5) ── */}
-      {model.capabilities.multiRef && !omniMediaLock && (
+      {model.capabilities.multiRef && !omniMediaLock &&
+        !(model.capabilities.refExclusive && !!startImageUrl) && (
         <MultiReferenceUploader
           slots={viduReferences}
           onChange={setViduReferences}
@@ -980,7 +989,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       )}
 
       {/* ── Image upload (only for I2V) ── */}
-      {model.capabilities.i2v && !omniMediaLock && (
+      {model.capabilities.i2v && !omniMediaLock &&
+        !(model.capabilities.refExclusive && viduReferences.length > 0) && (
         <Card className="p-5 bg-card/60 backdrop-blur-xl border-border/60 space-y-3">
           <div className="flex items-center justify-between">
             <Label className="text-sm font-medium">
@@ -1231,11 +1241,24 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
             {language === 'de' ? 'Qualität' : 'Quality'}
           </Label>
-          <div className="h-9 flex items-center px-3 rounded-md bg-background/40 border border-border/40">
-            <Badge variant="outline" className="border-primary/30 text-primary">
-              {model.resolution}
-            </Badge>
-          </div>
+          {(model.resolutions?.length ?? 0) > 1 ? (
+            <Select value={resolution} onValueChange={setResolution}>
+              <SelectTrigger className="bg-background/40 border-border/40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {model.resolutions!.map((r) => (
+                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="h-9 flex items-center px-3 rounded-md bg-background/40 border border-border/40">
+              <Badge variant="outline" className="border-primary/30 text-primary">
+                {model.resolution}
+              </Badge>
+            </div>
+          )}
         </div>
 
         {model.capabilities.audio && (
