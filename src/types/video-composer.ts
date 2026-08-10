@@ -987,34 +987,13 @@ export const CLIP_SOURCE_LABELS: Record<ClipSource, { de: string; en: string }> 
   upload:        { de: 'Eigener Upload', en: 'Own Upload' },
 };
 
-// Estimated costs per clip source × quality tier — EUR per second
-// Normalized 14.07.2026 — exactly 3.00× Replicate cost margin across all video models.
-// Keep aligned with `src/lib/cost/videoProviderMargins.ts` and `supabase/functions/_shared/clip-costs.ts`.
-export const CLIP_SOURCE_COSTS: Record<ClipSource, Record<ClipQuality, number>> = {
-  'ai-hailuo':   { standard: 0.14, pro: 0.23 },
-  'ai-kling':    { standard: 0.18, pro: 0.30 },
-  // Kling 3.0 Omni: native lip-sync + audio in one call, 3.00× margin
-  'ai-kling-omni': { standard: 0.60, pro: 0.60 },
-  'ai-sora':     { standard: 0.60, pro: 1.35 },
-  'ai-wan':      { standard: 0.12, pro: 0.21 },
-  'ai-seedance': { standard: 0.09, pro: 0.18 }, // Mini = 0.06 (see registry)
-  // Seedance 2.5 (ModelArk direkt) — 3.00× Marge, bis 30 s pro Szene
-  'ai-seedance25': { standard: 0.663, pro: 0.663 },
+// Costs per clip source × quality tier — EUR per second.
+// DERIVED from the canonical pricing catalog (sell = 3.00× provider cost),
+// identical to `supabase/functions/_shared/clip-costs.ts`. Never edit numbers
+// here — change `src/lib/cost/videoPricingCatalog.ts` (+ the shared mirror).
+export const CLIP_SOURCE_COSTS: Record<ClipSource, Record<ClipQuality, number>> =
+  buildComposerCostTable() as Record<ClipSource, Record<ClipQuality, number>>;
 
-  'ai-luma':     { standard: 0.21, pro: 0.36 },
-  // Veo 3.1: standard = Lite 720p, pro = Pro 1080p
-  'ai-veo':      { standard: 0.45, pro: 3.30 },
-  'ai-runway':   { standard: 0.24, pro: 0.24 },
-  'ai-pika':     { standard: 0.12, pro: 0.27 },
-  // Vidu Q2: flat €0.66 per 5s clip → 0.13 €/s for parity
-  'ai-vidu':     { standard: 0.13, pro: 0.13 },
-  // HappyHorse 1.0: standard = 720p, pro = 1080p
-  'ai-happyhorse': { standard: 0.42, pro: 0.84 },
-  'ai-image':    { standard: 0.01, pro: 0.015 },
-  stock:         { standard: 0, pro: 0 },
-  'stock-image': { standard: 0, pro: 0 },
-  upload:        { standard: 0, pro: 0 },
-};
 
 // Quality tier labels & resolution hints
 export const QUALITY_LABELS: Record<ClipSource, Record<ClipQuality, string>> = {
