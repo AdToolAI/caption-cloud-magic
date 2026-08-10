@@ -108,7 +108,7 @@ const WORDS = {
   en: "the a an is are was were be your you and with to for of in on at it this that not no failed please could can create start download save settings error video image new only more all from".split(" "),
 };
 const ES_MARKERS = /(ción\b|ciones\b|¿|¡|ñ|vídeo|está\b|más\b)/i;
-const DE_MARKERS = /[äöüßÄÖÜ]/;
+const DE_MARKERS = /[äößÄÖ]|(?<![gq])ü/;
 
 function scoreLanguages(value) {
   const tokens = (value.toLowerCase().match(/[a-zà-ÿ]+/g) || []);
