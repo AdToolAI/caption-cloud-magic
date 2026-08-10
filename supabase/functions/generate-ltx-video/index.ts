@@ -10,22 +10,30 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Normalized 14.07.2026 — exactly 3.00× Replicate cost margin
+// LTX 2.3 — provider cost fast $0.06/s, pro $0.08/s (3× margin)
 const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'ltx-standard': { EUR: 0.06, USD: 0.06 },
-  'ltx-pro':      { EUR: 0.12, USD: 0.12 },
+  'ltx-standard': { EUR: 0.18, USD: 0.18 },
+  'ltx-pro':      { EUR: 0.24, USD: 0.24 },
 };
 
-// Lightricks LTX Video 2.0 — text-to-video and image-to-video
+// Lightricks LTX 2.3 — text-to-video and image-to-video with native audio
 const REPLICATE_MODELS: Record<string, string> = {
-  'ltx-standard': 'lightricks/ltx-video',
-  'ltx-pro': 'lightricks/ltx-video-2-pro',
+  'ltx-standard': 'lightricks/ltx-2.3-fast',
+  'ltx-pro': 'lightricks/ltx-2.3-pro',
 };
 
-const ASPECT_RATIO_TO_SIZE: Record<string, { width: number; height: number }> = {
-  '16:9': { width: 1280, height: 720 },
-  '9:16': { width: 720, height: 1280 },
-  '1:1': { width: 768, height: 768 },
+// LTX 2.3 only exposes 16:9 and 9:16 — anything else snaps to landscape.
+const SUPPORTED_ASPECT_RATIOS = ['16:9', '9:16'];
+// Duration enums: fast [6..20 step 2], pro [6, 8, 10].
+const ALLOWED_DURATIONS: Record<string, number[]> = {
+  'ltx-standard': [6, 8, 10, 12, 14, 16, 18, 20],
+  'ltx-pro': [6, 8, 10],
+};
+
+const snapDuration = (model: string, requested: number): number => {
+  const allowed = ALLOWED_DURATIONS[model] ?? ALLOWED_DURATIONS['ltx-standard'];
+  return allowed.reduce((best, value) =>
+    Math.abs(value - requested) < Math.abs(best - requested) ? value : best, allowed[0]);
 };
 
 interface GenerateRequest {
@@ -34,6 +42,7 @@ interface GenerateRequest {
   duration: number;
   aspectRatio: '16:9' | '9:16' | '1:1';
   startImageUrl?: string;
+  generateAudio?: boolean;
 }
 
 serve(async (req) => {
@@ -159,13 +168,14 @@ serve(async (req) => {
     const webhookUrl = appendWebhookToken(`${SUPABASE_URL}/functions/v1/replicate-webhook`);
 
     const replicateModel = REPLICATE_MODELS[model];
-    const size = ASPECT_RATIO_TO_SIZE[aspectRatio] || ASPECT_RATIO_TO_SIZE['16:9'];
+    const ratio = SUPPORTED_ASPECT_RATIOS.includes(aspectRatio) ? aspectRatio : '16:9';
 
     const replicateInput: Record<string, any> = {
       prompt,
-      duration,
-      width: size.width,
-      height: size.height,
+      duration: snapDuration(model, duration),
+      aspect_ratio: ratio,
+      resolution: model === 'ltx-pro' ? '1080p' : '1080p',
+      generate_audio: (await Promise.resolve(body.generateAudio)) !== false,
     };
 
     if (isImageToVideo) {
