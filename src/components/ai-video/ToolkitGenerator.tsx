@@ -1225,6 +1225,18 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               {model.durations.map((d) => (
                 <SelectItem key={d} value={String(d)}>{d}s</SelectItem>
               ))}
+              {model.capabilities.smartDuration && (
+                <SelectItem value="-1">
+                  {tx({
+                    de: `Auto (Modell entscheidet, max. ${Math.max(...model.durations)}s)`,
+                    en: `Auto (model decides, max ${Math.max(...model.durations)}s)`,
+                    es: `Auto (el modelo decide, máx. ${Math.max(...model.durations)}s)`,
+                  })}
+                </SelectItem>
+              )}
+              {[].map((d: number) => (
+
+              ))}
             </SelectContent>
           </Select>
         </div>
