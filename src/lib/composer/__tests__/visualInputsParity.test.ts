@@ -69,10 +69,12 @@ describe("compose-video-clips visual-input parity", () => {
 });
 
 describe("server-side transition frame helper", () => {
-  const HELPER = readFileSync(
+  const RAW = readFileSync(
     resolve(process.cwd(), "supabase/functions/_shared/transition-frame.ts"),
     "utf8",
   );
+  // Comments explain the policy; the guard checks executable code only.
+  const HELPER = RAW.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
   it("is AWS-only — no Replicate / lucataco frame grabs", () => {
     expect(HELPER).not.toMatch(/replicate/i);
@@ -88,3 +90,4 @@ describe("server-side transition frame helper", () => {
     expect(HELPER).not.toContain("lock_reference_url");
   });
 });
+
