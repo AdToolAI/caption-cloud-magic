@@ -1,47 +1,77 @@
-# Atlantis-Briefing: Was die Analyse heute trifft — und was verloren geht
+# Ton, Untertitel und Lip-Sync: sauberer Weg statt Automatik
 
-## Kurzantwort
+## Antwort auf die Kernfrage
 
-Der Grundriss würde korrekt ankommen: 60 Sekunden gesamt, exakt 2 Szenen à 30 Sekunden, 9:16, kein Cast, kein Dialog, kein Voiceover, Negative Prompt. Die Szenenzahl wird über die Zeile `Szenen: 2 × 30 Sekunden` **und** die `Szene 1 / Szene 2`-Marker doppelt erkannt, die Gesamtlänge über `Länge: 60 Sekunden`; 30 s pro Szene liegen innerhalb der erlaubten Spanne (1–60 s).
+Der professionelle Weg ist nicht „Briefing erzeugt Ton", sondern: **Das Briefing erfasst die Tonabsicht als Daten. Erzeugt wird Ton nur in einem eigenen, sichtbaren Schritt nach der Bildgenerierung.** Damit bleibt die Lip-Sync-Kette unangetastet — sie sieht weiterhin stumme Clips plus die Voiceover-Spur, genau wie heute.
 
-Vier Dinge aus genau diesem Briefing gehen aktuell verloren oder werden falsch gesetzt.
+Der Composer hat dafür schon den richtigen Schalter: `withAudio` pro Szene (Veo/Kling setzen `generate_audio=false`, Sora wird beim Stitch stummgeschaltet). Heute wird der beim Briefing-Apply nicht gesetzt, und Sounddesign-Text hat gar kein Feld. Genau diese zwei Lücken schließen wir — ohne neue Automatik.
 
-## 1. Das komplette Sounddesign fällt weg
+## Die drei Tonquellen sauber trennen
 
-Im Manifest-Schema, im Produktionsplan und im Composer-Szenenmodell gibt es kein Feld für Umgebungsgeräusche, SFX oder Audio-Atmosphäre. Der Block „Sounddesign" (Wind, Möwen, Grollen, Stille, Cut-to-black mit Meeresgrollen) hat kein Ziel und wird verworfen — er landet höchstens zufällig als Prosa im Bildprompt. Bei einem Video, dessen ganze Wirkung am Ton hängt, ist das der größte Verlust.
+```text
+Provider-Ton   (Seedance/Veo/Sora/Kling erzeugen Musik + Atmo im Clip)
+Studio-Ton     (Atmo/SFX/Musik als eigene Spuren im Motion Studio)
+Sprache        (Voiceover / Lip-Sync-Dialog)
+```
 
-Vorschlag: `soundDesign` pro Szene (plus global) ins Manifest und in den Plan aufnehmen, im Plan-Sheet anzeigen und beim Anwenden an den Audio-fähigen Modellprompt übergeben (Seedance 2.5, Veo). Bei Modellen ohne nativen Ton als Hinweis „Sounddesign wird im Motion Studio als Atmo-Spur benötigt" ausweisen statt still zu schlucken.
+Regel, die überall gilt: **Provider-Ton und Studio-Ton schließen sich pro Szene aus.** Beides gleichzeitig ergibt doppelte Atmosphäre und doppelte Musik — genau der Fehler, den wir nicht ins Motion Studio holen wollen.
 
-## 2. Die Kamerafahrt wird auf einen einzigen Token reduziert
+Daraus folgt ein einziges Feld pro Szene, `audioSource`, mit drei Werten:
 
-Pro Szene existiert genau ein `movement`, ein `framing`, ein `angle`, ein `lighting`. Eine Choreografie wie „aerial establishing → descending crane → street-level tracking → wide coastal → push toward seabed" muss auf einen Wert kollabieren; der Rest überlebt nur, wenn das Modell ihn zufällig in den englischen Szenenprompt schreibt.
+| Wert | Bedeutung | `withAudio` | Lip-Sync |
+| --- | --- | --- | --- |
+| `provider` | Modell erzeugt Ton mit (Atmo + Musik im Clip) | true | gesperrt |
+| `studio` | Clip stumm, Ton kommt später als Spuren | false | erlaubt |
+| `silent` | Clip stumm, kein Ton geplant | false | erlaubt |
 
-Vorschlag: Feld `cameraChoreographyEN` pro Szene (Freitext, englisch), das die vollständige Bewegungsfolge trägt, im Plan-Sheet sichtbar ist und in den Szenenprompt gehängt wird. Die Enum-Tokens bleiben unverändert für die Shot-Director-UI.
+Lip-Sync-Szenen setzen zwingend `studio` (oder `silent`) — Provider-Ton auf einer Lip-Sync-Szene wird gar nicht erst angeboten. Das ist die Schutzregel, die verhindert, dass Sound und Lip-Sync kollidieren.
 
-## 3. Der Ort `@atlantis` bleibt unaufgelöst
+## Was das Briefing tut — und was nicht
 
-`@atlantis` existiert nicht in Cast & World. Die Mention wird als `unresolved` markiert, die Szene bekommt keine Location — die ausführliche Ortsbeschreibung (Marmor, Kanäle, Hafen, Terrassen) hat kein Zuhause.
+Das Briefing **schreibt nur Absicht**, nie Audio:
 
-Vorschlag: Für unaufgelöste Mentions mit Beschreibungstext im Plan-Sheet zwei Aktionen anbieten: „Als Ort in Cast & World anlegen" oder „Als Freitext-Location übernehmen". Der Beschreibungstext wird dabei mitgeführt, statt verworfen zu werden.
+- Neues Feld `soundDesign` pro Szene (plus global) — der Text aus dem Briefing wird wortgetreu abgelegt und im Plan-Sheet angezeigt.
+- `audioSource` wird beim Anwenden abgeleitet: Szene mit Dialog/Lip-Sync → `studio`; Szene ohne Sprache mit Sounddesign-Text → Vorschlag je nach gewähltem Modell (Modell mit eigenem Ton → `provider`, sonst `studio`); nichts davon → `silent`.
+- Der Vorschlag ist im Plan-Sheet pro Szene sichtbar und umschaltbar. Kein stiller Automatismus.
 
-## 4. Untertitel würden eingeschaltet, obwohl das Briefing sie verbietet
+Für das Atlantis-Briefing heißt das konkret: kein Cast, kein VO, ausführliches Sounddesign, Modell Seedance 2.5 → beide Szenen kommen als `provider` mit dem Sounddesign-Text im Prompt an, und der Kunde sieht im Sheet den Hinweis, dass nachträgliche SFX-Spuren dann nicht mehr nötig sind.
 
-Die Caption-Defaults stehen auf `enabled: true` / `auto-from-vo`. Bei einem Projekt ohne Voiceover und mit „keine Untertitel" im Negative Prompt ist das falsch.
+## Der Audio-Schritt im Motion Studio
 
-Vorschlag: Regel „kein Voiceover und keine Dialogzeilen im ganzen Plan → `captions.enabled = false`", zusätzlich Auswertung expliziter Verbote im Negative Prompt.
+Nach der Clipgenerierung bekommt jede Szene im Audio-Bereich eine Karte mit dem hinterlegten Sounddesign-Text und drei Wegen:
 
-## Zusätzlich
+- **Provider-Ton behalten** — nichts tun, SFX-Aktionen sind für diese Szene ausgegraut mit Begründung.
+- **Automatisch erzeugen** — der Sounddesign-Text geht als Prompt an die SFX-Generierung, das Ergebnis landet als eigene Atmo-Spur. Nur bei `studio`/`silent`.
+- **Manuell** — eigene Datei hochladen oder aus der Bibliothek wählen.
 
-- Der globale Kontinuitätsblock („gleiche Stadt, gleiche Küstenlinie, Szene 2 setzt direkt an Szene 1 an") hat nur `continuityHint` pro Szene als Ziel. Beim Anwenden soll der globale Text in beide Szenen als Kontinuitäts-Hinweis übernommen werden, damit die Prompts derselben Stadt folgen.
-- 30 s pro Szene können nicht alle Modelle. Wenn das ausgewählte Videomodell unter der Szenendauer liegt, soll das Plan-Sheet vor dem Anwenden warnen und Seedance 2.5 vorschlagen, statt die Szene später still zu kürzen.
+Wechselt jemand nachträglich von `provider` auf `studio`, wird die Szene als „neu zu generieren" markiert, statt heimlich einen Clip mit eingebranntem Ton stummzuschalten.
+
+## Untertitel
+
+Untertitel hängen an Sprache, nicht an Ton. Regel:
+
+- Voiceover oder Dialogzeilen im Plan → Untertitel an, Quelle bleibt `auto-from-vo`.
+- Weder VO noch Dialog → Untertitel aus. Provider-Ton ändert daran nichts, weil Musik und Atmo nicht untertitelt werden.
+- Ein explizites Verbot im Negative Prompt („keine Untertitel", „no subtitles") schaltet sie zusätzlich hart aus.
+
+Heute stehen die Defaults auf „an", das Atlantis-Briefing bekäme also Untertitel ohne einen einzigen gesprochenen Satz.
+
+## Kamerafahrt und Ort (aus derselben Analyse)
+
+Zwei kleinere Lücken, die im selben Zug mitlaufen, weil sie dieselben Dateien betreffen:
+
+- Mehrstufige Kamerafahrten kollabieren heute auf ein einziges `movement`-Token. Neues Feld `cameraChoreographyEN` trägt die vollständige Bewegungsfolge in den Szenenprompt; die Enum-Werte bleiben für die Shot-Director-UI erhalten.
+- Unaufgelöste Orts-Mentions mit Beschreibungstext (`@atlantis`) werden im Plan-Sheet mit zwei Aktionen angeboten: „In Cast & World anlegen" oder „Als Freitext-Location übernehmen" — statt den Beschreibungstext zu verwerfen.
+- Liegt die Szenendauer über dem, was das gewählte Videomodell kann, warnt das Plan-Sheet vor dem Anwenden und schlägt Seedance 2.5 vor, statt später still zu kürzen.
 
 ## Technische Details
 
-- `supabase/functions/_shared/briefing/manifestSchema.ts`: `soundDesign` (string, max 1000) und `cameraChoreographyEN` (string, max 600) pro Szene, `soundDesign` optional auf Projektebene; identisch in `BRIEFING_TOOL_PARAMETERS`.
-- `supabase/functions/_shared/briefing/deep/index.ts`: Prompt-Regeln, damit Sounddesign-Blöcke und mehrstufige Kamerafahrten in die neuen Felder gehen statt in `anchorPromptEN`; Caption-Auto-Off-Regel nach der Manifest-Validierung.
-- `src/lib/video-composer/briefing/productionPlan.ts`: gleiche Felder im Zod-Plan-Schema.
-- `src/components/video-composer/briefing/ProductionPlanSheet.tsx`: Anzeige/Bearbeitung von Sounddesign und Kamerafahrt, Aktionen für unaufgelöste Orte, Modell-Dauer-Warnung.
-- `src/hooks/useApplyProductionPlan.ts`: Mapping der neuen Felder in die Composer-Szene und in den Szenenprompt; globaler Kontinuitätstext in `continuityHint`. Die Lip-Sync-Schutzfilter bleiben unverändert.
-- Tests: Fixture aus genau diesem Atlantis-Briefing — prüft 2 Szenen × 30 s, leerer Cast, Captions aus, Sounddesign und Kamerafahrt pro Szene vorhanden, Negative Prompt vollständig.
+- `supabase/functions/_shared/briefing/manifestSchema.ts` + `src/lib/video-composer/briefing/productionPlan.ts`: `soundDesign` (max 1000), `audioSource` (`provider|studio|silent`), `cameraChoreographyEN` (max 600) pro Szene; `soundDesign` optional auf Projektebene. Gleiche Felder in `BRIEFING_TOOL_PARAMETERS`.
+- `supabase/functions/_shared/briefing/deep/index.ts`: Prompt-Regeln, damit Sounddesign-Blöcke und Kamerafahrten in die neuen Felder gehen statt in `anchorPromptEN`; Untertitel-Auto-Off nach der Validierung.
+- `src/hooks/useApplyProductionPlan.ts`: Ableitung `audioSource` → `withAudio`, Sperre `provider` bei Dialog/Lip-Sync, Sounddesign in den Szenen-Datensatz, Kamerafahrt an den Prompt, globaler Kontinuitätstext in `continuityHint`. Die bestehenden Lip-Sync-Schutzfilter (`clip_status`, `dialog_shots`, `lock_reference_url`) bleiben unverändert; es wird weiterhin nie in `dialog_shots` oder `syncso_*` geschrieben.
+- `src/components/video-composer/briefing/ProductionPlanSheet.tsx`: Sounddesign- und Kamerafahrt-Anzeige, Tonquellen-Umschalter mit Begründung, Aktionen für unaufgelöste Orte, Modell-Dauer-Warnung.
+- Motion-Studio-Audiobereich: Szenenkarte mit Sounddesign-Text und den drei Wegen; SFX-Aktionen gesperrt bei `audioSource === 'provider'`; Umschalten auf `studio` markiert die Szene als neu zu generieren.
+- `src/config/aiVideoModelRegistry.ts`: explizites Flag `nativeAudio` pro Modell (heute nur implizit über `withAudio`-Sonderfälle im Generierungscode verteilt) — eine Quelle für UI-Sperren und Vorschlagslogik.
+- Tests: Atlantis-Briefing als Fixture (2 × 30 s, leerer Cast, Untertitel aus, `audioSource === 'provider'` bei Seedance, Sounddesign und Kamerafahrt vorhanden); zusätzlich ein Test, der `audioSource === 'provider'` auf einer Dialog-/Lip-Sync-Szene verbietet.
 
-Keine Änderungen an Lip-Sync-Ketten, Ankerlogik oder Rendering.
+Keine Änderungen an Lip-Sync-Ketten, Ankerlogik, Rendering oder Preisen.
