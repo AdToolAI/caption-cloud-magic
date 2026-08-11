@@ -222,3 +222,4 @@ Updated: today
 - [v370 Cast-Clause-Vertrag](mem://architecture/video-composer/v370-cast-clause-contract) — Cast-Block wird deterministisch über `_shared/cast-clause.ts` gebaut (eine Klausel, Anzahl == Namen, keine Bracket-Tags, idempotent); Regex-„Cast-Rescue" abgeschafft, Pre-Dispatch-Contract vor HappyHorse.
 
 - [Vollständiger Composer-Rollback 27.07.2026](mem://architecture/lipsync/v399-full-composer-rollback-27-07) — VERBINDLICH: gesamter Composer-Pfad (Clip, Webhook, Audio, Lip-Sync, Frontend-Trigger) auf Commit 58060cffe; Post-Juli-Contract-Module entfernt; composer-start-scene-generation stillgelegt.
+- [Briefing-Übernahme v414](mem://features/briefing-apply-v414) — Dialogzeilen wandern wieder ins Storyboard (nur mit auflösbarem Sprecher, Checkbox im Plan-Sheet); Parallel-Fire der Deep-Analyse entfernt.
