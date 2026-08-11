@@ -212,6 +212,22 @@ const TOOL_PASS_A = {
                 },
               },
               anchorPromptEN: { type: 'string' },
+              cameraChoreographyEN: {
+                type: 'string',
+                description:
+                  'Full multi-step camera movement in ENGLISH when the briefing describes a choreography rather than a single move (e.g. "aerial establishing over the harbour → crane down to street level → slow tracking shot behind the runners"). The shotDirector.movement enum only carries the dominant move; put the complete sequence here.',
+              },
+              soundDesign: {
+                type: 'string',
+                description:
+                  'Sound design / ambience / SFX described for THIS scene, in the briefing language, verbatim-close (e.g. "rising wind, gurgling water, distant seagulls"). Metadata only — never invent sound when the briefing does not mention any, and never fold it into anchorPromptEN.',
+              },
+              audioSource: {
+                type: 'string',
+                enum: ['provider', 'studio', 'silent'],
+                description:
+                  'Who owns this scene\'s audio. "studio" = clip stays silent, audio is added later as tracks (ALWAYS use this when the scene has voiceover or dialog). "provider" = the video model should generate ambience/music itself (only for scenes without speech that describe sound design). "silent" = no audio planned at all. Omit when unsure.',
+              },
               performance: {
                 type: 'object',
                 properties: {
