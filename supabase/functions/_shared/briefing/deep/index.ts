@@ -3352,6 +3352,7 @@ YOU MUST:
     // v415 — audio ownership + caption normalization (speech-bound captions,
     // never provider audio on a speaking scene).
     let audioNormalization: ReturnType<typeof normalizeAudioAndCaptions> | null = null;
+    try { enforceEnglishNegativePrompts(plan); } catch { /* non-fatal */ }
     try { audioNormalization = normalizeAudioAndCaptions(plan, briefing); } catch { /* non-fatal */ }
 
     const _briefingContract = {
