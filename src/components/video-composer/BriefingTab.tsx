@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import BriefingFormatGuide from './briefing/BriefingFormatGuide';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
@@ -246,6 +248,7 @@ export default function BriefingTab({
   // briefingImportOpen state removed — auto-analyse handled by dashboard hook.
 
   const TIPS_KEY = 'video-composer-briefing-tips-collapsed';
+  const [showFormatGuide, setShowFormatGuide] = useState(false);
   const [tipsCollapsed, setTipsCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(TIPS_KEY) === '1'; } catch { return false; }
   });
@@ -623,7 +626,16 @@ export default function BriefingTab({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">{cfg.descriptionLabel}</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label className="text-xs">{cfg.descriptionLabel}</Label>
+              <button
+                type="button"
+                onClick={() => setShowFormatGuide(true)}
+                className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-amber-200"
+              >
+                {tx({ de: 'Aufbau ansehen', en: 'View structure', es: 'Ver estructura' })}
+              </button>
+            </div>
             <Textarea
               value={briefing.productDescription}
               onChange={(e) => onUpdateBriefing({ productDescription: e.target.value })}
@@ -1050,6 +1062,17 @@ export default function BriefingTab({
       </div>
 
       </div>
+
+      <Sheet open={showFormatGuide} onOpenChange={setShowFormatGuide}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader className="mb-4">
+            <SheetTitle>
+              {tx({ de: 'So baust du dein Briefing auf', en: 'How to structure your briefing', es: 'Cómo estructurar tu briefing' })}
+            </SheetTitle>
+          </SheetHeader>
+          <BriefingFormatGuide />
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
