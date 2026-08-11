@@ -18,7 +18,14 @@
 import type { ClipSource } from '@/types/video-composer';
 import { AI_VIDEO_TOOLKIT_MODELS } from '@/config/aiVideoModelRegistry';
 
-export type SceneAudioSource = 'provider' | 'studio' | 'silent';
+/**
+ * v418 adds `ambient`: the model produces ambience/foley only (speech is
+ * banned in the prompt and re-checked by a speech gate after the render),
+ * the spoken voice still comes from the studio track. It is the ONLY
+ * combination of provider audio and studio audio that is allowed.
+ */
+export type SceneAudioSource = 'provider' | 'studio' | 'silent' | 'ambient';
+
 
 /** Composer `clipSource` values whose model family can generate its own audio. */
 export const NATIVE_AUDIO_CLIP_SOURCES: ReadonlySet<string> = new Set(
