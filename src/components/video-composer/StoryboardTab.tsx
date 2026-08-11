@@ -120,6 +120,8 @@ export default function StoryboardTab({
   storyboardError = null,
   onRetryStoryboard,
   onBackToBriefing,
+  onGenerateFromBriefing,
+
 }: StoryboardTabProps) {
   const tr = useTx();
 
