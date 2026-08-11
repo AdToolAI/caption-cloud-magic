@@ -569,34 +569,9 @@ export default function BriefingTab({
         )}
       </StagePanel>
 
-      {/* Mode Selection — Direct & Studio only (Quick auto-uses AI mode) */}
-      {showDirect && (
-        <StagePanel slateIndex="01" eyebrow="Scene · Production Mode" title={t('videoComposer.mode')}>
-          <div className="grid grid-cols-2 gap-3">
-            {([
-              { mode: 'ai' as ComposerMode, icon: Wand2, label: t('videoComposer.aiAssisted'), desc: t('videoComposer.aiAssistedDesc') },
-              { mode: 'manual' as ComposerMode, icon: Hand, label: t('videoComposer.manual'), desc: t('videoComposer.manualDesc') },
-            ]).map(({ mode, icon: Icon, label, desc }) => (
-              <button
-                key={mode}
-                onClick={() => onUpdateBriefing({ mode })}
-                className={`p-4 rounded-lg border text-left transition-all ${
-                  briefing.mode === mode
-                    ? 'border-amber-300/70 bg-amber-300/5 ring-1 ring-amber-300/30 shadow-[0_0_24px_-12px_hsla(43,90%,68%,0.6)]'
-                    : 'border-border/40 hover:border-amber-200/30'
-                }`}
-              >
-                <Icon className={`h-5 w-5 mb-2 ${briefing.mode === mode ? 'text-amber-300' : 'text-muted-foreground'}`} />
-                <p className="font-medium text-sm">{label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
-              </button>
-            ))}
-          </div>
-        </StagePanel>
-      )}
-
       {/* Category Selection */}
-      <StagePanel slateIndex="02" eyebrow="Scene · Format" title={t('videoComposer.category')}>
+      <StagePanel slateIndex="01" eyebrow="Scene · Format" title={t('videoComposer.category')}>
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {CATEGORIES.map(({ id, label, icon: Icon, desc }) => (
             <button
