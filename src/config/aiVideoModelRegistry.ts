@@ -656,6 +656,37 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
       refExclusive: true,
       smartDuration: true,
     },
+    /**
+     * ModelArk accepts exactly ONE input mode per task. First-frame,
+     * first+last-frame and multi-reference share a single exclusive slot, so
+     * "seamless transition" and "identity references" genuinely compete here.
+     * Reference videos live inside the reference budget — that is why
+     * `clip-reference` is the continuity mode of choice for this model.
+     * Lip-sync: NOT certified as a master-plate provider yet (`ai-seedance25`
+     * is absent from the backend allowlist) — see plan Phase 3a.
+     */
+    visualInputs: {
+      mode: 'exclusive',
+      modes: ['first-frame', 'first-last-frame', 'references'],
+      firstFrame: { supported: true, slot: 'visual-input' },
+      endFrame: { supported: true, slot: 'visual-input', requiresFirstFrame: true },
+      references: {
+        max: 30,
+        slot: 'visual-input',
+        videos: 10,
+        audios: 10,
+        character: true,
+        product: true,
+        location: true,
+      },
+      lipSync: {
+        supported: false,
+        requiresIdentityReference: true,
+        conflictsWithFirstFrame: true,
+        verification: { status: 'unverified' },
+      },
+    },
+
     durations: [4, 5, 8, 10, 12, 15, 20, 25, 30],
     resolution: '720p',
     resolutions: ['720p', '480p'],
