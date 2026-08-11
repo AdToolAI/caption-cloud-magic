@@ -23,6 +23,9 @@ import { toast } from '@/hooks/use-toast';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useApplyBriefingManifest } from '@/hooks/useApplyBriefingManifest';
 import { BriefingManifest, type TBriefingManifest } from '@/lib/video-composer/briefing/manifestSchema';
+import BriefingFormatGuide from './BriefingFormatGuide';
+import { getBriefingTemplate } from '@/lib/video-composer/briefingTemplate';
+
 import type {
   ComposerScene,
   AssemblyConfig,
