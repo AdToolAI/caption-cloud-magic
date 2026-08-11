@@ -285,7 +285,10 @@ function planSceneToComposerScene(
   voicePoolAssignments: Record<string, string> = {},
   isSingleScenePlan = false,
   applyDialogTurns = false,
+  /** v418 — Seedance 2.5 certified for lip-sync on this account. */
+  longFormDialogAllowed = false,
 ): ComposerScene {
+
 
   // Build characterShots from resolved cast. The plan stores `characterId`
   // as the BASE brand_characters.id (CastRef invariant) plus an optional
