@@ -110,6 +110,7 @@ import { shouldInheritContinuity as shouldInheritPlanContinuity } from '@/lib/vi
 import { tx } from '@/lib/i18nText';
 import { resolveSceneAudioSource, type SceneAudioSource } from '@/config/nativeAudioSources';
 import { pickClipSourceForDuration } from '@/lib/composer/pickClipSourceForDuration';
+import { useStudioPreferences } from '@/hooks/useStudioPreferences';
 
 /** v416 — true when a plan scene actually contains speech (VO, dialog, lip-sync). */
 function planSceneHasSpeech(scene: TPlanScene): boolean {
