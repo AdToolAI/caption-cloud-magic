@@ -108,7 +108,7 @@ interface BriefingTabProps {
   language: string;
   onUpdateBriefing: (b: Partial<ComposerBriefing>) => void;
   onUpdateProject: (p: Record<string, any>) => void;
-  onGoToStoryboard: () => void;
+  onGoToStoryboard: (opts?: { skipAnalysis?: boolean }) => void;
   onScenesGenerated: (scenes: ComposerScene[]) => void;
   /** Fired the moment AI generation kicks off, so the dashboard can flip a
    *  global flag and show a loading panel on the Storyboard tab. */
