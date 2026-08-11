@@ -88,13 +88,23 @@ interface LocalProject {
   cutdownType?: string | null;
 }
 
-const STORAGE_KEY = 'video-composer-draft';
-const TAB_STORAGE_KEY = 'video-composer-draft-tab';
+const DRAFT_BASE_KEY = 'video-composer-draft';
+const TAB_DRAFT_BASE_KEY = 'video-composer-draft-tab';
+
+/** Draft keys are bound to the signed-in account (see local-draft-scope). */
+const storageKey = () => {
+  migrateLegacyDraftKey(DRAFT_BASE_KEY);
+  return scopedDraftKey(DRAFT_BASE_KEY);
+};
+const tabStorageKey = () => {
+  migrateLegacyDraftKey(TAB_DRAFT_BASE_KEY);
+  return scopedDraftKey(TAB_DRAFT_BASE_KEY);
+};
 const TAB_ORDER: TabId[] = ['briefing', 'storyboard', 'text', 'audio', 'export', 'campaign'];
 
 function loadDraft(): LocalProject | null {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(storageKey());
     if (stored) return JSON.parse(stored);
   } catch { /* ignore */ }
   return null;
@@ -102,14 +112,14 @@ function loadDraft(): LocalProject | null {
 
 function saveDraft(project: LocalProject) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
+    localStorage.setItem(storageKey(), JSON.stringify(project));
   } catch { /* ignore */ }
 }
 
 function clearDraft() {
   try {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(TAB_STORAGE_KEY);
+    localStorage.removeItem(storageKey());
+    localStorage.removeItem(tabStorageKey());
   } catch { /* ignore */ }
 }
 
