@@ -64,6 +64,7 @@ import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 import { isPageReload } from '@/lib/composer/isPageReload';
 import { scopedDraftKey, migrateLegacyDraftKey } from '@/lib/local-draft-scope';
+import { useAuth } from '@/hooks/useAuth';
 import { useStoryboardTransition } from '@/hooks/useStoryboardTransition';
 import ProductionWarRoom from './storyboard/ProductionWarRoom';
 import ProductionPlanSheet from './briefing/ProductionPlanSheet';
