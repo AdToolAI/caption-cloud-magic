@@ -15,12 +15,13 @@ const corsHeaders = {
 
 type ViduModel = "vidu-q2-reference" | "vidu-q2-i2v" | "vidu-q2-t2v";
 
-// Vidu Q2 charges a flat fee per generation (5s fixed clip).
-// Normalized 14.07.2026 to 3.00× cost margin (q3-pro ≈ $0.22 flat, q3-turbo ≈ $0.20 flat).
-const FLAT_PRICE_EUR: Record<ViduModel, number> = {
-  "vidu-q2-reference": 0.66,
-  "vidu-q2-i2v":       0.66,
-  "vidu-q2-t2v":       0.60,
+// Vidu Q3 bills per second of output. Provider rates (platform.vidu.com/docs/pricing,
+// worst case 1080p): q3-pro ≈ $0.125/s, q3-turbo ≈ $0.065/s.
+// Margin policy: exactly 3.00× provider cost — mirrors VIDEO_PRICING_CATALOG.
+const PRICE_PER_SECOND_EUR: Record<ViduModel, number> = {
+  "vidu-q2-reference": 0.375,
+  "vidu-q2-i2v":       0.375,
+  "vidu-q2-t2v":       0.195,
 };
 
 // Replicate slugs. The original `vidu/q2-*` models were retired by Replicate
@@ -38,7 +39,15 @@ const REPLICATE_MODELS: Record<ViduModel, string> = {
   "vidu-q2-t2v": "vidu/q3-turbo",
 };
 
-const FIXED_DURATION = 5;
+// Verified Replicate input schema for `vidu/q3-pro` / `vidu/q3-turbo` (11.08.2026):
+//   duration 1–16 (default 5) · resolution 540p|720p|1080p ·
+//   aspect_ratio 16:9|9:16|3:4|4:3|1:1 · start_image · end_image ·
+//   audio (bool, default true) · seed. No negative_prompt, no reference array.
+const MIN_DURATION = 1;
+const MAX_DURATION = 16;
+const DEFAULT_DURATION = 5;
+const ALLOWED_ASPECTS = new Set(["16:9", "9:16", "1:1", "4:3", "3:4"]);
+const ALLOWED_RESOLUTIONS = new Set(["540p", "720p", "1080p"]);
 const MAX_REFERENCES = 7;
 const VALID_ROLES = new Set(["character", "product", "location", "style", "prop"]);
 
@@ -52,7 +61,12 @@ interface GenerateRequest {
   referenceRoles?: string[];
   /** I2V single start image (alternative to referenceImages[0]). */
   startImageUrl?: string;
-  negativePrompt?: string;
+  /** Optional end frame — Vidu Q3 interpolates start → end. */
+  endImageUrl?: string;
+  duration?: number;
+  resolution?: string;
+  /** Native audio track (Q3 only, default on). */
+  audio?: boolean;
   seed?: number;
 }
 
@@ -208,13 +222,22 @@ serve(async (req) => {
       referenceImages = [],
       referenceRoles = [],
       startImageUrl,
-      negativePrompt,
+      endImageUrl,
+      duration: rawDuration,
+      resolution: rawResolution,
+      audio,
       seed,
     } = body;
 
     const replicateModel = REPLICATE_MODELS[model];
-    const totalCost = FLAT_PRICE_EUR[model];
-    if (!replicateModel || totalCost === undefined) {
+    const perSecond = PRICE_PER_SECOND_EUR[model];
+    const duration = Math.min(
+      MAX_DURATION,
+      Math.max(MIN_DURATION, Math.round(Number(rawDuration) || DEFAULT_DURATION)),
+    );
+    const resolution = ALLOWED_RESOLUTIONS.has(String(rawResolution)) ? String(rawResolution) : "1080p";
+    const totalCost = Number((perSecond * duration).toFixed(2));
+    if (!replicateModel || perSecond === undefined) {
       return new Response(JSON.stringify({ error: `Unknown Vidu model: ${model}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -224,8 +247,8 @@ serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (!["16:9", "9:16", "1:1"].includes(aspectRatio)) {
-      return new Response(JSON.stringify({ error: "aspectRatio must be 16:9, 9:16 or 1:1." }), {
+    if (!ALLOWED_ASPECTS.has(aspectRatio)) {
+      return new Response(JSON.stringify({ error: "aspectRatio must be 16:9, 9:16, 1:1, 4:3 or 3:4." }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -304,10 +327,10 @@ serve(async (req) => {
         user_id: user.id,
         prompt: finalPrompt,
         model,
-        duration_seconds: FIXED_DURATION,
+        duration_seconds: duration,
         aspect_ratio: aspectRatio,
-        resolution: "1080p",
-        cost_per_second: totalCost / FIXED_DURATION,
+        resolution,
+        cost_per_second: perSecond,
         total_cost_euros: totalCost,
         status: "pending",
         source_image_url: startImageUrl ?? referenceImages[0] ?? null,
@@ -338,9 +361,10 @@ serve(async (req) => {
       prompt: finalPrompt,
       seed: seed ?? Math.floor(Math.random() * 1_000_000),
       aspect_ratio: aspectRatio,
-      duration: FIXED_DURATION,
+      duration,
+      resolution,
+      audio: audio !== false,
     };
-    if (negativePrompt) viduInput.negative_prompt = negativePrompt;
 
     if (model === "vidu-q2-reference") {
       // q3-pro does not accept a multi-image array — send the first reference
@@ -355,6 +379,8 @@ serve(async (req) => {
       const img = startImageUrl ?? referenceImages[0];
       if (img) viduInput.start_image = img;
     }
+    // End frame is supported by both q3-pro and q3-turbo (start-end interpolation).
+    if (endImageUrl && model !== "vidu-q2-t2v") viduInput.end_image = endImageUrl;
 
     let prediction;
     try {
@@ -393,8 +419,8 @@ serve(async (req) => {
       .eq("id", generation.id);
 
     await trackAIGeneration('started', user.id, {
-      provider: 'vidu', model, duration_s: FIXED_DURATION,
-      cost_eur: totalCost, aspect_ratio: aspectRatio, resolution: '1080p',
+      provider: 'vidu', model, duration_s: duration,
+      cost_eur: totalCost, aspect_ratio: aspectRatio, resolution,
       generation_id: generation.id,
     }).catch(() => {});
 
