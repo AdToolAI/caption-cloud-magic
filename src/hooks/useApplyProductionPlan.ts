@@ -108,6 +108,7 @@ function emptyPlanCastSlot(sceneIndex: number): PlanCastSlot {
 
 import { shouldInheritContinuity as shouldInheritPlanContinuity } from '@/lib/video-composer/briefing/planContinuity';
 import { tx } from '@/lib/i18nText';
+import type { SceneAudioSource } from '@/config/nativeAudioSources';
 
 function hydratePlanScenesForApply(scenes: TPlanScene[]): TPlanScene[] {
   let lastCast: PlanCastSlot | null = null;
