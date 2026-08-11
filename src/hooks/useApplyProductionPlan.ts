@@ -1159,5 +1159,5 @@ export function useApplyProductionPlan() {
       verified: true,
       warnings,
     };
-  }, []);
+  }, [suggestEditorMode]);
 }
