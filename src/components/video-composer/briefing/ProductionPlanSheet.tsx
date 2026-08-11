@@ -56,12 +56,19 @@ const isUuid = (val?: string | null) =>
 
 import { normalizeAssetKey as _normalizeAssetKey } from '@/lib/video-composer/briefing/assetKeyUtils';
 import { shouldInheritContinuity } from '@/lib/video-composer/briefing/planContinuity';
+import { canonicalPoolId } from '@/lib/video-composer/canonicalCastId';
 
 const normalizeAssetKey = (value?: string | null) =>
   _normalizeAssetKey(value, { stripLocationPrefix: true });
 
 const uuidInside = (value?: string | null) =>
   String(value ?? '').match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? null;
+
+const NON_SPEAKER_KEYS = new Set([
+  'ort', 'location', 'cast', 'aktion', 'action', 'kamera', 'camera',
+  'dialog', 'ziel', 'goal', 'dauer', 'duration', 'stimme', 'voice',
+  'untertitel', 'subtitle', 'subtitles',
+]);
 
 type PlanCastSlot = NonNullable<TPlanScene['cast']>[number];
 type PlanLocationSlot = NonNullable<TPlanScene['location']>;
@@ -576,10 +583,12 @@ export default function ProductionPlanSheet({
     const briefingChars = currentBriefing?.characters ?? [];
     if (!briefingChars.length || !charOptions.length) return;
 
-    // Briefing-Auswahl → Library-IDs (Auswahlreihenfolge bleibt erhalten).
+    // Briefing-Auswahl → kanonische Cast-&-World-UUIDs. ComposerCharacter.id
+    // itself is the UUID for current Cast & World rows; brandCharacterId only
+    // exists on bridged legacy rows.
     const ordered: string[] = [];
     for (const c of briefingChars) {
-      const direct = (c as any).brandCharacterId ?? (c as any).characterId ?? null;
+      const direct = canonicalPoolId(c);
       const byId = direct ? charOptions.find((o) => o.id === direct || uuidInside(o.id) === uuidInside(direct)) : null;
       const needle = normalizeAssetKey((c as any).name);
       const hit = byId ?? (needle ? charOptions.find((o) => normalizeAssetKey(o.name) === needle) : null);
@@ -599,6 +608,10 @@ export default function ProductionPlanSheet({
     autoCastSignatureRef.current = signature;
 
     const keyOf = (v?: string | null) => normalizeAssetKey(String(v ?? '').replace(/^@/, ''));
+    const isSpeakerKey = (v?: string | null) => {
+      const key = keyOf(v);
+      return !!key && !NON_SPEAKER_KEYS.has(key);
+    };
     const byMention = new Map<string, string>();
     const used = new Set<string>();
 
@@ -612,26 +625,68 @@ export default function ProductionPlanSheet({
       }
     }
 
-    const nextFree = () => ordered.find((id) => !used.has(id)) ?? null;
+    // Real speaker mentions are authoritative. Collect them once in first-
+    // appearance order, then ensure every scene exposes the mentions it uses.
+    const orderedSpeakerKeys: string[] = [];
+    const speakerLabel = new Map<string, string>();
+    for (const s of plan.scenes) {
+      for (const t of s.dialogTurns ?? []) {
+        const raw = (t as any)?.speakerMentionKey ?? (t as any)?.speakerName;
+        const k = keyOf(raw);
+        if (!isSpeakerKey(raw) || orderedSpeakerKeys.includes(k)) continue;
+        orderedSpeakerKeys.push(k);
+        speakerLabel.set(k, String(raw ?? k).replace(/^@/, ''));
+      }
+    }
+
+    // Fill globally by selected-character order before rebuilding scenes.
+    for (const key of orderedSpeakerKeys) {
+      if (byMention.has(key)) continue;
+      const id = ordered.find((candidate) => !used.has(candidate));
+      if (!id) break;
+      byMention.set(key, id);
+      used.add(id);
+    }
+
     let changed = false;
 
     const scenes = plan.scenes.map((s) => {
       let sceneChanged = false;
-      const cast = (s.cast ?? []).map((c) => {
+      const sceneSpeakerKeys = Array.from(new Set((s.dialogTurns ?? [])
+        .map((t: any) => t?.speakerMentionKey ?? t?.speakerName)
+        .filter(isSpeakerKey)
+        .map(keyOf))).slice(0, 4);
+      const cast = (s.cast ?? []).filter((c) => {
+        const k = keyOf(c.mentionKey || c.characterName);
+        const keep = !NON_SPEAKER_KEYS.has(k) || !!uuidInside(c.characterId ?? null);
+        if (!keep) sceneChanged = true;
+        return keep;
+      }).map((c) => {
         const existing = uuidInside(c.characterId ?? null) ?? splitCastId(c.characterId).baseId;
         if (existing && isUuid(existing)) return c;
         const k = keyOf(c.mentionKey || c.characterName);
-        let id = k ? byMention.get(k) ?? null : null;
-        if (!id) {
-          id = nextFree();
-          if (!id) return c;
-          used.add(id);
-          if (k) byMention.set(k, id);
-        }
+        const id = k ? byMention.get(k) ?? null : null;
+        if (!id) return c;
         sceneChanged = true;
         const matched = charOptions.find((o) => o.id === id);
         return { ...c, characterId: id, characterName: matched?.name ?? c.characterName, outfitLookId: null };
       });
+
+      const castKeys = new Set(cast.map((c) => keyOf(c.mentionKey || c.characterName)).filter(Boolean));
+      for (const k of sceneSpeakerKeys) {
+        if (cast.length >= 4 || castKeys.has(k)) continue;
+        const id = byMention.get(k) ?? null;
+        const matched = id ? charOptions.find((o) => o.id === id) : null;
+        cast.push({
+          mentionKey: `@${speakerLabel.get(k) ?? k}`,
+          characterId: id,
+          characterName: matched?.name ?? speakerLabel.get(k) ?? 'Sprecher',
+          outfitLookId: null,
+          voiceId: null,
+        });
+        castKeys.add(k);
+        sceneChanged = true;
+      }
 
       const dialogTurns = (s.dialogTurns ?? []).map((t: any) => {
         const bound = uuidInside(t?.speakerCharacterId ?? null);
