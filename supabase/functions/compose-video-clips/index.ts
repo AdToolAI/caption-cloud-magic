@@ -1537,6 +1537,12 @@ serve(async (req) => {
     }
 
     const processScenes = async () => {
+    // v418 — Seedance 2.5 as a lip-sync plate provider is behind a rollout
+    // flag. Resolved once per request, not per scene.
+    const seedance25LipsyncEnabled = await isSeedance25LipsyncEnabled(
+      supabaseAdmin,
+      user.id,
+    );
     // Process each scene
     for (const scene of scenes) {
       // ── HARD-GUARD: legacy `heygen` override → `auto` ───────────────────
