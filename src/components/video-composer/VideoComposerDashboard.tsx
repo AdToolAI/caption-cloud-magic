@@ -38,6 +38,7 @@ import { getClipCost, DEFAULT_TEXT_OVERLAY } from '@/types/video-composer';
 import { useComposerPersistence, persistAssemblyConfig, persistAdMeta } from '@/hooks/useComposerPersistence';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
 import { SceneRenderConfirmProvider } from '@/lib/composer/sceneRenderConfirm';
 import MotionStudioTopStepper, { type TopStepperStep } from './MotionStudioTopStepper';
