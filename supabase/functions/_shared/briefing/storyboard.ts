@@ -961,14 +961,8 @@ Generate the storyboard using the create_storyboard function.`;
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("compose-video-storyboard error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    console.error("[storyboard] error:", error);
+    return briefingErrorResponse(500, corsHeaders, error instanceof Error ? error.message : "Unknown error");
   }
 })(req));
 }
