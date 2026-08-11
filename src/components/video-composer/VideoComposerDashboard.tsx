@@ -865,7 +865,7 @@ export default function VideoComposerDashboard() {
     // Intercept briefing → storyboard: try to run the auto-analyse flow.
     // The hook short-circuits when the storyboard already has scenes or
     // any scene is lipsync-protected — in those cases we just navigate.
-    if (next === 'storyboard' && activeTab === 'briefing') {
+    if (next === 'storyboard' && activeTab === 'briefing' && !opts?.skipAnalysis) {
       const { handled } = await storyboardTransition.attempt();
       if (handled) {
         // Don't switch tabs yet — the War Room is up, and the plan-apply
