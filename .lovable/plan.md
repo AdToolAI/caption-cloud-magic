@@ -37,7 +37,7 @@ Im Briefing-Analyse-Dashboard bleibt jede Zuordnung änderbar: pro Cast-Slot ein
 Sobald ein Cast-Slot eine Figur bekommt — automatisch oder von Hand —, werden alle Turns mit derselben `@mention` gebunden (`speakerCharacterId`), inklusive Stimme aus dem Figurenprofil. Beim Übernehmen landen Cast-Slots, Sprecherbindung und Stimmen unverändert im Storyboard (`characterShots` + `dialogTurns`); geschützte Szenen bleiben unangetastet.
 
 
-### 4. Negative Prompt einsprachig
+### 5. Negative Prompt einsprachig
 Der Plan-Normalizer übersetzt den Negative Prompt vollständig ins Englische (kein Teil-Merge mehr), die deutsche Fassung bleibt nur zur Anzeige.
 
 ### 5. Anschluss Szene 1 → Szene 2
