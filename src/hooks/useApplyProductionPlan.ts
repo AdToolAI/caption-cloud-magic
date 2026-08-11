@@ -40,6 +40,7 @@ import { dedupePlanSceneCast } from '@/lib/video-composer/briefing/planCastDedup
 import { resolveCanonicalCharacterId } from '@/lib/video-composer/canonicalCastId';
 import { getOutfitPresetById } from '@/config/defaultOutfitPresets';
 import { isDirectiveTurn } from '@/lib/motion-studio/planDisplayFilter';
+import { normalizeAssetKey } from '@/lib/video-composer/briefing/assetKeyUtils';
 
 const DEFAULT_TEXT_OVERLAY = {
   text: '',
@@ -268,6 +269,7 @@ function planSceneToComposerScene(
   voicePoolPicker?: VoicePoolPicker,
   voicePoolAssignments: Record<string, string> = {},
   isSingleScenePlan = false,
+  applyDialogTurns = false,
 ): ComposerScene {
 
   // Build characterShots from resolved cast. The plan stores `characterId`
@@ -760,6 +762,8 @@ export interface ApplyPlanArgs {
   onUpdateBriefing: (patch: Partial<ComposerBriefing>) => void;
   onUpdateScenes: (scenes: ComposerScene[]) => void;
   onApplyAssembly: (next: AssemblyConfig) => void;
+  /** v414 — Dialogzeilen aus dem Plan mit ins Storyboard übernehmen. */
+  applyDialogTurns?: boolean;
 }
 
 export interface ApplyPlanResult {
@@ -776,6 +780,7 @@ export function useApplyProductionPlan() {
       plan: rawPlan, projectId, language,
       currentScenes, currentAssembly, currentBriefing,
       onUpdateBriefing, onUpdateScenes, onApplyAssembly,
+      applyDialogTurns = false,
     } = args;
     const finalizeResult = finalizePlanCanonical(rawPlan);
     const finalized = finalizeResult!.plan;
@@ -899,6 +904,7 @@ export function useApplyProductionPlan() {
           voicePoolPicker,
           voicePoolAssignments,
           hydratedScenes.length === 1,
+          applyDialogTurns,
         ),
       );
 
