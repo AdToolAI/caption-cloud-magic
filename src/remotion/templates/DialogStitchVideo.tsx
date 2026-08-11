@@ -563,6 +563,9 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   masterVideoUrl,
   masterImageUrl,
   masterAudioUrl,
+  ambientAudioUrl,
+  ambientVolume,
+
   totalSec,
   targetWidth,
   targetHeight,
