@@ -1008,13 +1008,22 @@ export default function BriefingTab({
         </Card>
       )}
 
-      {/* Action — gold-gradient cinematic CTA */}
-      <div className="flex justify-end pt-2">
+      {/* Action — empty path (ghost) + gold-gradient cinematic CTA */}
+      <div className="flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3 pt-2">
+        <button
+          type="button"
+          onClick={handleStartEmptyStoryboard}
+          disabled={isGenerating}
+          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full border border-border/50 text-muted-foreground font-mono text-[11px] uppercase tracking-[0.25em] transition-all hover:text-foreground hover:border-amber-200/40 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <ArrowRight className="h-4 w-4" />
+          {tx({ de: 'Leer ins Storyboard', en: 'Start empty storyboard', es: 'Ir al storyboard vacío' })}
+        </button>
         <button
           type="button"
           onClick={handleGenerateStoryboard}
           disabled={!canProceed || isGenerating}
-          className={`group relative inline-flex items-center gap-2 px-6 py-3 rounded-full font-mono text-[11px] uppercase tracking-[0.25em] text-[hsl(230_30%_4%)] disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_40px_-8px_hsla(43,90%,68%,0.7)] hover:-translate-y-[1px] ${canProceed && !isGenerating ? 'stage-cta-sheen' : ''}`}
+          className={`group relative inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-mono text-[11px] uppercase tracking-[0.25em] text-[hsl(230_30%_4%)] disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_40px_-8px_hsla(43,90%,68%,0.7)] hover:-translate-y-[1px] ${canProceed && !isGenerating ? 'stage-cta-sheen' : ''}`}
           style={{
             background: 'linear-gradient(180deg, #FFE9A8 0%, #F5C76A 50%, #b78934 100%)',
             boxShadow:
@@ -1026,19 +1035,15 @@ export default function BriefingTab({
               <Loader2 className="h-4 w-4 animate-spin" />
               {t('videoComposer.generatingStoryboard')}
             </>
-          ) : briefing.mode === 'ai' ? (
+          ) : (
             <>
               <Sparkles className="h-4 w-4" />
               {t('videoComposer.generateStoryboard')}
             </>
-          ) : (
-            <>
-              <ArrowRight className="h-4 w-4" />
-              {t('videoComposer.continueToStoryboard')}
-            </>
           )}
         </button>
       </div>
+
       </div>
     </div>
   );
