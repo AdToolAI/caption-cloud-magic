@@ -11,7 +11,14 @@ import type { ComposerScene } from "@/types/video-composer";
 
 export const MAX_PROJECT_SECONDS = 600; // 10 minutes
 export const MIN_SCENE_SECONDS = 3;
-export const MAX_SCENE_SECONDS = 15;
+/**
+ * Hard provider cap for ONE scene. Seedance 2.5 (ModelArk) renders up to 30 s
+ * per shot; every other model tops out at 15 s and gets clamped by
+ * `maxDurationForScene(scenes, sceneId, clipSource)`.
+ */
+export const MAX_SCENE_SECONDS = 30;
+/** Cap for models without long-form support. */
+export const DEFAULT_MAX_SCENE_SECONDS = 15;
 
 /** Sum of durations of every scene EXCEPT the one with `excludeSceneId`. */
 export function sumOtherScenesDuration(
