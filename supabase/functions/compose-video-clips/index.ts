@@ -132,7 +132,7 @@ interface ClipScene {
   /** Continuity: URL of the previous scene's rendered clip (video-reference models). */
   previousClipUrl?: string;
   /** User/auto preference for how this scene connects to the previous one. */
-  visualContinuity?: "auto" | "cut" | "continue";
+  visualContinuity?: "auto" | "seamless" | "identity" | "match-cut";
   /** Additional role-tagged references (character / location / product). */
   visualReferences?: Array<{
     url: string;

@@ -520,6 +520,10 @@ export interface ComposerScene {
   locationReferences?: { url: string; entityId?: string }[];
   productReferences?: { url: string; entityId?: string }[];
   visualContinuity?: 'auto' | 'seamless' | 'identity' | 'match-cut';
+  /** Last usable frame of the previous scene's clip (client-extracted, continuity only). */
+  transitionFrameUrl?: string;
+  /** Previous scene's rendered clip URL — used by video-reference models. */
+  previousClipUrl?: string;
 
   /**
    * Phase C.1 runtime-only annotations from `propagateDialogLock`. Not
