@@ -57,9 +57,10 @@ Guard-Tests: Standardfall darf niemals `generate_audio: true` senden; Hybrid-Fal
 
 ## Technische Notizen
 
-- Änderungsumfang an der eingefrorenen Kette: ausschließlich Allowlist + Flag. T3 (Anker), T5 (Geometrie), T6 (Assignment-Lock) und der Mux-Gate bleiben unangetastet; Geometrie-Anker bleibt `reference_image_url` (v400).
-- Neue Tests: Allowlist-Spiegel Dispatcher ↔ Resolver, stumme Platte, Resolver liefert für Lip-Sync-Szene auf Seedance 2.5 `inputMode: "first-frame"` mit dem Anker (nie `references`, nie Clip-Referenz).
-- Berührte Dateien: `supabase/functions/compose-video-clips/index.ts`, `supabase/functions/_shared/visual-inputs.ts`, `supabase/functions/_shared/modelark.ts` (nur Aufrufparameter), `src/lib/aiVideoModelRegistry.ts`, `src/components/video-composer/SceneCard.tsx`, neue Tests unter `src/lib/composer/__tests__/`.
+- Änderungsumfang an der eingefrorenen Kette: Allowlist, Flag und ein Audio-Layer, der erst NACH Sync.so greift. T3 (Anker), T5 (Geometrie), T6 (Assignment-Lock) und das Mux-Gate bleiben unangetastet; Geometrie-Anker bleibt `reference_image_url` (v400).
+- Sprach-Gate: Transkription der Plattentonspur über die Lovable-AI-Speech-to-Text-Route; leeres Transkript = Atmo darf bleiben, sonst stumm. Fail-closed bei jedem Fehler des Gates.
+- Neue Tests: Allowlist-Spiegel Dispatcher ↔ Resolver, stumme Platte im Standardfall, Atmo nie an Sync.so, Sprach-Gate erzwingt stumm, Resolver liefert für Lip-Sync-Szene auf Seedance 2.5 `inputMode: "first-frame"` mit dem Anker (nie `references`, nie Clip-Referenz).
+- Berührte Dateien: `supabase/functions/compose-video-clips/index.ts`, `supabase/functions/_shared/visual-inputs.ts`, `supabase/functions/_shared/modelark.ts` (Aufrufparameter), die Stitch-/Mux-Stufe für den Atmo-Layer, `src/lib/aiVideoModelRegistry.ts`, `src/components/video-composer/SceneCard.tsx`, neue Tests unter `src/lib/composer/__tests__/`.
 
 ## Offene Entscheidung
 
