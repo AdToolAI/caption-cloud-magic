@@ -55,6 +55,27 @@ export default function BriefingImportDialog({
   const [accept, setAccept] = useState({
     project: true, scenes: true, voice: true, captions: true, negativePrompt: true,
   });
+  const [showGuide, setShowGuide] = useState(false);
+
+  // Loads the canonical sample briefing into the textarea. Never silently
+  // overwrites work the user already pasted.
+  const handleInsertTemplate = () => {
+    const template = getBriefingTemplate();
+    if (text.trim().length > 0) {
+      const ok = window.confirm(
+        tx({
+          de: 'Vorhandenen Text durch das Muster-Briefing ersetzen?',
+          en: 'Replace the existing text with the sample briefing?',
+          es: '¿Reemplazar el texto existente por el briefing de muestra?',
+        }),
+      );
+      if (!ok) return;
+    }
+    setText(template);
+    setShowGuide(true);
+  };
+
+
 
   const { characters, locations } = useUnifiedMentionLibrary();
   const applyManifest = useApplyBriefingManifest();
