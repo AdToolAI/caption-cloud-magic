@@ -1731,6 +1731,37 @@ export default function SceneCard({
                                 </Select>
                               </div>
                             )}
+                            {dialogMode && scene.clipSource === "ai-seedance25" && (
+                              <label className="mt-2 flex items-start gap-2 rounded-md border border-border/50 bg-card/40 p-2">
+                                <input
+                                  type="checkbox"
+                                  className="mt-0.5 h-3.5 w-3.5 accent-primary"
+                                  checked={scene.audioSource === "ambient"}
+                                  onChange={(e) =>
+                                    onUpdate({
+                                      audioSource: (e.target.checked ? "ambient" : "silent") as any,
+                                    })
+                                  }
+                                />
+                                <span className="leading-tight">
+                                  <span className="block text-[11px] font-medium">
+                                    {tx({
+                                      de: "Umgebungston vom Modell",
+                                      en: "Ambience from the model",
+                                      es: "Ambiente del modelo",
+                                    })}
+                                  </span>
+                                  <span className="block text-[9px] text-muted-foreground">
+                                    {tx({
+                                      de: "Nur Atmo und Geräusche — die Stimme kommt weiter aus dem Studio. Erkennt die Prüfung Sprache, läuft die Szene stumm.",
+                                      en: "Ambience and foley only — the voice still comes from the studio. If the check hears speech, the scene stays muted.",
+                                      es: "Solo ambiente y efectos: la voz sigue viniendo del estudio. Si la comprobación detecta habla, la escena queda muda.",
+                                    })}
+                                  </span>
+                                </span>
+                              </label>
+                            )}
+
                         {(() => {
                           const selectedModel = AI_VIDEO_TOOLKIT_MODELS.find(
                             (m) => m.id === currentModelId,
