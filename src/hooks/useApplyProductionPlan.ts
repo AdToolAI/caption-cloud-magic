@@ -855,6 +855,9 @@ export interface ApplyPlanResult {
 
 export function useApplyProductionPlan() {
   const { suggestEditorMode } = useStudioPreferences();
+  // v418 — decides whether long dialog scenes may be routed to Seedance 2.5.
+  const seedance25LipsyncEnabled = useSeedance25Lipsync();
+
   return useCallback(async (args: ApplyPlanArgs): Promise<ApplyPlanResult> => {
     const {
       plan: rawPlan, projectId, language,
