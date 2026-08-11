@@ -8,6 +8,7 @@
  * and never read this constant.
  */
 import type { ComposerScene } from "@/types/video-composer";
+import { maxSecondsForClipSource } from "@/lib/composer/pickClipSourceForDuration";
 
 export const MAX_PROJECT_SECONDS = 600; // 10 minutes
 export const MIN_SCENE_SECONDS = 3;
