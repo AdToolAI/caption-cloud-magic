@@ -65,6 +65,62 @@ export interface ScriptTimingInfo {
 const NON_SPEAKER_LABELS =
   /^(szene|scene|shot|kamera|framing|mood|note|tone|dialog|dialogue|voiceover|vo|hook|reveal|cta|pain|proof|beat|setting|location|action|takt|jingle|musik|music|onscreen|caption|regie|director)$/i;
 
+/**
+ * Briefing block keys (DE/EN/ES). A line like "DAUER: 30 Sekunden" or
+ * "ORT: @studio-loft" is structure, never dialogue. Without this list the
+ * script-timing detector emitted @dauer / @ort / @cast / @aktion as speakers
+ * and the whole cast assignment downstream had nothing real to bind.
+ */
+const NON_SPEAKER_BLOCK_KEYS = new Set([
+  // duration / length
+  'dauer', 'laenge', 'lange', 'length', 'duration', 'duracion', 'zeit', 'time', 'timing',
+  // place
+  'ort', 'location', 'lugar', 'ubicacion', 'setting', 'set', 'kulisse',
+  // cast
+  'cast', 'besetzung', 'reparto', 'charaktere', 'characters', 'personajes', 'figuren',
+  // action / camera
+  'aktion', 'action', 'accion', 'kamera', 'camera', 'camara', 'shotdirector', 'shot-director',
+  'bewegung', 'movement', 'framing', 'winkel', 'angle', 'licht', 'lighting', 'luz',
+  // audio
+  'stimme', 'voice', 'voz', 'audio', 'ton', 'sound', 'sounddesign', 'sound-design',
+  'musik', 'music', 'musica', 'atmo', 'ambience',
+  // text layers
+  'untertitel', 'subtitle', 'subtitles', 'subtitulos', 'overlay', 'text', 'onscreen',
+  // prompts / style
+  'prompt', 'prompts', 'negativprompt', 'negativ-prompt', 'negativeprompt', 'negative-prompt',
+  'stil', 'style', 'estilo', 'visuellerstil', 'look', 'farben', 'colors',
+  // meta
+  'ziel', 'goal', 'objetivo', 'produkt', 'product', 'producto', 'projekt', 'project', 'proyecto',
+  'zielgruppe', 'audience', 'publico', 'tonalitaet', 'tonalitat', 'tonalidad', 'tonality',
+  'format', 'formato', 'seitenverhaeltnis', 'seitenverhaltnis', 'aspectratio', 'aspect-ratio',
+  'uebergang', 'ubergang', 'transition', 'transicion', 'engine', 'modell', 'model', 'modelo',
+  'usp', 'usps', 'brief', 'briefing', 'notiz', 'note', 'notes', 'nota',
+]);
+
+function normalizeLabelKey(label: string): string {
+  return String(label ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+/** True when a "Label: text" line is briefing structure, not a spoken line. */
+export function isNonSpeakerLabel(label: string): boolean {
+  const raw = String(label ?? '').trim();
+  if (!raw) return true;
+  if (NON_SPEAKER_LABELS.test(raw)) return true;
+  const key = normalizeLabelKey(raw);
+  if (!key) return true;
+  if (NON_SPEAKER_BLOCK_KEYS.has(key)) return true;
+  // Compound keys such as "Negative Prompt (EN)" or "Visueller Stil".
+  const compact = key.replace(/^(der|die|das|the|el|la)/, '');
+  return NON_SPEAKER_BLOCK_KEYS.has(compact);
+}
+
+
 function stripLine(s: string): string {
   return String(s ?? '').replace(/^\s+|\s+$/g, '');
 }
@@ -155,7 +211,7 @@ function extractByShotMarkers(body: string): DetectedShot[] {
       );
       if (!dl) continue;
       const label = dl[1].trim();
-      if (NON_SPEAKER_LABELS.test(label)) continue;
+      if (isNonSpeakerLabel(label)) continue;
       const inlineTiming = dl[2] ? parseTimeWindow(`(${dl[2]})`).durationSec : null;
       const text = dl[3].trim();
       if (!text) continue;
@@ -260,7 +316,7 @@ function extractByNamedSpeakerBlocks(body: string): DetectedShot[] {
     const m = line.match(/^([A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9\-\.\s]{1,40}?)\s*[:—-]\s+(.+)$/);
     if (!m) continue;
     const label = stripLine(m[1]);
-    if (NON_SPEAKER_LABELS.test(label)) continue;
+    if (isNonSpeakerLabel(label)) continue;
     if (/^(sprecher|speaker|talent|person|charakter|character|rolle|role)\s*\d+/i.test(label)) continue;
     i += 1;
     shots.push({

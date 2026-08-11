@@ -68,7 +68,23 @@ const NON_SPEAKER_KEYS = new Set([
   'ort', 'location', 'cast', 'aktion', 'action', 'kamera', 'camera',
   'dialog', 'ziel', 'goal', 'dauer', 'duration', 'stimme', 'voice',
   'untertitel', 'subtitle', 'subtitles',
+  'laenge', 'length', 'zeit', 'time', 'besetzung', 'charaktere', 'characters',
+  'musik', 'music', 'audio', 'ton', 'sound', 'sounddesign', 'atmo',
+  'prompt', 'prompts', 'negativprompt', 'negativeprompt', 'stil', 'style',
+  'produkt', 'product', 'projekt', 'project', 'zielgruppe', 'audience',
+  'tonalitaet', 'tonalitat', 'tonality', 'format', 'seitenverhaeltnis',
+  'uebergang', 'ubergang', 'transition', 'engine', 'modell', 'model',
+  'usp', 'usps', 'briefing', 'notiz', 'note', 'overlay', 'text',
 ]);
+
+/** True when a plan dialog turn belongs to a real speaker (not a block label). */
+const isRealSpeakerTurn = (t: any): boolean => {
+  if (!String(t?.text ?? '').trim()) return false;
+  const key = normalizeAssetKey(String(t?.speakerMentionKey ?? t?.speakerName ?? '').replace(/^@/, ''));
+  if (!key) return false;
+  return !NON_SPEAKER_KEYS.has(key);
+};
+
 
 type PlanCastSlot = NonNullable<TPlanScene['cast']>[number];
 type PlanLocationSlot = NonNullable<TPlanScene['location']>;
@@ -178,13 +194,16 @@ export default function ProductionPlanSheet({
   }, [currentBriefing]);
 
   const planRequestedDurationSec = useMemo(() => readRequestedDurationFromPlan(plan), [plan]);
+  // v420 — Nur echte Sprecher-Turns zählen. Briefing-Blocklabels ("DAUER:",
+  // "ORT:", "CAST:") sind Struktur, keine Dialogzeilen.
   const dialogTurnCount = useMemo(
     () => (plan?.scenes ?? []).reduce(
-      (acc, sc) => acc + ((sc as any).dialogTurns ?? []).filter((t: any) => (t?.text ?? '').trim()).length,
+      (acc, sc) => acc + ((sc as any).dialogTurns ?? []).filter(isRealSpeakerTurn).length,
       0,
     ),
     [plan],
   );
+
   const effectiveCurrentBriefing = useMemo(() => {
     const currentDuration = Number(currentBriefing?.duration);
     if (planRequestedDurationSec !== null && (!Number.isFinite(currentDuration) || currentDuration < 15)) {
@@ -1160,6 +1179,7 @@ export default function ProductionPlanSheet({
           .filter((id): id is string => !!id && isUuid(id)),
       );
       turns.forEach((turn, turnIndex) => {
+        if (!isRealSpeakerTurn(turn)) return; // Blocklabels sind keine Sprecher.
         const boundId = uuidInside((turn as any).speakerCharacterId ?? null);
         if (!boundId || !castIds.has(boundId)) {
           issues.push({
@@ -1169,6 +1189,7 @@ export default function ProductionPlanSheet({
           });
         }
       });
+
     }
     return issues;
   }, [safePlan, outfitById]);

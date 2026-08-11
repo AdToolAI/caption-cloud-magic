@@ -11,7 +11,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 import { isQaMockRequest, qaMockJson } from "../../qaMock.ts";
 import { resolveCatalogId, CATALOG_VERSION, type CatalogAxis } from "./catalog.ts";
-import { detectScriptTimingMode, type ScriptTimingInfo } from "./detectScriptTimingMode.ts";
+import { detectScriptTimingMode, isNonSpeakerLabel, type ScriptTimingInfo } from "./detectScriptTimingMode.ts";
 import { enforceSoloCast } from "./enforceSoloCast.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1037,8 +1037,11 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
           mood: t?.mood ? String(t.mood).slice(0, 80) : undefined,
           delivery: t?.delivery ? String(t.delivery).slice(0, 240) : undefined,
         }))
-        .filter((t: any) => t.speakerMentionKey && t.text)
+        // v420 — Briefing-Blocklabels ("DAUER:", "ORT:", "CAST:") sind keine
+        // Sprecher. Solche Turns nie ins Manifest lassen.
+        .filter((t: any) => t.speakerMentionKey && t.text && !isNonSpeakerLabel(String(t.speakerMentionKey).replace(/^@/, '')))
         .slice(0, 20);
+
       if (turns.length) dialogTurns = turns;
     }
 
@@ -2983,6 +2986,41 @@ YOU MUST:
     } catch (e: any) {
       console.warn('[briefing-deep-parse] strict cast pass failed (non-fatal):', e?.message);
     }
+
+    // v420 — Ensemble-Mindestbesetzung: wenn das Briefing N Cast-&-World-
+    // Figuren auswählt, darf keine Ensemble-Szene mit weniger Slots
+    // zurückkommen. Fehlende Figuren werden in Auswahlreihenfolge als Slots
+    // ergänzt (max. 4). Solo-Szenen (genau 1 Slot) bleiben unangetastet.
+    try {
+      const required = extractSelectedCastFromBriefing(briefing, characters);
+      const scenesArr = Array.isArray((plan as any)?.scenes) ? (plan as any).scenes : [];
+      if (required.length >= 2 && scenesArr.length) {
+        let added = 0;
+        const keyOf = (c: any) =>
+          String(c?.characterId ?? '').toLowerCase() ||
+          normalizeMention(c?.mentionKey || c?.characterName || '');
+        for (const sc of scenesArr) {
+          const cast = Array.isArray(sc.cast) ? [...sc.cast] : [];
+          if (cast.length < 2) continue; // Solo-Szene bleibt solo.
+          const present = new Set(cast.map(keyOf).filter(Boolean));
+          for (const req of required) {
+            if (cast.length >= Math.min(required.length, 4)) break;
+            const k = keyOf(req);
+            if (!k || present.has(k)) continue;
+            cast.push({ ...req, shotType: 'full' });
+            present.add(k);
+            added += 1;
+          }
+          if (cast.length !== (sc.cast?.length ?? 0)) sc.cast = cast;
+        }
+        if (added > 0) {
+          console.log('[briefing-deep-parse] ensemble_cast_minimum', { added, required: required.length });
+        }
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] ensemble cast minimum failed (non-fatal):', e?.message);
+    }
+
 
     // v213 — Briefing Fidelity Pass: when the briefing carried an explicit
     // "## Verbatim Script", enforce 1:1 dialog reproduction + speaker mapping.
