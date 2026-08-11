@@ -1,49 +1,61 @@
-# Briefing-Analyse: Blocklabels raus, echten Dialog rein
+# Briefing-Analyse: Dialog deterministisch, LLM raus aus dem Sprecher-Feld
 
-## Was der Screenshot und die Plandaten zeigen
+## Ehrliche Antwort zur Frage „sauberste Lösung?"
 
-Der zuletzt gespeicherte Plan (22:58 UTC) enthält:
+Die vorige Fassung war eine Reparatur: Filter nachziehen, Herkunft suchen, Gate einbauen. Das behebt den Fall, hält aber die eigentliche Ursache am Leben — **`dialogTurns` hat heute vier konkurrierende Schreiber** (LLM-Rohausgabe, Script-Timing-Seeding, Speaker-Map-Pass, Rescue-Pass). Jeder darf beliebige Mentions setzen, jeder Fix muss an allen vier Stellen wiederholt werden. Genau deshalb ist derselbe Fehler jetzt mehrfach zurückgekommen.
 
-- Szene 1 und Szene 2 haben jetzt **korrekt 4 Cast-Slots** (`@founder`, `@creative`, `@marketer`, `@creator`) — die Ensemble-Mindestbesetzung greift.
-- Als „Dialogzeilen" stehen aber weiterhin **nur Strukturzeilen** drin: `@dauer`, `@ort`, `@cast`, `@aktion`, `@stimme`, `@untertitel`, `@negative-prompt`. Kein einziger echter Sprecher-Turn.
-- Der **echte Dialog steht komplett als Fließtext im `@aktion`-Block**: `@creative: "Moment. Das Briefing kommt einfach hier rein?" @founder: "Genau." …` — elf Zeilen, die nie in Turns zerlegt wurden.
+Die saubere Lösung ist eine Zuständigkeitsentscheidung, keine weitere Filterschicht:
 
-Daraus folgt zweierlei:
+> **Wer Dialog schreibt, ist genau eine Komponente: ein deterministischer Extraktor. Das Sprachmodell liefert Struktur, Bildsprache und Timing — aber keine Sprecherzeilen mehr.**
 
-1. Der v420-Labelfilter greift auf diesem Pfad **nicht**. Die Label-Turns entstehen nicht im Shot-Parser (dort ist der Filter aktiv), sondern weiter hinten — die Sanitize-Stelle in `deep/index.ts` ist offenbar nicht der letzte Schreibpunkt ins Manifest. Welcher Pass sie erzeugt, ist noch **nicht** belegt und muss zuerst festgestellt werden.
-2. Dialog, der **inline in einem Prosablock** als `@mention: "Text"` steht, wird gar nicht als Dialog erkannt. Der Parser kennt nur Zeilenanfangs-Muster `LABEL: Text`. Deshalb „kein korrektes Skript".
+Dialog ist im Briefing wörtlich vorhanden. Ihn von einem Modell „erkennen" zu lassen, ist unnötiges Risiko: es erfindet Sprecher, wandelt Blocklabels in Mentions um und verliert Reihenfolge. Ein Parser tut das exakt und testbar.
+
+## Belegter Ist-Zustand (Plan vom 22:58 UTC)
+
+- Cast: Szene 1 und 2 haben korrekt **4 Slots** (`@founder`, `@creative`, `@marketer`, `@creator`) — die Ensemble-Mindestbesetzung funktioniert.
+- `dialogTurns`: ausschließlich **Strukturzeilen** (`@dauer`, `@ort`, `@cast`, `@aktion`, `@stimme`, `@untertitel`, `@negative-prompt`). Kein echter Sprecher-Turn.
+- Der echte Dialog steht als Fließtext im `@aktion`-Block: `@creative: "Moment. Das Briefing kommt einfach hier rein?" @founder: "Genau." …` — 11 Zeilen, nie zerlegt.
 
 ## Umsetzung
 
-### 1. Herkunft der Label-Turns feststellen (erster Schritt)
+### 1. Ein Dialog-Extraktor als einzige Quelle
 
-Ein Trace-Log an jedem Punkt, der `dialogTurns` schreibt (LLM-Rohausgabe, Script-Timing-Seeding, Speaker-Map-Pass, Rescue-Pass), mit Szenen-Index und Mention-Keys. Ein Lauf mit dem Continuity-Stress-Test-Briefing zeigt eindeutig, welcher Pass `@dauer` erzeugt. Erst danach der Fix an genau dieser Stelle.
+Neues Modul `supabase/functions/_shared/briefing/deep/extractDialog.ts`. Es liest den Szenenblock des Briefings und erzeugt die Turns:
 
-### 2. Ein einziges Schluss-Gate vor dem Persistieren
+- Zeilenform `@mention: "Text"` **und** Inline-Vorkommen mitten im Prosablock, mehrere pro Absatz, gerade und typografische Anführungszeichen.
+- Fallback auf Klarnamen-Form `Name: Text`, aber nur wenn der Name eindeutig einem Cast-Slot der Szene entspricht.
+- Reihenfolge = Reihenfolge im Text. Sprecher = Cast-Slot der Szene; unbekannte Mention → Zeile bleibt Prosa, wird nie zum Turn.
+- Blocklabels (`isNonSpeakerLabel`, DE/EN/ES) sind strukturell ausgeschlossen — nicht als nachgelagerter Filter, sondern weil ein Label nie ein Cast-Slot ist.
+- Extrahierte Zitate werden aus dem Aktionstext entfernt, damit der Visual-Prompt sie nicht doppelt enthält.
 
-Unabhängig vom Verursacher: direkt bevor das Manifest validiert und in `composer_production_plans` geschrieben wird, laufen alle `dialogTurns` durch `isNonSpeakerLabel`. Blocklabels können damit nirgends mehr durchrutschen, egal welcher Pass sie einschleust.
+### 2. Die anderen drei Schreiber verlieren das Recht auf `dialogTurns`
 
-### 3. Inline-Dialog aus Prosablöcken extrahieren
+- Das Modell-Schema (Pass A/B) bekommt **kein** `dialogTurns`-Feld mehr; kommt trotzdem eins zurück, wird es verworfen.
+- Script-Timing-Seeding und Rescue-Pass setzen nur noch Dauer, Voiceover-Text und Location — keine Turns.
+- Der Speaker-Map-Pass bindet nur noch bestehende Turns an Charakter-UUIDs, er erzeugt keine.
 
-Neuer deterministischer Extraktor: In `AKTION`/`DIALOG`/Freitextblöcken werden alle Vorkommen von `@mention: "Text"` (auch mehrere pro Absatz, mit typografischen wie geraden Anführungszeichen) in Reihenfolge zu Dialog-Turns. Regeln:
+### 3. Invariante im Schema statt im Code verstreut
 
-- Nur `@mention`s, die im Cast-Block der Szene stehen, werden Sprecher — sonst bleibt der Text Prosa.
-- Der extrahierte Dialogtext wird aus dem Aktionstext entfernt, damit er nicht doppelt im Visual-Prompt landet.
-- Ergebnis für dieses Briefing: Szene 2 bekommt 11 Turns mit korrekt gebundenen Sprechern.
+`ProductionPlan` (Zod) erhält eine Regel: jeder Turn braucht einen `speakerMentionKey`, der in `scene.cast` vorkommt. Verletzungen scheitern beim Parsen — der Fehler kann nicht mehr stillschweigend bis in die UI durchlaufen. Das ersetzt das zuvor geplante „Schluss-Gate".
 
-### 4. UI: Blocklabels nicht mehr als Dialogzeilen rendern
+### 4. UI folgt der Invariante
 
-Im Plan-Sheet werden Zeilen, die `isRealSpeakerTurn` nicht bestehen, ohne Sprecher-Dropdown und ohne „Sprecher noch offen"-Badge dargestellt (als reine Briefing-Notiz) — der Zähler ist bereits gefiltert, die Liste noch nicht.
+Im Plan-Sheet entfällt die Sonderbehandlung: da nur echte Turns existieren, verschwinden Dropdown und „Sprecher noch offen" an Strukturzeilen automatisch. Briefing-Notizen (Stimme, Untertitel, Negative Prompt) werden weiterhin angezeigt, aber als Notiz ohne Sprecherfeld.
 
-### 5. Regressionstest
+### 5. Tests, die den Regress dauerhaft verhindern
 
-Fixture = das Continuity-Stress-Test-Briefing. Erwartung: 0 Label-Turns, Szene 2 mit 11 Turns in Originalreihenfolge, Sprecher gebunden an `@creative`/`@founder`/`@marketer`/`@creator`, Aktionstext ohne Dialogzitate.
+- Fixture Continuity-Stress-Test: 0 Label-Turns, Szene 2 mit 11 Turns in Originalreihenfolge, Sprecher `@creative`/`@founder`/`@marketer`/`@creator`, Aktionstext ohne Zitate.
+- Fixture reines Voiceover-Briefing ohne Dialog: 0 Turns, Voiceover-Text bleibt erhalten.
+- Fixture Klarnamen-Dialog (`Samuel: …`): korrekt gebunden.
+- Schema-Test: ein Turn mit Mention außerhalb des Cast lässt die Validierung scheitern.
 
 ## Technische Bereiche
 
-- `supabase/functions/_shared/briefing/deep/index.ts` — Trace, Schluss-Gate, Inline-Dialog-Extraktion
-- `supabase/functions/_shared/briefing/deep/detectScriptTimingMode.ts` — Extraktor-Helfer wiederverwenden
-- `src/components/video-composer/briefing/ProductionPlanSheet.tsx` — Darstellung der Nicht-Sprecher-Zeilen
-- Test unter `src/lib/video-composer/__tests__/`
+- `supabase/functions/_shared/briefing/deep/extractDialog.ts` (neu) — alleiniger Turn-Erzeuger
+- `supabase/functions/_shared/briefing/deep/index.ts` — Schema ohne `dialogTurns`, Seeding/Rescue entschärft, Extraktor eingehängt
+- `supabase/functions/_shared/briefing/deep/detectScriptTimingMode.ts` — Labelerkennung wird vom Extraktor mitgenutzt
+- `src/lib/video-composer/briefing/productionPlan.ts` — Cast-Invariante im Zod-Schema
+- `src/components/video-composer/briefing/ProductionPlanSheet.tsx` — Anzeige der Notizzeilen
+- Tests unter `src/lib/video-composer/__tests__/`
 
-Lip-Sync-Pipeline, gerenderte und gesperrte Szenen bleiben unverändert.
+Lip-Sync-Pipeline, Anker-Logik sowie gerenderte und gesperrte Szenen bleiben unverändert.
