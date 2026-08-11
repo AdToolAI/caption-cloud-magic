@@ -1,69 +1,72 @@
-# Motion Studio: Manueller Modus sauber verdrahten
+# Motion Studio: Modus-Schritt ersetzen durch zwei Wege am Ende des Briefings
+
+## Empfehlung
+
+Ja — der Button ist die bessere Lösung. Ein Modus-Schalter ganz oben (SC 01) zwingt eine
+Entscheidung ab, bevor der Nutzer überhaupt weiß, was er eingibt, er ist unsichtbar wirksam
+und im Code heute faktisch wirkungslos. Zwei Aktionen am Ende des Briefings sind das
+Muster, das professionelle Tools nutzen: eine klare Primäraktion und ein leiser Ausweg,
+beide genau in dem Moment, in dem die Entscheidung wirklich ansteht.
+
+```text
+[ Leer ins Storyboard ]        [ ✦ STORYBOARD GENERIEREN ]
+   sekundär, Ghost-Button          primär, Gold-CTA
+```
 
 ## Was heute passiert (geprüft im Code)
 
-Der Modus-Schalter (SC 01 "KI-gestützt" / "Manuell") schreibt `briefing.mode`
-(`src/types/video-composer.ts:109,195`) und wird mit dem Briefing als JSON gespeichert
-(`src/hooks/useComposerPersistence.ts:131`). Gelesen wird der Wert aber **nur** in einer
-einzigen Datei: `src/components/video-composer/BriefingTab.tsx`.
-
-Dort bewirkt "Manuell" genau zwei Dinge:
-- Der CTA heißt "Weiter zum Storyboard" statt "Storyboard generieren" (Zeile 1054).
-- Der Stock-First-Schalter wird ausgeblendet (Zeile 993).
-- Der direkte Aufruf `analyze-briefing?mode=storyboard` wird übersprungen (Zeile 314-318).
-
-## Der Widerspruch
-
-Der Manuell-Zweig ruft `onGoToStoryboard()` auf. Das landet in
-`VideoComposerDashboard.handleTabChange` (Zeile 866-871), und der fängt jeden Wechsel
-Briefing → Storyboard ab und startet `storyboardTransition.attempt()`.
-`useStoryboardTransition.attempt` (Zeile 1106-1126) kennt nur drei Guards: geschützte Szenen,
-bereits vorhandene Szenen, zu kurzes Briefing. **`briefing.mode` wird dort nirgends geprüft.**
-
-Ergebnis: Wer "Manuell" wählt und genug Briefing-Text hat, bekommt trotzdem die volle
-Deep-Analyse mit War Room, Plan-Sheet und AI-Kosten — also exakt das, was er abgewählt hat.
-Der "Skip" in BriefingTab ist damit wirkungslos. Nur bei sehr kurzem Briefing (< 40 Zeichen)
-fühlt sich der Manuell-Modus heute korrekt an.
-
-Zweitens: Der Modus ist ein reines Briefing-Flag. Nach dem Storyboard-Einstieg liest ihn
-niemand mehr — Autopilot, Szenen-KI-Buttons und Plan-Übernahme verhalten sich identisch.
-Das ist vertretbar (manuelle Nutzer sollen einzelne KI-Helfer ja punktuell nutzen dürfen),
-aber es sollte bewusst so benannt sein statt zufällig.
+- Der Modus schreibt `briefing.mode` (`src/types/video-composer.ts:109,195`) und wird nur in
+  `BriefingTab.tsx` gelesen: CTA-Label (1054), Stock-First-Sichtbarkeit (993), Skip des
+  direkten Analyse-Aufrufs (314-318).
+- Der Manuell-Zweig ruft `onGoToStoryboard()`. Das landet in
+  `VideoComposerDashboard.handleTabChange` (866-871), das jeden Wechsel Briefing → Storyboard
+  abfängt und `storyboardTransition.attempt()` startet.
+- `useStoryboardTransition.attempt` (1106-1126) kennt nur drei Guards: geschützte Szenen,
+  vorhandene Szenen, zu kurzes Briefing. **`briefing.mode` wird dort nirgends geprüft.**
+  Wer "Manuell" wählt, bekommt trotzdem Deep-Analyse, War Room, Plan-Sheet und AI-Kosten.
 
 ## Umsetzung
 
-1. **Manuell heißt manuell — kein Auto-Analyse-Start**
-   - In `useStoryboardTransition.attempt()` einen vierten Guard ganz vorne ergänzen:
-     bei `briefing.mode === 'manual'` sofort `{ handled: false }` zurückgeben.
-     Damit navigiert das Dashboard einfach zum Storyboard, ohne War Room und ohne
-     AI-Request. Der Hook bekommt `briefing` bereits als Prop, es ist kein neues Wiring nötig.
+1. **Modus-Panel SC 01 entfernen**
+   - Die Kachelauswahl "KI-gestützt / Manuell" fällt weg; die folgenden Slate-Nummern
+     rücken auf. Das Feld `briefing.mode` bleibt im Typ und in der DB erhalten
+     (Alt-Projekte laden weiter), wird aber nicht mehr über UI gesetzt.
 
-2. **KI-Modus bleibt unverändert**
-   - Kein Eingriff in Guards 1-3, in `analyze-briefing`, in die Plan-Übernahme oder in
-     `useApplyProductionPlan`. Der KI-Pfad verhält sich exakt wie heute.
+2. **Zwei Aktionen in der Briefing-Fußzeile**
+   - Primär: "Storyboard generieren" — unverändert der bestehende KI-Pfad.
+   - Sekundär: "Leer ins Storyboard" — Ghost-Button links daneben, setzt intern
+     `mode: 'manual'` und navigiert direkt weiter.
+   - Der Leer-Weg braucht nur den Produktnamen, nicht die volle Briefing-Pflicht: er ist
+     auch aktiv, wenn der Gold-CTA noch gesperrt ist.
 
-3. **Manueller Einstieg wird nicht zur Sackgasse**
-   - Der leere Storyboard-Zustand (`StoryboardTab.tsx:698`) bekommt zusätzlich zum
-     "Szene hinzufügen"-CTA eine zweite, dezente Aktion "Doch KI-Vorschlag erzeugen",
-     die den Modus auf `ai` setzt und die Analyse einmalig anstößt. So bleibt der
-     Wechsel jederzeit möglich, ohne zurück ins Briefing zu müssen.
+3. **Leer heißt leer — kein Auto-Analyse-Start**
+   - Neuer Guard ganz vorne in `useStoryboardTransition.attempt()`: bei
+     `briefing.mode === 'manual'` sofort `{ handled: false }`. Ohne diesen Guard bleibt der
+     Button wirkungslos, weil das Dashboard die Analyse weiterhin selbst anstößt.
+   - Der KI-Pfad und alle bestehenden Guards bleiben unverändert.
 
-4. **Modus im Storyboard sichtbar machen**
-   - Kleiner Statusindikator in der Storyboard-Kopfzeile ("Manuell" / "KI-gestützt"),
-     klickbar zum Umschalten. Damit ist für den Nutzer erkennbar, warum die Analyse
-     lief oder nicht lief.
+4. **Rückweg im leeren Storyboard**
+   - Im Empty-State (`StoryboardTab.tsx:698`) neben "Szene hinzufügen" eine zweite,
+     dezente Aktion "Aus Briefing generieren": setzt `mode: 'ai'` und stößt die Analyse
+     einmalig an. Niemand sitzt in einer Sackgasse.
 
-5. **Absichern**
-   - Test in `src/hooks/__tests__/` : `attempt()` mit `mode: 'manual'` und langem
-     Briefing muss `handled: false` liefern und darf keinen Fetch absetzen.
+5. **Stock-First**
+   - Der Schalter hängt heute an `mode === 'ai'`. Da der Modus nicht mehr vorab gewählt
+     wird, ist er künftig immer sichtbar — er wirkt ohnehin nur bei KI-Generierung.
+
+6. **Absichern**
+   - Test: `attempt()` mit `mode: 'manual'` und langem Briefing liefert `handled: false`
+     und setzt keinen Fetch ab.
 
 ## Technische Details
 
+- `src/components/video-composer/BriefingTab.tsx` — SC-01-Panel raus, Slate-Indizes
+  nachziehen; Footer bekommt den Ghost-Button, der `onUpdateBriefing({ mode: 'manual' })`
+  plus `onUpdateProject({ status: 'storyboard' })` plus `onGoToStoryboard()` ausführt;
+  `handleGenerateStoryboard` behält nur noch den KI-Pfad; Stock-First-Bedingung entfällt.
 - `src/hooks/useStoryboardTransition.ts` — Guard 0 auf `briefing?.mode === 'manual'`
-  vor Guard 1; Kommentarblock analog zu den bestehenden Guards.
-- `src/components/video-composer/BriefingTab.tsx` — Manuell-Zweig bleibt wie er ist
-  (er wird durch den neuen Guard erstmals wirksam).
-- `src/components/video-composer/StoryboardTab.tsx` — Empty-State-Sekundäraktion +
-  Modus-Chip; beides über bestehende `onUpdateBriefing`-Prop, keine neue State-Quelle.
-- Keine Änderungen an Lip-Sync-Dateien, an `analyze-briefing` oder am Render-Pfad.
+  vor Guard 1, Kommentar analog zu den bestehenden Guards.
+- `src/components/video-composer/StoryboardTab.tsx` — Sekundäraktion im Empty-State über
+  die bestehende `onUpdateBriefing`-Prop, keine neue State-Quelle.
+- Kein Eingriff in `analyze-briefing`, `useApplyProductionPlan`, Lip-Sync oder Render-Pfad.
 - Alle neuen Texte über `tx({ de, en, es })` gemäß Language-Purity-Check.
