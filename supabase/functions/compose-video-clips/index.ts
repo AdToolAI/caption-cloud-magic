@@ -4172,6 +4172,20 @@ serve(async (req) => {
           const isI2V = !!planImageUrl;
           const seed25Duration = Math.max(3, Math.min(30, Math.round(scene.durationSeconds)));
 
+          // ── v418 audio ownership ──────────────────────────────────────────
+          // A lip-sync scene renders a SILENT plate: the studio owns the
+          // voice. The single exception is the hybrid ambience mode, where
+          // the model may add room tone/foley — never speech (the prompt
+          // forbids it and a speech gate re-mutes the plate afterwards).
+          const __seed25Engine = (scene.engineOverride ?? "auto") as string;
+          const __seed25IsLipSync =
+            __seed25Engine === "cinematic-sync" || __seed25Engine === "sync-segments";
+          const __seed25Ambient = (scene as any).audioSource === "ambient";
+          const __seed25GenerateAudio = __seed25IsLipSync
+            ? __seed25Ambient
+            : (scene as any).audioSource === "provider" || scene.withAudio === true;
+          const __seed25Prompt = enrichPrompt(scene.aiPrompt, undefined, isI2V);
+
           await supabaseAdmin
             .from("composer_scenes")
             .update({
@@ -4185,8 +4199,12 @@ serve(async (req) => {
           let taskId: string;
           try {
             taskId = await createSeedance25Task({
-              prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
+              prompt: __seed25GenerateAudio
+                ? `${__seed25Prompt}\n\n${AMBIENT_NO_SPEECH_PROMPT}`
+                : __seed25Prompt,
+              generateAudio: __seed25GenerateAudio,
               duration: seed25Duration,
+
               // Seedance 2.5 tops out at 720p output (ModelArk docs).
               resolution: "720p",
               aspectRatio: "16:9",
