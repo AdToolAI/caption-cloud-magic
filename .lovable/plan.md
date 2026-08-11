@@ -40,14 +40,15 @@ Sobald ein Cast-Slot eine Figur bekommt — automatisch oder von Hand —, werde
 ### 5. Negative Prompt einsprachig
 Der Plan-Normalizer übersetzt den Negative Prompt vollständig ins Englische (kein Teil-Merge mehr), die deutsche Fassung bleibt nur zur Anzeige.
 
-### 5. Anschluss Szene 1 → Szene 2
+### 6. Anschluss Szene 1 → Szene 2
 Szene 2 wird beim Übernehmen automatisch auf Bildanschluss „Nahtlos" gesetzt, wenn der Anchor-Prompt/Continuity-Hinweis die Vorgängerszene fortsetzt — heute muss das je Szene von Hand gewählt werden.
 
 ## Betroffene Dateien
 
-- `supabase/functions/_shared/briefing/deep/index.ts` — Dialog-Extraktor, Sperrliste, `enforceStrictCast`, Negative-Prompt-Normalisierung
-- `src/components/video-composer/briefing/ProductionPlanSheet.tsx` — offene Cast-Slots, Auto-Bindung, Link „In Cast & World anlegen"
-- `src/hooks/useApplyProductionPlan.ts` — Continuity-Vorbelegung für Folgeszenen
-- Tests: `src/hooks/__tests__/useApplyProductionPlan.test.ts` plus neue Fixture mit genau diesem Briefing (4 Sprecher, 2 Szenen, Label-Zeilen)
+- `supabase/functions/_shared/briefing/deep/index.ts` — Dialog-Extraktor, Sperrliste, `enforceStrictCast`, Auto-Besetzung nach Auswahlreihenfolge, Negative-Prompt-Normalisierung
+- `src/components/video-composer/briefing/ProductionPlanSheet.tsx` — offene Cast-Slots, Figuren-Auswahl je Slot mit Tausch-Logik, Badge „automatisch zugeordnet", Auto-Bindung, Link „In Cast & World anlegen"
+- `src/hooks/useApplyProductionPlan.ts` — Cast/Sprecher/Stimmen ins Storyboard, Continuity-Vorbelegung für Folgeszenen
+- Tests: `src/hooks/__tests__/useApplyProductionPlan.test.ts` plus neue Fixture mit genau diesem Briefing (4 Sprecher, 2 Szenen, Label-Zeilen) und ein Test für die Reihenfolge-Besetzung
+
 
 Danach: Briefing erneut analysieren. Erwartung — Szene 1 mit 6, Szene 2 mit 9 Sprechzeilen, vier Cast-Slots je Szene, davon drei sichtbar offen bis du sie in Cast & World anlegst.
