@@ -305,17 +305,24 @@ export default function BriefingTab({
     onUpdateBriefing({ usps: briefing.usps.filter((_, i) => i !== index) });
   };
 
+  // Empty path — the user skips the AI analysis entirely and builds the
+  // storyboard by hand. `mode: 'manual'` is the contract the transition hook
+  // reads to suppress the auto deep-parse (see useStoryboardTransition Guard 0).
+  const handleStartEmptyStoryboard = () => {
+    onUpdateBriefing({ mode: 'manual' });
+    onUpdateProject({ status: 'storyboard' });
+    onGoToStoryboard();
+  };
+
   const handleGenerateStoryboard = async () => {
     if (!briefing.productName.trim()) {
       toast({ title: cfg.missingPrimaryToast, variant: 'destructive' });
       return;
     }
 
-    if (briefing.mode === 'manual') {
-      onUpdateProject({ status: 'storyboard' });
-      onGoToStoryboard();
-      return;
-    }
+    // The AI path always analyses — the empty path has its own button.
+    if (briefing.mode === 'manual') onUpdateBriefing({ mode: 'ai' });
+
 
     // Switch to the Storyboard tab IMMEDIATELY so the user sees the
     // loading panel instead of staring at the Briefing form for 10–20s.
