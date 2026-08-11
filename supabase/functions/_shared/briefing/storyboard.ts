@@ -1,14 +1,16 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
-import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { getVisualStyleHint } from "../composer-visual-styles.ts";
+import { isQaMockRequest, qaMockJson } from "../qaMock.ts";
 import {
   ALL_EFFECT_IDS,
   EFFECT_DESCRIPTIONS,
   getDefaultEffects,
   sanitizeEffects,
   type SceneEffectId,
-} from "../_shared/composer-effects.ts";
-import { tl, withLang } from "../_shared/i18n.ts";
+} from "../composer-effects.ts";
+import { tl, withLang } from "../i18n.ts";
+import { callBriefingGateway } from "./models.ts";
+import { briefingErrorResponse } from "./errors.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -152,7 +154,11 @@ Use sceneType values loosely — map "hook"=opening, "problem"=conflict beats, "
   custom: `FREE EDITOR MODE — follow the user's free description as literally as possible. Treat "productName" as the title, "productDescription" as the user's full creative brief (TOP PRIORITY — the storyboard must reflect it scene-by-scene), "usps" as optional style hints. Do NOT impose AIDA or any fixed framework. Generate scenes that mirror the user's description in order. Text overlays only if the brief implies them.`,
 };
 
-serve((req: Request) => withLang(req, () => (async (req) => {
+export function handleStoryboard(
+  req: Request,
+  preparsedBody?: Record<string, unknown>,
+): Promise<Response> {
+  return withLang(req, () => (async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -162,7 +168,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
   }
 
   try {
-    const { briefing, category, language } = await req.json() as {
+    const { briefing, category, language } = (preparsedBody ?? await req.json()) as unknown as {
       briefing: Briefing;
       category: string;
       language: string;
@@ -489,91 +495,22 @@ Generate the storyboard using the create_storyboard function.`;
       tool_choice: { type: "function", function: { name: "create_storyboard" } },
     });
 
-    // Retry-with-fallback wrapper:
-    // 1. Up to 3 attempts on the primary model with exponential backoff
-    //    (only for transient 502/503/504 — 429/402/4xx never retry).
-    // 2. One final fallback to google/gemini-2.5-flash if the primary
-    //    keeps returning transient errors. Lovable AI Gateway occasionally
-    //    has short Gemini-3-flash outages that gemini-2.5-flash rides out.
-    const PRIMARY_MODEL = "google/gemini-3-flash-preview";
-    const FALLBACK_MODEL = "google/gemini-2.5-flash";
-    const TRANSIENT_STATUSES = new Set([502, 503, 504]);
-
-    const callGateway = async (model: string): Promise<Response> => {
-      return await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: buildBody(model),
-      });
-    };
-
-    let response: Response | null = null;
-    let lastStatus = 0;
-    let lastErrText = "";
-    const attemptPlan: Array<{ model: string; attempt: number; backoffMs: number }> = [
-      { model: PRIMARY_MODEL, attempt: 1, backoffMs: 0 },
-      { model: PRIMARY_MODEL, attempt: 2, backoffMs: 800 },
-      { model: PRIMARY_MODEL, attempt: 3, backoffMs: 1600 },
-      { model: FALLBACK_MODEL, attempt: 4, backoffMs: 800 }, // final fallback
-    ];
-
-    for (const step of attemptPlan) {
-      if (step.backoffMs > 0) {
-        const jitter = Math.floor(Math.random() * 200);
-        await new Promise((r) => setTimeout(r, step.backoffMs + jitter));
-      }
-      console.log(`[storyboard] gateway attempt ${step.attempt} model=${step.model}`);
-      try {
-        response = await callGateway(step.model);
-      } catch (netErr) {
-        console.warn(`[storyboard] network error attempt ${step.attempt}:`, (netErr as Error).message);
-        lastStatus = 0;
-        lastErrText = (netErr as Error).message || "network error";
-        continue;
-      }
-
-      // Non-retryable client errors — return immediately.
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again shortly.", retryable: true }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      if (response.ok) break;
-
-      // Transient → retry. Other 4xx/5xx → break and surface error.
-      lastStatus = response.status;
-      try { lastErrText = await response.text(); } catch { lastErrText = ""; }
-      if (!TRANSIENT_STATUSES.has(response.status)) {
-        console.error(`[storyboard] non-transient gateway error ${response.status}:`, lastErrText);
-        break;
-      }
-      console.warn(`[storyboard] transient ${response.status} on attempt ${step.attempt}, will retry`);
-      response = null;
+    // One shared model chain + one shared, localised error surface for the
+    // whole briefing pipeline (see _shared/briefing/models.ts).
+    let response: Response;
+    try {
+      const attempt = await callBriefingGateway(
+        LOVABLE_API_KEY,
+        (model) => JSON.parse(buildBody(model)),
+        "storyboard",
+      );
+      response = attempt.response;
+    } catch (gwErr: any) {
+      const status = gwErr?.status === 429 || gwErr?.status === 402 ? gwErr.status : 503;
+      console.error(`[storyboard] gateway gave up: ${gwErr?.message} ${gwErr?.body ?? ""}`.slice(0, 400));
+      return briefingErrorResponse(status, corsHeaders);
     }
 
-    if (!response || !response.ok) {
-      const isTransient = TRANSIENT_STATUSES.has(lastStatus) || lastStatus === 0;
-      const status = isTransient ? 503 : (lastStatus || 500);
-      const message = isTransient
-        ? "AI Gateway temporarily unavailable — please try again in 30 seconds."
-        : `AI Gateway error: ${lastStatus}`;
-      console.error(`[storyboard] giving up after retries. lastStatus=${lastStatus} lastErr=${lastErrText.slice(0, 300)}`);
-      return new Response(JSON.stringify({ error: message, retryable: isTransient }), {
-        status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     const aiResult = await response.json();
     const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
@@ -1027,13 +964,8 @@ Generate the storyboard using the create_storyboard function.`;
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("compose-video-storyboard error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    console.error("[storyboard] error:", error);
+    return briefingErrorResponse(500, corsHeaders, error instanceof Error ? error.message : "Unknown error");
   }
-})(req)));
+})(req));
+}

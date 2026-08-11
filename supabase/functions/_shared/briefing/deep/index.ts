@@ -9,7 +9,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { isQaMockRequest, qaMockJson } from "../../qaMock.ts";
 import { resolveCatalogId, CATALOG_VERSION, type CatalogAxis } from "./catalog.ts";
 import { detectScriptTimingMode, type ScriptTimingInfo } from "./detectScriptTimingMode.ts";
 import { enforceSoloCast } from "./enforceSoloCast.ts";
@@ -1895,7 +1895,10 @@ function ensureProductionPlanEnsembleServer(plan: any, briefing: string, charact
   return { repaired, required: required.length };
 }
 
-Deno.serve(async (req) => {
+export async function handleDeepParse(
+  req: Request,
+  preparsedBody?: Record<string, unknown>,
+): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   // QA smoke short-circuit
   if (isQaMockRequest(req)) {
@@ -1917,7 +1920,7 @@ Deno.serve(async (req) => {
     }
     const userId = userRes.user.id;
 
-    const body = await req.json().catch(() => ({}));
+    const body = preparsedBody ?? (await req.json().catch(() => ({})));
     const briefing: string = String(body?.briefing ?? '').trim();
     // v176: coerce empty/whitespace strings to null so the UUID column doesn't
     // reject the insert with "22P02 invalid input syntax for type uuid".
@@ -3255,4 +3258,4 @@ YOU MUST:
       status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+}

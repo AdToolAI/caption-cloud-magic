@@ -1,6 +1,6 @@
 project_id = "lbunafpxuskwmsrraqxl"
 
-[functions.briefing-deep-parse]
+[functions.analyze-briefing]
 verify_jwt = true
 timeout_sec = 300
 

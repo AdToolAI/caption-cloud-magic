@@ -1,4 +1,4 @@
-import { tl, withLang } from "../_shared/i18n.ts";
+import { tl, withLang } from "../../i18n.ts";
 // supabase/functions/briefing-deep-parse/catalog.ts
 //
 // Edge-side mirror of `src/lib/video-composer/catalog/index.ts`.

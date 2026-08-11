@@ -260,7 +260,7 @@ export default function BriefingTab({
   // analysis time. Fire-and-forget; failures are non-fatal.
   useEffect(() => {
     try {
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/briefing-deep-parse`;
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-briefing?mode=deep`;
       const anon = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
       // Use OPTIONS (CORS preflight) — returns 200 immediately without auth
       // or LLM cost, while still spinning up the Edge Function container so
@@ -326,7 +326,7 @@ export default function BriefingTab({
 
     let hadScenes = false;
     try {
-      const { data, error } = await supabase.functions.invoke('compose-video-storyboard', {
+      const { data, error } = await supabase.functions.invoke('analyze-briefing?mode=storyboard', {
         body: { briefing, category, language },
       });
 
