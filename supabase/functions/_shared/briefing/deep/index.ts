@@ -1924,6 +1924,57 @@ function ensureProductionPlanEnsembleServer(plan: any, briefing: string, charact
   return { repaired, required: required.length };
 }
 
+/**
+ * v415 — deterministic audio/caption normalization.
+ *
+ * Rules (see plan "Ton, Untertitel und Lip-Sync"):
+ *  - a scene with voiceover / dialog / lipSync can NEVER be `provider`
+ *    (provider audio would collide with the VO + lip-sync chain),
+ *  - a speechless scene keeps `provider` only when the model actually has
+ *    native audio — that decision is made client-side, so we only ensure the
+ *    value is one of provider|studio|silent and default it sanely,
+ *  - captions are speech-bound: no speech anywhere (or an explicit ban in the
+ *    negative prompt) turns them off.
+ */
+export function normalizeAudioAndCaptions(plan: any, rawBriefing = ''): {
+  scenesWithSpeech: number;
+  captionsForcedOff: boolean;
+  providerDowngraded: number;
+} {
+  const scenes: any[] = Array.isArray(plan?.scenes) ? plan.scenes : [];
+  let scenesWithSpeech = 0;
+  let providerDowngraded = 0;
+
+  for (const sc of scenes) {
+    const hasVo = String(sc?.voiceover?.text ?? '').trim().length > 0;
+    const hasDialog = Array.isArray(sc?.dialogTurns)
+      && sc.dialogTurns.some((t: any) => String(t?.text ?? '').trim().length > 0);
+    const speech = hasVo || hasDialog || sc?.lipSync === true;
+    if (speech) scenesWithSpeech += 1;
+
+    const raw = String(sc?.audioSource ?? '').trim();
+    let next: 'provider' | 'studio' | 'silent' | undefined =
+      raw === 'provider' || raw === 'studio' || raw === 'silent' ? raw : undefined;
+
+    if (speech) {
+      if (next === 'provider') providerDowngraded += 1;
+      next = 'studio';
+    } else if (!next) {
+      next = String(sc?.soundDesign ?? '').trim() ? 'studio' : 'silent';
+    }
+    sc.audioSource = next;
+  }
+
+  const banned = /\b(no|keine|kein|sin)\s+(subtitles?|captions?|untertitel|subt[ií]tulos)\b/i
+    .test(`${plan?.negativePrompt ?? ''}\n${rawBriefing}`);
+  const captionsForcedOff = scenesWithSpeech === 0 || banned;
+  if (captionsForcedOff) {
+    plan.captions = { ...(plan.captions ?? {}), enabled: false };
+  }
+
+  return { scenesWithSpeech, captionsForcedOff, providerDowngraded };
+}
+
 export async function handleDeepParse(
   req: Request,
   preparsedBody?: Record<string, unknown>,
