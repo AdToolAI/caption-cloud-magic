@@ -102,11 +102,14 @@ const labels = {
     subtitle:
       'Ayuda a la IA a mantener a las personas con apariencia similar entre escenas — la identidad facial exacta no es técnicamente posible con texto a vídeo.',
     add: 'Añadir personaje',
-    pickFromLibrary: 'Elegir de la biblioteca de avatares',
-    pickerTitle: 'Vincular un avatar como personaje',
+    pickFromLibrary: 'Elegir de Cast & World',
+    pickerTitle: 'Vincular un personaje de Cast & World',
     pickerDesc:
-      'Vincula un avatar de tu biblioteca. Su retrato se usa automáticamente como frame ancla (i2v) en las escenas con este personaje — la única palanca fiable para una consistencia facial real.',
-    pickerEmpty: 'No hay avatares en tu biblioteca. Crea uno en "Avatares".',
+      'Vincula un personaje de Cast & World. Su imagen de referencia se usa automáticamente como frame ancla (i2v) en las escenas con este personaje — la única palanca fiable para una consistencia facial real.',
+    pickerEmpty: 'Todavía no hay personajes en Cast & World.',
+    pickerSectionTitle: 'Cast & World (con imagen de referencia)',
+    openCastWorld: 'Abrir Cast & World',
+
     use: 'Vincular',
     anchorBadge: 'Referencia visual',
     anchorBadgeLocked: 'Primer frame fijado',
