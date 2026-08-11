@@ -63,6 +63,7 @@ import { ComposerHistoryContext } from './ComposerHistoryContext';
 import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 import { isPageReload } from '@/lib/composer/isPageReload';
+import { scopedDraftKey, migrateLegacyDraftKey } from '@/lib/local-draft-scope';
 import { useStoryboardTransition } from '@/hooks/useStoryboardTransition';
 import ProductionWarRoom from './storyboard/ProductionWarRoom';
 import ProductionPlanSheet from './briefing/ProductionPlanSheet';
@@ -129,7 +130,7 @@ function clearDraft() {
  *  is needed — the previous strict gating caused unwanted resets to 'briefing'. */
 function restoreActiveTab(): TabId {
   try {
-    const stored = localStorage.getItem(TAB_STORAGE_KEY) as TabId | null;
+    const stored = localStorage.getItem(tabStorageKey()) as TabId | null;
     if (stored === 'clips') return 'storyboard';
     if (stored && TAB_ORDER.includes(stored)) return stored;
     return 'briefing';
@@ -187,7 +188,7 @@ export default function VideoComposerDashboard() {
     if (hasUrlProject) {
       // Fresh project from a director-wizard redirect — drop any stale draft
       // so we don't merge unrelated scenes. Hydration effect will fill it in.
-      try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+      try { localStorage.removeItem(storageKey()); } catch { /* ignore */ }
       return { ...defaultProject, id: urlProjectId! };
     }
     const draft = loadDraft();
@@ -1084,7 +1085,7 @@ export default function VideoComposerDashboard() {
   // Persist active tab so users return to where they left off
   useEffect(() => {
     try {
-      localStorage.setItem(TAB_STORAGE_KEY, activeTab);
+      localStorage.setItem(tabStorageKey(), activeTab);
     } catch { /* ignore */ }
   }, [activeTab]);
 
@@ -1879,8 +1880,8 @@ export default function VideoComposerDashboard() {
               onOpenChild={(childId) => {
                 // Reset draft and load the child project on next mount
                 try {
-                  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...defaultProject, id: childId }));
-                  localStorage.setItem(TAB_STORAGE_KEY, 'export' as TabId);
+                  localStorage.setItem(storageKey(), JSON.stringify({ ...defaultProject, id: childId }));
+                  localStorage.setItem(tabStorageKey(), 'export' as TabId);
                 } catch { /* ignore */ }
                 window.location.reload();
               }}
