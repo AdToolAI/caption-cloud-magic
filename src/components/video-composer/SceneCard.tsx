@@ -1176,7 +1176,7 @@ export default function SceneCard({
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                        Dauer
+                        {tx({ de: 'Dauer', en: 'Duration', es: 'Duración' })}
                       </span>
                       <div className="flex gap-1 flex-wrap">
                         {buckets.map((sec) => {
