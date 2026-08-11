@@ -4,7 +4,7 @@ Die vermissten Charaktere sind geklärt (anderes Konto) — kein Handlungsbedarf
 keine Datenänderung.
 
 
-## 2. Es gibt immer noch zwei Charakter-Quellen
+## 1. Es gibt immer noch zwei Charakter-Quellen
 
 Der Dialog listet zwei Blöcke:
 
