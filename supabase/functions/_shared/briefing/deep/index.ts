@@ -1936,6 +1936,53 @@ function ensureProductionPlanEnsembleServer(plan: any, briefing: string, charact
  *  - captions are speech-bound: no speech anywhere (or an explicit ban in the
  *    negative prompt) turns them off.
  */
+/**
+ * v416 — Negative prompts are consumed by the video models, which are trained
+ * on English. Models sometimes echo the briefing's German/Spanish wording, so
+ * we map the recurring terms deterministically instead of trusting the prompt.
+ */
+const NEGATIVE_TERM_MAP: Array<[RegExp, string]> = [
+  [/\buntertitel\b|\bsubt[ií]tulos\b/gi, 'subtitles'],
+  [/\beinblendungen\b|\bbauchbinden?\b|\br[oó]tulos\b/gi, 'on-screen text'],
+  [/\btext(einblendung(en)?)?\s+im\s+bild\b/gi, 'text in image'],
+  [/\bschrift(zug|en)?\b|\bletras\b/gi, 'lettering'],
+  [/\bwasserzeichen\b|\bmarca de agua\b/gi, 'watermark'],
+  [/\blogos?\b/gi, 'logo'],
+  [/\bverzerr\w*\b|\bdeformad\w*\b/gi, 'distorted'],
+  [/\bentstellte?\s+(gesichter|h[aä]nde)\b/gi, 'deformed faces, deformed hands'],
+  [/\bh[aä]nde\b|\bmanos\b/gi, 'hands'],
+  [/\bgesicht(er)?\b|\bcaras?\b|\brostros?\b/gi, 'faces'],
+  [/\bunscharf\b|\bborros\w*\b/gi, 'blurry'],
+  [/\bk[oö]rnig\b|\bgranulad\w*\b/gi, 'grainy'],
+  [/\bmoderne?\w*\b|\bmodern\w*\b/gi, 'modern elements'],
+  [/\bmenschenmenge\b|\bmultitud\b/gi, 'crowd'],
+  [/\bkeine?\b|\bkein\b|\bsin\b|\bnicht\b/gi, 'no'],
+  [/\bund\b|\by\b/gi, ','],
+];
+
+function toEnglishNegative(value: unknown): string | undefined {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return undefined;
+  let out = raw;
+  for (const [re, en] of NEGATIVE_TERM_MAP) out = out.replace(re, en);
+  // collapse the artefacts the replacements can produce
+  out = out.replace(/\s*,\s*(,\s*)+/g, ', ').replace(/\s{2,}/g, ' ').replace(/^[,\s]+|[,\s]+$/g, '');
+  return out || undefined;
+}
+
+/** Rewrites plan-level and per-scene negative prompts to English in place. */
+export function enforceEnglishNegativePrompts(plan: any): number {
+  let rewritten = 0;
+  const next = toEnglishNegative(plan?.negativePrompt);
+  if (next && next !== plan.negativePrompt) { plan.negativePrompt = next; rewritten += 1; }
+  const scenes: any[] = Array.isArray(plan?.scenes) ? plan.scenes : [];
+  for (const sc of scenes) {
+    const s = toEnglishNegative(sc?.negativePromptScene);
+    if (s && s !== sc.negativePromptScene) { sc.negativePromptScene = s; rewritten += 1; }
+  }
+  return rewritten;
+}
+
 export function normalizeAudioAndCaptions(plan: any, rawBriefing = ''): {
   scenesWithSpeech: number;
   captionsForcedOff: boolean;
