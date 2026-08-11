@@ -192,8 +192,11 @@ describe('registry coverage', () => {
     for (const model of AI_VIDEO_TOOLKIT_MODELS) {
       const profile = deriveVisualInputProfile(model);
       expect(profile.mode === 'exclusive' || profile.mode === 'slots').toBe(true);
-      expect(profile.lipSync.verification.status).toBe('unverified');
+      // Certification is opt-in per model; everything else stays unverified.
+      const expected = model.id === 'seedance-2-5' ? 'verified' : 'unverified';
+      expect(profile.lipSync.verification.status).toBe(expected);
     }
+
   });
 
   it('resolves without a first frame when the model has no i2v slot', () => {
