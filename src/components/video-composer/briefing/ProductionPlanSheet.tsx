@@ -1797,20 +1797,33 @@ export default function ProductionPlanSheet({
                 </SectionCard>
               )}
 
-              {/* Captions */}
+              {/* Captions — v416: when subtitles are off, the styling rows are
+                  meaningless (and "Burn-In: on" was actively misleading). */}
               {plan.captions && (
-                <SectionCard title="Captions">
-                  <Row label="Font" value={plan.captions.font} />
-                  <Row label={tx({ de: "Größe", en: "Size", es: "Tamaño" })} value={plan.captions.sizePx ? `${plan.captions.sizePx}px` : undefined} />
-                  <Row label={tx({ de: "Farbe", en: "Color", es: "Color" })} value={plan.captions.color} />
-                  <Row label="Highlight" value={plan.captions.highlightColor} />
-                  <Row label="Position" value={plan.captions.position} />
-                  <Row label="Safe-Zone" value={plan.captions.safeZonePct ? `${plan.captions.safeZonePct}%` : undefined} />
-                  <Row label="Burn-In" value={plan.captions.burnIn ? tx({ de: 'an', en: 'on', es: 'activado' }) : tx({ de: 'aus', en: 'off', es: 'desactivado' })} />
-                  {!!plan.captions.highlightWords?.length && (
-                    <Row label="Highlight-Words" value={plan.captions.highlightWords.join(', ')} />
-                  )}
-                </SectionCard>
+                plan.captions.enabled === false ? (
+                  <SectionCard title="Captions">
+                    <div className="text-xs text-muted-foreground">
+                      {tx({
+                        de: 'Untertitel deaktiviert — keine Einblendungen im Clip.',
+                        en: 'Subtitles disabled — no on-screen captions.',
+                        es: 'Subtítulos desactivados — sin rótulos en pantalla.',
+                      })}
+                    </div>
+                  </SectionCard>
+                ) : (
+                  <SectionCard title="Captions">
+                    <Row label="Font" value={plan.captions.font} />
+                    <Row label={tx({ de: "Größe", en: "Size", es: "Tamaño" })} value={plan.captions.sizePx ? `${plan.captions.sizePx}px` : undefined} />
+                    <Row label={tx({ de: "Farbe", en: "Color", es: "Color" })} value={plan.captions.color} />
+                    <Row label="Highlight" value={plan.captions.highlightColor} />
+                    <Row label="Position" value={plan.captions.position} />
+                    <Row label="Safe-Zone" value={plan.captions.safeZonePct ? `${plan.captions.safeZonePct}%` : undefined} />
+                    <Row label="Burn-In" value={plan.captions.burnIn ? tx({ de: 'an', en: 'on', es: 'activado' }) : tx({ de: 'aus', en: 'off', es: 'desactivado' })} />
+                    {!!plan.captions.highlightWords?.length && (
+                      <Row label="Highlight-Words" value={plan.captions.highlightWords.join(', ')} />
+                    )}
+                  </SectionCard>
+                )
               )}
 
               {/* Negative Prompt */}
