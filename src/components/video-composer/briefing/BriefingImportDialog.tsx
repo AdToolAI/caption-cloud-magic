@@ -169,11 +169,41 @@ export default function BriefingImportDialog({
         </DialogHeader>
 
         {step === 'paste' && (
-          <div className="flex-1 flex flex-col gap-3 min-h-0">
+          <div className="flex-1 flex flex-col gap-3 min-h-0 overflow-auto">
+            <div className="flex items-center justify-between gap-3">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] hover:text-amber-200"
+                onClick={handleInsertTemplate}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                {tx({ de: 'Muster-Briefing einfügen', en: 'Insert sample briefing', es: 'Insertar briefing de muestra' })}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground"
+                onClick={() => setShowGuide((v) => !v)}
+              >
+                {showGuide
+                  ? tx({ de: 'Aufbau ausblenden', en: 'Hide structure', es: 'Ocultar estructura' })
+                  : tx({ de: 'Aufbau & Regeln', en: 'Structure & rules', es: 'Estructura y reglas' })}
+              </Button>
+            </div>
+
+            {showGuide && <BriefingFormatGuide onInsert={handleInsertTemplate} />}
+
             <Textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder={tx({ de: `Beispiel:\\n\\n🎬 HOOK #1 — Founder Pain 15s DE\\n• 3 Szenen × 5s, 9:16, 30fps, TikTok\\n• VO: George (JBFqnCBsd6RMkjVDRZzb), eleven_multilingual_v2, stability 0.45\\n• Szene 1 — Pain: Medium Close-Up, Eye Level, Static, Soft Window left, "Du sitzt sechs Stunden an einem einzigen Reel."\\n• @founder-avatar in @home-office\\n• Captions: Inter Bold 64px, Highlight #F5C76A, bottom 18% safe-zone\\n…`, en: `Example:\\n\\n🎬 HOOK #1 — Founder Pain 15s DE\\n• 3 scenes × 5s, 9:16, 30fps, TikTok\\n• VO: George (JBFqnCBsd6RMkjVDRZzb), eleven_multilingual_v2, stability 0.45\\n• Scene 1 — Pain: Medium Close-Up, Eye Level, Static, Soft Window left, "Du sitzt sechs Stunden an einem einzigen Reel."\\n• @founder-avatar in @home-office\\n• Captions: Inter Bold 64px, Highlight #F5C76A, bottom 18% safe-zone\\n…`, es: `Ejemplo:\\n\\n🎬 HOOK #1 — Founder Pain 15s DE\\n• 3 escenas × 5s, 9:16, 30fps, TikTok\\n• VO: George (JBFqnCBsd6RMkjVDRZzb), eleven_multilingual_v2, stability 0.45\\n• Escena 1 — Dolor: Primer plano medio, Nivel de los ojos, Estático, Ventana suave a la izquierda, "Du sitzt sechs Stunden an einem einzigen Reel."\\n• @founder-avatar en @home-office\\n• Subtítulos: Inter Bold 64px, Resaltado #F5C76A, zona segura inferior 18%\\n…` })}
+              placeholder={tx({
+                de: 'Briefing hier einfügen — oder oben das Muster-Briefing laden.',
+                en: 'Paste your briefing here — or load the sample briefing above.',
+                es: 'Pega aquí tu briefing — o carga arriba el briefing de muestra.',
+              })}
               className="flex-1 min-h-[300px] font-mono text-xs"
             />
             <div className="text-xs text-muted-foreground">
