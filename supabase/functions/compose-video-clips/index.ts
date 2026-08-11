@@ -4738,8 +4738,27 @@ serve(async (req) => {
           creditErr,
         );
         creditWarning = `Credit deduction of €${actualCost.toFixed(2)} failed: ${String((creditErr as any)?.message ?? creditErr).slice(0, 200)}`;
+        // Make the silent failure visible: the clips are already running, so
+        // we never abort — but the event shows up in the account's log.
+        try {
+          await supabaseAdmin.from("app_events").insert({
+            user_id: user.id,
+            event_type: "edge_fn.error",
+            source: "compose-video-clips",
+            payload_json: {
+              kind: "credit_deduction_failed",
+              projectId,
+              amountEuros: actualCost,
+              scenes: billableResults.length,
+              message: creditWarning,
+            },
+          });
+        } catch (logErr) {
+          console.error("[compose-video-clips] credit warning log failed:", logErr);
+        }
       }
     }
+
 
 
 
