@@ -157,6 +157,7 @@ export const BRIEFING_TOOL_PARAMETERS = {
         fps: { type: 'integer', enum: [24, 25, 30, 60] },
         totalDurationSec: { type: 'number' },
         platforms: { type: 'array', items: { type: 'string' } },
+        soundDesign: { type: 'string' },
       },
     },
     scenes: {
