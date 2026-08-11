@@ -43,8 +43,9 @@ Beispiel-Spot 9:16, 30 Sekunden, 3 Szenen, zwei Sprecher mit echtem Dialog, ein 
 
 ## Technische Details
 
-- Vorlage und Feldreferenz als einzige Quelle in `src/lib/video-composer/briefingTemplate.ts` (Objekt je Sprache), damit Sheet, Einfügen-Aktion und Dokumentation nicht auseinanderlaufen.
-- Neue Komponente `src/components/video-composer/BriefingTemplateSheet.tsx`, eingebunden in `BriefingTab.tsx` oberhalb des Textfelds in Stage 02.
+- Vorlage, Feldreferenz und Fehlerliste als einzige Quelle in `src/lib/video-composer/briefingTemplate.ts` (Objekt je Sprache), damit Import-Dialog, Stage-02-Sheet und Dokumentation nicht auseinanderlaufen.
+- Neue Komponente `src/components/video-composer/briefing/BriefingFormatGuide.tsx` — rendert Muster + Regeln, wird im `BriefingImportDialog.tsx` inline und in `BriefingTab.tsx` als Sheet verwendet.
+
 - Zusätzlich `docs/briefing-musterbeispiel.md` als Referenz für Support und Onboarding.
 - `src/lib/video-composer/__tests__/briefingTemplate.test.ts` prüft mit den bestehenden Detektoren, dass das Muster genau 30 s, 3 Szenen und eindeutige @-Mentions ergibt — so veraltet die Vorlage nicht still, wenn sich die Parser ändern.
 - Keine Änderungen an Edge Functions oder Prompts.
