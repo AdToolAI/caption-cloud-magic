@@ -42,16 +42,19 @@ export function sumAllScenesDuration(
 
 /**
  * Maximum value the duration slider for ONE scene may show, given the
- * remaining project budget. Falls back to provider hard-cap (15 s) when
- * plenty of budget is left.
+ * remaining project budget AND the provider cap of the scene's model
+ * (30 s on Seedance 2.5, 15 s or less everywhere else).
  */
 export function maxDurationForScene(
   scenes: ComposerScene[] | undefined | null,
   sceneId?: string,
+  clipSource?: string | null,
 ): number {
   const otherTotal = sumOtherScenesDuration(scenes, sceneId);
   const remaining = Math.max(0, MAX_PROJECT_SECONDS - otherTotal);
-  return Math.max(MIN_SCENE_SECONDS, Math.min(MAX_SCENE_SECONDS, remaining));
+  const source = clipSource ?? scenes?.find((s) => s.id === sceneId)?.clipSource ?? null;
+  const providerCap = source ? maxSecondsForClipSource(source) : DEFAULT_MAX_SCENE_SECONDS;
+  return Math.max(MIN_SCENE_SECONDS, Math.min(providerCap, remaining));
 }
 
 /**
