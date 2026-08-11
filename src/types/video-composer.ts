@@ -550,6 +550,19 @@ export interface ComposerScene {
    */
   withAudio?: boolean;
   /**
+   * v415 — audio ownership for this scene.
+   *  - 'provider': the video model bakes ambience/music in (`withAudio: true`),
+   *  - 'studio':   the clip stays silent, audio is added later as tracks,
+   *  - 'silent':   no audio planned.
+   * Provider audio and studio tracks are mutually exclusive; scenes with
+   * voiceover, dialog or lip-sync are always 'studio'.
+   */
+  audioSource?: 'provider' | 'studio' | 'silent';
+  /** v415 — sound-design intent from the briefing (metadata for the audio step). */
+  soundDesign?: string;
+  /** v415 — full multi-step camera choreography (already folded into aiPrompt). */
+  cameraChoreographyEN?: string;
+  /**
    * Lip-sync the scene's character video to the voiceover slice.
    * - Hailuo: voiceover is passed inline as `audio` (no extra cost).
    * - Other providers: post-hoc via `lip-sync-video` (sync-labs, ~8 credits).
