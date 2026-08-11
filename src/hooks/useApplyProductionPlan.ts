@@ -878,6 +878,20 @@ export function useApplyProductionPlan() {
     }
     if (Object.keys(briefingPatch).length) onUpdateBriefing(briefingPatch);
 
+    // v416 — suggest the editor mode ONCE from the analysed plan: anything with
+    // speech, cast or an explicit look needs the Direct panels; a pure B-roll
+    // plan stays in Quick. Never overrides a mode the user picked himself.
+    try {
+      const needsDirect = (plan.scenes || []).some((s) =>
+        s.lipSync
+        || s.voiceover?.text?.trim()
+        || (s.dialogTurns && s.dialogTurns.length)
+        || (s.cast && s.cast.some((c) => c.characterId || c.characterName))
+        || !!(s as any).stylePreset,
+      );
+      suggestEditorMode(needsDirect ? 'direct' : 'quick');
+    } catch { /* mode suggestion must never block applying the plan */ }
+
     // 2) Determine which existing scenes are PROTECTED.
     //    Step 2a: local quick check.
     const locallyProtected = currentScenes.filter(isLocallyProtected);
