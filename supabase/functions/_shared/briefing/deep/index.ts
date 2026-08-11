@@ -1252,6 +1252,11 @@ function enforceStrictCast(plan: any, required: any[]) {
   }
   let dropped = 0;
   let backfilled = 0;
+  let keptUnresolved = 0;
+  // v419 — cast slots the briefing mentions but that have no library match
+  // must survive: the review sheet auto-casts them from the briefed Cast &
+  // World selection. Only nameless/duplicate slots are dropped.
+  const maxCast = Math.max(required.length, 4);
   for (const sc of plan.scenes) {
     if (!Array.isArray(sc.cast)) continue;
     const kept: any[] = [];
@@ -1271,6 +1276,10 @@ function enforceStrictCast(plan: any, required: any[]) {
         if (!c.mentionKey && hit.mentionKey) c.mentionKey = hit.mentionKey;
         backfilled += 1;
         kept.push(c);
+      } else if (mk && kept.length < maxCast) {
+        c.characterId = null;
+        keptUnresolved += 1;
+        kept.push(c);
       } else {
         dropped += 1;
       }
@@ -1279,8 +1288,9 @@ function enforceStrictCast(plan: any, required: any[]) {
     const d = dedupeSceneCast(sc.cast);
     if (d.removed > 0) sc.cast = d.cast;
   }
-  return { dropped, backfilled };
+  return { dropped, backfilled, keptUnresolved };
 }
+
 
 function mergePlanScenesToSingleContinuousScene(
   planLike: any,

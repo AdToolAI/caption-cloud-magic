@@ -164,6 +164,7 @@ export default function ProductionPlanSheet({
   } | null>(null);
   const currentBriefingRef = useRef(currentBriefing);
   const autoBoundDialogSignatureRef = useRef<string | null>(null);
+  const autoCastSignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
     currentBriefingRef.current = currentBriefing;
@@ -562,6 +563,96 @@ export default function ProductionPlanSheet({
     if (changed) setPlan({ ...plan, scenes: nextScenes });
   }, [plan]);
 
+  /**
+   * v419 Auto-Besetzung: unbesetzte Cast-Slots werden mit den im Briefing
+   * gewählten Cast-&-World-Figuren gefüllt — in der Auswahlreihenfolge des
+   * Briefings, zugeordnet in der Reihenfolge des ersten Auftretens der
+   * @mention-Slots. Dieselbe Mention bekommt projektweit dieselbe Figur.
+   * Anschließend werden Dialogzeilen an ihre Mention gebunden.
+   * Manuelle Änderungen werden nicht überschrieben (Signatur-Guard).
+   */
+  useEffect(() => {
+    if (!plan?.scenes?.length) return;
+    const briefingChars = currentBriefing?.characters ?? [];
+    if (!briefingChars.length || !charOptions.length) return;
+
+    // Briefing-Auswahl → Library-IDs (Auswahlreihenfolge bleibt erhalten).
+    const ordered: string[] = [];
+    for (const c of briefingChars) {
+      const direct = (c as any).brandCharacterId ?? (c as any).characterId ?? null;
+      const byId = direct ? charOptions.find((o) => o.id === direct || uuidInside(o.id) === uuidInside(direct)) : null;
+      const needle = normalizeAssetKey((c as any).name);
+      const hit = byId ?? (needle ? charOptions.find((o) => normalizeAssetKey(o.name) === needle) : null);
+      if (hit && !ordered.includes(hit.id)) ordered.push(hit.id);
+    }
+    if (!ordered.length) return;
+
+    const signature = JSON.stringify([
+      ordered,
+      plan.scenes.map((s) => ({
+        i: s.index,
+        cast: (s.cast ?? []).map((c) => `${c.mentionKey ?? ''}|${c.characterId ?? ''}`),
+        turns: (s.dialogTurns ?? []).map((t: any) => `${t?.speakerMentionKey ?? ''}|${t?.speakerCharacterId ?? ''}`),
+      })),
+    ]);
+    if (autoCastSignatureRef.current === signature) return;
+    autoCastSignatureRef.current = signature;
+
+    const keyOf = (v?: string | null) => normalizeAssetKey(String(v ?? '').replace(/^@/, ''));
+    const byMention = new Map<string, string>();
+    const used = new Set<string>();
+
+    for (const s of plan.scenes) {
+      for (const c of s.cast ?? []) {
+        const id = uuidInside(c.characterId ?? null) ?? splitCastId(c.characterId).baseId;
+        if (!id || !isUuid(id)) continue;
+        used.add(id);
+        const k = keyOf(c.mentionKey || c.characterName);
+        if (k && !byMention.has(k)) byMention.set(k, id);
+      }
+    }
+
+    const nextFree = () => ordered.find((id) => !used.has(id)) ?? null;
+    let changed = false;
+
+    const scenes = plan.scenes.map((s) => {
+      let sceneChanged = false;
+      const cast = (s.cast ?? []).map((c) => {
+        const existing = uuidInside(c.characterId ?? null) ?? splitCastId(c.characterId).baseId;
+        if (existing && isUuid(existing)) return c;
+        const k = keyOf(c.mentionKey || c.characterName);
+        let id = k ? byMention.get(k) ?? null : null;
+        if (!id) {
+          id = nextFree();
+          if (!id) return c;
+          used.add(id);
+          if (k) byMention.set(k, id);
+        }
+        sceneChanged = true;
+        const matched = charOptions.find((o) => o.id === id);
+        return { ...c, characterId: id, characterName: matched?.name ?? c.characterName, outfitLookId: null };
+      });
+
+      const dialogTurns = (s.dialogTurns ?? []).map((t: any) => {
+        const bound = uuidInside(t?.speakerCharacterId ?? null);
+        if (bound && isUuid(bound)) return t;
+        const k = keyOf(t?.speakerMentionKey ?? t?.speakerName);
+        const id = k ? byMention.get(k) ?? null : null;
+        if (!id) return t;
+        sceneChanged = true;
+        return { ...t, speakerCharacterId: id };
+      });
+
+      if (!sceneChanged) return s;
+      changed = true;
+      return { ...s, cast, dialogTurns };
+    });
+
+    if (changed) setPlan({ ...plan, scenes });
+  }, [plan, charOptions, currentBriefing]);
+
+
+
 
   // Identify which existing scenes are lipsync-protected (display only).
   const protectedSceneIds = useMemo(() => {
@@ -775,6 +866,9 @@ export default function ProductionPlanSheet({
    * Sets the BASE character on a cast slot (CastRef.characterId).
    * Resets `outfitLookId` so we never end up with an outfit that
    * belongs to a different avatar.
+   * v419: Tausch statt Doppelbelegung — ist die Figur bereits einem anderen
+   * Slot derselben Szene zugewiesen, tauschen beide Slots ihre Figuren.
+   * Dialogzeilen dieser Mention folgen der neuen Besetzung automatisch.
    */
   const updateSceneCastChar = (sceneIndex: number, castIdx: number, characterId: string | null) => {
     setPlan((p) => p && {
@@ -784,6 +878,7 @@ export default function ProductionPlanSheet({
         const cast = [...(s.cast ?? [])];
         while (cast.length <= castIdx) cast.push(emptyCastSlot(sceneIndex));
         const c = cast[castIdx] ?? emptyCastSlot(sceneIndex);
+        const prevId = uuidInside(c.characterId ?? null) ?? splitCastId(c.characterId).baseId;
         const matched = charOptions.find((x) => x.id === characterId);
         cast[castIdx] = {
           ...c,
@@ -792,10 +887,45 @@ export default function ProductionPlanSheet({
           // Outfit is a separate axis — reset it when the base avatar changes.
           outfitLookId: null,
         };
-        return { ...s, cast };
+
+        // Swap: der andere Slot mit derselben Figur bekommt die vorherige.
+        if (characterId) {
+          for (let i = 0; i < cast.length; i += 1) {
+            if (i === castIdx) continue;
+            const otherId = uuidInside(cast[i].characterId ?? null) ?? splitCastId(cast[i].characterId).baseId;
+            if (otherId && otherId === characterId) {
+              const swapMatch = prevId ? charOptions.find((x) => x.id === prevId) : null;
+              cast[i] = {
+                ...cast[i],
+                characterId: prevId ?? null,
+                characterName: swapMatch?.name ?? cast[i].characterName,
+                outfitLookId: null,
+              };
+            }
+          }
+        }
+
+        // Dialogzeilen an ihre Mention binden.
+        const keyOf = (v?: string | null) => normalizeAssetKey(String(v ?? '').replace(/^@/, ''));
+        const mentionMap = new Map<string, string | null>();
+        for (const slot of cast) {
+          const k = keyOf(slot.mentionKey || slot.characterName);
+          const id = uuidInside(slot.characterId ?? null) ?? splitCastId(slot.characterId).baseId;
+          if (k) mentionMap.set(k, id ?? null);
+        }
+        const dialogTurns = (s.dialogTurns ?? []).map((t: any) => {
+          const k = keyOf(t?.speakerMentionKey ?? t?.speakerName);
+          if (!k || !mentionMap.has(k)) return t;
+          const id = mentionMap.get(k) ?? null;
+          if ((t?.speakerCharacterId ?? null) === id) return t;
+          return { ...t, speakerCharacterId: id };
+        });
+
+        return { ...s, cast, dialogTurns };
       }),
     });
   };
+
 
   /** Sets the optional outfit look (CastRef.outfitLookId) on a cast slot. */
   const updateSceneCastOutfit = (sceneIndex: number, castIdx: number, outfitLookId: string | null) => {
