@@ -1,164 +1,30 @@
-// supabase/functions/parse-briefing/index.ts
+// supabase/functions/_shared/briefing/manifest.ts
 //
-// Stage 1 of the Briefing → Storyboard pipeline.
+// Free-form briefing → BriefingManifest.
 //
-// Accepts a long-form briefing (markdown, tables, freeform — up to ~30k tokens
-// of text) and uses Gemini 2.5 Flash with tool-calling to extract a strictly
-// typed BriefingManifest. The manifest is then rendered by BriefingApplySheet
-// on the client; only after the user confirms is anything written into the
-// composer project.
-//
-// Costs ~Lovable-AI Flash tokens; NO credits are deducted here.
+// Differences to the old `parse-briefing` function:
+//  - tool schema and validation both come from ONE shared schema file
+//  - the manifest is validated ON THE SERVER; invalid output triggers a single
+//    repair round that feeds the validation errors back into the model
+//  - errors are localised (DE/EN/ES) instead of raw English strings
+//  - the shared model chain is used (no per-function model drift)
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { isQaMockRequest, qaMockResponse, qaMockJson } from "../qaMock.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { BriefingManifest, BRIEFING_TOOL_PARAMETERS } from "./manifestSchema.ts";
+import { callBriefingGateway, readToolCallArguments, GatewayError, GATEWAY_URL, BRIEFING_REPAIR_MODEL } from "./models.ts";
+import { briefingErrorResponse, statusFromError } from "./errors.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type',
-};
-
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!;
-
-// ── Tool-calling schema (kept narrow, mirrors src/lib/.../manifestSchema.ts) ──
-
-const FRAMING = ['extreme-wide', 'wide', 'medium-wide', 'medium', 'medium-close-up', 'close-up', 'extreme-close-up'];
-const ANGLE = ['eye-level', 'low-angle', 'high-angle', 'dutch-angle', 'over-the-shoulder', 'three-quarter', 'profile', 'frontal'];
-const MOVEMENT = ['static', 'slow-push-in', 'push-in', 'pull-out', 'pan-left', 'pan-right', 'tilt-up', 'tilt-down', 'tracking', 'handheld', 'orbital', 'crane-up', 'crane-down', 'lean-in'];
-const LIGHTING = ['natural', 'soft-window', 'hard-window', 'golden-hour', 'blue-hour', 'low-key', 'high-key', 'rim', 'backlit', 'practical', 'studio-softbox', 'neon', 'overcast'];
-const ENGINE = ['auto', 'broll', 'heygen', 'sync-polish', 'cinematic-sync', 'sync-segments', 'native-dialogue'];
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 
 const TOOL_DEFINITION = {
-  type: 'function',
+  type: "function",
   function: {
-    name: 'emitBriefingManifest',
+    name: "emitBriefingManifest",
     description:
-      'Extract a structured production manifest from the briefing. Map every concrete value the briefing states (durations, voiceover lines, voice IDs, shot framing, captions, negative prompt, cast/location mentions). Leave fields undefined when the briefing does not specify them — do not invent.',
-    parameters: {
-      type: 'object',
-      properties: {
-        project: {
-          type: 'object',
-          properties: {
-            name: { type: 'string' },
-            aspectRatio: { type: 'string', enum: ['16:9', '9:16', '1:1', '4:5'] },
-            fps: { type: 'integer', enum: [24, 25, 30, 60] },
-            totalDurationSec: { type: 'number' },
-            platforms: { type: 'array', items: { type: 'string' } },
-          },
-        },
-        scenes: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              index: { type: 'integer' },
-              label: { type: 'string' },
-              durationSec: { type: 'number' },
-              engine: { type: 'string', enum: ENGINE },
-              voiceover: {
-                type: 'object',
-                properties: {
-                  text: { type: 'string' },
-                  timecodeStartSec: { type: 'number' },
-                  timecodeEndSec: { type: 'number' },
-                  delivery: { type: 'string' },
-                  speedMultiplier: { type: 'number' },
-                },
-              },
-              cast: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    mentionKey: { type: 'string' },
-                    outfit: { type: 'string' },
-                  },
-                  required: ['mentionKey'],
-                },
-              },
-              location: {
-                type: 'object',
-                properties: { mentionKey: { type: 'string' } },
-                required: ['mentionKey'],
-              },
-              shotDirector: {
-                type: 'object',
-                properties: {
-                  framing: { type: 'string', enum: FRAMING },
-                  angle: { type: 'string', enum: ANGLE },
-                  movement: { type: 'string', enum: MOVEMENT },
-                  lighting: { type: 'string', enum: LIGHTING },
-                  stylePreset: { type: 'string' },
-                },
-              },
-              anchorPromptEN: { type: 'string' },
-              performance: {
-                type: 'object',
-                properties: {
-                  mimik: { type: 'string' },
-                  gestik: { type: 'string' },
-                  blick: { type: 'string' },
-                  energy: { type: 'integer' },
-                },
-              },
-            },
-            required: ['index', 'durationSec'],
-          },
-        },
-        voice: {
-          type: 'object',
-          properties: {
-            provider: { type: 'string', enum: ['elevenlabs'] },
-            voiceId: { type: 'string' },
-            voiceName: { type: 'string' },
-            model: { type: 'string' },
-            stability: { type: 'number' },
-            similarityBoost: { type: 'number' },
-            style: { type: 'number' },
-            speakerBoost: { type: 'boolean' },
-            speed: { type: 'number' },
-            requestStitching: { type: 'boolean' },
-          },
-        },
-        captions: {
-          type: 'object',
-          properties: {
-            enabled: { type: 'boolean' },
-            source: { type: 'string', enum: ['auto-from-vo', 'manual'] },
-            font: { type: 'string' },
-            sizePx: { type: 'integer' },
-            color: { type: 'string' },
-            strokeColor: { type: 'string' },
-            strokePx: { type: 'integer' },
-            highlightColor: { type: 'string' },
-            maxWordsPerCue: { type: 'integer' },
-            position: { type: 'string', enum: ['top', 'bottom', 'center'] },
-            safeZonePct: { type: 'integer' },
-            burnIn: { type: 'boolean' },
-            highlightWords: { type: 'array', items: { type: 'string' } },
-          },
-        },
-        negativePrompt: { type: 'string' },
-        unresolved: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              field: { type: 'string' },
-              reason: { type: 'string' },
-              suggestion: { type: 'string' },
-            },
-            required: ['field', 'reason'],
-          },
-        },
-      },
-      required: ['scenes'],
-    },
+      "Extract a structured production manifest from the briefing. Map every concrete value the briefing states (durations, voiceover lines, voice IDs, shot framing, captions, negative prompt, cast/location mentions). Leave fields undefined when the briefing does not specify them — do not invent.",
+    parameters: BRIEFING_TOOL_PARAMETERS,
   },
 };
 
@@ -169,93 +35,105 @@ Rules:
 - Extract every concrete value the briefing names: scene durations, voiceover lines with timecodes, ElevenLabs voice ID/model/stability/similarity/style/speed/speaker_boost, caption style (font, size, color, stroke, highlight color, safe-zone, max-words-per-cue), highlighted keywords, negative prompt, cast mentions (e.g. "@founder-avatar"), location mentions (e.g. "@home-office"), shot framing/angle/movement/lighting per scene, style presets, and anchor prompt hints (keep these in English).
 - DO NOT invent fields the briefing does not state. Leave optional fields undefined.
 - Map shot framing/angle/movement/lighting to the provided enum values (closest match). If no match exists, omit the field and add an entry to "unresolved".
+- Scene "index" starts at 1 and increases by 1. "durationSec" must be between 1 and 60.
 - For VO timecodes, prefer "timecodeStartSec"/"timecodeEndSec" in seconds.
 - For mentions like "@founder-avatar", keep the leading "@" verbatim — the resolver maps them to DB IDs.
 - If the briefing references a voice by name only (e.g. "George"), set voice.voiceName and leave voiceId for the resolver.
 - Anything ambiguous → add to "unresolved" with field path and a short reason.`;
 
-async function callGateway(briefing: string, model: string) {
-  const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `BRIEFING:\n\n${briefing}` },
-      ],
-      tools: [TOOL_DEFINITION],
-      tool_choice: { type: 'function', function: { name: 'emitBriefingManifest' } },
-      max_tokens: 8000,
-    }),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    const err: any = new Error(`gateway ${res.status}: ${text.slice(0, 300)}`);
-    err.status = res.status;
-    throw err;
+function buildBody(model: string, briefing: string, repairNote?: string) {
+  const messages: Array<{ role: string; content: string }> = [
+    { role: "system", content: SYSTEM_PROMPT },
+    { role: "user", content: `BRIEFING:\n\n${briefing}` },
+  ];
+  if (repairNote) {
+    messages.push({
+      role: "user",
+      content:
+        `Your previous manifest failed schema validation with these errors:\n${repairNote}\n\n` +
+        `Emit the tool call again, fixing exactly these problems. Keep all other extracted values.`,
+    });
   }
-  const json = await res.json();
-  const call = json?.choices?.[0]?.message?.tool_calls?.[0];
-  if (!call?.function?.arguments) throw new Error('no tool call returned');
-  return JSON.parse(call.function.arguments);
+  return {
+    model,
+    messages,
+    tools: [TOOL_DEFINITION],
+    tool_choice: { type: "function", function: { name: "emitBriefingManifest" } },
+    max_tokens: 8000,
+  };
 }
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+function formatIssues(issues: Array<{ path: (string | number)[]; message: string }>): string {
+  return issues
+    .slice(0, 25)
+    .map((i) => `- ${i.path.join(".") || "(root)"}: ${i.message}`)
+    .join("\n");
+}
 
-  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "parse-briefing" });
+export async function analyzeFreeformBriefing(
+  briefing: string,
+): Promise<{ manifest: unknown; model: string; repaired: boolean }> {
+  const { response, model } = await callBriefingGateway(
+    LOVABLE_API_KEY,
+    (m) => buildBody(m, briefing),
+    "briefing-manifest",
+  );
+  let raw = readToolCallArguments(await response.json());
 
+  let parsed = BriefingManifest.safeParse(raw);
+  if (parsed.success) return { manifest: parsed.data, model, repaired: false };
 
+  // ── One repair round: feed the validation errors back into the model ──
+  const note = formatIssues(parsed.error.issues as any);
+  console.warn("[briefing-manifest] schema invalid, running repair round:", note);
+
+  const repairRes = await fetch(GATEWAY_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify(buildBody(BRIEFING_REPAIR_MODEL, briefing, note)),
+  });
+  if (repairRes.status === 429 || repairRes.status === 402) {
+    throw new GatewayError(repairRes.status, `gateway ${repairRes.status}`);
+  }
+  if (repairRes.ok) {
+    raw = readToolCallArguments(await repairRes.json());
+    parsed = BriefingManifest.safeParse(raw);
+    if (parsed.success) {
+      return { manifest: parsed.data, model: BRIEFING_REPAIR_MODEL, repaired: true };
+    }
+  }
+
+  const err: any = new Error("manifest failed schema validation");
+  err.status = 422;
+  err.issues = formatIssues((parsed as any).error.issues);
+  throw err;
+}
+
+export async function handleManifest(
+  req: Request,
+  corsHeaders: Record<string, string>,
+  body: Record<string, unknown>,
+): Promise<Response> {
   try {
-    // Auth (verify_jwt is on by default for new functions in this project, but
-    // we still grab the user so we can scope future cache rows by user_id).
-    const authHeader = req.headers.get('Authorization') ?? '';
+    const authHeader = req.headers.get("Authorization") ?? "";
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: userRes } = await supabase.auth.getUser();
-    if (!userRes?.user) {
-      return new Response(JSON.stringify({ error: 'unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    if (!userRes?.user) return briefingErrorResponse(401, corsHeaders);
 
-    const body = await req.json().catch(() => ({}));
-    const briefing: string = String(body?.briefing ?? '').trim();
-    if (!briefing) {
-      return new Response(JSON.stringify({ error: 'briefing text required' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    if (briefing.length > 120_000) {
-      return new Response(JSON.stringify({ error: 'briefing too long (max ~120k chars)' }), {
-        status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    const briefing = String(body?.briefing ?? "").trim();
+    if (!briefing) return briefingErrorResponse(400, corsHeaders, "briefing text required");
+    if (briefing.length > 120_000) return briefingErrorResponse(413, corsHeaders);
 
-    // Try Gemini 2.5 Flash first (1M context, cheap). Fall back to Pro on
-    // structured-output failure (very long / dense briefings).
-    let manifest: any;
-    try {
-      manifest = await callGateway(briefing, 'google/gemini-2.5-flash');
-    } catch (e: any) {
-      if (e?.status === 429 || e?.status === 402) throw e;
-      console.warn('[parse-briefing] flash failed, retrying with pro:', e?.message);
-      manifest = await callGateway(briefing, 'google/gemini-2.5-pro');
-    }
-
-    return new Response(JSON.stringify({ manifest }), {
-      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    const { manifest, model, repaired } = await analyzeFreeformBriefing(briefing);
+    return new Response(JSON.stringify({ manifest, model, repaired }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
-    const status = e?.status === 429 ? 429 : e?.status === 402 ? 402 : 500;
-    console.error('[parse-briefing] error:', e?.message);
-    return new Response(JSON.stringify({ error: e?.message ?? 'parse failed' }), {
-      status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    const status = statusFromError(e);
+    console.error("[briefing-manifest] error:", e?.message);
+    return briefingErrorResponse(status, corsHeaders, e?.issues);
   }
-});
+}
