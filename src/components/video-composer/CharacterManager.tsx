@@ -51,7 +51,7 @@ const labels = {
       'crimson tunic with golden lion crest, fur-lined cloak, golden crown with red rubies, ornate longsword',
     proTipTitle: 'Pro-Tipp: Sherlock-Holmes-Effekt',
     proTipBody:
-      tx({ de: 'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Für echte Gesichts-Konsistenz nutze einen Avatar aus der Bibliothek (Button oben rechts).', en: 'Describe distinctive clothing & objects in detail (coat, crown, weapon). The AI repeats these much more reliably than faces — the viewer recognizes the person by them. For true facial consistency, use an avatar from the library (button top right).', es: 'Describe la ropa y los objetos distintivos en detalle (abrigo, corona, arma). La IA los repite de forma mucho más fiable que los rostros; el espectador reconoce a la persona por ellos. Para una verdadera consistencia facial, utiliza un avatar de la biblioteca (botón superior derecho).' }),
+      tx({ de: 'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Für echte Gesichts-Konsistenz verknüpfe einen Charakter aus Cast & World (Button oben rechts).', en: 'Describe distinctive clothing & objects in detail (coat, crown, weapon). The AI repeats these much more reliably than faces — the viewer recognizes the person by them. For true facial consistency, link a character from Cast & World (button top right).', es: 'Describe la ropa y los objetos distintivos en detalle (abrigo, corona, arma). La IA los repite de forma mucho más fiable que los rostros; el espectador reconoce a la persona por ellos. Para una consistencia facial real, vincula un personaje de Cast & World (botón arriba a la derecha).' }),
     empty: tx({ de: 'Keine Charaktere definiert.', en: 'No characters defined.', es: 'No hay personajes definidos.' }),
     delete: tx({ de: 'Löschen', en: 'Delete', es: 'Eliminar' }),
     frequency: tx({ de: 'Auftritte im Storyboard', en: 'Storyboard appearances', es: 'Apariciones en el guion gráfico' }),
@@ -92,7 +92,7 @@ const labels = {
       'crimson tunic with golden lion crest, fur-lined cloak, golden crown with red rubies, ornate longsword',
     proTipTitle: 'Pro tip: the Sherlock Holmes effect',
     proTipBody:
-      'Describe signature clothing & objects in detail (cloak, crown, weapon). For real face consistency, link an avatar from your library (button top-right).',
+      'Describe signature clothing & objects in detail (cloak, crown, weapon). For real face consistency, link a character from Cast & World (button top-right).',
     empty: 'No characters defined.',
     delete: 'Delete',
     frequency: 'Storyboard appearances',
@@ -133,7 +133,7 @@ const labels = {
       'crimson tunic with golden lion crest, fur-lined cloak, golden crown with red rubies, ornate longsword',
     proTipTitle: 'Consejo Pro: el efecto Sherlock Holmes',
     proTipBody:
-      'Describe la ropa y objetos distintivos con detalle (capa, corona, arma). Para una consistencia facial real, vincula un avatar de tu biblioteca (botón arriba a la derecha).',
+      'Describe la ropa y objetos distintivos con detalle (capa, corona, arma). Para una consistencia facial real, vincula un personaje de Cast & World (botón arriba a la derecha).',
     empty: 'Sin personajes definidos.',
     delete: 'Eliminar',
     frequency: 'Apariciones en el storyboard',
