@@ -11,7 +11,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 import { isQaMockRequest, qaMockJson } from "../../qaMock.ts";
 import { resolveCatalogId, CATALOG_VERSION, type CatalogAxis } from "./catalog.ts";
-import { detectScriptTimingMode, type ScriptTimingInfo } from "./detectScriptTimingMode.ts";
+import { detectScriptTimingMode, isNonSpeakerLabel, type ScriptTimingInfo } from "./detectScriptTimingMode.ts";
 import { enforceSoloCast } from "./enforceSoloCast.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
