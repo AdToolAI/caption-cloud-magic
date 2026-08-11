@@ -1,5 +1,6 @@
 import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +11,6 @@ import { Plus, Trash2, User, Lightbulb, Library, Sparkles, ImageIcon } from 'luc
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
-import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import type { ComposerCharacter } from '@/types/video-composer';
 
@@ -26,11 +26,14 @@ const labels = {
     subtitle:
       tx({ de: 'Hilft der KI, Personen über mehrere Szenen hinweg ähnlich aussehen zu lassen — exakte Gesichts-Identität ist mit Text-zu-Video technisch nicht möglich.', en: 'Helps the AI make people look similar across multiple scenes — exact facial identity is not technically possible with text-to-video.', es: 'Ayuda a la IA a que las personas se parezcan en varias escenas; la identidad facial exacta no es técnicamente posible con texto a vídeo.' }),
     add: tx({ de: 'Charakter hinzufügen', en: 'Add character', es: 'Añadir personaje' }),
-    pickFromLibrary: tx({ de: 'Aus Avatar-Bibliothek wählen', en: 'Choose from avatar library', es: 'Elegir de la biblioteca de avatares' }),
-    pickerTitle: tx({ de: 'Avatar als Charakter verknüpfen', en: 'Link avatar as character', es: 'Vincular avatar como personaje' }),
+    pickFromLibrary: tx({ de: 'Aus Cast & World wählen', en: 'Choose from Cast & World', es: 'Elegir de Cast & World' }),
+    pickerTitle: tx({ de: 'Charakter aus Cast & World verknüpfen', en: 'Link character from Cast & World', es: 'Vincular personaje de Cast & World' }),
     pickerDesc:
-      tx({ de: 'Verknüpfe einen Avatar aus deiner Bibliothek. Sein Portrait wird automatisch als Anker-Frame (i2v) für Szenen mit diesem Charakter genutzt — das ist der einzige zuverlässige Hebel für echte Gesichts-Konsistenz.', en: 'Link an avatar from your library. Its portrait will automatically be used as an anchor frame (i2v) for scenes with this character — this is the only reliable lever for true facial consistency.', es: 'Vincula un avatar de tu biblioteca. Su retrato se utilizará automáticamente como fotograma de anclaje (i2v) para las escenas con este personaje; esta es la única palanca fiable para una verdadera consistencia facial.' }),
-    pickerEmpty: tx({ de: 'Keine Avatare in der Bibliothek. Lege einen unter „Avatare" an.', en: 'No avatars in the library. Create one under "Avatars".', es: 'No hay avatares en la biblioteca. Crea uno en "Avatares".' }),
+      tx({ de: 'Verknüpfe einen Charakter aus Cast & World. Sein Referenzbild wird automatisch als Anker-Frame (i2v) für Szenen mit diesem Charakter genutzt — das ist der einzige zuverlässige Hebel für echte Gesichts-Konsistenz.', en: 'Link a character from Cast & World. Its reference image is automatically used as the anchor frame (i2v) for scenes with this character — the only reliable lever for true facial consistency.', es: 'Vincula un personaje de Cast & World. Su imagen de referencia se usa automáticamente como frame ancla (i2v) en las escenas con este personaje: la única palanca fiable para una consistencia facial real.' }),
+    pickerEmpty: tx({ de: 'Noch keine Charaktere in Cast & World.', en: 'No characters in Cast & World yet.', es: 'Todavía no hay personajes en Cast & World.' }),
+    pickerSectionTitle: tx({ de: 'Cast & World (mit Referenzbild)', en: 'Cast & World (with reference image)', es: 'Cast & World (con imagen de referencia)' }),
+    openCastWorld: tx({ de: 'Cast & World öffnen', en: 'Open Cast & World', es: 'Abrir Cast & World' }),
+
     use: 'Verknüpfen',
     anchorBadge: 'Look-Referenz',
     anchorBadgeLocked: 'Erster Frame fixiert',
@@ -48,7 +51,7 @@ const labels = {
       'crimson tunic with golden lion crest, fur-lined cloak, golden crown with red rubies, ornate longsword',
     proTipTitle: 'Pro-Tipp: Sherlock-Holmes-Effekt',
     proTipBody:
-      tx({ de: 'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Für echte Gesichts-Konsistenz nutze einen Avatar aus der Bibliothek (Button oben rechts).', en: 'Describe distinctive clothing & objects in detail (coat, crown, weapon). The AI repeats these much more reliably than faces — the viewer recognizes the person by them. For true facial consistency, use an avatar from the library (button top right).', es: 'Describe la ropa y los objetos distintivos en detalle (abrigo, corona, arma). La IA los repite de forma mucho más fiable que los rostros; el espectador reconoce a la persona por ellos. Para una verdadera consistencia facial, utiliza un avatar de la biblioteca (botón superior derecho).' }),
+      tx({ de: 'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Für echte Gesichts-Konsistenz verknüpfe einen Charakter aus Cast & World (Button oben rechts).', en: 'Describe distinctive clothing & objects in detail (coat, crown, weapon). The AI repeats these much more reliably than faces — the viewer recognizes the person by them. For true facial consistency, link a character from Cast & World (button top right).', es: 'Describe la ropa y los objetos distintivos en detalle (abrigo, corona, arma). La IA los repite de forma mucho más fiable que los rostros; el espectador reconoce a la persona por ellos. Para una consistencia facial real, vincula un personaje de Cast & World (botón arriba a la derecha).' }),
     empty: tx({ de: 'Keine Charaktere definiert.', en: 'No characters defined.', es: 'No hay personajes definidos.' }),
     delete: tx({ de: 'Löschen', en: 'Delete', es: 'Eliminar' }),
     frequency: tx({ de: 'Auftritte im Storyboard', en: 'Storyboard appearances', es: 'Apariciones en el guion gráfico' }),
@@ -64,11 +67,14 @@ const labels = {
     subtitle:
       'Helps the AI keep people looking similar across scenes — pixel-perfect face identity is technically impossible with text-to-video.',
     add: 'Add character',
-    pickFromLibrary: 'Pick from Avatar Library',
-    pickerTitle: 'Link an avatar as character',
+    pickFromLibrary: 'Choose from Cast & World',
+    pickerTitle: 'Link a character from Cast & World',
     pickerDesc:
-      'Link an avatar from your library. Its portrait is automatically used as the anchor frame (i2v) for any scene featuring this character — the only reliable lever for real face consistency.',
-    pickerEmpty: 'No avatars in your library yet. Create one under "Avatars".',
+      'Link a character from Cast & World. Its reference image is automatically used as the anchor frame (i2v) for any scene featuring this character — the only reliable lever for real face consistency.',
+    pickerEmpty: 'No characters in Cast & World yet.',
+    pickerSectionTitle: 'Cast & World (with reference image)',
+    openCastWorld: 'Open Cast & World',
+
     use: 'Link',
     anchorBadge: 'Look reference',
     anchorBadgeLocked: 'First frame locked',
@@ -86,7 +92,7 @@ const labels = {
       'crimson tunic with golden lion crest, fur-lined cloak, golden crown with red rubies, ornate longsword',
     proTipTitle: 'Pro tip: the Sherlock Holmes effect',
     proTipBody:
-      'Describe signature clothing & objects in detail (cloak, crown, weapon). For real face consistency, link an avatar from your library (button top-right).',
+      'Describe signature clothing & objects in detail (cloak, crown, weapon). For real face consistency, link a character from Cast & World (button top-right).',
     empty: 'No characters defined.',
     delete: 'Delete',
     frequency: 'Storyboard appearances',
@@ -102,11 +108,14 @@ const labels = {
     subtitle:
       'Ayuda a la IA a mantener a las personas con apariencia similar entre escenas — la identidad facial exacta no es técnicamente posible con texto a vídeo.',
     add: 'Añadir personaje',
-    pickFromLibrary: 'Elegir de la biblioteca de avatares',
-    pickerTitle: 'Vincular un avatar como personaje',
+    pickFromLibrary: 'Elegir de Cast & World',
+    pickerTitle: 'Vincular un personaje de Cast & World',
     pickerDesc:
-      'Vincula un avatar de tu biblioteca. Su retrato se usa automáticamente como frame ancla (i2v) en las escenas con este personaje — la única palanca fiable para una consistencia facial real.',
-    pickerEmpty: 'No hay avatares en tu biblioteca. Crea uno en "Avatares".',
+      'Vincula un personaje de Cast & World. Su imagen de referencia se usa automáticamente como frame ancla (i2v) en las escenas con este personaje — la única palanca fiable para una consistencia facial real.',
+    pickerEmpty: 'Todavía no hay personajes en Cast & World.',
+    pickerSectionTitle: 'Cast & World (con imagen de referencia)',
+    openCastWorld: 'Abrir Cast & World',
+
     use: 'Vincular',
     anchorBadge: 'Referencia visual',
     anchorBadgeLocked: 'Primer frame fijado',
@@ -124,7 +133,7 @@ const labels = {
       'crimson tunic with golden lion crest, fur-lined cloak, golden crown with red rubies, ornate longsword',
     proTipTitle: 'Consejo Pro: el efecto Sherlock Holmes',
     proTipBody:
-      'Describe la ropa y objetos distintivos con detalle (capa, corona, arma). Para una consistencia facial real, vincula un avatar de tu biblioteca (botón arriba a la derecha).',
+      'Describe la ropa y objetos distintivos con detalle (capa, corona, arma). Para una consistencia facial real, vincula un personaje de Cast & World (botón arriba a la derecha).',
     empty: 'Sin personajes definidos.',
     delete: 'Eliminar',
     frequency: 'Apariciones en el storyboard',
@@ -157,7 +166,6 @@ export default function CharacterManager({ characters, language, onChange }: Cha
   const [draft, setDraft] = useState({ name: '', appearance: '', signatureItems: '' });
   const [pickerOpen, setPickerOpen] = useState(false);
   const { data: avatars = [], isLoading: avatarsLoading } = useAccessibleCharacters();
-  const { characters: libChars, loading: libLoading } = useMotionStudioLibrary();
 
   const addCharacter = () => {
     if (!draft.name.trim()) return;
@@ -202,25 +210,6 @@ export default function CharacterManager({ characters, language, onChange }: Cha
         referenceImageUrl: portrait || undefined,
         usePortraitAsFirstFrame: false,
         identityCardPrompt: idCard || undefined,
-      },
-    ]);
-    setPickerOpen(false);
-  };
-
-  const linkLibraryCharacter = (lc: any) => {
-    const libIdToken = `lib:${lc.id}`;
-    if (characters.some((c) => c.id === libIdToken)) {
-      setPickerOpen(false);
-      return;
-    }
-    onChange([
-      ...characters,
-      {
-        id: libIdToken,
-        name: lc.name,
-        appearance: lc.description || '',
-        signatureItems: lc.signature_items || '',
-        referenceImageUrl: lc.reference_image_url || undefined,
       },
     ]);
     setPickerOpen(false);
@@ -457,13 +446,22 @@ export default function CharacterManager({ characters, language, onChange }: Cha
             {/* Avatars section */}
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/80">
-                {lang === 'de' ? tx({ de: "Avatare (mit Portrait-Anker)", en: "Avatars (with portrait anchor)", es: "Avatares (con anclaje vertical)" }) : lang === 'es' ? 'Avatares (con ancla)' : 'Avatars (portrait anchor)'}
+                {t.pickerSectionTitle}
               </p>
               {avatarsLoading ? (
                 <p className="text-xs text-muted-foreground py-3 text-center">…</p>
               ) : avatars.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-3 text-center">{t.pickerEmpty}</p>
+                <div className="py-6 flex flex-col items-center gap-3 text-center">
+                  <p className="text-xs text-muted-foreground">{t.pickerEmpty}</p>
+                  <Button asChild size="sm" variant="outline" className="gap-1.5">
+                    <Link to="/library" onClick={() => setPickerOpen(false)}>
+                      <Library className="h-3.5 w-3.5" />
+                      {t.openCastWorld}
+                    </Link>
+                  </Button>
+                </div>
               ) : (
+
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {avatars.map((a: any) => {
                     const portrait = a.portrait_url || a.reference_image_url;
@@ -500,55 +498,6 @@ export default function CharacterManager({ characters, language, onChange }: Cha
               )}
             </div>
 
-            {/* Library characters section */}
-            <div className="space-y-2 mt-4 pt-4 border-t border-border/40">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {lang === 'de' ? 'Library-Charaktere (nur Beschreibung)' : lang === 'es' ? 'Personajes de Library (solo descripción)' : 'Library characters (description only)'}
-              </p>
-              {libLoading ? (
-                <p className="text-xs text-muted-foreground py-3 text-center">…</p>
-              ) : libChars.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-3 text-center italic">
-                  {lang === 'de' ? 'Keine Library-Charaktere.' : lang === 'es' ? 'Sin personajes.' : 'No library characters.'}
-                </p>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {libChars.map((lc: any) => {
-                    const portrait = lc.reference_image_url;
-                    const alreadyLinked = characters.some((c) => c.id === `lib:${lc.id}`);
-                    return (
-                      <button
-                        key={lc.id}
-                        type="button"
-                        onClick={() => linkLibraryCharacter(lc)}
-                        disabled={alreadyLinked}
-                        className={`group relative rounded-lg border bg-card/60 overflow-hidden text-left transition ${
-                          alreadyLinked
-                            ? 'border-primary/40 opacity-60 cursor-not-allowed'
-                            : 'border-border/40 hover:border-primary/60 hover:bg-primary/5'
-                        }`}
-                      >
-                        <div className="aspect-[3/4] bg-muted flex items-center justify-center overflow-hidden">
-                          {portrait ? (
-                            <img src={portrait} alt={lc.name} className="h-full w-full object-cover" loading="lazy" />
-                          ) : (
-                            <User className="h-8 w-8 text-muted-foreground" />
-                          )}
-                        </div>
-                        <div className="p-2">
-                          <p className="text-xs font-semibold truncate">{lc.name}</p>
-                          {!portrait && (
-                            <p className="text-[10px] text-amber-500/80">
-                              {lang === 'de' ? '⚠ Nur Text' : lang === 'es' ? '⚠ Solo texto' : '⚠ Text only'}
-                            </p>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
           </ScrollArea>
         </DialogContent>
       </Dialog>
