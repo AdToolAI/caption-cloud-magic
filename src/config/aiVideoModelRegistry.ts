@@ -716,7 +716,13 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     statusReason: tx({ de: 'Pika läuft offiziell nur über die fal.ai-API. Sobald der fal.ai-Zugang hinterlegt ist, schalten wir das Modell wieder frei.', en: 'Pika is only officially available through the fal.ai API. We will re-enable the model as soon as fal.ai access is configured.', es: 'Pika solo está disponible oficialmente a través de la API de fal.ai. Reactivaremos el modelo en cuanto se configure el acceso a fal.ai.' }),
   },
 
-  /* ─────────── Vidu (IDs q2-*, läuft real auf Q3) ─────────── */
+  /* ─────────── Vidu (IDs q2-*, läuft real auf Replicate `vidu/q3-*`) ───────────
+   * Verifiziertes Replicate-Input-Schema (11.08.2026):
+   *   duration 1–16 (default 5) · resolution 540p/720p/1080p ·
+   *   aspect_ratio 16:9|9:16|3:4|4:3|1:1 · start_image · end_image ·
+   *   audio (bool, default true) · seed. KEIN reference_images-Array und
+   *   KEIN negative_prompt — Multi-Ref existiert auf Replicate nicht.
+   */
   {
     id: 'vidu-q2-reference',
     name: VIDU_VIDEO_MODELS['vidu-q2-reference'].name,
@@ -725,14 +731,14 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-vidu-video',
     group: 'recommended',
     icon: Eye,
-    capabilities: { t2v: false, i2v: false, audio: false, multiRef: true, maxReferences: 7, multiRefRequired: true, anchorOnly: true },
-    durations: [5],
+    capabilities: { t2v: true, i2v: true, audio: true, endFrame: true },
+    durations: viduDurations,
     resolution: '1080p',
-    aspectRatios: ['16:9', '9:16', '1:1'],
-    // Flat €0.66 / 5s ≈ €0.13/s for UI parity (real billing is flat per generation)
-    costPerSecond: { EUR: 0.13, USD: 0.13 },
-    badge: 'Multi-Ref',
-    tagline: tx({ de: 'Bis zu 7 Refs: Charakter + Produkt + Location in einer Szene', en: 'Up to 7 refs: character + product + location in one scene', es: 'Hasta 7 referencias: personaje + producto + ubicación en una escena' }),
+    resolutions: ['540p', '720p', '1080p'],
+    aspectRatios: viduAspect,
+    costPerSecond: { EUR: 0.375, USD: 0.375 },
+    badge: 'Start+End',
+    tagline: tx({ de: 'Q3 Pro: Start- und Endframe, natives Audio, bis 16s', en: 'Q3 Pro: start + end frame, native audio, up to 16s', es: 'Q3 Pro: fotograma inicial y final, audio nativo, hasta 16s' }),
     legacyRoute: '/vidu-studio',
   },
   {
@@ -743,13 +749,14 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-vidu-video',
     group: 'fast',
     icon: Eye,
-    capabilities: { t2v: false, i2v: true, audio: false },
-    durations: [5],
+    capabilities: { t2v: false, i2v: true, audio: true, endFrame: true },
+    durations: viduDurations,
     resolution: '1080p',
-    aspectRatios: ['16:9', '9:16', '1:1'],
-    costPerSecond: { EUR: 0.12, USD: 0.12 },
+    resolutions: ['540p', '720p', '1080p'],
+    aspectRatios: viduAspect,
+    costPerSecond: { EUR: 0.375, USD: 0.375 },
     badge: 'I2V',
-    tagline: tx({ de: 'Animiert ein Standbild zu einem 5s-Clip', en: 'Animates a still image into a 5s clip', es: 'Anima una imagen fija en un clip de 5s' }),
+    tagline: tx({ de: 'Animiert ein Standbild zu bis zu 16s Video', en: 'Animates a still image into up to 16s of video', es: 'Anima una imagen fija en un vídeo de hasta 16s' }),
     legacyRoute: '/vidu-studio',
   },
   {
@@ -760,13 +767,14 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-vidu-video',
     group: 'fast',
     icon: Eye,
-    capabilities: { t2v: true, i2v: false, audio: false },
-    durations: [5],
+    capabilities: { t2v: true, i2v: false, audio: true },
+    durations: viduDurations,
     resolution: '1080p',
-    aspectRatios: ['16:9', '9:16', '1:1'],
-    costPerSecond: { EUR: 0.12, USD: 0.12 },
+    resolutions: ['540p', '720p', '1080p'],
+    aspectRatios: viduAspect,
+    costPerSecond: { EUR: 0.195, USD: 0.195 },
     badge: 'T2V',
-    tagline: tx({ de: '5s Clip aus reinem Prompt', en: '5s clip from pure prompt', es: 'Clip de 5 segundos de Pure Prompt' }),
+    tagline: tx({ de: 'Q3 Turbo: schneller Clip aus reinem Prompt, bis 16s', en: 'Q3 Turbo: fast clip from a pure prompt, up to 16s', es: 'Q3 Turbo: clip rápido a partir de un prompt, hasta 16s' }),
     legacyRoute: '/vidu-studio',
   },
 
