@@ -8,6 +8,9 @@ import {
   type SceneEffectId,
 } from "../composer-effects.ts";
 import { tl, withLang } from "../i18n.ts";
+import { callBriefingGateway } from "./models.ts";
+import { briefingErrorResponse } from "./errors.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
