@@ -78,7 +78,7 @@ export function calculateSoraLongformCost(
     ? ESTIMATED_COSTS.sora_longform_pro 
     : ESTIMATED_COSTS.sora_longform_standard;
   
-  const eurosPerSecond = model === 'sora-2-pro' ? 1.30 : 0.55;
+  const eurosPerSecond = model === 'sora-2-pro' ? 1.50 : 0.30;
   
   return {
     credits: totalDurationSeconds * creditsPerSecond,
