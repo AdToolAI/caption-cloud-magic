@@ -298,7 +298,12 @@ export default function ProductionPlanSheet({
       const sourceCast = lastResolvedCast ?? firstResolvedCast;
       const cast = [...(s.cast ?? [])];
 
-      if (cast.length === 0) {
+      // v416 — only scenes with actual speech (lip-sync, voiceover, dialog)
+      // get a speaker slot. Silent B-roll scenes stay cast-free.
+      const sceneHasSpeech = Boolean(
+        s.lipSync || s.voiceover?.text?.trim() || (s.dialogTurns && s.dialogTurns.length),
+      );
+      if (cast.length === 0 && sceneHasSpeech) {
         const inherited = sourceCast && shouldInheritContinuity(s, 'cast')
           ? cloneCastSlot(sourceCast, s.index)
           : emptyCastSlot(s.index);
