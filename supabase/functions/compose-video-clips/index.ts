@@ -4718,6 +4718,10 @@ serve(async (req) => {
         scene.durationSeconds * (CLIP_COSTS[scene.clipSource]?.[q] ?? 0);
     }
 
+    // Surfaced to the caller when the debit itself failed — the clips are
+    // already running, so this must never abort, but it must not stay silent.
+    let creditWarning: string | null = null;
+
     if (billableResults.length > 0 && actualCost > 0) {
       try {
         await supabaseAdmin.rpc("deduct_ai_video_credits", {
@@ -4733,8 +4737,11 @@ serve(async (req) => {
           "[compose-video-clips] Credit deduction failed:",
           creditErr,
         );
+        creditWarning = `Credit deduction of €${actualCost.toFixed(2)} failed: ${String((creditErr as any)?.message ?? creditErr).slice(0, 200)}`;
       }
     }
+
+
 
     // Check if all scenes are already done (stock/upload only)
     const allDone = results.every(
