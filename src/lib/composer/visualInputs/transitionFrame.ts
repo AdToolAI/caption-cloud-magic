@@ -31,9 +31,11 @@ export function scoreFrame(data: Uint8ClampedArray): FrameQuality {
   let sum = 0;
   let sumSq = 0;
   let n = 0;
-  // Sample every 8th pixel — plenty for a luminance histogram, cheap enough
-  // to run on 5 candidates without blocking the UI thread noticeably.
-  for (let i = 0; i < data.length; i += 32) {
+  // Sample every 5th pixel. Cheap enough for 5 candidates, and an odd stride
+  // avoids aliasing away high-frequency detail on regular patterns (an even
+  // stride can land on the same phase of a 2-pixel pattern and report a
+  // perfectly detailed frame as flat).
+  for (let i = 0; i < data.length; i += 20) {
     const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
     sum += y;
     sumSq += y * y;
