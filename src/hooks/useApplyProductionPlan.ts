@@ -682,6 +682,13 @@ function planSceneToComposerScene(
     musicCue: ps.musicCue,
     continuityHint: ps.continuityHint,
     negativePromptScene: ps.negativePromptScene,
+    // v415 — audio ownership. Speech (VO / dialog / lip-sync) always forces
+    // `studio`, i.e. a silent clip, so voiceover and the lip-sync chain own
+    // the audio. `withAudio` mirrors the decision for the generation call.
+    soundDesign: (ps as any).soundDesign || undefined,
+    audioSource: sceneAudioSource,
+    withAudio: sceneAudioSource === 'provider',
+    cameraChoreographyEN: (ps as any).cameraChoreographyEN || undefined,
     // v175: denormalised mention IDs for downstream analytics / Brand-Scan.
     mentionedCharacterIds,
     mentionedLocationIds,
