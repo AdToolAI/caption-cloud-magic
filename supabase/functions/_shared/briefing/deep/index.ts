@@ -12,6 +12,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isQaMockRequest, qaMockJson } from "../../qaMock.ts";
 import { resolveCatalogId, CATALOG_VERSION, type CatalogAxis } from "./catalog.ts";
 import { detectScriptTimingMode, isNonSpeakerLabel, type ScriptTimingInfo } from "./detectScriptTimingMode.ts";
+import {
+  splitBriefingScenes,
+  extractTurnsFromBlock,
+  normalizeMentionKey,
+  stripQuotedDialog,
+} from "./extractDialog.ts";
 import { enforceSoloCast } from "./enforceSoloCast.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -3036,6 +3042,78 @@ YOU MUST:
     } catch (e: any) {
       console.warn('[briefing-deep-parse] fidelity pass failed (non-fatal):', e?.message);
     }
+
+    // ── v421 — Deterministischer Dialog-Extraktor (Single Source of Truth) ──
+    // Der Dialog steht wörtlich im Briefing. Alles, was frühere Pässe (LLM,
+    // Script-Timing, Speaker-Map, Rescue) an `dialogTurns` geschrieben haben,
+    // wird verworfen, sobald der Extraktor für eine Szene echte Zeilen findet.
+    // Findet er keine, bleiben nur Turns bestehen, deren Mention wirklich im
+    // Szenen-Cast existiert — Strukturlabels (`@dauer`, `@ort`) fliegen raus.
+    let deterministicDialogStats: { scenes: number; turns: number; dropped: number } | null = null;
+    try {
+      const scenesArr = Array.isArray((plan as any)?.scenes) ? (plan as any).scenes : [];
+      const blocks = splitBriefingScenes(briefing);
+      const nameToMention = new Map<string, string>();
+      for (const sc of scenesArr) {
+        for (const c of Array.isArray(sc?.cast) ? sc.cast : []) {
+          const mention = normalizeMentionKey(String(c?.mentionKey ?? c?.characterName ?? ''));
+          if (!mention) continue;
+          const nm = normalizeMentionKey(String(c?.characterName ?? ''));
+          if (nm) nameToMention.set(nm, mention);
+        }
+      }
+      const stats = { scenes: 0, turns: 0, dropped: 0 };
+      scenesArr.forEach((sc: any, i: number) => {
+        const allowed = new Set<string>();
+        for (const c of Array.isArray(sc?.cast) ? sc.cast : []) {
+          const mention = normalizeMentionKey(String(c?.mentionKey ?? c?.characterName ?? ''));
+          if (mention) allowed.add(mention);
+        }
+        if (!allowed.size) return;
+
+        const block =
+          blocks.find((b) => b.index === Number(sc?.index ?? i + 1)) ?? blocks[i] ?? (blocks.length === 1 ? blocks[0] : null);
+        const extracted = block ? extractTurnsFromBlock(block.body, allowed, nameToMention) : [];
+
+        const before = Array.isArray(sc?.dialogTurns) ? sc.dialogTurns.length : 0;
+        if (extracted.length) {
+          sc.dialogTurns = extracted.map((t) => ({
+            speakerMentionKey: t.mentionKey,
+            speakerCharacterId: null,
+            text: t.text,
+          }));
+          stats.scenes += 1;
+          stats.turns += extracted.length;
+          stats.dropped += before;
+        } else if (before) {
+          // Keep only turns whose mention is a real cast slot.
+          const kept = sc.dialogTurns.filter((t: any) => {
+            const slug = normalizeMentionKey(String(t?.speakerMentionKey ?? ''));
+            return !!slug && !isNonSpeakerLabel(slug) && allowed.has(slug);
+          });
+          stats.dropped += before - kept.length;
+          sc.dialogTurns = kept;
+        }
+
+        // Prosafelder von wörtlich eingebettetem Dialog befreien.
+        for (const key of ['action', 'sceneAction', 'visualDescription', 'anchorPromptEN', 'summary']) {
+          if (typeof sc?.[key] === 'string' && sc[key].includes('@')) {
+            sc[key] = stripQuotedDialog(sc[key]);
+          }
+        }
+      });
+      deterministicDialogStats = stats;
+      if (stats.scenes > 0 || stats.dropped > 0) {
+        (plan as any)._meta = {
+          ...((plan as any)._meta ?? {}),
+          deterministicDialog: stats,
+        };
+        console.log('[briefing-deep-parse] deterministic_dialog', stats);
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] deterministic dialog extractor failed (non-fatal):', e?.message);
+    }
+
 
     // v219 — Continuous-Scene dialog-turn ensemble split. When the LLM
     // collapsed a multi-speaker briefing into a single dialogTurn or a plain
