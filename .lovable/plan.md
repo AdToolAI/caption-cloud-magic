@@ -134,6 +134,22 @@ continuityFrameScore = visualQuality + subjectVisibility + compositionQuality
 
 Die Lip-Sync-Kette (Feature-Freeze v400, Geometrie ausschließlich auf `reference_image_url`) bleibt in Phase 1 und 2 unberührt und wird in Phase 3 nur nach grünem Referenzlauf mit vier Sprechern angefasst.
 
+## Risiko für die Lip-Sync-Pipeline
+
+Ehrliche Antwort: **In Phase 1 nein, in Phase 2 nur an genau einer Stelle, in Phase 3 bewusst und kontrolliert.**
+
+Die eine reale Gefahrenstelle: `supabase/functions/compose-video-clips/index.ts` steht auf der Freeze-Liste (`.lovable/LIPSYNC-FEATURE-FREEZE.md`) — und genau diese Datei soll in Phase 2 den Provider-Adapter bekommen. Deshalb gelten dort harte Randbedingungen:
+
+1. Der Resolver wird in `compose-video-clips` nur für Szenen aufgerufen, für die `isLipSyncIntentional()` (aus `src/lib/video-composer/lipSyncIntent.ts`, die Single Source of Truth) **false** liefert. Für alle anderen Szenen läuft der bestehende Code Zeile für Zeile unverändert weiter.
+2. Nicht angefasst werden: die Provider-Migrationen (HappyHorse/Pika → Hailuo), `LIPSYNC_PROVIDERS`-Prüfung, `beginSceneRun()`, Plate-Dispatch, `compose-dialog-segments`, `sync-so-webhook`, `pass-face-preclip`, `DialogStitchVideo`, `lipsyncProviderSafety.ts`.
+3. `src/lib/composer/__tests__/lipsyncFrozenContract.test.ts` und der Deno-Contract-Test bleiben grün — sie prüfen unter anderem, dass `compose-video-clips` weiterhin `beginSceneRun` aufruft. Ein Bruch fällt in CI auf, nicht beim Kunden.
+4. Neue Szenenfelder sind additiv; `reference_image_url` und `lock_reference_url` behalten Bedeutung und Schreibpfade. Die v400-Invariante „Geometrie wird auf `reference_image_url` gemessen" bleibt wortgleich gültig.
+
+Was bleibt an Restrisiko: Phase 2 ändert die Datei, in der auch die Lip-Sync-Verzweigung liegt — ein Flüchtigkeitsfehler beim Umbau träfe theoretisch beide Pfade. Absicherung: der Umbau erfolgt als eigener, kleiner Diff (nur der Nicht-Lip-Sync-Zweig), mit einem Vorher/Nachher-Referenzlauf einer Vier-Sprecher-Szene und Eintrag im Golden-Run-Log.
+
+Formal bedeutet Phase 3 ein Teil-Unfreeze („unfreeze lipsync" mit Scope „First-Frame-Slot bei verifizierten Providern"). Ohne diese ausdrückliche Freigabe wird Phase 3 nicht gestartet — Phase 1 und 2 liefern eigenständig Nutzen.
+
+
 ## UI
 
 Ein Feld an der Schnittkante: **Visual Continuity — Auto · Seamless · Identity · Match Cut**, Default Auto. Tooltip nennt die Entscheidung im Klartext („Hailuo — Charakter-Identität hat Vorrang → Match Cut", „Seedance 2.5 — Charakter + Vorframe + Location → nahtlos"). Keine technischen Begriffe wie „First Frame Slot". Gesperrte Optionen zeigen ihre Begründung.
