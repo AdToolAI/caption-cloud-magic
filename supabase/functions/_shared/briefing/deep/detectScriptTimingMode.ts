@@ -211,7 +211,7 @@ function extractByShotMarkers(body: string): DetectedShot[] {
       );
       if (!dl) continue;
       const label = dl[1].trim();
-      if (NON_SPEAKER_LABELS.test(label)) continue;
+      if (isNonSpeakerLabel(label)) continue;
       const inlineTiming = dl[2] ? parseTimeWindow(`(${dl[2]})`).durationSec : null;
       const text = dl[3].trim();
       if (!text) continue;
@@ -316,7 +316,7 @@ function extractByNamedSpeakerBlocks(body: string): DetectedShot[] {
     const m = line.match(/^([A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9\-\.\s]{1,40}?)\s*[:—-]\s+(.+)$/);
     if (!m) continue;
     const label = stripLine(m[1]);
-    if (NON_SPEAKER_LABELS.test(label)) continue;
+    if (isNonSpeakerLabel(label)) continue;
     if (/^(sprecher|speaker|talent|person|charakter|character|rolle|role)\s*\d+/i.test(label)) continue;
     i += 1;
     shots.push({
