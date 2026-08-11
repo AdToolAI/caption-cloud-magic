@@ -96,7 +96,11 @@ interface StoryboardTabProps {
   /** Switches the parent dashboard back to the Briefing tab so the user
    *  can adjust their inputs. */
   onBackToBriefing?: () => void;
+  /** Explicitly runs the briefing analysis from the empty storyboard, even
+   *  when the user originally chose the empty ("manual") path. */
+  onGenerateFromBriefing?: () => void;
 }
+
 
 export default function StoryboardTab({
   scenes,
