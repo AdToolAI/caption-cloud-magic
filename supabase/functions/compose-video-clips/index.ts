@@ -3649,6 +3649,80 @@ serve(async (req) => {
       // anchor" forces `match-cut`, which means the plan's first frame IS the
       // anchor — byte-identical to the pre-resolver behaviour, so T5 geometry,
       // T6 assignment-lock and the whole frozen chain see no change at all.
+      //
+      // v417: the previous frame / previous clip no longer depend on the
+      // browser having captured them. When the client sent nothing (single
+      // scene re-render, Autopilot, server jobs) we pull the predecessor's
+      // clip from the request order and extract the frame server-side.
+      let continuityFrameUrl: string | null =
+        (scene as any).transitionFrameUrl ?? null;
+      let continuityClipUrl: string | null =
+        (scene as any).previousClipUrl ?? null;
+      const continuityPref = (scene as any).visualContinuity ?? "auto";
+      const sceneOrderIdx = scenes.findIndex((s) => s.id === scene.id);
+      if (
+        !continuityFrameUrl &&
+        continuityPref !== "match-cut" &&
+        sceneOrderIdx > 0
+      ) {
+        try {
+          const prevScene = scenes[sceneOrderIdx - 1];
+          const { data: prevRow } = await supabaseAdmin
+            .from("composer_scenes")
+            .select("clip_url, duration_seconds")
+            .eq("id", prevScene.id)
+            .maybeSingle();
+          const prevClipUrl = String((prevRow as any)?.clip_url ?? "");
+          if (prevClipUrl) {
+            continuityClipUrl = continuityClipUrl ?? prevClipUrl;
+            const framed = await ensureTransitionFrame({
+              supabaseAdmin,
+              userId: user.id,
+              projectId,
+              previousSceneId: prevScene.id,
+              previousClipUrl: prevClipUrl,
+              previousDurationSeconds:
+                Number((prevRow as any)?.duration_seconds) ||
+                prevScene.durationSeconds,
+            });
+            if (framed.url) {
+              continuityFrameUrl = framed.url;
+            } else if (framed.reason) {
+              console.log(
+                `[compose-video-clips] scene ${scene.id} continuity frame unavailable (${framed.reason}) — falling back to match-cut`,
+              );
+            }
+          }
+        } catch (contErr) {
+          console.warn(
+            `[compose-video-clips] scene ${scene.id} server continuity backfill failed (non-fatal):`,
+            contErr,
+          );
+        }
+      }
+
+      // Cast & World references — role-tagged, so the budget/arbitration in
+      // the resolver can rank them. Only providers that actually accept
+      // multiple references (Seedance 2.5, Kling Omni, …) ever see them.
+      const clientRefs = Array.isArray((scene as any).visualReferences)
+        ? ((scene as any).visualReferences as Array<Record<string, unknown>>)
+        : [];
+      const castRefs: Array<{ url: string; kind: "image"; role: string; weight: number }> = [];
+      const seenRefUrls = new Set<string>(
+        clientRefs
+          .map((r) => String((r as any)?.url ?? ""))
+          .filter((u) => u.length > 0),
+      );
+      if (scene.referenceImageUrl) seenRefUrls.add(scene.referenceImageUrl);
+      for (const cs of scene.characterShots ?? []) {
+        if (!cs?.characterId || cs.shotType === "absent") continue;
+        const url = charById.get(cs.characterId)?.referenceImageUrl;
+        if (typeof url === "string" && url.length > 0 && !seenRefUrls.has(url)) {
+          seenRefUrls.add(url);
+          castRefs.push({ url, kind: "image", role: "character", weight: 0.9 });
+        }
+      }
+
       const visualPlan = planSceneVisualInputs(
         {
           lip_sync_with_voiceover: scene.lipSyncWithVoiceover ?? null,
@@ -3661,14 +3735,13 @@ serve(async (req) => {
           clipSource: scene.clipSource,
           anchorImageUrl: scene.referenceImageUrl ?? null,
           endFrameUrl: scene.endReferenceImageUrl ?? null,
-          previousFrameUrl: (scene as any).transitionFrameUrl ?? null,
-          previousClipUrl: (scene as any).previousClipUrl ?? null,
-          references: Array.isArray((scene as any).visualReferences)
-            ? (scene as any).visualReferences
-            : [],
-          continuityPreference: (scene as any).visualContinuity ?? "auto",
+          previousFrameUrl: continuityFrameUrl,
+          previousClipUrl: continuityClipUrl,
+          references: [...clientRefs, ...castRefs] as any,
+          continuityPreference: continuityPref,
         },
       );
+
       // The ONE start image every provider branch below must use.
       const planImageUrl = visualPlan.firstFrameUrl;
       const planEndImageUrl = visualPlan.endFrameUrl ?? scene.endReferenceImageUrl;
