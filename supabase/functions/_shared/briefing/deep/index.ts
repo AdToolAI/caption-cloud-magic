@@ -1895,7 +1895,10 @@ function ensureProductionPlanEnsembleServer(plan: any, briefing: string, charact
   return { repaired, required: required.length };
 }
 
-export async function handleDeepParse(req: Request): Promise<Response> {
+export async function handleDeepParse(
+  req: Request,
+  preparsedBody?: Record<string, unknown>,
+): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   // QA smoke short-circuit
   if (isQaMockRequest(req)) {
@@ -1917,7 +1920,7 @@ export async function handleDeepParse(req: Request): Promise<Response> {
     }
     const userId = userRes.user.id;
 
-    const body = await req.json().catch(() => ({}));
+    const body = preparsedBody ?? (await req.json().catch(() => ({})));
     const briefing: string = String(body?.briefing ?? '').trim();
     // v176: coerce empty/whitespace strings to null so the UUID column doesn't
     // reject the insert with "22P02 invalid input syntax for type uuid".

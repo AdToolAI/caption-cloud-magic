@@ -154,7 +154,10 @@ Use sceneType values loosely — map "hook"=opening, "problem"=conflict beats, "
   custom: `FREE EDITOR MODE — follow the user's free description as literally as possible. Treat "productName" as the title, "productDescription" as the user's full creative brief (TOP PRIORITY — the storyboard must reflect it scene-by-scene), "usps" as optional style hints. Do NOT impose AIDA or any fixed framework. Generate scenes that mirror the user's description in order. Text overlays only if the brief implies them.`,
 };
 
-export function handleStoryboard(req: Request): Promise<Response> {
+export function handleStoryboard(
+  req: Request,
+  preparsedBody?: Record<string, unknown>,
+): Promise<Response> {
   return withLang(req, () => (async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -165,7 +168,7 @@ export function handleStoryboard(req: Request): Promise<Response> {
   }
 
   try {
-    const { briefing, category, language } = await req.json() as {
+    const { briefing, category, language } = (preparsedBody ?? await req.json()) as unknown as {
       briefing: Briefing;
       category: string;
       language: string;
