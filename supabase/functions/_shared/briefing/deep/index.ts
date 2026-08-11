@@ -1037,8 +1037,11 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
           mood: t?.mood ? String(t.mood).slice(0, 80) : undefined,
           delivery: t?.delivery ? String(t.delivery).slice(0, 240) : undefined,
         }))
-        .filter((t: any) => t.speakerMentionKey && t.text)
+        // v420 — Briefing-Blocklabels ("DAUER:", "ORT:", "CAST:") sind keine
+        // Sprecher. Solche Turns nie ins Manifest lassen.
+        .filter((t: any) => t.speakerMentionKey && t.text && !isNonSpeakerLabel(String(t.speakerMentionKey).replace(/^@/, '')))
         .slice(0, 20);
+
       if (turns.length) dialogTurns = turns;
     }
 
