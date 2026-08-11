@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select';
 import {
   ShoppingBag, Building2, BookOpen, Palette,
-  Wand2, Hand, Plus, X, ArrowRight, Loader2, Sparkles, ShieldAlert, ChevronDown, ChevronUp,
+  Plus, X, ArrowRight, Loader2, Sparkles, ShieldAlert, ChevronDown, ChevronUp,
 } from 'lucide-react';
 // ProductionPlanSheet is now mounted at dashboard level (see VideoComposerDashboard).
 import { toast } from '@/hooks/use-toast';
@@ -28,7 +28,6 @@ import type {
   ComposerBriefing,
   ComposerCategory,
   ComposerScene,
-  ComposerMode,
   AspectRatio,
   EmotionalTone,
   ClipQuality,
@@ -108,7 +107,7 @@ interface BriefingTabProps {
   language: string;
   onUpdateBriefing: (b: Partial<ComposerBriefing>) => void;
   onUpdateProject: (p: Record<string, any>) => void;
-  onGoToStoryboard: () => void;
+  onGoToStoryboard: (opts?: { skipAnalysis?: boolean }) => void;
   onScenesGenerated: (scenes: ComposerScene[]) => void;
   /** Fired the moment AI generation kicks off, so the dashboard can flip a
    *  global flag and show a loading panel on the Storyboard tab. */
@@ -305,17 +304,25 @@ export default function BriefingTab({
     onUpdateBriefing({ usps: briefing.usps.filter((_, i) => i !== index) });
   };
 
+  // Empty path — the user skips the AI analysis entirely and builds the
+  // storyboard by hand. `mode: 'manual'` is the contract the transition hook
+  // reads to suppress the auto deep-parse (see useStoryboardTransition Guard 0).
+  const handleStartEmptyStoryboard = () => {
+    onUpdateBriefing({ mode: 'manual' });
+    onUpdateProject({ status: 'storyboard' });
+    onGoToStoryboard({ skipAnalysis: true });
+
+  };
+
   const handleGenerateStoryboard = async () => {
     if (!briefing.productName.trim()) {
       toast({ title: cfg.missingPrimaryToast, variant: 'destructive' });
       return;
     }
 
-    if (briefing.mode === 'manual') {
-      onUpdateProject({ status: 'storyboard' });
-      onGoToStoryboard();
-      return;
-    }
+    // The AI path always analyses — the empty path has its own button.
+    if (briefing.mode === 'manual') onUpdateBriefing({ mode: 'ai' });
+
 
     // Switch to the Storyboard tab IMMEDIATELY so the user sees the
     // loading panel instead of staring at the Briefing form for 10–20s.
@@ -569,34 +576,9 @@ export default function BriefingTab({
         )}
       </StagePanel>
 
-      {/* Mode Selection — Direct & Studio only (Quick auto-uses AI mode) */}
-      {showDirect && (
-        <StagePanel slateIndex="01" eyebrow="Scene · Production Mode" title={t('videoComposer.mode')}>
-          <div className="grid grid-cols-2 gap-3">
-            {([
-              { mode: 'ai' as ComposerMode, icon: Wand2, label: t('videoComposer.aiAssisted'), desc: t('videoComposer.aiAssistedDesc') },
-              { mode: 'manual' as ComposerMode, icon: Hand, label: t('videoComposer.manual'), desc: t('videoComposer.manualDesc') },
-            ]).map(({ mode, icon: Icon, label, desc }) => (
-              <button
-                key={mode}
-                onClick={() => onUpdateBriefing({ mode })}
-                className={`p-4 rounded-lg border text-left transition-all ${
-                  briefing.mode === mode
-                    ? 'border-amber-300/70 bg-amber-300/5 ring-1 ring-amber-300/30 shadow-[0_0_24px_-12px_hsla(43,90%,68%,0.6)]'
-                    : 'border-border/40 hover:border-amber-200/30'
-                }`}
-              >
-                <Icon className={`h-5 w-5 mb-2 ${briefing.mode === mode ? 'text-amber-300' : 'text-muted-foreground'}`} />
-                <p className="font-medium text-sm">{label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
-              </button>
-            ))}
-          </div>
-        </StagePanel>
-      )}
-
       {/* Category Selection */}
-      <StagePanel slateIndex="02" eyebrow="Scene · Format" title={t('videoComposer.category')}>
+      <StagePanel slateIndex="01" eyebrow="Scene · Format" title={t('videoComposer.category')}>
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {CATEGORIES.map(({ id, label, icon: Icon, desc }) => (
             <button
@@ -617,7 +599,7 @@ export default function BriefingTab({
       </StagePanel>
 
       {/* Category-Specific Briefing */}
-      <StagePanel slateIndex="03" eyebrow="Scene · Subject" title={cfg.cardTitle}>
+      <StagePanel slateIndex="02" eyebrow="Scene · Subject" title={cfg.cardTitle}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -720,7 +702,7 @@ export default function BriefingTab({
       </StagePanel>
 
       {/* Style & Format — Quick = compact (AR + Duration only). Direct/Studio = full. */}
-      <StagePanel slateIndex="04" eyebrow="Scene · Style & Format" title={t('videoComposer.styleFormat')}>
+      <StagePanel slateIndex="03" eyebrow="Scene · Style & Format" title={t('videoComposer.styleFormat')}>
         <div className="space-y-4">
           {showDirect && (
             <div className="grid grid-cols-2 gap-4">
@@ -893,7 +875,7 @@ export default function BriefingTab({
       {/* Visual Style — Direct & Studio only */}
       {showDirect && (
         <StagePanel
-          slateIndex="05"
+          slateIndex="04"
           eyebrow="Scene · Visual Language"
           title={
             <span className="flex items-center gap-2">
@@ -989,8 +971,7 @@ export default function BriefingTab({
         />
       )}
 
-      {/* Stock-First Toggle (AI mode only) — opt-in cost saver */}
-      {briefing.mode === 'ai' && (
+      {/* Stock-First Toggle — opt-in cost saver for AI generation */}
         <Card className="border-emerald-500/40 bg-gradient-to-br from-emerald-500/5 to-card/80 shadow-[0_0_24px_-12px_hsl(142_76%_45%/0.4)]">
           <CardContent className="pt-5">
             <button
@@ -1031,15 +1012,23 @@ export default function BriefingTab({
             </button>
           </CardContent>
         </Card>
-      )}
 
-      {/* Action — gold-gradient cinematic CTA */}
-      <div className="flex justify-end pt-2">
+      {/* Action — empty path (ghost) + gold-gradient cinematic CTA */}
+      <div className="flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3 pt-2">
+        <button
+          type="button"
+          onClick={handleStartEmptyStoryboard}
+          disabled={isGenerating}
+          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full border border-border/50 text-muted-foreground font-mono text-[11px] uppercase tracking-[0.25em] transition-all hover:text-foreground hover:border-amber-200/40 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <ArrowRight className="h-4 w-4" />
+          {tx({ de: 'Leer ins Storyboard', en: 'Start empty storyboard', es: 'Ir al storyboard vacío' })}
+        </button>
         <button
           type="button"
           onClick={handleGenerateStoryboard}
           disabled={!canProceed || isGenerating}
-          className={`group relative inline-flex items-center gap-2 px-6 py-3 rounded-full font-mono text-[11px] uppercase tracking-[0.25em] text-[hsl(230_30%_4%)] disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_40px_-8px_hsla(43,90%,68%,0.7)] hover:-translate-y-[1px] ${canProceed && !isGenerating ? 'stage-cta-sheen' : ''}`}
+          className={`group relative inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-mono text-[11px] uppercase tracking-[0.25em] text-[hsl(230_30%_4%)] disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_40px_-8px_hsla(43,90%,68%,0.7)] hover:-translate-y-[1px] ${canProceed && !isGenerating ? 'stage-cta-sheen' : ''}`}
           style={{
             background: 'linear-gradient(180deg, #FFE9A8 0%, #F5C76A 50%, #b78934 100%)',
             boxShadow:
@@ -1051,19 +1040,15 @@ export default function BriefingTab({
               <Loader2 className="h-4 w-4 animate-spin" />
               {t('videoComposer.generatingStoryboard')}
             </>
-          ) : briefing.mode === 'ai' ? (
+          ) : (
             <>
               <Sparkles className="h-4 w-4" />
               {t('videoComposer.generateStoryboard')}
             </>
-          ) : (
-            <>
-              <ArrowRight className="h-4 w-4" />
-              {t('videoComposer.continueToStoryboard')}
-            </>
           )}
         </button>
       </div>
+
       </div>
     </div>
   );

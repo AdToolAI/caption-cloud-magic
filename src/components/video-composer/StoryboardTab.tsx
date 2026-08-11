@@ -96,7 +96,11 @@ interface StoryboardTabProps {
   /** Switches the parent dashboard back to the Briefing tab so the user
    *  can adjust their inputs. */
   onBackToBriefing?: () => void;
+  /** Explicitly runs the briefing analysis from the empty storyboard, even
+   *  when the user originally chose the empty ("manual") path. */
+  onGenerateFromBriefing?: () => void;
 }
+
 
 export default function StoryboardTab({
   scenes,
@@ -116,6 +120,8 @@ export default function StoryboardTab({
   storyboardError = null,
   onRetryStoryboard,
   onBackToBriefing,
+  onGenerateFromBriefing,
+
 }: StoryboardTabProps) {
   const tr = useTx();
 
@@ -712,10 +718,18 @@ export default function StoryboardTab({
           >
             <div className="py-8 text-center">
               <p className="text-muted-foreground text-sm mb-3">{tx({ de: "Noch keine Szenen vorhanden", en: "No scenes available yet", es: "Aún no hay escenas disponibles" })}</p>
-              <Button onClick={handleAddSceneClick} disabled={!addSceneAllowed} variant="outline" className="gap-2">
-                <Plus className="h-4 w-4" /> Erste Szene hinzufügen
-              </Button>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Button onClick={handleAddSceneClick} disabled={!addSceneAllowed} variant="outline" className="gap-2">
+                  <Plus className="h-4 w-4" /> {tx({ de: 'Erste Szene hinzufügen', en: 'Add first scene', es: 'Añadir primera escena' })}
+                </Button>
+                {onGenerateFromBriefing && (
+                  <Button onClick={onGenerateFromBriefing} variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground">
+                    <Sparkles className="h-4 w-4" /> {tx({ de: 'Aus Briefing generieren', en: 'Generate from briefing', es: 'Generar desde el briefing' })}
+                  </Button>
+                )}
+              </div>
             </div>
+
           </StagePanel>
         )
 

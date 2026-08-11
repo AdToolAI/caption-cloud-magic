@@ -844,7 +844,7 @@ export default function VideoComposerDashboard() {
     onUpdateBriefing: updateBriefing,
   });
 
-  const handleTabChange = useCallback(async (next: TabId) => {
+  const handleTabChange = useCallback(async (next: TabId, opts?: { skipAnalysis?: boolean }) => {
     // Flush any pending debounced scene-edit writes synchronously
     // (covers the Storyboard → Clips transition, which is exactly when
     // users notice their prompt edits being lost).
@@ -865,7 +865,7 @@ export default function VideoComposerDashboard() {
     // Intercept briefing → storyboard: try to run the auto-analyse flow.
     // The hook short-circuits when the storyboard already has scenes or
     // any scene is lipsync-protected — in those cases we just navigate.
-    if (next === 'storyboard' && activeTab === 'briefing') {
+    if (next === 'storyboard' && activeTab === 'briefing' && !opts?.skipAnalysis) {
       const { handled } = await storyboardTransition.attempt();
       if (handled) {
         // Don't switch tabs yet — the War Room is up, and the plan-apply
@@ -1669,7 +1669,7 @@ export default function VideoComposerDashboard() {
               language={project.language}
               onUpdateBriefing={updateBriefing}
               onUpdateProject={updateProject}
-              onGoToStoryboard={() => handleTabChange('storyboard')}
+              onGoToStoryboard={(opts) => handleTabChange('storyboard', opts)}
               onScenesGenerated={(scenes) => {
                 setStoryboardError(null);
                 setScenes(scenes);
@@ -1726,6 +1726,13 @@ export default function VideoComposerDashboard() {
                   setRetryStoryboardNonce((n) => n + 1);
                 }}
                 onBackToBriefing={() => setActiveTab('briefing')}
+                onGenerateFromBriefing={async () => {
+                  // The user started empty but now wants the AI plan.
+                  updateBriefing({ mode: 'ai' });
+                  setStoryboardError(null);
+                  await storyboardTransition.attempt({ force: true });
+                }}
+
                 onEnsurePersisted={async () => {
                   const result = await ensureProjectPersisted(project);
                   // Sync ref BEFORE setState so any callback that fires inside
