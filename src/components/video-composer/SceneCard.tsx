@@ -1197,12 +1197,12 @@ export default function SceneCard({
                         })}
                       </div>
                       <span className="text-[10px] text-muted-foreground">
-                        · {providerLabel} nativ
+                        · {providerLabel} {tx({ de: 'nativ', en: 'native', es: 'nativo' })}
                       </span>
                     </div>
                     {budgetCapped && (
                       <p className="text-[10px] text-amber-300/80 leading-snug">
-                        Projekt-Budget fast voll · max. {sliderMax}s für diese Szene.
+                        {tx({ de: `Projekt-Budget fast voll · max. ${sliderMax}s für diese Szene.`, en: `Project budget almost full · max. ${sliderMax}s for this scene.`, es: `Presupuesto casi agotado · máx. ${sliderMax}s para esta escena.` })}
                       </p>
                     )}
                     {isHailuoPro10 && (
