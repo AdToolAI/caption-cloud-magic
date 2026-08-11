@@ -940,17 +940,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         basePrompt={prompt}
       />
 
-      {/* ── Brand Character Lock (cross-studio persistent character) ──
-           Hidden for Kling Omni — the unified Cast & Lip-Sync panel above
-           is the single source of truth for characters in that mode. */}
-      {!isKlingOmni && (
-        <Card className="p-5 bg-card/60 backdrop-blur-xl border-border/60">
-          <BrandCharacterSelector
-            value={brandCharacter?.id ?? null}
-            onChange={setBrandCharacter}
-          />
-        </Card>
-      )}
+      {/* Character selection lives exclusively in Cast & World below. */}
 
       <ToolkitCastWorldPicker
         characterIds={castCharacterIds}
