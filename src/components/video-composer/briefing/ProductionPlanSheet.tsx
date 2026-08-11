@@ -164,6 +164,7 @@ export default function ProductionPlanSheet({
   } | null>(null);
   const currentBriefingRef = useRef(currentBriefing);
   const autoBoundDialogSignatureRef = useRef<string | null>(null);
+  const autoCastSignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
     currentBriefingRef.current = currentBriefing;
