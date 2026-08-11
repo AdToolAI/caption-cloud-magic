@@ -433,7 +433,47 @@ function planSceneToComposerScene(
   const dialogVoices: Record<string, string> = {};
   const requiredDialogSpeakerIds: string[] = [];
   const dialogScript: string | undefined = undefined;
-  const dialogTurns: ComposerScene['dialogTurns'] | undefined = undefined;
+  // v414 — Dialogzeilen werden wieder übernommen, aber NUR wenn der Sprecher
+  // eindeutig auf eine Charakter-UUID auflösbar ist (direkt oder über den
+  // Cast-Slot des mentionKey). Freitext-/Meta-Zeilen ohne Sprecher bleiben
+  // draußen — das war die Fragilität, die zu v229 geführt hat.
+  const dialogTurns: ComposerScene['dialogTurns'] | undefined = (() => {
+    if (!applyDialogTurns) return undefined;
+    const raw = Array.isArray(ps.dialogTurns) ? ps.dialogTurns : [];
+    if (raw.length === 0) return undefined;
+    const castByKey = new Map<string, string>();
+    for (const c of ps.cast ?? []) {
+      const id = c.characterId ? stripPrefix(String(c.characterId)) : '';
+      if (!PLAN_UUID_RE.test(id)) continue;
+      if (c.mentionKey) castByKey.set(normalizeAssetKey(c.mentionKey), id);
+      if (c.characterName) castByKey.set(normalizeAssetKey(c.characterName), id);
+    }
+    const turns = raw
+      .map((t, idx) => {
+        const text = (t.text ?? '').trim();
+        if (!text) return null;
+        const direct = t.speakerCharacterId ? stripPrefix(String(t.speakerCharacterId)) : '';
+        const characterId = PLAN_UUID_RE.test(direct)
+          ? direct
+          : castByKey.get(normalizeAssetKey(t.speakerMentionKey)) ?? '';
+        if (!characterId) return null;
+        const displayName = (ps.cast ?? []).find(
+          (c) => stripPrefix(String(c.characterId ?? '')) === characterId,
+        )?.characterName?.trim();
+        return {
+          turnId: newTurnId(),
+          characterId,
+          ...(displayName ? { displayName } : {}),
+          text,
+          ...(t.mood ? { mood: t.mood } : {}),
+          ...(t.delivery ? { delivery: t.delivery } : {}),
+          order: idx,
+        };
+      })
+      .filter((t): t is NonNullable<typeof t> => !!t);
+    return turns.length > 0 ? turns : undefined;
+  })();
+
   void voicePoolPicker;
   void voicePoolAssignments;
   void defaultVoicesByCharacter;
