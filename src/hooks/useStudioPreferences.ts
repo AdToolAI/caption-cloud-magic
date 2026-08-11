@@ -80,7 +80,24 @@ export function useStudioPreferences() {
     });
   }, []);
 
-  const setEditorMode = useCallback((mode: EditorMode) => update({ editorMode: mode }), [update]);
+  const setEditorMode = useCallback(
+    (mode: EditorMode) => update({ editorMode: mode, editorModeManual: true }),
+    [update],
+  );
+  /**
+   * v416 — one-shot suggestion after a briefing analysis. Never overrides a
+   * mode the user picked themselves, and never escalates to "studio".
+   */
+  const suggestEditorMode = useCallback(
+    (mode: Exclude<EditorMode, 'studio'>) => {
+      const current = readFromStorage();
+      if (current.editorModeManual) return;
+      if (current.editorMode === 'studio') return;
+      if (current.editorMode === mode) return;
+      update({ editorMode: mode });
+    },
+    [update],
+  );
   const setAudioMode = useCallback((mode: StageAudioMode) => update({ audioMode: mode }), [update]);
   const toggleCinemascope = useCallback(
     () => update({ cinemascope: !readFromStorage().cinemascope }),
