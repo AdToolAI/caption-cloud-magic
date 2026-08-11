@@ -50,7 +50,8 @@ Der Modus wird pro Kante automatisch vorgeschlagen (Frame-Chain, wenn möglich; 
 - `src/types/video-composer.ts`: Feld `transitionMode?: 'frame-chain' | 'endframe-bridge' | 'match-cut'` je Szene (bezieht sich auf die Kante zur Vorszene).
 - UI: Badge plus Auswahl an der Schnittkante in `SceneStripTile.tsx` / `SceneCutDriftIndicator.tsx`; `ContinuityGuardianStrip.tsx` prüft nur noch Kanten im Modus `match-cut` auf Drift, da die anderen Modi die Kante hart setzen.
 - Render-Seite: `compose-video-clips` reicht bei `frame-chain` die extrahierte Last-Frame-URL als `firstFrameUrl` der Folgeszene durch; bei `endframe-bridge` zusätzlich als `end_image` der Vorszene (Luma/LTX/Vidu/Seedance-Mini-Routen unterstützen das bereits).
-- Keine Änderung an Preisen, Wallet-Logik oder der Lip-Sync-Kette selbst.
+- Guard-Test: kein Codepfad des Übergangs-Modus darf `referenceImageUrl` oder `lockReferenceUrl` schreiben, und keine Szene mit Lip-Sync-Engine darf einen anderen Modus als `match-cut` erhalten.
+- Keine Änderung an Preisen, Wallet-Logik oder der Lip-Sync-Kette (Baseline v283 bleibt unberührt).
 
 ## Verifikation
 
