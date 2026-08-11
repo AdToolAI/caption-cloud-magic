@@ -510,6 +510,18 @@ export interface ComposerScene {
   continuityLocked?: boolean;
   lockReferenceUrl?: string;
   /**
+   * Visual-Continuity-System (Phase 1) — additive scene fields.
+   * These NEVER replace `referenceImageUrl` / `lockReferenceUrl`: those two
+   * remain the identity/geometry anchors of the frozen lip-sync chain (v400).
+   * The resolver only reads them; nothing here is written by the render path.
+   */
+  sceneClass?: 'environment' | 'product' | 'character';
+  characterReferences?: { url: string; entityId?: string }[];
+  locationReferences?: { url: string; entityId?: string }[];
+  productReferences?: { url: string; entityId?: string }[];
+  visualContinuity?: 'auto' | 'seamless' | 'identity' | 'match-cut';
+
+  /**
    * Phase C.1 runtime-only annotations from `propagateDialogLock`. Not
    * persisted; the snake_case persistence mapper ignores them.
    *  - 'self'      → this scene owns its lockReferenceUrl
