@@ -13,6 +13,8 @@ export interface StudioPreferences {
   editorMode: EditorMode;
   audioMode: StageAudioMode;
   cinemascope: boolean;
+  /** v416 — true once the user picked a mode themselves. Blocks auto-suggest. */
+  editorModeManual: boolean;
 }
 
 const STORAGE_KEY = "motion-studio:prefs:v1";
@@ -21,6 +23,7 @@ const DEFAULTS: StudioPreferences = {
   editorMode: "quick",
   audioMode: "ambient",
   cinemascope: false,
+  editorModeManual: false,
 };
 
 function readFromStorage(): StudioPreferences {
@@ -37,6 +40,7 @@ function readFromStorage(): StudioPreferences {
       audioMode:
         parsed.audioMode === "off" || parsed.audioMode === "full" ? parsed.audioMode : "ambient",
       cinemascope: Boolean(parsed.cinemascope),
+      editorModeManual: Boolean(parsed.editorModeManual),
     };
   } catch {
     return DEFAULTS;
@@ -76,7 +80,24 @@ export function useStudioPreferences() {
     });
   }, []);
 
-  const setEditorMode = useCallback((mode: EditorMode) => update({ editorMode: mode }), [update]);
+  const setEditorMode = useCallback(
+    (mode: EditorMode) => update({ editorMode: mode, editorModeManual: true }),
+    [update],
+  );
+  /**
+   * v416 — one-shot suggestion after a briefing analysis. Never overrides a
+   * mode the user picked themselves, and never escalates to "studio".
+   */
+  const suggestEditorMode = useCallback(
+    (mode: Exclude<EditorMode, 'studio'>) => {
+      const current = readFromStorage();
+      if (current.editorModeManual) return;
+      if (current.editorMode === 'studio') return;
+      if (current.editorMode === mode) return;
+      update({ editorMode: mode });
+    },
+    [update],
+  );
   const setAudioMode = useCallback((mode: StageAudioMode) => update({ audioMode: mode }), [update]);
   const toggleCinemascope = useCallback(
     () => update({ cinemascope: !readFromStorage().cinemascope }),
@@ -87,6 +108,7 @@ export function useStudioPreferences() {
   return {
     prefs,
     setEditorMode,
+    suggestEditorMode,
     setAudioMode,
     toggleCinemascope,
     setCinemascope,

@@ -108,7 +108,18 @@ function emptyPlanCastSlot(sceneIndex: number): PlanCastSlot {
 
 import { shouldInheritContinuity as shouldInheritPlanContinuity } from '@/lib/video-composer/briefing/planContinuity';
 import { tx } from '@/lib/i18nText';
-import type { SceneAudioSource } from '@/config/nativeAudioSources';
+import { resolveSceneAudioSource, type SceneAudioSource } from '@/config/nativeAudioSources';
+import { pickClipSourceForDuration } from '@/lib/composer/pickClipSourceForDuration';
+import { useStudioPreferences } from '@/hooks/useStudioPreferences';
+
+/** v416 — true when a plan scene actually contains speech (VO, dialog, lip-sync). */
+function planSceneHasSpeech(scene: TPlanScene): boolean {
+  return Boolean(
+    scene.lipSync
+      || scene.voiceover?.text?.trim()
+      || (scene.dialogTurns && scene.dialogTurns.length),
+  );
+}
 
 function hydratePlanScenesForApply(scenes: TPlanScene[]): TPlanScene[] {
   let lastCast: PlanCastSlot | null = null;
@@ -119,7 +130,10 @@ function hydratePlanScenesForApply(scenes: TPlanScene[]): TPlanScene[] {
   return scenes.map((scene) => {
     const cast = [...(scene.cast ?? [])];
     const sourceCast = lastCast ?? firstCast;
-    if (cast.length === 0) {
+    // v416 — no ghost cast: an empty "S0x Sprecher" placeholder is only
+    // created when the scene really has speech. Silent B-roll scenes stay
+    // cast-free instead of inventing a speaker slot.
+    if (cast.length === 0 && planSceneHasSpeech(scene)) {
       cast.push(sourceCast && shouldInheritPlanContinuity(scene, 'cast')
         ? { ...sourceCast, mentionKey: sourceCast.mentionKey || `S${String(scene.index).padStart(2, '0')} Sprecher` }
         : emptyPlanCastSlot(scene.index));
@@ -617,10 +631,21 @@ function planSceneToComposerScene(
   }
 
 
+  // v416 — pick the clip source FIRST: scenes longer than the default model
+  // can handle (>15 s) must run on Seedance 2.5, the only long-form provider.
+  const preferredSource = dialogMode ? 'ai-happyhorse' : 'ai-hailuo';
+  const picked = pickClipSourceForDuration({
+    durationSeconds: ps.durationSec,
+    preferred: preferredSource,
+    dialogMode,
+  });
+  const resolvedClipSource = picked.clipSource;
+  const resolvedDuration = picked.durationSeconds;
+
   // v415 — resolve the audio owner. Speech always wins: a scene with
   // voiceover, dialog or lip-sync must be generated SILENT so the studio
   // (voiceover + lip-sync + SFX tracks) owns the audio. Provider audio is
-  // only ever kept for speechless scenes.
+  // only ever kept for speechless scenes on models with native audio.
   const hasSpeechForAudio = Boolean(
     dialogMode
       || (typeof dialogScript === 'string' && dialogScript.trim())
@@ -628,27 +653,23 @@ function planSceneToComposerScene(
       || ps.voiceover?.text?.trim()
       || ps.lipSync,
   );
-  const requestedAudioSource = (ps as any).audioSource as SceneAudioSource | undefined;
-  const sceneAudioSource: SceneAudioSource = hasSpeechForAudio
-    ? 'studio'
-    : requestedAudioSource === 'provider'
-      ? 'provider'
-      : requestedAudioSource === 'silent'
-        ? 'silent'
-        : requestedAudioSource === 'studio'
-          ? 'studio'
-          : (String((ps as any).soundDesign ?? '').trim() ? 'studio' : 'silent');
+  const sceneAudioSource: SceneAudioSource = resolveSceneAudioSource({
+    hasSpeech: hasSpeechForAudio,
+    hasSoundDesign: Boolean(String((ps as any).soundDesign ?? '').trim()),
+    clipSource: resolvedClipSource,
+    requested: (ps as any).audioSource as SceneAudioSource | undefined,
+  });
 
   return {
     id: newSceneId(),
     projectId,
     orderIndex,
     sceneType,
-    durationSeconds: Math.round(ps.durationSec),
-    // Lip-Sync-Szenen defaulten auf HappyHorse (dialog-fähig). Die Cinematic-Sync-
-    // Pipeline migriert bei Bedarf intern auf Hailuo-Plate — die UI bleibt
-    // konsistent auf einem dialog-fähigen Modell.
-    clipSource: (dialogMode ? 'ai-happyhorse' : 'ai-hailuo') as any,
+    durationSeconds: resolvedDuration,
+    // Lip-Sync-Szenen defaulten auf HappyHorse (dialog-fähig). Lange B-Roll-
+    // Szenen (>15 s) laufen auf Seedance 2.5 (ModelArk), alles andere auf
+    // Hailuo.
+    clipSource: resolvedClipSource as any,
     clipQuality: 'standard',
     clipStatus: 'pending',
     // v415 — sound design only reaches the model when the provider owns the
@@ -826,6 +847,7 @@ export interface ApplyPlanResult {
 }
 
 export function useApplyProductionPlan() {
+  const { suggestEditorMode } = useStudioPreferences();
   return useCallback(async (args: ApplyPlanArgs): Promise<ApplyPlanResult> => {
     const {
       plan: rawPlan, projectId, language,
@@ -855,6 +877,20 @@ export function useApplyProductionPlan() {
       briefingPatch.duration = Math.round(plan.project.totalDurationSec);
     }
     if (Object.keys(briefingPatch).length) onUpdateBriefing(briefingPatch);
+
+    // v416 — suggest the editor mode ONCE from the analysed plan: anything with
+    // speech, cast or an explicit look needs the Direct panels; a pure B-roll
+    // plan stays in Quick. Never overrides a mode the user picked himself.
+    try {
+      const needsDirect = (plan.scenes || []).some((s) =>
+        s.lipSync
+        || s.voiceover?.text?.trim()
+        || (s.dialogTurns && s.dialogTurns.length)
+        || (s.cast && s.cast.some((c) => c.characterId || c.characterName))
+        || !!(s as any).stylePreset,
+      );
+      suggestEditorMode(needsDirect ? 'direct' : 'quick');
+    } catch { /* mode suggestion must never block applying the plan */ }
 
     // 2) Determine which existing scenes are PROTECTED.
     //    Step 2a: local quick check.
@@ -1123,5 +1159,5 @@ export function useApplyProductionPlan() {
       verified: true,
       warnings,
     };
-  }, []);
+  }, [suggestEditorMode]);
 }

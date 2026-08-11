@@ -110,6 +110,7 @@ import {
   getProviderLabel,
   snapDurationToProvider,
 } from "@/lib/video-composer/providerCapabilities";
+import { maxSecondsForClipSource } from "@/lib/composer/pickClipSourceForDuration";
 import { ModelSelector } from "@/components/ai-video/ModelSelector";
 import {
   COMPOSER_AVAILABLE_MODELS,
@@ -1124,7 +1125,9 @@ export default function SceneCard({
               {(() => {
                 const MAX_PROJECT_SEC = 600;
                 const MIN_SCENE = 3;
-                const PROVIDER_MAX = 15;
+                // v416 — the provider cap is model-specific (30 s on Seedance 2.5,
+                // 15 s elsewhere). Hard-coding 15 disabled the long buckets.
+                const PROVIDER_MAX = maxSecondsForClipSource(scene.clipSource);
                 const remaining = Math.max(0, MAX_PROJECT_SEC - siblingsDurationSec);
                 const sliderMax = Math.max(MIN_SCENE, Math.min(PROVIDER_MAX, remaining));
                 const budgetCapped = sliderMax < PROVIDER_MAX;
@@ -1173,7 +1176,7 @@ export default function SceneCard({
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                        Dauer
+                        {tx({ de: 'Dauer', en: 'Duration', es: 'Duración' })}
                       </span>
                       <div className="flex gap-1 flex-wrap">
                         {buckets.map((sec) => {
@@ -1194,12 +1197,12 @@ export default function SceneCard({
                         })}
                       </div>
                       <span className="text-[10px] text-muted-foreground">
-                        · {providerLabel} nativ
+                        · {providerLabel} {tx({ de: 'nativ', en: 'native', es: 'nativo' })}
                       </span>
                     </div>
                     {budgetCapped && (
                       <p className="text-[10px] text-amber-300/80 leading-snug">
-                        Projekt-Budget fast voll · max. {sliderMax}s für diese Szene.
+                        {tx({ de: `Projekt-Budget fast voll · max. ${sliderMax}s für diese Szene.`, en: `Project budget almost full · max. ${sliderMax}s for this scene.`, es: `Presupuesto casi agotado · máx. ${sliderMax}s para esta escena.` })}
                       </p>
                     )}
                     {isHailuoPro10 && (

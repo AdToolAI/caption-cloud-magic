@@ -8,10 +8,18 @@
  * and never read this constant.
  */
 import type { ComposerScene } from "@/types/video-composer";
+import { maxSecondsForClipSource } from "@/lib/composer/pickClipSourceForDuration";
 
 export const MAX_PROJECT_SECONDS = 600; // 10 minutes
 export const MIN_SCENE_SECONDS = 3;
-export const MAX_SCENE_SECONDS = 15;
+/**
+ * Hard provider cap for ONE scene. Seedance 2.5 (ModelArk) renders up to 30 s
+ * per shot; every other model tops out at 15 s and gets clamped by
+ * `maxDurationForScene(scenes, sceneId, clipSource)`.
+ */
+export const MAX_SCENE_SECONDS = 30;
+/** Cap for models without long-form support. */
+export const DEFAULT_MAX_SCENE_SECONDS = 15;
 
 /** Sum of durations of every scene EXCEPT the one with `excludeSceneId`. */
 export function sumOtherScenesDuration(
@@ -35,16 +43,19 @@ export function sumAllScenesDuration(
 
 /**
  * Maximum value the duration slider for ONE scene may show, given the
- * remaining project budget. Falls back to provider hard-cap (15 s) when
- * plenty of budget is left.
+ * remaining project budget AND the provider cap of the scene's model
+ * (30 s on Seedance 2.5, 15 s or less everywhere else).
  */
 export function maxDurationForScene(
   scenes: ComposerScene[] | undefined | null,
   sceneId?: string,
+  clipSource?: string | null,
 ): number {
   const otherTotal = sumOtherScenesDuration(scenes, sceneId);
   const remaining = Math.max(0, MAX_PROJECT_SECONDS - otherTotal);
-  return Math.max(MIN_SCENE_SECONDS, Math.min(MAX_SCENE_SECONDS, remaining));
+  const source = clipSource ?? scenes?.find((s) => s.id === sceneId)?.clipSource ?? null;
+  const providerCap = source ? maxSecondsForClipSource(source) : DEFAULT_MAX_SCENE_SECONDS;
+  return Math.max(MIN_SCENE_SECONDS, Math.min(providerCap, remaining));
 }
 
 /**

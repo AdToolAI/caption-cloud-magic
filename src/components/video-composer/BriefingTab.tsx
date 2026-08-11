@@ -44,7 +44,7 @@ import VideoModeSelector from './VideoModeSelector';
 import BrandKitApplyPanel from './BrandKitApplyPanel';
 import StagePanel from './stage/StagePanel';
 import DirectorsNote from './stage/DirectorsNote';
-import FilmStripModeSelector from './stage/FilmStripModeSelector';
+
 import { useStudioPreferences } from '@/hooks/useStudioPreferences';
 import type { VideoMode, AssemblyConfig } from '@/types/video-composer';
 
@@ -239,10 +239,18 @@ export default function BriefingTab({
   retryStoryboardNonce = 0,
 }: BriefingTabProps) {
   const { t } = useTranslation();
-  const { prefs } = useStudioPreferences();
+  const { prefs, setEditorMode } = useStudioPreferences();
   const editorMode = prefs.editorMode; // 'quick' | 'direct' | 'studio'
   const showDirect = editorMode !== 'quick';
   const showStudio = editorMode === 'studio';
+  // v416 — Quick hides real panels. If those hidden panels already carry data
+  // (from the briefing analysis or an earlier session), surface a one-line
+  // hint instead of letting the values disappear silently.
+  const hiddenPanelsHaveData = !showDirect && Boolean(
+    (briefing.visualStyle && String(briefing.visualStyle).trim())
+    || (briefing.characters && briefing.characters.length)
+    || (briefing.videoMode && briefing.videoMode !== 'video'),
+  );
   const [uspInput, setUspInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   // briefingImportOpen state removed — auto-analyse handled by dashboard hook.
@@ -536,8 +544,22 @@ export default function BriefingTab({
       */}
 
 
-      {/* Film-strip Mode Selector — visible Quick / Direct / Studio reels */}
-      <FilmStripModeSelector />
+      {/* v416 — the Quick/Direct/Studio switch lives ONLY in the DirectorBar
+          (sticky, global). The big film-strip duplicate was removed. */}
+
+      {hiddenPanelsHaveData && (
+        <button
+          type="button"
+          onClick={() => setEditorMode('direct')}
+          className="w-full rounded-xl border border-amber-300/25 bg-amber-300/5 px-4 py-2.5 text-left text-xs text-amber-100/80 transition-colors hover:border-amber-300/50 hover:text-amber-100"
+        >
+          {tx({
+            de: 'Stil, Marken-Kit oder Cast sind gesetzt, aber im Quick-Modus ausgeblendet — mehr Panels anzeigen',
+            en: 'Style, brand kit or cast are set but hidden in Quick mode — show more panels',
+            es: 'Estilo, kit de marca o elenco están definidos pero ocultos en modo Quick — mostrar más paneles',
+          })}
+        </button>
+      )}
 
       {/* Crossfade wrapper — re-keyed on editorMode so panel changes "feel" */}
       <div key={editorMode} className="stage-mode-fade space-y-6">
