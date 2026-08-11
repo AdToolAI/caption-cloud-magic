@@ -38,15 +38,26 @@ Neues Modul `supabase/functions/_shared/briefing/deep/extractDialog.ts`. Es lies
 
 `ProductionPlan` (Zod) erhält eine Regel: jeder Turn braucht einen `speakerMentionKey`, der in `scene.cast` vorkommt. Verletzungen scheitern beim Parsen — der Fehler kann nicht mehr stillschweigend bis in die UI durchlaufen. Das ersetzt das zuvor geplante „Schluss-Gate".
 
-### 4. UI folgt der Invariante
+### 4. Der Cast-Slot ist der Slotfänger — die Figur erbt seinen Dialog
 
-Im Plan-Sheet entfällt die Sonderbehandlung: da nur echte Turns existieren, verschwinden Dropdown und „Sprecher noch offen" an Strukturzeilen automatisch. Briefing-Notizen (Stimme, Untertitel, Negative Prompt) werden weiterhin angezeigt, aber als Notiz ohne Sprecherfeld.
+Die Mention (`@creative`) ist der Slot, nicht die Person. Wer immer diesem Slot zugeordnet wird, bekommt automatisch **alle** Zeilen dieser Mention:
 
-### 5. Tests, die den Regress dauerhaft verhindern
+- Zuordnung passiert genau einmal pro Szene am Cast-Slot. Turns speichern primär die Mention; die Charakter-UUID wird daraus abgeleitet, nicht separat gepflegt.
+- Figur im Slot wechseln → alle Zeilen dieser Mention wechseln mit, in allen Szenen, ohne weiteren Klick.
+- Zwei Slots tauschen → die Dialoge tauschen mit; keine Figur bekommt dieselbe Zeile doppelt.
+- Ein leerer Slot mit Zeilen bleibt sichtbar offen; sobald eine Figur gesetzt ist, ist die Zeile gebunden.
+- Beim Anwenden auf das Storyboard wird die Mention erneut über den Cast aufgelöst — kein eingefrorener Stand aus dem Analysezeitpunkt.
+
+### 5. UI folgt der Invariante
+
+Im Plan-Sheet entfällt die Sonderbehandlung: da nur echte Turns existieren, verschwinden Dropdown und „Sprecher noch offen" an Strukturzeilen automatisch. Pro Zeile steht nur noch der Slotname; gewählt wird die Figur oben am Cast-Slot. Briefing-Notizen (Stimme, Untertitel, Negative Prompt) werden als Notiz ohne Sprecherfeld angezeigt.
+
+### 6. Tests, die den Regress dauerhaft verhindern
 
 - Fixture Continuity-Stress-Test: 0 Label-Turns, Szene 2 mit 11 Turns in Originalreihenfolge, Sprecher `@creative`/`@founder`/`@marketer`/`@creator`, Aktionstext ohne Zitate.
 - Fixture reines Voiceover-Briefing ohne Dialog: 0 Turns, Voiceover-Text bleibt erhalten.
 - Fixture Klarnamen-Dialog (`Samuel: …`): korrekt gebunden.
+- Slotfänger-Test: Figur am Slot wechseln bzw. zwei Slots tauschen → alle zugehörigen Zeilen folgen, bis ins Storyboard.
 - Schema-Test: ein Turn mit Mention außerhalb des Cast lässt die Validierung scheitern.
 
 ## Technische Bereiche
