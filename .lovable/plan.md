@@ -16,10 +16,20 @@ Es geht also nicht um Umbau der Lip-Sync-Pipeline, sondern um **Zertifizierung e
 - Spiegel-Liste in `supabase/functions/_shared/visual-inputs.ts` (zertifizierte Plate-Provider) mitziehen, damit Resolver und Dispatcher nicht auseinanderlaufen.
 - Beide Listen werden per Test aneinander gebunden.
 
-### 2. Stumme Platte als harte Invariante
-- Im Seedance-2.5-Zweig `generate_audio: false` explizit setzen, sobald die Szene Lip-Sync-Absicht hat, und Referenz-Audio unterdrücken.
-- Passt zur Audio-Ownership-Regel (v415): Sprache erzwingt den stummen Clip; der Ton kommt aus dem Studio-Track, nicht vom Provider.
-- Guard-Test: keine Lip-Sync-Szene darf jemals einen ModelArk-Task mit `generate_audio: true` auslösen.
+### 2. Tonhoheit: stumme Stimmspur, optional native Atmosphäre (Hybrid)
+Die Stimme kommt immer von uns, der Provider darf höchstens die Umgebung liefern. Zwei Zustände pro Szene:
+
+- **Standard (stumme Platte):** `generate_audio: false`, Referenz-Audio unterdrückt. Ton komplett aus dem Studio-Track (v415).
+- **Hybrid „Atmo nativ":** `generate_audio: true`, aber der Prompt-Layer verbietet Sprache explizit (englisch: no speech, no dialogue, no voices, ambience and foley only). Genutzt wird die Tonspur nur als Atmosphären-Bett unter unserer VO.
+
+Regeln für den Hybrid-Fall, damit er nicht zur Fehlerquelle wird:
+- **Sync.so sieht die Atmo nie.** Lip-Sync läuft auf der Platte plus unserer VO; das Atmo-Bett wird erst beim Mux zurückgemischt. Sonst driftet der Mund gegen zwei konkurrierende Tonquellen.
+- **Sprach-Gate nach dem Render:** die Plattentonspur wird transkribiert. Ist Sprache erkennbar (nicht-leeres Transkript / Sprachenergie), wird die Tonspur verworfen und die Szene läuft stumm weiter — fail-closed, kein Renderfehler, nur Telemetrie und ein Hinweis in der Szene.
+- **Mix-Deckel:** Atmo als eigener Layer unterhalb der Sprache, mit Pegeldeckel und Ducking unter der VO; Lautstärken bleiben hart auf [0, 1] geclampt (bekannter Browser-Crash-Pfad).
+- **Kosten:** natives Audio ist Teil des Seedance-Preises, verursacht also keine Zusatzkosten — das Sprach-Gate (STT auf wenige Sekunden) schon, aber im Cent-Bereich.
+
+Guard-Tests: Standardfall darf niemals `generate_audio: true` senden; Hybrid-Fall darf niemals eine Tonspur an Sync.so weiterreichen; ein nicht bestandenes Sprach-Gate muss zwingend zu „stumm" führen.
+
 
 ### 3. Längen- und Zeitfenster
 - Lip-Sync-Platten von Seedance 2.5: 4–30 s erlaubt, keine Snap-Werte (ModelArk akzeptiert ganze Sekunden).
@@ -36,18 +46,21 @@ Es geht also nicht um Umbau der Lip-Sync-Pipeline, sondern um **Zertifizierung e
 - Bestehende, idempotente Refund-Automatik auf den ModelArk-Fehlerpfad anwenden (Task failed / timeout / Sync.so failed).
 
 ### 6. UI
-- Lip-Sync-Schalter in der SceneCard für Seedance 2.5 freigeben, mit Hinweistext zum Längenfenster und dazu, dass der Provider-Ton dabei abgeschaltet wird.
+- Lip-Sync-Schalter in der SceneCard für Seedance 2.5 freigeben, mit Hinweistext zum Längenfenster.
+- Neue Szenen-Option „Umgebungston vom Modell" (Standard: aus). Aktiv bedeutet: Atmosphäre nativ, Stimme weiterhin von uns; der Hinweistext sagt das genau so.
 - Registry-Fähigkeit `lipSyncCertified` für Seedance 2.5 setzen, damit Modellauswahl und Auto-Provider-Wahl (>15 s → Seedance 2.5) nicht mehr in eine gesperrte Kombination laufen.
 
 ### 7. Rollout mit Bremse
 - Feature-Flag `composer.feature.seedance25_lipsync`, Standard aus.
-- Erst für den Owner-Account einschalten, ein echter Test je Fall: Einzelsprecher 20 s und Zweisprecher-Dialog 25 s. Erst wenn beide sauber durchlaufen (Platte stumm, Sync sitzt, Kosten korrekt), wird das Flag global aktiviert.
+- Erst für den Owner-Account einschalten, drei echte Tests: Einzelsprecher 20 s stumm, Zweisprecher-Dialog 25 s stumm, ein Durchlauf mit Hybrid-Atmo. Erst wenn alle drei sauber sind (Sync sitzt, keine Doppelstimme, Kosten korrekt), wird das Flag global aktiviert.
+
 
 ## Technische Notizen
 
-- Änderungsumfang an der eingefrorenen Kette: ausschließlich Allowlist + Flag. T3 (Anker), T5 (Geometrie), T6 (Assignment-Lock) und der Mux-Gate bleiben unangetastet; Geometrie-Anker bleibt `reference_image_url` (v400).
-- Neue Tests: Allowlist-Spiegel Dispatcher ↔ Resolver, stumme Platte, Resolver liefert für Lip-Sync-Szene auf Seedance 2.5 `inputMode: "first-frame"` mit dem Anker (nie `references`, nie Clip-Referenz).
-- Berührte Dateien: `supabase/functions/compose-video-clips/index.ts`, `supabase/functions/_shared/visual-inputs.ts`, `supabase/functions/_shared/modelark.ts` (nur Aufrufparameter), `src/lib/aiVideoModelRegistry.ts`, `src/components/video-composer/SceneCard.tsx`, neue Tests unter `src/lib/composer/__tests__/`.
+- Änderungsumfang an der eingefrorenen Kette: Allowlist, Flag und ein Audio-Layer, der erst NACH Sync.so greift. T3 (Anker), T5 (Geometrie), T6 (Assignment-Lock) und das Mux-Gate bleiben unangetastet; Geometrie-Anker bleibt `reference_image_url` (v400).
+- Sprach-Gate: Transkription der Plattentonspur über die Lovable-AI-Speech-to-Text-Route; leeres Transkript = Atmo darf bleiben, sonst stumm. Fail-closed bei jedem Fehler des Gates.
+- Neue Tests: Allowlist-Spiegel Dispatcher ↔ Resolver, stumme Platte im Standardfall, Atmo nie an Sync.so, Sprach-Gate erzwingt stumm, Resolver liefert für Lip-Sync-Szene auf Seedance 2.5 `inputMode: "first-frame"` mit dem Anker (nie `references`, nie Clip-Referenz).
+- Berührte Dateien: `supabase/functions/compose-video-clips/index.ts`, `supabase/functions/_shared/visual-inputs.ts`, `supabase/functions/_shared/modelark.ts` (Aufrufparameter), die Stitch-/Mux-Stufe für den Atmo-Layer, `src/lib/aiVideoModelRegistry.ts`, `src/components/video-composer/SceneCard.tsx`, neue Tests unter `src/lib/composer/__tests__/`.
 
 ## Offene Entscheidung
 
