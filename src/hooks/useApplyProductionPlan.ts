@@ -357,6 +357,11 @@ function planSceneToComposerScene(
   // scene-level + global negative-prompt suffix.
   const promptParts: string[] = [];
   if (ps.anchorPromptEN?.trim()) promptParts.push(ps.anchorPromptEN.trim());
+  // v415 — multi-step camera choreography. The shotDirector enums only carry
+  // the dominant move, so the full sequence goes into the prompt verbatim.
+  if ((ps as any).cameraChoreographyEN?.trim()) {
+    promptParts.push(`Camera: ${String((ps as any).cameraChoreographyEN).trim()}`);
+  }
   if (ps.continuityHint?.trim()) promptParts.push(`Continuity: ${ps.continuityHint.trim()}`);
   if (ps.brandAnchor?.note?.trim()) promptParts.push(`Brand: ${ps.brandAnchor.note.trim()}`);
 
