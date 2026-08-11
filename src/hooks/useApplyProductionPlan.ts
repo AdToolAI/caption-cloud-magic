@@ -616,6 +616,28 @@ function planSceneToComposerScene(
   }
 
 
+  // v415 — resolve the audio owner. Speech always wins: a scene with
+  // voiceover, dialog or lip-sync must be generated SILENT so the studio
+  // (voiceover + lip-sync + SFX tracks) owns the audio. Provider audio is
+  // only ever kept for speechless scenes.
+  const hasSpeechForAudio = Boolean(
+    dialogMode
+      || (typeof dialogScript === 'string' && dialogScript.trim())
+      || (dialogTurns && dialogTurns.length)
+      || ps.voiceover?.text?.trim()
+      || ps.lipSync,
+  );
+  const requestedAudioSource = (ps as any).audioSource as SceneAudioSource | undefined;
+  const sceneAudioSource: SceneAudioSource = hasSpeechForAudio
+    ? 'studio'
+    : requestedAudioSource === 'provider'
+      ? 'provider'
+      : requestedAudioSource === 'silent'
+        ? 'silent'
+        : requestedAudioSource === 'studio'
+          ? 'studio'
+          : (String((ps as any).soundDesign ?? '').trim() ? 'studio' : 'silent');
+
   return {
     id: newSceneId(),
     projectId,
