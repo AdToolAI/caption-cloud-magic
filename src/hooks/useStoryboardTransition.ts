@@ -24,6 +24,7 @@ import { toast } from '@/hooks/use-toast';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import type { ComposerScene, ComposerBriefing } from '@/types/video-composer';
 import { readBriefingContract } from '@/lib/video-composer/briefing/briefingContract';
+import { canonicalPoolId } from '@/lib/video-composer/canonicalCastId';
 
 /**
  * Build a deterministic Hook/Reveal/CTA arc so the user is never blocked
@@ -972,7 +973,8 @@ function buildBriefingText(b: ComposerBriefing): string {
     lines.push('', '## Cast (selected in briefing)');
     for (const c of b.characters) {
       const slug = toMentionSlug(c.name);
-      const libSuffix = c.brandCharacterId ? `  (library:${c.brandCharacterId})` : '';
+      const canonicalId = canonicalPoolId(c);
+      const libSuffix = isUuid(canonicalId) ? `  (library:${canonicalId})` : '';
       lines.push(`- @${slug} — **${c.name}**${libSuffix}`);
       if (c.appearance) lines.push(`  · Appearance: ${c.appearance}`);
       if (c.signatureItems) lines.push(`  · Signature items: ${c.signatureItems}`);
