@@ -67,11 +67,14 @@ const labels = {
     subtitle:
       'Helps the AI keep people looking similar across scenes — pixel-perfect face identity is technically impossible with text-to-video.',
     add: 'Add character',
-    pickFromLibrary: 'Pick from Avatar Library',
-    pickerTitle: 'Link an avatar as character',
+    pickFromLibrary: 'Choose from Cast & World',
+    pickerTitle: 'Link a character from Cast & World',
     pickerDesc:
-      'Link an avatar from your library. Its portrait is automatically used as the anchor frame (i2v) for any scene featuring this character — the only reliable lever for real face consistency.',
-    pickerEmpty: 'No avatars in your library yet. Create one under "Avatars".',
+      'Link a character from Cast & World. Its reference image is automatically used as the anchor frame (i2v) for any scene featuring this character — the only reliable lever for real face consistency.',
+    pickerEmpty: 'No characters in Cast & World yet.',
+    pickerSectionTitle: 'Cast & World (with reference image)',
+    openCastWorld: 'Open Cast & World',
+
     use: 'Link',
     anchorBadge: 'Look reference',
     anchorBadgeLocked: 'First frame locked',
