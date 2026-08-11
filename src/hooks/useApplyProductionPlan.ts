@@ -111,6 +111,15 @@ import { tx } from '@/lib/i18nText';
 import { resolveSceneAudioSource, type SceneAudioSource } from '@/config/nativeAudioSources';
 import { pickClipSourceForDuration } from '@/lib/composer/pickClipSourceForDuration';
 
+/** v416 — true when a plan scene actually contains speech (VO, dialog, lip-sync). */
+function planSceneHasSpeech(scene: TPlanScene): boolean {
+  return Boolean(
+    scene.lipSync
+      || scene.voiceover?.text?.trim()
+      || (scene.dialogTurns && scene.dialogTurns.length),
+  );
+}
+
 function hydratePlanScenesForApply(scenes: TPlanScene[]): TPlanScene[] {
   let lastCast: PlanCastSlot | null = null;
   let firstCast: PlanCastSlot | null = null;
@@ -120,7 +129,10 @@ function hydratePlanScenesForApply(scenes: TPlanScene[]): TPlanScene[] {
   return scenes.map((scene) => {
     const cast = [...(scene.cast ?? [])];
     const sourceCast = lastCast ?? firstCast;
-    if (cast.length === 0) {
+    // v416 — no ghost cast: an empty "S0x Sprecher" placeholder is only
+    // created when the scene really has speech. Silent B-roll scenes stay
+    // cast-free instead of inventing a speaker slot.
+    if (cast.length === 0 && planSceneHasSpeech(scene)) {
       cast.push(sourceCast && shouldInheritPlanContinuity(scene, 'cast')
         ? { ...sourceCast, mentionKey: sourceCast.mentionKey || `S${String(scene.index).padStart(2, '0')} Sprecher` }
         : emptyPlanCastSlot(scene.index));
