@@ -126,9 +126,11 @@ describe('Seedance 2.5 specifics', () => {
     expect(seedance25.references.videos).toBe(10);
   });
 
-  it('is not a certified lip-sync plate provider yet', () => {
-    expect(seedance25.lipSync.supported).toBe(false);
+  it('is a certified lip-sync plate provider (v418, flag-gated at dispatch)', () => {
+    expect(seedance25.lipSync.supported).toBe(true);
+    expect(seedance25.lipSync.verification.status).toBe('verified');
   });
+
 
   it('uses the previous clip as continuity reference instead of a frame', () => {
     const plan = resolveVisualInputs({
