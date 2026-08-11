@@ -1,58 +1,91 @@
-# Nahtlose Szenenübergänge: was wirklich zählt
+# Visual-Continuity-System für Motion Studio
 
-## Kurzantwort auf deine Frage
+Die Analyse ist richtig und ersetzt meinen bisherigen Vorschlag. Ein reiner `transitionMode` löst nur die Schnittkante — das eigentliche Problem ist, dass `firstFrame`, Charakter-Identität und Location/Produkt heute in einen einzigen gedanklichen „Referenzbild"-Slot fallen.
 
-Mehrere Referenzbilder sind für den nahtlosen Schnitt **nicht** der entscheidende Hebel. Zwei Dinge werden oft verwechselt:
+Zwei Punkte, denen ich ausdrücklich zustimme:
 
-- **Nahtloser Übergang (Schnittkante)** = das letzte Bild von Szene N wird zum Startbild von Szene N+1. Dafür braucht ein Modell nur **ein** Bild (i2v / first frame) — das können praktisch alle Modelle im Studio.
-- **Konsistenz über die Szene hinweg** (gleiche Person, gleiches Produkt, gleicher Look) = dafür helfen mehrere Referenzbilder.
+- **`maxReferences` reicht als Fähigkeitsangabe nicht.** Entscheidend ist, ob `first_frame` ein eigener API-Parameter ist oder einen der Referenzslots verbraucht. Genau das steht heute nirgends.
+- **„Lip-Sync = immer Match-Cut" als Hardcode ist falsch.** Richtig ist die Slot-Konflikt-Regel: Frame-Chain wird nur blockiert, wenn First Frame und Identitäts-Anker auf demselben Modell um denselben Input-Slot konkurrieren.
 
-Stand der Registry heute — Modelle mit mehr als einem Referenzbild:
+Ein Punkt, an dem ich vorsichtiger bin: die Lip-Sync-Kette steht unter Feature-Freeze (v400, `.lovable/LIPSYNC-FEATURE-FREEZE.md`, Invariante 1: Geometrie wird ausschließlich auf `reference_image_url` gemessen). Der Resolver darf deshalb für Lip-Sync-Szenen zwar *auswerten*, aber im ersten Schritt nichts am Payload der Sync-Kette ändern. Die Lockerung „Lip-Sync + First Frame, wenn getrennte Slots" wird als Fähigkeit modelliert, aber erst nach einem grünen Referenzlauf scharf geschaltet.
 
-| Modell | Referenzbilder |
-| --- | --- |
-| Seedance 2.5 | bis 30 (plus Referenz-Videos) |
-| Kling Omni | bis 7 |
-| Veo 3.1 lite / fast / pro | bis 3 |
-| Runway Gen-4 Aleph | 1 (Video-zu-Video) |
-| alle übrigen (Kling 2.5/2.6/3, Wan, Hailuo, Luma, LTX, Grok, Pika, Vidu, HappyHorse, Seedance 1/2.0) | 1 Bild |
+## Architektur
 
-Zusätzlich gibt es Modelle mit **Endframe** (Start *und* Ziel setzbar): Luma, LTX Standard, Vidu, Seedance Mini. Das ist für weiche Übergänge sogar präziser als Multi-Ref.
+```text
+Storyboard → Scene Analysis → Continuity Requirements
+   → Character / Product / Location Anchors
+   → Model Capability Lookup
+   → VisualInputResolver
+   → Transition Resolver
+   → Lip-Sync Compatibility Guard
+   → Provider Payload
+```
 
-Zu deinem Punkt A: Ja — sobald Lip-Sync auf einer Szene läuft, ist der Clip an die Sync-Plate gebunden, und ein hart verketteter Frame-Übergang ist nicht garantiert. Das ist eine echte Einschränkung, keine Konfigurationssache.
+### 1. Getrennte Bildrollen pro Szene
 
-## Deine Rückfrage: kollidiert das mit dem Charakter-Anker und der Lip-Sync-Kette?
+Statt eines Slots: `firstFrameUrl`, `endFrameUrl`, `characterReferences[]`, `locationReferences[]`, `productReferences[]`. Die bestehenden Felder `referenceImageUrl` und `lockReferenceUrl` bleiben als Identitäts-Anker unangetastet und werden in `characterReferences` nur *gespiegelt*, nie ersetzt — die v400-Invariante bleibt gültig.
 
-Berechtigt — und genau hier wird die Grenze hart gezogen. Im Szenen-Typ existieren heute drei getrennte Felder (`src/types/video-composer.ts`): `referenceImageUrl` (Geometrie-Anker des Charakters, laut v400 verbindlich die Messgrundlage), `lockReferenceUrl` (unveränderlicher Identitäts-Lock) und `firstFrameUrl` (gecachter Startframe). Der Übergangs-Modus fasst **ausschließlich** `firstFrameUrl` an.
+### 2. Registry: `visualInputs` statt `maxReferences`
 
-Daraus folgen drei nicht verhandelbare Regeln:
+```ts
+visualInputs: {
+  firstFrame: true,
+  endFrame: false,
+  references: { max: 30, character: true, product: true, location: true },
+  firstFrameConsumesReferenceSlot: false,
+  lipSync: { supported: true, requiresIdentityReference: true, conflictsWithFirstFrame: false },
+}
+```
 
-1. `referenceImageUrl` und `lockReferenceUrl` werden vom Übergangs-Modus **nie** überschrieben. Der Charakter-Anker bleibt der Anker; ein verketteter Last-Frame ist nur der Bildeinstieg der Szene.
-2. Szenen mit Lip-Sync-Engine (`cinematic-sync`, `sync-segments`, `heygen-talking-head`) sind vom Frame-Chain **ausgeschlossen** — sie bekommen zwangsweise `match-cut`. Die Lip-Sync-Kette (Baseline v283, Rollback-Stand 27.07.) wird nicht angefasst: kein neuer Input, keine geänderte Plate, keine geänderte Anker-Auflösung.
-3. Wenn eine Szene keinen eigenen Charakter-Anker hat, ändert der Modus daran nichts — er erzeugt keine neuen Anker und löst keine Anker-Recovery aus.
+Pro Modell aus der bereits erstellten Capability-Matrix (`docs/ai-video-capability-matrix.md`) befüllt. `maxReferences` bleibt als abgeleiteter Wert für die UI erhalten, damit nichts bricht.
 
-Praktisch heißt das: nahtlose Kanten gibt es zwischen stummen/B-Roll-Szenen und zwischen Szenen mit Off-Voice. Dialogszenen mit Lip-Sync bleiben harter Schnitt mit Anker-Konsistenz — sichtbar begründet in der UI, statt es zu versuchen und die Sync-Qualität zu riskieren.
+### 3. VisualInputResolver
 
-## Was gebaut wird
+`resolveVisualInputs({ scene, previousScene, model, transitionPreference })` → `{ firstFrameUrl, referenceImages, endFrameUrl, transitionMode, anchorStrategy, warnings }`.
 
-Ein sichtbarer **Übergangs-Modus pro Schnittkante** im Storyboard statt der heutigen impliziten Logik:
+`anchorStrategy`: `transition-priority` | `identity-priority` | `product-priority` | `balanced`.
 
-1. **Frame-Chain (nahtlos)** — letzter Frame der Vorszene wird `firstFrameUrl` der Folgeszene. Verfügbar, wenn die Folgeszene i2v kann und **kein** Lip-Sync trägt. Nutzt die vorhandene `extract-video-last-frame` / `useFrameContinuity`-Kette, wird aber explizit pro Kante gesetzt statt nur als Drift-Prüfung im Hintergrund.
-2. **Match-Cut (Konsistenz)** — Pflicht bei Lip-Sync und bei Modellen ohne i2v: beide Szenen behalten ihre bestehenden Anker, harter Schnitt, keine Frame-Verkettung. Multi-Ref-Modelle (Seedance 2.5, Kling Omni, Veo) bekommen hier zusätzlich die vorhandenen Anker (Cast, Produkt, Location) als Referenzliste mitgegeben — additiv, ohne den Haupt-Anker zu ersetzen.
-3. **Endframe-Bridge** — bei Modellen mit `endFrame` (Luma, LTX, Vidu, Seedance Mini) kann das Zielbild der Vorszene auf das Startbild der Folgeszene gesetzt werden. Ergibt die sauberste Kante ohne Nachbearbeitung. Ebenfalls für Lip-Sync-Szenen gesperrt.
+Automatik: kein Charakter → `transition-priority`; sichtbarer wiederkehrender Charakter → `identity-priority`; Produkt-Hero-Shot → `product-priority`; Multi-Ref-Modell mit getrenntem First-Frame-Slot → `balanced`.
 
-Der Modus wird pro Kante automatisch vorgeschlagen (Frame-Chain, wenn möglich; sonst Endframe-Bridge; sonst Match-Cut) und ist manuell umstellbar. Nicht mögliche Modi werden mit Begründung gesperrt angezeigt („Lip-Sync aktiv", „Modell unterstützt kein Startbild") statt still zu scheitern.
+Priorität bei nur einem verfügbaren Bild-Slot:
+- B-Roll / Environment: Last Frame > Location
+- Produkt: Produkt oder Last Frame (je nach `product-priority`)
+- Charakter ohne Lip-Sync: Charakter-Identität > Last Frame
+- Charakter mit Lip-Sync: Charakter-Anker / Sync-Plate schlägt alles
 
+### 4. Reference Budget
+
+Nicht 30 Bilder schicken, weil 30 gehen. Gewichtete Auswahl, dann auf das Modell-Maximum gekürzt: Previous-Frame (höchste), Hauptcharakter (höchste), Nebencharakter (hoch), Produkt (hoch), Location (mittel), Style (niedrig), weitere Charakter-Refs (niedrig).
+
+### 5. UI an der Schnittkante
+
+Kein technischer Wortlaut. Ein Feld **Visual Continuity** mit `Auto · Seamless · Identity · Match Cut`; Auto ist Default. Tooltip nennt die getroffene Entscheidung im Klartext, z. B. „Hailuo — Charakter-Identität hat Vorrang → Match Cut" oder „Seedance 2.5 — Charakter + Vorframe + Location → nahtlos". Unmögliche Optionen sind gesperrt mit Begründung.
+
+### 6. Transition Frame Analyzer (Stufe 2)
+
+Statt stumpf dem letzten Frame: „last usable continuity frame". Bewertet die letzten ~1 s auf `characterVisibility`, `characterCount`, `productVisibility`, `cameraAngle`, `motionBlur`, `occlusion`, `lighting`, `frameQuality` und wählt den besten Kandidaten. Baut auf `extract-video-last-frame` / `extract-video-frames` und `analyze-scene-subject` auf — die existieren bereits.
+
+## Reihenfolge
+
+1. **Registry `visualInputs`** für alle Modelle füllen + Test, dass jedes Modell einen vollständigen Block hat.
+2. **Szenen-Bildrollen** in `src/types/video-composer.ts` und Persistenz (`composer_scenes`), abwärtskompatibel zu heutigen Feldern.
+3. **VisualInputResolver** als reine Funktion mit Unit-Tests je Rendering-Klasse (B-Roll, Produkt, Charakter ohne Sync, Charakter mit Sync).
+4. **Render-Routen anbinden**: `compose-video-clips` ruft den Resolver auf und übergibt das Ergebnis; die providerspezifischen `if/else`-Ketten für Bildinputs entfallen dort.
+5. **UI „Visual Continuity"** an der Schnittkante inkl. Klartext-Tooltip.
+6. **Reference Budget** für Multi-Ref-Modelle.
+7. **Transition Frame Analyzer** als letzter Schritt, hinter einem Flag.
+
+Schritte 1–3 sind reine Vorbereitung ohne Verhaltensänderung; ab Schritt 4 wird pro Provider verifiziert.
 
 ## Technische Details
 
-- Neue Datei `src/lib/composer/transitionMode.ts`: `resolveTransitionMode(prev, next)` — liest `capabilities.i2v`, `capabilities.endFrame`, `capabilities.multiRef/maxReferences` aus `aiVideoModelRegistry.ts` sowie die Lip-Sync-Engine der Folgeszene.
-- `src/types/video-composer.ts`: Feld `transitionMode?: 'frame-chain' | 'endframe-bridge' | 'match-cut'` je Szene (bezieht sich auf die Kante zur Vorszene).
-- UI: Badge plus Auswahl an der Schnittkante in `SceneStripTile.tsx` / `SceneCutDriftIndicator.tsx`; `ContinuityGuardianStrip.tsx` prüft nur noch Kanten im Modus `match-cut` auf Drift, da die anderen Modi die Kante hart setzen.
-- Render-Seite: `compose-video-clips` reicht bei `frame-chain` die extrahierte Last-Frame-URL als `firstFrameUrl` der Folgeszene durch; bei `endframe-bridge` zusätzlich als `end_image` der Vorszene (Luma/LTX/Vidu/Seedance-Mini-Routen unterstützen das bereits).
-- Guard-Test: kein Codepfad des Übergangs-Modus darf `referenceImageUrl` oder `lockReferenceUrl` schreiben, und keine Szene mit Lip-Sync-Engine darf einen anderen Modus als `match-cut` erhalten.
-- Keine Änderung an Preisen, Wallet-Logik oder der Lip-Sync-Kette (Baseline v283 bleibt unberührt).
+- Neu: `src/lib/composer/visualInputs/{types.ts,resolveVisualInputs.ts,referenceBudget.ts}` + Tests.
+- `src/config/aiVideoModelRegistry.ts`: `visualInputs`-Block je Modell, `maxReferences` als Ableitung.
+- `src/types/video-composer.ts`: neue Rollen-Arrays, `visualContinuity?: 'auto' | 'seamless' | 'identity' | 'match-cut'` je Kante.
+- `supabase/functions/compose-video-clips/index.ts` und die `generate-*-video`-Functions nehmen das Resolver-Ergebnis entgegen, statt Bildinputs selbst zu wählen.
+- Guard-Tests: (a) kein Resolver-Pfad schreibt `referenceImageUrl` / `lockReferenceUrl`; (b) Lip-Sync-Szenen erhalten nur dann einen First Frame, wenn `lipSync.conflictsWithFirstFrame === false` **und** das Freeze-Flag für diese Lockerung gesetzt ist; (c) Referenzanzahl je Payload ≤ Modell-Maximum.
+- Lip-Sync-Kette (v400-Freeze) bleibt in Stufe 1–6 unverändert; Preise und Wallet-Logik ebenfalls.
 
 ## Verifikation
 
-Ein Testprojekt mit drei Szenen: (a) zwei stumme Szenen auf Hailuo → Frame-Chain, Kante visuell nahtlos; (b) eine Szene mit Lip-Sync → Modus sperrt auf Match-Cut mit Hinweis; (c) Luma-Paar → Endframe-Bridge. Payload je Route wird protokolliert.
+Vier Referenzfälle, je ein echter Lauf mit protokolliertem Payload: (a) Atlantis / B-Roll auf Seedance 2.5 → Frame-Chain + Location-Referenz; (b) Landschaftspaar auf Hailuo → Frame-Chain; (c) Founder-Spot mit Lip-Sync → Identity-Priority, Anker unverändert, Match Cut; (d) Produkt-Hero auf Kling Omni → Produkt + Vorframe.
