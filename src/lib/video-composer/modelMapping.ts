@@ -94,7 +94,7 @@ const LIPSYNC_FAMILIES = new Set(['happyhorse', 'hailuo', 'kling', 'wan', 'seeda
  * provider first so the ModelSelector pre-selects HappyHorse.
  */
 export const COMPOSER_DIALOG_MODELS: ToolkitModel[] = COMPOSER_AVAILABLE_MODELS
-  // Seedance 2.5 (ModelArk) is not certified for the Sync.so lip-sync path.
+  // v418: Seedance 2.5 is certified but flag-gated — see composerDialogModels().
   .filter((m) => LIPSYNC_FAMILIES.has(m.family) && m.id !== 'seedance-2-5')
   .sort((a, b) => {
     // HappyHorse (primary) before Hailuo (fallback); standard before pro.
@@ -102,6 +102,18 @@ export const COMPOSER_DIALOG_MODELS: ToolkitModel[] = COMPOSER_AVAILABLE_MODELS
     if (fam(a) !== fam(b)) return fam(a) - fam(b);
     return /pro/i.test(a.id) ? 1 : -1;
   });
+
+/**
+ * Dialog picker contents for a given rollout state. With the Seedance 2.5
+ * lip-sync flag on, the 4–30s plate provider is appended at the end (it is
+ * the premium option, never the default).
+ */
+export function composerDialogModels(seedance25Enabled: boolean): ToolkitModel[] {
+  if (!seedance25Enabled) return COMPOSER_DIALOG_MODELS;
+  const seedance25 = COMPOSER_AVAILABLE_MODELS.filter((m) => m.id === 'seedance-2-5');
+  return [...COMPOSER_DIALOG_MODELS, ...seedance25];
+}
+
 
 /** Default (cheapest, most flexible) lip-sync provider preselected when the toggle flips ON. */
 export const DIALOG_FALLBACK_CLIP_SOURCE: ClipSource = LIPSYNC_PRIMARY_CLIP_SOURCE;
