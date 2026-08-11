@@ -562,6 +562,94 @@ export default function ProductionPlanSheet({
     if (changed) setPlan({ ...plan, scenes: nextScenes });
   }, [plan]);
 
+  /**
+   * v419 Auto-Besetzung: unbesetzte Cast-Slots werden mit den im Briefing
+   * gewählten Cast-&-World-Figuren gefüllt — in der Auswahlreihenfolge des
+   * Briefings, zugeordnet in der Reihenfolge des ersten Auftretens der
+   * @mention-Slots. Dieselbe Mention bekommt projektweit dieselbe Figur.
+   * Anschließend werden Dialogzeilen an ihre Mention gebunden.
+   * Manuelle Änderungen werden nicht überschrieben (Signatur-Guard).
+   */
+  useEffect(() => {
+    if (!plan?.scenes?.length) return;
+    const briefingChars = currentBriefing?.characters ?? [];
+    if (!briefingChars.length || !charOptions.length) return;
+
+    // Briefing-Auswahl → Library-IDs (Auswahlreihenfolge bleibt erhalten).
+    const ordered: string[] = [];
+    for (const c of briefingChars) {
+      const direct = (c as any).brandCharacterId ?? (c as any).characterId ?? null;
+      const byId = direct ? charOptions.find((o) => o.id === direct || uuidInside(o.id) === uuidInside(direct)) : null;
+      const needle = normalizeAssetKey((c as any).name);
+      const hit = byId ?? (needle ? charOptions.find((o) => normalizeAssetKey(o.name) === needle) : null);
+      if (hit && !ordered.includes(hit.id)) ordered.push(hit.id);
+    }
+    if (!ordered.length) return;
+
+    const signature = JSON.stringify([
+      ordered,
+      plan.scenes.map((s) => ({
+        i: s.index,
+        cast: (s.cast ?? []).map((c) => `${c.mentionKey ?? ''}|${c.characterId ?? ''}`),
+        turns: (s.dialogTurns ?? []).map((t: any) => `${t?.speakerMentionKey ?? ''}|${t?.speakerCharacterId ?? ''}`),
+      })),
+    ]);
+    if (autoCastSignatureRef.current === signature) return;
+    autoCastSignatureRef.current = signature;
+
+    const keyOf = (v?: string | null) => normalizeAssetKey(String(v ?? '').replace(/^@/, ''));
+    const byMention = new Map<string, string>();
+    const used = new Set<string>();
+
+    for (const s of plan.scenes) {
+      for (const c of s.cast ?? []) {
+        const id = uuidInside(c.characterId ?? null) ?? splitCastId(c.characterId).baseId;
+        if (!id || !isUuid(id)) continue;
+        used.add(id);
+        const k = keyOf(c.mentionKey || c.characterName);
+        if (k && !byMention.has(k)) byMention.set(k, id);
+      }
+    }
+
+    const nextFree = () => ordered.find((id) => !used.has(id)) ?? null;
+    let changed = false;
+
+    const scenes = plan.scenes.map((s) => {
+      const cast = (s.cast ?? []).map((c) => {
+        const existing = uuidInside(c.characterId ?? null) ?? splitCastId(c.characterId).baseId;
+        if (existing && isUuid(existing)) return c;
+        const k = keyOf(c.mentionKey || c.characterName);
+        let id = k ? byMention.get(k) ?? null : null;
+        if (!id) {
+          id = nextFree();
+          if (!id) return c;
+          used.add(id);
+          if (k) byMention.set(k, id);
+        }
+        changed = true;
+        const matched = charOptions.find((o) => o.id === id);
+        return { ...c, characterId: id, characterName: matched?.name ?? c.characterName, outfitLookId: null };
+      });
+
+      const dialogTurns = (s.dialogTurns ?? []).map((t: any) => {
+        const bound = uuidInside(t?.speakerCharacterId ?? null);
+        if (bound && isUuid(bound)) return t;
+        const k = keyOf(t?.speakerMentionKey ?? t?.speakerName);
+        const id = k ? byMention.get(k) ?? null : null;
+        if (!id) return t;
+        changed = true;
+        return { ...t, speakerCharacterId: id };
+      });
+
+      if (!changed) return s;
+      return { ...s, cast, dialogTurns };
+    });
+
+    if (changed) setPlan({ ...plan, scenes });
+  }, [plan, charOptions, currentBriefing]);
+
+
+
 
   // Identify which existing scenes are lipsync-protected (display only).
   const protectedSceneIds = useMemo(() => {
