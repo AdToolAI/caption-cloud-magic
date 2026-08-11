@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { identifyUser, resetUser, trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
 import { mapAuthError, trackAuthError } from '@/lib/authErrors';
 import { translations, type Language } from '@/lib/translations';
+import { clearAllLocalDrafts } from '@/lib/local-draft-scope';
 
 const getLang = (): Language => {
   const saved = (localStorage.getItem('adtool-ai-lang') || 'de').toLowerCase().slice(0, 2);
@@ -277,6 +278,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     resetUser();
     clearSubscriptionCache();
+    // Local drafts belong to the leaving account and must not leak into the
+    // next sign-in on this browser.
+    clearAllLocalDrafts();
     await supabase.auth.signOut();
     toast.success('Logged out successfully');
   };

@@ -63,6 +63,8 @@ import { ComposerHistoryContext } from './ComposerHistoryContext';
 import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 import { isPageReload } from '@/lib/composer/isPageReload';
+import { scopedDraftKey, migrateLegacyDraftKey } from '@/lib/local-draft-scope';
+import { useAuth } from '@/hooks/useAuth';
 import { useStoryboardTransition } from '@/hooks/useStoryboardTransition';
 import ProductionWarRoom from './storyboard/ProductionWarRoom';
 import ProductionPlanSheet from './briefing/ProductionPlanSheet';
@@ -88,13 +90,23 @@ interface LocalProject {
   cutdownType?: string | null;
 }
 
-const STORAGE_KEY = 'video-composer-draft';
-const TAB_STORAGE_KEY = 'video-composer-draft-tab';
+const DRAFT_BASE_KEY = 'video-composer-draft';
+const TAB_DRAFT_BASE_KEY = 'video-composer-draft-tab';
+
+/** Draft keys are bound to the signed-in account (see local-draft-scope). */
+const storageKey = () => {
+  migrateLegacyDraftKey(DRAFT_BASE_KEY);
+  return scopedDraftKey(DRAFT_BASE_KEY);
+};
+const tabStorageKey = () => {
+  migrateLegacyDraftKey(TAB_DRAFT_BASE_KEY);
+  return scopedDraftKey(TAB_DRAFT_BASE_KEY);
+};
 const TAB_ORDER: TabId[] = ['briefing', 'storyboard', 'text', 'audio', 'export', 'campaign'];
 
 function loadDraft(): LocalProject | null {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(storageKey());
     if (stored) return JSON.parse(stored);
   } catch { /* ignore */ }
   return null;
@@ -102,14 +114,14 @@ function loadDraft(): LocalProject | null {
 
 function saveDraft(project: LocalProject) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
+    localStorage.setItem(storageKey(), JSON.stringify(project));
   } catch { /* ignore */ }
 }
 
 function clearDraft() {
   try {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(TAB_STORAGE_KEY);
+    localStorage.removeItem(storageKey());
+    localStorage.removeItem(tabStorageKey());
   } catch { /* ignore */ }
 }
 
@@ -119,7 +131,7 @@ function clearDraft() {
  *  is needed — the previous strict gating caused unwanted resets to 'briefing'. */
 function restoreActiveTab(): TabId {
   try {
-    const stored = localStorage.getItem(TAB_STORAGE_KEY) as TabId | null;
+    const stored = localStorage.getItem(tabStorageKey()) as TabId | null;
     if (stored === 'clips') return 'storyboard';
     if (stored && TAB_ORDER.includes(stored)) return stored;
     return 'briefing';
@@ -177,7 +189,7 @@ export default function VideoComposerDashboard() {
     if (hasUrlProject) {
       // Fresh project from a director-wizard redirect — drop any stale draft
       // so we don't merge unrelated scenes. Hydration effect will fill it in.
-      try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+      try { localStorage.removeItem(storageKey()); } catch { /* ignore */ }
       return { ...defaultProject, id: urlProjectId! };
     }
     const draft = loadDraft();
@@ -1074,9 +1086,20 @@ export default function VideoComposerDashboard() {
   // Persist active tab so users return to where they left off
   useEffect(() => {
     try {
-      localStorage.setItem(TAB_STORAGE_KEY, activeTab);
+      localStorage.setItem(tabStorageKey(), activeTab);
     } catch { /* ignore */ }
   }, [activeTab]);
+
+  // Account switch inside a live tab: never keep writing the previous
+  // account's draft — drop it and load the new account's own draft.
+  const authUserId = useAuth().user?.id ?? null;
+  const lastAuthUserIdRef = useRef<string | null>(authUserId);
+  useEffect(() => {
+    if (lastAuthUserIdRef.current === authUserId) return;
+    lastAuthUserIdRef.current = authUserId;
+    setProject(loadDraft() ?? defaultProject);
+    setActiveTab(restoreActiveTab());
+  }, [authUserId]);
 
   const updateProject = useCallback((updates: Partial<LocalProject>) => {
     setProject(prev => ({ ...prev, ...updates }));
@@ -1869,8 +1892,8 @@ export default function VideoComposerDashboard() {
               onOpenChild={(childId) => {
                 // Reset draft and load the child project on next mount
                 try {
-                  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...defaultProject, id: childId }));
-                  localStorage.setItem(TAB_STORAGE_KEY, 'export' as TabId);
+                  localStorage.setItem(storageKey(), JSON.stringify({ ...defaultProject, id: childId }));
+                  localStorage.setItem(tabStorageKey(), 'export' as TabId);
                 } catch { /* ignore */ }
                 window.location.reload();
               }}
