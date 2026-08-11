@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
@@ -154,6 +155,7 @@ export default function ProductionPlanSheet({
   const queryClient = useQueryClient();
   const applyPlan = useApplyProductionPlan();
   const [applying, setApplying] = useState(false);
+  const [applyDialogTurns, setApplyDialogTurns] = useState(true);
   const [creatingLoc, setCreatingLoc] = useState<number | null>(null);
   const [applyResult, setApplyResult] = useState<{
     ok: boolean;
@@ -168,6 +170,13 @@ export default function ProductionPlanSheet({
   }, [currentBriefing]);
 
   const planRequestedDurationSec = useMemo(() => readRequestedDurationFromPlan(plan), [plan]);
+  const dialogTurnCount = useMemo(
+    () => (plan?.scenes ?? []).reduce(
+      (acc, sc) => acc + ((sc as any).dialogTurns ?? []).filter((t: any) => (t?.text ?? '').trim()).length,
+      0,
+    ),
+    [plan],
+  );
   const effectiveCurrentBriefing = useMemo(() => {
     const currentDuration = Number(currentBriefing?.duration);
     if (planRequestedDurationSec !== null && (!Number.isFinite(currentDuration) || currentDuration < 15)) {
@@ -711,6 +720,7 @@ export default function ProductionPlanSheet({
         onUpdateBriefing,
         onUpdateScenes,
         onApplyAssembly,
+        applyDialogTurns,
       });
       const warnings = result.warnings ?? [];
       setApplyResult({
@@ -1846,6 +1856,19 @@ export default function ProductionPlanSheet({
                 <Sparkles className="h-4 w-4" /> {tx({ de: 'Briefing analysieren', en: 'Analyze briefing', es: 'Analizar briefing' })}
               </Button>
             </>
+          )}
+          {step === 'review' && safePlan && dialogTurnCount > 0 && (
+            <label className="mr-auto flex items-center gap-2 text-xs text-muted-foreground">
+              <Checkbox
+                checked={applyDialogTurns}
+                onCheckedChange={(v) => setApplyDialogTurns(v === true)}
+              />
+              {tx({
+                de: `${dialogTurnCount} Dialogzeilen übernehmen`,
+                en: `Apply ${dialogTurnCount} dialogue lines`,
+                es: `Aplicar ${dialogTurnCount} líneas de diálogo`,
+              })}
+            </label>
           )}
           {step === 'review' && safePlan && (
             <>

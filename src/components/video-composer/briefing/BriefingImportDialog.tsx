@@ -145,7 +145,7 @@ export default function BriefingImportDialog({
       onUpdateBriefing, onUpdateScenes, onApplyAssembly,
     });
     toast({
-      title: 'Briefing übernommen',
+      title: tx({ de: 'Briefing übernommen', en: 'Briefing applied', es: 'Briefing aplicado' }),
       description: tx({ de: `${result.scenesApplied} Szenen · ${result.voiceApplied ? 'Voice ✓ · ' : ''}${result.captionsApplied ? 'Captions ✓' : ''}`, en: `${result.scenesApplied} Scenes · ${result.voiceApplied ? 'Voice ✓ · ' : ''}${result.captionsApplied ? 'Captions ✓' : ''}`, es: `${result.scenesApplied} Escenas · ${result.voiceApplied ? 'Voice ✓ · ' : ''}${result.captionsApplied ? 'Captions ✓' : ''}` }),
     });
     handleClose(false);
@@ -157,11 +157,14 @@ export default function BriefingImportDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-amber-300" />
-            Briefing importieren
+            {tx({ de: 'Briefing importieren', en: 'Import briefing', es: 'Importar briefing' })}
           </DialogTitle>
           <DialogDescription>
-            Füge ein vollständiges Briefing ein (Skript-Tabelle, Voice-Settings, Caption-Style, Negative Prompt) —
-            die AI extrahiert daraus deterministisch alle Felder, die du dann pro Sektion übernimmst.
+            {tx({
+              de: 'Füge ein vollständiges Briefing ein (Skript-Tabelle, Voice-Settings, Caption-Style, Negative Prompt) — die AI extrahiert daraus deterministisch alle Felder, die du dann pro Sektion übernimmst.',
+              en: 'Paste a complete briefing (script table, voice settings, caption style, negative prompt) — the AI deterministically extracts every field, which you then apply per section.',
+              es: 'Pega un briefing completo (tabla de guion, ajustes de voz, estilo de subtítulos, prompt negativo) — la IA extrae de forma determinista todos los campos, que luego aplicas por sección.',
+            })}
           </DialogDescription>
         </DialogHeader>
 
@@ -174,8 +177,12 @@ export default function BriefingImportDialog({
               className="flex-1 min-h-[300px] font-mono text-xs"
             />
             <div className="text-xs text-muted-foreground">
-              {text.length.toLocaleString()} Zeichen · ~{Math.ceil(text.length / 4).toLocaleString()} Tokens
-              {text.length > 120_000 && <span className="text-destructive ml-2">— zu lang (max ~120k)</span>}
+              {tx({
+                de: `${text.length.toLocaleString()} Zeichen · ~${Math.ceil(text.length / 4).toLocaleString()} Tokens`,
+                en: `${text.length.toLocaleString()} characters · ~${Math.ceil(text.length / 4).toLocaleString()} tokens`,
+                es: `${text.length.toLocaleString()} caracteres · ~${Math.ceil(text.length / 4).toLocaleString()} tokens`,
+              })}
+              {text.length > 120_000 && <span className="text-destructive ml-2">{tx({ de: '— zu lang (max ~120k)', en: '— too long (max ~120k)', es: '— demasiado largo (máx. ~120k)' })}</span>}
             </div>
           </div>
         )}
@@ -188,13 +195,13 @@ export default function BriefingImportDialog({
                 <SectionCard
                   checked={accept.project}
                   onToggle={(v) => setAccept((a) => ({ ...a, project: v }))}
-                  title="Projekt"
+                  title={tx({ de: "Projekt", en: "Project", es: "Proyecto" })}
                 >
                   <Row label="Name" value={manifest.project.name} />
                   <Row label="Format" value={manifest.project.aspectRatio} />
                   <Row label="FPS" value={manifest.project.fps?.toString()} />
-                  <Row label="Gesamtdauer" value={manifest.project.totalDurationSec ? `${manifest.project.totalDurationSec}s` : undefined} />
-                  <Row label="Plattformen" value={manifest.project.platforms?.join(', ')} />
+                  <Row label={tx({ de: "Gesamtdauer", en: "Total duration", es: "Duración total" })} value={manifest.project.totalDurationSec ? `${manifest.project.totalDurationSec}s` : undefined} />
+                  <Row label={tx({ de: "Plattformen", en: "Platforms", es: "Plataformas" })} value={manifest.project.platforms?.join(', ')} />
                 </SectionCard>
               )}
 
@@ -260,9 +267,9 @@ export default function BriefingImportDialog({
                 >
                   <Row label="Font" value={manifest.captions.font} />
                   <Row label={tx({ de: "Größe", en: "Size", es: "Tamaño" })} value={manifest.captions.sizePx ? `${manifest.captions.sizePx}px` : undefined} />
-                  <Row label="Farbe" value={manifest.captions.color} />
+                  <Row label={tx({ de: "Farbe", en: "Color", es: "Color" })} value={manifest.captions.color} />
                   <Row label="Highlight" value={manifest.captions.highlightColor} />
-                  <Row label="Max Wörter/Cue" value={manifest.captions.maxWordsPerCue?.toString()} />
+                  <Row label={tx({ de: "Max Wörter/Cue", en: "Max words/cue", es: "Máx. palabras/cue" })} value={manifest.captions.maxWordsPerCue?.toString()} />
                   <Row label="Position" value={manifest.captions.position} />
                   <Row label="Safe-Zone" value={manifest.captions.safeZonePct ? `${manifest.captions.safeZonePct}%` : undefined} />
                   <Row label="Burn-In" value={manifest.captions.burnIn?.toString()} />
@@ -305,7 +312,11 @@ export default function BriefingImportDialog({
                         ))}
                       </div>
                       <div className="text-muted-foreground">
-                        Diese Szenen werden ohne Cast/Location angelegt — du kannst sie nach dem Import in der Library anlegen und der Szene hinzufügen.
+                        {tx({
+                          de: 'Diese Szenen werden ohne Cast/Location angelegt — du kannst sie nach dem Import in der Library anlegen und der Szene hinzufügen.',
+                          en: 'These scenes are created without cast/location — you can create them in the library after the import and add them to the scene.',
+                          es: 'Estas escenas se crean sin reparto/localización — puedes crearlos en la biblioteca tras la importación y añadirlos a la escena.',
+                        })}
                       </div>
                     </div>
                   )}
@@ -316,7 +327,7 @@ export default function BriefingImportDialog({
               {manifest.unresolved.length > 0 && (
                 <div className="rounded-lg border border-amber-400/30 bg-amber-400/5 p-3 space-y-1 text-xs">
                   <div className="font-medium text-amber-300 flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" /> Ungeklärte Felder
+                    <AlertTriangle className="h-3 w-3" /> {tx({ de: 'Ungeklärte Felder', en: 'Unresolved fields', es: 'Campos sin resolver' })}
                   </div>
                   {manifest.unresolved.map((u, i) => (
                     <div key={i} className="text-muted-foreground">
@@ -335,7 +346,7 @@ export default function BriefingImportDialog({
             <>
               <Button variant="ghost" onClick={() => handleClose(false)}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</Button>
               <Button onClick={handleParse} disabled={parsing || text.trim().length < 40 || text.length > 120_000}>
-                {parsing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Parse…</> : <><Sparkles className="h-4 w-4 mr-2" />Briefing analysieren</>}
+                {parsing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{tx({ de: 'Analysiere…', en: 'Parsing…', es: 'Analizando…' })}</> : <><Sparkles className="h-4 w-4 mr-2" />{tx({ de: 'Briefing analysieren', en: 'Analyze briefing', es: 'Analizar briefing' })}</>}
               </Button>
             </>
           )}
@@ -343,7 +354,7 @@ export default function BriefingImportDialog({
             <>
               <Button variant="ghost" onClick={() => setStep('paste')}>{tx({ de: "Zurück", en: "Back", es: "Atrás" })}</Button>
               <Button onClick={handleApply} className="bg-amber-400 text-black hover:bg-amber-300">
-                <CheckCircle2 className="h-4 w-4 mr-2" />Alles übernehmen
+                <CheckCircle2 className="h-4 w-4 mr-2" />{tx({ de: 'Alles übernehmen', en: 'Apply all', es: 'Aplicar todo' })}
               </Button>
             </>
           )}
