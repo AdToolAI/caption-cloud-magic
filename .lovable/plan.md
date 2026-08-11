@@ -1,52 +1,61 @@
-# Briefing-Analyse: Audit-Ergebnis und Bereinigungsplan
+# Briefing-Analyse: eine Pipeline statt drei
 
-## Was ich gefunden habe
+## Die smarteste Lösung
 
-Es gibt heute **drei parallele Briefing-Analyse-Pfade**, die im Kern dasselbe tun (Briefing → Szenen/Manifest):
+Nicht drei Pfade parallel reparieren, sondern **einen einzigen Briefing-Service** bauen, den alle Einstiege benutzen. Jeder zusätzliche Pfad ist eine weitere Stelle, an der Schema, Modell, Sprache und Fehlerverhalten auseinanderlaufen — genau das verursacht heute die Widersprüche.
+
+Zielbild:
 
 ```text
-A) Formular  → compose-video-storyboard  → Szenen direkt in Composer-State
-B) Freitext  → parse-briefing            → Manifest → useApplyBriefingManifest
-C) Freitext  → briefing-deep-parse (2 Pässe, 3258 Zeilen)
-                                          → composer_production_plans → useApplyProductionPlan
+Formular-Briefing  ┐
+Freitext-Import    ├─→  analyze-briefing (eine Edge Function)
+Production Plan    ┘         │
+                             ├─ Pass A: Struktur extrahieren (Manifest)
+                             ├─ Pass B: Mentions auflösen + Konsistenz (optional)
+                             └─ Ergebnis: EIN Manifest-Objekt
+                                       │
+                             ein Apply-Hook → Composer-State (+ optional persistiert)
 ```
 
-Content Studio (`BriefStep`) nutzt keinen dieser drei Wege — dort läuft ein vierter, eigener Weg.
+Ein Schema, ein Modell-Set, ein Fehler- und Sprachverhalten, ein Apply-Weg.
 
-### Konkrete Widersprüche
+## Warum das „fehlerfrei für den Kunden" bedeutet
 
-1. **Drei Kopien desselben Tool-Schemas** (je eine pro Edge Function), die laut Code-Kommentar das Frontend-Zod-Schema „spiegeln“ sollen. Schema-Drift ist strukturell eingebaut.
-2. **Drei verschiedene Modell-Ketten**: Pfad A auf `gemini-3-flash-preview` (Preview-Modell im Hauptpfad), B und C auf `gemini-2.5-*`.
-3. **Zwei verschiedene Apply-Hooks** mit je eigener Mention-Auflösung (`useApplyBriefingManifest` vs. `useApplyProductionPlan`).
-4. **i18n-Bruch**: Fehlermeldungen in `compose-video-storyboard` (429/402) sind hart englisch, während `briefing-deep-parse` sauber DE/EN/ES liefert.
-5. **Timeout-Mismatch**: Pfad C nutzt bewusst rohes `fetch` mit 120 s, Pfad A/B laufen weiter über `supabase.functions.invoke` (~30 s) — obwohl Pfad A bis zu 4 Gateway-Versuche mit Backoff macht.
-6. **Keine serverseitige Validierung** in `parse-briefing`: rohes LLM-JSON geht raus, Zod prüft erst im Client, Fehlerfall nur `console.warn`.
-7. **Doppelte Dauer-Logik**: Regex-Heuristiken für Zeitangaben in `briefing-deep-parse` konkurrieren mit der LLM-Extraktion (deshalb existiert überhaupt ein `canonical.source`-Feld).
-8. **Credits**: In keiner der drei Functions ist Abzug oder Refund sichtbar. Bei Pfad C (2 Pässe) fehlt ein Refund-Pfad, falls Pass B nach Pass A scheitert.
+- **Kein Schema-Drift mehr**: Das Manifest-Schema liegt einmal in `_shared/` und wird sowohl für den Tool-Call als auch für die Validierung benutzt. Ein Feld ändern heißt: eine Datei ändern.
+- **Kein stiller Teilfehler**: Das Modell-Ergebnis wird serverseitig validiert. Ungültig heißt „nochmal versuchen" (ein Repair-Durchlauf mit den Validierungsfehlern im Prompt) und danach eine klare Fehlermeldung — nie halb-befüllte Szenen.
+- **Verständliche Fehler in der Sprache des Nutzers**: Rate-Limit, Guthaben, Modellfehler kommen übersetzt (DE/EN/ES) aus einer gemeinsamen Fehlerhilfe.
+- **Kein Abbruch mitten in der Generierung**: Die Analyse streamt, statt nach ~30 s ins Leere zu laufen. Der Nutzer sieht Fortschritt ("Briefing wird gelesen…", "Szenen werden gebaut…") statt eines toten Spinners.
+- **Guthaben stimmt immer**: Ein Abrechnungspunkt am Ende des erfolgreichen Laufs; bricht Pass B ab, wird nichts belastet bzw. idempotent erstattet.
 
-## Vorgeschlagene Umsetzung (priorisiert)
+## Umsetzung in vier Schritten
 
-### Stufe 1 — Korrektheit und Nutzer-sichtbare Fehler
-- `compose-video-storyboard`: Fehlertexte (Rate-Limit, Credits, Parse-Fehler) auf `tl()/withLang()` umstellen, Sprache aus dem Request übernehmen.
-- `parse-briefing`: Manifest serverseitig gegen dasselbe Schema validieren, bei Fehler strukturierter Fehler statt halb-valider Daten.
-- `BriefingImportDialog`: bei ungültigem Manifest sichtbaren Fehler-Toast statt stiller Warnung.
-- Frontend-Aufrufe von `compose-video-storyboard` und `parse-briefing` auf `fetch` + `AbortController` (120 s) umstellen, analog `useStoryboardTransition`.
+**Schritt 1 — Fundament (ohne Verhaltensänderung)**
+- `supabase/functions/_shared/briefingManifest.ts`: Zod-Schema + daraus generiertes Tool-Schema, ein einziges Mal.
+- `supabase/functions/_shared/briefingModels.ts`: Primary + Fallback-Kette, stabiles Modell statt Preview im Hauptpfad.
+- `supabase/functions/_shared/briefingErrors.ts`: übersetzte Fehler (429/402/Timeout/Validierung).
 
-### Stufe 2 — Eine Quelle der Wahrheit
-- Das Zod-Manifest-Schema als gemeinsame Datei nach `supabase/functions/_shared/briefingManifest.ts` ziehen; alle drei Functions leiten ihr Tool-Schema daraus ab statt aus manuellen Kopien.
-- Modell-Policy zentralisieren (`_shared/briefingModels.ts`): ein Primary + Fallback-Kette für alle Briefing-Calls; Preview-Modell im Hauptpfad durch stabiles Modell ersetzen.
-- Mention-Auflösung in einen gemeinsamen Helper zusammenziehen, den beide Apply-Hooks nutzen.
+**Schritt 2 — `analyze-briefing` als neue Zielfunktion**
+- Basis ist die vorhandene Deep-Parse-Logik (die reifste der drei), aufgeräumt und auf die shared Bausteine gesetzt.
+- Zwei Modi: `mode: "structured"` (Formular) und `mode: "freeform"` (Import/Plan). Beide liefern dasselbe Manifest.
+- Streaming-Antwort mit Statusereignissen; Validierung + ein Repair-Retry vor dem Fehlerfall.
+- Persistenz in `composer_production_plans` bleibt optional per Flag.
 
-### Stufe 3 — Konsolidierung der Pfade
-- `parse-briefing` als eigenständigen Pfad auflösen: Freitext-Import läuft künftig über `briefing-deep-parse` (Pass A allein reicht für den Import-Dialog), Ergebnis wird auf dasselbe Manifest gemappt. Damit bleiben zwei Pfade: Formular (A) und Freitext (C).
-- Dauer-Heuristik: Regex bleibt nur noch als Plausibilitätsprüfung mit Warnung, nicht als konkurrierende Quelle; `canonical.source` dokumentieren.
-- Credits: prüfen, wo Abzug tatsächlich passiert; für `briefing-deep-parse` idempotenten Refund ergänzen, falls Pass B fehlschlägt (gemäß Projekt-Regel zu Credit-Refunds).
-- Tote Refactoring-Reste in `BriefingTab.tsx` entfernen.
+**Schritt 3 — Frontend auf einen Weg umstellen**
+- `BriefingTab` (Formular), `BriefingImportDialog` (Freitext) und `useStoryboardTransition` rufen alle `analyze-briefing`.
+- Ein gemeinsamer Apply-Hook (`useApplyBriefingManifest` erweitert, `useApplyProductionPlan` geht darin auf) inklusive einer einzigen Mention-Auflösung.
+- Sichtbare Fehlerzustände im Dialog statt `console.warn`.
+
+**Schritt 4 — Altlasten entfernen und absichern**
+- `parse-briefing` und `compose-video-storyboard` werden entfernt, sobald der neue Pfad läuft.
+- Regex-Dauer-Heuristik wird zur reinen Plausibilitätswarnung degradiert (nicht mehr konkurrierende Quelle).
+- Tests: Schema-Paritätstest (bricht den Build bei Drift), Snapshot-Test „Briefing → Manifest" für ein deutsches und ein englisches Beispielbriefing, Fehlerpfad-Test für 429/402/ungültiges Manifest.
 
 ## Technische Details
-- Betroffen: `supabase/functions/compose-video-storyboard/index.ts`, `supabase/functions/parse-briefing/index.ts`, `supabase/functions/briefing-deep-parse/index.ts`, neue Dateien unter `supabase/functions/_shared/`, `src/components/video-composer/BriefingTab.tsx`, `src/components/video-composer/briefing/BriefingImportDialog.tsx`, `src/hooks/useApplyBriefingManifest.ts`, `src/hooks/useApplyProductionPlan.ts`, `src/hooks/useStoryboardTransition.ts`.
-- Keine DB-Schemaänderung nötig; `composer_production_plans` bleibt unverändert.
-- Absicherung: Vitest-Test, der Frontend-Zod-Schema und die drei Tool-Schemas auf Feldgleichheit prüft, damit Drift künftig den Build bricht.
+- Neue Dateien: `supabase/functions/analyze-briefing/index.ts`, `supabase/functions/_shared/briefingManifest.ts`, `briefingModels.ts`, `briefingErrors.ts`.
+- Geändert: `src/components/video-composer/BriefingTab.tsx`, `src/components/video-composer/briefing/BriefingImportDialog.tsx`, `src/components/video-composer/briefing/ProductionPlanSheet.tsx`, `src/hooks/useStoryboardTransition.ts`, `src/hooks/useApplyBriefingManifest.ts`, `src/hooks/useApplyProductionPlan.ts`.
+- Entfernt (Schritt 4): `supabase/functions/parse-briefing/`, `supabase/functions/compose-video-storyboard/`.
+- Keine DB-Schemaänderung; `composer_production_plans` bleibt wie es ist.
+- Kein künstliches Client-Timeout auf den Modell-Aufruf — stattdessen Streaming, damit lange Analysen sauber durchlaufen.
 
-## Offene Frage
-Soll Stufe 3 (Auflösen von `parse-briefing`) direkt mit rein, oder erst Stufe 1+2 als risikoarme Bereinigung?
+## Risiko und Reihenfolge
+Schritte 1–3 sind additiv: Der neue Pfad läuft neben dem alten, umgeschaltet wird pro Einstieg. Schritt 4 (Löschen) passiert erst, wenn alle drei Einstiege verifiziert auf `analyze-briefing` laufen.
