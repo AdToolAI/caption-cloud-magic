@@ -1001,7 +1001,9 @@ export function useApplyProductionPlan() {
           voicePoolAssignments,
           hydratedScenes.length === 1,
           applyDialogTurns,
+          seedance25LipsyncEnabled,
         ),
+
       );
 
 
