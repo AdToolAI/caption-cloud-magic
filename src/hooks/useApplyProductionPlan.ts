@@ -617,10 +617,21 @@ function planSceneToComposerScene(
   }
 
 
+  // v416 — pick the clip source FIRST: scenes longer than the default model
+  // can handle (>15 s) must run on Seedance 2.5, the only long-form provider.
+  const preferredSource = dialogMode ? 'ai-happyhorse' : 'ai-hailuo';
+  const picked = pickClipSourceForDuration({
+    durationSeconds: ps.durationSec,
+    preferred: preferredSource,
+    dialogMode,
+  });
+  const resolvedClipSource = picked.clipSource;
+  const resolvedDuration = picked.durationSeconds;
+
   // v415 — resolve the audio owner. Speech always wins: a scene with
   // voiceover, dialog or lip-sync must be generated SILENT so the studio
   // (voiceover + lip-sync + SFX tracks) owns the audio. Provider audio is
-  // only ever kept for speechless scenes.
+  // only ever kept for speechless scenes on models with native audio.
   const hasSpeechForAudio = Boolean(
     dialogMode
       || (typeof dialogScript === 'string' && dialogScript.trim())
@@ -628,27 +639,23 @@ function planSceneToComposerScene(
       || ps.voiceover?.text?.trim()
       || ps.lipSync,
   );
-  const requestedAudioSource = (ps as any).audioSource as SceneAudioSource | undefined;
-  const sceneAudioSource: SceneAudioSource = hasSpeechForAudio
-    ? 'studio'
-    : requestedAudioSource === 'provider'
-      ? 'provider'
-      : requestedAudioSource === 'silent'
-        ? 'silent'
-        : requestedAudioSource === 'studio'
-          ? 'studio'
-          : (String((ps as any).soundDesign ?? '').trim() ? 'studio' : 'silent');
+  const sceneAudioSource: SceneAudioSource = resolveSceneAudioSource({
+    hasSpeech: hasSpeechForAudio,
+    hasSoundDesign: Boolean(String((ps as any).soundDesign ?? '').trim()),
+    clipSource: resolvedClipSource,
+    requested: (ps as any).audioSource as SceneAudioSource | undefined,
+  });
 
   return {
     id: newSceneId(),
     projectId,
     orderIndex,
     sceneType,
-    durationSeconds: Math.round(ps.durationSec),
-    // Lip-Sync-Szenen defaulten auf HappyHorse (dialog-fähig). Die Cinematic-Sync-
-    // Pipeline migriert bei Bedarf intern auf Hailuo-Plate — die UI bleibt
-    // konsistent auf einem dialog-fähigen Modell.
-    clipSource: (dialogMode ? 'ai-happyhorse' : 'ai-hailuo') as any,
+    durationSeconds: resolvedDuration,
+    // Lip-Sync-Szenen defaulten auf HappyHorse (dialog-fähig). Lange B-Roll-
+    // Szenen (>15 s) laufen auf Seedance 2.5 (ModelArk), alles andere auf
+    // Hailuo.
+    clipSource: resolvedClipSource as any,
     clipQuality: 'standard',
     clipStatus: 'pending',
     // v415 — sound design only reaches the model when the provider owns the
