@@ -1,91 +1,126 @@
 # Visual-Continuity-System für Motion Studio
 
-Die Analyse ist richtig und ersetzt meinen bisherigen Vorschlag. Ein reiner `transitionMode` löst nur die Schnittkante — das eigentliche Problem ist, dass `firstFrame`, Charakter-Identität und Location/Produkt heute in einen einzigen gedanklichen „Referenzbild"-Slot fallen.
+Die vier Verschärfungen sind berechtigt und werden übernommen. Kernkorrekturen gegenüber der vorigen Fassung:
 
-Zwei Punkte, denen ich ausdrücklich zustimme:
+- **Ein Resolver, keine zweite Instanz.** Transition Resolver, Anchor Strategy, Reference Budget und Compatibility Guards liegen *im* `VisualInputResolver`. Er gibt einen fertigen `ResolvedVisualPlan` zurück; die Renderroute enthält keine Continuity-Logik mehr.
+- **Slot-Topologie statt Boolean.** Jeder Bildinput trägt einen Slot-Namen. Gleicher Slot = Konflikt, verschiedener Slot = koexistiert. Kein `firstFrameConsumesReferenceSlot`.
+- **Kein „Lip-Sync = immer Match-Cut".** Die Regel lautet ausschließlich: *ein geschützter Identitäts-/Sync-Anker wird niemals für Übergangskontinuität geopfert.* Match-Cut ist die Folge eines Slot-Konflikts, keine Hardcode-Regel.
+- **Relevanz statt statischem Rang** beim Reference Budget.
 
-- **`maxReferences` reicht als Fähigkeitsangabe nicht.** Entscheidend ist, ob `first_frame` ein eigener API-Parameter ist oder einen der Referenzslots verbraucht. Genau das steht heute nirgends.
-- **„Lip-Sync = immer Match-Cut" als Hardcode ist falsch.** Richtig ist die Slot-Konflikt-Regel: Frame-Chain wird nur blockiert, wenn First Frame und Identitäts-Anker auf demselben Modell um denselben Input-Slot konkurrieren.
-
-Ein Punkt, an dem ich vorsichtiger bin: die Lip-Sync-Kette steht unter Feature-Freeze (v400, `.lovable/LIPSYNC-FEATURE-FREEZE.md`, Invariante 1: Geometrie wird ausschließlich auf `reference_image_url` gemessen). Der Resolver darf deshalb für Lip-Sync-Szenen zwar *auswerten*, aber im ersten Schritt nichts am Payload der Sync-Kette ändern. Die Lockerung „Lip-Sync + First Frame, wenn getrennte Slots" wird als Fähigkeit modelliert, aber erst nach einem grünen Referenzlauf scharf geschaltet.
-
-## Architektur
+## Zielarchitektur
 
 ```text
-Storyboard → Scene Analysis → Continuity Requirements
-   → Character / Product / Location Anchors
-   → Model Capability Lookup
-   → VisualInputResolver
-   → Transition Resolver
-   → Lip-Sync Compatibility Guard
-   → Provider Payload
+STORYBOARD
+   ↓ Scene Requirement Analysis
+   ↓ Visual Scene Classification
+   ↓ Character / Product / Location Anchors
+   ↓ Model Capability Profile
+   ↓ ┌────────────────────────┐
+     │ VisualInputResolver    │
+     │  Anchor Strategy       │
+     │  Transition Strategy   │
+     │  Reference Selection   │
+     │  Slot Arbitration      │
+     │  Compatibility Guard   │
+     └────────────────────────┘
+   ↓ ResolvedVisualPlan
+   ↓ Provider Adapter  (übersetzt nur, entscheidet nichts)
+   ↓ Render
 ```
 
-### 1. Getrennte Bildrollen pro Szene
+Der Provider-Adapter ersetzt die heutige Lage, in der jede `generate-*-video`-Function ihre Bildinputs selbst wählt und `compose-video-clips` zusätzlich eine providerspezifische `if/else`-Kette führt.
 
-Statt eines Slots: `firstFrameUrl`, `endFrameUrl`, `characterReferences[]`, `locationReferences[]`, `productReferences[]`. Die bestehenden Felder `referenceImageUrl` und `lockReferenceUrl` bleiben als Identitäts-Anker unangetastet und werden in `characterReferences` nur *gespiegelt*, nie ersetzt — die v400-Invariante bleibt gültig.
+## 1. Scene Classification
 
-### 2. Registry: `visualInputs` statt `maxReferences`
+```ts
+type VisualSceneClass = 'environment' | 'product' | 'character' | 'lipsync-character';
+// 'mixed' bleibt als spätere Erweiterung offen
+```
+
+Die Klasse bestimmt die Priorität bei knappem Slot:
+- `environment` → Übergang vor Location
+- `product` → Produkt oder Übergang, je nach Hero-Status
+- `character` → Identität vor Übergang
+- `lipsync-character` → Sync-/Identitäts-Anker vor allem anderen
+
+## 2. Registry: Slot-Topologie
 
 ```ts
 visualInputs: {
-  firstFrame: true,
-  endFrame: false,
-  references: { max: 30, character: true, product: true, location: true },
-  firstFrameConsumesReferenceSlot: false,
-  lipSync: { supported: true, requiresIdentityReference: true, conflictsWithFirstFrame: false },
+  firstFrame: { supported: true, slot: 'first-frame' },
+  endFrame:   { supported: false },
+  references: { max: 30, slot: 'references', character: true, product: true, location: true },
+  lipSync:    { supported: true, requiresIdentityReference: true, verified: false },
 }
 ```
 
-Pro Modell aus der bereits erstellten Capability-Matrix (`docs/ai-video-capability-matrix.md`) befüllt. `maxReferences` bleibt als abgeleiteter Wert für die UI erhalten, damit nichts bricht.
+Konkurrierender Provider:
 
-### 3. VisualInputResolver
+```ts
+firstFrame: { supported: true, slot: 'image-input' },
+references: { max: 1, slot: 'image-input' },
+```
 
-`resolveVisualInputs({ scene, previousScene, model, transitionPreference })` → `{ firstFrameUrl, referenceImages, endFrameUrl, transitionMode, anchorStrategy, warnings }`.
+Zwei Wahrheitsgrade: `supported` (laut Doku) und `verified` (im echten Lauf bestätigt). Auto nutzt nur `verified`-Fähigkeiten; `supported && !verified` erscheint als manuell wählbare Option mit Hinweis. Damit lassen sich später `character_ref`, `subject_ref`, `style_ref`, `start_image`, `end_image`, `video_ref` als weitere Slots ergänzen, ohne das Modell umzubauen.
 
-`anchorStrategy`: `transition-priority` | `identity-priority` | `product-priority` | `balanced`.
+## 3. ResolvedVisualPlan
 
-Automatik: kein Charakter → `transition-priority`; sichtbarer wiederkehrender Charakter → `identity-priority`; Produkt-Hero-Shot → `product-priority`; Multi-Ref-Modell mit getrenntem First-Frame-Slot → `balanced`.
+```ts
+{
+  transition: { mode: 'frame-chain' | 'endframe-bridge' | 'match-cut', sourceFrameUrl?: string },
+  anchors: { identity: [...], product: [...], location: [...] },
+  references: [...],          // bereits budgetiert und auf max gekürzt
+  endFrameUrl?: string,
+  anchorStrategy: 'transition-priority' | 'identity-priority' | 'product-priority' | 'balanced',
+  constraints: { identityProtected: boolean, lipSyncProtected: boolean },
+  warnings: string[],
+}
+```
 
-Priorität bei nur einem verfügbaren Bild-Slot:
-- B-Roll / Environment: Last Frame > Location
-- Produkt: Produkt oder Last Frame (je nach `product-priority`)
-- Charakter ohne Lip-Sync: Charakter-Identität > Last Frame
-- Charakter mit Lip-Sync: Charakter-Anker / Sync-Plate schlägt alles
+Slot-Arbitrierung: belegen First Frame und der Identitäts-Anker denselben Slot und ist die Identität geschützt, gewinnt die Identität → `match-cut`. Sind die Slots getrennt und die Fähigkeit `verified`, ist `frame-chain` auch bei Lip-Sync möglich.
 
-### 4. Reference Budget
+## 4. Reference Budget nach Relevanz
 
-Nicht 30 Bilder schicken, weil 30 gehen. Gewichtete Auswahl, dann auf das Modell-Maximum gekürzt: Previous-Frame (höchste), Hauptcharakter (höchste), Nebencharakter (hoch), Produkt (hoch), Location (mittel), Style (niedrig), weitere Charakter-Refs (niedrig).
+```
+referenceScore = sceneRelevance × continuityImportance × identityImportance × providerCompatibility
+```
 
-### 5. UI an der Schnittkante
+Sortieren, auf das Modellmaximum kürzen. Eine Figur, die in dieser Szene nicht auftritt, fällt heraus — auch wenn sie global ein wichtiger Anker ist. Nicht 30 Bilder schicken, weil 30 gehen.
 
-Kein technischer Wortlaut. Ein Feld **Visual Continuity** mit `Auto · Seamless · Identity · Match Cut`; Auto ist Default. Tooltip nennt die getroffene Entscheidung im Klartext, z. B. „Hailuo — Charakter-Identität hat Vorrang → Match Cut" oder „Seedance 2.5 — Charakter + Vorframe + Location → nahtlos". Unmögliche Optionen sind gesperrt mit Begründung.
+## 5. Transition Frame Analyzer (Phase 3)
 
-### 6. Transition Frame Analyzer (Stufe 2)
+„Last usable continuity frame" statt letztem Frame:
 
-Statt stumpf dem letzten Frame: „last usable continuity frame". Bewertet die letzten ~1 s auf `characterVisibility`, `characterCount`, `productVisibility`, `cameraAngle`, `motionBlur`, `occlusion`, `lighting`, `frameQuality` und wählt den besten Kandidaten. Baut auf `extract-video-last-frame` / `extract-video-frames` und `analyze-scene-subject` auf — die existieren bereits.
+```
+continuityFrameScore = visualQuality + subjectVisibility + compositionQuality
+                     + motionCompatibility + semanticEndState
+```
 
-## Reihenfolge
+`semanticEndState` zählt mit: der Frame, in dem die Figur halb durch die Tür ist, kann der dramaturgisch richtige Einstieg für die Folgeszene sein, auch wenn ein früherer Frame technisch sauberer ist. Baut auf `extract-video-last-frame`, `extract-video-frames` und `analyze-scene-subject` auf.
 
-1. **Registry `visualInputs`** für alle Modelle füllen + Test, dass jedes Modell einen vollständigen Block hat.
-2. **Szenen-Bildrollen** in `src/types/video-composer.ts` und Persistenz (`composer_scenes`), abwärtskompatibel zu heutigen Feldern.
-3. **VisualInputResolver** als reine Funktion mit Unit-Tests je Rendering-Klasse (B-Roll, Produkt, Charakter ohne Sync, Charakter mit Sync).
-4. **Render-Routen anbinden**: `compose-video-clips` ruft den Resolver auf und übergibt das Ergebnis; die providerspezifischen `if/else`-Ketten für Bildinputs entfallen dort.
-5. **UI „Visual Continuity"** an der Schnittkante inkl. Klartext-Tooltip.
-6. **Reference Budget** für Multi-Ref-Modelle.
-7. **Transition Frame Analyzer** als letzter Schritt, hinter einem Flag.
+## Releases
 
-Schritte 1–3 sind reine Vorbereitung ohne Verhaltensänderung; ab Schritt 4 wird pro Provider verifiziert.
+**Phase 1 — Capability Foundation.** Registry-Slot-Topologie für alle Modelle, Szenen-Bildrollen (`firstFrameUrl`, `endFrameUrl`, `characterReferences[]`, `locationReferences[]`, `productReferences[]`), Scene Classification, Resolver + Unit-Tests. **Keine Verhaltensänderung im Render.** `referenceImageUrl` und `lockReferenceUrl` bleiben unverändert bestehen und werden nur gespiegelt, nie ersetzt.
+
+**Phase 2 — Silent / B-Roll Continuity.** Resolver scharf für `environment` und `product` ohne Lip-Sync: Frame-Chain und Endframe-Bridge, Provider-Adapter für die betroffenen Routen, UI „Visual Continuity" an der Schnittkante.
+
+**Phase 3 — Character Intelligence.** Relevanz-Gewichtung, Multi-Ref-Budget, Lip-Sync-Kompatibilität über Slot-Konflikt + `verified`, Transition Frame Analyzer.
+
+Die Lip-Sync-Kette (Feature-Freeze v400, Invariante: Geometrie ausschließlich auf `reference_image_url`) bleibt in Phase 1 und 2 vollständig unberührt. In Phase 3 wird sie nur dort angefasst, wo ein echter Provider-Lauf `verified: true` rechtfertigt — und nur nach grünem Referenzlauf mit vier Sprechern.
+
+## UI
+
+Ein Feld an der Schnittkante: **Visual Continuity — Auto · Seamless · Identity · Match Cut**, Default Auto. Der Tooltip nennt die Entscheidung im Klartext, z. B. „Hailuo — Charakter-Identität hat Vorrang → Match Cut" oder „Seedance 2.5 — Charakter + Vorframe + Location → nahtlos". Keine technischen Begriffe wie „First Frame Slot".
 
 ## Technische Details
 
-- Neu: `src/lib/composer/visualInputs/{types.ts,resolveVisualInputs.ts,referenceBudget.ts}` + Tests.
-- `src/config/aiVideoModelRegistry.ts`: `visualInputs`-Block je Modell, `maxReferences` als Ableitung.
-- `src/types/video-composer.ts`: neue Rollen-Arrays, `visualContinuity?: 'auto' | 'seamless' | 'identity' | 'match-cut'` je Kante.
-- `supabase/functions/compose-video-clips/index.ts` und die `generate-*-video`-Functions nehmen das Resolver-Ergebnis entgegen, statt Bildinputs selbst zu wählen.
-- Guard-Tests: (a) kein Resolver-Pfad schreibt `referenceImageUrl` / `lockReferenceUrl`; (b) Lip-Sync-Szenen erhalten nur dann einen First Frame, wenn `lipSync.conflictsWithFirstFrame === false` **und** das Freeze-Flag für diese Lockerung gesetzt ist; (c) Referenzanzahl je Payload ≤ Modell-Maximum.
-- Lip-Sync-Kette (v400-Freeze) bleibt in Stufe 1–6 unverändert; Preise und Wallet-Logik ebenfalls.
+- Neu: `src/lib/composer/visualInputs/{types.ts,classifyScene.ts,resolveVisualInputs.ts,referenceBudget.ts,slotArbitration.ts}` + Tests je Szenenklasse.
+- `src/config/aiVideoModelRegistry.ts`: `visualInputs`-Block mit Slots je Modell, gefüllt aus `docs/ai-video-capability-matrix.md`; `maxReferences` bleibt als abgeleiteter Wert für bestehende UI.
+- `src/types/video-composer.ts`: Rollen-Arrays und `visualContinuity?: 'auto' | 'seamless' | 'identity' | 'match-cut'` je Kante; Persistenz in `composer_scenes` abwärtskompatibel.
+- Provider-Adapter je Familie: nimmt den `ResolvedVisualPlan` und mappt ihn auf den Provider-Body. `compose-video-clips` verliert seine Bildinput-Verzweigungen.
+- Guard-Tests: (a) kein Resolver-Pfad schreibt `referenceImageUrl` / `lockReferenceUrl`; (b) ein geschützter Identitäts-Anker wird nie durch einen First Frame verdrängt; (c) `frame-chain` bei Lip-Sync nur bei getrennten Slots **und** `verified: true`; (d) Referenzanzahl je Payload ≤ Modellmaximum; (e) kein Provider-Adapter enthält Continuity-Entscheidungen.
+- Preise, Wallet-Logik und Sync-Payload bleiben unverändert.
 
 ## Verifikation
 
-Vier Referenzfälle, je ein echter Lauf mit protokolliertem Payload: (a) Atlantis / B-Roll auf Seedance 2.5 → Frame-Chain + Location-Referenz; (b) Landschaftspaar auf Hailuo → Frame-Chain; (c) Founder-Spot mit Lip-Sync → Identity-Priority, Anker unverändert, Match Cut; (d) Produkt-Hero auf Kling Omni → Produkt + Vorframe.
+Je ein echter Lauf mit protokolliertem Payload: (a) Atlantis / Environment auf Seedance 2.5 → Frame-Chain + Location-Referenz; (b) Landschaftspaar auf Hailuo → Frame-Chain; (c) Founder-Spot mit Lip-Sync → Identity-Priority, Anker unverändert, Match Cut; (d) Produkt-Hero auf Kling Omni → Produkt + Vorframe. Jeder Lauf, der eine `supported`-Fähigkeit bestätigt, setzt sie in der Registry auf `verified: true`.
