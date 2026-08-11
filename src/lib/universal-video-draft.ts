@@ -1,5 +1,17 @@
-const WIZARD_KEY = 'universal-video-wizard-state';
-const CONSULTANT_KEY = 'universal-video-consultant-state';
+import { scopedDraftKey, migrateLegacyDraftKey } from '@/lib/local-draft-scope';
+
+const WIZARD_BASE_KEY = 'universal-video-wizard-state';
+const CONSULTANT_BASE_KEY = 'universal-video-consultant-state';
+
+/** Drafts are bound to the signed-in account, never shared across logins. */
+const wizardKey = () => {
+  migrateLegacyDraftKey(WIZARD_BASE_KEY);
+  return scopedDraftKey(WIZARD_BASE_KEY);
+};
+const consultantKey = () => {
+  migrateLegacyDraftKey(CONSULTANT_BASE_KEY);
+  return scopedDraftKey(CONSULTANT_BASE_KEY);
+};
 const DRAFT_VERSION = 3;
 
 export interface WizardDraft {
@@ -43,15 +55,15 @@ function safeParse<T>(key: string): T | null {
 }
 
 export function getWizardDraft(): WizardDraft | null {
-  return safeParse<WizardDraft>(WIZARD_KEY);
+  return safeParse<WizardDraft>(wizardKey());
 }
 
 export function getConsultantDraft(): ConsultantDraft | null {
-  return safeParse<ConsultantDraft>(CONSULTANT_KEY);
+  return safeParse<ConsultantDraft>(consultantKey());
 }
 
 export function saveWizardDraft(data: Omit<WizardDraft, 'updatedAt' | 'version'>) {
-  localStorage.setItem(WIZARD_KEY, JSON.stringify({
+  localStorage.setItem(wizardKey(), JSON.stringify({
     ...data,
     updatedAt: new Date().toISOString(),
     version: DRAFT_VERSION,
@@ -59,7 +71,7 @@ export function saveWizardDraft(data: Omit<WizardDraft, 'updatedAt' | 'version'>
 }
 
 export function saveConsultantDraft(data: Omit<ConsultantDraft, 'updatedAt' | 'version'>) {
-  localStorage.setItem(CONSULTANT_KEY, JSON.stringify({
+  localStorage.setItem(consultantKey(), JSON.stringify({
     ...data,
     updatedAt: new Date().toISOString(),
     version: DRAFT_VERSION,
@@ -67,8 +79,8 @@ export function saveConsultantDraft(data: Omit<ConsultantDraft, 'updatedAt' | 'v
 }
 
 export function clearAllDrafts() {
-  localStorage.removeItem(WIZARD_KEY);
-  localStorage.removeItem(CONSULTANT_KEY);
+  localStorage.removeItem(wizardKey());
+  localStorage.removeItem(consultantKey());
 }
 
 export function hasMeaningfulDraft(): boolean {
