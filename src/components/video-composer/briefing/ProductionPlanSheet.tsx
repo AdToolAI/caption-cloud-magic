@@ -616,6 +616,7 @@ export default function ProductionPlanSheet({
     let changed = false;
 
     const scenes = plan.scenes.map((s) => {
+      let sceneChanged = false;
       const cast = (s.cast ?? []).map((c) => {
         const existing = uuidInside(c.characterId ?? null) ?? splitCastId(c.characterId).baseId;
         if (existing && isUuid(existing)) return c;
@@ -627,7 +628,7 @@ export default function ProductionPlanSheet({
           used.add(id);
           if (k) byMention.set(k, id);
         }
-        changed = true;
+        sceneChanged = true;
         const matched = charOptions.find((o) => o.id === id);
         return { ...c, characterId: id, characterName: matched?.name ?? c.characterName, outfitLookId: null };
       });
@@ -638,11 +639,12 @@ export default function ProductionPlanSheet({
         const k = keyOf(t?.speakerMentionKey ?? t?.speakerName);
         const id = k ? byMention.get(k) ?? null : null;
         if (!id) return t;
-        changed = true;
+        sceneChanged = true;
         return { ...t, speakerCharacterId: id };
       });
 
-      if (!changed) return s;
+      if (!sceneChanged) return s;
+      changed = true;
       return { ...s, cast, dialogTurns };
     });
 
