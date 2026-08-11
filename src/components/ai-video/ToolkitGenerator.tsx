@@ -465,9 +465,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         castBuilding,
         castProps,
       );
-      const brandSuffix = brandCharacter
-        ? `Featuring ${brandCharacter.name}: ${buildCharacterPromptInjection(brandCharacter)}.`
-        : '';
+      // Cast & World already describes every booked character inside
+      // `castSuffix` — no second character injection needed.
+      const brandSuffix = '';
       const shotSuffix = buildShotPromptSuffix(shotSelection);
       // Guard against gibberish/faux-text hallucinations from video models
       // (Hailuo/Kling/Veo/Sora/Seedance/…). Motion Studio path is not touched.
