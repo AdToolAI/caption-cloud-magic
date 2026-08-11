@@ -770,12 +770,24 @@ function buildAssembly(
     };
   }
 
-  if (plan.captions) {
-    const c = plan.captions;
+  // v415 — captions are speech-bound: without voiceover or dialog anywhere in
+  // the plan there is nothing to subtitle (music and ambience are not), and an
+  // explicit ban in the negative prompt switches them off as well.
+  const planHasSpeech = (plan.scenes ?? []).some((s) =>
+    Boolean(
+      s.voiceover?.text?.trim()
+        || (s.dialogTurns ?? []).some((t) => String(t?.text ?? '').trim()),
+    ),
+  );
+  const captionsBanned = /\b(no|keine|kein|sin)\s+(subtitles?|captions?|untertitel|subt[ií]tulos)\b/i
+    .test(String(plan.negativePrompt ?? ''));
+
+  if (plan.captions || !planHasSpeech || captionsBanned) {
+    const c = plan.captions ?? {};
     next = {
       ...next,
       subtitles: {
-        enabled: c.enabled ?? true,
+        enabled: (!planHasSpeech || captionsBanned) ? false : (c.enabled ?? true),
         language,
         style: {
           font: c.font ?? 'Inter Bold',
