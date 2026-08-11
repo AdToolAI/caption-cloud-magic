@@ -317,9 +317,21 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
   const consistencyKey = `ai-${model.family}`;
 
-  /* ── Brand Character Lock (cross-studio persistent character) ── */
+  /* ── Character lock — Cast & World is the single source of truth.
+   * The primary (first) Cast & World character drives the anchor, the
+   * prompt injection, the reference-uploader hint and usage tracking. */
   const { trackUsage: trackBrandUsage } = useBrandCharacters();
-  const [brandCharacter, setBrandCharacter] = useState<BrandCharacter | null>(null);
+  const brandCharacter = useMemo(() => {
+    const c = castCharacters[0];
+    if (!c) return null;
+    return {
+      id: c.id,
+      name: c.name,
+      description: c.description ?? '',
+      signature_items: c.signature_items ?? '',
+      reference_image_url: c.reference_image_url ?? null,
+    };
+  }, [castCharacters]);
 
   /* ── Shot Director (cinematic prompt builder) ── */
   const [shotSelection, setShotSelection] = useState<ShotSelection>({});
