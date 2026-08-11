@@ -893,7 +893,9 @@ export function useApplyProductionPlan() {
       .sort((a, b) => a.index - b.index)
       .map((s, i) =>
         planSceneToComposerScene(
-          s,
+          // v415 — global sound-design intent falls through to scenes that
+          // don't carry their own. Metadata only: nothing is generated here.
+          { ...s, soundDesign: (s as any).soundDesign ?? plan.project?.soundDesign } as TPlanScene,
           protectedScenes.length + i,
           projectId,
           plan.negativePrompt,
