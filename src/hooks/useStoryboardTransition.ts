@@ -1173,7 +1173,7 @@ export function useStoryboardTransition({
     // `supabase.functions.invoke` imposes a ~30s timeout that kicks in before
     // deep-parse can finish, so we use raw fetch.
     const CLIENT_TIMEOUT_MS = 120_000;
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/briefing-deep-parse`;
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-briefing?mode=deep`;
     const anon = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
     const { data: { session } } = await supabase.auth.getSession();
     const authToken = session?.access_token ?? anon;

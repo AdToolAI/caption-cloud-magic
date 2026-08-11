@@ -111,7 +111,7 @@ export default function BriefingImportDialog({
     }
     setParsing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('parse-briefing', {
+      const { data, error } = await supabase.functions.invoke('analyze-briefing?mode=freeform', {
         body: { briefing },
       });
       if (error) throw error;
