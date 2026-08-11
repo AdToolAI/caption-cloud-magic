@@ -154,6 +154,8 @@ const lumaRay32Aspect = ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'];
 const ltxAspect = ['16:9', '9:16'];
 /** xai/grok-imagine-video `aspect_ratio` enum (minus "auto"). */
 const grokAspect = ['16:9', '9:16', '1:1', '4:3', '3:4', '3:2', '2:3'];
+/** Pika 2.2 (fal.ai `fal-ai/pika/v2.2/*`) `aspect_ratio` enum. */
+const pikaAspect = ['16:9', '9:16', '1:1', '4:5', '5:4', '3:2', '2:3'];
 
 export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
   /* ─────────── Kling family ─────────── */
