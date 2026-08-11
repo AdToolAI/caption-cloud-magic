@@ -36,8 +36,7 @@ import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import { resolveMentions } from '@/lib/motion-studio/mentionParser';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
-import { BrandCharacterSelector } from '@/components/brand-characters/BrandCharacterSelector';
-import { useBrandCharacters, buildCharacterPromptInjection, type BrandCharacter } from '@/hooks/useBrandCharacters';
+import { useBrandCharacters } from '@/hooks/useBrandCharacters';
 import type { ShotSelection } from '@/config/shotDirector';
 import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
 import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
@@ -318,9 +317,21 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
   const consistencyKey = `ai-${model.family}`;
 
-  /* ── Brand Character Lock (cross-studio persistent character) ── */
+  /* ── Character lock — Cast & World is the single source of truth.
+   * The primary (first) Cast & World character drives the anchor, the
+   * prompt injection, the reference-uploader hint and usage tracking. */
   const { trackUsage: trackBrandUsage } = useBrandCharacters();
-  const [brandCharacter, setBrandCharacter] = useState<BrandCharacter | null>(null);
+  const brandCharacter = useMemo(() => {
+    const c = castCharacters[0];
+    if (!c) return null;
+    return {
+      id: c.id,
+      name: c.name,
+      description: c.description ?? '',
+      signature_items: c.signature_items ?? '',
+      reference_image_url: c.reference_image_url ?? null,
+    };
+  }, [castCharacters]);
 
   /* ── Shot Director (cinematic prompt builder) ── */
   const [shotSelection, setShotSelection] = useState<ShotSelection>({});
@@ -454,9 +465,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         castBuilding,
         castProps,
       );
-      const brandSuffix = brandCharacter
-        ? `Featuring ${brandCharacter.name}: ${buildCharacterPromptInjection(brandCharacter)}.`
-        : '';
+      // Cast & World already describes every booked character inside
+      // `castSuffix` — no second character injection needed.
+      const brandSuffix = '';
       const shotSuffix = buildShotPromptSuffix(shotSelection);
       // Guard against gibberish/faux-text hallucinations from video models
       // (Hailuo/Kling/Veo/Sora/Seedance/…). Motion Studio path is not touched.
@@ -929,17 +940,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         basePrompt={prompt}
       />
 
-      {/* ── Brand Character Lock (cross-studio persistent character) ──
-           Hidden for Kling Omni — the unified Cast & Lip-Sync panel above
-           is the single source of truth for characters in that mode. */}
-      {!isKlingOmni && (
-        <Card className="p-5 bg-card/60 backdrop-blur-xl border-border/60">
-          <BrandCharacterSelector
-            value={brandCharacter?.id ?? null}
-            onChange={setBrandCharacter}
-          />
-        </Card>
-      )}
+      {/* Character selection lives exclusively in Cast & World below. */}
 
       <ToolkitCastWorldPicker
         characterIds={castCharacterIds}

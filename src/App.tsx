@@ -120,7 +120,6 @@ const QACockpit = lazy(() => import("./pages/admin/QACockpit"));
 
 
 const AIVideoToolkit = lazy(() => import("./pages/AIVideoToolkit"));
-const BrandCharacters = lazy(() => import("./pages/BrandCharacters"));
 const AvatarDetail = lazy(() => import("./pages/AvatarDetail"));
 const Locations = lazy(() => import("./pages/Locations"));
 const Library = lazy(() => import("./pages/Library"));
@@ -291,7 +290,7 @@ function AppLayout() {
           {/* Unified AI Video Toolkit — replaces former individual studios */}
           <Route path="/ai-video-studio" element={<AIVideoToolkit />} />
           <Route path="/ai-video-toolkit" element={<Navigate to="/ai-video-studio" replace />} />
-          <Route path="/brand-characters" element={<ProtectedRoute><BrandCharacters /></ProtectedRoute>} />
+          <Route path="/brand-characters" element={<Navigate to="/library" replace />} />
           <Route path="/avatars" element={<Navigate to="/library" replace />} />
           <Route path="/avatars/:id" element={<ProtectedRoute><AvatarDetail /></ProtectedRoute>} />
           <Route path="/locations" element={<ProtectedRoute><Locations /></ProtectedRoute>} />
