@@ -28,8 +28,14 @@ In `supabase/functions/_shared/briefing/deep/index.ts` vor der Modell-Auswertung
 ### 2. Unbesetzte Cast-Slots erhalten statt löschen
 `enforceStrictCast` verwirft heute jeden Slot ohne `characterId`, der nicht in der Briefing-Roster-Liste steht. Künftig: Slots, deren `mentionKey` **im Briefing-Text vorkommt**, bleiben mit `characterId: null` erhalten und erscheinen im Plan als offene Zeile mit Auswahl „Figur zuordnen" oder „In Cast & World anlegen". Nur wirklich erfundene Sprecher (nicht im Briefing) werden weiter entfernt.
 
-### 3. Auto-Bindung der Sprecher
-Sobald ein Cast-Slot eine Figur bekommt, werden alle Turns mit derselben `@mention` automatisch gebunden (`speakerCharacterId`). Im `ProductionPlanSheet` gilt das auch beim manuellen Zuordnen — eine Auswahl statt elf.
+### 3. Gewählte Cast-&-World-Figuren automatisch in Reihenfolge besetzen
+Hast du im Composer vier Figuren gewählt und das Briefing sagt nichts über die Zuordnung, werden die offenen Sprecher-Mentions **in der Reihenfolge ihres ersten Auftretens im Briefing** mit den gewählten Figuren **in deren Auswahlreihenfolge** besetzt: 1. Mention → 1. gewählte Figur usw. Nennt das Briefing eine Figur namentlich oder passt ein `mentionKey` zu einem Bibliotheksnamen, hat diese Zuordnung Vorrang; die Auto-Verteilung füllt nur den Rest. Mehr Mentions als gewählte Figuren → Rest bleibt offen (keine Doppelbesetzung).
+
+Im Briefing-Analyse-Dashboard bleibt jede Zuordnung änderbar: pro Cast-Slot ein Auswahlfeld mit allen Cast-&-World-Figuren, inklusive Tausch zweier Figuren (die andere Zeile wird dabei mitgetauscht statt doppelt belegt) und einer Markierung „automatisch zugeordnet", solange du nichts geändert hast.
+
+### 4. Auto-Bindung der Sprecher
+Sobald ein Cast-Slot eine Figur bekommt — automatisch oder von Hand —, werden alle Turns mit derselben `@mention` gebunden (`speakerCharacterId`), inklusive Stimme aus dem Figurenprofil. Beim Übernehmen landen Cast-Slots, Sprecherbindung und Stimmen unverändert im Storyboard (`characterShots` + `dialogTurns`); geschützte Szenen bleiben unangetastet.
+
 
 ### 4. Negative Prompt einsprachig
 Der Plan-Normalizer übersetzt den Negative Prompt vollständig ins Englische (kein Teil-Merge mehr), die deutsche Fassung bleibt nur zur Anzeige.
