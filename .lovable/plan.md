@@ -1,6 +1,9 @@
-# Muster-Briefing im Briefing-Tab
+# Muster-Briefing dort, wo das Briefing wirklich eingefügt wird
 
-Ziel: Kunden sehen direkt am Eingabefeld, wie ein Briefing aufgebaut sein muss, damit die KI-Analyse alles korrekt erkennt und ins Storyboard überträgt.
+Ziel: Kunden sehen genau an der Stelle, an der sie ihr Briefing eintippen oder einfügen, wie es aufgebaut sein muss, damit die KI-Analyse alles korrekt erkennt und ins Storyboard überträgt.
+
+Platzierung: Hauptplatz ist der **Briefing-Import-Dialog** — das ist die Fläche, in die Kunden ihr komplettes Briefing kleben. Dort steht heute ein Beispiel im Placeholder, das beim ersten Tastendruck verschwindet und ein anderes Format zeigt als das, was die Analyse optimal parst. Am Beschreibungsfeld in Stage 02 kommt nur ein dezenter Link auf dieselbe Vorlage.
+
 
 ## Was die Analyse sicher erkennt
 
