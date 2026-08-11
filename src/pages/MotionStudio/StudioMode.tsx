@@ -31,7 +31,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { useMotionStudioCastCharacters } from '@/hooks/useMotionStudioCastCharacters';
-import CharacterEditor from '@/components/motion-studio/CharacterEditor';
 import LocationEditor from '@/components/motion-studio/LocationEditor';
 import SceneSnippetPicker from '@/components/motion-studio/SceneSnippetPicker';
 import AIDirectorBriefDialog, { type DirectorPlan } from '@/components/motion-studio/AIDirectorBriefDialog';
@@ -75,7 +74,6 @@ export default function StudioMode() {
   const [creating, setCreating] = useState(false);
 
   // Editor dialogs
-  const [charEditorOpen, setCharEditorOpen] = useState(false);
   const [locEditorOpen, setLocEditorOpen] = useState(false);
   const [snippetOpen, setSnippetOpen] = useState(false);
   const [directorOpen, setDirectorOpen] = useState(false);
@@ -317,7 +315,7 @@ export default function StudioMode() {
               characters={characters}
               selectedIds={selectedCharIds}
               onToggle={toggleChar}
-              onAddNew={() => setCharEditorOpen(true)}
+              onAddNew={() => navigate('/library')}
             />
           )}
 
@@ -399,11 +397,6 @@ export default function StudioMode() {
       </div>
 
       {/* Editors */}
-      <CharacterEditor
-        open={charEditorOpen}
-        onOpenChange={setCharEditorOpen}
-        onSaved={(c) => setSelectedCharIds((prev) => [...prev, c.id])}
-      />
       <LocationEditor
         open={locEditorOpen}
         onOpenChange={setLocEditorOpen}
@@ -515,10 +508,10 @@ function CastStep({
       <StepHeader
         icon={Users}
         title={tx({ de: "Cast deine Charaktere", en: "Cast your characters", es: "Elige tus personajes" })}
-        subtitle={tx({ de: "Wähle wiederkehrende Figuren aus deiner Library — sie bleiben über alle Szenen visuell konsistent.", en: "Select recurring characters from your library — they will remain visually consistent across all scenes.", es: "Selecciona personajes recurrentes de tu biblioteca; se mantendrán visualmente consistentes en todas las escenas." })}
+        subtitle={tx({ de: "Wähle wiederkehrende Figuren aus Cast & World — sie bleiben über alle Szenen visuell konsistent.", en: "Select recurring characters from Cast & World — they will remain visually consistent across all scenes.", es: "Selecciona personajes recurrentes de Cast & World; se mantendrán visualmente consistentes en todas las escenas." })}
         action={
           <Button onClick={onAddNew} className="gap-2">
-            <Plus className="h-4 w-4" /> Neuer Charakter
+            <Plus className="h-4 w-4" /> {tx({ de: "In Cast & World anlegen", en: "Create in Cast & World", es: "Crear en Cast & World" })}
           </Button>
         }
       />
@@ -530,7 +523,7 @@ function CastStep({
           icon={Users}
           title={tx({ de: "Noch keine Charaktere", en: "No characters yet", es: "Aún no hay personajes" })}
           desc={tx({ de: "Lege deinen ersten Charakter an — mit Reference-Image und Voice für maximale Konsistenz.", en: "Create your first character — with a reference image and voice for maximum consistency.", es: "Crea tu primer personaje, con una imagen de referencia y voz para una máxima coherencia." })}
-          actionLabel="Charakter anlegen"
+          actionLabel={tx({ de: "In Cast & World anlegen", en: "Create in Cast & World", es: "Crear en Cast & World" })}
           onAction={onAddNew}
         />
       ) : (
