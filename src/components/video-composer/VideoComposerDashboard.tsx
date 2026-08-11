@@ -1089,6 +1089,17 @@ export default function VideoComposerDashboard() {
     } catch { /* ignore */ }
   }, [activeTab]);
 
+  // Account switch inside a live tab: never keep writing the previous
+  // account's draft — drop it and load the new account's own draft.
+  const authUserId = useAuth().user?.id ?? null;
+  const lastAuthUserIdRef = useRef<string | null>(authUserId);
+  useEffect(() => {
+    if (lastAuthUserIdRef.current === authUserId) return;
+    lastAuthUserIdRef.current = authUserId;
+    setProject(loadDraft() ?? defaultProject);
+    setActiveTab(restoreActiveTab());
+  }, [authUserId]);
+
   const updateProject = useCallback((updates: Partial<LocalProject>) => {
     setProject(prev => ({ ...prev, ...updates }));
   }, []);
