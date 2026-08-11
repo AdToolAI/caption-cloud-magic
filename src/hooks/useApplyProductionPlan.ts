@@ -651,7 +651,11 @@ function planSceneToComposerScene(
     clipSource: (dialogMode ? 'ai-happyhorse' : 'ai-hailuo') as any,
     clipQuality: 'standard',
     clipStatus: 'pending',
-    aiPrompt,
+    // v415 — sound design only reaches the model when the provider owns the
+    // audio. Studio/silent scenes keep it as metadata for the audio step.
+    aiPrompt: (sceneAudioSource === 'provider' && String((ps as any).soundDesign ?? '').trim())
+      ? `${aiPrompt ? `${aiPrompt} ` : ''}Audio: ${String((ps as any).soundDesign).trim()}`
+      : aiPrompt,
     characterShot: characterShots[0],
     characterShots: characterShots.length ? characterShots : undefined,
     engineOverride: engine !== 'auto' ? (engine as any) : undefined,
