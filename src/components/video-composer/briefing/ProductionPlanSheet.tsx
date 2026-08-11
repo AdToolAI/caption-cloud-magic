@@ -68,7 +68,23 @@ const NON_SPEAKER_KEYS = new Set([
   'ort', 'location', 'cast', 'aktion', 'action', 'kamera', 'camera',
   'dialog', 'ziel', 'goal', 'dauer', 'duration', 'stimme', 'voice',
   'untertitel', 'subtitle', 'subtitles',
+  'laenge', 'length', 'zeit', 'time', 'besetzung', 'charaktere', 'characters',
+  'musik', 'music', 'audio', 'ton', 'sound', 'sounddesign', 'atmo',
+  'prompt', 'prompts', 'negativprompt', 'negativeprompt', 'stil', 'style',
+  'produkt', 'product', 'projekt', 'project', 'zielgruppe', 'audience',
+  'tonalitaet', 'tonalitat', 'tonality', 'format', 'seitenverhaeltnis',
+  'uebergang', 'ubergang', 'transition', 'engine', 'modell', 'model',
+  'usp', 'usps', 'briefing', 'notiz', 'note', 'overlay', 'text',
 ]);
+
+/** True when a plan dialog turn belongs to a real speaker (not a block label). */
+const isRealSpeakerTurn = (t: any): boolean => {
+  if (!String(t?.text ?? '').trim()) return false;
+  const key = normalizeAssetKey(String(t?.speakerMentionKey ?? t?.speakerName ?? '').replace(/^@/, ''));
+  if (!key) return false;
+  return !NON_SPEAKER_KEYS.has(key);
+};
+
 
 type PlanCastSlot = NonNullable<TPlanScene['cast']>[number];
 type PlanLocationSlot = NonNullable<TPlanScene['location']>;
