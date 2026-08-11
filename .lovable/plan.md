@@ -46,12 +46,14 @@ Guard-Tests: Standardfall darf niemals `generate_audio: true` senden; Hybrid-Fal
 - Bestehende, idempotente Refund-Automatik auf den ModelArk-Fehlerpfad anwenden (Task failed / timeout / Sync.so failed).
 
 ### 6. UI
-- Lip-Sync-Schalter in der SceneCard für Seedance 2.5 freigeben, mit Hinweistext zum Längenfenster und dazu, dass der Provider-Ton dabei abgeschaltet wird.
+- Lip-Sync-Schalter in der SceneCard für Seedance 2.5 freigeben, mit Hinweistext zum Längenfenster.
+- Neue Szenen-Option „Umgebungston vom Modell" (Standard: aus). Aktiv bedeutet: Atmosphäre nativ, Stimme weiterhin von uns; der Hinweistext sagt das genau so.
 - Registry-Fähigkeit `lipSyncCertified` für Seedance 2.5 setzen, damit Modellauswahl und Auto-Provider-Wahl (>15 s → Seedance 2.5) nicht mehr in eine gesperrte Kombination laufen.
 
 ### 7. Rollout mit Bremse
 - Feature-Flag `composer.feature.seedance25_lipsync`, Standard aus.
-- Erst für den Owner-Account einschalten, ein echter Test je Fall: Einzelsprecher 20 s und Zweisprecher-Dialog 25 s. Erst wenn beide sauber durchlaufen (Platte stumm, Sync sitzt, Kosten korrekt), wird das Flag global aktiviert.
+- Erst für den Owner-Account einschalten, drei echte Tests: Einzelsprecher 20 s stumm, Zweisprecher-Dialog 25 s stumm, ein Durchlauf mit Hybrid-Atmo. Erst wenn alle drei sauber sind (Sync sitzt, keine Doppelstimme, Kosten korrekt), wird das Flag global aktiviert.
+
 
 ## Technische Notizen
 
