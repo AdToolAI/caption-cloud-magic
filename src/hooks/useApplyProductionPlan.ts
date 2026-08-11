@@ -846,6 +846,7 @@ export interface ApplyPlanResult {
 }
 
 export function useApplyProductionPlan() {
+  const { suggestEditorMode } = useStudioPreferences();
   return useCallback(async (args: ApplyPlanArgs): Promise<ApplyPlanResult> => {
     const {
       plan: rawPlan, projectId, language,
