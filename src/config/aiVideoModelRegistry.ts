@@ -160,6 +160,10 @@ const pikaAspect = ['16:9', '9:16', '1:1', '4:5', '5:4', '3:2', '2:3'];
 const viduAspect = ['16:9', '9:16', '1:1', '4:3', '3:4'];
 /** Vidu Q3 duration range 1–16 s — exposed as a sensible selection. */
 const viduDurations = [4, 5, 6, 8, 10, 12, 16];
+/** HappyHorse 1.0 (Replicate) `aspect_ratio` enum. */
+const happyhorseAspect = ['16:9', '9:16', '1:1', '4:3', '3:4'];
+/** HappyHorse 1.0 `duration` enum: every integer from 3 to 15. */
+const happyhorseDurations = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
 export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
   /* ─────────── Kling family ─────────── */
