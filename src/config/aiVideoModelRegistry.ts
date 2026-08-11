@@ -109,6 +109,16 @@ export interface ToolkitModel {
     smartDuration?: boolean;
   };
 
+  /**
+   * Visual-Continuity-System — explicit slot topology for this model.
+   * Optional: when omitted, `deriveVisualInputProfile()` builds it from
+   * `capabilities`. Set it only where the provider contract cannot be
+   * expressed by the flags alone (e.g. Seedance 2.5's exclusive input modes).
+   */
+  visualInputs?: VisualInputProfile;
+
+
+
   /** Allowed durations in seconds (used to render the slider/select). */
   durations: number[];
   /** Quality/resolution label for the badge (default / highest option). */
