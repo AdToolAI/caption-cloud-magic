@@ -714,7 +714,9 @@ export default function VideoComposerDashboard() {
   const handleReset = useCallback(async () => {
     const oldId = project.id;
     setShowResetDialog(false);
-    if (oldId) {
+    // Only persisted projects have server-side jobs to cancel. An unsaved
+    // draft id (empty / non-UUID) would only produce a 404 from the function.
+    if (isUuid(oldId)) {
       setIsResetting(true);
       try {
         const { data, error: cancelErr } = await supabase.functions.invoke(
@@ -730,13 +732,32 @@ export default function VideoComposerDashboard() {
             : tx({ de: 'Keine laufenden Jobs.', en: 'No ongoing jobs.', es: 'No hay trabajos en curso.' }),
         });
       } catch (e) {
-        toast({
-          title: tx({ de: "Cancel teilweise fehlgeschlagen", en: "Cancel partially failed", es: "Cancelar parcialmente fallido" }),
-          description:
-            (e instanceof Error ? e.message : String(e)) +
-            tx({ de: ' — neues Projekt wird trotzdem gestartet.', en: ' — new project will be started anyway.', es: ' — se iniciará un nuevo proyecto de todos modos.' }),
-          variant: 'destructive',
-        });
+        // `functions.invoke` collapses every failure into "non-2xx status
+        // code" — unpack the real status + body so the toast (and the console)
+        // name the actual cause.
+        let status: number | undefined;
+        let bodyText = '';
+        let code = '';
+        if (e instanceof FunctionsHttpError) {
+          status = e.context?.status;
+          bodyText = await e.context.text().catch(() => '');
+          try { code = String(JSON.parse(bodyText)?.error ?? ''); } catch { /* not JSON */ }
+        }
+        const detail = bodyText || (e instanceof Error ? e.message : String(e));
+        // Nothing to cancel: the project is already gone (earlier reset) or
+        // does not belong to this user. Not an error worth alarming about.
+        if (code === 'project_not_found' || code === 'forbidden') {
+          console.warn('[composer-reset] cancel skipped:', code, { projectId: oldId });
+        } else {
+          console.error('[composer-reset] cancel failed:', status, detail);
+          toast({
+            title: tx({ de: 'Cancel teilweise fehlgeschlagen', en: 'Cancel partially failed', es: 'Cancelar parcialmente fallido' }),
+            description:
+              `${status ? `${status}: ` : ''}${detail}` +
+              tx({ de: ' — neues Projekt wird trotzdem gestartet.', en: ' — new project will be started anyway.', es: ' — se iniciará un nuevo proyecto de todos modos.' }),
+            variant: 'destructive',
+          });
+        }
       } finally {
         setIsResetting(false);
       }
