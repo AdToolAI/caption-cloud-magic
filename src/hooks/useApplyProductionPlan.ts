@@ -633,12 +633,16 @@ function planSceneToComposerScene(
 
   // v416 — pick the clip source FIRST: scenes longer than the default model
   // can handle (>15 s) must run on Seedance 2.5, the only long-form provider.
+  // v418 — dialog scenes may join that route once Seedance 2.5 is certified
+  // for lip-sync on this account; otherwise they are clamped as before.
   const preferredSource = dialogMode ? 'ai-happyhorse' : 'ai-hailuo';
   const picked = pickClipSourceForDuration({
     durationSeconds: ps.durationSec,
     preferred: preferredSource,
     dialogMode,
+    longFormDialogAllowed,
   });
+
   const resolvedClipSource = picked.clipSource;
   const resolvedDuration = picked.durationSeconds;
 
