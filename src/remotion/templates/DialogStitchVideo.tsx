@@ -125,6 +125,13 @@ export const DialogStitchVideoSchema = z.object({
    *  per-pass single-face preclips animate the lips on top. */
   masterImageUrl: z.string().url().optional().nullable(),
   masterAudioUrl: z.string().url(),
+  /** v418 hybrid ambience: the ORIGINAL (pre-lip-sync) plate, used purely as
+   *  an ambience/foley bed underneath the studio voice. Only ever set when
+   *  the post-render speech gate found no speech on the plate. */
+  ambientAudioUrl: z.string().url().optional().nullable(),
+  /** Mix level of that bed. Clamped to [0, 1] at render time. */
+  ambientVolume: z.number().optional().nullable(),
+
   totalSec: z.number().positive(),
   targetWidth: z.number().positive().optional(),
   targetHeight: z.number().positive().optional(),
