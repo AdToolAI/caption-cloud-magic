@@ -1,24 +1,8 @@
-# Cast & World: falsches Konto, doppelte Quelle, Motion-Studio-Lücke
+# Cast & World: doppelte Quelle entfernen, Motion-Studio-Lücke schließen
 
-## 1. Die vier Charaktere sind nicht gelöscht
+Die vermissten Charaktere sind geklärt (anderes Konto) — kein Handlungsbedarf,
+keine Datenänderung.
 
-Geprüft in der Datenbank: **Matthew Dusatko, Samuel Dusatko, Sarah Dusatko und Kailee
-existieren alle noch**, nicht archiviert, mit Referenzbild. Sie gehören zum Konto
-`bestofproducts4u@gmail.com`. Der Screenshot zeigt eine Session des Kontos
-`info@useadtool.ai` — und das hat null eigene Charaktere. Es wurde also nichts
-gelöscht, du bist nur im anderen Konto angemeldet.
-
-(Nebenbefund: es gibt zusätzlich drei ältere archivierte Duplikate von Matthew/Sarah
-aus dem Mai — die sind bewusst archiviert und bleiben ausgeblendet.)
-
-Zwei mögliche Wege, das dauerhaft zu lösen:
-
-- **A (Standard):** Charaktere bleiben, wo sie sind — du arbeitest im Konto
-  `bestofproducts4u@gmail.com`, wenn du sie brauchst.
-- **B (Umzug):** Ich kopiere die vier Charaktere samt Referenzbildern, Outfits und
-  Varianten auf `info@useadtool.ai`, damit das Firmenkonto vollständig ist.
-
-Ich brauche von dir die Entscheidung A oder B, bevor ich Daten anfasse.
 
 ## 2. Es gibt immer noch zwei Charakter-Quellen
 
