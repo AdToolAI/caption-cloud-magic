@@ -154,6 +154,16 @@ const lumaRay32Aspect = ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'];
 const ltxAspect = ['16:9', '9:16'];
 /** xai/grok-imagine-video `aspect_ratio` enum (minus "auto"). */
 const grokAspect = ['16:9', '9:16', '1:1', '4:3', '3:4', '3:2', '2:3'];
+/** Pika 2.2 (fal.ai `fal-ai/pika/v2.2/*`) `aspect_ratio` enum. */
+const pikaAspect = ['16:9', '9:16', '1:1', '4:5', '5:4', '3:2', '2:3'];
+/** Vidu Q3 (Replicate `vidu/q3-*`) `aspect_ratio` enum. */
+const viduAspect = ['16:9', '9:16', '1:1', '4:3', '3:4'];
+/** Vidu Q3 duration range 1–16 s — exposed as a sensible selection. */
+const viduDurations = [4, 5, 6, 8, 10, 12, 16];
+/** HappyHorse 1.0 (Replicate) `aspect_ratio` enum. */
+const happyhorseAspect = ['16:9', '9:16', '1:1', '4:3', '3:4'];
+/** HappyHorse 1.0 `duration` enum: every integer from 3 to 15. */
+const happyhorseDurations = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
 export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
   /* ─────────── Kling family ─────────── */
@@ -668,11 +678,17 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     legacyRoute: '/runway-video-studio',
   },
 
-  /* ─────────── Pika 2.2 ─────────── */
+  /* ─────────── Pika 2.2 (fal.ai `fal-ai/pika/v2.2/*`) ───────────
+   * Provider reality check 11.08.2026: Pika has NO first-party Replicate
+   * model — the official developer route is fal.ai. Durations 5/10 s,
+   * 720p + 1080p, text-to-video and image-to-video (single start frame),
+   * negative prompt + seed supported, no native audio. Pikaframes needs
+   * 2–5 keyframes (not a plain end frame), so `endFrame` stays false.
+   */
   {
     id: 'pika-2-2-standard',
     name: 'Pika 2.2',
-    provider: 'Pika Labs',
+    provider: 'Pika Labs (fal.ai)',
     family: 'pika',
     edgeFunction: 'generate-pika-video',
     group: 'recommended',
@@ -680,18 +696,18 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     capabilities: { t2v: true, i2v: true, audio: false },
     durations: [5, 10],
     resolution: '720p',
-    aspectRatios: ['16:9', '9:16', '1:1'],
+    aspectRatios: pikaAspect,
     costPerSecond: { EUR: 0.12, USD: 0.12 },
     badge: 'Wartung',
-    tagline: 'Smooth motion · Start+End frame morphing',
+    tagline: 'Smooth motion · 5s/10s · 720p',
     legacyRoute: '/pika-video-studio',
     status: 'maintenance',
-    statusReason: tx({ de: 'Pika ist temporär offline (Provider-Wartung). Wir aktivieren das Modell wieder, sobald die Pika Labs API stabil läuft.', en: 'Pika is temporarily offline (provider maintenance). We will re-enable the model as soon as the Pika Labs API is stable again.', es: 'Pika está temporalmente fuera de línea (mantenimiento del proveedor). Reactivaremos el modelo en cuanto la API de Pika Labs vuelva a ser estable.' }),
+    statusReason: tx({ de: 'Pika läuft offiziell nur über die fal.ai-API. Sobald der fal.ai-Zugang hinterlegt ist, schalten wir das Modell wieder frei.', en: 'Pika is only officially available through the fal.ai API. We will re-enable the model as soon as fal.ai access is configured.', es: 'Pika solo está disponible oficialmente a través de la API de fal.ai. Reactivaremos el modelo en cuanto se configure el acceso a fal.ai.' }),
   },
   {
     id: 'pika-2-2-pro',
     name: 'Pika 2.2 Pro',
-    provider: 'Pika Labs',
+    provider: 'Pika Labs (fal.ai)',
     family: 'pika',
     edgeFunction: 'generate-pika-video',
     group: 'premium',
@@ -699,16 +715,22 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     capabilities: { t2v: true, i2v: true, audio: false },
     durations: [5, 10],
     resolution: '1080p',
-    aspectRatios: ['16:9', '9:16', '1:1'],
+    aspectRatios: pikaAspect,
     costPerSecond: { EUR: 0.27, USD: 0.27 },
     badge: 'Wartung',
-    tagline: 'High-fidelity Pika · 1080p',
+    tagline: 'High-fidelity Pika · 5s/10s · 1080p',
     legacyRoute: '/pika-video-studio',
     status: 'maintenance',
-    statusReason: tx({ de: 'Pika ist temporär offline (Provider-Wartung). Wir aktivieren das Modell wieder, sobald die Pika Labs API stabil läuft.', en: 'Pika is temporarily offline (provider maintenance). We will re-enable the model as soon as the Pika Labs API is stable again.', es: 'Pika está temporalmente fuera de línea (mantenimiento del proveedor). Reactivaremos el modelo en cuanto la API de Pika Labs vuelva a ser estable.' }),
+    statusReason: tx({ de: 'Pika läuft offiziell nur über die fal.ai-API. Sobald der fal.ai-Zugang hinterlegt ist, schalten wir das Modell wieder frei.', en: 'Pika is only officially available through the fal.ai API. We will re-enable the model as soon as fal.ai access is configured.', es: 'Pika solo está disponible oficialmente a través de la API de fal.ai. Reactivaremos el modelo en cuanto se configure el acceso a fal.ai.' }),
   },
 
-  /* ─────────── Vidu (IDs q2-*, läuft real auf Q3) ─────────── */
+  /* ─────────── Vidu (IDs q2-*, läuft real auf Replicate `vidu/q3-*`) ───────────
+   * Verifiziertes Replicate-Input-Schema (11.08.2026):
+   *   duration 1–16 (default 5) · resolution 540p/720p/1080p ·
+   *   aspect_ratio 16:9|9:16|3:4|4:3|1:1 · start_image · end_image ·
+   *   audio (bool, default true) · seed. KEIN reference_images-Array und
+   *   KEIN negative_prompt — Multi-Ref existiert auf Replicate nicht.
+   */
   {
     id: 'vidu-q2-reference',
     name: VIDU_VIDEO_MODELS['vidu-q2-reference'].name,
@@ -717,14 +739,14 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-vidu-video',
     group: 'recommended',
     icon: Eye,
-    capabilities: { t2v: false, i2v: false, audio: false, multiRef: true, maxReferences: 7, multiRefRequired: true, anchorOnly: true },
-    durations: [5],
+    capabilities: { t2v: true, i2v: true, audio: true, endFrame: true },
+    durations: viduDurations,
     resolution: '1080p',
-    aspectRatios: ['16:9', '9:16', '1:1'],
-    // Flat €0.66 / 5s ≈ €0.13/s for UI parity (real billing is flat per generation)
-    costPerSecond: { EUR: 0.13, USD: 0.13 },
-    badge: 'Multi-Ref',
-    tagline: tx({ de: 'Bis zu 7 Refs: Charakter + Produkt + Location in einer Szene', en: 'Up to 7 refs: character + product + location in one scene', es: 'Hasta 7 referencias: personaje + producto + ubicación en una escena' }),
+    resolutions: ['540p', '720p', '1080p'],
+    aspectRatios: viduAspect,
+    costPerSecond: { EUR: 0.375, USD: 0.375 },
+    badge: 'Start+End',
+    tagline: tx({ de: 'Q3 Pro: Start- und Endframe, natives Audio, bis 16s', en: 'Q3 Pro: start + end frame, native audio, up to 16s', es: 'Q3 Pro: fotograma inicial y final, audio nativo, hasta 16s' }),
     legacyRoute: '/vidu-studio',
   },
   {
@@ -735,13 +757,14 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-vidu-video',
     group: 'fast',
     icon: Eye,
-    capabilities: { t2v: false, i2v: true, audio: false },
-    durations: [5],
+    capabilities: { t2v: false, i2v: true, audio: true, endFrame: true },
+    durations: viduDurations,
     resolution: '1080p',
-    aspectRatios: ['16:9', '9:16', '1:1'],
-    costPerSecond: { EUR: 0.12, USD: 0.12 },
+    resolutions: ['540p', '720p', '1080p'],
+    aspectRatios: viduAspect,
+    costPerSecond: { EUR: 0.375, USD: 0.375 },
     badge: 'I2V',
-    tagline: tx({ de: 'Animiert ein Standbild zu einem 5s-Clip', en: 'Animates a still image into a 5s clip', es: 'Anima una imagen fija en un clip de 5s' }),
+    tagline: tx({ de: 'Animiert ein Standbild zu bis zu 16s Video', en: 'Animates a still image into up to 16s of video', es: 'Anima una imagen fija en un vídeo de hasta 16s' }),
     legacyRoute: '/vidu-studio',
   },
   {
@@ -752,17 +775,23 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-vidu-video',
     group: 'fast',
     icon: Eye,
-    capabilities: { t2v: true, i2v: false, audio: false },
-    durations: [5],
+    capabilities: { t2v: true, i2v: false, audio: true },
+    durations: viduDurations,
     resolution: '1080p',
-    aspectRatios: ['16:9', '9:16', '1:1'],
-    costPerSecond: { EUR: 0.12, USD: 0.12 },
+    resolutions: ['540p', '720p', '1080p'],
+    aspectRatios: viduAspect,
+    costPerSecond: { EUR: 0.195, USD: 0.195 },
     badge: 'T2V',
-    tagline: tx({ de: '5s Clip aus reinem Prompt', en: '5s clip from pure prompt', es: 'Clip de 5 segundos de Pure Prompt' }),
+    tagline: tx({ de: 'Q3 Turbo: schneller Clip aus reinem Prompt, bis 16s', en: 'Q3 Turbo: fast clip from a pure prompt, up to 16s', es: 'Q3 Turbo: clip rápido a partir de un prompt, hasta 16s' }),
     legacyRoute: '/vidu-studio',
   },
 
-  /* ─────────── HappyHorse 1.0 (Alibaba) ─────────── */
+  /* ─────────── HappyHorse 1.0 (Alibaba, Replicate `alibaba/happyhorse-1.0`) ───────────
+   * Verifiziertes Replicate-Input-Schema (11.08.2026):
+   *   duration enum 3…15 · resolution 720p/1080p · aspect_ratio
+   *   16:9|9:16|1:1|4:3|3:4 · image (Startframe) · seed.
+   *   Kein Audio-Parameter und kein negative_prompt → kein nativer Dialog.
+   */
   {
     id: 'happyhorse-standard',
     name: HAPPYHORSE_VIDEO_MODELS['happyhorse-standard'].name,
@@ -771,13 +800,13 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-happyhorse-video',
     group: 'recommended',
     icon: Sparkles,
-    capabilities: { t2v: true, i2v: true, audio: false, nativeDialogue: true },
-    durations: [3, 5, 8, 10, 12, 15],
+    capabilities: { t2v: true, i2v: true, audio: false },
+    durations: happyhorseDurations,
     resolution: '720p',
-    aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+    aspectRatios: happyhorseAspect,
     costPerSecond: HAPPYHORSE_VIDEO_MODELS['happyhorse-standard'].costPerSecond,
     badge: 'Neu · Alibaba',
-    tagline: 'Multi-Shot Consistency · Dialog-Driven',
+    tagline: 'Multi-Shot Consistency · 3–15s · 720p',
     legacyRoute: '/happyhorse-video-studio',
   },
   {
@@ -788,13 +817,13 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-happyhorse-video',
     group: 'premium',
     icon: Sparkles,
-    capabilities: { t2v: true, i2v: true, audio: false, nativeDialogue: true },
-    durations: [3, 5, 8, 10, 12, 15],
+    capabilities: { t2v: true, i2v: true, audio: false },
+    durations: happyhorseDurations,
     resolution: '1080p',
-    aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+    aspectRatios: happyhorseAspect,
     costPerSecond: HAPPYHORSE_VIDEO_MODELS['happyhorse-pro'].costPerSecond,
     badge: 'Premium · 1080p',
-    tagline: 'Multi-Shot Consistency · 1080p',
+    tagline: 'Multi-Shot Consistency · 3–15s · 1080p',
     legacyRoute: '/happyhorse-video-studio',
   },
 
