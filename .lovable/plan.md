@@ -20,7 +20,7 @@ Der Dialog listet zwei Blöcke:
 - Leerzustand wird handlungsfähig: „Noch keine Charaktere in Cast & World" plus
   Button, der `/library` öffnet.
 
-## 3. Ausgewählte Charaktere kommen nicht im Motion Studio an
+## 2. Ausgewählte Charaktere kommen nicht im Motion Studio an
 
 Ursache: Das Motion Studio (Hub, Studio-Mode, Library, LibraryPicker) liest
 ausschließlich `motion_studio_characters`. Cast & World liegt in
