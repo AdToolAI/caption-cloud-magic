@@ -118,6 +118,8 @@ export const BriefingProject = z.object({
   fps: z.number().int().refine((v) => v === 24 || v === 25 || v === 30 || v === 60).optional(),
   totalDurationSec: z.number().min(1).max(600).optional(),
   platforms: z.array(z.string()).optional(),
+  /** v415 — global sound-design intent (metadata only, never generated). */
+  soundDesign: z.string().max(1000).optional(),
 });
 
 export const BriefingUnresolved = z.object({
