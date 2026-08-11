@@ -198,6 +198,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           ambientGate: {
             status: gate.allowed ? 'passed' : 'muted',
             reason: gate.reason,
+            // Only a cleared plate may ever be mixed in as an ambience bed.
+            url: gate.allowed ? permanentUrl : null,
             checkedAt: new Date().toISOString(),
           },
         };
