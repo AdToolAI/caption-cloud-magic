@@ -111,6 +111,8 @@ import { tx } from '@/lib/i18nText';
 import { resolveSceneAudioSource, type SceneAudioSource } from '@/config/nativeAudioSources';
 import { pickClipSourceForDuration } from '@/lib/composer/pickClipSourceForDuration';
 import { useStudioPreferences } from '@/hooks/useStudioPreferences';
+import { useSeedance25Lipsync } from '@/hooks/useSeedance25Lipsync';
+
 
 /** v416 — true when a plan scene actually contains speech (VO, dialog, lip-sync). */
 function planSceneHasSpeech(scene: TPlanScene): boolean {
@@ -285,7 +287,10 @@ function planSceneToComposerScene(
   voicePoolAssignments: Record<string, string> = {},
   isSingleScenePlan = false,
   applyDialogTurns = false,
+  /** v418 — Seedance 2.5 certified for lip-sync on this account. */
+  longFormDialogAllowed = false,
 ): ComposerScene {
+
 
   // Build characterShots from resolved cast. The plan stores `characterId`
   // as the BASE brand_characters.id (CastRef invariant) plus an optional
@@ -633,12 +638,16 @@ function planSceneToComposerScene(
 
   // v416 — pick the clip source FIRST: scenes longer than the default model
   // can handle (>15 s) must run on Seedance 2.5, the only long-form provider.
+  // v418 — dialog scenes may join that route once Seedance 2.5 is certified
+  // for lip-sync on this account; otherwise they are clamped as before.
   const preferredSource = dialogMode ? 'ai-happyhorse' : 'ai-hailuo';
   const picked = pickClipSourceForDuration({
     durationSeconds: ps.durationSec,
     preferred: preferredSource,
     dialogMode,
+    longFormDialogAllowed,
   });
+
   const resolvedClipSource = picked.clipSource;
   const resolvedDuration = picked.durationSeconds;
 
@@ -848,6 +857,9 @@ export interface ApplyPlanResult {
 
 export function useApplyProductionPlan() {
   const { suggestEditorMode } = useStudioPreferences();
+  // v418 — decides whether long dialog scenes may be routed to Seedance 2.5.
+  const seedance25LipsyncEnabled = useSeedance25Lipsync();
+
   return useCallback(async (args: ApplyPlanArgs): Promise<ApplyPlanResult> => {
     const {
       plan: rawPlan, projectId, language,
@@ -994,7 +1006,9 @@ export function useApplyProductionPlan() {
           voicePoolAssignments,
           hydratedScenes.length === 1,
           applyDialogTurns,
+          seedance25LipsyncEnabled,
         ),
+
       );
 
 
@@ -1159,5 +1173,5 @@ export function useApplyProductionPlan() {
       verified: true,
       warnings,
     };
-  }, [suggestEditorMode]);
+  }, [suggestEditorMode, seedance25LipsyncEnabled]);
 }

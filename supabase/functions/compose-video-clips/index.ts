@@ -4170,7 +4170,9 @@ serve(async (req) => {
           // `modelark-poll` edge function (which calls compose-clip-webhook
           // with a Replicate-shaped payload, reusing all downstream logic).
           const isI2V = !!planImageUrl;
-          const seed25Duration = Math.max(3, Math.min(30, Math.round(scene.durationSeconds)));
+          // Same bounds as the pre-dispatch guard above: ModelArk accepts 4–30 s.
+          const seed25Duration = Math.max(4, Math.min(30, Math.round(scene.durationSeconds)));
+
 
           // ── v418 audio ownership ──────────────────────────────────────────
           // A lip-sync scene renders a SILENT plate: the studio owns the
@@ -4716,6 +4718,10 @@ serve(async (req) => {
         scene.durationSeconds * (CLIP_COSTS[scene.clipSource]?.[q] ?? 0);
     }
 
+    // Surfaced to the caller when the debit itself failed — the clips are
+    // already running, so this must never abort, but it must not stay silent.
+    let creditWarning: string | null = null;
+
     if (billableResults.length > 0 && actualCost > 0) {
       try {
         await supabaseAdmin.rpc("deduct_ai_video_credits", {
@@ -4731,8 +4737,30 @@ serve(async (req) => {
           "[compose-video-clips] Credit deduction failed:",
           creditErr,
         );
+        creditWarning = `Credit deduction of €${actualCost.toFixed(2)} failed: ${String((creditErr as any)?.message ?? creditErr).slice(0, 200)}`;
+        // Make the silent failure visible: the clips are already running, so
+        // we never abort — but the event shows up in the account's log.
+        try {
+          await supabaseAdmin.from("app_events").insert({
+            user_id: user.id,
+            event_type: "edge_fn.error",
+            source: "compose-video-clips",
+            payload_json: {
+              kind: "credit_deduction_failed",
+              projectId,
+              amountEuros: actualCost,
+              scenes: billableResults.length,
+              message: creditWarning,
+            },
+          });
+        } catch (logErr) {
+          console.error("[compose-video-clips] credit warning log failed:", logErr);
+        }
       }
     }
+
+
+
 
     // Check if all scenes are already done (stock/upload only)
     const allDone = results.every(

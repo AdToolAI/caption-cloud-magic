@@ -44,20 +44,24 @@ export function exceedsSourceDuration(
 /**
  * Pick the clip source for a scene of `durationSeconds`.
  *
- * - Lip-sync / dialog scenes keep their certified provider (Seedance 2.5 is
- *   NOT lip-sync certified) — they are only clamped, never re-routed.
- * - Any other scene longer than the preferred source allows is moved to
+ * - Non-dialog scenes longer than the preferred source allows are moved to
  *   Seedance 2.5, the only long-form provider.
+ * - Dialog / lip-sync scenes may only be re-routed to Seedance 2.5 when the
+ *   v418 rollout flag certified it as a lip-sync plate provider
+ *   (`longFormDialogAllowed`, fed by `useSeedance25Lipsync()`). Without the
+ *   flag they keep their certified provider and are merely clamped.
  */
 export function pickClipSourceForDuration(input: {
   durationSeconds: number;
   preferred?: ClipSource | string | null;
   dialogMode?: boolean;
+  /** v418 — Seedance 2.5 is certified for lip-sync for this account. */
+  longFormDialogAllowed?: boolean;
 }): { clipSource: ClipSource; durationSeconds: number; switched: boolean } {
   const requested = Math.max(1, Math.round(input.durationSeconds || 0));
   const preferred = (input.preferred as ClipSource) || 'ai-hailuo';
 
-  if (input.dialogMode) {
+  if (input.dialogMode && !input.longFormDialogAllowed) {
     return {
       clipSource: preferred,
       durationSeconds: Math.min(requested, maxSecondsForClipSource(preferred)),
@@ -76,6 +80,7 @@ export function pickClipSourceForDuration(input: {
     switched: preferred !== LONG_FORM_CLIP_SOURCE,
   };
 }
+
 
 /** Snap a duration to the nearest allowed value of the given source. */
 export function snapDurationToSource(
