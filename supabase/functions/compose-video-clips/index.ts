@@ -4071,8 +4071,15 @@ serve(async (req) => {
               // Seedance 2.5 tops out at 720p output (ModelArk docs).
               resolution: "720p",
               aspectRatio: "16:9",
-              firstFrameUrl: planImageUrl ?? undefined,
-              lastFrameUrl: planEndImageUrl ?? undefined,
+              // ModelArk's three image modes are mutually exclusive — the
+              // resolver already picked exactly one, so only that one is sent.
+              firstFrameUrl:
+                visualPlan.inputMode === "references" ? undefined : planImageUrl ?? undefined,
+              lastFrameUrl:
+                visualPlan.inputMode === "first-last-frame" ? planEndImageUrl ?? undefined : undefined,
+              referenceImageUrls:
+                visualPlan.inputMode === "references" ? planReferenceUrls : undefined,
+              referenceVideoUrls: planReferenceVideoUrls.length ? planReferenceVideoUrls : undefined,
             });
           } catch (arkErr: any) {
             console.error(
