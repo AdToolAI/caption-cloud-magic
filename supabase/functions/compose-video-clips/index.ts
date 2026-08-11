@@ -6,6 +6,9 @@ import { planSceneVisualInputs } from "../_shared/visual-inputs.ts";
 import { ensureTransitionFrame } from "../_shared/transition-frame.ts";
 import { CLIP_COSTS, type ClipQuality } from "../_shared/clip-costs.ts";
 import { createSeedance25Task, MODELARK_JOB_PREFIX } from "../_shared/modelark.ts";
+import { isSeedance25LipsyncEnabled } from "../_shared/seedance25-lipsync-flag.ts";
+import { AMBIENT_NO_SPEECH_PROMPT } from "../_shared/ambient-audio.ts";
+
 import {
   countDialogSpeakers,
   stripSpeakerPrefixes,
