@@ -57,9 +57,9 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   'ltx-standard':         { id: 'ltx-standard',         label: 'LTX 2.3 Fast',         unit: 'per-second', sellEUR: 0.18, sellUSD: 0.18, costEUR: 0.06,  minDuration: 6,  maxDuration: 20 },
   'ltx-pro':              { id: 'ltx-pro',              label: 'LTX 2.3 Pro',          unit: 'per-second', sellEUR: 0.24, sellUSD: 0.24, costEUR: 0.08,  minDuration: 6,  maxDuration: 10 },
 
-  'vidu-q2-reference':    { id: 'vidu-q2-reference',    label: 'Vidu Q3 Reference (5s)', unit: 'per-clip', sellEUR: 0.66, sellUSD: 0.66, costEUR: 0.22, fixedClipSeconds: 5 },
-  'vidu-q2-i2v':          { id: 'vidu-q2-i2v',          label: 'Vidu Q3 I2V (5s)',       unit: 'per-clip', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20, fixedClipSeconds: 5 },
-  'vidu-q2-t2v':          { id: 'vidu-q2-t2v',          label: 'Vidu Q3 T2V (5s)',       unit: 'per-clip', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20, fixedClipSeconds: 5 },
+  'vidu-q2-reference':    { id: 'vidu-q2-reference',    label: 'Vidu Q3 Pro (Start+End)', unit: 'per-second', sellEUR: 0.375, sellUSD: 0.375, costEUR: 0.125, minDuration: 1, maxDuration: 16 },
+  'vidu-q2-i2v':          { id: 'vidu-q2-i2v',          label: 'Vidu Q3 Pro I2V',         unit: 'per-second', sellEUR: 0.375, sellUSD: 0.375, costEUR: 0.125, minDuration: 1, maxDuration: 16 },
+  'vidu-q2-t2v':          { id: 'vidu-q2-t2v',          label: 'Vidu Q3 Turbo T2V',       unit: 'per-second', sellEUR: 0.195, sellUSD: 0.195, costEUR: 0.065, minDuration: 1, maxDuration: 16 },
 
   'pika-2-2-standard':    { id: 'pika-2-2-standard',    label: 'Pika 2.2 Std',         unit: 'per-second', sellEUR: 0.12, sellUSD: 0.12, costEUR: 0.04,  minDuration: 3,  maxDuration: 10 },
   'pika-2-2-pro':         { id: 'pika-2-2-pro',         label: 'Pika 2.2 Pro',         unit: 'per-second', sellEUR: 0.27, sellUSD: 0.27, costEUR: 0.09,  minDuration: 3,  maxDuration: 10 },
