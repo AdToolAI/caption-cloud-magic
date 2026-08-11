@@ -782,7 +782,12 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     legacyRoute: '/vidu-studio',
   },
 
-  /* ─────────── HappyHorse 1.0 (Alibaba) ─────────── */
+  /* ─────────── HappyHorse 1.0 (Alibaba, Replicate `alibaba/happyhorse-1.0`) ───────────
+   * Verifiziertes Replicate-Input-Schema (11.08.2026):
+   *   duration enum 3…15 · resolution 720p/1080p · aspect_ratio
+   *   16:9|9:16|1:1|4:3|3:4 · image (Startframe) · seed.
+   *   Kein Audio-Parameter und kein negative_prompt → kein nativer Dialog.
+   */
   {
     id: 'happyhorse-standard',
     name: HAPPYHORSE_VIDEO_MODELS['happyhorse-standard'].name,
@@ -791,13 +796,13 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-happyhorse-video',
     group: 'recommended',
     icon: Sparkles,
-    capabilities: { t2v: true, i2v: true, audio: false, nativeDialogue: true },
-    durations: [3, 5, 8, 10, 12, 15],
+    capabilities: { t2v: true, i2v: true, audio: false },
+    durations: happyhorseDurations,
     resolution: '720p',
-    aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+    aspectRatios: happyhorseAspect,
     costPerSecond: HAPPYHORSE_VIDEO_MODELS['happyhorse-standard'].costPerSecond,
     badge: 'Neu · Alibaba',
-    tagline: 'Multi-Shot Consistency · Dialog-Driven',
+    tagline: 'Multi-Shot Consistency · 3–15s · 720p',
     legacyRoute: '/happyhorse-video-studio',
   },
   {
@@ -808,13 +813,13 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-happyhorse-video',
     group: 'premium',
     icon: Sparkles,
-    capabilities: { t2v: true, i2v: true, audio: false, nativeDialogue: true },
-    durations: [3, 5, 8, 10, 12, 15],
+    capabilities: { t2v: true, i2v: true, audio: false },
+    durations: happyhorseDurations,
     resolution: '1080p',
-    aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+    aspectRatios: happyhorseAspect,
     costPerSecond: HAPPYHORSE_VIDEO_MODELS['happyhorse-pro'].costPerSecond,
     badge: 'Premium · 1080p',
-    tagline: 'Multi-Shot Consistency · 1080p',
+    tagline: 'Multi-Shot Consistency · 3–15s · 1080p',
     legacyRoute: '/happyhorse-video-studio',
   },
 
