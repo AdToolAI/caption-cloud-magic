@@ -623,7 +623,16 @@ export default function BriefingTab({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">{cfg.descriptionLabel}</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label className="text-xs">{cfg.descriptionLabel}</Label>
+              <button
+                type="button"
+                onClick={() => setShowFormatGuide(true)}
+                className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-amber-200"
+              >
+                {tx({ de: 'Aufbau ansehen', en: 'View structure', es: 'Ver estructura' })}
+              </button>
+            </div>
             <Textarea
               value={briefing.productDescription}
               onChange={(e) => onUpdateBriefing({ productDescription: e.target.value })}
