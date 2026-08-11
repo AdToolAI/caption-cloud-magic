@@ -1103,11 +1103,19 @@ export function useStoryboardTransition({
    * (we'll handle navigation after the plan is applied). Returns false
    * when the caller should fall through with normal tab navigation.
    */
-  const attempt = useCallback(async (): Promise<{ handled: boolean }> => {
+  const attempt = useCallback(async (opts?: { force?: boolean }): Promise<{ handled: boolean }> => {
+    // GUARD 0 — the user explicitly chose the empty path in the Briefing
+    // ("Leer ins Storyboard" sets briefing.mode = 'manual'). Never spend an
+    // AI request or open the War Room in that case. `force` is used by the
+    // explicit "Generate from briefing" action in the empty storyboard.
+    if (!opts?.force && briefing?.mode === 'manual') {
+      return { handled: false };
+    }
     // GUARD 1 — protected scenes exist: never re-analyse.
     if (scenes.some(isProtected)) {
       return { handled: false };
     }
+
     // GUARD 2 — already has user-created scenes: skip auto-analyse. Exception:
     // failed/canceled fallback rows are repairable and should be replaced by the
     // full plan instead of trapping the user in stale placeholders.
