@@ -62,7 +62,10 @@ describe('detectScriptTimingMode', () => {
 
   it('erkennt echte Dialogzeilen weiterhin', () => {
     const info = detectScriptTimingMode(REAL_DIALOG_BRIEFING);
-    const labels = info.shots.flatMap((s) => s.dialogTurns).map((t) => t.speakerLabel);
+    const labels = info.shots
+      .flatMap((s) => (s.dialogTurns.length ? s.dialogTurns.map((t) => t.speakerLabel) : [s.speakerLabel]))
+      .filter(Boolean);
     expect(labels).toEqual(['Samuel', 'Kailee']);
   });
+
 });
