@@ -1,6 +1,9 @@
-# Muster-Briefing im Briefing-Tab
+# Muster-Briefing dort, wo das Briefing wirklich eingefügt wird
 
-Ziel: Kunden sehen direkt am Eingabefeld, wie ein Briefing aufgebaut sein muss, damit die KI-Analyse alles korrekt erkennt und ins Storyboard überträgt.
+Ziel: Kunden sehen genau an der Stelle, an der sie ihr Briefing eintippen oder einfügen, wie es aufgebaut sein muss, damit die KI-Analyse alles korrekt erkennt und ins Storyboard überträgt.
+
+Platzierung: Hauptplatz ist der **Briefing-Import-Dialog** — das ist die Fläche, in die Kunden ihr komplettes Briefing kleben. Dort steht heute ein Beispiel im Placeholder, das beim ersten Tastendruck verschwindet und ein anderes Format zeigt als das, was die Analyse optimal parst. Am Beschreibungsfeld in Stage 02 kommt nur ein dezenter Link auf dieselbe Vorlage.
+
 
 ## Was die Analyse sicher erkennt
 
@@ -11,20 +14,28 @@ Ziel: Kunden sehen direkt am Eingabefeld, wie ein Briefing aufgebaut sein muss, 
 - **Stimme, Untertitel, Negative Prompt** als Schlüssel-Wert-Zeilen am Ende.
 - **Kein On-Screen-Text** in Szenenbeschreibungen (Hooks, CTAs, Untertitel) — die Analyse ignoriert ihn dort bewusst.
 
-## UI: Hilfe direkt am Eingabefeld
+## UI
 
-Über dem Beschreibungs-/Briefing-Textfeld in Stage 02 kommt eine schmale Hilfszeile:
+**1) Import-Dialog (Hauptplatz)**
 
 ```text
-Beschreibung                       [ Aufbau ansehen ]  [ Muster einfügen ]
+Briefing importieren
+[ Muster-Briefing einfügen ]        [ Aufbau & Regeln ]
 ┌───────────────────────────────────────────────────────────────────────┐
-│  … Briefing-Textfeld …                                                │
+│  … großes Briefing-Textfeld …                                         │
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Aufbau ansehen** öffnet ein Sheet mit dem vollständigen Muster-Briefing (monospace, scrollbar), einer kurzen Feldreferenz („welche Zeile füllt was im Storyboard") und dem Anti-Muster-Abschnitt mit den fünf häufigsten Fehlern. Enthält einen Kopieren-Button.
-- **Muster einfügen** schreibt die Vorlage in das leere Feld; ist bereits Text vorhanden, kommt eine Rückfrage vor dem Überschreiben.
-- Stil nach James Bond 2028: Ghost-Buttons, Mono-Uppercase-Tracking, Gold nur als Hover-Akzent.
+- **Muster-Briefing einfügen** schreibt die Vorlage ins leere Feld; bei vorhandenem Text erst Rückfrage.
+- **Aufbau & Regeln** klappt direkt über dem Feld einen kompakten Block auf: das vollständige Muster in Monospace, die Feldreferenz („welche Zeile füllt was im Storyboard") und die fünf häufigsten Fehler. Mit Kopieren-Button, bleibt sichtbar während man tippt.
+- Der bisherige Placeholder-Text wird auf eine kurze Ein-Zeilen-Version gekürzt, damit er nicht mehr mit der Vorlage konkurriert.
+
+**2) Beschreibungsfeld Stage 02 (Sekundär)**
+
+- Nur ein Ghost-Link „Aufbau ansehen" neben dem Label, der dieselbe Vorlage in einem Sheet öffnet. Kein Einfügen-Button, weil dieses Feld die Produktbeschreibung ist und kein Vollbriefing.
+
+Stil nach James Bond 2028: Ghost-Buttons, Mono-Uppercase-Tracking, Gold nur als Hover-Akzent.
+
 
 ## Inhalt des Musters
 
@@ -32,8 +43,9 @@ Beispiel-Spot 9:16, 30 Sekunden, 3 Szenen, zwei Sprecher mit echtem Dialog, ein 
 
 ## Technische Details
 
-- Vorlage und Feldreferenz als einzige Quelle in `src/lib/video-composer/briefingTemplate.ts` (Objekt je Sprache), damit Sheet, Einfügen-Aktion und Dokumentation nicht auseinanderlaufen.
-- Neue Komponente `src/components/video-composer/BriefingTemplateSheet.tsx`, eingebunden in `BriefingTab.tsx` oberhalb des Textfelds in Stage 02.
+- Vorlage, Feldreferenz und Fehlerliste als einzige Quelle in `src/lib/video-composer/briefingTemplate.ts` (Objekt je Sprache), damit Import-Dialog, Stage-02-Sheet und Dokumentation nicht auseinanderlaufen.
+- Neue Komponente `src/components/video-composer/briefing/BriefingFormatGuide.tsx` — rendert Muster + Regeln, wird im `BriefingImportDialog.tsx` inline und in `BriefingTab.tsx` als Sheet verwendet.
+
 - Zusätzlich `docs/briefing-musterbeispiel.md` als Referenz für Support und Onboarding.
 - `src/lib/video-composer/__tests__/briefingTemplate.test.ts` prüft mit den bestehenden Detektoren, dass das Muster genau 30 s, 3 Szenen und eindeutige @-Mentions ergibt — so veraltet die Vorlage nicht still, wenn sich die Parser ändern.
 - Keine Änderungen an Edge Functions oder Prompts.
