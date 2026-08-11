@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { beginSceneRun } from "../_shared/scene-run-begin.ts";
 import { planSceneVisualInputs } from "../_shared/visual-inputs.ts";
+import { ensureTransitionFrame } from "../_shared/transition-frame.ts";
 import { CLIP_COSTS, type ClipQuality } from "../_shared/clip-costs.ts";
 import { createSeedance25Task, MODELARK_JOB_PREFIX } from "../_shared/modelark.ts";
 import {
