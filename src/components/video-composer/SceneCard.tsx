@@ -110,6 +110,7 @@ import {
   getProviderLabel,
   snapDurationToProvider,
 } from "@/lib/video-composer/providerCapabilities";
+import { maxSecondsForClipSource } from "@/lib/composer/pickClipSourceForDuration";
 import { ModelSelector } from "@/components/ai-video/ModelSelector";
 import {
   COMPOSER_AVAILABLE_MODELS,
