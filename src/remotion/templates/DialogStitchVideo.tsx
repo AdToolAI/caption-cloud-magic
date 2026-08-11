@@ -871,6 +871,17 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
       {/* Single canonical audio track (merged master WAV). */}
       {masterAudioUrl && <Audio src={masterAudioUrl} />}
 
+      {/* v418 hybrid ambience bed — the model's own room tone underneath the
+          studio voice. Never a speech source: it is only passed in after the
+          post-render speech gate cleared the plate. Volume hard-clamped. */}
+      {ambientAudioUrl && (
+        <Audio
+          src={ambientAudioUrl}
+          volume={Math.max(0, Math.min(1, Number(ambientVolume ?? 0.18)))}
+        />
+      )}
+
+
       {totalSec ? null : null}
     </AbsoluteFill>
   );
