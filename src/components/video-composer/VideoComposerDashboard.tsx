@@ -844,7 +844,7 @@ export default function VideoComposerDashboard() {
     onUpdateBriefing: updateBriefing,
   });
 
-  const handleTabChange = useCallback(async (next: TabId) => {
+  const handleTabChange = useCallback(async (next: TabId, opts?: { skipAnalysis?: boolean }) => {
     // Flush any pending debounced scene-edit writes synchronously
     // (covers the Storyboard → Clips transition, which is exactly when
     // users notice their prompt edits being lost).
