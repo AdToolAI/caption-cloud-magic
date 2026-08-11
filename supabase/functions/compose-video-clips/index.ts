@@ -1815,7 +1815,8 @@ serve(async (req) => {
           JSON.stringify({
             error: "invalid_provider_for_lipsync",
             message:
-              tl({ de: `Lip-Sync ist aktuell nur mit HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s) oder Luma (5/9s) möglich. Aktuell: ${scene.clipSource}. Bitte Provider wechseln oder Lip-Sync deaktivieren.`, en: `Lip-sync is currently only possible with HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s) or Luma (5/9s). Current: ${scene.clipSource}. Please change provider or disable lip-sync.`, es: `La sincronización labial solo es posible actualmente con HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s) o Luma (5/9s). Actual: ${scene.clipSource}. Por favor, cambia de proveedor o desactiva la sincronización labial.` }),
+              tl({ de: `Lip-Sync ist aktuell nur mit HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s)${seedance25LipsyncEnabled ? ", Seedance 2.5 (4–30s)" : ""} oder Luma (5/9s) möglich. Aktuell: ${scene.clipSource}. Bitte Provider wechseln oder Lip-Sync deaktivieren.`, en: `Lip-sync is currently only possible with HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s)${seedance25LipsyncEnabled ? ", Seedance 2.5 (4–30s)" : ""} or Luma (5/9s). Current: ${scene.clipSource}. Please change provider or disable lip-sync.`, es: `La sincronización labial solo es posible actualmente con HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s)${seedance25LipsyncEnabled ? ", Seedance 2.5 (4–30s)" : ""} o Luma (5/9s). Actual: ${scene.clipSource}. Por favor, cambia de proveedor o desactiva la sincronización labial.` }),
+
             scene_id: scene.id,
             picked: scene.clipSource,
             allowed: Array.from(LIPSYNC_PROVIDERS),
