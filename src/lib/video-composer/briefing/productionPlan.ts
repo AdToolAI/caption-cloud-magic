@@ -283,6 +283,8 @@ export const PlanProject = z.object({
   fps: z.number().int().optional(),
   totalDurationSec: z.number().min(1).max(600).optional(),
   platforms: z.array(z.string()).optional(),
+  /** v415 — global sound-design intent (never auto-generated). */
+  soundDesign: z.string().max(1000).optional(),
 });
 
 export const PlanUnresolved = z.object({
