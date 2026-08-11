@@ -1895,7 +1895,7 @@ function ensureProductionPlanEnsembleServer(plan: any, briefing: string, charact
   return { repaired, required: required.length };
 }
 
-Deno.serve(async (req) => {
+export async function handleDeepParse(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   // QA smoke short-circuit
   if (isQaMockRequest(req)) {
@@ -3255,4 +3255,4 @@ YOU MUST:
       status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+}

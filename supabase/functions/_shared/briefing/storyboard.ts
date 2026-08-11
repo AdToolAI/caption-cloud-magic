@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getVisualStyleHint } from "../composer-visual-styles.ts";
 import { isQaMockRequest, qaMockJson } from "../qaMock.ts";
 import {
@@ -152,7 +151,8 @@ Use sceneType values loosely — map "hook"=opening, "problem"=conflict beats, "
   custom: `FREE EDITOR MODE — follow the user's free description as literally as possible. Treat "productName" as the title, "productDescription" as the user's full creative brief (TOP PRIORITY — the storyboard must reflect it scene-by-scene), "usps" as optional style hints. Do NOT impose AIDA or any fixed framework. Generate scenes that mirror the user's description in order. Text overlays only if the brief implies them.`,
 };
 
-serve((req: Request) => withLang(req, () => (async (req) => {
+export function handleStoryboard(req: Request): Promise<Response> {
+  return withLang(req, () => (async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -1036,4 +1036,5 @@ Generate the storyboard using the create_storyboard function.`;
       }
     );
   }
-})(req)));
+})(req));
+}
