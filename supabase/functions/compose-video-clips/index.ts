@@ -1886,7 +1886,24 @@ serve(async (req) => {
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
         }
+      } else if (scene.clipSource === "ai-seedance25") {
+        // v418 — Seedance 2.5 plates: 4–30s, whole seconds (ModelArk).
+        const d = Number(scene.durationSeconds);
+        if (!Number.isFinite(d) || d < 4 || d > 30) {
+          return new Response(
+            JSON.stringify({
+              error: "invalid_duration_for_provider",
+              message: tl({ de: `Seedance 2.5 unterstützt 4–30 Sekunden. Gewählt: ${d}s.`, en: `Seedance 2.5 supports 4–30 seconds. Selected: ${d}s.`, es: `Seedance 2.5 admite 4–30 segundos. Seleccionado: ${d}s.` }),
+              scene_id: scene.id,
+              provider: "ai-seedance25",
+              picked: d,
+              allowed: { min: 4, max: 30 },
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
       } else if (scene.clipSource === "ai-seedance") {
+
         const d = Number(scene.durationSeconds);
         if (!Number.isFinite(d) || d < 3 || d > 12) {
           return new Response(
