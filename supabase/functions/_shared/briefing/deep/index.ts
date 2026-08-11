@@ -3302,6 +3302,11 @@ YOU MUST:
     const _validSources = new Set(['explicit-briefing', 'script', 'board']);
     const _rawSource = explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board');
     const _source = _validSources.has(_rawSource) ? _rawSource : 'board';
+    // v415 — audio ownership + caption normalization (speech-bound captions,
+    // never provider audio on a speaking scene).
+    let audioNormalization: ReturnType<typeof normalizeAudioAndCaptions> | null = null;
+    try { audioNormalization = normalizeAudioAndCaptions(plan, briefing); } catch { /* non-fatal */ }
+
     const _briefingContract = {
       durationSec: _clampDur(_canonicalTotal),
       sceneCount: _clampSceneCount(_canonicalScenes),
