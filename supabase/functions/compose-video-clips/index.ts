@@ -4170,7 +4170,9 @@ serve(async (req) => {
           // `modelark-poll` edge function (which calls compose-clip-webhook
           // with a Replicate-shaped payload, reusing all downstream logic).
           const isI2V = !!planImageUrl;
-          const seed25Duration = Math.max(3, Math.min(30, Math.round(scene.durationSeconds)));
+          // Same bounds as the pre-dispatch guard above: ModelArk accepts 4–30 s.
+          const seed25Duration = Math.max(4, Math.min(30, Math.round(scene.durationSeconds)));
+
 
           // ── v418 audio ownership ──────────────────────────────────────────
           // A lip-sync scene renders a SILENT plate: the studio owns the
