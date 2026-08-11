@@ -6374,6 +6374,8 @@ export type Database = {
           applied_style_preset_id: string | null
           audio_plan: Json | null
           audio_selfheal_count: number
+          audio_source: string | null
+          camera_choreography_en: string | null
           character_audio_url: string | null
           character_image_url: string | null
           character_script: string | null
@@ -6452,6 +6454,7 @@ export type Database = {
           seed: number | null
           seed_variations: Json
           shot_director: Json | null
+          sound_design: string | null
           stock_keywords: string | null
           subject_track: Json | null
           talking_head_aspect: string | null
@@ -6476,6 +6479,8 @@ export type Database = {
           applied_style_preset_id?: string | null
           audio_plan?: Json | null
           audio_selfheal_count?: number
+          audio_source?: string | null
+          camera_choreography_en?: string | null
           character_audio_url?: string | null
           character_image_url?: string | null
           character_script?: string | null
@@ -6554,6 +6559,7 @@ export type Database = {
           seed?: number | null
           seed_variations?: Json
           shot_director?: Json | null
+          sound_design?: string | null
           stock_keywords?: string | null
           subject_track?: Json | null
           talking_head_aspect?: string | null
@@ -6578,6 +6584,8 @@ export type Database = {
           applied_style_preset_id?: string | null
           audio_plan?: Json | null
           audio_selfheal_count?: number
+          audio_source?: string | null
+          camera_choreography_en?: string | null
           character_audio_url?: string | null
           character_image_url?: string | null
           character_script?: string | null
@@ -6656,6 +6664,7 @@ export type Database = {
           seed?: number | null
           seed_variations?: Json
           shot_director?: Json | null
+          sound_design?: string | null
           stock_keywords?: string | null
           subject_track?: Json | null
           talking_head_aspect?: string | null
