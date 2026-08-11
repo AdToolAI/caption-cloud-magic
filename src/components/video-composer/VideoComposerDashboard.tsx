@@ -1726,6 +1726,13 @@ export default function VideoComposerDashboard() {
                   setRetryStoryboardNonce((n) => n + 1);
                 }}
                 onBackToBriefing={() => setActiveTab('briefing')}
+                onGenerateFromBriefing={async () => {
+                  // The user started empty but now wants the AI plan.
+                  updateBriefing({ mode: 'ai' });
+                  setStoryboardError(null);
+                  await storyboardTransition.attempt({ force: true });
+                }}
+
                 onEnsurePersisted={async () => {
                   const result = await ensureProjectPersisted(project);
                   // Sync ref BEFORE setState so any callback that fires inside
