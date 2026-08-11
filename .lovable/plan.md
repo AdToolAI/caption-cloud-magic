@@ -14,20 +14,28 @@ Platzierung: Hauptplatz ist der **Briefing-Import-Dialog** — das ist die Fläc
 - **Stimme, Untertitel, Negative Prompt** als Schlüssel-Wert-Zeilen am Ende.
 - **Kein On-Screen-Text** in Szenenbeschreibungen (Hooks, CTAs, Untertitel) — die Analyse ignoriert ihn dort bewusst.
 
-## UI: Hilfe direkt am Eingabefeld
+## UI
 
-Über dem Beschreibungs-/Briefing-Textfeld in Stage 02 kommt eine schmale Hilfszeile:
+**1) Import-Dialog (Hauptplatz)**
 
 ```text
-Beschreibung                       [ Aufbau ansehen ]  [ Muster einfügen ]
+Briefing importieren
+[ Muster-Briefing einfügen ]        [ Aufbau & Regeln ]
 ┌───────────────────────────────────────────────────────────────────────┐
-│  … Briefing-Textfeld …                                                │
+│  … großes Briefing-Textfeld …                                         │
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Aufbau ansehen** öffnet ein Sheet mit dem vollständigen Muster-Briefing (monospace, scrollbar), einer kurzen Feldreferenz („welche Zeile füllt was im Storyboard") und dem Anti-Muster-Abschnitt mit den fünf häufigsten Fehlern. Enthält einen Kopieren-Button.
-- **Muster einfügen** schreibt die Vorlage in das leere Feld; ist bereits Text vorhanden, kommt eine Rückfrage vor dem Überschreiben.
-- Stil nach James Bond 2028: Ghost-Buttons, Mono-Uppercase-Tracking, Gold nur als Hover-Akzent.
+- **Muster-Briefing einfügen** schreibt die Vorlage ins leere Feld; bei vorhandenem Text erst Rückfrage.
+- **Aufbau & Regeln** klappt direkt über dem Feld einen kompakten Block auf: das vollständige Muster in Monospace, die Feldreferenz („welche Zeile füllt was im Storyboard") und die fünf häufigsten Fehler. Mit Kopieren-Button, bleibt sichtbar während man tippt.
+- Der bisherige Placeholder-Text wird auf eine kurze Ein-Zeilen-Version gekürzt, damit er nicht mehr mit der Vorlage konkurriert.
+
+**2) Beschreibungsfeld Stage 02 (Sekundär)**
+
+- Nur ein Ghost-Link „Aufbau ansehen" neben dem Label, der dieselbe Vorlage in einem Sheet öffnet. Kein Einfügen-Button, weil dieses Feld die Produktbeschreibung ist und kein Vollbriefing.
+
+Stil nach James Bond 2028: Ghost-Buttons, Mono-Uppercase-Tracking, Gold nur als Hover-Akzent.
+
 
 ## Inhalt des Musters
 
