@@ -115,6 +115,8 @@ import { ModelSelector } from "@/components/ai-video/ModelSelector";
 import {
   COMPOSER_AVAILABLE_MODELS,
   COMPOSER_DIALOG_MODELS,
+  composerDialogModels,
+  lipsyncClipSources,
   NATIVE_DIALOGUE_CLIP_SOURCES,
   DIALOG_FALLBACK_CLIP_SOURCE,
   DIALOG_FALLBACK_CLIP_QUALITY,
@@ -125,6 +127,8 @@ import {
   modelIdToSource,
   sourceToModelId,
 } from "@/lib/video-composer/modelMapping";
+import { useSeedance25Lipsync } from "@/hooks/useSeedance25Lipsync";
+
 
 import { AI_VIDEO_TOOLKIT_MODELS } from "@/config/aiVideoModelRegistry";
 import { startSceneGeneration } from "@/lib/composer/startSceneGeneration";
