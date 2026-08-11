@@ -239,10 +239,18 @@ export default function BriefingTab({
   retryStoryboardNonce = 0,
 }: BriefingTabProps) {
   const { t } = useTranslation();
-  const { prefs } = useStudioPreferences();
+  const { prefs, setEditorMode } = useStudioPreferences();
   const editorMode = prefs.editorMode; // 'quick' | 'direct' | 'studio'
   const showDirect = editorMode !== 'quick';
   const showStudio = editorMode === 'studio';
+  // v416 — Quick hides real panels. If those hidden panels already carry data
+  // (from the briefing analysis or an earlier session), surface a one-line
+  // hint instead of letting the values disappear silently.
+  const hiddenPanelsHaveData = !showDirect && Boolean(
+    (briefing.visualStyle && String(briefing.visualStyle).trim())
+    || (briefing.characters && briefing.characters.length)
+    || (briefing.videoMode && briefing.videoMode !== 'video'),
+  );
   const [uspInput, setUspInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   // briefingImportOpen state removed — auto-analyse handled by dashboard hook.
