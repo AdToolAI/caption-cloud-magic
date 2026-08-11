@@ -40,6 +40,7 @@ function readFromStorage(): StudioPreferences {
       audioMode:
         parsed.audioMode === "off" || parsed.audioMode === "full" ? parsed.audioMode : "ambient",
       cinemascope: Boolean(parsed.cinemascope),
+      editorModeManual: Boolean(parsed.editorModeManual),
     };
   } catch {
     return DEFAULTS;
