@@ -178,13 +178,16 @@ export default function ProductionPlanSheet({
   }, [currentBriefing]);
 
   const planRequestedDurationSec = useMemo(() => readRequestedDurationFromPlan(plan), [plan]);
+  // v420 — Nur echte Sprecher-Turns zählen. Briefing-Blocklabels ("DAUER:",
+  // "ORT:", "CAST:") sind Struktur, keine Dialogzeilen.
   const dialogTurnCount = useMemo(
     () => (plan?.scenes ?? []).reduce(
-      (acc, sc) => acc + ((sc as any).dialogTurns ?? []).filter((t: any) => (t?.text ?? '').trim()).length,
+      (acc, sc) => acc + ((sc as any).dialogTurns ?? []).filter(isRealSpeakerTurn).length,
       0,
     ),
     [plan],
   );
+
   const effectiveCurrentBriefing = useMemo(() => {
     const currentDuration = Number(currentBriefing?.duration);
     if (planRequestedDurationSec !== null && (!Number.isFinite(currentDuration) || currentDuration < 15)) {
