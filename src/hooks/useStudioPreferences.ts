@@ -13,6 +13,8 @@ export interface StudioPreferences {
   editorMode: EditorMode;
   audioMode: StageAudioMode;
   cinemascope: boolean;
+  /** v416 — true once the user picked a mode themselves. Blocks auto-suggest. */
+  editorModeManual: boolean;
 }
 
 const STORAGE_KEY = "motion-studio:prefs:v1";
@@ -21,6 +23,7 @@ const DEFAULTS: StudioPreferences = {
   editorMode: "quick",
   audioMode: "ambient",
   cinemascope: false,
+  editorModeManual: false,
 };
 
 function readFromStorage(): StudioPreferences {
