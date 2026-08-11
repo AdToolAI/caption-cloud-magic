@@ -311,7 +311,8 @@ export default function BriefingTab({
   const handleStartEmptyStoryboard = () => {
     onUpdateBriefing({ mode: 'manual' });
     onUpdateProject({ status: 'storyboard' });
-    onGoToStoryboard();
+    onGoToStoryboard({ skipAnalysis: true });
+
   };
 
   const handleGenerateStoryboard = async () => {
