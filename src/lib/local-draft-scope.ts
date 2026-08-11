@@ -66,7 +66,12 @@ const DRAFT_BASE_KEYS = [
   'universal-video-consultant-state',
 ];
 
-const DRAFT_EXACT_KEYS = ['composer_import', 'ai-toolkit-prompt-draft', 'wizardPrompt'];
+const DRAFT_EXACT_KEYS = [
+  'composer_import',
+  'composer_draft',
+  'ai-video-toolkit:prompt-draft',
+  'wizardPrompt',
+];
 
 /** Called on sign-out: no draft of the leaving account may survive locally. */
 export function clearAllLocalDrafts(): void {
