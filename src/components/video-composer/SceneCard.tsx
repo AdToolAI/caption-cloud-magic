@@ -468,14 +468,18 @@ export default function SceneCard({
   // (e.g. ai-kling, ai-veo from the previous 3-provider policy) onto the
   // primary lipsync provider so the user never lands on an unrenderable
   // combination after re-opening an older project.
+  // v418: Seedance 2.5 is a certified plate provider once the rollout flag is
+  // on — check against the flag-aware list, otherwise the picker selection is
+  // reverted to HappyHorse on the very next render.
   useEffect(() => {
     if (!isLipsyncEngine(scene.engineOverride ?? null)) return;
-    if (isLipsyncClipSource(scene.clipSource)) return;
+    const allowed = lipsyncClipSources(seedance25LipsyncEnabled) as ReadonlyArray<string>;
+    if (allowed.includes(scene.clipSource as string)) return;
     onUpdate({
       clipSource: LIPSYNC_PRIMARY_CLIP_SOURCE,
       clipQuality: 'standard',
     });
-  }, [scene.engineOverride, scene.clipSource, onUpdate]);
+  }, [scene.engineOverride, scene.clipSource, seedance25LipsyncEnabled, onUpdate]);
 
 
   // Scene Dialog Studio — toggleable per-scene script editor (monolog from 1 cast,
