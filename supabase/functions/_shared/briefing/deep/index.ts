@@ -451,6 +451,19 @@ For EVERY auto-generated scene you MUST fill what the briefing does not specify:
   the beat.
 - "brollHints": 3–6 short English Pexels/Pixabay keywords for optional cutaways.
 - "beat": label like "Hook", "Pain", "Reveal", "Proof", "CTA".
+- "cameraChoreographyEN": ONLY when the briefing describes a multi-step camera
+  move. Keep the full sequence ("aerial establishing → crane down → tracking"),
+  and still pick the dominant move for "shotDirector.movement".
+- "soundDesign": ONLY when the briefing actually describes ambience, SFX or
+  atmosphere for that scene. Copy the intent faithfully; do NOT invent sound,
+  and do NOT put sound words into "anchorPromptEN".
+- "audioSource": "studio" for every scene with voiceover or dialog (the clip
+  must stay silent so voiceover and lip-sync own the audio). "provider" only
+  for speechless scenes that describe sound design. "silent" for speechless
+  scenes without any sound description. Omit when unsure.
+- CAPTIONS RULE: set "captions.enabled" to false when NO scene has voiceover or
+  dialog, or when the briefing explicitly forbids subtitles. Music and ambience
+  are never subtitled.
 
 ENSEMBLE CAST GUARANTEE (SOFT — respect the script): If the "## Cast" section
 contains 2–4 selected avatars, prefer at least ONE ensemble scene where ALL
