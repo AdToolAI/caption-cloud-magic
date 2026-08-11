@@ -1173,5 +1173,5 @@ export function useApplyProductionPlan() {
       verified: true,
       warnings,
     };
-  }, [suggestEditorMode]);
+  }, [suggestEditorMode, seedance25LipsyncEnabled]);
 }
