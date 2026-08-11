@@ -1124,7 +1124,9 @@ export default function SceneCard({
               {(() => {
                 const MAX_PROJECT_SEC = 600;
                 const MIN_SCENE = 3;
-                const PROVIDER_MAX = 15;
+                // v416 — the provider cap is model-specific (30 s on Seedance 2.5,
+                // 15 s elsewhere). Hard-coding 15 disabled the long buckets.
+                const PROVIDER_MAX = maxSecondsForClipSource(scene.clipSource);
                 const remaining = Math.max(0, MAX_PROJECT_SEC - siblingsDurationSec);
                 const sliderMax = Math.max(MIN_SCENE, Math.min(PROVIDER_MAX, remaining));
                 const budgetCapped = sliderMax < PROVIDER_MAX;
