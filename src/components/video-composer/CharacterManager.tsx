@@ -26,11 +26,14 @@ const labels = {
     subtitle:
       tx({ de: 'Hilft der KI, Personen über mehrere Szenen hinweg ähnlich aussehen zu lassen — exakte Gesichts-Identität ist mit Text-zu-Video technisch nicht möglich.', en: 'Helps the AI make people look similar across multiple scenes — exact facial identity is not technically possible with text-to-video.', es: 'Ayuda a la IA a que las personas se parezcan en varias escenas; la identidad facial exacta no es técnicamente posible con texto a vídeo.' }),
     add: tx({ de: 'Charakter hinzufügen', en: 'Add character', es: 'Añadir personaje' }),
-    pickFromLibrary: tx({ de: 'Aus Avatar-Bibliothek wählen', en: 'Choose from avatar library', es: 'Elegir de la biblioteca de avatares' }),
-    pickerTitle: tx({ de: 'Avatar als Charakter verknüpfen', en: 'Link avatar as character', es: 'Vincular avatar como personaje' }),
+    pickFromLibrary: tx({ de: 'Aus Cast & World wählen', en: 'Choose from Cast & World', es: 'Elegir de Cast & World' }),
+    pickerTitle: tx({ de: 'Charakter aus Cast & World verknüpfen', en: 'Link character from Cast & World', es: 'Vincular personaje de Cast & World' }),
     pickerDesc:
-      tx({ de: 'Verknüpfe einen Avatar aus deiner Bibliothek. Sein Portrait wird automatisch als Anker-Frame (i2v) für Szenen mit diesem Charakter genutzt — das ist der einzige zuverlässige Hebel für echte Gesichts-Konsistenz.', en: 'Link an avatar from your library. Its portrait will automatically be used as an anchor frame (i2v) for scenes with this character — this is the only reliable lever for true facial consistency.', es: 'Vincula un avatar de tu biblioteca. Su retrato se utilizará automáticamente como fotograma de anclaje (i2v) para las escenas con este personaje; esta es la única palanca fiable para una verdadera consistencia facial.' }),
-    pickerEmpty: tx({ de: 'Keine Avatare in der Bibliothek. Lege einen unter „Avatare" an.', en: 'No avatars in the library. Create one under "Avatars".', es: 'No hay avatares en la biblioteca. Crea uno en "Avatares".' }),
+      tx({ de: 'Verknüpfe einen Charakter aus Cast & World. Sein Referenzbild wird automatisch als Anker-Frame (i2v) für Szenen mit diesem Charakter genutzt — das ist der einzige zuverlässige Hebel für echte Gesichts-Konsistenz.', en: 'Link a character from Cast & World. Its reference image is automatically used as the anchor frame (i2v) for scenes with this character — the only reliable lever for true facial consistency.', es: 'Vincula un personaje de Cast & World. Su imagen de referencia se usa automáticamente como frame ancla (i2v) en las escenas con este personaje: la única palanca fiable para una consistencia facial real.' }),
+    pickerEmpty: tx({ de: 'Noch keine Charaktere in Cast & World.', en: 'No characters in Cast & World yet.', es: 'Todavía no hay personajes en Cast & World.' }),
+    pickerSectionTitle: tx({ de: 'Cast & World (mit Referenzbild)', en: 'Cast & World (with reference image)', es: 'Cast & World (con imagen de referencia)' }),
+    openCastWorld: tx({ de: 'Cast & World öffnen', en: 'Open Cast & World', es: 'Abrir Cast & World' }),
+
     use: 'Verknüpfen',
     anchorBadge: 'Look-Referenz',
     anchorBadgeLocked: 'Erster Frame fixiert',
