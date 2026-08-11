@@ -16,10 +16,20 @@ Es geht also nicht um Umbau der Lip-Sync-Pipeline, sondern um **Zertifizierung e
 - Spiegel-Liste in `supabase/functions/_shared/visual-inputs.ts` (zertifizierte Plate-Provider) mitziehen, damit Resolver und Dispatcher nicht auseinanderlaufen.
 - Beide Listen werden per Test aneinander gebunden.
 
-### 2. Stumme Platte als harte Invariante
-- Im Seedance-2.5-Zweig `generate_audio: false` explizit setzen, sobald die Szene Lip-Sync-Absicht hat, und Referenz-Audio unterdrücken.
-- Passt zur Audio-Ownership-Regel (v415): Sprache erzwingt den stummen Clip; der Ton kommt aus dem Studio-Track, nicht vom Provider.
-- Guard-Test: keine Lip-Sync-Szene darf jemals einen ModelArk-Task mit `generate_audio: true` auslösen.
+### 2. Tonhoheit: stumme Stimmspur, optional native Atmosphäre (Hybrid)
+Die Stimme kommt immer von uns, der Provider darf höchstens die Umgebung liefern. Zwei Zustände pro Szene:
+
+- **Standard (stumme Platte):** `generate_audio: false`, Referenz-Audio unterdrückt. Ton komplett aus dem Studio-Track (v415).
+- **Hybrid „Atmo nativ":** `generate_audio: true`, aber der Prompt-Layer verbietet Sprache explizit (englisch: no speech, no dialogue, no voices, ambience and foley only). Genutzt wird die Tonspur nur als Atmosphären-Bett unter unserer VO.
+
+Regeln für den Hybrid-Fall, damit er nicht zur Fehlerquelle wird:
+- **Sync.so sieht die Atmo nie.** Lip-Sync läuft auf der Platte plus unserer VO; das Atmo-Bett wird erst beim Mux zurückgemischt. Sonst driftet der Mund gegen zwei konkurrierende Tonquellen.
+- **Sprach-Gate nach dem Render:** die Plattentonspur wird transkribiert. Ist Sprache erkennbar (nicht-leeres Transkript / Sprachenergie), wird die Tonspur verworfen und die Szene läuft stumm weiter — fail-closed, kein Renderfehler, nur Telemetrie und ein Hinweis in der Szene.
+- **Mix-Deckel:** Atmo als eigener Layer unterhalb der Sprache, mit Pegeldeckel und Ducking unter der VO; Lautstärken bleiben hart auf [0, 1] geclampt (bekannter Browser-Crash-Pfad).
+- **Kosten:** natives Audio ist Teil des Seedance-Preises, verursacht also keine Zusatzkosten — das Sprach-Gate (STT auf wenige Sekunden) schon, aber im Cent-Bereich.
+
+Guard-Tests: Standardfall darf niemals `generate_audio: true` senden; Hybrid-Fall darf niemals eine Tonspur an Sync.so weiterreichen; ein nicht bestandenes Sprach-Gate muss zwingend zu „stumm" führen.
+
 
 ### 3. Längen- und Zeitfenster
 - Lip-Sync-Platten von Seedance 2.5: 4–30 s erlaubt, keine Snap-Werte (ModelArk akzeptiert ganze Sekunden).
