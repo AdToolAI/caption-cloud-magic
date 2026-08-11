@@ -64,6 +64,14 @@ export const BriefingScene = z.object({
     stylePreset: z.string().max(80).optional(),
   }).optional(),
 
+  /** v415 — sound-design intent, verbatim from the briefing. No audio is generated from it. */
+  soundDesign: z.string().max(1000).optional(),
+  /** v415 — audio ownership: provider audio vs. studio tracks vs. silent. */
+  audioSource: z.enum(['provider', 'studio', 'silent']).optional(),
+  /** v415 — full multi-step camera choreography in English. */
+  cameraChoreographyEN: z.string().max(600).optional(),
+
+
   /** English anchor / i2v prompt hint — used as the AI scene prompt. */
   anchorPromptEN: z.string().max(2000).optional(),
 
