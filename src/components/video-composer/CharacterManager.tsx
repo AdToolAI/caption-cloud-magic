@@ -1,5 +1,6 @@
 import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +11,6 @@ import { Plus, Trash2, User, Lightbulb, Library, Sparkles, ImageIcon } from 'luc
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
-import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import type { ComposerCharacter } from '@/types/video-composer';
 
@@ -166,7 +166,6 @@ export default function CharacterManager({ characters, language, onChange }: Cha
   const [draft, setDraft] = useState({ name: '', appearance: '', signatureItems: '' });
   const [pickerOpen, setPickerOpen] = useState(false);
   const { data: avatars = [], isLoading: avatarsLoading } = useAccessibleCharacters();
-  const { characters: libChars, loading: libLoading } = useMotionStudioLibrary();
 
   const addCharacter = () => {
     if (!draft.name.trim()) return;
@@ -211,25 +210,6 @@ export default function CharacterManager({ characters, language, onChange }: Cha
         referenceImageUrl: portrait || undefined,
         usePortraitAsFirstFrame: false,
         identityCardPrompt: idCard || undefined,
-      },
-    ]);
-    setPickerOpen(false);
-  };
-
-  const linkLibraryCharacter = (lc: any) => {
-    const libIdToken = `lib:${lc.id}`;
-    if (characters.some((c) => c.id === libIdToken)) {
-      setPickerOpen(false);
-      return;
-    }
-    onChange([
-      ...characters,
-      {
-        id: libIdToken,
-        name: lc.name,
-        appearance: lc.description || '',
-        signatureItems: lc.signature_items || '',
-        referenceImageUrl: lc.reference_image_url || undefined,
       },
     ]);
     setPickerOpen(false);
