@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { tx } from '@/lib/i18nText';
+import type { VisualInputProfile } from '@/lib/composer/visualInputs/types';
+
 
 import { KLING_VIDEO_MODELS } from './klingVideoCredits';
 import { VEO_VIDEO_MODELS } from './veoVideoCredits';
