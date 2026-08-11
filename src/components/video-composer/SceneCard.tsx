@@ -1553,9 +1553,10 @@ export default function SceneCard({
                                 if (engineChanged) updates.engineOverride = nextEngine;
                                 if (lipSyncChanged) updates.lipSyncWithVoiceover = nextLipSync;
                                 if (next) {
-                                  const ok = (NATIVE_DIALOGUE_CLIP_SOURCES as ReadonlyArray<string>).includes(
-                                    scene.clipSource,
-                                  );
+                                  const ok = (
+                                    lipsyncClipSources(seedance25LipsyncEnabled) as ReadonlyArray<string>
+                                  ).includes(scene.clipSource);
+
                                   if (!ok) {
                                     updates.clipSource = DIALOG_FALLBACK_CLIP_SOURCE;
                                     updates.clipQuality = DIALOG_FALLBACK_CLIP_QUALITY;
