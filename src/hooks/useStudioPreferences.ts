@@ -108,6 +108,7 @@ export function useStudioPreferences() {
   return {
     prefs,
     setEditorMode,
+    suggestEditorMode,
     setAudioMode,
     toggleCinemascope,
     setCinemascope,
