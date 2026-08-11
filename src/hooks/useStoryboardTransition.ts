@@ -949,7 +949,7 @@ export function detectBriefingFidelity(b: ComposerBriefing): {
  * In LITERAL mode (script detected), the parser MUST reproduce the script
  * verbatim — no speaker reassignment, no dialog rewriting.
  */
-function buildBriefingText(b: ComposerBriefing): string {
+export function buildBriefingText(b: ComposerBriefing): string {
   const lines: string[] = [];
   const fidelity = detectBriefingFidelity(b);
 
