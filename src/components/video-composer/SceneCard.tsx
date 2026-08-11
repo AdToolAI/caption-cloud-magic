@@ -1670,6 +1670,55 @@ export default function SceneCard({
                               models={modelsForPicker}
                               className="h-11 bg-card/60 backdrop-blur-sm border-border/60 hover:border-primary/40 transition-colors text-xs"
                             />
+                            {index > 0 && (
+                              <div className="mt-2">
+                                <Label className="text-[10px] text-muted-foreground">
+                                  {tx({
+                                    de: "Übergang von der vorherigen Szene",
+                                    en: "Transition from the previous scene",
+                                    es: "Transición desde la escena anterior",
+                                  })}
+                                </Label>
+                                <Select
+                                  value={scene.visualContinuity ?? "auto"}
+                                  onValueChange={(v) =>
+                                    onUpdate({
+                                      visualContinuity: v as ComposerScene["visualContinuity"],
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger className="h-9 text-xs mt-1">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="auto" className="text-xs">
+                                      {tx({ de: "Automatisch", en: "Automatic", es: "Automático" })}
+                                    </SelectItem>
+                                    <SelectItem value="seamless" className="text-xs">
+                                      {tx({
+                                        de: "Nahtlos — am Endbild anknüpfen",
+                                        en: "Seamless — continue from the end frame",
+                                        es: "Sin cortes: continuar desde el fotograma final",
+                                      })}
+                                    </SelectItem>
+                                    <SelectItem value="identity" className="text-xs">
+                                      {tx({
+                                        de: "Figur zuerst — Anker schützen",
+                                        en: "Character first — protect the anchor",
+                                        es: "Personaje primero: proteger el ancla",
+                                      })}
+                                    </SelectItem>
+                                    <SelectItem value="match-cut" className="text-xs">
+                                      {tx({
+                                        de: "Harter Schnitt",
+                                        en: "Hard cut",
+                                        es: "Corte seco",
+                                      })}
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
                         {(() => {
                           const selectedModel = AI_VIDEO_TOOLKIT_MODELS.find(
                             (m) => m.id === currentModelId,

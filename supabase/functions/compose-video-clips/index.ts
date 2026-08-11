@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { beginSceneRun } from "../_shared/scene-run-begin.ts";
+import { planSceneVisualInputs } from "../_shared/visual-inputs.ts";
 import { CLIP_COSTS, type ClipQuality } from "../_shared/clip-costs.ts";
 import { createSeedance25Task, MODELARK_JOB_PREFIX } from "../_shared/modelark.ts";
 import {
@@ -126,6 +127,20 @@ interface ClipScene {
   referenceImageUrl?: string;
   /** Optional anchor image for the END of the clip (Kling/Luma backward extend / bridge). */
   endReferenceImageUrl?: string;
+  /** Continuity: last usable frame of the PREVIOUS scene's clip (client-extracted). */
+  transitionFrameUrl?: string;
+  /** Continuity: URL of the previous scene's rendered clip (video-reference models). */
+  previousClipUrl?: string;
+  /** User/auto preference for how this scene connects to the previous one. */
+  visualContinuity?: "auto" | "seamless" | "identity" | "match-cut";
+  /** Additional role-tagged references (character / location / product). */
+  visualReferences?: Array<{
+    url: string;
+    kind?: "image" | "video";
+    role?: string;
+    weight?: number;
+    protected?: boolean;
+  }>;
   durationSeconds: number;
   characterShot?: { characterId: string; shotType: CharacterShotType; actionEn?: string; actionUser?: string };
   characterShots?: Array<{ characterId: string; shotType: CharacterShotType; actionEn?: string; actionUser?: string }>;
@@ -3626,6 +3641,49 @@ serve(async (req) => {
       // to Cinematic-Sync BEFORE this point (see the guard around L1157).
       // The standalone Talking-Head module (`/talking-head`) is unaffected —
       // only the Composer's auto-portrait dispatch was removed.
+      // ── VISUAL-INPUT RESOLUTION (Phase 2) ───────────────────────────────
+      // ONE decision instance for every image/video input a provider gets.
+      // The anchor (`scene.referenceImageUrl`, resolved above in T3) is passed
+      // in read-only; the resolver never writes it back. For a scene with
+      // lip-sync intent the invariant "continuity never displaces a protected
+      // anchor" forces `match-cut`, which means the plan's first frame IS the
+      // anchor — byte-identical to the pre-resolver behaviour, so T5 geometry,
+      // T6 assignment-lock and the whole frozen chain see no change at all.
+      const visualPlan = planSceneVisualInputs(
+        {
+          lip_sync_with_voiceover: scene.lipSyncWithVoiceover ?? null,
+          engine_override: scene.engineOverride ?? null,
+          dialog_mode: (scene as any).dialogMode ?? null,
+          character_shots: scene.characterShots ?? [],
+          lock_reference_url: (scene as any).lockReferenceUrl ?? null,
+        },
+        {
+          clipSource: scene.clipSource,
+          anchorImageUrl: scene.referenceImageUrl ?? null,
+          endFrameUrl: scene.endReferenceImageUrl ?? null,
+          previousFrameUrl: (scene as any).transitionFrameUrl ?? null,
+          previousClipUrl: (scene as any).previousClipUrl ?? null,
+          references: Array.isArray((scene as any).visualReferences)
+            ? (scene as any).visualReferences
+            : [],
+          continuityPreference: (scene as any).visualContinuity ?? "auto",
+        },
+      );
+      // The ONE start image every provider branch below must use.
+      const planImageUrl = visualPlan.firstFrameUrl;
+      const planEndImageUrl = visualPlan.endFrameUrl ?? scene.endReferenceImageUrl;
+      const planReferenceUrls = visualPlan.references
+        .filter((r) => r.kind !== "video")
+        .map((r) => r.url);
+      const planReferenceVideoUrls = visualPlan.references
+        .filter((r) => r.kind === "video")
+        .map((r) => r.url);
+      if (visualPlan.transition.mode !== "match-cut" || visualPlan.warnings.length > 0) {
+        console.log(
+          `[compose-video-clips] scene ${scene.id} visual-plan: transition=${visualPlan.transition.mode} inputMode=${visualPlan.inputMode} refs=${visualPlan.references.length} lipSyncProtected=${visualPlan.constraints.lipSyncProtected} warnings=${visualPlan.warnings.join(",") || "none"}`,
+        );
+      }
+
       try {
         if (scene.clipSource === "upload" && scene.uploadUrl) {
 
@@ -3700,7 +3758,7 @@ serve(async (req) => {
               `[compose-video-clips] Hailuo Pro+10s API-incompatible — downgrading resolution to 768p (Scene ${scene.id}).`,
             );
           }
-          const isI2V = !!scene.referenceImageUrl;
+          const isI2V = !!planImageUrl;
           const isCinematicSyncScene =
             (scene.engineOverride ?? "auto") === "cinematic-sync" ||
             (scene.engineOverride ?? "auto") === "sync-segments";
@@ -3736,7 +3794,7 @@ serve(async (req) => {
           };
           // Image-to-Video: use reference image as the first frame
           if (isI2V) {
-            hailuoInput.first_frame_image = scene.referenceImageUrl;
+            hailuoInput.first_frame_image = planImageUrl;
             console.log(
               `[compose-video-clips] Hailuo scene ${scene.id} uses reference image (lead-in trim ${computeLeadInTrim("ai-hailuo", true)}s)`,
             );
@@ -3764,7 +3822,7 @@ serve(async (req) => {
           });
         } else if (scene.clipSource === "ai-kling") {
           // Kling 3.0 Omni via Replicate — supports T2V, I2V, 3-15s
-          const isI2V = !!scene.referenceImageUrl;
+          const isI2V = !!planImageUrl;
           await supabaseAdmin
             .from("composer_scenes")
             .update({
@@ -3800,14 +3858,14 @@ serve(async (req) => {
           };
           // Image-to-Video: optional start/end image
           if (isI2V) {
-            klingInput.start_image = scene.referenceImageUrl;
+            klingInput.start_image = planImageUrl;
             console.log(
               `[compose-video-clips] Kling scene ${scene.id} uses start_image (lead-in trim ${computeLeadInTrim("ai-kling", true)}s)`,
             );
           }
 
-          if (scene.endReferenceImageUrl) {
-            klingInput.end_image = scene.endReferenceImageUrl;
+          if (planEndImageUrl) {
+            klingInput.end_image = planEndImageUrl;
             console.log(
               `[compose-video-clips] Kling scene ${scene.id} uses end_image (backward extend / bridge)`,
             );
@@ -3899,7 +3957,7 @@ serve(async (req) => {
           }
         } else if (scene.clipSource === "ai-wan") {
           // Wan 2.5 via Replicate — supports i2v when reference image present
-          const isI2V = !!scene.referenceImageUrl;
+          const isI2V = !!planImageUrl;
           await supabaseAdmin
             .from("composer_scenes")
             .update({
@@ -3926,7 +3984,7 @@ serve(async (req) => {
             `[compose-video-clips] Wan scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${wanDuration}s`,
           );
           if (isI2V) {
-            wanInput.image = scene.referenceImageUrl;
+            wanInput.image = planImageUrl;
             console.log(
               `[compose-video-clips] Wan scene ${scene.id} uses i2v reference (lead-in trim ${computeLeadInTrim("ai-wan", true)}s)`,
             );
@@ -3951,7 +4009,7 @@ serve(async (req) => {
           });
         } else if (scene.clipSource === "ai-seedance") {
           // Seedance 1 Lite via Replicate
-          const isI2V = !!scene.referenceImageUrl;
+          const isI2V = !!planImageUrl;
           await supabaseAdmin
             .from("composer_scenes")
             .update({
@@ -3977,7 +4035,7 @@ serve(async (req) => {
             `[compose-video-clips] Seedance scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${seedDuration}s`,
           );
           if (isI2V) {
-            seedInput.image = scene.referenceImageUrl;
+            seedInput.image = planImageUrl;
             console.log(
               `[compose-video-clips] Seedance scene ${scene.id} uses i2v reference (lead-in trim ${computeLeadInTrim("ai-seedance", true)}s)`,
             );
@@ -4006,7 +4064,7 @@ serve(async (req) => {
           // task id is stored with a `modelark:` prefix and finalized by the
           // `modelark-poll` edge function (which calls compose-clip-webhook
           // with a Replicate-shaped payload, reusing all downstream logic).
-          const isI2V = !!scene.referenceImageUrl;
+          const isI2V = !!planImageUrl;
           const seed25Duration = Math.max(3, Math.min(30, Math.round(scene.durationSeconds)));
 
           await supabaseAdmin
@@ -4027,8 +4085,15 @@ serve(async (req) => {
               // Seedance 2.5 tops out at 720p output (ModelArk docs).
               resolution: "720p",
               aspectRatio: "16:9",
-              firstFrameUrl: scene.referenceImageUrl ?? undefined,
-              lastFrameUrl: scene.endReferenceImageUrl ?? undefined,
+              // ModelArk's three image modes are mutually exclusive — the
+              // resolver already picked exactly one, so only that one is sent.
+              firstFrameUrl:
+                visualPlan.inputMode === "references" ? undefined : planImageUrl ?? undefined,
+              lastFrameUrl:
+                visualPlan.inputMode === "first-last-frame" ? planEndImageUrl ?? undefined : undefined,
+              referenceImageUrls:
+                visualPlan.inputMode === "references" ? planReferenceUrls : undefined,
+              referenceVideoUrls: planReferenceVideoUrls.length ? planReferenceVideoUrls : undefined,
             });
           } catch (arkErr: any) {
             console.error(
@@ -4078,7 +4143,7 @@ serve(async (req) => {
         } else if (scene.clipSource === "ai-luma") {
 
           // Luma Ray 2 via Replicate — supports start_image
-          const isI2V = !!scene.referenceImageUrl;
+          const isI2V = !!planImageUrl;
           await supabaseAdmin
             .from("composer_scenes")
             .update({
@@ -4100,13 +4165,13 @@ serve(async (req) => {
             `[compose-video-clips] Luma scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${lumaDuration}s`,
           );
           if (isI2V) {
-            lumaInput.start_image = scene.referenceImageUrl;
+            lumaInput.start_image = planImageUrl;
             console.log(
               `[compose-video-clips] Luma scene ${scene.id} uses start_image keyframe (lead-in trim ${computeLeadInTrim("ai-luma", true)}s)`,
             );
           }
-          if (scene.endReferenceImageUrl) {
-            lumaInput.end_image = scene.endReferenceImageUrl;
+          if (planEndImageUrl) {
+            lumaInput.end_image = planEndImageUrl;
             console.log(
               `[compose-video-clips] Luma scene ${scene.id} uses end_image keyframe (backward extend / bridge)`,
             );
@@ -4132,7 +4197,7 @@ serve(async (req) => {
         } else if (scene.clipSource === "ai-veo") {
           // Google Veo 3.1 via Replicate — native audio
           // standard → google/veo-3.1-fast (Lite, $0.05/s 720p) | pro → google/veo-3.1 (Premium 1080p, $0.40/s)
-          const isI2V = !!scene.referenceImageUrl;
+          const isI2V = !!planImageUrl;
           await supabaseAdmin
             .from("composer_scenes")
             .update({
@@ -4160,7 +4225,7 @@ serve(async (req) => {
             generate_audio: scene.withAudio !== false,
           };
           if (isI2V) {
-            veoInput.image = scene.referenceImageUrl;
+            veoInput.image = planImageUrl;
             console.log(
               `[compose-video-clips] Veo scene ${scene.id} uses i2v reference (${veoModel}, lead-in trim ${computeLeadInTrim("ai-veo", true)}s)`,
             );
@@ -4299,7 +4364,7 @@ serve(async (req) => {
           }
         } else if (scene.clipSource === "ai-pika") {
           // Pika 2.2 via Replicate — supports T2V + I2V (Pikaframes via end_image)
-          const isI2V = !!scene.referenceImageUrl;
+          const isI2V = !!planImageUrl;
           await supabaseAdmin
             .from("composer_scenes")
             .update({
@@ -4324,8 +4389,8 @@ serve(async (req) => {
                 model: quality === "pro" ? "pika-2-2-pro" : "pika-2-2-standard",
                 duration: pikaDuration,
                 aspectRatio: "16:9",
-                startImageUrl: scene.referenceImageUrl,
-                endImageUrl: scene.endReferenceImageUrl,
+                startImageUrl: planImageUrl,
+                endImageUrl: planEndImageUrl,
               }),
             },
           );
@@ -4372,7 +4437,7 @@ serve(async (req) => {
           // composer-specific webhook fires and updates composer_scenes.
           // (Going through generate-happyhorse-video would only update the
           // toolkit's ai_video_generations table, leaving the scene stuck.)
-          const isI2V = !!scene.referenceImageUrl;
+          const isI2V = !!planImageUrl;
           const isCinematicSyncHH =
             (scene.engineOverride ?? "auto") === "cinematic-sync";
 
@@ -4460,7 +4525,7 @@ serve(async (req) => {
             seed: Math.floor(Math.random() * 2_147_483_647),
           };
           if (isI2V) {
-            hhInput.image = scene.referenceImageUrl;
+            hhInput.image = planImageUrl;
             console.log(
               `[compose-video-clips] HappyHorse scene ${scene.id} uses image (lead-in trim ${computeLeadInTrim("ai-happyhorse", true)}s, cinematic-sync=${isCinematicSyncHH})`,
             );

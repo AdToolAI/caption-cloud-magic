@@ -116,6 +116,12 @@ export interface ResolveVisualInputsArgs {
   sceneClass: VisualSceneClass;
   requirements: SceneVisualRequirements;
   profile: VisualInputProfile;
+  /**
+   * The scene's identity/geometry anchor (`referenceImageUrl`). Read-only:
+   * it is the first frame for every non-continuity outcome, which is what
+   * keeps the frozen lip-sync chain byte-identical.
+   */
+  anchorImageUrl?: string;
   /** Last usable continuity frame of the previous scene, if any. */
   previousFrameUrl?: string;
   /** Rendered clip of the previous scene, for `clip-reference` transitions. */

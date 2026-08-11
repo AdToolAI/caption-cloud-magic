@@ -57,6 +57,7 @@ import ContinuityGuardianStrip from './ContinuityGuardianStrip';
 import RenderPipelinePanel from './RenderPipelinePanel';
 import FramePickerOverlay from './FramePickerOverlay';
 import { prepareSceneRuns, startSceneGeneration } from '@/lib/composer/startSceneGeneration';
+import { prepareContinuityInputs } from '@/lib/composer/visualInputs/prepareContinuityInputs';
 
 interface ClipsTabProps {
   scenes: ComposerScene[];
@@ -649,6 +650,16 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           }),
       );
 
+      // Visual continuity: hand the server the last usable frame (and clip URL)
+      // of the preceding scene. Lip-sync scenes are excluded inside the helper,
+      // and the server-side resolver still decides whether it may be used.
+      const { data: authData } = await supabase.auth.getUser();
+      const continuityInputs = await prepareContinuityInputs(
+        pScenes,
+        eligibleScenes.map((s) => s.id),
+        authData?.user?.id,
+      );
+
       const scenesPayload = eligibleScenes.map(s => {
         const composed = composedByScene.get(s.id)!;
         const prepared = anchorByScene.get(s.id);
@@ -673,6 +684,9 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           dialogVoices: s.dialogVoices,
           engineOverride: s.engineOverride ?? 'auto',
           withAudio: s.withAudio !== false,
+          visualContinuity: s.visualContinuity ?? 'auto',
+          transitionFrameUrl: continuityInputs.get(s.id)?.transitionFrameUrl,
+          previousClipUrl: continuityInputs.get(s.id)?.previousClipUrl,
         };
       });
 

@@ -29,6 +29,7 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
     sceneClass,
     requirements,
     profile,
+    anchorImageUrl,
     previousFrameUrl,
     previousClipUrl,
     endFrameUrl,
@@ -47,7 +48,9 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
       ((requirements.lipSync || requirements.identityCritical) && ref.role === 'character'),
   }));
 
-  const hasProtectedAnchor = candidates.some((r) => r.protected);
+  const hasProtectedAnchor =
+    candidates.some((r) => r.protected) ||
+    (Boolean(anchorImageUrl) && (requirements.lipSync || requirements.identityCritical));
 
   let strategy: AnchorStrategy = anchorStrategyFor(sceneClass, requirements);
   if (continuityPreference === 'seamless' && !hasProtectedAnchor) strategy = 'transition-priority';
@@ -95,12 +98,14 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
   const droppedProtected = dropped.filter((r) => r.protected);
   if (droppedProtected.length > 0) warnings.push('protected_reference_dropped');
 
-  const useFirstFrame = transition === 'frame-chain' || transition === 'endframe-bridge';
+  const useContinuityFrame = transition === 'frame-chain' || transition === 'endframe-bridge';
+  // The anchor stays the first frame whenever continuity does not supply one.
+  const firstFrameUrl = useContinuityFrame ? previousFrameUrl : anchorImageUrl;
 
   return {
     transition: {
       mode: transition,
-      sourceFrameUrl: useFirstFrame ? previousFrameUrl : undefined,
+      sourceFrameUrl: useContinuityFrame ? previousFrameUrl : undefined,
       sourceClipUrl: transition === 'clip-reference' ? previousClipUrl : undefined,
     },
     anchors: {
@@ -109,7 +114,7 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
       location: byRole(selected, 'location'),
     },
     references: selected,
-    firstFrameUrl: useFirstFrame ? previousFrameUrl : undefined,
+    firstFrameUrl: firstFrameUrl || undefined,
     endFrameUrl: transition === 'endframe-bridge' ? endFrameUrl : undefined,
     inputMode,
     anchorStrategy: strategy,
