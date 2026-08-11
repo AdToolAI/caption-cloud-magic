@@ -111,6 +111,8 @@ import { tx } from '@/lib/i18nText';
 import { resolveSceneAudioSource, type SceneAudioSource } from '@/config/nativeAudioSources';
 import { pickClipSourceForDuration } from '@/lib/composer/pickClipSourceForDuration';
 import { useStudioPreferences } from '@/hooks/useStudioPreferences';
+import { useSeedance25Lipsync } from '@/hooks/useSeedance25Lipsync';
+
 
 /** v416 — true when a plan scene actually contains speech (VO, dialog, lip-sync). */
 function planSceneHasSpeech(scene: TPlanScene): boolean {
