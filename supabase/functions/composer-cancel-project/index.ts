@@ -52,6 +52,7 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader.startsWith("Bearer ")) {
+      console.warn("[composer-cancel-project] 401 — missing bearer token");
       return json({ error: "unauthorized" }, 401);
     }
     const userClient = createClient(supabaseUrl, anonKey, {
@@ -60,11 +61,17 @@ serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: claims } = await userClient.auth.getClaims(token);
     const userId = claims?.claims?.sub as string | undefined;
-    if (!userId) return json({ error: "unauthorized" }, 401);
+    if (!userId) {
+      console.warn("[composer-cancel-project] 401 — token carries no subject");
+      return json({ error: "unauthorized" }, 401);
+    }
 
     const body = await req.json().catch(() => ({}));
     const projectId: string | undefined = body?.project_id ?? body?.projectId;
-    if (!projectId) return json({ error: "project_id_required" }, 400);
+    if (!projectId) {
+      console.warn("[composer-cancel-project] 400 — project_id missing", { userId });
+      return json({ error: "project_id_required" }, 400);
+    }
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
@@ -74,8 +81,12 @@ serve(async (req) => {
       .select("id, user_id, status")
       .eq("id", projectId)
       .maybeSingle();
-    if (!project) return json({ error: "project_not_found" }, 404);
+    if (!project) {
+      console.warn("[composer-cancel-project] 404 — project not found", { projectId, userId });
+      return json({ error: "project_not_found" }, 404);
+    }
     if ((project as any).user_id !== userId) {
+      console.warn("[composer-cancel-project] 403 — project owned by another user", { projectId, userId });
       return json({ error: "forbidden" }, 403);
     }
 
