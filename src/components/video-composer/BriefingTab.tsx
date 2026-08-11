@@ -972,8 +972,7 @@ export default function BriefingTab({
         />
       )}
 
-      {/* Stock-First Toggle (AI mode only) — opt-in cost saver */}
-      {briefing.mode === 'ai' && (
+      {/* Stock-First Toggle — opt-in cost saver for AI generation */}
         <Card className="border-emerald-500/40 bg-gradient-to-br from-emerald-500/5 to-card/80 shadow-[0_0_24px_-12px_hsl(142_76%_45%/0.4)]">
           <CardContent className="pt-5">
             <button
@@ -1014,7 +1013,6 @@ export default function BriefingTab({
             </button>
           </CardContent>
         </Card>
-      )}
 
       {/* Action — empty path (ghost) + gold-gradient cinematic CTA */}
       <div className="flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3 pt-2">
