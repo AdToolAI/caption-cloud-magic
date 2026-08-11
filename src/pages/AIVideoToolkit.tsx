@@ -216,7 +216,7 @@ export default function AIVideoToolkit() {
           <TabsContent value="generate" className="space-y-6">
             <FirstVideoGuide />
             <Link
-              to="/brand-characters"
+              to="/library"
               className="flex items-center justify-between gap-3 p-3 rounded-lg border border-primary/20 bg-gradient-to-r from-primary/5 to-transparent hover:border-primary/40 transition group"
             >
               <div className="flex items-center gap-3">

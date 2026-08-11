@@ -267,7 +267,7 @@ export const CapabilityBento = () => {
   const [openStudio, setOpenStudio] = useState<StudioKey | null>(null);
 
   const tiles = [
-    { key: "cast" as const, icon: Users, href: "/brand-characters", Visual: CastVisual, chip: "Nano Banana 2 · Seedream 4 · Gemini 3 Pro" },
+    { key: "cast" as const, icon: Users, href: "/library", Visual: CastVisual, chip: "Nano Banana 2 · Seedream 4 · Gemini 3 Pro" },
     { key: "motion" as const, icon: MessagesSquare, href: "/motion-studio", Visual: MotionVisual, chip: "Kling Omni · Hailuo · Sync.so · AWS Rekognition" },
     { key: "video" as const, icon: Clapperboard, href: "/ai-video-studio", Visual: EngineOrbitVisual, chip: "32 Models · 1 Interface" },
     { key: "picture" as const, icon: Palette, href: "/picture-studio", Visual: StyleFramesVisual, chip: "Nano Banana 2 · Seedream 4 · Flux Ultra" },

@@ -323,7 +323,7 @@ export function CharacterCastPicker({
 
                 <div className="border-t border-border/40 my-1" />
                 <a
-                  href="/brand-characters"
+                  href="/library"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-muted text-left text-xs text-primary"

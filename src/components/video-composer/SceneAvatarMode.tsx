@@ -176,7 +176,7 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
         <Button
           size="sm"
           variant="ghost"
-          onClick={() => navigate('/brand-characters')}
+          onClick={() => navigate('/library')}
           className="gap-1 h-7 text-[10px] text-primary/80 hover:text-primary"
         >
           <ExternalLink className="h-3 w-3" />
@@ -230,7 +230,7 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
           })}
           <button
             type="button"
-            onClick={() => navigate('/brand-characters')}
+            onClick={() => navigate('/library')}
             className="aspect-[3/4] rounded-xl border border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-primary transition-colors"
           >
             <Plus className="h-4 w-4" />
