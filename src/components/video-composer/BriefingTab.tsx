@@ -592,7 +592,7 @@ export default function BriefingTab({
       </StagePanel>
 
       {/* Category-Specific Briefing */}
-      <StagePanel slateIndex="03" eyebrow="Scene · Subject" title={cfg.cardTitle}>
+      <StagePanel slateIndex="02" eyebrow="Scene · Subject" title={cfg.cardTitle}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -695,7 +695,7 @@ export default function BriefingTab({
       </StagePanel>
 
       {/* Style & Format — Quick = compact (AR + Duration only). Direct/Studio = full. */}
-      <StagePanel slateIndex="04" eyebrow="Scene · Style & Format" title={t('videoComposer.styleFormat')}>
+      <StagePanel slateIndex="03" eyebrow="Scene · Style & Format" title={t('videoComposer.styleFormat')}>
         <div className="space-y-4">
           {showDirect && (
             <div className="grid grid-cols-2 gap-4">
@@ -868,7 +868,7 @@ export default function BriefingTab({
       {/* Visual Style — Direct & Studio only */}
       {showDirect && (
         <StagePanel
-          slateIndex="05"
+          slateIndex="04"
           eyebrow="Scene · Visual Language"
           title={
             <span className="flex items-center gap-2">
