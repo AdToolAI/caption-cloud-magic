@@ -127,6 +127,20 @@ interface ClipScene {
   referenceImageUrl?: string;
   /** Optional anchor image for the END of the clip (Kling/Luma backward extend / bridge). */
   endReferenceImageUrl?: string;
+  /** Continuity: last usable frame of the PREVIOUS scene's clip (client-extracted). */
+  transitionFrameUrl?: string;
+  /** Continuity: URL of the previous scene's rendered clip (video-reference models). */
+  previousClipUrl?: string;
+  /** User/auto preference for how this scene connects to the previous one. */
+  visualContinuity?: "auto" | "cut" | "continue";
+  /** Additional role-tagged references (character / location / product). */
+  visualReferences?: Array<{
+    url: string;
+    kind?: "image" | "video";
+    role?: string;
+    weight?: number;
+    protected?: boolean;
+  }>;
   durationSeconds: number;
   characterShot?: { characterId: string; shotType: CharacterShotType; actionEn?: string; actionUser?: string };
   characterShots?: Array<{ characterId: string; shotType: CharacterShotType; actionEn?: string; actionUser?: string }>;
