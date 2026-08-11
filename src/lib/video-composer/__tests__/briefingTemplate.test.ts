@@ -22,7 +22,7 @@ describe('briefing template', () => {
 
   it.each(LANGS)('%s: per-scene durations add up to the total', (lang) => {
     const t = BRIEFING_TEMPLATES[lang];
-    const durations = [...t.matchAll(/^(?:Dauer|Duration|Duración):\s*(\d+)\s*(?:Sekunden|seconds|segundos)$/gm)]
+    const durations = [...t.matchAll(/^(?:Dauer|Duration|Duración de escena):\s*(\d+)\s*(?:Sekunden|seconds|segundos)$/gm)]
       .map((m) => Number(m[1]));
     expect(durations).toHaveLength(3);
     expect(durations.reduce((a, b) => a + b, 0)).toBe(30);

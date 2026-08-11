@@ -118,7 +118,7 @@ Lugares:
 Objetivo: Mostrar que un creador sustituye a todo un estudio con AdTool AI.
 
 Escena 1 — La duda
-Duración: 10 segundos
+Duración de escena: 10 segundos
 Lugar: @home-office
 Reparto: @cliente
 Cámara: medium-close-up, eye-level, slow-push-in, soft-window
@@ -126,7 +126,7 @@ Acción: Ella desliza su feed, se recuesta, frunce el ceño.
 Voz en off: "Contenido nuevo cada semana — y lo haces todo sola."
 
 Escena 2 — El giro
-Duración: 12 segundos
+Duración de escena: 12 segundos
 Lugar: @home-office
 Reparto: @founder, @cliente
 Cámara: medium, three-quarter, tracking, natural
@@ -136,7 +136,7 @@ Diálogo:
 @founder: "Entra el briefing, sale el spot terminado."
 
 Escena 3 — La prueba
-Duración: 8 segundos
+Duración de escena: 8 segundos
 Lugar: @home-office
 Reparto: @founder
 Cámara: close-up, frontal, static, golden-hour
