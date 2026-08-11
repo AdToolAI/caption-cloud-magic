@@ -670,11 +670,17 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     legacyRoute: '/runway-video-studio',
   },
 
-  /* ─────────── Pika 2.2 ─────────── */
+  /* ─────────── Pika 2.2 (fal.ai `fal-ai/pika/v2.2/*`) ───────────
+   * Provider reality check 11.08.2026: Pika has NO first-party Replicate
+   * model — the official developer route is fal.ai. Durations 5/10 s,
+   * 720p + 1080p, text-to-video and image-to-video (single start frame),
+   * negative prompt + seed supported, no native audio. Pikaframes needs
+   * 2–5 keyframes (not a plain end frame), so `endFrame` stays false.
+   */
   {
     id: 'pika-2-2-standard',
     name: 'Pika 2.2',
-    provider: 'Pika Labs',
+    provider: 'Pika Labs (fal.ai)',
     family: 'pika',
     edgeFunction: 'generate-pika-video',
     group: 'recommended',
@@ -682,18 +688,18 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     capabilities: { t2v: true, i2v: true, audio: false },
     durations: [5, 10],
     resolution: '720p',
-    aspectRatios: ['16:9', '9:16', '1:1'],
+    aspectRatios: pikaAspect,
     costPerSecond: { EUR: 0.12, USD: 0.12 },
     badge: 'Wartung',
-    tagline: 'Smooth motion · Start+End frame morphing',
+    tagline: 'Smooth motion · 5s/10s · 720p',
     legacyRoute: '/pika-video-studio',
     status: 'maintenance',
-    statusReason: tx({ de: 'Pika ist temporär offline (Provider-Wartung). Wir aktivieren das Modell wieder, sobald die Pika Labs API stabil läuft.', en: 'Pika is temporarily offline (provider maintenance). We will re-enable the model as soon as the Pika Labs API is stable again.', es: 'Pika está temporalmente fuera de línea (mantenimiento del proveedor). Reactivaremos el modelo en cuanto la API de Pika Labs vuelva a ser estable.' }),
+    statusReason: tx({ de: 'Pika läuft offiziell nur über die fal.ai-API. Sobald der fal.ai-Zugang hinterlegt ist, schalten wir das Modell wieder frei.', en: 'Pika is only officially available through the fal.ai API. We will re-enable the model as soon as fal.ai access is configured.', es: 'Pika solo está disponible oficialmente a través de la API de fal.ai. Reactivaremos el modelo en cuanto se configure el acceso a fal.ai.' }),
   },
   {
     id: 'pika-2-2-pro',
     name: 'Pika 2.2 Pro',
-    provider: 'Pika Labs',
+    provider: 'Pika Labs (fal.ai)',
     family: 'pika',
     edgeFunction: 'generate-pika-video',
     group: 'premium',
@@ -701,13 +707,13 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     capabilities: { t2v: true, i2v: true, audio: false },
     durations: [5, 10],
     resolution: '1080p',
-    aspectRatios: ['16:9', '9:16', '1:1'],
+    aspectRatios: pikaAspect,
     costPerSecond: { EUR: 0.27, USD: 0.27 },
     badge: 'Wartung',
-    tagline: 'High-fidelity Pika · 1080p',
+    tagline: 'High-fidelity Pika · 5s/10s · 1080p',
     legacyRoute: '/pika-video-studio',
     status: 'maintenance',
-    statusReason: tx({ de: 'Pika ist temporär offline (Provider-Wartung). Wir aktivieren das Modell wieder, sobald die Pika Labs API stabil läuft.', en: 'Pika is temporarily offline (provider maintenance). We will re-enable the model as soon as the Pika Labs API is stable again.', es: 'Pika está temporalmente fuera de línea (mantenimiento del proveedor). Reactivaremos el modelo en cuanto la API de Pika Labs vuelva a ser estable.' }),
+    statusReason: tx({ de: 'Pika läuft offiziell nur über die fal.ai-API. Sobald der fal.ai-Zugang hinterlegt ist, schalten wir das Modell wieder frei.', en: 'Pika is only officially available through the fal.ai API. We will re-enable the model as soon as fal.ai access is configured.', es: 'Pika solo está disponible oficialmente a través de la API de fal.ai. Reactivaremos el modelo en cuanto se configure el acceso a fal.ai.' }),
   },
 
   /* ─────────── Vidu (IDs q2-*, läuft real auf Q3) ─────────── */
