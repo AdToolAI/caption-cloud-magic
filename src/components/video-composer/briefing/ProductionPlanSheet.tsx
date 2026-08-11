@@ -866,6 +866,9 @@ export default function ProductionPlanSheet({
    * Sets the BASE character on a cast slot (CastRef.characterId).
    * Resets `outfitLookId` so we never end up with an outfit that
    * belongs to a different avatar.
+   * v419: Tausch statt Doppelbelegung — ist die Figur bereits einem anderen
+   * Slot derselben Szene zugewiesen, tauschen beide Slots ihre Figuren.
+   * Dialogzeilen dieser Mention folgen der neuen Besetzung automatisch.
    */
   const updateSceneCastChar = (sceneIndex: number, castIdx: number, characterId: string | null) => {
     setPlan((p) => p && {
@@ -875,6 +878,7 @@ export default function ProductionPlanSheet({
         const cast = [...(s.cast ?? [])];
         while (cast.length <= castIdx) cast.push(emptyCastSlot(sceneIndex));
         const c = cast[castIdx] ?? emptyCastSlot(sceneIndex);
+        const prevId = uuidInside(c.characterId ?? null) ?? splitCastId(c.characterId).baseId;
         const matched = charOptions.find((x) => x.id === characterId);
         cast[castIdx] = {
           ...c,
@@ -883,10 +887,45 @@ export default function ProductionPlanSheet({
           // Outfit is a separate axis — reset it when the base avatar changes.
           outfitLookId: null,
         };
-        return { ...s, cast };
+
+        // Swap: der andere Slot mit derselben Figur bekommt die vorherige.
+        if (characterId) {
+          for (let i = 0; i < cast.length; i += 1) {
+            if (i === castIdx) continue;
+            const otherId = uuidInside(cast[i].characterId ?? null) ?? splitCastId(cast[i].characterId).baseId;
+            if (otherId && otherId === characterId) {
+              const swapMatch = prevId ? charOptions.find((x) => x.id === prevId) : null;
+              cast[i] = {
+                ...cast[i],
+                characterId: prevId ?? null,
+                characterName: swapMatch?.name ?? cast[i].characterName,
+                outfitLookId: null,
+              };
+            }
+          }
+        }
+
+        // Dialogzeilen an ihre Mention binden.
+        const keyOf = (v?: string | null) => normalizeAssetKey(String(v ?? '').replace(/^@/, ''));
+        const mentionMap = new Map<string, string | null>();
+        for (const slot of cast) {
+          const k = keyOf(slot.mentionKey || slot.characterName);
+          const id = uuidInside(slot.characterId ?? null) ?? splitCastId(slot.characterId).baseId;
+          if (k) mentionMap.set(k, id ?? null);
+        }
+        const dialogTurns = (s.dialogTurns ?? []).map((t: any) => {
+          const k = keyOf(t?.speakerMentionKey ?? t?.speakerName);
+          if (!k || !mentionMap.has(k)) return t;
+          const id = mentionMap.get(k) ?? null;
+          if ((t?.speakerCharacterId ?? null) === id) return t;
+          return { ...t, speakerCharacterId: id };
+        });
+
+        return { ...s, cast, dialogTurns };
       }),
     });
   };
+
 
   /** Sets the optional outfit look (CastRef.outfitLookId) on a cast slot. */
   const updateSceneCastOutfit = (sceneIndex: number, castIdx: number, outfitLookId: string | null) => {
