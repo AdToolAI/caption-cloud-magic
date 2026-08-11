@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { useMotionStudioCastCharacters } from '@/hooks/useMotionStudioCastCharacters';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { supabase } from '@/integrations/supabase/client';
@@ -122,7 +123,9 @@ const TOOLBOX_ITEMS = [
 
 export default function MotionStudioHub() {
   const { user } = useAuth();
-  const { characters, locations, loading: libLoading } = useMotionStudioLibrary();
+  const { locations, loading: locsLoading } = useMotionStudioLibrary();
+  const { characters, loading: charsLoading } = useMotionStudioCastCharacters();
+  const libLoading = locsLoading || charsLoading;
   const { voices, loading: voicesLoading } = useCustomVoices();
   const { wallet, loading: walletLoading } = useAIVideoWallet();
   const [recent, setRecent] = useState<RecentProject[]>([]);

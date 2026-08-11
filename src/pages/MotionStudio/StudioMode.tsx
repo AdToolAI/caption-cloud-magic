@@ -30,6 +30,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { useMotionStudioCastCharacters } from '@/hooks/useMotionStudioCastCharacters';
 import CharacterEditor from '@/components/motion-studio/CharacterEditor';
 import LocationEditor from '@/components/motion-studio/LocationEditor';
 import SceneSnippetPicker from '@/components/motion-studio/SceneSnippetPicker';
@@ -60,7 +61,9 @@ interface DraftScene {
 export default function StudioMode() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { characters, locations, loading } = useMotionStudioLibrary();
+  const { locations, loading: locsLoading } = useMotionStudioLibrary();
+  const { characters, loading: charsLoading } = useMotionStudioCastCharacters();
+  const loading = locsLoading || charsLoading;
 
   const [step, setStep] = useState<StepId>('cast');
   const [selectedCharIds, setSelectedCharIds] = useState<string[]>([]);
