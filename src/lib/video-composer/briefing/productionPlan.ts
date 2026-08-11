@@ -155,6 +155,24 @@ export const PlanScene = z.object({
   }).optional(),
   /** Negative prompt scoped to this scene (in addition to the global one). */
   negativePromptScene: z.string().max(1000).optional(),
+  /**
+   * v415 — Sound-design intent (ambience, SFX, atmosphere) captured verbatim
+   * from the briefing. NEVER generates audio by itself: it is either fed into
+   * the prompt of a model with native audio, or offered as an SFX prompt in
+   * the Motion-Studio audio step.
+   */
+  soundDesign: z.string().max(1000).optional(),
+  /**
+   * v415 — Which layer owns this scene's audio. Provider audio and studio
+   * tracks are mutually exclusive; lip-sync scenes must never be 'provider'.
+   */
+  audioSource: z.enum(['provider', 'studio', 'silent']).optional(),
+  /**
+   * v415 — Full camera choreography in English ("aerial establishing → crane
+   * down → street-level tracking"). The shotDirector enums only carry one
+   * value each, so multi-step moves live here and go into the scene prompt.
+   */
+  cameraChoreographyEN: z.string().max(600).optional(),
   /** Continuity hint, e.g. "same position as S01", "match wardrobe S02". */
   continuityHint: z.string().max(240).optional(),
   /** Music cue marker for this scene. */
@@ -265,6 +283,8 @@ export const PlanProject = z.object({
   fps: z.number().int().optional(),
   totalDurationSec: z.number().min(1).max(600).optional(),
   platforms: z.array(z.string()).optional(),
+  /** v415 — global sound-design intent (never auto-generated). */
+  soundDesign: z.string().max(1000).optional(),
 });
 
 export const PlanUnresolved = z.object({

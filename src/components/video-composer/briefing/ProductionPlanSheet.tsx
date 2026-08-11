@@ -1483,6 +1483,32 @@ export default function ProductionPlanSheet({
 
 
                       {/* Stage-2 plan extras: brollHints / brandAnchor / continuity / music / per-scene negative */}
+                      {/* v415 — audio ownership + sound design. Read-only here:
+                          the decision is enforced by the plan normalizer
+                          (speech scenes are always silent plates). */}
+                      {((s as any).audioSource || (s as any).soundDesign || (s as any).cameraChoreographyEN) && (
+                        <div className="space-y-1">
+                          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">{tx({ de: 'Ton & Kamera', en: 'Audio & camera', es: 'Audio y cámara' })}</Label>
+                          <div className="flex flex-wrap gap-1">
+                            {(s as any).audioSource === 'provider' && (
+                              <Badge variant="outline" className="text-[10px] border-amber-300/40 text-amber-300">{tx({ de: 'Ton vom KI-Modell', en: 'Audio from AI model', es: 'Audio del modelo IA' })}</Badge>
+                            )}
+                            {(s as any).audioSource === 'studio' && (
+                              <Badge variant="outline" className="text-[10px]">{tx({ de: 'Ton im Studio (stummer Clip)', en: 'Audio in studio (silent clip)', es: 'Audio en el estudio (clip mudo)' })}</Badge>
+                            )}
+                            {(s as any).audioSource === 'silent' && (
+                              <Badge variant="outline" className="text-[10px]">{tx({ de: 'Ohne Ton', en: 'No audio', es: 'Sin audio' })}</Badge>
+                            )}
+                          </div>
+                          {(s as any).soundDesign && (
+                            <div className="text-[11px] italic text-muted-foreground">{tx({ de: 'Sound-Design', en: 'Sound design', es: 'Diseño de sonido' })}: {(s as any).soundDesign}</div>
+                          )}
+                          {(s as any).cameraChoreographyEN && (
+                            <div className="text-[11px] italic text-muted-foreground">{tx({ de: 'Kamerafahrt', en: 'Camera move', es: 'Movimiento de cámara' })}: {(s as any).cameraChoreographyEN}</div>
+                          )}
+                        </div>
+                      )}
+
                       {(s.brollHints?.length || s.brandAnchor || s.musicCue || s.continuityHint || s.negativePromptScene) && (
                         <div className="space-y-1">
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">{tx({ de: 'Plan-Extras', en: 'Plan extras', es: 'Extras del plan' })}</Label>

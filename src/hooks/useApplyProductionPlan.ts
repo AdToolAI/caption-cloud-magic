@@ -108,6 +108,7 @@ function emptyPlanCastSlot(sceneIndex: number): PlanCastSlot {
 
 import { shouldInheritContinuity as shouldInheritPlanContinuity } from '@/lib/video-composer/briefing/planContinuity';
 import { tx } from '@/lib/i18nText';
+import type { SceneAudioSource } from '@/config/nativeAudioSources';
 
 function hydratePlanScenesForApply(scenes: TPlanScene[]): TPlanScene[] {
   let lastCast: PlanCastSlot | null = null;
@@ -357,6 +358,11 @@ function planSceneToComposerScene(
   // scene-level + global negative-prompt suffix.
   const promptParts: string[] = [];
   if (ps.anchorPromptEN?.trim()) promptParts.push(ps.anchorPromptEN.trim());
+  // v415 — multi-step camera choreography. The shotDirector enums only carry
+  // the dominant move, so the full sequence goes into the prompt verbatim.
+  if ((ps as any).cameraChoreographyEN?.trim()) {
+    promptParts.push(`Camera: ${String((ps as any).cameraChoreographyEN).trim()}`);
+  }
   if (ps.continuityHint?.trim()) promptParts.push(`Continuity: ${ps.continuityHint.trim()}`);
   if (ps.brandAnchor?.note?.trim()) promptParts.push(`Brand: ${ps.brandAnchor.note.trim()}`);
 
@@ -611,6 +617,28 @@ function planSceneToComposerScene(
   }
 
 
+  // v415 — resolve the audio owner. Speech always wins: a scene with
+  // voiceover, dialog or lip-sync must be generated SILENT so the studio
+  // (voiceover + lip-sync + SFX tracks) owns the audio. Provider audio is
+  // only ever kept for speechless scenes.
+  const hasSpeechForAudio = Boolean(
+    dialogMode
+      || (typeof dialogScript === 'string' && dialogScript.trim())
+      || (dialogTurns && dialogTurns.length)
+      || ps.voiceover?.text?.trim()
+      || ps.lipSync,
+  );
+  const requestedAudioSource = (ps as any).audioSource as SceneAudioSource | undefined;
+  const sceneAudioSource: SceneAudioSource = hasSpeechForAudio
+    ? 'studio'
+    : requestedAudioSource === 'provider'
+      ? 'provider'
+      : requestedAudioSource === 'silent'
+        ? 'silent'
+        : requestedAudioSource === 'studio'
+          ? 'studio'
+          : (String((ps as any).soundDesign ?? '').trim() ? 'studio' : 'silent');
+
   return {
     id: newSceneId(),
     projectId,
@@ -623,7 +651,11 @@ function planSceneToComposerScene(
     clipSource: (dialogMode ? 'ai-happyhorse' : 'ai-hailuo') as any,
     clipQuality: 'standard',
     clipStatus: 'pending',
-    aiPrompt,
+    // v415 — sound design only reaches the model when the provider owns the
+    // audio. Studio/silent scenes keep it as metadata for the audio step.
+    aiPrompt: (sceneAudioSource === 'provider' && String((ps as any).soundDesign ?? '').trim())
+      ? `${aiPrompt ? `${aiPrompt} ` : ''}Audio: ${String((ps as any).soundDesign).trim()}`
+      : aiPrompt,
     characterShot: characterShots[0],
     characterShots: characterShots.length ? characterShots : undefined,
     engineOverride: engine !== 'auto' ? (engine as any) : undefined,
@@ -677,6 +709,13 @@ function planSceneToComposerScene(
     musicCue: ps.musicCue,
     continuityHint: ps.continuityHint,
     negativePromptScene: ps.negativePromptScene,
+    // v415 — audio ownership. Speech (VO / dialog / lip-sync) always forces
+    // `studio`, i.e. a silent clip, so voiceover and the lip-sync chain own
+    // the audio. `withAudio` mirrors the decision for the generation call.
+    soundDesign: (ps as any).soundDesign || undefined,
+    audioSource: sceneAudioSource,
+    withAudio: sceneAudioSource === 'provider',
+    cameraChoreographyEN: (ps as any).cameraChoreographyEN || undefined,
     // v175: denormalised mention IDs for downstream analytics / Brand-Scan.
     mentionedCharacterIds,
     mentionedLocationIds,
@@ -731,12 +770,24 @@ function buildAssembly(
     };
   }
 
-  if (plan.captions) {
-    const c = plan.captions;
+  // v415 — captions are speech-bound: without voiceover or dialog anywhere in
+  // the plan there is nothing to subtitle (music and ambience are not), and an
+  // explicit ban in the negative prompt switches them off as well.
+  const planHasSpeech = (plan.scenes ?? []).some((s) =>
+    Boolean(
+      s.voiceover?.text?.trim()
+        || (s.dialogTurns ?? []).some((t) => String(t?.text ?? '').trim()),
+    ),
+  );
+  const captionsBanned = /\b(no|keine|kein|sin)\s+(subtitles?|captions?|untertitel|subt[ií]tulos)\b/i
+    .test(String(plan.negativePrompt ?? ''));
+
+  if (plan.captions || !planHasSpeech || captionsBanned) {
+    const c = plan.captions ?? {};
     next = {
       ...next,
       subtitles: {
-        enabled: c.enabled ?? true,
+        enabled: (!planHasSpeech || captionsBanned) ? false : (c.enabled ?? true),
         language,
         style: {
           font: c.font ?? 'Inter Bold',
@@ -893,7 +944,9 @@ export function useApplyProductionPlan() {
       .sort((a, b) => a.index - b.index)
       .map((s, i) =>
         planSceneToComposerScene(
-          s,
+          // v415 — global sound-design intent falls through to scenes that
+          // don't carry their own. Metadata only: nothing is generated here.
+          { ...s, soundDesign: (s as any).soundDesign ?? plan.project?.soundDesign } as TPlanScene,
           protectedScenes.length + i,
           projectId,
           plan.negativePrompt,
@@ -944,6 +997,9 @@ export function useApplyProductionPlan() {
           clip_quality: s.clipQuality || 'standard',
           clip_status: s.clipStatus ?? 'pending',
           with_audio: s.withAudio !== false,
+          audio_source: (s as any).audioSource ?? null,
+          sound_design: (s as any).soundDesign ?? null,
+          camera_choreography_en: (s as any).cameraChoreographyEN ?? null,
           lip_sync_with_voiceover: (s as any).lipSyncWithVoiceover === true,
           dialog_mode: (s as any).dialogMode === true,
           ai_prompt: s.aiPrompt ?? null,

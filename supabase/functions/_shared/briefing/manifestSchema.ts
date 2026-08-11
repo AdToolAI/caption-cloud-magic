@@ -64,6 +64,14 @@ export const BriefingScene = z.object({
     stylePreset: z.string().max(80).optional(),
   }).optional(),
 
+  /** v415 — sound-design intent, verbatim from the briefing. No audio is generated from it. */
+  soundDesign: z.string().max(1000).optional(),
+  /** v415 — audio ownership: provider audio vs. studio tracks vs. silent. */
+  audioSource: z.enum(['provider', 'studio', 'silent']).optional(),
+  /** v415 — full multi-step camera choreography in English. */
+  cameraChoreographyEN: z.string().max(600).optional(),
+
+
   /** English anchor / i2v prompt hint — used as the AI scene prompt. */
   anchorPromptEN: z.string().max(2000).optional(),
 
@@ -110,6 +118,8 @@ export const BriefingProject = z.object({
   fps: z.number().int().refine((v) => v === 24 || v === 25 || v === 30 || v === 60).optional(),
   totalDurationSec: z.number().min(1).max(600).optional(),
   platforms: z.array(z.string()).optional(),
+  /** v415 — global sound-design intent (metadata only, never generated). */
+  soundDesign: z.string().max(1000).optional(),
 });
 
 export const BriefingUnresolved = z.object({
@@ -147,6 +157,7 @@ export const BRIEFING_TOOL_PARAMETERS = {
         fps: { type: 'integer', enum: [24, 25, 30, 60] },
         totalDurationSec: { type: 'number' },
         platforms: { type: 'array', items: { type: 'string' } },
+        soundDesign: { type: 'string' },
       },
     },
     scenes: {
@@ -198,6 +209,9 @@ export const BRIEFING_TOOL_PARAMETERS = {
             },
           },
           anchorPromptEN: { type: 'string' },
+          soundDesign: { type: 'string' },
+          audioSource: { type: 'string', enum: ['provider', 'studio', 'silent'] },
+          cameraChoreographyEN: { type: 'string' },
           performance: {
             type: 'object',
             properties: {

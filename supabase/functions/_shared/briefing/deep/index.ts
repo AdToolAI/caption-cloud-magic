@@ -212,6 +212,22 @@ const TOOL_PASS_A = {
                 },
               },
               anchorPromptEN: { type: 'string' },
+              cameraChoreographyEN: {
+                type: 'string',
+                description:
+                  'Full multi-step camera movement in ENGLISH when the briefing describes a choreography rather than a single move (e.g. "aerial establishing over the harbour → crane down to street level → slow tracking shot behind the runners"). The shotDirector.movement enum only carries the dominant move; put the complete sequence here.',
+              },
+              soundDesign: {
+                type: 'string',
+                description:
+                  'Sound design / ambience / SFX described for THIS scene, in the briefing language, verbatim-close (e.g. "rising wind, gurgling water, distant seagulls"). Metadata only — never invent sound when the briefing does not mention any, and never fold it into anchorPromptEN.',
+              },
+              audioSource: {
+                type: 'string',
+                enum: ['provider', 'studio', 'silent'],
+                description:
+                  'Who owns this scene\'s audio. "studio" = clip stays silent, audio is added later as tracks (ALWAYS use this when the scene has voiceover or dialog). "provider" = the video model should generate ambience/music itself (only for scenes without speech that describe sound design). "silent" = no audio planned at all. Omit when unsure.',
+              },
               performance: {
                 type: 'object',
                 properties: {
@@ -435,6 +451,19 @@ For EVERY auto-generated scene you MUST fill what the briefing does not specify:
   the beat.
 - "brollHints": 3–6 short English Pexels/Pixabay keywords for optional cutaways.
 - "beat": label like "Hook", "Pain", "Reveal", "Proof", "CTA".
+- "cameraChoreographyEN": ONLY when the briefing describes a multi-step camera
+  move. Keep the full sequence ("aerial establishing → crane down → tracking"),
+  and still pick the dominant move for "shotDirector.movement".
+- "soundDesign": ONLY when the briefing actually describes ambience, SFX or
+  atmosphere for that scene. Copy the intent faithfully; do NOT invent sound,
+  and do NOT put sound words into "anchorPromptEN".
+- "audioSource": "studio" for every scene with voiceover or dialog (the clip
+  must stay silent so voiceover and lip-sync own the audio). "provider" only
+  for speechless scenes that describe sound design. "silent" for speechless
+  scenes without any sound description. Omit when unsure.
+- CAPTIONS RULE: set "captions.enabled" to false when NO scene has voiceover or
+  dialog, or when the briefing explicitly forbids subtitles. Music and ambience
+  are never subtitled.
 
 ENSEMBLE CAST GUARANTEE (SOFT — respect the script): If the "## Cast" section
 contains 2–4 selected avatars, prefer at least ONE ensemble scene where ALL
@@ -1895,6 +1924,57 @@ function ensureProductionPlanEnsembleServer(plan: any, briefing: string, charact
   return { repaired, required: required.length };
 }
 
+/**
+ * v415 — deterministic audio/caption normalization.
+ *
+ * Rules (see plan "Ton, Untertitel und Lip-Sync"):
+ *  - a scene with voiceover / dialog / lipSync can NEVER be `provider`
+ *    (provider audio would collide with the VO + lip-sync chain),
+ *  - a speechless scene keeps `provider` only when the model actually has
+ *    native audio — that decision is made client-side, so we only ensure the
+ *    value is one of provider|studio|silent and default it sanely,
+ *  - captions are speech-bound: no speech anywhere (or an explicit ban in the
+ *    negative prompt) turns them off.
+ */
+export function normalizeAudioAndCaptions(plan: any, rawBriefing = ''): {
+  scenesWithSpeech: number;
+  captionsForcedOff: boolean;
+  providerDowngraded: number;
+} {
+  const scenes: any[] = Array.isArray(plan?.scenes) ? plan.scenes : [];
+  let scenesWithSpeech = 0;
+  let providerDowngraded = 0;
+
+  for (const sc of scenes) {
+    const hasVo = String(sc?.voiceover?.text ?? '').trim().length > 0;
+    const hasDialog = Array.isArray(sc?.dialogTurns)
+      && sc.dialogTurns.some((t: any) => String(t?.text ?? '').trim().length > 0);
+    const speech = hasVo || hasDialog || sc?.lipSync === true;
+    if (speech) scenesWithSpeech += 1;
+
+    const raw = String(sc?.audioSource ?? '').trim();
+    let next: 'provider' | 'studio' | 'silent' | undefined =
+      raw === 'provider' || raw === 'studio' || raw === 'silent' ? raw : undefined;
+
+    if (speech) {
+      if (next === 'provider') providerDowngraded += 1;
+      next = 'studio';
+    } else if (!next) {
+      next = String(sc?.soundDesign ?? '').trim() ? 'studio' : 'silent';
+    }
+    sc.audioSource = next;
+  }
+
+  const banned = /\b(no|keine|kein|sin)\s+(subtitles?|captions?|untertitel|subt[ií]tulos)\b/i
+    .test(`${plan?.negativePrompt ?? ''}\n${rawBriefing}`);
+  const captionsForcedOff = scenesWithSpeech === 0 || banned;
+  if (captionsForcedOff) {
+    plan.captions = { ...(plan.captions ?? {}), enabled: false };
+  }
+
+  return { scenesWithSpeech, captionsForcedOff, providerDowngraded };
+}
+
 export async function handleDeepParse(
   req: Request,
   preparsedBody?: Record<string, unknown>,
@@ -3222,6 +3302,11 @@ YOU MUST:
     const _validSources = new Set(['explicit-briefing', 'script', 'board']);
     const _rawSource = explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board');
     const _source = _validSources.has(_rawSource) ? _rawSource : 'board';
+    // v415 — audio ownership + caption normalization (speech-bound captions,
+    // never provider audio on a speaking scene).
+    let audioNormalization: ReturnType<typeof normalizeAudioAndCaptions> | null = null;
+    try { audioNormalization = normalizeAudioAndCaptions(plan, briefing); } catch { /* non-fatal */ }
+
     const _briefingContract = {
       durationSec: _clampDur(_canonicalTotal),
       sceneCount: _clampSceneCount(_canonicalScenes),
@@ -3247,7 +3332,7 @@ YOU MUST:
       (plan as any)._meta.debug = _debug;
     } catch { /* non-fatal */ }
 
-    return new Response(JSON.stringify({ plan, version, briefing_contract: _briefingContract, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, continuous_scene_split: continuousSplitStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, canonical: { duration_seconds: _canonicalTotal, scene_count: _canonicalScenes, source: explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board') }, duration_auto_extend: durationAutoExtend, duration_auto_extend_blocked: durationAutoExtendBlocked }), {
+    return new Response(JSON.stringify({ plan, version, briefing_contract: _briefingContract, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, continuous_scene_split: continuousSplitStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, canonical: { duration_seconds: _canonicalTotal, scene_count: _canonicalScenes, source: explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board') }, duration_auto_extend: durationAutoExtend, duration_auto_extend_blocked: durationAutoExtendBlocked, audio_normalization: audioNormalization }), {
 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

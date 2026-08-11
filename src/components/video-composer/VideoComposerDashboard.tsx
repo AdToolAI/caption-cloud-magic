@@ -351,6 +351,10 @@ export default function VideoComposerDashboard() {
             clipSource: row.clip_source as ClipSource,
             clipQuality: (row.clip_quality || 'standard') as ClipQuality,
             withAudio: row.with_audio !== false,
+            // v415 — audio ownership + briefing metadata.
+            audioSource: ((row as any).audio_source ?? undefined) as any,
+            soundDesign: (row as any).sound_design ?? undefined,
+            cameraChoreographyEN: (row as any).camera_choreography_en ?? undefined,
             lipSyncWithVoiceover: resolveLipSyncValue(row.id, (row as any).lip_sync_with_voiceover === true),
             // ── Volatile lifecycle fields: ALWAYS take DB value, never local ──
             // These describe the live render/lipsync job and MUST NOT be merged
@@ -524,6 +528,10 @@ export default function VideoComposerDashboard() {
             clipSource: row.clip_source as ClipSource,
             clipQuality: (row.clip_quality || 'standard') as ClipQuality,
             withAudio: row.with_audio !== false,
+            // v415 — audio ownership + briefing metadata.
+            audioSource: ((row as any).audio_source ?? undefined) as any,
+            soundDesign: (row as any).sound_design ?? undefined,
+            cameraChoreographyEN: (row as any).camera_choreography_en ?? undefined,
             lipSyncWithVoiceover: resolveLipSyncValue(row.id, (row as any).lip_sync_with_voiceover === true),
             // v131.7: DB-first für ALLE Lifecycle-Felder (lipsync/twoshot/clipError/dialogShots).
             // Vorher: clipError, dialogShots fehlten hier — ein Realtime-Tick nach
@@ -1072,6 +1080,9 @@ export default function VideoComposerDashboard() {
           clip_source: s.clipSource,
           clip_quality: s.clipQuality || 'standard',
           with_audio: s.withAudio !== false,
+          audio_source: (s as any).audioSource ?? null,
+          sound_design: (s as any).soundDesign ?? null,
+          camera_choreography_en: (s as any).cameraChoreographyEN ?? null,
           // Lip-Sync toggle has its own atomic write path (SceneCard /
           // SceneAvatarMode → markLipSyncPending). If a click is still
           // in-flight, prefer the pending value over whatever stale snapshot
