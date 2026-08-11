@@ -209,6 +209,9 @@ export const BRIEFING_TOOL_PARAMETERS = {
             },
           },
           anchorPromptEN: { type: 'string' },
+          soundDesign: { type: 'string' },
+          audioSource: { type: 'string', enum: ['provider', 'studio', 'silent'] },
+          cameraChoreographyEN: { type: 'string' },
           performance: {
             type: 'object',
             properties: {
