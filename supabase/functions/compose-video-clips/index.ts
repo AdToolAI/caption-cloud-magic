@@ -1787,7 +1787,11 @@ serve(async (req) => {
         "ai-wan",
         "ai-seedance",
         "ai-luma",
+        // v418 — certified, but only while the rollout flag is on. Mirrors
+        // LIPSYNC_CERTIFIED_SOURCES in _shared/visual-inputs.ts.
+        ...(seedance25LipsyncEnabled ? ["ai-seedance25"] : []),
       ]);
+
 
       if (
         LIPSYNC_PROVIDERS.has(scene.clipSource as string) &&
