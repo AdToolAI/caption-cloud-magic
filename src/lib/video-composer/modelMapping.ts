@@ -68,12 +68,25 @@ export const LIPSYNC_CLIP_SOURCES: ReadonlyArray<ClipSource> = [
 ];
 
 /**
+ * v418 — Seedance 2.5 (4–30s plates) is certified but stays behind the
+ * rollout flag `composer.feature.seedance25_lipsync`. Callers that know the
+ * flag state use this instead of the frozen list above.
+ */
+export const LIPSYNC_CLIP_SOURCE_SEEDANCE25: ClipSource = 'ai-seedance25';
+export function lipsyncClipSources(seedance25Enabled: boolean): ReadonlyArray<ClipSource> {
+  return seedance25Enabled
+    ? [...LIPSYNC_CLIP_SOURCES, LIPSYNC_CLIP_SOURCE_SEEDANCE25]
+    : LIPSYNC_CLIP_SOURCES;
+}
+
+/**
  * Legacy alias — kept so existing imports (RenderPreFlightDialog, etc.)
  * keep working. Now mirrors LIPSYNC_CLIP_SOURCES.
  */
 export const NATIVE_DIALOGUE_CLIP_SOURCES: ReadonlyArray<ClipSource> = LIPSYNC_CLIP_SOURCES;
 
 const LIPSYNC_FAMILIES = new Set(['happyhorse', 'hailuo', 'kling', 'wan', 'seedance', 'luma']);
+
 
 /**
  * Composer dropdown models filtered to the Lip-Sync-certified subset
