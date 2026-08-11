@@ -1511,11 +1511,8 @@ export default function SceneCard({
                                 </span>
                                 <span className="text-[9px] text-muted-foreground leading-tight truncate">
                                   {dialogMode
-                                    ? lang === "de"
-                                    ? "6 Modelle · HappyHorse · Hailuo · Kling · Wan · Seedance · Luma (Sync.so)"
-                                    : lang === "es"
-                                      ? "6 modelos · HappyHorse · Hailuo · Kling · Wan · Seedance · Luma (Sync.so)"
-                                      : "6 models · HappyHorse · Hailuo · Kling · Wan · Seedance · Luma (Sync.so)"
+                                    ? `${modelsForPicker.length} ${lang === "es" ? "modelos" : lang === "en" ? "models" : "Modelle"} · HappyHorse · Hailuo · Kling · Wan · Seedance${s25 ? " · Seedance 2.5" : ""} · Luma (Sync.so)`
+
                                   : lang === "de"
                                     ? tx({ de: "B-Roll-Modus · 11 Modelle verfügbar", en: "B-roll mode · 11 models available", es: "Modo B-roll · 11 modelos disponibles" })
                                     : lang === "es"
