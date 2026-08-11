@@ -536,8 +536,8 @@ export default function BriefingTab({
       */}
 
 
-      {/* Film-strip Mode Selector — visible Quick / Direct / Studio reels */}
-      <FilmStripModeSelector />
+      {/* v416 — the Quick/Direct/Studio switch lives ONLY in the DirectorBar
+          (sticky, global). The big film-strip duplicate was removed. */}
 
       {/* Crossfade wrapper — re-keyed on editorMode so panel changes "feel" */}
       <div key={editorMode} className="stage-mode-fade space-y-6">
