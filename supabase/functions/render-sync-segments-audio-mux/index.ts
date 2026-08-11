@@ -627,10 +627,20 @@ serve(async (req) => {
       );
     }
 
+    // v418 hybrid ambience — mix the model's own room tone under the studio
+    // voice, but only for a plate the speech gate explicitly cleared.
+    const __ambientGate = ((scene as any).audio_plan?.ambientGate ?? {}) as Record<string, unknown>;
+    const ambientAudioUrl =
+      __ambientGate.status === "passed" && typeof __ambientGate.url === "string"
+        ? String(__ambientGate.url)
+        : null;
+
     const inputProps: Record<string, unknown> = {
       masterVideoUrl: masterVideoUrlForMux,
       masterAudioUrl,
+      ...(ambientAudioUrl ? { ambientAudioUrl, ambientVolume: 0.18 } : {}),
       totalSec,
+
       targetWidth: width,
       targetHeight: height,
       srcWidth: width,
