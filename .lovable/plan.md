@@ -124,6 +124,38 @@ continuityFrameScore = visualQuality + subjectVisibility + compositionQuality
 
 `semanticEndState` zählt mit: der Frame, in dem die Figur halb durch die Tür ist, kann der dramaturgisch richtige Einstieg für die Folgeszene sein, auch wenn ein früherer Frame technisch sauberer ist. Baut auf `extract-video-last-frame`, `extract-video-frames` und `analyze-scene-subject` auf.
 
+## Seedance 2.5 im Speziellen
+
+**Braucht Seedance 2.5 das System überhaupt?** Ja — gerade dort. In der Registry steht `refExclusive: true`: ModelArk erlaubt pro Task **entweder** First-Frame **oder** First+Last-Frame **oder** Multi-Referenz (bis 30 Bilder / 10 Videos / 10 Audios) — nicht kombiniert. Genau das ist der Slot-Konflikt, den der Resolver auflösen soll: „Vorframe für den nahtlosen Übergang" und „Charakter-/Produkt-Referenzen für Identität" konkurrieren bei Seedance 2.5 um denselben Slot. Ohne Resolver entscheidet das heute implizit der Code in `generate-seedance25-video`.
+
+Konsequenz für die Slot-Topologie: Seedance 2.5 bekommt kein `slot: 'first-frame'` neben `slot: 'references'`, sondern **einen exklusiven Slot** (`slot: 'visual-input'`, `exclusive: true`) mit drei Modi:
+
+```ts
+visualInputs: {
+  mode: 'exclusive',
+  slot: 'visual-input',
+  modes: ['first-frame', 'first-last-frame', 'references'],
+  references: { max: 30, videos: 10, audios: 10, character: true, product: true, location: true },
+}
+```
+
+**Video-to-Video als Continuity-Träger.** `v2v: true` plus 10 Referenzvideos heißt: statt eines Standbilds kann der Vorgängerclip selbst als Referenz mitgegeben werden. Das ist der bessere Übergang, weil Bewegung und Grading mitwandern statt nur ein Frame. Deshalb kommt eine vierte Transition-Mode dazu:
+
+```ts
+transition.mode: 'frame-chain' | 'clip-reference' | 'endframe-bridge' | 'match-cut'
+```
+
+`clip-reference` ist nur bei Modellen mit `references.videos > 0` wählbar und läuft im Referenz-Modus — der Vorgängerclip belegt einen Referenz-Slot, Charakter- und Location-Bilder belegen weitere. Damit löst sich bei Seedance 2.5 der Konflikt „Übergang **oder** Identität" auf: beides liegt im selben Referenz-Budget und wird nur noch nach Score gewichtet. Der Transition Frame Analyzer bleibt für Modelle ohne v2v relevant.
+
+**Ist die Lip-Sync-Pipeline mit Seedance 2.5 kompatibel?** Technisch ja, aktuell aber bewusst gesperrt — und das ist kein Versehen:
+
+- Lip-Sync ist providerunabhängig: der Master-Plate wird vom Videomodell gerendert, der Mund kommt danach von Sync.so (`PROVIDER.model = "sync-3"` im Frozen Contract). Seedance 2.5 liefert einen ganz normalen Plate.
+- Die Allowlist in `compose-video-clips/index.ts` (`LIPSYNC_PROVIDERS`) enthält `ai-seedance` (Seedance 1), **nicht** `ai-seedance25`. Ein Lip-Sync-Render auf Seedance 2.5 endet heute mit `invalid_provider_for_lipsync` (HTTP 400).
+- Drei reale Hürden vor einer Freigabe: (1) Nativ-Audio (`generate_audio`) muss für Plates zwingend aus sein, sonst kämpfen Provider-Ton und VO; (2) 30-s-Plates verlängern Preclip, Pass-Zahl und Mux deutlich — die Watchdog-Grenzen (`staleProvider` 10 min, `staleHard` 25 min) sind auf kurze Plates ausgelegt; (3) `refExclusive` verhindert, dass der Identitäts-Anker und ein Vorframe gleichzeitig gesetzt werden — bei Lip-Sync gewinnt der Anker, also `match-cut`.
+
+Daraus wird ein eigener, klar abgegrenzter Schritt: **Phase 3a — Seedance 2.5 als zertifizierter Plate-Provider.** Inhalt: Nativ-Audio-Zwangsabschaltung im Lip-Sync-Pfad, Plate-Längenobergrenze (Start: 15 s wie HappyHorse, Anhebung erst nach Messwerten), Watchdog-Werte pro Plate-Länge statt global, dann Aufnahme von `ai-seedance25` in die Allowlist. Ausgelöst wird das nur durch ein ausdrückliches „unfreeze lipsync" mit Scope „Seedance-2.5-Plate" und einem grünen Vier-Sprecher-Referenzlauf vorher und nachher.
+
+
 ## Releases
 
 **Phase 1 — Capability Foundation.** Slot-Topologie für alle Modelle, Szenen-Bildrollen, Classification + Requirements, Resolver, Unit-Tests. Keine Verhaltensänderung im Render.
