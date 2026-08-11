@@ -172,7 +172,9 @@ export const CLIP_SOURCE_CAPABILITIES: Record<string, SourceCapabilities> = {
 
 /**
  * Certified lip-sync master-plate providers — mirrors `LIPSYNC_PROVIDERS` in
- * `compose-video-clips/index.ts`. `ai-seedance25` is deliberately absent.
+ * `compose-video-clips/index.ts`. `ai-seedance25` was certified in v418
+ * (Phase 3a) and is gated at dispatch time by the feature flag
+ * `composer.feature.seedance25_lipsync`.
  */
 export const LIPSYNC_CERTIFIED_SOURCES = new Set([
   "ai-happyhorse",
@@ -180,8 +182,10 @@ export const LIPSYNC_CERTIFIED_SOURCES = new Set([
   "ai-kling",
   "ai-wan",
   "ai-seedance",
+  "ai-seedance25",
   "ai-luma",
 ]);
+
 
 export function deriveProfileFromCapabilities(
   caps: SourceCapabilities,

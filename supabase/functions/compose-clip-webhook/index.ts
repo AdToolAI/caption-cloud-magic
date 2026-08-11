@@ -6,6 +6,8 @@ import { verifyWebhookRequest, appendWebhookToken } from "../_shared/webhook-aut
 import { CLIP_COSTS } from "../_shared/clip-costs.ts";
 import { countDialogSpeakers as detectSpeakerCount } from "../_shared/dialog-speakers.ts";
 import { isGreenNetRejection } from "../_shared/happyhorse-green-net.ts";
+import { isAmbientAudioRow, runAmbientSpeechGate } from "../_shared/ambient-audio.ts";
+
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
@@ -159,7 +161,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // an endless "Clip wird erstellt" loop.
       const { data: preUpdateScene } = await supabase
         .from('composer_scenes')
-        .select('engine_override, clip_source, lip_sync_status, twoshot_stage')
+        .select('engine_override, clip_source, lip_sync_status, twoshot_stage, audio_source, audio_plan')
         .eq('id', sceneId)
         .maybeSingle();
       const isCinematicSync =
@@ -182,10 +184,35 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         sceneUpdate.lip_sync_status = 'pending';
         sceneUpdate.twoshot_stage = 'master_clip';
       }
+
+      // ── v418 hybrid ambience: speech gate ────────────────────────────────
+      // The plate was allowed to generate room tone/foley. Before that bed is
+      // ever mixed under the studio voice, transcribe it: any recognizable
+      // speech (or any failure of the gate itself) means the scene plays
+      // muted. Fail-soft — this never turns a finished render into an error.
+      if (isAmbientAudioRow(preUpdateScene as any)) {
+        const gate = await runAmbientSpeechGate(permanentUrl);
+        const prevPlan = ((preUpdateScene as any)?.audio_plan ?? {}) as Record<string, unknown>;
+        sceneUpdate.audio_plan = {
+          ...prevPlan,
+          ambientGate: {
+            status: gate.allowed ? 'passed' : 'muted',
+            reason: gate.reason,
+            // Only a cleared plate may ever be mixed in as an ambience bed.
+            url: gate.allowed ? permanentUrl : null,
+            checkedAt: new Date().toISOString(),
+          },
+        };
+        console.log(
+          `[compose-clip-webhook] scene=${sceneId} ambient_gate=${gate.allowed ? 'passed' : 'muted'} reason=${gate.reason}`,
+        );
+      }
+
       await supabase
         .from('composer_scenes')
         .update(sceneUpdate)
         .eq('id', sceneId);
+
 
       // 📚 Auto-archive every generated AI clip into the Media Library (KI tab).
       // Even if the full project never finishes, or the user later regenerates the

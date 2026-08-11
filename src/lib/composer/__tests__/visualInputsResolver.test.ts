@@ -126,9 +126,11 @@ describe('Seedance 2.5 specifics', () => {
     expect(seedance25.references.videos).toBe(10);
   });
 
-  it('is not a certified lip-sync plate provider yet', () => {
-    expect(seedance25.lipSync.supported).toBe(false);
+  it('is a certified lip-sync plate provider (v418, flag-gated at dispatch)', () => {
+    expect(seedance25.lipSync.supported).toBe(true);
+    expect(seedance25.lipSync.verification.status).toBe('verified');
   });
+
 
   it('uses the previous clip as continuity reference instead of a frame', () => {
     const plan = resolveVisualInputs({
@@ -190,8 +192,11 @@ describe('registry coverage', () => {
     for (const model of AI_VIDEO_TOOLKIT_MODELS) {
       const profile = deriveVisualInputProfile(model);
       expect(profile.mode === 'exclusive' || profile.mode === 'slots').toBe(true);
-      expect(profile.lipSync.verification.status).toBe('unverified');
+      // Certification is opt-in per model; everything else stays unverified.
+      const expected = model.id === 'seedance-2-5' ? 'verified' : 'unverified';
+      expect(profile.lipSync.verification.status).toBe(expected);
     }
+
   });
 
   it('resolves without a first frame when the model has no i2v slot', () => {

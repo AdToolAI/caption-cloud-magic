@@ -6,6 +6,9 @@ import { planSceneVisualInputs } from "../_shared/visual-inputs.ts";
 import { ensureTransitionFrame } from "../_shared/transition-frame.ts";
 import { CLIP_COSTS, type ClipQuality } from "../_shared/clip-costs.ts";
 import { createSeedance25Task, MODELARK_JOB_PREFIX } from "../_shared/modelark.ts";
+import { isSeedance25LipsyncEnabled } from "../_shared/seedance25-lipsync-flag.ts";
+import { AMBIENT_NO_SPEECH_PROMPT } from "../_shared/ambient-audio.ts";
+
 import {
   countDialogSpeakers,
   stripSpeakerPrefixes,
@@ -1534,6 +1537,12 @@ serve(async (req) => {
     }
 
     const processScenes = async () => {
+    // v418 — Seedance 2.5 as a lip-sync plate provider is behind a rollout
+    // flag. Resolved once per request, not per scene.
+    const seedance25LipsyncEnabled = await isSeedance25LipsyncEnabled(
+      supabaseAdmin,
+      user.id,
+    );
     // Process each scene
     for (const scene of scenes) {
       // ── HARD-GUARD: legacy `heygen` override → `auto` ───────────────────
@@ -1778,7 +1787,11 @@ serve(async (req) => {
         "ai-wan",
         "ai-seedance",
         "ai-luma",
+        // v418 — certified, but only while the rollout flag is on. Mirrors
+        // LIPSYNC_CERTIFIED_SOURCES in _shared/visual-inputs.ts.
+        ...(seedance25LipsyncEnabled ? ["ai-seedance25"] : []),
       ]);
+
 
       if (
         LIPSYNC_PROVIDERS.has(scene.clipSource as string) &&
@@ -1802,7 +1815,8 @@ serve(async (req) => {
           JSON.stringify({
             error: "invalid_provider_for_lipsync",
             message:
-              tl({ de: `Lip-Sync ist aktuell nur mit HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s) oder Luma (5/9s) möglich. Aktuell: ${scene.clipSource}. Bitte Provider wechseln oder Lip-Sync deaktivieren.`, en: `Lip-sync is currently only possible with HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s) or Luma (5/9s). Current: ${scene.clipSource}. Please change provider or disable lip-sync.`, es: `La sincronización labial solo es posible actualmente con HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s) o Luma (5/9s). Actual: ${scene.clipSource}. Por favor, cambia de proveedor o desactiva la sincronización labial.` }),
+              tl({ de: `Lip-Sync ist aktuell nur mit HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s)${seedance25LipsyncEnabled ? ", Seedance 2.5 (4–30s)" : ""} oder Luma (5/9s) möglich. Aktuell: ${scene.clipSource}. Bitte Provider wechseln oder Lip-Sync deaktivieren.`, en: `Lip-sync is currently only possible with HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s)${seedance25LipsyncEnabled ? ", Seedance 2.5 (4–30s)" : ""} or Luma (5/9s). Current: ${scene.clipSource}. Please change provider or disable lip-sync.`, es: `La sincronización labial solo es posible actualmente con HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s)${seedance25LipsyncEnabled ? ", Seedance 2.5 (4–30s)" : ""} o Luma (5/9s). Actual: ${scene.clipSource}. Por favor, cambia de proveedor o desactiva la sincronización labial.` }),
+
             scene_id: scene.id,
             picked: scene.clipSource,
             allowed: Array.from(LIPSYNC_PROVIDERS),
@@ -1872,7 +1886,24 @@ serve(async (req) => {
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
         }
+      } else if (scene.clipSource === "ai-seedance25") {
+        // v418 — Seedance 2.5 plates: 4–30s, whole seconds (ModelArk).
+        const d = Number(scene.durationSeconds);
+        if (!Number.isFinite(d) || d < 4 || d > 30) {
+          return new Response(
+            JSON.stringify({
+              error: "invalid_duration_for_provider",
+              message: tl({ de: `Seedance 2.5 unterstützt 4–30 Sekunden. Gewählt: ${d}s.`, en: `Seedance 2.5 supports 4–30 seconds. Selected: ${d}s.`, es: `Seedance 2.5 admite 4–30 segundos. Seleccionado: ${d}s.` }),
+              scene_id: scene.id,
+              provider: "ai-seedance25",
+              picked: d,
+              allowed: { min: 4, max: 30 },
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
       } else if (scene.clipSource === "ai-seedance") {
+
         const d = Number(scene.durationSeconds);
         if (!Number.isFinite(d) || d < 3 || d > 12) {
           return new Response(
@@ -4141,6 +4172,20 @@ serve(async (req) => {
           const isI2V = !!planImageUrl;
           const seed25Duration = Math.max(3, Math.min(30, Math.round(scene.durationSeconds)));
 
+          // ── v418 audio ownership ──────────────────────────────────────────
+          // A lip-sync scene renders a SILENT plate: the studio owns the
+          // voice. The single exception is the hybrid ambience mode, where
+          // the model may add room tone/foley — never speech (the prompt
+          // forbids it and a speech gate re-mutes the plate afterwards).
+          const __seed25Engine = (scene.engineOverride ?? "auto") as string;
+          const __seed25IsLipSync =
+            __seed25Engine === "cinematic-sync" || __seed25Engine === "sync-segments";
+          const __seed25Ambient = (scene as any).audioSource === "ambient";
+          const __seed25GenerateAudio = __seed25IsLipSync
+            ? __seed25Ambient
+            : (scene as any).audioSource === "provider" || scene.withAudio === true;
+          const __seed25Prompt = enrichPrompt(scene.aiPrompt, undefined, isI2V);
+
           await supabaseAdmin
             .from("composer_scenes")
             .update({
@@ -4154,8 +4199,12 @@ serve(async (req) => {
           let taskId: string;
           try {
             taskId = await createSeedance25Task({
-              prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
+              prompt: __seed25GenerateAudio
+                ? `${__seed25Prompt}\n\n${AMBIENT_NO_SPEECH_PROMPT}`
+                : __seed25Prompt,
+              generateAudio: __seed25GenerateAudio,
               duration: seed25Duration,
+
               // Seedance 2.5 tops out at 720p output (ModelArk docs).
               resolution: "720p",
               aspectRatio: "16:9",

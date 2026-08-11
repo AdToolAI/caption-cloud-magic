@@ -18,7 +18,14 @@
 import type { ClipSource } from '@/types/video-composer';
 import { AI_VIDEO_TOOLKIT_MODELS } from '@/config/aiVideoModelRegistry';
 
-export type SceneAudioSource = 'provider' | 'studio' | 'silent';
+/**
+ * v418 adds `ambient`: the model produces ambience/foley only (speech is
+ * banned in the prompt and re-checked by a speech gate after the render),
+ * the spoken voice still comes from the studio track. It is the ONLY
+ * combination of provider audio and studio audio that is allowed.
+ */
+export type SceneAudioSource = 'provider' | 'studio' | 'silent' | 'ambient';
+
 
 /** Composer `clipSource` values whose model family can generate its own audio. */
 export const NATIVE_AUDIO_CLIP_SOURCES: ReadonlySet<string> = new Set(
@@ -45,9 +52,16 @@ export function resolveSceneAudioSource(input: {
   clipSource?: ClipSource | string | null;
   requested?: SceneAudioSource | null;
 }): SceneAudioSource {
-  if (input.hasSpeech) return 'studio';
   const requested = input.requested;
-  if (requested === 'provider') {
+  if (input.hasSpeech) {
+    // v418 hybrid: speech scenes may keep a native ambience bed, but only on
+    // models that can make sound at all. The voice itself stays studio-owned.
+    if (requested === 'ambient' && sourceHasNativeAudio(input.clipSource)) return 'ambient';
+    return 'studio';
+  }
+  if (requested === 'provider' || requested === 'ambient') {
+    // Without speech there is nothing to keep separate — a plain provider
+    // track is the simpler, cheaper equivalent of the hybrid.
     return sourceHasNativeAudio(input.clipSource) ? 'provider' : 'studio';
   }
   if (requested === 'studio' || requested === 'silent') return requested;
@@ -59,5 +73,15 @@ export function resolveSceneAudioSource(input: {
 
 /** `withAudio` flag for the generation call derived from the audio owner. */
 export function withAudioForSource(audioSource: SceneAudioSource): boolean {
-  return audioSource === 'provider';
+  return audioSource === 'provider' || audioSource === 'ambient';
 }
+
+/**
+ * True when the scene keeps a native ambience bed underneath a studio voice.
+ * The bed is mixed in at the very end (mux stage) and must never reach the
+ * lip-sync model as an audio input.
+ */
+export function isHybridAmbientSource(audioSource: SceneAudioSource | string | null | undefined): boolean {
+  return audioSource === 'ambient';
+}
+

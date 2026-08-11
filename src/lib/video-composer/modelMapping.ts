@@ -68,6 +68,18 @@ export const LIPSYNC_CLIP_SOURCES: ReadonlyArray<ClipSource> = [
 ];
 
 /**
+ * v418 — Seedance 2.5 (4–30s plates) is certified but stays behind the
+ * rollout flag `composer.feature.seedance25_lipsync`. Callers that know the
+ * flag state use this instead of the frozen list above.
+ */
+export const LIPSYNC_CLIP_SOURCE_SEEDANCE25: ClipSource = 'ai-seedance25';
+export function lipsyncClipSources(seedance25Enabled: boolean): ReadonlyArray<ClipSource> {
+  return seedance25Enabled
+    ? [...LIPSYNC_CLIP_SOURCES, LIPSYNC_CLIP_SOURCE_SEEDANCE25]
+    : LIPSYNC_CLIP_SOURCES;
+}
+
+/**
  * Legacy alias — kept so existing imports (RenderPreFlightDialog, etc.)
  * keep working. Now mirrors LIPSYNC_CLIP_SOURCES.
  */
@@ -75,13 +87,14 @@ export const NATIVE_DIALOGUE_CLIP_SOURCES: ReadonlyArray<ClipSource> = LIPSYNC_C
 
 const LIPSYNC_FAMILIES = new Set(['happyhorse', 'hailuo', 'kling', 'wan', 'seedance', 'luma']);
 
+
 /**
  * Composer dropdown models filtered to the Lip-Sync-certified subset
  * (HappyHorse standard/pro + Hailuo standard/pro). Order matters — primary
  * provider first so the ModelSelector pre-selects HappyHorse.
  */
 export const COMPOSER_DIALOG_MODELS: ToolkitModel[] = COMPOSER_AVAILABLE_MODELS
-  // Seedance 2.5 (ModelArk) is not certified for the Sync.so lip-sync path.
+  // v418: Seedance 2.5 is certified but flag-gated — see composerDialogModels().
   .filter((m) => LIPSYNC_FAMILIES.has(m.family) && m.id !== 'seedance-2-5')
   .sort((a, b) => {
     // HappyHorse (primary) before Hailuo (fallback); standard before pro.
@@ -89,6 +102,18 @@ export const COMPOSER_DIALOG_MODELS: ToolkitModel[] = COMPOSER_AVAILABLE_MODELS
     if (fam(a) !== fam(b)) return fam(a) - fam(b);
     return /pro/i.test(a.id) ? 1 : -1;
   });
+
+/**
+ * Dialog picker contents for a given rollout state. With the Seedance 2.5
+ * lip-sync flag on, the 4–30s plate provider is appended at the end (it is
+ * the premium option, never the default).
+ */
+export function composerDialogModels(seedance25Enabled: boolean): ToolkitModel[] {
+  if (!seedance25Enabled) return COMPOSER_DIALOG_MODELS;
+  const seedance25 = COMPOSER_AVAILABLE_MODELS.filter((m) => m.id === 'seedance-2-5');
+  return [...COMPOSER_DIALOG_MODELS, ...seedance25];
+}
+
 
 /** Default (cheapest, most flexible) lip-sync provider preselected when the toggle flips ON. */
 export const DIALOG_FALLBACK_CLIP_SOURCE: ClipSource = LIPSYNC_PRIMARY_CLIP_SOURCE;

@@ -125,6 +125,13 @@ export const DialogStitchVideoSchema = z.object({
    *  per-pass single-face preclips animate the lips on top. */
   masterImageUrl: z.string().url().optional().nullable(),
   masterAudioUrl: z.string().url(),
+  /** v418 hybrid ambience: the ORIGINAL (pre-lip-sync) plate, used purely as
+   *  an ambience/foley bed underneath the studio voice. Only ever set when
+   *  the post-render speech gate found no speech on the plate. */
+  ambientAudioUrl: z.string().url().optional().nullable(),
+  /** Mix level of that bed. Clamped to [0, 1] at render time. */
+  ambientVolume: z.number().optional().nullable(),
+
   totalSec: z.number().positive(),
   targetWidth: z.number().positive().optional(),
   targetHeight: z.number().positive().optional(),
@@ -556,6 +563,9 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   masterVideoUrl,
   masterImageUrl,
   masterAudioUrl,
+  ambientAudioUrl,
+  ambientVolume,
+
   totalSec,
   targetWidth,
   targetHeight,
@@ -860,6 +870,17 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
 
       {/* Single canonical audio track (merged master WAV). */}
       {masterAudioUrl && <Audio src={masterAudioUrl} />}
+
+      {/* v418 hybrid ambience bed — the model's own room tone underneath the
+          studio voice. Never a speech source: it is only passed in after the
+          post-render speech gate cleared the plate. Volume hard-clamped. */}
+      {ambientAudioUrl && (
+        <Audio
+          src={ambientAudioUrl}
+          volume={Math.max(0, Math.min(1, Number(ambientVolume ?? 0.18)))}
+        />
+      )}
+
 
       {totalSec ? null : null}
     </AbsoluteFill>

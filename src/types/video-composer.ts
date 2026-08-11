@@ -573,7 +573,13 @@ export interface ComposerScene {
    * Provider audio and studio tracks are mutually exclusive; scenes with
    * voiceover, dialog or lip-sync are always 'studio'.
    */
-  audioSource?: 'provider' | 'studio' | 'silent';
+  /**
+   *  - 'ambient' (v418): hybrid — the model generates ambience/foley only
+   *    (speech is forbidden in the prompt and re-checked by a speech gate),
+   *    while the spoken voice still comes from the studio track.
+   */
+  audioSource?: 'provider' | 'studio' | 'silent' | 'ambient';
+
   /** v415 — sound-design intent from the briefing (metadata for the audio step). */
   soundDesign?: string;
   /** v415 — full multi-step camera choreography (already folded into aiPrompt). */

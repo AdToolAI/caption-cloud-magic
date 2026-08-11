@@ -115,6 +115,8 @@ import { ModelSelector } from "@/components/ai-video/ModelSelector";
 import {
   COMPOSER_AVAILABLE_MODELS,
   COMPOSER_DIALOG_MODELS,
+  composerDialogModels,
+  lipsyncClipSources,
   NATIVE_DIALOGUE_CLIP_SOURCES,
   DIALOG_FALLBACK_CLIP_SOURCE,
   DIALOG_FALLBACK_CLIP_QUALITY,
@@ -125,6 +127,8 @@ import {
   modelIdToSource,
   sourceToModelId,
 } from "@/lib/video-composer/modelMapping";
+import { useSeedance25Lipsync } from "@/hooks/useSeedance25Lipsync";
+
 
 import { AI_VIDEO_TOOLKIT_MODELS } from "@/config/aiVideoModelRegistry";
 import { startSceneGeneration } from "@/lib/composer/startSceneGeneration";
@@ -342,6 +346,9 @@ export default function SceneCard({
     | "en"
     | "es";
   const confirmRender = useSceneRenderConfirm();
+  // v418 rollout brake — mirrors the server flag for Seedance 2.5 plates.
+  const seedance25LipsyncEnabled = useSeedance25Lipsync();
+
   const isStock =
     scene.clipSource === "stock" || scene.clipSource === "stock-image";
   const clipSourceIcon = scene.clipSource.startsWith("ai-")
@@ -1452,7 +1459,7 @@ export default function SceneCard({
                     {sourceMode === "ai" && (() => {
                       const dialogMode = scene.dialogMode === true;
                       const modelsForPicker = dialogMode
-                        ? COMPOSER_DIALOG_MODELS
+                        ? composerDialogModels(seedance25LipsyncEnabled)
                         : COMPOSER_AVAILABLE_MODELS;
                       const toggleOnLabel =
                         lang === "de"
@@ -1460,12 +1467,19 @@ export default function SceneCard({
                           : lang === "es"
                             ? "Diálogo y Lip-Sync"
                             : "Dialog & Lip-Sync";
-                      const toggleHint =
-                        lang === "de"
-                          ? tx({ de: "HappyHorse, Hailuo, Kling, Wan, Seedance und Luma sind für Sync.so Lip-Sync zertifiziert.", en: "HappyHorse, Hailuo, Kling, Wan, Seedance, and Luma are certified for Sync.so Lip-Sync.", es: "HappyHorse, Hailuo, Kling, Wan, Seedance y Luma están certificados para Sync.so Lip-Sync." })
-                          : lang === "es"
-                            ? "HappyHorse, Hailuo, Kling, Wan, Seedance y Luma están certificados para Sync.so lip-sync."
-                            : "HappyHorse, Hailuo, Kling, Wan, Seedance and Luma are certified for Sync.so lip-sync.";
+                      const s25 = seedance25LipsyncEnabled;
+                      const toggleHint = s25
+                        ? tx({
+                            de: "HappyHorse, Hailuo, Kling, Wan, Seedance, Seedance 2.5 (bis 30s) und Luma sind für Sync.so Lip-Sync zertifiziert.",
+                            en: "HappyHorse, Hailuo, Kling, Wan, Seedance, Seedance 2.5 (up to 30s) and Luma are certified for Sync.so lip-sync.",
+                            es: "HappyHorse, Hailuo, Kling, Wan, Seedance, Seedance 2.5 (hasta 30s) y Luma están certificados para Sync.so lip-sync.",
+                          })
+                        : tx({
+                            de: "HappyHorse, Hailuo, Kling, Wan, Seedance und Luma sind für Sync.so Lip-Sync zertifiziert.",
+                            en: "HappyHorse, Hailuo, Kling, Wan, Seedance and Luma are certified for Sync.so lip-sync.",
+                            es: "HappyHorse, Hailuo, Kling, Wan, Seedance y Luma están certificados para Sync.so lip-sync.",
+                          });
+
 
                       return (
                         <div className="space-y-2">
@@ -1497,11 +1511,8 @@ export default function SceneCard({
                                 </span>
                                 <span className="text-[9px] text-muted-foreground leading-tight truncate">
                                   {dialogMode
-                                    ? lang === "de"
-                                    ? "6 Modelle · HappyHorse · Hailuo · Kling · Wan · Seedance · Luma (Sync.so)"
-                                    : lang === "es"
-                                      ? "6 modelos · HappyHorse · Hailuo · Kling · Wan · Seedance · Luma (Sync.so)"
-                                      : "6 models · HappyHorse · Hailuo · Kling · Wan · Seedance · Luma (Sync.so)"
+                                    ? `${modelsForPicker.length} ${lang === "es" ? "modelos" : lang === "en" ? "models" : "Modelle"} · HappyHorse · Hailuo · Kling · Wan · Seedance${s25 ? " · Seedance 2.5" : ""} · Luma (Sync.so)`
+
                                   : lang === "de"
                                     ? tx({ de: "B-Roll-Modus · 11 Modelle verfügbar", en: "B-roll mode · 11 models available", es: "Modo B-roll · 11 modelos disponibles" })
                                     : lang === "es"
@@ -1542,9 +1553,10 @@ export default function SceneCard({
                                 if (engineChanged) updates.engineOverride = nextEngine;
                                 if (lipSyncChanged) updates.lipSyncWithVoiceover = nextLipSync;
                                 if (next) {
-                                  const ok = (NATIVE_DIALOGUE_CLIP_SOURCES as ReadonlyArray<string>).includes(
-                                    scene.clipSource,
-                                  );
+                                  const ok = (
+                                    lipsyncClipSources(seedance25LipsyncEnabled) as ReadonlyArray<string>
+                                  ).includes(scene.clipSource);
+
                                   if (!ok) {
                                     updates.clipSource = DIALOG_FALLBACK_CLIP_SOURCE;
                                     updates.clipQuality = DIALOG_FALLBACK_CLIP_QUALITY;
@@ -1719,6 +1731,37 @@ export default function SceneCard({
                                 </Select>
                               </div>
                             )}
+                            {dialogMode && scene.clipSource === "ai-seedance25" && (
+                              <label className="mt-2 flex items-start gap-2 rounded-md border border-border/50 bg-card/40 p-2">
+                                <input
+                                  type="checkbox"
+                                  className="mt-0.5 h-3.5 w-3.5 accent-primary"
+                                  checked={scene.audioSource === "ambient"}
+                                  onChange={(e) =>
+                                    onUpdate({
+                                      audioSource: (e.target.checked ? "ambient" : "silent") as any,
+                                    })
+                                  }
+                                />
+                                <span className="leading-tight">
+                                  <span className="block text-[11px] font-medium">
+                                    {tx({
+                                      de: "Umgebungston vom Modell",
+                                      en: "Ambience from the model",
+                                      es: "Ambiente del modelo",
+                                    })}
+                                  </span>
+                                  <span className="block text-[9px] text-muted-foreground">
+                                    {tx({
+                                      de: "Nur Atmo und Geräusche — die Stimme kommt weiter aus dem Studio. Erkennt die Prüfung Sprache, läuft die Szene stumm.",
+                                      en: "Ambience and foley only — the voice still comes from the studio. If the check hears speech, the scene stays muted.",
+                                      es: "Solo ambiente y efectos: la voz sigue viniendo del estudio. Si la comprobación detecta habla, la escena queda muda.",
+                                    })}
+                                  </span>
+                                </span>
+                              </label>
+                            )}
+
                         {(() => {
                           const selectedModel = AI_VIDEO_TOOLKIT_MODELS.find(
                             (m) => m.id === currentModelId,

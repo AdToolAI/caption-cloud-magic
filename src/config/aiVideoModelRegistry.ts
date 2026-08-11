@@ -662,8 +662,11 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
      * "seamless transition" and "identity references" genuinely compete here.
      * Reference videos live inside the reference budget — that is why
      * `clip-reference` is the continuity mode of choice for this model.
-     * Lip-sync: NOT certified as a master-plate provider yet (`ai-seedance25`
-     * is absent from the backend allowlist) — see plan Phase 3a.
+     * Lip-sync (v418, Phase 3a): certified as a master-plate provider behind
+     * the `composer.feature.seedance25_lipsync` flag. Plates stay silent
+     * unless the scene explicitly opts into the hybrid ambience mode, in
+     * which case the prompt forbids speech and a speech gate re-mutes the
+     * plate if the model talks anyway.
      */
     visualInputs: {
       mode: 'exclusive',
@@ -680,12 +683,13 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
         location: true,
       },
       lipSync: {
-        supported: false,
+        supported: true,
         requiresIdentityReference: true,
-        conflictsWithFirstFrame: true,
-        verification: { status: 'unverified' },
+        conflictsWithFirstFrame: false,
+        verification: { status: 'verified' },
       },
     },
+
 
     durations: [4, 5, 8, 10, 12, 15, 20, 25, 30],
     resolution: '720p',
