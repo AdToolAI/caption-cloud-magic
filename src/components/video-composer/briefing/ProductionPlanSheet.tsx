@@ -1179,6 +1179,7 @@ export default function ProductionPlanSheet({
           .filter((id): id is string => !!id && isUuid(id)),
       );
       turns.forEach((turn, turnIndex) => {
+        if (!isRealSpeakerTurn(turn)) return; // Blocklabels sind keine Sprecher.
         const boundId = uuidInside((turn as any).speakerCharacterId ?? null);
         if (!boundId || !castIds.has(boundId)) {
           issues.push({
@@ -1188,6 +1189,7 @@ export default function ProductionPlanSheet({
           });
         }
       });
+
     }
     return issues;
   }, [safePlan, outfitById]);
