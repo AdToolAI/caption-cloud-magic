@@ -457,13 +457,22 @@ export default function CharacterManager({ characters, language, onChange }: Cha
             {/* Avatars section */}
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/80">
-                {lang === 'de' ? tx({ de: "Avatare (mit Portrait-Anker)", en: "Avatars (with portrait anchor)", es: "Avatares (con anclaje vertical)" }) : lang === 'es' ? 'Avatares (con ancla)' : 'Avatars (portrait anchor)'}
+                {t.pickerSectionTitle}
               </p>
               {avatarsLoading ? (
                 <p className="text-xs text-muted-foreground py-3 text-center">…</p>
               ) : avatars.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-3 text-center">{t.pickerEmpty}</p>
+                <div className="py-6 flex flex-col items-center gap-3 text-center">
+                  <p className="text-xs text-muted-foreground">{t.pickerEmpty}</p>
+                  <Button asChild size="sm" variant="outline" className="gap-1.5">
+                    <Link to="/library" onClick={() => setPickerOpen(false)}>
+                      <Library className="h-3.5 w-3.5" />
+                      {t.openCastWorld}
+                    </Link>
+                  </Button>
+                </div>
               ) : (
+
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {avatars.map((a: any) => {
                     const portrait = a.portrait_url || a.reference_image_url;
