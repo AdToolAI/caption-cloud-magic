@@ -6,6 +6,8 @@ import { verifyWebhookRequest, appendWebhookToken } from "../_shared/webhook-aut
 import { CLIP_COSTS } from "../_shared/clip-costs.ts";
 import { countDialogSpeakers as detectSpeakerCount } from "../_shared/dialog-speakers.ts";
 import { isGreenNetRejection } from "../_shared/happyhorse-green-net.ts";
+import { isAmbientAudioRow, runAmbientSpeechGate } from "../_shared/ambient-audio.ts";
+
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
