@@ -1459,7 +1459,7 @@ export default function SceneCard({
                     {sourceMode === "ai" && (() => {
                       const dialogMode = scene.dialogMode === true;
                       const modelsForPicker = dialogMode
-                        ? COMPOSER_DIALOG_MODELS
+                        ? composerDialogModels(seedance25LipsyncEnabled)
                         : COMPOSER_AVAILABLE_MODELS;
                       const toggleOnLabel =
                         lang === "de"
@@ -1467,12 +1467,19 @@ export default function SceneCard({
                           : lang === "es"
                             ? "Diálogo y Lip-Sync"
                             : "Dialog & Lip-Sync";
-                      const toggleHint =
-                        lang === "de"
-                          ? tx({ de: "HappyHorse, Hailuo, Kling, Wan, Seedance und Luma sind für Sync.so Lip-Sync zertifiziert.", en: "HappyHorse, Hailuo, Kling, Wan, Seedance, and Luma are certified for Sync.so Lip-Sync.", es: "HappyHorse, Hailuo, Kling, Wan, Seedance y Luma están certificados para Sync.so Lip-Sync." })
-                          : lang === "es"
-                            ? "HappyHorse, Hailuo, Kling, Wan, Seedance y Luma están certificados para Sync.so lip-sync."
-                            : "HappyHorse, Hailuo, Kling, Wan, Seedance and Luma are certified for Sync.so lip-sync.";
+                      const s25 = seedance25LipsyncEnabled;
+                      const toggleHint = s25
+                        ? tx({
+                            de: "HappyHorse, Hailuo, Kling, Wan, Seedance, Seedance 2.5 (bis 30s) und Luma sind für Sync.so Lip-Sync zertifiziert.",
+                            en: "HappyHorse, Hailuo, Kling, Wan, Seedance, Seedance 2.5 (up to 30s) and Luma are certified for Sync.so lip-sync.",
+                            es: "HappyHorse, Hailuo, Kling, Wan, Seedance, Seedance 2.5 (hasta 30s) y Luma están certificados para Sync.so lip-sync.",
+                          })
+                        : tx({
+                            de: "HappyHorse, Hailuo, Kling, Wan, Seedance und Luma sind für Sync.so Lip-Sync zertifiziert.",
+                            en: "HappyHorse, Hailuo, Kling, Wan, Seedance and Luma are certified for Sync.so lip-sync.",
+                            es: "HappyHorse, Hailuo, Kling, Wan, Seedance y Luma están certificados para Sync.so lip-sync.",
+                          });
+
 
                       return (
                         <div className="space-y-2">
