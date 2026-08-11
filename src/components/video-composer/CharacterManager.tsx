@@ -500,55 +500,6 @@ export default function CharacterManager({ characters, language, onChange }: Cha
               )}
             </div>
 
-            {/* Library characters section */}
-            <div className="space-y-2 mt-4 pt-4 border-t border-border/40">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {lang === 'de' ? 'Library-Charaktere (nur Beschreibung)' : lang === 'es' ? 'Personajes de Library (solo descripción)' : 'Library characters (description only)'}
-              </p>
-              {libLoading ? (
-                <p className="text-xs text-muted-foreground py-3 text-center">…</p>
-              ) : libChars.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-3 text-center italic">
-                  {lang === 'de' ? 'Keine Library-Charaktere.' : lang === 'es' ? 'Sin personajes.' : 'No library characters.'}
-                </p>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {libChars.map((lc: any) => {
-                    const portrait = lc.reference_image_url;
-                    const alreadyLinked = characters.some((c) => c.id === `lib:${lc.id}`);
-                    return (
-                      <button
-                        key={lc.id}
-                        type="button"
-                        onClick={() => linkLibraryCharacter(lc)}
-                        disabled={alreadyLinked}
-                        className={`group relative rounded-lg border bg-card/60 overflow-hidden text-left transition ${
-                          alreadyLinked
-                            ? 'border-primary/40 opacity-60 cursor-not-allowed'
-                            : 'border-border/40 hover:border-primary/60 hover:bg-primary/5'
-                        }`}
-                      >
-                        <div className="aspect-[3/4] bg-muted flex items-center justify-center overflow-hidden">
-                          {portrait ? (
-                            <img src={portrait} alt={lc.name} className="h-full w-full object-cover" loading="lazy" />
-                          ) : (
-                            <User className="h-8 w-8 text-muted-foreground" />
-                          )}
-                        </div>
-                        <div className="p-2">
-                          <p className="text-xs font-semibold truncate">{lc.name}</p>
-                          {!portrait && (
-                            <p className="text-[10px] text-amber-500/80">
-                              {lang === 'de' ? '⚠ Nur Text' : lang === 'es' ? '⚠ Solo texto' : '⚠ Text only'}
-                            </p>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
           </ScrollArea>
         </DialogContent>
       </Dialog>
