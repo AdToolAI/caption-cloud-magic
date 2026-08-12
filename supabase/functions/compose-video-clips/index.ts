@@ -4183,6 +4183,20 @@ serve(async (req) => {
             .eq("id", scene.id);
 
           let taskId: string;
+          // Belt and braces: with a composed anchor on an identity-critical
+          // scene, raw cast portraits must NEVER reach ModelArk — its privacy
+          // filter rejects clear photos of real people
+          // (`InputImageSensitiveContentDetected.PrivacyInformation`).
+          const __seed25AnchorOwnsSlot = Boolean(planImageUrl) &&
+            (visualPlan.constraints.identityProtected || __seed25IsLipSync);
+          const __seed25UseReferences = visualPlan.inputMode === "references" &&
+            !__seed25AnchorOwnsSlot;
+          if (visualPlan.inputMode === "references" && __seed25AnchorOwnsSlot) {
+            console.log(
+              `[compose-video-clips] scene ${scene.id}: anchor overrides reference slot for Seedance 2.5 (${planReferenceUrls.length} portraits suppressed)`,
+            );
+          }
+
           try {
             taskId = await createSeedance25Task({
               prompt: __seed25GenerateAudio
@@ -4196,34 +4210,39 @@ serve(async (req) => {
               aspectRatio: "16:9",
               // ModelArk's three image modes are mutually exclusive — the
               // resolver already picked exactly one, so only that one is sent.
-              firstFrameUrl:
-                visualPlan.inputMode === "references" ? undefined : planImageUrl ?? undefined,
+              firstFrameUrl: __seed25UseReferences ? undefined : planImageUrl ?? undefined,
               lastFrameUrl:
                 visualPlan.inputMode === "first-last-frame" ? planEndImageUrl ?? undefined : undefined,
-              referenceImageUrls:
-                visualPlan.inputMode === "references" ? planReferenceUrls : undefined,
-              referenceVideoUrls: planReferenceVideoUrls.length ? planReferenceVideoUrls : undefined,
+              referenceImageUrls: __seed25UseReferences ? planReferenceUrls : undefined,
+              referenceVideoUrls: __seed25UseReferences && planReferenceVideoUrls.length
+                ? planReferenceVideoUrls
+                : undefined,
             });
           } catch (arkErr: any) {
             console.error(
               `[compose-video-clips] Seedance 2.5 scene ${scene.id} failed:`,
               arkErr,
             );
+            const __arkRaw = String(arkErr?.message ?? "ModelArk error");
+            const __arkMessage = /SensitiveContent|PrivacyInformation/i.test(__arkRaw)
+              ? "Seedance 2.5 hat die Eingabebilder abgelehnt (Personenschutz). Bitte einen generierten Szenen-Anker statt einzelner Personenfotos verwenden."
+              : __arkRaw;
             await supabaseAdmin
               .from("composer_scenes")
               .update({
                 clip_status: "failed",
-                clip_error: String(arkErr?.message ?? "ModelArk error").slice(0, 500),
+                clip_error: __arkMessage.slice(0, 500),
                 updated_at: new Date().toISOString(),
               })
               .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
               status: "failed",
-              error: String(arkErr?.message ?? "ModelArk error").slice(0, 300),
+              error: __arkMessage.slice(0, 300),
             });
             continue;
           }
+
 
           console.log(
             `[compose-video-clips] Seedance 2.5 scene ${scene.id}: ModelArk task ${taskId} (${seed25Duration}s)`,
