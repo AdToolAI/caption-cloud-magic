@@ -101,10 +101,12 @@ export function arbitrateSlots(input: ArbitrationInput): ArbitrationResult {
   }
 
   // 4. Reference-video continuity beats a still frame when available: motion
-  //    and grading carry over instead of a single frame.
-  if (canClipReference && strategy !== 'transition-priority') {
+  //    and grading carry over instead of a single frame. On exclusive-slot
+  //    providers it is the only continuity that fits, so it always wins.
+  if (canClipReference && (strategy !== 'transition-priority' || profile.mode === 'exclusive')) {
     return { transition: 'clip-reference', inputMode: 'references', warnings };
   }
+
 
   // 5. Plain frame chaining.
   if (input.hasPreviousFrame && profile.firstFrame.supported) {
