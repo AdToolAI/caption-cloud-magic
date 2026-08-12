@@ -285,7 +285,13 @@ export function usePipelineProgress({
         // contribute to this run's progress.
         const ss = scenesRef.current;
         const ac = assemblyRef.current;
-        const ai = ss.filter((s) => s.clipSource?.startsWith('ai-'));
+        const clipStartIds = phase === 'clips'
+          ? new Set(('sceneIds' in e ? e.sceneIds : undefined) ?? [])
+          : null;
+        const ai = ss.filter(
+          (s) => s.clipSource?.startsWith('ai-') &&
+            (!clipStartIds || clipStartIds.size === 0 || clipStartIds.has(s.id)),
+        );
         const lipTargets = ss.filter(
           (s) =>
             !isCanceledLipsyncScene(s) &&
@@ -448,7 +454,7 @@ export function usePipelineProgress({
       )));
     const ready = aiScenes.filter(isReadyOrLipsynced).length;
     const generating = aiScenes.filter(
-      (s) => s.clipStatus === 'generating' && !isReadyOrLipsynced(s) && !isSceneTerminalFailure(s),
+      (s) => belongsToCurrentRun(s) && s.clipStatus === 'generating' && !isReadyOrLipsynced(s) && !isSceneTerminalFailure(s),
     ).length;
     const failed = aiScenes.filter((s) => belongsToCurrentRun(s) && s.clipStatus === 'failed').length;
     // Stage 7: a scene with an active backend handle (Replicate prediction,
@@ -458,7 +464,7 @@ export function usePipelineProgress({
     // disappears for 5–30 s right after the user clicks "Generieren".
     const backendActive = aiScenes.filter((s) => {
       const sa = s as any;
-      if (!belongsToCurrentRun(sa)) return true;
+      if (!belongsToCurrentRun(sa)) return false;
       if (isSceneTerminalFailure(sa)) return false;
       if (isCanceledLipsyncScene(sa)) return false;
       if (isReadyOrLipsynced(sa)) return false;

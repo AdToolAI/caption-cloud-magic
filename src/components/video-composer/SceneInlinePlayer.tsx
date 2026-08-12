@@ -410,8 +410,12 @@ export default function SceneInlinePlayer({
               de: lower.includes('modelark_real_person_anchor_rejected')
                 ? 'Seedance 2.5 hat den komponierten Szenen-Anker abgelehnt, weil darin reale Personen erkannt wurden. Es wurden keine einzelnen Cast-Fotos gesendet.'
                 : 'Seedance 2.5 hat das Eingabebild abgelehnt. Bitte ein anderes, zulässiges Motiv verwenden.',
-              en: 'Seedance 2.5 rejected the input images (privacy filter). The composed scene anchor is now sent instead of individual portraits – please click "Re-render".',
-              es: 'Seedance 2.5 rechazó las imágenes de entrada (filtro de privacidad). Ahora se envía el ancla de escena compuesta en lugar de retratos individuales: haz clic en «Volver a renderizar».',
+              en: lower.includes('modelark_real_person_anchor_rejected')
+                ? 'Seedance 2.5 rejected the composed scene anchor because real people were detected in it. No individual cast portraits were sent.'
+                : 'Seedance 2.5 rejected the input image. Please use a different, permitted visual.',
+              es: lower.includes('modelark_real_person_anchor_rejected')
+                ? 'Seedance 2.5 rechazó el ancla de escena compuesta porque detectó personas reales. No se enviaron retratos individuales del elenco.'
+                : 'Seedance 2.5 rechazó la imagen de entrada. Usa otra imagen permitida.',
             });
           } else if (!rawErr) {
             friendly = tx({ de: 'Render fehlgeschlagen.', en: 'Render failed.', es: 'Error en el renderizado.' });
