@@ -837,7 +837,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // which ElevenLabs sometimes voiced as an audible mumble/breath at the
     // end of short replies ("Was denn? <mumble>"). Silence here is sample-
     // accurate and never bleeds into another speaker's lip-sync window.
-    const INTER_SPEAKER_PAUSE_SEC = 0.25;
+    const INTER_SPEAKER_PAUSE_SEC = INTER_SPEAKER_PAUSE_MS / 1000;
     // ── v94 — Parallel TTS with concurrency=2 ───────────────────────────
     // Previously the for-loop awaited each ElevenLabs/Hume call serially
     // (~0.8-2.5s each). For a 4-speaker / 8-turn scene this added 6-20s of
