@@ -58,6 +58,19 @@ Nicht in der Allowlist (`_shared/composer-ai-sources.ts:8-20`): **`ai-vidu`** un
 **Schritt 5 — Produktionsplan-Effekte konsolidieren**
 - Die drei Effekte in eine einzige Normalisierungsfunktion zusammenführen, die auf jeden Plan-Wechsel einmal deterministisch läuft; Dialogtexte in die Auto-Cast-Signatur aufnehmen.
 
+**Schritt 6 — Lip-Sync-Provider hart einschränken**
+Sobald Lip-Sync für eine Szene aktiv ist, sind nur noch **Hailuo** und **Happy Horse** als Plate-Provider zulässig.
+- `lipsyncMasterProvider.ts` wird zur alleinigen Wahrheit: erlaubte Liste = `ai-hailuo`, `ai-happyhorse`.
+- Aktiviert der Kunde Lip-Sync bei einem anderen Provider, erscheint ein Dialog: „Lip-Sync benötigt einen zertifizierten Plate-Provider" mit genau zwei Buttons (Hailuo / Happy Horse) und Abbrechen. Kein stiller Auto-Wechsel — die Szene bleibt unverändert, bis der Kunde wählt.
+- Umgekehrt: wechselt der Kunde bei einer Lip-Sync-Szene auf einen nicht zulässigen Provider, erscheint derselbe Dialog mit der zusätzlichen Option „Lip-Sync für diese Szene deaktivieren".
+- Im Modell-Picker werden nicht zulässige Modelle bei aktivem Lip-Sync ausgegraut mit Hinweis-Tooltip statt einfach zu verschwinden.
+- Serverseitig spiegelt `compose-video-clips` die Regel: Lip-Sync-Szene mit fremdem Provider → klarer, lokalisierter Fehler statt Rewrite.
+- Die Briefing-Automatik (`pickClipSourceForDuration`) darf für Dialog-Szenen ebenfalls nur noch diese beiden vorschlagen.
+
+Anmerkung: Seedance 2.5 war zwar als Plate zertifiziert (v418), scheitert aber in der Praxis regelmäßig am ModelArk-Personenschutz. Die Einschränkung beseitigt genau diese Fehlerklasse — der Vorschlag ist aus meiner Sicht richtig. Seedance bleibt für alle Nicht-Dialog-Szenen (bis 30 s) uneingeschränkt verfügbar.
+
+
+
 ## Technische Details
 
 Betroffene Dateien: `supabase/functions/_shared/composer-ai-sources.ts`, `supabase/functions/compose-video-clips/index.ts`, `src/lib/video-composer/modelMapping.ts`, `src/lib/video-composer/providerCapabilities.ts`, `src/components/video-composer/SceneCard.tsx`, `src/components/video-composer/ProductionPlanSheet.tsx`, `src/hooks/useApplyProductionPlan.ts`, `supabase/functions/analyze-briefing/storyboard.ts` und `deep/index.ts`, `src/config/aiVideoModelRegistry.ts`.
