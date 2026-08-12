@@ -4,11 +4,12 @@
  * The dual-write layer must stay a pure mirror: off by default, never
  * branching the dispatch, never touching frozen lip-sync concerns.
  */
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { dualWriteDispatch } from '../../../../supabase/functions/_shared/v427-dual-write.ts';
+import { __resetV427FlagCache } from '../../../../supabase/functions/_shared/v427-flags.ts';
 
 const root = resolve(__dirname, '../../../..');
 const read = (p: string) => readFileSync(resolve(root, p), 'utf8');
@@ -37,6 +38,7 @@ function adminWithFlag(enabled: boolean, writes: string[]) {
 }
 
 describe('v427 dual-write', () => {
+  beforeEach(() => __resetV427FlagCache());
   it('writes nothing while the flag is off', async () => {
     const writes: string[] = [];
     await dualWriteDispatch(adminWithFlag(false, writes), { sceneId: 's', externalJobId: 'x' });
