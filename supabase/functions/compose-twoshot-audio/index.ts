@@ -1095,7 +1095,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         }, 400);
       }
       // Extend in 0.1s steps (matches plate-render granularity) + 0.3s tail.
-      const newDur = Math.ceil((spokenSec + 0.30) * 10) / 10;
+      const newDur = Math.ceil((spokenSec + TAIL_PADDING_SEC) * STEPS_PER_SEC) / STEPS_PER_SEC;
       dialogOverflowExtended = {
         from: Math.round(sceneDur * 1000) / 1000,
         to: newDur,
