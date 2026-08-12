@@ -60,7 +60,7 @@ Nicht in der Allowlist (`_shared/composer-ai-sources.ts:8-20`): **`ai-vidu`** un
 
 **Schritt 6 — Lip-Sync-Provider hart einschränken**
 Sobald Lip-Sync für eine Szene aktiv ist, sind nur noch **Hailuo** und **Happy Horse** als Plate-Provider zulässig.
-- `lipsyncMasterProvider.ts` wird zur alleinigen Wahrheit: erlaubte Liste = `ai-hailuo`, `ai-happyhorse`.
+- `lipsyncMasterProvider.ts` wird zur alleinigen Wahrheit. Die Liste wird nicht hart in die UI geschrieben, sondern aus einem Registry-Flag `lipsyncCertified` abgeleitet — heute gesetzt für `ai-hailuo` und `ai-happyhorse`. So lässt sich später ein weiterer Provider durch ein einziges Flag zertifizieren, ohne UI, Backend und Automatik erneut anzufassen.
 - Aktiviert der Kunde Lip-Sync bei einem anderen Provider, erscheint ein Dialog: „Lip-Sync benötigt einen zertifizierten Plate-Provider" mit genau zwei Buttons (Hailuo / Happy Horse) und Abbrechen. Kein stiller Auto-Wechsel — die Szene bleibt unverändert, bis der Kunde wählt.
 - Umgekehrt: wechselt der Kunde bei einer Lip-Sync-Szene auf einen nicht zulässigen Provider, erscheint derselbe Dialog mit der zusätzlichen Option „Lip-Sync für diese Szene deaktivieren".
 - Im Modell-Picker werden nicht zulässige Modelle bei aktivem Lip-Sync ausgegraut mit Hinweis-Tooltip statt einfach zu verschwinden.
