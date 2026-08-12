@@ -44,3 +44,19 @@ Nicht angefasst: Render-Pipeline, Edge Functions, Lip-Sync-Kette, Credits.
 
 - Vitest: bestehende Composer-Tests laufen weiter; neuer Test für `usePipelineProgress` mit den Fällen „eine Szene failed, Rest ready → Phase terminal“ und „clips:start setzt Floor auf 0“.
 - Manuell: fehlgeschlagene Szene → Leiste stoppt und zeigt Fehler; „Neu rendern“ → Leiste beginnt bei ~0 % und läuft hoch.
+
+## Problem 3 — Im anderen Account fehlt die Hälfte der Briefing-Seite
+
+Verifiziert im Code:
+
+- `BriefingTab.tsx` blendet je nach Editor-Modus Panels aus: `showDirect = editorMode !== 'quick'` versteckt sechs Blöcke (u. a. Stil & Format-Details, Marken-Kit-Optionen, Cast/Charaktere, Studio-Panel).
+- Der Modus kommt aus `useStudioPreferences` mit **Default `quick`** und wird in `localStorage` unter dem globalen Key `motion-studio:prefs:v1` gespeichert — nicht pro Benutzer.
+
+Der zweite Account hat also einfach nie „Direct/Studio“ gewählt und sieht die Quick-Ansicht. Zusätzlich ist der Key nicht user-gescoped, d. h. Modus-Einstellungen wandern zwischen Accounts im selben Browser (gleiche Klasse wie der bereits gefixte Entwurfs-Scope).
+
+**Lösung:**
+
+- `motion-studio:prefs:v1` pro Benutzer scopen (analog `src/lib/local-draft-scope.ts`) und beim Logout aufräumen.
+- Im Briefing sichtbar machen, dass Panels ausgeblendet sind: dauerhafter, dezenter Hinweis mit Ein-Klick-Umschalter „Alle Felder anzeigen“ — nicht nur dann, wenn versteckte Panels bereits Daten enthalten (`hiddenPanelsHaveData`).
+
+Betroffene Dateien zusätzlich: `src/hooks/useStudioPreferences.ts`, `src/components/video-composer/BriefingTab.tsx`.
