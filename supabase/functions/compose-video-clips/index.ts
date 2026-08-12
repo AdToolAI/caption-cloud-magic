@@ -1,5 +1,6 @@
 // compose-video-clips v2.4.0 — v81 shared CLIP_COSTS + dialog-speakers
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { planContinuityChain, resumeContinuityChain, sweepContinuityQueue } from "../_shared/continuity-chain.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { beginSceneRun } from "../_shared/scene-run-begin.ts";
 import { planSceneVisualInputs } from "../_shared/visual-inputs.ts";
@@ -222,14 +223,24 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseClient.auth.getUser(token);
 
-    if (authError || !user) {
-      throw new Error("Unauthorized");
+    // v426 — internal chain resume. `compose-clip-webhook` restarts a scene
+    // that was parked behind its predecessor. It authenticates with the
+    // service-role key and names the owning user explicitly; project
+    // ownership is still verified below, so this cannot cross accounts.
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const internalActorId = req.headers.get("x-internal-actor-user-id");
+    let user: { id: string } | null = null;
+    if (serviceRoleKey && token === serviceRoleKey && internalActorId) {
+      user = { id: internalActorId };
+    } else {
+      const { data: authData, error: authError } = await supabaseClient.auth.getUser(token);
+      if (authError || !authData?.user) {
+        throw new Error("Unauthorized");
+      }
+      user = authData.user;
     }
+    if (!user) throw new Error("Unauthorized");
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -1555,6 +1566,14 @@ serve(async (req) => {
       } catch (e) {
         console.warn("[compose-video-clips] markSceneContractFailure failed", e);
       }
+      // v426 — release any successor parked behind this scene, otherwise it
+      // would wait for a clip that will never arrive.
+      await resumeContinuityChain({
+        supabaseAdmin,
+        projectId,
+        predecessorSceneId: sceneId,
+        predecessorFailed: true,
+      });
     };
 
     const processScenes = async () => {
@@ -1564,8 +1583,27 @@ serve(async (req) => {
       supabaseAdmin,
       user.id,
     );
+    // ── v426 Seamless-Transition chain ────────────────────────────────────
+    // Scenes whose predecessor renders in this very batch are parked and
+    // resumed by the webhook once that clip exists — otherwise they would
+    // look for a predecessor clip that is not there yet and silently fall
+    // back to a hard cut.
+    __stage = "v426_continuity_chain";
+    await sweepContinuityQueue(supabaseAdmin, projectId);
+    const { deferred: deferredSceneIds } = await planContinuityChain({
+      supabaseAdmin,
+      projectId,
+      userId: user.id,
+      scenes: scenes as unknown as Array<Record<string, unknown>>,
+      requestContext: { projectId, visualStyle, characters, previewOnly, run_context: runContext },
+    });
+
     // Process each scene
     for (const scene of scenes) {
+      if (deferredSceneIds.has(String(scene.id))) {
+        console.log(`[compose-video-clips] scene ${scene.id}: parked for continuity chain`);
+        continue;
+      }
       // ── HARD-GUARD: legacy `heygen` override → `auto` ───────────────────
       // The Composer's HeyGen/Talking-Head portrait route was removed. Any
       // scene still carrying `engineOverride='heygen'` (stale UI state,
@@ -3741,12 +3779,40 @@ serve(async (req) => {
       const continuityPref = (scene as any).visualContinuity ?? "auto";
       const sceneOrderIdx = scenes.findIndex((s) => s.id === scene.id);
       if (
-        !continuityFrameUrl &&
-        continuityPref !== "match-cut" &&
-        sceneOrderIdx > 0
+        (!continuityFrameUrl || !continuityClipUrl) &&
+        continuityPref !== "match-cut"
       ) {
         try {
-          const prevScene = scenes[sceneOrderIdx - 1];
+          // v426: the predecessor is the scene BEFORE this one in the project,
+          // not merely the previous entry of this request. A single-scene
+          // re-render therefore chains just as well as a full batch.
+          let prevScene: { id: string; durationSeconds?: number } | null =
+            sceneOrderIdx > 0
+              ? { id: scenes[sceneOrderIdx - 1].id, durationSeconds: scenes[sceneOrderIdx - 1].durationSeconds }
+              : null;
+          if (!prevScene) {
+            const { data: selfRow } = await supabaseAdmin
+              .from("composer_scenes")
+              .select("order_index")
+              .eq("id", scene.id)
+              .maybeSingle();
+            const ownOrder = Number((selfRow as any)?.order_index ?? -1);
+            if (ownOrder > 0) {
+              const { data: predRow } = await supabaseAdmin
+                .from("composer_scenes")
+                .select("id, duration_seconds")
+                .eq("project_id", projectId)
+                .eq("order_index", ownOrder - 1)
+                .maybeSingle();
+              if ((predRow as any)?.id) {
+                prevScene = {
+                  id: String((predRow as any).id),
+                  durationSeconds: Number((predRow as any).duration_seconds) || undefined,
+                };
+              }
+            }
+          }
+          if (!prevScene) throw new Error("no_predecessor");
           const { data: prevRow } = await supabaseAdmin
             .from("composer_scenes")
             .select("clip_url, duration_seconds")
@@ -3755,7 +3821,9 @@ serve(async (req) => {
           const prevClipUrl = String((prevRow as any)?.clip_url ?? "");
           if (prevClipUrl) {
             continuityClipUrl = continuityClipUrl ?? prevClipUrl;
-            const framed = await ensureTransitionFrame({
+            const framed = continuityFrameUrl
+              ? { url: continuityFrameUrl }
+              : await ensureTransitionFrame({
               supabaseAdmin,
               userId: user.id,
               projectId,
@@ -3764,17 +3832,17 @@ serve(async (req) => {
               previousDurationSeconds:
                 Number((prevRow as any)?.duration_seconds) ||
                 prevScene.durationSeconds,
-            });
+            } as any);
             if (framed.url) {
               continuityFrameUrl = framed.url;
-            } else if (framed.reason) {
+            } else if ((framed as any).reason) {
               console.log(
-                `[compose-video-clips] scene ${scene.id} continuity frame unavailable (${framed.reason}) — falling back to match-cut`,
+                `[compose-video-clips] scene ${scene.id} continuity frame unavailable (${(framed as any).reason}) — falling back to match-cut`,
               );
             }
           }
         } catch (contErr) {
-          console.warn(
+          if ((contErr as Error)?.message !== "no_predecessor") console.warn(
             `[compose-video-clips] scene ${scene.id} server continuity backfill failed (non-fatal):`,
             contErr,
           );

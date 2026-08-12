@@ -60,10 +60,10 @@ export function arbitrateSlots(input: ArbitrationInput): ArbitrationResult {
     (profile.mode !== 'exclusive' || (profile.modes ?? []).includes('references'));
 
   // 1. Protected anchor (identity / lip-sync) always keeps its slot.
+  //    v426: on an exclusive-slot provider the anchor wins outright — handing
+  //    the single slot to a continuity reference would drop the vetted anchor.
   if (hasProtectedAnchor && collide) {
-    // Reference-video continuity lives in the SAME reference budget, so it is
-    // the one continuity option that does not displace the anchor.
-    if (canClipReference && !requirements.lipSync) {
+    if (canClipReference && !requirements.lipSync && profile.mode !== 'exclusive') {
       return { transition: 'clip-reference', inputMode: 'references', warnings };
     }
     if (requirements.lipSync) {
@@ -71,8 +71,13 @@ export function arbitrateSlots(input: ArbitrationInput): ArbitrationResult {
     } else {
       warnings.push('identity_anchor_protected_match_cut');
     }
+    if (profile.mode === 'exclusive' && profile.firstFrame.supported) {
+      warnings.push('anchor_takes_exclusive_slot');
+      return { transition: 'match-cut', inputMode: 'first-frame', warnings };
+    }
     return { transition: 'match-cut', inputMode: 'references', warnings };
   }
+
 
   // 2. Lip-sync without slot collision still requires a certified + verified
   //    provider before continuity may touch the first frame.
@@ -96,10 +101,12 @@ export function arbitrateSlots(input: ArbitrationInput): ArbitrationResult {
   }
 
   // 4. Reference-video continuity beats a still frame when available: motion
-  //    and grading carry over instead of a single frame.
-  if (canClipReference && strategy !== 'transition-priority') {
+  //    and grading carry over instead of a single frame. On exclusive-slot
+  //    providers it is the only continuity that fits, so it always wins.
+  if (canClipReference && (strategy !== 'transition-priority' || profile.mode === 'exclusive')) {
     return { transition: 'clip-reference', inputMode: 'references', warnings };
   }
+
 
   // 5. Plain frame chaining.
   if (input.hasPreviousFrame && profile.firstFrame.supported) {

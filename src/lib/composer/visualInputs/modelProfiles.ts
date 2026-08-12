@@ -10,26 +10,21 @@
  */
 
 import { AI_VIDEO_TOOLKIT_MODELS, type ToolkitModel } from '@/config/aiVideoModelRegistry';
+import { modelIdToSource } from '@/lib/video-composer/modelMapping';
+import { isLipsyncCertifiedProvider } from '@/lib/video-composer/lipsyncMasterProvider';
 import type { VisualInputProfile } from './types';
 
-/**
- * Certified lip-sync master-plate providers. Mirrors the backend allowlist in
- * `compose-video-clips/index.ts` — `ai-seedance25` is deliberately absent
- * (see plan, Phase 3a).
- */
-export const LIPSYNC_CERTIFIED_FAMILIES = new Set([
-  'happyhorse',
-  'hailuo',
-  'kling',
-  'wan',
-  'luma',
-]);
 
-/** Seedance 1.x is certified, Seedance 2.5 is not. */
+/**
+ * Lip-sync certification is owned by the v425 provider contract
+ * (`lipsyncMasterProvider.ts`) and mirrored backend-side in
+ * `supabase/functions/_shared/composer-ai-sources.ts`. This module must never
+ * keep a second, drifting list.
+ */
 function isLipSyncCertified(model: ToolkitModel): boolean {
-  if (model.family === 'seedance') return model.id !== 'seedance-2-5';
-  return LIPSYNC_CERTIFIED_FAMILIES.has(model.family);
+  return isLipsyncCertifiedProvider(modelIdToSource(model.id).clipSource);
 }
+
 
 export function deriveVisualInputProfile(model: ToolkitModel): VisualInputProfile {
   if (model.visualInputs) return model.visualInputs;
@@ -62,7 +57,7 @@ export function deriveVisualInputProfile(model: ToolkitModel): VisualInputProfil
         supported: lipSyncSupported,
         requiresIdentityReference: true,
         conflictsWithFirstFrame: true,
-        verification: { status: 'unverified' },
+        verification: { status: lipSyncSupported ? 'verified' : 'unverified' },
       },
     };
   }
@@ -91,7 +86,7 @@ export function deriveVisualInputProfile(model: ToolkitModel): VisualInputProfil
       supported: lipSyncSupported,
       requiresIdentityReference: true,
       conflictsWithFirstFrame: !separateReferenceSlot,
-      verification: { status: 'unverified' },
+      verification: { status: lipSyncSupported ? 'verified' : 'unverified' },
     },
   };
 }

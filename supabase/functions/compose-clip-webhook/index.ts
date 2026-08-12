@@ -11,6 +11,7 @@ import { isAmbientAudioRow, runAmbientSpeechGate } from "../_shared/ambient-audi
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
+import { resumeContinuityChain, sweepContinuityQueue } from "../_shared/continuity-chain.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -318,9 +319,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         console.error('[compose-clip-webhook] archive error:', archiveErr);
       }
 
-      // 🎬 BLOCK F — Continuity Auto-Trigger
-      // Fire-and-forget: extract last frame so the NEXT scene can chain off it.
-      // We do this only if the next scene exists and has no reference image yet.
+      // 🎬 BLOCK F — Continuity (v426)
+      // The last frame is cached on THIS scene only. It is never written into
+      // the next scene's `reference_image_url` — that column is the v400
+      // lip-sync identity anchor. Continuity is handed to the successor as
+      // payload (`transitionFrameUrl` / `previousClipUrl`) by the chain below.
       try {
         const { data: currentScene } = await supabase
           .from('composer_scenes')
@@ -328,65 +331,40 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           .eq('id', sceneId)
           .single();
 
-        if (currentScene) {
-          const { data: nextScene } = await supabase
-            .from('composer_scenes')
-            .select('id, reference_image_url')
-            .eq('project_id', projectId)
-            .eq('order_index', (currentScene.order_index ?? 0) + 1)
-            .maybeSingle();
-
-          // Always extract the last frame for the current scene (so it's cached
-          // for later "use as ref" actions). Skip auto-chain if the next scene
-          // already has its own reference image.
-          const shouldChain = nextScene && !nextScene.reference_image_url;
-
-          // Don't await — let it run in background so the webhook responds fast.
-          const extractPromise = supabase.functions.invoke('extract-video-last-frame', {
-            body: {
-              videoUrl: permanentUrl,
-              durationSeconds: currentScene.duration_seconds ?? 5,
-              sceneId,
-              projectId,
-            },
-          }).then(async ({ data, error }) => {
-            if (error) {
-              console.error('[compose-clip-webhook] extract-frame failed:', error);
-              return;
-            }
-            const frameUrl = (data as any)?.lastFrameUrl;
-            if (frameUrl && shouldChain && nextScene) {
-              await supabase
-                .from('composer_scenes')
-                .update({
-                  reference_image_url: frameUrl,
-                  continuity_source_scene_id: sceneId,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', nextScene.id);
-              console.log(
-                `[compose-clip-webhook] 🔗 Continuity chained: scene ${sceneId} → ${nextScene.id}`
-              );
-            } else if (frameUrl) {
-              console.log(
-                `[compose-clip-webhook] 📸 Last frame cached for scene ${sceneId} (no chain)`
-              );
-            }
-          }).catch((e) => {
-            console.error('[compose-clip-webhook] extract-frame threw:', e);
-          });
-
-          // EdgeRuntime keeps the background task alive after the response.
-          // @ts-ignore — Deno Deploy / Supabase edge runtime API
-          if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
-            // @ts-ignore
-            EdgeRuntime.waitUntil(extractPromise);
+        const chainPromise = (async () => {
+          try {
+            await supabase.functions.invoke('extract-video-last-frame', {
+              body: {
+                videoUrl: permanentUrl,
+                durationSeconds: currentScene?.duration_seconds ?? 5,
+                sceneId,
+                projectId,
+              },
+            });
+          } catch (e) {
+            console.error('[compose-clip-webhook] extract-frame failed:', e);
           }
+          await resumeContinuityChain({
+            supabaseAdmin: supabase,
+            projectId,
+            predecessorSceneId: sceneId,
+            predecessorClipUrl: permanentUrl,
+            predecessorDurationSeconds: currentScene?.duration_seconds ?? null,
+          });
+          await sweepContinuityQueue(supabase, projectId);
+        })();
+
+        // EdgeRuntime keeps the background task alive after the response.
+        // @ts-ignore — Deno Deploy / Supabase edge runtime API
+        if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+          // @ts-ignore
+          EdgeRuntime.waitUntil(chainPromise);
         }
       } catch (chainErr) {
         // Never fail the webhook because of continuity issues
         console.error('[compose-clip-webhook] continuity chain error:', chainErr);
       }
+
 
       // 🎤 Server-owned audio → lip-sync handoff.
       // A cinematic-sync master must never be dispatched to Sync.so before
@@ -677,6 +655,19 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             console.error('[compose-clip-webhook] Refund failed:', refundErr);
           }
         }
+      }
+
+      // v426 — a successor parked behind this scene must not stay `queued`.
+      // It is released immediately, with continuity downgraded to match-cut.
+      try {
+        await resumeContinuityChain({
+          supabaseAdmin: supabase,
+          projectId,
+          predecessorSceneId: sceneId,
+          predecessorFailed: true,
+        });
+      } catch (chainErr) {
+        console.error('[compose-clip-webhook] chain release after failure error:', chainErr);
       }
 
     } else {

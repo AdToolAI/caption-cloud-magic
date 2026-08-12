@@ -5835,6 +5835,73 @@ export type Database = {
           },
         ]
       }
+      composer_continuity_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          dispatched_at: string | null
+          expires_at: string
+          id: string
+          last_error: string | null
+          payload: Json
+          predecessor_scene_id: string
+          project_id: string
+          scene_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          dispatched_at?: string | null
+          expires_at?: string
+          id?: string
+          last_error?: string | null
+          payload: Json
+          predecessor_scene_id: string
+          project_id: string
+          scene_id: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          dispatched_at?: string | null
+          expires_at?: string
+          id?: string
+          last_error?: string | null
+          payload?: Json
+          predecessor_scene_id?: string
+          project_id?: string
+          scene_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "composer_continuity_queue_predecessor_scene_id_fkey"
+            columns: ["predecessor_scene_id"]
+            isOneToOne: false
+            referencedRelation: "composer_scenes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "composer_continuity_queue_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "composer_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "composer_continuity_queue_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "composer_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       composer_drift_checks: {
         Row: {
           anchor_image_url: string | null
