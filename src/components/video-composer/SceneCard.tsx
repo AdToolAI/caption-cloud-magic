@@ -1273,7 +1273,9 @@ export default function SceneCard({
                         {tx({ de: '10s bei Hailuo nur in 768p verfügbar — Pro wird auf Standard-Auflösung reduziert.', en: '10s with Hailuo is only available in 768p — Pro is reduced to standard resolution.', es: '10s con Hailuo solo disponible en 768p — Pro se reduce a resolución estándar.' })}
                       </p>
                     )}
+                    {dialogLengthWarning}
                   </div>
+
                 );
               })()}
 
