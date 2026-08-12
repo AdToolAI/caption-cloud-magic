@@ -1163,6 +1163,40 @@ export default function SceneCard({
                 const providerLabel = getProviderLabel(scene.clipSource);
                 const current = scene.durationSeconds;
 
+                // v422 — preflight honesty: `compose-twoshot-audio` aborts the
+                // whole run with `dialog_too_long_for_plate` once the spoken
+                // track exceeds the plate by more than 5 s. Warn here instead.
+                const spokenSec = isLipsyncEngine(scene.engineOverride ?? null)
+                  ? estimateSpokenSeconds(scene.dialogScript)
+                  : 0;
+                const dialogTooLong = dialogExceedsPlate(spokenSec, current, PROVIDER_MAX);
+                const seedanceMax = maxSecondsForClipSource('ai-seedance25');
+                const seedanceWouldFit =
+                  seedance25LipsyncEnabled &&
+                  scene.clipSource !== 'ai-seedance25' &&
+                  spokenSec <= seedanceMax;
+                const dialogLengthWarning = dialogTooLong ? (
+                  <p className="text-[10px] text-red-300/90 leading-snug">
+                    {tx({
+                      de: `Skript dauert ca. ${spokenSec}s, die Platte nur ${current}s (max. ${PROVIDER_MAX}s).`,
+                      en: `Script runs approx. ${spokenSec}s, the plate only ${current}s (max ${PROVIDER_MAX}s).`,
+                      es: `El guion dura aprox. ${spokenSec}s, la placa solo ${current}s (máx. ${PROVIDER_MAX}s).`,
+                    })}{' '}
+                    {seedanceWouldFit
+                      ? tx({
+                          de: `Text kürzen oder auf Seedance 2.5 wechseln und die Szene auf ${Math.min(seedanceMax, Math.ceil(spokenSec + 0.3))}s verlängern.`,
+                          en: `Shorten the text or switch to Seedance 2.5 and extend the scene to ${Math.min(seedanceMax, Math.ceil(spokenSec + 0.3))}s.`,
+                          es: `Acorta el texto o cambia a Seedance 2.5 y extiende la escena a ${Math.min(seedanceMax, Math.ceil(spokenSec + 0.3))}s.`,
+                        })
+                      : tx({
+                          de: 'Bitte Text kürzen oder die Szene verlängern — sonst bricht der Lauf ab.',
+                          en: 'Please shorten the text or extend the scene — otherwise the run aborts.',
+                          es: 'Acorta el texto o extiende la escena — de lo contrario, la ejecución se cancela.',
+                        })}
+                  </p>
+                ) : null;
+
+
                 // Free-range slider for HappyHorse (native 3–15s / 1s steps) and for non-AI sources.
                 if (isHappyHorse || !isAi) {
                   return (
