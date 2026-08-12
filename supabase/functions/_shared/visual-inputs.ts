@@ -566,8 +566,9 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
   // On an exclusive-slot provider the chosen input mode owns the only slot.
   // When the anchor took it, no reference image may travel with the request.
   const exposedReferences = profile.mode === "exclusive" && inputMode !== "references"
-    ? selected.filter((r) => r.kind === "video")
+    ? []
     : selected;
+
 
   return {
     transition: {
