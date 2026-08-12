@@ -16,8 +16,9 @@ export type PipelinePhaseId =
   | 'export';
 
 export type PipelineEvent =
-  | { type: 'clips:start' }
-  | { type: 'clips:end' }
+  | { type: 'clips:start'; sceneIds?: string[] }
+  | { type: 'clips:scope'; sceneIds: string[]; runIds?: Record<string, string> }
+  | { type: 'clips:end'; sceneIds?: string[] }
   | { type: 'voiceover:start' }
   | { type: 'voiceover:end' }
   | { type: 'lipsync:start' }

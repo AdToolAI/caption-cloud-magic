@@ -64,6 +64,7 @@ interface PersistedSnapshot {
   realProgress: { value: number; at: number };
   /** Wall-clock write time — snapshots older than SNAPSHOT_TTL_MS are ignored. */
   savedAt?: number;
+  clipScope?: { sceneIds: string[]; runIds?: Record<string, string> } | null;
 }
 
 /** A resumed run is only plausible for ~30 minutes. Older snapshots are stale. */
@@ -207,6 +208,7 @@ export function usePipelineProgress({
   // 0 % even though the backend render is still mid-flight.
   const hydratedRef = useRef(false);
   const hydratedRealProgressRef = useRef<{ value: number; at: number } | null>(null);
+  const hydratedClipScopeRef = useRef<{ sceneIds: string[]; runIds?: Record<string, string> } | null>(null);
   if (!hydratedRef.current) {
     hydratedRef.current = true;
     const snap = readSnapshot(storageKey);
@@ -221,6 +223,7 @@ export function usePipelineProgress({
       startedAtRef.current = snap.startedAt;
       baselineRef.current = snap.baseline;
       hydratedRealProgressRef.current = snap.realProgress;
+      hydratedClipScopeRef.current = snap.clipScope ?? null;
     } else if (snap) {
       // Stale (or pre-TTL format) snapshot — never resume from it, otherwise
       // a new run starts at the previous run's 99 %.
@@ -234,6 +237,10 @@ export function usePipelineProgress({
   const [eventFlags, setEventFlags] = useState<Record<PipelinePhaseId, boolean>>({
     clips: false, voiceover: false, lipsync: false, music: false, export: false,
   });
+  const [clipScope, setClipScope] = useState<{
+    sceneIds: string[];
+    runIds?: Record<string, string>;
+  } | null>(hydratedClipScopeRef.current);
 
   // Snapshot scene/assembly state into refs so the event listener can read
   // the latest values without re-subscribing (which would lose pending events).
@@ -244,6 +251,11 @@ export function usePipelineProgress({
 
   useEffect(() => {
     return subscribePipelineEvents((e) => {
+      if (e.type === 'clips:scope') {
+        setClipScope({ sceneIds: [...new Set(e.sceneIds)], runIds: e.runIds });
+        setBaselineVersion((v) => v + 1);
+        return;
+      }
       const [phase, action] = e.type.split(':') as [PipelinePhaseId, 'start' | 'end'];
       if (action === 'start') {
         if (pipelineStartRef.current === null || phase === 'clips') {
@@ -259,6 +271,11 @@ export function usePipelineProgress({
           // Drop stall baseline + any event flags left over from the last run.
           runResetTokenRef.current += 1;
           setEventFlags({ clips: false, voiceover: false, lipsync: false, music: false, export: false });
+          if (phase === 'clips') {
+            setClipScope({
+              sceneIds: [...new Set(('sceneIds' in e ? e.sceneIds : undefined) ?? [])],
+            });
+          }
         }
 
         // Reset this phase so it starts at 0 % for the new run.
@@ -268,7 +285,13 @@ export function usePipelineProgress({
         // contribute to this run's progress.
         const ss = scenesRef.current;
         const ac = assemblyRef.current;
-        const ai = ss.filter((s) => s.clipSource?.startsWith('ai-'));
+        const clipStartIds = phase === 'clips'
+          ? new Set(('sceneIds' in e ? e.sceneIds : undefined) ?? [])
+          : null;
+        const ai = ss.filter(
+          (s) => s.clipSource?.startsWith('ai-') &&
+            (!clipStartIds || clipStartIds.size === 0 || clipStartIds.has(s.id)),
+        );
         const lipTargets = ss.filter(
           (s) =>
             !isCanceledLipsyncScene(s) &&
@@ -401,8 +424,13 @@ export function usePipelineProgress({
 
 
   const aiScenes = useMemo(
-    () => scenes.filter((s) => s.clipSource?.startsWith('ai-')),
-    [scenes],
+    () => {
+      const allAi = scenes.filter((s) => s.clipSource?.startsWith('ai-'));
+      if (!clipScope || clipScope.sceneIds.length === 0) return allAi;
+      const ids = new Set(clipScope.sceneIds);
+      return allAi.filter((s) => ids.has(s.id));
+    },
+    [scenes, clipScope],
   );
 
   const clipsReal = useMemo(() => {
@@ -412,18 +440,23 @@ export function usePipelineProgress({
     // clip_url, even if some webhook variant forgot to flip clip_status.
     // Without this the bar gets stuck at ~40% in the Clips phase forever
     // after Sync.so finishes.
+    const belongsToCurrentRun = (s: any) => {
+      const expected = clipScope?.runIds?.[s.id];
+      return !expected || s.activeRunId === expected || s.active_run_id === expected;
+    };
     const isReadyOrLipsynced = (s: any) =>
+      belongsToCurrentRun(s) && (
       s.clipStatus === 'ready' ||
       (!!s.clipUrl && (
         s.lipSyncStatus === 'applied' ||
         s.twoshotStage === 'complete' ||
         s.twoshotStage === 'done'
-      ));
+      )));
     const ready = aiScenes.filter(isReadyOrLipsynced).length;
     const generating = aiScenes.filter(
-      (s) => s.clipStatus === 'generating' && !isReadyOrLipsynced(s) && !isSceneTerminalFailure(s),
+      (s) => belongsToCurrentRun(s) && s.clipStatus === 'generating' && !isReadyOrLipsynced(s) && !isSceneTerminalFailure(s),
     ).length;
-    const failed = aiScenes.filter((s) => s.clipStatus === 'failed').length;
+    const failed = aiScenes.filter((s) => belongsToCurrentRun(s) && s.clipStatus === 'failed').length;
     // Stage 7: a scene with an active backend handle (Replicate prediction,
     // dialog-shot pipeline, lipsync stage) also counts as "running" — even
     // when clipStatus momentarily reverts to 'pending' between the optimistic
@@ -431,6 +464,7 @@ export function usePipelineProgress({
     // disappears for 5–30 s right after the user clicks "Generieren".
     const backendActive = aiScenes.filter((s) => {
       const sa = s as any;
+      if (!belongsToCurrentRun(sa)) return false;
       if (isSceneTerminalFailure(sa)) return false;
       if (isCanceledLipsyncScene(sa)) return false;
       if (isReadyOrLipsynced(sa)) return false;
@@ -458,7 +492,7 @@ export function usePipelineProgress({
     const running = generating > 0 || backendActive > 0;
     // Terminal as soon as every AI scene is ready or failed.
     const allTerminal = aiScenes.every(
-      (s) => isReadyOrLipsynced(s) || s.clipStatus === 'failed',
+      (s) => isReadyOrLipsynced(s) || (belongsToCurrentRun(s) && s.clipStatus === 'failed'),
     );
     const terminal = !running && (allTerminal || progress >= 1);
     return {
@@ -467,7 +501,7 @@ export function usePipelineProgress({
       done: terminal && failed === 0,
       failed: terminal && failed > 0,
     };
-  }, [aiScenes, baselineVersion]);
+  }, [aiScenes, baselineVersion, clipScope]);
 
 
   const voiceoverReal = useMemo(() => {
@@ -933,6 +967,7 @@ export function usePipelineProgress({
         baseline: baselineRef.current,
         realProgress: realProgressRef.current,
         savedAt: Date.now(),
+        clipScope,
 
       });
     }

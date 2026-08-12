@@ -137,15 +137,15 @@ export function useGenerateAllClips({
     // Fire BEFORE ensureProject / Nano-Banana so the bar moves on the
     // very next frame. Also flip every pending AI scene to 'generating'
     // locally so the per-scene shimmer appears instantly.
-    emitPipelineEvent({ type: 'clips:start' });
-    // 🎬 Action — cinematic clapper cue for the Sound Stage layer.
-    emitStageEvent('action', { source: 'generate-all' });
     const pendingNow = scenes.filter(
       (s) =>
         s.clipStatus !== 'ready' &&
         !(s.clipSource === 'upload' && s.uploadUrl) &&
         s.clipSource?.startsWith('ai-'),
     );
+    emitPipelineEvent({ type: 'clips:start', sceneIds: pendingNow.map((s) => s.id) });
+    // 🎬 Action — cinematic clapper cue for the Sound Stage layer.
+    emitStageEvent('action', { source: 'generate-all' });
     if (pendingNow.length > 0) {
       onUpdateScenes(
         scenes.map((s) =>
@@ -309,6 +309,13 @@ export function useGenerateAllClips({
         compose: { projectId: pid, scenes: scenesPayload, visualStyle, characters },
         reason: 'storyboard_generate_all',
         useExistingRun: true,
+      });
+      emitPipelineEvent({
+        type: 'clips:scope',
+        sceneIds: eligibleIds,
+        runIds: Object.fromEntries(
+          Object.entries(started.runs).map(([id, run]) => [id, run.run_id]),
+        ),
       });
       const data = started.compose;
 
