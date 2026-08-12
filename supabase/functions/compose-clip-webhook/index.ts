@@ -12,6 +12,8 @@ import { isAmbientAudioRow, runAmbientSpeechGate } from "../_shared/ambient-audi
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { resumeContinuityChain, sweepContinuityQueue } from "../_shared/continuity-chain.ts";
+import { guardCallback } from "../_shared/v427-callback-guard.ts";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -148,6 +150,25 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     console.log(`[compose-clip-webhook v2] Scene: ${sceneId}, Status: ${payload.status}`);
 
     const { id: predictionId, status, output, error: predError } = payload;
+
+    // ── v427A3 callback guard (default "off" → no-op) ────────────────────
+    // Second identity check on top of the legacy stale-run gate above. Only a
+    // provably wrong delivery is blocked, and only in "enforce" mode.
+    if (hasActiveIdentity && runId) {
+      const guard = await guardCallback(supabase, {
+        sceneId,
+        runId,
+        stage: 'base_video',
+        externalJobId: predictionId ? String(predictionId) : null,
+      });
+      if (!guard.proceed) {
+        return new Response(
+          JSON.stringify({ ok: true, ignored: true, reason: guard.reason ?? 'guard_rejected' }),
+          { status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+
 
     if (status === 'succeeded' && output) {
       const videoUrl = Array.isArray(output) ? output[0] : output;

@@ -22,6 +22,8 @@ import {
   MODELARK_BASE_URL,
   modelArkApiKey,
 } from "../_shared/modelark.ts";
+import { heartbeatPipelineJob } from "../_shared/v427-callback-guard.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -156,8 +158,19 @@ async function scan(sceneFilterId: string | null) {
           await notifyWebhook({ status: "failed", error: "ModelArk task timed out" });
           summary.failed++;
         } else {
+          // v427A3: non-consuming heartbeat so provider leases stay alive.
+          // Never consumes the completion event, never fails the poll.
+          if (scene.active_run_id) {
+            await heartbeatPipelineJob(supabase, {
+              sceneId: scene.id,
+              runId: String(scene.active_run_id),
+              stage: "base_video",
+              externalJobId: taskId,
+            });
+          }
           summary.pending++;
         }
+
       } catch (err) {
         console.error(`[modelark-poll] scene ${scene.id}:`, err);
         summary.pending++;
