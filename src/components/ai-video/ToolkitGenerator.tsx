@@ -132,13 +132,17 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const PROVIDER_TTS_LANGS: Record<string, ReadonlyArray<'en' | 'de' | 'es'>> = {
     veo:        ['en', 'de', 'es'],
     sora:       ['en', 'de', 'es'],
+    // Seedance 2.5 (ModelArk) erzeugt mit `generate_audio` echten Dialog/Voiceover:
+    seedance:   ['en', 'de', 'es'],
     kling:      ['en'],
     grok:       ['en'],
     happyhorse: ['en'],
     // Ambience/Foley only — kein verlässliches Voiceover (Ton wird trotzdem erzeugt):
-    ltx: [], wan: [], hailuo: [], luma: [], seedance: [], runway: [], pika: [], vidu: [],
+    ltx: [], wan: [], hailuo: [], luma: [], runway: [], pika: [], vidu: [],
   };
   const isKlingOmni = model.id === 'kling-omni';
+  /** Kann das Modell überhaupt Sprache erzeugen (unabhängig von der Sprache)? */
+  const modelSpeaks = isKlingOmni || (PROVIDER_TTS_LANGS[model.family] ?? []).length > 0;
   const ttsLangSupported = isKlingOmni
     ? effectiveSpokenLang === 'en'
     : (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang);
@@ -1337,7 +1341,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 onCheckedChange={setGenerateAudio}
               />
             </div>
-            {generateAudio && (
+            {generateAudio && modelSpeaks && (
               <div className="flex items-center justify-between gap-3 pt-1 border-t border-border/30">
                 <Label className="text-xs text-muted-foreground">
                   {tx({ de: 'Gesprochene Sprache', en: 'Spoken language', es: 'Idioma hablado' })}
@@ -1359,13 +1363,22 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 </Select>
               </div>
             )}
-            {generateAudio && !ttsLangSupported && (
+            {generateAudio && !modelSpeaks && (
+              <p className="text-[11px] leading-snug text-muted-foreground pt-1 border-t border-border/30">
+                {tx({
+                  de: `${model.name} erzeugt Umgebungssound, Foley und Musik, aber keine gesprochene Sprache. Für Voiceover z. B. Veo 3.1, Sora 2 oder Seedance 2.5 wählen — oder die Stimme nachträglich im Motion Studio ergänzen.`,
+                  en: `${model.name} generates ambient sound, foley and music, but no spoken language. For voiceover pick e.g. Veo 3.1, Sora 2 or Seedance 2.5 — or add the voice later in Motion Studio.`,
+                  es: `${model.name} genera sonido ambiente, foley y música, pero no voz hablada. Para locución elige p. ej. Veo 3.1, Sora 2 o Seedance 2.5, o añade la voz después en Motion Studio.`,
+                })}
+              </p>
+            )}
+            {generateAudio && modelSpeaks && !ttsLangSupported && (
               <p className="text-[11px] leading-snug text-amber-500/90 pt-1 border-t border-border/30">
-                {language === 'de'
-                  ? tx({ de: `${model.name} unterstützt ${effectiveSpokenLang === "de" ? "Deutsch" : effectiveSpokenLang === "es" ? "Spanisch" : "diese Sprache"} nicht zuverlässig. Für diese Szene wird kein Voiceover erzeugt — nur Umgebungssound/Musik. Für echtes Voiceover z. B. Veo 3.1 oder Sora 2 wählen, oder nachträglich im Motion Studio ergänzen.`, en: `${model.name} does not reliably support ${effectiveSpokenLang === "de" ? "German" : effectiveSpokenLang === "es" ? "Spanish" : "this language"}. No voiceover will be generated for this scene — only ambient sound/music. For real voiceover, pick e.g. Veo 3.1 or Sora 2, or add it later in Motion Studio.`, es: `${model.name} no admite de forma fiable ${effectiveSpokenLang === "de" ? "alemán" : effectiveSpokenLang === "es" ? "español" : "este idioma"}. No se generará locución para esta escena, solo sonido ambiental/música. Para una locución real, elige p. ej. Veo 3.1 o Sora 2, o añádela después en Motion Studio.` })
-                  : language === 'es'
-                  ? `${model.name} no admite ${effectiveSpokenLang === 'de' ? 'alemán' : effectiveSpokenLang === 'es' ? 'español' : 'este idioma'} de forma fiable. Esta escena se generará sin voz — solo sonido ambiente/música. Para voz real usa p. ej. Veo 3.1 o Sora 2, o añádela después en Motion Studio.`
-                  : `${model.name} does not reliably support ${effectiveSpokenLang === 'de' ? 'German' : effectiveSpokenLang === 'es' ? 'Spanish' : 'this language'}. This scene will render without voiceover — ambient sound / music only. For real voiceover pick e.g. Veo 3.1 or Sora 2, or add it later in Motion Studio.`}
+                {tx({
+                  de: `${model.name} unterstützt ${effectiveSpokenLang === 'de' ? 'Deutsch' : effectiveSpokenLang === 'es' ? 'Spanisch' : 'diese Sprache'} nicht zuverlässig. Für diese Szene wird kein Voiceover erzeugt — nur Umgebungssound/Musik. Für echtes Voiceover z. B. Veo 3.1 oder Sora 2 wählen, oder nachträglich im Motion Studio ergänzen.`,
+                  en: `${model.name} does not reliably support ${effectiveSpokenLang === 'de' ? 'German' : effectiveSpokenLang === 'es' ? 'Spanish' : 'this language'}. No voiceover will be generated for this scene — only ambient sound/music. For real voiceover, pick e.g. Veo 3.1 or Sora 2, or add it later in Motion Studio.`,
+                  es: `${model.name} no admite de forma fiable ${effectiveSpokenLang === 'de' ? 'alemán' : effectiveSpokenLang === 'es' ? 'español' : 'este idioma'}. No se generará locución para esta escena, solo sonido ambiental/música. Para una locución real, elige p. ej. Veo 3.1 o Sora 2, o añádela después en Motion Studio.`,
+                })}
               </p>
             )}
           </div>
