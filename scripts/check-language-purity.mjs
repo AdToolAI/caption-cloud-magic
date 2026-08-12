@@ -18,7 +18,9 @@ const FILES = ["src/lib/translations.ts", "src/lib/translationsFill.ts"];
 const MARKERS = {
   es: /(vídeo|víd\b|está\b|están\b|función|funciones|¿|¡|ción\b|ciones\b|créditos|Historial|Error al |No se pudo|Inténtalo|exitosa|exitoso|Elige |Elija |escena|escenas|Subido|Añadir|Añade|Introducir|Atrás|Haga clic|Haz clic|Guardando|Actualizar ahora|conexión|conexiones|publicación|Por favor|Configuración|Descripción|Duración|Resolución|Reintentar|Eliminar|Restablecer|Agregar|Comprar |ilimitad|Vista previa|Proporción|Ninguna\b|Ninguno\b|Velocidad\b)/,
   de: /(ä|ö|ü|ß|\b(nicht|wurde|wird|deine|dein|deinen|Deine|Dein|kannst|Du kannst|erstellen|erstellt|Einstellungen|Fehler beim|Bitte|Zurück|Speichern|Löschen|Hinzufügen|hochladen|Vorschau)\b)/,
-  en: /\b(the|your|please|could not|failed to|settings|delete|upload|preview|scene|video is|will be)\b/i,
+  // Kept narrow on purpose: German UI copy legitimately uses loanwords like
+  // "Upload", "Preview", "Team" — only sentence-level English is a smell.
+  en: /\b(the|your|please|could not|failed to|will be|has been)\b/i,
 };
 
 const ENTRY = /^(\s*)([A-Za-z0-9_]+)(:\s*)('|")((?:\\.|(?!\4)[^\\])*)\4(,?\s*)$/;
