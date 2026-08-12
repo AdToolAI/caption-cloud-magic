@@ -8,7 +8,7 @@ import { CLIP_COSTS, type ClipQuality } from "../_shared/clip-costs.ts";
 import { createSeedance25Task, MODELARK_JOB_PREFIX } from "../_shared/modelark.ts";
 import { isSeedance25LipsyncEnabled } from "../_shared/seedance25-lipsync-flag.ts";
 import { AMBIENT_NO_SPEECH_PROMPT } from "../_shared/ambient-audio.ts";
-import { isSupportedComposerAiSource } from "../_shared/composer-ai-sources.ts";
+import { isSupportedComposerAiSource, isLipsyncCertifiedAiSource, LIPSYNC_CERTIFIED_AI_SOURCES } from "../_shared/composer-ai-sources.ts";
 
 import {
   countDialogSpeakers,
@@ -1537,6 +1537,26 @@ serve(async (req) => {
       );
     }
 
+    // v425 — surface a provider-contract violation in the UI instead of
+    // leaving the scene spinning in `generating`.
+    const markSceneContractFailure = async (sceneId: string, message: string) => {
+      try {
+        await supabaseAdmin
+          .from("composer_scenes")
+          .update({
+            clip_status: "failed",
+            clip_error: message,
+            pipeline_state: "failed",
+            pipeline_detail: message,
+            pipeline_state_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+      } catch (e) {
+        console.warn("[compose-video-clips] markSceneContractFailure failed", e);
+      }
+    };
+
     const processScenes = async () => {
     // v418 — Seedance 2.5 as a lip-sync plate provider is behind a rollout
     // flag. Resolved once per request, not per scene.
@@ -1937,23 +1957,50 @@ serve(async (req) => {
       }
 
 
-      // Defensive: rewrite unsupported AI engines to a working default.
+      // v425: never rewrite silently — an unsupported engine is a contract
+      // violation of the picker, so fail loudly instead of swapping providers.
       if (
         scene.clipSource.startsWith("ai-") &&
         !isSupportedComposerAiSource(scene.clipSource)
       ) {
-        console.warn(
-          `[compose-video-clips] Scene ${scene.id} clipSource '${scene.clipSource}' not supported by composer — falling back to ai-hailuo.`,
+        await markSceneContractFailure(
+          scene.id,
+          `Provider '${scene.clipSource}' wird vom Composer nicht unterstützt.`,
         );
-        scene.clipSource = "ai-hailuo";
-        // Persist the rewrite so the UI reflects reality
-        await supabaseAdmin
-          .from("composer_scenes")
-          .update({
-            clip_source: "ai-hailuo",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", scene.id);
+        return new Response(
+          JSON.stringify({
+            error: "unsupported_clip_source",
+            message: `Provider '${scene.clipSource}' wird vom Composer nicht unterstützt. Bitte ein anderes KI-Modell wählen.`,
+            scene_id: scene.id,
+            provider: scene.clipSource,
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      // v425: lip-sync contract — only certified master plates are allowed.
+      {
+        const __engine = scene.engineOverride ?? "auto";
+        const __lipsyncScene =
+          __engine === "cinematic-sync" ||
+          __engine === "sync-segments" ||
+          (scene as any).dialogMode === true;
+        if (__lipsyncScene && !isLipsyncCertifiedAiSource(scene.clipSource)) {
+          await markSceneContractFailure(
+            scene.id,
+            `Lip-Sync läuft nur über HappyHorse oder Hailuo. Gewählt: ${scene.clipSource}.`,
+          );
+          return new Response(
+            JSON.stringify({
+              error: "provider_not_lipsync_certified",
+              message: `Lip-Sync läuft nur über HappyHorse oder Hailuo. Gewählt: ${scene.clipSource}.`,
+              scene_id: scene.id,
+              provider: scene.clipSource,
+              allowed: [...LIPSYNC_CERTIFIED_AI_SOURCES],
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
       }
 
       const quality: Quality = scene.clipQuality === "pro" ? "pro" : "standard";

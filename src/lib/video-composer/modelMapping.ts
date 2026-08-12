@@ -17,9 +17,16 @@ import { tx } from "@/lib/i18nText";
 import { Image as ImageIcon } from 'lucide-react';
 import { AI_VIDEO_TOOLKIT_MODELS, type ToolkitModel } from '@/config/aiVideoModelRegistry';
 import type { ClipSource, ClipQuality, ComposerCategory } from '@/types/video-composer';
+import { isSupportedComposerClipSource } from './supportedComposerSources';
+import {
+  DIALOG_MASTER_PROVIDERS,
+  LIPSYNC_PRIMARY_PROVIDER,
+  LIPSYNC_SECONDARY_PROVIDER,
+  isLipsyncCertifiedProvider,
+} from './lipsyncMasterProvider';
 
 /** Toolkit families that compose-video-clips can actually render. */
-const COMPOSER_FAMILIES = new Set(['hailuo', 'kling', 'wan', 'seedance', 'luma', 'veo', 'runway', 'pika', 'vidu', 'happyhorse']);
+const COMPOSER_FAMILIES = new Set(['hailuo', 'kling', 'wan', 'seedance', 'luma', 'veo', 'runway', 'happyhorse']);
 
 /** Synthetic toolkit entry for the static "Gemini Image + Ken-Burns" source. */
 const IMAGE_TOOLKIT_MODEL: ToolkitModel = {
@@ -42,7 +49,14 @@ const IMAGE_TOOLKIT_MODEL: ToolkitModel = {
 
 /** All models exposed in the per-scene composer dropdown. */
 export const COMPOSER_AVAILABLE_MODELS: ToolkitModel[] = [
-  ...AI_VIDEO_TOOLKIT_MODELS.filter((m) => COMPOSER_FAMILIES.has(m.family)),
+  ...AI_VIDEO_TOOLKIT_MODELS.filter(
+    (m) =>
+      COMPOSER_FAMILIES.has(m.family) &&
+      // v425: only expose models whose clip source the backend truly renders.
+      // Previously unsupported sources (ai-vidu, ai-kling-omni, ai-pika) were
+      // silently rewritten to Hailuo inside compose-video-clips.
+      isSupportedComposerClipSource(modelIdToSource(m.id).clipSource),
+  ),
   IMAGE_TOOLKIT_MODEL,
 ];
 
@@ -56,27 +70,17 @@ export const COMPOSER_AVAILABLE_MODELS: ToolkitModel[] = [
  * usable for B-roll / non-lipsync scenes but are hidden from the picker
  * the moment the user enables Dialog & Lip-Sync.
  */
-export const LIPSYNC_PRIMARY_CLIP_SOURCE: ClipSource = 'ai-happyhorse';
-export const LIPSYNC_FALLBACK_CLIP_SOURCE: ClipSource = 'ai-hailuo';
-export const LIPSYNC_CLIP_SOURCES: ReadonlyArray<ClipSource> = [
-  LIPSYNC_PRIMARY_CLIP_SOURCE,
-  LIPSYNC_FALLBACK_CLIP_SOURCE,
-  'ai-kling',
-  'ai-wan',
-  'ai-seedance',
-  'ai-luma',
-];
-
+export const LIPSYNC_PRIMARY_CLIP_SOURCE: ClipSource = LIPSYNC_PRIMARY_PROVIDER;
+export const LIPSYNC_FALLBACK_CLIP_SOURCE: ClipSource = LIPSYNC_SECONDARY_PROVIDER;
 /**
- * v418 — Seedance 2.5 (4–30s plates) is certified but stays behind the
- * rollout flag `composer.feature.seedance25_lipsync`. Callers that know the
- * flag state use this instead of the frozen list above.
+ * v425 — derived from the certified list in `lipsyncMasterProvider.ts`.
+ * Certifying a new provider = edit that file (plus the backend mirror).
  */
-export const LIPSYNC_CLIP_SOURCE_SEEDANCE25: ClipSource = 'ai-seedance25';
-export function lipsyncClipSources(seedance25Enabled: boolean): ReadonlyArray<ClipSource> {
-  return seedance25Enabled
-    ? [...LIPSYNC_CLIP_SOURCES, LIPSYNC_CLIP_SOURCE_SEEDANCE25]
-    : LIPSYNC_CLIP_SOURCES;
+export const LIPSYNC_CLIP_SOURCES: ReadonlyArray<ClipSource> = DIALOG_MASTER_PROVIDERS;
+
+/** @deprecated v425 — the certified list is no longer flag-gated. */
+export function lipsyncClipSources(_seedance25Enabled?: boolean): ReadonlyArray<ClipSource> {
+  return LIPSYNC_CLIP_SOURCES;
 }
 
 /**
@@ -85,7 +89,7 @@ export function lipsyncClipSources(seedance25Enabled: boolean): ReadonlyArray<Cl
  */
 export const NATIVE_DIALOGUE_CLIP_SOURCES: ReadonlyArray<ClipSource> = LIPSYNC_CLIP_SOURCES;
 
-const LIPSYNC_FAMILIES = new Set(['happyhorse', 'hailuo', 'kling', 'wan', 'seedance', 'luma']);
+const LIPSYNC_CERTIFIED_SOURCES = new Set<string>(LIPSYNC_CLIP_SOURCES);
 
 
 /**
@@ -94,26 +98,19 @@ const LIPSYNC_FAMILIES = new Set(['happyhorse', 'hailuo', 'kling', 'wan', 'seeda
  * provider first so the ModelSelector pre-selects HappyHorse.
  */
 export const COMPOSER_DIALOG_MODELS: ToolkitModel[] = COMPOSER_AVAILABLE_MODELS
-  // v418: Seedance 2.5 is certified but flag-gated — see composerDialogModels().
-  .filter((m) => LIPSYNC_FAMILIES.has(m.family) && m.id !== 'seedance-2-5')
+  .filter((m) => LIPSYNC_CERTIFIED_SOURCES.has(modelIdToSource(m.id).clipSource))
   .sort((a, b) => {
     // HappyHorse (primary) before Hailuo (fallback); standard before pro.
-    const fam = (x: ToolkitModel) => (x.family === 'happyhorse' ? 0 : 1);
+    const fam = (x: ToolkitModel) =>
+      modelIdToSource(x.id).clipSource === LIPSYNC_PRIMARY_CLIP_SOURCE ? 0 : 1;
     if (fam(a) !== fam(b)) return fam(a) - fam(b);
     return /pro/i.test(a.id) ? 1 : -1;
   });
 
-/**
- * Dialog picker contents for a given rollout state. With the Seedance 2.5
- * lip-sync flag on, the 4–30s plate provider is appended at the end (it is
- * the premium option, never the default).
- */
-export function composerDialogModels(seedance25Enabled: boolean): ToolkitModel[] {
-  if (!seedance25Enabled) return COMPOSER_DIALOG_MODELS;
-  const seedance25 = COMPOSER_AVAILABLE_MODELS.filter((m) => m.id === 'seedance-2-5');
-  return [...COMPOSER_DIALOG_MODELS, ...seedance25];
+/** @deprecated v425 — the dialog picker is no longer flag-gated. */
+export function composerDialogModels(_seedance25Enabled?: boolean): ToolkitModel[] {
+  return COMPOSER_DIALOG_MODELS;
 }
-
 
 /** Default (cheapest, most flexible) lip-sync provider preselected when the toggle flips ON. */
 export const DIALOG_FALLBACK_CLIP_SOURCE: ClipSource = LIPSYNC_PRIMARY_CLIP_SOURCE;
@@ -126,7 +123,7 @@ export function isLipsyncEngine(engine: string | null | undefined): boolean {
 
 /** True iff the given clip source is allowed when Lip-Sync is active. */
 export function isLipsyncClipSource(src: string | null | undefined): boolean {
-  return !!src && (LIPSYNC_CLIP_SOURCES as ReadonlyArray<string>).includes(src);
+  return isLipsyncCertifiedProvider(src);
 }
 
 
@@ -145,7 +142,7 @@ export function modelIdToSource(modelId: string): { clipSource: ClipSource; clip
   const clipSource: ClipSource = (() => {
     switch (family) {
       case 'hailuo':   return 'ai-hailuo';
-      case 'kling':    return 'ai-kling';
+      case 'kling':    return modelId === 'kling-omni' ? 'ai-kling-omni' : 'ai-kling';
       case 'veo':      return 'ai-veo';
       case 'wan':      return 'ai-wan';
       case 'luma':     return 'ai-luma';
