@@ -1937,23 +1937,42 @@ serve(async (req) => {
       }
 
 
-      // Defensive: rewrite unsupported AI engines to a working default.
+      // v425: never rewrite silently — an unsupported engine is a contract
+      // violation of the picker, so fail loudly instead of swapping providers.
       if (
         scene.clipSource.startsWith("ai-") &&
         !isSupportedComposerAiSource(scene.clipSource)
       ) {
-        console.warn(
-          `[compose-video-clips] Scene ${scene.id} clipSource '${scene.clipSource}' not supported by composer — falling back to ai-hailuo.`,
+        return new Response(
+          JSON.stringify({
+            error: "unsupported_clip_source",
+            message: `Provider '${scene.clipSource}' wird vom Composer nicht unterstützt. Bitte ein anderes KI-Modell wählen.`,
+            scene_id: scene.id,
+            provider: scene.clipSource,
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
-        scene.clipSource = "ai-hailuo";
-        // Persist the rewrite so the UI reflects reality
-        await supabaseAdmin
-          .from("composer_scenes")
-          .update({
-            clip_source: "ai-hailuo",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", scene.id);
+      }
+
+      // v425: lip-sync contract — only certified master plates are allowed.
+      {
+        const __engine = scene.engineOverride ?? "auto";
+        const __lipsyncScene =
+          __engine === "cinematic-sync" ||
+          __engine === "sync-segments" ||
+          (scene as any).dialogMode === true;
+        if (__lipsyncScene && !isLipsyncCertifiedAiSource(scene.clipSource)) {
+          return new Response(
+            JSON.stringify({
+              error: "provider_not_lipsync_certified",
+              message: `Lip-Sync läuft nur über HappyHorse oder Hailuo. Gewählt: ${scene.clipSource}.`,
+              scene_id: scene.id,
+              provider: scene.clipSource,
+              allowed: [...LIPSYNC_CERTIFIED_AI_SOURCES],
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
       }
 
       const quality: Quality = scene.clipQuality === "pro" ? "pro" : "standard";
