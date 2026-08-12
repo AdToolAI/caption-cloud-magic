@@ -1537,6 +1537,23 @@ serve(async (req) => {
       );
     }
 
+    // v425 — surface a provider-contract violation in the UI instead of
+    // leaving the scene spinning in `generating`.
+    const markSceneContractFailure = async (sceneId: string, message: string) => {
+      try {
+        await supabaseAdmin
+          .from("composer_scenes")
+          .update({
+            status: "failed",
+            error_message: message,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+      } catch (e) {
+        console.warn("[compose-video-clips] markSceneContractFailure failed", e);
+      }
+    };
+
     const processScenes = async () => {
     // v418 — Seedance 2.5 as a lip-sync plate provider is behind a rollout
     // flag. Resolved once per request, not per scene.
@@ -1943,6 +1960,10 @@ serve(async (req) => {
         scene.clipSource.startsWith("ai-") &&
         !isSupportedComposerAiSource(scene.clipSource)
       ) {
+        await markSceneContractFailure(
+          scene.id,
+          `Provider '${scene.clipSource}' wird vom Composer nicht unterstützt.`,
+        );
         return new Response(
           JSON.stringify({
             error: "unsupported_clip_source",
@@ -1962,6 +1983,10 @@ serve(async (req) => {
           __engine === "sync-segments" ||
           (scene as any).dialogMode === true;
         if (__lipsyncScene && !isLipsyncCertifiedAiSource(scene.clipSource)) {
+          await markSceneContractFailure(
+            scene.id,
+            `Lip-Sync läuft nur über HappyHorse oder Hailuo. Gewählt: ${scene.clipSource}.`,
+          );
           return new Response(
             JSON.stringify({
               error: "provider_not_lipsync_certified",
