@@ -386,10 +386,13 @@ export interface ArbitrationInput {
   requirements: SceneVisualRequirements;
   strategy: AnchorStrategy;
   hasProtectedAnchor: boolean;
+  /** True when an actual anchor IMAGE (`reference_image_url`) exists. */
+  hasAnchorImage?: boolean;
   hasPreviousFrame: boolean;
   hasPreviousClip: boolean;
   hasEndFrame: boolean;
 }
+
 
 export function arbitrateSlots(
   input: ArbitrationInput,
