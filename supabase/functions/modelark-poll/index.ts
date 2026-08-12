@@ -22,6 +22,8 @@ import {
   MODELARK_BASE_URL,
   modelArkApiKey,
 } from "../_shared/modelark.ts";
+import { heartbeatPipelineJob } from "../_shared/v427-callback-guard.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
