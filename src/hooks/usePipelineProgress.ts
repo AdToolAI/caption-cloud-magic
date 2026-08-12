@@ -800,6 +800,13 @@ export function usePipelineProgress({
   const realProgressRef = useRef<{ value: number; at: number }>(
     hydratedRealProgressRef.current ?? { value: 0, at: Date.now() },
   );
+  // A `clips:start` (incl. single-scene re-render) resets the stall baseline —
+  // the new run must be measured from 0, not from the previous run's peak.
+  if (appliedRunResetTokenRef.current !== runResetTokenRef.current) {
+    appliedRunResetTokenRef.current = runResetTokenRef.current;
+    realProgressRef.current = { value: 0, at: Date.now() };
+  }
+
   const realProgressSum =
     clipsReal.progress * PHASE_WEIGHTS.clips +
     voiceoverReal.progress * PHASE_WEIGHTS.voiceover +
