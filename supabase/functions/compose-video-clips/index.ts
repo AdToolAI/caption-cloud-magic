@@ -38,6 +38,16 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 import { dualWriteDispatches } from "../_shared/v427-dual-write.ts";
+import { isV427FlagEnabled } from "../_shared/v427-flags.ts";
+import {
+  InsufficientCreditsError,
+  maxRunCostEuros,
+  recordSceneRunContracts,
+  releaseRunReservation,
+  reserveRunCredits,
+  settleRunReservation,
+  type ReservationHandle,
+} from "../_shared/v427-credit-contract.ts";
 import {
   countFacesInImage,
   countHumansInImage,
@@ -215,6 +225,11 @@ serve(async (req) => {
   // Cached body so the FATAL catch (below) can mark scenes as `failed` even
   // when the crash happens before processScenes() runs.
   let __parsedBody: ClipRequest | null = null;
+  // v427B — visible to the FATAL catch so a crash never leaves reserved money
+  // sitting on a run that produced nothing. Settling is idempotent.
+  let __v427Reservation: ReservationHandle | null = null;
+
+
 
   try {
     const supabaseClient = createClient(
@@ -470,6 +485,52 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // ── v427B — Geldvertrag: Obergrenze reservieren, BEVOR ein bezahlter
+    // Providerauftrag rausgeht. Ein Voiceover kann eine Szene noch bis ans
+    // Providerfenster verlängern, deshalb wird die Obergrenze gesperrt und
+    // nach dem Dispatch exakt reduziert. Flag aus ⇒ komplett legacy.
+    let v427Reservation: ReservationHandle | null = null;
+    const v427CreditsEnabled = await isV427FlagEnabled(
+      supabaseAdmin,
+      "v427.credit_reservations",
+      user.id,
+    );
+    if (v427CreditsEnabled && aiScenes.length > 0) {
+      const ceilingCost = maxRunCostEuros(aiScenes as any);
+      try {
+        v427Reservation = __v427Reservation = await reserveRunCredits(supabaseAdmin, {
+          userId: user.id,
+          projectId,
+          sceneIds: aiScenes.map((s) => s.id),
+          runIds: Array.from(sceneRunStamps.values()).map((s) => s.runId),
+          amountEuros: ceilingCost,
+          metadata: { quoted_cost_euros: totalCost, scene_count: aiScenes.length },
+        });
+        console.log(
+          `[compose-video-clips] v427 reserved €${ceilingCost.toFixed(2)} (quote €${totalCost.toFixed(2)}) reservation=${v427Reservation?.reservationId}`,
+        );
+      } catch (resErr) {
+        if (resErr instanceof InsufficientCreditsError) {
+          return new Response(
+            JSON.stringify({
+              error: `Insufficient credits. This run can require up to €${resErr.required.toFixed(2)}.`,
+              code: "INSUFFICIENT_CREDITS",
+              needsPurchase: true,
+              required: resErr.required,
+            }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        // Infra failure on the reservation path must not silently bill later.
+        console.error("[compose-video-clips] v427 reservation failed:", resErr);
+        return new Response(
+          JSON.stringify({ ok: false, error: "reservation_failed", message: String((resErr as Error)?.message ?? resErr) }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
     const replicate = new Replicate({
       auth: Deno.env.get("REPLICATE_API_KEY"),
     });
@@ -4907,7 +4968,42 @@ serve(async (req) => {
     // already running, so this must never abort, but it must not stay silent.
     let creditWarning: string | null = null;
 
-    if (billableResults.length > 0 && actualCost > 0) {
+    if (v427Reservation) {
+      // v427B — the money is already off the wallet. Reduce the reservation to
+      // what actually got dispatched; everything else flows straight back.
+      if (billableResults.length > 0 && actualCost > 0) {
+        await settleRunReservation(supabaseAdmin, v427Reservation.reservationId, actualCost);
+        console.log(
+          `[compose-video-clips] v427 settled €${actualCost.toFixed(2)} of €${v427Reservation.reservedEuros.toFixed(2)} (${billableResults.length} scenes, ${generatingCount} async)`,
+        );
+      } else {
+        await releaseRunReservation(
+          supabaseAdmin,
+          v427Reservation.reservationId,
+          "no_billable_dispatch",
+        );
+        console.log("[compose-video-clips] v427 released reservation — nothing dispatched");
+      }
+
+      await recordSceneRunContracts(
+        supabaseAdmin,
+        billableResults.flatMap((r) => {
+          const scene = scenes.find((s) => s.id === r.sceneId);
+          const stamp = sceneRunStamps.get(r.sceneId);
+          if (!scene || !stamp) return [];
+          const q: Quality = scene.clipQuality === "pro" ? "pro" : "standard";
+          return [{
+            sceneId: scene.id,
+            runId: stamp.runId,
+            requestedDurationMs: Math.round((scene.durationSeconds || 0) * 1000),
+            quotedCostEuros:
+              scene.durationSeconds * (CLIP_COSTS[scene.clipSource]?.[q] ?? 0),
+            reservationId: v427Reservation!.reservationId,
+            metadata: { provider: scene.clipSource, quality: q, project_id: projectId },
+          }];
+        }),
+      );
+    } else if (billableResults.length > 0 && actualCost > 0) {
       try {
         await supabaseAdmin.rpc("deduct_ai_video_credits", {
           p_user_id: user.id,
@@ -4943,6 +5039,7 @@ serve(async (req) => {
         }
       }
     }
+
 
 
 
@@ -4995,6 +5092,23 @@ serve(async (req) => {
       `[compose-video-clips] FATAL @ stage=${__stage}: ${msg}`,
       stack || "",
     );
+    // v427B — release any money still sitting on this crashed run (no-op when
+    // the settlement above already ran).
+    if (__v427Reservation) {
+      try {
+        const adminUrl = Deno.env.get("SUPABASE_URL") ?? "";
+        const adminKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+        if (adminUrl && adminKey) {
+          await releaseRunReservation(
+            createClient(adminUrl, adminKey),
+            __v427Reservation.reservationId,
+            `fatal_${__stage}`,
+          );
+        }
+      } catch (relErr) {
+        console.error("[compose-video-clips] v427 reservation release failed:", relErr);
+      }
+    }
     // Try to flip any scenes the client sent into a visible `failed` state so
     // the UI doesn't sit on `pending`/`generating` forever. Best-effort only —
     // if even the body parse failed we just return the error JSON.
