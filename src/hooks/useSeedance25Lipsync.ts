@@ -25,8 +25,19 @@ function resolveFlag(raw: unknown, userId: string | null): boolean {
   return false;
 }
 
-export function useSeedance25Lipsync(): boolean {
-  const [enabled, setEnabled] = useState(false);
+export interface Seedance25LipsyncState {
+  enabled: boolean;
+  /** True until the rollout flag has been read once. Callers that migrate a
+   *  persisted clipSource MUST wait for this to be false — otherwise the
+   *  initial `enabled=false` reverts a valid Seedance 2.5 scene to HappyHorse. */
+  loading: boolean;
+}
+
+export function useSeedance25LipsyncState(): Seedance25LipsyncState {
+  const [state, setState] = useState<Seedance25LipsyncState>({
+    enabled: false,
+    loading: true,
+  });
 
   useEffect(() => {
     let active = true;
@@ -37,9 +48,12 @@ export function useSeedance25Lipsync(): boolean {
           supabase.from("system_config").select("value").eq("key", CFG_KEY).maybeSingle(),
         ]);
         if (!active) return;
-        setEnabled(resolveFlag((data as any)?.value ?? null, auth?.user?.id ?? null));
+        setState({
+          enabled: resolveFlag((data as any)?.value ?? null, auth?.user?.id ?? null),
+          loading: false,
+        });
       } catch {
-        if (active) setEnabled(false);
+        if (active) setState({ enabled: false, loading: false });
       }
     })();
     return () => {
@@ -47,7 +61,12 @@ export function useSeedance25Lipsync(): boolean {
     };
   }, []);
 
-  return enabled;
+  return state;
 }
+
+export function useSeedance25Lipsync(): boolean {
+  return useSeedance25LipsyncState().enabled;
+}
+
 
 export { resolveFlag as __resolveSeedance25LipsyncFlag };

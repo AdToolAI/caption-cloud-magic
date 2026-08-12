@@ -111,6 +111,8 @@ import {
   snapDurationToProvider,
 } from "@/lib/video-composer/providerCapabilities";
 import { maxSecondsForClipSource } from "@/lib/composer/pickClipSourceForDuration";
+import { estimateSpokenSeconds, dialogExceedsPlate } from "@/lib/composer/estimateSpokenSeconds";
+
 import { ModelSelector } from "@/components/ai-video/ModelSelector";
 import {
   COMPOSER_AVAILABLE_MODELS,
@@ -127,7 +129,7 @@ import {
   modelIdToSource,
   sourceToModelId,
 } from "@/lib/video-composer/modelMapping";
-import { useSeedance25Lipsync } from "@/hooks/useSeedance25Lipsync";
+import { useSeedance25LipsyncState } from "@/hooks/useSeedance25Lipsync";
 
 
 import { AI_VIDEO_TOOLKIT_MODELS } from "@/config/aiVideoModelRegistry";
@@ -347,7 +349,9 @@ export default function SceneCard({
     | "es";
   const confirmRender = useSceneRenderConfirm();
   // v418 rollout brake — mirrors the server flag for Seedance 2.5 plates.
-  const seedance25LipsyncEnabled = useSeedance25Lipsync();
+  const { enabled: seedance25LipsyncEnabled, loading: seedance25FlagLoading } =
+    useSeedance25LipsyncState();
+
 
   const isStock =
     scene.clipSource === "stock" || scene.clipSource === "stock-image";
@@ -471,7 +475,12 @@ export default function SceneCard({
   // v418: Seedance 2.5 is a certified plate provider once the rollout flag is
   // on — check against the flag-aware list, otherwise the picker selection is
   // reverted to HappyHorse on the very next render.
+  // v422: the rollout flag is read asynchronously. Until it has landed the
+  // hook reports `false`, which used to revert a persisted Seedance 2.5 scene
+  // to HappyHorse on the very first render (including a DB write). Never
+  // migrate on an unresolved flag.
   useEffect(() => {
+    if (seedance25FlagLoading) return;
     if (!isLipsyncEngine(scene.engineOverride ?? null)) return;
     const allowed = lipsyncClipSources(seedance25LipsyncEnabled) as ReadonlyArray<string>;
     if (allowed.includes(scene.clipSource as string)) return;
@@ -479,7 +488,14 @@ export default function SceneCard({
       clipSource: LIPSYNC_PRIMARY_CLIP_SOURCE,
       clipQuality: 'standard',
     });
-  }, [scene.engineOverride, scene.clipSource, seedance25LipsyncEnabled, onUpdate]);
+  }, [
+    scene.engineOverride,
+    scene.clipSource,
+    seedance25LipsyncEnabled,
+    seedance25FlagLoading,
+    onUpdate,
+  ]);
+
 
 
   // Scene Dialog Studio — toggleable per-scene script editor (monolog from 1 cast,
@@ -1149,6 +1165,40 @@ export default function SceneCard({
                 const providerLabel = getProviderLabel(scene.clipSource);
                 const current = scene.durationSeconds;
 
+                // v422 — preflight honesty: `compose-twoshot-audio` aborts the
+                // whole run with `dialog_too_long_for_plate` once the spoken
+                // track exceeds the plate by more than 5 s. Warn here instead.
+                const spokenSec = isLipsyncEngine(scene.engineOverride ?? null)
+                  ? estimateSpokenSeconds(scene.dialogScript)
+                  : 0;
+                const dialogTooLong = dialogExceedsPlate(spokenSec, current, PROVIDER_MAX);
+                const seedanceMax = maxSecondsForClipSource('ai-seedance25');
+                const seedanceWouldFit =
+                  seedance25LipsyncEnabled &&
+                  scene.clipSource !== 'ai-seedance25' &&
+                  spokenSec <= seedanceMax;
+                const dialogLengthWarning = dialogTooLong ? (
+                  <p className="text-[10px] text-red-300/90 leading-snug">
+                    {tx({
+                      de: `Skript dauert ca. ${spokenSec}s, die Platte nur ${current}s (max. ${PROVIDER_MAX}s).`,
+                      en: `Script runs approx. ${spokenSec}s, the plate only ${current}s (max ${PROVIDER_MAX}s).`,
+                      es: `El guion dura aprox. ${spokenSec}s, la placa solo ${current}s (máx. ${PROVIDER_MAX}s).`,
+                    })}{' '}
+                    {seedanceWouldFit
+                      ? tx({
+                          de: `Text kürzen oder auf Seedance 2.5 wechseln und die Szene auf ${Math.min(seedanceMax, Math.ceil(spokenSec + 0.3))}s verlängern.`,
+                          en: `Shorten the text or switch to Seedance 2.5 and extend the scene to ${Math.min(seedanceMax, Math.ceil(spokenSec + 0.3))}s.`,
+                          es: `Acorta el texto o cambia a Seedance 2.5 y extiende la escena a ${Math.min(seedanceMax, Math.ceil(spokenSec + 0.3))}s.`,
+                        })
+                      : tx({
+                          de: 'Bitte Text kürzen oder die Szene verlängern — sonst bricht der Lauf ab.',
+                          en: 'Please shorten the text or extend the scene — otherwise the run aborts.',
+                          es: 'Acorta el texto o extiende la escena — de lo contrario, la ejecución se cancela.',
+                        })}
+                  </p>
+                ) : null;
+
+
                 // Free-range slider for HappyHorse (native 3–15s / 1s steps) and for non-AI sources.
                 if (isHappyHorse || !isAi) {
                   return (
@@ -1173,6 +1223,8 @@ export default function SceneCard({
                           HappyHorse · {current}s ({tx({ de: 'nativ 3–15s, jede Sekunde wählbar', en: 'native 3–15s, any second selectable', es: 'nativo 3–15s, cualquier segundo seleccionable' })})
                         </p>
                       )}
+                      {dialogLengthWarning}
+
                     </div>
                   );
                 }
@@ -1221,7 +1273,9 @@ export default function SceneCard({
                         {tx({ de: '10s bei Hailuo nur in 768p verfügbar — Pro wird auf Standard-Auflösung reduziert.', en: '10s with Hailuo is only available in 768p — Pro is reduced to standard resolution.', es: '10s con Hailuo solo disponible en 768p — Pro se reduce a resolución estándar.' })}
                       </p>
                     )}
+                    {dialogLengthWarning}
                   </div>
+
                 );
               })()}
 
