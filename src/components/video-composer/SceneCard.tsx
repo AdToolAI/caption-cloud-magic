@@ -498,6 +498,113 @@ export default function SceneCard({
 
 
 
+  // v425 — Lip-Sync provider contract. Only HappyHorse and Hailuo are
+  // certified master plates; enabling Dialog & Lip-Sync on any other provider
+  // asks the user to choose instead of silently switching.
+  const [lipsyncProviderPromptOpen, setLipsyncProviderPromptOpen] = useState(false);
+
+  const applyDialogModeToggle = async (
+    next: boolean,
+    forcedSource?: ClipSource,
+  ) => {
+    const dialogMode = scene.dialogMode === true;
+                                
+                                const updates: Partial<ComposerScene> = { dialogMode: next };
+                                let dbClipSource: ClipSource | undefined;
+                                let dbClipQuality: ClipQuality | undefined;
+                                // Snapshot previous engine + lipsync flag for rollback.
+                                const prevEngine = scene.engineOverride ?? "auto";
+                                const prevLipSync = scene.lipSyncWithVoiceover === true;
+                                // When the user turns Dialog & Lip-Sync ON we MUST also
+                                // route the scene through the Cinematic-Sync pipeline
+                                // (Hailuo plate → Sync.so lipsync overlay) — otherwise
+                                // `compose-video-clips` auto-routes single-speaker
+                                // dialog scenes to HeyGen, which produces an isolated
+                                // avatar bust instead of integrating the dialogue into
+                                // the actual scene visual.
+                                const nextEngine: ComposerScene["engineOverride"] = next
+                                  ? "cinematic-sync"
+                                  : prevEngine === "cinematic-sync"
+                                    ? "auto"
+                                    : prevEngine;
+                                const nextLipSync = next ? true : false;
+                                const engineChanged = nextEngine !== prevEngine;
+                                const lipSyncChanged = nextLipSync !== prevLipSync;
+                                if (engineChanged) updates.engineOverride = nextEngine;
+                                if (lipSyncChanged) updates.lipSyncWithVoiceover = nextLipSync;
+                                if (next) {
+                                  // The rollout flag resolves asynchronously. Preserve an already
+                                  // selected Seedance 2.5 scene while it is loading; the guarded
+                                  // migration effect above handles a genuinely disabled flag once
+                                  // the read completes.
+                                  const pendingSeedance25Selection =
+                                    seedance25FlagLoading && scene.clipSource === "ai-seedance25";
+                                  const ok = !forcedSource && isLipsyncClipSource(scene.clipSource);
+
+                                  if (!ok) {
+                                    const target = forcedSource ?? DIALOG_FALLBACK_CLIP_SOURCE;
+                                    updates.clipSource = target;
+                                    updates.clipQuality = DIALOG_FALLBACK_CLIP_QUALITY;
+                                    dbClipSource = target;
+                                    dbClipQuality = DIALOG_FALLBACK_CLIP_QUALITY;
+                                    toast({
+                                      title:
+                                        lang === "de"
+                                          ? tx({ de: "Modell auf HappyHorse 1.0 gewechselt", en: "Model changed to HappyHorse 1.0", es: "Modelo cambiado a HappyHorse 1.0" })
+                                          : lang === "es"
+                                            ? "Modelo cambiado a HappyHorse 1.0"
+                                            : "Switched to HappyHorse 1.0",
+                                      description:
+                                        lang === "de"
+                                          ? tx({ de: "Lip-Sync läuft nur über HappyHorse (3–15s) oder Hailuo (6/10s Fallback). HappyHorse vorausgewählt.", en: "Lip-sync only runs via HappyHorse (3–15s) or Hailuo (6/10s fallback). HappyHorse pre-selected.", es: "La sincronización labial solo funciona a través de HappyHorse (3–15s) o Hailuo (6/10s de respaldo). HappyHorse preseleccionado." })
+                                          : lang === "es"
+                                            ? "Lip-Sync solo con HappyHorse (3–15s) o Hailuo (6/10s alternativa). HappyHorse preseleccionado."
+                                            : "Lip-Sync runs only on HappyHorse (3–15s) or Hailuo (6/10s fallback). HappyHorse preselected.",
+                                    });
+
+                                  }
+                                }
+                                // Optimistic local update.
+                                onUpdate(updates);
+                                // Mark pending so a racing realtime refetch or
+                                // debounced scene-save can't revert any of the
+                                // toggled fields before the DB commit lands.
+                                markDialogModePending(scene.id, next);
+                                if (lipSyncChanged) markLipSyncPending(scene.id, nextLipSync);
+                                if (engineChanged) markEngineOverridePending(scene.id, nextEngine);
+                                if (isUuid(scene.id)) {
+                                  try {
+                                    const payload: Record<string, unknown> = {
+                                      dialog_mode: next,
+                                    };
+                                    if (engineChanged) payload.engine_override = nextEngine;
+                                    if (lipSyncChanged) payload.lip_sync_with_voiceover = nextLipSync;
+                                    if (dbClipSource) payload.clip_source = dbClipSource;
+                                    if (dbClipQuality) payload.clip_quality = dbClipQuality;
+                                    const { error } = await supabase
+                                      .from("composer_scenes")
+                                      .update(payload)
+                                      .eq("id", scene.id);
+                                    if (error) throw error;
+                                  } catch (e) {
+                                    console.warn(
+                                      "[SceneCard] dialogMode toggle persist failed",
+                                      e,
+                                    );
+                                    clearDialogModePending(scene.id);
+                                    if (lipSyncChanged) clearLipSyncPending(scene.id);
+                                    if (engineChanged) clearEngineOverridePending(scene.id);
+                                    // Roll back local optimistic change.
+                                    const rollback: Partial<ComposerScene> = { dialogMode: !next };
+                                    if (engineChanged) rollback.engineOverride = prevEngine;
+                                    if (lipSyncChanged) rollback.lipSyncWithVoiceover = prevLipSync;
+                                    if (dbClipSource) rollback.clipSource = scene.clipSource;
+                                    if (dbClipQuality) rollback.clipQuality = scene.clipQuality;
+                                    onUpdate(rollback);
+                                  }
+                                }
+  };
+
   // Scene Dialog Studio — toggleable per-scene script editor (monolog from 1 cast,
   // dialog from 2+). Hidden by default; opened via the "Skript schreiben" button
   // in the cast row. Initial open if a script already exists.
@@ -1587,103 +1694,13 @@ export default function SceneCard({
                               type="button"
                               role="switch"
                               aria-checked={dialogMode}
-                              onClick={async () => {
+                              onClick={() => {
                                 const next = !dialogMode;
-                                const updates: Partial<ComposerScene> = { dialogMode: next };
-                                let dbClipSource: ClipSource | undefined;
-                                let dbClipQuality: ClipQuality | undefined;
-                                // Snapshot previous engine + lipsync flag for rollback.
-                                const prevEngine = scene.engineOverride ?? "auto";
-                                const prevLipSync = scene.lipSyncWithVoiceover === true;
-                                // When the user turns Dialog & Lip-Sync ON we MUST also
-                                // route the scene through the Cinematic-Sync pipeline
-                                // (Hailuo plate → Sync.so lipsync overlay) — otherwise
-                                // `compose-video-clips` auto-routes single-speaker
-                                // dialog scenes to HeyGen, which produces an isolated
-                                // avatar bust instead of integrating the dialogue into
-                                // the actual scene visual.
-                                const nextEngine: ComposerScene["engineOverride"] = next
-                                  ? "cinematic-sync"
-                                  : prevEngine === "cinematic-sync"
-                                    ? "auto"
-                                    : prevEngine;
-                                const nextLipSync = next ? true : false;
-                                const engineChanged = nextEngine !== prevEngine;
-                                const lipSyncChanged = nextLipSync !== prevLipSync;
-                                if (engineChanged) updates.engineOverride = nextEngine;
-                                if (lipSyncChanged) updates.lipSyncWithVoiceover = nextLipSync;
-                                if (next) {
-                                  // The rollout flag resolves asynchronously. Preserve an already
-                                  // selected Seedance 2.5 scene while it is loading; the guarded
-                                  // migration effect above handles a genuinely disabled flag once
-                                  // the read completes.
-                                  const pendingSeedance25Selection =
-                                    seedance25FlagLoading && scene.clipSource === "ai-seedance25";
-                                  const ok = pendingSeedance25Selection || (
-                                    lipsyncClipSources(seedance25LipsyncEnabled) as ReadonlyArray<string>
-                                  ).includes(scene.clipSource);
-
-                                  if (!ok) {
-                                    updates.clipSource = DIALOG_FALLBACK_CLIP_SOURCE;
-                                    updates.clipQuality = DIALOG_FALLBACK_CLIP_QUALITY;
-                                    dbClipSource = DIALOG_FALLBACK_CLIP_SOURCE;
-                                    dbClipQuality = DIALOG_FALLBACK_CLIP_QUALITY;
-                                    toast({
-                                      title:
-                                        lang === "de"
-                                          ? tx({ de: "Modell auf HappyHorse 1.0 gewechselt", en: "Model changed to HappyHorse 1.0", es: "Modelo cambiado a HappyHorse 1.0" })
-                                          : lang === "es"
-                                            ? "Modelo cambiado a HappyHorse 1.0"
-                                            : "Switched to HappyHorse 1.0",
-                                      description:
-                                        lang === "de"
-                                          ? tx({ de: "Lip-Sync läuft nur über HappyHorse (3–15s) oder Hailuo (6/10s Fallback). HappyHorse vorausgewählt.", en: "Lip-sync only runs via HappyHorse (3–15s) or Hailuo (6/10s fallback). HappyHorse pre-selected.", es: "La sincronización labial solo funciona a través de HappyHorse (3–15s) o Hailuo (6/10s de respaldo). HappyHorse preseleccionado." })
-                                          : lang === "es"
-                                            ? "Lip-Sync solo con HappyHorse (3–15s) o Hailuo (6/10s alternativa). HappyHorse preseleccionado."
-                                            : "Lip-Sync runs only on HappyHorse (3–15s) or Hailuo (6/10s fallback). HappyHorse preselected.",
-                                    });
-
-                                  }
+                                if (next && !isLipsyncClipSource(scene.clipSource)) {
+                                  setLipsyncProviderPromptOpen(true);
+                                  return;
                                 }
-                                // Optimistic local update.
-                                onUpdate(updates);
-                                // Mark pending so a racing realtime refetch or
-                                // debounced scene-save can't revert any of the
-                                // toggled fields before the DB commit lands.
-                                markDialogModePending(scene.id, next);
-                                if (lipSyncChanged) markLipSyncPending(scene.id, nextLipSync);
-                                if (engineChanged) markEngineOverridePending(scene.id, nextEngine);
-                                if (isUuid(scene.id)) {
-                                  try {
-                                    const payload: Record<string, unknown> = {
-                                      dialog_mode: next,
-                                    };
-                                    if (engineChanged) payload.engine_override = nextEngine;
-                                    if (lipSyncChanged) payload.lip_sync_with_voiceover = nextLipSync;
-                                    if (dbClipSource) payload.clip_source = dbClipSource;
-                                    if (dbClipQuality) payload.clip_quality = dbClipQuality;
-                                    const { error } = await supabase
-                                      .from("composer_scenes")
-                                      .update(payload)
-                                      .eq("id", scene.id);
-                                    if (error) throw error;
-                                  } catch (e) {
-                                    console.warn(
-                                      "[SceneCard] dialogMode toggle persist failed",
-                                      e,
-                                    );
-                                    clearDialogModePending(scene.id);
-                                    if (lipSyncChanged) clearLipSyncPending(scene.id);
-                                    if (engineChanged) clearEngineOverridePending(scene.id);
-                                    // Roll back local optimistic change.
-                                    const rollback: Partial<ComposerScene> = { dialogMode: !next };
-                                    if (engineChanged) rollback.engineOverride = prevEngine;
-                                    if (lipSyncChanged) rollback.lipSyncWithVoiceover = prevLipSync;
-                                    if (dbClipSource) rollback.clipSource = scene.clipSource;
-                                    if (dbClipQuality) rollback.clipQuality = scene.clipQuality;
-                                    onUpdate(rollback);
-                                  }
-                                }
+                                void applyDialogModeToggle(next);
                               }}
                               className={cn(
                                 "relative shrink-0 inline-flex h-5 w-9 items-center rounded-full transition-colors",
