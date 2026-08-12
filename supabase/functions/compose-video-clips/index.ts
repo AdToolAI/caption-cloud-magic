@@ -3779,12 +3779,40 @@ serve(async (req) => {
       const continuityPref = (scene as any).visualContinuity ?? "auto";
       const sceneOrderIdx = scenes.findIndex((s) => s.id === scene.id);
       if (
-        !continuityFrameUrl &&
-        continuityPref !== "match-cut" &&
-        sceneOrderIdx > 0
+        (!continuityFrameUrl || !continuityClipUrl) &&
+        continuityPref !== "match-cut"
       ) {
         try {
-          const prevScene = scenes[sceneOrderIdx - 1];
+          // v426: the predecessor is the scene BEFORE this one in the project,
+          // not merely the previous entry of this request. A single-scene
+          // re-render therefore chains just as well as a full batch.
+          let prevScene: { id: string; durationSeconds?: number } | null =
+            sceneOrderIdx > 0
+              ? { id: scenes[sceneOrderIdx - 1].id, durationSeconds: scenes[sceneOrderIdx - 1].durationSeconds }
+              : null;
+          if (!prevScene) {
+            const { data: selfRow } = await supabaseAdmin
+              .from("composer_scenes")
+              .select("order_index")
+              .eq("id", scene.id)
+              .maybeSingle();
+            const ownOrder = Number((selfRow as any)?.order_index ?? -1);
+            if (ownOrder > 0) {
+              const { data: predRow } = await supabaseAdmin
+                .from("composer_scenes")
+                .select("id, duration_seconds")
+                .eq("project_id", projectId)
+                .eq("order_index", ownOrder - 1)
+                .maybeSingle();
+              if ((predRow as any)?.id) {
+                prevScene = {
+                  id: String((predRow as any).id),
+                  durationSeconds: Number((predRow as any).duration_seconds) || undefined,
+                };
+              }
+            }
+          }
+          if (!prevScene) throw new Error("no_predecessor");
           const { data: prevRow } = await supabaseAdmin
             .from("composer_scenes")
             .select("clip_url, duration_seconds")
@@ -3793,7 +3821,9 @@ serve(async (req) => {
           const prevClipUrl = String((prevRow as any)?.clip_url ?? "");
           if (prevClipUrl) {
             continuityClipUrl = continuityClipUrl ?? prevClipUrl;
-            const framed = await ensureTransitionFrame({
+            const framed = continuityFrameUrl
+              ? { url: continuityFrameUrl }
+              : await ensureTransitionFrame({
               supabaseAdmin,
               userId: user.id,
               projectId,
@@ -3802,17 +3832,17 @@ serve(async (req) => {
               previousDurationSeconds:
                 Number((prevRow as any)?.duration_seconds) ||
                 prevScene.durationSeconds,
-            });
+            } as any);
             if (framed.url) {
               continuityFrameUrl = framed.url;
-            } else if (framed.reason) {
+            } else if ((framed as any).reason) {
               console.log(
-                `[compose-video-clips] scene ${scene.id} continuity frame unavailable (${framed.reason}) — falling back to match-cut`,
+                `[compose-video-clips] scene ${scene.id} continuity frame unavailable (${(framed as any).reason}) — falling back to match-cut`,
               );
             }
           }
         } catch (contErr) {
-          console.warn(
+          if ((contErr as Error)?.message !== "no_predecessor") console.warn(
             `[compose-video-clips] scene ${scene.id} server continuity backfill failed (non-fatal):`,
             contErr,
           );
