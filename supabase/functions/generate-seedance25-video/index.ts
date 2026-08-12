@@ -86,6 +86,7 @@ Deno.serve(async (req) => {
       referenceVideoUrl,
       referenceAudioUrls,
       generateAudio = false,
+      suppressDialogue = false,
       seed,
     } = body;
 
@@ -94,6 +95,17 @@ Deno.serve(async (req) => {
       ...(referenceVideoUrl ? [referenceVideoUrl] : []),
     ].filter(Boolean).slice(0, 10);
     const refAudios = (referenceAudioUrls ?? []).filter(Boolean).slice(0, 10);
+
+    // Ambience-only: sound yes, speech no. Same wording as the composer's
+    // hybrid-ambient path so both routes condition the model identically.
+    const NO_SPEECH_CLAUSE =
+      "[AUDIO] Ambient sound design only: room tone, foley, natural environment " +
+      "and optional instrumental music. No spoken words, no dialogue, no narration, " +
+      "no singing. Characters do not talk and their lips stay closed.";
+    const effectivePrompt =
+      generateAudio && suppressDialogue
+        ? `${String(prompt).trim()}\n\n${NO_SPEECH_CLAUSE}`
+        : prompt;
 
     if (!prompt || !prompt.trim()) {
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
