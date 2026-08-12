@@ -144,6 +144,17 @@ function isActiveDialogShots(dialogShots: any) {
   return !!dialogShots?.status && !TERMINAL_DIALOG_SHOT_STATUSES.has(String(dialogShots.status));
 }
 
+function isSceneTerminalFailure(scene: any) {
+  return scene?.clipStatus === 'failed' ||
+    scene?.clip_status === 'failed' ||
+    scene?.lipSyncStatus === 'failed' ||
+    scene?.lip_sync_status === 'failed' ||
+    scene?.twoshotStage === 'failed' ||
+    scene?.twoshot_stage === 'failed' ||
+    scene?.dialogShots?.status === 'failed' ||
+    scene?.dialog_shots?.status === 'failed';
+}
+
 // Customer-facing Composer generation should feel like one stable 7–8 minute
 // process, not like separate phases racing each other to 70% after 2 minutes.
 const RUN_NOMINAL_SECONDS = 480;
@@ -410,7 +421,7 @@ export function usePipelineProgress({
       ));
     const ready = aiScenes.filter(isReadyOrLipsynced).length;
     const generating = aiScenes.filter(
-      (s) => s.clipStatus === 'generating' && !isReadyOrLipsynced(s),
+      (s) => s.clipStatus === 'generating' && !isReadyOrLipsynced(s) && !isSceneTerminalFailure(s),
     ).length;
     const failed = aiScenes.filter((s) => s.clipStatus === 'failed').length;
     // Stage 7: a scene with an active backend handle (Replicate prediction,
@@ -420,6 +431,7 @@ export function usePipelineProgress({
     // disappears for 5–30 s right after the user clicks "Generieren".
     const backendActive = aiScenes.filter((s) => {
       const sa = s as any;
+      if (isSceneTerminalFailure(sa)) return false;
       if (isCanceledLipsyncScene(sa)) return false;
       if (isReadyOrLipsynced(sa)) return false;
       const stage = sa.twoshotStage;
@@ -517,6 +529,7 @@ export function usePipelineProgress({
      * must NOT keep the bar pinned in "running" forever.
      */
     const isTerminalScene = (s: any) =>
+      isSceneTerminalFailure(s) ||
       s.lipSyncStatus === 'applied' ||
       s.lipSyncStatus === 'canceled' ||
       s.lipSyncStatus === 'failed' ||
@@ -821,6 +834,7 @@ export function usePipelineProgress({
   // visible in the scene state, the run is NOT stalled even if the
   // weighted progress bar hasn't moved (Sync.so passes are long).
   const hasActiveLipsyncEvidence = (scenes ?? []).some((s: any) => {
+    if (isSceneTerminalFailure(s)) return false;
     if (isCanceledLipsyncScene(s)) return false;
     if (s.lipSyncStatus === 'running' || s.lipSyncStatus === 'audio_muxing') return true;
     if (s.engineOverride === 'cinematic-sync' && s.clipStatus === 'generating') return true;

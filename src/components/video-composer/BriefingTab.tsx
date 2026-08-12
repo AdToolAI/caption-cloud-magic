@@ -241,16 +241,6 @@ export default function BriefingTab({
   const { t } = useTranslation();
   const { prefs, setEditorMode } = useStudioPreferences();
   const editorMode = prefs.editorMode; // 'quick' | 'direct' | 'studio'
-  const showDirect = editorMode !== 'quick';
-  const showStudio = editorMode === 'studio';
-  // v416 — Quick hides real panels. If those hidden panels already carry data
-  // (from the briefing analysis or an earlier session), surface a one-line
-  // hint instead of letting the values disappear silently.
-  const hiddenPanelsHaveData = !showDirect && Boolean(
-    (briefing.visualStyle && String(briefing.visualStyle).trim())
-    || (briefing.characters && briefing.characters.length)
-    || (briefing.videoMode && briefing.videoMode !== 'video'),
-  );
   const [uspInput, setUspInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   // briefingImportOpen state removed — auto-analyse handled by dashboard hook.
@@ -544,28 +534,25 @@ export default function BriefingTab({
       */}
 
 
-      {/* v416 — the Quick/Direct/Studio switch lives ONLY in the DirectorBar
-          (sticky, global). The big film-strip duplicate was removed. */}
-
-      {!showDirect && (
-        <button
-          type="button"
-          onClick={() => setEditorMode('direct')}
-          className="w-full rounded-xl border border-amber-300/25 bg-amber-300/5 px-4 py-2.5 text-left text-xs text-amber-100/80 transition-colors hover:border-amber-300/50 hover:text-amber-100"
-        >
-          {hiddenPanelsHaveData
-            ? tx({
-                de: 'Stil, Marken-Kit oder Cast sind gesetzt, aber im Quick-Modus ausgeblendet — mehr Panels anzeigen',
-                en: 'Style, brand kit or cast are set but hidden in Quick mode — show more panels',
-                es: 'Estilo, kit de marca o elenco están definidos pero ocultos en modo Quick — mostrar más paneles',
-              })
-            : tx({
-                de: 'Einige Panels sind im Quick-Modus ausgeblendet (Ton, Sprache, Video-Modus, visueller Stil) — alle Felder anzeigen',
-                en: 'Some panels are hidden in Quick mode (tone, language, video mode, visual style) — show all fields',
-                es: 'Algunos paneles están ocultos en modo Quick (tono, idioma, modo de vídeo, estilo visual) — mostrar todos los campos',
-              })}
-        </button>
-      )}
+      <div className="sticky top-2 z-20 flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/95 p-2 shadow-sm backdrop-blur">
+        <span className="px-2 text-xs text-muted-foreground">
+          {tx({ de: 'Arbeitsmodus', en: 'Workspace mode', es: 'Modo de trabajo' })}
+        </span>
+        <div className="grid grid-cols-3 gap-1" role="group" aria-label={tx({ de: 'Arbeitsmodus', en: 'Workspace mode', es: 'Modo de trabajo' })}>
+          {(['quick', 'direct', 'studio'] as const).map((mode) => (
+            <Button
+              key={mode}
+              type="button"
+              size="sm"
+              variant={editorMode === mode ? 'default' : 'ghost'}
+              onClick={() => setEditorMode(mode)}
+              className="h-8 px-3 text-xs capitalize"
+            >
+              {mode}
+            </Button>
+          ))}
+        </div>
+      </div>
 
 
       {/* Crossfade wrapper — re-keyed on editorMode so panel changes "feel" */}
@@ -745,8 +732,7 @@ export default function BriefingTab({
       {/* Style & Format — Quick = compact (AR + Duration only). Direct/Studio = full. */}
       <StagePanel slateIndex="03" eyebrow="Scene · Style & Format" title={t('videoComposer.styleFormat')}>
         <div className="space-y-4">
-          {showDirect && (
-            <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs">{t('videoComposer.emotionalTone')}</Label>
                 <Select
@@ -779,8 +765,7 @@ export default function BriefingTab({
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-          )}
+          </div>
 
           {/* Duration Slider — bis 10 Minuten (hartes Projekt-Budget) */}
           <div className="space-y-2">
@@ -835,8 +820,7 @@ export default function BriefingTab({
           </div>
 
           {/* Default Quality Tier — Direct & Studio only */}
-          {showDirect && (
-            <div className="space-y-1.5">
+          <div className="space-y-1.5">
               <Label className="text-xs">{tx({ de: "KI-Qualität (Standard für alle Szenen)", en: "AI Quality (Default for all scenes)", es: "Calidad de IA (predeterminado para todas las escenas)" })}</Label>
               <div className="grid grid-cols-2 gap-2">
                 {([
@@ -870,52 +854,40 @@ export default function BriefingTab({
               <p className="text-[10px] text-muted-foreground/70">
                 Pro-Szene überschreibbar im Storyboard.
               </p>
-            </div>
-          )}
+          </div>
         </div>
       </StagePanel>
 
-      {/* Video Mode — Direct & Studio only */}
-      {showDirect && (
-        <VideoModeSelector
+      <VideoModeSelector
           value={briefing.videoMode || 'video'}
           language={language}
           onChange={(mode: VideoMode) => onUpdateBriefing({ videoMode: mode })}
-        />
-      )}
+      />
 
-      {/* Recurring Characters — Studio only (advanced) */}
-      {showStudio && (
-        <>
-          <CharacterManager
+      <CharacterManager
             characters={briefing.characters || []}
             language={language}
             onChange={(characters: ComposerCharacter[]) => onUpdateBriefing({ characters })}
-          />
-          <ScriptSpeakerMapper
+      />
+      <ScriptSpeakerMapper
             briefing={briefing}
             language={language}
             onUpdateBriefing={onUpdateBriefing}
-          />
-        </>
-      )}
+      />
 
       {/* Director's Note — Direct & Studio only */}
-      {showDirect && (
-        <DirectorsNote>
+      <DirectorsNote>
           {language === 'de'
             ? tx({ de: 'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Für echte Gesichts-Konsistenz nutze einen Avatar aus der Bibliothek.', en: 'Describe distinctive clothing & objects in detail (coat, crown, weapon). The AI repeats these much more reliably than faces — the viewer recognizes the person by them. For true facial consistency, use an avatar from the library.', es: 'Describe la ropa y los objetos distintivos en detalle (abrigo, corona, arma). La IA los repite de forma mucho más fiable que los rostros; el espectador reconoce a la persona por ellos. Para una verdadera consistencia facial, utiliza un avatar de la biblioteca.' })
             : language === 'es'
               ? 'Describe ropa y objetos distintivos en detalle (abrigo, corona, arma). La IA los repite con mucha más fiabilidad que las caras — el espectador reconoce al personaje por ellos. Para consistencia facial real, usa un avatar de la biblioteca.'
               : 'Describe distinctive clothing & props in detail (coat, crown, weapon). The AI repeats those far more reliably than faces — your audience recognises the character by them. For true face consistency, use an avatar from the library.'}
-        </DirectorsNote>
-      )}
+      </DirectorsNote>
 
 
 
       {/* Visual Style — Direct & Studio only */}
-      {showDirect && (
-        <StagePanel
+      <StagePanel
           slateIndex="04"
           eyebrow="Scene · Visual Language"
           title={
@@ -997,8 +969,7 @@ export default function BriefingTab({
               );
             })}
           </div>
-        </StagePanel>
-      )}
+      </StagePanel>
 
       {/* Brand Kit Auto-Apply */}
       {assemblyConfig && onChangeBrandKit && onChangeBrandKitAutoSync && onApplyAssembly && (
