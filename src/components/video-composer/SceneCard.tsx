@@ -117,13 +117,12 @@ import { ModelSelector } from "@/components/ai-video/ModelSelector";
 import {
   COMPOSER_AVAILABLE_MODELS,
   COMPOSER_DIALOG_MODELS,
-  composerDialogModels,
-  lipsyncClipSources,
   NATIVE_DIALOGUE_CLIP_SOURCES,
   DIALOG_FALLBACK_CLIP_SOURCE,
   DIALOG_FALLBACK_CLIP_QUALITY,
   LIPSYNC_CLIP_SOURCES,
   LIPSYNC_PRIMARY_CLIP_SOURCE,
+  LIPSYNC_FALLBACK_CLIP_SOURCE,
   isLipsyncEngine,
   isLipsyncClipSource,
   modelIdToSource,
@@ -1265,10 +1264,9 @@ export default function SceneCard({
                   : 0;
                 const dialogTooLong = dialogExceedsPlate(spokenSec, current, PROVIDER_MAX);
                 const seedanceMax = maxSecondsForClipSource('ai-seedance25');
-                const seedanceWouldFit =
-                  seedance25LipsyncEnabled &&
-                  scene.clipSource !== 'ai-seedance25' &&
-                  spokenSec <= seedanceMax;
+                // v425: Seedance 2.5 is no longer lip-sync certified — never
+                // suggest it as a way out of a too-long dialog.
+                const seedanceWouldFit = false;
                 const dialogLengthWarning = dialogTooLong ? (
                   <p className="text-[10px] text-red-300/90 leading-snug">
                     {tx({
@@ -1693,6 +1691,54 @@ export default function SceneCard({
                               />
                             </button>
                           </div>
+
+                          {/* v425 — Lip-Sync-Provider-Vertrag */}
+                          <AlertDialog
+                            open={lipsyncProviderPromptOpen}
+                            onOpenChange={setLipsyncProviderPromptOpen}
+                          >
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  {tx({
+                                    de: "Lip-Sync braucht einen zertifizierten Provider",
+                                    en: "Lip-sync needs a certified provider",
+                                    es: "El lip-sync necesita un proveedor certificado",
+                                  })}
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  {tx({
+                                    de: `„${getProviderLabel(scene.clipSource)}“ ist für Lip-Sync nicht zertifiziert. Wähle HappyHorse (3–15s) oder Hailuo (6/10s) — oder behalte das Modell und lass Lip-Sync aus.`,
+                                    en: `"${getProviderLabel(scene.clipSource)}" is not certified for lip-sync. Pick HappyHorse (3–15s) or Hailuo (6/10s) — or keep the model and leave lip-sync off.`,
+                                    es: `«${getProviderLabel(scene.clipSource)}» no está certificado para lip-sync. Elige HappyHorse (3–15s) o Hailuo (6/10s), o mantén el modelo y deja el lip-sync desactivado.`,
+                                  })}
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>
+                                  {tx({
+                                    de: "Lip-Sync aus lassen",
+                                    en: "Leave lip-sync off",
+                                    es: "Dejar lip-sync desactivado",
+                                  })}
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => {
+                                    void applyDialogModeToggle(true, LIPSYNC_FALLBACK_CLIP_SOURCE);
+                                  }}
+                                >
+                                  Hailuo
+                                </AlertDialogAction>
+                                <AlertDialogAction
+                                  onClick={() => {
+                                    void applyDialogModeToggle(true, LIPSYNC_PRIMARY_CLIP_SOURCE);
+                                  }}
+                                >
+                                  HappyHorse
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
 
                           {/* Szenen-Referenzbild — nur sichtbar wenn Lip-Sync AUS ist */}
                           <SceneReferenceImageSlot scene={scene} onUpdate={onUpdate} />
