@@ -6093,6 +6093,92 @@ export type Database = {
           },
         ]
       }
+      composer_pipeline_jobs: {
+        Row: {
+          attempt_no: number
+          callback_claim_expires_at: string | null
+          callback_claim_token: string | null
+          callback_claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          error_code: string | null
+          external_job_id: string | null
+          id: string
+          idempotency_key: string
+          last_heartbeat_at: string | null
+          metadata: Json
+          payload_hash: string | null
+          provider: string | null
+          run_contract_version: number
+          run_id: string
+          scene_id: string
+          segment_id: string | null
+          speaker_id: string | null
+          stage: string
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempt_no?: number
+          callback_claim_expires_at?: string | null
+          callback_claim_token?: string | null
+          callback_claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_code?: string | null
+          external_job_id?: string | null
+          id?: string
+          idempotency_key: string
+          last_heartbeat_at?: string | null
+          metadata?: Json
+          payload_hash?: string | null
+          provider?: string | null
+          run_contract_version?: number
+          run_id: string
+          scene_id: string
+          segment_id?: string | null
+          speaker_id?: string | null
+          stage: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempt_no?: number
+          callback_claim_expires_at?: string | null
+          callback_claim_token?: string | null
+          callback_claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_code?: string | null
+          external_job_id?: string | null
+          id?: string
+          idempotency_key?: string
+          last_heartbeat_at?: string | null
+          metadata?: Json
+          payload_hash?: string | null
+          provider?: string | null
+          run_contract_version?: number
+          run_id?: string
+          scene_id?: string
+          segment_id?: string | null
+          speaker_id?: string | null
+          stage?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "composer_pipeline_jobs_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "composer_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       composer_pipeline_runs: {
         Row: {
           allow_partial: boolean | null
@@ -6413,6 +6499,92 @@ export type Database = {
           },
         ]
       }
+      composer_scene_runs: {
+        Row: {
+          audio_asset_hash: string | null
+          audio_asset_id: string | null
+          audio_plan_id: string | null
+          billable_duration_seconds: number | null
+          completed_at: string | null
+          contract_frozen_at: string | null
+          created_at: string
+          dialog_content_hash: string | null
+          duration_policy_version: string | null
+          effective_duration_frames: number | null
+          effective_duration_ms: number | null
+          measured_audio_duration_ms: number | null
+          metadata: Json
+          quoted_cost_euros: number | null
+          requested_duration_ms: number | null
+          required_duration_ms: number | null
+          reservation_id: string | null
+          run_contract_version: number
+          run_id: string
+          scene_id: string
+          status: string
+          updated_at: string
+          voice_configuration_hash: string | null
+        }
+        Insert: {
+          audio_asset_hash?: string | null
+          audio_asset_id?: string | null
+          audio_plan_id?: string | null
+          billable_duration_seconds?: number | null
+          completed_at?: string | null
+          contract_frozen_at?: string | null
+          created_at?: string
+          dialog_content_hash?: string | null
+          duration_policy_version?: string | null
+          effective_duration_frames?: number | null
+          effective_duration_ms?: number | null
+          measured_audio_duration_ms?: number | null
+          metadata?: Json
+          quoted_cost_euros?: number | null
+          requested_duration_ms?: number | null
+          required_duration_ms?: number | null
+          reservation_id?: string | null
+          run_contract_version?: number
+          run_id: string
+          scene_id: string
+          status?: string
+          updated_at?: string
+          voice_configuration_hash?: string | null
+        }
+        Update: {
+          audio_asset_hash?: string | null
+          audio_asset_id?: string | null
+          audio_plan_id?: string | null
+          billable_duration_seconds?: number | null
+          completed_at?: string | null
+          contract_frozen_at?: string | null
+          created_at?: string
+          dialog_content_hash?: string | null
+          duration_policy_version?: string | null
+          effective_duration_frames?: number | null
+          effective_duration_ms?: number | null
+          measured_audio_duration_ms?: number | null
+          metadata?: Json
+          quoted_cost_euros?: number | null
+          requested_duration_ms?: number | null
+          required_duration_ms?: number | null
+          reservation_id?: string | null
+          run_contract_version?: number
+          run_id?: string
+          scene_id?: string
+          status?: string
+          updated_at?: string
+          voice_configuration_hash?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "composer_scene_runs_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "composer_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       composer_scene_transitions: {
         Row: {
           created_at: string
@@ -6439,9 +6611,15 @@ export type Database = {
           ai_prompt: string | null
           anchor_confirmed_at: string | null
           applied_style_preset_id: string | null
+          audio_asset_hash: string | null
+          audio_asset_id: string | null
           audio_plan: Json | null
+          audio_plan_id: string | null
           audio_selfheal_count: number
           audio_source: string | null
+          base_clip_status: string | null
+          base_clip_url: string | null
+          billable_duration_seconds: number | null
           camera_choreography_en: string | null
           character_audio_url: string | null
           character_image_url: string | null
@@ -6465,6 +6643,7 @@ export type Database = {
           continuity_source_scene_id: string | null
           cost_euros: number
           created_at: string
+          dialog_content_hash: string | null
           dialog_locked_at: string | null
           dialog_mode: boolean
           dialog_script: string | null
@@ -6473,7 +6652,11 @@ export type Database = {
           dialog_turns: Json
           dialog_voices: Json
           director_modifiers: Json | null
+          duration_policy_version: string | null
+          duration_run_id: string | null
           duration_seconds: number
+          effective_duration_frames: number | null
+          effective_duration_ms: number | null
           effects: Json | null
           end_reference_image_url: string | null
           engine_override: string
@@ -6489,6 +6672,7 @@ export type Database = {
           lip_sync_status: string | null
           lip_sync_with_voiceover: boolean
           lock_reference_url: string | null
+          measured_audio_duration_ms: number | null
           mentioned_character_ids: string[] | null
           mentioned_location_ids: string[] | null
           motion_track: Json | null
@@ -6510,10 +6694,15 @@ export type Database = {
           prompt_mode: string | null
           prompt_slot_order: string[] | null
           prompt_slots: Json | null
+          quoted_cost_euros: number | null
           realism_preset: string | null
           reference_image_url: string | null
           replicate_prediction_id: string | null
+          requested_duration_ms: number | null
+          required_duration_ms: number | null
+          reservation_id: string | null
           retry_count: number
+          run_contract_version: number | null
           scene_action_en: string | null
           scene_action_user: string | null
           scene_assets: Json
@@ -6535,6 +6724,7 @@ export type Database = {
           updated_at: string
           upload_type: string | null
           upload_url: string | null
+          voice_configuration_hash: string | null
           with_audio: boolean
         }
         Insert: {
@@ -6544,9 +6734,15 @@ export type Database = {
           ai_prompt?: string | null
           anchor_confirmed_at?: string | null
           applied_style_preset_id?: string | null
+          audio_asset_hash?: string | null
+          audio_asset_id?: string | null
           audio_plan?: Json | null
+          audio_plan_id?: string | null
           audio_selfheal_count?: number
           audio_source?: string | null
+          base_clip_status?: string | null
+          base_clip_url?: string | null
+          billable_duration_seconds?: number | null
           camera_choreography_en?: string | null
           character_audio_url?: string | null
           character_image_url?: string | null
@@ -6570,6 +6766,7 @@ export type Database = {
           continuity_source_scene_id?: string | null
           cost_euros?: number
           created_at?: string
+          dialog_content_hash?: string | null
           dialog_locked_at?: string | null
           dialog_mode?: boolean
           dialog_script?: string | null
@@ -6578,7 +6775,11 @@ export type Database = {
           dialog_turns?: Json
           dialog_voices?: Json
           director_modifiers?: Json | null
+          duration_policy_version?: string | null
+          duration_run_id?: string | null
           duration_seconds?: number
+          effective_duration_frames?: number | null
+          effective_duration_ms?: number | null
           effects?: Json | null
           end_reference_image_url?: string | null
           engine_override?: string
@@ -6594,6 +6795,7 @@ export type Database = {
           lip_sync_status?: string | null
           lip_sync_with_voiceover?: boolean
           lock_reference_url?: string | null
+          measured_audio_duration_ms?: number | null
           mentioned_character_ids?: string[] | null
           mentioned_location_ids?: string[] | null
           motion_track?: Json | null
@@ -6615,10 +6817,15 @@ export type Database = {
           prompt_mode?: string | null
           prompt_slot_order?: string[] | null
           prompt_slots?: Json | null
+          quoted_cost_euros?: number | null
           realism_preset?: string | null
           reference_image_url?: string | null
           replicate_prediction_id?: string | null
+          requested_duration_ms?: number | null
+          required_duration_ms?: number | null
+          reservation_id?: string | null
           retry_count?: number
+          run_contract_version?: number | null
           scene_action_en?: string | null
           scene_action_user?: string | null
           scene_assets?: Json
@@ -6640,6 +6847,7 @@ export type Database = {
           updated_at?: string
           upload_type?: string | null
           upload_url?: string | null
+          voice_configuration_hash?: string | null
           with_audio?: boolean
         }
         Update: {
@@ -6649,9 +6857,15 @@ export type Database = {
           ai_prompt?: string | null
           anchor_confirmed_at?: string | null
           applied_style_preset_id?: string | null
+          audio_asset_hash?: string | null
+          audio_asset_id?: string | null
           audio_plan?: Json | null
+          audio_plan_id?: string | null
           audio_selfheal_count?: number
           audio_source?: string | null
+          base_clip_status?: string | null
+          base_clip_url?: string | null
+          billable_duration_seconds?: number | null
           camera_choreography_en?: string | null
           character_audio_url?: string | null
           character_image_url?: string | null
@@ -6675,6 +6889,7 @@ export type Database = {
           continuity_source_scene_id?: string | null
           cost_euros?: number
           created_at?: string
+          dialog_content_hash?: string | null
           dialog_locked_at?: string | null
           dialog_mode?: boolean
           dialog_script?: string | null
@@ -6683,7 +6898,11 @@ export type Database = {
           dialog_turns?: Json
           dialog_voices?: Json
           director_modifiers?: Json | null
+          duration_policy_version?: string | null
+          duration_run_id?: string | null
           duration_seconds?: number
+          effective_duration_frames?: number | null
+          effective_duration_ms?: number | null
           effects?: Json | null
           end_reference_image_url?: string | null
           engine_override?: string
@@ -6699,6 +6918,7 @@ export type Database = {
           lip_sync_status?: string | null
           lip_sync_with_voiceover?: boolean
           lock_reference_url?: string | null
+          measured_audio_duration_ms?: number | null
           mentioned_character_ids?: string[] | null
           mentioned_location_ids?: string[] | null
           motion_track?: Json | null
@@ -6720,10 +6940,15 @@ export type Database = {
           prompt_mode?: string | null
           prompt_slot_order?: string[] | null
           prompt_slots?: Json | null
+          quoted_cost_euros?: number | null
           realism_preset?: string | null
           reference_image_url?: string | null
           replicate_prediction_id?: string | null
+          requested_duration_ms?: number | null
+          required_duration_ms?: number | null
+          reservation_id?: string | null
           retry_count?: number
+          run_contract_version?: number | null
           scene_action_en?: string | null
           scene_action_user?: string | null
           scene_assets?: Json
@@ -6745,6 +6970,7 @@ export type Database = {
           updated_at?: string
           upload_type?: string | null
           upload_url?: string | null
+          voice_configuration_hash?: string | null
           with_audio?: boolean
         }
         Relationships: [
