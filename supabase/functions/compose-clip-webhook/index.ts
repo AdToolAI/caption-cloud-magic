@@ -149,6 +149,25 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
     const { id: predictionId, status, output, error: predError } = payload;
 
+    // ── v427A3 callback guard (default "off" → no-op) ────────────────────
+    // Second identity check on top of the legacy stale-run gate above. Only a
+    // provably wrong delivery is blocked, and only in "enforce" mode.
+    if (hasActiveIdentity && runId) {
+      const guard = await guardCallback(supabase, {
+        sceneId,
+        runId,
+        stage: 'base_video',
+        externalJobId: predictionId ? String(predictionId) : null,
+      });
+      if (!guard.proceed) {
+        return new Response(
+          JSON.stringify({ ok: true, ignored: true, reason: guard.reason ?? 'guard_rejected' }),
+          { status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+
+
     if (status === 'succeeded' && output) {
       const videoUrl = Array.isArray(output) ? output[0] : output;
       console.log(`[compose-clip-webhook] Clip ready: ${videoUrl}`);
