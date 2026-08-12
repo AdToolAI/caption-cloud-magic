@@ -458,9 +458,6 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    void sceneRunStamps;
-
-
     const replicate = new Replicate({
       auth: Deno.env.get("REPLICATE_API_KEY"),
     });
@@ -468,6 +465,11 @@ serve(async (req) => {
     const webhookUrl = appendWebhookToken(
       `${supabaseUrl}/functions/v1/compose-clip-webhook`,
     );
+    const sceneWebhookUrl = (sceneId: string) => {
+      const stamp = sceneRunStamps.get(sceneId);
+      if (!stamp) throw new Error(`missing_run_stamp:${sceneId}`);
+      return `${webhookUrl}&scene_id=${sceneId}&project_id=${projectId}&run_id=${encodeURIComponent(stamp.runId)}&generation=${stamp.generation}`;
+    };
 
     // IMPORTANT: We do NOT append negative words to the positive prompt.
     // Diffusion video models (Hailuo, Kling) treat words like "text", "captions",
@@ -3907,7 +3909,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: "minimax/hailuo-2.3",
             input: hailuoInput,
-            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: sceneWebhookUrl(scene.id),
             webhook_events_filter: ["completed"],
           });
 
@@ -3978,7 +3980,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: "kwaivgi/kling-v3-omni-video",
             input: klingInput,
-            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: sceneWebhookUrl(scene.id),
             webhook_events_filter: ["completed"],
           });
 
@@ -4097,7 +4099,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: wanModel,
             input: wanInput,
-            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: sceneWebhookUrl(scene.id),
             webhook_events_filter: ["completed"],
           });
 
@@ -4148,7 +4150,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: "bytedance/seedance-1-lite",
             input: seedInput,
-            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: sceneWebhookUrl(scene.id),
             webhook_events_filter: ["completed"],
           });
 
@@ -4327,7 +4329,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: "luma/ray-2-720p",
             input: lumaInput,
-            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: sceneWebhookUrl(scene.id),
             webhook_events_filter: ["completed"],
           });
 
@@ -4381,7 +4383,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: veoModel,
             input: veoInput,
-            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: sceneWebhookUrl(scene.id),
             webhook_events_filter: ["completed"],
           });
 
@@ -4422,7 +4424,7 @@ serve(async (req) => {
                 duration: fallbackDuration,
                 resolution: "768p",
               },
-              webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
+              webhook: sceneWebhookUrl(scene.id),
               webhook_events_filter: ["completed"],
             });
             await supabaseAdmin
@@ -4683,7 +4685,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: "alibaba/happyhorse-1.0",
             input: hhInput,
-            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: sceneWebhookUrl(scene.id),
             webhook_events_filter: ["completed"],
           });
 

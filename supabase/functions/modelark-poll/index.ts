@@ -108,7 +108,7 @@ async function scan(sceneFilterId: string | null) {
     /* ── 2. Video Composer scenes ───────────────────────────────────── */
     let sceneQuery = supabase
       .from("composer_scenes")
-      .select("id, project_id, replicate_prediction_id, updated_at")
+      .select("id, project_id, replicate_prediction_id, active_run_id, plate_generation, updated_at")
       .eq("clip_status", "generating")
       .like("replicate_prediction_id", `${MODELARK_JOB_PREFIX}%`)
       .limit(50);
@@ -124,7 +124,7 @@ async function scan(sceneFilterId: string | null) {
 
       const notifyWebhook = async (payload: Record<string, unknown>) => {
         const res = await fetch(
-          `${webhookUrl}&scene_id=${scene.id}&project_id=${scene.project_id}`,
+          `${webhookUrl}&scene_id=${scene.id}&project_id=${scene.project_id}&run_id=${encodeURIComponent(scene.active_run_id ?? "")}&generation=${scene.plate_generation ?? 0}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

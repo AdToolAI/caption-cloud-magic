@@ -67,10 +67,13 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
       // function). The user must see the loading state on the very next
       // frame after clicking, not 30s later.
       setGenerating((prev) => ({ ...prev, [scene.id]: true }));
-      emitPipelineEvent({ type: 'clips:start' });
       if (scene.clipSource?.startsWith('ai-')) {
         opts.onOptimisticPatch?.(scene.id, { clipStatus: 'generating' });
       }
+      // Patch the failed/ready scene first. Otherwise the progress listener can
+      // sample the previous terminal state immediately after the reset event
+      // and lock its monotonic floor back near 99%.
+      emitPipelineEvent({ type: 'clips:start' });
       const previousStatus = scene.clipStatus;
       try {
         let pid = opts.projectId;
