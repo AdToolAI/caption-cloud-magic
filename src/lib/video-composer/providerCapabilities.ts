@@ -13,6 +13,10 @@
  * 400) instead of changing clip_source / duration_seconds behind the scenes.
  */
 
+import { AI_VIDEO_TOOLKIT_MODELS } from '@/config/aiVideoModelRegistry';
+import { isLipsyncCertifiedProvider } from './lipsyncMasterProvider';
+import { modelIdToSource } from './modelMapping';
+
 export type ClipSource =
   | 'ai-hailuo'
   | 'ai-happyhorse'
@@ -163,6 +167,33 @@ export const PROVIDER_CAPS: Record<string, ProviderCapability> = {
     maxSpeakers: 2,
   },
 };
+
+/**
+ * v425 — durations are derived from the AI Video Toolkit registry (the single
+ * source of truth for provider capabilities) and only fall back to the manual
+ * buckets above when a source has no registry model (e.g. ai-image).
+ */
+const REGISTRY_DURATIONS: Record<string, number[]> = (() => {
+  const out: Record<string, Set<number>> = {};
+  for (const m of AI_VIDEO_TOOLKIT_MODELS) {
+    const src = modelIdToSource(m.id).clipSource as string;
+    if (!src) continue;
+    const bucket = (out[src] ??= new Set<number>());
+    for (const d of m.durations ?? []) {
+      if (Number.isFinite(d) && d > 0) bucket.add(Math.round(d));
+    }
+  }
+  return Object.fromEntries(
+    Object.entries(out).map(([k, v]) => [k, [...v].sort((a, b) => a - b)]),
+  );
+})();
+
+// Keep the manual table in lock-step with the registry + lip-sync contract.
+for (const [src, cap] of Object.entries(PROVIDER_CAPS)) {
+  const derived = REGISTRY_DURATIONS[src];
+  if (derived && derived.length > 0) cap.durations = derived;
+  cap.lipsync = isLipsyncCertifiedProvider(src) || cap.nativeLipSync === true;
+}
 
 /** True if this provider produces final lip-synced video without Sync.so. */
 export function providerHasNativeLipSync(clipSource: string | undefined | null): boolean {
