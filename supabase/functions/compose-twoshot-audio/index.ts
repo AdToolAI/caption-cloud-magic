@@ -1088,7 +1088,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           error: "dialog_too_long_for_plate",
           message:
             tl({ de: `Das Skript dauert ${spokenSec.toFixed(2)} s, aber die Szene ist nur ${sceneDur.toFixed(2)} s lang. `, en: `The script is ${spokenSec.toFixed(2)}s long, but the scene is only ${sceneDur.toFixed(2)}s long.`, es: `El guion dura ${spokenSec.toFixed(2)}s, pero la escena solo dura ${sceneDur.toFixed(2)}s.` }) +
-            tl({ de: `Bitte Text kürzen oder die Szene auf mindestens ${Math.ceil(spokenSec + 0.3)} s verlängern.`, en: `Please shorten text or extend the scene to at least ${Math.ceil(spokenSec + 0.3)}s.`, es: `Por favor, acorta el texto o extiende la escena a al menos ${Math.ceil(spokenSec + 0.3)}s.` }),
+            tl({ de: `Bitte Text kürzen oder die Szene auf mindestens ${Math.ceil(spokenSec + TAIL_PADDING_SEC)} s verlängern.`, en: `Please shorten text or extend the scene to at least ${Math.ceil(spokenSec + TAIL_PADDING_SEC)}s.`, es: `Por favor, acorta el texto o extiende la escena a al menos ${Math.ceil(spokenSec + TAIL_PADDING_SEC)}s.` }),
           spoken_sec: Math.round(spokenSec * 1000) / 1000,
           scene_dur_sec: sceneDur,
           overflow_sec: Math.round(overflow * 1000) / 1000,
