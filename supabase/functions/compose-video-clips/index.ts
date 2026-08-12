@@ -1,5 +1,6 @@
 // compose-video-clips v2.4.0 — v81 shared CLIP_COSTS + dialog-speakers
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { planContinuityChain, sweepContinuityQueue } from "../_shared/continuity-chain.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { beginSceneRun } from "../_shared/scene-run-begin.ts";
 import { planSceneVisualInputs } from "../_shared/visual-inputs.ts";
@@ -222,14 +223,24 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseClient.auth.getUser(token);
 
-    if (authError || !user) {
-      throw new Error("Unauthorized");
+    // v426 — internal chain resume. `compose-clip-webhook` restarts a scene
+    // that was parked behind its predecessor. It authenticates with the
+    // service-role key and names the owning user explicitly; project
+    // ownership is still verified below, so this cannot cross accounts.
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const internalActorId = req.headers.get("x-internal-actor-user-id");
+    let user: { id: string } | null = null;
+    if (serviceRoleKey && token === serviceRoleKey && internalActorId) {
+      user = { id: internalActorId };
+    } else {
+      const { data: authData, error: authError } = await supabaseClient.auth.getUser(token);
+      if (authError || !authData?.user) {
+        throw new Error("Unauthorized");
+      }
+      user = authData.user;
     }
+    if (!user) throw new Error("Unauthorized");
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -1564,8 +1575,27 @@ serve(async (req) => {
       supabaseAdmin,
       user.id,
     );
+    // ── v426 Seamless-Transition chain ────────────────────────────────────
+    // Scenes whose predecessor renders in this very batch are parked and
+    // resumed by the webhook once that clip exists — otherwise they would
+    // look for a predecessor clip that is not there yet and silently fall
+    // back to a hard cut.
+    __stage = "v426_continuity_chain";
+    await sweepContinuityQueue(supabaseAdmin, projectId);
+    const { deferred: deferredSceneIds } = await planContinuityChain({
+      supabaseAdmin,
+      projectId,
+      userId: user.id,
+      scenes: scenes as unknown as Array<Record<string, unknown>>,
+      requestContext: { projectId, visualStyle, characters, previewOnly, run_context: runContext },
+    });
+
     // Process each scene
     for (const scene of scenes) {
+      if (deferredSceneIds.has(String(scene.id))) {
+        console.log(`[compose-video-clips] scene ${scene.id}: parked for continuity chain`);
+        continue;
+      }
       // ── HARD-GUARD: legacy `heygen` override → `auto` ───────────────────
       // The Composer's HeyGen/Talking-Head portrait route was removed. Any
       // scene still carrying `engineOverride='heygen'` (stale UI state,
