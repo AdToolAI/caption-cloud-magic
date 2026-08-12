@@ -1,25 +1,33 @@
-# Seedance 2.5 als sicherer Lip-Sync-Provider einstufen
+# Seedance 2.5 für einen echten Lip-Sync-Testlauf beibehalten
 
 ## Problem
 
-Beim Rendern einer Dialog-Szene mit Seedance 2.5 erscheint eine rote Risiko-Warnung ("keine zuverlässigen Ergebnisse", "Ghost-Mouthing", Haftungs-/Credit-Ausschluss) mit Pflicht-Checkbox, obwohl Seedance 2.5 in v418 als Lip-Sync-Plate-Provider (4–30s) zertifiziert wurde.
+Seedance 2.5 lässt sich im Picker auswählen, wird aber beim Start des Dialog-Renderings wieder durch HappyHorse ersetzt. Dadurch kann der gewünschte Seedance-Testlauf nicht stattfinden.
 
-Ursache: Die Sicherheitsliste `LIPSYNC_SAFE_PROVIDERS` in `src/config/lipsyncProviderSafety.ts` enthält nur `ai-hailuo`, `ai-happyhorse`, `ai-kling-omni`. Der Clip-Source-Wert `ai-seedance25` fehlt, deshalb greift die v209-Risiko-Warnung. Zusätzlich fehlt `ai-seedance25` in `humanProviderName`, weshalb im Dialog der rohe technische Name "ai-seedance25" statt "Seedance 2.5" steht.
+Die verbleibende Ursache ist im Code bestätigt: `SceneDialogStudio.tsx` besitzt beim Renderstart eine eigene veraltete Provider-Liste ohne `ai-seedance25`. Deshalb setzt Zeile 1674–1677 die Auswahl auf `ai-happyhorse` zurück und schreibt HappyHorse anschließend sowohl in den lokalen Szenenstatus als auch in den Dispatch-Payload. Der Picker und das Backend kennen Seedance 2.5 bereits korrekt; die frühere Flag-Race-Condition in `SceneCard` ist ebenfalls schon abgesichert.
 
 ## Änderungen
 
-1. `src/config/lipsyncProviderSafety.ts`
-   - `ai-seedance25` in `LIPSYNC_SAFE_PROVIDERS` aufnehmen, mit Kommentar-Verweis auf die v418-Zertifizierung (4–30s Plate, Multi-Speaker geprüft).
-   - `humanProviderName`: Mapping `ai-seedance25` → "Seedance 2.5" ergänzen (das legacy `ai-seedance` bleibt "Seedance" und weiterhin risikobehaftet).
+1. `src/components/video-composer/SceneDialogStudio.tsx`
+   - `ai-seedance25` in die dortige Render-Allowlist aufnehmen, damit die explizite Nutzerauswahl nicht mehr auf HappyHorse fällt.
+   - Seedance-2.5-Dauer im bestehenden Duration-Zweig korrekt auf 4–30 Sekunden begrenzen.
+   - Anzeigenamen "Seedance 2.5" in die lokale Provider-Beschriftung aufnehmen.
+   - Der tatsächlich gewählte Provider wird unverändert an `startSceneGeneration` und damit an `compose-video-clips` übergeben.
 
-2. `src/components/video-composer/SceneCard.tsx`
-   - Die Multi-Speaker-Erklärung ("pro Sprecher-Turn ein eigener Hailuo-Plate …") nennt hart "Hailuo", auch wenn Seedance 2.5 gewählt ist. Provider-Namen dynamisch aus dem gewählten Clip-Source über `humanProviderName` einsetzen (DE/EN/ES).
+2. `src/config/lipsyncProviderSafety.ts`
+   - Nur das fehlende Anzeigenamen-Mapping `ai-seedance25` → "Seedance 2.5" ergänzen, damit die bestehende Testwarnung keinen technischen Rohwert zeigt.
+   - Seedance 2.5 **nicht** als sicher einstufen: Die rote Risiko-Warnung und die bewusste Zustimmung bleiben bestehen, bis der Testlauf die Multi-Speaker-Qualität tatsächlich bestätigt.
+
+3. Regressionstest
+   - Absichern, dass eine Seedance-2.5-Dialogszene beim Renderstart `ai-seedance25` und die gewählte Dauer behält.
+   - Absichern, dass ein wirklich nicht erlaubter Provider weiterhin auf HappyHorse fällt bzw. abgewiesen wird.
 
 ## Nicht Teil dieser Änderung
 
-- Keine Änderung an Pipeline, Kosten, Flag `composer.feature.seedance25_lipsync` oder Refund-Regeln.
-- Legacy-Seedance (`ai-seedance`), Kling, Wan, Luma behalten die Risiko-Warnung.
+- Keine Änderung an Gates, Face-Mapping, Preclip, Sync.so, Provider-Payload oder Zustandsmaschine der eingefrorenen Lip-Sync-Kette.
+- Keine Änderung an Kosten, Rollout-Flag oder Refund-Regeln.
+- Die bestehende Risiko-Warnung bleibt für Seedance 2.5 und andere experimentelle Provider aktiv.
 
 ## Verifikation
 
-Dialog-Szene mit Seedance 2.5 und mehreren Sprechern öffnen: Der Render-Bestätigungsdialog zeigt keine rote Warnung und keine Pflicht-Checkbox mehr; der Bestätigen-Button ist sofort aktiv. Mit Kling/Wan bleibt die Warnung bestehen.
+Eine Szene mit mehreren Sprechern auf Seedance 2.5 und bis zu 30 Sekunden stellen, Renderdialog öffnen, Risiko bewusst bestätigen und starten. Danach prüfen: UI und persistierte Szene bleiben auf Seedance 2.5; der Dispatch läuft mit `clipSource = ai-seedance25` statt HappyHorse. Anschließend wird das erzeugte Ergebnis auf Ghost-Mouthing, Gesichtsverzerrung, Sprecher-Zuordnung und Mundbewegungen der Nicht-Sprecher beurteilt.
