@@ -37,6 +37,7 @@ function parseRetryAfter(msg: string): number {
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
+import { dualWriteDispatches } from "../_shared/v427-dual-write.ts";
 import {
   countFacesInImage,
   countHumansInImage,
@@ -4865,6 +4866,23 @@ serve(async (req) => {
         results.push({ sceneId: scene.id, status: "failed", error: errMsg });
       }
     }
+
+    // v427A2 — mirror the dispatches that just happened into the job ledger.
+    // Flag-gated, post-hoc, non-branching: legacy stays in control.
+    await dualWriteDispatches(
+      supabaseAdmin,
+      results
+        .filter((r: any) => r.status === "generating")
+        .map((r: any) => ({
+          sceneId: r.sceneId,
+          externalJobId: r.predictionId ?? null,
+          provider: scenes.find((s) => s.id === r.sceneId)?.clipSource ?? null,
+          stage: "base_video" as const,
+        })),
+      user.id,
+    );
+
+
 
     // Deduct credits for AI scenes that started generating (video) OR
     // synchronously completed (ai-image returns status='ready' immediately).
