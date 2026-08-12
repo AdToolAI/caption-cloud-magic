@@ -203,23 +203,16 @@ export const isSubscribed = (
 ): boolean => !!subscribed;
 
 
-// Access control helpers
+// Access control helpers — Open Access (Beta 2026): keine Feature-Sperren.
 export const hasAccess = (
-  userPlan: PlanType, 
-  feature: keyof PlanFeatures
-): boolean => {
-  return pricingPlans[userPlan].features[feature] === true || 
-         pricingPlans[userPlan].features[feature] === Infinity;
-};
+  _userPlan: PlanType,
+  _feature: keyof PlanFeatures
+): boolean => true;
 
 export const getFeatureLimit = (
-  userPlan: PlanType,
-  feature: keyof PlanFeatures
-): number => {
-  const value = pricingPlans[userPlan].features[feature];
-  if (typeof value === 'number') return value;
-  return value ? Infinity : 0;
-};
+  _userPlan: PlanType,
+  _feature: keyof PlanFeatures
+): number => Infinity;
 
 export const getPlanCredits = (planType: PlanType): number => {
   const credits = pricingPlans[planType].credits;

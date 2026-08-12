@@ -36,6 +36,8 @@ Updated: today
 - **Audio/Video Separation**: Treat video scenes with variable durations; audio (original, VO, music) are linear tracks. Sync playback rates.
 - **Director's Cut Export**: Hard-crop for burned-in subtitles. WYSIWYG parity between Studio state and snake_case export payload.
 - **Data Persistence**: Video creations go to 'video_creations' table; other media to 'content_items'.
+- **Open Access**: Keine Feature-Sperren — jede Funktion ist für jeden angemeldeten Nutzer frei; keine Plan-/Trial-/Abo-Gates einführen. [Details](mem://features/open-access-beta-2026)
+- **i18n-Reinheit**: Jeder Wert in der Sprache seines Blocks; `scripts/check-language-purity.mjs` nach Übersetzungsänderungen laufen lassen. [Details](mem://i18n/language-purity)
 - **Timeouts**: Complex AI edge functions require 120s - 300s.
 - **Founders-Anonymität**: Nie Platznummer/Position/Rang/Beitrittsdatum eines Gründers anzeigen — nur Restlaufzeit. Siehe [Founders Circle UI](mem://features/founders-circle-ui).
 - **Video Rate Limits**: Per-user hourly limit removed; wallet balance is the only spend protection.
