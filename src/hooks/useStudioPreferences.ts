@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { migrateLegacyDraftKey, scopedDraftKey } from "@/lib/local-draft-scope";
 
 /**
  * Motion Studio "Sound Stage" preferences.
@@ -17,10 +18,19 @@ export interface StudioPreferences {
   editorModeManual: boolean;
 }
 
-const STORAGE_KEY = "motion-studio:prefs:v1";
+const STORAGE_BASE = "motion-studio:prefs:v1";
+/**
+ * Scoped per account: the mode decides which briefing panels are visible, so
+ * an unscoped key made a second account in the same browser inherit (or lose)
+ * half the briefing page.
+ */
+const storageKey = () => scopedDraftKey(STORAGE_BASE);
 
 const DEFAULTS: StudioPreferences = {
-  editorMode: "quick",
+  // v423 — "direct" shows the complete briefing. Quick hides tone, language,
+  // video mode, visual style and the director's note, which read as a broken
+  // page on a fresh account.
+  editorMode: "direct",
   audioMode: "ambient",
   cinemascope: false,
   editorModeManual: false,
@@ -29,18 +39,23 @@ const DEFAULTS: StudioPreferences = {
 function readFromStorage(): StudioPreferences {
   if (typeof window === "undefined") return DEFAULTS;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    migrateLegacyDraftKey(STORAGE_BASE);
+    const raw = window.localStorage.getItem(storageKey());
     if (!raw) return DEFAULTS;
     const parsed = JSON.parse(raw) as Partial<StudioPreferences>;
+    const manual = Boolean(parsed.editorModeManual);
+    const storedMode =
+      parsed.editorMode === "direct" || parsed.editorMode === "studio" || parsed.editorMode === "quick"
+        ? parsed.editorMode
+        : DEFAULTS.editorMode;
     return {
-      editorMode:
-        parsed.editorMode === "direct" || parsed.editorMode === "studio"
-          ? parsed.editorMode
-          : "quick",
+      // Only honour "quick" when the user picked it themselves — legacy
+      // records carry the old implicit quick default.
+      editorMode: storedMode === "quick" && !manual ? DEFAULTS.editorMode : storedMode,
       audioMode:
         parsed.audioMode === "off" || parsed.audioMode === "full" ? parsed.audioMode : "ambient",
       cinemascope: Boolean(parsed.cinemascope),
-      editorModeManual: Boolean(parsed.editorModeManual),
+      editorModeManual: manual,
     };
   } catch {
     return DEFAULTS;
@@ -50,11 +65,12 @@ function readFromStorage(): StudioPreferences {
 function writeToStorage(prefs: StudioPreferences): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+    window.localStorage.setItem(storageKey(), JSON.stringify(prefs));
   } catch {
     /* no-op */
   }
 }
+
 
 const STORAGE_EVENT = "motion-studio:prefs-changed";
 

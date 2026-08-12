@@ -547,19 +547,26 @@ export default function BriefingTab({
       {/* v416 — the Quick/Direct/Studio switch lives ONLY in the DirectorBar
           (sticky, global). The big film-strip duplicate was removed. */}
 
-      {hiddenPanelsHaveData && (
+      {!showDirect && (
         <button
           type="button"
           onClick={() => setEditorMode('direct')}
           className="w-full rounded-xl border border-amber-300/25 bg-amber-300/5 px-4 py-2.5 text-left text-xs text-amber-100/80 transition-colors hover:border-amber-300/50 hover:text-amber-100"
         >
-          {tx({
-            de: 'Stil, Marken-Kit oder Cast sind gesetzt, aber im Quick-Modus ausgeblendet — mehr Panels anzeigen',
-            en: 'Style, brand kit or cast are set but hidden in Quick mode — show more panels',
-            es: 'Estilo, kit de marca o elenco están definidos pero ocultos en modo Quick — mostrar más paneles',
-          })}
+          {hiddenPanelsHaveData
+            ? tx({
+                de: 'Stil, Marken-Kit oder Cast sind gesetzt, aber im Quick-Modus ausgeblendet — mehr Panels anzeigen',
+                en: 'Style, brand kit or cast are set but hidden in Quick mode — show more panels',
+                es: 'Estilo, kit de marca o elenco están definidos pero ocultos en modo Quick — mostrar más paneles',
+              })
+            : tx({
+                de: 'Einige Panels sind im Quick-Modus ausgeblendet (Ton, Sprache, Video-Modus, visueller Stil) — alle Felder anzeigen',
+                en: 'Some panels are hidden in Quick mode (tone, language, video mode, visual style) — show all fields',
+                es: 'Algunos paneles están ocultos en modo Quick (tono, idioma, modo de vídeo, estilo visual) — mostrar todos los campos',
+              })}
         </button>
       )}
+
 
       {/* Crossfade wrapper — re-keyed on editorMode so panel changes "feel" */}
       <div key={editorMode} className="stage-mode-fade space-y-6">

@@ -62,7 +62,13 @@ interface PersistedSnapshot {
     musicHad: boolean;
   } | null;
   realProgress: { value: number; at: number };
+  /** Wall-clock write time — snapshots older than SNAPSHOT_TTL_MS are ignored. */
+  savedAt?: number;
 }
+
+/** A resumed run is only plausible for ~30 minutes. Older snapshots are stale. */
+const SNAPSHOT_TTL_MS = 30 * 60 * 1000;
+
 
 function readSnapshot(key: string): PersistedSnapshot | null {
   try {
@@ -150,6 +156,16 @@ export function usePipelineProgress({
   projectId,
 }: UsePipelineProgressArgs) {
   const storageKey = storageKeyFor(projectId);
+  // The pipeline-event listener is subscribed once (empty deps) and would
+  // otherwise capture the FIRST render's key. When `projectId` arrives late
+  // that key is `…:default` while snapshots are written under `…:<id>` — the
+  // stale 99 % snapshot then survives every reset and is re-hydrated.
+  const storageKeyRef = useRef(storageKey);
+  storageKeyRef.current = storageKey;
+  /** Bumped on every `clips:start` so downstream refs can hard-reset. */
+  const runResetTokenRef = useRef(0);
+  const appliedRunResetTokenRef = useRef(0);
+
   // ── Per-run baselines ──────────────────────────────────────────────
   // Captured the moment a phase emits `:start`. They make the bar always
   // start at 0 %, even if some assets from a previous run already exist
@@ -183,15 +199,24 @@ export function usePipelineProgress({
   if (!hydratedRef.current) {
     hydratedRef.current = true;
     const snap = readSnapshot(storageKey);
-    if (snap) {
+    const fresh =
+      !!snap &&
+      typeof snap.savedAt === 'number' &&
+      Date.now() - snap.savedAt < SNAPSHOT_TTL_MS;
+    if (snap && fresh) {
       pipelineStartRef.current = snap.pipelineStart;
       runFloorRef.current = snap.runFloor;
       floorRef.current = snap.floor;
       startedAtRef.current = snap.startedAt;
       baselineRef.current = snap.baseline;
       hydratedRealProgressRef.current = snap.realProgress;
+    } else if (snap) {
+      // Stale (or pre-TTL format) snapshot — never resume from it, otherwise
+      // a new run starts at the previous run's 99 %.
+      clearSnapshot(storageKey);
     }
   }
+
   const lastPersistAtRef = useRef(0);
 
   // ── Event-driven "start" flags ───────────────────────────────────
@@ -212,12 +237,19 @@ export function usePipelineProgress({
       if (action === 'start') {
         if (pipelineStartRef.current === null || phase === 'clips') {
           // Fresh run — clear any stale persisted snapshot from a previous run.
-          clearSnapshot(storageKey);
+          // Use the CURRENT key (ref) plus the legacy `default` key, which was
+          // written before `projectId` was available.
+          clearSnapshot(storageKeyRef.current);
+          clearSnapshot(storageKeyFor(undefined));
           pipelineStartRef.current = Date.now();
           runFloorRef.current = 0;
           floorRef.current = { clips: 0, voiceover: 0, lipsync: 0, music: 0, export: 0 };
           startedAtRef.current = { clips: null, voiceover: null, lipsync: null, music: null, export: null };
+          // Drop stall baseline + any event flags left over from the last run.
+          runResetTokenRef.current += 1;
+          setEventFlags({ clips: false, voiceover: false, lipsync: false, music: false, export: false });
         }
+
         // Reset this phase so it starts at 0 % for the new run.
         floorRef.current[phase] = 0;
         startedAtRef.current[phase] = Date.now();
@@ -402,19 +434,29 @@ export function usePipelineProgress({
       );
     }).length;
     // Progress is measured RELATIVE to the baseline captured on `clips:start`.
+    // A failed scene is SETTLED, not pending — otherwise a single hard failure
+    // keeps the phase at 99 % "running" forever (observed: bar ran 20+ min
+    // after a ModelArk reject).
+    const settled = ready + failed;
     const baseReady = b?.clipsReady ?? 0;
     const baseTotal = b?.clipsTotal ?? aiScenes.length;
     const denom = Math.max(1, baseTotal - baseReady);
-    const numer = Math.max(0, ready - baseReady);
+    const numer = Math.max(0, settled - baseReady);
     const progress = Math.min(1, numer / denom);
     const running = generating > 0 || backendActive > 0;
+    // Terminal as soon as every AI scene is ready or failed.
+    const allTerminal = aiScenes.every(
+      (s) => isReadyOrLipsynced(s) || s.clipStatus === 'failed',
+    );
+    const terminal = !running && (allTerminal || progress >= 1);
     return {
       progress,
       running,
-      done: progress >= 1 && !running && failed === 0,
-      failed: failed > 0 && !running,
+      done: terminal && failed === 0,
+      failed: terminal && failed > 0,
     };
   }, [aiScenes, baselineVersion]);
+
 
   const voiceoverReal = useMemo(() => {
     const vo = assemblyConfig?.voiceover;
@@ -758,6 +800,13 @@ export function usePipelineProgress({
   const realProgressRef = useRef<{ value: number; at: number }>(
     hydratedRealProgressRef.current ?? { value: 0, at: Date.now() },
   );
+  // A `clips:start` (incl. single-scene re-render) resets the stall baseline —
+  // the new run must be measured from 0, not from the previous run's peak.
+  if (appliedRunResetTokenRef.current !== runResetTokenRef.current) {
+    appliedRunResetTokenRef.current = runResetTokenRef.current;
+    realProgressRef.current = { value: 0, at: Date.now() };
+  }
+
   const realProgressSum =
     clipsReal.progress * PHASE_WEIGHTS.clips +
     voiceoverReal.progress * PHASE_WEIGHTS.voiceover +
@@ -869,6 +918,8 @@ export function usePipelineProgress({
         startedAt: startedAtRef.current,
         baseline: baselineRef.current,
         realProgress: realProgressRef.current,
+        savedAt: Date.now(),
+
       });
     }
   }
