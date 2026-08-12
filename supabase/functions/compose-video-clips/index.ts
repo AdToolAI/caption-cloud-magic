@@ -225,6 +225,11 @@ serve(async (req) => {
   // Cached body so the FATAL catch (below) can mark scenes as `failed` even
   // when the crash happens before processScenes() runs.
   let __parsedBody: ClipRequest | null = null;
+  // v427B — visible to the FATAL catch so a crash never leaves reserved money
+  // sitting on a run that produced nothing. Settling is idempotent.
+  let __v427Reservation: ReservationHandle | null = null;
+
+
 
   try {
     const supabaseClient = createClient(
