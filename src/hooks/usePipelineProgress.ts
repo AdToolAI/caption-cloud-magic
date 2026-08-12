@@ -439,13 +439,13 @@ export function usePipelineProgress({
       return !expected || s.activeRunId === expected || s.active_run_id === expected;
     };
     const isReadyOrLipsynced = (s: any) =>
-      belongsToCurrentRun(s) &&
+      belongsToCurrentRun(s) && (
       s.clipStatus === 'ready' ||
-      (belongsToCurrentRun(s) && !!s.clipUrl && (
+      (!!s.clipUrl && (
         s.lipSyncStatus === 'applied' ||
         s.twoshotStage === 'complete' ||
         s.twoshotStage === 'done'
-      ));
+      )));
     const ready = aiScenes.filter(isReadyOrLipsynced).length;
     const generating = aiScenes.filter(
       (s) => s.clipStatus === 'generating' && !isReadyOrLipsynced(s) && !isSceneTerminalFailure(s),
@@ -486,7 +486,7 @@ export function usePipelineProgress({
     const running = generating > 0 || backendActive > 0;
     // Terminal as soon as every AI scene is ready or failed.
     const allTerminal = aiScenes.every(
-      (s) => isReadyOrLipsynced(s) || s.clipStatus === 'failed',
+      (s) => isReadyOrLipsynced(s) || (belongsToCurrentRun(s) && s.clipStatus === 'failed'),
     );
     const terminal = !running && (allTerminal || progress >= 1);
     return {

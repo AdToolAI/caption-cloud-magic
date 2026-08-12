@@ -4214,6 +4214,22 @@ serve(async (req) => {
             );
           }
 
+          const __seed25Stamp = sceneRunStamps.get(scene.id);
+          if (!__seed25Stamp) {
+            throw new Error(`missing_run_stamp:${scene.id}`);
+          }
+          const __seed25FirstFrameCount = __seed25UseReferences || !planImageUrl ? 0 : 1;
+          const __seed25ReferenceCount = __seed25UseReferences ? planReferenceUrls.length : 0;
+          if (__seed25AnchorOwnsSlot && (__seed25FirstFrameCount !== 1 || __seed25ReferenceCount !== 0)) {
+            throw new Error("seedance_protected_anchor_payload_contract_failed");
+          }
+          console.log(
+            `[compose-video-clips] seedance_payload_contract scene=${scene.id} ` +
+              `run=${__seed25Stamp.runId} gen=${__seed25Stamp.generation} ` +
+              `mode=${__seed25UseReferences ? "references" : "first-frame"} ` +
+              `first_frames=${__seed25FirstFrameCount} reference_images=${__seed25ReferenceCount}`,
+          );
+
           try {
             taskId = await createSeedance25Task({
               prompt: __seed25GenerateAudio
@@ -4241,10 +4257,12 @@ serve(async (req) => {
               arkErr,
             );
             const __arkRaw = String(arkErr?.message ?? "ModelArk error");
-            const __arkMessage = /SensitiveContent|PrivacyInformation/i.test(__arkRaw)
+            const __arkMessage = /PrivacyInformation/i.test(__arkRaw)
+              ? "modelark_real_person_anchor_rejected"
+              : /SensitiveContent/i.test(__arkRaw)
               ? "modelark_input_images_rejected"
               : __arkRaw;
-            await supabaseAdmin
+            const __failedUpdate = await supabaseAdmin
               .from("composer_scenes")
               .update({
                 clip_status: "failed",
@@ -4255,7 +4273,12 @@ serve(async (req) => {
                 dialog_shots: null,
                 updated_at: new Date().toISOString(),
               })
-              .eq("id", scene.id);
+              .eq("id", scene.id)
+              .eq("active_run_id", __seed25Stamp.runId)
+              .eq("plate_generation", __seed25Stamp.generation);
+            if (__failedUpdate.error) {
+              console.error(`[compose-video-clips] Seedance failure write rejected scene=${scene.id}`, __failedUpdate.error);
+            }
             results.push({
               sceneId: scene.id,
               status: "failed",
@@ -4269,10 +4292,15 @@ serve(async (req) => {
             `[compose-video-clips] Seedance 2.5 scene ${scene.id}: ModelArk task ${taskId} (${seed25Duration}s)`,
           );
 
-          await supabaseAdmin
+          const __taskWrite = await supabaseAdmin
             .from("composer_scenes")
             .update({ replicate_prediction_id: `${MODELARK_JOB_PREFIX}${taskId}` })
-            .eq("id", scene.id);
+            .eq("id", scene.id)
+            .eq("active_run_id", __seed25Stamp.runId)
+            .eq("plate_generation", __seed25Stamp.generation);
+          if (__taskWrite.error) {
+            throw new Error(`seedance_task_write_failed:${__taskWrite.error.message}`);
+          }
 
           // Kick the poller so completion does not depend on client polling.
           void fetch(`${supabaseUrl}/functions/v1/modelark-poll`, {
