@@ -45,18 +45,27 @@ Nicht angefasst: Render-Pipeline, Edge Functions, Lip-Sync-Kette, Credits.
 - Vitest: bestehende Composer-Tests laufen weiter; neuer Test für `usePipelineProgress` mit den Fällen „eine Szene failed, Rest ready → Phase terminal“ und „clips:start setzt Floor auf 0“.
 - Manuell: fehlgeschlagene Szene → Leiste stoppt und zeigt Fehler; „Neu rendern“ → Leiste beginnt bei ~0 % und läuft hoch.
 
-## Problem 3 — Im anderen Account fehlt die Hälfte der Briefing-Seite
+## Problem 3 — Im anderen Account fehlt die Hälfte der Briefing-Seite (auch oben)
 
 Verifiziert im Code:
 
-- `BriefingTab.tsx` blendet je nach Editor-Modus Panels aus: `showDirect = editorMode !== 'quick'` versteckt sechs Blöcke (u. a. Stil & Format-Details, Marken-Kit-Optionen, Cast/Charaktere, Studio-Panel).
-- Der Modus kommt aus `useStudioPreferences` mit **Default `quick`** und wird in `localStorage` unter dem globalen Key `motion-studio:prefs:v1` gespeichert — nicht pro Benutzer.
+- `useStudioPreferences` hat **Default `editorMode: 'quick'`** und speichert unter dem globalen, nicht user-gescopten Key `motion-studio:prefs:v1`.
+- `BriefingTab.tsx` blendet im Quick-Modus Panels über die ganze Seite verteilt aus — oben wie unten:
+  - Emotionaler Ton + Sprache (innerhalb von Panel SC 03, deshalb wirkt „Stil & Format" oben beschnitten)
+  - weiterer Stil-/Format-Block
+  - Video-Modus-Auswahl (`VideoModeSelector`)
+  - Cast & World / Sprecher-Mapping (nur Studio)
+  - Regie-Notiz
+  - Visueller Stil (Panel SC 04)
+- Der einzige Hinweis darauf (`hiddenPanelsHaveData`) erscheint nur, wenn die versteckten Felder bereits Daten enthalten — bei einem frischen Account also nie.
 
-Der zweite Account hat also einfach nie „Direct/Studio“ gewählt und sieht die Quick-Ansicht. Zusätzlich ist der Key nicht user-gescoped, d. h. Modus-Einstellungen wandern zwischen Accounts im selben Browser (gleiche Klasse wie der bereits gefixte Entwurfs-Scope).
+Der zweite Account steht schlicht auf QUICK (im Screenshot oben rechts aktiv), der Hauptaccount auf Direct/Studio. Es fehlt nichts wegen Plan, Rolle oder Credits.
 
 **Lösung:**
 
-- `motion-studio:prefs:v1` pro Benutzer scopen (analog `src/lib/local-draft-scope.ts`) und beim Logout aufräumen.
-- Im Briefing sichtbar machen, dass Panels ausgeblendet sind: dauerhafter, dezenter Hinweis mit Ein-Klick-Umschalter „Alle Felder anzeigen“ — nicht nur dann, wenn versteckte Panels bereits Daten enthalten (`hiddenPanelsHaveData`).
+1. Default auf `direct` umstellen, solange der Nutzer nicht selbst gewählt hat (`editorModeManual === false`) — die vollständige Briefing-Seite ist der erwartete Erststart.
+2. `motion-studio:prefs:v1` pro Benutzer scopen (analog `src/lib/local-draft-scope.ts`) und beim Logout aufräumen, damit Modus-Zustände nicht zwischen Accounts im selben Browser wandern.
+3. Im Quick-Modus dauerhaft eine dezente Zeile „Einige Panels sind im Quick-Modus ausgeblendet — alle Felder anzeigen" mit Ein-Klick-Umschalter zeigen, unabhängig davon, ob die versteckten Felder Daten haben.
 
 Betroffene Dateien zusätzlich: `src/hooks/useStudioPreferences.ts`, `src/components/video-composer/BriefingTab.tsx`.
+
