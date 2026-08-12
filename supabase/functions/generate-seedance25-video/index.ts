@@ -240,7 +240,7 @@ Deno.serve(async (req) => {
     let taskId: string;
     try {
       taskId = await createSeedance25Task({
-        prompt,
+        prompt: effectivePrompt,
         duration: smartDuration ? -1 : duration,
         resolution,
         aspectRatio,
