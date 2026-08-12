@@ -1,32 +1,30 @@
-# Seedance 2.5: kein Rückbau, sondern sauberer Fallback
+# Arbeitsmodi entfernen — Briefing immer im vollen Studio-Umfang
 
-## Empfehlung
+## Ausgangslage (geprüft)
 
-Nicht zurückrudern. Die Seedance-Integration ist technisch korrekt — blockiert wird sie nur vom Personenschutz von ModelArk, sobald reale Personen im Anker sind. Alles andere (lange Szenen bis 30 s, Text-to-Video, Bild-Anker ohne reale Personen) funktioniert.
+Im Briefing-Tab rendern bereits **alle** Panels unabhängig vom gewählten Modus: Kategorie, Produkt/Service, Stil & Format, Video-Modus, Cast & World (CharacterManager), Sprecher-Zuordnung, Director's Note, Visueller Stil, Marken-Kit und Stock-First stehen ohne Bedingung im Markup. Der Umschalter Quick/Direct/Studio ändert nur einen gespeicherten Wert und löst eine Crossfade-Animation aus — inhaltlich passiert nichts.
 
-Hailuo und Happy Horse bleiben unberührt: sie laufen über eigene Dispatch-Zweige und den bestehenden Lip-Sync-Pfad. Der Fehler betraf ausschließlich den ModelArk-Zweig.
+Genau das erklärt den gemeldeten Bug: Die UI ändert sich beim Umschalten nicht, weil es nichts zu ändern gibt. Der Umschalter verspricht eine Abstufung, die es im Code nicht gibt.
 
-Statt Rückbau: Seedance dort einsetzen, wo es erlaubt ist, und bei realen Personen automatisch auf einen zulässigen Provider ausweichen — mit klarer Meldung an den Kunden.
+## Ziel
 
-## Was gebaut wird
+Die Modus-Umschalter komplett entfernen. Jeder Nutzer sieht immer das vollständige Studio-Briefing; die Briefing-Analyse übernimmt weiterhin die Automatik (Szenen, Sprecher, Dauer, Provider-Wahl).
 
-1. **Personen-Vorprüfung vor dem ModelArk-Call**
-   Wenn die Szene einen Anker mit realen Cast-Personen enthält, wird gar nicht erst an ModelArk gesendet.
+## Umsetzung
 
-2. **Automatischer Provider-Fallback**
-   In diesem Fall übernimmt der bisherige Provider (Hailuo bzw. Happy Horse) die Szene. Szenen über deren Längenlimit werden dabei sauber in zulässige Segmente geplant, statt zu scheitern.
-
-3. **Ehrliche Meldung statt Fehler**
-   Der Kunde sieht: "Diese Szene enthält reale Personen — Seedance 2.5 ist dafür gesperrt, es wurde automatisch auf <Provider> gewechselt." Kein roter Abbruch, kein hängender Ladebalken.
-
-4. **Seedance bleibt voll nutzbar** für Szenen ohne reale Personen (Produkt, Umgebung, illustrierte/stilisierte Charaktere, reines Text-to-Video) mit den vollen 4–30 s.
-
-5. **Optionaler Freischalt-Pfad**
-   Sobald BytePlus die Advanced Creation Rights für verifizierte Real-Personen freigibt, wird die Vorprüfung über ein Flag deaktiviert — ohne weiteren Umbau.
+1. **Umschalter im Briefing-Tab entfernen** — die sticky Leiste „Arbeitsmodus" mit den drei Buttons fällt weg. Der Crossfade-Wrapper wird zum normalen Container ohne Modus-Key, damit die Seite beim Tippen nicht neu animiert.
+2. **Umschalter in der Director-Bar entfernen** — die Chips QUICK / DIRECT / STUDIO oben rechts verschwinden. Ambient-Audio und Cinemascope bleiben unverändert.
+3. **Preferences aufräumen** — `editorMode`, `editorModeManual`, `setEditorMode` und `suggestEditorMode` werden aus den Studio-Preferences entfernt; die automatische Modus-Empfehlung nach der Plan-Anwendung entfällt ersatzlos. Bereits gespeicherte Alt-Werte im Browser werden beim Laden ignoriert, ohne Fehler zu werfen.
+4. **Rest unverändert** — Audio-Modus, Cinemascope und die Scoping-Logik pro Nutzer bleiben genau wie sie sind.
 
 ## Technische Details
 
-- Vorprüfung im Seedance-Dispatch von `supabase/functions/compose-video-clips/index.ts`, gespeist aus dem Anker-Vertrag in `_shared/visual-inputs.ts` (Anker mit Cast-Porträt-Herkunft = real person).
-- Fallback-Auswahl über die bestehende Single-Source `composer-ai-sources.ts` / `pickClipSourceForDuration.ts`, damit UI-Auswahl und Backend identisch entscheiden.
-- Fallback-Grund wird als Szenen-Metadatum persistiert und im Studio angezeigt; Pipeline-Status endet terminal korrekt.
-- Freischaltung später über System-Flag `composer.feature.seedance25_real_persons`.
+- `src/components/video-composer/BriefingTab.tsx`: Modus-Leiste (ca. Z. 537–555) löschen, `key={editorMode}` und die `useStudioPreferences`-Nutzung für den Modus entfernen.
+- `src/components/video-composer/stage/DirectorBar.tsx`: `ModeSwitch` samt Import und `setEditorMode` entfernen.
+- `src/hooks/useStudioPreferences.ts`: `EditorMode`-Typ, Felder, Setter und `suggestEditorMode` entfernen; Parser toleriert unbekannte Alt-Felder.
+- `src/hooks/useApplyProductionPlan.ts`: Aufruf von `suggestEditorMode` entfernen.
+- Ergebnis prüfen: TypeScript-Check muss ohne Restreferenzen auf `editorMode` durchlaufen.
+
+## Nicht Teil dieser Änderung
+
+Keine Änderung an Briefing-Analyse, Storyboard, Provider-Wahl oder Lip-Sync-Kette.
