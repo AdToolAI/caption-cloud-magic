@@ -6438,6 +6438,51 @@ export type Database = {
           },
         ]
       }
+      composer_run_reservations: {
+        Row: {
+          actual_euros: number | null
+          created_at: string
+          id: string
+          metadata: Json
+          project_id: string | null
+          reason: string | null
+          reserved_euros: number
+          run_ids: string[]
+          scene_ids: string[]
+          settled_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          actual_euros?: number | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          project_id?: string | null
+          reason?: string | null
+          reserved_euros: number
+          run_ids?: string[]
+          scene_ids?: string[]
+          settled_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          actual_euros?: number | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          project_id?: string | null
+          reason?: string | null
+          reserved_euros?: number
+          run_ids?: string[]
+          scene_ids?: string[]
+          settled_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       composer_scene_comments: {
         Row: {
           body: string
@@ -19408,6 +19453,21 @@ export type Database = {
         Returns: number
       }
       cleanup_synthetic_probe_runs: { Args: never; Returns: undefined }
+      composer_release_run_reservation: {
+        Args: { p_reason?: string; p_reservation_id: string }
+        Returns: number
+      }
+      composer_reserve_run_credits: {
+        Args: {
+          p_amount: number
+          p_metadata?: Json
+          p_project_id?: string
+          p_run_ids?: string[]
+          p_scene_ids?: string[]
+          p_user_id: string
+        }
+        Returns: string
+      }
       composer_scene_transition: {
         Args: {
           _detail?: string
@@ -19422,6 +19482,10 @@ export type Database = {
           reason: string
           state: Database["public"]["Enums"]["composer_scene_state"]
         }[]
+      }
+      composer_settle_run_reservation: {
+        Args: { p_actual: number; p_reservation_id: string }
+        Returns: number
       }
       composer_start_scene_run: {
         Args: { _scene_id: string }
