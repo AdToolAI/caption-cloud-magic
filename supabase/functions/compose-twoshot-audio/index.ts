@@ -29,6 +29,15 @@ import {
   type DialogTurn,
 } from "../_shared/scene-dialog-turns.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
+// v427B — the timing literals below now live in one named place. Values are
+// unchanged (300 ms tail / grace, 5 s cap, 100 ms step, 250 ms pause).
+import {
+  DURATION_STEP_MS,
+  INTER_SPEAKER_PAUSE_MS,
+  MAX_EXTEND_MS,
+  OVERFLOW_GRACE_MS,
+  TAIL_PADDING_MS,
+} from "../_shared/v427-duration-contract.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
