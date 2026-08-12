@@ -563,6 +563,12 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
   // anchor — byte-identical to the pre-resolver behaviour.
   const firstFrameUrl = useContinuityFrame ? previousFrameUrl : anchorImageUrl;
 
+  // On an exclusive-slot provider the chosen input mode owns the only slot.
+  // When the anchor took it, no reference image may travel with the request.
+  const exposedReferences = profile.mode === "exclusive" && inputMode !== "references"
+    ? selected.filter((r) => r.kind === "video")
+    : selected;
+
   return {
     transition: {
       mode: transition,
@@ -574,7 +580,8 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
       product: byRole(selected, "product"),
       location: byRole(selected, "location"),
     },
-    references: selected,
+    references: exposedReferences,
+
     firstFrameUrl: firstFrameUrl || undefined,
     endFrameUrl: transition === "endframe-bridge" ? endFrameUrl : undefined,
     inputMode,
