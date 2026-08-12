@@ -38,6 +38,16 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 import { dualWriteDispatches } from "../_shared/v427-dual-write.ts";
+import { isV427FlagEnabled } from "../_shared/v427-flags.ts";
+import {
+  InsufficientCreditsError,
+  maxRunCostEuros,
+  recordSceneRunContracts,
+  releaseRunReservation,
+  reserveRunCredits,
+  settleRunReservation,
+  type ReservationHandle,
+} from "../_shared/v427-credit-contract.ts";
 import {
   countFacesInImage,
   countHumansInImage,
