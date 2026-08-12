@@ -473,7 +473,12 @@ export default function SceneCard({
   // v418: Seedance 2.5 is a certified plate provider once the rollout flag is
   // on — check against the flag-aware list, otherwise the picker selection is
   // reverted to HappyHorse on the very next render.
+  // v422: the rollout flag is read asynchronously. Until it has landed the
+  // hook reports `false`, which used to revert a persisted Seedance 2.5 scene
+  // to HappyHorse on the very first render (including a DB write). Never
+  // migrate on an unresolved flag.
   useEffect(() => {
+    if (seedance25FlagLoading) return;
     if (!isLipsyncEngine(scene.engineOverride ?? null)) return;
     const allowed = lipsyncClipSources(seedance25LipsyncEnabled) as ReadonlyArray<string>;
     if (allowed.includes(scene.clipSource as string)) return;
@@ -481,7 +486,14 @@ export default function SceneCard({
       clipSource: LIPSYNC_PRIMARY_CLIP_SOURCE,
       clipQuality: 'standard',
     });
-  }, [scene.engineOverride, scene.clipSource, seedance25LipsyncEnabled, onUpdate]);
+  }, [
+    scene.engineOverride,
+    scene.clipSource,
+    seedance25LipsyncEnabled,
+    seedance25FlagLoading,
+    onUpdate,
+  ]);
+
 
 
   // Scene Dialog Studio — toggleable per-scene script editor (monolog from 1 cast,
