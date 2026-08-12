@@ -135,6 +135,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     kling:      ['en'],
     grok:       ['en'],
     happyhorse: ['en'],
+    // Ambience/Foley only — kein verlässliches Voiceover (Ton wird trotzdem erzeugt):
     ltx: [], wan: [], hailuo: [], luma: [], seedance: [], runway: [], pika: [], vidu: [],
   };
   const isKlingOmni = model.id === 'kling-omni';
@@ -745,7 +746,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         body.referenceImages = composedSubjectRefs;
       }
       if (model.capabilities.audio) {
-        body.generateAudio = generateAudio && ttsLangSupported && !omniNonEnglishSilent;
+        // Audio-Fähigkeit != Sprach-Fähigkeit: Modelle ohne verlässliche TTS
+        // (z. B. Seedance 2.5) liefern trotzdem Ambience/Foley/Musik. Nur bei
+        // Kling Omni DE/ES wird der Ton hart abgeschaltet (Fantasie-Sprache).
+        body.generateAudio = generateAudio && !omniNonEnglishSilent;
         if (generateAudio && ttsLangSupported && !omniNonEnglishSilent) {
           body.spokenLanguage = effectiveSpokenLang;
         } else if ((generateAudio && !ttsLangSupported) || omniNonEnglishSilent) {

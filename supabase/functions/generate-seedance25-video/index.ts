@@ -38,6 +38,12 @@ interface GenerateRequest {
   referenceAudioUrls?: string[];
   /** Native audio generation (`generate_audio`). */
   generateAudio?: boolean;
+  /**
+   * Ambience-only mode: the model may produce sound, but must not speak.
+   * Seedance 2.5 has no reliable TTS, so spoken lines would come out as
+   * gibberish — the voice is added later in the studio instead.
+   */
+  suppressDialogue?: boolean;
   seed?: number;
 }
 
@@ -80,6 +86,7 @@ Deno.serve(async (req) => {
       referenceVideoUrl,
       referenceAudioUrls,
       generateAudio = false,
+      suppressDialogue = false,
       seed,
     } = body;
 
@@ -88,6 +95,17 @@ Deno.serve(async (req) => {
       ...(referenceVideoUrl ? [referenceVideoUrl] : []),
     ].filter(Boolean).slice(0, 10);
     const refAudios = (referenceAudioUrls ?? []).filter(Boolean).slice(0, 10);
+
+    // Ambience-only: sound yes, speech no. Same wording as the composer's
+    // hybrid-ambient path so both routes condition the model identically.
+    const NO_SPEECH_CLAUSE =
+      "[AUDIO] Ambient sound design only: room tone, foley, natural environment " +
+      "and optional instrumental music. No spoken words, no dialogue, no narration, " +
+      "no singing. Characters do not talk and their lips stay closed.";
+    const effectivePrompt =
+      generateAudio && suppressDialogue
+        ? `${String(prompt).trim()}\n\n${NO_SPEECH_CLAUSE}`
+        : prompt;
 
     if (!prompt || !prompt.trim()) {
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
@@ -240,7 +258,7 @@ Deno.serve(async (req) => {
     let taskId: string;
     try {
       taskId = await createSeedance25Task({
-        prompt,
+        prompt: effectivePrompt,
         duration: smartDuration ? -1 : duration,
         resolution,
         aspectRatio,
