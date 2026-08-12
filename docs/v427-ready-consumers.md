@@ -43,8 +43,9 @@ Nutzer-/Export-Gate: clip_status = ready AND (requires_lip_sync = false OR lip_s
 Fortschrittsanzeige (`usePipelineProgress`, `pipelineEvents`) leitet ihre Phasen ab C-Phase
 ausschließlich aus `pipeline_state` ab.
 
-## Offener Phase-0-Punkt
+## Phase-0-Punkt erledigt
 
-`tail_padding_ms`: der produktive Wert steckt in der Timing-Logik von `compose-twoshot-audio`
-(u. a. Hallucination-Trim bei 400 ms) und wird vor v427B als benannte Konstante extrahiert —
-ohne den Wert zu verändern.
+`tail_padding_ms` ist extrahiert: `supabase/functions/_shared/v427-duration-contract.ts`
+(`TAIL_PADDING_MS = 300`, dazu Grace 300 ms, Cap 5 s, Step 100 ms, Sprecherpause 250 ms sowie
+die Providerfenster). Die Werte stammen unverändert aus `compose-twoshot-audio`, das jetzt die
+benannten Konstanten nutzt. Bewacht durch `src/lib/composer/__tests__/v427DurationContract.test.ts`.
