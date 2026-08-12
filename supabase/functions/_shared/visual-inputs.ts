@@ -522,6 +522,8 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
     requirements,
     strategy,
     hasProtectedAnchor,
+    hasAnchorImage: Boolean(anchorImageUrl),
+
     hasPreviousFrame: Boolean(previousFrameUrl),
     hasPreviousClip: Boolean(previousClipUrl),
     hasEndFrame: Boolean(endFrameUrl),
