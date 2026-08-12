@@ -86,11 +86,16 @@ describe('v427 callback guard', () => {
   });
 
   it('stays free of frozen lip-sync concerns', () => {
-    const src = read(GUARD).toLowerCase();
+    // Comments may name the freeze; the executable code may not touch it.
+    const code = read(GUARD)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '')
+      .toLowerCase();
     for (const term of ['mask', 'crop', 'bbox', 'preclip', 'happyhorse', 'hailuo', 'lipsync']) {
-      expect(src).not.toContain(term);
+      expect(code).not.toContain(term);
     }
   });
+
 
 
   it('runs after the legacy stale-run gate in the webhook', () => {
