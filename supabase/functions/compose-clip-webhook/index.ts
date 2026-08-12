@@ -108,6 +108,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const url = new URL(req.url);
     const sceneId = url.searchParams.get('scene_id');
     const projectId = url.searchParams.get('project_id');
+    const runId = url.searchParams.get('run_id');
+    const generation = Number(url.searchParams.get('generation'));
 
     if (!sceneId || !projectId) {
       throw new Error('Missing scene_id or project_id query params');
@@ -116,6 +118,29 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, serviceKey);
+
+    // Reject provider callbacks from an older render before downloading,
+    // archiving, refunding or mutating anything. A re-render owns a new
+    // active_run_id + generation and the previous run becomes inert.
+    const { data: liveScene, error: liveSceneError } = await supabase
+      .from('composer_scenes')
+      .select('active_run_id, plate_generation')
+      .eq('id', sceneId)
+      .maybeSingle();
+    if (liveSceneError) throw liveSceneError;
+    const hasActiveIdentity = !!(liveScene as any)?.active_run_id;
+    if (hasActiveIdentity && (
+      !runId ||
+      !Number.isFinite(generation) ||
+      (liveScene as any).active_run_id !== runId ||
+      Number((liveScene as any).plate_generation) !== generation
+    )) {
+      console.warn(`[compose-clip-webhook] stale callback ignored scene=${sceneId}`);
+      return new Response(JSON.stringify({ ok: true, ignored: true, reason: 'stale_run' }), {
+        status: 202,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const payload = await req.json();
     // v2 — archive every AI clip to Media Library (KI tab)

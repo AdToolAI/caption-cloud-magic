@@ -19,6 +19,7 @@ import { extractFunctionsError } from '@/lib/functionsError';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { buildInvokePrompt } from '@/lib/motion-studio/buildInvokePrompt';
 import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
+import { startSceneGeneration } from '@/lib/composer/startSceneGeneration';
 import type {
   ComposerScene,
   ComposerCharacter,
@@ -66,10 +67,13 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
       // function). The user must see the loading state on the very next
       // frame after clicking, not 30s later.
       setGenerating((prev) => ({ ...prev, [scene.id]: true }));
-      emitPipelineEvent({ type: 'clips:start' });
       if (scene.clipSource?.startsWith('ai-')) {
         opts.onOptimisticPatch?.(scene.id, { clipStatus: 'generating' });
       }
+      // Patch the failed/ready scene first. Otherwise the progress listener can
+      // sample the previous terminal state immediately after the reset event
+      // and lock its monotonic floor back near 99%.
+      emitPipelineEvent({ type: 'clips:start' });
       const previousStatus = scene.clipStatus;
       try {
         let pid = opts.projectId;
@@ -165,8 +169,10 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
         // because we sent the raw scene.aiPrompt.
         const composedInvoke = buildInvokePrompt(workingScene, opts.characters, 'en');
 
-        const { data, error } = await supabase.functions.invoke('compose-video-clips', {
-          body: {
+        const started = await startSceneGeneration({
+          sceneIds: [workingScene.id],
+          reason: 'storyboard_scene_generate',
+          compose: {
             projectId: pid,
             visualStyle: opts.visualStyle,
             characters: opts.characters,
@@ -195,7 +201,7 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
             ],
           },
         });
-        if (error) throw error;
+        const data = started.compose;
 
         // The edge function now returns HTTP 200 with `{ok:false, error, stage}`
         // on early-phase crashes (so supabase-js doesn't bury the message
