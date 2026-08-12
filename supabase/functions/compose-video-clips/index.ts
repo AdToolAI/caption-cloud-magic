@@ -4963,7 +4963,42 @@ serve(async (req) => {
     // already running, so this must never abort, but it must not stay silent.
     let creditWarning: string | null = null;
 
-    if (billableResults.length > 0 && actualCost > 0) {
+    if (v427Reservation) {
+      // v427B — the money is already off the wallet. Reduce the reservation to
+      // what actually got dispatched; everything else flows straight back.
+      if (billableResults.length > 0 && actualCost > 0) {
+        await settleRunReservation(supabaseAdmin, v427Reservation.reservationId, actualCost);
+        console.log(
+          `[compose-video-clips] v427 settled €${actualCost.toFixed(2)} of €${v427Reservation.reservedEuros.toFixed(2)} (${billableResults.length} scenes, ${generatingCount} async)`,
+        );
+      } else {
+        await releaseRunReservation(
+          supabaseAdmin,
+          v427Reservation.reservationId,
+          "no_billable_dispatch",
+        );
+        console.log("[compose-video-clips] v427 released reservation — nothing dispatched");
+      }
+
+      await recordSceneRunContracts(
+        supabaseAdmin,
+        billableResults.flatMap((r) => {
+          const scene = scenes.find((s) => s.id === r.sceneId);
+          const stamp = sceneRunStamps.get(r.sceneId);
+          if (!scene || !stamp) return [];
+          const q: Quality = scene.clipQuality === "pro" ? "pro" : "standard";
+          return [{
+            sceneId: scene.id,
+            runId: stamp.runId,
+            requestedDurationMs: Math.round((scene.durationSeconds || 0) * 1000),
+            quotedCostEuros:
+              scene.durationSeconds * (CLIP_COSTS[scene.clipSource]?.[q] ?? 0),
+            reservationId: v427Reservation!.reservationId,
+            metadata: { provider: scene.clipSource, quality: q, project_id: projectId },
+          }];
+        }),
+      );
+    } else if (billableResults.length > 0 && actualCost > 0) {
       try {
         await supabaseAdmin.rpc("deduct_ai_video_credits", {
           p_user_id: user.id,
@@ -4999,6 +5034,7 @@ serve(async (req) => {
         }
       }
     }
+
 
 
 
