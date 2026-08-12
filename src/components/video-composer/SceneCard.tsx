@@ -1516,8 +1516,10 @@ export default function SceneCard({
 
                     {sourceMode === "ai" && (() => {
                       const dialogMode = scene.dialogMode === true;
+                      const preservePendingSeedance25 =
+                        seedance25FlagLoading && scene.clipSource === "ai-seedance25";
                       const modelsForPicker = dialogMode
-                        ? composerDialogModels(seedance25LipsyncEnabled)
+                        ? composerDialogModels(seedance25LipsyncEnabled || preservePendingSeedance25)
                         : COMPOSER_AVAILABLE_MODELS;
                       const toggleOnLabel =
                         lang === "de"

@@ -34,11 +34,23 @@ interface ModelSelectorProps {
 
 const GROUP_ORDER: ToolkitModelGroup[] = ['recommended', 'audio', 'fast', 'premium'];
 
+/** Keep the controlled value visible even while a feature-filtered model list
+ * is still resolving. This prevents Radix Select from displaying a stale
+ * previous label when the selected model is temporarily absent. */
+export function includeSelectedModel(models: ToolkitModel[], value: string): ToolkitModel[] {
+  if (!value || models.some((model) => model.id === value)) return models;
+  const canonical = AI_VIDEO_TOOLKIT_MODELS.find((model) => model.id === value);
+  return canonical ? [canonical, ...models] : models;
+}
+
 export function ModelSelector({ value, onChange, currency, models, className, lockedModelIds, lockedReason }: ModelSelectorProps) {
   const { language } = useTranslation();
   const lang = (['de', 'en', 'es'].includes(language) ? language : 'en') as 'de' | 'en' | 'es';
   const symbol = currency === 'USD' ? '$' : '€';
-  const list = models ?? AI_VIDEO_TOOLKIT_MODELS;
+  const list = useMemo(
+    () => includeSelectedModel(models ?? AI_VIDEO_TOOLKIT_MODELS, value),
+    [models, value],
+  );
   const { getPricePerSecond } = useVideoPricingCatalog();
 
   // Canonical price (from server catalog) with local-config fallback.
