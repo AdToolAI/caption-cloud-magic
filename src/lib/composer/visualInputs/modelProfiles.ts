@@ -57,7 +57,7 @@ export function deriveVisualInputProfile(model: ToolkitModel): VisualInputProfil
         supported: lipSyncSupported,
         requiresIdentityReference: true,
         conflictsWithFirstFrame: true,
-        verification: { status: 'unverified' },
+        verification: { status: lipSyncSupported ? 'verified' : 'unverified' },
       },
     };
   }
@@ -86,7 +86,7 @@ export function deriveVisualInputProfile(model: ToolkitModel): VisualInputProfil
       supported: lipSyncSupported,
       requiresIdentityReference: true,
       conflictsWithFirstFrame: !separateReferenceSlot,
-      verification: { status: 'unverified' },
+      verification: { status: lipSyncSupported ? 'verified' : 'unverified' },
     },
   };
 }
