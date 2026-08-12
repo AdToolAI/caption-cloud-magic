@@ -156,6 +156,16 @@ export function usePipelineProgress({
   projectId,
 }: UsePipelineProgressArgs) {
   const storageKey = storageKeyFor(projectId);
+  // The pipeline-event listener is subscribed once (empty deps) and would
+  // otherwise capture the FIRST render's key. When `projectId` arrives late
+  // that key is `…:default` while snapshots are written under `…:<id>` — the
+  // stale 99 % snapshot then survives every reset and is re-hydrated.
+  const storageKeyRef = useRef(storageKey);
+  storageKeyRef.current = storageKey;
+  /** Bumped on every `clips:start` so downstream refs can hard-reset. */
+  const runResetTokenRef = useRef(0);
+  const appliedRunResetTokenRef = useRef(0);
+
   // ── Per-run baselines ──────────────────────────────────────────────
   // Captured the moment a phase emits `:start`. They make the bar always
   // start at 0 %, even if some assets from a previous run already exist
