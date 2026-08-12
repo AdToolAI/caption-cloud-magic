@@ -1,17 +1,16 @@
 import { useCallback } from "react";
-import { Volume2, VolumeX, Music2, Film, Maximize2, Minimize2, Gauge } from "lucide-react";
-import { useStudioPreferences, type EditorMode, type StageAudioMode } from "@/hooks/useStudioPreferences";
+import { Volume2, VolumeX, Music2, Maximize2, Minimize2 } from "lucide-react";
+import { useStudioPreferences, type StageAudioMode } from "@/hooks/useStudioPreferences";
 import { tx } from '@/lib/i18nText';
 
 /**
  * Director's Bar — the sticky cinematic control strip at the top of the
- * Motion Studio Stage. Surfaces the three things that define the immersive
- * feel: Editor Mode (Quick/Direct/Studio), Audio Mode (Off/Ambient/Full),
- * and Cinemascope toggle. Everything else stays inside the existing
- * dashboard.
+ * Motion Studio Stage. Surfaces Audio Mode (Off/Ambient/Full) and the
+ * Cinemascope toggle. The Quick/Direct/Studio switch was removed: the
+ * briefing always shows the full studio feature set.
  */
 export default function DirectorBar() {
-  const { prefs, setEditorMode, setAudioMode, toggleCinemascope } = useStudioPreferences();
+  const { prefs, setAudioMode, toggleCinemascope } = useStudioPreferences();
 
   const audioIcon =
     prefs.audioMode === "off" ? VolumeX : prefs.audioMode === "ambient" ? Volume2 : Music2;
