@@ -6,46 +6,26 @@ import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
  * Check if a user's plan has access to a specific feature
  */
 export const hasAccess = (
-  userPlan: PlanType | null | undefined, 
-  feature: keyof PlanFeatures
-): boolean => {
-  if (!userPlan) return false;
-  
-  const plan = pricingPlans[userPlan];
-  const featureValue = plan.features[feature];
-  
-  return featureValue === true;
-};
+  _userPlan: PlanType | null | undefined,
+  _feature: keyof PlanFeatures
+): boolean => true; // Open Access (Beta 2026): keine Feature-Sperren mehr.
 
 /**
  * Get the numeric limit for a feature (e.g., captionsPerMonth)
  */
 export const getFeatureLimit = (
-  userPlan: PlanType | null | undefined,
-  feature: keyof PlanFeatures
-): number => {
-  if (!userPlan) return 0;
-  
-  const plan = pricingPlans[userPlan];
-  const value = plan.features[feature];
-  
-  if (typeof value === 'number') return value;
-  if (value === true) return Infinity;
-  return 0;
-};
+  _userPlan: PlanType | null | undefined,
+  _feature: keyof PlanFeatures
+): number => Infinity; // Open Access (Beta 2026): keine Limits mehr.
 
 /**
  * Check if a user has reached their feature limit
  */
 export const hasReachedLimit = (
-  userPlan: PlanType | null | undefined,
-  feature: keyof PlanFeatures,
-  currentUsage: number
-): boolean => {
-  const limit = getFeatureLimit(userPlan, feature);
-  if (limit === Infinity) return false;
-  return currentUsage >= limit;
-};
+  _userPlan: PlanType | null | undefined,
+  _feature: keyof PlanFeatures,
+  _currentUsage: number
+): boolean => false; // Open Access (Beta 2026): kein Limit wird je erreicht.
 
 /**
  * Get the required plan for a feature
