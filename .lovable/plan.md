@@ -15,8 +15,30 @@ Die Analyse ist gut. Ich habe alle sechs Kritikpunkte im Code nachgeprüft — f
 
 ## Umsetzung
 
-### 1. Eine unveränderliche Dauer
-`effective_duration_seconds` wird **vor** allem anderen bestimmt: VO/Dialog schätzen → auf das Providerraster normalisieren (Hailuo 6/10, HappyHorse 3–15, Seedance 4–30) → dann Providervertrag prüfen → dann Preis. Passt die Sprache nicht ins Providerfenster, bricht der Lauf mit klarer Meldung ab statt später still zu überziehen. Der Wert wird auf der Szene gespeichert und von Kalkulation, Abbuchung, Fortschritt und Render gleichermaßen gelesen. Das Auto-Extend an Zeile 2046 verliert damit seine Rolle als heimlicher Dauer-Änderer.
+### 1. Ein Dauervertrag pro Run (unveränderlich)
+
+Die Kritik ist berechtigt: „schätzen“ reicht nicht, und die Dauer gehört zum Run, nicht dauerhaft zur Szene.
+
+**Feste Reihenfolge vor jedem kostenpflichtigen Dispatch:**
+Auth/Ownership → Dialog kanonisieren → Provider-/Engine-Zulässigkeit (dauerunabhängig) → Sprach-/Audiotimeline bestimmen → `required_duration_ms` → Aufrunden auf das nächste zulässige Providerfenster → Dauervertrag validieren → Preis → Guthaben reservieren → Run-Snapshot atomar speichern → Dispatch.
+
+**Audiodauer wird gemessen, nicht geraten.** Der Audio-Plan (TTS/Turns) entsteht **vor** dem Videojob:
+`required_duration_ms = max(end_time aller dialog_turns) + tail_padding_ms` (400 ms Standardpuffer). Damit macht ein TTS-Fehler keinen bereits bezahlten Videojob unbrauchbar. Nur wenn kein Audio-Plan möglich ist, greift die Textschätzung — dann mit konservativem Aufschlag und derselben späteren Assertion.
+
+**Snapshot-Felder pro Run** (auf der Szene, gebunden an `active_run_id`):
+`requested_duration_seconds`, `required_duration_ms`, `effective_duration_seconds`, `billable_duration_seconds`, `duration_run_id`, `quoted_cost_euros`, `duration_policy_version`.
+Vertrag: Sobald reserviert und gestartet, sind effektive Dauer, abrechenbare Dauer und Preis für diesen Run eingefroren. Dialog-, Stimmen-, Provider- oder Tempoänderung sowie Rerender erzeugen eine neue `run_id` und damit einen neuen Snapshot. Jeder Leser/Writer prüft `duration_run_id = active_run_id`.
+
+**Eine zentrale Dauer-Policy, keine dritte Liste.** `DurationPolicy` (`discrete` mit `valuesSeconds`, bzw. `range` mit min/max/step) liegt neben `lipsyncMasterProvider.ts` und wird nach `_shared/composer-ai-sources.ts` gespiegelt; Hailuo `[6,10]`, HappyHorse 3–15/1, Seedance 2.5 4–30/1. Eine reine Funktion `resolveEffectiveDuration(requiredSeconds, policy)` bedient UI, Servervalidierung, Preis und Tests.
+
+**Immer aufrunden, nie klemmen.** 6,01 s bei Hailuo → 10 s; 10,01 s → Abbruch vor Dispatch mit klarer Meldung („Der Dialog braucht 10,8 s. Hailuo unterstützt hier nur 6 oder 10 s — kürze den Dialog oder wähle HappyHorse.“). Kein stiller Providerwechsel.
+
+**Auto-Extend (Zeile 2046) wird zur reinen Kontrollschranke.** Es verändert keine Dauer, keinen Preis, keinen Providervertrag und bucht nichts nach. Liegt die gemessene Sprache über dem Snapshot, wird der Lauf als `duration_contract_drift` markiert und bricht ab statt still zu verlängern.
+
+**Fortschritt bleibt ereignisbasiert.** Die effektive Dauer dient nur ETA, Gewichtung und Kostenanzeige — nicht der Prozentkurve.
+
+**Grenztests vor dem Merge:** Hailuo 5,99→6 / 6,01→10 / 10,01→Fehler ohne Dispatch und ohne Belastung; HappyHorse 2,4→3 / 14,2→15 / 15,01→Fehler; Dialogänderung → neue run_id, neue Dauer, neuer Preis; alter Run-Webhook verändert Dauer/Kosten des neuen Runs nicht; gemessene Audiodauer > Snapshot → Contract-Drift.
+
 
 ### 2. `ready` heißt fertig
 Der Provider-Webhook setzt künftig `base_clip_ready`. `ready` wird ausschließlich am Ende gesetzt — nach Mux bzw. sofort, wenn die Szene kein Lip-Sync braucht. Dasselbe Gate (`clip_status = ready AND (kein Lip-Sync ODER lip_sync_status = done)`) gilt für Vorschau, Export, Projektabschluss und Benachrichtigung.
