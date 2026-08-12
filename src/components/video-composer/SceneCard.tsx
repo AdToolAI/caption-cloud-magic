@@ -482,8 +482,7 @@ export default function SceneCard({
   useEffect(() => {
     if (seedance25FlagLoading) return;
     if (!isLipsyncEngine(scene.engineOverride ?? null)) return;
-    const allowed = lipsyncClipSources(seedance25LipsyncEnabled) as ReadonlyArray<string>;
-    if (allowed.includes(scene.clipSource as string)) return;
+    if (isLipsyncClipSource(scene.clipSource)) return;
     onUpdate({
       clipSource: LIPSYNC_PRIMARY_CLIP_SOURCE,
       clipQuality: 'standard',
@@ -491,7 +490,6 @@ export default function SceneCard({
   }, [
     scene.engineOverride,
     scene.clipSource,
-    seedance25LipsyncEnabled,
     seedance25FlagLoading,
     onUpdate,
   ]);
@@ -507,8 +505,6 @@ export default function SceneCard({
     next: boolean,
     forcedSource?: ClipSource,
   ) => {
-    const dialogMode = scene.dialogMode === true;
-                                
                                 const updates: Partial<ComposerScene> = { dialogMode: next };
                                 let dbClipSource: ClipSource | undefined;
                                 let dbClipQuality: ClipQuality | undefined;
@@ -533,12 +529,6 @@ export default function SceneCard({
                                 if (engineChanged) updates.engineOverride = nextEngine;
                                 if (lipSyncChanged) updates.lipSyncWithVoiceover = nextLipSync;
                                 if (next) {
-                                  // The rollout flag resolves asynchronously. Preserve an already
-                                  // selected Seedance 2.5 scene while it is loading; the guarded
-                                  // migration effect above handles a genuinely disabled flag once
-                                  // the read completes.
-                                  const pendingSeedance25Selection =
-                                    seedance25FlagLoading && scene.clipSource === "ai-seedance25";
                                   const ok = !forcedSource && isLipsyncClipSource(scene.clipSource);
 
                                   if (!ok) {
@@ -548,12 +538,7 @@ export default function SceneCard({
                                     dbClipSource = target;
                                     dbClipQuality = DIALOG_FALLBACK_CLIP_QUALITY;
                                     toast({
-                                      title:
-                                        lang === "de"
-                                          ? tx({ de: "Modell auf HappyHorse 1.0 gewechselt", en: "Model changed to HappyHorse 1.0", es: "Modelo cambiado a HappyHorse 1.0" })
-                                          : lang === "es"
-                                            ? "Modelo cambiado a HappyHorse 1.0"
-                                            : "Switched to HappyHorse 1.0",
+                                      title: getProviderLabel(target),
                                       description:
                                         lang === "de"
                                           ? tx({ de: "Lip-Sync läuft nur über HappyHorse (3–15s) oder Hailuo (6/10s Fallback). HappyHorse vorausgewählt.", en: "Lip-sync only runs via HappyHorse (3–15s) or Hailuo (6/10s fallback). HappyHorse pre-selected.", es: "La sincronización labial solo funciona a través de HappyHorse (3–15s) o Hailuo (6/10s de respaldo). HappyHorse preseleccionado." })
@@ -1623,10 +1608,8 @@ export default function SceneCard({
 
                     {sourceMode === "ai" && (() => {
                       const dialogMode = scene.dialogMode === true;
-                      const preservePendingSeedance25 =
-                        seedance25FlagLoading && scene.clipSource === "ai-seedance25";
                       const modelsForPicker = dialogMode
-                        ? composerDialogModels(seedance25LipsyncEnabled || preservePendingSeedance25)
+                        ? COMPOSER_DIALOG_MODELS
                         : COMPOSER_AVAILABLE_MODELS;
                       const toggleOnLabel =
                         lang === "de"
@@ -1634,18 +1617,11 @@ export default function SceneCard({
                           : lang === "es"
                             ? "Diálogo y Lip-Sync"
                             : "Dialog & Lip-Sync";
-                      const s25 = seedance25LipsyncEnabled;
-                      const toggleHint = s25
-                        ? tx({
-                            de: "HappyHorse, Hailuo, Kling, Wan, Seedance, Seedance 2.5 (bis 30s) und Luma sind für Sync.so Lip-Sync zertifiziert.",
-                            en: "HappyHorse, Hailuo, Kling, Wan, Seedance, Seedance 2.5 (up to 30s) and Luma are certified for Sync.so lip-sync.",
-                            es: "HappyHorse, Hailuo, Kling, Wan, Seedance, Seedance 2.5 (hasta 30s) y Luma están certificados para Sync.so lip-sync.",
-                          })
-                        : tx({
-                            de: "HappyHorse, Hailuo, Kling, Wan, Seedance und Luma sind für Sync.so Lip-Sync zertifiziert.",
-                            en: "HappyHorse, Hailuo, Kling, Wan, Seedance and Luma are certified for Sync.so lip-sync.",
-                            es: "HappyHorse, Hailuo, Kling, Wan, Seedance y Luma están certificados para Sync.so lip-sync.",
-                          });
+                      const toggleHint = tx({
+                        de: "Für Lip-Sync sind nur HappyHorse (3–15s) und Hailuo (6/10s) zertifiziert.",
+                        en: "Only HappyHorse (3–15s) and Hailuo (6/10s) are certified for lip-sync.",
+                        es: "Solo HappyHorse (3–15s) y Hailuo (6/10s) están certificados para lip-sync.",
+                      });
 
 
                       return (
@@ -1678,13 +1654,13 @@ export default function SceneCard({
                                 </span>
                                 <span className="text-[9px] text-muted-foreground leading-tight truncate">
                                   {dialogMode
-                                    ? `${modelsForPicker.length} ${lang === "es" ? "modelos" : lang === "en" ? "models" : "Modelle"} · HappyHorse · Hailuo · Kling · Wan · Seedance${s25 ? " · Seedance 2.5" : ""} · Luma (Sync.so)`
+                                    ? `${modelsForPicker.length} ${lang === "es" ? "modelos" : lang === "en" ? "models" : "Modelle"} · HappyHorse · Hailuo (Sync.so)`
 
                                   : lang === "de"
-                                    ? tx({ de: "B-Roll-Modus · 11 Modelle verfügbar", en: "B-roll mode · 11 models available", es: "Modo B-roll · 11 modelos disponibles" })
+                                    ? tx({ de: `B-Roll-Modus · ${modelsForPicker.length} Modelle verfügbar`, en: `B-roll mode · ${modelsForPicker.length} models available`, es: `Modo B-roll · ${modelsForPicker.length} modelos disponibles` })
                                     : lang === "es"
-                                      ? "Modo B-roll · 11 modelos disponibles"
-                                      : "B-roll mode · 11 models available"}
+                                      ? `Modo B-roll · ${modelsForPicker.length} modelos disponibles`
+                                      : `B-roll mode · ${modelsForPicker.length} models available`}
 
 
                                 </span>
