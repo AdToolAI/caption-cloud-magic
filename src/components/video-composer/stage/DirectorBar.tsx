@@ -1,17 +1,16 @@
 import { useCallback } from "react";
-import { Volume2, VolumeX, Music2, Film, Maximize2, Minimize2, Gauge } from "lucide-react";
-import { useStudioPreferences, type EditorMode, type StageAudioMode } from "@/hooks/useStudioPreferences";
+import { Volume2, VolumeX, Music2, Maximize2, Minimize2 } from "lucide-react";
+import { useStudioPreferences, type StageAudioMode } from "@/hooks/useStudioPreferences";
 import { tx } from '@/lib/i18nText';
 
 /**
  * Director's Bar — the sticky cinematic control strip at the top of the
- * Motion Studio Stage. Surfaces the three things that define the immersive
- * feel: Editor Mode (Quick/Direct/Studio), Audio Mode (Off/Ambient/Full),
- * and Cinemascope toggle. Everything else stays inside the existing
- * dashboard.
+ * Motion Studio Stage. Surfaces Audio Mode (Off/Ambient/Full) and the
+ * Cinemascope toggle. The Quick/Direct/Studio switch was removed: the
+ * briefing always shows the full studio feature set.
  */
 export default function DirectorBar() {
-  const { prefs, setEditorMode, setAudioMode, toggleCinemascope } = useStudioPreferences();
+  const { prefs, setAudioMode, toggleCinemascope } = useStudioPreferences();
 
   const audioIcon =
     prefs.audioMode === "off" ? VolumeX : prefs.audioMode === "ambient" ? Volume2 : Music2;
@@ -38,8 +37,6 @@ export default function DirectorBar() {
 
         {/* Right: cinematic controls */}
         <div className="flex items-center gap-2">
-          <ModeSwitch value={prefs.editorMode} onChange={setEditorMode} />
-
           <button
             type="button"
             onClick={cycleAudio}
@@ -67,41 +64,6 @@ export default function DirectorBar() {
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function ModeSwitch({
-  value,
-  onChange,
-}: {
-  value: EditorMode;
-  onChange: (m: EditorMode) => void;
-}) {
-  const modes: { id: EditorMode; label: string; hint: string }[] = [
-    { id: "quick", label: "Quick", hint: tx({ de: "Ein Prompt, fertig", en: "One prompt, done", es: "Un prompt, listo" }) },
-    { id: "direct", label: "Direct", hint: tx({ de: "Cast + Style + Dauer", en: "Cast + Style + Duration", es: "Elenco + Estilo + Duración" }) },
-    { id: "studio", label: "Studio", hint: tx({ de: "Volle Regie", en: "Full Direction", es: "Dirección completa" }) },
-  ];
-
-  return (
-    <div className="flex items-center gap-1 rounded-full border border-[hsl(43_90%_68%/0.18)] bg-[hsl(220_35%_6%/0.6)] p-0.5">
-      <Gauge className="ml-2 h-3.5 w-3.5 text-[hsl(43_90%_68%)]/70" />
-      {modes.map((m) => (
-        <button
-          key={m.id}
-          type="button"
-          onClick={() => onChange(m.id)}
-          title={m.hint}
-          className={`px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider transition-all ${
-            value === m.id
-              ? "bg-[hsl(43_90%_68%)] text-[hsl(230_30%_4%)] shadow-[0_0_18px_hsla(43,90%,68%,0.35)]"
-              : "text-[hsl(210_40%_98%)]/60 hover:text-[hsl(43_90%_68%)]"
-          }`}
-        >
-          {m.label}
-        </button>
-      ))}
     </div>
   );
 }
