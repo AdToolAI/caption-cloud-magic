@@ -127,7 +127,7 @@ import {
   modelIdToSource,
   sourceToModelId,
 } from "@/lib/video-composer/modelMapping";
-import { useSeedance25Lipsync } from "@/hooks/useSeedance25Lipsync";
+import { useSeedance25LipsyncState } from "@/hooks/useSeedance25Lipsync";
 
 
 import { AI_VIDEO_TOOLKIT_MODELS } from "@/config/aiVideoModelRegistry";
