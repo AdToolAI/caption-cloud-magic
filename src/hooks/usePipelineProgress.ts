@@ -237,12 +237,19 @@ export function usePipelineProgress({
       if (action === 'start') {
         if (pipelineStartRef.current === null || phase === 'clips') {
           // Fresh run — clear any stale persisted snapshot from a previous run.
-          clearSnapshot(storageKey);
+          // Use the CURRENT key (ref) plus the legacy `default` key, which was
+          // written before `projectId` was available.
+          clearSnapshot(storageKeyRef.current);
+          clearSnapshot(storageKeyFor(undefined));
           pipelineStartRef.current = Date.now();
           runFloorRef.current = 0;
           floorRef.current = { clips: 0, voiceover: 0, lipsync: 0, music: 0, export: 0 };
           startedAtRef.current = { clips: null, voiceover: null, lipsync: null, music: null, export: null };
+          // Drop stall baseline + any event flags left over from the last run.
+          runResetTokenRef.current += 1;
+          setEventFlags({ clips: false, voiceover: false, lipsync: false, music: false, export: false });
         }
+
         // Reset this phase so it starts at 0 % for the new run.
         floorRef.current[phase] = 0;
         startedAtRef.current[phase] = Date.now();
