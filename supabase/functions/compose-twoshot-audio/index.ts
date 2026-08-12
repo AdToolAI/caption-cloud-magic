@@ -1076,8 +1076,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // kürzt am Ende (`cut_off`). HappyHorse (3–15s) darf weiterhin verlängern.
     const sceneClipSource = String((scene as any).clip_source ?? "");
     const isHailuoScene = sceneClipSource === "ai-hailuo";
-    const OVERFLOW_GRACE_SEC = 0.30;
-    const MAX_EXTEND_SEC = 5.0;
+    const OVERFLOW_GRACE_SEC = OVERFLOW_GRACE_MS / 1000;
+    const MAX_EXTEND_SEC = MAX_EXTEND_MS / 1000;
+    const TAIL_PADDING_SEC = TAIL_PADDING_MS / 1000;
+    const STEPS_PER_SEC = 1000 / DURATION_STEP_MS;
     let dialogOverflowExtended: { from: number; to: number; overflowSec: number } | null = null;
     if (!isHailuoScene && spokenSec > sceneDur + OVERFLOW_GRACE_SEC) {
       const overflow = spokenSec - sceneDur;
