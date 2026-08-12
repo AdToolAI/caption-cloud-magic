@@ -53,7 +53,6 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { getCurrencyForLanguage } from '@/lib/currency';
 import {
   buildSpokenLanguageDirective,
-  getSpokenLanguagePromptLabel,
   isSpokenLanguageSelection,
   resolveAutoSpokenLanguage,
   SEEDANCE_SPOKEN_LANGUAGES,
