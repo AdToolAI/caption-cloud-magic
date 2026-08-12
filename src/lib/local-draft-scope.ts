@@ -64,7 +64,11 @@ const DRAFT_BASE_KEYS = [
   'video-composer-ad-meta',
   'universal-video-wizard-state',
   'universal-video-consultant-state',
+  // Editor mode decides which briefing panels are visible — must not leak
+  // between accounts in the same browser.
+  'motion-studio:prefs:v1',
 ];
+
 
 const DRAFT_EXACT_KEYS = [
   'composer_import',
