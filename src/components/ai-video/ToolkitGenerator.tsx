@@ -495,7 +495,6 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       // native TTS actually supports the chosen language. Otherwise Kling/Grok
       // hallucinate fantasy phonemes instead of speaking German/Spanish → fall
       // back to ambient-only (silent characters + room tone / background music).
-      const langLabel = getSpokenLanguagePromptLabel(effectiveSpokenLang);
       const dialogueSuppressed = omniNonEnglishSilent || (!!(model.capabilities.audio && generateAudio) && !ttsLangSupported);
       const spokenLangSuffix = (model.capabilities.audio && generateAudio && ttsLangSupported)
         ? buildSpokenLanguageDirective(effectiveSpokenLang)
