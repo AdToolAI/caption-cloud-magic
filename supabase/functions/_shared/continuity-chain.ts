@@ -126,7 +126,10 @@ export async function planContinuityChain(args: PlanChainArgs): Promise<PlanChai
       await supabaseAdmin
         .from("composer_scenes")
         .update({
-          clip_status: "queued",
+          // Deliberately NOT a new `clip_status` value: the whole UI treats
+          // `generating` as "work in flight", which a parked scene is. Only
+          // the pipeline state spells out that it waits for its predecessor.
+          clip_status: "generating",
           clip_error: null,
           pipeline_state: "queued",
           pipeline_detail: `waiting_for_scene_${predId.slice(0, 8)}`,
@@ -201,7 +204,7 @@ async function dispatchQueued(
         updated_at: new Date().toISOString(),
       })
       .eq("id", row.scene_id)
-      .eq("clip_status", "queued");
+      .eq("clip_status", "generating");
     console.error(`[continuity-chain] dispatch failed scene=${row.scene_id} ${res.status}`);
     return;
   }
