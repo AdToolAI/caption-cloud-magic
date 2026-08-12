@@ -347,7 +347,9 @@ export default function SceneCard({
     | "es";
   const confirmRender = useSceneRenderConfirm();
   // v418 rollout brake — mirrors the server flag for Seedance 2.5 plates.
-  const seedance25LipsyncEnabled = useSeedance25Lipsync();
+  const { enabled: seedance25LipsyncEnabled, loading: seedance25FlagLoading } =
+    useSeedance25LipsyncState();
+
 
   const isStock =
     scene.clipSource === "stock" || scene.clipSource === "stock-image";
