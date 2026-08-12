@@ -67,6 +67,11 @@ import {
 import type { ShotSelection } from '@/config/shotDirector';
 import { Sparkles as SparklesIcon, Play, Clapperboard } from 'lucide-react';
 import { tx } from '@/lib/i18nText';
+import {
+  clampDialogMasterDuration,
+  DIALOG_MASTER_PROVIDER_LABELS,
+  resolveDialogMasterProvider,
+} from '@/lib/video-composer/lipsyncMasterProvider';
 import type {
   ComposerCharacter,
   ComposerScene,
@@ -1666,45 +1671,14 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         // HappyHorse, Hailuo, Kling, Wan, Seedance and Luma. Anything else
         // falls back to HappyHorse (safe 3–15s default). Backend enforces
         // the same allowlist with a 400 response.
-        const LIPSYNC_PROVIDERS = [
-          'ai-hailuo', 'ai-happyhorse', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma',
-        ] as const;
-        type LipsyncProvider = typeof LIPSYNC_PROVIDERS[number];
         const userPickedProvider = (scene.clipSource as string) || 'ai-happyhorse';
-        const masterProvider: LipsyncProvider =
-          (LIPSYNC_PROVIDERS as readonly string[]).includes(userPickedProvider)
-            ? (userPickedProvider as LipsyncProvider)
-            : 'ai-happyhorse';
-
-        const clamp = (min: number, max: number) =>
-          Math.min(max, Math.max(min, Math.ceil(userPick)));
-        const masterDuration =
-          masterProvider === 'ai-hailuo'
-            // Hailuo STRICT — only 10 stays 10, everything else snaps to 6.
-            ? (userPick === 10 ? 10 : 6)
-            : masterProvider === 'ai-happyhorse'
-              ? clamp(3, 15)
-              : masterProvider === 'ai-kling'
-                ? clamp(3, 15)
-                : masterProvider === 'ai-wan'
-                  ? clamp(3, 10)
-                  : masterProvider === 'ai-seedance'
-                    ? clamp(3, 12)
-                    // Luma Ray 2 — only 5s or 9s.
-                    : (userPick >= 8 ? 9 : 5);
+        const masterProvider = resolveDialogMasterProvider(userPickedProvider);
+        const masterDuration = clampDialogMasterDuration(masterProvider, userPick);
 
         if (audioRequired > masterDuration) {
-          const providerLabel: Record<LipsyncProvider, string> = {
-            'ai-hailuo': 'Hailuo',
-            'ai-happyhorse': 'HappyHorse',
-            'ai-kling': 'Kling',
-            'ai-wan': 'Wan',
-            'ai-seedance': 'Seedance',
-            'ai-luma': 'Luma Ray 2',
-          };
           toast({
             title: tx({ de: 'Dialog länger als Szene', en: 'Dialog longer than scene', es: 'Diálogo más largo que la escena' }),
-            description: tx({ de: `Audio braucht ~${audioRequired}s, ${providerLabel[masterProvider]}-Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Szenendauer erhöhen oder Provider mit größerem Duration-Fenster wählen.`, en: `Audio needs ~${audioRequired}s, ${providerLabel[masterProvider]} scene is ${masterDuration}s. Sync.so cuts at the end (cut_off). To get full dialogue, increase scene duration or choose a provider with a larger duration window.`, es: `El audio necesita ~${audioRequired}s, la escena de ${providerLabel[masterProvider]} es de ${masterDuration}s. Sync.so corta al final (cut_off). Para obtener el diálogo completo, aumenta la duración de la escena o elige un proveedor con una ventana de duración mayor.` }),
+            description: tx({ de: `Audio braucht ~${audioRequired}s, ${DIALOG_MASTER_PROVIDER_LABELS[masterProvider]}-Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Szenendauer erhöhen oder Provider mit größerem Duration-Fenster wählen.`, en: `Audio needs ~${audioRequired}s, ${DIALOG_MASTER_PROVIDER_LABELS[masterProvider]} scene is ${masterDuration}s. Sync.so cuts at the end (cut_off). To get full dialogue, increase scene duration or choose a provider with a larger duration window.`, es: `El audio necesita ~${audioRequired}s, la escena de ${DIALOG_MASTER_PROVIDER_LABELS[masterProvider]} es de ${masterDuration}s. Sync.so corta al final (cut_off). Para obtener el diálogo completo, aumenta la duración de la escena o elige un proveedor con una ventana de duración mayor.` }),
           });
         }
 

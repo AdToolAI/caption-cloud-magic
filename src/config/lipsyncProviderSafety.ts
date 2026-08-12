@@ -86,6 +86,7 @@ export function humanProviderName(source: ClipSource | string): string {
     'ai-wan': 'Wan',
     'ai-luma': 'Luma',
     'ai-seedance': 'Seedance',
+    'ai-seedance25': 'Seedance 2.5',
     'ai-sora': 'Sora',
     'ai-runway': 'Runway',
     'ai-pika': 'Pika',
