@@ -1,23 +1,25 @@
-# Falscher Audio-Hinweis bei Modellen ohne Voiceover
+# Seedance 2.5: Sprache/Voiceover freischalten statt unterdrücken
 
 ## Befund
 
-In `src/components/ai-video/ToolkitGenerator.tsx` gibt es nur einen einzigen Zustand: `ttsLangSupported`. Für Seedance 2.5 (und LTX, Wan, Hailuo, Luma, Runway, Pika, Vidu) ist die Sprachliste leer — damit ist `ttsLangSupported` **für jede** Sprache `false`, auch für Englisch. Der Hinweistext formuliert das aber als Sprachproblem („unterstützt diese Sprache nicht zuverlässig"), obwohl das Modell überhaupt kein Voiceover kann — unabhängig von der Sprache. Zusätzlich wird der Auswahlblock „Gesprochene Sprache" für diese Modelle angezeigt, obwohl die Wahl dort folgenlos bleibt.
+In `src/components/ai-video/ToolkitGenerator.tsx` steht Seedance in `PROVIDER_TTS_LANGS` mit leerer Liste (`seedance: []`). Folge: `ttsLangSupported` ist für **jede** Sprache `false` — auch für Englisch. Daraus entstehen drei Fehler:
+
+- Der gelbe Hinweis behauptet fälschlich, die gewählte Sprache werde nicht unterstützt.
+- `spokenLanguage` wird nie an die Edge Function übergeben.
+- Stattdessen wird `suppressDialogue: true` gesendet, was serverseitig einen No-Speech-Zusatz an den Prompt hängt — das Modell wird also aktiv am Sprechen gehindert.
+
+Seedance 2.5 erzeugt mit `generate_audio` aber sehr wohl Dialog/Voiceover, nicht nur Ambience.
 
 ## Umsetzung
 
-1. **Zwei Fälle unterscheiden** statt einem Flag:
-   - `modelSpeaks` = das Modell hat überhaupt native Sprachausgabe (Sprachliste nicht leer bzw. Kling Omni).
-   - `ttsLangSupported` = die gewählte Sprache ist davon abgedeckt (nur relevant, wenn `modelSpeaks`).
+1. **Seedance als sprachfähig eintragen** (`ToolkitGenerator.tsx`): `seedance: ['en', 'de', 'es']`. Damit greift der bestehende Pfad: Sprachwahl sichtbar, `spokenLanguage` wird gesendet, kein `suppressDialogue`, kein Warnhinweis.
 
-2. **Hinweistexte trennen** (DE/EN/ES):
-   - Kein Voiceover möglich: „<Modell> erzeugt Umgebungssound, Foley und Musik, aber keine Sprache. Für gesprochenen Text z. B. Veo 3.1 oder Sora 2 wählen oder die Stimme im Motion Studio ergänzen." — neutral formuliert, ohne Sprachbezug.
-   - Sprache nicht unterstützt (z. B. Kling/Grok/HappyHorse mit DE/ES): bisheriger Text bleibt.
+2. **Prompt-Sprachhinweis**: Der vorhandene `spokenLangSuffix` (Dialog in der gewählten Sprache) wird für Seedance mitgesendet, damit die Sprache deterministisch gesetzt ist und nicht vom Prompt-Inhalt abhängt.
 
-3. **Sprachwahl ausblenden**, wenn das Modell keine Sprache erzeugen kann — die Auswahl hätte dort keine Wirkung. Bei Modellen mit eingeschränkter Sprachliste bleibt sie sichtbar.
+3. **Hinweistext generalisieren**: Der Warnblock unterscheidet künftig „Modell kann gar keine Sprache" (Ambience/Foley/Musik-Text, ohne Sprachbezug) von „diese Sprache wird nicht zuverlässig unterstützt" (bisheriger Text, z. B. Kling/Grok/HappyHorse bei DE/ES). Bei Modellen ohne jede Sprachausgabe wird die Sprachwahl ausgeblendet, da sie folgenlos wäre.
 
-4. Am Request-Verhalten ändert sich nichts: `generateAudio` geht weiterhin durch, `suppressDialogue` wird weiterhin gesetzt, wenn keine echte Sprache möglich ist.
+4. **Verifikation**: je ein 4-s-Testclip mit Sprech-Prompt auf EN und DE bei 480p; geprüft wird im Function-Log, dass `generate_audio: true` und der Sprach-Suffix rausgehen, und an der fertigen MP4, dass verständliche Sprache in der gewählten Sprache zu hören ist. Falls DE/ES im Test Fantasie-Sprache liefert, wird die Liste auf die bestätigten Sprachen reduziert — dann greift automatisch wieder der korrekte, sprachbezogene Hinweis.
 
 ## Technische Details
 
-Nur `src/components/ai-video/ToolkitGenerator.tsx` (Ableitung um `modelSpeaks` erweitern, Hinweisblock ~Zeile 1362 aufteilen, Sprachwahl-Block ~Zeile 1340 bedingt rendern). Keine Änderungen an Edge Functions, Preisen oder der Lip-Sync-Kette.
+Betroffen: `src/components/ai-video/ToolkitGenerator.tsx` (Sprachtabelle, Hinweisblock ~1362, Sprachwahl ~1340). Das in der Edge Function `generate-seedance25-video` bereits vorhandene `suppressDialogue`-Feld bleibt bestehen, wird für Seedance im Normalfall aber nicht mehr gesetzt. Keine Änderungen an Preisen, Wallet-Logik, Composer-Pfad oder Lip-Sync-Kette.
