@@ -45,7 +45,6 @@ import BrandKitApplyPanel from './BrandKitApplyPanel';
 import StagePanel from './stage/StagePanel';
 import DirectorsNote from './stage/DirectorsNote';
 
-import { useStudioPreferences } from '@/hooks/useStudioPreferences';
 import type { VideoMode, AssemblyConfig } from '@/types/video-composer';
 
 const ASPECT_RATIOS: { value: AspectRatio; label: string; desc: string }[] = [
