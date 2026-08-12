@@ -199,15 +199,24 @@ export function usePipelineProgress({
   if (!hydratedRef.current) {
     hydratedRef.current = true;
     const snap = readSnapshot(storageKey);
-    if (snap) {
+    const fresh =
+      !!snap &&
+      typeof snap.savedAt === 'number' &&
+      Date.now() - snap.savedAt < SNAPSHOT_TTL_MS;
+    if (snap && fresh) {
       pipelineStartRef.current = snap.pipelineStart;
       runFloorRef.current = snap.runFloor;
       floorRef.current = snap.floor;
       startedAtRef.current = snap.startedAt;
       baselineRef.current = snap.baseline;
       hydratedRealProgressRef.current = snap.realProgress;
+    } else if (snap) {
+      // Stale (or pre-TTL format) snapshot — never resume from it, otherwise
+      // a new run starts at the previous run's 99 %.
+      clearSnapshot(storageKey);
     }
   }
+
   const lastPersistAtRef = useRef(0);
 
   // ── Event-driven "start" flags ───────────────────────────────────
