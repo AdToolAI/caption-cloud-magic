@@ -918,6 +918,8 @@ export function usePipelineProgress({
         startedAt: startedAtRef.current,
         baseline: baselineRef.current,
         realProgress: realProgressRef.current,
+        savedAt: Date.now(),
+
       });
     }
   }
