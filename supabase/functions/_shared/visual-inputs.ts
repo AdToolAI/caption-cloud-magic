@@ -21,6 +21,7 @@
 // ============================================================================
 
 import { isLipSyncIntentionalRow, type LipSyncSceneSnake } from "./lipSyncIntent.ts";
+import { LIPSYNC_CERTIFIED_AI_SOURCES } from "./composer-ai-sources.ts";
 
 /* ────────────────────────────── Types ────────────────────────────────── */
 
@@ -171,20 +172,11 @@ export const CLIP_SOURCE_CAPABILITIES: Record<string, SourceCapabilities> = {
 };
 
 /**
- * Certified lip-sync master-plate providers — mirrors `LIPSYNC_PROVIDERS` in
- * `compose-video-clips/index.ts`. `ai-seedance25` was certified in v418
- * (Phase 3a) and is gated at dispatch time by the feature flag
- * `composer.feature.seedance25_lipsync`.
+ * Certified lip-sync master-plate providers (v425 contract).
+ * Single source of truth: `_shared/composer-ai-sources.ts` — this module only
+ * re-exports it so the resolver and the dispatcher can never drift apart.
  */
-export const LIPSYNC_CERTIFIED_SOURCES = new Set([
-  "ai-happyhorse",
-  "ai-hailuo",
-  "ai-kling",
-  "ai-wan",
-  "ai-seedance",
-  "ai-seedance25",
-  "ai-luma",
-]);
+export { LIPSYNC_CERTIFIED_AI_SOURCES as LIPSYNC_CERTIFIED_SOURCES } from "./composer-ai-sources.ts";
 
 
 export function deriveProfileFromCapabilities(
@@ -221,7 +213,7 @@ export function deriveProfileFromCapabilities(
         supported: lipSyncSupported,
         requiresIdentityReference: true,
         conflictsWithFirstFrame: true,
-        verification: { status: "unverified" },
+        verification: { status: lipSyncSupported ? "verified" : "unverified" },
       },
     };
   }
@@ -248,7 +240,7 @@ export function deriveProfileFromCapabilities(
       supported: lipSyncSupported,
       requiresIdentityReference: true,
       conflictsWithFirstFrame: !separateReferenceSlot,
-      verification: { status: "unverified" },
+      verification: { status: lipSyncSupported ? "verified" : "unverified" },
     },
   };
 }
@@ -258,7 +250,7 @@ export function deriveProfileFromCapabilities(
 export function getVisualInputProfileForSource(clipSource: string | null | undefined): VisualInputProfile {
   const key = String(clipSource ?? "");
   const caps = CLIP_SOURCE_CAPABILITIES[key] ?? { i2v: true };
-  return deriveProfileFromCapabilities(caps, LIPSYNC_CERTIFIED_SOURCES.has(key));
+  return deriveProfileFromCapabilities(caps, LIPSYNC_CERTIFIED_AI_SOURCES.has(key));
 }
 
 /* ───────────────────────── Scene classification ──────────────────────── */
@@ -405,6 +397,20 @@ export function arbitrateSlots(
     (profile.mode !== "exclusive" || (profile.modes ?? []).includes("references"));
 
   if (hasProtectedAnchor && collide) {
+    // v426: the composed, identity-verified anchor ALWAYS wins the single
+    // slot. Handing the slot to a clip reference instead would drop the
+    // anchor and push raw cast portraits / unvetted frames at the provider —
+    // exactly what ModelArk rejects with
+    // `InputImageSensitiveContentDetected.PrivacyInformation`.
+    if (Boolean(input.hasAnchorImage) && profile.firstFrame.supported) {
+      warnings.push(
+        requirements.lipSync
+          ? "lipsync_anchor_protected_match_cut"
+          : "identity_anchor_protected_match_cut",
+      );
+      warnings.push("anchor_takes_exclusive_slot");
+      return { transition: "match-cut", inputMode: "first-frame", warnings };
+    }
     if (canClipReference && !requirements.lipSync) {
       return { transition: "clip-reference", inputMode: "references", warnings };
     }
@@ -414,16 +420,11 @@ export function arbitrateSlots(
     // gets as its i2v start image. Sending the raw cast portraits instead is
     // what makes ModelArk reject the task with
     // `InputImageSensitiveContentDetected.PrivacyInformation`.
-    const anchorTakesSlot = Boolean(input.hasAnchorImage) && profile.firstFrame.supported;
     warnings.push(
       requirements.lipSync
         ? "lipsync_anchor_protected_match_cut"
         : "identity_anchor_protected_match_cut",
     );
-    if (anchorTakesSlot) {
-      warnings.push("anchor_takes_exclusive_slot");
-      return { transition: "match-cut", inputMode: "first-frame", warnings };
-    }
     return { transition: "match-cut", inputMode: "references", warnings };
   }
 
@@ -445,7 +446,11 @@ export function arbitrateSlots(
     }
   }
 
-  if (canClipReference && strategy !== "transition-priority") {
+  // Reference-video continuity beats a still frame when the provider can take
+  // it: motion, grading and framing carry over instead of one frozen frame.
+  // On exclusive-slot providers (Seedance 2.5) it is the ONLY continuity that
+  // fits next to nothing else, so it always wins there.
+  if (canClipReference && (strategy !== "transition-priority" || profile.mode === "exclusive")) {
     return { transition: "clip-reference", inputMode: "references", warnings };
   }
 
@@ -561,7 +566,12 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
   // The anchor stays the first frame for every non-continuity outcome. For a
   // lip-sync scene the transition is always `match-cut`, so this is always the
   // anchor — byte-identical to the pre-resolver behaviour.
-  const firstFrameUrl = useContinuityFrame ? previousFrameUrl : anchorImageUrl;
+  const exclusiveReferencePayload = profile.mode === "exclusive" && inputMode === "references";
+  const firstFrameUrl = exclusiveReferencePayload
+    ? undefined
+    : useContinuityFrame
+    ? previousFrameUrl
+    : anchorImageUrl;
 
   // On an exclusive-slot provider the chosen input mode owns the only slot.
   // When the anchor took it, no reference image may travel with the request.
