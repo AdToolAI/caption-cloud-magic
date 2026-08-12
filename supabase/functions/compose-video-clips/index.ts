@@ -4225,7 +4225,7 @@ serve(async (req) => {
             );
             const __arkRaw = String(arkErr?.message ?? "ModelArk error");
             const __arkMessage = /SensitiveContent|PrivacyInformation/i.test(__arkRaw)
-              ? "Seedance 2.5 hat die Eingabebilder abgelehnt (Personenschutz). Bitte einen generierten Szenen-Anker statt einzelner Personenfotos verwenden."
+              ? "modelark_input_images_rejected"
               : __arkRaw;
             await supabaseAdmin
               .from("composer_scenes")
