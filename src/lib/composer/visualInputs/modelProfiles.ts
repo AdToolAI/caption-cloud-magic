@@ -10,7 +10,10 @@
  */
 
 import { AI_VIDEO_TOOLKIT_MODELS, type ToolkitModel } from '@/config/aiVideoModelRegistry';
+import { modelIdToSource } from '@/lib/video-composer/modelMapping';
+import { isLipsyncCertifiedProvider } from '@/lib/video-composer/lipsyncMasterProvider';
 import type { VisualInputProfile } from './types';
+
 
 /**
  * Lip-sync certification is owned by the v425 provider contract
