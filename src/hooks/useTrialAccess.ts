@@ -2,15 +2,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTrialStatus } from "@/hooks/useTrialStatus";
 
 /**
- * useTrialAccess — Beta 2026.
+ * useTrialAccess — Beta 2026 (Open Access).
  *
- * Zugang zu Premium-Features basiert ausschließlich auf dem Stripe-
- * Subscription-Status (`useAuth().subscribed`). Das alte Credit-System
- * ist abgeschafft.
+ * Es gibt keine Feature-Sperren mehr: weder Trial-Ablauf noch fehlendes Abo
+ * blockieren eine Funktion. `hasFullAccess` ist konstant `true`; einzige
+ * Voraussetzung bleibt die Anmeldung (Route-Guards).
  *
- * Trial bleibt als Übergangsfenster für Neu-User erhalten (definiert über
- * `useTrialStatus`), damit sie die Plattform vor der ersten Zahlung
- * ausprobieren können.
+ * `isTrialActive` / `isPaid` bleiben als reine Statusinformation erhalten
+ * (Badges, Abrechnung, Analytics) — sie steuern keinen Zugang mehr.
  */
 export function useTrialAccess() {
   const trial = useTrialStatus();
@@ -22,8 +21,8 @@ export function useTrialAccess() {
   return {
     isTrialActive,
     isPaid,
-    /** True = bypass all upgrade walls. */
-    hasFullAccess: isTrialActive || isPaid,
+    /** Open Access: immer true — keine Upgrade-Wände mehr. */
+    hasFullAccess: true as const,
     trial,
     planCode: isPaid ? "basic" : "free",
   };
