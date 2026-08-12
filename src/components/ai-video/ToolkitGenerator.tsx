@@ -135,6 +135,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     kling:      ['en'],
     grok:       ['en'],
     happyhorse: ['en'],
+    // Ambience/Foley only — kein verlässliches Voiceover (Ton wird trotzdem erzeugt):
     ltx: [], wan: [], hailuo: [], luma: [], seedance: [], runway: [], pika: [], vidu: [],
   };
   const isKlingOmni = model.id === 'kling-omni';
