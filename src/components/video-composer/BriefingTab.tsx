@@ -239,8 +239,6 @@ export default function BriefingTab({
   retryStoryboardNonce = 0,
 }: BriefingTabProps) {
   const { t } = useTranslation();
-  const { prefs, setEditorMode } = useStudioPreferences();
-  const editorMode = prefs.editorMode; // 'quick' | 'direct' | 'studio'
   const [uspInput, setUspInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   // briefingImportOpen state removed — auto-analyse handled by dashboard hook.
@@ -534,29 +532,7 @@ export default function BriefingTab({
       */}
 
 
-      <div className="sticky top-2 z-20 flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/95 p-2 shadow-sm backdrop-blur">
-        <span className="px-2 text-xs text-muted-foreground">
-          {tx({ de: 'Arbeitsmodus', en: 'Workspace mode', es: 'Modo de trabajo' })}
-        </span>
-        <div className="grid grid-cols-3 gap-1" role="group" aria-label={tx({ de: 'Arbeitsmodus', en: 'Workspace mode', es: 'Modo de trabajo' })}>
-          {(['quick', 'direct', 'studio'] as const).map((mode) => (
-            <Button
-              key={mode}
-              type="button"
-              size="sm"
-              variant={editorMode === mode ? 'default' : 'ghost'}
-              onClick={() => setEditorMode(mode)}
-              className="h-8 px-3 text-xs capitalize"
-            >
-              {mode}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-
-      {/* Crossfade wrapper — re-keyed on editorMode so panel changes "feel" */}
-      <div key={editorMode} className="stage-mode-fade space-y-6">
+      <div className="space-y-6">
 
 
 

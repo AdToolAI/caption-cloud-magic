@@ -110,7 +110,6 @@ import { shouldInheritContinuity as shouldInheritPlanContinuity } from '@/lib/vi
 import { tx } from '@/lib/i18nText';
 import { resolveSceneAudioSource, type SceneAudioSource } from '@/config/nativeAudioSources';
 import { pickClipSourceForDuration } from '@/lib/composer/pickClipSourceForDuration';
-import { useStudioPreferences } from '@/hooks/useStudioPreferences';
 import { useSeedance25LipsyncState } from '@/hooks/useSeedance25Lipsync';
 
 
@@ -856,7 +855,6 @@ export interface ApplyPlanResult {
 }
 
 export function useApplyProductionPlan() {
-  const { suggestEditorMode } = useStudioPreferences();
   // v418 — decides whether long dialog scenes may be routed to Seedance 2.5.
   const { enabled: seedance25LipsyncEnabled, loading: seedance25LipsyncLoading } =
     useSeedance25LipsyncState();
@@ -894,20 +892,6 @@ export function useApplyProductionPlan() {
       briefingPatch.duration = Math.round(plan.project.totalDurationSec);
     }
     if (Object.keys(briefingPatch).length) onUpdateBriefing(briefingPatch);
-
-    // v416 — suggest the editor mode ONCE from the analysed plan: anything with
-    // speech, cast or an explicit look needs the Direct panels; a pure B-roll
-    // plan stays in Quick. Never overrides a mode the user picked himself.
-    try {
-      const needsDirect = (plan.scenes || []).some((s) =>
-        s.lipSync
-        || s.voiceover?.text?.trim()
-        || (s.dialogTurns && s.dialogTurns.length)
-        || (s.cast && s.cast.some((c) => c.characterId || c.characterName))
-        || !!(s as any).stylePreset,
-      );
-      suggestEditorMode(needsDirect ? 'direct' : 'quick');
-    } catch { /* mode suggestion must never block applying the plan */ }
 
     // 2) Determine which existing scenes are PROTECTED.
     //    Step 2a: local quick check.
@@ -1178,5 +1162,5 @@ export function useApplyProductionPlan() {
       verified: true,
       warnings,
     };
-  }, [suggestEditorMode, longFormDialogAllowed]);
+  }, [longFormDialogAllowed]);
 }

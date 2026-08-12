@@ -7,33 +7,20 @@ import { migrateLegacyDraftKey, scopedDraftKey } from "@/lib/local-draft-scope";
  * Audio mode: off → no cues, ambient → set ambient + event cues, full → ambient + cues + scene mood underscore.
  */
 
-export type EditorMode = "quick" | "direct" | "studio";
 export type StageAudioMode = "off" | "ambient" | "full";
 
 export interface StudioPreferences {
-  editorMode: EditorMode;
   audioMode: StageAudioMode;
   cinemascope: boolean;
-  /** v416 — true once the user picked a mode themselves. Blocks auto-suggest. */
-  editorModeManual: boolean;
 }
 
 const STORAGE_BASE = "motion-studio:prefs:v1";
-/**
- * Scoped per account: the mode decides which briefing panels are visible, so
- * an unscoped key made a second account in the same browser inherit (or lose)
- * half the briefing page.
- */
+/** Scoped per account so a second account in the same browser keeps its own stage settings. */
 const storageKey = () => scopedDraftKey(STORAGE_BASE);
 
 const DEFAULTS: StudioPreferences = {
-  // v423 — "direct" shows the complete briefing. Quick hides tone, language,
-  // video mode, visual style and the director's note, which read as a broken
-  // page on a fresh account.
-  editorMode: "direct",
   audioMode: "ambient",
   cinemascope: false,
-  editorModeManual: false,
 };
 
 function readFromStorage(): StudioPreferences {
@@ -43,19 +30,11 @@ function readFromStorage(): StudioPreferences {
     const raw = window.localStorage.getItem(storageKey());
     if (!raw) return DEFAULTS;
     const parsed = JSON.parse(raw) as Partial<StudioPreferences>;
-    const manual = Boolean(parsed.editorModeManual);
-    const storedMode =
-      parsed.editorMode === "direct" || parsed.editorMode === "studio" || parsed.editorMode === "quick"
-        ? parsed.editorMode
-        : DEFAULTS.editorMode;
+    // v424 — legacy records may still carry editorMode/editorModeManual. Ignored.
     return {
-      // Only honour "quick" when the user picked it themselves — legacy
-      // records carry the old implicit quick default.
-      editorMode: storedMode === "quick" && !manual ? DEFAULTS.editorMode : storedMode,
       audioMode:
         parsed.audioMode === "off" || parsed.audioMode === "full" ? parsed.audioMode : "ambient",
       cinemascope: Boolean(parsed.cinemascope),
-      editorModeManual: manual,
     };
   } catch {
     return DEFAULTS;
@@ -96,24 +75,6 @@ export function useStudioPreferences() {
     });
   }, []);
 
-  const setEditorMode = useCallback(
-    (mode: EditorMode) => update({ editorMode: mode, editorModeManual: true }),
-    [update],
-  );
-  /**
-   * v416 — one-shot suggestion after a briefing analysis. Never overrides a
-   * mode the user picked themselves, and never escalates to "studio".
-   */
-  const suggestEditorMode = useCallback(
-    (mode: Exclude<EditorMode, 'studio'>) => {
-      const current = readFromStorage();
-      if (current.editorModeManual) return;
-      if (current.editorMode === 'studio') return;
-      if (current.editorMode === mode) return;
-      update({ editorMode: mode });
-    },
-    [update],
-  );
   const setAudioMode = useCallback((mode: StageAudioMode) => update({ audioMode: mode }), [update]);
   const toggleCinemascope = useCallback(
     () => update({ cinemascope: !readFromStorage().cinemascope }),
@@ -123,8 +84,6 @@ export function useStudioPreferences() {
 
   return {
     prefs,
-    setEditorMode,
-    suggestEditorMode,
     setAudioMode,
     toggleCinemascope,
     setCinemascope,
