@@ -480,6 +480,52 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // ── v427B — Geldvertrag: Obergrenze reservieren, BEVOR ein bezahlter
+    // Providerauftrag rausgeht. Ein Voiceover kann eine Szene noch bis ans
+    // Providerfenster verlängern, deshalb wird die Obergrenze gesperrt und
+    // nach dem Dispatch exakt reduziert. Flag aus ⇒ komplett legacy.
+    let v427Reservation: ReservationHandle | null = null;
+    const v427CreditsEnabled = await isV427FlagEnabled(
+      supabaseAdmin,
+      "v427.credit_reservations",
+      user.id,
+    );
+    if (v427CreditsEnabled && aiScenes.length > 0) {
+      const ceilingCost = maxRunCostEuros(aiScenes as any);
+      try {
+        v427Reservation = await reserveRunCredits(supabaseAdmin, {
+          userId: user.id,
+          projectId,
+          sceneIds: aiScenes.map((s) => s.id),
+          runIds: Array.from(sceneRunStamps.values()).map((s) => s.runId),
+          amountEuros: ceilingCost,
+          metadata: { quoted_cost_euros: totalCost, scene_count: aiScenes.length },
+        });
+        console.log(
+          `[compose-video-clips] v427 reserved €${ceilingCost.toFixed(2)} (quote €${totalCost.toFixed(2)}) reservation=${v427Reservation?.reservationId}`,
+        );
+      } catch (resErr) {
+        if (resErr instanceof InsufficientCreditsError) {
+          return new Response(
+            JSON.stringify({
+              error: `Insufficient credits. This run can require up to €${resErr.required.toFixed(2)}.`,
+              code: "INSUFFICIENT_CREDITS",
+              needsPurchase: true,
+              required: resErr.required,
+            }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        // Infra failure on the reservation path must not silently bill later.
+        console.error("[compose-video-clips] v427 reservation failed:", resErr);
+        return new Response(
+          JSON.stringify({ ok: false, error: "reservation_failed", message: String((resErr as Error)?.message ?? resErr) }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
     const replicate = new Replicate({
       auth: Deno.env.get("REPLICATE_API_KEY"),
     });
