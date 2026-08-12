@@ -51,6 +51,15 @@ import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { useVideoPricingCatalog } from '@/hooks/useVideoPricingCatalog';
 import { useTranslation } from '@/hooks/useTranslation';
 import { getCurrencyForLanguage } from '@/lib/currency';
+import {
+  buildSpokenLanguageDirective,
+  getSpokenLanguagePromptLabel,
+  isSpokenLanguageSelection,
+  resolveAutoSpokenLanguage,
+  SEEDANCE_SPOKEN_LANGUAGES,
+  type SpokenLanguageCode,
+  type SpokenLanguageSelection,
+} from '@/lib/ai-video/spokenLanguage';
 import type { Currency } from '@/config/pricing';
 import {
   AI_VIDEO_TOOLKIT_MODELS,
@@ -111,18 +120,18 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   // explicitly names a target language. We let the user override the auto-pick
   // (which follows the UI language) so a DE user can force ES/EN audio if desired.
   const SPOKEN_LANG_KEY = 'ai-video-toolkit:spoken-lang';
-  const [spokenLanguage, setSpokenLanguage] = useState<'auto' | 'de' | 'en' | 'es'>(() => {
+  const [spokenLanguage, setSpokenLanguage] = useState<SpokenLanguageSelection>(() => {
     try {
       const v = typeof localStorage !== 'undefined' ? localStorage.getItem(SPOKEN_LANG_KEY) : null;
-      return v === 'de' || v === 'en' || v === 'es' || v === 'auto' ? v : 'auto';
+      return isSpokenLanguageSelection(v) ? v : 'auto';
     } catch { return 'auto'; }
   });
   useEffect(() => {
     try { localStorage.setItem(SPOKEN_LANG_KEY, spokenLanguage); } catch { /* noop */ }
   }, [spokenLanguage]);
-  const effectiveSpokenLang: 'de' | 'en' | 'es' =
+  const effectiveSpokenLang: SpokenLanguageCode =
     spokenLanguage === 'auto'
-      ? (language === 'de' ? 'de' : language === 'es' ? 'es' : 'en')
+      ? resolveAutoSpokenLanguage(language)
       : spokenLanguage;
   // Sprachen, für die der native TTS/Lip-Sync des Providers verlässlich Klartext
   // produziert. Alles außerhalb → ambient-only Fallback (kein Voiceover), sonst
@@ -141,11 +150,16 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     ltx: [], wan: [], hailuo: [], luma: [], runway: [], pika: [], vidu: [],
   };
   const isKlingOmni = model.id === 'kling-omni';
+  const isSeedance25 = model.id === 'seedance-2-5';
   /** Kann das Modell überhaupt Sprache erzeugen (unabhängig von der Sprache)? */
-  const modelSpeaks = isKlingOmni || (PROVIDER_TTS_LANGS[model.family] ?? []).length > 0;
-  const ttsLangSupported = isKlingOmni
+  const modelSpeaks = isSeedance25 || isKlingOmni || (PROVIDER_TTS_LANGS[model.family] ?? []).length > 0;
+  // Seedance 2.5 has no provider-side language enum. Native dialogue is
+  // prompt-controlled, so local allowlists must never silence its audio.
+  const ttsLangSupported = isSeedance25
+    ? true
+    : isKlingOmni
     ? effectiveSpokenLang === 'en'
-    : (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang);
+    : (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang as 'en' | 'de' | 'es');
   const omniNonEnglishSilent = isKlingOmni && effectiveSpokenLang !== 'en';
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
   /* ── Kling Omni: unified Cast + per-speaker Lip-Sync (max. 4 cast, 2 lip-sync) ── */
@@ -481,14 +495,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       // native TTS actually supports the chosen language. Otherwise Kling/Grok
       // hallucinate fantasy phonemes instead of speaking German/Spanish → fall
       // back to ambient-only (silent characters + room tone / background music).
-      const langLabel = effectiveSpokenLang === 'de'
-        ? 'German (Deutsch)'
-        : effectiveSpokenLang === 'es'
-        ? 'Spanish (Español)'
-        : 'English';
+      const langLabel = getSpokenLanguagePromptLabel(effectiveSpokenLang);
       const dialogueSuppressed = omniNonEnglishSilent || (!!(model.capabilities.audio && generateAudio) && !ttsLangSupported);
       const spokenLangSuffix = (model.capabilities.audio && generateAudio && ttsLangSupported)
-        ? `All spoken dialogue, narration and voiceover MUST be performed in ${langLabel}. Do not use any other language for speech. Lip movement must match ${langLabel} phonemes.`
+        ? buildSpokenLanguageDirective(effectiveSpokenLang)
         : '';
       const ambientOnlySuffix = dialogueSuppressed
         ? 'IMPORTANT: Do NOT generate any spoken dialogue, narration, voiceover, or lip-synced speech. Characters must remain silent — closed or naturally resting mouths, no lip movement matching speech. The audio track should contain ONLY ambient environmental sound, room tone, or subtle background music appropriate for the scene. No singing, no whispering, no non-verbal vocalizations that imply language.'
@@ -750,9 +760,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         body.referenceImages = composedSubjectRefs;
       }
       if (model.capabilities.audio) {
-        // Audio-Fähigkeit != Sprach-Fähigkeit: Modelle ohne verlässliche TTS
-        // (z. B. Seedance 2.5) liefern trotzdem Ambience/Foley/Musik. Nur bei
-        // Kling Omni DE/ES wird der Ton hart abgeschaltet (Fantasie-Sprache).
+        // Audio capability != speech capability. Seedance 2.5 keeps native
+        // audio enabled for every prompt-controlled language; only providers
+        // with a known unsupported language receive the ambience-only guard.
         body.generateAudio = generateAudio && !omniNonEnglishSilent;
         if (generateAudio && ttsLangSupported && !omniNonEnglishSilent) {
           body.spokenLanguage = effectiveSpokenLang;
@@ -1346,7 +1356,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 <Label className="text-xs text-muted-foreground">
                   {tx({ de: 'Gesprochene Sprache', en: 'Spoken language', es: 'Idioma hablado' })}
                 </Label>
-                <Select value={spokenLanguage} onValueChange={(v) => setSpokenLanguage(v as 'auto' | 'de' | 'en' | 'es')}>
+                <Select value={spokenLanguage} onValueChange={(v) => {
+                  if (isSpokenLanguageSelection(v)) setSpokenLanguage(v);
+                }}>
                   <SelectTrigger className="h-8 w-[180px] text-xs">
                     <SelectValue />
                   </SelectTrigger>
@@ -1356,12 +1368,24 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                         ? `Auto (UI: ${language === 'de' ? 'Deutsch' : 'English'})`
                         : `Auto (UI: ${language === 'es' ? 'Español' : 'English'})`}
                     </SelectItem>
-                    <SelectItem value="de">Deutsch</SelectItem>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="es">Español</SelectItem>
+                    {(isSeedance25
+                      ? SEEDANCE_SPOKEN_LANGUAGES
+                      : SEEDANCE_SPOKEN_LANGUAGES.filter(({ code }) => code === 'de' || code === 'en' || code === 'es')
+                    ).map(({ code, label }) => (
+                      <SelectItem key={code} value={code}>{label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
+            )}
+            {generateAudio && isSeedance25 && (
+              <p className="text-[11px] leading-snug text-muted-foreground pt-1 border-t border-border/30">
+                {tx({
+                  de: 'Seedance 2.5 erzeugt natives Audio inklusive Dialog. Sprache und Wortlaut werden über deinen Prompt gesteuert; Aussprache und Lippenbewegung können modellbedingt variieren.',
+                  en: 'Seedance 2.5 generates native audio including dialogue. Language and wording are controlled through your prompt; pronunciation and lip movement may vary by generation.',
+                  es: 'Seedance 2.5 genera audio nativo, incluido el diálogo. El idioma y el texto se controlan mediante tu prompt; la pronunciación y el movimiento labial pueden variar.',
+                })}
+              </p>
             )}
             {generateAudio && !modelSpeaks && (
               <p className="text-[11px] leading-snug text-muted-foreground pt-1 border-t border-border/30">
