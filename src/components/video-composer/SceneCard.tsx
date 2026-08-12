@@ -1223,6 +1223,8 @@ export default function SceneCard({
                           HappyHorse · {current}s ({tx({ de: 'nativ 3–15s, jede Sekunde wählbar', en: 'native 3–15s, any second selectable', es: 'nativo 3–15s, cualquier segundo seleccionable' })})
                         </p>
                       )}
+                      {dialogLengthWarning}
+
                     </div>
                   );
                 }
