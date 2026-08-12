@@ -38,6 +38,12 @@ interface GenerateRequest {
   referenceAudioUrls?: string[];
   /** Native audio generation (`generate_audio`). */
   generateAudio?: boolean;
+  /**
+   * Ambience-only mode: the model may produce sound, but must not speak.
+   * Seedance 2.5 has no reliable TTS, so spoken lines would come out as
+   * gibberish — the voice is added later in the studio instead.
+   */
+  suppressDialogue?: boolean;
   seed?: number;
 }
 
