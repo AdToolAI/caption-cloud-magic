@@ -121,8 +121,14 @@ jobs.forEach((j, idx) => {
   if (v === undefined || v === j.value) return;
   const state = fileState.find((f) => f.file === j.file);
   const [, indent, key, sep, quote, , tail] = j.match;
-  const escaped = v.replace(/\\/g, "\\\\").replace(new RegExp(quote, "g"), `\\${quote}`);
-  state.lines[j.index] = `${indent}${key}${sep}${quote}${escaped}${quote}${tail}`;
+  // The value is written back verbatim (the model is told to preserve escape
+  // sequences); skip anything that would break the string literal.
+  const unescapedQuote = new RegExp(`(^|[^\\\\])(\\\\\\\\)*${quote}`);
+  if (unescapedQuote.test(v)) {
+    console.warn(`skipped (quote): ${j.file}:${j.index + 1} ${j.key}`);
+    return;
+  }
+  state.lines[j.index] = `${indent}${key}${sep}${quote}${v}${quote}${tail}`;
   changed++;
 });
 
