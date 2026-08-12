@@ -193,6 +193,8 @@ interface ClipRequest {
    *  spend. The client then shows the preview and re-invokes without this
    *  flag once the user confirms. */
   previewOnly?: boolean;
+  /** Run identities minted by composer-start-scene-generation. */
+  run_context?: Record<string, { generation: number; run_id: string }>;
 }
 
 
@@ -237,7 +239,7 @@ serve(async (req) => {
     __stage = "parse_body";
     const body: ClipRequest = await req.json();
     __parsedBody = body;
-    const { projectId, scenes, visualStyle, characters, previewOnly } = body;
+    const { projectId, scenes, visualStyle, characters, previewOnly, run_context: runContext } = body;
 
     if (!projectId) {
       return new Response(
@@ -428,20 +430,33 @@ serve(async (req) => {
         .filter((s) => s.clipSource?.startsWith("ai-"))
         .map((s) => s.id);
       if (earlyAiSceneIds.length > 0) {
-        const stamps = await beginSceneRun(
-          supabaseAdmin,
-          earlyAiSceneIds,
-          "compose-video-clips",
-        );
-        sceneRunStamps = new Map(
-          stamps.map((s) => [s.sceneId, { runId: s.runId, generation: s.generation }]),
-        );
+        if (runContext) {
+          const { data: liveRows, error: liveErr } = await supabaseAdmin
+            .from("composer_scenes")
+            .select("id, active_run_id, plate_generation")
+            .in("id", earlyAiSceneIds);
+          if (liveErr) throw liveErr;
+          for (const id of earlyAiSceneIds) {
+            const expected = runContext[id];
+            const live = (liveRows ?? []).find((row: any) => row.id === id);
+            if (!expected || !live || live.active_run_id !== expected.run_id || Number(live.plate_generation) !== Number(expected.generation)) {
+              throw new Error(`stale_or_missing_run_context:${id}`);
+            }
+            sceneRunStamps.set(id, { runId: expected.run_id, generation: expected.generation });
+          }
+        } else {
+          // Legacy/direct callers still get a fresh identity, but all product
+          // UI callers must use composer-start-scene-generation for full purge.
+          const stamps = await beginSceneRun(supabaseAdmin, earlyAiSceneIds, "compose-video-clips-legacy");
+          sceneRunStamps = new Map(stamps.map((s) => [s.sceneId, { runId: s.runId, generation: s.generation }]));
+        }
       }
     } catch (preMarkErr) {
-      console.warn(
-        "[compose-video-clips] EARLY pre-mark failed (non-fatal):",
-        preMarkErr,
-      );
+      console.error("[compose-video-clips] run validation failed:", preMarkErr);
+      return new Response(JSON.stringify({ ok: false, error: "run_validation_failed", message: String((preMarkErr as Error)?.message ?? preMarkErr) }), {
+        status: 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
     void sceneRunStamps;
 
@@ -4232,6 +4247,10 @@ serve(async (req) => {
               .update({
                 clip_status: "failed",
                 clip_error: __arkMessage.slice(0, 500),
+                replicate_prediction_id: null,
+                lip_sync_status: null,
+                twoshot_stage: null,
+                dialog_shots: null,
                 updated_at: new Date().toISOString(),
               })
               .eq("id", scene.id);

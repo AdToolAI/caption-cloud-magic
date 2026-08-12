@@ -31,6 +31,7 @@ import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBr
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { emitStageEvent } from '@/lib/stage/stageEvents';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
+import { prepareSceneRuns, startSceneGeneration } from '@/lib/composer/startSceneGeneration';
 
 interface UseGenerateAllClipsArgs {
   scenes: ComposerScene[];
@@ -204,6 +205,13 @@ export function useGenerateAllClips({
           ),
       );
 
+      const eligibleIds = eligibleScenes
+        .filter((scene) => scene.clipSource.startsWith('ai-'))
+        .map((scene) => scene.id);
+      if (eligibleIds.length > 0) {
+        await prepareSceneRuns({ sceneIds: eligibleIds, reason: 'storyboard_generate_all' });
+      }
+
       // 3. compose prompts
       const composedByScene = new Map<string, ReturnType<typeof composeFinalPrompt>>();
       for (const s of eligibleScenes) {
@@ -296,10 +304,13 @@ export function useGenerateAllClips({
       });
       onUpdateScenes(optimistic);
 
-      const { data, error } = await supabase.functions.invoke('compose-video-clips', {
-        body: { projectId: pid, scenes: scenesPayload, visualStyle, characters },
+      const started = await startSceneGeneration({
+        sceneIds: eligibleIds,
+        compose: { projectId: pid, scenes: scenesPayload, visualStyle, characters },
+        reason: 'storyboard_generate_all',
+        useExistingRun: true,
       });
-      if (error) throw error;
+      const data = started.compose;
 
       // Edge function returns HTTP 200 with `{ok:false}` on early-phase crashes.
       if (data && (data as any).ok === false) {

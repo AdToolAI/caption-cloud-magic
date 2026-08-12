@@ -2,10 +2,9 @@ import { tx } from "@/lib/i18nText";
 /**
  * startSceneGeneration — Adapter auf den Baseline-Pfad vom 27.07.2026.
  *
- * Der v377 "Single-Run-Vertrag" (`composer-start-scene-generation`) ist Teil
- * des Post-Juli-Umbaus und wurde beim chirurgischen Rollback stillgelegt. Die
- * Baseline startet einen Clip-Render genau so, wie es der Juli-Stand tat:
- * direkter Aufruf von `compose-video-clips`.
+ * Der v377 "Single-Run-Vertrag" (`composer-start-scene-generation`) ist der
+ * einzige erlaubte Startpunkt. Reset + Run-Akquise + Dispatch passieren
+ * serverseitig fail-closed, damit niemals zwei Generationen kollabieren.
  *
  * Diese Datei bleibt bestehen, damit die bestehenden UI-Komponenten (ClipsTab,
  * SceneCard, SceneDialogStudio, AnchorPreviewGate, FaceMapReviewDialog,
@@ -54,8 +53,13 @@ export async function startSceneGeneration(params: {
 }): Promise<StartSceneGenerationResult> {
   requireIds(params.sceneIds);
 
-  const { data, error } = await supabase.functions.invoke('compose-video-clips', {
-    body: params.compose,
+  const { data, error } = await supabase.functions.invoke('composer-start-scene-generation', {
+    body: {
+      scene_ids: params.sceneIds,
+      compose: params.compose,
+      reason: params.reason ?? 'user_regenerate',
+      use_existing_run: params.useExistingRun === true,
+    },
   });
 
   if (error) {
@@ -65,18 +69,37 @@ export async function startSceneGeneration(params: {
     );
   }
 
-  return { runs: {}, compose: data };
+  if (data?.ok === false) {
+    throw new SceneGenerationStartError(
+      String(data.error ?? 'start_failed'),
+      String(data.message ?? data.error ?? tx({ de: 'Der Render konnte nicht gestartet werden.', en: 'The render could not be started.', es: 'No se pudo iniciar el renderizado.' })),
+    );
+  }
+
+  return { runs: data?.runs ?? {}, compose: data?.compose ?? data };
 }
 
 /**
- * Erste Etappe des früheren Split-Starts. Auf dem Baseline-Pfad gibt es keine
- * serverseitige Run-Akquise mehr — die Funktion bleibt als No-op erhalten,
- * damit "alle Clips generieren" unverändert aufrufbar ist.
+ * Erste Etappe des Split-Starts: atomarer Run-Wechsel + vollständiger Purge,
+ * bevor neue Anchor-Artefakte erzeugt werden.
  */
 export async function prepareSceneRuns(params: {
   sceneIds: string[];
   reason?: string;
 }): Promise<Record<string, SceneRunInfo>> {
-  requireIds(params.sceneIds);
-  return {};
+  const sceneIds = requireIds(params.sceneIds);
+  const { data, error } = await supabase.functions.invoke('composer-start-scene-generation', {
+    body: {
+      scene_ids: sceneIds,
+      prepare_only: true,
+      reason: params.reason ?? 'user_regenerate',
+    },
+  });
+  if (error || data?.ok === false) {
+    throw new SceneGenerationStartError(
+      String(data?.error ?? 'prepare_failed'),
+      error?.message || String(data?.message ?? data?.error ?? tx({ de: 'Der vorherige Lauf konnte nicht sicher beendet werden.', en: 'The previous run could not be safely terminated.', es: 'No se pudo finalizar de forma segura la ejecución anterior.' })),
+    );
+  }
+  return data?.runs ?? {};
 }
