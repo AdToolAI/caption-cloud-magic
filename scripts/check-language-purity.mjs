@@ -45,6 +45,13 @@ function langAt(lines) {
   return map;
 }
 
+/** Intentional cross-language copy (brand phrasing, marketing headlines). */
+const ALLOW = new Set([
+  "z.B. Behind-the-Scenes Cut",
+  "p.ej. Corte Behind-the-Scenes",
+  "wins the game",
+]);
+
 const problems = [];
 
 for (const file of FILES) {
@@ -63,7 +70,7 @@ for (const file of FILES) {
     const m = ENTRY.exec(line);
     if (!m) return;
     const value = m[5];
-    if (!value || NEUTRAL.test(value.trim())) return;
+    if (!value || NEUTRAL.test(value.trim()) || ALLOW.has(value.trim())) return;
 
     for (const [other, marker] of Object.entries(MARKERS)) {
       if (other === lang) continue;
