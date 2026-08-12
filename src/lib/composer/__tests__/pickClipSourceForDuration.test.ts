@@ -27,16 +27,16 @@ describe('pickClipSourceForDuration', () => {
     expect(r.switched).toBe(false);
   });
 
-  it('v418 — routes long dialog scenes to Seedance 2.5 once certified', () => {
+  it('v425 — never routes dialog scenes away from certified providers', () => {
     const r = pickClipSourceForDuration({
       durationSeconds: 25,
       preferred: 'ai-happyhorse',
       dialogMode: true,
       longFormDialogAllowed: true,
     });
-    expect(r.clipSource).toBe('ai-seedance25');
-    expect(r.durationSeconds).toBe(25);
-    expect(r.switched).toBe(true);
+    expect(r.clipSource).toBe('ai-happyhorse');
+    expect(r.durationSeconds).toBeLessThanOrEqual(15);
+    expect(r.switched).toBe(false);
   });
 
   it('never exceeds the 30 s long-form ceiling', () => {
