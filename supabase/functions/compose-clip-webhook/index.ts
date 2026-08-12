@@ -11,6 +11,7 @@ import { isAmbientAudioRow, runAmbientSpeechGate } from "../_shared/ambient-audi
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
+import { resumeContinuityChain, sweepContinuityQueue } from "../_shared/continuity-chain.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -654,6 +655,19 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             console.error('[compose-clip-webhook] Refund failed:', refundErr);
           }
         }
+      }
+
+      // v426 — a successor parked behind this scene must not stay `queued`.
+      // It is released immediately, with continuity downgraded to match-cut.
+      try {
+        await resumeContinuityChain({
+          supabaseAdmin: supabase,
+          projectId,
+          predecessorSceneId: sceneId,
+          predecessorFailed: true,
+        });
+      } catch (chainErr) {
+        console.error('[compose-clip-webhook] chain release after failure error:', chainErr);
       }
 
     } else {
