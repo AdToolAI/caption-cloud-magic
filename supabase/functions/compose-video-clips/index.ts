@@ -499,7 +499,7 @@ serve(async (req) => {
     if (v427CreditsEnabled && aiScenes.length > 0) {
       const ceilingCost = maxRunCostEuros(aiScenes as any);
       try {
-        v427Reservation = await reserveRunCredits(supabaseAdmin, {
+        v427Reservation = __v427Reservation = await reserveRunCredits(supabaseAdmin, {
           userId: user.id,
           projectId,
           sceneIds: aiScenes.map((s) => s.id),
@@ -5092,6 +5092,23 @@ serve(async (req) => {
       `[compose-video-clips] FATAL @ stage=${__stage}: ${msg}`,
       stack || "",
     );
+    // v427B — release any money still sitting on this crashed run (no-op when
+    // the settlement above already ran).
+    if (__v427Reservation) {
+      try {
+        const adminUrl = Deno.env.get("SUPABASE_URL") ?? "";
+        const adminKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+        if (adminUrl && adminKey) {
+          await releaseRunReservation(
+            createClient(adminUrl, adminKey),
+            __v427Reservation.reservationId,
+            `fatal_${__stage}`,
+          );
+        }
+      } catch (relErr) {
+        console.error("[compose-video-clips] v427 reservation release failed:", relErr);
+      }
+    }
     // Try to flip any scenes the client sent into a visible `failed` state so
     // the UI doesn't sit on `pending`/`generating` forever. Best-effort only —
     // if even the body parse failed we just return the error JSON.
