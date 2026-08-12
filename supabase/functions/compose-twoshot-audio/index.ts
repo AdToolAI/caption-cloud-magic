@@ -29,6 +29,15 @@ import {
   type DialogTurn,
 } from "../_shared/scene-dialog-turns.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
+// v427B — the timing literals below now live in one named place. Values are
+// unchanged (300 ms tail / grace, 5 s cap, 100 ms step, 250 ms pause).
+import {
+  DURATION_STEP_MS,
+  INTER_SPEAKER_PAUSE_MS,
+  MAX_EXTEND_MS,
+  OVERFLOW_GRACE_MS,
+  TAIL_PADDING_MS,
+} from "../_shared/v427-duration-contract.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -828,7 +837,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // which ElevenLabs sometimes voiced as an audible mumble/breath at the
     // end of short replies ("Was denn? <mumble>"). Silence here is sample-
     // accurate and never bleeds into another speaker's lip-sync window.
-    const INTER_SPEAKER_PAUSE_SEC = 0.25;
+    const INTER_SPEAKER_PAUSE_SEC = INTER_SPEAKER_PAUSE_MS / 1000;
     // ── v94 — Parallel TTS with concurrency=2 ───────────────────────────
     // Previously the for-loop awaited each ElevenLabs/Hume call serially
     // (~0.8-2.5s each). For a 4-speaker / 8-turn scene this added 6-20s of
@@ -1067,8 +1076,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // kürzt am Ende (`cut_off`). HappyHorse (3–15s) darf weiterhin verlängern.
     const sceneClipSource = String((scene as any).clip_source ?? "");
     const isHailuoScene = sceneClipSource === "ai-hailuo";
-    const OVERFLOW_GRACE_SEC = 0.30;
-    const MAX_EXTEND_SEC = 5.0;
+    const OVERFLOW_GRACE_SEC = OVERFLOW_GRACE_MS / 1000;
+    const MAX_EXTEND_SEC = MAX_EXTEND_MS / 1000;
+    const TAIL_PADDING_SEC = TAIL_PADDING_MS / 1000;
+    const STEPS_PER_SEC = 1000 / DURATION_STEP_MS;
     let dialogOverflowExtended: { from: number; to: number; overflowSec: number } | null = null;
     if (!isHailuoScene && spokenSec > sceneDur + OVERFLOW_GRACE_SEC) {
       const overflow = spokenSec - sceneDur;
@@ -1077,14 +1088,14 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           error: "dialog_too_long_for_plate",
           message:
             tl({ de: `Das Skript dauert ${spokenSec.toFixed(2)} s, aber die Szene ist nur ${sceneDur.toFixed(2)} s lang. `, en: `The script is ${spokenSec.toFixed(2)}s long, but the scene is only ${sceneDur.toFixed(2)}s long.`, es: `El guion dura ${spokenSec.toFixed(2)}s, pero la escena solo dura ${sceneDur.toFixed(2)}s.` }) +
-            tl({ de: `Bitte Text kürzen oder die Szene auf mindestens ${Math.ceil(spokenSec + 0.3)} s verlängern.`, en: `Please shorten text or extend the scene to at least ${Math.ceil(spokenSec + 0.3)}s.`, es: `Por favor, acorta el texto o extiende la escena a al menos ${Math.ceil(spokenSec + 0.3)}s.` }),
+            tl({ de: `Bitte Text kürzen oder die Szene auf mindestens ${Math.ceil(spokenSec + TAIL_PADDING_SEC)} s verlängern.`, en: `Please shorten text or extend the scene to at least ${Math.ceil(spokenSec + TAIL_PADDING_SEC)}s.`, es: `Por favor, acorta el texto o extiende la escena a al menos ${Math.ceil(spokenSec + TAIL_PADDING_SEC)}s.` }),
           spoken_sec: Math.round(spokenSec * 1000) / 1000,
           scene_dur_sec: sceneDur,
           overflow_sec: Math.round(overflow * 1000) / 1000,
         }, 400);
       }
       // Extend in 0.1s steps (matches plate-render granularity) + 0.3s tail.
-      const newDur = Math.ceil((spokenSec + 0.30) * 10) / 10;
+      const newDur = Math.ceil((spokenSec + TAIL_PADDING_SEC) * STEPS_PER_SEC) / STEPS_PER_SEC;
       dialogOverflowExtended = {
         from: Math.round(sceneDur * 1000) / 1000,
         to: newDur,
