@@ -94,21 +94,13 @@ export function validateSceneForCinematicSync(
     });
   }
 
-  // Provider lip-sync allowlist (July 2026 policy: providers whose i2v output
-  // reliably produces realistic, speaking human faces that pass Sync.so's
-  // face-gate on lipsync-2-pro. Pipeline itself is unchanged.)
-  const LIPSYNC_ALLOWED = new Set([
-    'ai-hailuo',
-    'ai-happyhorse',
-    'ai-kling',
-    'ai-seedance',
-    'ai-wan',
-  ]);
-  if (!LIPSYNC_ALLOWED.has(provider)) {
+  // Read the shared capability registry instead of maintaining a second
+  // provider allowlist that can drift from the picker and dispatch path.
+  if (!providerSupportsLipsync(provider)) {
     out.push({
       code: 'provider_no_lipsync_support',
       level: 'warning',
-      message: tx({ de: `Lip-Sync ist zertifiziert für HappyHorse, Hailuo, Kling, Seedance und Wan. Aktuell: ${PROVIDER_CAPS[provider]?.label ?? provider} — Auto-Fallback auf Hailuo.`, en: `Lip-sync is certified for HappyHorse, Hailuo, Kling, Seedance, and Wan. Current: ${PROVIDER_CAPS[provider]?.label ?? provider} — auto-fallback to Hailuo.`, es: `La sincronización labial está certificada para HappyHorse, Hailuo, Kling, Seedance y Wan. Actual: ${PROVIDER_CAPS[provider]?.label ?? provider} — retroceso automático a Hailuo.` }),
+      message: tx({ de: `${PROVIDER_CAPS[provider]?.label ?? provider} ist nicht für Lip-Sync freigegeben. Bitte vor dem Rendern einen zertifizierten Provider wählen.`, en: `${PROVIDER_CAPS[provider]?.label ?? provider} is not approved for lip-sync. Please choose a certified provider before rendering.`, es: `${PROVIDER_CAPS[provider]?.label ?? provider} no está aprobado para sincronización labial. Elige un proveedor certificado antes de renderizar.` }),
     });
   }
 
