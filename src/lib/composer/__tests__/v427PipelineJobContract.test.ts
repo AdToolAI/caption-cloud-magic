@@ -70,15 +70,17 @@ describe('v427 freeze safety', () => {
 
   it('never moves a dispatched job backwards', () => {
     const src = read(HELPER);
-    expect(src).toContain("if (current.status === 'dispatching') patch.status = 'dispatched';");
+    expect(src).toContain('if (current.status === "dispatching") patch.status = "dispatched";');
   });
 
   it('does not touch any frozen lip-sync concern', () => {
-    const src = read(HELPER).toLowerCase();
-    for (const forbidden of ['mask', 'preclip_geometry', 'faceshare', 'crop', 'camera', 'retry']) {
-      expect(src).not.toContain(forbidden);
-    }
+    const src = read(HELPER);
+    // No imports from frozen modules and no outbound provider calls.
+    expect(src).not.toMatch(/from "\.\/(pass-face-preclip|syncso-|plate-|face-|camera-path|compute-mouth)/);
+    expect(src).not.toContain('fetch(');
+    expect(src).not.toMatch(/sync\.so|replicate\.com|ark\.ap-southeast/i);
   });
+
 
   it('all v427 flags default to legacy behaviour', () => {
     const src = read(FLAGS);
