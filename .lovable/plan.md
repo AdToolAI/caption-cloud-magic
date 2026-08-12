@@ -44,7 +44,7 @@ Vertrag: Sobald reserviert und gestartet, sind effektive Dauer, abrechenbare Dau
 Der Provider-Webhook setzt künftig `base_clip_ready`. `ready` wird ausschließlich am Ende gesetzt — nach Mux bzw. sofort, wenn die Szene kein Lip-Sync braucht. Dasselbe Gate (`clip_status = ready AND (kein Lip-Sync ODER lip_sync_status = done)`) gilt für Vorschau, Export, Projektabschluss und Benachrichtigung.
 
 ### 3. Echtes Guthaben-Ledger
-Der Composer nutzt die vorhandene Reserve-Commit-Refund-Kette: atomare Reservierung pro Run vor dem Dispatch, Umwandlung in Abbuchung nach erfolgreichem Start, Freigabe für nicht gestartete Szenen, Erstattung anhand des **gespeicherten** Betrags pro Szene (nicht anhand der tagesaktuellen `CLIP_COSTS`).
+Der Composer nutzt die vorhandene Reserve-Commit-Refund-Kette: atomare Reservierung pro Run vor dem Dispatch, Umwandlung in Abbuchung nach erfolgreichem Start, Freigabe für nicht gestartete Szenen. Commit und Refund lesen ausschließlich `quoted_cost_euros` aus dem Run-Snapshot — nie erneut die aktuelle `CLIP_COSTS`-Tabelle.
 
 ### 4. Providerabhängige Lease
 Statt pauschal 15 Minuten: `provider_timeout + Polling- und Webhook-Toleranz`, für ModelArk also 30 Minuten. Zusätzlich ein Heartbeat, der die Lease verlängert, solange der Providerjob nachweislich läuft.
