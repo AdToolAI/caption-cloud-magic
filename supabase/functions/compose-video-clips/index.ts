@@ -8,6 +8,7 @@ import { CLIP_COSTS, type ClipQuality } from "../_shared/clip-costs.ts";
 import { createSeedance25Task, MODELARK_JOB_PREFIX } from "../_shared/modelark.ts";
 import { isSeedance25LipsyncEnabled } from "../_shared/seedance25-lipsync-flag.ts";
 import { AMBIENT_NO_SPEECH_PROMPT } from "../_shared/ambient-audio.ts";
+import { isSupportedComposerAiSource } from "../_shared/composer-ai-sources.ts";
 
 import {
   countDialogSpeakers,
@@ -1486,23 +1487,6 @@ serve(async (req) => {
       }
     };
 
-    // Engines that compose-video-clips actually implements. Anything outside
-    // this set (e.g. legacy 'ai-sora' after the OpenAI Sunset 2026) gets
-    // normalized to a working default so an upstream planner (Auto-Director,
-    // manual choice) can never leave a scene stranded in 'pending' forever.
-    const SUPPORTED_AI_SOURCES = new Set([
-      "ai-hailuo",
-      "ai-kling",
-      "ai-wan",
-      "ai-seedance",
-      "ai-luma",
-      "ai-veo",
-      "ai-runway",
-      "ai-pika",
-      "ai-happyhorse",
-      "ai-image",
-    ]);
-
     // ── Optimistic pre-mark + background dispatch ─────────────────────────
     // The original synchronous per-scene loop could take 60+ seconds per scene
     // (Nano Banana 2 anchor compose + face/identity audits + provider dispatch).
@@ -1939,7 +1923,7 @@ serve(async (req) => {
       // Defensive: rewrite unsupported AI engines to a working default.
       if (
         scene.clipSource.startsWith("ai-") &&
-        !SUPPORTED_AI_SOURCES.has(scene.clipSource)
+        !isSupportedComposerAiSource(scene.clipSource)
       ) {
         console.warn(
           `[compose-video-clips] Scene ${scene.id} clipSource '${scene.clipSource}' not supported by composer — falling back to ai-hailuo.`,

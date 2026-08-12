@@ -1706,14 +1706,14 @@ export default function SceneCard({
                             <Label className="text-[10px] text-muted-foreground">
                               {lang === "de"
                                 ? dialogMode
-                                  ? "KI-Modell · Lip-Sync (HappyHorse · Hailuo Fallback)"
+                                  ? "KI-Modell · zertifizierter Lip-Sync-Provider"
                                   : tx({ de: "KI-Modell · Qualität & Preis im Dropdown", en: "AI model · Quality & price in dropdown", es: "Modelo de IA · Calidad y precio en el menú desplegable" })
                                 : lang === "es"
                                   ? dialogMode
-                                    ? "Modelo IA · Lip-Sync (HappyHorse · Hailuo)"
+                                    ? "Modelo IA · proveedor certificado de Lip-Sync"
                                     : "Modelo IA"
                                   : dialogMode
-                                    ? "AI Model · Lip-Sync (HappyHorse · Hailuo)"
+                                    ? "AI Model · certified lip-sync provider"
                                     : "AI Model"}
                             </Label>
 

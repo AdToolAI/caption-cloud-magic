@@ -100,8 +100,8 @@ export const PROVIDER_CAPS: Record<string, ProviderCapability> = {
   'ai-seedance25': {
     // ModelArk direct API — long-form scenes, provider range 4-30 s.
     durations: [4, 5, 8, 10, 12, 15, 20, 25, 30],
-    lipsync: false,
-    multiSpeaker: false,
+    lipsync: true,
+    multiSpeaker: true,
     startEndFrames: true,
     label: 'Seedance 2.5',
   },
