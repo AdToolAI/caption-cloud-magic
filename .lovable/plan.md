@@ -1,63 +1,125 @@
-# Urteil zur Analyse + Härtungsplan (v427)
+# Härtungsplan v427 (überarbeitet nach Review)
 
-Die Analyse ist gut. Ich habe alle sechs Kritikpunkte im Code nachgeprüft — fünf treffen zu, einer nur zur Hälfte. Nichts davon verlangt einen Umbau, alles sind Übergänge, die abgesichert werden müssen.
+Die vier Korrekturen sind berechtigt und werden vollständig übernommen. Zwei davon waren echte Implementierungsblocker: die verlorene angeforderte Dauer und die einzelne `provider_job_id`. Der Plan unten ist die freigabefähige Fassung.
 
-## Was ich verifiziert habe
+## Verifizierte Befunde (unverändert)
 
 | Punkt | Befund im Code |
 |---|---|
-| Dauer zu spät berechnet | **Bestätigt.** Guthabenprüfung in `compose-video-clips` (Zeile 377–410) rechnet mit `scene.durationSeconds`; das Cinematic-Sync-Auto-Extend läuft erst ab Zeile 2046 — also nach Provider- und Kostenprüfung. |
-| `ready` vor Lip-Sync | **Bestätigt.** `compose-clip-webhook` (Zeile 197) setzt `clip_status: 'ready'` und im selben Update `lip_sync_status: 'pending'`. Eine Dialogszene gilt damit als fertig, obwohl nur die Platte steht. |
-| Kein Escrow | **Bestätigt.** `credit_reservations` und die Funktionen `credit-reserve/commit/refund` existieren, werden vom Composer-Pfad aber nicht benutzt: dort nur Balance-Check vorne, `deduct_ai_video_credits` hinten (Zeile 4885+). |
-| TTL kürzer als Providerlauf | **Bestätigt.** `PARK_TTL_MINUTES = 15` in `continuity-chain.ts` gegen `TASK_TIMEOUT_MS = 25 min` in `modelark-poll`. |
-| Alte Webhooks | **Halb.** `compose-clip-webhook` und `modelark-poll` prüfen `active_run_id`. `sync-so-webhook` und `render-sync-segments-audio-mux` tun das nicht — dort kann ein Nachzügler noch schreiben. Eine `provider_job_id`-Prüfung gibt es nirgends. |
-| Storyboard nur im State | **Bestätigt.** `onScenesGenerated` (BriefingTab Zeile 453) reicht die Szenen nur an den Dashboard-State weiter; persistiert wird erst beim Speichern/Rendern. |
+| Dauer zu spät berechnet | Guthabenprüfung in `compose-video-clips` (377–410) rechnet mit `scene.durationSeconds`; Auto-Extend erst ab 2046. |
+| `ready` vor Lip-Sync | `compose-clip-webhook` (197) setzt `clip_status: 'ready'` zusammen mit `lip_sync_status: 'pending'`. |
+| Kein Escrow | `credit_reservations` + `credit-reserve/commit/refund` existieren, Composer-Pfad nutzt sie nicht. |
+| TTL kürzer als Providerlauf | `PARK_TTL_MINUTES = 15` gegen `TASK_TIMEOUT_MS = 25 min` (modelark-poll). |
+| Alte Webhooks | `sync-so-webhook` und `render-sync-segments-audio-mux` prüfen `active_run_id` nicht; Job-ID-Prüfung fehlt überall. |
+| Storyboard nur im State | `onScenesGenerated` (BriefingTab 453) persistiert nicht. |
 
-## Umsetzung
+## Übernommene Korrekturen
 
-### 1. Ein Dauervertrag pro Run (unveränderlich)
+### 1. Dauervertrag: angeforderte Dauer bleibt Untergrenze
 
-Die Kritik ist berechtigt: „schätzen“ reicht nicht, und die Dauer gehört zum Run, nicht dauerhaft zur Szene.
+Maßgeblich ist:
 
-**Feste Reihenfolge vor jedem kostenpflichtigen Dispatch:**
-Auth/Ownership → Dialog kanonisieren → Provider-/Engine-Zulässigkeit (dauerunabhängig) → Sprach-/Audiotimeline bestimmen → `required_duration_ms` → Aufrunden auf das nächste zulässige Providerfenster → Dauervertrag validieren → Preis → Guthaben reservieren → Run-Snapshot atomar speichern → Dispatch.
+```text
+raw_required_duration_ms =
+  max(requested_duration_ms, measured_audio_end_ms + tail_padding_ms)
+→ Aufrunden auf nächstes zulässiges Providerfenster
+→ effective_duration_ms / effective_duration_frames
+→ billable_duration_seconds → Preis
+```
 
-**Audiodauer wird gemessen, nicht geraten.** Der Audio-Plan (TTS/Turns) entsteht **vor** dem Videojob:
-`required_duration_ms = max(end_time aller dialog_turns) + tail_padding_ms` (400 ms Standardpuffer). Damit macht ein TTS-Fehler keinen bereits bezahlten Videojob unbrauchbar. Nur wenn kein Audio-Plan möglich ist, greift die Textschätzung — dann mit konservativem Aufschlag und derselben späteren Assertion.
+Voiceover verlängert, verkürzt nie. Intern wird in ganzzahligen Millisekunden bzw. Frames gerechnet; `effective_duration_seconds` ist nur abgeleiteter Anzeige- und Providerwert.
 
-**Snapshot-Felder pro Run** (auf der Szene, gebunden an `active_run_id`):
-`requested_duration_seconds`, `required_duration_ms`, `effective_duration_seconds`, `billable_duration_seconds`, `duration_run_id`, `quoted_cost_euros`, `duration_policy_version`.
-Vertrag: Sobald reserviert und gestartet, sind effektive Dauer, abrechenbare Dauer und Preis für diesen Run eingefroren. Dialog-, Stimmen-, Provider- oder Tempoänderung sowie Rerender erzeugen eine neue `run_id` und damit einen neuen Snapshot. Jeder Leser/Writer prüft `duration_run_id = active_run_id`.
+**Feste Reihenfolge vor jedem kostenpflichtigen Dispatch:** Auth/Ownership → Dialog kanonisieren → Provider-/Engine-Zulässigkeit (dauerunabhängig) → Audio-Plan/TTS → `raw_required_duration_ms` → Providerfenster → Dauervertrag validieren → Preis → Transaktion (Run + Reservierung) → Dispatch.
 
-**Eine zentrale Dauer-Policy, keine dritte Liste.** `DurationPolicy` (`discrete` mit `valuesSeconds`, bzw. `range` mit min/max/step) liegt neben `lipsyncMasterProvider.ts` und wird nach `_shared/composer-ai-sources.ts` gespiegelt; Hailuo `[6,10]`, HappyHorse 3–15/1, Seedance 2.5 4–30/1. Eine reine Funktion `resolveEffectiveDuration(requiredSeconds, policy)` bedient UI, Servervalidierung, Preis und Tests.
+**Das gemessene Audio ist das später verwendete Audio.** TTS wird vor dem Videojob erzeugt und als Teil des Run-Vertrags eingefroren: `audio_plan_id`, `audio_asset_id`, `audio_asset_hash`, `measured_audio_duration_ms`, `dialog_content_hash`, `voice_configuration_hash`. Die Sync-Unterpipeline lädt exakt dieses Asset und synthetisiert nicht neu. Das ist die einzige echte Änderung der Ausführungsreihenfolge in v427. TTS-Kosten laufen in derselben Reservierung mit, als eigene idempotente Position `charge_type = 'tts'`.
 
-**Immer aufrunden, nie klemmen.** 6,01 s bei Hailuo → 10 s; 10,01 s → Abbruch vor Dispatch mit klarer Meldung („Der Dialog braucht 10,8 s. Hailuo unterstützt hier nur 6 oder 10 s — kürze den Dialog oder wähle HappyHorse.“). Kein stiller Providerwechsel.
+**Weitere Snapshot-Felder:** `requested_duration_ms`, `required_duration_ms`, `effective_duration_ms`, `effective_duration_frames`, `billable_duration_seconds`, `duration_run_id`, `quoted_cost_euros`, `duration_policy_version`, `run_contract_version = 427`. Jeder Leser/Writer prüft `duration_run_id = active_run_id`.
 
-**Auto-Extend (Zeile 2046) wird zur reinen Kontrollschranke.** Es verändert keine Dauer, keinen Preis, keinen Providervertrag und bucht nichts nach. Liegt die gemessene Sprache über dem Snapshot, wird der Lauf als `duration_contract_drift` markiert und bricht ab statt still zu verlängern.
+**Immer aufrunden, nie klemmen.** Hailuo 6,01 s → 10 s; 10,01 s → Abbruch vor Dispatch, ohne Belastung, mit klarer Meldung. Auto-Extend (2046) wird zur reinen Kontrollschranke: keine Dauer-, Preis- oder Provideränderung; Abweichung = `duration_contract_drift`.
 
-**Fortschritt bleibt ereignisbasiert.** Die effektive Dauer dient nur ETA, Gewichtung und Kostenanzeige — nicht der Prozentkurve.
+**Kein stiller Providerwechsel bei Dialog-/Lip-Sync-Szenen.** Die bestehende Dauerumleitung nicht-dialogischer Szenen auf Seedance 2.5 (>15 s) bleibt unverändert bestehen — sie ist Produktverhalten, keine Härtungslücke.
 
-**Grenztests vor dem Merge:** Hailuo 5,99→6 / 6,01→10 / 10,01→Fehler ohne Dispatch und ohne Belastung; HappyHorse 2,4→3 / 14,2→15 / 15,01→Fehler; Dialogänderung → neue run_id, neue Dauer, neuer Preis; alter Run-Webhook verändert Dauer/Kosten des neuen Runs nicht; gemessene Audiodauer > Snapshot → Contract-Drift.
+### 2. Provider-Capabilities und Lip-Sync-Zertifizierung getrennt
 
+Zwei Verträge statt einer Datei:
 
-### 2. `ready` heißt fertig
-Der Provider-Webhook setzt künftig `base_clip_ready`. `ready` wird ausschließlich am Ende gesetzt — nach Mux bzw. sofort, wenn die Szene kein Lip-Sync braucht. Dasselbe Gate (`clip_status = ready AND (kein Lip-Sync ODER lip_sync_status = done)`) gilt für Vorschau, Export, Projektabschluss und Benachrichtigung.
+- `ProviderCapabilities`: `durationPolicy`, `supportedQualities`, `supportedInputs`, `supportsAudio`, Referenz-Slots.
+- `LipSyncCertification`: `certified`, `supportedEngines`, `dialogRestrictions` — bleibt in `lipsyncMasterProvider.ts`.
 
-### 3. Echtes Guthaben-Ledger
-Der Composer nutzt die vorhandene Reserve-Commit-Refund-Kette: atomare Reservierung pro Run vor dem Dispatch, Umwandlung in Abbuchung nach erfolgreichem Start, Freigabe für nicht gestartete Szenen. Commit und Refund lesen ausschließlich `quoted_cost_euros` aus dem Run-Snapshot — nie erneut die aktuelle `CLIP_COSTS`-Tabelle.
+Seedance 2.5: `duration 4–30`, `lipSyncCertified = false`. Ein Paritätstest im Build vergleicht Client-Policy und `_shared/composer-ai-sources.ts`; unterschiedliche Dauerfenster lassen den Build fehlschlagen.
 
-### 4. Providerabhängige Lease
-Statt pauschal 15 Minuten: `provider_timeout + Polling- und Webhook-Toleranz`, für ModelArk also 30 Minuten. Zusätzlich ein Heartbeat, der die Lease verlängert, solange der Providerjob nachweislich läuft.
+### 3. Zwei Fertigbegriffe: Basis vs. Endergebnis
 
-### 5. Nachzügler hart abweisen
-Jeder Schreibpfad (`compose-clip-webhook`, `modelark-poll`, `sync-so-webhook`, `render-sync-segments-audio-mux`) schreibt nur bei passender `active_run_id` **und** passender Provider-Job-ID. Sonst: `stale_callback` protokollieren, keine Mutation. Die Job-ID wird beim Dispatch auf der Szene abgelegt.
+Provider-Webhook schreibt:
 
-### 6. Storyboard sofort als Entwurf
-Direkt nach `onScenesGenerated` wird ein versionierter Entwurf persistiert (Briefing-Hash, Erzeugungsmodus, Zeitstempel), danach Debounce-Autosave bei manuellen Änderungen. Beim Öffnen wird ein neuerer Entwurf angeboten statt still verworfen.
+```text
+clip_status    = generating
+pipeline_state = base_clip_ready
+base_clip_status = ready
+```
 
-### 7. UX-Klarheit (aus deiner Analyse übernommen)
-- Zwei verständliche Einstiege statt Technikbegriffen: „Aus einer Idee erstellen“ und „Fertiges Skript importieren“, mit Live-Vorschau neben dem Eingabefeld (erkannte Sprecher, Dialogzeilen, nicht zugeordnete Zeilen).
-- Statt „Generating“ echte Phasen: wartet auf vorherige Szene / Video wird generiert / Dialog wird vorbereitet / Lip-Sync / Zusammenführen / Export.
+Er extrahiert Übergangsmaterial und setzt die Kontinuitätskette **sofort** fort — die nächste Szene wartet nicht auf TTS, Sync.so und Mux.
 
-## Reihenfolge
-1–2 zuerst (Geld- und Fertig-Semantik), dann 5 und 4 (Datenintegrität unter Last), dann 3, dann 6–7.
+```text
+Kontinuitäts-Gate: base_clip_status = ready AND Übergangsmaterial vorhanden
+Nutzer-/Export-Gate: clip_status = ready AND (requires_lip_sync = false OR lip_sync_status = done)
+```
+
+`clip_status = ready` / `pipeline_state = completed` wird ausschließlich für das endgültige Nutzerergebnis gesetzt. Vorschau, Export, Projektabschluss und Benachrichtigung hängen am Nutzer-Gate.
+
+### 4. Stage-spezifische Job-Identitäten
+
+Neue Tabelle statt einer einzelnen `provider_job_id`:
+
+```text
+composer_pipeline_jobs(
+  id, scene_id, run_id, stage, segment_id,
+  external_job_id, status, created_at, completed_at)
+stage ∈ base_video | audio_plan | tts | preclip | sync_segment | audio_mux | final_render
+UNIQUE(scene_id, run_id, stage, segment_id)
+```
+
+Ein Callback schreibt nur, wenn `scene.active_run_id = callback.run_id`, ein passender Job-Datensatz (`scene_id`, `run_id`, `stage`, `external_job_id`, ggf. `segment_id`/`speaker_id`) existiert und der erwartete Zustand nicht terminal ist. Jede Zustandsänderung erfolgt als Compare-and-Set (`WHERE active_run_id = :run_id AND pipeline_state = :expected`), doppelte Zustellung wird damit zum No-op.
+
+### 5. Dauervertrag und Escrow gemeinsam, in einer Transaktion
+
+```text
+BEGIN
+  neue run_id setzen (active_run_id)
+  Run-Vertrag persistieren (Dauer, Preis, Audio-Asset, Policy-Version)
+  Credits atomar reservieren
+  Reservierungs-ID am Run speichern
+COMMIT
+→ danach externer Dispatch
+```
+
+**„Erfolgreich gestartet"** = Provider hat einen Auftrag erzeugt UND dessen Job-ID ist für diesen Run persistiert. Netzwerk-Timeout nach Create → Reservierung geht in `dispatch_uncertain` und wird von einem Reconciliation-Job geklärt, nicht sofort freigegeben. Idempotency-Key beim Provider: `scene_id + run_id + stage`. Commit/Release/Refund idempotent via `UNIQUE(scene_id, run_id, charge_type)`. Batch-Renders erzeugen alle Szenenreservierungen in einer Transaktion (Parent-Reservierung über die Summe plus Szenenallokationen), damit nicht die halbe Charge startet.
+
+### 6. Providerabhängige Lease + Heartbeat
+
+`lease_expires_at`, `lease_run_id`, `lease_job_id`, `last_heartbeat_at`. TTL = Provider-Timeout + Toleranz (ModelArk 30 min). Heartbeat verlängert nur bei passender Run- **und** Job-ID. Die Kettenlease hängt allein am `base_video`-Job, nicht an der Lip-Sync-Unterpipeline.
+
+### 7. Storyboard-Entwurf mit Optimistic Concurrency
+
+Direkt nach `onScenesGenerated` persistieren: `draft_revision`, `last_saved_revision`, `client_instance_id`, `updated_at`, Briefing-Hash, Erzeugungsmodus. Autosave debounced; Schreibkonflikt zweier Tabs wird erkannt und angeboten statt still überschrieben.
+
+### 8. UI-Phasen aus der Zustandsmaschine
+
+Sichtbare Phasen (wartet auf vorherige Szene / Video / Dialog wird vorbereitet / Lip-Sync / Zusammenführen / Export) werden aus `pipeline_state` abgeleitet — keine frei gesetzten UI-Texte.
+
+## Reihenfolge (übernommen)
+
+- **v427A — Datenintegrität:** Schema für Run-Vertrag und `composer_pipeline_jobs`, Nachzüglerprüfung (`run_id` + `stage` + `external_job_id`), `run_contract_version = 427`.
+- **v427B — Dauer und Geld als Einheit:** Audio-Preflight, `max(requested, audio)`, Run-Snapshot + Reservierung in einer Transaktion, idempotente Dispatch/Commit/Release/Refund.
+- **v427C — Fertig-Semantik:** `base_clip_ready` nichtterminal, Kette läuft bei Basisfertigstellung weiter, `clip_status = ready` nur final, alle Gates umgestellt.
+- **v427D — Wartezeiten und Wiederherstellung:** Leases + Heartbeats, Storyboard-Autosave, UI-Phasen.
+
+## Rollout (Expand and Contract)
+
+1. Neue Felder/Tabellen nullable hinzufügen.
+2. Neue Runs mit `run_contract_version = 427` dual-write.
+3. Strikte Job-ID- und Gate-Checks nur für v427-Runs.
+4. Alte v426-Runs auslaufen lassen.
+5. Legacy-Fallback entfernen.
+
+Bestandsdaten mit `clip_status = ready` + `lip_sync_status = pending/running` werden nicht pauschal migriert; ein Reconciliation-Lauf unterscheidet aktive Altläufe von echten Ergebnissen.
