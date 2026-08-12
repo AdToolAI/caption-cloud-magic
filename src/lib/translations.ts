@@ -16188,7 +16188,7 @@ translations.de.uvc = {
   generationFailedDesc: 'Die Videogenerierung konnte nicht abgeschlossen werden.',
   // Preview
   videoPreview: 'Videovorschau',
-  videoCreatedSuccess: 'Dein {nombre} wurde erfolgreich erstellt!',
+  videoCreatedSuccess: 'Dein {name} wurde erfolgreich erstellt!',
   // Manual mode
   manualModeSoon: 'Manueller Modus kommt bald',
   nextBtn: 'Weiter',
@@ -16289,11 +16289,11 @@ translations.de.uvc = {
   moodColor_playful: 'Bunt, Pastell, verspielt',
   // Mode Selector
   changeCategory: 'Cambiar categoría',
-  howCreateVideo: 'Wie möchtest du dein {nombre} erstellen?',
+  howCreateVideo: 'Wie möchtest du dein {name} erstellen?',
   chooseAutoOrManual: 'Wähle zwischen vollautomatischer KI-Erstellung oder manueller Steuerung',
   recommended: 'Empfohlen',
   fullServiceTitle: '🤖 Full-Service KI',
-  fullServiceDesc: 'Siéntate: la IA creará tu {nombre} completo automáticamente',
+  fullServiceDesc: 'Zurücklehnen: Die KI erstellt dein {name} vollautomatisch',
   fullServiceQ: '{count} tiefgehende Interview-Fragen',
   fullServiceTime: 'Fertig in ~5-15 Minuten',
   fullServiceNoWork: 'No se requiere trabajo manual',
@@ -16329,7 +16329,7 @@ translations.de.uvc = {
   consultantPreferManual: 'Lieber manuell',
   consultantCreateQuestion: 'Soll dein Video jetzt erstellt werden? Das dauert etwa 5 bis 15 Minuten.',
   // Auto Generation Progress
-  genCategoryCreating: 'Se crea {nombre}',
+  genCategoryCreating: '{name} wird erstellt',
   genVideoCreating: 'Dein Video wird erstellt.',
   genSitBack: 'Siéntate: la IA trabaja para ti',
   genRenderRetries: 'Render-Retries: {count}/3',
