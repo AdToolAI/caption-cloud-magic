@@ -46,22 +46,21 @@ export function exceedsSourceDuration(
  *
  * - Non-dialog scenes longer than the preferred source allows are moved to
  *   Seedance 2.5, the only long-form provider.
- * - Dialog / lip-sync scenes may only be re-routed to Seedance 2.5 when the
- *   v418 rollout flag certified it as a lip-sync plate provider
- *   (`longFormDialogAllowed`, fed by `useSeedance25Lipsync()`). Without the
- *   flag they keep their certified provider and are merely clamped.
+ * - Dialog / lip-sync scenes are NEVER re-routed to a long-form provider
+ *   (v425): only HappyHorse and Hailuo are certified master plates, so a
+ *   dialog scene keeps its certified provider and is merely clamped.
  */
 export function pickClipSourceForDuration(input: {
   durationSeconds: number;
   preferred?: ClipSource | string | null;
   dialogMode?: boolean;
-  /** v418 — Seedance 2.5 is certified for lip-sync for this account. */
+  /** @deprecated v425 — dialog scenes never leave the certified providers. */
   longFormDialogAllowed?: boolean;
 }): { clipSource: ClipSource; durationSeconds: number; switched: boolean } {
   const requested = Math.max(1, Math.round(input.durationSeconds || 0));
   const preferred = (input.preferred as ClipSource) || 'ai-hailuo';
 
-  if (input.dialogMode && !input.longFormDialogAllowed) {
+  if (input.dialogMode) {
     return {
       clipSource: preferred,
       durationSeconds: Math.min(requested, maxSecondsForClipSource(preferred)),
