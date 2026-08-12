@@ -62,7 +62,13 @@ interface PersistedSnapshot {
     musicHad: boolean;
   } | null;
   realProgress: { value: number; at: number };
+  /** Wall-clock write time — snapshots older than SNAPSHOT_TTL_MS are ignored. */
+  savedAt?: number;
 }
+
+/** A resumed run is only plausible for ~30 minutes. Older snapshots are stale. */
+const SNAPSHOT_TTL_MS = 30 * 60 * 1000;
+
 
 function readSnapshot(key: string): PersistedSnapshot | null {
   try {
