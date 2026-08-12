@@ -1611,7 +1611,13 @@ export default function SceneCard({
                                 if (engineChanged) updates.engineOverride = nextEngine;
                                 if (lipSyncChanged) updates.lipSyncWithVoiceover = nextLipSync;
                                 if (next) {
-                                  const ok = (
+                                  // The rollout flag resolves asynchronously. Preserve an already
+                                  // selected Seedance 2.5 scene while it is loading; the guarded
+                                  // migration effect above handles a genuinely disabled flag once
+                                  // the read completes.
+                                  const pendingSeedance25Selection =
+                                    seedance25FlagLoading && scene.clipSource === "ai-seedance25";
+                                  const ok = pendingSeedance25Selection || (
                                     lipsyncClipSources(seedance25LipsyncEnabled) as ReadonlyArray<string>
                                   ).includes(scene.clipSource);
 

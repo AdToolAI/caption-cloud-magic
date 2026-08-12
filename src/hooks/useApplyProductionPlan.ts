@@ -111,7 +111,7 @@ import { tx } from '@/lib/i18nText';
 import { resolveSceneAudioSource, type SceneAudioSource } from '@/config/nativeAudioSources';
 import { pickClipSourceForDuration } from '@/lib/composer/pickClipSourceForDuration';
 import { useStudioPreferences } from '@/hooks/useStudioPreferences';
-import { useSeedance25Lipsync } from '@/hooks/useSeedance25Lipsync';
+import { useSeedance25LipsyncState } from '@/hooks/useSeedance25Lipsync';
 
 
 /** v416 — true when a plan scene actually contains speech (VO, dialog, lip-sync). */
@@ -858,7 +858,12 @@ export interface ApplyPlanResult {
 export function useApplyProductionPlan() {
   const { suggestEditorMode } = useStudioPreferences();
   // v418 — decides whether long dialog scenes may be routed to Seedance 2.5.
-  const seedance25LipsyncEnabled = useSeedance25Lipsync();
+  const { enabled: seedance25LipsyncEnabled, loading: seedance25LipsyncLoading } =
+    useSeedance25LipsyncState();
+  // Never downgrade a long dialog plan while the asynchronous rollout flag is
+  // unresolved. If the flag ultimately resolves OFF, SceneCard's guarded
+  // migration applies the certified fallback after resolution.
+  const longFormDialogAllowed = seedance25LipsyncEnabled || seedance25LipsyncLoading;
 
   return useCallback(async (args: ApplyPlanArgs): Promise<ApplyPlanResult> => {
     const {
@@ -1006,7 +1011,7 @@ export function useApplyProductionPlan() {
           voicePoolAssignments,
           hydratedScenes.length === 1,
           applyDialogTurns,
-          seedance25LipsyncEnabled,
+          longFormDialogAllowed,
         ),
 
       );
@@ -1173,5 +1178,5 @@ export function useApplyProductionPlan() {
       verified: true,
       warnings,
     };
-  }, [suggestEditorMode, seedance25LipsyncEnabled]);
+  }, [suggestEditorMode, longFormDialogAllowed]);
 }
