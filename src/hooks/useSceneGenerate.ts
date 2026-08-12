@@ -73,7 +73,7 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
       // Patch the failed/ready scene first. Otherwise the progress listener can
       // sample the previous terminal state immediately after the reset event
       // and lock its monotonic floor back near 99%.
-      emitPipelineEvent({ type: 'clips:start' });
+      emitPipelineEvent({ type: 'clips:start', sceneIds: [scene.id] });
       const previousStatus = scene.clipStatus;
       try {
         let pid = opts.projectId;
@@ -200,6 +200,13 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
               },
             ],
           },
+        });
+        emitPipelineEvent({
+          type: 'clips:scope',
+          sceneIds: [workingScene.id],
+          runIds: Object.fromEntries(
+            Object.entries(started.runs).map(([id, run]) => [id, run.run_id]),
+          ),
         });
         const data = started.compose;
 
