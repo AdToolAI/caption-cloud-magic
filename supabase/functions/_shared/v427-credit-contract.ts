@@ -153,7 +153,7 @@ export async function recordSceneRunContracts(
         metadata: r.metadata ?? {},
         updated_at: new Date().toISOString(),
       })),
-      { onConflict: "run_id,scene_id" },
+      { onConflict: "run_id" },
     );
   } catch (e) {
     console.warn("[v427] recordSceneRunContracts failed (non-fatal):", e);
