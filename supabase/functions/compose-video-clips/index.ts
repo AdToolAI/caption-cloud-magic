@@ -1544,8 +1544,11 @@ serve(async (req) => {
         await supabaseAdmin
           .from("composer_scenes")
           .update({
-            status: "failed",
-            error_message: message,
+            clip_status: "failed",
+            clip_error: message,
+            pipeline_state: "failed",
+            pipeline_detail: message,
+            pipeline_state_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
