@@ -434,19 +434,29 @@ export function usePipelineProgress({
       );
     }).length;
     // Progress is measured RELATIVE to the baseline captured on `clips:start`.
+    // A failed scene is SETTLED, not pending — otherwise a single hard failure
+    // keeps the phase at 99 % "running" forever (observed: bar ran 20+ min
+    // after a ModelArk reject).
+    const settled = ready + failed;
     const baseReady = b?.clipsReady ?? 0;
     const baseTotal = b?.clipsTotal ?? aiScenes.length;
     const denom = Math.max(1, baseTotal - baseReady);
-    const numer = Math.max(0, ready - baseReady);
+    const numer = Math.max(0, settled - baseReady);
     const progress = Math.min(1, numer / denom);
     const running = generating > 0 || backendActive > 0;
+    // Terminal as soon as every AI scene is ready or failed.
+    const allTerminal = aiScenes.every(
+      (s) => isReadyOrLipsynced(s) || s.clipStatus === 'failed',
+    );
+    const terminal = !running && (allTerminal || progress >= 1);
     return {
       progress,
       running,
-      done: progress >= 1 && !running && failed === 0,
-      failed: failed > 0 && !running,
+      done: terminal && failed === 0,
+      failed: terminal && failed > 0,
     };
   }, [aiScenes, baselineVersion]);
+
 
   const voiceoverReal = useMemo(() => {
     const vo = assemblyConfig?.voiceover;
