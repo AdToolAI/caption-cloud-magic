@@ -132,13 +132,17 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const PROVIDER_TTS_LANGS: Record<string, ReadonlyArray<'en' | 'de' | 'es'>> = {
     veo:        ['en', 'de', 'es'],
     sora:       ['en', 'de', 'es'],
+    // Seedance 2.5 (ModelArk) erzeugt mit `generate_audio` echten Dialog/Voiceover:
+    seedance:   ['en', 'de', 'es'],
     kling:      ['en'],
     grok:       ['en'],
     happyhorse: ['en'],
     // Ambience/Foley only — kein verlässliches Voiceover (Ton wird trotzdem erzeugt):
-    ltx: [], wan: [], hailuo: [], luma: [], seedance: [], runway: [], pika: [], vidu: [],
+    ltx: [], wan: [], hailuo: [], luma: [], runway: [], pika: [], vidu: [],
   };
   const isKlingOmni = model.id === 'kling-omni';
+  /** Kann das Modell überhaupt Sprache erzeugen (unabhängig von der Sprache)? */
+  const modelSpeaks = isKlingOmni || (PROVIDER_TTS_LANGS[model.family] ?? []).length > 0;
   const ttsLangSupported = isKlingOmni
     ? effectiveSpokenLang === 'en'
     : (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang);
