@@ -1,6 +1,6 @@
 // compose-video-clips v2.4.0 — v81 shared CLIP_COSTS + dialog-speakers
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { planContinuityChain, sweepContinuityQueue } from "../_shared/continuity-chain.ts";
+import { planContinuityChain, resumeContinuityChain, sweepContinuityQueue } from "../_shared/continuity-chain.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { beginSceneRun } from "../_shared/scene-run-begin.ts";
 import { planSceneVisualInputs } from "../_shared/visual-inputs.ts";
@@ -1566,6 +1566,14 @@ serve(async (req) => {
       } catch (e) {
         console.warn("[compose-video-clips] markSceneContractFailure failed", e);
       }
+      // v426 — release any successor parked behind this scene, otherwise it
+      // would wait for a clip that will never arrive.
+      await resumeContinuityChain({
+        supabaseAdmin,
+        projectId,
+        predecessorSceneId: sceneId,
+        predecessorFailed: true,
+      });
     };
 
     const processScenes = async () => {
