@@ -1,9 +1,9 @@
 /**
  * AI video sources implemented by compose-video-clips.
  *
- * This registry is intentionally independent from the lip-sync rollout gate:
- * a source can be implemented by the composer while still requiring an
- * additional feature check before it may be used as a lip-sync master plate.
+ * Mirror of `src/lib/video-composer/supportedComposerSources.ts` — keep both
+ * in sync. An unsupported source must never be silently rewritten to another
+ * provider; the composer fails loudly instead (v425).
  */
 export const SUPPORTED_COMPOSER_AI_SOURCES = new Set([
   "ai-hailuo",
@@ -14,11 +14,26 @@ export const SUPPORTED_COMPOSER_AI_SOURCES = new Set([
   "ai-luma",
   "ai-veo",
   "ai-runway",
-  "ai-pika",
   "ai-happyhorse",
   "ai-image",
 ]);
 
 export function isSupportedComposerAiSource(source: string): boolean {
   return SUPPORTED_COMPOSER_AI_SOURCES.has(source);
+}
+
+/**
+ * v425 — Lip-Sync contract. Only these providers may serve as a master plate
+ * for the Cinematic-Sync / Sync.so pipeline. Mirror of
+ * `src/lib/video-composer/lipsyncMasterProvider.ts`.
+ */
+export const LIPSYNC_CERTIFIED_AI_SOURCES = new Set([
+  "ai-happyhorse",
+  "ai-hailuo",
+]);
+
+export const LIPSYNC_PRIMARY_AI_SOURCE = "ai-happyhorse";
+
+export function isLipsyncCertifiedAiSource(source: string | null | undefined): boolean {
+  return !!source && LIPSYNC_CERTIFIED_AI_SOURCES.has(source);
 }
