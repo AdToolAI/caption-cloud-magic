@@ -386,10 +386,13 @@ export interface ArbitrationInput {
   requirements: SceneVisualRequirements;
   strategy: AnchorStrategy;
   hasProtectedAnchor: boolean;
+  /** True when an actual anchor IMAGE (`reference_image_url`) exists. */
+  hasAnchorImage?: boolean;
   hasPreviousFrame: boolean;
   hasPreviousClip: boolean;
   hasEndFrame: boolean;
 }
+
 
 export function arbitrateSlots(
   input: ArbitrationInput,
@@ -405,13 +408,25 @@ export function arbitrateSlots(
     if (canClipReference && !requirements.lipSync) {
       return { transition: "clip-reference", inputMode: "references", warnings };
     }
+    // Exclusive-slot providers (Seedance 2.5) can carry EITHER a first frame
+    // OR references — never both. With a protected anchor the anchor wins the
+    // slot: it is the composed, identity-verified plate every other provider
+    // gets as its i2v start image. Sending the raw cast portraits instead is
+    // what makes ModelArk reject the task with
+    // `InputImageSensitiveContentDetected.PrivacyInformation`.
+    const anchorTakesSlot = Boolean(input.hasAnchorImage) && profile.firstFrame.supported;
     warnings.push(
       requirements.lipSync
         ? "lipsync_anchor_protected_match_cut"
         : "identity_anchor_protected_match_cut",
     );
+    if (anchorTakesSlot) {
+      warnings.push("anchor_takes_exclusive_slot");
+      return { transition: "match-cut", inputMode: "first-frame", warnings };
+    }
     return { transition: "match-cut", inputMode: "references", warnings };
   }
+
 
   if (requirements.lipSync) {
     const verified = profile.lipSync.supported &&
@@ -507,6 +522,8 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
     requirements,
     strategy,
     hasProtectedAnchor,
+    hasAnchorImage: Boolean(anchorImageUrl),
+
     hasPreviousFrame: Boolean(previousFrameUrl),
     hasPreviousClip: Boolean(previousClipUrl),
     hasEndFrame: Boolean(endFrameUrl),
@@ -546,6 +563,13 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
   // anchor — byte-identical to the pre-resolver behaviour.
   const firstFrameUrl = useContinuityFrame ? previousFrameUrl : anchorImageUrl;
 
+  // On an exclusive-slot provider the chosen input mode owns the only slot.
+  // When the anchor took it, no reference image may travel with the request.
+  const exposedReferences = profile.mode === "exclusive" && inputMode !== "references"
+    ? []
+    : selected;
+
+
   return {
     transition: {
       mode: transition,
@@ -557,7 +581,8 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
       product: byRole(selected, "product"),
       location: byRole(selected, "location"),
     },
-    references: selected,
+    references: exposedReferences,
+
     firstFrameUrl: firstFrameUrl || undefined,
     endFrameUrl: transition === "endframe-bridge" ? endFrameUrl : undefined,
     inputMode,

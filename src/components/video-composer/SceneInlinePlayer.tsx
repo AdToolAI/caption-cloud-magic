@@ -400,8 +400,19 @@ export default function SceneInlinePlayer({
             friendly = repairExhausted
               ? tx({ de: 'HappyHorse hat den Szenen-Prompt abgelehnt (Inhaltsfilter) – auch der automatisch entschärfte Prompt wurde blockiert. Die Credits wurden zurückerstattet. Kürze den Prompt oder wechsle den Provider (z. B. Hailuo) und starte neu.', en: 'HappyHorse rejected the scene prompt (content filter) – the automatically softened prompt was also blocked. Your credits were refunded. Shorten the prompt or switch providers (e.g. Hailuo) and restart.', es: 'HappyHorse rechazó el prompt de la escena (filtro de contenido) – el prompt suavizado automáticamente también fue bloqueado. Se reembolsaron tus créditos. Acorta el prompt o cambia de proveedor (p. ej. Hailuo) y reinicia.' })
               : tx({ de: 'HappyHorse hat den Szenen-Prompt abgelehnt (Inhaltsfilter). Der Prompt wurde automatisch entschärft und einmal erneut versucht. Die Credits wurden zurückerstattet – du kannst „Neu rendern" klicken oder den Provider wechseln.', en: 'HappyHorse rejected the scene prompt (content filter). The prompt was automatically softened and retried once. Your credits were refunded – you can click "Re-render" or switch providers.', es: 'HappyHorse rechazó el prompt de la escena (filtro de contenido). El prompt se suavizó automáticamente y se reintentó una vez. Se reembolsaron tus créditos – puedes hacer clic en "Volver a renderizar" o cambiar de proveedor.' });
+          } else if (
+            lower.includes('modelark_input_images_rejected') ||
+            lower.includes('sensitivecontentdetected') ||
+            lower.includes('privacyinformation')
+          ) {
+            friendly = tx({
+              de: 'Seedance 2.5 hat die Eingabebilder abgelehnt (Personenschutz). Es wird jetzt der komponierte Szenen-Anker statt einzelner Personenfotos gesendet – bitte „Neu rendern" klicken.',
+              en: 'Seedance 2.5 rejected the input images (privacy filter). The composed scene anchor is now sent instead of individual portraits – please click "Re-render".',
+              es: 'Seedance 2.5 rechazó las imágenes de entrada (filtro de privacidad). Ahora se envía el ancla de escena compuesta en lugar de retratos individuales: haz clic en «Volver a renderizar».',
+            });
           } else if (!rawErr) {
             friendly = tx({ de: 'Render fehlgeschlagen.', en: 'Render failed.', es: 'Error en el renderizado.' });
+
           } else if (
             lower === 'model_failed_silently' ||
             lower.startsWith('model_failed') ||

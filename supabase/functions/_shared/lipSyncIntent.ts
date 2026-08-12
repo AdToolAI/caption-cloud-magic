@@ -3,6 +3,13 @@
 
 const OPT_IN_ENGINES = new Set(['cinematic-sync', 'sync-segments', 'native-dialogue']);
 
+/** Snake-case scene row fields the lip-sync intent check reads. */
+export interface LipSyncSceneSnake {
+  lip_sync_with_voiceover?: boolean | null;
+  dialog_mode?: unknown;
+  engine_override?: string | null;
+}
+
 export function isLipSyncIntentionalRow(row: any): boolean {
   if (!row) return false;
   if (row.lip_sync_with_voiceover === true) return true;
