@@ -315,6 +315,7 @@ async function flowComposerStitch(ctx: RunCtx): Promise<FlowResult> {
       duration_seconds: 5,
       clip_url: ctx.assets.video,
       clip_status: "ready",
+      pipeline_state: "plate_ready",
       clip_source: "ai-hailuo",
       scene_type: "custom",
       transition_type: "fade",

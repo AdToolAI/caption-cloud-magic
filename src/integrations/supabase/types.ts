@@ -6737,6 +6737,8 @@ export type Database = {
           pipeline_state: Database["public"]["Enums"]["composer_scene_state"]
           pipeline_state_at: string
           pipeline_state_run_id: string | null
+          pipeline_substate: string | null
+          pipeline_substate_at: string | null
           plate_generation: number
           plate_generation_started_at: string | null
           plate_ready_at: string | null
@@ -6867,6 +6869,8 @@ export type Database = {
           pipeline_state?: Database["public"]["Enums"]["composer_scene_state"]
           pipeline_state_at?: string
           pipeline_state_run_id?: string | null
+          pipeline_substate?: string | null
+          pipeline_substate_at?: string | null
           plate_generation?: number
           plate_generation_started_at?: string | null
           plate_ready_at?: string | null
@@ -6997,6 +7001,8 @@ export type Database = {
           pipeline_state?: Database["public"]["Enums"]["composer_scene_state"]
           pipeline_state_at?: string
           pipeline_state_run_id?: string | null
+          pipeline_substate?: string | null
+          pipeline_substate_at?: string | null
           plate_generation?: number
           plate_generation_started_at?: string | null
           plate_ready_at?: string | null
@@ -19498,21 +19504,38 @@ export type Database = {
         }
         Returns: string
       }
-      composer_scene_transition: {
-        Args: {
-          _detail?: string
-          _from?: Database["public"]["Enums"]["composer_scene_state"][]
-          _generation?: number
-          _run_id?: string
-          _scene_id: string
-          _to: Database["public"]["Enums"]["composer_scene_state"]
-        }
-        Returns: {
-          applied: boolean
-          reason: string
-          state: Database["public"]["Enums"]["composer_scene_state"]
-        }[]
-      }
+      composer_scene_transition:
+        | {
+            Args: {
+              _detail?: string
+              _from?: Database["public"]["Enums"]["composer_scene_state"][]
+              _generation?: number
+              _run_id?: string
+              _scene_id: string
+              _to: Database["public"]["Enums"]["composer_scene_state"]
+            }
+            Returns: {
+              applied: boolean
+              reason: string
+              state: Database["public"]["Enums"]["composer_scene_state"]
+            }[]
+          }
+        | {
+            Args: {
+              _detail?: string
+              _from?: Database["public"]["Enums"]["composer_scene_state"][]
+              _generation?: number
+              _run_id?: string
+              _scene_id: string
+              _substate?: string
+              _to: Database["public"]["Enums"]["composer_scene_state"]
+            }
+            Returns: {
+              applied: boolean
+              reason: string
+              state: Database["public"]["Enums"]["composer_scene_state"]
+            }[]
+          }
       composer_settle_run_reservation: {
         Args: { p_actual: number; p_reservation_id: string }
         Returns: number
@@ -19535,6 +19558,14 @@ export type Database = {
           _twoshot_stage: string
         }
         Returns: Database["public"]["Enums"]["composer_scene_state"]
+      }
+      composer_substate_from_legacy: {
+        Args: {
+          _clip_status: string
+          _lip_sync_status: string
+          _twoshot_stage: string
+        }
+        Returns: string
       }
       compute_content_hash: {
         Args: {

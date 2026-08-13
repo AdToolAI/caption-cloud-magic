@@ -126,6 +126,38 @@ export function sceneState(row: any): SceneState {
   return isSceneState(s) ? s : deriveStateFromLegacy(row);
 }
 
+/** v430 Step 5C — diagnostischer/UI-relevanter Unterzustand. */
+export type SceneSubstate = string | null;
+
+/** Identisch zu `public.composer_substate_from_legacy()` — nur für Altzeilen. */
+export function deriveSubstateFromLegacy(row: any): SceneSubstate {
+  const clipStatus = row?.clip_status ?? row?.clipStatus ?? null;
+  const stage = row?.twoshot_stage ?? row?.twoshotStage ?? null;
+  const ls = row?.lip_sync_status ?? row?.lipSyncStatus ?? null;
+
+  if (clipStatus === "awaiting_manual_face_map") return "awaiting_manual_face_map";
+  if (clipStatus === "awaiting_confirmation" && stage === "preview") return "awaiting_confirmation";
+  if (typeof stage === "string" && stage.startsWith("syncso_pass_")) return stage;
+  if (typeof stage === "string" && stage.startsWith("syncso_fanout_")) return stage;
+  if (typeof stage === "string" && stage.startsWith("syncso_retry_")) return stage;
+  if (stage === "circuit_open") return "circuit_open";
+  if (stage === "deferred") return "deferred";
+  if (stage === "needs_clip_rerender") return "needs_clip_rerender";
+  if (stage === "anchor") return "anchor";
+  if (stage === "anchor_soft_pass") return "anchor_soft_pass";
+  if (stage === "preview") return "preview";
+  if (stage === "audio_mux_failed") return "audio_mux_failed";
+  if (stage === "failed" && ls === "failed") return "lipsync_failed";
+  return null;
+}
+
+/** Unterzustand einer Szenenzeile lesen — `pipeline_substate` gewinnt immer. */
+export function sceneSubstate(row: any): SceneSubstate {
+  const sub = row?.pipeline_substate ?? row?.pipelineSubstate ?? null;
+  if (sub === null || sub === undefined) return deriveSubstateFromLegacy(row);
+  return typeof sub === "string" && sub.length > 0 ? sub : null;
+}
+
 export const isTerminalState = (s: SceneState) => TERMINAL.has(s);
 export const isRealizedState = (s: SceneState) => REALIZED.has(s);
 export const isInFlightState = (s: SceneState) => IN_FLIGHT.has(s);
@@ -222,6 +254,7 @@ async function rpcTransition(
     detail?: string | null;
     runId?: string | null;
     generation?: number | null;
+    substate?: SceneSubstate;
   },
 ): Promise<TransitionResult> {
   const { data, error } = await supabase.rpc("composer_scene_transition", {
@@ -231,6 +264,7 @@ async function rpcTransition(
     _detail: opts.detail ?? null,
     _run_id: opts.runId ?? null,
     _generation: opts.generation ?? null,
+    _substate: opts.substate ?? null,
   });
 
   if (error) {
@@ -254,6 +288,7 @@ async function rpcTransition(
  * @param from   erlaubte Ausgangszustände (leer = beliebig, aber immer noch
  *               durch die Übergangstabelle begrenzt)
  * @param runId  bindet den Wechsel an einen Lauf — passt er nicht, greift er nicht
+ * @param substate  optionaler diagnostischer/UI-relevanter Unterzustand
  */
 export async function transitionScene(
   supabase: any,
@@ -264,6 +299,7 @@ export async function transitionScene(
     detail?: string | null;
     runId?: string | null;
     generation?: number | null;
+    substate?: SceneSubstate;
   } = {},
 ): Promise<TransitionResult> {
   let result = await rpcTransition(supabase, sceneId, to, opts);

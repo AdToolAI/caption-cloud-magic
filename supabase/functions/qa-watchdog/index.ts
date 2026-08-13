@@ -225,6 +225,7 @@ Deno.serve((req: Request) => withLang(req, () => (withSentryCron("qa-watchdog", 
           lip_sync_status: "failed",
           twoshot_stage: "failed",
           clip_error: "watchdog_stuck_lipsync_refunded",
+          pipeline_state: "failed",
           updated_at: new Date().toISOString(),
         })
         .in("id", ids);
@@ -308,6 +309,7 @@ Deno.serve((req: Request) => withLang(req, () => (withSentryCron("qa-watchdog", 
           .update({
             clip_status: "canceled",
             clip_error: "watchdog_never_dispatched",
+            pipeline_state: "canceled",
             updated_at: new Date().toISOString(),
           })
           .in("id", chunk);
@@ -353,6 +355,7 @@ Deno.serve((req: Request) => withLang(req, () => (withSentryCron("qa-watchdog", 
               s.clip_error && String(s.clip_error).length > 0
                 ? String(s.clip_error)
                 : "v381_orphan_generating_no_run",
+            pipeline_state: "failed",
             updated_at: new Date().toISOString(),
           })
           .eq("id", s.id);
@@ -441,6 +444,7 @@ Deno.serve((req: Request) => withLang(req, () => (withSentryCron("qa-watchdog", 
           .update({
             clip_status: "canceled",
             clip_error: "watchdog_hard_ttl_expired",
+            pipeline_state: "canceled",
             updated_at: new Date().toISOString(),
           })
           .in("id", chunk);

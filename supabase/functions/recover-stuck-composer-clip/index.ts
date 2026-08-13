@@ -104,6 +104,7 @@ async function markFailed(
     .update({
       clip_status: "failed",
       clip_error: reason.slice(0, 500),
+      pipeline_state: "failed",
       ...(isCinematicSync
         ? {
             lip_sync_status: null,

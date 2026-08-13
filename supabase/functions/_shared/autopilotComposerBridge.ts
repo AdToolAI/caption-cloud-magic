@@ -170,6 +170,7 @@ export async function upsertBridgeScene(admin: Admin, args: BridgeSceneArgs): Pr
     scene_type: "custom",
     ...materializeCompatibilityOutput('base', { baseUrl: args.clipUrl }),
     clip_status: "completed",
+    pipeline_state: "plate_ready",
     clip_source: "ai-hailuo",
     clip_error: null,
     duration_seconds: args.durationSeconds,

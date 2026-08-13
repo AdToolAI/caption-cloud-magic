@@ -210,6 +210,7 @@ serve(async (req) => {
         clip_source: engine,
         ai_prompt: s.aiPrompt,
         clip_status: 'pending',
+        pipeline_state: 'plate_queued',
         text_overlay: s.textOverlay ?? {},
         transition_type: 'fade',
         transition_duration: 0.5,
