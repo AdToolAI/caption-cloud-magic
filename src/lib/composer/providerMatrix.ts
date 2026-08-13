@@ -20,6 +20,7 @@
 import { AI_VIDEO_TOOLKIT_MODELS } from '@/config/aiVideoModelRegistry';
 import { isLipsyncCertifiedProvider } from '@/lib/video-composer/lipsyncMasterProvider';
 import { modelIdToSource } from '@/lib/video-composer/modelMapping';
+import { clampDurationForSource, snapDurationToBuckets } from './durationClamp';
 
 export interface ProviderMatrixEntry {
   /** Allowed duration buckets (whole seconds). */
@@ -175,33 +176,22 @@ export function snapDurationToProvider(
   requested: number,
   clipSource: string | undefined | null,
 ): { duration: number; changed: boolean } {
-  const allowed = getProviderDurations(clipSource);
-  if (allowed.length === 0) return { duration: requested, changed: false };
-  if (allowed.includes(Math.round(requested))) {
-    const rounded = Math.round(requested);
-    return { duration: rounded, changed: rounded !== requested };
-  }
-  const next = allowed.find((d) => d >= requested);
-  const picked = next ?? allowed[allowed.length - 1];
-  const min = allowed[0];
-  const max = allowed[allowed.length - 1];
-  const final = requested < min ? min : requested > max ? max : picked;
-  return { duration: final, changed: final !== requested };
+  return snapDurationToBuckets(requested, getProviderDurations(clipSource));
 }
 
 /**
  * Hard clamp used by the dialog/lip-sync master path.
- * Semantics are a verbatim port of `clampDialogMasterDuration`:
- *  - Hailuo: two buckets — `>= 10 → 10`, otherwise `6`
- *  - HappyHorse: continuous 3–15 s
- *  - any other provider: snap into the provider's bucket list
+ * Semantics are a verbatim port of `clampDialogMasterDuration`.
  */
 export function clampProviderDuration(
   clipSource: string | undefined | null,
   duration: number,
 ): number {
-  const picked = Number.isFinite(duration) ? Math.ceil(duration) : 6;
-  if (clipSource === 'ai-hailuo') return picked >= 10 ? 10 : 6;
-  if (clipSource === 'ai-happyhorse') return Math.min(15, Math.max(3, picked));
-  return snapDurationToProvider(picked, clipSource).duration;
+  return clampDurationForSource(clipSource, duration, getProviderDurations(clipSource));
+}
+
+/** Certified as Sync.so master plate (excludes native one-call lip-sync). */
+export function providerIsLipsyncCertified(clipSource: string | undefined | null): boolean {
+  const entry = getProviderEntry(clipSource);
+  return !!entry && entry.lipsync && entry.nativeLipSync !== true;
 }
