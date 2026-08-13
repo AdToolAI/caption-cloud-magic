@@ -79,9 +79,12 @@ Jeder Ausnahme-Marker trägt eine kurze Begründung und wird im Test geprüft.
 
 ## Technische Umsetzung
 
-1. **Reader-Migration** Datei für Datei, semantikgleich. Wo eine Komponente
-   heute auf `pending | generating | ready | failed` verzweigt, kommt der Wert
-   aus `clipStatusFromState(sceneState(scene))` statt aus der Spalte.
+1. **Reader-Migration** Datei für Datei, semantikgleich. Reine Anzeigewerte
+   (`pending | generating | ready | failed`) kommen aus
+   `clipStatusFromState(sceneState(scene))`. Jede Entscheidung, die Ready von
+   Failed trennt (Buttons, Filter, Fortschrittszählung, Export-Gates), läuft
+   ausschliesslich über `legacyClipReadyEquivalentRow()` /
+   `legacyClipFailedEquivalentRow()`.
 2. **Contract-Scanner** `src/lib/composer/__tests__/clientReaderContract5E.test.ts`:
    scannt `src/components/**`, `src/hooks/**`, `src/pages/**` auf
    `clip_status|clipStatus|twoshot_stage|twoshotStage|lip_sync_status|lipSyncStatus`
