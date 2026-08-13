@@ -136,6 +136,8 @@ export async function recordSceneRunContracts(
     requestedDurationMs: number;
     quotedCostEuros: number;
     reservationId?: string | null;
+    /** v430 Step 4 — immutable continuity snapshot for this run. */
+    continuitySourceClipUrl?: string | null;
     metadata?: Record<string, unknown>;
   }>,
 ): Promise<void> {
@@ -150,6 +152,7 @@ export async function recordSceneRunContracts(
         quoted_cost_euros: r.quotedCostEuros,
         reservation_id: r.reservationId ?? null,
         duration_policy_version: "v427",
+        continuity_source_clip_url: r.continuitySourceClipUrl ?? null,
         metadata: r.metadata ?? {},
         updated_at: new Date().toISOString(),
       })),

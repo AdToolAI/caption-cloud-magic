@@ -460,6 +460,8 @@ serve(async (req) => {
     // previous run's lip-sync state and visible clip, and stamps a fresh
     // active_run_id / plate_generation before anything is dispatched.
     let sceneRunStamps = new Map<string, { runId: string; generation: number }>();
+    // v430 Step 4 — continuity input each scene was dispatched with (run snapshot).
+    const continuityBindings = new Map<string, string | null>();
     try {
       const earlyAiSceneIds = (scenes as Array<{ id: string; clipSource?: string }>)
         .filter((s) => s.clipSource?.startsWith("ai-"))
@@ -4010,6 +4012,7 @@ serve(async (req) => {
           !sceneWantsLipSync &&
           visualPlan.transition.mode !== "match-cut" &&
           !!continuityClipUrl;
+        continuityBindings.set(scene.id, usedContinuity ? continuityClipUrl : null);
         await supabaseAdmin
           .from("composer_scenes")
           .update({
@@ -5072,6 +5075,7 @@ serve(async (req) => {
             quotedCostEuros:
               scene.durationSeconds * (CLIP_COSTS[scene.clipSource]?.[q] ?? 0),
             reservationId: v427Reservation!.reservationId,
+            continuitySourceClipUrl: continuityBindings.get(scene.id) ?? null,
             metadata: { provider: scene.clipSource, quality: q, project_id: projectId },
           }];
         }),
