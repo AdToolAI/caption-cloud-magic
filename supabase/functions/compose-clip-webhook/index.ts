@@ -707,19 +707,21 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
 
     // Check if ALL scenes in this project are now done
+    // v430 Step 5D: state via sceneState(), output existence via
+    // resolveSceneOutput() — ready/failed classified exclusively.
     const { data: allScenes } = await supabase
       .from('composer_scenes')
-      .select('clip_status, clip_source')
+      .select('clip_source, pipeline_state, clip_status, clip_url, base_video_url, processed_video_url, lip_sync_source_clip_url, lip_sync_status, upload_url')
       .eq('project_id', projectId);
 
     if (allScenes) {
       const allDone = allScenes.every(
-        s => s.clip_status === 'ready' || s.clip_status === 'failed' || s.clip_source === 'upload'
+        s => legacyClipReadyEquivalentRow(s) || legacyClipFailedEquivalentRow(s) || s.clip_source === 'upload'
       );
 
       if (allDone) {
         const allReady = allScenes.every(
-          s => s.clip_status === 'ready' || s.clip_source === 'upload'
+          s => legacyClipReadyEquivalentRow(s) || s.clip_source === 'upload'
         );
 
         await supabase
