@@ -708,13 +708,13 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     if (script === lastPushedScriptRef.current) return;
     const handle = setTimeout(() => {
       const updates: Partial<ComposerScene> = { dialogScript: script };
-      if (canonicalDialogTurns.length > 0) {
-        const aligned = alignDialogTurnsToScript({
-          turns: canonicalDialogTurns,
-          script,
-          resolveSpeakerId: resolveCastByName,
-        });
-        if (aligned) updates.dialogTurns = aligned as ComposerScene['dialogTurns'];
+      // v430 Step 0 — one canonical contract decides what the scene says.
+      const effective = resolveEffectiveDialog(
+        { dialogScript: script, dialogTurns: canonicalDialogTurns },
+        { resolveSpeakerId: resolveCastByName },
+      );
+      if (effective.diverged) {
+        updates.dialogTurns = effective.turns as ComposerScene['dialogTurns'];
       }
 
       lastPushedScriptRef.current = script;
