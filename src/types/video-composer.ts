@@ -511,6 +511,17 @@ export interface ComposerScene {
   continuityLocked?: boolean;
   lockReferenceUrl?: string;
   /**
+   * v430 Step 4 — continuity dependency state (read-only mirror of the DB).
+   * `continuitySourceClipUrl` is what the scene is CONFIGURED with,
+   * `continuityRenderedSourceClipUrl` what its existing video was RENDERED
+   * with, `continuityStale` the value-based staleness flag maintained by the
+   * DB trigger, `firstRenderedAt` the reset-proof "was ever rendered" stamp.
+   */
+  continuitySourceClipUrl?: string | null;
+  continuityRenderedSourceClipUrl?: string | null;
+  continuityStale?: boolean;
+  firstRenderedAt?: string | null;
+  /**
    * Visual-Continuity-System (Phase 1) — additive scene fields.
    * These NEVER replace `referenceImageUrl` / `lockReferenceUrl`: those two
    * remain the identity/geometry anchors of the frozen lip-sync chain (v400).
