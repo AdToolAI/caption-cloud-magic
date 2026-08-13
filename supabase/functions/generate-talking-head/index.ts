@@ -693,6 +693,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       if (earlySceneId) {
         const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
         await admin.from('composer_scenes').update({
+          pipeline_state: 'failed',
           clip_status: 'failed',
           clip_error: message.slice(0, 500),
           updated_at: new Date().toISOString(),
