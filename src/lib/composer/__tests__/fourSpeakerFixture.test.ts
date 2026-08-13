@@ -36,14 +36,19 @@ function makeAdmin(initial: Row[] = []) {
   const rows = new Map<string, Row>();
   for (const r of initial) rows.set(r.id, { ...r });
 
-  function match(row: Row, filters: Record<string, unknown>): boolean {
-    for (const [k, v] of Object.entries(filters)) {
-      if ((row as any)[k] !== v) return false;
-    }
-    return true;
+  function evaluate(filters: Record<string, unknown>, inFilters: Record<string, unknown[]>) {
+    return Array.from(rows.values()).filter((r) => {
+      for (const [k, v] of Object.entries(filters)) {
+        if ((r as any)[k] !== v) return false;
+      }
+      for (const [k, vals] of Object.entries(inFilters)) {
+        if (!vals.includes((r as any)[k])) return false;
+      }
+      return true;
+    });
   }
 
-  function query(table: string) {
+  function makeBuilder(table: string, mode: 'select' | 'update' | 'upsert' = 'select', patch?: any) {
     const filters: Record<string, unknown> = {};
     const inFilters: Record<string, unknown[]> = {};
     let selectedCols: string[] = ['*'];
@@ -78,14 +83,7 @@ function makeAdmin(initial: Row[] = []) {
       },
       or: (_expr: string) => builder,
       maybeSingle: async () => {
-        let result = Array.from(rows.values()).filter((r) => {
-          if (table !== 'composer_pipeline_jobs') return false;
-          if (!match(r, filters)) return false;
-          for (const [k, vals] of Object.entries(inFilters)) {
-            if (!vals.includes((r as any)[k])) return false;
-          }
-          return true;
-        });
+        let result = evaluate(filters, inFilters);
         if (orderBy) {
           result.sort((a, b) => {
             const dir = orderBy!.asc ? 1 : -1;
@@ -93,22 +91,55 @@ function makeAdmin(initial: Row[] = []) {
           });
         }
         if (limitN) result = result.slice(0, limitN);
+
+        if (mode === 'update' && result[0]) {
+          for (const [k, v] of Object.entries(patch)) {
+            (result[0] as any)[k] = v;
+          }
+        }
+
         return { data: result[0] ?? null };
       },
       then: async (cb: any) => {
-        let result = Array.from(rows.values()).filter((r) => {
-          if (table !== 'composer_pipeline_jobs') return false;
-          if (!match(r, filters)) return false;
-          for (const [k, vals] of Object.entries(inFilters)) {
-            if (!vals.includes((r as any)[k])) return false;
+        let result = evaluate(filters, inFilters);
+        if (orderBy) {
+          result.sort((a, b) => {
+            const dir = orderBy!.asc ? 1 : -1;
+            return ((a as any)[orderBy!.col] > (b as any)[orderBy!.col] ? 1 : -1) * dir;
+          });
+        }
+        if (limitN) result = result.slice(0, limitN);
+
+        if (mode === 'update') {
+          for (const r of result) {
+            for (const [k, v] of Object.entries(patch)) {
+              (r as any)[k] = v;
+            }
           }
-          return true;
-        });
+        }
+
         if (countOpts) {
           return cb({ data: [], count: result.length });
         }
         return cb({ data: result });
       },
+    };
+    return builder;
+  }
+
+  function table(name: string) {
+    if (name === 'composer_scenes') {
+      return {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: { active_run_id: RUN_ID } }),
+          }),
+        }),
+      };
+    }
+    return {
+      select: (...cols: any[]) => makeBuilder(name, 'select').select(...cols),
+      update: (patch: any) => makeBuilder(name, 'update', patch),
       upsert: (row: any) => {
         const id = row.id ?? `job-${Math.random().toString(36).slice(2)}`;
         const next: Row = {
@@ -131,63 +162,11 @@ function makeAdmin(initial: Row[] = []) {
           }),
         };
       },
-      update: (patch: any) => {
-        return {
-          eq: (col: string, val: unknown) => {
-            filters[col] = val;
-            return {
-              eq: (col2: string, val2: unknown) => {
-                filters[col2] = val2;
-                return {
-                  in: (col3: string, vals: unknown[]) => {
-                    inFilters[col3] = vals;
-                    return {
-                      or: (_expr: string) => ({
-                        select: () => ({
-                          maybeSingle: async () => {
-                            const candidates = Array.from(rows.values()).filter((r) => {
-                              if (table !== 'composer_pipeline_jobs') return false;
-                              if (!match(r, filters)) return false;
-                              for (const [k, vals] of Object.entries(inFilters)) {
-                                if (!vals.includes((r as any)[k])) return false;
-                              }
-                              return true;
-                            });
-                            const target = candidates[0];
-                            if (target) {
-                              for (const [k, v] of Object.entries(patch)) {
-                                (target as any)[k] = v;
-                              }
-                            }
-                            return { data: target ?? null };
-                          },
-                        }),
-                      }),
-                    };
-                  },
-                };
-              },
-            };
-          },
-        };
-      },
     };
-    return builder;
   }
 
   return {
-    from: (name: string) => {
-      if (name === 'composer_scenes') {
-        return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: async () => ({ data: { active_run_id: RUN_ID } }),
-            }),
-          }),
-        };
-      }
-      return query(name);
-    },
+    from: (name: string) => table(name),
     rpc: async () => ({ error: null }),
   } as any;
 }
