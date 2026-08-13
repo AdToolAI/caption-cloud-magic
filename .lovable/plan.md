@@ -89,11 +89,11 @@ Die Frame-Extraktion selbst ist kostenlos bzw. läuft über den bestehenden `ens
 
 ## Umsetzungsumfang Schritt 4 (nach Freigabe)
 
-- Migration: `composer_scenes.first_rendered_at`, `continuity_source_clip_url`, `continuity_stale` (+ Backfill, Trigger für `first_rendered_at`).
+- Migration: `composer_scenes.first_rendered_at`, `continuity_source_clip_url`, `continuity_stale` (+ Backfill, Trigger für `first_rendered_at`, Trigger `propagate_continuity_staleness` auf `clip_url`).
 - `continuity-chain.ts` liest über `resolveSceneOutput()` statt roh `clip_url`.
-- `materializeCompatibilityOutput()` wird einziger Setzer von `continuity_stale`.
-- Neuer reiner Helper `src/lib/composer/continuity/continuityState.ts` (+ Backend-Spiegel) mit `sceneWasEverRendered()` und `isContinuityStale()`, Parity-Test Client/Server.
+- `materializeCompatibilityOutput()` bleibt unverändert auf den Output-Patch von Szene A beschränkt — kein Cross-Scene-Write.
+- Neuer reiner Helper `src/lib/composer/continuity/continuityState.ts` (+ Backend-Spiegel) mit `sceneWasEverRendered()` und NULL-sicherem `isContinuityStale()`, Parity-Test Client/Server.
 - UI: Stale-Badge und Button "Continuity aktualisieren" auf der Szenenkachel, ohne Render-Trigger.
-- Tests: Reset-Festigkeit von `first_rendered_at`, "fehlgeschlagener Run macht B nicht stale", Legacy-Parität, Lip-Sync-Szenen bleiben aus der Kette ausgeschlossen.
+- Tests: Reset-Festigkeit von `first_rendered_at`, "fehlgeschlagener Run macht B nicht stale", `NULL`-Übergang setzt stale, mehrere Dependents über `continuity_source_scene_id`, keine transitive Kaskade, Materializer schreibt keine Fremdszene, Legacy-Parität, Lip-Sync-Szenen bleiben aus der Kette ausgeschlossen.
 
 Keine Änderungen an Lip-Sync-Semantik, `reference_image_url`, State Machine oder `transitionType`.
