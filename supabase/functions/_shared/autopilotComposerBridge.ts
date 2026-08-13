@@ -27,6 +27,7 @@
  */
 
 import type { AutopilotTurn } from "./autopilotLipSync.ts";
+import { materializeCompatibilityOutput } from "./materialize-scene-output.ts";
 
 // deno-lint-ignore no-explicit-any
 type Admin = any;
@@ -167,7 +168,7 @@ export async function upsertBridgeScene(admin: Admin, args: BridgeSceneArgs): Pr
     project_id: args.projectId,
     order_index: args.sceneIndex,
     scene_type: "custom",
-    clip_url: args.clipUrl,
+    ...materializeCompatibilityOutput('base', { baseUrl: args.clipUrl }),
     clip_status: "completed",
     clip_source: "ai-hailuo",
     clip_error: null,
