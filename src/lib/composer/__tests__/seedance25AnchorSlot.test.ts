@@ -39,7 +39,9 @@ describe("Seedance 2.5 exclusive slot arbitration", () => {
     expect(plan.inputMode).toBe("first-frame");
     expect(plan.firstFrameUrl).toBe(ANCHOR);
     expect(plan.references).toEqual([]);
-    expect(plan.warnings).toContain("anchor_takes_exclusive_slot");
+    // v428: the lip-sync hard rule now decides first — same payload outcome
+    // (anchor in the single slot, no raw portraits), different reason code.
+    expect(plan.warnings).toContain("lipsync_continuity_disabled");
   });
 
   it("keeps references when there is no anchor to protect", () => {
