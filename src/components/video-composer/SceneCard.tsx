@@ -194,6 +194,7 @@ import { countSceneSpeakers } from "@/lib/composer/countSceneSpeakers";
 import { useOutfitLookMap } from "@/hooks/useOutfitLookMap";
 import { tx } from "@/lib/i18nText";
 import { SceneContinuityStatus } from "./SceneContinuityStatus";
+import { clipStatusFromState, legacyClipFailedEquivalentRow, legacyClipReadyEquivalentRow, sceneState, sceneSubstate } from '@/lib/composer/sceneState';
 
 /**
  * Wave 3.1 — compact Catalog-ID chip strip. Reads scene-level shadow IDs
@@ -349,6 +350,28 @@ export default function SceneCard({
     | "en"
     | "es";
   const confirmRender = useSceneRenderConfirm();
+  // v430 Schritt 5E — Zustand ausschliesslich ueber die Zustandsmaschine lesen.
+  const sceneLifecycleState = sceneState(scene);
+  const sceneDetailState = sceneSubstate(scene);
+  const legacyStatus = clipStatusFromState(sceneLifecycleState);
+  const sceneIsReady = legacyClipReadyEquivalentRow(scene);
+  const sceneIsFailed = legacyClipFailedEquivalentRow(scene);
+  /** Lip-Sync laeuft gerade (frueher lip_sync_status = 'running'). */
+  const lipsyncBusy =
+    sceneLifecycleState === 'lipsync_dispatched' ||
+    sceneLifecycleState === 'lipsync_running' ||
+    sceneLifecycleState === 'lipsync_muxing';
+  /** Ein Lip-Sync-Artefakt existiert (frueher lip_sync_status/twoshot_stage gesetzt). */
+  const hasLipsyncArtifact =
+    lipsyncBusy ||
+    sceneLifecycleState === 'audio_prep' ||
+    sceneLifecycleState === 'audio_ready' ||
+    sceneLifecycleState === 'complete' ||
+    !!sceneDetailState;
+  /** Lauf laesst sich abbrechen (frueher running/stitching/pending/failed/stage aktiv). */
+  const lipsyncCancellable =
+    hasLipsyncArtifact && (lipsyncBusy || sceneIsFailed ||
+      sceneLifecycleState === 'audio_prep' || sceneLifecycleState === 'audio_ready');
   // v418 rollout brake — mirrors the server flag for Seedance 2.5 plates.
   const { enabled: seedance25LipsyncEnabled, loading: seedance25FlagLoading } =
     useSeedance25LipsyncState();
@@ -1380,7 +1403,7 @@ export default function SceneCard({
 
               {/* 🎬 Director Mode — Hybrid Production actions (only when source clip is ready) */}
               {onHybridExtend &&
-                scene.clipStatus === "ready" &&
+                sceneIsReady &&
                 scene.clipUrl && (
                   <div className="flex flex-wrap items-center gap-1.5 pt-1 rounded-md border border-primary/20 bg-gradient-to-r from-primary/5 via-transparent to-primary/5 px-2 py-1.5">
                     <span className="text-[9px] uppercase tracking-wider font-semibold text-primary flex items-center gap-1">
@@ -2292,9 +2315,8 @@ export default function SceneCard({
                   next to SceneDialogStudio so the buttons are where users
                   expect them after a dialog-shot render. */}
               {(scene.lipSyncAppliedAt ||
-                !!scene.lipSyncStatus ||
+                hasLipsyncArtifact ||
                 !!(scene as any).dialogShots ||
-                !!(scene as any).twoshotStage ||
                 scene.engineOverride === "cinematic-sync") && (
                 <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5">
                   <span className="text-[10px] font-semibold text-primary mr-auto">
@@ -2302,7 +2324,7 @@ export default function SceneCard({
                   </span>
                   <button
                     type="button"
-                    disabled={scene.lipSyncStatus === "running"}
+                    disabled={lipsyncBusy}
                     onClick={async () => {
                       try {
                         await cleanRestartLipSync({ force: true });
@@ -2391,10 +2413,7 @@ export default function SceneCard({
                   {scene.engineOverride === "cinematic-sync" && (
                     <button
                       type="button"
-                      disabled={
-                        scene.clipStatus === "generating" ||
-                        scene.lipSyncStatus === "running"
-                      }
+                      disabled={legacyStatus === "generating" || lipsyncBusy}
                       title={tx({ de: "Setzt Anchor + Clip zurück und rendert beides neu — empfohlen bei 'source_clip_missing_speakers', 'anchor_missing_speakers' oder 'v153_preflight_block' (Face-Detect fehlgeschlagen).", en: "Resets anchor + clip and re-renders both — recommended for 'source_clip_missing_speakers', 'anchor_missing_speakers' or 'v153_preflight_block' (face detection failed).", es: "Restablece el anchor + clip y renderiza ambos de nuevo — recomendado para 'source_clip_missing_speakers', 'anchor_missing_speakers' o 'v153_preflight_block' (falló la detección facial)." })}
                       onClick={async () => {
                         // ── Schritt 1: Cost-Confirm-Gate (re-roll) ──────
@@ -2744,16 +2763,17 @@ export default function SceneCard({
                               SYNCED
                             </span>
                           )}
-                          {scene.lipSyncStatus === "running" && (
+                          {lipsyncBusy && (
                             <span className="px-1 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[8px] font-bold animate-pulse">
                               SYNCING…
                             </span>
                           )}
-                          {scene.lipSyncStatus === "failed" && (
+                          {sceneIsFailed && (
                             <span className="px-1 py-0.5 rounded bg-red-500/20 text-red-300 text-[8px] font-bold">
                               FAILED
                             </span>
                           )}
+                          {/* legacy-mapping-allowed: 'no_voiceover' hat keine Entsprechung im Substate */}
                           {scene.lipSyncStatus === "no_voiceover" && (
                             <span className="px-1 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[8px] font-bold">
                               VO FEHLT
@@ -2829,7 +2849,7 @@ export default function SceneCard({
                             }
                           }
                         }}
-                        disabled={scene.lipSyncStatus === "running"}
+                        disabled={lipsyncBusy}
                         className={`px-2 py-1 rounded text-[10px] font-medium transition-all disabled:opacity-50 ${
                           scene.lipSyncWithVoiceover
                             ? "bg-primary/20 text-primary ring-1 ring-primary/40"
@@ -2842,19 +2862,7 @@ export default function SceneCard({
                     {/* v18: Cancel button — visible while lip-sync is in flight so the
                         user can abort a stuck run cleanly without leaving a zombie
                         entry that the auto-trigger would keep reviving. */}
-                    {!scene.lipSyncAppliedAt &&
-                      (scene.lipSyncStatus === "running" ||
-                        scene.lipSyncStatus === "stitching" ||
-                        (scene.lipSyncStatus as any) === "audio_muxing" ||
-                        scene.lipSyncStatus === "pending" ||
-                        // v20: also show during the brief "failed" window
-                        // before useTwoShotAutoTrigger auto-recovers — lets
-                        // the user opt out of the auto-retry loop entirely.
-                        scene.lipSyncStatus === "failed" ||
-                        (!!(scene as any).twoshotStage &&
-                          !["failed", "done", "complete", "canceled"].includes(
-                            String((scene as any).twoshotStage),
-                          ))) && (
+                    {!scene.lipSyncAppliedAt && lipsyncCancellable && (
                         <div className="flex flex-wrap items-center gap-2 self-end">
                           <button
                             type="button"
