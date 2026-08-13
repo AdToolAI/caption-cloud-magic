@@ -113,7 +113,27 @@ Ein persistierter Dirty-Marker für genau diesen Fall existiert heute **nicht**.
 
 Stattdessen wird der Dirty-Zustand nach demselben wertbasierten Prinzip wie Staleness abgeleitet — und dafür braucht es genau **eine** zusätzliche persistierte Spalte:
 
-- `composer_scenes.continuity_rendered_source_clip_url text` — die Continuity-Quelle, mit der der **aktuell vorhandene Output von B tatsächlich gerendert wurde**. Sie wird ausschließlich an den bestehenden Finalisierungspunkten geschrieben (dort, wo `materializeCompatibilityOutput('base'|'processed')` bereits läuft): Wert = der `continuity_source_clip_url`, der beim Start dieses Runs galt.
+- `composer_scenes.continuity_rendered_source_clip_url text` — die Continuity-Quelle, mit der der **aktuell vorhandene Output von B tatsächlich gerendert wurde**. Sie wird ausschließlich an den bestehenden Finalisierungspunkten geschrieben (dort, wo `materializeCompatibilityOutput('base'|'processed')` bereits läuft) — und zwar **aus dem run-gebundenen Snapshot**, nie aus dem aktuellen Scene-Wert (siehe nächster Abschnitt).
+
+### Wo der Run-Snapshot der Continuity-Quelle lebt
+
+Dein Race ist real: der Finalisierungspunkt darf `scene.continuity_source_clip_url` nicht lesen, weil der Wert während des laufenden Runs geändert worden sein kann. Bestandsaufnahme der vorhandenen run-gebundenen Persistenz:
+
+| Kandidat | Run-gebunden? | Immutable? | Enthält Continuity-Input? |
+|---|---|---|---|
+| `composer_scene_runs` | ja (`run_id`, `contract_frozen_at`) | ja, eingefrorener Run-Contract mit `dialog_content_hash`, `audio_asset_hash`, `voice_configuration_hash` | **nein** |
+| `plate_attempts` | ja (`run_id`, `expected_plate_generation`, Tombstoning via `superseded_by_generation`) | ja, Zeile pro Dispatch | **nein** (nur `provider`, `provider_job_id`, `clip_url`) |
+| `composer_pipeline_jobs` | ja (`run_id`, `payload_hash`, `metadata` jsonb) | Job-bezogen, nur bei aktivem Dual-Write-Flag geschrieben | **nein**, und nicht flächendeckend vorhanden |
+| Provider-Dispatch | nur in-memory Payload | nein | — |
+
+Es existiert also **kein** geeigneter Snapshot. Minimalste Ergänzung — keine neue Tabelle, kein neues Konzept:
+
+- Neue Spalte `plate_attempts.continuity_source_clip_url text`, geschrieben **einmalig beim Dispatch** in derselben Insert-Anweisung, die den Attempt anlegt. `plate_attempts` ist der einzige Ort, der bei **jedem** Plate-Run unabhängig von Feature-Flags entsteht, ist bereits run- und generationsgebunden und wird nie überschrieben, sondern tombstoned.
+- Spiegel in `composer_scene_runs.continuity_source_clip_url` beim Contract-Freeze, damit der v427-Run-Contract vollständig bleibt; ein Guard verbietet Änderungen nach `contract_frozen_at`.
+- Finalisierung liest den Wert in dieser Reihenfolge: Attempt-Zeile zu `run_id` / `expected_plate_generation` → `composer_scene_runs`-Zeile zu `run_id` → sonst `NULL` (Legacy-Run vor der Migration). **Niemals** der aktuelle Scene-Wert.
+
+Im Race-Beispiel schreibt die Finalisierung damit X, obwohl die Szene inzwischen auf Y konfiguriert ist — genau richtig: `rendered = X ≠ Y` ⇒ B bleibt korrekt renderbedürftig.
+
 
 ```ts
 needsContinuityRerender(scene) :=
