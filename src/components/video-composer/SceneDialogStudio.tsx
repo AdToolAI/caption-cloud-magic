@@ -830,23 +830,51 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     }
   };
 
+  /** Cast lookup by written speaker name (exact or first-name match). */
+  const resolveCastByName = (name: string) => {
+    const b = name.toLowerCase().trim();
+    if (!b) return null;
+    const hit = sceneCast.find((c) => {
+      const a = (c.name || '').toLowerCase().trim();
+      if (!a) return false;
+      return a === b || a.split(/\s+/)[0] === b.split(/\s+/)[0];
+    });
+    return hit ? { id: hit.id, name: hit.name } : null;
+  };
+
+  /**
+   * Turns aligned to the *current* script. The editor decides how many lines
+   * exist; the canonical turns decide who speaks. Shortening the script now
+   * really shortens the scene (blocks, speakers, seconds and persistence).
+   */
+  const alignedTurns = useMemo(
+    () =>
+      alignDialogTurnsToScript({
+        turns: canonicalDialogTurns,
+        script,
+        resolveSpeakerId: resolveCastByName,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [canonicalDialogTurns, script, sceneCast],
+  );
+
   const idBlocks = useMemo<DialogBlock[] | null>(() => {
-    if (canonicalDialogTurns.length === 0) return null;
-    const texts = scriptLineTexts(script);
-    const hasAlignedEditorText = texts.length === canonicalDialogTurns.length;
-    const out = canonicalDialogTurns
-      .map((turn, index) => {
+    const source = alignedTurns ?? (canonicalDialogTurns.length > 0 ? canonicalDialogTurns : null);
+    if (!source) return null;
+    const out = source
+      .map((turn) => {
         const speaker = sceneCast.find((c) => c.id === turn.characterId || c.brandCharacterId === turn.characterId);
         const speakerId = speaker?.id ?? turn.characterId;
         return {
           speakerId,
           speakerName: speaker?.name ?? turn.displayName ?? `Character ${turn.characterId.slice(0, 8)}`,
-          text: hasAlignedEditorText ? (texts[index] ?? turn.text) : turn.text,
+          text: turn.text,
         } satisfies DialogBlock;
       })
       .filter((block) => block.text.trim().length > 0);
     return out.length > 0 ? out : null;
-  }, [canonicalDialogTurns, script, sceneCast]);
+  }, [alignedTurns, canonicalDialogTurns, sceneCast]);
+
 
   // v229 — Robust fallback: wenn weder ID-Turns noch der Namens-Parser Blöcke
   // finden, sichtbare `Name: Text`-Zeilen trotzdem als Blöcke zählen. Sprecher,
