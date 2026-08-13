@@ -1,36 +1,42 @@
-# Lip-Sync-Abgleich: Guide (v400-Text) gegen den tatsächlichen Code
+# Lip-Sync: Ist der Stand vom 03.08. noch intakt?
 
-Kurzantwort: Die Kette ist **strukturell intakt** — alle vier Verträge stehen im Code. Aber der von dir gepostete Guide beschreibt an mehreren Stellen einen Stand, der so **nicht mehr im Code ist**; er wurde beim chirurgischen Rollback vom 27.07. (Baseline v283) entfernt. Der Guide ist damit teils Wunschbild, teils historisch.
+Du hast recht mit dem Datum — der Text ist vom 03.08.2026, 23:31, also 25 Minuten nach dem Freeze-Commit (`cae9730f8`, 03.08. 23:06 UTC). Ich habe deshalb nicht gegen mein Gedächtnis geprüft, sondern **den heutigen Code gegen genau diesen Commit gediffed**.
 
-## Was heute verifiziert im Code steht
+## Ergebnis: die Kette ist intakt
 
-- `beginSceneRun()` existiert und ist der Einstieg in `compose-video-clips` (T2, Run-Identität).
-- `run_guard_discarded` ist im `sync-so-webhook` aktiv (T11).
-- Watchdog-Zeiten stimmen exakt mit dem Freeze überein: Preflight 4 min, Provider 10 min, Audio-Mux 6 min, Hard 25 min, Dispatch-Recovery 30 s.
-- Slot-Zuordnung row-major ist in `plateFaceSlotRouter.ts` implementiert.
-- Der Freeze-Guard-Test (`lipsyncFrozenContract.test.ts`, 10 Tests) läuft grün — die eingefrorenen Werte sind unverändert.
-- Die v427-Arbeiten (Job-Ledger, Callback-Guard, Kreditreservierung) laufen additiv und flag-gesteuert; sie schreiben keine Lip-Sync-Zustände.
+Diff des gesamten eingefrorenen Scopes (alle `_shared/`-Lip-Sync-Module, `compose-video-clips`, `compose-dialog-segments`, `sync-so-webhook`, `remotion-webhook`, `lipsync-watchdog`, `reset-lipsync-scene`, beide Remotion-Templates) zwischen Freeze-Commit und HEAD:
 
-## Wo Guide und Code auseinanderlaufen
+- **Unverändert, Byte für Byte:** `scene-run-begin.ts`, `scene-run.ts`, `pass-face-preclip.ts`, `syncso-face-gate.ts`, `plateFaceSlotRouter.ts`, `plate-face-detect.ts`, `plate-face-identity.ts`, `twoshot-face-map.ts`, `camera-path.ts`, `compute-mouth-centered-crop.ts`, `face-*.ts`, `cast-clause.ts`, `lipsync-fail.ts`, `plate-attempt.ts`, `anchor-min-face-size.ts`, `lipsync-frozen-contract.ts`, `lipsync-watchdog`, `reset-lipsync-scene`, `DialogTurnFaceCropVideo.tsx`.
+- **`sync-so-webhook`:** nur Übersetzungen der Fehlermeldungen (`tl(...)`) und der `withLang`-Wrapper. Run-Guard, Pass-Logik, Retry-Leiter unangetastet.
+- **`compose-dialog-segments`:** ebenfalls nur i18n der Gate-Meldungen.
+- **`remotion-webhook`:** interne Preclip/Stitch-Artefakte landen nicht mehr in der Mediathek. Kein Einfluss auf die Kette.
+- **`DialogStitchVideo.tsx`:** eine optionale Ambience-Spur (v418), Lautstärke auf [0,1] geklemmt. Maske weiter `30 % → 78 %`, Reprojektion unverändert.
+- **`compose-video-clips`:** die große Änderung (+769 Zeilen), aber additiv außen herum — v425-Provider-Vertrag, v426-Kontinuitätskette, v427-Ledger/Guard/Reservierung, alle flag-gesteuert. Einzige Löschung: die alte lokale `SUPPORTED_AI_SOURCES`-Liste, ersetzt durch die zentrale Quelle.
+- Der Freeze-Guard-Test läuft grün (10/10).
 
-| Guide sagt | Code sagt | Bewertung |
+## Wo der Text und der Code auseinandergehen
+
+Der Guide beschreibt einige Dinge, die **schon am 03.08. nicht im Code waren** — nicht seither entfernt, sondern beim Rollback vom 27.07. verschwunden und im Text als Sollzustand mitgeschrieben. Verifiziert direkt am Freeze-Commit:
+
+| Guide | Am 03.08. im Code | Heute |
 |---|---|---|
-| Face-Gate: Gesichtsanteil ≥ 24 %, Mindestgröße 144 px, Mund-Randabstand, fail-closed | `syncso-face-gate.ts` ist der v252-Rekognition-Gate: prüft Vorhandensein/Koordinate/Mehrfachgesichter; `probe_unavailable` ist **nicht blockierend** | echte Abweichung — v331-Schwellen sind im Rollback entfallen |
-| Mund bei 62 % Höhe (Mouth-Priority-Framing) | keine 0.62-Konstante in Preclip/Crop/Remotion-Template | entfallen; Framing läuft über `targetFaceShare 0.42` |
-| Harte Maske 55–63 % Radius | weiche radiale Maske 30 % → 78 % (im Freeze festgeschrieben und getestet) | bewusster Freeze-Wert, Guide ist veraltet |
-| `mouth-motion-verdict.ts`, `static` failt Szene, `unknown` blockiert Mux | Modul existiert nicht; `report-lipsync-motion-probe` ist reine Telemetrie | echte Abweichung — Passthrough-Erkennung ist derzeit nicht scharf |
-| `rek-image-space.ts`, `lipsync-closeup-contract.ts` (120 px Mindestbreite) | Dateien existieren nicht | entfallen; nur `anchor-min-face-size.ts` |
-| Geometrie ausschließlich auf `reference_image_url` | im Geometriepfad korrekt, aber `lock_reference_url` wird an mehreren Stellen weiter geschrieben/gelesen (`face-frame-extract`, `plate-face-detect`, `visual-inputs`) | Restrisiko: die alte Ursache des 27.07.-Bugs ist nicht strukturell ausgeschlossen |
+| `mouth-motion-verdict.ts`, `static` failt, `unknown` blockiert Mux | Datei existierte nicht | existiert nicht; `report-lipsync-motion-probe` ist reine Telemetrie |
+| `rek-image-space.ts` | existierte nicht | existiert nicht |
+| `lipsync-closeup-contract.ts`, 120 px Mindest-Gesichtsbreite | existierte nicht | existiert nicht (`anchor-min-face-size.ts` deckt einen Teil ab) |
+| Face-Gate: 24 % Gesichtsanteil, 144 px, Mund-Randabstand, fail-closed | nicht im Gate; `syncso-face-gate.ts` war schon v252 (Rekognition, Präsenz/Koordinate) | identisch |
+| Mund bei 62 % Höhe | keine 62-%-Konstante | keine |
+| Harte Maske 55–63 % | weiche Maske 30 % → 78 % | identisch |
 
-## Was ich vorschlage (in dieser Reihenfolge)
+Der funktionierende Lauf vom 03.08. lief also **ohne** diese Bausteine. Das ist die wichtige Erkenntnis: sie sind nicht die Ursache des Erfolgs, sie sind ein älterer Entwurf, der in den Text gerutscht ist.
 
-1. **Guide als Dokument korrigieren, nicht den Code.** `docs/lipsync-pipeline-v400.md` wird zur ehrlichen Ist-Spezifikation umgeschrieben, mit einem Abschnitt „bewusst nicht implementiert (Rollback 27.07.)". Damit hört der Guide auf, falsche Erwartungen zu erzeugen. Null Risiko.
-2. **Anker-Kohärenz strukturell absichern.** Ein Guard-Test, der verbietet, dass `lock_reference_url` im Geometriepfad (`face-frame-extract`, `plate-face-detect`, Preclip) als Messgrundlage dient. Keine Verhaltensänderung, nur ein Netz gegen den bekanntesten Regressionspfad.
-3. **Passthrough-Erkennung: erst messen, dann entscheiden.** Die vorhandene Telemetrie (`report-lipsync-motion-probe`) über ein paar echte Läufe auswerten. Erst wenn die Verdicts belastbar sind, entscheiden wir, ob `static` wieder scharf schalten soll — das wäre ein Unfreeze und braucht deine ausdrückliche Freigabe.
-4. **Face-Gate-Schwellen (24 % / 144 px) bleiben aus**, solange kein Vier-Sprecher-Referenzlauf zeigt, dass sie gebraucht werden. Sie wieder einzuschalten ist die Änderung, die die Kette 2026 zweimal zum Kippen gebracht hat.
+## Vorschlag
+
+1. **Guide-Text auf den bewiesenen Ist-Stand korrigieren.** `docs/lipsync-pipeline-v400.md` bekommt die tatsächlichen Werte plus einen Abschnitt „im Text beschrieben, aber bewusst nicht im Code (Rollback 27.07.)". Damit hört der Guide auf, bei jedem künftigen Verdacht falsche Fährten zu legen.
+2. **Drift-Wächter gegen den Freeze-Commit.** Ein Test, der die eingefrorenen Dateien gegen ihre Hashes vom Commit `cae9730f8` prüft und Abweichungen benennt. Erlaubte Ausnahmen (i18n-Strings) werden explizit gelistet. Danach ist „ist die Kette noch intakt?" eine Testfrage, keine Recherche.
+3. **Kein Code an der Kette anfassen.** Face-Gate-Schwellen, 62-%-Framing und scharfe Passthrough-Erkennung bleiben aus, bis du ausdrücklich „unfreeze lipsync" mit Scope sagst — sie waren am erfolgreichen Referenztag nicht aktiv.
 
 ## Technische Notizen
 
-- Kein Schritt oben verändert Gates, Schwellenwerte, Framing, Maskengeometrie, Provider-Payloads oder die Zustandsmaschine. Schritte 1 und 2 sind Dokumentation und Tests, Schritt 3 ist Auswertung.
-- Vor jedem Deploy an der Kette bleibt `lipsync-selftest` (GET, kreditfrei) der Health-Check: HTTP 200 = grün.
-- Schritte 3 und 4 sind ausdrücklich **Entscheidungen**, keine automatischen Umsetzungen — sie fallen unter „unfreeze lipsync".
+- Vergleichsbasis: `cae9730f845fa5d40217dd5899bd3cc8e8c82039` (03.08.2026 23:06 UTC), der letzte Commit vor dem Zeitstempel deiner Datei.
+- Beide Schritte sind Dokumentation und Tests — null Laufzeitrisiko, keine Deployments an Chain-Funktionen nötig.
+- `lipsync-selftest` (GET, kreditfrei) bleibt der Health-Check vor jedem Deploy an der Kette.
