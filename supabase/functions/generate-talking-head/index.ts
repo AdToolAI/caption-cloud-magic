@@ -463,6 +463,8 @@ async function processHeyGenJob(opts: {
           if (opts.sceneId) {
             await admin.from('composer_scenes').update({
               ...materializeCompatibilityOutput('base', { baseUrl: finalUrl }),
+              // v430 Step 5D: dual write — modern state + legacy mirror.
+              pipeline_state: 'plate_ready',
               clip_status: 'ready',
               updated_at: new Date().toISOString(),
             }).eq('id', opts.sceneId);
