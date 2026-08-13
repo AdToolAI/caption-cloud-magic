@@ -1,70 +1,97 @@
-# Lip-Sync-Absicherung v428: Anchor-Härtung, Dokumententrennung, Vertragstests
+# v428: Anchor-Härtung, danach Motion Studio fertigstellen
 
-Dein Review ist an den entscheidenden Stellen berechtigt. Ich habe die drei Kritikpunkte am Code nachgeprüft — zwei bestätigen sich, einer ist enger als befürchtet. Der Plan wird entsprechend umgestellt: kein Überschreiben des Guides, kein Datei-Hash-Test, dafür eine echte Härtung an der Kontinuitätskette.
+Alle sieben Korrekturen sind eingearbeitet. Der alte, widersprüchliche Abschnitt (Guide überschreiben, Hash-Test, „kein Code an der Kette") ist ersatzlos gestrichen — dieses Dokument ist die einzige gültige Anweisung.
 
-## Nachprüfung (Belege)
+Und ja, ich verstehe deine Priorisierung: erst das Motion Studio zu Ende bauen, dann zurück an die Lip-Sync-Qualität (Outcome-Gate, Face-Gates, Framing). Die Anchor-Härtung ist kein Lip-Sync-Ausbau — sie ist die Bedingung dafür, dass am Motion Studio weitergearbeitet werden kann, ohne die laufende Kette zu gefährden. Deshalb steht sie vorn und ist eng begrenzt.
 
-**1. Meine Aussage „alle vier Verträge intakt" war zu weit.** Korrekt ist: Run-Identität und Assignment-Lock sind vollständig, Anchor-Kohärenz ist im Hauptpfad korrekt, aber nicht strukturell erzwungen, und das Outcome-Gate ist nicht scharf (`report-lipsync-motion-probe` ist reine Telemetrie, `mouth-motion-verdict.ts` existiert nicht — auch nicht am Freeze-Commit). Ein Passthrough kann heute als Erfolg durchlaufen.
+## Einordnung: kontrollierter, eng begrenzter Unfreeze
 
-**2. Die v426-Lücke existiert wirklich — im Code, nicht nur theoretisch.** In `slotArbitration.ts` greift der Schutz `hasProtectedAnchor && collide` → `match-cut`. Fällt eine dieser beiden Bedingungen weg, läuft eine Lip-Sync-Szene weiter durch bis Schritt 3–5 und kann `endframe-bridge`, `clip-reference` oder `frame-chain` bekommen. In `resolveVisualInputs.ts` Zeile 103 wird dann `firstFrameUrl = previousFrameUrl` — also Plate aus Bild B, Geometrie später auf `reference_image_url` = Bild A. Genau der Anchor-Mismatch von Juli. Bei Hailuo/HappyHorse kollidieren die Slots zwar (beide `image-input`), sodass der Regelfall heute `match-cut` liefert — aber der Schutz hängt an einer Slot-Eigenschaft des Providers, nicht an der Lip-Sync-Absicht. Das ist zu fragil.
+`compose-video-clips` steht im eingefrorenen Scope. Punkt A ändert diese Datei — das ist ein **kontrollierter Unfreeze, begrenzt auf die vorgelagerte Visual-Input-Auflösung und die Continuity-Backfill-Schleife**. Nicht angefasst: Preclip, Face-Slot-Routing, Sync.so-Dispatch, Reprojektion, Stitching, Gates, Schwellenwerte, Zustandsmaschine. Die Änderung verengt Verhalten und macht den Freeze strenger.
 
-**3. Nur ein echter `lock_reference_url`-Lesepfad ist relevant:** `compose-dialog-segments/index.ts:1362` (`lockAnchorUrl`). Die übrigen Treffer sind Schreibpfade oder Kommentare. Der Lesepfad gehört unter einen Test gestellt, der belegt, dass er nie Geometriequelle wird.
+## Belegte Lücke
 
-## Was umgesetzt wird
+`slotArbitration.ts` schützt nur über `hasProtectedAnchor && collide`. Fällt eine der beiden Bedingungen weg, läuft eine Lip-Sync-Szene bis Schritt 3–5 durch und bekommt `endframe-bridge`, `clip-reference` oder `frame-chain`; `resolveVisualInputs.ts:103` setzt dann `firstFrameUrl = previousFrameUrl`. Plate aus Bild B, Geometrie auf Bild A — der Anchor-Mismatch von Juli. Bei Hailuo/HappyHorse kollidieren die Slots heute zufällig, der Schutz hängt also an einer Provider-Eigenschaft statt an der Lip-Sync-Absicht.
 
-### A. Harte Regel: Continuity aus bei Lip-Sync (Verhaltensänderung, klein und gerichtet)
+---
 
-In `slotArbitration.ts` kommt eine Regel **vor** allen anderen Zweigen:
+# Block 1 — Lip-Sync gegen v426 absichern
 
-```text
-requirements.lipSync === true
-  → transition = 'match-cut'
-  → inputMode  = firstFrame.supported ? 'first-frame' : 'references'
-  → warning    'lipsync_continuity_disabled'
-```
+## Commit 1: nur Dokumentation und Tests
 
-Damit ist der Plate-Input einer Lip-Sync-Szene immer der Anchor — unabhängig von Provider-Slots, Flags oder Reihenfolge. In `resolveVisualInputs.ts` wird zusätzlich abgesichert, dass `useContinuityFrame` bei `requirements.lipSync` niemals wahr werden kann. Beides gilt auch bei aktivierten v426/v427-Flags; ein Flag kann diese Regel nicht aufheben.
+Kein Laufzeitcode. Neue Anchor-Tests dürfen hier **rot** sein — sie belegen die Lücke.
 
-Dieselbe Regel spiegelt der Dispatcher: die Server-Kontinuitäts-Backfill-Schleife in `compose-video-clips` (Zeile ~3843) überspringt Lip-Sync-Szenen, damit gar kein Continuity-Frame extrahiert wird.
+**Dokumente (nichts wird überschrieben):**
+- `docs/archive/lipsync-pipeline-v400-freeze-original.md` — Guide vom 03.08., unverändert archiviert.
+- `docs/lipsync-pipeline-v400-errata.md` — pro Punkt: Guide-Aussage, Befund am Freeze-Commit `cae9730f8`, heutiger Stand (24-%-Face-Gate, 144 px, 62-%-Mundposition, harte Maske 55–63 %, Passthrough-Erkennung, `mouth-motion-verdict.ts`, `rek-image-space.ts`, Watchdog-Stufen).
+- `docs/lipsync-pipeline-current.md` — Ist-Spezifikation v425–v428.
+- Ehrliche Bestandsaufnahme der vier Verträge: Run-Identität und Assignment-Lock vollständig, Anchor-Kohärenz im Hauptpfad korrekt aber (noch) nicht strukturell erzwungen, **Outcome-Gate nicht scharf** — nur Telemetrie, ein Passthrough kann heute als Erfolg durchlaufen.
 
-### B. Dokumente trennen statt überschreiben
+**Tests (`src/lib/composer/__tests__/lipsyncAnchorCoherence.test.ts`):**
 
-- `docs/archive/lipsync-pipeline-v400-freeze-original.md` — der Guide vom 03.08., unverändert.
-- `docs/lipsync-pipeline-v400-errata.md` — pro Punkt: Guide-Aussage, Befund am Freeze-Commit `cae9730f8`, heutiger Stand. Betrifft 24-%-Face-Gate, 144 px, 62-%-Mundposition, harte Maske 55–63 %, Passthrough-Erkennung, `mouth-motion-verdict.ts`, `rek-image-space.ts`, Watchdog-Stufen.
-- `docs/lipsync-pipeline-current.md` — Ist-Spezifikation inklusive v425–v428 und dem neuen Continuity-Ausschluss.
+Verhaltenstests, keine Namensprüfungen. Für `requirements.lipSync === true` über **alle** Provider-Profile, mit/ohne Vorgängerframe, mit/ohne Endframe, mit Clip-Referenz:
+- `anchorImageUrl === scene.reference_image_url`
+- `firstFrameUrl === scene.reference_image_url`
+- `previousFrameUrl` erscheint nicht im Plate-Payload
+- `endFrameUrl` erscheint nicht im Plate-Payload
+- `clipReference` erscheint nicht im Plate-Payload
+- `lock_reference_url` beeinflusst weder Plate-Input noch Geometrie
 
-Kein bestehendes Dokument wird inhaltlich umgeschrieben.
+**Differentialtest:** `reference_image_url = A`, `lock_reference_url = B`; danach `lock_reference_url = C`. Plate-Input und Geometrie zeigen in beiden Läufen auf A.
 
-### C. Semantische Vertragstests statt Hash-Test
+**Einstiegspunkt-Tests** — `requirements.lipSync` muss vor `arbitrateSlots` feststehen, je ein Test für: manuell aktiviertes Lip-Sync, Multi-Speaker-Dialog, Single-Speaker-Dialog, Replay/Regeneration, Watchdog-Recovery, bestehende Szene mit neuem Run, Autopilot-/Auto-Composer-Pfad.
 
-Der Datei-Hash-Test entfällt. Neue Vitest-Suite `src/lib/composer/__tests__/lipsyncAnchorCoherence.test.ts` und Erweiterung der bestehenden Contract-Tests:
+**Vertragstests (erweitert):** alter Run überschreibt keinen aktuellen Clip · `plate_generation` muss übereinstimmen · Assignment-Lock nach Dispatch unverändert · gültiger Callback genau einmal · veralteter Callback verworfen · fehlgeschlagener Callback erneut zustellbar · Reservierung/Refund/Watchdog genau einmal · vier Sprecher ⇒ vier stabile Slots und vier Jobs.
 
-- Lip-Sync-Szene ⇒ `transition = match-cut` und `firstFrameUrl === anchorImageUrl` — über alle Provider-Profile, mit und ohne Vorgängerframe, mit und ohne Endframe, mit Clip-Referenz.
-- Geometriequelle einer Lip-Sync-Szene ist `reference_image_url`; `lock_reference_url` erscheint in keinem Mess-Aufruf.
-- Assignment-Lock wird nach Dispatch nicht neu berechnet.
-- Alter Run überschreibt keinen aktuellen Clip; `plate_generation` muss übereinstimmen.
-- Callback: gültig genau einmal verarbeitet, veraltet verworfen, fehlgeschlagen erneut zustellbar.
-- Reservierung: Erfolg verbraucht, Fehler gibt frei, verspäteter Callback und Watchdog buchen kein zweites Mal.
-- Vier Sprecher ⇒ vier stabile Slots, vier Provider-Jobs.
+**Vier-Sprecher-Fixture** aus dem Golden Run (Scene `c934a823…`): kreditfrei, ohne Provider-Aufruf, prüft Slots, Jobs, Run-ID, Generation, Reprojektionsgeometrie, Abrechnung.
 
-### D. Callback-Guard: Zustände trennen
+## Commit 2: ausschließlich Anchor-Härtung
 
-`v427-callback-guard.ts` bekommt statt „geclaimt / Duplikat" vier Zustände: `received`, `processing`, `succeeded`, `failed_redeliverable`. Ein Callback wird erst nach erfolgreicher Verarbeitung endgültig konsumiert; scheitert die Verarbeitung, bleibt er erneut zustellbar. Reihenfolge bleibt: `run_guard_discarded` zuerst, Guard danach. Der Guard bleibt auf `observe` bis der Referenzlauf grün ist.
+Drei Schutzschichten, keine davon per Flag abschaltbar:
 
-### E. Vier-Sprecher-Referenztest
+1. `slotArbitration.ts` — neue Regel **vor** allen anderen Zweigen:
+   `requirements.lipSync === true` → `transition = 'match-cut'`, Warnung `lipsync_continuity_disabled`.
+2. `resolveVisualInputs.ts` — `useContinuityFrame` kann bei `requirements.lipSync` nicht wahr werden.
+3. `compose-video-clips/index.ts` — die Continuity-Backfill-Schleife (~Z. 3843) überspringt Lip-Sync-Szenen; es wird gar kein Frame extrahiert. Backend-Spiegel `_shared/visual-inputs.ts` identisch.
 
-Kreditfreier Fixture-Test aus dem Golden Run vom 03.08. (Scene `c934a823…`): feste Anchor-Bilder, feste Dialogreihenfolge, erwartete vier Slots, vier Jobs, Run-ID/Generation, Reprojektionsgeometrie, Kreditabrechnung genau einmal. Läuft in CI ohne Provider-Aufruf. Der echte Staging-Canary bleibt manuell, vor jeder Flag-Aktivierung.
+**Anchor-treuer Input, fail-closed:** kein Fallback auf `references` als Notlösung. Es wird der provider-spezifische, im v425-Vertrag als Lip-Sync-tauglich zertifizierte Image-Input verwendet. Gibt es keinen anchor-treuen Image-Input, bricht die Szene mit `lipsync_anchor_input_unsupported` ab, statt auf eine lose Referenzart auszuweichen. Diese Zuordnung wird zentral im v425-Provider-Vertrag hinterlegt.
 
-## Was ausdrücklich nicht passiert
+Danach müssen Anchor-, Parity-, Freeze- und Vier-Sprecher-Tests grün sein.
 
-- Kein Reaktivieren von 24 %, 144 px, 62-%-Framing oder harter Maske.
-- Kein Scharfschalten des Outcome-Gates. Die Telemetrie wird erst ausgewertet; das scharfe Gate braucht deine ausdrückliche Freigabe und wäre ein Unfreeze.
-- Keine Änderung an Gates, Payloads, Retry-Verhalten oder Zustandsmaschine der Kette.
-- Kein Flag-Rollout: v426/v427-Flags bleiben stehen, wo sie stehen, bis der Vier-Sprecher-Referenzlauf mit den neuen Tests grün ist.
+## Staging-Canary (vor Commit 3)
+
+Vier-Sprecher-Konfiguration vom 03.08.: vier richtige Gesichter, vier richtige Stimmen, vier Jobs, korrekte Run-ID und Generation, richtige Reprojektion, **kein Vorgängerframe im Payload**, Credits genau einmal.
+
+## Commit 3: Callback-Guard, ausschließlich observe
+
+Vier Zustände: `received`, `processing`, `succeeded`, `failed_redeliverable`. Ein Callback gilt erst nach erfolgreicher Verarbeitung als konsumiert; scheitert sie, bleibt er erneut zustellbar. Reihenfolge unverändert: `run_guard_discarded` zuerst, Guard danach.
+
+**Observe ist fail-open und wird als solches getestet:** der Guard darf protokollieren, aber niemals einen Callback verwerfen, verzögern, als konsumiert markieren oder die Verarbeitung wegen eines eigenen Schreibfehlers abbrechen. Duplikatsperre erst nach ausdrücklicher Aktivierung von `enforce`. Getrennter Runtime-Commit, nie zusammen mit Commit 2.
+
+## Commit 4: separat
+
+Die zwei Altfehler in `visualInputsResolver.test.ts` (Seedance-Zertifizierungsstatus) an den v425-Vertrag angleichen. Eigener Commit, damit ein späterer roter Lauf eindeutig zuzuordnen ist.
+
+## Produktionsdeploy
+
+Flag-Zustände dokumentieren · nie zwei Flags gleichzeitig umschalten · `lipsync-selftest` vor dem Deploy · Deploy (`compose-video-clips`, `compose-clip-webhook`) · Selftest danach · ein echter Vier-Sprecher-Lauf · Ledger, Callback-Reihenfolge und Credit-Abschluss kontrollieren.
+
+---
+
+# Block 2 — Motion Studio fertigstellen
+
+Erst wenn Block 1 grün ist. Offen aus dem v427-Vertrag:
+
+- **B (Geld & Dauer, gebaut, nicht aktiv):** `v427.credit_reservations` und `v427.audio_preflight` auf dem Betreiber-Account testen — Reservierung vor Dispatch, exakte Abrechnung danach, genau eine Buchung pro Lauf. Offene Produktentscheidung: Wer trägt die TTS-Kosten, wenn der gemessene Dialog in kein Providerfenster passt (Hailuo 10 s, HappyHorse 15 s, Seedance 30 s)?
+- **C (Fertig-Semantik):** `base_clip_ready` (Bild fertig) vs. `ready` (Mux fertig). Die Kontinuitätskette startet den Folgeclip schon bei fertiger Bildbasis. Consumer aus `docs/v427-ready-consumers.md` umstellen, Flip hinter `v427.ready_semantics`.
+- **D (Leases & UI):** `v427.provider_leases` gegen Doppelbuchung desselben Providerslots, Storyboard-Persistenz, Fortschrittsanzeige vollständig aus `pipeline_state`.
+- **Rollout A2/A3:** Dual-Write und Guard von `observe` auf `enforce`, nachdem mehrere Läufe keine Ablehnung gegen gültige Callbacks gezeigt haben.
+
+# Block 3 — später, nur mit ausdrücklichem Unfreeze
+
+Outcome-Gate scharf schalten (`static` failt, `unknown` blockiert Mux), Face-Gate-Schwellen, 62-%-Framing, harte Maske. Bleibt bewusst offen und wird **nicht** zusammen mit der Anchor-Reparatur angefasst. Bis dahin wird die vorhandene Telemetrie nur ausgewertet.
 
 ## Technische Notizen
 
-- Punkt A ist die einzige Laufzeitänderung. Sie verengt Verhalten (Continuity aus bei Lip-Sync) und kann keine neue Bildquelle einführen — der Freeze wird dadurch strenger, nicht lockerer. Sie berührt keine der in `.lovable/LIPSYNC-FEATURE-FREEZE.md` gelisteten Dateien der Kette selbst, sondern nur die vorgelagerte Input-Auflösung.
-- Betroffen: `src/lib/composer/visualInputs/slotArbitration.ts`, `resolveVisualInputs.ts`, der Backend-Spiegel `supabase/functions/_shared/visual-inputs.ts`, die Backfill-Schleife in `compose-video-clips/index.ts`, `_shared/v427-callback-guard.ts`.
-- Deploys danach: `compose-video-clips`, `compose-clip-webhook`. `lipsync-selftest` vorher und nachher.
-- Der Freeze-Guard-Test (10/10) und `visualInputsParity` müssen grün bleiben; die zwei bekannten Altfehler in `visualInputsResolver.test.ts` (Seedance-Zertifizierungsstatus) werden im selben Zug an den v425-Vertrag angeglichen.
+- Betroffene Dateien Block 1: `src/lib/composer/visualInputs/slotArbitration.ts`, `resolveVisualInputs.ts`, `supabase/functions/_shared/visual-inputs.ts`, `supabase/functions/compose-video-clips/index.ts` (nur Backfill-Schleife), `supabase/functions/_shared/v427-callback-guard.ts` (Commit 3), `_shared/composer-ai-sources.ts` (anchor-treuer Input im v425-Vertrag).
+- Der Freeze-Guard-Test (10/10) und `visualInputsParity` bleiben Abnahmebedingung jedes Commits.
+- Einziger echter `lock_reference_url`-Lesepfad: `compose-dialog-segments/index.ts:1362`. Er bleibt unverändert, wird aber vom Differentialtest abgedeckt.
