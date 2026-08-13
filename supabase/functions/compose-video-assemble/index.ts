@@ -6,6 +6,7 @@ import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
+import { sceneState, legacyClipReadyEquivalentRow } from "../_shared/scene-state.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
