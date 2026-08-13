@@ -214,8 +214,8 @@ describe('registry coverage', () => {
     for (const model of AI_VIDEO_TOOLKIT_MODELS) {
       const profile = deriveVisualInputProfile(model);
       expect(profile.mode === 'exclusive' || profile.mode === 'slots').toBe(true);
-      // Certification is opt-in per model; everything else stays unverified.
-      const expected = model.id === 'seedance-2-5' ? 'verified' : 'unverified';
+      // v425: verification tracks the certified provider list, nothing else.
+      const expected = profile.lipSync.supported ? 'verified' : 'unverified';
       expect(profile.lipSync.verification.status).toBe(expected);
     }
 
