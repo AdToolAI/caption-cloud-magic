@@ -214,7 +214,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const isCinematicSync =
         String((preUpdateScene as any)?.engine_override ?? '') === 'cinematic-sync';
       const sceneUpdate: Record<string, unknown> = {
-        clip_url: permanentUrl,
+        // v430 Step 1 — plate delivery goes through the single writer.
+        ...materializeCompatibilityOutput('base', { baseUrl: permanentUrl }),
         clip_status: 'ready',
         clip_error: null,
         updated_at: new Date().toISOString(),
