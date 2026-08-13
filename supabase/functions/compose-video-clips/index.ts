@@ -13,6 +13,8 @@ import { AMBIENT_NO_SPEECH_PROMPT } from "../_shared/ambient-audio.ts";
 import { isSupportedComposerAiSource, isLipsyncCertifiedAiSource, LIPSYNC_CERTIFIED_AI_SOURCES } from "../_shared/composer-ai-sources.ts";
 import { hailuoBucketFor } from "../_shared/provider-matrix.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
+import { resolveSceneOutput } from "../_shared/resolve-scene-output.ts";
+import { isSceneOutputFinal } from "../_shared/continuity-state.ts";
 
 import {
   countDialogSpeakers,
