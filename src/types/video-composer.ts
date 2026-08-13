@@ -338,10 +338,16 @@ export interface ComposerScene {
   ignoreWorldRefs?: boolean;
   clipUrl?: string;
   clipStatus: ClipStatus;
+  /** v430 Step 1 — output columns. Read via resolveSceneOutput(), never directly. */
+  baseVideoUrl?: string | null;
+  processedVideoUrl?: string | null;
   /** Authoritative lifecycle state. Legacy status fields are display-only mirrors. */
   pipelineState?: import('@/lib/composer/sceneState').SceneState;
   pipelineStateAt?: string;
   pipelineStateRunId?: string | null;
+  /** v430 Step 5C — diagnostic substate. Read via sceneSubstate(). */
+  pipelineSubstate?: string | null;
+  pipelineSubstateAt?: string | null;
   activeRunId?: string | null;
   plateGeneration?: number;
   plateReadyGeneration?: number | null;
