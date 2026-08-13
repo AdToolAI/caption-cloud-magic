@@ -13,6 +13,8 @@ import { AMBIENT_NO_SPEECH_PROMPT } from "../_shared/ambient-audio.ts";
 import { isSupportedComposerAiSource, isLipsyncCertifiedAiSource, LIPSYNC_CERTIFIED_AI_SOURCES } from "../_shared/composer-ai-sources.ts";
 import { hailuoBucketFor } from "../_shared/provider-matrix.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
+import { resolveSceneOutput } from "../_shared/resolve-scene-output.ts";
+import { isSceneOutputFinal } from "../_shared/continuity-state.ts";
 
 import {
   countDialogSpeakers,
@@ -458,6 +460,8 @@ serve(async (req) => {
     // previous run's lip-sync state and visible clip, and stamps a fresh
     // active_run_id / plate_generation before anything is dispatched.
     let sceneRunStamps = new Map<string, { runId: string; generation: number }>();
+    // v430 Step 4 — continuity input each scene was dispatched with (run snapshot).
+    const continuityBindings = new Map<string, string | null>();
     try {
       const earlyAiSceneIds = (scenes as Array<{ id: string; clipSource?: string }>)
         .filter((s) => s.clipSource?.startsWith("ai-"))
@@ -3852,9 +3856,10 @@ serve(async (req) => {
         : ((scene as any).previousClipUrl ?? null);
       const continuityPref = (scene as any).visualContinuity ?? "auto";
       const sceneOrderIdx = scenes.findIndex((s) => s.id === scene.id);
+      // v430 Step 4 — remember WHICH predecessor output this dispatch binds to.
+      let continuitySourceSceneId: string | null = null;
       if (
         !sceneWantsLipSync &&
-        (!continuityFrameUrl || !continuityClipUrl) &&
         continuityPref !== "match-cut"
       ) {
         try {
@@ -3888,13 +3893,28 @@ serve(async (req) => {
             }
           }
           if (!prevScene) throw new Error("no_predecessor");
+          // v430 Step 4 — continuity reads the RESOLVED, FINAL output of the
+          // predecessor, never `clip_url` directly. A lip-sync predecessor that
+          // has only delivered its plate is NOT final: chaining onto it would
+          // bind the successor to an intermediate frame that the mux replaces.
           const { data: prevRow } = await supabaseAdmin
             .from("composer_scenes")
-            .select("clip_url, duration_seconds")
+            .select(
+              "clip_url, processed_video_url, base_video_url, lip_sync_source_clip_url, upload_url, lip_sync_status, lip_sync_with_voiceover, dialog_mode, engine_override, duration_seconds",
+            )
             .eq("id", prevScene.id)
             .maybeSingle();
-          const prevClipUrl = String((prevRow as any)?.clip_url ?? "");
+          const prevFinal = isSceneOutputFinal(prevRow as any);
+          const prevClipUrl = prevFinal
+            ? (resolveSceneOutput(prevRow as any).effectiveUrl ?? "")
+            : "";
+          if (!prevFinal) {
+            console.log(
+              `[compose-video-clips] scene ${scene.id} predecessor ${prevScene.id} output not final — continuity skipped (match-cut)`,
+            );
+          }
           if (prevClipUrl) {
+            continuitySourceSceneId = prevScene.id;
             continuityClipUrl = continuityClipUrl ?? prevClipUrl;
             const framed = continuityFrameUrl
               ? { url: continuityFrameUrl }
@@ -3980,6 +4000,31 @@ serve(async (req) => {
           `[compose-video-clips] scene ${scene.id} visual-plan: transition=${visualPlan.transition.mode} inputMode=${visualPlan.inputMode} refs=${visualPlan.references.length} lipSyncProtected=${visualPlan.constraints.lipSyncProtected} warnings=${visualPlan.warnings.join(",") || "none"}`,
         );
       }
+
+      // ── v430 Step 4: bind the continuity dependency BEFORE dispatch ──────
+      // The DB trigger `register_plate_attempt` snapshots
+      // `continuity_source_clip_url` into the attempt row the moment the
+      // provider job id lands, so this write must happen first. It records
+      // the STRATEGY RESULT (what the plan actually consumed), not an
+      // intention: a plan that fell back to match-cut clears the binding.
+      {
+        const usedContinuity =
+          !sceneWantsLipSync &&
+          visualPlan.transition.mode !== "match-cut" &&
+          !!continuityClipUrl;
+        continuityBindings.set(scene.id, usedContinuity ? continuityClipUrl : null);
+        await supabaseAdmin
+          .from("composer_scenes")
+          .update({
+            continuity_source_scene_id: usedContinuity ? continuitySourceSceneId : null,
+            continuity_source_clip_url: usedContinuity ? continuityClipUrl : null,
+            // The binding is fresh by definition at dispatch time.
+            continuity_stale: false,
+          })
+          .eq("id", scene.id);
+      }
+
+
 
       // v428 fail-closed: a lip-sync scene whose provider has no
       // anchor-faithful image input must not be dispatched onto a loose
@@ -5030,6 +5075,7 @@ serve(async (req) => {
             quotedCostEuros:
               scene.durationSeconds * (CLIP_COSTS[scene.clipSource]?.[q] ?? 0),
             reservationId: v427Reservation!.reservationId,
+            continuitySourceClipUrl: continuityBindings.get(scene.id) ?? null,
             metadata: { provider: scene.clipSource, quality: q, project_id: projectId },
           }];
         }),

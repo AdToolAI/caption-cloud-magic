@@ -450,6 +450,11 @@ export default function VideoComposerDashboard() {
             continuityDriftLabel: ((row as any).continuity_drift_label as any) ?? local?.continuityDriftLabel,
             continuityAutoRepair: ((row as any).continuity_auto_repair as any) ?? local?.continuityAutoRepair,
             continuityLocked: ((row as any).continuity_locked as any) ?? local?.continuityLocked,
+            // v430 Step 4 — DB is the only truth for these; never fall back to local.
+            continuitySourceClipUrl: ((row as any).continuity_source_clip_url as any) ?? null,
+            continuityRenderedSourceClipUrl: ((row as any).continuity_rendered_source_clip_url as any) ?? null,
+            continuityStale: ((row as any).continuity_stale as any) === true,
+            firstRenderedAt: ((row as any).first_rendered_at as any) ?? null,
             lockReferenceUrl: ((row as any).lock_reference_url as any) ?? local?.lockReferenceUrl,
             actionBeat: ((row as any).action_beat as any) ?? local?.actionBeat,
             realismPreset: ((row as any).realism_preset as any) ?? local?.realismPreset,
@@ -628,6 +633,11 @@ export default function VideoComposerDashboard() {
             continuityDriftLabel: ((row as any).continuity_drift_label as any) ?? local?.continuityDriftLabel,
             continuityAutoRepair: ((row as any).continuity_auto_repair as any) ?? local?.continuityAutoRepair,
             continuityLocked: ((row as any).continuity_locked as any) ?? local?.continuityLocked,
+            // v430 Step 4 — DB is the only truth for these; never fall back to local.
+            continuitySourceClipUrl: ((row as any).continuity_source_clip_url as any) ?? null,
+            continuityRenderedSourceClipUrl: ((row as any).continuity_rendered_source_clip_url as any) ?? null,
+            continuityStale: ((row as any).continuity_stale as any) === true,
+            firstRenderedAt: ((row as any).first_rendered_at as any) ?? null,
             lockReferenceUrl: ((row as any).lock_reference_url as any) ?? local?.lockReferenceUrl,
             actionBeat: ((row as any).action_beat as any) ?? local?.actionBeat,
             realismPreset: ((row as any).realism_preset as any) ?? local?.realismPreset,

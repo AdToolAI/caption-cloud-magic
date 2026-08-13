@@ -6554,6 +6554,7 @@ export type Database = {
           audio_plan_id: string | null
           billable_duration_seconds: number | null
           completed_at: string | null
+          continuity_source_clip_url: string | null
           contract_frozen_at: string | null
           created_at: string
           dialog_content_hash: string | null
@@ -6579,6 +6580,7 @@ export type Database = {
           audio_plan_id?: string | null
           billable_duration_seconds?: number | null
           completed_at?: string | null
+          continuity_source_clip_url?: string | null
           contract_frozen_at?: string | null
           created_at?: string
           dialog_content_hash?: string | null
@@ -6604,6 +6606,7 @@ export type Database = {
           audio_plan_id?: string | null
           billable_duration_seconds?: number | null
           completed_at?: string | null
+          continuity_source_clip_url?: string | null
           contract_frozen_at?: string | null
           created_at?: string
           dialog_content_hash?: string | null
@@ -6689,7 +6692,10 @@ export type Database = {
           continuity_drift_notes: Json | null
           continuity_drift_score: number | null
           continuity_locked: boolean
+          continuity_rendered_source_clip_url: string | null
+          continuity_source_clip_url: string | null
           continuity_source_scene_id: string | null
+          continuity_stale: boolean
           cost_euros: number
           created_at: string
           dialog_content_hash: string | null
@@ -6710,6 +6716,7 @@ export type Database = {
           end_reference_image_url: string | null
           engine_override: string
           first_frame_url: string | null
+          first_rendered_at: string | null
           frame_pick_seconds: number | null
           hybrid_mode: string | null
           hybrid_target_scene_id: string | null
@@ -6815,7 +6822,10 @@ export type Database = {
           continuity_drift_notes?: Json | null
           continuity_drift_score?: number | null
           continuity_locked?: boolean
+          continuity_rendered_source_clip_url?: string | null
+          continuity_source_clip_url?: string | null
           continuity_source_scene_id?: string | null
+          continuity_stale?: boolean
           cost_euros?: number
           created_at?: string
           dialog_content_hash?: string | null
@@ -6836,6 +6846,7 @@ export type Database = {
           end_reference_image_url?: string | null
           engine_override?: string
           first_frame_url?: string | null
+          first_rendered_at?: string | null
           frame_pick_seconds?: number | null
           hybrid_mode?: string | null
           hybrid_target_scene_id?: string | null
@@ -6941,7 +6952,10 @@ export type Database = {
           continuity_drift_notes?: Json | null
           continuity_drift_score?: number | null
           continuity_locked?: boolean
+          continuity_rendered_source_clip_url?: string | null
+          continuity_source_clip_url?: string | null
           continuity_source_scene_id?: string | null
+          continuity_stale?: boolean
           cost_euros?: number
           created_at?: string
           dialog_content_hash?: string | null
@@ -6962,6 +6976,7 @@ export type Database = {
           end_reference_image_url?: string | null
           engine_override?: string
           first_frame_url?: string | null
+          first_rendered_at?: string | null
           frame_pick_seconds?: number | null
           hybrid_mode?: string | null
           hybrid_target_scene_id?: string | null
@@ -10956,6 +10971,7 @@ export type Database = {
         Row: {
           clip_url: string | null
           completed_at: string | null
+          continuity_source_clip_url: string | null
           created_at: string
           expected_plate_generation: number
           id: string
@@ -10971,6 +10987,7 @@ export type Database = {
         Insert: {
           clip_url?: string | null
           completed_at?: string | null
+          continuity_source_clip_url?: string | null
           created_at?: string
           expected_plate_generation: number
           id?: string
@@ -10986,6 +11003,7 @@ export type Database = {
         Update: {
           clip_url?: string | null
           completed_at?: string | null
+          continuity_source_clip_url?: string | null
           created_at?: string
           expected_plate_generation?: number
           id?: string
@@ -19699,6 +19717,10 @@ export type Database = {
         Returns: number
       }
       owns_composer_project: { Args: { _project_id: string }; Returns: boolean }
+      propagate_continuity_staleness: {
+        Args: { _effective_url: string; _scene_id: string }
+        Returns: number
+      }
       purchase_character: {
         Args: {
           _character_id: string
@@ -19770,6 +19792,24 @@ export type Database = {
       reset_monthly_credits: { Args: never; Returns: undefined }
       revoke_founder_status: {
         Args: { _reason: string; _user_id: string }
+        Returns: boolean
+      }
+      scene_lipsync_intentional: {
+        Args: {
+          _dialog_mode: boolean
+          _engine_override: string
+          _lip_sync_with_voiceover: boolean
+        }
+        Returns: boolean
+      }
+      scene_output_is_final: {
+        Args: {
+          _clip_url: string
+          _dialog_mode: boolean
+          _engine_override: string
+          _lip_sync_with_voiceover: boolean
+          _processed_video_url: string
+        }
         Returns: boolean
       }
       seed_ai_superuser_demo_data: {

@@ -14,7 +14,7 @@ import { tl, withLang } from "../_shared/i18n.ts";
 import { resumeContinuityChain, sweepContinuityQueue } from "../_shared/continuity-chain.ts";
 import { guardCallback } from "../_shared/v427-callback-guard.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
-import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
+import { continuityRenderedPatch } from "../_shared/continuity-run-snapshot.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -218,6 +218,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const sceneUpdate: Record<string, unknown> = {
         // v430 Step 1 — plate delivery goes through the single writer.
         ...materializeCompatibilityOutput('base', { baseUrl: permanentUrl }),
+        // v430 Step 4 — stamp the continuity input THIS run was dispatched
+        // with (immutable snapshot, never the scene's current binding), so a
+        // later re-binding shows up as "needs re-render" instead of silently
+        // pretending the existing video already used it.
+        ...(await continuityRenderedPatch(supabase, sceneId, { runId })),
         clip_status: 'ready',
         clip_error: null,
         updated_at: new Date().toISOString(),

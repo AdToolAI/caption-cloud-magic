@@ -193,6 +193,7 @@ import { useSceneRenderConfirm } from "@/lib/composer/sceneRenderConfirm";
 import { countSceneSpeakers } from "@/lib/composer/countSceneSpeakers";
 import { useOutfitLookMap } from "@/hooks/useOutfitLookMap";
 import { tx } from "@/lib/i18nText";
+import { SceneContinuityStatus } from "./SceneContinuityStatus";
 
 /**
  * Wave 3.1 — compact Catalog-ID chip strip. Reads scene-level shadow IDs
@@ -1905,6 +1906,9 @@ export default function SceneCard({
                                 </SelectContent>
                               </Select>
                             </div>
+
+                            {/* v430 Step 4 — continuity dependency status */}
+                            <SceneContinuityStatus scene={scene} language={language} />
 
                             {dialogMode && scene.clipSource === "ai-seedance25" && (
                               <label className="mt-2 flex items-start gap-2 rounded-md border border-border/50 bg-card/40 p-2">
