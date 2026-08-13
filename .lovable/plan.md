@@ -62,8 +62,8 @@ Zusätzlich bleibt bei `failed` mit vorhandener `clip_url` der alte `clip_status
 | Datei | Heutiger Legacy-Read | Ziel |
 |---|---|---|
 | `compose-video-assemble:150,164` | `clip_status === 'ready'` | `legacyClipReadyEquivalent(s)` (Zustand + Output) |
-| `compose-stitch-and-handoff:87-88` | zählt `ready` / `failed` | `legacyClipReadyEquivalent(s)` / `sceneState(s) === 'failed'` |
-| `compose-clip-webhook:495,712-722` | Projektfortschritt | dito, SQL-Filter auf `pipeline_state` |
+| `compose-stitch-and-handoff:87-88` | zählt `ready` / `failed` | `ready = legacyClipReadyEquivalent(s)`; `failed = !ready && sceneState(s) === 'failed'` (exklusiv) |
+| `compose-clip-webhook:495,712-722` | Projektfortschritt | dito, exklusive Klassifikation; SQL-Filter exakt paritätisch oder Helper nach dem Laden |
 | `compose-video-clips:1804-1810` | `clip_status`-Guard | `sceneState()` |
 | `modelark-poll:114` | `.eq('clip_status','generating')` | `.eq('pipeline_state','plate_rendering')` |
 | `composer-cancel-scene:86` | `LIVE_CLIP.has(clip_status)` | `sceneState()`; Lip-Sync-Zweig bleibt Legacy |
@@ -75,13 +75,15 @@ Explizite Legacy-Ausnahmen (unverändert, nur kommentiert): `lipsync-watchdog`, 
 
 - Nur Lesepfade; keine Zustandssemantik, keine Lip-Sync-Logik ändern.
 - Verhalten 1:1 identisch; jede Abweichung ist ein Bug, keine Verbesserung.
-- Reader lesen ausschließlich über `sceneState()` / `sceneSubstate()`.
-- `legacyClipReadyEquivalent` berücksichtigt Hauptzustand **und** vorhandenen effektiven Output, damit `failed` + bestehende Plate legacy-paritätisch bleibt.
+- Statusinterpretation ausschließlich über `sceneState()` / `sceneSubstate()`; Output-Existenz ausschließlich über `resolveSceneOutput()`. Keine direkte Interpretation von `clip_status`, `twoshot_stage` oder `lip_sync_status` außerhalb der Allowlist.
+- `legacyClipReadyEquivalent(scene)` = Zustand über `sceneState()` **plus** Output-Existenz über `resolveSceneOutput()`. Es gibt nur diese eine Variante.
+- Ready/Failed werden **exklusiv** klassifiziert: `ready = legacyClipReadyEquivalent(scene)`, `failed = !ready && sceneState(scene) === 'failed'`. Das gilt auch für SQL-/Projektfortschrittslogik — ein reiner `pipeline_state = 'failed'`-Filter ist unzulässig, wenn der alte `clip_status` wegen vorhandener Platte `ready` geblieben wäre.
 - `modelark-poll` verwendet ausschließlich `pipeline_state = 'plate_rendering'`; kein Legacy-Fallback.
 
 ## Teil 3 — Tests
 
-- Paritätstests je migriertem Reader über die volle Zustandsmatrix.
+- Paritätstests je migriertem Reader über die volle Zustandsmatrix (12 Zustände × Output vorhanden/leer).
+- Pflicht-Fixture: `pipeline_state = 'failed'` + effektiver Output vorhanden → Legacy-Klasse `ready`, **nicht** `failed`.
 - Reader-Allowlist im Scanner: neue direkte Legacy-Reads außerhalb der Ausnahmen lassen den Test fehlschlagen.
 - `bunx vitest run src/lib/composer/__tests__`, `bunx tsgo`, `deno test`.
 
