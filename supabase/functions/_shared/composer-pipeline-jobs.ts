@@ -84,6 +84,7 @@ export interface PipelineJobRow {
   segment_id: string | null;
   attempt_no: number;
   status: PipelineJobStatus;
+  callback_delivery_status: CallbackDeliveryStatus | null;
   external_job_id: string | null;
   [k: string]: unknown;
 }
