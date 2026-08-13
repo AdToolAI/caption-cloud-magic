@@ -1724,6 +1724,29 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           });
         }
 
+        // v430 Step 0 — preflight on the CANONICAL dialog. The server stays
+        // fail-closed (`dialog_too_long_for_plate`); this only stops the user
+        // from burning credits on a run that cannot succeed.
+        const preflight = dialogPreflight(
+          { dialogScript: script, dialogTurns: canonicalDialogTurns },
+          masterDuration,
+          maxSecondsForClipSource(masterProvider),
+          { resolveSpeakerId: resolveCastByName },
+        );
+        if (preflight.exceedsPlate) {
+          toast({
+            title: tx({ de: 'Skript zu lang für die Szene', en: 'Script too long for the scene', es: 'El guion es demasiado largo para la escena' }),
+            description: tx({
+              de: `Das Skript dauert ca. ${preflight.spokenSec}s, die Szene nur ${masterDuration}s (max. ${maxSecondsForClipSource(masterProvider)}s). Bitte Text kürzen oder die Szene verlängern.`,
+              en: `The script runs approx. ${preflight.spokenSec}s, the scene only ${masterDuration}s (max ${maxSecondsForClipSource(masterProvider)}s). Please shorten the text or extend the scene.`,
+              es: `El guion dura aprox. ${preflight.spokenSec}s, la escena solo ${masterDuration}s (máx. ${maxSecondsForClipSource(masterProvider)}s). Acorta el texto o extiende la escena.`,
+            }),
+            variant: 'destructive',
+          });
+          return;
+        }
+
+
         const dialogScriptText = synthed.map((s) => `${s.character.name}: ${s.block.text}`).join('\n');
         const dialogVoicesMap: Record<string, DialogVoiceCfg> = {};
         for (const s of synthed) {
