@@ -29,6 +29,7 @@ import {
   type DialogTurn,
 } from "../_shared/scene-dialog-turns.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
+import { resolveEffectiveDialog } from "../_shared/resolve-effective-dialog.ts";
 // v427B — the timing literals below now live in one named place. Values are
 // unchanged (300 ms tail / grace, 5 s cap, 100 ms step, 250 ms pause).
 import {
