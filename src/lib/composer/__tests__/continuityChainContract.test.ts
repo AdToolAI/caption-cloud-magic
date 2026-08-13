@@ -37,7 +37,7 @@ describe('SQL contract', () => {
   });
 
   it('staleness is set, not latched (IS DISTINCT FROM, no OR continuity_stale)', () => {
-    const fn = migrationSql.match(/FUNCTION public\.propagate_continuity_staleness[\s\S]*?\$\$/i);
+    const fn = migrationSql.match(/FUNCTION public\.propagate_continuity_staleness\([\s\S]*?\$function\$|FUNCTION public\.propagate_continuity_staleness\([\s\S]*?END;\s*\$\$/i);
     expect(fn).toBeTruthy();
     expect(fn![0]).toMatch(/IS DISTINCT FROM/i);
     expect(fn![0]).not.toMatch(/continuity_stale\s+OR/i);
@@ -51,7 +51,8 @@ describe('SQL contract', () => {
 });
 
 describe('continuity-chain.ts', () => {
-  const src = read('supabase/functions/_shared/continuity-chain.ts');
+  const raw = read('supabase/functions/_shared/continuity-chain.ts');
+  const src = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
   it('reads the resolved output instead of raw clip_url', () => {
     expect(src).toMatch(/resolveSceneOutput/);
