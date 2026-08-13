@@ -1,21 +1,27 @@
 /**
- * providerCapabilities — Single source of truth for what each AI video
- * provider can actually do in the Cinematic-Sync / Lip-Sync pipeline.
+ * providerCapabilities — ADAPTER (v430 Schritt 2).
  *
- * Used by:
- *  - SceneDialogStudio (duration picker)
- *  - SceneCard (provider picker, lip-sync badges)
- *  - validateSceneForCinematicSync (frontend preflight)
- *  - compose-video-clips edge function (backend duration guard)
- *
- * RULE: never hard-snap a duration silently. If the user picks a value
- * the provider can't honour, surface it (UI snap with toast, or backend
- * 400) instead of changing clip_source / duration_seconds behind the scenes.
+ * The capability truth now lives in `src/lib/composer/providerMatrix.ts`.
+ * This module keeps the historic API surface (`PROVIDER_CAPS` and the
+ * `provider*` helpers) so existing callers (SceneCard, renderWarnings,
+ * validateSceneForCinematicSync) stay untouched — every value is read from
+ * the matrix, nothing is maintained here.
  */
 
-import { AI_VIDEO_TOOLKIT_MODELS } from '@/config/aiVideoModelRegistry';
-import { isLipsyncCertifiedProvider } from './lipsyncMasterProvider';
-import { modelIdToSource } from './modelMapping';
+import {
+  PROVIDER_MATRIX,
+  type ProviderMatrixEntry,
+  getProviderDurations,
+  getProviderLabel,
+  getLipsyncProviders as matrixLipsyncProviders,
+  providerHasNativeAudio,
+  providerHasNativeLipSync,
+  providerMaxSpeakers,
+  providerSupportedLanguages,
+  providerSupportsLipsync,
+  providerSupportsMultiSpeaker,
+  snapDurationToProvider,
+} from '@/lib/composer/providerMatrix';
 
 export type ClipSource =
   | 'ai-hailuo'
@@ -33,248 +39,24 @@ export type ClipSource =
   | 'ai-vidu'
   | 'ai-kling-omni';
 
-export interface ProviderCapability {
-  /** Allowed duration buckets (in whole seconds). Picker must restrict to these. */
-  durations: number[];
-  /** Whether this provider can act as Sync.so master plate (lip-sync). */
-  lipsync: boolean;
-  /** Whether the provider supports multi-speaker dialog scenes. */
-  multiSpeaker: boolean;
-  /** Human-readable label for UI hints. */
-  label: string;
-  /**
-   * NEW (v250 — Kling Omni): provider produces final lip-synced video in
-   * ONE call. When true, the composer skips the Sync.so pipeline entirely
-   * for scenes using this provider.
-   */
-  nativeLipSync?: boolean;
-  /** NEW: provider generates TTS + ambient audio natively (no ElevenLabs step). */
-  nativeAudio?: boolean;
-  /** NEW: ISO-639-1 language codes the provider speaks with correct lip-sync. */
-  supportedLanguages?: string[];
-  /** NEW: Multi-shot capability (Kling Omni can chain 2–6 cam angles). */
-  multiShot?: { min: number; max: number };
-  /** NEW: Provider supports start-frame + end-frame interpolation. */
-  startEndFrames?: boolean;
-  /** NEW: Hard cap on speakers per scene (Omni: 2, Hailuo: 4+). */
-  maxSpeakers?: number;
-}
+export type ProviderCapability = ProviderMatrixEntry;
 
-export const PROVIDER_CAPS: Record<string, ProviderCapability> = {
-  'ai-hailuo': {
-    durations: [6, 10],
-    lipsync: true,
-    multiSpeaker: true,
-    label: 'Hailuo',
-  },
-  'ai-happyhorse': {
-    durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-    lipsync: true,
-    // Single-speaker is rock-solid; multi-speaker has shown identity-drift
-    // in past memory. We allow it but the user sees a Beta hint in the UI.
-    multiSpeaker: true,
-    label: 'HappyHorse',
-  },
-  'ai-kling': {
-    // Toolkit ground-truth: Replicate accepts 3–15s freely (see aiVideoModelRegistry).
-    durations: [3, 5, 8, 10, 15],
-    lipsync: true,
-    multiSpeaker: false,
-    label: 'Kling',
-  },
-  'ai-veo': {
-    durations: [4, 6, 8],
-    lipsync: false,
-    multiSpeaker: false,
-    label: 'Veo',
-  },
-  'ai-wan': {
-    durations: [5, 10],
-    lipsync: true,
-    multiSpeaker: false,
-    label: 'Wan',
-  },
-  'ai-seedance': {
-    // Toolkit ground-truth: seedance-1-lite supports 5/8/10/12s (backend caps ≤12).
-    durations: [5, 8, 10, 12],
-    lipsync: true,
-    multiSpeaker: false,
-    label: 'Seedance',
-  },
-  'ai-seedance25': {
-    // ModelArk direct API — long-form scenes, provider range 4-30 s.
-    durations: [4, 5, 8, 10, 12, 15, 20, 25, 30],
-    lipsync: true,
-    multiSpeaker: true,
-    startEndFrames: true,
-    label: 'Seedance 2.5',
-  },
+/** @deprecated read the matrix directly — kept as a view for legacy callers. */
+export const PROVIDER_CAPS: Record<string, ProviderCapability> = PROVIDER_MATRIX;
 
-  'ai-luma': {
-    durations: [5, 9],
-    lipsync: false,
-    multiSpeaker: false,
-    label: 'Luma',
-  },
-  'ai-ltx': {
-    durations: [4, 6, 8],
-    lipsync: false,
-    multiSpeaker: false,
-    label: 'LTX',
-  },
-  'ai-grok': {
-    durations: [6, 12],
-    lipsync: false,
-    multiSpeaker: false,
-    label: 'Grok',
-  },
-  'ai-sora': {
-    durations: [4, 8, 12],
-    lipsync: false,
-    multiSpeaker: false,
-    label: 'Sora',
-  },
-  'ai-pika': {
-    durations: [5, 10],
-    lipsync: false,
-    multiSpeaker: false,
-    label: 'Pika',
-  },
-  'ai-runway': {
-    durations: [5, 10],
-    lipsync: false,
-    multiSpeaker: false,
-    label: 'Runway',
-  },
-  'ai-vidu': {
-    durations: [5],
-    lipsync: false,
-    multiSpeaker: false,
-    label: 'Vidu',
-  },
-  'ai-kling-omni': {
-    // Kling 3.0 Omni: native audio + lip-sync + multi-shot in one call.
-    // Max 15s per generation, DE/EN/ES lip-sync verified in Kuaishou release notes.
-    durations: [5, 8, 10, 15],
-    lipsync: true,
-    multiSpeaker: true,
-    label: 'Kling Omni',
-    nativeLipSync: true,
-    nativeAudio: true,
-    supportedLanguages: ['de', 'en', 'es'],
-    multiShot: { min: 2, max: 6 },
-    startEndFrames: true,
-    maxSpeakers: 2,
-  },
+export {
+  getProviderDurations,
+  getProviderLabel,
+  providerHasNativeAudio,
+  providerHasNativeLipSync,
+  providerMaxSpeakers,
+  providerSupportedLanguages,
+  providerSupportsLipsync,
+  providerSupportsMultiSpeaker,
+  snapDurationToProvider,
 };
 
-/**
- * v425 — durations are derived from the AI Video Toolkit registry (the single
- * source of truth for provider capabilities) and only fall back to the manual
- * buckets above when a source has no registry model (e.g. ai-image).
- */
-const REGISTRY_DURATIONS: Record<string, number[]> = (() => {
-  const out: Record<string, Set<number>> = {};
-  for (const m of AI_VIDEO_TOOLKIT_MODELS) {
-    const src = modelIdToSource(m.id).clipSource as string;
-    if (!src) continue;
-    const bucket = (out[src] ??= new Set<number>());
-    for (const d of m.durations ?? []) {
-      if (Number.isFinite(d) && d > 0) bucket.add(Math.round(d));
-    }
-  }
-  return Object.fromEntries(
-    Object.entries(out).map(([k, v]) => [k, [...v].sort((a, b) => a - b)]),
-  );
-})();
-
-// Keep the manual table in lock-step with the registry + lip-sync contract.
-for (const [src, cap] of Object.entries(PROVIDER_CAPS)) {
-  const derived = REGISTRY_DURATIONS[src];
-  if (derived && derived.length > 0) cap.durations = derived;
-  cap.lipsync = isLipsyncCertifiedProvider(src) || cap.nativeLipSync === true;
-}
-
-/** True if this provider produces final lip-synced video without Sync.so. */
-export function providerHasNativeLipSync(clipSource: string | undefined | null): boolean {
-  if (!clipSource) return false;
-  return !!PROVIDER_CAPS[clipSource]?.nativeLipSync;
-}
-
-/** True if this provider generates its own audio (TTS + ambient). */
-export function providerHasNativeAudio(clipSource: string | undefined | null): boolean {
-  if (!clipSource) return false;
-  return !!PROVIDER_CAPS[clipSource]?.nativeAudio;
-}
-
-/** Languages this provider speaks with correct lip-sync. */
-export function providerSupportedLanguages(clipSource: string | undefined | null): string[] {
-  if (!clipSource) return [];
-  return PROVIDER_CAPS[clipSource]?.supportedLanguages ?? [];
-}
-
-/** Hard cap on speakers per scene, or Infinity when unspecified. */
-export function providerMaxSpeakers(clipSource: string | undefined | null): number {
-  if (!clipSource) return Infinity;
-  return PROVIDER_CAPS[clipSource]?.maxSpeakers ?? Infinity;
-}
-
-const DEFAULT_LIPSYNC_PROVIDER: ClipSource = 'ai-hailuo';
-
-export function getProviderDurations(clipSource: string | undefined | null): number[] {
-  if (!clipSource) return PROVIDER_CAPS[DEFAULT_LIPSYNC_PROVIDER].durations;
-  return PROVIDER_CAPS[clipSource]?.durations ?? PROVIDER_CAPS[DEFAULT_LIPSYNC_PROVIDER].durations;
-}
-
-export function providerSupportsLipsync(clipSource: string | undefined | null): boolean {
-  if (!clipSource) return false;
-  return !!PROVIDER_CAPS[clipSource]?.lipsync;
-}
-
-export function providerSupportsMultiSpeaker(clipSource: string | undefined | null): boolean {
-  if (!clipSource) return false;
-  return !!PROVIDER_CAPS[clipSource]?.multiSpeaker;
-}
-
-export function getProviderLabel(clipSource: string | undefined | null): string {
-  if (!clipSource) return 'Hailuo';
-  return PROVIDER_CAPS[clipSource]?.label ?? clipSource;
-}
-
-/**
- * Snap a requested duration to the nearest value the provider supports.
- * Returns { duration, changed } so the caller can show a toast when changed.
- *
- * Algorithm: pick the smallest allowed value that is >= requested. If the
- * request exceeds the max, use the max. If below the min, use the min.
- * For continuous ranges this preserves the user intent better than rounding.
- */
-export function snapDurationToProvider(
-  requested: number,
-  clipSource: string | undefined | null,
-): { duration: number; changed: boolean } {
-  const allowed = getProviderDurations(clipSource);
-  if (allowed.length === 0) return { duration: requested, changed: false };
-  if (allowed.includes(Math.round(requested))) {
-    const rounded = Math.round(requested);
-    return { duration: rounded, changed: rounded !== requested };
-  }
-  // Pick smallest allowed >= requested, fall back to max
-  const next = allowed.find((d) => d >= requested);
-  const picked = next ?? allowed[allowed.length - 1];
-  // For tiny values below min, use min
-  const min = allowed[0];
-  const max = allowed[allowed.length - 1];
-  const final = requested < min ? min : requested > max ? max : picked;
-  return { duration: final, changed: final !== requested };
-}
-
-/**
- * All lip-sync capable providers (used to build provider dropdowns
- * when scene is in dialog/lipsync mode).
- */
+/** All lip-sync capable providers (used to build provider dropdowns). */
 export function getLipsyncProviders(): ClipSource[] {
-  return Object.entries(PROVIDER_CAPS)
-    .filter(([, cap]) => cap.lipsync)
-    .map(([key]) => key as ClipSource);
+  return matrixLipsyncProviders() as ClipSource[];
 }
