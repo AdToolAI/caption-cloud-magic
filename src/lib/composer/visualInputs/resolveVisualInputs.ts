@@ -98,9 +98,18 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
   const droppedProtected = dropped.filter((r) => r.protected);
   if (droppedProtected.length > 0) warnings.push('protected_reference_dropped');
 
-  const useContinuityFrame = transition === 'frame-chain' || transition === 'endframe-bridge';
+  // v428 second layer: a lip-sync scene can never take a continuity frame,
+  // whatever the arbitration returned. Plate input === geometry anchor.
+  const useContinuityFrame =
+    !requirements.lipSync &&
+    (transition === 'frame-chain' || transition === 'endframe-bridge');
   // The anchor stays the first frame whenever continuity does not supply one.
-  const firstFrameUrl = useContinuityFrame ? previousFrameUrl : anchorImageUrl;
+  const firstFrameUrl = requirements.lipSync
+    ? anchorImageUrl
+    : useContinuityFrame
+      ? previousFrameUrl
+      : anchorImageUrl;
+
 
   return {
     transition: {
