@@ -29,12 +29,14 @@ export interface SceneFinalityInput {
   engine_override?: string | null;
   clip_url?: string | null;
   processed_video_url?: string | null;
+  lip_sync_status?: string | null;
   // camelCase tolerance — the client scene model uses these.
   lipSyncWithVoiceover?: boolean | null;
   dialogMode?: unknown;
   engineOverride?: string | null;
   clipUrl?: string | null;
   processedVideoUrl?: string | null;
+  lipSyncStatus?: string | null;
 }
 
 function str(v: unknown): string | null {
