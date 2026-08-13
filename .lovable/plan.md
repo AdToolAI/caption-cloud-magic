@@ -47,13 +47,15 @@ Wir folgen deinem Einwand und **verwerfen** das Stale-Setzen bei `beginSceneRun(
 Neue Regel — Stale ist wertbasiert, nicht ereignisbasiert, und **NULL-sicher**:
 
 ```sql
--- SQL
+-- SQL: nicht sticky — der Zustand wird gesetzt, nicht gelatcht
 UPDATE public.composer_scenes b
-   SET continuity_stale = true
+   SET continuity_stale =
+         (b.continuity_source_clip_url IS DISTINCT FROM <effectiveUrl(a)>)
  WHERE b.continuity_source_scene_id = a.id
-   AND b.continuity_source_clip_url IS NOT NULL
-   AND b.continuity_source_clip_url IS DISTINCT FROM <effectiveUrl(a)>;
+   AND b.continuity_source_clip_url IS NOT NULL;
 ```
+
+Liefert A später wieder exakt die alte URL, wird `continuity_stale` durch denselben Mechanismus automatisch wieder `false`. Das Feld ist damit ein gespeicherter Wahrheitszustand, kein „war irgendwann stale"-Latch.
 
 ```ts
 // TypeScript
