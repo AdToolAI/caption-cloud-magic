@@ -132,8 +132,10 @@ serve(async (req) => {
       ) {
         sceneIdsWithLipsync.push(s.id);
       }
-      const cs = s.clip_status;
-      if (cs === "pending" || cs === "generating") {
+      // v430 Step 5D: clip branch via sceneState(). Legacy parity:
+      // pending → idle, generating → plate_rendering.
+      const cs = sceneState(s);
+      if (cs === "idle" || cs === "plate_rendering") {
         sceneIdsWithClip.push(s.id);
       }
     }
