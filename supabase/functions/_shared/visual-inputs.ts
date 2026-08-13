@@ -22,6 +22,12 @@
 
 import { isLipSyncIntentionalRow, type LipSyncSceneSnake } from "./lipSyncIntent.ts";
 import { LIPSYNC_CERTIFIED_AI_SOURCES } from "./composer-ai-sources.ts";
+import {
+  continuityPreferenceForSource,
+  type PersistedVisualSource,
+  resolveVisualSource,
+  type VisualSourceDecision,
+} from "./visual-source.ts";
 
 /* ────────────────────────────── Types ────────────────────────────────── */
 
@@ -110,6 +116,8 @@ export interface ResolvedVisualPlan {
   inputMode: VisualInputMode | "none";
   anchorStrategy: AnchorStrategy;
   constraints: { identityProtected: boolean; lipSyncProtected: boolean };
+  /** v430 Step 3 — requested vs. effective strategy (`requested: null` = legacy). */
+  visualSource: VisualSourceDecision;
   warnings: string[];
 }
 
@@ -502,6 +510,8 @@ export interface ResolveVisualInputsArgs {
   endFrameUrl?: string;
   references: VisualReference[];
   continuityPreference?: ContinuityPreference;
+  /** v430 Step 3 — persisted `composer_scenes.visual_source`; `null` = legacy. */
+  requestedVisualSource?: PersistedVisualSource;
 }
 
 function byRole(refs: VisualReference[], role: VisualReferenceRole): VisualReference[] {
@@ -519,6 +529,7 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
     endFrameUrl,
     references,
     continuityPreference = "auto",
+    requestedVisualSource = null,
   } = args;
 
   const warnings: string[] = [];
@@ -534,9 +545,22 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
   const hasProtectedAnchor = candidates.some((r) => r.protected) ||
     (Boolean(anchorImageUrl) && (requirements.lipSync || requirements.identityCritical));
 
+  // v430 Step 3 — requested → effective. `null` (legacy) leaves the pre-v430
+  // arbitration completely untouched.
+  const visualSource: VisualSourceDecision = resolveVisualSource(requestedVisualSource, {
+    profile,
+    lipSync: requirements.lipSync,
+    hasAnchorImage: Boolean(anchorImageUrl),
+    hasPreviousFrame: Boolean(previousFrameUrl),
+    hasPreviousClip: Boolean(previousClipUrl),
+  });
+  const effectivePreference: ContinuityPreference = requestedVisualSource === null
+    ? continuityPreference
+    : continuityPreferenceForSource(visualSource.effective);
+
   let strategy: AnchorStrategy = anchorStrategyFor(sceneClass, requirements);
-  if (continuityPreference === "seamless" && !hasProtectedAnchor) strategy = "transition-priority";
-  if (continuityPreference === "identity") strategy = "identity-priority";
+  if (effectivePreference === "seamless" && !hasProtectedAnchor) strategy = "transition-priority";
+  if (effectivePreference === "identity") strategy = "identity-priority";
 
   let { transition, inputMode, warnings: slotWarnings } = arbitrateSlots({
     profile,
@@ -551,11 +575,11 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
   });
   warnings.push(...slotWarnings);
 
-  if (continuityPreference === "match-cut") {
+  if (effectivePreference === "match-cut") {
     transition = "match-cut";
     inputMode = profile.references.max > 0 ? "references" : "none";
   }
-  if (continuityPreference === "seamless" && transition === "match-cut" && hasProtectedAnchor) {
+  if (effectivePreference === "seamless" && transition === "match-cut" && hasProtectedAnchor) {
     warnings.push("seamless_denied_protected_anchor");
   }
 
@@ -622,6 +646,7 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
       identityProtected: hasProtectedAnchor,
       lipSyncProtected: requirements.lipSync,
     },
+    visualSource: reconcileVisualSource(visualSource, transition),
     warnings,
   };
 }
@@ -640,6 +665,8 @@ export interface SceneVisualContext {
   previousClipUrl?: string | null;
   references?: VisualReference[];
   continuityPreference?: ContinuityPreference | null;
+  /** `composer_scenes.visual_source`; `null`/absent = legacy scene. */
+  requestedVisualSource?: PersistedVisualSource;
 }
 
 export function planSceneVisualInputs(
@@ -660,5 +687,29 @@ export function planSceneVisualInputs(
     previousClipUrl: ctx.previousClipUrl ?? undefined,
     references: ctx.references ?? [],
     continuityPreference: ctx.continuityPreference ?? "auto",
+    requestedVisualSource: ctx.requestedVisualSource ?? null,
   });
+}
+
+/**
+ * The arbitration is the last word. A requested `previous_final_frame` that it
+ * could not honour is reported as an override — the requested value stays.
+ */
+function reconcileVisualSource(
+  decision: VisualSourceDecision,
+  transition: TransitionMode,
+): VisualSourceDecision {
+  if (decision.requested === null) return decision;
+  const continuityApplied = transition === "frame-chain" ||
+    transition === "endframe-bridge" ||
+    transition === "clip-reference";
+  if (decision.effective === "previous_final_frame" && !continuityApplied) {
+    return {
+      requested: decision.requested,
+      effective: "character_anchor",
+      overridden: true,
+      reason: "provider_slot_unsupported",
+    };
+  }
+  return decision;
 }

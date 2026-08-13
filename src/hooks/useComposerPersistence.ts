@@ -229,6 +229,8 @@ export function useComposerPersistence() {
               continuity_locked: scene.continuityLocked === true,
               action_beat: (scene.actionBeat ?? null) as any,
               realism_preset: scene.realismPreset ?? null,
+              // v430 Step 3 — strategy only; NULL keeps the scene on legacy arbitration.
+              visual_source: scene.visualSource ?? null,
               scene_action_user: scene.sceneActionUser ?? null,
               scene_action_en: scene.sceneActionEn ?? null,
             } as any)
@@ -292,6 +294,8 @@ export function useComposerPersistence() {
               continuity_locked: scene.continuityLocked === true,
               action_beat: (scene.actionBeat ?? null) as any,
               realism_preset: scene.realismPreset ?? null,
+              // v430 Step 3 — strategy only; NULL keeps the scene on legacy arbitration.
+              visual_source: scene.visualSource ?? null,
               scene_action_user: scene.sceneActionUser ?? null,
               scene_action_en: scene.sceneActionEn ?? null,
             } as any)

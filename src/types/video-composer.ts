@@ -1,3 +1,4 @@
+import type { PersistedVisualSource } from '@/lib/composer/visualInputs/visualSource';
 import { tx } from "@/lib/i18nText";
 // AI Video Composer — Scene-Based Video Assembly Types
 
@@ -520,6 +521,12 @@ export interface ComposerScene {
   locationReferences?: { url: string; entityId?: string }[];
   productReferences?: { url: string; entityId?: string }[];
   visualContinuity?: 'auto' | 'seamless' | 'identity' | 'match-cut';
+  /**
+   * v430 Step 3 — `composer_scenes.visual_source`: the user's visual-input
+   * STRATEGY, never an asset. `null`/undefined = legacy scene (pre-v430
+   * arbitration); `'auto'` is an explicitly chosen automatic strategy.
+   */
+  visualSource?: PersistedVisualSource;
   /** Last usable frame of the previous scene's clip (client-extracted, continuity only). */
   transitionFrameUrl?: string;
   /** Previous scene's rendered clip URL — used by video-reference models. */
