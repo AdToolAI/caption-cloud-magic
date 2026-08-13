@@ -59,6 +59,23 @@ export function arbitrateSlots(input: ArbitrationInput): ArbitrationResult {
     (profile.references.videos ?? 0) > 0 &&
     (profile.mode !== 'exclusive' || (profile.modes ?? []).includes('references'));
 
+  // 0. v428 — LIP-SYNC HARD RULE. Evaluated before every other branch and not
+  //    switchable by any flag: a lip-sync scene never receives continuity.
+  //    The frozen chain measures face geometry on `reference_image_url`; if
+  //    the plate were generated from a predecessor frame instead, geometry and
+  //    plate would come from different images (the July anchor mismatch).
+  //    Fail-closed: without an anchor-faithful image input the scene aborts
+  //    rather than degrading to a loose reference slot.
+  if (requirements.lipSync) {
+    warnings.push('lipsync_continuity_disabled');
+    if (profile.firstFrame.supported) {
+      return { transition: 'match-cut', inputMode: 'first-frame', warnings };
+    }
+    warnings.push('lipsync_anchor_input_unsupported');
+    return { transition: 'match-cut', inputMode: 'none', warnings };
+  }
+
+
   // 1. Protected anchor (identity / lip-sync) always keeps its slot.
   //    v426: on an exclusive-slot provider the anchor wins outright — handing
   //    the single slot to a continuity reference would drop the vetted anchor.
