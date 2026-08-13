@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { tl } from "@/lib/i18nText";
+import { pickText } from "@/lib/i18nText";
 import { resolveSceneOutput } from "@/lib/composer/output/resolveSceneOutput";
 import {
   isSceneOutputFinal,
@@ -40,7 +40,7 @@ const PRED_COLUMNS =
   "id, clip_url, processed_video_url, base_video_url, lip_sync_source_clip_url, upload_url, lip_sync_status, lip_sync_with_voiceover, dialog_mode, engine_override";
 
 export function SceneContinuityStatus({ scene, language, onRefresh }: Props) {
-  const tx = (m: { de: string; en: string; es: string }) => tl(m, language);
+  const tx = (m: { de: string; en: string; es: string }) => pickText(language, m);
   const { toast } = useToast();
 
   const predecessorId = (scene as any).continuationSourceSceneId as string | null | undefined;
