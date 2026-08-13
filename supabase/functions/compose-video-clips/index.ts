@@ -15,6 +15,7 @@ import { hailuoBucketFor } from "../_shared/provider-matrix.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 import { resolveSceneOutput } from "../_shared/resolve-scene-output.ts";
 import { isSceneOutputFinal } from "../_shared/continuity-state.ts";
+import { sceneState as sceneStateOf, legacyClipReadyEquivalentRow } from "../_shared/scene-state.ts";
 
 import {
   countDialogSpeakers,
