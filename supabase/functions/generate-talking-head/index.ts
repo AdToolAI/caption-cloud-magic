@@ -508,6 +508,7 @@ async function refundCredits(
   try {
     if (sceneId) {
       await admin.from('composer_scenes').update({
+        pipeline_state: 'failed',
         clip_status: 'failed',
         clip_error: reason.slice(0, 500),
         updated_at: new Date().toISOString(),
