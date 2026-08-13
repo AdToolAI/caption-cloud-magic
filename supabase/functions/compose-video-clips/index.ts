@@ -3997,6 +3997,30 @@ serve(async (req) => {
         );
       }
 
+      // ── v430 Step 4: bind the continuity dependency BEFORE dispatch ──────
+      // The DB trigger `register_plate_attempt` snapshots
+      // `continuity_source_clip_url` into the attempt row the moment the
+      // provider job id lands, so this write must happen first. It records
+      // the STRATEGY RESULT (what the plan actually consumed), not an
+      // intention: a plan that fell back to match-cut clears the binding.
+      {
+        const usedContinuity =
+          !sceneWantsLipSync &&
+          visualPlan.transition.mode !== "match-cut" &&
+          !!continuityClipUrl;
+        await supabaseAdmin
+          .from("composer_scenes")
+          .update({
+            continuity_source_scene_id: usedContinuity ? continuitySourceSceneId : null,
+            continuity_source_clip_url: usedContinuity ? continuityClipUrl : null,
+            // The binding is fresh by definition at dispatch time.
+            continuity_stale: false,
+          })
+          .eq("id", scene.id);
+      }
+
+
+
       // v428 fail-closed: a lip-sync scene whose provider has no
       // anchor-faithful image input must not be dispatched onto a loose
       // reference slot — the plate would no longer match the geometry anchor.
