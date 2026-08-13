@@ -84,16 +84,20 @@ Jeder Ausnahme-Marker trägt eine kurze Begründung und wird im Test geprüft.
 
 ## Technische Umsetzung
 
-1. **Reader-Migration** Datei für Datei, semantikgleich. Reine Anzeigewerte
-   (`pending | generating | ready | failed`) kommen aus
-   `clipStatusFromState(sceneState(scene))`. Jede Entscheidung, die Ready von
-   Failed trennt (Buttons, Filter, Fortschrittszählung, Export-Gates), läuft
-   ausschliesslich über `legacyClipReadyEquivalentRow()` /
-   `legacyClipFailedEquivalentRow()`.
+1. **Reader-Migration** Datei für Datei, semantikgleich. Jede bisher von
+   `clip_status` abhängige Darstellung oder Verhaltenslogik wird output-aware:
+   `legacyClipStatusEquivalentRow()` für die Vier-Werte-Projektion,
+   `legacyClipReadyEquivalentRow()` / `legacyClipFailedEquivalentRow()` für
+   Ready/Failed-Entscheidungen (Buttons, Filter, Sortierung,
+   Fortschrittszählung, Export- und Render-Gates).
+   `failed` + effektiver Output bleibt überall `ready`.
 2. **Contract-Scanner** `src/lib/composer/__tests__/clientReaderContract5E.test.ts`:
-   scannt `src/components/**`, `src/hooks/**`, `src/pages/**` auf
+   scannt `src/components/**`, `src/hooks/**`, `src/pages/**`,
+   `src/lib/video-composer/**`, `src/lib/composer/**` (ohne `__tests__`) auf
    `clip_status|clipStatus|twoshot_stage|twoshotStage|lip_sync_status|lipSyncStatus`
-   und failt bei jedem Treffer ausserhalb der Allowlist.
+   und failt bei jedem Treffer ohne Ausnahme-Marker. Die kanonischen Adapter
+   (`sceneState.ts`, `resolveSceneOutput.ts`) sind gezielt markierte Ausnahmen,
+   keine pauschalen Datei-Freigaben.
 3. **Verhaltenstests** für die kritischen Projektionen: Fortschritt,
    Ready/Failed-Exklusivität, Substate-Gates (`awaiting_manual_face_map`,
    `circuit_open`, `anchor`), Auto-Trigger-Gates.
