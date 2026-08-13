@@ -174,6 +174,36 @@ export const isSceneInFlight = (row: any) => isInFlightState(sceneState(row));
 export const sceneProgressPercent = (row: any) => stateProgress(sceneState(row));
 
 /**
+ * v430 Schritt 5D — 1:1-Parität zum alten `clip_status === 'ready'`.
+ * Spiegel von `supabase/functions/_shared/scene-state.ts`.
+ *
+ * Ready/Failed exklusiv klassifizieren:
+ *   ready  = legacyClipReadyEquivalent(...)
+ *   failed = !ready && sceneState(row) === 'failed'
+ */
+export function legacyClipReadyEquivalent(input: {
+  state: SceneState;
+  hasEffectiveOutput: boolean;
+}): boolean {
+  if (REALIZED.has(input.state)) return true;
+  if (input.state === 'failed' && input.hasEffectiveOutput) return true;
+  return false;
+}
+
+export function legacyClipReadyEquivalentRow(row: any): boolean {
+  const out = resolveSceneOutput(row);
+  return legacyClipReadyEquivalent({
+    state: sceneState(row),
+    hasEffectiveOutput: typeof out.effectiveUrl === 'string' && out.effectiveUrl.length > 0,
+  });
+}
+
+export function legacyClipFailedEquivalentRow(row: any): boolean {
+  if (legacyClipReadyEquivalentRow(row)) return false;
+  return sceneState(row) === 'failed';
+}
+
+/**
  * v388 — Legacy-Projektion.
  * Einzige erlaubte Quelle fuer die alten `clipStatus`-Anzeigewerte in der
  * Oberflaeche. Komponenten, die noch auf `pending | generating | ready |
