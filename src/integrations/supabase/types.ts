@@ -6099,6 +6099,7 @@ export type Database = {
           callback_claim_expires_at: string | null
           callback_claim_token: string | null
           callback_claimed_at: string | null
+          callback_delivery_status: string | null
           completed_at: string | null
           created_at: string
           error_code: string | null
@@ -6124,6 +6125,7 @@ export type Database = {
           callback_claim_expires_at?: string | null
           callback_claim_token?: string | null
           callback_claimed_at?: string | null
+          callback_delivery_status?: string | null
           completed_at?: string | null
           created_at?: string
           error_code?: string | null
@@ -6149,6 +6151,7 @@ export type Database = {
           callback_claim_expires_at?: string | null
           callback_claim_token?: string | null
           callback_claimed_at?: string | null
+          callback_delivery_status?: string | null
           completed_at?: string | null
           created_at?: string
           error_code?: string | null
