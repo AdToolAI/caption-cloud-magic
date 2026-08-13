@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { ComposerScene } from '@/types/video-composer';
+import { legacyClipReadyEquivalentRow } from '@/lib/composer/sceneState';
 
 export type PipelineStatus =
   | 'idle'
@@ -59,7 +60,7 @@ export function useMultiSceneRender(opts: Options) {
   const overallProgress = (() => {
     const total = scenes.length || 1;
     const done = scenes.filter(
-      (s) => s.clipStatus === 'ready' || (s.clipSource === 'upload' && s.uploadUrl)
+      (s) => legacyClipReadyEquivalentRow(s) || (s.clipSource === 'upload' && s.uploadUrl)
     ).length;
     const generationPart = (done / total) * 70; // generation phase = 70 % of bar
     let stitchPart = 0;

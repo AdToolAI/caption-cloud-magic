@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { sceneState, clipStatusFromState } from '@/lib/composer/sceneState';
+import { sceneState, clipStatusFromState, isSceneInFlight, legacyClipFailedEquivalentRow, legacyClipReadyEquivalentRow } from '@/lib/composer/sceneState';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -226,10 +226,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     onUpdateScenes(reordered.map((s, i) => ({ ...s, orderIndex: i })));
   };
 
-  const allReady = scenes.every((s) => s.clipStatus === 'ready' || (s.clipSource === 'upload' && s.uploadUrl));
-  const readyCount = scenes.filter((s) => s.clipStatus === 'ready' || (s.clipSource === 'upload' && s.uploadUrl)).length;
-  const generatingCount = scenes.filter((s) => s.clipStatus === 'generating').length;
-  const pendingScenes = scenes.filter(s => s.clipStatus !== 'ready' && s.clipStatus !== 'generating' && !(s.clipSource === 'upload' && s.uploadUrl));
+  const allReady = scenes.every((s) => legacyClipReadyEquivalentRow(s) || (s.clipSource === 'upload' && s.uploadUrl));
+  const readyCount = scenes.filter((s) => legacyClipReadyEquivalentRow(s) || (s.clipSource === 'upload' && s.uploadUrl)).length;
+  const generatingCount = scenes.filter((s) => clipStatusFromState(sceneState(s)) === 'generating').length;
+  const pendingScenes = scenes.filter(s => !legacyClipReadyEquivalentRow(s) && clipStatusFromState(sceneState(s)) !== 'generating' && !(s.clipSource === 'upload' && s.uploadUrl));
   const progressPercent = scenes.length > 0 ? (readyCount / scenes.length) * 100 : 0;
 
   // Calculate total cost (only pending AI scenes)
@@ -274,7 +274,9 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       const lipChanged =
         !!dbScene &&
         ((dbScene as any).lip_sync_applied_at !== (scene.lipSyncAppliedAt ?? null) ||
+          // legacy-mapping-allowed: Änderungserkennung gegen die Spiegelfelder
           (dbScene as any).lip_sync_status !== (scene.lipSyncStatus ?? null) ||
+          // legacy-mapping-allowed: Änderungserkennung gegen die Spiegelfelder
           (dbScene as any).twoshot_stage !== (scene.twoshotStage ?? null) ||
           (dbScene as any).continuity_drift_score !== (scene.continuityDriftScore ?? null));
       // v388 — Anzeige-Status kommt aus dem Zustandsautomaten, nicht aus der
@@ -283,6 +285,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       const dbClipStatus = dbScene ? clipStatusFromState(sceneState(dbScene)) : null;
       if (
         dbScene &&
+        // legacy-mapping-allowed: Änderungserkennung gegen das Spiegelfeld
         (dbClipStatus !== scene.clipStatus ||
           dbScene.clip_url !== scene.clipUrl ||
           (dbScene.upload_type && dbScene.upload_type !== scene.uploadType) ||
@@ -292,7 +295,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       ) {
         changed = true;
         // Toast on transition generating → ready
-        if (scene.clipStatus === 'generating' && dbClipStatus === 'ready') {
+        if (clipStatusFromState(sceneState(scene)) === 'generating' && dbClipStatus === 'ready') {
 
           toast({ title: tx({ de: `Szene ${idx + 1} fertig ✓`, en: `Scene ${idx + 1} finished ✓`, es: `Escena ${idx + 1} terminada ✓` }), description: SCENE_TYPE_LABELS[scene.sceneType]?.de });
           if (dbScene.clip_url) {
@@ -332,11 +335,13 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             isLipSyncIntentionalRow(dbScene as any) &&
             // v317: Master-Clip muss fertig sein — nie Lip-Sync auf einem
             // fehlgeschlagenen/laufenden Master starten.
-            dbScene.clip_status === 'ready' &&
+            legacyClipReadyEquivalentRow(dbScene) &&
             typeof (dbScene as any).clip_url === 'string' &&
             (dbScene as any).clip_url.length > 0 &&
             !(dbScene as any).lip_sync_applied_at &&
+            // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
             (dbScene as any).lip_sync_status !== 'running' &&
+            // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
             (dbScene as any).lip_sync_status !== 'no_voiceover' &&
             speakerCount <= 1
           ) {
@@ -344,13 +349,15 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             lipSyncTargets.push(scene.id);
           }
         }
-        if (scene.clipStatus === 'generating' && dbClipStatus === 'failed') {
+        if (clipStatusFromState(sceneState(scene)) === 'generating' && dbClipStatus === 'failed') {
           toast({ title: tx({ de: `Szene ${idx + 1} fehlgeschlagen`, en: `Scene ${idx + 1} failed`, es: `La escena ${idx + 1} falló` }), variant: 'destructive' });
         }
         // Cinematic-Sync: notify when Sync.so step finishes
         if (
           (dbScene as any).engine_override === 'cinematic-sync' &&
+          // legacy-mapping-allowed: Lip-Sync-Übergangs-Toast gegen die Spiegelfelder
           scene.lipSyncStatus !== 'done' &&
+          // legacy-mapping-allowed: Lip-Sync-Übergangs-Toast gegen die Spiegelfelder
           (dbScene as any).lip_sync_status === 'done'
         ) {
           toast({
@@ -360,7 +367,9 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         }
         if (
           (dbScene as any).engine_override === 'cinematic-sync' &&
+          // legacy-mapping-allowed: Lip-Sync-Übergangs-Toast gegen die Spiegelfelder
           scene.lipSyncStatus !== 'failed' &&
+          // legacy-mapping-allowed: Lip-Sync-Übergangs-Toast gegen die Spiegelfelder
           (dbScene as any).lip_sync_status === 'failed'
         ) {
           toast({
@@ -371,7 +380,9 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         }
         if (
           (dbScene as any).engine_override === 'cinematic-sync' &&
+          // legacy-mapping-allowed: Lip-Sync-Übergangs-Toast gegen die Spiegelfelder
           scene.lipSyncStatus !== 'no_voiceover' &&
+          // legacy-mapping-allowed: Lip-Sync-Übergangs-Toast gegen die Spiegelfelder
           (dbScene as any).lip_sync_status === 'no_voiceover'
         ) {
           toast({
@@ -386,9 +397,13 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           clipStatus: dbClipStatus as ComposerScene['clipStatus'],
 
           clipUrl: dbScene.clip_url || undefined,
+          baseVideoUrl: (dbScene as any).base_video_url ?? null,
+          processedVideoUrl: (dbScene as any).processed_video_url ?? null,
           pipelineState: (dbScene as any).pipeline_state,
           pipelineStateAt: (dbScene as any).pipeline_state_at,
           pipelineStateRunId: (dbScene as any).pipeline_state_run_id,
+          pipelineSubstate: (dbScene as any).pipeline_substate ?? null,
+          pipelineSubstateAt: (dbScene as any).pipeline_substate_at ?? null,
           activeRunId: (dbScene as any).active_run_id,
           plateGeneration: (dbScene as any).plate_generation,
           plateReadyGeneration: (dbScene as any).plate_ready_generation,
@@ -396,8 +411,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           engineOverride: ((dbScene as any).engine_override as ComposerScene['engineOverride']) ?? scene.engineOverride ?? 'auto',
           clipSource: ((dbScene as any).clip_source as ComposerScene['clipSource']) ?? scene.clipSource,
           lipSyncAppliedAt: (dbScene as any).lip_sync_applied_at ?? null,
+          // legacy-mapping-allowed: DB-Zeile -> Client-Modell (Spiegelfeld)
           lipSyncStatus: (dbScene as any).lip_sync_status ?? null,
           lipSyncSourceClipUrl: (dbScene as any).lip_sync_source_clip_url ?? null,
+          // legacy-mapping-allowed: DB-Zeile -> Client-Modell (Spiegelfeld)
           twoshotStage: ((dbScene as any).twoshot_stage as ComposerScene['twoshotStage']) ?? null,
           clipError: (dbScene as any).clip_error ?? null,
           continuityDriftScore: typeof (dbScene as any).continuity_drift_score === 'number'
@@ -534,8 +551,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
   // Poll every 3s while generating OR while a Cinematic-Sync lip-sync phase
   // is still running (Hailuo may already be `ready` but Sync.so is processing).
   const cinematicSyncRunning = scenes.some(
-    (s) => s.engineOverride === 'cinematic-sync' &&
-      (s.lipSyncStatus === 'running' || s.lipSyncStatus === 'pending'),
+    (s) => s.engineOverride === 'cinematic-sync' && isSceneInFlight(s),
   );
   useEffect(() => {
     if (generatingCount === 0 && !cinematicSyncRunning) return;
@@ -582,16 +598,13 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
 
       const eligibleScenes = pScenes.filter(
         s =>
-          s.clipStatus !== 'ready' &&
+          !legacyClipReadyEquivalentRow(s) &&
           !(s.clipSource === 'upload' && s.uploadUrl) &&
-          // Two-Shot scenes already mid-render (cinematic-sync engine + a
-          // twoshotStage set) are owned by their dedicated pipeline; don't
-          // double-trigger via "Alle generieren".
+          // Two-Shot scenes already mid-render are owned by their dedicated
+          // pipeline; don't double-trigger via "Alle generieren".
           !(
-            s.clipStatus === 'generating' &&
             s.engineOverride === 'cinematic-sync' &&
-            !!(s as any).twoshotStage &&
-            (s as any).twoshotStage !== 'failed'
+            isSceneInFlight(s)
           ),
       );
 
@@ -779,7 +792,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
   const handleGenerateSingle = async (scene: ComposerScene) => {
     setSingleGenerating(prev => ({ ...prev, [scene.id]: true }));
     // Snapshot for rollback if invocation fails.
-    const previousStatus = scene.clipStatus;
+    const previousStatus = clipStatusFromState(sceneState(scene));
     try {
       const persisted = await ensureProject();
       if (!persisted) {
@@ -1044,6 +1057,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       // Roll back optimistic state.
       const rolledBack = scenes.map((s) =>
         s.id === scene.id
+          // legacy-mapping-allowed: Rollback schreibt die Spiegelfelder zurück
           ? { ...s, clipStatus: scene.clipStatus, lipSyncStatus: scene.lipSyncStatus ?? null }
           : s,
       );
@@ -1093,7 +1107,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         projectId={projectId}
         scenes={scenes}
         pendingCount={pendingScenes.length}
-        failedCount={scenes.filter((s) => s.clipStatus === 'failed').length}
+        failedCount={scenes.filter((s) => legacyClipFailedEquivalentRow(s)).length}
         isAllReady={allReady}
         onGenerateAll={handleGenerateAll}
       />
@@ -1293,7 +1307,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
           <div className="grid gap-3">
             {scenes.map((scene, i) => {
-              const status = statusConfig[scene.clipStatus] || statusConfig.pending;
+              const status = statusConfig[clipStatusFromState(sceneState(scene))] || statusConfig.pending;
           const sceneQuality = scene.clipQuality || 'standard';
           const baseCost = scene.clipSource.startsWith('ai-')
             ? getClipCost(scene.clipSource, sceneQuality, scene.durationSeconds)
@@ -1307,7 +1321,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           const hasUpload = !!scene.uploadUrl;
           const isAi = scene.clipSource.startsWith('ai-');
           const isStock = scene.clipSource === 'stock';
-          const isThisGenerating = singleGenerating[scene.id] || scene.clipStatus === 'generating';
+          const isThisGenerating = singleGenerating[scene.id] || clipStatusFromState(sceneState(scene)) === 'generating';
 
           return (
             <SortableSceneItem
@@ -1391,7 +1405,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                             Mit Referenzbild
                           </span>
                         )}
-                        {scene.clipStatus === 'generating' && isAi && (
+                        {clipStatusFromState(sceneState(scene)) === 'generating' && isAi && (
                           <span className="text-accent inline-flex items-center gap-1">
                             <Loader2 className="h-2.5 w-2.5 animate-spin" />
                             KI rendert ca. 30–60s…
@@ -1404,7 +1418,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                   {/* Actions */}
                   <div className="flex flex-col gap-1 justify-center">
                     {/* Pending AI → Generate button */}
-                    {isAi && scene.clipStatus === 'pending' && (
+                    {isAi && clipStatusFromState(sceneState(scene)) === 'pending' && (
                       <Button
                         size="sm"
                         onClick={() => handleGenerateSingle(scene)}
@@ -1420,7 +1434,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                       </Button>
                     )}
                     {/* Failed → Retry */}
-                    {scene.clipStatus === 'failed' && (
+                    {legacyClipFailedEquivalentRow(scene) && (
                       <Button
                         size="sm"
                         variant="destructive"
@@ -1437,7 +1451,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                       </Button>
                     )}
                     {/* Ready → Re-roll */}
-                    {scene.clipStatus === 'ready' && isAi && (
+                    {legacyClipReadyEquivalentRow(scene) && isAi && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -1455,7 +1469,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                       </Button>
                     )}
                     {/* Cinematic-Sync Switch — Artlist-style: render real scene with Hailuo + auto lip-sync */}
-                    {scene.clipStatus === 'ready' && isHeygen && (
+                    {legacyClipReadyEquivalentRow(scene) && isHeygen && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -1468,7 +1482,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                         In echte Szene einbauen €0.95
                       </Button>
                     )}
-                    {scene.clipStatus === 'ready' && scene.clipUrl && (() => {
+                    {legacyClipReadyEquivalentRow(scene) && scene.clipUrl && (() => {
                       const isSaved = savedSceneIds.has(scene.id);
                       const isSaving = savingSceneId === scene.id;
                       return (
@@ -1492,7 +1506,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                       );
                     })()}
                     {/* Frame-to-Shot Continuity → use last frame as next scene's start */}
-                    {scene.clipStatus === 'ready' && scene.clipUrl && (() => {
+                    {legacyClipReadyEquivalentRow(scene) && scene.clipUrl && (() => {
                       const next = scenes[i + 1];
                       if (!next) return null;
                       const nextIsAi = next.clipSource.startsWith('ai-');
@@ -1518,7 +1532,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                       );
                     })()}
                     {/* Frame-Picker (Artlist-style: pick ANY frame) */}
-                    {scene.clipStatus === 'ready' && scene.clipUrl && (() => {
+                    {legacyClipReadyEquivalentRow(scene) && scene.clipUrl && (() => {
                       const next = scenes[i + 1];
                       if (!next) return null;
                       const nextIsAi = next.clipSource.startsWith('ai-');
@@ -1537,14 +1551,14 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                       );
                     })()}
                     {/* Generating disabled marker */}
-                    {scene.clipStatus === 'generating' && (
+                    {clipStatusFromState(sceneState(scene)) === 'generating' && (
                       <Button size="sm" disabled className="gap-1 text-[10px] h-7 px-2">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         Wird generiert…
                       </Button>
                     )}
                     {/* Stock pending */}
-                    {isStock && scene.clipStatus !== 'ready' && (
+                    {isStock && !legacyClipReadyEquivalentRow(scene) && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -1565,7 +1579,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                       </span>
                     )}
                     {/* Stock alt search button (always available) */}
-                    {!isStock && scene.clipStatus !== 'generating' && (
+                    {!isStock && clipStatusFromState(sceneState(scene)) !== 'generating' && (
                       <Button
                         size="icon"
                         variant="ghost"

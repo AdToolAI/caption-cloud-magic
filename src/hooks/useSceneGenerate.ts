@@ -20,6 +20,7 @@ import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { buildInvokePrompt } from '@/lib/motion-studio/buildInvokePrompt';
 import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 import { startSceneGeneration } from '@/lib/composer/startSceneGeneration';
+import { clipStatusFromState, sceneState } from '@/lib/composer/sceneState';
 import type {
   ComposerScene,
   ComposerCharacter,
@@ -74,7 +75,7 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
       // sample the previous terminal state immediately after the reset event
       // and lock its monotonic floor back near 99%.
       emitPipelineEvent({ type: 'clips:start', sceneIds: [scene.id] });
-      const previousStatus = scene.clipStatus;
+      const previousStatus = clipStatusFromState(sceneState(scene));
       try {
         let pid = opts.projectId;
         let workingScene = scene;

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import type { ComposerScene } from '@/types/video-composer';
 import { useProviderEta } from '@/hooks/useProviderEta';
+import { sceneState } from '@/lib/composer/sceneState';
 
 interface SceneGenerationSkeletonProps {
   scene: ComposerScene;
@@ -31,9 +32,9 @@ export function SceneGenerationSkeleton({ scene }: SceneGenerationSkeletonProps)
   // Track wall-clock elapsed since this scene entered the 'generating'
   // state. Reset whenever the scene id or status changes.
   const startRef = useRef<number>(Date.now());
-  const lastKey = useRef<string>(`${scene.id}-${scene.clipStatus}`);
-  if (lastKey.current !== `${scene.id}-${scene.clipStatus}`) {
-    lastKey.current = `${scene.id}-${scene.clipStatus}`;
+  const lastKey = useRef<string>(`${scene.id}-${sceneState(scene)}`);
+  if (lastKey.current !== `${scene.id}-${sceneState(scene)}`) {
+    lastKey.current = `${scene.id}-${sceneState(scene)}`;
     startRef.current = Date.now();
   }
 

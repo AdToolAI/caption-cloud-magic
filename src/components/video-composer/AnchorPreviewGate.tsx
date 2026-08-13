@@ -43,6 +43,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
+import { sceneState } from "@/lib/composer/sceneState";
 
 interface PreviewAudit {
   reason?: string;
@@ -139,13 +140,13 @@ export function AnchorPreviewGate({
       const { data } = await supabase
         .from("composer_scenes")
         .select(
-          "preview_anchor_url, preview_audit, clip_status, clip_error",
+          "preview_anchor_url, preview_audit, clip_status, pipeline_state, lip_sync_status, twoshot_stage, clip_error",
         )
         .eq("id", sceneId)
         .maybeSingle();
       const row = data as any;
       if (!row) continue;
-      if (row.clip_status === "failed") {
+      if (sceneState(row) === "failed") {
         setPhase("error");
         setErrMsg(row.clip_error || tx({ de: "Anchor konnte nicht komponiert werden.", en: "Anchor could not be composed.", es: "No se pudo componer el ancla." }));
         return;

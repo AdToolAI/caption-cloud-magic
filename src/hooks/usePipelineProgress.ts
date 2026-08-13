@@ -15,6 +15,12 @@ import type { AssemblyConfig, ComposerScene } from '@/types/video-composer';
 import { subscribePipelineEvents, type PipelinePhaseId } from '@/lib/pipelineEvents';
 import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
+import {
+  sceneState,
+  clipStatusFromState,
+  legacyClipReadyEquivalentRow,
+  legacyClipFailedEquivalentRow,
+} from '@/lib/composer/sceneState';
 import { tx } from '@/lib/i18nText';
 
 export interface PipelinePhaseState {
@@ -130,7 +136,9 @@ const TERMINAL_DIALOG_SHOT_STATUSES = new Set(['done', 'failed', 'canceled']);
 
 function isCanceledLipsyncScene(scene: any) {
   return (
+    // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
     scene?.lipSyncStatus === 'canceled' ||
+    // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
     scene?.lip_sync_status === 'canceled' ||
     scene?.dialogShots?.status === 'canceled' ||
     scene?.dialog_shots?.status === 'canceled'
@@ -146,11 +154,14 @@ function isActiveDialogShots(dialogShots: any) {
 }
 
 function isSceneTerminalFailure(scene: any) {
-  return scene?.clipStatus === 'failed' ||
-    scene?.clip_status === 'failed' ||
+  return legacyClipFailedEquivalentRow(scene) ||
+    // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
     scene?.lipSyncStatus === 'failed' ||
+    // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
     scene?.lip_sync_status === 'failed' ||
+    // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
     scene?.twoshotStage === 'failed' ||
+    // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
     scene?.twoshot_stage === 'failed' ||
     scene?.dialogShots?.status === 'failed' ||
     scene?.dialog_shots?.status === 'failed';
@@ -295,7 +306,9 @@ export function usePipelineProgress({
         const lipTargets = ss.filter(
           (s) =>
             !isCanceledLipsyncScene(s) &&
-            (isLipSyncIntentional(s as any) || !!(s as any).twoshotStage),
+            // legacy-mapping-allowed: Lip-Sync-Zielmenge (v425-Vertrag unverändert)
+            // legacy-mapping-allowed: Lip-Sync-Zielmenge (v425-Vertrag unverändert)
+        (isLipSyncIntentional(s as any) || !!(s as any).twoshotStage),
         );
         const dsTotals = lipTargets.reduce(
           (acc, s) => {
@@ -308,12 +321,15 @@ export function usePipelineProgress({
           { done: 0, total: 0 },
         );
         baselineRef.current = {
-          clipsReady: ai.filter((s) => s.clipStatus === 'ready').length,
+          clipsReady: ai.filter((s) => legacyClipReadyEquivalentRow(s)).length,
           clipsTotal: ai.length,
           lipsyncDone: lipTargets.filter(
             (s) =>
+              // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
               ((s as any).lipSyncStatus === 'done' && !!(s as any).lipSyncAppliedAt) ||
+              // legacy-mapping-allowed: Lip-Sync-Substage
               (s as any).twoshotStage === 'done' ||
+              // legacy-mapping-allowed: Lip-Sync-Substage
               (s as any).twoshotStage === 'complete' ||
               ((s as any).dialogShots ?? (s as any).dialog_shots)?.status === 'done',
           ).length,
@@ -348,9 +364,11 @@ export function usePipelineProgress({
     const hasActiveBackend = ss.some((s) => {
       const sa = s as any;
       if (isCanceledLipsyncScene(sa)) return false;
-      if (sa.clipStatus === 'generating') return true;
+      if (clipStatusFromState(sceneState(sa)) === 'generating') return true;
+      // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
       if (sa.lipSyncStatus === 'running') return true;
       if (sa.replicatePredictionId) return true;
+      // legacy-mapping-allowed: Lip-Sync-Substage
       const stage = sa.twoshotStage;
       if (isActiveTwoshotStage(stage)) return true;
       const ds = sa.dialogShots ?? sa.dialog_shots ?? null;
@@ -362,6 +380,7 @@ export function usePipelineProgress({
     const lipTargets = ss.filter(
       (s) =>
         !isCanceledLipsyncScene(s) &&
+        // legacy-mapping-allowed: Lip-Sync-Zielmenge (v425-Vertrag unverändert)
         (isLipSyncIntentional(s as any) || !!(s as any).twoshotStage),
     );
     const dsTotals = lipTargets.reduce(
@@ -375,12 +394,15 @@ export function usePipelineProgress({
       { done: 0, total: 0 },
     );
     baselineRef.current = {
-      clipsReady: ai.filter((s) => s.clipStatus === 'ready').length,
+      clipsReady: ai.filter((s) => legacyClipReadyEquivalentRow(s)).length,
       clipsTotal: ai.length,
       lipsyncDone: lipTargets.filter(
         (s) =>
+          // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
           ((s as any).lipSyncStatus === 'done' && !!(s as any).lipSyncAppliedAt) ||
+          // legacy-mapping-allowed: Lip-Sync-Substage
           (s as any).twoshotStage === 'done' ||
+          // legacy-mapping-allowed: Lip-Sync-Substage
           (s as any).twoshotStage === 'complete' ||
           ((s as any).dialogShots ?? (s as any).dialog_shots)?.status === 'done',
       ).length,
@@ -411,10 +433,10 @@ export function usePipelineProgress({
           // Do not treat it as a lipsync target — otherwise the global bar
           // shows misleading progress (e.g. 96%) for a scene that hard-failed
           // at image generation (Green-Net reject, etc.).
-          const cs = (s as any).clipStatus ?? (s as any).clip_status;
-          if (cs === 'failed') return false;
+          if (legacyClipFailedEquivalentRow(s)) return false;
           return (
             isLipSyncIntentional(s as any) ||
+            // legacy-mapping-allowed: Lip-Sync-Zielmenge (v425-Vertrag unverändert)
             !!(s as any).twoshotStage
           );
         },
@@ -446,17 +468,20 @@ export function usePipelineProgress({
     };
     const isReadyOrLipsynced = (s: any) =>
       belongsToCurrentRun(s) && (
-      s.clipStatus === 'ready' ||
+      legacyClipReadyEquivalentRow(s) ||
       (!!s.clipUrl && (
+        // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
         s.lipSyncStatus === 'applied' ||
+        // legacy-mapping-allowed: Lip-Sync-Substage
         s.twoshotStage === 'complete' ||
+        // legacy-mapping-allowed: Lip-Sync-Substage
         s.twoshotStage === 'done'
       )));
     const ready = aiScenes.filter(isReadyOrLipsynced).length;
     const generating = aiScenes.filter(
-      (s) => belongsToCurrentRun(s) && s.clipStatus === 'generating' && !isReadyOrLipsynced(s) && !isSceneTerminalFailure(s),
+      (s) => belongsToCurrentRun(s) && clipStatusFromState(sceneState(s)) === 'generating' && !isReadyOrLipsynced(s) && !isSceneTerminalFailure(s),
     ).length;
-    const failed = aiScenes.filter((s) => belongsToCurrentRun(s) && s.clipStatus === 'failed').length;
+    const failed = aiScenes.filter((s) => belongsToCurrentRun(s) && legacyClipFailedEquivalentRow(s)).length;
     // Stage 7: a scene with an active backend handle (Replicate prediction,
     // dialog-shot pipeline, lipsync stage) also counts as "running" — even
     // when clipStatus momentarily reverts to 'pending' between the optimistic
@@ -468,7 +493,10 @@ export function usePipelineProgress({
       if (isSceneTerminalFailure(sa)) return false;
       if (isCanceledLipsyncScene(sa)) return false;
       if (isReadyOrLipsynced(sa)) return false;
+      // legacy-mapping-allowed: Lip-Sync-Substage
+      // legacy-mapping-allowed: Lip-Sync-Substage
       const stage = sa.twoshotStage;
+      // legacy-mapping-allowed: Lip-Sync-Substage
       const lip = sa.lipSyncStatus;
       const ds = sa.dialogShots ?? sa.dialog_shots ?? null;
       const dsActive = isActiveDialogShots(ds);
@@ -492,7 +520,7 @@ export function usePipelineProgress({
     const running = generating > 0 || backendActive > 0;
     // Terminal as soon as every AI scene is ready or failed.
     const allTerminal = aiScenes.every(
-      (s) => isReadyOrLipsynced(s) || (belongsToCurrentRun(s) && s.clipStatus === 'failed'),
+      (s) => isReadyOrLipsynced(s) || (belongsToCurrentRun(s) && legacyClipFailedEquivalentRow(s)),
     );
     const terminal = !running && (allTerminal || progress >= 1);
     return {
@@ -538,15 +566,17 @@ export function usePipelineProgress({
       (s) => {
         // v182: failed master clip must never count as "lipsync running" — the
         // bar would otherwise spin on a scene where lip-sync is impossible.
-        const cs = (s as any).clipStatus ?? (s as any).clip_status;
+        // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
         const ts = (s as any).twoshotStage ?? (s as any).twoshot_stage;
+        // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
         const ls = (s as any).lipSyncStatus ?? (s as any).lip_sync_status;
-        if (cs === 'failed') return false;
+        if (legacyClipFailedEquivalentRow(s)) return false;
         if (TERMINAL_TWOSHOT_STAGES.has(String(ts))) return false;
         if (ls === 'canceled') return false;
         if (isCanceledLipsyncScene(s)) return false;
         return (
           isLipSyncIntentional(s as any) ||
+          // legacy-mapping-allowed: Lip-Sync-Zielmenge (v425-Vertrag unverändert)
           !!(s as any).twoshotStage
         );
       },
@@ -564,9 +594,13 @@ export function usePipelineProgress({
      */
     const isTerminalScene = (s: any) =>
       isSceneTerminalFailure(s) ||
+      // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
       s.lipSyncStatus === 'applied' ||
+      // legacy-mapping-allowed: Lip-Sync-Substage
       s.lipSyncStatus === 'canceled' ||
+      // legacy-mapping-allowed: Lip-Sync-Substage
       s.lipSyncStatus === 'failed' ||
+      // legacy-mapping-allowed: Lip-Sync-Substage
       TERMINAL_TWOSHOT_STAGES.has(String(s.twoshotStage ?? '')) ||
       TERMINAL_DIALOG_SHOT_STATUSES.has(String(getDialogShots(s)?.status ?? ''));
 
@@ -574,9 +608,13 @@ export function usePipelineProgress({
       const ds = getDialogShots(s);
       if (ds?.status === 'done') return true;
       return (
+        // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
         ((s as any).lipSyncStatus === 'done' && !!(s as any).lipSyncAppliedAt) ||
+        // legacy-mapping-allowed: Lip-Sync-Substage
         (s as any).lipSyncStatus === 'applied' ||
+        // legacy-mapping-allowed: Lip-Sync-Substage
         (s as any).twoshotStage === 'done' ||
+        // legacy-mapping-allowed: Lip-Sync-Substage
         (s as any).twoshotStage === 'complete'
       );
     }).length;
@@ -601,11 +639,13 @@ export function usePipelineProgress({
     const running = targets.some(
       (s) =>
         !isTerminalScene(s) &&
+        // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
         (s as any).lipSyncStatus === 'running' &&
         hasRealJob(s),
     ) || targets.some(
       (s) => {
         if (isTerminalScene(s)) return false;
+        // legacy-mapping-allowed: Lip-Sync-Substage
         const stage = (s as any).twoshotStage;
         if (!isActiveTwoshotStage(stage)) return false;
         // Frühe v5-Stages (Audio-Prep, Anchor-Bau, Master-Plate, Sync.so-Queue,
@@ -623,6 +663,7 @@ export function usePipelineProgress({
         ].includes(stage)) {
           return true;
         }
+        // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
         return hasRealJob(s) || (s as any).lipSyncStatus === 'running' || (s as any).lipSyncStatus === 'audio_muxing';
       },
     ) || targets.some((s) => {
@@ -640,10 +681,15 @@ export function usePipelineProgress({
       // the v4 per-turn path is actually progressing underneath.
       const ce = (s as any).clipError as string | undefined;
       const isAutoRetry = typeof ce === 'string' && ce.startsWith('auto-retry:');
+      // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
       if (isAutoRetry && (s as any).lipSyncStatus !== 'failed') return false;
+      // legacy-mapping-allowed: Lip-Sync-Substage
       return (s as any).lipSyncStatus === 'failed' ||
+        // legacy-mapping-allowed: Lip-Sync-Substage
         (s as any).twoshotStage === 'failed' ||
+        // legacy-mapping-allowed: Lip-Sync-Substage
         (s as any).twoshotStage === 'audio_mux_failed' ||
+        // legacy-mapping-allowed: Lip-Sync-Substage
         (s as any).twoshotStage === 'needs_clip_rerender';
     });
 
@@ -836,6 +882,7 @@ export function usePipelineProgress({
   // Minuten (4× Sync.so + 4× Preclip + Audio-Mux). Stall-Threshold dynamisch.
   const lipTargetCount = (scenes ?? []).filter((s: any) =>
     !isCanceledLipsyncScene(s) &&
+    // legacy-mapping-allowed: Lip-Sync-Zielmenge (v425-Vertrag unverändert)
     (isLipSyncIntentional(s) || !!s.twoshotStage),
   ).length;
   const maxSpeakers = (scenes ?? []).reduce((m: number, s: any) => {
@@ -870,8 +917,10 @@ export function usePipelineProgress({
   const hasActiveLipsyncEvidence = (scenes ?? []).some((s: any) => {
     if (isSceneTerminalFailure(s)) return false;
     if (isCanceledLipsyncScene(s)) return false;
+    // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
     if (s.lipSyncStatus === 'running' || s.lipSyncStatus === 'audio_muxing') return true;
-    if (s.engineOverride === 'cinematic-sync' && s.clipStatus === 'generating') return true;
+    if (s.engineOverride === 'cinematic-sync' && clipStatusFromState(sceneState(s)) === 'generating') return true;
+    // legacy-mapping-allowed: Lip-Sync-Substage
     const stage = s.twoshotStage;
     if (isActiveTwoshotStage(stage)) return true;
     const ds = s.dialogShots ?? s.dialog_shots ?? null;

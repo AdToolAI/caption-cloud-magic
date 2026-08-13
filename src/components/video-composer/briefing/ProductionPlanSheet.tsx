@@ -57,6 +57,7 @@ const isUuid = (val?: string | null) =>
 import { normalizeAssetKey as _normalizeAssetKey } from '@/lib/video-composer/briefing/assetKeyUtils';
 import { shouldInheritContinuity } from '@/lib/video-composer/briefing/planContinuity';
 import { canonicalPoolId } from '@/lib/video-composer/canonicalCastId';
+import { sceneState } from '@/lib/composer/sceneState';
 
 const normalizeAssetKey = (value?: string | null) =>
   _normalizeAssetKey(value, { stripLocationPrefix: true });
@@ -734,9 +735,8 @@ export default function ProductionPlanSheet({
     for (const s of currentScenes) {
       const a = s as any;
       if (
-        (s.clipStatus && s.clipStatus !== 'pending') ||
+        sceneState(s) !== 'idle' ||
         s.clipUrl ||
-        a.lipSyncStatus ||
         a.dialogLockedAt ||
         a.lockReferenceUrl
       ) set.add(s.id);

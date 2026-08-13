@@ -111,6 +111,7 @@ import { tx } from '@/lib/i18nText';
 import { resolveSceneAudioSource, type SceneAudioSource } from '@/config/nativeAudioSources';
 import { pickClipSourceForDuration } from '@/lib/composer/pickClipSourceForDuration';
 import { useSeedance25LipsyncState } from '@/hooks/useSeedance25Lipsync';
+import { isSceneInFlight, sceneState } from '@/lib/composer/sceneState';
 
 
 /** v416 — true when a plan scene actually contains speech (VO, dialog, lip-sync). */
@@ -265,9 +266,8 @@ function splitAction(anchorEN?: string): { characterAction?: string; environment
  */
 function isLocallyProtected(s: ComposerScene): boolean {
   if (s.clipUrl) return true;
-  if (s.clipStatus === 'generating') return true;
+  if (isSceneInFlight(s)) return true;
   const anyS = s as any;
-  if (anyS.lipSyncStatus) return true;
   if (anyS.dialogLockedAt) return true;
   if (anyS.lockReferenceUrl) return true;
   return false;
@@ -921,8 +921,8 @@ export function useApplyProductionPlan() {
         console.warn('[useApplyProductionPlan] dialog_shots probe failed, fail-open for failed/canceled repair rows:', e);
         // Fail-open for visibly broken scenes; fail-closed for pending unknowns.
         for (const s of candidateForDelete) {
-          const status = String(s.clipStatus ?? '');
-          if (status !== 'failed' && status !== 'canceled') dbProtectedIds.add(s.id);
+          const st = sceneState(s);
+          if (st !== 'failed' && st !== 'canceled') dbProtectedIds.add(s.id);
         }
       }
     }
@@ -1034,6 +1034,7 @@ export function useApplyProductionPlan() {
           duration_seconds: s.durationSeconds,
           clip_source: s.clipSource,
           clip_quality: s.clipQuality || 'standard',
+          // legacy-mapping-allowed: Writer-Spiegel der Alt-Spalte
           clip_status: s.clipStatus ?? 'pending',
           with_audio: s.withAudio !== false,
           audio_source: (s as any).audioSource ?? null,

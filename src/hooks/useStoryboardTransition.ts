@@ -25,6 +25,7 @@ import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import type { ComposerScene, ComposerBriefing } from '@/types/video-composer';
 import { readBriefingContract } from '@/lib/video-composer/briefing/briefingContract';
 import { canonicalPoolId } from '@/lib/video-composer/canonicalCastId';
+import { isSceneInFlight, legacyClipReadyEquivalentRow, sceneState } from '@/lib/composer/sceneState';
 
 /**
  * Build a deterministic Hook/Reveal/CTA arc so the user is never blocked
@@ -859,17 +860,16 @@ function isProtected(s: ComposerScene): boolean {
   // Failed/canceled scenes without a render are repairable fallback rows and
   // MUST be replaceable by a later full Briefing plan. Protect only real output
   // or in-flight state.
-  if (s.clipStatus === 'generating' || s.clipStatus === 'ready') return true;
+  if (isSceneInFlight(s) || legacyClipReadyEquivalentRow(s)) return true;
   const a = s as any;
-  if (a.lipSyncStatus) return true;
   if (a.dialogLockedAt) return true;
   if (a.lockReferenceUrl) return true;
   return false;
 }
 
 function isRepairableFailedScene(s: ComposerScene): boolean {
-  const status = String(s.clipStatus ?? '');
-  return (status === 'failed' || status === 'canceled') && !isProtected(s);
+  const st = sceneState(s);
+  return (st === 'failed' || st === 'canceled') && !isProtected(s);
 }
 
 /** Slugify a character name into a stable @-mention key. */

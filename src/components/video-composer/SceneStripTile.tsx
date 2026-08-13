@@ -18,6 +18,7 @@ import { Check, Loader2, AlertCircle, Sparkles, Image as ImageIcon } from 'lucid
 import type { ComposerScene, ComposerCharacter } from '@/types/video-composer';
 import { getClipCost } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
+import { clipStatusFromState, sceneState } from '@/lib/composer/sceneState';
 
 const NOT_RENDERED_L10N: Record<'de' | 'en' | 'es', string> = {
   de: 'Noch nicht gerendert',
@@ -79,7 +80,7 @@ function SceneStripTileImpl({ scene, index, isActive, characters, onSelect }: Sc
   const { language } = useTranslation();
   const notRendered = NOT_RENDERED_L10N[(language as 'de' | 'en' | 'es') ?? 'de'] ?? NOT_RENDERED_L10N.de;
   const thumb = pickThumbnail(scene);
-  const status = STATUS_STYLE[scene.clipStatus] ?? STATUS_STYLE.pending;
+  const status = STATUS_STYLE[clipStatusFromState(sceneState(scene))] ?? STATUS_STYLE.pending;
   const StatusIcon = status.icon;
   const typeLabel = SCENE_TYPE_LABEL[scene.sceneType] ?? scene.sceneType;
   const cost = getClipCost(scene.clipSource, scene.clipQuality || 'standard', scene.durationSeconds);
@@ -155,7 +156,7 @@ function SceneStripTileImpl({ scene, index, isActive, characters, onSelect }: Sc
               status.cls,
             )}
           >
-            <StatusIcon className={cn('h-2.5 w-2.5', scene.clipStatus === 'generating' && 'animate-spin')} />
+            <StatusIcon className={cn('h-2.5 w-2.5', clipStatusFromState(sceneState(scene)) === 'generating' && 'animate-spin')} />
             {status.label}
           </span>
         </div>

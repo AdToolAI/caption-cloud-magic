@@ -32,6 +32,7 @@ import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { emitStageEvent } from '@/lib/stage/stageEvents';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
 import { prepareSceneRuns, startSceneGeneration } from '@/lib/composer/startSceneGeneration';
+import { isSceneInFlight, legacyClipReadyEquivalentRow, sceneState } from '@/lib/composer/sceneState';
 
 interface UseGenerateAllClipsArgs {
   scenes: ComposerScene[];
@@ -43,19 +44,30 @@ interface UseGenerateAllClipsArgs {
   onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
 }
 
+function isLipsyncPhase(scene: ComposerScene): boolean {
+  const st = sceneState(scene);
+  return (
+    st === 'audio_prep' ||
+    st === 'audio_ready' ||
+    st === 'lipsync_dispatched' ||
+    st === 'lipsync_running' ||
+    st === 'lipsync_muxing' ||
+    st === 'complete'
+  );
+}
+
 function isScenePipelineReady(scene: ComposerScene) {
   const dialogVoiceCount = scene.dialogVoices ? countSceneSpeakers(scene) : 0;
   const needsLipsync =
     scene.engineOverride === 'cinematic-sync' ||
-    !!(scene as any).twoshotStage ||
+    isLipsyncPhase(scene) ||
     dialogVoiceCount > 1;
   if (scene.clipSource === 'upload' && !!scene.uploadUrl && !needsLipsync) return true;
-  if (scene.clipStatus !== 'ready') return false;
+  if (!legacyClipReadyEquivalentRow(scene)) return false;
   if (!needsLipsync) return true;
   return (
-    ((scene as any).lipSyncStatus === 'done' && !!(scene as any).lipSyncAppliedAt) ||
-    (scene as any).twoshotStage === 'done' ||
-    (scene as any).twoshotStage === 'complete'
+    sceneState(scene) === 'complete' ||
+    (!!(scene as any).lipSyncAppliedAt && sceneState(scene) !== 'failed')
   );
 }
 
@@ -99,7 +111,7 @@ export function useGenerateAllClips({
   );
 
   const generatingCount = useMemo(
-    () => scenes.filter((s) => s.clipStatus === 'generating' || (s as any).lipSyncStatus === 'running').length,
+    () => scenes.filter((s) => isSceneInFlight(s)).length,
     [scenes],
   );
 
@@ -107,13 +119,11 @@ export function useGenerateAllClips({
     () =>
       scenes.filter(
         (s) =>
-          s.clipStatus !== 'ready' &&
+          !legacyClipReadyEquivalentRow(s) &&
           !(s.clipSource === 'upload' && s.uploadUrl) &&
           !(
-            s.clipStatus === 'generating' &&
             s.engineOverride === 'cinematic-sync' &&
-            !!(s as any).twoshotStage &&
-            (s as any).twoshotStage !== 'failed'
+            isSceneInFlight(s)
           ),
       ),
     [scenes],
@@ -139,7 +149,7 @@ export function useGenerateAllClips({
     // locally so the per-scene shimmer appears instantly.
     const pendingNow = scenes.filter(
       (s) =>
-        s.clipStatus !== 'ready' &&
+        !legacyClipReadyEquivalentRow(s) &&
         !(s.clipSource === 'upload' && s.uploadUrl) &&
         s.clipSource?.startsWith('ai-'),
     );
@@ -183,13 +193,11 @@ export function useGenerateAllClips({
 
       const eligibleScenes = pScenes.filter(
         (s) =>
-          s.clipStatus !== 'ready' &&
+          !legacyClipReadyEquivalentRow(s) &&
           !(s.clipSource === 'upload' && s.uploadUrl) &&
           !(
-            s.clipStatus === 'generating' &&
             s.engineOverride === 'cinematic-sync' &&
-            !!(s as any).twoshotStage &&
-            (s as any).twoshotStage !== 'failed'
+            isSceneInFlight(s)
           ) &&
           // Stage 8 (May 31 2026): don't re-trigger Cinematic-Sync scenes that
           // are already mid-lipsync — that's the root cause of "5 min later
@@ -199,9 +207,8 @@ export function useGenerateAllClips({
           !(
             s.engineOverride === 'cinematic-sync' &&
             !(s as any).lipSyncAppliedAt &&
-            ['pending', 'running', 'stitching'].includes(
-              String((s as any).lipSyncStatus ?? ''),
-            )
+            isLipsyncPhase(s) &&
+            sceneState(s) !== 'complete'
           ),
       );
 

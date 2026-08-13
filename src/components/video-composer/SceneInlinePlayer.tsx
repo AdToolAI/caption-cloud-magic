@@ -24,7 +24,7 @@ import { useResetLipSync } from '@/hooks/useResetLipSync';
 import type { ComposerScene } from '@/types/video-composer';
 import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
-import { isInFlightState, sceneState } from '@/lib/composer/sceneState';
+import { clipStatusFromState, isInFlightState, sceneState } from '@/lib/composer/sceneState';
 
 interface Props {
   scene: ComposerScene;
@@ -64,7 +64,7 @@ export default function SceneInlinePlayer({
   // `lockReferenceUrl` are the *anchor* / front image and would otherwise
   // bleed into every not-yet-rendered scene, faking a render result.
   const posterUrl = scene.firstFrameUrl || scene.lastFrameUrl || undefined;
-  const status = scene.clipStatus;
+  const status = clipStatusFromState(sceneState(scene));
   const pipelineState = sceneState(scene);
 
   // Pipeline-Vollständigkeit: Bei Cinematic-Sync/Dialog-/Talking-Head-Szenen
@@ -75,8 +75,6 @@ export default function SceneInlinePlayer({
     scene.engineOverride === 'cinematic-sync' ||
     isLipSyncIntentional(scene) ||
     dialogVoiceCount > 1;
-  const lipSyncStatus = (scene as any).lipSyncStatus as string | null | undefined;
-  const twoshotStage = (scene as any).twoshotStage as string | null | undefined;
   const lipSyncAppliedAt = (scene as any).lipSyncAppliedAt as string | null | undefined;
   const dialogShots: any =
     (scene as any).dialogShots ?? (scene as any).dialog_shots ?? null;
