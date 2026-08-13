@@ -22,6 +22,31 @@ Ein Zeilenzahl-Vergleich reicht nicht — gleiche Anzahl bei geändertem Text bl
 - **Genau drei Aufrufer, alle mit demselben Vertrag:** Dialog-Editor (beim Laden und beim Speichern), UI-Preflight (blockt den Generieren-Button bei geschätzter Überlänge) und `compose-twoshot-audio` (vor der TTS).
 - Der Server-Hard-Guard (`spokenSec > sceneDur + 5s` → Fehler) **bleibt unverändert bestehen**. Preflight ist UX, der Server bleibt fail-closed.
 
+### Implementierungsauftrag Schritt 0 — Grenzen
+
+**Neue Dateien**
+- `src/lib/composer/dialog/resolveEffectiveDialog.ts` — pure function, kein Supabase-Import. Signatur: `resolveEffectiveDialog(scene) → { turns, source: 'turns' | 'aligned' | 'script', diverged: boolean, reason }`.
+- `supabase/functions/_shared/resolve-effective-dialog.ts` — wortgleicher Spiegel.
+- `src/lib/composer/dialog/__tests__/resolveEffectiveDialog.test.ts` — Fixtures: identisch, gekürzt, erweitert, gleiche Anzahl mit geändertem Text, Sprecher umbenannt, Reihenfolge getauscht, leeres Skript, Vier-Sprecher-Fall.
+- `src/lib/composer/dialog/__tests__/dialogContractParity.test.ts` — Client/Server-Spiegel-Parität.
+
+**Zu ändernde Dateien**
+- `SceneDialogStudio.tsx` — Alignment beim Laden und beim Speichern über den neuen Vertrag statt eigener Vergleichslogik.
+- `SceneCard.tsx` — Preflight: Generieren-Button blockiert mit klarer Meldung, wenn die geschätzte Sprechdauer das Plate-Limit sprengt.
+- `supabase/functions/compose-twoshot-audio/index.ts` — **eine** Abgleichstufe vor der TTS; danach unverändert weiter.
+
+**Do not touch**
+- `compose-dialog-segments` (Pass-Aufbau, v95-Split, v194-Stabilizer), Geometrie-/Assignment-Kette, Sync.so-Dispatch, `sync-so-webhook`, `beginSceneRun`, `reset-lipsync-scene`.
+- Der Duration-Hard-Guard und die 5s-Auto-Extend-Grenze in `compose-twoshot-audio` bleiben zeilengleich.
+- Keine Migration, keine neuen Spalten, keine Änderung an `dialog_turns`-IDs.
+
+**Akzeptanzkriterien**
+- Szene `b34d1eae…` (4 Skriptzeilen, 6 gespeicherte Turns) vertont nach dem Fix 4 Turns und läuft durch.
+- Fall „gleiche Anzahl, geänderter Text" wird als Divergenz erkannt.
+- Turn-IDs bleiben bei unveränderten Zeilen stabil (V201).
+- Alle 118 bestehenden Lip-Sync-Tests plus die neuen Vertragstests grün, `tsgo` sauber.
+
+
 ## Schritt 1 — Output-Semantik (kompatibel, kein Big Bang)
 
 - Neue Felder auf `composer_scenes`: `base_video_url`, `processed_video_url`. Backfill: `base_video_url = COALESCE(lip_sync_source_clip_url, clip_url)`, `processed_video_url = clip_url` wenn `lip_sync_status = 'applied'`.
