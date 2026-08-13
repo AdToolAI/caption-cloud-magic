@@ -2,65 +2,82 @@
 
 Leitprinzip: Die funktionierende Lip-Sync-Engine wird **nicht** refaktoriert. Run-Identität (`active_run_id` + `plate_generation`), Geometriemessung auf `reference_image_url`, eingefrorener Assignment-Lock und das fail-closed Outcome-Gate bleiben unangetastet. Wir räumen das Motion Studio **um sie herum** auf.
 
-Reihenfolge: Output-Semantik → Capabilities → Visual-Input → Continuity → UI. Der `dialog_too_long_for_plate`-Fehler wird bewusst **nicht** zuerst geflickt; er löst sich in Schritt 1/3 als Nebeneffekt der entkoppelten Dauerrechnung.
+Reihenfolge: Dialog-Canonicalization → Output-Semantik → Capabilities → Visual-Input → Continuity → State/Legacy → UI.
 
 ---
 
+## Schritt 0 — Dialog-Canonicalization (Blocker)
+
+Ursache von `dialog_too_long_for_plate`: UI-Skript hat 4 Turns, DB `dialog_turns` hat 6, der Server vertont `dialog_turns`.
+
+Ein Zeilenzahl-Vergleich reicht nicht — gleiche Anzahl bei geändertem Text bleibt unentdeckt.
+
+- Neuer kanonischer Vertrag `resolveEffectiveDialog(scene)` in `src/lib/composer/dialog/` plus wortgleicher Backend-Spiegel in `_shared/`.
+- Divergenz-Erkennung vergleicht **normalisierter Sprecher + normalisierter Text + Reihenfolge**, nicht nur die Länge. Normalisierung: trim, Whitespace-Kollaps, Unicode-NFC, case-insensitiver Sprechername.
+- Bei Divergenz wird über `alignDialogTurnsToScript` ausgerichtet — stabile Turn-IDs bleiben erhalten (Lip-Sync-V201-Vertrag: `dialog_turns` ist UUID-Quelle der Wahrheit).
+- **Genau drei Aufrufer, alle mit demselben Vertrag:** Dialog-Editor (beim Laden und beim Speichern), UI-Preflight (blockt den Generieren-Button bei geschätzter Überlänge) und `compose-twoshot-audio` (vor der TTS).
+- Der Server-Hard-Guard (`spokenSec > sceneDur + 5s` → Fehler) **bleibt unverändert bestehen**. Preflight ist UX, der Server bleibt fail-closed.
+
 ## Schritt 1 — Output-Semantik (kompatibel, kein Big Bang)
 
-Heute überschreibt der Sync.so-Webhook `clip_url` in-place; die Priorität `lip_sync_source_clip_url ?? clip_url` ist an mindestens drei Stellen dupliziert.
-
 - Neue Felder auf `composer_scenes`: `base_video_url`, `processed_video_url`. Backfill: `base_video_url = COALESCE(lip_sync_source_clip_url, clip_url)`, `processed_video_url = clip_url` wenn `lip_sync_status = 'applied'`.
-- `clip_url` bleibt bestehen als **vom Resolver geschriebene Kompatibilitätsspalte**. Bridge-Trigger `composer_scene_state_bridge()`, Media-Library-Sync und Exporter laufen unverändert.
-- Ein einziger Resolver `resolveSceneOutput(scene)` (Client + Backend-Spiegel) ersetzt alle duplizierten `?? `-Ketten in `useTwoShotAutoTrigger.ts`, `DebugLipsync.tsx` und `compose-dialog-segments`.
-- `lip_sync_source_clip_url` wird zur reinen Legacy-Spiegelspalte (weiter geschrieben, nicht mehr gelesen).
+- `clip_url` bleibt als Kompatibilitätsspalte. Bridge-Trigger `composer_scene_state_bridge()`, Media-Library-Sync und Exporter laufen unverändert.
+- **Strikte Trennung Lesen/Schreiben:**
+  - `resolveSceneOutput(scene)` — **pure function**, keine DB, keine Persistenz, kein Netzwerk. Gibt nur den effektiven Output zurück. Ein Lint-/Vertragstest verbietet Supabase-Importe in diesem Modul.
+  - `materializeCompatibilityOutput(...)` — der einzige Schreiber von `clip_url`. Aufrufbar ausschließlich an definierten Finalisierungspunkten: Plate-Webhook, Sync.so-Mux-Abschluss, `beginSceneRun`, Reset-Pfade.
+- Alle duplizierten `lip_sync_source_clip_url ?? clip_url`-Ketten (`useTwoShotAutoTrigger.ts:465`, `DebugLipsync.tsx:145`, `compose-dialog-segments`) werden durch den Resolver ersetzt.
+- `beginSceneRun()` bekommt die neuen Felder in seinen atomaren Reset-Vertrag: `base_video_url = null`, `processed_video_url = null` zusätzlich zu `clip_url = null`, im selben UPDATE. Kein Eingriff in den Kern (Cancel, Lock-Purge, neue `active_run_id`, `plate_generation + 1`).
 
 ## Schritt 2 — Capability-System zentralisieren
 
-Capabilities liegen heute in vier Quellen: `aiVideoModelRegistry.ts`, `providerCapabilities.ts`, `modelProfiles.ts`, `lipsyncMasterProvider.ts` — plus hartkodierte Checks (`isHailuoScene`, 6s/10s-Buckets).
+Belegt: Es gibt kein separates Plate-Provider-Feld. Die Plate wird aus `scene.clipSource` gerendert, und genau dieses Feld prüft der fail-closed Guard in `compose-video-clips/index.ts:2082-2105`. Eine Kling-/Seedance-Plate in einer Lip-Sync-Szene ist technisch unmöglich.
 
 - Eine Matrix `src/lib/composer/providerMatrix.ts` als alleinige Wahrheit: pro Provider `i2v`, `t2v`, `videoReference`, `inputSlots`, `durationRange`/`durationBuckets`, `nativeAudio`, `lipsyncMaster`.
-- Kein zweites `pipelineMode`-Feld: Lip-Sync bleibt eine Capability (`lipsyncMaster`), der bestehende fail-closed Guard in `compose-video-clips` (`provider_not_lipsync_certified`) bleibt exakt so.
-- Backend-Spiegel `_shared/provider-matrix.ts` wird aus derselben Definition generiert; ein Vertragstest vergleicht beide Seiten und failt bei Drift.
-- Hartkodierte Dauer-Buckets werden durch Matrix-Lookups ersetzt.
+- **`lipsyncMaster: boolean` genügt** — kein `lipsyncPlateSource`, kein `pipelineMode`.
+- Die v400-Passage „HappyHorse / Kling / Seedance (Image-to-Video)" wird in `docs/lipsync-pipeline-v400-errata.md` ausdrücklich als **Legacy (Stand vor v425)** markiert.
+- Backend-Spiegel `_shared/provider-matrix.ts` aus derselben Definition; Vertragstest failt bei Drift.
+- Hartkodierte Dauer-Buckets (`isHailuoScene`, 6s/10s) werden durch Matrix-Lookups ersetzt.
 
 ## Schritt 3 — Visual Input statt „Frame-First"-Modus
 
 Kein Backendpfad kennt den Begriff „Frame-First" — er ist reiner localStorage-UI-Toggle.
 
 - Neues persistiertes Feld `generation_input.visual_source`: `manual | character_anchor | previous_final_frame | uploaded_reference | generated_still`.
-- `slotArbitration.ts` entscheidet nicht mehr implizit aus dem Zustand, sondern validiert die explizite Quelle gegen die Provider-Slots aus Schritt 2. Ergebnis bleibt derselbe `TransitionMode` (`frame-chain`, `clip-reference`, `endframe-bridge`, `match-cut`).
+- `slotArbitration.ts` validiert die explizite Quelle gegen die Provider-Slots aus Schritt 2, statt sie implizit aus dem Zustand abzuleiten. Ergebnis bleibt derselbe `TransitionMode`.
 - Unverändert: Bei Lip-Sync gewinnt der Anker kategorisch, Continuity ist hart gesperrt (drei Schichten, v428).
-- Der Frame-First-Button wird zur Anzeige der aktiven `visual_source`, nicht zu einem eigenen Modus.
-- Begriffstrennung: UI-`transitionType` (Cut/Crossfade, reines Compositing) wird in `cutStyle` umbenannt, damit es nicht mehr mit dem Resolver-`TransitionMode` kollidiert.
+- Begriffstrennung: UI-`transitionType` (Cut/Crossfade, reines Compositing) wird zu `cutStyle`, damit es nicht mehr mit dem Resolver-`TransitionMode` kollidiert.
 
 ## Schritt 4 — Continuity-Abhängigkeitsmodell (Variante C)
 
-- Szene 2 übernimmt den neuen Frame von Szene 1 **automatisch, solange sie selbst noch nie gerendert wurde**.
-- Wurde Szene 2 bereits gerendert, bleibt ihr Ergebnis stehen und sie wird als `continuity_stale` markiert (mit `continuity_source_scene_id` + `continuity_source_clip_url`, gegen den der Frame gecacht wurde). Die Karte zeigt „Anschluss veraltet" plus Button „Continuity aktualisieren".
-- `beginSceneRun()` nullt weiterhin die eigenen Frames, setzt aber zusätzlich `continuity_stale` auf allen direkten Nachfolgern — keine transitive Kaskade, die Kette propagiert erst beim jeweiligen Re-Render.
-- Geparkte Einträge in `composer_continuity_queue` bekommen einen eigenen Status statt `clip_status = 'generating'`, damit Polling-Hooks sie nicht als laufenden Provider-Job missdeuten.
+- Szene 2 übernimmt den neuen Frame von Szene 1 automatisch, **solange sie selbst noch nie gerendert wurde**.
+- Bereits gerenderte Szene 2 behält ihr Ergebnis und wird `continuity_stale` markiert (mit `continuity_source_scene_id` + `continuity_source_clip_url`). Karte zeigt „Anschluss veraltet" + Button „Continuity aktualisieren".
+- `beginSceneRun()` setzt zusätzlich `continuity_stale` auf den **direkten** Nachfolgern — keine transitive Kaskade.
+- Geparkte Einträge in `composer_continuity_queue` bekommen einen eigenen Status statt `clip_status = 'generating'`.
 
 ## Schritt 5 — State Machine als einziger Orchestrierungsvertrag
 
-- `composer_scenes.pipeline_state` + die atomaren DB-Transitions bleiben die Wahrheit. **Keine neue Frontend-State-Maschine.**
-- Legacy-Spiegel (`clip_status`, `twoshot_stage`, `lip_sync_status`) werden schrittweise read-only: erst alle Client-Leser auf `pipeline_state` umstellen, dann die Rückwärtsrichtung des Bridge-Triggers (Legacy → State) abschalten, Vorwärtsrichtung (State → Legacy) für Kompatibilität behalten.
-- Der Watchdog für verwaiste Jobs und `composer_pipeline_jobs` mit `claimPipelineCallback` bleiben unverändert.
+- `composer_scenes.pipeline_state` + die atomaren DB-Transitions bleiben die Autorität. **Keine neue Frontend-State-Maschine.** Guards gegen illegale Übergänge und Watchdog bleiben.
+- Legacy-Spiegel (`clip_status`, `twoshot_stage`, `lip_sync_status`) schrittweise read-only: erst Client-Leser auf `pipeline_state` umstellen, dann die Rückwärtsrichtung des Bridge-Triggers abschalten, Vorwärtsrichtung behalten.
 
 ## Schritt 6 — UI-Aufräumen (zuletzt)
 
-- SceneCard zeigt Zustand ausschließlich aus `pipeline_state` + Resolver-Output.
-- Die drei Reset-Aktionen werden zu zwei klaren: „Lip-Sync neu" (Plate behalten) und „Alles neu" (Run-Reset).
-- Debug-Panels lesen über den Resolver statt über eigene Feldketten.
+Erst nachdem Schritt 0-5 stehen, weil die Reset-Semantik davon abhängt.
+
+- Zwei klare Reset-Aktionen:
+  - **„Lip-Sync neu" (Plate behalten)** — `active_run_id` und `plate_generation` bleiben **unverändert**. Das ist das heutige, bewährte Verhalten von `reset-lipsync-scene`.
+  - **„Alles neu"** — voller `beginSceneRun()` inkl. der neuen Output-Felder aus Schritt 1.
+- SceneCard zeigt Zustand ausschließlich aus `pipeline_state` + `resolveSceneOutput`.
 
 ---
 
 ## Technische Details
 
-**Nicht anfassen:** `compose-dialog-segments` Pass-Aufbau (v95 Per-Turn-Split, v194 Stabilizer), Geometrie-/Assignment-Kette, Sync.so-Dispatch, `try_claim_mux_dispatch`, `safeMarkSceneFailed`, `beginSceneRun`-Kern.
+**Callback-Isolierung bei „Lip-Sync neu" (bestehender Vertrag, wird nur dokumentiert):** Die Abgrenzung alter Sync.so-Callbacks läuft nicht über `active_run_id`, sondern über Job-ID-Mitgliedschaft. `reset-lipsync-scene` nullt `dialog_shots`; `sync-so-webhook/index.ts:377-400` verwirft jeden Callback, dessen `job_id` nicht in `dialog_shots.passes[].job_id` steht (`stale_run_result`), bzw. findet gar keine Szene (`no_scene_match`, `:364`). Ein alter Callback kann den neuen Versuch nicht überschreiben. Dieser Mechanismus wird nicht angefasst, sondern als Vertrag in die Doku aufgenommen — inklusive der Regel, dass jeder künftige Lip-Sync-Reset `dialog_shots` atomar nullen **muss**.
 
-**Vertragstests je Schritt:** Provider-Matrix-Spiegel (Client vs. Backend), Resolver-Output vs. Legacy-Kette auf Bestandsdaten, Lip-Sync-Anker-Kohärenz (bestehende 118 Tests müssen grün bleiben), Continuity-Staleness-Propagation.
+**Nicht anfassen:** `compose-dialog-segments` Pass-Aufbau (v95 Per-Turn-Split, v194 Stabilizer), Geometrie-/Assignment-Kette, Sync.so-Dispatch, `try_claim_mux_dispatch`, `safeMarkSceneFailed`, `beginSceneRun`-Kern, Server-Hard-Guard der Dialoglänge.
 
-**Migrationen:** additiv, jede mit GRANTs; keine Spalte wird in dieser Phase gelöscht. `clip_url`-Drop ist explizit **kein** Teil dieses Plans.
+**Sprecher-Kardinalität (Dokumentationskorrektur):** Der Vertrag lautet „ein Sync.so-Pass pro Dialog-**Turn** plus ein Stabilizer-Pass pro Zuhörer" — nicht „ein Job pro Sprecher". A → B → A ergibt drei Passes. `speaker_idx` ist Identitäts-/Geometrie-Key, nicht Job-Kardinalität.
 
-**Sprecher-Kardinalität (Dokumentationskorrektur):** Der Vertrag lautet „ein Sync.so-Pass pro Dialog-Turn plus ein Stabilizer-Pass pro Zuhörer" — nicht „ein Job pro Sprecher". `speaker_idx` ist Identitäts-/Geometrie-Key, nicht Job-Kardinalität. Wird in `docs/lipsync-pipeline-v400-errata.md` nachgezogen.
+**Vertragstests je Schritt:** `resolveEffectiveDialog` Client/Server-Parität (inkl. Fall „gleiche Anzahl, anderer Text"), Purity-Test für `resolveSceneOutput`, Provider-Matrix-Spiegel, Lip-Sync-Anker-Kohärenz (bestehende 118 Tests müssen grün bleiben), Continuity-Staleness-Propagation.
+
+**Migrationen:** additiv, jede mit GRANTs; keine Spalte wird gelöscht. Ein `clip_url`-Drop ist explizit **kein** Teil dieses Plans.
