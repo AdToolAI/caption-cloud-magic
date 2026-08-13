@@ -17,6 +17,7 @@ import type { AssemblyConfig, ComposerScene, WatermarkConfig } from '@/types/vid
 import { DEFAULT_WATERMARK_CONFIG, getClipCost } from '@/types/video-composer';
 import { persistAssemblyConfig } from '@/hooks/useComposerPersistence';
 import { useSceneAudioClips } from '@/hooks/useSceneAudioClips';
+import { legacyClipReadyEquivalentRow } from '@/lib/composer/sceneState';
 
 interface AssemblyTabProps {
   project: any;
@@ -97,7 +98,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
   const pollStartRef = useRef<number>(0);
   const hydratedRef = useRef(false);
 
-  const readyClips = scenes.filter(s => s.clipStatus === 'ready' && s.clipUrl);
+  const readyClips = scenes.filter(s => legacyClipReadyEquivalentRow(s) && s.clipUrl);
   const allReady = readyClips.length === scenes.length && scenes.length > 0;
   const canRender = readyClips.length > 0;
 

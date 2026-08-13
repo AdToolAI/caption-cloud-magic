@@ -92,9 +92,15 @@ function scanFile(absPath: string): Hit[] {
   };
 
   const visit = (node: ts.Node) => {
-    // x.clip_status / x?.clipStatus
+    // x.clip_status / x?.clipStatus — Schreibziele (`x.clipStatus = …`) sind
+    // Writer und werden in 5E bewusst nicht gemeldet.
     if (ts.isPropertyAccessExpression(node) && LEGACY_FIELDS.has(node.name.text)) {
-      push(node);
+      const parent = node.parent;
+      const isWriteTarget =
+        ts.isBinaryExpression(parent) &&
+        parent.left === node &&
+        parent.operatorToken.kind === ts.SyntaxKind.EqualsToken;
+      if (!isWriteTarget) push(node);
     }
     // x['clip_status']
     if (

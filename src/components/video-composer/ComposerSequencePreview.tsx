@@ -12,6 +12,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { tx } from '@/lib/i18nText';
 import { PreviewTextOverlayLayer } from './PreviewTextOverlayLayer';
 import type { SceneAudioClip } from './SoundDesignPanel';
+import { legacyClipFailedEquivalentRow, legacyClipReadyEquivalentRow, sceneState, sceneSubstate } from '@/lib/composer/sceneState';
 
 interface Props {
   scenes: ComposerScene[];
@@ -106,9 +107,9 @@ export default function ComposerSequencePreview({
           // Image scenes: an uploaded image is always playable; an AI-image
           // clip only when the scene is marked ready.
           if (s.uploadUrl) return true;
-          return s.clipStatus === 'ready' && !!s.clipUrl;
+          return legacyClipReadyEquivalentRow(s) && !!s.clipUrl;
         }
-        return s.clipStatus === 'ready' && !!s.clipUrl;
+        return legacyClipReadyEquivalentRow(s) && !!s.clipUrl;
       }),
     [scenes],
   );
@@ -1249,7 +1250,7 @@ export default function ComposerSequencePreview({
 
         {/* Two-Shot Lip-Sync Pending / Failed Badge */}
         {currentScene && pendingTwoShotSceneIds.has(currentScene.id) && (
-          (currentScene as any).lipSyncStatus === 'failed' ? (
+          legacyClipFailedEquivalentRow(currentScene) ? (
             (() => {
               const err = String((currentScene as any).clipError ?? '');
               // sync-so-webhook now prefixes the reason with [error_code]
@@ -1311,7 +1312,7 @@ export default function ComposerSequencePreview({
 
           ) : (
             (() => {
-              const stage = String((currentScene as any).twoshotStage ?? '');
+              const stage = String(sceneSubstate(currentScene) ?? sceneState(currentScene) ?? '');
               const label =
                 stage === 'audio' ? tx({ de: 'Voiceover wird gebaut…', en: 'Voiceover is being built…', es: 'Se está construyendo locución...' })
                 : stage === 'anchor' ? tx({ de: 'Anchor wird komponiert…', en: 'Anchor is composed…', es: 'El ancla está compuesta…' })

@@ -21,6 +21,7 @@ import { useFrameContinuity } from '@/hooks/useFrameContinuity';
 import { useContinuityDrift, driftSeverity } from '@/hooks/useContinuityDrift';
 import ContinuityHistoryDrawer from './ContinuityHistoryDrawer';
 import type { ComposerScene } from '@/types/video-composer';
+import { legacyClipReadyEquivalentRow } from '@/lib/composer/sceneState';
 import {
   runCinematicContinuityRules,
   RULE_LABELS,
@@ -104,11 +105,11 @@ export default function ContinuityGuardianStrip({
       const prev = scenes[i];
       const next = scenes[i + 1];
       const prevReady =
-        prev.clipStatus === 'ready' &&
+        legacyClipReadyEquivalentRow(prev) &&
         (prev.clipUrl || prev.uploadUrl) &&
         prev.clipSource.startsWith('ai-');
       const nextReady =
-        next.clipStatus === 'ready' &&
+        legacyClipReadyEquivalentRow(next) &&
         (next.clipUrl || next.uploadUrl) &&
         next.clipSource.startsWith('ai-');
       if (prevReady && nextReady && isContinuityRelevant(prev, next)) {

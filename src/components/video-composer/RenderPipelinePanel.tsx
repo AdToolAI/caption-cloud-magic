@@ -19,6 +19,7 @@ import {
 import { useMultiSceneRender, type PipelineStatus } from '@/hooks/useMultiSceneRender';
 import type { ComposerScene } from '@/types/video-composer';
 import RenderPreFlightDialog from './RenderPreFlightDialog';
+import { legacyClipReadyEquivalentRow } from '@/lib/composer/sceneState';
 
 interface RenderPipelinePanelProps {
   projectId?: string;
@@ -75,7 +76,7 @@ export default function RenderPipelinePanel({
 
   const isBusy = status === 'queueing' || status === 'generating' || status === 'stitching';
   const completed = scenes.filter(
-    (s) => s.clipStatus === 'ready' || (s.clipSource === 'upload' && s.uploadUrl)
+    (s) => legacyClipReadyEquivalentRow(s) || (s.clipSource === 'upload' && s.uploadUrl)
   ).length;
 
   const openInDirectorsCut = () => {

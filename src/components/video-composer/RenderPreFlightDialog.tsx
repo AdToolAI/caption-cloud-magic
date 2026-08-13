@@ -26,6 +26,7 @@ import {
 import type { ComposerScene } from '@/types/video-composer';
 import { NATIVE_DIALOGUE_CLIP_SOURCES } from '@/lib/video-composer/modelMapping';
 import { tx } from '@/lib/i18nText';
+import { legacyClipFailedEquivalentRow, legacyClipReadyEquivalentRow } from '@/lib/composer/sceneState';
 
 
 /**
@@ -80,7 +81,7 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
       !!s.clipUrl ||
       !!s.uploadUrl ||
       !!s.referenceImageUrl ||
-      s.clipStatus === 'ready';
+      legacyClipReadyEquivalentRow(s);
 
     // Blocker: AI scene with neither prompt nor asset
     if (!hasPrompt && !hasAsset) {
@@ -107,7 +108,7 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
     }
 
     // Warning: failed status from previous run
-    if (s.clipStatus === 'failed') {
+    if (legacyClipFailedEquivalentRow(s)) {
       out.push({
         id: `${s.id}-failed`,
         severity: 'warning',
