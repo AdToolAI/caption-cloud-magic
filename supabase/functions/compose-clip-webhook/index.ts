@@ -15,6 +15,7 @@ import { resumeContinuityChain, sweepContinuityQueue } from "../_shared/continui
 import { guardCallback } from "../_shared/v427-callback-guard.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 import { continuityRenderedPatch } from "../_shared/continuity-run-snapshot.ts";
+import { legacyClipReadyEquivalentRow, legacyClipFailedEquivalentRow } from "../_shared/scene-state.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
