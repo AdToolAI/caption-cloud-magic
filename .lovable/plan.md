@@ -37,11 +37,13 @@ Nicht angefasst: `plate-attempt.ts` (andere Tabelle), Snapshot-/Draft-/QA-Pfade,
 
 ## Tests
 
-- Writer-Inventory-Test (`materializeSceneOutput.test.ts`) um die vier Dateien erweitern — und **nicht nur** auf das Literal `clip_url:` prüfen. Der Test stellt sicher, dass in diesen Runtime-Dateien keine direkte Mutation von `composer_scenes.clip_url` außerhalb des Materializers mehr möglich ist:
-  - jedes `.from("composer_scenes")` mit `.update(`/`.insert(`/`.upsert(` muss ein Payload-Objekt verwenden, das `materializeCompatibilityOutput(` enthält;
-  - jede Erwähnung von `clip_url` in einem Schreibpfad (auch Varianten wie `"clip_url":`, `clip_url =`, `[ 'clip_url' ]`, dynamisch gebaute Patch-Objekte) failt den Test, sofern sie nicht aus dem Materializer stammt.
+- Writer-Inventory-Test (`materializeSceneOutput.test.ts`) — die Regel greift **feldbezogen**, nicht pauschal pro Update:
+  - Sobald ein produktiver Write eines der Output-Felder (`clip_url`, `base_video_url`, `processed_video_url`) mutiert, muss das vollständige Tripel ausschließlich über `materializeCompatibilityOutput()` entstehen.
+  - Alle anderen `composer_scenes`-Writes (z. B. `pipeline_state`, `duration_seconds`, `poster_url`, `clip_status`, `dialog_turns`) bleiben ausdrücklich erlaubt und dürfen den Test nicht brechen.
+  - Erkannt werden auch Schreibvarianten jenseits von `clip_url:` — `"clip_url":`, `clip_url =`, `['clip_url']`, dynamisch gebaute Patch-Objekte —, sofern sie nicht aus dem Materializer stammen.
 - Ein Single-Source-Test: nur eine Datei im Repo definiert eine Output-Materialisierung (`materialize-scene-output.ts`); es existiert kein zweiter Export mit gleicher Aufgabe.
-- Explizit dokumentierte Ausnahme für `plate_attempts.clip_url` im Test-Kommentar, damit sie nicht versehentlich mitmigriert wird.
+- `plate_attempts.clip_url` bleibt ausdrücklich außerhalb dieses Vertrags (andere Tabelle) — im Test-Kommentar dokumentiert.
+
 
 ## Reihenfolge
 
