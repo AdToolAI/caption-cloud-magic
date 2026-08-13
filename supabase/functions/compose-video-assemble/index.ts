@@ -146,8 +146,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // 3. Verify each clip is renderable: ready OR upload-with-url.
     //    Partial-render policy: skip not-ready scenes instead of failing,
     //    so users can render with a subset of finished clips.
+    //    v430 Step 5D: state read via sceneState()/resolveSceneOutput() parity
+    //    helper instead of the legacy `clip_status` column.
     const isRenderable = (s: any) =>
-      (s.clip_status === 'ready' && !!s.clip_url) ||
+      (legacyClipReadyEquivalentRow(s) && !!s.clip_url) ||
       (s.clip_source === 'upload' && !!s.upload_url);
 
     const totalScenesCount = (scenes || []).length;
@@ -161,7 +163,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     if (skippedScenes > 0 && scenes) {
       const skippedDetails = (scenes || [])
         .filter(s => !isRenderable(s))
-        .map(s => `Szene ${(s.order_index ?? 0) + 1} (status: ${s.clip_status})`)
+        .map(s => `Szene ${(s.order_index ?? 0) + 1} (status: ${sceneState(s)})`)
         .join(', ');
       console.log(`[compose-video-assemble] Partial render: ${skippedScenes}/${totalScenesCount} scene(s) skipped → ${skippedDetails}`);
       // Mutate the array in place so all downstream logic (probe, remotionScenes,
