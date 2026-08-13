@@ -24,6 +24,7 @@
 
 import { failLipSync } from "./lipsync-fail.ts";
 import { supersedeOpenPlateAttempts } from "./plate-attempt.ts";
+import { materializeCompatibilityOutput } from "./materialize-scene-output.ts";
 
 type SupabaseLike = {
   from: (t: string) => any;

@@ -22,6 +22,8 @@
  * und gestempelt.
  */
 
+import { materializeCompatibilityOutput } from "./materialize-scene-output.ts";
+
 type SupabaseLike = {
   from: (table: string) => any;
 };
