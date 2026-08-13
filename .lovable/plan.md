@@ -33,23 +33,27 @@ Heute steht die Datei komplett in der `SKIP_FILES`-Liste des Contract-Scanners. 
 
 Nur Oberfläche und Begriffe. Kein Backend-Verhalten, keine Pipeline-Semantik.
 
-### 6.1 Reset-Aktionen vereinheitlichen
-Ein gemeinsamer Einstieg für „Szene zurücksetzen“: Hard-Reset (alles), Lip-Sync-Reset (processed → base) und Continuity-Aktualisierung liegen heute in verschiedenen Buttons/Dialogen mit unterschiedlicher Beschriftung. Ziel: ein Dialog mit klar benannten Optionen, der die bereits bestehenden Backend-Pfade unverändert aufruft.
+### 6.1 „Szenenaktionen“ statt Sammelbegriff „Reset“
+Ein gemeinsamer Einstieg „Szene verwalten / Szenenaktionen“ mit drei klar getrennten, unterschiedlich benannten Operationen — bewusst kein gemeinsamer Reset-Begriff:
+- **Lip-Sync neu erstellen** — bestehende Plate bleibt erhalten.
+- **Szene komplett neu erstellen** — vollständiger Run-Reset.
+- **Kontinuität aktualisieren** — nur der Anschluss wird neu gebunden, kein Render.
 
-### 6.2 `transitionType` → `cutStyle`
-Der Name existiert an vielen Stellen, darunter Remotion-Templates, Director's Cut und die DB-Spalte `transition_type`. Vorschlag zur Risikobegrenzung:
-- Umbenennung nur in der Motion-Studio-/Composer-Oberfläche und deren Typen (`ComposerScene`, Storyboard-UI, Transition-Handle).
-- DB-Spalte `transition_type`, Remotion-Templates und Director's Cut bleiben unangetastet; die Zuordnung passiert an genau einer Mapping-Stelle.
-- Alternative auf Wunsch: vollständige Umbenennung inklusive DB-Spalte und Render-Payload — grösserer Eingriff, berührt Export und Director's Cut.
+Alle drei rufen die bereits bestehenden Backend-Pfade unverändert auf.
+
+### 6.2 `transitionType` → `cutStyle` (Teil-Rename, entschieden)
+- Neuer Name `cutStyle` nur im Motion-Studio-/Composer-Modell und in der UI (`ComposerScene`, Storyboard-UI, Transition-Handle).
+- DB-Spalte bleibt `transition_type`, Render-Payloads bleiben unverändert, Remotion bleibt unverändert, Director's Cut bleibt unverändert.
+- Genau eine Adapter-/Mapping-Stelle `cutStyle ↔ transition_type`; kein Full-Rename, keine Migration.
 
 ### 6.3 Legacy-Begriffe aus der UI entfernen
-Sichtbare Restbegriffe wie „Two-Shot“, „Cinematic-Sync“, „Plate“, „twoshot_stage“ in Badges, Tooltips und Fehlermeldungen auf Kundensprache umstellen (DE/EN/ES über `i18nText`), interne Namen nur noch in Debug-Ansichten.
+Sichtbare Restbegriffe wie „Two-Shot“, „Cinematic-Sync“, „Plate“, „twoshot_stage“ in Badges, Tooltips und Fehlermeldungen auf Kundensprache umstellen (DE/EN/ES über `i18nText`). Wichtig: interne Fehlercodes werden nicht vernichtet — der maschinenlesbare Code bleibt in Debug-/Detailansichten und in den Logs sichtbar, übersetzt wird nur der Kundentext.
 
 ### 6.4 SceneCard konsequent auf State/Substate/Resolver
 Verbliebene lokale Ableitungen in `SceneCard.tsx` durch die kanonischen Helfer ersetzen; Video-Quelle ausschliesslich über `resolveSceneOutput()`.
 
 ### 6.5 Debug-/Statusanzeigen vereinheitlichen
-Eine gemeinsame Status-Komponente für Szenen-Badges, Render-Queue und Pipeline-Panel, gespeist aus `sceneState()` + `sceneSubstate()`, statt drei eigener Label-Tabellen.
+Eine gemeinsame Status-Komponente für Szenen-Badges, Render-Queue und Pipeline-Panel, gespeist aus `sceneState()` + `sceneSubstate()`, statt drei eigener Label-Tabellen — inklusive Debug-Zeile mit Rohzustand und Fehlercode.
 
 ### Nicht in Schritt 6
 Lip-Sync-Writer-Migration und Abschalten der Reverse-Bridge — das bleibt v431.
