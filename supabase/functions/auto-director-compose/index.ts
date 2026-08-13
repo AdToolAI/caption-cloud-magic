@@ -209,7 +209,10 @@ serve(async (req) => {
         duration_seconds: s.durationSeconds,
         clip_source: engine,
         ai_prompt: s.aiPrompt,
-        clip_status: 'pending',
+        // Dual-write: state is authoritative, legacy mirror must match it
+        // (plate_queued <-> 'queued'), otherwise insert leaves clip_status='pending'
+        // while pipeline_state='plate_queued' — a contradictory pair.
+        clip_status: 'queued',
         pipeline_state: 'plate_queued',
         text_overlay: s.textOverlay ?? {},
         transition_type: 'fade',
