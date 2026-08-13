@@ -96,22 +96,51 @@ Der Insert-Zweig der Bridge leitet `idle` beim Anlegen aus Legacy ab; ein separa
 
 Die Rückwärts-Bridge bleibt in Schritt 5 vollständig und global aktiv. Keine szenengebundene Abschaltung: eine Bridge, die von `scene_lipsync_intentional()` abhängt, würde zwei Orchestrierungsregeln in derselben Tabelle erzeugen, und der Lip-Sync-Intent einer Szene kann sich über ihre Lebenszeit ändern.
 
-1. **5A — Writer-Inventar einfrieren.** Contract-Test mit expliziter Allowlist der bekannten Legacy-only Lip-Sync-Writer (`compose-dialog-segments`, `sync-so-webhook`, `lipsync-watchdog`, `compose-twoshot-audio`, `render-sync-segments-audio-mux`, `_shared/lipsync-fail.ts`, `reset-lipsync-scene`, `cancel-dialog-lipsync`, `report-lipsync-motion-probe`). Jeder neue Legacy-only Writer außerhalb der Liste macht den Test rot. Semantik dieser Pfade wird nicht angefasst.
-2. **5B — Alle Nicht-Lip-Sync-Writer dualisieren:** `qa-watchdog`, `recover-stuck-composer-clip`, `remotion-webhook`, `generate-talking-head`, `compose-scene-anchor`, `auto-director-compose`, `motion-studio-superuser`, `qa-weekly-deep-sweep`, `autopilotComposerBridge`. Sie schreiben künftig zusätzlich über `composer_scene_transition()`.
+1. **5A — Writer-Inventar einfrieren.**
 
-   **Operative Regel (verbindlich):** Die Dualisierung folgt exakt dem bereits funktionierenden Dual-Write-Muster. `composer_scene_transition()` ist für den Hauptzustand autoritativ; der bestehende Legacy-Write bleibt unverändert bestehen, darf aber keine zweite, abweichende State-Transition erzeugen. Reihenfolge pro Pfad: Transition zuerst, Legacy-Write danach im selben Vorgang mit identischer Zielsemantik. Ein Contract-/Regressionstest muss belegen, dass bei aktiver Vorwärts- **und** Rückwärts-Bridge ein Dual-Write weder eine Transition-Schleife noch eine illegale Doppel-Transition (State A→B→A oder zwei konkurrierende Ziele) auslöst.
-3. **5C — `pipeline_substate` einführen.** Vertrag: `pipeline_state` = orchestrierungsrelevanter Hauptzustand, `pipeline_substate` = diagnostischer/UI-relevanter Unterzustand und **niemals** Gate für State-Transitions. Befüllung ausschließlich in dieser Richtung:
+   Contract-Test mit expliziter Allowlist der bekannten Legacy-only Lip-Sync-Writer:
+   `compose-dialog-segments`, `sync-so-webhook`, `lipsync-watchdog`, `compose-twoshot-audio`, `render-sync-segments-audio-mux`, `_shared/lipsync-fail.ts`, `reset-lipsync-scene`, `cancel-dialog-lipsync`, `report-lipsync-motion-probe`.
+   Jeder neue Legacy-only Writer außerhalb der Liste macht den Test rot. Semantik dieser Pfade wird nicht angefasst.
 
-```text
-Legacy Lip-Sync Writer → twoshot_stage / Spezialstatus → Compatibility-Mirror → pipeline_substate
-migrierte Writer-Pfade → pipeline_substate direkt
-```
+2. **5B — Alle Nicht-Lip-Sync-Writer dualisieren.**
 
-   Nicht `pipeline_state → pipeline_substate` — das wäre informationsverlustbehaftet. Abgedeckte Werte: `awaiting_manual_face_map`, `awaiting_confirmation`, `circuit_open`, `deferred`, `needs_clip_rerender`, `anchor`, `anchor_soft_pass`, `preview`, `syncso_pass_%`, `syncso_fanout_%`, `syncso_retry_%`, `audio_mux_failed`.
-4. **5D — Backend-Reader migrieren.** Alles, was Hauptzustände braucht, liest `pipeline_state`. Nur Funktionen, die echte Lip-Sync-Unterzustände brauchen, lesen weiter Legacy — `lipsync-watchdog` ist die bewusst dokumentierte Ausnahme (Scan-Filter auf `syncso_%`, `circuit_open`, `deferred`).
-5. **5E — Client vollständig auf `sceneStateOf()` + `pipeline_substate`.** Danach interpretiert kein normaler UI-Code mehr selbst `clip_status`, `twoshot_stage` oder `lip_sync_status`; ein Contract-Test sperrt neue Direktzugriffe.
-6. **5F — Reverse Bridge bleibt unverändert aktiv.** Keine teilweise Abschaltung, kein Flag.
-7. **5G — Regressionstests, Deployments, STOP.** Keine Legacy-Spalte wird gelöscht; die Vorwärtsrichtung State → Legacy bleibt dauerhaft.
+   Betroffene Pfade: `qa-watchdog`, `recover-stuck-composer-clip`, `remotion-webhook`, `generate-talking-head`, `compose-scene-anchor`, `auto-director-compose`, `motion-studio-superuser`, `qa-weekly-deep-sweep`, `autopilotComposerBridge`.
+   Sie schreiben künftig zusätzlich über `composer_scene_transition()`.
+
+   **Operative Regel (verbindlich):** Die Dualisierung folgt exakt dem bereits funktionierenden Dual-Write-Muster. `composer_scene_transition()` ist für den Hauptzustand autoritativ; der bestehende Legacy-Write bleibt unverändert bestehen, darf aber keine zweite, abweichende State-Transition erzeugen.
+
+   Reihenfolge pro Pfad: Transition zuerst, Legacy-Write danach im selben Vorgang mit identischer Zielsemantik. Ein Contract-/Regressionstest muss belegen, dass bei aktiver Vorwärts- **und** Rückwärts-Bridge ein Dual-Write weder eine Transition-Schleife noch eine illegale Doppel-Transition (State A→B→A oder zwei konkurrierende Ziele) auslöst.
+
+3. **5C — `pipeline_substate` einführen.**
+
+   Vertrag: `pipeline_state` = orchestrierungsrelevanter Hauptzustand, `pipeline_substate` = diagnostischer/UI-relevanter Unterzustand und **niemals** Gate für State-Transitions.
+
+   Befüllung ausschließlich in dieser Richtung:
+
+   ```text
+   Legacy Lip-Sync Writer → twoshot_stage / Spezialstatus → Compatibility-Mirror → pipeline_substate
+   migrierte Writer-Pfade → pipeline_substate direkt
+   ```
+
+   Nicht `pipeline_state → pipeline_substate` — das wäre informationsverlustbehaftet.
+
+   Abgedeckte Werte: `awaiting_manual_face_map`, `awaiting_confirmation`, `circuit_open`, `deferred`, `needs_clip_rerender`, `anchor`, `anchor_soft_pass`, `preview`, `syncso_pass_%`, `syncso_fanout_%`, `syncso_retry_%`, `audio_mux_failed`.
+
+4. **5D — Backend-Reader migrieren.**
+
+   Alles, was Hauptzustände braucht, liest `pipeline_state`. Nur Funktionen, die echte Lip-Sync-Unterzustände brauchen, lesen weiter Legacy. `lipsync-watchdog` ist die bewusst dokumentierte Ausnahme (Scan-Filter auf `syncso_%`, `circuit_open`, `deferred`).
+
+5. **5E — Client vollständig auf `sceneStateOf()` + `pipeline_substate`.**
+
+   Danach interpretiert kein normaler UI-Code mehr selbst `clip_status`, `twoshot_stage` oder `lip_sync_status`; ein Contract-Test sperrt neue Direktzugriffe.
+
+6. **5F — Reverse Bridge bleibt unverändert aktiv.**
+
+   Keine teilweise Abschaltung, kein Flag.
+
+7. **5G — Regressionstests, Deployments, STOP.**
+
+   Keine Legacy-Spalte wird gelöscht; die Vorwärtsrichtung State → Legacy bleibt dauerhaft.
 
 ## Danach: v431 (eigener Schritt, nicht Teil von Schritt 5)
 
