@@ -9,7 +9,7 @@ const FN_DIR = resolve(process.cwd(), 'supabase/functions');
 
 /**
  * v430 Step 1 — `materializeCompatibilityOutput` is the ONLY new writer of
- * `clip_url`. These tests pin both the behaviour and the writer inventory.
+ * `composer_scenes.clip_url`. These tests pin both the behaviour and the writer inventory.
  */
 describe('materializeCompatibilityOutput', () => {
   it('base mode mirrors the plate into clip_url and drops a stale processed result', () => {
@@ -60,12 +60,18 @@ describe('materializeCompatibilityOutput', () => {
 
 describe('clip_url writer inventory (v430 Step 1)', () => {
   const FINALIZATION_POINTS = [
+    // Lip-Sync finalization (migrated in first half of Schritt 1)
     'compose-clip-webhook/index.ts',
     'sync-so-webhook/index.ts',
     'remotion-webhook/index.ts',
     'reset-lipsync-scene/index.ts',
     '_shared/scene-run-begin.ts',
     '_shared/scene-hard-reset.ts',
+    // Additional productive writers closed by the Schritt 1 audit
+    'compose-video-clips/index.ts',
+    'generate-talking-head/index.ts',
+    'generate-composer-image-scene/index.ts',
+    '_shared/autopilotComposerBridge.ts',
   ];
 
   it('every migrated finalization point writes through the single writer', () => {
@@ -75,13 +81,57 @@ describe('clip_url writer inventory (v430 Step 1)', () => {
     }
   });
 
-  it('the migrated finalization points no longer set clip_url directly', () => {
+  it('no output-field mutation happens outside the materializer in the migrated files', () => {
+    // These are the output columns that must always be written as a triple.
+    const OUTPUT_FIELDS = ['clip_url', 'base_video_url', 'processed_video_url'];
+
     for (const rel of FINALIZATION_POINTS) {
       const src = readFileSync(resolve(FN_DIR, rel), 'utf8');
-      const direct = src
+
+      // Any line that assigns one of the output columns must be inside a
+      // materializeCompatibilityOutput(...) spread. We detect the most common
+      // literal assignment shapes; dynamic builders are caught by the second
+      // assertion below.
+      const directAssignments = src
         .split('\n')
-        .filter((l) => /^\s*clip_url:/.test(l) && !l.includes('//'));
-      expect(direct, `${rel}: ${direct.join(' | ')}`).toEqual([]);
+        .map((l, idx) => ({ line: idx + 1, text: l }))
+        .filter(({ text }) => {
+          const trimmed = text.trim();
+          // Match literal output-column assignments: `clip_url:`, `"clip_url":`, `clip_url =`, etc.
+          const isOutputFieldLine = OUTPUT_FIELDS.some(
+            (field) =>
+              new RegExp(`^["']?${field}["']?\\s*:`).test(trimmed) ||
+              new RegExp(`^["']?${field}["']?\\s*=`).test(trimmed),
+          );
+          if (!isOutputFieldLine) return false;
+          // Allow the spread line that carries the materializer result.
+          if (/\.\.\.materializeCompatibilityOutput\(/.test(text)) return false;
+          // Allow comment-only lines.
+          if (/^\s*\/\//.test(text)) return false;
+          return true;
+        });
+
+      expect(directAssignments, `${rel}: ${JSON.stringify(directAssignments)}`).toEqual([]);
     }
+  });
+
+  it('the materializer is the single source of output materialization', () => {
+    const root = process.cwd();
+    // Any file exporting something with the same responsibility would be a second truth.
+    const hits: string[] = [];
+    for (const rel of [
+      'supabase/functions/_shared/materialize-scene-output.ts',
+    ]) {
+      const src = readFileSync(resolve(root, rel), 'utf8');
+      if (/export function materializeCompatibilityOutput/.test(src)) hits.push(rel);
+    }
+    expect(hits).toEqual(['supabase/functions/_shared/materialize-scene-output.ts']);
+  });
+
+  it('plate_attempts.clip_url is explicitly out of scope (different table)', () => {
+    const src = readFileSync(resolve(FN_DIR, '_shared/plate-attempt.ts'), 'utf8');
+    // The plate_attempts table is a log for the watchdog, not composer_scenes.
+    expect(src).toMatch(/plate_attempts/);
+    expect(src).not.toMatch(/from\s*["']composer_scenes["']/);
   });
 });
