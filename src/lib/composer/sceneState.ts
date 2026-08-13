@@ -1,4 +1,5 @@
 import { tx } from "@/lib/i18nText";
+import { resolveSceneOutput } from "@/lib/composer/output/resolveSceneOutput";
 /**
  * v384 — Zustandsmaschine für Composer-Szenen (Client-Seite).
  *
