@@ -633,6 +633,20 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     errors.push(`update:${(e as Error).message}`.slice(0, 120));
   }
 
+  // ── v430 Step 4: the output is really gone → dependents are stale ───────
+  // Explicit, ONE call, only on this path. The value-based DB trigger cannot
+  // see a clear (it ignores `NEW.clip_url IS NULL` so a run start never
+  // propagates), so the hard reset is the only place that says it out loud.
+  // `reset-lipsync-scene` deliberately does NOT call this.
+  try {
+    await supabase.rpc("propagate_continuity_staleness", {
+      _scene_id: sceneId,
+      _effective_url: null,
+    });
+  } catch (e) {
+    console.warn(`[v380_hard_reset] continuity propagation failed (non-fatal): ${(e as Error).message}`);
+  }
+
   console.log(
     `[v380_hard_reset] scene=${sceneId} gen=${nextGeneration} jobs_canceled=${jobIds.length} attempts_superseded=${supersededAttempts} renders_superseded=${supersededRenders} assets_cleared=${cleanedAssets === null ? "all" : "derived"} objects_deleted=${deletedObjects} refund=${refund.decision}(${refund.amount}) errors=${errors.length}`,
   );
