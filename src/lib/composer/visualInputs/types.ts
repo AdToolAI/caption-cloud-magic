@@ -11,6 +11,10 @@
  * `lockReferenceUrl` — those stay owned by the (frozen) lip-sync chain.
  */
 
+import type { PersistedVisualSource, VisualSourceDecision } from './visualSource';
+
+
+
 /** What the scene is fundamentally about. Lip-sync is NOT a class. */
 export type VisualSceneClass = 'environment' | 'product' | 'character';
 
@@ -107,8 +111,14 @@ export interface ResolvedVisualPlan {
   inputMode: VisualInputMode | 'none';
   anchorStrategy: AnchorStrategy;
   constraints: { identityProtected: boolean; lipSyncProtected: boolean };
+  /**
+   * v430 Step 3 — requested vs. effective visual-input strategy.
+   * `requested: null` = legacy/unmigrated scene (never re-interpreted).
+   */
+  visualSource: VisualSourceDecision;
   warnings: string[];
 }
+
 
 /* ─────────────────────────── Resolver input ──────────────────────────── */
 
@@ -132,4 +142,9 @@ export interface ResolveVisualInputsArgs {
   references: VisualReference[];
   /** User override from the UI. */
   continuityPreference?: 'auto' | 'seamless' | 'identity' | 'match-cut';
+  /**
+   * v430 Step 3 — persisted `composer_scenes.visual_source`.
+   * `null`/omitted = legacy scene: arbitration stays pre-v430.
+   */
+  requestedVisualSource?: PersistedVisualSource;
 }

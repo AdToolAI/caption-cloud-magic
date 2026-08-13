@@ -1842,6 +1842,70 @@ export default function SceneCard({
                                 </Select>
                               </div>
                             )}
+                            <div className="mt-2">
+                              <Label className="text-[10px] text-muted-foreground">
+                                {tx({
+                                  de: "Bildquelle für den Start",
+                                  en: "Visual source for the start",
+                                  es: "Fuente visual para el inicio",
+                                })}
+                              </Label>
+                              <Select
+                                value={scene.visualSource ?? "legacy"}
+                                onValueChange={(v) =>
+                                  onUpdate({
+                                    visualSource: (v === "legacy"
+                                      ? null
+                                      : v) as ComposerScene["visualSource"],
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="h-9 text-xs mt-1">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="legacy" className="text-xs">
+                                    {tx({
+                                      de: "Wie bisher (unverändert)",
+                                      en: "As before (unchanged)",
+                                      es: "Como antes (sin cambios)",
+                                    })}
+                                  </SelectItem>
+                                  <SelectItem value="auto" className="text-xs">
+                                    {tx({ de: "Automatisch", en: "Automatic", es: "Automático" })}
+                                  </SelectItem>
+                                  <SelectItem value="character_anchor" className="text-xs">
+                                    {tx({
+                                      de: "Figuren-Anker",
+                                      en: "Character anchor",
+                                      es: "Ancla del personaje",
+                                    })}
+                                  </SelectItem>
+                                  <SelectItem value="previous_final_frame" className="text-xs">
+                                    {tx({
+                                      de: "Endbild der vorherigen Szene",
+                                      en: "Final frame of the previous scene",
+                                      es: "Fotograma final de la escena anterior",
+                                    })}
+                                  </SelectItem>
+                                  <SelectItem value="uploaded_reference" className="text-xs">
+                                    {tx({
+                                      de: "Hochgeladenes Referenzbild",
+                                      en: "Uploaded reference image",
+                                      es: "Imagen de referencia subida",
+                                    })}
+                                  </SelectItem>
+                                  <SelectItem value="generated_still" className="text-xs">
+                                    {tx({
+                                      de: "Generiertes Standbild",
+                                      en: "Generated still",
+                                      es: "Fotograma generado",
+                                    })}
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
                             {dialogMode && scene.clipSource === "ai-seedance25" && (
                               <label className="mt-2 flex items-start gap-2 rounded-md border border-border/50 bg-card/40 p-2">
                                 <input

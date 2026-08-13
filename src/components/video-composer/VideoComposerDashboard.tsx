@@ -1,3 +1,4 @@
+import { parseVisualSource } from '@/lib/composer/visualInputs/visualSource';
 import { tx } from "@/lib/i18nText";
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -452,6 +453,7 @@ export default function VideoComposerDashboard() {
             lockReferenceUrl: ((row as any).lock_reference_url as any) ?? local?.lockReferenceUrl,
             actionBeat: ((row as any).action_beat as any) ?? local?.actionBeat,
             realismPreset: ((row as any).realism_preset as any) ?? local?.realismPreset,
+            visualSource: (parseVisualSource((row as any).visual_source) ?? local?.visualSource ?? null),
             continuationSourceSceneId: ((row as any).continuity_source_scene_id as any) ?? local?.continuationSourceSceneId ?? null,
             framePickSeconds: ((row as any).frame_pick_seconds as any) != null
               ? Number((row as any).frame_pick_seconds)
@@ -629,6 +631,7 @@ export default function VideoComposerDashboard() {
             lockReferenceUrl: ((row as any).lock_reference_url as any) ?? local?.lockReferenceUrl,
             actionBeat: ((row as any).action_beat as any) ?? local?.actionBeat,
             realismPreset: ((row as any).realism_preset as any) ?? local?.realismPreset,
+            visualSource: (parseVisualSource((row as any).visual_source) ?? local?.visualSource ?? null),
             twoshotStage: ((row as any).twoshot_stage as any) ?? local?.twoshotStage ?? null,
             continuationSourceSceneId: ((row as any).continuity_source_scene_id as any) ?? local?.continuationSourceSceneId ?? null,
             framePickSeconds: ((row as any).frame_pick_seconds as any) != null

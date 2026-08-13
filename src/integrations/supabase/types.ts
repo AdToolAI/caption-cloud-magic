@@ -6774,6 +6774,7 @@ export type Database = {
           updated_at: string
           upload_type: string | null
           upload_url: string | null
+          visual_source: string | null
           voice_configuration_hash: string | null
           with_audio: boolean
         }
@@ -6899,6 +6900,7 @@ export type Database = {
           updated_at?: string
           upload_type?: string | null
           upload_url?: string | null
+          visual_source?: string | null
           voice_configuration_hash?: string | null
           with_audio?: boolean
         }
@@ -7024,6 +7026,7 @@ export type Database = {
           updated_at?: string
           upload_type?: string | null
           upload_url?: string | null
+          visual_source?: string | null
           voice_configuration_hash?: string | null
           with_audio?: boolean
         }

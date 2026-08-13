@@ -685,6 +685,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           engineOverride: s.engineOverride ?? 'auto',
           withAudio: s.withAudio !== false,
           visualContinuity: s.visualContinuity ?? 'auto',
+          visualSource: s.visualSource ?? null,
           transitionFrameUrl: continuityInputs.get(s.id)?.transitionFrameUrl,
           previousClipUrl: continuityInputs.get(s.id)?.previousClipUrl,
         };

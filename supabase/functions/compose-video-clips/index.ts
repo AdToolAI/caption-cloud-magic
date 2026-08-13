@@ -4,6 +4,7 @@ import { planContinuityChain, resumeContinuityChain, sweepContinuityQueue } from
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { beginSceneRun } from "../_shared/scene-run-begin.ts";
 import { planSceneVisualInputs } from "../_shared/visual-inputs.ts";
+import { parseVisualSource } from "../_shared/visual-source.ts";
 import { ensureTransitionFrame } from "../_shared/transition-frame.ts";
 import { CLIP_COSTS, type ClipQuality } from "../_shared/clip-costs.ts";
 import { createSeedance25Task, MODELARK_JOB_PREFIX } from "../_shared/modelark.ts";
@@ -153,6 +154,8 @@ interface ClipScene {
   previousClipUrl?: string;
   /** User/auto preference for how this scene connects to the previous one. */
   visualContinuity?: "auto" | "seamless" | "identity" | "match-cut";
+  /** v430 Step 3 — `composer_scenes.visual_source`; null/absent = legacy. */
+  visualSource?: string | null;
   /** Additional role-tagged references (character / location / product). */
   visualReferences?: Array<{
     url: string;
@@ -3959,6 +3962,7 @@ serve(async (req) => {
           previousClipUrl: continuityClipUrl,
           references: [...clientRefs, ...castRefs] as any,
           continuityPreference: continuityPref,
+          requestedVisualSource: parseVisualSource((scene as any).visualSource),
         },
       );
 
