@@ -14,11 +14,17 @@ Zustandsmaschine gelesen:
 - Ready/Failed-Gates ausschliesslich über `legacyClipReadyEquivalentRow()` /
   `legacyClipFailedEquivalentRow()` (exklusiv, output-aware: `failed` +
   vorhandener effektiver Output = ready, niemals zusätzlich failed)
-- Legacy-Parität (alles, was den bisherigen `clip_status` semantisch
-  reproduziert — Darstellung wie Verhalten) läuft über einen neuen
-  output-aware Projektionshelper `legacyClipStatusEquivalentRow(scene)` in
-  `src/lib/composer/sceneState.ts`. Er liefert `pending | generating | ready |
-  failed` und klassifiziert `failed` + effektiver Output als `ready`.
+- **Kein universelles Vier-Werte-Abbild.** Es wird kein Helfer eingeführt, der
+  den gesamten alten `clip_status` auf `pending | generating | ready | failed`
+  reduziert — die Legacy-Domäne kennt auch `queued`, `canceled`,
+  `awaiting_manual_face_map`, `awaiting_confirmation`. Stattdessen:
+  - `queued`, `canceled`, laufende Zustände direkt über `sceneState()`
+  - Spezialzustände über `sceneSubstate()`
+  - nur die Ready/Failed-Grenze über die output-aware exklusiven Helfer
+  Falls doch eine geschlossene Projektion nötig wird
+  (`legacyClipStatusEquivalentRow()`), muss sie die vollständige relevante
+  Legacy-Domäne inkl. `queued`, `canceled` und der Substate-Sonderfälle
+  abbilden und dokumentiert getestet sein.
 - `clipStatusFromState(sceneState(scene))` NUR dort, wo bewusst der neue
   Pipeline-State dargestellt wird und keine Legacy-Parität nötig ist. Nicht
   für Filter, Sortierung, Buttons, Progress, Export- oder Render-Gates.
