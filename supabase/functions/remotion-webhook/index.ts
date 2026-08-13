@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { verifyWebhookRequest } from "../_shared/webhook-auth.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
