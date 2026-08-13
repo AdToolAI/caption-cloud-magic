@@ -20,6 +20,7 @@ import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { buildInvokePrompt } from '@/lib/motion-studio/buildInvokePrompt';
 import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 import { startSceneGeneration } from '@/lib/composer/startSceneGeneration';
+import { clipStatusFromState, sceneState } from '@/lib/composer/sceneState';
 import type {
   ComposerScene,
   ComposerCharacter,

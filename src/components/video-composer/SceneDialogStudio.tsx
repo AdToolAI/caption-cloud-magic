@@ -70,6 +70,7 @@ import {
 import type { ShotSelection } from '@/config/shotDirector';
 import { Sparkles as SparklesIcon, Play, Clapperboard } from 'lucide-react';
 import { tx } from '@/lib/i18nText';
+import { isSceneInFlight, sceneState } from '@/lib/composer/sceneState';
 import {
   clampDialogMasterDuration,
   DIALOG_MASTER_PROVIDER_LABELS,

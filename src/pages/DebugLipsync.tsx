@@ -156,6 +156,7 @@ export default function DebugLipsync() {
             <p className="text-sm text-neutral-400 mt-1">
               Scene <code className="text-neutral-200">{scene.id.slice(0, 8)}</code>
               {" · "}status{" "}
+              {/* legacy-mapping-allowed: Debug-Ansicht zeigt bewusst die Rohspalte */}
               <span className="text-neutral-200">{ds?.status ?? scene.lip_sync_status ?? "—"}</span>
               {" · "}passes{" "}
               <span className="text-neutral-200">{passes.length}</span>
