@@ -3852,9 +3852,10 @@ serve(async (req) => {
         : ((scene as any).previousClipUrl ?? null);
       const continuityPref = (scene as any).visualContinuity ?? "auto";
       const sceneOrderIdx = scenes.findIndex((s) => s.id === scene.id);
+      // v430 Step 4 — remember WHICH predecessor output this dispatch binds to.
+      let continuitySourceSceneId: string | null = null;
       if (
         !sceneWantsLipSync &&
-        (!continuityFrameUrl || !continuityClipUrl) &&
         continuityPref !== "match-cut"
       ) {
         try {
@@ -3888,13 +3889,28 @@ serve(async (req) => {
             }
           }
           if (!prevScene) throw new Error("no_predecessor");
+          // v430 Step 4 — continuity reads the RESOLVED, FINAL output of the
+          // predecessor, never `clip_url` directly. A lip-sync predecessor that
+          // has only delivered its plate is NOT final: chaining onto it would
+          // bind the successor to an intermediate frame that the mux replaces.
           const { data: prevRow } = await supabaseAdmin
             .from("composer_scenes")
-            .select("clip_url, duration_seconds")
+            .select(
+              "clip_url, processed_video_url, base_video_url, lip_sync_source_clip_url, upload_url, lip_sync_status, lip_sync_with_voiceover, dialog_mode, engine_override, duration_seconds",
+            )
             .eq("id", prevScene.id)
             .maybeSingle();
-          const prevClipUrl = String((prevRow as any)?.clip_url ?? "");
+          const prevFinal = isSceneOutputFinal(prevRow as any);
+          const prevClipUrl = prevFinal
+            ? (resolveSceneOutput(prevRow as any).effectiveUrl ?? "")
+            : "";
+          if (!prevFinal) {
+            console.log(
+              `[compose-video-clips] scene ${scene.id} predecessor ${prevScene.id} output not final — continuity skipped (match-cut)`,
+            );
+          }
           if (prevClipUrl) {
+            continuitySourceSceneId = prevScene.id;
             continuityClipUrl = continuityClipUrl ?? prevClipUrl;
             const framed = continuityFrameUrl
               ? { url: continuityFrameUrl }
