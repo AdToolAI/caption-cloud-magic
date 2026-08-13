@@ -63,4 +63,4 @@ Lip-Sync-Writer-Migration und Abschalten der Reverse-Bridge — das bleibt v431.
 ## Vorgehen
 
 1. Teil A umsetzen, Tests, STOP mit Bericht.
-2. Danach Schritt 6 als eigener Plan mit deiner Entscheidung zu 6.2 (Teil-Rename oder Voll-Rename).
+2. Danach Schritt 6 als eigener Plan auf Basis der oben festgelegten Entscheidungen (Teil-Rename `cutStyle`, „Szenenaktionen“ statt Reset-Sammelbegriff).
