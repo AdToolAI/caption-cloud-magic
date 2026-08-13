@@ -26,7 +26,13 @@ function json(body: unknown, status = 200) {
   });
 }
 
-const LIVE_CLIP = new Set(["pending", "queued", "generating", "composing", "lipsync"]);
+/**
+ * v430 Step 5D — clip branch reads `pipeline_state` instead of `clip_status`.
+ * Legacy parity: clip_status pending → idle, queued → plate_queued,
+ * generating → plate_rendering. ('composing'/'lipsync' were never produced by
+ * the bridge; they are pre-v384 leftovers.)
+ */
+const LIVE_CLIP_STATES = new Set(["idle", "plate_queued", "plate_rendering"]);
 const LIVE_LIPSYNC = new Set(["pending", "generating", "syncing"]);
 
 serve(async (req) => {
