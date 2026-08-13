@@ -11,9 +11,12 @@ Zustandsmaschine gelesen:
 - Hauptzustand: `sceneState(scene)` aus `src/lib/composer/sceneState.ts`
 - Detailzustand: `sceneSubstate(scene)` (v430 5C)
 - Output-Fragen: `resolveSceneOutput(scene)` / `resolveSceneSourcePlate(scene)`
-- Legacy-Anzeigewerte nur noch über `clipStatusFromState(sceneState(scene))`
-- Ready/Failed-Klassifikation nur über `legacyClipReadyEquivalentRow()` /
-  `legacyClipFailedEquivalentRow()` (exklusiv, `failed` + Output = ready)
+- Ready/Failed-Gates ausschliesslich über `legacyClipReadyEquivalentRow()` /
+  `legacyClipFailedEquivalentRow()` (exklusiv, output-aware: `failed` +
+  vorhandener effektiver Output = ready, niemals zusätzlich failed)
+- `clipStatusFromState(sceneState(scene))` NUR für nicht-gatende Legacy-
+  Anzeigeprojektionen (Badge-Text, Icon, Sortierung). Niemals für eine
+  Ready/Failed-Entscheidung — der Funktion fehlt die Output-Information.
 
 Direkte Interpretation von `clip_status`, `twoshot_stage`, `lip_sync_status`
 im UI ist danach verboten und wird durch einen Scanner-Test blockiert.
@@ -41,21 +44,31 @@ Zusätzlich geprüft und mitmigriert, sofern reine Leser:
 
 ## Allowlist (bewusst geschützte Legacy-Pfade)
 
-Diese Stellen dürfen Legacy-Spalten weiter lesen und werden im Scanner
-namentlich freigegeben:
+Die Allowlist gilt **feld- und nutzungsbezogen**, nicht pauschal pro Datei.
+Erlaubt sind nur reine Mapping-/Serialisierungszugriffe (Feld lesen und
+unverändert weiterreichen). Sobald eine Stelle aus einem Legacy-Feld einen
+Zustand *ableitet*, wird sie in 5E migriert — auch wenn die Datei sonst
+allowlisted ist. Der Scanner arbeitet deshalb mit Datei+Zeilenbereich bzw.
+markierten Ausnahmen (`// legacy-mapping-allowed: <Grund>`), nie mit einer
+reinen Dateiliste.
 
 - `src/lib/composer/sceneState.ts` — die Bridge-Ableitung selbst
 - `src/lib/composer/output/resolveSceneOutput.ts` — Output-Legacy-Toleranz
-- `src/pages/DebugLipsync.tsx` — Diagnose-/Debug-Ansicht
-- `src/lib/video-composer/lipSyncPending.ts` — Lip-Sync-Kompatibilitätspfad,
-  falls die Semantik nicht 1:1 abbildbar ist
-- `src/integrations/supabase/types.ts`, Persistenz-/Mapping-Layer
-  (`useComposerPersistence`, `sceneSnapshot`) für reines Feld-Mapping
-- Schreibpfade (`useSceneGenerate`, `useApplyProductionPlan`,
+- `src/pages/DebugLipsync.tsx` — reine Diagnose-/Debug-Ansicht, zeigt die
+  Rohspalten absichtlich an
+- `src/lib/video-composer/lipSyncPending.ts` — zuerst prüfen: interpretiert die
+  Datei Zustand, wird sie migriert; nur Feld-Mapping bleibt markiert erlaubt
+- `src/lib/video-composer/sceneSnapshot.ts`, `useComposerPersistence` —
+  Snapshot/Persistenz: Feld-Mapping erlaubt, jede Zustandsableitung darin wird
+  migriert
+- `src/integrations/supabase/types.ts` — generierte Typen
+- Writer-Dateien (`useSceneGenerate`, `useApplyProductionPlan`,
   `useApplyBriefingManifest`, `spawnCoverageScenes`, `buildAdScenes`,
-  `spawnAdCampaignChildren`) — 5E ändert keine Writer
+  `spawnAdCampaignChildren`): nur die **Schreib**-Zugriffe auf Legacy-Spalten
+  sind erlaubt. Lesende Zustandsinterpretation in diesen Dateien wird migriert
+  und vom Scanner weiterhin blockiert.
 
-Jeder Allowlist-Eintrag bekommt im Test eine Begründung.
+Jeder Ausnahme-Marker trägt eine kurze Begründung und wird im Test geprüft.
 
 ## Nicht-Ziele
 
@@ -66,9 +79,12 @@ Jeder Allowlist-Eintrag bekommt im Test eine Begründung.
 
 ## Technische Umsetzung
 
-1. **Reader-Migration** Datei für Datei, semantikgleich. Wo eine Komponente
-   heute auf `pending | generating | ready | failed` verzweigt, kommt der Wert
-   aus `clipStatusFromState(sceneState(scene))` statt aus der Spalte.
+1. **Reader-Migration** Datei für Datei, semantikgleich. Reine Anzeigewerte
+   (`pending | generating | ready | failed`) kommen aus
+   `clipStatusFromState(sceneState(scene))`. Jede Entscheidung, die Ready von
+   Failed trennt (Buttons, Filter, Fortschrittszählung, Export-Gates), läuft
+   ausschliesslich über `legacyClipReadyEquivalentRow()` /
+   `legacyClipFailedEquivalentRow()`.
 2. **Contract-Scanner** `src/lib/composer/__tests__/clientReaderContract5E.test.ts`:
    scannt `src/components/**`, `src/hooks/**`, `src/pages/**` auf
    `clip_status|clipStatus|twoshot_stage|twoshotStage|lip_sync_status|lipSyncStatus`
