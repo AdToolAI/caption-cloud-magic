@@ -12,7 +12,6 @@ import {
   claimPipelineCallback,
   completePipelineJob,
   allRequiredSyncJobsSucceeded,
-  buildIdempotencyKey,
   type CallbackIdentity,
 } from '../../../../supabase/functions/_shared/composer-pipeline-jobs.ts';
 
@@ -37,61 +36,81 @@ function makeAdmin(initial: Row[] = []) {
   const rows = new Map<string, Row>();
   for (const r of initial) rows.set(r.id, { ...r });
 
-  const table = (name: string): any => {
-    if (name !== 'composer_pipeline_jobs' && name !== 'composer_scenes') {
-      return {
-        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }),
-      };
+  function match(row: Row, filters: Record<string, unknown>): boolean {
+    for (const [k, v] of Object.entries(filters)) {
+      if ((row as any)[k] !== v) return false;
     }
+    return true;
+  }
 
-    if (name === 'composer_scenes') {
-      return {
-        select: () => ({
-          eq: () => ({
-            maybeSingle: async () => ({ data: { active_run_id: RUN_ID } }),
-          }),
-        }),
-      };
-    }
+  function query(table: string) {
+    const filters: Record<string, unknown> = {};
+    const inFilters: Record<string, unknown[]> = {};
+    let selectedCols: string[] = ['*'];
+    let countOpts: any = null;
+    let orderBy: { col: string; asc: boolean } | null = null;
+    let limitN: number | null = null;
 
     const builder: any = {
-      select: (...cols: string[]) => {
-        let result = Array.from(rows.values());
-        builder._eq = {};
-        builder._in = {};
-        builder._order = null;
-        builder._limit = null;
-
-        builder.eq = (col: string, val: unknown) => {
-          builder._eq[col] = val;
-          result = result.filter((r) => (r as any)[col] === val);
-          return builder;
-        };
-        builder.in = (col: string, vals: unknown[]) => {
-          result = result.filter((r) => vals.includes((r as any)[col]));
-          return builder;
-        };
-        builder.order = (col: string, opts: any) => {
-          builder._order = { col, asc: opts?.ascending ?? false };
-          result.sort((a, b) => {
-            const dir = builder._order.asc ? 1 : -1;
-            return ((a as any)[col] > (b as any)[col] ? 1 : -1) * dir;
-          });
-          return builder;
-        };
-        builder.limit = (n: number) => {
-          builder._limit = n;
-          return builder;
-        };
-        builder.maybeSingle = async () => {
-          const slice = builder._limit ? result.slice(0, builder._limit) : result;
-          return { data: slice[0] ?? null };
-        };
-        builder.then = async (cb: any) => cb({ data: result });
+      select: (...cols: any[]) => {
+        if (cols.length === 1 && typeof cols[0] === 'object') {
+          countOpts = cols[0];
+        } else {
+          selectedCols = cols.length ? cols : ['*'];
+        }
         return builder;
       },
-      upsert: (row: any, _opts?: any) => {
-        const id = row.id ?? `job-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
+      eq: (col: string, val: unknown) => {
+        filters[col] = val;
+        return builder;
+      },
+      in: (col: string, vals: unknown[]) => {
+        inFilters[col] = vals;
+        return builder;
+      },
+      order: (col: string, opts: any) => {
+        orderBy = { col, asc: opts?.ascending ?? false };
+        return builder;
+      },
+      limit: (n: number) => {
+        limitN = n;
+        return builder;
+      },
+      or: (_expr: string) => builder,
+      maybeSingle: async () => {
+        let result = Array.from(rows.values()).filter((r) => {
+          if (table !== 'composer_pipeline_jobs') return false;
+          if (!match(r, filters)) return false;
+          for (const [k, vals] of Object.entries(inFilters)) {
+            if (!vals.includes((r as any)[k])) return false;
+          }
+          return true;
+        });
+        if (orderBy) {
+          result.sort((a, b) => {
+            const dir = orderBy!.asc ? 1 : -1;
+            return ((a as any)[orderBy!.col] > (b as any)[orderBy!.col] ? 1 : -1) * dir;
+          });
+        }
+        if (limitN) result = result.slice(0, limitN);
+        return { data: result[0] ?? null };
+      },
+      then: async (cb: any) => {
+        let result = Array.from(rows.values()).filter((r) => {
+          if (table !== 'composer_pipeline_jobs') return false;
+          if (!match(r, filters)) return false;
+          for (const [k, vals] of Object.entries(inFilters)) {
+            if (!vals.includes((r as any)[k])) return false;
+          }
+          return true;
+        });
+        if (countOpts) {
+          return cb({ data: [], count: result.length });
+        }
+        return cb({ data: result });
+      },
+      upsert: (row: any) => {
+        const id = row.id ?? `job-${Math.random().toString(36).slice(2)}`;
         const next: Row = {
           id,
           scene_id: row.scene_id,
@@ -113,33 +132,64 @@ function makeAdmin(initial: Row[] = []) {
         };
       },
       update: (patch: any) => {
-        const target = Array.from(rows.values()).find((r) => {
-          for (const [k, v] of Object.entries(builder._eq ?? {})) {
-            if ((r as any)[k] !== v) return false;
-          }
-          return true;
-        });
-        if (target) {
-          for (const [k, v] of Object.entries(patch)) {
-            (target as any)[k] = v;
-          }
-        }
         return {
-          select: () => ({
-            maybeSingle: async () => ({ data: target ?? null }),
-          }),
+          eq: (col: string, val: unknown) => {
+            filters[col] = val;
+            return {
+              eq: (col2: string, val2: unknown) => {
+                filters[col2] = val2;
+                return {
+                  in: (col3: string, vals: unknown[]) => {
+                    inFilters[col3] = vals;
+                    return {
+                      or: (_expr: string) => ({
+                        select: () => ({
+                          maybeSingle: async () => {
+                            const candidates = Array.from(rows.values()).filter((r) => {
+                              if (table !== 'composer_pipeline_jobs') return false;
+                              if (!match(r, filters)) return false;
+                              for (const [k, vals] of Object.entries(inFilters)) {
+                                if (!vals.includes((r as any)[k])) return false;
+                              }
+                              return true;
+                            });
+                            const target = candidates[0];
+                            if (target) {
+                              for (const [k, v] of Object.entries(patch)) {
+                                (target as any)[k] = v;
+                              }
+                            }
+                            return { data: target ?? null };
+                          },
+                        }),
+                      }),
+                    };
+                  },
+                };
+              },
+            };
+          },
         };
       },
-      eq: (col: string, val: unknown) => {
-        builder._eq = { ...(builder._eq ?? {}), [col]: val };
-        return builder;
-      },
-      or: (_expr: string) => builder,
     };
     return builder;
-  };
+  }
 
-  return { from: (n: string) => table(n), rpc: async () => ({ error: null }) } as any;
+  return {
+    from: (name: string) => {
+      if (name === 'composer_scenes') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: { active_run_id: RUN_ID } }),
+            }),
+          }),
+        };
+      }
+      return query(name);
+    },
+    rpc: async () => ({ error: null }),
+  } as any;
 }
 
 const SPEAKERS = ['spk-a', 'spk-b', 'spk-c', 'spk-d'];
@@ -179,7 +229,6 @@ describe('four-speaker fixture', () => {
     const admin = makeAdmin();
     const jobs = await seedFourSpeakerSegmentJobs(admin);
 
-    // Complete speaker A only.
     await completePipelineJob(admin, jobs[0].id, 'succeeded');
 
     const a = (await admin.from('composer_pipeline_jobs').select('*').eq('id', jobs[0].id).maybeSingle()).data;
@@ -220,7 +269,6 @@ describe('four-speaker fixture', () => {
     const firstClaim = await claimPipelineCallback(admin, id);
     expect(firstClaim.ok).toBe(true);
 
-    // Business logic fails retryably.
     await completePipelineJob(admin, jobs[0].id, 'failed_redeliverable', 'mux_timeout');
 
     const row = (await admin.from('composer_pipeline_jobs').select('*').eq('id', jobs[0].id).maybeSingle()).data;
@@ -229,12 +277,10 @@ describe('four-speaker fixture', () => {
     expect(row.status).not.toBe('failed');
     expect(row.callback_claim_token).toBeNull();
 
-    // Provider redelivers; claim succeeds again.
     const secondClaim = await claimPipelineCallback(admin, id);
     expect(secondClaim.ok).toBe(true);
     expect(secondClaim.claimToken).not.toBe(firstClaim.claimToken);
 
-    // Now succeed.
     await completePipelineJob(admin, jobs[0].id, 'succeeded');
     const done = (await admin.from('composer_pipeline_jobs').select('*').eq('id', jobs[0].id).maybeSingle()).data;
     expect(done.status).toBe('succeeded');
