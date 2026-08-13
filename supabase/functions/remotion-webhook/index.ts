@@ -275,7 +275,12 @@ serve(async (req) => {
             }
             const nowIso = new Date().toISOString();
             await supabaseAdmin.from('composer_scenes').update({
-              clip_url: finalOutputUrl,
+              // v430 Step 1 — the fan-in mux is the same finalization point as
+              // the single-speaker sync webhook: processed output, plate kept.
+              ...materializeCompatibilityOutput('processed', {
+                baseUrl: prevState?.source_clip_url ?? null,
+                processedUrl: finalOutputUrl,
+              }),
               // v268 — dialog-stitch finalisiert die Szene komplett; ohne
               // clip_status='ready' bleibt die UI ewig auf „Szene wird
               // gebaut…" obwohl das MP4 längst existiert.
