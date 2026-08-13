@@ -396,6 +396,22 @@ export function arbitrateSlots(
     (profile.references.videos ?? 0) > 0 &&
     (profile.mode !== "exclusive" || (profile.modes ?? []).includes("references"));
 
+  // v428 — LIP-SYNC HARD RULE, evaluated before every other branch and not
+  // switchable by any flag. The frozen chain measures geometry on
+  // `reference_image_url`; a continuity frame as plate input would split
+  // geometry and plate across two images (the July anchor mismatch).
+  // Fail-closed: no anchor-faithful image input → abort instead of falling
+  // back to a loose reference slot.
+  if (requirements.lipSync) {
+    warnings.push("lipsync_continuity_disabled");
+    if (profile.firstFrame.supported) {
+      return { transition: "match-cut", inputMode: "first-frame", warnings };
+    }
+    warnings.push("lipsync_anchor_input_unsupported");
+    return { transition: "match-cut", inputMode: "none", warnings };
+  }
+
+
   if (hasProtectedAnchor && collide) {
     // v426: the composed, identity-verified anchor ALWAYS wins the single
     // slot. Handing the slot to a clip reference instead would drop the
