@@ -660,6 +660,72 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         }
       }
     }
+
+    // ── v430 Step 0 — Dialog-Canonicalization (single alignment stage) ──────
+    // The script textarea is the source of truth for *what* is said; the
+    // canonical turns stay the source of truth for *who* says it (v201 UUIDs).
+    // If the persisted turns diverge from the script (shortened, extended,
+    // rewritten, reassigned) we align, PERSIST, and only then voice them.
+    // Persistence failure is fail-closed: no TTS on an inconsistent DB.
+    if (rawTurns.length > 0 && dialogScript.trim()) {
+      let nameResolver: ((name: string) => { id: string; name: string } | null) | undefined;
+      try {
+        const shots = Array.isArray((scene as any).character_shots) ? (scene as any).character_shots : [];
+        const castIds = Array.from(new Set([
+          ...rawTurns.map((t) => t.characterId),
+          ...shots.map((s: any) => String(s?.characterId ?? s?.character_id ?? "")).filter(Boolean),
+        ]));
+        const { data: castRows } = await supabase
+          .from("brand_characters")
+          .select("id, name")
+          .in("id", castIds);
+        const cast = (castRows ?? []).map((c: any) => ({ id: String(c.id), name: String(c.name ?? "") }));
+        nameResolver = (name: string) => {
+          const b = name.toLowerCase().trim();
+          if (!b) return null;
+          const hit = cast.find((c) => {
+            const a = c.name.toLowerCase().trim();
+            if (!a) return false;
+            return a === b || a.split(/\s+/)[0] === b.split(/\s+/)[0];
+          });
+          return hit ? { id: hit.id, name: hit.name } : null;
+        };
+      } catch (e) {
+        console.warn("[compose-twoshot-audio] v430 cast name fetch failed:", (e as any)?.message);
+      }
+
+      const effective = resolveEffectiveDialog(
+        { dialogScript, dialogTurns: rawTurns },
+        { resolveSpeakerId: nameResolver },
+      );
+      if (effective.diverged) {
+        console.log(
+          `[compose-twoshot-audio] v430_dialog_canonicalization scene=${scene_id} reason=${effective.reason} before=${rawTurns.length} after=${effective.turns.length}`,
+        );
+        const persistPayload = effective.turns.map((t, i) => ({
+          turnId: t.turnId,
+          characterId: t.characterId,
+          displayName: t.displayName,
+          text: t.text,
+          mood: t.mood,
+          order: i,
+        }));
+        const { error: persistErr } = await supabase
+          .from("composer_scenes")
+          .update({ dialog_turns: persistPayload, updated_at: new Date().toISOString() })
+          .eq("id", scene_id);
+        if (persistErr) {
+          console.error(
+            `[compose-twoshot-audio] v430_dialog_canonicalization_persist_failed scene=${scene_id} err=${persistErr.message}`,
+          );
+          return json(
+            { error: "dialog_canonicalization_persist_failed", reason: effective.reason, detail: persistErr.message },
+            500,
+          );
+        }
+        rawTurns = normalizeTurns(persistPayload);
+      }
+    }
     let idOnlyActive = false;
     let idOnlyNameById = new Map<string, string>();
     if (idOnlyOn && rawTurns.length > 0) {
