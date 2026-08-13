@@ -94,7 +94,7 @@ serve(async (req) => {
     const { data: scenes } = await supabase
       .from("composer_scenes")
       .select(
-        "id, clip_status, lip_sync_status, lip_sync_applied_at, dialog_shots, audio_plan, replicate_prediction_id",
+        "id, pipeline_state, clip_status, clip_url, active_run_id, lip_sync_status, lip_sync_applied_at, dialog_shots, audio_plan, replicate_prediction_id",
       )
       .eq("project_id", projectId);
 
