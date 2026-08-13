@@ -1126,7 +1126,14 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               sync_so_url: outputUrl,
               finished_at: nowIso,
             },
-            clip_url: finalUrl,
+            // v430 Step 1 — the muxed result is the processed output; the
+            // plate stays in base_video_url. Single compatibility writer.
+            ...materializeCompatibilityOutput("processed", {
+              baseUrl: (sceneRowForOutput as any)?.base_video_url
+                ?? (sceneRowForOutput as any)?.lip_sync_source_clip_url
+                ?? null,
+              processedUrl: finalUrl,
+            }),
             clip_status: "ready",
             lip_sync_status: "applied",
             lip_sync_applied_at: nowIso,
