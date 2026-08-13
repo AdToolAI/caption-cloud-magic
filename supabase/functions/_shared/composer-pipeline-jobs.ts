@@ -48,6 +48,7 @@ export const NON_TERMINAL_STATUSES: PipelineJobStatus[] = [
   "dispatching",
   "dispatched",
   "running",
+  "callback_processing",
 ];
 
 export const TERMINAL_STATUSES: PipelineJobStatus[] = [
@@ -56,6 +57,13 @@ export const TERMINAL_STATUSES: PipelineJobStatus[] = [
   "cancelled",
   "stale",
 ];
+
+/** v427A3+ — callback delivery lifecycle, separate from the job lifecycle. */
+export type CallbackDeliveryStatus =
+  | "received"
+  | "processing"
+  | "succeeded"
+  | "failed_redeliverable";
 
 export type RejectReason =
   | "stale_callback"
@@ -76,6 +84,7 @@ export interface PipelineJobRow {
   segment_id: string | null;
   attempt_no: number;
   status: PipelineJobStatus;
+  callback_delivery_status: CallbackDeliveryStatus | null;
   external_job_id: string | null;
   [k: string]: unknown;
 }
@@ -261,6 +270,12 @@ export async function assertActivePipelineJob(
 /**
  * Consuming claim for completion events. Idempotent: a duplicate delivery of a
  * finished job is a no-op, a crashed handler's lease expires and can be retaken.
+ *
+ * v427A3+ also tracks the callback delivery lifecycle:
+ *   received            — callback arrived (set explicitly by receivePipelineCallback)
+ *   processing          — claim acquired, business logic running
+ *   succeeded           — business logic completed
+ *   failed_redeliverable — business logic failed but the provider may redeliver
  */
 export async function claimPipelineCallback(
   admin: any,
@@ -277,11 +292,15 @@ export async function claimPipelineCallback(
   if (TERMINAL_STATUSES.includes(job.status)) {
     return { ok: false, reason: "duplicate_callback", job };
   }
+  if (job.callback_delivery_status === "succeeded") {
+    return { ok: false, reason: "duplicate_callback", job };
+  }
 
   const token = crypto.randomUUID();
   const now = new Date();
   const patch: Record<string, unknown> = {
     status: "callback_processing",
+    callback_delivery_status: "processing",
     callback_claim_token: token,
     callback_claimed_at: now.toISOString(),
     callback_claim_expires_at: new Date(now.getTime() + CLAIM_LEASE_MS).toISOString(),
@@ -296,6 +315,7 @@ export async function claimPipelineCallback(
     .in("status", NON_TERMINAL_STATUSES);
 
   // Free lease OR expired lease — a live claim by another handler blocks us.
+  // A failed_redeliverable delivery is also free to reclaim.
   q = q.or(`callback_claim_expires_at.is.null,callback_claim_expires_at.lt.${now.toISOString()}`);
 
   const { data } = await q.select().maybeSingle();
@@ -303,19 +323,67 @@ export async function claimPipelineCallback(
   return { ok: true, job: data as PipelineJobRow, claimToken: token };
 }
 
+/** Optional explicit receive step. Most callers use claimPipelineCallback directly. */
+export async function receivePipelineCallback(
+  admin: any,
+  id: CallbackIdentity,
+): Promise<GateResult> {
+  if (!(await sceneRunMatches(admin, id.sceneId, id.runId))) {
+    return { ok: false, reason: "wrong_run" };
+  }
+  const job = await loadJob(admin, id);
+  if (!job) return { ok: false, reason: "job_missing" };
+  if (id.externalJobId && job.external_job_id && job.external_job_id !== id.externalJobId) {
+    return { ok: false, reason: "wrong_job" };
+  }
+  if (job.callback_delivery_status === "succeeded" || TERMINAL_STATUSES.includes(job.status)) {
+    return { ok: false, reason: "duplicate_callback", job };
+  }
+
+  await admin
+    .from("composer_pipeline_jobs")
+    .update({ callback_delivery_status: "received" })
+    .eq("id", job.id)
+    .eq("run_id", id.runId)
+    .in("status", NON_TERMINAL_STATUSES);
+
+  return { ok: true, job };
+}
+
 export async function completePipelineJob(
   admin: any,
   jobId: string,
-  outcome: "succeeded" | "failed",
+  outcome: "succeeded" | "failed" | "failed_redeliverable",
   errorCode?: string | null,
 ): Promise<void> {
+  const now = new Date().toISOString();
+
+  if (outcome === "failed_redeliverable") {
+    // Release the claim so a provider redelivery can try again.
+    // The job itself stays non-terminal because the provider job is done;
+    // only our processing failed.
+    await admin
+      .from("composer_pipeline_jobs")
+      .update({
+        callback_delivery_status: "failed_redeliverable",
+        callback_claim_token: null,
+        callback_claimed_at: null,
+        callback_claim_expires_at: null,
+        error_code: errorCode ?? null,
+      })
+      .eq("id", jobId);
+    return;
+  }
+
   await admin
     .from("composer_pipeline_jobs")
     .update({
       status: outcome,
+      callback_delivery_status: outcome,
       error_code: errorCode ?? null,
-      completed_at: new Date().toISOString(),
+      completed_at: now,
       callback_claim_token: null,
+      callback_claimed_at: null,
       callback_claim_expires_at: null,
     })
     .eq("id", jobId);

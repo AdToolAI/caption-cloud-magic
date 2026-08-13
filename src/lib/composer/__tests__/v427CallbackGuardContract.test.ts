@@ -43,7 +43,7 @@ function admin({ mode, activeRunId = 'run-1', job = null }: WorldOpts) {
     };
     return b;
   };
-  return { from: (n: string) => table(n) } as any;
+  return { from: (n: string) => table(n), rpc: async () => ({ error: null }) } as any;
 }
 
 const identity = { sceneId: 's1', runId: 'run-1', stage: 'base_video' as const };
