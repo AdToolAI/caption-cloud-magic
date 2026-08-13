@@ -249,6 +249,32 @@ export async function resumeContinuityChain(args: ResumeArgs): Promise<void> {
       .eq("status", "pending");
     if (!rows?.length) return;
 
+    // v430 Step 4 — FINALITY GATE. A callback may fire on an intermediate
+    // result (lip-sync plate delivered, mux still pending). Chaining onto it
+    // would bind the successor to a frame that the finished scene replaces.
+    // In that case the scene stays parked; the processed-output callback (or
+    // the sweep) resumes it.
+    let effectiveClipUrl = predecessorClipUrl ?? null;
+    if (!predecessorFailed) {
+      const { data: predRow } = await supabaseAdmin
+        .from("composer_scenes")
+        .select(
+          "clip_url, processed_video_url, base_video_url, lip_sync_source_clip_url, upload_url, lip_sync_status, lip_sync_with_voiceover, dialog_mode, engine_override",
+        )
+        .eq("id", predecessorSceneId)
+        .maybeSingle();
+      if (predRow) {
+        if (!isSceneOutputFinal(predRow as any)) {
+          console.log(
+            `[continuity-chain] predecessor ${predecessorSceneId} output not final yet — successors stay parked`,
+          );
+          return;
+        }
+        effectiveClipUrl = resolveSceneOutput(predRow as any).effectiveUrl ?? effectiveClipUrl;
+      }
+    }
+
+
     for (const row of rows) {
       let patch: Record<string, unknown> = {};
       if (predecessorFailed || !predecessorClipUrl) {
