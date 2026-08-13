@@ -21,10 +21,7 @@ Zustandsmaschine gelesen:
   - `queued`, `canceled`, laufende Zustände direkt über `sceneState()`
   - Spezialzustände über `sceneSubstate()`
   - nur die Ready/Failed-Grenze über die output-aware exklusiven Helfer
-  Falls doch eine geschlossene Projektion nötig wird
-  (`legacyClipStatusEquivalentRow()`), muss sie die vollständige relevante
-  Legacy-Domäne inkl. `queued`, `canceled` und der Substate-Sonderfälle
-  abbilden und dokumentiert getestet sein.
+  `failed` + effektiver Output ist `ready` und niemals gleichzeitig `failed`.
 - `clipStatusFromState(sceneState(scene))` NUR dort, wo bewusst der neue
   Pipeline-State dargestellt wird und keine Legacy-Parität nötig ist. Nicht
   für Filter, Sortierung, Buttons, Progress, Export- oder Render-Gates.
