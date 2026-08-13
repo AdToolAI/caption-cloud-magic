@@ -112,6 +112,7 @@ import {
 } from "@/lib/video-composer/providerCapabilities";
 import { maxSecondsForClipSource } from "@/lib/composer/pickClipSourceForDuration";
 import { estimateSpokenSeconds, dialogExceedsPlate } from "@/lib/composer/estimateSpokenSeconds";
+import { dialogPreflight } from "@/lib/composer/dialog/dialogPreflight";
 
 import { ModelSelector } from "@/components/ai-video/ModelSelector";
 import {
