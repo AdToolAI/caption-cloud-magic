@@ -94,8 +94,10 @@ Jeder Ausnahme-Marker trägt eine kurze Begründung und wird im Test geprüft.
    Fortschrittszählung, Export- und Render-Gates).
    `failed` + effektiver Output bleibt überall `ready`.
 2. **Contract-Scanner** `src/lib/composer/__tests__/clientReaderContract5E.test.ts`:
-   scannt `src/components/**`, `src/hooks/**`, `src/pages/**`,
-   `src/lib/video-composer/**`, `src/lib/composer/**` (ohne `__tests__`).
+   scannt **alle** `src/**/*.{ts,tsx}`. Ausgenommen sind ausschliesslich
+   Testdateien (`__tests__`, `*.test.*`), generierte Typen
+   (`src/integrations/supabase/types.ts`) und konkret markierte Mapping-/
+   Writer-Zugriffe.
    Erkannt werden **direkte Legacy-Feldzugriffe**, nicht Identifier-
    Substrings: Property-Access (`x.clip_status`, `x.clipStatus`,
    `x.twoshot_stage`, `x.lip_sync_status`, …), Destructuring
