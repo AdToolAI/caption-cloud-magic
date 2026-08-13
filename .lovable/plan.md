@@ -126,12 +126,16 @@ Kein Eingriff in die State Machine, kein neues Flag, kein zweiter Wahrheitsbegri
 
 ## Umsetzungsumfang Schritt 4 (nach Freigabe)
 
-- Migration: `composer_scenes.first_rendered_at`, `continuity_source_clip_url`, `continuity_stale`; Backfill; Trigger für `first_rendered_at`; SQL-Funktion `public.propagate_continuity_staleness(_scene_id, _effective_url)` plus Trigger `AFTER UPDATE OF clip_url ... WHEN (NEW.clip_url IS NOT NULL AND NEW.clip_url IS DISTINCT FROM OLD.clip_url)`.
+- Migration: `composer_scenes.first_rendered_at`, `continuity_source_clip_url`, `continuity_rendered_source_clip_url`, `continuity_stale`; Backfill; Trigger für `first_rendered_at`; SQL-Funktion `public.propagate_continuity_staleness(_scene_id, _effective_url)` plus Trigger `AFTER UPDATE OF clip_url ... WHEN (NEW.clip_url IS NOT NULL AND NEW.clip_url IS DISTINCT FROM OLD.clip_url)`.
 - `continuity-chain.ts` liest über `resolveSceneOutput()` statt roh `clip_url`.
 - `materializeCompatibilityOutput()` bleibt unverändert auf den Output-Patch von Szene A beschränkt — kein Cross-Scene-Write und kein Setzen von `continuity_stale`.
-- Reset-Pfade (`scene-hard-reset.ts`, `reset-lipsync-scene`) rufen nach erfolgreichem Reset einmalig `propagateContinuityStaleness(sceneId, null)`. `beginSceneRun()` bleibt unangetastet.
-- Neuer **reiner** Helper `src/lib/composer/continuity/continuityState.ts` (+ Backend-Spiegel): `isContinuityStale(storedSource, currentEffectiveUrl)` und `sceneWasEverRendered({ firstRenderedAt, completedPlateAttemptExists, legacyEffectiveUrl })`. Keine DB-Abfrage im Pure-Layer — `completedPlateAttemptExists` wird vom Aufrufer geladen und hineingereicht. Parity-Test Client/Server.
-- UI: Stale-Badge und Button "Continuity aktualisieren" auf der Szenenkachel, ohne Render-Trigger.
-- Tests: Reset-Festigkeit von `first_rendered_at`; Run-Start-Clear macht B **nicht** stale; fehlgeschlagener Run macht B nicht stale; erfolgreicher Output-Wechsel setzt stale; identische URL setzt nicht stale; Hard-Reset setzt stale; mehrere Dependents über `continuity_source_scene_id`; keine transitive Kaskade; Materializer schreibt keine Fremdszene; Pure-Helper ohne DB-Zugriff; Legacy-Parität; Lip-Sync-Szenen bleiben aus der Kette ausgeschlossen.
+- Reset-Pfade:
+  - `scene-hard-reset.ts` — Output wird wirklich entfernt → einmaliger expliziter Aufruf `propagateContinuityStaleness(sceneId, null)`.
+  - `reset-lipsync-scene` — processed → base, der effektive Output bleibt **non-null** → **kein** expliziter RPC; der normale DB-Trigger erkennt den Wechsel `processedUrl → baseUrl` bereits.
+  - `beginSceneRun()` bleibt unangetastet.
+- Neuer **reiner** Helper `src/lib/composer/continuity/continuityState.ts` (+ Backend-Spiegel): `isContinuityStale(storedSource, currentEffectiveUrl)`, `needsContinuityRerender(...)` und `sceneWasEverRendered({ firstRenderedAt, completedPlateAttemptExists, legacyEffectiveUrl })`. Keine DB-Abfrage im Pure-Layer — `completedPlateAttemptExists` wird vom Aufrufer geladen und hineingereicht. Parity-Test Client/Server.
+- Finalisierungspunkte schreiben zusätzlich `continuity_rendered_source_clip_url` (Continuity-Quelle des abgeschlossenen Runs) — im selben Patch, ohne Cross-Scene-Write.
+- UI: Stale-Badge, Badge "neu rendern nötig" (abgeleitet, nicht gespeichert) und Button "Continuity aktualisieren" auf der Szenenkachel, ohne Render-Trigger.
+- Tests: Reset-Festigkeit von `first_rendered_at`; Run-Start-Clear macht B **nicht** stale; fehlgeschlagener Run macht B nicht stale; erfolgreicher Output-Wechsel setzt stale; identische URL setzt nicht stale; Hard-Reset setzt stale; `reset-lipsync-scene` propagiert nur über den Trigger und ruft keinen Null-RPC; Dirty-Zustand überlebt Reload (`rendered ≠ konfiguriert`) und löst sich nach erfolgreichem Render auf; mehrere Dependents über `continuity_source_scene_id`; keine transitive Kaskade; Materializer schreibt keine Fremdszene; Pure-Helper ohne DB-Zugriff; Legacy-Parität; Lip-Sync-Szenen bleiben aus der Kette ausgeschlossen.
 
 Keine Änderungen an Lip-Sync-Semantik, `reference_image_url`, State Machine oder `transitionType`.
