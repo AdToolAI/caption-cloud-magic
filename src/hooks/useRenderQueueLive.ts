@@ -20,7 +20,14 @@ export interface QueueRow {
   project_id: string;
   scene_type: string;
   clip_source: string | null;
+  /** legacy-mapping-allowed: Rohzeile aus der DB; Anzeige liest sceneState(). */
   clip_status: string;
+  pipeline_state?: string | null;
+  pipeline_substate?: string | null;
+  base_video_url?: string | null;
+  processed_video_url?: string | null;
+  lip_sync_status?: string | null;
+  twoshot_stage?: string | null;
   duration_seconds: number | null;
   clip_url: string | null;
   updated_at: string;
@@ -45,13 +52,13 @@ export function useRenderQueueLive(pollMs = 5000) {
     const [live, done] = await Promise.all([
       supabase
         .from('composer_scenes')
-        .select('id, project_id, scene_type, clip_source, clip_status, duration_seconds, clip_url, updated_at, created_at')
+        .select('id, project_id, scene_type, clip_source, clip_status, pipeline_state, pipeline_substate, lip_sync_status, twoshot_stage, base_video_url, processed_video_url, duration_seconds, clip_url, updated_at, created_at')
         .in('clip_status', LIVE_STATUSES)
         .order('updated_at', { ascending: false })
         .limit(200),
       supabase
         .from('composer_scenes')
-        .select('id, project_id, scene_type, clip_source, clip_status, duration_seconds, clip_url, updated_at, created_at')
+        .select('id, project_id, scene_type, clip_source, clip_status, pipeline_state, pipeline_substate, lip_sync_status, twoshot_stage, base_video_url, processed_video_url, duration_seconds, clip_url, updated_at, created_at')
         .in('clip_status', ['completed', 'failed'])
         .order('updated_at', { ascending: false })
         .limit(20),

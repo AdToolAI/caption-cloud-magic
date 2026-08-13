@@ -27,8 +27,31 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useRenderQueueLive, type QueueRow } from '@/hooks/useRenderQueueLive';
 import { CLIP_SOURCE_LABELS } from '@/types/video-composer';
+import { sceneState } from '@/lib/composer/sceneState';
 
 const LIVE_STATUSES = ['pending', 'queued', 'generating', 'composing', 'lipsync'] as const;
+
+/**
+ * v430 Schritt 5E — Anzeige-Status kommt aus dem Zustandsautomaten,
+ * nicht mehr aus der Alt-Spalte `clip_status`.
+ */
+function queueStatusOf(row: QueueRow): string {
+  switch (sceneState(row)) {
+    case 'idle': return 'pending';
+    case 'plate_queued': return 'queued';
+    case 'plate_rendering': return 'generating';
+    case 'audio_prep':
+    case 'audio_ready': return 'composing';
+    case 'lipsync_dispatched':
+    case 'lipsync_running':
+    case 'lipsync_muxing': return 'lipsync';
+    case 'plate_ready':
+    case 'complete': return 'completed';
+    case 'failed': return 'failed';
+    case 'canceled': return 'canceled';
+    default: return 'pending';
+  }
+}
 
 const STATUS_META: Record<string, { tint: string; label: string }> = {
   pending: { tint: 'bg-slate-500/20 text-slate-300 border-slate-500/30', label: tx({ de: 'Wartet', en: 'Waiting', es: 'Esperando' }) },
@@ -85,14 +108,15 @@ function QueueRowCard({
     ? CLIP_SOURCE_LABELS[row.clip_source as keyof typeof CLIP_SOURCE_LABELS]
     : undefined;
   const provider = providerEntry?.de ?? row.clip_source ?? '—';
-  const isLive = (LIVE_STATUSES as readonly string[]).includes(row.clip_status);
+  const status = queueStatusOf(row);
+  const isLive = (LIVE_STATUSES as readonly string[]).includes(status);
 
   return (
     <Card className="p-3 flex items-center justify-between gap-3 hover:border-primary/40 transition-colors">
       <div className="flex items-center gap-3 min-w-0">
-        {row.clip_status === 'failed' || row.clip_status === 'canceled' ? (
+        {status === 'failed' || status === 'canceled' ? (
           <XCircle className="h-4 w-4 text-rose-400 shrink-0" />
-        ) : row.clip_status === 'completed' ? (
+        ) : status === 'completed' ? (
           <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
         ) : (
           <Loader2 className="h-4 w-4 text-sky-400 shrink-0 animate-spin" />
@@ -111,7 +135,7 @@ function QueueRowCard({
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        {statusBadge(row.clip_status)}
+        {statusBadge(status)}
         {isLive && onCancel && (
           <Button
             size="sm"
@@ -144,7 +168,7 @@ export default function RenderQueue() {
   const grouped = useMemo(() => {
     const g: Record<string, QueueRow[]> = {};
     for (const r of rows) {
-      (g[r.clip_status] ??= []).push(r);
+      (g[queueStatusOf(r)] ??= []).push(r);
     }
     return g;
   }, [rows]);
