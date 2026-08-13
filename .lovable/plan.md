@@ -26,10 +26,10 @@ Schritt 1 ist **noch nicht** abgeschlossen. Vier produktive Pfade tragen Output-
 
 ## Umsetzung (Restarbeit Schritt 1)
 
-Alle vier Pfade laufen über `materializeCompatibilityOutput()`; keine neue Semantik, kein Eingriff in Lip-Sync.
+Alle vier Pfade laufen über **denselben** in Schritt 1 eingeführten Materializer: `materializeCompatibilityOutput()` aus `supabase/functions/_shared/materialize-scene-output.ts`. Das ist keine neue Funktion, sondern exakt die bestehende (Datei = `materialize-scene-output.ts`, Export = `materializeCompatibilityOutput`). Es wird **kein zweiter Helper und keine zweite Output-Materialisierungslogik** angelegt — auch keine lokale Wrapper-Kopie in einer Function.
 
 1. `compose-video-clips/index.ts` — Upload- und Stock-Zweig: `clip_url: …` ersetzen durch `...materializeCompatibilityOutput('base', { baseUrl: … })`, `clip_status` unverändert.
-2. `generate-talking-head/index.ts` — Zeile 464 → `'base'`; Zeile 645 (Dispatch-Reset) → `'clear'`, im selben Update-Objekt.
+2. `generate-talking-head/index.ts` — Zeile 464 → `'base'`; Zeile 645 (Dispatch-Reset) → `'clear'`, im selben Update-Objekt (nullt `clip_url`, `base_video_url` und `processed_video_url` atomar).
 3. `generate-composer-image-scene/index.ts` — Zeile 235 → `'base'`. `transitionScene(... 'plate_ready')` bleibt unangetastet.
 4. `_shared/autopilotComposerBridge.ts` — das `row`-Objekt baut `clip_url` künftig über `'base'`, damit Insert **und** Update das vollständige Tripel schreiben.
 
@@ -37,9 +37,17 @@ Nicht angefasst: `plate-attempt.ts` (andere Tabelle), Snapshot-/Draft-/QA-Pfade,
 
 ## Tests
 
-- Writer-Inventory-Test (`materializeSceneOutput.test.ts`) um die vier Dateien erweitern: enthalten `materializeCompatibilityOutput(`, keine direkte `clip_url:`-Zuweisung mehr.
+- Writer-Inventory-Test (`materializeSceneOutput.test.ts`) um die vier Dateien erweitern — und **nicht nur** auf das Literal `clip_url:` prüfen. Der Test stellt sicher, dass in diesen Runtime-Dateien keine direkte Mutation von `composer_scenes.clip_url` außerhalb des Materializers mehr möglich ist:
+  - jedes `.from("composer_scenes")` mit `.update(`/`.insert(`/`.upsert(` muss ein Payload-Objekt verwenden, das `materializeCompatibilityOutput(` enthält;
+  - jede Erwähnung von `clip_url` in einem Schreibpfad (auch Varianten wie `"clip_url":`, `clip_url =`, `[ 'clip_url' ]`, dynamisch gebaute Patch-Objekte) failt den Test, sofern sie nicht aus dem Materializer stammt.
+- Ein Single-Source-Test: nur eine Datei im Repo definiert eine Output-Materialisierung (`materialize-scene-output.ts`); es existiert kein zweiter Export mit gleicher Aufgabe.
 - Explizit dokumentierte Ausnahme für `plate_attempts.clip_url` im Test-Kommentar, damit sie nicht versehentlich mitmigriert wird.
-- Bestehende Suites (`src/lib/composer`, 118 Lip-Sync-Anker-Tests) plus `tsgo` müssen grün bleiben.
-- Betroffene Edge-Functions neu deployen.
 
-Danach ist Schritt 1 geschlossen und Schritt 2 (Capabilities) kann starten.
+## Reihenfolge
+
+1. Restarbeit Schritt 1 implementieren.
+2. Betroffene Edge-Functions deployen (`compose-video-clips`, `generate-talking-head`, `generate-composer-image-scene` sowie die Consumer des Bridge-Shared-Moduls).
+3. Alle relevanten Suites + die 118 Lip-Sync-Anker-Tests + `tsgo`.
+4. Writer-Inventory erneut prüfen.
+5. STOP — Bericht. Schritt 2 startet nicht automatisch.
+
