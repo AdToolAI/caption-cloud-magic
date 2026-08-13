@@ -61,8 +61,8 @@ Zusätzlich bleibt bei `failed` mit vorhandener `clip_url` der alte `clip_status
 
 | Datei | Heutiger Legacy-Read | Ziel |
 |---|---|---|
-| `compose-video-assemble:150,164` | `clip_status === 'ready'` | `legacyClipReadyEquivalent(sceneState(s))` |
-| `compose-stitch-and-handoff:87-88` | zählt `ready` / `failed` | `legacyClipReadyEquivalent()` / `sceneState() === 'failed'` |
+| `compose-video-assemble:150,164` | `clip_status === 'ready'` | `legacyClipReadyEquivalent(s)` (Zustand + Output) |
+| `compose-stitch-and-handoff:87-88` | zählt `ready` / `failed` | `legacyClipReadyEquivalent(s)` / `sceneState(s) === 'failed'` |
 | `compose-clip-webhook:495,712-722` | Projektfortschritt | dito, SQL-Filter auf `pipeline_state` |
 | `compose-video-clips:1804-1810` | `clip_status`-Guard | `sceneState()` |
 | `modelark-poll:114` | `.eq('clip_status','generating')` | `.eq('pipeline_state','plate_rendering')` |
