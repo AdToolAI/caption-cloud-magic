@@ -75,6 +75,7 @@ import {
   type AssetRef,
 } from "../_shared/asset-ref.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
+import { isLipSyncIntentionalPayload } from "../_shared/lipSyncIntent.ts";
 const ANCHOR_AUDIT_VERSION = 15;
 
 const corsHeaders = {
@@ -3834,13 +3835,20 @@ serve(async (req) => {
       // browser having captured them. When the client sent nothing (single
       // scene re-render, Autopilot, server jobs) we pull the predecessor's
       // clip from the request order and extract the frame server-side.
-      let continuityFrameUrl: string | null =
-        (scene as any).transitionFrameUrl ?? null;
-      let continuityClipUrl: string | null =
-        (scene as any).previousClipUrl ?? null;
+      // v428 third layer: a lip-sync scene never gets a continuity input at
+      // all — not even an extracted frame. The resolver would drop it anyway;
+      // skipping here also saves the extraction and keeps the payload clean.
+      const sceneWantsLipSync = isLipSyncIntentionalPayload(scene);
+      let continuityFrameUrl: string | null = sceneWantsLipSync
+        ? null
+        : ((scene as any).transitionFrameUrl ?? null);
+      let continuityClipUrl: string | null = sceneWantsLipSync
+        ? null
+        : ((scene as any).previousClipUrl ?? null);
       const continuityPref = (scene as any).visualContinuity ?? "auto";
       const sceneOrderIdx = scenes.findIndex((s) => s.id === scene.id);
       if (
+        !sceneWantsLipSync &&
         (!continuityFrameUrl || !continuityClipUrl) &&
         continuityPref !== "match-cut"
       ) {
@@ -3966,6 +3974,23 @@ serve(async (req) => {
           `[compose-video-clips] scene ${scene.id} visual-plan: transition=${visualPlan.transition.mode} inputMode=${visualPlan.inputMode} refs=${visualPlan.references.length} lipSyncProtected=${visualPlan.constraints.lipSyncProtected} warnings=${visualPlan.warnings.join(",") || "none"}`,
         );
       }
+
+      // v428 fail-closed: a lip-sync scene whose provider has no
+      // anchor-faithful image input must not be dispatched onto a loose
+      // reference slot — the plate would no longer match the geometry anchor.
+      if (visualPlan.warnings.includes("lipsync_anchor_input_unsupported")) {
+        const msg = tl({
+          de: `Lip-Sync abgebrochen: Das gewählte Videomodell besitzt keinen Bild-Eingang, der den Anker unverändert übernimmt (lipsync_anchor_input_unsupported). Bitte HappyHorse oder Hailuo verwenden.`,
+          en: `Lip-sync aborted: the selected video model has no image input that carries the anchor unchanged (lipsync_anchor_input_unsupported). Please use HappyHorse or Hailuo.`,
+          es: `Sincronización labial cancelada: el modelo de vídeo elegido no tiene una entrada de imagen que conserve el ancla sin cambios (lipsync_anchor_input_unsupported). Utiliza HappyHorse o Hailuo.`,
+        });
+        console.error(
+          `[compose-video-clips] scene ${scene.id} lipsync_anchor_input_unsupported source=${scene.clipSource}`,
+        );
+        await markSceneContractFailure(scene.id, msg);
+        continue;
+      }
+
 
       try {
         if (scene.clipSource === "upload" && scene.uploadUrl) {

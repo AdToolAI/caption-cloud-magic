@@ -98,10 +98,14 @@ describe('core invariant — continuity never displaces a protected anchor', () 
       references: [characterRef],
     });
     expect(plan.transition.mode).toBe('match-cut');
-    expect(plan.warnings).toContain('lipsync_capability_unverified_match_cut');
+    // v428: the lip-sync rule fires before the verification branch, so the
+    // reason recorded is the hard rule — the outcome is identical.
+    expect(plan.warnings).toContain('lipsync_continuity_disabled');
   });
 
-  it('allows frame-chain with lip-sync only on separate slots AND verified', () => {
+  // v428: a verified lip-sync capability no longer buys a frame-chain. No
+  // lip-sync scene ever takes a continuity frame, on any profile.
+  it('denies frame-chain for lip-sync even when the capability is verified', () => {
     const verified: VisualInputProfile = {
       ...slotModel,
       lipSync: { ...slotModel.lipSync, verification: { status: 'verified' } },
@@ -110,12 +114,13 @@ describe('core invariant — continuity never displaces a protected anchor', () 
       sceneClass: 'character',
       requirements: req({ lipSync: true, identityCritical: true }),
       profile: verified,
+      anchorImageUrl: 'https://x/anchor.jpg',
       previousFrameUrl: 'https://x/prev.jpg',
       references: [characterRef],
     });
-    expect(plan.transition.mode).toBe('frame-chain');
-    expect(plan.firstFrameUrl).toBe('https://x/prev.jpg');
-    expect(plan.anchors.identity).toHaveLength(1);
+    expect(plan.transition.mode).toBe('match-cut');
+    expect(plan.firstFrameUrl).toBe('https://x/anchor.jpg');
+    expect(plan.warnings).toContain('lipsync_continuity_disabled');
   });
 });
 
@@ -134,18 +139,51 @@ describe('Seedance 2.5 specifics', () => {
 
   it('uses the previous clip as continuity reference instead of a frame', () => {
     const plan = resolveVisualInputs({
-      sceneClass: 'character',
-      requirements: req({ identityCritical: true }),
+      sceneClass: 'environment',
+      requirements: req(),
       profile: seedance25,
       previousFrameUrl: 'https://x/prev.jpg',
       previousClipUrl: 'https://x/prev.mp4',
-      references: [characterRef],
+      references: [],
     });
     expect(plan.transition.mode).toBe('clip-reference');
     expect(plan.inputMode).toBe('references');
     expect(plan.transition.sourceClipUrl).toBe('https://x/prev.mp4');
     expect(plan.references.some((r) => r.kind === 'video')).toBe(true);
-    expect(plan.anchors.identity).toHaveLength(1);
+  });
+
+  // v426: on the single-slot provider a protected identity anchor outranks the
+  // clip reference — handing the slot to continuity would drop the anchor.
+  it('keeps the protected anchor instead of the clip on the exclusive slot', () => {
+    const plan = resolveVisualInputs({
+      sceneClass: 'character',
+      requirements: req({ identityCritical: true }),
+      profile: seedance25,
+      anchorImageUrl: 'https://x/anchor.jpg',
+      previousFrameUrl: 'https://x/prev.jpg',
+      previousClipUrl: 'https://x/prev.mp4',
+      references: [characterRef],
+    });
+    expect(plan.transition.mode).toBe('match-cut');
+    expect(plan.firstFrameUrl).toBe('https://x/anchor.jpg');
+    expect(plan.transition.sourceClipUrl).toBeUndefined();
+  });
+
+  // v428: the same scene with lip-sync intent loses the clip reference.
+  it('drops the clip reference as soon as the scene is a lip-sync scene', () => {
+    const plan = resolveVisualInputs({
+      sceneClass: 'character',
+      requirements: req({ identityCritical: true, lipSync: true }),
+      profile: seedance25,
+      anchorImageUrl: 'https://x/anchor.jpg',
+      previousFrameUrl: 'https://x/prev.jpg',
+      previousClipUrl: 'https://x/prev.mp4',
+      references: [characterRef],
+    });
+    expect(plan.transition.mode).toBe('match-cut');
+    expect(plan.firstFrameUrl).toBe('https://x/anchor.jpg');
+    expect(plan.transition.sourceClipUrl).toBeUndefined();
+    expect(plan.references.some((r) => r.kind === 'video')).toBe(false);
   });
 
   it('chains frames for a plain environment scene', () => {
@@ -192,8 +230,8 @@ describe('registry coverage', () => {
     for (const model of AI_VIDEO_TOOLKIT_MODELS) {
       const profile = deriveVisualInputProfile(model);
       expect(profile.mode === 'exclusive' || profile.mode === 'slots').toBe(true);
-      // Certification is opt-in per model; everything else stays unverified.
-      const expected = model.id === 'seedance-2-5' ? 'verified' : 'unverified';
+      // v425: verification tracks the certified provider list, nothing else.
+      const expected = profile.lipSync.supported ? 'verified' : 'unverified';
       expect(profile.lipSync.verification.status).toBe(expected);
     }
 

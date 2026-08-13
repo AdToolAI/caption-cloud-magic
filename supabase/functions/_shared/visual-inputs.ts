@@ -396,6 +396,22 @@ export function arbitrateSlots(
     (profile.references.videos ?? 0) > 0 &&
     (profile.mode !== "exclusive" || (profile.modes ?? []).includes("references"));
 
+  // v428 — LIP-SYNC HARD RULE, evaluated before every other branch and not
+  // switchable by any flag. The frozen chain measures geometry on
+  // `reference_image_url`; a continuity frame as plate input would split
+  // geometry and plate across two images (the July anchor mismatch).
+  // Fail-closed: no anchor-faithful image input → abort instead of falling
+  // back to a loose reference slot.
+  if (requirements.lipSync) {
+    warnings.push("lipsync_continuity_disabled");
+    if (profile.firstFrame.supported) {
+      return { transition: "match-cut", inputMode: "first-frame", warnings };
+    }
+    warnings.push("lipsync_anchor_input_unsupported");
+    return { transition: "match-cut", inputMode: "none", warnings };
+  }
+
+
   if (hasProtectedAnchor && collide) {
     // v426: the composed, identity-verified anchor ALWAYS wins the single
     // slot. Handing the slot to a clip reference instead would drop the
@@ -561,17 +577,22 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
   if (dropped.length > 0) warnings.push(`references_trimmed:${dropped.length}`);
   if (dropped.some((r) => r.protected)) warnings.push("protected_reference_dropped");
 
-  const useContinuityFrame = transition === "frame-chain" || transition === "endframe-bridge";
+  // v428 second layer: a lip-sync scene never takes a continuity frame,
+  // whatever arbitration returned. Plate input === geometry anchor.
+  const useContinuityFrame = !requirements.lipSync &&
+    (transition === "frame-chain" || transition === "endframe-bridge");
 
   // The anchor stays the first frame for every non-continuity outcome. For a
-  // lip-sync scene the transition is always `match-cut`, so this is always the
-  // anchor — byte-identical to the pre-resolver behaviour.
+  // lip-sync scene it is the ONLY possible outcome.
   const exclusiveReferencePayload = profile.mode === "exclusive" && inputMode === "references";
-  const firstFrameUrl = exclusiveReferencePayload
+  const firstFrameUrl = requirements.lipSync
+    ? anchorImageUrl
+    : exclusiveReferencePayload
     ? undefined
     : useContinuityFrame
     ? previousFrameUrl
     : anchorImageUrl;
+
 
   // On an exclusive-slot provider the chosen input mode owns the only slot.
   // When the anchor took it, no reference image may travel with the request.
