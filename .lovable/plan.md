@@ -83,7 +83,45 @@ Die Trennung erfolgt über die Richtung des Wechsels — nicht über ein neues I
 Konkret:
 
 1. **DB-Trigger `AFTER UPDATE OF clip_url ON composer_scenes`**, Bedingung `WHEN (NEW.clip_url IS NOT NULL AND NEW.clip_url IS DISTINCT FROM OLD.clip_url)`. Er propagiert also ausschließlich **erfolgreiche Output-Wechsel**. Ein Clear (`NEW.clip_url IS NULL`) — egal ob Run-Start oder Reset — löst ihn nie aus. Damit ist der Run-Start strukturell ausgeschlossen, ohne dass die DB "Absichten" raten muss.
-2. **Explizite Propagation im Reset-Pfad**: `scene-hard-reset.ts` und `reset-lipsync-scene` rufen nach erfolgreichem Reset einmalig `propagateContinuityStaleness(sceneId, /* effectiveUrl */ null)` auf (eigener Helper, RPC `public.propagate_continuity_staleness(_scene_id uuid, _effective_url text)`). Nur der Reset kennt die Semantik "Output wurde bewusst entfernt"; der Run-Start ruft ihn nicht.
+2. **Explizite Propagation nur im Hard-Reset-Pfad**: `scene-hard-reset.ts` ruft nach erfolgreichem Reset einmalig `propagateContinuityStaleness(sceneId, /* effectiveUrl */ null)` auf (eigener Helper, RPC `public.propagate_continuity_staleness(_scene_id uuid, _effective_url text)`). `reset-lipsync-scene` ruft ihn **nicht** — dort bleibt der effektive Output non-null (processed → base) und der normale Trigger greift. Der Run-Start ruft ihn ebenfalls nie.
+
+### Zwischenoutput-Guard: Plate ist bei Lip-Sync nicht final
+
+Berechtigter Einwand. Der Trigger darf nicht auf jedem non-null Wechsel feuern, weil bei einer Lip-Sync-Szene zuerst die Base-Plate materialisiert wird (`materializeCompatibilityOutput('base')`) und erst der Mux den finalen Output liefert.
+
+Es gibt bereits eine etablierte Wahrheit für "diese Szene will Lip-Sync": `isLipSyncIntentionalRow()` in `supabase/functions/_shared/lipSyncIntent.ts` (Spiegel: `src/lib/video-composer/lipSyncIntent.ts`) — `lip_sync_with_voiceover = true` ODER `dialog_mode = true` ODER `engine_override ∈ {cinematic-sync, sync-segments, native-dialogue}`. Diese Regel wird **nicht geändert**, nur gelesen.
+
+Minimalste Lösung — ein zusätzliches Finalitäts-Prädikat, keine Änderung der Lip-Sync-Engine:
+
+```sql
+-- SQL-Spiegel der bestehenden Intent-Regel, reine Lesefunktion
+public.scene_lipsync_intentional(scene composer_scenes) :=
+     scene.lip_sync_with_voiceover IS TRUE
+  OR scene.dialog_mode IS TRUE
+  OR scene.engine_override IN ('cinematic-sync','sync-segments','native-dialogue');
+
+-- Output gilt als semantisch final:
+public.scene_output_is_final(scene) :=
+  CASE WHEN public.scene_lipsync_intentional(scene)
+       THEN scene.processed_video_url IS NOT NULL   -- erst nach erfolgreichem Mux
+       ELSE scene.clip_url IS NOT NULL              -- normale Szene: base = final
+  END;
+```
+
+Der Trigger bekommt damit die Bedingung:
+
+```sql
+AFTER UPDATE OF clip_url ON public.composer_scenes
+WHEN (NEW.clip_url IS NOT NULL
+      AND NEW.clip_url IS DISTINCT FROM OLD.clip_url
+      AND public.scene_output_is_final(NEW))
+```
+
+- Normale Szene: Plate-Webhook setzt `clip_url = base` → final → Propagation wie bisher geplant.
+- Lip-Sync-Szene: Plate-Webhook setzt `clip_url = base`, `processed_video_url` bleibt NULL → **keine** Propagation. Erst der Mux (`materializeCompatibilityOutput('processed')`) setzt `processed_video_url` → Propagation genau einmal, auf dem finalen Output.
+- Scheitert der Lip-Sync nach der Plate, wurde nie propagiert; B behält seinen bisherigen Vertrag.
+
+Dasselbe Prädikat gilt spiegelbildlich im Pure-Layer als `isSceneOutputFinal(scene)` und gated zusätzlich die UI: Solange A nicht final ist, liefert `resolveSceneOutput(A)` zwar eine URL, aber "Continuity aktualisieren" auf B ist **deaktiviert** (Hinweis: "Vorgängerszene ist noch in Produktion"). Damit kann der Nutzer B im Zeitfenster zwischen Plate und Mux nicht versehentlich auf die Zwischen-Plate binden. Auch `continuity-chain.ts` verlangt vor dem Frame-Chaining `isSceneOutputFinal(A)` — der bestehende Wartemechanismus über `composer_continuity_queue` bleibt unverändert und parkt den Nachfolger einfach bis zur Finalität.
 3. Beide Wege benutzen exakt dieselbe SQL-Funktion und damit dieselbe NULL-sichere Vergleichsregel — es gibt keine zweite Stale-Definition.
 
 `propagateContinuityStaleness()` ist damit kein reiner Test-/Reparaturpfad mehr, sondern der offizielle zweite Auslöser — aber ausschließlich am Reset-Punkt, nicht im Materializer und nicht in `beginSceneRun()`.
@@ -148,17 +186,17 @@ Kein Eingriff in die State Machine, kein neues Flag, kein zweiter Wahrheitsbegri
 
 ## Umsetzungsumfang Schritt 4 (nach Freigabe)
 
-- Migration: `composer_scenes.first_rendered_at`, `continuity_source_clip_url`, `continuity_rendered_source_clip_url`, `continuity_stale`; `plate_attempts.continuity_source_clip_url`; `composer_scene_runs.continuity_source_clip_url` (+ Freeze-Guard); Backfill; Trigger für `first_rendered_at`; SQL-Funktion `public.propagate_continuity_staleness(_scene_id, _effective_url)`, die `continuity_stale` **setzt statt latcht**, plus Trigger `AFTER UPDATE OF clip_url ... WHEN (NEW.clip_url IS NOT NULL AND NEW.clip_url IS DISTINCT FROM OLD.clip_url)`. **Legacy-Backfill**: Für bereits gerenderte Bestandszenen mit gesetzter `continuity_source_clip_url` wird `continuity_rendered_source_clip_url := continuity_source_clip_url`, um bestehende Szenen nicht allein durch die Migration als renderbedürftig zu markieren. Für nie gerenderte Szenen bleibt das Feld `NULL`. Ab dem ersten neuen Run wird ausschließlich der immutable Run-Snapshot verwendet.
-- `continuity-chain.ts` liest über `resolveSceneOutput()` statt roh `clip_url`.
+- Migration: `composer_scenes.first_rendered_at`, `continuity_source_clip_url`, `continuity_rendered_source_clip_url`, `continuity_stale`; `plate_attempts.continuity_source_clip_url`; `composer_scene_runs.continuity_source_clip_url` (+ Freeze-Guard); Backfill; Trigger für `first_rendered_at`; Lesefunktionen `public.scene_lipsync_intentional()` / `public.scene_output_is_final()`; SQL-Funktion `public.propagate_continuity_staleness(_scene_id, _effective_url)`, die `continuity_stale` **setzt statt latcht**, plus Trigger `AFTER UPDATE OF clip_url ... WHEN (NEW.clip_url IS NOT NULL AND NEW.clip_url IS DISTINCT FROM OLD.clip_url AND public.scene_output_is_final(NEW))`. **Legacy-Backfill**: Für bereits gerenderte Bestandszenen mit gesetzter `continuity_source_clip_url` wird `continuity_rendered_source_clip_url := continuity_source_clip_url`, um bestehende Szenen nicht allein durch die Migration als renderbedürftig zu markieren. Für nie gerenderte Szenen bleibt das Feld `NULL`. Ab dem ersten neuen Run wird ausschließlich der immutable Run-Snapshot verwendet.
+- `continuity-chain.ts` liest über `resolveSceneOutput()` statt roh `clip_url` und verlangt `isSceneOutputFinal(A)`.
 - `materializeCompatibilityOutput()` bleibt unverändert auf den Output-Patch von Szene A beschränkt — kein Cross-Scene-Write und kein Setzen von `continuity_stale`.
 - Reset-Pfade:
   - `scene-hard-reset.ts` — Output wird wirklich entfernt → einmaliger expliziter Aufruf `propagateContinuityStaleness(sceneId, null)`.
   - `reset-lipsync-scene` — processed → base, der effektive Output bleibt **non-null** → **kein** expliziter RPC; der normale DB-Trigger erkennt den Wechsel `processedUrl → baseUrl` bereits.
   - `beginSceneRun()` bleibt unangetastet.
 - Dispatch schreibt den Continuity-Snapshot einmalig in die `plate_attempts`-Zeile (und beim Contract-Freeze in `composer_scene_runs`).
-- Neuer **reiner** Helper `src/lib/composer/continuity/continuityState.ts` (+ Backend-Spiegel): `isContinuityStale(storedSource, currentEffectiveUrl)`, `needsContinuityRerender(...)` und `sceneWasEverRendered({ firstRenderedAt, completedPlateAttemptExists, legacyEffectiveUrl })`. Keine DB-Abfrage im Pure-Layer — `completedPlateAttemptExists` wird vom Aufrufer geladen und hineingereicht. Parity-Test Client/Server.
+- Neuer **reiner** Helper `src/lib/composer/continuity/continuityState.ts` (+ Backend-Spiegel): `isContinuityStale(storedSource, currentEffectiveUrl)`, `isSceneOutputFinal(scene)`, `needsContinuityRerender(...)` und `sceneWasEverRendered({ firstRenderedAt, completedPlateAttemptExists, legacyEffectiveUrl })`. Keine DB-Abfrage im Pure-Layer — `completedPlateAttemptExists` wird vom Aufrufer geladen und hineingereicht. Parity-Test Client/Server/SQL.
 - Finalisierungspunkte schreiben `continuity_rendered_source_clip_url` **aus dem Run-Snapshot** (Attempt → Run-Contract → NULL), nie aus dem aktuellen Scene-Wert.
-- UI: Stale-Badge, Badge "neu rendern nötig" (abgeleitet, nicht gespeichert) und Button "Continuity aktualisieren" auf der Szenenkachel, ohne Render-Trigger.
-- Tests: Reset-Festigkeit von `first_rendered_at`; Run-Start-Clear macht B **nicht** stale; fehlgeschlagener Run macht B nicht stale; erfolgreicher Output-Wechsel setzt stale; identische URL setzt nicht stale; **Rückkehr auf die alte URL setzt `continuity_stale` wieder auf `false`** (kein Latch); Hard-Reset setzt stale; `reset-lipsync-scene` propagiert nur über den Trigger und ruft keinen Null-RPC; **Race-Test: Continuity-Wechsel während laufendem Run schreibt bei Finalisierung den Snapshot X, nicht den aktuellen Wert Y**; Dirty-Zustand überlebt Reload und löst sich nach erfolgreichem Render auf; mehrere Dependents über `continuity_source_scene_id`; keine transitive Kaskade; Materializer schreibt keine Fremdszene; Pure-Helper ohne DB-Zugriff; Legacy-Parität; Lip-Sync-Szenen bleiben aus der Kette ausgeschlossen.
+- UI: Stale-Badge, Badge "neu rendern nötig" (abgeleitet, nicht gespeichert) und Button "Continuity aktualisieren" auf der Szenenkachel, ohne Render-Trigger; der Button ist deaktiviert, solange der Output der Vorgängerszene nicht final ist.
+- Tests: Reset-Festigkeit von `first_rendered_at`; Run-Start-Clear macht B **nicht** stale; fehlgeschlagener Run macht B nicht stale; erfolgreicher Output-Wechsel setzt stale; identische URL setzt nicht stale; **Rückkehr auf die alte URL setzt `continuity_stale` wieder auf `false`** (kein Latch); Hard-Reset setzt stale; `reset-lipsync-scene` propagiert nur über den Trigger und ruft keinen Null-RPC; **Lip-Sync-Zwischenoutput: Plate-Materialisierung propagiert nicht, erst der Mux propagiert genau einmal; abgebrochener Lip-Sync nach der Plate propagiert nie; "Continuity aktualisieren" ist in diesem Fenster gesperrt**; **Race-Test: Continuity-Wechsel während laufendem Run schreibt bei Finalisierung den Snapshot X, nicht den aktuellen Wert Y**; Dirty-Zustand überlebt Reload und löst sich nach erfolgreichem Render auf; mehrere Dependents über `continuity_source_scene_id`; keine transitive Kaskade; Materializer schreibt keine Fremdszene; Pure-Helper ohne DB-Zugriff; Legacy-Parität; Lip-Sync-Szenen bleiben als Konsumenten aus der Kette ausgeschlossen.
 
 Keine Änderungen an Lip-Sync-Semantik, `reference_image_url`, State Machine oder `transitionType`.
