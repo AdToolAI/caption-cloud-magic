@@ -1,43 +1,88 @@
 # v430 — Schritt 5D: Backend-Reader auf `pipeline_state` migrieren
 
-Zusätzlich vorab die zwei Regressionspunkte aus dem 5B-Abschluss. Kein 5E in dieser Phase.
+Vorab: die drei geforderten Klärungen, gemessen am aktuellen Codestand. Danach der eigentliche 5D-Plan.
 
-## Teil 0 — Regressionen aus 5B schließen
+## Klärung 1 — Writer-Status `remotion-webhook` und `generate-talking-head`
 
-1. **Auto-Director-Regressionstest**: Test, der festnagelt, dass ein neu eingefügter Auto-Director-Scene-Insert `pipeline_state = 'plate_queued'` **und** `clip_status = 'queued'` trägt (nie `pending`). Umgesetzt als Contract-Test über die Bridge-Mapping-Tabelle (`composer_state_from_legacy` / Forward-Mapping) plus ein Quell-Scan-Test auf `auto-director-compose`, der das Insert-Paar prüft.
-2. **Deno-Test sichtbar machen**: `supabase/functions/_shared/scene-state-write-contract.test.ts` einmal mit `deno test` ausführen (Vitest kann die https-Imports nicht laden) und das Kommando als npm-Script `test:deno-functions` hinterlegen, damit der blinde Fleck dokumentiert und wiederholbar ist. Ergebnis wird im Abschlussbericht genannt.
+**Antwort: Beide wurden in 5B NICHT dualisiert. Sie sind auch nicht bewusst allowlistet — sie sind durch eine Lücke im Scanner gefallen.**
 
-## Teil 1 — Reader-Inventar (Ergebnis der Analyse)
+Aktueller Codestand:
 
-Zu migrieren (kein Lip-Sync-Substage-Wissen nötig):
+- `generate-talking-head/index.ts` schreibt an vier Stellen ausschließlich Legacy: Zeile 466 `clip_status: 'ready'`, 509 `clip_status: 'failed'`, 645 `clip_status: 'generating'`, 692 `clip_status: 'failed'`. Kein `pipeline_state`, kein `composer_scene_transition()`.
+- `remotion-webhook/index.ts` Zeile 288 schreibt `clip_status: 'ready'`, `lip_sync_status: 'done'`, `twoshot_stage: 'done'` — ebenfalls ohne `pipeline_state`.
+- Beide stehen **weder** in `LIP_SYNC_LEGACY_ONLY` **noch** in `KNOWN_NON_LIP_SYNC_LEGACY_ONLY`. Im Kommentar über der zweiten Liste sind sie noch als 5B-Ziele genannt, die Listeneinträge wurden aber beim Abschluss von 5B entfernt.
+- Der Test schlägt trotzdem nicht fehl, weil der Scanner `materializeCompatibilityOutput(...)` als legitimen Dual-Write akzeptiert. Beide Dateien rufen diesen Helper auf — er schreibt jedoch nachweislich nur `base_video_url` / `processed_video_url` / `clip_url` und **kein** `pipeline_state`. Damit gilt: Scanner-Fehlalarm-Freiheit ist falsch positiv.
+
+Konsequenz für die Umsetzung (Teil 0 unten):
+- Scanner-Regel korrigieren: `materializeCompatibilityOutput()` zählt als Output-Writer, nicht als State-Dual-Write.
+- `generate-talking-head` wird nachträglich dualisiert (`plate_rendering` / `plate_ready` / `failed`) — reiner Nicht-Lip-Sync-Pfad.
+- `remotion-webhook` Zeile 288 ist Lip-Sync-Fan-in-Finalisierung und gehört damit unter den v400-Freeze: **keine Dualisierung**, sondern expliziter Eintrag in `LIP_SYNC_LEGACY_ONLY` mit Begründung. Die Reverse-Bridge leitet dort korrekt `complete` ab.
+
+## Klärung 2 — `modelark-poll`: kein Legacy-OR-Fallback
+
+**Antwort: Ein Runtime-Fallback ist nicht nötig; der Reader liest nur `pipeline_state`.**
+
+Belegt an der Datenbank:
+- `composer_scenes.pipeline_state` ist `NOT NULL` mit Default `'idle'`.
+- Der Bridge-Trigger `trg_composer_scene_state_bridge` läuft `BEFORE INSERT OR UPDATE`. Beim Insert wird `pipeline_state` aus den Legacy-Spalten abgeleitet, sobald es auf dem Default steht. Ein Insert-/Importpfad, der eine Szene ohne gültiges `pipeline_state` erzeugen könnte, existiert damit nicht.
+
+Also: `modelark-poll` filtert künftig `.eq('pipeline_state','plate_rendering')`, ohne OR-Zweig. Der frühere Formulierungsvorschlag mit Legacy-OR entfällt ersatzlos.
+
+## Klärung 3 — Legacy-Parität von `clip_status = 'ready'`
+
+Aus der Vorwärtsrichtung der Bridge ergibt sich exakt diese Zustandsmenge, die `clip_status = 'ready'` erzeugt:
+
+```text
+plate_ready, audio_prep, audio_ready,
+lipsync_dispatched, lipsync_running, lipsync_muxing,
+complete
+```
+
+Zusätzlich bleibt bei `failed` mit vorhandener `clip_url` der alte `clip_status` stehen — eine gescheiterte Szene mit gültiger Platte kann daher weiterhin `ready` tragen.
+
+`isRealizedState()` bildet diese Menge **nicht** identisch ab. Deshalb gilt für 5D verbindlich:
+
+- Es wird ein Prädikat `legacyClipReadyEquivalent(state)` mit genau der obigen Menge eingeführt und für jeden Reader verwendet, der heute `clip_status === 'ready'` prüft.
+- `isRealizedState()` wird nur dort eingesetzt, wo ein Paritätstest über eine Fixture-Matrix aller 12 Zustände × `clip_url` vorhanden/leer beweist, dass beide Ausdrücke dieselbe Menge liefern.
+- Betroffen und einzeln nachzuweisen: `compose-video-assemble` (Z. 150/164), `compose-stitch-and-handoff` (Z. 87-88), `compose-clip-webhook` Projektfortschritt (Z. 495, 712-722).
+- Der `failed`-Sonderfall mit vorhandener `clip_url` wird als eigener Testfall geführt.
+
+---
+
+## Teil 0 — Vorarbeiten (aus 5B nachgezogen)
+
+1. Scanner-Fix: `materializeCompatibilityOutput()` gilt nicht mehr als State-Dual-Write.
+2. `generate-talking-head` dualisieren (4 Schreibstellen).
+3. `remotion-webhook` mit Begründung in `LIP_SYNC_LEGACY_ONLY` aufnehmen.
+4. Auto-Director-Regressionstest: Insert trägt `pipeline_state = 'plate_queued'` **und** `clip_status = 'queued'`.
+5. `deno test` für `_shared/scene-state-write-contract.test.ts` einmal ausführen und als Script `test:deno-functions` hinterlegen.
+
+## Teil 1 — Zu migrierende Reader
 
 | Datei | Heutiger Legacy-Read | Ziel |
 |---|---|---|
-| `compose-video-assemble/index.ts:150,164` | `clip_status === 'ready'` als Gate + Fehlertext | `isRealizedState(sceneState(s))`, Text aus `sceneState()` |
-| `compose-stitch-and-handoff/index.ts:87-88` | Zählt `ready` / `failed` | `sceneState()` + `isRealizedState` / `isTerminalFailure` |
-| `compose-clip-webhook/index.ts:495,712-722` | Projekt-Fortschritt über `clip_status` | `pipeline_state`-Filter bzw. `sceneState()` |
-| `compose-video-clips/index.ts:1804-1810` | `clip_status` als Vor-Render-Guard | `sceneState()` |
-| `modelark-poll/index.ts:114` | `.eq('clip_status','generating')` | `.in('pipeline_state', ['plate_rendering'])` mit Legacy-OR-Fallback für Altzeilen |
-| `composer-cancel-scene/index.ts:86` | `LIVE_CLIP.has(clip_status)` | `sceneState()`-basierte Live-Prüfung; Lip-Sync-Zweig (Z. 87) bleibt Legacy |
-| `composer-cancel-project/index.ts:128-135` | `clip_status` / `lip_sync_status` | Clip-Zweig auf `sceneState()`; Lip-Sync-Zweig bleibt Legacy |
+| `compose-video-assemble:150,164` | `clip_status === 'ready'` | `legacyClipReadyEquivalent(sceneState(s))` |
+| `compose-stitch-and-handoff:87-88` | zählt `ready` / `failed` | `legacyClipReadyEquivalent()` / `sceneState() === 'failed'` |
+| `compose-clip-webhook:495,712-722` | Projektfortschritt | dito, SQL-Filter auf `pipeline_state` |
+| `compose-video-clips:1804-1810` | `clip_status`-Guard | `sceneState()` |
+| `modelark-poll:114` | `.eq('clip_status','generating')` | `.eq('pipeline_state','plate_rendering')` |
+| `composer-cancel-scene:86` | `LIVE_CLIP.has(clip_status)` | `sceneState()`; Lip-Sync-Zweig bleibt Legacy |
+| `composer-cancel-project:128-135` | `clip_status` / `lip_sync_status` | Clip-Zweig auf `sceneState()`; Lip-Sync-Zweig bleibt Legacy |
 
-Explizite Legacy-Ausnahmen (bleiben unverändert, werden nur kommentiert und in der Allowlist geführt):
+Explizite Legacy-Ausnahmen (unverändert, nur kommentiert): `lipsync-watchdog`, `compose-dialog-segments`, `compose-twoshot-audio`, `cancel-dialog-lipsync`, `sync-so-webhook`, `remotion-webhook`, `reset-lipsync-scene`, `report-lipsync-motion-probe`, `lipsync-selftest`, `composer-reset-selftest`, `_shared/scene-hard-reset.ts`, `_shared/scene-run-begin.ts`, `_shared/lipsync-fail.ts`, `_shared/autopilotComposerBridge.ts:356`, `compose-clip-webhook:406-431`, `compose-video-clips:5212`.
 
-`lipsync-watchdog`, `compose-dialog-segments`, `compose-twoshot-audio`, `cancel-dialog-lipsync`, `sync-so-webhook`, `remotion-webhook`, `reset-lipsync-scene`, `report-lipsync-motion-probe`, `lipsync-selftest`, `composer-reset-selftest`, `_shared/scene-hard-reset.ts`, `_shared/scene-run-begin.ts`, `_shared/lipsync-fail.ts`, `_shared/autopilotComposerBridge.ts:356`, `compose-clip-webhook/index.ts:406-431`, `compose-video-clips/index.ts:5212`.
+## Teil 2 — Regeln
 
-## Teil 2 — Regeln der Migration
-
-- Nur Lesepfade. Keine Writer, keine Zustandssemantik, keine Lip-Sync-Logik ändern.
-- Jeder migrierte Reader nutzt ausschließlich `sceneState()` / `sceneSubstate()` aus `_shared/scene-state.ts`.
-- Da die Reverse-Bridge global aktiv bleibt, ist `pipeline_state` für Altzeilen bereits befüllt; wo direkt in SQL gefiltert wird (`modelark-poll`), bleibt ein Legacy-OR-Zweig als Sicherheitsnetz.
-- Verhalten muss 1:1 identisch bleiben — Abweichungen gelten als Bug, nicht als Verbesserung.
+- Nur Lesepfade; keine Zustandssemantik, keine Lip-Sync-Logik ändern.
+- Verhalten 1:1 identisch; jede Abweichung ist ein Bug, keine Verbesserung.
+- Reader lesen ausschließlich über `sceneState()` / `sceneSubstate()`.
 
 ## Teil 3 — Tests
 
-- Neue Reader-Contract-Tests: für jeden migrierten Reader ein Fixture-Paar (Legacy-only-Zeile vs. neue Zeile) mit identischem Resultat.
-- Erweiterung des Allowlist-Scanners um eine **Reader**-Liste: neue direkte Legacy-Reads außerhalb der Ausnahmeliste lassen den Test fehlschlagen.
-- `bunx vitest run src/lib/composer/__tests__`, `bunx tsgo`, `deno test` für die Funktions-Verträge.
+- Paritätstests je migriertem Reader über die volle Zustandsmatrix.
+- Reader-Allowlist im Scanner: neue direkte Legacy-Reads außerhalb der Ausnahmen lassen den Test fehlschlagen.
+- `bunx vitest run src/lib/composer/__tests__`, `bunx tsgo`, `deno test`.
 
-## Teil 4 — Deployment und Stopp
+## Teil 4 — Deploy und Stopp
 
-Deploy der berührten Funktionen: `compose-video-assemble`, `compose-stitch-and-handoff`, `compose-clip-webhook`, `compose-video-clips`, `modelark-poll`, `composer-cancel-scene`, `composer-cancel-project`. Danach Abschlussbericht mit Vorher/Nachher-Reader-Inventar und **STOP**. 5E folgt als eigene Phase.
+Deploy: `compose-video-assemble`, `compose-stitch-and-handoff`, `compose-clip-webhook`, `compose-video-clips`, `modelark-poll`, `composer-cancel-scene`, `composer-cancel-project`, `generate-talking-head`. Danach Abschlussbericht mit Vorher/Nachher-Reader-Inventar und **STOP**. 5E folgt separat.
