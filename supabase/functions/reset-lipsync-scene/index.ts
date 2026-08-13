@@ -21,6 +21,7 @@ import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { getSyncApiKey } from "../_shared/syncso-preflight.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
