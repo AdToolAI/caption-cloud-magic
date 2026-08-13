@@ -110,7 +110,45 @@ describe('v430 5D — migrierte Reader lesen keine clip_status-Zweige mehr', () 
 
   it('composer-cancel-project nutzt sceneState()', () => {
     const src = read('supabase/functions/composer-cancel-project/index.ts');
-    expect(src).toContain('const cs = sceneState(s);');
+    expect(src).toContain('LIVE_CLIP_STATES.has(sceneState(s))');
     expect(src).not.toContain("cs === \"pending\" || cs === \"generating\"");
   });
+
+  it('beide Cancel-Pfade nutzen dieselbe Live-Zustandsmenge inkl. plate_queued', () => {
+    const setLine = (p: string) =>
+      read(p)
+        .split('\n')
+        .find((l) => l.includes('const LIVE_CLIP_STATES'))
+        ?.trim();
+    const scene = setLine('supabase/functions/composer-cancel-scene/index.ts');
+    const project = setLine('supabase/functions/composer-cancel-project/index.ts');
+    expect(scene).toBeDefined();
+    expect(project).toBe(scene);
+    expect(scene).toContain('plate_queued');
+  });
 });
+
+describe('v430 5D — Bridge-Parität der abbrechbaren Zustände', () => {
+  const LIVE = new Set(['idle', 'plate_queued', 'plate_rendering']);
+
+  it('pending + active_run_id ist plate_queued und bleibt abbrechbar', () => {
+    const row = { clip_status: 'pending', active_run_id: 'run-1' };
+    expect(sceneState(row)).toBe('plate_queued');
+    expect(LIVE.has(sceneState(row))).toBe(true);
+  });
+
+  it('pending ohne run_id ist idle und bleibt abbrechbar', () => {
+    expect(sceneState({ clip_status: 'pending' })).toBe('idle');
+    expect(LIVE.has(sceneState({ clip_status: 'pending' }))).toBe(true);
+  });
+
+  it('generating ist plate_rendering und bleibt abbrechbar', () => {
+    expect(sceneState({ clip_status: 'generating' })).toBe('plate_rendering');
+  });
+
+  it('ready/complete sind nicht abbrechbar', () => {
+    expect(LIVE.has(sceneState({ clip_status: 'ready', clip_url: 'u' }))).toBe(false);
+    expect(LIVE.has(sceneState({ pipeline_state: 'complete' }))).toBe(false);
+  });
+});
+

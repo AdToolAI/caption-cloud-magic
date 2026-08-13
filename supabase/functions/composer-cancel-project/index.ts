@@ -23,6 +23,12 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { transitionScene, sceneState } from "../_shared/scene-state.ts";
 
+/**
+ * v430 Step 5D — abbrechbare ("live") Clip-Zustände.
+ * Identisch zu composer-cancel-scene.
+ */
+const LIVE_CLIP_STATES = new Set(["idle", "plate_queued", "plate_rendering"]);
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -132,10 +138,13 @@ serve(async (req) => {
       ) {
         sceneIdsWithLipsync.push(s.id);
       }
-      // v430 Step 5D: clip branch via sceneState(). Legacy parity:
-      // pending → idle, generating → plate_rendering.
-      const cs = sceneState(s);
-      if (cs === "idle" || cs === "plate_rendering") {
+      // v430 Step 5D: clip branch via sceneState(). Legacy parity to the old
+      // `clip_status === 'pending' || 'generating'` check:
+      //   pending  + active_run_id → plate_queued
+      //   pending  ohne run_id     → idle
+      //   generating               → plate_rendering
+      // Damit ist die Menge identisch zu composer-cancel-scene.
+      if (LIVE_CLIP_STATES.has(sceneState(s))) {
         sceneIdsWithClip.push(s.id);
       }
     }
