@@ -1,4 +1,4 @@
-# v430 Schritt 5 — Writer-/Reader-Audit vor dem Abschalten der Rückwärts-Bridge
+# v430 Schritt 5 — Writer-/Reader-Migration, Rückwärts-Bridge bleibt aktiv
 
 Antworten auf die vier Fragen, jeweils belegt durch Repo-Scan und Live-Abfragen. Am Ende steht ein angepasster Umsetzungsvorschlag, weil der Audit einen harten Blocker gefunden hat.
 
