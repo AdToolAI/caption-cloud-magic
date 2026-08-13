@@ -39,7 +39,13 @@ const LEGACY_FIELDS = new Set([
 ]);
 
 /** Generierte Dateien und Tests. */
-const SKIP_FILES = new Set(['src/integrations/supabase/types.ts']);
+const SKIP_FILES = new Set([
+  'src/integrations/supabase/types.ts',
+  // Kanonische Resolver — sie DÜRFEN die Alt-Spalten lesen, das ist ihr Zweck.
+  'src/lib/composer/sceneState.ts',
+  'src/lib/composer/output/resolveSceneOutput.ts',
+  'src/lib/composer/continuity/continuityState.ts',
+]);
 
 const MARKER = 'legacy-mapping-allowed:';
 
