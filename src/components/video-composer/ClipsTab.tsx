@@ -357,6 +357,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           (dbScene as any).engine_override === 'cinematic-sync' &&
           // legacy-mapping-allowed: Lip-Sync-Übergangs-Toast gegen die Spiegelfelder
           scene.lipSyncStatus !== 'done' &&
+          // legacy-mapping-allowed: Lip-Sync-Übergangs-Toast gegen die Spiegelfelder
           (dbScene as any).lip_sync_status === 'done'
         ) {
           toast({
@@ -368,6 +369,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           (dbScene as any).engine_override === 'cinematic-sync' &&
           // legacy-mapping-allowed: Lip-Sync-Übergangs-Toast gegen die Spiegelfelder
           scene.lipSyncStatus !== 'failed' &&
+          // legacy-mapping-allowed: Lip-Sync-Übergangs-Toast gegen die Spiegelfelder
           (dbScene as any).lip_sync_status === 'failed'
         ) {
           toast({
@@ -380,6 +382,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           (dbScene as any).engine_override === 'cinematic-sync' &&
           // legacy-mapping-allowed: Lip-Sync-Übergangs-Toast gegen die Spiegelfelder
           scene.lipSyncStatus !== 'no_voiceover' &&
+          // legacy-mapping-allowed: Lip-Sync-Übergangs-Toast gegen die Spiegelfelder
           (dbScene as any).lip_sync_status === 'no_voiceover'
         ) {
           toast({
