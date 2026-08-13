@@ -83,7 +83,45 @@ Die Trennung erfolgt über die Richtung des Wechsels — nicht über ein neues I
 Konkret:
 
 1. **DB-Trigger `AFTER UPDATE OF clip_url ON composer_scenes`**, Bedingung `WHEN (NEW.clip_url IS NOT NULL AND NEW.clip_url IS DISTINCT FROM OLD.clip_url)`. Er propagiert also ausschließlich **erfolgreiche Output-Wechsel**. Ein Clear (`NEW.clip_url IS NULL`) — egal ob Run-Start oder Reset — löst ihn nie aus. Damit ist der Run-Start strukturell ausgeschlossen, ohne dass die DB "Absichten" raten muss.
-2. **Explizite Propagation im Reset-Pfad**: `scene-hard-reset.ts` und `reset-lipsync-scene` rufen nach erfolgreichem Reset einmalig `propagateContinuityStaleness(sceneId, /* effectiveUrl */ null)` auf (eigener Helper, RPC `public.propagate_continuity_staleness(_scene_id uuid, _effective_url text)`). Nur der Reset kennt die Semantik "Output wurde bewusst entfernt"; der Run-Start ruft ihn nicht.
+2. **Explizite Propagation nur im Hard-Reset-Pfad**: `scene-hard-reset.ts` ruft nach erfolgreichem Reset einmalig `propagateContinuityStaleness(sceneId, /* effectiveUrl */ null)` auf (eigener Helper, RPC `public.propagate_continuity_staleness(_scene_id uuid, _effective_url text)`). `reset-lipsync-scene` ruft ihn **nicht** — dort bleibt der effektive Output non-null (processed → base) und der normale Trigger greift. Der Run-Start ruft ihn ebenfalls nie.
+
+### Zwischenoutput-Guard: Plate ist bei Lip-Sync nicht final
+
+Berechtigter Einwand. Der Trigger darf nicht auf jedem non-null Wechsel feuern, weil bei einer Lip-Sync-Szene zuerst die Base-Plate materialisiert wird (`materializeCompatibilityOutput('base')`) und erst der Mux den finalen Output liefert.
+
+Es gibt bereits eine etablierte Wahrheit für "diese Szene will Lip-Sync": `isLipSyncIntentionalRow()` in `supabase/functions/_shared/lipSyncIntent.ts` (Spiegel: `src/lib/video-composer/lipSyncIntent.ts`) — `lip_sync_with_voiceover = true` ODER `dialog_mode = true` ODER `engine_override ∈ {cinematic-sync, sync-segments, native-dialogue}`. Diese Regel wird **nicht geändert**, nur gelesen.
+
+Minimalste Lösung — ein zusätzliches Finalitäts-Prädikat, keine Änderung der Lip-Sync-Engine:
+
+```sql
+-- SQL-Spiegel der bestehenden Intent-Regel, reine Lesefunktion
+public.scene_lipsync_intentional(scene composer_scenes) :=
+     scene.lip_sync_with_voiceover IS TRUE
+  OR scene.dialog_mode IS TRUE
+  OR scene.engine_override IN ('cinematic-sync','sync-segments','native-dialogue');
+
+-- Output gilt als semantisch final:
+public.scene_output_is_final(scene) :=
+  CASE WHEN public.scene_lipsync_intentional(scene)
+       THEN scene.processed_video_url IS NOT NULL   -- erst nach erfolgreichem Mux
+       ELSE scene.clip_url IS NOT NULL              -- normale Szene: base = final
+  END;
+```
+
+Der Trigger bekommt damit die Bedingung:
+
+```sql
+AFTER UPDATE OF clip_url ON public.composer_scenes
+WHEN (NEW.clip_url IS NOT NULL
+      AND NEW.clip_url IS DISTINCT FROM OLD.clip_url
+      AND public.scene_output_is_final(NEW))
+```
+
+- Normale Szene: Plate-Webhook setzt `clip_url = base` → final → Propagation wie bisher geplant.
+- Lip-Sync-Szene: Plate-Webhook setzt `clip_url = base`, `processed_video_url` bleibt NULL → **keine** Propagation. Erst der Mux (`materializeCompatibilityOutput('processed')`) setzt `processed_video_url` → Propagation genau einmal, auf dem finalen Output.
+- Scheitert der Lip-Sync nach der Plate, wurde nie propagiert; B behält seinen bisherigen Vertrag.
+
+Dasselbe Prädikat gilt spiegelbildlich im Pure-Layer als `isSceneOutputFinal(scene)` und gated zusätzlich die UI: Solange A nicht final ist, liefert `resolveSceneOutput(A)` zwar eine URL, aber "Continuity aktualisieren" auf B ist **deaktiviert** (Hinweis: "Vorgängerszene ist noch in Produktion"). Damit kann der Nutzer B im Zeitfenster zwischen Plate und Mux nicht versehentlich auf die Zwischen-Plate binden. Auch `continuity-chain.ts` verlangt vor dem Frame-Chaining `isSceneOutputFinal(A)` — der bestehende Wartemechanismus über `composer_continuity_queue` bleibt unverändert und parkt den Nachfolger einfach bis zur Finalität.
 3. Beide Wege benutzen exakt dieselbe SQL-Funktion und damit dieselbe NULL-sichere Vergleichsregel — es gibt keine zweite Stale-Definition.
 
 `propagateContinuityStaleness()` ist damit kein reiner Test-/Reparaturpfad mehr, sondern der offizielle zweite Auslöser — aber ausschließlich am Reset-Punkt, nicht im Materializer und nicht in `beginSceneRun()`.
