@@ -645,6 +645,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
         talking_head_aspect: aspectRatio,
         talking_head_resolution: resolution,
         replicate_prediction_id: videoId, // reusing column to store HeyGen video_id
+        pipeline_state: 'plate_rendering',
         clip_status: 'generating',
         ...materializeCompatibilityOutput('clear'),
         updated_at: new Date().toISOString(),
