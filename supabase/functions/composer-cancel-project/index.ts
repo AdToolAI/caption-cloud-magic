@@ -23,6 +23,12 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { transitionScene, sceneState } from "../_shared/scene-state.ts";
 
+/**
+ * v430 Step 5D — abbrechbare ("live") Clip-Zustände.
+ * Identisch zu composer-cancel-scene.
+ */
+const LIVE_CLIP_STATES = new Set(["idle", "plate_queued", "plate_rendering"]);
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
