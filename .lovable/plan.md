@@ -82,7 +82,8 @@ Explizite Legacy-Ausnahmen (unverändert, nur kommentiert): `lipsync-watchdog`, 
 
 ## Teil 3 — Tests
 
-- Paritätstests je migriertem Reader über die volle Zustandsmatrix.
+- Paritätstests je migriertem Reader über die volle Zustandsmatrix (12 Zustände × Output vorhanden/leer).
+- Pflicht-Fixture: `pipeline_state = 'failed'` + effektiver Output vorhanden → Legacy-Klasse `ready`, **nicht** `failed`.
 - Reader-Allowlist im Scanner: neue direkte Legacy-Reads außerhalb der Ausnahmen lassen den Test fehlschlagen.
 - `bunx vitest run src/lib/composer/__tests__`, `bunx tsgo`, `deno test`.
 
