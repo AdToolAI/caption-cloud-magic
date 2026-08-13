@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-// @ts-expect-error — Deno edge-function module, imported here as plain TS.
+// Deno edge-function module, imported here as plain TS.
 import { materializeCompatibilityOutput } from '../../../../../supabase/functions/_shared/materialize-scene-output.ts';
 import { resolveSceneOutput } from '../resolveSceneOutput';
 
