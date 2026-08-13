@@ -36,7 +36,7 @@ import { extractFunctionsError } from '@/lib/functionsError';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
 import { startSceneGeneration } from '@/lib/composer/startSceneGeneration';
-import { alignDialogTurnsToScript } from '@/lib/composer/alignDialogTurnsToScript';
+import { resolveEffectiveDialog } from '@/lib/composer/dialog/resolveEffectiveDialog';
 import { parseDialogScript, uniqueSpeakers, type DialogBlock } from '@/lib/talking-head/parseDialogScript';
 import { applyDialogToPrompt, INTER_SPEAKER_GAP_SEC } from '@/lib/motion-studio/applyDialogToPrompt';
 import { buildInvokePrompt } from '@/lib/motion-studio/buildInvokePrompt';
