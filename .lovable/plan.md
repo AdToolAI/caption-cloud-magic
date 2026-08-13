@@ -12,15 +12,18 @@ Definition für Variante C (belastbar, reset-fest):
 
 ```text
 sceneWasEverRendered(scene) :=
-     EXISTS (plate_attempts WHERE scene_id = scene.id AND status = 'completed')
-  OR resolveSceneOutput(scene).effectiveUrl IS NOT NULL
-  OR scene.first_rendered_at IS NOT NULL
+     scene.first_rendered_at IS NOT NULL              -- primäre, reset-feste Wahrheit
+  OR completedPlateAttemptExists(scene.id)            -- Legacy-/Integritätsfallback
+  OR legacyFallbackEffectiveOutputExists(scene)       -- reiner Kompatibilitätszweig
 ```
 
-Ergänzend führen wir eine kleine, ausdrücklich **nie löschbare** Spalte ein, damit die Erkennung nicht von einer Join-Tabelle abhängt und auch Alt-Szenen ohne `plate_attempts`-Zeilen (vor v375) korrekt sind:
+Reihenfolge ist bewusst: `first_rendered_at` ist nach Migration und Backfill die Definition. `plate_attempts.status = 'completed'` dient nur als Integritätsfallback für Zeilen, die der Backfill nicht erwischt. `resolveSceneOutput().effectiveUrl` ist **keine** Definition von "ever rendered" — sie überlebt einen Reset nicht und bleibt nur als Kompatibilitätszweig für den kurzen Moment zwischen Render-Erfolg und Trigger sowie für unmigrierte Alt-Zeilen.
+
+Die neue Spalte:
 
 - `composer_scenes.first_rendered_at timestamptz` — wird per Trigger **einmalig** gesetzt (`COALESCE(OLD.first_rendered_at, now())`), sobald erstmals ein Output materialisiert wird. Weder Reset noch `beginSceneRun` dürfen sie leeren; ein Contract-Test erzwingt das.
 - Backfill der bestehenden Zeilen: `first_rendered_at := COALESCE(plate_ready_at, updated_at)` für alle Szenen mit vorhandenem Output oder einem `completed`-Attempt; sonst `NULL`.
+
 
 `clip_url`, `base_video_url` und `pipeline_state` werden für diese Frage **nicht** herangezogen.
 
