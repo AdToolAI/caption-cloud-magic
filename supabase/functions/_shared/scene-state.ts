@@ -1,4 +1,5 @@
 import { tl, withLang } from "./i18n.ts";
+import { resolveSceneOutput } from "./resolve-scene-output.ts";
 /**
  * v384 — Zustandsmaschine für `composer_scenes` (Server-Seite).
  *
