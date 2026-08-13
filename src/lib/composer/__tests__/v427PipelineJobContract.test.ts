@@ -56,10 +56,10 @@ describe('v427 job ledger', () => {
 
   it('exposes the four callback delivery states', () => {
     const src = read(HELPER);
-    expect(src).toContain("'received'");
-    expect(src).toContain("'processing'");
-    expect(src).toContain("'succeeded'");
-    expect(src).toContain("'failed_redeliverable'");
+    expect(src).toContain('"received"');
+    expect(src).toContain('"processing"');
+    expect(src).toContain('"succeeded"');
+    expect(src).toContain('"failed_redeliverable"');
   });
 });
 
