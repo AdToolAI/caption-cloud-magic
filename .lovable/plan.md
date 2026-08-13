@@ -107,11 +107,12 @@ Die Frame-Extraktion selbst ist kostenlos bzw. läuft über den bestehenden `ens
 
 ## Umsetzungsumfang Schritt 4 (nach Freigabe)
 
-- Migration: `composer_scenes.first_rendered_at`, `continuity_source_clip_url`, `continuity_stale` (+ Backfill, Trigger für `first_rendered_at`, Trigger `propagate_continuity_staleness` auf `clip_url`).
+- Migration: `composer_scenes.first_rendered_at`, `continuity_source_clip_url`, `continuity_stale`; Backfill; Trigger für `first_rendered_at`; SQL-Funktion `public.propagate_continuity_staleness(_scene_id, _effective_url)` plus Trigger `AFTER UPDATE OF clip_url ... WHEN (NEW.clip_url IS NOT NULL AND NEW.clip_url IS DISTINCT FROM OLD.clip_url)`.
 - `continuity-chain.ts` liest über `resolveSceneOutput()` statt roh `clip_url`.
-- `materializeCompatibilityOutput()` bleibt unverändert auf den Output-Patch von Szene A beschränkt — kein Cross-Scene-Write.
-- Neuer reiner Helper `src/lib/composer/continuity/continuityState.ts` (+ Backend-Spiegel) mit `sceneWasEverRendered()` und NULL-sicherem `isContinuityStale()`, Parity-Test Client/Server.
+- `materializeCompatibilityOutput()` bleibt unverändert auf den Output-Patch von Szene A beschränkt — kein Cross-Scene-Write und kein Setzen von `continuity_stale`.
+- Reset-Pfade (`scene-hard-reset.ts`, `reset-lipsync-scene`) rufen nach erfolgreichem Reset einmalig `propagateContinuityStaleness(sceneId, null)`. `beginSceneRun()` bleibt unangetastet.
+- Neuer **reiner** Helper `src/lib/composer/continuity/continuityState.ts` (+ Backend-Spiegel): `isContinuityStale(storedSource, currentEffectiveUrl)` und `sceneWasEverRendered({ firstRenderedAt, completedPlateAttemptExists, legacyEffectiveUrl })`. Keine DB-Abfrage im Pure-Layer — `completedPlateAttemptExists` wird vom Aufrufer geladen und hineingereicht. Parity-Test Client/Server.
 - UI: Stale-Badge und Button "Continuity aktualisieren" auf der Szenenkachel, ohne Render-Trigger.
-- Tests: Reset-Festigkeit von `first_rendered_at`, "fehlgeschlagener Run macht B nicht stale", `NULL`-Übergang setzt stale, mehrere Dependents über `continuity_source_scene_id`, keine transitive Kaskade, Materializer schreibt keine Fremdszene, Legacy-Parität, Lip-Sync-Szenen bleiben aus der Kette ausgeschlossen.
+- Tests: Reset-Festigkeit von `first_rendered_at`; Run-Start-Clear macht B **nicht** stale; fehlgeschlagener Run macht B nicht stale; erfolgreicher Output-Wechsel setzt stale; identische URL setzt nicht stale; Hard-Reset setzt stale; mehrere Dependents über `continuity_source_scene_id`; keine transitive Kaskade; Materializer schreibt keine Fremdszene; Pure-Helper ohne DB-Zugriff; Legacy-Parität; Lip-Sync-Szenen bleiben aus der Kette ausgeschlossen.
 
 Keine Änderungen an Lip-Sync-Semantik, `reference_image_url`, State Machine oder `transitionType`.
