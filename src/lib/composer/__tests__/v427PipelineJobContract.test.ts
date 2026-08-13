@@ -42,6 +42,7 @@ describe('v427 job ledger', () => {
   it('terminal and non-terminal statuses do not overlap', () => {
     for (const s of TERMINAL_STATUSES) expect(NON_TERMINAL_STATUSES).not.toContain(s);
     expect(NON_TERMINAL_STATUSES).toContain('dispatching');
+    expect(NON_TERMINAL_STATUSES).toContain('callback_processing');
     expect(TERMINAL_STATUSES).toContain('succeeded');
   });
 
@@ -51,6 +52,14 @@ describe('v427 job ledger', () => {
       fakeAdmin([{ status: 'succeeded' }, { status: 'running' }]), 's', 'r')).toBe(false);
     expect(await allRequiredSyncJobsSucceeded(
       fakeAdmin([{ status: 'succeeded' }, { status: 'succeeded' }]), 's', 'r')).toBe(true);
+  });
+
+  it('exposes the four callback delivery states', () => {
+    const src = read(HELPER);
+    expect(src).toContain("'received'");
+    expect(src).toContain("'processing'");
+    expect(src).toContain("'succeeded'");
+    expect(src).toContain("'failed_redeliverable'");
   });
 });
 
