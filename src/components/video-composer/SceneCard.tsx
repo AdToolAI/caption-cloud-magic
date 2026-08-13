@@ -112,6 +112,7 @@ import {
 } from "@/lib/video-composer/providerCapabilities";
 import { maxSecondsForClipSource } from "@/lib/composer/pickClipSourceForDuration";
 import { estimateSpokenSeconds, dialogExceedsPlate } from "@/lib/composer/estimateSpokenSeconds";
+import { dialogPreflight } from "@/lib/composer/dialog/dialogPreflight";
 
 import { ModelSelector } from "@/components/ai-video/ModelSelector";
 import {
@@ -1256,13 +1257,18 @@ export default function SceneCard({
                 const providerLabel = getProviderLabel(scene.clipSource);
                 const current = scene.durationSeconds;
 
-                // v422 — preflight honesty: `compose-twoshot-audio` aborts the
-                // whole run with `dialog_too_long_for_plate` once the spoken
-                // track exceeds the plate by more than 5 s. Warn here instead.
-                const spokenSec = isLipsyncEngine(scene.engineOverride ?? null)
-                  ? estimateSpokenSeconds(scene.dialogScript)
-                  : 0;
-                const dialogTooLong = dialogExceedsPlate(spokenSec, current, PROVIDER_MAX);
+                // v430 Step 0 — preflight measures the CANONICAL dialog
+                // (`resolveEffectiveDialog`), not the possibly stale
+                // `dialog_turns`. The server stays fail-closed.
+                const preflight = isLipsyncEngine(scene.engineOverride ?? null)
+                  ? dialogPreflight(
+                      { dialogScript: scene.dialogScript, dialogTurns: scene.dialogTurns },
+                      current,
+                      PROVIDER_MAX,
+                    )
+                  : { spokenSec: 0, exceedsPlate: false, turnCount: 0, diverged: false };
+                const spokenSec = preflight.spokenSec;
+                const dialogTooLong = preflight.exceedsPlate;
                 const seedanceMax = maxSecondsForClipSource('ai-seedance25');
                 // v425: Seedance 2.5 is no longer lip-sync certified — never
                 // suggest it as a way out of a too-long dialog.

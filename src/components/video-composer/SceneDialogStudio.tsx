@@ -36,7 +36,9 @@ import { extractFunctionsError } from '@/lib/functionsError';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
 import { startSceneGeneration } from '@/lib/composer/startSceneGeneration';
-import { alignDialogTurnsToScript } from '@/lib/composer/alignDialogTurnsToScript';
+import { resolveEffectiveDialog } from '@/lib/composer/dialog/resolveEffectiveDialog';
+import { dialogPreflight } from '@/lib/composer/dialog/dialogPreflight';
+import { maxSecondsForClipSource } from '@/lib/composer/pickClipSourceForDuration';
 import { parseDialogScript, uniqueSpeakers, type DialogBlock } from '@/lib/talking-head/parseDialogScript';
 import { applyDialogToPrompt, INTER_SPEAKER_GAP_SEC } from '@/lib/motion-studio/applyDialogToPrompt';
 import { buildInvokePrompt } from '@/lib/motion-studio/buildInvokePrompt';
@@ -708,13 +710,13 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     if (script === lastPushedScriptRef.current) return;
     const handle = setTimeout(() => {
       const updates: Partial<ComposerScene> = { dialogScript: script };
-      if (canonicalDialogTurns.length > 0) {
-        const aligned = alignDialogTurnsToScript({
-          turns: canonicalDialogTurns,
-          script,
-          resolveSpeakerId: resolveCastByName,
-        });
-        if (aligned) updates.dialogTurns = aligned as ComposerScene['dialogTurns'];
+      // v430 Step 0 — one canonical contract decides what the scene says.
+      const effective = resolveEffectiveDialog(
+        { dialogScript: script, dialogTurns: canonicalDialogTurns },
+        { resolveSpeakerId: resolveCastByName },
+      );
+      if (effective.diverged) {
+        updates.dialogTurns = effective.turns as ComposerScene['dialogTurns'];
       }
 
       lastPushedScriptRef.current = script;
@@ -844,20 +846,33 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   };
 
   /**
-   * Turns aligned to the *current* script. The editor decides how many lines
-   * exist; the canonical turns decide who speaks. Shortening the script now
+   * v430 Step 0 — the canonical dialog contract. The editor decides how many
+   * lines exist; the canonical turns decide who speaks. Shortening the script
    * really shortens the scene (blocks, speakers, seconds and persistence).
    */
-  const alignedTurns = useMemo(
+  const effectiveDialog = useMemo(
     () =>
-      alignDialogTurnsToScript({
-        turns: canonicalDialogTurns,
-        script,
-        resolveSpeakerId: resolveCastByName,
-      }),
+      resolveEffectiveDialog(
+        { dialogScript: script, dialogTurns: canonicalDialogTurns },
+        { resolveSpeakerId: resolveCastByName },
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [canonicalDialogTurns, script, sceneCast],
   );
+
+  const alignedTurns = effectiveDialog.turns.length > 0 ? effectiveDialog.turns : null;
+
+  // Alignment on *load*: a scene that was shortened elsewhere (plan apply,
+  // another tab, an earlier session that never flushed) arrives with a script
+  // of N lines and M persisted turns. Persist the canonical turns immediately
+  // so `compose-twoshot-audio` can never voice the stale list.
+  useEffect(() => {
+    if (isUserTypingRef.current) return;
+    if (script !== (scene.dialogScript ?? '')) return;
+    if (!effectiveDialog.diverged) return;
+    onUpdate({ dialogTurns: effectiveDialog.turns as ComposerScene['dialogTurns'] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.id, scene.dialogScript, effectiveDialog.diverged, effectiveDialog.reason, canonicalTurnsHash]);
 
   const idBlocks = useMemo<DialogBlock[] | null>(() => {
     const source = alignedTurns ?? (canonicalDialogTurns.length > 0 ? canonicalDialogTurns : null);
@@ -1710,6 +1725,29 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             description: tx({ de: `Audio braucht ~${audioRequired}s, ${DIALOG_MASTER_PROVIDER_LABELS[masterProvider]}-Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Szenendauer erhöhen oder Provider mit größerem Duration-Fenster wählen.`, en: `Audio needs ~${audioRequired}s, ${DIALOG_MASTER_PROVIDER_LABELS[masterProvider]} scene is ${masterDuration}s. Sync.so cuts at the end (cut_off). To get full dialogue, increase scene duration or choose a provider with a larger duration window.`, es: `El audio necesita ~${audioRequired}s, la escena de ${DIALOG_MASTER_PROVIDER_LABELS[masterProvider]} es de ${masterDuration}s. Sync.so corta al final (cut_off). Para obtener el diálogo completo, aumenta la duración de la escena o elige un proveedor con una ventana de duración mayor.` }),
           });
         }
+
+        // v430 Step 0 — preflight on the CANONICAL dialog. The server stays
+        // fail-closed (`dialog_too_long_for_plate`); this only stops the user
+        // from burning credits on a run that cannot succeed.
+        const preflight = dialogPreflight(
+          { dialogScript: script, dialogTurns: canonicalDialogTurns },
+          masterDuration,
+          maxSecondsForClipSource(masterProvider),
+          { resolveSpeakerId: resolveCastByName },
+        );
+        if (preflight.exceedsPlate) {
+          toast({
+            title: tx({ de: 'Skript zu lang für die Szene', en: 'Script too long for the scene', es: 'El guion es demasiado largo para la escena' }),
+            description: tx({
+              de: `Das Skript dauert ca. ${preflight.spokenSec}s, die Szene nur ${masterDuration}s (max. ${maxSecondsForClipSource(masterProvider)}s). Bitte Text kürzen oder die Szene verlängern.`,
+              en: `The script runs approx. ${preflight.spokenSec}s, the scene only ${masterDuration}s (max ${maxSecondsForClipSource(masterProvider)}s). Please shorten the text or extend the scene.`,
+              es: `El guion dura aprox. ${preflight.spokenSec}s, la escena solo ${masterDuration}s (máx. ${maxSecondsForClipSource(masterProvider)}s). Acorta el texto o extiende la escena.`,
+            }),
+            variant: 'destructive',
+          });
+          return;
+        }
+
 
         const dialogScriptText = synthed.map((s) => `${s.character.name}: ${s.block.text}`).join('\n');
         const dialogVoicesMap: Record<string, DialogVoiceCfg> = {};
