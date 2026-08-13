@@ -42,7 +42,7 @@ Zusätzlich bleibt bei `failed` mit vorhandener `clip_url` der alte `clip_status
 
 `isRealizedState()` bildet diese Menge **nicht** identisch ab. Deshalb gilt für 5D verbindlich:
 
-- Es wird ein Prädikat `legacyClipReadyEquivalent(state)` mit genau der obigen Menge eingeführt und für jeden Reader verwendet, der heute `clip_status === 'ready'` prüft.
+- Es wird ein Prädikat `legacyClipReadyEquivalent(scene)` eingeführt, das **Hauptzustand und effektive Output-Existenz** auswertet (Signatur: `legacyClipReadyEquivalent({ state, hasEffectiveOutput })`, abgeleitet über `sceneState(row)` und `resolveSceneOutput(row).effectiveUrl`). Vertrag: die sieben Zustände oben → ready; zusätzlich `failed` **mit** vorhandenem gültigem Output → ebenfalls Legacy-ready. Ein reiner Zustands-Lookup wäre unvollständig und ist untersagt.
 - `isRealizedState()` wird nur dort eingesetzt, wo ein Paritätstest über eine Fixture-Matrix aller 12 Zustände × `clip_url` vorhanden/leer beweist, dass beide Ausdrücke dieselbe Menge liefern.
 - Betroffen und einzeln nachzuweisen: `compose-video-assemble` (Z. 150/164), `compose-stitch-and-handoff` (Z. 87-88), `compose-clip-webhook` Projektfortschritt (Z. 495, 712-722).
 - Der `failed`-Sonderfall mit vorhandener `clip_url` wird als eigener Testfall geführt.
