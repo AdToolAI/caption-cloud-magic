@@ -577,17 +577,22 @@ export function resolveVisualInputs(args: ResolveVisualInputsArgs): ResolvedVisu
   if (dropped.length > 0) warnings.push(`references_trimmed:${dropped.length}`);
   if (dropped.some((r) => r.protected)) warnings.push("protected_reference_dropped");
 
-  const useContinuityFrame = transition === "frame-chain" || transition === "endframe-bridge";
+  // v428 second layer: a lip-sync scene never takes a continuity frame,
+  // whatever arbitration returned. Plate input === geometry anchor.
+  const useContinuityFrame = !requirements.lipSync &&
+    (transition === "frame-chain" || transition === "endframe-bridge");
 
   // The anchor stays the first frame for every non-continuity outcome. For a
-  // lip-sync scene the transition is always `match-cut`, so this is always the
-  // anchor — byte-identical to the pre-resolver behaviour.
+  // lip-sync scene it is the ONLY possible outcome.
   const exclusiveReferencePayload = profile.mode === "exclusive" && inputMode === "references";
-  const firstFrameUrl = exclusiveReferencePayload
+  const firstFrameUrl = requirements.lipSync
+    ? anchorImageUrl
+    : exclusiveReferencePayload
     ? undefined
     : useContinuityFrame
     ? previousFrameUrl
     : anchorImageUrl;
+
 
   // On an exclusive-slot provider the chosen input mode owns the only slot.
   // When the anchor took it, no reference image may travel with the request.
