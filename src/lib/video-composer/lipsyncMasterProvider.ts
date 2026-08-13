@@ -1,4 +1,5 @@
 import type { ClipSource } from '@/types/video-composer';
+import { clampDurationForSource } from '@/lib/composer/durationClamp';
 
 /**
  * v425 — Lip-Sync provider contract.
@@ -42,11 +43,13 @@ export function resolveDialogMasterProvider(source: string | null | undefined): 
     : LIPSYNC_PRIMARY_PROVIDER;
 }
 
+/**
+ * v430 — clamp semantics live in the shared leaf `composer/durationClamp.ts`
+ * (also used by the provider matrix). Values are unchanged:
+ * Hailuo 6/10 buckets, HappyHorse continuous 3–15 s.
+ */
 export function clampDialogMasterDuration(provider: DialogMasterProvider, duration: number): number {
-  const picked = Number.isFinite(duration) ? Math.ceil(duration) : 6;
-  if (provider === 'ai-hailuo') return picked >= 10 ? 10 : 6;
-  // HappyHorse: continuous 3–15s
-  return Math.min(15, Math.max(3, picked));
+  return clampDurationForSource(provider, duration, []);
 }
 
 export const DIALOG_MASTER_PROVIDER_LABELS: Record<DialogMasterProvider, string> = {
