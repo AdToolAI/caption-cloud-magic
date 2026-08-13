@@ -92,18 +92,30 @@ Der Insert-Zweig der Bridge leitet `idle` beim Anlegen aus Legacy ab; ein separa
 | Refund/Failure (`lipsync-fail.ts`, v427-Ledger) | Legacy-Fail-Marker; Ledger selbst ist Legacy-frei | teils — Refund-Trigger bleibt vorerst Legacy |
 | `composer_pipeline_jobs` | keine Legacy-Spalten | bereits sauber |
 
-## Empfehlung: Schritt 5 anders zuschneiden
+## Umsetzung Schritt 5 — rein strukturell, ohne Bridge-Abschaltung
 
-Die vorgeschlagene Reihenfolge ist richtig, aber der letzte Schritt („Legacy→State-Bridge abschalten") ist mit der heutigen Lip-Sync-Kette nicht erreichbar, ohne genau die Semantik zu ändern, die geschützt ist. Vorschlag:
+Die Rückwärts-Bridge bleibt in Schritt 5 vollständig und global aktiv. Keine szenengebundene Abschaltung: eine Bridge, die von `scene_lipsync_intentional()` abhängt, würde zwei Orchestrierungsregeln in derselben Tabelle erzeugen, und der Lip-Sync-Intent einer Szene kann sich über ihre Lebenszeit ändern.
 
-1. **5A — Inventar festnageln:** Contract-Test, der die obige Writer-Tabelle einfriert. Neue Legacy-only Writer außerhalb einer expliziten Allowlist lassen den Test rot werden.
-2. **5B — Nicht-Lip-Sync-Writer auf dual umstellen:** `qa-watchdog`, `recover-stuck-composer-clip`, `remotion-webhook`, `generate-talking-head`, `compose-scene-anchor`, `auto-director-compose`, `motion-studio-superuser`, `autopilotComposerBridge`. Lip-Sync-Kette bleibt unangetastet.
-3. **5C — Sub-Zustände retten:** Spalte `pipeline_substate text` (reiner Anzeige-/Filterwert, kein Gate) für `awaiting_manual_face_map`, `awaiting_confirmation`, `circuit_open`, `deferred`, `needs_clip_rerender`, `anchor*`, `syncso_*`. Von der Vorwärts-Bridge mitgeschrieben. Erst danach ist der Informationsverlust bei Frage 2 gelöst.
-4. **5D — Backend-Leser umstellen** (Tabelle Frage 4), Watchdog explizit als Compatibility-Leser dokumentiert und getestet.
-5. **5E — Client-Leser** auf `sceneStateOf()` + `pipeline_substate` migrieren; Legacy-Zugriffe im Client per Lint-/Contract-Test sperren.
-6. **5F — Bridge-Abschaltung nur szenengebunden:** Legacy → State wird per Flag deaktiviert, aber **nur für Szenen ohne Lip-Sync-Intent** (`scene_lipsync_intentional() = false`). Lip-Sync-Szenen behalten die Rückwärtsrichtung, bis die Lip-Sync-Kette selbst auf Transitions umgestellt wird — das ist ein eigener Schritt (v431) mit eigenem Vertrag.
-7. **5G — Regressionstests + STOP.** Keine Spalte wird gelöscht; Vorwärtsrichtung State → Legacy bleibt dauerhaft.
+1. **5A — Writer-Inventar einfrieren.** Contract-Test mit expliziter Allowlist der bekannten Legacy-only Lip-Sync-Writer (`compose-dialog-segments`, `sync-so-webhook`, `lipsync-watchdog`, `compose-twoshot-audio`, `render-sync-segments-audio-mux`, `_shared/lipsync-fail.ts`, `reset-lipsync-scene`, `cancel-dialog-lipsync`, `report-lipsync-motion-probe`). Jeder neue Legacy-only Writer außerhalb der Liste macht den Test rot. Semantik dieser Pfade wird nicht angefasst.
+2. **5B — Alle Nicht-Lip-Sync-Writer dualisieren:** `qa-watchdog`, `recover-stuck-composer-clip`, `remotion-webhook`, `generate-talking-head`, `compose-scene-anchor`, `auto-director-compose`, `motion-studio-superuser`, `qa-weekly-deep-sweep`, `autopilotComposerBridge`. Sie schreiben künftig zusätzlich über `composer_scene_transition()`.
+3. **5C — `pipeline_substate` einführen.** Vertrag: `pipeline_state` = orchestrierungsrelevanter Hauptzustand, `pipeline_substate` = diagnostischer/UI-relevanter Unterzustand und **niemals** Gate für State-Transitions. Befüllung ausschließlich in dieser Richtung:
 
-## Offene Entscheidung
+```text
+Legacy Lip-Sync Writer → twoshot_stage / Spezialstatus → Compatibility-Mirror → pipeline_substate
+migrierte Writer-Pfade → pipeline_substate direkt
+```
 
-Punkt 6 ist die einzige echte Abweichung von deinem Entwurf. Alternative wäre, die Rückwärts-Bridge in Schritt 5 gar nicht anzufassen und die Abschaltung komplett nach v431 zu verschieben.
+   Nicht `pipeline_state → pipeline_substate` — das wäre informationsverlustbehaftet. Abgedeckte Werte: `awaiting_manual_face_map`, `awaiting_confirmation`, `circuit_open`, `deferred`, `needs_clip_rerender`, `anchor`, `anchor_soft_pass`, `preview`, `syncso_pass_%`, `syncso_fanout_%`, `syncso_retry_%`, `audio_mux_failed`.
+4. **5D — Backend-Reader migrieren.** Alles, was Hauptzustände braucht, liest `pipeline_state`. Nur Funktionen, die echte Lip-Sync-Unterzustände brauchen, lesen weiter Legacy — `lipsync-watchdog` ist die bewusst dokumentierte Ausnahme (Scan-Filter auf `syncso_%`, `circuit_open`, `deferred`).
+5. **5E — Client vollständig auf `sceneStateOf()` + `pipeline_substate`.** Danach interpretiert kein normaler UI-Code mehr selbst `clip_status`, `twoshot_stage` oder `lip_sync_status`; ein Contract-Test sperrt neue Direktzugriffe.
+6. **5F — Reverse Bridge bleibt unverändert aktiv.** Keine teilweise Abschaltung, kein Flag.
+7. **5G — Regressionstests, Deployments, STOP.** Keine Legacy-Spalte wird gelöscht; die Vorwärtsrichtung State → Legacy bleibt dauerhaft.
+
+## Danach: v431 (eigener Schritt, nicht Teil von Schritt 5)
+
+Lip-Sync-Legacy-Writer auf `composer_scene_transition()` + `pipeline_substate` umstellen → letzten Legacy-only Writer entfernen → Vertragstests → Bridge Legacy → State **global** abschalten.
+
+## Datenlage
+
+Kein Backfill nötig: 4.246 Szenen, 0 mit `pipeline_state IS NULL`, 0 Widersprüche zwischen State und Legacy-Derivat. Schritt 5 bleibt eine rein strukturelle Änderung ohne Datenrettung.
+
