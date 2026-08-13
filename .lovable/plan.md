@@ -44,21 +44,31 @@ Zusätzlich geprüft und mitmigriert, sofern reine Leser:
 
 ## Allowlist (bewusst geschützte Legacy-Pfade)
 
-Diese Stellen dürfen Legacy-Spalten weiter lesen und werden im Scanner
-namentlich freigegeben:
+Die Allowlist gilt **feld- und nutzungsbezogen**, nicht pauschal pro Datei.
+Erlaubt sind nur reine Mapping-/Serialisierungszugriffe (Feld lesen und
+unverändert weiterreichen). Sobald eine Stelle aus einem Legacy-Feld einen
+Zustand *ableitet*, wird sie in 5E migriert — auch wenn die Datei sonst
+allowlisted ist. Der Scanner arbeitet deshalb mit Datei+Zeilenbereich bzw.
+markierten Ausnahmen (`// legacy-mapping-allowed: <Grund>`), nie mit einer
+reinen Dateiliste.
 
 - `src/lib/composer/sceneState.ts` — die Bridge-Ableitung selbst
 - `src/lib/composer/output/resolveSceneOutput.ts` — Output-Legacy-Toleranz
-- `src/pages/DebugLipsync.tsx` — Diagnose-/Debug-Ansicht
-- `src/lib/video-composer/lipSyncPending.ts` — Lip-Sync-Kompatibilitätspfad,
-  falls die Semantik nicht 1:1 abbildbar ist
-- `src/integrations/supabase/types.ts`, Persistenz-/Mapping-Layer
-  (`useComposerPersistence`, `sceneSnapshot`) für reines Feld-Mapping
-- Schreibpfade (`useSceneGenerate`, `useApplyProductionPlan`,
+- `src/pages/DebugLipsync.tsx` — reine Diagnose-/Debug-Ansicht, zeigt die
+  Rohspalten absichtlich an
+- `src/lib/video-composer/lipSyncPending.ts` — zuerst prüfen: interpretiert die
+  Datei Zustand, wird sie migriert; nur Feld-Mapping bleibt markiert erlaubt
+- `src/lib/video-composer/sceneSnapshot.ts`, `useComposerPersistence` —
+  Snapshot/Persistenz: Feld-Mapping erlaubt, jede Zustandsableitung darin wird
+  migriert
+- `src/integrations/supabase/types.ts` — generierte Typen
+- Writer-Dateien (`useSceneGenerate`, `useApplyProductionPlan`,
   `useApplyBriefingManifest`, `spawnCoverageScenes`, `buildAdScenes`,
-  `spawnAdCampaignChildren`) — 5E ändert keine Writer
+  `spawnAdCampaignChildren`): nur die **Schreib**-Zugriffe auf Legacy-Spalten
+  sind erlaubt. Lesende Zustandsinterpretation in diesen Dateien wird migriert
+  und vom Scanner weiterhin blockiert.
 
-Jeder Allowlist-Eintrag bekommt im Test eine Begründung.
+Jeder Ausnahme-Marker trägt eine kurze Begründung und wird im Test geprüft.
 
 ## Nicht-Ziele
 
