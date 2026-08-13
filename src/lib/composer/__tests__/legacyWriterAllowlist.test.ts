@@ -115,14 +115,16 @@ function hasLegacyWrite(source: string): boolean {
 }
 
 function hasTransitionCall(source: string): boolean {
-  // Explicit transition RPC/helper, the v430 materializer, or a direct
-  // pipeline_state / pipeline_substate write on insert/update. Any of these
-  // count as a dual writer because the modern state columns are being
-  // authored alongside the legacy compatibility columns.
+  // Explicit transition RPC/helper or a direct pipeline_state /
+  // pipeline_substate write on insert/update.
+  //
+  // v430 Step 5D: `materializeCompatibilityOutput()` is NOT a state dual-write.
+  // It only writes base_video_url / processed_video_url / clip_url and never
+  // touches `pipeline_state`. Treating it as a dual-write produced false
+  // negatives (generate-talking-head, remotion-webhook).
   return (
     /composer_scene_transition\s*\(/.test(source) ||
     /transitionScene\s*\(/.test(source) ||
-    /materializeCompatibilityOutput\s*\(/.test(source) ||
     /['"]pipeline_state['"]\s*:/.test(source) ||
     /['"]pipeline_substate['"]\s*:/.test(source)
   );
