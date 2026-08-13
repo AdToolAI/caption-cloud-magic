@@ -386,9 +386,13 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           clipStatus: dbClipStatus as ComposerScene['clipStatus'],
 
           clipUrl: dbScene.clip_url || undefined,
+          baseVideoUrl: (dbScene as any).base_video_url ?? null,
+          processedVideoUrl: (dbScene as any).processed_video_url ?? null,
           pipelineState: (dbScene as any).pipeline_state,
           pipelineStateAt: (dbScene as any).pipeline_state_at,
           pipelineStateRunId: (dbScene as any).pipeline_state_run_id,
+          pipelineSubstate: (dbScene as any).pipeline_substate ?? null,
+          pipelineSubstateAt: (dbScene as any).pipeline_substate_at ?? null,
           activeRunId: (dbScene as any).active_run_id,
           plateGeneration: (dbScene as any).plate_generation,
           plateReadyGeneration: (dbScene as any).plate_ready_generation,
