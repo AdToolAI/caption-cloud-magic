@@ -35,16 +35,28 @@ Ein Zeilenzahl-Vergleich reicht nicht — gleiche Anzahl bei geändertem Text bl
 - `SceneCard.tsx` — Preflight: Generieren-Button blockiert mit klarer Meldung, wenn die geschätzte Sprechdauer das Plate-Limit sprengt.
 - `supabase/functions/compose-twoshot-audio/index.ts` — **eine** Abgleichstufe vor der TTS; danach unverändert weiter.
 
+**Server-Canonicalization muss persistieren**
+- Erkennt `compose-twoshot-audio` eine Divergenz und richtet aus, werden die kanonischen Turns **vor der TTS in `dialog_turns` geschrieben**.
+- Schlägt diese Persistenz fehl: **fail-closed** — keine TTS starten, Fehler zurückgeben. Andernfalls wäre nur der aktuelle Run repariert und die DB bliebe inkonsistent.
+- Der Schreibvorgang ist idempotent und behält stabile Turn-IDs bei.
+
 **Do not touch**
 - `compose-dialog-segments` (Pass-Aufbau, v95-Split, v194-Stabilizer), Geometrie-/Assignment-Kette, Sync.so-Dispatch, `sync-so-webhook`, `beginSceneRun`, `reset-lipsync-scene`.
 - Der Duration-Hard-Guard und die 5s-Auto-Extend-Grenze in `compose-twoshot-audio` bleiben zeilengleich.
-- Keine Migration, keine neuen Spalten, keine Änderung an `dialog_turns`-IDs.
+- Keine Migration, keine neuen Spalten. Turn-IDs unveränderter Zeilen bleiben identisch.
 
 **Akzeptanzkriterien**
-- Szene `b34d1eae…` (4 Skriptzeilen, 6 gespeicherte Turns) vertont nach dem Fix 4 Turns und läuft durch.
+- Szene `b34d1eae…` resolved nach dem Fix **exakt 4 effektive Turns**. Liegen sie im Preflight-Limit, startet der Render und `compose-twoshot-audio` vertont ausschließlich diese 4 Turns. Sind sie tatsächlich zu lang, blockiert der UI-Preflight **vor** Credit-Verbrauch; der Server-Hard-Guard bleibt letzte Instanz.
 - Fall „gleiche Anzahl, geänderter Text" wird als Divergenz erkannt.
+- A → B → A bleibt drei Turns.
+- Leeres `dialog_script` lässt bestehende `dialog_turns` unangetastet.
 - Turn-IDs bleiben bei unveränderten Zeilen stabil (V201).
-- Alle 118 bestehenden Lip-Sync-Tests plus die neuen Vertragstests grün, `tsgo` sauber.
+- Die TTS erhält ausschließlich das Ergebnis von `resolveEffectiveDialog()` — kein zweiter versteckter Fallback-Pfad.
+- Alle 118 bestehenden Lip-Sync-Tests plus die neuen Contract-/Parity-Tests grün, `tsgo` sauber.
+
+**Abschlussregel**
+Nach Schritt 0 wird gestoppt und berichtet: Änderungen, Testergebnisse und alle Abweichungen vom Auftrag. Schritt 1 beginnt unter keinen Umständen automatisch.
+
 
 
 ## Schritt 1 — Output-Semantik (kompatibel, kein Big Bang)
