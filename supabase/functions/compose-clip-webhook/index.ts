@@ -218,6 +218,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const sceneUpdate: Record<string, unknown> = {
         // v430 Step 1 — plate delivery goes through the single writer.
         ...materializeCompatibilityOutput('base', { baseUrl: permanentUrl }),
+        // v430 Step 4 — stamp the continuity input THIS run was dispatched
+        // with (immutable snapshot, never the scene's current binding), so a
+        // later re-binding shows up as "needs re-render" instead of silently
+        // pretending the existing video already used it.
+        ...(await continuityRenderedPatch(supabase, sceneId, { runId })),
         clip_status: 'ready',
         clip_error: null,
         updated_at: new Date().toISOString(),
