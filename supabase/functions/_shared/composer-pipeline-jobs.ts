@@ -48,6 +48,7 @@ export const NON_TERMINAL_STATUSES: PipelineJobStatus[] = [
   "dispatching",
   "dispatched",
   "running",
+  "callback_processing",
 ];
 
 export const TERMINAL_STATUSES: PipelineJobStatus[] = [
@@ -56,6 +57,13 @@ export const TERMINAL_STATUSES: PipelineJobStatus[] = [
   "cancelled",
   "stale",
 ];
+
+/** v427A3+ — callback delivery lifecycle, separate from the job lifecycle. */
+export type CallbackDeliveryStatus =
+  | "received"
+  | "processing"
+  | "succeeded"
+  | "failed_redeliverable";
 
 export type RejectReason =
   | "stale_callback"
