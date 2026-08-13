@@ -25,7 +25,8 @@ const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
 describe('v430/4 pure layer', () => {
   it('performs no I/O — no supabase, fetch, Deno or DB access', () => {
     for (const p of [CLIENT, SERVER]) {
-      const src = read(p);
+      // Comments legitimately name the mirror file path — check code only.
+      const src = read(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
       expect(src).not.toMatch(/supabase/i);
       expect(src).not.toMatch(/\bfetch\(/);
       expect(src).not.toMatch(/\bDeno\./);
