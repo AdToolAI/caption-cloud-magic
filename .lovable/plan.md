@@ -11,9 +11,12 @@ Zustandsmaschine gelesen:
 - Hauptzustand: `sceneState(scene)` aus `src/lib/composer/sceneState.ts`
 - Detailzustand: `sceneSubstate(scene)` (v430 5C)
 - Output-Fragen: `resolveSceneOutput(scene)` / `resolveSceneSourcePlate(scene)`
-- Legacy-Anzeigewerte nur noch über `clipStatusFromState(sceneState(scene))`
-- Ready/Failed-Klassifikation nur über `legacyClipReadyEquivalentRow()` /
-  `legacyClipFailedEquivalentRow()` (exklusiv, `failed` + Output = ready)
+- Ready/Failed-Gates ausschliesslich über `legacyClipReadyEquivalentRow()` /
+  `legacyClipFailedEquivalentRow()` (exklusiv, output-aware: `failed` +
+  vorhandener effektiver Output = ready, niemals zusätzlich failed)
+- `clipStatusFromState(sceneState(scene))` NUR für nicht-gatende Legacy-
+  Anzeigeprojektionen (Badge-Text, Icon, Sortierung). Niemals für eine
+  Ready/Failed-Entscheidung — der Funktion fehlt die Output-Information.
 
 Direkte Interpretation von `clip_status`, `twoshot_stage`, `lip_sync_status`
 im UI ist danach verboten und wird durch einen Scanner-Test blockiert.
