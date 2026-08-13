@@ -378,9 +378,13 @@ export default function VideoComposerDashboard() {
             lipSyncStatus: (row as any).lip_sync_status ?? null,
             clipUrl: row.clip_url ?? undefined,
             clipStatus: (row.clip_status || 'pending') as ClipStatus,
+            baseVideoUrl: (row as any).base_video_url ?? null,
+            processedVideoUrl: (row as any).processed_video_url ?? null,
             pipelineState: (row as any).pipeline_state,
             pipelineStateAt: (row as any).pipeline_state_at,
             pipelineStateRunId: (row as any).pipeline_state_run_id,
+            pipelineSubstate: (row as any).pipeline_substate ?? null,
+            pipelineSubstateAt: (row as any).pipeline_substate_at ?? null,
             activeRunId: (row as any).active_run_id,
             plateGeneration: (row as any).plate_generation,
             plateReadyGeneration: (row as any).plate_ready_generation,
@@ -574,9 +578,13 @@ export default function VideoComposerDashboard() {
             // playing an old / wrong clip while the new render is pending.
             clipUrl: row.clip_url ?? undefined,
             clipStatus: (row.clip_status || 'pending') as ClipStatus,
+            baseVideoUrl: (row as any).base_video_url ?? null,
+            processedVideoUrl: (row as any).processed_video_url ?? null,
             pipelineState: (row as any).pipeline_state,
             pipelineStateAt: (row as any).pipeline_state_at,
             pipelineStateRunId: (row as any).pipeline_state_run_id,
+            pipelineSubstate: (row as any).pipeline_substate ?? null,
+            pipelineSubstateAt: (row as any).pipeline_substate_at ?? null,
             activeRunId: (row as any).active_run_id,
             plateGeneration: (row as any).plate_generation,
             plateReadyGeneration: (row as any).plate_ready_generation,
@@ -936,7 +944,7 @@ export default function VideoComposerDashboard() {
     try {
       const { data } = await supabase
         .from('composer_scenes')
-        .select('id, clip_status, clip_url, cost_euros, pipeline_state, pipeline_state_at, pipeline_state_run_id, active_run_id, plate_generation, plate_ready_generation')
+        .select('id, clip_status, clip_url, base_video_url, processed_video_url, cost_euros, pipeline_state, pipeline_state_at, pipeline_state_run_id, pipeline_substate, pipeline_substate_at, active_run_id, plate_generation, plate_ready_generation')
         .eq('project_id', project.id);
       if (!data) return;
       setProject(prev => ({
@@ -949,9 +957,13 @@ export default function VideoComposerDashboard() {
             clipStatus: (fresh.clip_status || s.clipStatus) as ClipStatus,
             clipUrl: fresh.clip_url ?? undefined,
             costEuros: Number(fresh.cost_euros ?? s.costEuros),
+            baseVideoUrl: (fresh as any).base_video_url ?? null,
+            processedVideoUrl: (fresh as any).processed_video_url ?? null,
             pipelineState: fresh.pipeline_state,
             pipelineStateAt: fresh.pipeline_state_at,
             pipelineStateRunId: fresh.pipeline_state_run_id,
+            pipelineSubstate: (fresh as any).pipeline_substate ?? null,
+            pipelineSubstateAt: (fresh as any).pipeline_substate_at ?? null,
             activeRunId: fresh.active_run_id,
             plateGeneration: fresh.plate_generation,
             plateReadyGeneration: fresh.plate_ready_generation,
