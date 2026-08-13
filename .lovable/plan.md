@@ -14,9 +14,14 @@ Zustandsmaschine gelesen:
 - Ready/Failed-Gates ausschliesslich über `legacyClipReadyEquivalentRow()` /
   `legacyClipFailedEquivalentRow()` (exklusiv, output-aware: `failed` +
   vorhandener effektiver Output = ready, niemals zusätzlich failed)
-- `clipStatusFromState(sceneState(scene))` NUR für nicht-gatende Legacy-
-  Anzeigeprojektionen (Badge-Text, Icon, Sortierung). Niemals für eine
-  Ready/Failed-Entscheidung — der Funktion fehlt die Output-Information.
+- Legacy-Parität (alles, was den bisherigen `clip_status` semantisch
+  reproduziert — Darstellung wie Verhalten) läuft über einen neuen
+  output-aware Projektionshelper `legacyClipStatusEquivalentRow(scene)` in
+  `src/lib/composer/sceneState.ts`. Er liefert `pending | generating | ready |
+  failed` und klassifiziert `failed` + effektiver Output als `ready`.
+- `clipStatusFromState(sceneState(scene))` NUR dort, wo bewusst der neue
+  Pipeline-State dargestellt wird und keine Legacy-Parität nötig ist. Nicht
+  für Filter, Sortierung, Buttons, Progress, Export- oder Render-Gates.
 
 Direkte Interpretation von `clip_status`, `twoshot_stage`, `lip_sync_status`
 im UI ist danach verboten und wird durch einen Scanner-Test blockiert.
