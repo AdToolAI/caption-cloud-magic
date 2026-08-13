@@ -42,7 +42,7 @@ Zusätzlich bleibt bei `failed` mit vorhandener `clip_url` der alte `clip_status
 
 `isRealizedState()` bildet diese Menge **nicht** identisch ab. Deshalb gilt für 5D verbindlich:
 
-- Es wird ein Prädikat `legacyClipReadyEquivalent(state)` mit genau der obigen Menge eingeführt und für jeden Reader verwendet, der heute `clip_status === 'ready'` prüft.
+- Es wird ein Prädikat `legacyClipReadyEquivalent(scene)` eingeführt, das **Hauptzustand und effektive Output-Existenz** auswertet (Signatur: `legacyClipReadyEquivalent({ state, hasEffectiveOutput })`, abgeleitet über `sceneState(row)` und `resolveSceneOutput(row).effectiveUrl`). Vertrag: die sieben Zustände oben → ready; zusätzlich `failed` **mit** vorhandenem gültigem Output → ebenfalls Legacy-ready. Ein reiner Zustands-Lookup wäre unvollständig und ist untersagt.
 - `isRealizedState()` wird nur dort eingesetzt, wo ein Paritätstest über eine Fixture-Matrix aller 12 Zustände × `clip_url` vorhanden/leer beweist, dass beide Ausdrücke dieselbe Menge liefern.
 - Betroffen und einzeln nachzuweisen: `compose-video-assemble` (Z. 150/164), `compose-stitch-and-handoff` (Z. 87-88), `compose-clip-webhook` Projektfortschritt (Z. 495, 712-722).
 - Der `failed`-Sonderfall mit vorhandener `clip_url` wird als eigener Testfall geführt.
@@ -61,8 +61,8 @@ Zusätzlich bleibt bei `failed` mit vorhandener `clip_url` der alte `clip_status
 
 | Datei | Heutiger Legacy-Read | Ziel |
 |---|---|---|
-| `compose-video-assemble:150,164` | `clip_status === 'ready'` | `legacyClipReadyEquivalent(sceneState(s))` |
-| `compose-stitch-and-handoff:87-88` | zählt `ready` / `failed` | `legacyClipReadyEquivalent()` / `sceneState() === 'failed'` |
+| `compose-video-assemble:150,164` | `clip_status === 'ready'` | `legacyClipReadyEquivalent(s)` (Zustand + Output) |
+| `compose-stitch-and-handoff:87-88` | zählt `ready` / `failed` | `legacyClipReadyEquivalent(s)` / `sceneState(s) === 'failed'` |
 | `compose-clip-webhook:495,712-722` | Projektfortschritt | dito, SQL-Filter auf `pipeline_state` |
 | `compose-video-clips:1804-1810` | `clip_status`-Guard | `sceneState()` |
 | `modelark-poll:114` | `.eq('clip_status','generating')` | `.eq('pipeline_state','plate_rendering')` |
@@ -76,6 +76,8 @@ Explizite Legacy-Ausnahmen (unverändert, nur kommentiert): `lipsync-watchdog`, 
 - Nur Lesepfade; keine Zustandssemantik, keine Lip-Sync-Logik ändern.
 - Verhalten 1:1 identisch; jede Abweichung ist ein Bug, keine Verbesserung.
 - Reader lesen ausschließlich über `sceneState()` / `sceneSubstate()`.
+- `legacyClipReadyEquivalent` berücksichtigt Hauptzustand **und** vorhandenen effektiven Output, damit `failed` + bestehende Plate legacy-paritätisch bleibt.
+- `modelark-poll` verwendet ausschließlich `pipeline_state = 'plate_rendering'`; kein Legacy-Fallback.
 
 ## Teil 3 — Tests
 
