@@ -75,8 +75,9 @@ Explizite Legacy-Ausnahmen (unverändert, nur kommentiert): `lipsync-watchdog`, 
 
 - Nur Lesepfade; keine Zustandssemantik, keine Lip-Sync-Logik ändern.
 - Verhalten 1:1 identisch; jede Abweichung ist ein Bug, keine Verbesserung.
-- Reader lesen ausschließlich über `sceneState()` / `sceneSubstate()`.
-- `legacyClipReadyEquivalent` berücksichtigt Hauptzustand **und** vorhandenen effektiven Output, damit `failed` + bestehende Plate legacy-paritätisch bleibt.
+- Statusinterpretation ausschließlich über `sceneState()` / `sceneSubstate()`; Output-Existenz ausschließlich über `resolveSceneOutput()`. Keine direkte Interpretation von `clip_status`, `twoshot_stage` oder `lip_sync_status` außerhalb der Allowlist.
+- `legacyClipReadyEquivalent(scene)` = Zustand über `sceneState()` **plus** Output-Existenz über `resolveSceneOutput()`. Es gibt nur diese eine Variante.
+- Ready/Failed werden **exklusiv** klassifiziert: `ready = legacyClipReadyEquivalent(scene)`, `failed = !ready && sceneState(scene) === 'failed'`. Das gilt auch für SQL-/Projektfortschrittslogik — ein reiner `pipeline_state = 'failed'`-Filter ist unzulässig, wenn der alte `clip_status` wegen vorhandener Platte `ready` geblieben wäre.
 - `modelark-poll` verwendet ausschließlich `pipeline_state = 'plate_rendering'`; kein Legacy-Fallback.
 
 ## Teil 3 — Tests
