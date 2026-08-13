@@ -11,7 +11,7 @@
 
 import { AI_VIDEO_TOOLKIT_MODELS, type ToolkitModel } from '@/config/aiVideoModelRegistry';
 import { modelIdToSource } from '@/lib/video-composer/modelMapping';
-import { isLipsyncCertifiedProvider } from '@/lib/video-composer/lipsyncMasterProvider';
+import { providerIsLipsyncCertified } from '@/lib/composer/providerMatrix';
 import type { VisualInputProfile } from './types';
 
 
@@ -22,7 +22,7 @@ import type { VisualInputProfile } from './types';
  * keep a second, drifting list.
  */
 function isLipSyncCertified(model: ToolkitModel): boolean {
-  return isLipsyncCertifiedProvider(modelIdToSource(model.id).clipSource);
+  return providerIsLipsyncCertified(modelIdToSource(model.id).clipSource);
 }
 
 

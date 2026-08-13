@@ -1,3 +1,5 @@
+import { LIPSYNC_CERTIFIED_SOURCES } from "./provider-matrix.ts";
+
 /**
  * AI video sources implemented by compose-video-clips.
  *
@@ -27,10 +29,7 @@ export function isSupportedComposerAiSource(source: string): boolean {
  * for the Cinematic-Sync / Sync.so pipeline. Mirror of
  * `src/lib/video-composer/lipsyncMasterProvider.ts`.
  */
-export const LIPSYNC_CERTIFIED_AI_SOURCES = new Set([
-  "ai-happyhorse",
-  "ai-hailuo",
-]);
+export const LIPSYNC_CERTIFIED_AI_SOURCES = new Set<string>(LIPSYNC_CERTIFIED_SOURCES);
 
 export const LIPSYNC_PRIMARY_AI_SOURCE = "ai-happyhorse";
 
