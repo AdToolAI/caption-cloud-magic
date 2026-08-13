@@ -191,7 +191,7 @@ Kein Eingriff in die State Machine, kein neues Flag, kein zweiter Wahrheitsbegri
 - `materializeCompatibilityOutput()` bleibt unverändert auf den Output-Patch von Szene A beschränkt — kein Cross-Scene-Write und kein Setzen von `continuity_stale`.
 - Reset-Pfade:
   - `scene-hard-reset.ts` — Output wird wirklich entfernt → einmaliger expliziter Aufruf `propagateContinuityStaleness(sceneId, null)`.
-  - `reset-lipsync-scene` — processed → base, der effektive Output bleibt **non-null** → **kein** expliziter RPC; der normale DB-Trigger erkennt den Wechsel `processedUrl → baseUrl` bereits.
+  - `reset-lipsync-scene` — processed → base. **Kein** expliziter RPC und **keine** Stale-Propagation beim Reset selbst. Da der Lip-Sync-Intent bestehen bleibt, ist die zurückgesetzte Base-Plate kein finaler Output und der Finalitäts-Guard blockiert den Trigger. Erst der nächste erfolgreiche processed/Mux-Output darf Dependents neu bewerten.
   - `beginSceneRun()` bleibt unangetastet.
 - Dispatch schreibt den Continuity-Snapshot einmalig in die `plate_attempts`-Zeile (und beim Contract-Freeze in `composer_scene_runs`).
 - Neuer **reiner** Helper `src/lib/composer/continuity/continuityState.ts` (+ Backend-Spiegel): `isContinuityStale(storedSource, currentEffectiveUrl)`, `isSceneOutputFinal(scene)`, `needsContinuityRerender(...)` und `sceneWasEverRendered({ firstRenderedAt, completedPlateAttemptExists, legacyEffectiveUrl })`. Keine DB-Abfrage im Pure-Layer — `completedPlateAttemptExists` wird vom Aufrufer geladen und hineingereicht. Parity-Test Client/Server/SQL.
