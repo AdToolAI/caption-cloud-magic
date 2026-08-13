@@ -14,11 +14,17 @@ Zustandsmaschine gelesen:
 - Ready/Failed-Gates ausschliesslich über `legacyClipReadyEquivalentRow()` /
   `legacyClipFailedEquivalentRow()` (exklusiv, output-aware: `failed` +
   vorhandener effektiver Output = ready, niemals zusätzlich failed)
-- Legacy-Parität (alles, was den bisherigen `clip_status` semantisch
-  reproduziert — Darstellung wie Verhalten) läuft über einen neuen
-  output-aware Projektionshelper `legacyClipStatusEquivalentRow(scene)` in
-  `src/lib/composer/sceneState.ts`. Er liefert `pending | generating | ready |
-  failed` und klassifiziert `failed` + effektiver Output als `ready`.
+- **Kein universelles Vier-Werte-Abbild.** Es wird kein Helfer eingeführt, der
+  den gesamten alten `clip_status` auf `pending | generating | ready | failed`
+  reduziert — die Legacy-Domäne kennt auch `queued`, `canceled`,
+  `awaiting_manual_face_map`, `awaiting_confirmation`. Stattdessen:
+  - `queued`, `canceled`, laufende Zustände direkt über `sceneState()`
+  - Spezialzustände über `sceneSubstate()`
+  - nur die Ready/Failed-Grenze über die output-aware exklusiven Helfer
+  Falls doch eine geschlossene Projektion nötig wird
+  (`legacyClipStatusEquivalentRow()`), muss sie die vollständige relevante
+  Legacy-Domäne inkl. `queued`, `canceled` und der Substate-Sonderfälle
+  abbilden und dokumentiert getestet sein.
 - `clipStatusFromState(sceneState(scene))` NUR dort, wo bewusst der neue
   Pipeline-State dargestellt wird und keine Legacy-Parität nötig ist. Nicht
   für Filter, Sortierung, Buttons, Progress, Export- oder Render-Gates.
@@ -84,20 +90,28 @@ Jeder Ausnahme-Marker trägt eine kurze Begründung und wird im Test geprüft.
 
 ## Technische Umsetzung
 
-1. **Reader-Migration** Datei für Datei, semantikgleich. Jede bisher von
-   `clip_status` abhängige Darstellung oder Verhaltenslogik wird output-aware:
-   `legacyClipStatusEquivalentRow()` für die Vier-Werte-Projektion,
-   `legacyClipReadyEquivalentRow()` / `legacyClipFailedEquivalentRow()` für
-   Ready/Failed-Entscheidungen (Buttons, Filter, Sortierung,
+1. **Reader-Migration** Datei für Datei, semantikgleich. Zustände über
+   `sceneState()`, Sonderfälle über `sceneSubstate()`, Ready/Failed
+   ausschliesslich über `legacyClipReadyEquivalentRow()` /
+   `legacyClipFailedEquivalentRow()` (Buttons, Filter, Sortierung,
    Fortschrittszählung, Export- und Render-Gates).
    `failed` + effektiver Output bleibt überall `ready`.
 2. **Contract-Scanner** `src/lib/composer/__tests__/clientReaderContract5E.test.ts`:
    scannt `src/components/**`, `src/hooks/**`, `src/pages/**`,
-   `src/lib/video-composer/**`, `src/lib/composer/**` (ohne `__tests__`) auf
-   `clip_status|clipStatus|twoshot_stage|twoshotStage|lip_sync_status|lipSyncStatus`
-   und failt bei jedem Treffer ohne Ausnahme-Marker. Die kanonischen Adapter
-   (`sceneState.ts`, `resolveSceneOutput.ts`) sind gezielt markierte Ausnahmen,
-   keine pauschalen Datei-Freigaben.
+   `src/lib/video-composer/**`, `src/lib/composer/**` (ohne `__tests__`).
+   Erkannt werden **direkte Legacy-Feldzugriffe**, nicht Identifier-
+   Substrings: Property-Access (`x.clip_status`, `x.clipStatus`,
+   `x.twoshot_stage`, `x.lip_sync_status`, …), Destructuring
+   (`const { clip_status } = …`), Bracket-Access (`x['clip_status']`),
+   Objekt-Keys in Vergleichen und String-Literale in Filterausdrücken.
+   Aufrufe der kanonischen Helfer (`clipStatusFromState`,
+   `legacyClipReadyEquivalentRow`, …) dürfen keine False Positives erzeugen —
+   dafür wird der Treffer AST-nah über den Ausdruckskontext klassifiziert
+   (bevorzugt TypeScript-AST via `ts.createSourceFile`, sonst ein
+   kontextsensitiver Source-Scanner). Ausnahmen nur über den Marker
+   `// legacy-mapping-allowed: <Grund>` an der konkreten Zeile; die kanonischen
+   Adapter (`sceneState.ts`, `resolveSceneOutput.ts`) sind so markiert, nicht
+   pauschal freigegeben.
 3. **Verhaltenstests** für die kritischen Projektionen: Fortschritt,
    Ready/Failed-Exklusivität, Substate-Gates (`awaiting_manual_face_map`,
    `circuit_open`, `anchor`), Auto-Trigger-Gates.
