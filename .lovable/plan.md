@@ -29,22 +29,22 @@ Heute steht die Datei komplett in der `SKIP_FILES`-Liste des Contract-Scanners. 
 
 ---
 
-## Teil B — Schritt 6 (UI-Aufräumen), Vorschlag zur Freigabe
+## Teil B — Schritt 6 (UI-Aufräumen), erst nach dem Teil-A-Bericht
 
 Nur Oberfläche und Begriffe. Kein Backend-Verhalten, keine Pipeline-Semantik.
 
-### 6.1 „Szenenaktionen“ statt Sammelbegriff „Reset“
-Ein gemeinsamer Einstieg „Szene verwalten / Szenenaktionen“ mit drei klar getrennten, unterschiedlich benannten Operationen — bewusst kein gemeinsamer Reset-Begriff:
+### 6.1 „Szenenaktionen“
+Ein gemeinsamer Einstieg „Szenenaktionen“ mit drei getrennt benannten Operationen — kein Sammelbegriff „Reset“:
 - **Lip-Sync neu erstellen** — bestehende Plate bleibt erhalten.
 - **Szene komplett neu erstellen** — vollständiger Run-Reset.
 - **Kontinuität aktualisieren** — nur der Anschluss wird neu gebunden, kein Render.
 
-Alle drei rufen die bereits bestehenden Backend-Pfade unverändert auf.
+Alle drei rufen die bestehenden Backend-Pfade unverändert auf.
 
-### 6.2 `transitionType` → `cutStyle` (Teil-Rename, entschieden)
-- Neuer Name `cutStyle` nur im Motion-Studio-/Composer-Modell und in der UI (`ComposerScene`, Storyboard-UI, Transition-Handle).
-- DB-Spalte bleibt `transition_type`, Render-Payloads bleiben unverändert, Remotion bleibt unverändert, Director's Cut bleibt unverändert.
-- Genau eine Adapter-/Mapping-Stelle `cutStyle ↔ transition_type`; kein Full-Rename, keine Migration.
+### 6.2 `transitionType` → `cutStyle` (Teil-Rename)
+- `cutStyle` nur im Composer-Modell und in der UI (`ComposerScene`, Storyboard-UI, Transition-Handle).
+- DB-Spalte `transition_type`, Render-Payloads, Remotion und Director's Cut bleiben unverändert.
+- Genau eine Adapter-Stelle `cutStyle ↔ transition_type`; kein Full-Rename, keine Migration.
 
 ### 6.3 Legacy-Begriffe aus der UI entfernen
 Sichtbare Restbegriffe wie „Two-Shot“, „Cinematic-Sync“, „Plate“, „twoshot_stage“ in Badges, Tooltips und Fehlermeldungen auf Kundensprache umstellen (DE/EN/ES über `i18nText`). Wichtig: interne Fehlercodes werden nicht vernichtet — der maschinenlesbare Code bleibt in Debug-/Detailansichten und in den Logs sichtbar, übersetzt wird nur der Kundentext.
