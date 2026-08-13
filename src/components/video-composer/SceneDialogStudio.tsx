@@ -844,20 +844,33 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   };
 
   /**
-   * Turns aligned to the *current* script. The editor decides how many lines
-   * exist; the canonical turns decide who speaks. Shortening the script now
+   * v430 Step 0 — the canonical dialog contract. The editor decides how many
+   * lines exist; the canonical turns decide who speaks. Shortening the script
    * really shortens the scene (blocks, speakers, seconds and persistence).
    */
-  const alignedTurns = useMemo(
+  const effectiveDialog = useMemo(
     () =>
-      alignDialogTurnsToScript({
-        turns: canonicalDialogTurns,
-        script,
-        resolveSpeakerId: resolveCastByName,
-      }),
+      resolveEffectiveDialog(
+        { dialogScript: script, dialogTurns: canonicalDialogTurns },
+        { resolveSpeakerId: resolveCastByName },
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [canonicalDialogTurns, script, sceneCast],
   );
+
+  const alignedTurns = effectiveDialog.turns.length > 0 ? effectiveDialog.turns : null;
+
+  // Alignment on *load*: a scene that was shortened elsewhere (plan apply,
+  // another tab, an earlier session that never flushed) arrives with a script
+  // of N lines and M persisted turns. Persist the canonical turns immediately
+  // so `compose-twoshot-audio` can never voice the stale list.
+  useEffect(() => {
+    if (isUserTypingRef.current) return;
+    if (script !== (scene.dialogScript ?? '')) return;
+    if (!effectiveDialog.diverged) return;
+    onUpdate({ dialogTurns: effectiveDialog.turns as ComposerScene['dialogTurns'] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.id, scene.dialogScript, effectiveDialog.diverged, effectiveDialog.reason, canonicalTurnsHash]);
 
   const idBlocks = useMemo<DialogBlock[] | null>(() => {
     const source = alignedTurns ?? (canonicalDialogTurns.length > 0 ? canonicalDialogTurns : null);
