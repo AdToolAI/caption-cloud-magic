@@ -34,6 +34,10 @@ const LIP_SYNC_LEGACY_ONLY: string[] = [
   "reset-lipsync-scene",
   "cancel-dialog-lipsync",
   "report-lipsync-motion-probe",
+  // v430 Step 5D: lip-sync fan-in finalisation (writes clip_status/lip_sync_status/
+  // twoshot_stage = done after the Remotion mux). Under the v400 freeze this path
+  // must not be dualised; the reverse bridge derives `complete` from it.
+  "remotion-webhook",
 ];
 
 /**
