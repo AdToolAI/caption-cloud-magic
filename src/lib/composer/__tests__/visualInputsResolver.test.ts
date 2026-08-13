@@ -153,6 +153,23 @@ describe('Seedance 2.5 specifics', () => {
     expect(plan.anchors.identity).toHaveLength(1);
   });
 
+  // v428: the same scene with lip-sync intent loses the clip reference.
+  it('drops the clip reference as soon as the scene is a lip-sync scene', () => {
+    const plan = resolveVisualInputs({
+      sceneClass: 'character',
+      requirements: req({ identityCritical: true, lipSync: true }),
+      profile: seedance25,
+      anchorImageUrl: 'https://x/anchor.jpg',
+      previousFrameUrl: 'https://x/prev.jpg',
+      previousClipUrl: 'https://x/prev.mp4',
+      references: [characterRef],
+    });
+    expect(plan.transition.mode).toBe('match-cut');
+    expect(plan.firstFrameUrl).toBe('https://x/anchor.jpg');
+    expect(plan.transition.sourceClipUrl).toBeUndefined();
+    expect(plan.references.some((r) => r.kind === 'video')).toBe(false);
+  });
+
   it('chains frames for a plain environment scene', () => {
     const plan = resolveVisualInputs({
       sceneClass: 'environment',
