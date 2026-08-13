@@ -132,10 +132,13 @@ serve(async (req) => {
       ) {
         sceneIdsWithLipsync.push(s.id);
       }
-      // v430 Step 5D: clip branch via sceneState(). Legacy parity:
-      // pending → idle, generating → plate_rendering.
-      const cs = sceneState(s);
-      if (cs === "idle" || cs === "plate_rendering") {
+      // v430 Step 5D: clip branch via sceneState(). Legacy parity to the old
+      // `clip_status === 'pending' || 'generating'` check:
+      //   pending  + active_run_id → plate_queued
+      //   pending  ohne run_id     → idle
+      //   generating               → plate_rendering
+      // Damit ist die Menge identisch zu composer-cancel-scene.
+      if (LIVE_CLIP_STATES.has(sceneState(s))) {
         sceneIdsWithClip.push(s.id);
       }
     }
