@@ -121,7 +121,9 @@ serve(async (req) => {
       replicate_prediction_id: null,
       dialog_shots: null,
       clip_error: null,
-      clip_url: restoredSourceClip ?? null,
+      // v430 Step 1 — restoring the plate goes through the single writer, so
+      // base_video_url is restored and the processed result is dropped too.
+      ...materializeCompatibilityOutput("base", { baseUrl: restoredSourceClip ?? null }),
       clip_status: restoredSourceClip ? "ready" : ((scene as any).clip_status ?? "pending"),
       lip_sync_source_clip_url: null,
       lip_sync_applied_at: null,
