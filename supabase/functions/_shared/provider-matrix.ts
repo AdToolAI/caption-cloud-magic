@@ -155,3 +155,20 @@ export function clampProviderDuration(
   if (clipSource === "ai-happyhorse") return Math.min(15, Math.max(3, picked));
   return snapDurationToProvider(picked, clipSource).duration;
 }
+
+/**
+ * Hailuo renders only two buckets (6 s / 10 s). Two historic call sites use
+ * DIFFERENT rounding rules and both are preserved verbatim (v430 Schritt 2
+ * centralises the lookup, it does NOT change bucket semantics):
+ *  - "exact"           : only an explicit 10 renders 10, everything else 6
+ *                        (avoids Pro+10s API rejections for 8/9 s scenes)
+ *  - "legacy-fallback" : >= 8 renders 10 (Runway → Hailuo re-route)
+ */
+export function hailuoBucketFor(
+  seconds: number,
+  mode: "exact" | "legacy-fallback",
+): 6 | 10 {
+  const value = Number(seconds);
+  if (mode === "exact") return value === 10 ? 10 : 6;
+  return value >= 8 ? 10 : 6;
+}

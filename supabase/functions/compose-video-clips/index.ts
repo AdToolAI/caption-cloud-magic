@@ -10,6 +10,7 @@ import { createSeedance25Task, MODELARK_JOB_PREFIX } from "../_shared/modelark.t
 import { isSeedance25LipsyncEnabled } from "../_shared/seedance25-lipsync-flag.ts";
 import { AMBIENT_NO_SPEECH_PROMPT } from "../_shared/ambient-audio.ts";
 import { isSupportedComposerAiSource, isLipsyncCertifiedAiSource, LIPSYNC_CERTIFIED_AI_SOURCES } from "../_shared/composer-ai-sources.ts";
+import { hailuoBucketFor } from "../_shared/provider-matrix.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 
 import {
@@ -4058,7 +4059,7 @@ serve(async (req) => {
           // exact pick — only treat the scene as 10s when explicitly set to 10,
           // otherwise render 6s. Previously `>= 8 ? 10 : 6` silently rounded
           // 8s/9s scenes up to 10s and triggered Pro+10s API rejections.
-          const duration = Number(scene.durationSeconds) === 10 ? 10 : 6;
+          const duration = hailuoBucketFor(scene.durationSeconds, "exact");
           // Hailuo API constraint: 1080p is only accepted for 6s. 10s requires 768p.
           const resolution =
             duration === 10 ? "768p" : quality === "pro" ? "1080p" : "768p";
@@ -4646,7 +4647,7 @@ serve(async (req) => {
               })
               .eq("id", scene.id);
             // Re-route this scene to Hailuo by inserting a synthetic Hailuo call
-            const fallbackDuration = scene.durationSeconds >= 8 ? 10 : 6;
+            const fallbackDuration = hailuoBucketFor(scene.durationSeconds, "legacy-fallback");
             const fallbackPred = await replicate.predictions.create({
               model: "minimax/hailuo-2.3",
               input: {
