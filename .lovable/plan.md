@@ -54,3 +54,8 @@ Variante 2, wie vom Nutzer präferiert: **deterministische Auflösung, kein stil
 5. Tests: Legacy-Parität (`NULL`), Override-Matrix (jede Strategie × Lip-Sync an/aus × exklusiver/Slot-Provider), Client/Server-Parity des Resolvers, plus die bestehenden 118 Anchor-Tests unverändert grün.
 
 Nicht enthalten: `cutStyle`-Umbenennung, State/Legacy-Aufräumen, Änderungen an `reference_image_url`, `lock_reference_url` oder der Continuity-Queue.
+
+## Zusätzliche Implementierungsregeln
+
+- **Resolver bleibt strikt pure.** Er persistiert nichts und schreibt in kein DB-Feld. Rückgabe: `requested_source`, `effective_source`, `sourceOverride` und die daraus abgeleiteten Inputs. Geschrieben wird `visual_source` ausschließlich durch die explizite Nutzeraktion in der UI.
+- **`NULL` ≠ `auto`.** Ergebnisgleich, semantisch getrennt: `NULL` = legacy/unmigriert, `auto` = explizit gewählte Automatik. Der Typ ist `VisualSourceStrategy | null` (kein Defaulting auf `auto` beim Laden), `sourceOverride.requested` gibt `null` als `null` zurück, und eigene Tests fixieren beide Fälle separat.
