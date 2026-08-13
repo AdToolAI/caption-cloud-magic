@@ -277,7 +277,7 @@ export async function resumeContinuityChain(args: ResumeArgs): Promise<void> {
 
     for (const row of rows) {
       let patch: Record<string, unknown> = {};
-      if (predecessorFailed || !predecessorClipUrl) {
+      if (predecessorFailed || !effectiveClipUrl) {
         patch = { visualContinuity: "match-cut" };
       } else {
         const frame = await ensureTransitionFrame({
@@ -285,11 +285,11 @@ export async function resumeContinuityChain(args: ResumeArgs): Promise<void> {
           userId: String(row.user_id),
           projectId,
           previousSceneId: predecessorSceneId,
-          previousClipUrl: predecessorClipUrl,
+          previousClipUrl: effectiveClipUrl,
           previousDurationSeconds: predecessorDurationSeconds ?? undefined,
         });
         patch = {
-          previousClipUrl: predecessorClipUrl,
+          previousClipUrl: effectiveClipUrl,
           ...(frame.url ? { transitionFrameUrl: frame.url } : {}),
         };
         if (!frame.url) {
