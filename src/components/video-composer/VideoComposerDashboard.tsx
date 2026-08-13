@@ -69,6 +69,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useStoryboardTransition } from '@/hooks/useStoryboardTransition';
 import ProductionWarRoom from './storyboard/ProductionWarRoom';
 import ProductionPlanSheet from './briefing/ProductionPlanSheet';
+import { clipStatusFromState, isInFlightState, legacyClipReadyEquivalentRow, sceneState } from '@/lib/composer/sceneState';
 
 type TabId = 'briefing' | 'storyboard' | 'clips' | 'text' | 'audio' | 'export' | 'campaign';
 
@@ -201,13 +202,11 @@ export default function VideoComposerDashboard() {
     // session — reset to 'pending' so the UI doesn't show a fake "Baut…"
     // overlay until DB-sync arrives ~1s later.
     const detoxedScenes = (draft.scenes ?? []).map((s: any) => {
-      const lip = s?.lipSyncStatus;
-      const two = s?.twoshotStage;
+      const st = sceneState(s);
       const hasJob =
         !!s?.replicatePredictionId ||
-        lip === 'running' ||
-        (two && two !== 'failed' && two !== 'done' && two !== 'complete');
-      if (s?.clipStatus === 'generating' && !hasJob) {
+        (isInFlightState(st) && st !== 'plate_queued' && st !== 'plate_rendering');
+      if (clipStatusFromState(st) === 'generating' && !hasJob) {
         return { ...s, clipStatus: 'pending' };
       }
       return s;
@@ -375,8 +374,10 @@ export default function VideoComposerDashboard() {
             // with a stale optimistic patch from localStorage. (Stage 6 fix.)
             lipSyncAppliedAt: (row as any).lip_sync_applied_at ?? null,
             lipSyncSourceClipUrl: (row as any).lip_sync_source_clip_url ?? null,
+            // legacy-mapping-allowed: DB-Zeile -> Client-Modell (Spiegelfeld)
             lipSyncStatus: (row as any).lip_sync_status ?? null,
             clipUrl: row.clip_url ?? undefined,
+            // legacy-mapping-allowed: DB-Zeile -> Client-Modell (Spiegelfeld)
             clipStatus: (row.clip_status || 'pending') as ClipStatus,
             baseVideoUrl: (row as any).base_video_url ?? null,
             processedVideoUrl: (row as any).processed_video_url ?? null,
@@ -391,6 +392,7 @@ export default function VideoComposerDashboard() {
             replicatePredictionId: row.replicate_prediction_id ?? null,
             clipError: (row as any).clip_error ?? null,
             dialogShots: (row as any).dialog_shots ?? null,
+            // legacy-mapping-allowed: DB-Zeile -> Client-Modell (Spiegelfeld)
             twoshotStage: (row as any).twoshot_stage ?? null,
             previewClipUrl: (row as any).preview_clip_url ?? null,
             previewStatus: (row as any).preview_status ?? null,
@@ -478,12 +480,12 @@ export default function VideoComposerDashboard() {
 
 
         const readyCount = dbScenes.filter(s =>
-          s.clipStatus === 'ready' || (s.clipSource === 'upload' && !!s.uploadUrl)
+          legacyClipReadyEquivalentRow(s) || (s.clipSource === 'upload' && !!s.uploadUrl)
         ).length;
 
         const hadDrift = dbScenes.some(s => {
           const local = localById.get(s.id);
-          return local && local.clipStatus !== s.clipStatus;
+          return local && sceneState(local) !== sceneState(s);
         });
 
         setProject(prev => ({ ...prev, scenes: propagateDialogLock(dbScenes) }));
@@ -564,6 +566,7 @@ export default function VideoComposerDashboard() {
             // Forensic-Felder zur Anzeige des Failure-Banners fehlten.
             lipSyncAppliedAt: (row as any).lip_sync_applied_at ?? null,
             lipSyncSourceClipUrl: (row as any).lip_sync_source_clip_url ?? null,
+            // legacy-mapping-allowed: DB-Zeile -> Client-Modell (Spiegelfeld)
             lipSyncStatus: (row as any).lip_sync_status ?? null,
             clipError: (row as any).clip_error ?? null,
             dialogShots: (row as any).dialog_shots ?? null,
@@ -577,6 +580,7 @@ export default function VideoComposerDashboard() {
             // must NOT bleed back into UI — otherwise the preview would keep
             // playing an old / wrong clip while the new render is pending.
             clipUrl: row.clip_url ?? undefined,
+            // legacy-mapping-allowed: DB-Zeile -> Client-Modell (Spiegelfeld)
             clipStatus: (row.clip_status || 'pending') as ClipStatus,
             baseVideoUrl: (row as any).base_video_url ?? null,
             processedVideoUrl: (row as any).processed_video_url ?? null,
@@ -650,6 +654,7 @@ export default function VideoComposerDashboard() {
             actionBeat: ((row as any).action_beat as any) ?? local?.actionBeat,
             realismPreset: ((row as any).realism_preset as any) ?? local?.realismPreset,
             visualSource: (parseVisualSource((row as any).visual_source) ?? local?.visualSource ?? null),
+            // legacy-mapping-allowed: DB-Zeile -> Client-Modell (Spiegelfeld)
             twoshotStage: ((row as any).twoshot_stage as any) ?? local?.twoshotStage ?? null,
             continuationSourceSceneId: ((row as any).continuity_source_scene_id as any) ?? local?.continuationSourceSceneId ?? null,
             framePickSeconds: ((row as any).frame_pick_seconds as any) != null
@@ -954,6 +959,7 @@ export default function VideoComposerDashboard() {
           if (!fresh) return s;
           return {
             ...s,
+            // legacy-mapping-allowed: DB-Zeile -> Client-Modell (Spiegelfeld)
             clipStatus: (fresh.clip_status || s.clipStatus) as ClipStatus,
             clipUrl: fresh.clip_url ?? undefined,
             costEuros: Number(fresh.cost_euros ?? s.costEuros),
@@ -1072,7 +1078,7 @@ export default function VideoComposerDashboard() {
         return project.scenes.length > 0;
       case 'clips':
         return project.scenes.length > 0 && project.scenes.every(
-          (s) => s.clipStatus === 'ready' || (s.clipSource === 'upload' && !!s.uploadUrl)
+          (s) => legacyClipReadyEquivalentRow(s) || (s.clipSource === 'upload' && !!s.uploadUrl)
         );
       case 'text':
         return !!project.assemblyConfig.voiceover || project.scenes.some((s) => !!s.textOverlay?.text);
@@ -1356,6 +1362,7 @@ export default function VideoComposerDashboard() {
           duration_seconds: baseScene.durationSeconds,
           clip_source: baseScene.clipSource,
           clip_quality: baseScene.clipQuality || 'standard',
+          // legacy-mapping-allowed: Writer-Spiegel der Alt-Spalte
           clip_status: baseScene.clipStatus ?? 'pending',
           clip_url: baseScene.clipUrl ?? null,
           with_audio: baseScene.withAudio !== false,
@@ -1464,6 +1471,7 @@ export default function VideoComposerDashboard() {
       duration_seconds: p.durationSeconds ?? 5,
       clip_source: p.clipSource ?? 'stock',
       clip_quality: p.clipQuality ?? 'standard',
+      // legacy-mapping-allowed: Writer-Spiegel der Alt-Spalte
       clip_status: p.clipStatus ?? 'pending',
       clip_url: p.clipUrl ?? null,
       with_audio: p.withAudio !== false,
