@@ -76,6 +76,8 @@ Explizite Legacy-Ausnahmen (unverändert, nur kommentiert): `lipsync-watchdog`, 
 - Nur Lesepfade; keine Zustandssemantik, keine Lip-Sync-Logik ändern.
 - Verhalten 1:1 identisch; jede Abweichung ist ein Bug, keine Verbesserung.
 - Reader lesen ausschließlich über `sceneState()` / `sceneSubstate()`.
+- `legacyClipReadyEquivalent` berücksichtigt Hauptzustand **und** vorhandenen effektiven Output, damit `failed` + bestehende Plate legacy-paritätisch bleibt.
+- `modelark-poll` verwendet ausschließlich `pipeline_state = 'plate_rendering'`; kein Legacy-Fallback.
 
 ## Teil 3 — Tests
 
