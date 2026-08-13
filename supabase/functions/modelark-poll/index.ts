@@ -111,7 +111,9 @@ async function scan(sceneFilterId: string | null) {
     let sceneQuery = supabase
       .from("composer_scenes")
       .select("id, project_id, replicate_prediction_id, active_run_id, plate_generation, updated_at")
-      .eq("clip_status", "generating")
+      // v430 Step 5D: read the modern state column only; `pipeline_state` is
+      // NOT NULL and always maintained by the bridge trigger. No legacy OR.
+      .eq("pipeline_state", "plate_rendering")
       .like("replicate_prediction_id", `${MODELARK_JOB_PREFIX}%`)
       .limit(50);
     if (sceneFilterId) sceneQuery = sceneQuery.eq("id", sceneFilterId);
