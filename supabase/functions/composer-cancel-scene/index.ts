@@ -89,7 +89,7 @@ serve(async (req) => {
     const syncJobs: string[] = [];
 
     for (const s of authorized) {
-      if (LIVE_CLIP.has(s.clip_status)) clipIds.push(s.id);
+      if (LIVE_CLIP_STATES.has(sceneState(s))) clipIds.push(s.id);
       if (!s.lip_sync_applied_at && LIVE_LIPSYNC.has(s.lip_sync_status)) lipsyncIds.push(s.id);
 
       const state = s.dialog_shots ?? null;
