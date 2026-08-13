@@ -605,7 +605,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // passes don't clobber each other's job_ids/status.
       const { data: freshDoneRow } = await supabase
         .from("composer_scenes")
-        .select("dialog_shots")
+        // v430 Step 1 — the plate columns come along so the finalize below can
+        // keep base_video_url intact while writing the processed result.
+        .select("dialog_shots, base_video_url, lip_sync_source_clip_url")
         .eq("id", sceneId)
         .maybeSingle();
       const freshDoneState: any = (freshDoneRow as any)?.dialog_shots ?? state;
