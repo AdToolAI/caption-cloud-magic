@@ -44,20 +44,38 @@ Ist-Zustand: `supabase/functions/_shared/continuity-chain.ts` liest heute noch r
 
 Wir folgen deinem Einwand und **verwerfen** das Stale-Setzen bei `beginSceneRun()`.
 
-Neue Regel — Stale ist wertbasiert, nicht ereignisbasiert:
+Neue Regel — Stale ist wertbasiert, nicht ereignisbasiert, und **NULL-sicher**:
 
-```text
-B.continuity_stale := B.continuity_source_clip_url IS NOT NULL
-                      AND B.continuity_source_clip_url
-                          <> resolveSceneOutput(A).effectiveUrl
+```sql
+-- SQL
+UPDATE public.composer_scenes b
+   SET continuity_stale = true
+ WHERE b.continuity_source_scene_id = a.id
+   AND b.continuity_source_clip_url IS NOT NULL
+   AND b.continuity_source_clip_url IS DISTINCT FROM <effectiveUrl(a)>;
 ```
 
-- Gesetzt wird das ausschließlich im **zentralen Writer** `materializeCompatibilityOutput()`: wenn sich der effektive Output einer Szene A erfolgreich geändert hat, wird der direkte Nachfolger B (nur er, keine Transitiv-Kaskade) auf `continuity_stale = true` markiert.
-- Startet A einen Run und **scheitert** dieser, ändert sich `effectiveUrl` nicht → B bleibt gültig. Genau der von dir beschriebene Fall.
-- Bei einem Reset von A, der den Output tatsächlich leert, ändert sich `effectiveUrl` auf `NULL` → B wird korrekt stale (der Frame-Ursprung existiert nicht mehr).
-- Rein defensiv wird der Vergleich zusätzlich beim Laden im Client ausgewertet (abgeleiteter Zustand), sodass eine verpasste Schreiboperation nicht zu falsch "frisch" führt.
+```ts
+// TypeScript
+isContinuityStale(storedSource, currentEffectiveUrl) :=
+  storedSource != null && storedSource !== currentEffectiveUrl;
+```
+
+Damit gilt korrekt: alt = `https://…/clip.mp4`, neu = `NULL` → **stale = true**.
+
+**Kein Side-Effect im Materializer.** `materializeCompatibilityOutput()` bleibt exakt das, was Schritt 1 definiert hat: Builder des Output-Patches für Szene A, keine Cross-Scene-Writes. Die Staleness-Propagation ist ein **eigener Mechanismus**:
+
+- Primär ein DB-Trigger `AFTER UPDATE OF clip_url ON composer_scenes` (Compatibility-Alias des effektiven Outputs, nach Schritt 1 garantiert `clip_url = processed ?? base`). Er reagiert atomar in derselben Transaktion, unabhängig davon, welcher Code den Output geschrieben hat.
+- Die Trigger-Logik lebt in einer Funktion `public.propagate_continuity_staleness()`; ein expliziter Helper `propagateContinuityStaleness()` existiert nur als Test-/Reparaturpfad, nicht im Materializer-Aufrufweg.
+
+**Propagation über die echte Dependency, nicht über die Position:** markiert werden alle Szenen mit `continuity_source_scene_id = A.id` — auch mehrere. Reordering-fest. Keine transitive Kaskade: nur direkte Dependents; deren eigene Dependents werden erst stale, wenn sich deren Quelle tatsächlich ändert.
+
+- Startet A einen Run und **scheitert** dieser, ändert sich der effektive Output nicht → kein Trigger-Feuer → B bleibt gültig.
+- Bei einem Reset von A, der den Output tatsächlich leert, wechselt der effektive Output auf `NULL` → B wird über `IS DISTINCT FROM` korrekt stale.
+- Rein defensiv wird derselbe NULL-sichere Vergleich beim Laden im Client ausgewertet (abgeleiteter Zustand), sodass ein verpasster Write nicht zu falsch "frisch" führt.
 
 Kein Run-Start, kein Queue-Ereignis und kein Provider-Wechsel setzt `continuity_stale` — nur die tatsächliche Output-Änderung.
+
 
 ## Frage 4 — Was macht "Continuity aktualisieren"?
 
