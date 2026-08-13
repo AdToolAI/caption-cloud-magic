@@ -63,18 +63,36 @@ isContinuityStale(storedSource, currentEffectiveUrl) :=
 
 Damit gilt korrekt: alt = `https://…/clip.mp4`, neu = `NULL` → **stale = true**.
 
-**Kein Side-Effect im Materializer.** `materializeCompatibilityOutput()` bleibt exakt das, was Schritt 1 definiert hat: Builder des Output-Patches für Szene A, keine Cross-Scene-Writes. Die Staleness-Propagation ist ein **eigener Mechanismus**:
+**Kein Side-Effect im Materializer.** `materializeCompatibilityOutput()` bleibt exakt das, was Schritt 1 definiert hat: Builder des Output-Patches für Szene A, keine Cross-Scene-Writes.
 
-- Primär ein DB-Trigger `AFTER UPDATE OF clip_url ON composer_scenes` (Compatibility-Alias des effektiven Outputs, nach Schritt 1 garantiert `clip_url = processed ?? base`). Er reagiert atomar in derselben Transaktion, unabhängig davon, welcher Code den Output geschrieben hat.
-- Die Trigger-Logik lebt in einer Funktion `public.propagate_continuity_staleness()`; ein expliziter Helper `propagateContinuityStaleness()` existiert nur als Test-/Reparaturpfad, nicht im Materializer-Aufrufweg.
+### Der Blocker: Run-Start-Clear vs. echte Output-Invalidierung
+
+Dein Einwand ist bestätigt. `beginSceneRun()` schreibt heute `materializeCompatibilityOutput("clear")`, setzt also `clip_url = NULL` bereits beim Run-Start (`supabase/functions/_shared/scene-run-begin.ts`, Zeile 134). Ein nackter `AFTER UPDATE OF clip_url`-Trigger würde dort feuern. `beginSceneRun()` wird **nicht** geändert.
+
+Die Trennung erfolgt über die Richtung des Wechsels — nicht über ein neues Intent-Feld, nicht über Flags im Materializer:
+
+| Ereignis | `clip_url` alt → neu | Mechanismus | Dependents |
+|---|---|---|---|
+| Run-Start (`beginSceneRun`) | `url` → `NULL` | Trigger ignoriert NULL-Ziel | unverändert |
+| Run scheitert | keine Änderung | — | unverändert |
+| Run finalisiert erfolgreich (Plate-Webhook, Sync-Mux) | `NULL` → `url'` | Trigger feuert | stale, wenn `IS DISTINCT FROM` |
+| Expliziter Hard-Reset / Output-Entfernung | `url` → `NULL` | expliziter Aufruf im Reset-Pfad | stale |
+
+Konkret:
+
+1. **DB-Trigger `AFTER UPDATE OF clip_url ON composer_scenes`**, Bedingung `WHEN (NEW.clip_url IS NOT NULL AND NEW.clip_url IS DISTINCT FROM OLD.clip_url)`. Er propagiert also ausschließlich **erfolgreiche Output-Wechsel**. Ein Clear (`NEW.clip_url IS NULL`) — egal ob Run-Start oder Reset — löst ihn nie aus. Damit ist der Run-Start strukturell ausgeschlossen, ohne dass die DB "Absichten" raten muss.
+2. **Explizite Propagation im Reset-Pfad**: `scene-hard-reset.ts` und `reset-lipsync-scene` rufen nach erfolgreichem Reset einmalig `propagateContinuityStaleness(sceneId, /* effectiveUrl */ null)` auf (eigener Helper, RPC `public.propagate_continuity_staleness(_scene_id uuid, _effective_url text)`). Nur der Reset kennt die Semantik "Output wurde bewusst entfernt"; der Run-Start ruft ihn nicht.
+3. Beide Wege benutzen exakt dieselbe SQL-Funktion und damit dieselbe NULL-sichere Vergleichsregel — es gibt keine zweite Stale-Definition.
+
+`propagateContinuityStaleness()` ist damit kein reiner Test-/Reparaturpfad mehr, sondern der offizielle zweite Auslöser — aber ausschließlich am Reset-Punkt, nicht im Materializer und nicht in `beginSceneRun()`.
 
 **Propagation über die echte Dependency, nicht über die Position:** markiert werden alle Szenen mit `continuity_source_scene_id = A.id` — auch mehrere. Reordering-fest. Keine transitive Kaskade: nur direkte Dependents; deren eigene Dependents werden erst stale, wenn sich deren Quelle tatsächlich ändert.
 
-- Startet A einen Run und **scheitert** dieser, ändert sich der effektive Output nicht → kein Trigger-Feuer → B bleibt gültig.
-- Bei einem Reset von A, der den Output tatsächlich leert, wechselt der effektive Output auf `NULL` → B wird über `IS DISTINCT FROM` korrekt stale.
+- Startet A einen Run und **scheitert** dieser, bleibt `clip_url` NULL, es feuert nichts → B bleibt gültig und behält seinen Continuity-Vertrag.
+- Läuft A erfolgreich durch und liefert dieselbe URL wie zuvor, greift `IS DISTINCT FROM` → B bleibt gültig.
 - Rein defensiv wird derselbe NULL-sichere Vergleich beim Laden im Client ausgewertet (abgeleiteter Zustand), sodass ein verpasster Write nicht zu falsch "frisch" führt.
 
-Kein Run-Start, kein Queue-Ereignis und kein Provider-Wechsel setzt `continuity_stale` — nur die tatsächliche Output-Änderung.
+Kein Run-Start, kein Queue-Ereignis und kein Provider-Wechsel setzt `continuity_stale`.
 
 
 ## Frage 4 — Was macht "Continuity aktualisieren"?
@@ -89,11 +107,12 @@ Die Frame-Extraktion selbst ist kostenlos bzw. läuft über den bestehenden `ens
 
 ## Umsetzungsumfang Schritt 4 (nach Freigabe)
 
-- Migration: `composer_scenes.first_rendered_at`, `continuity_source_clip_url`, `continuity_stale` (+ Backfill, Trigger für `first_rendered_at`, Trigger `propagate_continuity_staleness` auf `clip_url`).
+- Migration: `composer_scenes.first_rendered_at`, `continuity_source_clip_url`, `continuity_stale`; Backfill; Trigger für `first_rendered_at`; SQL-Funktion `public.propagate_continuity_staleness(_scene_id, _effective_url)` plus Trigger `AFTER UPDATE OF clip_url ... WHEN (NEW.clip_url IS NOT NULL AND NEW.clip_url IS DISTINCT FROM OLD.clip_url)`.
 - `continuity-chain.ts` liest über `resolveSceneOutput()` statt roh `clip_url`.
-- `materializeCompatibilityOutput()` bleibt unverändert auf den Output-Patch von Szene A beschränkt — kein Cross-Scene-Write.
-- Neuer reiner Helper `src/lib/composer/continuity/continuityState.ts` (+ Backend-Spiegel) mit `sceneWasEverRendered()` und NULL-sicherem `isContinuityStale()`, Parity-Test Client/Server.
+- `materializeCompatibilityOutput()` bleibt unverändert auf den Output-Patch von Szene A beschränkt — kein Cross-Scene-Write und kein Setzen von `continuity_stale`.
+- Reset-Pfade (`scene-hard-reset.ts`, `reset-lipsync-scene`) rufen nach erfolgreichem Reset einmalig `propagateContinuityStaleness(sceneId, null)`. `beginSceneRun()` bleibt unangetastet.
+- Neuer **reiner** Helper `src/lib/composer/continuity/continuityState.ts` (+ Backend-Spiegel): `isContinuityStale(storedSource, currentEffectiveUrl)` und `sceneWasEverRendered({ firstRenderedAt, completedPlateAttemptExists, legacyEffectiveUrl })`. Keine DB-Abfrage im Pure-Layer — `completedPlateAttemptExists` wird vom Aufrufer geladen und hineingereicht. Parity-Test Client/Server.
 - UI: Stale-Badge und Button "Continuity aktualisieren" auf der Szenenkachel, ohne Render-Trigger.
-- Tests: Reset-Festigkeit von `first_rendered_at`, "fehlgeschlagener Run macht B nicht stale", `NULL`-Übergang setzt stale, mehrere Dependents über `continuity_source_scene_id`, keine transitive Kaskade, Materializer schreibt keine Fremdszene, Legacy-Parität, Lip-Sync-Szenen bleiben aus der Kette ausgeschlossen.
+- Tests: Reset-Festigkeit von `first_rendered_at`; Run-Start-Clear macht B **nicht** stale; fehlgeschlagener Run macht B nicht stale; erfolgreicher Output-Wechsel setzt stale; identische URL setzt nicht stale; Hard-Reset setzt stale; mehrere Dependents über `continuity_source_scene_id`; keine transitive Kaskade; Materializer schreibt keine Fremdszene; Pure-Helper ohne DB-Zugriff; Legacy-Parität; Lip-Sync-Szenen bleiben aus der Kette ausgeschlossen.
 
 Keine Änderungen an Lip-Sync-Semantik, `reference_image_url`, State Machine oder `transitionType`.
