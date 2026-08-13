@@ -23,6 +23,8 @@
  */
 
 import { ensureTransitionFrame } from "./transition-frame.ts";
+import { resolveSceneOutput } from "./resolve-scene-output.ts";
+import { isSceneOutputFinal } from "./continuity-state.ts";
 
 const PARK_TTL_MINUTES = 15;
 
@@ -297,7 +299,9 @@ export async function sweepContinuityQueue(
     const predIds = [...new Set(rows.map((r: any) => String(r.predecessor_scene_id)))];
     const { data: preds } = await supabaseAdmin
       .from("composer_scenes")
-      .select("id, clip_url, clip_status, duration_seconds")
+      .select(
+        "id, clip_url, processed_video_url, base_video_url, lip_sync_source_clip_url, upload_url, lip_sync_status, lip_sync_with_voiceover, dialog_mode, engine_override, clip_status, duration_seconds",
+      )
       .in("id", predIds);
     const predById = new Map<string, any>((preds ?? []).map((p: any) => [String(p.id), p]));
     const now = Date.now();
@@ -307,7 +311,14 @@ export async function sweepContinuityQueue(
       const expired = new Date(row.expires_at).getTime() < now;
       const predTerminal =
         pred?.clip_status === "failed" || pred?.clip_status === "canceled" || !pred;
-      const predReady = pred?.clip_status === "ready" && !!pred?.clip_url;
+      // v430 Step 4 — "ready" is not enough: only a SEMANTICALLY FINAL output
+      // may feed the chain. A lip-sync predecessor that has merely delivered
+      // its plate keeps the successor parked until the mux is done.
+      const predOutput = resolveSceneOutput(pred as any);
+      const predReady =
+        pred?.clip_status === "ready" &&
+        isSceneOutputFinal(pred as any) &&
+        !!predOutput.effectiveUrl;
 
       if (!expired && !predTerminal && !predReady) continue;
 
@@ -315,7 +326,7 @@ export async function sweepContinuityQueue(
         supabaseAdmin,
         projectId,
         predecessorSceneId: String(row.predecessor_scene_id),
-        predecessorClipUrl: predReady ? pred.clip_url : null,
+        predecessorClipUrl: predReady ? predOutput.effectiveUrl : null,
         predecessorDurationSeconds: pred?.duration_seconds ?? null,
         predecessorFailed: !predReady,
       });
