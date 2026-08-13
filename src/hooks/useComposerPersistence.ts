@@ -194,6 +194,7 @@ export function useComposerPersistence() {
               upload_type: scene.uploadType ?? null,
               reference_image_url: scene.referenceImageUrl ?? null,
               clip_url: scene.clipUrl ?? null,
+              // legacy-mapping-allowed: Writer-Spiegel der Alt-Spalte
               clip_status: scene.clipStatus,
               text_overlay: scene.textOverlay as any,
               transition_type: scene.transitionType,
@@ -258,6 +259,7 @@ export function useComposerPersistence() {
               upload_type: scene.uploadType ?? null,
               reference_image_url: scene.referenceImageUrl ?? null,
               clip_url: scene.clipUrl ?? null,
+              // legacy-mapping-allowed: Writer-Spiegel der Alt-Spalte
               clip_status: scene.clipStatus || 'pending',
               text_overlay: scene.textOverlay as any,
               transition_type: scene.transitionType || 'fade',

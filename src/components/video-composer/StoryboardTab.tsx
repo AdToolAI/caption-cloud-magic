@@ -39,6 +39,7 @@ import StagePanel from './stage/StagePanel';
 
 import { Play, CheckCircle2 } from 'lucide-react';
 import { tx, useTx } from '@/lib/i18nText';
+import { legacyClipReadyEquivalentRow } from '@/lib/composer/sceneState';
 
 const SCENE_TYPE_LABEL_DE: Record<string, string> = {
   hook: 'Hook',
@@ -320,7 +321,7 @@ export default function StoryboardTab({
           updates.clipSource !== undefined && updates.clipSource !== s.clipSource;
         const wasAiClip = (s.clipSource || '').startsWith('ai-');
         const newIsAi = (updated.clipSource || '').startsWith('ai-');
-        if (sourceChanged && wasAiClip && newIsAi && s.clipStatus === 'ready') {
+        if (sourceChanged && wasAiClip && newIsAi && legacyClipReadyEquivalentRow(s)) {
           updated.clipStatus = 'pending';
           updated.clipUrl = undefined;
           (updated as any).replicatePredictionId = undefined;
@@ -367,7 +368,7 @@ export default function StoryboardTab({
         clipSource: first.clipSource,
         clipQuality: first.clipQuality,
       };
-      if (s.clipStatus === 'ready') {
+      if (legacyClipReadyEquivalentRow(s)) {
         updated.clipStatus = 'pending';
         updated.clipUrl = undefined;
         (updated as any).replicatePredictionId = undefined;
@@ -771,7 +772,7 @@ export default function StoryboardTab({
                         projectId ? (mode) => openHybridDialog(selectedScene, mode) : undefined
                       }
                       hasOtherReadyScenes={scenes.some(
-                        (s) => s.id !== selectedScene.id && s.clipStatus === 'ready' && !!s.clipUrl,
+                        (s) => s.id !== selectedScene.id && legacyClipReadyEquivalentRow(s) && !!s.clipUrl,
                       )}
                       onAddScene={onAddScene}
                       siblingsDurationSec={sumOtherScenesDuration(scenes, selectedScene.id)}

@@ -23,7 +23,8 @@ export function sceneToSnakeSnapshot(scene: ComposerScene): Record<string, unkno
     clip_source: scene.clipSource,
     clip_quality: scene.clipQuality ?? 'standard',
     clip_url: scene.clipUrl ?? null,
-    clip_status: scene.clipStatus,
+    // legacy-mapping-allowed: Writer-Spiegel der Alt-Spalte
+  clip_status: scene.clipStatus,
     clip_lead_in_trim_seconds: scene.clipLeadInTrimSeconds ?? 0,
     reference_image_url: (scene as unknown as { referenceImageUrl?: string }).referenceImageUrl ?? null,
     first_frame_url: (scene as unknown as { firstFrameUrl?: string }).firstFrameUrl ?? null,

@@ -1689,9 +1689,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         // Single-flight guard: if this scene is already mid-render via two-shot
         // (e.g. user double-clicked the button), do nothing.
         if (
-          scene.clipStatus === 'generating' &&
-          (scene as any).twoshotStage &&
-          (scene as any).twoshotStage !== 'failed'
+          isSceneInFlight(scene) &&
+          sceneState(scene) !== 'plate_queued' &&
+          sceneState(scene) !== 'plate_rendering'
         ) {
           console.info('[SceneDialogStudio] two-shot already in flight — skipping re-trigger');
           if (onClose) onClose();

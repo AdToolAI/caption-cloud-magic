@@ -13,6 +13,7 @@ import { useMouthYavgProbe } from '@/hooks/useMouthYavgProbe';
 import { FaceMapReviewDialog } from './FaceMapReviewDialog';
 import { startSceneGeneration } from '@/lib/composer/startSceneGeneration';
 import { sceneState, isRealizedState } from '@/lib/composer/sceneState';
+import { legacyClipReadyEquivalentRow, sceneState, sceneSubstate } from '@/lib/composer/sceneState';
 
 /** Providers that produce an i2v lead-in freeze worth auto-trimming. */
 const I2V_PROVIDERS: ReadonlyArray<string> = [
@@ -73,7 +74,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     if (autoDetectedRef.current === url) return;
     if ((scene.clipLeadInTrimSeconds ?? 0) > 0) return;
     if (!I2V_PROVIDERS.includes(scene.clipSource)) return;
-    if (scene.clipStatus !== 'ready') return;
+    if (!legacyClipReadyEquivalentRow(scene)) return;
     autoDetectedRef.current = url;
     (async () => {
       try {
@@ -86,7 +87,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
         }
       } catch { /* silent — Smart-Trim is opt-in best-effort */ }
     })();
-  }, [scene.clipUrl, scene.clipStatus, scene.clipSource, scene.clipLeadInTrimSeconds, scene.id]);
+  }, [scene.clipUrl, sceneState(scene), scene.clipSource, scene.clipLeadInTrimSeconds, scene.id]);
 
   const triggerFastPreview = async () => {
     if (busy) return;
@@ -230,7 +231,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   // v274 — awaiting manual speaker↔face mapping. Block the auto-spinner
   // and surface a review button so the user finishes the mapping BEFORE
   // any provider clip is dispatched with wrong routing.
-  if ((scene.clipStatus as string) === 'awaiting_manual_face_map') {
+  if (sceneSubstate(scene) === 'awaiting_manual_face_map') {
     return (
       <>
         <div className="relative w-full h-full bg-amber-500/10 border border-amber-500/40 flex flex-col items-center justify-center gap-1 p-2 text-center">
