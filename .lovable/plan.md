@@ -82,8 +82,8 @@ Die Trennung erfolgt über die Richtung des Wechsels — nicht über ein neues I
 
 Konkret:
 
-1. **DB-Trigger `AFTER UPDATE OF clip_url ON composer_scenes`**, Bedingung `WHEN (NEW.clip_url IS NOT NULL AND NEW.clip_url IS DISTINCT FROM OLD.clip_url)`. Er propagiert also ausschließlich **erfolgreiche Output-Wechsel**. Ein Clear (`NEW.clip_url IS NULL`) — egal ob Run-Start oder Reset — löst ihn nie aus. Damit ist der Run-Start strukturell ausgeschlossen, ohne dass die DB "Absichten" raten muss.
-2. **Explizite Propagation nur im Hard-Reset-Pfad**: `scene-hard-reset.ts` ruft nach erfolgreichem Reset einmalig `propagateContinuityStaleness(sceneId, /* effectiveUrl */ null)` auf (eigener Helper, RPC `public.propagate_continuity_staleness(_scene_id uuid, _effective_url text)`). `reset-lipsync-scene` ruft ihn **nicht** — dort bleibt der effektive Output non-null (processed → base) und der normale Trigger greift. Der Run-Start ruft ihn ebenfalls nie.
+1. **DB-Trigger `AFTER UPDATE OF clip_url ON composer_scenes`**, Bedingung `WHEN (NEW.clip_url IS NOT NULL AND NEW.clip_url IS DISTINCT FROM OLD.clip_url AND public.scene_output_is_final(NEW))`. Er propagiert also ausschließlich **erfolgreiche, finale Output-Wechsel**. Ein Clear (`NEW.clip_url IS NULL`) — egal ob Run-Start oder Reset — löst ihn nie aus; eine Base-Plate bei bestehendem Lip-Sync-Intent löst ihn ebenfalls nicht aus. Damit ist der Run-Start strukturell ausgeschlossen, ohne dass die DB "Absichten" raten muss.
+2. **Explizite Propagation nur im Hard-Reset-Pfad**: `scene-hard-reset.ts` ruft nach erfolgreichem Reset einmalig `propagateContinuityStaleness(sceneId, /* effectiveUrl */ null)` auf (eigener Helper, RPC `public.propagate_continuity_staleness(_scene_id uuid, _effective_url text)`). `reset-lipsync-scene` ruft ihn **nicht** — dort bleibt der Lip-Sync-Intent bestehen, die Base-Plate ist kein finaler Output, und der Finalitäts-Guard blockiert den Trigger. Dependents behalten ihren bisherigen Continuity-Vertrag, bis ein neuer erfolgreicher Mux einen finalen `processed_video_url` erzeugt. Der Run-Start ruft den RPC ebenfalls nie.
 
 ### Zwischenoutput-Guard: Plate ist bei Lip-Sync nicht final
 
