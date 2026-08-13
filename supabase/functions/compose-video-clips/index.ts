@@ -3974,6 +3974,23 @@ serve(async (req) => {
         );
       }
 
+      // v428 fail-closed: a lip-sync scene whose provider has no
+      // anchor-faithful image input must not be dispatched onto a loose
+      // reference slot — the plate would no longer match the geometry anchor.
+      if (visualPlan.warnings.includes("lipsync_anchor_input_unsupported")) {
+        const msg = tl({
+          de: `Lip-Sync abgebrochen: Das gewählte Videomodell besitzt keinen Bild-Eingang, der den Anker unverändert übernimmt (lipsync_anchor_input_unsupported). Bitte HappyHorse oder Hailuo verwenden.`,
+          en: `Lip-sync aborted: the selected video model has no image input that carries the anchor unchanged (lipsync_anchor_input_unsupported). Please use HappyHorse or Hailuo.`,
+          es: `Sincronización labial cancelada: el modelo de vídeo elegido no tiene una entrada de imagen que conserve el ancla sin cambios (lipsync_anchor_input_unsupported). Utiliza HappyHorse o Hailuo.`,
+        });
+        console.error(
+          `[compose-video-clips] scene ${scene.id} lipsync_anchor_input_unsupported source=${scene.clipSource}`,
+        );
+        await markSceneContractFailure(scene.id, msg);
+        continue;
+      }
+
+
       try {
         if (scene.clipSource === "upload" && scene.uploadUrl) {
 
