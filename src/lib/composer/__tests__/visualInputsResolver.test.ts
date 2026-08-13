@@ -139,18 +139,34 @@ describe('Seedance 2.5 specifics', () => {
 
   it('uses the previous clip as continuity reference instead of a frame', () => {
     const plan = resolveVisualInputs({
-      sceneClass: 'character',
-      requirements: req({ identityCritical: true }),
+      sceneClass: 'environment',
+      requirements: req(),
       profile: seedance25,
       previousFrameUrl: 'https://x/prev.jpg',
       previousClipUrl: 'https://x/prev.mp4',
-      references: [characterRef],
+      references: [],
     });
     expect(plan.transition.mode).toBe('clip-reference');
     expect(plan.inputMode).toBe('references');
     expect(plan.transition.sourceClipUrl).toBe('https://x/prev.mp4');
     expect(plan.references.some((r) => r.kind === 'video')).toBe(true);
-    expect(plan.anchors.identity).toHaveLength(1);
+  });
+
+  // v426: on the single-slot provider a protected identity anchor outranks the
+  // clip reference — handing the slot to continuity would drop the anchor.
+  it('keeps the protected anchor instead of the clip on the exclusive slot', () => {
+    const plan = resolveVisualInputs({
+      sceneClass: 'character',
+      requirements: req({ identityCritical: true }),
+      profile: seedance25,
+      anchorImageUrl: 'https://x/anchor.jpg',
+      previousFrameUrl: 'https://x/prev.jpg',
+      previousClipUrl: 'https://x/prev.mp4',
+      references: [characterRef],
+    });
+    expect(plan.transition.mode).toBe('match-cut');
+    expect(plan.firstFrameUrl).toBe('https://x/anchor.jpg');
+    expect(plan.transition.sourceClipUrl).toBeUndefined();
   });
 
   // v428: the same scene with lip-sync intent loses the clip reference.
