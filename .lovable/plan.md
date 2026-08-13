@@ -90,20 +90,28 @@ Jeder Ausnahme-Marker trägt eine kurze Begründung und wird im Test geprüft.
 
 ## Technische Umsetzung
 
-1. **Reader-Migration** Datei für Datei, semantikgleich. Jede bisher von
-   `clip_status` abhängige Darstellung oder Verhaltenslogik wird output-aware:
-   `legacyClipStatusEquivalentRow()` für die Vier-Werte-Projektion,
-   `legacyClipReadyEquivalentRow()` / `legacyClipFailedEquivalentRow()` für
-   Ready/Failed-Entscheidungen (Buttons, Filter, Sortierung,
+1. **Reader-Migration** Datei für Datei, semantikgleich. Zustände über
+   `sceneState()`, Sonderfälle über `sceneSubstate()`, Ready/Failed
+   ausschliesslich über `legacyClipReadyEquivalentRow()` /
+   `legacyClipFailedEquivalentRow()` (Buttons, Filter, Sortierung,
    Fortschrittszählung, Export- und Render-Gates).
    `failed` + effektiver Output bleibt überall `ready`.
 2. **Contract-Scanner** `src/lib/composer/__tests__/clientReaderContract5E.test.ts`:
    scannt `src/components/**`, `src/hooks/**`, `src/pages/**`,
-   `src/lib/video-composer/**`, `src/lib/composer/**` (ohne `__tests__`) auf
-   `clip_status|clipStatus|twoshot_stage|twoshotStage|lip_sync_status|lipSyncStatus`
-   und failt bei jedem Treffer ohne Ausnahme-Marker. Die kanonischen Adapter
-   (`sceneState.ts`, `resolveSceneOutput.ts`) sind gezielt markierte Ausnahmen,
-   keine pauschalen Datei-Freigaben.
+   `src/lib/video-composer/**`, `src/lib/composer/**` (ohne `__tests__`).
+   Erkannt werden **direkte Legacy-Feldzugriffe**, nicht Identifier-
+   Substrings: Property-Access (`x.clip_status`, `x.clipStatus`,
+   `x.twoshot_stage`, `x.lip_sync_status`, …), Destructuring
+   (`const { clip_status } = …`), Bracket-Access (`x['clip_status']`),
+   Objekt-Keys in Vergleichen und String-Literale in Filterausdrücken.
+   Aufrufe der kanonischen Helfer (`clipStatusFromState`,
+   `legacyClipReadyEquivalentRow`, …) dürfen keine False Positives erzeugen —
+   dafür wird der Treffer AST-nah über den Ausdruckskontext klassifiziert
+   (bevorzugt TypeScript-AST via `ts.createSourceFile`, sonst ein
+   kontextsensitiver Source-Scanner). Ausnahmen nur über den Marker
+   `// legacy-mapping-allowed: <Grund>` an der konkreten Zeile; die kanonischen
+   Adapter (`sceneState.ts`, `resolveSceneOutput.ts`) sind so markiert, nicht
+   pauschal freigegeben.
 3. **Verhaltenstests** für die kritischen Projektionen: Fortschritt,
    Ready/Failed-Exklusivität, Substate-Gates (`awaiting_manual_face_map`,
    `circuit_open`, `anchor`), Auto-Trigger-Gates.
