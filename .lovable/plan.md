@@ -4,6 +4,10 @@ Leitprinzip: Die funktionierende Lip-Sync-Engine wird **nicht** refaktoriert. Ru
 
 Reihenfolge: Dialog-Canonicalization → Output-Semantik → Capabilities → Visual-Input → Continuity → State/Legacy → UI.
 
+`dialog_too_long_for_plate` wird **nicht** durch einen Duration-Sonderfix gepatcht. Die zugrunde liegende Daten-Divergenz wird in Schritt 0 durch Dialog-Canonicalization behoben. Der bestehende serverseitige Duration-Hard-Guard bleibt unverändert.
+
+Umsetzung strikt sequenziell: ein Schritt pro Auftrag. Nach jedem Schritt müssen die bestehenden 118 Lip-Sync-Tests plus die neuen Vertragstests grün sein, bevor der nächste beginnt. **Jetzt umzusetzen: ausschließlich Schritt 0.**
+
 ---
 
 ## Schritt 0 — Dialog-Canonicalization (Blocker)
