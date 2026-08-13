@@ -13,6 +13,8 @@ import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { resumeContinuityChain, sweepContinuityQueue } from "../_shared/continuity-chain.ts";
 import { guardCallback } from "../_shared/v427-callback-guard.ts";
+import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
+import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -214,7 +216,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const isCinematicSync =
         String((preUpdateScene as any)?.engine_override ?? '') === 'cinematic-sync';
       const sceneUpdate: Record<string, unknown> = {
-        clip_url: permanentUrl,
+        // v430 Step 1 — plate delivery goes through the single writer.
+        ...materializeCompatibilityOutput('base', { baseUrl: permanentUrl }),
         clip_status: 'ready',
         clip_error: null,
         updated_at: new Date().toISOString(),

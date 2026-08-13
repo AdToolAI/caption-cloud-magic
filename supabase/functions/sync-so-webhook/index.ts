@@ -33,6 +33,8 @@ import {
 import { probeMp4Dims } from "../_shared/twoshot-face-map.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
+import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
+import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 
 
 const corsHeaders = {
@@ -605,7 +607,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // passes don't clobber each other's job_ids/status.
       const { data: freshDoneRow } = await supabase
         .from("composer_scenes")
-        .select("dialog_shots")
+        // v430 Step 1 — the plate columns come along so the finalize below can
+        // keep base_video_url intact while writing the processed result.
+        .select("dialog_shots, base_video_url, lip_sync_source_clip_url")
         .eq("id", sceneId)
         .maybeSingle();
       const freshDoneState: any = (freshDoneRow as any)?.dialog_shots ?? state;
@@ -1126,7 +1130,14 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               sync_so_url: outputUrl,
               finished_at: nowIso,
             },
-            clip_url: finalUrl,
+            // v430 Step 1 — the muxed result is the processed output; the
+            // plate stays in base_video_url. Single compatibility writer.
+            ...materializeCompatibilityOutput("processed", {
+              baseUrl: (freshDoneRow as any)?.base_video_url
+                ?? (freshDoneRow as any)?.lip_sync_source_clip_url
+                ?? null,
+              processedUrl: finalUrl,
+            }),
             clip_status: "ready",
             lip_sync_status: "applied",
             lip_sync_applied_at: nowIso,

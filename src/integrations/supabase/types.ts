@@ -6667,6 +6667,7 @@ export type Database = {
           audio_source: string | null
           base_clip_status: string | null
           base_clip_url: string | null
+          base_video_url: string | null
           billable_duration_seconds: number | null
           camera_choreography_en: string | null
           character_audio_url: string | null
@@ -6737,6 +6738,7 @@ export type Database = {
           preview_audit: Json | null
           preview_clip_url: string | null
           preview_status: string | null
+          processed_video_url: string | null
           progress_percent: number | null
           project_id: string
           prompt_mode: string | null
@@ -6790,6 +6792,7 @@ export type Database = {
           audio_source?: string | null
           base_clip_status?: string | null
           base_clip_url?: string | null
+          base_video_url?: string | null
           billable_duration_seconds?: number | null
           camera_choreography_en?: string | null
           character_audio_url?: string | null
@@ -6860,6 +6863,7 @@ export type Database = {
           preview_audit?: Json | null
           preview_clip_url?: string | null
           preview_status?: string | null
+          processed_video_url?: string | null
           progress_percent?: number | null
           project_id: string
           prompt_mode?: string | null
@@ -6913,6 +6917,7 @@ export type Database = {
           audio_source?: string | null
           base_clip_status?: string | null
           base_clip_url?: string | null
+          base_video_url?: string | null
           billable_duration_seconds?: number | null
           camera_choreography_en?: string | null
           character_audio_url?: string | null
@@ -6983,6 +6988,7 @@ export type Database = {
           preview_audit?: Json | null
           preview_clip_url?: string | null
           preview_status?: string | null
+          processed_video_url?: string | null
           progress_percent?: number | null
           project_id?: string
           prompt_mode?: string | null

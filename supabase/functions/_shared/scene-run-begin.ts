@@ -22,6 +22,8 @@
  * und gestempelt.
  */
 
+import { materializeCompatibilityOutput } from "./materialize-scene-output.ts";
+
 type SupabaseLike = {
   from: (table: string) => any;
 };
@@ -127,7 +129,9 @@ export async function beginSceneRun(
         .from("composer_scenes")
         .update({
           // 3. sichtbares Ergebnis des Vorlaufs
-          clip_url: null,
+          // v430 Step 1 — clip_url plus the new output columns are cleared as
+          // ONE triple through the single compatibility writer.
+          ...materializeCompatibilityOutput("clear"),
           first_frame_url: null,
           last_frame_url: null,
           clip_error: null,

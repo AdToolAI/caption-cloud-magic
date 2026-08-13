@@ -24,6 +24,7 @@
 
 import { failLipSync } from "./lipsync-fail.ts";
 import { supersedeOpenPlateAttempts } from "./plate-attempt.ts";
+import { materializeCompatibilityOutput } from "./materialize-scene-output.ts";
 
 type SupabaseLike = {
   from: (t: string) => any;
@@ -602,7 +603,8 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
       plate_generation_started_at: nowIso,
       plate_ready_generation: null,
       plate_ready_at: null,
-      clip_url: null,
+      // v430 Step 1 — single compatibility writer clears the output triple.
+      ...materializeCompatibilityOutput("clear"),
       clip_status: "pending",
       clip_error: null,
       preview_clip_url: null,

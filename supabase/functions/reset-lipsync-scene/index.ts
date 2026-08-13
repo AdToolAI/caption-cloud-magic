@@ -21,6 +21,7 @@ import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { getSyncApiKey } from "../_shared/syncso-preflight.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -121,7 +122,9 @@ serve(async (req) => {
       replicate_prediction_id: null,
       dialog_shots: null,
       clip_error: null,
-      clip_url: restoredSourceClip ?? null,
+      // v430 Step 1 — restoring the plate goes through the single writer, so
+      // base_video_url is restored and the processed result is dropped too.
+      ...materializeCompatibilityOutput("base", { baseUrl: restoredSourceClip ?? null }),
       clip_status: restoredSourceClip ? "ready" : ((scene as any).clip_status ?? "pending"),
       lip_sync_source_clip_url: null,
       lip_sync_applied_at: null,
