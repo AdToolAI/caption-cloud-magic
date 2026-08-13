@@ -1,4 +1,5 @@
 import { tl, withLang } from "./i18n.ts";
+import { resolveSceneOutput } from "./resolve-scene-output.ts";
 /**
  * v384 — Zustandsmaschine für `composer_scenes` (Server-Seite).
  *
@@ -162,6 +163,45 @@ export const isTerminalState = (s: SceneState) => TERMINAL.has(s);
 export const isRealizedState = (s: SceneState) => REALIZED.has(s);
 export const isInFlightState = (s: SceneState) => IN_FLIGHT.has(s);
 export const stateProgress = (s: SceneState) => PROGRESS[s] ?? 0;
+
+/**
+ * v430 Schritt 5D — 1:1-Parität zum alten `clip_status === 'ready'`.
+ *
+ * Die Bridge erzeugt `clip_status = 'ready'` für genau diese Zustände:
+ *   plate_ready, audio_prep, audio_ready, lipsync_dispatched,
+ *   lipsync_running, lipsync_muxing, complete
+ *
+ * Sonderfall: bei `failed` bleibt der alte `clip_status` stehen — eine
+ * gescheiterte Szene mit gültigem Output trug daher weiterhin `ready`.
+ * Deshalb wertet das Prädikat Zustand UND Output-Existenz aus.
+ *
+ * Ready/Failed sind exklusiv zu klassifizieren:
+ *   ready  = legacyClipReadyEquivalent(...)
+ *   failed = !ready && sceneState(row) === 'failed'
+ */
+export function legacyClipReadyEquivalent(input: {
+  state: SceneState;
+  hasEffectiveOutput: boolean;
+}): boolean {
+  if (REALIZED.has(input.state)) return true;
+  if (input.state === "failed" && input.hasEffectiveOutput) return true;
+  return false;
+}
+
+/** Bequemer Row-Wrapper: leitet Zustand und Output-Existenz selbst ab. */
+export function legacyClipReadyEquivalentRow(row: any): boolean {
+  const out = resolveSceneOutput(row);
+  return legacyClipReadyEquivalent({
+    state: sceneState(row),
+    hasEffectiveOutput: typeof out.effectiveUrl === "string" && out.effectiveUrl.length > 0,
+  });
+}
+
+/** Exklusive Failed-Klasse (Legacy-Parität). */
+export function legacyClipFailedEquivalentRow(row: any): boolean {
+  if (legacyClipReadyEquivalentRow(row)) return false;
+  return sceneState(row) === "failed";
+}
 
 /**
  * v384 — Realized-Vertrag. Ersetzt den v182-Guard, der auf JEDES nicht-leere

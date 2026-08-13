@@ -15,6 +15,7 @@ import { hailuoBucketFor } from "../_shared/provider-matrix.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 import { resolveSceneOutput } from "../_shared/resolve-scene-output.ts";
 import { isSceneOutputFinal } from "../_shared/continuity-state.ts";
+import { sceneState as sceneStateOf, legacyClipReadyEquivalentRow } from "../_shared/scene-state.ts";
 
 import {
   countDialogSpeakers,
@@ -1801,26 +1802,29 @@ serve(async (req) => {
         const { data: dbRow } = await supabaseAdmin
           .from("composer_scenes")
           .select(
-            "cinematic_preset_slug, engine_override, clip_status, clip_url, character_audio_url",
+            "cinematic_preset_slug, engine_override, pipeline_state, clip_status, clip_url, base_video_url, processed_video_url, lip_sync_source_clip_url, lip_sync_status, upload_url, active_run_id, character_audio_url",
           )
           .eq("id", scene.id)
           .maybeSingle();
         const slug = (dbRow as any)?.cinematic_preset_slug as string | null;
         const dbEngine = (dbRow as any)?.engine_override as string | null;
-        const status = (dbRow as any)?.clip_status as string | null;
+        // v430 Step 5D: state via sceneState(), readiness via the parity helper.
+        const state = dbRow ? sceneStateOf(dbRow) : "idle";
+        const isReady = dbRow ? legacyClipReadyEquivalentRow(dbRow) : false;
+        const isRendering = state === "plate_rendering";
         const hasAudio = !!(dbRow as any)?.character_audio_url;
         if (
           dbEngine !== "cinematic-sync" &&
           slug &&
           slug.startsWith("dialog-srs:") &&
-          (hasAudio || status === "generating" || status === "ready")
+          (hasAudio || isRendering || isReady)
         ) {
           console.log(
-            `[compose-video-clips] Skipping SRS lip-sync sub-scene ${scene.id} (slug=${slug}, status=${status})`,
+            `[compose-video-clips] Skipping SRS lip-sync sub-scene ${scene.id} (slug=${slug}, state=${state})`,
           );
           results.push({
             sceneId: scene.id,
-            status: status === "ready" ? "ready" : "generating",
+            status: isReady ? "ready" : "generating",
           });
           continue;
         }

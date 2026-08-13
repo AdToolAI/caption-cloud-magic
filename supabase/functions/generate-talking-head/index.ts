@@ -463,6 +463,8 @@ async function processHeyGenJob(opts: {
           if (opts.sceneId) {
             await admin.from('composer_scenes').update({
               ...materializeCompatibilityOutput('base', { baseUrl: finalUrl }),
+              // v430 Step 5D: dual write — modern state + legacy mirror.
+              pipeline_state: 'plate_ready',
               clip_status: 'ready',
               updated_at: new Date().toISOString(),
             }).eq('id', opts.sceneId);
@@ -506,6 +508,7 @@ async function refundCredits(
   try {
     if (sceneId) {
       await admin.from('composer_scenes').update({
+        pipeline_state: 'failed',
         clip_status: 'failed',
         clip_error: reason.slice(0, 500),
         updated_at: new Date().toISOString(),
@@ -642,6 +645,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
         talking_head_aspect: aspectRatio,
         talking_head_resolution: resolution,
         replicate_prediction_id: videoId, // reusing column to store HeyGen video_id
+        pipeline_state: 'plate_rendering',
         clip_status: 'generating',
         ...materializeCompatibilityOutput('clear'),
         updated_at: new Date().toISOString(),
@@ -689,6 +693,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       if (earlySceneId) {
         const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
         await admin.from('composer_scenes').update({
+          pipeline_state: 'failed',
           clip_status: 'failed',
           clip_error: message.slice(0, 500),
           updated_at: new Date().toISOString(),

@@ -9,7 +9,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
-import { transitionScene } from "../_shared/scene-state.ts";
+import { transitionScene, sceneState } from "../_shared/scene-state.ts";
 
 
 const corsHeaders = {
@@ -26,7 +26,13 @@ function json(body: unknown, status = 200) {
   });
 }
 
-const LIVE_CLIP = new Set(["pending", "queued", "generating", "composing", "lipsync"]);
+/**
+ * v430 Step 5D — clip branch reads `pipeline_state` instead of `clip_status`.
+ * Legacy parity: clip_status pending → idle, queued → plate_queued,
+ * generating → plate_rendering. ('composing'/'lipsync' were never produced by
+ * the bridge; they are pre-v384 leftovers.)
+ */
+const LIVE_CLIP_STATES = new Set(["idle", "plate_queued", "plate_rendering"]);
 const LIVE_LIPSYNC = new Set(["pending", "generating", "syncing"]);
 
 serve(async (req) => {
@@ -61,7 +67,7 @@ serve(async (req) => {
     // Fetch scenes + owning project to verify ownership
     const { data: scenes, error: fetchErr } = await supabase
       .from("composer_scenes")
-      .select("id, project_id, clip_status, lip_sync_status, lip_sync_applied_at, dialog_shots, audio_plan, replicate_prediction_id")
+      .select("id, project_id, pipeline_state, clip_status, clip_url, active_run_id, lip_sync_status, lip_sync_applied_at, dialog_shots, audio_plan, replicate_prediction_id")
       .in("id", sceneIds);
     if (fetchErr) return json({ error: fetchErr.message }, 500);
     if (!scenes || scenes.length === 0) return json({ ok: true, canceled: 0 });
@@ -83,7 +89,7 @@ serve(async (req) => {
     const syncJobs: string[] = [];
 
     for (const s of authorized) {
-      if (LIVE_CLIP.has(s.clip_status)) clipIds.push(s.id);
+      if (LIVE_CLIP_STATES.has(sceneState(s))) clipIds.push(s.id);
       if (!s.lip_sync_applied_at && LIVE_LIPSYNC.has(s.lip_sync_status)) lipsyncIds.push(s.id);
 
       const state = s.dialog_shots ?? null;

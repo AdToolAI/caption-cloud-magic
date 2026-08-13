@@ -7,6 +7,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { legacyClipReadyEquivalentRow, legacyClipFailedEquivalentRow } from "../_shared/scene-state.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -79,13 +80,16 @@ serve(async (req) => {
     // Load scenes
     const { data: scenes, error: scenesErr } = await supabase
       .from("composer_scenes")
-      .select("id, clip_status")
+      .select("id, pipeline_state, clip_status, clip_url, base_video_url, processed_video_url, lip_sync_source_clip_url, lip_sync_status, upload_url")
       .eq("project_id", projectId);
     if (scenesErr) throw scenesErr;
 
     const total = scenes?.length || 0;
-    const ready = (scenes || []).filter((s) => s.clip_status === "ready").length;
-    const failed = (scenes || []).filter((s) => s.clip_status === "failed").length;
+    // v430 Step 5D: ready/failed exclusively classified via the parity helper.
+    // A failed scene that still carries a valid output counted as `ready`
+    // under the legacy `clip_status` mirror and must keep doing so.
+    const ready = (scenes || []).filter((s) => legacyClipReadyEquivalentRow(s)).length;
+    const failed = (scenes || []).filter((s) => legacyClipFailedEquivalentRow(s)).length;
     const pending = total - ready - failed;
 
     if (total === 0) {

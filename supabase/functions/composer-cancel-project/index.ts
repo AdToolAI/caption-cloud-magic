@@ -21,7 +21,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
-import { transitionScene } from "../_shared/scene-state.ts";
+import { transitionScene, sceneState } from "../_shared/scene-state.ts";
 
 
 const corsHeaders = {
@@ -94,7 +94,7 @@ serve(async (req) => {
     const { data: scenes } = await supabase
       .from("composer_scenes")
       .select(
-        "id, clip_status, lip_sync_status, lip_sync_applied_at, dialog_shots, audio_plan, replicate_prediction_id",
+        "id, pipeline_state, clip_status, clip_url, active_run_id, lip_sync_status, lip_sync_applied_at, dialog_shots, audio_plan, replicate_prediction_id",
       )
       .eq("project_id", projectId);
 
@@ -132,8 +132,10 @@ serve(async (req) => {
       ) {
         sceneIdsWithLipsync.push(s.id);
       }
-      const cs = s.clip_status;
-      if (cs === "pending" || cs === "generating") {
+      // v430 Step 5D: clip branch via sceneState(). Legacy parity:
+      // pending → idle, generating → plate_rendering.
+      const cs = sceneState(s);
+      if (cs === "idle" || cs === "plate_rendering") {
         sceneIdsWithClip.push(s.id);
       }
     }
