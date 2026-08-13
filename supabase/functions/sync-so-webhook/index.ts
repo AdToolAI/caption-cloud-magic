@@ -1131,8 +1131,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             // v430 Step 1 — the muxed result is the processed output; the
             // plate stays in base_video_url. Single compatibility writer.
             ...materializeCompatibilityOutput("processed", {
-              baseUrl: (sceneRowForOutput as any)?.base_video_url
-                ?? (sceneRowForOutput as any)?.lip_sync_source_clip_url
+              baseUrl: (freshDoneRow as any)?.base_video_url
+                ?? (freshDoneRow as any)?.lip_sync_source_clip_url
                 ?? null,
               processedUrl: finalUrl,
             }),
