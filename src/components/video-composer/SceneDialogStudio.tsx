@@ -698,8 +698,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id, scene.dialogScript, canonicalTurnsHash]);
 
-  // Persist script with debounce. If canonical ID turns exist, keep them as the
-  // technical source of truth and only update turn text by line order.
+  // Persist script with debounce. Canonical ID turns stay the technical source
+  // of truth for *who* speaks; the editor decides how many lines exist — a
+  // shortened script really shortens the turn list (v201 ids stay stable).
   useEffect(() => {
     if (script === (scene.dialogScript ?? '')) return;
     // Skip echoes: if this value is the one we just pushed, the parent update
@@ -708,15 +709,14 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     const handle = setTimeout(() => {
       const updates: Partial<ComposerScene> = { dialogScript: script };
       if (canonicalDialogTurns.length > 0) {
-        const texts = scriptLineTexts(script);
-        if (texts.length === canonicalDialogTurns.length) {
-          updates.dialogTurns = canonicalDialogTurns.map((turn, order) => ({
-            ...turn,
-            text: texts[order] ?? turn.text,
-            order,
-          }));
-        }
+        const aligned = alignDialogTurnsToScript({
+          turns: canonicalDialogTurns,
+          script,
+          resolveSpeakerId: resolveCastByName,
+        });
+        if (aligned) updates.dialogTurns = aligned as ComposerScene['dialogTurns'];
       }
+
       lastPushedScriptRef.current = script;
       onUpdate(updates);
     }, 500);
