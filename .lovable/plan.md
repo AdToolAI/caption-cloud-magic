@@ -100,19 +100,42 @@ Kein Run-Start, kein Queue-Ereignis und kein Provider-Wechsel setzt `continuity_
 Bestätigt wie von dir festgelegt. Der Button ist eine reine Dependency-Aktualisierung:
 
 1. Er löst `resolveSceneOutput(A)` neu auf, extrahiert bei Bedarf den Last-Frame und schreibt `continuity_source_clip_url` (+ Frame-URL) auf B.
-2. Er setzt `continuity_stale = false` und markiert B als **renderbedürftig** (`needs_rerender`-Hinweis in der UI, sichtbar an der Kachel).
+2. Er setzt `continuity_stale = false`.
 3. Er startet **keinen** kostenpflichtigen Render und reserviert keine Credits. Der Render bleibt eine bewusste zweite Nutzeraktion.
 
 Die Frame-Extraktion selbst ist kostenlos bzw. läuft über den bestehenden `ensureTransitionFrame`-Pfad; falls dieser einen bezahlten Lambda-Still auslöst, wird das Ergebnis gecacht und pro `effectiveUrl` nur einmal erzeugt.
 
+### `needs_rerender` ist kein UI-State — es wird abgeleitet, nicht gespeichert
+
+Ein persistierter Dirty-Marker für genau diesen Fall existiert heute **nicht**. `plate_generation` / `plate_ready_generation` bilden nur "läuft gerade ein neuer Run" ab und werden beim Hard-Reset geleert; die vorhandenen `*_hash`-Spalten (`dialog_content_hash`, `audio_asset_hash`, `voice_configuration_hash`) sind das etablierte Muster für "Input-Revision", werden im aktuellen Code aber nicht gelesen. Ein neues Flag-System bauen wir trotzdem nicht.
+
+Stattdessen wird der Dirty-Zustand nach demselben wertbasierten Prinzip wie Staleness abgeleitet — und dafür braucht es genau **eine** zusätzliche persistierte Spalte:
+
+- `composer_scenes.continuity_rendered_source_clip_url text` — die Continuity-Quelle, mit der der **aktuell vorhandene Output von B tatsächlich gerendert wurde**. Sie wird ausschließlich an den bestehenden Finalisierungspunkten geschrieben (dort, wo `materializeCompatibilityOutput('base'|'processed')` bereits läuft): Wert = der `continuity_source_clip_url`, der beim Start dieses Runs galt.
+
+```ts
+needsContinuityRerender(scene) :=
+  sceneWasEverRendered(scene)
+  && scene.continuity_source_clip_url != null
+  && scene.continuity_rendered_source_clip_url !== scene.continuity_source_clip_url;
+```
+
+Damit gilt: gerendert mit Frame X → A ändert sich → B stale → "Continuity aktualisieren" schreibt Quelle Y und `continuity_stale = false` → `rendered = X ≠ Y = konfiguriert` → **renderbedürftig, reload-fest**, weil beide Werte in der DB liegen. Nach dem nächsten erfolgreichen Render von B wird `continuity_rendered_source_clip_url = Y` geschrieben und der Zustand löst sich von selbst auf.
+
+Kein Eingriff in die State Machine, kein neues Flag, kein zweiter Wahrheitsbegriff: Staleness vergleicht A-Output gegen B-Konfiguration, Dirty vergleicht B-Konfiguration gegen B-Renderstand. Beide Vergleiche leben im reinen Helper `continuityState.ts`.
+
 ## Umsetzungsumfang Schritt 4 (nach Freigabe)
 
-- Migration: `composer_scenes.first_rendered_at`, `continuity_source_clip_url`, `continuity_stale`; Backfill; Trigger für `first_rendered_at`; SQL-Funktion `public.propagate_continuity_staleness(_scene_id, _effective_url)` plus Trigger `AFTER UPDATE OF clip_url ... WHEN (NEW.clip_url IS NOT NULL AND NEW.clip_url IS DISTINCT FROM OLD.clip_url)`.
+- Migration: `composer_scenes.first_rendered_at`, `continuity_source_clip_url`, `continuity_rendered_source_clip_url`, `continuity_stale`; Backfill; Trigger für `first_rendered_at`; SQL-Funktion `public.propagate_continuity_staleness(_scene_id, _effective_url)` plus Trigger `AFTER UPDATE OF clip_url ... WHEN (NEW.clip_url IS NOT NULL AND NEW.clip_url IS DISTINCT FROM OLD.clip_url)`.
 - `continuity-chain.ts` liest über `resolveSceneOutput()` statt roh `clip_url`.
 - `materializeCompatibilityOutput()` bleibt unverändert auf den Output-Patch von Szene A beschränkt — kein Cross-Scene-Write und kein Setzen von `continuity_stale`.
-- Reset-Pfade (`scene-hard-reset.ts`, `reset-lipsync-scene`) rufen nach erfolgreichem Reset einmalig `propagateContinuityStaleness(sceneId, null)`. `beginSceneRun()` bleibt unangetastet.
-- Neuer **reiner** Helper `src/lib/composer/continuity/continuityState.ts` (+ Backend-Spiegel): `isContinuityStale(storedSource, currentEffectiveUrl)` und `sceneWasEverRendered({ firstRenderedAt, completedPlateAttemptExists, legacyEffectiveUrl })`. Keine DB-Abfrage im Pure-Layer — `completedPlateAttemptExists` wird vom Aufrufer geladen und hineingereicht. Parity-Test Client/Server.
-- UI: Stale-Badge und Button "Continuity aktualisieren" auf der Szenenkachel, ohne Render-Trigger.
-- Tests: Reset-Festigkeit von `first_rendered_at`; Run-Start-Clear macht B **nicht** stale; fehlgeschlagener Run macht B nicht stale; erfolgreicher Output-Wechsel setzt stale; identische URL setzt nicht stale; Hard-Reset setzt stale; mehrere Dependents über `continuity_source_scene_id`; keine transitive Kaskade; Materializer schreibt keine Fremdszene; Pure-Helper ohne DB-Zugriff; Legacy-Parität; Lip-Sync-Szenen bleiben aus der Kette ausgeschlossen.
+- Reset-Pfade:
+  - `scene-hard-reset.ts` — Output wird wirklich entfernt → einmaliger expliziter Aufruf `propagateContinuityStaleness(sceneId, null)`.
+  - `reset-lipsync-scene` — processed → base, der effektive Output bleibt **non-null** → **kein** expliziter RPC; der normale DB-Trigger erkennt den Wechsel `processedUrl → baseUrl` bereits.
+  - `beginSceneRun()` bleibt unangetastet.
+- Neuer **reiner** Helper `src/lib/composer/continuity/continuityState.ts` (+ Backend-Spiegel): `isContinuityStale(storedSource, currentEffectiveUrl)`, `needsContinuityRerender(...)` und `sceneWasEverRendered({ firstRenderedAt, completedPlateAttemptExists, legacyEffectiveUrl })`. Keine DB-Abfrage im Pure-Layer — `completedPlateAttemptExists` wird vom Aufrufer geladen und hineingereicht. Parity-Test Client/Server.
+- Finalisierungspunkte schreiben zusätzlich `continuity_rendered_source_clip_url` (Continuity-Quelle des abgeschlossenen Runs) — im selben Patch, ohne Cross-Scene-Write.
+- UI: Stale-Badge, Badge "neu rendern nötig" (abgeleitet, nicht gespeichert) und Button "Continuity aktualisieren" auf der Szenenkachel, ohne Render-Trigger.
+- Tests: Reset-Festigkeit von `first_rendered_at`; Run-Start-Clear macht B **nicht** stale; fehlgeschlagener Run macht B nicht stale; erfolgreicher Output-Wechsel setzt stale; identische URL setzt nicht stale; Hard-Reset setzt stale; `reset-lipsync-scene` propagiert nur über den Trigger und ruft keinen Null-RPC; Dirty-Zustand überlebt Reload (`rendered ≠ konfiguriert`) und löst sich nach erfolgreichem Render auf; mehrere Dependents über `continuity_source_scene_id`; keine transitive Kaskade; Materializer schreibt keine Fremdszene; Pure-Helper ohne DB-Zugriff; Legacy-Parität; Lip-Sync-Szenen bleiben aus der Kette ausgeschlossen.
 
 Keine Änderungen an Lip-Sync-Semantik, `reference_image_url`, State Machine oder `transitionType`.
