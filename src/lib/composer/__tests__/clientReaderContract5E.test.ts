@@ -45,6 +45,10 @@ const SKIP_FILES = new Set([
   'src/lib/composer/sceneState.ts',
   'src/lib/composer/output/resolveSceneOutput.ts',
   'src/lib/composer/continuity/continuityState.ts',
+  // Lip-Sync-Orchestrierung im Client. Sie liest bewusst die
+  // Substage-Rohspalten (Spiegel des Server-`lipsync-watchdog`) und bleibt
+  // nach dem v425-Vertrag semantisch unverändert.
+  'src/hooks/useTwoShotAutoTrigger.ts',
 ]);
 
 const MARKER = 'legacy-mapping-allowed:';
