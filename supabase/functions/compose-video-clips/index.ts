@@ -10,6 +10,7 @@ import { createSeedance25Task, MODELARK_JOB_PREFIX } from "../_shared/modelark.t
 import { isSeedance25LipsyncEnabled } from "../_shared/seedance25-lipsync-flag.ts";
 import { AMBIENT_NO_SPEECH_PROMPT } from "../_shared/ambient-audio.ts";
 import { isSupportedComposerAiSource, isLipsyncCertifiedAiSource, LIPSYNC_CERTIFIED_AI_SOURCES } from "../_shared/composer-ai-sources.ts";
+import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 
 import {
   countDialogSpeakers,
@@ -3999,7 +4000,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_url: scene.uploadUrl,
+              ...materializeCompatibilityOutput('base', { baseUrl: scene.uploadUrl }),
               clip_status: "ready",
               updated_at: new Date().toISOString(),
             })
@@ -4030,7 +4031,7 @@ serve(async (req) => {
             await supabaseAdmin
               .from("composer_scenes")
               .update({
-                clip_url: bestVideo.url,
+                ...materializeCompatibilityOutput('base', { baseUrl: bestVideo.url }),
                 clip_status: "ready",
                 updated_at: new Date().toISOString(),
               })

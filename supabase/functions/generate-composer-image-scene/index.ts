@@ -16,6 +16,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { transitionScene } from "../_shared/scene-state.ts";
+import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -232,7 +233,7 @@ serve(async (req) => {
     await supabaseAdmin
       .from("composer_scenes")
       .update({
-        clip_url: publicUrl,
+        ...materializeCompatibilityOutput('base', { baseUrl: publicUrl }),
         upload_type: "image",
         updated_at: new Date().toISOString(),
       })

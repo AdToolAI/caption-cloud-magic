@@ -2,6 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.45.0';
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
+import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -461,7 +462,7 @@ async function processHeyGenJob(opts: {
 
           if (opts.sceneId) {
             await admin.from('composer_scenes').update({
-              clip_url: finalUrl,
+              ...materializeCompatibilityOutput('base', { baseUrl: finalUrl }),
               clip_status: 'ready',
               updated_at: new Date().toISOString(),
             }).eq('id', opts.sceneId);
@@ -642,7 +643,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
         talking_head_resolution: resolution,
         replicate_prediction_id: videoId, // reusing column to store HeyGen video_id
         clip_status: 'generating',
-        clip_url: null,
+        ...materializeCompatibilityOutput('clear'),
         updated_at: new Date().toISOString(),
       };
       if (composerCharacterId) {
