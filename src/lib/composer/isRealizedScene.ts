@@ -3,9 +3,10 @@
  * is actually ready". Downstream audio/lip-sync failures do not invalidate or
  * hide a successfully rendered plate.
  *
- * Accepts both DB-snake_case (composer_scenes row) and app-camelCase
- * (ComposerScene type) — fields are read in both shapes.
+ * v430 Step 5E — reads pipeline_state via sceneState() instead of clip_status.
  */
+import { sceneState, isRealizedState } from './sceneState';
+
 /**
  * Recovery/info markers written by server-side self-heal paths. These are NOT
  * terminal errors — they signal the pipeline transiently reset the scene and
@@ -28,11 +29,11 @@ function isRecoveryClipError(clipError: unknown): boolean {
 export function isRealizedScene(scene: any): boolean {
   if (!scene) return false;
 
-  const clipStatus = scene.clip_status ?? scene.clipStatus ?? null;
   const clipUrl = scene.clip_url ?? scene.clipUrl ?? null;
   const clipError = scene.clip_error ?? scene.clipError ?? null;
-  if (clipStatus !== 'ready') return false;
+
   if (typeof clipUrl !== 'string' || clipUrl.length === 0) return false;
+  if (!isRealizedState(sceneState(scene))) return false;
   // Only block on hard failures — recovery/info markers are transient.
   if (clipError && !isRecoveryClipError(clipError)) return false;
 

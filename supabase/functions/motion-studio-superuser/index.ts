@@ -510,6 +510,7 @@ async function ensureTestProject(userId: string): Promise<{ projectId: string; s
         clip_source: "ai-image",
         ai_prompt: "Cinematic espresso cup on marble",
         clip_status: "ready",
+        pipeline_state: "plate_ready",
         clip_url: PUBLIC_TEST_CLIP,
       });
     }
@@ -522,6 +523,7 @@ async function ensureTestProject(userId: string): Promise<{ projectId: string; s
         clip_source: "ai-image",
         ai_prompt: "Steam rising from coffee in slow motion",
         clip_status: "ready",
+        pipeline_state: "plate_ready",
         clip_url: PUBLIC_TEST_CLIP,
       });
     }

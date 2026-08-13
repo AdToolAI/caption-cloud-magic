@@ -132,6 +132,7 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
           try {
             const preMark: Record<string, unknown> = {
               clip_status: 'generating',
+              pipeline_state: forceCinematicSync ? 'audio_prep' : 'plate_rendering',
               clip_error: null,
             };
             if (forceCinematicSync) {
@@ -140,6 +141,7 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
                 lip_sync_with_voiceover: true,
                 lip_sync_status: 'pending',
                 twoshot_stage: 'audio',
+                pipeline_substate: 'audio',
                 dialog_shots: null,
                 lip_sync_source_clip_url: null,
               });
