@@ -67,7 +67,7 @@ serve(async (req) => {
     // Fetch scenes + owning project to verify ownership
     const { data: scenes, error: fetchErr } = await supabase
       .from("composer_scenes")
-      .select("id, project_id, clip_status, lip_sync_status, lip_sync_applied_at, dialog_shots, audio_plan, replicate_prediction_id")
+      .select("id, project_id, pipeline_state, clip_status, clip_url, active_run_id, lip_sync_status, lip_sync_applied_at, dialog_shots, audio_plan, replicate_prediction_id")
       .in("id", sceneIds);
     if (fetchErr) return json({ error: fetchErr.message }, 500);
     if (!scenes || scenes.length === 0) return json({ ok: true, canceled: 0 });
