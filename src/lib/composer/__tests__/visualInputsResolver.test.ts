@@ -98,10 +98,14 @@ describe('core invariant — continuity never displaces a protected anchor', () 
       references: [characterRef],
     });
     expect(plan.transition.mode).toBe('match-cut');
-    expect(plan.warnings).toContain('lipsync_capability_unverified_match_cut');
+    // v428: the lip-sync rule fires before the verification branch, so the
+    // reason recorded is the hard rule — the outcome is identical.
+    expect(plan.warnings).toContain('lipsync_continuity_disabled');
   });
 
-  it('allows frame-chain with lip-sync only on separate slots AND verified', () => {
+  // v428: a verified lip-sync capability no longer buys a frame-chain. No
+  // lip-sync scene ever takes a continuity frame, on any profile.
+  it('denies frame-chain for lip-sync even when the capability is verified', () => {
     const verified: VisualInputProfile = {
       ...slotModel,
       lipSync: { ...slotModel.lipSync, verification: { status: 'verified' } },
@@ -110,12 +114,13 @@ describe('core invariant — continuity never displaces a protected anchor', () 
       sceneClass: 'character',
       requirements: req({ lipSync: true, identityCritical: true }),
       profile: verified,
+      anchorImageUrl: 'https://x/anchor.jpg',
       previousFrameUrl: 'https://x/prev.jpg',
       references: [characterRef],
     });
-    expect(plan.transition.mode).toBe('frame-chain');
-    expect(plan.firstFrameUrl).toBe('https://x/prev.jpg');
-    expect(plan.anchors.identity).toHaveLength(1);
+    expect(plan.transition.mode).toBe('match-cut');
+    expect(plan.firstFrameUrl).toBe('https://x/anchor.jpg');
+    expect(plan.warnings).toContain('lipsync_continuity_disabled');
   });
 });
 
