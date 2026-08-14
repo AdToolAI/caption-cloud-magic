@@ -224,7 +224,7 @@ export default function SceneInlinePlayer({
             scene.engineOverride === 'cinematic-sync' &&
             dialogVoiceCount >= 2 && (
               <span
-                title={tx({ de: "Lip-Sync auf altem HappyHorse-Master. Bitte 🔁 Lip-Sync neu rendern — wird automatisch mit Hailuo erzeugt.", en: "Lip-sync on old HappyHorse master. Please 🔁 re-render lip-sync — will be generated automatically with Hailuo.", es: "Sincronización labial en el máster antiguo de HappyHorse. Por favor 🔁 vuelve a renderizar la sincronización labial — se generará automáticamente con Hailuo." })}
+                title={tx({ de: "Die Lippensynchronisation läuft auf einem veralteten Video. Bitte die Lippensynchronisation neu erstellen.", en: "Lip-sync is running on an outdated video. Please re-create the lip-sync.", es: "La sincronización labial usa un video desactualizado. Vuelve a crearla." })}
                 className="px-1.5 py-0.5 rounded-md bg-amber-500/15 backdrop-blur text-[9px] font-semibold text-amber-300 border border-amber-500/40"
               >
                 ⚠ {tx({ de: "Re-Render empfohlen", en: "Re-render recommended", es: "Se recomienda volver a renderizar" })}

@@ -36,7 +36,7 @@ const TRENDING_TAGS = [
 
 const PRO_TIPS = [
   tx({ de: 'Hooks unter 1.5s halten die ersten 3s der Watch-Time stabil.', en: 'Hooks under 1.5s keep the first 3 seconds of the watch time stable.', es: 'Los ganchos de menos de 1,5 s mantienen estables los primeros 3 segundos del tiempo de visualización.' }),
-  tx({ de: 'Cinematic-Sync rendert echte Wunsch-Szenen — kein Avatar-Bust mehr.', en: 'Cinematic-Sync renders real desired scenes — no more avatar bust.', es: 'Cinematic-Sync renderiza escenas deseadas reales, sin más bustos de avatar.' }),
+  tx({ de: 'Die Lippensynchronisation läuft auf echten Szenen — kein Avatar-Brustbild mehr.', en: 'Lip-sync runs on real scenes — no more avatar busts.', es: 'La sincronización labial funciona sobre escenas reales, sin bustos de avatar.' }),
   tx({ de: 'Brand-Charaktere mit Identity-Card sind über alle Provider konsistent.', en: 'Brand characters with Identity-Card are consistent across all providers.', es: 'Los personajes de marca con Identity-Card son consistentes en todos los proveedores.' }),
   tx({ de: 'Negative-Prompts werden auf Szenen-Ebene global injiziert.', en: 'Negative prompts are globally injected at the scene level.', es: 'Los prompts negativos se inyectan globalmente a nivel de escena.' }),
   tx({ de: 'Lip-Sync-aktive Szenen werden vom Plan niemals überschrieben.', en: 'Lip-sync active scenes are never overwritten by the plan.', es: 'Las escenas con sincronización labial activa nunca son sobrescritas por el plan.' }),
