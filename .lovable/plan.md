@@ -52,30 +52,111 @@ Deine sechs Forderungen werden vollständig übernommen und sind so umsetzbar. P
 - **`expected_run_id` / `expected_plate_generation` sind Pflichtparameter**, nicht optional. Für nachweislich verwaiste Läufe (`active_run_id IS NULL`) gibt es einen eigenen expliziten Grund (`orphaned_run`), der nicht bedeutet „Prüfung aus", sondern „erwarteter Zustand ist: kein aktiver Lauf". Ein Aufruf mit NULL-Run und einer Szene, die einen aktiven Lauf hat, ist damit ein Stale-Fall.
 - **Stale-Recovery ist ein No-op mit Rückgabewert**, keine Exception und keine Zustandsänderung: `applied=false, reason='stale_run' | 'stale_generation'`, Auditzeile mit `outcome='stale'`. Die Szene bleibt unangetastet — der Watchdog darf nicht in der Lage sein, durch eigene Verspätung Schaden anzurichten.
 
+## Antwort 4 — Wie wird `not-applicable` daran gehindert, ein Bypass zu werden?
+
+Durch eine **geschlossene Grundmenge plus namentliche Allowlist**, nicht durch ein Flag. Typvertrag wie von dir vorgeschlagen:
+
+```ts
+export type RunlessTransitionReason =
+  | 'user_cancel'          // Nutzer bricht Szene/Projekt ab, unabhängig vom laufenden Run
+  | 'project_teardown'     // Projektabbruch, Szene wird kollektiv terminal
+  | 'pre_run_dispatch'     // Übergang VOR Vergabe einer Run-ID (idle → plate_queued)
+  | 'runless_generator';   // Generator ohne Run-Ledger (heute nur generate-composer-image-scene)
+
+export type RunGuard =
+  | { kind: 'run'; runId: string; generation: number }
+  | { kind: 'not-applicable'; reason: RunlessTransitionReason; writeId: string };
+```
+
+Harte Regeln:
+
+- `writeId` muss eine ID aus dem v431-Inventar sein; der Contract-Test prüft das gegen `V431_RUNLESS_ALLOWLIST`. Jeder neue `not-applicable`-Aufruf ohne Allowlist-Eintrag macht den Test rot.
+- **Callback-, Webhook-, Render- und Watchdog-Pfade dürfen `not-applicable` nie verwenden.** Der Scanner-Test verbietet die Konstante in `*webhook*`, `*watchdog*`, `sync-so-*`, `remotion-*`, `render-*` und `recover-*` grundsätzlich — dort gibt es immer einen Run, dessen Identität nachweisbar ist.
+- Jede Ausnahme braucht im Dossier einen Satz, warum dieser Übergang nachweislich zu keinem Run gehört.
+
+Kandidatenliste heute (11 `transitionScene`-Aufrufe, geprüft):
+
+| Write-ID | Grund | Begründung |
+| --- | --- | --- |
+| `composer-cancel-scene:canceled` | `user_cancel` | Nutzeraktion; soll gerade unabhängig vom laufenden Run greifen |
+| `composer-cancel-project:canceled` | `project_teardown` | Kollektiver Abbruch über alle Szenen |
+| `composer-start-scene-generation:plate-queued` / `:dispatch-failed` | **kein Runless** — hat bereits `runId` + `generation` | bleibt `kind: 'run'` |
+| `generate-composer-image-scene` (5×) | `runless_generator` | Bild-Szenengenerator läuft heute ohne Run-Ledger-Eintrag; Debt-Eintrag mit Ziel, ihn in G2 an `composer_start_scene_run()` anzuschließen |
+| `hybrid-extend-scene:failed` | **kein Runless** | gehört zum Extend-Lauf; wird in G4 auf `kind: 'run'` gehoben, bis dahin bleibt es ein offen markierter Befund, kein Allowlist-Eintrag |
+
+Damit ist die Ausnahmemenge klein, benannt, begründet und schrumpfend — kein beschriftetes Loch.
+
+## Antwort 5 — Kann die 6-Argument-Überladung sicher gelöscht werden?
+
+**Nein, nicht mit dem heutigen Beweisstand.** Gemessen:
+
+- Beide Überladungen haben `EXECUTE` für `anon`, `authenticated` und `service_role` — die 6er ist über die Data API **von außen aufrufbar**, PostgREST wählt sie anhand der übergebenen Argumentnamen. Repo-Freiheit von Aufrufern beweist also nichts über echte Clients.
+- `pg_stat_statements` (Schema `extensions`) enthält **keinen** Eintrag für die Funktion — weder für die 6er noch für die 7er. Das Fenster ist damit nicht aussagekräftig, nicht „bewiesen ungenutzt".
+
+Konsequenz — dein Vorschlag wird übernommen: **in G0 kein Drop.** Stattdessen:
+
+1. 6er-Überladung als deprecated markieren (Kommentar + `RAISE LOG 'v431_legacy_overload_call scene=% caller=%'`).
+2. Sie intern auf die neue geguardete Implementierung delegieren, damit sie kein zweiter, ungeprüfter Pfad bleibt — mit `guard_mode = 'runless'` und Grund `legacy_overload`, der seinerseits nur die heute schon erlaubten Übergangsklassen zulässt.
+3. `EXECUTE` für `anon` entziehen (kein legitimer Browser-Client ruft Zustandsübergänge direkt auf) — das ist reversibel und verkleinert die Angriffsfläche sofort.
+4. Beobachtungsfenster bis G6; Drop nur, wenn das Log über die Zeit leer bleibt.
+
+## Antwort 6 — Guard-Modus in `composer_scene_transition()` selbst
+
+Übernommen, das ist die eigentliche Reparatur. Neue Signatur mit **Pflichtparameter** `_guard_mode`:
+
+```sql
+composer_scene_transition(
+  _scene_id    uuid,
+  _to          composer_scene_state,
+  _guard_mode  composer_transition_guard_mode,   -- 'run_bound' | 'runless'  (PFLICHT)
+  _run_id      uuid    default null,
+  _generation  integer default null,
+  _runless_reason composer_runless_reason default null,
+  _from        composer_scene_state[] default null,
+  _detail      text default null,
+  _substate    text default null,
+  _clear_detail   boolean default false,
+  _clear_substate boolean default false,
+  _error_text  text default null
+)
+```
+
+Vertrag in der Funktion, alles unter demselben `FOR UPDATE`:
+
+- `guard_mode = 'run_bound'`: `_run_id` **und** `_generation` müssen beide gesetzt sein — fehlt eines, `reason = 'guard_incomplete'`, kein Write. Beide werden gegen `active_run_id` und `plate_generation` geprüft (`stale_run` / `stale_generation`). Kein halber Guard mehr.
+- `guard_mode = 'runless'`: `_runless_reason` ist Pflicht und muss im Enum liegen; zusätzlich muss der Übergang in einer eigenen Tabelle `composer_runless_transitions (reason, from_state, to_state)` erlaubt sein. `_run_id`/`_generation` müssen NULL sein — sonst `reason = 'guard_conflict'`.
+- **Kein stilles NULL mehr**: ein Aufruf ohne `_guard_mode` schlägt schon an der Signatur fehl.
+- Bleibt bestehen: Übergangstabelle, Zeilensperre, `can_edit_composer_project()` bei nicht-NULL `auth.uid()`.
+- Neu atomar im selben Statement: `pipeline_state`, `pipeline_substate`, `pipeline_detail`, `pipeline_state_run_id`, **`clip_error`** (`_error_text`) sowie das explizite Löschen von Detail/Substate über die beiden `_clear_*`-Flags.
+
+Damit kann kein Aufrufer — auch kein direkter RPC-Aufruf an der TypeScript-Fassade vorbei — mehr einen run-blinden Übergang ausführen.
+
 ## G0 — Auftrag (nach Freigabe)
 
-**G0.1 — Run-Guard im Kernprimitive verpflichtend machen**
-- `transitionScene()` bekommt eine Pflichtangabe zur Run-Bindung: entweder `runId`/`generation` oder ein ausdrückliches `runGuard: 'not-applicable'` mit Begründung. Kein stilles NULL mehr.
-- `failSceneState()` erhält dieselbe Pflicht und reicht `runId` durch.
-- Ein Contract-Test verbietet neue Aufrufe ohne Run-Bindung.
-- Bestandsaufrufe werden in G0 noch nicht inhaltlich umgestellt: sie bekommen die explizite `not-applicable`-Markierung, damit die Schuld sichtbar und zählbar ist statt unsichtbar.
+**G0.1 — DB-Kernvertrag (`composer_scene_transition`)**
+- Enums `composer_transition_guard_mode`, `composer_runless_reason`; Tabelle `composer_runless_transitions` mit den heute legitimen runlosen Klassen.
+- Neue Funktionsversion gemäß Antwort 6, inklusive `clip_error`-Atomizität und löschbarem Detail/Substate.
+- 6er-Überladung: deprecaten, instrumentieren, auf `runless/legacy_overload` delegieren, `anon`-EXECUTE entziehen. **Kein Drop.**
 
-**G0.2 — `composer_scene_transition` bereinigen**
-- Die 6-Argument-Überladung entfernen (nachweislich kein Aufrufer).
-- `_detail`/`_substate` löschbar machen (explizites Sentinel statt reinem `COALESCE`), damit Reste alter Pässe verschwinden.
-- Zustand und Fehlertext in derselben Transaktion schreiben (`_error_text`-Parameter), damit „failed ohne Grund" nicht mehr entstehen kann.
-- Rückgabegrund um `stale_run`/`stale_generation` erweitert protokollieren.
+**G0.2 — TypeScript-Fassade**
+- `RunGuard`-Union aus Antwort 4; `transitionScene()`/`failSceneState()` verlangen ihn als Pflichtargument.
+- `failSceneState()` reicht Run und Fehlertext durch; keine getrennten `clip_error`-Updates mehr aus dem Helfer.
+- Contract-Test mit `V431_RUNLESS_ALLOWLIST`; Scanner-Test verbietet `not-applicable` in Webhook-/Watchdog-/Render-/Recover-Dateien.
+- Die 11 Bestandsaufrufe werden gemäß Tabelle in Antwort 4 zugeordnet — 2 bleiben `run`, 7 werden allowlisted, `hybrid-extend-scene` bleibt offener Befund für G4.
 
 **G0.3 — `composer_recover_scene()`**
-- Signatur: `(_scene_id, _expected_run_id, _expected_generation, _target ∈ {failed, canceled}, _reason composer_recovery_reason, _actor text)`.
+- Signatur: `(_scene_id, _expected_run_id, _expected_generation, _target ∈ {failed, canceled}, _reason composer_recovery_reason, _actor text)`; `_expected_*` sind Pflicht, `orphaned_run` ist der ausdrückliche Grund für „erwartet: kein aktiver Lauf".
 - Ablauf in einer Transaktion: `FOR UPDATE` → Run-/Generationsabgleich → Ziel-Whitelist → Write → Auditzeile.
 - Auditzeile mit `from_state`, `to_state`, `run_id`, `generation`, `reason`, `actor`, `outcome ∈ {applied, stale, rejected}`.
-- Stale = No-op, protokolliert, kein Szenenfehler.
+- Stale = No-op mit `applied=false`, protokolliert, kein Szenenfehler.
 - `hybrid-extend-scene` (Ziel `idle`) und `qa-weekly-deep-sweep` (Ziel `plate_ready`) bekommen den Primitive **nicht**; sie gehen auf legalen Übergang bzw. `scene-hard-reset.ts`.
 
 **G0.4 — Nachweise**
+- DB-Test: `run_bound` ohne Generation → `guard_incomplete`, kein Write. `runless` mit Run-ID → `guard_conflict`. `runless` mit nicht gelisteter Klasse → abgelehnt.
 - Fixture-Test: verspäteter Callback eines alten Runs verändert nichts (je einmal über `transitionScene`, `failSceneState`, `composer_recover_scene`).
 - Fixture-Test: Recovery mit passendem Run setzt terminal und erzeugt genau eine Auditzeile.
-- Dossier-Update: neue Spalte `guardKind` (`rpc-atomic` / `pre-write-js` / `none`) im Inventar und in der TS-Fixture; TOCTOU-Fenster bei `sync-so-webhook`, `lipsync-watchdog` und `compose-dialog-segments` ausdrücklich markiert; `remotion-webhook` als „kein Run-Bezug" hervorgehoben.
+- Regressionstest: bestehende Übergänge der 11 Aufrufstellen verhalten sich unverändert (Vorher/Nachher-Matrix über die Übergangstabelle).
+- Dossier-Update: Spalte `guardKind` (`rpc-atomic` / `pre-write-js` / `none`) im Inventar und in der TS-Fixture; TOCTOU-Fenster bei `sync-so-webhook`, `lipsync-watchdog` und `compose-dialog-segments` markiert; `remotion-webhook` als „kein Run-Bezug" hervorgehoben; Allowlist-Begründungen je Ausnahme.
 
 Keine Migration von Writern in G0. G1 startet erst, wenn G0.4 grün ist.
+
