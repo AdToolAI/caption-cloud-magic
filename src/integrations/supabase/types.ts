@@ -19630,6 +19630,40 @@ export type Database = {
         Returns: number
       }
       cleanup_synthetic_probe_runs: { Args: never; Returns: undefined }
+      composer_fail_scene_with_mirrors: {
+        Args: {
+          _clip_status?: string
+          _error_text: string
+          _generation: number
+          _lip_sync_status?: string
+          _run_id: string
+          _scene_id: string
+          _substate?: string
+          _twoshot_stage?: string
+          _write_id: string
+        }
+        Returns: Json
+      }
+      composer_finalize_talking_head: {
+        Args: {
+          _base_url?: string
+          _character_audio_url?: string
+          _character_image_url?: string
+          _character_script?: string
+          _character_voice_id?: string
+          _error_text?: string
+          _generation: number
+          _mentioned_character_ids?: string[]
+          _mode: string
+          _replicate_prediction_id?: string
+          _run_id: string
+          _scene_id: string
+          _talking_head_aspect?: string
+          _talking_head_resolution?: string
+          _write_id: string
+        }
+        Returns: Json
+      }
       composer_recover_scene: {
         Args: {
           _expected_plate_generation: number

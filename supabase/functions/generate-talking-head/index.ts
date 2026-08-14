@@ -2,7 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.45.0';
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
-import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -473,18 +473,29 @@ async function processHeyGenJob(opts: {
 
 
           if (opts.sceneId) {
-            // v431 G2.1 — Run-Provenienz nur protokolliert; Writer-Migration folgt G2.2.
-            console.log(
-              `[talking-head] v431_g2_1 write=plate-ready scene=${opts.sceneId} run=${opts.runId ?? "none"} gen=${opts.plateGeneration ?? "none"}`,
-            );
-            await admin.from('composer_scenes').update({
-              ...materializeCompatibilityOutput('base', { baseUrl: finalUrl }),
-              // v430 Step 5D: dual write — modern state + legacy mirror.
-              pipeline_state: 'plate_ready',
-              clip_status: 'ready',
-              updated_at: new Date().toISOString(),
-            }).eq('id', opts.sceneId);
+            // v431 G2.2 — Output + kanonischer State + Legacy-Spiegel atomar
+            // unter demselben Row Lock (Run + Generation + from_state).
+            if (!opts.runId || typeof opts.plateGeneration !== 'number') {
+              console.error(
+                `[talking-head] v431_g2_2 write=plate-ready scene=${opts.sceneId} result=missing_run_provenance`,
+              );
+            } else {
+              const { data: fin, error: finErr } = await admin.rpc('composer_finalize_talking_head', {
+                _scene_id: opts.sceneId,
+                _mode: 'complete',
+                _run_id: opts.runId,
+                _generation: opts.plateGeneration,
+                _write_id: 'talking_head_plate_ready',
+                _base_url: finalUrl,
+              });
+              const res = (fin ?? {}) as { applied?: boolean; reason?: string };
+              console.log(
+                `[talking-head] v431_g2_2 write=plate-ready scene=${opts.sceneId} run=${opts.runId} ` +
+                  `gen=${opts.plateGeneration} result=${finErr ? `rpc_error:${finErr.message}` : (res.applied ? 'applied' : (res.reason ?? 'not_applied'))}`,
+              );
+            }
           }
+
 
           console.log(`[talking-head] ✅ Completed for video_id=${opts.videoId}`);
         } catch (e: any) {
@@ -511,6 +522,46 @@ async function processHeyGenJob(opts: {
   await refundCredits(admin2, opts.userId, opts.videoId, opts.estimatedCostEur, opts.sceneId, 'HeyGen render timed out after 5min', { runId: opts.runId, plateGeneration: opts.plateGeneration });
 }
 
+/**
+ * v431 G2.2 — einziger Fehler-Writer dieser Funktion. Kanonischer State,
+ * `clip_status` und `clip_error` werden atomar unter demselben Row Lock mit
+ * Run-/Generations-/From-State-Guard geschrieben. Fehlt die Provenienz, wird
+ * gar nichts geschrieben (fail-closed).
+ */
+async function failSceneGuarded(
+  admin: ReturnType<typeof createClient>,
+  opts: {
+    sceneId: string;
+    runStamp?: { runId?: string; plateGeneration?: number };
+    writeId: string;
+    reason: string;
+    marker: string;
+  },
+): Promise<void> {
+  const runId = opts.runStamp?.runId;
+  const generation = opts.runStamp?.plateGeneration;
+  if (!runId || typeof generation !== 'number') {
+    console.error(
+      `[talking-head] v431_g2_2 ${opts.marker} scene=${opts.sceneId} result=missing_run_provenance`,
+    );
+    return;
+  }
+  const { data, error } = await admin.rpc('composer_finalize_talking_head', {
+    _scene_id: opts.sceneId,
+    _mode: 'fail',
+    _run_id: runId,
+    _generation: generation,
+    _write_id: opts.writeId,
+    _error_text: opts.reason.slice(0, 500),
+  });
+  const res = (data ?? {}) as { applied?: boolean; reason?: string };
+  console.log(
+    `[talking-head] v431_g2_2 ${opts.marker} scene=${opts.sceneId} run=${runId} gen=${generation} ` +
+      `result=${error ? `rpc_error:${error.message}` : (res.applied ? 'applied' : (res.reason ?? 'not_applied'))}`,
+  );
+}
+
+
 // Idempotent credit refund (per-job). Uses existing refund_ai_video_credits RPC
 // which expects a UUID generation_id. We deterministically derive a UUID from
 // the HeyGen video_id so retries are idempotent (same video_id → same UUID).
@@ -521,21 +572,20 @@ async function refundCredits(
   amountEur: number,
   sceneId: string | undefined,
   reason: string,
-  /** v431 G2.1 — eingefrorener Dispatch-Snapshot, nur Telemetrie. */
+  /** v431 G2.2 — eingefrorener Dispatch-Snapshot (Guard-Quelle). */
   runStamp?: { runId?: string; plateGeneration?: number },
 ) {
   try {
     if (sceneId) {
-      console.log(
-        `[talking-head] v431_g2_1 write=failed scene=${sceneId} run=${runStamp?.runId ?? "none"} gen=${runStamp?.plateGeneration ?? "none"}`,
-      );
-      await admin.from('composer_scenes').update({
-        pipeline_state: 'failed',
-        clip_status: 'failed',
-        clip_error: reason.slice(0, 500),
-        updated_at: new Date().toISOString(),
-      }).eq('id', sceneId);
+      await failSceneGuarded(admin, {
+        sceneId,
+        runStamp,
+        writeId: 'talking_head_failed',
+        reason,
+        marker: 'write=failed',
+      });
     }
+
 
 
     // Derive deterministic UUIDv5-style id from video_id for idempotency
@@ -673,27 +723,37 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
     // Step 4: Update scene with processing status
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     if (sceneId) {
-      const sceneUpdate: Record<string, unknown> = {
-        character_image_url: imageUrl,
-        character_audio_url: audioUrl,
-        character_voice_id: voiceId || customVoiceId,
-        character_script: text,
-        talking_head_aspect: aspectRatio,
-        talking_head_resolution: resolution,
-        replicate_prediction_id: videoId, // reusing column to store HeyGen video_id
-        pipeline_state: 'plate_rendering',
-        clip_status: 'generating',
-        ...materializeCompatibilityOutput('clear'),
-        updated_at: new Date().toISOString(),
-      };
-      if (composerCharacterId) {
-        sceneUpdate.mentioned_character_ids = [composerCharacterId];
+      // v431 G2.2 — fail-closed: ohne vollständige Run-Provenienz kein Scene-Write.
+      if (!runId || typeof plateGeneration !== 'number') {
+        console.error(
+          `[talking-head] v431_g2_2 write=plate-rendering scene=${sceneId} result=missing_run_provenance`,
+        );
+        return new Response(JSON.stringify({ error: 'missing_run_provenance' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
+      const { data: startRes, error: startErr } = await admin.rpc('composer_finalize_talking_head', {
+        _scene_id: sceneId,
+        _mode: 'start',
+        _run_id: runId,
+        _generation: plateGeneration,
+        _write_id: 'talking_head_plate_rendering',
+        _character_image_url: imageUrl ?? null,
+        _character_audio_url: audioUrl,
+        _character_voice_id: voiceId || customVoiceId || null,
+        _character_script: text ?? null,
+        _talking_head_aspect: aspectRatio,
+        _talking_head_resolution: resolution,
+        _replicate_prediction_id: videoId,
+        _mentioned_character_ids: composerCharacterId ? [composerCharacterId] : null,
+      });
+      const sr = (startRes ?? {}) as { applied?: boolean; reason?: string };
       console.log(
-        `[talking-head] v431_g2_1 write=plate-rendering scene=${sceneId} run=${runId ?? "none"} gen=${plateGeneration ?? "none"}`,
+        `[talking-head] v431_g2_2 write=plate-rendering scene=${sceneId} run=${runId} gen=${plateGeneration} ` +
+          `result=${startErr ? `rpc_error:${startErr.message}` : (sr.applied ? 'applied' : (sr.reason ?? 'not_applied'))}`,
       );
-      await admin.from('composer_scenes').update(sceneUpdate).eq('id', sceneId);
     }
+
 
     // Step 5: Schedule background polling
     const estimatedCostEur = 0.30; // HeyGen photo avatar pricing approximation
@@ -732,18 +792,17 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
     // "generating…" forever after an upload/HeyGen failure.
     try {
       if (earlySceneId) {
-        console.log(
-          `[talking-head] v431_g2_1 write=failed-early scene=${earlySceneId} run=${earlyRunStamp.runId ?? "none"} gen=${earlyRunStamp.plateGeneration ?? "none"}`,
-        );
         const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-        await admin.from('composer_scenes').update({
-          pipeline_state: 'failed',
-          clip_status: 'failed',
-          clip_error: message.slice(0, 500),
-          updated_at: new Date().toISOString(),
-        }).eq('id', earlySceneId);
+        await failSceneGuarded(admin, {
+          sceneId: earlySceneId,
+          runStamp: earlyRunStamp,
+          writeId: 'talking_head_failed_early',
+          reason: message,
+          marker: 'write=failed-early',
+        });
       }
     } catch (_e) { /* non-fatal */ }
+
     return new Response(JSON.stringify({ error: message }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

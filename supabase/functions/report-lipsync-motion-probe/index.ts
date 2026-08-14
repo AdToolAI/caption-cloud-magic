@@ -141,14 +141,29 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
     const pass = passes[body.pass_idx] as Record<string, unknown> | undefined;
     if (!pass) return json({ ok: true, is_noop: isNoop, threshold: YAVG_NOOP_THRESHOLD });
 
-    // v431 G2.1 — Run-Provenienz stammt ausschliesslich aus dem beim Dispatch
-    // eingefrorenen Pass-Slot (immutable), nie aus der Live-Szene.
+    // v431 G2.1/G2.2 — Run-Provenienz stammt ausschliesslich aus dem beim
+    // Dispatch eingefrorenen Pass-Slot (immutable), nie aus der Live-Szene.
+    // G2.2: bevor der Snapshot ueberhaupt genutzt wird, muss die gemeldete
+    // job_id exakt zur Slot-job_id passen (fail-closed, No-op bei Mismatch).
     const passRunId = (pass as Record<string, unknown>).run_id ?? null;
     const passPlateGeneration = (pass as Record<string, unknown>).plate_generation ?? null;
+    const slotJobId = typeof pass.job_id === "string" && pass.job_id.length > 0 ? pass.job_id : null;
+    const reportedJobId = typeof body.job_id === "string" && body.job_id.length > 0 ? body.job_id : null;
+    const jobSlotMatch = !!slotJobId && !!reportedJobId && slotJobId === reportedJobId;
     console.log(
-      `[report-lipsync-motion-probe] v431_g2_1 scene=${body.scene_id} pass=${body.pass_idx} ` +
-        `run=${passRunId ?? "none"} gen=${passPlateGeneration ?? "none"}`,
+      `[report-lipsync-motion-probe] v431_g2_2 scene=${body.scene_id} pass=${body.pass_idx} ` +
+        `run=${passRunId ?? "none"} gen=${passPlateGeneration ?? "none"} ` +
+        `slot_job=${slotJobId ?? "none"} reported_job=${reportedJobId ?? "none"} match=${jobSlotMatch}`,
     );
+
+    if (!jobSlotMatch) {
+      console.warn(
+        `[report-lipsync-motion-probe] v431_g2_2 job_slot_mismatch scene=${body.scene_id} pass=${body.pass_idx} ` +
+          `expected=${slotJobId ?? "none"} got=${reportedJobId ?? "none"} → no-op`,
+      );
+      return json({ ok: true, ignored: "job_slot_mismatch" });
+    }
+
 
     try {
       await admin.rpc("update_dialog_pass_slot", {
@@ -309,15 +324,33 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
     ).toFixed(1);
     const userMsg = tl({ de: `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) konnte nach ${NOOP_LADDER.length + 1} Versuchen nicht erzeugt werden. Bitte Plate neu rendern.`, en: `Lip-sync for ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) could not be generated after ${NOOP_LADDER.length + 1} attempts. Please re-render plate.`, es: `La sincronización labial para ${passSpeakerName} (Turno ${turnStart}s–${turnEnd}s) no pudo generarse después de ${NOOP_LADDER.length + 1} intentos. Por favor, vuelve a renderizar la placa.` });
 
-    await admin
-      .from("composer_scenes")
-      .update({
-        lip_sync_status: "failed",
-        twoshot_stage: "needs_clip_rerender",
-        clip_error: userMsg,
-        updated_at: nowIso,
-      })
-      .eq("id", body.scene_id);
+    // v431 G2.2 — kanonischer State + Substate + Legacy-Spiegel atomar unter
+    // demselben Row Lock mit Run-/Generations-Guard. Fehlt der Slot-Snapshot,
+    // wird die Szene gar nicht angefasst (fail-closed, kein Legacy-Fallback).
+    if (typeof passRunId !== "string" || typeof passPlateGeneration !== "number") {
+      console.warn(
+        `[report-lipsync-motion-probe] v431_g2_2 write=hard-fail scene=${body.scene_id} ` +
+          `pass=${body.pass_idx} result=missing_run_provenance`,
+      );
+    } else {
+      const { data: failRes, error: failErr } = await admin.rpc("composer_fail_scene_with_mirrors", {
+        _scene_id: body.scene_id,
+        _run_id: passRunId,
+        _generation: passPlateGeneration,
+        _write_id: "motion_probe_noop_unrecoverable",
+        _error_text: userMsg,
+        _substate: "needs_clip_rerender",
+        _lip_sync_status: "failed",
+        _twoshot_stage: "needs_clip_rerender",
+      });
+      const fr = (failRes ?? {}) as { applied?: boolean; reason?: string };
+      console.log(
+        `[report-lipsync-motion-probe] v431_g2_2 write=hard-fail scene=${body.scene_id} pass=${body.pass_idx} ` +
+          `run=${passRunId} gen=${passPlateGeneration} ` +
+          `result=${failErr ? `rpc_error:${failErr.message}` : (fr.applied ? "applied" : (fr.reason ?? "not_applied"))}`,
+      );
+    }
+
 
     await logDispatch(admin, {
       scene_id: body.scene_id,
