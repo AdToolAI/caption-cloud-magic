@@ -66,6 +66,14 @@ composer_fail_hybrid_extend_scene(
 - fehlende Provenienz → `missing_run_provenance`; falscher From-State → No-op mit `unexpected_state`; keine Output-, keine Legacy-Mutation bei Ablehnung.
 - Legacy-Spiegel: setzt im selben Aufruf nach erfolgreichem Core-Write `clip_status = 'failed'` und `clip_error = _error_text` (identisches Muster wie `composer_fail_scene_with_mirrors`, aber ohne Lip-Sync-Felder und ohne Clear-Flag).
 
+**G0-Sicherheitsvertrag für `composer_fail_hybrid_extend_scene` (verbindlich, identisch zu den übrigen neuen Facades):**
+- `SECURITY DEFINER` mit `SET search_path = pg_catalog, public`.
+- Alle Tabellen- und Funktionsreferenzen schema-qualifiziert (`public.composer_scenes`, `public.composer_scene_transition_core`, `public.composer_scene_transition_log`).
+- Rechte: `REVOKE ALL ON FUNCTION … FROM PUBLIC, anon, authenticated;` und `GRANT EXECUTE … TO service_role;` — kein Client-Zugriff, Aufruf nur aus der Edge-Function.
+- `caller_class` und `source_signature` sind **fest im Primitive** verdrahtet (`'v2'`/`'v2'`), nicht als Parameter exponiert und nicht überschreibbar.
+- Die Signatur exponiert **keine** Parameter für Zielstate, Guard-Mode, From-States, Substate, Clear-Flags oder Legacy-Lip-Sync-Felder: `_to = 'failed'`, `_guard_mode = 'run_bound'`, `_from = ARRAY['plate_queued']` sind Konstanten im Funktionskörper. Die einzige textuelle Steuerung ist `_write_id`, und die läuft gegen die geschlossene Drei-Werte-Allowlist.
+- Genau **eine** auflösbare Signatur (5 Argumente, keine Defaults, kein Overload) — Nachweis über `pg_proc` wie in S1.
+
 Alle drei Hybrid-Failure-Writes nutzen dieses Primitive; `markSceneFailed()` entfällt ersatzlos.
 
 ## Zielvertrag G2.4 — autoritative Endfassung
