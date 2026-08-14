@@ -33,7 +33,7 @@ RETURNS TABLE(applied boolean, state composer_scene_state, substate text, reason
 
 `pipeline_state_run_id`: bei `run_bound` = `_run_id`; bei `runless` **explizit `NULL`**. Kein `COALESCE(_run_id, active_run_id)` mehr.
 
-Detail/Substate: `_clear_detail`/`_clear_substate` setzen explizit auf NULL; ohne sie gilt weiter `COALESCE`. Zustand, Detail und Substate werden in genau einem `UPDATE` geschrieben — Fehlertext und Zustand sind damit atomar.
+Detail/Substate/Fehlertext: `_error_text` schreibt das Fehlertextfeld der Szene, `_clear_detail`/`_clear_substate`/`_clear_error` setzen das jeweilige Feld explizit auf NULL; ohne sie gilt weiter `COALESCE`. Zielzustand, Detail, Substate und Fehlertext werden in genau einem `UPDATE` geschrieben — damit ist „State + Error atomar" tatsächlich implementierbar, und `failSceneState()` braucht keinen zweiten Write mehr.
 
 ## 2. Atomarer Pfad statt v391-Loop
 
