@@ -33,6 +33,25 @@ G0-State-Core unverändert (eingefroren).
   `report-lipsync-motion-probe`, alle Webhooks/Watchdogs/Fan-in, `hybrid-extend-scene` (G2),
   Lip-Sync-Frozen-Contracts, Cast & World, Reverse-Bridge.
 
+## 2.1 SceneCard-Reset-Implementierung
+
+Der Client-Pfad für „Lip-Sync komplett zurücksetzen“ (und den in-flight-Abbruch-Button)
+wurde auf den G0-Vertrag migriert:
+
+- Kein direktes `supabase.from('composer_scenes').update(...)` mehr im Client.
+- Stattdessen einziger Aufruf: `supabase.functions.invoke('cancel-dialog-lipsync', { body: { scene_id, reset: true } })`.
+- `cancel-dialog-lipsync` nutzt für `reset === true` das SQL-Primitive
+  `composer_reset_lipsync_full(_scene_id, _expected_generation, _expected_run_id)`.
+- Das Primitive führt den atomaren Row-Lock, Stale-Request-Guard, Base-Restore
+  (`clip_url = base_video_url`, `processed_video_url = NULL`) und die Bereinigung der
+  13 Lip-Sync-Runtime-Keys in `audio_plan.twoshot` durch.
+- Der Client macht einen optimistischen lokalen Rollback (inkl. Rückstellung von
+  `clipUrl` auf `baseVideoUrl` und Löschen von `processedVideoUrl`) und kann bei
+  Fehler (`stale_reset`, `no_base_plate`, etc.) sauber zurückrollen.
+- Der Reset-Button funktioniert nun auch für bereits angewandte Szenen
+  (`lip_sync_applied_at IS NOT NULL`), weil `reset: true` den früheren
+  `already_applied`-Shortcut überspringt.
+
 ## 3. Grandfathering / Runless
 
 - `composer_transition_grandfather` enthält ausschließlich Wrapper-Signaturen
