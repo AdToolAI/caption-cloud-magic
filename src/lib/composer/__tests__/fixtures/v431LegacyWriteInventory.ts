@@ -943,22 +943,11 @@ export const V431_LEGACY_WRITE_INVENTORY: readonly LegacyWriteEntry[] = [
     idempotency: "unguarded-low-traffic",
     callbackRisk: "medium",
   },
-  {
-    id: "hybrid-extend-scene:idle",
-    file: "supabase/functions/hybrid-extend-scene/index.ts",
-    line: 194,
-    writeRole: "state",
-    trigger: "edge-invoke",
-    fields: ["pipeline_state"],
-    values: {"pipeline_state": "\"idle\""},
-    targetState: "\"idle\"",
-    targetSubstate: "aus twoshot_stage abzuleiten",
-    derivable: "1:1",
-    runGuard: ["id-only"],
-    atomicWith: [],
-    idempotency: "unguarded-low-traffic",
-    callbackRisk: "medium",
-  },
+  // v431 G2.4 — `hybrid-extend-scene:idle` ENTFERNT: nachweislich kein State-Writer,
+  // sondern ein INSERT-Default (`pipeline_state: "idle"` im INSERT der neuen Szene).
+  // Kein From-State, keine Vorgaengerzeile, kein Run -> insert-default, kein Runless,
+  // kein Grandfathering. Writer-Count sinkt dadurch um 1.
+
   {
     id: "lipsync-watchdog:failed",
     file: "supabase/functions/lipsync-watchdog/index.ts",
