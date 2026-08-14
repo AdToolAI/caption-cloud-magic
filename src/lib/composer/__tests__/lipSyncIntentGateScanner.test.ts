@@ -217,6 +217,9 @@ const ALLOWLIST: Record<string, number> = {
   'src/lib/composer/estimateSceneRenderCost.ts': 2,
   'src/lib/composer/pickClipSourceForDuration.ts': 1,
   'src/lib/video-composer/briefing/driftAutoFix.ts': 1,
+  // v431 G1: kein Intent-Gate — reine Snapshot-/Rollback-Serialisierung des
+  // Lip-Sync-Reset-Pfads (Snapshot, optimistischer Patch, stale_reset-Refetch).
+  'src/lib/video-composer/lipSyncResetFlow.ts': 4,
   'src/lib/video-composer/briefing/driftDetector.ts': 1,
   'src/lib/video-composer/renderWarnings.ts': 3,
 };

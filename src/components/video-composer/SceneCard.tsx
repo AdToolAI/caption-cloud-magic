@@ -93,6 +93,13 @@ import {
 } from "@/lib/motion-studio/mentionParser";
 import { composePromptLayers } from "@/lib/motion-studio/composePromptLayers";
 import { markLipSyncPending, clearLipSyncPending, markDialogModePending, clearDialogModePending, markEngineOverridePending, clearEngineOverridePending } from "@/lib/video-composer/lipSyncPending";
+import {
+  captureLipSyncResetSnapshot,
+  buildOptimisticLipSyncReset,
+  applyOptimisticResetMarkers,
+  restoreResetMarkersFromSnapshot,
+  recoverFromStaleReset,
+} from "@/lib/video-composer/lipSyncResetFlow";
 import { isLipSyncIntentional } from "@/lib/video-composer/lipSyncIntent";
 import { sceneFeaturesCharacter } from "@/lib/motion-studio/sceneFeaturesCharacter";
 import {
@@ -2405,40 +2412,13 @@ export default function SceneCard({
                       )
                         return;
 
-                      const s = scene as any;
-                      const rollback = {
-                        lipSyncStatus: s.lipSyncStatus, // legacy-mapping-allowed: optimistic rollback snapshot
-                        lipSyncAppliedAt: s.lipSyncAppliedAt,
-                        lipSyncSourceClipUrl: s.lipSyncSourceClipUrl,
-                        clipUrl: s.clipUrl,
-                        processedVideoUrl: s.processedVideoUrl ?? null,
-                        twoshotStage: s.twoshotStage, // legacy-mapping-allowed: optimistic rollback snapshot
-                        dialogShots: s.dialogShots,
-                        lipSyncWithVoiceover: s.lipSyncWithVoiceover,
-                        dialogMode: s.dialogMode,
-                        engineOverride: s.engineOverride,
-                        clipError: s.clipError,
-                        replicatePredictionId: s.replicatePredictionId,
-                      };
+                      const snapshot = captureLipSyncResetSnapshot(scene);
 
                       try {
-                        markLipSyncPending(scene.id, false);
-                        markDialogModePending(scene.id, false);
-                        markEngineOverridePending(scene.id, "auto");
-                        (onUpdate as (updates: any) => void)({
-                          lipSyncStatus: "canceled" as any,
-                          lipSyncAppliedAt: null as any,
-                          lipSyncSourceClipUrl: null as any,
-                          clipUrl: scene.baseVideoUrl ?? scene.clipUrl,
-                          processedVideoUrl: null as any,
-                          twoshotStage: null as any,
-                          dialogShots: null as any,
-                          lipSyncWithVoiceover: false,
-                          dialogMode: false,
-                          engineOverride: "auto",
-                          clipError: "lipsync_reset_by_user" as any,
-                          replicatePredictionId: null as any,
-                        });
+                        applyOptimisticResetMarkers(scene.id);
+                        (onUpdate as (updates: any) => void)(
+                          buildOptimisticLipSyncReset(scene, "lipsync_reset_by_user"),
+                        );
                         emitPipelineEvent({ type: "lipsync:end" });
 
                         const { data, error } = await supabase.functions.invoke(
@@ -2448,11 +2428,17 @@ export default function SceneCard({
                         if (error) throw error;
                         if (data && data.ok !== true) {
                           const reason = data.reason ?? "reset_failed";
-                          const message =
-                            reason === "stale_reset"
-                              ? tx({ de: "Die Szene wurde zwischenzeitlich neu gestartet. Bitte aktualisiere die Ansicht.", en: "The scene was restarted in the meantime. Please refresh the view.", es: "La escena se reinició mientras tanto. Actualiza la vista." })
-                              : tx({ de: "Der Reset konnte nicht durchgeführt werden.", en: "The reset could not be performed.", es: "No se pudo realizar el restablecimiento." });
-                          throw new Error(message);
+                          if (reason === "stale_reset") {
+                            await recoverFromStaleReset(scene.id, onUpdate as any);
+                            const staleErr: any = new Error(
+                              tx({ de: "Die Szene wurde zwischenzeitlich neu gestartet. Die Ansicht wurde aktualisiert.", en: "The scene was restarted in the meantime. The view has been refreshed.", es: "La escena se reinició mientras tanto. La vista se ha actualizado." }),
+                            );
+                            staleErr.__staleResetHandled = true;
+                            throw staleErr;
+                          }
+                          throw new Error(
+                            tx({ de: "Der Reset konnte nicht durchgeführt werden.", en: "The reset could not be performed.", es: "No se pudo realizar el restablecimiento." }),
+                          );
                         }
 
                         emitPipelineEvent({ type: "lipsync:end" });
@@ -2462,7 +2448,10 @@ export default function SceneCard({
                             tx({ de: "Lip-Sync wurde deaktiviert und das Basis-Video wiederhergestellt.", en: "Lip sync was disabled and the base video restored.", es: "La sincronización labial se desactivó y el video base se restauró." }),
                         });
                       } catch (e) {
-                        (onUpdate as (updates: any) => void)(rollback);
+                        if (!(e as any)?.__staleResetHandled) {
+                          (onUpdate as (updates: any) => void)(snapshot);
+                          restoreResetMarkersFromSnapshot(scene.id, snapshot);
+                        }
                         console.warn("[SceneCard] lip-sync reset failed", e);
                         toast({
                           title: tx({ de: "Zurücksetzen fehlgeschlagen", en: "Reset failed", es: "Error al restablecer" }),
@@ -2872,40 +2861,13 @@ export default function SceneCard({
                           <button
                             type="button"
                             onClick={async () => {
-                              const s = scene as any;
-                              const rollback = {
-                                lipSyncStatus: s.lipSyncStatus, // legacy-mapping-allowed: optimistic rollback snapshot
-                                lipSyncAppliedAt: s.lipSyncAppliedAt,
-                                lipSyncSourceClipUrl: s.lipSyncSourceClipUrl,
-                                clipUrl: s.clipUrl,
-                                processedVideoUrl: s.processedVideoUrl ?? null,
-                                twoshotStage: s.twoshotStage, // legacy-mapping-allowed: optimistic rollback snapshot
-                                dialogShots: s.dialogShots,
-                                lipSyncWithVoiceover: s.lipSyncWithVoiceover,
-                                dialogMode: s.dialogMode,
-                                engineOverride: s.engineOverride,
-                                clipError: s.clipError,
-                                replicatePredictionId: s.replicatePredictionId,
-                              };
+                              const snapshot = captureLipSyncResetSnapshot(scene);
                               try {
-                                markLipSyncPending(scene.id, false);
-                                markDialogModePending(scene.id, false);
-                                markEngineOverridePending(scene.id, "auto");
+                                applyOptimisticResetMarkers(scene.id);
                                 // Optimistic local update so the spinner stops immediately.
-                                (onUpdate as (updates: any) => void)({
-                                  lipSyncStatus: "canceled" as any,
-                                  lipSyncAppliedAt: null as any,
-                                  lipSyncSourceClipUrl: null as any,
-                                  clipUrl: scene.baseVideoUrl ?? scene.clipUrl,
-                                  processedVideoUrl: null as any,
-                                  twoshotStage: null as any,
-                                  dialogShots: null as any,
-                                  lipSyncWithVoiceover: false,
-                                  dialogMode: false,
-                                  engineOverride: "auto",
-                                  clipError: "lipsync_canceled_by_user" as any,
-                                  replicatePredictionId: null as any,
-                                });
+                                (onUpdate as (updates: any) => void)(
+                                  buildOptimisticLipSyncReset(scene, "lipsync_canceled_by_user"),
+                                );
                                 emitPipelineEvent({ type: "lipsync:end" });
                                 const { data, error } = await supabase.functions.invoke(
                                   "cancel-dialog-lipsync",
@@ -2914,11 +2876,17 @@ export default function SceneCard({
                                 if (error) throw error;
                                 if (data && data.ok !== true) {
                                   const reason = data.reason ?? "reset_failed";
-                                  const message =
-                                    reason === "stale_reset"
-                                      ? tx({ de: "Die Szene wurde zwischenzeitlich neu gestartet. Bitte aktualisiere die Ansicht.", en: "The scene was restarted in the meantime. Please refresh the view.", es: "La escena se reinició mientras tanto. Actualiza la vista." })
-                                      : tx({ de: "Der Abbruch konnte nicht durchgeführt werden.", en: "The cancellation could not be performed.", es: "No se pudo realizar la cancelación." });
-                                  throw new Error(message);
+                                  if (reason === "stale_reset") {
+                                    await recoverFromStaleReset(scene.id, onUpdate as any);
+                                    const staleErr: any = new Error(
+                                      tx({ de: "Die Szene wurde zwischenzeitlich neu gestartet. Die Ansicht wurde aktualisiert.", en: "The scene was restarted in the meantime. The view has been refreshed.", es: "La escena se reinició mientras tanto. La vista se ha actualizado." }),
+                                    );
+                                    staleErr.__staleResetHandled = true;
+                                    throw staleErr;
+                                  }
+                                  throw new Error(
+                                    tx({ de: "Der Abbruch konnte nicht durchgeführt werden.", en: "The cancellation could not be performed.", es: "No se pudo realizar la cancelación." }),
+                                  );
                                 }
                                 emitPipelineEvent({ type: "lipsync:end" });
                                 toast({
@@ -2927,7 +2895,10 @@ export default function SceneCard({
                                     tx({ de: "Du kannst jetzt sauber neu starten — keine alten Einträge bleiben.", en: "You can now start fresh — no old entries remain.", es: "Ahora puedes empezar de nuevo limpiamente — no quedan entradas antiguas." }),
                                 });
                               } catch (e) {
-                                (onUpdate as (updates: any) => void)(rollback);
+                                if (!(e as any)?.__staleResetHandled) {
+                                  (onUpdate as (updates: any) => void)(snapshot);
+                                  restoreResetMarkersFromSnapshot(scene.id, snapshot);
+                                }
                                 console.warn("[SceneCard] cancel lipsync failed", e);
                                 toast({
                                   title: tx({ de: "Abbruch fehlgeschlagen", en: "Cancellation failed", es: "Error al cancelar" }),
