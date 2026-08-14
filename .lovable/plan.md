@@ -62,7 +62,14 @@ RLS an, `service_role` voll, `authenticated` nur lesend auf eigene Projekte, kei
 
 ## 5. Compatibility-Wrapper
 
-`composer_scene_transition/6` und `/7` bleiben bestehen, kein Drop in G0. Beide werden zu dünnen Wrappern, die auf den neuen Kern delegieren mit `_guard_mode := CASE WHEN _run_id IS NOT NULL THEN 'run_bound' ELSE 'runless' END`, `_runless_reason := 'system_migration'`, `_write_id := 'legacy_wrapper'`, und die jeden Aufruf mit `source_signature = 'legacy_6'|'legacy_7'` plus Caller-Rolle in den Audit-Log schreiben. Erst wenn dieser Log über ein Beobachtungsfenster keine Fremdaufrufe zeigt, ist ein Drop in G6 begründbar.
+`composer_scene_transition/6` und `/7` bleiben bestehen, kein Drop in G0. Sie sind die einzige kontrollierte Compatibility-Grenze während des Beobachtungsfensters:
+
+- Der neue Kern `composer_scene_transition_v2` ist **nur für `service_role`** ausführbar (`REVOKE EXECUTE FROM public, anon, authenticated`). Die Wrapper sind `SECURITY DEFINER` und behalten die heutige Aufrufbarkeit für `authenticated`.
+- Die Wrapper delegieren mit `source_signature = 'legacy_6'|'legacy_7'` und `_write_id = 'legacy_wrapper_6'|'legacy_wrapper_7'`.
+- Ein Wrapper-Aufruf **mit** `_run_id` läuft als `run_bound` — unverändert.
+- Ein Wrapper-Aufruf **ohne** `_run_id` ist **kein** genereller Runless-Freifahrtschein. `system_migration` ist ausschließlich in Kombination mit einer expliziten DB-seitigen Grandfather-Allowlist gültig, die auf `(source_signature, write_id, from_state, to_state)` matcht. Nur die dort eingetragenen Kantenpaare dürfen run-blind ausgeführt werden; jede andere Kante wird mit `reason = 'runless_not_grandfathered'` abgelehnt und trotzdem auditiert.
+- Die Allowlist wird beim Migrationsschreiben aus dem bestehenden Inventar (`docs/v431-prep-inventory.md`) befüllt, ist eine eigene Tabelle `public.composer_transition_grandfather` (service_role only) und schrumpft mit jeder Gruppe G1–G5, bis sie in G6 leer ist.
+- Erst wenn der Audit-Log über ein Beobachtungsfenster keine Fremdaufrufe zeigt **und** die Allowlist leer ist, ist ein Drop in G6 begründbar.
 
 ## 6. Recovery-Primitive
 
