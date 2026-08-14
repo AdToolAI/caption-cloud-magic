@@ -532,21 +532,20 @@ async function refundCredits(
   amountEur: number,
   sceneId: string | undefined,
   reason: string,
-  /** v431 G2.1 — eingefrorener Dispatch-Snapshot, nur Telemetrie. */
+  /** v431 G2.2 — eingefrorener Dispatch-Snapshot (Guard-Quelle). */
   runStamp?: { runId?: string; plateGeneration?: number },
 ) {
   try {
     if (sceneId) {
-      console.log(
-        `[talking-head] v431_g2_1 write=failed scene=${sceneId} run=${runStamp?.runId ?? "none"} gen=${runStamp?.plateGeneration ?? "none"}`,
-      );
-      await admin.from('composer_scenes').update({
-        pipeline_state: 'failed',
-        clip_status: 'failed',
-        clip_error: reason.slice(0, 500),
-        updated_at: new Date().toISOString(),
-      }).eq('id', sceneId);
+      await failSceneGuarded(admin, {
+        sceneId,
+        runStamp,
+        writeId: 'talking_head_failed',
+        reason,
+        marker: 'write=failed',
+      });
     }
+
 
 
     // Derive deterministic UUIDv5-style id from video_id for idempotency
