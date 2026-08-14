@@ -28,8 +28,18 @@ RETURNS TABLE(applied boolean, state composer_scene_state, substate text, reason
 
 - `run_bound`: `_run_id` und `_generation` sind Pflicht (sonst `reason = 'guard_args_missing'`). Geprüft wird **atomar unter demselben Row Lock**: `active_run_id = _run_id` (sonst `stale_run`) **und** `plate_generation = _generation` (sonst `stale_generation`). Kein JS-seitiger Vorabvergleich mehr — das heutige TOCTOU-Fenster entfällt.
 - `runless`: `_run_id`/`_generation` müssen NULL sein (sonst `guard_mode_conflict`), `_runless_reason` ist Pflicht und muss aus der geschlossenen Menge stammen:
-  `user_cancel_no_active_run`, `project_teardown_no_active_run`, `image_scene_no_run_context`, `admin_recovery`, `system_migration`.
-  Ein unbekannter Grund wird abgelehnt (`runless_reason_invalid`). `hybrid_extend_*` ist **bewusst nicht** in dieser Menge.
+  `user_cancel_no_active_run`, `project_teardown_no_active_run`, `image_scene_no_run_context`, `system_migration`.
+  Ein unbekannter Grund wird abgelehnt (`runless_reason_invalid`). `admin_recovery` ist **entfernt** — dafür existiert ausschließlich `composer_recover_scene()`. `hybrid_extend_*` ist **bewusst nicht** in dieser Menge.
+
+### 1a. Kanten-Allowlist für runless (auch für direkte v2-Aufrufe)
+
+Ein legitimer Runless-Grund allein berechtigt **nicht** zu jeder state-machine-legalen Kante. Neue Tabelle `public.composer_runless_transition_rules(reason text, write_id text, from_state composer_scene_state, to_state composer_scene_state, note text, PRIMARY KEY(reason, write_id, from_state, to_state))`, service_role only, RLS an, kein `anon`/`authenticated`-Grant.
+
+Jeder `runless`-Aufruf — auch ein direkter service_role-Aufruf von v2 — muss unter dem Row Lock ein Match auf `(_runless_reason, _write_id, current_state, _to)` finden. Kein Match ⇒ `reason = 'runless_edge_not_allowed'`, kein Write, aber Audit-Zeile. Die Zeilen werden in der Migration aus dem Cancel-Vertrag (Abschnitt 8) und dem Image-Szenen-Pfad befüllt; `system_migration` läuft zusätzlich über `composer_transition_grandfather` (Abschnitt 5).
+
+### 1b. Runless-Gründe mit „kein aktiver Run"-Bedingung
+
+Für `user_cancel_no_active_run`, `project_teardown_no_active_run` und `image_scene_no_run_context` prüft die DB unter demselben `FOR UPDATE` zusätzlich `active_run_id IS NULL`. Ist zwischen dem vorbereitenden SELECT des Aufrufers und dem RPC ein Run B gestartet, ist der Aufruf ein **No-op** mit `reason = 'run_reappeared'` — Run B wird niemals durch einen runless-Cancel terminiert. Damit ist der No-active-run-Cancel-Race vollständig in der DB geschlossen.
 
 `pipeline_state_run_id`: bei `run_bound` = `_run_id`; bei `runless` **explizit `NULL`**. Kein `COALESCE(_run_id, active_run_id)` mehr.
 
