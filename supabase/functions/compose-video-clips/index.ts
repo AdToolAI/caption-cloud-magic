@@ -463,21 +463,40 @@ serve(async (req) => {
     let sceneRunStamps = new Map<string, { runId: string; generation: number }>();
     // v430 Step 4 — continuity input each scene was dispatched with (run snapshot).
     const continuityBindings = new Map<string, string | null>();
+    // v431 G2.3/S2 — Quellasset-Snapshot: beginSceneRun() räumt Output-Felder
+    // (base_video_url/clip_url) auf. Die Upload-Quelle wird deshalb VOR jeder
+    // Run-Akquise aus dem Request-Payload eingefroren und die Finalisierung
+    // liest ausschließlich aus diesem Snapshot — nie aus einem Output-Feld.
+    const uploadSourceSnapshot = new Map<string, string>();
+    for (const s of scenes as Array<{ id: string; clipSource?: string; uploadUrl?: string }>) {
+      if (s.clipSource === "upload" && s.uploadUrl) uploadSourceSnapshot.set(s.id, s.uploadUrl);
+    }
     try {
-      const earlyAiSceneIds = (scenes as Array<{ id: string; clipSource?: string }>)
-        .filter((s) => s.clipSource?.startsWith("ai-"))
+      // v431 G2.3/S2 — Upload-Szenen erhalten dieselbe kanonische Run-Provenienz
+      // wie ai-*-Szenen (kein Sonderpfad, keine Doppel-Runs).
+      const earlyRunSceneIds = (scenes as Array<{ id: string; clipSource?: string; uploadUrl?: string }>)
+        .filter((s) => s.clipSource?.startsWith("ai-") || (s.clipSource === "upload" && s.uploadUrl))
         .map((s) => s.id);
-      if (earlyAiSceneIds.length > 0) {
+      if (earlyRunSceneIds.length > 0) {
+        const needsAcquisition: string[] = [];
         if (runContext) {
           const { data: liveRows, error: liveErr } = await supabaseAdmin
             .from("composer_scenes")
             .select("id, active_run_id, plate_generation")
-            .in("id", earlyAiSceneIds);
+            .in("id", earlyRunSceneIds);
           if (liveErr) throw liveErr;
-          for (const id of earlyAiSceneIds) {
+          for (const id of earlyRunSceneIds) {
             const expected = runContext[id];
+            if (!expected) {
+              // Der kanonische Starter hat für diese Szene keinen Run erzeugt
+              // (z. B. reine Upload-Szene im gemischten Batch) → genau eine
+              // Akquise über denselben Vertrag, kein zweiter Run für Szenen,
+              // die bereits einen kanonischen Run mitbringen.
+              needsAcquisition.push(id);
+              continue;
+            }
             const live = (liveRows ?? []).find((row: any) => row.id === id);
-            if (!expected || !live || live.active_run_id !== expected.run_id || Number(live.plate_generation) !== Number(expected.generation)) {
+            if (!live || live.active_run_id !== expected.run_id || Number(live.plate_generation) !== Number(expected.generation)) {
               throw new Error(`stale_or_missing_run_context:${id}`);
             }
             sceneRunStamps.set(id, { runId: expected.run_id, generation: expected.generation });
@@ -485,8 +504,13 @@ serve(async (req) => {
         } else {
           // Legacy/direct callers still get a fresh identity, but all product
           // UI callers must use composer-start-scene-generation for full purge.
-          const stamps = await beginSceneRun(supabaseAdmin, earlyAiSceneIds, "compose-video-clips-legacy");
-          sceneRunStamps = new Map(stamps.map((s) => [s.sceneId, { runId: s.runId, generation: s.generation }]));
+          needsAcquisition.push(...earlyRunSceneIds);
+        }
+        if (needsAcquisition.length > 0) {
+          const stamps = await beginSceneRun(supabaseAdmin, needsAcquisition, "compose-video-clips-legacy");
+          for (const s of stamps) {
+            sceneRunStamps.set(s.sceneId, { runId: s.runId, generation: s.generation });
+          }
         }
       }
     } catch (preMarkErr) {
