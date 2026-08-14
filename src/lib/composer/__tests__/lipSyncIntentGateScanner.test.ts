@@ -203,12 +203,12 @@ const ALLOWLIST: Record<string, number> = {
   'src/components/video-composer/SceneAvatarMode.tsx': 1,
   'src/components/video-composer/SceneCard.tsx': 24, // v430.1 2A
   'src/components/video-composer/SceneClipProgress.tsx': 0, // v430.1 2A
-  'src/components/video-composer/SceneDialogStudio.tsx': 5,
+  'src/components/video-composer/SceneDialogStudio.tsx': 3, // v430.1 2B
   'src/components/video-composer/SceneInlinePlayer.tsx': 0, // v430.1 2A
   'src/components/video-composer/SceneReferenceImageSlot.tsx': 1,
   'src/config/lipsyncProviderSafety.ts': 2,
   'src/hooks/useApplyProductionPlan.ts': 3,
-  'src/hooks/useGenerateAllClips.ts': 5,
+  'src/hooks/useGenerateAllClips.ts': 4, // v430.1 2B
   'src/hooks/useMouthYavgProbe.ts': 1,
   'src/hooks/usePipelineProgress.ts': 0, // v430.1 2A
   'src/lib/composer/continuity/continuityState.ts': 2,
