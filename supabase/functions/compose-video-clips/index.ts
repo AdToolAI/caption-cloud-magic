@@ -4115,27 +4115,65 @@ serve(async (req) => {
 
       try {
         if (scene.clipSource === "upload" && scene.uploadUrl) {
-
-          // Upload: just mark as ready
-          await supabaseAdmin
-            .from("composer_scenes")
-            .update({
-              ...materializeCompatibilityOutput('base', { baseUrl: scene.uploadUrl }),
-              clip_status: "ready",
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", scene.id);
-          // v431 G2.1 — Upload-Zweig sieht jetzt den bestehenden Run-Stempel
-          // (Telemetrie; keine neue Run-Erzeugung, kein Verhaltenswechsel).
+          // v431 G2.3 — Upload-Finalisierung über gehärtetes Domain-Primitive.
+          const stamp = sceneRunStamps.get(scene.id);
+          const uploadRunId = stamp?.runId;
+          const uploadGeneration = stamp?.generation;
           console.log(
-            `[compose-video-clips] v431_g2_1 write=upload-complete scene=${scene.id} ` +
-              `run=${sceneRunStamps.get(scene.id)?.runId ?? "none"} gen=${sceneRunStamps.get(scene.id)?.generation ?? "none"}`,
+            `[compose-video-clips] v431_g2_3 write=upload-complete scene=${scene.id} ` +
+              `run=${uploadRunId ?? "none"} gen=${uploadGeneration ?? "none"}`,
           );
-          results.push({
-            sceneId: scene.id,
-            status: "ready",
-            clipUrl: scene.uploadUrl,
-          });
+
+          if (uploadRunId && uploadGeneration) {
+            const { data: finRes, error: finErr } = await supabaseAdmin.rpc(
+              "composer_finalize_upload_scene",
+              {
+                _scene_id: scene.id,
+                _run_id: uploadRunId,
+                _generation: uploadGeneration,
+                _write_id: "cvc:upload-complete",
+                _upload_url: scene.uploadUrl,
+              },
+            );
+
+            if (finErr || (finRes as any)?.applied !== true) {
+              const reason = (finRes as any)?.reason ?? finErr?.message ?? "unknown";
+              console.warn(
+                `[compose-video-clips] v431_g2_3 upload-finalizer not applied scene=${scene.id} reason=${reason}`,
+              );
+              results.push({
+                sceneId: scene.id,
+                status: "failed",
+                error: `upload_finalizer:${reason}`,
+              });
+              continue;
+            }
+
+            results.push({
+              sceneId: scene.id,
+              status: "ready",
+              clipUrl: scene.uploadUrl,
+            });
+          } else {
+            // Kein Run-Stempel → kein G2-gesicherter Write. Legacy-Pfad bleibt
+            // erhalten, bis die Provenienz für diese Szene hergestellt ist.
+            console.warn(
+              `[compose-video-clips] v431_g2_3 write=upload-complete scene=${scene.id} reason=no_run_stamp fallback=legacy`,
+            );
+            await supabaseAdmin
+              .from("composer_scenes")
+              .update({
+                ...materializeCompatibilityOutput('base', { baseUrl: scene.uploadUrl }),
+                clip_status: "ready",
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", scene.id);
+            results.push({
+              sceneId: scene.id,
+              status: "ready",
+              clipUrl: scene.uploadUrl,
+            });
+          }
         } else if (scene.clipSource === "stock" && scene.stockKeywords) {
           // Stock: search and pick best match
           const stockResponse = await fetch(
