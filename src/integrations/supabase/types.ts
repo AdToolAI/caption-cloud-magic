@@ -19630,6 +19630,16 @@ export type Database = {
         Returns: number
       }
       cleanup_synthetic_probe_runs: { Args: never; Returns: undefined }
+      composer_fail_hybrid_extend_scene: {
+        Args: {
+          _error_text: string
+          _generation: number
+          _run_id: string
+          _scene_id: string
+          _write_id: string
+        }
+        Returns: Json
+      }
       composer_fail_scene_with_mirrors: {
         Args: {
           _clear_lip_sync_fields?: boolean
