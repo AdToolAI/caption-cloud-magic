@@ -12,6 +12,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { tx } from '@/lib/i18nText';
 import { PreviewTextOverlayLayer } from './PreviewTextOverlayLayer';
 import type { SceneAudioClip } from './SoundDesignPanel';
+import { presentSceneError } from '@/lib/composer/errors/sceneErrorPresenter';
 import { legacyClipFailedEquivalentRow, legacyClipReadyEquivalentRow, sceneState, sceneSubstate } from '@/lib/composer/sceneState';
 
 interface Props {
@@ -1278,13 +1279,13 @@ export default function ComposerSequencePreview({
             (() => {
               const stage = String(sceneSubstate(currentScene) ?? sceneState(currentScene) ?? '');
               const label =
-                stage === 'audio' ? tx({ de: 'Voiceover wird gebaut…', en: 'Voiceover is being built…', es: 'Se está construyendo locución...' })
-                : stage === 'anchor' ? tx({ de: 'Anchor wird komponiert…', en: 'Anchor is composed…', es: 'El ancla está compuesta…' })
-                : stage === 'master_clip' ? tx({ de: 'Hailuo rendert die Szene…', en: 'Hailuo renders the scene...', es: 'Hailuo renderiza la escena...' })
-                : stage === 'lipsync_1' ? 'Sync.so Pass 1 läuft…'
-                : stage === 'lipsync_2' ? 'Sync.so Pass 2 läuft…'
-                : stage === 'continuity' ? 'Continuity-Check…'
-                : tx({ de: 'Lip-Sync wird vorbereitet…', en: 'Lip sync is being prepared...', es: 'Se está preparando la sincronización de labios...' });
+                stage === 'audio' ? tx({ de: 'Voiceover wird erstellt…', en: 'Voiceover is being created…', es: 'Se está creando la locución…' })
+                : stage === 'anchor' ? tx({ de: 'Ausgangsbild wird erstellt…', en: 'Reference image is being created…', es: 'Se está creando la imagen de referencia…' })
+                : stage === 'master_clip' ? tx({ de: 'Video wird gerendert…', en: 'Video is rendering…', es: 'El video se está renderizando…' })
+                : stage === 'lipsync_1' ? tx({ de: 'Lippensynchronisation läuft (1/2)…', en: 'Lip-sync running (1/2)…', es: 'Sincronización labial en curso (1/2)…' })
+                : stage === 'lipsync_2' ? tx({ de: 'Lippensynchronisation läuft (2/2)…', en: 'Lip-sync running (2/2)…', es: 'Sincronización labial en curso (2/2)…' })
+                : stage === 'continuity' ? tx({ de: 'Übergang wird geprüft…', en: 'Checking the transition…', es: 'Comprobando la transición…' })
+                : tx({ de: 'Lippensynchronisation wird vorbereitet…', en: 'Lip-sync is being prepared…', es: 'Se está preparando la sincronización labial…' });
               return (
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-500/90 backdrop-blur text-[11px] text-black font-semibold flex items-center gap-1.5 z-20 animate-pulse">
                   <span>🎬</span>
