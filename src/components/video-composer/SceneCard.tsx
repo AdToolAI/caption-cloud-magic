@@ -193,6 +193,7 @@ import { useSceneRenderConfirm } from "@/lib/composer/sceneRenderConfirm";
 import { countSceneSpeakers } from "@/lib/composer/countSceneSpeakers";
 import { useOutfitLookMap } from "@/hooks/useOutfitLookMap";
 import { tx } from "@/lib/i18nText";
+import { SceneActionsMenu } from "./SceneActionsMenu";
 import { SceneContinuityStatus } from "./SceneContinuityStatus";
 import { clipStatusFromState, legacyClipFailedEquivalentRow, legacyClipReadyEquivalentRow, sceneState, sceneSubstate } from '@/lib/composer/sceneState';
 
@@ -993,6 +994,71 @@ export default function SceneCard({
     });
   };
 
+  // v430 Schritt 6.1 — Aktionen aus der Toolbar in "Szenenaktionen" verschoben.
+  // Handler, Payloads und Confirm-Gates sind unveraendert uebernommen.
+  const handleRestartLipSyncAction = async () => {
+                      try {
+                        await cleanRestartLipSync({ force: true });
+                      } catch (e) {
+                        console.warn("[SceneCard] re-sync failed", e);
+                        toast({
+                          title: tx({ de: "Lip-Sync fehlgeschlagen", en: "Lip sync failed", es: "Sincronización labial fallida" }),
+                          description: (e as any)?.message ?? tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }),
+                          variant: "destructive",
+                        });
+                      }
+                    };
+  const handleFullSceneRegenerateAction = async () => {
+                        // ── Schritt 1: Cost-Confirm-Gate (re-roll) ──────
+                        const passes = countSceneSpeakers(scene);
+                        const ok = await confirmRender({
+                          scenes: [scene],
+                          passes,
+                          title: tx({ de: 'Clip + Lip-Sync neu rendern?', en: 'Re-render clip + lip sync?', es: '¿Volver a renderizar el clip + la sincronización labial?' }),
+                          description:
+                            tx({ de: 'Anchor und Clip werden zurückgesetzt und beides neu generiert. Credits werden erneut verbraucht.', en: 'Anchor and clip will be reset and both regenerated. Credits will be consumed again.', es: 'El anchor y el clip se restablecerán y ambos se regenerarán. Se consumirán créditos nuevamente.' }),
+                        });
+                        if (!ok) return;
+                        try {
+                          onUpdate({
+                            referenceImageUrl: undefined,
+                            clipUrl: undefined,
+                            clipStatus: "generating",
+                            lipSyncStatus: null as any,
+                            lipSyncAppliedAt: null as any,
+                          });
+                          await startSceneGeneration({
+                            sceneIds: [scene.id],
+                            reason: "scene_card_full_regenerate",
+                            compose: {
+                                projectId: scene.projectId,
+                                scenes: [
+                                  {
+                                    id: scene.id,
+                                    clipSource: scene.clipSource,
+                                    clipQuality:
+                                      scene.clipQuality || "standard",
+                                    aiPrompt: scene.aiPrompt,
+                                    durationSeconds: scene.durationSeconds,
+                                    characterShot: scene.characterShot,
+                                    characterShots: scene.characterShots,
+                                    dialogScript: scene.dialogScript,
+                                    dialogVoices: scene.dialogVoices,
+                                    engineOverride: "cinematic-sync",
+                                    withAudio: scene.withAudio !== false,
+                                  },
+                                ],
+                                characters,
+                            },
+                          });
+                        } catch (e) {
+                          console.warn(
+                            "[SceneCard] re-roll clip + lipsync failed",
+                            e,
+                          );
+                          onUpdate({ clipStatus: "failed" as any });
+                        }
+                      };
   return (
     <Card
       ref={cardRef as any}
@@ -2322,25 +2388,12 @@ export default function SceneCard({
                   <span className="text-[10px] font-semibold text-primary mr-auto">
                     🎙️ Lip-Sync Aktionen
                   </span>
-                  <button
-                    type="button"
-                    disabled={lipsyncBusy}
-                    onClick={async () => {
-                      try {
-                        await cleanRestartLipSync({ force: true });
-                      } catch (e) {
-                        console.warn("[SceneCard] re-sync failed", e);
-                        toast({
-                          title: tx({ de: "Lip-Sync fehlgeschlagen", en: "Lip sync failed", es: "Sincronización labial fallida" }),
-                          description: (e as any)?.message ?? tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }),
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                    className="text-[10px] px-2 py-1 rounded border border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-50"
-                  >
-                    🔁 {tx({ de: "Lip-Sync neu rendern", en: "Re-render lip sync", es: "Volver a renderizar sincronización labial" })}
-                  </button>
+                  <SceneActionsMenu
+                    scene={scene}
+                    language={lang}
+                    onRestartLipSync={handleRestartLipSyncAction}
+                    onFullRegenerate={handleFullSceneRegenerateAction}
+                  />
                   <button
                     type="button"
                     title={tx({ de: "Stoppt Lip-Sync für diese Szene, leert Sync-Daten und behält das gerenderte Basis-Video. Keine neuen Credits.", en: "Stops lip sync for this scene, clears sync data, and keeps the rendered base video. No new credits.", es: "Detiene la sincronización labial de esta escena, borra los datos de sync y conserva el video base renderizado. Sin nuevos créditos." })}
@@ -2410,67 +2463,6 @@ export default function SceneCard({
                   >
                     🗑 {tx({ de: 'Lipsync komplett zurücksetzen', en: 'Completely reset lip sync', es: 'Restablecer completamente la sincronización labial' })}
                   </button>
-                  {scene.engineOverride === "cinematic-sync" && (
-                    <button
-                      type="button"
-                      disabled={legacyStatus === "generating" || lipsyncBusy}
-                      title={tx({ de: "Setzt Anchor + Clip zurück und rendert beides neu — empfohlen bei 'source_clip_missing_speakers', 'anchor_missing_speakers' oder 'v153_preflight_block' (Face-Detect fehlgeschlagen).", en: "Resets anchor + clip and re-renders both — recommended for 'source_clip_missing_speakers', 'anchor_missing_speakers' or 'v153_preflight_block' (face detection failed).", es: "Restablece el anchor + clip y renderiza ambos de nuevo — recomendado para 'source_clip_missing_speakers', 'anchor_missing_speakers' o 'v153_preflight_block' (falló la detección facial)." })}
-                      onClick={async () => {
-                        // ── Schritt 1: Cost-Confirm-Gate (re-roll) ──────
-                        const passes = countSceneSpeakers(scene);
-                        const ok = await confirmRender({
-                          scenes: [scene],
-                          passes,
-                          title: tx({ de: 'Clip + Lip-Sync neu rendern?', en: 'Re-render clip + lip sync?', es: '¿Volver a renderizar el clip + la sincronización labial?' }),
-                          description:
-                            tx({ de: 'Anchor und Clip werden zurückgesetzt und beides neu generiert. Credits werden erneut verbraucht.', en: 'Anchor and clip will be reset and both regenerated. Credits will be consumed again.', es: 'El anchor y el clip se restablecerán y ambos se regenerarán. Se consumirán créditos nuevamente.' }),
-                        });
-                        if (!ok) return;
-                        try {
-                          onUpdate({
-                            referenceImageUrl: undefined,
-                            clipUrl: undefined,
-                            clipStatus: "generating",
-                            lipSyncStatus: null as any,
-                            lipSyncAppliedAt: null as any,
-                          });
-                          await startSceneGeneration({
-                            sceneIds: [scene.id],
-                            reason: "scene_card_full_regenerate",
-                            compose: {
-                                projectId: scene.projectId,
-                                scenes: [
-                                  {
-                                    id: scene.id,
-                                    clipSource: scene.clipSource,
-                                    clipQuality:
-                                      scene.clipQuality || "standard",
-                                    aiPrompt: scene.aiPrompt,
-                                    durationSeconds: scene.durationSeconds,
-                                    characterShot: scene.characterShot,
-                                    characterShots: scene.characterShots,
-                                    dialogScript: scene.dialogScript,
-                                    dialogVoices: scene.dialogVoices,
-                                    engineOverride: "cinematic-sync",
-                                    withAudio: scene.withAudio !== false,
-                                  },
-                                ],
-                                characters,
-                            },
-                          });
-                        } catch (e) {
-                          console.warn(
-                            "[SceneCard] re-roll clip + lipsync failed",
-                            e,
-                          );
-                          onUpdate({ clipStatus: "failed" as any });
-                        }
-                      }}
-                      className="text-[10px] px-2 py-1 rounded border border-amber-400/40 text-amber-300 hover:bg-amber-400/10 disabled:opacity-50"
-                    >
-                      🎥 Clip + Lip-Sync neu rendern
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={() => setAnchorPreviewOpen(true)}
