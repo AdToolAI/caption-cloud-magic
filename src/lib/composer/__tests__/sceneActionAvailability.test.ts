@@ -18,9 +18,13 @@ const base: SceneActionInput = {
 };
 
 describe('sceneActionAvailability', () => {
-  it('hides everything for a plain finished scene', () => {
-    const a = sceneActionAvailability(base);
+  it('hides everything for a plain scene without lip-sync artifacts', () => {
+    const a = sceneActionAvailability({ ...base, state: 'idle' });
     expect(a.anyVisible).toBe(false);
+  });
+
+  it('keeps the legacy visibility: a completed scene still counts as lip-sync artifact', () => {
+    expect(sceneActionAvailability(base).lipSyncRestart.visible).toBe(true);
   });
 
   it('shows lip-sync restart on lip-sync intent and disables it while running', () => {
@@ -40,7 +44,7 @@ describe('sceneActionAvailability', () => {
   });
 
   it('offers the full regenerate only for the cinematic-sync engine', () => {
-    expect(sceneActionAvailability(base).fullRegenerate.visible).toBe(false);
+    expect(sceneActionAvailability({ ...base, state: 'idle' }).fullRegenerate.visible).toBe(false);
     const a = sceneActionAvailability({ ...base, engineOverride: 'cinematic-sync' });
     expect(a.fullRegenerate).toEqual({ visible: true, disabled: false });
     expect(
@@ -54,7 +58,8 @@ describe('sceneActionAvailability', () => {
 
   it('shows continuity update only when configured AND stale', () => {
     expect(
-      sceneActionAvailability({ ...base, continuityStale: true }).continuityUpdate.visible,
+      sceneActionAvailability({ ...base, state: 'idle', continuityStale: true }).continuityUpdate
+        .visible,
     ).toBe(false);
     const a = sceneActionAvailability({
       ...base,
