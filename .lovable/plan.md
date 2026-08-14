@@ -99,8 +99,95 @@ G0-Vertrags und gehört als eigener Punkt entschieden, nicht nebenbei.
 - **G2.4** `hybrid-extend-scene` (#1 Rollenkorrektur im Inventar, #2 `run_bound`).
 - Danach: Inventar-Diff, Frozen-Suite + `tsgo`, `docs/v431-g2-report.md`, STOP.
 
-## 6. STOP
+## 6. Nachtrag — die drei offenen Provenienzketten (belegt)
 
-G2.0 abgeschlossen. Keine Migration, keine Codeänderung. Offen zur Entscheidung:
-ob `beginSceneRun()` in G2 zusätzlich `pipeline_state`/`pipeline_substate` setzen soll
-(würde #21 statt nach G5 in G2 lösen).
+### 6.1 Kanonischer Run-Start im Projekt
+
+Es gibt genau einen kanonischen Run-Start:
+`supabase/functions/composer-start-scene-generation/index.ts` (Shapes `{compose}` bzw.
+`{prepare_only}` → `{compose, use_existing_run:true}`). Er ruft intern den Run-Erwerb auf und
+liefert je Szene `run_id` + `generation` zurück. `compose-video-clips` validiert diesen
+`runContext` gegen die Live-Zeile und friert ihn in `sceneRunStamps` ein
+(`compose-video-clips/index.ts:463–489`); nur Legacy-Direktaufrufer bekommen dort ersatzweise
+`beginSceneRun(..., "compose-video-clips-legacy")`. `sceneRunStamps` ist der einzige zulässige
+Snapshot innerhalb eines Dispatch.
+
+### 6.2 `generate-talking-head` — Run-Erzeuger
+
+Caller-Kette heute: `TalkingHeadDialog.tsx:260/767` → `useTalkingHead.generate()`
+(`src/hooks/useTalkingHead.ts:36`) → Edge-Function. `sceneId` ist optional
+(`targetSceneId === '__none__' ? undefined : …`), d. h. Standalone ist ein realer Fall.
+
+Festlegung für G2:
+
+```text
+Composer-Fall (sceneId gesetzt):
+  TalkingHeadDialog
+    → composer-start-scene-generation { scene_ids:[sceneId], prepare_only:true, reason:'talking_head' }
+      → liefert { runId, generation }            ← kanonischer Run-Start
+    → generate-talking-head { sceneId, runId, plateGeneration }   (immutable aus der Antwort)
+      → Request-Validierung: sceneId ohne runId/plateGeneration = 400 fail-closed
+      → runId/generation in jobOpts einfrieren
+      → ERST DANACH createHeyGenVideo()  (Provider-Spend nach Run-Erzeugung)
+Standalone-Fall (kein sceneId): unverändert, kein composer_scenes-Write.
+```
+
+Ausdrücklich verboten: `active_run_id` kurz vor dem Write aus der Szene lesen. Poller
+(`:464`), Refund-Pfad (`:510`) und Early-Fail (`:695`) benutzen ausschließlich die in
+`jobOpts` eingefrorenen Werte.
+
+### 6.3 `hybrid-extend-scene` — Reihenfolge korrigiert
+
+Ist-Reihenfolge: INSERT (`:185–209`) → Frame-Extraktion (`:218–252`, Fail `:258`) →
+Anchor-Prüfung (Fail `:263`) → Anchor-Wiring → `compose-video-clips`-Dispatch (Fail `:313`).
+Die im Bericht genannte Platzierung „Run-Start vor dem Dispatch“ liegt damit **hinter** zwei
+Failure-Callsites. Übernommen wird deine Präferenz:
+
+```text
+INSERT (pipeline_state:'idle' = insert-default)
+  → beginSceneRun(newSceneId, reason:'hybrid-extend')        ← neu, direkt nach INSERT
+  → Frame-Extraktion            (Fail :258 → run_bound)
+  → Anchor-Prüfung              (Fail :263 → run_bound)
+  → compose-video-clips-Dispatch mit runContext (Fail :313 → run_bound)
+```
+
+Alle drei `markSceneFailed`-Callsites liegen dann hinter dem Run-Start und werden
+`run_bound` mit Branch-IDs `hybrid-extend:frame-extraction`, `:no-anchor`, `:dispatch`.
+Keine Ausnahme, kein Grandfathering. Der Dispatch reicht den Run als `runContext` weiter,
+damit `compose-video-clips` keinen zweiten Run erzeugt.
+
+### 6.4 `compose-twoshot-audio` — konkreter Dispatcher
+
+Drei Aufrufer im Bestand:
+
+| Aufrufer | Run-Quelle | G2-Behandlung |
+| --- | --- | --- |
+| `compose-video-clips/index.ts:2217` (Cinematic-Sync-Prep im Szenen-Loop) | `sceneRunStamps.get(scene.id)` — validierter `runContext` aus `composer-start-scene-generation`, eingefroren bei `:463–489`, **vor** jedem Provider-Spend | **einziger G2-Pfad**: `run_id` + `plate_generation` aus dem Stamp mitschicken |
+| `compose-clip-webhook` (`invokeSceneFunction('compose-twoshot-audio')`) | Webhook-Kontext | **G3** (Webhooks/Fan-in) |
+| `useTwoShotAutoTrigger.ts` (Client-Self-Heal, `body:{ scene_id }`) | keine | **G5** (Client-Writer) |
+
+`compose-twoshot-audio` selbst liest den Run nie aus der Szene. Ohne mitgelieferten Run
+schreibt es künftig **keinen** Scene-State (#18 fail-closed); Audio-Erzeugung, `audio_plan`
+und `character_audio_url` (#19/#20, Rolle output/job_metadata) laufen unverändert weiter,
+damit Webhook- und Self-Heal-Pfade bis G3/G5 funktionsfähig bleiben.
+
+### 6.5 Zusätzlicher Contract-Test (übernommen)
+
+Neuer Test in der Frozen-Suite: `update_dialog_pass_slot` darf `run_id` und
+`plate_generation` eines bestehenden Pass-Slots niemals überschreiben — geprüft als
+DB-Contract (Patch mit diesen Keys wird verworfen) plus statischer Scanner, dass kein
+Aufrufer diese Keys im `_patch` mitsendet.
+
+## 7. Übernommene Entscheidungen
+
+- `useSceneGenerate` → **G5**. `beginSceneRun()` wird in G2 **nicht** um
+  `pipeline_state`/`pipeline_substate` erweitert.
+- Keine neue Runless-Regel, kein neues Grandfathering.
+- `compose-video-clips:5255` (Fatal-Catch-all) bleibt bei **G3**.
+
+## 8. STOP
+
+G2.0 abgeschlossen, Provenienzketten belegt. Nächster Schritt nach Freigabe: **G2.1**
+— ausschließlich Payload-/Snapshot-Erweiterungen (6.2 Request-Felder, 6.3 Run-Start-Position,
+6.4 Stamp-Durchreichung, Pass-Slot-Einfrieren + Contract-Test), noch keine Writer-Umstellung.
+
