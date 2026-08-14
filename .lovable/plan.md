@@ -55,10 +55,17 @@ Verbindlich für G2.2:
    (`stale_run`, `stale_generation`, `unexpected_state`) zurück; es wird nichts
    geschrieben, die Funktion loggt `write=plate-ready result=<grund>` und
    beendet den Job-Zweig. Kein Retry, kein ungeguardeter Ersatz-Write.
-4. **Ungekoppelte Nebenpfade.** Reine State-Writes ohne Output (Refund-Fail,
-   Early-Fail) laufen über `transitionSceneV2()` (`run_bound`,
-   `expected_generation`); ein stale oder gecancelter Run darf weder Output
-   löschen noch die Szene auf `failed` ziehen.
+4. **Fehlerpfade ebenfalls atomar (kein zweites Legacy-Update).** Der
+   Talking-Head-Fehlerfall ändert kanonischen State **und** Legacy-Spiegel und
+   ist damit ebenfalls ein gekoppelter Write: `pipeline_state = 'failed'` +
+   `clip_status = 'failed'` + `clip_error` werden in **einer** Transaktion unter
+   demselben Row Lock mit Run-/Generations-/From-State-Guard materialisiert —
+   über denselben eng geschnittenen Finalizer (Modus `fail`) bzw. ein schmales
+   Schwester-Primitive. `transitionSceneV2()` bleibt ausschließlich für Writes
+   reserviert, die **keine** Legacy-Spiegel und keinen Output berühren. Ein
+   ungeguardetes `.update()` nach einem Transition-Write ist in G2.2 verboten.
+   Der generische G0-Core wird dafür **nicht** erweitert.
+
 
 5. **Fehlender Run = fail-closed (G2.0-Regel).** Ist `sceneId` gesetzt, aber
    der Run-Snapshot unvollständig (`runId` oder `plateGeneration` fehlt), gibt
