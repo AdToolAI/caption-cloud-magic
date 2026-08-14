@@ -125,12 +125,12 @@ export function restoreResetMarkersFromSnapshot(
  */
 export function buildStaleResetPatch(row: LipSyncResetServerRow): Record<string, unknown> {
   return {
-    lipSyncStatus: row.lip_sync_status ?? null,
+    lipSyncStatus: row.lip_sync_status ?? null, // legacy-mapping-allowed: stale_reset refetch snapshot
     lipSyncAppliedAt: row.lip_sync_applied_at ?? null,
     lipSyncSourceClipUrl: row.lip_sync_source_clip_url ?? null,
     clipUrl: row.clip_url ?? null,
     processedVideoUrl: row.processed_video_url ?? null,
-    twoshotStage: row.twoshot_stage ?? null,
+    twoshotStage: row.twoshot_stage ?? null, // legacy-mapping-allowed: stale_reset refetch snapshot
     dialogShots: row.dialog_shots ?? null,
     lipSyncWithVoiceover: row.lip_sync_with_voiceover === true,
     dialogMode: row.dialog_mode === true,
