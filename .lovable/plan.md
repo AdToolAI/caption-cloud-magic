@@ -75,9 +75,13 @@ Neu: `src/components/video-composer/SceneStatusBadge.tsx`
 
 ### 4. Guard und Tests
 
-- `sceneStatusPresenter.test.ts`: Label für **alle** 12 `SCENE_STATES`, für die bekannten
-  Substates und für unbekannte/leere Substates (Fallback), plus Kundensprach-Assertion
-  (kein `syncso`, `twoshot`, `plate`, `cinematic-sync` im sichtbaren Text, alle drei Sprachen).
+- `sceneStatusPresenter.test.ts`: Keys/Params für **alle** 12 `SCENE_STATES`, für die
+  bekannten Substates und für unbekannte/leere Substates (Fallback `detailKey === null`).
+  Zusätzlich: Presenter-Output ist locale-frei (enthält keinen fertigen Text).
+- Rendering-Test für `SceneStatusBadge`: Keys ergeben in DE/EN/ES vollständige Texte
+  (kein fehlender Key) und verletzen den 6.3-Vertrag nicht (kein `syncso`, `twoshot`,
+  `plate`, `cinematic-sync` sichtbar).
+- Zyklus-Test: `sceneStatusPresenter.ts` enthält keinen Runtime-Import aus `sceneState.ts`.
 - Erweiterung des 6.3-Sprachscanners um `SceneStatusBadge.tsx`.
 - Scanner-Test: keine zweite Status-Label-Tabelle mehr im Composer-UI.
 
