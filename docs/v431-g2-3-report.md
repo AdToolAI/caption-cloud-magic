@@ -7,7 +7,7 @@
 
 ### 1. Datenbank — neues Domain-Primitive `composer_finalize_upload_scene`
 
-Migration: `20260815000000_v431_g2_3_upload_finalizer.sql`
+Migration: `20260814223446_a9740501-0403-4877-9ed2-8f1af8e40299.sql`
 
 - Nur `write_id='cvc:upload-complete'` erlaubt.
 - `SECURITY DEFINER`, `search_path = pg_catalog, public`.
