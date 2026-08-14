@@ -246,6 +246,7 @@ describe('v430.1 — Intent-Gate-Scanner', () => {
     const counts: Record<string, number> = {};
     for (const hit of scanAll()) counts[hit.file] = (counts[hit.file] ?? 0) + 1;
 
+    console.log("COUNTS="+JSON.stringify(counts));
     const drift: string[] = [];
     for (const file of new Set([...Object.keys(counts), ...Object.keys(ALLOWLIST)])) {
       const now = counts[file] ?? 0;
