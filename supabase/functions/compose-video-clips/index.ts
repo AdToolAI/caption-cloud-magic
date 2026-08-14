@@ -4143,6 +4143,8 @@ serve(async (req) => {
       try {
         if (scene.clipSource === "upload" && scene.uploadUrl) {
           // v431 G2.3 — Upload-Finalisierung über gehärtetes Domain-Primitive.
+          // Quelle ist der VOR der Run-Akquise eingefrorene Snapshot.
+          const uploadSourceUrl = uploadSourceSnapshot.get(scene.id) ?? scene.uploadUrl;
           const stamp = sceneRunStamps.get(scene.id);
           const uploadRunId = stamp?.runId;
           const uploadGeneration = stamp?.generation;
@@ -4151,56 +4153,48 @@ serve(async (req) => {
               `run=${uploadRunId ?? "none"} gen=${uploadGeneration ?? "none"}`,
           );
 
-          if (uploadRunId && uploadGeneration) {
-            const { data: finRes, error: finErr } = await supabaseAdmin.rpc(
-              "composer_finalize_upload_scene",
-              {
-                _scene_id: scene.id,
-                _run_id: uploadRunId,
-                _generation: uploadGeneration,
-                _write_id: "cvc:upload-complete",
-                _upload_url: scene.uploadUrl,
-              },
+          if (!uploadRunId || !uploadGeneration) {
+            // fail-closed: ohne Run-Provenienz kein State-/Output-Write.
+            console.error(
+              `[compose-video-clips] v431_g2_3 write=upload-complete scene=${scene.id} reason=upload_missing_run_provenance fail_closed=true`,
             );
-
-            if (finErr || (finRes as any)?.applied !== true) {
-              const reason = (finRes as any)?.reason ?? finErr?.message ?? "unknown";
-              console.warn(
-                `[compose-video-clips] v431_g2_3 upload-finalizer not applied scene=${scene.id} reason=${reason}`,
-              );
-              results.push({
-                sceneId: scene.id,
-                status: "failed",
-                error: `upload_finalizer:${reason}`,
-              });
-              continue;
-            }
-
             results.push({
               sceneId: scene.id,
-              status: "ready",
-              clipUrl: scene.uploadUrl,
+              status: "failed",
+              error: "upload_missing_run_provenance",
             });
-          } else {
-            // Kein Run-Stempel → kein G2-gesicherter Write. Legacy-Pfad bleibt
-            // erhalten, bis die Provenienz für diese Szene hergestellt ist.
-            console.warn(
-              `[compose-video-clips] v431_g2_3 write=upload-complete scene=${scene.id} reason=no_run_stamp fallback=legacy`,
-            );
-            await supabaseAdmin
-              .from("composer_scenes")
-              .update({
-                ...materializeCompatibilityOutput('base', { baseUrl: scene.uploadUrl }),
-                clip_status: "ready",
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", scene.id);
-            results.push({
-              sceneId: scene.id,
-              status: "ready",
-              clipUrl: scene.uploadUrl,
-            });
+            continue;
           }
+
+          const { data: finRes, error: finErr } = await supabaseAdmin.rpc(
+            "composer_finalize_upload_scene",
+            {
+              _scene_id: scene.id,
+              _run_id: uploadRunId,
+              _generation: uploadGeneration,
+              _write_id: "cvc:upload-complete",
+              _upload_url: uploadSourceUrl,
+            },
+          );
+
+          if (finErr || (finRes as any)?.applied !== true) {
+            const reason = (finRes as any)?.reason ?? finErr?.message ?? "unknown";
+            console.warn(
+              `[compose-video-clips] v431_g2_3 upload-finalizer not applied scene=${scene.id} reason=${reason}`,
+            );
+            results.push({
+              sceneId: scene.id,
+              status: "failed",
+              error: `upload_finalizer:${reason}`,
+            });
+            continue;
+          }
+
+          results.push({
+            sceneId: scene.id,
+            status: "ready",
+            clipUrl: uploadSourceUrl,
+          });
         } else if (scene.clipSource === "stock" && scene.stockKeywords) {
           // Stock: search and pick best match
           const stockResponse = await fetch(
