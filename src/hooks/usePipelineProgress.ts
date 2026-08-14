@@ -535,7 +535,7 @@ export function usePipelineProgress({
   const voiceoverReal = useMemo(() => {
     const vo = assemblyConfig?.voiceover;
     const b = baselineRef.current;
-    // For Cinematic-Sync / sync-segments flows the user does NOT see an
+    // For Lip-Sync / sync-segments flows the user does NOT see an
     // independent "Voiceover" step — `compose-twoshot-audio` is an internal
     // sub-step of Lip-Sync. Suppress the phase entirely when the only audio
     // activity is for lipsync scenes.
@@ -913,7 +913,7 @@ export function usePipelineProgress({
   // v73 — Active backend evidence suppresses the stall flag: as long as
   // a Sync.so job / audio-mux render / non-terminal twoshot stage is
   // visible in the scene state, the run is NOT stalled even if the
-  // weighted progress bar hasn't moved (Sync.so passes are long).
+  // weighted progress bar hasn't moved (lip-sync passes are long).
   const hasActiveLipsyncEvidence = (scenes ?? []).some((s: any) => {
     if (isSceneTerminalFailure(s)) return false;
     if (isCanceledLipsyncScene(s)) return false;

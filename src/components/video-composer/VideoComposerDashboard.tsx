@@ -701,7 +701,7 @@ export default function VideoComposerDashboard() {
   // Realtime: when ANY collaborator updates a scene in this project, refetch.
   useComposerScenesRealtime(project.id, refetchScenesFromDb);
 
-  // Tab-übergreifender Auto-Trigger für Two-Shot/Cinematic-Sync Lip-Sync.
+  // Tab-übergreifender Auto-Trigger für Two-Shot/Lip-Sync Lip-Sync.
   // Stellt sicher, dass auch Voiceover-/Musik-/Export-Tab die Pipeline anstoßen,
   // sobald eine Szene im "ready, but no lip-sync yet"-State steht.
   useTwoShotAutoTrigger(project.id);
@@ -854,7 +854,9 @@ export default function VideoComposerDashboard() {
         fontSize: 48,
         color: '#FFFFFF',
       },
-      cutStyle: (s.cutStyle ?? 'crossfade') as ComposerScene['cutStyle'],
+      // Template-Grenze: `transitionType` ist externes Template-Schema,
+      // kein Composer-Domain-Feld — Überführung nur explizit hier.
+      cutStyle: (s.transitionType ?? 'crossfade') as ComposerScene['cutStyle'],
       transitionDuration: s.transitionDuration ?? 0.5,
       retryCount: 0,
       costEuros: 0,
@@ -1284,7 +1286,7 @@ export default function VideoComposerDashboard() {
 
   /**
    * Local-only scene state update. Does NOT schedule a debounced DB flush
-   * and CANCELS any pending one — used by handlers (e.g. Cinematic-Sync start)
+   * and CANCELS any pending one — used by handlers (e.g. Lip-Sync start)
    * that have already persisted their target row themselves and don't want
    * a stale full-scene snapshot to clobber engine_override / clip_status.
    */

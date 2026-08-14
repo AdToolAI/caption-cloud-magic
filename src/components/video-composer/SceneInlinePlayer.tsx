@@ -15,6 +15,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { tx } from '@/lib/i18nText';
+import { presentSceneError } from '@/lib/composer/errors/sceneErrorPresenter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, RefreshCw, Sparkles, ImageIcon, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -223,7 +224,7 @@ export default function SceneInlinePlayer({
             scene.engineOverride === 'cinematic-sync' &&
             dialogVoiceCount >= 2 && (
               <span
-                title={tx({ de: "Lip-Sync auf altem HappyHorse-Master. Bitte 🔁 Lip-Sync neu rendern — wird automatisch mit Hailuo erzeugt.", en: "Lip-sync on old HappyHorse master. Please 🔁 re-render lip-sync — will be generated automatically with Hailuo.", es: "Sincronización labial en el máster antiguo de HappyHorse. Por favor 🔁 vuelve a renderizar la sincronización labial — se generará automáticamente con Hailuo." })}
+                title={tx({ de: "Die Lippensynchronisation läuft auf einem veralteten Video. Bitte die Lippensynchronisation neu erstellen.", en: "Lip-sync is running on an outdated video. Please re-create the lip-sync.", es: "La sincronización labial usa un video desactualizado. Vuelve a crearla." })}
                 className="px-1.5 py-0.5 rounded-md bg-amber-500/15 backdrop-blur text-[9px] font-semibold text-amber-300 border border-amber-500/40"
               >
                 ⚠ {tx({ de: "Re-Render empfohlen", en: "Re-render recommended", es: "Se recomienda volver a renderizar" })}
@@ -307,8 +308,8 @@ export default function SceneInlinePlayer({
 
                     title = tx({ de: 'Lip-Sync läuft…', en: 'Lip-sync running…', es: 'Sincronización labial en curso…' });
                     sub = totalPasses > 0
-                      ? `Sync.so · ${tx({ de: 'Pass', en: 'Pass', es: 'Pasada' })} ${Math.min(donePasses + 1, totalPasses)}/${totalPasses}`
-                      : `Sync.so · ${tx({ de: '~60 s pro Sprecher-Turn', en: '~60s per speaker turn', es: '~60 s por turno de hablante' })}`;
+                      ? `${tx({ de: 'Durchgang', en: 'Pass', es: 'Pasada' })} ${Math.min(donePasses + 1, totalPasses)}/${totalPasses}`
+                      : tx({ de: '~60 s pro Sprecher', en: '~60s per speaker', es: '~60 s por hablante' });
                   } else if (pipelineState === 'audio_prep') {
                     if (audioUrl) {
                       title = tx({ de: 'Audio fertig — Lip-Sync wird gestartet…', en: 'Audio ready — starting lip-sync…', es: 'Audio listo — iniciando sincronización labial…' });
@@ -319,7 +320,7 @@ export default function SceneInlinePlayer({
                     }
                   } else if (pipelineState === 'lipsync_dispatched' && hasProviderJob) {
                     title = tx({ de: 'Lip-Sync läuft…', en: 'Lip-sync running…', es: 'Sincronización labial en curso…' });
-                    sub = `Sync.so · ${tx({ de: '~60 s pro Sprecher-Turn', en: '~60s per speaker turn', es: '~60 s por turno de hablante' })}`;
+                    sub = tx({ de: '~60 s pro Sprecher', en: '~60s per speaker', es: '~60 s por hablante' });
                   } else if (pipelineState === 'audio_ready' && !hasProviderJob) {
                     // Recovery-Fenster: server-watchdog dispatcht spätestens nach 3 min.
                     if (limboStuck) {
@@ -327,14 +328,14 @@ export default function SceneInlinePlayer({
                       sub = tx({ de: 'Server-Watchdog versucht es erneut · jederzeit manuell neu starten', en: 'Server watchdog is retrying · you can restart manually anytime', es: 'El vigilante del servidor está reintentando · puedes reiniciar manualmente en cualquier momento' });
                     } else {
                       title = tx({ de: 'Lip-Sync wird gestartet…', en: 'Starting lip-sync…', es: 'Iniciando sincronización labial…' });
-                      sub = tx({ de: 'Bereit, Sync.so wird angestoßen', en: 'Ready, Sync.so is being triggered', es: 'Listo, se está activando Sync.so' });
+                      sub = tx({ de: 'Bereit — Lippensynchronisation wird angestoßen', en: 'Ready — lip-sync is being triggered', es: 'Listo — se está iniciando la sincronización labial' });
                     }
                   } else if (pipelineState === 'audio_ready' && audioUrl) {
                     title = tx({ de: 'Lip-Sync wird gestartet…', en: 'Starting lip-sync…', es: 'Iniciando sincronización labial…' });
-                    sub = `Sync.so · ${tx({ de: '~60 s pro Sprecher-Turn', en: '~60s per speaker turn', es: '~60 s por turno de hablante' })}`;
+                    sub = tx({ de: '~60 s pro Sprecher', en: '~60s per speaker', es: '~60 s por hablante' });
                   } else {
                     title = tx({ de: 'Lip-Sync startet…', en: 'Lip-sync starting…', es: 'Iniciando sincronización labial…' });
-                    sub = `Sync.so · ${tx({ de: '~60 s pro Sprecher-Turn', en: '~60s per speaker turn', es: '~60 s por turno de hablante' })}`;
+                    sub = tx({ de: '~60 s pro Sprecher', en: '~60s per speaker', es: '~60 s por hablante' });
                   }
                 }
                 return (
@@ -378,64 +379,24 @@ export default function SceneInlinePlayer({
             anchor_identity_failed) plus a Re-Render button, instead of an
             endless tx({ de: "Szene wird gebaut…", en: "Scene is building…", es: "La escena se está construyendo…" }) spinner. */}
         {isFailed && (() => {
-          const rawErr = String(
-            (scene as any).clipError ?? (scene as any).clip_error ?? '',
-          ).trim();
-          const lower = rawErr.toLowerCase();
-          // Map silent/opaque model fails to actionable text.
-          let friendly: string;
-          const isInvalidPrompt =
-            lower.includes('invalid_prompt_rejected') ||
-            lower.includes('invalidparameter') ||
-            lower.includes('could not process with this prompt');
-          const isGreenNet =
-            lower.includes('green_net_rejected') ||
-            lower.includes('datainspectionfailed') ||
-            lower.includes('green net check failed') ||
-            lower.includes('inappropriate content');
-          const repairExhausted = lower.includes('prompt_repair_exhausted');
-          if (isGreenNet || isInvalidPrompt) {
-            friendly = repairExhausted
-              ? tx({ de: 'HappyHorse hat den Szenen-Prompt abgelehnt (Inhaltsfilter) – auch der automatisch entschärfte Prompt wurde blockiert. Die Credits wurden zurückerstattet. Kürze den Prompt oder wechsle den Provider (z. B. Hailuo) und starte neu.', en: 'HappyHorse rejected the scene prompt (content filter) – the automatically softened prompt was also blocked. Your credits were refunded. Shorten the prompt or switch providers (e.g. Hailuo) and restart.', es: 'HappyHorse rechazó el prompt de la escena (filtro de contenido) – el prompt suavizado automáticamente también fue bloqueado. Se reembolsaron tus créditos. Acorta el prompt o cambia de proveedor (p. ej. Hailuo) y reinicia.' })
-              : tx({ de: 'HappyHorse hat den Szenen-Prompt abgelehnt (Inhaltsfilter). Der Prompt wurde automatisch entschärft und einmal erneut versucht. Die Credits wurden zurückerstattet – du kannst „Neu rendern" klicken oder den Provider wechseln.', en: 'HappyHorse rejected the scene prompt (content filter). The prompt was automatically softened and retried once. Your credits were refunded – you can click "Re-render" or switch providers.', es: 'HappyHorse rechazó el prompt de la escena (filtro de contenido). El prompt se suavizó automáticamente y se reintentó una vez. Se reembolsaron tus créditos – puedes hacer clic en "Volver a renderizar" o cambiar de proveedor.' });
-          } else if (
-            lower.includes('modelark_real_person_anchor_rejected') ||
-            lower.includes('modelark_input_images_rejected') ||
-            lower.includes('sensitivecontentdetected') ||
-            lower.includes('privacyinformation')
-          ) {
-            friendly = tx({
-              de: lower.includes('modelark_real_person_anchor_rejected')
-                ? 'Seedance 2.5 hat den komponierten Szenen-Anker abgelehnt, weil darin reale Personen erkannt wurden. Es wurden keine einzelnen Cast-Fotos gesendet.'
-                : 'Seedance 2.5 hat das Eingabebild abgelehnt. Bitte ein anderes, zulässiges Motiv verwenden.',
-              en: lower.includes('modelark_real_person_anchor_rejected')
-                ? 'Seedance 2.5 rejected the composed scene anchor because real people were detected in it. No individual cast portraits were sent.'
-                : 'Seedance 2.5 rejected the input image. Please use a different, permitted visual.',
-              es: lower.includes('modelark_real_person_anchor_rejected')
-                ? 'Seedance 2.5 rechazó el ancla de escena compuesta porque detectó personas reales. No se enviaron retratos individuales del elenco.'
-                : 'Seedance 2.5 rechazó la imagen de entrada. Usa otra imagen permitida.',
-            });
-          } else if (!rawErr) {
-            friendly = tx({ de: 'Render fehlgeschlagen.', en: 'Render failed.', es: 'Error en el renderizado.' });
-
-          } else if (
-            lower === 'model_failed_silently' ||
-            lower.startsWith('model_failed') ||
-            lower === 'failed' ||
-            lower === 'null'
-          ) {
-            friendly =
-              tx({ de: 'Das Video-Modell hat die Generierung intern abgebrochen (kein Grund vom Provider geliefert). Bitte Anchor neu generieren oder Prompt leicht anpassen und erneut starten.', en: 'The video model internally aborted the generation (no reason provided by the provider). Please regenerate the anchor or slightly adjust the prompt and restart.', es: 'El modelo de video interrumpió internamente la generación (el proveedor no dio ningún motivo). Vuelve a generar el anclaje o ajusta ligeramente el prompt y reinicia.' });
-          } else {
-            friendly = rawErr.length > 220 ? rawErr.slice(0, 220) + '…' : rawErr;
-          }
+          // v430/6.3: Kundentext kommt ausschließlich aus dem zentralen Presenter.
+          // Rohtext bleibt als Debug-Detail im title-Attribut.
+          const p = presentSceneError(
+            (scene as any).clipError ?? (scene as any).clip_error,
+          );
+          const friendly = [tx(p.headline), p.hint ? tx(p.hint) : null]
+            .filter(Boolean)
+            .join(' ');
           return (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gradient-to-br from-destructive/30 via-black/70 to-destructive/30 backdrop-blur-[2px] px-3 text-center">
               <AlertTriangle className="h-7 w-7 text-destructive mb-1.5" />
               <p className="text-[11px] font-semibold text-destructive-foreground">
                 {tx({ de: "Szene fehlgeschlagen", en: "Scene failed", es: "La escena falló" })}
               </p>
-              <p className="mt-1 text-[9px] leading-snug text-foreground/80 line-clamp-4">
+              <p
+                className="mt-1 text-[9px] leading-snug text-foreground/80 line-clamp-4"
+                title={p.code ? `${p.code} · ${p.raw.slice(0, 300)}` : p.raw.slice(0, 300)}
+              >
                 {friendly}
               </p>
               <div className="mt-2 flex items-center gap-1.5">

@@ -96,3 +96,20 @@ describe('Keine doppelte Domain-Wahrheit', () => {
     }
   });
 });
+
+describe('Template-Grenze (externes Schema)', () => {
+  it('documents transitionType as a non-domain template field', () => {
+    const tpl = read('src/types/motion-studio-templates.ts');
+    expect(tpl).toContain('KEIN Composer-Domain-Feld');
+    expect(tpl).toContain('transitionType?: TransitionStyle;');
+    // Kein cutStyle-Feld im Template-Schema (nur im Kommentar erwähnt).
+    expect(tpl).not.toMatch(/^\s*cutStyle\??:/m);
+  });
+
+  it('converts scene_suggestions explicitly instead of spreading the template object', () => {
+    const dash = read('src/components/video-composer/VideoComposerDashboard.tsx');
+    expect(dash).toContain("cutStyle: (s.transitionType ?? 'crossfade')");
+    // Kein Spread einer Template-Suggestion in ein Scene-Literal.
+    expect(dash).not.toMatch(/scene_suggestions[\s\S]{0,400}\.\.\.s[,\s}]/);
+  });
+});

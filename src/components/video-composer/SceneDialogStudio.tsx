@@ -1041,7 +1041,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 
   const totalChars = blocks.reduce((sum, b) => sum + b.text.length, 0);
   const estimatedDurationSec = Math.max(3, Math.ceil(totalChars / 18));
-  // Legacy HeyGen cost estimation dropped — Cinematic-Sync cost is shown per scene in ClipsTab.
+  // Legacy HeyGen cost estimation dropped — Lip-Sync cost is shown per scene in ClipsTab.
   const totalCost = 0;
 
   const handleAiScript = async () => {
@@ -1336,7 +1336,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     if (!wantsLipSync) {
       toast({
         title: tx({ de: 'Lip-Sync ist ausgeschaltet', en: 'Lip-Sync is off', es: 'Lip-Sync está desactivado' }),
-        description: tx({ de: 'Aktiviere den Dialog & Lip-Sync-Schalter, um das Studio zu starten — oder nutze den regulären "Generieren"-Button für einen reinen Bild-Render ohne Sync.so.', en: 'Turn the Dialog & Lip-Sync switch on to use the Studio — or use the standard Generate button for an image-only render.', es: 'Activa el interruptor de Diálogo & Lip-Sync para usar el Studio — o pulsa "Generar" para un render solo de imagen.' }),
+        description: tx({ de: 'Aktiviere den Dialog & Lip-Sync-Schalter, um das Studio zu starten — oder nutze den regulären "Generieren"-Button für einen reinen Bild-Render ohne Lippensynchronisation.', en: 'Turn the Dialog & Lip-Sync switch on to use the Studio — or use the standard Generate button for an image-only render.', es: 'Activa el interruptor de Diálogo & Lip-Sync para usar el Studio — o pulsa "Generar" para un render solo de imagen.' }),
         variant: 'destructive',
       });
       return;
@@ -1373,7 +1373,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     }
     // ── Schritt 1: Cost-Confirm-Gate (Dialog) ───────────────────────────
     // N speakers × ceil(dur) × 9 Cr/s for Sync.so lipsync passes, plus
-    // Hailuo plate + VO per turn. Show aggregated cost before firing.
+    // base clip + VO per turn. Show aggregated cost before firing.
     {
       const turnCount = Math.max(1, blocks.length);
       const ok = await confirmRender({
@@ -1392,7 +1392,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             : tx({ de: 'Dialog-Szene rendern?', en: 'Render dialog scene?', es: '¿Renderizar escena de diálogo?' }),
         description:
           turnCount > 1
-            ? tx({ de: 'Pro Sprecher-Turn läuft ein eigener Hailuo-Plate + dedizierter Sync.so Lip-Sync. Gesamtkosten siehe unten.', en: 'Each speaker turn runs its own Hailuo plate + dedicated Sync.so lip-sync. See total cost below.', es: 'Cada turno del orador ejecuta su propia toma Hailuo + Sync.so lip-sync dedicado. Ver el costo total abajo.' })
+            ? tx({ de: 'Pro Sprecher-Turn läuft ein eigener Basis-Clip + dedizierter Lippensynchronisation. Gesamtkosten siehe unten.', en: 'Each speaker turn runs its own base clip + dedicated lip-sync. See total cost below.', es: 'Cada turno del orador ejecuta su propia clip base + lip-sync dedicado. Ver el costo total abajo.' })
             : tx({ de: 'Voiceover + Lip-Sync werden mitberechnet.', en: 'Voiceover + lip-sync will be included in the cost.', es: 'La voz en off + lip-sync se incluirán en el costo.' }),
       });
       if (!ok) return;
@@ -1425,8 +1425,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       ? true
       : renderAsSeparateScenes;
 
-    // ── Stage 8 (May 31 2026): single-speaker Cinematic-Sync routing ─────
-    // For 1-speaker scenes that the user explicitly put on the Cinematic-Sync
+    // ── Stage 8 (May 31 2026): single-speaker Lip-Sync routing ─────
+    // For 1-speaker scenes that the user explicitly put on the Lip-Sync
     // engine (toggle "Dialog & Lip-Sync" on / `engineOverride='cinematic-sync'`
     // / `lipSyncWithVoiceover=true`), DO NOT take the legacy inline /
     // HeyGen-Talking-Head path — that's what produced the "Animorph + double
@@ -1442,7 +1442,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // v232 — Single-Speaker Symmetrie: für 1 Sprecher darf der Button-Klick
     // NICHT mehr `renderAsSeparateScenes` (Multi-Speaker-Toggle) verlangen.
     // Das war der Grund, warum der User den Toggle erst manuell einschalten
-    // musste, bevor der Cinematic-Sync-Pfad griff.
+    // musste, bevor der Lip-Sync-Pfad griff.
     const buttonIntendsLipSync =
       (blocks.length === 1 && allHavePortraits) ||
       (blocks.length >= 2 && allHavePortraits && !renderAsSeparateScenes);
@@ -1681,7 +1681,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       // 6s/10s Hailuo i2v master clip (both speakers in frame, anchored from
       // Nano Banana 2 two-shot composition); ClipsTab's auto-trigger then
       // detects ≥2 speakers in dialog_script and invokes
-      // compose-twoshot-lipsync for sequential per-face Sync.so passes.
+      // compose-twoshot-lipsync for sequential per-face lip-sync passes.
       //
       // No more sub-scene splitting — the storyboard shows ONE card with
       // a 6-stage progress bar (audio → anchor → master_clip → lipsync_1
@@ -1723,7 +1723,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         if (audioRequired > masterDuration) {
           toast({
             title: tx({ de: 'Dialog länger als Szene', en: 'Dialog longer than scene', es: 'Diálogo más largo que la escena' }),
-            description: tx({ de: `Audio braucht ~${audioRequired}s, ${DIALOG_MASTER_PROVIDER_LABELS[masterProvider]}-Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Szenendauer erhöhen oder Provider mit größerem Duration-Fenster wählen.`, en: `Audio needs ~${audioRequired}s, ${DIALOG_MASTER_PROVIDER_LABELS[masterProvider]} scene is ${masterDuration}s. Sync.so cuts at the end (cut_off). To get full dialogue, increase scene duration or choose a provider with a larger duration window.`, es: `El audio necesita ~${audioRequired}s, la escena de ${DIALOG_MASTER_PROVIDER_LABELS[masterProvider]} es de ${masterDuration}s. Sync.so corta al final (cut_off). Para obtener el diálogo completo, aumenta la duración de la escena o elige un proveedor con una ventana de duración mayor.` }),
+            description: tx({ de: `Audio braucht ~${audioRequired}s, ${DIALOG_MASTER_PROVIDER_LABELS[masterProvider]}-Szene ist ${masterDuration}s. Der Ton wird am Ende abgeschnitten. Für vollen Dialog Szenendauer erhöhen oder Provider mit größerem Duration-Fenster wählen.`, en: `Audio needs ~${audioRequired}s, ${DIALOG_MASTER_PROVIDER_LABELS[masterProvider]} scene is ${masterDuration}s. The audio gets cut off at the end. To get full dialogue, increase scene duration or choose a provider with a larger duration window.`, es: `El audio necesita ~${audioRequired}s, la escena de ${DIALOG_MASTER_PROVIDER_LABELS[masterProvider]} es de ${masterDuration}s. El audio se corta al final. Para obtener el diálogo completo, aumenta la duración de la escena o elige un proveedor con una ventana de duración mayor.` }),
           });
         }
 
@@ -1797,13 +1797,13 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             });
             return;
           }
-          // Cinematic-Sync anchors are server-only. Client-side pre-compose can
+          // Lip-Sync anchors are server-only. Client-side pre-compose can
           // add prompt/name-match duplicates before the server audit runs.
           const composedFirstFrame: string | undefined = undefined;
 
           // v173 — run composeFinalPrompt so performance (mimik/gestik/blick/
           // energy) and actionBeat from the Briefing-Plan actually reach the
-          // Cinematic-Sync wrapper. Previously this path sent scene.aiPrompt
+          // Lip-Sync wrapper. Previously this path sent scene.aiPrompt
           // raw, which silently dropped those fields.
           const composedInvoke = buildInvokePrompt(scene as any, characters as any, language);
 
@@ -1831,7 +1831,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           // as soon as the lip-synced clip lands (otherwise the embedded VO
           // is inaudible until the user manually unmutes).
           // v351 — Re-Run: alten Abschluss-Zustand wegräumen, aber laufende
-          // Sync.so-Jobs vorher sauber canceln (Slot-Leak-Schutz).
+          // laufende Lip-Sync-Aufträge vorher sauber canceln (Slot-Leak-Schutz).
           await startSceneGeneration({
             sceneIds: [sceneIdFinal],
             reason: 'dialog_studio_regenerate',
@@ -1853,7 +1853,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         okCount = 1;
         toast({
           title: tx({ de: 'Dialog-Shots werden gerendert', en: 'Rendering Dialog Shots', es: 'Renderizando Dialog-Shots' }),
-          description: tx({ de: `Pro Sprecher-Turn wird ein eigener Shot (Hailuo + Sync.so Lip-Sync) gerendert und am Ende zu einer ${masterDuration}s-Szene gestitcht. Live-Fortschritt im Clip-Karten-Overlay.`, en: `For each speaker turn, a separate shot (Hailuo + Sync.so Lip-Sync) is rendered and then stitched together into a ${masterDuration}s scene. Live progress in the clip card overlay.`, es: `Para cada turno de orador, se renderiza una toma separada (Hailuo + Sync.so Lip-Sync) y luego se une en una escena de ${masterDuration}s. Progreso en vivo en la superposición de la tarjeta de clip.` }),
+          description: tx({ de: `Pro Sprecher-Turn wird ein eigener Shot (Hailuo + Lippensynchronisation) gerendert und am Ende zu einer ${masterDuration}s-Szene gestitcht. Live-Fortschritt im Clip-Karten-Overlay.`, en: `For each speaker turn, a separate shot (Hailuo + Lippensynchronisation) is rendered and then stitched together into a ${masterDuration}s scene. Live progress in the clip card overlay.`, es: `Para cada turno de orador, se renderiza una toma separada (Hailuo + Lippensynchronisation) y luego se une en una escena de ${masterDuration}s. Progreso en vivo en la superposición de la tarjeta de clip.` }),
         });
         if (onClose) onClose();
       } catch (twoShotErr) {
@@ -2339,11 +2339,11 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           label = tx({ de: `⚠️ ${missing.name} hat kein Portrait — bitte Cast-Charakter zuweisen, sonst kein echter Lip-Sync möglich.`, en: `⚠️ ${missing.name} has no portrait — please assign a cast character, otherwise real lip-sync is not possible.`, es: `⚠️ ${missing.name} no tiene retrato; asigna un personaje del elenco, de lo contrario no será posible una sincronización labial real.` });
         } else if (isSrsSplit && portraitsAll) {
           tone = 'primary';
-          label = tx({ de: `🎬 Wird als ${speakers.length} Szene${speakers.length === 1 ? '' : 'n'} gerendert (Shot-Reverse-Shot, je 1 Hailuo-Plate + Sync.so pro Sprecher)`, en: `🎬 Will be rendered as ${speakers.length} scene${speakers.length === 1 ? '' : 's'} (shot-reverse-shot, 1 Hailuo plate + Sync.so per speaker each)`, es: `🎬 Se renderizará como ${speakers.length} escena${speakers.length === 1 ? '' : 's'} (plano-contraplano, 1 placa Hailuo + Sync.so por orador cada una)` });
+          label = tx({ de: `🎬 Wird als ${speakers.length} Szene${speakers.length === 1 ? '' : 'n'} gerendert (Shot-Reverse-Shot, je 1 Basis-Clip mit Lippensynchronisation pro Sprecher)`, en: `🎬 Will be rendered as ${speakers.length} scene${speakers.length === 1 ? '' : 's'} (shot-reverse-shot, 1 lip-synced base clip per speaker)`, es: `🎬 Se renderizará como ${speakers.length} escena${speakers.length === 1 ? '' : 's'} (plano-contraplano, 1 clip base con sincronización labial por orador)` });
         } else if (isSyncSegments && portraitsAll) {
           tone = 'primary';
           // sync-segments pricing ≈ €0.20/s; show flat cost note instead of per-speaker.
-          label = tx({ de: `⚡ Lip-Sync via Sync.so sync-3 (Fast Dialog) — Mund passt zum Audio${speakers.length > 1 ? ` · ${speakers.length} Sprecher in einer Plate` : ''} (~€0,20/s)`, en: `⚡ Lip-sync via Sync.so sync-3 (Fast Dialog) — mouth matches the audio${speakers.length > 1 ? ` · ${speakers.length} speakers in one plate` : ''} (~€0.20/s)`, es: `⚡ Lip-sync vía Sync.so sync-3 (Fast Dialog) — la boca coincide con el audio${speakers.length > 1 ? ` · ${speakers.length} hablantes en una sola toma` : ''} (~€0,20/s)` });
+          label = tx({ de: `⚡ Lip-Sync via schnelle Lippensynchronisation — Mund passt zum Audio${speakers.length > 1 ? ` · ${speakers.length} Sprecher in einem Clip` : ''} (~€0,20/s)`, en: `⚡ Lip-sync via schnelle Lippensynchronisation — mouth matches the audio${speakers.length > 1 ? ` · ${speakers.length} speakers in one clip` : ''} (~€0.20/s)`, es: `⚡ Lip-sync vía schnelle Lippensynchronisation — la boca coincide con el audio${speakers.length > 1 ? ` · ${speakers.length} hablantes en un solo clip` : ''} (~€0,20/s)` });
         } else {
           label = tx({ de: '🔊 Audio-Overlay (kein Lip-Sync möglich ohne Cast-Portrait)', en: '🔊 Audio overlay (no lip-sync possible without a cast portrait)', es: '🔊 Solo audio (sin retrato, no hay lip-sync posible)' });
         }
@@ -2360,7 +2360,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         return (
           <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5 text-[10px] text-emerald-400 leading-relaxed">
             🎭 <strong>Dialog-Shot Pipeline:</strong>{' '}
-            {tx({ de: `Pro Sprecher-Turn ein eigener Hailuo-Plate + dedizierter Sync.so Lip-Sync. ${blocks.length} Shots werden am Ende zu einer Szene gestitcht.`, en: `Each speaker turn gets its own Hailuo plate + dedicated Sync.so lip-sync. ${blocks.length} shots will be stitched into one scene at the end.`, es: `Cada turno de orador obtiene su propia placa Hailuo + sincronización labial dedicada de Sync.so. ${blocks.length} tomas se unirán en una escena al final.` })}
+            {tx({ de: `Pro Sprecher-Turn ein eigener Basis-Clip + dedizierter Lippensynchronisation. ${blocks.length} Shots werden am Ende zu einer Szene gestitcht.`, en: `Each speaker turn gets its own base clip + dedicated lip-sync. ${blocks.length} shots will be stitched into one scene at the end.`, es: `Cada turno de orador obtiene su propia clip base + sincronización labial dedicada. ${blocks.length} tomas se unirán en una escena al final.` })}
           </div>
         );
       })()}

@@ -12,12 +12,24 @@ import type {
 
 export type TemplateStyle = 'cinematic' | 'minimal' | 'realistic' | 'documentary' | 'comic';
 
+/**
+ * CONTRACT (v430 / 6.2):
+ * `TemplateSceneSuggestion.transitionType` gehört zum externen Template-Schema und ist
+ * KEIN Composer-Domain-Feld. Das Composer-Domänenmodell kennt ausschließlich `cutStyle`
+ * (siehe `src/lib/video-composer/cutStyle.ts`).
+ *
+ * Falls ein Consumer aus einem Template eine `ComposerScene` erzeugt, muss die Überführung
+ * IMMER explizit erfolgen (`cutStyle: template.transitionType ?? <Default>`), niemals durch
+ * ein Spread des Template-Objekts in ein Scene-Literal. Persistenz nach `transition_type`
+ * läuft weiterhin nur über `cutStyleToRow()`.
+ */
 export interface TemplateSceneSuggestion {
   sceneType: SceneType;
   durationSeconds: number;
   clipSource: ClipSource;
   clipQuality?: ClipQuality;
   aiPrompt?: string;
+  /** Externes Template-Feld — im Composer nur explizit nach `cutStyle` überführen. */
   transitionType?: TransitionStyle;
   transitionDuration?: number;
 }

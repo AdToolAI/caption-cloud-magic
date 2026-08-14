@@ -72,9 +72,9 @@ const COPY: Record<Lang, {
           tx({ de: "Jede Szene bekommt einen Director Score von 0–100. Werte ab 80 sind Render-ready, alles darunter zeigt dir konkret, was fehlt: zu langer Prompt, kein klares Outcome, fehlender Cast-Anker oder kollidierende Aktionen.", en: "Each scene gets a Director Score from 0–100. Values from 80 are render-ready, anything below shows you specifically what's missing: prompt too long, no clear outcome, missing cast anchor, or colliding actions.", es: "Cada escena obtiene una Puntuación de Director de 0 a 100. Los valores a partir de 80 están listos para renderizar, cualquier cosa por debajo te muestra específicamente lo que falta: prompt demasiado largo, sin resultado claro, ancla de elenco faltante o acciones en conflicto." }),
       },
       {
-        title: "Cinematic-Sync Engine",
+        title: tx({ de: "Sprechende Szenen", en: "Talking scenes", es: "Escenas habladas" }),
         body:
-          tx({ de: "Bei sprechenden Szenen empfiehlt sich „Cinematic-Sync“ statt eines reinen Avatar-Busts: Hailuo rendert die echte Szene, Sync.so legt anschließend lippensynchron dein Voice-Over drauf. Kostet etwas mehr, sieht aber wie ein echter Shot aus.", en: "For talking scenes, “Cinematic-Sync” is recommended instead of a pure avatar bust: Hailuo renders the actual scene, then Sync.so overlays your voice-over lip-sync. Costs a bit more, but looks like a real shot.", es: "Para escenas habladas, se recomienda “Cinematic-Sync” en lugar de un busto de avatar puro: Hailuo renderiza la escena real, luego Sync.so superpone tu voz en off sincronizada con los labios. Cuesta un poco más, pero parece una toma real." }),
+          tx({ de: "Bei sprechenden Szenen lohnt sich die Lippensynchronisation: Zuerst wird die echte Szene gerendert, danach wird dein Voiceover lippensynchron daraufgelegt. Kostet etwas mehr, sieht aber aus wie eine echte Aufnahme.", en: "For talking scenes, lip-sync is worth it: the real scene is rendered first, then your voiceover is matched to the mouth. Costs a bit more, but looks like a real shot.", es: "En escenas habladas merece la pena la sincronización labial: primero se renderiza la escena real y después tu locución se ajusta a los labios. Cuesta algo más, pero parece una toma real." }),
       },
       {
         title: "Continuity Guardian",
@@ -132,9 +132,9 @@ const COPY: Record<Lang, {
           "Each scene gets a Director Score from 0–100. Anything ≥80 is render-ready; below that you'll see exactly what's missing: prompt too long, no clear outcome, missing cast anchor or colliding actions.",
       },
       {
-        title: "Cinematic-Sync engine",
+        title: "Talking scenes",
         body:
-          "For dialog scenes, prefer „Cinematic-Sync“ over a plain avatar bust: Hailuo renders the real scene, then Sync.so lip-syncs your voice-over on top. Costs a bit more, looks like a real shot.",
+          "For dialog scenes, lip-sync is worth it: the real scene is rendered first, then your voiceover is matched to the mouth. Costs a bit more, looks like a real shot.",
       },
       {
         title: "Continuity Guardian",
@@ -192,9 +192,9 @@ const COPY: Record<Lang, {
           "Cada escena recibe un Director Score de 0 a 100. Desde 80 está lista para renderizar; por debajo te indica qué falta: prompt muy largo, sin outcome claro, sin ancla de cast o acciones que chocan.",
       },
       {
-        title: "Motor Cinematic-Sync",
+        title: "Escenas habladas",
         body:
-          "Para escenas con diálogo, „Cinematic-Sync“ es mejor que un busto de avatar: Hailuo renderiza la escena real y Sync.so añade el lip-sync de tu voz encima. Cuesta un poco más, se ve como un shot real.",
+          "En escenas con diálogo merece la pena la sincronización labial: primero se renderiza la escena real y después tu locución se ajusta a los labios. Cuesta algo más, parece una toma real.",
       },
       {
         title: "Continuity Guardian",
