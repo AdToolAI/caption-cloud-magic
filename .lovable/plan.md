@@ -4,48 +4,99 @@ v430 / v430.1 gelten als eingefroren. Dieser Auftrag erzeugt ausschließlich Dok
 
 ## Ziel
 
-Ein belastbares Migrationsdossier, das für jeden Legacy-Lip-Sync-Write sagt: was schreibt er heute, worauf mappt er in der `pipeline_state` / `pipeline_substate`-Welt, und in welcher Migrationsgruppe er später angefasst wird.
+Ein belastbares Migrationsdossier, das für jede Legacy-Schreibstelle sagt: welche Rolle sie hat, ob überhaupt ein Zustandswechsel gemeint ist, unter welchem Guard sie schreibt, und in welcher Migrationsgruppe sie später angefasst wird.
 
 ## Lieferungen
 
-### 1. Legacy-Write-Inventar mit Zustands-Mapping
-Vollständige Tabelle aller Legacy-Lip-Sync-Writes (Felder wie `lipsync_status`, `lip_sync_job_id`, `lip_sync_video_url`, `processed_video_url`, `lipsync_provider`) mit Spalten:
-Datei + Zeile, Feldsatz, Auslöser (Webhook / Watchdog / UI / Cron), heutiger Legacy-Wert, Ziel `pipeline_state`, Ziel `pipeline_substate`, ob der Wert verlustfrei ableitbar ist, Risikoklasse.
+### 1. Legacy-Write-Inventar mit Rolle, Mapping und Run-Semantik
 
-Schwerpunkt-Writer laut Vorab-Scan: `compose-dialog-segments`, `compose-video-clips`, `sync-so-webhook`, `lipsync-watchdog`, `compose-clip-webhook`, `remotion-webhook`, `render-sync-segments-audio-mux`, `cancel-dialog-lipsync`, `compose-twoshot-audio`, `composer-cancel-scene`, `composer-cancel-project` sowie clientseitig `useTwoShotAutoTrigger`, `ClipsTab`, `useRenderQueueLive`, `usePipelineProgress`, `VideoComposerDashboard`.
+Vollständige Tabelle aller Legacy-Lip-Sync-Schreibstellen (`lipsync_status`, `lip_sync_job_id`, `lip_sync_video_url`, `processed_video_url`, `lipsync_provider` u. a.).
 
-Jede Zeile bekommt eine der Kennzeichnungen: **1:1 ableitbar**, **ableitbar mit Zusatzkontext**, **kein Ziel-Zustand vorhanden (Vertragslücke)**.
+Jede Zeile bekommt eine **stabile semantische ID** statt einer Zeilennummer, Form `<writer>:<semantik>`:
+
+```text
+syncso-webhook:final-mux-complete
+compose-dialog-segments:dispatch-running
+lipsync-watchdog:timeout-failed
+```
+
+Zeilennummern werden nur zusätzlich als Fundstelle geführt (volatil, nicht Schlüssel).
+
+Spalten je Zeile:
+
+| Spalte | Bedeutung |
+| --- | --- |
+| `id` | stabile semantische ID (Schlüssel) |
+| `file` / `line` | Fundstelle, volatil |
+| `write_role` | `state` \| `substate` \| `output` \| `job_metadata` \| `diagnostic` |
+| `fields` | geschriebener Feldsatz |
+| `trigger` | Webhook / Watchdog / UI / Cron / Fan-in |
+| `legacy_value` | heutiger Wert |
+| `target_state` | Ziel `pipeline_state` — bei `output`/`job_metadata`/`diagnostic` ausdrücklich **„kein State-Wechsel"** |
+| `target_substate` | Ziel `pipeline_substate` bzw. „kein State-Wechsel" |
+| `derivable` | 1:1 ableitbar / mit Zusatzkontext / Vertragslücke |
+| `run_guard` | prüft der Writer `active_run_id`, `plate_generation`, Job-ID? |
+| `atomic_with` | wird der State atomar mit dem Output geschrieben (ja/nein, welche Felder) |
+| `idempotency` | verhält sich ein Doppel-Callback neutral? |
+| `callback_risk` | Race-/Spät-Callback-Risiko (out-of-order, veralteter Run, paralleler Retry) |
+| `risk_class` | Migrationsrisiko |
+
+Nur `state` und `substate` brauchen zwingend ein State-Mapping. Für `output`, `job_metadata` und `diagnostic` wird ausdrücklich vermerkt, dass kein Zustandsübergang gemeint ist — damit v431 später keinem Metadaten-Write künstlich einen `pipeline_state` verpasst.
+
+Schwerpunkt-Writer laut Vorab-Scan: `compose-dialog-segments`, `compose-video-clips`, `sync-so-webhook`, `lipsync-watchdog`, `compose-clip-webhook`, `remotion-webhook`, `render-sync-segments-audio-mux`, `cancel-dialog-lipsync`, `compose-twoshot-audio`, `composer-cancel-scene`, `composer-cancel-project` sowie clientseitig `useTwoShotAutoTrigger`, `ClipsTab`, `useRenderQueueLive`, `usePipelineProgress`, `VideoComposerDashboard`. Besondere Sorgfalt bei `sync-so-webhook`, `remotion-webhook` und dem Mux-Pfad: dort zählt nicht nur *welcher* State geschrieben wird, sondern *wann* und *unter welchem Guard*.
 
 ### 2. Klärung der roten `scene-state-write-contract`-Befunde
+
 Der Vertragstest erlaubt derzeit nur `scene-hard-reset.ts`, `scene-state.ts` und die Testdatei. Direkte `pipeline_state`-Schreibvorgänge bestehen aktuell u. a. in:
 `qa-watchdog` (4 Stellen: failed / canceled), `recover-stuck-composer-clip` (failed), `compose-video-clips` (failed), `qa-weekly-deep-sweep` (plate_ready), `motion-studio-superuser` (2× plate_ready), `hybrid-extend-scene` (idle), `continuity-chain` (queued / failed), `autopilotComposerBridge` (plate_ready).
 
-Für jede Stelle wird entschieden und begründet: Umstellung auf `transitionScene()` / `failSceneState()`, oder dokumentierte Ausnahme mit Aufnahme in die Allowlist (z. B. Recovery-Pfade ohne gültigen Vorzustand). Schwerpunkt wie gefordert auf `qa-watchdog` und `recover-stuck-composer-clip`. Keine Codeänderung in diesem Auftrag — nur die Entscheidung samt Zielzustand des Tests.
+Jede Stelle wird in **genau eine von drei** Kategorien eingeordnet:
+
+1. **Normale legale Transition** → gehört auf `transitionScene()`.
+2. **Terminales Failure** → gehört auf `failSceneState()`.
+3. **Recovery-Override erforderlich** → die bestehende State-Machine kann den legitimen Recovery-Fall nicht ausdrücken. Das wird als **Vertragslücke** dokumentiert, nicht als dauerhafte Allowlist-Erlaubnis. Für diese Fälle wird ein späterer, expliziter und getesteter Recovery-Primitive skizziert (Signatur, erlaubte Vorzustände „beliebig/inkonsistent", Zielzustände `failed`/`canceled`, Protokollpflicht, Run-Abgleich).
+
+`qa-watchdog` und `recover-stuck-composer-clip` sind die Hauptkandidaten für Kategorie 3 und werden explizit begründet. Kein direkter `pipeline_state`-Write wird in diesem Auftrag dauerhaft allowlistet; eine Allowlist-Eintragung ist höchstens temporär und trägt dann die Kategorie-3-Markierung.
 
 ### 3. Die 8 Legacy-Output-Randzeilen
-Dokumentation der bekannten Randfälle aus dem v430-Audit: Szenen-ID-Klasse, Feldkonstellation, warum `resolveSceneOutput()` heute abweicht, und ob eine Datenkorrektur, eine Resolver-Regel oder bewusstes Belassen die richtige Antwort ist.
 
-### 4. `compose-video-assemble` → `resolveSceneOutput()`
-Einordnung als möglicher kleiner Cleanup: heutige URL-Auswahl im Assemble-Pfad, Abweichungen gegenüber der geteilten Resolver-Logik, Aufwand, Risiko für Export-Parität und Empfehlung (eigene Mini-Phase vor oder nach der Writer-Migration).
+Dokumentation der bekannten Randfälle aus dem v430-Audit: Szenen-ID-Klasse, Feldkonstellation, warum `resolveSceneOutput()` heute abweicht, und ob Datenkorrektur, Resolver-Regel oder bewusstes Belassen die richtige Antwort ist.
+
+### 4. Eigener Track: `compose-video-assemble` → `resolveSceneOutput()`
+
+Kein Teil einer Writer-Gruppe — es ist ein **Output-Reader-Cleanup** und steht als eigener kleiner Track im Dossier. Inhalt: heutige URL-Auswahl im Assemble-Pfad, Abweichungen gegenüber der geteilten Resolver-Logik, Aufwand, Risiko für Export-Parität, Empfehlung zur Einordnung (unabhängig von der Writer-Migration, voraussichtlich vor dem Abschalten der Reverse-Bridge).
 
 ### 5. Migrationsgruppen
-Festlegung der Reihenfolge, in der Lip-Sync-Writer gefahrlos migriert werden, jeweils mit Abbruchkriterium und Nachweis:
 
 ```text
-G1  Terminal-/Fehlerpfade (cancel-*, watchdogs, recover)   - geringstes Risiko
-G2  Webhook-Endzustände (sync-so, compose-clip, remotion)  - Kern der Lip-Sync-Kette
-G3  Mux-/Assembly-Writer (audio-mux, twoshot, assemble)    - Ausgabe-Parität kritisch
-G4  Client-Reader/Writer (Hooks + UI)                      - erst nach G1-G3
-G5  Reverse-Bridge abschalten                              - letzter Schritt, separat
+G0  State-/Recovery-Verträge vervollständigen
+    transitionScene / failSceneState / ggf. Recovery-Primitive
+G1  Einfache terminale UI-/Cancel-Pfade
+    cancel-dialog-lipsync, explizite Failure-Helper
+G2  Audio-/Dispatch-Zwischenzustände
+    compose-twoshot-audio, Dispatch-/Start-Pfade
+G3  Webhooks + Mux/Fan-in
+    sync-so-webhook, remotion-webhook, compose-dialog-segments, audio-mux
+G4  Watchdog/Recovery
+    erst nachdem dieselben States durch G1-G3 sauber geschrieben werden
+G5  verbleibende Client-/Compatibility-Pfade
+G6  Reverse-Bridge global abschalten
+
+Eigener Track (parallel, nicht Teil von G0-G6):
+T1  compose-video-assemble -> resolveSceneOutput() (Output-Reader-Cleanup)
 ```
+
+Watchdog/Recovery ist bewusst spät: die Läufe sind selten, treffen aber genau die kaputten und race-lastigen Zustände. Jede Gruppe bekommt Abbruchkriterium und Nachweis.
 
 ## Ergebnisartefakt
 
-Ein Dokument `docs/v431-prep-inventory.md` mit den Abschnitten 1–5. Zusätzlich ein maschinenlesbares Inventar als Testfixture, damit spätere Phasen gegen eine eingefrorene Ausgangsmenge prüfen können (analog zum v430.1-Gate-Scanner) — reines Lesen, keine Verhaltensänderung.
+- `docs/v431-prep-inventory.md` mit den Abschnitten 1–5.
+- Maschinenlesbares Inventar als Testfixture, geschlüsselt über die stabilen semantischen IDs (analog zum v430.1-Gate-Scanner). Damit kann ein späterer Contract-Test erzwingen: **keine neue Legacy-State-Write-ID ohne Aufnahme ins Inventar.** In diesem Auftrag wird die Fixture nur erzeugt und gegen den Ist-Stand eingefroren — reines Lesen, keine Verhaltensänderung.
 
 ## Abgrenzung
 
-- Kein Writer wird umgestellt.
+- Kein Writer wird umgestellt, kein Recovery-Primitive gebaut.
 - Die Reverse-Bridge bleibt unverändert aktiv.
 - Keine Migration, keine Datenkorrektur an den 8 Randzeilen.
-- Am Ende: STOP mit Bericht, danach Phasenfreigabe Gruppe für Gruppe.
+- Keine dauerhafte Allowlist-Erweiterung im Vertragstest.
+- Am Ende: STOP mit Bericht + Fixture; G0/G1 erst nach separater Freigabe.
