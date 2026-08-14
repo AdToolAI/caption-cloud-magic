@@ -59,9 +59,14 @@ Neu: `src/components/video-composer/SceneStatusBadge.tsx`
 
 ### 3. Konsumenten umstellen
 
+**Regel ohne Ausnahme:** Sichtbare Statusdarstellung läuft ausschließlich über
+`SceneStatusBadge`. `sceneStatusPresentation()` darf direkt nur von Tests oder
+nicht-visuellen Projektionen aufgerufen werden — kein anderer Consumer übersetzt Keys
+selbst. Ein Scanner-Test setzt das durch (`tx(...)` auf Presenter-Keys nur im Badge).
+
 - `SceneCard.tsx` — Statuszeile auf `SceneStatusBadge`.
 - `SceneClipProgress.tsx` — die verstreuten Inline-Statustexte
-  (Zeilen ~233–270, ~316, ~446, ~470, ~550) auf Badge bzw. Presenter delegieren.
+  (Zeilen ~233–270, ~316, ~446, ~470, ~550) auf `SceneStatusBadge` umstellen.
 - `ClipsTab.tsx` — Szenen-Statusanzeige auf Badge.
 - `RenderPipelinePanel.tsx` — die **szenenbezogenen** Statuszeilen auf Badge.
   Die dortige `statusLabel`-Tabelle für `PipelineStatus` (Projekt-Aggregat aus
