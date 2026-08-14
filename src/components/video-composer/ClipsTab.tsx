@@ -75,12 +75,7 @@ interface ClipsTabProps {
   onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
 }
 
-const statusConfig: Record<string, { color: string; bg: string; label: string }> = {
-  pending: { color: 'text-muted-foreground', bg: 'bg-muted/40 border-border/40', label: tx({ de: 'Ausstehend', en: 'Pending', es: 'Pendiente' }) },
-  generating: { color: 'text-accent', bg: 'bg-accent/15 border-accent/40 animate-pulse', label: tx({ de: 'Generiert…', en: 'Generating…', es: 'Generando...' }) },
-  ready: { color: 'text-green-400', bg: 'bg-green-500/15 border-green-500/40', label: tx({ de: 'Fertig', en: 'Ready', es: 'Listo' }) },
-  failed: { color: 'text-destructive', bg: 'bg-destructive/15 border-destructive/40', label: tx({ de: 'Fehlgeschlagen', en: 'Failed', es: 'Fallido' }) },
-};
+// v430 Schritt 6.5 — Statuslabels kommen jetzt aus <SceneStatusBadge>.
 
 export default function ClipsTab({ scenes, projectId, visualStyle, characters, language, onUpdateScenes, onUpdateScenesLocalOnly, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
   // Normalise the project language to the 3 accepted DirectorLanguage codes.
@@ -1307,7 +1302,6 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
           <div className="grid gap-3">
             {scenes.map((scene, i) => {
-              const status = statusConfig[clipStatusFromState(sceneState(scene))] || statusConfig.pending;
           const sceneQuality = scene.clipQuality || 'standard';
           const baseCost = scene.clipSource.startsWith('ai-')
             ? getClipCost(scene.clipSource, sceneQuality, scene.durationSeconds)
