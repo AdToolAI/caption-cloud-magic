@@ -220,7 +220,7 @@ export default function SceneInlinePlayer({
               lip-sync was generated against the wrong plate. Re-render swaps to Hailuo. */}
           {!isWorking &&
             scene.clipSource === 'ai-happyhorse' &&
-            scene.engineOverride === 'cinematic-sync' &&
+            isLipSyncIntentional(scene) &&
             dialogVoiceCount >= 2 && (
               <span
                 title={tx({ de: "Die Lippensynchronisation läuft auf einem veralteten Video. Bitte die Lippensynchronisation neu erstellen.", en: "Lip-sync is running on an outdated video. Please re-create the lip-sync.", es: "La sincronización labial usa un video desactualizado. Vuelve a crearla." })}
