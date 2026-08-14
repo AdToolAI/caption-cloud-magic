@@ -19660,6 +19660,14 @@ export type Database = {
         }
         Returns: string
       }
+      composer_reset_lipsync_full: {
+        Args: {
+          _expected_generation: number
+          _expected_run_id?: string
+          _scene_id: string
+        }
+        Returns: Json
+      }
       composer_scene_transition:
         | {
             Args: {

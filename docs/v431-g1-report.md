@@ -1,13 +1,13 @@
 # v431 — G1-Abnahmebericht (reduzierter Scope)
 
-Status: **G1 umgesetzt, ein Punkt bewusst STOP** (SceneCard-Cancel, siehe unten).
-G0-State-Core unverändert (eingefroren).
+Status: **G1 umgesetzt**. G0-State-Core unverändert (eingefroren).
 
 ## 1. Migrierte Writes
 
 | bisherige semantische ID | neue Branch-IDs | Vertrag |
 | --- | --- | --- |
 | `compose-video-clips:failed` | `compose-video-clips:failed-unsupported-source`<br>`compose-video-clips:failed-lipsync-uncertified`<br>`compose-video-clips:failed-anchor-input-unsupported` | `transitionSceneV2()`, `guardMode: run_bound`, `runId`/`generation` aus `sceneRunStamps` (Dispatch-Snapshot) |
+| `SceneCard:canceled` | `cancel-dialog-lipsync:reset` | `composer_reset_lipsync_full()` SQL-Primitive mit `expected_generation`/`expected_run_id`-Guards; kein direkter Client-Write mehr |
 
 `markSceneContractFailure()` wurde **nicht pauschal** umgestellt, sondern gesplittet:
 
@@ -24,28 +24,32 @@ G0-State-Core unverändert (eingefroren).
 
 ## 2. Nicht migriert (bewusst)
 
-- **`SceneCard:canceled`** — STOP statt Migration. Begründung: Der Client ruft heute bereits
-  `cancel-dialog-lipsync` (`reset: true`) auf; dessen Patch ist mit dem Client-Write
-  feldgleich (`lip_sync_status`, `lip_sync_applied_at`, `lip_sync_source_clip_url`,
-  `twoshot_stage`, `dialog_shots`, `lip_sync_with_voiceover`, `dialog_mode`,
-  `engine_override`, `clip_error`, `replicate_prediction_id`) und zusätzlich breiter
-  (Sync.so-Job-Cancel, `syncso_inflight_jobs`-Cleanup, Dispatch-Lock).
-  **Aber**: Die Edge-Function bricht bei gesetztem `lip_sync_applied_at` früh mit
-  `skipped: "already_applied"` ab. Der Client-Write setzt heute auch dann zurück.
-  Ein reines Entfernen des Client-Writes würde den Button „Lipsync komplett zurücksetzen“
-  für bereits angewandte Szenen funktional entwerten. Das ist eine **Semantik-Änderung**,
-  keine reine Deduplizierung → Freigabe erforderlich.
-  Optionen für die Freigabe:
-  1. Verhalten akzeptieren (angewandte Szenen sind nicht mehr per Button rücksetzbar), oder
-  2. `cancel-dialog-lipsync` darf bei `reset === true` den `already_applied`-Shortcut
-     überspringen (kleine Edge-Function-Änderung, kein neuer State-Vertrag).
-- **`cancel-dialog-lipsync:canceled`** — nicht angefasst. Kein `run_bound` möglich (kennt nur
-  den *jetzt* aktiven Run); Delegation an `composer-cancel-scene` ist fachlich **nicht**
-  deckungsgleich (Scene-Cancel ist ein Voll-Cancel, hier bleibt das Basis-Video erhalten).
-  Keine neue Runless-Regel angelegt.
+- **`cancel-dialog-lipsync:canceled`** (nicht-Reset-Cancel) — nicht angefasst. Kein `run_bound`
+  möglich (kennt nur den *jetzt* aktiven Run); Delegation an `composer-cancel-scene` ist
+  fachlich **nicht** deckungsgleich (Scene-Cancel ist ein Voll-Cancel, hier bleibt das
+  Basis-Video erhalten). Keine neue Runless-Regel angelegt.
 - Unverändert außerhalb des Änderungssets: `_shared/lipsync-fail.ts`, `generate-talking-head`,
   `report-lipsync-motion-probe`, alle Webhooks/Watchdogs/Fan-in, `hybrid-extend-scene` (G2),
   Lip-Sync-Frozen-Contracts, Cast & World, Reverse-Bridge.
+
+## 2.1 SceneCard-Reset-Implementierung
+
+Der Client-Pfad für „Lip-Sync komplett zurücksetzen“ (und den in-flight-Abbruch-Button)
+wurde auf den G0-Vertrag migriert:
+
+- Kein direktes `supabase.from('composer_scenes').update(...)` mehr im Client.
+- Stattdessen einziger Aufruf: `supabase.functions.invoke('cancel-dialog-lipsync', { body: { scene_id, reset: true } })`.
+- `cancel-dialog-lipsync` nutzt für `reset === true` das SQL-Primitive
+  `composer_reset_lipsync_full(_scene_id, _expected_generation, _expected_run_id)`.
+- Das Primitive führt den atomaren Row-Lock, Stale-Request-Guard, Base-Restore
+  (`clip_url = base_video_url`, `processed_video_url = NULL`) und die Bereinigung der
+  13 Lip-Sync-Runtime-Keys in `audio_plan.twoshot` durch.
+- Der Client macht einen optimistischen lokalen Rollback (inkl. Rückstellung von
+  `clipUrl` auf `baseVideoUrl` und Löschen von `processedVideoUrl`) und kann bei
+  Fehler (`stale_reset`, `no_base_plate`, etc.) sauber zurückrollen.
+- Der Reset-Button funktioniert nun auch für bereits angewandte Szenen
+  (`lip_sync_applied_at IS NOT NULL`), weil `reset: true` den früheren
+  `already_applied`-Shortcut überspringt.
 
 ## 3. Grandfathering / Runless
 
@@ -74,12 +78,20 @@ Statische Prüfungen:
 - `vitest run src/lib/composer/__tests__` — 29 Dateien / 368 Tests grün, inkl.
   `lipsyncFrozenContract`, `legacyWriterAllowlist`, `sceneStateClientContract`,
   `forceCinematicSyncRouting`.
-- Inventar `v431LegacyWriteInventory.ts`: Eintrag aufgeteilt, jede Branch-ID trägt
-  `migratedIn: "G1"`, `contractWriteId` und den verbliebenen Legacy-Zweig.
+- `clientReaderContract5E` grün nach Einführung von `legacy-mapping-allowed`-Markern
+  für die optimistischen Rollback-Snapshots in `SceneCard.tsx`.
+- Inventar `v431LegacyWriteInventory.ts`: Eintrag `SceneCard:canceled` auf
+  `migratedIn: "G1"`, `contractWriteId: "cancel-dialog-lipsync:reset"` gesetzt;
+  verbliebener Legacy-Zweig entfernt.
 
 ## 5. Änderungsset
 
 - `supabase/functions/compose-video-clips/index.ts` (Helper-Split + 3 Call-Sites, deployed)
+- `supabase/functions/cancel-dialog-lipsync/index.ts` (`reset: true` verwendet
+  `composer_reset_lipsync_full`, deployed)
+- `src/components/video-composer/SceneCard.tsx` (beide Cancel-/Reset-Buttons rufen
+  ausschließlich `cancel-dialog-lipsync` auf, mit Rollback-Handling für
+  `stale_reset`/`no_base_plate`)
 - `src/lib/composer/__tests__/fixtures/v431LegacyWriteInventory.ts` (Inventar-Diff)
 - Smoke-Migration (Fixture, self-cleaning)
 - `docs/v431-g1-report.md`

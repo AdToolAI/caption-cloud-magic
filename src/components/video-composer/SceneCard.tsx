@@ -2396,14 +2396,31 @@ export default function SceneCard({
                   />
                   <button
                     type="button"
-                    title={tx({ de: "Stoppt Lip-Sync für diese Szene, leert Sync-Daten und behält das gerenderte Basis-Video. Keine neuen Credits.", en: "Stops lip sync for this scene, clears sync data, and keeps the rendered base video. No new credits.", es: "Detiene la sincronización labial de esta escena, borra los datos de sync y conserva el video base renderizado. Sin nuevos créditos." })}
+                    title={tx({ de: "Stoppt Lip-Sync für diese Szene, leert Sync-Daten und stellt das gerenderte Basis-Video wieder her. Keine neuen Credits.", en: "Stops lip sync for this scene, clears sync data, and restores the rendered base video. No new credits.", es: "Detiene la sincronización labial de esta escena, borra los datos de sync y restaura el video base renderizado. Sin nuevos créditos." })}
                     onClick={async () => {
                       if (
                         !confirm(
-                          tx({ de: "Lip-Sync für diese Szene wirklich stoppen und deaktivieren?\n\nLaufende laufende Lip-Sync-Aufträge werden abgebrochen und Dialog-Shots geleert. Das gerenderte Basis-Video bleibt erhalten.", en: "Really stop and disable lip sync for this scene?\n\nRunning running lip-sync tasks will be cancelled and dialog shots cleared. The rendered base video is preserved.", es: "¿Detener y desactivar realmente la sincronización labial de esta escena?\n\nLos tareas de sincronización labial en curso se cancelarán y los dialog shots se borrarán. El video base renderizado se conserva." }),
+                          tx({ de: "Lip-Sync für diese Szene wirklich stoppen und deaktivieren?\n\nLaufende Lip-Sync-Aufträge werden abgebrochen und Dialog-Shots geleert. Das Basis-Video wird wiederhergestellt.", en: "Really stop and disable lip sync for this scene?\n\nRunning lip-sync tasks will be cancelled and dialog shots cleared. The base video will be restored.", es: "¿Detener y desactivar realmente la sincronización labial de esta escena?\n\nLas tareas de sincronización labial en curso se cancelarán y los dialog shots se borrarán. El video base se restaurará." }),
                         )
                       )
                         return;
+
+                      const s = scene as any;
+                      const rollback = {
+                        lipSyncStatus: s.lipSyncStatus, // legacy-mapping-allowed: optimistic rollback snapshot
+                        lipSyncAppliedAt: s.lipSyncAppliedAt,
+                        lipSyncSourceClipUrl: s.lipSyncSourceClipUrl,
+                        clipUrl: s.clipUrl,
+                        processedVideoUrl: s.processedVideoUrl ?? null,
+                        twoshotStage: s.twoshotStage, // legacy-mapping-allowed: optimistic rollback snapshot
+                        dialogShots: s.dialogShots,
+                        lipSyncWithVoiceover: s.lipSyncWithVoiceover,
+                        dialogMode: s.dialogMode,
+                        engineOverride: s.engineOverride,
+                        clipError: s.clipError,
+                        replicatePredictionId: s.replicatePredictionId,
+                      };
+
                       try {
                         markLipSyncPending(scene.id, false);
                         markDialogModePending(scene.id, false);
@@ -2412,47 +2429,43 @@ export default function SceneCard({
                           lipSyncStatus: "canceled" as any,
                           lipSyncAppliedAt: null as any,
                           lipSyncSourceClipUrl: null as any,
+                          clipUrl: scene.baseVideoUrl ?? scene.clipUrl,
+                          processedVideoUrl: null as any,
                           twoshotStage: null as any,
                           dialogShots: null as any,
                           lipSyncWithVoiceover: false,
                           dialogMode: false,
                           engineOverride: "auto",
-                          clipError: "lipsync_canceled_by_user" as any,
+                          clipError: "lipsync_reset_by_user" as any,
                           replicatePredictionId: null as any,
                         });
                         emitPipelineEvent({ type: "lipsync:end" });
-                        await supabase.functions
-                          .invoke("cancel-dialog-lipsync", {
-                            body: { scene_id: scene.id, reset: true },
-                          })
-                          .catch(() => {});
-                        const { error: updateError } = await supabase
-                          .from("composer_scenes")
-                          .update({
-                            lip_sync_status: "canceled",
-                            lip_sync_applied_at: null,
-                            lip_sync_source_clip_url: null,
-                            twoshot_stage: null,
-                            dialog_shots: null,
-                            lip_sync_with_voiceover: false,
-                            dialog_mode: false,
-                            engine_override: "auto",
-                            clip_error: "lipsync_canceled_by_user",
-                            replicate_prediction_id: null,
-                            updated_at: new Date().toISOString(),
-                          })
-                          .eq("id", scene.id);
-                        if (updateError) throw updateError;
+
+                        const { data, error } = await supabase.functions.invoke(
+                          "cancel-dialog-lipsync",
+                          { body: { scene_id: scene.id, reset: true } },
+                        );
+                        if (error) throw error;
+                        if (data && data.ok !== true) {
+                          const reason = data.reason ?? "reset_failed";
+                          const message =
+                            reason === "stale_reset"
+                              ? tx({ de: "Die Szene wurde zwischenzeitlich neu gestartet. Bitte aktualisiere die Ansicht.", en: "The scene was restarted in the meantime. Please refresh the view.", es: "La escena se reinició mientras tanto. Actualiza la vista." })
+                              : tx({ de: "Der Reset konnte nicht durchgeführt werden.", en: "The reset could not be performed.", es: "No se pudo realizar el restablecimiento." });
+                          throw new Error(message);
+                        }
+
                         emitPipelineEvent({ type: "lipsync:end" });
                         toast({
-                          title: tx({ de: "Lip-Sync gestoppt", en: "Lip sync stopped", es: "Sincronización labial detenida" }),
+                          title: tx({ de: "Lip-Sync zurückgesetzt", en: "Lip sync reset", es: "Sincronización labial restablecida" }),
                           description:
-                            tx({ de: "Die Lippensynchronisation wurde abgebrochen und Lip-Sync für diese Szene deaktiviert. Das Basis-Video bleibt erhalten.", en: "Lip-sync was cancelled and lip sync was disabled for this scene. The base video is preserved.", es: "Se canceló la sincronización labial y se desactivó la sincronización labial de esta escena. El video base se conserva." }),
+                            tx({ de: "Lip-Sync wurde deaktiviert und das Basis-Video wiederhergestellt.", en: "Lip sync was disabled and the base video restored.", es: "La sincronización labial se desactivó y el video base se restauró." }),
                         });
                       } catch (e) {
-                        console.warn("[SceneCard] hard reset failed", e);
+                        (onUpdate as (updates: any) => void)(rollback);
+                        console.warn("[SceneCard] lip-sync reset failed", e);
                         toast({
-                          title: tx({ de: "Löschen fehlgeschlagen", en: "Deletion failed", es: "Error al eliminar" }),
+                          title: tx({ de: "Zurücksetzen fehlgeschlagen", en: "Reset failed", es: "Error al restablecer" }),
                           description:
                             (e as any)?.message ?? tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }),
                           variant: "destructive",
@@ -2461,7 +2474,7 @@ export default function SceneCard({
                     }}
                     className="text-[10px] px-2 py-1 rounded border border-destructive/40 text-destructive hover:bg-destructive/10"
                   >
-                    🗑 {tx({ de: 'Lipsync komplett zurücksetzen', en: 'Completely reset lip sync', es: 'Restablecer completamente la sincronización labial' })}
+                    🗑 {tx({ de: 'Lip-Sync komplett zurücksetzen', en: 'Completely reset lip sync', es: 'Restablecer completamente la sincronización labial' })}
                   </button>
                   <button
                     type="button"
@@ -2859,6 +2872,21 @@ export default function SceneCard({
                           <button
                             type="button"
                             onClick={async () => {
+                              const s = scene as any;
+                              const rollback = {
+                                lipSyncStatus: s.lipSyncStatus, // legacy-mapping-allowed: optimistic rollback snapshot
+                                lipSyncAppliedAt: s.lipSyncAppliedAt,
+                                lipSyncSourceClipUrl: s.lipSyncSourceClipUrl,
+                                clipUrl: s.clipUrl,
+                                processedVideoUrl: s.processedVideoUrl ?? null,
+                                twoshotStage: s.twoshotStage, // legacy-mapping-allowed: optimistic rollback snapshot
+                                dialogShots: s.dialogShots,
+                                lipSyncWithVoiceover: s.lipSyncWithVoiceover,
+                                dialogMode: s.dialogMode,
+                                engineOverride: s.engineOverride,
+                                clipError: s.clipError,
+                                replicatePredictionId: s.replicatePredictionId,
+                              };
                               try {
                                 markLipSyncPending(scene.id, false);
                                 markDialogModePending(scene.id, false);
@@ -2866,6 +2894,10 @@ export default function SceneCard({
                                 // Optimistic local update so the spinner stops immediately.
                                 (onUpdate as (updates: any) => void)({
                                   lipSyncStatus: "canceled" as any,
+                                  lipSyncAppliedAt: null as any,
+                                  lipSyncSourceClipUrl: null as any,
+                                  clipUrl: scene.baseVideoUrl ?? scene.clipUrl,
+                                  processedVideoUrl: null as any,
                                   twoshotStage: null as any,
                                   dialogShots: null as any,
                                   lipSyncWithVoiceover: false,
@@ -2875,11 +2907,19 @@ export default function SceneCard({
                                   replicatePredictionId: null as any,
                                 });
                                 emitPipelineEvent({ type: "lipsync:end" });
-                                const { error } = await supabase.functions.invoke(
+                                const { data, error } = await supabase.functions.invoke(
                                   "cancel-dialog-lipsync",
                                   { body: { scene_id: scene.id, reset: true } },
                                 );
                                 if (error) throw error;
+                                if (data && data.ok !== true) {
+                                  const reason = data.reason ?? "reset_failed";
+                                  const message =
+                                    reason === "stale_reset"
+                                      ? tx({ de: "Die Szene wurde zwischenzeitlich neu gestartet. Bitte aktualisiere die Ansicht.", en: "The scene was restarted in the meantime. Please refresh the view.", es: "La escena se reinició mientras tanto. Actualiza la vista." })
+                                      : tx({ de: "Der Abbruch konnte nicht durchgeführt werden.", en: "The cancellation could not be performed.", es: "No se pudo realizar la cancelación." });
+                                  throw new Error(message);
+                                }
                                 emitPipelineEvent({ type: "lipsync:end" });
                                 toast({
                                   title: tx({ de: "Lip-Sync abgebrochen", en: "Lip sync cancelled", es: "Sincronización labial cancelada" }),
@@ -2887,6 +2927,7 @@ export default function SceneCard({
                                     tx({ de: "Du kannst jetzt sauber neu starten — keine alten Einträge bleiben.", en: "You can now start fresh — no old entries remain.", es: "Ahora puedes empezar de nuevo limpiamente — no quedan entradas antiguas." }),
                                 });
                               } catch (e) {
+                                (onUpdate as (updates: any) => void)(rollback);
                                 console.warn("[SceneCard] cancel lipsync failed", e);
                                 toast({
                                   title: tx({ de: "Abbruch fehlgeschlagen", en: "Cancellation failed", es: "Error al cancelar" }),
