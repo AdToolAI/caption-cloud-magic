@@ -44,7 +44,7 @@ Der Client-Loop in `_shared/scene-state.ts:352-371` entfällt ersatzlos. Die Pfa
 3. Direkte Kante in `composer_scene_transitions`? → anwenden.
 4. Sonst: `WITH RECURSIVE` über `composer_scene_transitions` den kürzesten Pfad `current → _to` suchen, **eingeschränkt auf die Vorwärtsordnung der linearen Kette** (`idle, plate_queued, plate_rendering, plate_ready, audio_prep, audio_ready, lipsync_dispatched, lipsync_running, lipsync_muxing, complete`). Kanten nach `failed`, `canceled`, `idle` sowie Self-Kanten sind als Pfad-Zwischenschritte ausgeschlossen; Suchtiefe hart begrenzt.
 5. Kein Pfad → `transition_not_allowed`, nichts geschrieben.
-6. Pfad gefunden → **ein** `UPDATE` auf den Zielzustand, plus eine Audit-Zeile je logischem Zwischenschritt, alles in derselben Transaktion. `path` kommt im Result zurück.
+6. Pfad gefunden → **ein** `UPDATE` auf den Zielzustand, plus **eine Audit-Zeile je traversierter Kante** (also inklusive der letzten Kante auf `_to`), alles in derselben Transaktion. Für einen Pfad mit n Kanten entstehen exakt n Audit-Zeilen mit `step_index = 1..n`; `is_intermediate = true` für `step_index < n`, `false` für die letzte Zeile. `path` kommt im Result zurück.
 
 Damit werden folgende Kanten **nicht** zusätzlich in die Allowlist aufgenommen: `plate_ready→audio_ready`, `plate_ready→lipsync_dispatched|lipsync_running|lipsync_muxing`, `audio_prep→lipsync_dispatched|lipsync_running|lipsync_muxing`, `audio_ready→lipsync_running|lipsync_muxing`. Die Allowlist behält ausschließlich echte Einzelschrittkanten.
 
