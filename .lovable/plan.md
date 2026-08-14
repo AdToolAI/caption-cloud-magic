@@ -104,11 +104,13 @@ Bleibt in G0 unverändert und wird **nicht** in die permanente Runless-Allowlist
 
 - **Contract-Test Guard-Modi**: jeder Aufruf des neuen Kerns liefert `guard_mode` und `write_id`; `runless` nur mit Grund aus der geschlossenen Menge; `runless` in Webhook-/Watchdog-Dateien verboten.
 - **Race-Test Run-Guard**: Run A startet, Run B startet, Cancel für A darf B nicht terminal setzen. Zusätzlich zwei konkurrierende Transitionen auf dieselbe Szene — genau eine gewinnt, die andere liefert `stale_run`/`stale_generation`.
-- **Pfad-Atomizität**: `plate_ready → lipsync_running` erzeugt genau ein `UPDATE`, drei Audit-Zeilen und keinen sichtbaren Zwischenzustand; ein Abbruch mittendrin lässt die Szene auf dem Ausgangszustand.
+- **Pfad-Atomizität**: `plate_ready → lipsync_running` läuft über vier Kanten (`plate_ready→audio_prep→audio_ready→lipsync_dispatched→lipsync_running`) und erzeugt genau ein `UPDATE` und **genau vier** Audit-Zeilen (`step_index` 1–4, die letzte mit `is_intermediate = false`) sowie keinen sichtbaren Zwischenzustand; ein Abbruch mittendrin lässt die Szene auf dem Ausgangszustand.
+- **State + Error atomar**: ein `failed`-Übergang mit `_error_text` schreibt Zustand und Fehlertext in einem `UPDATE`; ein Folgeübergang mit `_clear_error` leert ihn.
 - **`pipeline_state_run_id`**: nach `runless` exakt NULL, nach `run_bound` exakt `_run_id`.
-- **Grants**: `has_function_privilege('anon', …, 'EXECUTE')` ist auf allen drei Funktionen `false`; anon-Aufruf über die Data API liefert `forbidden`.
+- **Grants**: `has_function_privilege('anon', …, 'EXECUTE')` ist auf allen drei Funktionen `false`; `authenticated` hat auf `composer_scene_transition_v2` kein EXECUTE; anon-Aufruf über die Data API liefert `forbidden`.
+- **Wrapper-Grandfathering**: ein run-loser Wrapper-Aufruf auf einer gelisteten Kante wird angewendet; derselbe Aufruf auf einer nicht gelisteten, aber state-machine-legalen Kante wird mit `runless_not_grandfathered` abgelehnt und auditiert.
 - **Wrapper-Telemetrie**: Aufruf über 6er und 7er erzeugt je eine Audit-Zeile mit korrekter `source_signature`.
-- **Recovery**: stale Erwartungswerte ⇒ No-op + Audit-Zeile; passende Werte ⇒ Übergang + Audit-Zeile.
+- **Recovery**: stale Run oder stale Generation ⇒ No-op + Audit-Zeile; `orphaned_run` mit `_expected_run_id = NULL` bei tatsächlich NULLem `active_run_id` ⇒ Übergang, bei wieder gesetztem Run ⇒ `run_reappeared`-No-op; `_expected_run_id = NULL` mit anderem Grund ⇒ harter Fehler.
 - Bestehende Composer-Suite und `tsgo` müssen grün bleiben; die Lip-Sync-Frozen-Contract-Tests dürfen sich nicht bewegen.
 
 ## 11. Reihenfolge und Abschluss
