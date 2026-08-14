@@ -14,7 +14,6 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
-import { transitionScene } from "../_shared/scene-state.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -208,13 +207,14 @@ serve(async (req) => {
     }
     const newSceneId = newScene.id;
 
-    // --- v431 G2.1 — Run-Acquisition direkt nach dem INSERT --------------
-    // Verbindliche Paritaetsregel: Hybrid benutzt denselben kanonischen
-    // Acquisition-Vertrag wie jeder andere Pfad
-    // (`composer-start-scene-generation { prepare_only: true }`) und reicht das
-    // Ergebnis als `run_context` an `compose-video-clips` weiter, damit dort
+    // --- v431 G2.4 — Run-Acquisition direkt nach dem INSERT, FAIL-CLOSED -----
+    // Hybrid benutzt denselben kanonischen Acquisition-Vertrag wie jeder andere
+    // Pfad (`composer-start-scene-generation { prepare_only: true }`) und reicht
+    // das Ergebnis als `run_context` an `compose-video-clips` weiter, damit dort
     // KEIN zweiter Run entsteht. Kein Sonder-Run-Pfad, kein beginSceneRun().
+    // Ohne Run wird nichts extrahiert und nichts dispatcht.
     let hybridRunContext: Record<string, { run_id: string; generation: number }> | null = null;
+    let hybridRun: { runId: string; generation: number } | null = null;
     try {
       const prepResp = await fetch(
         `${SUPABASE_URL}/functions/v1/composer-start-scene-generation`,
@@ -232,17 +232,51 @@ serve(async (req) => {
       if (!prepResp.ok) throw new Error(`${prepResp.status} ${prepText.slice(0, 300)}`);
       const prepJson = JSON.parse(prepText);
       const run = prepJson?.runs?.[newSceneId];
-      if (run?.run_id) {
-        hybridRunContext = { [newSceneId]: { run_id: String(run.run_id), generation: Number(run.generation ?? 0) } };
+      if (!run?.run_id || run?.generation === undefined || run?.generation === null) {
+        throw new Error("prepare_only returned no run provenance");
       }
+      hybridRun = { runId: String(run.run_id), generation: Number(run.generation) };
+      hybridRunContext = { [newSceneId]: { run_id: hybridRun.runId, generation: hybridRun.generation } };
       console.log(
-        `[hybrid-extend-scene] v431_g2_1 run_acquired scene=${newSceneId} run=${run?.run_id ?? "none"} gen=${run?.generation ?? "none"}`,
+        `[hybrid-extend-scene] v431_g2_4 run_acquired scene=${newSceneId} run=${hybridRun.runId} gen=${hybridRun.generation}`,
       );
     } catch (e) {
-      // G2.1 ist nicht fail-closed: ohne Run laeuft der heutige Pfad weiter,
-      // `compose-video-clips` erzeugt dann wie bisher seinen Legacy-Run.
-      console.warn(`[hybrid-extend-scene] v431_g2_1 run_acquire_failed: ${(e as Error).message}`);
+      // v431 G2.4 — Compensating Cleanup, deckt auch den Partial-Run ab
+      // (`composer_start_scene_run` committet `active_run_id` bevor ein
+      // Folgeschritt scheitern kann). `active_run_id` ist deshalb KEIN
+      // Ausschlusskriterium. Vor jedem Spend gibt es an dieser Zeile kein
+      // Output, der Delete ist damit sicher.
+      const { data: deleted, error: delErr } = await admin
+        .from("composer_scenes")
+        .delete()
+        .eq("id", newSceneId)
+        .eq("continuity_source_scene_id", body.sourceSceneId)
+        .in("pipeline_state", ["idle", "plate_queued"])
+        .eq("clip_status", "pending")
+        .is("clip_url", null)
+        .is("base_video_url", null)
+        .is("processed_video_url", null)
+        .select("id");
+      const cleaned = !delErr && Array.isArray(deleted) && deleted.length === 1;
+      if (!cleaned) {
+        console.error(
+          `[hybrid-extend-scene] v431_g2_4 hybrid_zombie_unresolved scene=${newSceneId} delete_error=${delErr?.message ?? "guard_not_matched"}`,
+        );
+      }
+      console.warn(
+        `[hybrid-extend-scene] v431_g2_4 hybrid_run_acquire_failed scene=${newSceneId} cleaned=${cleaned}: ${(e as Error).message}`,
+      );
+      return new Response(
+        JSON.stringify({
+          error: `hybrid_run_acquire_failed: ${(e as Error).message}`,
+          code: "hybrid_run_acquire_failed",
+          cleaned,
+          ...(cleaned ? {} : { unresolvedSceneId: newSceneId, reason: "hybrid_zombie_unresolved" }),
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
+
 
 
     // --- Anchor frame extraction ---
@@ -292,12 +326,12 @@ serve(async (req) => {
         }
       }
     } catch (e) {
-      await markSceneFailed(admin, newSceneId);
+      await failHybridScene(admin, newSceneId, hybridRun, "hybrid:frame-extract-failed", `Frame extraction failed: ${(e as Error).message}`);
       return jsonError(`Frame extraction failed: ${(e as Error).message}`, 500);
     }
 
     if (!startAnchor) {
-      await markSceneFailed(admin, newSceneId);
+      await failHybridScene(admin, newSceneId, hybridRun, "hybrid:no-anchor", "No anchor frame produced");
       return jsonError("No anchor frame produced", 500);
     }
 
@@ -342,14 +376,14 @@ serve(async (req) => {
         scenes: [composeScene],
         visualStyle: (project.briefing as any)?.visualStyle,
         characters: (project.briefing as any)?.characters,
-        // v431 G2.1 — kanonischer Run aus der Acquisition oben.
+        // v431 G2.4 — kanonischer Run aus der fail-closed Acquisition oben.
         ...(hybridRunContext ? { run_context: hybridRunContext } : {}),
       }),
     });
 
     if (!composeResp.ok) {
       const txt = await composeResp.text();
-      await markSceneFailed(admin, newSceneId);
+      await failHybridScene(admin, newSceneId, hybridRun, "hybrid:dispatch-failed", `compose-video-clips failed: ${txt.slice(0, 500)}`);
       return jsonError(`compose-video-clips failed: ${txt}`, 500);
     }
 
@@ -409,11 +443,39 @@ function jsonError(message: string, status: number) {
   });
 }
 
-async function markSceneFailed(admin: any, sceneId: string) {
+/**
+ * v431 G2.4 — run-/generation-gebundener Failure-Write.
+ * Ausschliesslich ueber das enge Primitive `composer_fail_hybrid_extend_scene`:
+ * Zielstate, Guard-Mode und From-State (`plate_queued`) sind dort Konstanten,
+ * Legacy-Spiegel laufen atomar mit dem kanonischen State.
+ * Kein id-only-Write, kein `markSceneFailed()` mehr.
+ */
+async function failHybridScene(
+  admin: any,
+  sceneId: string,
+  run: { runId: string; generation: number } | null,
+  writeId: "hybrid:frame-extract-failed" | "hybrid:no-anchor" | "hybrid:dispatch-failed",
+  errorText: string,
+) {
+  if (!run) {
+    console.error(`[hybrid-extend-scene] v431_g2_4 ${writeId} skipped_missing_run_provenance scene=${sceneId}`);
+    return;
+  }
   try {
-    await transitionScene(admin, sceneId, "failed", { detail: "hybrid-extend-scene" });
+    const { data, error } = await admin.rpc("composer_fail_hybrid_extend_scene", {
+      _scene_id: sceneId,
+      _run_id: run.runId,
+      _generation: run.generation,
+      _write_id: writeId,
+      _error_text: errorText.slice(0, 1000),
+    });
+    if (error) throw new Error(error.message);
+    const applied = (data as any)?.applied === true;
+    console.log(
+      `[hybrid-extend-scene] v431_g2_4 ${writeId} scene=${sceneId} run=${run.runId} gen=${run.generation} applied=${applied} reason=${(data as any)?.reason ?? "unknown"}`,
+    );
   } catch (e) {
-    console.warn("[hybrid-extend-scene] failed to mark scene failed:", e);
+    console.warn(`[hybrid-extend-scene] v431_g2_4 ${writeId} rpc_failed scene=${sceneId}: ${(e as Error).message}`);
   }
 }
 

@@ -86,7 +86,7 @@ sich allein **keinen** Zustandswechsel (der Zustand ergibt sich aus `clip_status
 | `generate-talking-head:failed` | `supabase/functions/generate-talking-head/index.ts:510` | state | edge-invoke | 'failed' | kontext | id-only | clip_error, clip_status | unguarded-low-traffic | medium |
 | `generate-talking-head:plate-rendering` | `supabase/functions/generate-talking-head/index.ts:648` | state | edge-invoke | 'plate_rendering' | kontext | id-only | — | unguarded-low-traffic | medium |
 | `generate-talking-head:failed-2` | `supabase/functions/generate-talking-head/index.ts:695` | state | edge-invoke | 'failed' | kontext | id-only | clip_error, clip_status | unguarded-low-traffic | medium |
-| `hybrid-extend-scene:idle` | `supabase/functions/hybrid-extend-scene/index.ts:194` | state | edge-invoke | "idle" | 1:1 | id-only | — | unguarded-low-traffic | medium |
+| ~~`hybrid-extend-scene:idle`~~ | `supabase/functions/hybrid-extend-scene/index.ts:194` | **insert-default (v431 G2.4 reklassifiziert, kein State-Writer)** | edge-invoke | "idle" als Feldwert im INSERT | — | kein From-State | — | — | — |
 | `lipsync-watchdog:failed` | `supabase/functions/lipsync-watchdog/index.ts:325` | state | watchdog | failed | 1:1 | id-only | clip_error, dialog_shots, twoshot_stage | unguarded-low-traffic | medium |
 | `lipsync-watchdog:clear` | `supabase/functions/lipsync-watchdog/index.ts:353` | state | watchdog | Reset des Legacy-Feldes — kein State-Wechsel | kontext | id-only | clip_error, twoshot_stage | unguarded-low-traffic | medium |
 | `lipsync-watchdog:pending` | `supabase/functions/lipsync-watchdog/index.ts:690` | state | watchdog | kein direkter State (bleibt Vorzustand) | kontext | id-only | clip_error, dialog_shots, twoshot_stage | unguarded-low-traffic | medium |
@@ -158,7 +158,7 @@ drei Kategorien:
 | `auto-director-compose:216` | `plate_queued` | 1 — `transitionScene()` | Regulärer Einreihungs-Übergang. |
 | `motion-studio-superuser:513/526` | `plate_ready` | 1 — `transitionScene()` | Testharness setzt einen regulären Zustand; sollte denselben Wrapper nutzen wie Produktion, sonst testet der Harness eine Welt, die es nicht gibt. |
 | `qa-weekly-deep-sweep:318` | `plate_ready` | **3 — Recovery-Override** | Sweep repariert Szenen, die einen Clip haben, aber im Zustand hängen. Vorzustand ist per Definition inkonsistent. |
-| `hybrid-extend-scene:194` | `idle` | **3 — Recovery-Override** | Setzt eine Szene aus beliebigem Zustand auf `idle` zurück, um Extend zu erlauben. Kein legaler Übergang in der Maschine. |
+| ~~`hybrid-extend-scene:194`~~ | `idle` | **v431 G2.4 korrigiert: insert-default, kein Recovery-Override** | Kein Reset einer Bestandszeile — der Wert steht im INSERT der neu angelegten Szene. Kein Vorzustand, kein Übergang, damit auch keine Runless-Ausnahme nötig. Die drei echten Failure-Writes laufen seit G2.4 run-/generation-gebunden über `composer_fail_hybrid_extend_scene`. |
 | `qa-watchdog:228/312/358/447` | `failed` / `canceled` | **3 — Recovery-Override** | Springt aus beliebigen hängenden Zuständen auf terminal. Genau der Fall, den `failSceneState()` heute nicht ausdrücken kann, weil es einen gültigen Vorzustand voraussetzt. |
 | `recover-stuck-composer-clip:107` | `failed` | **3 — Recovery-Override** | Wie oben, zusätzlich mit Legacy-Reset (`lip_sync_status: null`) im selben Statement. |
 
