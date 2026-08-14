@@ -66,8 +66,9 @@ Ausgenommen bleiben Writer und Mapping: Objekt-Property-Zuweisungen (`engineOver
 
 - Datei:Zeile und Zweck (was wird sichtbar/aktiv)
 - heutige Bedingung
-- **paritätisch / weitet aus / verengt** gegenüber `isLipSyncIntentional()`
-- bei Abweichung: die konkreten Fixture-IDs der Differenz und ob die Änderung nutzerseitig sichtbar wäre
+- `parity = exact | broader | narrower | mixed` gegenüber `isLipSyncIntentional()`
+- **False-positive Fixture-IDs** (Gate true, SSoT false) und **False-negative Fixture-IDs** (SSoT true, Gate false) — getrennt ausgewiesen, auch wenn beide Mengen gleichzeitig belegt sind (`mixed`)
+- pro Differenzmenge: ob die Änderung nutzerseitig sichtbar wäre
 - Empfehlung für Schritt 2: umstellen / bewusst belassen (mit Begründung)
 
 Erwartete Muster, die der Bericht belegen muss:
