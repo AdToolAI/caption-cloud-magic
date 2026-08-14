@@ -68,13 +68,19 @@ composer_fail_hybrid_extend_scene(
 
 Alle drei Hybrid-Failure-Writes nutzen dieses Primitive; `markSceneFailed()` entfällt ersatzlos.
 
-## Zielvertrag G2.4
+## Zielvertrag G2.4 — autoritative Endfassung
 
-1. Run-Akquise wird **fail-closed**: schlägt `prepare_only` fehl, startet weder Frame-Extraktion noch Provider-Dispatch; Cleanup nach Befund 5.
-2. Die drei Failure-Pfade schreiben run-gebunden über `composer_fail_hybrid_extend_scene` mit `expected_from = {plate_queued}` (Befund 6). `composer_fail_scene_with_mirrors` bleibt unverändert eingefroren, `_clear_lip_sync_fields` bleibt auf `cvc:failed/pika` beschränkt.
-3. Stale/falsche Generation/falscher From-State → keine Mutation an Output- und Legacy-Feldern.
-4. Kein Sonder-Run-Pfad, kein `beginSceneRun()` in Hybrid; `run_context` an `compose-video-clips` bleibt unverändert.
-5. `hybrid-extend-scene:idle` raus aus dem State-Writer-Inventar (insert-default), keine Runless-Regel, kein Grandfathering.
+Diese Liste ist der einzige gültige Implementierungsvertrag für G2.4. Frühere Formulierungen (Cleanup-Guard mit `active_run_id IS NULL`, „kein neues Primitive", Failure-Writes über `composer_fail_scene_with_mirrors`) sind ersatzlos gestrichen.
+
+1. `hybrid-extend-scene:idle` = **insert-default**, kein State-Writer; raus aus dem State-Writer-Inventar.
+2. `prepare_only`-Run-Akquise ist **fail-closed** vor jedem Frame-Extract- und Provider-Spend.
+3. Cleanup bei Run-Akquise-Fehler **gemäß Befund 5**: auch der Partial-Run mit bereits gesetztem `active_run_id` wird gelöscht, solange die dort definierten Ownership-, State- und Output-Guards gelten. Ist die Zeile nicht sicher löschbar (Fremdmutation/Output vorhanden), kein Delete, sondern `hybrid_zombie_unresolved` mit Scene-ID im Log und im Fehler-Response.
+4. Genau **ein** neues Primitive: `composer_fail_hybrid_extend_scene` (Signatur und Semantik nach Befund 6).
+5. Alle drei Hybrid-Failure-WriteIDs (`hybrid:frame-extract-failed`, `hybrid:no-anchor`, `hybrid:dispatch-failed`) schreiben ausschließlich aus `plate_queued`, run- und generation-gebunden; `markSceneFailed()` entfällt ersatzlos.
+6. `composer_fail_scene_with_mirrors` bleibt **unverändert frozen**; keine neue Signatur, kein Overload, `_clear_lip_sync_fields` bleibt auf `cvc:failed/pika` beschränkt.
+7. Kein Runless, kein Grandfathering, kein `beginSceneRun()`-Sonderweg; `run_context` an `compose-video-clips` bleibt unverändert.
+8. Smokes gemäß Verifikationsabschnitt unten, danach Frozen-Suite (identischer Command wie G2.3-Baseline, 527 Tests) + `tsgo` → **STOP**.
+
 
 
 ## Verifikation, die zu G2.4 gehört
