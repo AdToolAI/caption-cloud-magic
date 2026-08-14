@@ -1,38 +1,55 @@
-# v431 G2.3 — Abschlussbericht S1–S4 (Abnahme-Vorlage)
+# v431 — G2.4 Analyse & Scope (hybrid-extend-scene)
 
-S1–S4 sind bereits umgesetzt und verifiziert. Dieser Plan legt die Abnahme vor: jede verbindliche Grenze aus dem Auftrag gegen ihren Nachweis. Kein weiterer Code-Change, kein G2.4.
+Reiner Scope-Bericht. Keine Migration, keine Code-Änderung in diesem Schritt.
 
-## Grenzen und Nachweise
+## Befund 1 — `hybrid-extend-scene:idle` ist eine Falschklassifikation
 
-| Verbindliche Grenze | Nachweis | Status |
-| --- | --- | --- |
-| Nach S1 exakt eine auflösbare `composer_fail_scene_with_mirrors`-Signatur | `pg_proc`-Abfrage liefert genau eine Signatur (10 Argumente, letztes `boolean` mit Default); alte 9-Arg-Signatur gedroppt | erfüllt |
-| Echte 7-/8-Arg-Calls ohne PGRST203 | Named-Args-Calls mit 7, 8 und 10 Argumenten lösen eindeutig auf; Smoke-Fälle B1/B3/C1/C2 rufen genau so auf | erfüllt |
-| `_clear_lip_sync_fields=true` nur für `cvc:failed/pika` | Allowlist in der Funktion; Fremd-`write_id` → `clear_flag_not_allowed`, keine Mutation, Audit-Zeile vorhanden (Fälle B3, AUDIT_clear_flag_rejected) | erfüllt |
-| Upload: vorhandenen `runContext` wiederverwenden, ein Dispatch = eine Run-ID + ein Generation-Bump | Akquise nur für Szenen ohne Stempel im `run_context`; abweichender/veralteter Kontext → `stale_or_missing_run_context` statt zweitem Run | erfüllt |
-| Upload-Source vor Output-Clear immutable gesichert, exakt dieselbe URL finalisiert | `uploadSourceSnapshot` vor jeder Run-Akquise; Smoke-Fall A6 finalisiert nach Output-Clear exakt die Snapshot-URL in `base_video_url` und `clip_url` | erfüllt |
-| Upload/Pika ohne vollständige Provenienz → kein State-/Output-Write, kein Legacy-Fallback | fail-closed mit `upload_missing_run_provenance`; alle Legacy-Fallbacks in beiden Zweigen entfernt | erfüllt |
-| Stale / falsche Generation / falscher From-State / falsche `writeId` → Output- und Legacy-Felder unangetastet | Smoke-Fälle A2–A5, B2, C2 vergleichen Vorher/Nachher über den vollen Feldsatz (State, `lip_sync_status`, `twoshot_stage`, `dialog_shots`, `lip_sync_source_clip_url`, `clip_status`, `base_video_url`, `clip_url`) — identisch | erfüllt |
-| S4 nutzt denselben exakten Frozen-Suite-Command wie die Vergleichsbaseline | Baseline-Selektor `src/lib/composer` + `src/lib/video-composer`: 482 (G2.2) → 527 (G2.3), beide grün; enger Selektor separat ausgewiesen | erfüllt |
+`supabase/functions/hybrid-extend-scene/index.ts:194` schreibt `pipeline_state: "idle"` **nicht** als Transition, sondern als Feldwert im `INSERT` der neuen Szene (Zeilen 183–204). Es gibt keine Vorgängerzeile, keinen From-State, keinen Run.
 
-## Testbaseline (wörtlich)
+Konsequenz für das Inventar:
+- Eintrag `hybrid-extend-scene:idle` in `docs/v431-prep-inventory.md` (Zeile 89) und in `src/lib/composer/__tests__/fixtures/v431LegacyWriteInventory.ts` (Zeile ~947) wird als `insert-default` reklassifiziert bzw. aus dem State-Writer-Inventar entfernt.
+- Ebenso zu korrigieren: die Einstufung „3 — Recovery-Override / kein legaler Übergang“ (Inventar Zeile 161). Sie beschreibt einen Reset auf beliebige Bestandszeilen — das passiert hier nachweislich nicht.
+- Damit sinkt der Writer-Count um 1; keine Runless-Ausnahme, kein Grandfathering nötig.
 
-- `npx vitest run src/lib/composer src/lib/video-composer` → 46 Dateien / 527 Tests grün (Baseline-Command, identisch zu G2.2)
-- `npx vitest run src/lib/composer/__tests__` → 30 Dateien / 373 Tests grün (enger Selektor)
-- `npx tsgo --noEmit` → keine Fehler
+## Befund 2 — Run-Akquise ist heute nicht fail-closed
 
-Die frühere Diskrepanz „482 vs. 373“ war ein Selektor-Vergleichsfehler im Zwischenbericht, keine Regression.
+Nach dem INSERT holt die Funktion den kanonischen Run über `composer-start-scene-generation { prepare_only: true }` (Zeilen 216–246). Der `catch` ist bewusst weich (G2.1): bei Fehlschlag läuft der Pfad ohne `run_context` weiter, `compose-video-clips` erzeugt dann seinen Legacy-Run.
 
-## DB-Smoke
+Für G2.4 ist das der eigentliche Blocker: die Failure-Pfade können nur dann run-gebunden schreiben, wenn der Run vor der Frame-Extraktion garantiert existiert.
 
-15 Fälle, alle PASS, jeweils mit Fixture-Rollback (0 Restzeilen): A1–A6 (Upload applied, stale run, stale generation, falscher From-State, falsche `write_id`, Snapshot nach Output-Clear), B1–B3 (Pika applied + Clear, stale, Clear-Flag-Allowlist), C1–C2 (CTA hard fail, stale), D (Signatur-Eindeutigkeit) sowie drei Audit-Fälle (abgelehnter Upload, abgelehntes Clear-Flag, angewendeter Upload) mit `run_id`, `generation`, `applied`, `reason`, `caller_role`.
+## Befund 3 — die drei echten Failure-Pfade
 
-## Was diese Freigabe bewirkt
+Alle drei laufen heute über `markSceneFailed()` → `transitionScene(admin, sceneId, "failed", …)` (Zeile 414), also id-only, ohne Run/Generation, ohne atomaren Legacy-Spiegel.
 
-- Kein Code- oder Schema-Change mehr in diesem Schritt; der Bericht liegt in `docs/v431-g2-3-report.md`.
-- Mit der Freigabe gilt G2.3 als DONE / FROZEN.
-- G2.4 wird erst nach separater Freigabe aufgesetzt; `compose-dialog-segments` (Deferred-Refund-Race) bleibt ausdrücklich offen.
+| writeId | Ort | Auslöser | From-State | Ziel | Provenienz heute | Spiegel |
+|---|---|---|---|---|---|---|
+| `hybrid:frame-extract-failed` | Z. 294–296 | `extractFrame()` wirft | `plate_queued` (nach Run-Start) | `failed` | keine | nein |
+| `hybrid:no-anchor` | Z. 298–301 | kein `startAnchor` produziert | `plate_queued` | `failed` | keine | nein |
+| `hybrid:dispatch-failed` | Z. 350–353 | `compose-video-clips` antwortet non-2xx | `plate_queued` | `failed` | keine | nein |
 
-## Nach der Freigabe
+Nicht im Scope, aber benannt: der äußere `catch` (Zeile 367–369) markiert die Szene gar nicht als `failed` — er loggt nur. Das ist eine getrennte Lücke (Szene bleibt hängen) und gehört fachlich zu G4/Recovery, nicht zu G2.4; ich führe sie im Bericht als bekannte Restschuld.
 
-STOP. Keine weiteren Änderungen ohne neuen Auftrag.
+## Zielvertrag G2.4
+
+1. Run-Akquise wird **fail-closed**: schlägt `prepare_only` fehl, bricht die Funktion mit definiertem Fehler ab, bevor Frame-Extraktion oder Provider-Dispatch startet. Kein Spend vor Provenienz.
+2. Die drei Failure-Pfade schreiben über das bestehende Primitive `composer_fail_scene_with_mirrors` mit `_run_id` / `_generation` aus der Akquise und eigener `_write_id` (`hybrid:frame-extract-failed`, `hybrid:no-anchor`, `hybrid:dispatch-failed`). Kein neues Primitive, keine neue Signatur — die S1-Signatur bleibt eindeutig, `_clear_lip_sync_fields` wird **nicht** verwendet (Allowlist bleibt auf `cvc:failed/pika`).
+3. Stale/falsche Generation → keine Mutation an Output- und Legacy-Feldern; `markSceneFailed()` ohne Run entfällt ersatzlos.
+4. Kein Sonder-Run-Pfad, kein `beginSceneRun()` in Hybrid; die Weitergabe als `run_context` an `compose-video-clips` bleibt unverändert.
+
+## Verifikation, die zu G2.4 gehört
+
+- Unit/Fixture: Inventar-Fixture ohne `hybrid-extend-scene:idle`, Count-Assertion angepasst.
+- Transaktionaler DB-Smoke pro writeId: `applied`, `stale run`, `falsche Generation`, `falsche write_id` — inkl. Nachweis, dass bei allen Ablehnungen weder Output- noch Legacy-Spiegel mutiert werden (gleiches Muster wie S3).
+- Frozen-Suite mit demselben exakten Command wie die G2.3-Baseline (527 Tests) plus `tsgo`.
+- Danach: G2 komplett DONE / FROZEN.
+
+## Offene Punkte, die G2.4 bewusst nicht anfasst
+
+- `compose-dialog-segments` Deferred-Refund (kein Transaction-Key, keine Idempotenz, Wallet read-modify-write) — bleibt eigener Credit-Gate-Track vor G3/G4.
+- Äußerer Catch-all in `hybrid-extend-scene` ohne Fail-Write — Kandidat für G4.
+
+## Reihenfolge danach
+
+G2.4 → G3 (Webhooks/Fan-in) → G4 + Credit-Gate → G5 → T1 → G6 → CW1.
+
+Freigabe hier bedeutet: Umsetzung von G2.4 nach genau diesem Vertrag, dann Bericht und STOP.
