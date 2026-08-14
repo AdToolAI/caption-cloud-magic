@@ -22,7 +22,7 @@ Kein Gate in diesem Batch beeinflusst Provider-Wahl, Dispatch, Rendering oder Ko
 
 ## Vorgehen
 
-1. In jeder der sechs Dateien den lokalen Intent-Ausdruck durch `isLipSyncIntentional(scene)` (bzw. das vorhandene Szenen-Objekt) ersetzen; orthogonale Bedingungsteile (clipSource, Status, URLs, Provider-Checks) bleiben unveraendert stehen.
+1. In den fuenf betroffenen Dateien (SceneCard, SceneClipProgress, SceneInlinePlayer, ClipsTab, usePipelineProgress) ausschliesslich den Intent-Teil des Ausdrucks durch `isLipSyncIntentional(scene)` ersetzen; alle orthogonalen Bedingungsteile (clipSource, Status, URLs, Finalitaet, Provider-Checks) bleiben zeichengenau stehen.
 2. Import aus `src/lib/video-composer/lipSyncIntent.ts`; keine neue Hilfsfunktion, keine Signaturaenderung.
 3. `fixtures/lipSyncIntentGates.ts`: die sieben Praedikate auf die neue Bedingung nachziehen, damit das Inventar den Code weiterhin exakt spiegelt.
 4. Allowlist des AST-Scanners (`lipSyncIntentGateScanner.test.ts`) fuer die entfernten Direkt-Lesezugriffe aktualisieren, damit der Scanner gruen bleibt und die verbleibenden 12 Gates weiter eingefroren sind.
