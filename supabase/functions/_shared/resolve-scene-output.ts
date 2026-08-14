@@ -51,6 +51,13 @@ export interface SceneOutput {
   isLipsynced: boolean;
 }
 
+/**
+ * v430.0 — historical compatibility values that both mean "lip-sync finished".
+ * The frozen lip-sync chain writes `done`; `applied` only exists on older rows.
+ * READ-ONLY compatibility: no writer may start emitting `applied` again.
+ */
+export const LIPSYNC_DONE_STATES: ReadonlySet<string> = new Set(['done', 'applied']);
+
 function str(v: unknown): string | null {
   if (typeof v !== 'string') return null;
   const t = v.trim();
@@ -63,7 +70,7 @@ function str(v: unknown): string | null {
  *
  * Read order:
  *   processed_video_url
- *   -> clip_url when lip_sync_status = 'applied'
+ *   -> clip_url when lip_sync_status is a completed value ('done' | 'applied')
  *   -> base_video_url
  *   -> lip_sync_source_clip_url
  *   -> clip_url
@@ -77,10 +84,12 @@ export function resolveSceneOutput(scene: SceneOutputInput | null | undefined): 
   const legacyClip = str(s.clip_url ?? s.clipUrl);
   const legacyPlate = str(s.lip_sync_source_clip_url ?? s.lipSyncSourceClipUrl);
   const upload = str(s.upload_url ?? s.uploadUrl);
-  const applied = String(s.lip_sync_status ?? s.lipSyncStatus ?? '') === 'applied';
+  const applied = LIPSYNC_DONE_STATES.has(
+    String(s.lip_sync_status ?? s.lipSyncStatus ?? ''),
+  );
 
-  // Processed: the new column wins; otherwise a legacy applied scene keeps its
-  // muxed result in clip_url.
+  // Processed: the new column wins; otherwise a legacy completed lip-sync scene
+  // keeps its muxed result in clip_url.
   const processedUrl = processedCol ?? (applied ? legacyClip : null);
 
   // Base plate: the new column wins; otherwise the legacy mirror column, and
