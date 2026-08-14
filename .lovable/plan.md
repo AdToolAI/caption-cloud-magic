@@ -48,7 +48,8 @@ Folge: ein fehlgeschlagener Run-Erwerb und die drei Hybrid-Failure-Pfade vor dem
 ## Verifikation, die zu G2.4 gehört
 
 - Unit/Fixture: Inventar-Fixture ohne `hybrid-extend-scene:idle`, Count-Assertion angepasst.
-- Transaktionaler DB-Smoke pro writeId: `applied`, `stale run`, `falsche Generation`, `falsche write_id` — inkl. Nachweis, dass bei allen Ablehnungen weder Output- noch Legacy-Spiegel mutiert werden (gleiches Muster wie S3).
+- Transaktionaler DB-Smoke pro writeId: `applied`, `stale run`, `falsche Generation`, `falsche write_id`, zusätzlich für `dispatch-failed` der Fall „Szene steht bereits auf `plate_rendering`/`failed`" → No-op — inkl. Nachweis, dass bei allen Ablehnungen weder Output- noch Legacy-Spiegel mutiert werden (Muster wie S3).
+- Cleanup-Nachweis: Run-Akquise-Failure → Szenenzeile existiert danach nicht mehr; Gegenprobe mit fortgeschrittener Zeile → kein Delete, `hybrid_cleanup_skipped` geloggt.
 - Frozen-Suite mit demselben exakten Command wie die G2.3-Baseline (527 Tests) plus `tsgo`.
 - Danach: G2 komplett DONE / FROZEN.
 
