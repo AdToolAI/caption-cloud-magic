@@ -133,7 +133,7 @@ sich allein **keinen** Zustandswechsel (der Zustand ergibt sich aus `clip_status
   Failure-Pfade (`failed`) plus Dispatch-Zustände (`pending`, `running`). Die Failure-Pfade
   sind 1:1 auf `failSceneState()` abbildbar, die Dispatch-Pfade brauchen Kontext
   (`twoshot_stage`), weil `pending` allein keinen Zustandswechsel bedeutet.
-- **`compose-video-clips` (7)** — mischt Plate-Zustand mit Legacy-Lip-Sync-Resets
+- **`compose-video-clips` (8)** — mischt Plate-Zustand mit Legacy-Lip-Sync-Resets
   (`lip_sync_status: null`); enthält zusätzlich einen direkten `pipeline_state: "failed"`.
 - **UI-Writer** (`SceneCard`, `useSceneGenerate`, `useTwoShotAutoTrigger`) schreiben Zustand
   direkt aus dem Client. Sie gehören nach G5, sind aber die einzigen Writer, die ohne
@@ -143,7 +143,7 @@ sich allein **keinen** Zustandswechsel (der Zustand ergibt sich aus `clip_status
 
 Der Vertragstest (`supabase/functions/_shared/scene-state-write-contract.test.ts`) erlaubt
 heute nur `scene-hard-reset.ts`, `scene-state.ts` und sich selbst. Direkte
-`pipeline_state`-Writes existieren aktuell an 14 Stellen. Klassifikation in genau eine von
+`pipeline_state`-Writes existieren aktuell an 18 Stellen. Klassifikation in genau eine von
 drei Kategorien:
 
 | Stelle | Wert | Kategorie | Begründung |
