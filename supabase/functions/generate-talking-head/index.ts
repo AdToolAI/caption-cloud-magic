@@ -37,7 +37,15 @@ interface TalkingHeadRequest {
   talkingPhotoId?: string;
   /** Briefing-Cast character id, written to scene's mentioned_character_ids. */
   composerCharacterId?: string;
+  /**
+   * v431 G2.1 — Run-Provenienz aus dem kanonischen Run-Start
+   * (`composer-start-scene-generation { prepare_only: true }`). In G2.1 nur
+   * transportiert, eingefroren und geloggt; die Writer-Migration folgt in G2.2.
+   */
+  runId?: string;
+  plateGeneration?: number;
 }
+
 
 // ---------- ElevenLabs TTS (unchanged from previous version) ----------
 async function synthesizeAudio(text: string, voiceId: string): Promise<string> {
@@ -419,7 +427,11 @@ async function processHeyGenJob(opts: {
   userId: string;
   sceneId: string | undefined;
   estimatedCostEur: number;
+  /** v431 G2.1 — eingefrorene Run-Provenienz (Dispatch-Snapshot, unveränderlich). */
+  runId?: string;
+  plateGeneration?: number;
 }) {
+
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   const POLL_INTERVAL_MS = 5_000;
   const MAX_DURATION_MS = 5 * 60 * 1000; // 5 minutes
@@ -461,6 +473,10 @@ async function processHeyGenJob(opts: {
 
 
           if (opts.sceneId) {
+            // v431 G2.1 — Run-Provenienz nur protokolliert; Writer-Migration folgt G2.2.
+            console.log(
+              `[talking-head] v431_g2_1 write=plate-ready scene=${opts.sceneId} run=${opts.runId ?? "none"} gen=${opts.plateGeneration ?? "none"}`,
+            );
             await admin.from('composer_scenes').update({
               ...materializeCompatibilityOutput('base', { baseUrl: finalUrl }),
               // v430 Step 5D: dual write — modern state + legacy mirror.
@@ -469,17 +485,18 @@ async function processHeyGenJob(opts: {
               updated_at: new Date().toISOString(),
             }).eq('id', opts.sceneId);
           }
+
           console.log(`[talking-head] ✅ Completed for video_id=${opts.videoId}`);
         } catch (e: any) {
           console.error(`[talking-head] Post-completion processing failed: ${e?.message}`);
-          await refundCredits(admin, opts.userId, opts.videoId, opts.estimatedCostEur, opts.sceneId, `Post-processing failed: ${e?.message}`);
+          await refundCredits(admin, opts.userId, opts.videoId, opts.estimatedCostEur, opts.sceneId, `Post-processing failed: ${e?.message}`, { runId: opts.runId, plateGeneration: opts.plateGeneration });
         }
         return;
       }
 
       if (poll.status === 'failed') {
         console.error(`[talking-head] HeyGen reported failed: ${poll.error}`);
-        await refundCredits(admin, opts.userId, opts.videoId, opts.estimatedCostEur, opts.sceneId, poll.error || 'HeyGen render failed');
+        await refundCredits(admin, opts.userId, opts.videoId, opts.estimatedCostEur, opts.sceneId, poll.error || 'HeyGen render failed', { runId: opts.runId, plateGeneration: opts.plateGeneration });
         return;
       }
       // status === 'processing' or 'pending' → continue polling
@@ -491,7 +508,7 @@ async function processHeyGenJob(opts: {
   // Timeout fallback
   console.error(`[talking-head] Timeout after 5min for video_id=${opts.videoId}`);
   const admin2 = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-  await refundCredits(admin2, opts.userId, opts.videoId, opts.estimatedCostEur, opts.sceneId, 'HeyGen render timed out after 5min');
+  await refundCredits(admin2, opts.userId, opts.videoId, opts.estimatedCostEur, opts.sceneId, 'HeyGen render timed out after 5min', { runId: opts.runId, plateGeneration: opts.plateGeneration });
 }
 
 // Idempotent credit refund (per-job). Uses existing refund_ai_video_credits RPC
@@ -504,9 +521,14 @@ async function refundCredits(
   amountEur: number,
   sceneId: string | undefined,
   reason: string,
+  /** v431 G2.1 — eingefrorener Dispatch-Snapshot, nur Telemetrie. */
+  runStamp?: { runId?: string; plateGeneration?: number },
 ) {
   try {
     if (sceneId) {
+      console.log(
+        `[talking-head] v431_g2_1 write=failed scene=${sceneId} run=${runStamp?.runId ?? "none"} gen=${runStamp?.plateGeneration ?? "none"}`,
+      );
       await admin.from('composer_scenes').update({
         pipeline_state: 'failed',
         clip_status: 'failed',
@@ -514,6 +536,7 @@ async function refundCredits(
         updated_at: new Date().toISOString(),
       }).eq('id', sceneId);
     }
+
 
     // Derive deterministic UUIDv5-style id from video_id for idempotency
     const enc = new TextEncoder().encode(`heygen-${videoId}`);
@@ -553,6 +576,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   // Captured early so the catch-block can always mark the sub-scene as
   // `failed` (even if req.json() below threw or the body was already consumed).
   let earlySceneId: string | undefined;
+  let earlyRunStamp: { runId?: string; plateGeneration?: number } = {};
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -592,7 +616,19 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       resolution = '720p',
       talkingPhotoId: presetTalkingPhotoId,
       composerCharacterId,
+      runId,
+      plateGeneration,
     } = body;
+
+    // v431 G2.1 — Run-Provenienz wird ab hier unveraendert mitgefuehrt
+    // (Dispatch-Snapshot). Kein fail-closed in G2.1: fehlt sie, laeuft der
+    // heutige Pfad unveraendert weiter.
+    earlyRunStamp = { runId, plateGeneration };
+    if (sceneId) {
+      console.log(
+        `[talking-head] v431_g2_1 dispatch scene=${sceneId} run=${runId ?? "none"} gen=${plateGeneration ?? "none"}`,
+      );
+    }
 
     if (!imageUrl && !presetTalkingPhotoId) {
       return new Response(JSON.stringify({ error: 'imageUrl or talkingPhotoId is required' }), {
@@ -653,6 +689,9 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       if (composerCharacterId) {
         sceneUpdate.mentioned_character_ids = [composerCharacterId];
       }
+      console.log(
+        `[talking-head] v431_g2_1 write=plate-rendering scene=${sceneId} run=${runId ?? "none"} gen=${plateGeneration ?? "none"}`,
+      );
       await admin.from('composer_scenes').update(sceneUpdate).eq('id', sceneId);
     }
 
@@ -664,6 +703,8 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       aspectRatio, resolution,
       userId: user.id, sceneId,
       estimatedCostEur,
+      // v431 G2.1 — eingefroren, damit Poller/Refund denselben Run sehen.
+      runId, plateGeneration,
     };
 
     // @ts-ignore EdgeRuntime is available in Supabase Edge Runtime
@@ -691,6 +732,9 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
     // "generating…" forever after an upload/HeyGen failure.
     try {
       if (earlySceneId) {
+        console.log(
+          `[talking-head] v431_g2_1 write=failed-early scene=${earlySceneId} run=${earlyRunStamp.runId ?? "none"} gen=${earlyRunStamp.plateGeneration ?? "none"}`,
+        );
         const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
         await admin.from('composer_scenes').update({
           pipeline_state: 'failed',

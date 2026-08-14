@@ -569,8 +569,14 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { scene_id, force_regenerate } = body || {};
+    const { scene_id, force_regenerate, run_id: dispatchRunId, plate_generation: dispatchPlateGeneration } = body || {};
     if (!scene_id) return json({ error: "scene_id required" }, 400);
+    // v431 G2.1 — Run-Provenienz kommt ausschliesslich vom Dispatcher
+    // (compose-video-clips). Webhook-/Self-Heal-Aufrufer liefern sie noch nicht;
+    // deren Verhalten bleibt in G2.1 unveraendert.
+    console.log(
+      `[compose-twoshot-audio] v431_g2_1 scene=${scene_id} run=${dispatchRunId ?? "none"} gen=${dispatchPlateGeneration ?? "none"}`,
+    );
 
     // Load scene + ownership
     const { data: scene, error: sErr } = await supabase

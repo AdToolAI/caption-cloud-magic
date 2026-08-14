@@ -15,7 +15,11 @@ export interface TalkingHeadParams {
   resolution?: '480p' | '720p';
   /** Briefing-Cast character id — written to composer_scenes.mentioned_character_ids */
   composerCharacterId?: string;
+  /** v431 G2.1 — run provenance, acquired by this hook (never set by callers). */
+  runId?: string;
+  plateGeneration?: number;
 }
+
 
 export interface TalkingHeadResult {
   success: boolean;
@@ -33,9 +37,39 @@ export function useTalkingHead() {
   const generate = async (params: TalkingHeadParams): Promise<TalkingHeadResult | null> => {
     setLoading(true);
     try {
+      // v431 G2.1 — Run-Provenienz: im Composer-Fall (sceneId gesetzt) wird der
+      // Lauf VOR dem Provider-Dispatch über den kanonischen Vertrag erworben und
+      // unverändert an die Edge-Function durchgereicht. Schlägt der Erwerb fehl,
+      // bleibt das heutige Verhalten erhalten (kein fail-closed in G2.1).
+      let runId: string | undefined;
+      let plateGeneration: number | undefined;
+      if (params.sceneId) {
+        try {
+          const { data: prep, error: prepErr } = await supabase.functions.invoke(
+            'composer-start-scene-generation',
+            {
+              body: {
+                scene_ids: [params.sceneId],
+                prepare_only: true,
+                reason: 'talking_head',
+              },
+            },
+          );
+          if (prepErr) throw prepErr;
+          const run = (prep as any)?.runs?.[params.sceneId];
+          if (run?.run_id) {
+            runId = String(run.run_id);
+            plateGeneration = Number(run.generation ?? 0);
+          }
+        } catch (prepError) {
+          console.warn('[useTalkingHead] run acquisition failed, continuing legacy:', prepError);
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke('generate-talking-head', {
-        body: params,
+        body: { ...params, runId, plateGeneration },
       });
+
 
       if (error) throw error;
 
