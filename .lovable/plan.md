@@ -97,6 +97,7 @@ Diese Liste ist der einzige gültige Implementierungsvertrag für G2.4. Frühere
 - Transaktionaler DB-Smoke pro writeId: `applied`, `stale run`, `falsche Generation`, `falsche write_id`, zusätzlich für `dispatch-failed` der Fall „Szene steht bereits auf `plate_rendering`/`failed`" → No-op — inkl. Nachweis, dass bei allen Ablehnungen weder Output- noch Legacy-Spiegel mutiert werden (Muster wie S3).
 - Cleanup-Nachweis (beide Formen): (a) Fehler **vor** Run-Erwerb → Zeile weg; (b) Fehler **nach** `composer_start_scene_run`, also `active_run_id` bereits gesetzt und State `idle` → Zeile ebenfalls weg (`cleaned:true`); (c) Gegenprobe mit Zeile, die bereits `clip_url` trägt → kein Delete, `hybrid_zombie_unresolved` geloggt und im Response ausgewiesen.
 - DB-Smoke für `composer_fail_hybrid_extend_scene`: `applied` aus `plate_queued`; No-op aus `plate_rendering` (`unexpected_state`); stale run/generation; nicht erlaubte write_id — jeweils mit Nachweis unveränderter Output- und Legacy-Felder.
+- Security-Nachweis für das neue Primitive: `pg_proc`-Abfrage mit genau einer Signatur, `prosecdef = true`, `proconfig` enthält `search_path=pg_catalog, public`, sowie `has_function_privilege('anon'|'authenticated', …, 'EXECUTE') = false` und für `service_role` `= true`.
 - Frozen-Suite mit demselben exakten Command wie die G2.3-Baseline (527 Tests) plus `tsgo`.
 - Danach: G2 komplett DONE / FROZEN.
 
