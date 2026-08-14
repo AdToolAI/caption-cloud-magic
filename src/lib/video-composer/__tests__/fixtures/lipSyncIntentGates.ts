@@ -79,8 +79,8 @@ export const INTENT_GATES: IntentGate[] = [
     id: 'dialogstudio-wants-lipsync',
     site: 'src/components/video-composer/SceneDialogStudio.tsx:1335',
     purpose: 'Studio-Start erlaubt (sonst Toast "Lip-Sync ist ausgeschaltet")',
-    condition: 'scene.lipSyncWithVoiceover === true || scene.dialogMode === true',
-    predicate: (s) => s.lipSyncWithVoiceover === true || s.dialogMode === true,
+    condition: 'isLipSyncIntentional(scene)  // v430.1 Schritt 2B',
+    predicate: (s) => ssot(s),
   },
   {
     id: 'dialogstudio-force-cinematic',
@@ -152,8 +152,8 @@ export const INTENT_GATES: IntentGate[] = [
     id: 'generateall-needs-lipsync',
     site: 'src/hooks/useGenerateAllClips.ts:62',
     purpose: 'Szene gilt erst nach Lip-Sync als pipeline-ready (Intent-Anteil)',
-    condition: "scene.engineOverride === 'cinematic-sync'",
-    predicate: (s) => s.engineOverride === 'cinematic-sync',
+    condition: 'isLipSyncIntentional(scene)  // v430.1 Schritt 2B',
+    predicate: (s) => ssot(s),
   },
   {
     id: 'mouthprobe-cinematic',
