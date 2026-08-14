@@ -72,8 +72,8 @@ Ausgenommen bleiben Writer und Mapping: Objekt-Property-Zuweisungen (`engineOver
 - Empfehlung für Schritt 2: umstellen / bewusst belassen (mit Begründung)
 
 Erwartete Muster, die der Bericht belegen muss:
-- `engineOverride === 'cinematic-sync'`-Gates **verengen** (kein `sync-segments`/`native-dialogue`, kein `lipSyncWithVoiceover === true`) und **weiten gleichzeitig aus** (ignorieren das Toggle-Veto `lipSyncWithVoiceover === false`).
-- `dialogMode === true`-Gates ignorieren ebenfalls das Toggle-Veto.
+- `engineOverride === 'cinematic-sync'`-Gates sind `mixed`: false-positive bei `lipSyncWithVoiceover=false + cinematic-sync` (Gate true, SSoT false) und false-negative bei `lipSyncWithVoiceover=true` ohne cinematic-sync sowie bei `sync-segments`/`native-dialogue`.
+- `dialogMode`-Gates sind mindestens false-positive gegenüber dem Toggle-Veto (`lipSyncWithVoiceover=false + dialogMode=true`).
 
 ## Abgrenzung
 
