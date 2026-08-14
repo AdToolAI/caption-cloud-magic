@@ -792,18 +792,17 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
     // "generating…" forever after an upload/HeyGen failure.
     try {
       if (earlySceneId) {
-        console.log(
-          `[talking-head] v431_g2_1 write=failed-early scene=${earlySceneId} run=${earlyRunStamp.runId ?? "none"} gen=${earlyRunStamp.plateGeneration ?? "none"}`,
-        );
         const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-        await admin.from('composer_scenes').update({
-          pipeline_state: 'failed',
-          clip_status: 'failed',
-          clip_error: message.slice(0, 500),
-          updated_at: new Date().toISOString(),
-        }).eq('id', earlySceneId);
+        await failSceneGuarded(admin, {
+          sceneId: earlySceneId,
+          runStamp: earlyRunStamp,
+          writeId: 'talking_head_failed_early',
+          reason: message,
+          marker: 'write=failed-early',
+        });
       }
     } catch (_e) { /* non-fatal */ }
+
     return new Response(JSON.stringify({ error: message }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
