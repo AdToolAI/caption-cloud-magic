@@ -1,121 +1,134 @@
-# v431 — SceneCard:canceled: Verhaltensmatrix + Entscheidungsvorschlag
+# v431 / G1 — SceneCard „Lip-Sync komplett zurücksetzen" → `cancel-dialog-lipsync(reset:true)`
 
-Reine Lesearbeit. Kein Code geändert. `compose-video-clips` (G1) bleibt wie abgenommen.
+Richtung wie freigegeben. Zuerst die drei Implementierungsdetails belegt, danach der Umsetzungsvertrag.
+Noch kein Code geändert.
 
-## 1. Die drei Pfade in Kurzform
+## A. Die drei Vorab-Bestätigungen
 
-| Pfad | Zweck laut Code | Guard |
+### A1 — Welches Feld ist zuverlässig die Base-Plate?
+
+Messung über alle Szenen mit `lip_sync_applied_at IS NOT NULL` (236 Zeilen):
+
+| Kennzahl | Wert |
+| --- | --- |
+| mit `base_video_url` | 235 |
+| mit `lip_sync_source_clip_url` | 235 |
+| beide gesetzt **und verschieden** | 0 |
+| keines von beiden gesetzt | 1 |
+| `base_video_url = processed_video_url` (Mischzustand) | 0 |
+
+Ergebnis: `base_video_url` ist die kanonische Base-Plate und deckt den Bestand
+vollständig ab; `lip_sync_source_clip_url` ist dort, wo es existiert, **identisch** und
+damit ein unschädlicher Legacy-Fallback. Die eine Ausnahmezeile
+(`4e771db5-cc40-40ec-b889-58057a3c9855`) hat **überhaupt kein** Video —
+`clip_url` und `processed_video_url` sind ebenfalls leer, es gibt also nichts zu
+retten und keinen Mischzustand zu erzeugen.
+
+Restore-Regel (ersetzt den kritisierten Fallback):
+
+```text
+1. base_video_url gesetzt                    -> Base = base_video_url
+2. sonst lip_sync_source_clip_url gesetzt    -> Base = lip_sync_source_clip_url   (Legacy)
+3. sonst processed_video_url leer/nicht ges. -> materialize('clear')  (Szene hat gar kein Video)
+4. sonst                                     -> FAIL CLOSED, kein Write, Fehler an SceneCard
+```
+
+`clip_url` wird **nie** als Base-Quelle gelesen. Fall 4 tritt im heutigen Bestand
+0-mal auf und ist reiner Schutz gegen künftige Legacy-Zeilen.
+
+### A2 — Wie wird Generation-Bump + Vollreset race-frei?
+
+Heute gibt es keinen atomaren Reset-Primitiv: `cancel-dialog-lipsync` schreibt über
+mehrere PostgREST-Updates, und der Base-Wert müsste zwischen Lesen und Schreiben
+gehalten werden — genau das JS-Muster, das ausgeschlossen werden soll.
+
+Vorgeschlagen wird deshalb ein neues SQL-Primitiv
+`composer_reset_lipsync_full(_scene_id uuid)` (SECURITY DEFINER, `REVOKE FROM anon`,
+nur `service_role`), das in **einer** Transaktion:
+
+```text
+SELECT ... FROM composer_scenes WHERE id = _scene_id FOR UPDATE   -- Row-Lock
+  -> Base-Plate nach Regel A1 auflösen (nur aus der gelockten Zeile)
+  -> Fall 4: RAISE / return { ok:false, reason:'no_base_plate' }, kein Write
+  -> EIN UPDATE:
+       plate_generation      = plate_generation + 1     -- Fence zuerst, im selben Write
+       base_video_url        = <aufgelöste Base>
+       processed_video_url   = NULL
+       clip_url              = <aufgelöste Base>        -- v430-Tripel bleibt konsistent
+       lip_sync_applied_at   = NULL
+       lip_sync_status       = 'canceled'
+       twoshot_stage         = NULL
+       dialog_mode           = false
+       engine_override       = 'auto'
+       lip_sync_with_voiceover = false
+       replicate_prediction_id = NULL
+       dialog_shots          = NULL
+       audio_plan            = audio_plan - 'twoshot'   -- bzw. twoshot-Cache-Keys entfernt
+       clip_error            = 'lipsync_reset_by_user'
+  -> gibt die vorher bekannten Job-IDs zurück
+COMMIT
+```
+
+Damit gilt: Der Bump liegt im **selben** `UPDATE` wie die Bereinigung — es gibt kein
+Fenster, in dem Dialogdaten schon weg, die Generation aber noch alt ist. Der Job-Cancel
+gegen Sync.so läuft in der Edge-Function **nach** dem Commit auf den zurückgegebenen
+IDs; ein Callback, der genau dazwischen eintrifft, ist bereits stale
+(`plate-attempt` / v427-Callback-Guard prüfen `plate_generation`).
+
+Der Bump gilt für **jeden** `reset:true`-Vollreset, unabhängig von `lip_sync_applied_at`.
+`cancel-dialog-lipsync` bleibt trotz neuem Primitiv ein **Legacy-State-Writer**: die
+Zustandsableitung passiert weiter über die Reverse-Bridge aus den Legacy-Spalten, es
+wird kein `run_bound`/`runless`-Vertrag vorgetäuscht und keine neue Runless-Regel
+eingeführt.
+
+### A3 — Wird `active_run_id` in terminalen Szenen heute beibehalten?
+
+Bestandsmessung: von 4246 Szenen hat **genau 1** ein `active_run_id`
+(Zustand `failed`/`clip_status=ready`). Nach Zustand:
+
+| pipeline_state | Zeilen | davon mit `active_run_id` |
 | --- | --- | --- |
-| SceneCard „Lipsync komplett zurücksetzen“ | Lip-Sync **abschalten**, Basis-Video behalten | keiner (Client schreibt immer) |
-| `cancel-dialog-lipsync` (`reset:true`) | laufenden Lip-Sync **abbrechen + deaktivieren** | `lip_sync_applied_at` → Abbruch |
-| `reset-lipsync-scene` | **sauberer Neustart** desselben Lip-Syncs | `lip_sync_applied_at` → Abbruch, `force:true` hebt ihn auf |
+| canceled | 3544 | 0 |
+| plate_ready | 271 | 0 |
+| complete | 228 | 0 |
+| failed | 201 | 1 |
+| idle | 1 | 0 |
 
-## 2. Verhaltensmatrix
+Weder `composer_scene_transition_core` noch die Bridge setzen `active_run_id` beim
+Terminalwechsel auf `NULL` — der Stempel wird schlicht fast nie gesetzt
+(`composer_start_scene_run` / `beginSceneRun` ist der einzige Setzer und wird in der
+Lip-Sync-Kette seit dem v398-Rollback praktisch nicht genutzt). Konsumenten:
+`decidePlateAttempt` behandelt `active_run_id != NULL` als „Single-Run-Vertrag aktiv"
+und lässt unregistrierte Callbacks fail-closed abprallen; `qa-watchdog` sucht Zombies
+über `clip_status='generating' AND active_run_id IS NULL`; `usePipelineProgress`
+filtert nur auf Gleichheit mit einem erwarteten Run.
 
-Legende: „—“ = wird nicht angefasst.
+Ergebnis: **`active_run_id` bleibt unangetastet.** Kein Konsument liest ein
+gesetztes `active_run_id` allein als „Run läuft noch" in einer Weise, die den Reset
+stören würde, und das Callback-Fencing hängt ausschließlich an `plate_generation`.
 
-### A) Lip-Sync läuft / noch nicht angewandt (`lip_sync_applied_at = NULL`)
+## B. Umsetzungsvertrag (nach Freigabe)
 
-| Feld | SceneCard (heute) | `cancel-dialog-lipsync` reset:true | `reset-lipsync-scene` |
-| --- | --- | --- | --- |
-| `pipeline_state` | `canceled` (Reverse-Bridge aus `lip_sync_status='canceled'`) | `canceled` (identisch) | aus Legacy abgeleitet: `plate_ready`, wenn `clip_url` vorhanden, sonst `idle` |
-| `processed_video_url` | — | — | `NULL` (über `materializeCompatibilityOutput('base')`) |
-| `clip_url` | — | — | = Basis-Plate (`clip_url` bleibt, `processed` fällt weg) |
-| `base_video_url` | — | — | = Plate (`clip_url` der Szene) |
-| `lip_sync_applied_at` | `NULL` | `NULL` | `NULL` |
-| `dialog_shots` | `NULL` | `NULL` (reset:true) | `NULL` |
-| Jobs (Sync.so) | **nicht abgebrochen** (nur der parallele Invoke tut das) | DELETE `/v2/generations/{id}` für alle bekannten Jobs + `syncso_inflight_jobs`-Cleanup | dito, über `failLipSync()` |
-| Locks | — | `try_acquire_dialog_lock` / `release_dialog_lock` (30 s TTL) | keiner |
-| `active_run_id` | — | — | — |
-| `plate_generation` | — | — | — |
-| `clip_error` | `lipsync_canceled_by_user` | `lipsync_canceled_by_user` | `NULL` (+ vorher `failLipSync` setzt kurz den Fehlergrund) |
-| Legacy-Spiegel | `lip_sync_status=canceled`, `twoshot_stage=NULL`, `dialog_mode=false`, `engine_override=auto`, `lip_sync_with_voiceover=false`, `replicate_prediction_id=NULL` | **feldgleich** | `lip_sync_status=pending`, `twoshot_stage=NULL`, `clip_status=ready`, `replicate_prediction_id=NULL`, `audio_plan.twoshot` bereinigt (faceMap, anchor_face_audit, sync_job_id, segments) — `dialog_mode`/`engine_override` bleiben **an** |
-| Credits / Reservations | keine | **keine** (kein Refund, keine Reservation-Abrechnung) | Refund über `failLipSync()` (`dialog_shots.cost_credits` → `wallets`, einmalig via `dialog_shots.refunded`); `composer_run_reservations` unberührt |
+1. **Neue DB-Funktion** `composer_reset_lipsync_full` wie in A2, inklusive
+   Grants (`service_role` only) und Fail-Closed-Rückgabe `no_base_plate`.
+2. **`cancel-dialog-lipsync`**: bei `reset === true` neuer Vollreset-Zweig, der den
+   `already_applied`-Shortcut bewusst überspringt und das Primitiv aufruft.
+   - **kein** Refund, wenn `lip_sync_applied_at` gesetzt war (Guard-Zweck bleibt erhalten);
+   - Refund im nicht-angewandten Fall unverändert über den bestehenden Pfad;
+   - Job-Cancel + `syncso_inflight_jobs`-Cleanup nach dem Commit;
+   - Dialog-Lock wie heute;
+   - Fehler (`no_base_plate`, Lockkonflikt) als 4xx/5xx mit Grund zurückgeben.
+3. **`SceneCard`**: direkter State-Write entfällt, Aufruf nur noch über die
+   Edge-Function; Fehler werden als Toast angezeigt statt verschluckt.
+4. **`reset-lipsync-scene`** bleibt unverändert der Restart-Vertrag.
 
-Folge bei `reset-lipsync-scene`: `lip_sync_status='pending'` ist genau der Zustand, den
-`useTwoShotAutoTrigger` als frischen Kandidaten aufgreift → der Lip-Sync **startet neu**.
+## C. Tests / Smokes vor STOP
 
-### B) Lip-Sync bereits angewandt (`lip_sync_applied_at != NULL`)
-
-| Feld | SceneCard (heute) | `cancel-dialog-lipsync` reset:true | `reset-lipsync-scene` ohne `force` | `reset-lipsync-scene` mit `force:true` |
-| --- | --- | --- | --- | --- |
-| Ausgang | schreibt trotzdem | `{ ok:true, skipped:"already_applied" }`, **kein** Write | `{ ok:true, status:"already_applied" }`, **kein** Write | führt Reset aus |
-| `pipeline_state` | `canceled` | — | — | `plate_ready` (Plate wieder sichtbar) |
-| `processed_video_url` | **bleibt** (lip-gesynctes Ergebnis) | — | — | `NULL` |
-| `clip_url` | **bleibt = processed** | — | — | = wiederhergestellte Plate |
-| `base_video_url` | bleibt | — | — | = `lip_sync_source_clip_url` (Original-Plate) |
-| `lip_sync_applied_at` | `NULL` | — | — | `NULL` |
-| `dialog_shots` | `NULL` | — | — | `NULL` |
-| Jobs | keine offen | — | — | `failLipSync()` bricht **früh** ab (`already_applied`) → **kein** Job-Cleanup, **kein** Refund |
-| Locks | — | — | — | keiner |
-| `active_run_id` / `plate_generation` | — | — | — | — |
-| `clip_error` | `lipsync_canceled_by_user` | — | — | `NULL` |
-| Legacy-Spiegel | wie oben (Lip-Sync **aus**) | — | — | `lip_sync_status=pending` (Lip-Sync **an**, Auto-Trigger greift) |
-| Credits | keine | — | — | keine (Refund-Zweig übersprungen) |
-
-**Wichtiger Widerspruch im heutigen SceneCard-Pfad (Fall B):** Der Client setzt
-`lip_sync_applied_at=NULL` und `lip_sync_status=canceled`, lässt aber
-`processed_video_url` / `clip_url` auf dem lip-gesyncten Ergebnis stehen. Die Szene zeigt
-danach weiterhin das lip-gesyncte Video, behauptet aber „kein Lip-Sync“. Das ist kein
-Vollreset, sondern ein inkonsistenter Mischzustand.
-
-### C) Direkte Antwort auf die fünf offenen Punkte
-
-1. **`lip_sync_applied_at != NULL`** — siehe Tabelle B: `cancel-dialog-lipsync(reset:true)` schreibt heute **gar nichts** und meldet `skipped:"already_applied"`. Der Button wäre also für angewandte Szenen wirkungslos, wenn man ohne weitere Änderung umroutet.
-2. **Credits / Reservations** — SceneCard: nie. `cancel-dialog-lipsync`: nie (auch im nicht-angewandten Fall kein Refund). `reset-lipsync-scene`: Refund nur im nicht-angewandten Fall über `failLipSync()` (`dialog_shots.cost_credits` → `wallets`, idempotent über `dialog_shots.refunded`); mit `force:true` auf angewandter Szene wird der Refund-Zweig übersprungen. `composer_run_reservations` wird von **keinem** der drei Pfade angefasst — offene Reservierungen bleiben bis zum regulären Settle/Ablauf stehen.
-3. **Ursprung von `already_applied`** — siehe Abschnitt 3: Schutz von fertigem Ergebnis **und** Refund, keine Pipeline-Invariante.
-4. **Output-Rückstellung bei `reset:true`** — **Nein.** `cancel-dialog-lipsync` kennt `materializeCompatibilityOutput` nicht und fasst `base_video_url` / `processed_video_url` / `clip_url` in keinem Zweig an. Selbst wenn man `already_applied` überspringt, bliebe das lip-gesynctes Ergebnis in `clip_url` stehen. Die Output-Rückstellung muss also **explizit ergänzt** werden (Punkt 5.1) — sie fällt nicht durch das Überspringen des Guards von allein an.
-5. **Alte Jobs / Callbacks nach dem Reset** — `reset:true` nullt `dialog_shots`; der Sync.so-Webhook findet seine Szene über die Job-IDs in `dialog_shots.passes[]` und läuft danach in `no_scene_match`, kann also kein Ergebnis zurückschreiben. Das ist aber eine *Nebenwirkung*, keine Run-Absicherung: `active_run_id` und `plate_generation` bleiben unverändert, der v427-Callback-Guard sieht denselben Lauf weiter als gültig. Für echte Run-Sicherheit muss der Reset-Zweig `plate_generation` erhöhen (Punkt 5.1). Job-Cancel und Lock laufen im nicht-angewandten Fall sauber; im angewandten Fall sind ohnehin keine Jobs offen.
-
-**Fazit zur Leitfrage:** `reset:true` räumt nach Überspringen von `already_applied` **noch nicht** vollständig und run-sicher auf — Statusfelder und Locks ja, finaler Output und Generations-Fencing nein. Die Freigabe des Guard-Übersprungs sollte deshalb an die beiden Ergänzungen in 5.1 gekoppelt werden.
-
-## 3. Warum es `already_applied` gibt
-
-Der Guard steht an drei Stellen mit derselben Begründung im Code:
-`failLipSync()` — *„Already complete — never overwrite a successful scene“*;
-`reset-lipsync-scene` — dort ausdrücklich mit `force`-Ausnahme; `cancel-dialog-lipsync` — ohne
-Ausnahme. Er schützt **das fertige Ergebnis und den Refund** (ein Cancel nach Erfolg dürfte
-sonst Credits zurückgeben und ein bezahltes Ergebnis verwerfen). Er schützt **keinen**
-tieferen Ledger-/Pipeline-Vertrag: weder `composer_run_reservations` noch
-`active_run_id`/`plate_generation` noch der v427-Callback-Guard hängen daran; keiner der drei
-Pfade fasst diese Felder an. Dass `reset-lipsync-scene` den Guard per `force` bereits legal
-umgeht (und SceneCard das über `cleanRestartLipSync({force:true})` heute schon nutzt),
-bestätigt: Es ist eine Datenschutz-Regel für das Ergebnis, kein Invariantenschutz.
-
-## 4. Antwort auf die Leitfrage
-
-**Nein — `reset-lipsync-scene` deckt „Lipsync komplett zurücksetzen“ nicht ab.** Es ist der
-*Neustart*-Vertrag: Ergebnis verwerfen, Plate wiederherstellen, `lip_sync_status='pending'` →
-der Auto-Trigger startet denselben Lip-Sync sofort erneut. Der Button will das Gegenteil:
-Lip-Sync **aus** (`dialog_mode=false`, `engine_override='auto'`,
-`lip_sync_with_voiceover=false`), Plate behalten, nichts startet nach.
-
-`cancel-dialog-lipsync(reset:true)` ist der einzige Pfad mit genau dieser
-Deaktivierungs-Semantik — ihm fehlt nur die Ergebnis-Bereinigung für Fall B.
-
-## 5. Vorschlag (zur Freigabe, noch nicht umgesetzt)
-
-Weder den Guard blind überspringen noch SceneCard auf den Neustart-Vertrag umbiegen, sondern
-den Deaktivierungs-Pfad vollständig machen:
-
-1. `cancel-dialog-lipsync` erhält bei `reset === true` einen **expliziten Vollreset-Zweig**
-   statt des `already_applied`-Shortcuts. In diesem Zweig zusätzlich zum heutigen Patch:
-   - Ergebnis auf die Plate zurücksetzen über `materializeCompatibilityOutput('base', { baseUrl: lip_sync_source_clip_url ?? clip_url })` — damit kann kein lip-gesynctes Video als „ohne Lip-Sync“ weiterleben;
-   - `audio_plan.twoshot`-Cache bereinigen (faceMap, anchor_face_audit, sync_job_id, segments) wie im Reset-Pfad;
-   - **kein** Refund bei bereits angewandtem Lip-Sync (Guard-Zweck bleibt gewahrt);
-   - `plate_generation` erhöhen, damit ein verspäteter Sync.so-Callback aus dem alten Lauf am v427-Callback-Guard scheitert und das Ergebnis nicht wiederherstellen kann.
-2. `SceneCard` verliert seinen direkten State-Write und ruft nur noch diese Funktion; Fehler
-   werden nicht mehr verschluckt, sondern als Toast gemeldet.
-3. Ohne Freigabe von Punkt 1 bleibt SceneCard unverändert — dann lieber ein bewusst
-   inkonsistenter Altzustand als ein stiller Funktionsverlust.
-
-Der State-Write von `cancel-dialog-lipsync` bleibt in beiden Varianten **Legacy** (kein
-`run_bound` möglich, keine neue Runless-Regel) — die Migration dieses Writers bleibt spätere
-Gate-Arbeit.
-
-## 6. Status
-
-- G1 `compose-video-clips`: PASS (unverändert).
-- G1 `SceneCard:canceled`: offen — wartet auf Entscheidung zu Punkt 5.1.
-- `cancel-dialog-lipsync` als State-Writer: weiterhin nicht migriert.
-- `already_applied`-Guard: unverändert bis zur Freigabe.
+- DB-Smoke gegen eine Kopie: Vollreset auf (a) laufender, (b) angewandter,
+  (c) URL-loser Szene → Felder, `plate_generation+1`, Fail-Closed-Fall.
+- Callback-Stale-Nachweis: Callback mit alter Generation nach Reset → abgewiesen.
+- Vitest-Suite komplett (aktuell 368 Tests) plus neuer Unit-Test für die
+  Base-Plate-Auflösung.
+- Inventar-Diff `v431LegacyWriteInventory` aktualisieren
+  (`SceneCard:canceled` entfällt, `cancel-dialog-lipsync` bleibt Legacy).
+- Danach STOP-Bericht mit PASS/FAIL je Pfad.
