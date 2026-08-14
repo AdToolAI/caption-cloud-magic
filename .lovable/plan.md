@@ -1,99 +1,111 @@
-# Phase 0 — Bericht zu den vier offenen G0-Klärungen (reine Analyse)
+# G0 — Implementierungsvertrag State-Core (final, zur Freigabe)
 
-Keine Codeänderung, keine Migration, keine Writer-Migration, kein Cast-&-World-Eingriff. Der Lip-Sync-Freeze bleibt unberührt.
+Scope: ausschließlich der State-Core. Keine Lip-Sync-Writer-Migration, kein G1–G6, kein Cast & World. Der Lip-Sync-Freeze (`.lovable/LIPSYNC-FEATURE-FREEZE.md`) bleibt unangetastet — G0 ändert das Kernprimitive, nicht seine Aufrufer.
 
-Vorab, weil es die G0-Planung direkt betrifft: **beide Überladungen von `composer_scene_transition` sind heute für die Rolle `anon` ausführbar, und die Ownership-Prüfung greift bei `auth.uid() IS NULL` gar nicht.** Details unter 0.2. Das ist kein Nebenbefund, sondern eine offene Tür in den State-Core.
+## 1. Kanonische RPC
 
----
+Neuer Kern `public.composer_scene_transition_v2(...)`, `SECURITY DEFINER`, `search_path = public`:
 
-## 0.1 — Der fehlende `transitionScene()`-Caller
+```
+_scene_id            uuid      NOT NULL
+_to                  composer_scene_state NOT NULL
+_guard_mode          text      NOT NULL     -- 'run_bound' | 'runless'
+_run_id              uuid      DEFAULT NULL -- Pflicht bei run_bound
+_generation          integer   DEFAULT NULL -- Pflicht bei run_bound
+_runless_reason      text      DEFAULT NULL -- Pflicht bei runless, geschlossene Menge
+_write_id            text      NOT NULL     -- stabile semantische Write-ID
+_from                composer_scene_state[] DEFAULT NULL
+_detail              text      DEFAULT NULL
+_substate            text      DEFAULT NULL
+_clear_detail        boolean   DEFAULT false
+_clear_substate      boolean   DEFAULT false
+RETURNS TABLE(applied boolean, state composer_scene_state, substate text, reason text, path composer_scene_state[])
+```
 
-`rg "transitionScene\("` liefert 11 Treffer: 1 Definition (`_shared/scene-state.ts:333`), **10 direkte Call-Sites** und **1 indirekten Aufruf** innerhalb von `failSceneState()` (`scene-state.ts:409`). Der bisher nicht zugeordnete elfte ist dieser interne Aufruf.
+`_guard_mode` hat keinen Default — jeder Aufrufer muss sich entscheiden.
 
-| Write-ID | Ort | Ziel | runId | gen | Klasse |
-|---|---|---|---|---|---|
-| `composer-start-scene-generation:enter-plate-queued-on-run-start` | `:200` | `plate_queued` | ja | ja | **run_bound** |
-| `composer-start-scene-generation:fail-on-dispatch-failure` | `:255` | `failed` | ja | ja | **run_bound** |
-| `composer-cancel-project:cancel-scene-on-project-cancel` | `:215` | `canceled` | nein | nein | runless (Grenzfall) |
-| `composer-cancel-scene:cancel-scene-on-user-request` | `:147` | `canceled` | nein | nein | runless (Grenzfall) |
-| `generate-composer-image-scene:enter-plate-rendering` | `:147` | `plate_rendering` | nein | nein | legitim runless |
-| `generate-composer-image-scene:fail-on-gateway-error` | `:168` | `failed` | nein | nein | legitim runless |
-| `generate-composer-image-scene:fail-on-no-image` | `:195` | `failed` | nein | nein | legitim runless |
-| `generate-composer-image-scene:fail-on-upload-error` | `:222` | `failed` | nein | nein | legitim runless |
-| `generate-composer-image-scene:enter-plate-ready` | `:241` | `plate_ready` | nein | nein | legitim runless |
-| `hybrid-extend-scene:mark-failed-on-error` | `:375` | `failed` | nein | nein | legitim runless |
-| `scene-state:failSceneState-internal-transition` | `scene-state.ts:409` | `failed`/`canceled` | nein | nein | **Vertragslücke** |
+- `run_bound`: `_run_id` und `_generation` sind Pflicht (sonst `reason = 'guard_args_missing'`). Geprüft wird **atomar unter demselben Row Lock**: `active_run_id = _run_id` (sonst `stale_run`) **und** `plate_generation = _generation` (sonst `stale_generation`). Kein JS-seitiger Vorabvergleich mehr — das heutige TOCTOU-Fenster entfällt.
+- `runless`: `_run_id`/`_generation` müssen NULL sein (sonst `guard_mode_conflict`), `_runless_reason` ist Pflicht und muss aus der geschlossenen Menge stammen:
+  `user_cancel_no_active_run`, `project_teardown_no_active_run`, `image_scene_no_run_context`, `admin_recovery`, `system_migration`.
+  Ein unbekannter Grund wird abgelehnt (`runless_reason_invalid`). `hybrid_extend_*` ist **bewusst nicht** in dieser Menge.
 
-Begründung der Klassen:
-- **run_bound**: `runId` + `generation` werden durchgereicht, DB-Guard `stale_run`/`stale_generation` greift.
-- **legitim runless**: `generate-composer-image-scene` und `hybrid-extend-scene` kennen kein `active_run_id`/`plate_generation` — es gibt dort keinen Run, gegen den geprüft werden könnte.
-- **Grenzfall Cancel**: beide Cancel-Funktionen **lesen** `active_run_id` bereits in ihren Row-Select (`composer-cancel-project:103`, `composer-cancel-scene:70`), reichen ihn aber nicht durch. Ob das gewolltes Force-Cancel ist, ist eine Produktentscheidung, keine Codefrage — Vorschlag für G0: `guard_mode: 'runless'` mit Pflichtgrund `user_cancel` / `project_cancel`, nicht stillschweigend ungeprüft.
-- **Vertragslücke `failSceneState()`**: die Funktion hat **null aktive Aufrufer** im Repo (nur die Definition und eine Erwähnung im Contract-Test). Sie war laut Kommentar (`scene-state.ts:388-399`) als Ersatz für ca. 40 direkte `pipeline_state: 'failed'`-Writes gedacht — dieser Migrationspfad wurde nie verdrahtet. Separat gezählt: `failSceneState()`-Aufrufe = **0**.
+`pipeline_state_run_id`: bei `run_bound` = `_run_id`; bei `runless` **explizit `NULL`**. Kein `COALESCE(_run_id, active_run_id)` mehr.
 
-Zusatzbefund für G0/G5: der Contract-Test `scene-state-write-contract.test.ts:16-20` erlaubt direkte `pipeline_state`-Writes nur in `scene-hard-reset.ts` und `scene-state.ts`, im Repo existieren aber >15 weitere Fundstellen (`qa-watchdog`, `generate-talking-head`, `compose-video-clips:1633`, `recover-stuck-composer-clip:107`, `_shared/continuity-chain.ts`, `_shared/autopilotComposerBridge.ts:173`, `auto-director-compose:216`, `motion-studio-superuser`). Der Test-Regex matcht nur String-Literale und erfasst diese Fälle nicht zuverlässig — die "EIN Schreibpfad"-Garantie ist heute nicht durchgesetzt.
+Detail/Substate: `_clear_detail`/`_clear_substate` setzen explizit auf NULL; ohne sie gilt weiter `COALESCE`. Zustand, Detail und Substate werden in genau einem `UPDATE` geschrieben — Fehlertext und Zustand sind damit atomar.
 
-## 0.2 — Alte RPC-Signaturen
+## 2. Atomarer Pfad statt v391-Loop
 
-Es existieren genau zwei Überladungen, beide `SECURITY DEFINER`, `search_path=public`:
+Der Client-Loop in `_shared/scene-state.ts:352-371` entfällt ersatzlos. Die Pfadlogik wandert unter den Row Lock:
 
-| Variante | Argumente | Repo-Aufrufer |
-|---|---|---|
-| **A (6-arg)** | `_scene_id, _to, _from, _detail, _run_id, _generation` | **keiner** |
-| **B (7-arg)** | A + `_substate` | nur `scene-state.ts:300-308` (`rpcTransition`) |
+1. `SELECT … FOR UPDATE` auf `composer_scenes`.
+2. Guards (Ownership, guard_mode, `_from`).
+3. Direkte Kante in `composer_scene_transitions`? → anwenden.
+4. Sonst: `WITH RECURSIVE` über `composer_scene_transitions` den kürzesten Pfad `current → _to` suchen, **eingeschränkt auf die Vorwärtsordnung der linearen Kette** (`idle, plate_queued, plate_rendering, plate_ready, audio_prep, audio_ready, lipsync_dispatched, lipsync_running, lipsync_muxing, complete`). Kanten nach `failed`, `canceled`, `idle` sowie Self-Kanten sind als Pfad-Zwischenschritte ausgeschlossen; Suchtiefe hart begrenzt.
+5. Kein Pfad → `transition_not_allowed`, nichts geschrieben.
+6. Pfad gefunden → **ein** `UPDATE` auf den Zielzustand, plus eine Audit-Zeile je logischem Zwischenschritt, alles in derselben Transaktion. `path` kommt im Result zurück.
 
-Kein `DROP FUNCTION` in den Migrationen — die 7er kam als zusätzliche Überladung (`20260813221849:165`), die 6er (`20260802143005:225`) blieb live.
+Damit werden folgende Kanten **nicht** zusätzlich in die Allowlist aufgenommen: `plate_ready→audio_ready`, `plate_ready→lipsync_dispatched|lipsync_running|lipsync_muxing`, `audio_prep→lipsync_dispatched|lipsync_running|lipsync_muxing`, `audio_ready→lipsync_running|lipsync_muxing`. Die Allowlist behält ausschließlich echte Einzelschrittkanten.
 
-**Grants (live, `proacl` / `has_function_privilege`):** `anon`, `authenticated`, `service_role` haben **auf beiden** EXECUTE. Die Migrationen machen zwar `REVOKE ALL … FROM public` + gezielte GRANTs an `authenticated`/`service_role`, aber `anon` kommt über einen `pg_default_acl`-Eintrag für Schema `public`, Objekttyp `f` — der von `REVOKE … FROM public` nicht berührt wird. Das Revoke verfehlt damit sein Ziel.
+## 3. Transition-Audit
 
-**Autorisierung in der Funktion:** `IF auth.uid() IS NOT NULL AND NOT can_edit_composer_project(...)` (`20260813221849:188-190`). Bei einem echten anon-Aufruf ist `auth.uid()` NULL → **die Ownership-Prüfung wird übersprungen.** Verbleibende Schranken: nur die Allowlist `composer_scene_transitions` und die optionalen `_run_id`/`_generation`-Guards, die ein externer Aufrufer schlicht weglässt.
+Neue Tabelle `public.composer_scene_transition_log`:
+`id, scene_id, project_id, from_state, to_state, step_index, is_intermediate, guard_mode, runless_reason, run_id, generation, write_id, applied, reason, source_signature ('v2'|'legacy_6'|'legacy_7'|'recovery'), caller_role, auth_uid, created_at`.
 
-**Erreichbarkeit:** beide via `POST /rest/v1/rpc/composer_scene_transition`; PostgREST wählt die Überladung nach der Named-Args-Menge (ohne `_substate` → A, mit → B).
+RLS an, `service_role` voll, `authenticated` nur lesend auf eigene Projekte, kein `anon`-Grant. Geschrieben wird ausschließlich aus den SECURITY-DEFINER-Funktionen. Die Tabelle bedient drei Zwecke gleichzeitig: Zwischenschritt-Historie (2.), Wrapper-Telemetrie (5.) und Auditpflicht des Recovery-Primitives (6.).
 
-**Observability:** es gibt keine. `composer_scene_transitions` ist die statische Zulässigkeitsmatrix, keine Audit-Tabelle. Die Funktion loggt nur `RAISE LOG 'v384_forbidden_transition'` (Ablehnung wegen State-Machine), nicht `forbidden`, nicht Erfolge. Das Applikationslogging in `scene-state.ts:356-382` sieht nur Aufrufe über Edge Functions. Ein Direktaufruf via PostgREST erzeugt keine für uns sichtbare Spur.
+## 4. Sicherheit
 
-**Fazit:** externe Nutzung ist **nicht ausschließbar**. Kein Drop in G0. Ziel bleibt die vorgeschlagene Architektur — neuer kanonischer guarded Kern, 6er und 7er als instrumentierte, deprecatete Wrapper, die delegieren. Erste konkrete Maßnahme in G0 sollte jedoch der Entzug von `anon`-EXECUTE auf beiden Alt-Signaturen sein, plus eine Instrumentierung, die Caller-Rolle und Signatur in eine Audit-Tabelle schreibt — ohne diese Zahlen ist ein späterer Drop nie belastbar begründbar.
+- `REVOKE EXECUTE … FROM anon` auf `composer_scene_transition/6`, `/7` und dem neuen Kern — inklusive `ALTER DEFAULT PRIVILEGES`-Korrektur bzw. explizitem Revoke, damit der `pg_default_acl`-Eintrag für Schema `public` nicht erneut greift.
+- Die Ownership-Lücke wird geschlossen: statt `IF auth.uid() IS NOT NULL AND NOT can_edit_composer_project(...)` gilt künftig — ist der Aufrufer **nicht** `service_role`, ist `auth.uid()` Pflicht und `can_edit_composer_project()` muss zutreffen; NULL ohne `service_role` ⇒ `forbidden`. Edge Functions laufen als `service_role` und sind davon nicht betroffen. Verifiziert wird das mit einem anon-Aufruf gegen die Data API (muss `forbidden`/403 liefern) und einem service_role-Aufruf (muss weiter funktionieren).
 
-## 0.3 — v391 Gap-Filler atomar
+## 5. Compatibility-Wrapper
 
-**Fundort:** `_shared/scene-state.ts:270-385`. Der "Gap-Filler" ist ein **Client-Loop**, kein DB-Mechanismus: schlägt der erste RPC mit `transition_not_allowed` fehl und liegt das Ziel in `LINEAR_CHAIN` weiter vorn als `fromIdx+1`, holt eine `for`-Schleife (`:361-369`) jeden Zwischenschritt als **eigenen RPC-Call in eigener Transaktion** nach, mit `detail = v391_chain_step_<state>`.
+`composer_scene_transition/6` und `/7` bleiben bestehen, kein Drop in G0. Beide werden zu dünnen Wrappern, die auf den neuen Kern delegieren mit `_guard_mode := CASE WHEN _run_id IS NOT NULL THEN 'run_bound' ELSE 'runless' END`, `_runless_reason := 'system_migration'`, `_write_id := 'legacy_wrapper'`, und die jeden Aufruf mit `source_signature = 'legacy_6'|'legacy_7'` plus Caller-Rolle in den Audit-Log schreiben. Erst wenn dieser Log über ein Beobachtungsfenster keine Fremdaufrufe zeigt, ist ein Drop in G6 begründbar.
 
-**(a) Ketten:** dynamisch, nicht fest kodiert — jede Vorwärtslücke in `LINEAR_CHAIN`, z.B. `plate_ready → audio_prep → audio_ready`, `audio_ready → lipsync_dispatched → lipsync_running` (der in `:350` genannte historische Fall), bis hin zu `plate_ready → … → complete`.
+## 6. Recovery-Primitive
 
-**(b) Transaktionsgrenzen:** jeder Schritt ist für sich atomar (`FOR UPDATE` + ein `UPDATE`), aber es gibt **kein Dach über der Kette**. Crasht die Function zwischen Schritt n und n+1, bleibt die Szene committed auf einem validen Zwischenzustand stehen — ununterscheidbar von einem regulären Zwischenzustand. Kein Marker sagt, dass eine Kette abgebrochen ist; Watchdogs sehen nur ein Timeout, Webhooks warten auf ein Zielevent, das nie kommt, und es gibt keinen Wiederaufnahme-Mechanismus außer dem nächsten regulären `transitionScene`-Aufruf.
+`public.composer_recover_scene(_scene_id, _expected_run_id uuid, _expected_plate_generation int, _to composer_scene_state, _reason text, _write_id text)`:
+- Zielzustand nur `failed` oder `canceled`.
+- `_reason` aus geschlossener Menge (`watchdog_timeout`, `stuck_clip_recovery`, `orphaned_job`, `manual_admin`).
+- Stimmt `active_run_id`/`plate_generation` nicht mit den Erwartungswerten überein, ist der Aufruf ein **No-op** mit `reason = 'stale_recovery'` — kein Force-Write.
+- Jeder Aufruf, auch der No-op, erzeugt eine Audit-Zeile mit `source_signature = 'recovery'`.
+- Nur `service_role`.
 
-**(c) Atomarer Pfadvertrag:** die vorgeschlagene Form ist umsetzbar und deckt sich mit dem Bestand:
-1. `SELECT … FOR UPDATE` (wie heute),
-2. vollständigen Pfad `current → _to` per `WITH RECURSIVE` über `composer_scene_transitions` bestimmen, begrenzt auf die Vorwärtsordnung von `LINEAR_CHAIN` (Rückwärts-, Terminal- und Self-Kanten explizit ausschließen, sonst findet die Rekursion Pfade über `idle`/`failed`),
-3. gesamten Pfad validieren, Run-/Generation-Guard **einmal** am Anfang (das Lock friert den Zustand ein),
-4. nur den finalen Zielzustand schreiben — kein Zwischen-Commit,
-5. je logischem Zwischenschritt eine Historienzeile, in derselben Transaktion.
+## 7. `failSceneState()`
 
-Kritischer Punkt: **Schritt 5 hat heute kein Ziel.** Es existiert keine Transition-Historie. `composer_scene_transitions` ist die Allowlist, `composer_scene_runs` ist der Run-Kontrakt, `composer_undo_stack` ist User-Undo, `composer_pipeline_runs` ist ein Projekt-Aggregat. Der einzige Beleg eines Übergangs ist der überschriebene `pipeline_state`/`pipeline_detail`/`updated_at`. G0 braucht also eine neue Audit-Tabelle (`from_state, to_state, step_index, guard_mode, run_id, generation, reason, at`) — sie ist ohnehin Voraussetzung für 0.2 (Signatur-Telemetrie) und für den Recovery-Primitive.
+Wird run-sicher gemacht (Pflichtparameter `guardMode`, `writeId`, bei `run_bound` zusätzlich `runId`+`generation`) und bleibt in G0 **ohne Aufrufer**. Der Helfer ist als Debt markiert; verdrahtet wird er erst in G1–G4. Der Contract-Test hält fest, dass er heute 0 Repo-Caller hat.
 
-**(d) Kanten, die dadurch NICHT freigegeben werden müssen:** `plate_ready→audio_ready`, `plate_ready→lipsync_dispatched|lipsync_running|lipsync_muxing`, `audio_prep→lipsync_dispatched|lipsync_running|lipsync_muxing`, `audio_ready→lipsync_running|lipsync_muxing`. Die Allowlist (73 Zeilen) behält damit ausschließlich echte Einzelschrittkanten.
+## 8. Cancel-Vertrag (Produktentscheidung umgesetzt)
 
-## 0.4 — `pipeline_state_run_id`
+`composer-cancel-scene` und `composer-cancel-project` laden `active_run_id` bereits. Beide erfassen künftig zusätzlich `plate_generation` und rufen:
+- mit aktivem Run: `guard_mode = 'run_bound'` und exakt diesem Run + dieser Generation. Wurde zwischenzeitlich ein neuer Run gestartet, schlägt der Cancel mit `stale_run` fehl und terminiert Run B **nicht**.
+- ohne aktiven Run: `guard_mode = 'runless'` mit `user_cancel_no_active_run` bzw. `project_teardown_no_active_run`.
 
-Spalte auf `composer_scenes`, `uuid`, nullable, kein Default (eingeführt `20260802143005:24`, Backfill `:220` aus `active_run_id`).
+Projekt-Abbruch wendet denselben Vertrag **pro Szene** an, nicht pauschal auf das Projekt.
 
-- **(a) Schreiber:** ausschließlich `composer_scene_transition`, mit `pipeline_state_run_id = COALESCE(_run_id, active_run_id)`. Kein Edge-Function- oder Client-Code schreibt direkt.
-- **(b) Leser:** nur Anzeige. `ClipsTab.tsx:400`, `VideoComposerDashboard.tsx:387,590,955,973` mappen sie auf `pipelineStateRunId` (`types/video-composer.ts:347`). **Keine Verzweigung** darauf, weder im Client noch serverseitig — `rg pipeline_state_run_id supabase/functions` = 0 Treffer. Guards, Watchdogs und der `stale_run`-Check der DB-Funktion arbeiten mit `active_run_id`, nicht mit dieser Spalte.
-- **(c) Heute ohne Run-Kontext:** genau die implizite Nebenwirkung, die vermieden werden soll. `COALESCE` zieht bei `_run_id IS NULL` still den vorhandenen `active_run_id` nach — auch wenn der aus einem alten, längst beendeten Lauf stammt. Die Spalte behauptet dann einen Run-Bezug, den der Aufrufer nie hergestellt hat. Ein expliziter Reset auf NULL passiert nirgends, auch nicht in `scene-hard-reset.ts`.
-- **(d) Empfehlung:** `guard_mode = runless → pipeline_state_run_id = NULL`, explizit gesetzt, nicht per COALESCE. Kein heutiger Leser bricht daran, weil keiner die Spalte auswertet. Damit wird die Spalte zu dem, was sie sein soll: "dieser Zustand wurde von Run X gesetzt" bzw. "von keinem Run". Die Alternative (Wert erhalten) ist technisch ebenso folgenlos, konserviert aber genau die Zweideutigkeit, die 0.4 beseitigen soll. UNKNOWN bleibt nur externes BI/Reporting außerhalb des Repos.
+Write-IDs: `composer-cancel-scene:cancel-active-run`, `composer-cancel-scene:cancel-no-active-run`, `composer-cancel-project:cancel-active-run`, `composer-cancel-project:teardown-no-active-run`.
 
----
+## 9. `hybrid-extend-scene`
 
-## Ergebnis / Vorschlag für den G0-Scope
+Bleibt in G0 unverändert und wird **nicht** in die permanente Runless-Allowlist aufgenommen. Er wird als Vertragslücke `hybrid-extend-scene:mark-failed-on-error` im Inventar geführt und läuft übergangsweise über `system_migration`, mit Contract-Test-Eintrag „bekannte Debt, Ziel G2: run_bound". In G2 bekommt der Extend-Pfad einen echten Run-Kontext.
 
-Bestätigt und unverändert übernommen: guarded `composer_scene_transition`, atomare Run-ID+Generation-Prüfung, RunGuard-Union, run-sicheres `failSceneState()`, atomarer Fehlertext, explizit löschbares Detail/Substate, Recovery-Primitive, Compatibility-Wrapper für 6er und 7er, atomarer Gap-Filler-Ersatz, Contract- und Race-Tests.
+## 10. Tests
 
-Aus Phase 0 kommen drei Ergänzungen dazu, die ich für G0 empfehle:
-1. **Transition-Audit-Tabelle** — Voraussetzung für den atomaren Pfad (0.3), für die Wrapper-Telemetrie (0.2) und für die Auditpflicht des Recovery-Primitives.
-2. **`anon`-EXECUTE auf beiden Signaturen entziehen** und die `auth.uid() IS NULL`-Lücke schließen (0.2). Reiner Rechteentzug, kein Drop, kein Verhaltensbruch für Edge Functions (die laufen als `service_role`).
-3. **`failSceneState()` als toten Pfad markieren** statt ihn als Bestandsvertrag zu führen (0.1) — er wird in G0 run-sicher gemacht und erst in G1–G4 verdrahtet.
+- **Contract-Test Guard-Modi**: jeder Aufruf des neuen Kerns liefert `guard_mode` und `write_id`; `runless` nur mit Grund aus der geschlossenen Menge; `runless` in Webhook-/Watchdog-Dateien verboten.
+- **Race-Test Run-Guard**: Run A startet, Run B startet, Cancel für A darf B nicht terminal setzen. Zusätzlich zwei konkurrierende Transitionen auf dieselbe Szene — genau eine gewinnt, die andere liefert `stale_run`/`stale_generation`.
+- **Pfad-Atomizität**: `plate_ready → lipsync_running` erzeugt genau ein `UPDATE`, drei Audit-Zeilen und keinen sichtbaren Zwischenzustand; ein Abbruch mittendrin lässt die Szene auf dem Ausgangszustand.
+- **`pipeline_state_run_id`**: nach `runless` exakt NULL, nach `run_bound` exakt `_run_id`.
+- **Grants**: `has_function_privilege('anon', …, 'EXECUTE')` ist auf allen drei Funktionen `false`; anon-Aufruf über die Data API liefert `forbidden`.
+- **Wrapper-Telemetrie**: Aufruf über 6er und 7er erzeugt je eine Audit-Zeile mit korrekter `source_signature`.
+- **Recovery**: stale Erwartungswerte ⇒ No-op + Audit-Zeile; passende Werte ⇒ Übergang + Audit-Zeile.
+- Bestehende Composer-Suite und `tsgo` müssen grün bleiben; die Lip-Sync-Frozen-Contract-Tests dürfen sich nicht bewegen.
 
-Zwei Punkte brauchen eine Produktentscheidung von dir, bevor G0 startet:
-- **Cancel-Semantik**: sollen `composer-cancel-project` und `composer-cancel-scene` run_bound werden (nur der aktive Run darf gecancelt werden) oder bleiben sie bewusst runless mit Pflichtgrund? Beide haben `active_run_id` bereits zur Hand.
-- **`hybrid-extend-scene`**: bleibt runless klassifiziert, oder soll es in G2/G3 einen echten Run-Kontext bekommen?
+## 11. Reihenfolge und Abschluss
 
-STOP. Keine Implementierung bis zur Freigabe dieser vier Antworten.
+1. Migration: Audit-Tabelle + Grants.
+2. Migration: neuer Kern, Pfadvalidierung, Recovery-Primitive, Revoke/Ownership-Fix, Wrapper-Umbau.
+3. `_shared/scene-state.ts`: v391-Loop entfernen, `guardMode`/`writeId` als Pflichtparameter, `failSceneState()` härten.
+4. Nur die zwei Cancel-Functions auf den neuen Vertrag heben (das ist Teil des Cancel-Vertrags, nicht G1).
+5. Tests, Deployment, Race-Nachweis, Bericht.
+
+Danach STOP. G1 erst nach separater Freigabe. Cast & World bleibt CW1 nach v431.
