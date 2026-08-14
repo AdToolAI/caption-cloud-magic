@@ -58,13 +58,14 @@ Deno.serve(async (req) => {
   );
   const out: any = {};
   const created: string[] = [];
+  let orderSeq = 900000 + Math.floor(Math.random() * 50000);
 
   const mk = async (extra: Record<string, unknown>) => {
     const { data, error } = await db
       .from("composer_scenes")
       .insert({
         project_id: PROJECT_ID,
-        order_index: 999,
+        order_index: orderSeq++,
         duration_seconds: 5,
         audio_plan: AUDIO_PLAN,
         lip_sync_with_voiceover: true,
