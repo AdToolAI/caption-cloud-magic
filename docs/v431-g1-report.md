@@ -25,25 +25,10 @@ G0-State-Core unverändert (eingefroren).
 
 ## 2. Nicht migriert (bewusst)
 
-- **`SceneCard:canceled`** — STOP statt Migration. Begründung: Der Client ruft heute bereits
-  `cancel-dialog-lipsync` (`reset: true`) auf; dessen Patch ist mit dem Client-Write
-  feldgleich (`lip_sync_status`, `lip_sync_applied_at`, `lip_sync_source_clip_url`,
-  `twoshot_stage`, `dialog_shots`, `lip_sync_with_voiceover`, `dialog_mode`,
-  `engine_override`, `clip_error`, `replicate_prediction_id`) und zusätzlich breiter
-  (Sync.so-Job-Cancel, `syncso_inflight_jobs`-Cleanup, Dispatch-Lock).
-  **Aber**: Die Edge-Function bricht bei gesetztem `lip_sync_applied_at` früh mit
-  `skipped: "already_applied"` ab. Der Client-Write setzt heute auch dann zurück.
-  Ein reines Entfernen des Client-Writes würde den Button „Lipsync komplett zurücksetzen“
-  für bereits angewandte Szenen funktional entwerten. Das ist eine **Semantik-Änderung**,
-  keine reine Deduplizierung → Freigabe erforderlich.
-  Optionen für die Freigabe:
-  1. Verhalten akzeptieren (angewandte Szenen sind nicht mehr per Button rücksetzbar), oder
-  2. `cancel-dialog-lipsync` darf bei `reset === true` den `already_applied`-Shortcut
-     überspringen (kleine Edge-Function-Änderung, kein neuer State-Vertrag).
-- **`cancel-dialog-lipsync:canceled`** — nicht angefasst. Kein `run_bound` möglich (kennt nur
-  den *jetzt* aktiven Run); Delegation an `composer-cancel-scene` ist fachlich **nicht**
-  deckungsgleich (Scene-Cancel ist ein Voll-Cancel, hier bleibt das Basis-Video erhalten).
-  Keine neue Runless-Regel angelegt.
+- **`cancel-dialog-lipsync:canceled`** (nicht-Reset-Cancel) — nicht angefasst. Kein `run_bound`
+  möglich (kennt nur den *jetzt* aktiven Run); Delegation an `composer-cancel-scene` ist
+  fachlich **nicht** deckungsgleich (Scene-Cancel ist ein Voll-Cancel, hier bleibt das
+  Basis-Video erhalten). Keine neue Runless-Regel angelegt.
 - Unverändert außerhalb des Änderungssets: `_shared/lipsync-fail.ts`, `generate-talking-head`,
   `report-lipsync-motion-probe`, alle Webhooks/Watchdogs/Fan-in, `hybrid-extend-scene` (G2),
   Lip-Sync-Frozen-Contracts, Cast & World, Reverse-Bridge.
