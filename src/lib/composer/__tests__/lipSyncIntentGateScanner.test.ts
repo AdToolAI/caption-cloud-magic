@@ -75,7 +75,10 @@ function unwrap(node: ts.Node): ts.Node {
     cur.parent &&
     (ts.isParenthesizedExpression(cur.parent) ||
       ts.isAsExpression(cur.parent) ||
-      ts.isNonNullExpression(cur.parent))
+      ts.isNonNullExpression(cur.parent) ||
+      (ts.isBinaryExpression(cur.parent) &&
+        cur.parent.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken &&
+        cur.parent.left === cur))
   ) {
     cur = cur.parent;
   }
@@ -246,7 +249,7 @@ describe('v430.1 — Intent-Gate-Scanner', () => {
     const counts: Record<string, number> = {};
     for (const hit of scanAll()) counts[hit.file] = (counts[hit.file] ?? 0) + 1;
 
-    console.log("HITS="+JSON.stringify(scanAll().map(h=>`${h.file}:${h.line}`)));
+    console.log("COUNTS="+JSON.stringify(counts));
     const drift: string[] = [];
     for (const file of new Set([...Object.keys(counts), ...Object.keys(ALLOWLIST)])) {
       const now = counts[file] ?? 0;
