@@ -151,3 +151,9 @@ dedupliziert nach Kleinschreibung des Namens, Brand gewinnt. Das ist der einzige
 Ort, an dem Nicht-`brand_*`-Daten noch in die Pipeline kommen — und damit der
 Angriffspunkt für den separaten CW1-Track (eine kanonische Bibliothek,
 langfristig nur `brand_*`). CW1 bleibt bewusst außerhalb von v431.
+
+**CW1-Vormerkung (nicht jetzt):** Zwei Angriffspunkte, beide erst nach v431.
+1. Zweite Quelle in `useUnifiedMentionLibrary` entfernen — nur noch `brand_*`.
+2. `useAccessibleCharacters`: Dedupe nach Kleinschreibung des Namens durch Dedupe
+   nach kanonischer Character-ID ersetzen. Zwei verschiedene Figuren dürfen nicht
+   zusammenfallen, nur weil beide „Anna" heißen.
