@@ -2861,7 +2861,6 @@ export default function SceneCard({
                           <button
                             type="button"
                             onClick={async () => {
-                              const s = scene as any;
                               const snapshot = captureLipSyncResetSnapshot(scene);
                               try {
                                 applyOptimisticResetMarkers(scene.id);
