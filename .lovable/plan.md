@@ -50,7 +50,15 @@ Neu: `src/lib/video-composer/__tests__/lipSyncIntentGateParity.test.ts`.
 
 Jedes Gate aus der Tabelle wird als reines Prädikat nachgebildet (exakt die heutige Bedingung, kein Refactor der Quelle) und über die 45 Fixtures ausgewertet. Der Test schreibt die heutige Wahrheitstabelle fest und schlägt fehl, sobald jemand ein Gate ändert, ohne diesen Vertrag anzufassen. Zusätzlich wird pro Gate die Differenzmenge zu `isLipSyncIntentional()` als Snapshot festgehalten — leere Differenz = paritätisch.
 
-Ergänzend ein Scanner-Test, der neue direkte `dialogMode ===` / `engineOverride ===` Lesegates in den Composer-Verzeichnissen gegen eine Allowlist prüft, damit während v430.1 keine neuen Gates entstehen.
+Ergänzend ein AST-Scanner-Test, der **jede lesende Verwendung** der Intent-Felder (`dialogMode`, `dialog_mode`, `engineOverride`, `engine_override`, `lipSyncWithVoiceover`, `lip_sync_with_voiceover`) in einem Bedingungskontext erfasst — nicht nur eine Vergleichssyntax. Erfasst werden mindestens:
+
+- `x === '…'`, `x !== '…'`
+- Truthiness: `if (dialogMode)`, `!dialogMode`, `&&`/`||`-Operanden
+- Ternäre Ausdrücke und boolesche Zuweisungen (`const isX = …`)
+- Helferaufrufe mit dem Feld als Argument: `isLipsyncEngine(engineOverride)`
+- Mengenprüfungen: `[…].includes(engineOverride)`, `SET.has(engineOverride)`
+
+Ausgenommen bleiben Writer und Mapping: Objekt-Property-Zuweisungen (`engineOverride: …`), Payload-/Snapshot-Bau, Persistenz und Rollback. Alle heute vorhandenen Lesegates stehen in einer Allowlist; jeder neue Treffer lässt den Test rot laufen.
 
 ## Bericht (Ergebnis dieses Auftrags)
 
@@ -58,13 +66,14 @@ Ergänzend ein Scanner-Test, der neue direkte `dialogMode ===` / `engineOverride
 
 - Datei:Zeile und Zweck (was wird sichtbar/aktiv)
 - heutige Bedingung
-- **paritätisch / weitet aus / verengt** gegenüber `isLipSyncIntentional()`
-- bei Abweichung: die konkreten Fixture-IDs der Differenz und ob die Änderung nutzerseitig sichtbar wäre
+- `parity = exact | broader | narrower | mixed` gegenüber `isLipSyncIntentional()`
+- **False-positive Fixture-IDs** (Gate true, SSoT false) und **False-negative Fixture-IDs** (SSoT true, Gate false) — getrennt ausgewiesen, auch wenn beide Mengen gleichzeitig belegt sind (`mixed`)
+- pro Differenzmenge: ob die Änderung nutzerseitig sichtbar wäre
 - Empfehlung für Schritt 2: umstellen / bewusst belassen (mit Begründung)
 
 Erwartete Muster, die der Bericht belegen muss:
-- `engineOverride === 'cinematic-sync'`-Gates **verengen** (kein `sync-segments`/`native-dialogue`, kein `lipSyncWithVoiceover === true`) und **weiten gleichzeitig aus** (ignorieren das Toggle-Veto `lipSyncWithVoiceover === false`).
-- `dialogMode === true`-Gates ignorieren ebenfalls das Toggle-Veto.
+- `engineOverride === 'cinematic-sync'`-Gates sind `mixed`: false-positive bei `lipSyncWithVoiceover=false + cinematic-sync` (Gate true, SSoT false) und false-negative bei `lipSyncWithVoiceover=true` ohne cinematic-sync sowie bei `sync-segments`/`native-dialogue`.
+- `dialogMode`-Gates sind mindestens false-positive gegenüber dem Toggle-Veto (`lipSyncWithVoiceover=false + dialogMode=true`).
 
 ## Abgrenzung
 
