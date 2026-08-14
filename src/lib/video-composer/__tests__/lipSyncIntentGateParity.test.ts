@@ -69,9 +69,10 @@ const FROZEN: Record<string, Frozen> = {
     falseNegativeCount: 16,
   },
   'scenecard-lipsync-actions': {
-    parity: 'mixed',
-    falsePositives: ['Lf-Dt-Ecs', 'Lf-Df-Ecs', 'Lf-Du-Ecs'],
-    falseNegativeCount: 20,
+    // v430.1 Schritt 2A — bewusst auf die SSoT umgestellt.
+    parity: 'exact',
+    falsePositives: [],
+    falseNegativeCount: 0,
   },
   'dialogstudio-wants-lipsync': {
     parity: 'mixed',
@@ -84,32 +85,28 @@ const FROZEN: Record<string, Frozen> = {
     falseNegativeCount: 8,
   },
   'clipprogress-is-cinematic': {
-    parity: 'mixed',
-    falsePositives: ['Lf-Dt-Ecs', 'Lf-Df-Ecs', 'Lf-Du-Ecs'],
-    falseNegativeCount: 20,
+    // v430.1 Schritt 2A — bewusst auf die SSoT umgestellt.
+    parity: 'exact',
+    falsePositives: [],
+    falseNegativeCount: 0,
   },
   'clipprogress-should-be-lipsync': {
-    parity: 'mixed',
-    falsePositives: [
-      'Lf-Dt-Eauto',
-      'Lf-Dt-Ecs',
-      'Lf-Dt-Ess',
-      'Lf-Dt-End',
-      'Lf-Dt-Eu',
-      'Lf-Df-Ecs',
-      'Lf-Du-Ecs',
-    ],
-    falseNegativeCount: 4,
+    // v430.1 Schritt 2A — bewusst auf die SSoT umgestellt.
+    parity: 'exact',
+    falsePositives: [],
+    falseNegativeCount: 0,
   },
   'inlineplayer-needs-lipsync': {
-    parity: 'broader',
-    falsePositives: ['Lf-Dt-Ecs', 'Lf-Df-Ecs', 'Lf-Du-Ecs'],
+    // v430.1 Schritt 2A — bewusst auf die SSoT umgestellt.
+    parity: 'exact',
+    falsePositives: [],
     falseNegativeCount: 0,
   },
   'inlineplayer-legacy-happyhorse-warn': {
-    parity: 'mixed',
-    falsePositives: ['Lf-Dt-Ecs', 'Lf-Df-Ecs', 'Lf-Du-Ecs'],
-    falseNegativeCount: 20,
+    // v430.1 Schritt 2A — bewusst auf die SSoT umgestellt.
+    parity: 'exact',
+    falsePositives: [],
+    falseNegativeCount: 0,
   },
   'clipstab-locks-user-duration': {
     parity: 'mixed',
@@ -117,9 +114,10 @@ const FROZEN: Record<string, Frozen> = {
     falseNegativeCount: 14,
   },
   'clipstab-poll-cinematic': {
-    parity: 'mixed',
-    falsePositives: ['Lf-Dt-Ecs', 'Lf-Df-Ecs', 'Lf-Du-Ecs'],
-    falseNegativeCount: 20,
+    // v430.1 Schritt 2A — bewusst auf die SSoT umgestellt.
+    parity: 'exact',
+    falsePositives: [],
+    falseNegativeCount: 0,
   },
   'preflight-dialog-checks': {
     parity: 'mixed',
@@ -127,9 +125,10 @@ const FROZEN: Record<string, Frozen> = {
     falseNegativeCount: 16,
   },
   'pipelineprogress-cinematic-generating': {
-    parity: 'mixed',
-    falsePositives: ['Lf-Dt-Ecs', 'Lf-Df-Ecs', 'Lf-Du-Ecs'],
-    falseNegativeCount: 20,
+    // v430.1 Schritt 2A — bewusst auf die SSoT umgestellt.
+    parity: 'exact',
+    falsePositives: [],
+    falseNegativeCount: 0,
   },
   'generateall-needs-lipsync': {
     parity: 'mixed',
@@ -178,7 +177,7 @@ describe('v430.1 — Fixture-Matrix', () => {
   });
 });
 
-describe('v430.1 — Gate-Parität (eingefroren, keine Umstellung)', () => {
+describe('v430.1 — Gate-Parität (2A umgestellt, Rest eingefroren)', () => {
   it('das Inventar enthält jedes eingefrorene Gate genau einmal', () => {
     const ids = INTENT_GATES.map((g) => g.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -195,26 +194,39 @@ describe('v430.1 — Gate-Parität (eingefroren, keine Umstellung)', () => {
     });
   }
 
-  it('kein Gate ist heute paritätisch zur SSoT', () => {
+  it('genau die sieben v430.1-2A-Gates sind paritätisch zur SSoT', () => {
     const exact = INTENT_GATES.filter((g) => {
       const { falsePositives, falseNegatives } = evaluate(g.predicate);
       return classifyParity(falsePositives, falseNegatives) === 'exact';
     });
-    expect(exact.map((g) => g.id)).toEqual([]);
+    expect(exact.map((g) => g.id).sort()).toEqual(
+      [
+        'clipprogress-is-cinematic',
+        'clipprogress-should-be-lipsync',
+        'clipstab-poll-cinematic',
+        'inlineplayer-legacy-happyhorse-warn',
+        'inlineplayer-needs-lipsync',
+        'pipelineprogress-cinematic-generating',
+        'scenecard-lipsync-actions',
+      ].sort(),
+    );
   });
 
-  it('jedes cinematic-sync-Gate verletzt das Toggle-Veto identisch', () => {
+  it('die verbliebenen cinematic-sync-Gates verletzen das Toggle-Veto identisch', () => {
     const vetoBreakers = ['Lf-Dt-Ecs', 'Lf-Df-Ecs', 'Lf-Du-Ecs'];
+    // v430.1 Schritt 2A: die umgestellten Gates respektieren das Veto jetzt.
+    for (const id of ['generateall-needs-lipsync', 'mouthprobe-cinematic']) {
+      const gate = INTENT_GATES.find((g) => g.id === id)!;
+      expect(evaluate(gate.predicate).falsePositives, id).toEqual(vetoBreakers);
+    }
     for (const id of [
       'clipprogress-is-cinematic',
       'clipstab-poll-cinematic',
       'pipelineprogress-cinematic-generating',
-      'generateall-needs-lipsync',
-      'mouthprobe-cinematic',
       'inlineplayer-legacy-happyhorse-warn',
     ]) {
       const gate = INTENT_GATES.find((g) => g.id === id)!;
-      expect(evaluate(gate.predicate).falsePositives, id).toEqual(vetoBreakers);
+      expect(evaluate(gate.predicate).falsePositives, id).toEqual([]);
     }
   });
 
