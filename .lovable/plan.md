@@ -28,8 +28,18 @@ RETURNS TABLE(applied boolean, state composer_scene_state, substate text, reason
 
 - `run_bound`: `_run_id` und `_generation` sind Pflicht (sonst `reason = 'guard_args_missing'`). Geprüft wird **atomar unter demselben Row Lock**: `active_run_id = _run_id` (sonst `stale_run`) **und** `plate_generation = _generation` (sonst `stale_generation`). Kein JS-seitiger Vorabvergleich mehr — das heutige TOCTOU-Fenster entfällt.
 - `runless`: `_run_id`/`_generation` müssen NULL sein (sonst `guard_mode_conflict`), `_runless_reason` ist Pflicht und muss aus der geschlossenen Menge stammen:
-  `user_cancel_no_active_run`, `project_teardown_no_active_run`, `image_scene_no_run_context`, `admin_recovery`, `system_migration`.
-  Ein unbekannter Grund wird abgelehnt (`runless_reason_invalid`). `hybrid_extend_*` ist **bewusst nicht** in dieser Menge.
+  `user_cancel_no_active_run`, `project_teardown_no_active_run`, `image_scene_no_run_context`, `system_migration`.
+  Ein unbekannter Grund wird abgelehnt (`runless_reason_invalid`). `admin_recovery` ist **entfernt** — dafür existiert ausschließlich `composer_recover_scene()`. `hybrid_extend_*` ist **bewusst nicht** in dieser Menge.
+
+### 1a. Kanten-Allowlist für runless (auch für direkte v2-Aufrufe)
+
+Ein legitimer Runless-Grund allein berechtigt **nicht** zu jeder state-machine-legalen Kante. Neue Tabelle `public.composer_runless_transition_rules(reason text, write_id text, from_state composer_scene_state, to_state composer_scene_state, note text, PRIMARY KEY(reason, write_id, from_state, to_state))`, service_role only, RLS an, kein `anon`/`authenticated`-Grant.
+
+Jeder `runless`-Aufruf — auch ein direkter service_role-Aufruf von v2 — muss unter dem Row Lock ein Match auf `(_runless_reason, _write_id, current_state, _to)` finden. Kein Match ⇒ `reason = 'runless_edge_not_allowed'`, kein Write, aber Audit-Zeile. Die Zeilen werden in der Migration aus dem Cancel-Vertrag (Abschnitt 8) und dem Image-Szenen-Pfad befüllt; `system_migration` läuft zusätzlich über `composer_transition_grandfather` (Abschnitt 5).
+
+### 1b. Runless-Gründe mit „kein aktiver Run"-Bedingung
+
+Für `user_cancel_no_active_run`, `project_teardown_no_active_run` und `image_scene_no_run_context` prüft die DB unter demselben `FOR UPDATE` zusätzlich `active_run_id IS NULL`. Ist zwischen dem vorbereitenden SELECT des Aufrufers und dem RPC ein Run B gestartet, ist der Aufruf ein **No-op** mit `reason = 'run_reappeared'` — Run B wird niemals durch einen runless-Cancel terminiert. Damit ist der No-active-run-Cancel-Race vollständig in der DB geschlossen.
 
 `pipeline_state_run_id`: bei `run_bound` = `_run_id`; bei `runless` **explizit `NULL`**. Kein `COALESCE(_run_id, active_run_id)` mehr.
 
@@ -58,7 +68,9 @@ RLS an, `service_role` voll, `authenticated` nur lesend auf eigene Projekte, kei
 ## 4. Sicherheit
 
 - `REVOKE EXECUTE … FROM anon` auf `composer_scene_transition/6`, `/7` und dem neuen Kern — inklusive `ALTER DEFAULT PRIVILEGES`-Korrektur bzw. explizitem Revoke, damit der `pg_default_acl`-Eintrag für Schema `public` nicht erneut greift.
-- Die Ownership-Lücke wird geschlossen: statt `IF auth.uid() IS NOT NULL AND NOT can_edit_composer_project(...)` gilt künftig — ist der Aufrufer **nicht** `service_role`, ist `auth.uid()` Pflicht und `can_edit_composer_project()` muss zutreffen; NULL ohne `service_role` ⇒ `forbidden`. Edge Functions laufen als `service_role` und sind davon nicht betroffen. Verifiziert wird das mit einem anon-Aufruf gegen die Data API (muss `forbidden`/403 liefern) und einem service_role-Aufruf (muss weiter funktionieren).
+- **Rollenerkennung (exakt festgelegt):** In `SECURITY DEFINER` ist `current_user` der Funktions-Owner und darf **nicht** zur Autorisierung verwendet werden. Maßgeblich ist ausschließlich der Request-Claim: `coalesce(current_setting('request.jwt.claims', true)::jsonb ->> 'role', current_setting('request.jwt.claim.role', true), '')`. Nur der Wert `service_role` gilt als privilegiert. Fällt der Claim leer aus (direkte SQL-Session ohne PostgREST), gilt der Aufrufer als **nicht** privilegiert.
+- Die Ownership-Lücke wird geschlossen: ist der Claim nicht `service_role`, ist `auth.uid()` Pflicht und `can_edit_composer_project(auth.uid(), project_id)` muss zutreffen; `auth.uid() IS NULL` ohne `service_role` ⇒ `forbidden`. Edge Functions laufen mit `service_role`-Claim und sind nicht betroffen.
+- Pflichttests: `anon` ⇒ verboten; `authenticated` + fremdes Projekt ⇒ verboten; `authenticated` + eigenes Projekt ⇒ erlaubt; `service_role` ⇒ erlaubt.
 
 ## 5. Compatibility-Wrapper
 
@@ -68,7 +80,9 @@ RLS an, `service_role` voll, `authenticated` nur lesend auf eigene Projekte, kei
 - Die Wrapper delegieren mit `source_signature = 'legacy_6'|'legacy_7'` und `_write_id = 'legacy_wrapper_6'|'legacy_wrapper_7'`.
 - Ein Wrapper-Aufruf **mit** `_run_id` läuft als `run_bound` — unverändert.
 - Ein Wrapper-Aufruf **ohne** `_run_id` ist **kein** genereller Runless-Freifahrtschein. `system_migration` ist ausschließlich in Kombination mit einer expliziten DB-seitigen Grandfather-Allowlist gültig, die auf `(source_signature, write_id, from_state, to_state)` matcht. Nur die dort eingetragenen Kantenpaare dürfen run-blind ausgeführt werden; jede andere Kante wird mit `reason = 'runless_not_grandfathered'` abgelehnt und trotzdem auditiert.
-- Die Allowlist wird beim Migrationsschreiben aus dem bestehenden Inventar (`docs/v431-prep-inventory.md`) befüllt, ist eine eigene Tabelle `public.composer_transition_grandfather` (service_role only) und schrumpft mit jeder Gruppe G1–G5, bis sie in G6 leer ist.
+- **Partial Guard — kein Fallback auf runless.** Die Wrapper wählen `run_bound` **nicht** allein anhand `_run_id IS NOT NULL`, sondern nur wenn `_run_id` **und** `_generation` gesetzt sind. Genau eines von beiden gesetzt ⇒ `reason = 'guard_args_missing'`, **kein Write**, Audit-Zeile. Weder `_run_id` ohne `_generation` noch `_generation` ohne `_run_id` darf jemals in den runless-Pfad fallen. Beides NULL ⇒ runless-Pfad mit Grandfather-Prüfung.
+- Ein Wrapper-Aufruf **ohne** beide Guard-Argumente durchläuft zusätzlich die Regeln aus 1a und 1b, die Grandfather-Allowlist ist also eine Verschärfung, kein Ersatz.
+- Die Grandfather-Allowlist wird beim Migrationsschreiben aus dem bestehenden Inventar (`docs/v431-prep-inventory.md`) befüllt, ist eine eigene Tabelle `public.composer_transition_grandfather` (service_role only) und schrumpft mit jeder Gruppe G1–G5, bis sie in G6 leer ist.
 - Erst wenn der Audit-Log über ein Beobachtungsfenster keine Fremdaufrufe zeigt **und** die Allowlist leer ist, ist ein Drop in G6 begründbar.
 
 ## 6. Recovery-Primitive
@@ -90,7 +104,7 @@ Wird run-sicher gemacht (Pflichtparameter `guardMode`, `writeId`, bei `run_bound
 
 `composer-cancel-scene` und `composer-cancel-project` laden `active_run_id` bereits. Beide erfassen künftig zusätzlich `plate_generation` und rufen:
 - mit aktivem Run: `guard_mode = 'run_bound'` und exakt diesem Run + dieser Generation. Wurde zwischenzeitlich ein neuer Run gestartet, schlägt der Cancel mit `stale_run` fehl und terminiert Run B **nicht**.
-- ohne aktiven Run: `guard_mode = 'runless'` mit `user_cancel_no_active_run` bzw. `project_teardown_no_active_run`.
+- ohne aktiven Run: `guard_mode = 'runless'` mit `user_cancel_no_active_run` bzw. `project_teardown_no_active_run`. Die DB prüft diesen Fall gemäß 1b erneut unter dem Row Lock: ist inzwischen Run B da, No-op mit `run_reappeared` — die Edge Function meldet das als „Abbruch nicht angewendet, neuer Run aktiv" und cancelt B nicht.
 
 Projekt-Abbruch wendet denselben Vertrag **pro Szene** an, nicht pauschal auf das Projekt.
 
@@ -102,7 +116,11 @@ Bleibt in G0 unverändert und wird **nicht** in die permanente Runless-Allowlist
 
 ## 10. Tests
 
-- **Contract-Test Guard-Modi**: jeder Aufruf des neuen Kerns liefert `guard_mode` und `write_id`; `runless` nur mit Grund aus der geschlossenen Menge; `runless` in Webhook-/Watchdog-Dateien verboten.
+- **Contract-Test Guard-Modi**: jeder Aufruf des neuen Kerns liefert `guard_mode` und `write_id`; `runless` nur mit Grund aus der geschlossenen Menge (`admin_recovery` existiert nicht mehr); `runless` in Webhook-/Watchdog-Dateien verboten.
+- **Runless-Kanten-Allowlist**: ein direkter service_role-v2-Aufruf mit gültigem Grund, aber nicht in `composer_runless_transition_rules` gelisteter Kante ⇒ `runless_edge_not_allowed`, kein Write, Audit-Zeile; gelistete Kante ⇒ angewendet.
+- **Runless No-active-run-Race**: bei gesetztem `active_run_id` liefern `user_cancel_no_active_run`, `project_teardown_no_active_run` und `image_scene_no_run_context` `run_reappeared` und schreiben nichts.
+- **Partial Guard**: Wrapper-Aufruf mit `_run_id` ohne `_generation` und umgekehrt ⇒ `guard_args_missing`, kein Write, Audit-Zeile, **kein** runless-Fallback.
+- **Rollenerkennung**: vier Fälle — `anon` verboten, `authenticated` + fremdes Projekt verboten, `authenticated` + eigenes Projekt erlaubt, `service_role` erlaubt. Zusätzlich Nachweis, dass `current_user` nirgends autorisierend ausgewertet wird.
 - **Race-Test Run-Guard**: Run A startet, Run B startet, Cancel für A darf B nicht terminal setzen. Zusätzlich zwei konkurrierende Transitionen auf dieselbe Szene — genau eine gewinnt, die andere liefert `stale_run`/`stale_generation`.
 - **Pfad-Atomizität**: `plate_ready → lipsync_running` läuft über vier Kanten (`plate_ready→audio_prep→audio_ready→lipsync_dispatched→lipsync_running`) und erzeugt genau ein `UPDATE` und **genau vier** Audit-Zeilen (`step_index` 1–4, die letzte mit `is_intermediate = false`) sowie keinen sichtbaren Zwischenzustand; ein Abbruch mittendrin lässt die Szene auf dem Ausgangszustand.
 - **State + Error atomar**: ein `failed`-Übergang mit `_error_text` schreibt Zustand und Fehlertext in einem `UPDATE`; ein Folgeübergang mit `_clear_error` leert ihn.
@@ -115,8 +133,8 @@ Bleibt in G0 unverändert und wird **nicht** in die permanente Runless-Allowlist
 
 ## 11. Reihenfolge und Abschluss
 
-1. Migration: Audit-Tabelle `composer_scene_transition_log` + Grandfather-Tabelle `composer_transition_grandfather` + Grants.
-2. Migration: neuer Kern (inkl. `_error_text`/`_clear_error`), Pfadvalidierung, Recovery-Primitive, Revoke/Ownership-Fix, Wrapper-Umbau auf die Grandfather-Allowlist.
+1. Migration: Audit-Tabelle `composer_scene_transition_log`, Regel-Tabelle `composer_runless_transition_rules`, Grandfather-Tabelle `composer_transition_grandfather` + Grants + Seed-Zeilen.
+2. Migration: neuer Kern (inkl. `_error_text`/`_clear_error`, Claim-basierte Rollenerkennung, 1a/1b-Prüfungen), Pfadvalidierung, Recovery-Primitive, Revoke/Ownership-Fix, Wrapper-Umbau inkl. Partial-Guard-Regel.
 3. `_shared/scene-state.ts`: v391-Loop entfernen, `guardMode`/`writeId` als Pflichtparameter, `failSceneState()` härten.
 4. Nur die zwei Cancel-Functions auf den neuen Vertrag heben (das ist Teil des Cancel-Vertrags, nicht G1).
 5. Tests, Deployment, Race-Nachweis, Bericht.
