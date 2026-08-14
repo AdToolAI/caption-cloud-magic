@@ -4946,20 +4946,51 @@ serve(async (req) => {
               pikaResp.status,
               errBody,
             );
-            // v431 G2.1 — Pika-Zweig sieht jetzt den bestehenden Run-Stempel.
+            // v431 G2.3 — Pika-Failure über gehärtete Primitive, nur wenn
+            // Run-Provenienz vorhanden ist. cinematic-sync Szenen bereinigen
+            // zusätzlich die Lip-Sync-Legacy-Felder atomar mit dem State.
+            const pikaStamp = sceneRunStamps.get(scene.id);
+            const pikaRunId = pikaStamp?.runId;
+            const pikaGeneration = pikaStamp?.generation;
+            const isCinematicSync = (scene.engineOverride ?? "auto") === "cinematic-sync";
             console.log(
-              `[compose-video-clips] v431_g2_1 write=failed/pika scene=${scene.id} ` +
-                `run=${sceneRunStamps.get(scene.id)?.runId ?? "none"} gen=${sceneRunStamps.get(scene.id)?.generation ?? "none"}`,
+              `[compose-video-clips] v431_g2_3 write=failed/pika scene=${scene.id} ` +
+                `run=${pikaRunId ?? "none"} gen=${pikaGeneration ?? "none"}`,
             );
-            await supabaseAdmin
-              .from("composer_scenes")
-              .update(
-                failedClipUpdate(
-                  (scene.engineOverride ?? "auto") === "cinematic-sync",
-                  `Pika ${pikaResp.status}`,
-                ),
-              )
-              .eq("id", scene.id);
+
+            if (pikaRunId && pikaGeneration) {
+              const { data: failRes, error: failErr } = await supabaseAdmin.rpc(
+                "composer_fail_scene_with_mirrors",
+                {
+                  _scene_id: scene.id,
+                  _run_id: pikaRunId,
+                  _generation: pikaGeneration,
+                  _write_id: "cvc:failed/pika",
+                  _error_text: `Pika ${pikaResp.status}`,
+                  _clip_status: "failed",
+                  _clear_lip_sync_fields: isCinematicSync,
+                },
+              );
+              const fr = (failRes ?? {}) as { applied?: boolean; reason?: string };
+              console.log(
+                `[compose-video-clips] v431_g2_3 failed/pika scene=${scene.id} ` +
+                  `result=${failErr ? `rpc_error:${failErr.message}` : (fr.applied ? "applied" : (fr.reason ?? "not_applied"))}`,
+              );
+            } else {
+              // Kein Run-Stempel → Legacy-Pfad erhalten.
+              console.warn(
+                `[compose-video-clips] v431_g2_3 write=failed/pika scene=${scene.id} reason=no_run_stamp fallback=legacy`,
+              );
+              await supabaseAdmin
+                .from("composer_scenes")
+                .update(
+                  failedClipUpdate(
+                    isCinematicSync,
+                    `Pika ${pikaResp.status}`,
+                  ),
+                )
+                .eq("id", scene.id);
+            }
             results.push({
               sceneId: scene.id,
               status: "failed",
