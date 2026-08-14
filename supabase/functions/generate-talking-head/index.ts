@@ -522,6 +522,46 @@ async function processHeyGenJob(opts: {
   await refundCredits(admin2, opts.userId, opts.videoId, opts.estimatedCostEur, opts.sceneId, 'HeyGen render timed out after 5min', { runId: opts.runId, plateGeneration: opts.plateGeneration });
 }
 
+/**
+ * v431 G2.2 — einziger Fehler-Writer dieser Funktion. Kanonischer State,
+ * `clip_status` und `clip_error` werden atomar unter demselben Row Lock mit
+ * Run-/Generations-/From-State-Guard geschrieben. Fehlt die Provenienz, wird
+ * gar nichts geschrieben (fail-closed).
+ */
+async function failSceneGuarded(
+  admin: ReturnType<typeof createClient>,
+  opts: {
+    sceneId: string;
+    runStamp?: { runId?: string; plateGeneration?: number };
+    writeId: string;
+    reason: string;
+    marker: string;
+  },
+): Promise<void> {
+  const runId = opts.runStamp?.runId;
+  const generation = opts.runStamp?.plateGeneration;
+  if (!runId || typeof generation !== 'number') {
+    console.error(
+      `[talking-head] v431_g2_2 ${opts.marker} scene=${opts.sceneId} result=missing_run_provenance`,
+    );
+    return;
+  }
+  const { data, error } = await admin.rpc('composer_finalize_talking_head', {
+    _scene_id: opts.sceneId,
+    _mode: 'fail',
+    _run_id: runId,
+    _generation: generation,
+    _write_id: opts.writeId,
+    _error_text: opts.reason.slice(0, 500),
+  });
+  const res = (data ?? {}) as { applied?: boolean; reason?: string };
+  console.log(
+    `[talking-head] v431_g2_2 ${opts.marker} scene=${opts.sceneId} run=${runId} gen=${generation} ` +
+      `result=${error ? `rpc_error:${error.message}` : (res.applied ? 'applied' : (res.reason ?? 'not_applied'))}`,
+  );
+}
+
+
 // Idempotent credit refund (per-job). Uses existing refund_ai_video_credits RPC
 // which expects a UUID generation_id. We deterministically derive a UUID from
 // the HeyGen video_id so retries are idempotent (same video_id → same UUID).
