@@ -158,7 +158,7 @@ drei Kategorien:
 | `auto-director-compose:216` | `plate_queued` | 1 — `transitionScene()` | Regulärer Einreihungs-Übergang. |
 | `motion-studio-superuser:513/526` | `plate_ready` | 1 — `transitionScene()` | Testharness setzt einen regulären Zustand; sollte denselben Wrapper nutzen wie Produktion, sonst testet der Harness eine Welt, die es nicht gibt. |
 | `qa-weekly-deep-sweep:318` | `plate_ready` | **3 — Recovery-Override** | Sweep repariert Szenen, die einen Clip haben, aber im Zustand hängen. Vorzustand ist per Definition inkonsistent. |
-| `hybrid-extend-scene:194` | `idle` | **3 — Recovery-Override** | Setzt eine Szene aus beliebigem Zustand auf `idle` zurück, um Extend zu erlauben. Kein legaler Übergang in der Maschine. |
+| ~~`hybrid-extend-scene:194`~~ | `idle` | **v431 G2.4 korrigiert: insert-default, kein Recovery-Override** | Kein Reset einer Bestandszeile — der Wert steht im INSERT der neu angelegten Szene. Kein Vorzustand, kein Übergang, damit auch keine Runless-Ausnahme nötig. Die drei echten Failure-Writes laufen seit G2.4 run-/generation-gebunden über `composer_fail_hybrid_extend_scene`. |
 | `qa-watchdog:228/312/358/447` | `failed` / `canceled` | **3 — Recovery-Override** | Springt aus beliebigen hängenden Zuständen auf terminal. Genau der Fall, den `failSceneState()` heute nicht ausdrücken kann, weil es einen gültigen Vorzustand voraussetzt. |
 | `recover-stuck-composer-clip:107` | `failed` | **3 — Recovery-Override** | Wie oben, zusätzlich mit Legacy-Reset (`lip_sync_status: null`) im selben Statement. |
 
