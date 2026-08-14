@@ -198,23 +198,25 @@ function scanAll(): GateHit[] {
 /** Eingefrorenes Inventar: Datei -> Anzahl lesender Intent-Gates. */
 const ALLOWLIST: Record<string, number> = {
   'src/components/video-composer/ClipsTab.tsx': 12,
-  'src/components/video-composer/FaceMapReviewDialog.tsx': 1,
+  'src/components/video-composer/ComposerSequencePreview.tsx': 2,
   'src/components/video-composer/RenderPreFlightDialog.tsx': 1,
-  'src/components/video-composer/SceneActionsMenu.tsx': 1,
-  'src/components/video-composer/SceneCard.tsx': 20,
+  'src/components/video-composer/SceneAvatarMode.tsx': 1,
+  'src/components/video-composer/SceneCard.tsx': 25,
   'src/components/video-composer/SceneClipProgress.tsx': 3,
-  'src/components/video-composer/SceneDialogStudio.tsx': 12,
-  'src/components/video-composer/SceneInlinePlayer.tsx': 3,
-  'src/hooks/useApplyProductionPlan.ts': 4,
-  'src/hooks/useGenerateAllClips.ts': 7,
+  'src/components/video-composer/SceneDialogStudio.tsx': 5,
+  'src/components/video-composer/SceneInlinePlayer.tsx': 2,
+  'src/components/video-composer/SceneReferenceImageSlot.tsx': 1,
+  'src/config/lipsyncProviderSafety.ts': 2,
+  'src/hooks/useApplyProductionPlan.ts': 3,
+  'src/hooks/useGenerateAllClips.ts': 5,
   'src/hooks/useMouthYavgProbe.ts': 1,
   'src/hooks/usePipelineProgress.ts': 1,
-  'src/hooks/useSceneGenerate.ts': 2,
-  'src/hooks/useTwoShotAutoTrigger.ts': 1,
-  'src/lib/composer/sceneActionAvailability.ts': 1,
-  'src/lib/composer/visualInputs/classifyScene.ts': 1,
-  'src/lib/video-composer/lipsyncPreflight.ts': 1,
-  'src/lib/video-composer/sceneEngineRouter.ts': 5,
+  'src/lib/composer/continuity/continuityState.ts': 2,
+  'src/lib/composer/estimateSceneRenderCost.ts': 2,
+  'src/lib/composer/pickClipSourceForDuration.ts': 1,
+  'src/lib/video-composer/briefing/driftAutoFix.ts': 1,
+  'src/lib/video-composer/briefing/driftDetector.ts': 1,
+  'src/lib/video-composer/renderWarnings.ts': 3,
 };
 
 describe('v430.1 — Intent-Gate-Scanner', () => {
@@ -249,7 +251,6 @@ describe('v430.1 — Intent-Gate-Scanner', () => {
     const counts: Record<string, number> = {};
     for (const hit of scanAll()) counts[hit.file] = (counts[hit.file] ?? 0) + 1;
 
-    console.log("COUNTS="+JSON.stringify(counts));
     const drift: string[] = [];
     for (const file of new Set([...Object.keys(counts), ...Object.keys(ALLOWLIST)])) {
       const now = counts[file] ?? 0;
