@@ -463,21 +463,40 @@ serve(async (req) => {
     let sceneRunStamps = new Map<string, { runId: string; generation: number }>();
     // v430 Step 4 — continuity input each scene was dispatched with (run snapshot).
     const continuityBindings = new Map<string, string | null>();
+    // v431 G2.3/S2 — Quellasset-Snapshot: beginSceneRun() räumt Output-Felder
+    // (base_video_url/clip_url) auf. Die Upload-Quelle wird deshalb VOR jeder
+    // Run-Akquise aus dem Request-Payload eingefroren und die Finalisierung
+    // liest ausschließlich aus diesem Snapshot — nie aus einem Output-Feld.
+    const uploadSourceSnapshot = new Map<string, string>();
+    for (const s of scenes as Array<{ id: string; clipSource?: string; uploadUrl?: string }>) {
+      if (s.clipSource === "upload" && s.uploadUrl) uploadSourceSnapshot.set(s.id, s.uploadUrl);
+    }
     try {
-      const earlyAiSceneIds = (scenes as Array<{ id: string; clipSource?: string }>)
-        .filter((s) => s.clipSource?.startsWith("ai-"))
+      // v431 G2.3/S2 — Upload-Szenen erhalten dieselbe kanonische Run-Provenienz
+      // wie ai-*-Szenen (kein Sonderpfad, keine Doppel-Runs).
+      const earlyRunSceneIds = (scenes as Array<{ id: string; clipSource?: string; uploadUrl?: string }>)
+        .filter((s) => s.clipSource?.startsWith("ai-") || (s.clipSource === "upload" && s.uploadUrl))
         .map((s) => s.id);
-      if (earlyAiSceneIds.length > 0) {
+      if (earlyRunSceneIds.length > 0) {
+        const needsAcquisition: string[] = [];
         if (runContext) {
           const { data: liveRows, error: liveErr } = await supabaseAdmin
             .from("composer_scenes")
             .select("id, active_run_id, plate_generation")
-            .in("id", earlyAiSceneIds);
+            .in("id", earlyRunSceneIds);
           if (liveErr) throw liveErr;
-          for (const id of earlyAiSceneIds) {
+          for (const id of earlyRunSceneIds) {
             const expected = runContext[id];
+            if (!expected) {
+              // Der kanonische Starter hat für diese Szene keinen Run erzeugt
+              // (z. B. reine Upload-Szene im gemischten Batch) → genau eine
+              // Akquise über denselben Vertrag, kein zweiter Run für Szenen,
+              // die bereits einen kanonischen Run mitbringen.
+              needsAcquisition.push(id);
+              continue;
+            }
             const live = (liveRows ?? []).find((row: any) => row.id === id);
-            if (!expected || !live || live.active_run_id !== expected.run_id || Number(live.plate_generation) !== Number(expected.generation)) {
+            if (!live || live.active_run_id !== expected.run_id || Number(live.plate_generation) !== Number(expected.generation)) {
               throw new Error(`stale_or_missing_run_context:${id}`);
             }
             sceneRunStamps.set(id, { runId: expected.run_id, generation: expected.generation });
@@ -485,8 +504,13 @@ serve(async (req) => {
         } else {
           // Legacy/direct callers still get a fresh identity, but all product
           // UI callers must use composer-start-scene-generation for full purge.
-          const stamps = await beginSceneRun(supabaseAdmin, earlyAiSceneIds, "compose-video-clips-legacy");
-          sceneRunStamps = new Map(stamps.map((s) => [s.sceneId, { runId: s.runId, generation: s.generation }]));
+          needsAcquisition.push(...earlyRunSceneIds);
+        }
+        if (needsAcquisition.length > 0) {
+          const stamps = await beginSceneRun(supabaseAdmin, needsAcquisition, "compose-video-clips-legacy");
+          for (const s of stamps) {
+            sceneRunStamps.set(s.sceneId, { runId: s.runId, generation: s.generation });
+          }
         }
       }
     } catch (preMarkErr) {
@@ -514,7 +538,10 @@ serve(async (req) => {
           userId: user.id,
           projectId,
           sceneIds: aiScenes.map((s) => s.id),
-          runIds: Array.from(sceneRunStamps.values()).map((s) => s.runId),
+          // v431 G2.3/S2 — nur AI-Runs sind kostenrelevant; Upload-Runs bleiben draußen.
+          runIds: aiScenes
+            .map((s) => sceneRunStamps.get(s.id)?.runId)
+            .filter((v): v is string => Boolean(v)),
           amountEuros: ceilingCost,
           metadata: { quoted_cost_euros: totalCost, scene_count: aiScenes.length },
         });
@@ -4116,6 +4143,8 @@ serve(async (req) => {
       try {
         if (scene.clipSource === "upload" && scene.uploadUrl) {
           // v431 G2.3 — Upload-Finalisierung über gehärtetes Domain-Primitive.
+          // Quelle ist der VOR der Run-Akquise eingefrorene Snapshot.
+          const uploadSourceUrl = uploadSourceSnapshot.get(scene.id) ?? scene.uploadUrl;
           const stamp = sceneRunStamps.get(scene.id);
           const uploadRunId = stamp?.runId;
           const uploadGeneration = stamp?.generation;
@@ -4124,56 +4153,48 @@ serve(async (req) => {
               `run=${uploadRunId ?? "none"} gen=${uploadGeneration ?? "none"}`,
           );
 
-          if (uploadRunId && uploadGeneration) {
-            const { data: finRes, error: finErr } = await supabaseAdmin.rpc(
-              "composer_finalize_upload_scene",
-              {
-                _scene_id: scene.id,
-                _run_id: uploadRunId,
-                _generation: uploadGeneration,
-                _write_id: "cvc:upload-complete",
-                _upload_url: scene.uploadUrl,
-              },
+          if (!uploadRunId || !uploadGeneration) {
+            // fail-closed: ohne Run-Provenienz kein State-/Output-Write.
+            console.error(
+              `[compose-video-clips] v431_g2_3 write=upload-complete scene=${scene.id} reason=upload_missing_run_provenance fail_closed=true`,
             );
-
-            if (finErr || (finRes as any)?.applied !== true) {
-              const reason = (finRes as any)?.reason ?? finErr?.message ?? "unknown";
-              console.warn(
-                `[compose-video-clips] v431_g2_3 upload-finalizer not applied scene=${scene.id} reason=${reason}`,
-              );
-              results.push({
-                sceneId: scene.id,
-                status: "failed",
-                error: `upload_finalizer:${reason}`,
-              });
-              continue;
-            }
-
             results.push({
               sceneId: scene.id,
-              status: "ready",
-              clipUrl: scene.uploadUrl,
+              status: "failed",
+              error: "upload_missing_run_provenance",
             });
-          } else {
-            // Kein Run-Stempel → kein G2-gesicherter Write. Legacy-Pfad bleibt
-            // erhalten, bis die Provenienz für diese Szene hergestellt ist.
-            console.warn(
-              `[compose-video-clips] v431_g2_3 write=upload-complete scene=${scene.id} reason=no_run_stamp fallback=legacy`,
-            );
-            await supabaseAdmin
-              .from("composer_scenes")
-              .update({
-                ...materializeCompatibilityOutput('base', { baseUrl: scene.uploadUrl }),
-                clip_status: "ready",
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", scene.id);
-            results.push({
-              sceneId: scene.id,
-              status: "ready",
-              clipUrl: scene.uploadUrl,
-            });
+            continue;
           }
+
+          const { data: finRes, error: finErr } = await supabaseAdmin.rpc(
+            "composer_finalize_upload_scene",
+            {
+              _scene_id: scene.id,
+              _run_id: uploadRunId,
+              _generation: uploadGeneration,
+              _write_id: "cvc:upload-complete",
+              _upload_url: uploadSourceUrl,
+            },
+          );
+
+          if (finErr || (finRes as any)?.applied !== true) {
+            const reason = (finRes as any)?.reason ?? finErr?.message ?? "unknown";
+            console.warn(
+              `[compose-video-clips] v431_g2_3 upload-finalizer not applied scene=${scene.id} reason=${reason}`,
+            );
+            results.push({
+              sceneId: scene.id,
+              status: "failed",
+              error: `upload_finalizer:${reason}`,
+            });
+            continue;
+          }
+
+          results.push({
+            sceneId: scene.id,
+            status: "ready",
+            clipUrl: uploadSourceUrl,
+          });
         } else if (scene.clipSource === "stock" && scene.stockKeywords) {
           // Stock: search and pick best match
           const stockResponse = await fetch(
@@ -4977,19 +4998,10 @@ serve(async (req) => {
                   `result=${failErr ? `rpc_error:${failErr.message}` : (fr.applied ? "applied" : (fr.reason ?? "not_applied"))}`,
               );
             } else {
-              // Kein Run-Stempel → Legacy-Pfad erhalten.
-              console.warn(
-                `[compose-video-clips] v431_g2_3 write=failed/pika scene=${scene.id} reason=no_run_stamp fallback=legacy`,
+              // fail-closed: ohne Run-Provenienz kein State-/Spiegel-Write.
+              console.error(
+                `[compose-video-clips] v431_g2_3 write=failed/pika scene=${scene.id} reason=pika_missing_run_provenance fail_closed=true`,
               );
-              await supabaseAdmin
-                .from("composer_scenes")
-                .update(
-                  failedClipUpdate(
-                    isCinematicSync,
-                    `Pika ${pikaResp.status}`,
-                  ),
-                )
-                .eq("id", scene.id);
             }
             results.push({
               sceneId: scene.id,

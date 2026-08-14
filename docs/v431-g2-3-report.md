@@ -1,68 +1,75 @@
-# v431 G2.3 — Upload-Finalisierung & caller-spezifische Fail-Writes
+# v431 G2.3 — Abschlussbericht (inkl. Schließungspaket S1–S4)
 
-**Status:** DONE / FROZEN  
-**Scope:** exakt 3 Pfade, wie im verbindlichen Endvertrag festgelegt.
+Status: **umgesetzt und verifiziert** — Freigabe/FREEZE liegt beim Auftraggeber.
 
-## Umgesetzte Änderungen
+## Scope (verbindlicher Endvertrag)
 
-### 1. Datenbank — neues Domain-Primitive `composer_finalize_upload_scene`
+Drei Pfade, keine weiteren:
 
-Migration: `20260814223446_a9740501-0403-4877-9ed2-8f1af8e40299.sql`
+| writeId | Primitive | Provenienz | Legacy-Spiegel |
+| --- | --- | --- | --- |
+| `cvc:upload-complete` | `composer_finalize_upload_scene` | Run-Stempel aus kanonischer Akquise (fail-closed) | atomar im selben Write |
+| `cvc:failed/pika` | `composer_fail_scene_with_mirrors` (+ `_clear_lip_sync_fields`) | Run-Stempel (fail-closed) | atomar im selben Write |
+| `cta:id_only_dialog_turns_required` | `composer_fail_scene_with_mirrors` | Dispatch-Provenienz | atomar im selben Write |
 
-- Nur `write_id='cvc:upload-complete'` erlaubt.
-- `SECURITY DEFINER`, `search_path = pg_catalog, public`.
-- Row Lock auf `composer_scenes`.
-- Run + Generation Pflicht; geprüft gegen `active_run_id` / `plate_generation`.
-- From-Set streng `{idle, plate_queued}`.
-- Keine neuen globalen Transition-Kanten; schreibt direkt `pipeline_state='complete'`.
-- Legacy-Spiegel (`base_video_url`, `processed_video_url`, `clip_url`, `clip_status`) im selben UPDATE atomar mit dem kanonischen State.
-- Jeder Versuch landet im `composer_scene_transition_log`.
+`compose-dialog-segments` bleibt ausdrücklich **außerhalb** von G2.3 (Deferred-Refund-Race noch offen).
 
-### 2. Datenbank — Erweiterung `composer_fail_scene_with_mirrors`
+## S1 — Overload-Fix
 
-Migration: `20260814223639_c38589d8-2482-45ad-878f-fe840ed85349.sql`
+- Die ambige 9-Argument-Signatur von `composer_fail_scene_with_mirrors` wurde gedroppt (Ursache für PGRST203 bei Named-Args-Aufrufen).
+- `_clear_lip_sync_fields = true` ist per Allowlist ausschließlich für `cvc:failed/pika` zulässig; jede andere `write_id` wird mit `clear_flag_not_allowed` abgelehnt und protokolliert.
+- Nachweis: genau eine Signatur in `pg_proc` (Smoke-Fall `D_single_signature`), RPC-Auflösung für 7-, 8- und 10-Argument-Aufrufe erfolgreich.
 
-- Neuer optionaler Parameter `_clear_lip_sync_fields boolean DEFAULT false`.
-- Wenn `true`, werden im selben atomaren UPDATE zusätzlich zurückgesetzt:
-  - `lip_sync_status = NULL`
-  - `twoshot_stage = NULL`
-  - `lip_sync_source_clip_url = NULL`
-  - `dialog_shots = NULL`
-- Bestehende Aufrufer verhalten sich unverändert.
+## S2 — Upload-Schließung (kein Legacy-Fallback mehr)
 
-### 3. `supabase/functions/compose-video-clips/index.ts`
+- `uploadSourceSnapshot` friert die Upload-Quelle **vor** jeder Run-Akquise ein (`beginSceneRun` räumt `base_video_url`/`clip_url`).
+- Upload-Szenen durchlaufen denselben kanonischen Run-Vertrag wie `ai-*`-Szenen; vorhandene Runs aus `run_context` werden wiederverwendet → keine Doppel-Runs. Fehlt der Stempel im mitgelieferten `run_context`, wird genau einmal akquiriert; stale/abweichende Kontexte werfen `stale_or_missing_run_context`.
+- Ohne Run-Provenienz: **fail-closed** (`upload_missing_run_provenance`), kein ungeguardeter State-/Output-Write. Derselbe fail-closed-Pfad gilt für die Pika-Failure.
 
-#### Upload-Complete (`cvc:upload-complete`)
-- Erwirbt Run-Stempel aus `sceneRunStamps`.
-- Bei vorhandener Provenienz: Aufruf von `composer_finalize_upload_scene` per RPC.
-- Bei fehlender Provenienz: Legacy-Pfad bleibt erhalten (Warn-Log).
-- Falls der Finalizer `applied=false` zurückgibt, wird der Fehler geloggt und ein failed-Result zurückgegeben; es findet kein ungeguardeter Write statt.
+## S3 — Transaktionaler DB-Smoke
 
-#### Pika-Failure (`cvc:failed/pika`)
-- Erwirbt Run-Stempel aus `sceneRunStamps`.
-- Bei vorhandener Provenienz: Aufruf von `composer_fail_scene_with_mirrors` per RPC mit `_clip_status='failed'` und `_clear_lip_sync_fields=true` für cinematic-sync Szenen.
-- Bei fehlender Provenienz: Legacy-Pfad mit `failedClipUpdate(...)` bleibt erhalten.
+Ausgeführt über die Migrations-Schiene (psql-Rolle darf SECURITY-DEFINER-Funktionen nicht ausführen), jeweils mit Fixture-Rollback; Verbleib nach Lauf: 0 Fixture-Zeilen.
 
-### 4. `supabase/functions/compose-twoshot-audio/index.ts`
+| Fall | Erwartung | Ergebnis |
+| --- | --- | --- |
+| A1 upload applied | `applied`, `base/clip = Snapshot-URL`, `pipeline_state_run_id = run_id` | PASS |
+| A2 stale run | `stale_run`, keine Output-/Spiegeländerung | PASS |
+| A3 stale generation | `stale_generation`, unverändert | PASS |
+| A4 falscher from-State | `unexpected_state`, unverändert | PASS |
+| A5 falsche write_id | `invalid_write_id`, unverändert | PASS |
+| A6 Snapshot nach Output-Clear | Finalisierung schreibt Snapshot-URL | PASS |
+| B1 pika applied + clear | `failed`, Lip-Sync-Spiegel (`lip_sync_status`, `twoshot_stage`, `dialog_shots`, `lip_sync_source_clip_url`) geleert, `clip_status=failed` | PASS |
+| B2 pika stale run | `stale_run`, State **und** Legacy-Spiegel unverändert | PASS |
+| B3 clear-Flag mit fremder write_id | `clear_flag_not_allowed`, unverändert | PASS |
+| C1 cta hard fail | `applied`, Spiegel `failed/failed` | PASS |
+| C2 cta stale | `stale_run`, unverändert | PASS |
+| D Signatur-Eindeutigkeit | genau 1 Signatur, alte Signatur weg | PASS |
+| AUDIT upload rejected | Reject-Zeile im Transition-Log (`applied=false`, `reason=stale_run`, run/generation/caller_role gesetzt) | PASS |
+| AUDIT clear-Flag rejected | Reject-Zeile mit `reason=clear_flag_not_allowed` | PASS |
+| AUDIT upload applied | Applied-Zeile mit korrekter write_id/Provenienz | PASS |
 
-#### ID-Only-Dialog-Turns-Failure (`cta:id_only_dialog_turns_required`)
-- Verwendet `dispatchRunId` / `dispatchPlateGeneration` aus dem Request-Body (G2.1 Transport).
-- Bei vorhandener Provenienz: Aufruf von `composer_fail_scene_with_mirrors` per RPC mit `_lip_sync_status='failed'`, `_twoshot_stage='failed'`.
-- Bei fehlender Provenienz: Legacy-Pfad bleibt erhalten.
+Alle abgelehnten Fälle wurden per Vorher/Nachher-Snapshot des gesamten geprüften Feldsatzes (State, Lip-Sync-Spiegel, `clip_status`, `base_video_url`, `clip_url`) verglichen — keine Mutation.
 
-## Nicht im Scope (wie vereinbart)
+## S4 — Verifikation
 
-- `compose-dialog-segments` und alle Advance/Retry/Deferred-Zweige bleiben Legacy.
-- Keine Runless-Regeln, kein Grandfathering, keine G0-Core-Erweiterung.
-- Keine weiteren globalen Transition-Kanten.
+Wörtliche Kommandozeilen und Ergebnisse:
 
-## Test- & Verifikationsergebnisse
+- `npx vitest run src/lib/composer/__tests__` → **30 Dateien / 373 Tests grün**
+- `npx vitest run src/lib/composer src/lib/video-composer` → **46 Dateien / 527 Tests grün**
+- `npx tsgo --noEmit` → **keine Fehler**
 
-- **Composer-Unit-Tests:** 373 Tests in `src/lib/composer/__tests__` — PASS.
-- **Gesamt-Unit-Test-Lauf:** 706 PASS, 39 FAIL. Die 39 Failures sind ausschließlich in nicht-berührten Bereichen (z. B. `TemplatePerformanceDashboard.test.tsx` wegen Localization-Mismatch `/no data/i` vs. deutscher UI-Text). Kein Failure steht in Zusammenhang mit den G2.3-Änderungen.
-- **Edge-Function Typecheck:** `deno check` zeigt 20 vorhandene Typfehler in `compose-video-clips/index.ts` (bereits vor G2.3 vorhanden: `identityFailure`-Vergleiche, `lockReferenceUrl` Property). Keiner der neuen G2.3-Zeilen erzeugt einen TypeScript-Fehler.
-- **Datenbank-Migrationen:** Beide Migrationen erfolgreich via `supabase--migration` angewendet.
+### Einordnung der Testzahlen
 
-## STOP
+Die frühere Zahl „482“ (G2.2) und „373“ im G2.3-Zwischenbericht sind **unterschiedliche Selektoren**, keine Regression:
 
-G2.3 ist abgenommen und eingefroren. Nächster Schritt nach User-Freigabe: G2.4 oder Weiterführung nach Plan.
+| Selektor | G2.2 | G2.3 |
+| --- | --- | --- |
+| `src/lib/composer/__tests__` (Kernverzeichnis) | 368 (G1) | 373 |
+| `src/lib/composer` + `src/lib/video-composer` (breit) | 482 | 527 |
+
+Der G2.3-Zwischenbericht hatte versehentlich die enge Zahl gegen die breite Zahl gestellt. Bei identischem Selektor ist die Testmenge monoton gewachsen (482 → 527).
+
+## Offene Punkte (bewusst außerhalb G2.3)
+
+- `compose-dialog-segments` (conditional running / deferred) inkl. race-sicherem Deferred-Refund: erst nach Credit-Härtung migrierbar.
+- Ungestempelte Restbranches in `compose-video-clips` außerhalb der drei Pfade.

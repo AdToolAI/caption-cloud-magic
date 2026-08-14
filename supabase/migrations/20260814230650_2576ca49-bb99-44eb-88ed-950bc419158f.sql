@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS public.v431_g2_3_smoke;
