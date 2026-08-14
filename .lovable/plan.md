@@ -17,7 +17,7 @@ Read-only-Vorbereitung, dann ein Smoke auf einer Wegwerf-Szene eines Testkontos,
 | Lip-Sync läuft | Base restauriert, `processed_video_url = NULL`, `plate_generation +1` |
 | bereits angewandt | Base restauriert, kein Refund, Generation +1 |
 | `expected_generation` veraltet | `stale_reset` (409), **null** DB-Writes (Snapshot byte-identisch) |
-| kein `base_video_url` und kein Legacy-Fallback | `no_base_plate` (422), fail closed |
+| kein `base_video_url` und kein Legacy-Fallback | `no_base_plate` (422), fail closed: **kein einziges Feld mutiert**, `plate_generation` explizit unverändert |
 | Callback mit alter Generation nach Reset | vom Callback-Guard abgewiesen, keine Szenenmutation |
 | Credits | `credit_reservations` + `credit_transactions` vorher/nachher identisch |
 | `audio_plan.twoshot` | genau die 13 Runtime-Keys weg, Planungs-Keys unverändert |
@@ -37,7 +37,7 @@ Diese Marker überschreiben in der Präsentationsschicht den Szenenwert, d.h. na
 
 Fix: im `catch` beider Handler die Marker auf die Snapshot-Werte zurücksetzen (`markLipSyncPending(id, prevLipSyncWithVoiceover)`, `markDialogModePending(id, prevDialogMode)`, `markEngineOverridePending(id, prevEngineOverride ?? "auto")`), plus ein Regressionstest in `sceneCardPresentation.test.ts`, der nach simuliertem Serverfehler den vollständigen Vorher-Zustand inkl. Pending-Marker einfordert.
 
-Zusätzlich: bei `stale_reset` ist Rollback allein nicht korrekt — der Serverzustand ist neuer als der Client. Dort nach dem Rollback ein Refetch der Szene auslösen statt den alten Snapshot als Wahrheit stehen zu lassen.
+Zusätzlich: bei `stale_reset` ist Rollback allein nicht korrekt — der Serverzustand ist neuer als der Client. Dort nach dem lokalen Rollback ein Refetch der Szene auslösen statt den alten Snapshot als Wahrheit stehen zu lassen. Nach dem Refetch werden die Pending-Marker aus dem **frisch geladenen Serverzustand** gesetzt bzw. geleert — sie dürfen nicht auf die Snapshot-Werte zurückfallen.
 
 ## 3. Finale G1-Teststufe
 
