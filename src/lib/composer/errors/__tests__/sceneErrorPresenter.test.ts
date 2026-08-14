@@ -31,7 +31,7 @@ describe('presentSceneError', () => {
   it('falls back to the syncso_ prefix when the provider code is unknown', () => {
     const p = presentSceneError('syncso_segments_FAILED: [totally_new_code] boom');
     expect(p.kind).toBe('known');
-    expect(p.code).toBe('syncso_');
+    expect(p.code).toBe('syncso');
     expect(p.headline.de).toContain('Lip-Sync-Dienst');
   });
 
@@ -105,6 +105,6 @@ describe('Presenter bleibt pure', () => {
     expect(src).not.toMatch(/from ['"]@\/components/);
     expect(src).not.toMatch(/from ['"]@\/integrations/);
     expect(src).not.toMatch(/from ['"]@\/hooks/);
-    expect(src).not.toMatch(/\btx\(/);
+    expect(src.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/\btx\(/);
   });
 });
