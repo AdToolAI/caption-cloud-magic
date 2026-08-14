@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import SceneStatusBadge from '@/components/video-composer/SceneStatusBadge';
 import { sceneState, clipStatusFromState, isSceneInFlight, legacyClipFailedEquivalentRow, legacyClipReadyEquivalentRow } from '@/lib/composer/sceneState';
 
 import { Card, CardContent } from '@/components/ui/card';
