@@ -24,8 +24,14 @@ Transaktional, mit Rollback, gegen dieselbe DELETE-Prädikatenmenge wie die Edge
 | # | Fall | Ausgangszeile | Erwartung |
 |---|---|---|---|
 | C1 | Cleanup vor Run-Erwerb | `pipeline_state='idle'`, `clip_status='pending'`, `active_run_id IS NULL`, alle Output-Felder NULL | genau 1 Zeile gelöscht |
-| C2 | Cleanup nach partiellem Run-Erwerb | wie C1, aber `active_run_id` gesetzt und `plate_generation` erhöht, `pipeline_state='plate_queued'` | genau 1 Zeile gelöscht (`active_run_id` ist kein Ausschlusskriterium) |
-| C3 | Zombie-Gegenprobe | wie C2, aber `clip_url` gesetzt (bzw. `clip_status='ready'`) | 0 Zeilen gelöscht, Zeile unverändert vorhanden → `hybrid_zombie_unresolved` |
+| C2 (Pflicht) | Cleanup nach partiellem Run-Erwerb | `pipeline_state='idle'`, `clip_status='pending'`, `active_run_id` **gesetzt**, `plate_generation` erhöht, alle Output-Felder NULL | genau 1 Zeile gelöscht (`active_run_id` ist kein Ausschlusskriterium) |
+| C2b (optional) | Partial-Run bereits in `plate_queued` | wie C2, aber `pipeline_state='plate_queued'` | genau 1 Zeile gelöscht |
+| C3 | Zombie-Gegenprobe | wie C2, aber `clip_url` gesetzt (bzw. `clip_status='ready'`) | 0 Zeilen gelöscht, Zeile vollständig unverändert → `hybrid_zombie_unresolved` |
+
+C2 bildet exakt den gefährlichen Zustand ab, der entsteht, wenn `composer_start_scene_run()`
+bereits committet hat und `hardResetScene()` bzw. der Eintritt nach `plate_queued` danach
+scheitert.
+
 
 Zusätzlich in C3 bestätigen, dass weder Output-Felder noch Legacy-Spiegel
 (`clip_status`, `clip_error`) verändert wurden.
