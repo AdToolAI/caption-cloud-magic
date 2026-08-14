@@ -20,7 +20,7 @@ Migration: `20260814223446_a9740501-0403-4877-9ed2-8f1af8e40299.sql`
 
 ### 2. Datenbank — Erweiterung `composer_fail_scene_with_mirrors`
 
-Migration: `20260815000500_v431_g2_3_fail_mirrors_extension.sql` (Tool-Name intern)
+Migration: `20260814223639_c38589d8-2482-45ad-878f-fe840ed85349.sql`
 
 - Neuer optionaler Parameter `_clear_lip_sync_fields boolean DEFAULT false`.
 - Wenn `true`, werden im selben atomaren UPDATE zusätzlich zurückgesetzt:
