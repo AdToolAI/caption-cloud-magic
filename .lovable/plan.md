@@ -56,9 +56,11 @@ zurückgegebenen IDs.
 Kein Refund (weder angewandt noch laufend), keine Manipulation von
 `composer_run_reservations`, kein Schreiben auf `wallets` oder `dialog_shots.refunded`.
 Damit bleibt die heute gemessene Ist-Semantik von `cancel-dialog-lipsync` exakt erhalten.
-Die frühere Formulierung „Refund im nicht-angewandten Fall unverändert" entfällt
-ersatzlos. Eine Vereinheitlichung der Credit-Semantik gehört in einen eigenen
-Ledger-Track, nicht in diesen Reset.
+`cancel-dialog-lipsync(reset:true)` löst keinen Refund aus, unabhängig davon, ob
+Lip-Sync noch läuft oder bereits angewandt wurde. `wallets`,
+`composer_run_reservations` und `dialog_shots.refunded` bleiben unverändert. Eine
+Vereinheitlichung der Credit-Semantik gehört in einen eigenen Ledger-Track, nicht in
+diesen Reset.
 
 Hinweis zur Vollständigkeit: `dialog_shots` wird beim Reset genullt; ein späterer
 Refund über diesen Datensatz wäre danach nicht mehr möglich. Das ist identisch zum
