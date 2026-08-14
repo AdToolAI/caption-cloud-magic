@@ -723,27 +723,37 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
     // Step 4: Update scene with processing status
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     if (sceneId) {
-      const sceneUpdate: Record<string, unknown> = {
-        character_image_url: imageUrl,
-        character_audio_url: audioUrl,
-        character_voice_id: voiceId || customVoiceId,
-        character_script: text,
-        talking_head_aspect: aspectRatio,
-        talking_head_resolution: resolution,
-        replicate_prediction_id: videoId, // reusing column to store HeyGen video_id
-        pipeline_state: 'plate_rendering',
-        clip_status: 'generating',
-        ...materializeCompatibilityOutput('clear'),
-        updated_at: new Date().toISOString(),
-      };
-      if (composerCharacterId) {
-        sceneUpdate.mentioned_character_ids = [composerCharacterId];
+      // v431 G2.2 — fail-closed: ohne vollständige Run-Provenienz kein Scene-Write.
+      if (!runId || typeof plateGeneration !== 'number') {
+        console.error(
+          `[talking-head] v431_g2_2 write=plate-rendering scene=${sceneId} result=missing_run_provenance`,
+        );
+        return new Response(JSON.stringify({ error: 'missing_run_provenance' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
+      const { data: startRes, error: startErr } = await admin.rpc('composer_finalize_talking_head', {
+        _scene_id: sceneId,
+        _mode: 'start',
+        _run_id: runId,
+        _generation: plateGeneration,
+        _write_id: 'talking_head_plate_rendering',
+        _character_image_url: imageUrl ?? null,
+        _character_audio_url: audioUrl,
+        _character_voice_id: voiceId || customVoiceId || null,
+        _character_script: text ?? null,
+        _talking_head_aspect: aspectRatio,
+        _talking_head_resolution: resolution,
+        _replicate_prediction_id: videoId,
+        _mentioned_character_ids: composerCharacterId ? [composerCharacterId] : null,
+      });
+      const sr = (startRes ?? {}) as { applied?: boolean; reason?: string };
       console.log(
-        `[talking-head] v431_g2_1 write=plate-rendering scene=${sceneId} run=${runId ?? "none"} gen=${plateGeneration ?? "none"}`,
+        `[talking-head] v431_g2_2 write=plate-rendering scene=${sceneId} run=${runId} gen=${plateGeneration} ` +
+          `result=${startErr ? `rpc_error:${startErr.message}` : (sr.applied ? 'applied' : (sr.reason ?? 'not_applied'))}`,
       );
-      await admin.from('composer_scenes').update(sceneUpdate).eq('id', sceneId);
     }
+
 
     // Step 5: Schedule background polling
     const estimatedCostEur = 0.30; // HeyGen photo avatar pricing approximation
