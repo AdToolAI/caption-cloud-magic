@@ -2,7 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.45.0';
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
-import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
