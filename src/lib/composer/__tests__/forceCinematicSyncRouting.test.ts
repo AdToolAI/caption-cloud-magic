@@ -207,8 +207,13 @@ describe('v430.1 Gate 9 — forceCinematicSync Routing-No-Op', () => {
       };
       return forceCinematicSyncNeu(i) && !isLipSyncIntentional(f);
     });
-    // Genau die Toggle-Veto-Fälle: buttonIntendsLipSync routet sie trotzdem.
+    // Die Menge umfasst sowohl Toggle-Veto-Fälle als auch Szenen ganz ohne
+    // Opt-in-Signal — `buttonIntendsLipSync` routet sie bewusst trotzdem.
     expect(broaderThanSsot.length).toBeGreaterThan(0);
-    expect(broaderThanSsot.every((f) => f.lipSyncWithVoiceover === false)).toBe(true);
+    expect(
+      broaderThanSsot.some((f) => f.lipSyncWithVoiceover === false),
+      'Toggle-Veto-Fälle müssen enthalten sein',
+    ).toBe(true);
+    expect(broaderThanSsot.every((f) => isLipSyncIntentional(f) === false)).toBe(true);
   });
 });
