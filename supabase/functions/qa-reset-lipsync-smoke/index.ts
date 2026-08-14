@@ -15,7 +15,7 @@ const AUDIO_PLAN = {
     last_segments: [1],
     audio_input_mode: "mix",
     passes: [1],
-    syncJobs: ["job-1", "job-2"],
+    syncJobs: { jobs: ["job-3"] },
     heartbeat: { at: "now" },
     lipsyncedAt: "2026-01-01",
     diagnostics: { x: 1 },
@@ -71,7 +71,8 @@ Deno.serve(async (req) => {
         lip_sync_with_voiceover: true,
         dialog_mode: true,
         engine_override: "cinematic-sync",
-        dialog_shots: [{ shot: 1, job_id: "job-1" }, { shot: 2, job_id: "job-2" }],
+        dialog_shots: { shots: [{ sync_job_id: "job-1" }], passes: [{ job_id: "job-2" }] },
+        replicate_prediction_id: "sync:job-4",
         ...extra,
       })
       .select("id")
