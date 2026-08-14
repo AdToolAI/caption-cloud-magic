@@ -65,14 +65,38 @@ function scan(file: string): Violation[] {
     out.push({ file: relative(ROOT, file), line: line + 1, text: text.slice(0, 160) });
   };
 
-  const visit = (node: ts.Node) => {
+  const USER_PROP_NAMES = new Set(['de', 'en', 'es', 'title', 'description', 'label', 'placeholder', 'headline', 'hint']);
+
+  const checkExpr = (node: ts.Node) => {
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
       check(node.text, node.getStart(sf));
     } else if (ts.isTemplateExpression(node)) {
       check(node.head.text, node.getStart(sf));
       node.templateSpans.forEach((span) => check(span.literal.text, span.getStart(sf)));
+    } else if (ts.isConditionalExpression(node)) {
+      checkExpr(node.whenTrue);
+      checkExpr(node.whenFalse);
+    }
+  };
+
+  const visit = (node: ts.Node) => {
+    // Sichtbare Texte: tx()/Objekt-Properties mit Kunden-Slots, JSX-Text,
+    // JSX-Attribute wie title/placeholder. Interne IDs ('cinematic-sync'),
+    // Konsolen-Logs und Storage-Keys werden bewusst nicht geprüft.
+    if (ts.isPropertyAssignment(node)) {
+      const name = node.name.getText(sf).replace(/['"]/g, '');
+      if (USER_PROP_NAMES.has(name)) checkExpr(node.initializer);
     } else if (ts.isJsxText(node)) {
       check(node.text, node.getStart(sf));
+    } else if (ts.isJsxAttribute(node)) {
+      const name = node.name.getText(sf);
+      if (USER_PROP_NAMES.has(name) && node.initializer) {
+        if (ts.isJsxExpression(node.initializer) && node.initializer.expression) {
+          checkExpr(node.initializer.expression);
+        } else {
+          checkExpr(node.initializer);
+        }
+      }
     }
     ts.forEachChild(node, visit);
   };
