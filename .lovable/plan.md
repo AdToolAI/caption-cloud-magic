@@ -81,30 +81,48 @@ Verbindlich für G2.2:
    Eskalation, kein Hard-Fail. Rückgabe `{ ok: true, ignored: 'job_slot_mismatch' }`
    plus Diagnose-Log mit erwarteter/erhaltener Job-ID; die Dispatch-Log-Zeile
    (rein diagnostisch) darf weiterhin geschrieben werden.
-3. **Match = geguardeter Write.** Nur bei Übereinstimmung wird der
-   Run-Snapshot verwendet; der Hard-Fail-Zweig schreibt den Scene-State dann
-   über `transitionSceneV2()` (`run_bound`, `expected_generation` aus dem
-   Slot). Bleibt der Slot ohne Run-Snapshot (Alt-Zeilen), bleibt der heutige
-   Legacy-Write mit Log-Marker `run=none` — keine neue Ausnahme.
+3. **Match = geguardeter Write, sonst fail-closed.** Nur bei Übereinstimmung
+   wird der Run-Snapshot verwendet; der Hard-Fail-Zweig schreibt den
+   Scene-State dann über `transitionSceneV2()` (`run_bound`,
+   `expected_generation` aus dem Slot). Fehlt dem Slot der vollständige
+   Run-Snapshot (Alt-Zeilen), gibt es **keinen** `composer_scenes`-Write:
+   Diagnose-Log und Pass-/Slot-Verarbeitung laufen weiter, der Scene-State
+   bleibt unangetastet. **Kein Legacy-State-Fallback.**
 4. **Immutability bleibt.** `update_dialog_pass_slot` schützt `run_id` /
    `plate_generation` bereits; G2.2 erweitert den Schutz auf `job_id`, sobald
    sie gesetzt ist — mit der bestehenden Reset-Semantik als einzigem Weg, sie
    wieder freizugeben (expliziter Nullsetz-Pfad in `compose-dialog-segments`).
+5. **Reset-Nachweis (Contract-Test).** Ein `job_id = NULL`-Reset darf niemals
+   dazu führen, dass ein Job aus einer **neuen** Generation den alten
+   `run_id` / `plate_generation`-Snapshot erbt. Der Test belegt genau eine der
+   beiden gültigen Bedingungen: Reset/Retry passiert garantiert innerhalb
+   desselben Runs und derselben Generation, **oder** der Slot wird bei neuem
+   Run vollständig neu erstellt. Trifft keine zu, ist der Reset-Pfad
+   entsprechend zu härten, bevor G2.2 abgenommen wird.
 
 ## Umsetzungsreihenfolge nach GO
 
 1. Migration: `job_id`-Immutability-Erweiterung in `update_dialog_pass_slot`
-   (inkl. explizit erlaubtem Reset-Pfad).
-2. `generate-talking-head`: geguardete Output-Updates + `transitionSceneV2()`
-   für `plate_rendering` / `plate_ready` / `failed`.
-3. `report-lipsync-motion-probe`: Job-Slot-Match-Gate + geguardeter Hard-Fail.
-4. Stale-Run-Smokes auf echter DB:
+   (inkl. explizit erlaubtem Reset-Pfad) und — falls für die atomare Variante
+   gewählt — das Talking-Head-Finalisierungs-Primitive mit Row Lock.
+2. `generate-talking-head`: geguardete Output-Updates (Run + Generation +
+   From-State) + `transitionSceneV2()` für `plate_rendering` / `plate_ready` /
+   `failed`; fail-closed bei fehlender Provenienz.
+3. `report-lipsync-motion-probe`: Job-Slot-Match-Gate + geguardeter Hard-Fail,
+   fail-closed ohne Slot-Run-Snapshot.
+4. Smokes auf echter DB:
    - alter Run schreibt `plate_ready` → 0 Zeilen, Output unverändert, kein State
+   - **Cancel-Race (verpflichtend):** Run A aktiv → User-Cancel → verspätetes
+     Talking-Head-Completion für Run A → weder Output noch State ändern sich
    - aktueller Run → Output + State wie heute
-   - Probe mit falscher `job_id` → No-op, Slot & Szene unverändert
+   - `sceneId` ohne vollständigen Run-Snapshot → gar kein Scene-Write
+   - Probe mit falscher/NULL `job_id` → No-op, Slot & Szene unverändert
    - Probe mit korrekter `job_id` → Eskalation/Hard-Fail wie heute
-5. Tests + `tsgo`, Bericht in `docs/v431-g2-report.md`.
+   - Probe mit korrektem Job, aber ohne Slot-Run-Snapshot → kein State-Write
+5. Contract-Tests (Slot-Immutability inkl. `job_id`-Reset-Nachweis) + `tsgo`,
+   Bericht in `docs/v431-g2-report.md`.
 6. **STOP vor G2.3.**
+
 
 ## Baseline für den Bericht
 
