@@ -1,5 +1,5 @@
 /**
- * Tab-unabhängiger Auto-Trigger für die Two-Shot/Cinematic-Sync Lip-Sync-Pipeline.
+ * Tab-unabhängiger Auto-Trigger für die Two-Shot/Lip-Sync Lip-Sync-Pipeline.
  *
  * Findet alle Szenen im Projekt mit:
  *   engine_override = 'cinematic-sync'
@@ -94,7 +94,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         if (error || !data) return;
 
         // ── Talking-Head Master Self-Heal ───────────────────────────────
-        // Cinematic-Sync scenes whose `clip_url` is a raw `/talking-head-renders/`
+        // Lip-Sync scenes whose `clip_url` is a raw `/talking-head-renders/`
         // file are invalid masters for v5 lip-sync. compose-dialog-segments
         // blocks them with `raw_talking_head_source_blocked`; here we reset
         // BEFORE audio-prep / candidate selection so the next "Alle generieren"
@@ -191,7 +191,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // (`lipsync-watchdog` cron + `reset-lipsync-scene` user action).
         // The previous client-side stale resets caused the infinite loop:
         // a real provider job was misclassified as "stale" → set to pending
-        // → re-dispatched → old Sync.so jobs orphaned, new ones queued.
+        // → re-dispatched → old running lip-sync tasks orphaned, new ones queued.
         const runningSyncJobs = (data as any[]).filter(
           (d) =>
             isDialogEngine(d.engine_override) &&
@@ -208,7 +208,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         }
 
         // ── AUDIO-PLATE SELF-HEAL ────────────────────────────────────────
-        // Cinematic-Sync braucht zwingend `audio_plan.twoshot.url` (gemerged
+        // Lip-Sync braucht zwingend `audio_plan.twoshot.url` (gemerged
         // VO aus compose-twoshot-audio). Bei manchen Flows (Engine nach
         // Master-Render umgestellt, Dialog-Toggle nachträglich aktiviert,
         // oder stiller Exception-Abbruch in compose-video-clips' Prep-Block)
@@ -569,7 +569,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
               if (reason === 'tts_failed' || reason === 'no_voiceover') {
                 emitPipelineEvent({ type: 'lipsync:end' });
                 toast({
-                  title: tx({ de: 'Cinematic-Sync braucht ein Voiceover', en: 'Cinematic-Sync needs a voiceover', es: 'Cinematic-Sync necesita un voiceover' }),
+                  title: tx({ de: 'Lip-Sync braucht ein Voiceover', en: 'Lip-Sync needs a voiceover', es: 'Lip-Sync necesita un voiceover' }),
                   description:
                     message || tx({ de: 'Bitte im Voiceover-Tab eine Stimme prüfen, dann erneut versuchen.', en: 'Please check a voice in the Voiceover tab, then try again.', es: 'Comprueba una voz en la pestaña Voiceover y vuelve a intentarlo.' }),
                   variant: 'destructive',

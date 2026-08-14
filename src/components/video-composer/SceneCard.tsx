@@ -491,7 +491,7 @@ export default function SceneCard({
   }, []);
 
   // June 2026 Lip-Sync Policy — when the scene is routed through the
-  // Cinematic-Sync / Sync.so pipeline, only HappyHorse (primary) and
+  // Lip-Sync / Sync.so pipeline, only HappyHorse (primary) and
   // Hailuo (fallback) are certified as master plates. Auto-migrate any
   // legacy scene whose clipSource is still set to a non-certified provider
   // (e.g. ai-kling, ai-veo from the previous 3-provider policy) onto the
@@ -537,8 +537,8 @@ export default function SceneCard({
                                 const prevEngine = scene.engineOverride ?? "auto";
                                 const prevLipSync = scene.lipSyncWithVoiceover === true;
                                 // When the user turns Dialog & Lip-Sync ON we MUST also
-                                // route the scene through the Cinematic-Sync pipeline
-                                // (Hailuo plate → Sync.so lipsync overlay) — otherwise
+                                // route the scene through the Lip-Sync pipeline
+                                // (base clip → Sync.so lipsync overlay) — otherwise
                                 // `compose-video-clips` auto-routes single-speaker
                                 // dialog scenes to HeyGen, which produces an isolated
                                 // avatar bust instead of integrating the dialogue into
@@ -1175,10 +1175,10 @@ export default function SceneCard({
                             className="h-5 px-1.5 text-[9px] gap-1 cursor-pointer border-emerald-500/60 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
                             title={
                               lang === "de"
-                                ? tx({ de: `${speakerCount} Sprecher erkannt. Beim Generieren läuft die Dialog-Shot Pipeline: pro Sprecher-Turn ein eigener Hailuo-Plate (Mund frei, eigenes Portrait) + dedizierter Sync.so Lip-Sync, danach zu einem Clip gestitcht. Skaliert auf beliebig viele Sprecher. Klick öffnet das Dialog-Studio.`, en: `${speakerCount} speakers detected. The dialog-shot pipeline runs during generation: each speaker turn gets its own Hailuo plate (mouth free, own portrait) + dedicated Sync.so lip-sync, then stitched into a clip. Scales to any number of speakers. Click opens the dialog studio.`, es: `${speakerCount} oradores detectados. La tubería de tomas de diálogo se ejecuta durante la generación: cada turno de orador obtiene su propia placa Hailuo (boca libre, retrato propio) + sincronización labial dedicada de Sync.so, luego se une en un clip. Se escala a cualquier número de oradores. El clic abre el estudio de diálogo.` })
+                                ? tx({ de: `${speakerCount} Sprecher erkannt. Beim Generieren läuft die Dialog-Shot Pipeline: pro Sprecher-Turn ein eigener Basis-Clip (Mund frei, eigenes Portrait) + dedizierter Lippensynchronisation, danach zu einem Clip gestitcht. Skaliert auf beliebig viele Sprecher. Klick öffnet das Dialog-Studio.`, en: `${speakerCount} speakers detected. The dialog-shot pipeline runs during generation: each speaker turn gets its own base clip (mouth free, own portrait) + dedicated lip-sync, then stitched into a clip. Scales to any number of speakers. Click opens the dialog studio.`, es: `${speakerCount} oradores detectados. La tubería de tomas de diálogo se ejecuta durante la generación: cada turno de orador obtiene su propia clip base (boca libre, retrato propio) + sincronización labial dedicada, luego se une en un clip. Se escala a cualquier número de oradores. El clic abre el estudio de diálogo.` })
                                 : lang === "es"
                                   ? `${speakerCount} hablantes detectados. Al renderizar se ejecuta el pipeline Dialog-Shot: un plate Hailuo + lip-sync Sync.so dedicado por turno, después concat a un clip. Escala a N hablantes. Click abre el Dialog Studio.`
-                                  : `${speakerCount} speakers detected. Generating runs the Dialog-Shot pipeline: one dedicated Hailuo plate + Sync.so lip-sync per speaker turn, then concatenated to one clip. Scales to N speakers. Click opens Dialog Studio.`
+                                  : `${speakerCount} speakers detected. Generating runs the Dialog-Shot pipeline: one dedicated base clip + lip-sync per speaker turn, then concatenated to one clip. Scales to N speakers. Click opens Dialog Studio.`
                             }
                             onClick={() => setSplitConfirmOpen(true)}
                           >
@@ -1218,7 +1218,7 @@ export default function SceneCard({
                             >
                               ⚡ Fast Dialog · 1-Call (Sync.so Segments) — Default
                             </SelectItem>
-                            {/* HeyGen Talking-Head option removed — Composer scenes always use Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Portrait lip-sync lives in the standalone /talking-head module. */}
+                            {/* HeyGen Talking-Head option removed — Composer scenes always use Lip-Sync (HappyHorse/Hailuo → Sync.so). Portrait lip-sync lives in the standalone /talking-head module. */}
 
                             <SelectItem value="broll" className="text-xs">
                               📺 B-Roll (Off-Screen-VO)
@@ -1230,7 +1230,7 @@ export default function SceneCard({
                                 dialog scenes use v69 unified single-face preclip. */}
                           </SelectContent>
                         </Select>
-                        {/* Cinematic-Sync quick-switch lives in ClipsTab as a prominent action button — kept out of here to avoid duplication. */}
+                        {/* Lip-Sync quick-switch lives in ClipsTab as a prominent action button — kept out of here to avoid duplication. */}
                         {(() => {
                           const warns = validateSceneForCinematicSync(scene);
                           if (warns.length === 0) return null;
@@ -2400,7 +2400,7 @@ export default function SceneCard({
                     onClick={async () => {
                       if (
                         !confirm(
-                          tx({ de: "Lip-Sync für diese Szene wirklich stoppen und deaktivieren?\n\nLaufende Sync.so-Jobs werden abgebrochen und Dialog-Shots geleert. Das gerenderte Basis-Video bleibt erhalten.", en: "Really stop and disable lip sync for this scene?\n\nRunning Sync.so jobs will be cancelled and dialog shots cleared. The rendered base video is preserved.", es: "¿Detener y desactivar realmente la sincronización labial de esta escena?\n\nLos trabajos de Sync.so en curso se cancelarán y los dialog shots se borrarán. El video base renderizado se conserva." }),
+                          tx({ de: "Lip-Sync für diese Szene wirklich stoppen und deaktivieren?\n\nLaufende laufende Lip-Sync-Aufträge werden abgebrochen und Dialog-Shots geleert. Das gerenderte Basis-Video bleibt erhalten.", en: "Really stop and disable lip sync for this scene?\n\nRunning running lip-sync tasks will be cancelled and dialog shots cleared. The rendered base video is preserved.", es: "¿Detener y desactivar realmente la sincronización labial de esta escena?\n\nLos tareas de sincronización labial en curso se cancelarán y los dialog shots se borrarán. El video base renderizado se conserva." }),
                         )
                       )
                         return;
@@ -2447,7 +2447,7 @@ export default function SceneCard({
                         toast({
                           title: tx({ de: "Lip-Sync gestoppt", en: "Lip sync stopped", es: "Sincronización labial detenida" }),
                           description:
-                            tx({ de: "Sync.so wurde abgebrochen und Lip-Sync für diese Szene deaktiviert. Das Basis-Video bleibt erhalten.", en: "Sync.so was cancelled and lip sync was disabled for this scene. The base video is preserved.", es: "Se canceló Sync.so y se desactivó la sincronización labial de esta escena. El video base se conserva." }),
+                            tx({ de: "Die Lippensynchronisation wurde abgebrochen und Lip-Sync für diese Szene deaktiviert. Das Basis-Video bleibt erhalten.", en: "Lip-sync was cancelled and lip sync was disabled for this scene. The base video is preserved.", es: "Se canceló la sincronización labial y se desactivó la sincronización labial de esta escena. El video base se conserva." }),
                         });
                       } catch (e) {
                         console.warn("[SceneCard] hard reset failed", e);
@@ -2746,7 +2746,7 @@ export default function SceneCard({
                           🎙️ Lip-Sync zum Voiceover
                           <span
                             className="px-1 py-0.5 rounded bg-amber-400/20 text-amber-200 text-[8px] font-bold ring-1 ring-amber-400/30"
-                            title={tx({ de: "Sync.so lipsync-2-pro — Artlist-grade fidelity, identity-locked, kein Face-Morph", en: "Sync.so lipsync-2-pro — Artlist-grade fidelity, identity-locked, no face morph", es: "Sync.so lipsync-2-pro — fidelidad de nivel Artlist, identidad bloqueada, sin transformación facial" })}
+                            title={tx({ de: "Premium-Lippensynchronisation — Artlist-grade fidelity, identity-locked, kein Face-Morph", en: "Premium-Lippensynchronisation — Artlist-grade fidelity, identity-locked, no face morph", es: "Premium-Lippensynchronisation — fidelidad de nivel Artlist, identidad bloqueada, sin transformación facial" })}
                           >
                             PRO
                           </span>
@@ -2775,7 +2775,7 @@ export default function SceneCard({
                         <span className="text-[9px] text-muted-foreground">
                           {scene.lipSyncAppliedAt
                             ? "Charakter spricht wortgenau · lipsync-2-pro · ~14 Credits"
-                            : tx({ de: "Auto: Sync.so lipsync-2-pro nach Generate (~14 Credits, Artlist-Qualität)", en: "Auto: Sync.so lipsync-2-pro after generate (~14 credits, Artlist quality)", es: "Auto: Sync.so lipsync-2-pro tras la generación (~14 créditos, calidad Artlist)" })}
+                            : tx({ de: "Auto: Premium-Lippensynchronisation nach Generate (~14 Credits, Artlist-Qualität)", en: "Auto: Premium-Lippensynchronisation after generate (~14 credits, Artlist quality)", es: "Auto: Premium-Lippensynchronisation tras la generación (~14 créditos, calidad Artlist)" })}
                         </span>
                       </div>
                       <button

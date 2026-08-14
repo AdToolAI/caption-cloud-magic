@@ -120,8 +120,8 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     }
   };
 
-  // Cinematic-Sync state — Dialog-Shot pipeline (1..N speakers).
-  // Each speaker turn becomes its own Hailuo plate + Sync.so lipsync.
+  // Lip-Sync state — Dialog-Shot pipeline (1..N speakers).
+  // Each speaker turn becomes its own base clip + Sync.so lipsync.
   const isCinematic = scene.engineOverride === 'cinematic-sync';
   const dialogShotsState = (scene as any).dialogShots ?? (scene as any).dialog_shots ?? null;
   const lipSyncCanceled = pipelineState === 'canceled';
@@ -182,7 +182,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
       }
       toast({
         title: tx({ de: 'Renderpfad neu gestartet', en: 'Render path restarted', es: 'Ruta de renderizado reiniciada' }),
-        description: tx({ de: 'Die Szene läuft jetzt über HappyHorse/Hailuo + Sync.so.', en: 'The scene is now running via HappyHorse/Hailuo + Sync.so.', es: 'La escena se está ejecutando ahora a través de HappyHorse/Hailuo + Sync.so.' }),
+        description: tx({ de: 'Die Szene läuft jetzt über die Lip-Sync-Pipeline.', en: 'The scene is now running via die Lip-Sync-Pipeline.', es: 'La escena se está ejecutando ahora a través de die Lip-Sync-Pipeline.' }),
       });
     } catch (err) {
       toast({
@@ -258,7 +258,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
         <XCircle className="h-5 w-5 text-destructive" />
         <span className="text-[9px] text-destructive font-semibold">{tx({ de: 'Falscher Renderpfad', en: 'Wrong render path', es: 'Ruta de renderizado incorrecta' })}</span>
         <span className="text-[8px] text-muted-foreground leading-tight">
-          {tx({ de: 'Talking-Head statt Szene + Sync.so', en: 'Talking-Head instead of scene + Sync.so', es: 'Talking-Head en lugar de escena + Sync.so' })}
+          {tx({ de: 'Talking-Head statt Szene mit Lippensynchronisation', en: 'Talking-Head instead of scene with lip-sync', es: 'Talking-Head en lugar de escena con sincronización labial' })}
         </span>
         <button
           type="button"
@@ -309,12 +309,12 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
               }
             }}
           />
-          {/* Cinematic-Sync — Hailuo done, Sync.so still running */}
+          {/* Lip-Sync — Hailuo done, Sync.so still running */}
           {lipSyncRunning && (
             <div className="absolute inset-0 bg-black/55 backdrop-blur-[1px] flex flex-col items-center justify-center gap-1 pointer-events-none">
               <Loader2 className="h-5 w-5 text-emerald-300 animate-spin" />
               <span className="text-[10px] text-emerald-200 font-semibold uppercase tracking-wide">{tx({ de: 'Lip-Sync läuft', en: 'Lip-Sync running', es: 'Sincronización labial en curso' })}</span>
-              <span className="text-[8px] text-emerald-100/80">Sync.so · ~60 s</span>
+              <span className="text-[8px] text-emerald-100/80">~60 s</span>
             </div>
           )}
           {/* Per-shot progress bar while dialog pipeline is finishing on top of a ready master clip */}
@@ -385,7 +385,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
             <span className="text-[8px] font-bold uppercase tracking-wide">{tx({ de: 'Vorschau', en: 'Preview', es: 'Vista previa' })}</span>
           </div>
         )}
-        {/* Cinematic-Sync — explicit phase 1 banner so user knows the OLD HeyGen avatar is being replaced */}
+        {/* Lip-Sync — explicit phase 1 banner so user knows the OLD HeyGen avatar is being replaced */}
         {isCinematic && (
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-emerald-950/95 via-emerald-900/80 to-transparent px-2 py-1.5 pointer-events-none">
             <div className="flex items-center gap-1.5">
@@ -542,7 +542,7 @@ interface DialogShotsBarProps {
 
 /**
  * Per-shot progress overlay for the Dialog-Shot Pipeline (1..N speakers).
- * Each shot = 1 Hailuo plate + 1 Sync.so lipsync for one speaker turn.
+ * Each shot = 1 base clip + 1 Sync.so lipsync for one speaker turn.
  */
 function DialogShotsBar({ shots, ready, total }: DialogShotsBarProps) {
   const headline = total > 0

@@ -149,7 +149,7 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
       const cast = s.characterShots ?? [];
       const scriptText = (s.dialogScript ?? '').trim();
 
-      // Blocker: dialog mode without cast → Hailuo plate has no portrait anchor
+      // Blocker: dialog mode without cast → base clip has no portrait anchor
       if (cast.length === 0) {
         out.push({
           id: `${s.id}-dlg-cast`,
@@ -218,8 +218,8 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
             severity: 'warning',
             sceneIndex: idx,
             icon: <Clock className="h-3.5 w-3.5" />,
-            title: `${tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} ${idx}: ${tx({ de: 'Skript zu lang für Plate', en: 'Script too long for plate', es: 'Guion demasiado largo para la placa' })}`,
-            detail: `${tx({ de: 'Skript', en: 'Script', es: 'Guion' })} ~${expectedVoSec}s, ${tx({ de: 'Szene nur', en: 'scene only', es: 'escena solo' })} ${dur}s — ${tx({ de: 'Sync.so schneidet ab. Szene verlängern oder Skript kürzen.', en: 'Sync.so will cut it off. Extend the scene or shorten the script.', es: 'Sync.so lo cortará. Alarga la escena o acorta el guion.' })}`,
+            title: `${tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} ${idx}: ${tx({ de: 'Skript zu lang für die Szene', en: 'Script too long for the scene', es: 'Guion demasiado largo para la escena' })}`,
+            detail: `${tx({ de: 'Skript', en: 'Script', es: 'Guion' })} ~${expectedVoSec}s, ${tx({ de: 'Szene nur', en: 'scene only', es: 'escena solo' })} ${dur}s — ${tx({ de: 'Der Ton wird am Ende abgeschnitten. Szene verlängern oder Skript kürzen.', en: 'The audio gets cut off at the end. Extend the scene or shorten the script.', es: 'El audio se cortará al final. Alarga la escena o acorta el guion.' })}`,
           });
         }
       }
