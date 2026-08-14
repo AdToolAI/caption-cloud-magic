@@ -185,9 +185,40 @@ Aufrufer diese Keys im `_patch` mitsendet.
 - Keine neue Runless-Regel, kein neues Grandfathering.
 - `compose-video-clips:5255` (Fatal-Catch-all) bleibt bei **G3**.
 
-## 8. STOP
+## 8. G2.1 — Umsetzungsscope (freigegeben, keine Writer-Migration)
 
-G2.0 abgeschlossen, Provenienzketten belegt. Nächster Schritt nach Freigabe: **G2.1**
-— ausschließlich Payload-/Snapshot-Erweiterungen (6.2 Request-Felder, 6.3 Run-Start-Position,
-6.4 Stamp-Durchreichung, Pass-Slot-Einfrieren + Contract-Test), noch keine Writer-Umstellung.
+Nur Payload-/Snapshot-Erweiterungen. `transitionSceneV2()`-Umstellungen erst ab G2.2.
+Bestehende Semantik aller Aufrufer bleibt unverändert — insbesondere schreiben Webhook- und
+Self-Heal-Caller von `compose-twoshot-audio` weiter genau wie heute (kein fail-closed in G2.1).
+
+1. **Talking-Head**: optionale Felder `runId` + `plateGeneration` im Request; `TalkingHeadDialog`
+   holt sie im Composer-Fall über `composer-start-scene-generation { prepare_only: true }`
+   **vor** dem Aufruf; die Function friert sie in `jobOpts` ein und reicht sie an Poller,
+   Refund- und Early-Fail-Pfad durch. Noch kein fail-closed, noch keine Write-Änderung —
+   die Werte werden in G2.1 nur transportiert und geloggt.
+2. **Probe-Pass-Snapshot**: `compose-dialog-segments` schreibt `run_id` + `plate_generation`
+   einmalig beim Pass-Dispatch in den Slot; `report-lipsync-motion-probe` liest sie und gibt
+   sie in Log/Response aus. Dazu der Immutability-Contract: `update_dialog_pass_slot`
+   überschreibt diese beiden Keys nie (DB-Contract + statischer Scanner).
+3. **`compose-twoshot-audio`**: `compose-video-clips:2217` sendet `run_id` + `plate_generation`
+   aus `sceneRunStamps` mit; die Function nimmt sie entgegen und protokolliert sie.
+   Fehlen sie (Webhook/Self-Heal), verhält sie sich exakt wie heute.
+4. **`compose-video-clips`**: Upload-Zweig (`:4131`) und Pika-Zweig (`:4907`) erhalten Zugriff
+   auf den bestehenden `sceneRunStamps`-Eintrag; keine neue Run-Erzeugung, kein Verhaltenswechsel.
+5. **Hybrid-Extend Run-Acquisition** direkt nach dem INSERT, mit verbindlicher Grenze:
+   - Bevorzugt derselbe kanonische Acquisition-Vertrag wie `composer-start-scene-generation`
+     (`prepare_only`-Pfad), danach Dispatch mit `use_existing_run`/`runContext`.
+   - Ein direkter `beginSceneRun()`-Aufruf ist nur zulässig, wenn im G2.1-Bericht belegt wird,
+     dass er identischen Ledger-, Generation-, Output-Clear- und Lock-Vertrag erzeugt **und**
+     `compose-video-clips` danach keinen zweiten Run startet. Andernfalls Variante A.
+   - Kein neuer Sonder-Run-Pfad für Hybrid.
+
+### Nachweise vor STOP
+
+- Payload-/Run-Parität: identische Zustände wie heute, kein Doppel-Run
+  (Run-ID-Zählung je Szene vor/nach), kein zusätzlicher Provider-Spend oder Credit-Effekt.
+- Immutability-Test für die Pass-Slot-Keys grün.
+- Frozen-Suite (Composer/Lip-Sync) + `tsgo` grün.
+- Bericht `docs/v431-g2-1-report.md`, dann **STOP vor G2.2**.
+
 
