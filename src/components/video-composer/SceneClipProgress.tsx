@@ -1,3 +1,4 @@
+import SceneStatusBadge from '@/components/video-composer/SceneStatusBadge';
 import { tx } from "@/lib/i18nText";
 import { useEffect, useRef, useState } from 'react';
 import { XCircle, Sparkles, Clock, Image as ImageIcon, Film, Zap, Loader2, Grid2x2, Scissors, RotateCcw, UserCheck } from 'lucide-react';
@@ -235,7 +236,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
       <>
         <div className="relative w-full h-full bg-amber-500/10 border border-amber-500/40 flex flex-col items-center justify-center gap-1 p-2 text-center">
           <UserCheck className="h-5 w-5 text-amber-500" />
-          <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold">{tx({ de: 'Face-Map prüfen', en: 'Check Face-Map', es: 'Comprobar Face-Map' })}</span>
+          <SceneStatusBadge scene={scene} bare className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold" />
           <span className="text-[8px] text-muted-foreground leading-tight">
             {tx({ de: 'Sprecher konnten dem Anker nicht eindeutig zugeordnet werden.', en: 'Speakers could not be clearly assigned to the anchor.', es: 'No se pudo asignar claramente a los hablantes al ancla.' })}
           </span>
@@ -313,7 +314,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
           {lipSyncRunning && (
             <div className="absolute inset-0 bg-black/55 backdrop-blur-[1px] flex flex-col items-center justify-center gap-1 pointer-events-none">
               <Loader2 className="h-5 w-5 text-emerald-300 animate-spin" />
-              <span className="text-[10px] text-emerald-200 font-semibold uppercase tracking-wide">{tx({ de: 'Lip-Sync läuft', en: 'Lip-Sync running', es: 'Sincronización labial en curso' })}</span>
+              <SceneStatusBadge state="lipsync_running" bare className="text-[10px] text-emerald-200 font-semibold uppercase tracking-wide" />
               <span className="text-[8px] text-emerald-100/80">~60 s</span>
             </div>
           )}
@@ -443,7 +444,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     return (
       <div className="relative w-full h-full bg-destructive/10 border border-destructive/30 flex flex-col items-center justify-center gap-1">
         <XCircle className="h-5 w-5 text-destructive" />
-        <span className="text-[9px] text-destructive font-medium">{tx({ de: 'Fehlgeschlagen', en: 'Failed', es: 'Fallido' })}</span>
+        <SceneStatusBadge scene={scene} bare className="text-[9px] text-destructive font-medium" />
         {isAi && hasPrompt && (
           <button
             type="button"
