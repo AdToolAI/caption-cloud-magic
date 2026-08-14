@@ -10,7 +10,7 @@
  * `SceneCard.tsx` stehenden Ableitungen 1:1.
  */
 import { resolveSceneOutput, type SceneOutputInput } from '@/lib/composer/output/resolveSceneOutput';
-import type { SceneLifecycleState, SceneSubstate } from '@/lib/composer/sceneState';
+import type { SceneState, SceneSubstate } from '@/lib/composer/sceneState';
 
 export interface ScenePresentationInput extends SceneOutputInput {
   aiPrompt?: string | null;
@@ -109,7 +109,7 @@ export interface SceneLipsyncFlags {
  * Zustand kommt ausschliesslich aus der Zustandsmaschine.
  */
 export function sceneLipsyncFlags(
-  lifecycleState: SceneLifecycleState,
+  lifecycleState: SceneState,
   detailState: SceneSubstate | null | undefined,
   sceneIsFailed: boolean,
 ): SceneLipsyncFlags {
