@@ -1,91 +1,76 @@
-# v431 — G1: Einfache State-/Terminal-Pfade
+# v431 — G1: Nachweise + reduzierter Scope
 
-G0 gilt als abgeschlossen und eingefroren. Der State-Core wird während G1 nicht mehr verändert
-(Ausnahme: nachgewiesener G0-Regressionsbug). G1 migriert nur die einfachen, nicht
-webhook-/fan-in-/watchdog-kritischen Legacy-State-Writer auf den G0-Vertrag.
+Zwei geforderte Nachweise sind erbracht (reine Lesearbeit, kein Code geändert). Ergebnis:
+Der G1-Scope aus dem Vorschlag war zu breit — drei Writer haben keine belastbare
+Run-Provenienz und ein Shared Helper würde ausgeschlossene G3/G4-Pfade indirekt mitziehen.
 
-## Schritt 0 — Repo-Parität der drei G0-Fixes
+## Nachweis 1 — Run-Provenienz je geplantem run_bound-Writer
 
-Bereits geprüft: alle drei Smoke-Fixes liegen als versionierte Migrationen im Repo
-(`composer_recover_scene` Parameter-Shadowing, mehrdeutige `reason`-Referenz im Core,
-Schreibziel `clip_error` statt `pipeline_error_text`) und der Smoke-Lauf ist ebenfalls
-versioniert. In G1 wird das nur noch einmal als Diff DB-Funktion vs. Migrationsdatei
-verifiziert und im Bericht bestätigt — keine neue Migration nötig, sofern der Diff leer ist.
+| Writer | Quelle der Run-Identität | Bewertung |
+| --- | --- | --- |
+| `compose-video-clips:failed` | `sceneRunStamps` (Map sceneId → {runId, generation}), gebildet **vor** dem Dispatch aus dem Run-Ledger und gegen die Live-Zeile verifiziert; dieselben Werte werden in die Webhook-URL (`run_id`, `generation`) eingebrannt und an anderer Stelle bereits als `.eq("active_run_id", …).eq("plate_generation", …)`-Filter genutzt | **Akzeptabel** — immutable Dispatch-Snapshot, kein frischer Read |
+| `generate-talking-head:failed` / `:failed-2` | Keine. Die Funktion kennt weder `active_run_id` noch `plate_generation`; der Client (`src/hooks/useTalkingHead.ts`) übergibt keinen Run-Kontext. Ein `run_bound`-Write wäre nur über einen frischen Scene-Read möglich | **Nicht akzeptabel** → raus aus G1 |
+| `report-lipsync-motion-probe:failed` | Keine. Payload enthält nur `scene_id` (+ Probe-Daten) aus `src/hooks/useMouthYavgProbe.ts`; kein Run-/Job-Bezug | **Nicht akzeptabel** → raus aus G1 |
+| `cancel-dialog-lipsync:canceled` | Keine. Payload = `scene_id` (+ `reset`); die Funktion liest die Szene und kennt nur den *jetzt* aktiven Run | **Nicht akzeptabel als run_bound**; runless wäre nur mit einer **neuen** Regelzeile möglich → laut Vertrag STOP statt Ausnahme |
 
-## Schritt 1 — G1-Writer-Set festlegen (aus dem v431-Inventar)
+Konsequenz: `generate-talking-head` und `report-lipsync-motion-probe` brauchen zuerst eine
+durchgereichte Run-Identität (Dispatch-Payload bzw. Probe-Payload) — das ist eine
+Schnittstellenänderung und gehört nach G2. `cancel-dialog-lipsync` wird nur dann migriert,
+wenn es seinen State-Write an den bereits in G0 migrierten Cancel-Pfad
+(`composer-cancel-scene`, write_id `composer-cancel-scene:cancel-no-active-run`) delegiert,
+also **ohne** neue Runless-Regel; ist das fachlich nicht deckungsgleich, bleibt es liegen.
 
-Migriert werden diese semantischen Write-IDs:
+## Nachweis 2 — Call-Graph `_shared/lipsync-fail.ts`
 
-| writeId | Rolle | Zielsemantik | Guard |
-| --- | --- | --- | --- |
-| `lipsync-fail:failed` | state | failed + `clip_error` atomar | run_bound |
-| `cancel-dialog-lipsync:canceled` | state | canceled | run_bound, Fallback runless nur falls Regel existiert |
-| `compose-video-clips:failed` (Zeile 1633) | state | failed + `clip_error` | run_bound |
-| `generate-talking-head:failed` / `:failed-2` | state | failed + `clip_error` | run_bound |
-| `report-lipsync-motion-probe:failed` | state | failed + `clip_error` | run_bound |
-| `SceneCard:canceled` | state (UI) | canceled | über bestehende Cancel-Edge-Function statt Direktschreiben |
+`failLipSync()` hat vier produktive Caller:
 
-Ausdrücklich **nicht** in G1: `sync-so-webhook`, `remotion-webhook`, `compose-clip-webhook`,
-`compose-dialog-segments`, `render-sync-segments-audio-mux`, `lipsync-watchdog`, `qa-watchdog`,
-`recover-stuck-composer-clip`, `qa-weekly-deep-sweep`, `continuity-chain` (fan-in),
-`autopilotComposerBridge` (fan-in), `useTwoShotAutoTrigger` (G5),
-`hybrid-extend-scene` (bleibt Debt, Ziel G2 `run_bound`), Reverse-Bridge, Cast & World.
+| Caller | Gruppe |
+| --- | --- |
+| `compose-dialog-segments/index.ts` (5 Callsites) | **G3** — ausgeschlossen |
+| `lipsync-watchdog/index.ts` | **G4** — ausgeschlossen |
+| `_shared/scene-hard-reset.ts` | Reset/Recovery — ausgeschlossen |
+| `reset-lipsync-scene/index.ts` | Reset-Pfad, nicht terminal-failure — nicht G1 |
 
-Vor jeder Umstellung wird der Writer klassifiziert (echter State-Write vs. reiner
-Output-/Diagnose-/Reset-Write). Nur echte `state`/`substate`-Writes werden migriert; reine
-Feld-Resets bleiben unverändert.
+Es gibt **keinen** ausschließlichen G1-Caller. Ein Umbau des Helpers würde G3/G4 indirekt
+migrieren. Deshalb: `lipsync-fail:failed` wird in G1 **nicht angefasst** — weder Helper noch
+Callsites. Die Migration erfolgt in G3, dann helper-intern mit optionalem Run-Kontext, damit
+die späteren Caller unverändert bleiben können.
 
-## Schritt 2 — Umstellung pro Writer
+## Reduzierter G1-Scope (Umsetzung nach Freigabe)
 
-Pro Writer:
+1. `compose-video-clips:failed` (Zeile ~1633, `markSceneContractFailure`) → `transitionSceneV2()`
+   mit `guardMode: "run_bound"`, `runId`/`generation` aus dem vorhandenen `sceneRunStamps`-Snapshot,
+   `_error_text` = Fehlermeldung (Zustand + `clip_error` atomar). Failure-Zweige, die **vor**
+   dem Stempeln auftreten, bleiben unverändert und bleiben Debt für G2.
+2. `SceneCard:canceled` → kein direkter Client-State-Write mehr; Aufruf der bestehenden
+   Cancel-Edge-Function. Sichtbare Cancel-Semantik unverändert.
+3. Optional, nur bei fachlicher Deckungsgleichheit: `cancel-dialog-lipsync:canceled`
+   delegiert an den bestehenden migrierten Cancel-Pfad. Sonst STOP und Rückmeldung.
 
-- Aufruf auf `transitionSceneV2()` mit stabiler `writeId` aus dem Inventar.
-- Terminaler Failure schreibt Zustand **und** `clip_error` in einem Core-Aufruf
-  (`_error_text`), kein separates Fehler-`update()` mehr.
-- `run_bound` ist der Default. `runless` nur, wenn der Pfad im Betrieb ohne aktiven Run
-  auftreten kann und eine bereits existierende Regel greift.
-- **Keine neue `system_migration`-Signatur und keine neue Runless-Regel als Bypass.**
-  Wenn ein Writer nur mit neuer Ausnahme migrierbar wäre: STOP und Rückfrage.
-- Legacy-Spiegel (`clip_status`, `lip_sync_status`, `twoshot_stage`) nur soweit weiterführen,
-  wie der bestehende Compatibility-Vertrag es noch verlangt.
-- `SceneCard:canceled` schreibt keinen Zustand mehr direkt aus dem Client, sondern ruft den
-  bestehenden Cancel-Pfad auf; sichtbare Cancel-Semantik bleibt identisch.
+Nicht in G1 (unverändert): sync-so-webhook, remotion-webhook, compose-clip-webhook,
+compose-dialog-segments, render-sync-segments-audio-mux, lipsync-watchdog, qa-watchdog,
+recover-stuck-composer-clip, qa-weekly-deep-sweep, continuity-chain, autopilotComposerBridge,
+useTwoShotAutoTrigger, hybrid-extend-scene (Debt → G2 `run_bound`), Lip-Sync-Frozen-Contracts,
+Cast & World, Reverse-Bridge.
 
-## Schritt 3 — Grandfathering verkleinern
+## Regeln während G1
 
-Für jede erfolgreich migrierte Kante werden die zugehörigen Zeilen aus
-`composer_transition_grandfather` entfernt (eine Migration, am Ende von G1, nach grünen Tests).
-Die Tabelle muss monoton schrumpfen — kommt während G1 ein Eintrag hinzu, ist das ein
-STOP-Signal statt einer Erweiterung des Compatibility-Korridors.
+- Keine neue Runless-Regel, keine neue `system_migration`-Signatur, kein neuer
+  Grandfather-Eintrag. Bedarf = STOP.
+- `composer_transition_grandfather` schrumpft monoton: nur die Kanten der tatsächlich
+  migrierten Writes werden am Ende von G1 per Migration entfernt.
+- G0-State-Core bleibt eingefroren; die drei Smoke-Fixes liegen bereits als versionierte
+  Migrationen im Repo (verifiziert), vor Umsetzungsbeginn wird nur noch der Diff
+  DB-Funktion ↔ Migrationsdatei bestätigt.
 
-Ebenso wird die Allowlist im `scene-state-write-contract`-Test um die migrierten Stellen
-verkleinert, und die Inventar-Fixture wird entsprechend fortgeschrieben.
+## G1-Abnahme
 
-## Schritt 4 — G1-Abnahme
+- Writer-Inventar vorher/nachher.
+- Liste entfernter semantischer Write-IDs aus Grandfathering.
+- Contract-Scanner grün; Allowlist entsprechend verkleinert.
+- State-/Error-Atomizität nachgewiesen (ein Core-Aufruf, ein Audit-Eintrag).
+- Keine neuen Runless-Ausnahmen.
+- Composer-Tests + `tsgo` grün; Lip-Sync-Frozen-Contract-Tests unverändert grün.
+- Kleiner Smoke je migriertem Writer-Typ (Failure-Terminal run_bound, UI-Cancel).
 
-- Writer-Inventar vorher/nachher (Zahlen je Rolle und Trigger).
-- Liste der aus Grandfathering/`system_migration` entfernten semantischen Write-IDs.
-- Contract-Scanner grün.
-- Nachweis State-/Error-Atomizität (ein Statement, ein Audit-Eintrag pro Failure).
-- Nachweis: keine neuen Runless-Ausnahmen.
-- Bestehende Composer-Tests + `tsgo` grün.
-- Lip-Sync-Frozen-Contract-Tests unverändert grün.
-- Kleiner Smoke je migriertem Writer-Typ (Failure-Terminal, Cancel-Terminal, UI-Cancel).
-
-Danach **STOP** und G1-Bericht. Kein G2 ohne neue Freigabe.
-
-## Technische Notizen
-
-- Vertragseinstieg bleibt `transitionSceneV2()` in `supabase/functions/_shared/scene-state.ts`
-  (RPC `composer_scene_transition_v2` → `composer_scene_transition_core`).
-- `failSceneState()` läuft heute über die Legacy-Fassade `composer_scene_transition/7`; die
-  migrierten Failure-Pfade rufen stattdessen direkt `transitionSceneV2()` mit `_error_text`,
-  damit Zustand und Fehlertext atomar sind. `failSceneState()` selbst bleibt für die noch
-  nicht migrierten Gruppen unverändert.
-- Betroffene Dateien: `supabase/functions/_shared/lipsync-fail.ts`,
-  `supabase/functions/cancel-dialog-lipsync/index.ts`,
-  `supabase/functions/compose-video-clips/index.ts`,
-  `supabase/functions/generate-talking-head/index.ts`,
-  `supabase/functions/report-lipsync-motion-probe/index.ts`,
-  `src/components/video-composer/SceneCard.tsx`, plus Test-/Fixture-Dateien und eine
-  Abschluss-Migration für das Grandfather-Trimmen.
+Danach STOP und G1-Bericht. Kein G2 ohne neue Freigabe.
