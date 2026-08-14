@@ -14,33 +14,48 @@ Neuer offener Mini-Schritt wird im Plan-Archiv und als Contract-Kommentar festge
 
 ## Umfang 6.5
 
-### 1. Presenter (pure)
+### 1. Presenter (pure, locale-unabhängig — Variante A)
 
 Neu: `src/lib/composer/status/sceneStatusPresenter.ts`
 
-- `sceneStatusLabel(state, substate)` → `{ headline, detail, tone, progressHint }`
-  - `headline`: aus `SCENE_STATE_LABEL[state]` (bestehende Tabelle wandert hierher).
-  - `detail`: lokalisierte, neutrale Projektion des Substates.
+- `sceneStatusPresentation(state, substate)` →
+  `{ headlineKey, detailKey, detailParams, tone, progressHint }`
+  - Gibt **nur Translation-Keys plus Parameter** zurück, nie fertigen Text.
+    Kein `tx`, kein Locale-Read, keine globale Sprache — damit strikt deterministisch.
+  - `detailParams` trägt Zähler wie `{ pass: 2, total: 3 }`, nie den Rohstring.
   - `tone`: `'idle' | 'running' | 'ready' | 'warn' | 'error'` — nur Darstellungs-Klasse,
     keine neue Zustandslogik.
 - Strikt pure: keine React-, Supabase- oder DOM-Imports, keine Reads von `scene`,
   nur die beiden übergebenen Werte.
+- Import-Richtung (kein Zyklus): Der Presenter importiert aus `sceneState.ts`
+  **ausschließlich Typen** (`import type { SceneState, SceneSubstate }`), niemals
+  Runtime-Werte. Die Label-Wahrheit (`SCENE_STATE_LABEL` bzw. deren Key-Tabelle) lebt im
+  Presenter; `sceneState.ts` re-exportiert sie höchstens für Bestandsimporte.
+  Falls der Typ-Import zyklisch würde, wandern die State-Typen in ein neutrales
+  Definitionsmodul `src/lib/composer/status/sceneStateTypes.ts`, aus dem beide lesen.
 - Substate-Projektion: bekannte Präfixe (`syncso_*`, `twoshot_*`, `plate_*`,
-  `awaiting_manual_face_map`, …) werden auf Kundentexte gemappt, z. B.
-  „Lip-Sync wird verarbeitet“, „Durchgang 2 von 3“, „Zuordnung prüfen“.
-  Zähler wie `pass_2_of_3` werden als neutraler Fortschritt ausgegeben, nie roh.
-- **Unbekannter Substate → sicherer Fallback**: `detail = null`, `headline` bleibt der
+  `awaiting_manual_face_map`, …) werden auf neutrale Keys gemappt, z. B.
+  `status.lipsync.processing`, `status.lipsync.pass`, `status.facemap.review`.
+- **Unbekannter Substate → sicherer Fallback**: `detailKey = null`, Headline bleibt der
   Hauptzustand. Nie den Rohwert anzeigen.
-- 6.3-Vertrag gilt: keine sichtbaren `syncso_*`, `twoshot_*`, `plate`, `cinematic-sync`.
+- 6.3-Vertrag gilt für die Texte, die das Badge aus den Keys erzeugt: keine sichtbaren
+  `syncso_*`, `twoshot_*`, `plate`, `cinematic-sync`.
 
 ### 2. Gemeinsame Komponente
 
 Neu: `src/components/video-composer/SceneStatusBadge.tsx`
 
-- Props: `scene` (oder `state` + `substate`), `size`, `showDetail`, `debug`.
-- Liest Hauptstatus ausschließlich über `sceneState()`, Detail über `sceneSubstate()`.
+- Übersetzt die Keys des Presenters mit `tx`/`i18nText` in DE/EN/ES — der Badge ist der
+  einzige Ort, an dem aus Projektion sichtbarer Text wird.
+- Eindeutiger Props-Vertrag (Discriminated Union, gleiche Debug-Fähigkeit in beiden Formen):
+  - `{ scene: ComposerScene }` — Badge liest selbst `sceneState()` / `sceneSubstate()`
+    und den Fehlercode.
+  - `{ state, substate, errorCode }` — `errorCode` ist bei dieser Form **verpflichtend**
+    (darf `null` sein), damit Debug in beiden Varianten identisch funktioniert.
+  - gemeinsam: `size`, `showDetail`, `debug`.
 - Roh-`pipeline_state`, Roh-`pipeline_substate` und Fehlercode nur im `title`/Debug-Slot,
   nicht als sichtbarer Kundentext.
+
 
 ### 3. Konsumenten umstellen
 
