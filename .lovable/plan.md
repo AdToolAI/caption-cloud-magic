@@ -75,9 +75,11 @@ RLS an, `service_role` voll, `authenticated` nur lesend auf eigene Projekte, kei
 
 `public.composer_recover_scene(_scene_id, _expected_run_id uuid, _expected_plate_generation int, _to composer_scene_state, _reason text, _write_id text)`:
 - Zielzustand nur `failed` oder `canceled`.
-- `_reason` aus geschlossener Menge (`watchdog_timeout`, `stuck_clip_recovery`, `orphaned_job`, `manual_admin`).
-- Stimmt `active_run_id`/`plate_generation` nicht mit den Erwartungswerten überein, ist der Aufruf ein **No-op** mit `reason = 'stale_recovery'` — kein Force-Write.
-- Jeder Aufruf, auch der No-op, erzeugt eine Audit-Zeile mit `source_signature = 'recovery'`.
+- `_reason` aus geschlossener Menge (`watchdog_timeout`, `stuck_clip_recovery`, `orphaned_job`, `orphaned_run`, `manual_admin`).
+- **`_expected_plate_generation` ist immer Pflicht** und wird immer verglichen — auch beim orphaned Recovery. Stimmt sie nicht, ist der Aufruf ein No-op mit `reason = 'stale_generation'`. Recovery bleibt damit ausnahmslos generationsgebunden.
+- **`_expected_run_id` darf ausschließlich bei `_reason = 'orphaned_run'` NULL sein.** In diesem Fall verlangt die DB unter dem Row Lock zusätzlich `active_run_id IS NULL`; ist dort ein Run gesetzt, ist der Aufruf ein No-op mit `reason = 'run_reappeared'`. Bei jedem anderen Grund ist `_expected_run_id` NULL ein harter Fehler (`expected_run_id_required`).
+- Bei gesetztem `_expected_run_id`: stimmt `active_run_id` nicht überein, No-op mit `reason = 'stale_recovery'` — kein Force-Write.
+- Jeder Aufruf, auch jeder No-op, erzeugt eine Audit-Zeile mit `source_signature = 'recovery'` inkl. `reason`.
 - Nur `service_role`.
 
 ## 7. `failSceneState()`
