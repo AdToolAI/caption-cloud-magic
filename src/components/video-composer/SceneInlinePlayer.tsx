@@ -73,7 +73,6 @@ export default function SceneInlinePlayer({
   // durchgelaufen ist. Sonst zeigen wir keinen grünen Haken.
   const dialogVoiceCount = scene.dialogVoices ? countSceneSpeakers(scene) : 0;
   const needsLipsync =
-    scene.engineOverride === 'cinematic-sync' ||
     isLipSyncIntentional(scene) ||
     dialogVoiceCount > 1;
   const lipSyncAppliedAt = (scene as any).lipSyncAppliedAt as string | null | undefined;
