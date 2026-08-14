@@ -66,6 +66,14 @@ composer_fail_hybrid_extend_scene(
 - fehlende Provenienz → `missing_run_provenance`; falscher From-State → No-op mit `unexpected_state`; keine Output-, keine Legacy-Mutation bei Ablehnung.
 - Legacy-Spiegel: setzt im selben Aufruf nach erfolgreichem Core-Write `clip_status = 'failed'` und `clip_error = _error_text` (identisches Muster wie `composer_fail_scene_with_mirrors`, aber ohne Lip-Sync-Felder und ohne Clear-Flag).
 
+**G0-Sicherheitsvertrag für `composer_fail_hybrid_extend_scene` (verbindlich, identisch zu den übrigen neuen Facades):**
+- `SECURITY DEFINER` mit `SET search_path = pg_catalog, public`.
+- Alle Tabellen- und Funktionsreferenzen schema-qualifiziert (`public.composer_scenes`, `public.composer_scene_transition_core`, `public.composer_scene_transition_log`).
+- Rechte: `REVOKE ALL ON FUNCTION … FROM PUBLIC, anon, authenticated;` und `GRANT EXECUTE … TO service_role;` — kein Client-Zugriff, Aufruf nur aus der Edge-Function.
+- `caller_class` und `source_signature` sind **fest im Primitive** verdrahtet (`'v2'`/`'v2'`), nicht als Parameter exponiert und nicht überschreibbar.
+- Die Signatur exponiert **keine** Parameter für Zielstate, Guard-Mode, From-States, Substate, Clear-Flags oder Legacy-Lip-Sync-Felder: `_to = 'failed'`, `_guard_mode = 'run_bound'`, `_from = ARRAY['plate_queued']` sind Konstanten im Funktionskörper. Die einzige textuelle Steuerung ist `_write_id`, und die läuft gegen die geschlossene Drei-Werte-Allowlist.
+- Genau **eine** auflösbare Signatur (5 Argumente, keine Defaults, kein Overload) — Nachweis über `pg_proc` wie in S1.
+
 Alle drei Hybrid-Failure-Writes nutzen dieses Primitive; `markSceneFailed()` entfällt ersatzlos.
 
 ## Zielvertrag G2.4 — autoritative Endfassung
@@ -75,7 +83,7 @@ Diese Liste ist der einzige gültige Implementierungsvertrag für G2.4. Frühere
 1. `hybrid-extend-scene:idle` = **insert-default**, kein State-Writer; raus aus dem State-Writer-Inventar.
 2. `prepare_only`-Run-Akquise ist **fail-closed** vor jedem Frame-Extract- und Provider-Spend.
 3. Cleanup bei Run-Akquise-Fehler **gemäß Befund 5**: auch der Partial-Run mit bereits gesetztem `active_run_id` wird gelöscht, solange die dort definierten Ownership-, State- und Output-Guards gelten. Ist die Zeile nicht sicher löschbar (Fremdmutation/Output vorhanden), kein Delete, sondern `hybrid_zombie_unresolved` mit Scene-ID im Log und im Fehler-Response.
-4. Genau **ein** neues Primitive: `composer_fail_hybrid_extend_scene` (Signatur und Semantik nach Befund 6).
+4. Genau **ein** neues Primitive: `composer_fail_hybrid_extend_scene` (Signatur, Semantik und **G0-Sicherheitsvertrag** nach Befund 6 — SECURITY DEFINER, fixiertes `search_path`, schema-qualifiziert, EXECUTE nur `service_role`, fest verdrahtete `caller_class`/`source_signature`, keine über Parameter öffenbaren States/Guard-Modes/Write-IDs).
 5. Alle drei Hybrid-Failure-WriteIDs (`hybrid:frame-extract-failed`, `hybrid:no-anchor`, `hybrid:dispatch-failed`) schreiben ausschließlich aus `plate_queued`, run- und generation-gebunden; `markSceneFailed()` entfällt ersatzlos.
 6. `composer_fail_scene_with_mirrors` bleibt **unverändert frozen**; keine neue Signatur, kein Overload, `_clear_lip_sync_fields` bleibt auf `cvc:failed/pika` beschränkt.
 7. Kein Runless, kein Grandfathering, kein `beginSceneRun()`-Sonderweg; `run_context` an `compose-video-clips` bleibt unverändert.
@@ -89,6 +97,7 @@ Diese Liste ist der einzige gültige Implementierungsvertrag für G2.4. Frühere
 - Transaktionaler DB-Smoke pro writeId: `applied`, `stale run`, `falsche Generation`, `falsche write_id`, zusätzlich für `dispatch-failed` der Fall „Szene steht bereits auf `plate_rendering`/`failed`" → No-op — inkl. Nachweis, dass bei allen Ablehnungen weder Output- noch Legacy-Spiegel mutiert werden (Muster wie S3).
 - Cleanup-Nachweis (beide Formen): (a) Fehler **vor** Run-Erwerb → Zeile weg; (b) Fehler **nach** `composer_start_scene_run`, also `active_run_id` bereits gesetzt und State `idle` → Zeile ebenfalls weg (`cleaned:true`); (c) Gegenprobe mit Zeile, die bereits `clip_url` trägt → kein Delete, `hybrid_zombie_unresolved` geloggt und im Response ausgewiesen.
 - DB-Smoke für `composer_fail_hybrid_extend_scene`: `applied` aus `plate_queued`; No-op aus `plate_rendering` (`unexpected_state`); stale run/generation; nicht erlaubte write_id — jeweils mit Nachweis unveränderter Output- und Legacy-Felder.
+- Security-Nachweis für das neue Primitive: `pg_proc`-Abfrage mit genau einer Signatur, `prosecdef = true`, `proconfig` enthält `search_path=pg_catalog, public`, sowie `has_function_privilege('anon'|'authenticated', …, 'EXECUTE') = false` und für `service_role` `= true`.
 - Frozen-Suite mit demselben exakten Command wie die G2.3-Baseline (527 Tests) plus `tsgo`.
 - Danach: G2 komplett DONE / FROZEN.
 
