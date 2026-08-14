@@ -4998,19 +4998,10 @@ serve(async (req) => {
                   `result=${failErr ? `rpc_error:${failErr.message}` : (fr.applied ? "applied" : (fr.reason ?? "not_applied"))}`,
               );
             } else {
-              // Kein Run-Stempel → Legacy-Pfad erhalten.
-              console.warn(
-                `[compose-video-clips] v431_g2_3 write=failed/pika scene=${scene.id} reason=no_run_stamp fallback=legacy`,
+              // fail-closed: ohne Run-Provenienz kein State-/Spiegel-Write.
+              console.error(
+                `[compose-video-clips] v431_g2_3 write=failed/pika scene=${scene.id} reason=pika_missing_run_provenance fail_closed=true`,
               );
-              await supabaseAdmin
-                .from("composer_scenes")
-                .update(
-                  failedClipUpdate(
-                    isCinematicSync,
-                    `Pika ${pikaResp.status}`,
-                  ),
-                )
-                .eq("id", scene.id);
             }
             results.push({
               sceneId: scene.id,
