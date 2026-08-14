@@ -3,7 +3,7 @@
  * storyboard. Click opens the TransitionPopover to configure type + duration.
  *
  * The transition data lives on the LEFT scene's
- * `transitionType` / `transitionDuration` fields (existing composer schema).
+ * `cutStyle` / `transitionDuration` fields (existing composer schema).
  */
 import { ArrowDown, Scissors, Waves } from 'lucide-react';
 import { cn } from '@/lib/utils';
