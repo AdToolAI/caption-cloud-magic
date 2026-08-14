@@ -1,107 +1,126 @@
-# v431 G2.3 — Scope-Tabelle v2 (nur Analyse, keine Migration)
+# v431 G2.3 — Finaler Scope-Vertrag (nur Analyse, keine Migration)
 
-Nachgezogen: die drei Punkte aus dem Review. Kein Code-Change bis zum GO.
+Die drei Abschlussfragen sind belegt. Zwei davon verengen den Scope, eine
+bestätigt Variante C mit vollem G0-Invariantensatz.
 
-## 1. Die fünf semantischen Pfade
+## 1. Deferred-Refund — Nachweis: NICHT race-sicher, daher aus dem Scope
 
-| writeId | from-state(s) | to-state / substate | immutable run source | Legacy-Spiegel | Output im selben Write? | Provider/Credit-Spend davor? | stale behavior |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `cds:conditional-running-or-pending` (Circuit-Open, index.ts:1285) | `audio_ready`, `lipsync_dispatched`, `lipsync_running` | `keepRunning=true` → `lipsync_running` + substate `circuit_open`; sonst `audio_ready` + substate `circuit_open` | **Request-Body** `run_id` + `plate_generation` (Payload-Erweiterung, siehe §2) | `lip_sync_status`, `twoshot_stage='circuit_open'`, `clip_error` — **atomar im Primitive** | nein | nein (Gate liegt vor dem Wallet-Debit) | stale → No-op, 202-Antwort unverändert |
-| `cds:pending-3` (deferred, index.ts:4221) | `audio_ready`, `lipsync_dispatched` | `audio_ready` + substate `deferred` | dito Request-Body | `lip_sync_status='pending'`, `twoshot_stage='deferred'`, `clip_error` — atomar | nein | ja — Initial-Dispatch-Debit wird im selben Zweig refundiert (:4200); Refund bleibt ausserhalb des State-Writes | stale → No-op; Refund läuft unabhängig |
-| — `isAdvance/isRetry`-Diagnosezweig (:4204) | — | **nicht migrieren** | — | nur `clip_error` | — | — | reine Diagnose |
-| `compose-twoshot-audio:failed` (:653) | `audio_prep` | `failed` + substate `dialog_turns_required` | Request-Body `run_id` + `plate_generation` (:572, seit G2.1 vorhanden) | `lip_sync_status='failed'`, `twoshot_stage='failed'`, `clip_error` — atomar | nein | nein (vor TTS-Spend) | ohne Body-Provenienz kein migrierter Write → Legacy-Ast bleibt |
-| `cvc:upload-complete` (:4117) | `idle`, `plate_queued` | `complete` | `sceneRunStamps` (G2.1) | `clip_status='ready'` — atomar | **ja, zwingend** (Output-Tripel + Terminalstate in einem Commit) | nein | stale → No-op, kein Output-Overwrite |
-| `cvc:failed/pika` (:4904) | `idle`, `plate_queued`, `plate_rendering` | `failed` + substate `provider_error` | `sceneRunStamps` (G2.1) | `clip_status='failed'`, `clip_error` (+ `twoshot_stage` nur wenn `failedClipUpdate()` es heute setzt) — atomar | nein | ja — Pika-Call davor; Refund-Pfad unverändert | stale → No-op, Antwort bleibt `failed` |
+Belegter Code-Stand (`compose-dialog-segments/index.ts:4199-4209`):
 
-## 2. Punkt 1 — Run-Provenienz für Circuit-Open und Deferred
+```
+const { data: wDef } = await supabase.from("wallets")
+  .select("balance").eq("user_id", userId).single();
+await supabase.from("wallets")
+  .update({ balance: Number(wDef?.balance ?? 0) + totalCost, ... })
+  .eq("user_id", userId);
+```
 
-Verifiziert: `compose-dialog-segments` liest `active_run_id` + `plate_generation`
-heute aus dem Szenen-SELECT (:785) und setzt daraus seinen Run-Kontext (:797-798).
-Es bekommt diese Werte **nicht** vom Caller. Der Review-Einwand trifft zu.
+Befund, ohne Beschönigung:
 
-Konsequenz — Reihenfolge vor der Writer-Migration:
+- Es gibt **keine** Debit-/Reservation-/Transaction-ID. Refundiert wird ein
+  *neu berechneter* Betrag (`computeCost(totalSec) * speakerCount`) auf den
+  **aktuellen** Wallet-Saldo, adressiert nur über `user_id`.
+- Es gibt **keinen** Idempotenz-/Unique-Guard: zwei Zustellungen desselben
+  Deferred-Zweigs zahlen zweimal aus.
+- Ein verspäteter Aufruf aus Run A würde einen Betrag zurückzahlen, der aus
+  dem Szenen-Stand zum Lesezeitpunkt stammt — also potenziell der Spend von
+  Run B. Es ist zusätzlich ein klassisches Lost-Update (read-modify-write ohne
+  Row Lock).
+- Die Reservations-Primitive (`composer_reserve_run_credits`,
+  `composer_settle_run_reservation`, `composer_release_run_reservation`)
+  existieren in der DB, werden von diesem Pfad aber **nicht** benutzt.
 
-1. **Payload-Erweiterung zuerst.** `compose-dialog-segments` akzeptiert
-   `run_id` + `plate_generation` im Request-Body, analog zu
-   `compose-twoshot-audio` (:572). Der Scene-Read bleibt nur noch fachlicher
-   Datenlader, nie Provenienzquelle.
-2. **Dispatch-Bindung beim Erst-Dispatch.** Der Wert wird beim ursprünglichen
-   Dispatch einmalig gesetzt; `isAdvance`/`isRetry`-Aufrufe reichen exakt die
-   beim Dispatch eingefrorene Provenienz weiter (bereits immutable im Pass-Slot
-   aus G2.1: `run_id` + `plate_generation` sind dort per RPC-Guard
-   überschreibgeschützt). Für Advance/Retry ist der Pass-Slot damit eine
-   zulässige immutable Quelle — der Szenen-Read ist es nicht.
-3. **Caller-spezifischer Zuschnitt, wie bei twoshot-audio.** Nur Caller mit
-   vollständiger Provenienz laufen über das geguardete Primitive:
+Die geforderten drei Akzeptanzkriterien sind damit **nicht** erfüllt, und sie
+lassen sich ohne neue Credit-Logik auch nicht erfüllen.
 
-| Caller | Gruppe | Provenienz nach Payload-Erweiterung |
-| --- | --- | --- |
-| Client (`SceneCard`, `ClipsTab`, `SceneClipProgress`, `FaceMapReviewDialog`, `useTwoShotAutoTrigger`) | G2 | ja — Run stammt aus `composer-start-scene-generation` |
-| `compose-clip-webhook` (:482) | G3 | nein → Legacy-Write bleibt |
-| `_shared/autopilotComposerBridge` (:339) | G5 | nein → Legacy-Write bleibt |
-| `lipsync-watchdog` (Advance) | G4 | Pass-Slot-Snapshot, sonst Legacy |
+**Konsequenz (kein Credit-Change in G2.3):** der Deferred-Zweig
+`!isAdvance && !isRetry` — der einzige, der refundiert — wird in G2.3
+**nicht** migriert und bleibt Legacy. Migriert wird nur der
+`isAdvance || isRetry`-Zweig, der per Konstruktion **keinen** Refund auslöst
+(„advance path keeps the existing charge"). Damit entsteht kein Pfad, in dem
+ein run-geguardeter No-op-State auf einen ungeguardeten Geldpfad trifft.
 
-Kein Fail-closed in G2.3 — ein harter Block würde Webhook, Watchdog und
-Self-Heal stumm brechen.
+Die Refund-Härtung (Bindung an Transaction-Key + Idempotenz, bevorzugt über
+die vorhandenen Reservations-Primitive) wird als eigener Punkt für die
+Credit-Gate-Etappe notiert, nicht in G2.3 gelöst.
 
-## 3. Punkt 2 — Upload → `complete` als Variante C
+## 2. compose-dialog-segments — Caller-Vertrag pro tatsächlichem Aufrufer
 
-Variante A (globale Kanten) ist verworfen. Umsetzung als enges Domain-Primitive:
+Verifiziert: **kein** Caller übergibt heute Run-Provenienz; die Funktion leitet
+sie aus dem Live-Scene-Read ab (`:785`, `:797-798`). Das ist als Provenienz
+verworfen.
 
-`composer_finalize_upload_scene(_scene_id, _run_id, _generation, _write_id, _upload_url)`
+| Tatsächlicher Caller | Aufruf | Immutable Run-Snapshot? | G2.3-Behandlung |
+| --- | --- | --- | --- |
+| `useTwoShotAutoTrigger` (:529) | Poll-getriebener Auto-Trigger über DB-Rows | **nein** — kennt nur den Live-Row-Stand | **bleibt G5**, unveränderter Legacy-Ast |
+| `ClipsTab` (:492) | Poll-getriebener Auto-Trigger (`auto: true`) | **nein** | bleibt Legacy |
+| `compose-clip-webhook` (:482) | Server-Kette nach Plate-Fertigstellung | nein | bleibt G3-Legacy |
+| `_shared/autopilotComposerBridge` (:339) | Self-Heal | nein | bleibt G5-Legacy |
+| `lipsync-watchdog` (Advance) | Advance/Retry gegen bestehende Passes | **ja** — der Pass-Slot trägt seit G2.1 `run_id` + `plate_generation` überschreibgeschützt | **G2-Primitive** |
+| interner Advance/Retry-Pfad innerhalb `compose-dialog-segments` | Fan-out über bestehende Passes | **ja** — selbe Pass-Slot-Quelle | **G2-Primitive** |
 
-- akzeptiert **ausschliesslich** `_write_id = 'cvc:upload-complete'`
-- festes From-Set `{idle, plate_queued}`, fester To-State `complete`,
-  kein frei übergebbarer Zielstate
-- `SELECT ... FOR UPDATE` auf die Szene, Run-ID- und Generation-Gate
-  (`stale_run` / `stale_generation` → No-op)
-- Output-Tripel + `pipeline_state='complete'` + `clip_status='ready'`
-  in **einem** Commit
-- eigener Eintrag in `composer_scene_transition_log` (write_id, Run,
-  Generation, From/To, Ergebnis) — bewusst ohne Aufruf von
-  `composer_scene_transition_core`, damit `composer_scene_transitions`
-  unverändert bleibt
-- **keine** neuen globalen Transition-Kanten, **keine** Änderung am
-  generischen G0-Core
+`useTwoShotAutoTrigger` rutscht ausdrücklich **nicht** in G2 — ein nachträglich
+angehängter Live-Scene-Run wäre genau die Provenienz-Fiktion, die G1/G2
+ausschliesst.
 
-In der DB verifiziert: `composer_scene_transitions` enthält heute keine Kante
-`idle → complete` bzw. `plate_queued → complete`; das bleibt so.
+**Damit reduziert sich Punkt 1+2 auf eine gemeinsame Scope-Grenze:**
+Circuit-Open und Deferred werden in G2.3 **nur im Advance/Retry-Zweig**
+migriert (Pass-Slot-Provenienz, kein Refund). Der Initial-Dispatch-Zweig
+beider Pfade bleibt unverändert Legacy bis G4/G5. Keine Payload-Erweiterung
+nötig — die Provenienz kommt aus dem bereits immutablen Pass-Slot.
 
-## 4. Punkt 3 — Atomarität kanonischer State + Legacy-Spiegel
+## 3. `composer_finalize_upload_scene` — vollständiger G0-Invariantensatz
 
-Für jeden G2.3-Pfad gilt die G2.2-Regel: ein run-geguardetes Primitive schreibt
-State, Substate und die noch benötigten Spiegel unter demselben Row Lock. Kein
-`transitionSceneV2()` plus nachgelagertes `.update()`.
+Variante C, eng gescoptes Domain-Primitive, `SECURITY DEFINER`. Der Vertrag
+hält explizit fest — weil das Primitive bewusst nicht durch
+`composer_scene_transition_core` läuft:
 
-| Pfad | Primitive | Spiegel im selben Commit |
-| --- | --- | --- |
-| Circuit-Open | `composer_park_lipsync_dispatch` (neu, schmal; Modi `circuit_open` \| `deferred`, geschlossene From/To-Semantik) | `lip_sync_status`, `twoshot_stage`, `clip_error` |
-| Deferred | dito, Modus `deferred` | `lip_sync_status`, `twoshot_stage`, `clip_error` |
-| Twoshot-Audio-Failure | `composer_fail_scene_with_mirrors` (G2.2, wiederverwendet — Modi bleiben geschlossen) | `lip_sync_status='failed'`, `twoshot_stage='failed'`, `clip_error` |
-| Pika-Failure | `composer_fail_scene_with_mirrors`, Substate `provider_error` | `clip_status='failed'`, `clip_error` + nur die heute tatsächlich gesetzten weiteren Spiegel |
-| Upload-Complete | `composer_finalize_upload_scene` | `clip_status='ready'` + Output-Tripel |
+| Invariante | Festlegung |
+| --- | --- |
+| Signatur | `composer_finalize_upload_scene(_scene_id uuid, _run_id uuid, _generation int, _write_id text, _upload_url text)` |
+| write_id | akzeptiert **ausschliesslich** `'cvc:upload-complete'`, sonst `invalid_write_id` ohne Write |
+| Row Lock | `SELECT ... FROM composer_scenes WHERE id=_scene_id FOR UPDATE` als erste Anweisung |
+| Run-Gate | `active_run_id = _run_id` sonst `stale_run`; `plate_generation = _generation` sonst `stale_generation` — beide unter dem Lock |
+| From-Set | fest `{idle, plate_queued}`; alles andere → `unexpected_from_state` |
+| To-State | fest `complete`, kein Parameter |
+| Provenienzspalte | `pipeline_state_run_id = _run_id` (plus Generation-Spiegel wie in den G2.2-Primitiven) |
+| Atomarität | Output-Tripel (`clip_url`, `base_video_url`, `processed_video_url` gemäss `materializeCompatibilityOutput('base')`) + `pipeline_state='complete'` + `clip_status='ready'` in **einem** Commit |
+| Audit | ein Eintrag in `composer_scene_transition_log` mit `write_id`, Run, Generation, From/To und Ergebnis `applied` \| `stale_run` \| `stale_generation` \| `unexpected_from_state` |
+| Kein Write bei Ablehnung | stale oder unzulässiger From-State → **kein** Output-Write, kein Spiegel-Write, nur Audit |
+| Härtung | `SECURITY DEFINER`, `SET search_path = public`, `REVOKE ALL FROM PUBLIC/anon/authenticated`, `GRANT EXECUTE TO service_role` — identisch zu `composer_finalize_talking_head` |
+| State Machine | **keine** neuen Kanten in `composer_scene_transitions`, keine Änderung am generischen G0-Core |
 
-Neu entsteht damit genau **ein** zusätzliches Primitive
-(`composer_park_lipsync_dispatch`) plus das Upload-Primitive. Kein generischer
-Bypass, keine frei übergebbaren Zielstates.
+## 4. Finaler G2.3-Migrationsscope
 
-## 5. Ausserhalb G2.3
+| # | writeId | Zweig | Primitive | From → To/Substate | Run-Quelle | Spiegel (atomar) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `cds:conditional-running-or-pending` | nur `isAdvance \|\| isRetry` | `composer_park_lipsync_dispatch` (neu, Modi `circuit_open` \| `deferred`, geschlossen) | `lipsync_dispatched\|lipsync_running` → gleicher State + `circuit_open` | Pass-Slot | `lip_sync_status`, `twoshot_stage`, `clip_error` |
+| 2 | `cds:pending-3` | nur `isAdvance \|\| isRetry` (refundfrei) | dito, Modus `deferred` | `lipsync_dispatched\|lipsync_running` → gleicher State + `deferred` | Pass-Slot | `lip_sync_status`, `twoshot_stage`, `clip_error` |
+| 3 | `compose-twoshot-audio:failed` | nur G2-Caller `compose-video-clips` mit Body-Provenienz | `composer_fail_scene_with_mirrors` (G2.2, unverändert) | `audio_prep` → `failed` + `dialog_turns_required` | Body `run_id`/`plate_generation` (:572) | `lip_sync_status`, `twoshot_stage`, `clip_error` |
+| 4 | `cvc:upload-complete` | alle | `composer_finalize_upload_scene` (neu) | `idle\|plate_queued` → `complete` | `sceneRunStamps` | `clip_status='ready'` + Output-Tripel |
+| 5 | `cvc:failed/pika` | alle | `composer_fail_scene_with_mirrors` | `idle\|plate_queued\|plate_rendering` → `failed` + `provider_error` | `sceneRunStamps` | `clip_status='failed'`, `clip_error` + nur heute gesetzte weitere Spiegel |
 
+Neu: genau zwei Primitive (`composer_park_lipsync_dispatch`,
+`composer_finalize_upload_scene`). Keine neuen Runless-/Grandfather-Ausnahmen,
+kein generischer Bypass, keine frei übergebbaren Zielstates.
+
+## 5. Ausserhalb G2.3 (unverändert)
+
+Initial-Dispatch-Zweige von Circuit-Open/Deferred, `useTwoShotAutoTrigger`,
+`ClipsTab`-Auto-Trigger, `compose-clip-webhook`, `autopilotComposerBridge`,
 Reset-Pfade, `clip_error`-only-Diagnosen, Output-Writes ohne Statuswechsel,
-Job-Metadata (`replicate_prediction_id`, `audio_plan`, `dialog_turns`,
-`dialog_shots`). `useSceneGenerate` bleibt G5. Webhook und Self-Heal bleiben
-bis G3/G5 unverändert.
+Job-Metadata. Zusätzlich neu notiert: **Refund-Härtung des Deferred-Pfads**
+(Transaction-Key + Idempotenz) als eigener Credit-Gate-Punkt.
 
 ## 6. Umsetzungsreihenfolge nach GO
 
-1. Payload-Erweiterung `compose-dialog-segments` (`run_id`/`plate_generation`)
-   inkl. Weitergabe durch die G2-Caller — noch ohne Writer-Wechsel.
-2. DB-Migration: `composer_park_lipsync_dispatch`, `composer_finalize_upload_scene`.
-3. Writer-Migration der fünf Pfade, caller-spezifisch.
-4. Verifikation: `tsgo`, Composer-/Lip-Sync-Suite, Writer-Inventar-Test um die
-   neuen Primitive erweitert, transaktionale DB-Smokes (stale run, stale
-   generation, doppelter Callback, unzulässiger From-State, Cancel-Race,
-   Audit-Log-Vollständigkeit), Bericht in `docs/v431-g2-3-report.md`.
+1. DB-Migration: `composer_park_lipsync_dispatch`, `composer_finalize_upload_scene`.
+2. Writer-Migration der fünf Einträge aus §4, zweig- und caller-spezifisch.
+3. Verifikation: `tsgo`, Composer-/Lip-Sync-Suite, Writer-Inventar-Test um beide
+   Primitive erweitert, transaktionale DB-Smokes (stale run, stale generation,
+   unzulässiger From-State, falsches `write_id`, doppelter Callback,
+   Cancel-Race, Audit-Vollständigkeit, „kein Output-Write bei Ablehnung").
+4. Bericht `docs/v431-g2-3-report.md`.
 
 Baseline-Vermerk: die vorbestehenden Social-Publishing-Reds in
 `src/pages/__tests__/Composer.test.tsx` bleiben unverändert ausserhalb Scope.
