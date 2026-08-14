@@ -104,7 +104,7 @@ Wird run-sicher gemacht (Pflichtparameter `guardMode`, `writeId`, bei `run_bound
 
 `composer-cancel-scene` und `composer-cancel-project` laden `active_run_id` bereits. Beide erfassen künftig zusätzlich `plate_generation` und rufen:
 - mit aktivem Run: `guard_mode = 'run_bound'` und exakt diesem Run + dieser Generation. Wurde zwischenzeitlich ein neuer Run gestartet, schlägt der Cancel mit `stale_run` fehl und terminiert Run B **nicht**.
-- ohne aktiven Run: `guard_mode = 'runless'` mit `user_cancel_no_active_run` bzw. `project_teardown_no_active_run`.
+- ohne aktiven Run: `guard_mode = 'runless'` mit `user_cancel_no_active_run` bzw. `project_teardown_no_active_run`. Die DB prüft diesen Fall gemäß 1b erneut unter dem Row Lock: ist inzwischen Run B da, No-op mit `run_reappeared` — die Edge Function meldet das als „Abbruch nicht angewendet, neuer Run aktiv" und cancelt B nicht.
 
 Projekt-Abbruch wendet denselben Vertrag **pro Szene** an, nicht pauschal auf das Projekt.
 
