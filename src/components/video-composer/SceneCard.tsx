@@ -196,6 +196,14 @@ import { tx } from "@/lib/i18nText";
 import { SceneActionsMenu } from "./SceneActionsMenu";
 import { SceneContinuityStatus } from "./SceneContinuityStatus";
 import { clipStatusFromState, legacyClipFailedEquivalentRow, legacyClipReadyEquivalentRow, sceneState, sceneSubstate } from '@/lib/composer/sceneState';
+import {
+  sceneDirectorModeReady,
+  sceneHasAuthoredContent,
+  sceneLipsyncFlags,
+  sceneRenderedOutputUrl,
+  sceneStockThumbnail,
+  sceneThumbnailSource,
+} from '@/lib/composer/sceneCardPresentation';
 
 /**
  * Wave 3.1 — compact Catalog-ID chip strip. Reads scene-level shadow IDs
@@ -357,22 +365,15 @@ export default function SceneCard({
   const legacyStatus = clipStatusFromState(sceneLifecycleState);
   const sceneIsReady = legacyClipReadyEquivalentRow(scene);
   const sceneIsFailed = legacyClipFailedEquivalentRow(scene);
-  /** Lip-Sync laeuft gerade (frueher lip_sync_status = 'running'). */
-  const lipsyncBusy =
-    sceneLifecycleState === 'lipsync_dispatched' ||
-    sceneLifecycleState === 'lipsync_running' ||
-    sceneLifecycleState === 'lipsync_muxing';
-  /** Ein Lip-Sync-Artefakt existiert (frueher lip_sync_status/twoshot_stage gesetzt). */
-  const hasLipsyncArtifact =
-    lipsyncBusy ||
-    sceneLifecycleState === 'audio_prep' ||
-    sceneLifecycleState === 'audio_ready' ||
-    sceneLifecycleState === 'complete' ||
-    !!sceneDetailState;
-  /** Lauf laesst sich abbrechen (frueher running/stitching/pending/failed/stage aktiv). */
-  const lipsyncCancellable =
-    hasLipsyncArtifact && (lipsyncBusy || sceneIsFailed ||
-      sceneLifecycleState === 'audio_prep' || sceneLifecycleState === 'audio_ready');
+  // v430 Schritt 6.4 — Lip-Sync-Flags kommen aus dem pure Presentational-Helper.
+  const {
+    busy: lipsyncBusy,
+    hasArtifact: hasLipsyncArtifact,
+    cancellable: lipsyncCancellable,
+  } = sceneLipsyncFlags(sceneLifecycleState, sceneDetailState, sceneIsFailed);
+  // v430 Schritt 6.4 — Output ausschliesslich ueber den Resolver.
+  const renderedOutputUrl = sceneRenderedOutputUrl(scene);
+  const thumbnail = sceneThumbnailSource(scene);
   // v418 rollout brake — mirrors the server flag for Seedance 2.5 plates.
   const { enabled: seedance25LipsyncEnabled, loading: seedance25FlagLoading } =
     useSeedance25LipsyncState();
@@ -660,8 +661,7 @@ export default function SceneCard({
     const hasContent =
       Boolean((scene.aiPrompt ?? "").trim()) ||
       Boolean((scene.dialogScript ?? "").trim()) ||
-      Boolean(scene.clipUrl) ||
-      Boolean(scene.uploadUrl);
+      sceneHasAuthoredContent(scene);
     return !hasContent;
   });
   // When embedded inside the persistent Studio Pane, the editor is always
@@ -1469,8 +1469,7 @@ export default function SceneCard({
 
               {/* 🎬 Director Mode — Hybrid Production actions (only when source clip is ready) */}
               {onHybridExtend &&
-                sceneIsReady &&
-                scene.clipUrl && (
+                sceneDirectorModeReady(scene, sceneIsReady) && (
                   <div className="flex flex-wrap items-center gap-1.5 pt-1 rounded-md border border-primary/20 bg-gradient-to-r from-primary/5 via-transparent to-primary/5 px-2 py-1.5">
                     <span className="text-[9px] uppercase tracking-wider font-semibold text-primary flex items-center gap-1">
                       🎬{" "}
@@ -3253,9 +3252,9 @@ export default function SceneCard({
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      {scene.stockMediaThumb || scene.clipUrl ? (
+                      {sceneStockThumbnail(scene) ? (
                         <img
-                          src={scene.stockMediaThumb || scene.clipUrl}
+                          src={sceneStockThumbnail(scene) ?? undefined}
                           alt="stock thumbnail"
                           className="w-10 h-7 rounded object-cover flex-shrink-0"
                         />
@@ -3270,7 +3269,7 @@ export default function SceneCard({
                       )}
                       <div className="min-w-0">
                         <p className="text-[10px] text-muted-foreground truncate">
-                          {scene.clipUrl
+                          {renderedOutputUrl
                             ? scene.stockMediaAuthor?.name
                               ? `${scene.stockMediaSource} · ${scene.stockMediaAuthor.name}`
                               : tx({ de: "Stock ausgewählt", en: "Stock selected", es: "Stock seleccionado" })
@@ -3547,24 +3546,15 @@ export default function SceneCard({
 
             {/* Thumbnail preview */}
             <div className="w-24 h-16 rounded bg-muted/30 border border-border/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
-              {(scene.uploadType === "image" ||
-                scene.clipSource === "ai-image" ||
-                scene.clipSource === "stock-image") &&
-              (scene.clipUrl || scene.uploadUrl) ? (
+              {thumbnail.kind === "image" ? (
                 <img
-                  src={scene.clipUrl || scene.uploadUrl}
+                  src={thumbnail.url ?? undefined}
                   alt=""
                   className="w-full h-full object-cover"
                 />
-              ) : scene.clipUrl ? (
+              ) : thumbnail.kind === "video" ? (
                 <video
-                  src={scene.clipUrl}
-                  className="w-full h-full object-cover"
-                  muted
-                />
-              ) : scene.uploadUrl ? (
-                <video
-                  src={scene.uploadUrl}
+                  src={thumbnail.url ?? undefined}
                   className="w-full h-full object-cover"
                   muted
                 />
