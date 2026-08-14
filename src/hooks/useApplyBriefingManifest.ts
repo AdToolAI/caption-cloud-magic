@@ -125,7 +125,7 @@ function manifestSceneToComposerScene(
         }
       : undefined,
     textOverlay: { ...DEFAULT_TEXT_OVERLAY } as any,
-    transitionType: 'none',
+    cutStyle: 'none',
     transitionDuration: 0,
     retryCount: 0,
     costEuros: 0,

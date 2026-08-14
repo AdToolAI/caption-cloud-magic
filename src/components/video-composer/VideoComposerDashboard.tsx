@@ -70,6 +70,7 @@ import { useStoryboardTransition } from '@/hooks/useStoryboardTransition';
 import ProductionWarRoom from './storyboard/ProductionWarRoom';
 import ProductionPlanSheet from './briefing/ProductionPlanSheet';
 import { clipStatusFromState, isInFlightState, legacyClipReadyEquivalentRow, sceneState } from '@/lib/composer/sceneState';
+import { cutStyleFromRow, cutStyleToRow } from "@/lib/video-composer/cutStyle";
 
 type TabId = 'briefing' | 'storyboard' | 'clips' | 'text' | 'audio' | 'export' | 'campaign';
 
@@ -414,7 +415,7 @@ export default function VideoComposerDashboard() {
                 text: pickText(row.id, 'textOverlay.text', rowOverlay?.text ?? null, local?.textOverlay?.text),
               };
             })(),
-            transitionType: row.transition_type ?? local?.transitionType ?? 'crossfade',
+            cutStyle: cutStyleFromRow(row, local?.cutStyle ?? ('crossfade' as any)),
             transitionDuration: row.transition_duration ?? local?.transitionDuration ?? 0.5,
             retryCount: row.retry_count ?? 0,
             costEuros: Number(row.cost_euros ?? 0),
@@ -603,7 +604,7 @@ export default function VideoComposerDashboard() {
                 text: pickText(row.id, 'textOverlay.text', rowOverlay?.text ?? null, local?.textOverlay?.text),
               };
             })(),
-            transitionType: row.transition_type ?? local?.transitionType ?? 'crossfade',
+            cutStyle: cutStyleFromRow(row, local?.cutStyle ?? ('crossfade' as any)),
             transitionDuration: row.transition_duration ?? local?.transitionDuration ?? 0.5,
             // v131.7: DB-first für replicatePredictionId — lokaler Stale-Wert
             // (z. B. `sync:0b09b825…` nach Watchdog-Reset) hat sonst die
@@ -853,7 +854,7 @@ export default function VideoComposerDashboard() {
         fontSize: 48,
         color: '#FFFFFF',
       },
-      transitionType: (s.transitionType ?? 'crossfade') as ComposerScene['transitionType'],
+      cutStyle: (s.cutStyle ?? 'crossfade') as ComposerScene['cutStyle'],
       transitionDuration: s.transitionDuration ?? 0.5,
       retryCount: 0,
       costEuros: 0,
@@ -1174,7 +1175,7 @@ export default function VideoComposerDashboard() {
           upload_type: s.uploadType ?? null,
           reference_image_url: s.referenceImageUrl ?? null,
           text_overlay: s.textOverlay as any,
-          transition_type: s.transitionType,
+          transition_type: cutStyleToRow(s.cutStyle, undefined),
           transition_duration: s.transitionDuration,
           character_shot: (s.characterShot ?? null) as any,
           character_shots: (s.characterShots ?? (s.characterShot ? [s.characterShot] : [])) as any,
@@ -1316,7 +1317,7 @@ export default function VideoComposerDashboard() {
       clipQuality: 'standard',
       clipStatus: 'pending',
       textOverlay: { ...DEFAULT_TEXT_OVERLAY },
-      transitionType: 'none',
+      cutStyle: 'none',
       transitionDuration: 0,
       retryCount: 0,
       costEuros: 0,
@@ -1373,7 +1374,7 @@ export default function VideoComposerDashboard() {
           upload_type: baseScene.uploadType ?? null,
           reference_image_url: baseScene.referenceImageUrl ?? null,
           text_overlay: baseScene.textOverlay as any,
-          transition_type: baseScene.transitionType,
+          transition_type: cutStyleToRow(baseScene.cutStyle, undefined),
           transition_duration: baseScene.transitionDuration,
           director_modifiers: (baseScene.directorModifiers ?? {}) as any,
           shot_director: (baseScene.shotDirector ?? {}) as any,
@@ -1482,7 +1483,7 @@ export default function VideoComposerDashboard() {
       upload_type: p.uploadType ?? null,
       reference_image_url: p.referenceImageUrl ?? null,
       text_overlay: (p.textOverlay ?? DEFAULT_TEXT_OVERLAY) as any,
-      transition_type: p.transitionType ?? 'none',
+      transition_type: cutStyleToRow(p.cutStyle, 'none' as any),
       transition_duration: p.transitionDuration ?? 0,
       director_modifiers: (p.directorModifiers ?? {}) as any,
       shot_director: (p.shotDirector ?? {}) as any,

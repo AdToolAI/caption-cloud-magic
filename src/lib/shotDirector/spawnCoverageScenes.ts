@@ -67,7 +67,7 @@ export function buildCoveragePartials(
     clipStatus: 'pending',
     durationSeconds: baseDuration,
     referenceImageUrl: scene.referenceImageUrl,
-    transitionType: 'none',
+    cutStyle: 'none',
     transitionDuration: 0,
     withAudio: false,
     lipSyncWithVoiceover: false,

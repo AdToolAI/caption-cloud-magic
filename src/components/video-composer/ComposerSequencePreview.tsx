@@ -53,11 +53,11 @@ const CROSSFADE_MS = 400;
 /** Cut = hard swap, but a few frames of blend hide the src swap glitch. */
 const CUT_MS = 60;
 /** Resolve the effective preview transition duration (ms) for the LEAVING scene.
- *  Uses the same fields the exporter reads (`transitionType` / `transitionDuration`),
+ *  Uses the same fields the exporter reads (`cutStyle` / `transitionDuration`),
  *  so preview mirrors what the final MP4 will show. `none` → hard cut. */
 const resolveTransitionMs = (scene: ComposerScene | undefined): number => {
   if (!scene) return CROSSFADE_MS;
-  const type = (scene.transitionType ?? 'crossfade') as string;
+  const type = (scene.cutStyle ?? 'crossfade') as string;
   if (type === 'none') return CUT_MS;
   const secs = Number(scene.transitionDuration);
   if (!Number.isFinite(secs) || secs <= 0) return CROSSFADE_MS;

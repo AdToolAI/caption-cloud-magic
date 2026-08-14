@@ -4,7 +4,7 @@ import { tx } from "@/lib/i18nText";
  * currently selected scene's outgoing transition. Mirrors the popover UI but
  * inline for keyboard/A11y access from the StudioPane.
  *
- * Writes to `scene.transitionType` / `scene.transitionDuration` — the same
+ * Writes to `scene.cutStyle` / `scene.transitionDuration` — the same
  * fields the storyboard `TransitionHandle` writes and that
  * `compose-video-assemble` reads from the DB during export.
  */
@@ -33,13 +33,13 @@ const L10N = {
 } as const;
 
 interface Props {
-  transitionType: TransitionStyle;
+  cutStyle: TransitionStyle;
   transitionDuration: number;
   onChange: (type: TransitionStyle, duration: number) => void;
 }
 
 export function SceneTransitionInlineEditor({
-  transitionType,
+  cutStyle,
   transitionDuration,
   onChange,
 }: Props) {
@@ -55,7 +55,7 @@ export function SceneTransitionInlineEditor({
       </div>
 
       <TransitionSelector
-        value={transitionType}
+        value={cutStyle}
         onChange={(v) => onChange(v as TransitionStyle, transitionDuration)}
         availableTransitions={palette as string[]}
         label=""
@@ -73,8 +73,8 @@ export function SceneTransitionInlineEditor({
           min={0.2}
           max={1.5}
           step={0.1}
-          onValueChange={(v) => onChange(transitionType, Math.round(v[0] * 10) / 10)}
-          disabled={transitionType === 'none'}
+          onValueChange={(v) => onChange(cutStyle, Math.round(v[0] * 10) / 10)}
+          disabled={cutStyle === 'none'}
         />
       </div>
 

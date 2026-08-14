@@ -220,7 +220,7 @@ export default function StoryboardTab({
       clipQuality: last.clipQuality,
       durationSeconds: last.durationSeconds,
       withAudio: last.withAudio,
-      transitionType: last.transitionType,
+      cutStyle: last.cutStyle,
       transitionDuration: last.transitionDuration,
       shotDirector: last.shotDirector ? { ...last.shotDirector } : undefined,
       directorModifiers: last.directorModifiers ? { ...last.directorModifiers } : undefined,
@@ -262,7 +262,7 @@ export default function StoryboardTab({
         clipQuality: 'standard',
         clipStatus: 'pending',
         textOverlay: { ...DEFAULT_TEXT_OVERLAY },
-        transitionType: 'none',
+        cutStyle: 'none',
         transitionDuration: 0,
         retryCount: 0,
         costEuros: 0,
@@ -298,7 +298,7 @@ export default function StoryboardTab({
       clipQuality: 'standard',
       clipStatus: 'pending',
       textOverlay: { ...DEFAULT_TEXT_OVERLAY },
-      transitionType: 'none',
+      cutStyle: 'none',
       transitionDuration: 0,
       retryCount: 0,
       costEuros: 0,
@@ -791,10 +791,10 @@ export default function StoryboardTab({
                     />
                     {selectedIndex < scenes.length - 1 && (
                       <SceneTransitionInlineEditor
-                        transitionType={(selectedScene.transitionType ?? 'none') as any}
+                        cutStyle={(selectedScene.cutStyle ?? 'none') as any}
                         transitionDuration={selectedScene.transitionDuration ?? 0.5}
-                        onChange={(transitionType, transitionDuration) =>
-                          updateScene(selectedScene.id, { transitionType, transitionDuration })
+                        onChange={(cutStyle, transitionDuration) =>
+                          updateScene(selectedScene.id, { cutStyle, transitionDuration })
                         }
                       />
                     )}
@@ -828,8 +828,8 @@ export default function StoryboardTab({
               onReorder={onUpdateScenes}
               onAddScene={handleAddSceneClick}
               onGenerate={generateScene}
-              onUpdateSceneTransition={(sceneId, transitionType, transitionDuration) =>
-                updateScene(sceneId, { transitionType, transitionDuration })
+              onUpdateSceneTransition={(sceneId, cutStyle, transitionDuration) =>
+                updateScene(sceneId, { cutStyle, transitionDuration })
               }
             />
           </div>

@@ -112,6 +112,7 @@ import { resolveSceneAudioSource, type SceneAudioSource } from '@/config/nativeA
 import { pickClipSourceForDuration } from '@/lib/composer/pickClipSourceForDuration';
 import { useSeedance25LipsyncState } from '@/hooks/useSeedance25Lipsync';
 import { isSceneInFlight, sceneState } from '@/lib/composer/sceneState';
+import { cutStyleToRow } from "@/lib/video-composer/cutStyle";
 
 
 /** v416 — true when a plan scene actually contains speech (VO, dialog, lip-sync). */
@@ -726,7 +727,7 @@ function planSceneToComposerScene(
         } as any
       : ({ ...DEFAULT_TEXT_OVERLAY } as any),
     // Stage-3: transition into this scene (plan-driven). Falls back to crossfade.
-    transitionType: (ps.transition?.type ?? 'crossfade') as any,
+    cutStyle: (ps.transition?.type ?? 'crossfade') as any,
     transitionDuration: ps.transition?.durationSec ?? 0.4,
     // Stage-3: deterministic seed (mapped to composer_scenes.seed).
     seed: typeof ps.seed === 'number' ? ps.seed : undefined,
@@ -1044,7 +1045,7 @@ export function useApplyProductionPlan() {
           dialog_mode: (s as any).dialogMode === true,
           ai_prompt: s.aiPrompt ?? null,
           text_overlay: (s.textOverlay ?? DEFAULT_TEXT_OVERLAY) as any,
-          transition_type: s.transitionType ?? 'crossfade',
+          transition_type: cutStyleToRow(s.cutStyle, 'crossfade' as any),
           transition_duration: s.transitionDuration ?? 0.4,
           retry_count: s.retryCount ?? 0,
           cost_euros: s.costEuros ?? 0,

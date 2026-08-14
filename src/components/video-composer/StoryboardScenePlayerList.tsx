@@ -40,7 +40,7 @@ interface Props {
   onGenerate: (scene: ComposerScene) => void;
   onUpdateSceneTransition?: (
     sceneId: string,
-    transitionType: TransitionStyle,
+    cutStyle: TransitionStyle,
     transitionDuration: number,
   ) => void;
   className?: string;
@@ -146,7 +146,7 @@ export default function StoryboardScenePlayerList({
           <div className="space-y-3">
             {scenes.map((scene, index) => {
               const isLast = index === scenes.length - 1;
-              const transitionType = (scene.transitionType ?? 'none') as TransitionStyle;
+              const cutStyle = (scene.cutStyle ?? 'none') as TransitionStyle;
               const transitionDuration = scene.transitionDuration ?? 0.5;
               return (
                 <div key={scene.id}>
@@ -160,7 +160,7 @@ export default function StoryboardScenePlayerList({
                   />
                   {!isLast && onUpdateSceneTransition && (
                     <TransitionHandle
-                      value={transitionType}
+                      value={cutStyle}
                       duration={transitionDuration}
                       onChange={(type, duration) =>
                         onUpdateSceneTransition(scene.id, type, duration)

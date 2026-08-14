@@ -359,7 +359,8 @@ export interface ComposerScene {
    */
   clipLeadInTrimSeconds?: number;
   textOverlay: TextOverlayConfig;
-  transitionType: TransitionStyle;
+  /** v430 6.2 — Domänenname; DB-Spalte bleibt `transition_type`. */
+  cutStyle: TransitionStyle;
   transitionDuration: number;
   replicatePredictionId?: string;
   retryCount: number;

@@ -213,7 +213,7 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
 
     // Stage-3: Transition propagation
     const planTrans = ps.transition?.type;
-    const sceneTrans = (ss as any).transitionType as string | undefined;
+    const sceneTrans = (ss as any).cutStyle as string | undefined;
     if (planTrans && sceneTrans && planTrans !== sceneTrans) {
       const sev = sevFor('transition.type', 'warn');
       findings.push({
