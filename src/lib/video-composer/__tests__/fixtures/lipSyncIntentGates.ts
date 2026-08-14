@@ -70,10 +70,10 @@ export const INTENT_GATES: IntentGate[] = [
   },
   {
     id: 'scenecard-lipsync-actions',
-    site: 'src/components/video-composer/SceneCard.tsx:2385',
+    site: 'src/components/video-composer/SceneCard.tsx:2386',
     purpose: 'Leiste "Lip-Sync Aktionen" (Intent-Anteil der OR-Kette)',
-    condition: "scene.engineOverride === 'cinematic-sync'",
-    predicate: (s) => s.engineOverride === 'cinematic-sync',
+    condition: 'isLipSyncIntentional(scene)  // v430.1 Schritt 2A',
+    predicate: (s) => ssot(s),
   },
   {
     id: 'dialogstudio-wants-lipsync',
@@ -95,33 +95,29 @@ export const INTENT_GATES: IntentGate[] = [
     id: 'clipprogress-is-cinematic',
     site: 'src/components/video-composer/SceneClipProgress.tsx:126',
     purpose: 'Cinematic-Marker für die Fortschrittsanzeige',
-    condition: "scene.engineOverride === 'cinematic-sync'",
-    predicate: (s) => s.engineOverride === 'cinematic-sync',
+    condition: 'isLipSyncIntentional(scene)  // v430.1 Schritt 2A',
+    predicate: (s) => ssot(s),
   },
   {
     id: 'clipprogress-should-be-lipsync',
     site: 'src/components/video-composer/SceneClipProgress.tsx:132',
     purpose: 'Szene gilt als Lip-Sync-Szene (Spinner/Warnungen)',
-    condition:
-      "engineOverride === 'cinematic-sync' || dialogMode === true || lipSyncWithVoiceover === true",
-    predicate: (s) =>
-      s.engineOverride === 'cinematic-sync' ||
-      s.dialogMode === true ||
-      s.lipSyncWithVoiceover === true,
+    condition: 'isLipSyncIntentional(scene)  // v430.1 Schritt 2A',
+    predicate: (s) => ssot(s),
   },
   {
     id: 'inlineplayer-needs-lipsync',
     site: 'src/components/video-composer/SceneInlinePlayer.tsx:76',
     purpose: 'Grüner Haken erst nach Lip-Sync (Intent-Anteil)',
-    condition: "scene.engineOverride === 'cinematic-sync' || isLipSyncIntentional(scene)",
-    predicate: (s) => s.engineOverride === 'cinematic-sync' || ssot(s),
+    condition: 'isLipSyncIntentional(scene)  // v430.1 Schritt 2A',
+    predicate: (s) => ssot(s),
   },
   {
     id: 'inlineplayer-legacy-happyhorse-warn',
-    site: 'src/components/video-composer/SceneInlinePlayer.tsx:224',
+    site: 'src/components/video-composer/SceneInlinePlayer.tsx:223',
     purpose: 'Warnung "Lip-Sync auf veraltetem Video" (Intent-Anteil)',
-    condition: "scene.engineOverride === 'cinematic-sync'",
-    predicate: (s) => s.engineOverride === 'cinematic-sync',
+    condition: 'isLipSyncIntentional(scene)  // v430.1 Schritt 2A',
+    predicate: (s) => ssot(s),
   },
   {
     id: 'clipstab-locks-user-duration',
@@ -135,8 +131,8 @@ export const INTENT_GATES: IntentGate[] = [
     id: 'clipstab-poll-cinematic',
     site: 'src/components/video-composer/ClipsTab.tsx:550',
     purpose: '3s-Polling läuft weiter, solange Lip-Sync arbeitet (Intent-Anteil)',
-    condition: "s.engineOverride === 'cinematic-sync'",
-    predicate: (s) => s.engineOverride === 'cinematic-sync',
+    condition: 'isLipSyncIntentional(s)  // v430.1 Schritt 2A',
+    predicate: (s) => ssot(s),
   },
   {
     id: 'preflight-dialog-checks',
@@ -149,8 +145,8 @@ export const INTENT_GATES: IntentGate[] = [
     id: 'pipelineprogress-cinematic-generating',
     site: 'src/hooks/usePipelineProgress.ts:922',
     purpose: 'Szene zählt als "in Arbeit" während Lip-Sync (Intent-Anteil)',
-    condition: "s.engineOverride === 'cinematic-sync'",
-    predicate: (s) => s.engineOverride === 'cinematic-sync',
+    condition: 'isLipSyncIntentional(s)  // v430.1 Schritt 2A',
+    predicate: (s) => ssot(s),
   },
   {
     id: 'generateall-needs-lipsync',
