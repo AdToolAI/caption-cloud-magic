@@ -377,14 +377,14 @@ serve(async (req) => {
         scenes: [composeScene],
         visualStyle: (project.briefing as any)?.visualStyle,
         characters: (project.briefing as any)?.characters,
-        // v431 G2.1 — kanonischer Run aus der Acquisition oben.
+        // v431 G2.4 — kanonischer Run aus der fail-closed Acquisition oben.
         ...(hybridRunContext ? { run_context: hybridRunContext } : {}),
       }),
     });
 
     if (!composeResp.ok) {
       const txt = await composeResp.text();
-      await markSceneFailed(admin, newSceneId);
+      await failHybridScene(admin, newSceneId, hybridRun, "hybrid:dispatch-failed", `compose-video-clips failed: ${txt.slice(0, 500)}`);
       return jsonError(`compose-video-clips failed: ${txt}`, 500);
     }
 
