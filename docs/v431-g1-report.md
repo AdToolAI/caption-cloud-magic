@@ -1,7 +1,6 @@
 # v431 — G1-Abnahmebericht (reduzierter Scope)
 
-Status: **G1 umgesetzt, ein Punkt bewusst STOP** (SceneCard-Cancel, siehe unten).
-G0-State-Core unverändert (eingefroren).
+Status: **G1 umgesetzt**. G0-State-Core unverändert (eingefroren).
 
 ## 1. Migrierte Writes
 
@@ -79,12 +78,20 @@ Statische Prüfungen:
 - `vitest run src/lib/composer/__tests__` — 29 Dateien / 368 Tests grün, inkl.
   `lipsyncFrozenContract`, `legacyWriterAllowlist`, `sceneStateClientContract`,
   `forceCinematicSyncRouting`.
-- Inventar `v431LegacyWriteInventory.ts`: Eintrag aufgeteilt, jede Branch-ID trägt
-  `migratedIn: "G1"`, `contractWriteId` und den verbliebenen Legacy-Zweig.
+- `clientReaderContract5E` grün nach Einführung von `legacy-mapping-allowed`-Markern
+  für die optimistischen Rollback-Snapshots in `SceneCard.tsx`.
+- Inventar `v431LegacyWriteInventory.ts`: Eintrag `SceneCard:canceled` auf
+  `migratedIn: "G1"`, `contractWriteId: "cancel-dialog-lipsync:reset"` gesetzt;
+  verbliebener Legacy-Zweig entfernt.
 
 ## 5. Änderungsset
 
 - `supabase/functions/compose-video-clips/index.ts` (Helper-Split + 3 Call-Sites, deployed)
+- `supabase/functions/cancel-dialog-lipsync/index.ts` (`reset: true` verwendet
+  `composer_reset_lipsync_full`, deployed)
+- `src/components/video-composer/SceneCard.tsx` (beide Cancel-/Reset-Buttons rufen
+  ausschließlich `cancel-dialog-lipsync` auf, mit Rollback-Handling für
+  `stale_reset`/`no_base_plate`)
 - `src/lib/composer/__tests__/fixtures/v431LegacyWriteInventory.ts` (Inventar-Diff)
 - Smoke-Migration (Fixture, self-cleaning)
 - `docs/v431-g1-report.md`
