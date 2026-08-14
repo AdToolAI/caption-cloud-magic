@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
         audio_plan: AUDIO_PLAN,
         lip_sync_with_voiceover: true,
         dialog_mode: true,
-        engine_override: "sync_so",
+        engine_override: "cinematic-sync",
         dialog_shots: [{ shot: 1, job_id: "job-1" }, { shot: 2, job_id: "job-2" }],
         ...extra,
       })
