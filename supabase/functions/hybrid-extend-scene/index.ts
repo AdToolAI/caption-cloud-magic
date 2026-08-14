@@ -327,12 +327,12 @@ serve(async (req) => {
         }
       }
     } catch (e) {
-      await markSceneFailed(admin, newSceneId);
+      await failHybridScene(admin, newSceneId, hybridRun, "hybrid:frame-extract-failed", `Frame extraction failed: ${(e as Error).message}`);
       return jsonError(`Frame extraction failed: ${(e as Error).message}`, 500);
     }
 
     if (!startAnchor) {
-      await markSceneFailed(admin, newSceneId);
+      await failHybridScene(admin, newSceneId, hybridRun, "hybrid:no-anchor", "No anchor frame produced");
       return jsonError("No anchor frame produced", 500);
     }
 
