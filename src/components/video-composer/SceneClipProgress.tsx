@@ -14,6 +14,7 @@ import { useMouthYavgProbe } from '@/hooks/useMouthYavgProbe';
 import { FaceMapReviewDialog } from './FaceMapReviewDialog';
 import { startSceneGeneration } from '@/lib/composer/startSceneGeneration';
 import { sceneState, isRealizedState, legacyClipReadyEquivalentRow, sceneSubstate } from '@/lib/composer/sceneState';
+import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 
 /** Providers that produce an i2v lead-in freeze worth auto-trimming. */
 const I2V_PROVIDERS: ReadonlyArray<string> = [
