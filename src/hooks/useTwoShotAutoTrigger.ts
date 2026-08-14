@@ -22,6 +22,7 @@ import { toast } from '@/hooks/use-toast';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { isRealizedScene } from '@/lib/composer/isRealizedScene';
+import { legacyClipReadyEquivalentRow } from '@/lib/composer/sceneState';
 import { isLipSyncIntentionalRow } from '@/lib/video-composer/lipSyncIntent';
 import { tx } from '@/lib/i18nText';
 
@@ -49,6 +50,7 @@ const isDialogEngine = (eo: any) => DIALOG_ENGINES.has(String(eo ?? ''));
  * ungewollt Sync.so-Kosten auslösen.
  */
 const isLipSyncCandidate = (d: any) =>
+  // lipsync-legacy-read: v425 — Cancel-Opt-out der Lip-Sync-Kette, kein Hauptzustand.
   d.lip_sync_status !== 'canceled' &&
   isDialogEngine(d.engine_override) &&
   isLipSyncIntentionalRow(d);
@@ -193,7 +195,9 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         const runningSyncJobs = (data as any[]).filter(
           (d) =>
             isDialogEngine(d.engine_override) &&
+            // lipsync-legacy-read: v425 — laufender Provider-Job der Lip-Sync-Substage.
             d.lip_sync_status !== 'canceled' &&
+            // lipsync-legacy-read: v425 — laufender Provider-Job der Lip-Sync-Substage.
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
             hasRecordedProviderJob(d),
@@ -231,6 +235,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         const orphanReruns = (data as any[]).filter(
           (d) =>
             isDialogEngine(d.engine_override) &&
+            // lipsync-legacy-read: v425 — Orphan-Re-Run-Marker der Lip-Sync-Substage.
             d.lip_sync_status === 'pending' &&
             d.lip_sync_applied_at &&
             typeof d.clip_url === 'string' &&
@@ -262,7 +267,9 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         const stalePrep = (data as any[]).filter(
           (d) =>
             isDialogEngine(d.engine_override) &&
+            // lipsync-legacy-read: v425 — Cancel-Opt-out der Lip-Sync-Kette.
             d.lip_sync_status !== 'canceled' &&
+            // lipsync-legacy-read: v425 — Audio-Prep-Substage (Spiegel lipsync-watchdog).
             d.twoshot_stage === 'audio' &&
             !d.audio_plan?.twoshot?.url &&
             d.updated_at &&
@@ -298,9 +305,11 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
-          if (d.clip_status && d.clip_status !== 'ready') return false;
+          if (!legacyClipReadyEquivalentRow(d)) return false;
           if (!d.audio_plan?.twoshot?.url) return false;
+          // lipsync-legacy-read: v425 — Substage bereits über Audio hinaus.
           if (d.lip_sync_status === 'running' || d.lip_sync_status === 'stitching' || d.lip_sync_status === 'applied' || d.lip_sync_status === 'done') return false;
+          // lipsync-legacy-read: v425 — Substage bereits über Audio hinaus.
           if (d.twoshot_stage && d.twoshot_stage !== 'audio') return false;
           return true;
         });
@@ -335,9 +344,10 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
-          if (d.clip_status && d.clip_status !== 'ready') return false;
+          if (!legacyClipReadyEquivalentRow(d)) return false;
           if (d.audio_plan?.twoshot?.url) return false; // schon da
-          if (d.twoshot_stage === 'audio') return false; // läuft gerade
+          // lipsync-legacy-read: v425 — Audio-Prep läuft gerade.
+          if (d.twoshot_stage === 'audio') return false;
           if (inflight.current.has(`audio-prep:${d.id}`)) return false;
           if (!hasDialogScript(d)) return false;
           return true;
@@ -439,11 +449,12 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           if (!isLipSyncCandidate(d)) return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
           // Master clip must be READY — never try lip-sync on a failed/generating master.
-          if (d.clip_status && d.clip_status !== 'ready') return false;
+          if (!legacyClipReadyEquivalentRow(d)) return false;
           if (d.lip_sync_applied_at) return false;
           // v18: never auto-revive a user-cancelled scene. The Cancel button
           // explicitly opts the user out — only an explicit "Lip-Sync neu rendern"
           // click should re-enter the pipeline.
+          // lipsync-legacy-read: v425 — expliziter User-Abbruch der Lip-Sync-Kette.
           if (d.lip_sync_status === 'canceled') return false;
           if (inflight.current.has(d.id)) return false;
           if (autoRetried.current.has(d.id)) return false;
@@ -453,6 +464,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           // — DO NOT auto-advance them from the client, otherwise we re-enter
           // the dispatch loop that flipped the breaker open in the first place.
           const ADVANCEABLE_STAGES = new Set(['master_clip', 'failed']);
+          // lipsync-legacy-read: v425 — nur 'master_clip'/'failed' dürfen weiterlaufen.
           if (d.twoshot_stage && !ADVANCEABLE_STAGES.has(d.twoshot_stage)) return false;
           // ── Pre-flight gate ──────────────────────────────────────────
           // v5 (compose-dialog-segments) hard-requires audio_plan.twoshot.url
@@ -467,6 +479,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           if (!sourceClip || typeof sourceClip !== 'string' || sourceClip.length === 0) return false;
           // v23: ONLY `pending` (or null) is a valid start state on the client.
           // `failed` requires explicit user reset via `reset-lipsync-scene`.
+          // lipsync-legacy-read: v425 — gültiger Start-Zustand der Lip-Sync-Substage.
           if (d.lip_sync_status === 'pending' || d.lip_sync_status == null) return true;
           return false;
         });
@@ -475,7 +488,9 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
             (d) =>
               isLipSyncCandidate(d) &&
               !d.lip_sync_applied_at &&
+              // lipsync-legacy-read: v425 — sichtbare Lip-Sync-Arbeit für den Fortschrittsbalken.
               (d.lip_sync_status === 'running' ||
+                // lipsync-legacy-read: v425 — sichtbare Lip-Sync-Arbeit für den Fortschrittsbalken.
                 (d.twoshot_stage && !['done', 'complete', 'failed'].includes(String(d.twoshot_stage)))),
           );
           if (!anyVisibleLipsyncWork && progressActive.current) {
