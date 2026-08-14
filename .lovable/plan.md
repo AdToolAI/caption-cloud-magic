@@ -33,16 +33,48 @@ Nicht im Scope, aber benannt: der äußere `catch` (Zeile 367–369) markiert di
 
 `composer-start-scene-generation` mit `prepare_only: true` durchläuft nur Ownership-Check, `startSceneRun()`, `hardResetScene()` und den Eintritt nach `plate_queued`. Es gibt in dieser Funktion keinen Aufruf von `reserveRunCredits()`/`composer_reserve_run_credits`; der einzige Aufrufer im gesamten Functions-Baum ist `compose-video-clips` (`_shared/v427-credit-contract.ts` wird nur dort importiert).
 
-Folge: ein fehlgeschlagener Run-Erwerb und die drei Hybrid-Failure-Pfade vor dem Dispatch können keine hängende Reservation hinterlassen — es gibt keine. Die einzige Credit-Bewegung im Prepare-Pfad ist die `refundDecision` des `hardResetScene()` für den **vorherigen** Lauf, die unverändert nach bestehendem Vertrag läuft. `hybrid:dispatch-failed` betrifft nur den Fall, in dem `compose-video-clips` nicht mit 2xx antwortet; die dortige Reservation wird weiterhin durch die bestehende Settle/Release-Logik in `compose-video-clips` selbst behandelt — G2.4 fasst sie nicht an.
+## Befund 5 — `prepare_only` ist NICHT alles-oder-nichts (Variante B gilt)
+
+Geprüft in der DB und im Code:
+- `composer_start_scene_run(_scene_id)` ist für sich atomar (`SELECT … FOR UPDATE` + ein `UPDATE`), committet aber **sofort** `plate_generation+1`, `active_run_id`, `active_run_started_at`.
+- Danach laufen in `composer-start-scene-generation` **separate** Schritte: `hardResetScene()` (kann mit `reset_failed`/409 abbrechen) und erst dann `transitionScene(… 'plate_queued')`.
+
+Damit ist eine Teilmutation real möglich: Antwort non-2xx, während die Szene bereits `active_run_id` gesetzt hat und noch auf `idle` steht. Der bisher vorgeschlagene Delete-Guard (`active_run_id IS NULL`) würde dann **nicht** greifen — also Variante B.
+
+**Vertrag:** Der Compensating-Cleanup deckt beide Formen ab und `cleaned:false` ist kein akzeptierter Endzustand für die eben erzeugte Szene. Gelöscht wird die Zeile, wenn **alle** gelten:
+`id = <newSceneId dieser Anfrage>` und `continuity_source_scene_id = <sourceSceneId>` (Beweis: von dieser Anfrage angelegt) und `pipeline_state IN ('idle','plate_queued')` und `clip_status = 'pending'` und `clip_url IS NULL` und `base_video_url IS NULL` und `processed_video_url IS NULL`.
+`active_run_id` ist **kein** Ausschlusskriterium mehr — ein halb erworbener Run ist genau der Fall, der weg muss. Vor jedem Frame-/Provider-Spend gibt es kein fremdes Output an dieser Zeile, deshalb ist der Delete sicher. Greift der Guard trotzdem nicht (Zeile hat bereits Output oder ist fortgeschritten — nur denkbar bei paralleler Fremdmutation), wird nicht gelöscht, sondern **laut** als `hybrid_zombie_unresolved` mit Scene-ID geloggt und im Fehler-Response ausgewiesen. Antwort: `hybrid_run_acquire_failed` mit `cleaned: true|false`.
+Kein atomares Insert+Run-Primitive in G2.4 (bleibt notierte Verbesserung).
+
+## Befund 6 — `composer_fail_scene_with_mirrors` kann `expected_from` NICHT ausdrücken
+
+Die eindeutige 10-Argument-Signatur lautet
+`(_scene_id, _run_id, _generation, _write_id, _error_text, _substate, _lip_sync_status, _twoshot_stage, _clip_status, _clear_lip_sync_fields)`
+und ruft intern `composer_scene_transition_core(…, _from := NULL, …)` auf — es gibt also keinen From-State-Guard, nur die allgemeine Legalität `current → failed`. Da `failed` aus mehreren Zuständen legal ist, könnte `dispatch-failed` eine bereits nach `plate_rendering` fortgeschrittene Szene überschreiben.
+
+`composer_scene_transition_core` besitzt den Guard bereits als Parameter `_from composer_scene_state[]`.
+
+**Vertrag:** Das eingefrorene Primitive wird **nicht** angefasst (kein neuer Default-Parameter, kein Overload-Risiko). Stattdessen ein enges Hybrid-Primitive:
+
+```text
+composer_fail_hybrid_extend_scene(
+  _scene_id uuid, _run_id uuid, _generation int, _write_id text, _error_text text
+) RETURNS jsonb
+```
+- write_id-Allowlist: exakt `hybrid:frame-extract-failed`, `hybrid:no-anchor`, `hybrid:dispatch-failed` — sonst `applied:false, reason:'write_id_not_allowed'` inkl. Audit-Zeile.
+- delegiert an `composer_scene_transition_core(_to := 'failed', _guard_mode := 'run_bound', _from := ARRAY['plate_queued'], …)` — Row Lock, Run/Generation-Fencing und Audit kommen vom Core.
+- fehlende Provenienz → `missing_run_provenance`; falscher From-State → No-op mit `unexpected_state`; keine Output-, keine Legacy-Mutation bei Ablehnung.
+- Legacy-Spiegel: setzt im selben Aufruf nach erfolgreichem Core-Write `clip_status = 'failed'` und `clip_error = _error_text` (identisches Muster wie `composer_fail_scene_with_mirrors`, aber ohne Lip-Sync-Felder und ohne Clear-Flag).
+
+Alle drei Hybrid-Failure-Writes nutzen dieses Primitive; `markSceneFailed()` entfällt ersatzlos.
 
 ## Zielvertrag G2.4
 
-1. Run-Akquise wird **fail-closed**: schlägt `prepare_only` fehl, startet weder Frame-Extraktion noch Provider-Dispatch.
-2. **Kein Zombie bei Run-Akquise-Failure.** Vor dem Abbruch löscht die Funktion die soeben angelegte Szene über ein streng geguardetes Compensating-Delete: `id = <die eben zurückgegebene newSceneId>` **und** `pipeline_state = 'idle'` **und** `active_run_id IS NULL` **und** `clip_status = 'pending'`. Trifft der Guard nicht (Zeile bereits fortgeschritten oder fremd berührt), wird nichts gelöscht und der Fall geloggt (`hybrid_cleanup_skipped`), damit kein fremder Zustand zerstört wird. Kein neues DB-Primitive, kein atomarer Insert+Run-Erwerb in G2.4 (bleibt notierte Verbesserung für später). Antwort in beiden Fällen: definierter Fehler `hybrid_run_acquire_failed` mit `cleaned: true|false`.
-3. Die drei Failure-Pfade schreiben über das bestehende Primitive `composer_fail_scene_with_mirrors` mit `_run_id` / `_generation` aus der Akquise und eigener `_write_id` (`hybrid:frame-extract-failed`, `hybrid:no-anchor`, `hybrid:dispatch-failed`). Kein neues Primitive, keine neue Signatur — S1-Signatur bleibt eindeutig, `_clear_lip_sync_fields` wird **nicht** verwendet (Allowlist bleibt auf `cvc:failed/pika`).
-4. **From-State-Semantik.** `frame-extract-failed` und `no-anchor` laufen aus dem unmittelbar nach Run-Start erwarteten `plate_queued`. `hybrid:dispatch-failed` setzt `failed` nur, wenn Run + Generation noch stimmen **und** die Szene weiterhin in `plate_queued` steht. Ist sie durch den Downstream bereits weiter (`plate_rendering`, `failed`, `canceled`, …), erfolgt kein erzwungenes Überschreiben: No-op mit Grund `unexpected_state`, bestehender Zustand bleibt erhalten, HTTP-Fehler an den Client bleibt.
-5. Stale/falsche Generation → keine Mutation an Output- und Legacy-Feldern; `markSceneFailed()` ohne Run entfällt ersatzlos.
-6. Kein Sonder-Run-Pfad, kein `beginSceneRun()` in Hybrid; die Weitergabe als `run_context` an `compose-video-clips` bleibt unverändert.
+1. Run-Akquise wird **fail-closed**: schlägt `prepare_only` fehl, startet weder Frame-Extraktion noch Provider-Dispatch; Cleanup nach Befund 5.
+2. Die drei Failure-Pfade schreiben run-gebunden über `composer_fail_hybrid_extend_scene` mit `expected_from = {plate_queued}` (Befund 6). `composer_fail_scene_with_mirrors` bleibt unverändert eingefroren, `_clear_lip_sync_fields` bleibt auf `cvc:failed/pika` beschränkt.
+3. Stale/falsche Generation/falscher From-State → keine Mutation an Output- und Legacy-Feldern.
+4. Kein Sonder-Run-Pfad, kein `beginSceneRun()` in Hybrid; `run_context` an `compose-video-clips` bleibt unverändert.
+5. `hybrid-extend-scene:idle` raus aus dem State-Writer-Inventar (insert-default), keine Runless-Regel, kein Grandfathering.
 
 
 ## Verifikation, die zu G2.4 gehört
