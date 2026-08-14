@@ -102,7 +102,8 @@ describe('Template-Grenze (externes Schema)', () => {
     const tpl = read('src/types/motion-studio-templates.ts');
     expect(tpl).toContain('KEIN Composer-Domain-Feld');
     expect(tpl).toContain('transitionType?: TransitionStyle;');
-    expect(tpl).not.toContain('cutStyle');
+    // Kein cutStyle-Feld im Template-Schema (nur im Kommentar erwähnt).
+    expect(tpl).not.toMatch(/^\s*cutStyle\??:/m);
   });
 
   it('converts scene_suggestions explicitly instead of spreading the template object', () => {
