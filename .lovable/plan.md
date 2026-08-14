@@ -18,6 +18,8 @@ Heute liegen die Szenen-Operationen verstreut in `SceneCard.tsx` (u. a. `reset-l
   - Lip-Sync-Verfügbarkeit über den bestehenden Lip-Sync-Intent-Vertrag (`isLipSyncIntentionalRow`, v425-Providerliste), nicht über den Pipeline-State allein.
   - Kontinuität über die bestehenden Continuity-Helper in `src/lib/composer/continuity/continuityState.ts` (`continuity_stale`, `needsContinuityRerender`, Vorgänger-Finalität, `continuity_source_scene_id`).
 - Sammelbegriff „Reset“ verschwindet aus den Labels.
+- **Akzeptanzregel Einzigartigkeit**: sobald ein Menüeintrag verdrahtet ist, wird der bisherige parallele Button entfernt. `SceneContinuityStatus.tsx` behält Status/Badge, aber keinen zweiten „Kontinuität aktualisieren“-Button; die alten Lip-Sync- und Hard-Reset-Einstiege in `SceneCard.tsx` entfallen. Handler, Payloads und Bestätigungen bleiben identisch, Statusanzeigen bleiben dort, wo sie sinnvoll sind.
+- Kein Backend-, Writer-, State- oder Lip-Sync-Verhalten wird geändert.
 
 ## 6.2 `transitionType` → `cutStyle` (Teil-Rename)
 
