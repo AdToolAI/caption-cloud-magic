@@ -654,15 +654,40 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           console.error(
             `[compose-twoshot-audio] v201_id_only_required_block scene=${scene_id} reason=${ensured.reason} details=${JSON.stringify(ensured.details ?? {})}`,
           );
-          await supabase
-            .from("composer_scenes")
-            .update({
-              twoshot_stage: "failed",
-              lip_sync_status: "failed",
-              clip_error: `id_only_dialog_turns_required:${ensured.reason}`,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", scene_id);
+          // v431 G2.3 — caller-spezifischer Fail-Write nur mit Run-Provenienz.
+          if (dispatchRunId && typeof dispatchPlateGeneration === 'number') {
+            const { data: failRes, error: failErr } = await supabase.rpc(
+              "composer_fail_scene_with_mirrors",
+              {
+                _scene_id: scene_id,
+                _run_id: dispatchRunId,
+                _generation: dispatchPlateGeneration,
+                _write_id: "cta:id_only_dialog_turns_required",
+                _error_text: `id_only_dialog_turns_required:${ensured.reason}`,
+                _lip_sync_status: "failed",
+                _twoshot_stage: "failed",
+              },
+            );
+            const fr = (failRes ?? {}) as { applied?: boolean; reason?: string };
+            console.log(
+              `[compose-twoshot-audio] v431_g2_3 id_only_dialog_turns_required scene=${scene_id} ` +
+                `result=${failErr ? `rpc_error:${failErr.message}` : (fr.applied ? "applied" : (fr.reason ?? "not_applied"))}`,
+            );
+          } else {
+            // Kein Run-Stempel → Legacy-Pfad erhalten.
+            console.warn(
+              `[compose-twoshot-audio] v431_g2_3 id_only_dialog_turns_required scene=${scene_id} reason=no_run_stamp fallback=legacy`,
+            );
+            await supabase
+              .from("composer_scenes")
+              .update({
+                twoshot_stage: "failed",
+                lip_sync_status: "failed",
+                clip_error: `id_only_dialog_turns_required:${ensured.reason}`,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", scene_id);
+          }
           return json({ error: "id_only_dialog_turns_required", reason: ensured.reason, details: ensured.details ?? null }, 422);
         }
       }
