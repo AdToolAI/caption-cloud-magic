@@ -20,8 +20,10 @@ Zählung hat `composer-cancel-project` mit nur einem statt zwei Aufrufen geführ
 | `hybrid-extend-scene/index.ts` (375) | 1 | **Vertragslücke**, dokumentierte Debt: `failed` ohne jeden Run-/Generation-Guard, läuft heute über den Legacy-7er-Wrapper und damit über `system_migration` |
 
 Ergebnis: kein unbekannter zwölfter Caller. Die einzige echte Lücke bleibt
-`hybrid-extend-scene`; sie ist als Debt markiert und wird in G1 geschlossen, nicht
-in G0.
+`hybrid-extend-scene`. Sie wird in G0 nur als Debt markiert; der echte
+Run-Kontext (`run_bound`) kommt wie ursprünglich vereinbart in **G2**, nicht in
+G1 — es ist ein Provider-/Render-Lauf und gehört fachlich zu Audio/Dispatch/Run,
+während G1 klein und risikoarm bei den Terminal-/Cancel-Writern bleibt.
 
 ## 2. 6er- und 7er-Signatur sind beide erhalten geblieben
 
@@ -73,14 +75,43 @@ pipeline_state_run_id = CASE WHEN guard_mode = 'run_bound' THEN run_id ELSE NULL
   `composer_runless_transition_rules` und einen Grund aus der erlaubten Liste;
   `system_migration` ist ausschließlich den Legacy-Wrappern vorbehalten.
 
-## Was für G0 noch offen ist
+## Was für G0 noch offen ist — der funktionale DB-Smoke
 
-Nur die funktionale DB-Verifikation: Der Smoke-Test
+Einziges verbleibendes Abschluss-Gate. Der Test
 (`/mnt/documents/g0-smoke-test.sql`) konnte in der Sandbox nicht laufen, weil die
-Sandbox-Rolle nicht in `auth.users` schreiben darf. Nachzuholen mit
-`SET LOCAL ROLE service_role` in einer Rollback-Transaktion: Run-Guard-Ablehnung,
-Runless-Allowlist, Gap-Pfad mit vier Audit-Zeilen, Recovery-No-op bei
-wiederaufgetauchtem Run.
+Sandbox-Rolle nicht in `auth.users` schreiben darf.
+
+**Autorisierungskontext:** `SET LOCAL ROLE service_role` allein genügt nicht — der
+Core erkennt Privilegierung über den JWT-Claim, nicht über `current_user`. Der
+Smoke muss denselben Claim-Pfad setzen, den die Funktion liest:
+
+```sql
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
+-- falls der Core zusätzlich den flachen Pfad liest:
+SELECT set_config('request.jwt.claim.role', 'service_role', true);
+-- Fixtures + Assertions
+ROLLBACK;
+```
+
+Vor dem Lauf wird die im Core tatsächlich implementierte Claim-Quelle aus der
+Funktionsdefinition gelesen und der Test exakt darauf gebaut.
+
+**Vier Pflicht-Assertions:**
+
+1. **Stale Run** — Guard erwartet Run A, aktiv ist Run B: kein State-Write, Szene
+   unverändert, Ablehnung im Audit.
+2. **Runless-Allowlist** — gelistete Kante mit erlaubtem Grund geht durch; eine
+   state-machine-legale, aber nicht in `composer_runless_transition_rules`
+   gelistete Kante wird abgewiesen.
+3. **Gap-Pfad** — `plate_ready → lipsync_running`: genau **ein** UPDATE auf
+   `composer_scenes`, **exakt vier** Zeilen in `composer_scene_transition_log`,
+   finaler State `lipsync_running`.
+4. **Recovery** — `orphaned_run` bei `active_run_id IS NULL` greift; taucht ein
+   Run wieder auf, ergibt sich `run_reappeared` ohne Write.
+
+Alles in einer Rollback-Transaktion gegen isolierte Testdaten. Ergebnis kommt als
+kurzer PASS/FAIL-Bericht pro Assertion, danach STOP — G1 erst nach grünem Smoke.
 
 ---
 
@@ -120,3 +151,9 @@ dedupliziert nach Kleinschreibung des Namens, Brand gewinnt. Das ist der einzige
 Ort, an dem Nicht-`brand_*`-Daten noch in die Pipeline kommen — und damit der
 Angriffspunkt für den separaten CW1-Track (eine kanonische Bibliothek,
 langfristig nur `brand_*`). CW1 bleibt bewusst außerhalb von v431.
+
+**CW1-Vormerkung (nicht jetzt):** Zwei Angriffspunkte, beide erst nach v431.
+1. Zweite Quelle in `useUnifiedMentionLibrary` entfernen — nur noch `brand_*`.
+2. `useAccessibleCharacters`: Dedupe nach Kleinschreibung des Namens durch Dedupe
+   nach kanonischer Character-ID ersetzen. Zwei verschiedene Figuren dürfen nicht
+   zusammenfallen, nur weil beide „Anna" heißen.
