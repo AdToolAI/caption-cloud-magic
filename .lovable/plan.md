@@ -17,8 +17,10 @@ _write_id            text      NOT NULL     -- stabile semantische Write-ID
 _from                composer_scene_state[] DEFAULT NULL
 _detail              text      DEFAULT NULL
 _substate            text      DEFAULT NULL
+_error_text          text      DEFAULT NULL
 _clear_detail        boolean   DEFAULT false
 _clear_substate      boolean   DEFAULT false
+_clear_error         boolean   DEFAULT false
 RETURNS TABLE(applied boolean, state composer_scene_state, substate text, reason text, path composer_scene_state[])
 ```
 
