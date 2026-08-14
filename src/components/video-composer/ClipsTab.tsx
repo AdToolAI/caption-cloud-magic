@@ -1345,11 +1345,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                         {costPerClip > 0 && (
                           <span className="text-[10px] text-amber-400">€{costPerClip.toFixed(2)}</span>
                         )}
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded-full border ${status.bg} ${status.color}`}
-                        >
-                          {status.label}
-                        </span>
+                        <SceneStatusBadge scene={scene} />
                       </div>
                       <p
                         className="text-[11px] text-foreground/80 overflow-hidden text-ellipsis break-words"
