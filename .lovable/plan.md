@@ -43,15 +43,39 @@ die späteren Caller unverändert bleiben können.
    `_error_text` = Fehlermeldung (Zustand + `clip_error` atomar). Failure-Zweige, die **vor**
    dem Stempeln auftreten, bleiben unverändert und bleiben Debt für G2.
 2. `SceneCard:canceled` → kein direkter Client-State-Write mehr; Aufruf der bestehenden
-   Cancel-Edge-Function. Sichtbare Cancel-Semantik unverändert.
-3. Optional, nur bei fachlicher Deckungsgleichheit: `cancel-dialog-lipsync:canceled`
-   delegiert an den bestehenden migrierten Cancel-Pfad. Sonst STOP und Rückmeldung.
+   Cancel-Edge-Function. Der neue Weg darf bewusst breiter sein als der alte Client-Write;
+   die zusätzlichen Side Effects werden vorher aufgelistet und als gewünschte
+   Cancel-Semantik bestätigt.
+3. Nur bei nachgewiesener Semantikgleichheit: `cancel-dialog-lipsync:canceled`.
+   Vorab read-only-Vergleich von `cancel-dialog-lipsync` und `composer-cancel-scene` über
+   Jobs/Locks, `dialog_shots`, Outputs, Run-Ledger, Reset-Verhalten und Credits. Ist der
+   Scene-Cancel breiter oder anders, bleibt der Writer in G1 liegen. Keine neue Runless-Regel.
 
-Nicht in G1 (unverändert): sync-so-webhook, remotion-webhook, compose-clip-webhook,
-compose-dialog-segments, render-sync-segments-audio-mux, lipsync-watchdog, qa-watchdog,
-recover-stuck-composer-clip, qa-weekly-deep-sweep, continuity-chain, autopilotComposerBridge,
-useTwoShotAutoTrigger, hybrid-extend-scene (Debt → G2 `run_bound`), Lip-Sync-Frozen-Contracts,
-Cast & World, Reverse-Bridge.
+Verbindliche Umsetzungsregeln:
+
+- `markSceneContractFailure` wird **nicht pauschal** umgestellt. Zuerst alle Call-Sites
+  auflisten und danach trennen, ob zum Aufrufzeitpunkt ein `sceneRunStamps`-Eintrag existiert.
+  Nur run-gestempelte Call-Sites gehen auf `transitionSceneV2()`; falls nötig wird der Helper
+  gesplittet, damit Legacy-Caller unverändert bleiben.
+- Ist die bisherige semantische writeId dafür zu grob, wird sie jetzt in stabile
+  branch-spezifische IDs aufgeteilt und im Inventar (`v431LegacyWriteInventory.ts` + Dossier)
+  dokumentiert.
+- Es wird kein Grandfather-Eintrag entfernt, den ein noch nicht migrierter Branch weiterhin
+  benötigt.
+
+Nicht in G1 (unverändert und **nicht** im Änderungsset): `_shared/lipsync-fail.ts`,
+`generate-talking-head`, `report-lipsync-motion-probe`, sync-so-webhook, remotion-webhook,
+compose-clip-webhook, compose-dialog-segments, render-sync-segments-audio-mux,
+lipsync-watchdog, qa-watchdog, recover-stuck-composer-clip, qa-weekly-deep-sweep,
+continuity-chain, autopilotComposerBridge, useTwoShotAutoTrigger,
+hybrid-extend-scene (Debt → G2 `run_bound`), Lip-Sync-Frozen-Contracts, Cast & World,
+Reverse-Bridge.
+
+Änderungsset G1: `supabase/functions/compose-video-clips/index.ts`,
+`src/components/video-composer/SceneCard.tsx`, ggf.
+`supabase/functions/cancel-dialog-lipsync/index.ts` (nur nach bestandenem Vergleich),
+Inventar-/Testdateien sowie eine Abschluss-Migration für das Grandfather-Trimmen.
+
 
 ## Regeln während G1
 
