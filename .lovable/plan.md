@@ -100,7 +100,7 @@ Watchdog/Recovery ist bewusst spät: die Läufe sind selten, treffen aber genau 
 ## Ergebnisartefakt
 
 - `docs/v431-prep-inventory.md` mit den Abschnitten 1–5.
-- Maschinenlesbares Inventar als Testfixture, geschlüsselt über die stabilen semantischen IDs (analog zum v430.1-Gate-Scanner). Damit kann ein späterer Contract-Test erzwingen: **keine neue Legacy-State-Write-ID ohne Aufnahme ins Inventar.** In diesem Auftrag wird die Fixture nur erzeugt und gegen den Ist-Stand eingefroren — reines Lesen, keine Verhaltensänderung.
+- Maschinenlesbares Inventar als Testfixture, geschlüsselt über die stabilen semantischen IDs (analog zum v430.1-Gate-Scanner). Die Fixture friert **alle** Legacy-Writes ein, der spätere Guard unterscheidet aber nach `write_role`: ein neuer `job_metadata`- oder `output`-Write ist **nicht** automatisch ein neuer Legacy-State-Writer. Erzwungen wird primär: **keine neue `state`/`substate`-Write-ID ohne Aufnahme ins Inventar** — diese Rollen sind für die spätere Bridge-Abschaltung entscheidend. Output- und Metadaten-Writes werden separat bewertet und blockieren die Bridge-Abschaltung nicht automatisch. In diesem Auftrag wird die Fixture nur erzeugt und gegen den Ist-Stand eingefroren — reines Lesen, keine Verhaltensänderung.
 
 ## Abgrenzung
 
