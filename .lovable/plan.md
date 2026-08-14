@@ -1,73 +1,63 @@
-# v430 Final-Acceptance-Audit — Bericht + nächste Schritte
+# v430.0 Hotfix — Output-Invariante bei abgeschlossenem Lip-Sync
 
-Reiner Audit, keine Codeänderungen. Ergebnis: **1 echter Regressions-Bug gefunden** (Output-Invariante bei abgeschlossenem Lip-Sync). Alles andere PASS.
+Nur dieser Hotfix. Keine Arbeiten an v430.1 oder v431 im selben Zug.
 
-## 1. Ergebnis pro Vertrag
+## Befund (bestätigt)
 
-| Vertrag | Ergebnis | Belegt durch |
-|---|---|---|
-| Client-Reader-Scanner (5E) — keine neuen Legacy-Reads | PASS | `clientReaderContract5E.test.ts` grün (5 Tests) |
-| Writer-Inventar (5A) — nur eingefrorene Lip-Sync-Writer legacy-only | PASS | `legacyWriterAllowlist.test.ts` grün, Liste unverändert |
-| `pipeline_state` vs. Legacy-Spiegel in der Live-DB | PASS | 4.246 Szenen (45 Tage): 0 `state_conflicts`, 0 `pipeline_state IS NULL`, 0 Substate-Abweichungen |
-| Output-Invariante `clip_url = processed ?? base` | **FAIL** | 236 Szenen verletzen sie; Details unten |
-| Continuity-Invarianten | PASS | 0 Zeilen mit `continuity_stale = true`, 0 Zeilen mit Output ohne `first_rendered_at` |
-| Provider-Matrix Client/Server-Parität | PASS | `providerMatrix.test.ts` grün, Diff nur Kommentare |
-| `visual_source = NULL` → Legacy-Parität | PASS | alle 4.246 Zeilen sind `NULL`, Paritätstest grün |
-| Gesamte Composer-Suite | PASS | 409/409 Tests, `tsgo` sauber |
-| Vollständiger E2E-Smoke (10 Pfade) | OFFEN | siehe Abschnitt 4 — erst nach dem Fix sinnvoll |
+Schritt 1 nahm `lip_sync_status = 'applied'` als Marker für „fertig gemischt" an; die eingefrorene Lip-Sync-Kette schreibt in der Praxis `'done'`. Folge: `processed_video_url` ist in der gesamten Live-DB bei keiner Zeile gesetzt, `base_video_url` trägt die Platte, und `resolveSceneOutput()` liefert bei 228 abgeschlossenen Lip-Sync-Szenen die Platte statt des gemischten Clips.
 
-Hinweis: Die Dateien unter `supabase/functions/_shared/*.test.ts` sind Deno-Tests und laufen bewusst nicht in Vitest (https-Imports). Kein Regressionsbefund.
+## Guardrails (verbindlich)
 
-## 2. Der gefundene Bug (Blocker für die v430-Abnahme)
+1. `done` und `applied` gelten ausschließlich als **historische Kompatibilitätswerte** für „Lip-Sync abgeschlossen". Keine Änderung an Writer-Semantik; es wird nirgends neu `applied` geschrieben. Der Resolver versteht nur beide Formen.
+2. Backfill streng und idempotent, keine Inferenz für fehlgeschlagene, abgebrochene oder zurückgesetzte Szenen.
+3. Verifikation danach repo-/DB-weit über Invarianten, nicht nur über die bekannten Zeilen.
 
-**Symptom:** Bei fertigen Lip-Sync-Szenen liefert `resolveSceneOutput()` die **Basis-Platte statt des fertig gemischten Clips**. Betroffen sind 228 Szenen mit abgeschlossenem Lip-Sync (plus 8 weitere Randfälle).
+## Umsetzung
 
-**Ursache:** Schritt 1 hat als Marker für „fertig gemischt" den Wert `lip_sync_status = 'applied'` angenommen. Die eingefrorene Lip-Sync-Kette schreibt in der Praxis aber `'done'`.
+### 1. Resolver (Client + Backend-Spiegel)
 
-- Backfill-Migration setzte `base_video_url = lip_sync_source_clip_url` (Platte) für alle Zeilen,
-- `processed_video_url` blieb dabei leer, weil die Bedingung auf `'applied'` prüfte,
-- in der gesamten Live-DB ist `processed_video_url` bei **keiner einzigen** Zeile gesetzt,
-- Resolver-Reihenfolge `processed → base → clip_url` liefert deshalb die Platte.
+In `src/lib/composer/output/resolveSceneOutput.ts` und `supabase/functions/_shared/resolve-scene-output.ts` die Prüfung `status === 'applied'` durch eine gemeinsame Konstante `LIPSYNC_DONE_STATES = ['done', 'applied']` ersetzen. Ein Wertepaar, sonst identische Logik und identische Rückgabefelder. Beide Dateien bleiben feldgleich (Paritätstest).
 
-Vor v430 lasen UI und Export direkt `clip_url` (den gemischten Clip) — die Umstellung auf den Resolver hat das Verhalten also sichtbar verändert.
+### 2. Backfill-Migration (einmalig, idempotent)
 
-**Geplante Korrektur (v430.0 Hotfix, minimal):**
-1. `resolveSceneOutput.ts` + Backend-Spiegel: `'done'` als gleichwertig zu `'applied'` behandeln (ein Wertepaar, keine neue Semantik).
-2. Einmalige Daten-Migration: `processed_video_url = clip_url` für Zeilen mit abgeschlossenem Lip-Sync, deren `clip_url` von `base_video_url` abweicht. Fehlgeschlagene/abgebrochene Zeilen bleiben unangetastet.
-3. Regressionstest: fertige Lip-Sync-Zeile im `'done'`-Format → `effectiveUrl` ist der gemischte Clip, `isLipsynced = true`.
-4. Erneuter DB-Invariantencheck: 0 Verletzungen.
+```
+UPDATE composer_scenes
+SET processed_video_url = clip_url
+WHERE lip_sync_status IN ('done','applied')
+  AND clip_url IS NOT NULL
+  AND base_video_url IS NOT NULL
+  AND clip_url IS DISTINCT FROM base_video_url
+  AND processed_video_url IS NULL
+```
 
-Keine Änderung an Lip-Sync-Writern, State Machine, Continuity oder UI-Gates.
+Zusätzlicher Abschluss-Guard: Nur Zeilen, deren Zustandsmaschine den Clip als fertig ausweist (`pipeline_state = 'complete'` bzw. der äquivalente Legacy-Spiegel). Vor dem Ausführen wird geprüft, wie viele der 228 Zeilen diesen Guard erfüllen; erfüllen ihn nicht alle, wird die Abweichung berichtet statt stillschweigend gelockert.
 
-## 3. Danach: v430.1 — Lip-Sync-Intent-Gates (Mini-Step)
+### 3. Tests
 
-Inventar in `SceneCard.tsx`: rund 30 Stellen lesen `dialogMode` bzw. `engineOverride` direkt; der kanonische Vertrag ist `isLipSyncIntentional()` (Veto über `lipSyncWithVoiceover`, dann `dialogMode`, dann Opt-in-Engines).
+- Regression: Zeile im `'done'`-Format → `effectiveUrl = processed`, `isLipsynced = true`, `baseUrl` bleibt die Platte.
+- Äquivalenz: `'done'` und `'applied'` erzeugen identische Resolver-Ausgabe.
+- Negativfälle: `failed`, `canceled`, zurückgesetzt → weiterhin Platte, `processed = null`.
+- Client/Backend-Parität bleibt grün.
 
-Vorgehen strikt zweistufig:
-1. **Paritätstest zuerst:** heutige Sichtbarkeitsmenge der Toolbar/Aktionen über eine Fixture-Matrix (alle Kombinationen aus `lipSyncWithVoiceover` × `dialogMode` × `engineOverride`) einfrieren.
-2. Ersetzen **nur dort**, wo der Test dieselbe sichtbare Menge beweist. Jede Abweichung wird dokumentiert und **nicht** umgestellt — keine stillen UX-Änderungen.
+### 4. DB-Invariantencheck nach der Migration (repo-/DB-weit)
 
-## 4. E2E-Smoke-Abnahme
+- fertiger Lip-Sync: `effectiveUrl = processed_video_url = clip_url`
+- Basisvideo bleibt `base_video_url`
+- normale Szene: `effectiveUrl = base_video_url`
+- `clip_url = processed_video_url ?? base_video_url`
+- Client- und Backend-Resolver liefern dasselbe
+- `done` und `applied` mit identischer Semantik
 
-Der Smoke über alle zehn Pfade (normale AI-Szene, Upload/Stock, Lip-Sync 1 Sprecher, Multi-Speaker, Lip-Sync-Retry, kompletter Re-Render, Frame/Continuity über zwei Szenen, Continuity stale → aktualisieren → neu rendern, Cancel/Retry/Failed, Export/Assembly) verbraucht echte Renderzeit und Guthaben. Er wird nach dem Hotfix als eigener Durchlauf gefahren, mit Protokoll pro Pfad: erwarteter `pipeline_state`-Verlauf, `effectiveUrl`-Quelle, Continuity-Flags, Ledger-Buchung.
+Jede Invariante als Zählabfrage mit Zielwert 0 Verletzungen; das Ergebnis kommt in den Abschlussbericht.
 
-## 5. Ausgangsbasis für v431 — verbliebene Legacy-only Lip-Sync-Writer
+### 5. E2E-Smoke (nach dem Hotfix)
 
-| Pfad | Legacy-Schreibstellen |
-|---|---|
-| `compose-dialog-segments` | 55 |
-| `sync-so-webhook` | 23 |
-| `lipsync-watchdog` | 8 |
-| `remotion-webhook` (Lip-Sync-Fan-in) | 7 |
-| `render-sync-segments-audio-mux` | 6 |
-| `compose-twoshot-audio` | 3 |
-| `reset-lipsync-scene` | 3 |
-| `cancel-dialog-lipsync` | 2 |
-| `report-lipsync-motion-probe` | 2 |
-| `_shared/lipsync-fail.ts` | 2 |
+Schwerpunkt Export/Assembly und Continuity: beide müssen nachweislich den fertigen gemischten Clip verwenden, nicht die Platte. Protokoll pro Pfad: Quelle von `effectiveUrl`, `pipeline_state`-Verlauf, Continuity-Flags.
 
-Summe: 10 Pfade, 111 Schreibstellen. v431 wird daraus in Phasen zerlegt (vollständiges Mapping Legacy-Write → Ziel-`pipeline_state`/`substate`, dann gruppenweise Migration, Webhook-/Race-Tests, Watchdog zuletzt, Reverse-Bridge global erst bei 0 Legacy-only Runtime-Writern). Der Migrationsvertrag dafür wird separat aufgestellt.
+## Reihenfolge
 
-## 6. Nächster Schritt
+Hotfix → Tests → Migration → DB-Invariantencheck → E2E-Smoke → STOP. v430.1 erst danach als eigener Auftrag.
 
-Freigabe für den **v430.0-Hotfix** aus Abschnitt 2 (der einzige gefundene Regressions-Bug). Danach E2E-Smoke, dann v430.1, dann v431-Vertrag.
+## Nicht enthalten
+
+Keine Änderung an Lip-Sync-Writern, State Machine, Continuity-Kette, Provider-Matrix oder UI-Gates.
