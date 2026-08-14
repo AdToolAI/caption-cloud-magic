@@ -43,7 +43,8 @@ describe('v430 6.5 — sceneStatusPresentation', () => {
   });
 
   it('bleibt locale-unabhängig (kein tx/getLang/localStorage im Modul)', () => {
-    const src = readFileSync('src/lib/composer/status/sceneStatusPresenter.ts', 'utf8');
+    const raw = readFileSync('src/lib/composer/status/sceneStatusPresenter.ts', 'utf8');
+    const src = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
     expect(src).not.toMatch(/i18nText|getLang|localStorage|\btx\(/);
     expect(src).not.toMatch(/^import \{[^}]*\} from '@\/lib\/composer\/sceneState'/m);
   });
