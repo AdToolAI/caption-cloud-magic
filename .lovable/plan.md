@@ -68,7 +68,9 @@ RLS an, `service_role` voll, `authenticated` nur lesend auf eigene Projekte, kei
 ## 4. Sicherheit
 
 - `REVOKE EXECUTE … FROM anon` auf `composer_scene_transition/6`, `/7` und dem neuen Kern — inklusive `ALTER DEFAULT PRIVILEGES`-Korrektur bzw. explizitem Revoke, damit der `pg_default_acl`-Eintrag für Schema `public` nicht erneut greift.
-- Die Ownership-Lücke wird geschlossen: statt `IF auth.uid() IS NOT NULL AND NOT can_edit_composer_project(...)` gilt künftig — ist der Aufrufer **nicht** `service_role`, ist `auth.uid()` Pflicht und `can_edit_composer_project()` muss zutreffen; NULL ohne `service_role` ⇒ `forbidden`. Edge Functions laufen als `service_role` und sind davon nicht betroffen. Verifiziert wird das mit einem anon-Aufruf gegen die Data API (muss `forbidden`/403 liefern) und einem service_role-Aufruf (muss weiter funktionieren).
+- **Rollenerkennung (exakt festgelegt):** In `SECURITY DEFINER` ist `current_user` der Funktions-Owner und darf **nicht** zur Autorisierung verwendet werden. Maßgeblich ist ausschließlich der Request-Claim: `coalesce(current_setting('request.jwt.claims', true)::jsonb ->> 'role', current_setting('request.jwt.claim.role', true), '')`. Nur der Wert `service_role` gilt als privilegiert. Fällt der Claim leer aus (direkte SQL-Session ohne PostgREST), gilt der Aufrufer als **nicht** privilegiert.
+- Die Ownership-Lücke wird geschlossen: ist der Claim nicht `service_role`, ist `auth.uid()` Pflicht und `can_edit_composer_project(auth.uid(), project_id)` muss zutreffen; `auth.uid() IS NULL` ohne `service_role` ⇒ `forbidden`. Edge Functions laufen mit `service_role`-Claim und sind nicht betroffen.
+- Pflichttests: `anon` ⇒ verboten; `authenticated` + fremdes Projekt ⇒ verboten; `authenticated` + eigenes Projekt ⇒ erlaubt; `service_role` ⇒ erlaubt.
 
 ## 5. Compatibility-Wrapper
 
