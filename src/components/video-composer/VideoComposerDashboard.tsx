@@ -854,7 +854,9 @@ export default function VideoComposerDashboard() {
         fontSize: 48,
         color: '#FFFFFF',
       },
-      cutStyle: (s.cutStyle ?? 'crossfade') as ComposerScene['cutStyle'],
+      // Template-Grenze: `transitionType` ist externes Template-Schema,
+      // kein Composer-Domain-Feld — Überführung nur explizit hier.
+      cutStyle: (s.transitionType ?? 'crossfade') as ComposerScene['cutStyle'],
       transitionDuration: s.transitionDuration ?? 0.5,
       retryCount: 0,
       costEuros: 0,
