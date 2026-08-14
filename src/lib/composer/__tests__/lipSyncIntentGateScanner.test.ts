@@ -197,20 +197,20 @@ function scanAll(): GateHit[] {
 
 /** Eingefrorenes Inventar: Datei -> Anzahl lesender Intent-Gates. */
 const ALLOWLIST: Record<string, number> = {
-  'src/components/video-composer/ClipsTab.tsx': 12,
+  'src/components/video-composer/ClipsTab.tsx': 11, // v430.1 2A
   'src/components/video-composer/ComposerSequencePreview.tsx': 2,
   'src/components/video-composer/RenderPreFlightDialog.tsx': 1,
   'src/components/video-composer/SceneAvatarMode.tsx': 1,
-  'src/components/video-composer/SceneCard.tsx': 25,
-  'src/components/video-composer/SceneClipProgress.tsx': 3,
+  'src/components/video-composer/SceneCard.tsx': 24, // v430.1 2A
+  'src/components/video-composer/SceneClipProgress.tsx': 0, // v430.1 2A
   'src/components/video-composer/SceneDialogStudio.tsx': 5,
-  'src/components/video-composer/SceneInlinePlayer.tsx': 2,
+  'src/components/video-composer/SceneInlinePlayer.tsx': 0, // v430.1 2A
   'src/components/video-composer/SceneReferenceImageSlot.tsx': 1,
   'src/config/lipsyncProviderSafety.ts': 2,
   'src/hooks/useApplyProductionPlan.ts': 3,
   'src/hooks/useGenerateAllClips.ts': 5,
   'src/hooks/useMouthYavgProbe.ts': 1,
-  'src/hooks/usePipelineProgress.ts': 1,
+  'src/hooks/usePipelineProgress.ts': 0, // v430.1 2A
   'src/lib/composer/continuity/continuityState.ts': 2,
   'src/lib/composer/estimateSceneRenderCost.ts': 2,
   'src/lib/composer/pickClipSourceForDuration.ts': 1,
