@@ -8,6 +8,7 @@ G0-State-Core unverändert (eingefroren).
 | bisherige semantische ID | neue Branch-IDs | Vertrag |
 | --- | --- | --- |
 | `compose-video-clips:failed` | `compose-video-clips:failed-unsupported-source`<br>`compose-video-clips:failed-lipsync-uncertified`<br>`compose-video-clips:failed-anchor-input-unsupported` | `transitionSceneV2()`, `guardMode: run_bound`, `runId`/`generation` aus `sceneRunStamps` (Dispatch-Snapshot) |
+| `SceneCard:canceled` | `cancel-dialog-lipsync:reset` | `composer_reset_lipsync_full()` SQL-Primitive mit `expected_generation`/`expected_run_id`-Guards; kein direkter Client-Write mehr |
 
 `markSceneContractFailure()` wurde **nicht pauschal** umgestellt, sondern gesplittet:
 
