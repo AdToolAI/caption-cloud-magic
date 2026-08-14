@@ -1,4 +1,3 @@
-import { tl, withLang } from "./i18n.ts";
 import { resolveSceneOutput } from "./resolve-scene-output.ts";
 /**
  * v384 — Zustandsmaschine für `composer_scenes` (Server-Seite).
@@ -260,31 +259,18 @@ export interface TransitionResult {
   reason: string | null;
 }
 
-/**
- * Atomarer Zustandswechsel über die DB-Funktion.
- *
- * @param from   erlaubte Ausgangszustände (leer = beliebig, aber immer noch
- *               durch die Übergangstabelle begrenzt)
- * @param runId  bindet den Wechsel an einen Lauf — passt er nicht, greift er nicht
- */
-/**
- * v391 — Lineare Hauptkette der Pipeline. Nur hierueber darf ein Ziel
- * schrittweise erreicht werden; Sonderwege (failed/canceled/idle/reset)
- * bleiben ausdruecklich ausgeschlossen.
- */
-const LINEAR_CHAIN: readonly SceneState[] = [
-  "idle",
-  "plate_queued",
-  "plate_rendering",
-  "plate_ready",
-  "audio_prep",
-  "audio_ready",
-  "lipsync_dispatched",
-  "lipsync_running",
-  "lipsync_muxing",
-  "complete",
-];
+export interface TransitionV2Result extends TransitionResult {
+  substate: SceneSubstate;
+  path: SceneState[] | null;
+}
 
+/**
+ * G0 — Legacy-RPC an die 7-Argument-Fassade `composer_scene_transition/7`.
+ * Die Fassade ist ein duenner Wrapper um den neuen atomaren Core; sie
+ * behaelt die alte Signatur bei, damit bestehende Caller nicht brechen.
+ * Der v391-Client-Loop ist ueberfluessig geworden, weil der Core Pfade
+ * atomar materialisiert.
+ */
 async function rpcTransition(
   supabase: any,
   sceneId: string,
@@ -323,7 +309,69 @@ async function rpcTransition(
 }
 
 /**
- * Atomarer Zustandswechsel über die DB-Funktion.
+ * G0 — Moderne RPC an `composer_scene_transition_v2`.
+ * Pflicht-Guard-Modus (`run_bound` | `runless`) verhindert, dass ein
+ * verspaeteter Callback oder ein paralleler Cancel einen falschen Lauf
+ * quittiert.
+ */
+async function rpcTransitionV2(
+  supabase: any,
+  sceneId: string,
+  to: SceneState,
+  opts: {
+    guardMode: "run_bound" | "runless";
+    runId?: string | null;
+    generation?: number | null;
+    runlessReason?: string | null;
+    writeId?: string | null;
+    from?: SceneState[];
+    detail?: string | null;
+    substate?: SceneSubstate;
+    errorText?: string | null;
+    clearDetail?: boolean;
+    clearSubstate?: boolean;
+    clearError?: boolean;
+  },
+): Promise<TransitionV2Result> {
+  const { data, error } = await supabase.rpc("composer_scene_transition_v2", {
+    _scene_id: sceneId,
+    _to: to,
+    _guard_mode: opts.guardMode,
+    _run_id: opts.runId ?? null,
+    _generation: opts.generation ?? null,
+    _runless_reason: opts.runlessReason ?? null,
+    _write_id: opts.writeId ?? null,
+    _from: opts.from && opts.from.length > 0 ? opts.from : null,
+    _detail: opts.detail ?? null,
+    _substate: opts.substate ?? null,
+    _error_text: opts.errorText ?? null,
+    _clear_detail: opts.clearDetail ?? false,
+    _clear_substate: opts.clearSubstate ?? false,
+    _clear_error: opts.clearError ?? false,
+  });
+
+  if (error) {
+    console.error(
+      `[g0_transition_v2_error] scene=${sceneId} to=${to} err=${error.message ?? String(error)}`,
+    );
+    return { applied: false, state: null, reason: "rpc_error", substate: null, path: null };
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  const path = Array.isArray(row?.path)
+    ? row.path.filter((x: unknown) => isSceneState(x))
+    : null;
+  return {
+    applied: !!row?.applied,
+    state: isSceneState(row?.state) ? row.state : null,
+    reason: row?.reason ?? null,
+    substate: row?.substate ?? null,
+    path,
+  };
+}
+
+/**
+ * Atomarer Zustandswechsel über die Legacy-Fassade.
  *
  * @param from   erlaubte Ausgangszustände (leer = beliebig, aber immer noch
  *               durch die Übergangstabelle begrenzt)
@@ -342,43 +390,55 @@ export async function transitionScene(
     substate?: SceneSubstate;
   } = {},
 ): Promise<TransitionResult> {
-  let result = await rpcTransition(supabase, sceneId, to, opts);
-
-  // v391 — Klassenfehler-Schutz. Ein Ziel, das auf der linearen Hauptkette
-  // liegt, aber nur ueber Zwischenzustaende erreichbar ist, wurde bisher
-  // still abgelehnt (`applied=false`) — die Pipeline blieb dann sichtbar
-  // stehen (z.B. `audio_ready → lipsync_running`). Solche Spruenge werden
-  // jetzt Schritt fuer Schritt nachgeholt, statt zu versanden.
-  if (!result.applied && result.reason === "transition_not_allowed" && result.state) {
-    const fromIdx = LINEAR_CHAIN.indexOf(result.state);
-    const toIdx = LINEAR_CHAIN.indexOf(to);
-    if (fromIdx >= 0 && toIdx > fromIdx + 1) {
-      console.warn(
-        `[v391_transition_gap] scene=${sceneId} ${result.state} → ${to} ` +
-          tl({ de: `nicht direkt erlaubt — Zwischenzustaende werden nachgeholt: `, en: `not directly allowed — intermediate states will be caught up: `, es: `no permitido directamente — los estados intermedios se pondrán al día: ` }) +
-          LINEAR_CHAIN.slice(fromIdx + 1, toIdx + 1).join(" → "),
-      );
-      for (let i = fromIdx + 1; i <= toIdx; i++) {
-        const step = LINEAR_CHAIN[i];
-        result = await rpcTransition(supabase, sceneId, step, {
-          ...opts,
-          from: [LINEAR_CHAIN[i - 1]],
-          detail: opts.detail ?? `v391_chain_step_${step}`,
-        });
-        if (!result.applied) break;
-      }
-    }
-  }
+  const result = await rpcTransition(supabase, sceneId, to, opts);
 
   if (!result.applied) {
-    // v391 — abgelehnte Uebergaenge sind ab jetzt immer eine Warnung. Vorher
-    // stand das nur als INFO im Log und blieb wochenlang unentdeckt.
     console.warn(
       `[v391_transition_rejected] scene=${sceneId} to=${to} state=${result.state} reason=${result.reason ?? "-"}`,
     );
   } else {
     console.log(
       `[v384_transition] scene=${sceneId} to=${to} applied=true state=${result.state} reason=${result.reason ?? "-"}`,
+    );
+  }
+  return result;
+}
+
+/**
+ * G0 — Atomarer Zustandswechsel mit Pflicht-Guard.
+ *
+ * @param guardMode   'run_bound' erfordert runId + generation und prueft
+ *                    gegen die gesperrte Zeile. 'runless' erfordert einen
+ *                    in composer_runless_transition_rules erlaubten Grund.
+ */
+export async function transitionSceneV2(
+  supabase: any,
+  sceneId: string,
+  to: SceneState,
+  opts: {
+    guardMode: "run_bound" | "runless";
+    runId?: string | null;
+    generation?: number | null;
+    runlessReason?: string | null;
+    writeId?: string | null;
+    from?: SceneState[];
+    detail?: string | null;
+    substate?: SceneSubstate;
+    errorText?: string | null;
+    clearDetail?: boolean;
+    clearSubstate?: boolean;
+    clearError?: boolean;
+  },
+): Promise<TransitionV2Result> {
+  const result = await rpcTransitionV2(supabase, sceneId, to, opts);
+
+  if (!result.applied) {
+    console.warn(
+      `[g0_transition_v2_rejected] scene=${sceneId} to=${to} state=${result.state} reason=${result.reason ?? "-"}`,
+    );
+  } else {
+    console.log(
+      `[g0_transition_v2] scene=${sceneId} to=${to} applied=true state=${result.state} reason=${result.reason ?? "-"} path=${result.path?.join("→") ?? "-"}`,
     );
   }
   return result;
