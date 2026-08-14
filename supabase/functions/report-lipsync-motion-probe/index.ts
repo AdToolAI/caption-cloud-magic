@@ -141,6 +141,15 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
     const pass = passes[body.pass_idx] as Record<string, unknown> | undefined;
     if (!pass) return json({ ok: true, is_noop: isNoop, threshold: YAVG_NOOP_THRESHOLD });
 
+    // v431 G2.1 — Run-Provenienz stammt ausschliesslich aus dem beim Dispatch
+    // eingefrorenen Pass-Slot (immutable), nie aus der Live-Szene.
+    const passRunId = (pass as Record<string, unknown>).run_id ?? null;
+    const passPlateGeneration = (pass as Record<string, unknown>).plate_generation ?? null;
+    console.log(
+      `[report-lipsync-motion-probe] v431_g2_1 scene=${body.scene_id} pass=${body.pass_idx} ` +
+        `run=${passRunId ?? "none"} gen=${passPlateGeneration ?? "none"}`,
+    );
+
     try {
       await admin.rpc("update_dialog_pass_slot", {
         _scene_id: body.scene_id,
@@ -159,7 +168,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       console.log(
         `[report-lipsync-motion-probe] v248 scene=${body.scene_id} pass=${body.pass_idx} yavg=${body.yavg.toFixed(3)} OK`,
       );
-      return json({ ok: true, is_noop: false, threshold: YAVG_NOOP_THRESHOLD });
+      return json({ ok: true, is_noop: false, threshold: YAVG_NOOP_THRESHOLD, run_id: passRunId, plate_generation: passPlateGeneration });
     }
 
     console.warn(
@@ -268,7 +277,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       console.warn(
         `[report-lipsync-motion-probe] v248_slice4 scene=${body.scene_id} pass=${body.pass_idx} → escalating step=${nextStep} variant=${nextRung.variant}`,
       );
-      return json({ ok: true, is_noop: true, escalated: true, step: nextStep, variant: nextRung.variant });
+      return json({ ok: true, is_noop: true, escalated: true, step: nextStep, variant: nextRung.variant, run_id: passRunId, plate_generation: passPlateGeneration });
     }
 
     // Ladder exhausted → hard fail + needs_clip_rerender (refund automation picks it up).
@@ -333,7 +342,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       `[report-lipsync-motion-probe] v248_slice4 scene=${body.scene_id} pass=${body.pass_idx} speaker="${passSpeakerName}" NOOP-LADDER-EXHAUSTED → hard-fail`,
     );
 
-    return json({ ok: true, is_noop: true, escalated: false, hard_failed: true });
+    return json({ ok: true, is_noop: true, escalated: false, hard_failed: true, run_id: passRunId, plate_generation: passPlateGeneration });
   } catch (e) {
     console.error(`[report-lipsync-motion-probe] error: ${(e as Error).message}`);
     return json({ error: "internal", message: (e as Error).message }, 500);

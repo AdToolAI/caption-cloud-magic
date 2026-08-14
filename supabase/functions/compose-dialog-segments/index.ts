@@ -782,13 +782,21 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, audio_plan, dialog_script, dialog_turns, character_shots, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, lip_sync_status, reference_image_url, lock_reference_url, scene_assets",
+        "id, project_id, audio_plan, dialog_script, dialog_turns, character_shots, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, lip_sync_status, reference_image_url, lock_reference_url, scene_assets, active_run_id, plate_generation",
       )
       .eq("id", sceneId)
       .single();
     if (sceneErr || !scene) {
       return json({ error: "scene_not_found", details: sceneErr?.message }, 404);
     }
+
+    // v431 G2.1 — Run-Snapshot des Dispatch. Wird beim Anlegen eines Pass-Slots
+    // EINMALIG eingefroren; `update_dialog_pass_slot` ueberschreibt die beiden
+    // Keys danach nie wieder (DB-Contract).
+    const passRunStamp: Record<string, unknown> = {
+      run_id: (scene as any).active_run_id ?? null,
+      plate_generation: Number((scene as any).plate_generation ?? 0),
+    };
 
     const { data: project } = await supabase
       .from("composer_projects")
@@ -7466,7 +7474,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const { error: slotErr } = await supabase.rpc("update_dialog_pass_slot", {
         _scene_id: sceneId,
         _pass_idx: currentPassIdx,
-        _patch: pass,
+        _patch: { ...passRunStamp, ...(pass as Record<string, unknown>) },
       });
       if (slotErr) {
         console.warn(
@@ -7635,7 +7643,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             const { error } = await supabase.rpc("update_dialog_pass_slot", {
               _scene_id: sceneId,
               _pass_idx: slotIdx,
-              _patch: skeleton,
+              _patch: { ...passRunStamp, ...skeleton },
             });
             if (error) throw new Error(error.message);
             return slotIdx;

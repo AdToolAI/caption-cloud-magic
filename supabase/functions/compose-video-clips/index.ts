@@ -2221,7 +2221,12 @@ serve(async (req) => {
                   "Content-Type": "application/json",
                   Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
                 },
-                body: JSON.stringify({ scene_id: scene.id }),
+                // v431 G2.1 — Run-Provenienz aus dem validierten Dispatch-Stempel.
+                body: JSON.stringify({
+                  scene_id: scene.id,
+                  run_id: sceneRunStamps.get(scene.id)?.runId ?? null,
+                  plate_generation: sceneRunStamps.get(scene.id)?.generation ?? null,
+                }),
               });
               // Drain body to avoid leak; capture text on failure for logs.
               const respText = await r.text().catch(() => "");
@@ -4120,6 +4125,12 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
+          // v431 G2.1 — Upload-Zweig sieht jetzt den bestehenden Run-Stempel
+          // (Telemetrie; keine neue Run-Erzeugung, kein Verhaltenswechsel).
+          console.log(
+            `[compose-video-clips] v431_g2_1 write=upload-complete scene=${scene.id} ` +
+              `run=${sceneRunStamps.get(scene.id)?.runId ?? "none"} gen=${sceneRunStamps.get(scene.id)?.generation ?? "none"}`,
+          );
           results.push({
             sceneId: scene.id,
             status: "ready",
@@ -4896,6 +4907,11 @@ serve(async (req) => {
               `[compose-video-clips] Pika scene ${scene.id} failed:`,
               pikaResp.status,
               errBody,
+            );
+            // v431 G2.1 — Pika-Zweig sieht jetzt den bestehenden Run-Stempel.
+            console.log(
+              `[compose-video-clips] v431_g2_1 write=failed/pika scene=${scene.id} ` +
+                `run=${sceneRunStamps.get(scene.id)?.runId ?? "none"} gen=${sceneRunStamps.get(scene.id)?.generation ?? "none"}`,
             );
             await supabaseAdmin
               .from("composer_scenes")

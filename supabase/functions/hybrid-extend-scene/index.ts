@@ -208,6 +208,43 @@ serve(async (req) => {
     }
     const newSceneId = newScene.id;
 
+    // --- v431 G2.1 — Run-Acquisition direkt nach dem INSERT --------------
+    // Verbindliche Paritaetsregel: Hybrid benutzt denselben kanonischen
+    // Acquisition-Vertrag wie jeder andere Pfad
+    // (`composer-start-scene-generation { prepare_only: true }`) und reicht das
+    // Ergebnis als `run_context` an `compose-video-clips` weiter, damit dort
+    // KEIN zweiter Run entsteht. Kein Sonder-Run-Pfad, kein beginSceneRun().
+    let hybridRunContext: Record<string, { run_id: string; generation: number }> | null = null;
+    try {
+      const prepResp = await fetch(
+        `${SUPABASE_URL}/functions/v1/composer-start-scene-generation`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: authHeader },
+          body: JSON.stringify({
+            scene_ids: [newSceneId],
+            prepare_only: true,
+            reason: "hybrid_extend",
+          }),
+        },
+      );
+      const prepText = await prepResp.text();
+      if (!prepResp.ok) throw new Error(`${prepResp.status} ${prepText.slice(0, 300)}`);
+      const prepJson = JSON.parse(prepText);
+      const run = prepJson?.runs?.[newSceneId];
+      if (run?.run_id) {
+        hybridRunContext = { [newSceneId]: { run_id: String(run.run_id), generation: Number(run.generation ?? 0) } };
+      }
+      console.log(
+        `[hybrid-extend-scene] v431_g2_1 run_acquired scene=${newSceneId} run=${run?.run_id ?? "none"} gen=${run?.generation ?? "none"}`,
+      );
+    } catch (e) {
+      // G2.1 ist nicht fail-closed: ohne Run laeuft der heutige Pfad weiter,
+      // `compose-video-clips` erzeugt dann wie bisher seinen Legacy-Run.
+      console.warn(`[hybrid-extend-scene] v431_g2_1 run_acquire_failed: ${(e as Error).message}`);
+    }
+
+
     // --- Anchor frame extraction ---
     // forward       → source.last
     // backward      → source.first
@@ -305,6 +342,8 @@ serve(async (req) => {
         scenes: [composeScene],
         visualStyle: (project.briefing as any)?.visualStyle,
         characters: (project.briefing as any)?.characters,
+        // v431 G2.1 — kanonischer Run aus der Acquisition oben.
+        ...(hybridRunContext ? { run_context: hybridRunContext } : {}),
       }),
     });
 
