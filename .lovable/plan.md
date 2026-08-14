@@ -4,12 +4,15 @@ Erst 6.2-Nachzug (Contract-Kommentar), dann 6.3. Keine Backend-Semantik, keine D
 
 ## Teil 0 — 6.2-Nachzug (klein)
 
+- **Build-Blocker zuerst**: `VideoComposerDashboard.tsx:857` liest `s.cutStyle` auf einer
+  `TemplateSceneSuggestion` — dieses Feld heißt dort `transitionType` (TS2339). Genau die
+  Template-Grenze, die du beschreibst: explizite Überführung
+  `cutStyle: (s.transitionType ?? 'crossfade')` mit Grenz-Kommentar.
 - `src/types/motion-studio-templates.ts`: Contract-Kommentar über `transitionType`:
   externes Template-Schema, kein Composer-Domain-Feld; Überführung in eine `ComposerScene`
-  ausschließlich über `cutStyleFromRow`/`cutStyleToRow`.
-- Test in `cutStyle.test.ts`: kein Consumer erzeugt aus einem Template-Objekt eine Scene mit
-  `transitionType` (AST-/Repo-Scan auf Spread von Template-Objekten in Scene-Literale plus
-  Verbot von `transitionType` in Composer-Domain-Dateien — Erweiterung des bestehenden Scanners).
+  ausschließlich explizit an der Template-Grenze bzw. über die `cutStyle`-Mapper.
+- Test in `cutStyle.test.ts`: kein Consumer spreadet ein Template-Objekt in ein Scene-Literal
+  bzw. schleppt `transitionType` in Composer-Domain-Dateien ein (Scanner-Erweiterung).
 
 ## Teil 1 — Zentraler Fehler-Presenter (reine Darstellung)
 
