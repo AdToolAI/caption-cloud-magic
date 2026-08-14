@@ -81,9 +81,12 @@ const FROZEN: Record<string, Frozen> = {
     falseNegativeCount: 0,
   },
   'dialogstudio-force-cinematic': {
-    parity: 'mixed',
-    falsePositives: ['Lf-Dt-Ecs', 'Lf-Df-Ecs', 'Lf-Du-Ecs'],
-    falseNegativeCount: 8,
+    // v430.1 Gate 9 — das INTENT-FRAGMENT ist bewusst auf die SSoT umgestellt.
+    // Das vollständige Routing-Gate `forceCinematicSync` bleibt wegen
+    // `buttonIntendsLipSync` absichtlich breiter (siehe forceCinematicSyncRouting.test.ts).
+    parity: 'exact',
+    falsePositives: [],
+    falseNegativeCount: 0,
   },
   'clipprogress-is-cinematic': {
     // v430.1 Schritt 2A — bewusst auf die SSoT umgestellt.

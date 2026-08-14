@@ -84,12 +84,10 @@ export const INTENT_GATES: IntentGate[] = [
   },
   {
     id: 'dialogstudio-force-cinematic',
-    site: 'src/components/video-composer/SceneDialogStudio.tsx:1465',
+    site: 'src/components/video-composer/SceneDialogStudio.tsx:1468',
     purpose: 'Einzelblock-Dialog erzwingt die Cinematic-Sync-Kette (Intent-Anteil)',
-    condition:
-      "scene.engineOverride === 'cinematic-sync' || scene.lipSyncWithVoiceover === true",
-    predicate: (s) =>
-      s.engineOverride === 'cinematic-sync' || s.lipSyncWithVoiceover === true,
+    condition: 'isLipSyncIntentional(scene)  // v430.1 Gate 9',
+    predicate: (s) => ssot(s),
   },
   {
     id: 'clipprogress-is-cinematic',
