@@ -15,7 +15,7 @@ import { hailuoBucketFor } from "../_shared/provider-matrix.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 import { resolveSceneOutput } from "../_shared/resolve-scene-output.ts";
 import { isSceneOutputFinal } from "../_shared/continuity-state.ts";
-import { sceneState as sceneStateOf, legacyClipReadyEquivalentRow } from "../_shared/scene-state.ts";
+import { sceneState as sceneStateOf, legacyClipReadyEquivalentRow, transitionSceneV2 } from "../_shared/scene-state.ts";
 
 import {
   countDialogSpeakers,
@@ -2135,6 +2135,7 @@ serve(async (req) => {
         await markSceneContractFailure(
           scene.id,
           `Provider '${scene.clipSource}' wird vom Composer nicht unterstützt.`,
+          "compose-video-clips:contract-failure-unsupported-source",
         );
         return new Response(
           JSON.stringify({
@@ -2158,6 +2159,7 @@ serve(async (req) => {
           await markSceneContractFailure(
             scene.id,
             `Lip-Sync läuft nur über HappyHorse oder Hailuo. Gewählt: ${scene.clipSource}.`,
+            "compose-video-clips:contract-failure-lipsync-uncertified",
           );
           return new Response(
             JSON.stringify({
@@ -4097,7 +4099,11 @@ serve(async (req) => {
         console.error(
           `[compose-video-clips] scene ${scene.id} lipsync_anchor_input_unsupported source=${scene.clipSource}`,
         );
-        await markSceneContractFailure(scene.id, msg);
+        await markSceneContractFailure(
+          scene.id,
+          msg,
+          "compose-video-clips:contract-failure-anchor-input-unsupported",
+        );
         continue;
       }
 
