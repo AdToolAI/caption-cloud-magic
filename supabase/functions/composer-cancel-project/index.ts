@@ -21,7 +21,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
-import { transitionScene, sceneState } from "../_shared/scene-state.ts";
+import { transitionSceneV2, sceneState } from "../_shared/scene-state.ts";
 
 /**
  * v430 Step 5D — abbrechbare ("live") Clip-Zustände.
@@ -100,13 +100,13 @@ serve(async (req) => {
     const { data: scenes } = await supabase
       .from("composer_scenes")
       .select(
-        "id, pipeline_state, clip_status, clip_url, active_run_id, lip_sync_status, lip_sync_applied_at, dialog_shots, audio_plan, replicate_prediction_id",
+        "id, pipeline_state, clip_status, clip_url, active_run_id, plate_generation, lip_sync_status, lip_sync_applied_at, dialog_shots, audio_plan, replicate_prediction_id",
       )
       .eq("project_id", projectId);
 
     const allJobIds: string[] = [];
-    const sceneIdsWithLipsync: string[] = [];
-    const sceneIdsWithClip: string[] = [];
+    const scenesWithLipsync: any[] = [];
+    const scenesWithClip: any[] = [];
 
     for (const s of (scenes ?? []) as any[]) {
       // Sync.so job ids from dialog_shots.shots
@@ -136,7 +136,7 @@ serve(async (req) => {
         !s.lip_sync_applied_at &&
         (ls === "pending" || ls === "generating" || ls === "syncing")
       ) {
-        sceneIdsWithLipsync.push(s.id);
+        scenesWithLipsync.push(s);
       }
       // v430 Step 5D: clip branch via sceneState(). Legacy parity to the old
       // `clip_status === 'pending' || 'generating'` check:
@@ -145,7 +145,7 @@ serve(async (req) => {
       //   generating               → plate_rendering
       // Damit ist die Menge identisch zu composer-cancel-scene.
       if (LIVE_CLIP_STATES.has(sceneState(s))) {
-        sceneIdsWithClip.push(s.id);
+        scenesWithClip.push(s);
       }
     }
 
@@ -192,9 +192,11 @@ serve(async (req) => {
 
     // v385 — ein Abbruch = ein Zustandswechsel. Legacy-Spalten spiegelt der
     // Bridge-Trigger, hier bleibt nur der Anzeigetext.
-    const cancelIds = Array.from(
-      new Set([...sceneIdsWithLipsync, ...sceneIdsWithClip]),
+    // G0 — Cancel benutzt transitionSceneV2 mit Pflicht-Guard.
+    const cancelScenes = Array.from(
+      new Set([...scenesWithLipsync, ...scenesWithClip]),
     );
+    const cancelIds = cancelScenes.map((s) => s.id);
     if (cancelIds.length > 0) {
       try {
         await supabase
@@ -211,10 +213,25 @@ serve(async (req) => {
         );
       }
 
-      for (const id of cancelIds) {
-        await transitionScene(supabase, id, "canceled", {
-          detail: "canceled_by_user_new_project",
-        });
+      for (const s of cancelScenes) {
+        const runId = s.active_run_id ?? null;
+        const generation = s.plate_generation ?? null;
+        if (runId && generation != null) {
+          await transitionSceneV2(supabase, s.id, "canceled", {
+            guardMode: "run_bound",
+            runId,
+            generation,
+            writeId: "composer-cancel-project:teardown-scene",
+            detail: "canceled_by_user_new_project",
+          });
+        } else {
+          await transitionSceneV2(supabase, s.id, "canceled", {
+            guardMode: "runless",
+            runlessReason: "project_teardown_no_active_run",
+            writeId: "composer-cancel-project:teardown-no-active-run",
+            detail: "canceled_by_user_new_project",
+          });
+        }
       }
     }
 
@@ -232,16 +249,16 @@ serve(async (req) => {
     }
 
     console.log(
-      `[composer-cancel-project] project=${projectId} user=${userId} scenes=${scenes?.length ?? 0} jobs=${uniqueJobIds.length} lipsync=${sceneIdsWithLipsync.length} clips=${sceneIdsWithClip.length}`,
+      `[composer-cancel-project] project=${projectId} user=${userId} scenes=${scenes?.length ?? 0} jobs=${uniqueJobIds.length} lipsync=${scenesWithLipsync.length} clips=${scenesWithClip.length}`,
     );
 
     return json({
       ok: true,
       project_id: projectId,
       canceled_scenes:
-        sceneIdsWithLipsync.length + sceneIdsWithClip.length,
-      canceled_lipsync: sceneIdsWithLipsync.length,
-      canceled_clips: sceneIdsWithClip.length,
+        scenesWithLipsync.length + scenesWithClip.length,
+      canceled_lipsync: scenesWithLipsync.length,
+      canceled_clips: scenesWithClip.length,
       canceled_syncso_jobs: uniqueJobIds.length,
     });
   } catch (e) {

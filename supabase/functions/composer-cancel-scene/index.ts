@@ -9,7 +9,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
-import { transitionScene, sceneState } from "../_shared/scene-state.ts";
+import { transitionSceneV2, sceneState } from "../_shared/scene-state.ts";
 
 
 const corsHeaders = {
@@ -67,7 +67,7 @@ serve(async (req) => {
     // Fetch scenes + owning project to verify ownership
     const { data: scenes, error: fetchErr } = await supabase
       .from("composer_scenes")
-      .select("id, project_id, pipeline_state, clip_status, clip_url, active_run_id, lip_sync_status, lip_sync_applied_at, dialog_shots, audio_plan, replicate_prediction_id")
+      .select("id, project_id, pipeline_state, clip_status, clip_url, active_run_id, plate_generation, lip_sync_status, lip_sync_applied_at, dialog_shots, audio_plan, replicate_prediction_id")
       .in("id", sceneIds);
     if (fetchErr) return json({ error: fetchErr.message }, 500);
     if (!scenes || scenes.length === 0) return json({ ok: true, canceled: 0 });
@@ -84,13 +84,13 @@ serve(async (req) => {
     const authorized = (scenes as any[]).filter((s) => ownedProjects.has(s.project_id));
     if (authorized.length === 0) return json({ error: "forbidden" }, 403);
 
-    const clipIds: string[] = [];
-    const lipsyncIds: string[] = [];
+    const clipScenes: any[] = [];
+    const lipsyncScenes: any[] = [];
     const syncJobs: string[] = [];
 
     for (const s of authorized) {
-      if (LIVE_CLIP_STATES.has(sceneState(s))) clipIds.push(s.id);
-      if (!s.lip_sync_applied_at && LIVE_LIPSYNC.has(s.lip_sync_status)) lipsyncIds.push(s.id);
+      if (LIVE_CLIP_STATES.has(sceneState(s))) clipScenes.push(s);
+      if (!s.lip_sync_applied_at && LIVE_LIPSYNC.has(s.lip_sync_status)) lipsyncScenes.push(s);
 
       const state = s.dialog_shots ?? null;
       if (Array.isArray(state?.shots)) {
@@ -132,7 +132,9 @@ serve(async (req) => {
     const nowIso = new Date().toISOString();
     // v385 — Zustand nur noch über die Zustandsmaschine; Legacy-Spalten
     // spiegelt der Bridge-Trigger.
-    const cancelIds = Array.from(new Set([...clipIds, ...lipsyncIds]));
+    // G0 — Cancel benutzt transitionSceneV2 mit Pflicht-Guard.
+    const cancelScenes = Array.from(new Set([...clipScenes, ...lipsyncScenes]));
+    const cancelIds = cancelScenes.map((s) => s.id);
     if (cancelIds.length > 0) {
       await supabase
         .from("composer_scenes")
@@ -143,23 +145,38 @@ serve(async (req) => {
         })
         .in("id", cancelIds);
 
-      for (const id of cancelIds) {
-        await transitionScene(supabase, id, "canceled", {
-          detail: "canceled_by_user",
-        });
+      for (const s of cancelScenes) {
+        const runId = s.active_run_id ?? null;
+        const generation = s.plate_generation ?? null;
+        if (runId && generation != null) {
+          await transitionSceneV2(supabase, s.id, "canceled", {
+            guardMode: "run_bound",
+            runId,
+            generation,
+            writeId: "composer-cancel-scene:cancel-scene",
+            detail: "canceled_by_user",
+          });
+        } else {
+          await transitionSceneV2(supabase, s.id, "canceled", {
+            guardMode: "runless",
+            runlessReason: "user_cancel_no_active_run",
+            writeId: "composer-cancel-scene:cancel-no-active-run",
+            detail: "canceled_by_user",
+          });
+        }
       }
     }
 
 
     console.log(
-      `[composer-cancel-scene] user=${userId} scenes=${authorized.length} clips=${clipIds.length} lipsync=${lipsyncIds.length} syncso=${uniqueJobs.length}`,
+      `[composer-cancel-scene] user=${userId} scenes=${authorized.length} clips=${clipScenes.length} lipsync=${lipsyncScenes.length} syncso=${uniqueJobs.length}`,
     );
 
     return json({
       ok: true,
-      canceled: clipIds.length + lipsyncIds.length,
-      canceled_clips: clipIds.length,
-      canceled_lipsync: lipsyncIds.length,
+      canceled: clipScenes.length + lipsyncScenes.length,
+      canceled_clips: clipScenes.length,
+      canceled_lipsync: lipsyncScenes.length,
       canceled_syncso_jobs: uniqueJobs.length,
     });
   } catch (e) {

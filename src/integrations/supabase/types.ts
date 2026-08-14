@@ -6486,6 +6486,30 @@ export type Database = {
         }
         Relationships: []
       }
+      composer_runless_transition_rules: {
+        Row: {
+          from_state: Database["public"]["Enums"]["composer_scene_state"]
+          note: string | null
+          reason: string
+          to_state: Database["public"]["Enums"]["composer_scene_state"]
+          write_id: string
+        }
+        Insert: {
+          from_state: Database["public"]["Enums"]["composer_scene_state"]
+          note?: string | null
+          reason: string
+          to_state: Database["public"]["Enums"]["composer_scene_state"]
+          write_id: string
+        }
+        Update: {
+          from_state?: Database["public"]["Enums"]["composer_scene_state"]
+          note?: string | null
+          reason?: string
+          to_state?: Database["public"]["Enums"]["composer_scene_state"]
+          write_id?: string
+        }
+        Relationships: []
+      }
       composer_scene_comments: {
         Row: {
           body: string
@@ -6629,6 +6653,99 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "composer_scene_runs_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "composer_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      composer_scene_transition_log: {
+        Row: {
+          applied: boolean
+          auth_uid: string | null
+          caller_class: string
+          caller_role: string | null
+          created_at: string
+          detail: string | null
+          error_text: string | null
+          from_state: Database["public"]["Enums"]["composer_scene_state"]
+          generation: number | null
+          guard_mode: string
+          id: string
+          is_intermediate: boolean
+          path: Database["public"]["Enums"]["composer_scene_state"][] | null
+          project_id: string
+          reason: string | null
+          run_id: string | null
+          runless_reason: string | null
+          scene_id: string
+          source_signature: string
+          step_index: number
+          substate: string | null
+          to_state: Database["public"]["Enums"]["composer_scene_state"]
+          write_id: string
+        }
+        Insert: {
+          applied: boolean
+          auth_uid?: string | null
+          caller_class: string
+          caller_role?: string | null
+          created_at?: string
+          detail?: string | null
+          error_text?: string | null
+          from_state: Database["public"]["Enums"]["composer_scene_state"]
+          generation?: number | null
+          guard_mode: string
+          id?: string
+          is_intermediate?: boolean
+          path?: Database["public"]["Enums"]["composer_scene_state"][] | null
+          project_id: string
+          reason?: string | null
+          run_id?: string | null
+          runless_reason?: string | null
+          scene_id: string
+          source_signature: string
+          step_index: number
+          substate?: string | null
+          to_state: Database["public"]["Enums"]["composer_scene_state"]
+          write_id: string
+        }
+        Update: {
+          applied?: boolean
+          auth_uid?: string | null
+          caller_class?: string
+          caller_role?: string | null
+          created_at?: string
+          detail?: string | null
+          error_text?: string | null
+          from_state?: Database["public"]["Enums"]["composer_scene_state"]
+          generation?: number | null
+          guard_mode?: string
+          id?: string
+          is_intermediate?: boolean
+          path?: Database["public"]["Enums"]["composer_scene_state"][] | null
+          project_id?: string
+          reason?: string | null
+          run_id?: string | null
+          runless_reason?: string | null
+          scene_id?: string
+          source_signature?: string
+          step_index?: number
+          substate?: string | null
+          to_state?: Database["public"]["Enums"]["composer_scene_state"]
+          write_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "composer_scene_transition_log_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "composer_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "composer_scene_transition_log_scene_id_fkey"
             columns: ["scene_id"]
             isOneToOne: false
             referencedRelation: "composer_scenes"
@@ -7184,6 +7301,30 @@ export type Database = {
           updated_at?: string | null
           use_count?: number | null
           views_count?: number | null
+        }
+        Relationships: []
+      }
+      composer_transition_grandfather: {
+        Row: {
+          from_state: Database["public"]["Enums"]["composer_scene_state"]
+          note: string | null
+          source_signature: string
+          to_state: Database["public"]["Enums"]["composer_scene_state"]
+          write_id: string
+        }
+        Insert: {
+          from_state: Database["public"]["Enums"]["composer_scene_state"]
+          note?: string | null
+          source_signature: string
+          to_state: Database["public"]["Enums"]["composer_scene_state"]
+          write_id: string
+        }
+        Update: {
+          from_state?: Database["public"]["Enums"]["composer_scene_state"]
+          note?: string | null
+          source_signature?: string
+          to_state?: Database["public"]["Enums"]["composer_scene_state"]
+          write_id?: string
         }
         Relationships: []
       }
@@ -19489,6 +19630,21 @@ export type Database = {
         Returns: number
       }
       cleanup_synthetic_probe_runs: { Args: never; Returns: undefined }
+      composer_recover_scene: {
+        Args: {
+          _expected_plate_generation: number
+          _expected_run_id: string
+          _reason: string
+          _scene_id: string
+          _to: Database["public"]["Enums"]["composer_scene_state"]
+          _write_id: string
+        }
+        Returns: {
+          applied: boolean
+          reason: string
+          state: Database["public"]["Enums"]["composer_scene_state"]
+        }[]
+      }
       composer_release_run_reservation: {
         Args: { p_reason?: string; p_reservation_id: string }
         Returns: number
@@ -19536,6 +19692,58 @@ export type Database = {
               state: Database["public"]["Enums"]["composer_scene_state"]
             }[]
           }
+      composer_scene_transition_core: {
+        Args: {
+          _caller_class?: string
+          _clear_detail?: boolean
+          _clear_error?: boolean
+          _clear_substate?: boolean
+          _detail?: string
+          _error_text?: string
+          _from?: Database["public"]["Enums"]["composer_scene_state"][]
+          _generation: number
+          _guard_mode: string
+          _run_id: string
+          _runless_reason: string
+          _scene_id: string
+          _source_signature?: string
+          _substate?: string
+          _to: Database["public"]["Enums"]["composer_scene_state"]
+          _write_id: string
+        }
+        Returns: {
+          applied: boolean
+          path: Database["public"]["Enums"]["composer_scene_state"][]
+          reason: string
+          state: Database["public"]["Enums"]["composer_scene_state"]
+          substate: string
+        }[]
+      }
+      composer_scene_transition_v2: {
+        Args: {
+          _clear_detail?: boolean
+          _clear_error?: boolean
+          _clear_substate?: boolean
+          _detail?: string
+          _error_text?: string
+          _from?: Database["public"]["Enums"]["composer_scene_state"][]
+          _generation?: number
+          _guard_mode: string
+          _run_id?: string
+          _runless_reason?: string
+          _scene_id: string
+          _substate?: string
+          _to: Database["public"]["Enums"]["composer_scene_state"]
+          _write_id?: string
+        }
+        Returns: {
+          applied: boolean
+          path: Database["public"]["Enums"]["composer_scene_state"][]
+          reason: string
+          state: Database["public"]["Enums"]["composer_scene_state"]
+          substate: string
+        }[]
+      }
       composer_settle_run_reservation: {
         Args: { p_actual: number; p_reservation_id: string }
         Returns: number
