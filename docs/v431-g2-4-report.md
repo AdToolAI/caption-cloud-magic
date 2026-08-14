@@ -40,6 +40,10 @@ has_function_privilege: anon=f | authenticated=f | service_role=t
 
 ## 4. Transaktionaler DB-Smoke (mit Rollback)
 
+Gesamtabdeckung: **7 Primitive-Fälle + 3 Cleanup-Fälle** (plus 3 ergänzende Gegenproben aus S5).
+
+### 4.1 Primitive `composer_fail_hybrid_extend_scene` (7 Fälle)
+
 | Fall | Ergebnis | Zeile danach |
 |---|---|---|
 | applied aus `plate_queued` (`hybrid:no-anchor`) | `applied:true, success` | `failed/failed/boom`, `clip_url` unverändert |
@@ -52,6 +56,41 @@ has_function_privilege: anon=f | authenticated=f | service_role=t
 
 Bei allen Ablehnungen wurden weder Output-Felder (`clip_url`) noch Legacy-Spiegel (`clip_status`, `clip_error`) mutiert. Der gesamte Smoke lief in einer Transaktion, die per `RAISE EXCEPTION` zurückgerollt wurde — keine Restdaten.
 
+### 4.2 Compensating Cleanup — S5 (3 Cleanup-Fälle + Gegenproben)
+
+Der Cleanup ist **ein einzelnes atomar geguardetes DELETE** ohne vorheriges SELECT
+(`id` ∧ `continuity_source_scene_id` ∧ `pipeline_state IN ('idle','plate_queued')` ∧
+`clip_status='pending'` ∧ `clip_url IS NULL` ∧ `base_video_url IS NULL` ∧
+`processed_video_url IS NULL`). Der Smoke verwendet exakt dieselbe Prädikatenmenge,
+kein Nachbau; kein Race-Window zwischen Check und Delete.
+
+| # | Fall | Ausgangszeile | Erwartung | Ergebnis |
+|---|---|---|---|---|
+| C1 | Cleanup vor Run-Erwerb | `idle` / `pending` / `active_run_id IS NULL` / Output NULL | 1 Delete | **1** ✓ |
+| C2 (Pflicht) | Partial-Run, `idle` + gesetztem `active_run_id`, `plate_generation=2` | Output NULL | 1 Delete | **1** ✓ |
+| C2b (optional) | Partial-Run bereits in `plate_queued`, `active_run_id` gesetzt | Output NULL | 1 Delete | **1** ✓ |
+| C3 | Zombie-Gegenprobe: `clip_url` gesetzt, `clip_status='ready'` | — | 0 Deletes, Zeile unverändert | **0** ✓ (`plate_ready/ready/out.mp4/clip_error=NULL`) |
+| C3a | Output-Guard isoliert: `pending`, aber `clip_url` gesetzt | — | 0 Deletes | **0** ✓ (`plate_queued/pending/out.mp4/clip_error=NULL`) |
+| C3b | Output-Guard isoliert: `pending`, aber `base_video_url` gesetzt | — | 0 Deletes | **0** ✓ (`plate_queued/pending/base.mp4/clip_error=NULL`) |
+| C3c | Fremdmutationsschutz: fremder `continuity_source_scene_id` | sauber, ohne Output | 0 Deletes | **0** ✓ (`idle/pending/clip_error=NULL`) |
+
+C2 bildet exakt den gefährlichen Zustand ab, der entsteht, wenn `composer_start_scene_run()`
+bereits committet hat und `hardResetScene()` bzw. der Eintritt nach `plate_queued` danach
+scheitert — `active_run_id` ist korrekt **kein** Ausschlusskriterium.
+
+In allen 0-Delete-Fällen blieb die Zeile vollständig unverändert (Output-Felder **und**
+Legacy-Spiegel `clip_status`, `clip_error`) → produktiv der Pfad
+`hybrid_zombie_unresolved` (Log + `unresolvedSceneId` in der Response, `cleaned:false`).
+
+Beide S5-Durchläufe liefen transaktional und wurden per `RAISE EXCEPTION` zurückgerollt.
+Nachkontrolle: `select count(*) … order_index between 9000 and 9200` → **0** — keine Restdaten.
+
+Hinweis (Telemetrie, keine Abweichung): der Legacy-Bridge-Trigger leitet beim INSERT aus
+`clip_status` einen `pipeline_state` ab (`ready → plate_ready`, `pending + Output → plate_queued`).
+Das passiert beim Anlegen der Fixture, nicht durch das DELETE; die Zeilen wurden nach dem
+DELETE-Versuch nicht mutiert.
+
+
 ## 5. Verifikation
 
 - `npx vitest run src/lib/composer src/lib/video-composer` → **46 Dateien / 527 Tests grün** (identischer Command und identische Zahl wie die G2.3-Baseline).
@@ -63,4 +102,4 @@ Bei allen Ablehnungen wurden weder Output-Felder (`clip_url`) noch Legacy-Spiege
 - Äußerer Catch-all in `hybrid-extend-scene` ohne Fail-Write → G4/Recovery.
 - `compose-dialog-segments` Deferred-Refund → eigener Credit-Gate-Track vor G3/G4.
 
-**Status: G2.4 umgesetzt. STOP — kein G3 ohne neuen Auftrag.**
+**Status: G2.4 umgesetzt, S5-Cleanup-Smoke nachgereicht und grün (keine Produktivcode-Änderung in S5). STOP — kein G3 ohne neuen Auftrag.**
