@@ -1177,7 +1177,7 @@ export default function SceneCard({
                               lang === "de"
                                 ? tx({ de: `${speakerCount} Sprecher erkannt. Beim Generieren läuft die Dialog-Shot Pipeline: pro Sprecher-Turn ein eigener Basis-Clip (Mund frei, eigenes Portrait) + dedizierter Lippensynchronisation, danach zu einem Clip gestitcht. Skaliert auf beliebig viele Sprecher. Klick öffnet das Dialog-Studio.`, en: `${speakerCount} speakers detected. The dialog-shot pipeline runs during generation: each speaker turn gets its own base clip (mouth free, own portrait) + dedicated lip-sync, then stitched into a clip. Scales to any number of speakers. Click opens the dialog studio.`, es: `${speakerCount} oradores detectados. La tubería de tomas de diálogo se ejecuta durante la generación: cada turno de orador obtiene su propia clip base (boca libre, retrato propio) + sincronización labial dedicada, luego se une en un clip. Se escala a cualquier número de oradores. El clic abre el estudio de diálogo.` })
                                 : lang === "es"
-                                  ? `${speakerCount} hablantes detectados. Al renderizar se ejecuta el pipeline Dialog-Shot: un plate Hailuo + lip-sync Sync.so dedicado por turno, después concat a un clip. Escala a N hablantes. Click abre el Dialog Studio.`
+                                  ? `${speakerCount} hablantes detectados. Al generar, cada turno recibe su propio clip base con sincronización labial y luego todo se une en un clip. Clic para abrir el estudio de diálogo.`
                                   : `${speakerCount} speakers detected. Generating runs the Dialog-Shot pipeline: one dedicated base clip + lip-sync per speaker turn, then concatenated to one clip. Scales to N speakers. Click opens Dialog Studio.`
                             }
                             onClick={() => setSplitConfirmOpen(true)}
@@ -1216,7 +1216,7 @@ export default function SceneCard({
                               value="sync-segments"
                               className="text-xs"
                             >
-                              ⚡ Fast Dialog · 1-Call (Sync.so Segments) — Default
+                              ⚡ Schnelle Lippensynchronisation (Standard)
                             </SelectItem>
                             {/* HeyGen Talking-Head option removed — Composer scenes always use Lip-Sync (HappyHorse/Hailuo → Sync.so). Portrait lip-sync lives in the standalone /talking-head module. */}
 
@@ -1224,7 +1224,7 @@ export default function SceneCard({
                               📺 B-Roll (Off-Screen-VO)
                             </SelectItem>
                             <SelectItem value="sync-polish" className="text-xs">
-                              ✨ Sync.so Polish
+                              ✨ Premium-Lippensynchronisation
                             </SelectItem>
                             {/* v70: cinematic-sync-legacy option removed — all
                                 dialog scenes use v69 unified single-face preclip. */}
@@ -1748,7 +1748,7 @@ export default function SceneCard({
                                 </span>
                                 <span className="text-[9px] text-muted-foreground leading-tight truncate">
                                   {dialogMode
-                                    ? `${modelsForPicker.length} ${lang === "es" ? "modelos" : lang === "en" ? "models" : "Modelle"} · HappyHorse · Hailuo (Sync.so)`
+                                    ? `${modelsForPicker.length} ${lang === "es" ? "modelos" : lang === "en" ? "models" : "Modelle"} · ${tx({ de: "für Lippensynchronisation zertifiziert", en: "certified for lip-sync", es: "certificados para sincronización labial" })}`
 
                                   : lang === "de"
                                     ? tx({ de: `B-Roll-Modus · ${modelsForPicker.length} Modelle verfügbar`, en: `B-roll mode · ${modelsForPicker.length} models available`, es: `Modo B-roll · ${modelsForPicker.length} modelos disponibles` })
