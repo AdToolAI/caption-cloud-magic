@@ -1333,7 +1333,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // KEINE Sync.so-Pipeline aus dem Studio heraus — sonst kostet der
     // Klick Credits obwohl der Nutzer explizit "kein Lip-Sync" gewählt hat.
     // v430.1 Schritt 2B — kanonischer Intent (SSoT) statt Teilsemantik.
-    const wantsLipSync = isLipSyncIntentional(scene as any);
+    const wantsLipSync = isLipSyncIntentional(scene);
     if (!wantsLipSync) {
       toast({
         title: tx({ de: 'Lip-Sync ist ausgeschaltet', en: 'Lip-Sync is off', es: 'Lip-Sync está desactivado' }),
@@ -1460,12 +1460,15 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       return;
     }
 
+    // v430.1 Gate 9 — der Intent-Anteil kommt aus der SSoT `isLipSyncIntentional()`
+    // (Toggle-Veto, dialogMode, alle Lip-Sync-Engines). Das GESAMTE Gate bleibt
+    // wegen `buttonIntendsLipSync` bewusst breiter als die SSoT: jeder
+    // Single-Speaker-Fall mit Portrait routet in die Cinematic-Sync-Kette
+    // (v232-Vertrag, Single-Speaker-Symmetrie). Routing bleibt dadurch identisch.
     const forceCinematicSync =
       blocks.length === 1 &&
       allHavePortraits &&
-      ((scene as any).engineOverride === 'cinematic-sync' ||
-        (scene as any).lipSyncWithVoiceover === true ||
-        buttonIntendsLipSync);
+      (isLipSyncIntentional(scene) || buttonIntendsLipSync);
 
     if (!forceCinematicSync && (blocks.length < 2 || !useProfessionalSrs)) {
       await handleGenerateInline();

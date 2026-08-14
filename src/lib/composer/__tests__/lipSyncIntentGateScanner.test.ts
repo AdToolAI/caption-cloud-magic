@@ -203,7 +203,9 @@ const ALLOWLIST: Record<string, number> = {
   'src/components/video-composer/SceneAvatarMode.tsx': 1,
   'src/components/video-composer/SceneCard.tsx': 24, // v430.1 2A
   'src/components/video-composer/SceneClipProgress.tsx': 0, // v430.1 2A
-  'src/components/video-composer/SceneDialogStudio.tsx': 3, // v430.1 2B
+  // v430.1 Gate 9: verbleibender Read = Zeile ~2327, Provider-Label-Anzeige
+  // (engineOverride als Provider-Kennung, kein Intent-Gate — bewusst kein SSoT).
+  'src/components/video-composer/SceneDialogStudio.tsx': 1,
   'src/components/video-composer/SceneInlinePlayer.tsx': 0, // v430.1 2A
   'src/components/video-composer/SceneReferenceImageSlot.tsx': 1,
   'src/config/lipsyncProviderSafety.ts': 2,

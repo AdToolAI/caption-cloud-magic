@@ -81,9 +81,12 @@ const FROZEN: Record<string, Frozen> = {
     falseNegativeCount: 0,
   },
   'dialogstudio-force-cinematic': {
-    parity: 'mixed',
-    falsePositives: ['Lf-Dt-Ecs', 'Lf-Df-Ecs', 'Lf-Du-Ecs'],
-    falseNegativeCount: 8,
+    // v430.1 Gate 9 — das INTENT-FRAGMENT ist bewusst auf die SSoT umgestellt.
+    // Das vollständige Routing-Gate `forceCinematicSync` bleibt wegen
+    // `buttonIntendsLipSync` absichtlich breiter (siehe forceCinematicSyncRouting.test.ts).
+    parity: 'exact',
+    falsePositives: [],
+    falseNegativeCount: 0,
   },
   'clipprogress-is-cinematic': {
     // v430.1 Schritt 2A — bewusst auf die SSoT umgestellt.
@@ -196,7 +199,7 @@ describe('v430.1 — Gate-Parität (2A umgestellt, Rest eingefroren)', () => {
     });
   }
 
-  it('genau die sieben v430.1-2A-Gates sind paritätisch zur SSoT', () => {
+  it('genau die zehn umgestellten Gates (2A + 2B + Gate 9) sind paritätisch zur SSoT', () => {
     const exact = INTENT_GATES.filter((g) => {
       const { falsePositives, falseNegatives } = evaluate(g.predicate);
       return classifyParity(falsePositives, falseNegatives) === 'exact';
@@ -212,6 +215,10 @@ describe('v430.1 — Gate-Parität (2A umgestellt, Rest eingefroren)', () => {
         'scenecard-lipsync-actions',
         'dialogstudio-wants-lipsync',
         'generateall-needs-lipsync',
+        // v430.1 Gate 9 — nur das Intent-Fragment; das vollständige
+        // `forceCinematicSync` bleibt wegen `buttonIntendsLipSync` breiter
+        // (Nachweis in src/lib/composer/__tests__/forceCinematicSyncRouting.test.ts).
+        'dialogstudio-force-cinematic',
       ].sort(),
     );
   });

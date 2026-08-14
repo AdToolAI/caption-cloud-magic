@@ -1,10 +1,10 @@
 # v430.1 — Paritätsbericht der Lip-Sync-Intent-Gates
 
-Stand: 14.08.2026, nach **Schritt 2A + 2B**. Die sieben Anzeige-/Polling-Gates
-(7, 10, 11, 12, 13, 15, 17) sowie die beiden run-/kostenrelevanten Gates 8 und 18
-laufen jetzt auf der SSoT `isLipSyncIntentional()`. Die verbleibenden zehn Gates
-bleiben mit ihrer heutigen Abweichungsmenge eingefroren. Gate 9 bleibt
-ausdrücklich unberührt und bekommt einen eigenen Provider-Routing-Nachweis.
+Stand: 14.08.2026, nach **Schritt 2A + 2B + Gate 9**. Die sieben Anzeige-/Polling-Gates
+(7, 10, 11, 12, 13, 15, 17), die beiden run-/kostenrelevanten Gates 8 und 18 sowie
+das Intent-Fragment von Gate 9 laufen jetzt auf der SSoT `isLipSyncIntentional()`.
+Die verbleibenden neun Gates (1–6, 14, 16, 19) bleiben mit ihrer heutigen
+Abweichungsmenge bewusst eingefroren. Damit ist v430.1 funktional abgeschlossen.
 
 ## Grundlagen
 
@@ -27,16 +27,19 @@ ID-Schema: `L<t|f|u>-D<t|f|u>-E<auto|cs|ss|nd|u>`
 `t/f/u` = true/false/unset, `cs/ss/nd` = cinematic-sync/sync-segments/native-dialogue).
 
 Tests:
-- `src/lib/video-composer/__tests__/lipSyncIntentGateParity.test.ts` — 7 Gates auf `exact`, 12 Gates weiterhin auf ihrer eingefrorenen Differenz.
-- `src/lib/composer/__tests__/lipSyncIntentGateScanner.test.ts` — AST-Scanner über alle lesenden Intent-Verwendungen in Bedingungskontexten (Allowlist nach 2A nachgezogen).
+- `src/lib/video-composer/__tests__/lipSyncIntentGateParity.test.ts` — 10 Gates auf `exact`, 9 Gates weiterhin auf ihrer eingefrorenen Differenz.
+- `src/lib/composer/__tests__/lipSyncIntentGateScanner.test.ts` — AST-Scanner über alle lesenden Intent-Verwendungen in Bedingungskontexten (Allowlist nach 2A/2B/Gate 9 nachgezogen).
+- `src/lib/composer/__tests__/forceCinematicSyncRouting.test.ts` — Routing-No-Op-Nachweis für Gate 9.
 
 ## Gesamtbild
 
-- **19 klassifizierte Gates**, davon **9 `exact`**, **0 `broader`**, **0 `narrower`**, **10 `mixed`**.
+- **19 klassifizierte Gates**, davon **10 `exact`**, **0 `broader`**, **0 `narrower`**, **9 `mixed`**.
 - Umgestellt (2A): `scenecard-lipsync-actions`, `clipprogress-is-cinematic`, `clipprogress-should-be-lipsync`, `inlineplayer-needs-lipsync`, `inlineplayer-legacy-happyhorse-warn`, `clipstab-poll-cinematic`, `pipelineprogress-cinematic-generating`.
 - Umgestellt (2B): `dialogstudio-wants-lipsync` (Studio-Start, kostenrelevant) und `generateall-needs-lipsync` (Ready-Zählung, ohne Dispatch-/Kostenpfad).
-- Damit respektieren diese neun Gates das Toggle-Veto und erkennen `sync-segments`, `native-dialogue` sowie den Voiceover-Opt-in.
-- Unverändert eingefroren: Gates 1–6, 9, 14, 16, 19 mit den zwei bekannten Fehlerklassen (Toggle-Veto ignoriert / Opt-in-Wege übersehen).
+- Umgestellt (Gate 9): `dialogstudio-force-cinematic` — nur das Intent-Fragment; die Routing-Matrix bleibt durch `buttonIntendsLipSync` unverändert.
+- Damit respektieren diese zehn Gates das Toggle-Veto und erkennen `sync-segments`, `native-dialogue` sowie den Voiceover-Opt-in.
+- Bewusst unverändert eingefroren: Gates 1–6, 14, 16, 19 mit den zwei bekannten Fehlerklassen (Toggle-Veto ignoriert / Opt-in-Wege übersehen).
+- Verbleibender direkter Read in `SceneDialogStudio.tsx` (~Zeile 2327): `engineOverride` als **Provider-Kennung für das Footer-Label** — kein Intent-Gate, bleibt bewusst ausserhalb der SSoT.
 
 ## Gate-für-Gate
 
@@ -112,14 +115,22 @@ Tests:
 - **False positives (0)**
 - **False negatives (0)**
 
-### `dialogstudio-force-cinematic`
+### `dialogstudio-force-cinematic` — v430.1 Gate 9: Intent-Fragment auf SSoT umgestellt
 
-- **Stelle:** `src/components/video-composer/SceneDialogStudio.tsx:1465`
+- **Stelle:** `src/components/video-composer/SceneDialogStudio.tsx:1468`
 - **Zweck:** Einzelblock-Dialog erzwingt die Cinematic-Sync-Kette (Intent-Anteil)
-- **Heutige Bedingung:** `scene.engineOverride === 'cinematic-sync' || scene.lipSyncWithVoiceover === true`
-- **parity:** `mixed`
-- **False positives (3)** — Gate true, SSoT false: `Lf-Dt-Ecs`, `Lf-Df-Ecs`, `Lf-Du-Ecs`
-- **False negatives (8)** — SSoT true, Gate false: `Lu-Dt-Eauto`, `Lu-Dt-Ess`, `Lu-Dt-End`, `Lu-Dt-Eu`, `Lu-Df-Ess`, `Lu-Df-End`, `Lu-Du-Ess`, `Lu-Du-End`
+- **Heutige Bedingung:** `isLipSyncIntentional(scene)  // v430.1 Gate 9`
+- **parity:** `exact`
+- **False positives (0)**
+- **False negatives (0)**
+- **Routing-Hinweis:** Das vollständige Gate im Code lautet
+  `blocks.length === 1 && allHavePortraits && (isLipSyncIntentional(scene) || buttonIntendsLipSync)`
+  und bleibt bewusst **breiter** als die SSoT: `buttonIntendsLipSync` ist für jeden
+  Single-Speaker-Fall mit Portrait true und dominiert den OR-Ausdruck (v232-Vertrag,
+  Single-Speaker-Symmetrie). Auch die Toggle-Veto-Fälle (`Lf-*-Ecs`) routen daher
+  weiterhin in die Cinematic-Sync-Kette — die Umstellung ist ein Routing-No-Op.
+  Nachweis über das volle Kreuzprodukt (45 Fixtures × Blockzahl × Portrait × SRS):
+  `src/lib/composer/__tests__/forceCinematicSyncRouting.test.ts`.
 
 ### `clipprogress-is-cinematic` — v430.1: auf SSoT umgestellt
 
