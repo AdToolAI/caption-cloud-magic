@@ -444,11 +444,39 @@ function jsonError(message: string, status: number) {
   });
 }
 
-async function markSceneFailed(admin: any, sceneId: string) {
+/**
+ * v431 G2.4 — run-/generation-gebundener Failure-Write.
+ * Ausschliesslich ueber das enge Primitive `composer_fail_hybrid_extend_scene`:
+ * Zielstate, Guard-Mode und From-State (`plate_queued`) sind dort Konstanten,
+ * Legacy-Spiegel laufen atomar mit dem kanonischen State.
+ * Kein id-only-Write, kein `markSceneFailed()` mehr.
+ */
+async function failHybridScene(
+  admin: any,
+  sceneId: string,
+  run: { runId: string; generation: number } | null,
+  writeId: "hybrid:frame-extract-failed" | "hybrid:no-anchor" | "hybrid:dispatch-failed",
+  errorText: string,
+) {
+  if (!run) {
+    console.error(`[hybrid-extend-scene] v431_g2_4 ${writeId} skipped_missing_run_provenance scene=${sceneId}`);
+    return;
+  }
   try {
-    await transitionScene(admin, sceneId, "failed", { detail: "hybrid-extend-scene" });
+    const { data, error } = await admin.rpc("composer_fail_hybrid_extend_scene", {
+      _scene_id: sceneId,
+      _run_id: run.runId,
+      _generation: run.generation,
+      _write_id: writeId,
+      _error_text: errorText.slice(0, 1000),
+    });
+    if (error) throw new Error(error.message);
+    const applied = (data as any)?.applied === true;
+    console.log(
+      `[hybrid-extend-scene] v431_g2_4 ${writeId} scene=${sceneId} run=${run.runId} gen=${run.generation} applied=${applied} reason=${(data as any)?.reason ?? "unknown"}`,
+    );
   } catch (e) {
-    console.warn("[hybrid-extend-scene] failed to mark scene failed:", e);
+    console.warn(`[hybrid-extend-scene] v431_g2_4 ${writeId} rpc_failed scene=${sceneId}: ${(e as Error).message}`);
   }
 }
 
