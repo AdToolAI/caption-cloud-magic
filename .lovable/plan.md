@@ -115,8 +115,8 @@ Bleibt in G0 unverändert und wird **nicht** in die permanente Runless-Allowlist
 
 ## 11. Reihenfolge und Abschluss
 
-1. Migration: Audit-Tabelle + Grants.
-2. Migration: neuer Kern, Pfadvalidierung, Recovery-Primitive, Revoke/Ownership-Fix, Wrapper-Umbau.
+1. Migration: Audit-Tabelle `composer_scene_transition_log` + Grandfather-Tabelle `composer_transition_grandfather` + Grants.
+2. Migration: neuer Kern (inkl. `_error_text`/`_clear_error`), Pfadvalidierung, Recovery-Primitive, Revoke/Ownership-Fix, Wrapper-Umbau auf die Grandfather-Allowlist.
 3. `_shared/scene-state.ts`: v391-Loop entfernen, `guardMode`/`writeId` als Pflichtparameter, `failSceneState()` härten.
 4. Nur die zwei Cancel-Functions auf den neuen Vertrag heben (das ist Teil des Cancel-Vertrags, nicht G1).
 5. Tests, Deployment, Race-Nachweis, Bericht.
