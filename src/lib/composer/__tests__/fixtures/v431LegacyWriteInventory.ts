@@ -43,6 +43,12 @@ export interface LegacyWriteEntry {
   atomicWith: string[];
   idempotency: 'guarded' | 'unguarded' | 'unguarded-low-traffic';
   callbackRisk: 'low' | 'medium' | 'high';
+  /** v431 — Gate, in dem dieser Write auf den G0-Vertrag migriert wurde. */
+  migratedIn?: 'G0' | 'G1' | 'G2' | 'G3' | 'G4' | 'G5';
+  /** v431 — write_id, mit dem der Write im Transition-Log erscheint. */
+  contractWriteId?: string;
+  /** v431 — verbliebener Legacy-Zweig (Debt), falls nur teilweise migriert. */
+  residualLegacyBranch?: string;
 }
 
 export const V431_LEGACY_WRITE_INVENTORY: readonly LegacyWriteEntry[] = [
@@ -719,9 +725,9 @@ export const V431_LEGACY_WRITE_INVENTORY: readonly LegacyWriteEntry[] = [
     callbackRisk: "medium",
   },
   {
-    id: "compose-video-clips:failed",
+    id: "compose-video-clips:failed-unsupported-source",
     file: "supabase/functions/compose-video-clips/index.ts",
-    line: 1630,
+    line: 2136,
     writeRole: "state",
     trigger: "edge-invoke",
     fields: ["pipeline_state"],
@@ -729,10 +735,51 @@ export const V431_LEGACY_WRITE_INVENTORY: readonly LegacyWriteEntry[] = [
     targetState: "\"failed\"",
     targetSubstate: "aus twoshot_stage abzuleiten",
     derivable: "1:1",
-    runGuard: ["id-only"],
+    runGuard: ["run_bound (sceneRunStamps) — Legacy-Fallback nur ohne Stempel"],
     atomicWith: ["clip_error", "clip_status"],
-    idempotency: "unguarded-low-traffic",
+    idempotency: "guarded",
     callbackRisk: "medium",
+    migratedIn: "G1",
+    contractWriteId: "compose-video-clips:contract-failure-unsupported-source",
+    residualLegacyBranch: "kein Legacy-Zweig erwartet: Branch greift nur fuer ai-Quellen, die immer gestempelt sind",
+  },
+  {
+    id: "compose-video-clips:failed-lipsync-uncertified",
+    file: "supabase/functions/compose-video-clips/index.ts",
+    line: 2160,
+    writeRole: "state",
+    trigger: "edge-invoke",
+    fields: ["pipeline_state"],
+    values: {"pipeline_state": "\"failed\""},
+    targetState: "\"failed\"",
+    targetSubstate: "aus twoshot_stage abzuleiten",
+    derivable: "1:1",
+    runGuard: ["run_bound (sceneRunStamps) — Legacy-Fallback nur ohne Stempel"],
+    atomicWith: ["clip_error", "clip_status"],
+    idempotency: "guarded",
+    callbackRisk: "medium",
+    migratedIn: "G1",
+    contractWriteId: "compose-video-clips:contract-failure-lipsync-uncertified",
+    residualLegacyBranch: "Legacy-Write bleibt fuer Lip-Sync-Szenen mit Nicht-ai-clipSource (kein Run-Stempel) — Debt G2",
+  },
+  {
+    id: "compose-video-clips:failed-anchor-input-unsupported",
+    file: "supabase/functions/compose-video-clips/index.ts",
+    line: 4102,
+    writeRole: "state",
+    trigger: "edge-invoke",
+    fields: ["pipeline_state"],
+    values: {"pipeline_state": "\"failed\""},
+    targetState: "\"failed\"",
+    targetSubstate: "aus twoshot_stage abzuleiten",
+    derivable: "1:1",
+    runGuard: ["run_bound (sceneRunStamps) — Legacy-Fallback nur ohne Stempel"],
+    atomicWith: ["clip_error", "clip_status"],
+    idempotency: "guarded",
+    callbackRisk: "medium",
+    migratedIn: "G1",
+    contractWriteId: "compose-video-clips:contract-failure-anchor-input-unsupported",
+    residualLegacyBranch: "Legacy-Write bleibt fuer ungestempelte Szenen — Debt G2",
   },
   {
     id: "compose-video-clips:clear-2",

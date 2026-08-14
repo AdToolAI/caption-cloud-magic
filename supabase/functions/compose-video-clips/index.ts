@@ -15,7 +15,7 @@ import { hailuoBucketFor } from "../_shared/provider-matrix.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 import { resolveSceneOutput } from "../_shared/resolve-scene-output.ts";
 import { isSceneOutputFinal } from "../_shared/continuity-state.ts";
-import { sceneState as sceneStateOf, legacyClipReadyEquivalentRow } from "../_shared/scene-state.ts";
+import { sceneState as sceneStateOf, legacyClipReadyEquivalentRow, transitionSceneV2 } from "../_shared/scene-state.ts";
 
 import {
   countDialogSpeakers,
@@ -1623,7 +1623,18 @@ serve(async (req) => {
 
     // v425 — surface a provider-contract violation in the UI instead of
     // leaving the scene spinning in `generating`.
-    const markSceneContractFailure = async (sceneId: string, message: string) => {
+    //
+    // v431 G1 — the state part of this failure is migrated to the G0 contract,
+    // but ONLY for branches that own a run stamp from the dispatch snapshot
+    // (`sceneRunStamps`). Un-stamped call sites keep the legacy write; they are
+    // debt for G2 because they cannot name the run that caused the failure.
+    type ContractFailureWriteId =
+      | "compose-video-clips:contract-failure-unsupported-source"
+      | "compose-video-clips:contract-failure-lipsync-uncertified"
+      | "compose-video-clips:contract-failure-anchor-input-unsupported";
+
+    /** Legacy path — unchanged, used when no run stamp exists (G2 debt). */
+    const legacyMarkSceneContractFailure = async (sceneId: string, message: string) => {
       try {
         await supabaseAdmin
           .from("composer_scenes")
@@ -1639,6 +1650,49 @@ serve(async (req) => {
       } catch (e) {
         console.warn("[compose-video-clips] markSceneContractFailure failed", e);
       }
+    };
+
+    const markSceneContractFailure = async (
+      sceneId: string,
+      message: string,
+      writeId: ContractFailureWriteId,
+    ) => {
+      const stamp = sceneRunStamps.get(sceneId);
+      if (!stamp) {
+        // G2 debt: no provenance for this branch — legacy write stays.
+        console.warn(
+          `[compose-video-clips] contract failure without run stamp scene=${sceneId} write=${writeId} (legacy path)`,
+        );
+        await legacyMarkSceneContractFailure(sceneId, message);
+      } else {
+        try {
+          // State + clip_error atomically through the G0 core.
+          const res = await transitionSceneV2(supabaseAdmin, sceneId, "failed", {
+            guardMode: "run_bound",
+            runId: stamp.runId,
+            generation: stamp.generation,
+            writeId,
+            detail: message,
+            errorText: message,
+          });
+          if (!res.applied) {
+            console.warn(
+              `[compose-video-clips] contract failure transition rejected scene=${sceneId} write=${writeId} reason=${res.reason ?? "-"}`,
+            );
+          } else {
+            // Compatibility mirror — readers still consume clip_status.
+            // Run-guarded so a stale run can never overwrite a newer one.
+            await supabaseAdmin
+              .from("composer_scenes")
+              .update({ clip_status: "failed", updated_at: new Date().toISOString() })
+              .eq("id", sceneId)
+              .eq("active_run_id", stamp.runId)
+              .eq("plate_generation", stamp.generation);
+          }
+        } catch (e) {
+          console.warn("[compose-video-clips] markSceneContractFailure (v2) failed", e);
+        }
+      }
       // v426 — release any successor parked behind this scene, otherwise it
       // would wait for a clip that will never arrive.
       await resumeContinuityChain({
@@ -1648,6 +1702,7 @@ serve(async (req) => {
         predecessorFailed: true,
       });
     };
+
 
     const processScenes = async () => {
     // v418 — Seedance 2.5 as a lip-sync plate provider is behind a rollout
@@ -2080,6 +2135,7 @@ serve(async (req) => {
         await markSceneContractFailure(
           scene.id,
           `Provider '${scene.clipSource}' wird vom Composer nicht unterstützt.`,
+          "compose-video-clips:contract-failure-unsupported-source",
         );
         return new Response(
           JSON.stringify({
@@ -2103,6 +2159,7 @@ serve(async (req) => {
           await markSceneContractFailure(
             scene.id,
             `Lip-Sync läuft nur über HappyHorse oder Hailuo. Gewählt: ${scene.clipSource}.`,
+            "compose-video-clips:contract-failure-lipsync-uncertified",
           );
           return new Response(
             JSON.stringify({
@@ -4042,7 +4099,11 @@ serve(async (req) => {
         console.error(
           `[compose-video-clips] scene ${scene.id} lipsync_anchor_input_unsupported source=${scene.clipSource}`,
         );
-        await markSceneContractFailure(scene.id, msg);
+        await markSceneContractFailure(
+          scene.id,
+          msg,
+          "compose-video-clips:contract-failure-anchor-input-unsupported",
+        );
         continue;
       }
 
