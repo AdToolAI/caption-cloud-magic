@@ -31,32 +31,35 @@ Dieser Plan ändert noch keinen Code.
 
 Verbindlich für G2.2:
 
-1. **Kein unbedingter Scene-Output-Write mehr.** Jeder Write auf
-   `composer_scenes`, der Output-Felder berührt (`clip_url`, `base_video_url`,
-   `processed_video_url` bzw. alles aus `materializeCompatibilityOutput`),
-   wird mit dem eingefrorenen Dispatch-Snapshot **und** dem erwarteten
-   aktuellen Zustand geguardet:
-   `.eq('id', sceneId).eq('active_run_id', runId).eq('plate_generation', generation).in('pipeline_state', <erlaubte From-States>)`.
-2. **Cancel-Race geschlossen (From-State-Guard).** Run + Generation allein
+1. **Atomare Finalisierung statt zwei Statements (verpflichtend).** Output und
+   State werden für die gekoppelten Talking-Head-Übergänge
+   (`plate_rendering`-Einstieg mit Output-Clear und `plate_ready`-Completion)
+   in **einem** Commit materialisiert — über ein eng geschnittenes RPC-Primitive
+   `composer_finalize_talking_head(...)`:
+   `SELECT ... FOR UPDATE` → `active_run_id` prüfen → `plate_generation` prüfen
+   → erwarteten `from_state` prüfen → Output materialisieren →
+   `pipeline_state` + `pipeline_substate` + `clip_status`-Spiegel schreiben →
+   Commit. Kein generischer neuer State-Bypass: das Primitive kennt nur die
+   Talking-Head-Übergänge und ruft intern denselben Kernvertrag wie
+   `transitionSceneV2()` (`run_bound`) auf.
+2. **Cancel-Race und Doppel-Callback geschlossen.** Run + Generation allein
    reichen nicht: ein User-Cancel behält `active_run_id` und
-   `plate_generation` und setzt nur `pipeline_state = 'canceled'`. Der
-   Completion-Write darf deshalb ausschließlich aus dem laufenden
-   Talking-Head-Zustand (`plate_rendering`) greifen, nie aus `canceled`,
-   `failed` oder `complete`. Bevorzugte Umsetzung: eine kleine atomare
-   DB-Finalisierung, die unter Row Lock Run + Generation + From-State prüft
-   und Output + State gemeinsam materialisiert. Bleiben es zwei Statements,
-   trägt der Output-Write zwingend alle drei Bedingungen (Run, Generation,
-   erwarteter `pipeline_state`) und läuft **vor** dem State-Übergang über
-   `transitionSceneV2()` (`run_bound`, `expected_generation`).
-3. **0 aktualisierte Zeilen = stale/canceled → No-op.** Liefert der
-   Output-Update keine Zeile zurück, wird der State-Übergang **nicht**
-   ausgeführt; die Funktion loggt `write=plate-ready result=stale` und beendet
-   den Job-Zweig ohne weitere Mutation. Kein Retry, kein ungeguardeter
-   Ersatz-Write.
-4. **Gleiche Regel für die Nebenpfade.** `plate_rendering` (inkl.
-   `materializeCompatibilityOutput('clear')`), Refund-Fail und Early-Fail
-   laufen über denselben Guard; ein stale oder gecancelter Run darf weder
-   Output löschen noch die Szene auf `failed` ziehen.
+   `plate_generation` und setzt nur `pipeline_state = 'canceled'`. Da Prüfung,
+   Output und State unter demselben Row Lock laufen, kann weder ein Cancel
+   zwischen Output und State schlüpfen noch ein zweiter Completion-Callback
+   desselben Runs ein zweites Mal materialisieren. Zulässiger `from_state` für
+   die Completion ist ausschließlich `plate_rendering`; `canceled`, `failed`
+   und `complete` sind ausgeschlossen.
+3. **Guard-Verletzung = No-op mit Grund.** Das Primitive gibt bei
+   Run-/Generations-/From-State-Abweichung `applied = false` mit Grund
+   (`stale_run`, `stale_generation`, `unexpected_state`) zurück; es wird nichts
+   geschrieben, die Funktion loggt `write=plate-ready result=<grund>` und
+   beendet den Job-Zweig. Kein Retry, kein ungeguardeter Ersatz-Write.
+4. **Ungekoppelte Nebenpfade.** Reine State-Writes ohne Output (Refund-Fail,
+   Early-Fail) laufen über `transitionSceneV2()` (`run_bound`,
+   `expected_generation`); ein stale oder gecancelter Run darf weder Output
+   löschen noch die Szene auf `failed` ziehen.
+
 5. **Fehlender Run = fail-closed (G2.0-Regel).** Ist `sceneId` gesetzt, aber
    der Run-Snapshot unvollständig (`runId` oder `plateGeneration` fehlt), gibt
    es **keinen** `composer_scenes`-Write — weder State noch Output, weder im
@@ -100,28 +103,62 @@ Verbindlich für G2.2:
    Run vollständig neu erstellt. Trifft keine zu, ist der Reset-Pfad
    entsprechend zu härten, bevor G2.2 abgenommen wird.
 
+## Vertragsnachweis 3 — Legacy-Spiegel bleiben bis G6 erhalten
+
+G6 ist nicht erreicht: `clip_status`, `lip_sync_status` und `twoshot_stage`
+haben nachweislich noch aktive Leser (u. a. `usePipelineProgress`,
+`useTwoShotAutoTrigger`, `useRenderQueueLive`, `ClipsTab`,
+`sceneCardPresentation`, `resolveSceneOutput`, `sceneErrorPresenter` sowie
+Webhooks im Backend). G2.2 entfernt daher **keinen** Spiegel; jeder Spiegel
+wird im selben geguardeten Write mitgeschrieben.
+
+`generate-talking-head` (kanonisch + Spiegel, gekoppelt):
+- Einstieg: `pipeline_state = 'plate_rendering'` + `clip_status = 'generating'`
+  + Output-Clear.
+- Completion: `pipeline_state = 'plate_ready'` + `clip_status = 'ready'`
+  + Output-Materialisierung.
+- Fehler/Refund: `pipeline_state = 'failed'` + `clip_status = 'failed'`
+  + `clip_error`.
+
+`report-lipsync-motion-probe` (Hard-Fail, kanonisch + Spiegel):
+- kanonisch: `pipeline_state = 'failed'`,
+  `pipeline_substate = 'needs_clip_rerender'`, `clip_error = <User-Text>`.
+- Spiegel bleiben bis G6 erhalten: `lip_sync_status = 'failed'` und
+  `twoshot_stage = 'needs_clip_rerender'` werden weiterhin im selben
+  geguardeten Write gesetzt. Ein Entfernen ist erst nach einem dokumentierten
+  Reader-Audit (eigener Schritt in G6) zulässig.
+- Der Eskalations-Zweig bleibt unverändert; er berührt nur Slot-Daten.
+
 ## Umsetzungsreihenfolge nach GO
 
-1. Migration: `job_id`-Immutability-Erweiterung in `update_dialog_pass_slot`
-   (inkl. explizit erlaubtem Reset-Pfad) und — falls für die atomare Variante
-   gewählt — das Talking-Head-Finalisierungs-Primitive mit Row Lock.
-2. `generate-talking-head`: geguardete Output-Updates (Run + Generation +
-   From-State) + `transitionSceneV2()` für `plate_rendering` / `plate_ready` /
-   `failed`; fail-closed bei fehlender Provenienz.
-3. `report-lipsync-motion-probe`: Job-Slot-Match-Gate + geguardeter Hard-Fail,
-   fail-closed ohne Slot-Run-Snapshot.
+1. Migration:
+   - `job_id`-Immutability-Erweiterung in `update_dialog_pass_slot` (inkl.
+     explizit erlaubtem Reset-Pfad),
+   - neues `composer_finalize_talking_head(...)` (Row Lock, Run +
+     Generation + `from_state`, Output + State + Spiegel in einem Commit).
+2. `generate-talking-head`: gekoppelte Übergänge über das neue Primitive,
+   reine State-Writes über `transitionSceneV2()`, fail-closed bei fehlender
+   Provenienz, alle Spiegel unverändert mitgeschrieben.
+3. `report-lipsync-motion-probe`: Job-Slot-Match-Gate + geguardeter Hard-Fail
+   mit kanonischem State/Substate **und** Spiegeln, fail-closed ohne
+   Slot-Run-Snapshot.
 4. Smokes auf echter DB:
-   - alter Run schreibt `plate_ready` → 0 Zeilen, Output unverändert, kein State
-   - **Cancel-Race (verpflichtend):** Run A aktiv → User-Cancel → verspätetes
-     Talking-Head-Completion für Run A → weder Output noch State ändern sich
-   - aktueller Run → Output + State wie heute
+   - stale Run schreibt `plate_ready` → `applied=false`, Output und State
+     unverändert
+   - **Cancel-Race (verpflichtend):** `plate_rendering` → Completion beginnt →
+     konkurrierender Cancel → nur eine konsistente Reihenfolge sichtbar;
+     niemals `canceled` mit nachträglich materialisiertem Completion-Output
+   - zweiter Completion-Callback desselben Runs → No-op
+   - aktueller Run → Output + State + Spiegel wie heute
    - `sceneId` ohne vollständigen Run-Snapshot → gar kein Scene-Write
    - Probe mit falscher/NULL `job_id` → No-op, Slot & Szene unverändert
-   - Probe mit korrekter `job_id` → Eskalation/Hard-Fail wie heute
+   - Probe mit korrekter `job_id` → Hard-Fail mit `failed` +
+     `needs_clip_rerender` + Spiegeln
    - Probe mit korrektem Job, aber ohne Slot-Run-Snapshot → kein State-Write
-5. Contract-Tests (Slot-Immutability inkl. `job_id`-Reset-Nachweis) + `tsgo`,
-   Bericht in `docs/v431-g2-report.md`.
+5. Contract-Tests (Slot-Immutability inkl. `job_id`-Reset-Nachweis,
+   Spiegel-Parität) + `tsgo`, Bericht in `docs/v431-g2-report.md`.
 6. **STOP vor G2.3.**
+
 
 
 ## Baseline für den Bericht
