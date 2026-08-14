@@ -473,18 +473,29 @@ async function processHeyGenJob(opts: {
 
 
           if (opts.sceneId) {
-            // v431 G2.1 — Run-Provenienz nur protokolliert; Writer-Migration folgt G2.2.
-            console.log(
-              `[talking-head] v431_g2_1 write=plate-ready scene=${opts.sceneId} run=${opts.runId ?? "none"} gen=${opts.plateGeneration ?? "none"}`,
-            );
-            await admin.from('composer_scenes').update({
-              ...materializeCompatibilityOutput('base', { baseUrl: finalUrl }),
-              // v430 Step 5D: dual write — modern state + legacy mirror.
-              pipeline_state: 'plate_ready',
-              clip_status: 'ready',
-              updated_at: new Date().toISOString(),
-            }).eq('id', opts.sceneId);
+            // v431 G2.2 — Output + kanonischer State + Legacy-Spiegel atomar
+            // unter demselben Row Lock (Run + Generation + from_state).
+            if (!opts.runId || typeof opts.plateGeneration !== 'number') {
+              console.error(
+                `[talking-head] v431_g2_2 write=plate-ready scene=${opts.sceneId} result=missing_run_provenance`,
+              );
+            } else {
+              const { data: fin, error: finErr } = await admin.rpc('composer_finalize_talking_head', {
+                _scene_id: opts.sceneId,
+                _mode: 'complete',
+                _run_id: opts.runId,
+                _generation: opts.plateGeneration,
+                _write_id: 'talking_head_plate_ready',
+                _base_url: finalUrl,
+              });
+              const res = (fin ?? {}) as { applied?: boolean; reason?: string };
+              console.log(
+                `[talking-head] v431_g2_2 write=plate-ready scene=${opts.sceneId} run=${opts.runId} ` +
+                  `gen=${opts.plateGeneration} result=${finErr ? `rpc_error:${finErr.message}` : (res.applied ? 'applied' : (res.reason ?? 'not_applied'))}`,
+              );
+            }
           }
+
 
           console.log(`[talking-head] ✅ Completed for video_id=${opts.videoId}`);
         } catch (e: any) {
