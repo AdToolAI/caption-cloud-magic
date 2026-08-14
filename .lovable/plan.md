@@ -51,54 +51,86 @@ Da das Gate ohnehin `blocks.length === 1 && allHavePortraits` verlangt, dominier
 
 ## Umsetzung (freigegeben)
 
-### Codeänderung — nur das Intent-Fragment
+### 1. Codeänderung — nur das Intent-Fragment, ohne Type-Bypass
 
-`SceneDialogStudio.tsx:1463-1468`:
+`ComposerScene` (`src/types/video-composer.ts`) deklariert alle drei Intent-Felder bereits typisiert:
+
+| Feld | Zeile | Typ |
+|------|-------|-----|
+| `engineOverride` | 316 | `'auto' \| 'broll' \| 'sync-polish' \| 'cinematic-sync' \| 'sync-segments' \| 'native-dialogue'` (optional) |
+| `dialogMode` | 324 | `boolean` (optional) |
+| `lipSyncWithVoiceover` | 617 | `boolean` (optional) |
+
+Der Prop ist `scene: ComposerScene` (Zeile 89). Die SSoT-Signatur erwartet `LipSyncSceneCamel` mit `engineOverride?: string \| null` — der String-Literal-Union ist darauf zuweisbar. Der Aufruf ist daher **ohne Cast** typkorrekt:
 
 ```ts
 const forceCinematicSync =
   blocks.length === 1 &&
   allHavePortraits &&
-  (isLipSyncIntentional(scene as any) || buttonIntendsLipSync);
+  (isLipSyncIntentional(scene) || buttonIntendsLipSync);
 ```
 
-Alle anderen Teile bleiben Zeichen für Zeichen unverändert: `blocks.length === 1`, `allHavePortraits`, `buttonIntendsLipSync`, die nachfolgende `if (!forceCinematicSync && ...)`-Verzweigung, alle Portrait-Guards und Toasts.
+Kein `as any`. Alle anderen Teile bleiben Zeichen für Zeichen unverändert: `blocks.length === 1`, `allHavePortraits`, `buttonIntendsLipSync`, die nachfolgende `if (!forceCinematicSync && ...)`-Verzweigung, alle Portrait-Guards und Toasts.
 
-### Testvertrag — sauber getrennt
+### 2. Scanner-Allowlist — der eine verbleibende Reader, eindeutig benannt
+
+Direkte Intent-Reads in `SceneDialogStudio.tsx` heute (Allowlist-Wert 3):
+
+| Zeile | Ausdruck | Gate |
+|-------|----------|------|
+| 1466 | `(scene as any).engineOverride === 'cinematic-sync'` | Gate 9 |
+| 1467 | `(scene as any).lipSyncWithVoiceover === true` | Gate 9 |
+| 2327 | `const engineOv = (scene as any).engineOverride as string \| undefined` | **kein Intent-Gate** |
+
+Nach der Änderung bleibt genau **ein** Treffer: **Zeile 2327**.
+
+Dieser Read gehört **nicht** zum Lip-Sync-Intent-Vertrag. Er speist die **Provider-Namens-Anzeige** im Studio-Footer (`isSyncSegments` → sichtbares Label „Sync-Segments" / „Cinematic-Sync" / SRS-Split-Hinweis). Er liest `engineOverride` als **Provider-Kennung**, nicht als Intent-Signal, und behandelt `undefined`/`'auto'` bewusst als `sync-segments` (siehe Kommentar Zeile 2328-2330, gespiegelt aus `recommendEngineForScene`). Eine Umstellung auf `isLipSyncIntentional()` wäre hier semantisch falsch, weil das Label den gewählten Provider benennen muss, nicht ob Lip-Sync gewollt ist.
+
+Allowlist-Änderung in `lipSyncIntentGateScanner.test.ts:206`:
+
+```ts
+// v430.1 Gate 9: verbleibender Read = Zeile 2327, Provider-Label-Anzeige
+// (engineOverride als Provider-Kennung, kein Intent-Gate — bewusst kein SSoT).
+'src/components/video-composer/SceneDialogStudio.tsx': 1,
+```
+
+### 3. Testvertrag — sauber getrennt
 
 Zwei unterschiedliche Charakterisierungen, die nicht vermischt werden:
 
-1. **Intent-Fragment** (`dialogstudio-force-cinematic`): nach der Umstellung `exact` gegenüber `isLipSyncIntentional()`. Das Fixture-Prädikat in `lipSyncIntentGates.ts` wird auf `ssot(s)` gesetzt, die Parity-Erwartung in `lipSyncIntentGateParity.test.ts` auf `exact`.
+1. **Intent-Fragment** (`dialogstudio-force-cinematic`): nach der Umstellung `exact` gegenüber `isLipSyncIntentional()`. Fixture-Prädikat in `lipSyncIntentGates.ts` → `ssot(s)`, Parity-Erwartung in `lipSyncIntentGateParity.test.ts` → `exact`.
 
-2. **Gesamtes Routing-Gate** `forceCinematicSync`: bleibt **bewusst nicht** SSoT-paritätisch, weil `buttonIntendsLipSync` zusätzlich routet. Wird im 19-Gate-Bericht ausdrücklich als solches vermerkt — nicht als „exact" für das vollständige Gate.
+2. **Gesamtes Routing-Gate** `forceCinematicSync`: bleibt **bewusst nicht** SSoT-paritätisch, weil `buttonIntendsLipSync` zusätzlich routet. Der Bericht bekommt für Gate 9 eine Fußnote:
 
-Der Berichtstext in `docs/v430-1-intent-gate-parity.md` bekommt für Gate 9 eine Fußnote, die diese Trennung festhält.
+   > Gate 9 charakterisiert ausschliesslich das **Intent-Fragment**. Das vollständige Routing-Gate `forceCinematicSync` ist wegen `buttonIntendsLipSync` **bewusst breiter** als die SSoT: jeder Single-Speaker-Fall mit Portrait routet in die Cinematic-Sync-Kette, auch bei Toggle-Veto. Das ist kein Paritätsverstoss, sondern der gewollte v232-Vertrag (Single-Speaker-Symmetrie).
 
-### Regressionstest (neu)
+### 4. Regressionstest (neu)
 
-Neue Test-Datei mit der Routing-Matrix als reine Prädikat-Nachbildung von `forceCinematicSync`:
+Neue Test-Datei mit der Routing-Matrix als Prädikat-Nachbildung von `forceCinematicSync` — **jeweils in der Alt- und der Neu-Fassung**, damit der Test die No-Op-Eigenschaft beweist statt sie nur zu behaupten:
 
-| Fall | Erwartetes Routing |
-|------|--------------------|
-| 1 Sprecher + Portrait + Toggle AUS | `forceCinematicSync === true` (via `buttonIntendsLipSync`) |
-| 1 Sprecher + Portrait + `sync-segments` | `forceCinematicSync === true` |
-| 1 Sprecher + Portrait + `dialogMode` | `forceCinematicSync === true` |
-| 1 Sprecher ohne Portrait | früher Guard/Return, Gate nie erreicht |
-| Multi-Speaker (≥2 Blöcke) | `forceCinematicSync === false`, Routing via `useProfessionalSrs` |
+| Fall | Erwartetes Routing (alt == neu) |
+|------|--------------------------------|
+| 1 Sprecher + Portrait + Toggle AUS | `true` (via `buttonIntendsLipSync`) |
+| 1 Sprecher + Portrait + `sync-segments` | `true` |
+| 1 Sprecher + Portrait + `dialogMode` | `true` |
+| 1 Sprecher + Portrait + `cinematic-sync` | `true` |
+| 1 Sprecher ohne Portrait | Gate nie erreicht (früher Guard/Return) |
+| Multi-Speaker (≥2 Blöcke) | `false`, Routing via `useProfessionalSrs` |
 
-Der Test prüft die Matrix **vor und nach** der Umstellung identisch — er ist der Beweis für die No-Op-Eigenschaft.
-
-### Scanner-Allowlist
-
-`lipSyncIntentGateScanner.test.ts`: der direkte Intent-Read in `SceneDialogStudio.tsx` entfällt an dieser Stelle; die erwartete Anzahl direkter Gates in dieser Datei wird von 3 auf 1 reduziert (Gate 9 verschwindet, `native-dialogue`-Prompt-Modus bleibt unberührt, da in `SceneCard.tsx`).
+Zusätzlich über das volle 45-Zeilen-Fixture-Kreuzprodukt: `forceCinematicSyncAlt(f) === forceCinematicSyncNeu(f)` für jede Kombination.
 
 ## Verifikation
 
 1. `bunx tsgo --noEmit`
 2. Composer-Suite (`src/lib/video-composer`, `src/lib/composer`) — aktuell 512 grün, danach + neue Routing-Matrix-Tests
-3. Parity-Bericht regenerieren: 10/19 Gates `exact`
+3. Parity-Bericht regenerieren
 4. UI-Smoke: Scene Dialog Studio öffnen, Single-Speaker-Dialog mit Portrait — Routing unverändert
 
-## Danach
+## Abschlusszählung nach Gate 9
 
-v430.1 ist funktional abgeschlossen. Die verbleibenden zehn Gates (1-6, 14, 16, 19) bleiben bewusst dialoggebunden und eingefroren.
+| Status | Anzahl | Gates |
+|--------|--------|-------|
+| `exact` (auf SSoT umgestellt) | **10/19** | 7, 8, 9, 10, 11, 12, 13, 15, 17, 18 |
+| bewusst unverändert (dialoggebunden, eingefroren) | **9/19** | 1, 2, 3, 4, 5, 6, 14, 16, 19 |
+
+Damit ist v430.1 funktional abgeschlossen.
