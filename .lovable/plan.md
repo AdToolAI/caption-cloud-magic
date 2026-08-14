@@ -1,4 +1,4 @@
-# v430.1 — Gate-9 Provider-/Routing-Nachweis
+# v430.1 — Gate 9: Provider-/Routing-Nachweis + Umsetzung
 
 ## Gate-Profil
 
@@ -7,74 +7,98 @@
 | Gate-ID | `dialogstudio-force-cinematic` |
 | Ort | `src/components/video-composer/SceneDialogStudio.tsx:1463-1468` |
 | Zweck | Einzelblock-Dialog erzwingt die Cinematic-Sync-Kette statt Inline-VO |
-| Heutige Bedingung (Intent-Anteil) | `engineOverride === 'cinematic-sync' \|\| lipSyncWithVoiceover === true` |
-| Vollständige heutige Bedingung | `blocks.length === 1 && allHavePortraits && (engineOverride === 'cinematic-sync' \|\| lipSyncWithVoiceover === true \|\| buttonIntendsLipSync)` |
+| Intent-Fragment (heute) | `engineOverride === 'cinematic-sync' \|\| lipSyncWithVoiceover === true` |
+| Vollständiges Routing-Gate | `blocks.length === 1 && allHavePortraits && (<Intent-Fragment> \|\| buttonIntendsLipSync)` |
 
-## Was das Gate steuert
+## Korrektur zum vorherigen Bericht
 
-`forceCinematicSync` entscheidet, ob ein Single-Speaker-Dialog in den **professionellen SRS/Cinematic-Sync-Pfad** (`compose-video-clips` + dedizierter Lip-Sync) oder in den **Inline-VO/HeyGen-Talking-Head-Pfad** läuft.
+Die Aussage „False Positives: keine" war **falsch**. Der harte Toggle-Veto der SSoT greift:
 
-```text
-forceCinematicSync = true  → PROFESSIONAL multi-speaker lip-sync (SRS)
-forceCinematicSync = false → handleGenerateInline() (Inline-VO)
-```
+| Fall | Heutiges Intent-Fragment | `isLipSyncIntentional()` | Klassifikation |
+|------|--------------------------|--------------------------|----------------|
+| `lipSyncWithVoiceover = false` + `engineOverride = 'cinematic-sync'` | **true** | **false** | **False Positive** |
 
-## Wichtiger Kontext: `buttonIntendsLipSync`
+Das sind die bereits zuvor katalogisierten `Lf-*-Ecs`-Fixtures. Das Intent-Fragment ist damit **mixed**, nicht `narrower`.
 
-Die heutige Bedingung enthält neben dem Intent-Anteil einen zusätzlichen OR-Zweig:
+### Vollständige Fixture-Klassifikation (Intent-Fragment)
+
+**False Positives (heute true, SSoT false):**
+- `Lf-Dt-Ecs`, `Lf-Df-Ecs`, `Lf-Du-Ecs` — Toggle AUS + `cinematic-sync`
+
+**False Negatives (heute false, SSoT true):**
+- `dialogMode === true` ohne Toggle/Engine (z. B. `Lu-Dt-Eu`, `Lu-Dt-Eauto`)
+- `engineOverride === 'sync-segments'` (z. B. `Lu-Df-Ess`)
+- `engineOverride === 'native-dialogue'` (z. B. `Lu-Df-End`)
+
+## Routing-Auswirkung: unverändert No-Op
+
+`buttonIntendsLipSync` ist für **jeden erreichbaren Single-Speaker-Fall mit Portrait** true:
 
 ```ts
 const buttonIntendsLipSync =
-  (blocks.length === 1 && allHavePortraits) ||
-  (blocks.length >= 2 && allHavePortraits && !renderAsSeparateScenes);
+  (blocks.length === 1 && allHavePortraits) || ...
 ```
 
-Für **Single-Speaker-Szenen mit Portraits** ist `buttonIntendsLipSync` **immer true**. Das bedeutet:
+Da das Gate ohnehin `blocks.length === 1 && allHavePortraits` verlangt, dominiert `buttonIntendsLipSync` den gesamten OR-Ausdruck. Das Intent-Fragment ist für das reale Routing heute **wirkungslos** — inklusive der oben gefundenen False Positives.
 
-- Alle erreichbaren Single-Speaker-Fälle (d.h. `blocks.length === 1 && allHavePortraits`) werden **bereits heute** in den Cinematic-Sync-Pfad gezwungen.
-- Der Intent-Anteil (`engineOverride` / `lipSyncWithVoiceover`) ist in der aktuellen Logik für Single-Speaker-Szenen **faktisch tot** — `buttonIntendsLipSync` dominiert.
-- Für Multi-Speaker-Szenen ist `forceCinematicSync` irrelevant, weil `blocks.length === 1` dort nie zutrifft; das Routing regelt `useProfessionalSrs`.
+| Szenario | Heute | Nach Umstellung | Änderung |
+|----------|-------|-----------------|----------|
+| 1 Sprecher + Portrait + Toggle AUS | Cinematic-Sync (via `buttonIntendsLipSync`) | Cinematic-Sync (via `buttonIntendsLipSync`) | **keine** |
+| 1 Sprecher + Portrait + `sync-segments` | Cinematic-Sync | Cinematic-Sync | **keine** |
+| 1 Sprecher + Portrait + `dialogMode` | Cinematic-Sync | Cinematic-Sync | **keine** |
+| 1 Sprecher ohne Portrait | Früher Toast/Return (Zeile 1452) | Früher Toast/Return | **keine** |
+| Multi-Speaker | `useProfessionalSrs` | `useProfessionalSrs` | **keine** |
 
-## Fixture-Vergleich: heute vs. `isLipSyncIntentional()`
+## Umsetzung (freigegeben)
 
-Die Fixture-Matrix umfasst 45 Kombinationen aus `lipSyncWithVoiceover`, `dialogMode` und `engineOverride`.
+### Codeänderung — nur das Intent-Fragment
 
-### False Positives (heute true, SSoT false)
+`SceneDialogStudio.tsx:1463-1468`:
 
-**Keine.** Die heutige Bedingung prüft nur `cinematic-sync` oder `lipSyncWithVoiceover === true`. `isLipSyncIntentional()` erkennt dieselben Fälle plus weitere Opt-in-Signale — sie ist also **breiter**, nicht enger.
+```ts
+const forceCinematicSync =
+  blocks.length === 1 &&
+  allHavePortraits &&
+  (isLipSyncIntentional(scene as any) || buttonIntendsLipSync);
+```
 
-### False Negatives (heute false, SSoT true)
+Alle anderen Teile bleiben Zeichen für Zeichen unverändert: `blocks.length === 1`, `allHavePortraits`, `buttonIntendsLipSync`, die nachfolgende `if (!forceCinematicSync && ...)`-Verzweigung, alle Portrait-Guards und Toasts.
 
-| Auslöser | Beispiel-Fixture | Bedeutung für Routing |
-|----------|------------------|----------------------|
-| `dialogMode === true` ohne Toggle/Engine | `L<u>-D<t>-E<u>` | Würde nach SSoT Cinematic-Sync erzwingen. |
-| `engineOverride === 'sync-segments'` | `L<u>-D<f>-E<ss>` | Würde nach SSoT Cinematic-Sync erzwingen. |
-| `engineOverride === 'native-dialogue'` | `L<u>-D<f>-E<nd>` | Würde nach SSoT Cinematic-Sync erzwingen. |
+### Testvertrag — sauber getrennt
 
-**Aber:** Für Single-Speaker-Szenen mit Portraits macht `buttonIntendsLipSync` diese Unterschiede praktisch irrelevant — die Szenen landen ohnehin im Cinematic-Sync-Pfad. Für alle anderen Fälle (kein Portrait, Multi-Speaker) greift `forceCinematicSync` gar nicht.
+Zwei unterschiedliche Charakterisierungen, die nicht vermischt werden:
 
-## Provider-/Routing-Auswirkung
+1. **Intent-Fragment** (`dialogstudio-force-cinematic`): nach der Umstellung `exact` gegenüber `isLipSyncIntentional()`. Das Fixture-Prädikat in `lipSyncIntentGates.ts` wird auf `ssot(s)` gesetzt, die Parity-Erwartung in `lipSyncIntentGateParity.test.ts` auf `exact`.
 
-| Szenario | Heute | Nach `isLipSyncIntentional()` | Routing-Änderung? |
-|----------|-------|------------------------------|-------------------|
-| Single-Speaker + Portraits | Cinematic-Sync (via `buttonIntendsLipSync`) | Cinematic-Sync (via `buttonIntendsLipSync`) | **Nein** |
-| Single-Speaker + `engineOverride='sync-segments'` | Cinematic-Sync (via `buttonIntendsLipSync`) | Cinematic-Sync (via `buttonIntendsLipSync` oder SSoT) | **Nein** |
-| Single-Speaker + `dialogMode=true` | Cinematic-Sync (via `buttonIntendsLipSync`) | Cinematic-Sync (via `buttonIntendsLipSync` oder SSoT) | **Nein** |
-| Single-Speaker ohne Portraits | Früher Toast/Return | Früher Toast/Return | **Nein** |
-| Multi-Speaker | Routing via `useProfessionalSrs` | Routing via `useProfessionalSrs` | **Nein** |
+2. **Gesamtes Routing-Gate** `forceCinematicSync`: bleibt **bewusst nicht** SSoT-paritätisch, weil `buttonIntendsLipSync` zusätzlich routet. Wird im 19-Gate-Bericht ausdrücklich als solches vermerkt — nicht als „exact" für das vollständige Gate.
 
-## Fazit
+Der Berichtstext in `docs/v430-1-intent-gate-parity.md` bekommt für Gate 9 eine Fußnote, die diese Trennung festhält.
 
-Eine Umstellung des Intent-Anteils von Gate 9 auf `isLipSyncIntentional()` wäre aus **Provider-/Routing-Sicht heute eine No-Op-Änderung**. Das tatsächliche Routing wird von `buttonIntendsLipSync` dominiert, das für alle erreichbaren Single-Speaker-Fälle bereits true ist.
+### Regressionstest (neu)
 
-### Empfehlung
+Neue Test-Datei mit der Routing-Matrix als reine Prädikat-Nachbildung von `forceCinematicSync`:
 
-Trotzdem **empfohlen**, den Intent-Anteil auf `isLipSyncIntentional()` umzustellen:
+| Fall | Erwartetes Routing |
+|------|--------------------|
+| 1 Sprecher + Portrait + Toggle AUS | `forceCinematicSync === true` (via `buttonIntendsLipSync`) |
+| 1 Sprecher + Portrait + `sync-segments` | `forceCinematicSync === true` |
+| 1 Sprecher + Portrait + `dialogMode` | `forceCinematicSync === true` |
+| 1 Sprecher ohne Portrait | früher Guard/Return, Gate nie erreicht |
+| Multi-Speaker (≥2 Blöcke) | `forceCinematicSync === false`, Routing via `useProfessionalSrs` |
 
-1. **Robustheit:** Falls `buttonIntendsLipSync` in Zukunft entfernt oder eingeschränkt wird, verhindert die SSoT, dass `sync-segments`, `native-dialogue` oder `dialogMode` versehentlich in den Inline-VO-Pfad rutschen.
-2. **Vertragstreue:** `cinematic-sync`, `sync-segments` und `native-dialogue` sind allesamt Lip-Sync-Engines und sollten konsistent behandelt werden.
-3. **Konsistenz:** Alle anderen Display-/Routing-Gates (7, 10-13, 15, 17, 8, 18) wurden bereits auf die SSoT umgestellt.
+Der Test prüft die Matrix **vor und nach** der Umstellung identisch — er ist der Beweis für die No-Op-Eigenschaft.
 
-### Keine Codeänderung in diesem Schritt
+### Scanner-Allowlist
 
-Dieser Bericht ist rein analytisch. Umsetzung von Gate 9 erst nach deiner Freigabe.
+`lipSyncIntentGateScanner.test.ts`: der direkte Intent-Read in `SceneDialogStudio.tsx` entfällt an dieser Stelle; die erwartete Anzahl direkter Gates in dieser Datei wird von 3 auf 1 reduziert (Gate 9 verschwindet, `native-dialogue`-Prompt-Modus bleibt unberührt, da in `SceneCard.tsx`).
+
+## Verifikation
+
+1. `bunx tsgo --noEmit`
+2. Composer-Suite (`src/lib/video-composer`, `src/lib/composer`) — aktuell 512 grün, danach + neue Routing-Matrix-Tests
+3. Parity-Bericht regenerieren: 10/19 Gates `exact`
+4. UI-Smoke: Scene Dialog Studio öffnen, Single-Speaker-Dialog mit Portrait — Routing unverändert
+
+## Danach
+
+v430.1 ist funktional abgeschlossen. Die verbleibenden zehn Gates (1-6, 14, 16, 19) bleiben bewusst dialoggebunden und eingefroren.
