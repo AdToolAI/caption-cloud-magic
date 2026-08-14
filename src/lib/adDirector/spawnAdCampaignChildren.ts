@@ -13,13 +13,13 @@
 import { supabase } from '@/integrations/supabase/client';
 import { buildCutdown, type CutdownType } from './buildCutdowns';
 import type {
-import { cutStyleToRow } from "@/lib/video-composer/cutStyle";
   AdCampaignMeta,
   ComposerScene,
   AssemblyConfig,
   ComposerBriefing,
   AspectRatio,
 } from '@/types/video-composer';
+import { cutStyleToRow } from "@/lib/video-composer/cutStyle";
 
 export interface SpawnInput {
   masterProjectId: string;
