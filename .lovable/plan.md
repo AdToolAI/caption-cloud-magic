@@ -45,14 +45,15 @@ Heute liegen die Szenen-Operationen verstreut in `SceneCard.tsx` (u. a. `reset-l
 - Eine Komponente `SceneStatusBadge.tsx` plus eine Label-Projektion `sceneStatusLabel(state, substate)` als einzige Quelle für Szenen-Badges.
 - Konsumenten: `SceneCard.tsx`/`SceneClipProgress.tsx`, Render-Queue-Ansicht und `RenderPipelinePanel.tsx` — statt drei eigener Label-Tabellen.
 - Debug-Zeile (Rohzustand + Fehlercode) bleibt in allen dreien identisch verfügbar.
+- Test der Projektion über **alle** States und Substates, inklusive der dynamischen Substates: interne Begriffe wie `syncso_*`, `twoshot_*` dürfen im normalen UI nicht wieder auftauchen (nur in Debug/Details).
 
 ## Tests und Abschluss
 
-- Neue Unit-Tests: `cutStyle`-Mapping, `sceneStatusLabel`-Projektion über alle States/Substates, Sichtbarkeitsregeln der Szenenaktionen.
+- Neue Unit-Tests: Sichtbarkeitsregeln der Szenenaktionen (6.1), `cutStyle`-Round-Trip pro Mapping-Grenze (6.2), Fehlercode-Projektion inkl. Fallback (6.3), `sceneStatusLabel` über alle States/Substates (6.5).
 - Bestehende Suites: `bunx vitest run src/lib/composer src/hooks src/components` inkl. Contract-Scanner, dazu `tsgo`.
 - UI-Smoke-Test im Preview (Motion Studio: Szenenkarte, Aktionen-Menü, Render-Queue, Pipeline-Panel).
 - Nach 6.5 und grünen Tests: STOP mit Bericht. Lip-Sync-Writer-Migration und Reverse-Bridge-Abschaltung bleiben v431.
 
 ## Vorgehen
 
-6.1 → Bericht → 6.2 → Bericht → 6.3 → Bericht → 6.4 → Bericht → 6.5 → Tests → STOP.
+Nur 6.1 implementieren → testen → Bericht → STOP. 6.2 startet erst nach separater Freigabe; danach 6.3 → 6.4 → 6.5, jeweils einzeln mit Bericht.
