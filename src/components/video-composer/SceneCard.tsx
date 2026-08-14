@@ -93,6 +93,7 @@ import {
 } from "@/lib/motion-studio/mentionParser";
 import { composePromptLayers } from "@/lib/motion-studio/composePromptLayers";
 import { markLipSyncPending, clearLipSyncPending, markDialogModePending, clearDialogModePending, markEngineOverridePending, clearEngineOverridePending } from "@/lib/video-composer/lipSyncPending";
+import { isLipSyncIntentional } from "@/lib/video-composer/lipSyncIntent";
 import { sceneFeaturesCharacter } from "@/lib/motion-studio/sceneFeaturesCharacter";
 import {
   useBrandCharacters,
