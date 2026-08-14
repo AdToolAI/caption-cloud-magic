@@ -52,6 +52,12 @@ const REGENERATE_VOICE: TriText = {
 interface Entry {
   headline: TriText;
   hint?: TriText;
+  /**
+   * Wenn true, gilt der Code auch, wenn er als abgegrenztes Token irgendwo im Rohtext steht
+   * (z. B. `... failed: InputImageSensitiveContentDetected ...`). Es wird ausschließlich der
+   * exakte Code gesucht — keine Freitext-Heuristik.
+   */
+  token?: boolean;
 }
 
 /**
@@ -214,24 +220,54 @@ const PREFIX_CODES: Array<[string, Entry]> = [
     hint: RERENDER_FULL,
   }],
   ['modelark_real_person_anchor_rejected', {
+    token: true,
     headline: { de: 'Das Video-Modell hat das Ausgangsbild abgelehnt, weil darin reale Personen erkannt wurden.', en: 'The video model rejected the reference image because real people were detected in it.', es: 'El modelo de video rechazó la imagen de referencia porque detectó personas reales.' },
     hint: RERENDER_FULL,
   }],
   ['modelark_input_images_rejected', {
+    token: true,
     headline: { de: 'Das Video-Modell hat das Eingabebild abgelehnt.', en: 'The video model rejected the input image.', es: 'El modelo de video rechazó la imagen de entrada.' },
     hint: { de: 'Bitte ein anderes, zulässiges Motiv verwenden.', en: 'Please use a different, permitted visual.', es: 'Usa otra imagen permitida.' },
   }],
   ['prompt_repair_exhausted', {
+    token: true,
     headline: { de: 'Der Inhaltsfilter des Video-Modells hat die Szenenbeschreibung abgelehnt — auch der automatisch entschärfte Text wurde blockiert. Die Credits wurden zurückerstattet.', en: 'The video model content filter rejected the scene description — the automatically softened text was blocked too. Your credits were refunded.', es: 'El filtro de contenido del modelo rechazó la descripción de la escena — el texto suavizado también fue bloqueado. Se reembolsaron tus créditos.' },
     hint: { de: 'Bitte die Beschreibung kürzen oder ein anderes Video-Modell wählen.', en: 'Please shorten the description or choose a different video model.', es: 'Acorta la descripción o elige otro modelo de video.' },
   }],
   ['invalid_prompt_rejected', {
+    token: true,
     headline: { de: 'Der Inhaltsfilter des Video-Modells hat die Szenenbeschreibung abgelehnt. Die Credits wurden zurückerstattet.', en: 'The video model content filter rejected the scene description. Your credits were refunded.', es: 'El filtro de contenido del modelo rechazó la descripción de la escena. Se reembolsaron tus créditos.' },
     hint: { de: 'Bitte die Beschreibung anpassen oder ein anderes Video-Modell wählen.', en: 'Please adjust the description or choose a different video model.', es: 'Ajusta la descripción o elige otro modelo de video.' },
   }],
   ['green_net_rejected', {
+    token: true,
     headline: { de: 'Der Inhaltsfilter des Video-Modells hat die Szenenbeschreibung abgelehnt. Die Credits wurden zurückerstattet.', en: 'The video model content filter rejected the scene description. Your credits were refunded.', es: 'El filtro de contenido del modelo rechazó la descripción de la escena. Se reembolsaron tus créditos.' },
     hint: { de: 'Bitte die Beschreibung anpassen oder ein anderes Video-Modell wählen.', en: 'Please adjust the description or choose a different video model.', es: 'Ajusta la descripción o elige otro modelo de video.' },
+  }],
+  ['InputImageSensitiveContentDetected', {
+    token: true,
+    headline: { de: 'Das Video-Modell hat das Eingabebild wegen seines Inhalts abgelehnt.', en: 'The video model rejected the input image because of its content.', es: 'El modelo de video rechazó la imagen de entrada por su contenido.' },
+    hint: { de: 'Bitte ein anderes, zulässiges Motiv verwenden.', en: 'Please use a different, permitted visual.', es: 'Usa otra imagen permitida.' },
+  }],
+  ['SensitiveContentDetected', {
+    token: true,
+    headline: { de: 'Das Video-Modell hat das Material wegen seines Inhalts abgelehnt.', en: 'The video model rejected the material because of its content.', es: 'El modelo de video rechazó el material por su contenido.' },
+    hint: { de: 'Bitte Beschreibung oder Motiv anpassen.', en: 'Please adjust the description or the visual.', es: 'Ajusta la descripción o la imagen.' },
+  }],
+  ['PrivacyInformation', {
+    token: true,
+    headline: { de: 'Das Video-Modell hat das Bild aus Datenschutzgründen abgelehnt.', en: 'The video model rejected the image for privacy reasons.', es: 'El modelo de video rechazó la imagen por motivos de privacidad.' },
+    hint: { de: 'Bitte ein anderes, zulässiges Motiv verwenden.', en: 'Please use a different, permitted visual.', es: 'Usa otra imagen permitida.' },
+  }],
+  ['DataInspectionFailed', {
+    token: true,
+    headline: { de: 'Der Inhaltsfilter des Video-Modells hat die Szene abgelehnt.', en: 'The video model content filter rejected the scene.', es: 'El filtro de contenido del modelo rechazó la escena.' },
+    hint: { de: 'Bitte Beschreibung oder Motiv anpassen.', en: 'Please adjust the description or the visual.', es: 'Ajusta la descripción o la imagen.' },
+  }],
+  ['InvalidParameter', {
+    token: true,
+    headline: { de: 'Das Video-Modell hat die Anfrage abgelehnt.', en: 'The video model rejected the request.', es: 'El modelo de video rechazó la solicitud.' },
+    hint: RERENDER_FULL,
   }],
 ];
 
@@ -300,7 +336,10 @@ export function presentSceneError(rawInput: string | null | undefined): SceneErr
   }
 
   for (const [prefix, e] of PREFIX_CODES) {
-    if (raw.startsWith(prefix)) {
+    const matches = e.token
+      ? new RegExp(`(^|[^a-z0-9_])${prefix}([^a-z0-9_]|$)`, 'i').test(raw)
+      : raw.startsWith(prefix);
+    if (matches) {
       return { kind: 'known', code: prefix.replace(/[:_]$/, ''), headline: e.headline, hint: e.hint, autoRetryHint, raw };
     }
   }
