@@ -59,6 +59,16 @@ Folge bei `reset-lipsync-scene`: `lip_sync_status='pending'` ist genau der Zusta
 danach weiterhin das lip-gesyncte Video, behauptet aber „kein Lip-Sync“. Das ist kein
 Vollreset, sondern ein inkonsistenter Mischzustand.
 
+### C) Direkte Antwort auf die fünf offenen Punkte
+
+1. **`lip_sync_applied_at != NULL`** — siehe Tabelle B: `cancel-dialog-lipsync(reset:true)` schreibt heute **gar nichts** und meldet `skipped:"already_applied"`. Der Button wäre also für angewandte Szenen wirkungslos, wenn man ohne weitere Änderung umroutet.
+2. **Credits / Reservations** — SceneCard: nie. `cancel-dialog-lipsync`: nie (auch im nicht-angewandten Fall kein Refund). `reset-lipsync-scene`: Refund nur im nicht-angewandten Fall über `failLipSync()` (`dialog_shots.cost_credits` → `wallets`, idempotent über `dialog_shots.refunded`); mit `force:true` auf angewandter Szene wird der Refund-Zweig übersprungen. `composer_run_reservations` wird von **keinem** der drei Pfade angefasst — offene Reservierungen bleiben bis zum regulären Settle/Ablauf stehen.
+3. **Ursprung von `already_applied`** — siehe Abschnitt 3: Schutz von fertigem Ergebnis **und** Refund, keine Pipeline-Invariante.
+4. **Output-Rückstellung bei `reset:true`** — **Nein.** `cancel-dialog-lipsync` kennt `materializeCompatibilityOutput` nicht und fasst `base_video_url` / `processed_video_url` / `clip_url` in keinem Zweig an. Selbst wenn man `already_applied` überspringt, bliebe das lip-gesynctes Ergebnis in `clip_url` stehen. Die Output-Rückstellung muss also **explizit ergänzt** werden (Punkt 5.1) — sie fällt nicht durch das Überspringen des Guards von allein an.
+5. **Alte Jobs / Callbacks nach dem Reset** — `reset:true` nullt `dialog_shots`; der Sync.so-Webhook findet seine Szene über die Job-IDs in `dialog_shots.passes[]` und läuft danach in `no_scene_match`, kann also kein Ergebnis zurückschreiben. Das ist aber eine *Nebenwirkung*, keine Run-Absicherung: `active_run_id` und `plate_generation` bleiben unverändert, der v427-Callback-Guard sieht denselben Lauf weiter als gültig. Für echte Run-Sicherheit muss der Reset-Zweig `plate_generation` erhöhen (Punkt 5.1). Job-Cancel und Lock laufen im nicht-angewandten Fall sauber; im angewandten Fall sind ohnehin keine Jobs offen.
+
+**Fazit zur Leitfrage:** `reset:true` räumt nach Überspringen von `already_applied` **noch nicht** vollständig und run-sicher auf — Statusfelder und Locks ja, finaler Output und Generations-Fencing nein. Die Freigabe des Guard-Übersprungs sollte deshalb an die beiden Ergänzungen in 5.1 gekoppelt werden.
+
 ## 3. Warum es `already_applied` gibt
 
 Der Guard steht an drei Stellen mit derselben Begründung im Code:
