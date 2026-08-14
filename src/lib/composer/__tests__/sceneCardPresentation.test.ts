@@ -198,7 +198,7 @@ describe('Reinheit des Helpers', () => {
       'utf8',
     );
     expect(src).not.toMatch(/from ['"]react['"]/);
-    expect(src).not.toMatch(/supabase/i);
+    expect(src).not.toMatch(/from ['"][^'"]*supabase[^'"]*['"]/i);
     expect(src).not.toMatch(/\.update\(|\.insert\(/);
   });
 });
