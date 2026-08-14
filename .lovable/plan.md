@@ -17,8 +17,10 @@ _write_id            text      NOT NULL     -- stabile semantische Write-ID
 _from                composer_scene_state[] DEFAULT NULL
 _detail              text      DEFAULT NULL
 _substate            text      DEFAULT NULL
+_error_text          text      DEFAULT NULL
 _clear_detail        boolean   DEFAULT false
 _clear_substate      boolean   DEFAULT false
+_clear_error         boolean   DEFAULT false
 RETURNS TABLE(applied boolean, state composer_scene_state, substate text, reason text, path composer_scene_state[])
 ```
 
@@ -31,7 +33,7 @@ RETURNS TABLE(applied boolean, state composer_scene_state, substate text, reason
 
 `pipeline_state_run_id`: bei `run_bound` = `_run_id`; bei `runless` **explizit `NULL`**. Kein `COALESCE(_run_id, active_run_id)` mehr.
 
-Detail/Substate: `_clear_detail`/`_clear_substate` setzen explizit auf NULL; ohne sie gilt weiter `COALESCE`. Zustand, Detail und Substate werden in genau einem `UPDATE` geschrieben — Fehlertext und Zustand sind damit atomar.
+Detail/Substate/Fehlertext: `_error_text` schreibt das Fehlertextfeld der Szene, `_clear_detail`/`_clear_substate`/`_clear_error` setzen das jeweilige Feld explizit auf NULL; ohne sie gilt weiter `COALESCE`. Zielzustand, Detail, Substate und Fehlertext werden in genau einem `UPDATE` geschrieben — damit ist „State + Error atomar" tatsächlich implementierbar, und `failSceneState()` braucht keinen zweiten Write mehr.
 
 ## 2. Atomarer Pfad statt v391-Loop
 
@@ -42,7 +44,7 @@ Der Client-Loop in `_shared/scene-state.ts:352-371` entfällt ersatzlos. Die Pfa
 3. Direkte Kante in `composer_scene_transitions`? → anwenden.
 4. Sonst: `WITH RECURSIVE` über `composer_scene_transitions` den kürzesten Pfad `current → _to` suchen, **eingeschränkt auf die Vorwärtsordnung der linearen Kette** (`idle, plate_queued, plate_rendering, plate_ready, audio_prep, audio_ready, lipsync_dispatched, lipsync_running, lipsync_muxing, complete`). Kanten nach `failed`, `canceled`, `idle` sowie Self-Kanten sind als Pfad-Zwischenschritte ausgeschlossen; Suchtiefe hart begrenzt.
 5. Kein Pfad → `transition_not_allowed`, nichts geschrieben.
-6. Pfad gefunden → **ein** `UPDATE` auf den Zielzustand, plus eine Audit-Zeile je logischem Zwischenschritt, alles in derselben Transaktion. `path` kommt im Result zurück.
+6. Pfad gefunden → **ein** `UPDATE` auf den Zielzustand, plus **eine Audit-Zeile je traversierter Kante** (also inklusive der letzten Kante auf `_to`), alles in derselben Transaktion. Für einen Pfad mit n Kanten entstehen exakt n Audit-Zeilen mit `step_index = 1..n`; `is_intermediate = true` für `step_index < n`, `false` für die letzte Zeile. `path` kommt im Result zurück.
 
 Damit werden folgende Kanten **nicht** zusätzlich in die Allowlist aufgenommen: `plate_ready→audio_ready`, `plate_ready→lipsync_dispatched|lipsync_running|lipsync_muxing`, `audio_prep→lipsync_dispatched|lipsync_running|lipsync_muxing`, `audio_ready→lipsync_running|lipsync_muxing`. Die Allowlist behält ausschließlich echte Einzelschrittkanten.
 
@@ -60,15 +62,24 @@ RLS an, `service_role` voll, `authenticated` nur lesend auf eigene Projekte, kei
 
 ## 5. Compatibility-Wrapper
 
-`composer_scene_transition/6` und `/7` bleiben bestehen, kein Drop in G0. Beide werden zu dünnen Wrappern, die auf den neuen Kern delegieren mit `_guard_mode := CASE WHEN _run_id IS NOT NULL THEN 'run_bound' ELSE 'runless' END`, `_runless_reason := 'system_migration'`, `_write_id := 'legacy_wrapper'`, und die jeden Aufruf mit `source_signature = 'legacy_6'|'legacy_7'` plus Caller-Rolle in den Audit-Log schreiben. Erst wenn dieser Log über ein Beobachtungsfenster keine Fremdaufrufe zeigt, ist ein Drop in G6 begründbar.
+`composer_scene_transition/6` und `/7` bleiben bestehen, kein Drop in G0. Sie sind die einzige kontrollierte Compatibility-Grenze während des Beobachtungsfensters:
+
+- Der neue Kern `composer_scene_transition_v2` ist **nur für `service_role`** ausführbar (`REVOKE EXECUTE FROM public, anon, authenticated`). Die Wrapper sind `SECURITY DEFINER` und behalten die heutige Aufrufbarkeit für `authenticated`.
+- Die Wrapper delegieren mit `source_signature = 'legacy_6'|'legacy_7'` und `_write_id = 'legacy_wrapper_6'|'legacy_wrapper_7'`.
+- Ein Wrapper-Aufruf **mit** `_run_id` läuft als `run_bound` — unverändert.
+- Ein Wrapper-Aufruf **ohne** `_run_id` ist **kein** genereller Runless-Freifahrtschein. `system_migration` ist ausschließlich in Kombination mit einer expliziten DB-seitigen Grandfather-Allowlist gültig, die auf `(source_signature, write_id, from_state, to_state)` matcht. Nur die dort eingetragenen Kantenpaare dürfen run-blind ausgeführt werden; jede andere Kante wird mit `reason = 'runless_not_grandfathered'` abgelehnt und trotzdem auditiert.
+- Die Allowlist wird beim Migrationsschreiben aus dem bestehenden Inventar (`docs/v431-prep-inventory.md`) befüllt, ist eine eigene Tabelle `public.composer_transition_grandfather` (service_role only) und schrumpft mit jeder Gruppe G1–G5, bis sie in G6 leer ist.
+- Erst wenn der Audit-Log über ein Beobachtungsfenster keine Fremdaufrufe zeigt **und** die Allowlist leer ist, ist ein Drop in G6 begründbar.
 
 ## 6. Recovery-Primitive
 
 `public.composer_recover_scene(_scene_id, _expected_run_id uuid, _expected_plate_generation int, _to composer_scene_state, _reason text, _write_id text)`:
 - Zielzustand nur `failed` oder `canceled`.
-- `_reason` aus geschlossener Menge (`watchdog_timeout`, `stuck_clip_recovery`, `orphaned_job`, `manual_admin`).
-- Stimmt `active_run_id`/`plate_generation` nicht mit den Erwartungswerten überein, ist der Aufruf ein **No-op** mit `reason = 'stale_recovery'` — kein Force-Write.
-- Jeder Aufruf, auch der No-op, erzeugt eine Audit-Zeile mit `source_signature = 'recovery'`.
+- `_reason` aus geschlossener Menge (`watchdog_timeout`, `stuck_clip_recovery`, `orphaned_job`, `orphaned_run`, `manual_admin`).
+- **`_expected_plate_generation` ist immer Pflicht** und wird immer verglichen — auch beim orphaned Recovery. Stimmt sie nicht, ist der Aufruf ein No-op mit `reason = 'stale_generation'`. Recovery bleibt damit ausnahmslos generationsgebunden.
+- **`_expected_run_id` darf ausschließlich bei `_reason = 'orphaned_run'` NULL sein.** In diesem Fall verlangt die DB unter dem Row Lock zusätzlich `active_run_id IS NULL`; ist dort ein Run gesetzt, ist der Aufruf ein No-op mit `reason = 'run_reappeared'`. Bei jedem anderen Grund ist `_expected_run_id` NULL ein harter Fehler (`expected_run_id_required`).
+- Bei gesetztem `_expected_run_id`: stimmt `active_run_id` nicht überein, No-op mit `reason = 'stale_recovery'` — kein Force-Write.
+- Jeder Aufruf, auch jeder No-op, erzeugt eine Audit-Zeile mit `source_signature = 'recovery'` inkl. `reason`.
 - Nur `service_role`.
 
 ## 7. `failSceneState()`
@@ -93,17 +104,19 @@ Bleibt in G0 unverändert und wird **nicht** in die permanente Runless-Allowlist
 
 - **Contract-Test Guard-Modi**: jeder Aufruf des neuen Kerns liefert `guard_mode` und `write_id`; `runless` nur mit Grund aus der geschlossenen Menge; `runless` in Webhook-/Watchdog-Dateien verboten.
 - **Race-Test Run-Guard**: Run A startet, Run B startet, Cancel für A darf B nicht terminal setzen. Zusätzlich zwei konkurrierende Transitionen auf dieselbe Szene — genau eine gewinnt, die andere liefert `stale_run`/`stale_generation`.
-- **Pfad-Atomizität**: `plate_ready → lipsync_running` erzeugt genau ein `UPDATE`, drei Audit-Zeilen und keinen sichtbaren Zwischenzustand; ein Abbruch mittendrin lässt die Szene auf dem Ausgangszustand.
+- **Pfad-Atomizität**: `plate_ready → lipsync_running` läuft über vier Kanten (`plate_ready→audio_prep→audio_ready→lipsync_dispatched→lipsync_running`) und erzeugt genau ein `UPDATE` und **genau vier** Audit-Zeilen (`step_index` 1–4, die letzte mit `is_intermediate = false`) sowie keinen sichtbaren Zwischenzustand; ein Abbruch mittendrin lässt die Szene auf dem Ausgangszustand.
+- **State + Error atomar**: ein `failed`-Übergang mit `_error_text` schreibt Zustand und Fehlertext in einem `UPDATE`; ein Folgeübergang mit `_clear_error` leert ihn.
 - **`pipeline_state_run_id`**: nach `runless` exakt NULL, nach `run_bound` exakt `_run_id`.
-- **Grants**: `has_function_privilege('anon', …, 'EXECUTE')` ist auf allen drei Funktionen `false`; anon-Aufruf über die Data API liefert `forbidden`.
+- **Grants**: `has_function_privilege('anon', …, 'EXECUTE')` ist auf allen drei Funktionen `false`; `authenticated` hat auf `composer_scene_transition_v2` kein EXECUTE; anon-Aufruf über die Data API liefert `forbidden`.
+- **Wrapper-Grandfathering**: ein run-loser Wrapper-Aufruf auf einer gelisteten Kante wird angewendet; derselbe Aufruf auf einer nicht gelisteten, aber state-machine-legalen Kante wird mit `runless_not_grandfathered` abgelehnt und auditiert.
 - **Wrapper-Telemetrie**: Aufruf über 6er und 7er erzeugt je eine Audit-Zeile mit korrekter `source_signature`.
-- **Recovery**: stale Erwartungswerte ⇒ No-op + Audit-Zeile; passende Werte ⇒ Übergang + Audit-Zeile.
+- **Recovery**: stale Run oder stale Generation ⇒ No-op + Audit-Zeile; `orphaned_run` mit `_expected_run_id = NULL` bei tatsächlich NULLem `active_run_id` ⇒ Übergang, bei wieder gesetztem Run ⇒ `run_reappeared`-No-op; `_expected_run_id = NULL` mit anderem Grund ⇒ harter Fehler.
 - Bestehende Composer-Suite und `tsgo` müssen grün bleiben; die Lip-Sync-Frozen-Contract-Tests dürfen sich nicht bewegen.
 
 ## 11. Reihenfolge und Abschluss
 
-1. Migration: Audit-Tabelle + Grants.
-2. Migration: neuer Kern, Pfadvalidierung, Recovery-Primitive, Revoke/Ownership-Fix, Wrapper-Umbau.
+1. Migration: Audit-Tabelle `composer_scene_transition_log` + Grandfather-Tabelle `composer_transition_grandfather` + Grants.
+2. Migration: neuer Kern (inkl. `_error_text`/`_clear_error`), Pfadvalidierung, Recovery-Primitive, Revoke/Ownership-Fix, Wrapper-Umbau auf die Grandfather-Allowlist.
 3. `_shared/scene-state.ts`: v391-Loop entfernen, `guardMode`/`writeId` als Pflichtparameter, `failSceneState()` härten.
 4. Nur die zwei Cancel-Functions auf den neuen Vertrag heben (das ist Teil des Cancel-Vertrags, nicht G1).
 5. Tests, Deployment, Race-Nachweis, Bericht.
