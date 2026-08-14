@@ -149,6 +149,26 @@ DB-Primitive mit `FOR UPDATE`, Run-, Generations- und From-State-Guard.
 Spiegel und ohne Output zulässig. Damit kann die bis G6 aktive Reverse-Bridge
 keinen Zwischenzustand spiegeln.
 
+## Regel: Primitive sind keine State-Machine-Nebenstraße
+
+`composer_finalize_talking_head` und `composer_fail_scene_with_mirrors` sind
+Ausführungs-Primitive, keine eigene Zustandslogik:
+
+- Unter demselben Row Lock prüfen sie zusätzlich die
+  `composer_scene_transitions`-Zulässigkeit (From→To) exakt wie der G0-Core.
+  Ein `UPDATE pipeline_state = ...` allein, weil Run und Generation stimmen,
+  ist unzulässig — Run-Sicherheit **und** Transition-Legalität müssen gelten.
+- Jede angewandte Transition wird im bestehenden Transition-Audit protokolliert:
+  `write_id`, `source_signature`, Run, Generation, From, To, Ergebnis.
+- `composer_finalize_talking_head` hat einen **geschlossenen** Modus-Satz:
+  `start` (→ `plate_rendering`), `complete` (`plate_rendering` → `plate_ready`),
+  `fail` (→ `failed`). Keine frei übergebbaren Zielstates, keine
+  Modi-Erweiterung ohne neue Freigabe.
+- Illegale Transition = `applied = false` mit Grund `illegal_transition`,
+  kein Teil-Write.
+
+
+
 ## Umsetzungsreihenfolge nach GO
 
 1. Migration:
