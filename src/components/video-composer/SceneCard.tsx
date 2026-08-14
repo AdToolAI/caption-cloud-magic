@@ -2430,9 +2430,11 @@ export default function SceneCard({
                           const reason = data.reason ?? "reset_failed";
                           if (reason === "stale_reset") {
                             await recoverFromStaleReset(scene.id, onUpdate as any);
-                            throw new Error(
+                            const staleErr: any = new Error(
                               tx({ de: "Die Szene wurde zwischenzeitlich neu gestartet. Die Ansicht wurde aktualisiert.", en: "The scene was restarted in the meantime. The view has been refreshed.", es: "La escena se reinició mientras tanto. La vista se ha actualizado." }),
                             );
+                            staleErr.__staleResetHandled = true;
+                            throw staleErr;
                           }
                           throw new Error(
                             tx({ de: "Der Reset konnte nicht durchgeführt werden.", en: "The reset could not be performed.", es: "No se pudo realizar el restablecimiento." }),
