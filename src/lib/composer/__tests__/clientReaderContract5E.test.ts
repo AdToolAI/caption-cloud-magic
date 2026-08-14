@@ -17,9 +17,11 @@
  * update/insert-Payloads) werden bewusst NICHT gemeldet — 5E ändert keine
  * Writer.
  *
- * Ausnahmen ausschliesslich zeilenbezogen über den Marker
- *   // legacy-mapping-allowed: <Grund>
- * am Treffer oder in der Zeile davor.
+ * Ausnahmen ausschliesslich zeilenbezogen über einen der beiden Marker
+ *   // legacy-mapping-allowed: <Grund>   (DB-Zeile -> Client-Modell, Diffs)
+ *   // lipsync-legacy-read: <Grund>      (v425-gebundene Substage-Reads)
+ * am Treffer oder in der Zeile davor. Datei-weite Ausnahmen für Hooks oder
+ * Komponenten sind verboten (siehe Test unten).
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -45,13 +47,20 @@ const SKIP_FILES = new Set([
   'src/lib/composer/sceneState.ts',
   'src/lib/composer/output/resolveSceneOutput.ts',
   'src/lib/composer/continuity/continuityState.ts',
-  // Lip-Sync-Orchestrierung im Client. Sie liest bewusst die
-  // Substage-Rohspalten (Spiegel des Server-`lipsync-watchdog`) und bleibt
-  // nach dem v425-Vertrag semantisch unverändert.
-  'src/hooks/useTwoShotAutoTrigger.ts',
 ]);
 
-const MARKER = 'legacy-mapping-allowed:';
+/** Zeilenbezogene Ausnahme-Marker. Beide brauchen einen Grund. */
+const MARKERS = ['legacy-mapping-allowed:', 'lipsync-legacy-read:'] as const;
+
+/** Trägt die Zeile einen Marker MIT nicht-leerer Begründung? */
+function markerWithReason(line: string): boolean {
+  for (const m of MARKERS) {
+    const idx = line.indexOf(m);
+    if (idx === -1) continue;
+    if (line.slice(idx + m.length).trim().length > 0) return true;
+  }
+  return false;
+}
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -87,7 +96,7 @@ function scanFile(absPath: string): Hit[] {
   const hits: Hit[] = [];
 
   const allowed = (lineIdx: number) =>
-    (lines[lineIdx] ?? '').includes(MARKER) || (lines[lineIdx - 1] ?? '').includes(MARKER);
+    markerWithReason(lines[lineIdx] ?? '') || markerWithReason(lines[lineIdx - 1] ?? '');
 
   const push = (node: ts.Node) => {
     const { line } = sf.getLineAndCharacterOfPosition(node.getStart(sf));
@@ -131,6 +140,38 @@ describe('v430 5E — Client-Reader-Contract', () => {
     const hits = walk(SRC).flatMap(scanFile);
     const report = hits.map((h) => `${h.file}:${h.line}  ${h.text}`).join('\n');
     expect(report, `Direkte Legacy-Reads gefunden:\n${report}`).toBe('');
+  });
+
+  it('erlaubt keine datei-weiten Ausnahmen für Hooks oder Komponenten', () => {
+    const forbidden = [...SKIP_FILES].filter(
+      (f) => f.startsWith('src/hooks/') || f.startsWith('src/components/'),
+    );
+    expect(
+      forbidden,
+      `Datei-weite Allowlist ist verboten — nutze zeilenbezogene Marker:\n${forbidden.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('akzeptiert nur Ausnahme-Marker mit Begründung', () => {
+    expect(markerWithReason('// lipsync-legacy-read: v425-Substage')).toBe(true);
+    expect(markerWithReason('// legacy-mapping-allowed: DB-Zeile -> Modell')).toBe(true);
+    expect(markerWithReason('// lipsync-legacy-read:')).toBe(false);
+    expect(markerWithReason('// legacy-mapping-allowed:   ')).toBe(false);
+    expect(markerWithReason('const a = 1;')).toBe(false);
+  });
+
+  it('jede Ausnahme im Frontend trägt eine Begründung', () => {
+    const bare: string[] = [];
+    for (const abs of walk(SRC)) {
+      const rel = relative(ROOT, abs).split(sep).join('/');
+      readFileSync(abs, 'utf8')
+        .split('\n')
+        .forEach((line, i) => {
+          const hasMarker = MARKERS.some((m) => line.includes(m));
+          if (hasMarker && !markerWithReason(line)) bare.push(`${rel}:${i + 1}`);
+        });
+    }
+    expect(bare, `Ausnahme ohne Begründung:\n${bare.join('\n')}`).toEqual([]);
   });
 
   it('erkennt Legacy-Reads und ignoriert die kanonischen Helfer', () => {
