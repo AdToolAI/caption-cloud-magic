@@ -91,13 +91,12 @@ RLS an, `service_role` voll, `authenticated` nur lesend auf eigene Projekte, kei
 
 `composer_scene_transition/6` und `/7` bleiben bestehen, kein Drop in G0. Sie sind die einzige kontrollierte Compatibility-Grenze während des Beobachtungsfensters:
 
-- Der neue Kern `composer_scene_transition_v2` ist **nur für `service_role`** ausführbar (`REVOKE EXECUTE FROM public, anon, authenticated`). Die Wrapper sind `SECURITY DEFINER` und behalten die heutige Aufrufbarkeit für `authenticated`.
-- Die Wrapper delegieren mit `source_signature = 'legacy_6'|'legacy_7'` und `_write_id = 'legacy_wrapper_6'|'legacy_wrapper_7'`.
-- Ein Wrapper-Aufruf **mit** `_run_id` läuft als `run_bound` — unverändert.
-- Ein Wrapper-Aufruf **ohne** `_run_id` ist **kein** genereller Runless-Freifahrtschein. `system_migration` ist ausschließlich in Kombination mit einer expliziten DB-seitigen Grandfather-Allowlist gültig, die auf `(source_signature, write_id, from_state, to_state)` matcht. Nur die dort eingetragenen Kantenpaare dürfen run-blind ausgeführt werden; jede andere Kante wird mit `reason = 'runless_not_grandfathered'` abgelehnt und trotzdem auditiert.
-- **Partial Guard — kein Fallback auf runless.** Die Wrapper wählen `run_bound` **nicht** allein anhand `_run_id IS NOT NULL`, sondern nur wenn `_run_id` **und** `_generation` gesetzt sind. Genau eines von beiden gesetzt ⇒ `reason = 'guard_args_missing'`, **kein Write**, Audit-Zeile. Weder `_run_id` ohne `_generation` noch `_generation` ohne `_run_id` darf jemals in den runless-Pfad fallen. Beides NULL ⇒ runless-Pfad mit Grandfather-Prüfung.
-- Ein Wrapper-Aufruf **ohne** beide Guard-Argumente durchläuft zusätzlich die Regeln aus 1a und 1b, die Grandfather-Allowlist ist also eine Verschärfung, kein Ersatz.
-- Die Grandfather-Allowlist wird beim Migrationsschreiben aus dem bestehenden Inventar (`docs/v431-prep-inventory.md`) befüllt, ist eine eigene Tabelle `public.composer_transition_grandfather` (service_role only) und schrumpft mit jeder Gruppe G1–G5, bis sie in G6 leer ist.
+- Die öffentliche Fassade `composer_scene_transition_v2` ist **nur für `service_role`** ausführbar (`REVOKE EXECUTE FROM public, anon, authenticated`). Die Wrapper sind `SECURITY DEFINER` und behalten die heutige Aufrufbarkeit für `authenticated`. Beide delegieren an `composer_scene_transition_core` und setzen dort `_source_signature = 'legacy_6'|'legacy_7'` und `_caller_class = 'legacy'` als Literale.
+- Wrapper-Write-IDs: `legacy_wrapper_6` / `legacy_wrapper_7`.
+- Ein Wrapper-Aufruf **mit** `_run_id` **und** `_generation` läuft als `run_bound` — unverändert.
+- **Partial Guard — kein Fallback auf runless.** `run_bound` gilt nur, wenn beide Guard-Argumente gesetzt sind. Genau eines von beiden gesetzt ⇒ `reason = 'guard_args_missing'`, **kein Write**, Audit-Zeile. Weder `_run_id` ohne `_generation` noch `_generation` ohne `_run_id` darf jemals in den runless-Pfad fallen.
+- **Runless-Pfad der Wrapper (strikt getrennt):** beide Guard-Argumente NULL ⇒ `_runless_reason = 'system_migration'`, und geprüft wird **ausschließlich** `public.composer_transition_grandfather` auf `(source_signature, write_id, from_state, to_state)`. Kein Match ⇒ `runless_not_grandfathered`, kein Write, Audit-Zeile. Die Regeln aus 1a gelten für Wrapper **nicht** und `system_migration` erscheint nie in `composer_runless_transition_rules`. Umgekehrt kann ein direkter v2-Aufruf `system_migration` nicht verwenden. Die Prüfung aus 1b (`active_run_id IS NULL`) gilt nur für die drei v2-Gründe.
+- Die Grandfather-Allowlist wird beim Migrationsschreiben aus dem bestehenden Inventar (`docs/v431-prep-inventory.md`) befüllt, ist eine eigene Tabelle (service_role only, RLS an) und schrumpft mit jeder Gruppe G1–G5, bis sie in G6 leer ist.
 - Erst wenn der Audit-Log über ein Beobachtungsfenster keine Fremdaufrufe zeigt **und** die Allowlist leer ist, ist ein Drop in G6 begründbar.
 
 ## 6. Recovery-Primitive
