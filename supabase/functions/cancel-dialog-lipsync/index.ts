@@ -8,8 +8,10 @@
  *  4. `dialog_shots` auf `status='canceled'` setzen, alle nicht-`ready` Shots auf `canceled`.
  *  5. `composer_scenes` setzen:
  *       lip_sync_status='canceled', twoshot_stage=null, clip_error='lipsync_canceled_by_user'
- *  6. Wenn `body.reset === true`: zusätzlich `dialog_shots=null`, `replicate_prediction_id=null`,
- *     `lip_sync_applied_at=null`, sodass der nächste Trigger sauber von vorne startet.
+ *  6. Wenn `body.reset === true`: vollständigen Reset über das atomare SQL-Primitiv
+ *     `composer_reset_lipsync_full`. Dieses bumpt `plate_generation`, stellt die
+ *     Base-Plate wieder her, bereinigt Runtime-Keys in `audio_plan.twoshot` und liefert
+ *     die bekannten Job-IDs zurück, damit wir Sync.so danach canceln können.
  *
  * Spätere Sync.so- oder Remotion-Webhooks erkennen `lip_sync_status='canceled'` bzw.
  * `dialog_shots.status='canceled'` und ack'en, ohne den Lauf wiederzubeleben.
@@ -79,7 +81,10 @@ serve(async (req) => {
       return json({ error: "forbidden" }, 403);
     }
 
-    if (scene.lip_sync_applied_at) {
+    // v431: For reset:true we intentionally skip the already_applied guard and
+    // route through the atomic full-reset primitive. For a plain cancel we keep
+    // the old behavior: do not touch an already-applied scene.
+    if (!reset && scene.lip_sync_applied_at) {
       return json({ ok: true, skipped: "already_applied" });
     }
 
@@ -98,7 +103,95 @@ serve(async (req) => {
     }
 
     try {
-      // Re-read inside the lock to get the freshest snapshot.
+      // v431: Full reset uses the atomic SQL primitive.
+      if (reset) {
+        // Read expected generation/run under the lock for the stale-request guard.
+        const { data: fresh } = await supabase
+          .from("composer_scenes")
+          .select("plate_generation, active_run_id")
+          .eq("id", sceneId)
+          .maybeSingle();
+
+        const expectedGeneration = (fresh as any)?.plate_generation ?? 1;
+        const expectedRunId = (fresh as any)?.active_run_id ?? null;
+
+        const { data: resetResult, error: resetErr } = await supabase.rpc(
+          "composer_reset_lipsync_full",
+          {
+            _scene_id: sceneId,
+            _expected_generation: expectedGeneration,
+            _expected_run_id: expectedRunId,
+          },
+        );
+
+        if (resetErr) {
+          console.error("[cancel-dialog-lipsync] reset primitive failed", resetErr);
+          return json({ error: resetErr.message ?? "reset_failed" }, 500);
+        }
+
+        const r = (resetResult ?? {}) as any;
+        if (r?.ok !== true) {
+          const reason = r?.reason ?? "reset_failed";
+          const status = reason === "stale_reset" ? 409 : 422;
+          return json({ ok: false, reason }, status);
+        }
+
+        const uniqueJobIds: string[] = Array.isArray(r?.canceled_jobs)
+          ? r.canceled_jobs.filter((id: unknown) => typeof id === "string" && id.length > 0)
+          : [];
+
+        // Release inflight slot rows.
+        if (uniqueJobIds.length > 0) {
+          try {
+            await supabase
+              .from("syncso_inflight_jobs")
+              .delete()
+              .in("job_id", uniqueJobIds);
+          } catch (e) {
+            console.warn(
+              `[cancel-dialog-lipsync] inflight cleanup failed: ${(e as Error).message}`,
+            );
+          }
+        }
+
+        // Best-effort: tell Sync.so to stop billing for in-flight jobs.
+        const syncSoKey = Deno.env.get("SYNC_SO_API_KEY") ?? Deno.env.get("SYNCSO_API_KEY");
+        if (syncSoKey && uniqueJobIds.length > 0) {
+          await Promise.all(
+            uniqueJobIds.map((id) =>
+              fetch(`https://api.sync.so/v2/generations/${id}`, {
+                method: "DELETE",
+                headers: { "x-api-key": syncSoKey },
+              })
+                .then((r) =>
+                  console.log(
+                    `[cancel-dialog-lipsync] sync.so DELETE job=${id} → ${r.status}`,
+                  ),
+                )
+                .catch((e) =>
+                  console.warn(
+                    `[cancel-dialog-lipsync] sync.so DELETE job=${id} threw: ${(e as Error).message}`,
+                  ),
+                ),
+            ),
+          );
+        }
+
+        console.log(
+          `[cancel-dialog-lipsync] full-reset scene=${sceneId} user=${userId} jobs=${uniqueJobIds.length} generation=${r?.new_generation}`,
+        );
+
+        return json({
+          ok: true,
+          scene_id: sceneId,
+          canceled_jobs: uniqueJobIds.length,
+          reset: true,
+          new_generation: r?.new_generation,
+          base_restored: r?.base_restored,
+        });
+      }
+
+      // Plain cancel path (unchanged).
       const { data: fresh } = await supabase
         .from("composer_scenes")
         .select("dialog_shots, lip_sync_status, lip_sync_applied_at")
@@ -208,9 +301,7 @@ serve(async (req) => {
         replicate_prediction_id: null,
         updated_at: nowIso,
       };
-      if (reset) {
-        patch.dialog_shots = null;
-      } else if (canceledState) {
+      if (canceledState) {
         patch.dialog_shots = canceledState;
       }
 
