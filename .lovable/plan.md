@@ -128,7 +128,23 @@ Write-IDs: `composer-cancel-scene:cancel-active-run`, `composer-cancel-scene:can
 
 Bleibt in G0 unverändert und wird **nicht** in die permanente Runless-Allowlist aufgenommen. Er wird als Vertragslücke `hybrid-extend-scene:mark-failed-on-error` im Inventar geführt und läuft übergangsweise über `system_migration`, mit Contract-Test-Eintrag „bekannte Debt, Ziel G2: run_bound". In G2 bekommt der Extend-Pfad einen echten Run-Kontext.
 
-## 10. Tests
+## 10. G0.4 — Trigger-/Side-Effect-Audit vor atomarem Pfad (verpflichtend)
+
+Der neue Kern schreibt bei einer Gap-Transition (z.B. `plate_ready → lipsync_running`) nur **ein** `UPDATE` auf den Endzustand; die Zwischenzustände (`audio_prep`, `audio_ready`, `lipsync_dispatched`) landen ausschließlich als Audit-Zeilen. Das ist beabsichtigt, darf aber keine produktiven Side Effects zerstören, die heute auf diese Zwischenzustände als tatsächliche DB-Zeilen reagieren.
+
+Daher **vor Deployment** Pflicht-Audit aller DB-Trigger, Edge-Function-Webhooks, Watchdogs, Cron-Jobs, Realtime-Listener und sonstiger Reaktoren, die auf `composer_scenes.pipeline_state` oder `composer_scenes.pipeline_substate` feuern:
+
+1. Inventarisierung: alle Trigger auf `composer_scenes` (event `UPDATE`/`INSERT`), alle Edge Functions, die `pipeline_state = 'audio_prep'|'audio_ready'|'lipsync_dispatched'` abfragen, alle SQL-Fragments mit diesen Literalen außerhalb des neuen Kerns.
+2. Klassifizierung pro gefundenem Reaktor:
+   - **Endzustand-geeignet**: reagiert nur auf `complete`, `failed`, `canceled` oder liest `path` aus dem RPC-Result — kein Eingriff nötig.
+   - **Zwischenzustand-abhängig, aber Audit-geeignet**: kann auf `composer_scene_transition_log` umgebogen werden (z.B. für Telemetrie oder Fortschrittsbalken) — Umbau in G0.4.
+   - **Zwischenzustand-essentiell**: benötigt zwingend ein sichtbares `UPDATE` auf `audio_prep`/`audio_ready`/`lipsync_dispatched`, um korrekt zu arbeiten (z.B. weil ein externer Worker über `UPDATE`-Notifications geweckt wird und keinen Audit-Log liest).
+3. Entscheidung: falls auch nur **ein** essentieller Reaktor gefunden wird, der ein echtes Zwischenzustands-UPDATE verlangt, ist G0 **zu STOPPen** und zu berichten. In diesem Fall muss der atomare Pfad entweder aufgebrochen oder der Reaktor vorab umgebaut werden — stillschweigendes Semantik-Ändern ist verboten.
+4. Regressionstest: `g04_trigger_side_effect_audit.test.ts` hält die Inventarliste und die Klassifizierung fest. Jeder neue Trigger auf `composer_scenes` muss in diesem Test dokumentiert und als „endzustand-geeignet" oder „audit-geeignet" klassifiziert werden; essentielle Zwischenzustands-Trigger sind im Test als `expected_essential_intermediate_trigger_count = 0` hart codiert.
+
+Dieser Audit ist **kein Vorab-Blocker für die Freigabe**, aber ein **verpflichtender G0-Abschlusstest vor Deployment**.
+
+## 11. Tests
 
 - **Contract-Test Guard-Modi**: jeder Aufruf des neuen Kerns liefert `guard_mode` und `write_id`; `runless` nur mit Grund aus der geschlossenen Menge (`admin_recovery` existiert nicht mehr); `runless` in Webhook-/Watchdog-Dateien verboten.
 - **Runless-Kanten-Allowlist**: ein direkter service_role-v2-Aufruf mit gültigem Grund, aber nicht in `composer_runless_transition_rules` gelisteter Kante ⇒ `runless_edge_not_allowed`, kein Write, Audit-Zeile; gelistete Kante ⇒ angewendet.
@@ -146,14 +162,16 @@ Bleibt in G0 unverändert und wird **nicht** in die permanente Runless-Allowlist
 - **Wrapper-Grandfathering**: ein run-loser Wrapper-Aufruf auf einer gelisteten Kante wird angewendet; derselbe Aufruf auf einer nicht gelisteten, aber state-machine-legalen Kante wird mit `runless_not_grandfathered` abgelehnt und auditiert.
 - **Wrapper-Telemetrie**: Aufruf über 6er und 7er erzeugt je eine Audit-Zeile mit korrekter `source_signature`.
 - **Recovery**: stale Run oder stale Generation ⇒ No-op + Audit-Zeile; `orphaned_run` mit `_expected_run_id = NULL` bei tatsächlich NULLem `active_run_id` ⇒ Übergang, bei wieder gesetztem Run ⇒ `run_reappeared`-No-op; `_expected_run_id = NULL` mit anderem Grund ⇒ harter Fehler.
+- **G0.4 Trigger-Audit**: `g04_trigger_side_effect_audit.test.ts` grün; essentielle Zwischenzustands-Trigger-Count = 0; dokumentierte Audit-/Endzustand-Trigger sind im Test erfasst.
 - Bestehende Composer-Suite und `tsgo` müssen grün bleiben; die Lip-Sync-Frozen-Contract-Tests dürfen sich nicht bewegen.
 
-## 11. Reihenfolge und Abschluss
+## 12. Reihenfolge und Abschluss
 
 1. Migration: Audit-Tabelle `composer_scene_transition_log`, Regel-Tabelle `composer_runless_transition_rules`, Grandfather-Tabelle `composer_transition_grandfather` + Grants + Seed-Zeilen.
 2. Migration: internes `composer_scene_transition_core` (inkl. `_error_text`/`_clear_error`, Claim-basierte Rollenerkennung, 1a/1b-Prüfungen, Pfadvalidierung) plus die drei Fassaden `v2`, `/6`, `/7` mit fixer `source_signature`/`caller_class`; Recovery-Primitive; Revoke/Ownership-Fix; search_path-Härtung.
 3. `_shared/scene-state.ts`: v391-Loop entfernen, `guardMode`/`writeId` als Pflichtparameter, `failSceneState()` härten.
 4. Nur die zwei Cancel-Functions auf den neuen Vertrag heben (das ist Teil des Cancel-Vertrags, nicht G1).
-5. Tests, Deployment, Race-Nachweis, Bericht.
+5. **G0.4**: Trigger-/Side-Effect-Audit durchführen; bei essentiellem Zwischenzustands-Trigger STOP und Bericht, sonst Test `g04_trigger_side_effect_audit.test.ts` einchecken.
+6. Tests, Deployment, Race-Nachweis, Bericht.
 
 Danach STOP. G1 erst nach separater Freigabe. Cast & World bleibt CW1 nach v431.
