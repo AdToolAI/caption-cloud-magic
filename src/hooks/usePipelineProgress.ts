@@ -919,7 +919,7 @@ export function usePipelineProgress({
     if (isCanceledLipsyncScene(s)) return false;
     // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
     if (s.lipSyncStatus === 'running' || s.lipSyncStatus === 'audio_muxing') return true;
-    if (s.engineOverride === 'cinematic-sync' && clipStatusFromState(sceneState(s)) === 'generating') return true;
+    if (isLipSyncIntentional(s) && clipStatusFromState(sceneState(s)) === 'generating') return true;
     // legacy-mapping-allowed: Lip-Sync-Substage
     const stage = s.twoshotStage;
     if (isActiveTwoshotStage(stage)) return true;

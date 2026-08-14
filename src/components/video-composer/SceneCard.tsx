@@ -93,6 +93,7 @@ import {
 } from "@/lib/motion-studio/mentionParser";
 import { composePromptLayers } from "@/lib/motion-studio/composePromptLayers";
 import { markLipSyncPending, clearLipSyncPending, markDialogModePending, clearDialogModePending, markEngineOverridePending, clearEngineOverridePending } from "@/lib/video-composer/lipSyncPending";
+import { isLipSyncIntentional } from "@/lib/video-composer/lipSyncIntent";
 import { sceneFeaturesCharacter } from "@/lib/motion-studio/sceneFeaturesCharacter";
 import {
   useBrandCharacters,
@@ -2382,7 +2383,7 @@ export default function SceneCard({
               {(scene.lipSyncAppliedAt ||
                 hasLipsyncArtifact ||
                 !!(scene as any).dialogShots ||
-                scene.engineOverride === "cinematic-sync") && (
+                isLipSyncIntentional(scene)) && (
                 <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5">
                   <span className="text-[10px] font-semibold text-primary mr-auto">
                     🎙️ Lip-Sync Aktionen

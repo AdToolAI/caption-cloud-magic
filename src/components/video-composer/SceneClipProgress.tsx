@@ -14,6 +14,7 @@ import { useMouthYavgProbe } from '@/hooks/useMouthYavgProbe';
 import { FaceMapReviewDialog } from './FaceMapReviewDialog';
 import { startSceneGeneration } from '@/lib/composer/startSceneGeneration';
 import { sceneState, isRealizedState, legacyClipReadyEquivalentRow, sceneSubstate } from '@/lib/composer/sceneState';
+import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 
 /** Providers that produce an i2v lead-in freeze worth auto-trimming. */
 const I2V_PROVIDERS: ReadonlyArray<string> = [
@@ -123,14 +124,11 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
 
   // Lip-Sync state — Dialog-Shot pipeline (1..N speakers).
   // Each speaker turn becomes its own base clip + Sync.so lipsync.
-  const isCinematic = scene.engineOverride === 'cinematic-sync';
+  // v430.1 Schritt 2A — Intent kommt aus der SSoT `isLipSyncIntentional()`.
+  const isCinematic = isLipSyncIntentional(scene);
   const dialogShotsState = (scene as any).dialogShots ?? (scene as any).dialog_shots ?? null;
   const lipSyncCanceled = pipelineState === 'canceled';
-  const shouldBeSceneLipsync =
-    !lipSyncCanceled &&
-    (isCinematic ||
-      scene.dialogMode === true ||
-      scene.lipSyncWithVoiceover === true);
+  const shouldBeSceneLipsync = !lipSyncCanceled && isLipSyncIntentional(scene);
   const wrongTalkingHeadReady =
     shouldBeSceneLipsync &&
     ['plate_ready', 'complete'].includes(pipelineState) &&
