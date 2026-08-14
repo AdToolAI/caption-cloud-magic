@@ -54,7 +54,16 @@ Jede Stelle wird in **genau eine von drei** Kategorien eingeordnet:
 
 1. **Normale legale Transition** → gehört auf `transitionScene()`.
 2. **Terminales Failure** → gehört auf `failSceneState()`.
-3. **Recovery-Override erforderlich** → die bestehende State-Machine kann den legitimen Recovery-Fall nicht ausdrücken. Das wird als **Vertragslücke** dokumentiert, nicht als dauerhafte Allowlist-Erlaubnis. Für diese Fälle wird ein späterer, expliziter und getesteter Recovery-Primitive skizziert (Signatur, erlaubte Vorzustände „beliebig/inkonsistent", Zielzustände `failed`/`canceled`, Protokollpflicht, Run-Abgleich).
+3. **Recovery-Override erforderlich** → die bestehende State-Machine kann den legitimen Recovery-Fall nicht ausdrücken. Das wird als **Vertragslücke** dokumentiert, nicht als dauerhafte Allowlist-Erlaubnis. Für diese Fälle wird ein späterer, expliziter und getesteter Recovery-Primitive skizziert.
+
+   „Beliebiger/inkonsistenter Vorzustand" bedeutet dabei ausdrücklich **nicht** „ungeprüfter Force-Write". Das Dossier schreibt als Pflichtbedingungen des Primitives mindestens fest:
+   - Abgleich gegen `active_run_id` / `plate_generation` bzw. einen vorhandenen Run-Ledger-Eintrag,
+   - Zielzustand ausschließlich `failed` oder `canceled`,
+   - maschinenlesbarer Recovery-Grund (Enum, kein Freitext),
+   - Audit-/Logging-Pflicht mit Vorzustand, Zielzustand und Auslöser.
+
+   Ohne diese Bedingungen wäre der Primitive nur ein schöner benannter Bypass.
+
 
 `qa-watchdog` und `recover-stuck-composer-clip` sind die Hauptkandidaten für Kategorie 3 und werden explizit begründet. Kein direkter `pipeline_state`-Write wird in diesem Auftrag dauerhaft allowlistet; eine Allowlist-Eintragung ist höchstens temporär und trägt dann die Kategorie-3-Markierung.
 
