@@ -38,16 +38,20 @@ Die gemeldeten 373 sind nicht reproduzierbar dokumentiert (kein Command im Beric
 ## Schließungsplan (vier Schritte, danach STOP)
 
 **S1 — Overload-Bereinigung (Vorrang, repariert G2.2)**
-Migration: alte 9-Arg-Signatur droppen; `_clear_lip_sync_fields` nur für `write_id='cvc:failed/pika'` zulassen, sonst Ablehnung mit Audit-Eintrag. Keine weitere Semantikänderung an dem Primitive.
+Migration: alte 9-Arg-Signatur droppen; `_clear_lip_sync_fields` nur für `write_id='cvc:failed/pika'` zulassen, sonst Ablehnung mit Audit-Eintrag (`clear_flag_not_allowed`). Keine weitere Semantikänderung an dem Primitive.
+Verifikation (verpflichtend): nach der Migration über `pg_proc`/`to_regprocedure` nachweisen, dass genau **eine** Signatur übrig ist; PostgREST-Schema-Cache neu laden (`NOTIFY pgrst, 'reload schema'`) und mit einem echten RPC-Aufruf in 7- und 8-Argument-Form (benannte Parameter, wie in `compose-twoshot-audio` und `report-lipsync-motion-probe`) belegen, dass kein PGRST203 mehr auftritt.
 
 **S2 — Upload-Pfad wirklich schließen**
-Run-Stamp-Akquise in `compose-video-clips` auf Upload-Szenen ausweiten (identischer kanonischer Vertrag wie für `ai-*`, kein Sonderpfad). Danach den Legacy-Fallback im `cvc:upload-complete`-Zweig entfernen: ohne Stamp kein State-/Output-Write, Szene wird als `failed: upload_missing_run_provenance` zurückgemeldet. Pika-Fallback ebenfalls auf fail-closed umstellen (kein Legacy-`.update()` mehr).
+Run-Stamp-Akquise in `compose-video-clips` auf Upload-Szenen ausweiten — identischer kanonischer Vertrag wie für `ai-*`, kein Sonderpfad.
+Kein Doppel-Run (verpflichtend): Liegt bereits ein kanonischer `runContext` aus `composer-start-scene-generation` vor, wird genau dieser für die Upload-Szene validiert und verwendet; ein neuer Run wird ausschließlich dort erworben, wo der kanonische Vertrag ihn ohnehin erwirbt (Legacy-Direktaufruf ohne `runContext`). Akzeptanztest: ein Upload-Dispatch ⇒ genau eine Run-ID und genau ein Generation-Bump.
+Danach Legacy-Fallback im `cvc:upload-complete`-Zweig entfernen: ohne Stamp kein State-/Output-Write, Szene wird als `failed: upload_missing_run_provenance` zurückgemeldet. Pika-Fallback ebenfalls fail-closed (kein ungeguardetes `.update()` mehr).
 
 **S3 — Transaktionaler DB-Smoke (Pflicht-Matrix, jeweils mit ROLLBACK)**
-`composer_finalize_upload_scene`: applied · stale run · stale generation · falscher From-State (z. B. `complete`) · falsche write_id · bei jeder Ablehnung Nachweis, dass `base_video_url`/`clip_url`/`clip_status` unverändert sind · Audit-Zeile für applied **und** rejected vollständig (write_id, run_id, generation, reason, caller_role).
-`cvc:failed/pika`: current run applied inkl. geleerter Lip-Sync-Felder bei cinematic-sync · stale run abgelehnt, keine Feldänderung · `_clear_lip_sync_fields=true` mit fremder write_id abgelehnt.
-`cta:id_only_dialog_turns_required`: current applied (lip_sync_status/twoshot_stage='failed'), stale abgelehnt.
-G2.2-Regression: 8-Argument-Aufruf von `composer_fail_scene_with_mirrors` ist wieder eindeutig auflösbar.
+`composer_finalize_upload_scene`: applied (inkl. Nachweis `pipeline_state_run_id = run_id`) · stale run · stale generation · falscher From-State (z. B. `complete`) · falsche write_id · bei **jeder** Ablehnung Nachweis, dass weder Output-Felder (`base_video_url`, `processed_video_url`, `clip_url`) **noch Legacy-Spiegel** (`clip_status`, `lip_sync_status`, `twoshot_stage`, `dialog_shots`) verändert wurden · Audit-Zeile für applied **und** rejected vollständig (write_id, run_id, generation, reason, caller_role).
+`cvc:failed/pika`: current run applied inkl. geleerter Lip-Sync-Felder bei cinematic-sync · stale run abgelehnt, keine Feld- oder Spiegeländerung · `_clear_lip_sync_fields=true` mit fremder write_id abgelehnt.
+`cta:id_only_dialog_turns_required`: current applied (lip_sync_status/twoshot_stage='failed'), stale abgelehnt ohne Spiegeländerung.
+G2.2-Regression: 7-/8-Argument-Aufrufe von `composer_fail_scene_with_mirrors` sind wieder eindeutig auflösbar (SQL **und** RPC).
+
 
 **S4 — Testzahlen belegen**
 Exakten Command für die Frozen-Composer-/Lip-Sync-Suite festschreiben (Datei-Glob im Bericht nennen), G2.2- und G2.3-Zahlen mit demselben Command gegenüberstellen, Edge-Typecheck-Fehlerliste vorher/nachher als Dateiliste anhängen und explizit bestätigen, dass keiner der Fehler in den drei G2.3-Dateien liegt.
