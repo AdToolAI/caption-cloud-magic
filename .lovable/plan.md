@@ -1,98 +1,106 @@
-# v431 — G2 Analyse- und Umsetzungsplan (Audio-/Dispatch-Zwischenzustände + zurückgestellte Writer)
+# v431 — G2.0 Analysebericht (read-only, keine Writer-Migration)
 
-Status: G0 DONE/FROZEN, G1 DONE/FROZEN. G2 wird hier nur **spezifiziert**, nicht migriert.
-Erst Writer-Set, Run-Provenienz und Schnittstellenänderungen — danach Freigabe, dann Umsetzung.
+Alle Angaben sind am Ist-Code belegt. Keine Datei außer diesem Plan wurde angefasst.
+Grundsätze aus der Freigabe übernommen: **keine neue Runless-Regel, kein neues Grandfathering.**
 
-## 1. Scope von G2
+## 0. Kernbefund vorab — `hybrid-extend-scene` ist kein State-Writer
 
-Zwei Blöcke, bewusst getrennt, weil ihre Provenienz-Lage unterschiedlich ist:
+`supabase/functions/hybrid-extend-scene/index.ts:185–209` ist ein **INSERT einer neuen Szene**
+(`.insert({ …, clip_status: "pending", pipeline_state: "idle", … })`), kein Override einer
+bestehenden Szene. Die Inventar-Klassifikation „Recovery-Override, kein legaler Übergang“
+ist damit falsch.
 
-- **G2-A — Writer ohne heutige Run-Identität** (aus G1 zurückgestellt):
-  `hybrid-extend-scene`, `generate-talking-head`, `report-lipsync-motion-probe`,
-  die ungestempelten `compose-video-clips`-Branches.
-- **G2-B — Audio-/Dispatch-Zwischenzustände** (Originalplan G2):
-  `compose-twoshot-audio`, `compose-dialog-segments` Dispatch-/Start-Pfade,
-  `useSceneGenerate`.
+Konsequenz: Es braucht weder eine `runless`-Ausnahme noch den Hard-Reset-Vertrag.
+Rolle wird zu **`insert-default`** korrigiert und aus dem State-Writer-Inventar genommen.
+Der eigentliche Extend-Render läuft danach über `compose-video-clips` (Zeile ~300, fetch),
+dort entsteht der Run. Die Fehlerpfade der Funktion (`markSceneFailed`, Zeilen 258/263/313)
+laufen bereits über `transitionScene()` auf die **neu eingefügte** Szene — deren Run ist zu
+dem Zeitpunkt noch nicht gestartet, sie sind daher G2-Kandidaten mit dem Ziel „Run zuerst
+starten, dann `run_bound`“, nicht „Ausnahme“.
 
-Ausdrücklich **nicht** in G2: Webhooks/Fan-in (G3), Watchdog/Recovery (G4),
-Client-Compatibility (G5), Bridge-Abschaltung (G6), `compose-video-assemble` (Track T1).
+## 1. Kandidatentabelle (Rolle · Provenienz · Zielverhalten)
 
-## 2. Writer-Set (Kandidaten, Inventar-IDs)
+Legende Rolle: `state` | `substate` | `output` | `job_metadata` | `diagnostic` | `reset` | `insert-default`.
+Nur `state` und echte `substate`-Semantik gehen in die State-Migration.
 
 ### G2-A
-| ID | Ziel-State heute | Rolle |
-| --- | --- | --- |
-| `hybrid-extend-scene:idle` | `idle` (Recovery-Override, kein legaler Übergang) | state |
-| `generate-talking-head:plate-rendering` | `plate_rendering` | state |
-| `generate-talking-head:plate-ready` | `plate_ready` | state |
-| `generate-talking-head:failed` / `:failed-2` | `failed` | state |
-| `report-lipsync-motion-probe:failed` | `failed` + `twoshot_stage=needs_clip_rerender` | state |
-| `compose-video-clips:clear`, `:clear-2`, `:clear-4` | Feld-Reset, kein State-Wechsel | state |
-| `compose-video-clips:pending`, `:pending-2`, `:pending-3` | kein direkter State | state |
 
-(`compose-video-clips:failed` ist in G1 migriert, `:clear-3` ist bereits guarded.)
+| # | writeId heute | Fundstelle | Rolle (korrigiert) | Run-Provenienz heute | Immutable vom Dispatch? | Payload-Änderung | writeId künftig | Spend vor/nach Run | Verhalten ohne Run |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `hybrid-extend-scene:idle` | `hybrid-extend-scene:194` | **insert-default** (kein State-Write) | entfällt | entfällt | keine | — (aus Inventar entfernen) | vor Run (Frame-Extraktion) | n/a |
+| 2 | `hybrid-extend-scene:markSceneFailed` (nicht inventarisiert) | `:258/:263/:313` → `:373` | state (failed) | keine — Szene wurde gerade erst eingefügt | nein | Run vor Dispatch starten (`beginSceneRun`) | `hybrid-extend:failed` (`run_bound`) | Extraktion vor Run; Provider-Spend erst in `compose-video-clips` | Run wird vorher erzeugt → fail-closed nie nötig |
+| 3 | `generate-talking-head:plate-rendering` | `:648` | state + job_metadata + output(`clear`) | keine; Body kennt nur `sceneId`/`projectId` | nein | `runId` + `plateGeneration` **pflicht bei `sceneId`** | `talking-head:plate-rendering` | HeyGen-Job wird **vor** dem Write erzeugt (`createHeyGenVideo`, :634) → Spend vor Run | **fail-closed**: kein `composer_scenes`-State-Write; Standalone-Rendering läuft weiter |
+| 4 | `generate-talking-head:plate-ready` | `:464` | output + state (`plate_ready`) | keine (Background-Poller, `jobOpts.sceneId`) | nein | Run-Kontext in `jobOpts` mitschleifen (Snapshot beim Dispatch) | `talking-head:plate-ready` | nach Provider-Spend | fail-closed (nur Storage/Signed-URL, kein Scene-Write) |
+| 5 | `generate-talking-head:failed` | `:510` (`refundCredits`) | state (failed) | keine | nein | dito | `talking-head:failed` | Refund unabhängig vom Scene-Write | Refund bleibt, Scene-Write entfällt |
+| 6 | `generate-talking-head:failed-2` | `:695` (`earlySceneId`) | state (failed) | keine | nein | dito | `talking-head:failed-early` | vor Spend möglich | fail-closed |
+| 7 | `report-lipsync-motion-probe:failed` | `:305` | state (failed) + **substate** (`needs_clip_rerender`) | nur `job_id` aus Client-Payload; `run_id` existiert weder im Payload noch im Pass-Slot (`rg run_id` in `compose-dialog-segments` → 0 Treffer) | **nein** | `run_id` + `plate_generation` beim Dispatch in den Pass-Slot einfrieren **und** in die Probe-Antwortkette reichen | `motion-probe:noop-ladder-exhausted` | Provider-Spend längst erfolgt | fail-closed: nur `syncso_dispatch_log` + Pass-Patch, kein Scene-State |
+| 8 | `compose-video-clips:clear` | `:641` | **kein Write** — Definition des Helpers `failedClipUpdate()` | — | — | keine | Inventareintrag korrigieren (Helper, kein Writer) | — | — |
+| 9 | `compose-video-clips:clear-2` | `:1743` | **job_metadata** (`engine_override: heygen → auto`) | — | — | keine | `cvc:normalize-engine-override` | — | bleibt Legacy, kein State |
+| 10 | `compose-video-clips:pending` | `:1888` | **job_metadata** (`clip_source: ai-sora → ai-veo`) | — | — | keine | `cvc:sunset-sora` | — | bleibt Legacy, kein State |
+| 11 | `compose-video-clips:pending-2` | `:4131` | **output** + state (`complete`) für Upload-Szenen | ungestempelt (Upload-Pfad läuft vor Run-Stamp) | nein | Upload-Pfad in `sceneRunStamps` aufnehmen | `cvc:upload-complete` | kein Provider-Spend | fail-closed nach Stamp-Aufnahme |
+| 12 | `compose-video-clips:pending-3` | `:4907` | state (failed) + job_metadata (`replicate_prediction_id`) | ungestempelt (Pika-Zweig) | nein | Branch in `sceneRunStamps` aufnehmen | `cvc:failed/pika` | Spend **vor** dem Write | nach Stamp `run_bound` |
+| 13 | `compose-video-clips:clear-4` | `:5255` | state (failed), Catch-all über `__parsedBody.scenes` | **keine** — Body-IDs, kein Run | nein | keine (Fatal-Handler) | bleibt Legacy | variabel | **nach G3** verschieben (Fan-in-/Fatal-Semantik) |
 
 ### G2-B
-| ID | Ziel-State heute | Rolle |
-| --- | --- | --- |
-| `compose-dialog-segments:pending`, `:pending-2`, `:pending-3` | Vorzustand bleibt | state |
-| `compose-dialog-segments:conditional-running-or-pending` | konditional | state |
-| `compose-twoshot-audio`-Zwischenschreiber (`audio_prep` / `twoshot_stage`) | substate | substate |
-| `useSceneGenerate:conditional-audio_prep-or-plate_rendering` | `audio_prep` \| `plate_rendering` | state |
 
-## 3. Run-Provenienz — Ist-Befund je Writer
+| # | writeId heute | Fundstelle | Rolle (korrigiert) | Run-Provenienz heute | Payload-Änderung | writeId künftig | Spend | Verhalten ohne Run |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 14 | `compose-dialog-segments:pending` | `:1028` | **reset** (Self-Heal: ungültige Talking-Head-Master-Plate) | keine | keine | `cds:reset/raw-talking-head` | vor Spend | bleibt Reset, kein State-Übergang |
+| 15 | `compose-dialog-segments:pending-2` | `:1125` | **reset** (Auto-Reset sauber refundeter Fehlversuche) | keine | keine | `cds:reset/stale-failed` | nach Refund | bleibt Reset |
+| 16 | `compose-dialog-segments:conditional-running-or-pending` | `:1285` | **state + substate** (Circuit-Open) | Dispatch kennt Szene, aber kein Run-Feld | `runId`/`plateGeneration` aus Dispatch-Snapshot | `cds:circuit-open` | vor Spend | fail-closed (nur `logSyncDispatch`) |
+| 17 | `compose-dialog-segments:pending-3` | `:4221` | Zweig A **diagnostic** (nur `clip_error`-Marker), Zweig B **substate** (`deferred`) | wie 16 | wie 16 | `cds:deferred` | vor Spend | Zweig A bleibt diagnostic |
+| 18 | `compose-twoshot-audio:*` | `:652` | state (failed) + substate | **keine** — Body kennt nur `scene_id` | `run_id`/`plate_generation` vom Aufrufer pflichtend | `twoshot-audio:failed/id-only` | vor ElevenLabs-Spend | fail-closed |
+| 19 | `compose-twoshot-audio` | `:715` | **job_metadata** (`dialog_turns`-Kanonisierung) | — | keine | `twoshot-audio:persist-turns` | — | unverändert |
+| 20 | `compose-twoshot-audio` | `:1424/:1464` | **output + job_metadata** (`character_audio_url`, `audio_plan`, ggf. `duration_seconds`) | — | keine | `twoshot-audio:audio-ready` | nach Spend | unverändert (kein State) |
+| 21 | `useSceneGenerate:conditional-audio_prep-or-plate_rendering` | `src/hooks/useSceneGenerate.ts:136` | state + substate (Client-Pre-Mark) | kein Run — läuft **vor** dem Invoke | — | siehe 2. | vor Spend | siehe 2. |
 
-Regel aus G1 unverändert: akzeptabel sind nur **immutable Dispatch-Snapshots** oder eine
-vom Aufrufer atomar mitgereichte Identität. Nicht akzeptabel: „Szene direkt vor dem Write lesen“.
+## 2. Server-Paritätsnachweis für `useSceneGenerate` — **nicht belegbar**
 
-| Writer | Heutige Identität | Bewertung |
-| --- | --- | --- |
-| `generate-talking-head` (4 Writes) | Request-Body kennt nur `sceneId`/`projectId`; kein `run_id`, kein `plate_generation`. Aufrufer sind UI (`useTalkingHead`), QA-Sweeps, Superuser-Smoke | **keine Provenienz** — Schnittstelle muss erweitert werden |
-| `report-lipsync-motion-probe` | Body trägt `scene_id`, `pass_idx`, `job_id`. `job_id` ist an einen Pass-Slot in `dialog_shots` gebunden | **Job-Provenienz vorhanden, Run-Provenienz nicht** — Run muss aus dem Pass-Slot abgeleitet oder mitgereicht werden |
-| `hybrid-extend-scene:idle` | Nutzer-initiierter Extend, bewusster Override aus beliebigem Zustand | **kein Run** — braucht `runless` + eigene Recovery-Semantik, nicht `run_bound` |
-| `compose-video-clips` ungestempelte Branches | Laufen vor bzw. außerhalb von `sceneRunStamps` | teils nachstempelbar, teils Pre-Run — **pro Branch entscheiden** |
-| `compose-dialog-segments` Dispatch-Pfade | Dispatch kennt den Run, reicht ihn aber nicht in jeden Write | **nachstempelbar** über bestehenden Dispatch-Snapshot |
-| `compose-twoshot-audio` | keinerlei `run_id` im Modul | **keine Provenienz** — Aufrufer muss ihn übergeben |
-| `useSceneGenerate` | Client, Run entsteht erst serverseitig in `scene-run-begin` | **kein Run vor dem Write** — Kandidat für Wegfall statt Migration |
+`beginSceneRun()` (`supabase/functions/_shared/scene-run-begin.ts:128–152`) schreibt
+`active_run_id`, `plate_generation`, `clip_status: "generating"`, Output-Clear und die
+Lip-Sync-Feld-Resets — **aber kein `pipeline_state` und kein `pipeline_substate`**.
+Der Client-Pre-Mark setzt genau diese beiden Felder (`audio_prep` | `plate_rendering`,
+`pipeline_substate: 'audio'`).
 
-## 4. Vorgeschlagene Schnittstellenänderungen
+Damit ist die geforderte Parität heute **nicht** gegeben. Nach der Freigaberegel:
+`useSceneGenerate` in G2 **nicht anfassen**, Verschiebung nach **G5**. Alternativ könnte
+G2 `beginSceneRun()` um den State-Anteil erweitern — das ist aber eine Erweiterung des
+G0-Vertrags und gehört als eigener Punkt entschieden, nicht nebenbei.
 
-1. **`generate-talking-head`**: optionale Felder `runId` + `plateGeneration` im Request-Body.
-   Gesetzt → `run_bound`; nicht gesetzt (QA/Standalone-Portrait ohne Composer-Szene) → Legacy bleibt,
-   Write nur wenn `sceneId` fehlt oder Szene keinen aktiven Run hat.
-2. **`report-lipsync-motion-probe`**: Run aus dem Pass-Slot (`dialog_shots[pass_idx].run_id`)
-   lesen, falls dort vorhanden; sonst Dispatch um `run_id` erweitern. Ziel: `run_bound` mit
-   Branch-ID `noop-ladder-exhausted`.
-3. **`compose-twoshot-audio`**: `runId`/`plateGeneration` als Pflichtfelder vom Dispatcher,
-   analog zu `sceneRunStamps` in `compose-video-clips`.
-4. **`hybrid-extend-scene`**: kein Run-Binding. Stattdessen expliziter Recovery-Aufruf
-   (`composer_scene_transition_v2` mit `_guard_mode='runless'`, Branch `hybrid-extend-reset`),
-   dokumentiert als bewusste Grandfather-Ausnahme mit Audit-Zeile.
-5. **`useSceneGenerate`**: Client-Write ersatzlos streichen, sobald `scene-run-begin` denselben
-   Zustand serverseitig setzt (Verifikation nötig); nur optimistische UI bleibt.
+## 3. Ergebnis der Rollen-Schärfung
 
-## 5. Ablauf der Umsetzung (nach Freigabe)
+- Echte State-/Substate-Writer in G2: **#2, #3, #4, #5, #6, #7, #11, #12, #16, #17(B), #18** (11).
+- Keine State-Migration: #1 (insert-default), #8 (Helper-Definition), #9, #10, #19, #20 (job_metadata/output),
+  #14, #15 (reset), #17(A) (diagnostic).
+- Nach G3 verschoben: **#13** (Fatal-Catch-all ohne jede Identität).
+- Nach G5 verschoben: **#21** (`useSceneGenerate`, Parität nicht belegt).
+- Neue Runless-Regeln: **0**. Neues Grandfathering: **0**.
 
-1. **G2.0 Nachweisrunde** — pro Writer Provenienz belegen (Code-Zitat + Dispatch-Kette),
-   Writer ohne belegbare Identität sofort nach G3/G4 verschieben statt „vermutlich passt es“.
-2. **G2.1 Dispatch-Erweiterungen** — Body-Felder ergänzen, Aufrufer nachziehen, abwärtskompatibel.
-3. **G2.2 Migration G2-A** (Writer mit dann belegter Identität) auf `transitionSceneV2`.
-4. **G2.3 Migration G2-B** (Audio-/Dispatch-Zwischenzustände).
-5. **G2.4 `hybrid-extend-scene`** als eigener Recovery-Vertrag.
-6. **Tests/Smokes** — Fixture-Parität, DB-Smoke je Branch, Frozen-Suite + `tsgo`.
-7. **Inventar-Diff + Grandfather-Trim**, Bericht `docs/v431-g2-report.md`, dann STOP.
+## 4. Benötigte Schnittstellenänderungen (Zusammenfassung)
 
-## 6. Abbruchkriterien
+1. `generate-talking-head`: `runId` + `plateGeneration` im Body; bei gesetzter `sceneId`
+   verpflichtend, sonst **kein** `composer_scenes`-Write (Standalone/QA bleibt funktionsfähig).
+   Beide Werte in `jobOpts` einfrieren, damit Poller und Refund denselben Run sehen.
+2. `report-lipsync-motion-probe`: `compose-dialog-segments` friert beim Pass-Dispatch
+   `run_id` + `plate_generation` im Pass-Slot ein (heute nicht vorhanden) und reicht sie
+   zusätzlich in die Probe-Payload. Der Slot wird nur bei Erstellung geschrieben,
+   `update_dialog_pass_slot` patcht diese Keys nie — erst damit gilt er als immutable.
+3. `compose-twoshot-audio`: `run_id` + `plate_generation` als Pflichtfelder vom Dispatcher.
+4. `hybrid-extend-scene`: `beginSceneRun()` für die neu eingefügte Szene vor dem
+   `compose-video-clips`-Dispatch; Fehlerpfade danach `run_bound`.
+5. `compose-video-clips`: Upload- und Pika-Zweig in den bestehenden `sceneRunStamps`-Snapshot
+   aufnehmen (keine neue Mechanik).
 
-- Dispatch erzeugt exakt dieselben Zustände wie heute — kein Doppel-Run, keine Doppelkosten
-  (Run-/Kosten-Paritätsnachweis wie in v430.1).
-- Verspäteter Callback eines alten Runs verändert nach dem Write nichts.
-- Lip-Sync-Pipeline unverändert: Provider-Vertrag v425 und Anchor-Kohärenz v400 bleiben unberührt.
-- Credits/Reservations werden in G2 nicht angefasst.
+## 5. Vorschlag für die Freigabestufen G2.1–G2.4
 
-## 7. Offene Entscheidungen für die Durchsicht
+- **G2.1** Payload-/Snapshot-Erweiterungen (1–3, 5), abwärtskompatibel, noch keine Writer-Umstellung.
+- **G2.2** Migration `generate-talking-head` (#3–#6) + `report-lipsync-motion-probe` (#7).
+- **G2.3** Migration Audio-/Dispatch (#16, #17B, #18) und `compose-video-clips` (#11, #12).
+- **G2.4** `hybrid-extend-scene` (#1 Rollenkorrektur im Inventar, #2 `run_bound`).
+- Danach: Inventar-Diff, Frozen-Suite + `tsgo`, `docs/v431-g2-report.md`, STOP.
 
-- Darf `generate-talking-head` bei fehlendem `runId` weiterhin Legacy schreiben, oder soll der
-  Szenen-Write dann komplett unterbleiben?
-- Soll `useSceneGenerate` in G2 entfallen oder erst in G5 mit den übrigen Client-Writern?
-- Ist eine dokumentierte `runless`-Ausnahme für `hybrid-extend-scene` akzeptabel?
+## 6. STOP
+
+G2.0 abgeschlossen. Keine Migration, keine Codeänderung. Offen zur Entscheidung:
+ob `beginSceneRun()` in G2 zusätzlich `pipeline_state`/`pipeline_substate` setzen soll
+(würde #21 statt nach G5 in G2 lösen).
