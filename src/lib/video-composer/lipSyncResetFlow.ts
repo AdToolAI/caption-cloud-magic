@@ -148,3 +148,24 @@ export function applyResetMarkersFromServerRow(
   markDialogModePending(sceneId, row.dialog_mode === true);
   markEngineOverridePending(sceneId, row.engine_override ?? "auto");
 }
+
+/**
+ * Refetches the scene after a `stale_reset` and seeds scene fields + markers
+ * from that fresh row. Returns true when the refetch succeeded.
+ */
+export async function recoverFromStaleReset(
+  sceneId: string,
+  onUpdate: (updates: Record<string, unknown>) => void,
+): Promise<boolean> {
+  const { supabase } = await import("@/integrations/supabase/client");
+  const { data, error } = await supabase
+    .from("composer_scenes")
+    .select(LIPSYNC_RESET_REFETCH_COLUMNS)
+    .eq("id", sceneId)
+    .maybeSingle();
+  if (error || !data) return false;
+  const row = data as unknown as LipSyncResetServerRow;
+  onUpdate(buildStaleResetPatch(row));
+  applyResetMarkersFromServerRow(sceneId, row);
+  return true;
+}
