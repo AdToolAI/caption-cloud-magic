@@ -69,8 +69,9 @@ Neu: `src/components/video-composer/SceneStatusBadge.tsx`
   Contract-Kommentar, dass sie kein Szenen-Zustand ist.
 - `src/components/render/*` (Remotion-Render-Jobs, `render_jobs.status`) bleibt unangetastet —
   anderer Zustandsraum, nicht Szenen-Pipeline. Wird im Bericht benannt.
-- `SCENE_STATE_LABEL` in `sceneState.ts` wird zum Re-Export aus dem Presenter oder entfernt,
-  damit keine parallele Wahrheit bleibt.
+- `SCENE_STATE_LABEL` in `sceneState.ts` wird zum reinen Re-Export aus dem Presenter
+  (oder entfernt), damit keine parallele Wahrheit bleibt — kein Runtime-Import zurück
+  in den Presenter.
 
 ### 4. Guard und Tests
 
