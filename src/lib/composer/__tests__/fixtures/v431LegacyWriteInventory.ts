@@ -63,7 +63,7 @@ export const V431_LEGACY_WRITE_INVENTORY: readonly LegacyWriteEntry[] = [
     callbackRisk: "medium",
   },
   {
-    id: "useSceneGenerate:forcecinematicsync-audio-prep-plat",
+    id: "useSceneGenerate:conditional-audio_prep-or-plate_rendering",
     file: "src/hooks/useSceneGenerate.ts",
     line: 136,
     writeRole: "state",
@@ -207,7 +207,7 @@ export const V431_LEGACY_WRITE_INVENTORY: readonly LegacyWriteEntry[] = [
     callbackRisk: "medium",
   },
   {
-    id: "scene-run-begin:null",
+    id: "scene-run-begin:clear",
     file: "supabase/functions/_shared/scene-run-begin.ts",
     line: 130,
     writeRole: "state",
@@ -271,7 +271,7 @@ export const V431_LEGACY_WRITE_INVENTORY: readonly LegacyWriteEntry[] = [
     callbackRisk: "high",
   },
   {
-    id: "compose-clip-webhook:null",
+    id: "compose-clip-webhook:clear",
     file: "supabase/functions/compose-clip-webhook/index.ts",
     line: 519,
     writeRole: "state",
@@ -287,7 +287,7 @@ export const V431_LEGACY_WRITE_INVENTORY: readonly LegacyWriteEntry[] = [
     callbackRisk: "high",
   },
   {
-    id: "compose-clip-webhook:null-2",
+    id: "compose-clip-webhook:clear-2",
     file: "supabase/functions/compose-clip-webhook/index.ts",
     line: 633,
     writeRole: "state",
@@ -383,7 +383,7 @@ export const V431_LEGACY_WRITE_INVENTORY: readonly LegacyWriteEntry[] = [
     callbackRisk: "medium",
   },
   {
-    id: "compose-dialog-segments:keeprunning-running-pending",
+    id: "compose-dialog-segments:conditional-running-or-pending",
     file: "supabase/functions/compose-dialog-segments/index.ts",
     line: 1285,
     writeRole: "state",
@@ -703,7 +703,7 @@ export const V431_LEGACY_WRITE_INVENTORY: readonly LegacyWriteEntry[] = [
     callbackRisk: "medium",
   },
   {
-    id: "compose-video-clips:null",
+    id: "compose-video-clips:clear",
     file: "supabase/functions/compose-video-clips/index.ts",
     line: 641,
     writeRole: "state",
@@ -735,7 +735,7 @@ export const V431_LEGACY_WRITE_INVENTORY: readonly LegacyWriteEntry[] = [
     callbackRisk: "medium",
   },
   {
-    id: "compose-video-clips:null-2",
+    id: "compose-video-clips:clear-2",
     file: "supabase/functions/compose-video-clips/index.ts",
     line: 1743,
     writeRole: "state",
@@ -783,7 +783,7 @@ export const V431_LEGACY_WRITE_INVENTORY: readonly LegacyWriteEntry[] = [
     callbackRisk: "medium",
   },
   {
-    id: "compose-video-clips:null-3",
+    id: "compose-video-clips:clear-3",
     file: "supabase/functions/compose-video-clips/index.ts",
     line: 4524,
     writeRole: "state",
@@ -815,7 +815,7 @@ export const V431_LEGACY_WRITE_INVENTORY: readonly LegacyWriteEntry[] = [
     callbackRisk: "medium",
   },
   {
-    id: "compose-video-clips:null-4",
+    id: "compose-video-clips:clear-4",
     file: "supabase/functions/compose-video-clips/index.ts",
     line: 5255,
     writeRole: "state",
@@ -927,7 +927,7 @@ export const V431_LEGACY_WRITE_INVENTORY: readonly LegacyWriteEntry[] = [
     callbackRisk: "medium",
   },
   {
-    id: "lipsync-watchdog:null",
+    id: "lipsync-watchdog:clear",
     file: "supabase/functions/lipsync-watchdog/index.ts",
     line: 353,
     writeRole: "state",
@@ -1359,7 +1359,7 @@ export const V431_LEGACY_WRITE_INVENTORY: readonly LegacyWriteEntry[] = [
     callbackRisk: "high",
   },
   {
-    id: "sync-so-webhook:partialmux-audio-muxing-running",
+    id: "sync-so-webhook:conditional-audio_muxing-or-running",
     file: "supabase/functions/sync-so-webhook/index.ts",
     line: 1751,
     writeRole: "state",
