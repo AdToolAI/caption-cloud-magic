@@ -199,7 +199,7 @@ describe('v430.1 — Gate-Parität (2A umgestellt, Rest eingefroren)', () => {
     });
   }
 
-  it('genau die sieben v430.1-2A-Gates sind paritätisch zur SSoT', () => {
+  it('genau die zehn umgestellten Gates (2A + 2B + Gate 9) sind paritätisch zur SSoT', () => {
     const exact = INTENT_GATES.filter((g) => {
       const { falsePositives, falseNegatives } = evaluate(g.predicate);
       return classifyParity(falsePositives, falseNegatives) === 'exact';
@@ -215,6 +215,10 @@ describe('v430.1 — Gate-Parität (2A umgestellt, Rest eingefroren)', () => {
         'scenecard-lipsync-actions',
         'dialogstudio-wants-lipsync',
         'generateall-needs-lipsync',
+        // v430.1 Gate 9 — nur das Intent-Fragment; das vollständige
+        // `forceCinematicSync` bleibt wegen `buttonIntendsLipSync` breiter
+        // (Nachweis in src/lib/composer/__tests__/forceCinematicSyncRouting.test.ts).
+        'dialogstudio-force-cinematic',
       ].sort(),
     );
   });
