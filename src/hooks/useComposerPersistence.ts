@@ -197,7 +197,7 @@ export function useComposerPersistence() {
               // legacy-mapping-allowed: Writer-Spiegel der Alt-Spalte
               clip_status: scene.clipStatus,
               text_overlay: scene.textOverlay as any,
-              transition_type: scene.transitionType,
+              transition_type: cutStyleToRow(scene.cutStyle, undefined),
               transition_duration: scene.transitionDuration,
               cost_euros: scene.costEuros,
               character_shot: (scene.characterShot ?? null) as any,
@@ -262,7 +262,7 @@ export function useComposerPersistence() {
               // legacy-mapping-allowed: Writer-Spiegel der Alt-Spalte
               clip_status: scene.clipStatus || 'pending',
               text_overlay: scene.textOverlay as any,
-              transition_type: scene.transitionType || 'fade',
+              transition_type: cutStyleToRow(scene.cutStyle, 'fade' as any),
               transition_duration: scene.transitionDuration ?? 0.5,
               cost_euros: scene.costEuros || 0,
               retry_count: scene.retryCount || 0,

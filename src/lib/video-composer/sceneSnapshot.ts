@@ -33,7 +33,7 @@ export function sceneToSnakeSnapshot(scene: ComposerScene): Record<string, unkno
     preview_clip_url: scene.previewClipUrl ?? null,
     preview_status: scene.previewStatus ?? null,
     text_overlay: scene.textOverlay ?? null,
-    transition_type: scene.transitionType ?? null,
+    transition_type: cutStyleToRow(scene.cutStyle, null),
     transition_duration: scene.transitionDuration ?? null,
     upload_type: (scene as unknown as { uploadType?: string }).uploadType ?? null,
   };

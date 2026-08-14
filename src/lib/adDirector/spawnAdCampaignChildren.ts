@@ -70,7 +70,7 @@ function freshSceneRow(s: ComposerScene, projectId: string, orderIndex: number) 
     clip_url: s.clipUrl ?? null,
     clip_status: s.clipUrl ? 'ready' : 'pending',
     text_overlay: (s.textOverlay ?? null) as any,
-    transition_type: s.transitionType || 'fade',
+    transition_type: cutStyleToRow(s.cutStyle, 'fade' as any),
     transition_duration: s.transitionDuration ?? 0.5,
     cost_euros: 0,
     retry_count: 0,
