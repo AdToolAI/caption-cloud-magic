@@ -69,9 +69,16 @@ describe('clip_url writer inventory (v430 Step 1)', () => {
     '_shared/scene-hard-reset.ts',
     // Additional productive writers closed by the Schritt 1 audit
     'compose-video-clips/index.ts',
-    'generate-talking-head/index.ts',
     'generate-composer-image-scene/index.ts',
     '_shared/autopilotComposerBridge.ts',
+  ];
+
+  // v431 G2.2 — diese Writer materialisieren Output nicht mehr im Client-Code,
+  // sondern atomar in der DB (Row Lock + Run-/Generations-Guard). Sie duerfen
+  // deshalb weder `materializeCompatibilityOutput()` noch direkte
+  // Output-Spalten-Zuweisungen enthalten.
+  const ATOMIC_DB_WRITERS = [
+    { rel: 'generate-talking-head/index.ts', rpc: 'composer_finalize_talking_head' },
   ];
 
   it('every migrated finalization point writes through the single writer', () => {
@@ -80,6 +87,20 @@ describe('clip_url writer inventory (v430 Step 1)', () => {
       expect(src, rel).toMatch(/materializeCompatibilityOutput\(/);
     }
   });
+
+  it('atomic DB writers materialize output through their guarded RPC only', () => {
+    for (const { rel, rpc } of ATOMIC_DB_WRITERS) {
+      const src = readFileSync(resolve(FN_DIR, rel), 'utf8');
+      expect(src, rel).toContain(rpc);
+      expect(src, rel).not.toMatch(/materializeCompatibilityOutput\(/);
+      for (const field of ['clip_url', 'base_video_url', 'processed_video_url']) {
+        expect(src, `${rel} must not assign ${field} directly`).not.toMatch(
+          new RegExp(`${field}\\s*:`),
+        );
+      }
+    }
+  });
+
 
   it('no output-field mutation happens outside the materializer in the migrated files', () => {
     // These are the output columns that must always be written as a triple.
