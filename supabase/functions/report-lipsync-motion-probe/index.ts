@@ -141,14 +141,29 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
     const pass = passes[body.pass_idx] as Record<string, unknown> | undefined;
     if (!pass) return json({ ok: true, is_noop: isNoop, threshold: YAVG_NOOP_THRESHOLD });
 
-    // v431 G2.1 — Run-Provenienz stammt ausschliesslich aus dem beim Dispatch
-    // eingefrorenen Pass-Slot (immutable), nie aus der Live-Szene.
+    // v431 G2.1/G2.2 — Run-Provenienz stammt ausschliesslich aus dem beim
+    // Dispatch eingefrorenen Pass-Slot (immutable), nie aus der Live-Szene.
+    // G2.2: bevor der Snapshot ueberhaupt genutzt wird, muss die gemeldete
+    // job_id exakt zur Slot-job_id passen (fail-closed, No-op bei Mismatch).
     const passRunId = (pass as Record<string, unknown>).run_id ?? null;
     const passPlateGeneration = (pass as Record<string, unknown>).plate_generation ?? null;
+    const slotJobId = typeof pass.job_id === "string" && pass.job_id.length > 0 ? pass.job_id : null;
+    const reportedJobId = typeof body.job_id === "string" && body.job_id.length > 0 ? body.job_id : null;
+    const jobSlotMatch = !!slotJobId && !!reportedJobId && slotJobId === reportedJobId;
     console.log(
-      `[report-lipsync-motion-probe] v431_g2_1 scene=${body.scene_id} pass=${body.pass_idx} ` +
-        `run=${passRunId ?? "none"} gen=${passPlateGeneration ?? "none"}`,
+      `[report-lipsync-motion-probe] v431_g2_2 scene=${body.scene_id} pass=${body.pass_idx} ` +
+        `run=${passRunId ?? "none"} gen=${passPlateGeneration ?? "none"} ` +
+        `slot_job=${slotJobId ?? "none"} reported_job=${reportedJobId ?? "none"} match=${jobSlotMatch}`,
     );
+
+    if (!jobSlotMatch) {
+      console.warn(
+        `[report-lipsync-motion-probe] v431_g2_2 job_slot_mismatch scene=${body.scene_id} pass=${body.pass_idx} ` +
+          `expected=${slotJobId ?? "none"} got=${reportedJobId ?? "none"} → no-op`,
+      );
+      return json({ ok: true, ignored: "job_slot_mismatch" });
+    }
+
 
     try {
       await admin.rpc("update_dialog_pass_slot", {
