@@ -34,27 +34,40 @@ Verbindlich für G2.2:
 1. **Kein unbedingter Scene-Output-Write mehr.** Jeder Write auf
    `composer_scenes`, der Output-Felder berührt (`clip_url`, `base_video_url`,
    `processed_video_url` bzw. alles aus `materializeCompatibilityOutput`),
-   wird mit dem eingefrorenen Dispatch-Snapshot geguardet:
-   `.eq('id', sceneId).eq('active_run_id', runId).eq('plate_generation', generation)`.
-2. **Getrennte Statements, feste Reihenfolge.** Output-Update zuerst
-   (geguardet, mit `.select('id')`), danach der State-Übergang über
-   `transitionSceneV2()` im Modus `run_bound` mit demselben `runId` +
-   `expected_generation`.
-3. **0 aktualisierte Zeilen = stale → No-op.** Liefert der Output-Update keine
-   Zeile zurück, wird der State-Übergang **nicht** ausgeführt; die Funktion
-   loggt `write=plate-ready result=stale` und beendet den Job-Zweig ohne
-   weitere Mutation. Kein Retry, kein Fallback auf einen ungeguardeten Write.
+   wird mit dem eingefrorenen Dispatch-Snapshot **und** dem erwarteten
+   aktuellen Zustand geguardet:
+   `.eq('id', sceneId).eq('active_run_id', runId).eq('plate_generation', generation).in('pipeline_state', <erlaubte From-States>)`.
+2. **Cancel-Race geschlossen (From-State-Guard).** Run + Generation allein
+   reichen nicht: ein User-Cancel behält `active_run_id` und
+   `plate_generation` und setzt nur `pipeline_state = 'canceled'`. Der
+   Completion-Write darf deshalb ausschließlich aus dem laufenden
+   Talking-Head-Zustand (`plate_rendering`) greifen, nie aus `canceled`,
+   `failed` oder `complete`. Bevorzugte Umsetzung: eine kleine atomare
+   DB-Finalisierung, die unter Row Lock Run + Generation + From-State prüft
+   und Output + State gemeinsam materialisiert. Bleiben es zwei Statements,
+   trägt der Output-Write zwingend alle drei Bedingungen (Run, Generation,
+   erwarteter `pipeline_state`) und läuft **vor** dem State-Übergang über
+   `transitionSceneV2()` (`run_bound`, `expected_generation`).
+3. **0 aktualisierte Zeilen = stale/canceled → No-op.** Liefert der
+   Output-Update keine Zeile zurück, wird der State-Übergang **nicht**
+   ausgeführt; die Funktion loggt `write=plate-ready result=stale` und beendet
+   den Job-Zweig ohne weitere Mutation. Kein Retry, kein ungeguardeter
+   Ersatz-Write.
 4. **Gleiche Regel für die Nebenpfade.** `plate_rendering` (inkl.
    `materializeCompatibilityOutput('clear')`), Refund-Fail und Early-Fail
-   laufen über denselben Guard; ein stale Run darf weder Output löschen noch
-   die Szene auf `failed` ziehen.
-5. **Fehlender Run.** Ist `runId` nicht vorhanden (kein Composer-Kontext oder
-   Acquisition fehlgeschlagen), bleibt in G2.2 exakt der heutige Legacy-Pfad
-   bestehen — mit Log-Marker `run=none`. Keine neue Runless-Regel, kein
-   Grandfathering; diese Restmenge wird in G3/G5 abgeräumt.
-6. **Credits.** Der Refund-Pfad bleibt inhaltlich unverändert; nur der
-   Scene-Write darin wird geguardet. Ein stale Run refundet weiterhin seinen
-   eigenen Spend, mutiert aber keine fremde Szene.
+   laufen über denselben Guard; ein stale oder gecancelter Run darf weder
+   Output löschen noch die Szene auf `failed` ziehen.
+5. **Fehlender Run = fail-closed (G2.0-Regel).** Ist `sceneId` gesetzt, aber
+   der Run-Snapshot unvollständig (`runId` oder `plateGeneration` fehlt), gibt
+   es **keinen** `composer_scenes`-Write — weder State noch Output, weder im
+   Erfolgs- noch im Fehlerpfad. Log-Marker
+   `write=<id> result=missing_run_provenance`, klare Fehlerantwort.
+   **Kein Legacy-Fallback.** Standalone-Aufrufe ohne `sceneId` laufen
+   unverändert weiter, da sie ohnehin keine Szene schreiben.
+6. **Credits.** Der Refund-Pfad bleibt inhaltlich unverändert; nur sein
+   Scene-Write wird geguardet bzw. bei fehlender Provenienz ausgelassen. Ein
+   stale Run refundet weiterhin seinen eigenen Spend, mutiert aber keine Szene.
+
 
 ## Vertragsnachweis 2 — Probe: Job-ID muss zum Slot passen
 
@@ -68,30 +81,48 @@ Verbindlich für G2.2:
    Eskalation, kein Hard-Fail. Rückgabe `{ ok: true, ignored: 'job_slot_mismatch' }`
    plus Diagnose-Log mit erwarteter/erhaltener Job-ID; die Dispatch-Log-Zeile
    (rein diagnostisch) darf weiterhin geschrieben werden.
-3. **Match = geguardeter Write.** Nur bei Übereinstimmung wird der
-   Run-Snapshot verwendet; der Hard-Fail-Zweig schreibt den Scene-State dann
-   über `transitionSceneV2()` (`run_bound`, `expected_generation` aus dem
-   Slot). Bleibt der Slot ohne Run-Snapshot (Alt-Zeilen), bleibt der heutige
-   Legacy-Write mit Log-Marker `run=none` — keine neue Ausnahme.
+3. **Match = geguardeter Write, sonst fail-closed.** Nur bei Übereinstimmung
+   wird der Run-Snapshot verwendet; der Hard-Fail-Zweig schreibt den
+   Scene-State dann über `transitionSceneV2()` (`run_bound`,
+   `expected_generation` aus dem Slot). Fehlt dem Slot der vollständige
+   Run-Snapshot (Alt-Zeilen), gibt es **keinen** `composer_scenes`-Write:
+   Diagnose-Log und Pass-/Slot-Verarbeitung laufen weiter, der Scene-State
+   bleibt unangetastet. **Kein Legacy-State-Fallback.**
 4. **Immutability bleibt.** `update_dialog_pass_slot` schützt `run_id` /
    `plate_generation` bereits; G2.2 erweitert den Schutz auf `job_id`, sobald
    sie gesetzt ist — mit der bestehenden Reset-Semantik als einzigem Weg, sie
    wieder freizugeben (expliziter Nullsetz-Pfad in `compose-dialog-segments`).
+5. **Reset-Nachweis (Contract-Test).** Ein `job_id = NULL`-Reset darf niemals
+   dazu führen, dass ein Job aus einer **neuen** Generation den alten
+   `run_id` / `plate_generation`-Snapshot erbt. Der Test belegt genau eine der
+   beiden gültigen Bedingungen: Reset/Retry passiert garantiert innerhalb
+   desselben Runs und derselben Generation, **oder** der Slot wird bei neuem
+   Run vollständig neu erstellt. Trifft keine zu, ist der Reset-Pfad
+   entsprechend zu härten, bevor G2.2 abgenommen wird.
 
 ## Umsetzungsreihenfolge nach GO
 
 1. Migration: `job_id`-Immutability-Erweiterung in `update_dialog_pass_slot`
-   (inkl. explizit erlaubtem Reset-Pfad).
-2. `generate-talking-head`: geguardete Output-Updates + `transitionSceneV2()`
-   für `plate_rendering` / `plate_ready` / `failed`.
-3. `report-lipsync-motion-probe`: Job-Slot-Match-Gate + geguardeter Hard-Fail.
-4. Stale-Run-Smokes auf echter DB:
+   (inkl. explizit erlaubtem Reset-Pfad) und — falls für die atomare Variante
+   gewählt — das Talking-Head-Finalisierungs-Primitive mit Row Lock.
+2. `generate-talking-head`: geguardete Output-Updates (Run + Generation +
+   From-State) + `transitionSceneV2()` für `plate_rendering` / `plate_ready` /
+   `failed`; fail-closed bei fehlender Provenienz.
+3. `report-lipsync-motion-probe`: Job-Slot-Match-Gate + geguardeter Hard-Fail,
+   fail-closed ohne Slot-Run-Snapshot.
+4. Smokes auf echter DB:
    - alter Run schreibt `plate_ready` → 0 Zeilen, Output unverändert, kein State
+   - **Cancel-Race (verpflichtend):** Run A aktiv → User-Cancel → verspätetes
+     Talking-Head-Completion für Run A → weder Output noch State ändern sich
    - aktueller Run → Output + State wie heute
-   - Probe mit falscher `job_id` → No-op, Slot & Szene unverändert
+   - `sceneId` ohne vollständigen Run-Snapshot → gar kein Scene-Write
+   - Probe mit falscher/NULL `job_id` → No-op, Slot & Szene unverändert
    - Probe mit korrekter `job_id` → Eskalation/Hard-Fail wie heute
-5. Tests + `tsgo`, Bericht in `docs/v431-g2-report.md`.
+   - Probe mit korrektem Job, aber ohne Slot-Run-Snapshot → kein State-Write
+5. Contract-Tests (Slot-Immutability inkl. `job_id`-Reset-Nachweis) + `tsgo`,
+   Bericht in `docs/v431-g2-report.md`.
 6. **STOP vor G2.3.**
+
 
 ## Baseline für den Bericht
 
