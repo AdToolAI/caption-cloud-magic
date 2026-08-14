@@ -1,10 +1,10 @@
 # v430.1 — Paritätsbericht der Lip-Sync-Intent-Gates
 
-Stand: 14.08.2026, nach **Schritt 2A**. Die sieben freigegebenen Anzeige-/
-Polling-Gates (7, 10, 11, 12, 13, 15, 17) laufen jetzt auf der SSoT
-`isLipSyncIntentional()`. Die verbleibenden zwölf Gates bleiben mit ihrer
-heutigen Abweichungsmenge eingefroren; über sie wird separat entschieden
-(2B: Gate 8 und 18; Gate 9 mit eigenem Provider-Routing-Nachweis).
+Stand: 14.08.2026, nach **Schritt 2A + 2B**. Die sieben Anzeige-/Polling-Gates
+(7, 10, 11, 12, 13, 15, 17) sowie die beiden run-/kostenrelevanten Gates 8 und 18
+laufen jetzt auf der SSoT `isLipSyncIntentional()`. Die verbleibenden zehn Gates
+bleiben mit ihrer heutigen Abweichungsmenge eingefroren. Gate 9 bleibt
+ausdrücklich unberührt und bekommt einen eigenen Provider-Routing-Nachweis.
 
 ## Grundlagen
 
@@ -32,10 +32,11 @@ Tests:
 
 ## Gesamtbild
 
-- **19 klassifizierte Gates**, davon **7 `exact`**, **0 `broader`**, **0 `narrower`**, **12 `mixed`**.
+- **19 klassifizierte Gates**, davon **9 `exact`**, **0 `broader`**, **0 `narrower`**, **10 `mixed`**.
 - Umgestellt (2A): `scenecard-lipsync-actions`, `clipprogress-is-cinematic`, `clipprogress-should-be-lipsync`, `inlineplayer-needs-lipsync`, `inlineplayer-legacy-happyhorse-warn`, `clipstab-poll-cinematic`, `pipelineprogress-cinematic-generating`.
-- Damit respektieren diese sieben Gates das Toggle-Veto und erkennen `sync-segments`, `native-dialogue` sowie den Voiceover-Opt-in.
-- Unverändert eingefroren: Gates 1–6, 8, 9, 14, 16, 18, 19 mit den zwei bekannten Fehlerklassen (Toggle-Veto ignoriert / Opt-in-Wege übersehen).
+- Umgestellt (2B): `dialogstudio-wants-lipsync` (Studio-Start, kostenrelevant) und `generateall-needs-lipsync` (Ready-Zählung, ohne Dispatch-/Kostenpfad).
+- Damit respektieren diese neun Gates das Toggle-Veto und erkennen `sync-segments`, `native-dialogue` sowie den Voiceover-Opt-in.
+- Unverändert eingefroren: Gates 1–6, 9, 14, 16, 19 mit den zwei bekannten Fehlerklassen (Toggle-Veto ignoriert / Opt-in-Wege übersehen).
 
 ## Gate-für-Gate
 
@@ -93,7 +94,7 @@ Tests:
 - **False positives (5)** — Gate true, SSoT false: `Lf-Dt-Eauto`, `Lf-Dt-Ecs`, `Lf-Dt-Ess`, `Lf-Dt-End`, `Lf-Dt-Eu`
 - **False negatives (16)** — SSoT true, Gate false: `Lt-Df-Eauto`, `Lt-Df-Ecs`, `Lt-Df-Ess`, `Lt-Df-End`, `Lt-Df-Eu`, `Lt-Du-Eauto`, `Lt-Du-Ecs`, `Lt-Du-Ess`, `Lt-Du-End`, `Lt-Du-Eu`, `Lu-Df-Ecs`, `Lu-Df-Ess`, `Lu-Df-End`, `Lu-Du-Ecs`, `Lu-Du-Ess`, `Lu-Du-End`
 
-### `scenecard-lipsync-actions` — v430.1 Schritt 2A: auf SSoT umgestellt
+### `scenecard-lipsync-actions` — v430.1: auf SSoT umgestellt
 
 - **Stelle:** `src/components/video-composer/SceneCard.tsx:2386`
 - **Zweck:** Leiste "Lip-Sync Aktionen" (Intent-Anteil der OR-Kette)
@@ -102,14 +103,14 @@ Tests:
 - **False positives (0)**
 - **False negatives (0)**
 
-### `dialogstudio-wants-lipsync`
+### `dialogstudio-wants-lipsync` — v430.1: auf SSoT umgestellt
 
 - **Stelle:** `src/components/video-composer/SceneDialogStudio.tsx:1335`
 - **Zweck:** Studio-Start erlaubt (sonst Toast "Lip-Sync ist ausgeschaltet")
-- **Heutige Bedingung:** `scene.lipSyncWithVoiceover === true || scene.dialogMode === true`
-- **parity:** `mixed`
-- **False positives (5)** — Gate true, SSoT false: `Lf-Dt-Eauto`, `Lf-Dt-Ecs`, `Lf-Dt-Ess`, `Lf-Dt-End`, `Lf-Dt-Eu`
-- **False negatives (6)** — SSoT true, Gate false: `Lu-Df-Ecs`, `Lu-Df-Ess`, `Lu-Df-End`, `Lu-Du-Ecs`, `Lu-Du-Ess`, `Lu-Du-End`
+- **Heutige Bedingung:** `isLipSyncIntentional(scene)  // v430.1 Schritt 2B`
+- **parity:** `exact`
+- **False positives (0)**
+- **False negatives (0)**
 
 ### `dialogstudio-force-cinematic`
 
@@ -120,7 +121,7 @@ Tests:
 - **False positives (3)** — Gate true, SSoT false: `Lf-Dt-Ecs`, `Lf-Df-Ecs`, `Lf-Du-Ecs`
 - **False negatives (8)** — SSoT true, Gate false: `Lu-Dt-Eauto`, `Lu-Dt-Ess`, `Lu-Dt-End`, `Lu-Dt-Eu`, `Lu-Df-Ess`, `Lu-Df-End`, `Lu-Du-Ess`, `Lu-Du-End`
 
-### `clipprogress-is-cinematic` — v430.1 Schritt 2A: auf SSoT umgestellt
+### `clipprogress-is-cinematic` — v430.1: auf SSoT umgestellt
 
 - **Stelle:** `src/components/video-composer/SceneClipProgress.tsx:126`
 - **Zweck:** Cinematic-Marker für die Fortschrittsanzeige
@@ -129,7 +130,7 @@ Tests:
 - **False positives (0)**
 - **False negatives (0)**
 
-### `clipprogress-should-be-lipsync` — v430.1 Schritt 2A: auf SSoT umgestellt
+### `clipprogress-should-be-lipsync` — v430.1: auf SSoT umgestellt
 
 - **Stelle:** `src/components/video-composer/SceneClipProgress.tsx:132`
 - **Zweck:** Szene gilt als Lip-Sync-Szene (Spinner/Warnungen)
@@ -138,7 +139,7 @@ Tests:
 - **False positives (0)**
 - **False negatives (0)**
 
-### `inlineplayer-needs-lipsync` — v430.1 Schritt 2A: auf SSoT umgestellt
+### `inlineplayer-needs-lipsync` — v430.1: auf SSoT umgestellt
 
 - **Stelle:** `src/components/video-composer/SceneInlinePlayer.tsx:76`
 - **Zweck:** Grüner Haken erst nach Lip-Sync (Intent-Anteil)
@@ -147,7 +148,7 @@ Tests:
 - **False positives (0)**
 - **False negatives (0)**
 
-### `inlineplayer-legacy-happyhorse-warn` — v430.1 Schritt 2A: auf SSoT umgestellt
+### `inlineplayer-legacy-happyhorse-warn` — v430.1: auf SSoT umgestellt
 
 - **Stelle:** `src/components/video-composer/SceneInlinePlayer.tsx:223`
 - **Zweck:** Warnung "Lip-Sync auf veraltetem Video" (Intent-Anteil)
@@ -165,7 +166,7 @@ Tests:
 - **False positives (6)** — Gate true, SSoT false: `Lf-Dt-Ecs`, `Lf-Dt-Ess`, `Lf-Df-Ecs`, `Lf-Df-Ess`, `Lf-Du-Ecs`, `Lf-Du-Ess`
 - **False negatives (14)** — SSoT true, Gate false: `Lt-Dt-Eauto`, `Lt-Dt-End`, `Lt-Dt-Eu`, `Lt-Df-Eauto`, `Lt-Df-End`, `Lt-Df-Eu`, `Lt-Du-Eauto`, `Lt-Du-End`, `Lt-Du-Eu`, `Lu-Dt-Eauto`, `Lu-Dt-End`, `Lu-Dt-Eu`, `Lu-Df-End`, `Lu-Du-End`
 
-### `clipstab-poll-cinematic` — v430.1 Schritt 2A: auf SSoT umgestellt
+### `clipstab-poll-cinematic` — v430.1: auf SSoT umgestellt
 
 - **Stelle:** `src/components/video-composer/ClipsTab.tsx:550`
 - **Zweck:** 3s-Polling läuft weiter, solange Lip-Sync arbeitet (Intent-Anteil)
@@ -183,7 +184,7 @@ Tests:
 - **False positives (5)** — Gate true, SSoT false: `Lf-Dt-Eauto`, `Lf-Dt-Ecs`, `Lf-Dt-Ess`, `Lf-Dt-End`, `Lf-Dt-Eu`
 - **False negatives (16)** — SSoT true, Gate false: `Lt-Df-Eauto`, `Lt-Df-Ecs`, `Lt-Df-Ess`, `Lt-Df-End`, `Lt-Df-Eu`, `Lt-Du-Eauto`, `Lt-Du-Ecs`, `Lt-Du-Ess`, `Lt-Du-End`, `Lt-Du-Eu`, `Lu-Df-Ecs`, `Lu-Df-Ess`, `Lu-Df-End`, `Lu-Du-Ecs`, `Lu-Du-Ess`, `Lu-Du-End`
 
-### `pipelineprogress-cinematic-generating` — v430.1 Schritt 2A: auf SSoT umgestellt
+### `pipelineprogress-cinematic-generating` — v430.1: auf SSoT umgestellt
 
 - **Stelle:** `src/hooks/usePipelineProgress.ts:922`
 - **Zweck:** Szene zählt als "in Arbeit" während Lip-Sync (Intent-Anteil)
@@ -192,14 +193,14 @@ Tests:
 - **False positives (0)**
 - **False negatives (0)**
 
-### `generateall-needs-lipsync`
+### `generateall-needs-lipsync` — v430.1: auf SSoT umgestellt
 
 - **Stelle:** `src/hooks/useGenerateAllClips.ts:62`
 - **Zweck:** Szene gilt erst nach Lip-Sync als pipeline-ready (Intent-Anteil)
-- **Heutige Bedingung:** `scene.engineOverride === 'cinematic-sync'`
-- **parity:** `mixed`
-- **False positives (3)** — Gate true, SSoT false: `Lf-Dt-Ecs`, `Lf-Df-Ecs`, `Lf-Du-Ecs`
-- **False negatives (20)** — SSoT true, Gate false: `Lt-Dt-Eauto`, `Lt-Dt-Ess`, `Lt-Dt-End`, `Lt-Dt-Eu`, `Lt-Df-Eauto`, `Lt-Df-Ess`, `Lt-Df-End`, `Lt-Df-Eu`, `Lt-Du-Eauto`, `Lt-Du-Ess`, `Lt-Du-End`, `Lt-Du-Eu`, `Lu-Dt-Eauto`, `Lu-Dt-Ess`, `Lu-Dt-End`, `Lu-Dt-Eu`, `Lu-Df-Ess`, `Lu-Df-End`, `Lu-Du-Ess`, `Lu-Du-End`
+- **Heutige Bedingung:** `isLipSyncIntentional(scene)  // v430.1 Schritt 2B`
+- **parity:** `exact`
+- **False positives (0)**
+- **False negatives (0)**
 
 ### `mouthprobe-cinematic`
 
