@@ -2339,7 +2339,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           label = tx({ de: `⚠️ ${missing.name} hat kein Portrait — bitte Cast-Charakter zuweisen, sonst kein echter Lip-Sync möglich.`, en: `⚠️ ${missing.name} has no portrait — please assign a cast character, otherwise real lip-sync is not possible.`, es: `⚠️ ${missing.name} no tiene retrato; asigna un personaje del elenco, de lo contrario no será posible una sincronización labial real.` });
         } else if (isSrsSplit && portraitsAll) {
           tone = 'primary';
-          label = tx({ de: `🎬 Wird als ${speakers.length} Szene${speakers.length === 1 ? '' : 'n'} gerendert (Shot-Reverse-Shot, je 1 Basis-Clip + Sync.so pro Sprecher)`, en: `🎬 Will be rendered as ${speakers.length} scene${speakers.length === 1 ? '' : 's'} (shot-reverse-shot, 1 base clip + Sync.so per speaker each)`, es: `🎬 Se renderizará como ${speakers.length} escena${speakers.length === 1 ? '' : 's'} (plano-contraplano, 1 clip base + Sync.so por orador cada una)` });
+          label = tx({ de: `🎬 Wird als ${speakers.length} Szene${speakers.length === 1 ? '' : 'n'} gerendert (Shot-Reverse-Shot, je 1 Basis-Clip mit Lippensynchronisation pro Sprecher)`, en: `🎬 Will be rendered as ${speakers.length} scene${speakers.length === 1 ? '' : 's'} (shot-reverse-shot, 1 lip-synced base clip per speaker)`, es: `🎬 Se renderizará como ${speakers.length} escena${speakers.length === 1 ? '' : 's'} (plano-contraplano, 1 clip base con sincronización labial por orador)` });
         } else if (isSyncSegments && portraitsAll) {
           tone = 'primary';
           // sync-segments pricing ≈ €0.20/s; show flat cost note instead of per-speaker.
