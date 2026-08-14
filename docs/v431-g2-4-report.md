@@ -102,4 +102,4 @@ DELETE-Versuch nicht mutiert.
 - Äußerer Catch-all in `hybrid-extend-scene` ohne Fail-Write → G4/Recovery.
 - `compose-dialog-segments` Deferred-Refund → eigener Credit-Gate-Track vor G3/G4.
 
-**Status: G2.4 umgesetzt. STOP — kein G3 ohne neuen Auftrag.**
+**Status: G2.4 umgesetzt, S5-Cleanup-Smoke nachgereicht und grün (keine Produktivcode-Änderung in S5). STOP — kein G3 ohne neuen Auftrag.**
