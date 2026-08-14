@@ -76,8 +76,8 @@ import {
   DIALOG_MASTER_PROVIDER_LABELS,
   resolveDialogMasterProvider,
 } from '@/lib/video-composer/lipsyncMasterProvider';
+import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 import type {
-import { isLipSyncIntentional } from "@/lib/video-composer/lipSyncIntent";
   ComposerCharacter,
   ComposerScene,
   CharacterShot,
