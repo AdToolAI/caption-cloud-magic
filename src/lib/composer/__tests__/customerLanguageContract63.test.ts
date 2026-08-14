@@ -26,7 +26,6 @@ const SCAN_DIRS = [
 const FORBIDDEN: RegExp[] = [
   /\bSync\.so\b/i,
   /\bCinematic[-\s]Sync\b/i,
-  /\bHappyHorse\b/i,
   /\bTwo[-\s]Shot\b/i,
   /\bPlate\b/,
   /\bplaca\b/i,

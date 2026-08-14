@@ -1366,9 +1366,9 @@ export default function SceneCard({
                 const dialogLengthWarning = dialogTooLong ? (
                   <p className="text-[10px] text-red-300/90 leading-snug">
                     {tx({
-                      de: `Skript dauert ca. ${spokenSec}s, die Platte nur ${current}s (max. ${PROVIDER_MAX}s).`,
-                      en: `Script runs approx. ${spokenSec}s, the plate only ${current}s (max ${PROVIDER_MAX}s).`,
-                      es: `El guion dura aprox. ${spokenSec}s, la placa solo ${current}s (máx. ${PROVIDER_MAX}s).`,
+                      de: `Skript dauert ca. ${spokenSec}s, die Szene nur ${current}s (max. ${PROVIDER_MAX}s).`,
+                      en: `Script runs approx. ${spokenSec}s, the scene only ${current}s (max ${PROVIDER_MAX}s).`,
+                      es: `El guion dura aprox. ${spokenSec}s, la escena solo ${current}s (máx. ${PROVIDER_MAX}s).`,
                     })}{' '}
                     {seedanceWouldFit
                       ? tx({

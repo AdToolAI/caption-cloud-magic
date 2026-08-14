@@ -373,7 +373,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           (dbScene as any).lip_sync_status === 'failed'
         ) {
           toast({
-            title: tx({ de: `Lip-Sync Lip-Sync fehlgeschlagen`, en: `Cinematic sync lip sync failed`, es: `Error de sincronización de labios en la sincronización labial` }),
+            title: tx({ de: `Lippensynchronisation fehlgeschlagen`, en: `Lip-sync failed`, es: `Falló la sincronización labial` }),
             description: tx({ de: `Szene ${idx + 1}: Das Video ist fertig, aber die Lippensynchronisation ist fehlgeschlagen. Credits wurden refundiert.`, en: `Scene ${idx + 1}: The video is finished, but lip-sync failed. Credits have been refunded.`, es: `Escena ${idx + 1}: el video terminó, pero la sincronización labial falló. Los créditos han sido reembolsados.` }),
             variant: 'destructive',
           });
@@ -386,7 +386,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           (dbScene as any).lip_sync_status === 'no_voiceover'
         ) {
           toast({
-            title: tx({ de: `Lip-Sync braucht ein Voiceover — Szene ${idx + 1}`, en: `Cinematic sync needs a voiceover — scene ${idx + 1}`, es: `La sincronización labial necesita una voz en off: escena ${idx + 1}` }),
+            title: tx({ de: `Lip-Sync braucht ein Voiceover — Szene ${idx + 1}`, en: `Lip-sync needs a voiceover — scene ${idx + 1}`, es: `La sincronización labial necesita una voz en off: escena ${idx + 1}` }),
             description: tx({ de: 'Das Video ist fertig, aber es gibt kein Voiceover für den Lip-Sync. Bitte erst im Dialog/VO-Tab eine Stimme generieren, dann Lip-Sync erneut starten.', en: 'The video is done, but there is no voiceover for the lip sync. Please generate a voice in the Dialog/VO tab first, then start Lip-Sync again.', es: 'El video terminó, pero no hay locución para la sincronización labial. Genera primero una voz en la pestaña Diálogo/VO y luego reinicia Lip-Sync.' }),
             variant: 'destructive',
           });
@@ -525,7 +525,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             }
             if (reason === 'tts_failed' || reason === 'no_voiceover') {
               toast({
-                title: tx({ de: "Lip-Sync braucht ein Voiceover", en: "Cinematic sync needs a voiceover", es: "La sincronización labial necesita una voz en off" }),
+                title: tx({ de: "Lip-Sync braucht ein Voiceover", en: "Lip-sync needs a voiceover", es: "La sincronización labial necesita una voz en off" }),
                 description: message || tx({ de: 'Bitte im Voiceover-Tab eine Stimme prüfen, dann erneut starten.', en: 'Please check a voice in the Voiceover tab, then restart.', es: 'Comprueba una voz en la pestaña de locución y vuelve a iniciar.' }),
                 variant: 'destructive',
               });
@@ -1048,8 +1048,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       }
 
       toast({
-        title: tx({ de: '🎬 Lip-Sync gestartet', en: '🎬 Cinematic sync started', es: '🎬 Se inició la sincronización labial' }),
-        description: tx({ de: `Szene ${(scene.orderIndex ?? 0) + 1}: Hailuo rendert die echte Szene (~60 s), danach läuft Lippensynchronisation automatisch.`, en: `Scene ${(scene.orderIndex ?? 0) + 1}: Hailuo renders the real scene (~60 s), then Lippensynchronisation runs automatically.`, es: `Escena ${(scene.orderIndex ?? 0) + 1}: Hailuo renderiza la escena real (~60 s), luego Lippensynchronisation se ejecuta automáticamente.` }),
+        title: tx({ de: '🎬 Lip-Sync gestartet', en: '🎬 Lip-sync started', es: '🎬 Se inició la sincronización labial' }),
+        description: tx({ de: `Szene ${(scene.orderIndex ?? 0) + 1}: Die Szene wird gerendert (~60 s), danach läuft die Lippensynchronisation automatisch.`, en: `Scene ${(scene.orderIndex ?? 0) + 1}: The scene is rendering (~60 s), then lip-sync runs automatically.`, es: `Escena ${(scene.orderIndex ?? 0) + 1}: la escena se está renderizando (~60 s), después la sincronización labial se ejecuta automáticamente.` }),
       });
       setTimeout(pollScenes, 800);
     } catch (err: any) {
