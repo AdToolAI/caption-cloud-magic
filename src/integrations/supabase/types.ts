@@ -18016,6 +18016,27 @@ export type Database = {
         }
         Relationships: []
       }
+      v431_g2_3_smoke: {
+        Row: {
+          case_id: string
+          created_at: string
+          id: number
+          result: Json
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          id?: number
+          result: Json
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          id?: number
+          result?: Json
+        }
+        Relationships: []
+      }
       video_analytics: {
         Row: {
           created_at: string
