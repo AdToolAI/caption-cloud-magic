@@ -196,7 +196,6 @@ import { tx } from "@/lib/i18nText";
 import { SceneActionsMenu } from "./SceneActionsMenu";
 import { SceneContinuityStatus } from "./SceneContinuityStatus";
 import { clipStatusFromState, legacyClipFailedEquivalentRow, legacyClipReadyEquivalentRow, sceneState, sceneSubstate } from '@/lib/composer/sceneState';
-import { resolveSceneOutput } from '@/lib/composer/output/resolveSceneOutput';
 import {
   sceneDirectorModeReady,
   sceneHasAuthoredContent,
@@ -373,7 +372,6 @@ export default function SceneCard({
     cancellable: lipsyncCancellable,
   } = sceneLipsyncFlags(sceneLifecycleState, sceneDetailState, sceneIsFailed);
   // v430 Schritt 6.4 — Output ausschliesslich ueber den Resolver.
-  const sceneOutput = resolveSceneOutput(scene);
   const renderedOutputUrl = sceneRenderedOutputUrl(scene);
   const thumbnail = sceneThumbnailSource(scene);
   // v418 rollout brake — mirrors the server flag for Seedance 2.5 plates.
