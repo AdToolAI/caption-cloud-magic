@@ -2,6 +2,7 @@ import { tx } from "@/lib/i18nText";
 import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type {
+import { cutStyleToRow } from "@/lib/video-composer/cutStyle";
   ComposerScene,
   ComposerBriefing,
   AssemblyConfig,

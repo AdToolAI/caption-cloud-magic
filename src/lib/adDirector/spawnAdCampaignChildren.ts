@@ -13,6 +13,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { buildCutdown, type CutdownType } from './buildCutdowns';
 import type {
+import { cutStyleToRow } from "@/lib/video-composer/cutStyle";
   AdCampaignMeta,
   ComposerScene,
   AssemblyConfig,

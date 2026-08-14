@@ -70,6 +70,7 @@ import { useStoryboardTransition } from '@/hooks/useStoryboardTransition';
 import ProductionWarRoom from './storyboard/ProductionWarRoom';
 import ProductionPlanSheet from './briefing/ProductionPlanSheet';
 import { clipStatusFromState, isInFlightState, legacyClipReadyEquivalentRow, sceneState } from '@/lib/composer/sceneState';
+import { cutStyleFromRow, cutStyleToRow } from "@/lib/video-composer/cutStyle";
 
 type TabId = 'briefing' | 'storyboard' | 'clips' | 'text' | 'audio' | 'export' | 'campaign';
 

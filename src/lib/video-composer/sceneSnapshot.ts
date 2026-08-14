@@ -9,6 +9,7 @@
  * and forward-compatible.
  */
 import type { ComposerScene } from '@/types/video-composer';
+import { cutStyleToRow } from "@/lib/video-composer/cutStyle";
 
 export function sceneToSnakeSnapshot(scene: ComposerScene): Record<string, unknown> {
   return {

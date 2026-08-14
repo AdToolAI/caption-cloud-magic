@@ -112,6 +112,7 @@ import { resolveSceneAudioSource, type SceneAudioSource } from '@/config/nativeA
 import { pickClipSourceForDuration } from '@/lib/composer/pickClipSourceForDuration';
 import { useSeedance25LipsyncState } from '@/hooks/useSeedance25Lipsync';
 import { isSceneInFlight, sceneState } from '@/lib/composer/sceneState';
+import { cutStyleToRow } from "@/lib/video-composer/cutStyle";
 
 
 /** v416 — true when a plan scene actually contains speech (VO, dialog, lip-sync). */
