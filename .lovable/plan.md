@@ -82,6 +82,8 @@ RLS an, `service_role` voll, `authenticated` nur lesend auf eigene Projekte, kei
 - Ein Wrapper-Aufruf **ohne** `_run_id` ist **kein** genereller Runless-Freifahrtschein. `system_migration` ist ausschließlich in Kombination mit einer expliziten DB-seitigen Grandfather-Allowlist gültig, die auf `(source_signature, write_id, from_state, to_state)` matcht. Nur die dort eingetragenen Kantenpaare dürfen run-blind ausgeführt werden; jede andere Kante wird mit `reason = 'runless_not_grandfathered'` abgelehnt und trotzdem auditiert.
 - **Partial Guard — kein Fallback auf runless.** Die Wrapper wählen `run_bound` **nicht** allein anhand `_run_id IS NOT NULL`, sondern nur wenn `_run_id` **und** `_generation` gesetzt sind. Genau eines von beiden gesetzt ⇒ `reason = 'guard_args_missing'`, **kein Write**, Audit-Zeile. Weder `_run_id` ohne `_generation` noch `_generation` ohne `_run_id` darf jemals in den runless-Pfad fallen. Beides NULL ⇒ runless-Pfad mit Grandfather-Prüfung.
 - Ein Wrapper-Aufruf **ohne** beide Guard-Argumente durchläuft zusätzlich die Regeln aus 1a und 1b, die Grandfather-Allowlist ist also eine Verschärfung, kein Ersatz.
+- Die Grandfather-Allowlist wird beim Migrationsschreiben aus dem bestehenden Inventar (`docs/v431-prep-inventory.md`) befüllt, ist eine eigene Tabelle `public.composer_transition_grandfather` (service_role only) und schrumpft mit jeder Gruppe G1–G5, bis sie in G6 leer ist.
+- Erst wenn der Audit-Log über ein Beobachtungsfenster keine Fremdaufrufe zeigt **und** die Allowlist leer ist, ist ein Drop in G6 begründbar.
 
 ## 6. Recovery-Primitive
 
