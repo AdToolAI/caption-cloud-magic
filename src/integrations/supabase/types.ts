@@ -19664,6 +19664,16 @@ export type Database = {
         }
         Returns: Json
       }
+      composer_finalize_upload_scene: {
+        Args: {
+          _generation: number
+          _run_id: string
+          _scene_id: string
+          _upload_url: string
+          _write_id: string
+        }
+        Returns: Json
+      }
       composer_recover_scene: {
         Args: {
           _expected_plate_generation: number
