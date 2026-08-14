@@ -1,105 +1,99 @@
-# Cast & World — Architektur-Audit (read-only, keine Codeänderungen)
+# Phase 0 — Bericht zu den vier offenen G0-Klärungen (reine Analyse)
 
-Kernbefund vorab: **Die IDs sind formal kanonisch, aber sie sind nirgends erzwungen.** Es existiert kein einziger Fremdschlüssel von `composer_scenes` auf `brand_characters` / `brand_locations` / `brand_props`. Alles hängt an Applikationsdisziplin. An mehreren Stellen fällt der Code auf **Namen** bzw. **Array-Index [0]** zurück, wenn eine UUID fehlt. Der Lip-Sync-Kern selbst ist davon gut isoliert.
+Keine Codeänderung, keine Migration, keine Writer-Migration, kein Cast-&-World-Eingriff. Der Lip-Sync-Freeze bleibt unberührt.
 
-## A. Cast & World Data Model
+Vorab, weil es die G0-Planung direkt betrifft: **beide Überladungen von `composer_scene_transition` sind heute für die Rolle `anon` ausführbar, und die Ownership-Prüfung greift bei `auth.uid() IS NULL` gar nicht.** Details unter 0.2. Das ist kein Nebenbefund, sondern eine offene Tür in den State-Core.
 
-| Entität | Tabelle | PK | Owner | Anchor-Feld | Archiv | Rolle |
-|---|---|---|---|---|---|---|
-| Characters | `brand_characters` (49 Sp.) | `id uuid` | `user_id`, opt. `brand_kit_id` | `reference_image_url NOT NULL`, `portrait_url` | `archived_at` | SoT |
-| Locations | `brand_locations` | `id uuid` | `user_id`, `brand_kit_id` | `reference_image_url NOT NULL` | `archived_at` | SoT |
-| Buildings | `brand_buildings` | `id uuid` | `user_id` | `reference_image_url` | `archived_at` | SoT |
-| Props | `brand_props` | `id uuid` | `user_id` | `reference_image_url` | `archived_at` | SoT |
-| Wardrobe/Outfits/Posen | `avatar_outfit_looks`, `avatar_wardrobe_variants`, `avatar_pose_variants` | `id uuid` | via `avatar_id` → CASCADE | `cover_url` / `image_url` | – | Kind |
-| Location-Varianten | `location_prop_variants`, `location_vibe_variants` | `id uuid` | via `location_id` → CASCADE | `image_url` | – | Kind |
-| Style/World | `motion_studio_style_presets` | `id uuid` | `user_id` | `preview_thumb_url` | – | SoT, einziger echter FK von `composer_scenes` |
-| Paralleles Modell | `motion_studio_characters` / `_locations` (+ Varianten) | `id uuid` | `user_id`, `workspace_id` | `reference_image_url` (nullable) | **kein `archived_at`** | zweite SoT |
-| Katalog | `*_catalog_previews` | `id uuid` | keiner | `image_url` | – | reiner UI-Spiegel |
+---
 
-Vehicles: existieren nicht als eigene Entität (UNKNOWN, ob als Prop geführt).
-**Zwei parallele Wahrheiten:** `brand_*` (Composer/Lip-Sync) und `motion_studio_*` (eigenes Consent-Modell). Nur `brand_*` ist im Lip-Sync-Pfad verdrahtet.
+## 0.1 — Der fehlende `transitionScene()`-Caller
 
-## B. Scene References
+`rg "transitionScene\("` liefert 11 Treffer: 1 Definition (`_shared/scene-state.ts:333`), **10 direkte Call-Sites** und **1 indirekten Aufruf** innerhalb von `failSceneState()` (`scene-state.ts:409`). Der bisher nicht zugeordnete elfte ist dieser interne Aufruf.
 
-Kein Join-Table-Modell — alles denormalisiert auf `composer_scenes` (130 Spalten):
-- kanonisch: `mentioned_character_ids uuid[]`, `mentioned_location_ids uuid[]`, `scene_assets jsonb` (`{id,type,role,displayName}[]`), `applied_style_preset_id` (echter FK, `SET NULL`), `dialog_turns[].characterId`
-- legacy: `character_shot` (Singular), `character_shots[].characterId` — enthält in echten Zeilen **Slugs** wie `"matthew-dusatko"` statt UUIDs; `ensureSceneAssetsForScene()` (`_shared/asset-ref.ts:110-189`) verwirft diese still per `isUuid()`-Check
-- nur Cache/Darstellung: `reference_image_url`, `lock_reference_url`, `character_image_url`, `first_frame_url`, `last_frame_url`, `end_reference_image_url`, `preview_anchor_url`, `dialog_shots.segments[].speakerName`
-- echte Join-Tabellen nur: `scene_face_tracks` (scene↔character, CASCADE) und `brand_character_usage` (Analytics)
+| Write-ID | Ort | Ziel | runId | gen | Klasse |
+|---|---|---|---|---|---|
+| `composer-start-scene-generation:enter-plate-queued-on-run-start` | `:200` | `plate_queued` | ja | ja | **run_bound** |
+| `composer-start-scene-generation:fail-on-dispatch-failure` | `:255` | `failed` | ja | ja | **run_bound** |
+| `composer-cancel-project:cancel-scene-on-project-cancel` | `:215` | `canceled` | nein | nein | runless (Grenzfall) |
+| `composer-cancel-scene:cancel-scene-on-user-request` | `:147` | `canceled` | nein | nein | runless (Grenzfall) |
+| `generate-composer-image-scene:enter-plate-rendering` | `:147` | `plate_rendering` | nein | nein | legitim runless |
+| `generate-composer-image-scene:fail-on-gateway-error` | `:168` | `failed` | nein | nein | legitim runless |
+| `generate-composer-image-scene:fail-on-no-image` | `:195` | `failed` | nein | nein | legitim runless |
+| `generate-composer-image-scene:fail-on-upload-error` | `:222` | `failed` | nein | nein | legitim runless |
+| `generate-composer-image-scene:enter-plate-ready` | `:241` | `plate_ready` | nein | nein | legitim runless |
+| `hybrid-extend-scene:mark-failed-on-error` | `:375` | `failed` | nein | nein | legitim runless |
+| `scene-state:failSceneState-internal-transition` | `scene-state.ts:409` | `failed`/`canceled` | nein | nein | **Vertragslücke** |
 
-## C. Identity Flow
+Begründung der Klassen:
+- **run_bound**: `runId` + `generation` werden durchgereicht, DB-Guard `stale_run`/`stale_generation` greift.
+- **legitim runless**: `generate-composer-image-scene` und `hybrid-extend-scene` kennen kein `active_run_id`/`plate_generation` — es gibt dort keinen Run, gegen den geprüft werden könnte.
+- **Grenzfall Cancel**: beide Cancel-Funktionen **lesen** `active_run_id` bereits in ihren Row-Select (`composer-cancel-project:103`, `composer-cancel-scene:70`), reichen ihn aber nicht durch. Ob das gewolltes Force-Cancel ist, ist eine Produktentscheidung, keine Codefrage — Vorschlag für G0: `guard_mode: 'runless'` mit Pflichtgrund `user_cancel` / `project_cancel`, nicht stillschweigend ungeprüft.
+- **Vertragslücke `failSceneState()`**: die Funktion hat **null aktive Aufrufer** im Repo (nur die Definition und eine Erwähnung im Contract-Test). Sie war laut Kommentar (`scene-state.ts:388-399`) als Ersatz für ca. 40 direkte `pipeline_state: 'failed'`-Writes gedacht — dieser Migrationspfad wurde nie verdrahtet. Separat gezählt: `failSceneState()`-Aufrufe = **0**.
 
-`characterId (UUID)` → `brand_characters` → `portrait_url/reference_image_url` → **Komposition** in `compose-scene-anchor` (Gruppenbild aus allen nicht-`absent` Shots) → Upload `composer-frames` → geschrieben nach `composer_scenes.reference_image_url` (`compose-video-clips:2972,3693`) → Provider.
+Zusatzbefund für G0/G5: der Contract-Test `scene-state-write-contract.test.ts:16-20` erlaubt direkte `pipeline_state`-Writes nur in `scene-hard-reset.ts` und `scene-state.ts`, im Repo existieren aber >15 weitere Fundstellen (`qa-watchdog`, `generate-talking-head`, `compose-video-clips:1633`, `recover-stuck-composer-clip:107`, `_shared/continuity-chain.ts`, `_shared/autopilotComposerBridge.ts:173`, `auto-director-compose:216`, `motion-studio-superuser`). Der Test-Regex matcht nur String-Literale und erfasst diese Fälle nicht zuverlässig — die "EIN Schreibpfad"-Garantie ist heute nicht durchgesetzt.
 
-- **Kopiert, nicht dynamisch resolved.** Ändert der Nutzer später das Portrait, bleibt die Szene auf dem alten Anchor. Kein Trigger, kein Invalidator für `scene_anchor_cache`.
-- `speaker_idx` ist deterministischer Geometrie-Key (First-Appearance über `dialog_turns`, `_shared/scene-dialog-turns.ts:161-206`), **nicht** Identität. Nur `resolveIdentityViaRekognition` nutzt ihn als Key im `assignmentLock` (`{speakerIdx: characterId}`) und `sync-so-webhook` als Fallback-Label.
-- Multi-Speaker hart auf 4 begrenzt (`_shared/cast-validation.ts:35-38`, FROZEN-INVARIANTS I.6); `character_id` darf nicht unter zwei `speaker_idx` erscheinen.
-- Hauptcharakter = `characterShots[0]` (`types/video-composer.ts:255`, `useApplyBriefingManifest.ts:98`). Kein Konsistenzcheck gegen die Sprecherreihenfolge aus `dialog_turns` (offener Befund).
-- **Kein Character-Asset-Hash.** Es gibt nur `dialog_content_hash`, `audio_asset_hash`, `voice_configuration_hash`. Anchor ist an `plate_generation` / `anchor_confirmed_at` / `active_run_id` gebunden, aber nicht an eine Asset-Revision.
+## 0.2 — Alte RPC-Signaturen
 
-## D. Prompt Flow
+Es existieren genau zwei Überladungen, beide `SECURITY DEFINER`, `search_path=public`:
 
-`Scene-Prompt` + `[Cast: Name (Shot)]` (`applyCastToPrompt.ts:70-94`, idempotent, UUID-strikt seit v211) + `<!--scene-assets-->@slug` (`applySceneAssetsToPrompt.ts:56-67`, idempotent) + `Cinematography:`-Suffix (`buildShotPromptSuffix.ts`) → Server: `[CastActions]` (`compose-video-clips:1133-1148`, Existenzcheck vor Insert) + Cast-Union speakers-first (`:1318-1370`) → Provider-Sanitizer (`happyhorse-green-net.ts:107`).
+| Variante | Argumente | Repo-Aufrufer |
+|---|---|---|
+| **A (6-arg)** | `_scene_id, _to, _from, _detail, _run_id, _generation` | **keiner** |
+| **B (7-arg)** | A + `_substate` | nur `scene-state.ts:300-308` (`rpcTransition`) |
 
-**Befund:** `supabase/functions/_shared/cast-clause.ts` mit `buildCastClause`/`validateCastContract` (v370-Vertrag) **existiert im Repo nicht mehr**. Ob der v370-Schutz gegen Mehrfach-Injektion heute noch aktiv ist, ist damit nicht verifizierbar. Continuity fließt nicht in den Prompt-Text (nur UI-Warnungen).
+Kein `DROP FUNCTION` in den Migrationen — die 7er kam als zusätzliche Überladung (`20260813221849:165`), die 6er (`20260802143005:225`) blieb live.
 
-## E. Visual Slot Arbitration
+**Grants (live, `proacl` / `has_function_privilege`):** `anon`, `authenticated`, `service_role` haben **auf beiden** EXECUTE. Die Migrationen machen zwar `REVOKE ALL … FROM public` + gezielte GRANTs an `authenticated`/`service_role`, aber `anon` kommt über einen `pg_default_acl`-Eintrag für Schema `public`, Objekttyp `f` — der von `REVOKE … FROM public` nicht berührt wird. Das Revoke verfehlt damit sein Ziel.
 
-Regel ist eindeutig und codebelegt: **Character-Anchor gewinnt immer.** `protected` wird nur für `role === 'character'` gesetzt (`resolveVisualInputs.ts:52-59`); bei Seedance 2.5 (`mode: 'exclusive'`) erzwingt `slotsCollide` immer Kollision, der Anchor nimmt den Slot (`anchor_takes_exclusive_slot`), Referenzen werden getrimmt. Dispatch-Guard wirft hart (`seedance_protected_anchor_payload_contract_failed`, `compose-video-clips:4464-4482`). Budget sortiert `protected` vor Score (`referenceBudget.ts:50`).
+**Autorisierung in der Funktion:** `IF auth.uid() IS NOT NULL AND NOT can_edit_composer_project(...)` (`20260813221849:188-190`). Bei einem echten anon-Aufruf ist `auth.uid()` NULL → **die Ownership-Prüfung wird übersprungen.** Verbleibende Schranken: nur die Allowlist `composer_scene_transitions` und die optionalen `_run_id`/`_generation`-Guards, die ein externer Aufrufer schlicht weglässt.
 
-**Ein Prop oder eine Location kann `reference_image_url` nicht überschreiben** — alle Schreibstellen sind character-getrieben. Locations gewinnen den First-Frame nur in nicht-identitätskritischen `transition-priority`-Szenen.
+**Erreichbarkeit:** beide via `POST /rest/v1/rpc/composer_scene_transition`; PostgREST wählt die Überladung nach der Named-Args-Menge (ohne `_substate` → A, mit → B).
 
-Strategien: `character_anchor`, `uploaded_reference`, `generated_still` sind im Resolver **nicht unterscheidbar** (alle nur `hasAnchorImage`-Check). `previous_final_frame` degradiert bei Lip-Sync (`lipsync_continuity_disabled`).
+**Observability:** es gibt keine. `composer_scene_transitions` ist die statische Zulässigkeitsmatrix, keine Audit-Tabelle. Die Funktion loggt nur `RAISE LOG 'v384_forbidden_transition'` (Ablehnung wegen State-Machine), nicht `forbidden`, nicht Erfolge. Das Applikationslogging in `scene-state.ts:356-382` sieht nur Aufrufe über Edge Functions. Ein Direktaufruf via PostgREST erzeugt keine für uns sichtbare Spur.
 
-## F. Mutation / Staleness
+**Fazit:** externe Nutzung ist **nicht ausschließbar**. Kein Drop in G0. Ziel bleibt die vorgeschlagene Architektur — neuer kanonischer guarded Kern, 6er und 7er als instrumentierte, deprecatete Wrapper, die delegieren. Erste konkrete Maßnahme in G0 sollte jedoch der Entzug von `anon`-EXECUTE auf beiden Alt-Signaturen sein, plus eine Instrumentierung, die Caller-Rolle und Signatur in eine Audit-Tabelle schreibt — ohne diese Zahlen ist ein späterer Drop nie belastbar begründbar.
 
-Ist-Zustand: **es passiert nichts.**
-- Keine Trigger auf `brand_characters/_locations/_props` außer `updated_at`-Stampern.
-- Staleness existiert nur scene→scene (`trg_continuity_staleness`, `propagate_continuity_staleness`, `composer_continuity_queue`, `continuity_source_scene_id`) — nie asset→scene.
-- Kein Revisions-/Hash-Vergleich gegen `brand_*.updated_at` im Client.
-- Kein automatisches Re-Render, aber auch **keine Warnung** an den Nutzer.
+## 0.3 — v391 Gap-Filler atomar
 
-## G. Dangerous Drift
+**Fundort:** `_shared/scene-state.ts:270-385`. Der "Gap-Filler" ist ein **Client-Loop**, kein DB-Mechanismus: schlägt der erste RPC mit `transition_not_allowed` fehl und liegt das Ziel in `LINEAR_CHAIN` weiter vorn als `fromIdx+1`, holt eine `for`-Schleife (`:361-369`) jeden Zwischenschritt als **eigenen RPC-Call in eigener Transaktion** nach, mit `detail = v391_chain_step_<state>`.
 
-1. `SceneAvatarMode.tsx:105-110` — resolved Character **per Name** neu und fällt auf `accessible[0]` zurück. Zwei gleichnamige Charaktere → falsches Portrait.
-2. `ensurePlanEnsemble.ts:40-41,151`, `planCastDedup.ts:35`, `finalizePlanCanonical.ts:249` — Cast-Key kollabiert auf normalisierten Namen, wenn `characterId` fehlt → zwei „Anna" werden zu einer.
-3. `character_shots[].characterId` enthält Slugs; `ensureSceneAssetsForScene` verwirft sie still.
-4. `useComposerPersistence.ts:183-304` schreibt `mentioned_character_ids`, `mentioned_location_ids`, `scene_assets` **überhaupt nicht** — im Gegensatz zu `VideoComposerDashboard.tsx:1203,1395` und `useApplyProductionPlan.ts:1063-1072`. Zwei Save-Pfade, unterschiedlicher Spaltenumfang.
-5. Client/Server-Zwillinge: `resolveSceneOutput` (byte-identisch, Paritätstest) und `visualSource` (semantischer Test) sind abgesichert — `slotArbitration.ts`/`referenceBudget.ts`/`types.ts` vs. `_shared/visual-inputs.ts` sind Copy-Paste **ohne Paritätstest**.
-6. `CapCutEditor.tsx:1523` nutzt `scene-${Date.now()}` statt `crypto.randomUUID()`.
-7. Löschung: keine FKs → dangling UUIDs, kein Fallback auf Name/URL. Ein Projekt ist nach Löschen eines World-Assets **nicht mehr reproduzierbar renderbar** (bereits gerenderte Clips bleiben, jeder Re-Render bricht am Anchor).
-8. Duplizieren: IDs werden 1:1 übernommen (Alias, kein Snapshot). „Projekt duplizieren" (`parent_project_id`) und „Template anwenden" konnten nicht lokalisiert werden — UNKNOWN.
-9. `archived_at` wird an keiner geprüften Render-Stelle gefiltert — UNKNOWN für die Picker-Hooks.
+**(a) Ketten:** dynamisch, nicht fest kodiert — jede Vorwärtslücke in `LINEAR_CHAIN`, z.B. `plate_ready → audio_prep → audio_ready`, `audio_ready → lipsync_dispatched → lipsync_running` (der in `:350` genannte historische Fall), bis hin zu `plate_ready → … → complete`.
 
-## H. Lip-Sync Safety
+**(b) Transaktionsgrenzen:** jeder Schritt ist für sich atomar (`FOR UPDATE` + ein `UPDATE`), aber es gibt **kein Dach über der Kette**. Crasht die Function zwischen Schritt n und n+1, bleibt die Szene committed auf einem validen Zwischenzustand stehen — ununterscheidbar von einem regulären Zwischenzustand. Kein Marker sagt, dass eine Kette abgebrochen ist; Watchdogs sehen nur ein Timeout, Webhooks warten auf ein Zielevent, das nie kommt, und es gibt keinen Wiederaufnahme-Mechanismus außer dem nächsten regulären `transitionScene`-Aufruf.
 
-Kritisch und heute eingehalten:
-- Anchor-Pflicht vor Provider-Spend (`v195_cinematic_sync_anchor_missing`).
-- `protected` nur für Character-Rolle → Props/Locations können den Anchor nie verdrängen.
-- Continuity ist bei Lip-Sync abgeschaltet (`lipsync_continuity_disabled`).
-- `characterId` ist Identität, `speaker_idx` nur Geometrie; `cast-validation.ts` erzwingt 1:1.
-- Max. 4 Sprecher, FROZEN.
+**(c) Atomarer Pfadvertrag:** die vorgeschlagene Form ist umsetzbar und deckt sich mit dem Bestand:
+1. `SELECT … FOR UPDATE` (wie heute),
+2. vollständigen Pfad `current → _to` per `WITH RECURSIVE` über `composer_scene_transitions` bestimmen, begrenzt auf die Vorwärtsordnung von `LINEAR_CHAIN` (Rückwärts-, Terminal- und Self-Kanten explizit ausschließen, sonst findet die Rekursion Pfade über `idle`/`failed`),
+3. gesamten Pfad validieren, Run-/Generation-Guard **einmal** am Anfang (das Lock friert den Zustand ein),
+4. nur den finalen Zielzustand schreiben — kein Zwischen-Commit,
+5. je logischem Zwischenschritt eine Historienzeile, in derselben Transaktion.
 
-Offene Risiken für Lip-Sync: kein immutabler Character-Snapshot im Run-Contract (nur `plate_generation`), keine Absicherung gegen Portrait-Änderung während eines laufenden Runs, `characterShots[0]` vs. Sprecherreihenfolge nicht abgeglichen.
+Kritischer Punkt: **Schritt 5 hat heute kein Ziel.** Es existiert keine Transition-Historie. `composer_scene_transitions` ist die Allowlist, `composer_scene_runs` ist der Run-Kontrakt, `composer_undo_stack` ist User-Undo, `composer_pipeline_runs` ist ein Projekt-Aggregat. Der einzige Beleg eines Übergangs ist der überschriebene `pipeline_state`/`pipeline_detail`/`updated_at`. G0 braucht also eine neue Audit-Tabelle (`from_state, to_state, step_index, guard_mode, run_id, generation, reason, at`) — sie ist ohnehin Voraussetzung für 0.2 (Signatur-Telemetrie) und für den Recovery-Primitive.
 
-## I. Recommendations (nur Architektur, keine Umsetzung)
+**(d) Kanten, die dadurch NICHT freigegeben werden müssen:** `plate_ready→audio_ready`, `plate_ready→lipsync_dispatched|lipsync_running|lipsync_muxing`, `audio_prep→lipsync_dispatched|lipsync_running|lipsync_muxing`, `audio_ready→lipsync_running|lipsync_muxing`. Die Allowlist (73 Zeilen) behält damit ausschließlich echte Einzelschrittkanten.
 
-1. **Asset-Revision statt Content-Hash**: `revision int` auf `brand_characters/_locations/_props`; Szenen speichern `cast_dependency_revisions jsonb`. Erkennung ≠ automatisches Re-Render — nur Badge, wie bei Continuity.
-2. **Immutabler Run-Snapshot**: Anchor + Character-Revision beim Start eines Runs an `active_run_id` einfrieren.
-3. **Ein Identity-Resolver**: Name-Fallbacks aus `SceneAvatarMode`, `ensurePlanEnsemble`, `planCastDedup`, `finalizePlanCanonical` entfernen bzw. auf „fail loud" umstellen.
-4. **Persistenz-Vertrag**: alle Scene-Writer schreiben dieselbe Spaltenmenge; Contract-Test dagegen.
-5. **Paritätstest** für `visual-inputs.ts` ↔ Client-Zwillinge.
-6. **Referentielle Integrität** wenigstens per Validierungsfunktion + Soft-Delete-Guard (kein Hard-Delete, solange Szenen referenzieren).
-7. `character_shots`-Slugs einmalig migrieren, danach Legacy-Feld einfrieren.
-8. v370-Cast-Clause klären: wiederherstellen oder Memory korrigieren.
+## 0.4 — `pipeline_state_run_id`
 
-## J. v431-Relevanz
+Spalte auf `composer_scenes`, `uuid`, nullable, kein Default (eingeführt `20260802143005:24`, Backfill `:220` aus `active_run_id`).
 
-**In v431 relevant (State-/Writer-Nähe):**
-- Der Anchor-Snapshot-Vertrag berührt `active_run_id` / `plate_generation` direkt → gehört zu G0 als *Lesevertrag* (Run-Guard muss den Anchor mit einschließen), nicht als Umbau.
-- Der Persistenz-Split in `useComposerPersistence` ist ein Scene-Writer und gehört ins v431-Writer-Inventar.
+- **(a) Schreiber:** ausschließlich `composer_scene_transition`, mit `pipeline_state_run_id = COALESCE(_run_id, active_run_id)`. Kein Edge-Function- oder Client-Code schreibt direkt.
+- **(b) Leser:** nur Anzeige. `ClipsTab.tsx:400`, `VideoComposerDashboard.tsx:387,590,955,973` mappen sie auf `pipelineStateRunId` (`types/video-composer.ts:347`). **Keine Verzweigung** darauf, weder im Client noch serverseitig — `rg pipeline_state_run_id supabase/functions` = 0 Treffer. Guards, Watchdogs und der `stale_run`-Check der DB-Funktion arbeiten mit `active_run_id`, nicht mit dieser Spalte.
+- **(c) Heute ohne Run-Kontext:** genau die implizite Nebenwirkung, die vermieden werden soll. `COALESCE` zieht bei `_run_id IS NULL` still den vorhandenen `active_run_id` nach — auch wenn der aus einem alten, längst beendeten Lauf stammt. Die Spalte behauptet dann einen Run-Bezug, den der Aufrufer nie hergestellt hat. Ein expliziter Reset auf NULL passiert nirgends, auch nicht in `scene-hard-reset.ts`.
+- **(d) Empfehlung:** `guard_mode = runless → pipeline_state_run_id = NULL`, explizit gesetzt, nicht per COALESCE. Kein heutiger Leser bricht daran, weil keiner die Spalte auswertet. Damit wird die Spalte zu dem, was sie sein soll: "dieser Zustand wurde von Run X gesetzt" bzw. "von keinem Run". Die Alternative (Wert erhalten) ist technisch ebenso folgenlos, konserviert aber genau die Zweideutigkeit, die 0.4 beseitigen soll. UNKNOWN bleibt nur externes BI/Reporting außerhalb des Repos.
 
-**Eigener späterer Track (nicht in v431 mischen):**
-- Asset-Revisionen/Staleness, Löschen/Archivieren, Duplizieren, Name-Fallbacks, Prompt-Injektion, Slot-Arbitrierungs-Parität. Das ist Identity/Dependency, nicht State-Machine.
+---
 
-Keine Codeänderungen vorgenommen. Bestehende Lip-Sync-Verträge unangetastet.
+## Ergebnis / Vorschlag für den G0-Scope
+
+Bestätigt und unverändert übernommen: guarded `composer_scene_transition`, atomare Run-ID+Generation-Prüfung, RunGuard-Union, run-sicheres `failSceneState()`, atomarer Fehlertext, explizit löschbares Detail/Substate, Recovery-Primitive, Compatibility-Wrapper für 6er und 7er, atomarer Gap-Filler-Ersatz, Contract- und Race-Tests.
+
+Aus Phase 0 kommen drei Ergänzungen dazu, die ich für G0 empfehle:
+1. **Transition-Audit-Tabelle** — Voraussetzung für den atomaren Pfad (0.3), für die Wrapper-Telemetrie (0.2) und für die Auditpflicht des Recovery-Primitives.
+2. **`anon`-EXECUTE auf beiden Signaturen entziehen** und die `auth.uid() IS NULL`-Lücke schließen (0.2). Reiner Rechteentzug, kein Drop, kein Verhaltensbruch für Edge Functions (die laufen als `service_role`).
+3. **`failSceneState()` als toten Pfad markieren** statt ihn als Bestandsvertrag zu führen (0.1) — er wird in G0 run-sicher gemacht und erst in G1–G4 verdrahtet.
+
+Zwei Punkte brauchen eine Produktentscheidung von dir, bevor G0 startet:
+- **Cancel-Semantik**: sollen `composer-cancel-project` und `composer-cancel-scene` run_bound werden (nur der aktive Run darf gecancelt werden) oder bleiben sie bewusst runless mit Pflichtgrund? Beide haben `active_run_id` bereits zur Hand.
+- **`hybrid-extend-scene`**: bleibt runless klassifiziert, oder soll es in G2/G3 einen echten Run-Kontext bekommen?
+
+STOP. Keine Implementierung bis zur Freigabe dieser vier Antworten.
