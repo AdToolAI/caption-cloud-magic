@@ -75,9 +75,10 @@ const FROZEN: Record<string, Frozen> = {
     falseNegativeCount: 0,
   },
   'dialogstudio-wants-lipsync': {
-    parity: 'mixed',
-    falsePositives: ['Lf-Dt-Eauto', 'Lf-Dt-Ecs', 'Lf-Dt-Ess', 'Lf-Dt-End', 'Lf-Dt-Eu'],
-    falseNegativeCount: 6,
+    // v430.1 Schritt 2B — bewusst auf die SSoT umgestellt.
+    parity: 'exact',
+    falsePositives: [],
+    falseNegativeCount: 0,
   },
   'dialogstudio-force-cinematic': {
     parity: 'mixed',
@@ -131,9 +132,10 @@ const FROZEN: Record<string, Frozen> = {
     falseNegativeCount: 0,
   },
   'generateall-needs-lipsync': {
-    parity: 'mixed',
-    falsePositives: ['Lf-Dt-Ecs', 'Lf-Df-Ecs', 'Lf-Du-Ecs'],
-    falseNegativeCount: 20,
+    // v430.1 Schritt 2B — bewusst auf die SSoT umgestellt.
+    parity: 'exact',
+    falsePositives: [],
+    falseNegativeCount: 0,
   },
   'mouthprobe-cinematic': {
     parity: 'mixed',
@@ -208,14 +210,16 @@ describe('v430.1 — Gate-Parität (2A umgestellt, Rest eingefroren)', () => {
         'inlineplayer-needs-lipsync',
         'pipelineprogress-cinematic-generating',
         'scenecard-lipsync-actions',
+        'dialogstudio-wants-lipsync',
+        'generateall-needs-lipsync',
       ].sort(),
     );
   });
 
   it('die verbliebenen cinematic-sync-Gates verletzen das Toggle-Veto identisch', () => {
     const vetoBreakers = ['Lf-Dt-Ecs', 'Lf-Df-Ecs', 'Lf-Du-Ecs'];
-    // v430.1 Schritt 2A: die umgestellten Gates respektieren das Veto jetzt.
-    for (const id of ['generateall-needs-lipsync', 'mouthprobe-cinematic']) {
+    // v430.1 Schritt 2A/2B: die umgestellten Gates respektieren das Veto jetzt.
+    for (const id of ['mouthprobe-cinematic']) {
       const gate = INTENT_GATES.find((g) => g.id === id)!;
       expect(evaluate(gate.predicate).falsePositives, id).toEqual(vetoBreakers);
     }
@@ -224,6 +228,7 @@ describe('v430.1 — Gate-Parität (2A umgestellt, Rest eingefroren)', () => {
       'clipstab-poll-cinematic',
       'pipelineprogress-cinematic-generating',
       'inlineplayer-legacy-happyhorse-warn',
+      'generateall-needs-lipsync',
     ]) {
       const gate = INTENT_GATES.find((g) => g.id === id)!;
       expect(evaluate(gate.predicate).falsePositives, id).toEqual([]);

@@ -77,6 +77,7 @@ import {
   resolveDialogMasterProvider,
 } from '@/lib/video-composer/lipsyncMasterProvider';
 import type {
+import { isLipSyncIntentional } from "@/lib/video-composer/lipSyncIntent";
   ComposerCharacter,
   ComposerScene,
   CharacterShot,
@@ -1331,8 +1332,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // (und der Nutzer hat auch keinen Dialog-Mode aktiviert), starten wir
     // KEINE Sync.so-Pipeline aus dem Studio heraus — sonst kostet der
     // Klick Credits obwohl der Nutzer explizit "kein Lip-Sync" gewählt hat.
-    const wantsLipSync =
-      scene.lipSyncWithVoiceover === true || scene.dialogMode === true;
+    // v430.1 Schritt 2B — kanonischer Intent (SSoT) statt Teilsemantik.
+    const wantsLipSync = isLipSyncIntentional(scene as any);
     if (!wantsLipSync) {
       toast({
         title: tx({ de: 'Lip-Sync ist ausgeschaltet', en: 'Lip-Sync is off', es: 'Lip-Sync está desactivado' }),

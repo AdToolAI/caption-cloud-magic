@@ -33,6 +33,7 @@ import { emitStageEvent } from '@/lib/stage/stageEvents';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
 import { prepareSceneRuns, startSceneGeneration } from '@/lib/composer/startSceneGeneration';
 import { isSceneInFlight, legacyClipReadyEquivalentRow, sceneState } from '@/lib/composer/sceneState';
+import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 
 interface UseGenerateAllClipsArgs {
   scenes: ComposerScene[];
@@ -59,7 +60,7 @@ function isLipsyncPhase(scene: ComposerScene): boolean {
 function isScenePipelineReady(scene: ComposerScene) {
   const dialogVoiceCount = scene.dialogVoices ? countSceneSpeakers(scene) : 0;
   const needsLipsync =
-    scene.engineOverride === 'cinematic-sync' ||
+    isLipSyncIntentional(scene as any) || // v430.1 Schritt 2B — SSoT statt cinematic-sync-Teilcheck
     isLipsyncPhase(scene) ||
     dialogVoiceCount > 1;
   if (scene.clipSource === 'upload' && !!scene.uploadUrl && !needsLipsync) return true;
