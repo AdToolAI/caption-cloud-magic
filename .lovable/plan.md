@@ -55,6 +55,6 @@ G2.2-Regression: 7-/8-Argument-Aufrufe von `composer_fail_scene_with_mirrors` si
 
 
 **S4 — Testzahlen belegen**
-Exakten Command für die Frozen-Composer-/Lip-Sync-Suite festschreiben (Datei-Glob im Bericht nennen), G2.2- und G2.3-Zahlen mit demselben Command gegenüberstellen, Edge-Typecheck-Fehlerliste vorher/nachher als Dateiliste anhängen und explizit bestätigen, dass keiner der Fehler in den drei G2.3-Dateien liegt.
+Im Bericht wird die **wörtliche, kopierbare Kommandozeile** der Frozen-Composer-/Lip-Sync-Suite dokumentiert (kein bloßer Glob, keine reine Testzahl); G2.2- und G2.3-Läufe werden mit exakt diesem identischen Command gegenübergestellt. Edge-Typecheck-Fehler werden vorher/nachher als Dateiliste angehängt, mit expliziter Bestätigung, dass keiner der Fehler in den drei G2.3-Dateien liegt.
 
 Ergebnis wird in `docs/v431-g2-3-report.md` nachgeführt (Abschnitte: Fallback-Auflösung, Primitive-Härtung, Smoke-Matrix, Testbaseline). Danach STOP zur Abnahme.
