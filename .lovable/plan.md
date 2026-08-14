@@ -116,7 +116,11 @@ Bleibt in G0 unverändert und wird **nicht** in die permanente Runless-Allowlist
 
 ## 10. Tests
 
-- **Contract-Test Guard-Modi**: jeder Aufruf des neuen Kerns liefert `guard_mode` und `write_id`; `runless` nur mit Grund aus der geschlossenen Menge; `runless` in Webhook-/Watchdog-Dateien verboten.
+- **Contract-Test Guard-Modi**: jeder Aufruf des neuen Kerns liefert `guard_mode` und `write_id`; `runless` nur mit Grund aus der geschlossenen Menge (`admin_recovery` existiert nicht mehr); `runless` in Webhook-/Watchdog-Dateien verboten.
+- **Runless-Kanten-Allowlist**: ein direkter service_role-v2-Aufruf mit gültigem Grund, aber nicht in `composer_runless_transition_rules` gelisteter Kante ⇒ `runless_edge_not_allowed`, kein Write, Audit-Zeile; gelistete Kante ⇒ angewendet.
+- **Runless No-active-run-Race**: bei gesetztem `active_run_id` liefern `user_cancel_no_active_run`, `project_teardown_no_active_run` und `image_scene_no_run_context` `run_reappeared` und schreiben nichts.
+- **Partial Guard**: Wrapper-Aufruf mit `_run_id` ohne `_generation` und umgekehrt ⇒ `guard_args_missing`, kein Write, Audit-Zeile, **kein** runless-Fallback.
+- **Rollenerkennung**: vier Fälle — `anon` verboten, `authenticated` + fremdes Projekt verboten, `authenticated` + eigenes Projekt erlaubt, `service_role` erlaubt. Zusätzlich Nachweis, dass `current_user` nirgends autorisierend ausgewertet wird.
 - **Race-Test Run-Guard**: Run A startet, Run B startet, Cancel für A darf B nicht terminal setzen. Zusätzlich zwei konkurrierende Transitionen auf dieselbe Szene — genau eine gewinnt, die andere liefert `stale_run`/`stale_generation`.
 - **Pfad-Atomizität**: `plate_ready → lipsync_running` läuft über vier Kanten (`plate_ready→audio_prep→audio_ready→lipsync_dispatched→lipsync_running`) und erzeugt genau ein `UPDATE` und **genau vier** Audit-Zeilen (`step_index` 1–4, die letzte mit `is_intermediate = false`) sowie keinen sichtbaren Zwischenzustand; ein Abbruch mittendrin lässt die Szene auf dem Ausgangszustand.
 - **State + Error atomar**: ein `failed`-Übergang mit `_error_text` schreibt Zustand und Fehlertext in einem `UPDATE`; ein Folgeübergang mit `_clear_error` leert ihn.
