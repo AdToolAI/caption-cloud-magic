@@ -538,7 +538,10 @@ serve(async (req) => {
           userId: user.id,
           projectId,
           sceneIds: aiScenes.map((s) => s.id),
-          runIds: Array.from(sceneRunStamps.values()).map((s) => s.runId),
+          // v431 G2.3/S2 — nur AI-Runs sind kostenrelevant; Upload-Runs bleiben draußen.
+          runIds: aiScenes
+            .map((s) => sceneRunStamps.get(s.id)?.runId)
+            .filter((v): v is string => Boolean(v)),
           amountEuros: ceilingCost,
           metadata: { quoted_cost_euros: totalCost, scene_count: aiScenes.length },
         });
