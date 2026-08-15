@@ -61,6 +61,15 @@ Gilt identisch für `composer_bind_plate_attempt` und `composer_bind_sync_pass_a
 
 **Security-Smoke (Teil der Testmatrix):** je RPC prüfen — `prosecdef = true`; `proconfig` enthält `search_path=pg_catalog, public`; `has_function_privilege('anon', …, 'EXECUTE') = false` und dasselbe für `authenticated`; `has_function_privilege('service_role', …, 'EXECUTE') = true`; genau **eine** Zeile in `pg_proc` je Funktionsname (keine Overload); `pronargdefaults = 0`. Zusätzlich negative Fälle: falsche Stage, fremde `scene_id`, abweichender Run/Generation → Exception, keine Teilwirkung.
 
+### Pass-Identitätsgate für `composer_bind_sync_pass_attempt`
+
+`_pass_idx` darf nicht länger allein vom Caller bestimmt werden. Verbindlich:
+
+- Der gelockte Ledger-Job muss `stage = 'sync_segment'` haben (geschlossene Prüfung, siehe oben).
+- Der adressierte Pass wird über die **bereits vorhandene stabile Identität** aus der Ledger-Zeile aufgelöst: `composer_pipeline_jobs.segment_id` bzw. `speaker_id` werden gegen die Identitätsfelder des Pass-Slots (`passes[i].segment_id` / `speaker_id` / kanonische Speaker-UUID aus dem v201-Vertrag) geprüft. Genau ein Pass darf matchen.
+- `_pass_idx` ist nur **bestätigend**: stimmt er nicht mit dem aufgelösten Index überein — oder ist die Auflösung mehrdeutig bzw. leer — wird eine Exception geworfen. Kein Slot-Write, keine Ledger-Bindung, vollständiger Rollback.
+- Smoke: gültiger Job für Pass A gegen `_pass_idx = B` → Exception; danach ist weder `external_job_id` gebunden noch `passes[A]`/`passes[B]` verändert (vollständiger Rollback nachgewiesen).
+
 
 ## Lücke 2 — Cutover-Vertrag für Rows ohne Pointer
 
