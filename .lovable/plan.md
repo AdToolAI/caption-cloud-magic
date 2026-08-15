@@ -46,6 +46,8 @@ Behandlung:
 1. **`src/pages/TeamWorkspace.tsx` wird zurückgenommen.** Die Umstellung `approver_id/approved_at → reviewed_by/reviewed_at` ist echte Verhaltensänderung und gehört nicht in diesen Deploy. Stattdessen wird der ursprüngliche Payload wiederhergestellt und nur typseitig entschärft, sodass das Laufzeitverhalten exakt dem Stand vor G3.2.1 entspricht. Der fachliche Fix (falsche Spaltennamen gegen `content_approvals`) wird separat als eigener Vorgang dokumentiert und später einzeln freigegeben.
 2. **Die reinen Payload-Casts bleiben** (`FaceMapReviewDialog`, `SceneCard` ×2, `useAudiobookProject`, `useSceneGenerate`, `useMotionStudioLibrary` ×2). Nachweis der Runtime-Identität: Es sind ausschließlich TypeScript-`as`-Assertions auf bestehende Argumente; sie werden beim Transpilieren entfernt. Beleg über einen Emit-Vergleich (esbuild/tsc-Emit vor/nach der Änderung → identisches JS) statt bloßer Behauptung.
 3. Alle drei Punkte werden im Bericht als „Out-of-Scope, build-blocking" mit Begründung gelistet, damit der G3.2.1-Diff sauber lesbar bleibt.
+4. **Kein Frontend-Deploy** wegen dieser Dateien; deployt wird ausschließlich die Edge-Function.
+5. Der `content_approvals`-Spaltenfehler (`approver_id`/`approved_at` existieren nicht) wird ausdrücklich als **offene Schuld** dokumentiert, nicht als behoben. Wenn der Rollback nur über einen Type-Cast auf den alten, fachlich vermutlich falschen Payload grün wird, ist das für diesen isolierten Edge-Function-Deploy akzeptabel.
 
 Falls sich der TeamWorkspace-Rollback nicht ohne Buildfehler darstellen lässt, wird das gemeldet und **kein** Deploy durchgeführt.
 
