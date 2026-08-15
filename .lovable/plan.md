@@ -91,9 +91,12 @@ ausgewiesen und nicht G3.2.2 zugerechnet.
 
 ### 8. Abschluss
 `docs/v431-g3-2-2-report.md` wird um reale Testzahlen, SQL-Smoke-Ergebnisse, Writer-Audit-Matrix
-und Abweichungen ergänzt. Bei vollständig grünem Ergebnis:
+und Abweichungen ergänzt. Nur bei vollständig grünem Ergebnis **und** ohne offene
+Contract-Deviation:
 **G3.2.2 IMPLEMENTED / VERIFIED — READY FOR DEPLOY REVIEW** (nicht DONE/FROZEN).
-Bei einem roten Contract-Gate: STOP mit Befund, keine automatische Reparatur.
+Bei einem roten Contract-Gate oder einer dokumentierten Deviation (inkl.
+`composer_touch_lipsync_progress` inline): STOP mit Befund, keine automatische Reparatur.
+
 
 ## Technische Hinweise
 
