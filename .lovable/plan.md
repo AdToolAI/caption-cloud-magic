@@ -18,7 +18,10 @@ Smoke S9 (transaktional, Fixture-Projekt, danach vollständig gelöscht), je ein
 | `lipsync_running` | `applied = false`, Verdikt `from_state_rejected` |
 | `complete` | `applied = false`, Verdikt `from_state_rejected` |
 
-Für jeden abgelehnten Fall zusätzlich beweisen: `clip_url`, `base_video_url`, `processed_video_url`, `clip_status`, `pipeline_state`, `lip_sync_status`, `twoshot_stage` sind byte-identisch zum Vorzustand (Snapshot-Vergleich vor/nach dem Aufruf), und der Plate-Ledger-Job bleibt `succeeded`.
+Zwei verpflichtende Zusatz-Assertions (Review-Runde):
+
+1. **Output-Invarianz gilt in allen sechs Fällen**, also auch bei den drei erlaubten From-States: `base_video_url`, `clip_url`, `processed_video_url`, `clip_status` und `dialog_shots` müssen unverändert bleiben. H darf ausschließlich State/Substate und die vorgesehenen Lip-Sync-Spiegel (`lip_sync_status`, `twoshot_stage`) ändern.
+2. **Transition-/Audit-Vertrag wird für erlaubte und abgelehnte Aufrufe nachgewiesen**: erlaubt → genau eine neue Audit-Zeile mit `applied = true`, `write_id = ccw:handoff_failed`, korrektem `run_id`/`generation`, `to_state = failed`, `guard_mode = run_bound`; abgelehnt → Audit-Zeile mit `applied = false` und gesetztem `reason`, und **keinerlei** Scene-Mutation (voller Row-Snapshot vor/nach ist identisch). Der Plate-Ledger-Job bleibt in allen Fällen `succeeded`.
 
 Ergebnis wird als Compatibility-Matrix in `docs/v431-g3-2-1-report.md` festgeschrieben; die drei erlaubten From-States sind damit abschließend aufgezählt.
 
