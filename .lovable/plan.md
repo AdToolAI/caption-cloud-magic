@@ -1,223 +1,233 @@
-# v431 G3 — Webhooks / Fan-in: Analyse & Scope
+# v431 G3.0b — Entscheidungsschluss vor dem Schnitt in G3.1 / G3.2
 
-Ziel: Ein verbindlicher Endvertrag, der beschreibt, wie `sync-so-webhook`, `remotion-webhook` (dialog-stitch), `compose-clip-webhook` und `render-sync-segments-audio-mux` ihre Zustands- und Output-Schreibvorgänge auf die G0/G2-Primitive (`composer_scene_transition_core` + Legacy-Spiegel) umziehen. Keine Code-Änderung in diesem Auftrag — nur Scope, Schnittstellen und Abnahmekriterien.
+Kein Implementierungs-GO. Dieser Bericht schließt die zehn offenen Architekturentscheidungen aus dem Review, korrigiert die Punkte, an denen der G3-Bericht zu weit ging, und schneidet G3 anschließend in zwei Phasen. Keine Migration, keine Codeänderung.
 
-## 1. Ausgangslage (bestätigt am Code)
+Die vier Feststellungen unten sind an Code/Schema verifiziert, nicht angenommen:
 
-Die folgenden Schreibstellen sind im v431-Vorbereitungsinventar (`docs/v431-prep-inventory.md`) als `callbackRisk: high` markiert und schreiben heute nur per `.eq("id", sceneId)` — ohne atomaren Run-/Generation-Abgleich:
+- `composer_scene_state` enthält `lipsync_muxing`. Es gibt **keinen** Enumwert `audio_muxing`.
+- `composer_state_from_legacy()` bildet `lip_sync_status='stitching' → lipsync_muxing` ab; `twoshot_stage='audio_mux_failed'` fällt auf `failed`. `audio_muxing` als Wert kommt ausschließlich in `lip_sync_status` / `twoshot_stage` / `dialog_shots.status` vor — also Legacy-Spiegel.
+- `update_dialog_pass_slot()` besitzt bereits `FOR UPDATE`, einen Rückwärts-Guard für terminale Slots und Immutabilität für `run_id`, `plate_generation`, `job_id` (G2.1/G2.2).
+- `try_claim_mux_dispatch()` setzt `dialog_shots.audio_mux.dispatched_at` genau einmal, **ohne** `render_id` und ohne Run-Bindung.
 
-| Pfad | Datei | Zustände | Besonderheit |
-| --- | --- | --- | --- |
-| `sync-so-webhook` | `supabase/functions/sync-so-webhook/index.ts` | `lipsync_running`, `audio_muxing`, `complete`, `failed` | Pass-Fan-in auf `dialog_shots.passes[]`, teilweise Refund, Recovery aus selbst-verschuldetem Watchdog-Fail |
-| `remotion-webhook` (dialog-stitch) | `supabase/functions/remotion-webhook/index.ts` | `complete`, `failed` | Schreibt `clip_url` + `lip_sync_applied_at` atomar mit `dialog_shots` |
-| `compose-clip-webhook` | `supabase/functions/compose-clip-webhook/index.ts` | `failed`, `clip_status=ready` | Replicate-Callback, hat bereits manuellen Run-/Generation-Check (Zeilen 131–149) und v427-callback-guard |
-| `render-sync-segments-audio-mux` | `supabase/functions/render-sync-segments-audio-mux/index.ts` | `audio_muxing`, `failed` | Lambda-Dispatcher, schreibt `audio_mux.render_id` und Fail-State |
+---
 
-Bestehende G0/G2-Primitive (bestätigt in `supabase/migrations/`):
+## D1 — Claim und Scene-Apply: eine Transaktion, kein zweistufiger Verbrauch
 
-- `composer_scene_transition_core(scene_id, to_state, guard_mode, run_id, generation, ...)` — zentrale State-Maschine mit Row-Lock, Run-/Generation-Guard und Transition-Log.
-- `composer_fail_scene_with_mirrors(...)` — atomares Fail inkl. Legacy-Spiegel, Write-ID-Allowlist.
-- `composer_finalize_upload_scene(...)` — atomares Finalisieren von Upload-Szenen inkl. Legacy-Spiegel.
-- `composer_pipeline_jobs` + `composer-pipeline-jobs.ts` — Job-Ledger für Run-/Job-Identität und Callback-Claiming.
+**Entscheidung: angenommen, in der strengeren Variante.** `claimPipelineCallback()` bleibt bestehen, verliert aber im G3-Pfad die Rolle des terminalen Verbrauchers. Der terminale Verbrauch des Job-Events geschieht ausschließlich innerhalb des Domain-Apply-RPC.
 
-## 2. Zielvertrag G3
-
-Jeder Callback-Handler muss vor einem Zustandswechsel beweisen:
-
-1. **Run-Provenienz**: `active_run_id` / `plate_generation` der Szene stimmen mit dem im Callback transportierten Run überein.
-2. **Job-Provenienz**: Der externe Job (`job_id`, `render_id`, `prediction_id`) gehört zu einem existierenden, nicht-terminalen `composer_pipeline_jobs`-Eintrag für diesen Run.
-3. **Claiming**: Ein Completion-Event wird idempotent geclaimed (`claimPipelineCallback`); ein verspäteter oder duplizierter Callback wird ignoriert.
-4. **Atomarität**: State-Transition + Legacy-Spiegel + Output-Materialisierung laufen im selben RPC unter `FOR UPDATE`.
-5. **Fail-Closed**: Wenn Run oder Job nicht passen, wird 200 OK zurückgegeben (Provider-Deklaration), aber die Szene nicht verändert.
-
-## 3. Scope-Grenzen
-
-### In G3
-
-- `sync-so-webhook` v5 sync-segments Pfad (single + multi-speaker).
-- `remotion-webhook` dialog-stitch Branch (success + failure).
-- `compose-clip-webhook` success/failure inkl. Auto-Retry-Logik.
-- `render-sync-segments-audio-mux` Dispatch- und Fail-Pfade.
-- Einführung neuer Domain-Primitive, wo die bestehenden (`composer_fail_scene_with_mirrors`, `composer_finalize_upload_scene`) nicht passen.
-
-### Außerhalb G3
-
-- `compose-dialog-segments` Deferred-Refund / Credit-Race — eigener Track, blockiert G3 nicht.
-- `autopilotComposerBridge` und `continuity-chain` Fan-in — G5.
-- UI-Writer (`SceneCard`, `useSceneGenerate`, `useTwoShotAutoTrigger`) — G5.
-- Watchdog/Recovery-Override (`qa-watchdog`, `lipsync-watchdog`, etc.) — G4.
-- Reverse-Bridge-Abschaltung — G6.
-
-## 4. Vorgeschlagene neue Primitive
-
-### 4.1 `composer_finalize_lipsync_scene`
-
-Zustandsübergang `lipsync_running | lipsync_muxing -> complete` mit atomarer Output-Materialisierung.
-
-Parameter:
+Verbindliches Muster für jeden G3-Callback:
 
 ```text
-_scene_id uuid
-_run_id uuid
-_generation integer
-_write_id text          -- 'sso:applied' | 'stitch:done'
-_processed_video_url text
-_source_clip_url text NULL
-_dialog_shots jsonb NULL
+composer_apply_callback_<domain>(
+  _pipeline_job_id  uuid,          -- primäre Callback-Identität
+  _external_job_id  text,          -- Bestätigung, nie Bestimmung
+  _write_id         text,          -- geschlossene Allowlist
+  <domain payload>
+) RETURNS jsonb
 ```
 
-Verhalten:
-- Row-Lock auf `composer_scenes`.
-- Guard: `active_run_id = _run_id`, `plate_generation = _generation`, `pipeline_state IN ('lipsync_running','lipsync_muxing')`.
-- Setzt `pipeline_state = 'complete'`, `pipeline_substate = NULL`.
-- Materialisiert Legacy-Spiegel: `processed_video_url = _processed_video_url`, `base_video_url = COALESCE(_source_clip_url, base_video_url)`, `clip_url = _processed_video_url`, `clip_status = 'ready'`, `lip_sync_applied_at = now()`.
-- Schreibt `dialog_shots` nur wenn übergeben (Fan-in-Handler).
-- Audit-Eintrag in `composer_scene_transition_log`.
+Innerhalb des RPC, in exakt dieser Lock-Reihenfolge (deterministisch, deadlock-frei):
 
-### 4.2 `composer_finalize_lipsync_mux`
+1. `SELECT ... FROM composer_pipeline_jobs WHERE id = _pipeline_job_id FOR UPDATE`
+2. `SELECT ... FROM composer_scenes WHERE id = job.scene_id FOR UPDATE`
+3. Provenienz-Prüfung (D2), Write-ID-/From-State-Matrix (D4/D6)
+4. Scene-Mutation + Legacy-Spiegel + Transition-Log
+5. Job terminalisieren (`status`, `callback_delivery_status='succeeded'`, `completed_at`, Claim-Felder leeren)
 
-Zustandsübergang `lipsync_running -> lipsync_muxing` ohne Output-Finalisierung (nur Dispatch-Marker).
+Alles in einem Commit. Bricht Schritt 4 ab, ist auch Schritt 5 nicht passiert — der Provider-Retry findet den Job non-terminal und darf erneut anwenden.
 
-Parameter:
+Ergänzend, damit kein Lease-Zombie in der Vorstufe entsteht: Wo `claimPipelineCallback()` im G3-Pfad noch vorgeschaltet läuft (Kurzschluss für offensichtlich falsche Zustellungen), ist sein Claim ausdrücklich ein **recoverable lease** — `CLAIM_LEASE_MS` läuft ab, `callback_delivery_status='processing'` ist kein Duplikat-Kriterium mehr. Duplikat ist nur, was der Apply-RPC selbst terminalisiert hat.
+
+Idempotenz-Kontrakt des Apply-RPC: Ist der Job bereits `succeeded` **und** trägt die Szene das Ergebnis dieses Write-IDs, ist die Antwort `{applied:false, reason:'duplicate_callback'}` — ein sauberes No-op, kein Fehler.
+
+## D2 — `composer_pipeline_jobs` ist die alleinige Quelle der Run-Provenienz
+
+**Entscheidung: angenommen, Empfehlung des G3-Berichts wird umgedreht.**
+
+Bindungsrichtung ist ab G3 ausschließlich:
 
 ```text
-_scene_id uuid
-_run_id uuid
-_generation integer
-_write_id text          -- 'sso:audio_muxing'
-_render_id text         -- Lambda render_id
+job_id (Callback)  →  composer_pipeline_jobs  →  scene_id + run_id + stage + segment_id + attempt_no
 ```
 
-Verhalten:
-- Guard: `pipeline_state = 'lipsync_running'`.
-- Setzt `pipeline_state = 'lipsync_muxing'`, `twoshot_stage = 'audio_muxing'` (Legacy), `dialog_shots.audio_mux.render_id = _render_id`.
+Regeln:
 
-### 4.3 Erweiterung `composer_fail_scene_with_mirrors`
+- `scene_id`, `run_id`, `stage`, `attempt_no` sind nach dem Insert **immutable** (DB-Trigger, analog zu `update_dialog_pass_slot`).
+- `plate_generation` wird beim Job-Insert aus dem Szenen-Snapshot eingefroren (neue Spalte `plate_generation` in `composer_pipeline_jobs`, Teil von G3.1) und danach nie überschrieben.
+- Callback-Payload, `dialog_shots.run_id` und `syncso_dispatch_log` dürfen die Werte nur **bestätigen**. Weicht ein bestätigender Wert ab → `wrong_job`, fail-closed.
+- Kein Handler liest `active_run_id` aus der Szene, um daraus die Callback-Identität abzuleiten. Der Vergleich läuft immer andersherum: Job liefert den erwarteten Run, die gelockte Szene muss ihn tragen.
 
-Neue Write-IDs:
-- `sso:failed` — Sync.so terminal failure.
-- `sso:partial_mux_refused` — v36 3+ speakers refusal.
-- `stitch:failed` — dialog-stitch Lambda failure.
-- `cvc:failed` — compose-clip-webhook terminal failure (ohne Auto-Retry).
-- `mux:preflight_failed` — render-sync-segments-audio-mux preflight failure.
-- `mux:invoke_failed` — render-sync-segments-audio-mux Lambda invoke failure.
+`dialog_shots.run_id` wird trotzdem beim Dispatch geschrieben — aber ausdrücklich nur als Diagnose-/Anzeigefeld, nicht als Entscheidungsgrundlage.
 
-Jede Write-ID bekommt eine eigene Legacy-Spiegel-Regel (z. B. `cvc:failed` darf `lip_sync_*` Felder nur dann löschen, wenn `engine_override = 'cinematic-sync'`).
+## D3 — Kanonischer State: `lipsync_muxing`. `audio_muxing` ist reiner Legacy-Spiegel
 
-## 5. Migrationspfade pro Handler
+**Entscheidung: `lipsync_muxing` ist der einzige kanonische `pipeline_state`.**
 
-### 5.1 `sync-so-webhook`
-
-Heutige Logik:
-- Lädt Szene per `id`.
-- Prüft `lip_sync_applied_at`, `canceled`, `failed` (inkl. Recovery aus Watchdog-Fail).
-- v5: matched `jobId` gegen `dialog_shots.passes[].job_id` oder `sync_job_id`.
-- Schreibt `dialog_shots`, `lip_sync_status`, `twoshot_stage`, `clip_error`.
-- Bei `COMPLETED`:
-  - single non-tight: direkt `complete`.
-  - single tight: dispatch `render-sync-segments-audio-mux`.
-  - multi: claim mux dispatch, set `audio_muxing`.
-- Bei `FAILED`: Refund, dann `failed`.
-
-Zielvertrag:
-1. Extrahiere `run_id` aus `dialog_shots.run_id` (muss beim Dispatch gesetzt werden) oder aus `syncso_dispatch_log`.
-2. Rufe `claimPipelineCallback({ sceneId, runId, stage: 'sync_segment', externalJobId: jobId })` auf.
-3. Bei `proceed=false`: 200 OK, Log, keine State-Änderung.
-4. Bei `proceed=true`:
-   - `COMPLETED` all done single non-tight → `composer_finalize_lipsync_scene(..., 'sso:applied', finalUrl, ...)`.
-   - `COMPLETED` multi → `composer_finalize_lipsync_mux(...)`.
-   - `FAILED` → `composer_fail_scene_with_mirrors(..., 'sso:failed', ...)`.
-5. Refund-Logik: muss den **selben** Run spenden, der im Callback geprüft wurde. Kein Rückgriff auf aktuelle Szene nach Transition.
-
-Offene Designfrage (im Scope zu klären): Woher kommt `run_id` im Sync.so-Webhook? Heute steht er nicht im `dialog_shots` Payload. Optionen:
-- A) `syncso_dispatch_log` erweitern um `run_id` / `plate_generation`.
-- B) `dialog_shots` erweitern um `run_id` / `plate_generation` beim Dispatch.
-- C) Beides redundant, mit Präferenz B (Szene ist SSoT).
-
-Empfohlene Option: **B + A als Fallback**.
-
-### 5.2 `remotion-webhook` (dialog-stitch)
-
-Heutige Logik:
-- `isDialogStitch` erkannt über `source === 'dialog-stitch'`.
-- `withDialogLock` um Read-Modify-Write.
-- Schreibt `clip_url`, `lip_sync_applied_at`, `lip_sync_status='done'`, `twoshot_stage='done'`, `clip_status='ready'`, `dialog_shots.status='done'`.
-- Failure-Branch: Refund, dann `lip_sync_status='failed'`, etc.
-
-Zielvertrag:
-1. `customData` enthält `run_id` und `plate_generation` (muss `render-sync-segments-audio-mux` beim Lambda-Dispatch setzen).
-2. `claimPipelineCallback({ sceneId, runId, stage: 'audio_mux', externalJobId: renderId })`.
-3. Success → `composer_finalize_lipsync_scene(..., 'stitch:done', finalOutputUrl, source_clip_url, dialog_shots)`.
-4. Failure → `composer_fail_scene_with_mirrors(..., 'stitch:failed', ...)`.
-
-### 5.3 `compose-clip-webhook`
-
-Heutige Logik:
-- Manueller Run-/Generation-Check (Zeilen 131–149).
-- v427-callback-guard für `stage: 'base_video'`.
-- Success: Download, Storage, `clip_url`, `clip_status='ready'`, ggf. Auto-Lip-Sync-Handoff.
-- Failure: Auto-Retry, dann `clip_status='failed'` + ggf. `lip_sync_*` Reset.
-
-Zielvertrag:
-1. Behält manuellen Run-/Generation-Check bei (er ist bereits fail-closed).
-2. Ersetzt State-Write durch `composer_finalize_plate_scene` (neues Primitive analog `composer_finalize_upload_scene`, aber für AI-Plate) ODER erweitert `composer_finalize_upload_scene` um AI-Plate-Modus.
-3. Failure → `composer_fail_scene_with_mirrors(..., 'cvc:failed', ...)`.
-4. Auto-Retry-Logik bleibt, aber Retry-Dispatch muss ein neues `composer_pipeline_jobs`-Segment für den neuen Versuch anlegen.
-
-### 5.4 `render-sync-segments-audio-mux`
-
-Heutige Logik:
-- Lädt Szene, prüft `audio_plan.twoshot.url`.
-- Preflight-HEAD-Check; bei Fehler direkt `failed`.
-- Lambda invoke fail → `failed`.
-- Dispatch success → `audio_muxing` + `dialog_shots.audio_mux.render_id`.
-
-Zielvertrag:
-1. Erhält `run_id` / `plate_generation` im Request-Body (muss Caller mitgeben).
-2. Preflight fail → `composer_fail_scene_with_mirrors(..., 'mux:preflight_failed', ...)`.
-3. Invoke fail → `composer_fail_scene_with_mirrors(..., 'mux:invoke_failed', ...)`.
-4. Dispatch success → `composer_finalize_lipsync_mux(...)`.
-5. Schreibt `run_id` / `plate_generation` in `video_renders.content_config` und `customData` des Lambda-Webhook.
-
-## 6. Caller-Anpassungen (notwendige Voraussetzungen)
-
-Damit die Webhooks ihre Run-Provenienz haben, müssen folgende Stellen `run_id` / `plate_generation` mitführen:
-
-| Caller | Änderung |
+| Ebene | Wert im Mux-Zustand |
 | --- | --- |
-| `compose-dialog-segments` (v5 Dispatch) | `dialog_shots.run_id`, `dialog_shots.plate_generation` setzen; `composer_pipeline_jobs` für jedes Segment anlegen. |
-| `render-sync-segments-audio-mux` | Request-Body akzeptiert `run_id`/`plate_generation`; in Lambda-`customData` weitergeben. |
-| `sync-so-webhook` URL / Payload | `run_id`/`plate_generation` optional in URL, falls Sync.so `customData` erlaubt; sonst aus `dialog_shots` lesen. |
+| `pipeline_state` | `lipsync_muxing` |
+| `pipeline_substate` | `audio_mux` |
+| `lip_sync_status` (Legacy) | `audio_muxing` |
+| `twoshot_stage` (Legacy) | `audio_muxing` |
+| `dialog_shots.status` (Legacy) | `audio_muxing` |
 
-## 7. Risiken & Abhilfe
+Der Ist-Befund im G3-Bericht beschrieb Legacy-Feldwerte, nicht Zielzustände — das war der Widerspruch. Keine neue Alias-Semantik: die Legacy-Werte werden vom Primitive geschrieben, nicht vom Handler, und existieren nur bis G6.
 
-| Risiko | Abhilfe |
+## D4 — `composer_finalize_lipsync_scene`: geschlossene Write-ID-Matrix, Base-URL nicht als Input
+
+**Entscheidung: angenommen.** Der Finalizer bekommt eine geschlossene Matrix und verliert `_source_clip_url`.
+
+| write_id | erlaubter From-State | Bedeutung |
+| --- | --- | --- |
+| `sso:applied` | ausschließlich `lipsync_running` | Single-Pass, non-tight: Sync.so-Output ist direkt final |
+| `stitch:done` | ausschließlich `lipsync_muxing` | Mux/Stitch-Ergebnis von Remotion |
+
+Ein `stitch:done` aus `lipsync_running` und ein `sso:applied` aus `lipsync_muxing` sind beide `unexpected_state` und werden abgewiesen (mit Audit-Zeile).
+
+Base-Quelle: Der Finalizer setzt `base_video_url` **nicht** aus Callback-Input. Unter dem Lock gilt
+
+```text
+base_video_url := COALESCE(base_video_url, lip_sync_source_clip_url)
+```
+
+also ausschließlich aus dem bereits gebundenen Szenen-Snapshot. Einziger Callback-Input für Output ist `_processed_video_url`; daraus folgen `processed_video_url` und `clip_url`.
+
+## D5 — Kein Whole-JSON-Overwrite von `dialog_shots`
+
+**Entscheidung: angenommen.** Der Parameter `_dialog_shots jsonb` entfällt ersatzlos.
+
+- Slot-Ebene (`passes[i]`) bleibt exklusiv bei `update_dialog_pass_slot()` — das RPC hat bereits Lock, Rückwärts-Guard und Immutabilität.
+- Der Finalizer patcht ausschließlich schmale Top-Level-Schlüssel per `jsonb_set` unter demselben Lock: `status`, `final_url`, `finished_at`. Nichts anderes.
+- Fehlerpfade patchen entsprechend nur `status`, `error`, `finished_at`, `refunded`.
+- Kein Handler übergibt je einen selbst gelesenen `dialog_shots`-Blob an ein G3-Primitive. Das wird im Guard-Test festgeschrieben.
+
+## D6 — Mux-Transition hat genau einen Owner: `render-sync-segments-audio-mux`
+
+**Entscheidung: angenommen, wie vorgeschlagen.**
+
+```text
+sync-so-webhook (Fan-in vollständig)
+   └─ try_claim_mux_dispatch(scene)      -- gewinnt genau einer
+        └─ POST render-sync-segments-audio-mux
+             └─ video_renders INSERT  → render_id existiert
+                  └─ composer_enter_lipsync_mux(job, render_id)   ← EINZIGER Owner
+```
+
+- `sync-so-webhook` schreibt im Multi-Pfad **keinen** Zustand mehr Richtung Mux. Es markiert den Pass fertig (Slot-RPC) und stößt den Dispatcher an.
+- `composer_enter_lipsync_mux` läuft erst, wenn eine `render_id` real existiert. Damit kann es keinen `lipsync_muxing`-Zustand ohne Render geben.
+- Identisch für Single-tight und Multi — der Single-tight-Pfad geht denselben Weg über den Dispatcher.
+- `try_claim_mux_dispatch` bleibt unverändert (nur Dispatch-Sperre, kein State-Writer). Es wird in G3.2 zusätzlich run-gebunden, indem der Aufrufer vorher den Job prüft.
+
+## D7 — Keine Erweiterung von `composer_fail_scene_with_mirrors`. Neue Callback-Failure-Facade
+
+**Entscheidung: angenommen — das frozen Primitive bleibt unangetastet.**
+
+Neu entsteht `composer_fail_callback_scene(...)` mit fest verdrahteter Matrix; From-States sind **nicht** übergebbar:
+
+| write_id | erlaubte From-States | Legacy-Spiegel-Policy |
+| --- | --- | --- |
+| `sso:failed` | `lipsync_dispatched`, `lipsync_running` | `lip_sync_status='failed'`, `twoshot_stage='failed'`, `clip_status` unverändert |
+| `sso:partial_mux_refused` | `lipsync_running` | wie oben, zusätzlich `dialog_shots.partial_*` |
+| `stitch:failed` | `lipsync_muxing` | `lip_sync_status='failed'`, `twoshot_stage='failed'` |
+| `mux:preflight_failed` | `lipsync_running`, `lipsync_muxing` | `twoshot_stage='failed'` |
+| `mux:invoke_failed` | `lipsync_muxing` | `twoshot_stage='audio_mux_failed'` |
+| `ccw:failed` | `plate_queued`, `plate_rendering` | `clip_status='failed'`; `lip_sync_*`-Reset nur bei `engine_override='cinematic-sync'` |
+
+Damit kann ein verspätetes `stitch:failed` eine bereits auf `complete` gelaufene Szene nicht mehr zurückwerfen — `complete` ist in keiner Zeile ein erlaubter From-State. Ergänzend gilt Job-Terminalität aus D1: ein zweiter Callback zu einem terminalen Job kommt gar nicht erst bis zur Matrix.
+
+Kein Freitext-`_clear_lip_sync_fields`-Flag: Was gelöscht wird, hängt allein an der write_id-Zeile.
+
+## D8 — `compose-clip-webhook`: eigenes `composer_finalize_plate_scene`
+
+**Entscheidung: eigenes Primitive. `composer_finalize_upload_scene` wird nicht semantisch verbreitert.**
+
+```text
+composer_finalize_plate_scene(
+  _pipeline_job_id uuid,
+  _external_job_id text,      -- Replicate prediction id
+  _write_id text,             -- 'ccw:plate-complete'
+  _plate_url text
+)
+```
+
+- From-State: ausschließlich `plate_rendering`. (`plate_queued → plate_rendering` bleibt Sache des Dispatchers; ein Callback in `plate_queued` ist `unexpected_state`.)
+- To-State: `plate_ready`.
+- Legacy-Spiegel im selben UPDATE: `base_video_url = _plate_url`, `clip_url = _plate_url`, `clip_status='ready'`, `clip_error=NULL`, `processed_video_url` bleibt unangetastet.
+- **Auto-Lip-Sync-Handoff startet erst nach dem Commit des Apply-RPC** und nur, wenn dieser `applied:true` zurückgibt. Der Handoff selbst (`compose-twoshot-audio` → `compose-dialog-segments`) bleibt unverändert; sein heutiger Fehlerpfad (`lip_sync_status='failed'` bei `clip_status='ready'`) wandert auf `ccw:handoff_failed` und wird — weil er den Plate-Zustand bewusst nicht antastet — in G3.2 als eigene, sehr enge Zeile der Failure-Facade geführt.
+
+## D9 — Auto-Retry: gleicher Scene-Run, neuer Job-Attempt
+
+**Entscheidung: angenommen, klare Trennung.**
+
+| Ebene | Bei transientem Auto-Retry |
 | --- | --- |
-| Sync.so Callback enthält keinen `run_id` | `dialog_shots` erweitern; Fallback auf `syncso_dispatch_log`. |
-| Multi-speaker Pass-Fan-in Race | `claimPipelineCallback` pro Segment + `update_dialog_pass_slot` (bereits vorhanden) behält Autorität über Slot-Updates; State-Transition nur wenn alle Segments `succeeded`. |
-| Remotion webhook `customData` Größenlimit | Nur `run_id`, `plate_generation`, `scene_id`, `render_id` mitgeben; keine großen Objekte. |
-| Auto-Retry von `compose-clip-webhook` erzeugt neue Run-Identität | Retry als neues `composer_pipeline_jobs`-Segment mit `attempt_no` inkrementieren. |
-| Watchdog-Recovery aus selbst-verschuldetem Fail | Bleibt erlaubt, muss aber ebenfalls `claimPipelineCallback` durchlaufen und darf nur innerhalb desselben Runs geschehen. |
+| `composer_scenes.active_run_id` | **unverändert** |
+| `composer_scenes.plate_generation` | **unverändert** |
+| `composer_pipeline_jobs.attempt_no` | +1, neue Zeile (neuer `idempotency_key`) |
+| `external_job_id` | neu (neue Replicate-Prediction) |
+| Alter Job | wird `stale` terminalisiert, im selben RPC wie die Attempt-Anlage |
 
-## 8. Teststrategie
+Nur ein bewusster User-/Orchestrator-Render („Neu rendern", Reset, Hybrid-Extend) wechselt Run-ID und/oder Generation. Der Risikotext des G3-Berichts („neue Run-Identität") war an dieser Stelle falsch und ist hiermit ersetzt.
 
-| Test | Nachweis |
+Gilt gleichermaßen für die Sync.so-Retry-Matrix (`prepareRetryFromWebhook`, `V5_RETRY_VARIANTS`) und die Watchdog-Auto-Retries: neue Attempts, nie neue Runs.
+
+## D10 — In-flight-Kompatibilität und Cutover
+
+**Entscheidung: angenommen, G3 wird geteilt.**
+
+- **G3.1 — Provenienz/Ledger (schreibt Daten, migriert keinen Writer).** Alle Dispatcher legen `composer_pipeline_jobs`-Zeilen mit eingefrorener `plate_generation` an und transportieren `pipeline_job_id` bis in den Callback (Sync.so-URL-Parameter, Remotion-`customData`, Replicate-Webhook-URL). Callback-Handler **lesen** die Ledger-Bindung, loggen Abweichungen — und schreiben weiter genau wie heute. Reiner Observe-Modus.
+- **Drain-Fenster.** Zwischen G3.1 und G3.2 liegt ein Fenster von mindestens der längsten realistischen Job-Laufzeit (Lambda-Timeout 300 s + Sync.so-Retry-Matrix; angesetzt: 60 Minuten ohne Ledger-lose Callbacks in der Telemetrie). Erst wenn die Observe-Telemetrie über dieses Fenster **null** Callbacks ohne Ledger-Bindung meldet, ist G3.2 freigabefähig. Diese Zahl ist Abnahmekriterium, keine Schätzung.
+- **G3.2 — Callback-Apply-Migration.** Handler rufen die Apply-RPCs; fehlende Ledger-Bindung ist fail-closed.
+- **Befristete Kompatibilität.** `syncso_dispatch_log` / `dialog_shots.run_id` dürfen in G3.2 nur als *bestätigende* Fallback-Quelle für Jobs dienen, die nachweislich vor dem G3.1-Deployment gestartet sind (`created_at < deployment_ts`). Diese Klausel bekommt ein hartes Ablaufdatum im Code und wird in G3.3 entfernt. Sie ist ausdrücklich keine zweite Source of Truth.
+
+## Sicherheitsvertrag aller neuen G3-Primitive
+
+Identisch zu G2.4, ohne Ausnahme:
+
+- `SECURITY DEFINER`, `SET search_path TO 'pg_catalog', 'public'`, alle Objekte schema-qualifiziert.
+- `REVOKE ALL ... FROM PUBLIC, anon, authenticated`; `GRANT EXECUTE ... TO service_role`.
+- Geschlossene Write-ID-Allowlist, keine übergebbaren From-States.
+- Jeder Versuch — `applied=true` wie `applied=false` — erzeugt eine Zeile in `composer_scene_transition_log` mit `source_signature='v2'`.
+
+---
+
+## Schnitt
+
+```text
+G3.1  Provenienz / Ledger (Observe)
+      • composer_pipeline_jobs.plate_generation + Immutabilitäts-Trigger
+      • Job-Anlage in allen vier Dispatch-Pfaden
+      • pipeline_job_id-Transport: Sync.so-URL, Remotion customData,
+        Replicate-Webhook-URL, Mux-Request-Body
+      • Handler lesen + loggen, schreiben unverändert
+      Abbruchkriterium: 0 Callbacks ohne Ledger-Bindung über das Drain-Fenster
+
+G3.2  Callback-Apply-Migration
+      • composer_apply_callback_* (D1-Muster)
+      • composer_finalize_lipsync_scene (D4)
+      • composer_enter_lipsync_mux (D6)
+      • composer_finalize_plate_scene (D8)
+      • composer_fail_callback_scene (D7)
+      • Handler-Umstellung, fail-closed
+      Abbruchkriterium: out-of-order / duplicate / wrong-job Callback
+      verändert nachweislich nichts
+
+G3.3  Entfernung der befristeten In-flight-Kompatibilität
+```
+
+## Erwartete Testmatrix für G3.2 (zur Vorabstimmung)
+
+| Fall | Erwartung |
 | --- | --- |
-| Out-of-order Callback | Älterer Sync.so-Callback für Run A wird ignoriert, während Run B aktiv ist. |
-| Duplicate Callback | Zweiter `COMPLETED`-Callback für dasselbe Segment ist no-op. |
-| Wrong Job | Callback mit unbekanntem `job_id` wird ignoriert. |
-| Run-Mismatch | Callback mit korrektem Job aber falschem `run_id` wird ignoriert. |
-| Atomarität | State-Transition + Legacy-Spiegel + Transition-Log in einem RPC. |
-| Fan-in Barrier | Szene bleibt `lipsync_running`, bis alle Segmente `succeeded`. |
-| Mux Dispatch Race | `try_claim_mux_dispatch` (bereits vorhanden) gewinnt nur einmal. |
+| Callback Run A, Szene auf Run B | kein Write, Audit-Zeile `stale_run` |
+| Zweiter `COMPLETED` für terminalen Job | `duplicate_callback`, kein Write |
+| Apply-RPC bricht nach Scene-Write ab | Rollback: Job bleibt non-terminal, Retry wirkt |
+| `stitch:done` aus `lipsync_running` | `unexpected_state` |
+| `stitch:failed` auf `complete` | `unexpected_state` |
+| Zwei parallele Fan-in-Webhooks | genau ein `try_claim_mux_dispatch`-Gewinner, genau ein `lipsync_muxing` |
+| Finalizer mit übergebenem `dialog_shots`-Blob | existiert nicht mehr (Guard-Test) |
+| Auto-Retry | `attempt_no+1`, `active_run_id`/`plate_generation` unverändert |
 
-## 9. Deliverables dieses Auftrags
+## STOP
 
-1. Dieser Plan als verbindlicher Endvertrag (`.lovable/plan.md`).
-2. Ein detailliertes Schnittstellen-Dokument pro Primitive (Parameter, Guard-Bedingungen, Legacy-Spiegel-Regeln).
-3. Eine Mapping-Tabelle: aktuelle Write-ID -> zukünftige Write-ID -> RPC.
-4. Klare GO/NO-GO Punkte für die eigentliche Migration.
-
-## 10. STOP
-
-Keine Code-Änderung ohne ausdrückliches GO für G3.1 (erster Migrations-Block).
+Keine Migration, keine Codeänderung. Nächster Schritt nach Freigabe dieses Entscheidungsstands: G3.1-Implementierungsvertrag (Ledger + Transport, Observe-Modus).
