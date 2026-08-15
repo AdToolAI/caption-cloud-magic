@@ -108,6 +108,39 @@ export async function acquireLedgerJob(
       return null;
     }
 
+    // G3.1b — Retry-Atomarität (D9): existiert für dieselbe
+    // (scene, run, stage, segment) noch ein nicht-terminaler Attempt, ist
+    // dieser Dispatch definitionsgemäß ein Retry. Ablösen + Anlegen laufen
+    // dann ausschließlich über den atomaren RPC; ein konkurrierender
+    // Ablöseversuch verliert deterministisch (Row-Lock + Guard).
+    let activeQuery = admin
+      .from("composer_pipeline_jobs")
+      .select("id, attempt_no")
+      .eq("scene_id", params.sceneId)
+      .eq("run_id", runId)
+      .eq("stage", params.stage)
+      .eq("plate_generation", plateGeneration)
+      .is("replaced_by", null)
+      .in("status", ["pending", "dispatching", "dispatched", "dispatch_uncertain"])
+      .order("attempt_no", { ascending: false })
+      .limit(1);
+    activeQuery = params.segmentId
+      ? activeQuery.eq("segment_id", params.segmentId)
+      : activeQuery.is("segment_id", null);
+    const { data: activeRows } = await activeQuery;
+    const previous = Array.isArray(activeRows) && activeRows.length > 0 ? activeRows[0] : null;
+    if (previous?.id) {
+      return await replaceLedgerAttempt(admin, {
+        previousJobId: String(previous.id),
+        sceneId: params.sceneId,
+        runId,
+        stage: params.stage,
+        plateGeneration,
+        provider: params.provider ?? null,
+        metadata: { ...(params.metadata ?? {}), retry_of_job_id: String(previous.id) },
+      });
+    }
+
     // attempt_no = bestehende Versuche derselben (scene, run, stage, segment) + 1
     let countQuery = admin
       .from("composer_pipeline_jobs")
