@@ -488,10 +488,15 @@ Von Deploy-Zeitstempel bis Resmoke-Ende auswerten und mit IDs/Timestamps festhal
 
 **G3.2.2 DEPLOY PLAN READY — AWAITING GO.**
 
-Zwei Punkte sind vor dem GO zu entscheiden bzw. herzustellen:
+Offene Punkte aus vorheriger Fassung geschlossen:
 
-1. **D1** — Umgang mit dem Plattform-Default-EXECUTE der Sandbox-Rolle (§1/§4).
-2. **In-flight Gate** — heute 4 / 0 / 4 / 0 / 44; muss vor dem Deploy auf 0/0/0/0/0 gedrained
-   sein (§2).
+1. **D1** — `sandbox_exec_lbunafpxuskwmsrraqxl` ist nachweislich plattformintern (nur
+   `postgres` Mitglied, `authenticator` kann sie nicht annehmen, Client-/Edge-Pfade laufen über
+   `anon`/`authenticated`/`service_role`). Akzeptiert als **accepted platform-internal ACL**;
+   kein REVOKE in Produktionsmigrationen (§1/§4).
+2. **In-flight Gate** — korrigiert auf echte In-flight-Semantik. Terminalität nur am kanonischen
+   `pipeline_state` (`complete`/`failed`/`canceled`). Korrigierte Baseline: **0 / 0 / 0 / 0 / 0**.
+   Historische 8 Ledger-Attempts (G3.1 Observe-Mode, terminale Szene) und 44 Pass-Slots
+   (pre-Ledger stale metadata, terminale Szenen) bleiben unangetastet (§2).
 
 Kein Deploy, kein G3.2.3. STOP.
