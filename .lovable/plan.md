@@ -53,8 +53,8 @@ non-tight), NOOP-Retryable inkl. Duplicate-Verhalten, ungültige Write-ID/Status
 **S10 ist ausgenommen** und läuft nicht als Single-Transaction-Smoke, sondern als echter
 Concurrency-/Integration-Test (siehe §4).
 
-
 ### 4. Mux-Ownership + S10 als echter Concurrency-Test
+
 Statischer Nachweis, dass der Webhook nach dem RPC ausschließlich
 `dispatch_mux → acquireLedgerJob('audio_mux') → invoke render-sync-segments-audio-mux` ausführt,
 plus Testnachweis, dass der State-Eintritt `lipsync_muxing` erst beim Mux-Owner nach realer
