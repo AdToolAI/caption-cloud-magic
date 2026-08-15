@@ -28,7 +28,7 @@ weitergeschrieben, Zeile ~508/1841).
 | B14 | Retry-Ladder (1453–1571) | tot (`canRetry=false`, v128) | – | – | wird gelöscht |
 | B15 | FAILED → sceneWillFail (1649–1733) | Wallet-Refund, Whole-JSON `failed`, Sibling-Cancel | – | ja | RPC (`fail`, Job=failed) |
 | B16 | FAILED → mustFailScene N≥3 (1759–1807) | Refund + Whole-JSON `failed` | – | ja | RPC (`fail`) |
-| B17 | FAILED → Scene lebt weiter / partialMux N≤2 (1809–1835) | Whole-JSON, ggf. `audio_muxing` + Mux-Invoke | – | ja | RPC (`continue` bzw. `dispatch_mux`) |
+| B17 | FAILED → Scene lebt weiter / partialMux N≤2 (1809–1835) | Whole-JSON, ggf. `audio_muxing` + Mux-Invoke | – | ja | RPC (`continue` bzw. `dispatch_mux`) — **Partial-Mux-Produktsemantik bleibt erhalten** (§3a) |
 
 Kritische Befunde:
 - **Whole-JSON-Clobber** von `dialog_shots` in B4, B7-Fallback, B10, B11, B12, B15, B16, B17 — Sibling-Passes können verloren gehen.
@@ -50,14 +50,28 @@ Zwei getrennte Entscheidungen im selben Commit:
   (`sync_noop_unrecoverable`). NOOP retrybar ⇒ `failed` (`sync_noop_retryable`, §5a).
 - **Scene-Verdict** = Aggregat über alle Passes.
 
-| Callback | früherer Pass failed | Job-Status | Scene-Verdict |
+| Callback | Kontext | Job-Status | Scene-Verdict |
 |---|---|---|---|
-| success | nein, andere offen | succeeded | continue |
-| success | nein, alle done | succeeded | dispatch_mux |
-| success | ja | **succeeded** | **fail** |
-| provider failed | egal | failed | continue \| fail (Aggregat) |
-| NOOP retryable | egal | failed (`sync_noop_retryable`) | redispatch |
+| success | keine früheren Fails, andere Passes offen | succeeded | continue |
+| success | keine früheren Fails, alle Passes done | succeeded | dispatch_mux |
+| success | früherer Pass failed, `totalSpeakers ≥ 3` | **succeeded** | **fail** |
+| success | früherer Pass failed, `totalSpeakers ≤ 2`, ≥1 Pass done, alle terminal | **succeeded** | **dispatch_mux** (Partial-Mux, §3a) |
+| success | früherer Pass failed, `totalSpeakers ≤ 2`, noch nicht alle terminal | succeeded | continue |
+| provider failed | Aggregat nicht terminal | failed | continue |
+| provider failed | alle terminal, `totalSpeakers ≤ 2`, ≥1 done | failed | **dispatch_mux** (Partial-Mux, §3a) |
+| provider failed | sonst terminal mit Fails | failed | fail |
+| NOOP retryable | egal | failed (`sync_noop_retryable`) → danach `stale` (§5a) | redispatch |
 | NOOP unrecoverable | egal | failed (`sync_noop_unrecoverable`) | fail |
+
+### 3a. Partial-Mux (verbindliche Entscheidung: erhalten)
+
+G3.2.2 ist eine Writer-/Apply-Migration, keine Produktänderung. Die heutige Partial-Mux-Regel
+aus B17/B10 (`partialMuxAllowed = totalSpeakers <= 2`, `partialMux = allTerminal && doneCount > 0
+&& partialMuxAllowed`, `mustFailScene = !partialMuxAllowed && allTerminal && failedCount > 0`,
+verifiziert `sync-so-webhook:1752–1757`) wird **unverändert in den Aggregator des RPC übernommen**.
+Ein `failed` Pass schließt `dispatch_mux` also nur bei `totalSpeakers ≥ 3` aus. Die Refusal
+`partial_mux_3plus` (Zeile 1068) bleibt als `fail` erhalten. Ein Pass-Fail bleibt in jedem Fall
+ein `failed` Ledger-Job — Partial-Mux ändert nur das Scene-Aggregat, nie den Job-Status.
 
 ## 4. `composer_apply_sync_segment_result` (neu, sole owner)
 
@@ -103,28 +117,36 @@ Kein Whole-JSON-Replace, keine Mutation fremder Slots.
 Kein `complete`, kein `lipsync_muxing` — Eintritt in `lipsync_muxing` bleibt beim echten
 Mux-Owner `render-sync-segments-audio-mux` mit realem `render_id` (D6).
 
-### 5a. `ssw:noop_escalate` — vollständiger Ledger-Vertrag (Punkt 3)
+### 5a. `ssw:noop_escalate` — Ledger-Vertrag (ohne Änderung am eingefrorenen Primitive)
 
-Alles in **einer** Transaktion des Apply-RPC:
-1. aktueller `sync_segment`-Attempt → `failed`, `failure_reason = 'sync_noop_retryable'`.
-2. `'sync_noop_retryable'` wird der Allowlist `composer_retryable_failure_reasons()`
-   hinzugefügt (heute enthält sie: `provider_transient_error`, `provider_timeout`,
-   `provider_rate_limited`, `dispatch_uncertain_recovery`, `watchdog_stalled`,
-   `poller_timeout`, `mux_redispatch` — verifiziert). Die Ergänzung ist Teil der G3.2.2-Migration.
-3. Pass-Paar wird nach dem zulässigen Reset-Vertrag freigegeben (`job_id`/`pipeline_job_id`
+Wichtig: `composer_replace_pipeline_attempt` wird **nicht** umgedeutet. Audit der eingefrorenen
+Implementierung (verifiziert): sie prüft den *gespeicherten* `error_code` des Vorgängers gegen
+`composer_retryable_failure_reasons()`, legt den Nachfolger mit `attempt_no+1` und Status
+`dispatching` an und setzt den Vorgänger anschließend auf `status='stale'`, `replaced_by=<neu>`,
+`completed_at=now()`, wobei der bestehende `error_code` erhalten bleibt.
+
+Daraus folgt die saubere Trennung:
+- **Segment-Ergebnis** (fachliches Verdikt dieses Callbacks): `failed` mit
+  `error_code = 'sync_noop_retryable'`.
+- **Finaler Ledger-Lifecycle-Status nach Replacement**: `stale` mit `replaced_by = replacement_job_id`
+  und weiterhin `error_code = 'sync_noop_retryable'`.
+
+Ablauf in **einer** Transaktion des Apply-RPC:
+1. aktueller `sync_segment`-Attempt → `status='failed'`, `error_code='sync_noop_retryable'`
+   (dieser gespeicherte Wert ist die Autorisierungsgrundlage für Schritt 3).
+2. `'sync_noop_retryable'` wird der Allowlist `composer_retryable_failure_reasons()` hinzugefügt
+   (heute: `provider_transient_error`, `provider_timeout`, `provider_rate_limited`,
+   `dispatch_uncertain_recovery`, `watchdog_stalled`, `poller_timeout`, `mux_redispatch` —
+   verifiziert). Die Ergänzung ist Teil der G3.2.2-Migration; das Primitive bleibt unverändert.
+3. `composer_replace_pipeline_attempt(previous_job_id, scene, run, 'sync_segment',
+   plate_generation, …)` im selben Commit; niemals Initial-Acquire. Rückgabe als
+   `replacement_job_id`. Der Vorgänger endet dadurch als `stale`/`replaced_by`.
+4. Pass-Paar wird nach dem zulässigen Reset-Vertrag freigegeben (`job_id`/`pipeline_job_id`
    atomar gemeinsam auf NULL, Status `pending`) — kein Einzel-Pointer-Write.
-4. Ersatz-Attempt ausschließlich über `composer_replace_pipeline_attempt(previous_job_id,
-   scene, run, 'sync_segment', plate_generation, …)` innerhalb desselben Commits; niemals
-   Initial-Acquire. Rückgabe als `replacement_job_id`.
 5. Edge darf **keinen** Attempt erzeugen: `compose-dialog-segments` wird mit dem vom RPC
    gelieferten `replacement_job_id` (+ `retry_of_pipeline_job_id`) aufgerufen und bindet nur
    noch die Provider-ID über `composer_bind_sync_pass_attempt` (G3.1f, frozen).
-6. Duplicate des alten NOOP-Callbacks: der alte Job ist bereits terminal und der Slot zeigt
-   nicht mehr auf ihn ⇒ `noop`. Kein zweiter Reset, kein zweiter Replacement-Attempt.
-7. Crash-Safety (Punkt 2, analog): existiert der Replacement-Attempt bereits, ist er aber
-   noch ungebunden und ohne Provider-Dispatch, liefert ein Duplicate erneut `redispatch`
-   **mit derselben** `replacement_job_id`. Der Retry wird nie dauerhaft verschluckt.
-   Exactly-once bleibt die Bindung (`composer_bind_sync_pass_attempt`), nicht der RPC-Claim.
+6. Duplicate-Verhalten dieses Zweigs ist ausschließlich in der Duplicate-Matrix (§8) geregelt.
 
 ## 6. Kein Callback-Job-Hop — B11 wird umgelegt (Punkt 1)
 
@@ -151,21 +173,30 @@ damit vollständig zum Finalizer.
 `composer_touch_lipsync_progress` bleibt interner SQL-Helper: kein Grant, kein Edge-RPC,
 kein Watchdog-Writer, nur innerhalb der Apply-Transaktion. Bound-job-no-callback-Recovery bleibt G4.
 
-## 8. Concurrency / Idempotency (Punkt 2 geschlossen)
+## 8. Concurrency / Idempotency — geschlossene Duplicate-Matrix
 
-- Duplicate identisch nach Apply → `noop`.
-- Duplicate konfliktär (anderer Output/Status) → `rejected`, keine Mutation.
+Es gibt **keine** pauschale „Duplicate → noop“-Regel mehr. Maßgeblich ist ausschließlich:
+
+| Duplicate-Fall | Bedingung | Ergebnis |
+|---|---|---|
+| finaler Success, Mux noch nicht beansprucht | kein `audio_mux`-Attempt im Ledger für (scene, run, plate_generation) | erneut `dispatch_mux`, **ohne** den Pass erneut zu mutieren |
+| finaler Success, Mux bereits im Ledger | `audio_mux`-Attempt existiert | `noop` |
+| finaler Success, Aggregat `continue`/`fail` unverändert | – | `noop` |
+| alter retryable-NOOP, Replacement offen | `replacement_job_id` existiert, ist ungebunden und ohne Provider-Dispatch | erneut `redispatch` mit **derselben** `replacement_job_id`, kein zweiter Reset, kein zweiter Attempt |
+| alter retryable-NOOP, Replacement bereits gebunden/dispatched | Provider-ID am Replacement gebunden | `noop` |
+| konfliktärer Duplicate | anderer Output-URL / anderer Provider-Status als bereits angewandt | `rejected`, keine Mutation |
+
+Weitere Regeln:
 - Zwei finale Pass-Callbacks parallel → Serialisierung über Job-Lock → Scene-Lock.
-- **`dispatch_mux` ist re-drivable, nicht Einmal-Verdikt.** Der RPC persistiert
+- **`dispatch_mux` ist re-drivable, kein Einmal-Verdikt.** Der RPC persistiert
   `dialog_shots.audio_mux.mux_dispatch_requested_at` (ersetzt die Semantik von
-  `try_claim_mux_dispatch`, das dadurch aus dem Sync-Pfad entfällt). Ein Duplicate oder ein
-  Folge-Callback liefert **erneut** `dispatch_mux`, solange kein autoritativer
-  `audio_mux`-Attempt im Ledger existiert. Damit kann ein Edge-Crash zwischen Commit und
-  `acquireLedgerJob('audio_mux')` den Mux nicht dauerhaft blockieren.
+  `try_claim_mux_dispatch`, das dadurch aus dem Sync-Pfad entfällt), verhindert damit aber
+  keine Wiederholung. Ein Edge-Crash zwischen Commit und `acquireLedgerJob('audio_mux')` kann
+  den Mux so nicht dauerhaft blockieren.
   **Exactly-once-Schranke bleibt `acquireLedgerJob('audio_mux')`** (`already_in_flight`,
   verifiziert in `sync-so-webhook:1229–1244`).
-- Gleiches Prinzip für `redispatch` (§5a.7): der RPC-Claim ist wiederholbar, exactly-once
-  liegt bei der Attempt-Bindung.
+- Gleiches Prinzip für `redispatch`: der RPC-Claim ist wiederholbar, exactly-once liegt bei
+  `composer_bind_sync_pass_attempt`.
 - Stale Run/Generation → kein Apply, Verdikt `stale_run` / `stale_generation`.
 - Falsche Pass-/Segment-Identität → `wrong_pass`, kein Apply.
 
@@ -186,18 +217,30 @@ Audit-Zeile für applied/rejected/noop.
 
 ## 11. Verbindliche Testmatrix
 
-S1 Erfolg, weitere offen → job succeeded / continue · S2 letzter Erfolg → `dispatch_mux` ·
-S3 Erfolg bei früherem Fail → job succeeded / scene fail · S4 Provider-Fail → job failed /
-korrektes Aggregat · S5 Duplicate success → noop · S6 conflicting duplicate → rejected ·
-S7 stale run · S8 stale generation · S9 falsche Pass-/Segment-Identität ·
-**S10 (neu gefasst)** zwei finale Callbacks bzw. Wiederholung nach simuliertem Edge-Crash →
-ggf. **mehrfach** `dispatch_mux`-Verdikt, aber **genau ein** `audio_mux`-Ledger-Attempt und
-**genau ein** Provider-Dispatch · S11 kein Whole-JSON-Clobber · S12 keine Fremd-Slot-Mutation ·
-S13 kein Initial-Acquire im Callback (nur `composer_replace_pipeline_attempt`) ·
-S14 kein `lipsync_muxing` vor Mux-Owner · S15 kein `complete`/`applied` aus Sync-Apply
-(inkl. single-speaker non-tight) · **S16** NOOP-retryable → Job `failed/sync_noop_retryable`,
-Reason in Allowlist, genau ein Replacement-Attempt, Duplicate erzeugt keinen zweiten ·
-**S17** `_write_id`/`_provider_status`-Mismatch → rejected ohne Mutation.
+- **S1** Erfolg, weitere Passes offen → Job `succeeded`, Verdikt `continue`.
+- **S2** letzter Erfolg, alle done → `dispatch_mux`.
+- **S3** Erfolg bei früherem Fail, `totalSpeakers ≥ 3` → Job `succeeded`, Scene `fail`.
+- **S3b** Erfolg bei früherem Fail, `totalSpeakers ≤ 2`, alle terminal → Job `succeeded`,
+  Scene `dispatch_mux` (Partial-Mux erhalten, §3a).
+- **S4** Provider-Fail → Job `failed`, Aggregat gemäß §3/§3a korrekt.
+- **S5** Duplicate finaler Success **ohne** `audio_mux`-Attempt → erneut `dispatch_mux`,
+  Pass unverändert; **mit** `audio_mux`-Attempt → `noop`.
+- **S6** konfliktärer Duplicate → `rejected`, keine Mutation.
+- **S7** stale Run · **S8** stale Generation · **S9** falsche Pass-/Segment-Identität → kein Apply.
+- **S10** zwei finale Callbacks bzw. Wiederholung nach simuliertem Edge-Crash → ggf. mehrfach
+  `dispatch_mux`, aber **genau ein** `audio_mux`-Ledger-Attempt und **genau ein** Provider-Dispatch.
+- **S11** kein Whole-JSON-Clobber · **S12** keine Fremd-Slot-Mutation.
+- **S13** kein Initial-Acquire im Callback (nur `composer_replace_pipeline_attempt`).
+- **S14** kein `lipsync_muxing` vor dem Mux-Owner · **S15** kein `complete`/`applied` aus dem
+  Sync-Apply (inkl. single-speaker non-tight).
+- **S16** NOOP-retryable: Segment-Ergebnis `failed` mit `error_code='sync_noop_retryable'`;
+  **finaler** Ledger-Zustand des Vorgängers nach Replacement ist `status='stale'`,
+  `replaced_by = replacement_job_id`, `error_code='sync_noop_retryable'` erhalten;
+  genau ein Replacement-Attempt (`attempt_no+1`, Status `dispatching`).
+- **S16b** Duplicate des alten NOOP-Callbacks: Replacement ungebunden → erneut `redispatch`
+  mit derselben `replacement_job_id`; Replacement gebunden → `noop`. Nie ein zweiter Attempt.
+- **S17** `_write_id`/`_provider_status`-Mismatch → `rejected` ohne Mutation.
+
 Zusätzlich Frozen-Suite + `tsgo`.
 
 ## Späterer Scope (nach Abnahme)
