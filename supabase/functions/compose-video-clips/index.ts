@@ -601,7 +601,11 @@ serve(async (req) => {
     const sceneWebhookUrl = (sceneId: string) => {
       const stamp = sceneRunStamps.get(sceneId);
       if (!stamp) throw new Error(`missing_run_stamp:${sceneId}`);
-      return `${webhookUrl}&scene_id=${sceneId}&project_id=${projectId}&run_id=${encodeURIComponent(stamp.runId)}&generation=${stamp.generation}`;
+      // v431 G3.1 — `pipeline_job_id` ist ab G3.2 die primäre Callback-Identität.
+      // In G3.1 wird sie nur transportiert und beobachtet.
+      const ledgerJobId = sceneLedgerJobs.get(sceneId);
+      const ledgerParam = ledgerJobId ? `&pipeline_job_id=${encodeURIComponent(ledgerJobId)}` : "";
+      return `${webhookUrl}&scene_id=${sceneId}&project_id=${projectId}&run_id=${encodeURIComponent(stamp.runId)}&generation=${stamp.generation}${ledgerParam}`;
     };
 
     // IMPORTANT: We do NOT append negative words to the positive prompt.
