@@ -6109,6 +6109,7 @@ export type Database = {
           last_heartbeat_at: string | null
           metadata: Json
           payload_hash: string | null
+          plate_generation: number | null
           provider: string | null
           run_contract_version: number
           run_id: string
@@ -6135,6 +6136,7 @@ export type Database = {
           last_heartbeat_at?: string | null
           metadata?: Json
           payload_hash?: string | null
+          plate_generation?: number | null
           provider?: string | null
           run_contract_version?: number
           run_id: string
@@ -6161,6 +6163,7 @@ export type Database = {
           last_heartbeat_at?: string | null
           metadata?: Json
           payload_hash?: string | null
+          plate_generation?: number | null
           provider?: string | null
           run_contract_version?: number
           run_id?: string

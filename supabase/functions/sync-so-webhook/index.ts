@@ -34,6 +34,7 @@ import { probeMp4Dims } from "../_shared/twoshot-face-map.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
+import { acquireLedgerJob, observeCallbackProvenance, readPipelineJobId } from "../_shared/v431-ledger.ts";
 
 
 const corsHeaders = {
@@ -326,7 +327,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
   if (sceneHint) {
     const { data } = await supabase
       .from("composer_scenes")
-      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status, active_run_id, plate_generation")
       .eq("id", sceneHint)
       .maybeSingle();
     if (data) {
@@ -342,7 +343,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // We must check ALL three so late/parallel pass webhooks find their scene.
     const { data: rows } = await supabase
       .from("composer_scenes")
-      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status, active_run_id, plate_generation")
       .in("lip_sync_status", ["running", "stitching", "audio_muxing"])
       .limit(200);
     for (const r of rows ?? []) {
@@ -398,6 +399,16 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       });
     }
   }
+
+  // ── v431 G3.1 — Ledger-Observe (schreibt nichts, blockiert nichts) ─────────
+  await observeCallbackProvenance(supabase, {
+    handler: "sync-so-webhook",
+    pipelineJobId: readPipelineJobId(url, payload as Record<string, unknown>),
+    sceneId,
+    stage: "sync_segment",
+    externalJobId: jobId ? String(jobId) : null,
+  });
+
 
   if (scene.lip_sync_applied_at) {
     return ok({ ok: true, skipped: "already_applied" });
@@ -1197,11 +1208,24 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         })
         .eq("id", sceneId);
       console.log(`[sync-so-webhook] v25 scene=${sceneId} ALL ${totalPasses} passes done → dispatching fan-in compositor`);
+      // v431 G3.1 — Ledger-Zeile für die Mux-Stage. D6: Owner der Mux-Stage
+      // ist der Dispatcher; hier entsteht nur die Provenienz-Zeile, die als
+      // `pipeline_job_id` im Request-Body mitreist.
+      const v431MuxLedgerJob = await acquireLedgerJob(supabase, {
+        sceneId,
+        runId: (scene as any)?.active_run_id ?? null,
+        stage: "audio_mux",
+        provider: "remotion",
+        metadata: { dispatcher: "sync-so-webhook", fan_in_passes: totalPasses },
+      });
       try {
         fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-          body: JSON.stringify({ scene_id: sceneId }),
+          body: JSON.stringify({
+            scene_id: sceneId,
+            ...(v431MuxLedgerJob ? { pipeline_job_id: v431MuxLedgerJob.id } : {}),
+          }),
         }).catch(() => {});
       } catch { /* ignore */ }
       return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", compositor: "dispatched" });

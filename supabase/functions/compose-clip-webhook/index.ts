@@ -13,6 +13,7 @@ import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { resumeContinuityChain, sweepContinuityQueue } from "../_shared/continuity-chain.ts";
 import { guardCallback } from "../_shared/v427-callback-guard.ts";
+import { observeCallbackProvenance, readPipelineJobId } from "../_shared/v431-ledger.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 import { continuityRenderedPatch } from "../_shared/continuity-run-snapshot.ts";
 import { legacyClipReadyEquivalentRow, legacyClipFailedEquivalentRow } from "../_shared/scene-state.ts";
@@ -171,6 +172,20 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         );
       }
     }
+
+
+    // ── v431 G3.1 — Ledger-Observe (schreibt nichts, blockiert nichts) ───
+    // Speist ausschließlich das Drain-Gate: erst wenn hier über das gesamte
+    // Drain-Fenster kein `missing_binding` mehr auftaucht, ist G3.2 (Apply)
+    // freigabefähig.
+    await observeCallbackProvenance(supabase, {
+      handler: 'compose-clip-webhook',
+      pipelineJobId: readPipelineJobId(url, payload),
+      sceneId,
+      stage: 'base_video',
+      externalJobId: predictionId ? String(predictionId) : null,
+      reportedRunId: runId,
+    });
 
 
     if (status === 'succeeded' && output) {

@@ -33,6 +33,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { acquireLedgerJob, bindLedgerExternalJob } from "../_shared/v431-ledger.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -108,13 +109,18 @@ serve(async (req) => {
     }
     const sceneId: string | undefined = body?.sceneId ?? body?.scene_id;
     const forceRemux = body?.force === true || body?.force_remux === true;
+    // v431 G3.1 — Provenienz aus dem Dispatcher-Body (Observe-Phase).
+    const v431IncomingLedgerJobId: string | null =
+      typeof body?.pipeline_job_id === "string" && body.pipeline_job_id.length > 0
+        ? body.pipeline_job_id
+        : null;
     sceneIdForDiagnostics = sceneId;
     if (!sceneId) return json({ error: "sceneId is required" }, 400);
 
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, dialog_shots, audio_plan, lip_sync_applied_at, lip_sync_status, clip_url",
+        "id, project_id, dialog_shots, audio_plan, lip_sync_applied_at, lip_sync_status, clip_url, active_run_id, plate_generation",
       )
       .eq("id", sceneId)
       .single();
@@ -809,6 +815,23 @@ serve(async (req) => {
       return json({ error: `insert render: ${insertErr.message}` }, 500);
     }
 
+    // v431 G3.1 — Ledger-Zeile der Mux-Stage. Übergibt der Dispatcher keine
+    // `pipeline_job_id` (Self-Dispatch/Retry-Pfade), legen wir sie hier an,
+    // damit jeder Remotion-Callback eine Provenienz-Referenz hat.
+    let v431MuxLedgerJobId: string | null = v431IncomingLedgerJobId;
+    if (!v431MuxLedgerJobId) {
+      const acquired = await acquireLedgerJob(supabase, {
+        sceneId,
+        runId: (scene as any).active_run_id ?? null,
+        stage: "audio_mux",
+        plateGeneration: Number((scene as any).plate_generation ?? 0),
+        provider: "remotion",
+        metadata: { dispatcher: "render-sync-segments-audio-mux", self_acquired: true },
+      });
+      v431MuxLedgerJobId = acquired?.id ?? null;
+    }
+    await bindLedgerExternalJob(supabase, v431MuxLedgerJobId, renderId);
+
     const webhookUrl = appendWebhookToken(
       `${supabaseUrl}/functions/v1/remotion-webhook`,
     );
@@ -858,6 +881,7 @@ serve(async (req) => {
           composer_scene_id: sceneId,
           composer_project_id: (scene as any).project_id,
           stage: "sync_segments_audio_mux",
+          ...(v431MuxLedgerJobId ? { pipeline_job_id: v431MuxLedgerJobId } : {}),
         },
       },
     };

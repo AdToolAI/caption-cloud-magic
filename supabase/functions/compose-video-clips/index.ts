@@ -43,7 +43,7 @@ function parseRetryAfter(msg: string): number {
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
-import { dualWriteDispatches } from "../_shared/v427-dual-write.ts";
+import { acquireLedgerJob, bindLedgerExternalJob } from "../_shared/v431-ledger.ts";
 import { isV427FlagEnabled } from "../_shared/v427-flags.ts";
 import {
   InsufficientCreditsError,
@@ -521,6 +521,28 @@ serve(async (req) => {
       });
     }
 
+    // ── v431 G3.1 — Ledger-Provenienz (Observe). ────────────────────────
+    // Die Job-Zeile entsteht VOR dem Provider-Call, damit ein sehr schneller
+    // Callback seine Identität immer schon in der Datenbank findet. Die
+    // eingefrorene `plate_generation` macht den Job unabhängig von späteren
+    // Szenen-Mutationen. Kein Writer wird hier migriert: schlägt die Akquise
+    // fehl, läuft der Legacy-Pfad unverändert weiter (fail-open bis G3.2).
+    const sceneLedgerJobs = new Map<string, string>();
+    for (const [sceneId, stamp] of sceneRunStamps.entries()) {
+      const handle = await acquireLedgerJob(supabaseAdmin, {
+        sceneId,
+        runId: stamp.runId,
+        stage: "base_video",
+        plateGeneration: stamp.generation,
+        provider: (scenes as Array<{ id: string; clipSource?: string }>)
+          .find((s) => s.id === sceneId)?.clipSource ?? null,
+        metadata: { dispatcher: "compose-video-clips" },
+      });
+      if (handle) sceneLedgerJobs.set(sceneId, handle.id);
+    }
+
+
+
     // ── v427B — Geldvertrag: Obergrenze reservieren, BEVOR ein bezahlter
     // Providerauftrag rausgeht. Ein Voiceover kann eine Szene noch bis ans
     // Providerfenster verlängern, deshalb wird die Obergrenze gesperrt und
@@ -579,7 +601,11 @@ serve(async (req) => {
     const sceneWebhookUrl = (sceneId: string) => {
       const stamp = sceneRunStamps.get(sceneId);
       if (!stamp) throw new Error(`missing_run_stamp:${sceneId}`);
-      return `${webhookUrl}&scene_id=${sceneId}&project_id=${projectId}&run_id=${encodeURIComponent(stamp.runId)}&generation=${stamp.generation}`;
+      // v431 G3.1 — `pipeline_job_id` ist ab G3.2 die primäre Callback-Identität.
+      // In G3.1 wird sie nur transportiert und beobachtet.
+      const ledgerJobId = sceneLedgerJobs.get(sceneId);
+      const ledgerParam = ledgerJobId ? `&pipeline_job_id=${encodeURIComponent(ledgerJobId)}` : "";
+      return `${webhookUrl}&scene_id=${sceneId}&project_id=${projectId}&run_id=${encodeURIComponent(stamp.runId)}&generation=${stamp.generation}${ledgerParam}`;
     };
 
     // IMPORTANT: We do NOT append negative words to the positive prompt.
@@ -5166,20 +5192,17 @@ serve(async (req) => {
       }
     }
 
-    // v427A2 — mirror the dispatches that just happened into the job ledger.
-    // Flag-gated, post-hoc, non-branching: legacy stays in control.
-    await dualWriteDispatches(
-      supabaseAdmin,
-      results
-        .filter((r: any) => r.status === "generating")
-        .map((r: any) => ({
-          sceneId: r.sceneId,
-          externalJobId: r.predictionId ?? null,
-          provider: scenes.find((s) => s.id === r.sceneId)?.clipSource ?? null,
-          stage: "base_video" as const,
-        })),
-      user.id,
-    );
+    // v431 G3.1 — die Ledger-Zeile existiert bereits seit VOR dem Dispatch
+    // (kanonische Callback-Identität in der Webhook-URL). Hier wird nur noch
+    // die Provider-Job-ID gebunden; der DB-Trigger macht sie unveränderlich.
+    // Ersetzt den post-hoc v427A2-Dual-Write für `base_video`: zwei Quellen
+    // für dieselbe Stage würden die D2-Eindeutigkeit brechen.
+    for (const r of results as Array<any>) {
+      if (r.status !== "generating") continue;
+      const ledgerJobId = sceneLedgerJobs.get(r.sceneId);
+      if (!ledgerJobId) continue;
+      await bindLedgerExternalJob(supabaseAdmin, ledgerJobId, r.predictionId ?? null);
+    }
 
 
 
