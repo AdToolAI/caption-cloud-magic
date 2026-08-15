@@ -10,9 +10,14 @@ Ergänzung von `docs/v431-g3-2-2-report.md`.
   (`_pipeline_job_id uuid, _external_job_id text, _write_id text, _provider_status text, _output_url text, _error_text text`),
   `SECURITY DEFINER`, `search_path = pg_catalog, public`.
 - `composer_replace_pipeline_attempt` ist unverändert vorhanden (Freeze-Kandidat für §5).
-- `composer_touch_lipsync_progress` existiert **nicht** in der Datenbank. Der Contract-Punkt
-  „intern only / kein Grant / kein Edge-RPC-Aufruf“ wird daher als *nicht anwendbar* geführt und
-  im Report explizit als solcher ausgewiesen — nicht als grünes Gate stillschweigend abgehakt.
+- `composer_touch_lipsync_progress` existiert **nicht** in der Datenbank. Das wird **nicht** als
+  N/A oder grün gewertet, sondern zunächst als Contract-Abweichung behandelt. Der Verify-Schritt
+  prüft gegen den LOCKED Contract, ob die vollständige Progress-Semantik äquivalent inline in
+  `composer_apply_sync_segment_result` umgesetzt wurde:
+  - Semantik fehlt oder nur teilweise vorhanden → **RED**, STOP mit Befund.
+  - Semantik vollständig und äquivalent inline → **DEVIATION — function inlined** dokumentieren
+    und STOP für Review; nicht automatisch READY FOR DEPLOY setzen.
+
 
 ## Ablauf
 
@@ -41,17 +46,30 @@ ausgeführt und zurückgerollt. Erfasst werden Verdict, `segment_result`, Pass-S
 Ledger-Attempt-Zählung und Scene-State-Diff. Abgedeckt: Success/Continue, letzter Success,
 Fail-Aggregat bei ≥3 und ≤2 Sprechern, Provider-Fail, Duplicate-Success mit und ohne
 vorhandenen `audio_mux`-Attempt, konfliktäres Duplicate, stale Run/Generation, falscher
-Pass/Segment, Concurrency-/Crash-Fall, Clobber- und Fremd-Slot-Freiheit, kein Initial-Acquire
+Pass/Segment, Clobber- und Fremd-Slot-Freiheit, kein Initial-Acquire
 im Callback, kein vorzeitiges `lipsync_muxing`, kein `complete`/`applied` (auch single-speaker
 non-tight), NOOP-Retryable inkl. Duplicate-Verhalten, ungültige Write-ID/Status-Kombination.
 
-### 4. Mux-Ownership
+**S10 ist ausgenommen** und läuft nicht als Single-Transaction-Smoke, sondern als echter
+Concurrency-/Integration-Test (siehe §4).
+
+
+### 4. Mux-Ownership + S10 als echter Concurrency-Test
 Statischer Nachweis, dass der Webhook nach dem RPC ausschließlich
 `dispatch_mux → acquireLedgerJob('audio_mux') → invoke render-sync-segments-audio-mux` ausführt,
 plus Testnachweis, dass der State-Eintritt `lipsync_muxing` erst beim Mux-Owner nach realer
-`render_id` erfolgt. Crash-Fall: Apply committed, Edge stirbt vor dem Acquire — identischer
-Callback erhält erneut `dispatch_mux`, es entsteht trotzdem genau ein Ledger-Attempt und genau
-ein Provider-Dispatch.
+`render_id` erfolgt.
+
+S10 wird als echter Race-Nachweis geführt, nicht als `BEGIN … ROLLBACK`:
+- **Zwei parallele Sessions/Callbacks** auf dieselbe Scene, deterministisch über eine Barriere
+  synchronisiert (beide erreichen den Apply-Punkt gleichzeitig, committen konkurrierend).
+- Nachweis über den Ledger: trotz ggf. mehrfachem `dispatch_mux` entsteht **genau ein**
+  `audio_mux`-Attempt (Verlierer bekommt `already_in_flight`).
+- Nachweis über einen **Fetch-/Invoke-Spy** in einem instrumentierten Edge-Test: **genau ein**
+  Provider-Dispatch an `render-sync-segments-audio-mux`.
+- Crash-Fall separat: Apply committed, Edge stirbt vor dem Acquire — identischer Callback
+  erhält erneut `dispatch_mux`, Ergebnis bleibt ein Attempt und ein Dispatch.
+
 
 ### 5. NOOP-Retry Ownership
 Nachweis: `sync_noop_retryable` liegt in der DB-Allowlist, der Ersatz läuft ausschließlich über
@@ -73,13 +91,19 @@ ausgewiesen und nicht G3.2.2 zugerechnet.
 
 ### 8. Abschluss
 `docs/v431-g3-2-2-report.md` wird um reale Testzahlen, SQL-Smoke-Ergebnisse, Writer-Audit-Matrix
-und Abweichungen ergänzt. Bei vollständig grünem Ergebnis:
+und Abweichungen ergänzt. Nur bei vollständig grünem Ergebnis **und** ohne offene
+Contract-Deviation:
 **G3.2.2 IMPLEMENTED / VERIFIED — READY FOR DEPLOY REVIEW** (nicht DONE/FROZEN).
-Bei einem roten Contract-Gate: STOP mit Befund, keine automatische Reparatur.
+Bei einem roten Contract-Gate oder einer dokumentierten Deviation (inkl.
+`composer_touch_lipsync_progress` inline): STOP mit Befund, keine automatische Reparatur.
+
 
 ## Technische Hinweise
 
 - Smokes laufen über `psql`-Transaktionen mit `ROLLBACK`; keine Datenmutation bleibt bestehen.
+  Ausnahme S10: parallele Sessions committen konkurrierend gegen eine Fixture-Scene und werden
+  danach gezielt aufgeräumt; der Provider-Dispatch wird gespyt, nicht real gesendet.
+
 - Grants werden über `information_schema.role_routine_grants` / `has_function_privilege` belegt.
 - Der Writer-Guard nutzt `rg` über `supabase/functions/**` mit Klassifikationstabelle im Report.
 - Keine Migration, kein Deploy, keine Änderung an Contract- oder Freeze-Artefakten.
