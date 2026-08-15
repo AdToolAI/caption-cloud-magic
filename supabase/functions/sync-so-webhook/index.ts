@@ -78,12 +78,9 @@ const RETRY_TEMPERATURES = [0.5, 0.35, 0.7, 0.4];
 // v82 (Phase 2.1) — `bbox-url-pro` (Sync.so `bounding_boxes_url`) is now
 // PRIMARY for multi-speaker dialog. On failure we step down to the
 // inline-bbox `coords-pro-box`, then the rest of the legacy ladder.
-const V5_RETRY_VARIANTS = ["bbox-url-pro", "coords-pro", "coords-pro-box", "sync3-coords", "coords-pro-lp2pro", "auto-pro", "auto-standard"] as const;
+// v431 G3.2.2 — die Variantenleiter des Callbacks (B14) ist entfallen; ein
+// erneuter Versuch läuft ausschließlich über den NOOP-Escalate-Vertrag (§5a).
 
-function nextV5RetryVariant(current: unknown) {
-  const idx = V5_RETRY_VARIANTS.indexOf(current as any);
-  return V5_RETRY_VARIANTS[Math.min(idx < 0 ? 1 : idx + 1, V5_RETRY_VARIANTS.length - 1)];
-}
 
 function isMultiSpeakerScene(shots: any[]): boolean {
   return new Set(shots.map((s) => s?.speaker_idx)).size >= 2;
