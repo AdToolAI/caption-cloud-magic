@@ -23,40 +23,43 @@ keine neue Architektur. `docs/v431-g3-2-2-contract.md` bleibt LOCKED und unverä
 ## Arbeitsschritte
 
 ### R1 — F1: `mux_dispatch_requested_at` (RED)
-In `composer_apply_sync_segment_result`, unter dem bestehenden Scene-Row-Lock:
-`_ds := jsonb_set(_ds, '{audio_mux}', COALESCE(_ds->'audio_mux','{}'::jsonb), true)` vor dem
-Detail-Write; danach wird **ausschließlich** `mux_dispatch_requested_at` schmal gesetzt.
-`dispatched_at` schreibt der Apply-RPC **nicht** — weder im Erst- noch im Redrive-Zweig;
-dieses Feld gehört allein dem Dispatch-Owner nach erfolgreichem `audio_mux`-Acquire.
-`mux_dispatch_requested_at` ist damit nur der re-drivable Request-Claim, Exactly-once bleibt
-am Ledger-Acquire. Kein Whole-JSON-Replace, Sibling-Keys bleiben erhalten. Duplicate-Redrive:
-fehlender `audio_mux`-Ledger-Attempt ⇒ erneut `dispatch_mux`, vorhandener Attempt ⇒ `noop`.
+Endgültige Regel: In `composer_apply_sync_segment_result` wird unter dem bestehenden
+Scene-Row-Lock zuerst der Parent erzeugt/gemergt
+(`_ds := jsonb_set(_ds, '{audio_mux}', COALESCE(_ds->'audio_mux','{}'::jsonb), true)`),
+danach **ausschließlich** `mux_dispatch_requested_at` schmal gesetzt. `dispatched_at` schreibt
+der Apply-RPC nicht — weder im Erst- noch im Redrive-Zweig; es gehört allein dem
+Dispatch-Owner nach erfolgreichem `audio_mux`-Acquire. `mux_dispatch_requested_at` ist damit
+nur der re-drivable Request-Claim; Exactly-once bleibt am Ledger-Acquire. Kein
+Whole-JSON-Replace, Sibling-Keys bleiben erhalten. Duplicate-Redrive: fehlender
+`audio_mux`-Ledger-Attempt ⇒ erneut `dispatch_mux`, vorhandener Attempt ⇒ `noop`.
 Smokes: fehlender Parent, vorhandener Parent mit Sibling-Keys, Duplicate/Crash-Redrive,
-plus negativer Guard „`dispatched_at` bleibt nach Apply unverändert/abwesend".
-
+plus negativer Guard „`dispatched_at` wird vom Apply-RPC nie geschrieben".
 
 ### R2 — F2: `composer_touch_lipsync_progress`
 Interner SQL-Helper wie im Contract §7 spezifiziert; die heutige Inline-Progress-Semantik
 (`lip_sync_status='running'`, `twoshot_stage='syncso_fanout_<done>_of_<total>'`,
 `updated_at=now()`) wandert wertgleich dorthin. `SECURITY DEFINER`,
-`search_path = pg_catalog, public`, `REVOKE ALL FROM PUBLIC`, **kein** Grant an `anon`,
-`authenticated` oder Edge; Aufruf nur aus `composer_apply_sync_segment_result`.
-Keine zusätzliche Transition-Autorität, keine State-Entscheidung im Helper.
-Smoke: Wert-für-Wert-Vergleich Inline vs. Helper für `done/total`-Kombinationen.
+`search_path = pg_catalog, public`, `REVOKE ALL FROM PUBLIC`; Aufruf nur aus
+`composer_apply_sync_segment_result`, keine zusätzliche Transition-Autorität,
+keine State-Entscheidung im Helper.
+Smokes: Wert-für-Wert-Vergleich Inline vs. Helper für `done/total`-Kombinationen; zusätzlich
+Security-Nachweis, dass **kein** Grantee direkten EXECUTE besitzt — weder `anon`,
+`authenticated`, `PUBLIC` noch `service_role` oder die Sandbox-Rollen; ausgeführt wird der
+Helper ausschließlich intern durch den Definer.
 
 ### R3 — F3: Legacy→State-Bridge, monotone Regel für genau diesen Fall
-`audio_muxing` (in `twoshot_stage` bzw. `lip_sync_status`) wird als Legacy-Kompatibilitätswert
-behandelt, und zwar **explizit monoton** gegen den aktuellen kanonischen State:
-- aktuell `lipsync_dispatched` + Legacy `audio_muxing` ⇒ höchstens `lipsync_running`;
+Endgültige Regel: Legacy `audio_muxing` (in `twoshot_stage` oder `lip_sync_status`) wird gegen
+den aktuellen kanonischen State **monoton** ausgewertet:
+- aktuell `lipsync_dispatched` ⇒ höchstens `lipsync_running`;
 - aktuell `lipsync_running` ⇒ bleibt `lipsync_running`;
-- aktuell `lipsync_muxing` oder später (`complete`) ⇒ **kein** Rückschritt, State bleibt;
-- die Bridge setzt wegen `audio_muxing` **niemals selbst** `lipsync_muxing`.
+- aktuell `lipsync_muxing` oder später (`complete`) ⇒ kein Rückschritt, State bleibt;
+- die Bridge setzt wegen `audio_muxing` niemals selbst `lipsync_muxing`.
 Terminale Legacy-Signale (`failed`, `canceled`, `done/applied`) bleiben unverändert wirksam;
 sonst wird keine Bridge-Semantik angefasst und `sync-so-webhook` zieht nichts vor.
 Smokes: (a) `plate_ready → lipsync_dispatched → lipsync_running → mux handoff` ohne
-Rückschritt; (b) **Beweis-Smoke**: Mux-Owner setzt `lipsync_muxing`, danach folgt ein
-Legacy-Bridge-Trigger mit `audio_muxing` ⇒ State bleibt `lipsync_muxing`;
-(c) bestehende Legacy-Pfade (fail/cancel/complete) unverändert.
+Rückschritt; (b) **Beweis-Smoke**: Mux-Owner setzt `lipsync_muxing`, danach Legacy-Bridge-Trigger
+mit `audio_muxing` ⇒ State bleibt `lipsync_muxing`; (c) bestehende Legacy-Pfade
+(fail/cancel/complete) unverändert.
 
 
 ### R4 — F4: stale Test-Guard
@@ -67,45 +70,57 @@ Keine Produktionslogik wird an den alten Test angepasst.
 
 ### R5 — F5: verbliebener Direct-Write im Recovery-Zweig
 `sync-so-webhook/index.ts` L598–607 (Recovery aus selbstverschuldetem `watchdog_*`-Fail).
-Entscheidung (nicht offen): der Pfad läuft **über den autoritativen RPC**. Die Un-Fail-Bedingung
-(`lip_sync_status='failed'` bzw. `dialog_shots.status='failed'` mit `clip_error ~
-'^watchdog_(provider_timeout|auto_retry_|hard_timeout)'`) wird als geguardete Vorstufe in
-`composer_apply_sync_segment_result` gezogen und dort unter demselben Row-Lock und denselben
-Provenienz-Guards ausgeführt (nur bei `segment_result = COMPLETED` mit gebundenem Pass).
-Der Edge-Branch wird vollständig **write-free**: nur Logging, danach RPC-Aufruf; bei
-`rejected`/`noop` schreibt er nichts. Danach Static Writer Guard erneut:
-0 unautorisierte Sync-Apply-Writer.
+Entscheidung (nicht offen): der Pfad läuft **über den autoritativen RPC**. In
+`composer_apply_sync_segment_result` entsteht dafür eine eng geguardete Vorstufe, die
+**kumulativ** nur dann greift:
+- `segment_result = COMPLETED` (normaler erfolgreicher Segment-Apply), und
+- Ledger-, Run-, Generation-, Job- und Pass-Prüfung sind bereits bestanden, und
+- der aktuelle Failure entspricht exakt dem bekannten selbstverursachten Muster
+  (`lip_sync_status='failed'` bzw. `dialog_shots.status='failed'` mit
+  `clip_error ~ '^watchdog_(provider_timeout|auto_retry_|hard_timeout)'`).
+Sie nimmt ausschließlich die dafür nötigen Failure-Mirrors und `clip_error` zurück und läuft
+danach in denselben normalen Apply weiter — kein generischer „unfail"-Mechanismus, kein
+zweiter Writer, keine eigene Transition-Autorität. Der Edge-Branch wird vollständig
+**write-free**: nur Logging, danach RPC-Aufruf; bei `rejected`/`noop` schreibt er nichts.
+Danach Static Writer Guard erneut: 0 unautorisierte Sync-Apply-Writer.
 
 
 ### R6 — F6: DB-Audit in derselben Transaktion
-`composer_apply_sync_segment_result` schreibt für `applied`, `noop` und `rejected` je eine
-Zeile in `composer_scene_transition_log` (bestehende G0/G3-Infrastruktur, kein zweiter SoT)
-im selben Commit. Inhalt ausreichend zur Rekonstruktion: `scene_id`, `run_id`,
-`plate_generation`, `pipeline_job_id`, `external_job_id`, `write_id`, `pass_idx`,
-`segment_result`, `verdict`, `reason`, Vorher/Nachher-State.
-Damit die Audit-Zeile überlebt, wird verbindlich getrennt:
-- **fachliche `rejected`/`noop`-Verdikte** (missing_binding, wrong_run, wrong_generation,
-  wrong_job, wrong_pass, wrong_stage, stale_write, duplicate) ⇒ normaler RPC-Return,
-  kein `RAISE`; die Audit-Zeile bleibt committed;
+Auditiert wird **erst ab autoritativ aufgelöster Ledger-Zeile**. Sobald
+`composer_apply_sync_segment_result` den Job über `pipeline_job_id` aufgelöst hat, schreibt es
+für `applied`, `noop` und `rejected` je eine Zeile in `composer_scene_transition_log`
+(bestehende G0/G3-Infrastruktur, kein zweiter SoT) im selben Commit. Inhalt ausreichend zur
+Rekonstruktion: `scene_id`, `run_id`, `plate_generation`, `pipeline_job_id`, `external_job_id`,
+`write_id`, `pass_idx`, `segment_result`, `verdict`, `reason`, Vorher/Nachher-State.
+Abgrenzungen, verbindlich:
+- **Pre-RPC-Provenienzfälle** (`missing_binding`, `job_not_found` und vergleichbare) bleiben
+  **ausschließlich** in `composer_callback_observations`. Ohne autoritative Ledger-Zeile gibt es
+  keine belastbare `scene_id`; es wird keine Scene-Zuordnung nur fürs Audit erfunden.
+- **fachliche `rejected`/`noop`-Verdikte nach Auflösung** (wrong_run, wrong_generation,
+  wrong_job, wrong_pass, wrong_stage, stale_write, duplicate) ⇒ normaler RPC-Return, kein
+  `RAISE`; die Audit-Zeile bleibt committed.
 - **echte Invarianz-/Security-Corruption** ⇒ weiterhin Exception mit Rollback; dort kann
   naturgemäß keine Audit-Zeile derselben Transaktion persistieren.
 Testmatrix: mindestens ein `rejected`-Fall mit anschließend nachweisbar vorhandener
-Audit-Zeile. Edge-seitige `composer_callback_observations` bleiben ergänzend,
-ersetzen das Audit nicht.
+Audit-Zeile, plus Negativ-Nachweis, dass `missing_binding` keine Transition-Log-Zeile erzeugt.
 
 
 ### R7 — S10 echt parallel (Pre-Deploy-Gate)
-Der Apply-RPC bleibt im Produktionsartefakt **service-role-only**. Kein `sandbox_exec`-Grant
-in der G3.2.2-Migration. Ablauf stattdessen streng dreiteilig und außerhalb der
-Produktmigration (Ad-hoc-SQL im Testfenster):
+Der Apply-RPC bleibt im Produktionsartefakt **service-role-only**; kein Grant wandert in die
+G3.2.2-Migration. Ablauf streng dreiteilig als Ad-hoc-Test-SQL im Testfenster:
 1. temporärer Test-DB-only `GRANT EXECUTE ... TO sandbox_exec`;
 2. S10-Lauf: zwei echte parallele `psql`-Sessions, Barrier über `pg_advisory_lock`, beide auf
    dieselbe Scene und denselben letzten Pass; jede Session ruft nach `dispatch_mux`
-   instrumentiert `composer_acquire_pipeline_attempt('audio_mux')`. Erwartung: mehrfaches
-   `dispatch_mux` zulässig, **genau ein** `audio_mux`-Ledger-Attempt, **genau ein** simulierter
-   Provider-Invoke. Synthetische Testdaten werden anschließend vollständig gelöscht;
-3. `REVOKE` des temporären Grants, danach Security-Smoke als Beweis:
-   `sandbox_exec=false`, `anon=false`, `authenticated=false`, `service_role=true`.
+   instrumentiert `composer_acquire_pipeline_attempt('audio_mux')`. **Nur der Acquire-Gewinner**
+   zählt und führt den simulierten Provider-Invoke aus; ein `already_in_flight`-Ergebnis
+   invoket nie. Erwartung: mehrfaches `dispatch_mux` zulässig, **genau ein**
+   `audio_mux`-Ledger-Attempt, **genau ein** Provider-Invoke. Synthetische Testdaten werden
+   anschließend vollständig gelöscht;
+3. `REVOKE` des temporären Grants, danach Security-Smoke als Beweis: Enumeration **aller**
+   Nicht-Owner-Grantees aus `proacl` — neben Owner/`postgres` darf ausschließlich
+   `service_role` EXECUTE besitzen; explizit `sandbox_exec=false`,
+   `sandbox_exec_lbunafpxuskwmsrraqxl=false` (bestehender Grant wird mit entfernt),
+   `anon=false`, `authenticated=false`, `PUBLIC=false`.
 Ist der temporäre Grant nicht durchsetzbar oder die Parallelität technisch blockiert:
 STOP mit präzisem Infrastruktur-Befund — kein schwächerer Single-Session-Ersatz,
 keine Umdeklaration als Production-Smoke.
@@ -118,9 +133,11 @@ Ergebnis wird in `docs/v431-g3-2-2-report.md` ergänzt.
 
 ## Technische Artefakte
 
-- Migration 1: `composer_apply_sync_segment_result` (R1, R2-Aufruf, R6) +
+- Migration 1: `composer_apply_sync_segment_result` (R1, R2-Aufruf, R5-Vorstufe, R6) +
   `composer_touch_lipsync_progress` (R2) + `composer_state_from_legacy` /
-  `composer_scene_state_bridge` (R3) + Grant für S10 (R7).
+  `composer_scene_state_bridge` (R3). **Kein Grant-Statement für S10** — der
+  `sandbox_exec`-Grant ist ausschließlich temporäres Ad-hoc-Test-SQL (GRANT → S10 → REVOKE)
+  und niemals Teil eines deploybaren Migrationsartefakts.
 - `supabase/functions/sync-so-webhook/index.ts` (R5).
 - `src/lib/composer/output/__tests__/materializeSceneOutput.test.ts` (R4).
 - Harness-Skripte unter `/tmp` (nicht im Repo), Smoke-SQL transaktional mit Rollback,
