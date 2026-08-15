@@ -667,3 +667,11 @@ Er enthält Ist-Vertrag, Blockade-Klasse (Ledger-Identitätsschlüssel), betroff
 Aufrufer, Option A (Ledger-Terminalisierung im Reset), Option B (kanonische neue
 Run-Identität), Entscheidungsmatrix, Invarianten und Verifikationsplan.
 Die Wahl zwischen A und B ist bewusst offen und ein eigener Freigabeschritt.
+
+---
+
+## 11. RS3 — Option A implementiert
+
+Die Reset-/Run-Lifecycle-Korrektur ist umgesetzt und dokumentiert in `docs/v431-rs3-report.md`
+(33/33 DB-Smokes, 546/546 Vitest, Abnahmekriterium S7 erfuellt). Der blockierte Resmoke-Lauf
+ist unveraendert; G3.2.2 bleibt **DEPLOYED — RESMOKE IN PROGRESS / NOT YET ACCEPTED**.
