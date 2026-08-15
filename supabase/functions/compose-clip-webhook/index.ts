@@ -173,6 +173,20 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
 
 
+    // ── v431 G3.1 — Ledger-Observe (schreibt nichts, blockiert nichts) ───
+    // Speist ausschließlich das Drain-Gate: erst wenn hier über das gesamte
+    // Drain-Fenster kein `missing_binding` mehr auftaucht, ist G3.2 (Apply)
+    // freigabefähig.
+    await observeCallbackProvenance(supabase, {
+      handler: 'compose-clip-webhook',
+      pipelineJobId: readPipelineJobId(url, payload),
+      sceneId,
+      stage: 'base_video',
+      externalJobId: predictionId ? String(predictionId) : null,
+      reportedRunId: runId,
+    });
+
+
     if (status === 'succeeded' && output) {
       const videoUrl = Array.isArray(output) ? output[0] : output;
       console.log(`[compose-clip-webhook] Clip ready: ${videoUrl}`);
