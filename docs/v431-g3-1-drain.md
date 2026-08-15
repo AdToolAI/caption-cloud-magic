@@ -286,3 +286,43 @@ STOP. Keine Reparatur, kein neuer Lauf.
 - **G3.2 bleibt gesperrt.**
 
 STOP — Freigabe für Produktionslauf #2 abwarten.
+
+## Produktionslauf #2 (Post-T0, G3.1d)
+
+- T0 (G3.1d-Rollout) = 2026-08-15T10:47:35Z
+- Projekt `04b80fab-090d-4108-a734-63e651c1b41c`, Szene `b34d1eae-6bf3-437d-a6ab-624be0155adc`
+- Vereinfachter Fall: Skript auf **einen Sprecher** reduziert ("Samuel Dusatko: Ein Studio fuer alles."), 13 s, HappyHorse, kein `tight_grid`-Retry
+- Start via UI (Storyboard → "Neu rendern" → "Rendern für 546 Cr") um **11:11:12Z**
+- Run-Identität: `run_id = 1ecc3f53-7b19-4f03-a084-f69f531de64b`, `plate_generation = 4`
+- Endzustand **11:17:03Z**: `pipeline_state = complete`, `clip_status = ready`, Clip vorhanden, kein `clip_error`
+
+### Ledger-Attempts (alle Post-T0, alle attempt_no = 1, plate_generation = 4, alle gebunden)
+
+| Stage | Job-ID | external_job_id | Status |
+|---|---|---|---|
+| base_video | 7c9abe7b… | 6exy628c7srmy0d00mfvnv7h0g | dispatched |
+| sync_segment | fa7f731a… | 83b6b532-cbf5-45f0-81f3-56734fe9c7d9 | dispatched |
+| audio_mux | 4fba9eef… | 96737a67-1f67-44af-9fb4-27667c12b78b | dispatched |
+
+### Persistente Observe-Telemetrie (`composer_callback_observations`, Post-T0)
+
+| Kanal | Handler | Post-T0 Events | Verdikt | missing_binding | job_not_found | wrong_job | binding_pending | stale_run | stale_generation |
+|---|---|---|---|---|---|---|---|---|---|
+| Replicate / Base-Video | compose-clip-webhook | 1 | bound | 0 | 0 | 0 | 0 | 0 | 0 |
+| Sync.so-Segment | sync-so-webhook | 1 | bound | 0 | 0 | 0 | 0 | 0 | 0 |
+| Audio-Mux / Remotion | remotion-webhook | 1 | bound | 0 | 0 | 0 | 0 | 0 | 0 |
+
+Letztes geprüftes Event: 2026-08-15T11:17:03.444Z.
+
+### Nebenbefunde
+
+- **B (Reaper) bestätigt wirksam:** Der Waisen-Attempt aus Lauf #1 (`b02ae224…`, `dispatching` ohne `external_job_id`) steht jetzt auf `dispatch_uncertain`. Heartbeat `composer-reap-orphaned-dispatches` läuft minütlich, `last_status = ok`, `threshold_minutes = 10`.
+- **A (`watchdog_no_prediction_id`)** ist in Lauf #2 nicht aufgetreten; bleibt dokumentierte Restschuld.
+
+### Status
+
+```text
+G3.1 DEPLOYED / DRAINING — Lauf #2 PASS (alle drei Null-Gates erfüllt)
+Drain-Fenster läuft bis 2026-08-15T11:47:35Z
+G3.2 LOCKED
+```
