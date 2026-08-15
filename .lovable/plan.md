@@ -116,13 +116,15 @@ Ablauf:
 2. Jüngsten relevanten Ledger-Vorgänger für `(scene, run, stage, generation, segment)` bestimmen; existiert er ⇒ `FOR UPDATE`
 3. `composer_scenes FOR UPDATE`
 4. Marker/Run/Generation lesen und in **dieser** Branch-Reihenfolge entscheiden:
-   - **kein Vorgänger** ⇒ unveränderter `composer_acquire_pipeline_attempt` als Attempt 1; bei gültigem Marker wird `_metadata` in derselben Transaktion um `rs3_reset_id = <reset_id>` ergänzt
-   - **Vorgänger vorhanden + gültige unverbrauchte Autorisierung** ⇒ Rearm-Core, Nachfolger `attempt_no + 1`
+   - **Epoch-Idempotenz zuerst:** existiert bereits ein Job derselben Identität `(scene, run, stage, generation, segment)` mit `metadata.rs3_reset_id = <current reset_id>`, der als Post-Reset-Attempt dieser Autorisierung erzeugt wurde ⇒ Rückgabe `already_acquired` (bzw. `already_rearmed`) mit **exakt dieser Job-ID**, kein Write, keine erneute Konsumption. Gilt unabhängig davon, ob es Attempt 1 ohne `rearm_of` oder N+1 mit `rearm_of` ist; die Erkennung stützt sich auf `rs3_reset_id`, nicht auf `rearm_of`.
+   - **kein Vorgänger** ⇒ unveränderter `composer_acquire_pipeline_attempt` als Attempt 1, wobei `_metadata` in derselben Transaktion um `rs3_reset_id = <reset_id>` ergänzt wird — und **dieselbe Stage-/Segment-Autorisierung wird im selben Commit konsumiert**, exakt wie im Rearm-Zweig. Für `audio_mux` wird dabei `mux_rearm_allowed = false` gesetzt. Ohne diese Konsumption könnte ein zweiter Dispatch fälschlich in den Rearm-Zweig fallen und Attempt 2 erzeugen.
+   - **Vorgänger vorhanden + gültige unverbrauchte Autorisierung** ⇒ Rearm-Core, Nachfolger `attempt_no + 1`, Autorisierung konsumiert
    - **Vorgänger vorhanden + keine/verbrauchte Autorisierung bei gültigem Marker** ⇒ fail closed `rs3_rearm_unavailable`
    - **kein Marker bzw. stale Run/Generation** ⇒ unverändert `composer_acquire_pipeline_attempt`, Ergebnis 1:1 durchgereicht (inklusive `predecessor_exists`)
 5. Commit.
 
-Im No-Predecessor-Fall gibt es keinen Job-Lock; Advisory → Scene ist dort korrekt und kollidiert mit keinem Callback-Pfad, da kein Job existiert.
+Im No-Predecessor-Fall gibt es keinen Job-Lock; Advisory → Scene ist dort korrekt und kollidiert mit keinem Callback-Pfad, da kein Job existiert. Die Serialisierung über Advisory + Scene-Row-Lock garantiert, dass Erzeugung von Attempt 1 und Konsumption der Autorisierung atomar in einem Commit passieren und parallele Aufrufer erst danach den Epoch-Idempotenz-Zweig sehen.
+
 
 `acquireLedgerJob()` (`_shared/v431-ledger.ts`, einzige Aufrufstelle des Acquire-RPC) ruft für diese beiden Stages den Wrapper, für alle anderen Stages unverändert das Original.
 
@@ -167,7 +169,12 @@ RS3-S1…S21 plus Frozen-Suite, `tsgo` und die bestehenden G3.1/G3.1f/G3.2.2-Smo
 17. Fence überlebt Consumption: nach verbrauchter Sync-/Mux-Autorisierung wehrt der Marker weiterhin alte Callbacks ab; Attempt-1-Identitäten ohne Vorgänger tragen ebenfalls `rs3_reset_id`
 18. **Refund-Idempotenz:** Reset + fehlgeschlagener Provider-Cancel + späterer Failure-Callback ⇒ kein zweiter Refund, keine weitere finanzielle Nebenwirkung
 19. **Reset-vs-Dispatch-Race:** Session A hält die Reset-Transaktion offen vor Commit, Session B versucht parallel einen Sync- bzw. Mux-Attempt für dieselbe Scene/Run/Generation. Nach Freigabe existiert **kein** aktiver ungetaggter Pre-Reset-Job: B wartet und erzeugt danach einen Job mit aktueller `rs3_reset_id`, oder B ist fail-closed.
-20. **No-Predecessor-Fall:** autorisierte Identität ohne jeden Vorgänger ⇒ erster Post-Reset-Dispatch erzeugt regulär Attempt 1, getaggt mit aktueller `rs3_reset_id`, atomar unter demselben Lock; Branch wird **vor** dem Rearm-Branch entschieden
+20. **No-Predecessor-Fall (verschärft), je für `sync_segment` und `audio_mux`:** autorisierte Identität ohne jeden Vorgänger ⇒ erster Post-Reset-Dispatch erzeugt regulär Attempt 1, getaggt mit aktueller `rs3_reset_id`; Branch wird **vor** dem Rearm-Branch entschieden. Zusätzlich verbindlich:
+    - zwei parallele No-Predecessor-Dispatches ⇒ genau **ein** Attempt 1
+    - der zweite Aufruf erhält `already_acquired` mit **derselben Job-ID**
+    - die Stage-/Segment-Autorisierung ist danach konsumiert
+    - ein dritter Dispatch erzeugt **niemals** Attempt 2 über den Rearm-Zweig
+    - für `audio_mux` ist `mux_rearm_allowed = false` gesetzt
 21. **Deadlock-Freiheit (Lock-Order):** paralleler Callback-Apply (Job → Scene, ohne Advisory) gegen Serialized-Acquire (Advisory → Job → Scene) auf derselben Scene/Identität, beide Richtungen und verschränkt ⇒ kein `deadlock detected`, beide Transaktionen terminieren mit den vertraglichen Ergebnissen; analog Reset (Advisory → Jobs → Scene) gegen Callback
 
 Zusätzlich: `user_reset` nicht retryable; Marker-Lifecycle (überlebt die Reset-Mutation); Fail-closed-Test `rs3_rearm_unavailable`; Drift-Test der Statusmenge; Frozen-Test, dass `composer_acquire_pipeline_attempt` unverändert `predecessor_exists` liefert.
