@@ -5957,7 +5957,28 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       };
     }
 
-    const diagnosticWebhookUrl = `${webhookUrl}&diagnostic_id=${encodeURIComponent(diagnosticId)}`;
+    // v431 G3.1 — Ledger-Zeile VOR dem Provider-Call. `plate_generation` wird
+    // aus dem Run-Snapshot dieses Dispatch eingefroren; die Job-ID reist als
+    // `pipeline_job_id` in der Webhook-URL mit und ist ab G3.2 die primäre
+    // Callback-Identität. Fail-open: ohne Ledger-Zeile läuft der Legacy-Pfad
+    // unverändert weiter (Observe-Phase).
+    const v431SyncLedgerJob = await acquireLedgerJob(supabase, {
+      sceneId,
+      runId: (passRunStamp.run_id as string | null) ?? null,
+      stage: "sync_segment",
+      plateGeneration: Number(passRunStamp.plate_generation ?? 0),
+      provider: "sync.so",
+      metadata: {
+        dispatcher: "compose-dialog-segments",
+        pass_idx: currentPassIdx,
+        total_passes: passes.length,
+        diagnostic_id: diagnosticId,
+        retry_variant: retryVariant,
+      },
+    });
+    const diagnosticWebhookUrl =
+      `${webhookUrl}&diagnostic_id=${encodeURIComponent(diagnosticId)}` +
+      (v431SyncLedgerJob ? `&pipeline_job_id=${encodeURIComponent(v431SyncLedgerJob.id)}` : "");
     // v61 — Multi-speaker default flipped to sync-3 (Sync.so's recommended
     // model for static / locked-camera / occluded plates per
     // https://sync.so/docs/models/lipsync "Still Frame Limitation").
