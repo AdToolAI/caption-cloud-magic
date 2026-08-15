@@ -19707,10 +19707,30 @@ export type Database = {
           status: string
         }[]
       }
+      composer_fail_callback_scene: {
+        Args: {
+          _dialog_patch?: Json
+          _error_text: string
+          _external_job_id: string
+          _pipeline_job_id: string
+          _write_id: string
+        }
+        Returns: Json
+      }
       composer_fail_hybrid_extend_scene: {
         Args: {
           _error_text: string
           _generation: number
+          _run_id: string
+          _scene_id: string
+          _write_id: string
+        }
+        Returns: Json
+      }
+      composer_fail_post_plate_handoff: {
+        Args: {
+          _error_text: string
+          _plate_generation: number
           _run_id: string
           _scene_id: string
           _write_id: string
@@ -19728,6 +19748,17 @@ export type Database = {
           _scene_id: string
           _substate?: string
           _twoshot_stage?: string
+          _write_id: string
+        }
+        Returns: Json
+      }
+      composer_finalize_plate_scene: {
+        Args: {
+          _base_video_url: string
+          _clip_source_hint?: string
+          _external_job_id: string
+          _extra?: Json
+          _pipeline_job_id: string
           _write_id: string
         }
         Returns: Json
