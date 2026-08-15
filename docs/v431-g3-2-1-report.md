@@ -356,3 +356,31 @@ wieder gelöscht.
 ## Status
 
 **FIXED / READY FOR PRODUCTION RESMOKE.** DB-Funktion ist live, kein Redeploy nötig.
+
+## Produktions-Resmoke (echt) — 2026-08-15
+
+Status: **DONE — Resmoke grün**
+
+Szene: `b34d1eae-6bf3-437d-a6ab-624be0155adc` (Projekt `04b80fab…`), echter UI-Run über
+„Clip generieren mit Voiceover" + Render-Bestätigungsdialog. Kein künstlicher Callback.
+
+- Run `73efdcab-6022-438f-a192-e35605384fc7`, `plate_generation = 5`, Dispatch 16:07:59Z
+  (Ledger `base_video`, Provider `ai-happyhorse`, `external_job_id = nsqj907mv9rmw0d00rqbt149ew`).
+- Zustand unmittelbar vor dem Plate-Callback (Snapshot 16:09:55Z): `pipeline_state = audio_ready`,
+  `pipeline_substate = NULL`, `pipeline_state_at = 16:08:55.419Z`,
+  `pipeline_state_run_id = 73efdcab…` → **Compatibility-Zweig `audio_ready`** getroffen (Kriterium 8).
+- Plate-Callback 16:11:08Z: Observe-Verdikt `bound`, RPC A `applied = true`,
+  Ledger-Job `base_video` → `succeeded` / `callback_delivery_status = succeeded` (16:11:11Z).
+  Keine `binding_pending`-/409-Serie im Fenster.
+- Kein State-Vorspringen durch A: die Kette lief unmittelbar weiter (`sync_segment` Dispatch 16:11:54Z),
+  d. h. der Compatibility-Apply hat den Lauf weder zurück auf `plate_ready` gesetzt noch blockiert.
+- Endzustand 16:14:27Z: `pipeline_state = complete`, `clip_status = ready`,
+  `base_video_url` (Storage `ai-videos/composer/…`) und `clip_url` (Remotion-Mux) materialisiert,
+  `processed_video_url` = Mux-Ergebnis der laufenden Kette.
+- Kein Duplicate-Plate-Callback aufgetreten (Kriterium 10 nicht auslösbar).
+- Observationen im Fenster: 3× `bound`, 1× `missing_binding` (16:14:03Z) — Letzteres ist ein
+  **zweiter sync.so-Callback** desselben `external_job_id` in `sync-so-webhook`, also außerhalb
+  des G3.2.1-Scopes (`compose-clip-webhook`); Vormerkung für G3.2.2 (Fan-in/Idempotenz sync.so).
+
+Fazit: die A-Compatibility-Matrix inkl. `pipeline_state_at`-Fix ist im echten Produktionslauf
+bestätigt. `compose-clip-webhook` / RPC A: **G3.2.1 abnahmebereit (DONE)**.
