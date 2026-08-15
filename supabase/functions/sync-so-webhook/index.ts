@@ -401,13 +401,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
   }
 
   // ── v431 G3.1 — Ledger-Observe (schreibt nichts, blockiert nichts) ─────────
+  // G3.1b: dieselbe Job-ID ist zugleich der Vorgänger jedes Retry-Dispatch,
+  // der aus diesem Callback heraus ausgelöst wird.
+  const v431CallbackJobId = readPipelineJobId(url, payload as Record<string, unknown>);
   await observeCallbackProvenance(supabase, {
     handler: "sync-so-webhook",
-    pipelineJobId: readPipelineJobId(url, payload as Record<string, unknown>),
+    pipelineJobId: v431CallbackJobId,
     sceneId,
     stage: "sync_segment",
     externalJobId: jobId ? String(jobId) : null,
   });
+
 
 
   if (scene.lip_sync_applied_at) {
