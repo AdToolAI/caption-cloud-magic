@@ -1550,6 +1550,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               repair_audio: needsAudioRepair,
               pass_idx: currentPass,
               ...(carryForceMultipass ? { force_multipass: true } : {}),
+              // G3.1b — expliziter Retry-Vertrag statt Initial-Akquise.
+              ...(v431CallbackJobId
+                ? {
+                    retry_of_pipeline_job_id: v431CallbackJobId,
+                    retry_reason: "provider_transient_error",
+                  }
+                : {}),
             }),
           }).catch(() => {});
         } catch {
