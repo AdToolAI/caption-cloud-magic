@@ -510,7 +510,10 @@ export const RETRYABLE_FAILURE_REASONS = [
   "watchdog_stalled",
   "poller_timeout",
   "mux_redispatch",
+  // v431 G3.2.2 §5a — Spiegel der DB-Allowlist `composer_retryable_failure_reasons()`.
+  "sync_noop_retryable",
 ] as const;
+
 
 export type RetryableFailureReason = (typeof RETRYABLE_FAILURE_REASONS)[number];
 
@@ -668,6 +671,72 @@ export async function resolveLedgerDispatch(
   if (!replaced) return { outcome: "skip", reason: "replace_lost" };
   return { outcome: "dispatch", job: replaced, kind: "retry" };
 }
+
+/**
+ * v431 G3.2.2 §5a Schritt 5 — Adoption eines bereits in der Apply-Transaktion
+ * erzeugten Replacement-Attempts.
+ *
+ * Der Dispatcher darf in diesem Fall KEINEN eigenen Attempt erzeugen (weder
+ * Acquire noch Replace). Er übernimmt ausschließlich die übergebene Zeile,
+ * nachdem Identität (Scene/Stage/Run/Generation) und Ungebundenheit
+ * (`external_job_id IS NULL`, Status `pending`/`dispatching`) bestätigt sind.
+ */
+export async function adoptPreAcquiredLedgerJob(
+  admin: any,
+  jobId: string,
+  expect: {
+    sceneId: string;
+    stage: PipelineStage;
+    runId: string | null | undefined;
+    plateGeneration?: number | null;
+  },
+): Promise<LedgerDispatchDecision> {
+  let row: any = null;
+  try {
+    const { data } = await admin
+      .from("composer_pipeline_jobs")
+      .select("id, scene_id, run_id, stage, plate_generation, attempt_no, status, external_job_id, replaced_by")
+      .eq("id", jobId)
+      .maybeSingle();
+    row = data ?? null;
+  } catch {
+    row = null;
+  }
+  if (!row) return { outcome: "skip", reason: "preacquired_job_not_found" };
+
+  if (String(row.scene_id) !== expect.sceneId || String(row.stage) !== expect.stage) {
+    return { outcome: "skip", reason: "preacquired_identity_mismatch" };
+  }
+  if (expect.runId && String(row.run_id) !== String(expect.runId)) {
+    return { outcome: "skip", reason: "preacquired_stale_run" };
+  }
+  if (
+    expect.plateGeneration != null &&
+    typeof row.plate_generation === "number" &&
+    row.plate_generation !== expect.plateGeneration
+  ) {
+    return { outcome: "skip", reason: "preacquired_stale_generation" };
+  }
+  if (row.external_job_id || row.replaced_by) {
+    return { outcome: "skip", reason: "preacquired_already_bound" };
+  }
+  if (!["pending", "dispatching"].includes(String(row.status ?? ""))) {
+    return { outcome: "skip", reason: "preacquired_not_dispatchable" };
+  }
+
+  return {
+    outcome: "dispatch",
+    kind: "retry",
+    job: {
+      id: String(row.id),
+      attemptNo: Number(row.attempt_no ?? 1),
+      runId: String(row.run_id),
+      plateGeneration: typeof row.plate_generation === "number" ? row.plate_generation : null,
+    },
+  };
+}
+
+
 
 
 /** Extrahiert `pipeline_job_id` aus URL-Query, Body oder Provider-Metadaten. */

@@ -1,7 +1,6 @@
 # v431 G3.2.2 — Sync Segment Authoritative Apply (Contract Lock)
 
-Analyse + verbindlicher Vertrag. Keine Code-Änderung, keine Migration, kein Deploy in diesem Schritt.
-Nach Freigabe wird exakt dieser Inhalt als `docs/v431-g3-2-2-contract.md` abgelegt (Deliverable), danach STOP.
+Analyse + verbindlicher Vertrag. Status: **LOCKED / GO FOR IMPLEMENTATION**.
 
 ## 1. Ist-Audit `sync-so-webhook` (1857 Zeilen, verifiziert)
 
@@ -41,10 +40,10 @@ Kritische Befunde:
 → Guards → Pass-Apply → Fan-in → Scene/Mirror → Audit → Job-Terminalisierung. Eine Transaktion.
 Kein Resolve über Payload, `dialog_shots`, `external_job_id`, Logs, Scene-Felder. G3.1f-Transport unverändert.
 
-## 3. Kernvertrag: Job-Status ≠ Scene-Verdict
+## 3. Kernvertrag: Segment-Ergebnis ≠ Scene-Verdict
 
 Zwei getrennte Entscheidungen im selben Commit:
-- **Segment-Ergebnis (pre-replacement job result)** = ausschließlich Ergebnis *dieses*
+- **Segment-Ergebnis (pre-replacement)** = ausschließlich Ergebnis *dieses*
   Provider-Segments. Provider-COMPLETED ohne NOOP ⇒ `succeeded`. FAILED/REJECTED/CANCELED
   ⇒ `failed` (`failure_reason` aus Provider-Klassifikation). NOOP unrecoverable ⇒ `failed`
   (`sync_noop_unrecoverable`). NOOP retrybar ⇒ `failed` (`sync_noop_retryable`, §5a), nach
@@ -76,9 +75,9 @@ ein `failed` Ledger-Job — Partial-Mux ändert nur das Scene-Aggregat, nie den 
 
 ## 4. `composer_apply_sync_segment_result` (neu, sole owner)
 
-`_pass_patch` **entfällt** (Punkt 4 geschlossen). Der Slot-Patch wird serverseitig
-deterministisch aus `_write_id` + `_provider_status` + `_output_url` + `_error_text`
-abgeleitet; der Caller kann keine Feldkombination mehr vorgeben.
+`_pass_patch` **entfällt**. Der Slot-Patch wird serverseitig deterministisch aus `_write_id` +
+`_provider_status` + `_output_url` + `_error_text` abgeleitet; der Caller kann keine
+Feldkombination mehr vorgeben.
 
 ```
 composer_apply_sync_segment_result(
@@ -89,7 +88,9 @@ composer_apply_sync_segment_result(
   _output_url       text,   -- nur bei ssw:success bedeutsam, sonst muss NULL sein
   _error_text       text
 ) RETURNS jsonb
--- { applied, verdict, job_status, scene_verdict, pass_idx, replacement_job_id, reason }
+-- { applied, verdict, segment_result, scene_verdict, pass_idx, replacement_job_id, reason }
+-- segment_result = pre-replacement segment result (succeeded | failed),
+--                  NICHT der finale Ledger-Lifecycle-Status
 ```
 
 Serverseitige Write-ID → Slot-Felder-Matrix (geschlossen, keine anderen Keys):
@@ -149,7 +150,7 @@ Ablauf in **einer** Transaktion des Apply-RPC:
    noch die Provider-ID über `composer_bind_sync_pass_attempt` (G3.1f, frozen).
 6. Duplicate-Verhalten dieses Zweigs ist ausschließlich in der Duplicate-Matrix (§8) geregelt.
 
-## 6. Kein Callback-Job-Hop — B11 wird umgelegt (Punkt 1)
+## 6. Kein Callback-Job-Hop — B11 wird umgelegt
 
 Verboten im selben Apply: Terminalisierung von `audio_mux`/Stitch-Jobs, Aufruf von
 `composer_finalize_lipsync_scene`, Scene direkt auf `complete`.
@@ -251,4 +252,4 @@ Migration: `composer_apply_sync_segment_result`, Allowlist-Erweiterung um
 `composer_touch_lipsync_progress` (intern). `try_claim_mux_dispatch` verliert seinen Aufrufer.
 Code: `sync-so-webhook` B4/B7/B8/B9/B10/B12/B15/B16/B17 auf den RPC, Löschung B5/B11/B14,
 Beibehaltung B6/B13 als reine Edge-Nebenwirkungen; Complete-Pfad ausschließlich über
-Mux-Owner → Finalizer. Deliverable `docs/v431-g3-2-2-contract.md`. Danach STOP für Review.
+Mux-Owner → Finalizer.
