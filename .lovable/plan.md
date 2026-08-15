@@ -44,13 +44,14 @@ Kein Resolve über Payload, `dialog_shots`, `external_job_id`, Logs, Scene-Felde
 ## 3. Kernvertrag: Job-Status ≠ Scene-Verdict
 
 Zwei getrennte Entscheidungen im selben Commit:
-- **Job-Status** = ausschließlich Ergebnis *dieses* Provider-Segments.
-  Provider-COMPLETED ohne NOOP ⇒ `succeeded`. FAILED/REJECTED/CANCELED ⇒ `failed`
-  (`failure_reason` aus Provider-Klassifikation). NOOP unrecoverable ⇒ `failed`
-  (`sync_noop_unrecoverable`). NOOP retrybar ⇒ `failed` (`sync_noop_retryable`, §5a).
+- **Segment-Ergebnis (pre-replacement job result)** = ausschließlich Ergebnis *dieses*
+  Provider-Segments. Provider-COMPLETED ohne NOOP ⇒ `succeeded`. FAILED/REJECTED/CANCELED
+  ⇒ `failed` (`failure_reason` aus Provider-Klassifikation). NOOP unrecoverable ⇒ `failed`
+  (`sync_noop_unrecoverable`). NOOP retrybar ⇒ `failed` (`sync_noop_retryable`, §5a), nach
+  `composer_replace_pipeline_attempt` wird der Vorgänger im Ledger final `stale`/`replaced_by`.
 - **Scene-Verdict** = Aggregat über alle Passes.
 
-| Callback | Kontext | Job-Status | Scene-Verdict |
+| Callback | Kontext | Segment-Ergebnis (pre-replacement) | Scene-Verdict |
 |---|---|---|---|
 | success | keine früheren Fails, andere Passes offen | succeeded | continue |
 | success | keine früheren Fails, alle Passes done | succeeded | dispatch_mux |
@@ -60,8 +61,8 @@ Zwei getrennte Entscheidungen im selben Commit:
 | provider failed | Aggregat nicht terminal | failed | continue |
 | provider failed | alle terminal, `totalSpeakers ≤ 2`, ≥1 done | failed | **dispatch_mux** (Partial-Mux, §3a) |
 | provider failed | sonst terminal mit Fails | failed | fail |
-| NOOP retryable | egal | failed (`sync_noop_retryable`) → danach `stale` (§5a) | redispatch |
-| NOOP unrecoverable | egal | failed (`sync_noop_unrecoverable`) | fail |
+| NOOP retryable | egal | `failed` (`sync_noop_retryable`), nach Replacement `stale`/`replaced_by` (§5a) | redispatch |
+| NOOP unrecoverable | egal | `failed` (`sync_noop_unrecoverable`) | fail |
 
 ### 3a. Partial-Mux (verbindliche Entscheidung: erhalten)
 
