@@ -13,6 +13,7 @@ import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { resumeContinuityChain, sweepContinuityQueue } from "../_shared/continuity-chain.ts";
 import { guardCallback } from "../_shared/v427-callback-guard.ts";
+import { observeCallbackProvenance, readPipelineJobId } from "../_shared/v431-ledger.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 import { continuityRenderedPatch } from "../_shared/continuity-run-snapshot.ts";
 import { legacyClipReadyEquivalentRow, legacyClipFailedEquivalentRow } from "../_shared/scene-state.ts";
