@@ -183,6 +183,8 @@ Zusätzlich: `user_reset` nicht retryable; Marker-Lifecycle (überlebt die Reset
 
 Nachweis: beide Reset-Aufrufer laufen über den einen RPC-Vertrag, kein verbleibender Direct-Clear-Pfad, kein direkter Aufruf des Acquire-RPC für Lip-Sync-Stages außerhalb des Wrappers.
 
+Wird der gemeinsame interne Core als eigene SQL-Funktion realisiert, gilt für ihn derselbe gehärtete Standard wie für die drei Einstiegspunkte (`SECURITY DEFINER`, `search_path = pg_catalog, public`, `REVOKE ALL ... FROM PUBLIC`, EXECUTE nur `service_role`).
+
 Alle **drei** neuen DB-Funktionen — `composer_reset_lipsync_with_attempt_cancellation`, `composer_acquire_reset_rearmed_attempt`, `composer_acquire_lipsync_attempt_serialized` — explizit: `SECURITY DEFINER`, `search_path = pg_catalog, public`, keine Defaults/Overloads, `REVOKE ALL ... FROM PUBLIC`, kein EXECUTE für `anon`/`authenticated`, `GRANT EXECUTE` nur an `service_role`. Akzeptiertes plattform-internes ACL wie bisher dokumentiert.
 
 
