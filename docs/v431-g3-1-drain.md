@@ -90,3 +90,13 @@ Function-Logs der vier Callback-Kanäle gezogen (`v431_observe`-Zeilen).
 ## Status
 
 G3.1 deployt, Drain-Fenster läuft. G3.2 bleibt gesperrt. STOP.
+
+## Produktionslauf #1 (Post-T0)
+
+- Auslösung: UI (Motion Studio → Storyboard → „Neu rendern“ → Bestätigung 546 Cr), keine Code-/Schema-/Config-Änderung.
+- Projekt `04b80fab-090d-4108-a734-63e651c1b41c`, Szene `b34d1eae-6bf3-437d-a6ab-624be0155adc`.
+- Run: `62949b1b-6d2f-4e25-9757-bcfc87cf8a17`, `plate_generation = 3`.
+- Ledger-Attempt: `b02ae224-7f6f-40a1-8b32-c6e1313f7e12`, stage `base_video`, attempt_no 1, plate_generation 3 (beim INSERT gesetzt) — INSERT-Pflicht erfüllt.
+- Zeitachse: Ledger-INSERT 09:23:06Z, Szene `plate_rendering/anchor` 09:23:57Z; Stand 09:31:50Z weiterhin Anchor-Vorlauf.
+- Kanaltabelle noch offen: Attempt steht auf `dispatching` ohne gebundene external ID (erwartetes `binding_pending`-Fenster, solange der Anchor-Vorlauf läuft). Webhook-/Fan-in-Kanäle (Replicate, Sync.so, Remotion-Mux) haben Post-T0 noch keinen Callback erzeugt.
+- Kein Observe-Verdikt bisher, keine State-Eingriffe durch die Observe-Pfade.
