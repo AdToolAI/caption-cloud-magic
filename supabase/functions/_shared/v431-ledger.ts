@@ -42,6 +42,22 @@ export interface LedgerJobHandle {
   plateGeneration: number | null;
 }
 
+/**
+ * G3.1b — Ergebnis der Initial-Akquise als Discriminated Union.
+ *
+ * `acquired`          → diese Zeile gehört dem Aufrufer, er darf dispatchen.
+ * `already_in_flight` → ein aktiver Attempt derselben Identität existiert
+ *                       bereits (auch `dispatch_uncertain`). Der Aufrufer darf
+ *                       NICHT dispatchen. Ein Redispatch ist ausschließlich
+ *                       über den expliziten Retry-/Replace-Vertrag zulässig.
+ * `unavailable`       → Ledger nicht verfügbar / keine belastbare Provenienz.
+ *                       Fail-open: der Legacy-Pfad läuft unverändert weiter.
+ */
+export type LedgerAcquireResult =
+  | { outcome: "acquired"; job: LedgerJobHandle }
+  | { outcome: "already_in_flight"; job: LedgerJobHandle; status: string | null }
+  | { outcome: "unavailable"; reason: string };
+
 function keyOf(p: {
   sceneId: string;
   runId: string;
@@ -52,20 +68,27 @@ function keyOf(p: {
   return [p.sceneId, p.runId, p.stage, p.segmentId ?? "-", String(p.attemptNo)].join(":");
 }
 
+/** Deterministischer Idempotenz-Schlüssel derselben Attempt-Identität. */
+export const buildLedgerIdempotencyKey = keyOf;
+
 /**
- * Legt (oder findet) die Ledger-Zeile für genau diesen Dispatch an.
+ * Initial-Akquise der Ledger-Zeile für genau diesen Dispatch.
  *
- * D9: Ein Auto-Retry derselben Stage im selben Run erhöht `attempt_no`,
- * niemals Run-ID oder Generation.
+ * Diese Funktion löst NIEMALS einen laufenden Attempt ab. Existiert bereits ein
+ * aktiver Attempt derselben (scene, run, stage, segment, generation), lautet das
+ * Verdikt `already_in_flight` — `composer_replace_pipeline_attempt` wird dabei
+ * nicht aufgerufen.
  *
- * Gibt `null` zurück, wenn keine belastbare Run-Identität existiert. In G3.1
- * ist das kein Fehler — der Legacy-Pfad läuft unverändert weiter und die
- * Observe-Telemetrie zählt die Lücke.
+ * Concurrency-Vertrag: zwei gleichzeitige Aufrufe derselben Identität ergeben
+ * deterministisch genau einmal `acquired` und einmal `already_in_flight`. Das
+ * garantiert das RPC `composer_acquire_pipeline_attempt` über
+ * `ON CONFLICT ON CONSTRAINT composer_pipeline_jobs_identity_unique DO NOTHING`
+ * plus Re-Read der Gewinnerzeile. Der Verlierer bekommt nie `unavailable`.
  */
 export async function acquireLedgerJob(
   admin: any,
   params: AcquireLedgerJobParams,
-): Promise<LedgerJobHandle | null> {
+): Promise<LedgerAcquireResult> {
   try {
     const runId = params.runId ? String(params.runId) : null;
     if (!runId) {
@@ -73,7 +96,7 @@ export async function acquireLedgerJob(
         scene_id: params.sceneId,
         stage: params.stage,
       }));
-      return null;
+      return { outcome: "unavailable", reason: "no_run" };
     }
 
     let plateGeneration = params.plateGeneration ?? null;
@@ -90,125 +113,76 @@ export async function acquireLedgerJob(
           dispatch_run_id: runId,
           scene_active_run_id: scene.active_run_id ?? null,
         }));
-        return null;
+        return { outcome: "unavailable", reason: "run_superseded" };
       }
       plateGeneration = typeof scene?.plate_generation === "number" ? scene.plate_generation : null;
     }
 
-    // G3.1b: `plate_generation` ist DB-seitig beim INSERT Pflicht. Ohne
-    // belastbare Generation wird gar keine Ledger-Zeile erzeugt (fail-closed
-    // gegenüber dem Ledger, fail-open gegenüber dem Render) — die Lücke zählt
-    // als Telemetrie in den Drain-Bericht.
+    // `plate_generation` ist DB-seitig beim INSERT Pflicht. Ohne belastbare
+    // Generation wird gar keine Ledger-Zeile erzeugt (fail-closed gegenüber dem
+    // Ledger, fail-open gegenüber dem Render).
     if (plateGeneration == null) {
       console.warn(`${V431_OBSERVE_TAG} ledger_skip_no_generation`, JSON.stringify({
         scene_id: params.sceneId,
         stage: params.stage,
         run_id: runId,
       }));
-      return null;
+      return { outcome: "unavailable", reason: "no_generation" };
     }
 
-    // G3.1b — Retry-Atomarität (D9): existiert für dieselbe
-    // (scene, run, stage, segment) noch ein nicht-terminaler Attempt, ist
-    // dieser Dispatch definitionsgemäß ein Retry. Ablösen + Anlegen laufen
-    // dann ausschließlich über den atomaren RPC; ein konkurrierender
-    // Ablöseversuch verliert deterministisch (Row-Lock + Guard).
-    let activeQuery = admin
-      .from("composer_pipeline_jobs")
-      .select("id, attempt_no")
-      .eq("scene_id", params.sceneId)
-      .eq("run_id", runId)
-      .eq("stage", params.stage)
-      .eq("plate_generation", plateGeneration)
-      .is("replaced_by", null)
-      .in("status", ["pending", "dispatching", "dispatched", "dispatch_uncertain"])
-      .order("attempt_no", { ascending: false })
-      .limit(1);
-    activeQuery = params.segmentId
-      ? activeQuery.eq("segment_id", params.segmentId)
-      : activeQuery.is("segment_id", null);
-    const { data: activeRows } = await activeQuery;
-    const previous = Array.isArray(activeRows) && activeRows.length > 0 ? activeRows[0] : null;
-    if (previous?.id) {
-      return await replaceLedgerAttempt(admin, {
-        previousJobId: String(previous.id),
-        sceneId: params.sceneId,
-        runId,
-        stage: params.stage,
-        plateGeneration,
-        provider: params.provider ?? null,
-        metadata: { ...(params.metadata ?? {}), retry_of_job_id: String(previous.id) },
-      });
-    }
-
-    // attempt_no = bestehende Versuche derselben (scene, run, stage, segment) + 1
-    let countQuery = admin
-      .from("composer_pipeline_jobs")
-      .select("id", { count: "exact", head: true })
-      .eq("scene_id", params.sceneId)
-      .eq("run_id", runId)
-      .eq("stage", params.stage);
-    countQuery = params.segmentId
-      ? countQuery.eq("segment_id", params.segmentId)
-      : countQuery.is("segment_id", null);
-    const { count } = await countQuery;
-    const attemptNo = (typeof count === "number" ? count : 0) + 1;
-
-    const idempotency_key = keyOf({
-      sceneId: params.sceneId,
-      runId,
-      stage: params.stage,
-      segmentId: params.segmentId ?? null,
-      attemptNo,
+    const { data, error } = await admin.rpc("composer_acquire_pipeline_attempt", {
+      p_scene_id: params.sceneId,
+      p_run_id: runId,
+      p_stage: params.stage,
+      p_plate_generation: plateGeneration,
+      p_run_contract_version: V427_RUN_CONTRACT_VERSION,
+      p_segment_id: params.segmentId ?? null,
+      p_speaker_id: params.speakerId ?? null,
+      p_provider: params.provider ?? null,
+      p_metadata: { ...(params.metadata ?? {}), ledger_source: "v431_g31" },
     });
 
-    const { data, error } = await admin
-      .from("composer_pipeline_jobs")
-      .upsert(
-        {
-          scene_id: params.sceneId,
-          run_id: runId,
-          run_contract_version: V427_RUN_CONTRACT_VERSION,
-          stage: params.stage,
-          segment_id: params.segmentId ?? null,
-          speaker_id: params.speakerId ?? null,
-          attempt_no: attemptNo,
-          plate_generation: plateGeneration,
-          provider: params.provider ?? null,
-          idempotency_key,
-          status: "dispatching",
-          started_at: new Date().toISOString(),
-          metadata: { ...(params.metadata ?? {}), ledger_source: "v431_g31" },
-        },
-        { onConflict: "idempotency_key", ignoreDuplicates: false },
-      )
-      .select("id, attempt_no, run_id, plate_generation")
-      .maybeSingle();
-
-    if (error || !data) {
-      console.warn(`${V431_OBSERVE_TAG} ledger_insert_failed`, JSON.stringify({
+    const row = Array.isArray(data) ? data[0] : data;
+    if (error || !row?.job_id) {
+      console.warn(`${V431_OBSERVE_TAG} ledger_acquire_failed`, JSON.stringify({
         scene_id: params.sceneId,
         stage: params.stage,
         error: error?.message ?? "no_row",
       }));
-      return null;
+      return { outcome: "unavailable", reason: "acquire_failed" };
     }
 
-    return {
-      id: String(data.id),
-      attemptNo: Number(data.attempt_no ?? attemptNo),
+    const job: LedgerJobHandle = {
+      id: String(row.job_id),
+      attemptNo: Number(row.attempt_no ?? 1),
       runId,
-      plateGeneration: typeof data.plate_generation === "number" ? data.plate_generation : null,
+      plateGeneration,
     };
+
+    if (String(row.outcome) === "already_in_flight") {
+      console.warn(`${V431_OBSERVE_TAG} ledger_already_in_flight`, JSON.stringify({
+        scene_id: params.sceneId,
+        stage: params.stage,
+        run_id: runId,
+        segment_id: params.segmentId ?? null,
+        pipeline_job_id: job.id,
+        attempt_no: job.attemptNo,
+        existing_status: row.status ?? null,
+      }));
+      return { outcome: "already_in_flight", job, status: row.status ? String(row.status) : null };
+    }
+
+    return { outcome: "acquired", job };
   } catch (e) {
     console.warn(`${V431_OBSERVE_TAG} ledger_acquire_threw`, JSON.stringify({
       scene_id: params.sceneId,
       stage: params.stage,
       error: e instanceof Error ? e.message : String(e),
     }));
-    return null;
+    return { outcome: "unavailable", reason: "threw" };
   }
 }
+
 
 /**
  * Verknüpft die externe Provider-Job-ID mit der Ledger-Zeile.
@@ -276,18 +250,25 @@ export async function settleLedgerDispatchFailure(
 /**
  * Konservative Klassifikation eines Dispatch-Fehlers.
  *
- * Nur eine beweisbare Ablehnung darf `rejected` werden. Alles andere bleibt
- * `uncertain` — ein Provider könnte den Auftrag angenommen haben und später
- * doch noch callbacken (D3/G3.1b).
+ * Nur eine nach Providervertrag beweisbare Nicht-Annahme darf `rejected`
+ * werden. Alles andere bleibt `uncertain` — der Provider könnte den Auftrag
+ * angenommen haben und später doch noch callbacken (D3/G3.1b).
+ *
+ * Ausdrücklich `uncertain`: 408 (Timeout), 409 (Konflikt beweist keine
+ * Nicht-Annahme), 429 (Rate-Limit), alle 5xx, Netzwerkabbrüche, unbekannte
+ * Antworten.
  */
 export function classifyDispatchFailure(err: unknown): "rejected" | "uncertain" {
   const msg = (err instanceof Error ? err.message : String(err ?? "")).toLowerCase();
-  if (/\b(400|401|403|404|409|422)\b/.test(msg)) return "rejected";
-  if (/missing_run_stamp|invalid_input|validation|unsupported|unauthorized|forbidden|not found/.test(msg)) {
+  // Zuerst die Codes, die niemals kippen dürfen.
+  if (/\b(408|409|429|5\d{2})\b/.test(msg)) return "uncertain";
+  if (/\b(400|401|403|404|422)\b/.test(msg)) return "rejected";
+  if (/missing_run_stamp|invalid_input|validation_failed|invalid_request|unsupported|unauthorized|forbidden|aborted_before_dispatch/.test(msg)) {
     return "rejected";
   }
   return "uncertain";
 }
+
 
 /**
  * Synchron fertige Dispatches (z. B. ai-image, das sofort ein Ergebnis liefert)
@@ -313,7 +294,10 @@ export async function completeLedgerJobImmediate(
 }
 
 export interface ReplaceLedgerAttemptParams {
+  /** Pflicht: der abzulösende Attempt. Kein impliziter Retry. */
   previousJobId: string;
+  /** Pflicht: dokumentierter Grund der Retry-Entscheidung. */
+  retryReason: string;
   sceneId: string;
   runId: string;
   stage: PipelineStage;
@@ -331,12 +315,24 @@ export interface ReplaceLedgerAttemptParams {
  * `attempt_no + 1` — oder gar nichts. Ein konkurrierender Ablöseversuch
  * verliert deterministisch und bekommt `null`; der Verlierer darf dann NICHT
  * dispatchen. Die neue `pipeline_job_id` steht erst nach dem Commit bereit.
+ *
+ * `previousJobId` und `retryReason` sind Pflicht — eine Initial-Akquise darf
+ * hier niemals landen.
  */
 export async function replaceLedgerAttempt(
   admin: any,
   params: ReplaceLedgerAttemptParams,
 ): Promise<LedgerJobHandle | null> {
   try {
+    if (!params.previousJobId || !params.retryReason) {
+      console.warn(`${V431_OBSERVE_TAG} ledger_replace_contract_violation`, JSON.stringify({
+        scene_id: params.sceneId,
+        stage: params.stage,
+        has_previous_job_id: Boolean(params.previousJobId),
+        has_retry_reason: Boolean(params.retryReason),
+      }));
+      return null;
+    }
     const { data, error } = await admin.rpc("composer_replace_pipeline_attempt", {
       p_previous_job_id: params.previousJobId,
       p_expected_scene_id: params.sceneId,
@@ -344,9 +340,14 @@ export async function replaceLedgerAttempt(
       p_expected_stage: params.stage,
       p_expected_plate_generation: params.plateGeneration,
       p_provider: params.provider ?? null,
-      p_metadata: params.metadata ?? {},
+      p_metadata: {
+        ...(params.metadata ?? {}),
+        retry_reason: params.retryReason,
+        retry_of_job_id: params.previousJobId,
+      },
     });
     const row = Array.isArray(data) ? data[0] : data;
+
     if (error || !row?.job_id) {
       console.warn(`${V431_OBSERVE_TAG} ledger_replace_lost`, JSON.stringify({
         previous_job_id: params.previousJobId,

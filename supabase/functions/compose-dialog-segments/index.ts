@@ -5963,7 +5963,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // `pipeline_job_id` in der Webhook-URL mit und ist ab G3.2 die primäre
     // Callback-Identität. Fail-open: ohne Ledger-Zeile läuft der Legacy-Pfad
     // unverändert weiter (Observe-Phase).
-    const v431SyncLedgerJob = await acquireLedgerJob(supabase, {
+    const v431SyncAcquisition = await acquireLedgerJob(supabase, {
       sceneId,
       runId: (passRunStamp.run_id as string | null) ?? null,
       stage: "sync_segment",
@@ -5977,9 +5977,28 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         retry_variant: retryVariant,
       },
     });
+    // G3.1b — Race-Verlierer dispatcht nicht. Die fremde Zeile wird NICHT
+    // gesettelt (sie gehört dem Gewinner) und nicht abgelöst.
+    if (v431SyncAcquisition.outcome === "already_in_flight") {
+      console.warn("[compose-dialog-segments] ledger attempt already in flight → dispatch skipped", JSON.stringify({
+        scene_id: sceneId,
+        pass_idx: currentPassIdx,
+        pipeline_job_id: v431SyncAcquisition.job.id,
+      }));
+      return json({
+        ok: true,
+        skipped: "already_in_flight",
+        scene_id: sceneId,
+        pipeline_job_id: v431SyncAcquisition.job.id,
+      });
+    }
+    const v431SyncLedgerJob = v431SyncAcquisition.outcome === "acquired"
+      ? v431SyncAcquisition.job
+      : null;
     const diagnosticWebhookUrl =
       `${webhookUrl}&diagnostic_id=${encodeURIComponent(diagnosticId)}` +
       (v431SyncLedgerJob ? `&pipeline_job_id=${encodeURIComponent(v431SyncLedgerJob.id)}` : "");
+
     // v61 — Multi-speaker default flipped to sync-3 (Sync.so's recommended
     // model for static / locked-camera / occluded plates per
     // https://sync.so/docs/models/lipsync "Still Frame Limitation").

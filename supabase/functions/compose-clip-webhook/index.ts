@@ -602,6 +602,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           if (previousLedgerJobId && (v431Scene as any)?.active_run_id) {
             retryLedgerJob = await replaceLedgerAttempt(supabase, {
               previousJobId: previousLedgerJobId,
+              retryReason: `replicate_auto_retry:${currentRetry + 1}`,
               sceneId,
               runId: String((v431Scene as any).active_run_id),
               stage: 'base_video',
@@ -609,6 +610,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               provider: 'replicate',
               metadata: { dispatcher: 'compose-clip-webhook', auto_retry: currentRetry + 1 },
             });
+
           }
 
           const webhookBase = appendWebhookToken(

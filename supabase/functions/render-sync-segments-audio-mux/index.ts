@@ -828,7 +828,10 @@ serve(async (req) => {
         provider: "remotion",
         metadata: { dispatcher: "render-sync-segments-audio-mux", self_acquired: true },
       });
-      v431MuxLedgerJobId = acquired?.id ?? null;
+      // G3.1b — nur ein gewonnener Attempt trägt Provenienz. `already_in_flight`
+      // bindet keine fremde Zeile; der Mux bleibt beim Gewinner.
+      v431MuxLedgerJobId = acquired.outcome === "acquired" ? acquired.job.id : null;
+
     }
     await bindLedgerExternalJob(supabase, v431MuxLedgerJobId, renderId);
 

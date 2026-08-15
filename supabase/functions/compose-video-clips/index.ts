@@ -534,8 +534,12 @@ serve(async (req) => {
     // Szenen-Mutationen. Kein Writer wird hier migriert: schlägt die Akquise
     // fehl, läuft der Legacy-Pfad unverändert weiter (fail-open bis G3.2).
     const sceneLedgerJobs = new Map<string, string>();
+    // G3.1b — Szenen, für die bereits ein aktiver Attempt derselben Identität
+    // läuft. Der Verlierer des Rennens dispatcht NICHT; ein Redispatch geht
+    // ausschließlich über den expliziten Retry-/Replace-Vertrag.
+    const sceneLedgerInFlight = new Set<string>();
     for (const [sceneId, stamp] of sceneRunStamps.entries()) {
-      const handle = await acquireLedgerJob(supabaseAdmin, {
+      const acquisition = await acquireLedgerJob(supabaseAdmin, {
         sceneId,
         runId: stamp.runId,
         stage: "base_video",
@@ -544,8 +548,13 @@ serve(async (req) => {
           .find((s) => s.id === sceneId)?.clipSource ?? null,
         metadata: { dispatcher: "compose-video-clips" },
       });
-      if (handle) sceneLedgerJobs.set(sceneId, handle.id);
+      if (acquisition.outcome === "acquired") {
+        sceneLedgerJobs.set(sceneId, acquisition.job.id);
+      } else if (acquisition.outcome === "already_in_flight") {
+        sceneLedgerInFlight.add(sceneId);
+      }
     }
+
 
 
 
@@ -1787,10 +1796,20 @@ serve(async (req) => {
 
     // Process each scene
     for (const scene of scenes) {
+      // G3.1b — Race-Verlierer der Initial-Akquise: ein aktiver Attempt
+      // derselben (scene, run, stage, generation) läuft bereits. Kein zweiter
+      // Providerauftrag, kein Doppel-Spend.
+      if (sceneLedgerInFlight.has(String(scene.id))) {
+        console.warn(
+          `[compose-video-clips] scene ${scene.id}: ledger attempt already in flight → dispatch skipped`,
+        );
+        continue;
+      }
       if (deferredSceneIds.has(String(scene.id))) {
         console.log(`[compose-video-clips] scene ${scene.id}: parked for continuity chain`);
         continue;
       }
+
       // ── HARD-GUARD: legacy `heygen` override → `auto` ───────────────────
       // The Composer's HeyGen/Talking-Head portrait route was removed. Any
       // scene still carrying `engineOverride='heygen'` (stale UI state,
