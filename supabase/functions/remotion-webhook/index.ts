@@ -53,12 +53,12 @@ serve(async (req) => {
 
     // v431 G3.1 — Ledger-Observe für Mux/Remotion-Callbacks. Reine Telemetrie,
     // kein Writer-Verhalten, kein Fail-Pfad (Observe-Phase vor dem Drain-Gate).
-    if (composerSceneId) {
+    if (composerSceneId && customData?.stage === 'sync_segments_audio_mux') {
       await observeCallbackProvenance(supabaseAdmin, {
         handler: 'remotion-webhook',
         pipelineJobId: typeof customData?.pipeline_job_id === 'string' ? customData.pipeline_job_id : null,
         sceneId: composerSceneId,
-        stage: customData?.stage === 'sync_segments_audio_mux' ? 'audio_mux' : String(customData?.stage ?? source ?? 'remotion'),
+        stage: 'audio_mux',
         externalJobId: (pendingRenderId ?? renderId) ? String(pendingRenderId ?? renderId) : null,
       });
     }
