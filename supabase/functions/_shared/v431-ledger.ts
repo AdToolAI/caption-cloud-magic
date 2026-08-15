@@ -491,7 +491,7 @@ export async function resolveLedgerDispatch(
   try {
     const { data } = await admin
       .from("composer_pipeline_jobs")
-      .select("id, scene_id, run_id, stage, plate_generation, attempt_no, status, replaced_by")
+      .select("id, scene_id, run_id, stage, plate_generation, attempt_no, status, replaced_by, error_code")
       .eq("id", retry.previousJobId)
       .maybeSingle();
     prev = data ?? null;
