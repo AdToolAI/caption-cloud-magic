@@ -6069,6 +6069,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         error_message: message,
         meta: { diagnostic_id: diagnosticId, retry_variant: retryVariant, pass_idx: currentPassIdx, total_passes: passes.length, ...meta },
       });
+      // v431 G3.1b — Abbruch VOR dem Provider-Call: beweisbar nicht angenommen.
+      await settleLedgerDispatchFailure(supabase, v431SyncLedgerJob?.id ?? null, {
+        errorCode: reason,
+        outcome: "rejected",
+      });
       return json({ error: reason, message, refunded: alreadyRefunded ? 0 : costCredits, ...meta }, status);
     };
 
