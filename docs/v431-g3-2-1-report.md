@@ -218,3 +218,81 @@ Kein G3.2.2.
 Die Matrix existiert nur, weil die Legacy→State-Bridge Szenen vor dem Plate-Callback nach
 `audio_prep`/`audio_ready` vorziehen kann. Nach G6 (Abbau der Legacy-Spiegel) ist sie erneut auf
 Reduzierbarkeit zu prüfen; Ziel bleibt `plate_rendering` als einziger From-State.
+
+---
+
+# Smoke S-A2 — Kanonisches State-Tupel (2026-08-15, Nachtrag 2)
+
+Anlass: Nachweisfrage, ob im Compatibility-Pfad **alle vier** kanonischen Felder unverändert
+bleiben — `pipeline_state`, `pipeline_substate`, `pipeline_state_at`, `pipeline_state_run_id`.
+
+## Vorbemerkung: der 19/19-Smoke deckte das nicht ab
+
+Die Apply-Zusicherung des ersten Smokes prüfte nur `pipeline_state` und `pipeline_substate`.
+`pipeline_state_at` und `pipeline_state_run_id` waren im Apply-Fall **nicht** verglichen; der
+vollständige Row-Diff existierte nur für Duplicate- und Rejected-Fälle. Die Bestätigung war aus
+den vorliegenden Daten also nicht ableitbar.
+
+## Messaufbau
+
+8 Fixtures (4 erlaubte From-States × `mirrors_consistent` / `mirrors_stale`), jeweils mit
+explizit gesetztem `pipeline_state_run_id = active_run_id`, einem erzwungenen runless
+Legacy-Bridge-Write **vor** dem RPC und einem bewusst alten `pipeline_state_at`
+(`now() - 3h`). Der alte Stempel ist methodisch nötig: `now()` ist innerhalb einer Transaktion
+konstant, ein Vorher/Nachher-Vergleich ohne Seed hätte jede Bridge-Neuableitung als „unverändert"
+maskiert. Ein erster Durchlauf ohne Seed tat genau das — die Zahlen daraus sind verworfen.
+
+## Ergebnis: 6/8 PASS, 2/8 FAIL
+
+| Fall | `pipeline_state` | `pipeline_substate` | `pipeline_state_run_id` | `pipeline_state_at` | Verdikt |
+| --- | --- | --- | --- | --- | --- |
+| `plate_rendering`, beide Varianten | echte Transition (Bridge hebt danach auf `audio_ready`, vorbestehend) | unverändert | = aktiver Run | neu gestempelt (korrekt) | PASS |
+| `plate_ready`, beide Varianten | unverändert | unverändert | = aktiver Run | **Seed erhalten** | PASS |
+| `audio_prep`, `mirrors_consistent` | unverändert | unverändert | = aktiver Run | **Seed erhalten** | PASS |
+| `audio_ready`, `mirrors_consistent` | unverändert | unverändert | = aktiver Run | **Seed erhalten** | PASS |
+| `audio_prep`, `mirrors_stale` | unverändert | unverändert | = aktiver Run | **auf `now()` gesprungen** | **FAIL** |
+| `audio_ready`, `mirrors_stale` | unverändert | unverändert | = aktiver Run | **auf `now()` gesprungen** | **FAIL** |
+
+## Beantwortung der gestellten Frage
+
+- `pipeline_state_run_id` bleibt in **allen acht** Fällen exakt auf dem aktiven Run. Kein `NULL`,
+  kein Fremdwert — auch nicht nach dem vorgeschalteten runless Legacy-Bridge-Write. Die Bridge
+  schreibt dieses Feld an keiner Stelle ihres Codes, und der Compatibility-Pfad tut es ebenfalls
+  nicht. Diese Sorge ist damit ausgeräumt.
+- `pipeline_state` und `pipeline_substate` bleiben in allen Compatibility-Fällen identisch.
+- `pipeline_state_at` ist **nicht** durchgängig stabil.
+
+## Ursache des `pipeline_state_at`-Drifts
+
+Nur wenn die Legacy-Spiegel widersprüchlich sind, leitet die Bridge beim Output-Write den State
+neu ab, und nur dann feuert die Restore-Anweisung von RPC A. Die Restore-Anweisung setzt
+`pipeline_state` **und** `pipeline_state_at = _scene.pipeline_state_at` — sie ist damit aber
+selbst ein State-Change-Write und läuft erneut durch den `state_changed`-Zweig der Bridge, der
+unbedingt `NEW.pipeline_state_at := now()` setzt und den mitgelieferten Wert überschreibt.
+
+Folge: In genau den zwei Fällen, in denen der Schutzmechanismus greift, wird die
+State-Verweildauer zurückgesetzt. `pipeline_state` selbst ist korrekt — die Provenienz „seit wann
+in diesem State" nicht. Das ist relevant für alles, was auf Staleness rechnet (Reaper,
+Watchdog): eine Szene erscheint jünger, als sie ist.
+
+## Kein Fix in diesem Schritt
+
+Vertragsgemäß wird der Fix **nicht** eigenmächtig eingebaut. Kandidat wäre ein nachgelagerter
+Write, der ausschließlich `pipeline_state_at` setzt: Ohne State- und ohne Legacy-Änderung greift
+weder der `state_changed`- noch der `legacy_changed`-Zweig der Bridge, der Wert bliebe stehen.
+Das braucht eine eigene Freigabe.
+
+## Statische Verifikation
+
+- `npx vitest run src/lib/composer src/lib/video-composer --testTimeout=60000` → 48 Dateien / 540 Tests grün.
+- `npx tsgo --noEmit` → grün.
+- `deno check` unverändert: der eine vorbestehende `TS2322` in `_shared/ambient-audio.ts:83`.
+
+## Status
+
+**PATCHED / AWAITING PRODUCTION RESMOKE.** Redeploy ist **nicht** erforderlich: A wird per RPC
+gerufen, die Migration ist DB-seitig live, und `compose-clip-webhook` nutzt die unveränderte
+Signatur.
+
+Offen vor dem Produktionslauf ist allein die Entscheidung zum `pipeline_state_at`-Drift. Die drei
+anderen kanonischen Felder inklusive `pipeline_state_run_id` sind belegt stabil.
