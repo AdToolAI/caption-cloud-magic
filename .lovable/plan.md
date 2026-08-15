@@ -116,13 +116,15 @@ Ablauf:
 2. Jüngsten relevanten Ledger-Vorgänger für `(scene, run, stage, generation, segment)` bestimmen; existiert er ⇒ `FOR UPDATE`
 3. `composer_scenes FOR UPDATE`
 4. Marker/Run/Generation lesen und in **dieser** Branch-Reihenfolge entscheiden:
-   - **kein Vorgänger** ⇒ unveränderter `composer_acquire_pipeline_attempt` als Attempt 1; bei gültigem Marker wird `_metadata` in derselben Transaktion um `rs3_reset_id = <reset_id>` ergänzt
-   - **Vorgänger vorhanden + gültige unverbrauchte Autorisierung** ⇒ Rearm-Core, Nachfolger `attempt_no + 1`
+   - **Epoch-Idempotenz zuerst:** existiert bereits ein Job derselben Identität `(scene, run, stage, generation, segment)` mit `metadata.rs3_reset_id = <current reset_id>`, der als Post-Reset-Attempt dieser Autorisierung erzeugt wurde ⇒ Rückgabe `already_acquired` (bzw. `already_rearmed`) mit **exakt dieser Job-ID**, kein Write, keine erneute Konsumption. Gilt unabhängig davon, ob es Attempt 1 ohne `rearm_of` oder N+1 mit `rearm_of` ist; die Erkennung stützt sich auf `rs3_reset_id`, nicht auf `rearm_of`.
+   - **kein Vorgänger** ⇒ unveränderter `composer_acquire_pipeline_attempt` als Attempt 1, wobei `_metadata` in derselben Transaktion um `rs3_reset_id = <reset_id>` ergänzt wird — und **dieselbe Stage-/Segment-Autorisierung wird im selben Commit konsumiert**, exakt wie im Rearm-Zweig. Für `audio_mux` wird dabei `mux_rearm_allowed = false` gesetzt. Ohne diese Konsumption könnte ein zweiter Dispatch fälschlich in den Rearm-Zweig fallen und Attempt 2 erzeugen.
+   - **Vorgänger vorhanden + gültige unverbrauchte Autorisierung** ⇒ Rearm-Core, Nachfolger `attempt_no + 1`, Autorisierung konsumiert
    - **Vorgänger vorhanden + keine/verbrauchte Autorisierung bei gültigem Marker** ⇒ fail closed `rs3_rearm_unavailable`
    - **kein Marker bzw. stale Run/Generation** ⇒ unverändert `composer_acquire_pipeline_attempt`, Ergebnis 1:1 durchgereicht (inklusive `predecessor_exists`)
 5. Commit.
 
-Im No-Predecessor-Fall gibt es keinen Job-Lock; Advisory → Scene ist dort korrekt und kollidiert mit keinem Callback-Pfad, da kein Job existiert.
+Im No-Predecessor-Fall gibt es keinen Job-Lock; Advisory → Scene ist dort korrekt und kollidiert mit keinem Callback-Pfad, da kein Job existiert. Die Serialisierung über Advisory + Scene-Row-Lock garantiert, dass Erzeugung von Attempt 1 und Konsumption der Autorisierung atomar in einem Commit passieren und parallele Aufrufer erst danach den Epoch-Idempotenz-Zweig sehen.
+
 
 `acquireLedgerJob()` (`_shared/v431-ledger.ts`, einzige Aufrufstelle des Acquire-RPC) ruft für diese beiden Stages den Wrapper, für alle anderen Stages unverändert das Original.
 
