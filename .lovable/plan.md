@@ -122,7 +122,7 @@ Ohne RS3-Marker bleibt die normale Callback-Semantik unverändert.
 
 ## 7. Tests
 
-RS3-S1…S18 plus Frozen-Suite, `tsgo` und die bestehenden G3.1/G3.1f/G3.2.2-Smokes:
+RS3-S1…S20 plus Frozen-Suite, `tsgo` und die bestehenden G3.1/G3.1f/G3.2.2-Smokes:
 
 1. offener `sync_segment` ⇒ `cancelled` / `user_reset`
 2. `running`-Attempt ⇒ ebenfalls terminalisiert
