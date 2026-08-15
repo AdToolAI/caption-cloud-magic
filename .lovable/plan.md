@@ -43,11 +43,19 @@ from public.composer_pipeline_jobs
 where stage = 'audio_mux'
   and status in ('pending','dispatching','dispatched','running');
 
--- G4: Replacement-Attempts in Zustellung
-select id, scene_id, stage, status, replaced_by, created_at
-from public.composer_pipeline_jobs
-where status in ('dispatching','dispatched')
-  and replaced_by is not null;
+-- G4: Replacement-Attempts in Zustellung (über die Vorgänger-Relation, da der neue
+-- Attempt selbst kein replaced_by trägt)
+select
+  r.id,
+  r.scene_id,
+  r.stage,
+  r.status,
+  p.id as predecessor_id,
+  r.created_at
+from public.composer_pipeline_jobs p
+join public.composer_pipeline_jobs r
+  on r.id = p.replaced_by
+where r.status in ('dispatching','dispatched');
 
 -- G5: Passes mit gebundenem Provider-Job (nicht terminal)
 select s.id as scene_id, p->>'job_id' as job_id, p->>'status' as pass_status,
