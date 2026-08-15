@@ -19691,6 +19691,24 @@ export type Database = {
         Returns: number
       }
       cleanup_synthetic_probe_runs: { Args: never; Returns: undefined }
+      composer_acquire_lipsync_attempt_serialized: {
+        Args: {
+          _metadata: Json
+          _plate_generation: number
+          _provider: string
+          _run_id: string
+          _scene_id: string
+          _segment_id: string
+          _stage: string
+        }
+        Returns: {
+          attempt_no: number
+          job_id: string
+          outcome: string
+          rs3_outcome: string
+          status: string
+        }[]
+      }
       composer_acquire_pipeline_attempt: {
         Args: {
           p_metadata?: Json
@@ -19710,7 +19728,36 @@ export type Database = {
           status: string
         }[]
       }
+      composer_acquire_reset_rearmed_attempt: {
+        Args: {
+          _metadata: Json
+          _plate_generation: number
+          _provider: string
+          _run_id: string
+          _scene_id: string
+          _segment_id: string
+          _stage: string
+        }
+        Returns: {
+          attempt_no: number
+          job_id: string
+          outcome: string
+          rs3_outcome: string
+          status: string
+        }[]
+      }
       composer_apply_sync_segment_result: {
+        Args: {
+          _error_text: string
+          _external_job_id: string
+          _output_url: string
+          _pipeline_job_id: string
+          _provider_status: string
+          _write_id: string
+        }
+        Returns: Json
+      }
+      composer_apply_sync_segment_result_core: {
         Args: {
           _error_text: string
           _external_job_id: string
@@ -19921,7 +19968,54 @@ export type Database = {
         }
         Returns: Json
       }
+      composer_reset_lipsync_with_attempt_cancellation: {
+        Args: {
+          _expected_plate_generation: number
+          _expected_run_id: string
+          _force: boolean
+          _scene_id: string
+        }
+        Returns: Json
+      }
       composer_retryable_failure_reasons: { Args: never; Returns: string[] }
+      composer_rs3_acquire_core: {
+        Args: {
+          _metadata: Json
+          _plate_generation: number
+          _provider: string
+          _rearm_only: boolean
+          _run_id: string
+          _scene_id: string
+          _segment_id: string
+          _stage: string
+        }
+        Returns: {
+          attempt_no: number
+          job_id: string
+          outcome: string
+          rs3_outcome: string
+          status: string
+        }[]
+      }
+      composer_rs3_fence_verdict: {
+        Args: { _pipeline_job_id: string; _scene_id: string }
+        Returns: Json
+      }
+      composer_rs3_is_pre_reset_attempt: {
+        Args: {
+          _job_metadata: Json
+          _job_plate_generation: number
+          _job_run_id: string
+          _scene_audio_plan: Json
+          _scene_plate_generation: number
+          _scene_run_id: string
+        }
+        Returns: boolean
+      }
+      composer_rs3_reset_cancellable_statuses: {
+        Args: never
+        Returns: string[]
+      }
       composer_scene_transition:
         | {
             Args: {
