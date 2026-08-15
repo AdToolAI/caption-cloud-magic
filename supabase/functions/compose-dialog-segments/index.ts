@@ -6893,6 +6893,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           refundCredits: totalCost,
           syncApiKey,
         });
+        // v431 G3.1b — Face-Gate blockt vor dem Provider-Call.
+        await settleLedgerDispatchFailure(supabase, v431SyncLedgerJob?.id ?? null, {
+          errorCode: "face_gate_blocked",
+          outcome: "rejected",
+        });
         return json(
           { error: "face_gate_blocked", code: gate.code, reason: gate.reason ?? null, provider_error_code: "no_face_pre_sync" },
           422,
