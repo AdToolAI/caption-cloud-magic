@@ -275,7 +275,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           _pipeline_job_id: ledgerJobId,
           _external_job_id: predictionId ? String(predictionId) : null,
           _write_id: 'ccw:plate-complete',
-          _base_video_url: permanentUrl,
+          _base_url: permanentUrl,
           _clip_source_hint: null,
           _extra: {
             ...continuityPatch,
