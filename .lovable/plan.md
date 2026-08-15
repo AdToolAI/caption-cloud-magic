@@ -16,11 +16,12 @@ Beide Base-Video-Forwarder lesen bereits `replicate_prediction_id` von der Szene
 
 - `composer_pipeline_jobs` bleibt alleinige autoritative Quelle. Der gespeicherte Wert ist ausschließlich ein Transport-Pointer.
 - **Der Pointer ist attempt-bound, nicht lebenslang immutable.** `external_job_id` und `pipeline_job_id` sind ein **Paar desselben Attempts**: sie werden nur gemeinsam gesetzt, nur gemeinsam zurückgesetzt und nie einzeln gewechselt.
+- **Ledger-Bindung und Transport-Paar entstehen in einer DB-Transaktion.** Kein Zwischenzustand „External-ID gebunden, Pointer fehlt" (oder umgekehrt) — realisiert über ein schmales Bind-RPC statt zweier aufeinanderfolgender Client-Updates.
 - Geschrieben wird das Paar ausschließlich beim Dispatch des Attempts. Kein Forwarder, kein Webhook, kein Reaper schreibt es.
 - Recovery-/Poll-Forwarder erzeugen keine Ledger-Identität und keinen neuen Attempt; sie reichen den gelesenen Pointer unverändert in URL bzw. Body weiter.
 - Der empfangende Webhook behält seine bestehende Ledger-/Run-/Generation-Prüfung unverändert. **Kein** Fallback auf `external_job_id + scene_id + stage`.
 - Falscher/staler Pointer wird vom bestehenden Webhook-Guard abgewiesen (`wrong_job` / `stale_run` / `stale_generation`), nicht repariert.
-- Fehlender Pointer: kein erfundener Wert, kein Ledger-Insert. Post-Cutover ist `reinject_missing_pipeline_job_id` ein **Vertragsfehler** (Error-Level, kein erwarteter Normalfall); Pre-Cutover-Rows siehe Cutover-Vertrag.
+- **Post-Cutover ohne Pointer wird nicht re-injiziert.** `reinject_missing_pipeline_job_id` auf Error-Level, und die Re-Injection selbst fällt aus: kein ungebundener Callback an einen Observe-/Apply-Handler, kein Ledger-Insert, kein Resolve-Fallback, kein erfundener Pointer. Der übrige Recovery-Pfad darf loggen und enden.
 
 ## Lücke 1 — Attempt-Wechsel und atomare Paarbindung
 
