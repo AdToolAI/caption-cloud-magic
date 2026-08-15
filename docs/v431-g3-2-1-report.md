@@ -359,7 +359,7 @@ wieder gelöscht.
 
 ## Produktions-Resmoke (echt) — 2026-08-15
 
-Status: **DONE — Resmoke grün**
+Status: **DONE / FROZEN** (Resmoke grün, abgenommen 2026-08-15)
 
 Szene: `b34d1eae-6bf3-437d-a6ab-624be0155adc` (Projekt `04b80fab…`), echter UI-Run über
 „Clip generieren mit Voiceover" + Render-Bestätigungsdialog. Kein künstlicher Callback.
@@ -378,9 +378,15 @@ Szene: `b34d1eae-6bf3-437d-a6ab-624be0155adc` (Projekt `04b80fab…`), echter UI
   `base_video_url` (Storage `ai-videos/composer/…`) und `clip_url` (Remotion-Mux) materialisiert,
   `processed_video_url` = Mux-Ergebnis der laufenden Kette.
 - Kein Duplicate-Plate-Callback aufgetreten (Kriterium 10 nicht auslösbar).
-- Observationen im Fenster: 3× `bound`, 1× `missing_binding` (16:14:03Z) — Letzteres ist ein
-  **zweiter sync.so-Callback** desselben `external_job_id` in `sync-so-webhook`, also außerhalb
-  des G3.2.1-Scopes (`compose-clip-webhook`); Vormerkung für G3.2.2 (Fan-in/Idempotenz sync.so).
+- Observationen im Fenster: 3× `bound`, 1× `missing_binding` (16:14:03Z). Letzteres ist **kein
+  A/Plate-Befund**: der echte Sync.so-Provider-Callback war 16:14:01Z korrekt `bound`; erst der
+  interne Forward aus `lipsync-watchdog` (Poll → `sync-so-webhook`, ohne `pipeline_job_id`)
+  verlor die Ledger-Bindung. Eingeordnet als **G3.1e-Befund (Watchdog-Forward ohne
+  Ledger-Bindung)** — siehe `docs/v431-g3-1e-analysis.md`, nicht als G3.2.2-Vormerkung.
 
 Fazit: die A-Compatibility-Matrix inkl. `pipeline_state_at`-Fix ist im echten Produktionslauf
-bestätigt. `compose-clip-webhook` / RPC A: **G3.2.1 abnahmebereit (DONE)**.
+bestätigt. `compose-clip-webhook` / RPC A: **G3.2.1 DONE / FROZEN**.
+
+Statusraster nach Abnahme: G3.2.1 DONE / FROZEN · G3.1 Core FROZEN · G3.1e DONE (Analyse) ·
+G3.1f empfohlen (Fix + gezielter Resmoke) · G3.2.2 BLOCKED bis dahin.
+
