@@ -25,7 +25,7 @@ Endfassung nach Review-Runde 2. Keine Migration, kein Code, kein Deploy in diese
 | noop-ladder exhausted | Slot-RPC + `update{lip_sync_status:'failed',twoshot_stage:'needs_clip_rerender',clip_error}` (L809) | **F** mit `_final_mode='fail'`, Verdikt `sso:noop_unrecoverable` |
 | partial-mux refused (≥3) | Whole-JSON + `lip_sync_status/twoshot_stage='failed'` + Wallet-Direktschreibung (L1035/L1042) | **F** `_final_mode='fail'`, Verdikt `sso:partial_mux_refused`; Refund nach Commit über Refund-RPC, **nie** direktes `wallets.update` |
 | failed/rejected/canceled | Slot-Patches, Retry-Ladder, Whole-JSON-Fails (L1493/L1704/L1780/L1806) | **F** (Segment-Fail; `_final_mode='fail'`, wenn Fan-in terminal) |
-| watchdog-recover | `update{dialog_shots:{...,status:'rendering'}}` (L461) | schmaler Progress-Patch (E-Logik) |
+| watchdog-recover | `update{dialog_shots:{...,status:'rendering'}}` (L461) | eigener run-bound RPC `composer_touch_lipsync_recover` (nicht E) |
 
 ### render-sync-segments-audio-mux
 | Pfad | heutige Writes | Ziel |
