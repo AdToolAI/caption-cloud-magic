@@ -31,33 +31,47 @@ kleiner **G3.1e**-Analyseblock.
 
 ## G3.1e — Scope (nur Analyse, keine Code-Änderung)
 
-1. **Bestandsaufnahme aller Callback-Wiedereinspeise-Pfade**, die einen Handler mit
-   Ledger-Observe aufrufen, ohne selbst Dispatcher zu sein:
-   - `lipsync-watchdog` → `sync-so-webhook` (bestätigter Befund),
-   - `report-lipsync-motion-probe` Re-Dispatch (~Zeile 271, „gleiche Form wie sync-so-webhook"),
-   - etwaige weitere Selbst-/Fan-out-Invokes in `sync-so-webhook`, `compose-dialog-segments`
-     und `remotion-webhook`, die eine Webhook-URL ohne `pipeline_job_id` bauen.
-   Ergebnis: Tabelle Pfad → trägt Bindung ja/nein → welcher Verdikt-Fall entsteht.
-2. **Telemetrie-Rückblick** über das gesamte G3.1-Drain-Fenster und danach:
-   alle `missing_binding`-Zeilen nach Handler, Stage und `external_job_id` gruppieren und
-   jede Zeile einem der Pfade aus (1) zuordnen. Prüfen, ob das ursprüngliche
-   Drain-Gate-Ergebnis (`missing_binding = 0`) nur deshalb grün war, weil der Watchdog in
-   diesem Fenster nie forwarden musste.
-3. **Bindungs-Auflösung bewerten:** Soll der Forwarder die `pipeline_job_id` mitgeben
-   (bevorzugt, weil provenienz-treu) oder soll Observe zusätzlich über
-   `external_job_id + stage + scene_id` auflösen dürfen? Trade-offs, Risiko für
-   `wrong_job`/`stale_generation`, und wie sich das zu G3.2 (Apply liest die Bindung
-   entscheidend, nicht mehr nur beobachtend) verhält.
-4. **Bericht** `docs/v431-g3-1e-analysis.md` mit Befund, betroffenen Pfaden,
-   empfohlenem Fix-Umfang (G3.1f) und expliziter Aussage, ob G3.2.2 blockiert ist.
+ 1. **Vollständiges Inventar aller internen Wiedereinspeisungen** eines Provider-Callbacks —
+    nicht nur Stellen, die eine Webhook-URL bauen, sondern jeder `fetch`/`invoke`/
+    Forward-Helper, der einen Callback-Handler mit rekonstruiertem Payload aufruft:
+    - `lipsync-watchdog` → `sync-so-webhook` (bestätigter Befund),
+    - `report-lipsync-motion-probe` Re-Dispatch (~Zeile 271, „gleiche Form wie sync-so-webhook"),
+    - Selbst-/Fan-out-Invokes in `sync-so-webhook`, `compose-dialog-segments`,
+      `compose-clip-webhook` und `remotion-webhook`,
+    - Recovery-/Poll-/Cron-Pfade (Reaper, `poll-dialog-shots`, ModelArk-Poller).
+    Ergebnis: Tabelle Pfad → trägt Bindung ja/nein → welcher Verdikt-Fall entsteht.
+ 2. **Telemetrie-Rückblick** über das gesamte G3.1-Drain-Fenster und danach:
+    alle `missing_binding`-Zeilen nach Handler, Stage und `external_job_id` gruppieren und
+    jede Zeile einem der Pfade aus (1) zuordnen. Formulierung im Bericht verbindlich:
+    das Drain-Ergebnis war für den damals beobachteten Traffic korrekt — das
+    **Coverage-Gate war unvollständig**, weil dieser Re-Injection-Pfad im Fenster nie
+    exercised wurde; späterer Produktionsverkehr hat ihn aufgedeckt.
+ 3. **Bindungs-Auflösung bewerten — mit fixer Vorzugsrichtung:** explizites Weiterreichen
+    der bestehenden `pipeline_job_id`. Eine Auflösung über `external_job_id + scene_id +
+    stage` darf **nicht** still als Ersatz-SoT eingeführt werden (D2-Vertrag bleibt
+    eingefroren); sie wird höchstens als bewusst benannte Notfalloption mit Risiken
+    (`wrong_job`, `stale_generation`) diskutiert. Für Forwarder, die die ID heute nicht
+    besitzen, untersucht G3.1e, wie sie die eindeutig zu diesem **bestehenden** Ledger-Job
+    gehörende ID zuverlässig erhalten und transportieren.
+ 4. **Bericht** `docs/v431-g3-1e-analysis.md` mit Befund, betroffenen Pfaden,
+    empfohlenem Fix-Umfang (G3.1f) und expliziter Aussage, ob G3.2.2 blockiert ist.
 
 Nicht in G3.1e enthalten: Code-Änderungen, Migrationen, Deploys, Produktionsläufe.
+Nach dem Bericht: **STOP**, keine automatische Reparatur.
 
 ## Parallel: G3.2.1 abschließen
 
 - `docs/v431-g3-2-1-report.md`: Status auf **DONE / FROZEN** setzen und die
   `missing_binding`-Zeile von „Vormerkung G3.2.2" auf „G3.1e-Befund (Watchdog-Forward ohne
   Ledger-Bindung)" korrigieren.
+
+## Statusraster
+
+- G3.2.1 — DONE / FROZEN
+- G3.1 Core — FROZEN
+- G3.1e — ANALYSIS GO
+- G3.2.2 — BLOCKED (erst nach G3.1f-Fix + gezieltem Resmoke)
+
 
 ## Technische Details
 
