@@ -170,6 +170,147 @@ function terminalV5Counts(passes: any[]) {
   return { doneCount, failedCount, allTerminal: doneCount + failedCount >= passes.length };
 }
 
+// ── v431 G3.2.2 — Sync Segment Authoritative Apply ─────────────────────────
+// Contract: docs/v431-g3-2-2-contract.md. `composer_apply_sync_segment_result`
+// ist SOLE OWNER von Slot-Patch, Scene-Verdict und Ledger-Terminalisierung.
+export type SyncSegmentWriteId =
+  | "ssw:success"
+  | "ssw:failed"
+  | "ssw:noop_fail"
+  | "ssw:noop_escalate";
+
+export interface ApplySyncSegmentResult {
+  applied: boolean;
+  verdict: string;
+  segment_result?: string | null;
+  scene_verdict?: string | null;
+  pass_idx?: number | null;
+  replacement_job_id?: string | null;
+  reason?: string | null;
+  total_passes?: number | null;
+  done_count?: number | null;
+  failed_count?: number | null;
+  final_url?: string | null;
+  next_pending_pass_idx?: number | null;
+  refund_due?: number | null;
+  already_refunded?: boolean | null;
+}
+
+async function applySyncSegmentResult(
+  supabase: any,
+  params: {
+    pipelineJobId: string | null;
+    externalJobId: string;
+    writeId: SyncSegmentWriteId;
+    providerStatus: string;
+    outputUrl: string | null;
+    errorText: string | null;
+  },
+): Promise<ApplySyncSegmentResult | null> {
+  // §2 — Provenienz kommt ausschließlich aus dem Ledger. Ohne Transport-Pointer
+  // wird NICHT angewandt (fail-closed); Watchdog/Poller sind das Sicherheitsnetz.
+  if (!params.pipelineJobId) {
+    console.error(
+      `[sync-so-webhook] g322_missing_binding job=${params.externalJobId} write_id=${params.writeId} — apply refused`,
+    );
+    return null;
+  }
+  const { data, error } = await supabase.rpc("composer_apply_sync_segment_result", {
+    _pipeline_job_id: params.pipelineJobId,
+    _external_job_id: params.externalJobId,
+    _write_id: params.writeId,
+    _provider_status: params.providerStatus,
+    _output_url: params.outputUrl,
+    _error_text: params.errorText,
+  });
+  if (error) {
+    console.error(
+      `[sync-so-webhook] g322_apply_failed job=${params.externalJobId} write_id=${params.writeId}: ${error.message}`,
+    );
+    return null;
+  }
+  const res = (data ?? {}) as ApplySyncSegmentResult;
+  console.log(
+    `[sync-so-webhook] g322_apply write_id=${params.writeId} verdict=${res.verdict} segment_result=${res.segment_result ?? "-"} pass=${res.pass_idx ?? "-"} reason=${res.reason ?? "-"}`,
+  );
+  return res;
+}
+
+/** Wallet-Refund als Edge-Nebenwirkung; der Marker ist idempotent (DB-seitig). */
+async function refundSceneIfDue(
+  supabase: any,
+  sceneId: string,
+  res: ApplySyncSegmentResult,
+): Promise<void> {
+  const amount = Number(res.refund_due ?? 0);
+  if (!(amount > 0) || res.already_refunded) return;
+  try {
+    const { data: claimed } = await supabase.rpc("composer_mark_sync_refund_applied", {
+      _scene_id: sceneId,
+      _amount: amount,
+    });
+    if (claimed !== true) return;
+    const { data: row } = await supabase
+      .from("composer_scenes").select("project_id").eq("id", sceneId).single();
+    const { data: proj } = await supabase
+      .from("composer_projects").select("user_id").eq("id", (row as any)?.project_id).single();
+    const uid = (proj as any)?.user_id;
+    if (!uid) return;
+    const { data: w } = await supabase
+      .from("wallets").select("balance").eq("user_id", uid).single();
+    await supabase
+      .from("wallets")
+      .update({ balance: Number((w as any)?.balance ?? 0) + amount, updated_at: new Date().toISOString() })
+      .eq("user_id", uid);
+    console.warn(`[sync-so-webhook] g322_refund scene=${sceneId} amount=${amount}`);
+  } catch (e) {
+    console.warn(`[sync-so-webhook] g322_refund_failed scene=${sceneId}: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * Mux-Dispatch. Der RPC-Claim ist re-drivable; die Exactly-once-Schranke ist
+ * `acquireLedgerJob('audio_mux')` (`already_in_flight`). D6: der Mux-Owner
+ * setzt `lipsync_muxing` selbst, hier entsteht nur die Provenienz-Zeile.
+ */
+async function dispatchAudioMux(
+  supabase: any,
+  supabaseUrl: string,
+  serviceKey: string,
+  sceneId: string,
+  scene: any,
+  totalPasses: number,
+): Promise<string> {
+  const acquisition = await acquireLedgerJob(supabase, {
+    sceneId,
+    runId: (scene as any)?.active_run_id ?? null,
+    stage: "audio_mux",
+    plateGeneration: typeof (scene as any)?.plate_generation === "number"
+      ? (scene as any).plate_generation
+      : null,
+    provider: "remotion",
+    metadata: { dispatcher: "sync-so-webhook", fan_in_passes: totalPasses },
+  });
+  if (acquisition.outcome === "already_in_flight" || acquisition.outcome === "predecessor_exists") {
+    console.warn(`[sync-so-webhook] scene=${sceneId} mux attempt ${acquisition.outcome} → dispatch skipped`);
+    return acquisition.outcome;
+  }
+  const muxJob = acquisition.outcome === "acquired" ? acquisition.job : null;
+  try {
+    fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+      body: JSON.stringify({
+        scene_id: sceneId,
+        ...(muxJob ? { pipeline_job_id: muxJob.id } : {}),
+      }),
+    }).catch(() => {});
+  } catch { /* ignore */ }
+  return "dispatched";
+}
+
+
+
 
 
 
