@@ -165,7 +165,7 @@ export function useAudiobookProject() {
     setChapters((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
     const payload: Record<string, unknown> = { ...patch };
     if (typeof patch.body === 'string') payload.char_count = countChars(patch.body);
-    const { error } = await supabase.from('audiobook_chapters').update(payload).eq('id', id);
+    const { error } = await supabase.from('audiobook_chapters').update(payload as never).eq('id', id);
     if (error) console.error('[audiobook] update chapter failed:', error);
   }, []);
 

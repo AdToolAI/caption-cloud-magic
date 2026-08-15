@@ -194,7 +194,7 @@ export function FaceMapReviewDialog({ open, onOpenChange, scene }: FaceMapReview
 
       const { error: updErr } = await supabase
         .from("composer_scenes")
-        .update(patch)
+        .update(patch as never)
         .eq("id", scene.id);
       if (updErr) throw updErr;
 

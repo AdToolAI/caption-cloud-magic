@@ -161,7 +161,7 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
                 twoshotStage: 'audio',
               });
             }
-            await supabase.from('composer_scenes').update(preMark).eq('id', workingScene.id);
+            await supabase.from('composer_scenes').update(preMark as never).eq('id', workingScene.id);
           } catch (preErr) {
             console.warn('[useSceneGenerate] pre-mark failed', preErr);
           }

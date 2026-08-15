@@ -14,7 +14,6 @@ import { tl, withLang } from "../_shared/i18n.ts";
 import { resumeContinuityChain, sweepContinuityQueue } from "../_shared/continuity-chain.ts";
 import { guardCallback } from "../_shared/v427-callback-guard.ts";
 import { bindLedgerExternalJob, classifyDispatchFailure, observeCallbackProvenance, readPipelineJobId, replaceLedgerAttempt, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
-import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 import { continuityRenderedPatch } from "../_shared/continuity-run-snapshot.ts";
 import { legacyClipReadyEquivalentRow, legacyClipFailedEquivalentRow } from "../_shared/scene-state.ts";
 
@@ -178,14 +177,16 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // Speist ausschließlich das Drain-Gate: erst wenn hier über das gesamte
     // Drain-Fenster kein `missing_binding` mehr auftaucht, ist G3.2 (Apply)
     // freigabefähig.
+    const ledgerJobId = readPipelineJobId(url, payload);
     await observeCallbackProvenance(supabase, {
       handler: 'compose-clip-webhook',
-      pipelineJobId: readPipelineJobId(url, payload),
+      pipelineJobId: ledgerJobId,
       sceneId,
       stage: 'base_video',
       externalJobId: predictionId ? String(predictionId) : null,
       reportedRunId: runId,
     });
+
 
 
     if (status === 'succeeded' && output) {
@@ -231,58 +232,69 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         .maybeSingle();
       const isCinematicSync =
         String((preUpdateScene as any)?.engine_override ?? '') === 'cinematic-sync';
-      const sceneUpdate: Record<string, unknown> = {
-        // v430 Step 1 — plate delivery goes through the single writer.
-        ...materializeCompatibilityOutput('base', { baseUrl: permanentUrl }),
-        // v430 Step 4 — stamp the continuity input THIS run was dispatched
-        // with (immutable snapshot, never the scene's current binding), so a
-        // later re-binding shows up as "needs re-render" instead of silently
-        // pretending the existing video already used it.
-        ...(await continuityRenderedPatch(supabase, sceneId, { runId })),
-        clip_status: 'ready',
-        clip_error: null,
-        updated_at: new Date().toISOString(),
-      };
-      if (isCinematicSync) {
-        // v176 (Jun 30 2026) — RESPECT USER PROVIDER.
-        // Previously: if clip_source === 'ai-happyhorse', we silently rewrote
-        // it to 'ai-hailuo' here under the legacy assumption that HH could
-        // not serve as a Cinematic-Sync master plate. Since v174 HH IS a
-        // valid master plate (compose-video-clips L3092+), so the rewrite
-        // overrode every successful HH render and the UI lied "Hailuo".
-        // clip_source is now left untouched — the provider the user picked
-        // is the provider we report.
-        sceneUpdate.lip_sync_status = 'pending';
-        sceneUpdate.twoshot_stage = 'master_clip';
-      }
+      // v430 Step 4 — stamp the continuity input THIS run was dispatched
+      // with (immutable snapshot, never the scene's current binding), so a
+      // later re-binding shows up as "needs re-render" instead of silently
+      // pretending the existing video already used it.
+      const continuityPatch = await continuityRenderedPatch(supabase, sceneId, { runId });
 
       // ── v418 hybrid ambience: speech gate ────────────────────────────────
       // The plate was allowed to generate room tone/foley. Before that bed is
       // ever mixed under the studio voice, transcribe it: any recognizable
       // speech (or any failure of the gate itself) means the scene plays
       // muted. Fail-soft — this never turns a finished render into an error.
+      let ambientGate: Record<string, unknown> | null = null;
       if (isAmbientAudioRow(preUpdateScene as any)) {
         const gate = await runAmbientSpeechGate(permanentUrl);
-        const prevPlan = ((preUpdateScene as any)?.audio_plan ?? {}) as Record<string, unknown>;
-        sceneUpdate.audio_plan = {
-          ...prevPlan,
-          ambientGate: {
-            status: gate.allowed ? 'passed' : 'muted',
-            reason: gate.reason,
-            // Only a cleared plate may ever be mixed in as an ambience bed.
-            url: gate.allowed ? permanentUrl : null,
-            checkedAt: new Date().toISOString(),
-          },
+        ambientGate = {
+          status: gate.allowed ? 'passed' : 'muted',
+          reason: gate.reason,
+          // Only a cleared plate may ever be mixed in as an ambience bed.
+          url: gate.allowed ? permanentUrl : null,
+          checkedAt: new Date().toISOString(),
         };
         console.log(
           `[compose-clip-webhook] scene=${sceneId} ambient_gate=${gate.allowed ? 'passed' : 'muted'} reason=${gate.reason}`,
         );
       }
 
-      await supabase
-        .from('composer_scenes')
-        .update(sceneUpdate)
-        .eq('id', sceneId);
+      // ── v431 G3.2.1 — atomarer Plate-Apply (RPC A) ───────────────────────
+      // Outputs, Legacy-Spiegel und Ledger-Terminalisierung fallen in EINEN
+      // Commit unter Job- + Scene-Row-Lock. Ohne Ledger-Job ist der Callback
+      // fail-closed retrybar (§4).
+      if (!ledgerJobId) {
+        console.warn(`[compose-clip-webhook] missing pipeline_job_id scene=${sceneId} → 409`);
+        return new Response(
+          JSON.stringify({ ok: false, applied: false, reason: 'missing_pipeline_job' }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+      const { data: plateApply, error: plateApplyError } = await supabase.rpc(
+        'composer_finalize_plate_scene',
+        {
+          _pipeline_job_id: ledgerJobId,
+          _external_job_id: predictionId ? String(predictionId) : null,
+          _write_id: 'ccw:plate-complete',
+          _base_url: permanentUrl,
+          _clip_source_hint: null,
+          _extra: {
+            ...continuityPatch,
+            ...(ambientGate ? { audio_plan_ambient_gate: ambientGate } : {}),
+            cinematic_sync: isCinematicSync,
+          },
+        },
+      );
+      if (plateApplyError) throw plateApplyError;
+      const plateVerdict = String((plateApply as any)?.verdict ?? 'unknown');
+      if ((plateApply as any)?.applied !== true) {
+        console.warn(`[compose-clip-webhook] plate apply rejected scene=${sceneId} verdict=${plateVerdict}`);
+        const httpStatus = plateVerdict === 'binding_pending' ? 409 : 202;
+        return new Response(
+          JSON.stringify({ ok: httpStatus === 202, applied: false, reason: plateVerdict }),
+          { status: httpStatus, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
 
 
       // 📚 Auto-archive every generated AI clip into the Media Library (KI tab).
@@ -500,15 +512,26 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             console.error(`[compose-clip-webhook] audio/lipsync handoff failed scene=${sceneId}:`, message);
             // Preserve the paid master clip and its ready status. Only the
             // downstream stage is marked failed so the user can retry it.
-            await supabase
-              .from('composer_scenes')
-              .update({
-                lip_sync_status: 'failed',
-                twoshot_stage: 'failed',
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', sceneId)
-              .eq('clip_status', 'ready');
+            // v431 G3.2.1 — RPC H: run-gebunden, kein zweiter Apply auf den
+            // bereits erfolgreichen Plate-Job.
+            const { data: handoffApply, error: handoffError } = await supabase.rpc(
+              'composer_fail_post_plate_handoff',
+              {
+                _scene_id: sceneId,
+                _run_id: runId,
+                _plate_generation: Number.isFinite(generation) ? generation : null,
+                _write_id: 'ccw:handoff_failed',
+                _error_text: `handoff_failed: ${message}`.slice(0, 480),
+              },
+            );
+            if (handoffError) {
+              console.error('[compose-clip-webhook] handoff fail RPC error:', handoffError);
+            } else if ((handoffApply as any)?.applied !== true) {
+              console.warn(
+                `[compose-clip-webhook] handoff fail rejected scene=${sceneId} verdict=${(handoffApply as any)?.verdict}`,
+              );
+            }
+
           });
 
           // @ts-ignore — Deno Deploy / Supabase edge runtime API
@@ -529,24 +552,31 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             `[compose-clip-webhook] scene ${sceneId}: cinematic-sync clip_url is talking-head — marking failed (legacy route blocked)`,
           );
           try {
-            await supabase
-              .from('composer_scenes')
-              .update({
-                clip_status: 'failed',
-                clip_error: tl({ de: 'legacy_talking_head_route_blocked: Composer-Szenen laufen jetzt ausschließlich über Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Bitte "Sauber neu starten" nutzen.', en: 'legacy_talking_head_route_blocked: Composer scenes now run exclusively via Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Please use "Clean Restart".', es: 'legacy_talking_head_route_blocked: Las escenas de Composer ahora se ejecutan exclusivamente a través de Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Por favor, use "Reiniciar Limpio".' }),
-                lip_sync_status: null,
-                twoshot_stage: null,
-                dialog_shots: null,
-                lip_sync_source_clip_url: null,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', sceneId);
+            // v431 G3.2.1 — RPC D (`ccw:legacy_route_blocked`).
+            const { data: blockApply, error: blockRpcError } = await supabase.rpc(
+              'composer_fail_callback_scene',
+              {
+                _pipeline_job_id: ledgerJobId,
+                _external_job_id: predictionId ? String(predictionId) : null,
+                _write_id: 'ccw:legacy_route_blocked',
+                _error_text: tl({ de: 'legacy_talking_head_route_blocked: Composer-Szenen laufen jetzt ausschließlich über Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Bitte "Sauber neu starten" nutzen.', en: 'legacy_talking_head_route_blocked: Composer scenes now run exclusively via Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Please use "Clean Restart".', es: 'legacy_talking_head_route_blocked: Las escenas de Composer ahora se ejecutan exclusivamente a través de Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Por favor, use "Reiniciar Limpio".' }),
+                _dialog_patch: null,
+              },
+            );
+            if (blockRpcError) {
+              console.error('[compose-clip-webhook] legacy-route fail RPC error:', blockRpcError);
+            } else if ((blockApply as any)?.applied !== true) {
+              console.warn(
+                `[compose-clip-webhook] legacy-route fail rejected scene=${sceneId} verdict=${(blockApply as any)?.verdict}`,
+              );
+            }
           } catch (blockErr) {
             console.error(
               '[compose-clip-webhook] legacy-route fail-mark error:',
               blockErr,
             );
           }
+
         }
 
       } catch (lipErr) {
@@ -680,24 +710,39 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const taggedError = (isGreenNet ? '[green_net_rejected] ' : '') +
         (String(enrichedError ?? '').slice(0, 480) || 'unknown_error');
 
-      await supabase
-        .from('composer_scenes')
-        .update({
-          clip_status: 'failed',
-          retry_count: currentRetry + 1,
-          clip_error: taggedError,
-          // v176: clip_source stays untouched on Green-Net — user decides.
-          ...(String((scene as any)?.engine_override ?? '') === 'cinematic-sync'
-            ? {
-                lip_sync_status: null,
-                twoshot_stage: null,
-                lip_sync_source_clip_url: null,
-                dialog_shots: null,
-              }
-            : {}),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', sceneId);
+      // v431 G3.2.1 — RPC D (`ccw:failed`): Scene-Fail, Legacy-Spiegel,
+      // retry_count und Ledger-Terminalisierung in EINEM Commit. Refund und
+      // Chain-Release laufen ausschließlich nach `applied:true`.
+      // v176: clip_source stays untouched on Green-Net — user decides.
+      if (!ledgerJobId) {
+        console.warn(`[compose-clip-webhook] missing pipeline_job_id on failure scene=${sceneId} → 409`);
+        return new Response(
+          JSON.stringify({ ok: false, applied: false, reason: 'missing_pipeline_job' }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+      const { data: failApplyRow, error: failApplyError } = await supabase.rpc(
+        'composer_fail_callback_scene',
+        {
+          _pipeline_job_id: ledgerJobId,
+          _external_job_id: predictionId ? String(predictionId) : null,
+          _write_id: 'ccw:failed',
+          _error_text: taggedError,
+          _dialog_patch: null,
+        },
+      );
+      if (failApplyError) throw failApplyError;
+      const failVerdict = String((failApplyRow as any)?.verdict ?? 'unknown');
+      const failApplied = (failApplyRow as any)?.applied === true;
+      if (!failApplied) {
+        console.warn(`[compose-clip-webhook] fail apply rejected scene=${sceneId} verdict=${failVerdict}`);
+        const httpStatus = failVerdict === 'binding_pending' ? 409 : 202;
+        return new Response(
+          JSON.stringify({ ok: httpStatus === 202, applied: false, reason: failVerdict }),
+          { status: httpStatus, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
 
       if (isGreenNet) {
         console.warn(
