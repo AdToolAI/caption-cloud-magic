@@ -511,54 +511,16 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       "sync-so-webhook",
       async () => {
     // v25 Fan-Out: match the job_id against passes[].job_id (preferred) OR
-    // the legacy top-level state.sync_job_id (single-pass scenes). Previously
-    // we required state.sync_job_id === jobId which dropped EVERY pass
-    // webhook except the most recently dispatched pass — causing scenes to
-    // hang indefinitely with only the last pass marked done.
+    // the legacy top-level state.sync_job_id (single-pass scenes).
+    //
+    // v431 G3.2.2 — B5 (v141 `syncso_dispatch_log`-Reattach) ist entfallen:
+    // die Pass-Identität kommt ausschließlich aus der gebundenen Ledger-Zeile
+    // (`metadata.pass_idx`), bestätigt durch das Slot-Pointer-Paar. Dieses
+    // Matching hier dient nur noch der Orphan-Erkennung (B6, Edge-Nebenwirkung)
+    // und der Forensik.
     const passesPre = Array.isArray((state as any).passes) ? [...(state as any).passes] : [];
-    let matchedIdx = passesPre.findIndex((p: any) => p?.job_id === jobId);
+    const matchedIdx = passesPre.findIndex((p: any) => p?.job_id === jobId);
     const isLegacySingle = matchedIdx < 0 && state.sync_job_id === jobId;
-    if (matchedIdx < 0 && !isLegacySingle) {
-      // v141 — Reattach late webhooks. Before treating this as an orphan,
-      // look the job up in `syncso_dispatch_log` to find the original
-      // pass_idx. After a watchdog auto-retry the pass's job_id is wiped
-      // from passes[], but the original Sync.so job can still complete
-      // and call back. If the corresponding pass is still pending and
-      // has no output_url, we adopt this webhook's result instead of
-      // throwing it away — which used to strand the scene at 95% forever.
-      try {
-        const { data: logRow } = await supabase
-          .from("syncso_dispatch_log")
-          .select("meta")
-          .eq("scene_id", sceneId)
-          .eq("job_id", jobId)
-          .eq("sync_status", "DISPATCHED")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        const loggedPassIdx = Number((logRow as any)?.meta?.pass_idx);
-        if (
-          Number.isFinite(loggedPassIdx) &&
-          loggedPassIdx >= 0 &&
-          loggedPassIdx < passesPre.length
-        ) {
-          const target = passesPre[loggedPassIdx];
-          const targetStatus = String(target?.status ?? "");
-          const targetHasOutput =
-            typeof target?.output_url === "string" && target.output_url.length > 0;
-          if (!targetHasOutput && (targetStatus === "pending" || targetStatus === "rendering" || targetStatus === "retrying" || targetStatus === "failed")) {
-            console.log(
-              `[sync-so-webhook] v141 scene=${sceneId} job=${jobId} REATTACH late webhook → pass_idx=${loggedPassIdx} (prev status=${targetStatus})`,
-            );
-            passesPre[loggedPassIdx] = { ...target, job_id: jobId, status: targetStatus === "pending" ? "rendering" : targetStatus };
-            (state as any).passes = passesPre;
-            matchedIdx = loggedPassIdx;
-          }
-        }
-      } catch (e) {
-        console.warn(`[sync-so-webhook] v141 reattach lookup crash: ${(e as Error).message}`);
-      }
-    }
     if (matchedIdx < 0 && !isLegacySingle) {
       console.warn(`[sync-so-webhook] v5 scene=${sceneId} job=${jobId} ORPHAN (not in passes[] count=${passesPre.length}) — releasing inflight slot + best-effort provider cancel`);
       // v33: clean up the orphan so we don't leak a Sync.so concurrency slot
@@ -573,6 +535,56 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       }
       return ok({ ok: true, skipped: "v5_job_orphan_cleaned", job_id: jobId });
     }
+
+    // ── v431 G3.2.2 — Post-Commit-Nebenwirkungen zum Scene-Verdict ─────────
+    // Der RPC hat bereits committet. Hier laufen ausschließlich Effekte, die
+    // nicht in die DB-Transaktion gehören: Wallet-Refund, Mux-Dispatch
+    // (exactly-once über `acquireLedgerJob('audio_mux')`), Advance-Kick.
+    const settleVerdict = async (res: ApplySyncSegmentResult, extra: Record<string, unknown> = {}) => {
+      const verdict = String(res.verdict ?? "");
+      const total = Number(res.total_passes ?? passesPre.length ?? 1);
+      const done = Number(res.done_count ?? 0);
+      let compositor: string | null = null;
+
+      if (verdict === "fail") {
+        await refundSceneIfDue(supabase, sceneId!, res);
+      } else if (verdict === "dispatch_mux") {
+        compositor = await dispatchAudioMux(
+          supabase, supabaseUrl, serviceKey, sceneId!, scene, total,
+        );
+      } else if (verdict === "continue") {
+        if (total >= 2 && done === total - 1) {
+          try {
+            fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+              body: JSON.stringify({ warmup: true }),
+            }).catch(() => {});
+          } catch { /* ignore */ }
+        }
+        const nextIdx = res.next_pending_pass_idx;
+        if (typeof nextIdx === "number" && nextIdx >= 0) {
+          try { triggerV5Advance(supabaseUrl, serviceKey, sceneId!, nextIdx, total); } catch { /* ignore */ }
+        }
+      }
+
+      return ok({
+        ok: true,
+        scene_id: sceneId,
+        job_id: jobId,
+        status,
+        engine: "sync-segments",
+        applied: !!res.applied,
+        verdict,
+        segment_result: res.segment_result ?? null,
+        pass_idx: res.pass_idx ?? null,
+        reason: res.reason ?? null,
+        ...(compositor ? { compositor } : {}),
+        ...extra,
+      });
+    };
+
+
 
     if (status === "COMPLETED" && outputUrl) {
       // ── v25 Fan-Out: passes run in parallel, all against the ORIGINAL
