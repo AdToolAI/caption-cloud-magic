@@ -114,10 +114,11 @@ Log-Zeile, Legacy-Verhalten unverändert (Observe bleibt read-only, kein State-W
 
 
 **Guard-Tests** (vitest, neu `v431LedgerContract.test.ts`):
-- **Race-Test (neu, Pflicht):** zwei parallele Initial-Akquisen derselben Identität →
-  exakt eine Ledger-Zeile für den ersten Attempt, ein Caller `acquired`, der andere
-  `already_in_flight`, `composer_replace_pipeline_attempt` nie aufgerufen; im
-  Dispatcher-Test genau ein Provider-Call.
+- **Race-Test (Pflicht, ergänzend zum DB-Smoke):** zwei parallele Initial-Akquisen
+  derselben Identität → ein Caller `acquired`, der andere `already_in_flight`,
+  `composer_replace_pipeline_attempt` nie aufgerufen; im Dispatcher-Test genau ein
+  Provider-Call.
+
 - Initial-Akquise bei bereits vorhandenem aktivem Attempt (inkl. `dispatch_uncertain`)
   ruft `composer_replace_pipeline_attempt` **nicht** auf und liefert `already_in_flight`.
 
