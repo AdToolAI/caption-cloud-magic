@@ -1,6 +1,8 @@
 # v431 G3.2 — Callback-Apply-Migration: autoritativer Endvertrag
 
-Endfassung nach Review-Runde 2. Keine Migration, kein Code, kein Deploy in diesem Schritt. G3.0b/G3.1 bleiben frozen; `composer_fail_scene_with_mirrors`, `composer_finalize_talking_head`, `composer_finalize_upload_scene` werden nicht angefasst.
+Endfassung nach Review-Runde 3. G3.0b/G3.1 bleiben frozen; `composer_fail_scene_with_mirrors`, `composer_finalize_talking_head`, `composer_finalize_upload_scene` werden nicht angefasst.
+
+**Freigabestand:** nur **G3.2.1** (A + H + D-`ccw:*` → `compose-clip-webhook` → Smokes → Frozen-Suite → `tsgo`/`deno check` → STOP) ist freigegeben. G3.2.2–G3.2.5 bleiben gesperrt; der Gesamtvertrag ist noch nicht eingefroren. Die beiden Sync-Punkte (F-Entkopplung, E/Watchdog-Recover) sind in §3 geschlossen und werden vor G3.2.4 separat abgenommen.
 
 ## 1. Writer-Inventar (Ist-Zustand, am Code verifiziert)
 
