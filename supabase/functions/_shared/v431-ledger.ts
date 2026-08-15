@@ -401,6 +401,14 @@ export async function observeCallbackProvenance(
         ledger_stage: job.stage,
       });
     }
+    if (input.externalJobId && !job.external_job_id) {
+      // G3.1b: Callback ist schneller als `bindLedgerExternalJob()`. Der Job ist
+      // über die `pipeline_job_id` eindeutig — das ist KEIN wrong_job, sondern
+      // ein eigener, gezählter Zustand (Datengrundlage der G3.2-Entscheidung).
+      return emit({ ...result, verdict: "binding_pending" }, {
+        job_status: job.status,
+      });
+    }
     if (
       input.externalJobId && job.external_job_id &&
       String(job.external_job_id) !== String(input.externalJobId)
