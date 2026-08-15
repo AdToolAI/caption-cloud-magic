@@ -75,9 +75,9 @@ Eine dauerhafte Pre-Cutover-Auflösung im Forwarder wird **nicht** eingeführt.
 
 ## Tests
 
-- Neue Unit-/Fixture-Tests: Watchdog-Forward-URL enthält denselben Pointer wie der reguläre Dispatch; `recover`-Replay und `modelark-poll`-Forward tragen die Plate-Pointer-ID; fehlender Pointer → genau ein `reinject_missing_pipeline_job_id`-Event, keine URL-Injektion, kein Abbruch.
+- Neue Unit-/Fixture-Tests: Watchdog-Forward-URL enthält denselben Pointer wie der reguläre Dispatch; `recover`-Replay und `modelark-poll`-Forward tragen die Plate-Pointer-ID; fehlender Pointer → genau ein `reinject_missing_pipeline_job_id`-Error-Event und **kein** ausgehender Callback (Fetch-Spy: 0 Requests).
 - Guard-Test: manipulierter/staler Pointer wird vom bestehenden Webhook-Guard abgewiesen; kein Fallback-Resolve.
-- Paar-Tests (SQL, transaktional): `job_id` non-null ohne `pipeline_job_id` → Exception; zweites Binding ohne Reset → beide Felder verworfen; Reset setzt beide auf `null`; danach bindet der neue Attempt beide gemeinsam. Base Video: kein Pfad schreibt `replicate_prediction_id` ohne `plate_pipeline_job_id`.
+- Paar-/Atomaritätstests (SQL, transaktional): `job_id` non-null ohne `pipeline_job_id` → Exception; zweites Binding ohne Reset → beide Felder verworfen; Reset setzt beide auf `null`; danach bindet der neue Attempt beide gemeinsam. Bind-RPCs: identisches Paar = No-op, fremde `external_job_id` bzw. falscher Run/Generation = Fehler, Rollback lässt weder Ledger-Bindung noch Pointer halb gesetzt zurück. Base Video: kein Pfad schreibt `replicate_prediction_id` ohne `plate_pipeline_job_id`.
 - Invarianz: keine neue Ledger-Zeile und kein neuer Attempt durch Re-Injection; Retry-/Acquire-Verträge aus G3.1 sowie G2.1/G2.2-Immutabilität unverändert (bestehende Suites).
 - Frozen-Suite, `tsgo`, `deno check` für die vier berührten Functions.
 - `composer_callback_observations` nach den gezielten Re-Injection-Tests: `missing_binding = 0`.
