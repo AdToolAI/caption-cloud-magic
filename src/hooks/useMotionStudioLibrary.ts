@@ -88,7 +88,7 @@ export function useMotionStudioLibrary() {
       }
       const { data, error } = await supabase
         .from('motion_studio_characters')
-        .insert({ ...draft, user_id: effectiveUser.id })
+        .insert({ ...draft, user_id: effectiveUser.id } as never)
         .select()
         .single();
       if (error) {
@@ -113,7 +113,7 @@ export function useMotionStudioLibrary() {
     async (id: string, patch: Partial<CharacterDraft>): Promise<boolean> => {
       const { data, error } = await supabase
         .from('motion_studio_characters')
-        .update(patch)
+        .update(patch as never)
         .eq('id', id)
         .select()
         .single();

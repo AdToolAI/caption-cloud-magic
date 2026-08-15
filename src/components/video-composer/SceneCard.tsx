@@ -602,7 +602,7 @@ export default function SceneCard({
                                     if (dbClipQuality) payload.clip_quality = dbClipQuality;
                                     const { error } = await supabase
                                       .from("composer_scenes")
-                                      .update(payload)
+                                      .update(payload as never)
                                       .eq("id", scene.id);
                                     if (error) throw error;
                                   } catch (e) {
@@ -2823,7 +2823,7 @@ export default function SceneCard({
                               if (dialogModeChanged) payload.dialog_mode = nextDialogMode;
                               const { error } = await supabase
                                 .from("composer_scenes")
-                                .update(payload)
+                                .update(payload as never)
                                 .eq("id", scene.id);
                               if (error) throw error;
                             } catch (e) {
