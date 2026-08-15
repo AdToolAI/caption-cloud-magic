@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS public._v431_sa2_results;
