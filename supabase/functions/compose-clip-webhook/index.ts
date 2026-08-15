@@ -13,7 +13,7 @@ import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { resumeContinuityChain, sweepContinuityQueue } from "../_shared/continuity-chain.ts";
 import { guardCallback } from "../_shared/v427-callback-guard.ts";
-import { observeCallbackProvenance, readPipelineJobId } from "../_shared/v431-ledger.ts";
+import { bindLedgerExternalJob, classifyDispatchFailure, observeCallbackProvenance, readPipelineJobId, replaceLedgerAttempt, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 import { continuityRenderedPatch } from "../_shared/continuity-run-snapshot.ts";
 import { legacyClipReadyEquivalentRow, legacyClipFailedEquivalentRow } from "../_shared/scene-state.ts";
@@ -588,10 +588,34 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           if (!replicateKey) throw new Error('REPLICATE_API_KEY missing');
           const replicate = new Replicate({ auth: replicateKey });
 
+          // v431 G3.1b — Provider-Retry ist ein eigener Ledger-Attempt:
+          // alter Attempt `stale` + neuer Attempt (attempt_no + 1) atomar in
+          // EINER Transaktion, VOR dem Provider-Dispatch. Die neue
+          // `pipeline_job_id` reist in der Callback-URL mit.
+          const previousLedgerJobId = readPipelineJobId(url, payload);
+          const { data: v431Scene } = await supabase
+            .from('composer_scenes')
+            .select('active_run_id, plate_generation')
+            .eq('id', sceneId)
+            .maybeSingle();
+          let retryLedgerJob: { id: string } | null = null;
+          if (previousLedgerJobId && (v431Scene as any)?.active_run_id) {
+            retryLedgerJob = await replaceLedgerAttempt(supabase, {
+              previousJobId: previousLedgerJobId,
+              sceneId,
+              runId: String((v431Scene as any).active_run_id),
+              stage: 'base_video',
+              plateGeneration: Number((v431Scene as any).plate_generation ?? 0),
+              provider: 'replicate',
+              metadata: { dispatcher: 'compose-clip-webhook', auto_retry: currentRetry + 1 },
+            });
+          }
+
           const webhookBase = appendWebhookToken(
             `${supabaseUrl}/functions/v1/compose-clip-webhook`,
           );
-          const newWebhook = `${webhookBase}&scene_id=${sceneId}&project_id=${projectId}`;
+          const newWebhook = `${webhookBase}&scene_id=${sceneId}&project_id=${projectId}` +
+            (retryLedgerJob ? `&pipeline_job_id=${encodeURIComponent(retryLedgerJob.id)}` : '');
 
           const createArgs: Record<string, unknown> = {
             input: payload.input,
@@ -601,9 +625,20 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           if (payload.model) createArgs.model = payload.model;
           else createArgs.version = payload.version;
 
-          const retried = await replicate.predictions.create(
-            createArgs as Parameters<typeof replicate.predictions.create>[0],
-          );
+          let retried;
+          try {
+            retried = await replicate.predictions.create(
+              createArgs as Parameters<typeof replicate.predictions.create>[0],
+            );
+          } catch (dispatchErr) {
+            await settleLedgerDispatchFailure(supabase, retryLedgerJob?.id ?? null, {
+              errorCode: 'replicate_retry_dispatch_failed',
+              outcome: classifyDispatchFailure(dispatchErr),
+            });
+            throw dispatchErr;
+          }
+
+          await bindLedgerExternalJob(supabase, retryLedgerJob?.id ?? null, retried.id);
 
           await supabase
             .from('composer_scenes')

@@ -95,6 +95,52 @@ export async function acquireLedgerJob(
       plateGeneration = typeof scene?.plate_generation === "number" ? scene.plate_generation : null;
     }
 
+    // G3.1b: `plate_generation` ist DB-seitig beim INSERT Pflicht. Ohne
+    // belastbare Generation wird gar keine Ledger-Zeile erzeugt (fail-closed
+    // gegenüber dem Ledger, fail-open gegenüber dem Render) — die Lücke zählt
+    // als Telemetrie in den Drain-Bericht.
+    if (plateGeneration == null) {
+      console.warn(`${V431_OBSERVE_TAG} ledger_skip_no_generation`, JSON.stringify({
+        scene_id: params.sceneId,
+        stage: params.stage,
+        run_id: runId,
+      }));
+      return null;
+    }
+
+    // G3.1b — Retry-Atomarität (D9): existiert für dieselbe
+    // (scene, run, stage, segment) noch ein nicht-terminaler Attempt, ist
+    // dieser Dispatch definitionsgemäß ein Retry. Ablösen + Anlegen laufen
+    // dann ausschließlich über den atomaren RPC; ein konkurrierender
+    // Ablöseversuch verliert deterministisch (Row-Lock + Guard).
+    let activeQuery = admin
+      .from("composer_pipeline_jobs")
+      .select("id, attempt_no")
+      .eq("scene_id", params.sceneId)
+      .eq("run_id", runId)
+      .eq("stage", params.stage)
+      .eq("plate_generation", plateGeneration)
+      .is("replaced_by", null)
+      .in("status", ["pending", "dispatching", "dispatched", "dispatch_uncertain"])
+      .order("attempt_no", { ascending: false })
+      .limit(1);
+    activeQuery = params.segmentId
+      ? activeQuery.eq("segment_id", params.segmentId)
+      : activeQuery.is("segment_id", null);
+    const { data: activeRows } = await activeQuery;
+    const previous = Array.isArray(activeRows) && activeRows.length > 0 ? activeRows[0] : null;
+    if (previous?.id) {
+      return await replaceLedgerAttempt(admin, {
+        previousJobId: String(previous.id),
+        sceneId: params.sceneId,
+        runId,
+        stage: params.stage,
+        plateGeneration,
+        provider: params.provider ?? null,
+        metadata: { ...(params.metadata ?? {}), retry_of_job_id: String(previous.id) },
+      });
+    }
+
     // attempt_no = bestehende Versuche derselben (scene, run, stage, segment) + 1
     let countQuery = admin
       .from("composer_pipeline_jobs")
@@ -190,6 +236,141 @@ export async function bindLedgerExternalJob(
   }
 }
 
+/**
+ * G3.1b — Dispatch-Failure-Semantik (Ledger-only).
+ *
+ * `rejected`  → der Provider hat den Auftrag nachweislich NICHT angenommen
+ *               (4xx, Validierungsfehler, Abbruch vor dem Absenden) ⇒ `failed`.
+ * `uncertain` → Ausgang unklar (Timeout, abgebrochener Fetch, 5xx, unbekannte
+ *               Antwort, Function-Kill) ⇒ `dispatch_uncertain`, recoverable.
+ *
+ * Wirkt nur aus `pending`/`dispatching`; niemals über `dispatched`/`succeeded`
+ * hinweg. Fasst ausschließlich `composer_pipeline_jobs` an — kein State-,
+ * Output-, Mirror- oder Credit-Effekt.
+ */
+export async function settleLedgerDispatchFailure(
+  admin: any,
+  jobId: string | null | undefined,
+  opts: { errorCode: string; outcome: "rejected" | "uncertain" },
+): Promise<void> {
+  if (!jobId) return;
+  try {
+    await admin
+      .from("composer_pipeline_jobs")
+      .update({
+        status: opts.outcome === "rejected" ? "failed" : "dispatch_uncertain",
+        error_code: opts.errorCode.slice(0, 120),
+        completed_at: opts.outcome === "rejected" ? new Date().toISOString() : null,
+      })
+      .eq("id", jobId)
+      .in("status", ["pending", "dispatching"]);
+  } catch (e) {
+    console.warn(`${V431_OBSERVE_TAG} ledger_settle_failed`, JSON.stringify({
+      pipeline_job_id: jobId,
+      outcome: opts.outcome,
+      error: e instanceof Error ? e.message : String(e),
+    }));
+  }
+}
+
+/**
+ * Konservative Klassifikation eines Dispatch-Fehlers.
+ *
+ * Nur eine beweisbare Ablehnung darf `rejected` werden. Alles andere bleibt
+ * `uncertain` — ein Provider könnte den Auftrag angenommen haben und später
+ * doch noch callbacken (D3/G3.1b).
+ */
+export function classifyDispatchFailure(err: unknown): "rejected" | "uncertain" {
+  const msg = (err instanceof Error ? err.message : String(err ?? "")).toLowerCase();
+  if (/\b(400|401|403|404|409|422)\b/.test(msg)) return "rejected";
+  if (/missing_run_stamp|invalid_input|validation|unsupported|unauthorized|forbidden|not found/.test(msg)) {
+    return "rejected";
+  }
+  return "uncertain";
+}
+
+/**
+ * Synchron fertige Dispatches (z. B. ai-image, das sofort ein Ergebnis liefert)
+ * haben keine externe Job-ID und dürfen nicht als offener Versand zurückbleiben.
+ */
+export async function completeLedgerJobImmediate(
+  admin: any,
+  jobId: string | null | undefined,
+): Promise<void> {
+  if (!jobId) return;
+  try {
+    await admin
+      .from("composer_pipeline_jobs")
+      .update({ status: "succeeded", completed_at: new Date().toISOString() })
+      .eq("id", jobId)
+      .in("status", ["pending", "dispatching"]);
+  } catch (e) {
+    console.warn(`${V431_OBSERVE_TAG} ledger_complete_failed`, JSON.stringify({
+      pipeline_job_id: jobId,
+      error: e instanceof Error ? e.message : String(e),
+    }));
+  }
+}
+
+export interface ReplaceLedgerAttemptParams {
+  previousJobId: string;
+  sceneId: string;
+  runId: string;
+  stage: PipelineStage;
+  plateGeneration: number;
+  provider?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * G3.1b — einziger erlaubter Retry-Einstieg.
+ *
+ * Ablösen des alten Attempts und Anlegen des neuen laufen atomar in EINER
+ * Transaktion (`composer_replace_pipeline_attempt`): Row-Lock auf den
+ * Vorgänger, Identitäts- und Ablösefähigkeitsprüfung, `stale` + INSERT
+ * `attempt_no + 1` — oder gar nichts. Ein konkurrierender Ablöseversuch
+ * verliert deterministisch und bekommt `null`; der Verlierer darf dann NICHT
+ * dispatchen. Die neue `pipeline_job_id` steht erst nach dem Commit bereit.
+ */
+export async function replaceLedgerAttempt(
+  admin: any,
+  params: ReplaceLedgerAttemptParams,
+): Promise<LedgerJobHandle | null> {
+  try {
+    const { data, error } = await admin.rpc("composer_replace_pipeline_attempt", {
+      p_previous_job_id: params.previousJobId,
+      p_expected_scene_id: params.sceneId,
+      p_expected_run_id: params.runId,
+      p_expected_stage: params.stage,
+      p_expected_plate_generation: params.plateGeneration,
+      p_provider: params.provider ?? null,
+      p_metadata: params.metadata ?? {},
+    });
+    const row = Array.isArray(data) ? data[0] : data;
+    if (error || !row?.job_id) {
+      console.warn(`${V431_OBSERVE_TAG} ledger_replace_lost`, JSON.stringify({
+        previous_job_id: params.previousJobId,
+        scene_id: params.sceneId,
+        stage: params.stage,
+        error: error?.message ?? "no_row",
+      }));
+      return null;
+    }
+    return {
+      id: String(row.job_id),
+      attemptNo: Number(row.attempt_no ?? 0),
+      runId: params.runId,
+      plateGeneration: params.plateGeneration,
+    };
+  } catch (e) {
+    console.warn(`${V431_OBSERVE_TAG} ledger_replace_threw`, JSON.stringify({
+      previous_job_id: params.previousJobId,
+      error: e instanceof Error ? e.message : String(e),
+    }));
+    return null;
+  }
+}
+
 /** Extrahiert `pipeline_job_id` aus URL-Query, Body oder Provider-Metadaten. */
 export function readPipelineJobId(
   ...sources: Array<URL | Record<string, unknown> | null | undefined>
@@ -207,6 +388,8 @@ export function readPipelineJobId(
 
 export type ObserveVerdict =
   | "bound"
+  /** Job über `pipeline_job_id` eindeutig gefunden, `external_job_id` noch NULL. */
+  | "binding_pending"
   | "missing_binding"
   | "job_not_found"
   | "wrong_job"
@@ -288,6 +471,14 @@ export async function observeCallbackProvenance(
       return emit({ ...result, verdict: "wrong_job" }, {
         ledger_scene_id: job.scene_id,
         ledger_stage: job.stage,
+      });
+    }
+    if (input.externalJobId && !job.external_job_id) {
+      // G3.1b: Callback ist schneller als `bindLedgerExternalJob()`. Der Job ist
+      // über die `pipeline_job_id` eindeutig — das ist KEIN wrong_job, sondern
+      // ein eigener, gezählter Zustand (Datengrundlage der G3.2-Entscheidung).
+      return emit({ ...result, verdict: "binding_pending" }, {
+        job_status: job.status,
       });
     }
     if (

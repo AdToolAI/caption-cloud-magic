@@ -43,7 +43,13 @@ function parseRetryAfter(msg: string): number {
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
-import { acquireLedgerJob, bindLedgerExternalJob } from "../_shared/v431-ledger.ts";
+import {
+  acquireLedgerJob,
+  bindLedgerExternalJob,
+  classifyDispatchFailure,
+  completeLedgerJobImmediate,
+  settleLedgerDispatchFailure,
+} from "../_shared/v431-ledger.ts";
 import { isV427FlagEnabled } from "../_shared/v427-flags.ts";
 import {
   InsufficientCreditsError,
@@ -5197,11 +5203,23 @@ serve(async (req) => {
     // die Provider-Job-ID gebunden; der DB-Trigger macht sie unveränderlich.
     // Ersetzt den post-hoc v427A2-Dual-Write für `base_video`: zwei Quellen
     // für dieselbe Stage würden die D2-Eindeutigkeit brechen.
+    //
+    // G3.1b: Jede Szene, die NICHT in den Provider gegangen ist, darf keine
+    // fälschlich „aktive" Job-Zeile hinterlassen. Beweisbare Ablehnung ⇒
+    // `failed`; jeder unklare Ausgang ⇒ recoverable `dispatch_uncertain`.
     for (const r of results as Array<any>) {
-      if (r.status !== "generating") continue;
       const ledgerJobId = sceneLedgerJobs.get(r.sceneId);
       if (!ledgerJobId) continue;
-      await bindLedgerExternalJob(supabaseAdmin, ledgerJobId, r.predictionId ?? null);
+      if (r.status === "generating") {
+        await bindLedgerExternalJob(supabaseAdmin, ledgerJobId, r.predictionId ?? null);
+      } else if (r.status === "ready") {
+        await completeLedgerJobImmediate(supabaseAdmin, ledgerJobId);
+      } else {
+        await settleLedgerDispatchFailure(supabaseAdmin, ledgerJobId, {
+          errorCode: String(r.error ?? "dispatch_failed"),
+          outcome: classifyDispatchFailure(r.error),
+        });
+      }
     }
 
 

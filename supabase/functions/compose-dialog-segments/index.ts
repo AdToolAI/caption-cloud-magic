@@ -117,7 +117,7 @@ import { rehostPlate } from "../_shared/rehostPlate.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
-import { acquireLedgerJob, bindLedgerExternalJob } from "../_shared/v431-ledger.ts";
+import { acquireLedgerJob, bindLedgerExternalJob, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -6069,6 +6069,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         error_message: message,
         meta: { diagnostic_id: diagnosticId, retry_variant: retryVariant, pass_idx: currentPassIdx, total_passes: passes.length, ...meta },
       });
+      // v431 G3.1b — Abbruch VOR dem Provider-Call: beweisbar nicht angenommen.
+      await settleLedgerDispatchFailure(supabase, v431SyncLedgerJob?.id ?? null, {
+        errorCode: reason,
+        outcome: "rejected",
+      });
       return json({ error: reason, message, refunded: alreadyRefunded ? 0 : costCredits, ...meta }, status);
     };
 
@@ -6888,6 +6893,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           refundCredits: totalCost,
           syncApiKey,
         });
+        // v431 G3.1b — Face-Gate blockt vor dem Provider-Call.
+        await settleLedgerDispatchFailure(supabase, v431SyncLedgerJob?.id ?? null, {
+          errorCode: "face_gate_blocked",
+          outcome: "rejected",
+        });
         return json(
           { error: "face_gate_blocked", code: gate.code, reason: gate.reason ?? null, provider_error_code: "no_face_pre_sync" },
           422,
@@ -7152,6 +7162,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         meta: { diagnostic_id: diagnosticId, retry_variant: retryVariant, pass_idx: currentPassIdx, total_passes: passes.length, payload_summary: payload, v249_preclip_metrics_persisted: true },
       });
       await recordCircuitFailure(supabase, "sync.so", classifySyncError(errTxt));
+      // v431 G3.1b — 4xx = bewiesene Ablehnung; 429/5xx/unklar = recoverable.
+      await settleLedgerDispatchFailure(supabase, v431SyncLedgerJob?.id ?? null, {
+        errorCode: `syncso_dispatch_${resp.status}`,
+        outcome: resp.status >= 400 && resp.status < 500 && resp.status !== 429
+          ? "rejected"
+          : "uncertain",
+      });
       return json(
         { error: "syncso_dispatch_failed", status: resp.status, body: errTxt.slice(0, 400) },
         502,
@@ -7169,10 +7186,20 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         message: `Sync.so /generate response missing keys: ${shape.missingKeys.join(", ")}`,
         payload: { missing_keys: shape.missingKeys, sample: data },
       });
+      // Antwort unlesbar ⇒ der Provider kann den Auftrag dennoch angenommen
+      // haben: Ungewissheit darf nicht terminalisiert werden.
+      await settleLedgerDispatchFailure(supabase, v431SyncLedgerJob?.id ?? null, {
+        errorCode: "syncso_schema_drift",
+        outcome: "uncertain",
+      });
       return json({ error: "schema_drift", missing: shape.missingKeys }, 502);
     }
     const jobId = String(data.id ?? "");
     if (!jobId) {
+      await settleLedgerDispatchFailure(supabase, v431SyncLedgerJob?.id ?? null, {
+        errorCode: "syncso_no_job_id",
+        outcome: "uncertain",
+      });
       return json({ error: "no_job_id" }, 502);
     }
 
