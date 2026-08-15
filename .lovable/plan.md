@@ -105,18 +105,21 @@ Entscheidung: **fail-closed + retrybar**, kein Binden aus dem Callback.
 
 ## 4. Fan-in-Invarianten (Multi-Speaker)
 
-`update_dialog_pass_slot()` bleibt alleinige Autorität für Segmentstatus. Szene bleibt `lipsync_running` bis alle Passes terminal sind. Genau ein Mux-Dispatch-Gewinner über `try_claim_mux_dispatch` **und** `acquireLedgerJob` (`already_in_flight` → Abbruch). Kein Handler schreibt `passes[]` außerhalb des Slot-RPC; der Whole-JSON-Fallback wird ersatzlos entfernt.
+Segmentstatus wird ausschließlich innerhalb von **F** geschrieben — `update_dialog_pass_slot()` bleibt die einzige Schreiblogik für `passes[]`, wird aber nur noch **innerhalb** der F-Transaktion aufgerufen, nie mehr direkt aus dem Handler. Damit sind Pass-Write, Progress-Spiegel und Job-Terminalisierung ein Commit (D1 erfüllt). Szene bleibt `lipsync_running`, bis alle Passes terminal sind. Genau ein Mux-Dispatch-Gewinner über `try_claim_mux_dispatch` **und** `acquireLedgerJob` (`already_in_flight` → Abbruch). Der Whole-JSON-Fallback entfällt ersatzlos.
 
 ## 5. Handler → RPC-Mapping (Ziel)
 
 ```text
-compose-clip-webhook            success → A | failure → D(ccw:*)      | retry → G3.1 replace
-sync-so-webhook                 pass    → E | single-final → B(sso:applied)
+compose-clip-webhook            plate success → A | plate failure → D(ccw:failed | ccw:legacy_route_blocked)
+                                post-commit handoff failure → composer_fail_post_plate_handoff (run-bound)
+                                retry → G3.1 replace
+sync-so-webhook                 segment callback (success/failure) → F (Slot + Progress + Job, ein Commit)
+                                single-final → B(sso:applied) | scene failure → D(sso:*)
                                 fan-in  → claim + Ledger + Dispatch (kein State-Write)
-                                failure → D(sso:*)
-render-sync-segments-audio-mux  dispatch→ C(mux:dispatched)           | failure → D(mux:*)
+render-sync-segments-audio-mux  dispatch→ C(mux:dispatched) | interner Fail → G(mux:preflight_failed | mux:invoke_failed)
 remotion-webhook (dialog-stitch) success→ B(stitch:done)              | failure → D(stitch:failed)
 ```
+
 
 ## 6. DB-Smoke-Matrix (je RPC A–G, transaktional, mit Rollback)
 
