@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      _v431_a_smoke_results: {
+        Row: {
+          detail: Json | null
+          id: number
+          ok: boolean | null
+          step: string
+        }
+        Insert: {
+          detail?: Json | null
+          id?: number
+          ok?: boolean | null
+          step: string
+        }
+        Update: {
+          detail?: Json | null
+          id?: number
+          ok?: boolean | null
+          step?: string
+        }
+        Relationships: []
+      }
       ab_test_events: {
         Row: {
           event_type: string
