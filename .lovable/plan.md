@@ -45,18 +45,18 @@ Keine zusätzliche Transition-Autorität, keine State-Entscheidung im Helper.
 Smoke: Wert-für-Wert-Vergleich Inline vs. Helper für `done/total`-Kombinationen.
 
 ### R3 — F3: Legacy→State-Bridge, monotone Regel für genau diesen Fall
-`audio_muxing` (in `twoshot_stage` bzw. `lip_sync_status`) wird als Legacy-Kompatibilitätswert
-behandelt, und zwar **explizit monoton** gegen den aktuellen kanonischen State:
-- aktuell `lipsync_dispatched` + Legacy `audio_muxing` ⇒ höchstens `lipsync_running`;
+Endgültige Regel: Legacy `audio_muxing` (in `twoshot_stage` oder `lip_sync_status`) wird gegen
+den aktuellen kanonischen State **monoton** ausgewertet:
+- aktuell `lipsync_dispatched` ⇒ höchstens `lipsync_running`;
 - aktuell `lipsync_running` ⇒ bleibt `lipsync_running`;
-- aktuell `lipsync_muxing` oder später (`complete`) ⇒ **kein** Rückschritt, State bleibt;
-- die Bridge setzt wegen `audio_muxing` **niemals selbst** `lipsync_muxing`.
+- aktuell `lipsync_muxing` oder später (`complete`) ⇒ kein Rückschritt, State bleibt;
+- die Bridge setzt wegen `audio_muxing` niemals selbst `lipsync_muxing`.
 Terminale Legacy-Signale (`failed`, `canceled`, `done/applied`) bleiben unverändert wirksam;
 sonst wird keine Bridge-Semantik angefasst und `sync-so-webhook` zieht nichts vor.
 Smokes: (a) `plate_ready → lipsync_dispatched → lipsync_running → mux handoff` ohne
-Rückschritt; (b) **Beweis-Smoke**: Mux-Owner setzt `lipsync_muxing`, danach folgt ein
-Legacy-Bridge-Trigger mit `audio_muxing` ⇒ State bleibt `lipsync_muxing`;
-(c) bestehende Legacy-Pfade (fail/cancel/complete) unverändert.
+Rückschritt; (b) **Beweis-Smoke**: Mux-Owner setzt `lipsync_muxing`, danach Legacy-Bridge-Trigger
+mit `audio_muxing` ⇒ State bleibt `lipsync_muxing`; (c) bestehende Legacy-Pfade
+(fail/cancel/complete) unverändert.
 
 
 ### R4 — F4: stale Test-Guard
