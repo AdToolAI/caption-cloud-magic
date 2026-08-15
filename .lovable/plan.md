@@ -46,9 +46,13 @@ ausgeführt und zurückgerollt. Erfasst werden Verdict, `segment_result`, Pass-S
 Ledger-Attempt-Zählung und Scene-State-Diff. Abgedeckt: Success/Continue, letzter Success,
 Fail-Aggregat bei ≥3 und ≤2 Sprechern, Provider-Fail, Duplicate-Success mit und ohne
 vorhandenen `audio_mux`-Attempt, konfliktäres Duplicate, stale Run/Generation, falscher
-Pass/Segment, Concurrency-/Crash-Fall, Clobber- und Fremd-Slot-Freiheit, kein Initial-Acquire
+Pass/Segment, Clobber- und Fremd-Slot-Freiheit, kein Initial-Acquire
 im Callback, kein vorzeitiges `lipsync_muxing`, kein `complete`/`applied` (auch single-speaker
 non-tight), NOOP-Retryable inkl. Duplicate-Verhalten, ungültige Write-ID/Status-Kombination.
+
+**S10 ist ausgenommen** und läuft nicht als Single-Transaction-Smoke, sondern als echter
+Concurrency-/Integration-Test (siehe §4).
+
 
 ### 4. Mux-Ownership
 Statischer Nachweis, dass der Webhook nach dem RPC ausschließlich
