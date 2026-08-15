@@ -32,14 +32,19 @@ Beide Base-Video-Forwarder lesen bereits `replicate_prediction_id` von der Szene
 
 Der Vertrag, der einen Pass für einen neuen Attempt öffnet, ist damit die Kombination aus (a) dem Terminal-Transition-Guard `assertSafeDispatchEntry` in `compose-dialog-segments` — ein terminaler Pass darf nur mit `user_retry_flag=true` + frischem `new_attempt_id` erneut dispatchen — und (b) dem expliziten Reset-Patch, der `job_id: null` schreibt (Skeleton-/Reset-Pfade, z. B. Fan-out-Skeleton mit `job_id: null`, sowie `composer_reset_lipsync_full`). Erst danach ist der Slot wieder bindbar.
 
-Umsetzung: `pipeline_job_id` bekommt in `update_dialog_pass_slot` **exakt dieselbe** Regel wie `job_id` plus eine Paarklausel:
+Umsetzung: `pipeline_job_id` bekommt in der Slot-Schreibschicht **exakt dieselbe** Regel wie `job_id` plus eine Paarklausel:
 - gesetzt und nicht-null → nicht überschreibbar (Patch-Feld wird verworfen, wie bei `job_id`);
 - ein Patch, der `job_id` non-null bindet, **muss** `pipeline_job_id` non-null mitliefern und umgekehrt — sonst `RAISE EXCEPTION` (kein stilles Halb-Binding);
 - jeder Reset, der `job_id: null` schreibt, setzt `pipeline_job_id: null` mit (und umgekehrt). Alle bestehenden Reset-/Skeleton-Patches werden entsprechend ergänzt.
 
 Kein unabhängiges Überschreiben eines immutable Slots: der neue Attempt bindet erst nach dem regulären Reset, und dann beide Werte gemeinsam in einem Patch.
 
-**Base Video.** `replicate_prediction_id` und `plate_pipeline_job_id` werden nur noch über einen gemeinsamen Helper `setPlateAttemptBinding(sceneId, { externalJobId, pipelineJobId })` geschrieben — ein einziges UPDATE, das immer beide Spalten setzt (auch beide auf `null` beim Reset). Kein Call-Site darf künftig `replicate_prediction_id` allein schreiben; ein Guard-Test über die Codebase erzwingt das.
+**Atomarität (neu, verbindlich).** Die Bindung erfolgt nicht mehr als „Ledger binden + danach Scene patchen", sondern über **ein** SECURITY-DEFINER-RPC pro Klasse, das Ledger-Row und Transport-Ziel in derselben Transaktion schreibt:
+
+- `composer_bind_plate_attempt(_pipeline_job_id, _external_job_id, _scene_id, _run_id, _plate_generation)` — bindet `composer_pipeline_jobs.external_job_id` **und** setzt `composer_scenes.replicate_prediction_id` + `plate_pipeline_job_id` (Row-Lock auf die Szene, Run-/Generation-Guard wie in G3.1). Ersetzt `bindLedgerExternalJob` + separates Scene-Update im Replicate- **und** ModelArk-Zweig; der ModelArk-Prefix (`modelark:`) wird als Parameterwert übergeben, nicht als zweite Codepfad-Variante.
+- `composer_bind_sync_pass_attempt(_pipeline_job_id, _external_job_id, _scene_id, _pass_idx)` — bindet die Ledger-Row **und** patcht `passes[i].job_id` + `passes[i].pipeline_job_id` über dieselbe Slot-Logik (Immutabilitäts-, Paar- und Terminal-Regeln aus `update_dialog_pass_slot` werden geteilt, nicht dupliziert).
+
+Beide RPCs sind idempotent bei identischem Paar (No-op) und schlagen fehl, wenn die Ledger-Row bereits an eine **andere** `external_job_id` gebunden ist oder Run/Generation nicht passen. Schlägt das RPC fehl, gilt der Dispatch als nicht gebunden und läuft in den bestehenden G3.1b-Dispatch-Settle-Pfad (`uncertain`/`failed`) — es entsteht kein halbgebundener Zustand. Ein Helper `setPlateAttemptBinding` als reines Client-Update entfällt damit; die Reset-Pfade setzen beide Spalten weiterhin gemeinsam auf `null`, ein Guard-Test verbietet Einzelschreiber von `replicate_prediction_id`.
 
 ## Lücke 2 — Cutover-Vertrag für Rows ohne Pointer
 
