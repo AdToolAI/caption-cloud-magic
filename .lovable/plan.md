@@ -1,6 +1,6 @@
 # v431 G3.0b — Entscheidungsschluss vor dem Schnitt in G3.1 / G3.2
 
-Kein Implementierungs-GO. Dieser Bericht schließt die zehn offenen Architekturentscheidungen aus dem Review, korrigiert die Punkte, an denen der G3-Bericht zu weit ging, und schneidet G3 anschließend in zwei Phasen. Keine Migration, keine Codeänderung.
+Kein Implementierungs-GO. Dieser Bericht ist der **autoritative G3.0b-Endvertrag** und ersetzt den vorherigen G3-Analyse-/Scope-Bericht vollständig — einschließlich aller dortigen Handler-Zielverträge, Provenienz-Optionen (A/B/C), Caller- und Risiko-Tabellen. Wo eine ältere Formulierung diesem Dokument widerspricht, gilt ausschließlich dieses Dokument. Keine Migration, keine Codeänderung.
 
 Die vier Feststellungen unten sind an Code/Schema verifiziert, nicht angenommen:
 
@@ -167,7 +167,7 @@ composer_finalize_plate_scene(
 | `external_job_id` | neu (neue Replicate-Prediction) |
 | Alter Job | wird `stale` terminalisiert, im selben RPC wie die Attempt-Anlage |
 
-Nur ein bewusster User-/Orchestrator-Render („Neu rendern", Reset, Hybrid-Extend) wechselt Run-ID und/oder Generation. Der Risikotext des G3-Berichts („neue Run-Identität") war an dieser Stelle falsch und ist hiermit ersetzt.
+Nur ein bewusster User-/Orchestrator-Render („Neu rendern", Reset, Hybrid-Extend) wechselt Run-ID und/oder Generation. Ein Auto-Retry erzeugt niemals eine neue Run-Identität.
 
 Gilt gleichermaßen für die Sync.so-Retry-Matrix (`prepareRetryFromWebhook`, `V5_RETRY_VARIANTS`) und die Watchdog-Auto-Retries: neue Attempts, nie neue Runs.
 
