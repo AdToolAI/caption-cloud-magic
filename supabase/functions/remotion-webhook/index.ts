@@ -63,6 +63,24 @@ serve(async (req) => {
       });
     }
 
+    // v431 RS3 §6 — Pre-Reset-Fence für Mux- UND Dialog-Stitch-Callbacks.
+    // Ein Callback aus der Epoche vor einem Lip-Sync-Reset ist ein No-op:
+    // keine Scene-Mutation, kein Fan-in, keine Resurrection.
+    if (composerSceneId && (customData?.stage === 'sync_segments_audio_mux' || isDialogStitch)) {
+      const fence = await rs3FenceVerdict(
+        supabaseAdmin,
+        composerSceneId,
+        typeof customData?.pipeline_job_id === 'string' ? customData.pipeline_job_id : null,
+      );
+      if (fence.fenced) {
+        return new Response(
+          JSON.stringify({ ok: true, skipped: fence.reason, scene_id: composerSceneId }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+
+
     console.log('📋 Webhook details:', { type, renderId, pendingRenderId, outName, userId, isDirectorsCut, isLongForm, progressIdFromWebhook });
 
     if (type === 'success') {
