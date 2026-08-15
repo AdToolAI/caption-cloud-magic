@@ -5192,20 +5192,17 @@ serve(async (req) => {
       }
     }
 
-    // v427A2 — mirror the dispatches that just happened into the job ledger.
-    // Flag-gated, post-hoc, non-branching: legacy stays in control.
-    await dualWriteDispatches(
-      supabaseAdmin,
-      results
-        .filter((r: any) => r.status === "generating")
-        .map((r: any) => ({
-          sceneId: r.sceneId,
-          externalJobId: r.predictionId ?? null,
-          provider: scenes.find((s) => s.id === r.sceneId)?.clipSource ?? null,
-          stage: "base_video" as const,
-        })),
-      user.id,
-    );
+    // v431 G3.1 — die Ledger-Zeile existiert bereits seit VOR dem Dispatch
+    // (kanonische Callback-Identität in der Webhook-URL). Hier wird nur noch
+    // die Provider-Job-ID gebunden; der DB-Trigger macht sie unveränderlich.
+    // Ersetzt den post-hoc v427A2-Dual-Write für `base_video`: zwei Quellen
+    // für dieselbe Stage würden die D2-Eindeutigkeit brechen.
+    for (const r of results as Array<any>) {
+      if (r.status !== "generating") continue;
+      const ledgerJobId = sceneLedgerJobs.get(r.sceneId);
+      if (!ledgerJobId) continue;
+      await bindLedgerExternalJob(supabaseAdmin, ledgerJobId, r.predictionId ?? null);
+    }
 
 
 
