@@ -189,7 +189,7 @@ Zusätzlich:
 | G3.2.1 | Migration A + H + D-Zeilen `ccw:*`; `compose-clip-webhook` umstellen | Smokes A/H/D-ccw, Frozen-Suite, `tsgo`, `deno check` → STOP |
 | G3.2.2 | Migration C + G; `render-sync-segments-audio-mux` umstellen, doppelten Ledger-Settle entfernen | Smokes C/G, Mux-Owner-Test → STOP |
 | G3.2.3 | Migration B + D (`stitch:failed`); `remotion-webhook` umstellen | Smokes B/D-stitch, Base-URL-Invariante → STOP |
-| G3.2.4 | Migration E + F; `sync-so-webhook` vollständig auf F umstellen, Whole-JSON-Fallback entfernen | Smokes F (alle vier Modi), Fan-in-Matrix, kein Whole-JSON → STOP |
+| G3.2.4 | Migration E + F + `composer_touch_lipsync_recover`; `sync-so-webhook` vollständig auf F umstellen, Whole-JSON-Fallback entfernen | Smokes F (alle Modi + Entkopplungsmatrix), Recover-RPC, Fan-in-Matrix, kein Whole-JSON → STOP |
 | G3.2.5 | Deploy aller berührten Functions, neues T0, Drain-Beobachtung über `composer_callback_observations` | Post-T0 0/0/0 je Kanal → Abnahme |
 
 Restschulden außerhalb des Scopes: `watchdog_no_prediction_id` sowie die Recovery gebundener Jobs ohne eintreffenden Callback (G4/Watchdog). G3.1-Artefakte (Observe-Telemetrie, Reaper, Acquire/Replace, Ledger-Immutabilität) bleiben unverändert.
