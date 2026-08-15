@@ -472,8 +472,20 @@ export async function resolveLedgerDispatch(
     if (acquisition.outcome === "already_in_flight") {
       return { outcome: "skip", reason: "already_in_flight", job: acquisition.job };
     }
+    if (acquisition.outcome === "predecessor_exists") {
+      // Terminaler Vorgänger ohne Retry-Kontext: das ist per Definition kein
+      // Initial-Dispatch. Es entsteht KEIN Attempt N+1 über Acquire.
+      console.warn(`${V431_OBSERVE_TAG} ledger_predecessor_requires_retry_context`, JSON.stringify({
+        scene_id: params.sceneId,
+        stage: params.stage,
+        previous_job_id: acquisition.job.id,
+        previous_status: acquisition.status,
+      }));
+      return { outcome: "skip", reason: "predecessor_requires_retry_context", job: acquisition.job };
+    }
     return { outcome: "unavailable", reason: acquisition.reason };
   }
+
 
   let prev: any = null;
   try {
