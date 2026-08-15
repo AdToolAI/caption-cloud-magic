@@ -1,6 +1,6 @@
 # v431 G3.0b — Entscheidungsschluss vor dem Schnitt in G3.1 / G3.2
 
-Kein Implementierungs-GO. Dieser Bericht schließt die zehn offenen Architekturentscheidungen aus dem Review, korrigiert die Punkte, an denen der G3-Bericht zu weit ging, und schneidet G3 anschließend in zwei Phasen. Keine Migration, keine Codeänderung.
+Kein Implementierungs-GO. Dieser Bericht ist der **autoritative G3.0b-Endvertrag** und ersetzt den vorherigen G3-Analyse-/Scope-Bericht vollständig — einschließlich aller dortigen Handler-Zielverträge, Provenienz-Optionen (A/B/C), Caller- und Risiko-Tabellen. Wo eine ältere Formulierung diesem Dokument widerspricht, gilt ausschließlich dieses Dokument. Keine Migration, keine Codeänderung.
 
 Die vier Feststellungen unten sind an Code/Schema verifiziert, nicht angenommen:
 
