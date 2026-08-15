@@ -62,7 +62,50 @@ interface SceneRow {
   dialog_shots: any;
   audio_plan: any;
   updated_at: string;
+  active_run_id?: string | null;
 }
+
+/**
+ * v431 G3.1b — Retry-Kontext für Re-Dispatches des Watchdogs.
+ *
+ * Initial-Akquise gilt NUR, wenn für diese Identität (Scene/Run/Stage/Segment)
+ * überhaupt kein Attempt existiert — nicht bloß „kein dispatchter Job". Findet
+ * sich ein Vorgänger (auch `failed`, `stale` oder `dispatch_uncertain`), reist
+ * er als expliziter Retry-Kontext mit; über Zulässigkeit entscheidet dann der
+ * Predecessor-/Replace-Vertrag in der DB, nicht der Watchdog.
+ *
+ * Zwischen diesem Read und dem Replace kann ein anderer Retry gewinnen; das
+ * verhindert der atomare Replace-Vertrag (`stale` + `replaced_by` bzw.
+ * `retry_superseded`). Ein zusätzlicher Client-Lock ist nicht nötig.
+ */
+async function buildRetryContext(
+  supabase: any,
+  sceneId: string,
+  runId: string | null | undefined,
+  stage: string,
+): Promise<{ retry_of_pipeline_job_id: string; retry_reason: string } | Record<string, never>> {
+  if (!runId) return {};
+  try {
+    const { data } = await supabase
+      .from("composer_pipeline_jobs")
+      .select("id, attempt_no")
+      .eq("scene_id", sceneId)
+      .eq("run_id", runId)
+      .eq("stage", stage)
+      .is("segment_id", null)
+      .order("attempt_no", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!data?.id) return {};
+    return {
+      retry_of_pipeline_job_id: String(data.id),
+      retry_reason: "watchdog_stalled",
+    };
+  } catch {
+    return {};
+  }
+}
+
 
 function hasRecordedProviderJobLocal(d: SceneRow): boolean {
   if (typeof d.replicate_prediction_id === "string" && d.replicate_prediction_id.startsWith("sync:")) {
