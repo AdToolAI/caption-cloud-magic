@@ -42,7 +42,11 @@ Gegen `composer_pipeline_jobs` für alle Post-T0-Zeilen: je Dispatch genau ein L
 - Restschuld A (`watchdog_no_prediction_id`) bleibt offen dokumentiert
 - Zeitstempel des letzten geprüften Events
 
-Bleibt das Gesamtfenster 0/0/0 und ist der Reaper lückenlos: Verdikt `G3.1 DONE / FROZEN` in den Bericht schreiben. Andernfalls Befund dokumentieren, keine Reparatur.
+Abschlussverdikt (0/0/0 allein genügt nicht):
+
+- 0/0/0, Reaper lückenlos **und** alle vier Kanäle (Base Video, Sync.so-Segment, Audio-Mux, Remotion) mindestens einmal Post-T0 mit `bound` beobachtet → `G3.1 DONE / FROZEN`.
+- 0/0/0 und Reaper lückenlos, aber Remotion weiterhin `not_observed` → `G3.1 DRAIN GATES PASS / REMOTION CHANNEL NOT YET OBSERVED` — ausdrücklich noch nicht DONE / FROZEN. Offener Rest: ein gezielter echter Mux/Remotion-Happy-Path, keine neue Architektur- und keine neue 60-Minuten-Runde.
+- Andernfalls Befund dokumentieren, keine Reparatur.
 
 Danach STOP. G3.2 bleibt gesperrt und wird nur auf separaten Auftrag freigegeben.
 
