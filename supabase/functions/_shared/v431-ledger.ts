@@ -45,18 +45,22 @@ export interface LedgerJobHandle {
 /**
  * G3.1b — Ergebnis der Initial-Akquise als Discriminated Union.
  *
- * `acquired`          → diese Zeile gehört dem Aufrufer, er darf dispatchen.
- * `already_in_flight` → ein aktiver Attempt derselben Identität existiert
- *                       bereits (auch `dispatch_uncertain`). Der Aufrufer darf
- *                       NICHT dispatchen. Ein Redispatch ist ausschließlich
- *                       über den expliziten Retry-/Replace-Vertrag zulässig.
- * `unavailable`       → Ledger nicht verfügbar / keine belastbare Provenienz.
- *                       Fail-open: der Legacy-Pfad läuft unverändert weiter.
+ * `acquired`            → diese Zeile gehört dem Aufrufer, er darf dispatchen.
+ * `already_in_flight`   → ein AKTIVER Attempt derselben Identität existiert
+ *                         bereits (auch `dispatch_uncertain`). Kein Dispatch.
+ * `predecessor_exists`  → ein TERMINALER Attempt (`succeeded`/`failed`/`stale`/
+ *                         `cancelled`) existiert bereits. Initial-Akquise ist
+ *                         damit ausgeschlossen; ein Redispatch ist nur über den
+ *                         expliziten Retry-/Replace-Vertrag zulässig.
+ * `unavailable`         → Ledger nicht verfügbar / keine belastbare Provenienz.
+ *                         Fail-open: der Legacy-Pfad läuft unverändert weiter.
  */
 export type LedgerAcquireResult =
   | { outcome: "acquired"; job: LedgerJobHandle }
   | { outcome: "already_in_flight"; job: LedgerJobHandle; status: string | null }
+  | { outcome: "predecessor_exists"; job: LedgerJobHandle; status: string | null }
   | { outcome: "unavailable"; reason: string };
+
 
 function keyOf(p: {
   sceneId: string;
@@ -159,8 +163,9 @@ export async function acquireLedgerJob(
       plateGeneration,
     };
 
-    if (String(row.outcome) === "already_in_flight") {
-      console.warn(`${V431_OBSERVE_TAG} ledger_already_in_flight`, JSON.stringify({
+    const outcome = String(row.outcome ?? "");
+    if (outcome === "already_in_flight" || outcome === "predecessor_exists") {
+      console.warn(`${V431_OBSERVE_TAG} ledger_${outcome}`, JSON.stringify({
         scene_id: params.sceneId,
         stage: params.stage,
         run_id: runId,
@@ -169,8 +174,13 @@ export async function acquireLedgerJob(
         attempt_no: job.attemptNo,
         existing_status: row.status ?? null,
       }));
-      return { outcome: "already_in_flight", job, status: row.status ? String(row.status) : null };
+      return {
+        outcome: outcome as "already_in_flight" | "predecessor_exists",
+        job,
+        status: row.status ? String(row.status) : null,
+      };
     }
+
 
     return { outcome: "acquired", job };
   } catch (e) {
@@ -462,14 +472,26 @@ export async function resolveLedgerDispatch(
     if (acquisition.outcome === "already_in_flight") {
       return { outcome: "skip", reason: "already_in_flight", job: acquisition.job };
     }
+    if (acquisition.outcome === "predecessor_exists") {
+      // Terminaler Vorgänger ohne Retry-Kontext: das ist per Definition kein
+      // Initial-Dispatch. Es entsteht KEIN Attempt N+1 über Acquire.
+      console.warn(`${V431_OBSERVE_TAG} ledger_predecessor_requires_retry_context`, JSON.stringify({
+        scene_id: params.sceneId,
+        stage: params.stage,
+        previous_job_id: acquisition.job.id,
+        previous_status: acquisition.status,
+      }));
+      return { outcome: "skip", reason: "predecessor_requires_retry_context", job: acquisition.job };
+    }
     return { outcome: "unavailable", reason: acquisition.reason };
   }
+
 
   let prev: any = null;
   try {
     const { data } = await admin
       .from("composer_pipeline_jobs")
-      .select("id, scene_id, run_id, stage, plate_generation, attempt_no, status, replaced_by")
+      .select("id, scene_id, run_id, stage, plate_generation, attempt_no, status, replaced_by, error_code")
       .eq("id", retry.previousJobId)
       .maybeSingle();
     prev = data ?? null;
@@ -496,15 +518,21 @@ export async function resolveLedgerDispatch(
   if (status === "cancelled" || status === "canceled") {
     return { outcome: "skip", reason: "previous_cancelled" };
   }
-  if (status === "failed" && !isRetryableFailureReason(retry.retryReason)) {
+  // Autorisierung liegt in der DB: `composer_replace_pipeline_attempt` prüft den
+  // GESPEICHERTEN `error_code` des unter Lock gelesenen Vorgängers gegen die
+  // geschlossene Allowlist. Diese Client-Vorprüfung spart nur den RPC-Roundtrip
+  // und darf nichts autorisieren, was die DB ablehnen würde.
+  if (status === "failed" && !isRetryableFailureReason(prev.error_code)) {
     console.warn(`${V431_OBSERVE_TAG} ledger_retry_reason_rejected`, JSON.stringify({
       scene_id: params.sceneId,
       stage: params.stage,
       previous_job_id: retry.previousJobId,
-      retry_reason: retry.retryReason,
+      stored_error_code: prev.error_code ?? null,
+      caller_retry_reason: retry.retryReason,
     }));
     return { outcome: "skip", reason: "failure_not_retryable" };
   }
+
 
   const plateGeneration =
     typeof prev.plate_generation === "number" ? prev.plate_generation : params.plateGeneration ?? null;

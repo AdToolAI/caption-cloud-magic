@@ -62,7 +62,50 @@ interface SceneRow {
   dialog_shots: any;
   audio_plan: any;
   updated_at: string;
+  active_run_id?: string | null;
 }
+
+/**
+ * v431 G3.1b — Retry-Kontext für Re-Dispatches des Watchdogs.
+ *
+ * Initial-Akquise gilt NUR, wenn für diese Identität (Scene/Run/Stage/Segment)
+ * überhaupt kein Attempt existiert — nicht bloß „kein dispatchter Job". Findet
+ * sich ein Vorgänger (auch `failed`, `stale` oder `dispatch_uncertain`), reist
+ * er als expliziter Retry-Kontext mit; über Zulässigkeit entscheidet dann der
+ * Predecessor-/Replace-Vertrag in der DB, nicht der Watchdog.
+ *
+ * Zwischen diesem Read und dem Replace kann ein anderer Retry gewinnen; das
+ * verhindert der atomare Replace-Vertrag (`stale` + `replaced_by` bzw.
+ * `retry_superseded`). Ein zusätzlicher Client-Lock ist nicht nötig.
+ */
+async function buildRetryContext(
+  supabase: any,
+  sceneId: string,
+  runId: string | null | undefined,
+  stage: string,
+): Promise<{ retry_of_pipeline_job_id: string; retry_reason: string } | Record<string, never>> {
+  if (!runId) return {};
+  try {
+    const { data } = await supabase
+      .from("composer_pipeline_jobs")
+      .select("id, attempt_no")
+      .eq("scene_id", sceneId)
+      .eq("run_id", runId)
+      .eq("stage", stage)
+      .is("segment_id", null)
+      .order("attempt_no", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!data?.id) return {};
+    return {
+      retry_of_pipeline_job_id: String(data.id),
+      retry_reason: "watchdog_stalled",
+    };
+  } catch {
+    return {};
+  }
+}
+
 
 function hasRecordedProviderJobLocal(d: SceneRow): boolean {
   if (typeof d.replicate_prediction_id === "string" && d.replicate_prediction_id.startsWith("sync:")) {
@@ -191,8 +234,9 @@ serve(async (req) => {
   const { data: rows, error } = await supabase
     .from("composer_scenes")
     .select(
-      "id, project_id, lip_sync_status, lip_sync_applied_at, twoshot_stage, clip_url, replicate_prediction_id, dialog_shots, audio_plan, updated_at",
+      "id, project_id, lip_sync_status, lip_sync_applied_at, twoshot_stage, clip_url, replicate_prediction_id, dialog_shots, audio_plan, updated_at, active_run_id",
     )
+
     // v141 — Widen filter to include the zombie state observed on
     // 2026-06-20: `pending + twoshot_stage=syncso_fanout_3_of_4`.
     // After a watchdog auto-retry reset a `rendering` pass to `pending`
@@ -417,14 +461,16 @@ serve(async (req) => {
       if (pendingIdxs.length > 0) {
         const next = pendingIdxs[0];
         try {
+          const retryCtx = await buildRetryContext(supabase, d.id, d.active_run_id, "sync_segment");
           await fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${serviceKey}`,
             },
-            body: JSON.stringify({ scene_id: d.id, advance: true, pass_idx: next }),
+            body: JSON.stringify({ scene_id: d.id, advance: true, pass_idx: next, ...retryCtx }),
           });
+
           advanced.push({ scene_id: d.id, pass_idx: next });
         } catch (e) {
           console.warn(`[lipsync-watchdog] advance dispatch crash scene=${d.id}: ${(e as Error).message}`);
@@ -484,6 +530,12 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq("id", d.id);
+        const recoveryRetryCtx = await buildRetryContext(
+          supabase,
+          d.id,
+          d.active_run_id,
+          "sync_segment",
+        );
         const invokeResp = await fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
           method: "POST",
           headers: {
@@ -491,8 +543,9 @@ serve(async (req) => {
             apikey: serviceKey,
             Authorization: `Bearer ${serviceKey}`,
           },
-          body: JSON.stringify({ scene_id: d.id, auto: true, recovery: true }),
+          body: JSON.stringify({ scene_id: d.id, auto: true, recovery: true, ...recoveryRetryCtx }),
         });
+
         const invokeBody = await invokeResp.text().catch(() => "");
         console.log(
           `[lipsync-watchdog] dispatch-recovery invoke scene=${d.id} status=${invokeResp.status} ` +
