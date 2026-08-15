@@ -163,8 +163,9 @@ export async function acquireLedgerJob(
       plateGeneration,
     };
 
-    if (String(row.outcome) === "already_in_flight") {
-      console.warn(`${V431_OBSERVE_TAG} ledger_already_in_flight`, JSON.stringify({
+    const outcome = String(row.outcome ?? "");
+    if (outcome === "already_in_flight" || outcome === "predecessor_exists") {
+      console.warn(`${V431_OBSERVE_TAG} ledger_${outcome}`, JSON.stringify({
         scene_id: params.sceneId,
         stage: params.stage,
         run_id: runId,
@@ -173,8 +174,13 @@ export async function acquireLedgerJob(
         attempt_no: job.attemptNo,
         existing_status: row.status ?? null,
       }));
-      return { outcome: "already_in_flight", job, status: row.status ? String(row.status) : null };
+      return {
+        outcome: outcome as "already_in_flight" | "predecessor_exists",
+        job,
+        status: row.status ? String(row.status) : null,
+      };
     }
+
 
     return { outcome: "acquired", job };
   } catch (e) {
