@@ -711,24 +711,39 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const taggedError = (isGreenNet ? '[green_net_rejected] ' : '') +
         (String(enrichedError ?? '').slice(0, 480) || 'unknown_error');
 
-      await supabase
-        .from('composer_scenes')
-        .update({
-          clip_status: 'failed',
-          retry_count: currentRetry + 1,
-          clip_error: taggedError,
-          // v176: clip_source stays untouched on Green-Net — user decides.
-          ...(String((scene as any)?.engine_override ?? '') === 'cinematic-sync'
-            ? {
-                lip_sync_status: null,
-                twoshot_stage: null,
-                lip_sync_source_clip_url: null,
-                dialog_shots: null,
-              }
-            : {}),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', sceneId);
+      // v431 G3.2.1 — RPC D (`ccw:failed`): Scene-Fail, Legacy-Spiegel,
+      // retry_count und Ledger-Terminalisierung in EINEM Commit. Refund und
+      // Chain-Release laufen ausschließlich nach `applied:true`.
+      // v176: clip_source stays untouched on Green-Net — user decides.
+      if (!ledgerJobId) {
+        console.warn(`[compose-clip-webhook] missing pipeline_job_id on failure scene=${sceneId} → 409`);
+        return new Response(
+          JSON.stringify({ ok: false, applied: false, reason: 'missing_pipeline_job' }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+      const { data: failApplyRow, error: failApplyError } = await supabase.rpc(
+        'composer_fail_callback_scene',
+        {
+          _pipeline_job_id: ledgerJobId,
+          _external_job_id: predictionId ? String(predictionId) : null,
+          _write_id: 'ccw:failed',
+          _error_text: taggedError,
+          _dialog_patch: null,
+        },
+      );
+      if (failApplyError) throw failApplyError;
+      const failVerdict = String((failApplyRow as any)?.verdict ?? 'unknown');
+      const failApplied = (failApplyRow as any)?.applied === true;
+      if (!failApplied) {
+        console.warn(`[compose-clip-webhook] fail apply rejected scene=${sceneId} verdict=${failVerdict}`);
+        const httpStatus = failVerdict === 'binding_pending' ? 409 : 202;
+        return new Response(
+          JSON.stringify({ ok: httpStatus === 202, applied: false, reason: failVerdict }),
+          { status: httpStatus, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
 
       if (isGreenNet) {
         console.warn(
