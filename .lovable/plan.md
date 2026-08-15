@@ -31,13 +31,15 @@ kleiner **G3.1e**-Analyseblock.
 
 ## G3.1e — Scope (nur Analyse, keine Code-Änderung)
 
-1. **Bestandsaufnahme aller Callback-Wiedereinspeise-Pfade**, die einen Handler mit
-   Ledger-Observe aufrufen, ohne selbst Dispatcher zu sein:
-   - `lipsync-watchdog` → `sync-so-webhook` (bestätigter Befund),
-   - `report-lipsync-motion-probe` Re-Dispatch (~Zeile 271, „gleiche Form wie sync-so-webhook"),
-   - etwaige weitere Selbst-/Fan-out-Invokes in `sync-so-webhook`, `compose-dialog-segments`
-     und `remotion-webhook`, die eine Webhook-URL ohne `pipeline_job_id` bauen.
-   Ergebnis: Tabelle Pfad → trägt Bindung ja/nein → welcher Verdikt-Fall entsteht.
+ 1. **Vollständiges Inventar aller internen Wiedereinspeisungen** eines Provider-Callbacks —
+    nicht nur Stellen, die eine Webhook-URL bauen, sondern jeder `fetch`/`invoke`/
+    Forward-Helper, der einen Callback-Handler mit rekonstruiertem Payload aufruft:
+    - `lipsync-watchdog` → `sync-so-webhook` (bestätigter Befund),
+    - `report-lipsync-motion-probe` Re-Dispatch (~Zeile 271, „gleiche Form wie sync-so-webhook"),
+    - Selbst-/Fan-out-Invokes in `sync-so-webhook`, `compose-dialog-segments`,
+      `compose-clip-webhook` und `remotion-webhook`,
+    - Recovery-/Poll-/Cron-Pfade (Reaper, `poll-dialog-shots`, ModelArk-Poller).
+    Ergebnis: Tabelle Pfad → trägt Bindung ja/nein → welcher Verdikt-Fall entsteht.
  2. **Telemetrie-Rückblick** über das gesamte G3.1-Drain-Fenster und danach:
     alle `missing_binding`-Zeilen nach Handler, Stage und `external_job_id` gruppieren und
     jede Zeile einem der Pfade aus (1) zuordnen. Formulierung im Bericht verbindlich:
