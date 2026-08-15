@@ -1,6 +1,7 @@
 # v431 RS3 — Option A: Atomic Lip-Sync Reset Cancellation (Report)
 
-Status: **RS3 IMPLEMENTED — READY FOR REVIEW** (Plan Rev. 5, `.lovable/plan/v431-rs3-option-a-atomic-lip-sync-reset-cancellation-2026-08-15.md`)
+Status: **RS3 DONE / FROZEN** (Post-Deploy Audit RS3-A abgeschlossen, siehe §6)
+Vorstatus: RS3 IMPLEMENTED — READY FOR REVIEW (Plan Rev. 5, `.lovable/plan/v431-rs3-option-a-atomic-lip-sync-reset-cancellation-2026-08-15.md`)
 
 ## 1. Was implementiert wurde
 
