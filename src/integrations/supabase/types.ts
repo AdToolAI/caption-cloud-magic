@@ -19643,6 +19643,25 @@ export type Database = {
         Returns: number
       }
       cleanup_synthetic_probe_runs: { Args: never; Returns: undefined }
+      composer_acquire_pipeline_attempt: {
+        Args: {
+          p_metadata?: Json
+          p_plate_generation: number
+          p_provider?: string
+          p_run_contract_version?: string
+          p_run_id: string
+          p_scene_id: string
+          p_segment_id?: string
+          p_speaker_id?: string
+          p_stage: string
+        }
+        Returns: {
+          attempt_no: number
+          job_id: string
+          outcome: string
+          status: string
+        }[]
+      }
       composer_fail_hybrid_extend_scene: {
         Args: {
           _error_text: string
