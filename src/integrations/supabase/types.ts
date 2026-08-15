@@ -19754,7 +19754,7 @@ export type Database = {
       }
       composer_finalize_plate_scene: {
         Args: {
-          _base_video_url: string
+          _base_url: string
           _clip_source_hint?: string
           _external_job_id: string
           _extra?: Json
