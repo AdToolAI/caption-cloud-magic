@@ -258,3 +258,218 @@ Audit-Zeilen wurden anschließend gelöscht, der Grant **revoked**
 
 **Status: G3.2.2 ACCEPTANCE GREEN — alle sechs Befunde geschlossen, S10 ausgeführt.
 Kein Deploy erfolgt. STOP für Review.**
+
+---
+
+# G3.2.2 — Production Deploy Review / Cutover Gate
+
+Stand: 2026-08-15, ~19:15 UTC. **Kein Deploy erfolgt.** Dieser Abschnitt ist reiner
+Deploy-Review + Cutover-/Resmoke-Plan. Kein G3.2.3, keine Codeänderung.
+
+## 1. Production-Diff (artifact → reason → production required)
+
+| Artefakt | Grund | Production nötig |
+| --- | --- | --- |
+| `supabase/migrations/20260815180037_55565e74-….sql` — `composer_retryable_failure_reasons()` (+`sync_noop_retryable`), `composer_mark_sync_refund_applied`, erste Fassung `composer_apply_sync_segment_result` | Basis-Vertrag G3.2.2 | **ja** |
+| `supabase/migrations/20260815185301_73dee86e-….sql` — `composer_touch_lipsync_progress` (R2), `composer_log_sync_segment_audit` (R6), `composer_state_from_legacy` + `composer_scene_state_bridge` (monotoner `audio_muxing`-Fix, R3), finale Fassung `composer_apply_sync_segment_result` (R1 ohne `dispatched_at`, R5 geguardete Recovery-Vorstufe, R6 Audit-Write) | Acceptance-Remediation R1 | **ja** |
+| Edge Function `sync-so-webhook` | einziger Laufzeit-Konsument des neuen Apply-Vertrags | **ja** |
+| `docs/v431-g3-2-2-contract.md`, `docs/v431-g3-2-2-report.md` | Dokumentation | nein |
+| `src/lib/composer/output/__tests__/materializeSceneOutput.test.ts`, SQL-Smoke-Skripte (`/tmp/g322_smoke.sql`) | Test/CI, kein Runtime-Artefakt | nein |
+| Frontend-Produktivcode (`src/**` außer Tests) | im G3.2.2-Scope unverändert | nein (kein Frontend-Deploy) |
+
+Nachweise (read-only, ausgeführt):
+
+- `rg -n "sandbox_exec" supabase/migrations/20260815180037_*.sql supabase/migrations/20260815185301_*.sql` → **0 Treffer**.
+  Die fünf `sandbox_exec%`-Treffer im Migrationsbaum stammen aus älteren G3.1-Migrationen
+  (`composer_record_callback_observation`, `composer_reap_cron_tick`) und sind nicht Teil des
+  G3.2.2-Diffs. Der temporäre R7-Grant war ad hoc und ist revoked.
+- Einzige `GRANT`-Zeilen in beiden G3.2.2-Migrationen: `… TO service_role` für
+  `composer_apply_sync_segment_result` und `composer_mark_sync_refund_applied`.
+  `composer_touch_lipsync_progress` und `composer_log_sync_segment_audit` enthalten
+  ausschließlich `REVOKE` (inkl. `service_role`).
+- `composer_replace_pipeline_attempt` wird in keiner der beiden Migrationen definiert
+  (kein `CREATE OR REPLACE`), nur aufgerufen. Referenz-Hash der aktuellen Definition:
+  `md5(pg_get_functiondef) = c4649e65440a64997376617721792aa8` — dient als Vor-/Nach-Vergleich.
+- Keine G3.2.3-/G4-Artefakte: keine Änderung an `compose-clip-webhook`, `remotion-webhook`,
+  `compose-dialog-segments`, `composer_bind_plate_attempt`, `composer_bind_sync_pass_attempt`.
+- Genau eine Signatur je neuer Funktion (`pg_proc`-Count = 1 für alle drei).
+
+### Offener Punkt D1 (vor Deploy zu entscheiden)
+
+Die Plattform vergibt per `DEFAULT PRIVILEGES` (`postgres`, objtype `f`) EXECUTE auf **jede**
+neue `public`-Funktion an `anon`, `authenticated`, `service_role` **und**
+`sandbox_exec_lbunafpxuskwmsrraqxl`. Unsere Migrationen widerrufen PUBLIC/anon/authenticated
+(und bei den internen Helfern zusätzlich `service_role`), **nicht** aber die
+projektspezifische Sandbox-Rolle. Ist-Zustand:
+
+```text
+composer_apply_sync_segment_result  → service_role=X, sandbox_exec_lbunafpxuskwmsrraqxl=X
+composer_touch_lipsync_progress     → sandbox_exec_lbunafpxuskwmsrraqxl=X (kein service_role)
+composer_log_sync_segment_audit     → sandbox_exec_lbunafpxuskwmsrraqxl=X (kein service_role)
+```
+
+Das ist kein R7-Rückstand, sondern Plattform-Default: dieselbe ACL tragen bereits die
+eingefrorenen G3.1-Primitive (`composer_bind_plate_attempt`, `composer_fail_callback_scene`,
+`composer_finalize_plate_scene`, `composer_reserve_run_credits`). Der Security-Smoke §4
+fordert für Sandbox-Rollen `false`. Zwei Optionen, Entscheidung liegt beim Review:
+
+- **D1-a:** Akzeptanzkriterium auf `anon`/`authenticated`/PUBLIC (+`service_role` bei den
+  internen Helfern) begrenzen, Sandbox-Rolle als plattformweite Diagnoserolle dokumentieren —
+  konsistent mit dem bereits eingefrorenen G3.1-Stand.
+- **D1-b:** Der deploybaren Migration explizite `REVOKE ALL … FROM sandbox_exec%`-Schleifen für
+  die drei G3.2.2-Funktionen hinzufügen (Codeänderung, daher außerhalb dieses Reviews).
+
+Bis zur Entscheidung bleibt §4 in der Fassung „Sandbox = false“ und ist damit **nicht** grün.
+
+## 2. Pre-Deploy In-flight Gate (read-only)
+
+Regel: Deploy **nur** bei 0 relevanten alten in-flight Sync-Apply-Runs. Bei >0 regulär drainen;
+kein Runtime-Fallback, kein Backfill/Rewrite alter Jobs ohne explizite neue Freigabe.
+
+```sql
+-- G1: aktive sync_segment-Ledger-Jobs
+select id, scene_id, status, external_job_id, created_at
+from public.composer_pipeline_jobs
+where stage = 'sync_segment'
+  and status in ('pending','dispatching','dispatched','running');
+
+-- G2: Szenen in aktiven Lip-Sync-States
+select id, pipeline_state, pipeline_substate, active_run_id, plate_generation, updated_at
+from public.composer_scenes
+where pipeline_state in ('lipsync_dispatched','lipsync_running','lipsync_muxing');
+
+-- G3: aktive audio_mux-Attempts
+select id, scene_id, status, created_at
+from public.composer_pipeline_jobs
+where stage = 'audio_mux'
+  and status in ('pending','dispatching','dispatched','running');
+
+-- G4: Replacement-Attempts in Zustellung (über die Vorgänger-Relation, da der neue
+--     Attempt selbst kein replaced_by trägt)
+select r.id, r.scene_id, r.stage, r.status, p.id as predecessor_id, r.created_at
+from public.composer_pipeline_jobs p
+join public.composer_pipeline_jobs r on r.id = p.replaced_by
+where r.status in ('dispatching','dispatched');
+
+-- G5: Passes mit gebundenem Provider-Job (nicht terminal)
+select s.id as scene_id, x->>'job_id' as job_id, x->>'status' as pass_status,
+       x->>'pipeline_job_id' as pipeline_job_id
+from public.composer_scenes s,
+     lateral jsonb_array_elements(coalesce(s.dialog_shots->'passes','[]'::jsonb)) x
+where x->>'job_id' is not null
+  and coalesce(x->>'status','') not in ('done','failed','canceled');
+```
+
+**Gate grün = G1, G2, G3, G4, G5 liefern exakt 0 Rows.** G2 wird nicht durch Legacy-Mirrors
+überstimmt: Steht der kanonische `pipeline_state` auf `lipsync_dispatched`, `lipsync_running`
+oder `lipsync_muxing`, ist die Szene in-flight, unabhängig vom Legacy-Feld. Ein kanonisches
+`retry_of`-Feld darf ergänzend geprüft werden, ist aber nicht das Gate.
+
+### Baseline-Messung 2026-08-15 ~19:14 UTC (nur Momentaufnahme, ersetzt das Gate nicht)
+
+| Gate | Rows | Befund |
+| --- | --- | --- |
+| G1 | 4 | `sync_segment`, alle `dispatched`, 11:15Z–17:24Z (Drain-/Resmoke-Läufe des Tages) |
+| G2 | 0 | grün |
+| G3 | 4 | `audio_mux`, alle `dispatched`, 11:16Z–17:25Z |
+| G4 | 0 | grün (keine Replacement-Kette in Zustellung) |
+| G5 | 44 | keine Szene davon in den letzten 24 h aktualisiert → durchweg historische Passes |
+
+Konsequenz: Das Gate ist **heute nicht grün**. Vor dem Deploy müssen G1/G3/G5 regulär
+gedrained bzw. über die bestehenden Recovery-/Reaper-Pfade terminalisiert werden; danach wird
+das Gate erneut vollständig gefahren und das Ergebnis hier protokolliert. Kein Rewrite alter
+Zeilen ohne separate Freigabe.
+
+## 3. Deploy-Reihenfolge
+
+1. Pre-Deploy In-flight Gate (§2) **exakt 0/0/0/0/0**.
+2. DB-Migrationen in Reihenfolge `20260815180037` → `20260815185301`
+   (RPCs, Retry-Allowlist, Bridge-Fix).
+3. DB-Security-Smoke (§4).
+4. Edge Function `sync-so-webhook` deployen, Zeitstempel festhalten.
+5. Post-Deploy Static-/Version-Sanity: deployte Function-Version protokollieren; Guard
+   „kein `complete`/`applied`-Write und kein Whole-JSON-`dialog_shots`-Write im Webhook“.
+6. Erst danach echter UI-Resmoke (§5).
+
+Begründung Zwischenzustände: DB-first ist der einzig kollisionsfreie Weg. Die drei Funktionen
+sind additiv, der noch laufende alte Webhook ruft sie nicht auf — Schritt 2 erzeugt daher keine
+Inkompatibilität. Webhook-first würde dagegen `composer_apply_sync_segment_result` aufrufen,
+bevor die Signatur existiert. Da es je Funktion genau eine Signatur und keine Overloads gibt,
+existiert kein Ambiguitätsfenster.
+
+## 4. Unmittelbarer Post-Deploy Security-Smoke (vor UI-Run)
+
+- `composer_apply_sync_segment_result`: genau eine Signatur, `prosecdef = t`,
+  `proconfig = search_path=pg_catalog, public`, `service_role` EXECUTE = `true`;
+  `anon`, `authenticated`, PUBLIC, `sandbox_exec`, `sandbox_exec_lbunafpxuskwmsrraqxl` = `false`
+  (siehe **D1** — mit heutigem Plattform-Default ist die projektspezifische Sandbox-Rolle `true`).
+- `composer_touch_lipsync_progress`: kein EXECUTE-Grantee, auch nicht `service_role`
+  (heute erfüllt für `service_role` = `false`; Sandbox-Rolle siehe D1). Nur interne Verwendung.
+- `composer_log_sync_segment_audit`: identische Anforderung.
+- `composer_replace_pipeline_attempt`: `md5(pg_get_functiondef)` muss
+  `c4649e65440a64997376617721792aa8` bleiben.
+- `select public.composer_retryable_failure_reasons()` enthält `sync_noop_retryable`
+  (heute bestätigt: `{provider_transient_error, provider_timeout, provider_rate_limited,
+  dispatch_uncertain_recovery, watchdog_stalled, poller_timeout, mux_redispatch,
+  sync_noop_retryable}`).
+- Bridge-Smoke in Transaktion mit Rollback: Szene in `lipsync_muxing` + Legacy-Write
+  `lip_sync_status = 'audio_muxing'` → bleibt `lipsync_muxing`, kein Rückfall auf
+  `plate_ready`/`lipsync_running`.
+
+## 5. Echter Production-Resmoke
+
+Kette: `sync_segment`-Callback → `composer_apply_sync_segment_result` → `dispatch_mux` →
+genau ein `audio_mux`-Ledger-Attempt → `render-sync-segments-audio-mux` → echte `render_id` →
+`lipsync_muxing` → Remotion/Stitch → `composer_finalize_lipsync_scene(stitch:done)` → `complete`.
+
+Abnahmekriterien (jeweils mit ID/Timestamp im Report zu belegen):
+
+- Callback-Observation = `bound`.
+- `sync_segment`-Job korrekt `succeeded` bzw. bei Failure korrekt terminalisiert.
+- Pass-Slot korrekt, kein Sibling-Clobber (übrige Slots unverändert).
+- `segment_result` und Scene-Verdict getrennt und korrekt.
+- `dialog_shots.audio_mux.mux_dispatch_requested_at` gesetzt; der Apply-RPC schreibt **kein**
+  `dispatched_at`.
+- Genau ein `audio_mux`-Attempt, genau ein tatsächlicher Mux-Dispatch.
+- `lipsync_muxing` erst durch den Mux-Owner mit realer `render_id`.
+- Kein Rückfall auf `plate_ready`/`lipsync_running` durch die Legacy-Bridge.
+- Kein `complete`/`applied` aus `sync-so-webhook`; Finalisierung ausschließlich über den
+  Stitch-Finalizer.
+- DB-Audit-Zeile (`source_signature = 'g322_sync_segment'`) vorhanden.
+- Keine `missing_binding`, `wrong_job`, `stale_run`, `stale_generation`,
+  `reinject_missing_pipeline_job_id`.
+
+## 6. Duplicate-/Redrive-Nachweis
+
+Natürlich auftretende Duplicates/Watchdog-Forwards werden ausgewertet; ein produktiver
+Provider-Run wird **nicht** künstlich sabotiert. Zusätzlich als Post-Deploy-Smoke
+(Transaktion + Rollback) zu belegen:
+
+- Identischer finaler Callback **vor** `audio_mux`-Acquire → erneut `dispatch_mux`.
+- Derselbe Callback **nach** existierendem `audio_mux`-Attempt → `noop`.
+- Niemals ein zweiter `audio_mux`-Attempt.
+
+## 7. Telemetrie-Fenster
+
+Von Deploy-Zeitstempel bis Resmoke-Ende auswerten und mit IDs/Timestamps festhalten:
+
+- `composer_callback_observations` gruppiert nach Verdict.
+- Transition-Audit (`composer_scene_transition_log`, `caller_class = 'sync_segment_apply'`,
+  `source_signature = 'g322_sync_segment'`).
+- Ledger-Attempts nach `stage` und `status`.
+- Reaper-/Watchdog-Fehler.
+- Zählungen `missing_binding`, `wrong_job`, `stale_run`, `stale_generation` — Erwartung 0.
+  `binding_pending` muss am **Ende** des Fensters ebenfalls 0 sein; ein kurzzeitiger Wert
+  während des Dispatch wird dokumentiert, darf aber nicht unresolved stehenbleiben.
+
+## 8. Status
+
+**G3.2.2 DEPLOY PLAN READY — AWAITING GO.**
+
+Zwei Punkte sind vor dem GO zu entscheiden bzw. herzustellen:
+
+1. **D1** — Umgang mit dem Plattform-Default-EXECUTE der Sandbox-Rolle (§1/§4).
+2. **In-flight Gate** — heute 4 / 0 / 4 / 0 / 44; muss vor dem Deploy auf 0/0/0/0/0 gedrained
+   sein (§2).
+
+Kein Deploy, kein G3.2.3. STOP.
