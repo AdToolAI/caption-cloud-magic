@@ -88,3 +88,62 @@ Nach der Typ-Regenerierung blockierten acht Buildfehler den Turn; sie sind nicht
 - **G3.2.1: GATES PASS / NOT DEPLOYED** — wartet auf Deploy-GO für ausschließlich `compose-clip-webhook`.
 - RPCs A/H/D sind live, service-role-only und vom noch nicht deployten Handler ungenutzt → kein Rollback nötig.
 - **G3.2.2 gesperrt.**
+
+---
+
+# Post-Deploy-Smoke (Plate-Callback)
+
+Status: **DEPLOYED / POST-DEPLOY-SMOKE FAIL — APPLY BLOCKIERT**
+Keine Reparatur in diesem Schritt (Plan-Scope). STOP zur Abnahme.
+
+## Deploy
+
+- Deployt: **ausschließlich** `compose-clip-webhook`. Kein Frontend-Deploy, keine weitere Function, keine Migration.
+- `T_deploy = 2026-08-15T13:50:26Z`.
+
+## Lauf-Identität (vollständig nach T_deploy)
+
+| Feld | Wert |
+| --- | --- |
+| Projekt | `04b80fab-090d-4108-a734-63e651c1b41c` |
+| Szene | `34d223fd-405c-4179-a6b5-ed6b0c7a61ab` (S2) |
+| `run_id` | `5811c009-444e-4a60-98d2-93a59c7f43db` |
+| `plate_generation` | 2 |
+| Ledger-Job | `0f8cb822-eb53-4c11-8f65-e61e733b5c79`, Stage `base_video`, Provider `ai-happyhorse` |
+| Start (UI, echter Render, 630 Cr) | 13:58:00Z |
+
+## Gate-Ergebnisse
+
+| Gate | Erwartung | Ist | Verdikt |
+| --- | --- | --- | --- |
+| Ledger-Bindung | Attempt 1, external ID gebunden, gen passend | Attempt 1, `external_job_id = c80763f69drmt0d00pvrwf4e5w`, `plate_generation = 2`, Status `dispatched` | PASS |
+| Observe | `bound` | 1 Event, `compose-clip-webhook` / `base_video` / **`bound`**, 14:01:18Z | PASS |
+| `binding_pending`/409-Serie | keine | keine | PASS |
+| Apply über A | `applied = true` | **`applied = false`, `reason = unexpected_from_state`**, `write_id = ccw:plate-complete`, 14:01:20Z | **FAIL** |
+| Ledger-Abschluss | Job → `succeeded` | Job bleibt `dispatched`, `completed_at = NULL` | **FAIL** (Folge) |
+| Scene-State | `plate_ready` bzw. legitimer Bridge-Folgezustand | `audio_ready` (unverändert) | **FAIL** (Folge) |
+| `base_video_url` / `clip_url` | gesetzt | beide `NULL`, `clip_status = generating` | **FAIL** (Folge) |
+| `processed_video_url` | unberührt | `NULL` — unberührt | PASS |
+| Duplicate-Callback | No-op | nicht real beobachtet (kein zweiter Provider-Callback); es gilt weiterhin nur Smoke S7 | NICHT BEOBACHTET |
+| H (Handoff-Failure) | nur innerhalb der Matrix | real nicht eingetreten | NICHT BEOBACHTET |
+
+## Befund
+
+Der Provider-Callback kam korrekt an, die Identitätsprüfung war vollständig sauber (`bound`, richtige Job-/Run-/Generation-Bindung, keine 409-Serie). Der Fehler liegt **nach** der Identität, in der From-State-Zulassung von RPC A:
+
+Zum Callback-Zeitpunkt stand die Szene auf **`audio_ready`**, nicht auf einem von A akzeptierten Vorzustand. Die Audio-Prep-Bridge hatte die Szene bereits um 13:58:53Z von `plate_queued` nach `audio_ready` weitergeschoben, **während** die Plate beim Provider noch lief. A hat den Apply damit vertragsgemäß fail-closed abgelehnt (`unexpected_from_state`) und keinerlei Scene-Mutation vorgenommen.
+
+Das ist exakt dasselbe Bridge-Verhalten, das in Gate 1 zur Erweiterung der **H**-From-States auf `plate_ready | audio_prep | audio_ready` geführt hatte. Diese Erweiterung wurde bei **A** nicht mitgezogen — A ist gegen eine Vorzustandsmenge geschnitten, die die aktive Bridge im Realbetrieb überholt.
+
+Fachliche Folge: Ein erfolgreicher Provider-Clip geht nicht verloren (Provider-Ergebnis existiert), wird aber nicht materialisiert; der Ledger-Job bleibt gebunden offen und fällt in die Reaper-/Watchdog-Zuständigkeit.
+
+Bewertung: **kein Identitäts-, Ledger- oder Observe-Defekt** — G3.1 trägt unverändert. Der Defekt sitzt allein in der From-State-Matrix von RPC A.
+
+## Nicht getan
+
+- Keine Korrektur an A, keine Migration, kein Re-Deploy, kein zweiter Lauf.
+- Kein G3.2.2.
+
+## Vorschlag für die Abnahme (nicht umgesetzt)
+
+Kandidat wäre, die A-From-State-Matrix auf dieselbe belegte, geschlossene Menge wie H zu ziehen und analog zu Gate 1 per Matrix-Smoke zu beweisen (erlaubt vs. verboten, Output-Invarianz, Audit-Vertrag). Das braucht eine eigene Freigabe.
