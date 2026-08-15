@@ -316,6 +316,8 @@ export function readPipelineJobId(
 
 export type ObserveVerdict =
   | "bound"
+  /** Job über `pipeline_job_id` eindeutig gefunden, `external_job_id` noch NULL. */
+  | "binding_pending"
   | "missing_binding"
   | "job_not_found"
   | "wrong_job"
