@@ -93,15 +93,38 @@ Keine frei übergebbaren From-States, keine Clear-Flags. Geschlossene Matrix:
 Ist der Job bereits `completed` und trifft ein Failure ein → `duplicate_callback`, **kein** Rollback auf `failed`. Ist der Job bereits `failed` und trifft ein Success ein → nur der in der Matrix erlaubte From-State entscheidet; `complete` wird nie aus `failed` erreicht (No-op `from_state_rejected`).
 
 ### E. `composer_touch_lipsync_progress(_pipeline_job_id uuid, _external_job_id text, _write_id text, _dialog_patch jsonb, _twoshot_stage text)`
-Fan-in-Fortschritt ohne State-Wechsel: prüft dieselbe Identität, bleibt zwingend in `lipsync_running`, patcht nur `twoshot_stage` (Regex `^syncso_fanout_\d+_of_\d+$` oder `rendering`) und die schmalen `dialog_shots`-Top-Level-Keys. Terminalisiert **keinen** Job. Segmentstatus bleibt ausschließlich bei `update_dialog_pass_slot()`.
+Reiner Progress-Spiegel **ohne** eigenen Callback-Besitz: wird nur noch **intern von F** benutzt (gleiche Transaktion, gleicher Lock) und nicht mehr direkt aus Handlern aufgerufen. Bleibt zwingend in `lipsync_running`, patcht nur `twoshot_stage` (Regex `^syncso_fanout_\d+_of_\d+$` oder `rendering`) und schmale `dialog_shots`-Top-Level-Keys. Optional als reine SQL-Hilfsfunktion (kein `EXECUTE`-Grant nach außen).
+
+### F. `composer_apply_sync_segment_result(_pipeline_job_id uuid, _external_job_id text, _write_id text, _pass_idx integer, _pass_patch jsonb, _progress_patch jsonb, _twoshot_stage text)`
+Schließt D1 für Multi-Speaker: **ein** Commit für Pass-Slot + Progress + Job-Terminalisierung.
+- Write-IDs geschlossen: `sso:segment_succeeded`, `sso:segment_failed`. Stage `sync_segment`, Job zusätzlich über `job.segment_id`/`job.speaker_id` gegen den adressierten Pass geprüft (`wrong_segment` → No-op).
+- Ablauf unter dem gemeinsamen Lock: Ledger-Job `FOR UPDATE` → Scene `FOR UPDATE` → Identitätsprüfung (§2) → Pass-Slot-Write mit derselben Logik wie `update_dialog_pass_slot()` (`_pass_idx` + Allowlist-Patch, kein Whole-JSON, andere Passes unantastbar) → Progress-Spiegel (E-Logik) → Job auf `succeeded` bzw. `failed`.
+- Szenen-State bleibt `lipsync_running`; F löst **keinen** State-Wechsel und keinen Mux-Dispatch aus.
+- Rückgabe zusätzlich `{all_passes_terminal, done_count, failed_count}`, damit der Handler nach Commit über Mux-Claim bzw. **D** (`sso:*`) entscheidet.
+
+### G. `composer_fail_internal_dispatch(_pipeline_job_id uuid, _write_id text, _error_text text, _dialog_patch jsonb)`
+Job-gebundener Internal-Failure-Vertrag **ohne** External-ID-Voraussetzung (Fehler vor oder unabhängig von der Provider-Bindung).
+- Kein `_external_job_id`-Parameter; die Prüfung `binding_pending`/`wrong_job` entfällt bewusst. Geprüft werden: Job existiert, `stage='audio_mux'`, `job.run_id = scene.active_run_id`, `job.plate_generation = scene.plate_generation`, Job nicht terminal, `replaced_by IS NULL`.
+- Write-IDs geschlossen: `mux:preflight_failed` (From `lipsync_running`, Substate `mux_preflight_failed`, Legacy `lip_sync_status='failed'`/`twoshot_stage='failed'`, `dialog_shots`-Allowlist `status`,`error`,`preflight`) und `mux:invoke_failed` (From `lipsync_running`,`lipsync_muxing`, Substate `mux_invoke_failed`, Legacy `lip_sync_status='failed'`/`twoshot_stage='audio_mux_failed'`, `audio_mux`-Key entfernt).
+- **Einziger Ledger-Owner:** G setzt Scene-Fail und Job-`failed` (`error_code` = Write-ID) in einem Commit. Für denselben Job wird `settleLedgerDispatchFailure()` weder davor noch danach aufgerufen — der Aufruf wird in `render-sync-segments-audio-mux` entfernt.
+- `video_renders.update(failed)` bleibt Handler-Arbeit nach Commit (eigene Tabelle, nicht Teil des Scene-Vertrags).
+
+### H. `composer_fail_post_plate_handoff(_scene_id uuid, _run_id uuid, _plate_generation integer, _write_id text, _error_text text)`
+Für `ccw:handoff_failed`: der Plate-Job ist zu diesem Zeitpunkt bereits legitim `succeeded`; ein zweiter Callback-Apply auf denselben Job wäre per Identitätsregel 6 zwingend `duplicate_callback`. Der Handoff-Fehler ist deshalb **kein** Provider-Callback, sondern ein enger run-gebundener Vertrag ohne Ledger-Job:
+- Kein `_pipeline_job_id`. Provenienz über `_run_id = scene.active_run_id` **und** `_plate_generation = scene.plate_generation` (sonst `stale_run`/`stale_generation`, No-op).
+- Write-ID geschlossen: `ccw:handoff_failed`. From-State ausschließlich `plate_ready` → `failed` / Substate `handoff_failed`.
+- Legacy-Spiegel `lip_sync_status='failed'`, `twoshot_stage='failed'`; Plate-Outputs (`base_video_url`, `clip_url`, `clip_status='ready'`) bleiben **unverändert**; `dialog_shots` unverändert.
+- Kein Job-Write (der Plate-Job bleibt korrekt `succeeded`). Eine eigene Handoff-Stage im Ledger wird bewusst nicht eingeführt: die `stage`-CHECK-Allowlist von `composer_pipeline_jobs` (`base_video, audio_plan, tts, preclip, sync_segment, audio_mux, final_render`) bleibt unangetastet.
 
 ## 3. Callback vor `external_job_id`-Bindung
 
 Entscheidung: **fail-closed + retrybar**, kein Binden aus dem Callback.
+- Prüfreihenfolge normativ: `job.external_job_id IS NULL` wird **vor** dem Wertvergleich geprüft (§2 Schritte 2/3), damit der NULL-Fall nie als `wrong_job` fehlklassifiziert wird.
 - Begründung Provenienz: Binden aus dem Callback würde die Payload zur zweiten Provenienzquelle machen und Regel 1 sowie die Ledger-Immutabilität aufweichen.
 - Begründung Telemetrie: G3.1 hat über das gesamte Post-T0-Fenster `binding_pending = 0` gemessen — der Fall ist real nicht aufgetreten; ein Sonderpfad hätte keinen Nutzen, aber vollen Angriffs-/Fehlerraum.
-- Begründung Provider-Semantik: Replicate, Sync.so und Remotion liefern Webhooks mit Wiederholung; ein `409 binding_pending` wird erneut zugestellt. Nach Ablauf greift der bestehende `dispatch_uncertain`-Reaper.
+- Begründung Provider-Semantik: Replicate, Sync.so und Remotion liefern Webhooks mit Wiederholung; ein `409 binding_pending` wird erneut zugestellt.
 - Handler-Verhalten: HTTP 409, `applied:false`, `verdict='binding_pending'`, Observation wie in G3.1; keine Scene-Mutation.
+
 
 ## 4. Fan-in-Invarianten (Multi-Speaker)
 
