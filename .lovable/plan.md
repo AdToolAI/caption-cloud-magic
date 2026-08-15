@@ -41,7 +41,7 @@ Kritische Befunde:
 → Guards → Pass-Apply → Fan-in → Scene/Mirror → Audit → Job-Terminalisierung. Eine Transaktion.
 Kein Resolve über Payload, `dialog_shots`, `external_job_id`, Logs, Scene-Felder. G3.1f-Transport unverändert.
 
-## 3. Kernvertrag: Job-Status ≠ Scene-Verdict
+## 3. Kernvertrag: Segment-Ergebnis ≠ Scene-Verdict
 
 Zwei getrennte Entscheidungen im selben Commit:
 - **Segment-Ergebnis (pre-replacement job result)** = ausschließlich Ergebnis *dieses*
@@ -89,7 +89,8 @@ composer_apply_sync_segment_result(
   _output_url       text,   -- nur bei ssw:success bedeutsam, sonst muss NULL sein
   _error_text       text
 ) RETURNS jsonb
--- { applied, verdict, job_status, scene_verdict, pass_idx, replacement_job_id, reason }
+-- { applied, verdict, segment_result, scene_verdict, pass_idx, replacement_job_id, reason }
+-- segment_result = pre-replacement segment result (succeeded | failed), NICHT finaler Ledger-Lifecycle-Status
 ```
 
 Serverseitige Write-ID → Slot-Felder-Matrix (geschlossen, keine anderen Keys):
