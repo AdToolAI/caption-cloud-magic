@@ -44,7 +44,7 @@ Kein Resolve über Payload, `dialog_shots`, `external_job_id`, Logs, Scene-Felde
 ## 3. Kernvertrag: Segment-Ergebnis ≠ Scene-Verdict
 
 Zwei getrennte Entscheidungen im selben Commit:
-- **Segment-Ergebnis (pre-replacement job result)** = ausschließlich Ergebnis *dieses*
+- **Segment-Ergebnis (pre-replacement)** = ausschließlich Ergebnis *dieses*
   Provider-Segments. Provider-COMPLETED ohne NOOP ⇒ `succeeded`. FAILED/REJECTED/CANCELED
   ⇒ `failed` (`failure_reason` aus Provider-Klassifikation). NOOP unrecoverable ⇒ `failed`
   (`sync_noop_unrecoverable`). NOOP retrybar ⇒ `failed` (`sync_noop_retryable`, §5a), nach
