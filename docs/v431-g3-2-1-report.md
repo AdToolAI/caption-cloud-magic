@@ -296,3 +296,63 @@ Signatur.
 
 Offen vor dem Produktionslauf ist allein die Entscheidung zum `pipeline_state_at`-Drift. Die drei
 anderen kanonischen Felder inklusive `pipeline_state_run_id` sind belegt stabil.
+
+---
+
+# `pipeline_state_at`-Fix (2026-08-15, Nachtrag 3)
+
+Freigegebener enger Fix für den in S-A2 belegten Drift. Betrifft ausschließlich die DB-Funktion
+`composer_finalize_plate_scene`; **kein** Edge-Function-Redeploy, kein Frontend-Change.
+
+## Umsetzung
+
+Im Compatibility-Zweig (`plate_ready | audio_prep | audio_ready`), alles unter dem bereits
+gehaltenen Row-Lock, in einem DB-Commit:
+
+1. Snapshot des vollständigen kanonischen Tupels aus `_scene` (per `FOR UPDATE` gelesen):
+   `pipeline_state`, `pipeline_substate`, `pipeline_state_at`, `pipeline_state_run_id`.
+2. Output-Finalisierung unverändert.
+3. Restore nur bei Drift — jetzt zusätzlich explizit `pipeline_substate` und
+   `pipeline_state_run_id` (vorher nur State + Timestamp).
+4. **Neu:** abschließender Timestamp-only-Write
+   `UPDATE composer_scenes SET pipeline_state_at = <Snapshot> WHERE id = … AND pipeline_state_at IS DISTINCT FROM <Snapshot>`.
+   Er berührt keine Legacy-Spalte und weder State noch Substate; damit greift in der Bridge weder
+   der `state_changed`- noch der `legacy_changed`-Zweig und der Wert bleibt stehen.
+5. Erst danach `composer_pipeline_jobs.status = 'succeeded'`.
+
+`plate_rendering → plate_ready` ist ausdrücklich ausgenommen: echte Transition über
+`composer_scene_transition_core`, `pipeline_state_at` wird korrekt neu gestempelt.
+
+## S-A2 (erweitert) — 10/10 PASS
+
+Messaufbau wie Nachtrag 2 (Seed `now() - 3h`, `pipeline_state_run_id = active_run_id`,
+Service-Role-Kontext), zusätzlich Rejected- und Duplicate-Fixture, Fixtures im selben Schritt
+wieder gelöscht.
+
+| # | Fixture | State | Substate | `state_run_id` | `state_at` | Outputs | Job |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `plate_ready` / mirrors_consistent | unverändert | unverändert | unverändert | **unverändert** | gesetzt | `succeeded` |
+| 2 | `plate_ready` / mirrors_stale | unverändert | unverändert | unverändert | **unverändert** | gesetzt | `succeeded` |
+| 3 | `audio_prep` / mirrors_consistent | unverändert | unverändert | unverändert | **unverändert** | gesetzt | `succeeded` |
+| 4 | `audio_prep` / mirrors_stale | unverändert | unverändert | unverändert | **unverändert** | gesetzt | `succeeded` |
+| 5 | `audio_ready` / mirrors_consistent | unverändert | unverändert | unverändert | **unverändert** | gesetzt | `succeeded` |
+| 6 | `audio_ready` / mirrors_stale | unverändert | unverändert | unverändert | **unverändert** | gesetzt | `succeeded` |
+| 7 | `plate_rendering` / mirrors_consistent | → `plate_ready` | von Transition geleert | unverändert | **neu gestempelt** | gesetzt | `succeeded` |
+| 8 | `plate_rendering` / mirrors_stale | → `plate_ready` | von Transition geleert | unverändert | **neu gestempelt** | gesetzt | `succeeded` |
+| 9 | Rejected (`complete`) | — | — | — | — | keine | unverändert (`dispatched`) |
+| 10 | Duplicate (Job `succeeded`) | — | — | — | — | keine | unverändert |
+
+- Fälle 9 und 10: vollständiger Row-Vergleich (`to_jsonb(scene) - 'updated_at'`) **identisch**,
+  Verdikte `from_state_rejected` bzw. `duplicate_callback`.
+- Die zwei FAILs aus Nachtrag 2 (`audio_prep`/`audio_ready` mit stale Spiegeln) sind grün.
+
+## Statische Verifikation
+
+- `vitest run src/lib/composer src/lib/video-composer --testTimeout=60000` → **48 Dateien / 540 Tests grün**.
+- `tsgo --noEmit` → grün.
+- Deno-Baseline unverändert: kein TypeScript geändert, der eine vorbestehende `TS2322` in
+  `_shared/ambient-audio.ts:83` bleibt offene Schuld.
+
+## Status
+
+**FIXED / READY FOR PRODUCTION RESMOKE.** DB-Funktion ist live, kein Redeploy nötig.
