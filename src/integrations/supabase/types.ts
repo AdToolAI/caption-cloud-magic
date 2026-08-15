@@ -14,60 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      _v431_sa2_results: {
-        Row: {
-          after_job: Json | null
-          after_row: Json | null
-          after_run_id: string | null
-          after_state: string | null
-          after_state_at: string | null
-          after_substate: string | null
-          before_job: Json | null
-          before_row: Json | null
-          before_run_id: string | null
-          before_state: string | null
-          before_state_at: string | null
-          before_substate: string | null
-          fixture: string | null
-          rpc: Json | null
-          seq: number | null
-        }
-        Insert: {
-          after_job?: Json | null
-          after_row?: Json | null
-          after_run_id?: string | null
-          after_state?: string | null
-          after_state_at?: string | null
-          after_substate?: string | null
-          before_job?: Json | null
-          before_row?: Json | null
-          before_run_id?: string | null
-          before_state?: string | null
-          before_state_at?: string | null
-          before_substate?: string | null
-          fixture?: string | null
-          rpc?: Json | null
-          seq?: number | null
-        }
-        Update: {
-          after_job?: Json | null
-          after_row?: Json | null
-          after_run_id?: string | null
-          after_state?: string | null
-          after_state_at?: string | null
-          after_substate?: string | null
-          before_job?: Json | null
-          before_row?: Json | null
-          before_run_id?: string | null
-          before_state?: string | null
-          before_state_at?: string | null
-          before_substate?: string | null
-          fixture?: string | null
-          rpc?: Json | null
-          seq?: number | null
-        }
-        Relationships: []
-      }
       ab_test_events: {
         Row: {
           event_type: string
