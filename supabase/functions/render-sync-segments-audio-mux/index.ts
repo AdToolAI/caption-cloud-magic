@@ -33,6 +33,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { acquireLedgerJob, bindLedgerExternalJob } from "../_shared/v431-ledger.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
