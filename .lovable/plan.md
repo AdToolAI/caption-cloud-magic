@@ -118,9 +118,11 @@ Ergebnis wird in `docs/v431-g3-2-2-report.md` ergänzt.
 
 ## Technische Artefakte
 
-- Migration 1: `composer_apply_sync_segment_result` (R1, R2-Aufruf, R6) +
+- Migration 1: `composer_apply_sync_segment_result` (R1, R2-Aufruf, R5-Vorstufe, R6) +
   `composer_touch_lipsync_progress` (R2) + `composer_state_from_legacy` /
-  `composer_scene_state_bridge` (R3) + Grant für S10 (R7).
+  `composer_scene_state_bridge` (R3). **Kein Grant-Statement für S10** — der
+  `sandbox_exec`-Grant ist ausschließlich temporäres Ad-hoc-Test-SQL (GRANT → S10 → REVOKE)
+  und niemals Teil eines deploybaren Migrationsartefakts.
 - `supabase/functions/sync-so-webhook/index.ts` (R5).
 - `src/lib/composer/output/__tests__/materializeSceneOutput.test.ts` (R4).
 - Harness-Skripte unter `/tmp` (nicht im Repo), Smoke-SQL transaktional mit Rollback,
