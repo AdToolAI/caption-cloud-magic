@@ -461,14 +461,16 @@ serve(async (req) => {
       if (pendingIdxs.length > 0) {
         const next = pendingIdxs[0];
         try {
+          const retryCtx = await buildRetryContext(supabase, d.id, d.active_run_id, "sync_segment");
           await fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${serviceKey}`,
             },
-            body: JSON.stringify({ scene_id: d.id, advance: true, pass_idx: next }),
+            body: JSON.stringify({ scene_id: d.id, advance: true, pass_idx: next, ...retryCtx }),
           });
+
           advanced.push({ scene_id: d.id, pass_idx: next });
         } catch (e) {
           console.warn(`[lipsync-watchdog] advance dispatch crash scene=${d.id}: ${(e as Error).message}`);
