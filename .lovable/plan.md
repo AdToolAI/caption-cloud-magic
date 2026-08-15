@@ -54,13 +54,22 @@ non-tight), NOOP-Retryable inkl. Duplicate-Verhalten, ungültige Write-ID/Status
 Concurrency-/Integration-Test (siehe §4).
 
 
-### 4. Mux-Ownership
+### 4. Mux-Ownership + S10 als echter Concurrency-Test
 Statischer Nachweis, dass der Webhook nach dem RPC ausschließlich
 `dispatch_mux → acquireLedgerJob('audio_mux') → invoke render-sync-segments-audio-mux` ausführt,
 plus Testnachweis, dass der State-Eintritt `lipsync_muxing` erst beim Mux-Owner nach realer
-`render_id` erfolgt. Crash-Fall: Apply committed, Edge stirbt vor dem Acquire — identischer
-Callback erhält erneut `dispatch_mux`, es entsteht trotzdem genau ein Ledger-Attempt und genau
-ein Provider-Dispatch.
+`render_id` erfolgt.
+
+S10 wird als echter Race-Nachweis geführt, nicht als `BEGIN … ROLLBACK`:
+- **Zwei parallele Sessions/Callbacks** auf dieselbe Scene, deterministisch über eine Barriere
+  synchronisiert (beide erreichen den Apply-Punkt gleichzeitig, committen konkurrierend).
+- Nachweis über den Ledger: trotz ggf. mehrfachem `dispatch_mux` entsteht **genau ein**
+  `audio_mux`-Attempt (Verlierer bekommt `already_in_flight`).
+- Nachweis über einen **Fetch-/Invoke-Spy** in einem instrumentierten Edge-Test: **genau ein**
+  Provider-Dispatch an `render-sync-segments-audio-mux`.
+- Crash-Fall separat: Apply committed, Edge stirbt vor dem Acquire — identischer Callback
+  erhält erneut `dispatch_mux`, Ergebnis bleibt ein Attempt und ein Dispatch.
+
 
 ### 5. NOOP-Retry Ownership
 Nachweis: `sync_noop_retryable` liegt in der DB-Allowlist, der Ersatz läuft ausschließlich über
