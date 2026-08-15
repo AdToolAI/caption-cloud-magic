@@ -1,6 +1,8 @@
 # v431 G3.2 — Callback-Apply-Migration: autoritativer Endvertrag
 
-Endfassung nach Review-Runde 2. Keine Migration, kein Code, kein Deploy in diesem Schritt. G3.0b/G3.1 bleiben frozen; `composer_fail_scene_with_mirrors`, `composer_finalize_talking_head`, `composer_finalize_upload_scene` werden nicht angefasst.
+Endfassung nach Review-Runde 3. G3.0b/G3.1 bleiben frozen; `composer_fail_scene_with_mirrors`, `composer_finalize_talking_head`, `composer_finalize_upload_scene` werden nicht angefasst.
+
+**Freigabestand:** nur **G3.2.1** (A + H + D-`ccw:*` → `compose-clip-webhook` → Smokes → Frozen-Suite → `tsgo`/`deno check` → STOP) ist freigegeben. G3.2.2–G3.2.5 bleiben gesperrt; der Gesamtvertrag ist noch nicht eingefroren. Die beiden Sync-Punkte (F-Entkopplung, E/Watchdog-Recover) sind in §3 geschlossen und werden vor G3.2.4 separat abgenommen.
 
 ## 1. Writer-Inventar (Ist-Zustand, am Code verifiziert)
 
@@ -25,7 +27,7 @@ Endfassung nach Review-Runde 2. Keine Migration, kein Code, kein Deploy in diese
 | noop-ladder exhausted | Slot-RPC + `update{lip_sync_status:'failed',twoshot_stage:'needs_clip_rerender',clip_error}` (L809) | **F** mit `_final_mode='fail'`, Verdikt `sso:noop_unrecoverable` |
 | partial-mux refused (≥3) | Whole-JSON + `lip_sync_status/twoshot_stage='failed'` + Wallet-Direktschreibung (L1035/L1042) | **F** `_final_mode='fail'`, Verdikt `sso:partial_mux_refused`; Refund nach Commit über Refund-RPC, **nie** direktes `wallets.update` |
 | failed/rejected/canceled | Slot-Patches, Retry-Ladder, Whole-JSON-Fails (L1493/L1704/L1780/L1806) | **F** (Segment-Fail; `_final_mode='fail'`, wenn Fan-in terminal) |
-| watchdog-recover | `update{dialog_shots:{...,status:'rendering'}}` (L461) | schmaler Progress-Patch (E-Logik) |
+| watchdog-recover | `update{dialog_shots:{...,status:'rendering'}}` (L461) | eigener run-bound RPC `composer_touch_lipsync_recover` (nicht E) |
 
 ### render-sync-segments-audio-mux
 | Pfad | heutige Writes | Ziel |
@@ -97,21 +99,28 @@ Nur echte Provider-Callback-Failures mit gebundener External-ID, deren Job noch 
 
 `ccw:handoff_failed` gehört zu **H**, `mux:*` zu **G**, alle `sso:*`-Verdikte zu **F**. Ist der Job bereits `succeeded` und trifft ein Failure ein → `duplicate_callback`, **kein** Rollback. Ist er bereits `failed` und trifft ein Success ein → `attempt_superseded`; `complete` wird nie aus `failed` erreicht.
 
-### E. `composer_touch_lipsync_progress(...)` — interner Helper
-Kein eigener Callback-Besitz, kein Grant nach außen. Wird ausschließlich **innerhalb von F** (und vom Watchdog-Recover-Pfad) benutzt: bleibt zwingend in `lipsync_running`, patcht nur `twoshot_stage` (Regex `^syncso_fanout_\d+_of_\d+$` oder `rendering`) und schmale `dialog_shots`-Top-Level-Keys. Terminalisiert nichts.
+### E. `composer_touch_lipsync_progress(...)` — interner Helper, kein externer Aufruf
+Kein eigener Callback-Besitz, **kein** `EXECUTE`-Grant nach außen. Wird ausschließlich **innerhalb von F** verwendet: bleibt zwingend in `lipsync_running`, patcht nur `twoshot_stage` (Regex `^syncso_fanout_\d+_of_\d+$`) und schmale `dialog_shots`-Top-Level-Keys. Terminalisiert nichts.
+
+**Watchdog-Recover benutzt E nicht.** Der Recover-Pfad (`dialog_shots.status → 'rendering'`, `sync-so-webhook` L461) bekommt in G3.2.4 einen eigenen geschlossenen, gegrantneten RPC `composer_touch_lipsync_recover(_scene_id uuid, _run_id uuid, _plate_generation integer, _write_id text)`: run-/generation-gebundene Provenienz (kein Ledger-Job), From-State ausschließlich `lipsync_running`, einziger erlaubter Write `dialog_shots.status='rendering'`, kein Job-Write, keine Output-/Mirror-Änderung.
 
 ### F. `composer_apply_sync_segment_result(_pipeline_job_id uuid, _external_job_id text, _write_id text, _pass_idx integer, _pass_patch jsonb, _final_mode text, _final_verdict text, _processed_url text, _error_text text, _progress_patch jsonb)`
 **Vollständiger und einziger Owner des Sync-Segment-Callback-Apply.** Ein Commit für Pass-Slot, Progress, Fan-in-Verdikt und Job-Terminalisierung. Nach F gibt es für denselben Job **niemals** einen zweiten Apply über B oder D.
 - Write-IDs geschlossen: `sso:segment_succeeded`, `sso:segment_failed`. Stage `sync_segment`; zusätzlich `job.segment_id`/`job.speaker_id` gegen den adressierten Pass (`wrong_segment` → No-op).
-- Ablauf unter gemeinsamem Lock: Job `FOR UPDATE` → Scene `FOR UPDATE` → Identitätsprüfung (§2) → Pass-Slot-Write mit der Logik von `update_dialog_pass_slot()` (`_pass_idx` + Allowlist-Patch, kein Whole-JSON, andere Passes unantastbar) → Fan-in-Auswertung **auf dem frisch geschriebenen Zustand** → Verdikt gemäß `_final_mode` → Job auf `succeeded`/`failed`.
-- `_final_mode` geschlossen, vom Handler vorgeschlagen und im RPC gegen den tatsächlichen Fan-in-Zustand validiert (Mismatch → `final_mode_rejected`, No-op):
+- Ablauf unter gemeinsamem Lock: Job `FOR UPDATE` → Scene `FOR UPDATE` → Identitätsprüfung (§2) → Pass-Slot-Write mit der Logik von `update_dialog_pass_slot()` (`_pass_idx` + Allowlist-Patch, kein Whole-JSON, andere Passes unantastbar) → Fan-in-Auswertung **auf dem frisch geschriebenen Zustand** → Scene-Verdikt gemäß `_final_mode` → Job-Terminalstatus.
+- **Zwei entkoppelte Wahrheiten (verbindlich):**
+  - **Job-Terminalstatus** folgt ausschließlich `_write_id`: `sso:segment_succeeded` → `succeeded`, `sso:segment_failed` → `failed`. `_final_mode` hat darauf **keinen** Einfluss.
+  - **Scene-Verdikt** folgt ausschließlich dem frisch gelockten Fan-in-Zustand aller Passes.
+  - Die Kombination `sso:segment_succeeded` + `_final_mode='fail'` ist ausdrücklich **zulässig und erwartet** (letztes Segment erfolgreich, ein früheres bereits fehlgeschlagen): Job `succeeded`, Scene `failed`. Ebenso zulässig: `sso:segment_failed` + `_final_mode='progress'`/`'mux'` ist **nicht** zulässig für `mux` (Mux verlangt alle Passes erfolgreich), aber zulässig für `progress`.
+- `_final_mode` geschlossen, vom Handler vorgeschlagen und im RPC gegen den tatsächlichen Fan-in-Zustand validiert (Mismatch → `final_mode_rejected`, No-op — auch der Pass-Write wird zurückgerollt):
 
-| `_final_mode` | Vorbedingung | Scene-Wirkung | Job |
-| --- | --- | --- | --- |
-| `progress` | mindestens ein Pass noch nicht terminal | bleibt `lipsync_running`; nur Progress-Spiegel (E-Logik) | `succeeded`/`failed` je Write-ID |
-| `mux` | alle Passes terminal und erfolgreich, Mux nötig (N≥2 oder single-tight) | bleibt `lipsync_running`, **kein** State-Write; Handler darf danach nur `try_claim_mux_dispatch` + `acquireLedgerJob('audio_mux')` + Dispatch ausführen | wie oben |
-| `finalize` | single, nicht-tight, kein Mux nötig, Pass erfolgreich, `_processed_url` non-null | `lipsync_running → complete`; `processed_video_url`, `clip_url`, `clip_status='ready'`, `lip_sync_applied_at=now()`, `clip_error=NULL`, `lip_sync_status='applied'`, `twoshot_stage='complete'`, `lip_sync_source_clip_url` = bestehendes `base_video_url` | `succeeded` |
-| `fail` | alle Passes terminal, mindestens einer fehlgeschlagen bzw. Ladder/Partial-Verdikt | `lipsync_running → failed`, Substate + Spiegel nach `_final_verdict` (s. u.) | `failed` |
+| `_final_mode` | Vorbedingung (nach Pass-Write geprüft) | Scene-Wirkung |
+| --- | --- | --- |
+| `progress` | mindestens ein Pass noch nicht terminal | bleibt `lipsync_running`; nur Progress-Spiegel (E-Logik) |
+| `mux` | alle Passes terminal **und alle erfolgreich**, Mux nötig (N≥2 oder single-tight) | bleibt `lipsync_running`, **kein** State-Write; Handler darf danach nur `try_claim_mux_dispatch` + `acquireLedgerJob('audio_mux')` + Dispatch ausführen |
+| `finalize` | single, nicht-tight, kein Mux nötig, Pass erfolgreich, `_processed_url` non-null | `lipsync_running → complete`; `processed_video_url`, `clip_url`, `clip_status='ready'`, `lip_sync_applied_at=now()`, `clip_error=NULL`, `lip_sync_status='applied'`, `twoshot_stage='complete'`, `lip_sync_source_clip_url` = bestehendes `base_video_url` |
+| `fail` | alle Passes terminal, mindestens einer fehlgeschlagen bzw. Ladder/Partial-Verdikt | `lipsync_running → failed`, Substate + Spiegel nach `_final_verdict` (s. u.) |
+
 
 - Geschlossene `_final_verdict`-Werte für `_final_mode='fail'`:
 
@@ -170,7 +179,7 @@ remotion-webhook (dialog-stitch) success → B(stitch:done) | failure → D(stit
 Für jeden job-gebundenen RPC: `current job success → applied` · `stale run` · `stale generation` · `wrong external job` · `wrong stage` · `wrong from-state` · `duplicate callback` · `binding_pending` (NULL-Bindung nie als `wrong_job`) · zwei parallele Callbacks (`FOR UPDATE`) → genau ein Apply · Failure nach Success → kein Rollback · RPC-Fehler nach Scene-Mutation → vollständiger Rollback inkl. Job · bei Rejection Outputs/Mirrors/`updated_at` unverändert.
 
 Zusätzlich:
-- **F:** Pass-Write und Job-Terminalstatus sind in derselben Transaktion sichtbar; künstlicher Fehler nach dem Slot-Write rollt Pass **und** Job zurück; `_final_mode` gegen den realen Fan-in-Zustand (falscher Modus → No-op); letzter fehlgeschlagener Pass mit `fail` setzt Scene-Fail **im selben Commit**; `finalize` nur bei single/non-tight; `mux` schreibt keinen Scene-State; `passes[]` anderer Speaker byte-identisch; kein B/D-Aufruf auf einen von F terminalisierten Job (Code-Grep + Runtime-Test).
+- **F:** Pass-Write und Job-Terminalstatus in derselben Transaktion sichtbar; künstlicher Fehler nach dem Slot-Write rollt Pass **und** Job zurück; **Entkopplungsmatrix**: `segment_succeeded`+`fail` → Job `succeeded`/Scene `failed`, `segment_failed`+`fail` → Job `failed`/Scene `failed`, `segment_failed`+`progress` → Job `failed`/Scene `lipsync_running`, `segment_failed`+`mux` → `final_mode_rejected` (No-op inkl. Pass-Rollback); `finalize` nur bei single/non-tight; `mux` schreibt keinen Scene-State; `passes[]` anderer Speaker byte-identisch; kein B/D-Aufruf auf einen von F terminalisierten Job (Code-Grep + Runtime-Test); Recover-RPC ändert nur `dialog_shots.status`.
 - **G:** Fail ohne `external_job_id` → `applied:true`; fremdes `run_id`/`plate_generation` → No-op; kein zweiter `settleLedgerDispatchFailure()` auf denselben Job (Grep-Test).
 - **H:** run-bound Apply nach `succeeded` Plate-Job → `applied:true`; veraltetes `run_id` → No-op; Plate-Outputs bleiben erhalten.
 - **Global:** kein RPC schreibt den String `completed`; kein Whole-JSON-`dialog_shots` mehr im Code.
@@ -182,7 +191,7 @@ Zusätzlich:
 | G3.2.1 | Migration A + H + D-Zeilen `ccw:*`; `compose-clip-webhook` umstellen | Smokes A/H/D-ccw, Frozen-Suite, `tsgo`, `deno check` → STOP |
 | G3.2.2 | Migration C + G; `render-sync-segments-audio-mux` umstellen, doppelten Ledger-Settle entfernen | Smokes C/G, Mux-Owner-Test → STOP |
 | G3.2.3 | Migration B + D (`stitch:failed`); `remotion-webhook` umstellen | Smokes B/D-stitch, Base-URL-Invariante → STOP |
-| G3.2.4 | Migration E + F; `sync-so-webhook` vollständig auf F umstellen, Whole-JSON-Fallback entfernen | Smokes F (alle vier Modi), Fan-in-Matrix, kein Whole-JSON → STOP |
+| G3.2.4 | Migration E + F + `composer_touch_lipsync_recover`; `sync-so-webhook` vollständig auf F umstellen, Whole-JSON-Fallback entfernen | Smokes F (alle Modi + Entkopplungsmatrix), Recover-RPC, Fan-in-Matrix, kein Whole-JSON → STOP |
 | G3.2.5 | Deploy aller berührten Functions, neues T0, Drain-Beobachtung über `composer_callback_observations` | Post-T0 0/0/0 je Kanal → Abnahme |
 
 Restschulden außerhalb des Scopes: `watchdog_no_prediction_id` sowie die Recovery gebundener Jobs ohne eintreffenden Callback (G4/Watchdog). G3.1-Artefakte (Observe-Telemetrie, Reaper, Acquire/Replace, Ledger-Immutabilität) bleiben unverändert.
