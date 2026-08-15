@@ -815,24 +815,34 @@ serve(async (req) => {
       return json({ error: `insert render: ${insertErr.message}` }, 500);
     }
 
-    // v431 G3.1 — Ledger-Zeile der Mux-Stage. Übergibt der Dispatcher keine
-    // `pipeline_job_id` (Self-Dispatch/Retry-Pfade), legen wir sie hier an,
-    // damit jeder Remotion-Callback eine Provenienz-Referenz hat.
+    // v431 G3.1b — Ledger-Zeile der Mux-Stage. Übergibt der Dispatcher keine
+    // `pipeline_job_id`, entscheidet der Vertrag: ohne Retry-Kontext eine
+    // Initial-Akquise (Attempt 1), mit `retry_of_pipeline_job_id` +
+    // `retry_reason` ein atomarer Replace des genannten Vorgängers.
     let v431MuxLedgerJobId: string | null = v431IncomingLedgerJobId;
     if (!v431MuxLedgerJobId) {
-      const acquired = await acquireLedgerJob(supabase, {
-        sceneId,
-        runId: (scene as any).active_run_id ?? null,
-        stage: "audio_mux",
-        plateGeneration: Number((scene as any).plate_generation ?? 0),
-        provider: "remotion",
-        metadata: { dispatcher: "render-sync-segments-audio-mux", self_acquired: true },
-      });
-      // G3.1b — nur ein gewonnener Attempt trägt Provenienz. `already_in_flight`
-      // bindet keine fremde Zeile; der Mux bleibt beim Gewinner.
-      v431MuxLedgerJobId = acquired.outcome === "acquired" ? acquired.job.id : null;
-
+      const decision = await resolveLedgerDispatch(
+        supabase,
+        {
+          sceneId,
+          runId: (scene as any).active_run_id ?? null,
+          stage: "audio_mux",
+          plateGeneration: Number((scene as any).plate_generation ?? 0),
+          provider: "remotion",
+          metadata: { dispatcher: "render-sync-segments-audio-mux", self_acquired: true },
+        },
+        readRetryContext(body),
+      );
+      if (decision.outcome === "skip") {
+        console.warn(
+          "[render-sync-segments-audio-mux] ledger dispatch skipped",
+          JSON.stringify({ scene_id: sceneId, reason: decision.reason }),
+        );
+        return json({ ok: true, skipped: decision.reason, scene_id: sceneId });
+      }
+      v431MuxLedgerJobId = decision.outcome === "dispatch" ? decision.job.id : null;
     }
+
     await bindLedgerExternalJob(supabase, v431MuxLedgerJobId, renderId);
 
     const webhookUrl = appendWebhookToken(
