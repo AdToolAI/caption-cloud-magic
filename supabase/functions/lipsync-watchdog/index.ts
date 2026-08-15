@@ -530,6 +530,12 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq("id", d.id);
+        const recoveryRetryCtx = await buildRetryContext(
+          supabase,
+          d.id,
+          d.active_run_id,
+          "sync_segment",
+        );
         const invokeResp = await fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
           method: "POST",
           headers: {
@@ -537,8 +543,9 @@ serve(async (req) => {
             apikey: serviceKey,
             Authorization: `Bearer ${serviceKey}`,
           },
-          body: JSON.stringify({ scene_id: d.id, auto: true, recovery: true }),
+          body: JSON.stringify({ scene_id: d.id, auto: true, recovery: true, ...recoveryRetryCtx }),
         });
+
         const invokeBody = await invokeResp.text().catch(() => "");
         console.log(
           `[lipsync-watchdog] dispatch-recovery invoke scene=${d.id} status=${invokeResp.status} ` +
