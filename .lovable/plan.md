@@ -101,6 +101,9 @@ Bei einem roten Contract-Gate oder einer dokumentierten Deviation (inkl.
 ## Technische Hinweise
 
 - Smokes laufen über `psql`-Transaktionen mit `ROLLBACK`; keine Datenmutation bleibt bestehen.
+  Ausnahme S10: parallele Sessions committen konkurrierend gegen eine Fixture-Scene und werden
+  danach gezielt aufgeräumt; der Provider-Dispatch wird gespyt, nicht real gesendet.
+
 - Grants werden über `information_schema.role_routine_grants` / `has_function_privilege` belegt.
 - Der Writer-Guard nutzt `rg` über `supabase/functions/**` mit Klassifikationstabelle im Report.
 - Keine Migration, kein Deploy, keine Änderung an Contract- oder Freeze-Artefakten.
