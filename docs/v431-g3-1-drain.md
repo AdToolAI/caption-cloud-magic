@@ -100,3 +100,116 @@ G3.1 deployt, Drain-Fenster läuft. G3.2 bleibt gesperrt. STOP.
 - Zeitachse: Ledger-INSERT 09:23:06Z, Szene `plate_rendering/anchor` 09:23:57Z; Stand 09:31:50Z weiterhin Anchor-Vorlauf.
 - Kanaltabelle noch offen: Attempt steht auf `dispatching` ohne gebundene external ID (erwartetes `binding_pending`-Fenster, solange der Anchor-Vorlauf läuft). Webhook-/Fan-in-Kanäle (Replicate, Sync.so, Remotion-Mux) haben Post-T0 noch keinen Callback erzeugt.
 - Kein Observe-Verdikt bisher, keine State-Eingriffe durch die Observe-Pfade.
+
+### Abschlussverdikt Lauf #1: **INCONCLUSIVE / NOT OBSERVED**
+
+- Szene terminal `failed` um 09:34:03.536Z, `clip_error = watchdog_no_prediction_id (refunded €5.46)`,
+  `pipeline_substate = anchor`, `pipeline_state_run_id` = korrekter Run.
+- Alle vier Callback-Kanäle bleiben `not_observed` (0 Post-T0-Dispatches, 0 Callbacks).
+  Die drei harten Gates sind formal 0, aber mangels Verkehr **ohne Abnahmewert**.
+- Kein Abnahmehaken für G3.1. Status bleibt `G3.1 DEPLOYED / DRAINING`, `G3.2 LOCKED`.
+
+## G3.1c — Ursachenanalyse (rein lesend, 2026-08-15 ~10:20Z)
+
+### A — `watchdog_no_prediction_id` → **not yet proven** (starke, konsistente Hypothese)
+
+Rekonstruierte Zeitachse (aus persistiertem State, da Logs des Fensters rotiert sind):
+
+```text
+09:23:06.362Z  beginSceneRun + acquireLedgerJob  -> Ledger b02ae224 (dispatching, external NULL)
+09:23:0x  Response 200 an UI, Restarbeit läuft in EdgeRuntime.waitUntil(processScenes())
+09:23:57.778Z  Anchor fertig + Audit ok (4/4 Gesichter, audit v15),
+               min_face_check ok:false (0.106 < 0.120) -> retried:true (tight_grid),
+               reference_image_url auf /scene-anchors/…-e50942c2f47c.png gesetzt
+   ...        KEIN weiterer State-Write dieser Function
+09:34:03.536Z  qa-watchdog (Cron */2, Regel 4b „>10 min generating, kein Webhook")
+               -> recover-stuck-composer-clip -> predictionId leer
+               -> refundScene() + markFailed('watchdog_no_prediction_id')
+```
+
+- Ausfallpunkt: **nach** Anchor-Persistenz, **vor** dem HappyHorse-Dispatch.
+  Provider war `ai-happyhorse`; der Dispatch samt `replicate_prediction_id`-Write und
+  `bindLedgerExternalJob()` sitzt in `supabase/functions/compose-video-clips/index.ts`
+  ab Zeile ~5078 (`else if (scene.clipSource === "ai-happyhorse")`, Prediction-Write 5188,
+  Ledger-Bindung 5233). Ledger-Akquise dagegen bereits Zeile 542.
+- Wahrscheinlichste Ursache: **Wall-Clock-Abbruch der Function**. Die schwere Arbeit läuft
+  als Hintergrundtask (`EdgeRuntime.waitUntil`, Zeile 5363) und teilt sich das Budget
+  `timeout_sec = 180` (`supabase/config.toml`, `[functions.compose-video-clips]`).
+  Anchor-Compose (`compose-scene-anchor`, eigenes Budget 120 s) plus der durch
+  `min_face_ratio` ausgelöste `tight_grid`-Retry verbrauchen den Großteil davon; die
+  Kette danach (universelles Cast-Anchor-Netz, Dialogaufbereitung, Provider-Call)
+  erreicht das Fenster nicht mehr.
+- Warum kein Fehler geschrieben wurde: Ein Kill des Hintergrundtasks löst weder den
+  `catch`-Block noch `safeMarkSceneFailed()` aus. Es gibt an dieser Stelle **keine**
+  Guard-/Failure-Semantik — die einzige Sicherung ist der externe qa-watchdog nach 10 min,
+  und der kennt den Ledger nicht.
+- Beweislücke: Die Function-Logs von 09:23–09:34 sind rotiert (siehe C). Ein sauberer
+  Beleg („shutdown/wall clock exceeded" bzw. letzte erreichte Log-Zeile vor dem Dispatch)
+  ist erst mit Punkt C möglich. Deshalb **not yet proven**, nicht „confirmed".
+- Minimal nötige Korrektur (nicht ausgeführt): Beweisführung über retentionssichere Logs
+  bei Lauf #2; erst danach über Budget/Fensterschnitt entscheiden.
+- Voraussetzung für Lauf #2: **nein** für die Reparatur, **ja** für C — sonst wiederholt
+  sich exakt dieselbe Beweislücke.
+
+### B — Reaper → **root cause / confirmed**
+
+- `public.composer_reap_orphaned_dispatches(p_older_than_minutes integer DEFAULT 10)`
+  existiert in Produktion, `SECURITY DEFINER`, `REVOKE ALL … FROM PUBLIC, anon, authenticated`,
+  `GRANT EXECUTE … TO service_role`.
+- **Es gibt keinen Aufrufer.** Weder ein `cron.job` (Volltextsuche über alle 312 Zeilen der
+  Cron-Tabelle: kein Treffer auf `reap`) noch eine Edge-Function ruft die Funktion auf.
+  Codeweite Suche findet sie ausschließlich in den drei Migrationen und in
+  `src/integrations/supabase/types.ts`. Der Reaper wurde angelegt und berechtigt,
+  aber nie geplant.
+- Das Eligibility-Prädikat trifft die Zielzeile eindeutig. Read-only-Gegenprobe mit exakt
+  dem Funktionsprädikat liefert genau eine Zeile:
+  `b02ae224…`, `status = dispatching`, `external_job_id = NULL`,
+  `started_at = 09:23:06.362Z`, Alter 00:54:09. Die Zeile wird also **nicht** durch
+  Status/Timestamps ausgeschlossen — sie wurde schlicht nie geprüft.
+- Keine fehlgeschlagene Mutation: `error_code` ist NULL, `updated_at` ist unverändert
+  identisch mit `created_at`. Die Zeile wurde seit dem INSERT nie angefasst.
+- Vertragstreue der Funktion selbst ist korrekt: `pending|dispatching` +
+  `external_job_id IS NULL` + Altersfenster → `dispatch_uncertain` mit
+  `error_code = 'reaper_orphaned_dispatch'`; kein `stale`, nichts Terminales.
+- Code-/Schema-Stellen: `supabase/migrations/20260815003034_*.sql` (Definition),
+  `20260815085014_*.sql` / `20260815085206_*.sql` (Grants/REVOKE), `cron.job` (Lücke).
+- Minimal nötige Korrektur: genau ein Scheduler-Eintrag, der den Reaper periodisch
+  (Vorschlag: minütlich oder alle 2 min, Fenster 10 min) als `service_role` ausführt.
+  Keine Änderung an Funktionskörper, Prädikat oder Observe-Vertrag.
+- Voraussetzung für Lauf #2: **ja**. Ohne Scheduler ist der Dispatch-Lifecycle in G3.1
+  nicht beobachtbar abgeschlossen.
+
+### C — Drain-Telemetrie → **root cause / confirmed**
+
+Gemessene reale Retention (Messung 2026-08-15 ~10:18Z):
+
+| Quelle | ältester Eintrag | jüngster Eintrag | Spanne | Zeilen im Fenster |
+| --- | --- | --- | --- | --- |
+| `function_edge_logs` | 10:09:00.79Z | 10:18:01.61Z | **9,0 min** | 49 |
+| `function_logs` | 10:09:00.54Z | 10:18:48.23Z | **9,8 min** | 387 |
+
+Folge: Ein 60-Minuten-Gate ist über diese Quellen **prinzipiell nicht rückwirkend
+beweisbar**. Rund 50 der 60 Minuten sind zum Auswertungszeitpunkt bereits verloren.
+
+Optionen (keine Vorentscheidung; G3.1-Observe ist bewusst read-only, ein INSERT im
+Observe-Pfad wäre eine Vertragsänderung):
+
+| Option | Eingriff in den Callback-Pfad | Beweisbarkeit 60-Min-Gate | Risiko |
+| --- | --- | --- | --- |
+| **C1** Append-only Observe-Telemetrie in eigener Tabelle, strikt fail-open, eigener Telemetry-Vertrag getrennt vom Ledger-Vertrag | ja — zusätzlicher Write im Callback; muss `try/catch`-gekapselt und ohne Rückwirkung auf das Verdikt sein | vollständig, lückenlos, direkt abfragbar | Vertragsänderung an G3.1; ein nicht fail-offener Write könnte Callbacks beeinflussen |
+| **C2** Vorhandener langlebiger Log-Sink | keiner | abhängig vom Sink | im Projekt ist aktuell **kein** langlebiger Sink verdrahtet — Option existiert derzeit nur theoretisch (externer Drain/Log-Forwarder wäre erst einzurichten) |
+| **C3** Periodisches Snapshotten der Function-Logs in Intervallen < Retention (z. B. alle 5 min in eine Snapshot-Tabelle) | keiner | vollständig, solange der Snapshotter läuft; jede Snapshotter-Störung erzeugt ein unbeweisbares Loch | Beweiskette hängt an einem zweiten Cron; keine Rückwirkung auf Callback-Verhalten |
+
+- Code-/Schema-Stellen: `supabase/functions/_shared/v431-ledger.ts` (Observe-Verdikte,
+  heute reines `console.log` mit Tag `[v431] g31_observe`), plus je nach Option eine neue
+  Telemetrie-/Snapshot-Tabelle und ein Cron-Eintrag.
+- Voraussetzung für Lauf #2: **ja** — ohne eine der Optionen bleibt jeder weitere Lauf
+  aus denselben Gründen `not observed`.
+
+### Gate vor Produktionslauf #2
+
+1. Reaper ist geplant und nachweislich aktiv (B, confirmed → Korrektur offen).
+2. `watchdog_no_prediction_id`-Pfad bewiesen, nicht nur plausibel (A, offen).
+3. Entscheidung für C1, C2 oder C3 getroffen und wirksam.
+
+STOP. Keine Reparatur, kein neuer Lauf.
