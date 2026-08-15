@@ -74,8 +74,17 @@ write-free (nur Logging/Netz-Cleanup). Danach Static Writer Guard erneut:
 Zeile in `composer_scene_transition_log` (bestehende G0/G3-Infrastruktur, kein zweiter SoT)
 im selben Commit. Inhalt ausreichend zur Rekonstruktion: `scene_id`, `run_id`,
 `plate_generation`, `pipeline_job_id`, `external_job_id`, `write_id`, `pass_idx`,
-`segment_result`, `verdict`, `reason`, Vorher/Nachher-State. Edge-seitige
-`composer_callback_observations` bleiben ergänzend, ersetzen das Audit nicht.
+`segment_result`, `verdict`, `reason`, Vorher/Nachher-State.
+Damit die Audit-Zeile überlebt, wird verbindlich getrennt:
+- **fachliche `rejected`/`noop`-Verdikte** (missing_binding, wrong_run, wrong_generation,
+  wrong_job, wrong_pass, wrong_stage, stale_write, duplicate) ⇒ normaler RPC-Return,
+  kein `RAISE`; die Audit-Zeile bleibt committed;
+- **echte Invarianz-/Security-Corruption** ⇒ weiterhin Exception mit Rollback; dort kann
+  naturgemäß keine Audit-Zeile derselben Transaktion persistieren.
+Testmatrix: mindestens ein `rejected`-Fall mit anschließend nachweisbar vorhandener
+Audit-Zeile. Edge-seitige `composer_callback_observations` bleiben ergänzend,
+ersetzen das Audit nicht.
+
 
 ### R7 — S10 echt parallel (Pre-Deploy-Gate)
 Der Apply-RPC bleibt im Produktionsartefakt **service-role-only**. Kein `sandbox_exec`-Grant
