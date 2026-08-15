@@ -43,7 +43,13 @@ function parseRetryAfter(msg: string): number {
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
-import { acquireLedgerJob, bindLedgerExternalJob } from "../_shared/v431-ledger.ts";
+import {
+  acquireLedgerJob,
+  bindLedgerExternalJob,
+  classifyDispatchFailure,
+  completeLedgerJobImmediate,
+  settleLedgerDispatchFailure,
+} from "../_shared/v431-ledger.ts";
 import { isV427FlagEnabled } from "../_shared/v427-flags.ts";
 import {
   InsufficientCreditsError,
