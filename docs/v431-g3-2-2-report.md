@@ -418,10 +418,15 @@ existiert kein Ambiguitätsfenster.
 
 - `composer_apply_sync_segment_result`: genau eine Signatur, `prosecdef = t`,
   `proconfig = search_path=pg_catalog, public`, `service_role` EXECUTE = `true`;
-  `anon`, `authenticated`, PUBLIC, `sandbox_exec`, `sandbox_exec_lbunafpxuskwmsrraqxl` = `false`
-  (siehe **D1** — mit heutigem Plattform-Default ist die projektspezifische Sandbox-Rolle `true`).
+  `anon` = `false`, `authenticated` = `false`, PUBLIC = `false`.
+  **D1-a (akzeptiert):** `sandbox_exec_lbunafpxuskwmsrraqxl` trägt aufgrund von Plattform-Default
+  Privileges ebenfalls EXECUTE. Nachweislich ist diese Rolle plattformintern: nur `postgres`
+  ist Mitglied, `authenticator` (PostgREST-Login) kann sie nicht annehmen, und Client-/Edge-Pfade
+  laufen ausschließlich über `anon`/`authenticated`/`service_role`. Sie entspricht dem bereits
+  eingefrorenen G3.1-Plattformmuster. Kein projekt-/umgebungsspezifisches REVOKE in
+  Produktionsmigrationen. Im Security-Vertrag dokumentiert als **accepted platform-internal ACL**.
 - `composer_touch_lipsync_progress`: kein EXECUTE-Grantee, auch nicht `service_role`
-  (heute erfüllt für `service_role` = `false`; Sandbox-Rolle siehe D1). Nur interne Verwendung.
+  (heute erfüllt für `service_role` = `false`). Nur interne Verwendung.
 - `composer_log_sync_segment_audit`: identische Anforderung.
 - `composer_replace_pipeline_attempt`: `md5(pg_get_functiondef)` muss
   `c4649e65440a64997376617721792aa8` bleiben.
