@@ -43,11 +43,19 @@ from public.composer_pipeline_jobs
 where stage = 'audio_mux'
   and status in ('pending','dispatching','dispatched','running');
 
--- G4: Replacement-Attempts in Zustellung
-select id, scene_id, stage, status, replaced_by, created_at
-from public.composer_pipeline_jobs
-where status in ('dispatching','dispatched')
-  and replaced_by is not null;
+-- G4: Replacement-Attempts in Zustellung (über die Vorgänger-Relation, da der neue
+-- Attempt selbst kein replaced_by trägt)
+select
+  r.id,
+  r.scene_id,
+  r.stage,
+  r.status,
+  p.id as predecessor_id,
+  r.created_at
+from public.composer_pipeline_jobs p
+join public.composer_pipeline_jobs r
+  on r.id = p.replaced_by
+where r.status in ('dispatching','dispatched');
 
 -- G5: Passes mit gebundenem Provider-Job (nicht terminal)
 select s.id as scene_id, p->>'job_id' as job_id, p->>'status' as pass_status,
@@ -58,8 +66,11 @@ where p->>'job_id' is not null
   and coalesce(p->>'status','') not in ('done','failed','canceled');
 ```
 
-Gate grün = G1, G3, G4, G5 leer und G2 leer (bzw. ausschließlich Szenen, die nachweislich
-bereits terminal gespiegelt sind und im Report einzeln begründet werden).
+Gate grün = G1, G2, G3, G4, G5 liefern **exakt 0 Rows**. G2 wird nicht durch Legacy-Mirrors
+überstimmt: Steht der kanonische `pipeline_state` auf `lipsync_dispatched`,
+`lipsync_running` oder `lipsync_muxing`, ist die Szene in-flight — unabhängig davon, wie ein
+Legacy-Feld aussieht. Bei >0 drainen/recovern und das Cutover-Gate erneut fahren.
+Ergänzend darf ein kanonisches `retry_of`-Feld geprüft werden, es ist aber nicht das Gate.
 
 ## 3. Deploy-Reihenfolge
 
@@ -126,7 +137,9 @@ Von Deploy-Zeitstempel bis Resmoke-Ende auswerten und im Report festhalten:
 - Transition-Audit-Zeilen (`composer_scene_transition_log`, `caller_class='sync_segment_apply'`).
 - Ledger-Attempts nach `stage` und `status`.
 - Reaper-/Watchdog-Fehler.
-- Zählungen: `missing_binding`, `wrong_job`, `stale_run`, `stale_generation`, `binding_pending` — Erwartung 0 (bzw. `binding_pending` nur transient).
+- Zählungen: `missing_binding`, `wrong_job`, `stale_run`, `stale_generation` — Erwartung 0.
+  `binding_pending` muss am **Ende** des Resmoke-Fensters ebenfalls 0 sein; ein kurzzeitiger
+  Wert während des Dispatch wird dokumentiert, darf aber nicht unresolved stehenbleiben.
 
 ## 8. Abschluss
 
