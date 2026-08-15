@@ -4,10 +4,11 @@ Kontrollierter Produktions-Cutover der bereits implementierten und lokal verifiz
 
 ## Schritt 1 — Pre-Deploy Cutover-Gate
 
-Unmittelbar vor dem Deploy die zwei eingefrorenen Abfragen erneut ausführen:
+Unmittelbar vor dem Deploy die zwei eingefrorenen Abfragen mit ihrem vollen In-flight-Scope erneut ausführen (keine historischen/abgeschlossenen Pre-Cutover-Rows mitzählen):
 
-- Base-Video in flight: `replicate_prediction_id IS NOT NULL` und `plate_pipeline_job_id IS NULL`
-- Sync-Passes in flight: `passes[i].job_id IS NOT NULL` und `passes[i].pipeline_job_id IS NULL`
+- Base-Video: nur aktive `plate_rendering`-Szenen mit `replicate_prediction_id IS NOT NULL` UND `plate_pipeline_job_id IS NULL`
+- Sync: nur aktive Lip-Sync-Szenen (`lipsync_dispatched` | `lipsync_running` | `lipsync_muxing`) und darin tatsächlich in-flight Passes mit Provider-`job_id`, aber fehlendem `pipeline_job_id`
+
 
 Deploy nur bei `base_unresolved = 0` UND `sync_unresolved = 0`.
 Bei jedem Wert > 0: STOP, kein Deploy, kein Laufzeit-Fallback. Stattdessen regulär drainen/terminieren lassen und den Cutover später erneut ansetzen.
