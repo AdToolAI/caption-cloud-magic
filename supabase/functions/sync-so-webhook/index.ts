@@ -1215,6 +1215,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         sceneId,
         runId: (scene as any)?.active_run_id ?? null,
         stage: "audio_mux",
+        plateGeneration: typeof (scene as any)?.plate_generation === "number"
+          ? (scene as any).plate_generation
+          : null,
         provider: "remotion",
         metadata: { dispatcher: "sync-so-webhook", fan_in_passes: totalPasses },
       });
