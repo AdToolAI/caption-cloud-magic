@@ -44,6 +44,9 @@ Bestanden nur wenn für denselben echten Provider-Job belegt ist:
 - Run-/Generation-/Pass-Identität unverändert
 - Pipeline läuft fachlich normal weiter bzw. idempotente Fan-in-Semantik greift korrekt
 
+Zusätzlich müssen direkter Provider-Callback und Watchdog-Forward im Nachweis sauber auseinandergehalten werden: gleicher `external_job_id`, gleicher `pipeline_job_id`, aber der zweite `bound`-Nachweis muss per Watchdog-Log und Timestamp eindeutig dem internen Forward zugeordnet sein. Genau dieser zweite Eintrag ersetzt den früheren `missing_binding`-Befund.
+
+
 ## Schritt 4 — Regression-/Telemetry-Check im Resmoke-Fenster
 
 - `missing_binding = 0` für neue G3.1f-Re-Injections
