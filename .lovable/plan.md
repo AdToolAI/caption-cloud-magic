@@ -33,6 +33,7 @@ Neu: `composer_reset_lipsync_with_attempt_cancellation(_scene_id uuid, _expected
 
 - `SECURITY DEFINER`, `SET search_path = pg_catalog, public`, keine Defaults, keine Overloads, schema-qualifizierte Referenzen, `service_role`-only (`REVOKE ALL` von `PUBLIC`, `anon`, `authenticated`).
 - Ablauf in genau einer Transaktion:
+  0. `pg_advisory_xact_lock(hashtextextended(scene_id::text, 0))` — gemeinsamer Serialisierungspunkt (§5b)
   1. Kandidaten-Jobs `FOR UPDATE` (deterministisch nach `id`)
   2. `composer_scenes FOR UPDATE`
   3. Guard `active_run_id` + `plate_generation` ⇒ sonst `stale_reset`, kein Write
