@@ -61,6 +61,15 @@ Gilt identisch für `composer_bind_plate_attempt` und `composer_bind_sync_pass_a
 
 **Security-Smoke (Teil der Testmatrix):** je RPC prüfen — `prosecdef = true`; `proconfig` enthält `search_path=pg_catalog, public`; `has_function_privilege('anon', …, 'EXECUTE') = false` und dasselbe für `authenticated`; `has_function_privilege('service_role', …, 'EXECUTE') = true`; genau **eine** Zeile in `pg_proc` je Funktionsname (keine Overload); `pronargdefaults = 0`. Zusätzlich negative Fälle: falsche Stage, fremde `scene_id`, abweichender Run/Generation → Exception, keine Teilwirkung.
 
+### Pass-Identitätsgate für `composer_bind_sync_pass_attempt`
+
+`_pass_idx` darf nicht länger allein vom Caller bestimmt werden. Verbindlich:
+
+- Der gelockte Ledger-Job muss `stage = 'sync_segment'` haben (geschlossene Prüfung, siehe oben).
+- Der adressierte Pass wird über die **bereits vorhandene stabile Identität** aus der Ledger-Zeile aufgelöst: `composer_pipeline_jobs.segment_id` bzw. `speaker_id` werden gegen die Identitätsfelder des Pass-Slots (`passes[i].segment_id` / `speaker_id` / kanonische Speaker-UUID aus dem v201-Vertrag) geprüft. Genau ein Pass darf matchen.
+- `_pass_idx` ist nur **bestätigend**: stimmt er nicht mit dem aufgelösten Index überein — oder ist die Auflösung mehrdeutig bzw. leer — wird eine Exception geworfen. Kein Slot-Write, keine Ledger-Bindung, vollständiger Rollback.
+- Smoke: gültiger Job für Pass A gegen `_pass_idx = B` → Exception; danach ist weder `external_job_id` gebunden noch `passes[A]`/`passes[B]` verändert (vollständiger Rollback nachgewiesen).
+
 
 ## Lücke 2 — Cutover-Vertrag für Rows ohne Pointer
 
@@ -72,8 +81,10 @@ Cutover-Gate (unmittelbar vor dem Deploy, **beide Klassen**):
 
 Beide Zählungen 0 → Cutover per Nachweis, kein Backfill, kein Übergangsmodus.
 
-- Base Video > 0 → **einmaliger** Backfill genau dieser Rows aus `composer_pipeline_jobs`, nur bei **eindeutigem** Match (`scene_id` + `stage='base_video'` + `external_job_id` + aktueller `run_id`/`plate_generation`, genau eine Zeile, nicht terminal). Mehrdeutig/kein Match → Row bleibt NULL und wird über den bestehenden Reaper-/Fail-Pfad beendet statt geraten. Einmalige Datenmigration, keine Laufzeitauflösung, im Bericht mit betroffenen IDs protokolliert.
-- Sync > 0 → **bevorzugt Drain bis 0**, dann deployen; kein spontan erfundener Backfill-Vertrag. Nur falls ein Drain nicht abwartbar ist: derselbe eindeutige Einmal-Match, aber ausschließlich gegen einen bestehenden `stage='sync_segment'`-Ledger-Job (scene + pass + `external_job_id` + Run/Generation, genau eine nicht-terminale Zeile) — sonst NULL lassen.
+- Base Video > 0 → **einmaliger** Backfill genau dieser Rows aus `composer_pipeline_jobs`, nur bei **eindeutigem** Match (`scene_id` + `stage='base_video'` + `external_job_id` + aktueller `run_id`/`plate_generation`, genau eine Zeile, nicht terminal). Einmalige Datenmigration, keine Laufzeitauflösung, im Bericht mit betroffenen IDs protokolliert.
+- Sync > 0 → **bevorzugt Drain bis 0**, dann deployen; kein spontan erfundener Backfill-Vertrag. Nur falls ein Drain nicht abwartbar ist: derselbe eindeutige Einmal-Match, aber ausschließlich gegen einen bestehenden `stage='sync_segment'`-Ledger-Job (scene + Pass-Identität + `external_job_id` + Run/Generation, genau eine nicht-terminale Zeile).
+
+**Endgate (verbindlich):** Nach jedem Backfill bzw. Drain werden **beide** Cutover-Abfragen erneut ausgeführt. Deploy-fähig ist ausschließlich der Zustand **Base unresolved = 0 und Sync unresolved = 0**. Mehrdeutige oder nicht matchbare aktive Rows bedeuten: warten, bis der bestehende Job sauber ausläuft oder über den regulären Reaper-/Fail-Pfad terminiert wird — **kein Deploy über eine unresolved aktive Row hinweg**, weil post-Cutover ein fehlender Pointer bewusst nicht mehr re-injiziert wird.
 
 Nach dem Cutover ist ein Dispatch ohne persistiertes Paar ein Vertragsfehler: Error-Log `reinject_missing_pipeline_job_id` (Felder `function`, `scene_id`, `stage`, `external_job_id`, `run_id`, `generation`) **und die Re-Injection unterbleibt** — der Forwarder sendet keinen ungebundenen Callback. Kein Ledger-Insert, kein Resolve-Fallback, keine erfundene ID; der übrige Recovery-Pfad (Refund-/Fail-/Reaper-Logik) bleibt unverändert.
 
