@@ -375,6 +375,28 @@ where x->>'job_id' is not null
 
 **Gate grün = G1, G2, G3, G4, G5 liefern exakt 0 Rows.**
 
+### Klassifikation der 44 historischen Pass-Slots (alte Gate-Fassung)
+
+Join gegen Scene-State und Ledger (44 Rows / 34 Szenen):
+
+| Scene `pipeline_state` | Pass-Status | `pipeline_job_id` | Ledger-Job | Rows |
+| --- | --- | --- | --- | --- |
+| `failed` | `rendering` | fehlt | keiner | 16 |
+| `failed` | `retrying` | fehlt | keiner | 14 |
+| `failed` | `canceled_by_scene_failure` | fehlt | keiner | 8 |
+| `canceled` | `rendering` | fehlt | keiner | 3 |
+| `complete` | `rendering` | fehlt | keiner | 3 |
+
+- **Alle** zugehörigen Szenen stehen terminal (`failed` / `canceled` / `complete`).
+- **Keine** Row trägt eine `pipeline_job_id`; es existiert kein korrespondierender Ledger-Job.
+- Jüngste Szenen-Aktualisierung: `2026-08-14 01:13Z` — nichts davon ist jünger als der G3.1-Cutover.
+
+→ Klassifikation: **orphaned stale metadata** aus vor-Ledger-Runs. Diese Rows werden **nie** natürlich drainen; „warte bis G5 = 0" ist ein unerreichbares Gate.
+
+### G1/G3-Observe-Mode-Befund (alte Gate-Fassung)
+
+Die 8 offenen Ledger-Attempts (4× `sync_segment`, 4× `audio_mux`, alle `dispatched`) gehören **alle derselben Szene** `b34d1eae-6bf3-437d-a6ab-624be0155adc` an — und die steht bereits auf `pipeline_state = complete` (17:26Z). G3.1 lief als Observe-Mode: die Attempts wurden gebunden, aber nie terminalisiert. Auch das drainiert nicht von selbst.
+
 ### Baseline-Messung 2026-08-15 ~19:14 UTC (korrigierte Gate-Fassung)
 
 | Gate | Rows | Befund |
@@ -385,7 +407,7 @@ where x->>'job_id' is not null
 | G4 | 0 | grün (keine Replacement-Kette in Zustellung) |
 | G5 | 0 | historische Pass-Slots gehören terminalen Szenen (`failed`/`canceled`/`complete`) und fallen definitorisch heraus |
 
-**Historische Artefakte (kein In-flight, kein Deploy-Blocker):**
+**Gate alter Fassung war unerreichbar / kein Cutover-Blocker:**
 
 - G1/G3 (alte Fassung): 8 offene Ledger-Attempts (`sync_segment`/`audio_mux`, alle `dispatched`),
   gehören alle zur selben Szene `b34d1eae-6bf3-437d-a6ab-624be0155adc`, die bereits
