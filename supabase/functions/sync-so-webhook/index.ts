@@ -761,62 +761,18 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         Number.isFinite(Number(passBeforeDone?.reference_frame_number));
 
       if (noopSuspect && !canEscalate) {
-        // Ladder exhausted (step >= 2) OR missing inputs → HARD FAIL + REFUND.
-        // No more PASS_DONE_SUSPECT (which silently muxed the NOOP output).
+        // Ladder erschöpft ODER fehlende Inputs → fachliches Segment-Fail.
+        // v431 G3.2.2: der Apply gehört ausschließlich dem RPC (write_id
+        // `ssw:noop_fail`); Refund + Folge-Dispatch sind Edge-Nebenwirkungen.
         const noopReasonHard = syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
           : syncOutputUnchanged
             ? "sync_output_unchanged"
             : "sync_output_reencoded_passthrough_suspect";
-        const failPatch = {
-          ...freshDonePasses[currentPass],
-          status: "failed",
-          job_id: null,
-          pipeline_job_id: null,
-          finished_at: nowIso,
-          error: "sync_noop_unrecoverable",
-          last_error: "sync_noop_unrecoverable",
-          last_error_class: "sync_noop_unrecoverable",
-          noop_escalation_step: noopEscalationStep,
-          noop_reason: noopReasonHard,
-        };
-        freshDonePasses[currentPass] = failPatch;
-        try {
-          await supabase.rpc("update_dialog_pass_slot", {
-            _scene_id: sceneId,
-            _pass_idx: currentPass,
-            _patch: {
-              status: "failed",
-              job_id: null,
-              pipeline_job_id: null,
-              finished_at: nowIso,
-              error: "sync_noop_unrecoverable",
-              noop_escalation_step: noopEscalationStep,
-            },
-          });
-        } catch {
-          await supabase
-            .from("composer_scenes")
-            .update({
-              dialog_shots: { ...freshDoneState, passes: freshDonePasses, updated_at: nowIso },
-              updated_at: nowIso,
-            })
-            .eq("id", sceneId);
-        }
-        // Mark scene needs_clip_rerender so the user gets a clear "re-render plate"
-        // hint rather than a frozen-lips final output.
         const turnStart = Number(passBeforeDone?.segments?.[0]?.startTime ?? 0).toFixed(1);
         const turnEnd = Number(passBeforeDone?.segments?.[0]?.endTime ?? 0).toFixed(1);
         const userMsg = tl({ de: `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) konnte nach ${NOOP_LADDER.length + 1} Versuchen nicht erzeugt werden. Bitte Plate neu rendern.`, en: `Lip-sync for ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) could not be generated after ${NOOP_LADDER.length + 1} attempts. Please re-render plate.`, es: `La sincronización labial para ${passSpeakerName} (Turno ${turnStart}s–${turnEnd}s) no pudo generarse después de ${NOOP_LADDER.length + 1} intentos. Por favor, vuelve a renderizar la placa.` });
-        await supabase
-          .from("composer_scenes")
-          .update({
-            lip_sync_status: "failed",
-            twoshot_stage: "needs_clip_rerender",
-            clip_error: userMsg,
-            updated_at: nowIso,
-          })
-          .eq("id", sceneId);
+
         await logSyncDispatch(supabase, {
           scene_id: sceneId,
           engine: "sync-segments",
@@ -832,22 +788,27 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             noop_escalation_step: noopEscalationStep,
             noop_reason: noopReasonHard,
             ladder_size: NOOP_LADDER.length,
-            canonical_lipsync_pipeline: speakerCount >= 2 ? "v204_preclip_bbox_clipspace" : null,
             previous_noop_output_url: rehostedUrl ?? outputUrl,
             size_ratio: sizeRatio,
           },
         });
+
+        const noopFailRes = await applySyncSegmentResult(supabase, {
+          pipelineJobId: v431CallbackJobId,
+          externalJobId: jobId,
+          writeId: "ssw:noop_fail",
+          providerStatus: "COMPLETED",
+          outputUrl: null,
+          errorText: userMsg,
+        });
+        if (!noopFailRes) {
+          return ok({ ok: true, skipped: "apply_unavailable", scene_id: sceneId, job_id: jobId });
+        }
         console.error(
-          `[sync-so-webhook] v134 scene=${sceneId} pass=${currentPass} speaker="${passSpeakerName}" NOOP-LADDER-EXHAUSTED step=${noopEscalationStep} → hard-fail (needs_clip_rerender)`,
+          `[sync-so-webhook] v134/g322 scene=${sceneId} pass=${currentPass} speaker="${passSpeakerName}" NOOP-LADDER-EXHAUSTED step=${noopEscalationStep} verdict=${noopFailRes.verdict}`,
         );
-        return ok({
-          ok: true,
-          scene_id: sceneId,
-          job_id: jobId,
-          status,
-          engine: "sync-segments",
+        return await settleVerdict(noopFailRes, {
           escalated: "noop_ladder_exhausted_v134",
-          pass_idx: currentPass,
           speaker_name: passSpeakerName,
         });
       }
@@ -860,63 +821,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           : syncOutputUnchanged
             ? "sync_output_unchanged"
             : "sync_output_reencoded_passthrough_suspect";
-        // v184 retry-forensics: append a FIFO entry (max 8) to
-        // pass.retry_history so we can reconstruct why a run took 15 min.
-        const _prevHistory = Array.isArray((freshDonePasses[currentPass] as any)?.retry_history)
-          ? ((freshDonePasses[currentPass] as any).retry_history as any[]).slice(-7)
-          : [];
-        const _newRetryEntry = {
-          ts: nowIso,
-          reason: "noop_ladder_escalation",
-          from_variant: passBeforeDone?.retry_variant ?? null,
-          to_variant: nextRung.variant,
-          step: nextStep,
-          noop_reason: noopReason,
-          size_ratio: sizeRatio,
-        };
-        const escalationPatch = {
-          ...freshDonePasses[currentPass],
-          status: "pending",
-          job_id: null,
-          pipeline_job_id: null,
-          output_url: null,
-          finished_at: null,
-          retry_variant: nextRung.variant,
-          noop_escalation_step: nextStep,
-          noop_retry_attempted: true, // kept for back-compat with v131 watchdog
-          noop_retry_attempt_id: newAttemptId,
-          noop_retry_reason: noopReason,
-          previous_noop_output_url: rehostedUrl ?? outputUrl,
-          previous_noop_size_ratio: sizeRatio,
-          retry_history: [..._prevHistory, _newRetryEntry],
-        };
-        freshDonePasses[currentPass] = escalationPatch;
-        try {
-          await supabase.rpc("update_dialog_pass_slot", {
-            _scene_id: sceneId,
-            _pass_idx: currentPass,
-            _patch: {
-              status: "pending",
-              job_id: null,
-              pipeline_job_id: null,
-              output_url: null,
-              finished_at: null,
-              retry_variant: nextRung.variant,
-              noop_escalation_step: nextStep,
-              noop_retry_attempted: true,
-              noop_retry_attempt_id: newAttemptId,
-            },
-          });
-        } catch (e) {
-          await supabase
-            .from("composer_scenes")
-            .update({
-              dialog_shots: { ...freshDoneState, passes: freshDonePasses, updated_at: nowIso },
-              updated_at: nowIso,
-            })
-            .eq("id", sceneId);
-        }
-        // Forensics: explicit per-pass log with turn_idx + speaker_name (v134 §3).
+
         await logSyncDispatch(supabase, {
           scene_id: sceneId,
           engine: "sync-segments",
@@ -937,8 +842,25 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             attempt_id: newAttemptId,
           },
         });
-        // Fire-and-forget re-dispatch with user_retry_flag so the
-        // safe-entry guard lets us back through.
+
+        // §5a — Slot-Reset, Segment-Fail (`sync_noop_retryable`) und
+        // Replacement-Attempt entstehen atomar im RPC. Der Edge-Aufruf darf
+        // KEINEN eigenen Attempt erzeugen.
+        const escalateRes = await applySyncSegmentResult(supabase, {
+          pipelineJobId: v431CallbackJobId,
+          externalJobId: jobId,
+          writeId: "ssw:noop_escalate",
+          providerStatus: "COMPLETED",
+          outputUrl: null,
+          errorText: noopReason,
+        });
+        if (!escalateRes) {
+          return ok({ ok: true, skipped: "apply_unavailable", scene_id: sceneId, job_id: jobId });
+        }
+        if (escalateRes.verdict !== "redispatch" || !escalateRes.replacement_job_id) {
+          return await settleVerdict(escalateRes, { escalated: `noop_ladder_step_${nextStep}_v134` });
+        }
+
         try {
           fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
             method: "POST",
@@ -950,21 +872,19 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               retry_variant: nextRung.variant,
               user_retry_flag: true,
               new_attempt_id: newAttemptId,
-              // G3.1b — expliziter Retry-Vertrag statt Initial-Akquise.
-              ...(v431CallbackJobId
-                ? {
-                    retry_of_pipeline_job_id: v431CallbackJobId,
-                    retry_reason: "provider_transient_error",
-                  }
-                : {}),
+              // §5a Schritt 5 — vorab erzeugte Ledger-Identität, kein neuer Attempt.
+              pipeline_job_id: escalateRes.replacement_job_id,
+              retry_of_pipeline_job_id: v431CallbackJobId,
+              retry_reason: "sync_noop_retryable",
               credit_charge_result: "skip",
               noop_auto_escalation: true,
               noop_escalation_step: nextStep,
             }),
           }).catch(() => {});
         } catch { /* ignore */ }
+
         console.warn(
-          `[sync-so-webhook] v134 scene=${sceneId} pass=${currentPass} speaker="${passSpeakerName}" NOOP → escalating step ${nextStep} variant=${nextRung.variant} (${nextRung.label}) attempt_id=${newAttemptId}`,
+          `[sync-so-webhook] v134/g322 scene=${sceneId} pass=${currentPass} NOOP → escalating step ${nextStep} variant=${nextRung.variant} replacement=${escalateRes.replacement_job_id}`,
         );
         return ok({
           ok: true,
@@ -972,291 +892,39 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           job_id: jobId,
           status,
           engine: "sync-segments",
+          verdict: "redispatch",
+          segment_result: escalateRes.segment_result ?? "failed",
           escalated: `noop_ladder_step_${nextStep}_v134`,
-          pass_idx: currentPass,
+          pass_idx: escalateRes.pass_idx ?? currentPass,
           speaker_name: passSpeakerName,
           variant: nextRung.variant,
+          replacement_job_id: escalateRes.replacement_job_id,
         });
       }
 
-      const noopSuspectFlags = noopSuspect ? {
-        sync_noop_suspect: true,
-        noop_reason: syncOutputResolutionRegression
-          ? "sync_output_resolution_regression"
-          : syncOutputUnchanged
-            ? "sync_output_unchanged"
-            : "sync_output_reencoded_passthrough_suspect",
-        noop_size_ratio: sizeRatio,
-      } : {};
-      if (freshDonePasses[currentPass]) {
-        freshDonePasses[currentPass] = {
-          ...freshDonePasses[currentPass],
-          status: "done",
-          output_url: rehostedUrl ?? outputUrl,
-          rehosted: !!rehostedUrl,
-          sync_output_probe: { inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression },
-          finished_at: nowIso,
-          ...noopSuspectFlags,
-        };
-      }
-
-      const { doneCount, failedCount, allTerminal } = terminalV5Counts(freshDonePasses);
-      const allDone = allTerminal && doneCount > 0;
-
-      // Find pending passes (deferred earlier or never dispatched). These
-      // need an explicit advance dispatch — without this, scenes whose
-      // fan-out hit the Sync.so concurrency limit on initial dispatch
-      // would never complete the remaining speakers.
-      const pendingIdxs = freshDonePasses
-        .map((p: any, i: number) => ((p?.status === "pending" || !p?.job_id) ? i : -1))
-        .filter((i: number) => i >= 0);
-
-      // v48 — partial-mux race fix.
-      // The COMPLETED branch used to dispatch the multi-speaker mux as soon
-      // as `allTerminal && doneCount > 0`. If a sibling FAILED webhook
-      // arrived BEFORE this COMPLETED webhook, `failedCount>0` was silently
-      // ignored and we muxed a video where one speaker was silent / had
-      // wrong audio (the scene-freeze bug for 3+ speakers).
-      // For 3+ speaker scenes we now mirror the FAILED-branch policy:
-      // any failed pass → fail the scene cleanly + refund. No partial mux.
-      if (allDone && failedCount > 0 && totalPasses >= 3) {
-        const failedSpeakers = freshDonePasses
-          .filter((p: any) => ["failed", "canceled_by_scene_failure"].includes(String(p?.status ?? "")))
-          .map((p: any) => p?.speaker_name ?? `Speaker ${Number(p?.speaker_idx ?? 0) + 1}`);
-        const failReason = tl({ de: `multi_speaker_incomplete_${doneCount}_of_${totalPasses}: Sprecher ${failedSpeakers.join(", ")} konnten nicht lip-synct werden — bitte Szene-Plate neu rendern oder Anzahl Sprecher reduzieren.`, en: `multi_speaker_incomplete_${doneCount}_of_${totalPasses}: Speakers ${failedSpeakers.join(", ")} could not be lip-synced — please re-render scene plate or reduce number of speakers.`, es: `multi_speaker_incomplete_${doneCount}_of_${totalPasses}: Los oradores ${failedSpeakers.join(", ")} no pudieron ser sincronizados labialmente — por favor, vuelve a renderizar la placa de la escena o reduce el número de oradores.` });
-        const costFinal = Number((freshDoneState as any)?.cost_credits ?? 0);
-        const alreadyRefundedFinal = !!(freshDoneState as any)?.refunded;
-        if (costFinal > 0 && !alreadyRefundedFinal) {
-          try {
-            const { data: row2 } = await supabase
-              .from("composer_scenes").select("project_id").eq("id", sceneId).single();
-            const { data: proj2 } = await supabase
-              .from("composer_projects").select("user_id").eq("id", (row2 as any)?.project_id).single();
-            const uid2 = (proj2 as any)?.user_id;
-            if (uid2) {
-              const { data: w2 } = await supabase
-                .from("wallets").select("balance").eq("user_id", uid2).single();
-              await supabase
-                .from("wallets")
-                .update({ balance: Number((w2 as any)?.balance ?? 0) + costFinal, updated_at: nowIso })
-                .eq("user_id", uid2);
-            }
-          } catch (_e) { /* best-effort */ }
-        }
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: {
-              ...freshDoneState,
-              passes: freshDonePasses,
-              status: "failed",
-              finished_at: nowIso,
-              refunded: costFinal > 0,
-              error: failReason,
-              partial_done_count: doneCount,
-              partial_failed_speakers: failedSpeakers,
-            },
-            lip_sync_status: "failed",
-            twoshot_stage: "failed",
-            clip_error: failReason,
-            updated_at: nowIso,
-          })
-          .eq("id", sceneId);
-        console.warn(
-          `[sync-so-webhook] v48 scene=${sceneId} COMPLETED-branch race — refusing partial mux (${doneCount}/${totalPasses} done, failed=${failedSpeakers.join(",")}) — refund=${costFinal}`,
-        );
-        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", refused: "partial_mux_3plus" });
-      }
-
-      if (!allDone) {
-        // Plan D (v93): atomic per-slot patch via RPC. Replaces the prior
-        // read-modify-write of `passes[]` which could lose updates when
-        // sibling parallel passes completed within milliseconds. The slot
-        // patch is idempotent — only `passes[currentPass]` is touched.
-        try {
-          await supabase.rpc("update_dialog_pass_slot", {
-            _scene_id: sceneId,
-            _pass_idx: currentPass,
-            _patch: {
-              status: "done",
-              output_url: rehostedUrl ?? outputUrl,
-              rehosted: !!rehostedUrl,
-              finished_at: nowIso,
-            },
-          });
-          // Top-level scene status / counters — non-slot fields, safe to UPDATE.
-          await supabase
-            .from("composer_scenes")
-            .update({
-              lip_sync_status: "running",
-              twoshot_stage: `syncso_fanout_${doneCount}_of_${totalPasses}`,
-              updated_at: nowIso,
-            })
-            .eq("id", sceneId);
-        } catch (e) {
-          // RPC failure → fall back to the legacy full-array write so a
-          // missing/migration-pending RPC never strands a scene.
-          console.warn(`[sync-so-webhook] plan_d rpc failed, falling back: ${(e as Error)?.message ?? e}`);
-          await supabase
-            .from("composer_scenes")
-            .update({
-              dialog_shots: { ...freshDoneState, passes: freshDonePasses, status: "rendering", updated_at: nowIso },
-              lip_sync_status: "running",
-              twoshot_stage: `syncso_fanout_${doneCount}_of_${totalPasses}`,
-              updated_at: nowIso,
-            })
-            .eq("id", sceneId);
-        }
-        console.log(`[sync-so-webhook] v25/plan_d scene=${sceneId} pass ${currentPass + 1}/${totalPasses} done (${doneCount} done, ${pendingIdxs.length} pending)`);
-
-        // v94 — Lambda warm-ping. When second-to-last pass completes, wake
-        // the audio-mux edge function so it's hot by the time the last pass
-        // arrives ~25-45s later. Fire-and-forget; the warmup branch returns
-        // 200 immediately without touching the DB or Lambda.
-        if (doneCount === totalPasses - 1 && totalPasses >= 2) {
-          try {
-            fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-              body: JSON.stringify({ warmup: true }),
-            }).catch(() => {});
-          } catch { /* ignore */ }
-        }
-
-        // Kick the next pending pass — now that we freed a slot, advance.
-        if (pendingIdxs.length > 0) {
-          const nextIdx = pendingIdxs[0];
-          try { triggerV5Advance(supabaseUrl, serviceKey, sceneId, nextIdx, totalPasses); } catch { /* ignore */ }
-        }
-        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", done: doneCount, total: totalPasses });
-      }
-
-      // ── All passes complete ──────────────────────────────────────────
-      const lastDonePass = [...freshDonePasses].reverse().find((p: any) => p?.status === "done" && p?.output_url);
-      const finalUrl = (lastDonePass as any)?.output_url ?? outputUrl;
-
-      // v64 — Single-speaker path:
-      //   • If the pass was dispatched with a TIGHT per-turn WAV
-      //     (`audio_tight` set), Sync.so's output equals only the speech
-      //     duration. We must overlay it onto the original full-length plate
-      //     via the audio-mux Lambda (same shots mechanism the N≥2 fan-out
-      //     uses) so the final scene length matches `totalSec`.
-      //   • Legacy non-tight single-speaker scenes finalize directly (audio
-      //     already matches the plate length).
-      const singleTight = totalPasses === 1 && !!(lastDonePass as any)?.audio_tight;
-      if (totalPasses === 1 && !singleTight) {
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: {
-              ...freshDoneState, passes: freshDonePasses,
-              status: "done",
-              final_url: finalUrl,
-              sync_so_url: outputUrl,
-              finished_at: nowIso,
-            },
-            // v430 Step 1 — the muxed result is the processed output; the
-            // plate stays in base_video_url. Single compatibility writer.
-            ...materializeCompatibilityOutput("processed", {
-              baseUrl: (freshDoneRow as any)?.base_video_url
-                ?? (freshDoneRow as any)?.lip_sync_source_clip_url
-                ?? null,
-              processedUrl: finalUrl,
-            }),
-            clip_status: "ready",
-            lip_sync_status: "applied",
-            lip_sync_applied_at: nowIso,
-            twoshot_stage: "complete",
-            clip_error: null,
-            updated_at: nowIso,
-          })
-          .eq("id", sceneId);
-        console.log(`[sync-so-webhook] v25 scene=${sceneId} single-speaker DONE (no tight, direct finalize)`);
-        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", applied: true });
-      }
-      if (singleTight) {
-        console.log(`[sync-so-webhook] v64 scene=${sceneId} single-speaker TIGHT → dispatching audio-mux (overlay on master plate)`);
-      }
-
-      // Multi-speaker: dispatch fan-in compositor.
-      // Plan D (v93): atomic mux-claim via try_claim_mux_dispatch RPC.
-      // When parallel passes complete near-simultaneously, all N webhooks
-      // see allDone=true; without the claim each would POST to the audio
-      // mux Lambda. The RPC sets dialog_shots.audio_mux.dispatched_at once
-      // and returns true only to the first caller — race-safe.
-      let muxClaimed = false;
-      try {
-        const { data: claimRes } = await supabase
-          .rpc("try_claim_mux_dispatch", { _scene_id: sceneId });
-        muxClaimed = claimRes === true;
-      } catch (e) {
-        // RPC missing/failure → fall back to legacy behavior (always dispatch).
-        // Lambda mux is idempotent via audio_mux.render_id so duplicate calls
-        // are safe; we only lose the wasted-invocation guard.
-        console.warn(`[sync-so-webhook] plan_d mux-claim rpc failed, falling through: ${(e as Error)?.message ?? e}`);
-        muxClaimed = true;
-      }
-      if (!muxClaimed) {
-        console.log(`[sync-so-webhook] plan_d_mux_lock_skipped scene=${sceneId} reason=already_claimed`);
-        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", compositor: "already_dispatched" });
-      }
-      console.log(`[sync-so-webhook] plan_d_mux_lock_acquired scene=${sceneId}`);
-
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: {
-            ...freshDoneState, passes: freshDonePasses,
-            status: "audio_muxing",
-            final_url: finalUrl,
-            sync_so_url: outputUrl,
-            finished_at: nowIso,
-            audio_mux: {
-              ...((freshDoneState as any)?.audio_mux ?? {}),
-              dispatched_at: nowIso,
-            },
-          },
-          lip_sync_status: "audio_muxing",
-          twoshot_stage: "audio_muxing",
-          clip_error: null,
-          updated_at: nowIso,
-        })
-        .eq("id", sceneId);
-      console.log(`[sync-so-webhook] v25 scene=${sceneId} ALL ${totalPasses} passes done → dispatching fan-in compositor`);
-      // v431 G3.1 — Ledger-Zeile für die Mux-Stage. D6: Owner der Mux-Stage
-      // ist der Dispatcher; hier entsteht nur die Provenienz-Zeile, die als
-      // `pipeline_job_id` im Request-Body mitreist.
-      const v431MuxAcquisition = await acquireLedgerJob(supabase, {
-        sceneId,
-        runId: (scene as any)?.active_run_id ?? null,
-        stage: "audio_mux",
-        plateGeneration: typeof (scene as any)?.plate_generation === "number"
-          ? (scene as any).plate_generation
-          : null,
-        provider: "remotion",
-        metadata: { dispatcher: "sync-so-webhook", fan_in_passes: totalPasses },
+      // ── Regulärer Segment-Erfolg ────────────────────────────────────────
+      // Slot-Patch, Aggregat, Scene-Mirror und Ledger-Terminalisierung laufen
+      // in EINER Transaktion. B11 (Single-Speaker-Finalize) ist entfallen:
+      // auch N=1 geht über `dispatch_mux` → Mux-Owner → Finalizer.
+      const successRes = await applySyncSegmentResult(supabase, {
+        pipelineJobId: v431CallbackJobId,
+        externalJobId: jobId,
+        writeId: "ssw:success",
+        providerStatus: "COMPLETED",
+        outputUrl: rehostedUrl ?? outputUrl,
+        errorText: null,
       });
-      // G3.1b — läuft der Mux-Attempt bereits (paralleler Fan-in-Abschluss),
-      // wird kein zweiter Compositor-Auftrag ausgelöst.
-      if (v431MuxAcquisition.outcome === "already_in_flight") {
-        console.warn(`[sync-so-webhook] scene=${sceneId} mux attempt already in flight → dispatch skipped`);
-        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", compositor: "already_in_flight" });
+      if (!successRes) {
+        return ok({ ok: true, skipped: "apply_unavailable", scene_id: sceneId, job_id: jobId });
       }
-      const v431MuxLedgerJob = v431MuxAcquisition.outcome === "acquired"
-        ? v431MuxAcquisition.job
-        : null;
-      try {
-        fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-          body: JSON.stringify({
-            scene_id: sceneId,
-            ...(v431MuxLedgerJob ? { pipeline_job_id: v431MuxLedgerJob.id } : {}),
-          }),
-        }).catch(() => {});
-      } catch { /* ignore */ }
+      console.log(
+        `[sync-so-webhook] g322 scene=${sceneId} pass=${successRes.pass_idx ?? currentPass} success → verdict=${successRes.verdict} (${successRes.done_count ?? "?"}/${successRes.total_passes ?? totalPasses} done)`,
+      );
+      return await settleVerdict(successRes, {
+        rehosted: !!rehostedUrl,
+        noop_suspect: noopSuspect || undefined,
+      });
 
-      return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", compositor: "dispatched" });
     } else {
       // ── FAILED / REJECTED / CANCELED ────────────────────────────────────
       // v431 G3.2.2: B13 (Forensik-Log) bleibt Edge-Nebenwirkung, der Apply
