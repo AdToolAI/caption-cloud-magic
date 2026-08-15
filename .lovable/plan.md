@@ -36,7 +36,25 @@ Reaper (korrigiert):
 
 ## 4 — Retry-Dispatches sind eigene Ledger-Attempts
 
-Nur die vier Initial-Dispatcher reichen nicht. Jeder neue Provider-Auftrag — auch aus Webhooks, Pollern und Watchdogs — bekommt VOR dem Dispatch eine eigene Zeile: gleiche `scene_id`/`run_id`/`stage`/`plate_generation`, `attempt_no + 1`, neue `pipeline_job_id`, die in die Callback-URL wandert. Der abgelöste Attempt wird nach dem Retry-Vertrag auf `stale` gesetzt (positiver Ablösebeweis, damit vertragskonform).
+Nur die vier Initial-Dispatcher reichen nicht. Jeder neue Provider-Auftrag — auch aus Webhooks, Pollern und Watchdogs — bekommt VOR dem Dispatch eine eigene Zeile: gleiche `scene_id`/`run_id`/`stage`/`plate_generation`, `attempt_no + 1`, neue `pipeline_job_id`, die in die Callback-URL wandert.
+
+### Atomarer Replace-Attempt-Vertrag (verbindlich)
+
+`attempt_no + 1` plus Unique Constraint ist kein vollständiger Vertrag, wenn fünf Quellen konkurrierend Retry auslösen können. Ablösen und Anlegen laufen deshalb in **einer** DB-Transaktion, gekapselt in einem `SECURITY DEFINER`-RPC `composer_replace_pipeline_attempt(previous_job_id, expected_scene_id, expected_run_id, expected_stage, expected_plate_generation, ...)`:
+
+```text
+FOR UPDATE auf previous_job_id
+  → Identität prüfen (scene/run/stage/generation müssen exakt passen)
+  → Ablösefähigkeit prüfen (nicht bereits stale/succeeded/cancelled/abgelöst)
+  → previous.status = 'stale' (+ replaced_by, completed_at)
+  → INSERT neuer Attempt mit attempt_no + 1, status 'pending'
+  → COMMIT, Rückgabe der neuen pipeline_job_id
+```
+
+- Der neue `pipeline_job_id` wird **erst nach erfolgreichem Commit** für den Provider-Dispatch verwendet.
+- Ein paralleler Ablöseversuch verliert deterministisch (Row Lock + Ablösefähigkeits-Prüfung + Unique Constraint auf `(scene_id, run_id, stage, segment_id, attempt_no)`) und erzeugt keinen zweiten aktiven Attempt; der Verlierer bricht den eigenen Retry ab, statt zu dispatchen.
+- Der Zwischenzustand „alter Attempt stale, neuer Insert fehlgeschlagen" ist ausgeschlossen: Fehler beim INSERT rollt die Terminalisierung mit zurück.
+- Kein Scene-State-, Mirror- oder Credit-Write; ausschließlich `composer_pipeline_jobs`.
 
 Zu verdrahtende Retry-/Re-Dispatch-Pfade (Inventar wird vor der Umsetzung final abgeglichen und im Bericht vollständig gelistet):
 
