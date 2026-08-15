@@ -95,17 +95,21 @@ ersetzen das Audit nicht.
 
 
 ### R7 — S10 echt parallel (Pre-Deploy-Gate)
-Der Apply-RPC bleibt im Produktionsartefakt **service-role-only**. Kein `sandbox_exec`-Grant
-in der G3.2.2-Migration. Ablauf stattdessen streng dreiteilig und außerhalb der
-Produktmigration (Ad-hoc-SQL im Testfenster):
+Der Apply-RPC bleibt im Produktionsartefakt **service-role-only**; kein Grant wandert in die
+G3.2.2-Migration. Ablauf streng dreiteilig als Ad-hoc-Test-SQL im Testfenster:
 1. temporärer Test-DB-only `GRANT EXECUTE ... TO sandbox_exec`;
 2. S10-Lauf: zwei echte parallele `psql`-Sessions, Barrier über `pg_advisory_lock`, beide auf
    dieselbe Scene und denselben letzten Pass; jede Session ruft nach `dispatch_mux`
-   instrumentiert `composer_acquire_pipeline_attempt('audio_mux')`. Erwartung: mehrfaches
-   `dispatch_mux` zulässig, **genau ein** `audio_mux`-Ledger-Attempt, **genau ein** simulierter
-   Provider-Invoke. Synthetische Testdaten werden anschließend vollständig gelöscht;
-3. `REVOKE` des temporären Grants, danach Security-Smoke als Beweis:
-   `sandbox_exec=false`, `anon=false`, `authenticated=false`, `service_role=true`.
+   instrumentiert `composer_acquire_pipeline_attempt('audio_mux')`. **Nur der Acquire-Gewinner**
+   zählt und führt den simulierten Provider-Invoke aus; ein `already_in_flight`-Ergebnis
+   invoket nie. Erwartung: mehrfaches `dispatch_mux` zulässig, **genau ein**
+   `audio_mux`-Ledger-Attempt, **genau ein** Provider-Invoke. Synthetische Testdaten werden
+   anschließend vollständig gelöscht;
+3. `REVOKE` des temporären Grants, danach Security-Smoke als Beweis: Enumeration **aller**
+   Nicht-Owner-Grantees aus `proacl` — neben Owner/`postgres` darf ausschließlich
+   `service_role` EXECUTE besitzen; explizit `sandbox_exec=false`,
+   `sandbox_exec_lbunafpxuskwmsrraqxl=false` (bestehender Grant wird mit entfernt),
+   `anon=false`, `authenticated=false`, `PUBLIC=false`.
 Ist der temporäre Grant nicht durchsetzbar oder die Parallelität technisch blockiert:
 STOP mit präzisem Infrastruktur-Befund — kein schwächerer Single-Session-Ersatz,
 keine Umdeklaration als Production-Smoke.
