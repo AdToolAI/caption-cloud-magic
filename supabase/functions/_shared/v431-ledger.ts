@@ -294,7 +294,10 @@ export async function completeLedgerJobImmediate(
 }
 
 export interface ReplaceLedgerAttemptParams {
+  /** Pflicht: der abzulösende Attempt. Kein impliziter Retry. */
   previousJobId: string;
+  /** Pflicht: dokumentierter Grund der Retry-Entscheidung. */
+  retryReason: string;
   sceneId: string;
   runId: string;
   stage: PipelineStage;
@@ -312,12 +315,24 @@ export interface ReplaceLedgerAttemptParams {
  * `attempt_no + 1` — oder gar nichts. Ein konkurrierender Ablöseversuch
  * verliert deterministisch und bekommt `null`; der Verlierer darf dann NICHT
  * dispatchen. Die neue `pipeline_job_id` steht erst nach dem Commit bereit.
+ *
+ * `previousJobId` und `retryReason` sind Pflicht — eine Initial-Akquise darf
+ * hier niemals landen.
  */
 export async function replaceLedgerAttempt(
   admin: any,
   params: ReplaceLedgerAttemptParams,
 ): Promise<LedgerJobHandle | null> {
   try {
+    if (!params.previousJobId || !params.retryReason) {
+      console.warn(`${V431_OBSERVE_TAG} ledger_replace_contract_violation`, JSON.stringify({
+        scene_id: params.sceneId,
+        stage: params.stage,
+        has_previous_job_id: Boolean(params.previousJobId),
+        has_retry_reason: Boolean(params.retryReason),
+      }));
+      return null;
+    }
     const { data, error } = await admin.rpc("composer_replace_pipeline_attempt", {
       p_previous_job_id: params.previousJobId,
       p_expected_scene_id: params.sceneId,
@@ -325,9 +340,14 @@ export async function replaceLedgerAttempt(
       p_expected_stage: params.stage,
       p_expected_plate_generation: params.plateGeneration,
       p_provider: params.provider ?? null,
-      p_metadata: params.metadata ?? {},
+      p_metadata: {
+        ...(params.metadata ?? {}),
+        retry_reason: params.retryReason,
+        retry_of_job_id: params.previousJobId,
+      },
     });
     const row = Array.isArray(data) ? data[0] : data;
+
     if (error || !row?.job_id) {
       console.warn(`${V431_OBSERVE_TAG} ledger_replace_lost`, JSON.stringify({
         previous_job_id: params.previousJobId,
