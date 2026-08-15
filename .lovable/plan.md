@@ -63,11 +63,16 @@ positiver Guard, dass der Aufruf im vorgesehenen Finalizer-Pfad existiert.
 Keine Produktionslogik wird an den alten Test angepasst.
 
 ### R5 — F5: verbliebener Direct-Write im Recovery-Zweig
-`sync-so-webhook/index.ts` (~L599, Recovery aus selbstverschuldetem `watchdog_*`-Fail):
-Der Scene-/Pass-Apply entfällt. Der Pfad wird entweder über
-`composer_apply_sync_segment_result` geführt oder bei `rejected`/`noop` vollständig
-write-free (nur Logging/Netz-Cleanup). Danach Static Writer Guard erneut:
+`sync-so-webhook/index.ts` L598–607 (Recovery aus selbstverschuldetem `watchdog_*`-Fail).
+Entscheidung (nicht offen): der Pfad läuft **über den autoritativen RPC**. Die Un-Fail-Bedingung
+(`lip_sync_status='failed'` bzw. `dialog_shots.status='failed'` mit `clip_error ~
+'^watchdog_(provider_timeout|auto_retry_|hard_timeout)'`) wird als geguardete Vorstufe in
+`composer_apply_sync_segment_result` gezogen und dort unter demselben Row-Lock und denselben
+Provenienz-Guards ausgeführt (nur bei `segment_result = COMPLETED` mit gebundenem Pass).
+Der Edge-Branch wird vollständig **write-free**: nur Logging, danach RPC-Aufruf; bei
+`rejected`/`noop` schreibt er nichts. Danach Static Writer Guard erneut:
 0 unautorisierte Sync-Apply-Writer.
+
 
 ### R6 — F6: DB-Audit in derselben Transaktion
 `composer_apply_sync_segment_result` schreibt für `applied`, `noop` und `rejected` je eine
