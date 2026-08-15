@@ -5,6 +5,7 @@ import { withDialogLock } from "../_shared/dialog-lock.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 import { observeCallbackProvenance } from "../_shared/v431-ledger.ts";
+import { rs3FenceVerdict } from "../_shared/v431-rs3-fence.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
