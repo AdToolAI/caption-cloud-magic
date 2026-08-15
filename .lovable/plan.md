@@ -78,20 +78,23 @@ Der Edge-Branch wird vollständig **write-free**: nur Logging, danach RPC-Aufruf
 
 
 ### R6 — F6: DB-Audit in derselben Transaktion
-`composer_apply_sync_segment_result` schreibt für `applied`, `noop` und `rejected` je eine
-Zeile in `composer_scene_transition_log` (bestehende G0/G3-Infrastruktur, kein zweiter SoT)
-im selben Commit. Inhalt ausreichend zur Rekonstruktion: `scene_id`, `run_id`,
-`plate_generation`, `pipeline_job_id`, `external_job_id`, `write_id`, `pass_idx`,
-`segment_result`, `verdict`, `reason`, Vorher/Nachher-State.
-Damit die Audit-Zeile überlebt, wird verbindlich getrennt:
-- **fachliche `rejected`/`noop`-Verdikte** (missing_binding, wrong_run, wrong_generation,
-  wrong_job, wrong_pass, wrong_stage, stale_write, duplicate) ⇒ normaler RPC-Return,
-  kein `RAISE`; die Audit-Zeile bleibt committed;
+Auditiert wird **erst ab autoritativ aufgelöster Ledger-Zeile**. Sobald
+`composer_apply_sync_segment_result` den Job über `pipeline_job_id` aufgelöst hat, schreibt es
+für `applied`, `noop` und `rejected` je eine Zeile in `composer_scene_transition_log`
+(bestehende G0/G3-Infrastruktur, kein zweiter SoT) im selben Commit. Inhalt ausreichend zur
+Rekonstruktion: `scene_id`, `run_id`, `plate_generation`, `pipeline_job_id`, `external_job_id`,
+`write_id`, `pass_idx`, `segment_result`, `verdict`, `reason`, Vorher/Nachher-State.
+Abgrenzungen, verbindlich:
+- **Pre-RPC-Provenienzfälle** (`missing_binding`, `job_not_found` und vergleichbare) bleiben
+  **ausschließlich** in `composer_callback_observations`. Ohne autoritative Ledger-Zeile gibt es
+  keine belastbare `scene_id`; es wird keine Scene-Zuordnung nur fürs Audit erfunden.
+- **fachliche `rejected`/`noop`-Verdikte nach Auflösung** (wrong_run, wrong_generation,
+  wrong_job, wrong_pass, wrong_stage, stale_write, duplicate) ⇒ normaler RPC-Return, kein
+  `RAISE`; die Audit-Zeile bleibt committed.
 - **echte Invarianz-/Security-Corruption** ⇒ weiterhin Exception mit Rollback; dort kann
   naturgemäß keine Audit-Zeile derselben Transaktion persistieren.
 Testmatrix: mindestens ein `rejected`-Fall mit anschließend nachweisbar vorhandener
-Audit-Zeile. Edge-seitige `composer_callback_observations` bleiben ergänzend,
-ersetzen das Audit nicht.
+Audit-Zeile, plus Negativ-Nachweis, dass `missing_binding` keine Transition-Log-Zeile erzeugt.
 
 
 ### R7 — S10 echt parallel (Pre-Deploy-Gate)
