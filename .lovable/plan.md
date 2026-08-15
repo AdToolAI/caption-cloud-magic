@@ -24,12 +24,16 @@ keine neue Architektur. `docs/v431-g3-2-2-contract.md` bleibt LOCKED und unverä
 
 ### R1 — F1: `mux_dispatch_requested_at` (RED)
 In `composer_apply_sync_segment_result`, unter dem bestehenden Scene-Row-Lock:
-`_ds := jsonb_set(_ds, '{audio_mux}', COALESCE(_ds->'audio_mux','{}'::jsonb), true)` vor
-allen `audio_mux`-Detail-Writes; danach ausschließlich schmale Key-Writes
-(`mux_dispatch_requested_at`, `dispatched_at`). Kein Whole-JSON-Replace, Sibling-Keys
-bleiben erhalten. Duplicate-Redrive-Zweig identisch behandelt: fehlender `audio_mux`-Ledger-Attempt
-⇒ erneut `dispatch_mux`, vorhandener Attempt ⇒ `noop`.
-Smokes: fehlender Parent, vorhandener Parent mit Sibling-Keys, Duplicate/Crash-Redrive.
+`_ds := jsonb_set(_ds, '{audio_mux}', COALESCE(_ds->'audio_mux','{}'::jsonb), true)` vor dem
+Detail-Write; danach wird **ausschließlich** `mux_dispatch_requested_at` schmal gesetzt.
+`dispatched_at` schreibt der Apply-RPC **nicht** — weder im Erst- noch im Redrive-Zweig;
+dieses Feld gehört allein dem Dispatch-Owner nach erfolgreichem `audio_mux`-Acquire.
+`mux_dispatch_requested_at` ist damit nur der re-drivable Request-Claim, Exactly-once bleibt
+am Ledger-Acquire. Kein Whole-JSON-Replace, Sibling-Keys bleiben erhalten. Duplicate-Redrive:
+fehlender `audio_mux`-Ledger-Attempt ⇒ erneut `dispatch_mux`, vorhandener Attempt ⇒ `noop`.
+Smokes: fehlender Parent, vorhandener Parent mit Sibling-Keys, Duplicate/Crash-Redrive,
+plus negativer Guard „`dispatched_at` bleibt nach Apply unverändert/abwesend".
+
 
 ### R2 — F2: `composer_touch_lipsync_progress`
 Interner SQL-Helper wie im Contract §7 spezifiziert; die heutige Inline-Progress-Semantik
