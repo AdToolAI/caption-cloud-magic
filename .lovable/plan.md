@@ -18,7 +18,7 @@ Analyse-Ergebnis + Endvertrag. Keine Migration, kein Code, kein Deploy in diesem
 ### sync-so-webhook (1852 Z.)
 | Pfad | heutige Writes | Ziel |
 | --- | --- | --- |
-| pass done, Fan-in offen | `update_dialog_pass_slot` + `update{lip_sync_status:'running',twoshot_stage:'syncso_fanout_x_of_n'}` (L1073/L1084) | Slot-RPC bleibt; Top-Level-Spiegel via **E** `composer_touch_lipsync_progress` (kein State-Wechsel) |
+| pass done, Fan-in offen | `update_dialog_pass_slot` + `update{lip_sync_status:'running',twoshot_stage:'syncso_fanout_x_of_n'}` (L1073/L1084) | **F** `composer_apply_sync_segment_result` (Slot + Progress + Job-Terminalisierung in einem Commit) |
 | Fallback bei RPC-Fehler | Whole-JSON `dialog_shots`-Rewrite (L1096) | **entfällt ersatzlos** (G3.0b §4) |
 | single, nicht-tight | Whole-JSON `dialog_shots` + `materializeCompatibilityOutput('processed')` + `clip_status='ready'`, `lip_sync_status='applied'`, `lip_sync_applied_at`, `twoshot_stage='complete'` (L1144) | **B** `sso:applied` |
 | single-tight / N≥2 all done | `try_claim_mux_dispatch` + Whole-JSON `status:'audio_muxing'` + `lip_sync_status='audio_muxing'` (L1201) + `acquireLedgerJob(audio_mux)` + Dispatch | **State-Write entfällt hier** (G3.0b §6): nur Claim + Ledger + Dispatch |
