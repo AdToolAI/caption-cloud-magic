@@ -33,6 +33,29 @@ erzeugt einen zweiten Auftrag — Doppel-Spend. Das wird korrigiert.
   bleibt der einzige Weg. `retry_reason` wandert in die Metadaten des neuen Attempts.
 - Rückgabetyp wird ein Discriminated Union, damit „nicht dispatchen" nicht mit
   „Ledger nicht verfügbar" (fail-open `null`) verwechselbar ist.
+- `dispatch_uncertain` zählt bei `acquireLedgerJob()` als `already_in_flight`. Ein
+  Redispatch daraus ist ausschließlich über den expliziten Retry-/Replace-Vertrag
+  zulässig — die Liveness-Entscheidung bleibt bewusst und erzeugt keinen versteckten
+  zweiten Provider-Auftrag.
+
+### 1b. Concurrency-sichere Initial-Akquise (Pflichtergebnis)
+
+Der Pre-Check allein reicht nicht: Zwei parallele Initial-Aufrufe können beide „kein
+aktiver Attempt" sehen und dann beim INSERT konkurrieren. Der Unique-Constraint verhindert
+die zweite Zeile, aber nicht den zweiten Provider-Call, solange der Verlierer den
+Unique-Fehler als fail-open `null` behandelt.
+
+**Vertrag:** Zwei gleichzeitige `acquireLedgerJob()`-Aufrufe für dieselbe
+(scene, run, stage, segment, generation) ergeben deterministisch genau einmal `acquired`
+und einmal `already_in_flight`. Der Verlierer gibt **niemals** `null`/fail-open zurück und
+dispatcht **niemals**. `composer_replace_pipeline_attempt` wird dabei nie aufgerufen.
+
+Umsetzung: `INSERT ... ON CONFLICT (idempotency_key) DO NOTHING` plus deterministischer
+Re-Read der Gewinnerzeile — leere Insert-Rückgabe ist der Beweis für den verlorenen Race
+und wird zu `already_in_flight` mit dem Handle des Gewinners (nicht zu `null`). Liefert der
+Re-Read wider Erwarten nichts, wird kurz erneut gelesen, bevor überhaupt eine andere
+Verdikt-Klasse in Frage kommt.
+
 
 ### 2. Aufrufer anpassen
 
