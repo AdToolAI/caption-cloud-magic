@@ -167,14 +167,17 @@ RS3-S1…S20 plus Frozen-Suite, `tsgo` und die bestehenden G3.1/G3.1f/G3.2.2-Smo
 17. Fence überlebt Consumption: nach verbrauchter Sync-/Mux-Autorisierung wehrt der Marker weiterhin alte Callbacks ab; Attempt-1-Identitäten ohne Vorgänger tragen ebenfalls `rs3_reset_id`
 18. **Refund-Idempotenz:** Reset + fehlgeschlagener Provider-Cancel + späterer Failure-Callback ⇒ kein zweiter Refund, keine weitere finanzielle Nebenwirkung
 19. **Reset-vs-Dispatch-Race:** Session A hält die Reset-Transaktion offen vor Commit, Session B versucht parallel einen Sync- bzw. Mux-Attempt für dieselbe Scene/Run/Generation. Nach Freigabe existiert **kein** aktiver ungetaggter Pre-Reset-Job: B wartet und erzeugt danach einen Job mit aktueller `rs3_reset_id`, oder B ist fail-closed.
-20. **No-Predecessor-Fall:** autorisierte Identität ohne jeden Vorgänger ⇒ erster Post-Reset-Dispatch erzeugt regulär Attempt 1, getaggt mit aktueller `rs3_reset_id`, atomar unter demselben Lock
-
+20. **No-Predecessor-Fall:** autorisierte Identität ohne jeden Vorgänger ⇒ erster Post-Reset-Dispatch erzeugt regulär Attempt 1, getaggt mit aktueller `rs3_reset_id`, atomar unter demselben Lock; Branch wird **vor** dem Rearm-Branch entschieden
+21. **Deadlock-Freiheit (Lock-Order):** paralleler Callback-Apply (Job → Scene, ohne Advisory) gegen Serialized-Acquire (Advisory → Job → Scene) auf derselben Scene/Identität, beide Richtungen und verschränkt ⇒ kein `deadlock detected`, beide Transaktionen terminieren mit den vertraglichen Ergebnissen; analog Reset (Advisory → Jobs → Scene) gegen Callback
 
 Zusätzlich: `user_reset` nicht retryable; Marker-Lifecycle (überlebt die Reset-Mutation); Fail-closed-Test `rs3_rearm_unavailable`; Drift-Test der Statusmenge; Frozen-Test, dass `composer_acquire_pipeline_attempt` unverändert `predecessor_exists` liefert.
 
 ## 8. Writer-/Security-Audit
 
-Nachweis: beide Reset-Aufrufer laufen über den einen RPC-Vertrag, kein verbleibender Direct-Clear-Pfad, beide neuen Primitive `service_role`-only, `anon`/`authenticated`/`PUBLIC` ohne EXECUTE, akzeptiertes plattform-internes ACL wie bisher dokumentiert.
+Nachweis: beide Reset-Aufrufer laufen über den einen RPC-Vertrag, kein verbleibender Direct-Clear-Pfad, kein direkter Aufruf des Acquire-RPC für Lip-Sync-Stages außerhalb des Wrappers.
+
+Alle **drei** neuen DB-Funktionen — `composer_reset_lipsync_with_attempt_cancellation`, `composer_acquire_reset_rearmed_attempt`, `composer_acquire_lipsync_attempt_serialized` — explizit: `SECURITY DEFINER`, `search_path = pg_catalog, public`, keine Defaults/Overloads, `REVOKE ALL ... FROM PUBLIC`, kein EXECUTE für `anon`/`authenticated`, `GRANT EXECUTE` nur an `service_role`. Akzeptiertes plattform-internes ACL wie bisher dokumentiert.
+
 
 ## 9. Deliverables
 
