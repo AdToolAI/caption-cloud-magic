@@ -19775,6 +19775,7 @@ export type Database = {
         }
         Returns: Json
       }
+      composer_retryable_failure_reasons: { Args: never; Returns: string[] }
       composer_scene_transition:
         | {
             Args: {
