@@ -1,27 +1,23 @@
 /**
  * reset-lipsync-scene — explicit user-triggered "clean restart" endpoint.
  *
- * Always-safe entry point to abort whatever lip-sync state a scene is in
- * and put it back into a clean `pending` state ready for a brand-new run.
+ * v431 RS3 (Option A): der komplette Reset ist EIN atomarer DB-Commit
+ * (`composer_reset_lipsync_with_attempt_cancellation`):
+ *   - offene Lip-Sync-Ledger-Attempts (`sync_segment`, `audio_mux`) werden
+ *     `cancelled` / `error_code='user_reset'`; terminale bleiben unberührt,
+ *   - die Szene wird auf den bekannten Reset-Feldsatz zurückgesetzt,
+ *   - ein Reset-Marker (`audio_plan.twoshot.rs3_reset`) autorisiert genau einen
+ *     On-Demand-Nachfolger je Stage/Segment und fenced alle Pre-Reset-Callbacks.
  *
- * Steps (idempotent):
- *   1. Verify caller owns the scene (auth via JWT).
- *   2. Call `failLipSync()` — cancels open Sync.so jobs, frees inflight slots,
- *      refunds credits once.
- *   3. Hard-reset the scene back to `pending` / null stages, clear
- *      dialog_shots + replicate_prediction_id so the auto-trigger sees a
- *      fresh candidate.
- *
- * Returns 200 on success. The auto-trigger (or a manual button click) then
- * starts a brand-new run.
+ * Diese Funktion macht danach nur noch: Auth/Ownership, den RPC-Aufruf und
+ * NACH dem Commit best-effort Provider-Cancels + den idempotenten Refund.
+ * Eigene Scene-Writes gibt es hier nicht mehr.
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
-import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { getSyncApiKey } from "../_shared/syncso-preflight.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
-import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -66,7 +62,7 @@ serve(async (req) => {
   // Ownership: scene → project → user
   const { data: scene } = await admin
     .from("composer_scenes")
-    .select("id, project_id, dialog_shots, lip_sync_applied_at, lip_sync_source_clip_url, clip_url, clip_status, audio_plan")
+    .select("id, project_id, active_run_id, plate_generation, dialog_shots, audio_plan")
     .eq("id", sceneId)
     .maybeSingle();
   if (!scene) return json({ error: "scene_not_found" }, 404);
@@ -80,58 +76,101 @@ serve(async (req) => {
     return json({ error: "forbidden" }, 403);
   }
 
-  if ((scene as any).lip_sync_applied_at && !force) {
+  // Zusätzliche Provider-IDs aus dem Legacy-State einsammeln, bevor der RPC
+  // `dialog_shots` löscht — sie werden nur für Best-effort-Cancels benutzt.
+  const legacyJobIds = new Set<string>();
+  const ds: any = (scene as any).dialog_shots ?? null;
+  for (const p of Array.isArray(ds?.passes) ? ds.passes : []) {
+    if (typeof p?.job_id === "string" && p.job_id) legacyJobIds.add(p.job_id);
+  }
+  for (const s of Array.isArray(ds?.shots) ? ds.shots : []) {
+    if (typeof s?.sync_job_id === "string" && s.sync_job_id) legacyJobIds.add(s.sync_job_id);
+  }
+  if (typeof ds?.sync_job_id === "string" && ds.sync_job_id) legacyJobIds.add(ds.sync_job_id);
+
+  // ── RS3: ein Commit ────────────────────────────────────────────────────
+  const { data: rpcData, error: rpcError } = await admin.rpc(
+    "composer_reset_lipsync_with_attempt_cancellation",
+    {
+      _scene_id: sceneId,
+      _expected_run_id: (scene as any).active_run_id ?? null,
+      _expected_plate_generation: typeof (scene as any).plate_generation === "number"
+        ? (scene as any).plate_generation
+        : null,
+      _force: force,
+    },
+  );
+  if (rpcError) {
+    console.error(`[reset-lipsync-scene] rs3_reset_failed scene=${sceneId}: ${rpcError.message}`);
+    return json({ error: "reset_failed", detail: rpcError.message }, 500);
+  }
+  const result: any = rpcData ?? {};
+  if (result?.ok !== true) {
+    return json({ ok: false, status: result?.outcome ?? "reset_rejected", scene_id: sceneId }, 409);
+  }
+  if (result.outcome === "already_applied") {
     return json({ ok: true, status: "already_applied" });
   }
 
-  const refundCredits = Number((scene as any).dialog_shots?.cost_credits) || 0;
-  await failLipSync({
-    supabase: admin,
-    sceneId,
-    userId,
-    reason: "user_reset",
-    refundCredits,
-    syncApiKey: getSyncApiKey() || null,
+  // ── Post-Commit: best-effort Provider-Cancels ──────────────────────────
+  for (const id of (Array.isArray(result.external_job_ids) ? result.external_job_ids : [])) {
+    if (typeof id === "string" && id.length > 0) legacyJobIds.add(id.replace(/^sync:/, ""));
+  }
+  const ids = Array.from(legacyJobIds);
+  if (ids.length > 0) {
+    try {
+      await admin.from("syncso_inflight_jobs").delete().in("job_id", ids);
+    } catch (e) {
+      console.warn(`[reset-lipsync-scene] inflight cleanup: ${(e as Error).message}`);
+    }
+    const syncApiKey = getSyncApiKey() || null;
+    if (syncApiKey) {
+      await Promise.all(ids.map((id) =>
+        fetch(`https://api.sync.so/v2/generations/${id}`, {
+          method: "DELETE",
+          headers: { "x-api-key": syncApiKey },
+        })
+          .then((r) => console.log(`[reset-lipsync-scene] sync.so DELETE ${id} → ${r.status}`))
+          .catch((e) => console.warn(`[reset-lipsync-scene] sync.so DELETE ${id}: ${(e as Error).message}`))
+      ));
+    }
+  }
+
+  // ── Post-Commit: Refund. Der Anspruch wurde im Reset-Commit EINMALIG
+  // beansprucht (`refund_claimed`), deshalb kann er hier nicht doppeln.
+  const refundCredits = Number(result.refund_credits) || 0;
+  let refunded = false;
+  if (result.refund_claimed === true && refundCredits > 0) {
+    try {
+      const { data: wallet } = await admin
+        .from("wallets").select("balance").eq("user_id", userId).single();
+      if (wallet) {
+        await admin.from("wallets").update({
+          balance: Number((wallet as any).balance ?? 0) + refundCredits,
+          updated_at: new Date().toISOString(),
+        }).eq("user_id", userId);
+        refunded = true;
+      }
+    } catch (e) {
+      console.warn(`[reset-lipsync-scene] refund crash: ${(e as Error).message}`);
+    }
+  }
+
+  console.log(`[reset-lipsync-scene] rs3 reset scene=${sceneId}`, JSON.stringify({
+    reset_id: result.reset_id,
+    canceled: result.canceled_job_ids,
+    authorized_segments: result.authorized_segments,
+    refunded,
+  }));
+
+  return json({
+    ok: true,
+    status: "reset",
+    scene_id: sceneId,
+    reset_id: result.reset_id,
+    canceled_job_ids: result.canceled_job_ids ?? [],
+    authorized_segments: result.authorized_segments ?? [],
+    refunded,
   });
-
-  // Hard reset → ready for a brand-new auto-trigger pick-up.
-  // Also clear the cached faceMap inside audio_plan.twoshot so the next run
-  // re-detects faces against the current plate; a stale faceMap from a
-  // previous (different aspect-ratio) clip would otherwise feed wrong
-  // coordinates into Sync.so on every retry.
-  const prevPlan = ((scene as any).audio_plan ?? {}) as Record<string, unknown>;
-  const prevTwoshot = (prevPlan as any).twoshot ?? {};
-  const cleanedTwoshot = { ...prevTwoshot };
-  delete (cleanedTwoshot as any).faceMap;
-  delete (cleanedTwoshot as any).anchor_face_audit;
-  delete (cleanedTwoshot as any).sync_job_id;
-  delete (cleanedTwoshot as any).segments_payload;
-  delete (cleanedTwoshot as any).last_segments;
-  delete (cleanedTwoshot as any).audio_input_mode;
-  const cleanedPlan = { ...prevPlan, twoshot: cleanedTwoshot };
-  const restoredSourceClip =
-    force && typeof (scene as any).lip_sync_source_clip_url === "string"
-      ? (scene as any).lip_sync_source_clip_url
-      : (scene as any).clip_url;
-
-  await admin
-    .from("composer_scenes")
-    .update({
-      lip_sync_status: "pending",
-      twoshot_stage: null,
-      replicate_prediction_id: null,
-      dialog_shots: null,
-      clip_error: null,
-      // v430 Step 1 — restoring the plate goes through the single writer, so
-      // base_video_url is restored and the processed result is dropped too.
-      ...materializeCompatibilityOutput("base", { baseUrl: restoredSourceClip ?? null }),
-      clip_status: restoredSourceClip ? "ready" : ((scene as any).clip_status ?? "pending"),
-      lip_sync_source_clip_url: null,
-      lip_sync_applied_at: null,
-      audio_plan: cleanedPlan,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", sceneId);
-
-  return json({ ok: true, status: "reset", scene_id: sceneId });
 });
+
