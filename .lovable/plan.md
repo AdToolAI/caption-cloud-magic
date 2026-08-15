@@ -34,8 +34,17 @@ Mechanik wie G2.3/G2.4, und nur die Resultate berichtet:
 | D6 | Reaper | `dispatch_uncertain`, `completed_at IS NULL`, Callback-Lookup über `pipeline_job_id` findet Job weiter |
 | D7 | Predecessor `succeeded` | `already_completed`, kein neuer Attempt |
 | D8 | Predecessor `stale` | `retry_superseded`, kein neuer Zweig |
-| D9 | Predecessor `failed`, Grund in `RETRYABLE_FAILURE_REASONS` | Replace, `attempt_no+1` |
-| D10 | Predecessor `failed`, Grund außerhalb der Liste | `failure_not_retryable`, kein Attempt |
+| D9 | Predecessor `failed`, **gespeicherter** Failure-/Error-Code in `RETRYABLE_FAILURE_REASONS` | Replace, `attempt_no+1` |
+| D10 | Predecessor `failed`, gespeicherter Code außerhalb der Liste — auch bei „gutem" Caller-`retry_reason` | `failure_not_retryable`, kein Attempt |
+| D11 | Acquire bei terminalem Vorgänger | `predecessor_exists`, kein INSERT |
+
+**Autorisierung liegt in der DB.** Die Retryfähigkeit wird ausschließlich im gelockten
+`composer_replace_pipeline_attempt` anhand des am Vorgänger **gespeicherten** Failure-/Error-Codes
+gegen die geschlossene Menge `RETRYABLE_FAILURE_REASONS` entschieden (SQL-seitige Konstante,
+spiegelbildlich zur TS-Liste, per Test abgeglichen). Ein vom Caller übergebenes `retry_reason`
+wird nur protokolliert und autorisiert nichts. D9/D10 prüfen genau dieses DB-Enforcement.
+
+
 
 ## 3. lipsync-watchdog — Formulierung war zu schwach, wird korrigiert
 
