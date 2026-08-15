@@ -118,18 +118,25 @@ render-sync-segments-audio-mux  dispatch→ C(mux:dispatched)           | failur
 remotion-webhook (dialog-stitch) success→ B(stitch:done)              | failure → D(stitch:failed)
 ```
 
-## 6. DB-Smoke-Matrix (je RPC A–E, transaktional, mit Rollback)
+## 6. DB-Smoke-Matrix (je RPC A–G, transaktional, mit Rollback)
 
-`current job success → applied` · `stale run → No-op` · `stale generation → No-op` · `wrong external job → No-op` · `wrong stage → No-op` · `wrong from-state → No-op` · `duplicate callback → No-op` · `binding_pending → No-op/409` · zwei parallele Completion-Callbacks (`FOR UPDATE`) → genau ein Apply · Failure nach Success → kein Rollback auf `failed` · Success nach terminalem Failure → gemäß Matrix · RPC-Fehler nach Scene-Mutation → vollständiger Rollback inkl. Job · kein Whole-JSON-`dialog_shots` (Vergleich `passes[]` byte-identisch) · bei Rejection Outputs/Mirrors/`updated_at` vollständig unverändert · Fan-in-Barriere: Szene bleibt `lipsync_running`, genau ein Mux-Gewinner.
+`current job success → applied` · `stale run → No-op` · `stale generation → No-op` · `wrong external job → No-op` · `wrong stage → No-op` · `wrong from-state → No-op` · `duplicate callback → No-op` · `binding_pending → No-op/409` (auch: NULL-Bindung wird **nicht** als `wrong_job` klassifiziert) · zwei parallele Completion-Callbacks (`FOR UPDATE`) → genau ein Apply · Failure nach Success → kein Rollback auf `failed` · Success nach terminalem Failure → gemäß Matrix · RPC-Fehler nach Scene-Mutation → vollständiger Rollback inkl. Job · kein Whole-JSON-`dialog_shots` (Vergleich `passes[]` byte-identisch) · bei Rejection Outputs/Mirrors/`updated_at` vollständig unverändert · Fan-in-Barriere: Szene bleibt `lipsync_running`, genau ein Mux-Gewinner.
+
+Zusätzliche Smokes aus den fünf geschlossenen Punkten:
+- **F (Segment-Apply):** Pass-Slot-Write und Job-`succeeded` sind in derselben Transaktion sichtbar; künstlicher Fehler nach dem Slot-Write rollt Pass **und** Job zurück; zweiter identischer Callback → `duplicate_callback`, `passes[]` unverändert; letzter Pass setzt `all_passes_terminal:true` genau einmal.
+- **G (Internal Failure):** Preflight-Fail ohne `external_job_id` → `applied:true`; derselbe Aufruf mit fremdem `run_id`/`plate_generation` → No-op; `mux:invoke_failed` terminalisiert den Job genau einmal, ein zusätzlicher `settleLedgerDispatchFailure()` auf denselben Job ist im Code nicht mehr vorhanden (Grep-Test).
+- **Post-Plate-Handoff:** `ccw:handoff_failed` gegen den bereits `succeeded` Plate-Job → Vertragsverletzung (RPC existiert dafür nicht); run-bound Aufruf mit veraltetem `run_id` → No-op; Plate-Outputs bleiben nach Handoff-Fail vollständig erhalten.
+- **Terminalstatus:** kein RPC schreibt jemals den String `completed`; Statuswerte bleiben in der bestehenden CHECK-Allowlist.
 
 ## 7. Umsetzungsreihenfolge (kleine Blöcke, STOP nach jedem)
 
 | Block | Inhalt | STOP-Gate |
 | --- | --- | --- |
-| G3.2.1 | Migration A + D-Zeilen `ccw:*`; Handler `compose-clip-webhook` umstellen | Smokes A/D-ccw grün, Frozen-Suite, `tsgo`, `deno check` → STOP |
-| G3.2.2 | Migration C + D-Zeilen `mux:*`; `render-sync-segments-audio-mux` umstellen | Smokes C/D-mux, Mux-Owner-Test → STOP |
-| G3.2.3 | Migration B (`stitch:done`) + `stitch:failed`; `remotion-webhook` umstellen | Smokes B/D-stitch, Base-URL-Invariante → STOP |
-| G3.2.4 | Migration B (`sso:applied`) + E + D-Zeilen `sso:*`; `sync-so-webhook` umstellen, Whole-JSON-Fallback entfernen | Smokes B/E/D-sso, Fan-in-Matrix, kein Whole-JSON → STOP |
+| G3.2.1 | Migration A + `composer_fail_post_plate_handoff` + D-Zeilen `ccw:failed`/`ccw:legacy_route_blocked`; Handler `compose-clip-webhook` umstellen | Smokes A/D-ccw/Post-Plate grün, Frozen-Suite, `tsgo`, `deno check` → STOP |
+| G3.2.2 | Migration C + G (`mux:preflight_failed`, `mux:invoke_failed`); `render-sync-segments-audio-mux` umstellen, doppelten Ledger-Settle entfernen | Smokes C/G, Mux-Owner-Test (genau ein Ledger-Owner) → STOP |
+| G3.2.3 | Migration B (`stitch:done`) + D (`stitch:failed`); `remotion-webhook` umstellen | Smokes B/D-stitch, Base-URL-Invariante → STOP |
+| G3.2.4 | Migration F + B (`sso:applied`) + D-Zeilen `sso:*`; `sync-so-webhook` umstellen, Whole-JSON-Fallback entfernen | Smokes F/B/D-sso, Fan-in-Matrix, kein Whole-JSON → STOP |
 | G3.2.5 | Deploy aller berührten Functions, neues T0, Drain-Beobachtung über `composer_callback_observations` | Post-T0 0/0/0 je Kanal → Abnahme |
 
-Restschuld `watchdog_no_prediction_id` bleibt außerhalb des Scopes. G3.1-Artefakte (Observe-Telemetrie, Reaper, Acquire/Replace, Ledger-Immutabilität) bleiben unverändert.
+Restschulden außerhalb des Scopes: `watchdog_no_prediction_id` sowie die Recovery gebundener Jobs ohne eintreffenden Callback (G4/Watchdog). G3.1-Artefakte (Observe-Telemetrie, Reaper, Acquire/Replace, Ledger-Immutabilität) bleiben unverändert.
+
