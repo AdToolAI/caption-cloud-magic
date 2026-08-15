@@ -46,37 +46,42 @@ Analyse-Ergebnis + Endvertrag. Keine Migration, kein Code, kein Deploy in diesem
 
 Alle neu: `SECURITY DEFINER`, `SET search_path = pg_catalog, public`, schema-qualifiziert, `REVOKE ALL FROM PUBLIC, anon, authenticated`, `GRANT EXECUTE TO service_role`. Reihenfolge in jedem RPC: `SELECT … FROM composer_pipeline_jobs WHERE id=_pipeline_job_id FOR UPDATE` → `SELECT … FROM composer_scenes WHERE id=job.scene_id FOR UPDATE` → Identitätsprüfung → From-State-Matrix → Writes → Job-Terminalisierung → Return. Rückgabe einheitlich `jsonb`: `{applied, verdict, scene_id, run_id, plate_generation, stage, job_status}`. Jeder Versuch (applied **und** rejected) schreibt eine Audit-Zeile.
 
-Identitätsprüfung (identisch in allen vier):
+**Terminalstatus normativ:** die bestehende CHECK-Allowlist von `composer_pipeline_jobs.status` lautet `pending, dispatching, dispatched, running, callback_processing, succeeded, failed, cancelled, stale, dispatch_uncertain` (in der DB verifiziert). Erfolgreicher Terminalstatus ist deshalb durchgängig **`succeeded`** — der Begriff `completed` kommt in G3.2 nicht vor, und es wird keine parallele Terminalsemantik eingeführt.
+
+Identitätsprüfung (identisch in allen Callback-RPCs, exakte Reihenfolge):
 1. Job existiert, `stage` = erwartete Stage → sonst `wrong_stage`.
-2. `_external_job_id` = `job.external_job_id` → sonst `wrong_job`.
-3. `job.external_job_id IS NULL` → `binding_pending` (siehe §3).
+2. `job.external_job_id IS NULL` → `binding_pending` (siehe §3) — **vor** jedem Wertvergleich.
+3. `_external_job_id = job.external_job_id` → sonst `wrong_job`.
 4. `job.run_id = scene.active_run_id` → sonst `stale_run`.
 5. `job.plate_generation = scene.plate_generation` → sonst `stale_generation`.
-6. Job bereits terminal `completed` → `duplicate_callback` (No-op, `applied:false`).
-7. Job terminal `failed`/`stale`/`replaced_by IS NOT NULL` → `attempt_superseded`.
+6. Job bereits terminal `succeeded` → `duplicate_callback` (No-op, `applied:false`).
+7. Job terminal `failed`/`cancelled`/`stale`/`replaced_by IS NOT NULL` → `attempt_superseded`.
+
+Schritte 2 und 3 entfallen ausschließlich in **G** (interner Dispatch-Fail ohne External-Bindung); Schritte 1–3 und 6–7 entfallen in **H** (kein Ledger-Job, run-gebundene Provenienz).
 
 ### A. `composer_finalize_plate_scene(_pipeline_job_id uuid, _external_job_id text, _write_id text, _base_video_url text, _clip_source_hint text, _extra jsonb)`
 - Write-ID geschlossen: nur `ccw:plate-complete`. Stage `base_video`.
 - From-State: **ausschließlich** `plate_rendering` → `plate_ready`. `plate_queued` → `from_state_rejected` (No-op).
 - Writes: `base_video_url`, `clip_url`, `clip_status='ready'`, `clip_error=NULL`, Continuity-Stempel + `audio_plan.ambientGate` als schmale Keys aus `_extra` (Allowlist: `continuity_rendered_*`, `audio_plan.ambientGate`, `lip_sync_status='pending'`, `twoshot_stage='master_clip'`). `processed_video_url` bleibt unberührt.
-- Job: `completed`. Audit über `composer_scene_transition_v2`-Pfad.
-- Handoff (`compose-twoshot-audio` → `compose-dialog-segments`), Archiv, Continuity-Chain, Projektstatus: erst nach Commit, nur bei `applied:true`.
+- Job: `succeeded`. Audit über `composer_scene_transition_v2`-Pfad.
+- Handoff (`compose-twoshot-audio` → `compose-dialog-segments`), Archiv, Continuity-Chain, Projektstatus: erst nach Commit, nur bei `applied:true`. Scheitert der Handoff, ist der Plate-Job endgültig `succeeded` — der Fehler läuft über **H**, nie über einen zweiten Apply auf denselben Job.
 
 ### B. `composer_finalize_lipsync_scene(_pipeline_job_id uuid, _external_job_id text, _write_id text, _processed_url text, _dialog_patch jsonb)`
 - Geschlossene Matrix: `sso:applied` nur `lipsync_running → complete` (Stage `sync_segment`); `stitch:done` nur `lipsync_muxing → complete` (Stage `audio_mux`).
 - Writes: `processed_video_url`, `clip_url`, `clip_status='ready'`, `lip_sync_applied_at=now()`, `clip_error=NULL`; Legacy-Spiegel `lip_sync_status='applied'|'done'`, `twoshot_stage='complete'|'done'` je Write-ID.
 - `base_video_url` wird **nicht** aus dem Callback gesetzt; `lip_sync_source_clip_url` = bestehendes `base_video_url` der Scene.
 - `_dialog_patch`: Allowlist `status`, `final_url`, `sync_so_url`, `finished_at` — Top-Level-Merge via `jsonb_set`, kein Blob-Overwrite, `passes` unantastbar.
-- Job: `completed`.
+- Job: `succeeded`.
 
 ### C. `composer_enter_lipsync_mux(_pipeline_job_id uuid, _external_job_id text, _write_id text, _render_id text)`
 - Write-ID geschlossen: `mux:dispatched`. Stage `audio_mux`. `_render_id` non-null Pflicht (`render_id_required`).
 - From-State: **ausschließlich** `lipsync_running → lipsync_muxing`; `pipeline_substate='audio_mux'`; Legacy `lip_sync_status='audio_muxing'`, `twoshot_stage='audio_muxing'`; `dialog_shots.audio_mux.render_id`/`dispatched_at` als schmaler Patch.
-- **Job-Lifecycle-Entscheidung:** der `audio_mux`-Ledger-Job wird hier **nicht** terminalisiert. Er ist über `bindLedgerExternalJob(renderId)` an genau den Remotion-Render gebunden, dessen Callback ihn später über **B** (`stitch:done`) oder **D** (`stitch:failed`) schließt. Terminalisierung hier würde Regel 2 (Apply + terminaler Claim atomar) für den Remotion-Callback unmöglich machen und den Reaper blind stellen. Bleibt der Callback aus, greift der bestehende `dispatch_uncertain`-Reaper.
+- **Job-Lifecycle-Entscheidung:** der `audio_mux`-Ledger-Job wird hier **nicht** terminalisiert. Er ist über `bindLedgerExternalJob(renderId)` an genau den Remotion-Render gebunden, dessen Callback ihn später über **B** (`stitch:done`) oder **D** (`stitch:failed`) schließt. Terminalisierung hier würde Regel 2 (Apply + terminaler Claim atomar) für den Remotion-Callback unmöglich machen.
+- **Keine Reaper-Garantie:** ein bereits gebundener `audio_mux`-Job ohne eintreffenden Callback ist **nicht** der Fall, den `composer_reap_orphaned_dispatches` abdeckt (der adressiert die ungebundene Dispatch-Phase). Diese Recovery ist ausdrücklich **G4/Watchdog-Restschuld** und wird in G3.2 nicht zugesichert.
 - Einziger Mux-State-Owner: `sync-so-webhook` ruft C **nicht** auf.
 
 ### D. `composer_fail_callback_scene(_pipeline_job_id uuid, _external_job_id text, _write_id text, _error_text text, _dialog_patch jsonb)`
-Keine frei übergebbaren From-States, keine Clear-Flags. Geschlossene Matrix:
+Nur echte Provider-Callback-Failures mit gebundener External-ID. Keine frei übergebbaren From-States, keine Clear-Flags. Geschlossene Matrix:
 
 | write_id | Stage | erlaubte From-States | → State / Substate | Legacy-Spiegel | Outputs | dialog_shots | Job |
 | --- | --- | --- | --- | --- | --- | --- | --- |
