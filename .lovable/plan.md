@@ -137,7 +137,9 @@ Von Deploy-Zeitstempel bis Resmoke-Ende auswerten und im Report festhalten:
 - Transition-Audit-Zeilen (`composer_scene_transition_log`, `caller_class='sync_segment_apply'`).
 - Ledger-Attempts nach `stage` und `status`.
 - Reaper-/Watchdog-Fehler.
-- Zählungen: `missing_binding`, `wrong_job`, `stale_run`, `stale_generation`, `binding_pending` — Erwartung 0 (bzw. `binding_pending` nur transient).
+- Zählungen: `missing_binding`, `wrong_job`, `stale_run`, `stale_generation` — Erwartung 0.
+  `binding_pending` muss am **Ende** des Resmoke-Fensters ebenfalls 0 sein; ein kurzzeitiger
+  Wert während des Dispatch wird dokumentiert, darf aber nicht unresolved stehenbleiben.
 
 ## 8. Abschluss
 
