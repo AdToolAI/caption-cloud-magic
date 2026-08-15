@@ -147,3 +147,74 @@ Bewertung: **kein Identitäts-, Ledger- oder Observe-Defekt** — G3.1 trägt un
 ## Vorschlag für die Abnahme (nicht umgesetzt)
 
 Kandidat wäre, die A-From-State-Matrix auf dieselbe belegte, geschlossene Menge wie H zu ziehen und analog zu Gate 1 per Matrix-Smoke zu beweisen (erlaubt vs. verboten, Output-Invarianz, Audit-Vertrag). Das braucht eine eigene Freigabe.
+
+---
+
+# A-Compatibility-Patch (Nachtrag, 2026-08-15)
+
+Freigegebener Scope: ausschließlich `composer_finalize_plate_scene` (RPC A). Kein G3.2.2, keine
+Änderung an H, D, Ledger, Webhook-Code oder Frontend. Kein Deploy in diesem Schritt.
+
+## Geschlossene Compatibility-Matrix (temporär, solange die Legacy→State-Bridge aktiv ist)
+
+| From-State | Outputs | State/Substate | Audit |
+| --- | --- | --- | --- |
+| `plate_rendering` | materialisiert | echte Transition → `plate_ready` über `composer_scene_transition_core` | `from = plate_rendering`, `to = plate_ready`, `applied = true` |
+| `plate_ready` | materialisiert | unverändert | `from = to = plate_ready`, `applied = true`, `reason = compatibility_finalize` |
+| `audio_prep` | materialisiert | unverändert | `from = to = audio_prep`, `applied = true`, `reason = compatibility_finalize` |
+| `audio_ready` | materialisiert | unverändert | `from = to = audio_ready`, `applied = true`, `reason = compatibility_finalize` |
+| `lipsync_dispatched`, `lipsync_running`, `lipsync_muxing`, `complete`, `failed`, `canceled`, alle übrigen | keine | keine | `applied = false`, `reason = from_state_rejected` |
+
+Alle vorgelagerten Guards sind unverändert (`write_id`, `stage = base_video`, `external_job_id`,
+`run_id = active_run_id`, `plate_generation`, `duplicate_callback`, `attempt_superseded`,
+`base_url_required`). Die From-State-Prüfung sitzt in derselben Guard-Kette und erzeugt bei
+Ablehnung eine Reject-Audit-Zeile ohne jede Scene-Mutation.
+
+## Zwei Härtungen, die der Smoke erzwungen hat
+
+1. **Keine Lip-Sync-Spiegel im Compatibility-Pfad.** `cinematic_sync` setzt `lip_sync_status`/
+   `twoshot_stage` nur noch beim echten `plate_rendering → plate_ready`-Übergang. Im
+   Compatibility-Pfad würde `twoshot_stage = 'master_clip'` die Bridge dazu bringen, den State
+   selbst zu verschieben.
+2. **Aktiver State-Schutz.** Nach dem Output-Write prüft A im Compatibility-Pfad, ob die Bridge
+   `pipeline_state` re-derived hat (sie tut das, sobald Legacy-Spalten ohne State-Write geändert
+   werden), und stellt den Ausgangs-State inklusive `pipeline_state_at` sofort wieder her. Damit ist
+   State-Erhalt garantiert — auch bei inkonsistenten Legacy-Spiegeln.
+
+## DB-Smoke (Fixture-Projekt, danach vollständig gelöscht) — 19/19 PASS
+
+Zwei Fixture-Varianten je erlaubtem State: `mirrors_consistent` (Legacy-Spiegel passend zum State)
+und `mirrors_stale` (Spiegel absichtlich widersprüchlich). Verglichen wurde jeweils **nach dem
+vollständigen RPC-Aufruf**.
+
+| Fall | Ergebnis |
+| --- | --- |
+| `plate_rendering` (beide Varianten) | `applied`, Audit `plate_rendering → plate_ready`; Bridge hebt danach wie gehabt auf `audio_ready` (vorbestehendes, dokumentiertes Verhalten) |
+| `plate_ready` (beide Varianten) | `compatibility_finalize`, State/Substate exakt identisch |
+| `audio_prep` (beide Varianten) | `compatibility_finalize`, State/Substate exakt identisch |
+| `audio_ready` (beide Varianten) | `compatibility_finalize`, State/Substate exakt identisch |
+| Outputs in allen erlaubten Fällen | `base_video_url` = `clip_url` = Callback-URL, `clip_status = ready`, `clip_error = NULL`, `processed_video_url` unberührt |
+| Ledger in allen erlaubten Fällen | Job `succeeded` |
+| Duplicate-Callback (8×, je nach Apply) | `duplicate_callback`, Scene-Row **und** Job-Row bis auf `updated_at` byte-identisch, kein zweiter Write |
+| `lipsync_dispatched`, `lipsync_running`, `complete` | `from_state_rejected`, vollständiger Scene-Row-Snapshot und Job-Row unverändert, Reject-Audit mit `applied = false` |
+
+## Statische Verifikation
+
+- `npx vitest run src/lib/composer src/lib/video-composer --testTimeout=60000` → **48 Dateien / 540 Tests grün** (eingefrorener Baseline-Command, Zahl unverändert).
+- `npx tsgo --noEmit` → grün.
+- `deno check --node-modules-dir=auto compose-clip-webhook/index.ts` → **1 vorbestehender Fehler**,
+  nicht in dieser Änderung: `TS2322` in `supabase/functions/_shared/ambient-audio.ts:83`
+  (`Uint8Array<ArrayBufferLike>` vs. `BlobPart`). Kein TypeScript wurde in diesem Schritt geändert;
+  der Befund ist damit unverändert gegenüber dem Stand vor dem Patch und wird als offene Schuld geführt.
+
+## Status
+
+**PATCHED / AWAITING REDEPLOY-GO.** Migration ist eingespielt (DB-seitig aktiv), die
+Edge-Function wurde **nicht** neu deployt und ist auch nicht betroffen — A wird über RPC gerufen.
+Kein G3.2.2.
+
+## Temporär, nicht dauerhaft
+
+Die Matrix existiert nur, weil die Legacy→State-Bridge Szenen vor dem Plate-Callback nach
+`audio_prep`/`audio_ready` vorziehen kann. Nach G6 (Abbau der Legacy-Spiegel) ist sie erneut auf
+Reduzierbarkeit zu prüfen; Ziel bleibt `plate_rendering` als einziger From-State.
