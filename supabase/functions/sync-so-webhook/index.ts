@@ -946,6 +946,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               retry_variant: nextRung.variant,
               user_retry_flag: true,
               new_attempt_id: newAttemptId,
+              // G3.1b — expliziter Retry-Vertrag statt Initial-Akquise.
+              ...(v431CallbackJobId
+                ? {
+                    retry_of_pipeline_job_id: v431CallbackJobId,
+                    retry_reason: "provider_transient_error",
+                  }
+                : {}),
               credit_charge_result: "skip",
               noop_auto_escalation: true,
               noop_escalation_step: nextStep,
