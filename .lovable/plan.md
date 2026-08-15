@@ -23,26 +23,29 @@ keine neue Architektur. `docs/v431-g3-2-2-contract.md` bleibt LOCKED und unverä
 ## Arbeitsschritte
 
 ### R1 — F1: `mux_dispatch_requested_at` (RED)
-In `composer_apply_sync_segment_result`, unter dem bestehenden Scene-Row-Lock:
-`_ds := jsonb_set(_ds, '{audio_mux}', COALESCE(_ds->'audio_mux','{}'::jsonb), true)` vor dem
-Detail-Write; danach wird **ausschließlich** `mux_dispatch_requested_at` schmal gesetzt.
-`dispatched_at` schreibt der Apply-RPC **nicht** — weder im Erst- noch im Redrive-Zweig;
-dieses Feld gehört allein dem Dispatch-Owner nach erfolgreichem `audio_mux`-Acquire.
-`mux_dispatch_requested_at` ist damit nur der re-drivable Request-Claim, Exactly-once bleibt
-am Ledger-Acquire. Kein Whole-JSON-Replace, Sibling-Keys bleiben erhalten. Duplicate-Redrive:
-fehlender `audio_mux`-Ledger-Attempt ⇒ erneut `dispatch_mux`, vorhandener Attempt ⇒ `noop`.
+Endgültige Regel: In `composer_apply_sync_segment_result` wird unter dem bestehenden
+Scene-Row-Lock zuerst der Parent erzeugt/gemergt
+(`_ds := jsonb_set(_ds, '{audio_mux}', COALESCE(_ds->'audio_mux','{}'::jsonb), true)`),
+danach **ausschließlich** `mux_dispatch_requested_at` schmal gesetzt. `dispatched_at` schreibt
+der Apply-RPC nicht — weder im Erst- noch im Redrive-Zweig; es gehört allein dem
+Dispatch-Owner nach erfolgreichem `audio_mux`-Acquire. `mux_dispatch_requested_at` ist damit
+nur der re-drivable Request-Claim; Exactly-once bleibt am Ledger-Acquire. Kein
+Whole-JSON-Replace, Sibling-Keys bleiben erhalten. Duplicate-Redrive: fehlender
+`audio_mux`-Ledger-Attempt ⇒ erneut `dispatch_mux`, vorhandener Attempt ⇒ `noop`.
 Smokes: fehlender Parent, vorhandener Parent mit Sibling-Keys, Duplicate/Crash-Redrive,
-plus negativer Guard „`dispatched_at` bleibt nach Apply unverändert/abwesend".
-
+plus negativer Guard „`dispatched_at` wird vom Apply-RPC nie geschrieben".
 
 ### R2 — F2: `composer_touch_lipsync_progress`
 Interner SQL-Helper wie im Contract §7 spezifiziert; die heutige Inline-Progress-Semantik
 (`lip_sync_status='running'`, `twoshot_stage='syncso_fanout_<done>_of_<total>'`,
 `updated_at=now()`) wandert wertgleich dorthin. `SECURITY DEFINER`,
-`search_path = pg_catalog, public`, `REVOKE ALL FROM PUBLIC`, **kein** Grant an `anon`,
-`authenticated` oder Edge; Aufruf nur aus `composer_apply_sync_segment_result`.
-Keine zusätzliche Transition-Autorität, keine State-Entscheidung im Helper.
-Smoke: Wert-für-Wert-Vergleich Inline vs. Helper für `done/total`-Kombinationen.
+`search_path = pg_catalog, public`, `REVOKE ALL FROM PUBLIC`; Aufruf nur aus
+`composer_apply_sync_segment_result`, keine zusätzliche Transition-Autorität,
+keine State-Entscheidung im Helper.
+Smokes: Wert-für-Wert-Vergleich Inline vs. Helper für `done/total`-Kombinationen; zusätzlich
+Security-Nachweis, dass **kein** Grantee direkten EXECUTE besitzt — weder `anon`,
+`authenticated`, `PUBLIC` noch `service_role` oder die Sandbox-Rollen; ausgeführt wird der
+Helper ausschließlich intern durch den Definer.
 
 ### R3 — F3: Legacy→State-Bridge, monotone Regel für genau diesen Fall
 Endgültige Regel: Legacy `audio_muxing` (in `twoshot_stage` oder `lip_sync_status`) wird gegen
