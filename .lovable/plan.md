@@ -142,6 +142,9 @@ RS3-S1…S18 plus Frozen-Suite, `tsgo` und die bestehenden G3.1/G3.1f/G3.2.2-Smo
 16. **Epoch-Fence:** verspäteter Success-Callback eines `succeeded` Pre-Reset-Attempts ⇒ `pre_reset_attempt` no-op, kein `dispatch_mux`, kein Redrive; ebenso für Mux/Stitch ⇒ keine Resurrection
 17. Fence überlebt Consumption: nach verbrauchter Sync-/Mux-Autorisierung wehrt der Marker weiterhin alte Callbacks ab; Attempt-1-Identitäten ohne Vorgänger tragen ebenfalls `rs3_reset_id`
 18. **Refund-Idempotenz:** Reset + fehlgeschlagener Provider-Cancel + späterer Failure-Callback ⇒ kein zweiter Refund, keine weitere finanzielle Nebenwirkung
+19. **Reset-vs-Dispatch-Race:** Session A hält die Reset-Transaktion offen vor Commit, Session B versucht parallel einen Sync- bzw. Mux-Attempt für dieselbe Scene/Run/Generation. Nach Freigabe existiert **kein** aktiver ungetaggter Pre-Reset-Job: B wartet und erzeugt danach einen Job mit aktueller `rs3_reset_id`, oder B ist fail-closed.
+20. **No-Predecessor-Fall:** autorisierte Identität ohne jeden Vorgänger ⇒ erster Post-Reset-Dispatch erzeugt regulär Attempt 1, getaggt mit aktueller `rs3_reset_id`, atomar unter demselben Lock
+
 
 Zusätzlich: `user_reset` nicht retryable; Marker-Lifecycle (überlebt die Reset-Mutation); Fail-closed-Test `rs3_rearm_unavailable`; Drift-Test der Statusmenge; Frozen-Test, dass `composer_acquire_pipeline_attempt` unverändert `predecessor_exists` liefert.
 
