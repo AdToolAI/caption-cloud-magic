@@ -128,6 +128,17 @@ serve(async (req) => {
       return json({ error: `scene not found: ${sceneErr?.message ?? ""}` }, 404);
     }
 
+    // v431 RS3 §6 — Pre-Reset-Fence. Ein Mux-Auftrag aus der Epoche vor einem
+    // Lip-Sync-Reset darf die zurückgesetzte Szene nicht wiederbeleben.
+    {
+      const fence = await rs3FenceVerdict(supabase, sceneId, v431IncomingLedgerJobId);
+      if (fence.fenced) {
+        return json({ ok: true, skipped: fence.reason, scene_id: sceneId });
+      }
+    }
+
+
+
     const state = ((scene as any).dialog_shots ?? null) as DialogShotsState | null;
     if ((scene as any).lip_sync_status === "canceled" || (state as any)?.status === "canceled") {
       return json({ ok: true, skipped: "canceled", scene_id: sceneId });
