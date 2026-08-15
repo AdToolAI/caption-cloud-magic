@@ -50,11 +50,13 @@ Unique-Fehler als fail-open `null` behandelt.
 und einmal `already_in_flight`. Der Verlierer gibt **niemals** `null`/fail-open zurück und
 dispatcht **niemals**. `composer_replace_pipeline_attempt` wird dabei nie aufgerufen.
 
-Umsetzung (Conflict-Target eindeutig geschlossen): Die Tabelle trägt zwei Unique-Indizes —
-`composer_pipeline_jobs_idempotency_key_unique (idempotency_key)` und
-`composer_pipeline_jobs_identity_unique NULLS NOT DISTINCT (scene_id, run_id, stage,
-segment_id, attempt_no)`. Der Race kollidiert auf dem **Identity**-Constraint, deshalb wird
-genau dieser als Conflict-Target gerichtet:
+Umsetzung (Conflict-Target eindeutig geschlossen): `pg_constraint` bestätigt
+`composer_pipeline_jobs_identity_unique` als **echten Unique Constraint** (`contype='u'`,
+`UNIQUE NULLS NOT DISTINCT (scene_id, run_id, stage, segment_id, attempt_no)`) — nicht nur
+als Index. `ON CONFLICT ON CONSTRAINT` ist damit zulässig; der Vertrag bleibt unverändert.
+Der zweite Unique-Constraint `composer_pipeline_jobs_idempotency_key_unique` bleibt
+bestehen, ist aber nicht das Conflict-Target.
+
 
 ```sql
 INSERT INTO composer_pipeline_jobs (...)
