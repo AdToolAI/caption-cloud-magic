@@ -9,7 +9,7 @@ Analyse-Ergebnis + Endvertrag. Keine Migration, kein Code, kein Deploy in diesem
 | --- | --- | --- |
 | success | `composer_scenes.update` (L282): `materializeCompatibilityOutput('base')` → `base_video_url`+`clip_url`, `continuityRenderedPatch`, `clip_status='ready'`, `clip_error=null`, ggf. `lip_sync_status='pending'`/`twoshot_stage='master_clip'`, `audio_plan.ambientGate` | **A** `composer_finalize_plate_scene` |
 | success/nachgelagert | `video_creations` Archiv, Continuity-Chain, `composer_projects.status` (L780) | bleibt Handler, **nach** Commit, nur bei `applied:true` |
-| handoff-fail | `update{lip_sync_status:'failed',twoshot_stage:'failed'} .eq(clip_status,'ready')` (L503) | **D** `ccw:handoff_failed` |
+| handoff-fail | `update{lip_sync_status:'failed',twoshot_stage:'failed'} .eq(clip_status,'ready')` (L503) | **H** `composer_fail_post_plate_handoff` (run-bound, kein Ledger-Job) |
 | legacy talking-head block | `update{clip_status:'failed',clip_error,…, dialog_shots:null}` (L532) | **D** `ccw:legacy_route_blocked` |
 | failed | `update{clip_status:'failed',retry_count,clip_error, ggf. lip_sync_status/twoshot_stage/dialog_shots=null}` (L683) + Refund + Chain-Release | **D** `ccw:failed`; Refund/Chain nach Commit |
 | auto-retry | `replaceLedgerAttempt` + `update{clip_status:'generating',retry_count,replicate_prediction_id}` (L645) | G3.1-Retry-Vertrag, **unverändert** |
