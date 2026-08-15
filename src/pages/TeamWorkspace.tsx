@@ -333,7 +333,7 @@ export default function TeamWorkspace() {
     setApprovals(approvals.map((a) => (a.id === approvalId ? { ...a, status: decision } : a)));
     const { error } = await supabase
       .from("content_approvals")
-      .update({ status: decision, reviewed_by: user.id, reviewed_at: new Date().toISOString() })
+      .update({ status: decision, approver_id: user.id, approved_at: new Date().toISOString() } as never)
       .eq("id", approvalId);
     if (error) {
       setApprovals(prev);
