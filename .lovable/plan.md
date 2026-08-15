@@ -50,11 +50,27 @@ Unique-Fehler als fail-open `null` behandelt.
 und einmal `already_in_flight`. Der Verlierer gibt **niemals** `null`/fail-open zurück und
 dispatcht **niemals**. `composer_replace_pipeline_attempt` wird dabei nie aufgerufen.
 
-Umsetzung: `INSERT ... ON CONFLICT (idempotency_key) DO NOTHING` plus deterministischer
-Re-Read der Gewinnerzeile — leere Insert-Rückgabe ist der Beweis für den verlorenen Race
-und wird zu `already_in_flight` mit dem Handle des Gewinners (nicht zu `null`). Liefert der
-Re-Read wider Erwarten nichts, wird kurz erneut gelesen, bevor überhaupt eine andere
-Verdikt-Klasse in Frage kommt.
+Umsetzung (Conflict-Target eindeutig geschlossen): Die Tabelle trägt zwei Unique-Indizes —
+`composer_pipeline_jobs_idempotency_key_unique (idempotency_key)` und
+`composer_pipeline_jobs_identity_unique NULLS NOT DISTINCT (scene_id, run_id, stage,
+segment_id, attempt_no)`. Der Race kollidiert auf dem **Identity**-Constraint, deshalb wird
+genau dieser als Conflict-Target gerichtet:
+
+```sql
+INSERT INTO composer_pipeline_jobs (...)
+ON CONFLICT ON CONSTRAINT composer_pipeline_jobs_identity_unique DO NOTHING
+RETURNING id, attempt_no, plate_generation;
+```
+
+Da PostgREST kein benanntes Constraint-Target erlaubt, läuft die Initial-Akquise über ein
+enges `SECURITY DEFINER`-RPC (`composer_acquire_pipeline_attempt`), das genau dieses
+Statement plus den deterministischen Re-Read der Gewinnerzeile enthält und ein Verdikt
+`acquired` | `already_in_flight` zurückgibt. Leere INSERT-Rückgabe ⇒ Race verloren ⇒
+`already_in_flight` mit dem Handle des Gewinners, **nie** `null`/fail-open. `idempotency_key`
+bleibt zusätzlich deterministisch aus derselben Identität (inkl. `attempt_no`) gebildet, ist
+aber nicht mehr das Conflict-Target. Das RPC bekommt fixierten `search_path` und EXECUTE nur
+für `service_role`.
+
 
 
 ### 2. Aufrufer anpassen
@@ -88,14 +104,21 @@ Log-Zeile, Legacy-Verhalten unverändert (Observe bleibt read-only, kein State-W
 4. `failed` vs. `dispatch_uncertain`: Settle wirkt nur aus `pending`/`dispatching`,
    niemals über `dispatched`/`succeeded` hinweg.
 5. Reaper: überfälliger Dispatch → `dispatch_uncertain`, nie `stale`, nie terminal.
-6. Security des neuen RPC: `SECURITY DEFINER` mit fixiertem `search_path`, EXECUTE nur
-   für `service_role`; Aufruf als `authenticated`/`anon` schlägt fehl.
+6. Security der neuen RPCs (`composer_acquire_pipeline_attempt`,
+   `composer_replace_pipeline_attempt`): `SECURITY DEFINER` mit fixiertem `search_path`,
+   EXECUTE nur für `service_role`; Aufruf als `authenticated`/`anon` schlägt fehl.
+7. **Echter DB-Concurrency-Smoke (neu, Pflicht):** zwei unabhängige Sessions/Transaktionen
+   rufen gleichzeitig die Initial-Akquise derselben Identität auf → genau 1 Zeile,
+   1× `acquired`, 1× `already_in_flight`, kein Replace-Aufruf, kein Exception-/fail-open-Pfad.
+
+
 
 **Guard-Tests** (vitest, neu `v431LedgerContract.test.ts`):
-- **Race-Test (neu, Pflicht):** zwei parallele Initial-Akquisen derselben Identität →
-  exakt eine Ledger-Zeile für den ersten Attempt, ein Caller `acquired`, der andere
-  `already_in_flight`, `composer_replace_pipeline_attempt` nie aufgerufen; im
-  Dispatcher-Test genau ein Provider-Call.
+- **Race-Test (Pflicht, ergänzend zum DB-Smoke):** zwei parallele Initial-Akquisen
+  derselben Identität → ein Caller `acquired`, der andere `already_in_flight`,
+  `composer_replace_pipeline_attempt` nie aufgerufen; im Dispatcher-Test genau ein
+  Provider-Call.
+
 - Initial-Akquise bei bereits vorhandenem aktivem Attempt (inkl. `dispatch_uncertain`)
   ruft `composer_replace_pipeline_attempt` **nicht** auf und liefert `already_in_flight`.
 
