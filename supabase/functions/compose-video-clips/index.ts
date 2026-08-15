@@ -521,6 +521,28 @@ serve(async (req) => {
       });
     }
 
+    // ── v431 G3.1 — Ledger-Provenienz (Observe). ────────────────────────
+    // Die Job-Zeile entsteht VOR dem Provider-Call, damit ein sehr schneller
+    // Callback seine Identität immer schon in der Datenbank findet. Die
+    // eingefrorene `plate_generation` macht den Job unabhängig von späteren
+    // Szenen-Mutationen. Kein Writer wird hier migriert: schlägt die Akquise
+    // fehl, läuft der Legacy-Pfad unverändert weiter (fail-open bis G3.2).
+    const sceneLedgerJobs = new Map<string, string>();
+    for (const [sceneId, stamp] of sceneRunStamps.entries()) {
+      const handle = await acquireLedgerJob(supabaseAdmin, {
+        sceneId,
+        runId: stamp.runId,
+        stage: "base_video",
+        plateGeneration: stamp.generation,
+        provider: (scenes as Array<{ id: string; clipSource?: string }>)
+          .find((s) => s.id === sceneId)?.clipSource ?? null,
+        metadata: { dispatcher: "compose-video-clips" },
+      });
+      if (handle) sceneLedgerJobs.set(sceneId, handle.id);
+    }
+
+
+
     // ── v427B — Geldvertrag: Obergrenze reservieren, BEVOR ein bezahlter
     // Providerauftrag rausgeht. Ein Voiceover kann eine Szene noch bis ans
     // Providerfenster verlängern, deshalb wird die Obergrenze gesperrt und
