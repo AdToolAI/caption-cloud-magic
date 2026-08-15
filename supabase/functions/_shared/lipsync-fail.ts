@@ -68,7 +68,13 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
   }
 
   const state: any = (existing as any)?.dialog_shots ?? null;
-  const alreadyRefunded = !!state?.refunded;
+  // v431 RS3 — der Reset beansprucht den Refund bereits im Reset-Commit
+  // (`audio_plan.twoshot.rs3_reset.refund_claimed`). Danach darf hier kein
+  // zweiter Refund entstehen, auch wenn `dialog_shots` geleert wurde.
+  const rs3Marker: any = (existing as any)?.audio_plan?.twoshot?.rs3_reset ?? null;
+  const rs3RefundClaimed = rs3Marker?.refund_claimed === true;
+  const alreadyRefunded = !!state?.refunded || rs3RefundClaimed;
+
   const stateCost = Number(state?.cost_credits) || 0;
   const requestedRefund = Number(args.refundCredits) || 0;
   // Prefer the cost persisted on the dialog state (authoritative) over a
