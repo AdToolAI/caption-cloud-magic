@@ -34,6 +34,7 @@ import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { bindLedgerExternalJob, readRetryContext, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
+import { rs3FenceVerdict } from "../_shared/v431-rs3-fence.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
