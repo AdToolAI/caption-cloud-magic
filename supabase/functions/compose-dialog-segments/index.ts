@@ -117,7 +117,7 @@ import { rehostPlate } from "../_shared/rehostPlate.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
-import { acquireLedgerJob, bindLedgerExternalJob, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
+import { bindLedgerExternalJob, readRetryContext, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
