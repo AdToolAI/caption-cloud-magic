@@ -164,11 +164,10 @@ async function headAsset(url: string | null | undefined): Promise<{ bytes: numbe
   }
 }
 
-function terminalV5Counts(passes: any[]) {
-  const doneCount = passes.filter((p: any) => p?.status === "done").length;
-  const failedCount = passes.filter((p: any) => ["failed", "canceled_by_scene_failure"].includes(String(p?.status ?? ""))).length;
-  return { doneCount, failedCount, allTerminal: doneCount + failedCount >= passes.length };
-}
+// v431 G3.2.2 — `terminalV5Counts` entfällt: das Pass-Aggregat wird
+// ausschließlich im Apply-RPC berechnet (§3/§3a).
+
+
 
 // ── v431 G3.2.2 — Sync Segment Authoritative Apply ─────────────────────────
 // Contract: docs/v431-g3-2-2-contract.md. `composer_apply_sync_segment_result`
