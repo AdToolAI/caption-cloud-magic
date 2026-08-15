@@ -203,6 +203,102 @@ export async function bindLedgerExternalJob(
   }
 }
 
+/**
+ * G3.1b — Dispatch-Failure-Semantik (Ledger-only).
+ *
+ * `rejected`  → der Provider hat den Auftrag nachweislich NICHT angenommen
+ *               (4xx, Validierungsfehler, Abbruch vor dem Absenden) ⇒ `failed`.
+ * `uncertain` → Ausgang unklar (Timeout, abgebrochener Fetch, 5xx, unbekannte
+ *               Antwort, Function-Kill) ⇒ `dispatch_uncertain`, recoverable.
+ *
+ * Wirkt nur aus `pending`/`dispatching`; niemals über `dispatched`/`succeeded`
+ * hinweg. Fasst ausschließlich `composer_pipeline_jobs` an — kein State-,
+ * Output-, Mirror- oder Credit-Effekt.
+ */
+export async function settleLedgerDispatchFailure(
+  admin: any,
+  jobId: string | null | undefined,
+  opts: { errorCode: string; outcome: "rejected" | "uncertain" },
+): Promise<void> {
+  if (!jobId) return;
+  try {
+    await admin
+      .from("composer_pipeline_jobs")
+      .update({
+        status: opts.outcome === "rejected" ? "failed" : "dispatch_uncertain",
+        error_code: opts.errorCode.slice(0, 120),
+        completed_at: opts.outcome === "rejected" ? new Date().toISOString() : null,
+      })
+      .eq("id", jobId)
+      .in("status", ["pending", "dispatching"]);
+  } catch (e) {
+    console.warn(`${V431_OBSERVE_TAG} ledger_settle_failed`, JSON.stringify({
+      pipeline_job_id: jobId,
+      outcome: opts.outcome,
+      error: e instanceof Error ? e.message : String(e),
+    }));
+  }
+}
+
+export interface ReplaceLedgerAttemptParams {
+  previousJobId: string;
+  sceneId: string;
+  runId: string;
+  stage: PipelineStage;
+  plateGeneration: number;
+  provider?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * G3.1b — einziger erlaubter Retry-Einstieg.
+ *
+ * Ablösen des alten Attempts und Anlegen des neuen laufen atomar in EINER
+ * Transaktion (`composer_replace_pipeline_attempt`): Row-Lock auf den
+ * Vorgänger, Identitäts- und Ablösefähigkeitsprüfung, `stale` + INSERT
+ * `attempt_no + 1` — oder gar nichts. Ein konkurrierender Ablöseversuch
+ * verliert deterministisch und bekommt `null`; der Verlierer darf dann NICHT
+ * dispatchen. Die neue `pipeline_job_id` steht erst nach dem Commit bereit.
+ */
+export async function replaceLedgerAttempt(
+  admin: any,
+  params: ReplaceLedgerAttemptParams,
+): Promise<LedgerJobHandle | null> {
+  try {
+    const { data, error } = await admin.rpc("composer_replace_pipeline_attempt", {
+      p_previous_job_id: params.previousJobId,
+      p_expected_scene_id: params.sceneId,
+      p_expected_run_id: params.runId,
+      p_expected_stage: params.stage,
+      p_expected_plate_generation: params.plateGeneration,
+      p_provider: params.provider ?? null,
+      p_metadata: params.metadata ?? {},
+    });
+    const row = Array.isArray(data) ? data[0] : data;
+    if (error || !row?.job_id) {
+      console.warn(`${V431_OBSERVE_TAG} ledger_replace_lost`, JSON.stringify({
+        previous_job_id: params.previousJobId,
+        scene_id: params.sceneId,
+        stage: params.stage,
+        error: error?.message ?? "no_row",
+      }));
+      return null;
+    }
+    return {
+      id: String(row.job_id),
+      attemptNo: Number(row.attempt_no ?? 0),
+      runId: params.runId,
+      plateGeneration: params.plateGeneration,
+    };
+  } catch (e) {
+    console.warn(`${V431_OBSERVE_TAG} ledger_replace_threw`, JSON.stringify({
+      previous_job_id: params.previousJobId,
+      error: e instanceof Error ? e.message : String(e),
+    }));
+    return null;
+  }
+}
+
 /** Extrahiert `pipeline_job_id` aus URL-Query, Body oder Provider-Metadaten. */
 export function readPipelineJobId(
   ...sources: Array<URL | Record<string, unknown> | null | undefined>
