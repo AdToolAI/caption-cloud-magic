@@ -531,3 +531,32 @@ Offene Punkte aus vorheriger Fassung geschlossen:
    (pre-Ledger stale metadata, terminale Szenen) bleiben unangetastet (§2).
 
 Kein Deploy, kein G3.2.3. STOP.
+
+## §9 — Production Deploy + Resmoke (Ausführung)
+
+### 9.1 Pre-Deploy In-flight Gate
+- Zeitpunkt: **2026-08-15T20:03:27Z**
+- Ergebnis: **G1=0 / G2=0 / G3=0 / G4=0 / G5=0** — Gate GRÜN (In-flight-Scope, nur non-terminale Szenen).
+
+### 9.2 DB-Deploy / Ist-Stand
+- Beide Migrationen (Basis-Vertrag + Remediation R1) sind in Produktion wirksam.
+- `composer_apply_sync_segment_result` — md5 `a8df11a106912562c3926f319f33eb36`, SECURITY DEFINER, gehärteter `search_path`.
+- `composer_replace_pipeline_attempt` — md5 `c4649e65440a64997376617721792aa8` (unverändert, wie gefordert).
+- Security-Smoke: `service_role = t` für den öffentlichen Apply-RPC; interne Helper (`composer_touch_lipsync_progress`, `composer_log_sync_segment_audit`) ohne direkten `service_role`-EXECUTE. `PUBLIC/anon/authenticated = false`. D1-a bleibt als *accepted platform-internal ACL* dokumentiert.
+- Retry-Allowlist enthält `sync_noop_retryable`.
+- Bridge-Smoke (mit Rollback): Legacy-Write `lip_sync_status='audio_muxing'` bei `pipeline_state='lipsync_muxing'` degradiert den kanonischen State **nicht** → **PASS**.
+
+### 9.3 Edge-Deploy
+- `sync-so-webhook` deployed. **T_deploy = 2026-08-15T20:04:53Z** (Upload-Start 20:04:40Z).
+- Static-Sanity: keine Legacy-Writer, keine direkten `composer_scenes`-Updates auf Pipeline-Feldern; ausschließlich autoritative RPC-Aufrufe.
+
+### 9.4 Echter UI-Resmoke (laufend)
+- Szene: `b34d1eae-6bf3-437d-a6ab-624be0155adc` (Projekt `04b80fab-…`), single-speaker, non-tight; Vorlauf war ein vollständiger Sync → Mux → Stitch → `complete`.
+- Clean-Restart über *Szenenaktionen → Lip-Sync neu erstellen* (`reset-lipsync-scene`, HTTP 200) um **20:09:22Z**. Reset korrekt: `pipeline_state=plate_ready`, `lip_sync_status=pending`, `dialog_shots` geleert, Plate/`plate_generation=7` erhalten.
+- Client-Auto-Trigger dispatcht ab **20:18:52Z** (`compose-dialog-segments`, HTTP 202, weiterhin zyklisch).
+- Stand **20:27:17Z**: Szene in `plate_ready` / `pending`, Pass-Status `rendering_preflight`. Es existiert **noch kein** `sync_segment`-Ledger-Attempt, folglich noch kein Sync-Callback und noch kein autoritativer Apply.
+- Telemetrie-Fenster T_deploy → 20:27:17Z: **keine** `composer_callback_observations`-Zeilen; damit auch `missing_binding = 0`, `job_not_found = 0`, `wrong_job = 0`, `binding_pending = 0` — aber **ohne positiven `bound`-Nachweis**.
+
+### 9.5 Status
+**G3.2.2 DEPLOYED — RESMOKE IN PROGRESS / NOT YET ACCEPTED.**
+Deploy und alle Post-Deploy-Smokes (Security, Contract, Bridge, Static) sind grün. Die Abnahmebedingung „echter Sync-Callback → autoritativer Apply → Mux → Stitch → Finalizer mit `bound`-Telemetrie“ ist **noch nicht** erfüllt, weil der Lauf zum Berichtszeitpunkt die Sync.so-Dispatch-Stufe noch nicht verlassen hat. **G3.2.2 wird daher NICHT auf DONE / FROZEN gesetzt.** Kein Cleanup, kein Backfill, keine Reparatur ohne neue Freigabe.
