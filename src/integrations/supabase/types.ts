@@ -14,27 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      _v431_a2_smoke_results: {
-        Row: {
-          detail: Json
-          id: number
-          ok: boolean
-          step: string
-        }
-        Insert: {
-          detail?: Json
-          id?: number
-          ok: boolean
-          step: string
-        }
-        Update: {
-          detail?: Json
-          id?: number
-          ok?: boolean
-          step?: string
-        }
-        Relationships: []
-      }
       ab_test_events: {
         Row: {
           event_type: string

@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS public._v431_a2_smoke_results;
