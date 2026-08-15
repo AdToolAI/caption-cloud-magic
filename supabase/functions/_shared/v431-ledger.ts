@@ -45,18 +45,22 @@ export interface LedgerJobHandle {
 /**
  * G3.1b — Ergebnis der Initial-Akquise als Discriminated Union.
  *
- * `acquired`          → diese Zeile gehört dem Aufrufer, er darf dispatchen.
- * `already_in_flight` → ein aktiver Attempt derselben Identität existiert
- *                       bereits (auch `dispatch_uncertain`). Der Aufrufer darf
- *                       NICHT dispatchen. Ein Redispatch ist ausschließlich
- *                       über den expliziten Retry-/Replace-Vertrag zulässig.
- * `unavailable`       → Ledger nicht verfügbar / keine belastbare Provenienz.
- *                       Fail-open: der Legacy-Pfad läuft unverändert weiter.
+ * `acquired`            → diese Zeile gehört dem Aufrufer, er darf dispatchen.
+ * `already_in_flight`   → ein AKTIVER Attempt derselben Identität existiert
+ *                         bereits (auch `dispatch_uncertain`). Kein Dispatch.
+ * `predecessor_exists`  → ein TERMINALER Attempt (`succeeded`/`failed`/`stale`/
+ *                         `cancelled`) existiert bereits. Initial-Akquise ist
+ *                         damit ausgeschlossen; ein Redispatch ist nur über den
+ *                         expliziten Retry-/Replace-Vertrag zulässig.
+ * `unavailable`         → Ledger nicht verfügbar / keine belastbare Provenienz.
+ *                         Fail-open: der Legacy-Pfad läuft unverändert weiter.
  */
 export type LedgerAcquireResult =
   | { outcome: "acquired"; job: LedgerJobHandle }
   | { outcome: "already_in_flight"; job: LedgerJobHandle; status: string | null }
+  | { outcome: "predecessor_exists"; job: LedgerJobHandle; status: string | null }
   | { outcome: "unavailable"; reason: string };
+
 
 function keyOf(p: {
   sceneId: string;
