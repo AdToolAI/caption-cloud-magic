@@ -1211,7 +1211,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // v431 G3.1 — Ledger-Zeile für die Mux-Stage. D6: Owner der Mux-Stage
       // ist der Dispatcher; hier entsteht nur die Provenienz-Zeile, die als
       // `pipeline_job_id` im Request-Body mitreist.
-      const v431MuxLedgerJob = await acquireLedgerJob(supabase, {
+      const v431MuxAcquisition = await acquireLedgerJob(supabase, {
         sceneId,
         runId: (scene as any)?.active_run_id ?? null,
         stage: "audio_mux",
@@ -1221,6 +1221,15 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         provider: "remotion",
         metadata: { dispatcher: "sync-so-webhook", fan_in_passes: totalPasses },
       });
+      // G3.1b — läuft der Mux-Attempt bereits (paralleler Fan-in-Abschluss),
+      // wird kein zweiter Compositor-Auftrag ausgelöst.
+      if (v431MuxAcquisition.outcome === "already_in_flight") {
+        console.warn(`[sync-so-webhook] scene=${sceneId} mux attempt already in flight → dispatch skipped`);
+        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", compositor: "already_in_flight" });
+      }
+      const v431MuxLedgerJob = v431MuxAcquisition.outcome === "acquired"
+        ? v431MuxAcquisition.job
+        : null;
       try {
         fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
           method: "POST",
@@ -1231,6 +1240,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           }),
         }).catch(() => {});
       } catch { /* ignore */ }
+
       return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", compositor: "dispatched" });
     } else {
       // FAILED / REJECTED / CANCELED
