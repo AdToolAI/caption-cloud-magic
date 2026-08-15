@@ -14,20 +14,51 @@ Beide Base-Video-Forwarder lesen bereits `replicate_prediction_id` von der Szene
 
 ## Vertrag (verbindlich)
 
-- `composer_pipeline_jobs` bleibt alleinige autoritative Quelle. Der gespeicherte Wert ist ausschließlich ein **immutable transport pointer**.
-- Der Pointer wird nur beim ursprünglichen Dispatch geschrieben, in derselben Operation wie die Bindung der externen Job-ID. Kein Forwarder, kein Webhook, kein Reaper schreibt ihn.
-- Recovery-/Poll-Forwarder erzeugen keine Ledger-Identität und keinen neuen Attempt; sie reichen den gelesenen Wert unverändert in URL bzw. Body weiter.
+- `composer_pipeline_jobs` bleibt alleinige autoritative Quelle. Der gespeicherte Wert ist ausschließlich ein Transport-Pointer.
+- **Der Pointer ist attempt-bound, nicht lebenslang immutable.** `external_job_id` und `pipeline_job_id` sind ein **Paar desselben Attempts**: sie werden nur gemeinsam gesetzt, nur gemeinsam zurückgesetzt und nie einzeln gewechselt.
+- Geschrieben wird das Paar ausschließlich beim Dispatch des Attempts. Kein Forwarder, kein Webhook, kein Reaper schreibt es.
+- Recovery-/Poll-Forwarder erzeugen keine Ledger-Identität und keinen neuen Attempt; sie reichen den gelesenen Pointer unverändert in URL bzw. Body weiter.
 - Der empfangende Webhook behält seine bestehende Ledger-/Run-/Generation-Prüfung unverändert. **Kein** Fallback auf `external_job_id + scene_id + stage`.
-- Fehlender Pointer: kein erfundener Wert, kein Ledger-Insert, keine Verhaltensänderung des Recovery-Pfads — nur strukturierte Telemetrie `reinject_missing_pipeline_job_id` (Felder: `function`, `scene_id`, `stage`, `external_job_id`, `run_id`, `generation`) und Weiterlauf wie bisher.
 - Falscher/staler Pointer wird vom bestehenden Webhook-Guard abgewiesen (`wrong_job` / `stale_run` / `stale_generation`), nicht repariert.
+- Fehlender Pointer: kein erfundener Wert, kein Ledger-Insert. Post-Cutover ist `reinject_missing_pipeline_job_id` ein **Vertragsfehler** (Error-Level, kein erwarteter Normalfall); Pre-Cutover-Rows siehe Cutover-Vertrag.
+
+## Lücke 1 — Attempt-Wechsel und atomare Paarbindung
+
+**Sync.so (belegt).** Der Pass-Slot wird ausschließlich über die RPC `update_dialog_pass_slot` geschrieben. Deren heutiger Stand:
+- G2.1: `run_id` und `plate_generation` sind nach dem ersten Setzen unpatchbar.
+- G2.2: `job_id` ist unveränderlich, sobald gesetzt — „einziger erlaubter Weg zurück ist der explizite Reset (`job_id: null`)".
+- Terminal-Slots werden bei Rückschritt entschärft (`status`/`output_url`/`finished_at`/`error` aus dem Patch entfernt).
+
+Der Vertrag, der einen Pass für einen neuen Attempt öffnet, ist damit die Kombination aus (a) dem Terminal-Transition-Guard `assertSafeDispatchEntry` in `compose-dialog-segments` — ein terminaler Pass darf nur mit `user_retry_flag=true` + frischem `new_attempt_id` erneut dispatchen — und (b) dem expliziten Reset-Patch, der `job_id: null` schreibt (Skeleton-/Reset-Pfade, z. B. Fan-out-Skeleton mit `job_id: null`, sowie `composer_reset_lipsync_full`). Erst danach ist der Slot wieder bindbar.
+
+Umsetzung: `pipeline_job_id` bekommt in `update_dialog_pass_slot` **exakt dieselbe** Regel wie `job_id` plus eine Paarklausel:
+- gesetzt und nicht-null → nicht überschreibbar (Patch-Feld wird verworfen, wie bei `job_id`);
+- ein Patch, der `job_id` non-null bindet, **muss** `pipeline_job_id` non-null mitliefern und umgekehrt — sonst `RAISE EXCEPTION` (kein stilles Halb-Binding);
+- jeder Reset, der `job_id: null` schreibt, setzt `pipeline_job_id: null` mit (und umgekehrt). Alle bestehenden Reset-/Skeleton-Patches werden entsprechend ergänzt.
+
+Kein unabhängiges Überschreiben eines immutable Slots: der neue Attempt bindet erst nach dem regulären Reset, und dann beide Werte gemeinsam in einem Patch.
+
+**Base Video.** `replicate_prediction_id` und `plate_pipeline_job_id` werden nur noch über einen gemeinsamen Helper `setPlateAttemptBinding(sceneId, { externalJobId, pipelineJobId })` geschrieben — ein einziges UPDATE, das immer beide Spalten setzt (auch beide auf `null` beim Reset). Kein Call-Site darf künftig `replicate_prediction_id` allein schreiben; ein Guard-Test über die Codebase erzwingt das.
+
+## Lücke 2 — Cutover-Vertrag für Rows ohne Pointer
+
+Bestandsaufnahme (heute, 16:34Z): `plate_rendering` = 0, davon mit `replicate_prediction_id` = 0, davon ModelArk = 0; Lip-Sync in-flight (`lipsync_dispatched|lipsync_running|lipsync_muxing`) = 0. Es existieren aktuell **keine recoveryfähigen Base-Video-Jobs ohne Pointer**.
+
+Cutover-Regel:
+1. Unmittelbar vor dem Deploy wird diese Zählung erneut ausgeführt (Gate). Ergebnis 0 → Cutover per Nachweis, kein Backfill, kein Übergangsmodus.
+2. Ergebnis > 0 → **einmaliger** Backfill genau dieser Rows aus `composer_pipeline_jobs`, nur bei **eindeutigem** Match (`scene_id` + `stage='base_video'` + `external_job_id` + aktueller `run_id`/`plate_generation`, genau eine Zeile, nicht terminal). Mehrdeutig/kein Match → Row bleibt NULL und wird über den bestehenden Reaper-/Fail-Pfad beendet statt geraten. Der Backfill ist eine einmalige Datenmigration, keine Laufzeitauflösung, und wird im Bericht mit betroffenen IDs protokolliert.
+3. Nach dem Cutover gilt: ein Dispatch ohne persistiertes Paar ist ein Vertragsfehler; `reinject_missing_pipeline_job_id` wird als Error geloggt (Felder `function`, `scene_id`, `stage`, `external_job_id`, `run_id`, `generation`) und der Recovery-Pfad verhält sich ansonsten unverändert (keine Injektion, kein Abbruch, keine neue Ledger-Zeile).
+
+Eine dauerhafte Pre-Cutover-Auflösung im Forwarder wird **nicht** eingeführt.
 
 ## Umsetzung
 
-1. **Migration:** Spalte `composer_scenes.plate_pipeline_job_id uuid null` (reiner Pointer, keine FK-Kaskade, kein Default). Kein Backfill für Alt-Szenen — dort greift die `reinject_missing_pipeline_job_id`-Telemetrie.
-2. **`compose-video-clips`:** an der Dispatch-Bindung (`bindLedgerExternalJob`) den Pointer zusammen mit `replicate_prediction_id` schreiben — für Replicate und für den ModelArk-Zweig. Beim Start eines neuen Attempts wird der Pointer mitüberschrieben (er gehört zur aktuellen `plate_generation`); wird kein Ledger-Job dispatcht, wird er auf `null` gesetzt statt einen alten Wert stehen zu lassen.
-3. **`recover-stuck-composer-clip`:** Szene-Select um `plate_pipeline_job_id` erweitern, `replayWebhook` hängt `&pipeline_job_id=…` an die bestehende URL; ohne Pointer nur Telemetrie.
-4. **`modelark-poll`:** Szene-Select um `plate_pipeline_job_id` erweitern, `notifyWebhook` hängt `&pipeline_job_id=…` an die bestehende URL (neben `run_id`/`generation`); ohne Pointer nur Telemetrie.
-5. **`compose-dialog-segments`:** an der Stelle `pass.job_id = jobId` zusätzlich `pass.pipeline_job_id = v431SyncLedgerJob.id` in den Pass-Snapshot schreiben. `run_id`, `plate_generation` und die Provider-`job_id` bleiben unverändert und werden nicht überschreibbar; der Pointer wird nur gesetzt, wenn er für diesen Pass noch nicht existiert oder der Pass gerade neu dispatcht wird.
+1. **Migration:** Spalte `composer_scenes.plate_pipeline_job_id uuid null`; Erweiterung von `update_dialog_pass_slot` um Immutabilitäts- und Paarklausel für `pipeline_job_id` (siehe Lücke 1); optionaler einmaliger Backfill nur, falls das Cutover-Gate > 0 liefert.
+2. **`compose-video-clips`:** alle Bindungsstellen (Replicate- und ModelArk-Zweig) auf `setPlateAttemptBinding` umstellen, aufgerufen an derselben Stelle wie `bindLedgerExternalJob`; Reset-Stellen setzen beide Spalten auf `null`.
+3. **`recover-stuck-composer-clip`:** Szene-Select um `plate_pipeline_job_id` erweitern, `replayWebhook` hängt `&pipeline_job_id=…` an die bestehende URL; ohne Pointer nur Error-Telemetrie.
+4. **`modelark-poll`:** Szene-Select um `plate_pipeline_job_id` erweitern, `notifyWebhook` hängt `&pipeline_job_id=…` an die bestehende URL (neben `run_id`/`generation`); ohne Pointer nur Error-Telemetrie.
+5. **`compose-dialog-segments`:** an der Bindungsstelle (`pass.job_id = jobId` / `bindLedgerExternalJob`) `pipeline_job_id` im selben Slot-Patch mitschreiben; alle Reset-/Skeleton-Patches ergänzen `pipeline_job_id: null`. `run_id`, `plate_generation` und die Provider-`job_id` bleiben unverändert geschützt.
+
 6. **`lipsync-watchdog`:** an beiden `pollAndForward`-Aufrufstellen (reguläre `rendering`-Passes und der 201-Probe-Zweig) `pipelineJobId: p.pipeline_job_id` mitgeben; `pollAndForward` hängt es an die `sync-so-webhook`-URL. Auswahl-, Poll- und Recovery-Logik bleiben unverändert.
 
 ## Tests
