@@ -62,7 +62,6 @@ describe('clip_url writer inventory (v430 Step 1)', () => {
   const FINALIZATION_POINTS = [
     // Lip-Sync finalization (migrated in first half of Schritt 1)
     'remotion-webhook/index.ts',
-    'reset-lipsync-scene/index.ts',
     '_shared/scene-run-begin.ts',
     '_shared/scene-hard-reset.ts',
     // Additional productive writers closed by the Schritt 1 audit
@@ -82,6 +81,12 @@ describe('clip_url writer inventory (v430 Step 1)', () => {
     // v431 G3.2.2 — Sync-Segment-Apply laeuft atomar ueber
     // composer_apply_sync_segment_result (Contract §6: kein Client-Materialize).
     { rel: 'sync-so-webhook/index.ts', rpc: 'composer_apply_sync_segment_result' },
+    // v431 RS3 — der Lip-Sync-Reset setzt Output-Spalten atomar in der DB
+    // (Ledger-Cancel + Reset + Marker in einem Commit), nicht mehr im Client.
+    {
+      rel: 'reset-lipsync-scene/index.ts',
+      rpc: 'composer_reset_lipsync_with_attempt_cancellation',
+    },
   ];
 
   it('every migrated finalization point writes through the single writer', () => {
