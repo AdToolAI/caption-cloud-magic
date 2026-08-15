@@ -38,6 +38,9 @@ Ergänzung zum Vertrag (ohne Verhalten des Renderers zu ändern, Observe bleibt 
     retryfähig führt; neuer Attempt weiterhin atomar an `previousJobId` gebunden.
   - Vorgänger aktiv (`pending`, `dispatching`, `dispatched`,
     `dispatch_uncertain`) → atomarer Replace wie oben.
+- Die retryfähigen `failed`-Gründe sind eine geschlossene, im Code hinterlegte
+  und per Test gesicherte Liste (`RETRYABLE_FAILURE_REASONS`). Kein generisches
+  `retry=true` durch beliebige Caller; unbekannter Grund → kein neuer Attempt.
 
 ## 2. Testbaseline vergleichbar machen
 
