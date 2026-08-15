@@ -169,7 +169,12 @@ RS3-S1…S21 plus Frozen-Suite, `tsgo` und die bestehenden G3.1/G3.1f/G3.2.2-Smo
 17. Fence überlebt Consumption: nach verbrauchter Sync-/Mux-Autorisierung wehrt der Marker weiterhin alte Callbacks ab; Attempt-1-Identitäten ohne Vorgänger tragen ebenfalls `rs3_reset_id`
 18. **Refund-Idempotenz:** Reset + fehlgeschlagener Provider-Cancel + späterer Failure-Callback ⇒ kein zweiter Refund, keine weitere finanzielle Nebenwirkung
 19. **Reset-vs-Dispatch-Race:** Session A hält die Reset-Transaktion offen vor Commit, Session B versucht parallel einen Sync- bzw. Mux-Attempt für dieselbe Scene/Run/Generation. Nach Freigabe existiert **kein** aktiver ungetaggter Pre-Reset-Job: B wartet und erzeugt danach einen Job mit aktueller `rs3_reset_id`, oder B ist fail-closed.
-20. **No-Predecessor-Fall:** autorisierte Identität ohne jeden Vorgänger ⇒ erster Post-Reset-Dispatch erzeugt regulär Attempt 1, getaggt mit aktueller `rs3_reset_id`, atomar unter demselben Lock; Branch wird **vor** dem Rearm-Branch entschieden
+20. **No-Predecessor-Fall (verschärft), je für `sync_segment` und `audio_mux`:** autorisierte Identität ohne jeden Vorgänger ⇒ erster Post-Reset-Dispatch erzeugt regulär Attempt 1, getaggt mit aktueller `rs3_reset_id`; Branch wird **vor** dem Rearm-Branch entschieden. Zusätzlich verbindlich:
+    - zwei parallele No-Predecessor-Dispatches ⇒ genau **ein** Attempt 1
+    - der zweite Aufruf erhält `already_acquired` mit **derselben Job-ID**
+    - die Stage-/Segment-Autorisierung ist danach konsumiert
+    - ein dritter Dispatch erzeugt **niemals** Attempt 2 über den Rearm-Zweig
+    - für `audio_mux` ist `mux_rearm_allowed = false` gesetzt
 21. **Deadlock-Freiheit (Lock-Order):** paralleler Callback-Apply (Job → Scene, ohne Advisory) gegen Serialized-Acquire (Advisory → Job → Scene) auf derselben Scene/Identität, beide Richtungen und verschränkt ⇒ kein `deadlock detected`, beide Transaktionen terminieren mit den vertraglichen Ergebnissen; analog Reset (Advisory → Jobs → Scene) gegen Callback
 
 Zusätzlich: `user_reset` nicht retryable; Marker-Lifecycle (überlebt die Reset-Mutation); Fail-closed-Test `rs3_rearm_unavailable`; Drift-Test der Statusmenge; Frozen-Test, dass `composer_acquire_pipeline_attempt` unverändert `predecessor_exists` liefert.
