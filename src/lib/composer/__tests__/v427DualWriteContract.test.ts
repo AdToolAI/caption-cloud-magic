@@ -63,12 +63,17 @@ describe('v427 dual-write', () => {
     expect(src).not.toMatch(/from "\.\/(pass-face-preclip|syncso-|plate-|face-|camera-path)/);
   });
 
-  it('is called after dispatch, not before, and cannot abort the run', () => {
+  // v431 G3.1 — der post-hoc Dual-Write für `base_video` ist ersetzt: die
+  // Provenienz-Zeile entsteht VOR dem Provider-Call über den Job-Ledger
+  // (`acquireLedgerJob`), zwei Quellen für dieselbe Stage würden die
+  // D2-Eindeutigkeit brechen. Der Dispatcher darf ihn deshalb nicht mehr rufen.
+  it('is no longer called by the dispatcher; the ledger owns base_video provenance', () => {
     const src = read(CALLER);
-    const call = src.indexOf('await dualWriteDispatches(');
-    expect(call).toBeGreaterThan(-1);
-    // must sit after the per-scene dispatch loop, before the credit deduction
-    expect(call).toBeGreaterThan(src.indexOf('replicate.predictions.create'));
-    expect(call).toBeLessThan(src.indexOf('const billableResults'));
+    expect(src).not.toContain('dualWriteDispatches(');
+    const acquire = src.indexOf('acquireLedgerJob(');
+    expect(acquire).toBeGreaterThan(-1);
+    // Ledger-Zeile vor dem Provider-Call.
+    expect(acquire).toBeLessThan(src.indexOf('replicate.predictions.create'));
   });
 });
+
