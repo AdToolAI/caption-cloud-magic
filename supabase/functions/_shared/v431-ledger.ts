@@ -240,6 +240,45 @@ export async function settleLedgerDispatchFailure(
   }
 }
 
+/**
+ * Konservative Klassifikation eines Dispatch-Fehlers.
+ *
+ * Nur eine beweisbare Ablehnung darf `rejected` werden. Alles andere bleibt
+ * `uncertain` — ein Provider könnte den Auftrag angenommen haben und später
+ * doch noch callbacken (D3/G3.1b).
+ */
+export function classifyDispatchFailure(err: unknown): "rejected" | "uncertain" {
+  const msg = (err instanceof Error ? err.message : String(err ?? "")).toLowerCase();
+  if (/\b(400|401|403|404|409|422)\b/.test(msg)) return "rejected";
+  if (/missing_run_stamp|invalid_input|validation|unsupported|unauthorized|forbidden|not found/.test(msg)) {
+    return "rejected";
+  }
+  return "uncertain";
+}
+
+/**
+ * Synchron fertige Dispatches (z. B. ai-image, das sofort ein Ergebnis liefert)
+ * haben keine externe Job-ID und dürfen nicht als offener Versand zurückbleiben.
+ */
+export async function completeLedgerJobImmediate(
+  admin: any,
+  jobId: string | null | undefined,
+): Promise<void> {
+  if (!jobId) return;
+  try {
+    await admin
+      .from("composer_pipeline_jobs")
+      .update({ status: "succeeded", completed_at: new Date().toISOString() })
+      .eq("id", jobId)
+      .in("status", ["pending", "dispatching"]);
+  } catch (e) {
+    console.warn(`${V431_OBSERVE_TAG} ledger_complete_failed`, JSON.stringify({
+      pipeline_job_id: jobId,
+      error: e instanceof Error ? e.message : String(e),
+    }));
+  }
+}
+
 export interface ReplaceLedgerAttemptParams {
   previousJobId: string;
   sceneId: string;
