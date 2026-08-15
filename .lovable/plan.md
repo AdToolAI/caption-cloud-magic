@@ -10,12 +10,13 @@ Observe ist read-only gegenüber allen Produktions- und Orchestrierungsdaten (Sc
 
 Bestätigter Defekt: `composer_reap_orphaned_dispatches(integer)` existiert, ist korrekt gehärtet (`REVOKE PUBLIC`, `GRANT service_role`), hat aber keinen Aufrufer.
 
-- pg_cron-Job `composer-reap-orphaned-dispatches`, Minutentakt, ruft die Funktion direkt in SQL auf (kein HTTP, kein Key im Job-Body).
-- Ausführung unter definierter, privilegierter Rolle; die Funktion bleibt `SECURITY DEFINER` mit gehärtetem `search_path`.
-- Heartbeat-Eintrag, damit ein nicht laufender Scheduler beim nächsten Drain sichtbar ist statt still zu bleiben.
+- pg_cron-Job `composer-reap-orphaned-dispatches`, Minutentakt, registriert durch die Migrations-/DB-Owner-Rolle (pg_cron läuft NICHT als `service_role`; der Job läuft unter der registrierenden DB-Rolle). Aufruf direkt in SQL, kein HTTP, kein Key im Job-Body.
+- Fester Threshold: `public.composer_reap_orphaned_dispatches(10)`. Die Funktion bleibt `SECURITY DEFINER` mit gehärtetem `search_path`; die registrierende Rolle erhält explizit `EXECUTE`.
+- Heartbeat entsteht im selben Cron-Lauf (ein einziges SQL-Statement/Block: Reaper aufrufen, Ergebnis in den Heartbeat schreiben) — kein zweiter unabhängiger Job, damit „Heartbeat grün, Reaper tot" ausgeschlossen ist. Inhalt: `ran_at`, verwendeter Threshold, `reaped_count`/Ergebnis.
 - Idempotente Registrierung (bestehenden Job vorher entplanen), damit die Migration wiederholbar ist.
 
-Smoke B: künstlich gealterte `dispatching`-Zeile ohne `external_job_id` anlegen → Scheduler/Reaper laufen lassen → Erwartung `status = dispatch_uncertain`, `recoverable = true`, `completed_at IS NULL`, Zeile per `pipeline_job_id` und späterer Bindung weiterhin auffindbar (Callback-Lookup unbeschädigt). Anschließend Testzeile entfernen.
+Smoke B: künstlich gealterte `dispatching`-Zeile ohne `external_job_id` anlegen → Scheduler/Reaper laufen lassen → Erwartung `status = dispatch_uncertain`, `recoverable = true`, `completed_at IS NULL`, Zeile per `pipeline_job_id` und späterer Bindung weiterhin auffindbar (Callback-Lookup unbeschädigt); Heartbeat-Zeile aus demselben Lauf mit passendem `reaped_count`. Anschließend Testzeile entfernen.
+
 
 ## C — Persistente append-only Callback-Telemetrie (C1)
 
