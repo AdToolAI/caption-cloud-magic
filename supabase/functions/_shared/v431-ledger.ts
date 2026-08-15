@@ -144,27 +144,58 @@ export async function acquireLedgerJob(
       return { outcome: "unavailable", reason: "no_generation" };
     }
 
-    const { data, error } = await admin.rpc("composer_acquire_pipeline_attempt", {
-      p_scene_id: params.sceneId,
-      p_run_id: runId,
-      p_stage: params.stage,
-      p_plate_generation: plateGeneration,
-      p_run_contract_version: V427_RUN_CONTRACT_VERSION,
-      p_segment_id: params.segmentId ?? null,
-      p_speaker_id: params.speakerId ?? null,
-      p_provider: params.provider ?? null,
-      p_metadata: { ...(params.metadata ?? {}), ledger_source: "v431_g31" },
-    });
+    // v431 RS3 §5b — Lip-Sync-Stages laufen ausschließlich über den
+    // serialisierten Wrapper (Advisory → Job → Scene). Dort greift das
+    // Reset-Epoch (`rs3_reset_id`) und der On-Demand-Rearm. Alle anderen
+    // Stages benutzen unverändert das eingefrorene G3.1b-Acquire.
+    const useRs3Serialized = params.stage === "sync_segment" || params.stage === "audio_mux";
+    const { data, error } = useRs3Serialized
+      ? await admin.rpc("composer_acquire_lipsync_attempt_serialized", {
+        _scene_id: params.sceneId,
+        _run_id: runId,
+        _stage: params.stage,
+        _plate_generation: plateGeneration,
+        _segment_id: params.segmentId ?? null,
+        _provider: params.provider ?? null,
+        _metadata: { ...(params.metadata ?? {}), ledger_source: "v431_g31" },
+      })
+      : await admin.rpc("composer_acquire_pipeline_attempt", {
+        p_scene_id: params.sceneId,
+        p_run_id: runId,
+        p_stage: params.stage,
+        p_plate_generation: plateGeneration,
+        p_run_contract_version: V427_RUN_CONTRACT_VERSION,
+        p_segment_id: params.segmentId ?? null,
+        p_speaker_id: params.speakerId ?? null,
+        p_provider: params.provider ?? null,
+        p_metadata: { ...(params.metadata ?? {}), ledger_source: "v431_g31" },
+      });
 
     const row = Array.isArray(data) ? data[0] : data;
+    if (row?.rs3_outcome) {
+      console.log(`${V431_OBSERVE_TAG} rs3_acquire`, JSON.stringify({
+        scene_id: params.sceneId,
+        stage: params.stage,
+        rs3_outcome: row.rs3_outcome,
+        outcome: row.outcome ?? null,
+        pipeline_job_id: row.job_id ?? null,
+      }));
+    }
     if (error || !row?.job_id) {
       console.warn(`${V431_OBSERVE_TAG} ledger_acquire_failed`, JSON.stringify({
         scene_id: params.sceneId,
         stage: params.stage,
+        rs3_outcome: row?.rs3_outcome ?? null,
         error: error?.message ?? "no_row",
       }));
-      return { outcome: "unavailable", reason: "acquire_failed" };
+      return {
+        outcome: "unavailable",
+        reason: typeof row?.rs3_outcome === "string" && row.rs3_outcome !== "passthrough"
+          ? String(row.rs3_outcome)
+          : "acquire_failed",
+      };
     }
+
 
     const job: LedgerJobHandle = {
       id: String(row.job_id),
