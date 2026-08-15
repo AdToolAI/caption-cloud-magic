@@ -46,6 +46,22 @@ Kein unabhängiges Überschreiben eines immutable Slots: der neue Attempt bindet
 
 Beide RPCs sind idempotent bei identischem Paar (No-op) und schlagen fehl, wenn die Ledger-Row bereits an eine **andere** `external_job_id` gebunden ist oder Run/Generation nicht passen. Schlägt das RPC fehl, gilt der Dispatch als nicht gebunden und läuft in den bestehenden G3.1b-Dispatch-Settle-Pfad (`uncertain`/`failed`) — es entsteht kein halbgebundener Zustand. Ein Helper `setPlateAttemptBinding` als reines Client-Update entfällt damit; die Reset-Pfade setzen beide Spalten weiterhin gemeinsam auf `null`, ein Guard-Test verbietet Einzelschreiber von `replicate_prediction_id`.
 
+### G0-Sicherheitsvertrag der beiden Bind-RPCs (verbindlich)
+
+Gilt identisch für `composer_bind_plate_attempt` und `composer_bind_sync_pass_attempt` — derselbe Standard wie bei allen G0/G2/G3-Primitives:
+
+- `SECURITY DEFINER`, `SET search_path = pg_catalog, public`, `LANGUAGE plpgsql`, `VOLATILE`.
+- Alle Tabellen-, Typ- und Funktionsreferenzen schema-qualifiziert (`public.composer_pipeline_jobs`, `public.composer_scenes`, `pg_catalog.now()` usw.).
+- `REVOKE ALL ON FUNCTION … FROM PUBLIC, anon, authenticated;` und `GRANT EXECUTE ON FUNCTION … TO service_role;` — kein Zugriff aus dem Client.
+- **Keine Default-Parameter, keine Overloads** — genau eine Signatur je RPC.
+- **Deterministische Lock-Reihenfolge:** zuerst `public.composer_pipeline_jobs … FOR UPDATE`, danach `public.composer_scenes … FOR UPDATE`. Keine andere Reihenfolge, kein zweites Lock-Muster.
+- **Geschlossene Stage-Prüfung:** Plate-RPC akzeptiert ausschließlich `stage = 'base_video'`, Sync-RPC ausschließlich `stage = 'sync_segment'`; jede andere Stage → Exception, kein Fallthrough.
+- **Autorität liegt bei der gelockten Ledger-Zeile:** `scene_id`, `run_id` und `plate_generation` werden aus der gelockten Job-Zeile gelesen und gegen die Szene geprüft. Caller-Parameter dürfen ausschließlich **bestätigen** (Mismatch → Exception); sie dürfen niemals bestimmen, welche Bindung geschrieben wird.
+- Rückgabe ist ein schmaler Statuswert (`bound` / `noop`), keine Row-Dumps; keine dynamische SQL-Ausführung.
+
+**Security-Smoke (Teil der Testmatrix):** je RPC prüfen — `prosecdef = true`; `proconfig` enthält `search_path=pg_catalog, public`; `has_function_privilege('anon', …, 'EXECUTE') = false` und dasselbe für `authenticated`; `has_function_privilege('service_role', …, 'EXECUTE') = true`; genau **eine** Zeile in `pg_proc` je Funktionsname (keine Overload); `pronargdefaults = 0`. Zusätzlich negative Fälle: falsche Stage, fremde `scene_id`, abweichender Run/Generation → Exception, keine Teilwirkung.
+
+
 ## Lücke 2 — Cutover-Vertrag für Rows ohne Pointer
 
 Bestandsaufnahme (heute, 16:34Z): `plate_rendering` = 0, davon mit `replicate_prediction_id` = 0, davon ModelArk = 0; Lip-Sync in-flight (`lipsync_dispatched|lipsync_running|lipsync_muxing`) = 0. Es existieren aktuell **keine recoveryfähigen Base-Video-Jobs ohne Pointer**.
