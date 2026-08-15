@@ -34,7 +34,7 @@ import { probeMp4Dims } from "../_shared/twoshot-face-map.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
-import { observeCallbackProvenance, readPipelineJobId } from "../_shared/v431-ledger.ts";
+import { acquireLedgerJob, observeCallbackProvenance, readPipelineJobId } from "../_shared/v431-ledger.ts";
 
 
 const corsHeaders = {
@@ -327,7 +327,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
   if (sceneHint) {
     const { data } = await supabase
       .from("composer_scenes")
-      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status, active_run_id, plate_generation")
       .eq("id", sceneHint)
       .maybeSingle();
     if (data) {
@@ -343,7 +343,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // We must check ALL three so late/parallel pass webhooks find their scene.
     const { data: rows } = await supabase
       .from("composer_scenes")
-      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status, active_run_id, plate_generation")
       .in("lip_sync_status", ["running", "stitching", "audio_muxing"])
       .limit(200);
     for (const r of rows ?? []) {
