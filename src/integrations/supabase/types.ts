@@ -6913,6 +6913,7 @@ export type Database = {
           pipeline_substate_at: string | null
           plate_generation: number
           plate_generation_started_at: string | null
+          plate_pipeline_job_id: string | null
           plate_ready_at: string | null
           plate_ready_generation: number | null
           preview_anchor_url: string | null
@@ -7045,6 +7046,7 @@ export type Database = {
           pipeline_substate_at?: string | null
           plate_generation?: number
           plate_generation_started_at?: string | null
+          plate_pipeline_job_id?: string | null
           plate_ready_at?: string | null
           plate_ready_generation?: number | null
           preview_anchor_url?: string | null
@@ -7177,6 +7179,7 @@ export type Database = {
           pipeline_substate_at?: string | null
           plate_generation?: number
           plate_generation_started_at?: string | null
+          plate_pipeline_job_id?: string | null
           plate_ready_at?: string | null
           plate_ready_generation?: number | null
           preview_anchor_url?: string | null
@@ -19706,6 +19709,25 @@ export type Database = {
           outcome: string
           status: string
         }[]
+      }
+      composer_bind_plate_attempt: {
+        Args: {
+          _external_job_id: string
+          _pipeline_job_id: string
+          _plate_generation: number
+          _run_id: string
+          _scene_id: string
+        }
+        Returns: string
+      }
+      composer_bind_sync_pass_attempt: {
+        Args: {
+          _external_job_id: string
+          _pass_idx: number
+          _pipeline_job_id: string
+          _scene_id: string
+        }
+        Returns: string
       }
       composer_fail_callback_scene: {
         Args: {

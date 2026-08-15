@@ -233,6 +233,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
           _patch: {
             status: "pending",
             job_id: null,
+            pipeline_job_id: null,
             output_url: null,
             finished_at: null,
             retry_variant: nextRung.variant,
@@ -304,6 +305,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
         _patch: {
           status: "failed",
           job_id: null,
+          pipeline_job_id: null,
           finished_at: nowIso,
           error: "sync_noop_unrecoverable",
           last_error: "sync_noop_unrecoverable",

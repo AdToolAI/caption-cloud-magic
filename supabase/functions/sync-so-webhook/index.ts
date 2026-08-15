@@ -772,6 +772,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           ...freshDonePasses[currentPass],
           status: "failed",
           job_id: null,
+          pipeline_job_id: null,
           finished_at: nowIso,
           error: "sync_noop_unrecoverable",
           last_error: "sync_noop_unrecoverable",
@@ -787,6 +788,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             _patch: {
               status: "failed",
               job_id: null,
+              pipeline_job_id: null,
               finished_at: nowIso,
               error: "sync_noop_unrecoverable",
               noop_escalation_step: noopEscalationStep,
@@ -876,6 +878,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           ...freshDonePasses[currentPass],
           status: "pending",
           job_id: null,
+          pipeline_job_id: null,
           output_url: null,
           finished_at: null,
           retry_variant: nextRung.variant,
@@ -895,6 +898,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             _patch: {
               status: "pending",
               job_id: null,
+              pipeline_job_id: null,
               output_url: null,
               finished_at: null,
               retry_variant: nextRung.variant,
@@ -1477,6 +1481,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
                 // v126 — Clear the dead provider state so compose-dialog-segments
                 // re-renders the preclip and dispatches a fresh sync-3 job.
                 job_id: null,
+                pipeline_job_id: null,
                 output_url: null,
                 started_at: null,
                 finished_at: null,

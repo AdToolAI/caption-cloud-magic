@@ -231,6 +231,109 @@ export async function bindLedgerExternalJob(
 }
 
 /**
+ * v431 G3.1f — Atomare Attempt-Bindung Plate (base_video).
+ *
+ * Bindet in EINER Transaktion: Ledger-`external_job_id`,
+ * `composer_scenes.replicate_prediction_id` und den Transport-Pointer
+ * `composer_scenes.plate_pipeline_job_id`. Kein halbgebundener Zustand.
+ * Fail-open nur dort, wo es gar keine Ledger-Zeile gibt (Legacy-Pfad):
+ * dann wird ausschließlich die Provider-ID geschrieben, ohne Pointer.
+ */
+export async function bindPlateAttempt(
+  admin: any,
+  params: {
+    pipelineJobId: string | null | undefined;
+    sceneId: string;
+    externalJobId: string;
+    runId: string | null;
+    plateGeneration: number;
+  },
+): Promise<boolean> {
+  if (!params.pipelineJobId) {
+    // Kein Ledger-Attempt (fail-open Observe-Rest): Legacy-Write ohne Pointer.
+    await admin
+      .from("composer_scenes")
+      .update({ replicate_prediction_id: params.externalJobId })
+      .eq("id", params.sceneId);
+    return false;
+  }
+  const { error } = await admin.rpc("composer_bind_plate_attempt", {
+    _pipeline_job_id: params.pipelineJobId,
+    _external_job_id: params.externalJobId,
+    _scene_id: params.sceneId,
+    _run_id: params.runId,
+    _plate_generation: params.plateGeneration,
+  });
+  if (error) {
+    console.error(`${V431_OBSERVE_TAG} plate_bind_failed`, JSON.stringify({
+      scene_id: params.sceneId,
+      pipeline_job_id: params.pipelineJobId,
+      external_job_id: params.externalJobId,
+      error: error.message,
+    }));
+    throw new Error(`plate_bind_failed: ${error.message}`);
+  }
+  return true;
+}
+
+/**
+ * v431 G3.1f — Atomare Attempt-Bindung Sync-Pass (sync_segment).
+ * Schreibt Ledger-Bindung + `passes[i].job_id` + `passes[i].pipeline_job_id`
+ * in einer Transaktion. Der Pass-Index wird gegen die Ledger-Identität geprüft.
+ */
+export async function bindSyncPassAttempt(
+  admin: any,
+  params: {
+    pipelineJobId: string | null | undefined;
+    sceneId: string;
+    passIdx: number;
+    externalJobId: string;
+  },
+): Promise<boolean> {
+  if (!params.pipelineJobId) return false;
+  const { error } = await admin.rpc("composer_bind_sync_pass_attempt", {
+    _pipeline_job_id: params.pipelineJobId,
+    _external_job_id: params.externalJobId,
+    _scene_id: params.sceneId,
+    _pass_idx: params.passIdx,
+  });
+  if (error) {
+    console.error(`${V431_OBSERVE_TAG} sync_pass_bind_failed`, JSON.stringify({
+      scene_id: params.sceneId,
+      pass_idx: params.passIdx,
+      pipeline_job_id: params.pipelineJobId,
+      error: error.message,
+    }));
+    throw new Error(`sync_pass_bind_failed: ${error.message}`);
+  }
+  return true;
+}
+
+/**
+ * v431 G3.1f — Vertragsfehler-Telemetrie für Re-Injection ohne Transport-Pointer.
+ * Der Forwarder MUSS danach abbrechen: kein ungebundener Callback.
+ */
+export function logMissingReinjectPointer(fields: {
+  function: string;
+  sceneId: string | null;
+  stage: string;
+  externalJobId: string | null;
+  runId?: string | null;
+  generation?: number | null;
+  passIdx?: number | null;
+}): void {
+  console.error(`${V431_OBSERVE_TAG} reinject_missing_pipeline_job_id`, JSON.stringify({
+    function: fields.function,
+    scene_id: fields.sceneId,
+    stage: fields.stage,
+    external_job_id: fields.externalJobId,
+    run_id: fields.runId ?? null,
+    generation: fields.generation ?? null,
+    pass_idx: fields.passIdx ?? null,
+  }));
+}
+
+/**
  * G3.1b — Dispatch-Failure-Semantik (Ledger-only).
  *
  * `rejected`  → der Provider hat den Auftrag nachweislich NICHT angenommen
