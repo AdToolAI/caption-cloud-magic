@@ -22,7 +22,7 @@ weitergeschrieben, Zeile ~508/1841).
 | B8 | NOOP-Eskalation (855–980) | Slot-Patch (job_id/pipeline_job_id=null), Re-Dispatch `compose-dialog-segments` | Retry-Vertrag (G3.1b) | – | RPC-Verdikt `redispatch`, Dispatch bleibt Edge |
 | B9 | Success, nicht alle terminal (1071–1131) | Slot-Patch `done`, Scene `running`+`twoshot_stage`, Advance-Kick, Mux-Warmup | – | ja | RPC (`continue`) |
 | B10 | v48 Partial-Mux-Refusal N≥3 (1022–1069) | Whole-JSON, Wallet-Refund, Scene `failed` | – | ja | RPC (`fail`) + Refund bleibt Edge/Folgeschritt |
-| B11 | Single-Speaker non-tight Finalize (1147–1176) | Whole-JSON, `lip_sync_status='applied'`, `lip_sync_applied_at`, `clip_status='ready'`, `materializeCompatibilityOutput` | – | **terminal complete** | **NICHT G3.2.2** (D4: Finalizer) — siehe §6 |
+| B11 | Single-Speaker non-tight Finalize (1147–1176) | Whole-JSON, `lip_sync_status='applied'`, `lip_sync_applied_at`, `clip_status='ready'`, `materializeCompatibilityOutput` | – | **terminal complete** | **wird gelöscht** — Umlegung auf `dispatch_mux` (siehe §6) |
 | B12 | Fan-in Mux-Dispatch (1181–1259) | `try_claim_mux_dispatch`, Whole-JSON `audio_muxing`, `lip_sync_status='audio_muxing'`, `acquireLedgerJob(audio_mux)`, Invoke Mux | neue `audio_mux`-Zeile | ja | RPC-Verdikt `dispatch_mux`; Acquire+Invoke bleiben Edge |
 | B13 | FAILED/… Logging (1290–1318) | `syncso_dispatch_log` | – | – | bleibt Edge |
 | B14 | Retry-Ladder (1453–1571) | tot (`canRetry=false`, v128) | – | – | wird gelöscht |
