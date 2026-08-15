@@ -50,20 +50,26 @@ Beide RPCs sind idempotent bei identischem Paar (No-op) und schlagen fehl, wenn 
 
 Bestandsaufnahme (heute, 16:34Z): `plate_rendering` = 0, davon mit `replicate_prediction_id` = 0, davon ModelArk = 0; Lip-Sync in-flight (`lipsync_dispatched|lipsync_running|lipsync_muxing`) = 0. Es existieren aktuell **keine recoveryfähigen Base-Video-Jobs ohne Pointer**.
 
-Cutover-Regel:
-1. Unmittelbar vor dem Deploy wird diese Zählung erneut ausgeführt (Gate). Ergebnis 0 → Cutover per Nachweis, kein Backfill, kein Übergangsmodus.
-2. Ergebnis > 0 → **einmaliger** Backfill genau dieser Rows aus `composer_pipeline_jobs`, nur bei **eindeutigem** Match (`scene_id` + `stage='base_video'` + `external_job_id` + aktueller `run_id`/`plate_generation`, genau eine Zeile, nicht terminal). Mehrdeutig/kein Match → Row bleibt NULL und wird über den bestehenden Reaper-/Fail-Pfad beendet statt geraten. Der Backfill ist eine einmalige Datenmigration, keine Laufzeitauflösung, und wird im Bericht mit betroffenen IDs protokolliert.
-3. Nach dem Cutover gilt: ein Dispatch ohne persistiertes Paar ist ein Vertragsfehler; `reinject_missing_pipeline_job_id` wird als Error geloggt (Felder `function`, `scene_id`, `stage`, `external_job_id`, `run_id`, `generation`) und der Recovery-Pfad verhält sich ansonsten unverändert (keine Injektion, kein Abbruch, keine neue Ledger-Zeile).
+Cutover-Gate (unmittelbar vor dem Deploy, **beide Klassen**):
+1. **Base Video in flight ohne Pointer:** Szenen in `plate_rendering` mit `replicate_prediction_id IS NOT NULL` (inkl. `modelark:`) und `plate_pipeline_job_id IS NULL`.
+2. **Sync-Passes in flight ohne Pointer:** Szenen mit einem Pass `status='rendering'|'pending'`-Nachfolge mit `job_id IS NOT NULL` und fehlendem `pipeline_job_id` (inkl. Zustände `lipsync_dispatched|lipsync_running|lipsync_muxing`).
+
+Beide Zählungen 0 → Cutover per Nachweis, kein Backfill, kein Übergangsmodus.
+
+- Base Video > 0 → **einmaliger** Backfill genau dieser Rows aus `composer_pipeline_jobs`, nur bei **eindeutigem** Match (`scene_id` + `stage='base_video'` + `external_job_id` + aktueller `run_id`/`plate_generation`, genau eine Zeile, nicht terminal). Mehrdeutig/kein Match → Row bleibt NULL und wird über den bestehenden Reaper-/Fail-Pfad beendet statt geraten. Einmalige Datenmigration, keine Laufzeitauflösung, im Bericht mit betroffenen IDs protokolliert.
+- Sync > 0 → **bevorzugt Drain bis 0**, dann deployen; kein spontan erfundener Backfill-Vertrag. Nur falls ein Drain nicht abwartbar ist: derselbe eindeutige Einmal-Match, aber ausschließlich gegen einen bestehenden `stage='sync_segment'`-Ledger-Job (scene + pass + `external_job_id` + Run/Generation, genau eine nicht-terminale Zeile) — sonst NULL lassen.
+
+Nach dem Cutover ist ein Dispatch ohne persistiertes Paar ein Vertragsfehler: Error-Log `reinject_missing_pipeline_job_id` (Felder `function`, `scene_id`, `stage`, `external_job_id`, `run_id`, `generation`) **und die Re-Injection unterbleibt** — der Forwarder sendet keinen ungebundenen Callback. Kein Ledger-Insert, kein Resolve-Fallback, keine erfundene ID; der übrige Recovery-Pfad (Refund-/Fail-/Reaper-Logik) bleibt unverändert.
 
 Eine dauerhafte Pre-Cutover-Auflösung im Forwarder wird **nicht** eingeführt.
 
 ## Umsetzung
 
-1. **Migration:** Spalte `composer_scenes.plate_pipeline_job_id uuid null`; Erweiterung von `update_dialog_pass_slot` um Immutabilitäts- und Paarklausel für `pipeline_job_id` (siehe Lücke 1); optionaler einmaliger Backfill nur, falls das Cutover-Gate > 0 liefert.
-2. **`compose-video-clips`:** alle Bindungsstellen (Replicate- und ModelArk-Zweig) auf `setPlateAttemptBinding` umstellen, aufgerufen an derselben Stelle wie `bindLedgerExternalJob`; Reset-Stellen setzen beide Spalten auf `null`.
-3. **`recover-stuck-composer-clip`:** Szene-Select um `plate_pipeline_job_id` erweitern, `replayWebhook` hängt `&pipeline_job_id=…` an die bestehende URL; ohne Pointer nur Error-Telemetrie.
-4. **`modelark-poll`:** Szene-Select um `plate_pipeline_job_id` erweitern, `notifyWebhook` hängt `&pipeline_job_id=…` an die bestehende URL (neben `run_id`/`generation`); ohne Pointer nur Error-Telemetrie.
-5. **`compose-dialog-segments`:** an der Bindungsstelle (`pass.job_id = jobId` / `bindLedgerExternalJob`) `pipeline_job_id` im selben Slot-Patch mitschreiben; alle Reset-/Skeleton-Patches ergänzen `pipeline_job_id: null`. `run_id`, `plate_generation` und die Provider-`job_id` bleiben unverändert geschützt.
+1. **Migration:** Spalte `composer_scenes.plate_pipeline_job_id uuid null`; Slot-Schreibschicht (`update_dialog_pass_slot`) um Immutabilitäts- und Paarklausel für `pipeline_job_id` erweitern; neue Bind-RPCs `composer_bind_plate_attempt` und `composer_bind_sync_pass_attempt` (siehe Lücke 1); Einmal-Backfill nur, falls das Cutover-Gate > 0 liefert.
+2. **`compose-video-clips`:** alle Bindungsstellen (Replicate- und ModelArk-Zweig) von `bindLedgerExternalJob` + Scene-Update auf `composer_bind_plate_attempt` umstellen; Reset-Stellen setzen beide Spalten gemeinsam auf `null`.
+3. **`recover-stuck-composer-clip`:** Szene-Select um `plate_pipeline_job_id` erweitern, `replayWebhook` hängt `&pipeline_job_id=…` an die bestehende URL; ohne Pointer wird **nicht** gesendet (Error-Telemetrie, Abbruch der Re-Injection).
+4. **`modelark-poll`:** Szene-Select um `plate_pipeline_job_id` erweitern, `notifyWebhook` hängt `&pipeline_job_id=…` an die bestehende URL (neben `run_id`/`generation`); ohne Pointer wird **nicht** gesendet (Error-Telemetrie, Abbruch der Re-Injection).
+5. **`compose-dialog-segments`:** Bindung des Passes über `composer_bind_sync_pass_attempt` (ein Aufruf statt Slot-Patch + `bindLedgerExternalJob`); alle Reset-/Skeleton-Patches ergänzen `pipeline_job_id: null`. `run_id`, `plate_generation` und die Provider-`job_id` bleiben unverändert geschützt.
 
 6. **`lipsync-watchdog`:** an beiden `pollAndForward`-Aufrufstellen (reguläre `rendering`-Passes und der 201-Probe-Zweig) `pipelineJobId: p.pipeline_job_id` mitgeben; `pollAndForward` hängt es an die `sync-so-webhook`-URL. Auswahl-, Poll- und Recovery-Logik bleiben unverändert.
 
