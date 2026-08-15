@@ -95,6 +95,19 @@ export async function acquireLedgerJob(
       plateGeneration = typeof scene?.plate_generation === "number" ? scene.plate_generation : null;
     }
 
+    // G3.1b: `plate_generation` ist DB-seitig beim INSERT Pflicht. Ohne
+    // belastbare Generation wird gar keine Ledger-Zeile erzeugt (fail-closed
+    // gegenüber dem Ledger, fail-open gegenüber dem Render) — die Lücke zählt
+    // als Telemetrie in den Drain-Bericht.
+    if (plateGeneration == null) {
+      console.warn(`${V431_OBSERVE_TAG} ledger_skip_no_generation`, JSON.stringify({
+        scene_id: params.sceneId,
+        stage: params.stage,
+        run_id: runId,
+      }));
+      return null;
+    }
+
     // attempt_no = bestehende Versuche derselben (scene, run, stage, segment) + 1
     let countQuery = admin
       .from("composer_pipeline_jobs")
