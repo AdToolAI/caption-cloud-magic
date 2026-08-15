@@ -399,6 +399,16 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
   }
 
+  // ── v431 G3.1 — Ledger-Observe (schreibt nichts, blockiert nichts) ─────────
+  await observeCallbackProvenance(supabase, {
+    handler: "sync-so-webhook",
+    pipelineJobId: readPipelineJobId(url, payload as Record<string, unknown>),
+    sceneId,
+    stage: "sync_segment",
+    externalJobId: jobId ? String(jobId) : null,
+  });
+
+
   if (scene.lip_sync_applied_at) {
     return ok({ ok: true, skipped: "already_applied" });
   }
