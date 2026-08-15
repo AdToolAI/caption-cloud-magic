@@ -510,7 +510,10 @@ export const RETRYABLE_FAILURE_REASONS = [
   "watchdog_stalled",
   "poller_timeout",
   "mux_redispatch",
+  // v431 G3.2.2 §5a — Spiegel der DB-Allowlist `composer_retryable_failure_reasons()`.
+  "sync_noop_retryable",
 ] as const;
+
 
 export type RetryableFailureReason = (typeof RETRYABLE_FAILURE_REASONS)[number];
 
