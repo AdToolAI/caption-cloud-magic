@@ -23,6 +23,7 @@ import {
   modelArkApiKey,
 } from "../_shared/modelark.ts";
 import { heartbeatPipelineJob } from "../_shared/v427-callback-guard.ts";
+import { logMissingReinjectPointer } from "../_shared/v431-ledger.ts";
 
 
 const corsHeaders = {
@@ -110,7 +111,7 @@ async function scan(sceneFilterId: string | null) {
     /* ── 2. Video Composer scenes ───────────────────────────────────── */
     let sceneQuery = supabase
       .from("composer_scenes")
-      .select("id, project_id, replicate_prediction_id, active_run_id, plate_generation, updated_at")
+      .select("id, project_id, replicate_prediction_id, plate_pipeline_job_id, active_run_id, plate_generation, updated_at")
       // v430 Step 5D: read the modern state column only; `pipeline_state` is
       // NOT NULL and always maintained by the bridge trigger. No legacy OR.
       .eq("pipeline_state", "plate_rendering")
@@ -127,8 +128,21 @@ async function scan(sceneFilterId: string | null) {
       summary.scenes++;
 
       const notifyWebhook = async (payload: Record<string, unknown>) => {
+        // v431 G3.1f — ohne Transport-Pointer wird NICHT re-injiziert.
+        const pointer = (scene as any).plate_pipeline_job_id as string | null;
+        if (!pointer) {
+          logMissingReinjectPointer({
+            function: "modelark-poll",
+            sceneId: scene.id,
+            stage: "base_video",
+            externalJobId: taskId,
+            runId: scene.active_run_id ?? null,
+            generation: scene.plate_generation ?? null,
+          });
+          return;
+        }
         const res = await fetch(
-          `${webhookUrl}&scene_id=${scene.id}&project_id=${scene.project_id}&run_id=${encodeURIComponent(scene.active_run_id ?? "")}&generation=${scene.plate_generation ?? 0}`,
+          `${webhookUrl}&scene_id=${scene.id}&project_id=${scene.project_id}&run_id=${encodeURIComponent(scene.active_run_id ?? "")}&generation=${scene.plate_generation ?? 0}&pipeline_job_id=${encodeURIComponent(pointer)}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

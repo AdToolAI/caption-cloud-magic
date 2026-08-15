@@ -26,6 +26,7 @@ import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { getSyncApiKey, releaseInflightSyncJob } from "../_shared/syncso-preflight.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { logMissingReinjectPointer } from "../_shared/v431-ledger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -166,8 +167,9 @@ async function pollAndForward(opts: {
   sceneId: string;
   supabaseUrl: string;
   serviceKey: string;
+  pipelineJobId: string | null;
 }): Promise<{ terminal: boolean; status?: string }> {
-  const { syncApiKey, jobId, sceneId, supabaseUrl, serviceKey } = opts;
+  const { syncApiKey, jobId, sceneId, supabaseUrl, serviceKey, pipelineJobId } = opts;
   try {
     const r = await fetch(`${SYNC_API_BASE}/generate/${jobId}`, {
       method: "GET",
@@ -187,9 +189,21 @@ async function pollAndForward(opts: {
     // compositor dispatch, retry/refund) runs unchanged. Include the
     // scene_id query hint and shared-secret token so verifyWebhookRequest
     // accepts it.
+    // v431 G3.1f — Transport-Pointer ist Pflicht; ohne ihn wird der Callback
+    // NICHT weitergereicht (kein ungebundener Re-Inject).
+    if (!pipelineJobId) {
+      logMissingReinjectPointer({
+        function: "lipsync-watchdog",
+        sceneId,
+        stage: "sync_segment",
+        externalJobId: jobId,
+      });
+      return { terminal: false };
+    }
     const sharedSecret = Deno.env.get("WEBHOOK_SHARED_SECRET") ?? "";
     const webhookUrl =
       `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}` +
+      `&pipeline_job_id=${encodeURIComponent(pipelineJobId)}` +
       (sharedSecret ? `&token=${encodeURIComponent(sharedSecret)}` : "");
     try {
       await fetch(webhookUrl, {
@@ -413,6 +427,7 @@ serve(async (req) => {
       for (const { p, i } of renderingPasses) {
         const r = await pollAndForward({
           syncApiKey, jobId: p.job_id, sceneId: d.id, supabaseUrl, serviceKey,
+          pipelineJobId: (p?.pipeline_job_id as string | null) ?? null,
         });
         if (r.terminal) {
           polled.push({ scene_id: d.id, job_id: p.job_id, status: r.status ?? "?" });
@@ -672,6 +687,7 @@ serve(async (req) => {
               if (String(p?.status ?? "") !== "rendering" || !p?.job_id) continue;
               const r = await pollAndForward({
                 syncApiKey, jobId: String(p.job_id), sceneId: d.id, supabaseUrl, serviceKey,
+                pipelineJobId: (p?.pipeline_job_id as string | null) ?? null,
               });
               if (r.terminal && r.status === "COMPLETED") {
                 liveCompletedRecovered = true;

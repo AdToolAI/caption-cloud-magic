@@ -45,7 +45,7 @@ import Replicate from "npm:replicate@0.25.2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 import {
   acquireLedgerJob,
-  bindLedgerExternalJob,
+  bindPlateAttempt,
   classifyDispatchFailure,
   completeLedgerJobImmediate,
   settleLedgerDispatchFailure,
@@ -621,6 +621,27 @@ serve(async (req) => {
       const ledgerJobId = sceneLedgerJobs.get(sceneId);
       const ledgerParam = ledgerJobId ? `&pipeline_job_id=${encodeURIComponent(ledgerJobId)}` : "";
       return `${webhookUrl}&scene_id=${sceneId}&project_id=${projectId}&run_id=${encodeURIComponent(stamp.runId)}&generation=${stamp.generation}${ledgerParam}`;
+    };
+
+    // v431 G3.1f — Atomare Attempt-Bindung: Provider-Job-ID und Transport-Pointer
+    // (`plate_pipeline_job_id`) entstehen gemeinsam in einer DB-Transaktion.
+    // Ohne Ledger-Zeile bleibt der Legacy-Write (ohne Pointer) erhalten.
+    const persistPlateAttempt = async (
+      sceneId: string,
+      externalJobId: string,
+      extraPatch?: Record<string, unknown>,
+    ) => {
+      const stamp = sceneRunStamps.get(sceneId);
+      await bindPlateAttempt(supabaseAdmin, {
+        pipelineJobId: sceneLedgerJobs.get(sceneId) ?? null,
+        sceneId,
+        externalJobId,
+        runId: stamp?.runId ?? null,
+        plateGeneration: Number(stamp?.generation ?? 0),
+      });
+      if (extraPatch && Object.keys(extraPatch).length > 0) {
+        await supabaseAdmin.from("composer_scenes").update(extraPatch).eq("id", sceneId);
+      }
     };
 
     // IMPORTANT: We do NOT append negative words to the positive prompt.
@@ -4352,13 +4373,11 @@ serve(async (req) => {
             webhook_events_filter: ["completed"],
           });
 
-          await supabaseAdmin
-            .from("composer_scenes")
-            .update({
-              replicate_prediction_id: prediction.id,
-              ...(isCinematicSyncScene ? { twoshot_stage: "master_clip" } : {}),
-            })
-            .eq("id", scene.id);
+          await persistPlateAttempt(
+            scene.id,
+            prediction.id,
+            isCinematicSyncScene ? { twoshot_stage: "master_clip" } : undefined,
+          );
 
           results.push({
             sceneId: scene.id,
@@ -4423,12 +4442,7 @@ serve(async (req) => {
             webhook_events_filter: ["completed"],
           });
 
-          await supabaseAdmin
-            .from("composer_scenes")
-            .update({
-              replicate_prediction_id: prediction.id,
-            })
-            .eq("id", scene.id);
+          await persistPlateAttempt(scene.id, prediction.id);
 
           results.push({
             sceneId: scene.id,
@@ -4542,10 +4556,7 @@ serve(async (req) => {
             webhook_events_filter: ["completed"],
           });
 
-          await supabaseAdmin
-            .from("composer_scenes")
-            .update({ replicate_prediction_id: prediction.id })
-            .eq("id", scene.id);
+          await persistPlateAttempt(scene.id, prediction.id);
 
           results.push({
             sceneId: scene.id,
@@ -4593,10 +4604,7 @@ serve(async (req) => {
             webhook_events_filter: ["completed"],
           });
 
-          await supabaseAdmin
-            .from("composer_scenes")
-            .update({ replicate_prediction_id: prediction.id })
-            .eq("id", scene.id);
+          await persistPlateAttempt(scene.id, prediction.id);
 
           results.push({
             sceneId: scene.id,
@@ -4731,14 +4739,18 @@ serve(async (req) => {
             `[compose-video-clips] Seedance 2.5 scene ${scene.id}: ModelArk task ${taskId} (${seed25Duration}s)`,
           );
 
-          const __taskWrite = await supabaseAdmin
-            .from("composer_scenes")
-            .update({ replicate_prediction_id: `${MODELARK_JOB_PREFIX}${taskId}` })
-            .eq("id", scene.id)
-            .eq("active_run_id", __seed25Stamp.runId)
-            .eq("plate_generation", __seed25Stamp.generation);
-          if (__taskWrite.error) {
-            throw new Error(`seedance_task_write_failed:${__taskWrite.error.message}`);
+          try {
+            await bindPlateAttempt(supabaseAdmin, {
+              pipelineJobId: sceneLedgerJobs.get(scene.id) ?? null,
+              sceneId: scene.id,
+              externalJobId: `${MODELARK_JOB_PREFIX}${taskId}`,
+              runId: __seed25Stamp.runId,
+              plateGeneration: __seed25Stamp.generation,
+            });
+          } catch (__bindErr) {
+            throw new Error(
+              `seedance_task_write_failed:${(__bindErr as Error)?.message ?? __bindErr}`,
+            );
           }
 
           // Kick the poller so completion does not depend on client polling.
@@ -4800,10 +4812,7 @@ serve(async (req) => {
             webhook_events_filter: ["completed"],
           });
 
-          await supabaseAdmin
-            .from("composer_scenes")
-            .update({ replicate_prediction_id: prediction.id })
-            .eq("id", scene.id);
+          await persistPlateAttempt(scene.id, prediction.id);
 
           results.push({
             sceneId: scene.id,
@@ -4854,10 +4863,7 @@ serve(async (req) => {
             webhook_events_filter: ["completed"],
           });
 
-          await supabaseAdmin
-            .from("composer_scenes")
-            .update({ replicate_prediction_id: prediction.id })
-            .eq("id", scene.id);
+          await persistPlateAttempt(scene.id, prediction.id);
 
           results.push({
             sceneId: scene.id,
@@ -4894,14 +4900,10 @@ serve(async (req) => {
               webhook: sceneWebhookUrl(scene.id),
               webhook_events_filter: ["completed"],
             });
-            await supabaseAdmin
-              .from("composer_scenes")
-              .update({
-                clip_status: "generating",
-                clip_quality: "standard",
-                replicate_prediction_id: fallbackPred.id,
-              })
-              .eq("id", scene.id);
+            await persistPlateAttempt(scene.id, fallbackPred.id, {
+              clip_status: "generating",
+              clip_quality: "standard",
+            });
             results.push({
               sceneId: scene.id,
               status: "generating",
@@ -4964,14 +4966,11 @@ serve(async (req) => {
             // Runway is async-polled in its own edge function; the composer
             // webhook isn't called. Mark as generating; user polls scene later
             // via the regular ai_video_generations status pipeline.
-            await supabaseAdmin
-              .from("composer_scenes")
-              .update({
-                replicate_prediction_id:
-                  runwayData.taskId ?? runwayData.generationId,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", scene.id);
+            await persistPlateAttempt(
+              scene.id,
+              String(runwayData.taskId ?? runwayData.generationId),
+              { updated_at: new Date().toISOString() },
+            );
             results.push({
               sceneId: scene.id,
               status: "generating",
@@ -5061,14 +5060,11 @@ serve(async (req) => {
             });
           } else {
             const pikaData = await pikaResp.json();
-            await supabaseAdmin
-              .from("composer_scenes")
-              .update({
-                replicate_prediction_id:
-                  pikaData.predictionId ?? pikaData.generationId,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", scene.id);
+            await persistPlateAttempt(
+              scene.id,
+              String(pikaData.predictionId ?? pikaData.generationId),
+              { updated_at: new Date().toISOString() },
+            );
             results.push({
               sceneId: scene.id,
               status: "generating",
@@ -5183,10 +5179,7 @@ serve(async (req) => {
             webhook_events_filter: ["completed"],
           });
 
-          await supabaseAdmin
-            .from("composer_scenes")
-            .update({ replicate_prediction_id: prediction.id })
-            .eq("id", scene.id);
+          await persistPlateAttempt(scene.id, prediction.id);
 
           results.push({
             sceneId: scene.id,
@@ -5230,7 +5223,9 @@ serve(async (req) => {
       const ledgerJobId = sceneLedgerJobs.get(r.sceneId);
       if (!ledgerJobId) continue;
       if (r.status === "generating") {
-        await bindLedgerExternalJob(supabaseAdmin, ledgerJobId, r.predictionId ?? null);
+        // v431 G3.1f — die Bindung ist bereits beim Dispatch atomar zusammen mit
+        // dem Transport-Pointer erfolgt (`composer_bind_plate_attempt`).
+        // Hier darf keine zweite, halbe Bindung mehr entstehen.
       } else if (r.status === "ready") {
         await completeLedgerJobImmediate(supabaseAdmin, ledgerJobId);
       } else {

@@ -117,7 +117,7 @@ import { rehostPlate } from "../_shared/rehostPlate.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
-import { bindLedgerExternalJob, readRetryContext, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
+import { bindSyncPassAttempt, readRetryContext, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -7237,11 +7237,20 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     });
     await recordCircuitSuccess(supabase, "sync.so");
 
+    // v431 G3.1f — Ledger-Bindung und Transport-Pointer entstehen atomar in
+    // EINER Transaktion; der Pass-Index wird gegen die Ledger-Identität geprüft.
+    // Ohne Ledger-Zeile bleibt der Legacy-Pfad (nur `job_id`) bestehen.
+    if (v431SyncLedgerJob?.id) {
+      await bindSyncPassAttempt(supabase, {
+        pipelineJobId: v431SyncLedgerJob.id,
+        sceneId,
+        passIdx: currentPassIdx,
+        externalJobId: jobId,
+      });
+      (pass as any).pipeline_job_id = v431SyncLedgerJob.id;
+    }
     pass.job_id = jobId;
     passes[currentPassIdx] = pass;
-
-    // v431 G3.1 — Provider-Job-ID an die Ledger-Zeile binden (bestätigend).
-    await bindLedgerExternalJob(supabase, v431SyncLedgerJob?.id ?? null, jobId);
 
 
     const nowIso = new Date().toISOString();
@@ -7721,6 +7730,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               started_at: null,
               finished_at: null,
               error: null,
+              // v431 G3.1f — Attempt-Paar wird immer gemeinsam zurückgesetzt.
+              pipeline_job_id: null,
             };
             const { error } = await supabase.rpc("update_dialog_pass_slot", {
               _scene_id: sceneId,

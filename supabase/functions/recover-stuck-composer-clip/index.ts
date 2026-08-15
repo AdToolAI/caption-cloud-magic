@@ -28,6 +28,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { CLIP_COSTS } from "../_shared/clip-costs.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { logMissingReinjectPointer } from "../_shared/v431-ledger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -122,11 +123,22 @@ async function replayWebhook(
   prediction: any,
   sceneId: string,
   projectId: string,
+  pipelineJobId: string | null,
 ): Promise<boolean> {
   const webhookBase = appendWebhookToken(
     `${SUPABASE_URL}/functions/v1/compose-clip-webhook`,
   );
-  const url = `${webhookBase}&scene_id=${encodeURIComponent(sceneId)}&project_id=${encodeURIComponent(projectId)}`;
+  // v431 G3.1f — Re-Injection ohne Transport-Pointer ist ein Vertragsfehler.
+  if (!pipelineJobId) {
+    logMissingReinjectPointer({
+      function: "recover-stuck-composer-clip",
+      sceneId,
+      stage: "base_video",
+      externalJobId: String(prediction?.id ?? ""),
+    });
+    return false;
+  }
+  const url = `${webhookBase}&scene_id=${encodeURIComponent(sceneId)}&project_id=${encodeURIComponent(projectId)}&pipeline_job_id=${encodeURIComponent(pipelineJobId)}`;
   try {
     const r = await fetch(url, {
       method: "POST",
@@ -157,7 +169,7 @@ async function processScene(
   const { data: scene, error } = await sb
     .from("composer_scenes")
     .select(
-      "id, project_id, replicate_prediction_id, clip_status, clip_url, duration_seconds, clip_source, clip_quality, updated_at, clip_error, engine_override",
+      "id, project_id, replicate_prediction_id, plate_pipeline_job_id, clip_status, clip_url, duration_seconds, clip_source, clip_quality, updated_at, clip_error, engine_override",
     )
     .eq("id", sceneId)
     .maybeSingle();
@@ -260,7 +272,12 @@ async function processScene(
   );
 
   if (status === "succeeded" && prediction.output) {
-    const ok = await replayWebhook(prediction, sceneId, scene.project_id);
+    const ok = await replayWebhook(
+      prediction,
+      sceneId,
+      scene.project_id,
+      ((scene as any).plate_pipeline_job_id as string | null) ?? null,
+    );
     if (ok) {
       console.log(
         `[recover-stuck-composer-clip] v149_webhook_replayed scene=${sceneId} pred=${predictionId}`,
