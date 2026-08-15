@@ -513,15 +513,26 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             console.error(`[compose-clip-webhook] audio/lipsync handoff failed scene=${sceneId}:`, message);
             // Preserve the paid master clip and its ready status. Only the
             // downstream stage is marked failed so the user can retry it.
-            await supabase
-              .from('composer_scenes')
-              .update({
-                lip_sync_status: 'failed',
-                twoshot_stage: 'failed',
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', sceneId)
-              .eq('clip_status', 'ready');
+            // v431 G3.2.1 — RPC H: run-gebunden, kein zweiter Apply auf den
+            // bereits erfolgreichen Plate-Job.
+            const { data: handoffApply, error: handoffError } = await supabase.rpc(
+              'composer_fail_post_plate_handoff',
+              {
+                _scene_id: sceneId,
+                _run_id: runId,
+                _plate_generation: Number.isFinite(generation) ? generation : null,
+                _write_id: 'ccw:handoff_failed',
+                _error_text: `handoff_failed: ${message}`.slice(0, 480),
+              },
+            );
+            if (handoffError) {
+              console.error('[compose-clip-webhook] handoff fail RPC error:', handoffError);
+            } else if ((handoffApply as any)?.applied !== true) {
+              console.warn(
+                `[compose-clip-webhook] handoff fail rejected scene=${sceneId} verdict=${(handoffApply as any)?.verdict}`,
+              );
+            }
+
           });
 
           // @ts-ignore — Deno Deploy / Supabase edge runtime API
