@@ -1,71 +1,83 @@
-# v431 G3.2.2 — Antworten D1 + G5, und Korrektur des Cutover-Gates
+# v431 G3.2.2 — Production Deploy + Sync → Mux → Stitch Resmoke
 
-Beide Rückfragen sind read-only beantwortet. Ergebnis: **D1-a ist belegt** und **G5 (sowie G1/G3) sind kein erreichbares Gate in der aktuellen Formulierung** — sie messen historischen Slot-/Ledger-Müll, nicht In-flight.
+Status: G3.2.2 DEPLOY PLAN READY — AWAITING GO.
+Ziel: Erstmaliger Production-Deploy der G3.2.2-Artefakte, gefolgt von einem echten UI-Lip-Sync-Lauf durch die gesamte Kette bis zum Stitch-Finalizer. Kein G3.2.3, keine Architekturänderung.
 
-## 1. D1 — Sandbox-Rolle: nachweislich plattformintern
+## 1. Pre-Deploy In-flight Gate (exakt 0/0/0/0/0)
 
-Messung (`pg_roles`, `pg_auth_members`):
+Vor jedem Deploy die fünf Gate-Queries aus `docs/v431-g3-2-2-report.md` §2 ausführen. Terminalität ausschließlich am kanonischen `pipeline_state` (`complete`, `failed`, `canceled`).
 
-| Rolle | login | Mitglied in | Mitglieder |
-| --- | --- | --- | --- |
-| `sandbox_exec_lbunafpxuskwmsrraqxl` | ja | — | nur `postgres` |
-| `anon` / `authenticated` / `service_role` | nein | — | — |
-| `authenticator` (PostgREST-Login) | ja | — | — |
+| Gate | Ziel |
+| --- | --- |
+| G1 | 0 offene `sync_segment`-Jobs in non-terminaler Szene |
+| G2 | 0 Szenen in `lipsync_dispatched`/`lipsync_running`/`lipsync_muxing` |
+| G3 | 0 offene `audio_mux`-Jobs in non-terminaler Szene |
+| G4 | 0 Replacement-Attempts im Status `dispatching`/`dispatched` |
+| G5 | 0 non-terminale Pass-Slots in non-terminalen Szenen bzw. mit non-terminalem Ledger-Job |
 
-- `authenticator` ist **nicht** Mitglied der Sandbox-Rolle; PostgREST kann per `SET ROLE` nur nach `anon`/`authenticated`/`service_role` wechseln. Edge Functions nutzen ausschließlich den Data-API-Pfad bzw. `service_role`.
-- Einziges Mitglied der Sandbox-Rolle ist `postgres` (Plattform-Superrolle). Kein Client- und kein Function-Pfad kann sie annehmen.
-- Die Rolle ist der Login der Lovable-Exec-Sandbox (`current_user = sandbox_exec`), also plattforminterne Toolchain, nicht Teil der Client-/Edge-Angriffsfläche. Dieselbe ACL besteht bereits bei den eingefrorenen G3.1-Primitiven.
+Nur bei exakt 0/0/0/0/0 weiter. Historische terminale Rows bleiben unangetastet.
 
-**Entscheidung: D1-a.** Kein Pattern-REVOKE, kein Hardcoding einer umgebungsspezifischen Rolle in Produktionsmigrationen.
+## 2. Production-Deploy-Reihenfolge
 
-Der Security-Vertrag §4 wird redaktionell so präzisiert (kein Code-, kein SQL-Change):
+1. **DB-Migration `20260815180037_…sql`** (Basis-Vertrag G3.2.2)
+   - `composer_apply_sync_segment_result`
+   - `composer_mark_sync_refund_applied`
+   - `composer_retryable_failure_reasons()` inkl. `sync_noop_retryable`
+2. **DB-Migration `20260815185301_…sql`** (Acceptance Remediation R1)
+   - `composer_touch_lipsync_progress`
+   - `composer_log_sync_segment_audit`
+   - monotoner `audio_muxing`-Bridge-Fix
+   - finale Fassung `composer_apply_sync_segment_result` (R1, R5, R6)
+3. **Security-Smoke** (§4 des Reports)
+   - `composer_apply_sync_segment_result`: SECURITY DEFINER, `search_path = pg_catalog, public`, `service_role = true`, `anon`/`authenticated`/`PUBLIC = false`, Sandbox-ACL akzeptiert.
+   - `composer_touch_lipsync_progress` / `composer_log_sync_segment_audit`: kein direkter EXECUTE-Grantee.
+   - `composer_replace_pipeline_attempt`: `md5(pg_get_functiondef)` unverändert `c4649e65440a64997376617721792aa8`.
+   - `composer_retryable_failure_reasons()` enthält `sync_noop_retryable`.
+   - Bridge-Smoke: Szene in `lipsync_muxing` + Legacy-Write `audio_muxing` bleibt `lipsync_muxing`.
+4. **Edge Function `sync-so-webhook` deployen**
+   - Deploy-Zeitstempel `T_deploy` festhalten.
+   - Post-Deploy Sanity: Kein `.update(`/`.upsert(` auf `composer_scenes` im Webhook (außer Credit-Wallet-Refund); kein Whole-JSON-Write auf `dialog_shots`; kein `complete`/`applied`-Write.
 
-- `PUBLIC = false`
-- `anon = false`
-- `authenticated = false`
-- öffentlicher Apply-RPC `composer_apply_sync_segment_result`: `service_role = true`
-- interne Helper `composer_touch_lipsync_progress`, `composer_log_sync_segment_audit`: kein direkter `service_role`-EXECUTE
-- `sandbox_exec_lbunafpxuskwmsrraqxl` = platform-internal role, kein Client-/Edge-Pfad, **akzeptierte Plattform-ACL** (mit obigem Nachweis im Bericht)
+## 3. Echter Production-Resmoke (UI-Lip-Sync-Lauf)
 
-## 2. G5 — was die 44 Passes wirklich sind
+Von der Studio-UI aus eine Szene mit mindestens einem Sprecher starten, der durch Sync.so geht. Abnahmekriterien mit IDs/Timestamps protokollieren:
 
-Join gegen Scene-State und Ledger (44 Rows / 34 Szenen):
+- [ ] `sync_segment`-Callback kommt an; `composer_callback_observations` Verdict = `bound`.
+- [ ] `composer_apply_sync_segment_result` wird aufgerufen; Rückgabe `segment_result` und `scene_verdict` sind getrennt und korrekt.
+- [ ] `sync_segment`-Ledger-Job endet korrekt (`succeeded` bzw. terminal bei Failure).
+- [ ] Pass-Slot korrekt gepatcht, keine Sibling-Clobber.
+- [ ] `dialog_shots.audio_mux.mux_dispatch_requested_at` gesetzt; Apply-RPC schreibt **kein** `dispatched_at`.
+- [ ] Genau ein `audio_mux`-Ledger-Attempt; genau ein tatsächlicher Mux-Dispatch.
+- [ ] `lipsync_muxing` erst durch den Mux-Owner mit realer `render_id`.
+- [ ] Kein Rückfall auf `plate_ready`/`lipsync_running` durch die Legacy-Bridge.
+- [ ] Kein `complete`/`applied` aus `sync-so-webhook`; Finalisierung ausschließlich über Stitch-Finalizer.
+- [ ] DB-Audit-Zeile in `composer_scene_transition_log` (`source_signature = 'g322_sync_segment'`, `caller_class = 'sync_segment_apply'`) vorhanden.
+- [ ] Keine `missing_binding`, `wrong_job`, `stale_run`, `stale_generation`, `reinject_missing_pipeline_job_id`.
 
-| Scene `pipeline_state` | Pass-Status | `pipeline_job_id` | Ledger-Job | Rows |
-| --- | --- | --- | --- | --- |
-| failed | rendering | fehlt | keiner | 16 |
-| failed | retrying | fehlt | keiner | 14 |
-| failed | canceled_by_scene_failure | fehlt | keiner | 8 |
-| canceled | rendering | fehlt | keiner | 3 |
-| complete | rendering | fehlt | keiner | 3 |
+## 4. Duplicate-/Redrive-Nachweis (Post-Deploy-Smoke)
 
-- **Alle** zugehörigen Szenen stehen terminal (`failed` / `canceled` / `complete`).
-- **Keine** Row trägt eine `pipeline_job_id`; es existiert kein korrespondierender Ledger-Job.
-- Jüngste Szenen-Aktualisierung: `2026-08-14 01:13Z` — nichts davon ist jünger als der G3.1-Cutover.
+Optional, falls natürliche Duplicates nicht auftreten: Transaktion mit Rollback oder kontrollierter Redrive zeigen:
 
-→ Klassifikation: **orphaned stale metadata** aus vor-Ledger-Runs. Diese Rows werden **nie** natürlich drainen; „warte bis G5 = 0" ist ein unerreichbares Gate.
+- Identischer finaler Callback vor `audio_mux`-Acquire → erneut `dispatch_mux`.
+- Derselbe Callback nach existierendem `audio_mux`-Attempt → `noop`.
+- Niemals ein zweiter `audio_mux`-Attempt.
 
-### Gleicher Befund bei G1/G3
+## 5. Telemetrie-Fenster (T_deploy → Resmoke-Ende)
 
-Die 8 offenen Ledger-Attempts (4× `sync_segment`, 4× `audio_mux`, alle `dispatched`) gehören **alle derselben Szene** `b34d1eae…` an — und die steht bereits auf `pipeline_state = complete` (17:26Z). G3.1 lief als Observe-Mode: die Attempts wurden gebunden, aber nie terminalisiert. Auch das drainiert nicht von selbst.
+Auswerten und mit IDs/Timestamps festhalten:
 
-## 3. Vorschlag: Gate auf echten In-flight-Scope korrigieren
+- `composer_callback_observations` gruppiert nach Verdict.
+- `composer_scene_transition_log` (`caller_class = 'sync_segment_apply'`, `source_signature = 'g322_sync_segment'`).
+- `composer_pipeline_jobs` nach `stage` und `status`.
+- Reaper-/Watchdog-Fehler.
+- Zählungen `missing_binding`, `wrong_job`, `stale_run`, `stale_generation` — Erwartung 0.
+- `binding_pending` am **Ende** des Fensters = 0.
 
-Statt Bereinigung oder Abwarten wird das Cutover-Gate auf „live" geschärft — die Rows selbst bleiben unangetastet:
+## 6. Abschluss
 
-- **G1/G3 neu:** offene `sync_segment` / `audio_mux`-Attempts **nur** zählen, wenn die zugehörige Szene nicht terminal ist (`pipeline_state not in ('complete','failed','canceled')`).
-- **G5 neu:** offene Pass-Slots **nur** zählen, wenn die Szene nicht terminal ist **oder** der Slot eine `pipeline_job_id` mit nicht-terminalem Ledger-Job trägt.
-- **G2/G4** bleiben unverändert bei exakt 0 Rows.
-- Zusätzlich unverändert: `binding_pending = 0` am Ende des Resmoke-Fensters.
+Ergebnisse in `docs/v431-g3-2-2-report.md` ergänzen. Status danach entweder:
 
-Mit dieser Fassung ist das Gate nach heutigem Stand **0/0/0/0/0** (die stale Rows fallen definitorisch heraus, nicht durch Datenänderung).
+- **G3.2.2 DONE / FROZEN** (wenn Resmoke grün und Telemetrie sauber), oder
+- **G3.2.2 DEPLOYED — FOLLOW-UP BEFUND** (wenn Abweichungen auftreten), gefolgt von separatem Fix-Plan.
 
-## 4. Umsetzung in diesem Schritt
-
-Nur Dokumentation, kein Deploy, keine Migration, keine Codeänderung:
-
-1. `docs/v431-g3-2-2-report.md` §4 um den D1-a-Nachweis (Rollen-/Membership-Tabelle) ergänzen und §4 auf grün stellen.
-2. `docs/v431-g3-2-2-report.md` §2 um die G5-Klassifikationstabelle, den G1/G3-Observe-Mode-Befund und die korrigierten Gate-Queries ergänzen; die Baseline-Messung als „Gate alter Fassung unerreichbar" markieren.
-3. Status setzen: **G3.2.2 DEPLOY PLAN READY — AWAITING GO** mit den beiden geschlossenen Punkten.
-
-Danach STOP; Cleanup der stale Rows nur auf separate Freigabe.
+Kein G3.2.3, keine weiteren Architekturänderungen. STOP nach Abschluss des Reports.
