@@ -518,15 +518,21 @@ export async function resolveLedgerDispatch(
   if (status === "cancelled" || status === "canceled") {
     return { outcome: "skip", reason: "previous_cancelled" };
   }
-  if (status === "failed" && !isRetryableFailureReason(retry.retryReason)) {
+  // Autorisierung liegt in der DB: `composer_replace_pipeline_attempt` prüft den
+  // GESPEICHERTEN `error_code` des unter Lock gelesenen Vorgängers gegen die
+  // geschlossene Allowlist. Diese Client-Vorprüfung spart nur den RPC-Roundtrip
+  // und darf nichts autorisieren, was die DB ablehnen würde.
+  if (status === "failed" && !isRetryableFailureReason(prev.error_code)) {
     console.warn(`${V431_OBSERVE_TAG} ledger_retry_reason_rejected`, JSON.stringify({
       scene_id: params.sceneId,
       stage: params.stage,
       previous_job_id: retry.previousJobId,
-      retry_reason: retry.retryReason,
+      stored_error_code: prev.error_code ?? null,
+      caller_retry_reason: retry.retryReason,
     }));
     return { outcome: "skip", reason: "failure_not_retryable" };
   }
+
 
   const plateGeneration =
     typeof prev.plate_generation === "number" ? prev.plate_generation : params.plateGeneration ?? null;
