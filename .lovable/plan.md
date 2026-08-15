@@ -87,6 +87,27 @@ Neu: `composer_acquire_reset_rearmed_attempt(_scene_id uuid, _run_id uuid, _stag
 - Aufrufer ausschließlich: `compose-dialog-segments` (Sync-Dispatch — Marker vorhanden ⇒ Rearm statt Initial-Acquire) und der Mux-Dispatch (`dispatchAudioMux` in `_shared/v431-ledger.ts`, aus dem Fan-in-`dispatch_mux`-Pfad). Danach jeweils unverändert der normale Provider-Bind-Pfad (`bindSyncPassAttempt` bzw. bestehende Mux-Bindung).
 - `SECURITY DEFINER`, `search_path = pg_catalog, public`, keine Defaults, keine Overloads, `service_role`-only.
 
+## 5b. Reset-vs-Dispatch-Serialisierung (Concurrency-Gate)
+
+Belegter Ist-Zustand: `composer_acquire_pipeline_attempt` nimmt **keinen** Scene-Row-Lock — es liest den jüngsten Attempt und inserted. Ein paralleler Dispatcher könnte also während des Reset-Fensters eine neue aktive Zeile ohne `rs3_reset_id` erzeugen. Diese Lücke wird geschlossen, ohne G3.1b-Semantik zu ändern.
+
+Gemeinsamer Serialisierungspunkt für alle drei Lip-Sync-Job-Creation-Pfade: `pg_advisory_xact_lock(hashtextextended(scene_id::text, 0))`, genommen als **erste** Anweisung, zusätzlich zum bestehenden `composer_scenes FOR UPDATE`.
+
+- `composer_reset_lipsync_with_attempt_cancellation` nimmt den Lock vor dem Kandidaten-Scan (§2 Schritt 0).
+- `composer_acquire_reset_rearmed_attempt` nimmt denselben Lock.
+- Neuer dünner Wrapper `composer_acquire_lipsync_attempt_serialized(_scene_id, _run_id, _stage, _plate_generation, _segment_id, _provider, _metadata)`, Stage-Allowlist `sync_segment | audio_mux`:
+  1. Advisory-Lock, dann `composer_scenes FOR UPDATE`
+  2. Marker lesen. Gültiger Marker für `run_id` + `plate_generation`:
+     - unverbrauchte Autorisierung für Stage/Segment ⇒ Delegation an `composer_acquire_reset_rearmed_attempt`
+     - Identität ohne jeden Vorgänger (No-Predecessor-Fall) ⇒ Delegation an das **unveränderte** `composer_acquire_pipeline_attempt`, wobei `_metadata` in derselben Transaktion um `rs3_reset_id = <reset_id>` ergänzt wird; Ergebnis ist regulär Attempt 1
+     - Autorisierung fehlt/verbraucht und Vorgänger existiert ⇒ fail closed `rs3_rearm_unavailable`
+  3. Kein Marker (bzw. stale Run/Generation) ⇒ unverändert `composer_acquire_pipeline_attempt`, Ergebnisdurchreichung 1:1
+- `acquireLedgerJob()` (`_shared/v431-ledger.ts`, einzige Aufrufstelle des Acquire-RPC) ruft für diese beiden Stages den Wrapper, für alle anderen Stages unverändert das Original.
+
+Wirkung: Session B wartet auf den Advisory-Lock des laufenden Resets und sieht danach garantiert den Marker; es kann kein aktiver, ungetaggter Pre-Reset-Job entstehen. Außerhalb des Reset-Fensters ist der Wrapper semantisch ein No-op über G3.1b.
+
+
+
 ## 6. Late-Callback-Owner und Pre-Reset-Fencing
 
 An jedem Entry Point gilt: existiert ein aktueller RS3-Marker für denselben `run_id`/`plate_generation` und gehört der Callback-Job **nicht** zu dieser `reset_id`, dann ist der Callback ein `pre_reset_attempt` ⇒ no-op. Das gilt ausdrücklich auch für alte `succeeded`/`failed`/`stale`-Attempts, nicht nur für beim Reset gecancelte. Keine Pass-Mutation, keine Scene-Mutation, kein Fan-in, kein Mux-Dispatch, kein Redrive, keine Resurrection.
