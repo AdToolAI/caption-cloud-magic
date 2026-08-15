@@ -10,11 +10,21 @@
  *     transportiert (Sync.so-URL, Remotion-customData, Replicate-Webhook-URL,
  *     Mux-Request-Body).
  *   • `observeCallbackProvenance()` liest die Bindung im Callback, loggt sie
- *     strukturiert — und schreibt NICHTS. Kein Handler-Verhalten ändert sich.
+ *     strukturiert — und mutiert NICHTS an Produktions-/Orchestrierungsdaten.
+ *
+ * v431 G3.1d — präzisierter Observe-Vertrag:
+ *   Observe ist read-only gegenüber allen Produktions- und Orchestrierungsdaten
+ *   (Scene, Ledger, State, Output, Mirrors, Credits). Die EINZIGE erlaubte
+ *   Schreiboperation ist ein append-only Diagnose-Insert in
+ *   `composer_callback_observations` via RPC `composer_record_callback_observation`.
+ *   Dieser Insert ist strikt best effort: Verdikt, Rückgabewert, HTTP-Status und
+ *   State-/Ledger-Pfad dürfen NIE von seinem Erfolg abhängen. Kein Retry im
+ *   Callback-Pfad, keine Exception nach außen.
  *
  * Fail-open ist in G3.1 Pflicht: jede Störung dieses Moduls darf einen echten
  * Render niemals blockieren. Fail-closed kommt erst in G3.2, nachdem das
  * Drain-Gate (0 Callbacks ohne Ledger-Bindung über das Drain-Fenster) grün ist.
+
  */
 
 import { V427_RUN_CONTRACT_VERSION } from "./v427-flags.ts";
@@ -601,11 +611,57 @@ export interface ObserveResult {
 }
 
 /**
+ * v431 G3.1d: append-only Diagnose-Insert (best effort, fail-open).
+ *
+ * Der einzige erlaubte Schreibpfad von Observe. Mutiert KEINE Produktionsdaten,
+ * kennt keinen Retry und wirft nie nach außen. Ein Fehler wird ausschließlich
+ * geloggt und darf Verdikt, HTTP-Status oder State-/Ledger-Pfad nicht ändern.
+ */
+async function recordObservationBestEffort(
+  admin: any,
+  row: {
+    handler: string;
+    verdict: string;
+    stage: string | null;
+    pipelineJobId: string | null;
+    sceneId: string | null;
+    runId: string | null;
+    plateGeneration: number | null;
+    externalJobId: string | null;
+    details: Record<string, unknown>;
+  },
+): Promise<void> {
+  try {
+    const { error } = await admin.rpc("composer_record_callback_observation", {
+      p_handler: row.handler,
+      p_verdict: row.verdict,
+      p_stage: row.stage,
+      p_pipeline_job_id: row.pipelineJobId,
+      p_scene_id: row.sceneId,
+      p_run_id: row.runId,
+      p_plate_generation: row.plateGeneration,
+      p_external_job_id: row.externalJobId,
+      p_details: row.details ?? {},
+    });
+    if (error) {
+      console.warn(`${V431_OBSERVE_TAG} telemetry_insert_failed`, error.message ?? String(error));
+    }
+  } catch (e) {
+    console.warn(
+      `${V431_OBSERVE_TAG} telemetry_insert_failed`,
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+}
+
+/**
  * G3.1 Observe: liest die Ledger-Bindung eines Callbacks und loggt sie.
  *
- * Schreibt NICHTS — weder Szene noch Job. Das Ergebnis darf in G3.1 von keinem
- * Handler als Entscheidungsgrundlage benutzt werden; es speist ausschließlich
- * das Drain-Gate-Kriterium (0 × `missing_binding` über das Drain-Fenster).
+ * Mutiert keine Produktions-/Orchestrierungsdaten — weder Szene noch Job.
+ * Einzige Ausnahme (G3.1d): ein append-only Diagnose-Insert, dessen Fehler
+ * ignoriert wird. Das Ergebnis darf in G3.1 von keinem Handler als
+ * Entscheidungsgrundlage benutzt werden; es speist ausschließlich das
+ * Drain-Gate-Kriterium (0 × `missing_binding` über das Drain-Fenster).
  */
 export async function observeCallbackProvenance(
   admin: any,
@@ -618,7 +674,8 @@ export async function observeCallbackProvenance(
     ledgerPlateGeneration: null,
   };
 
-  const emit = (r: ObserveResult, extra?: Record<string, unknown>) => {
+  // Verdikt bestimmen → Handler-Verhalten unverändert → Telemetrie best effort.
+  const emit = async (r: ObserveResult, extra?: Record<string, unknown>) => {
     console.log(`${V431_OBSERVE_TAG}`, JSON.stringify({
       handler: input.handler,
       verdict: r.verdict,
@@ -631,8 +688,23 @@ export async function observeCallbackProvenance(
       external_job_id: input.externalJobId ?? null,
       ...(extra ?? {}),
     }));
+    await recordObservationBestEffort(admin, {
+      handler: input.handler,
+      verdict: r.verdict,
+      stage: input.stage ?? null,
+      pipelineJobId: r.jobId,
+      sceneId: input.sceneId ?? null,
+      runId: r.ledgerRunId,
+      plateGeneration: r.ledgerPlateGeneration,
+      externalJobId: input.externalJobId ?? null,
+      details: {
+        reported_run_id: input.reportedRunId ?? null,
+        ...(extra ?? {}),
+      },
+    });
     return r;
   };
+
 
   try {
     if (!input.pipelineJobId) return emit(base);
