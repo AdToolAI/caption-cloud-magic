@@ -10,9 +10,14 @@ Ergänzung von `docs/v431-g3-2-2-report.md`.
   (`_pipeline_job_id uuid, _external_job_id text, _write_id text, _provider_status text, _output_url text, _error_text text`),
   `SECURITY DEFINER`, `search_path = pg_catalog, public`.
 - `composer_replace_pipeline_attempt` ist unverändert vorhanden (Freeze-Kandidat für §5).
-- `composer_touch_lipsync_progress` existiert **nicht** in der Datenbank. Der Contract-Punkt
-  „intern only / kein Grant / kein Edge-RPC-Aufruf“ wird daher als *nicht anwendbar* geführt und
-  im Report explizit als solcher ausgewiesen — nicht als grünes Gate stillschweigend abgehakt.
+- `composer_touch_lipsync_progress` existiert **nicht** in der Datenbank. Das wird **nicht** als
+  N/A oder grün gewertet, sondern zunächst als Contract-Abweichung behandelt. Der Verify-Schritt
+  prüft gegen den LOCKED Contract, ob die vollständige Progress-Semantik äquivalent inline in
+  `composer_apply_sync_segment_result` umgesetzt wurde:
+  - Semantik fehlt oder nur teilweise vorhanden → **RED**, STOP mit Befund.
+  - Semantik vollständig und äquivalent inline → **DEVIATION — function inlined** dokumentieren
+    und STOP für Review; nicht automatisch READY FOR DEPLOY setzen.
+
 
 ## Ablauf
 
