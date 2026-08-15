@@ -1796,10 +1796,20 @@ serve(async (req) => {
 
     // Process each scene
     for (const scene of scenes) {
+      // G3.1b — Race-Verlierer der Initial-Akquise: ein aktiver Attempt
+      // derselben (scene, run, stage, generation) läuft bereits. Kein zweiter
+      // Providerauftrag, kein Doppel-Spend.
+      if (sceneLedgerInFlight.has(String(scene.id))) {
+        console.warn(
+          `[compose-video-clips] scene ${scene.id}: ledger attempt already in flight → dispatch skipped`,
+        );
+        continue;
+      }
       if (deferredSceneIds.has(String(scene.id))) {
         console.log(`[compose-video-clips] scene ${scene.id}: parked for continuity chain`);
         continue;
       }
+
       // ── HARD-GUARD: legacy `heygen` override → `auto` ───────────────────
       // The Composer's HeyGen/Talking-Head portrait route was removed. Any
       // scene still carrying `engineOverride='heygen'` (stale UI state,
