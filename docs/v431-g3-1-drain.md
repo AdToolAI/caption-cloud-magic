@@ -326,3 +326,88 @@ G3.1 DEPLOYED / DRAINING — Lauf #2 PASS (alle drei Null-Gates erfüllt)
 Drain-Fenster läuft bis 2026-08-15T11:47:35Z
 G3.2 LOCKED
 ```
+
+---
+
+## Vollfenster-Auswertung (T0 → Auswertungsende)
+
+```text
+T0                 = 2026-08-15T10:47:35Z
+60-Min-Gate Ende   = 2026-08-15T11:47:35Z (abgelaufen)
+Ausgewertet bis    = 2026-08-15T12:57:00Z
+Quelle (maßgeblich)= composer_callback_observations (persistent, append-only)
+```
+
+### 1. Gates je Kanal (alle Post-T0-Events)
+
+| Kanal | Handler | Stage | Events | bound | missing_binding | job_not_found | wrong_job | binding_pending | stale_run | stale_generation | sonstige |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Replicate / Base-Video | compose-clip-webhook | base_video | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Sync.so-Segment | sync-so-webhook | sync_segment | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Audio-Mux | (Dispatch `render-sync-segments-audio-mux`) | audio_mux | — | — | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Remotion | remotion-webhook | audio_mux | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| **Gesamt** | | | **3** | **3** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+
+Harte Gates über das gesamte Fenster: `missing_binding = 0`, `job_not_found = 0`,
+`wrong_job = 0`. `binding_pending = 0`. Keine `stale_run`/`stale_generation`,
+keine `observe_error`- oder sonstigen Verdikte.
+
+Präzisierung zur Kanalzählung: Audio-Mux und Remotion sind in dieser Kette **ein
+physischer Rückkanal** — der Mux wird per Remotion gerendert, der zugehörige
+Ledger-Job (`stage = audio_mux`) wird beim Dispatch in
+`render-sync-segments-audio-mux` erzeugt und sein Callback trifft in
+`remotion-webhook` ein. Das eine Event `remotion-webhook / audio_mux / bound`
+belegt damit beide Kanäle; es ist kein zweites, unabhängiges Ereignis.
+`render-sync-segments-audio-mux` ist Dispatcher und schreibt selbst keine
+Observation.
+
+### 2. Ledger-Gegenprobe (`composer_pipeline_jobs`, Post-T0)
+
+| Stage | Job-ID | attempt_no | plate_generation | external_job_id gebunden | Status | replaced_by |
+|---|---|---|---|---|---|---|
+| base_video | 7c9abe7b-6634-4927-821c-67738d940222 | 1 | 4 | ja | dispatched | — |
+| sync_segment | fa7f731a-5212-46b4-a131-92a4c9842b2f | 1 | 4 | ja | dispatched | — |
+| audio_mux | 4fba9eef-0d41-48d3-b899-66e67b949353 | 1 | 4 | ja | dispatched | — |
+
+- Alle drei Zeilen: `run_id = 1ecc3f53-7b19-4f03-a084-f69f531de64b`,
+  `scene_id = b34d1eae-6bf3-437d-a6ab-624be0155adc`, `plate_generation` gesetzt.
+- Je Dispatch genau ein Ledger-Job; jede Observation trifft per
+  `pipeline_job_id` exakt diesen Job (1:1-Zuordnung, Identitätsfelder
+  deckungsgleich).
+- Attempt-Verteilung: **3× Attempt 1, 0 Replace-Attempts**. Kein Initial-Acquire
+  mit `attempt_no > 1`, keine `predecessor_exists`/`retry_superseded`/
+  `failure_not_retryable`-Verdikte, keine parallel aktiven Attempts derselben
+  Identität.
+
+### 3. Reaper-Lückenfreiheit (`cron.job_run_details`)
+
+| Kennzahl | Wert |
+|---|---|
+| Job | `composer-reap-orphaned-dispatches` |
+| Läufe im Fenster (ab T0) | 129 |
+| Erster / letzter Lauf | 10:48:00.22Z / 12:56:00.24Z |
+| Nicht-`succeeded`-Läufe | 0 |
+| Größter Abstand zwischen zwei Läufen | 60,63 s (Minutentakt eingehalten) |
+| Heartbeat aktuell | `last_status = ok`, `last_run_at = 12:57:00.27Z`, `consecutive_failures = 0`, `last_details = {ok: true, reaped_count: 0, threshold_minutes: 10}` |
+
+Ergebnis: **lückenlos** über das gesamte Post-T0-Fenster.
+
+### 4. Restschuld
+
+- **A — `watchdog_no_prediction_id`** bleibt offene, dokumentierte
+  Pipeline-Restschuld. In Lauf #2 nicht aufgetreten, nicht Teil von G3.1.
+
+### 5. Abschlussverdikt
+
+Letztes geprüftes Observation-Event: **2026-08-15T11:17:03.444Z**
+(Auswertungsstand 12:57Z).
+
+```text
+G3.1 DONE / FROZEN
+  - missing_binding = 0, job_not_found = 0, wrong_job = 0 (gesamtes Post-T0-Fenster)
+  - binding_pending = 0
+  - Reaper minütlich, 129/129 succeeded, max. Abstand 60,6 s
+  - Callback-Kanäle beobachtet & bound: Base-Video, Sync.so-Segment,
+    Audio-Mux/Remotion (ein gemeinsames Ereignis, siehe Präzisierung oben)
+G3.2 LOCKED — Freigabe nur auf separaten Auftrag
+```
