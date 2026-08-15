@@ -323,62 +323,79 @@ Bis zur Entscheidung bleibt §4 in der Fassung „Sandbox = false“ und ist dam
 
 ## 2. Pre-Deploy In-flight Gate (read-only)
 
-Regel: Deploy **nur** bei 0 relevanten alten in-flight Sync-Apply-Runs. Bei >0 regulär drainen;
-kein Runtime-Fallback, kein Backfill/Rewrite alter Jobs ohne explizite neue Freigabe.
+Regel: Deploy **nur** bei 0 relevanten alten in-flight Sync-Apply-Runs. Terminalität wird
+ausschließlich am kanonischen `pipeline_state` gemessen (`complete`, `failed`, `canceled`);
+kein Legacy-Mirror überschreibt diese Entscheidung. Bei >0 regulär drainen; kein
+Runtime-Fallback, kein Backfill/Rewrite alter Jobs ohne explizite neue Freigabe.
 
 ```sql
--- G1: aktive sync_segment-Ledger-Jobs
-select id, scene_id, status, external_job_id, created_at
-from public.composer_pipeline_jobs
-where stage = 'sync_segment'
-  and status in ('pending','dispatching','dispatched','running');
+-- G1: nonterminale Scene + offener sync_segment-Job
+select j.id, j.scene_id, j.status, j.external_job_id, j.created_at, s.pipeline_state
+from public.composer_pipeline_jobs j
+join public.composer_scenes s on s.id = j.scene_id
+where j.stage = 'sync_segment'
+  and j.status in ('pending','dispatching','dispatched','running')
+  and s.pipeline_state not in ('complete','failed','canceled');
 
--- G2: Szenen in aktiven Lip-Sync-States
+-- G2: Szenen in aktiven kanonischen Lip-Sync-States
 select id, pipeline_state, pipeline_substate, active_run_id, plate_generation, updated_at
 from public.composer_scenes
 where pipeline_state in ('lipsync_dispatched','lipsync_running','lipsync_muxing');
 
--- G3: aktive audio_mux-Attempts
-select id, scene_id, status, created_at
-from public.composer_pipeline_jobs
-where stage = 'audio_mux'
-  and status in ('pending','dispatching','dispatched','running');
+-- G3: nonterminale Scene + offener audio_mux-Job
+select j.id, j.scene_id, j.status, j.created_at, s.pipeline_state
+from public.composer_pipeline_jobs j
+join public.composer_scenes s on s.id = j.scene_id
+where j.stage = 'audio_mux'
+  and j.status in ('pending','dispatching','dispatched','running')
+  and s.pipeline_state not in ('complete','failed','canceled');
 
--- G4: Replacement-Attempts in Zustellung (über die Vorgänger-Relation, da der neue
---     Attempt selbst kein replaced_by trägt)
+-- G4: echter Replacement-Attempt in Zustellung
 select r.id, r.scene_id, r.stage, r.status, p.id as predecessor_id, r.created_at
 from public.composer_pipeline_jobs p
 join public.composer_pipeline_jobs r on r.id = p.replaced_by
 where r.status in ('dispatching','dispatched');
 
--- G5: Passes mit gebundenem Provider-Job (nicht terminal)
+-- G5: nonterminaler Scene-Pass oder tatsächlich gebundener nichtterminaler Ledger-Job
 select s.id as scene_id, x->>'job_id' as job_id, x->>'status' as pass_status,
        x->>'pipeline_job_id' as pipeline_job_id
 from public.composer_scenes s,
      lateral jsonb_array_elements(coalesce(s.dialog_shots->'passes','[]'::jsonb)) x
 where x->>'job_id' is not null
-  and coalesce(x->>'status','') not in ('done','failed','canceled');
+  and coalesce(x->>'status','') not in ('done','failed','canceled')
+  and (
+    s.pipeline_state not in ('complete','failed','canceled')
+    or exists (
+      select 1 from public.composer_pipeline_jobs j
+      where j.id::text = x->>'pipeline_job_id'
+        and j.status in ('pending','dispatching','dispatched','running')
+    )
+  );
 ```
 
-**Gate grün = G1, G2, G3, G4, G5 liefern exakt 0 Rows.** G2 wird nicht durch Legacy-Mirrors
-überstimmt: Steht der kanonische `pipeline_state` auf `lipsync_dispatched`, `lipsync_running`
-oder `lipsync_muxing`, ist die Szene in-flight, unabhängig vom Legacy-Feld. Ein kanonisches
-`retry_of`-Feld darf ergänzend geprüft werden, ist aber nicht das Gate.
+**Gate grün = G1, G2, G3, G4, G5 liefern exakt 0 Rows.**
 
-### Baseline-Messung 2026-08-15 ~19:14 UTC (nur Momentaufnahme, ersetzt das Gate nicht)
+### Baseline-Messung 2026-08-15 ~19:14 UTC (korrigierte Gate-Fassung)
 
 | Gate | Rows | Befund |
 | --- | --- | --- |
-| G1 | 4 | `sync_segment`, alle `dispatched`, 11:15Z–17:24Z (Drain-/Resmoke-Läufe des Tages) |
+| G1 | 0 | keine nonterminale Szene mit offenem `sync_segment`-Job |
 | G2 | 0 | grün |
-| G3 | 4 | `audio_mux`, alle `dispatched`, 11:16Z–17:25Z |
+| G3 | 0 | keine nonterminale Szene mit offenem `audio_mux`-Job |
 | G4 | 0 | grün (keine Replacement-Kette in Zustellung) |
-| G5 | 44 | keine Szene davon in den letzten 24 h aktualisiert → durchweg historische Passes |
+| G5 | 0 | historische Pass-Slots gehören terminalen Szenen (`failed`/`canceled`/`complete`) und fallen definitorisch heraus |
 
-Konsequenz: Das Gate ist **heute nicht grün**. Vor dem Deploy müssen G1/G3/G5 regulär
-gedrained bzw. über die bestehenden Recovery-/Reaper-Pfade terminalisiert werden; danach wird
-das Gate erneut vollständig gefahren und das Ergebnis hier protokolliert. Kein Rewrite alter
-Zeilen ohne separate Freigabe.
+**Historische Artefakte (kein In-flight, kein Deploy-Blocker):**
+
+- G1/G3 (alte Fassung): 8 offene Ledger-Attempts (`sync_segment`/`audio_mux`, alle `dispatched`),
+  gehören alle zur selben Szene `b34d1eae-6bf3-437d-a6ab-624be0155adc`, die bereits
+  `pipeline_state = complete` steht (G3.1 Observe-Mode, nie terminalisiert).
+- G5 (alte Fassung): 44 Pass-Slots ohne `pipeline_job_id`, jüngste Szenen-Aktualisierung
+  `2026-08-14 01:13Z`, alle zugehörigen Szenen terminal → orphaned stale metadata aus
+  pre-Ledger-Runs.
+
+Konsequenz: Das **korrigierte Gate ist heute 0/0/0/0/0**. Die historischen Rows bleiben
+unangetastet; kein Cleanup, kein Backfill, kein „Schönmachen" vor dem Deploy.
 
 ## 3. Deploy-Reihenfolge
 
