@@ -6111,6 +6111,7 @@ export type Database = {
           payload_hash: string | null
           plate_generation: number | null
           provider: string | null
+          replaced_by: string | null
           run_contract_version: number
           run_id: string
           scene_id: string
@@ -6138,6 +6139,7 @@ export type Database = {
           payload_hash?: string | null
           plate_generation?: number | null
           provider?: string | null
+          replaced_by?: string | null
           run_contract_version?: number
           run_id: string
           scene_id: string
@@ -6165,6 +6167,7 @@ export type Database = {
           payload_hash?: string | null
           plate_generation?: number | null
           provider?: string | null
+          replaced_by?: string | null
           run_contract_version?: number
           run_id?: string
           scene_id?: string
@@ -6176,6 +6179,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "composer_pipeline_jobs_replaced_by_fkey"
+            columns: ["replaced_by"]
+            isOneToOne: false
+            referencedRelation: "composer_pipeline_jobs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "composer_pipeline_jobs_scene_id_fkey"
             columns: ["scene_id"]
@@ -19688,6 +19698,11 @@ export type Database = {
         }
         Returns: Json
       }
+      composer_pipeline_jobs_g31_deployment_ts: { Args: never; Returns: string }
+      composer_reap_orphaned_dispatches: {
+        Args: { p_older_than_minutes?: number }
+        Returns: number
+      }
       composer_recover_scene: {
         Args: {
           _expected_plate_generation: number
@@ -19706,6 +19721,21 @@ export type Database = {
       composer_release_run_reservation: {
         Args: { p_reason?: string; p_reservation_id: string }
         Returns: number
+      }
+      composer_replace_pipeline_attempt: {
+        Args: {
+          p_expected_plate_generation: number
+          p_expected_run_id: string
+          p_expected_scene_id: string
+          p_expected_stage: string
+          p_metadata?: Json
+          p_previous_job_id: string
+          p_provider?: string
+        }
+        Returns: {
+          attempt_no: number
+          job_id: string
+        }[]
       }
       composer_reserve_run_credits: {
         Args: {
