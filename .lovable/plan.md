@@ -23,15 +23,18 @@ Smoke B: künstlich gealterte `dispatching`-Zeile ohne `external_job_id` anlegen
 Neue, isolierte Tabelle `public.composer_callback_observations` — rein diagnostisch, keine Orchestrierungsdaten:
 
 - Zeitstempel, `handler`, `pipeline_job_id`, `stage`, `verdict`, `scene_id`, `run_id`, `plate_generation`, `external_job_id`, kleines `details` JSONB.
-- Append-only: kein UPDATE/DELETE für irgendeine Rolle; Insert ausschließlich über `SECURITY DEFINER`-RPC `composer_record_callback_observation`, `EXECUTE` nur für `service_role`, `REVOKE` für `PUBLIC`/`anon`/`authenticated`.
+- Harte Isolation gegen Supabase-Default-Privileges: `REVOKE ALL` auf der Tabelle für `PUBLIC`, `anon`, `authenticated` **und `service_role`** — auch `service_role` darf nicht direkt an der Tabelle vorbei schreiben.
+- Schreiben ausschließlich über `public.composer_record_callback_observation`: `SECURITY DEFINER`, `SET search_path = pg_catalog, public`, alle Objekte schema-qualifiziert, `EXECUTE` nur für `service_role` (`REVOKE` für `PUBLIC`/`anon`/`authenticated`).
+- Append-only als echte DB-Invariante: zusätzlich zu fehlenden Grants ein Trigger, der UPDATE und DELETE auf der Tabelle unabhängig von Rolle/RLS ablehnt.
 - RLS aktiv, keine Client-Policies (kein Frontend-Zugriff), keine `anon`-Grants.
 - Keine Fremdschlüssel auf `composer_pipeline_jobs`/`composer_scenes`, damit Telemetrie niemals einen Produktionspfad blockieren oder Löschungen behindern kann.
 
-Verdrahtung: `observeCallbackProvenance()` schreibt im bestehenden `emit()`-Pfad zusätzlich zum Log genau eine Telemetriezeile. Der Aufruf ist in `try/catch` gekapselt und ohne Auswirkung auf Rückgabewert oder Verdikt; ein Telemetriefehler wird nur geloggt. Keine Änderung an Verdikt-Logik, Signaturen oder Handler-Verhalten.
+Verdrahtung: `observeCallbackProvenance()` schreibt im bestehenden `emit()`-Pfad zusätzlich zum Log genau eine Telemetriezeile. Reihenfolge verbindlich: Verdikt bestimmen → Handler-Verhalten unverändert → Telemetrie best effort. Der Insert ist ein gekapselter diagnostischer Side-Effect in `try/catch`, ohne Retry innerhalb des Callback-Pfads und ohne Exception nach außen. Weder Verdikt noch Rückgabewert, HTTP-Status oder State-/Ledger-Pfad dürfen vom Insert-Erfolg abhängen; ein Fehler wird nur geloggt. Keine Änderung an Verdikt-Logik, Signaturen oder Handler-Verhalten.
 
-Smoke C: Insert über `service_role`-RPC gelingt; direkter Insert/Update/Delete als `anon`/`authenticated` schlägt fehl; Fehler im Telemetriepfad (simuliert) verändert das Observe-Ergebnis nicht.
+Smoke C: Insert über `service_role`-RPC gelingt; direkter INSERT/UPDATE/DELETE als `service_role`, `anon` und `authenticated` schlägt fehl; UPDATE/DELETE auch mit erhöhten Rechten durch den Trigger blockiert; simulierter Telemetriefehler verändert Observe-Verdikt und Handler-Ergebnis nicht.
 
 ## Verifikation vor STOP
+
 
 - DB-Smokes B und C grün, Testdaten rückstandsfrei entfernt.
 - Datenbank-Linter ohne neue Findings zur neuen Tabelle/Funktion.
