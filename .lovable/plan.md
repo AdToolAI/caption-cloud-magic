@@ -40,8 +40,9 @@ Smoke C: Insert über `service_role`-RPC gelingt; direkter INSERT/UPDATE/DELETE 
 - Datenbank-Linter ohne neue Findings zur neuen Tabelle/Funktion.
 - Frozen-Suite gegen 536-Baseline grün, `tsgo`, `deno check` der berührten Function-Dateien.
 - `docs/v431-g3-1-drain.md` fortgeschrieben: Vertragspräzisierung, Reaper-Scheduler-Nachweis, Telemetrie-Beweisgrundlage für das 60-Minuten-Gate; A weiterhin als offene Restschuld.
+- **Neues T0** = Zeitpunkt des G3.1d-Deploys. Das alte Fenster (T0 = 2026-08-15T09:05:17Z) ist mangels persistenter Telemetrie kein gültiges Abnahmefenster und wird als verworfen dokumentiert.
 
-Danach STOP zur Freigabe von Produktionslauf #2 (bewusst einfacher Testfall ohne `tight_grid`-Retry-Bedingung); das Drain-Fenster startet mit dessen vollständiger Beobachtbarkeit neu.
+Danach STOP zur Freigabe von Produktionslauf #2 (bewusst einfacher Testfall ohne `tight_grid`-Retry-Bedingung). Lauf #2 muss vollständig nach dem neuen T0 liegen; das 60-Minuten-Drain-Fenster startet damit neu. Kein G3.2.
 
 ## Betroffene Artefakte
 
