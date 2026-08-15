@@ -19648,7 +19648,7 @@ export type Database = {
           p_metadata?: Json
           p_plate_generation: number
           p_provider?: string
-          p_run_contract_version?: string
+          p_run_contract_version?: number
           p_run_id: string
           p_scene_id: string
           p_segment_id?: string
