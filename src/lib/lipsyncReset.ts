@@ -31,38 +31,35 @@ export function hasActiveSyncPasses(dialogShots: unknown): boolean {
 
 /**
  * Clear the lip-sync state of a scene without leaking Sync.so slots.
- * `extraUpdate` is applied to `composer_scenes` in both branches.
+ *
+ * v431 RS3: es gibt KEINEN Direct-Clear-Zweig mehr. Jeder Lip-Sync-Reset läuft
+ * über `reset-lipsync-scene` → `composer_reset_lipsync_with_attempt_cancellation`,
+ * damit Ledger-Cancel, Scene-Reset und Rearm-Autorisierung in einem Commit
+ * passieren. Schlägt der Aufruf fehl, ist der Reset fail-closed (Fehler wird
+ * geworfen) — ein Client-Write auf `composer_scenes` ist nicht mehr zulässig.
+ *
+ * `extraUpdate` wird nur NACH einem erfolgreichen Reset angewandt.
  */
 export async function resetSceneLipSync(
   sceneId: string,
-  dialogShots: unknown,
+  _dialogShots: unknown,
   extraUpdate: Record<string, unknown> = {},
 ): Promise<void> {
-  if (hasActiveSyncPasses(dialogShots)) {
-    try {
-      await supabase.functions.invoke('reset-lipsync-scene', {
-        body: { scene_id: sceneId },
-      });
-      if (Object.keys(extraUpdate).length > 0) {
-        await supabase
-          .from('composer_scenes')
-          .update({ ...extraUpdate, updated_at: new Date().toISOString() })
-          .eq('id', sceneId);
-      }
-      return;
-    } catch (e) {
-      console.warn('[lipsyncReset] reset-lipsync-scene failed, falling back to direct clear', e);
-    }
+  const { data, error } = await supabase.functions.invoke('reset-lipsync-scene', {
+    body: { scene_id: sceneId },
+  });
+  if (error || (data as any)?.ok === false) {
+    const reason = error?.message ?? (data as any)?.status ?? 'reset_failed';
+    console.error('[lipsyncReset] reset-lipsync-scene failed', sceneId, reason);
+    throw new Error(`lipsync_reset_failed: ${reason}`);
   }
 
-  await supabase
-    .from('composer_scenes')
-    .update({
-      dialog_shots: null,
-      ...extraUpdate,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', sceneId);
+  if (Object.keys(extraUpdate).length > 0) {
+    await supabase
+      .from('composer_scenes')
+      .update({ ...extraUpdate, updated_at: new Date().toISOString() })
+      .eq('id', sceneId);
+  }
 }
 
 /**
