@@ -11,10 +11,12 @@ Der Kanal fehlte in meiner Zusammenfassung, nicht im Code:
 
 Heutiger Stand: Spalte existiert, Trigger `composer_pipeline_jobs_identity_guard` sperrt `scene_id`, `run_id`, `stage`, `attempt_no`, `segment_id` hart und `external_job_id`/`plate_generation`, sobald gesetzt. Offen ist genau der von dir benannte Fall `NULL → Wert` für neue Zeilen.
 
-Neuer DB-Vertrag (eine Migration):
+Neuer DB-Vertrag (eine Migration), ohne `created_at`-Bypass:
 
-- BEFORE INSERT: `plate_generation IS NULL` ⇒ Exception, sobald die Zeile nach dem G3.1-Stichtag entsteht (Stichtag als Konstante in der Triggerfunktion, Vergleich gegen `created_at`/`now()`).
-- BEFORE UPDATE: `plate_generation` vollständig immutable für Post-Stichtag-Zeilen. Der einmalige Backfill `NULL → Wert` bleibt ausschließlich für Pre-Stichtag-Zeilen erlaubt; `Wert → anderer Wert` bleibt überall verboten.
+- BEFORE INSERT: ab Aktivierung der Migration gilt für **jeden** neuen INSERT `NEW.plate_generation IS NOT NULL` — keine Ausnahme, keine Abhängigkeit von einem Caller-beeinflussbaren `created_at`. Ein fehlerhafter Service-Role-Caller kann also keine neuen NULL-Jobs mehr erzeugen.
+- BEFORE UPDATE: Die Pre-G3.1-Ausnahme (`NULL → Wert`, einmalig) gilt ausschließlich für bereits existierende Zeilen mit `OLD.created_at < deployment_ts`. `Wert → anderer Wert` bleibt überall verboten; für Post-Stichtag-Zeilen ist `plate_generation` vollständig immutable.
+- `created_at` wird für diesen Mechanismus selbst immutable (UPDATE auf `created_at` ⇒ Exception), damit das Zeitfenster nicht nachträglich erschlichen werden kann.
+- Langfristig: nach Drain der Altjobs `ALTER TABLE ... ALTER COLUMN plate_generation SET NOT NULL` und Rückbau der temporären Stichtagslogik. Wird als Folgeaufgabe im Bericht vermerkt.
 - Konsequenz für den Dispatcher: `acquireLedgerJob()` wird fail-closed gegenüber fehlender Generation — ohne belastbare `plate_generation` wird keine Ledger-Zeile erzeugt (der Legacy-Pfad läuft in G3.1 weiter, das Fehlen wird als Telemetrie gezählt und im Drain-Bericht ausgewiesen).
 
 ## 2/3 — Dispatch-Failure: `failed` nur bei bewiesener Ablehnung, sonst `dispatch_uncertain`
