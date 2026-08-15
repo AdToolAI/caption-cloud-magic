@@ -1208,11 +1208,24 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         })
         .eq("id", sceneId);
       console.log(`[sync-so-webhook] v25 scene=${sceneId} ALL ${totalPasses} passes done → dispatching fan-in compositor`);
+      // v431 G3.1 — Ledger-Zeile für die Mux-Stage. D6: Owner der Mux-Stage
+      // ist der Dispatcher; hier entsteht nur die Provenienz-Zeile, die als
+      // `pipeline_job_id` im Request-Body mitreist.
+      const v431MuxLedgerJob = await acquireLedgerJob(supabase, {
+        sceneId,
+        runId: (scene as any)?.active_run_id ?? null,
+        stage: "audio_mux",
+        provider: "remotion",
+        metadata: { dispatcher: "sync-so-webhook", fan_in_passes: totalPasses },
+      });
       try {
         fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-          body: JSON.stringify({ scene_id: sceneId }),
+          body: JSON.stringify({
+            scene_id: sceneId,
+            ...(v431MuxLedgerJob ? { pipeline_job_id: v431MuxLedgerJob.id } : {}),
+          }),
         }).catch(() => {});
       } catch { /* ignore */ }
       return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", compositor: "dispatched" });
