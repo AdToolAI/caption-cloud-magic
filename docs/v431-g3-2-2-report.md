@@ -675,3 +675,11 @@ Die Wahl zwischen A und B ist bewusst offen und ein eigener Freigabeschritt.
 Die Reset-/Run-Lifecycle-Korrektur ist umgesetzt und dokumentiert in `docs/v431-rs3-report.md`
 (33/33 DB-Smokes, 546/546 Vitest, Abnahmekriterium S7 erfuellt). Der blockierte Resmoke-Lauf
 ist unveraendert; G3.2.2 bleibt **DEPLOYED — RESMOKE IN PROGRESS / NOT YET ACCEPTED**.
+
+### 11.1 RS3-A Post-Deploy Audit — Abschluss
+
+`RS3 DONE / FROZEN` (siehe `docs/v431-rs3-report.md` §6): ACL-Fix am Apply-RPC,
+gezielter Redeploy von `compose-dialog-segments` (`T_RS3_effective = 2026-08-15T21:57:44Z`),
+Acquire-/Frozen-Nachweis gruen. `composer_acquire_pipeline_attempt` bleibt unveraendert.
+Der G3.2.2 Production Resmoke ist ein separates Gate auf einer frischen Testszene
+ohne Ledger-Historie, gerechnet ab `T_RS3_effective`; `b34d1eae` bleibt unangetastet.

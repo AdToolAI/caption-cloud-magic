@@ -1,6 +1,7 @@
 # v431 RS3 — Option A: Atomic Lip-Sync Reset Cancellation (Report)
 
-Status: **RS3 IMPLEMENTED — READY FOR REVIEW** (Plan Rev. 5, `.lovable/plan/v431-rs3-option-a-atomic-lip-sync-reset-cancellation-2026-08-15.md`)
+Status: **RS3 DONE / FROZEN** (Post-Deploy Audit RS3-A abgeschlossen, siehe §6)
+Vorstatus: RS3 IMPLEMENTED — READY FOR REVIEW (Plan Rev. 5, `.lovable/plan/v431-rs3-option-a-atomic-lip-sync-reset-cancellation-2026-08-15.md`)
 
 ## 1. Was implementiert wurde
 
@@ -74,10 +75,84 @@ Edge-Functions deployed: `reset-lipsync-scene`, `render-sync-segments-audio-mux`
 `remotion-webhook`, `sync-so-webhook`, `modelark-poll`, `recover-stuck-composer-clip`,
 `lipsync-watchdog`.
 
-## 6. Offen / nächster Schritt
+## 6. Post-Deploy Audit (RS3-A)
+
+### 6.1 Deploy-Grenze
+
+| Marke | Zeitpunkt (UTC) | Bedeutung |
+| --- | --- | --- |
+| `T_RS3_db` | 2026-08-15T21:38:09Z | Letzte RS3-DB-Migration. Konservative Untergrenze der bisherigen RS3-Telemetrie. **Nicht** der Nachweis der vollständigen produktiven Dispatch-Kette. |
+| `T_RS3_effective` | 2026-08-15T21:57:44Z | Redeploy von `compose-dialog-segments`. Ab hier ist das aktuelle `_shared/v431-ledger.ts` (serialized Acquire) nachweislich im produktiven Bundle des Sync-Dispatchers. |
+
+Ursprüngliches RS3-Deploy-Set (§5) enthielt `compose-dialog-segments` **nicht**, obwohl die
+Function `../_shared/v431-ledger.ts` importiert und `stage: "sync_segment"` akquiriert.
+Supabase bundelt jede Function samt Dependency-Graph in ein eigenes ESZip; ohne Redeploy hätte
+der produktive Sync-Dispatcher weiter den G3.1-Bundle-Stand ohne serialisierten Wrapper
+gefahren. RS3-A schließt genau diese Lücke — ohne funktionale Codeänderung.
+
+### 6.2 ACL-Fix und ACL-Dump
+
+Migration: `REVOKE EXECUTE ON FUNCTION public.composer_apply_sync_segment_result(uuid,text,text,text,text,text)
+FROM PUBLIC, anon, authenticated;` — `service_role` bleibt. Keine Body-/Semantikänderung.
+
+Verifiziert über `has_function_privilege` (nach der Migration):
+
+| Funktion | anon | authenticated | service_role |
+| --- | --- | --- | --- |
+| `composer_apply_sync_segment_result` | false | false | true |
+| `composer_reset_lipsync_with_attempt_cancellation` | false | false | true |
+| `composer_acquire_lipsync_attempt_serialized` | false | false | true |
+| `composer_acquire_reset_rearmed_attempt` | false | false | true |
+| `composer_rs3_fence_verdict` | false | false | true |
+| `composer_rs3_acquire_core` | false | false | false |
+| `composer_rs3_is_pre_reset_attempt` | false | false | false |
+| `composer_rs3_reset_cancellable_statuses` | false | false | false |
+
+`sandbox_exec_<ref>` erscheint weiterhin in allen `proacl`-Einträgen und bleibt als
+*accepted platform-internal ACL* (D1-a) dokumentiert — keine Anwendungsrolle.
+
+### 6.3 Acquire-/Wrapper-Nachweis
+
+- Repo-weite Suche (`supabase/functions`, `src`, ohne Tests): der einzige Aufrufer von
+  `composer_acquire_pipeline_attempt` / `composer_acquire_lipsync_attempt_serialized` ist
+  `_shared/v431-ledger.ts` (Zeilen 153 / 162). Kein direkter Lip-Sync-Stage-Acquire außerhalb
+  dieses Pfads. (`src/integrations/supabase/types.ts` = generierte Typen, kein Call.)
+- `compose-dialog-segments` → `resolveLedgerDispatch` / `adoptPreAcquiredLedgerJob`
+  → `acquireLedgerJob` → `stage === "sync_segment"` → serialized Wrapper.
+- `render-sync-segments-audio-mux` → `resolveLedgerDispatch` mit `stage: "audio_mux"`
+  → derselbe serialisierte Pfad.
+- Runtime sanity nach Redeploy: Aufruf von `compose-dialog-segments` mit leerem Body liefert
+  `400 {"error":"scene_id_required"}` aus dem Handler — Boot und Modulimport (inkl. des neuen
+  Shared-Bundles) fehlerfrei.
+
+### 6.4 Frozen-Nachweis
+
+- **Kein Stage-Guard** in `composer_acquire_pipeline_attempt`. Das G3.1b-Primitive bleibt
+  unverändert; der direkte `service_role`-Grant für Nicht-Lip-Sync-Stages bleibt Teil der
+  internen Trust Boundary. Ein DB-seitiges Verbot direkter Acquires wäre ein eigener
+  Hardening-Schritt mit Facade-Migration aller Stage-Aufrufer — nicht RS3-A.
+- Body-Fingerprints nach dem ACL-Fix (nur Grants geändert, keine `CREATE OR REPLACE`):
+  - `composer_acquire_pipeline_attempt` — `md5(prosrc) = 48406cdae034a06927419e1035c1ff54`
+  - `composer_replace_pipeline_attempt` — `md5(prosrc) = 97989b0801fdb9d55da3ad5c1a358e89`
+- Frozen-Suiten: `vitest run src/lib/composer src/lib/video-composer` → **546 / 546 PASS**
+  (49 Dateien, G3.1, G3.1f, G3.2.2, v427, v430 Intent-Gates). `tsgo --noEmit` → **0 Fehler**.
+
+### 6.5 Geltungsbereich der DB-Smokes
+
+RS3-A hat **keine** Funktionskörper verändert (ausschließlich ein REVOKE). Die transaktionale
+Smoke-Matrix aus §3 (33/33 PASS, inkl. S7-Rearm, No-Predecessor-Attempt-1, Doppel-Acquire-Abwehr,
+Passthrough-Semantik ohne RS3-Marker) gilt unverändert für die produktiven Objekte.
+Sie wurde hier bewusst **nicht** wiederholt, weil dafür erneut ein Ad-hoc-EXECUTE-Grant an die
+Sandbox-Rolle nötig wäre — das wäre eine Aufweichung der gerade geschlossenen ACL-Grenze.
+Der Live-Nachweis des Wrappers im echten Dispatch erfolgt im separaten
+G3.2.2-Production-Resmoke ab `T_RS3_effective`.
+
+## 7. Offen / nächster Schritt
 
 Der blockierte Resmoke-Lauf (Szene `b34d1eae`) ist **nicht** angefasst worden — kein Reset,
-kein Redrive, keine Reparatur ohne neue Freigabe. Nach Freigabe genügt ein UI-Reset der Szene,
-um den Ledger-Block zu lösen und den Sync → Mux → Stitch-Resmoke zu wiederholen.
+kein Redrive, keine Reparatur. Er wird auch nicht als Abnahmeszene verwendet.
+Der G3.2.2 Production Resmoke läuft in einem separaten Gate auf einer frischen Testszene
+ohne Ledger-Historie, gerechnet ab `T_RS3_effective`.
 
-**STOP für Review.**
+**RS3 DONE / FROZEN.** STOP.
+
