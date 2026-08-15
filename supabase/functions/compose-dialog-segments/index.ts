@@ -7184,6 +7184,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     pass.job_id = jobId;
     passes[currentPassIdx] = pass;
 
+    // v431 G3.1 — Provider-Job-ID an die Ledger-Zeile binden (bestätigend).
+    await bindLedgerExternalJob(supabase, v431SyncLedgerJob?.id ?? null, jobId);
+
+
     const nowIso = new Date().toISOString();
     // v59 — Preserve v58 multipass markers across every state write so a
     // pass-level retry cannot accidentally fall back into the broken
