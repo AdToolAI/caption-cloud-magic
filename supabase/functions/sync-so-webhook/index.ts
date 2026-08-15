@@ -591,23 +591,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       (scene.dialog_shots as any)?.status === "failed")
   ) {
     if (status === "COMPLETED" && outputUrl && sceneFailedSelfInflicted && jobKnown) {
+      // v431 G3.2.2 R5: write-free. Die Ruecknahme der Failure-Mirrors gehoert
+      // ausschliesslich der autoritativen Apply-Transaktion
+      // (composer_apply_sync_segment_result, geguardete Recovery-Vorstufe).
       console.log(
-        `[sync-so-webhook] v131.8 recover_from_self_inflicted_fail scene=${sceneId} job=${jobId} ` +
-        `prev_clip_error=${(scene as any).clip_error} — resetting status to running and continuing pass merge`,
+        `[sync-so-webhook] v431 recover_from_self_inflicted_fail_delegated scene=${sceneId} job=${jobId} ` +
+        `prev_clip_error=${(scene as any).clip_error} — recovery is applied inside the authoritative RPC`,
       );
-      await supabase
-        .from("composer_scenes")
-        .update({
-          lip_sync_status: "running",
-          twoshot_stage: dsForRecover?.engine === "sync-segments" ? "syncso_fanout_recovering" : "running",
-          clip_error: null,
-          dialog_shots: { ...dsForRecover, status: "rendering", recovered_from_watchdog_at: new Date().toISOString() },
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", sceneId);
       (scene as any).lip_sync_status = "running";
       (scene.dialog_shots as any).status = "rendering";
       // fall through into the normal v5 success branch below
+
     } else {
       console.log(
         `[sync-so-webhook] v129.4a ignored_due_scene_failed scene=${sceneId} job=${jobId} status=${status}`,
