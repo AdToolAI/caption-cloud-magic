@@ -5967,24 +5967,36 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // (Attempt 1). Ein echter Re-Dispatch (Sync.so-Webhook, Watchdog, Poller)
     // trägt `retry_of_pipeline_job_id` + `retry_reason` und läuft ausschließlich
     // über den atomaren Replace-Vertrag.
-    const v431SyncDecision = await resolveLedgerDispatch(
-      supabase,
-      {
-        sceneId,
-        runId: (passRunStamp.run_id as string | null) ?? null,
-        stage: "sync_segment",
-        plateGeneration: Number(passRunStamp.plate_generation ?? 0),
-        provider: "sync.so",
-        metadata: {
-          dispatcher: "compose-dialog-segments",
-          pass_idx: currentPassIdx,
-          total_passes: passes.length,
-          diagnostic_id: diagnosticId,
-          retry_variant: retryVariant,
-        },
+    // v431 G3.2.2 §5a — Ein NOOP-Escalate-Redispatch bringt den bereits in der
+    // Apply-Transaktion erzeugten Replacement-Attempt mit. Dieser Pfad darf
+    // keinen weiteren Attempt erzeugen, sondern adoptiert nur die Zeile.
+    const v431PreAcquiredJobId = typeof (body as any)?.pipeline_job_id === "string" &&
+      (body as any).pipeline_job_id.trim().length > 0
+      ? String((body as any).pipeline_job_id).trim()
+      : null;
+    const v431LedgerParams = {
+      sceneId,
+      runId: (passRunStamp.run_id as string | null) ?? null,
+      stage: "sync_segment" as const,
+      plateGeneration: Number(passRunStamp.plate_generation ?? 0),
+      provider: "sync.so",
+      metadata: {
+        dispatcher: "compose-dialog-segments",
+        pass_idx: currentPassIdx,
+        total_passes: passes.length,
+        diagnostic_id: diagnosticId,
+        retry_variant: retryVariant,
       },
-      readRetryContext(body),
-    );
+    };
+    const v431SyncDecision = v431PreAcquiredJobId
+      ? await adoptPreAcquiredLedgerJob(supabase, v431PreAcquiredJobId, {
+          sceneId,
+          stage: "sync_segment",
+          runId: v431LedgerParams.runId,
+          plateGeneration: v431LedgerParams.plateGeneration,
+        })
+      : await resolveLedgerDispatch(supabase, v431LedgerParams, readRetryContext(body));
+
     // G3.1b — Race-Verlierer dispatcht nicht. Die fremde Zeile wird NICHT
     // gesettelt (sie gehört dem Gewinner) und nicht abgelöst.
     if (v431SyncDecision.outcome === "skip") {
