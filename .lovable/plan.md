@@ -79,13 +79,16 @@ Ein Callback kann vor `bindLedgerExternalJob()` eintreffen. Ist die Ledger-Zeile
 ## Drain-Gate: Messbarkeit ist nicht Erfüllung
 
 - Das Fenster startet erst mit dem Deploy des **vollständigen** Vertrages (alle Kanäle inkl. Retry-Attempts, Failure-Semantik, INSERT-Pflicht).
-- Kriterium: 0 × `missing_binding` und 0 × `job_not_found` für Dispatches nach dem Deploy-Zeitstempel. Ältere in-flight-Callbacks werden über den Zeitstempel herausgefiltert. `binding_pending` wird gezählt und berichtet, blockiert das Gate aber nicht.
+- Kriterium: 0 × `missing_binding`, 0 × `job_not_found` und 0 × `wrong_job` für Dispatches nach dem Deploy-Zeitstempel. `wrong_job` bedeutet eine fehlerhafte Job-Bindung und muss vor G3.2 untersucht werden.
+- `stale_run` / `stale_generation` entstehen durch legitime Run-Wechsel und werden nur berichtet, nicht als Gate-Verletzung gewertet.
+- `binding_pending` wird gezählt und berichtet, blockiert G3.1 nicht, entscheidet aber mit über den G3.2-Vertrag.
+- Ältere in-flight-Callbacks werden über den Deploy-Zeitstempel herausgefiltert.
 - Messung: Auswertung der `[v431] g31_observe`-Logzeilen je Handler plus Gegenprobe in `composer_pipeline_jobs` (Anteil Post-Deploy-Runs mit Ledger-Zeile je Stage).
 
 ## Reihenfolge
 
-1. Migration: INSERT-Pflicht + volle Immutabilität für `plate_generation` (Stichtag), Reaper auf `dispatch_uncertain`.
-2. `settleLedgerDispatchFailure()` mit `rejected`/`uncertain` und `binding_pending`-Verdikt im Shared-Modul.
-3. Verdrahtung Initial-Dispatcher (`compose-video-clips`, `compose-dialog-segments`, `render-sync-segments-audio-mux`, `sync-so-webhook`) + alle Retry-Dispatcher aus dem Inventar.
-4. DB-Smokes (INSERT-Pflicht, Immutabilität, `failed` vs. `dispatch_uncertain`, Reaper terminalisiert nicht, Retry erzeugt `attempt_no + 1` und setzt Vorgänger auf `stale`) + Guard-Tests (Observe read-only).
+1. Migration: INSERT-Pflicht ohne `created_at`-Bypass, `created_at` immutable, volle Immutabilität für `plate_generation`, Reaper auf `dispatch_uncertain`, RPC `composer_replace_pipeline_attempt`.
+2. `settleLedgerDispatchFailure()` mit `rejected`/`uncertain` und `binding_pending`-Verdikt im Shared-Modul; Helper `replaceLedgerAttempt()` als einziger Retry-Einstieg.
+3. Verdrahtung Initial-Dispatcher (`compose-video-clips`, `compose-dialog-segments`, `render-sync-segments-audio-mux`, `sync-so-webhook`) + alle Retry-Dispatcher aus dem Inventar über `replaceLedgerAttempt()`.
+4. DB-Smokes (INSERT-Pflicht auch bei manipuliertem `created_at`, Immutabilität, `failed` vs. `dispatch_uncertain`, Reaper terminalisiert nicht, atomarer Replace inkl. Rollback bei INSERT-Fehler, konkurrierender Replace verliert deterministisch) + Guard-Tests (Observe read-only).
 5. Deploy → Drain-Fenster → Bericht in `docs/v431-g3-1-report.md`. STOP; kein G3.2.
