@@ -233,58 +233,69 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         .maybeSingle();
       const isCinematicSync =
         String((preUpdateScene as any)?.engine_override ?? '') === 'cinematic-sync';
-      const sceneUpdate: Record<string, unknown> = {
-        // v430 Step 1 — plate delivery goes through the single writer.
-        ...materializeCompatibilityOutput('base', { baseUrl: permanentUrl }),
-        // v430 Step 4 — stamp the continuity input THIS run was dispatched
-        // with (immutable snapshot, never the scene's current binding), so a
-        // later re-binding shows up as "needs re-render" instead of silently
-        // pretending the existing video already used it.
-        ...(await continuityRenderedPatch(supabase, sceneId, { runId })),
-        clip_status: 'ready',
-        clip_error: null,
-        updated_at: new Date().toISOString(),
-      };
-      if (isCinematicSync) {
-        // v176 (Jun 30 2026) — RESPECT USER PROVIDER.
-        // Previously: if clip_source === 'ai-happyhorse', we silently rewrote
-        // it to 'ai-hailuo' here under the legacy assumption that HH could
-        // not serve as a Cinematic-Sync master plate. Since v174 HH IS a
-        // valid master plate (compose-video-clips L3092+), so the rewrite
-        // overrode every successful HH render and the UI lied "Hailuo".
-        // clip_source is now left untouched — the provider the user picked
-        // is the provider we report.
-        sceneUpdate.lip_sync_status = 'pending';
-        sceneUpdate.twoshot_stage = 'master_clip';
-      }
+      // v430 Step 4 — stamp the continuity input THIS run was dispatched
+      // with (immutable snapshot, never the scene's current binding), so a
+      // later re-binding shows up as "needs re-render" instead of silently
+      // pretending the existing video already used it.
+      const continuityPatch = await continuityRenderedPatch(supabase, sceneId, { runId });
 
       // ── v418 hybrid ambience: speech gate ────────────────────────────────
       // The plate was allowed to generate room tone/foley. Before that bed is
       // ever mixed under the studio voice, transcribe it: any recognizable
       // speech (or any failure of the gate itself) means the scene plays
       // muted. Fail-soft — this never turns a finished render into an error.
+      let ambientGate: Record<string, unknown> | null = null;
       if (isAmbientAudioRow(preUpdateScene as any)) {
         const gate = await runAmbientSpeechGate(permanentUrl);
-        const prevPlan = ((preUpdateScene as any)?.audio_plan ?? {}) as Record<string, unknown>;
-        sceneUpdate.audio_plan = {
-          ...prevPlan,
-          ambientGate: {
-            status: gate.allowed ? 'passed' : 'muted',
-            reason: gate.reason,
-            // Only a cleared plate may ever be mixed in as an ambience bed.
-            url: gate.allowed ? permanentUrl : null,
-            checkedAt: new Date().toISOString(),
-          },
+        ambientGate = {
+          status: gate.allowed ? 'passed' : 'muted',
+          reason: gate.reason,
+          // Only a cleared plate may ever be mixed in as an ambience bed.
+          url: gate.allowed ? permanentUrl : null,
+          checkedAt: new Date().toISOString(),
         };
         console.log(
           `[compose-clip-webhook] scene=${sceneId} ambient_gate=${gate.allowed ? 'passed' : 'muted'} reason=${gate.reason}`,
         );
       }
 
-      await supabase
-        .from('composer_scenes')
-        .update(sceneUpdate)
-        .eq('id', sceneId);
+      // ── v431 G3.2.1 — atomarer Plate-Apply (RPC A) ───────────────────────
+      // Outputs, Legacy-Spiegel und Ledger-Terminalisierung fallen in EINEN
+      // Commit unter Job- + Scene-Row-Lock. Ohne Ledger-Job ist der Callback
+      // fail-closed retrybar (§4).
+      if (!ledgerJobId) {
+        console.warn(`[compose-clip-webhook] missing pipeline_job_id scene=${sceneId} → 409`);
+        return new Response(
+          JSON.stringify({ ok: false, applied: false, reason: 'missing_pipeline_job' }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+      const { data: plateApply, error: plateApplyError } = await supabase.rpc(
+        'composer_finalize_plate_scene',
+        {
+          _pipeline_job_id: ledgerJobId,
+          _external_job_id: predictionId ? String(predictionId) : null,
+          _write_id: 'ccw:plate-complete',
+          _base_video_url: permanentUrl,
+          _clip_source_hint: null,
+          _extra: {
+            ...continuityPatch,
+            ...(ambientGate ? { audio_plan_ambient_gate: ambientGate } : {}),
+            cinematic_sync: isCinematicSync,
+          },
+        },
+      );
+      if (plateApplyError) throw plateApplyError;
+      const plateVerdict = String((plateApply as any)?.verdict ?? 'unknown');
+      if ((plateApply as any)?.applied !== true) {
+        console.warn(`[compose-clip-webhook] plate apply rejected scene=${sceneId} verdict=${plateVerdict}`);
+        const httpStatus = plateVerdict === 'binding_pending' ? 409 : 202;
+        return new Response(
+          JSON.stringify({ ok: httpStatus === 202, applied: false, reason: plateVerdict }),
+          { status: httpStatus, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
 
 
       // 📚 Auto-archive every generated AI clip into the Media Library (KI tab).
