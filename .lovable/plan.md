@@ -97,21 +97,28 @@ Nur echte Provider-Callback-Failures mit gebundener External-ID, deren Job noch 
 
 `ccw:handoff_failed` gehört zu **H**, `mux:*` zu **G**, alle `sso:*`-Verdikte zu **F**. Ist der Job bereits `succeeded` und trifft ein Failure ein → `duplicate_callback`, **kein** Rollback. Ist er bereits `failed` und trifft ein Success ein → `attempt_superseded`; `complete` wird nie aus `failed` erreicht.
 
-### E. `composer_touch_lipsync_progress(...)` — interner Helper
-Kein eigener Callback-Besitz, kein Grant nach außen. Wird ausschließlich **innerhalb von F** (und vom Watchdog-Recover-Pfad) benutzt: bleibt zwingend in `lipsync_running`, patcht nur `twoshot_stage` (Regex `^syncso_fanout_\d+_of_\d+$` oder `rendering`) und schmale `dialog_shots`-Top-Level-Keys. Terminalisiert nichts.
+### E. `composer_touch_lipsync_progress(...)` — interner Helper, kein externer Aufruf
+Kein eigener Callback-Besitz, **kein** `EXECUTE`-Grant nach außen. Wird ausschließlich **innerhalb von F** verwendet: bleibt zwingend in `lipsync_running`, patcht nur `twoshot_stage` (Regex `^syncso_fanout_\d+_of_\d+$`) und schmale `dialog_shots`-Top-Level-Keys. Terminalisiert nichts.
+
+**Watchdog-Recover benutzt E nicht.** Der Recover-Pfad (`dialog_shots.status → 'rendering'`, `sync-so-webhook` L461) bekommt in G3.2.4 einen eigenen geschlossenen, gegrantneten RPC `composer_touch_lipsync_recover(_scene_id uuid, _run_id uuid, _plate_generation integer, _write_id text)`: run-/generation-gebundene Provenienz (kein Ledger-Job), From-State ausschließlich `lipsync_running`, einziger erlaubter Write `dialog_shots.status='rendering'`, kein Job-Write, keine Output-/Mirror-Änderung.
 
 ### F. `composer_apply_sync_segment_result(_pipeline_job_id uuid, _external_job_id text, _write_id text, _pass_idx integer, _pass_patch jsonb, _final_mode text, _final_verdict text, _processed_url text, _error_text text, _progress_patch jsonb)`
 **Vollständiger und einziger Owner des Sync-Segment-Callback-Apply.** Ein Commit für Pass-Slot, Progress, Fan-in-Verdikt und Job-Terminalisierung. Nach F gibt es für denselben Job **niemals** einen zweiten Apply über B oder D.
 - Write-IDs geschlossen: `sso:segment_succeeded`, `sso:segment_failed`. Stage `sync_segment`; zusätzlich `job.segment_id`/`job.speaker_id` gegen den adressierten Pass (`wrong_segment` → No-op).
-- Ablauf unter gemeinsamem Lock: Job `FOR UPDATE` → Scene `FOR UPDATE` → Identitätsprüfung (§2) → Pass-Slot-Write mit der Logik von `update_dialog_pass_slot()` (`_pass_idx` + Allowlist-Patch, kein Whole-JSON, andere Passes unantastbar) → Fan-in-Auswertung **auf dem frisch geschriebenen Zustand** → Verdikt gemäß `_final_mode` → Job auf `succeeded`/`failed`.
-- `_final_mode` geschlossen, vom Handler vorgeschlagen und im RPC gegen den tatsächlichen Fan-in-Zustand validiert (Mismatch → `final_mode_rejected`, No-op):
+- Ablauf unter gemeinsamem Lock: Job `FOR UPDATE` → Scene `FOR UPDATE` → Identitätsprüfung (§2) → Pass-Slot-Write mit der Logik von `update_dialog_pass_slot()` (`_pass_idx` + Allowlist-Patch, kein Whole-JSON, andere Passes unantastbar) → Fan-in-Auswertung **auf dem frisch geschriebenen Zustand** → Scene-Verdikt gemäß `_final_mode` → Job-Terminalstatus.
+- **Zwei entkoppelte Wahrheiten (verbindlich):**
+  - **Job-Terminalstatus** folgt ausschließlich `_write_id`: `sso:segment_succeeded` → `succeeded`, `sso:segment_failed` → `failed`. `_final_mode` hat darauf **keinen** Einfluss.
+  - **Scene-Verdikt** folgt ausschließlich dem frisch gelockten Fan-in-Zustand aller Passes.
+  - Die Kombination `sso:segment_succeeded` + `_final_mode='fail'` ist ausdrücklich **zulässig und erwartet** (letztes Segment erfolgreich, ein früheres bereits fehlgeschlagen): Job `succeeded`, Scene `failed`. Ebenso zulässig: `sso:segment_failed` + `_final_mode='progress'`/`'mux'` ist **nicht** zulässig für `mux` (Mux verlangt alle Passes erfolgreich), aber zulässig für `progress`.
+- `_final_mode` geschlossen, vom Handler vorgeschlagen und im RPC gegen den tatsächlichen Fan-in-Zustand validiert (Mismatch → `final_mode_rejected`, No-op — auch der Pass-Write wird zurückgerollt):
 
-| `_final_mode` | Vorbedingung | Scene-Wirkung | Job |
-| --- | --- | --- | --- |
-| `progress` | mindestens ein Pass noch nicht terminal | bleibt `lipsync_running`; nur Progress-Spiegel (E-Logik) | `succeeded`/`failed` je Write-ID |
-| `mux` | alle Passes terminal und erfolgreich, Mux nötig (N≥2 oder single-tight) | bleibt `lipsync_running`, **kein** State-Write; Handler darf danach nur `try_claim_mux_dispatch` + `acquireLedgerJob('audio_mux')` + Dispatch ausführen | wie oben |
-| `finalize` | single, nicht-tight, kein Mux nötig, Pass erfolgreich, `_processed_url` non-null | `lipsync_running → complete`; `processed_video_url`, `clip_url`, `clip_status='ready'`, `lip_sync_applied_at=now()`, `clip_error=NULL`, `lip_sync_status='applied'`, `twoshot_stage='complete'`, `lip_sync_source_clip_url` = bestehendes `base_video_url` | `succeeded` |
-| `fail` | alle Passes terminal, mindestens einer fehlgeschlagen bzw. Ladder/Partial-Verdikt | `lipsync_running → failed`, Substate + Spiegel nach `_final_verdict` (s. u.) | `failed` |
+| `_final_mode` | Vorbedingung (nach Pass-Write geprüft) | Scene-Wirkung |
+| --- | --- | --- |
+| `progress` | mindestens ein Pass noch nicht terminal | bleibt `lipsync_running`; nur Progress-Spiegel (E-Logik) |
+| `mux` | alle Passes terminal **und alle erfolgreich**, Mux nötig (N≥2 oder single-tight) | bleibt `lipsync_running`, **kein** State-Write; Handler darf danach nur `try_claim_mux_dispatch` + `acquireLedgerJob('audio_mux')` + Dispatch ausführen |
+| `finalize` | single, nicht-tight, kein Mux nötig, Pass erfolgreich, `_processed_url` non-null | `lipsync_running → complete`; `processed_video_url`, `clip_url`, `clip_status='ready'`, `lip_sync_applied_at=now()`, `clip_error=NULL`, `lip_sync_status='applied'`, `twoshot_stage='complete'`, `lip_sync_source_clip_url` = bestehendes `base_video_url` |
+| `fail` | alle Passes terminal, mindestens einer fehlgeschlagen bzw. Ladder/Partial-Verdikt | `lipsync_running → failed`, Substate + Spiegel nach `_final_verdict` (s. u.) |
+
 
 - Geschlossene `_final_verdict`-Werte für `_final_mode='fail'`:
 
