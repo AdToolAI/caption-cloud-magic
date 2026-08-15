@@ -61,7 +61,6 @@ describe('materializeCompatibilityOutput', () => {
 describe('clip_url writer inventory (v430 Step 1)', () => {
   const FINALIZATION_POINTS = [
     // Lip-Sync finalization (migrated in first half of Schritt 1)
-    'compose-clip-webhook/index.ts',
     'sync-so-webhook/index.ts',
     'remotion-webhook/index.ts',
     'reset-lipsync-scene/index.ts',
@@ -79,6 +78,8 @@ describe('clip_url writer inventory (v430 Step 1)', () => {
   // Output-Spalten-Zuweisungen enthalten.
   const ATOMIC_DB_WRITERS = [
     { rel: 'generate-talking-head/index.ts', rpc: 'composer_finalize_talking_head' },
+    // v431 G3.2.1 — Plate-Apply laeuft atomar ueber composer_finalize_plate_scene.
+    { rel: 'compose-clip-webhook/index.ts', rpc: 'composer_finalize_plate_scene' },
   ];
 
   it('every migrated finalization point writes through the single writer', () => {
