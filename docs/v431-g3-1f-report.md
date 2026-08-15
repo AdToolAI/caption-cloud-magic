@@ -72,3 +72,73 @@ Bestand ungebundener In-Flight-Jobs zum Zeitpunkt der Umstellung: 0.
 - Produktions-Exercise der drei Forwarder-Pfade (bisher im Drain-Fenster nie
   ausgelöst) zur Bestätigung von `bound`-Verdikten statt `missing_binding`.
 - G3.2.2 bleibt bis dahin BLOCKED.
+
+## Production Cutover + Watchdog-Forward Resmoke (2026-08-15)
+
+### 1. Pre-Deploy Cutover-Gate (In-flight-Scope)
+
+Messung 2026-08-15T17:07:18Z:
+
+- Base-Video (`pipeline_state='plate_rendering'` AND `replicate_prediction_id IS NOT NULL`
+  AND `plate_pipeline_job_id IS NULL`): **0**
+- Sync (`pipeline_state IN (lipsync_dispatched, lipsync_running, lipsync_muxing)`,
+  Pass mit `job_id` und ohne `pipeline_job_id`): **0**
+
+Gate **PASS** (0/0) → Deploy freigegeben.
+
+### 2. Deployment
+
+Deployt 2026-08-15T17:07:54Z: `compose-video-clips`, `compose-dialog-segments`,
+`lipsync-watchdog`, `recover-stuck-composer-clip`, `modelark-poll`.
+DB-Migration/Bind-RPCs waren bereits Production. Keine Änderung an der
+`sync-so-webhook`-Apply-Semantik, kein Frontend-Deploy.
+
+Security-/Schema-Smoke (beide RPCs): genau eine Signatur, `SECURITY DEFINER`,
+`search_path = pg_catalog, public`, EXECUTE nur `service_role`
+(anon/authenticated/public = N), Stage-Gates `base_video` bzw. `sync_segment`
+inkl. Scene-/Run-/Generation- bzw. Pass-Identitätsgate vorhanden.
+
+### 3. Gezielter Watchdog-Forward-Resmoke (echt)
+
+Szene `b34d1eae-6bf3-437d-a6ab-624be0155adc`.
+
+Vorlauf (Run `aba7f1d5…`, Gen 6, 17:09:59Z): atomare Plate-Bindung bestätigt —
+`plate_pipeline_job_id = f6a53693…` sofort mit `replicate_prediction_id` gesetzt;
+Sync-Pass 0 mit Paar `job_id 574fda4c… / pipeline_job_id 2b3d10d8…`.
+
+Resmoke-Run **`51f80471-8a3b-42be-894b-6754c4a49ef8`, Gen 7**:
+
+- Sync-Dispatch 17:24:16Z, Ledger `sync_segment` `d12b2704-8d1c-422d-b24a-3b8fcf27f5a9`,
+  `attempt_no = 1`, Provider-Job `50b402be-31d0-4f94-bc2f-9ae4f850fe42`.
+- Attempt-Paar im Pass-Slot: `passes[0].job_id = 50b402be…` +
+  `passes[0].pipeline_job_id = d12b2704…`.
+- `lipsync-watchdog` (echte Production-Invocation, Antwort 17:25:39Z) las genau
+  diesen Pass und meldete
+  `polled: [{scene_id: b34d1eae…, job_id: 50b402be…, status: COMPLETED}]`,
+  d. h. Poll + Forward an `sync-so-webhook` inkl. `pipeline_job_id`-Query-Parameter.
+- Telemetrie `composer_callback_observations`, Stage `sync_segment`,
+  `external_job_id = 50b402be…`:
+  - 17:25:33.810Z — direkter Provider-Callback → `bound`, `pipeline_job_id = d12b2704…`
+  - 17:25:35.324Z — **Watchdog-Forward** (Re-Injection, zeitlich innerhalb des
+    Watchdog-Poll-Fensters 17:25:33–17:25:39Z, kein zweiter Provider-Callback) →
+    **`bound`**, identischer `external_job_id`, identischer `pipeline_job_id`.
+    Dieser Eintrag ersetzt den früheren `missing_binding`-Befund vom 16:14:03Z.
+- Kein neuer Ledger-Job und kein neuer Attempt durch die Re-Injection:
+  für `50b402be…` existiert genau **1** Ledger-Zeile (`attempt_no = 1`), und der
+  Run hat genau **1** `sync_segment`-Job.
+- Run-/Generation-/Pass-Identität unverändert (`run_id 51f80471…`, `gen 7`, Pass 0).
+- Kette lief fachlich normal weiter: `audio_mux` 17:26:02Z `bound`,
+  Szene `pipeline_state = complete`, `lip_sync_status = done`.
+
+### 4. Regression-/Telemetrie-Check (Fenster ab 17:07Z)
+
+7 Observationen, davon **7× `bound`**:
+`missing_binding = 0`, `wrong_job = 0`, `stale_run = 0`, `stale_generation = 0`,
+`binding_pending = 0`. Keine `reinject_missing_pipeline_job_id`-Errors.
+Die beiden latenten Base-Video-Forwarder wurden bewusst nicht künstlich provoziert
+(Vertrag über S1–S9 + statischen Guard abgedeckt).
+
+### 5. Status
+
+**G3.1f DONE / FROZEN.**
+**G3.2.2 kann anschließend geöffnet werden.**
