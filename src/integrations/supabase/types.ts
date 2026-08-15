@@ -19710,6 +19710,17 @@ export type Database = {
           status: string
         }[]
       }
+      composer_apply_sync_segment_result: {
+        Args: {
+          _error_text: string
+          _external_job_id: string
+          _output_url: string
+          _pipeline_job_id: string
+          _provider_status: string
+          _write_id: string
+        }
+        Returns: Json
+      }
       composer_bind_plate_attempt: {
         Args: {
           _external_job_id: string
@@ -19814,6 +19825,10 @@ export type Database = {
           _write_id: string
         }
         Returns: Json
+      }
+      composer_mark_sync_refund_applied: {
+        Args: { _amount: number; _scene_id: string }
+        Returns: boolean
       }
       composer_pipeline_jobs_g31_deployment_ts: { Args: never; Returns: string }
       composer_reap_cron_tick: {
