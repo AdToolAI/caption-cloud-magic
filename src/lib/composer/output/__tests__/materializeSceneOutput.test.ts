@@ -61,7 +61,6 @@ describe('materializeCompatibilityOutput', () => {
 describe('clip_url writer inventory (v430 Step 1)', () => {
   const FINALIZATION_POINTS = [
     // Lip-Sync finalization (migrated in first half of Schritt 1)
-    'sync-so-webhook/index.ts',
     'remotion-webhook/index.ts',
     'reset-lipsync-scene/index.ts',
     '_shared/scene-run-begin.ts',
@@ -80,6 +79,9 @@ describe('clip_url writer inventory (v430 Step 1)', () => {
     { rel: 'generate-talking-head/index.ts', rpc: 'composer_finalize_talking_head' },
     // v431 G3.2.1 — Plate-Apply laeuft atomar ueber composer_finalize_plate_scene.
     { rel: 'compose-clip-webhook/index.ts', rpc: 'composer_finalize_plate_scene' },
+    // v431 G3.2.2 — Sync-Segment-Apply laeuft atomar ueber
+    // composer_apply_sync_segment_result (Contract §6: kein Client-Materialize).
+    { rel: 'sync-so-webhook/index.ts', rpc: 'composer_apply_sync_segment_result' },
   ];
 
   it('every migrated finalization point writes through the single writer', () => {

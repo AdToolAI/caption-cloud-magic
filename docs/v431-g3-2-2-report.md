@@ -167,3 +167,94 @@ G3.1f über einen realen Post-Deploy-Lauf mit Telemetrie belegen.
 
 **Status: G3.2.2 VERIFIED WITH FINDINGS — F1 (RED) und F4 (RED, Test-Guard) blockieren
 die Abnahme; F2/F6 sind Deviations zur Entscheidung, F3/F5 Amber. STOP für Review.**
+
+---
+
+# G. Acceptance Remediation R1 (2026-08-15)
+
+Scope: ausschließlich die sechs Acceptance-Befunde + S10-Ausführbarkeit. Keine neue
+Architektur, kein Production-Deploy.
+
+## R1 — F1 `mux_dispatch_requested_at`
+
+`composer_apply_sync_segment_result` erzeugt/merged den Parent
+(`jsonb_set(_ds, '{audio_mux}', COALESCE(_ds->'audio_mux','{}'), true)`) und setzt danach
+**ausschließlich** `audio_mux.mux_dispatch_requested_at`. `dispatched_at` wird vom
+Apply-RPC nicht geschrieben — Exactly-once bleibt am `composer_acquire_pipeline_attempt('audio_mux')`.
+Gilt für den Erst-Verdikt-Pfad **und** den Duplicate-Redrive-Pfad.
+Smokes: `R1 mux_dispatch_requested_at set` PASS, `R1 no dispatched_at written` PASS, `S2` PASS.
+
+## R2 — F2 `composer_touch_lipsync_progress`
+
+Interner Helper eingeführt (`SECURITY DEFINER`, `search_path = pg_catalog, public`),
+die bisher inline vorhandene Progress-Semantik (`dialog_shots`, `lip_sync_status='running'`,
+`twoshot_stage='syncso_fanout_<done>_of_<total>'`, `updated_at`) ist dorthin verschoben.
+Security-Nachweis (`has_function_privilege`): `PUBLIC`/`anon`/`authenticated`/`service_role`/
+`sandbox_exec` = **EXECUTE false**; Aufruf nur RPC-intern.
+
+## R3 — Legacy→State-Bridge (monoton)
+
+`composer_state_from_legacy` kennt `audio_muxing` und mappt es auf höchstens
+`lipsync_running` (nie `lipsync_muxing`). Zusätzlich klemmt `composer_scene_state_bridge`
+den Legacy-Zweig monoton: steht die Szene bereits auf `lipsync_muxing`/`complete`, wird
+sie durch den Legacy-Marker `audio_muxing` **nicht** zurückgestuft.
+Smokes: `R3 no state regression on mux handoff` PASS, `R3b monotone bridge` PASS.
+
+## R4 — Stale Test Guard
+
+`materializeSceneOutput.test.ts`: `sync-so-webhook/index.ts` von `FINALIZATION_POINTS`
+nach `ATOMIC_DB_WRITERS` (RPC `composer_apply_sync_segment_result`) verschoben —
+entspricht dem gelockten §6-Vertrag. 11/11 PASS.
+
+## R5 — Recovery-Direct-Write entfernt
+
+Der Direct-Write in `sync-so-webhook` (ehem. L598–607) ist entfernt; der Branch ist
+write-free und delegiert. Die Recovery ist als eng geguardete Vorstufe **im** RPC
+implementiert: nur nach bestandener Ledger-/Job-/Run-/Generation-/Pass-Provenienz, nur bei
+`ssw:success`, nur für `clip_error ~ '^watchdog_(provider_timeout|auto_retry_|hard_timeout)'`.
+Sie nimmt ausschließlich die Failure-Mirrors zurück (`clip_error=NULL`,
+`lip_sync_status='running'`, `dialog_shots.status='rendering'`, `recovered_from_watchdog_at`)
+und läuft danach in denselben normalen Apply weiter.
+Smokes: `R5 watchdog recovery in RPC` PASS, `R5b no recovery for real failure` PASS.
+
+## R6 — DB-Audit im selben Commit
+
+Interner Writer `composer_log_sync_segment_audit` schreibt nach
+`composer_scene_transition_log` (`source_signature='g322_sync_segment'`,
+`caller_class='sync_segment_apply'`, `detail` = Provenienz-/Verdikt-JSON).
+Auditiert werden **alle** Verdikte ab autoritativ aufgelöster Ledger-Zeile
+(applied / noop / redispatch / dispatch_mux / rejected); fachliche Rejects kehren normal
+zurück, das Audit bleibt committed. Pre-Resolution-Fälle (`missing_binding`,
+`job_not_found`, write_id-Matrix) schreiben **keine** DB-Zeile und bleiben in
+`composer_callback_observations`. Echte Invarianz-/Security-Korruption bleibt Exception.
+Smokes: `R6 audit row on applied`, `R6 audit row on rejected`, `R6 audit caller class`,
+`R6b no audit before ledger resolution` — alle PASS.
+
+## R7 — S10 als echter Parallelitätstest
+
+Temporärer Ad-hoc-Grant (kein Migrationsartefakt) an die Sandbox-Rolle, zwei **parallele
+psql-Sessions** mit gemeinsamer Startzeit auf denselben letzten Pass:
+
+- Session A: `verdict=dispatch_mux, applied=true` → `acquire('audio_mux') = acquired` → `PROVIDER_INVOKE=true`
+- Session B: `verdict=noop, reason=duplicate_callback` → kein Acquire → `PROVIDER_INVOKE=false`
+- `audio_mux`-Attempts für die Szene: **1**
+- `dialog_shots.audio_mux` enthält nur `mux_dispatch_requested_at`
+
+Nur der Acquire-Gewinner zählt/führt den simulierten Provider-Invoke aus. Fixture und
+Audit-Zeilen wurden anschließend gelöscht, der Grant **revoked**
+(`has_function_privilege('sandbox_exec', …) = false`, Nachweis nach Cleanup).
+
+## Recheck-Ergebnis
+
+- SQL-Smoke-Matrix S1–S17 + R1/R3/R5/R6: **40 / 40 PASS**.
+- S10 Parallel-Harness: **PASS** (siehe oben).
+- Static Writer Guard `sync-so-webhook`: kein `.update(`/`.upsert(` auf `composer_scenes`
+  mehr; verbleibender `.update(` betrifft ausschließlich das Credit-Wallet-Refund.
+- Security: `composer_apply_sync_segment_result` = SECURITY DEFINER,
+  `search_path = pg_catalog, public`, EXECUTE nur `service_role`;
+  `composer_touch_lipsync_progress` und `composer_log_sync_segment_audit` ohne jeden
+  EXECUTE-Grantee.
+- `vitest run src/lib/composer`: **450 / 450 PASS** (F4 geschlossen).
+
+**Status: G3.2.2 ACCEPTANCE GREEN — alle sechs Befunde geschlossen, S10 ausgeführt.
+Kein Deploy erfolgt. STOP für Review.**

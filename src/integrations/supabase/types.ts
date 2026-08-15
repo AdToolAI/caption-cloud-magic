@@ -19826,6 +19826,21 @@ export type Database = {
         }
         Returns: Json
       }
+      composer_log_sync_segment_audit: {
+        Args: {
+          _applied: boolean
+          _detail: Json
+          _from_state: Database["public"]["Enums"]["composer_scene_state"]
+          _generation: number
+          _project_id: string
+          _reason: string
+          _run_id: string
+          _scene_id: string
+          _to_state: Database["public"]["Enums"]["composer_scene_state"]
+          _write_id: string
+        }
+        Returns: undefined
+      }
       composer_mark_sync_refund_applied: {
         Args: { _amount: number; _scene_id: string }
         Returns: boolean
@@ -20021,6 +20036,15 @@ export type Database = {
           _twoshot_stage: string
         }
         Returns: string
+      }
+      composer_touch_lipsync_progress: {
+        Args: {
+          _dialog_shots: Json
+          _done: number
+          _scene_id: string
+          _total: number
+        }
+        Returns: undefined
       }
       compute_content_hash: {
         Args: {
