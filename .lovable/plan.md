@@ -167,7 +167,7 @@ composer_finalize_plate_scene(
 | `external_job_id` | neu (neue Replicate-Prediction) |
 | Alter Job | wird `stale` terminalisiert, im selben RPC wie die Attempt-Anlage |
 
-Nur ein bewusster User-/Orchestrator-Render („Neu rendern", Reset, Hybrid-Extend) wechselt Run-ID und/oder Generation. Der Risikotext des G3-Berichts („neue Run-Identität") war an dieser Stelle falsch und ist hiermit ersetzt.
+Nur ein bewusster User-/Orchestrator-Render („Neu rendern", Reset, Hybrid-Extend) wechselt Run-ID und/oder Generation. Ein Auto-Retry erzeugt niemals eine neue Run-Identität.
 
 Gilt gleichermaßen für die Sync.so-Retry-Matrix (`prepareRetryFromWebhook`, `V5_RETRY_VARIANTS`) und die Watchdog-Auto-Retries: neue Attempts, nie neue Runs.
 
