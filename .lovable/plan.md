@@ -27,8 +27,17 @@ Ergänzung zum Vertrag (ohne Verhalten des Renderers zu ändern, Observe bleibt 
   dispatcht — der Gewinner läuft bereits.
 - Ergebnis pro Retry: alter Attempt `stale` + `replaced_by`, neuer Attempt
   `attempt_no + 1`, dessen `pipeline_job_id` reist im Callback-Transport mit.
-- Ist der Vorgänger bereits terminal (`failed`/`succeeded`/`stale`), bleibt der
-  normale Acquire-Weg zulässig — die RPC vergibt dann sauber `attempt_no + 1`.
+- Vorgänger-Status entscheidet **nicht** über den Einstieg: ein semantischer
+  Retry bleibt immer Retry-Vertrag. `acquireLedgerJob()` ist nur zulässig, wenn
+  für diese (Scene, Run, Stage, Segment) noch kein Attempt existiert; es erzeugt
+  niemals bewusst Attempt > 1. Verbindliche Verdikte im Retry-Vertrag:
+  - Vorgänger `succeeded` → kein Retry, No-op `already_completed`.
+  - Vorgänger `stale` → kein neuer Zweig; `replaced_by` folgen bzw.
+    `retry_superseded`. Nie per Acquire Attempt N+1 erzeugen.
+  - Vorgänger `failed` → nur wenn der Retry-Vertrag diesen Failure explizit als
+    retryfähig führt; neuer Attempt weiterhin atomar an `previousJobId` gebunden.
+  - Vorgänger aktiv (`pending`, `dispatching`, `dispatched`,
+    `dispatch_uncertain`) → atomarer Replace wie oben.
 
 ## 2. Testbaseline vergleichbar machen
 
