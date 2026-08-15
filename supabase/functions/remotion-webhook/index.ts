@@ -4,6 +4,7 @@ import { verifyWebhookRequest } from "../_shared/webhook-auth.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
+import { observeCallbackProvenance } from "../_shared/v431-ledger.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,6 +50,18 @@ serve(async (req) => {
     const renderJobId = customData?.render_job_id;
     const longFormProjectId = customData?.sora_long_form_project_id;
     const composerSceneId = customData?.composer_scene_id;
+
+    // v431 G3.1 — Ledger-Observe für Mux/Remotion-Callbacks. Reine Telemetrie,
+    // kein Writer-Verhalten, kein Fail-Pfad (Observe-Phase vor dem Drain-Gate).
+    if (composerSceneId) {
+      await observeCallbackProvenance(supabaseAdmin, {
+        handler: 'remotion-webhook',
+        pipelineJobId: typeof customData?.pipeline_job_id === 'string' ? customData.pipeline_job_id : null,
+        sceneId: composerSceneId,
+        stage: customData?.stage === 'sync_segments_audio_mux' ? 'audio_mux' : String(customData?.stage ?? source ?? 'remotion'),
+        externalJobId: (pendingRenderId ?? renderId) ? String(pendingRenderId ?? renderId) : null,
+      });
+    }
 
     console.log('📋 Webhook details:', { type, renderId, pendingRenderId, outName, userId, isDirectorsCut, isLongForm, progressIdFromWebhook });
 
