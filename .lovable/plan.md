@@ -30,9 +30,9 @@ Analyse-Ergebnis + Endvertrag. Keine Migration, kein Code, kein Deploy in diesem
 ### render-sync-segments-audio-mux (994 Z.)
 | Pfad | heutige Writes | Ziel |
 | --- | --- | --- |
-| preflight fail | `update{lip_sync_status/twoshot_stage:'failed',clip_error, dialog_shots Whole-JSON}` (L753) | **D** `mux:preflight_failed` |
+| preflight fail | `update{lip_sync_status/twoshot_stage:'failed',clip_error, dialog_shots Whole-JSON}` (L753) | **G** `mux:preflight_failed` (job-bound, ohne External-ID) |
 | dispatch | `video_renders.insert`, `resolveLedgerDispatch`, `bindLedgerExternalJob(renderId)`, dann `update{dialog_shots.audio_mux.render_id, lip_sync_status/twoshot_stage:'audio_muxing'}` (L916) | **C** `composer_enter_lipsync_mux` (nach `bindLedgerExternalJob`, vor Lambda-Invoke) |
-| invoke fail | `video_renders.update(failed)` + Whole-JSON-Rollback + `lip_sync_status='failed'` (L961) + `settleLedgerDispatchFailure` | **D** `mux:invoke_failed`; Ledger-Settle bleibt G3.1 |
+| invoke fail | `video_renders.update(failed)` + Whole-JSON-Rollback + `lip_sync_status='failed'` (L961) + `settleLedgerDispatchFailure` | **G** `mux:invoke_failed` als einziger Owner; `settleLedgerDispatchFailure()` für diesen Job **entfällt** |
 
 ### remotion-webhook / dialog-stitch (878 Z.)
 | Pfad | heutige Writes | Ziel |
