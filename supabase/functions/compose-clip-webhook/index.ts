@@ -553,24 +553,31 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             `[compose-clip-webhook] scene ${sceneId}: cinematic-sync clip_url is talking-head — marking failed (legacy route blocked)`,
           );
           try {
-            await supabase
-              .from('composer_scenes')
-              .update({
-                clip_status: 'failed',
-                clip_error: tl({ de: 'legacy_talking_head_route_blocked: Composer-Szenen laufen jetzt ausschließlich über Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Bitte "Sauber neu starten" nutzen.', en: 'legacy_talking_head_route_blocked: Composer scenes now run exclusively via Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Please use "Clean Restart".', es: 'legacy_talking_head_route_blocked: Las escenas de Composer ahora se ejecutan exclusivamente a través de Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Por favor, use "Reiniciar Limpio".' }),
-                lip_sync_status: null,
-                twoshot_stage: null,
-                dialog_shots: null,
-                lip_sync_source_clip_url: null,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', sceneId);
+            // v431 G3.2.1 — RPC D (`ccw:legacy_route_blocked`).
+            const { data: blockApply, error: blockRpcError } = await supabase.rpc(
+              'composer_fail_callback_scene',
+              {
+                _pipeline_job_id: ledgerJobId,
+                _external_job_id: predictionId ? String(predictionId) : null,
+                _write_id: 'ccw:legacy_route_blocked',
+                _error_text: tl({ de: 'legacy_talking_head_route_blocked: Composer-Szenen laufen jetzt ausschließlich über Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Bitte "Sauber neu starten" nutzen.', en: 'legacy_talking_head_route_blocked: Composer scenes now run exclusively via Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Please use "Clean Restart".', es: 'legacy_talking_head_route_blocked: Las escenas de Composer ahora se ejecutan exclusivamente a través de Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Por favor, use "Reiniciar Limpio".' }),
+                _dialog_patch: null,
+              },
+            );
+            if (blockRpcError) {
+              console.error('[compose-clip-webhook] legacy-route fail RPC error:', blockRpcError);
+            } else if ((blockApply as any)?.applied !== true) {
+              console.warn(
+                `[compose-clip-webhook] legacy-route fail rejected scene=${sceneId} verdict=${(blockApply as any)?.verdict}`,
+              );
+            }
           } catch (blockErr) {
             console.error(
               '[compose-clip-webhook] legacy-route fail-mark error:',
               blockErr,
             );
           }
+
         }
 
       } catch (lipErr) {
