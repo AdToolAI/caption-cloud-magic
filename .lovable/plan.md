@@ -96,8 +96,9 @@ Log-Zeile, Legacy-Verhalten unverändert (Observe bleibt read-only, kein State-W
   exakt eine Ledger-Zeile für den ersten Attempt, ein Caller `acquired`, der andere
   `already_in_flight`, `composer_replace_pipeline_attempt` nie aufgerufen; im
   Dispatcher-Test genau ein Provider-Call.
-- Initial-Akquise bei bereits vorhandenem aktivem Attempt ruft
-  `composer_replace_pipeline_attempt` **nicht**
+- Initial-Akquise bei bereits vorhandenem aktivem Attempt (inkl. `dispatch_uncertain`)
+  ruft `composer_replace_pipeline_attempt` **nicht** auf und liefert `already_in_flight`.
+
 
 - `replaceLedgerAttempt` ohne `previousJobId`/`retryReason` ist nicht aufrufbar (Typ + Laufzeit).
 - Classifier-Matrix: 400/401/403/404/422 → rejected; 408/409/429/500/502/503/504/Timeout/
