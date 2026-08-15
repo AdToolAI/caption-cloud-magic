@@ -69,6 +69,9 @@ und in Code-Kommentar, Bericht und `docs/v427-run-contract.md` so formuliert:
 - DB-Smokes: Retry über Replace (alt `stale` + `replaced_by`, neu `attempt_no+1`),
   paralleler Replace-Verlierer, Reaper → recoverable, `plate_generation`-INSERT-Pflicht
   und Immutabilität, RPC-Security (nur `service_role`).
+- Predecessor-Verdikte: `succeeded` → kein neuer Attempt (`already_completed`),
+  `stale` → `retry_superseded` ohne neuen Zweig, `failed` → nur über den
+  retryfähigen Replace-Pfad, und Initial-Acquire erzeugt nie Attempt > 1.
 - Vertragstests: je ein Test pro Retry-Pfad, dass mit Retry-Kontext
   `replaceLedgerAttempt` und ohne Kontext `acquireLedgerJob` läuft, und dass ein
   legitimer Retry nicht als `already_in_flight` verschluckt wird.
