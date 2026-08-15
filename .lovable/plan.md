@@ -20,9 +20,14 @@ in der Matrix. Der Bericht wird um genau diesen Beleg ergänzt (statt eines Matr
 
 Grün und belegt ist bisher nur die **Acquire-Concurrency** (parallel → 1× `acquired`,
 2× `already_in_flight`) sowie die RPC-Security (`REVOKE PUBLIC`, nur `service_role`).
-Die übrigen vereinbarten Smokes wurden noch nicht als Suite ausgeführt. Sie werden vor dem
-Deploy als **eine transaktionale Migration mit `RAISE EXCEPTION`-Rollback** gefahren, gleiche
-Mechanik wie G2.3/G2.4, und nur die Resultate berichtet:
+Die übrigen vereinbarten Smokes wurden noch nicht als Suite ausgeführt. **D1/D2 und D5–D11**
+laufen transaktional und rückstandsfrei (`RAISE EXCEPTION`-Rollback, gleiche Mechanik wie
+G2.3/G2.4). **D3 und D4 sind echte Concurrency-Smokes und laufen ausdrücklich NICHT im
+DO-Block**, sondern mit unabhängigen, gleichzeitig geöffneten Sessions/Transaktionen gegen
+dieselbe Identität; anschließend werden die erzeugten Zeilen gezielt aufgeräumt. Berichtet
+werden nur die Resultate:
+
+
 
 | # | Smoke | Erwartung |
 |---|---|---|
