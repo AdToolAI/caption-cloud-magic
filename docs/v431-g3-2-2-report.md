@@ -658,3 +658,12 @@ Minimal nötige nächste Änderung (nur beschrieben, nicht umgesetzt) — RS2:
 ### 10.6 Status
 
 **G3.2.2 DEPLOYED — RESMOKE IN PROGRESS / NOT YET ACCEPTED** (unverändert). Deploy = PASS. Keine Mutation der Jobs d12b2704 / 7f983939, kein Cleanup, kein neuer Run, kein Deploy.
+
+### 10.7 Weiterführung RS2
+
+Der in §10.5 empfohlene Fix ist als eigener Contract ausgearbeitet:
+`docs/v431-rs2-contract.md` — **RS2 CONTRACT DRAFT — DECISION PENDING**.
+Er enthält Ist-Vertrag, Blockade-Klasse (Ledger-Identitätsschlüssel), betroffene
+Aufrufer, Option A (Ledger-Terminalisierung im Reset), Option B (kanonische neue
+Run-Identität), Entscheidungsmatrix, Invarianten und Verifikationsplan.
+Die Wahl zwischen A und B ist bewusst offen und ein eigener Freigabeschritt.
