@@ -18,7 +18,10 @@ Smoke S9 (transaktional, Fixture-Projekt, danach vollständig gelöscht), je ein
 | `lipsync_running` | `applied = false`, Verdikt `from_state_rejected` |
 | `complete` | `applied = false`, Verdikt `from_state_rejected` |
 
-Für jeden abgelehnten Fall zusätzlich beweisen: `clip_url`, `base_video_url`, `processed_video_url`, `clip_status`, `pipeline_state`, `lip_sync_status`, `twoshot_stage` sind byte-identisch zum Vorzustand (Snapshot-Vergleich vor/nach dem Aufruf), und der Plate-Ledger-Job bleibt `succeeded`.
+Zwei verpflichtende Zusatz-Assertions (Review-Runde):
+
+1. **Output-Invarianz gilt in allen sechs Fällen**, also auch bei den drei erlaubten From-States: `base_video_url`, `clip_url`, `processed_video_url`, `clip_status` und `dialog_shots` müssen unverändert bleiben. H darf ausschließlich State/Substate und die vorgesehenen Lip-Sync-Spiegel (`lip_sync_status`, `twoshot_stage`) ändern.
+2. **Transition-/Audit-Vertrag wird für erlaubte und abgelehnte Aufrufe nachgewiesen**: erlaubt → genau eine neue Audit-Zeile mit `applied = true`, `write_id = ccw:handoff_failed`, korrektem `run_id`/`generation`, `to_state = failed`, `guard_mode = run_bound`; abgelehnt → Audit-Zeile mit `applied = false` und gesetztem `reason`, und **keinerlei** Scene-Mutation (voller Row-Snapshot vor/nach ist identisch). Der Plate-Ledger-Job bleibt in allen Fällen `succeeded`.
 
 Ergebnis wird als Compatibility-Matrix in `docs/v431-g3-2-1-report.md` festgeschrieben; die drei erlaubten From-States sind damit abschließend aufgezählt.
 
@@ -43,6 +46,8 @@ Behandlung:
 1. **`src/pages/TeamWorkspace.tsx` wird zurückgenommen.** Die Umstellung `approver_id/approved_at → reviewed_by/reviewed_at` ist echte Verhaltensänderung und gehört nicht in diesen Deploy. Stattdessen wird der ursprüngliche Payload wiederhergestellt und nur typseitig entschärft, sodass das Laufzeitverhalten exakt dem Stand vor G3.2.1 entspricht. Der fachliche Fix (falsche Spaltennamen gegen `content_approvals`) wird separat als eigener Vorgang dokumentiert und später einzeln freigegeben.
 2. **Die reinen Payload-Casts bleiben** (`FaceMapReviewDialog`, `SceneCard` ×2, `useAudiobookProject`, `useSceneGenerate`, `useMotionStudioLibrary` ×2). Nachweis der Runtime-Identität: Es sind ausschließlich TypeScript-`as`-Assertions auf bestehende Argumente; sie werden beim Transpilieren entfernt. Beleg über einen Emit-Vergleich (esbuild/tsc-Emit vor/nach der Änderung → identisches JS) statt bloßer Behauptung.
 3. Alle drei Punkte werden im Bericht als „Out-of-Scope, build-blocking" mit Begründung gelistet, damit der G3.2.1-Diff sauber lesbar bleibt.
+4. **Kein Frontend-Deploy** wegen dieser Dateien; deployt wird ausschließlich die Edge-Function.
+5. Der `content_approvals`-Spaltenfehler (`approver_id`/`approved_at` existieren nicht) wird ausdrücklich als **offene Schuld** dokumentiert, nicht als behoben. Wenn der Rollback nur über einen Type-Cast auf den alten, fachlich vermutlich falschen Payload grün wird, ist das für diesen isolierten Edge-Function-Deploy akzeptabel.
 
 Falls sich der TeamWorkspace-Rollback nicht ohne Buildfehler darstellen lässt, wird das gemeldet und **kein** Deploy durchgeführt.
 
