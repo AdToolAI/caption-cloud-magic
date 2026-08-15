@@ -213,3 +213,76 @@ Observe-Pfad wäre eine Vertragsänderung):
 3. Entscheidung für C1, C2 oder C3 getroffen und wirksam.
 
 STOP. Keine Reparatur, kein neuer Lauf.
+
+---
+
+# v431 G3.1d — Drain-Hardening (Reaper + persistente Observe-Telemetrie)
+
+## Rollout-T0
+
+- **T0 (neu, Drain-Startmarke) = `2026-08-15T10:47:35Z`**
+  = max(Migrationsabschluss, letzter der sieben Function-Deploys). Erst ab
+  diesem Zeitpunkt ist das komplette G3.1d-Rollout (DB-Objekte **und** alle
+  Function-Instanzen) aktiv. Der alte T0 (`09:05:17Z`) ist damit historisch.
+- Redeployte Functions (ein Zug, alle erfolgreich): `compose-video-clips`,
+  `compose-clip-webhook`, `compose-dialog-segments`, `sync-so-webhook`,
+  `render-sync-segments-audio-mux`, `remotion-webhook`, `lipsync-watchdog`.
+
+## B — Reaper-Scheduler (Lücke geschlossen)
+
+- pg_cron-Job `composer-reap-orphaned-dispatches` läuft im Minutentakt; Reaper
+  und Heartbeat entstehen im **selben** SQL-Block: schlägt der Reaper fehl,
+  entsteht kein falscher grüner `reaped_count`.
+- **Smoke B (positiv):** künstlicher `dispatching`-Attempt ohne
+  `external_job_id` wurde nach Überschreiten des 10-Minuten-Thresholds vom
+  Cron-Lauf auf `dispatch_uncertain` gesetzt; Heartbeat
+  `{"ok": true, "reaped_count": 1, "threshold_minutes": 10}`. Testzeile danach
+  entfernt.
+- **Laufender Beleg:** `cron_heartbeats` @ `2026-08-15T10:48:00Z` →
+  `ok`, `reaped_count: 0` (keine Waisen offen).
+- Der Reaper terminalisiert weiterhin nicht: `dispatch_uncertain` bleibt ein
+  recoverable Zustand, kein `failed`.
+
+## C — Persistente Observe-Telemetrie (C1, isoliert)
+
+- Neue append-only Tabelle `composer_callback_observations`, strikt isoliert:
+  `REVOKE ALL` inkl. `service_role` (verifiziert: `ins/upd/del/sel = f`),
+  einziger Schreibpfad ist das `SECURITY DEFINER`-RPC
+  `composer_record_callback_observation` (`rpc_sr = t`).
+- **Smoke C:** RPC-Insert erfolgreich; direkte `UPDATE`/`DELETE`-Versuche
+  werden DB-seitig vom Append-only-Trigger abgewiesen (`42501`).
+- Verdrahtung in `supabase/functions/_shared/v431-ledger.ts`
+  (`recordObservationBestEffort`): genau ein Insert-Versuch pro Observe, kein
+  Retry, `try/catch` ohne Rethrow.
+
+## Präzisierter Observe-Vertrag (ab G3.1d verbindlich)
+
+> Observe ist read-only gegenüber allen Produktions- und Orchestrierungsdaten.
+> Erlaubt ist ausschließlich ein append-only Telemetrie-Insert in
+> `composer_callback_observations`, dessen Fehler ignoriert wird. Telemetrie ist
+> **kein** Callback-Gate: ein RPC-Fehler ändert weder Verdikt noch HTTP-Status
+> noch State-/Ledger-Pfad.
+
+## Verifikation
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Smoke B (Reaper + Heartbeat) | grün (`reaped_count: 1`, danach `0`) |
+| Smoke C (RPC-Insert / Append-only-Trigger) | grün (`42501` bei UPDATE/DELETE) |
+| Grants `composer_callback_observations` | `service_role`: ins/upd/del/sel = `f`, RPC = `t` |
+| Neue Vertragstests `v431ObserveTelemetryFailOpen.test.ts` | 4/4 grün (genau 1 RPC, RPC-Error und Exception ändern Verdikt nicht) |
+| Frozen-Suite `vitest run src/lib/composer src/lib/video-composer` | **540/540 grün** = 536-Baseline + 4 neue Tests (zwei FS-Scanner-Tests sind unter Default-Timeout flaky, mit `--testTimeout=60000` reproduzierbar grün) |
+| `tsgo --noEmit` | grün |
+| `deno check` | `_shared/v431-ledger.ts` und `render-sync-segments-audio-mux` grün; die übrigen Functions brechen lokal am vorbestehenden `npm:replicate@0.25.2`-Resolver ab (Umgebungslimit, kein Codebefund) — Deploy-Build serverseitig erfolgreich |
+| Supabase-Linter | keine neuen Findings zur G3.1d-Migration |
+
+## Status
+
+- **G3.1d: DONE.** Lücken B und C sind geschlossen und belegt.
+- **A (`watchdog_no_prediction_id`) bleibt offen** als separat dokumentierte
+  Pipeline-Restschuld; nicht Teil von G3.1d.
+- **Drain-Fenster läuft ab dem neuen T0.** Frühestes Ende des 60-Minuten-Gates:
+  `2026-08-15T11:47:35Z`.
+- **G3.2 bleibt gesperrt.**
+
+STOP — Freigabe für Produktionslauf #2 abwarten.

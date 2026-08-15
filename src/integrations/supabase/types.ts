@@ -5788,6 +5788,48 @@ export type Database = {
         }
         Relationships: []
       }
+      composer_callback_observations: {
+        Row: {
+          details: Json
+          external_job_id: string | null
+          handler: string
+          id: string
+          observed_at: string
+          pipeline_job_id: string | null
+          plate_generation: number | null
+          run_id: string | null
+          scene_id: string | null
+          stage: string | null
+          verdict: string
+        }
+        Insert: {
+          details?: Json
+          external_job_id?: string | null
+          handler: string
+          id?: string
+          observed_at?: string
+          pipeline_job_id?: string | null
+          plate_generation?: number | null
+          run_id?: string | null
+          scene_id?: string | null
+          stage?: string | null
+          verdict: string
+        }
+        Update: {
+          details?: Json
+          external_job_id?: string | null
+          handler?: string
+          id?: string
+          observed_at?: string
+          pipeline_job_id?: string | null
+          plate_generation?: number | null
+          run_id?: string | null
+          scene_id?: string | null
+          stage?: string | null
+          verdict?: string
+        }
+        Relationships: []
+      }
       composer_collaborators: {
         Row: {
           accepted_at: string | null
@@ -8098,6 +8140,7 @@ export type Database = {
           consecutive_failures: number
           expected_interval_seconds: number
           job_name: string
+          last_details: Json
           last_duration_ms: number | null
           last_error: string | null
           last_run_at: string
@@ -8108,6 +8151,7 @@ export type Database = {
           consecutive_failures?: number
           expected_interval_seconds?: number
           job_name: string
+          last_details?: Json
           last_duration_ms?: number | null
           last_error?: string | null
           last_run_at?: string
@@ -8118,6 +8162,7 @@ export type Database = {
           consecutive_failures?: number
           expected_interval_seconds?: number
           job_name?: string
+          last_details?: Json
           last_duration_ms?: number | null
           last_error?: string | null
           last_run_at?: string
@@ -19718,9 +19763,27 @@ export type Database = {
         Returns: Json
       }
       composer_pipeline_jobs_g31_deployment_ts: { Args: never; Returns: string }
+      composer_reap_cron_tick: {
+        Args: { p_older_than_minutes?: number }
+        Returns: undefined
+      }
       composer_reap_orphaned_dispatches: {
         Args: { p_older_than_minutes?: number }
         Returns: number
+      }
+      composer_record_callback_observation: {
+        Args: {
+          p_details?: Json
+          p_external_job_id?: string
+          p_handler: string
+          p_pipeline_job_id?: string
+          p_plate_generation?: number
+          p_run_id?: string
+          p_scene_id?: string
+          p_stage?: string
+          p_verdict: string
+        }
+        Returns: string
       }
       composer_recover_scene: {
         Args: {
