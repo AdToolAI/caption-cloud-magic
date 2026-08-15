@@ -117,7 +117,7 @@ import { rehostPlate } from "../_shared/rehostPlate.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
-import { acquireLedgerJob, bindLedgerExternalJob, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
+import { bindLedgerExternalJob, readRetryContext, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -5963,38 +5963,48 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // `pipeline_job_id` in der Webhook-URL mit und ist ab G3.2 die primäre
     // Callback-Identität. Fail-open: ohne Ledger-Zeile läuft der Legacy-Pfad
     // unverändert weiter (Observe-Phase).
-    const v431SyncAcquisition = await acquireLedgerJob(supabase, {
-      sceneId,
-      runId: (passRunStamp.run_id as string | null) ?? null,
-      stage: "sync_segment",
-      plateGeneration: Number(passRunStamp.plate_generation ?? 0),
-      provider: "sync.so",
-      metadata: {
-        dispatcher: "compose-dialog-segments",
-        pass_idx: currentPassIdx,
-        total_passes: passes.length,
-        diagnostic_id: diagnosticId,
-        retry_variant: retryVariant,
+    // G3.1b-Endvertrag: Ohne Retry-Kontext ist das eine Initial-Akquise
+    // (Attempt 1). Ein echter Re-Dispatch (Sync.so-Webhook, Watchdog, Poller)
+    // trägt `retry_of_pipeline_job_id` + `retry_reason` und läuft ausschließlich
+    // über den atomaren Replace-Vertrag.
+    const v431SyncDecision = await resolveLedgerDispatch(
+      supabase,
+      {
+        sceneId,
+        runId: (passRunStamp.run_id as string | null) ?? null,
+        stage: "sync_segment",
+        plateGeneration: Number(passRunStamp.plate_generation ?? 0),
+        provider: "sync.so",
+        metadata: {
+          dispatcher: "compose-dialog-segments",
+          pass_idx: currentPassIdx,
+          total_passes: passes.length,
+          diagnostic_id: diagnosticId,
+          retry_variant: retryVariant,
+        },
       },
-    });
+      readRetryContext(body),
+    );
     // G3.1b — Race-Verlierer dispatcht nicht. Die fremde Zeile wird NICHT
     // gesettelt (sie gehört dem Gewinner) und nicht abgelöst.
-    if (v431SyncAcquisition.outcome === "already_in_flight") {
-      console.warn("[compose-dialog-segments] ledger attempt already in flight → dispatch skipped", JSON.stringify({
+    if (v431SyncDecision.outcome === "skip") {
+      console.warn("[compose-dialog-segments] ledger dispatch skipped", JSON.stringify({
         scene_id: sceneId,
         pass_idx: currentPassIdx,
-        pipeline_job_id: v431SyncAcquisition.job.id,
+        reason: v431SyncDecision.reason,
+        pipeline_job_id: v431SyncDecision.job?.id ?? null,
       }));
       return json({
         ok: true,
-        skipped: "already_in_flight",
+        skipped: v431SyncDecision.reason,
         scene_id: sceneId,
-        pipeline_job_id: v431SyncAcquisition.job.id,
+        pipeline_job_id: v431SyncDecision.job?.id ?? null,
       });
     }
-    const v431SyncLedgerJob = v431SyncAcquisition.outcome === "acquired"
-      ? v431SyncAcquisition.job
+    const v431SyncLedgerJob = v431SyncDecision.outcome === "dispatch"
+      ? v431SyncDecision.job
       : null;
+
     const diagnosticWebhookUrl =
       `${webhookUrl}&diagnostic_id=${encodeURIComponent(diagnosticId)}` +
       (v431SyncLedgerJob ? `&pipeline_job_id=${encodeURIComponent(v431SyncLedgerJob.id)}` : "");

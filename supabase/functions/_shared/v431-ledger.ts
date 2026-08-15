@@ -372,6 +372,163 @@ export async function replaceLedgerAttempt(
   }
 }
 
+/**
+ * G3.1b-Endvertrag — geschlossene Menge retryfähiger Failure-Gründe.
+ *
+ * Ein bereits `failed` gelaufener Attempt darf NUR mit einem dieser Gründe
+ * erneut versucht werden. Es gibt kein generisches `retry=true`: ein Caller mit
+ * unbekanntem Grund bekommt `failure_not_retryable` und dispatcht nicht.
+ */
+export const RETRYABLE_FAILURE_REASONS = [
+  "provider_transient_error",
+  "provider_timeout",
+  "provider_rate_limited",
+  "dispatch_uncertain_recovery",
+  "watchdog_stalled",
+  "poller_timeout",
+  "mux_redispatch",
+] as const;
+
+export type RetryableFailureReason = (typeof RETRYABLE_FAILURE_REASONS)[number];
+
+export function isRetryableFailureReason(reason: string | null | undefined): boolean {
+  return !!reason && (RETRYABLE_FAILURE_REASONS as readonly string[]).includes(reason);
+}
+
+export interface LedgerRetryContext {
+  previousJobId: string;
+  retryReason: string;
+}
+
+/**
+ * Liest den expliziten Retry-Kontext (`retry_of_pipeline_job_id` +
+ * `retry_reason`) aus Request-Body oder URL. Fehlt er, ist der Aufruf per
+ * Definition ein Initial-Dispatch.
+ */
+export function readRetryContext(
+  ...sources: Array<URL | Record<string, unknown> | null | undefined>
+): LedgerRetryContext | null {
+  for (const src of sources) {
+    if (!src) continue;
+    const get = (k: string): unknown =>
+      src instanceof URL ? src.searchParams.get(k) : (src as Record<string, unknown>)[k];
+    const prev = get("retry_of_pipeline_job_id");
+    const reason = get("retry_reason");
+    if (typeof prev === "string" && prev.length > 0) {
+      return {
+        previousJobId: prev,
+        retryReason: typeof reason === "string" && reason.length > 0 ? reason : "unspecified",
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * Verdikt der Dispatch-Entscheidung.
+ *
+ * `dispatch`    → der Aufrufer besitzt die Ledger-Zeile und darf senden.
+ * `skip`        → es darf NICHT gesendet werden (bereits fertig, abgelöst,
+ *                 in-flight, nicht retryfähig oder Race verloren).
+ * `unavailable` → Ledger nicht verfügbar; Legacy-Pfad läuft fail-open weiter.
+ */
+export type LedgerDispatchDecision =
+  | { outcome: "dispatch"; job: LedgerJobHandle; kind: "initial" | "retry" }
+  | { outcome: "skip"; reason: string; job?: LedgerJobHandle }
+  | { outcome: "unavailable"; reason: string };
+
+/**
+ * G3.1b — einziger Einstiegspunkt für Dispatcher, die sowohl Initial- als auch
+ * Retry-Aufrufe bedienen (compose-dialog-segments, Mux, Watchdog-Ziele).
+ *
+ * Ohne Retry-Kontext: reine Initial-Akquise (Attempt 1, nie höher).
+ * Mit Retry-Kontext: Predecessor-Verdikte
+ *   succeeded → `already_completed`   (kein neuer Attempt)
+ *   stale     → `retry_superseded`    (kein neuer Zweig, `replaced_by` folgen)
+ *   failed    → nur bei retryfähigem Grund → atomarer Replace
+ *   aktiv     → atomarer Replace
+ * Ein verlorenes Replace-Race ergibt `skip`, niemals einen zweiten Dispatch.
+ */
+export async function resolveLedgerDispatch(
+  admin: any,
+  params: AcquireLedgerJobParams,
+  retry: LedgerRetryContext | null,
+): Promise<LedgerDispatchDecision> {
+  if (!retry) {
+    const acquisition = await acquireLedgerJob(admin, params);
+    if (acquisition.outcome === "acquired") {
+      return { outcome: "dispatch", job: acquisition.job, kind: "initial" };
+    }
+    if (acquisition.outcome === "already_in_flight") {
+      return { outcome: "skip", reason: "already_in_flight", job: acquisition.job };
+    }
+    return { outcome: "unavailable", reason: acquisition.reason };
+  }
+
+  let prev: any = null;
+  try {
+    const { data } = await admin
+      .from("composer_pipeline_jobs")
+      .select("id, scene_id, run_id, stage, plate_generation, attempt_no, status, replaced_by")
+      .eq("id", retry.previousJobId)
+      .maybeSingle();
+    prev = data ?? null;
+  } catch {
+    prev = null;
+  }
+
+  if (!prev) {
+    console.warn(`${V431_OBSERVE_TAG} ledger_retry_previous_not_found`, JSON.stringify({
+      scene_id: params.sceneId,
+      stage: params.stage,
+      previous_job_id: retry.previousJobId,
+    }));
+    return { outcome: "skip", reason: "previous_job_not_found" };
+  }
+
+  const status = String(prev.status ?? "");
+  if (status === "succeeded") {
+    return { outcome: "skip", reason: "already_completed" };
+  }
+  if (status === "stale" || prev.replaced_by) {
+    return { outcome: "skip", reason: "retry_superseded" };
+  }
+  if (status === "cancelled" || status === "canceled") {
+    return { outcome: "skip", reason: "previous_cancelled" };
+  }
+  if (status === "failed" && !isRetryableFailureReason(retry.retryReason)) {
+    console.warn(`${V431_OBSERVE_TAG} ledger_retry_reason_rejected`, JSON.stringify({
+      scene_id: params.sceneId,
+      stage: params.stage,
+      previous_job_id: retry.previousJobId,
+      retry_reason: retry.retryReason,
+    }));
+    return { outcome: "skip", reason: "failure_not_retryable" };
+  }
+
+  const plateGeneration =
+    typeof prev.plate_generation === "number" ? prev.plate_generation : params.plateGeneration ?? null;
+  const runId = params.runId ? String(params.runId) : String(prev.run_id ?? "");
+  if (plateGeneration == null || !runId) {
+    return { outcome: "unavailable", reason: "no_retry_provenance" };
+  }
+
+  const replaced = await replaceLedgerAttempt(admin, {
+    previousJobId: retry.previousJobId,
+    retryReason: retry.retryReason,
+    sceneId: params.sceneId,
+    runId,
+    stage: params.stage,
+    plateGeneration,
+    provider: params.provider ?? null,
+    metadata: params.metadata,
+  });
+
+  if (!replaced) return { outcome: "skip", reason: "replace_lost" };
+  return { outcome: "dispatch", job: replaced, kind: "retry" };
+}
+
+
 /** Extrahiert `pipeline_job_id` aus URL-Query, Body oder Provider-Metadaten. */
 export function readPipelineJobId(
   ...sources: Array<URL | Record<string, unknown> | null | undefined>

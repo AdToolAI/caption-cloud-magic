@@ -401,13 +401,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
   }
 
   // ── v431 G3.1 — Ledger-Observe (schreibt nichts, blockiert nichts) ─────────
+  // G3.1b: dieselbe Job-ID ist zugleich der Vorgänger jedes Retry-Dispatch,
+  // der aus diesem Callback heraus ausgelöst wird.
+  const v431CallbackJobId = readPipelineJobId(url, payload as Record<string, unknown>);
   await observeCallbackProvenance(supabase, {
     handler: "sync-so-webhook",
-    pipelineJobId: readPipelineJobId(url, payload as Record<string, unknown>),
+    pipelineJobId: v431CallbackJobId,
     sceneId,
     stage: "sync_segment",
     externalJobId: jobId ? String(jobId) : null,
   });
+
 
 
   if (scene.lip_sync_applied_at) {
@@ -942,6 +946,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               retry_variant: nextRung.variant,
               user_retry_flag: true,
               new_attempt_id: newAttemptId,
+              // G3.1b — expliziter Retry-Vertrag statt Initial-Akquise.
+              ...(v431CallbackJobId
+                ? {
+                    retry_of_pipeline_job_id: v431CallbackJobId,
+                    retry_reason: "provider_transient_error",
+                  }
+                : {}),
               credit_charge_result: "skip",
               noop_auto_escalation: true,
               noop_escalation_step: nextStep,
@@ -1539,6 +1550,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               repair_audio: needsAudioRepair,
               pass_idx: currentPass,
               ...(carryForceMultipass ? { force_multipass: true } : {}),
+              // G3.1b — expliziter Retry-Vertrag statt Initial-Akquise.
+              ...(v431CallbackJobId
+                ? {
+                    retry_of_pipeline_job_id: v431CallbackJobId,
+                    retry_reason: "provider_transient_error",
+                  }
+                : {}),
             }),
           }).catch(() => {});
         } catch {
