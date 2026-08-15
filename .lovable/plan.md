@@ -66,8 +66,11 @@ where p->>'job_id' is not null
   and coalesce(p->>'status','') not in ('done','failed','canceled');
 ```
 
-Gate grün = G1, G3, G4, G5 leer und G2 leer (bzw. ausschließlich Szenen, die nachweislich
-bereits terminal gespiegelt sind und im Report einzeln begründet werden).
+Gate grün = G1, G2, G3, G4, G5 liefern **exakt 0 Rows**. G2 wird nicht durch Legacy-Mirrors
+überstimmt: Steht der kanonische `pipeline_state` auf `lipsync_dispatched`,
+`lipsync_running` oder `lipsync_muxing`, ist die Szene in-flight — unabhängig davon, wie ein
+Legacy-Feld aussieht. Bei >0 drainen/recovern und das Cutover-Gate erneut fahren.
+Ergänzend darf ein kanonisches `retry_of`-Feld geprüft werden, es ist aber nicht das Gate.
 
 ## 3. Deploy-Reihenfolge
 
