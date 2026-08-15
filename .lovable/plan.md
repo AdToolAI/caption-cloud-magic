@@ -40,7 +40,24 @@ Nur bei exakt 0/0/0/0/0 weiter. Historische terminale Rows bleiben unangetastet.
 
 ## 3. Echter Production-Resmoke (UI-Lip-Sync-Lauf)
 
-Von der Studio-UI aus eine Szene mit mindestens einem Sprecher starten, der durch Sync.so geht. Abnahmekriterien mit IDs/Timestamps protokollieren:
+Genau **ein** Lauf. Szenenauswahl: eine Szene, die nachweislich auf `sync-segments` + Mux/Stitch auflöst — bevorzugt der **single-speaker non-tight**-Fall, um die B11-Umlegung (Finalisierung nur über Stitch-Finalizer) produktiv mit abzunehmen.
+
+Erwartete Kette:
+
+```text
+sync_segment callback
+  → composer_apply_sync_segment_result
+  → dispatch_mux
+  → genau ein audio_mux-Ledger-Attempt
+  → render-sync-segments-audio-mux
+  → reale render_id
+  → Mux-Owner setzt lipsync_muxing
+  → Remotion/Stitch
+  → composer_finalize_lipsync_scene(stitch:done)
+  → complete
+```
+
+Abnahmekriterien mit IDs und UTC-Zeitstempeln protokollieren:
 
 - [ ] `sync_segment`-Callback kommt an; `composer_callback_observations` Verdict = `bound`.
 - [ ] `composer_apply_sync_segment_result` wird aufgerufen; Rückgabe `segment_result` und `scene_verdict` sind getrennt und korrekt.
