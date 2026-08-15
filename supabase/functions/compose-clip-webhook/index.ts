@@ -178,14 +178,16 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // Speist ausschließlich das Drain-Gate: erst wenn hier über das gesamte
     // Drain-Fenster kein `missing_binding` mehr auftaucht, ist G3.2 (Apply)
     // freigabefähig.
+    const ledgerJobId = readPipelineJobId(url, payload);
     await observeCallbackProvenance(supabase, {
       handler: 'compose-clip-webhook',
-      pipelineJobId: readPipelineJobId(url, payload),
+      pipelineJobId: ledgerJobId,
       sceneId,
       stage: 'base_video',
       externalJobId: predictionId ? String(predictionId) : null,
       reportedRunId: runId,
     });
+
 
 
     if (status === 'succeeded' && output) {
