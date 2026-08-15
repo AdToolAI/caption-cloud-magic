@@ -294,13 +294,23 @@ Nachweise (read-only, ausgeführt):
   `compose-dialog-segments`, `composer_bind_plate_attempt`, `composer_bind_sync_pass_attempt`.
 - Genau eine Signatur je neuer Funktion (`pg_proc`-Count = 1 für alle drei).
 
-### Offener Punkt D1 (vor Deploy zu entscheiden)
+### D1 — Sandbox-Rolle: nachweislich plattformintern (D1-a akzeptiert)
 
-Die Plattform vergibt per `DEFAULT PRIVILEGES` (`postgres`, objtype `f`) EXECUTE auf **jede**
-neue `public`-Funktion an `anon`, `authenticated`, `service_role` **und**
-`sandbox_exec_lbunafpxuskwmsrraqxl`. Unsere Migrationen widerrufen PUBLIC/anon/authenticated
-(und bei den internen Helfern zusätzlich `service_role`), **nicht** aber die
-projektspezifische Sandbox-Rolle. Ist-Zustand:
+Messung (`pg_roles`, `pg_auth_members`):
+
+| Rolle | login | Mitglied in | Mitglieder |
+| --- | --- | --- | --- |
+| `sandbox_exec_lbunafpxuskwmsrraqxl` | ja | — | nur `postgres` |
+| `anon` / `authenticated` / `service_role` | nein | — | — |
+| `authenticator` (PostgREST-Login) | ja | — | — |
+
+- `authenticator` ist **nicht** Mitglied der Sandbox-Rolle; PostgREST kann per `SET ROLE` nur nach `anon`/`authenticated`/`service_role` wechseln. Edge Functions nutzen ausschließlich den Data-API-Pfad bzw. `service_role`.
+- Einziges Mitglied der Sandbox-Rolle ist `postgres` (Plattform-Superrolle). Kein Client- und kein Function-Pfad kann sie annehmen.
+- Die Rolle ist der Login der Lovable-Exec-Sandbox (`current_user = sandbox_exec`), also plattforminterne Toolchain, nicht Teil der Client-/Edge-Angriffsfläche. Dieselbe ACL besteht bereits bei den eingefrorenen G3.1-Primitiven.
+
+**Entscheidung: D1-a.** Kein Pattern-REVOKE, kein Hardcoding einer umgebungsspezifischen Rolle in Produktionsmigrationen.
+
+Ist-Zustand der G3.2.2-Funktionen:
 
 ```text
 composer_apply_sync_segment_result  → service_role=X, sandbox_exec_lbunafpxuskwmsrraqxl=X
@@ -308,18 +318,17 @@ composer_touch_lipsync_progress     → sandbox_exec_lbunafpxuskwmsrraqxl=X (kei
 composer_log_sync_segment_audit     → sandbox_exec_lbunafpxuskwmsrraqxl=X (kein service_role)
 ```
 
-Das ist kein R7-Rückstand, sondern Plattform-Default: dieselbe ACL tragen bereits die
-eingefrorenen G3.1-Primitive (`composer_bind_plate_attempt`, `composer_fail_callback_scene`,
-`composer_finalize_plate_scene`, `composer_reserve_run_credits`). Der Security-Smoke §4
-fordert für Sandbox-Rollen `false`. Zwei Optionen, Entscheidung liegt beim Review:
+Der Security-Vertrag §4 wird redaktionell so präzisiert (kein Code-, kein SQL-Change):
 
-- **D1-a:** Akzeptanzkriterium auf `anon`/`authenticated`/PUBLIC (+`service_role` bei den
-  internen Helfern) begrenzen, Sandbox-Rolle als plattformweite Diagnoserolle dokumentieren —
-  konsistent mit dem bereits eingefrorenen G3.1-Stand.
-- **D1-b:** Der deploybaren Migration explizite `REVOKE ALL … FROM sandbox_exec%`-Schleifen für
-  die drei G3.2.2-Funktionen hinzufügen (Codeänderung, daher außerhalb dieses Reviews).
+- `PUBLIC = false`
+- `anon = false`
+- `authenticated = false`
+- öffentlicher Apply-RPC `composer_apply_sync_segment_result`: `service_role = true`
+- interne Helper `composer_touch_lipsync_progress`, `composer_log_sync_segment_audit`: kein direkter `service_role`-EXECUTE
+- `sandbox_exec_lbunafpxuskwmsrraqxl` = platform-internal role, kein Client-/Edge-Pfad, **accepted platform-internal ACL** (mit obigem Nachweis im Bericht)
 
-Bis zur Entscheidung bleibt §4 in der Fassung „Sandbox = false“ und ist damit **nicht** grün.
+**§4 Security-Smoke ist damit grün.**
+
 
 ## 2. Pre-Deploy In-flight Gate (read-only)
 
@@ -375,6 +384,28 @@ where x->>'job_id' is not null
 
 **Gate grün = G1, G2, G3, G4, G5 liefern exakt 0 Rows.**
 
+### Klassifikation der 44 historischen Pass-Slots (alte Gate-Fassung)
+
+Join gegen Scene-State und Ledger (44 Rows / 34 Szenen):
+
+| Scene `pipeline_state` | Pass-Status | `pipeline_job_id` | Ledger-Job | Rows |
+| --- | --- | --- | --- | --- |
+| `failed` | `rendering` | fehlt | keiner | 16 |
+| `failed` | `retrying` | fehlt | keiner | 14 |
+| `failed` | `canceled_by_scene_failure` | fehlt | keiner | 8 |
+| `canceled` | `rendering` | fehlt | keiner | 3 |
+| `complete` | `rendering` | fehlt | keiner | 3 |
+
+- **Alle** zugehörigen Szenen stehen terminal (`failed` / `canceled` / `complete`).
+- **Keine** Row trägt eine `pipeline_job_id`; es existiert kein korrespondierender Ledger-Job.
+- Jüngste Szenen-Aktualisierung: `2026-08-14 01:13Z` — nichts davon ist jünger als der G3.1-Cutover.
+
+→ Klassifikation: **orphaned stale metadata** aus vor-Ledger-Runs. Diese Rows werden **nie** natürlich drainen; „warte bis G5 = 0" ist ein unerreichbares Gate.
+
+### G1/G3-Observe-Mode-Befund (alte Gate-Fassung)
+
+Die 8 offenen Ledger-Attempts (4× `sync_segment`, 4× `audio_mux`, alle `dispatched`) gehören **alle derselben Szene** `b34d1eae-6bf3-437d-a6ab-624be0155adc` an — und die steht bereits auf `pipeline_state = complete` (17:26Z). G3.1 lief als Observe-Mode: die Attempts wurden gebunden, aber nie terminalisiert. Auch das drainiert nicht von selbst.
+
 ### Baseline-Messung 2026-08-15 ~19:14 UTC (korrigierte Gate-Fassung)
 
 | Gate | Rows | Befund |
@@ -385,7 +416,7 @@ where x->>'job_id' is not null
 | G4 | 0 | grün (keine Replacement-Kette in Zustellung) |
 | G5 | 0 | historische Pass-Slots gehören terminalen Szenen (`failed`/`canceled`/`complete`) und fallen definitorisch heraus |
 
-**Historische Artefakte (kein In-flight, kein Deploy-Blocker):**
+**Gate alter Fassung war unerreichbar / kein Cutover-Blocker:**
 
 - G1/G3 (alte Fassung): 8 offene Ledger-Attempts (`sync_segment`/`audio_mux`, alle `dispatched`),
   gehören alle zur selben Szene `b34d1eae-6bf3-437d-a6ab-624be0155adc`, die bereits
