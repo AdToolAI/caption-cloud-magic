@@ -250,18 +250,25 @@ export async function settleLedgerDispatchFailure(
 /**
  * Konservative Klassifikation eines Dispatch-Fehlers.
  *
- * Nur eine beweisbare Ablehnung darf `rejected` werden. Alles andere bleibt
- * `uncertain` — ein Provider könnte den Auftrag angenommen haben und später
- * doch noch callbacken (D3/G3.1b).
+ * Nur eine nach Providervertrag beweisbare Nicht-Annahme darf `rejected`
+ * werden. Alles andere bleibt `uncertain` — der Provider könnte den Auftrag
+ * angenommen haben und später doch noch callbacken (D3/G3.1b).
+ *
+ * Ausdrücklich `uncertain`: 408 (Timeout), 409 (Konflikt beweist keine
+ * Nicht-Annahme), 429 (Rate-Limit), alle 5xx, Netzwerkabbrüche, unbekannte
+ * Antworten.
  */
 export function classifyDispatchFailure(err: unknown): "rejected" | "uncertain" {
   const msg = (err instanceof Error ? err.message : String(err ?? "")).toLowerCase();
-  if (/\b(400|401|403|404|409|422)\b/.test(msg)) return "rejected";
-  if (/missing_run_stamp|invalid_input|validation|unsupported|unauthorized|forbidden|not found/.test(msg)) {
+  // Zuerst die Codes, die niemals kippen dürfen.
+  if (/\b(408|409|429|5\d{2})\b/.test(msg)) return "uncertain";
+  if (/\b(400|401|403|404|422)\b/.test(msg)) return "rejected";
+  if (/missing_run_stamp|invalid_input|validation_failed|invalid_request|unsupported|unauthorized|forbidden|aborted_before_dispatch/.test(msg)) {
     return "rejected";
   }
   return "uncertain";
 }
+
 
 /**
  * Synchron fertige Dispatches (z. B. ai-image, das sofort ein Ergebnis liefert)
