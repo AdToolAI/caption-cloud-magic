@@ -14,7 +14,10 @@ DECLARE
   _other_job_id uuid := gen_random_uuid();
   _result jsonb;
 BEGIN
-  -- Setup minimal project/scene
+  -- Setup minimal user/project/scene
+  INSERT INTO auth.users (id, email, raw_user_meta_data)
+  VALUES (_user_id, 'f1-test@example.com', '{}'::jsonb);
+
   INSERT INTO public.projects (id, user_id, name)
   VALUES (_project_id, _user_id, 'f1-test-project');
 
