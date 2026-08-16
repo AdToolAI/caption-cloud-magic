@@ -65,9 +65,10 @@ Trotzdem entscheidet **kein ID-Format** über die Intent-Auflösung: Maßgeblich
 - `persistIntentWrite(...)` als gemeinsamer U-Writer-Helper.
 
 **2. Hydration (`VideoComposerDashboard.tsx`)**
-- Aus `loadDraft()` werden die drei Intent-Felder für persistierte Szenen (UUID) verworfen; die Szene startet mit `intentResolved = false`.
-- Mount-Hydration (~372/441/443) und Refetch (~562/631/633) setzen `intentResolved = true` und rufen vorher `reconcileIntentMarkers`.
-- Hydration-Fehler / kein Zeilentreffer → `intentResolved` bleibt false → `unresolved`.
+- Aus `loadDraft()` werden die drei Intent-Felder für alle Szenen verworfen, die nicht in `hydratedSceneIds` stehen; die Szene startet mit `intentResolved = false`. Kein ID-Format-Heuristik.
+- Mount-Hydration (~372/441/443) und Refetch (~562/631/633) tragen die Scene-ID in `hydratedSceneIds` ein, rufen vorher `reconcileIntentMarkers` und setzen `intentResolved = true`.
+- Hydration-Fehler / kein Zeilentreffer → Scene bleibt außerhalb von `hydratedSceneIds` → `unresolved`.
+
 
 **3. UI**
 - Toggle/Switch/Engine-Picker rendern drei Zustände: AN, AUS, "wird geladen" (disabled) sowie ein "ungespeichert"-Badge bei aktivem Marker.
