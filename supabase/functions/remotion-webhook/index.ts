@@ -279,9 +279,10 @@ serve(async (req) => {
         }
       } else if (isDialogStitch) {
         // ── Dialog-stitch render (cinematic-sync N-speaker pipeline) ──
-        // Lambda-side replacement for the forbidden Edge-Runtime ffmpeg.
-        // Writes the stitched clip back onto composer_scenes and marks
-        // lip_sync_applied_at so the composer treats the scene as done.
+        // v431 G3.2.2-F1.IMP: the audio_mux ledger job is the sole owner of
+        // scene terminalization. Current callbacks carry pipeline_job_id via
+        // customData.stage='sync_segments_audio_mux'. Missing provenance is
+        // a recovery case, not an excuse for a legacy direct update.
         if (pendingRenderId) {
           await supabaseAdmin.from('video_renders').update({
             status: 'completed',
@@ -290,51 +291,68 @@ serve(async (req) => {
             completed_at: new Date().toISOString(),
           }).eq('render_id', pendingRenderId);
         }
-        if (composerSceneId) {
-          await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-stitch', async () => {
-            const { data: sceneRow } = await supabaseAdmin
-              .from('composer_scenes')
-              .select('dialog_shots, lip_sync_status, lip_sync_applied_at')
-              .eq('id', composerSceneId)
-              .maybeSingle();
-            const prevState = (sceneRow?.dialog_shots as any) || {};
-            // v18 Cancel-Guard: do not overwrite clip_url for a cancelled scene.
-            if (
-              (sceneRow as any)?.lip_sync_status === 'canceled' ||
-              prevState?.status === 'canceled'
-            ) {
-              console.log(`💋 [dialog-stitch] scene ${composerSceneId} ignored — scene canceled`);
-              return;
-            }
-            const nowIso = new Date().toISOString();
-            await supabaseAdmin.from('composer_scenes').update({
-              // v430 Step 1 — the fan-in mux is the same finalization point as
-              // the single-speaker sync webhook: processed output, plate kept.
-              ...materializeCompatibilityOutput('processed', {
-                baseUrl: prevState?.source_clip_url ?? null,
-                processedUrl: finalOutputUrl,
-              }),
-              // v268 — dialog-stitch finalisiert die Szene komplett; ohne
-              // clip_status='ready' bleibt die UI ewig auf „Szene wird
-              // gebaut…" obwohl das MP4 längst existiert.
-              clip_status: 'ready',
-              lip_sync_source_clip_url: prevState?.source_clip_url ?? null,
-              lip_sync_applied_at: nowIso,
-              lip_sync_status: 'done',
-              twoshot_stage: 'done',
-              clip_error: null,
-              dialog_shots: {
-                ...prevState,
-                status: 'done',
-                final_url: finalOutputUrl,
-                finished_at: nowIso,
-              },
-              updated_at: nowIso,
-            }).eq('id', composerSceneId);
-          }, { ttlSeconds: 30 });
-          console.log(`💋 [dialog-stitch] scene ${composerSceneId} done → ${finalOutputUrl}`);
-        } else {
+
+        const pipelineJobId = typeof customData?.pipeline_job_id === 'string'
+          ? customData.pipeline_job_id
+          : null;
+        const stage = typeof customData?.stage === 'string' ? customData.stage : null;
+
+        if (!composerSceneId) {
           console.warn('💋 [dialog-stitch] success webhook without composer_scene_id');
+        } else if (stage !== 'sync_segments_audio_mux' || !pipelineJobId) {
+          // Fail-closed: no generic legacy fallback for current callbacks.
+          // A legacy direct update is only permissible with an explicit
+          // G0-Grandfather proof, which dialog-stitch callbacks do not have.
+          console.warn('💋 [dialog-stitch] missing provenance — no scene mutation', JSON.stringify({
+            scene_id: composerSceneId,
+            stage,
+            pipeline_job_id: pipelineJobId,
+            render_id: renderId,
+            reason: stage !== 'sync_segments_audio_mux' ? 'wrong_stage' : 'missing_pipeline_job_id',
+          }));
+          await observeCallbackProvenance(supabaseAdmin, {
+            handler: 'remotion-webhook',
+            pipelineJobId: null,
+            sceneId: composerSceneId,
+            stage: 'audio_mux',
+            externalJobId: (pendingRenderId ?? renderId) ? String(pendingRenderId ?? renderId) : null,
+          });
+        } else {
+          const { data: finalizeResult, error: finalizeError } = await supabaseAdmin.rpc(
+            'composer_finalize_lipsync_scene',
+            {
+              _pipeline_job_id: pipelineJobId,
+              _external_job_id: String(pendingRenderId ?? renderId),
+              _scene_id: composerSceneId,
+              _final_url: finalOutputUrl,
+              _write_id: 'stitch:done',
+            },
+          );
+          if (finalizeError) {
+            console.error('💋 [dialog-stitch] finalize rpc error', JSON.stringify({
+              scene_id: composerSceneId,
+              pipeline_job_id: pipelineJobId,
+              error: finalizeError.message,
+            }));
+            return new Response(
+              JSON.stringify({ ok: false, error: finalizeError.message }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 },
+            );
+          }
+          const verdict = (finalizeResult as any)?.verdict ?? 'unknown';
+          console.log('💋 [dialog-stitch] finalize result', JSON.stringify({
+            scene_id: composerSceneId,
+            pipeline_job_id: pipelineJobId,
+            verdict,
+            result: finalizeResult,
+          }));
+          if (verdict !== 'finalized' && verdict !== 'already_completed') {
+            return new Response(
+              JSON.stringify({ ok: false, verdict, scene_id: composerSceneId }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 409 },
+            );
+          }
+          console.log(`💋 [dialog-stitch] scene ${composerSceneId} done → ${finalOutputUrl}`);
         }
       } else if (isDirectorsCut && renderJobId) {
         const { data: renderJob } = await supabaseAdmin.from('director_cut_renders').select('user_id, credits_used').eq('id', renderJobId).single();

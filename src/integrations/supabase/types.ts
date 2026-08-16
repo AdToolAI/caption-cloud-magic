@@ -19832,6 +19832,16 @@ export type Database = {
         }
         Returns: Json
       }
+      composer_finalize_lipsync_scene: {
+        Args: {
+          _external_job_id: string
+          _final_url: string
+          _pipeline_job_id: string
+          _scene_id: string
+          _write_id: string
+        }
+        Returns: Json
+      }
       composer_finalize_plate_scene: {
         Args: {
           _base_url: string
