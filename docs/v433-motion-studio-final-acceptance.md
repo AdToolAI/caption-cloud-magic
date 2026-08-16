@@ -399,3 +399,60 @@ ACL composer_finalize_lipsync_scene: unverändert gegenüber Vorzustand
 
 **FA-3/P1 DB DEPLOY VERIFIED (Schritte 1, 2, 4) — SQL-Contracttests BLOCKED.**
 Kein FA-3-Render, keine neue Szene. FA-1 und FA-2 bleiben PASS.
+
+---
+
+## FA-3/P1 — Contracttests via verification-only migration (2026-08-16 23:06 UTC)
+
+**Verification-only migration; no schema/data mutation persisted.**
+
+Migration: `supabase/migrations/20260816230559_1ef0a17a-f5eb-44d9-b8b3-9814b774d6dc.sql`
+(T_FA3_P1_verif = 2026-08-16 23:06:09 UTC)
+
+### Vertrag (eingehalten)
+
+- kein `CREATE/ALTER/DROP FUNCTION`, kein `GRANT`/`REVOKE`
+- keine Änderung am Finalizer-Body
+- ausschließlich Fixtures + Aufruf des bereits installierten RPC + Assertions
+- drei getrennte innere Subtransaktionen, jede endet mit Sentinel
+  `RAISE EXCEPTION USING ERRCODE = 'FA3P1'`; gefangen wird ausschließlich
+  `WHEN SQLSTATE 'FA3P1'` — kein `WHEN OTHERS`, kein Catch von `P0001`
+- Lauf als Migration-Owner (`postgres`); die ACL wurde separat via
+  `has_function_privilege` nachgewiesen und hier nicht erneut geprüft
+- einzige dauerhafte Spur: der Migrationseintrag selbst
+
+### Contractfälle — alle GRÜN (Migration lief fehlerfrei durch)
+
+1. **Happy Path** — `verdict='finalized'`, `pipeline_state='complete'`,
+   `processed_video_url = clip_url = _final_url`,
+   `base_video_url` byte-identisch zum Fixture-Sentinel
+   (`https://sentinel.invalid/fa3p1-base-DO-NOT-TOUCH.mp4`),
+   Ledger-Job terminal (`status='succeeded'`, `completed_at` gesetzt,
+   Job-Identität scene/run/stage/plate_generation unverändert),
+   `write_id='stitch:done'` genau 1× applied im
+   `composer_scene_transition_log` (dort, wo der Contract ihn persistiert).
+2. **Duplicate/Idempotenz** — zweiter identischer Aufruf →
+   `verdict='already_completed'`, Output unverändert, `completed_at`
+   unverändert (keine zweite Terminalisierung), weiterhin genau 1 applied
+   `stitch:done`-Transition.
+3. **RS3 Pre-Reset-Fence** — veralteter Callback (`rs3_reset_id='reset-epoch-0'`
+   gegen Scene-Epoch `reset-epoch-1`) → `verdict='pre_reset_attempt'`,
+   `processed_video_url` und `clip_url` bleiben NULL, `base_video_url`
+   unverändert, Szene nicht `complete`.
+
+### Post-Migration Read-only Verifikation
+
+```text
+Test-Scenes (order_index 999901/999902/999903)      = 0
+Test-Jobs (idempotency_key like 'fa3p1-verif-%')    = 0
+Verwaiste Test-Transition-Rows                      = 0
+Funktionen im Schema public                         = 344 (unverändert)
+ACL: service_role=true; anon/authenticated/authenticator/PUBLIC=false (unverändert)
+Finalizer-Body md5                                  = 47aa2f2957537ccfe00c913693411a66 (identisch vor/nach)
+Persistente Spur                                    = ausschließlich der Migrationseintrag
+```
+
+### Status
+
+**FA-3/P1 DB DEPLOY VERIFIED.** Kein weiterer Deploy-Schritt.
+FA-1 und FA-2 bleiben PASS. Nächster Schritt: FA-3 RETEST SETUP mit frischer Szene.
