@@ -209,3 +209,61 @@ Completion; entspricht dem bekannten, noch nicht migrierten Start-Writer.
 
 **FA-3 = P1 — STOP.** Kein zweiter Versuch, kein Retry/Reset/Cleanup, keine
 Code-Änderung. Szene, Ledger und Run-Pointer bleiben unangetastet.
+
+---
+
+## FA-3/P1 — Fix: Stitch Finalizer Output Materialization (implementiert, NICHT deployed)
+
+**Scope**: reine Contract-Conformance auf Writer-Ebene. `resolveSceneOutput()`
+und `isSceneOutputFinal()` bleiben unverändert — der Reader hat den Fehler
+korrekt sichtbar gemacht.
+
+### Änderung
+Neue Migration `supabase/migrations/20260816223000_fa3_p1_stitch_output_materialization.sql`
+(`CREATE OR REPLACE FUNCTION public.composer_finalize_lipsync_scene(uuid, text, uuid, text, text)`).
+
+Statischer Funktions-Diff gegen die installierte F1.IMP-Definition
+(`20260816185114_…`) — exakt zwei Hunks:
+1. Header-Kommentar (nicht ausführbar).
+2. Erfolgs-UPDATE auf `composer_scenes`: **eine** zusätzliche Zeile
+   `processed_video_url = _final_url,`.
+
+Unverändert und ausdrücklich in der neuen Definition enthalten: Signatur,
+`SECURITY DEFINER`, `SET search_path TO 'pg_catalog', 'public'`,
+`REVOKE ... FROM PUBLIC/anon/authenticated` + `GRANT EXECUTE ... TO service_role`,
+Guard-/Verdict-Matrix, Lock-Reihenfolge (Job → Scene), `_write_id='stitch:done'`-
+Allowlist, RS3-Epoch-Fence, Ledger-Terminalisierung, `audio_mux`-Narrow-Merge,
+Transition-Log. `base_video_url` bleibt unter Plate-Ownership.
+`already_completed` bleibt read-only/idempotent; historische Zeilen mit
+`complete` + `processed_video_url IS NULL` werden **nicht** repariert.
+
+### Semantik nach dem Fix (ein Commit)
+`stitch:done` → Ledger `succeeded` → Scene `complete` →
+`processed_video_url = _final_url` → `clip_url = _final_url` →
+`resolveSceneOutput().source = 'processed'` → `isSceneOutputFinal() = true`.
+
+### Pre-Deploy-Evidence
+- **Vitest (grün)**: neue Suite
+  `src/lib/composer/output/__tests__/fa3P1StitchOutputMaterialization.test.ts`
+  belegt: intentionaler Lip-Sync + `complete` + `processed_video_url` ⇒
+  `source='processed'` und `isSceneOutputFinal()=true`; derselbe Zustand ohne
+  `processed_video_url` bleibt `false`; Non-Lip-Sync-/Plate-Output unverändert.
+- **Composer-Suiten**: `bunx vitest run src/lib/composer` → 40 Dateien / 455
+  Tests grün. Gesamtlauf: 43 Fehler = unveränderte, dokumentierte Baseline
+  (UI-/Komponententests ohne Bezug zum Finalizer).
+- **Writer-Inventar korrigiert** (`materializeSceneOutput.test.ts`):
+  `remotion-webhook` ist seit F1.IMP ein atomarer DB-Writer
+  (`composer_finalize_lipsync_scene`) und steht nicht mehr in
+  `FINALIZATION_POINTS`; die Feldprüfung nutzt jetzt eine Wortgrenze, damit
+  `preclip_url:` nicht fälschlich als `clip_url`-Write zählt.
+- **SQL-Contracttests vorbereitet** (`tests/v431-g3-2-2-f1-contract-tests.sql`):
+  Happy Path prüft zusätzlich `processed_video_url = final_url` und
+  `clip_url = final_url`; Duplicate-Zweig prüft Unverändertheit beider Spalten.
+  Ausführung **erst nach** dem produktiven DB-Deploy (nur Produktiv-DB
+  vorhanden).
+- **Kein Edge-Redeploy nötig** — `remotion-webhook` ruft den RPC bereits auf.
+
+**Status: FA-3/P1 IMPLEMENTED — STOP vor Production-DB-Deploy.**
+Deploy-Reihenfolge danach: Migration anwenden → Security/Signature/Body-Smoke →
+SQL-Contracttests inkl. `processed_video_url` → Residuen-Check → frische
+FA-3-Szene (nicht S06) → genau ein Render. FA-1/FA-2 bleiben PASS.

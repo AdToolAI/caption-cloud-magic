@@ -81,6 +81,17 @@ BEGIN
     RAISE EXCEPTION 'TEST FAILED: %', 'mux_dispatch_requested_at should be preserved';
   END IF;
 
+  -- 1b. FA-3/P1: the finalizer must materialize the full v430 output contract.
+  IF (SELECT processed_video_url FROM public.composer_scenes WHERE id = _scene_id)
+     IS DISTINCT FROM 'https://example.com/final.mp4' THEN
+    RAISE EXCEPTION 'TEST FAILED: %', 'processed_video_url should equal final_url after happy path';
+  END IF;
+
+  IF (SELECT clip_url FROM public.composer_scenes WHERE id = _scene_id)
+     IS DISTINCT FROM 'https://example.com/final.mp4' THEN
+    RAISE EXCEPTION 'TEST FAILED: %', 'clip_url should mirror final_url after happy path';
+  END IF;
+
   -- 2. Duplicate callback: succeeded -> already_completed
   _result := public.composer_finalize_lipsync_scene(
     _job_id, 'render-123', _scene_id,
@@ -89,6 +100,14 @@ BEGIN
 
   IF (_result->>'verdict') IS DISTINCT FROM 'already_completed' THEN
     RAISE EXCEPTION 'TEST FAILED: %', 'duplicate should be already_completed, got ' || (_result->>'verdict');
+  END IF;
+
+  -- 2b. FA-3/P1: duplicate finalize is read-only — output stays untouched.
+  IF (SELECT processed_video_url FROM public.composer_scenes WHERE id = _scene_id)
+     IS DISTINCT FROM 'https://example.com/final.mp4'
+     OR (SELECT clip_url FROM public.composer_scenes WHERE id = _scene_id)
+     IS DISTINCT FROM 'https://example.com/final.mp4' THEN
+    RAISE EXCEPTION 'TEST FAILED: %', 'duplicate finalize must not change the materialized output';
   END IF;
 
   -- 3. Invalid write_id
