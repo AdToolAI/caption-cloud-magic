@@ -61,7 +61,9 @@ Im `isDialogStitch`-Erfolgszweig gilt ausschließlich:
 - `pipeline_job_id` vorhanden → atomarer Finalizer, dessen Verdict entscheidet;
 - `pipeline_job_id` fehlt → Observation `missing_pipeline_job_id`, **keine** Scene-Mutation, Fall geht an Recovery;
 - Ledger-Zeile fehlt → `no_ledger_job`, **keine** Legacy-Finalisierung.
-Der bisherige Direct-Update wird für diesen Pfad entfernt. Ein Legacy-Zweig bleibt nur bestehen, wenn ein Callback nachweislich zu einem Pre-Ledger-Grandfather-Typ gehört (Callback ohne `customData.stage = 'sync_segments_audio_mux'` und ohne Ledger-Historie); dieser Zweig wird explizit als Grandfather markiert und geloggt, nicht als Sicherheitsgurt für aktuelle Stitch-Callbacks verwendet.
+Der bisherige Direct-Update wird für diesen Pfad entfernt — fail-closed, kein heuristischer Grandfather. Bloßes Fehlen von `stage`, `pipeline_job_id` oder Ledger-Historie ist **kein** Grandfather-Beweis. Ein Legacy-Direct-Update ist ausschließlich zulässig, wenn der Callback über einen bereits bestehenden, expliziten G0-Grandfather-Nachweis (`composer_transition_grandfather`, Match auf `source_signature` + `write_id`) als Pre-Ledger-Callback klassifiziert ist. Existiert für `dialog-stitch` keine solche Allowlist-Zeile, entfällt der Legacy-Zweig in diesem Branch vollständig.
+
+**`_scene_id` ist kein Zuordnungsschlüssel:** Scene, Run und Generation werden ausschließlich aus dem gelockten `pipeline_job_id`-Ledger-Eintrag abgeleitet. `_scene_id` dient nur als Confirmation-Guard; bei Abweichung → `wrong_job`, ohne die im Request genannte Szene zu locken oder zu mutieren.
 
 
 **Berührte Dateien:**
