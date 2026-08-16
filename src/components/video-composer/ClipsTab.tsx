@@ -738,7 +738,6 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         useExistingRun: true,
       });
       const data = started.compose;
-      endIntentWrite(scene.id, 'engineOverride', true);
 
       const updatedScenes = optimistic.map(scene => {
         const result = data?.results?.find((r: any) => r.sceneId === scene.id);
@@ -1043,6 +1042,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         },
       });
       const data = started.compose;
+      endIntentWrite(scene.id, 'engineOverride', true);
 
       const result = data?.results?.[0];
       if (result?.status === 'failed') {
