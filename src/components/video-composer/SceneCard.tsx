@@ -1729,7 +1729,13 @@ export default function SceneCard({
                     )}
 
                     {sourceMode === "ai" && (() => {
-                      const dialogMode = scene.dialogMode === true;
+                      // C1 — der Master-Toggle ist ein User-Writer für
+                      // dialogMode/lipSyncWithVoiceover/engineOverride. Solange
+                      // die Szene DB-gestützt, aber in dieser Session nicht
+                      // hydriert ist, darf der Zustand weder als AN noch als
+                      // AUS behauptet werden: neutral rendern und sperren.
+                      const intentUnresolved = lipSyncIntentUnresolved;
+                      const dialogMode = !intentUnresolved && scene.dialogMode === true;
                       const modelsForPicker = dialogMode
                         ? COMPOSER_DIALOG_MODELS
                         : COMPOSER_AVAILABLE_MODELS;
@@ -1739,11 +1745,17 @@ export default function SceneCard({
                           : lang === "es"
                             ? "Diálogo y Lip-Sync"
                             : "Dialog & Lip-Sync";
-                      const toggleHint = tx({
-                        de: "Für Lip-Sync sind nur HappyHorse (3–15s) und Hailuo (6/10s) zertifiziert.",
-                        en: "Only HappyHorse (3–15s) and Hailuo (6/10s) are certified for lip-sync.",
-                        es: "Solo HappyHorse (3–15s) y Hailuo (6/10s) están certificados para lip-sync.",
-                      });
+                      const toggleHint = intentUnresolved
+                        ? tx({
+                            de: "Intent wird geladen …",
+                            en: "Loading intent …",
+                            es: "Cargando intención …",
+                          })
+                        : tx({
+                            de: "Für Lip-Sync sind nur HappyHorse (3–15s) und Hailuo (6/10s) zertifiziert.",
+                            en: "Only HappyHorse (3–15s) and Hailuo (6/10s) are certified for lip-sync.",
+                            es: "Solo HappyHorse (3–15s) y Hailuo (6/10s) están certificados para lip-sync.",
+                          });
 
 
                       return (
@@ -1775,7 +1787,9 @@ export default function SceneCard({
                                   {toggleOnLabel}
                                 </span>
                                 <span className="text-[9px] text-muted-foreground leading-tight truncate">
-                                  {dialogMode
+                                  {intentUnresolved
+                                    ? tx({ de: "Status wird geladen …", en: "Loading status …", es: "Cargando estado …" })
+                                    : dialogMode
                                     ? `${modelsForPicker.length} ${lang === "es" ? "modelos" : lang === "en" ? "models" : "Modelle"} · ${tx({ de: "für Lippensynchronisation zertifiziert", en: "certified for lip-sync", es: "certificados para sincronización labial" })}`
 
                                   : lang === "de"
@@ -1792,7 +1806,11 @@ export default function SceneCard({
                               type="button"
                               role="switch"
                               aria-checked={dialogMode}
+                              disabled={intentUnresolved}
+                              aria-busy={intentUnresolved || undefined}
+                              title={toggleHint}
                               onClick={() => {
+                                if (intentUnresolved) return;
                                 const next = !dialogMode;
                                 if (next && !isLipsyncClipSource(scene.clipSource)) {
                                   setLipsyncProviderPromptOpen(true);
@@ -1801,16 +1819,22 @@ export default function SceneCard({
                                 void applyDialogModeToggle(next);
                               }}
                               className={cn(
-                                "relative shrink-0 inline-flex h-5 w-9 items-center rounded-full transition-colors",
-                                dialogMode
+                                "relative shrink-0 inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+                                intentUnresolved
+                                  ? "bg-transparent ring-1 ring-dashed ring-border"
+                                  : dialogMode
                                   ? "bg-amber-500/70 ring-1 ring-amber-300/60"
                                   : "bg-muted ring-1 ring-border",
                               )}
                             >
                               <span
                                 className={cn(
-                                  "inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform shadow-sm",
-                                  dialogMode ? "translate-x-5" : "translate-x-0.5",
+                                  "inline-block h-3.5 w-3.5 transform rounded-full transition-transform shadow-sm",
+                                  intentUnresolved
+                                    ? "translate-x-[0.65rem] bg-muted-foreground/50"
+                                    : dialogMode
+                                    ? "translate-x-5 bg-background"
+                                    : "translate-x-0.5 bg-background",
                                 )}
                               />
                             </button>
