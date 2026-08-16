@@ -91,8 +91,9 @@ kein stillschweigender Fix.
    Regressionstest gehört zum Narrow-Patch von `render-sync-segments-audio-mux` und
    wird dort separat geführt (Merge statt Überschreiben des `audio_mux`-Objekts).
    Im Finalizer wird nur zusätzlich geprüft, dass er das Feld nicht zerstört.
-5. Residuen-Nachweis nach dem Lauf: 0 Test-Zeilen, Funktions- und ACL-Snapshot vor/nach
-   identisch (bis auf den absichtlich wieder entfernten Clone).
+5. Residuen-Nachweis der bereits gelaufenen self-cleaning Tests bleibt Pflicht:
+   0 Test-Zeilen, Funktions- und ACL-Snapshot unverändert.
+
 
 ## V3 — Report-Korrektur
 
