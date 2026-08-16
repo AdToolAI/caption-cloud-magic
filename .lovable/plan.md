@@ -13,10 +13,10 @@ Per Playwright als Projekt-Owner in den Video Composer, Projekt `035273d7-…` �
 Ausschließlich über die normale Oberfläche:
 
 - genau **ein** Sprecher (Cast-Anzahl = 1), non-tight, keine Close-up-Sonderkonfiguration
-- **ein** kurzer kanonischer Dialog-Turn, klar innerhalb des Plate-Budgets (Ziel 4–6 s Sprechzeit, sicher unter der `dialog_too_long_for_plate`-Schwelle)
+- **ein** kurzer effektiver Dialog-Turn, klar innerhalb des Plate-Budgets (Ziel 4–6 s Sprechzeit, sicher unter der `dialog_too_long_for_plate`-Schwelle); „kanonisch" wird ggf. erst im Lauf durch `compose-twoshot-audio` persistiert
 - Voice-ID über den normalen Voice-Picker setzen und persistieren
 - intentionaler Lip-Sync über den Master-Toggle „Dialog & Lip-Sync" (nicht über Draft-Manipulation); Tri-State muss vor dem Klick resolved sein
-- Provider/Engine gemäß frozen Capability Matrix: zertifizierter Lip-Sync-Plate-Provider (HappyHorse, ggf. Hailuo), Engine `cinematic-sync`
+- Provider/Engine strikt nach der frozen Capability Matrix: nur ein dort für genau diese Konfiguration zertifizierter Lip-Sync-Master, Engine `cinematic-sync`
 - Speichern über den regulären Speichern-Button
 
 Falls das Speichern selbst TTS/Plate/Dispatch auslöst: nichts weiter anfassen, Vorgang exakt dokumentieren (Zeitstempel, Function, Ledger-Zeilen) und STOP.
