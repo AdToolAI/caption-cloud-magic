@@ -254,6 +254,7 @@ export default function StoryboardTab({
       // Fallback for legacy callers
       const newScene: ComposerScene = {
         id: `scene_${Date.now()}`,
+        scenePersistenceState: 'local_new',
         projectId: projectId ?? '',
         orderIndex: scenes.length,
         sceneType: 'custom',
@@ -290,6 +291,7 @@ export default function StoryboardTab({
     // Fallback: legacy local-only insert
     const newScene: ComposerScene = {
       id: `scene_${Date.now()}`,
+      scenePersistenceState: 'local_new',
       projectId: '',
       orderIndex: scenes.length,
       sceneType: 'custom',
