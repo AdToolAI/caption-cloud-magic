@@ -14,7 +14,10 @@ Einzige Absicherung: der Transport ist heute konditional (`...(v431MuxLedgerJobI
 1. **Neue RPC `composer_finalize_lipsync_scene`** (Migration) — alleiniger atomarer Owner der Stitch-Terminalisierung, exakt nach Contract §5.2 mit der Matrix aus §6. Ledger-Job → `succeeded` und Scene → `complete` in einer Transaktion, Audit-Eintrag `f1:stitch:done`.
 2. **`render-sync-segments-audio-mux` narrow patch** — `audio_mux` wird gemerged statt ersetzt, damit `mux_dispatch_requested_at` erhalten bleibt (Contract §7.1). Sonst keine Änderung an dieser Funktion.
 3. **`remotion-webhook` Stitch-Writer-Migration** — der `isDialogStitch`-Erfolgszweig ruft ausschließlich die RPC auf; der Legacy-Direct-Update wird für diesen Pfad entfernt. Fehlende `pipeline_job_id` oder `no_ledger_job` sind Provenienzfehler: Observation schreiben, keine Scene-Mutation, Recovery-Fall.
-4. **Tests** — Unit/Contract-Tests für die Matrix (first success, duplicate, wrong external job, `pending`-Callback, `dispatch_uncertain`, stale run/generation, canceled, Post-Reset-Lauf mit passender `rs3_reset_id` = erfolgreich, Pre-Reset-Attempt = `pre_reset_attempt`, `_write_id != 'stitch:done'`, fehlende `pipeline_job_id` = keine Mutation) plus ein Merge-Test für `audio_mux`.
+4. **Tests** — Unit/Contract-Tests für die Matrix (first success, duplicate, wrong external job, `pending`-Callback, `dispatch_uncertain`, stale run/generation, canceled, Post-Reset-Lauf mit passender `rs3_reset_id` = erfolgreich, Pre-Reset-Attempt = `pre_reset_attempt`, `_write_id != 'stitch:done'`, `_scene_id`-Mismatch = `wrong_job`) plus:
+   - aktueller Callback ohne `pipeline_job_id`, ohne `stage`, ohne Ledger → **keine** Finalisierung;
+   - explizit allowlisteter Pre-Ledger-Grandfather-Callback → nur dann Legacy-Semantik (Test entfällt, falls keine Allowlist-Zeile existiert und der Zweig entfernt wird);
+   - Merge-Test für `audio_mux` (`mux_dispatch_requested_at` überlebt den Dispatch).
 5. **STOP vor Deploy** — Report mit Diff-Übersicht und Testergebnissen, dann Review.
 
 ## Technisches
