@@ -192,3 +192,72 @@ There is **no** `materializeCompatibilityOutput` or other scene-mutating fallbac
 ## 7. STOP before Deploy
 
 Per the implementation gate: **no deploy and no production resmoke in this step.** This report marks the STOP point. The code is ready for review and subsequent deploy.
+
+---
+
+## 8. Edge Deploy + Production Resmoke (F1 Hauptabnahme)
+
+**T_F1_effective** = `2026-08-16T19:41:09Z` (zweiter Edge-Deploy erfolgreich:
+`render-sync-segments-audio-mux`, `remotion-webhook`).
+
+**Resmoke-Szene (frisch, ledger-frei vor Start):**
+`3d91edf4-2d77-4c78-8856-915102722c84` (S02, Projekt `035273d7-ae9b-44e0-89e7-f9e28703530d`).
+Single-Speaker, non-tight, intentional Lip-Sync, HappyHorse-Plate + ElevenLabs-Voice,
+`engine_override = cinematic-sync`.
+
+- **T_run_start** = `2026-08-16T20:05:00Z` (UI-Renderfreigabe im Confirm-Dialog)
+  → `run_id = 3f540ba3-e41e-4685-81c2-b48bf20d05f3`, `generation = 2`
+- **T_finalize** = `2026-08-16T20:11:11.248Z` (`stitch:done`, atomarer Commit)
+
+### Front-Half (frozen — nur bestätigt)
+| Stage | Job | Status | Bound |
+|---|---|---|---|
+| `base_video` | `25c2b6a0…` (ai-happyhorse, `291vtx7k7drmy0d01gps6rhc70`) | succeeded 20:08:07Z | verdict=bound |
+| `sync_segment` | `7934bf3e…` (sync.so, `6dffc931…`) | succeeded 20:10:51Z | verdict=bound |
+| `audio_mux` | `38e561e6…` (remotion, `2724237f…`) | dispatched 20:10:51Z | verdict=bound |
+
+Genau ein `audio_mux`-Job, realer `render_id`. Kein zweiter Attempt.
+
+### A — Narrow Patch (GRÜN)
+`dialog_shots.audio_mux` nach Dispatch:
+`mux_dispatch_requested_at = 2026-08-16T20:10:51.382Z`,
+`dispatched_at = 2026-08-16T20:10:55.094Z`,
+`render_id = external_job_id = 2724237f-ce34-4bda-9f5e-a936f77f193a`.
+Alle drei gleichzeitig vorhanden → Merge statt Overwrite bestätigt.
+
+### B — Ledger Finalization (GRÜN)
+Derselbe Job `38e561e6…`: `dispatched → succeeded`, `completed_at = 2026-08-16T20:11:11.248Z`,
+`callback_delivery_status = succeeded`, `attempt_no = 1`, kein zweiter Attempt.
+
+### C — Atomic Scene Finalization (GRÜN)
+`remotion-webhook` Log: `[dialog-stitch] finalize result … verdict:"finalized"` mit
+`pipeline_job_id = 38e561e6…`, `external_job_id = 2724237f…`, Confirmation-scene_id korrekt,
+finale URL `…/dialog-stitch-muxed-3d91edf4-…-1786911054427.mp4`, `_write_id = 'stitch:done'`.
+Audit `composer_scene_transition_log`: `lipsync_running → complete`, `applied = true`,
+`reason = finalized`, `source_signature = g322_stitch_finalize`, `caller_class = stitch_finalize`,
+`caller_role = service_role`.
+Danach: Ledger succeeded, `pipeline_state = complete`, `clip_status = ready`,
+Compatibility Output gesetzt (`clip_url` + `dialog_shots.final_url` + `dialog_shots.status = done`;
+das ist der im RPC festgelegte Ausgabevertrag — `processed_video_url` gehört nicht dazu).
+„scene complete + audio_mux dispatched" trat zu keinem Zeitpunkt als persistierter Endzustand auf.
+
+### D — Legacy ausgeschlossen (GRÜN)
+`legacy_wrapper_7` erscheint genau einmal, und zwar als Start-Write
+`idle → plate_queued` um 20:05:09Z (Run-Anlage, nicht Completion). Completion-Owner ist
+ausschließlich `stitch:done` / `g322_stitch_finalize`. Kein Direct-Complete im Stitch-Branch.
+
+### Duplicate-/Telemetry-Gates (GRÜN)
+- Kein Duplicate-Stitch aufgetreten; nur ein `audio_mux`-Job existiert.
+- Observations ab `T_F1_effective`: 3 Rows, alle `verdict = bound`;
+  `missing_binding`, `job_not_found`, `wrong_job`, `stale_run`, `stale_generation`,
+  `binding_pending`, `reinject_missing_pipeline_job_id` = 0.
+- `missing_pipeline_job_id` = 0 (kein Logtreffer); der reale Stitch-Callback trug
+  `pipeline_job_id` in `customData`.
+- Mindestens ein bound Sync-Callback vorhanden; Stitch-Verdict = `finalized`.
+
+### Nebenbefund (kein Blocker)
+Beim Szenen-Setup zeigte der Lip-Sync-Toggle aus dem lokalen Draft-Cache `true`,
+während die DB `false` hielt; das Hard-Gate `isLipSyncIntentional()` blockierte den
+ersten Startklick still. Nach explizitem Off→On war der Zustand persistiert und konsistent.
+
+**Ergebnis: G3.2.2-F1 DONE / FROZEN.**

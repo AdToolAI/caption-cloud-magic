@@ -712,3 +712,25 @@ eigenen Deliverable ausgearbeitet:
 Status: F1 ist analytisch abgeschlossen; Implementierung (`v431 G3.2.2-F1.IMP`)
 erfolgt erst nach Freigabe dieses Contracts.
 
+
+---
+
+## Nachtrag — F1 Production Resmoke (Abnahme)
+
+Der F1-Follow-up-Befund ist behoben und produktiv nachgewiesen.
+
+- `T_F1_effective` = 2026-08-16T19:41:09Z (Edge-Deploy `render-sync-segments-audio-mux`,
+  `remotion-webhook`)
+- Frische Resmoke-Szene `3d91edf4-2d77-4c78-8856-915102722c84`,
+  `run_id = 3f540ba3-e41e-4685-81c2-b48bf20d05f3`, `generation = 2`
+- `T_run_start` = 2026-08-16T20:05:00Z, `T_finalize` = 2026-08-16T20:11:11.248Z
+
+Nachgewiesen: Narrow Patch (`mux_dispatch_requested_at` + `dispatched_at` + `render_id`
+gleichzeitig), Ledger-Terminalisierung (`audio_mux` `dispatched → succeeded`, ein Attempt),
+atomare Scene-Finalisierung über `composer_finalize_lipsync_scene` mit `_write_id='stitch:done'`
+(Audit `g322_stitch_finalize`, `lipsync_running → complete`), kein Legacy-Completion-Owner,
+alle Telemetrie-Gates 0, alle drei Callbacks `verdict = bound`.
+
+Details: `docs/v431-g3-2-2-f1-imp-report.md` §8.
+
+**Status: G3.2.2-F1 DONE / FROZEN — G3.2.2 DONE / FROZEN.**
