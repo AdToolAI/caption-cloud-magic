@@ -636,6 +636,15 @@ export default function SceneCard({
                                 }
   };
 
+  /**
+   * C1 — tri-state lip-sync intent. `true` while the scene is DB-backed but
+   * its persisted intent was not confirmed in this session. Never render an
+   * unresolved intent as OFF; disable the control instead (fail-closed).
+   */
+  const lipSyncIntentUnresolved = isSceneIntentUnresolved(scene as any);
+
+
+
   // Scene Dialog Studio — toggleable per-scene script editor (monolog from 1 cast,
   // dialog from 2+). Hidden by default; opened via the "Skript schreiben" button
   // in the cast row. Initial open if a script already exists.
