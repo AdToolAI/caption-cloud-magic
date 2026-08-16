@@ -12,7 +12,7 @@ Setup:
 - `scene_type='custom'`, `clip_quality='standard'`, non-tight (keine Close-up-Sonderroute)
 - `dialog_mode=true`, `lip_sync_with_voiceover=true` (intentionaler Lip-Sync, DB-persistiert)
 - `engine_override='cinematic-sync'`, `clip_source='ai-happyhorse'` — zertifizierter Provider laut frozen Capability Matrix (`lipsyncMasterProvider.ts`: HappyHorse/Hailuo), `multiSpeaker=true`, Dauerraster 3–15 s
-- `duration_seconds=15` (oberes HappyHorse-Raster) — Dialog wird so bemessen, dass die geschätzte Sprechzeit klar unter Plate-Budget bleibt (Ziel ≤ 12 s; der Server bricht sonst mit `dialog_too_long_for_plate` ab bzw. verlängert)
+- `duration_seconds=15` (oberes HappyHorse-Raster) — sechs natürliche deutsche Sätze mit zusammen ca. 9–12 s gesprochener Zeit; komfortabel im Plate-Budget, aber lang genug, um Mundbewegung und Sprecherzuordnung visuell beurteilen zu können. Keine künstlich verkürzten Ein-Wort-Turns.
 - `reference_image_url` wird — wie in FA-3 belegt — im Lauf durch `compose-scene-anchor` als 4er-Gruppen-Plate erzeugt; Pre-Run `NULL` ist kein Blocker
 
 ## Cast: exakt 4 Identitäten
@@ -64,9 +64,13 @@ Pre-Run gilt `resolveEffectiveDialog()` nicht als Beweis (bei `dialog_turns=[]` 
 
 Browser-Smoke auf der Szene, Reload, Nachweis dass der Lip-Sync-Intent nach der Hydration dem DB-Wert entspricht (Tri-State aufgelöst, kein Draft-Override) und dass die 4 Sprecher im Dialog-Studio erscheinen.
 
-## Kostenhinweis (nur Info, kein Start)
+## Kostenvoranschlag (nur Ablesen, kein Start)
 
-4 Sprecher × 6 Passes treiben die Sync-Kosten (`ceil(dur) × 9 × passes`). Der Kostenvoranschlag wird im Renderdialog abgelesen und im Bericht dokumentiert — bestätigt wird erst nach separatem GO.
+Job-Kardinalität folgt den **Turns**, nicht den Sprechern: 6 kanonische Turns → **6 sync_segment-Passes** (nicht 4 × 6). Die vier Sprecher bestimmen nur Identität/Geometrie (`speaker_idx` 0..3). Kalkulation daher `ceil(dur) × 9 × passes` mit `passes = 6`. Der im Renderdialog angezeigte Voranschlag wird abgelesen und im Bericht dokumentiert — nicht bestätigt. Der Test wird nicht auf Sparsamkeit optimiert; Belastbarkeit geht vor Kosten.
+
+## FA-4 Abnahmekriterien (für den späteren Render, hier nur festgeschrieben)
+
+6 kanonische Turns → genau 6 Sync-Attempts · Sprecherfolge 0,1,2,3,0,1 · jede Turn-ID genau einmal · jede Voice korrekt dem Character zugeordnet · 4 Gesichter sauber auf Slots 0..3 · `reference_image_url` als tatsächlicher Geometrieanker · kein stiller Provider-Fallback · alle 6 Sync-Passes erfolgreich · genau 1 `audio_mux` · genau 1 Stitch · Finalizer `stitch:done` · `processed_video_url` final · **visuelle Sichtung des fertigen Clips**: kein falscher Mund, keine falsche Stimme. SQL/Ledger grün allein reicht bei FA-4 nicht.
 
 ## Report
 
