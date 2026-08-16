@@ -126,11 +126,19 @@ verständlich bleibt — sie werden inventarisiert, nicht als Blocker gewertet.
 ## Abschluss
 
 Bei grün: Status `MOTION STUDIO DONE / FROZEN` und Abschlussreport in
-`docs/v433-motion-studio-final-acceptance.md` mit
-bewiesenen Kernpfaden, unterstützten Sprachen, bewiesenem
-Multi-Speaker-Maximum, bekannten nicht-blockierenden Schulden und der Liste der
+`docs/v433-motion-studio-final-acceptance.md` mit bewiesenen Kernpfaden,
+unterstützten Sprachen, bekannten nicht-blockierenden Schulden und der Liste der
 frozen Architekturverträge (v283-Baseline, v400, v422, v425, v426, RS3,
 G3.2.2/F1, C1).
+
+Für FA-4 werden im Bericht zwei Kennzahlen **getrennt** ausgewiesen:
+„4 Sprecher erfolgreich bewiesen" und „maximale getestete Turn-Anzahl". Damit
+wird „Multi-Speaker-Maximum = 4" nicht fälschlich als Turn-Limit gelesen.
+
+EN/ES-Abnahmedefinition: beide Sprachen müssen funktional vollständig und
+verständlich sein. Fehlendes spanisches Feintuning mit sauberem EN-Fallback
+bleibt P2/P3; rohe Keys, prominente deutsche UI-Texte und Sprach-Rücksprünge
+sind Abschlussblocker.
 
 ## Technische Notizen
 
