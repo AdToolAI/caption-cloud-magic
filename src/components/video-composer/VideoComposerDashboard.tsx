@@ -110,7 +110,11 @@ const TAB_ORDER: TabId[] = ['briefing', 'storyboard', 'text', 'audio', 'export',
 function loadDraft(): LocalProject | null {
   try {
     const stored = localStorage.getItem(storageKey());
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      // C1: legacy drafts get a conservative provenance status and lose their
+      // stale intent fields; `db_hydrated` is session-scoped and downgraded.
+      return prepareDraftForSession(JSON.parse(stored)) as LocalProject | null;
+    }
   } catch { /* ignore */ }
   return null;
 }
