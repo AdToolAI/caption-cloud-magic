@@ -93,6 +93,7 @@ import {
 } from "@/lib/motion-studio/mentionParser";
 import { composePromptLayers } from "@/lib/motion-studio/composePromptLayers";
 import { markLipSyncPending, clearLipSyncPending, markDialogModePending, clearDialogModePending, markEngineOverridePending, clearEngineOverridePending } from "@/lib/video-composer/lipSyncPending";
+import { beginIntentWrite, endIntentWrite, isSceneIntentUnresolved } from "@/lib/video-composer/lipSyncIntentDraft";
 import {
   captureLipSyncResetSnapshot,
   buildOptimisticLipSyncReset,
@@ -591,6 +592,11 @@ export default function SceneCard({
                                 markDialogModePending(scene.id, next);
                                 if (lipSyncChanged) markLipSyncPending(scene.id, nextLipSync);
                                 if (engineChanged) markEngineOverridePending(scene.id, nextEngine);
+                                // C1 — persistent dirty markers survive a browser
+                                // death between optimistic patch and DB commit.
+                                beginIntentWrite(scene.id, 'dialogMode', next);
+                                if (lipSyncChanged) beginIntentWrite(scene.id, 'lipSyncWithVoiceover', nextLipSync);
+                                if (engineChanged) beginIntentWrite(scene.id, 'engineOverride', nextEngine ?? null);
                                 if (isUuid(scene.id)) {
                                   try {
                                     const payload: Record<string, unknown> = {
@@ -605,11 +611,17 @@ export default function SceneCard({
                                       .update(payload as never)
                                       .eq("id", scene.id);
                                     if (error) throw error;
+                                    endIntentWrite(scene.id, 'dialogMode', true);
+                                    if (lipSyncChanged) endIntentWrite(scene.id, 'lipSyncWithVoiceover', true);
+                                    if (engineChanged) endIntentWrite(scene.id, 'engineOverride', true);
                                   } catch (e) {
                                     console.warn(
                                       "[SceneCard] dialogMode toggle persist failed",
                                       e,
                                     );
+                                    endIntentWrite(scene.id, 'dialogMode', false);
+                                    if (lipSyncChanged) endIntentWrite(scene.id, 'lipSyncWithVoiceover', false);
+                                    if (engineChanged) endIntentWrite(scene.id, 'engineOverride', false);
                                     clearDialogModePending(scene.id);
                                     if (lipSyncChanged) clearLipSyncPending(scene.id);
                                     if (engineChanged) clearEngineOverridePending(scene.id);
@@ -623,6 +635,15 @@ export default function SceneCard({
                                   }
                                 }
   };
+
+  /**
+   * C1 — tri-state lip-sync intent. `true` while the scene is DB-backed but
+   * its persisted intent was not confirmed in this session. Never render an
+   * unresolved intent as OFF; disable the control instead (fail-closed).
+   */
+  const lipSyncIntentUnresolved = isSceneIntentUnresolved(scene as any);
+
+
 
   // Scene Dialog Studio — toggleable per-scene script editor (monolog from 1 cast,
   // dialog from 2+). Hidden by default; opened via the "Skript schreiben" button
@@ -2813,6 +2834,10 @@ export default function SceneCard({
                           markLipSyncPending(scene.id, next);
                           if (engineChanged) markEngineOverridePending(scene.id, nextEngine);
                           if (dialogModeChanged) markDialogModePending(scene.id, nextDialogMode);
+                          // C1 — persistent dirty markers (write recovery).
+                          beginIntentWrite(scene.id, 'lipSyncWithVoiceover', next);
+                          if (engineChanged) beginIntentWrite(scene.id, 'engineOverride', nextEngine ?? null);
+                          if (dialogModeChanged) beginIntentWrite(scene.id, 'dialogMode', nextDialogMode);
 
                           if (isUuid(scene.id)) {
                             try {
@@ -2826,11 +2851,17 @@ export default function SceneCard({
                                 .update(payload as never)
                                 .eq("id", scene.id);
                               if (error) throw error;
+                              endIntentWrite(scene.id, 'lipSyncWithVoiceover', true);
+                              if (engineChanged) endIntentWrite(scene.id, 'engineOverride', true);
+                              if (dialogModeChanged) endIntentWrite(scene.id, 'dialogMode', true);
                             } catch (e) {
                               console.warn(
                                 "[SceneCard] lip-sync toggle persist failed",
                                 e,
                               );
+                              endIntentWrite(scene.id, 'lipSyncWithVoiceover', false);
+                              if (engineChanged) endIntentWrite(scene.id, 'engineOverride', false);
+                              if (dialogModeChanged) endIntentWrite(scene.id, 'dialogMode', false);
                               clearLipSyncPending(scene.id);
                               if (engineChanged) clearEngineOverridePending(scene.id);
                               if (dialogModeChanged) clearDialogModePending(scene.id);
@@ -2843,14 +2874,17 @@ export default function SceneCard({
                             }
                           }
                         }}
-                        disabled={lipsyncBusy}
+                        disabled={lipsyncBusy || lipSyncIntentUnresolved}
+                        title={lipSyncIntentUnresolved ? tx({ de: 'Intent wird geladen …', en: 'Loading intent …', es: 'Cargando intención …' }) : undefined}
                         className={`px-2 py-1 rounded text-[10px] font-medium transition-all disabled:opacity-50 ${
-                          scene.lipSyncWithVoiceover
+                          lipSyncIntentUnresolved
+                            ? "text-muted-foreground border border-dashed border-border"
+                            : scene.lipSyncWithVoiceover
                             ? "bg-primary/20 text-primary ring-1 ring-primary/40"
                             : "text-muted-foreground hover:text-foreground border border-border"
                         }`}
                       >
-                        {scene.lipSyncWithVoiceover ? "AN" : "AUS"}
+                        {lipSyncIntentUnresolved ? "…" : scene.lipSyncWithVoiceover ? "AN" : "AUS"}
                       </button>
                     </div>
                     {/* v18: Cancel button — visible while lip-sync is in flight so the

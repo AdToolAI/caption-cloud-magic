@@ -323,6 +323,14 @@ export interface ComposerScene {
    */
   dialogMode?: boolean;
   /**
+   * C1 — scene provenance for the lip-sync intent contract.
+   * `local_new` = created client-side, never persisted (local intent is truth).
+   * `db_known_unhydrated` = DB-backed but not confirmed in this session → intent unresolved.
+   * `db_hydrated` = successfully read from / confirmed inserted into the DB in THIS session.
+   * See `src/lib/video-composer/lipSyncIntentDraft.ts`.
+   */
+  scenePersistenceState?: 'local_new' | 'db_known_unhydrated' | 'db_hydrated';
+  /**
    * Override: when true, send the character portrait directly as i2v first-frame
    * instead of composing a scene-aware anchor. Use only when the user explicitly
    * wants a face-locked opening (e.g. tight close-up).

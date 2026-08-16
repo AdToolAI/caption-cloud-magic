@@ -65,6 +65,7 @@ import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 import { isPageReload } from '@/lib/composer/isPageReload';
 import { scopedDraftKey, migrateLegacyDraftKey } from '@/lib/local-draft-scope';
+import { prepareDraftForSession, reconcileIntentMarkers } from '@/lib/video-composer/lipSyncIntentDraft';
 import { useAuth } from '@/hooks/useAuth';
 import { useStoryboardTransition } from '@/hooks/useStoryboardTransition';
 import ProductionWarRoom from './storyboard/ProductionWarRoom';
@@ -110,7 +111,11 @@ const TAB_ORDER: TabId[] = ['briefing', 'storyboard', 'text', 'audio', 'export',
 function loadDraft(): LocalProject | null {
   try {
     const stored = localStorage.getItem(storageKey());
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      // C1: legacy drafts get a conservative provenance status and lose their
+      // stale intent fields; `db_hydrated` is session-scoped and downgraded.
+      return prepareDraftForSession(JSON.parse(stored)) as LocalProject | null;
+    }
   } catch { /* ignore */ }
   return null;
 }
@@ -356,7 +361,14 @@ export default function VideoComposerDashboard() {
         const localById = new Map(project.scenes.map(s => [s.id, s]));
         const dbScenes: ComposerScene[] = data.map((row: any) => {
           const local = localById.get(row.id);
+          // C1 — reconcile dirty intent markers against the freshly read DB row.
+          reconcileIntentMarkers(row.id, {
+            lipSyncWithVoiceover: (row as any).lip_sync_with_voiceover === true,
+            dialogMode: ((row as any).dialog_mode as any) ?? false,
+            engineOverride: ((row as any).engine_override as any) ?? null,
+          });
           return {
+            scenePersistenceState: 'db_hydrated' as const,
             id: row.id,
             projectId: row.project_id,
             orderIndex: row.order_index,
@@ -546,7 +558,14 @@ export default function VideoComposerDashboard() {
         const localOnly = prev.scenes.filter(s => !isUuid(s.id));
         const dbScenes: ComposerScene[] = data.map((row: any) => {
           const local = localById.get(row.id);
+          // C1 — reconcile dirty intent markers against the freshly read DB row.
+          reconcileIntentMarkers(row.id, {
+            lipSyncWithVoiceover: (row as any).lip_sync_with_voiceover === true,
+            dialogMode: ((row as any).dialog_mode as any) ?? false,
+            engineOverride: ((row as any).engine_override as any) ?? null,
+          });
           return {
+            scenePersistenceState: 'db_hydrated' as const,
             id: row.id,
             projectId: row.project_id,
             orderIndex: row.order_index,
