@@ -316,11 +316,6 @@ serve(async (req) => {
             sceneId: composerSceneId,
             stage: 'audio_mux',
             externalJobId: (pendingRenderId ?? renderId) ? String(pendingRenderId ?? renderId) : null,
-            detail: {
-              observation: 'missing_pipeline_job_id',
-              stage_in_custom_data: stage,
-              pipeline_job_id_in_custom_data: pipelineJobId,
-            },
           });
         } else {
           const { data: finalizeResult, error: finalizeError } = await supabaseAdmin.rpc(
