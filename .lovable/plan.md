@@ -7,7 +7,6 @@
 
 **2. Provenienztransport bis `dialog-stitch`: bereits vorhanden, kein zusätzlicher Transport nötig.**
 Verifiziert im Code: `render-sync-segments-audio-mux` schreibt `customData.pipeline_job_id = v431MuxLedgerJobId` beim Lambda-Dispatch, `remotion-webhook` liest `customData.pipeline_job_id` und hat es im `isDialogStitch`-Branch verfügbar. Es wird heute nur nicht *verwendet* (keine Ledger-Terminalisierung, keine RPC). Der nächste Schritt ist damit **Finalizer + narrow patch + Writer-Migration**, kein Provenienz-Transportfix.
-Einzige Absicherung: der Transport ist heute konditional (`...(v431MuxLedgerJobId ? {...} : {})`). Für den Fall „kein Ledger-Job“ bleibt der Legacy-Pfad als expliziter, geloggter Fallback bestehen.
 
 ## Was gebaut wird
 
