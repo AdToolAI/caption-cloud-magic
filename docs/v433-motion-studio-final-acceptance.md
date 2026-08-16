@@ -162,3 +162,50 @@ angelegt über den normalen UI-Pfad „Szene hinzufügen").
 
 **FA-3 SETUP READY — STOP.** Kein kostenpflichtiger Render gestartet, kein
 Confirm-Dialog bestätigt.
+
+---
+
+## FA-3 — Realer Lauf auf S06 (`d9706a6e-…`) · Ergebnis: **P1 — STOP**
+
+**T_run_start (Confirm-Klick)** = `2026-08-16T22:16:37Z` („Rendern für 336 Cr")
+**run_id** = `cce6ee5b-a738-47ed-b668-82e0af6fd2b1`
+**Generation** = `plate_generation = 2` (Run-Stempel), `plate_ready_generation = 2`
+
+### Kettennachweis (read-only)
+| Schritt | Beleg | Status |
+|---|---|---|
+| `compose-twoshot-audio` | `audio_plan.twoshot` mit 1 Segment, `speaker: Sarah Dusatko`, `voice EXAVITQu4vr4xnSDxMaL`, 0–2.554 s; `dialog_turns` jetzt **genau 1 kanonischer Turn** (`turnId 683e9a88…`, `order 0`, characterId `5c81f9bf…`) | ✅ |
+| Plate | Ledger `base_video` **Attempt 1**, provider `ai-happyhorse`, `succeeded` 22:19:30Z, `base_video_url` gesetzt | ✅ |
+| sync_segment | Ledger **Attempt 1**, provider `sync.so`, ext `fd1227f3-…`, `succeeded` 22:21:46Z; genau 1 Pass | ✅ |
+| bound Callback + authoritative Apply | Transition `ssw:success`, `caller_class = sync_segment_apply`, `verdict = dispatch_mux`, `applied = true`, `pipeline_job_id 82812728…` | ✅ |
+| audio_mux | Ledger **Attempt 1** (`25f276c3…`), ext/`render_id` `ed8636f4-…`, `succeeded` 22:22:08Z; Narrow Patch belegt: `mux_dispatch_requested_at` **und** `dispatched_at` **und** `render_id` gleichzeitig in `dialog_shots.audio_mux` | ✅ |
+| Stitch-Finalisierung | Transition `stitch:done`, `caller_class = stitch_finalize`, `source_signature = g322_stitch_finalize`, `reason = finalized`, `applied = true` → `lipsync_running → complete` | ✅ |
+| Doppel-Dispatch / Legacy-Completion-Owner | Ledger exakt 3 Zeilen, je Attempt 1, kein Retry (`retry_count = 0`); Completion-Owner ist der RPC, **kein** Legacy-Wrapper | ✅ |
+
+Einziger `legacy`-Eintrag im Transition-Log ist der **Start**-Write
+`legacy_wrapper_7` (`idle → plate_queued`, 22:16:39Z) — Dispatch-seitig, nicht
+Completion; entspricht dem bekannten, noch nicht migrierten Start-Writer.
+
+### FA-3 P1 — Abweichung: `processed_video_url` bleibt NULL
+- Ist-Zustand: `clip_url` = Stitch-Mux-Output, `base_video_url` = Plate,
+  `lip_sync_status = 'done'`, aber **`processed_video_url IS NULL`**.
+- Ursache (statisch belegt): `composer_finalize_lipsync_scene` setzt in seinem
+  UPDATE nur `clip_url`, `lip_sync_source_clip_url`, `lip_sync_status`,
+  `twoshot_stage`, `dialog_shots`. Es ruft **nicht**
+  `materializeCompatibilityOutput('processed', …)` und schreibt die
+  Output-Spalte `processed_video_url` nicht.
+- Wirkung:
+  - `resolveSceneOutput()` liefert zwar `source = 'processed'`, aber nur über
+    den **Legacy-Kompatibilitätszweig** (`lip_sync_status ∈ {done, applied}` →
+    `clip_url` als processed). Der Spalten-Vertrag aus
+    `materialize-scene-output.ts` (`clip_url === processed_video_url ?? base_video_url`)
+    wird nur zufällig erfüllt.
+  - `isSceneOutputFinal()` (continuity-state) liefert für diese Szene
+    **false**, weil bei Lip-Sync-Intent ausdrücklich `processed_video_url`
+    verlangt wird → die Kontinuitätskette hält diesen fertigen Output für
+    nicht-final.
+- Bewertung: **P1** gegenüber dem FA-3-Abnahmekriterium „processed_video_url
+  vorhanden / Compatibility Output korrekt".
+
+**FA-3 = P1 — STOP.** Kein zweiter Versuch, kein Retry/Reset/Cleanup, keine
+Code-Änderung. Szene, Ledger und Run-Pointer bleiben unangetastet.
