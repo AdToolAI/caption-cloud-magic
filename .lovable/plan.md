@@ -49,4 +49,4 @@ Abweichung → STOP, ausdrücklich kein stilles Cleanup.
 
 ## Abschluss
 
-STOP für Review. FA-1 und FA-2 bleiben PASS. FA-3-Retest-Setup erst nach ausdrücklichem GO.
+Bei durchgehend grüner Evidence lautet der Status: **FA-3/P1 DB DEPLOY VERIFIED — STOP**. FA-1 und FA-2 bleiben PASS. FA-3-Retest-Setup erst nach ausdrücklichem GO.
