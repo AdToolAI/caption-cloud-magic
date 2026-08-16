@@ -24,17 +24,26 @@ Nicht geändert: `resolveSceneOutput()`, `isSceneOutputFinal()`, `materialize-sc
 
 `already_completed` bleibt ein reiner Vorab-Verdict ohne Scene-Write: keine Reparatur, kein Löschen, kein zweiter Finalize-Write. Historische Zeilen mit `complete` + `processed_video_url IS NULL` werden **nicht** automatisch nachgezogen. Für neue Finalisierungen ist dieser Zustand ausgeschlossen, weil Terminalisierung und Materialisierung in derselben Transaktion passieren.
 
+## Prozess (nur Produktiv-DB vorhanden)
+
+Die Migration wird in diesem Schritt **nur geschrieben, nicht angewendet**. Statt eines DB-Vortests:
+
+- Statischer Diff-Nachweis gegen den aktuellen Finalizer: einzige Änderung im erfolgreichen Scene-UPDATE ist `processed_video_url = _final_url` (plus Header-Kommentar).
+- Signatur, `SECURITY DEFINER`, `SET search_path TO 'pg_catalog','public'` sowie die REVOKE/GRANT-Grenze (`service_role` only) sind in der neuen Definition ausdrücklich enthalten.
+
 ## Tests
 
-1. SQL-Contracttests (`tests/v431-g3-2-2-f1-contract-tests.sql`, self-cleaning) erweitern:
+1. SQL-Contracttests (`tests/v431-g3-2-2-f1-contract-tests.sql`, self-cleaning) jetzt erweitern, aber **erst nach dem späteren DB-Deploy** ausführen:
    - Happy Path `dispatched → stitch:done`: Ledger `succeeded`, Scene `complete`, `processed_video_url = final_url`, `clip_url = final_url`, `mux_dispatch_requested_at` erhalten.
    - Duplicate: `already_completed`, `processed_video_url`/`clip_url` unverändert.
    - Bestehende Fälle 3–8 (invalid_write_id, wrong_job, dispatch_uncertain, RS3 pre/post reset) unverändert grün.
-2. Vitest-Ergänzung in `src/lib/composer/output/__tests__/` bzw. `continuityState`-Suite: Zeilenform nach Finalisierung ergibt `resolveSceneOutput() → { source: 'processed', url: final_url }` und `isSceneOutputFinal() → true`; Non-Lip-Sync-/Plate-Outputvertrag unverändert.
-3. Bestehende Frozen-Suiten (F1, G3.2.2, RS3, Parity/Mirror-Tests) laufen unverändert.
+2. Vitest **jetzt ausführen**: neue Fälle für die resultierende Zeilenform (`resolveSceneOutput() → source 'processed'`, `isSceneOutputFinal() → true`), Non-Lip-Sync-/Plate-Outputvertrag unverändert.
+3. Frozen-Suiten (F1, G3.2.2, RS3, Parity/Mirror-Tests) jetzt laufen lassen.
+
+Kein Edge-Redeploy nötig — `remotion-webhook` ruft bereits den produktiven Finalizer auf.
 
 ## Abschluss
 
 Kurzer P1-Nachtrag in `docs/v433-motion-studio-final-acceptance.md` (Root Cause, Diff, Testnachweis, Duplicate-Regel, Hinweis: historische Szenen bleiben unangetastet).
 
-Danach **STOP vor Deploy/Resmoke**. FA-3 wird nach Freigabe mit einer frischen Szene wiederholt, nicht mit S06. FA-1/FA-2 bleiben PASS.
+Danach **STOP vor Production-DB-Deploy**. Deploy-Reihenfolge später: Migration anwenden → Security/Signature/Body-Smoke → SQL-Contracttests inkl. `processed_video_url` → Residuen-Check → frische FA-3-Szene → genau ein Render. FA-1/FA-2 bleiben PASS.
