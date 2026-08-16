@@ -132,7 +132,8 @@ Regeln:
 - **Neu in C1 erzeugte lokale Szene → explizit `local_new`, lokaler Intent bleibt resolved; wird von der Legacy-Migration nicht angefasst und nicht mit einem Legacy-Draft verwechselt.**
 - **`migrateLegacyDraft()` doppelt ausgeführt → identisches Ergebnis; ein explizit gesetztes `local_new` wird nicht zu `db_known_unhydrated` umklassifiziert.**
 - **Insert schlägt fehl → Szene bleibt `local_new` (kein `db_hydrated`), lokaler Intent bleibt bedienbar.**
-- Regressionsschutz: andere Draft-Felder behalten ihr heutiges Merge-Verhalten.
+- **Draft enthält `db_hydrated` → nach `loadDraft()` im neuen Mount ist die Szene `db_known_unhydrated`/`unresolved`, bis die Session-Hydration bestätigt.**
+- Regressionsschutz: andere Draft-Felder behalten ihr heutiges Merge-Verhalten; bestehende Frozen-/Composer-Tests (Lip-Sync-Intent-Matrix, Gates, Ledger) laufen unverändert grün.
 
 ## Abschluss
 
