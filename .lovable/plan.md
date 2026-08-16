@@ -55,7 +55,8 @@ Nachweispflicht:
 - danach genau **ein** `audio_mux`, ein Stitch, ein `complete`
 - Preclip-Pflicht (v331) greift: Face-Share-Floor, gesichtsproportionale Maske
 - Geometrie-Anker ist `reference_image_url` (v400), kein `lock_reference_url`
-- Provider ausschliesslich HappyHorse oder Hailuo (v425), kein stiller Fallback
+- Provider entspricht der frozen Provider Capability Matrix (Lip-Sync-
+  Zertifizierung), kein stiller Fallback
 
 Visuelle Abnahme am fertigen Clip (P0 bei Verstoss): kein Mund bewegt sich beim
 falschen Sprecher, keine springende Geometrie-Zuordnung, keine Stimme auf der
