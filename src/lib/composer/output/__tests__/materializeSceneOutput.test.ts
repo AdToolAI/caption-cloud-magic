@@ -107,7 +107,8 @@ describe('clip_url writer inventory (v430 Step 1)', () => {
       expect(src, rel).not.toMatch(/materializeCompatibilityOutput\(/);
       for (const field of ['clip_url', 'base_video_url', 'processed_video_url']) {
         expect(src, `${rel} must not assign ${field} directly`).not.toMatch(
-          new RegExp(`${field}\\s*:`),
+          // Wortgrenze: `preclip_url:` ist ein anderes Feld (Plate-Preclip).
+          new RegExp(`\\b${field}\\s*:`),
         );
       }
     }
