@@ -57,10 +57,29 @@ Remotion/Stitch success
   → compatibility mirrors/output
 ```
 
-Entscheiden und begründen, ob Ledger-Terminalisierung und Scene-Finalisierung in **einem** DB-Primitive
-unter Job→Scene-Lock erfolgen (Präferenz) oder als zwei atomar geschützte Schritte mit explizitem
-Recovery-Vertrag. Der Zwischenzustand „scene complete + audio_mux dispatched" muss ausgeschlossen sein.
-Recovery-/Reaper-Verhalten und Duplicate-Callback-Verhalten (Idempotenz) mitspezifizieren.
+Verbindliche Abnahmekriterien für F1:
+
+1. **Provenienztransport beweisen.** Nachweisen, ob der `dialog-stitch`-Callback die `pipeline_job_id`
+   heute unveränderlich mitführt (Custom-Data → Lambda → Webhook). Falls nicht, wird der fehlende
+   Transport Teil der minimalen Writer-Migration. Kein Fallback auf Scene-ID-, `render_id`-, Payload-
+   oder Log-Suche — das Ledger bleibt laut G3.0b authoritative provenance.
+2. **Atomarer Owner.** Wird `composer_finalize_lipsync_scene` neu eingeführt, ist es selbst der atomare
+   Owner: `audio_mux` job FOR UPDATE → scene FOR UPDATE → provenance/run/generation/state guards →
+   Ledger `succeeded` → canonical scene `complete` + output/mirrors → Audit → commit. Der Zustand
+   „scene complete + audio_mux dispatched" ist damit technisch unmöglich.
+3. **Crash-Test am Atomic-Contract.** Statt „Crash zwischen Ledger- und Scene-Schritt": Exception nach
+   Ledger-Mutation und vor Scene-Mutation ⇒ vollständiger Transaktions-Rollback; erneuter Callback ⇒
+   genau eine erfolgreiche Terminalisierung.
+4. **Race-/Duplicate-Matrix explizit entscheiden** (unter Job→Scene-Lock): dispatched → stitch success
+   ⇒ succeeded + complete; duplicate success nach succeeded ⇒ idempotenter No-op; failure nach
+   succeeded ⇒ keine Regression; success nach cancelled/user_reset ⇒ No-op, keine Resurrection; stale
+   run/generation ⇒ no-op/rejected; zwei parallele Stitch-Success-Callbacks ⇒ genau eine
+   Terminalisierung; Reset vs. Stitch-Success ⇒ Ledger-Job-Lock entscheidet deterministisch, kein
+   Deadlock.
+
+Recovery-/Reaper-Verhalten wird mitspezifiziert. Der Report unterscheidet sauber zwischen der bislang
+nur spezifizierten Zielprimitive und der tatsächlich vorhandenen Implementierung.
+
 
 ## F1.5 — Legacy Completion Path
 
