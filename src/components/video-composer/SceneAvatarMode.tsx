@@ -352,11 +352,13 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
         </div>
         <Switch
           checked={lipSyncOn}
+          disabled={isSceneIntentUnresolved(scene as any)}
           onCheckedChange={async (v) => {
             // Optimistic local flip + same atomic DB write as SceneCard's
             // toggle button, so this entry point is race-safe too.
             onUpdate({ lipSyncWithVoiceover: v });
             markLipSyncPending(scene.id, v);
+            beginIntentWrite(scene.id, 'lipSyncWithVoiceover', v);
             if (UUID_RE.test(scene.id)) {
               try {
                 const { error } = await supabase
@@ -364,11 +366,15 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
                   .update({ lip_sync_with_voiceover: v })
                   .eq('id', scene.id);
                 if (error) throw error;
+                endIntentWrite(scene.id, 'lipSyncWithVoiceover', true);
               } catch (e) {
                 console.warn('[SceneAvatarMode] lip-sync toggle persist failed', e);
+                endIntentWrite(scene.id, 'lipSyncWithVoiceover', false);
                 clearLipSyncPending(scene.id);
                 onUpdate({ lipSyncWithVoiceover: !v });
               }
+            } else {
+              endIntentWrite(scene.id, 'lipSyncWithVoiceover', true);
             }
           }}
         />
