@@ -55,7 +55,7 @@ BEGIN
   _result := public.composer_finalize_lipsync_scene(
     _job_id, 'render-123', _scene_id,
     'https://example.com/final.mp4', 'stitch:done'
-  ;
+  );
 
   IF (_result->>'verdict') IS DISTINCT FROM 'finalized' THEN
     RAISE EXCEPTION 'TEST FAILED: %', 'happy path should finalize, got ' || (_result->>'verdict');
@@ -84,7 +84,7 @@ BEGIN
   _result := public.composer_finalize_lipsync_scene(
     _job_id, 'render-123', _scene_id,
     'https://example.com/final.mp4', 'stitch:done'
-  ;
+  );
 
   IF (_result->>'verdict') IS DISTINCT FROM 'already_completed' THEN
     RAISE EXCEPTION 'TEST FAILED: %', 'duplicate should be already_completed, got ' || (_result->>'verdict');
@@ -115,7 +115,7 @@ BEGIN
   _result := public.composer_finalize_lipsync_scene(
     _other_job_id, 'render-999', _scene_id,
     'https://example.com/final2.mp4', 'stitch:done'
-  ;
+  );
 
   IF (_result->>'verdict') IS DISTINCT FROM 'wrong_job' THEN
     RAISE EXCEPTION 'TEST FAILED: %', 'wrong external_job_id should be wrong_job, got ' || (_result->>'verdict');
@@ -125,7 +125,7 @@ BEGIN
   _result := public.composer_finalize_lipsync_scene(
     _other_job_id, 'render-456', gen_random_uuid(),
     'https://example.com/final2.mp4', 'stitch:done'
-  ;
+  );
 
   IF (_result->>'verdict') IS DISTINCT FROM 'wrong_job' THEN
     RAISE EXCEPTION 'TEST FAILED: %', 'scene_id mismatch should be wrong_job, got ' || (_result->>'verdict');
@@ -139,7 +139,7 @@ BEGIN
   _result := public.composer_finalize_lipsync_scene(
     _other_job_id, 'render-789', _scene_id,
     'https://example.com/final3.mp4', 'stitch:done'
-  ;
+  );
 
   IF (_result->>'verdict') IS DISTINCT FROM 'finalized' THEN
     RAISE EXCEPTION 'TEST FAILED: %', 'dispatch_uncertain with matching external_job_id should finalize, got ' || (_result->>'verdict');
@@ -174,7 +174,7 @@ BEGIN
   _result := public.composer_finalize_lipsync_scene(
     _other_job_id, 'render-rs3-old', _scene_id,
     'https://example.com/final-rs3.mp4', 'stitch:done'
-  ;
+  );
 
   IF (_result->>'verdict') IS DISTINCT FROM 'pre_reset_attempt' THEN
     RAISE EXCEPTION 'TEST FAILED: %', 'pre-reset attempt should be rejected, got ' || (_result->>'verdict');
@@ -188,7 +188,7 @@ BEGIN
   _result := public.composer_finalize_lipsync_scene(
     _other_job_id, 'render-rs3-old', _scene_id,
     'https://example.com/final-rs3.mp4', 'stitch:done'
-  ;
+  );
 
   IF (_result->>'verdict') IS DISTINCT FROM 'finalized' THEN
     RAISE EXCEPTION 'TEST FAILED: %', 'post-reset attempt with matching reset_id should finalize, got ' || (_result->>'verdict');
