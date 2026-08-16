@@ -103,6 +103,9 @@ export function applyOptimisticResetMarkers(sceneId: string): void {
   markLipSyncPending(sceneId, false);
   markDialogModePending(sceneId, false);
   markEngineOverridePending(sceneId, "auto");
+  // C1 — the server reset is authoritative; any persisted dirty marker from an
+  // earlier toggle must not survive it and win against the reset DB row.
+  clearSceneIntentMarkers(sceneId);
 }
 
 /**
