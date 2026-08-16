@@ -4,6 +4,8 @@
 
 BEGIN;
 
+GRANT EXECUTE ON FUNCTION public.composer_finalize_lipsync_scene(uuid, text, uuid, text, text) TO sandbox_exec;
+
 DO $$
 DECLARE
   _project_id uuid := '939a7999-8874-49c2-b2ff-df805b16fd69'::uuid;
