@@ -13,8 +13,8 @@ Einzige Absicherung: der Transport ist heute konditional (`...(v431MuxLedgerJobI
 
 1. **Neue RPC `composer_finalize_lipsync_scene`** (Migration) — alleiniger atomarer Owner der Stitch-Terminalisierung, exakt nach Contract §5.2 mit der Matrix aus §6. Ledger-Job → `succeeded` und Scene → `complete` in einer Transaktion, Audit-Eintrag `f1:stitch:done`.
 2. **`render-sync-segments-audio-mux` narrow patch** — `audio_mux` wird gemerged statt ersetzt, damit `mux_dispatch_requested_at` erhalten bleibt (Contract §7.1). Sonst keine Änderung an dieser Funktion.
-3. **`remotion-webhook` Stitch-Writer-Migration** — der `isDialogStitch`-Erfolgszweig ruft die RPC auf statt direkt `composer_scenes` zu updaten. Fehlt `pipeline_job_id` oder liefert die RPC `no_ledger_job`, greift der bisherige Legacy-Update als markierter Fallback (mit Warn-Log), damit kein Lauf hängen bleibt.
-4. **Tests** — Unit/Contract-Tests für die Matrix (first success, duplicate, wrong external job, stale run/generation, canceled) plus ein Merge-Test für `audio_mux`.
+3. **`remotion-webhook` Stitch-Writer-Migration** — der `isDialogStitch`-Erfolgszweig ruft ausschließlich die RPC auf; der Legacy-Direct-Update wird für diesen Pfad entfernt. Fehlende `pipeline_job_id` oder `no_ledger_job` sind Provenienzfehler: Observation schreiben, keine Scene-Mutation, Recovery-Fall.
+4. **Tests** — Unit/Contract-Tests für die Matrix (first success, duplicate, wrong external job, `pending`-Callback, `dispatch_uncertain`, stale run/generation, canceled, Post-Reset-Lauf mit passender `rs3_reset_id` = erfolgreich, Pre-Reset-Attempt = `pre_reset_attempt`, `_write_id != 'stitch:done'`, fehlende `pipeline_job_id` = keine Mutation) plus ein Merge-Test für `audio_mux`.
 5. **STOP vor Deploy** — Report mit Diff-Übersicht und Testergebnissen, dann Review.
 
 ## Technisches
@@ -26,18 +26,43 @@ composer_finalize_lipsync_scene(
   _external_job_id text,
   _scene_id uuid,
   _final_url text,
-  _write_id text
+  _write_id text  -- Allowlist: exakt 'stitch:done', sonst Reject 'invalid_write_id'
 ) RETURNS jsonb
 ```
 Return immer `{ "verdict": <text>, "scene_id": uuid, "pipeline_job_id": uuid }`, verdict ∈
-`finalized | already_completed | wrong_job | wrong_stage | stale_run | stale_generation | canceled | no_ledger_job`.
+`finalized | already_completed | wrong_job | wrong_stage | stale_run | stale_generation | canceled | pre_reset_attempt | invalid_write_id | no_ledger_job`.
 Nur `finalized` mutiert die Szene. `already_completed` ist ein Erfolgsfall für den Aufrufer (HTTP 200, keine Retry-Schleife). Alle Reject-Verdicts sind non-fatal für den Webhook (200, kein Lambda-Retry), werden aber in `composer_callback_observations` protokolliert.
 
 ACL: `REVOKE ALL FROM public/anon/authenticated`, `GRANT EXECUTE TO service_role` (analog `composer_apply_sync_segment_result`).
 
-**Zulässige Ausgangsstati:**
-- Ledger: nur `dispatched` (bzw. `bound`-Äquivalent) → `finalized`; `succeeded` → `already_completed`; `failed`/`stale`/`cancelled` → entsprechendes Reject-Verdict.
-- Scene: `active_run_id` und `plate_generation` müssen zum Ledger-Job passen; `lip_sync_status = 'canceled'` oder RS3-Reset-Marker → `canceled`.
+**Ledger From-State-Matrix (geschlossen, keine „Äquivalente"):**
+Reale Statuswerte in `composer_pipeline_jobs`: `pending`, `dispatching`, `dispatched`, `dispatch_uncertain`, `succeeded`, `failed`, `stale`, `cancelled`. Der `audio_mux`-Job wird von `bindLedgerExternalJob` auf `dispatched` gesetzt und bleibt es bis zum Stitch-Callback — es gibt keinen `bound`- oder `callback_processing`-Status.
+
+| From-State | Verdict |
+|---|---|
+| `dispatched` | `finalized` (einziger Erfolgsübergang → `succeeded`) |
+| `dispatch_uncertain` | `finalized`, sofern `external_job_id` exakt passt (Dispatch war real erfolgreich); sonst `wrong_job` |
+| `succeeded` | `already_completed`, keine Mutation |
+| `pending` / `dispatching` | `wrong_job` (Callback vor Bind — Provenienzfehler) |
+| `failed` / `stale` | `stale_run` bzw. `wrong_job` je nach `replaced_by` |
+| `cancelled` | `canceled`, keine Mutation |
+
+**Scene-Ausgangsstati und RS3-Epoch-Logik:**
+- `active_run_id` und `plate_generation` müssen zum Ledger-Job passen, sonst `stale_run` / `stale_generation`.
+- `lip_sync_status = 'canceled'` → `canceled`, keine Mutation.
+- RS3-Marker (`audio_plan.twoshot.rs3_reset`) wird **epoch-aware** ausgewertet, nie als pauschaler Cancel:
+  - kein Marker → normale Prüfung;
+  - Marker vorhanden und `job.metadata.rs3_reset_id` = aktueller `rs3_reset_id` → normal weiter (Post-Reset-Lauf darf finalisieren);
+  - Marker vorhanden und Job trägt eine andere/keine `rs3_reset_id` → `pre_reset_attempt`, keine Mutation.
+  Das ist dieselbe Fence-Logik wie in `composer_rs3_fence_verdict` / `composer_rs3_is_pre_reset_attempt` und wird von dort wiederverwendet statt neu formuliert.
+
+**Provenienz — kein generischer Legacy-Fallback:**
+Im `isDialogStitch`-Erfolgszweig gilt ausschließlich:
+- `pipeline_job_id` vorhanden → atomarer Finalizer, dessen Verdict entscheidet;
+- `pipeline_job_id` fehlt → Observation `missing_pipeline_job_id`, **keine** Scene-Mutation, Fall geht an Recovery;
+- Ledger-Zeile fehlt → `no_ledger_job`, **keine** Legacy-Finalisierung.
+Der bisherige Direct-Update wird für diesen Pfad entfernt. Ein Legacy-Zweig bleibt nur bestehen, wenn ein Callback nachweislich zu einem Pre-Ledger-Grandfather-Typ gehört (Callback ohne `customData.stage = 'sync_segments_audio_mux'` und ohne Ledger-Historie); dieser Zweig wird explizit als Grandfather markiert und geloggt, nicht als Sicherheitsgurt für aktuelle Stitch-Callbacks verwendet.
+
 
 **Berührte Dateien:**
 - neue Migration (RPC + Grants)
