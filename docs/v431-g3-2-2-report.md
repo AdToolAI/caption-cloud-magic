@@ -683,3 +683,32 @@ gezielter Redeploy von `compose-dialog-segments` (`T_RS3_effective = 2026-08-15T
 Acquire-/Frozen-Nachweis gruen. `composer_acquire_pipeline_attempt` bleibt unveraendert.
 Der G3.2.2 Production Resmoke ist ein separates Gate auf einer frischen Testszene
 ohne Ledger-Historie, gerechnet ab `T_RS3_effective`; `b34d1eae` bleibt unangetastet.
+
+---
+
+## 12. F1 — Mux/Stitch Terminalization Follow-up (Post-Resmoke Befund)
+
+Der G3.2.2 Production Resmoke auf Szene `be06d0fd-85ec-4822-a18b-ad32e7c82562`
+(T_run_start_utc = 2026-08-15T22:46:00Z, run `f7c0eb3b-06be-4106-9932-308cfc5b3bf0`,
+generation `2`) endete funktional gruen: Plate → sync_segment → audio_mux → Stitch
+produzierte ein finales Clip und die Szene erreichte `pipeline_state = complete`.
+
+Jedoch wurden drei strukturelle Vertragsabweichungen festgestellt (STOP korrekt):
+
+1. `dialog_shots.audio_mux.mux_dispatch_requested_at` ging verloren, weil
+   `render-sync-segments-audio-mux` das `audio_mux`-Objekt als Ganzes ersetzt.
+2. Der `audio_mux`-Ledger-Job (`ad4da886-6b13-41cd-9d8a-bee424a17293`) blieb auf
+   `dispatched`; er wurde nie terminalisiert.
+3. Die Szene wurde durch den Legacy-Direct-Update-Pfad in `remotion-webhook`
+   (`dialog-stitch`-Branch) auf `complete` gesetzt; `composer_finalize_lipsync_scene`
+   wurde nicht aufgerufen.
+
+Die vollständige Analyse, der Beweis der Provenienz-Kette, der Atomic-Finalizer-
+Contract, der angepasste Crash-Test und die Race-/Duplicate-Matrix sind in einem
+eigenen Deliverable ausgearbeitet:
+
+**`docs/v431-g3-2-2-f1-contract.md` — F1 ANALYSIS / CONTRACT GO — STOP for Review.**
+
+Status: F1 ist analytisch abgeschlossen; Implementierung (`v431 G3.2.2-F1.IMP`)
+erfolgt erst nach Freigabe dieses Contracts.
+
