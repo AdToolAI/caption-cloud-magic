@@ -63,7 +63,9 @@ Autoritativ ist ein expliziter Herkunfts-Status pro Szene, im Draft mitgeführt:
 | `db_known_unhydrated` | Szene stammt aus einem früheren DB-Load (Draft-Eintrag) oder aus einem bestätigten Insert, wurde in dieser Session aber noch nicht erfolgreich hydratisiert | **unresolved** — Controls disabled/"wird geladen", Renderstart fail-closed |
 | `db_hydrated` | in dieser Session erfolgreich aus der DB geladen | **resolved** aus dem DB-Wert nach `reconcileIntentMarkers` |
 
-Übergänge: bestätigter Insert (`addSceneToProject`, `ensureProjectPersisted`, Plan-Apply) → `local_new → db_hydrated` (der Insert-Wert ist der DB-Wert). Draft-Persistierung eines `db_hydrated`-Scene → beim nächsten Mount `db_known_unhydrated`, bis die Hydration greift. Hydration-Fehler oder fehlende Zeile → bleibt `db_known_unhydrated`.
+Übergänge: bestätigter Insert (`addSceneToProject`, `ensureProjectPersisted`, Plan-Apply) → `local_new → db_hydrated` (der Insert-Wert ist der DB-Wert). Hydration-Fehler oder fehlende Zeile → bleibt `db_known_unhydrated`.
+
+**Session-Semantik (verbindlich):** `db_hydrated` heißt "in **dieser** Session bestätigt", nicht "war irgendwann einmal hydratisiert". Beim Session-Mount stuft `loadDraft()` daher jedes im Draft gespeicherte `db_hydrated` sofort auf `db_known_unhydrated` zurück — vor jeder Intent-Auflösung und vor der neuen DB-Hydration. `db_hydrated` kann in einer Session ausschließlich durch erfolgreiche Hydration oder bestätigten Insert entstehen. `hydratedSceneIds` ist folglich pro Session leer beim Start.
 
 Ein `hydratedSceneIds`-Set ist dabei nur die Laufzeit-Repräsentation von `db_hydrated`; die Unterscheidung "noch nie persistiert" vs. "persistiert, aber noch nicht hydratisiert" trägt ausschließlich `scenePersistenceState`.
 
@@ -130,7 +132,8 @@ Regeln:
 - **Neu in C1 erzeugte lokale Szene → explizit `local_new`, lokaler Intent bleibt resolved; wird von der Legacy-Migration nicht angefasst und nicht mit einem Legacy-Draft verwechselt.**
 - **`migrateLegacyDraft()` doppelt ausgeführt → identisches Ergebnis; ein explizit gesetztes `local_new` wird nicht zu `db_known_unhydrated` umklassifiziert.**
 - **Insert schlägt fehl → Szene bleibt `local_new` (kein `db_hydrated`), lokaler Intent bleibt bedienbar.**
-- Regressionsschutz: andere Draft-Felder behalten ihr heutiges Merge-Verhalten.
+- **Draft enthält `db_hydrated` → nach `loadDraft()` im neuen Mount ist die Szene `db_known_unhydrated`/`unresolved`, bis die Session-Hydration bestätigt.**
+- Regressionsschutz: andere Draft-Felder behalten ihr heutiges Merge-Verhalten; bestehende Frozen-/Composer-Tests (Lip-Sync-Intent-Matrix, Gates, Ledger) laufen unverändert grün.
 
 ## Abschluss
 
