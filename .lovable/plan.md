@@ -15,9 +15,8 @@ Ein Query-Block gegen `pg_proc` / `information_schema.role_routine_grants`:
 - genau eine Signatur `composer_finalize_lipsync_scene`
 - `prosecdef = true`
 - `proconfig` enthält `search_path=pg_catalog, public`
-- EXECUTE: `service_role` = true; `anon`, `authenticated`, `PUBLIC` = false
-- `prosrc` enthält `processed_video_url = _final_url` und `clip_url = _final_url`
-- `prosrc` enthält **kein** `base_video_url =` Write
+- EXECUTE-Privilegien über tatsächliche Privilege-Prüfung (`has_function_privilege(...,'EXECUTE')`) statt reiner ACL-Textlesung: `service_role` = true; `anon`, `authenticated` = false; `PUBLIC` = false via `has_function_privilege('public', ...)`. Owner und akzeptierte Plattformrollen (`postgres`, `supabase_admin`) werden getrennt ausgewiesen und nicht als Verstoß gewertet.
+- **Struktureller Body-Nachweis** (nicht bloßes Token-Vorkommen): im Erfolgs-`UPDATE public.composer_scenes ... SET`-Block steht `processed_video_url = _final_url` und `clip_url = _final_url`; im selben SET-Block wird `base_video_url` **nicht** zugewiesen. Nachweis durch Extraktion genau dieses UPDATE-Statements aus `prosrc` und Zitat des SET-Blocks im Report.
 - Guard-/Verdict-Tokens unverändert vorhanden: `already_completed`, `invalid_write_id`, `wrong_job`, `dispatch_uncertain`, `rs3_reset_id`, `mux_dispatch_requested_at`, Lock-Reihenfolge Job → Scene
 
 Jede Abweichung → STOP, kein Nachbessern.
@@ -50,4 +49,4 @@ Abweichung → STOP, ausdrücklich kein stilles Cleanup.
 
 ## Abschluss
 
-STOP für Review. FA-1 und FA-2 bleiben PASS. FA-3-Retest-Setup erst nach ausdrücklichem GO.
+Bei durchgehend grüner Evidence lautet der Status: **FA-3/P1 DB DEPLOY VERIFIED — STOP**. FA-1 und FA-2 bleiben PASS. FA-3-Retest-Setup erst nach ausdrücklichem GO.
