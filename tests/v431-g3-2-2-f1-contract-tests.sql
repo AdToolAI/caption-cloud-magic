@@ -4,13 +4,6 @@
 
 BEGIN;
 
--- Test helpers
-CREATE OR REPLACE FUNCTION _test_fail(msg text) RETURNS void AS $$
-BEGIN
-  RAISE EXCEPTION 'TEST FAILED: %', msg;
-END;
-$$ LANGUAGE plpgsql;
-
 DO $$
 DECLARE
   _project_id uuid := gen_random_uuid();
