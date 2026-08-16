@@ -123,6 +123,8 @@ Regeln:
 - **`engineOverride = null` als legitimer persistierter Wert wird getrennt von `UNRESOLVED` getestet — der Resolver darf `null` nie als "noch nicht hydratisiert" behandeln.**
 - **`local_new`-Szene (nie persistiert) → lokaler Intent bleibt resolved und bedienbar; nach bestätigtem Insert `db_hydrated` mit demselben Wert.**
 - **`db_known_unhydrated` vs. `local_new`: identischer Draft-Inhalt, nur unterschiedlicher Herkunfts-Status → einmal `unresolved`, einmal resolved.**
+- **Legacy-Draft (kein `scenePersistenceState`), DB-backed Szene, stale `lipSync=true` → nach Migration `db_known_unhydrated` → zunächst `unresolved`; nach Hydration gewinnt der DB-Wert (false).**
+- **Neu in C1 erzeugte lokale Szene → explizit `local_new`, lokaler Intent bleibt resolved; wird von der Legacy-Migration nicht angefasst und nicht mit einem Legacy-Draft verwechselt.**
 - Regressionsschutz: andere Draft-Felder behalten ihr heutiges Merge-Verhalten.
 
 ## Abschluss
