@@ -65,34 +65,29 @@ kein stillschweigender Fix.
    textuell gegenübergestellt. Erwartung: exakt dieselben sechs Meldungen
    (`dialog-lock.ts`, `hasBackgroundMusic`).
 
-## V2 — DB-Contracttests + Atomizitätsnachweis ohne Test-Hook
+## V2 — DB-Contracttests + Atomizitätsnachweis ohne produktiven Test-Hook
 
 1. Beleg, dass die acht Szenarien gegen genau den heute installierten Funktionsbody
    liefen: `pg_get_functiondef` gegen den Migrationsinhalt vergleichen.
 2. Happy Path: Ledger `dispatched → succeeded` und Scene → `complete` in einem Commit.
 3. **Atomizität ohne produktiven Test-Hook.** Der Finalizer ist ein einzelner
-   PL/pgSQL-Body ohne Subtransaktionen, wird also vom Aufrufer in genau einer
-   Transaktion ausgeführt. Nachgewiesen wird das zweistufig:
-   - strukturell: Beleg aus dem Funktionsbody, dass zwischen Ledger-Update und
-     Scene-Update kein `EXCEPTION`-Block und kein Commit-Punkt liegt, jede Exception
-     also den kompletten Call zurückrollt;
-   - reproduzierbar: ein echter Fehlerfall **innerhalb desselben Calls**, der nach dem
-     Ledger-Write und vor dem erfolgreichen Scene-Write entsteht (Constraint-Verletzung
-     auf dem Scene-Update-Pfad, z. B. unzulässiger Zielzustand). Danach Prüfung:
-     Ledger unverändert `dispatched`, Scene unverändert nicht-`complete`.
-   Lässt sich ein solcher natürlicher, deterministischer Fehler **nicht** ohne jede
-   Schema- oder Funktionsmutation provozieren, wird der Rollback-Smoke **nicht**
-   ausgeführt. Es wird ausdrücklich **kein** temporärer Test-Clone und keine sonstige
-   DDL in der Produktions-DB angelegt. Stattdessen wird der Nachweis als
-   *structural transaction proof* dokumentiert, mit explizit begrenzter Beweiskraft:
-   belegt ist die Transaktionsgrenze aus dem Funktionsbody, nicht ein beobachteter
-   Rollback zur Laufzeit.
+   PL/pgSQL-Body. Strukturell wird aus dem installierten Funktionsbody belegt, dass
+   Ledger- und Scene-Mutation in demselben Call ohne Commit-Punkt, Subtransaktion oder
+   Exception-Swallowing liegen.
+   - Falls sich **ohne jede Schema- oder Funktionsmutation** ein natürlicher,
+     deterministischer Fehler nach dem Ledger-Write und vor dem erfolgreichen
+     Scene-Write provozieren lässt, darf zusätzlich der Runtime-Rollback-Smoke
+     ausgeführt werden.
+   - Falls nicht, wird **kein** temporärer Test-Clone und **keine** sonstige DDL in
+     Production erzeugt. Der Nachweis wird dann als *structural transaction proof* mit
+     entsprechend begrenzter Beweiskraft dokumentiert.
 4. `mux_dispatch_requested_at` ist **kein** Finalizer-Happy-Path-Kriterium. Der
    Regressionstest gehört zum Narrow-Patch von `render-sync-segments-audio-mux` und
    wird dort separat geführt (Merge statt Überschreiben des `audio_mux`-Objekts).
    Im Finalizer wird nur zusätzlich geprüft, dass er das Feld nicht zerstört.
-5. Residuen-Nachweis der bereits gelaufenen self-cleaning Tests bleibt Pflicht:
-   0 Test-Zeilen, Funktions- und ACL-Snapshot unverändert.
+5. Residuen-Nachweis der bereits gelaufenen self-cleaning Tests: keine Test-Rows,
+   keine zusätzlichen Funktionen, keine zusätzlichen Grants.
+
 
 
 ## V3 — Report-Korrektur
