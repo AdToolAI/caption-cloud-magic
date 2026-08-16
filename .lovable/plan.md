@@ -4,13 +4,15 @@ Keine DB-Migration. Keine Crash-Test-Migration. Nur zwei Edge-Deploys plus reale
 
 ## 1. Security-Smoke vor Deploy (read-only)
 Prüfen für `composer_finalize_lipsync_scene`: genau eine Signatur, SECURITY DEFINER, EXECUTE nur `service_role` (anon/authenticated/PUBLIC = false), keine Testfunktionen, Test-Grants oder Test-Rows.
+PUBLIC=false wird per tatsächlicher Privilege-Prüfung (`has_function_privilege`) belegt, nicht aus proacl-Text abgeleitet; Owner- und akzeptierte Plattformrollen werden getrennt dokumentiert.
 Abweichung → STOP.
 
 ## 2. Deploy genau zwei Edge Functions
 - `render-sync-segments-audio-mux`
 - `remotion-webhook`
 
-Sonst nichts. UTC-Zeitpunkt des zweiten erfolgreichen Deploys festhalten als `T_F1_effective`. Danach Boot-/Import-Sanity beider Functions. Deploy- oder Importfehler → STOP ohne Reparatur.
+Sonst nichts. UTC-Zeitpunkt des zweiten erfolgreichen Deploys festhalten als `T_F1_effective`. Danach Boot-/Import-Sanity beider Functions — ausschließlich harmloser Handler-/Validation-Nachweis (keine valide Stitch-Payload, keine State-Mutation). Deploy- oder Importfehler → STOP ohne Reparatur.
+
 
 ## 3. Post-Deploy Static Sanity am produktiven Stand
 - audio-mux: `audio_mux` wird gemerged, `mux_dispatch_requested_at` bleibt erhalten, `render_id`/`dispatched_at` additiv, `pipeline_job_id` weiter in `customData` bis Stitch.
@@ -36,3 +38,6 @@ Telemetrie ab `T_F1_effective` und ab `T_run_start`: missing_binding, job_not_fo
 ## 8. Abschluss
 Alles grün → `G3.2.2-F1 DONE / FROZEN` und `G3.2.2 DONE / FROZEN`; Production Evidence in `docs/v431-g3-2-2-f1-imp-report.md` und `docs/v431-g3-2-2-report.md` ergänzen. Danach STOP für Review.
 Jede Abweichung → `G3.2.2 DEPLOYED — FOLLOW-UP BEFUND`, sofort STOP, kein Cleanup, kein zweiter UI-Versuch.
+
+## 9. Zeitpunkte sichern
+`T_F1_effective` (zweiter Edge-Deploy erfolgreich), `T_run_start` (UI-Renderfreigabe), `T_finalize` (`f1:stitch:done` / atomarer Commit) explizit erfassen und im Report ausweisen, damit alle Evidence nachweislich nach dem wirksamen F1-Deploy entsteht.
