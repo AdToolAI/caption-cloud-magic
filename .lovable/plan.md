@@ -49,11 +49,24 @@ Klassen: **U** = explizite Benutzerentscheidung → `persistIntentWrite`; **D** 
 
 Damit ist die Tabelle vollständig; offene Einträge gibt es nicht mehr. Jeder U-Writer läuft über **einen** gemeinsamen Helper (Mark → DB-Write → Bestätigung → Clear/Rollback).
 
-## Persisted-Scene-Erkennung (Variante A belegt + Variante B umgesetzt)
+## Scene-Herkunft & Persistenz-Lifecycle (ersetzt die UUID-Heuristik)
 
-Repo-Nachweis: alle client-seitig erzeugten Szenen bekommen präfixierte, **nie** UUID-förmige IDs — `useSceneManager.ts:9`, `StoryboardTab.tsx:256/292`, `VideoComposerDashboard.addSceneToProject` (`scene_${Date.now()}`) und `useApplyProductionPlan.newSceneId()` (`scene_<ts>_<rand>`). Eine UUID entsteht ausschließlich aus dem DB-Insert/DB-Load. `crypto.randomUUID()` wird im Composer nur für Turn-IDs und Storage-Pfade benutzt, nie für Scene-IDs.
+Repo-Nachweis (nur als Assert/Test, **nicht** als Source of Truth): alle client-seitig erzeugten Szenen bekommen präfixierte, nie UUID-förmige IDs — `useSceneManager.ts:9`, `StoryboardTab.tsx:256/292`, `VideoComposerDashboard.addSceneToProject` (`scene_${Date.now()}`), `useApplyProductionPlan.newSceneId()`. `crypto.randomUUID()` wird im Composer nur für Turn-IDs und Storage-Pfade benutzt.
 
-Trotzdem entscheidet **kein ID-Format** über die Intent-Auflösung: Maßgeblich ist ein explizites `hydratedSceneIds`-Set, das nur beim erfolgreichen DB-Load bzw. nach bestätigtem DB-Insert gefüllt wird. Szenen außerhalb dieses Sets, die aus dem Draft stammen, sind `unresolved`; lokal neu erzeugte, noch nie persistierte Szenen behalten ihren lokalen Intent (sie haben keine DB-Wahrheit, die verletzt werden könnte).
+Autoritativ ist ein expliziter Herkunfts-Status pro Szene, im Draft mitgeführt:
+
+`scenePersistenceState = local_new | db_known_unhydrated | db_hydrated`
+
+| Zustand | Herkunft | Intent-Auflösung |
+| --- | --- | --- |
+| `local_new` | im Client erzeugt, nie erfolgreich in die DB inserted | **resolved** aus dem lokalen Wert — es existiert keine DB-Wahrheit, die verletzt werden könnte; Controls normal bedienbar |
+| `db_known_unhydrated` | Szene stammt aus einem früheren DB-Load (Draft-Eintrag) oder aus einem bestätigten Insert, wurde in dieser Session aber noch nicht erfolgreich hydratisiert | **unresolved** — Controls disabled/"wird geladen", Renderstart fail-closed |
+| `db_hydrated` | in dieser Session erfolgreich aus der DB geladen | **resolved** aus dem DB-Wert nach `reconcileIntentMarkers` |
+
+Übergänge: bestätigter Insert (`addSceneToProject`, `ensureProjectPersisted`, Plan-Apply) → `local_new → db_hydrated` (der Insert-Wert ist der DB-Wert). Draft-Persistierung eines `db_hydrated`-Scene → beim nächsten Mount `db_known_unhydrated`, bis die Hydration greift. Hydration-Fehler oder fehlende Zeile → bleibt `db_known_unhydrated`.
+
+Ein `hydratedSceneIds`-Set ist dabei nur die Laufzeit-Repräsentation von `db_hydrated`; die Unterscheidung "noch nie persistiert" vs. "persistiert, aber noch nicht hydratisiert" trägt ausschließlich `scenePersistenceState`.
+
 
 
 ## Umsetzung
