@@ -591,6 +591,11 @@ export default function SceneCard({
                                 markDialogModePending(scene.id, next);
                                 if (lipSyncChanged) markLipSyncPending(scene.id, nextLipSync);
                                 if (engineChanged) markEngineOverridePending(scene.id, nextEngine);
+                                // C1 — persistent dirty markers survive a browser
+                                // death between optimistic patch and DB commit.
+                                beginIntentWrite(scene.id, 'dialogMode', next);
+                                if (lipSyncChanged) beginIntentWrite(scene.id, 'lipSyncWithVoiceover', nextLipSync);
+                                if (engineChanged) beginIntentWrite(scene.id, 'engineOverride', nextEngine ?? null);
                                 if (isUuid(scene.id)) {
                                   try {
                                     const payload: Record<string, unknown> = {
