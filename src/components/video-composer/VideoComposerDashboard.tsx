@@ -65,6 +65,7 @@ import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 import { isPageReload } from '@/lib/composer/isPageReload';
 import { scopedDraftKey, migrateLegacyDraftKey } from '@/lib/local-draft-scope';
+import { prepareDraftForSession, reconcileIntentMarkers } from '@/lib/video-composer/lipSyncIntentDraft';
 import { useAuth } from '@/hooks/useAuth';
 import { useStoryboardTransition } from '@/hooks/useStoryboardTransition';
 import ProductionWarRoom from './storyboard/ProductionWarRoom';
