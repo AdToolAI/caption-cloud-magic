@@ -610,11 +610,17 @@ export default function SceneCard({
                                       .update(payload as never)
                                       .eq("id", scene.id);
                                     if (error) throw error;
+                                    endIntentWrite(scene.id, 'dialogMode', true);
+                                    if (lipSyncChanged) endIntentWrite(scene.id, 'lipSyncWithVoiceover', true);
+                                    if (engineChanged) endIntentWrite(scene.id, 'engineOverride', true);
                                   } catch (e) {
                                     console.warn(
                                       "[SceneCard] dialogMode toggle persist failed",
                                       e,
                                     );
+                                    endIntentWrite(scene.id, 'dialogMode', false);
+                                    if (lipSyncChanged) endIntentWrite(scene.id, 'lipSyncWithVoiceover', false);
+                                    if (engineChanged) endIntentWrite(scene.id, 'engineOverride', false);
                                     clearDialogModePending(scene.id);
                                     if (lipSyncChanged) clearLipSyncPending(scene.id);
                                     if (engineChanged) clearEngineOverridePending(scene.id);
