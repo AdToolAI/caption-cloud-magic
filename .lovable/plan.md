@@ -67,16 +67,29 @@ Previous Final Frame und Character Anchor. Kette über
 schreibt nie `reference_image_url` (v426). Anker belegt bei Seedance 2.5 den
 exklusiven Slot (v422), rohe Cast-Porträts gehen nicht an ModelArk.
 
-### FA-6 — Reset / Retry (kostenpflichtig, 1 Wiederholung)
-Lip-Sync-Reset real auslösen (`composer_reset_lipsync_full`), RS3-Marker und
-Epoch-Fence prüfen, danach frischer Lauf ohne alten Ledger-Blocker. Stale
-Callbacks des alten Attempts müssen abgewiesen werden, ohne die Szene zu
-mutieren.
+### FA-6 — Reset / Retry über den RS3-Pfad (kostenpflichtig, 1 Wiederholung)
+Lip-Sync-Reset **ausschliesslich über den normalen UI-Produktpfad** auslösen.
+Kein direkter Aufruf von `composer_reset_lipsync_full` — das ist der ältere
+Full-Reset-Vertrag mit abweichender Run-/Generation-Semantik und wäre der
+falsche Test. Nachzuweisen ist, dass der UI-Pfad auf den RS3-Resetvertrag
+(`composer_reset_lipsync_with_attempt_cancellation`) führt:
+
+- Run/Generation gemäss RS3 erhalten (Same-Run/Same-Generation-Rearm)
+- offene alte Attempts `cancelled` / `user_reset`
+- neuer `reset_id` / Epoch-Marker gesetzt
+- alter Callback wird als `pre_reset_attempt` / No-op abgewiesen, ohne
+  Scene-Mutation
+- neuer On-Demand-Attempt N+1 ohne `predecessor_exists`
+- erfolgreicher neuer Lauf bis `complete`
 
 ### FA-7 — Provider/Engine-Routing (kostenfrei)
-Capability-Matrix gegen die wichtigsten Engines: Auto-Wahl Seedance 2.5 ab
->15 s, Lip-Sync-Zertifizierung nur HappyHorse/Hailuo, Slot-Topologie pro
-Provider, Referenz-Limits. Reine UI-/Resolver-Prüfung ohne Render.
+Acceptance läuft gegen die **eingefrorene aktuelle Provider Capability Matrix**,
+nicht gegen hier notierte Beispielwerte. Zuerst die Matrix als Ist-Stand lesen,
+dann UI/Resolver dagegen prüfen: Auto-Provider-Wahl nach Szenenlänge,
+Lip-Sync-Zertifizierung, Slot-Topologie pro Provider, Referenz-Limits. Steht in
+der Matrix „Seedance 2.5 ab >15 s" und „Lip-Sync nur HappyHorse/Hailuo", muss
+genau das grün sein; weicht die Matrix bewusst ab, gewinnt die Matrix. Reine
+UI-/Resolver-Prüfung ohne Render.
 
 ### FA-8 — EN UI vollständig (kostenfrei)
 ### FA-9 — ES UI vollständig (kostenfrei)
@@ -87,13 +100,19 @@ Bestätigungsdialoge, Statusmeldungen.
 
 Kriterien: kein deutscher String in EN/ES, keine rohen/kaputten Keys, keine
 abgeschnittenen Labels, keine Sprache, die nach Reload oder Navigation
-zurückspringt. Zusätzlich statischer Scan auf verbliebene deutsche Literale in
-`src/components/video-composer` und auf `tx({...})`-Einträge ohne `es`-Wert
-(ES fällt heute auf EN zurück — akzeptabel, aber zu inventarisieren).
+zurückspringt.
+
+Ausführungsregel für den statischen Scan: nur **user-visible** Strings zählen
+als Finding. Kommentare, Logs, Test-Fixtures, Provider-/Modellnamen und interne
+Debugtexte machen den Scan nicht rot. `tx({...})`-Einträge ohne `es` sind
+dokumentierter EN-Fallback und damit P2/P3, solange die UI korrekt und
+verständlich bleibt — sie werden inventarisiert, nicht als Blocker gewertet.
 
 ### FA-10 — Final Output + Error/Recovery-Sanity (kostenfrei)
-- Output: `processed_video_url`, Compatibility Output, Download und Preview
-  funktionieren, Szene bleibt nach Reload korrekt.
+- Output: finaler Output gemäss `resolveSceneOutput()`, Compatibility Output,
+  Download und Preview funktionieren, Szene bleibt nach Reload korrekt.
+  `processed_video_url` wird zusätzlich dort verlangt, wo Lip-Sync intentional
+  war.
 - Ein kontrollierter, kostenfreier Guard-/Validation-Fehler (z. B.
   `dialog_too_long_for_plate` oder unresolved Intent) muss sichtbar und
   verständlich sein — kein stilles No-op.
