@@ -456,3 +456,67 @@ Persistente Spur                                    = ausschließlich der Migrat
 
 **FA-3/P1 DB DEPLOY VERIFIED.** Kein weiterer Deploy-Schritt.
 FA-1 und FA-2 bleiben PASS. Nächster Schritt: FA-3 RETEST SETUP mit frischer Szene.
+
+---
+
+## FA-3 RETEST — Kostenpflichtiger Render (P1-Retest)
+
+### Lauf-Identität
+
+```text
+Szene            = 5b0dca87-016f-4581-9af8-ba9276fc803e (frisch, order_index 6 / S07)
+Projekt          = 035273d7-ae9b-44e0-89e7-f9e28703530d
+run_id           = 7f236697-502f-4703-8ddf-1d9ebf2544b2
+T_run_start      = 2026-08-16 23:26:40.545532+00 (active_run_started_at)
+plate_generation = 2
+Kostenbestätigung= 469 Cr / €4.69 (Video 336 + VO 5 + Lip-Sync 128)
+Start-Pfad       = UI-Renderdialog → composer-start-scene-generation
+Nach Bestätigung = read-only Beobachtung, kein Retry/Reset/Cleanup
+```
+
+### Abnahmekriterien
+
+| # | Kriterium | Belegt | Ergebnis |
+|---|-----------|--------|----------|
+| 1 | genau 1 kanonischer Turn, speaker_idx 0, korrekte Voice | `dialog_turns` = 1 Eintrag (`order=0`, char `5c81f9bf…`), `audio_plan.twoshot.segments[0].voice = EXAVITQu4vr4xnSDxMaL` (ElevenLabs, Sarah Dusatko), `slotIndex=0` | PASS |
+| 2 | Plate/Anchor erfolgreich, `reference_image_url` erzeugt und als Geometrieanker genutzt | Anchor `…/scene-anchors/5b0dca87-…-188fb8bf743d.png` (23:27:02), `anchor_face_audit.ok=true` (1/1 Face), `faceMap.source='anchor'`, `faceMap.anchorUrl == reference_image_url` — erzeugt **vor** Sync-Dispatch (23:30:23) → v400-konform | PASS |
+| 3 | genau 1 `base_video` Attempt 1 | Ledger: `base_video/1/succeeded`, provider `ai-happyhorse`, ext `br1d3jvfexrmw0d01kk89g1vw8` | PASS |
+| 4 | genau 1 `sync_segment` Attempt 1 + positiver bound-Callback | Ledger: `sync_segment/1/succeeded`, provider `sync.so`, ext `30196cb9-…`, `callback_delivery_status='succeeded'` | PASS |
+| 5 | authoritative Apply → dispatch_mux | Transition `ssw:success` / reason `applied` (23:31:29), unmittelbar gefolgt von audio_mux-Acquire (23:31:29.637) | PASS |
+| 6 | genau 1 `audio_mux` Attempt 1 + realer render_id | Ledger: `audio_mux/1/succeeded`, provider `remotion`, render_id `f3372ec5-b706-4dd9-ac69-f55f6500d88b`, dispatcher `sync-so-webhook`, `fan_in_passes=1` | PASS |
+| 7 | Narrow Patch bleibt korrekt | `mux_dispatch`-Provenienz erhalten, kein zweiter mux-Job, kein `replaced_by` | PASS |
+| 8 | Stitch → `composer_finalize_lipsync_scene(…, 'stitch:done')` | Transition `lipsync_running → complete`, `write_id='stitch:done'`, reason `finalized` (23:31:48) | PASS |
+| 9 | audio_mux → succeeded + `completed_at` | `completed_at = 2026-08-16 23:31:48.250847+00` | PASS |
+| 10 | Scene → complete | `pipeline_state='complete'`, `lip_sync_status='done'`, `twoshot_stage='done'` | PASS |
+| 11 | `processed_video_url = final_url` | `…/dialog-stitch-muxed-5b0dca87-…-1786923091869.mp4` | PASS |
+| 12 | `clip_url = final_url` | identisch (`clip_url = processed_video_url` → true) | PASS |
+| 13 | `resolveSceneOutput().source = 'processed'` | `{source:'processed', isLipsynced:true, effectiveUrl=final_url}` | PASS |
+| 14 | **`isSceneOutputFinal() = true` (P1-Retest)** | `true` | **PASS** |
+| 15 | kein Legacy-Completion-Owner, keine Doppel-Dispatches | Ledger exakt 3 Jobs (je Attempt 1), 3 Callback-Observations, kein RS3-Marker, einziger Legacy-Write ist der Start-Wrapper (`legacy_wrapper_7`, idle→plate_queued); Completion ausschließlich über RPC-Writer | PASS |
+
+### Transition-Log
+
+```text
+23:26:41  idle            → plate_queued     legacy_wrapper_7
+23:29:24  audio_ready     → audio_ready      ccw:plate-complete   (compatibility_finalize)
+23:31:29  lipsync_running → lipsync_running  ssw:success          (applied)
+23:31:48  lipsync_running → complete         stitch:done          (finalized)
+```
+
+`composer_state_guard_violations`: 4 Zeilen, alle `verdict='observed'` / `reason='v400_july_baseline_observe_only'` — reine Telemetrie gemäß v398-Rollback, keine Blockade.
+
+### Endzustand
+
+```text
+pipeline_state       = complete
+clip_url             = s3://…/dialog-stitch-muxed-5b0dca87-…-1786923091869.mp4
+processed_video_url  = identisch mit clip_url
+base_video_url       = supabase://ai-videos/composer/…/5b0dca87-….mp4 (unverändert, Plate)
+reference_image_url  = composer-frames/…/scene-anchors/5b0dca87-…-188fb8bf743d.png
+```
+
+### Status
+
+**FA-3 = PASS.** Der P1-Fix (`processed_video_url = _final_url` im Stitch-Finalizer)
+ist im Produktionslauf bestätigt: `isSceneOutputFinal() = true`.
+FA-1, FA-2, FA-3 sind damit alle PASS — **Motion Studio Final Acceptance abgeschlossen.**
