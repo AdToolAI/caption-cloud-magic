@@ -6,20 +6,16 @@ BEGIN;
 
 DO $$
 DECLARE
-  _project_id uuid := gen_random_uuid();
-  _user_id uuid := gen_random_uuid();
+  _project_id uuid := 'a1f12c21-50c3-4eb9-ba3b-943df13a7c37'::uuid;
+  _user_id uuid := '8948d3d9-2c5e-4405-9e9c-1624448e7189'::uuid;
   _scene_id uuid := gen_random_uuid();
   _run_id uuid := gen_random_uuid();
   _job_id uuid := gen_random_uuid();
   _other_job_id uuid := gen_random_uuid();
   _result jsonb;
 BEGIN
-  -- Setup minimal user/project/scene
-  INSERT INTO auth.users (id, email, raw_user_meta_data)
-  VALUES (_user_id, 'f1-test@example.com', '{}'::jsonb);
-
-  INSERT INTO public.projects (id, user_id, name)
-  VALUES (_project_id, _user_id, 'f1-test-project');
+  -- Setup minimal scene under an existing project.
+  -- The transaction rolls back, so no production data is mutated.
 
   INSERT INTO public.composer_scenes (
     id, project_id, order_index, scene_type, duration_seconds, clip_source,
