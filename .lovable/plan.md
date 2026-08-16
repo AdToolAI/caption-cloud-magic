@@ -98,8 +98,9 @@ Acquire/Reset, G3.1 Ledger acquire/replace, Sync-Provider-Dispatch, Partial-Mux-
 Neu: `docs/v431-g3-2-2-f1-contract.md` mit
 Root Cause zu allen drei Abweichungen, aktueller Writer-/Callback-Kette, gewünschter Owner-Kette,
 atomarem Ledger-/Scene-Terminalvertrag, minimaler Writer-Migration und Testmatrix
-(Erfolg, Duplicate-Stitch-Callback, Stitch-Failure, Cancel/RS3-Reset während Mux, Recovery nach Crash
-zwischen Ledger- und Scene-Schritt, stale run/generation).
+(Erfolg, Duplicate-Stitch-Callback, Stitch-Failure, Cancel/RS3-Reset während Mux, Exception nach
+Ledger-Mutation vor Scene-Mutation → vollständiger Transaktions-Rollback → erneuter Callback → genau
+eine erfolgreiche Terminalisierung, stale run/generation).
 
 Ergänzung: `docs/v431-g3-2-2-report.md` erhält ausschließlich einen F1-Verweis.
 
