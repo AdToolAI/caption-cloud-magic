@@ -12,6 +12,7 @@ import { useFrameContinuity } from '@/hooks/useFrameContinuity';
 import { useSaveSceneToLibrary } from '@/hooks/useSaveSceneToLibrary';
 import { toast } from '@/hooks/use-toast';
 import { tx } from '@/lib/i18nText';
+import { beginIntentWrite, endIntentWrite } from '@/lib/video-composer/lipSyncIntentDraft';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -737,6 +738,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         useExistingRun: true,
       });
       const data = started.compose;
+      endIntentWrite(scene.id, 'engineOverride', true);
 
       const updatedScenes = optimistic.map(scene => {
         const result = data?.results?.find((r: any) => r.sceneId === scene.id);
@@ -965,6 +967,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     // dashboard cannot overwrite engine_override / clip_status 600 ms later
     // with a stale snapshot. The single-row DB update below is the source of truth.
     (onUpdateScenesLocalOnly ?? onUpdateScenes)(optimistic);
+    // C1 — this is a User-Writer for `engineOverride`: record the dirty marker
+    // so a browser death between the optimistic flip and the server-side
+    // persist cannot leave a silent UI/DB divergence.
+    beginIntentWrite(scene.id, 'engineOverride', 'cinematic-sync');
 
     try {
       // 2. Resolve the persisted scene id + project id WITHOUT rewriting the
@@ -1050,6 +1056,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       setTimeout(pollScenes, 800);
     } catch (err: any) {
       console.error('[ClipsTab] handleStartCinematicSync failed', err);
+      endIntentWrite(scene.id, 'engineOverride', false);
       // Roll back optimistic state.
       const rolledBack = scenes.map((s) =>
         s.id === scene.id
