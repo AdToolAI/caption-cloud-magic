@@ -917,10 +917,14 @@ serve(async (req) => {
 
     // Persist the dispatch on the scene BEFORE invoking, so a duplicate
     // call can short-circuit even if the Lambda invoke is in flight.
+    // F1.IMP narrow patch: merge with existing audio_mux so that
+    // mux_dispatch_requested_at (set by composer_apply_sync_segment_result)
+    // is preserved and not overwritten by the dispatch metadata.
     const updatedState: DialogShotsState = {
       ...state,
       status: "audio_muxing",
       audio_mux: {
+        ...(state.audio_mux ?? {}),
         render_id: renderId,
         dispatched_at: new Date().toISOString(),
       },
