@@ -25,7 +25,7 @@ BEGIN
     plate_generation, active_run_id, lip_sync_status, twoshot_stage,
     dialog_shots, audio_plan
   ) VALUES (
-    _scene_id, _project_id, 0, 'dialog', 10, 'ai',
+    _scene_id, _project_id, 999999, 'dialog', 10, 'ai',
     'rendering', '{}'::jsonb, 'cut', 0,
     0, 0, '720p', '[]'::jsonb, '{}'::jsonb,
     true, 'cinematic-sync', 'lipsync_muxing', now(),
