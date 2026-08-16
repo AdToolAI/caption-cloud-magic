@@ -80,18 +80,20 @@ kein stillschweigender Fix.
      Ledger-Write und vor dem erfolgreichen Scene-Write entsteht (Constraint-Verletzung
      auf dem Scene-Update-Pfad, z. B. unzulässiger Zielzustand). Danach Prüfung:
      Ledger unverändert `dispatched`, Scene unverändert nicht-`complete`.
-   Falls sich ein solcher Fall nicht ohne Änderung am Produktionsbody erzeugen lässt,
-   wird ersatzweise ein **temporärer Test-Clone** der Funktion unter eigenem Namen
-   angelegt, der denselben SQL-Core plus ein absichtliches `RAISE` enthält, in derselben
-   Transaktion getestet und im selben Lauf wieder gelöscht. Der Produktions-RPC bleibt
-   in beiden Varianten unangetastet; es wird ausdrücklich dokumentiert, dass der Clone
-   die Transaktionsgrenze beweist, nicht den Produktionsbody selbst.
+   Lässt sich ein solcher natürlicher, deterministischer Fehler **nicht** ohne jede
+   Schema- oder Funktionsmutation provozieren, wird der Rollback-Smoke **nicht**
+   ausgeführt. Es wird ausdrücklich **kein** temporärer Test-Clone und keine sonstige
+   DDL in der Produktions-DB angelegt. Stattdessen wird der Nachweis als
+   *structural transaction proof* dokumentiert, mit explizit begrenzter Beweiskraft:
+   belegt ist die Transaktionsgrenze aus dem Funktionsbody, nicht ein beobachteter
+   Rollback zur Laufzeit.
 4. `mux_dispatch_requested_at` ist **kein** Finalizer-Happy-Path-Kriterium. Der
    Regressionstest gehört zum Narrow-Patch von `render-sync-segments-audio-mux` und
    wird dort separat geführt (Merge statt Überschreiben des `audio_mux`-Objekts).
    Im Finalizer wird nur zusätzlich geprüft, dass er das Feld nicht zerstört.
-5. Residuen-Nachweis nach dem Lauf: 0 Test-Zeilen, Funktions- und ACL-Snapshot vor/nach
-   identisch (bis auf den absichtlich wieder entfernten Clone).
+5. Residuen-Nachweis der bereits gelaufenen self-cleaning Tests bleibt Pflicht:
+   0 Test-Zeilen, Funktions- und ACL-Snapshot unverändert.
+
 
 ## V3 — Report-Korrektur
 
