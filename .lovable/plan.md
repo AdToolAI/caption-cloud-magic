@@ -32,7 +32,7 @@ Setup gespiegelt von der akzeptierten FA-3-Szene:
 
 Kette wird über den Code belegt (statisch, kein Dispatch):
 `compose-twoshot-audio` → Plate → `compose-dialog-segments` → `sync_segment` → `audio_mux` → Stitch.
-Der v430-Effektivdialog (`resolveEffectiveDialog`) muss die eine Skriptzeile als effektive Sprecherzeit liefern (kein `dialog_too_long_for_plate`).
+Pre-Run gilt **nicht** `resolveEffectiveDialog()` als Beweis — bei `dialog_turns=[]` liefert es vertragsgemäß `reason='no_turns'`. Der Pre-Run-Nachweis lautet: `parseScriptLines()` → genau 1 Skriptzeile → eindeutiger Sprecher/Character → persistierte Voice → Länge innerhalb Plate-Budget. Die kanonische Prägung auf genau einen Turn wird erst in `compose-twoshot-audio` erwartet; danach läuft die Pipeline mit diesem Turn weiter.
 
 ## UI/DB-Intent-Konsistenz
 
