@@ -38,3 +38,6 @@ Telemetrie ab `T_F1_effective` und ab `T_run_start`: missing_binding, job_not_fo
 ## 8. Abschluss
 Alles grün → `G3.2.2-F1 DONE / FROZEN` und `G3.2.2 DONE / FROZEN`; Production Evidence in `docs/v431-g3-2-2-f1-imp-report.md` und `docs/v431-g3-2-2-report.md` ergänzen. Danach STOP für Review.
 Jede Abweichung → `G3.2.2 DEPLOYED — FOLLOW-UP BEFUND`, sofort STOP, kein Cleanup, kein zweiter UI-Versuch.
+
+## 9. Zeitpunkte sichern
+`T_F1_effective` (zweiter Edge-Deploy erfolgreich), `T_run_start` (UI-Renderfreigabe), `T_finalize` (`f1:stitch:done` / atomarer Commit) explizit erfassen und im Report ausweisen, damit alle Evidence nachweislich nach dem wirksamen F1-Deploy entsteht.
