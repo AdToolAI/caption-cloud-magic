@@ -22,8 +22,8 @@ DECLARE
   _result jsonb;
 BEGIN
   -- Setup minimal project/scene
-  INSERT INTO public.projects (id, user_id, name, status)
-  VALUES (_project_id, _user_id, 'f1-test-project', 'active');
+  INSERT INTO public.projects (id, user_id, name)
+  VALUES (_project_id, _user_id, 'f1-test-project');
 
   INSERT INTO public.composer_scenes (
     id, project_id, order_index, scene_type, duration_seconds, clip_source,
