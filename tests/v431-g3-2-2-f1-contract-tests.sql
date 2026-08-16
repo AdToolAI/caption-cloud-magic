@@ -6,17 +6,17 @@ BEGIN;
 
 DO $$
 DECLARE
-  _project_id uuid := gen_random_uuid(;
-  _user_id uuid := gen_random_uuid(;
-  _scene_id uuid := gen_random_uuid(;
-  _run_id uuid := gen_random_uuid(;
-  _job_id uuid := gen_random_uuid(;
-  _other_job_id uuid := gen_random_uuid(;
+  _project_id uuid := gen_random_uuid();
+  _user_id uuid := gen_random_uuid();
+  _scene_id uuid := gen_random_uuid();
+  _run_id uuid := gen_random_uuid();
+  _job_id uuid := gen_random_uuid();
+  _other_job_id uuid := gen_random_uuid();
   _result jsonb;
 BEGIN
   -- Setup minimal project/scene
   INSERT INTO public.projects (id, user_id, name)
-  VALUES (_project_id, _user_id, 'f1-test-project';
+  VALUES (_project_id, _user_id, 'f1-test-project');
 
   INSERT INTO public.composer_scenes (
     id, project_id, order_index, scene_type, duration_seconds, clip_source,
@@ -39,7 +39,7 @@ BEGIN
       )
     ),
     '{}'::jsonb
-  ;
+  );
 
   -- 1. Happy path: dispatched -> succeeded + complete
   INSERT INTO public.composer_pipeline_jobs (
@@ -50,7 +50,7 @@ BEGIN
     _job_id, _scene_id, _run_id, 431, 'audio_mux', 1,
     'f1-test-1', 'dispatched', 'render-123', 'remotion',
     '{}'::jsonb, 2
-  ;
+  );
 
   _result := public.composer_finalize_lipsync_scene(
     _job_id, 'render-123', _scene_id,
@@ -91,7 +91,7 @@ BEGIN
   END IF;
 
   -- 3. Invalid write_id
-  _other_job_id := gen_random_uuid(;
+  _other_job_id := gen_random_uuid();
   INSERT INTO public.composer_pipeline_jobs (
     id, scene_id, run_id, run_contract_version, stage, attempt_no,
     idempotency_key, status, external_job_id, provider, metadata,
@@ -100,12 +100,12 @@ BEGIN
     _other_job_id, _scene_id, _run_id, 431, 'audio_mux', 1,
     'f1-test-2', 'dispatched', 'render-456', 'remotion',
     '{}'::jsonb, 2
-  ;
+  );
 
   _result := public.composer_finalize_lipsync_scene(
     _other_job_id, 'render-456', _scene_id,
     'https://example.com/final2.mp4', 'wrong:write'
-  ;
+  );
 
   IF (_result->>'verdict') IS DISTINCT FROM 'invalid_write_id' THEN
     RAISE EXCEPTION 'TEST FAILED: %', 'invalid write_id should be rejected, got ' || (_result->>'verdict');
@@ -146,7 +146,7 @@ BEGIN
   END IF;
 
   -- 7. RS3 epoch-aware: pre-reset attempt rejected
-  _other_job_id := gen_random_uuid(;
+  _other_job_id := gen_random_uuid();
   UPDATE public.composer_scenes
   SET audio_plan = jsonb_build_object(
     'twoshot', jsonb_build_object(
@@ -169,7 +169,7 @@ BEGIN
     _other_job_id, _scene_id, _run_id, 431, 'audio_mux', 1,
     'f1-test-3', 'dispatched', 'render-rs3-old', 'remotion',
     jsonb_build_object('rs3_reset_id', 'reset-epoch-0'), 2
-  ;
+  );
 
   _result := public.composer_finalize_lipsync_scene(
     _other_job_id, 'render-rs3-old', _scene_id,
