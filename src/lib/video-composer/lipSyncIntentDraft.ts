@@ -343,3 +343,31 @@ export function downgradeHydratedOnMount<T extends DraftLike>(draft: T | null | 
 export function prepareDraftForSession<T extends DraftLike>(draft: T | null | undefined): T | null {
   return downgradeHydratedOnMount(migrateLegacyDraft(draft));
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Low-level write bracket for existing optimistic writers
+// ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * Marks a user-initiated intent write as in-flight and persists its recovery
+ * marker. Pair with `endIntentWrite`. Use when a writer already owns its own
+ * optimistic patch + rollback (SceneCard / SceneAvatarMode / ClipsTab).
+ */
+export function beginIntentWrite(sceneId: string, field: IntentField, desiredValue: IntentValue): string {
+  const mutationId = nextMutationId();
+  setIntentMarker({ sceneId, field, desiredValue, mutationId, setAt: Date.now() });
+  lostWrites.delete(keyOf(sceneId, field));
+  inflight.add(keyOf(sceneId, field));
+  return mutationId;
+}
+
+/** Ends an in-flight intent write. On failure the marker is dropped (DB wins). */
+export function endIntentWrite(sceneId: string, field: IntentField, ok: boolean): void {
+  inflight.delete(keyOf(sceneId, field));
+  if (ok) {
+    // Keep the marker until hydration confirms it; a confirmed write will be
+    // reconciled to `confirmed` and cleared there.
+    return;
+  }
+  clearIntentMarker(sceneId, field);
+}
