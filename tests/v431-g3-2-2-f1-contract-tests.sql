@@ -6,7 +6,7 @@ BEGIN;
 
 DO $$
 DECLARE
-  _project_id uuid := 'a1f12c21-50c3-4eb9-ba3b-943df13a7c37'::uuid;
+  _project_id uuid := '939a7999-8874-49c2-b2ff-df805b16fd69'::uuid;
   _user_id uuid := '8948d3d9-2c5e-4405-9e9c-1624448e7189'::uuid;
   _scene_id uuid := gen_random_uuid();
   _run_id uuid := gen_random_uuid();
