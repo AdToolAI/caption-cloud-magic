@@ -66,11 +66,11 @@ Browser-Smoke auf der Szene, Reload, Nachweis dass der Lip-Sync-Intent nach der 
 
 ## Kostenvoranschlag (nur Ablesen, kein Start)
 
-Job-Kardinalität folgt den **Turns**: 6 Turns → 6 Sync-Passes. Kalkulation `ceil(dur) × 9 × passes` mit `passes = 6`. Der im Renderdialog angezeigte Voranschlag wird nur abgelesen und dokumentiert — nicht bestätigt. Kosten sind kein Acceptance-Kriterium.
+Maßgeblich: 6 kanonische Turns = 6 sync_segment-Passes. Der im Renderdialog angezeigte Voranschlag wird nur abgelesen und dokumentiert — nicht bestätigt. Kosten sind kein Acceptance-Kriterium.
 
 ## FA-4 Abnahmekriterien (für den späteren Render, hier nur festgeschrieben)
 
-Mapping-Invariante (statt fixer Reihenfolge): exakt vier stabile Indizes 0..3 · bijektive Character↔`speaker_idx`-Zuordnung · dieselbe Figur trägt in allen ihren Turns denselben Index (Sarahs beide Turns identisch, Samuels beide identisch) · jeder Turn korrekt gegen die einmal deterministisch festgelegte Mapping-Tabelle. Die konkrete Folge `0,1,2,3,0,1` wird nur dann als harte Erwartung geführt, wenn der Code-Nachweis diese Sortierung tatsächlich belegt.
+Mapping-Invariante (maßgeblich, keine feste Zahlenfolge): exakt vier stabile Indizes 0..3 · bijektive Character↔`speaker_idx`-Zuordnung · dieselbe Figur trägt in allen ihren Turns denselben Index (Sarahs beide Turns identisch, Samuels beide identisch) · jeder Turn korrekt gegen die einmal deterministisch festgelegte Mapping-Tabelle. Eine konkrete Zahlenfolge wird nur dann hart geprüft, wenn der Code sie deterministisch so vorgibt.
 
 Weiter: 6 kanonische Turns → genau 6 Sync-Attempts · jede Turn-ID genau einmal · jede Voice korrekt dem Character zugeordnet · 4 Gesichter sauber auf Slots 0..3 · `reference_image_url` als tatsächlicher Geometrieanker · kein stiller Provider-Fallback · alle 6 Sync-Passes erfolgreich · genau 1 `audio_mux` · genau 1 Stitch · Finalizer `stitch:done` · `processed_video_url` final · **visuelle Sichtung des fertigen Clips**: kein falscher Mund, keine falsche Stimme. SQL/Ledger grün allein reicht bei FA-4 nicht.
 
