@@ -267,3 +267,135 @@ Transition-Log. `base_video_url` bleibt unter Plate-Ownership.
 Deploy-Reihenfolge danach: Migration anwenden → Security/Signature/Body-Smoke →
 SQL-Contracttests inkl. `processed_video_url` → Residuen-Check → frische
 FA-3-Szene (nicht S06) → genau ein Render. FA-1/FA-2 bleiben PASS.
+
+---
+
+## FA-3/P1 — Production DB Deploy + Verification
+
+### 1. Deploy
+
+- Angewendet: `supabase/migrations/20260816223000_fa3_p1_stitch_output_materialization.sql`
+  (`CREATE OR REPLACE FUNCTION public.composer_finalize_lipsync_scene(uuid, text, uuid, text, text)`),
+  eine Migration, kein Edge-Redeploy.
+- **T_FA3_P1_db = 2026-08-16 22:56:18 UTC** (`now() at time zone 'utc'` direkt nach Erfolg).
+- Security-Linter: 286 Findings = unveränderte Projekt-Baseline (RLS-Info /
+  Function-Search-Path-Warnungen aus Altbeständen), keine neuen Findings durch
+  diese Migration.
+
+### 2. Body-/Security-Smoke (read-only, `pg_proc` / `has_function_privilege`)
+
+```text
+sig_count            = 1
+identity_args        = _pipeline_job_id uuid, _external_job_id text, _scene_id uuid, _final_url text, _write_id text
+prosecdef            = true
+proconfig            = search_path=pg_catalog, public
+owner                = postgres
+prosrc md5 (vorher)  = 746f842e0ee0b49c11f8189cd19d31c2
+prosrc md5 (nachher) = 9d6ba907e6338014d3e903d0c6aa4b48
+```
+
+EXECUTE-Privilegien, per tatsächlicher Privilege-Prüfung
+(`has_function_privilege(role, oid, 'EXECUTE')`), nicht per ACL-Textlesung:
+
+```text
+service_role   EXECUTE = true
+anon           EXECUTE = false
+authenticated  EXECUTE = false
+authenticator  EXECUTE = false
+PUBLIC         EXECUTE = false
+```
+
+Getrennt ausgewiesen, kein Verstoß gegen die Grant-Grenze:
+
+```text
+postgres        EXECUTE = true   (Owner)
+supabase_admin  EXECUTE = true   (Plattform-Superuser, Bypass)
+ACL             = postgres=X/postgres | service_role=X/postgres | sandbox_exec_<ref>=X/postgres
+                  (der sandbox_exec_<ref>-Eintrag ist Bestand aus dem Vorzustand,
+                   wurde durch CREATE OR REPLACE übernommen und nicht erweitert)
+```
+
+**Struktureller Body-Nachweis** (Extraktion des Erfolgs-UPDATE aus `prosrc`,
+nicht bloßes Token-Vorkommen). Top-Level-SET-Ziele des
+`UPDATE public.composer_scenes ... WHERE id = _scene.id`:
+
+```text
+pipeline_state, pipeline_state_at, clip_status,
+processed_video_url, clip_url,
+lip_sync_status, lip_sync_applied_at, lip_sync_source_clip_url,
+twoshot_stage, clip_error, dialog_shots, updated_at
+```
+
+```sql
+      processed_video_url = _final_url,
+      clip_url            = _final_url,
+```
+
+`base_video_url` kommt im gesamten installierten Body **kein einziges Mal** vor
+(0 Treffer) — die Plate-Ownership bleibt unangetastet. Es existieren genau zwei
+UPDATE-Statements: `composer_pipeline_jobs` (Terminalisierung) und
+`composer_scenes` (Finalisierung), Lock-Reihenfolge Job → Scene unverändert.
+
+Diff installierter Body gegen den F1.IMP-Vorzustand (`unified diff`):
+
+```text
+--- prev_F1
++++ installed
+@@
+       pipeline_state_at = now(),
+       clip_status = 'ready',
++      processed_video_url = _final_url,
+       clip_url = _final_url,
+       lip_sync_status = 'done',
+```
+
+Genau eine hinzugefügte Zeile, keine weitere Abweichung. Guard-/Verdict-/RS3-/
+Ledger-Semantik damit beweisbar unverändert (`invalid_write_id`, `no_ledger_job`,
+`wrong_job`, `wrong_stage`, `stale_run`, `stale_generation`, `already_completed`,
+`canceled`, `dispatch_uncertain`, `pre_reset_attempt`, `rs3_reset_id`,
+`stitch:done`-Allowlist, `g322_stitch_finalize`).
+
+**Ergebnis Schritt 2: PASS.**
+
+### 3. SQL-Contracttests — BLOCKIERT (STOP, kein stilles Nachbessern)
+
+`tests/v431-g3-2-2-f1-contract-tests.sql` konnte gegen den installierten Body
+**nicht** ausgeführt werden:
+
+```text
+current_user = sandbox_exec
+has_function_privilege('sandbox_exec', composer_finalize_lipsync_scene, 'EXECUTE') = false
+psql: ERROR: permission denied for function composer_finalize_lipsync_scene
+```
+
+Ursache ist die eingefrorene Grant-Grenze selbst: die Funktion ist
+`service_role`-only, und die Sandbox-Rolle darf per Plattform-Design keine
+Datenbankfunktionen ausführen. Die im Testfile enthaltene Zeile
+`GRANT EXECUTE ... TO sandbox_exec` schlägt ebenfalls fehl (keine Ownership) —
+und ein Grant-Workaround ist ausdrücklich verboten. Ein Service-Role-Key ist auf
+Lovable Cloud nicht verfügbar.
+
+Verbleibender privilegierter Ausführungsweg: das Migrationstool (läuft als
+`postgres`). Die Tests würden dort als self-rolling-back DO-Block laufen
+(Sub-Transaktion + kontrolliertes Zurückrollen, kein Schema-Change, kein
+Commit von Testdaten). Das ist eine Prozessabweichung gegenüber „keine weitere
+Migration" und wird deshalb **nicht** eigenmächtig ausgeführt.
+
+**Ergebnis Schritt 3: BLOCKED — Freigabe erforderlich.**
+
+### 4. Residuen-Check (nach Deploy, vor Tests)
+
+```text
+Test-Scenes (order_index = 999999)                = 0
+Test-Ledger-Rows (idempotency_key like 'f1-test-%') = 0
+Test-Transition-Rows (render-123/456/789/rs3-old)  = 0
+Funktionen im Schema public: vorher 344 / nachher 344 (keine Testfunktionen)
+ACL composer_finalize_lipsync_scene: unverändert gegenüber Vorzustand
+```
+
+**Ergebnis Schritt 4: PASS** (Stand vor Ausführung der Contracttests).
+
+### Status
+
+**FA-3/P1 DB DEPLOY VERIFIED (Schritte 1, 2, 4) — SQL-Contracttests BLOCKED.**
+Kein FA-3-Render, keine neue Szene. FA-1 und FA-2 bleiben PASS.
