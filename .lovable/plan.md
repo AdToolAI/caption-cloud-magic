@@ -7,50 +7,81 @@ Nur die Divergenz zwischen angezeigtem Toggle und persistiertem Intent. G3.2.2, 
 Nachweise aus `VideoComposerDashboard.tsx`, `lipSyncPending.ts`, `lipSyncIntent.ts`:
 
 1. Der Composer-State wird beim Mount **zuerst aus dem localStorage-Draft** gebaut (`loadDraft()`), inklusive `lipSyncWithVoiceover`. Die DB-Hydration läuft erst danach asynchron.
-2. `useEffect(() => saveDraft(project), [project])` schreibt **jede** lokale State-Änderung in den Draft — auch rein optimistische Writes, die nie in die DB gehen. `lipSyncWithVoiceover: true` wird u. a. lokal gesetzt von `SceneDialogStudio`, `SceneClipProgress`, `FaceMapReviewDialog`, `useSceneGenerate`.
+2. `useEffect(() => saveDraft(project), [project])` schreibt **jede** lokale State-Änderung in den Draft — auch rein optimistische Writes, die nie in die DB gehen (`SceneDialogStudio`, `SceneClipProgress`, `FaceMapReviewDialog`, `useSceneGenerate` setzen `lipSyncWithVoiceover: true`).
 3. Die DB-Hydration steigt **still aus**, wenn `data.length === 0` oder ein Fehler auftritt (`catch → console.warn`), und läuft pro `project.id` nur einmal (`lastSyncedProjectIdRef`). In diesen Fällen bleibt der Draft-Wert stehen.
-4. Es gibt **kein Dirty-Tracking für Booleans**. `markDirty`/`isDirty` decken nur Textfelder ab; für Lip-Sync existiert nur die In-Memory-Registry `lipSyncPending` mit 8 s TTL, die einen Reload nicht überlebt. Ein alter Draft-Boolean ist damit von einem echten frischen User-Edit nicht unterscheidbar.
+4. Es gibt **kein Dirty-Tracking für Booleans**. `markDirty`/`isDirty` decken nur Textfelder ab; für Lip-Sync existiert nur die In-Memory-Registry `lipSyncPending` (8 s TTL), die einen Reload nicht überlebt und heute auch rein lokale Optimistic-Writes repräsentieren kann.
 5. Der Draft trägt **keine Scene-Revision und keinen Zeitstempel** — beim Laden ist nicht entscheidbar, ob er älter ist als die DB-Zeile.
-6. Render-Gates lesen den persistierten Intent (`isLipSyncIntentionalRow` auf der DB-Zeile), die UI den Draft-Wert. Genau daraus entsteht "UI=AN, Start blockiert".
+6. Render-Gates lesen den persistierten Intent (`isLipSyncIntentionalRow` auf der DB-Zeile), die UI den Draft-Wert. Genau daraus entsteht "UI=AN, Start still blockiert".
 
-Der generische Teil ist damit belegt: die Regel "Draft gewinnt bis die DB-Hydration eintrifft" gilt für **alle** Felder, nicht nur für Lip-Sync. Welcher der lokalen Writer im konkreten beobachteten Fall `true` gesetzt hat, ist noch nicht bewiesen — das wird als erster Implementierungsschritt bestätigt, ändert den Fix aber nicht.
+## Zielvertrag (inkl. C1-Zusatz-Contract)
 
-## Zielvertrag
+1. **Tri-State statt Boolean in der UI.** Der angezeigte Intent kennt `resolved:true`, `resolved:false`, `unresolved`. Solange die Szene nicht erfolgreich aus der DB hydratisiert wurde (Fehler, kein Zeilentreffer, noch laufende Hydration), ist der Intent `unresolved`: Toggle disabled mit sichtbarem "wird geladen", Renderstart fail-closed. Es wird **kein** OFF vorgetäuscht.
+2. **Dirty-Marker sind reine Write-Recovery-Metadaten**, keine zweite Source of Truth. Form: `{ sceneId, field, desiredValue, mutationId, setAt }`. Nach **jeder** erfolgreichen Hydration wird reconciled:
+   - DB == `desiredValue` → Write bestätigt, Marker löschen, DB gewinnt.
+   - DB != `desiredValue` und Mutation `mutationId` nachweislich noch in-flight (In-Memory-Registry dieser Session) → Pending/"ungespeichert" anzeigen.
+   - DB != `desiredValue` und kein aktiver Write → **DB gewinnt**, Marker löschen, Hinweis "Änderung konnte nicht gespeichert werden".
+   Eine TTL läuft zusätzlich mit, ist aber nie der Wahrheitsbeweis.
+3. **Bestätigung durch die DB.** Ein User-Intent-Write gilt erst als bestätigt, wenn der geschriebene Wert aus der DB zurückgelesen wurde (`update … .select()` bzw. Reconcile beim nächsten Hydrate). Bei Fehler: Rollback + Refetch/Reconcile + sichtbarer Fehler, keine dauerhafte optimistische Anzeige.
+4. **`lipSyncPending`-Registry wird eingegrenzt**: Sie darf für die drei Intent-Felder nur einen real in-flight DB-Write repräsentieren (Setzen unmittelbar vor dem Write, Löschen bei Bestätigung/Fehler). Rein lokale Optimistic-Writes ohne DB-Write dürfen sie nicht mehr füllen.
+5. `isLipSyncIntentional()` bleibt unverändert; kein "UI=true ⇒ Intent=true".
 
-- Persistierter DB-Wert gewinnt bei der Scene-Hydration, außer es liegt ein nachweislich aktueller, dirty User-Edit für dieselbe Scene vor.
-- Der Draft darf einen persistierten Intent-Boolean nie allein deshalb überschreiben, weil lokale Daten existieren.
-- `isLipSyncIntentional()` bleibt unverändert; kein "UI true ⇒ Intent true".
-- Persistierungsfehler sind sichtbar und fail-closed.
+## Writer-Audit (vor Coding, Ergebnis wird als Tabelle festgeschrieben)
+
+Der Scan über `lipSyncWithVoiceover`, `dialogMode`, `engineOverride` (camel + snake) liefert diese Kandidaten; jeder bekommt im Audit-Dokument eine verbindliche Klassifikation **U** (expliziter User-Writer → neuer Vertrag) oder **D** (derived/optimistisch → keine persistente Dirty-Autorität):
+
+| Ort | Feld(er) | erwartete Klasse |
+| --- | --- | --- |
+| `SceneCard.tsx` ~2804 (Lip-Sync AN/AUS) | alle drei | U |
+| `SceneCard.tsx` ~542 (Dialog & Lip-Sync Switch) | `dialogMode` (+ Mirror) | U |
+| `SceneCard.tsx` ~1204 (Engine-Picker Select) | `engineOverride` | U |
+| `SceneCard.tsx` ~1055 / ~2496 (Aktions-Buttons → `cinematic-sync`) | `engineOverride` | U (zu bestätigen) |
+| `SceneAvatarMode.tsx` ~358 (Talking-Head Switch) | `lipSyncWithVoiceover` | U |
+| `ClipsTab.tsx` ~955 / ~1034 | `engineOverride` | zu klassifizieren |
+| `SceneDialogStudio.tsx` ~1780/1829 | alle drei | D |
+| `SceneClipProgress.tsx` ~170 | alle drei | D |
+| `FaceMapReviewDialog.tsx` ~222 | alle drei | D |
+| `useSceneGenerate.ts` ~141/151/197 | alle drei | D (schreibt DB selbst) |
+| `useApplyProductionPlan.ts`, `useApplyBriefingManifest.ts`, `spawnCoverageScenes.ts` | `engineOverride`/`dialogMode` | D (Plan-Apply, schreibt DB) |
+| `useComposerPersistence.ts`, `VideoComposerDashboard.persistScenesToDb` | snake-Writes | Persistenzpfad — muss Dirty/Reconcile respektieren |
+| `lipSyncResetFlow.ts` | alle drei | Reset-Pfad, schreibt DB, löscht Marker |
+
+Jeder U-Writer läuft danach über **einen** gemeinsamen Helper (Mark → DB-Write → Bestätigung → Clear/Rollback). Jeder D-Writer bleibt lokal/DB-eigen, erzeugt aber keinen persistenten Marker.
 
 ## Umsetzung
 
-**1. Intent-Draft-Guard (neues Modul `src/lib/video-composer/lipSyncIntentDraft.ts`)**
-- Persistente Dirty-Marken (localStorage, account-scoped über `local-draft-scope`) je `sceneId` für die drei Intent-Felder `lipSyncWithVoiceover`, `dialogMode`, `engineOverride`: `{ value, setAt, cleared }`.
-- Eine Marke entsteht **nur** durch einen expliziten User-Toggle und wird nach bestätigtem DB-Write wieder gelöscht.
-- Auflösung bei Hydration: Marke vorhanden und noch nicht bestätigt → lokaler Wert (UI zeigt "ungespeichert"). Sonst → DB-Wert, kompromisslos.
+**1. Neues Modul `src/lib/video-composer/lipSyncIntentDraft.ts`**
+- Persistente Marker (`{ sceneId, field, desiredValue, mutationId, setAt }`, account-scoped über `local-draft-scope`) + In-Memory-Inflight-Registry.
+- `reconcileIntentMarkers(sceneId, dbRow)` nach jeder erfolgreichen Hydration gemäß Zusatz-Contract Punkt 2.
+- `resolveIntentField(sceneId, field, dbValue | UNRESOLVED)` liefert `{ state: 'resolved'|'unresolved', value, pending }`.
+- `persistIntentWrite(...)` als gemeinsamer U-Writer-Helper.
 
-**2. Draft-Hydration entschärfen (`VideoComposerDashboard.tsx`)**
-- Beim Aufbau des Initial-State aus `loadDraft()` werden die drei Intent-Felder auf allen persistierten Szenen (UUID-ID) **verworfen**, solange keine Dirty-Marke existiert; sie gelten bis zur DB-Hydration als "unbekannt" und werden nicht als AN gerendert.
-- In beiden Merge-Pfaden (Mount-Hydration Zeile ~372, Refetch ~562) ersetzt der neue Resolver `resolveLipSyncValue`/`resolveDialogModeValue`/`resolveEngineOverrideValue`: In-Memory-Pending-Registry (Race-Schutz, unverändert) **oder** persistente Dirty-Marke gewinnt, sonst DB.
-- Bricht die Hydration ab (Fehler / keine Zeilen), bleibt der Intent auf dem sicheren Default (OFF) statt auf dem alten Draft-Wert.
+**2. Hydration (`VideoComposerDashboard.tsx`)**
+- Aus `loadDraft()` werden die drei Intent-Felder für persistierte Szenen (UUID) verworfen; die Szene startet mit `intentResolved = false`.
+- Mount-Hydration (~372/441/443) und Refetch (~562/631/633) setzen `intentResolved = true` und rufen vorher `reconcileIntentMarkers`.
+- Hydration-Fehler / kein Zeilentreffer → `intentResolved` bleibt false → `unresolved`.
 
-**3. Toggle-Pfade fail-closed (`SceneCard.tsx`, `SceneAvatarMode.tsx`)**
-- Marke vor dem Write setzen, nach erfolgreichem Write löschen; bei Fehler Rollback **plus** sichtbarer Fehler-Toast statt nur `console.warn`.
-- Solange die Marke offen ist, zeigt der Toggle einen "ungespeichert"-Zustand an (kleiner Punkt/Badge am Schalter), damit UI=AN nie kanonisch wirkt, bevor die DB bestätigt hat.
+**3. UI**
+- Toggle/Switch/Engine-Picker rendern drei Zustände: AN, AUS, "wird geladen" (disabled) sowie ein "ungespeichert"-Badge bei aktivem Marker.
+- Renderstart-Preflight: `unresolved` blockiert mit klarer Meldung statt stillem No-Op (Gate-Semantik selbst unverändert).
+- Fehlgeschlagener Write: Rollback + sichtbarer Toast statt nur `console.warn`.
 
-**4. Optimistische Nicht-User-Writer**
-- Die Stellen, die `lipSyncWithVoiceover: true` lokal setzen (Dialog-Studio, Clip-Progress, FaceMap, `useSceneGenerate`), erzeugen **keine** Dirty-Marke; ihre lokalen Werte überleben damit keinen Reload und können den persistierten Intent nicht vortäuschen. Wo diese Pfade den Intent wirklich meinen, schreiben sie ihn (wie heute) über ihren eigenen DB-Write.
+**4. Persistenzpfade**
+- `persistScenesToDb` und `useComposerPersistence` schreiben die drei Felder nur aus bestätigtem/aktivem Intent, nie aus einem `unresolved`-Platzhalter.
 
-## Tests (Vitest, neu unter `src/lib/video-composer/__tests__/`)
+## Tests (Vitest, `src/lib/video-composer/__tests__/`)
 
-- DB=false + alter Draft=true (keine Marke) → UI=false.
-- DB=true + alter Draft=false (keine Marke) → UI=true.
-- Frischer dirty Edit false→true → UI=true; nach erfolgreichem Write Marke gelöscht, DB=true.
+- DB=false + alter Draft=true (kein Marker) → UI=false.
+- DB=true + alter Draft=false (kein Marker) → UI=true.
+- **DB=true + Hydration schlägt fehl → UI `unresolved`, nicht OFF; Renderstart fail-closed.**
+- Frischer dirty Edit false→true → UI=true (pending), nach Bestätigung Marker gelöscht, DB=true.
+- **Write erfolgreich, Tab stirbt vor Clear → Reload sieht DB == desiredValue → Marker wird entfernt, DB gewinnt.**
+- **Verwaister Marker (kein in-flight Write) mit DB-Gegenwert → DB gewinnt, Marker weg, Hinweis "nicht gespeichert".**
 - Persistierungsfehler → Rollback, keine dauerhafte ON-Anzeige, Fehler sichtbar.
 - Reload nach gespeichertem ON → UI/DB/Intent alle true.
-- UI ON (persistiert) → `isLipSyncIntentional()` true; persistiert OFF → false, auch bei altem Draft=true.
-- Regressionsschutz: andere Draft-Felder (Prompt-Texte, Character-Shots, Overlay) behalten ihr heutiges Merge-Verhalten.
+- Persistiert OFF + alter Draft true → `isLipSyncIntentional()` false.
+- **`dialogMode` und `engineOverride` durchlaufen denselben User-Writer-Vertrag (je ein Fall pro Feld).**
+- Regressionsschutz: andere Draft-Felder behalten ihr heutiges Merge-Verhalten.
 
 ## Abschluss
 
-Root Cause, minimaler Fix und Testergebnisse in `docs/v432-c1-lipsync-intent-divergence.md`. Danach STOP für Review — keine allgemeine Motion-Studio-Aufräumrunde.
+Writer-Audit-Tabelle, Root Cause, minimaler Fix und Testergebnisse in `docs/v432-c1-lipsync-intent-divergence.md`. Danach STOP für Review — danach Motion-Studio-Final-Acceptance, keine weitere Architekturbaustelle.
