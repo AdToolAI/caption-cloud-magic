@@ -67,6 +67,21 @@ Autoritativ ist ein expliziter Herkunfts-Status pro Szene, im Draft mitgeführt:
 
 Ein `hydratedSceneIds`-Set ist dabei nur die Laufzeit-Repräsentation von `db_hydrated`; die Unterscheidung "noch nie persistiert" vs. "persistiert, aber noch nicht hydratisiert" trägt ausschließlich `scenePersistenceState`.
 
+## Legacy-Draft-Vertrag (Drafts aus der Zeit vor C1)
+
+Bestehende `localStorage`-Drafts enthalten kein `scenePersistenceState`. Ein fehlender Status darf **niemals** als `local_new` interpretiert werden — sonst bliebe genau der Ursprungsbug (alter DB-backed Draft mit stale `lipSyncWithVoiceover=true`) beim ersten Reload nach dem Deployment bestehen.
+
+Regeln:
+
+- Der Draft bekommt eine `draftSchemaVersion`. Drafts ohne diese Version laufen einmalig durch `migrateLegacyDraft()` beim Laden; danach wird die migrierte Fassung mit Version geschrieben.
+- `migrateLegacyDraft()` vergibt pro Szene:
+  - DB-Herkunft belegbar (Szene besitzt DB-Marker wie `project_id`-Bindung / gespeicherte `created_at`/`updated_at` aus dem Load, oder — einmalig und rein kompatibilitätshalber — eine UUID-förmige ID) → `db_known_unhydrated`.
+  - Herkunft nicht belegbar → ebenfalls `db_known_unhydrated` (konservativ: lieber `unresolved` bis zur Hydration als stale Intent als kanonisch anzuzeigen). Es gibt in der Migration **keinen** Pfad nach `local_new`.
+- Die drei Intent-Felder werden für migrierte Szenen aus dem Draft verworfen; sie kommen ausschließlich aus der Hydration.
+- Die `scene_…`-/UUID-Form ist ausschließlich in dieser einmaligen Migration erlaubt und wird **nicht** Teil des laufenden Resolver-Vertrags; der Laufzeitvertrag bleibt rein statusbasiert.
+- Nur in dieser C1-Version neu erzeugte Szenen werden explizit mit `scenePersistenceState: 'local_new'` angelegt (`useSceneManager`, `StoryboardTab`, `addSceneToProject`, `useApplyProductionPlan`). Nach bestätigtem DB-Insert → sofort `db_hydrated`; beim nächsten gespeicherten Draft/Mount → `db_known_unhydrated`.
+
+
 
 
 ## Umsetzung
