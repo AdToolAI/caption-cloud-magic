@@ -23,6 +23,7 @@ import {
   markDialogModePending,
   markEngineOverridePending,
 } from "@/lib/video-composer/lipSyncPending";
+import { clearSceneIntentMarkers } from "@/lib/video-composer/lipSyncIntentDraft";
 
 export interface LipSyncResetSnapshot {
   lipSyncStatus: unknown;
