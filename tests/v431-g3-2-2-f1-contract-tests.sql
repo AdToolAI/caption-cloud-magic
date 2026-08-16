@@ -199,4 +199,5 @@ BEGIN
 END;
 $$;
 
+REVOKE EXECUTE ON FUNCTION public.composer_finalize_lipsync_scene(uuid, text, uuid, text, text) FROM sandbox_exec;
 ROLLBACK;
