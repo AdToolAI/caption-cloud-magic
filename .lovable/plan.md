@@ -28,11 +28,11 @@ gefahren.
 
 ### FA-2 — Standard-Render ohne Lip-Sync (kostenpflichtig, 1 Szene)
 Happy Path bis `complete`. Nachweis ist der finale Resolver-Output:
-`resolveSceneOutput()` liefert einen finalen Output, `base_video_url` /
-`processed_video_url` entsprechen der jeweiligen Intent-Semantik (ohne
-Lip-Sync-Intent ist `base_video_url` der korrekte finale Output), die
-`clip_url`-Compatibility ist korrekt. Dazu: ein Ledger-Job pro Stage, keine
-Legacy-Wrapper-Completion.
+`resolveSceneOutput()` liefert den finalen Output; ohne intentionalen Lip-Sync
+darf `base_video_url` der Finaloutput sein, mit intentionalem Lip-Sync ist
+`processed_video_url` erforderlich. Die `clip_url`-Compatibility ist korrekt.
+Dazu: genau ein Attempt je tatsächlich durchlaufener Stage, keine
+Doppel-Dispatches, keine Legacy-Wrapper-Completion.
 
 ### FA-3 — 1 Sprecher Lip-Sync (kostenpflichtig, kurzer Regressions-Smoke)
 Plate → sync_segment → audio_mux → Stitch → complete, Finalisierung via
@@ -55,7 +55,8 @@ Nachweispflicht:
 - danach genau **ein** `audio_mux`, ein Stitch, ein `complete`
 - Preclip-Pflicht (v331) greift: Face-Share-Floor, gesichtsproportionale Maske
 - Geometrie-Anker ist `reference_image_url` (v400), kein `lock_reference_url`
-- Provider ausschliesslich HappyHorse oder Hailuo (v425), kein stiller Fallback
+- Provider entspricht der frozen Provider Capability Matrix (Lip-Sync-
+  Zertifizierung), kein stiller Fallback
 
 Visuelle Abnahme am fertigen Clip (P0 bei Verstoss): kein Mund bewegt sich beim
 falschen Sprecher, keine springende Geometrie-Zuordnung, keine Stimme auf der
@@ -68,11 +69,9 @@ schreibt nie `reference_image_url` (v426). Anker belegt bei Seedance 2.5 den
 exklusiven Slot (v422), rohe Cast-Porträts gehen nicht an ModelArk.
 
 ### FA-6 — Reset / Retry über den RS3-Pfad (kostenpflichtig, 1 Wiederholung)
-Lip-Sync-Reset **ausschliesslich über den normalen UI-Produktpfad** auslösen.
-Kein direkter Aufruf von `composer_reset_lipsync_full` — das ist der ältere
-Full-Reset-Vertrag mit abweichender Run-/Generation-Semantik und wäre der
-falsche Test. Nachzuweisen ist, dass der UI-Pfad auf den RS3-Resetvertrag
-(`composer_reset_lipsync_with_attempt_cancellation`) führt:
+Lip-Sync-Reset **ausschliesslich über den normalen UI-Produktpfad** auslösen,
+kein direkter Full-Reset-RPC. Nachzuweisen ist, dass der UI-Pfad auf den
+RS3-Resetvertrag (`composer_reset_lipsync_with_attempt_cancellation`) führt:
 
 - Run/Generation gemäss RS3 erhalten (Same-Run/Same-Generation-Rearm)
 - offene alte Attempts `cancelled` / `user_reset`
@@ -80,16 +79,14 @@ falsche Test. Nachzuweisen ist, dass der UI-Pfad auf den RS3-Resetvertrag
 - alter Callback wird als `pre_reset_attempt` / No-op abgewiesen, ohne
   Scene-Mutation
 - neuer On-Demand-Attempt N+1 ohne `predecessor_exists`
-- erfolgreicher neuer Lauf bis `complete`
+- vollständiger neuer Lauf bis `complete`
 
 ### FA-7 — Provider/Engine-Routing (kostenfrei)
-Acceptance läuft gegen die **eingefrorene aktuelle Provider Capability Matrix**,
-nicht gegen hier notierte Beispielwerte. Zuerst die Matrix als Ist-Stand lesen,
-dann UI/Resolver dagegen prüfen: Auto-Provider-Wahl nach Szenenlänge,
-Lip-Sync-Zertifizierung, Slot-Topologie pro Provider, Referenz-Limits. Steht in
-der Matrix „Seedance 2.5 ab >15 s" und „Lip-Sync nur HappyHorse/Hailuo", muss
-genau das grün sein; weicht die Matrix bewusst ab, gewinnt die Matrix. Reine
-UI-/Resolver-Prüfung ohne Render.
+Zuerst die aktuelle frozen Provider Capability Matrix als Ist-Stand lesen, dann
+UI und Resolver ausschliesslich gegen diese Matrix prüfen: Auto-Provider-Wahl
+nach Szenenlänge, Lip-Sync-Zertifizierung, Slot-Topologie pro Provider,
+Referenz-Limits. Bei Abweichung zwischen Erwartung und Matrix gewinnt die
+Matrix. Reine UI-/Resolver-Prüfung ohne Render.
 
 ### FA-8 — EN UI vollständig (kostenfrei)
 ### FA-9 — ES UI vollständig (kostenfrei)
@@ -129,11 +126,19 @@ verständlich bleibt — sie werden inventarisiert, nicht als Blocker gewertet.
 ## Abschluss
 
 Bei grün: Status `MOTION STUDIO DONE / FROZEN` und Abschlussreport in
-`docs/v433-motion-studio-final-acceptance.md` mit
-bewiesenen Kernpfaden, unterstützten Sprachen, bewiesenem
-Multi-Speaker-Maximum, bekannten nicht-blockierenden Schulden und der Liste der
+`docs/v433-motion-studio-final-acceptance.md` mit bewiesenen Kernpfaden,
+unterstützten Sprachen, bekannten nicht-blockierenden Schulden und der Liste der
 frozen Architekturverträge (v283-Baseline, v400, v422, v425, v426, RS3,
 G3.2.2/F1, C1).
+
+Für FA-4 werden im Bericht zwei Kennzahlen **getrennt** ausgewiesen:
+„4 Sprecher erfolgreich bewiesen" und „maximale getestete Turn-Anzahl". Damit
+wird „Multi-Speaker-Maximum = 4" nicht fälschlich als Turn-Limit gelesen.
+
+EN/ES-Abnahmedefinition: beide Sprachen müssen funktional vollständig und
+verständlich sein. Fehlendes spanisches Feintuning mit sauberem EN-Fallback
+bleibt P2/P3; rohe Keys, prominente deutsche UI-Texte und Sprach-Rücksprünge
+sind Abschlussblocker.
 
 ## Technische Notizen
 
