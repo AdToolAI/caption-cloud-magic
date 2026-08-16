@@ -31,20 +31,31 @@ Nur `read_query`. Zu belegen:
 - keine alten Pass-/`pipeline_job_id`-Pointer auf der Szene
 - kein RS3-Marker (`audio_plan.twoshot.rs3_reset`, `rs3_reset_id`)
 - keine Output-Historie: `base_video_url`, `processed_video_url`, `clip_url`, Stitch-Pointer alle leer
-- kanonische `dialog_turns` (genau 1 Turn, `speaker_idx = 0`), persistierte Voice-ID, Cast-Anzahl = 1
+- Dialog-Zustand nach v430-Vertrag:
+  - `resolveEffectiveDialog(scene)` → **genau 1 effektiver Turn**
+  - Sprecher eindeutig der gewählte Cast, `speaker_idx = 0`, Cast-Anzahl = 1
+  - Voice-ID persistiert
+  - `dialog_turns` darf diesen einen Turn bereits enthalten **oder** vertragsgemäß noch `[]` sein; `[]` wird ausdrücklich als erwarteter Pre-Run-Zustand dokumentiert, nicht als Finding (kanonische Turns werden erst im Lauf durch `compose-twoshot-audio` geprägt)
 
 ## Schritt 4 — Routing-Nachweis (statisch, gegen den echten Code)
 
-Anhand der persistierten Werte gegen die tatsächliche Routing-/Preflight-Logik belegen, nicht gegen UI-Labels:
+Anhand der persistierten Werte gegen die tatsächliche Routing-/Preflight-Logik belegen, nicht gegen UI-Labels. Zu belegende Kette:
+
+```text
+intentional Lip-Sync → Plate → compose-twoshot-audio → kanonische Dialog-Prägung
+  → compose-dialog-segments → sync_segment → audio_mux → Stitch
+```
 
 - `lipSyncIntent.ts` (Front + Backend-Spiegel) → intentional
 - `sceneEngineRouter.ts` / `validateSceneForCinematicSync.ts` → Cinematic-Sync
-- `compose-video-clips/index.ts` → Branch Plate → `compose-dialog-segments`
+- `compose-video-clips/index.ts` → tatsächlicher produktiver Branch; ob Plate direkt an `compose-dialog-segments` übergibt oder weiterhin über `compose-twoshot-audio` läuft, wird am Code abgelesen und so dokumentiert, wie er ist
+- `compose-twoshot-audio` → Prägung der kanonischen Turns aus dem effektiven Dialog
 - `compose-dialog-segments` Preflight (Dialog vorhanden, Voice vorhanden, Segmentanzahl, Plate-Budget) → pass
-- `resolveEffectiveDialog.ts` → effektive Länge unter der Plate-Schwelle
-- `lipsyncMasterProvider.ts` (v425) → gewählter Provider zertifiziert
+- `resolveEffectiveDialog.ts` → 1 Turn, Länge unter der Plate-Schwelle
+- Provider-Wahl gegen die **frozen Capability Matrix** (`providerMatrix.ts` + `lipsyncMasterProvider.ts`, v425): HappyHorse/Hailuo nur dann, wenn die Matrix den Provider für genau diese Konfiguration als Lip-Sync-Master zertifiziert
 
 Explizit ausgeschlossen, je mit Codestelle: Talking-Head-Pfad (`generate-talking-head`), Tight-/Direct-Finalize-Pfad, Guard-Abbruch wegen fehlendem Dialog/Voice, Provider-Pfad der `sync_segment` umgeht.
+
 
 ## Schritt 5 — UI/DB-Konsistenz nach Reload
 
