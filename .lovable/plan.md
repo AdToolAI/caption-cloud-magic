@@ -69,11 +69,9 @@ schreibt nie `reference_image_url` (v426). Anker belegt bei Seedance 2.5 den
 exklusiven Slot (v422), rohe Cast-Porträts gehen nicht an ModelArk.
 
 ### FA-6 — Reset / Retry über den RS3-Pfad (kostenpflichtig, 1 Wiederholung)
-Lip-Sync-Reset **ausschliesslich über den normalen UI-Produktpfad** auslösen.
-Kein direkter Aufruf von `composer_reset_lipsync_full` — das ist der ältere
-Full-Reset-Vertrag mit abweichender Run-/Generation-Semantik und wäre der
-falsche Test. Nachzuweisen ist, dass der UI-Pfad auf den RS3-Resetvertrag
-(`composer_reset_lipsync_with_attempt_cancellation`) führt:
+Lip-Sync-Reset **ausschliesslich über den normalen UI-Produktpfad** auslösen,
+kein direkter Full-Reset-RPC. Nachzuweisen ist, dass der UI-Pfad auf den
+RS3-Resetvertrag (`composer_reset_lipsync_with_attempt_cancellation`) führt:
 
 - Run/Generation gemäss RS3 erhalten (Same-Run/Same-Generation-Rearm)
 - offene alte Attempts `cancelled` / `user_reset`
@@ -81,16 +79,14 @@ falsche Test. Nachzuweisen ist, dass der UI-Pfad auf den RS3-Resetvertrag
 - alter Callback wird als `pre_reset_attempt` / No-op abgewiesen, ohne
   Scene-Mutation
 - neuer On-Demand-Attempt N+1 ohne `predecessor_exists`
-- erfolgreicher neuer Lauf bis `complete`
+- vollständiger neuer Lauf bis `complete`
 
 ### FA-7 — Provider/Engine-Routing (kostenfrei)
-Acceptance läuft gegen die **eingefrorene aktuelle Provider Capability Matrix**,
-nicht gegen hier notierte Beispielwerte. Zuerst die Matrix als Ist-Stand lesen,
-dann UI/Resolver dagegen prüfen: Auto-Provider-Wahl nach Szenenlänge,
-Lip-Sync-Zertifizierung, Slot-Topologie pro Provider, Referenz-Limits. Steht in
-der Matrix „Seedance 2.5 ab >15 s" und „Lip-Sync nur HappyHorse/Hailuo", muss
-genau das grün sein; weicht die Matrix bewusst ab, gewinnt die Matrix. Reine
-UI-/Resolver-Prüfung ohne Render.
+Zuerst die aktuelle frozen Provider Capability Matrix als Ist-Stand lesen, dann
+UI und Resolver ausschliesslich gegen diese Matrix prüfen: Auto-Provider-Wahl
+nach Szenenlänge, Lip-Sync-Zertifizierung, Slot-Topologie pro Provider,
+Referenz-Limits. Bei Abweichung zwischen Erwartung und Matrix gewinnt die
+Matrix. Reine UI-/Resolver-Prüfung ohne Render.
 
 ### FA-8 — EN UI vollständig (kostenfrei)
 ### FA-9 — ES UI vollständig (kostenfrei)
