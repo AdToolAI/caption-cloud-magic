@@ -25,27 +25,36 @@ Nachweise aus `VideoComposerDashboard.tsx`, `lipSyncPending.ts`, `lipSyncIntent.
 4. **`lipSyncPending`-Registry wird eingegrenzt**: Sie darf für die drei Intent-Felder nur einen real in-flight DB-Write repräsentieren (Setzen unmittelbar vor dem Write, Löschen bei Bestätigung/Fehler). Rein lokale Optimistic-Writes ohne DB-Write dürfen sie nicht mehr füllen.
 5. `isLipSyncIntentional()` bleibt unverändert; kein "UI=true ⇒ Intent=true".
 
-## Writer-Audit (vor Coding, Ergebnis wird als Tabelle festgeschrieben)
+## Writer-Audit — vollständig (Call-Sites geprüft)
 
-Der Scan über `lipSyncWithVoiceover`, `dialogMode`, `engineOverride` (camel + snake) liefert diese Kandidaten; jeder bekommt im Audit-Dokument eine verbindliche Klassifikation **U** (expliziter User-Writer → neuer Vertrag) oder **D** (derived/optimistisch → keine persistente Dirty-Autorität):
+Klassen: **U** = explizite Benutzerentscheidung → `persistIntentWrite`; **D** = derived/automatisch/Plan → kein persistenter Marker; **R** = reine Request-Payload an die Edge-Function (kein Scene-State-Write); **P** = Persistenz-/Reset-Infrastruktur (kein User-Edit, muss Marker respektieren bzw. löschen).
 
-| Ort | Feld(er) | erwartete Klasse |
+| Ort | Feld(er) | Klasse |
 | --- | --- | --- |
 | `SceneCard.tsx` ~2804 (Lip-Sync AN/AUS) | alle drei | U |
 | `SceneCard.tsx` ~542 (Dialog & Lip-Sync Switch) | `dialogMode` (+ Mirror) | U |
 | `SceneCard.tsx` ~1204 (Engine-Picker Select) | `engineOverride` | U |
-| `SceneCard.tsx` ~1055 / ~2496 (Aktions-Buttons → `cinematic-sync`) | `engineOverride` | U (zu bestätigen) |
+| `SceneCard.tsx` ~1055 (Re-Roll) / ~2496 (Anchor-Preview-Gate) | `engineOverride` | **R** — `cinematic-sync` steht nur im `compose`-Payload von `startSceneGeneration` / `AnchorPreviewGate`; es gibt keinen `onUpdate`- und keinen DB-Write auf `engine_override`. Kein Marker. |
 | `SceneAvatarMode.tsx` ~358 (Talking-Head Switch) | `lipSyncWithVoiceover` | U |
-| `ClipsTab.tsx` ~955 / ~1034 | `engineOverride` | zu klassifizieren |
+| `ClipsTab.tsx` ~955 (`handleStartCinematicSync`) | `engineOverride` | **U** — expliziter Klick, optimistischer Local-Patch + eigener Single-Row-DB-Write auf `engine_override`. Läuft künftig über `persistIntentWrite` (Pending/Bestätigung/Rollback). |
+| `ClipsTab.tsx` ~1034 | `engineOverride` | **R** — nur `compose`-Payload derselben Aktion. |
+| `ClipsTab.tsx` ~407 / ~694 / ~810 / ~888 | `engineOverride` | D (Spiegelung DB→lokal bzw. Payload-Defaults) |
 | `SceneDialogStudio.tsx` ~1780/1829 | alle drei | D |
 | `SceneClipProgress.tsx` ~170 | alle drei | D |
 | `FaceMapReviewDialog.tsx` ~222 | alle drei | D |
 | `useSceneGenerate.ts` ~141/151/197 | alle drei | D (schreibt DB selbst) |
 | `useApplyProductionPlan.ts`, `useApplyBriefingManifest.ts`, `spawnCoverageScenes.ts` | `engineOverride`/`dialogMode` | D (Plan-Apply, schreibt DB) |
-| `useComposerPersistence.ts`, `VideoComposerDashboard.persistScenesToDb` | snake-Writes | Persistenzpfad — muss Dirty/Reconcile respektieren |
-| `lipSyncResetFlow.ts` | alle drei | Reset-Pfad, schreibt DB, löscht Marker |
+| `useComposerPersistence.ts`, `VideoComposerDashboard.persistScenesToDb` / `addSceneToProject` | snake-Writes | P — nie User-Edit, dürfen `unresolved` nie als Wert schreiben |
+| `lipSyncResetFlow.ts` | alle drei | P — schreibt DB und löscht Marker |
 
-Jeder U-Writer läuft danach über **einen** gemeinsamen Helper (Mark → DB-Write → Bestätigung → Clear/Rollback). Jeder D-Writer bleibt lokal/DB-eigen, erzeugt aber keinen persistenten Marker.
+Damit ist die Tabelle vollständig; offene Einträge gibt es nicht mehr. Jeder U-Writer läuft über **einen** gemeinsamen Helper (Mark → DB-Write → Bestätigung → Clear/Rollback).
+
+## Persisted-Scene-Erkennung (Variante A belegt + Variante B umgesetzt)
+
+Repo-Nachweis: alle client-seitig erzeugten Szenen bekommen präfixierte, **nie** UUID-förmige IDs — `useSceneManager.ts:9`, `StoryboardTab.tsx:256/292`, `VideoComposerDashboard.addSceneToProject` (`scene_${Date.now()}`) und `useApplyProductionPlan.newSceneId()` (`scene_<ts>_<rand>`). Eine UUID entsteht ausschließlich aus dem DB-Insert/DB-Load. `crypto.randomUUID()` wird im Composer nur für Turn-IDs und Storage-Pfade benutzt, nie für Scene-IDs.
+
+Trotzdem entscheidet **kein ID-Format** über die Intent-Auflösung: Maßgeblich ist ein explizites `hydratedSceneIds`-Set, das nur beim erfolgreichen DB-Load bzw. nach bestätigtem DB-Insert gefüllt wird. Szenen außerhalb dieses Sets, die aus dem Draft stammen, sind `unresolved`; lokal neu erzeugte, noch nie persistierte Szenen behalten ihren lokalen Intent (sie haben keine DB-Wahrheit, die verletzt werden könnte).
+
 
 ## Umsetzung
 
@@ -56,9 +65,10 @@ Jeder U-Writer läuft danach über **einen** gemeinsamen Helper (Mark → DB-Wri
 - `persistIntentWrite(...)` als gemeinsamer U-Writer-Helper.
 
 **2. Hydration (`VideoComposerDashboard.tsx`)**
-- Aus `loadDraft()` werden die drei Intent-Felder für persistierte Szenen (UUID) verworfen; die Szene startet mit `intentResolved = false`.
-- Mount-Hydration (~372/441/443) und Refetch (~562/631/633) setzen `intentResolved = true` und rufen vorher `reconcileIntentMarkers`.
-- Hydration-Fehler / kein Zeilentreffer → `intentResolved` bleibt false → `unresolved`.
+- Aus `loadDraft()` werden die drei Intent-Felder für alle Szenen verworfen, die nicht in `hydratedSceneIds` stehen; die Szene startet mit `intentResolved = false`. Kein ID-Format-Heuristik.
+- Mount-Hydration (~372/441/443) und Refetch (~562/631/633) tragen die Scene-ID in `hydratedSceneIds` ein, rufen vorher `reconcileIntentMarkers` und setzen `intentResolved = true`.
+- Hydration-Fehler / kein Zeilentreffer → Scene bleibt außerhalb von `hydratedSceneIds` → `unresolved`.
+
 
 **3. UI**
 - Toggle/Switch/Engine-Picker rendern drei Zustände: AN, AUS, "wird geladen" (disabled) sowie ein "ungespeichert"-Badge bei aktivem Marker.
@@ -79,7 +89,8 @@ Jeder U-Writer läuft danach über **einen** gemeinsamen Helper (Mark → DB-Wri
 - Persistierungsfehler → Rollback, keine dauerhafte ON-Anzeige, Fehler sichtbar.
 - Reload nach gespeichertem ON → UI/DB/Intent alle true.
 - Persistiert OFF + alter Draft true → `isLipSyncIntentional()` false.
-- **`dialogMode` und `engineOverride` durchlaufen denselben User-Writer-Vertrag (je ein Fall pro Feld).**
+- **`dialogMode` und `engineOverride` durchlaufen denselben User-Writer-Vertrag (je ein Fall pro Feld), inkl. `ClipsTab.handleStartCinematicSync`.**
+- **`engineOverride = null` als legitimer persistierter Wert wird getrennt von `UNRESOLVED` getestet — der Resolver darf `null` nie als "noch nicht hydratisiert" behandeln.**
 - Regressionsschutz: andere Draft-Felder behalten ihr heutiges Merge-Verhalten.
 
 ## Abschluss
