@@ -89,7 +89,8 @@ Trotzdem entscheidet **kein ID-Format** über die Intent-Auflösung: Maßgeblich
 - Persistierungsfehler → Rollback, keine dauerhafte ON-Anzeige, Fehler sichtbar.
 - Reload nach gespeichertem ON → UI/DB/Intent alle true.
 - Persistiert OFF + alter Draft true → `isLipSyncIntentional()` false.
-- **`dialogMode` und `engineOverride` durchlaufen denselben User-Writer-Vertrag (je ein Fall pro Feld).**
+- **`dialogMode` und `engineOverride` durchlaufen denselben User-Writer-Vertrag (je ein Fall pro Feld), inkl. `ClipsTab.handleStartCinematicSync`.**
+- **`engineOverride = null` als legitimer persistierter Wert wird getrennt von `UNRESOLVED` getestet — der Resolver darf `null` nie als "noch nicht hydratisiert" behandeln.**
 - Regressionsschutz: andere Draft-Felder behalten ihr heutiges Merge-Verhalten.
 
 ## Abschluss
