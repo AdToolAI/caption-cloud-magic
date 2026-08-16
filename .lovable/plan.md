@@ -80,6 +80,8 @@ Regeln:
 - Die drei Intent-Felder werden für migrierte Szenen aus dem Draft verworfen; sie kommen ausschließlich aus der Hydration.
 - Die `scene_…`-/UUID-Form ist ausschließlich in dieser einmaligen Migration erlaubt und wird **nicht** Teil des laufenden Resolver-Vertrags; der Laufzeitvertrag bleibt rein statusbasiert.
 - Nur in dieser C1-Version neu erzeugte Szenen werden explizit mit `scenePersistenceState: 'local_new'` angelegt (`useSceneManager`, `StoryboardTab`, `addSceneToProject`, `useApplyProductionPlan`). Nach bestätigtem DB-Insert → sofort `db_hydrated`; beim nächsten gespeicherten Draft/Mount → `db_known_unhydrated`.
+- **Idempotenz:** `migrateLegacyDraft()` ist ein reiner No-op für bereits versionierte C1-Drafts und klassifiziert eine Szene mit explizitem `scenePersistenceState` (inkl. `local_new`) niemals um. Mehrfaches Ausführen ändert nichts.
+- **Insert-Bestätigung:** `db_hydrated` wird erst nach bestätigtem DB-Write gesetzt (kein optimistischer Übergang). Schlägt der Insert fehl, bleibt die Szene `local_new` mit ihrem lokalen Intent.
 
 
 
