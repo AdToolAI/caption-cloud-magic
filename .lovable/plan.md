@@ -74,6 +74,7 @@ Bestehende `localStorage`-Drafts enthalten kein `scenePersistenceState`. Ein feh
 Regeln:
 
 - Der Draft bekommt eine `draftSchemaVersion`. Drafts ohne diese Version laufen einmalig durch `migrateLegacyDraft()` beim Laden; danach wird die migrierte Fassung mit Version geschrieben.
+- **Reihenfolge:** `loadDraft()` führt `migrateLegacyDraft()` aus, **bevor** irgendeine Intent-Auflösung oder Herkunftsinterpretation stattfindet. Es gibt während des Mounts keinen Zwischenzustand, in dem eine Szene ohne `scenePersistenceState` durch den Resolver läuft.
 - `migrateLegacyDraft()` vergibt pro Szene:
   - DB-Herkunft belegbar (Szene besitzt DB-Marker wie `project_id`-Bindung / gespeicherte `created_at`/`updated_at` aus dem Load, oder — einmalig und rein kompatibilitätshalber — eine UUID-förmige ID) → `db_known_unhydrated`.
   - Herkunft nicht belegbar → ebenfalls `db_known_unhydrated` (konservativ: lieber `unresolved` bis zur Hydration als stale Intent als kanonisch anzuzeigen). Es gibt in der Migration **keinen** Pfad nach `local_new`.
