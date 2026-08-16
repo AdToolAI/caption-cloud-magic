@@ -361,7 +361,14 @@ export default function VideoComposerDashboard() {
         const localById = new Map(project.scenes.map(s => [s.id, s]));
         const dbScenes: ComposerScene[] = data.map((row: any) => {
           const local = localById.get(row.id);
+          // C1 — reconcile dirty intent markers against the freshly read DB row.
+          reconcileIntentMarkers(row.id, {
+            lipSyncWithVoiceover: (row as any).lip_sync_with_voiceover === true,
+            dialogMode: ((row as any).dialog_mode as any) ?? false,
+            engineOverride: ((row as any).engine_override as any) ?? null,
+          });
           return {
+            scenePersistenceState: 'db_hydrated' as const,
             id: row.id,
             projectId: row.project_id,
             orderIndex: row.order_index,
