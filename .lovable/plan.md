@@ -78,9 +78,11 @@ Ein `hydratedSceneIds`-Set ist dabei nur die Laufzeit-Repräsentation von `db_hy
 - `persistIntentWrite(...)` als gemeinsamer U-Writer-Helper.
 
 **2. Hydration (`VideoComposerDashboard.tsx`)**
-- Aus `loadDraft()` werden die drei Intent-Felder für alle Szenen verworfen, die nicht in `hydratedSceneIds` stehen; die Szene startet mit `intentResolved = false`. Kein ID-Format-Heuristik.
-- Mount-Hydration (~372/441/443) und Refetch (~562/631/633) tragen die Scene-ID in `hydratedSceneIds` ein, rufen vorher `reconcileIntentMarkers` und setzen `intentResolved = true`.
-- Hydration-Fehler / kein Zeilentreffer → Scene bleibt außerhalb von `hydratedSceneIds` → `unresolved`.
+- Beim Aufbau aus `loadDraft()` wird pro Szene `scenePersistenceState` gesetzt: Szenen mit gespeicherter DB-Herkunft → `db_known_unhydrated` (Intent-Felder werden verworfen, Zustand `unresolved`); Szenen ohne DB-Herkunft → `local_new` (lokaler Intent bleibt gültig und resolved).
+- Mount-Hydration (~372/441/443) und Refetch (~562/631/633) rufen `reconcileIntentMarkers` und setzen die Szene auf `db_hydrated`.
+- Bestätigter Insert (`addSceneToProject`, `ensureProjectPersisted`, Plan-Apply) setzt `local_new → db_hydrated` mit dem eingefügten Wert als DB-Wahrheit.
+- Hydration-Fehler / kein Zeilentreffer → Szene bleibt `db_known_unhydrated` → `unresolved`. Kein ID-Format entscheidet; die belegte `scene_`-Präfix-Form dient nur als Assert im Test.
+
 
 
 **3. UI**
