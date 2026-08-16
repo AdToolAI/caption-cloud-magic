@@ -43,9 +43,15 @@ Kontrollierte Szene: vier deutsche Sprecher, vier unterschiedliche Voice-IDs,
 mehrere Turns mit Sprecherwechseln.
 
 Nachweispflicht:
-- `speaker_idx` eindeutig 0–3, keine Doppelbelegung, keine Lücke
-- vier korrekte Pass-Zuordnungen, kein übersprungener Pass
-- Turn-Kardinalität der `sync_segment`-Läufe entspricht dem Dialogplan
+- genau vier stabile Sprecheridentitäten, `speaker_idx = 0..3`, ohne
+  Doppelbelegung und ohne Lücke
+- Pass-/Ledger-Kardinalität = Anzahl **kanonischer Dialog-Turns**, nicht Anzahl
+  Sprecher (v400-Invariante: `speaker_idx` ist Identitäts-/Geometriezuordnung,
+  keine Job-Kardinalität; bei 4 Sprechern und 6 Turns also 6 `sync_segment`-
+  Attempts)
+- jeder `sync_segment`-Attempt ist genau einem Turn zugeordnet und trägt dessen
+  korrekten `speaker_idx`
+- kein Turn fehlt, kein Turn wird doppelt verarbeitet
 - danach genau **ein** `audio_mux`, ein Stitch, ein `complete`
 - Preclip-Pflicht (v331) greift: Face-Share-Floor, gesichtsproportionale Maske
 - Geometrie-Anker ist `reference_image_url` (v400), kein `lock_reference_url`
