@@ -20,29 +20,38 @@ Einzige dauerhafte Spur: der Migrationseintrag selbst.
 
 ## Rollback-Konstruktion
 
+Drei getrennte innere Subtransaktionen — je Contractfall eine, damit jeder Fall unabhängig zurückgerollt wird:
+
 ```text
 DO $$
 BEGIN
-  BEGIN                       -- inner subtransaction
-     Fixtures anlegen
-     RPC aufrufen (Erfolgsfall + Duplicate/Idempotenz + RS3-Fence-Fall)
-     Assertions (u.a. processed_video_url = clip_url = _final_url,
-                 base_video_url unverändert, Ledger terminal)
-     RAISE EXCEPTION USING ERRCODE = 'FA3P1';   -- Sentinel
-  EXCEPTION
-    WHEN SQLSTATE 'FA3P1' THEN NULL;            -- NUR Sentinel wird gefangen
-  END;
+  BEGIN                       -- Case 1: Happy Path
+     Fixtures (inkl. base_video_url-Sentinel) → RPC → Assertions
+     RAISE EXCEPTION USING ERRCODE = 'FA3P1';
+  EXCEPTION WHEN SQLSTATE 'FA3P1' THEN NULL; END;
+
+  BEGIN                       -- Case 2: Duplicate/Idempotenz
+     Fixtures → RPC → zweiter RPC-Call → Assertions
+     RAISE EXCEPTION USING ERRCODE = 'FA3P1';
+  EXCEPTION WHEN SQLSTATE 'FA3P1' THEN NULL; END;
+
+  BEGIN                       -- Case 3: RS3 Pre-Reset-Fence
+     Fixtures mit rs3_reset-Marker → RPC → Assertions
+     RAISE EXCEPTION USING ERRCODE = 'FA3P1';
+  EXCEPTION WHEN SQLSTATE 'FA3P1' THEN NULL; END;
 END $$;
 ```
 
-Jede echte Assertion-, SQL- oder RPC-Exception hat einen anderen SQLSTATE und propagiert → Migration schlägt fehl. Der Sentinel rollt den kompletten inneren Block inklusive aller Scene-/Ledger-Mutationen zurück, bevor er gefangen wird. Testlauf erfolgt als Migration-Owner (`postgres`); die ACL wurde bereits separat via `has_function_privilege` nachgewiesen und wird hier nicht erneut geprüft.
+Kein `WHEN OTHERS`, kein Catch von `P0001` oder anderen Assertion-Fehlern. Jede echte Assertion-, SQL- oder RPC-Exception propagiert → Migration schlägt rot fehl. Der Sentinel rollt den jeweiligen Block inklusive aller Scene-/Ledger-/Transition-Mutationen zurück, bevor er gefangen wird. Testlauf erfolgt als Migration-Owner (`postgres`); die ACL wurde bereits separat via `has_function_privilege` nachgewiesen und wird hier nicht erneut geprüft.
 
 ## Contractfälle
 
 Aus `tests/v431-g3-2-2-f1-contract-tests.sql` übernommen (ohne die dortige `GRANT`-Zeile):
-1. Erfolgsfall Stitch-Finalisierung → `clip_url` und `processed_video_url` = `_final_url`, `base_video_url` nicht beschrieben, Ledger terminal mit `write_id='stitch:done'`
-2. Duplicate-Call → idempotent, kein zweiter Ledger-Terminalisierungseffekt
-3. RS3-Epoch-Fence → veralteter Callback wird abgelehnt, keine Output-Materialisierung
+
+1. **Happy Path** — Fixture setzt einen bekannten `base_video_url`-Sentinelwert. Nach dem RPC: `clip_url = processed_video_url = _final_url`, `base_video_url` byte-identisch zum Sentinel. `write_id='stitch:done'` wird dort geprüft, wo der Contract ihn tatsächlich persistiert (Transition-/Audit-Eintrag); der Ledger-Job wird nur auf seinen realen Terminalzustand geprüft (Status `succeeded`, `completed_at` gesetzt, Job-Identität) — keine neu erfundene Ledger-Invariante.
+2. **Duplicate/Idempotenz** — Happy Path plus zweiter identischer RPC-Call: gleiche Endwerte, keine zweite Terminalisierung, kein zusätzlicher Transition-Eintrag.
+3. **RS3 Pre-Reset-Fence** — veralteter Callback nach Reset wird abgelehnt: keine Output-Materialisierung, `processed_video_url` und `clip_url` bleiben unverändert.
+
 
 ## Post-Migration Read-only Verifikation
 
