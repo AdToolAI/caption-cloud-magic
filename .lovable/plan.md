@@ -127,6 +127,8 @@ Regeln:
 - **`db_known_unhydrated` vs. `local_new`: identischer Draft-Inhalt, nur unterschiedlicher Herkunfts-Status → einmal `unresolved`, einmal resolved.**
 - **Legacy-Draft (kein `scenePersistenceState`), DB-backed Szene, stale `lipSync=true` → nach Migration `db_known_unhydrated` → zunächst `unresolved`; nach Hydration gewinnt der DB-Wert (false).**
 - **Neu in C1 erzeugte lokale Szene → explizit `local_new`, lokaler Intent bleibt resolved; wird von der Legacy-Migration nicht angefasst und nicht mit einem Legacy-Draft verwechselt.**
+- **`migrateLegacyDraft()` doppelt ausgeführt → identisches Ergebnis; ein explizit gesetztes `local_new` wird nicht zu `db_known_unhydrated` umklassifiziert.**
+- **Insert schlägt fehl → Szene bleibt `local_new` (kein `db_hydrated`), lokaler Intent bleibt bedienbar.**
 - Regressionsschutz: andere Draft-Felder behalten ihr heutiges Merge-Verhalten.
 
 ## Abschluss
