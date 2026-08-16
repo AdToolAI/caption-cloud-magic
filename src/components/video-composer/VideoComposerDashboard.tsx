@@ -1406,10 +1406,13 @@ export default function VideoComposerDashboard() {
           cinematic_preset_slug: baseScene.cinematicPresetSlug ?? null,
           dialog_script: baseScene.dialogScript ?? null,
           dialog_turns: ((baseScene as any).dialogTurns ?? []) as any,
-          dialog_voices: (baseScene.dialogVoices ?? null) as any,
+          // FA-2: dialog_voices / character_shots are NOT NULL in the schema —
+          // an explicit null violates the constraint and made "Szene hinzufügen"
+          // fail silently (console.warn only). Mirror the column defaults.
+          dialog_voices: (baseScene.dialogVoices ?? {}) as any,
           dialog_takes: (baseScene.dialogTakes ?? {}) as any,
           engine_override: baseScene.engineOverride ?? 'auto',
-          character_shots: (baseScene.characterShots ?? null) as any,
+          character_shots: (baseScene.characterShots ?? []) as any,
           // v175: denormalised mention IDs + first-speaker voice (initial insert).
           mentioned_character_ids: ((baseScene as any).mentionedCharacterIds ?? null) as any,
           mentioned_location_ids: ((baseScene as any).mentionedLocationIds ?? null) as any,

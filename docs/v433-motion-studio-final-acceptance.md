@@ -60,3 +60,46 @@ accepted clicks on the unresolved local value.
 - Case C re-run after the fix: pre-hydration disabled + busy, post-hydration DB truth
 
 **FA-1 — PASS.** No paid render was started.
+
+---
+
+## FA-2 — Standard-Render ohne Lip-Sync (Pre-Start-Snapshot)
+
+**Environment**
+- Project: `035273d7-ae9b-44e0-89e7-f9e28703530d`
+- Fresh scene S05: `8155c6d8-cb91-4919-bbb2-444db037f466` (order_index 4),
+  angelegt über den produktiven UI-Pfad („Szene hinzufügen" → `addSceneToProject`),
+  kein SQL-Insert.
+- Scripts: `/tmp/browser/fa2/*.py`
+
+### Finding FA-2/P1 (Anlagepfad, vor dem Render gefunden und gefixt)
+„Szene hinzufügen" schlug in Produktion **still** fehl: der Insert schrieb
+`character_shots: null` und `dialog_voices: null`, beide Spalten sind
+`NOT NULL` (Defaults `[]` / `{}`). PostgREST antwortete 400 / `23502`, der
+Dashboard-Pfad loggte nur `console.warn` und rollte den optimistischen Insert
+zurück — die Szene verschwand wortlos.
+
+Fix (Writer-Ebene, `VideoComposerDashboard.addSceneToProject`): beide Felder
+spiegeln jetzt die Spalten-Defaults. Keine Pipeline-, Gate- oder
+Vertragsänderung. Verifiziert: erneuter UI-Klick → `POST 201`, Szene
+persistiert (`8155c6d8-…`).
+
+### Pre-Start-Snapshot (read-only, vor dem kostenpflichtigen Start)
+| Kriterium | Wert |
+|---|---|
+| `lip_sync_with_voiceover` | `false` |
+| `dialog_mode` | `false` |
+| `engine_override` | `auto` (nicht in `OPT_IN_ENGINES`) |
+| `isLipSyncIntentionalRow()` | **false** (SSoT) |
+| `active_run_id` / `active_run_started_at` | `NULL` / `NULL` |
+| Ledger `composer_pipeline_jobs` (scene) | **0 Zeilen** |
+| Pass-/Job-Pointer | `plate_ready_generation`, `lip_sync_status`, `twoshot_stage`, `lip_sync_applied_at`, `lip_sync_source_clip_url`, `replicate_prediction_id` alle `NULL` |
+| RS3-Marker | `audio_plan` = `NULL` (kein `twoshot.rs3_reset`, kein `rs3_reset_id`) |
+| Output-Felder | `clip_url`, `base_video_url`, `processed_video_url` alle `NULL` |
+| Provider/Engine | `ai-happyhorse`, `clip_quality=standard`, 8 s, `with_audio=false` → normaler Standard-Render |
+| Prompt | `scene_action_user` (DE) + `ai_prompt`/`scene_action_en` (EN) gesetzt |
+| UI nach Reload | Intent tri-state **resolved**, „Dialog & Lip-Sync" = OFF = DB-Wahrheit |
+| `retry_count` / `clip_error` | `0` / `NULL` |
+
+**Status: STOP — Warten auf Renderfreigabe.** Es wurde kein kostenpflichtiger
+Render gestartet.
