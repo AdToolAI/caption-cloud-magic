@@ -49,11 +49,24 @@ Klassen: **U** = explizite Benutzerentscheidung → `persistIntentWrite`; **D** 
 
 Damit ist die Tabelle vollständig; offene Einträge gibt es nicht mehr. Jeder U-Writer läuft über **einen** gemeinsamen Helper (Mark → DB-Write → Bestätigung → Clear/Rollback).
 
-## Persisted-Scene-Erkennung (Variante A belegt + Variante B umgesetzt)
+## Scene-Herkunft & Persistenz-Lifecycle (ersetzt die UUID-Heuristik)
 
-Repo-Nachweis: alle client-seitig erzeugten Szenen bekommen präfixierte, **nie** UUID-förmige IDs — `useSceneManager.ts:9`, `StoryboardTab.tsx:256/292`, `VideoComposerDashboard.addSceneToProject` (`scene_${Date.now()}`) und `useApplyProductionPlan.newSceneId()` (`scene_<ts>_<rand>`). Eine UUID entsteht ausschließlich aus dem DB-Insert/DB-Load. `crypto.randomUUID()` wird im Composer nur für Turn-IDs und Storage-Pfade benutzt, nie für Scene-IDs.
+Repo-Nachweis (nur als Assert/Test, **nicht** als Source of Truth): alle client-seitig erzeugten Szenen bekommen präfixierte, nie UUID-förmige IDs — `useSceneManager.ts:9`, `StoryboardTab.tsx:256/292`, `VideoComposerDashboard.addSceneToProject` (`scene_${Date.now()}`), `useApplyProductionPlan.newSceneId()`. `crypto.randomUUID()` wird im Composer nur für Turn-IDs und Storage-Pfade benutzt.
 
-Trotzdem entscheidet **kein ID-Format** über die Intent-Auflösung: Maßgeblich ist ein explizites `hydratedSceneIds`-Set, das nur beim erfolgreichen DB-Load bzw. nach bestätigtem DB-Insert gefüllt wird. Szenen außerhalb dieses Sets, die aus dem Draft stammen, sind `unresolved`; lokal neu erzeugte, noch nie persistierte Szenen behalten ihren lokalen Intent (sie haben keine DB-Wahrheit, die verletzt werden könnte).
+Autoritativ ist ein expliziter Herkunfts-Status pro Szene, im Draft mitgeführt:
+
+`scenePersistenceState = local_new | db_known_unhydrated | db_hydrated`
+
+| Zustand | Herkunft | Intent-Auflösung |
+| --- | --- | --- |
+| `local_new` | im Client erzeugt, nie erfolgreich in die DB inserted | **resolved** aus dem lokalen Wert — es existiert keine DB-Wahrheit, die verletzt werden könnte; Controls normal bedienbar |
+| `db_known_unhydrated` | Szene stammt aus einem früheren DB-Load (Draft-Eintrag) oder aus einem bestätigten Insert, wurde in dieser Session aber noch nicht erfolgreich hydratisiert | **unresolved** — Controls disabled/"wird geladen", Renderstart fail-closed |
+| `db_hydrated` | in dieser Session erfolgreich aus der DB geladen | **resolved** aus dem DB-Wert nach `reconcileIntentMarkers` |
+
+Übergänge: bestätigter Insert (`addSceneToProject`, `ensureProjectPersisted`, Plan-Apply) → `local_new → db_hydrated` (der Insert-Wert ist der DB-Wert). Draft-Persistierung eines `db_hydrated`-Scene → beim nächsten Mount `db_known_unhydrated`, bis die Hydration greift. Hydration-Fehler oder fehlende Zeile → bleibt `db_known_unhydrated`.
+
+Ein `hydratedSceneIds`-Set ist dabei nur die Laufzeit-Repräsentation von `db_hydrated`; die Unterscheidung "noch nie persistiert" vs. "persistiert, aber noch nicht hydratisiert" trägt ausschließlich `scenePersistenceState`.
+
 
 
 ## Umsetzung
@@ -65,9 +78,11 @@ Trotzdem entscheidet **kein ID-Format** über die Intent-Auflösung: Maßgeblich
 - `persistIntentWrite(...)` als gemeinsamer U-Writer-Helper.
 
 **2. Hydration (`VideoComposerDashboard.tsx`)**
-- Aus `loadDraft()` werden die drei Intent-Felder für alle Szenen verworfen, die nicht in `hydratedSceneIds` stehen; die Szene startet mit `intentResolved = false`. Kein ID-Format-Heuristik.
-- Mount-Hydration (~372/441/443) und Refetch (~562/631/633) tragen die Scene-ID in `hydratedSceneIds` ein, rufen vorher `reconcileIntentMarkers` und setzen `intentResolved = true`.
-- Hydration-Fehler / kein Zeilentreffer → Scene bleibt außerhalb von `hydratedSceneIds` → `unresolved`.
+- Beim Aufbau aus `loadDraft()` wird pro Szene `scenePersistenceState` gesetzt: Szenen mit gespeicherter DB-Herkunft → `db_known_unhydrated` (Intent-Felder werden verworfen, Zustand `unresolved`); Szenen ohne DB-Herkunft → `local_new` (lokaler Intent bleibt gültig und resolved).
+- Mount-Hydration (~372/441/443) und Refetch (~562/631/633) rufen `reconcileIntentMarkers` und setzen die Szene auf `db_hydrated`.
+- Bestätigter Insert (`addSceneToProject`, `ensureProjectPersisted`, Plan-Apply) setzt `local_new → db_hydrated` mit dem eingefügten Wert als DB-Wahrheit.
+- Hydration-Fehler / kein Zeilentreffer → Szene bleibt `db_known_unhydrated` → `unresolved`. Kein ID-Format entscheidet; die belegte `scene_`-Präfix-Form dient nur als Assert im Test.
+
 
 
 **3. UI**
@@ -91,6 +106,8 @@ Trotzdem entscheidet **kein ID-Format** über die Intent-Auflösung: Maßgeblich
 - Persistiert OFF + alter Draft true → `isLipSyncIntentional()` false.
 - **`dialogMode` und `engineOverride` durchlaufen denselben User-Writer-Vertrag (je ein Fall pro Feld), inkl. `ClipsTab.handleStartCinematicSync`.**
 - **`engineOverride = null` als legitimer persistierter Wert wird getrennt von `UNRESOLVED` getestet — der Resolver darf `null` nie als "noch nicht hydratisiert" behandeln.**
+- **`local_new`-Szene (nie persistiert) → lokaler Intent bleibt resolved und bedienbar; nach bestätigtem Insert `db_hydrated` mit demselben Wert.**
+- **`db_known_unhydrated` vs. `local_new`: identischer Draft-Inhalt, nur unterschiedlicher Herkunfts-Status → einmal `unresolved`, einmal resolved.**
 - Regressionsschutz: andere Draft-Felder behalten ihr heutiges Merge-Verhalten.
 
 ## Abschluss
