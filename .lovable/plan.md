@@ -28,11 +28,11 @@ gefahren.
 
 ### FA-2 — Standard-Render ohne Lip-Sync (kostenpflichtig, 1 Szene)
 Happy Path bis `complete`. Nachweis ist der finale Resolver-Output:
-`resolveSceneOutput()` liefert einen finalen Output, `base_video_url` /
-`processed_video_url` entsprechen der jeweiligen Intent-Semantik (ohne
-Lip-Sync-Intent ist `base_video_url` der korrekte finale Output), die
-`clip_url`-Compatibility ist korrekt. Dazu: ein Ledger-Job pro Stage, keine
-Legacy-Wrapper-Completion.
+`resolveSceneOutput()` liefert den finalen Output; ohne intentionalen Lip-Sync
+darf `base_video_url` der Finaloutput sein, mit intentionalem Lip-Sync ist
+`processed_video_url` erforderlich. Die `clip_url`-Compatibility ist korrekt.
+Dazu: genau ein Attempt je tatsächlich durchlaufener Stage, keine
+Doppel-Dispatches, keine Legacy-Wrapper-Completion.
 
 ### FA-3 — 1 Sprecher Lip-Sync (kostenpflichtig, kurzer Regressions-Smoke)
 Plate → sync_segment → audio_mux → Stitch → complete, Finalisierung via
