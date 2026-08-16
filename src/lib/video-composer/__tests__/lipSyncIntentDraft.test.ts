@@ -148,7 +148,7 @@ describe('persistIntentWrite', () => {
 });
 
 describe('legacy draft migration', () => {
-  const legacy = {
+  const legacy: any = {
     scenes: [
       { id: SCENE, lipSyncWithVoiceover: true, dialogMode: true, engineOverride: 'cinematic-sync' },
     ],
@@ -174,7 +174,7 @@ describe('legacy draft migration', () => {
   });
 
   it('does not reclassify C1 scenes that are explicitly local_new', () => {
-    const draft = {
+    const draft: any = {
       scenes: [{ id: 'scene_9', scenePersistenceState: 'local_new', lipSyncWithVoiceover: true }],
     };
     const migrated = migrateLegacyDraft(draft)!;
@@ -185,7 +185,7 @@ describe('legacy draft migration', () => {
 
 describe('session semantics', () => {
   it('db_hydrated is downgraded on a new mount', () => {
-    const draft = {
+    const draft: any = {
       draftSchemaVersion: DRAFT_SCHEMA_VERSION,
       scenes: [{ id: SCENE, scenePersistenceState: 'db_hydrated', lipSyncWithVoiceover: true }],
     };
@@ -195,7 +195,7 @@ describe('session semantics', () => {
   });
 
   it('prepareDraftForSession migrates and downgrades in one pass', () => {
-    const draft = {
+    const draft: any = {
       scenes: [
         { id: SCENE, lipSyncWithVoiceover: true },
         { id: 'scene_2', scenePersistenceState: 'db_hydrated', lipSyncWithVoiceover: true },
