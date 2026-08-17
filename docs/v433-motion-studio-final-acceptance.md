@@ -890,3 +890,24 @@ Szene S09 `ece6a71c-118e-436a-ac1a-15182cc88ddb` — kein Render gestartet.
 | Pass-/Job-Pointer | `plate_pipeline_job_id` NULL, `lip_sync_status`/`lip_sync_applied_at` NULL |
 | RS3-Marker | keiner |
 | Exactly-Once-Bundle-Smoke | `preclip-dispatch-resume.test.ts` 8/8 PASS |
+
+### FA-4 RETEST IDENTITY READY (2026-08-17)
+
+Identity Gate vor Render, S09 `ece6a71c-118e-436a-ac1a-15182cc88ddb` — kein Render gestartet.
+
+| Turn | Script-Label | characterId | speaker_idx |
+| --- | --- | --- | --- |
+| 1 | Sarah Dusatko | `5c81f9bf-a5f1-4608-849f-e2a4adc84bcb` | 0 |
+| 2 | Samuel Dusatko | `483f9cdc-eb31-4486-bf67-9c5e7d955016` | 1 |
+| 3 | Matthew Dusatko | `54d90504-7253-482f-9c6f-1902e8a6749b` | 2 |
+| 4 | Kay Mark | `c65de5c6-75e1-47aa-956c-cd0cc424e736` | 3 |
+| 5 | Sarah Dusatko | `5c81f9bf-a5f1-4608-849f-e2a4adc84bcb` | 0 |
+| 6 | Samuel Dusatko | `483f9cdc-eb31-4486-bf67-9c5e7d955016` | 1 |
+
+- `count(distinct characterId) = 4`; T1==T5 (Sarah), T2==T6 (Samuel); keine Namens-Duplikate.
+- `dialog_voices` ist ausschließlich über diese vier Character-IDs gebunden (4 distinct Voice-IDs: `EXAVITQu4vr4xnSDxMaL`, `u86DavlmJKwP4sPOSkw7`, `pqHfZKP75CvOlQylNhV4`, `onwK4e9ZLuTAKqWW03F9`).
+- `speaker_idx` = Index der characterId in der deduplizierten ID-Liste (`orderedSpeakerIdsFromTurns` / `speakerIdxForTurn`); Namen sind kein Geometrie-/Speaker-Key.
+- Flag `composer.feature.id_only_cast_resolution = true` (ID-first erzwungen); JIT-Backfill in `_shared/scene-dialog-turns.ts` ist fail-closed (`unmatched_speaker` / `ambiguous_speaker`).
+- Frontend-Parser `src/lib/talking-head/parseDialogScript.ts` setzt `speakerId = cast.id`; unauflösbare Zeilen werden als Fortsetzungstext angehängt, nie als neuer Sprecher.
+
+Status: **FA-4 RETEST IDENTITY READY → STOP** (Render erst nach explizitem GO).
