@@ -4,6 +4,7 @@ import { Slider } from '@/components/ui/slider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useTranslation } from '@/hooks/useTranslation';
+import { tx } from '@/lib/i18nText';
 
 export interface SubtitleStyle {
   position: 'top' | 'center' | 'bottom';
