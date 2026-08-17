@@ -208,7 +208,7 @@ export const SubtitleStyleEditor = ({ style, onChange, sampleText, onSampleTextC
                 onClick={onResetSampleText}
                 className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
               >
-                {t('common.reset')}
+                {tx({ de: 'Zurücksetzen', en: 'Reset', es: 'Restablecer' })}
               </button>
             )}
           </div>
