@@ -95,7 +95,18 @@ export interface PassPreclipResult {
   /** v247 — true when clamping forced the crop off the ideal anchor. */
   clamped?: boolean;
   error?: string;
-  errorClass?: "dispatch_failed" | "lambda_failed" | "poll_timeout" | "invalid_input";
+  /**
+   * `dispatch_uncertain` (FA-4/P0): 5xx / network failure where it is unknown
+   * whether the render service received the request. Must be kept as its own
+   * class all the way to compose-dialog-segments — never collapsed into
+   * `dispatch_failed` or `poll_timeout`.
+   */
+  errorClass?:
+    | "dispatch_failed"
+    | "dispatch_uncertain"
+    | "lambda_failed"
+    | "poll_timeout"
+    | "invalid_input";
 }
 
 
