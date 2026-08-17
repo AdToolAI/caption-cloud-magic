@@ -29,9 +29,9 @@ Kein neues Accounting-Modell. Die Lücke ist nicht die Tabelle, sondern die fehl
 ## 2. Vertragsregeln (LOCKED)
 
 1. **Charge-Provenance-Pflicht.** Ein Refund entsteht nur gegen eine existierende, refundierbare Belastung: eine `ai_video_transactions`-Zeile mit `type='deduction'` (oder eine `composer_run_reservations`-Row im reservierten Zustand). `duration × provider_price` ist keine Geldquelle und darf im Recovery-Pfad nicht mehr als Betrag dienen.
-2. **Betrag aus der Charge.** Der Refundbetrag wird ausschließlich aus dem gespeicherten Charge-Betrag abgeleitet (`abs(amount_euros)` bzw. `reserved_euros − actual_euros`), nie aus `CLIP_COSTS`/`videoPricingCatalog`. Preisänderungen nach der Belastung verändern die Erstattung nicht.
+2. **Betrag aus eindeutig zugeordneter Charge.** Der Refundbetrag kommt ausschließlich aus einer Charge-Provenance, die eindeutig diesem Run-/Scene-Anteil zugeordnet ist (`abs(amount_euros)` einer run-/scene-scharfen Deduction bzw. `reserved_euros − actual_euros` der zugehörigen Reservierung), nie aus `CLIP_COSTS`/`videoPricingCatalog`. Preisänderungen nach der Belastung verändern die Erstattung nicht. **Aggregierte Legacy-Project-Charges sind ohne belegte Run-/Scene-Zuordnung nicht refundierbar; `abs(total project deduction)` darf niemals als Scene-Refund verwendet werden.** Fehlt die belegte Charge↔Run-Zuordnung, gilt zwingend Refund = 0.
 3. **Keine Charge ⇒ kein Credit.** Der Recovery-Pfad terminalisiert die Szene weiterhin (`clip_status='failed'`, `pipeline_state='failed'`, cinematic-sync-Felder wie heute), aber mit Refund 0 und einem `clip_error`, das „keine Belastung gefunden" ausweist. Failure-Terminalisierung ist niemals von einem Refund abhängig.
-4. **Idempotenz auf DB-Ebene.** Höchstens eine Gutschrift je (Charge, Refund-Grund). Der Refund muss die Charge eindeutig referenzieren (Charge-`id`, bei Reservierungen `reservation_id`) und diese Referenz muss durch einen DB-seitigen Eindeutigkeits-/Statusmechanismus geschützt sein. `clip_error LIKE 'watchdog_%'` und jeder andere Caller-Guard zählen ausdrücklich nicht.
+4. **Idempotenz auf DB-Ebene mit persistierter Refund→Charge-Referenz.** Jeder erfolgreiche Refund persistiert dauerhaft eine eindeutige Referenz auf die ursprüngliche Charge (`charge_id`, bei Reservierungen zusätzlich `reservation_id`) plus `run_id` und `refund_reason`. Die DB-Serialisierung garantiert **höchstens einen Refund pro (charge_id, refund_reason)**. Ein Row-Lock ohne persistierte Provenance ist ausdrücklich zu schwach (Auditierbarkeit). `clip_error LIKE 'watchdog_%'` und jeder andere Caller-Guard zählen nicht als Idempotenzmechanismus.
 5. **Race-Safety.** Zwei parallele Recovery-Caller erzeugen zusammen genau eine Gutschrift — Serialisierung im DB-Schritt (Row-Lock auf der Charge bzw. Unique-Constraint auf dem Refund-Schlüssel), nicht im Edge-Code.
 6. **Run-/Charge-Schärfe statt scene_id.** `scene_id` allein ist kein Idempotenzschlüssel; eine Szene hat legitim mehrere Runs. Der Schlüssel ist die Charge-Identität, mit `run_id` als Zuordnungsdimension. Solange der Legacy-Debit nur `generation_id = project_id` trägt, gilt: der Contract verlangt eine eindeutige Charge↔Run-Zuordnung, und ohne sie greift Regel 3 (kein Credit).
 7. **Bereits refundete Charge ⇒ No-op.** Zweiter Aufruf liefert Erfolg mit Betrag 0, kein Fehler, keine zweite Gutschrift, keine zusätzliche `ai_video_transactions`-Zeile.
@@ -52,6 +52,10 @@ Kein neues Accounting-Modell. Die Lücke ist nicht die Tabelle, sondern die fehl
 
 ## 4. Offene Entscheidung für den nächsten Schritt (bewusst nicht vorweggenommen)
 
-Ob DB-Idempotenz eine kleine Migration braucht, hängt an einer Frage: Es gibt heute **keinen** Refund→Charge-Verweis (die `refund`-Zeile trägt nur `generation_id`, `metadata` ist NULL). Damit ist entweder ein Verweis-/Unique-Feld auf `ai_video_transactions` nötig oder eine RPC, die Idempotenz über einen Row-Lock der Charge plus deterministischen Existenz-Check herstellt. Diese Wahl wird erst nach diesem Lock getroffen.
+Heute existiert **kein** Refund→Charge-Verweis (die `refund`-Zeile trägt nur `generation_id`, `metadata` ist NULL). Zwei zulässige Wege, Entscheidung erst in der Implementation-Analyse:
 
-**FA-4/P1-A ACCOUNTING FIX CONTRACT LOCKED → STOP.**
+- **Ohne Migration:** die bestehende `metadata`-Spalte der Refund-Transaktion nimmt verbindlich `charge_id`, `run_id` und `refund_reason` auf, und die DB-RPC serialisiert unter Charge-Lock, sodass der zweite Caller unter demselben Lock den bereits existierenden Refund erkennt und als No-op zurückkehrt.
+- **Mit kleinem DB-Constraint:** falls sich „höchstens ein Refund pro (charge_id, refund_reason)" mit den bestehenden Strukturen nicht zuverlässig erzwingen lässt, kommt ein minimaler Unique-Index/Constraint dazu — sonst nichts.
+
+**FA-4/P1-A ACCOUNTING FIX CONTRACT LOCKED → STOP.** Nächster Schritt auf GO: Implementation-Analyse für die kleinste DB-/RPC-Lösung.
+
