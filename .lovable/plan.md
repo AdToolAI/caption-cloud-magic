@@ -25,8 +25,26 @@ Nach Contract A: Anchor-Slots sind Character-Wahrheit, Plate-Faces sind rein geo
 - Ein Plate-Face darf nie zwei Characters tragen (Bijektion ist verpflichtend).
 - Extra-Faces bleiben im Ergebnis, aber ohne Character (bestehende v278.3-Semantik).
 - Weniger plausible Faces als Characters → `countMismatch` → fail-closed, kein Teil-Dispatch.
-- Maximal zulässige Geometrie-Abweichung: es wird kein neuer Grenzwert erfunden. Verwendet wird die bestehende Distanz-→-Confidence-Abbildung des Routers (`matchConfidence = 1 - d/0.5`, also d ≥ 0.5 = wertlos); ob daraus ein harter Cutoff wird, ist im Contract als offener Implementierungsparameter markiert und erst mit Test-Beleg zu fixieren.
 - Identity-Labels wirken ausschließlich als Tie-Break/Zusatzscore und dürfen nie einen sanity- oder geometrie-invaliden Kandidaten erzwingen.
+
+#### B.1 — Fail-closed-Bedingungen (Blocker geschlossen)
+
+Repo-weite read-only Prüfung: es existiert **kein** produktiver Grenzwert für Anchor↔Plate-**Geometrie**-Distanz. Vorhanden sind nur:
+
+- `plateFaceSlotRouter.ts`: `matchConfidence = 1 - d/0.5` (Zeile 391) — reine Score-Abbildung, nirgends als Gate ausgewertet; `maxDistance` (Zeile 410) wird nur berichtet. Einziger harter Ausgang ist `countMismatch = cols < rows` (Zeile 404).
+- `plate-face-identity.ts`: `minConfidence < 0.55 || minMargin < 0.15` (Zeile 553, N=3 verschärft auf 0.70/0.25) — das ist die **biometrische** Similarity-Ambiguity-Regel (v133), nicht Geometrie. Sie wird nicht auf Center-Distanzen übertragen.
+- Keine Router-/Identity-Tests und keine Doku definieren einen Geometrie-Cutoff.
+
+Contract-Festlegung: **Für diesen Fix wird kein neuer Distanz-Cutoff eingeführt.** Distanz, `maxDistance` und `matchConfidence` bleiben Telemetrie/Supporting Score.
+
+Fail-closed gilt deterministisch genau bei:
+
+a) `plausible_candidates < expected_characters` (nach Contract A) — bestehende `countMismatch`-Semantik.
+b) Keine vollständige Bijektion möglich, d. h. mindestens ein Anchor-Slot bleibt ohne eigenen Kandidaten.
+c) Exakt degenerierte bzw. equal-cost Ambiguität: mehrere Bijektionen erreichen dieselben minimalen Gesamtkosten mit unterschiedlicher Character→Face-Zuordnung, oder zwei Kandidaten haben identische Center-Geometrie.
+
+„near-identical" ist **kein** eigener Blocker — dafür existiert keine bestehende Toleranz. Der Testvertrag begrenzt sich auf exakt gleiche/degenerierte Geometrie und exakte Equal-Cost-Ambiguität.
+
 
 ### Contract C — assignmentLock-Semantik
 
