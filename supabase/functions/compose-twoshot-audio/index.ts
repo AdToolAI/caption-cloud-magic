@@ -277,7 +277,10 @@ function blocksFromDialogTurns(
       rawSpeaker,
       text: t.text,
       characterId: t.characterId,
+      // FA-4/P0 — Turn-Identität am kanonischen Erzeugungsort binden.
+      turnId: t.turnId ? String(t.turnId) : undefined,
     });
+
   }
   return out.length > 0 ? out : null;
 }
