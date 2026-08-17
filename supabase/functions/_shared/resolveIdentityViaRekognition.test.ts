@@ -213,11 +213,12 @@ Deno.test("T3: cache does not confuse two different anchor URLs", async () => {
   const urlB = "https://test.invalid/b.png";
 
   const originalFetch = globalThis.fetch;
-  const fetched = new Set<string>();
   globalThis.fetch = async (input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
-    fetched.add(url);
-    return new Response(makeTinyPng().buffer as ArrayBuffer, { status: 200 });
+    // Return deterministic but different bytes per URL so base64 differs.
+    const marker = url === urlA ? 0x01 : 0x02;
+    const bytes = new Uint8Array([marker, ...makeTinyPng()]);
+    return new Response(bytes.buffer as ArrayBuffer, { status: 200 });
   };
 
   try {
