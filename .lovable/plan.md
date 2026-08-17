@@ -38,7 +38,8 @@ Das ist der einzige DB-Änderungsbedarf dieses Gates.
 
 ## 3. Deploy-Schritte (enger Scope)
 
-1. **Migration (additiv, minimal)** — nur Rechte, keine Logikänderung:
+1. **Rechte-Migration (deklarativ, entzieht Rechte — nicht additiv im engeren
+   Sinn; Funktionsrumpf und Daten bleiben unberührt):**
    ```sql
    REVOKE EXECUTE ON FUNCTION public.composer_refund_charge(uuid,uuid,text)
      FROM PUBLIC, anon, authenticated;
@@ -48,16 +49,19 @@ Das ist der einzige DB-Änderungsbedarf dieses Gates.
 2. **DB-Sanity (read-only, nicht mutierend)**
    - Index genau einmal vorhanden (`pg_indexes`, Count = 1)
    - RPC vorhanden mit Signatur `(uuid,uuid,text)`
-   - ACL: `service_role=X`, kein `anon`/`authenticated`/PUBLIC
-   - RPC-Smoke mit nicht existierender `charge_id` ⇒ `outcome=no_charge`,
-     `amount_euros=0`, danach Nachweis: keine neue Zeile in
+   - Rechte explizit über `has_function_privilege(...,'EXECUTE')`:
+     `service_role = true`, `anon = false`, `authenticated = false`,
+     zusätzlich Nachweis, dass über PUBLIC/Default kein indirekter
+     EXECUTE-Pfad besteht (ACL-String nur als Zusatzbeleg)
+   - `no_charge`-Smoke: zufällige nicht existente `charge_id`, gültige
+     beliebige `run_id`, nicht leerer `refund_reason` ⇒ `outcome=no_charge`,
+     `amount_euros=0`; danach Beleg: keine neue Zeile in
      `ai_video_transactions`, keine Wallet-Bewegung
 3. **Edge-Function `recover-stuck-composer-clip` deployen**
    (inkl. `refund-provenance.ts`; `refund-provenance.test.ts` ist Testartefakt)
 4. **Boot-/Validation-Smoke** der Function mit unvollständigem Body ⇒ saubere
    Validierungsantwort statt Boot-Fehler
-5. **T_FA4_P1A_effective** = Zeitpunkt, ab dem Rechte-Migration **und** neue
-   Edge-Version beide produktiv sind — wird protokolliert
+5. **T_FA4_P1A_effective = max(T_ACL_fix, T_edge_deploy)** — wird protokolliert
 
 Nicht deployed/geändert: `qa-watchdog`, Reaper, Ledger, RS3,
 `refund_ai_video_credits`, Pricing, Provider/Plate, Lip-Sync.
@@ -66,15 +70,23 @@ Keine erneuten finanziellen Contracttests, kein FA-4-Render.
 ## 4. Dokumentation
 
 `docs/v433-motion-studio-final-acceptance.md` erhält den Abschnitt
-„FA-4/P1-A — Deploy Verification" mit `T_FA4_P1A_db`, dem ACL-Befund und
-seiner Korrektur, `T_FA4_P1A_effective` und den Sanity-Ergebnissen.
+„FA-4/P1-A — Deploy Verification" mit:
 
-Bei grün: **FA-4/P1-A DEPLOY VERIFIED → STOP.** P1-B (CPU exhaustion vor
-Plate-Dispatch) danach separat.
+- `T_FA4_P1A_db`: DB-Logik bereits 15:32–15:36 UTC produktiv
+- Zwischen `T_FA4_P1A_db` und der ACL-Korrektur bestand eine zu breite
+  RPC-EXECUTE-Berechtigung (`anon`, `authenticated`)
+- keine Evidence-/Wallet-Bereinigung vorgenommen
+- keine erneuten finanziellen Contracttests
+- kein FA-4-Render
+- `T_FA4_P1A_effective` + alle Sanity-Ergebnisse
+
+Bei grün: **FA-4/P1-A DEPLOY VERIFIED → STOP.** Danach ausschließlich P1-B
+(CPU exhaustion vor Plate-Dispatch).
 
 ## Technische Details
 
 - Die zwei TypeScript-Warnungen in `recover-stuck-composer-clip/index.ts`
   (Zeilen 282/363) sind unverändert gegenüber HEAD und kein Blocker.
-- Die Rechte-Migration ist rein additiv/deklarativ und berührt weder
-  Funktionsrumpf noch Index noch bestehende Transaktionsdaten.
+- Die Rechte-Migration ändert weder Funktionsrumpf noch Index noch
+  bestehende Transaktionsdaten.
+
