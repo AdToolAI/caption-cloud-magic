@@ -4,18 +4,23 @@ Ziel: Der Watchdog erstattet nur noch gegen eine DB-seitig belegte, run-scharfe 
 
 ## 1. Additive Migration
 
-### a) Partial Unique Index (wie vom Nutzer formuliert)
+### a) Partial Unique Index — höchstens ein Full Refund pro Charge
+
+Die RPC kennt nur Full Refund (`abs(charge.amount_euros)`). Die finanzielle Idempotenzidentität ist deshalb allein die Charge, nicht der Grund.
 
 ```sql
-CREATE UNIQUE INDEX ai_video_transactions_refund_provenance_uniq
+CREATE UNIQUE INDEX ai_video_transactions_refund_charge_uniq
 ON public.ai_video_transactions (
-  (metadata->>'refund_charge_id'),
-  (metadata->>'refund_reason')
+  (metadata->>'refund_charge_id')
 )
 WHERE type = 'refund'
-  AND metadata ? 'refund_charge_id'
-  AND metadata ? 'refund_reason';
+  AND metadata ? 'refund_charge_id';
 ```
+
+`refund_reason` bleibt verpflichtend in `metadata` (Audit/Diagnose), ist aber kein Teil der Idempotenzidentität. Damit gilt:
+- gleiche Charge + gleicher Grund → `already_refunded`
+- gleiche Charge + anderer Grund → ebenfalls `already_refunded`
+- zwei verschiedene Charges → getrennt refundierbar
 
 Legacy-Historie (inkl. der 6,30-€-Evidence mit `metadata IS NULL`) liegt bewusst außerhalb der Idempotenzdomäne. Kein Backfill, keine Korrektur.
 
