@@ -94,24 +94,31 @@ Freigegeben ausschließlich:
 Weiter frozen: Face-/BBox-/Maskengeometrie, v187/v331-Gates, Schwellenwerte,
 Sync-Ledger, RS3, G3.2.2/F1, Mux/Stitch.
 
-## Verbindliche Tests für den späteren Fix
+## Verbindliche Tests (8)
 
 1. 502 **vor** dem Claim → Reinvoke derselben ID → genau **ein** AWS-Start → Preclip ok.
 2. Antwortverlust **nach** gesetztem `lambda_invoked_at` → Reinvoke → `alreadyStarted /
    unresolved`, kein zweiter AWS-Start → Row später `completed` → Preclip ok.
 3. `lambda_invoked_at` gesetzt, danach kein Fortschritt → kein zweiter Start, unabhängig
    von der verstrichenen Zeit → v187 fail-closed + genau ein Refund.
-4. Zwei parallele Invokes derselben `pendingRenderId` → genau ein Claim/AWS-Start.
+4. **(kritisch)** Zwei parallele Invokes derselben `pendingRenderId` → genau ein
+   CAS-Gewinner, genau ein AWS-Start.
 5. `lambda_failed`, `invalid_input`, Credentials-/Config-Fehler → kein Retry.
 6. `poll_timeout` → kein AWS-Neustart; v188-Reuse unverändert.
-7. Claim atomar gesetzt, Prozess stirbt **vor** dem tatsächlichen AWS-Aufruf → Reinvoke
-   startet kein zweites Lambda → nach bestehendem Budget fail-closed. Bewusst akzeptierter
-   Preis von Exactly-Once: in diesem winzigen Fenster geht ggf. ein Render verloren, es
-   entstehen aber nie zwei.
+7. **(kritisch)** Claim gesetzt, Prozess stirbt **vor** dem AWS-Aufruf → Reinvoke startet
+   kein zweites Lambda → nach bestehendem Budget fail-closed. Bewusst akzeptierter Preis
+   von Exactly-Once: ggf. ein verlorener Render, aber nie zwei.
 8. N=4 endgültiger Preclip-Failure → weiterhin 0 `sync_segment`-Ledger-Jobs + genau ein
    Refund (heutiges Verhalten vor dem Ledger bleibt korrekt).
 
-## Danach
+## Umsetzung (nach GO)
 
-STOP. Erst nach Contract-Abnahme ein sehr kleiner Fix, dann ausschließlich Wiederholung
-von FA-4. FA-1 bis FA-3 bleiben PASS.
+1. `invoke-remotion-render/index.ts`: CAS-Claim + `alreadyStarted/unresolved`-Antwort.
+2. `_shared/pass-face-preclip.ts`: 5xx/Netzwerk → `dispatch_uncertain`, Row nicht auf
+   `failed` setzen, Recheck + höchstens ein Reinvoke derselben `pendingRenderId`.
+3. `compose-dialog-segments/index.ts`: nur Presentertext/Diagnoseklasse (kein Kollaps von
+   `dispatch_uncertain` zu `dispatch_failed`/`poll_timeout`), DE/EN/ES.
+4. Tests 1–8 ausführen, Doku-Nachtrag in
+   `docs/v433-motion-studio-final-acceptance.md`.
+5. **STOP vor Deploy.** Danach nur dieser kleine Fix deployen und ausschließlich FA-4 mit
+   einer frischen Szene wiederholen. FA-1 bis FA-3 bleiben PASS.
