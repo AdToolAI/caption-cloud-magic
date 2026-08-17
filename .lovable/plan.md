@@ -77,7 +77,10 @@ idempotenter Refund → kein Full-Plate-Fallback.
 | `poll_timeout` | kein AWS-Neustart; v188-Reuse unverändert |
 | abgeschlossener alter Render | v188-Reuse wie bisher |
 
-### F — Nutzermeldung (Presenter-Ebene, DE/EN/ES)
+### F — Nutzermeldung + Diagnose-Durchleitung (Presenter-Ebene, DE/EN/ES)
+- `dispatch_uncertain` bleibt eine **eigene Diagnoseklasse** im Preclip-Ergebnis und wird
+  unverändert bis `compose-dialog-segments` durchgereicht — es darf unterwegs nie zu
+  `dispatch_failed` oder `poll_timeout` kollabieren.
 - Dispatch-/Gatewayproblem: „Vorbereitung des Sprecher-Clips konnte wegen eines
   Infrastrukturfehlers nicht gestartet bzw. bestätigt werden."
 - echter Poll-Timeout: „wurde nicht rechtzeitig fertig."
