@@ -24,6 +24,8 @@ import { MorphTransition } from '../components/MorphTransition';
 import { ProfessionalLottieCharacter, type PhonemeTimestamp as CharacterPhonemeTimestamp } from '../components/ProfessionalLottieCharacter';
 import { DrawOnEffect } from '../components/DrawOnEffect';
 import { PrecisionSubtitleOverlay, withOpacity } from '../components/PrecisionSubtitleOverlay';
+import { getUccSubtitleFlexPlacement, UCC_SUBTITLE_MAX_WIDTH } from '../utils/subtitleConstants';
+
 import { SceneAudioManager, type SceneAudioConfig } from '../components/SceneAudioManager';
 import { getSoundUrlSync, type SoundEffectType } from '../components/EmbeddedSoundLibrary';
 
