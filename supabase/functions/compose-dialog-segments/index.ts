@@ -1909,6 +1909,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // when: N < 3 (legacy is cheap and reliable there), the anchor
       // layout is missing (older scenes), face-count mismatch, or the
       // AWS DetectFaces call fails.
+      // FA-4 P0 — a CONTRACTUAL geometry failure of the v278/FA-4 router is a
+      // confirmed statement about the plate. The legacy identity resolver must
+      // NOT take over in that case (it is exactly the path that produced the
+      // wrong-face runs). Infrastructure failures keep the legacy recovery.
+      let fa4ContractualFailure: { reason: string; detail: string } | null = null;
       if (
         hasCompleteV278AnchorLayout &&
         anchorLayoutRaw
@@ -1929,7 +1934,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             `[compose-dialog-segments] scene=${sceneId} v278_router ok=${routed.ok ? 1 : 0} ` +
             `resolved=${routed.resolvedCount}/${routed.expectedCount} faces=${routed.faces.length} ` +
             `mismatch=${routed.countMismatch ? 1 : 0} maxDist=${routed.maxDistance?.toFixed(3) ?? "-"} ` +
-            `ms=${routed.msTotal} reason=${routed.reason ?? "-"}`,
+            `ms=${routed.msTotal} reason=${routed.reason ?? "-"} class=${routed.failureClass ?? "-"}`,
           );
           if (routed.ok && routed.resolvedCount === speakers.length) {
             // Adapt router output to PlateIdentityMap shape.
@@ -1955,12 +1960,49 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               minMargin: 1,
               ambiguous: false,
             } as any;
+          } else if (routed.failureClass === "contractual") {
+            fa4ContractualFailure = {
+              reason: routed.reason ?? "fa4_fail_closed:unknown",
+              detail:
+                `anchor=${routed.expectedCount} detected=${routed.detectedCount ?? routed.faces.length} ` +
+                `resolved=${routed.resolvedCount}`,
+            };
           }
         } catch (err) {
+          // Thrown router errors are ALWAYS infrastructure → legacy recovery.
           console.warn(
             `[compose-dialog-segments] scene=${sceneId} v278_router threw — falling back to legacy: ${(err as Error)?.message}`,
           );
         }
+      }
+      if (fa4ContractualFailure) {
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} fa4_contract_b_fail_closed ` +
+          `reason=${fa4ContractualFailure.reason} ${fa4ContractualFailure.detail} — ` +
+          `legacy resolvePlateFaceIdentities suppressed, no provider dispatch`,
+        );
+        await failLipSync({
+          supabase,
+          sceneId,
+          reason: fa4ContractualFailure.reason,
+          userId,
+          refundCredits: totalCost,
+          syncApiKey,
+        });
+        return json(
+          {
+            error: "plate_identity_geometry_fail_closed",
+            reason: fa4ContractualFailure.reason,
+            detail: fa4ContractualFailure.detail,
+            message: tl({
+              de: "Die Gesichter im Plate lassen sich den Sprechern nicht eindeutig zuordnen. Der Lip-Sync wurde vor dem Start abgebrochen und die Credits wurden zurückerstattet.",
+              en: "The faces on the plate cannot be assigned unambiguously to the speakers. Lip-sync was aborted before dispatch and credits have been refunded.",
+              es: "Las caras del plano no se pueden asignar de forma inequívoca a los hablantes. El lip-sync se canceló antes de iniciarse y los créditos han sido reembolsados.",
+            }),
+            refunded: totalCost,
+          },
+          422,
+        );
       }
       if (!plateIdentityMap) try {
         plateIdentityMap = await resolvePlateFaceIdentities({
@@ -1980,6 +2022,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           `[compose-dialog-segments] scene=${sceneId} plate-identity resolve threw: ${(err as Error)?.message}`,
         );
       }
+
     }
     if (plateIdentityMap && plateIdentityMap.faces.length > 0) {
       // FA-4 Face-Candidate Fix — when the v278 router produced this map, the
