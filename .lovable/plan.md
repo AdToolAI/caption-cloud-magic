@@ -194,8 +194,9 @@ Nur:
 - `resolveIdentityViaRekognition` so umbauen, dass `compareOnePortrait` den
   vorbereiteten Anchor nicht erneut encodiert;
 - blockweises Encoding statt Byte-für-Byte-Konkatenation;
-- falls ohne Semantikänderung möglich: denselben finalen Anchor-Encode auch
-  zwischen `detectFacesOnAnchor` und v274 wiederverwenden;
+- **verbindlich:** derselbe finale Anchor-Encode wird auch zwischen
+  `detectFacesOnAnchor` und der v274-Compare-Schleife wiederverwendet, weil
+  beide denselben Request-Scope und dieselbe URL sehen;
 - Tests/Instrumentation für Load-/Encode-Counts und Ergebnisgleichheit.
 
 Nicht ändern: Anchor-Ladder und Attempt-Anzahl, strict-/framing-/face-size-
