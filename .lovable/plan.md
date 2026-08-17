@@ -38,14 +38,19 @@ DB-Writes, keine Migration, kein RS3-Marker, keine Pointer, kein Dispatch.
 ## Pre-Start-Snapshot (read-only)
 
 - `active_run_id = NULL`
-- `pipeline_state = idle`, `lip_sync_status` leer, `plate_generation` initial
+- `pipeline_state = idle`, `lip_sync_status` leer
+- `plate_generation`: kein Zielwert gefordert — nur der Startwert wird dokumentiert;
+  entscheidend ist, dass kein aktiver Run/Job/Pointer existiert (der Render darf den
+  Zähler danach kontrolliert erhöhen)
 - `composer_pipeline_jobs` für die Szene = 0 Zeilen (insb. `sync_segment` = 0, `audio_mux` = 0)
-- keine Output-Historie: `clip_url`, `base_video_url`, `processed_video_url` NULL
+- keine Output-Historie: `clip_url`, `base_video_url`, `processed_video_url` alle NULL
 - `reference_image_url = NULL`
 - keine Pass-/Job-Pointer in `dialog_shots` / `audio_plan`
 - kein RS3-Marker (`audio_plan.twoshot.rs3_reset`, `rs3_reset_id` fehlen)
-- 6 kanonische Turns, bijektiv auf 4 Character-IDs; Wiederholungspaare (1↔5, 2↔6) verifiziert
-- 4 distinct Voice-IDs, eindeutig je Character
+- genau 6 `dialog_turns` auf exakt 4 distinct Character-IDs; Turn 1 = Turn 5 und
+  Turn 2 = Turn 6 mit identischer Character-ID; jede Turn-ID eindeutig
+- 4 distinct Voice-IDs, je über die Character-ID gebunden, keine Doppelbelegung
+
 - C1: nach vollem Reload ist der Lip-Sync-Intent **resolved** und identisch mit dem
   persistierten DB-Wert (kein Draft-Overlay)
 
