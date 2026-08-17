@@ -602,7 +602,7 @@ export async function renderPassFacePreclip(
     return {
       ok: false,
       error: `dispatch_uncertain_${Math.round(pollTimeoutMs / 1000)}s`,
-      errorClass: "dispatch_uncertain",
+      errorClass: terminalClassOnNoProgress(true),
       preclipRenderId: renderId,
       crop,
       durationSec: dur,
