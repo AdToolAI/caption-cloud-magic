@@ -1035,3 +1035,44 @@ neuen Shared-Moduls.
 
 **Ergebnis: FA-4/P1-A DEPLOY VERIFIED.**
 Nächster Schritt separat: FA-4/P1-B — CPU exhaustion before plate dispatch.
+
+---
+
+## FA-4/P1-B — CPU Exhaustion Fix (v274 Identity Resolution) — IMPLEMENTED / TESTS GREEN
+
+**Scope:** `supabase/functions/_shared/resolveIdentityViaRekognition.ts` +
+`supabase/functions/_shared/image-encoding-cache.ts` + 6 verbindliche Deno-Tests.
+
+**Root Cause:** `bytesToBase64` in `resolveIdentityViaRekognition.ts` baute den
+Base64-String Byte-für-Byte per String-Konkatenation. Der finale Anchor-Frame
+wurde zwar nur einmal heruntergeladen, aber für jeden Charakter-Compare erneut
+encodiert (N=4 → 4+ Encodes). Das sprengte das CPU-Budget der Edge-Runtime
+vor dem HappyHorse-Dispatch.
+
+**Fix (Variante 1):**
+1. Neues `image-encoding-cache.ts` mit invocation-lokalem `ImageEncodingCache`.
+2. Jede URL wird genau einmal geladen und genau einmal Base64-encodiert.
+3. Blockweiser Encoder (`String.fromCharCode(...chunk)` mit 32k-Chunks) ersetzt
+die per-Byte-Konkatenation.
+4. Anchor-Base64 wird zwischen `DetectFaces` und allen `CompareFaces`-Aufrufen
+wiederverwendet.
+5. Nebenbei: `AWS_REGION_PATTERN` in `resolveIdentityViaRekognition.ts`
+wiederhergestellt (latenter Laufzeitfehler, wenn `REKOGNITION_REGION`/`AWS_REGION`
+gesetzt waren).
+
+**Test-Invarianten (alle grün):**
+- T1: N=4 → Anchor-URL genau 1× geladen, Base64 genau 1× encodiert, gleicher
+  Anchor-Base64 in Detect + 4× Compare.
+- T2: N=1/N=2/N=4 ergeben identische Assignment-Ergebnisse.
+- T3: Cache trennt zwei verschiedene URLs korrekt (2 Loads, 2 Encodes).
+- T4: 4 Portraits werden korrekt auf 4 Slots zugeordnet (Cross-Map-Test).
+- T5: Ein fehlgeschlagener Compare-Faces-Call vergiftet den Cache nicht.
+- T6: Blockweiser Encoder ist Byte-identisch zum Legacy-Encoder.
+
+**Testausführung:**
+```bash
+deno test --allow-env --allow-net --no-check supabase/functions/_shared/resolveIdentityViaRekognition.test.ts
+```
+→ `ok | 6 passed | 0 failed`
+
+**Status:** FA-4/P1-B IMPLEMENTED / TESTS GREEN — **STOP vor Deploy.**
