@@ -26,7 +26,10 @@ interface SubtitleStyleEditorProps {
   onChange: (style: SubtitleStyle) => void;
   sampleText: string;
   onSampleTextChange: (value: string) => void;
+  /** Present when the preview text was manually overridden — restores the segment text. */
+  onResetSampleText?: () => void;
 }
+
 
 const generateStrokeShadow = (color: string, width: number) => {
   const shadows = [];
