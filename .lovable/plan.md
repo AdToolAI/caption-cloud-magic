@@ -114,10 +114,22 @@ Zur Freigabe nach dem Lock, in dieser Reihenfolge:
   Kandidatensatz, bevor gematcht wird — unabhängig von ihrer Confidence.
 - **Trust-Gate darf Sanity nicht überspringen.** Confidence darf nur
   entscheiden, ob repariert wird — nicht, ob geprüft wird.
-- **Preclip-Identity-Validation fail-closed.** Ein Pass, dessen Crop nicht
-  nachweislich das Ziel-Gesicht enthält, darf nicht an Sync.so gehen.
+- **Deterministisches Crop-Containment-Gate statt Probe-Zwang.** Vor
+  Provider-Dispatch muss deterministisch beweisbar sein, dass der Preclip-Crop
+  den für den gelockten Character ausgewählten Face-Kandidaten enthält und
+  keinen konkurrierenden Sprecher als Ziel übernehmen kann. Ein optionaler
+  Vision-Probe darf zusätzliche Evidenz liefern, aber `probe_unavailable` darf
+  nicht der einzige Schutz sein — sonst wird aus dem Identity-Bug ein
+  Availability-Bug.
 - **Regressionsschutz.** Fixture aus genau diesem Detektionssatz (zehn
   Boxen, drei False-Positive-Labels) als Testfall.
+
+Zielvertrag (schon jetzt festgehalten):
+`Anchor Character Lock → plausible Plate-Face candidates → global bijective
+geometry assignment → identity labels only as supporting score → sanity always
+enforced → deterministic crop containment gate → Sync.so`.
+Nicht mehr: `Character label → first matching PlateFace → trust by confidence →
+dispatch`.
 
 Ledger, Fan-out, Turn-ID, `speaker_idx`, RS3, Mux und Finalizer bleiben
 unberührt.
