@@ -76,24 +76,51 @@ Der Lock beantwortet genau vier Fragen — nichts darüber hinaus:
 
 1. **Lief bei S11 der v278/Hungarian-Pfad?** Und falls ja: an welcher Stelle
    wurde sein korrektes geometrisches Ergebnis später überschrieben? Beleg aus
-   den Edge-Logs des Runs (Zeitfenster um 2026-08-17 20:38 UTC), Zeilen
-   `v278_router`, `v183_plate_identity_mapping`,
-   `v277_anchor_lock_face_missing`.
+   den Edge-Logs des Runs. **Log-Zeitfenster mindestens 2026-08-17
+   20:39:00Z–20:49:30Z** — `base_video` war erst gegen 20:44:30Z fertig, die
+   Face-/Preclip-Entscheidung liegt danach. Zeilen `v278_router`,
+   `v183_plate_identity_mapping`, `v277_anchor_lock_face_missing`.
+   Offene Inferenz, die die Logs bestätigen oder widerlegen müssen: persistiert
+   sind 10 Plate-Faces; bei einem angenommenen 4/4-v278-Ergebnis müsste
+   `plateIdentityMap.faces` im Wesentlichen die vier gerouteten Faces enthalten.
+   Das deutet darauf hin, dass v278 nicht ok war oder verworfen wurde und der
+   Legacy-Pfad `resolvePlateFaceIdentities` übernommen hat.
 2. **Lief `v183_anchor_identity_slot_bridge`?** Wenn ja: welche Face-Slots
    wurden dadurch gelabelt (Signatur `confidence: 0` / `matchConfidence: 0.85`)?
 3. **Warum akzeptierte `v239_repair_gate` Sarah/Matthew/Kay als trusted,**
-   obwohl ihre Boxflächen objektiv unter der Sanity-Schwelle liegen? Pro Slot
-   Flächenanteil, Seitenverhältnis und Trust-Grund nachrechnen.
+   obwohl ihre Boxflächen objektiv unter der Sanity-Schwelle liegen?
+   Gegenrechnung mit den **bestehenden Produktionskriterien**, keine neuen
+   Schwellen: Plate-Flächenanteil gegen 0.003–0.25, Aspect gegen 0.4–2.5. Pro
+   verwendeter Box dokumentieren: Area %, Aspect, `confidence`,
+   `matchConfidence`, abgeleiteter Trust-Grund und ob `bboxSanity()` überhaupt
+   ausgeführt wurde.
 4. **Lief anschließend v277 First-Match auf diesen bereits falsch gelabelten
    Kandidaten** und machte sie damit zur autoritativen `speakerPlateBBox`?
 
+Rekonstruierte Beweiskette (in genau dieser Reihenfolge, um zu zeigen, wo eine
+zunächst richtige Information verloren geht):
+
+```text
+v278_router
+  → ggf. Legacy resolvePlateFaceIdentities
+  → v183_anchor_identity_slot_bridge
+  → Aufbau anchorRekFacesByCid
+  → v277 locked-face selection
+  → speakerPlateBboxes[]
+  → v239_repair_gate
+  → Preclip-Crop
+  → Face-Probe / probe_unavailable
+```
+
 Zusätzlich als Beweis-Gegenprobe (keine fünfte Frage, sondern Beleg zu 1):
-die vier Anchor-Zentren gegen die Plate-Kandidaten stellen, **zuerst objektiv
-unplausible Kandidaten entfernen** (Mindestfläche, Seitenverhältnis) und dann
-eine **global bijektive Zuordnung (Hungarian)** rechnen — nicht greedy nearest
-neighbor, da dieser bei dicht stehenden Gesichtern zufällig richtig liegen kann
-und den Produktionsvertrag nicht abbildet. Erwartung: die vier großen realen
-Kandidaten liegen praktisch exakt auf den vier Anchor-Slots.
+**zuerst objektiv unplausible Kandidaten entfernen** (Area/Aspect nach
+Produktionskriterien), dann die vollständige **4×N-Kostenmatrix** über
+normalisierte Face-Zentren gegen die vier Anchor-Slots bilden und **global
+bijektiv (Hungarian) minimieren** — nicht greedy nearest neighbor, der bei dicht
+stehenden Gesichtern zufällig richtig liegen kann. Kostenmatrix und gewählte
+Zuordnung vollständig dokumentieren. Erwartung: die vier großen realen
+Kandidaten sind aus den bereits vorhandenen Run-Daten eindeutig
+rekonstruierbar.
 
 Ergebnis dokumentieren in `docs/v433-motion-studio-final-acceptance.md` als
 eigener Abschnitt "FA-4 Root-Cause-Lock — Face-Candidate-Auswahl", unter dem
@@ -114,13 +141,14 @@ Zur Freigabe nach dem Lock, in dieser Reihenfolge:
   Kandidatensatz, bevor gematcht wird — unabhängig von ihrer Confidence.
 - **Trust-Gate darf Sanity nicht überspringen.** Confidence darf nur
   entscheiden, ob repariert wird — nicht, ob geprüft wird.
-- **Deterministisches Crop-Containment-Gate statt Probe-Zwang.** Vor
-  Provider-Dispatch muss deterministisch beweisbar sein, dass der Preclip-Crop
-  den für den gelockten Character ausgewählten Face-Kandidaten enthält und
-  keinen konkurrierenden Sprecher als Ziel übernehmen kann. Ein optionaler
-  Vision-Probe darf zusätzliche Evidenz liefern, aber `probe_unavailable` darf
-  nicht der einzige Schutz sein — sonst wird aus dem Identity-Bug ein
-  Availability-Bug.
+- **Deterministisches Crop-Containment-Gate statt Probe-Zwang.** Formal: die
+  Target-BBox des gelockten Characters muss vollständig im Preclip-Crop liegen,
+  und kein Zentrum eines anderen bereits zugewiesenen Speaker-Faces darf im
+  zulässigen Target-Bereich dieses Crops liegen. Ist das geometrisch nicht
+  erfüllbar, fail-closed vor Sync.so. Deterministisch, ohne externen
+  Vision-Service. Ein optionaler Vision-Probe darf zusätzliche Evidenz liefern,
+  aber `probe_unavailable` darf nicht der einzige Schutz sein — sonst wird aus
+  dem Identity-Bug ein Availability-Bug.
 - **Regressionsschutz.** Fixture aus genau diesem Detektionssatz (zehn
   Boxen, drei False-Positive-Labels) als Testfall.
 
