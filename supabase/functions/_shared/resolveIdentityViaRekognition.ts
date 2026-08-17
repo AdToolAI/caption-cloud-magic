@@ -28,8 +28,9 @@
  * we want the helper standalone / auditable).
  */
 
-const AWS_REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;
+import { bytesToBase64, ImageEncodingCache } from "./image-encoding-cache.ts";
 const DEFAULT_REKOGNITION_REGION = "eu-central-1";
+const AWS_REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;
 function resolveRekognitionRegion(): string {
   const override = (Deno.env.get("REKOGNITION_REGION") ?? "").trim();
   if (override && AWS_REGION_PATTERN.test(override)) return override;
@@ -44,7 +45,6 @@ const ENDPOINT = `https://${HOST}/`;
 const AWS_ACCESS_KEY_ID = Deno.env.get("AWS_ACCESS_KEY_ID") ?? "";
 const AWS_SECRET_ACCESS_KEY = Deno.env.get("AWS_SECRET_ACCESS_KEY") ?? "";
 
-const FETCH_TIMEOUT_MS = 12_000;
 const REK_TIMEOUT_MS = 15_000;
 /** Similarity threshold to accept a portrait→box match (Rekognition 0..100). */
 const MIN_SIMILARITY = 55;
@@ -128,21 +128,6 @@ function withTimeout<T>(p: Promise<T>, ms: number, tag: string): Promise<T> {
   });
 }
 
-async function fetchImageBytes(url: string): Promise<Uint8Array | null> {
-  try {
-    const r = await withTimeout(fetch(url, { method: "GET" }), FETCH_TIMEOUT_MS, "img_fetch");
-    if (!r.ok) return null;
-    const buf = await r.arrayBuffer();
-    return new Uint8Array(buf);
-  } catch { return null; }
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin);
-}
-
 interface RekBox { Left: number; Top: number; Width: number; Height: number }
 
 interface DetectedFace {
@@ -154,8 +139,8 @@ interface DetectedFace {
   confidence: number;
 }
 
-async function detectFacesOnAnchor(anchorBytes: Uint8Array, imgW: number, imgH: number): Promise<DetectedFace[]> {
-  const payload = JSON.stringify({ Image: { Bytes: bytesToBase64(anchorBytes) }, Attributes: ["DEFAULT"] });
+async function detectFacesOnAnchor(anchorBase64: string, imgW: number, imgH: number): Promise<DetectedFace[]> {
+  const payload = JSON.stringify({ Image: { Bytes: anchorBase64 }, Attributes: ["DEFAULT"] });
   const res = await withTimeout(signedRekognitionCall("RekognitionService.DetectFaces", payload), REK_TIMEOUT_MS, "detect");
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -205,15 +190,15 @@ function iou(a: RekBox, b: RekBox): number {
 }
 
 async function compareOnePortrait(
-  portraitBytes: Uint8Array,
-  anchorBytes: Uint8Array,
+  portraitBase64: string,
+  anchorBase64: string,
   detected: DetectedFace[],
 ): Promise<Map<number, number>> {
   /** Returns Map<detectedSlot, similarity(0..100)>. */
   const out = new Map<number, number>();
   const payload = JSON.stringify({
-    SourceImage: { Bytes: bytesToBase64(portraitBytes) },
-    TargetImage: { Bytes: bytesToBase64(anchorBytes) },
+    SourceImage: { Bytes: portraitBase64 },
+    TargetImage: { Bytes: anchorBase64 },
     SimilarityThreshold: 0, // we filter later with MIN_SIMILARITY
     QualityFilter: "NONE",
   });
@@ -365,17 +350,19 @@ export async function resolveIdentityViaRekognition(params: {
     return { ...empty, reason: "empty_input", msTotal: Date.now() - t0 };
   }
 
-  const anchorBytes = await fetchImageBytes(params.anchorUrl);
-  if (!anchorBytes) {
+  const cache = new ImageEncodingCache();
+
+  const anchorCached = await cache.load(params.anchorUrl);
+  if (!anchorCached) {
     return { ...empty, reason: "anchor_fetch_failed", msTotal: Date.now() - t0 };
   }
-  const probed = await probeImageDims(anchorBytes);
+  const probed = await probeImageDims(anchorCached.bytes);
   const W = params.anchorWidth ?? probed?.width ?? 1024;
   const H = params.anchorHeight ?? probed?.height ?? 1024;
 
   let detected: DetectedFace[];
   try {
-    detected = await detectFacesOnAnchor(anchorBytes, W, H);
+    detected = await detectFacesOnAnchor(anchorCached.base64, W, H);
   } catch (e) {
     return { ...empty, dims: { width: W, height: H }, reason: `detect_failed:${(e as Error).message}`, msTotal: Date.now() - t0 };
   }
@@ -383,17 +370,17 @@ export async function resolveIdentityViaRekognition(params: {
     return { ...empty, dims: { width: W, height: H }, reason: "detect_zero_faces", msTotal: Date.now() - t0 };
   }
 
-  // Fetch portraits in parallel.
-  const portraitBytesArr = await Promise.all(
-    params.characters.map((c) => fetchImageBytes(c.portraitUrl)),
+  // Fetch portraits in parallel through the same cache.
+  const portraitCachedArr = await Promise.all(
+    params.characters.map((c) => cache.load(c.portraitUrl)),
   );
 
   // Score matrix: rows=characters, cols=detected slots.
   const scoreMatrix: number[][] = [];
   for (let i = 0; i < params.characters.length; i++) {
-    const pb = portraitBytesArr[i];
-    if (!pb) { scoreMatrix.push(new Array(detected.length).fill(0)); continue; }
-    const simMap = await compareOnePortrait(pb, anchorBytes, detected);
+    const pc = portraitCachedArr[i];
+    if (!pc) { scoreMatrix.push(new Array(detected.length).fill(0)); continue; }
+    const simMap = await compareOnePortrait(pc.base64, anchorCached.base64, detected);
     scoreMatrix.push(detected.map((d) => simMap.get(d.slot) ?? 0));
   }
 
