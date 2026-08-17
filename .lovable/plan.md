@@ -25,11 +25,20 @@ Deploy-Kandidaten.
 | `invoke-remotion-render` | eigener Code geändert (CAS-Claim) + importiert `preclip-dispatch-resume.ts` |
 | `compose-dialog-segments` | eigener Code geändert (Presenter) + einziger Importer von `pass-face-preclip.ts` |
 
-## 2. Deploy
+## 2. Deploy (verbindliche Reihenfolge)
 
 Deploy genau dieser beiden Functions, keine weiteren. **Keine DB-Migration.**
-Nach dem letzten erfolgreichen Deploy den UTC-Zeitstempel als
-`T_FA4_P0_effective` im Abnahmedokument festhalten.
+
+1. `invoke-remotion-render` **zuerst** — so gibt es kein Zwischenfenster, in dem
+   der neue Preclip-Caller gegen die alte Invoke-Semantik läuft.
+2. `compose-dialog-segments` **danach**.
+
+`T_FA4_P0_effective` = UTC-Zeitpunkt des erfolgreichen Deploys von
+`compose-dialog-segments`. Zusätzlich werden — soweit vom Deploy-Werkzeug
+zurückgegeben — die Edge-Deploy-Versionen/Deployment-IDs beider Functions im
+Report festgehalten (kein Gate, nur Nachweis, dass der FA-4-Retest auf dem
+neuen Bundle lief).
+
 
 ## 3. Post-Deploy Static/Boot Sanity
 
