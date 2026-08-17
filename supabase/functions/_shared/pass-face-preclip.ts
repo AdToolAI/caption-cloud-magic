@@ -402,36 +402,130 @@ export async function renderPassFacePreclip(
   };
 
   const dispatchStart = Date.now();
-  const invokeResp = await fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-    body: JSON.stringify({ lambdaPayload, pendingRenderId: renderId, userId }),
-  });
-  const dispatchMs = Date.now() - dispatchStart;
-  if (!invokeResp.ok) {
-    const t = await invokeResp.text().catch(() => "");
-    await supabase
+
+  // ── FA-4/P0 — dispatch resilience (exactly-once) ─────────────────────
+  // A 5xx / network failure is `dispatch_uncertain`: the request may have
+  // reached the render service even though we never saw a response. We
+  // therefore NEVER destroy the render row and NEVER create a second one.
+  // The single re-invoke reuses the SAME pendingRenderId; whether AWS is
+  // actually started is decided solely by the atomic dispatch claim inside
+  // invoke-remotion-render.
+  type InvokeOutcome = { ok: boolean; status: number; body: string; networkError: string | null };
+  const doInvoke = async (): Promise<InvokeOutcome> => {
+    try {
+      const resp = await fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+        body: JSON.stringify({ lambdaPayload, pendingRenderId: renderId, userId }),
+      });
+      const body = resp.ok ? "" : await resp.text().catch(() => "");
+      return { ok: resp.ok, status: resp.status, body, networkError: null };
+    } catch (e) {
+      return { ok: false, status: 0, body: "", networkError: (e as Error)?.message ?? String(e) };
+    }
+  };
+
+  /** Provably rejected before anything could be sent to AWS → no retry. */
+  const isDefinitiveRejection = (o: InvokeOutcome): boolean => {
+    if (o.networkError) return false;
+    if (o.status >= 400 && o.status < 500) return true;
+    return /aws_credentials_missing|invalid_input|dispatch_claim_failed|are required|scheduling conflict/i
+      .test(o.body);
+  };
+
+  const readClaimState = async (): Promise<{ claimed: boolean; completed: boolean; url: string }> => {
+    const { data: row } = await supabase
       .from("video_renders")
-      .update({
-        status: "failed",
-        error_message: `invoke ${invokeResp.status}: ${t}`.slice(0, 400),
-        completed_at: new Date().toISOString(),
-      })
-      .eq("render_id", renderId);
-    console.log(
-      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_timing invoke_failed status=${invokeResp.status} dispatch_ms=${dispatchMs} total_ms=${Date.now() - t0}`,
-    );
+      .select("status, video_url, content_config")
+      .eq("render_id", renderId)
+      .maybeSingle();
+    const cfg = ((row as any)?.content_config ?? {}) as Record<string, unknown>;
+    const status = String((row as any)?.status ?? "");
     return {
-      ok: false,
-      error: `invoke_${invokeResp.status}:${t.slice(0, 200)}`,
-      errorClass: "dispatch_failed",
-      preclipRenderId: renderId,
-      crop,
-      durationSec: dur,
-      fps: FPS,
-      frameCount: durationInFrames,
+      claimed: !!cfg.lambda_invoked_at || !!cfg.real_remotion_render_id ||
+        status === "rendering" || status === "completed",
+      completed: status === "completed",
+      url: String((row as any)?.video_url ?? ""),
     };
+  };
+
+  let invoke = await doInvoke();
+  let dispatchUncertain = false;
+
+  if (!invoke.ok) {
+    if (isDefinitiveRejection(invoke)) {
+      await supabase
+        .from("video_renders")
+        .update({
+          status: "failed",
+          error_message: `invoke ${invoke.status}: ${invoke.body}`.slice(0, 400),
+          completed_at: new Date().toISOString(),
+        })
+        .eq("render_id", renderId);
+      console.log(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_timing invoke_rejected status=${invoke.status} dispatch_ms=${Date.now() - dispatchStart} total_ms=${Date.now() - t0}`,
+      );
+      return {
+        ok: false,
+        error: `invoke_${invoke.status}:${invoke.body.slice(0, 200)}`,
+        errorClass: "dispatch_failed",
+        preclipRenderId: renderId,
+        crop,
+        durationSec: dur,
+        fps: FPS,
+        frameCount: durationInFrames,
+      };
+    }
+
+    dispatchUncertain = true;
+    console.warn(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} fa4p0_dispatch_uncertain status=${invoke.status} net=${invoke.networkError ?? "-"} — recheck, no row destruction`,
+    );
+
+    await new Promise((r) => setTimeout(r, 3_000));
+    const state = await readClaimState();
+    if (state.claimed) {
+      // Claim exists (or render already progressed) → poll only, never re-dispatch.
+      console.log(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} fa4p0_claim_present — poll only, no second AWS start`,
+      );
+    } else {
+      // Provably no claim → exactly one re-invoke with the SAME pendingRenderId.
+      invoke = await doInvoke();
+      if (invoke.ok) {
+        dispatchUncertain = false;
+        console.log(
+          `[pass-face-preclip] scene=${sceneId} pass=${passIdx} fa4p0_reinvoke_ok same_render_id=${renderId}`,
+        );
+      } else if (isDefinitiveRejection(invoke)) {
+        await supabase
+          .from("video_renders")
+          .update({
+            status: "failed",
+            error_message: `invoke ${invoke.status}: ${invoke.body}`.slice(0, 400),
+            completed_at: new Date().toISOString(),
+          })
+          .eq("render_id", renderId);
+        return {
+          ok: false,
+          error: `invoke_${invoke.status}:${invoke.body.slice(0, 200)}`,
+          errorClass: "dispatch_failed",
+          preclipRenderId: renderId,
+          crop,
+          durationSec: dur,
+          fps: FPS,
+          frameCount: durationInFrames,
+        };
+      } else {
+        console.warn(
+          `[pass-face-preclip] scene=${sceneId} pass=${passIdx} fa4p0_reinvoke_uncertain status=${invoke.status} net=${invoke.networkError ?? "-"}`,
+        );
+      }
+    }
   }
+
+  const dispatchMs = Date.now() - dispatchStart;
+
 
   // ── Poll for completion ──────────────────────────────────────────────
   const pollStart = Date.now();
