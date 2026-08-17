@@ -2018,6 +2018,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // Anchor kannte (Statisten, Reflexionen). Zuweisung bleibt Visual-L→R,
       // begrenzt auf die Anzahl der Anchor-Slots — der Rest bleibt `unlabeled`.
       if (
+        !fa4GeometryAuthoritative &&
         anchorHasIdentities &&
         anchorFaces.length >= 1 &&
         anchorFaces.length <= plateIdentityMap.faces.length &&
