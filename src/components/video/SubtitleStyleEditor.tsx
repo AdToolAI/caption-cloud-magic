@@ -200,9 +200,21 @@ export const SubtitleStyleEditor = ({ style, onChange, sampleText, onSampleTextC
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="subtitle-sample">{t('uc.subtitleTextPreview')}</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="subtitle-sample">{t('uc.subtitleTextPreview')}</Label>
+            {onResetSampleText && (
+              <button
+                type="button"
+                onClick={onResetSampleText}
+                className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              >
+                {t('common.reset')}
+              </button>
+            )}
+          </div>
           <Input id="subtitle-sample" value={sampleText} onChange={(e) => onSampleTextChange(e.target.value)} placeholder={t('uc.enterSampleSubtitle')} className="w-full" />
         </div>
+
 
         <div className="pt-4 border-t">
           <Label className="mb-3 block">{t('uc.previewLabel')}</Label>
