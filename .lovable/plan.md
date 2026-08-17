@@ -4,18 +4,23 @@ Ziel: Der Watchdog erstattet nur noch gegen eine DB-seitig belegte, run-scharfe 
 
 ## 1. Additive Migration
 
-### a) Partial Unique Index (wie vom Nutzer formuliert)
+### a) Partial Unique Index — höchstens ein Full Refund pro Charge
+
+Die RPC kennt nur Full Refund (`abs(charge.amount_euros)`). Die finanzielle Idempotenzidentität ist deshalb allein die Charge, nicht der Grund.
 
 ```sql
-CREATE UNIQUE INDEX ai_video_transactions_refund_provenance_uniq
+CREATE UNIQUE INDEX ai_video_transactions_refund_charge_uniq
 ON public.ai_video_transactions (
-  (metadata->>'refund_charge_id'),
-  (metadata->>'refund_reason')
+  (metadata->>'refund_charge_id')
 )
 WHERE type = 'refund'
-  AND metadata ? 'refund_charge_id'
-  AND metadata ? 'refund_reason';
+  AND metadata ? 'refund_charge_id';
 ```
+
+`refund_reason` bleibt verpflichtend in `metadata` (Audit/Diagnose), ist aber kein Teil der Idempotenzidentität. Damit gilt:
+- gleiche Charge + gleicher Grund → `already_refunded`
+- gleiche Charge + anderer Grund → ebenfalls `already_refunded`
+- zwei verschiedene Charges → getrennt refundierbar
 
 Legacy-Historie (inkl. der 6,30-€-Evidence mit `metadata IS NULL`) liegt bewusst außerhalb der Idempotenzdomäne. Kein Backfill, keine Korrektur.
 
@@ -25,15 +30,16 @@ Legacy-Historie (inkl. der 6,30-€-Evidence mit `metadata IS NULL`) liegt bewus
 
 Atomarer Ablauf:
 
-1. `SELECT ... FROM ai_video_transactions WHERE id = p_charge_id AND type = 'deduction' FOR UPDATE` — existiert die Row nicht: `no_charge`. (Der reale Belastungstyp ist `deduction`, nicht `debit`.)
+1. `SELECT ... FROM ai_video_transactions WHERE id = p_charge_id AND type = 'deduction' FOR UPDATE` — existiert die Row nicht: `no_charge`.
 2. **Provenance-Beweis DB-seitig** (Caller-Behauptung zählt nicht). Akzeptiert wird die Charge nur, wenn eine dieser Bedingungen gilt:
    - `generation_id = p_run_id`, oder
    - `metadata->>'run_id' = p_run_id::text`, oder
-   - `metadata->>'reservation_id'` verweist auf genau eine `composer_run_reservations`-Row, deren Run `p_run_id` ist (Verifikation gegen die Reservation-Tabelle, keine neue Reservation-Semantik).
-   Trifft nichts zu (heutiger Legacy-Debit mit `generation_id = project_id`): `no_charge`, Wallet unverändert.
-3. Aggregat-Schutz: Ist die Charge nicht eindeutig diesem Run zuzuordnen (z. B. Project-Aggregat), `no_charge`. `abs(total project deduction)` wird nie verwendet.
-4. Refund-Existenzprüfung innerhalb derselben Transaktion auf `(refund_charge_id, refund_reason)`: vorhanden → `already_refunded`, 0 €.
+   - `metadata->>'reservation_id'` verweist auf genau eine `composer_run_reservations`-Row, deren Run `p_run_id` ist.
+   Trifft nichts zu (heutiger Legacy-Pfad mit `generation_id = project_id`): `no_charge`, Wallet unverändert.
+3. Aggregat-Schutz: Ist die Charge nicht eindeutig diesem Run zuzuordnen (z. B. Project-Aggregat), `no_charge`. Ein Project-Aggregat wird niemals synthetisch aufgeteilt.
+4. Refund-Existenzprüfung innerhalb derselben Transaktion **allein auf `refund_charge_id`** (Grund ist nicht Teil der Identität): vorhanden → `already_refunded`, 0 €.
 5. Sonst atomar: Wallet-Gutschrift + Insert einer `type='refund'`-Transaction. **User/Wallet stammen ausschließlich aus der gelockten Charge** (`charge.user_id` → dessen Wallet), nie aus Caller-Parametern. Betrag `abs(charge.amount_euros)`, Metadata `{ refund_charge_id, run_id, refund_reason }` → `refunded`.
+6. Unique-Violation auf `ai_video_transactions_refund_charge_uniq` wird abgefangen und als `already_refunded` (0 €) zurückgegeben — nie als Fehler nach außen.
 
 Rückgabe (jsonb): `{ outcome, amount_euros, refund_transaction_id }` mit `outcome ∈ {no_charge, already_refunded, refunded}`.
 Betrag ausschließlich aus der validierten Charge — kein `CLIP_COSTS`, kein Caller-Betrag.
@@ -50,16 +56,17 @@ Betrag ausschließlich aus der validierten Charge — kein `CLIP_COSTS`, kein Ca
 
 ## 3. Die sechs Contracttests
 
-Als Deno-Tests neben der Funktion (`recover-stuck-composer-clip/refund-provenance.test.ts`; Resolver-Logik rein, RPC-Verhalten gegen ein Transaktions-/Wallet-Fake mit Lock- und Unique-Semantik):
+Zweistufig: Resolver-/Caller-Logik als Deno-Unit-Tests (`recover-stuck-composer-clip/refund-provenance.test.ts`), die DB-Semantik zusätzlich als echte Contracttests gegen PostgreSQL (Fixtures anlegen, RPC aufrufen, Wallet-Differenz und Refund-Rows messen, Fixtures wieder entfernen).
 
-1. Keine bzw. run-unscharfe Charge (Legacy `generation_id = project_id`) → `no_charge`, Wallet unverändert, Szene trotzdem `failed`.
-2. Eine run-scharfe Charge → `refunded`, exakt `abs(amount_euros)` der Charge.
-3. Identischer Refund zweimal → zweiter Aufruf `already_refunded`, 0 €.
-4. Zwei parallele Caller auf dieselbe `(charge_id, reason)` → genau eine Gutschrift (Charge-Lock + Partial Unique Index).
-5. Pricing nach der Charge geändert → Refund unverändert aus der Charge.
-6. Zwei Runs derselben Szene → Charges bleiben getrennt, jeder Refund ist run-/charge-spezifisch, keine Kollision.
+1. **T1 (No/Weak Provenance)** — Legacy-Charge `generation_id = project_id` → `no_charge`, Wallet unverändert, Szene trotzdem `failed`. *(Unit + DB)*
+2. **T2 (Success)** — run-scharfe Charge → `refunded`, exakt `abs(amount_euros)` der Charge. *(Unit + DB)*
+3. **T3 (Idempotenz, echt in der DB)** — zweiter Aufruf, auch mit **anderem** `refund_reason` → `already_refunded`, 0 €; genau eine Refund-Row, Wallet-Differenz genau einmal. *(DB verpflichtend)*
+4. **T4 (Parallel-Race, echt in der DB)** — zwei gleichzeitige RPC-Aufrufe auf dieselbe Charge aus zwei separaten PostgreSQL-Sessions → genau eine Wallet-Gutschrift, genau eine Refund-Row, der Verlierer erhält `already_refunded`. Kein Fake-Lock, echtes `FOR UPDATE` + Unique-Constraint. *(DB verpflichtend)*
+5. **T5 (Pricing-Drift)** — Pricing nach der Charge geändert → Refund unverändert aus der Charge. *(Unit + DB)*
+6. **T6 (Zwei Runs derselben Szene)** — zwei run-scharfe Charges → getrennt refundierbar, jeder Refund charge-spezifisch, keine Kollision. *(DB verpflichtend)*
 
 Zusätzlich (nicht anstelle von T4/T6): Reservation-Provenance wird nur bei DB-verifizierter Zuordnung akzeptiert, sonst `no_charge`.
+
 
 
 ## Nicht angefasst
