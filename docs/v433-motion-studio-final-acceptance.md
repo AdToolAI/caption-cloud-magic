@@ -1076,3 +1076,52 @@ deno test --allow-env --allow-net --no-check supabase/functions/_shared/resolveI
 → `ok | 6 passed | 0 failed`
 
 **Status:** FA-4/P1-B IMPLEMENTED / TESTS GREEN — **STOP vor Deploy.**
+
+---
+
+## FA-4/P1-B — Region-Sanity + Deploy (VERIFIED)
+
+**AWS-Region-Sanity (isolierte Tests R1–R6,
+`supabase/functions/_shared/resolveIdentityViaRekognition.region.test.ts`):**
+- R1: `AWS_REGION=eu-central-1` → `rekognition.eu-central-1.amazonaws.com` (unverändert akzeptiert)
+- R2: `AWS_REGION=us-east-1` → `rekognition.us-east-1.amazonaws.com`
+- R3: `AWS_REGION=Global` (produktiv beobachtet) → Fallback `eu-central-1`
+- R4: leer/whitespace → Fallback `eu-central-1`
+- R5: `REKOGNITION_REGION` schlägt `AWS_REGION` (Priorität unverändert)
+- R6: Modul-Import ohne ReferenceError (Regression gegen fehlende Konstante)
+
+Diff-Beleg: wiederhergestellt wurde ausschließlich die Konstante
+`AWS_REGION_PATTERN`. `MIN_SIMILARITY`, IoU-/Threshold-Logik, `REK_TIMEOUT_MS`
+und die Endpoint-Bildung sind unverändert.
+
+**Testausführung:**
+```bash
+deno test --no-check -A supabase/functions/_shared/resolveIdentityViaRekognition.region.test.ts \
+  supabase/functions/_shared/resolveIdentityViaRekognition.test.ts
+```
+→ `ok | 12 passed | 0 failed` (R1–R6 + T1–T6)
+
+**Importer-Scope (repo-weit belegt):**
+```text
+image-encoding-cache.ts
+  └─ resolveIdentityViaRekognition.ts
+       ├─ plateFaceSlotRouter.ts
+       │     ├─ compose-video-clips
+       │     └─ compose-dialog-segments
+       └─ compose-video-clips (direkt)
+```
+Keine weiteren produktiven Bundles. Keine Migration.
+
+**Deploy-Reihenfolge:** 1) `compose-video-clips`, 2) `compose-dialog-segments`.
+
+**Boot-Smoke (2026-08-17T17:47:44–47Z):**
+- `compose-video-clips` → HTTP 401 `UNAUTHORIZED_NO_AUTH_HEADER` (Auth-Guard, Bundle lädt)
+- `compose-dialog-segments` → HTTP 400 `scene_id_required` (Validierung, Bundle lädt)
+- Log: `BOOT version=v401-... deploy_marker=1786988867185`, `booted (time: 39ms)`,
+  kein Import-/Cold-Boot-Fehler; zusätzlich sichtbar:
+  `AWS_REGION='Global' is not a valid Rekognition region — falling back to eu-central-1`.
+
+**T_FA4_P1B_effective = 2026-08-17T17:47Z** (zweiter erfolgreicher Deploy;
+Boot bestätigt 17:47:47Z).
+
+**Status:** FA-4/P1-B DEPLOY VERIFIED — **STOP. Kein FA-4-Render.**
