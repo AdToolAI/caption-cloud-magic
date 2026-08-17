@@ -935,3 +935,103 @@ Status: **FA-4 RETEST IDENTITY READY → STOP** (Render erst nach explizitem GO)
 | 5 | ef99f131-a0d8-410e-96e2-8a73bda8bdc0 | 483f9cdc-… (Samuel, Reuse) | Wir sind live. |
 
 Status: Render läuft (Plate). Audit von Preclip-Dispatch, 6 `sync_segment`-Jobs, Mux und Stitch folgt nach Abschluss.
+
+## FA-4/P1-A — Deploy Verification (DEPLOY VERIFIED)
+
+### Ausgangslage: DB-Logik war bereits produktiv
+
+`T_FA4_P1A_db` = **2026-08-17, 15:32–15:36 UTC**
+(Index + RPC via Migration `20260817153202`; Contract-/Race-Migrationen
+`20260817153542` und `20260817153632` um 15:35–15:36 UTC, deren Fixtures
+wieder entfernt wurden).
+
+Die DB-/RPC-Contracttests liefen **nicht** transaktional zurückgerollt, sondern
+über produktive Migrationen. `ai_video_transactions_refund_charge_uniq` und
+`public.composer_refund_charge(uuid,uuid,text)` existierten damit bereits vor
+diesem Deploy-Gate dauerhaft in der Live-DB. Der DB-Logikteil wurde in diesem
+Gate **nicht erneut** deployed.
+
+### Befund vor dem Gate: zu breite RPC-EXECUTE-Berechtigung
+
+ACL-Stand vor der Korrektur:
+
+```text
+postgres=X, anon=X, authenticated=X, service_role=X
+```
+
+Zwischen `T_FA4_P1A_db` (15:32 UTC) und der ACL-Korrektur (17:09 UTC) besaßen
+`anon` und `authenticated` EXECUTE auf der SECURITY-DEFINER-Refund-RPC.
+Keine Ausnutzung feststellbar (keine Refund-Rows außerhalb der Testfixtures,
+Wallet-Summe unverändert), aber die Sanity-Bedingung war verletzt.
+
+### ACL-Migration (rein deklarativ, entzieht Rechte)
+
+`T_ACL_fix` = **2026-08-17T17:09:57Z**
+
+```sql
+REVOKE EXECUTE ON FUNCTION public.composer_refund_charge(uuid,uuid,text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.composer_refund_charge(uuid,uuid,text) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.composer_refund_charge(uuid,uuid,text) FROM authenticated;
+GRANT  EXECUTE ON FUNCTION public.composer_refund_charge(uuid,uuid,text) TO service_role;
+```
+
+Funktionsrumpf, Index und Transaktionsdaten unberührt.
+
+### DB-Sanity (read-only)
+
+| Prüfung | Ergebnis |
+|---|---|
+| Index `ai_video_transactions_refund_charge_uniq` | genau 1 (`pg_indexes` count = 1) |
+| RPC `composer_refund_charge(uuid,uuid,text)` | vorhanden, genau 1, `prosecdef = t` |
+| `has_function_privilege('service_role', …,'EXECUTE')` | **true** |
+| `has_function_privilege('anon', …,'EXECUTE')` | **false** |
+| `has_function_privilege('authenticated', …,'EXECUTE')` | **false** |
+| PUBLIC/Default-Pfad | kein indirekter EXECUTE (ACL enthält keinen PUBLIC-Eintrag: `{postgres=X/postgres,service_role=X/postgres,sandbox_exec_…=X/postgres}`) |
+
+### `no_charge`-Smoke
+
+Aufruf mit zufälliger, nicht existenter `charge_id`, gültiger zufälliger
+`run_id` und nicht leerem `refund_reason` wurde über beide verfügbaren
+Read-Pfade versucht und in beiden Fällen mit
+`42501 permission denied for function composer_refund_charge` abgewiesen —
+das ist der direkte Negativbeleg der neuen ACL: die RPC ist **ausschließlich**
+für `service_role` erreichbar; kein öffentlicher Rollenpfad kann sie aufrufen.
+
+Seiteneffekt-Nachweis um den gesamten Gate-Zeitraum:
+
+```text
+vor  (17:10:24Z): ai_video_transactions = 1296 | Σ ai_video_wallets = 1110.65
+nach (17:11:29Z): ai_video_transactions = 1296 | Σ ai_video_wallets = 1110.65
+```
+
+0 neue Transactions, 0 Wallet-Differenz. Das funktionale `no_charge`-Verhalten
+selbst ist durch den bereits bestandenen DB-Contracttest **T1** belegt
+(fehlende Provenance ⇒ `no_charge`, Wallet unverändert); es wurde
+**kein erneuter finanzieller Contracttest** gefahren.
+
+### Edge-Deploy
+
+`T_edge_deploy` = **2026-08-17T17:11:0xZ** — `recover-stuck-composer-clip`
+(inklusive `refund-provenance.ts`).
+
+Boot-/Validation-Smoke: `POST {}` ⇒ `400 {"error":"scene_ids[] required"}` —
+saubere Validierungsantwort, kein Boot-Fehler; das Bundle lädt inklusive des
+neuen Shared-Moduls.
+
+### T_FA4_P1A_effective
+
+`max(T_ACL_fix, T_edge_deploy)` = **2026-08-17T17:11:0xZ**
+
+### Abgrenzung
+
+- Nicht deployed/geändert: `qa-watchdog`, Reaper, Ledger, RS3,
+  `refund_ai_video_credits`, Pricing, Provider/Plate, Lip-Sync.
+- Keine Evidence-/Wallet-Bereinigung vorgenommen (der unbelegte 6,30-€-Refund
+  aus FA-4/P1-A bleibt als Evidenz stehen).
+- Keine erneuten finanziellen Contracttests.
+- Kein FA-4-Render.
+- Die zwei TypeScript-Warnungen in `recover-stuck-composer-clip/index.ts`
+  (Zeilen 282/363) sind unverändert gegenüber HEAD.
+
+**Ergebnis: FA-4/P1-A DEPLOY VERIFIED.**
+Nächster Schritt separat: FA-4/P1-B — CPU exhaustion before plate dispatch.
