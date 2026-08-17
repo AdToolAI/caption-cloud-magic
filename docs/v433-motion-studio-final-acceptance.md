@@ -520,3 +520,85 @@ reference_image_url  = composer-frames/…/scene-anchors/5b0dca87-…-188fb8bf74
 **FA-3 = PASS.** Der P1-Fix (`processed_video_url = _final_url` im Stitch-Finalizer)
 ist im Produktionslauf bestätigt: `isSceneOutputFinal() = true`.
 FA-1, FA-2, FA-3 sind damit alle PASS — **Motion Studio Final Acceptance abgeschlossen.**
+
+---
+
+## FA-4 SETUP — 4 deutsche Sprecher, 6 Turns (kein Render)
+
+Stand: Setup + Pre-Start-Snapshot. **Kein kostenpflichtiger Render gestartet.**
+
+### Szene
+
+```text
+project_id  = 035273d7-ae9b-44e0-89e7-f9e28703530d
+scene_id    = 42bcdda1-3a42-4d2a-b43e-21f1888cd1f2
+order_index = 7  (UI: S08, "Szene 8 / 8 · Custom")
+scene_type  = custom
+provider    = ai-happyhorse (zertifiziert, Multi-Speaker)
+modus       = cinematic-sync, intentionaler Lip-Sync (Toggle ON)
+duration    = 15s
+```
+
+### Cast & Stimmen (bijektiv, 4 Identitäten)
+
+| speaker | Charakter        | brand_characters.id | Voice (ElevenLabs) | Voice-ID             |
+|---------|------------------|---------------------|--------------------|----------------------|
+| 0       | Sarah Dusatko    | 5c81f9bf…           | Sarah              | EXAVITQu4vr4xnSDxMaL |
+| 1       | Samuel Dusatko   | 483f9cdc…           | George             | JBFqnCBsd6RMkjVDRZzb |
+| 2       | Matthew Dusatko  | 54d90504…           | Liam               | TX3LPaxmHKxFdv7VOQHJ |
+| 3       | Kay Mark         | c65de5c6…           | Brian              | nPczCjzI2devNBz1zQrb |
+
+UI bestätigt: „Cast voll (max. 4)", vier verschiedene Stimmen, keine Doppelbelegung.
+`speaker_idx` wird bewusst **nicht** vorab erzwungen — die Prägung erfolgt deterministisch im Lauf.
+
+### Dialog (6 kanonische Turns, DE)
+
+```text
+1 Sarah Dusatko:   Guten Morgen, kurz die Zahlen von gestern.
+2 Samuel Dusatko:  Die Kampagne läuft stabil über Plan.
+3 Matthew Dusatko: Die neuen Creatives performen deutlich besser.
+4 Kay Mark:        Dann ziehen wir das Budget nach.
+5 Sarah Dusatko:   Gut, wir halten den Kurs.
+6 Samuel Dusatko:  Ich schicke euch die Übersicht.
+```
+
+UI-Anzeige: „6 Blöcke · 4 Sprecher · ~12s" — effektiver Dialog unter der Plate-Dauer (15s).
+
+### Routing-Nachweis (UI)
+
+- „Dialog-Shot Pipeline: Pro Sprecher-Turn ein eigener Basis-Clip + dedizierter
+  Lippensynchronisation. **6 Shots** werden am Ende zu einer Szene gestitcht."
+- Erwartete Job-Kardinalität im Ledger: **6 × sync_segment → 1 × audio_mux → 1 × stitch**
+  (Sprecheranzahl bestimmt Identität/Geometrie, nicht die Job-Anzahl).
+- Provider-Hinweis: HappyHorse Multi-Speaker (Beta) mit automatischem Credit-Refund,
+  falls die Plate die Face-Detection nicht besteht.
+
+### Kostenvoranschlag
+
+```text
+Szene S08: €6.30   (15s × €0.42/s, HappyHorse 1.0, 720p)
+```
+
+### Pre-Start-Snapshot (read-only)
+
+```text
+pipeline_state        = idle
+active_run_id         = NULL
+clip_url              = NULL
+processed_video_url   = NULL
+base_video_url        = NULL
+composer_pipeline_jobs (scene) = 0 Zeilen
+cast_count = 4 · script_lines = 6
+```
+
+### Status
+
+**FA-4 SETUP READY → STOP.** Kein Render freigegeben.
+
+### Harte FA-4-Kriterien für den späteren Render
+
+1. Mapping-Invariante: stabile `speaker_idx` 0..3, bijektiv zu den vier Identitäten.
+2. Genau 6 sync_segment-Attempts.
+3. Genau 1 audio_mux.
+4. Genau 1 Stitch mit atomarer `processed_video_url`-Materialisierung (FA-3/P1).
+5. Visuelle Sichtung: korrekter Mund/Stimme je Turn, kein Cross-Talk.
