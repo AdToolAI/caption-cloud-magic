@@ -1,47 +1,92 @@
-# FA-4 Root-Cause-Lock — Face-Candidate-Auswahl: ABGESCHLOSSEN
+# FA-4 Face-Candidate Fix Contract (Contract-only)
 
-Status: **TECHNICAL PASS / VISUAL REVIEW: ISSUES** — unverändert. Kein Fix, kein Deploy, kein weiterer Render.
+Status bleibt: **TECHNICAL PASS / VISUAL REVIEW: ISSUES**, Root-Cause-Lock = PASS / FROZEN.
+Dieser Schritt liefert ausschließlich Dokumentation: kein Code, kein Deploy, kein Render, keine Migration, keine DB-Writes.
 
-Variante A (statisch-deduktiver Pfadbeweis) ist abgeschlossen und in `docs/v433-motion-studio-final-acceptance.md` unter dem bestehenden Status dokumentiert.
+## Schritt 0 — Doku-Hygiene (rein redaktionell)
 
-## Finale Beweiskette
+In `docs/v433-motion-studio-final-acceptance.md` die Reste entfernen, die dem abgeschlossenen Lock widersprechen: den Arbeitsplan-Abschnitt „Nächster Schritt: read-only Root-Cause-Lock“, die Zwischentabelle mit Q1 = „NICHT BEWIESEN“, den Log-Retention-Blocker und den Variante-A-Arbeitsplan. Erhalten bleiben: Lock = PASS / FROZEN, finale Beweiskette, die vier geschlossenen Lock-Fragen, Sanity-/Hungarian-Gegenprobe, eingefrorene Fix-Richtung und der Statussatz. Keine fachliche Neubewertung.
 
-1. **Anchor korrekt** — `anchor_face_layout` für S11 enthält vier eindeutige Slots (Sarah, Samuel, Matthew, Kay) mit plausiblen L→R-Zentren.
-2. **v278/Hungarian lief deduktiv erfolgreich**, wendete aber vor Hungarian keinen Area-/Aspect-Plausibilitätsfilter an. Die 10 persistierten Faces widersprechen dem nicht, weil `routePlateFacesToAnchor()` Extra-Faces im Ergebnis behält.
-3. **Matthew + Kay wurden bereits im v278-Ergebnis auf winzige False Positives gemappt.**
-4. **v183 Bridge** interpretierte fälschlich Slot als visuelle L→R-Reihenfolge und labelte zusätzlich einen False Positive als Sarah (`matchConfidence: 0.85`).
-5. **v277 First-Match** (`anchorRekFacesByCid`) wählte pro Character den ersten gelabelten Kandidaten — exakt die vier später verwendeten `speakerPlateBboxes`.
-6. **v239 Trust-Gate** akzeptierte die Boxen über Confidence/`matchConfidence` und übersprang dadurch `bboxSanity()` — obwohl Sarah, Matthew und Kay unter der Mindestfläche lagen.
-7. **Falsche Preclip-Crops** → 6× `FACE_GATE_PROBE_UNAVAILABLE`, jeweils fail-open → Sync.so verarbeitete die falsche Geometrie.
+## Schritt 1 — Neuer Abschnitt `## FA-4 Face-Candidate Fix Contract`
 
-## Vier Lock-Fragen — geschlossen
+Enthält Root-Cause-Bezug, Contracts A–F, Regression-Fixture, Owner-/Scope-Matrix, Nicht-Scope-Liste, Testplan, minimaler späterer Deploy-Scope.
 
-| Frage | Antwort |
-|---|---|
-| Q1: Lief v278/Hungarian? | JA — deduktiv bewiesen. Matthew und Kay bereits im v278-Ergebnis falsch. |
-| Q2: Lief v183 Bridge? | JA — deduktiv bewiesen. Bridge-Signaturen (`confidence: 0`, `matchConfidence: 0.85`) reproduzierbar. |
-| Q3: Warum akzeptierte v239 trotz Untergröße? | JA — bewiesen. Trusted-Shortcut überspringt `bboxSanity()`. |
-| Q4: Machte v277 First-Match die falschen Kandidaten autoritativ? | JA — für alle vier geschlossen. Reihenfolge erzeugt exakt die verwendeten Boxen. |
+### Contract A — Candidate Sanity VOR Assignment
 
-## Gegenprobe
+Ein einziger kanonischer Filter, angewendet auf jeden erkannten Plate-Face, bevor irgendeine Character-Zuordnung stattfindet. Kriterien exakt die bereits produktiven Grenzen (heute in `compose-dialog-segments/index.ts` als `bboxSanity()` ab Zeile 2376): `area_ratio` in [0.003, 0.25], `aspect` in [0.4, 2.5], nicht-degenerierte Box, Box innerhalb Plate-Geometrie mit bestehender Toleranz. Ablehnungsgründe bleiben `area_too_small`, `area_too_large`, `degenerate`, `out_of_plate`, `aspect_invalid`. Confidence und `matchConfidence` dürfen den Filter nicht überspringen. Keine neuen Schwellen.
 
-Nach Anwendung der bestehenden Sanity-Kriterien (Area 0.003–0.25, Aspect 0.4–2.5) bleiben exakt die vier großen plausiblen Faces übrig. Hungarian liefert dann global bijektiv: Sarah → links, Samuel → Mitte-links, Matthew → Mitte-rechts, Kay → rechts. Der Run hatte alle notwendige Geometrie — der Defekt liegt in der Candidate-Selection, nicht in fehlender Information.
+### Contract B — Global bijektive Geometrie-Zuordnung
 
-## Fix-Richtung (eingefroren, noch nicht umgesetzt)
+Nach Contract A: Anchor-Slots sind Character-Wahrheit, Plate-Faces sind rein geometrische Kandidaten.
 
-- Ranking-only: NEIN.
-- Geometrie-first + Plausibilitätsfilter: JA.
+- Primary Cost = euklidische Distanz normalisierter Center (Anchor ↔ Plate), wie heute in `routePlateFacesToAnchor()`.
+- Globale Minimum-Cost-Bijektion über die gefilterte Kandidatenmenge. Kein Greedy, kein `slot i → slot i`, kein First-Match per `characterId`.
+- Unlabeled Faces sind vollwertige Kandidaten.
+- Ein Plate-Face darf nie zwei Characters tragen (Bijektion ist verpflichtend).
+- Extra-Faces bleiben im Ergebnis, aber ohne Character (bestehende v278.3-Semantik).
+- Weniger plausible Faces als Characters → `countMismatch` → fail-closed, kein Teil-Dispatch.
+- Maximal zulässige Geometrie-Abweichung: es wird kein neuer Grenzwert erfunden. Verwendet wird die bestehende Distanz-→-Confidence-Abbildung des Routers (`matchConfidence = 1 - d/0.5`, also d ≥ 0.5 = wertlos); ob daraus ein harter Cutoff wird, ist im Contract als offener Implementierungsparameter markiert und erst mit Test-Beleg zu fixieren.
+- Identity-Labels wirken ausschließlich als Tie-Break/Zusatzscore und dürfen nie einen sanity- oder geometrie-invaliden Kandidaten erzwingen.
 
-Zielvertrag:
+### Contract C — assignmentLock-Semantik
+
+`assignmentLock` bleibt Identity-Fence `speaker_idx → character_id` und bestimmt nur, welcher Character für einen Anchor-Slot erwartet wird. Die Plate-BBox wird für diesen Character jedes Mal neu aus der validierten globalen Zuordnung gewonnen.
+
+Ersetzt bzw. entwertet werden:
+
+- `anchorRekFacesByCid` First-Match-Autorität (Zeilen ~2126–2160) — entfällt als Auswahlquelle.
+- `v183_anchor_identity_slot_bridge` (~2000–2039) als autoritative Identity-Zuweisung — nur noch Diagnostik.
+- `byIdRanked`-Confidence-Ranking (~2054–2090) als Auswahlpfad — nur noch Supporting Score.
+- Jeder Confidence-Shortcut, der Geometrie/Sanity umgeht.
+
+### Contract D — Sanity IMMER nach Assignment
+
+Die final gewählte BBox wird erneut objektiv validiert. Der `trustedSlots`-Shortcut in `v239_repair_gate` (~2303–2420) darf `bboxSanity()` nicht mehr überspringen. Confidence darf nur Diagnostics, Supporting Score und die Frage „zusätzliche Identity-Prüfung nötig?“ beeinflussen — nie eine geometrisch invalide Box freigeben.
+
+### Contract E — Deterministisches Preclip-Crop-Containment
+
+Vor jedem Sync.so-Dispatch ohne externen Vision-Service beweisbar:
+
+1. Target-BBox des zugeordneten Characters liegt vollständig im Preclip-Crop.
+2. Der Crop stammt aus genau dieser final zugeordneten Plate-BBox.
+3. Kein Zentrum eines anderen zugeordneten Speaker-Faces liegt im zulässigen Target-Bereich des Crops.
+4. Plate-space → Crop-space-Transformation ist deterministisch und bounds-valid.
+5. Die an `bounding_boxes_url` übergebene Box entspricht exakt dieser transformierten Target-BBox.
+
+Sonst FAIL CLOSED vor Sync.so. Fehlerklassen-Name noch offen: das bestehende Inventar (`face_validation_failed`, `v153_plate_bbox_required`, `v133_identity_ambiguous`, `v187_preclip_required_no_fullplate_fallback`) wird im Implementierungsschritt geprüft; erst dann wird entschieden, ob eine bestehende Klasse passt oder eine neue (Arbeitstitel `preclip_identity_geometry_mismatch`) eingeführt wird.
+
+### Contract F — Vision Probe
+
+`verifyFaceBeforeDispatch` bleibt optionale Zusatzevidenz. Ist der deterministische Contract E erfüllt, darf `face_probe_unavailable` non-blocking bleiben. Ist Contract E nicht erfüllt, ist der Dispatch unabhängig vom Probe-Ergebnis verboten. Damit wird aus dem Identity-Bug kein Availability-Bug.
+
+## Schritt 2 — Regression-Fixture S11
+
+Fixture: Plate 1284×718, 4 Anchor-Slots, 10 erkannte Plate-Faces inklusive der drei False-Positive-Labels. Erwartetes Ergebnis:
 
 ```text
-Anchor Character Lock → plausible Plate-Face candidates → global bijective
-geometry assignment → identity labels only as supporting score → sanity always
-enforced → deterministic crop containment gate → Sync.so
+Sarah   → [226,244,286,327]
+Samuel  → [476,209,540,294]
+Matthew → [753,187,819,277]
+Kay     → [1030,208,1099,296]
 ```
 
-Ledger, Fan-out, Turn-ID, `speaker_idx`, RS3, Mux und Finalizer bleiben unangetastet.
+Nachzuweisen: untergroße False Positives fallen vor Hungarian raus; genau die vier großen Faces bleiben; unlabeled Matthew/Kay werden korrekt gewählt; High-Confidence-Tiny-Boxes gewinnen nie; Kandidaten-Reihenfolge ist ergebnisneutral; Extra-Faces verschieben nichts; keine Box doppelt.
 
-## Nächster Schritt
+Zusätzliche Fälle: N=1, N=2, N=4, Extra-Faces, zu wenige plausible Faces → fail-closed, duplizierte/nahezu identische Geometrie, umsortierter Detector-Output, hohe Confidence bei invalider Geometrie, korrekte Geometrie ohne Label, korrekte Geometrie mit widersprüchlichem Label.
 
-Keiner. STOP. Der Lock ist dokumentiert. Eine spätere Umsetzung des Fix-Contracts bedarf einer eigenen Freigabe.
+## Schritt 3 — Owner-/Scope-Matrix (Analyse, kein Code)
+
+- Kanonischer Sanity-Filter + Bijektion: `supabase/functions/_shared/plateFaceSlotRouter.ts` ist der vorgesehene Owner — er besitzt bereits Detection, Normalisierung und `optimalAssignmentMin()`. Der Filter gehört zwischen `detectFacesOnBytes()` und den Matrix-Aufbau.
+- Zu neutralisieren in `compose-dialog-segments/index.ts`: Bridge-Autorität, `anchorRekFacesByCid`-First-Match, `byIdRanked`-Auswahl, `trustedSlots`-Shortcut im `v239_repair_gate`.
+- Weitere Betroffene: `_shared/plate-face-identity.ts` (`resolvePlateFaceIdentities`), `_shared/pass-face-preclip.ts` (Crop-Transform, `computeFaceCrop`/`computeMouthCenteredCrop`), `_shared/asd-strategy.ts`, `sync-so-webhook/index.ts` (nur lesend geprüft), `_shared/scene-hard-reset.ts`.
+- Späterer minimaler Deploy-Scope: `compose-dialog-segments` (zieht `_shared` ein). Kein weiterer Function-Redeploy vorgesehen.
+
+## Nicht im Scope (FROZEN)
+
+`composer_pipeline_jobs`, `sync_segment.segment_id`, `dialog_turn.id`, `speaker_idx`-Semantik, FA-4 Fan-out-Fix, G3.2.2, F1, RS3, `audio_mux`, Stitch/Finalizer, `processed_video_url`, Accounting/P1-A, Preclip Exactly-Once-Dispatch/P0, P1-B Image-Encoding-Cache.
+
+## Ergebnis
+
+Nach Umsetzung dieses Doku-Schritts wird der Status ausgegeben:
+
+`FA-4 FACE-CANDIDATE FIX CONTRACT READY → STOP`
