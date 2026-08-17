@@ -93,12 +93,16 @@ Sync-Ledger, RS3, G3.2.2/F1, Mux/Stitch.
 1. 502 **vor** dem Claim → Reinvoke derselben ID → genau **ein** AWS-Start → Preclip ok.
 2. Antwortverlust **nach** gesetztem `lambda_invoked_at` → Reinvoke → `alreadyStarted /
    unresolved`, kein zweiter AWS-Start → Row später `completed` → Preclip ok.
-3. `lambda_invoked_at` gesetzt, danach kein Fortschritt → kein zweiter Start (auch nicht
-   nach 90/300 s) → v187 fail-closed + genau ein Refund.
+3. `lambda_invoked_at` gesetzt, danach kein Fortschritt → kein zweiter Start, unabhängig
+   von der verstrichenen Zeit → v187 fail-closed + genau ein Refund.
 4. Zwei parallele Invokes derselben `pendingRenderId` → genau ein Claim/AWS-Start.
 5. `lambda_failed`, `invalid_input`, Credentials-/Config-Fehler → kein Retry.
 6. `poll_timeout` → kein AWS-Neustart; v188-Reuse unverändert.
-7. N=4 endgültiger Preclip-Failure → weiterhin 0 `sync_segment`-Ledger-Jobs + genau ein
+7. Claim atomar gesetzt, Prozess stirbt **vor** dem tatsächlichen AWS-Aufruf → Reinvoke
+   startet kein zweites Lambda → nach bestehendem Budget fail-closed. Bewusst akzeptierter
+   Preis von Exactly-Once: in diesem winzigen Fenster geht ggf. ein Render verloren, es
+   entstehen aber nie zwei.
+8. N=4 endgültiger Preclip-Failure → weiterhin 0 `sync_segment`-Ledger-Jobs + genau ein
    Refund (heutiges Verhalten vor dem Ledger bleibt korrekt).
 
 ## Danach
