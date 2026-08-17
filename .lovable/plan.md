@@ -64,19 +64,20 @@ vor Erzeugung des `turn_id`-Payloads. Ist das bestätigt, ist S11 gültig mit:
 1. **Panel weiterhin nicht bedienbar** über den normalen UI-Pfad → STOP und als
    UI-/Setup-Blocker melden. Keine manuellen DB-Writes, keine Migration, kein
    direktes RPC-Setzen.
-2. **`dialog_turns` bleibt leer trotz korrekt gespeichertem Skript + Voices** →
-   ebenfalls STOP. Vorher read-only klären, ob die Turn-Materialisierung im
-   aktuellen Produktvertrag JIT beim Render passiert (`_shared/scene-dialog-turns.ts`,
-   `compose-twoshot-audio`) oder ob der neue `turn_id → segment_id`-Pfad eine
-   bereits persistierte Turn-Liste voraussetzt. Ergebnis dokumentieren, nicht fixen.
+2. **JIT-Pfad nicht mehr vorhanden** oder `compose-twoshot-audio` erwartet
+   `turn_id`, bevor Turns materialisiert sind → STOP als Setup-/Lifecycle-Blocker.
+   Kein künstlicher Fix nur damit Pre-Render bereits Rows existieren.
 
 ## Dokumentation
 
 Abschnitt „FA-4 FINAL RETEST SETUP (S11)“ in
 `docs/v433-motion-studio-final-acceptance.md` ergänzen: Voice-Tabelle,
-Turn-Identitätstabelle, Snapshot, Kostenvoranschlag — bzw. der Blocker-Befund.
+Turn-Status (Fall A/B), Snapshot, Kostenvoranschlag — bzw. der Blocker-Befund.
 
 ## Abschluss
 
-Bei Erfolg: **FA-4 FINAL RETEST SETUP READY → STOP.** Kein Render. Der finale
-FA-4-Render startet erst nach separatem GO.
+Bei Erfolg: **FA-4 FINAL RETEST SETUP READY** — oder, falls Turns
+erwartungsgemäß JIT bleiben: **FA-4 FINAL RETEST SETUP READY — dialog_turns JIT
+VERIFIED**. Danach STOP. Kein Render; der finale FA-4-Render startet erst nach
+separatem Render-GO.
+
