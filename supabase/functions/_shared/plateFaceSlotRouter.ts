@@ -173,6 +173,16 @@ export interface PlateFaceSlotRouterResult {
   countMismatch: boolean;
   maxDistance: number | null;
   reason?: string;
+  /**
+   * FA-4 P0 — failure classification. `contractual` = confirmed geometry
+   * decision → integration MUST fail closed (no legacy face routing).
+   * `infrastructure` = recoverable, legacy fallback contract unchanged.
+   */
+  failureClass?: RouterFailureClass;
+  /** Faces returned by DetectFaces before sanity filtering. */
+  detectedCount?: number;
+  /** True when the DetectFaces call itself completed without error. */
+  detectSucceeded?: boolean;
   msTotal: number;
 }
 
