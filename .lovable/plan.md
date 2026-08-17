@@ -90,7 +90,7 @@ Kay     → [1030,208,1099,296]
 
 Nachzuweisen: untergroße False Positives fallen vor Hungarian raus; genau die vier großen Faces bleiben; unlabeled Matthew/Kay werden korrekt gewählt; High-Confidence-Tiny-Boxes gewinnen nie; Kandidaten-Reihenfolge ist ergebnisneutral; Extra-Faces verschieben nichts; keine Box doppelt.
 
-Zusätzliche Fälle: N=1, N=2, N=4, Extra-Faces, zu wenige plausible Faces → fail-closed, duplizierte/nahezu identische Geometrie, umsortierter Detector-Output, hohe Confidence bei invalider Geometrie, korrekte Geometrie ohne Label, korrekte Geometrie mit widersprüchlichem Label.
+Zusätzliche Fälle: N=1, N=2, N=4, Extra-Faces, zu wenige plausible Faces → fail-closed (B.1a), unvollständige Bijektion → fail-closed (B.1b), **exakt identische/degenerierte Kandidatengeometrie bzw. Equal-Cost-Ambiguität → fail-closed (B.1c)**, umsortierter Detector-Output, hohe Confidence bei invalider Geometrie, korrekte Geometrie ohne Label, korrekte Geometrie mit widersprüchlichem Label. Kein Test darf einen Distanz-Cutoff voraussetzen; „near-identical" ohne exakte Gleichheit ist ausdrücklich kein Fehlerfall.
 
 ## Schritt 3 — Owner-/Scope-Matrix (Analyse, kein Code)
 
