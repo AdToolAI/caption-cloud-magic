@@ -4,9 +4,6 @@ Nur **Analyse + Contract Lock**. Kein Code, keine Migration, kein Deploy, kein R
 Der Vertrag wird als Abschnitt „FA-4/P0 — Fix Contract" in
 `docs/v433-motion-studio-final-acceptance.md` abgelegt. Danach STOP.
 
-Der frühere Entwurf (LAMBDA_START_GRACE als Neustart-Erlaubnis, `preclip_key` +
-Unique-Index, Klassifikation nach HTTP-Familie) ist **zurückgezogen**. Er verletzte
-Exactly-Once.
 
 ## Belegter Ist-Zustand (read-only geprüft)
 
