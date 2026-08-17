@@ -4,6 +4,8 @@ import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { normalizeStartPayload, payloadDiagnostics, type NormalizedStartPayload } from "../_shared/remotion-payload.ts";
 import { getLambdaFunctionName, AWS_REGION } from "../_shared/aws-lambda.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+// FA-4/P0 — exactly-once dispatch claim decisions (pure, unit-tested).
+import { decideInvokeAction } from "../_shared/preclip-dispatch-resume.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -67,28 +69,47 @@ serve(async (req) => {
       .eq('render_id', pendingRenderId)
       .maybeSingle();
 
-    if (existingRender?.content_config && (existingRender.content_config as any).real_remotion_render_id) {
-      const existingRealId = (existingRender.content_config as any).real_remotion_render_id;
-      console.log(`⏭️ Already started: real_remotion_render_id=${existingRealId}, returning no-op`);
+    const existingCfg = (existingRender?.content_config as any) || {};
+    // ✅ FA-4/P0 — EXACTLY-ONCE START FENCE
+    // `content_config.lambda_invoked_at` is the dispatch claim. Once set for this
+    // pendingRenderId, NO caller may ever start AWS again — regardless of elapsed
+    // time or process restarts. A lost response is answered with
+    // alreadyStarted + unresolved so the caller polls instead of re-dispatching.
+    const invokeAction = decideInvokeAction({
+      lambdaInvokedAt: existingCfg.lambda_invoked_at ?? null,
+      realRemotionRenderId: existingCfg.real_remotion_render_id ?? null,
+      status: existingRender?.status ?? null,
+    });
+
+    if (invokeAction === 'already_started') {
+      const existingRealId = existingCfg.real_remotion_render_id ?? null;
+      console.log(`⏭️ Already started: real_remotion_render_id=${existingRealId ?? 'completed'}, returning no-op`);
       return new Response(
         JSON.stringify({
           success: true,
           renderId: pendingRenderId,
-          lambdaRenderId: existingRealId,
-          bucketName: (existingRender.content_config as any).bucket_name || 'remotionlambda-eucentral1-13gm4o6s90',
+          lambdaRenderId: existingRealId || pendingRenderId,
+          bucketName: existingCfg.bucket_name || 'remotionlambda-eucentral1-13gm4o6s90',
           alreadyStarted: true,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (existingRender?.status === 'completed') {
-      console.log(`⏭️ Render already completed, returning no-op`);
+    if (invokeAction === 'already_started_unresolved') {
+      console.log(`⏭️ Dispatch claim already held (lambda_invoked_at) — no AWS call, unresolved`);
       return new Response(
-        JSON.stringify({ success: true, renderId: pendingRenderId, alreadyStarted: true }),
+        JSON.stringify({
+          success: true,
+          renderId: pendingRenderId,
+          alreadyStarted: true,
+          unresolved: true,
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+
 
     // ✅ PAYLOAD MODE: strict-minimal bypasses normalizeStartPayload entirely
     const isStrictMinimal = lambdaPayload._payloadMode === 'strict-minimal';
@@ -220,20 +241,59 @@ serve(async (req) => {
     let lambdaRequestId: string | null = null;
     let lambdaError: string | null = null;
 
-    // Mark as rendering BEFORE call
-    await supabase.from('video_renders').update({
-      status: 'rendering',
-      bucket_name: bucketName,
-      content_config: {
-        ...existingConfig,
-        lambda_invoked_at: new Date().toISOString(),
-        lambda_render_id: pendingRenderId,
+    // ✅ FA-4/P0 — ATOMIC DISPATCH CLAIM (true compare-and-set, no SELECT→UPDATE).
+    // The UPDATE only matches while content_config->>lambda_invoked_at IS NULL, so
+    // exactly one concurrent caller gets a row back and is allowed to call AWS.
+    // No DB row lock is held across the external AWS call.
+    const { data: claimedRows, error: claimError } = await supabase
+      .from('video_renders')
+      .update({
+        status: 'rendering',
         bucket_name: bucketName,
-        out_name: outName,
-        lambda_function: LAMBDA_FUNCTION_NAME,
-        serve_url: serveUrl.substring(0, 120),
-      },
-    }).eq('render_id', pendingRenderId);
+        content_config: {
+          ...existingConfig,
+          lambda_invoked_at: new Date().toISOString(),
+          lambda_render_id: pendingRenderId,
+          bucket_name: bucketName,
+          out_name: outName,
+          lambda_function: LAMBDA_FUNCTION_NAME,
+          serve_url: serveUrl.substring(0, 120),
+        },
+      })
+      .eq('render_id', pendingRenderId)
+      .is('content_config->>lambda_invoked_at', null)
+      .select('render_id');
+
+    if (claimError) {
+      console.error(`❌ Dispatch claim failed: ${claimError.message}`);
+      return new Response(
+        JSON.stringify({ error: `dispatch_claim_failed: ${claimError.message}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!claimedRows || claimedRows.length === 0) {
+      // Another caller won the CAS in the meantime → never start a second Lambda.
+      const { data: raced } = await supabase
+        .from('video_renders')
+        .select('status, content_config')
+        .eq('render_id', pendingRenderId)
+        .maybeSingle();
+      const racedRealId = (raced?.content_config as any)?.real_remotion_render_id ?? null;
+      console.log(`⏭️ Lost dispatch CAS for ${pendingRenderId} — no AWS call (real_id=${racedRealId ?? 'pending'})`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          renderId: pendingRenderId,
+          lambdaRenderId: racedRealId || pendingRenderId,
+          realRemotionRenderId: racedRealId,
+          alreadyStarted: true,
+          unresolved: !racedRealId,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
 
     if (progressId) {
       const { data: progressRow } = await supabase

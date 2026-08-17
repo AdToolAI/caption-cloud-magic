@@ -773,3 +773,45 @@ klar von Timeout unterscheiden.
 
 FA-4/P0 Fix Contract: ausschließlich die Frage beantworten, wie ein
 `dispatch_uncertain`-Preclip idempotent wiederaufgenommen werden kann. Erst danach Code.
+
+---
+
+## FA-4/P0 — Fix Contract: Exactly-Once Preclip Dispatch Resume (implementiert)
+
+**Vertrag (verbindlich):**
+
+1. **Eine Row, eine ID.** Pro logischem Preclip existiert genau eine
+   `video_renders`-Row mit genau einer `pendingRenderId`. Ein Retry erzeugt
+   niemals eine zweite Row und niemals eine neue ID.
+2. **Atomarer Dispatch-Claim.** `content_config.lambda_invoked_at` ist der
+   Start-Fence. Er wird in `invoke-remotion-render` per echtem CAS gesetzt
+   (`UPDATE ... WHERE content_config->>'lambda_invoked_at' IS NULL`). Nur der
+   CAS-Gewinner ruft AWS auf.
+3. **Claim = endgültig.** Ist der Claim gesetzt, startet niemand mehr AWS —
+   unabhängig von vergangener Zeit, Prozess-Neustarts oder Parallelaufrufen.
+   Antwort: `alreadyStarted: true, unresolved: true` → der Aufrufer pollt nur.
+4. **5xx/Netzwerk = `dispatch_uncertain`.** Die Row wird nicht zerstört und
+   nicht zurückgesetzt. Der Aufrufer liest dieselbe Row erneut (Recheck).
+5. **Reinvoke nur ohne Claim.** Existiert nachweislich kein Claim, darf genau
+   ein Reinvoke mit *derselben* `pendingRenderId` erfolgen (3 s Backoff).
+6. **Kein Fortschritt bis Budgetende** → v187 fail-closed mit eigener
+   Diagnoseklasse `dispatch_uncertain` (nicht `poll_timeout`) und genau einem
+   Refund. Kein Full-Plate-Fallback.
+
+**Geänderte Dateien (Narrow Unfreeze):**
+
+- `supabase/functions/_shared/preclip-dispatch-resume.ts` (neu) — reine
+  Entscheidungslogik: `classifyDispatchOutcome`, `hasDispatchClaim`,
+  `decideAfterUncertainDispatch`, `decideInvokeAction`,
+  `terminalClassOnNoProgress`.
+- `supabase/functions/invoke-remotion-render/index.ts` — Start-Fence + CAS-Claim.
+- `supabase/functions/_shared/pass-face-preclip.ts` — Recheck/Reinvoke-Schleife,
+  Fehlerklasse `dispatch_uncertain`.
+- `supabase/functions/compose-dialog-segments/index.ts` — Presenter trennt
+  Infrastrukturfehler von echtem Timeout (DE/EN/ES), `preclip_error_class` in
+  der 422-Antwort.
+
+**Verifikation:** `deno test supabase/functions/_shared/preclip-dispatch-resume.test.ts`
+— 8/8 PASS (Happy Path, 502/Netzwerk = uncertain, 4xx = definitiv, Claim
+vorhanden → nur pollen, kein Claim → Reinvoke gleicher ID, Race mit genau einem
+AWS-Start, completed = No-op, Budgetende behält eigene Klasse).
