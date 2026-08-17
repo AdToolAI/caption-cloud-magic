@@ -128,21 +128,6 @@ function withTimeout<T>(p: Promise<T>, ms: number, tag: string): Promise<T> {
   });
 }
 
-async function fetchImageBytes(url: string): Promise<Uint8Array | null> {
-  try {
-    const r = await withTimeout(fetch(url, { method: "GET" }), FETCH_TIMEOUT_MS, "img_fetch");
-    if (!r.ok) return null;
-    const buf = await r.arrayBuffer();
-    return new Uint8Array(buf);
-  } catch { return null; }
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin);
-}
-
 interface RekBox { Left: number; Top: number; Width: number; Height: number }
 
 interface DetectedFace {
