@@ -28,7 +28,7 @@
  * we want the helper standalone / auditable).
  */
 
-const AWS_REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;
+import { bytesToBase64, ImageEncodingCache } from "./image-encoding-cache.ts";
 const DEFAULT_REKOGNITION_REGION = "eu-central-1";
 function resolveRekognitionRegion(): string {
   const override = (Deno.env.get("REKOGNITION_REGION") ?? "").trim();
