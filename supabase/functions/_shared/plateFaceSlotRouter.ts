@@ -24,7 +24,9 @@
 // Contract B (global bijective geometry assignment) live in a pure module.
 import {
   assignAnchorsToCandidatesBijective,
+  classifyRouterFailure,
   filterPlausibleCandidates,
+  type RouterFailureClass,
 } from "./plate-face-candidates.ts";
 
 // ── AWS Rekognition config (duplicated for auditability) ────────────
