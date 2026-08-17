@@ -266,32 +266,11 @@ async function detectFacesOnBytes(
   return raw.map((f, i) => ({ ...f, slot: i }));
 }
 
-/** Hungarian (brute permutation) — minimizes sum of costs. N ≤ 6 → ≤720 perms. */
-function optimalAssignmentMin(cost: number[][]): number[] {
-  const rows = cost.length;
-  if (rows === 0) return [];
-  const cols = cost[0]?.length ?? 0;
-  const pick = new Array(rows).fill(-1);
-  let bestPick: number[] | null = null;
-  let bestScore = Infinity;
-  const used = new Array(cols).fill(false);
-  const dfs = (r: number, sum: number) => {
-    if (sum >= bestScore) return; // prune
-    if (r === rows) {
-      if (sum < bestScore) { bestScore = sum; bestPick = pick.slice(); }
-      return;
-    }
-    for (let c = 0; c < cols; c++) {
-      if (used[c]) continue;
-      used[c] = true;
-      pick[r] = c;
-      dfs(r + 1, sum + (cost[r][c] ?? 0));
-      used[c] = false;
-    }
-  };
-  dfs(0, 0);
-  return bestPick ?? pick.map((_, i) => i);
-}
+// FA-4 — the previous local brute-force Hungarian (`optimalAssignmentMin`) was
+// replaced by the pure, unit-tested `assignAnchorsToCandidatesBijective`
+// (see _shared/plate-face-candidates.ts). It runs on sanity-filtered
+// candidates only and fails closed on exact equal-cost ambiguity.
+
 
 /**
  * Route plate faces to anchor slots by minimum-distance bijection.
