@@ -15289,8 +15289,9 @@ translations.de.uc = {
   fadeInOut: "Fade In/Out",
   slideInOut: "Slide In/Out",
   bounce: "Bounce",
-  subtitleTextPreview: "Texto de subtítulo (vista previa)",
-  enterSampleSubtitle: "Ingresa subtítulo de ejemplo...",
+  subtitleTextPreview: "Untertitel-Text (Vorschau)",
+  enterSampleSubtitle: "Beispiel-Untertitel eingeben …",
+
   previewLabel: "Vorschau",
   sampleSubtitleText: "Beispiel-Untertitel",
   scriptGenerator: "Voice-over Script Generator",
