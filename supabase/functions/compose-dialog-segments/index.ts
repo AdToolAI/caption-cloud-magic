@@ -5425,6 +5425,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             return json(
               {
                 error: "v187_preclip_required_no_fullplate_fallback",
+                // FA-4/P0 — keep the diagnosis class distinct for support.
+                preclip_error_class: preclipResult.errorClass ?? null,
                 reason,
                 refunded: totalCost,
               },
