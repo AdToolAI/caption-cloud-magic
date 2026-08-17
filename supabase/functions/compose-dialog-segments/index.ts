@@ -6201,6 +6201,20 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       return json({ error: reason, message, refunded: alreadyRefunded ? 0 : costCredits, ...meta }, status);
     };
 
+    // FA-4/P0 — fail-closed: Sync-Segment ohne kanonische `segment_id`
+    // (= dialog_turns.id bzw. deterministische Stabilizer-UUID) darf niemals
+    // beim Provider landen.
+    if (!v431SegmentId) {
+      return await failBeforeProviderDispatch(
+        "sync_segment_missing_segment_id",
+        "fa4_p0_preflight_blocked",
+        "Sync-Segment ohne kanonische segment_id (dialog_turns.id) — Dispatch blockiert.",
+        422,
+        { pass_idx: currentPassIdx, speaker_idx: (pass as any)?.speaker_idx ?? null },
+      );
+    }
+
+
     if (canonicalDialogTurnsCount > 0) {
       const passCharacterId = String(pass.character_id ?? "").trim();
       if (!passCharacterId || !canonicalSpeakerIds.includes(passCharacterId)) {
