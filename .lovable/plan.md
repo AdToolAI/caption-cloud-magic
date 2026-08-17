@@ -56,16 +56,17 @@ Betrag ausschließlich aus der validierten Charge — kein `CLIP_COSTS`, kein Ca
 
 ## 3. Die sechs Contracttests
 
-Als Deno-Tests neben der Funktion (`recover-stuck-composer-clip/refund-provenance.test.ts`; Resolver-Logik rein, RPC-Verhalten gegen ein Transaktions-/Wallet-Fake mit Lock- und Unique-Semantik):
+Zweistufig: Resolver-/Caller-Logik als Deno-Unit-Tests (`recover-stuck-composer-clip/refund-provenance.test.ts`), die DB-Semantik zusätzlich als echte Contracttests gegen PostgreSQL (Fixtures anlegen, RPC aufrufen, Wallet-Differenz und Refund-Rows messen, Fixtures wieder entfernen).
 
-1. Keine bzw. run-unscharfe Charge (Legacy `generation_id = project_id`) → `no_charge`, Wallet unverändert, Szene trotzdem `failed`.
-2. Eine run-scharfe Charge → `refunded`, exakt `abs(amount_euros)` der Charge.
-3. Identischer Refund zweimal → zweiter Aufruf `already_refunded`, 0 €.
-4. Zwei parallele Caller auf dieselbe `(charge_id, reason)` → genau eine Gutschrift (Charge-Lock + Partial Unique Index).
-5. Pricing nach der Charge geändert → Refund unverändert aus der Charge.
-6. Zwei Runs derselben Szene → Charges bleiben getrennt, jeder Refund ist run-/charge-spezifisch, keine Kollision.
+1. **T1 (No/Weak Provenance)** — Legacy-Charge `generation_id = project_id` → `no_charge`, Wallet unverändert, Szene trotzdem `failed`. *(Unit + DB)*
+2. **T2 (Success)** — run-scharfe Charge → `refunded`, exakt `abs(amount_euros)` der Charge. *(Unit + DB)*
+3. **T3 (Idempotenz, echt in der DB)** — zweiter Aufruf, auch mit **anderem** `refund_reason` → `already_refunded`, 0 €; genau eine Refund-Row, Wallet-Differenz genau einmal. *(DB verpflichtend)*
+4. **T4 (Parallel-Race, echt in der DB)** — zwei gleichzeitige RPC-Aufrufe auf dieselbe Charge aus zwei separaten PostgreSQL-Sessions → genau eine Wallet-Gutschrift, genau eine Refund-Row, der Verlierer erhält `already_refunded`. Kein Fake-Lock, echtes `FOR UPDATE` + Unique-Constraint. *(DB verpflichtend)*
+5. **T5 (Pricing-Drift)** — Pricing nach der Charge geändert → Refund unverändert aus der Charge. *(Unit + DB)*
+6. **T6 (Zwei Runs derselben Szene)** — zwei run-scharfe Charges → getrennt refundierbar, jeder Refund charge-spezifisch, keine Kollision. *(DB verpflichtend)*
 
 Zusätzlich (nicht anstelle von T4/T6): Reservation-Provenance wird nur bei DB-verifizierter Zuordnung akzeptiert, sonst `no_charge`.
+
 
 
 ## Nicht angefasst
