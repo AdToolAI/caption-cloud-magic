@@ -815,3 +815,59 @@ FA-4/P0 Fix Contract: ausschließlich die Frage beantworten, wie ein
 — 8/8 PASS (Happy Path, 502/Netzwerk = uncertain, 4xx = definitiv, Claim
 vorhanden → nur pollen, kein Claim → Reinvoke gleicher ID, Race mit genau einem
 AWS-Start, completed = No-op, Budgetende behält eigene Klasse).
+
+---
+
+## FA-4/P0 — Deploy Verification (DEPLOY VERIFIED)
+
+**T_FA4_P0_effective = 2026-08-17T09:35:01Z** (erfolgreicher Deploy von
+`compose-dialog-segments`; `invoke-remotion-render` unmittelbar davor).
+
+### Deploy-Scope (statisch belegt)
+
+- `grep "import .*pass-face-preclip"` → genau 1 Importer:
+  `compose-dialog-segments/index.ts:98`.
+- `grep "preclip-dispatch-resume"` → `_shared/pass-face-preclip.ts`,
+  `invoke-remotion-render/index.ts`, plus die Testdatei (nicht deploy-relevant).
+- `_shared/lipsync-frozen-contract.ts` nennt das Modul nur im Kommentar — keine
+  Import-Kante.
+- Deploy-Reihenfolge verbindlich: (1) `invoke-remotion-render`,
+  (2) `compose-dialog-segments`. Kein Zwischenfenster mit neuem Caller gegen
+  alte Invoke-Semantik. Keine DB-Migration.
+- Deployment-IDs/Versionen wurden vom Deploy-Werkzeug nicht zurückgegeben; als
+  Nachweis dient `T_FA4_P0_effective` plus die Boot-Smoke-Antworten unten.
+
+### Boot-/Validation-Smoke (keine Render-Payload)
+
+| Function | Request | Antwort |
+|---|---|---|
+| `invoke-remotion-render` | `POST {}` | `400 {"error":"lambdaPayload, pendingRenderId, and userId are required"}` |
+| `compose-dialog-segments` | `POST {}` | `400 {"error":"scene_id_required"}` |
+
+Beide Bundles laden inklusive des neuen Shared-Moduls; sauberer
+Validierungspfad statt Boot-Fehler.
+
+### Sanity-Checkliste (alle grün)
+
+- [x] CAS-Claim auf `lambda_invoked_at` — `invoke-remotion-render:255/264`
+      (`UPDATE ... .is('content_config->>lambda_invoked_at', null)`).
+- [x] Gesetzter Claim ⇒ kein weiterer AWS-Start (`already_started_unresolved`,
+      Zeilen 97–108).
+- [x] 5xx/Netzwerk ⇒ `dispatch_uncertain`, Row bleibt bestehen (kein
+      `failed`-Write im Resume-Pfad, `pass-face-preclip.ts:452–560`).
+- [x] Resume nutzt dieselbe `pendingRenderId` (`fa4p0_reinvoke_ok
+      same_render_id=…`, Zeile 516).
+- [x] Kein neuer `video_renders`-Row beim Resume — alle Resume-Zugriffe sind
+      `select`/`update` auf `render_id = renderId`.
+- [x] `lambda_failed`, `poll_timeout`, `invalid_input`, Config/Credentials
+      bleiben non-retryable (`isDefinitiveRejection`, Zeilen 447/474/518).
+- [x] v187 bleibt fail-closed — kein Full-Plate-Fallback bei >= 2 Sprechern.
+- [x] Refund unverändert idempotent (eine `failScene`-Stelle mit
+      `refundCredits: totalCost` pro Abbruch).
+- [x] DE/EN/ES-Meldungen für Infrastruktur- vs. Timeout-Fall vorhanden;
+      422-Antwort enthält `preclip_error_class`.
+- [x] `deno test _shared/preclip-dispatch-resume.test.ts` → 8/8 PASS.
+
+**Status: FA-4/P0 DEPLOY VERIFIED — STOP, kein Render.** FA-1 bis FA-3 bleiben
+PASS. Der Retest erfolgt separat mit einer frischen 4-Speaker-/6-Turn-Szene;
+die fehlgeschlagene S08 bleibt als Evidence unangetastet.
