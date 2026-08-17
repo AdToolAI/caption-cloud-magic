@@ -25,8 +25,26 @@ Nach Contract A: Anchor-Slots sind Character-Wahrheit, Plate-Faces sind rein geo
 - Ein Plate-Face darf nie zwei Characters tragen (Bijektion ist verpflichtend).
 - Extra-Faces bleiben im Ergebnis, aber ohne Character (bestehende v278.3-Semantik).
 - Weniger plausible Faces als Characters → `countMismatch` → fail-closed, kein Teil-Dispatch.
-- Maximal zulässige Geometrie-Abweichung: es wird kein neuer Grenzwert erfunden. Verwendet wird die bestehende Distanz-→-Confidence-Abbildung des Routers (`matchConfidence = 1 - d/0.5`, also d ≥ 0.5 = wertlos); ob daraus ein harter Cutoff wird, ist im Contract als offener Implementierungsparameter markiert und erst mit Test-Beleg zu fixieren.
 - Identity-Labels wirken ausschließlich als Tie-Break/Zusatzscore und dürfen nie einen sanity- oder geometrie-invaliden Kandidaten erzwingen.
+
+#### B.1 — Fail-closed-Bedingungen (Blocker geschlossen)
+
+Repo-weite read-only Prüfung: es existiert **kein** produktiver Grenzwert für Anchor↔Plate-**Geometrie**-Distanz. Vorhanden sind nur:
+
+- `plateFaceSlotRouter.ts`: `matchConfidence = 1 - d/0.5` (Zeile 391) — reine Score-Abbildung, nirgends als Gate ausgewertet; `maxDistance` (Zeile 410) wird nur berichtet. Einziger harter Ausgang ist `countMismatch = cols < rows` (Zeile 404).
+- `plate-face-identity.ts`: `minConfidence < 0.55 || minMargin < 0.15` (Zeile 553, N=3 verschärft auf 0.70/0.25) — das ist die **biometrische** Similarity-Ambiguity-Regel (v133), nicht Geometrie. Sie wird nicht auf Center-Distanzen übertragen.
+- Keine Router-/Identity-Tests und keine Doku definieren einen Geometrie-Cutoff.
+
+Contract-Festlegung: **Für diesen Fix wird kein neuer Distanz-Cutoff eingeführt.** Distanz, `maxDistance` und `matchConfidence` bleiben Telemetrie/Supporting Score.
+
+Fail-closed gilt deterministisch genau bei:
+
+a) `plausible_candidates < expected_characters` (nach Contract A) — bestehende `countMismatch`-Semantik.
+b) Keine vollständige Bijektion möglich, d. h. mindestens ein Anchor-Slot bleibt ohne eigenen Kandidaten.
+c) Exakt degenerierte bzw. equal-cost Ambiguität: mehrere Bijektionen erreichen dieselben minimalen Gesamtkosten mit unterschiedlicher Character→Face-Zuordnung, oder zwei Kandidaten haben identische Center-Geometrie.
+
+„near-identical" ist **kein** eigener Blocker — dafür existiert keine bestehende Toleranz. Der Testvertrag begrenzt sich auf exakt gleiche/degenerierte Geometrie und exakte Equal-Cost-Ambiguität.
+
 
 ### Contract C — assignmentLock-Semantik
 
@@ -72,14 +90,14 @@ Kay     → [1030,208,1099,296]
 
 Nachzuweisen: untergroße False Positives fallen vor Hungarian raus; genau die vier großen Faces bleiben; unlabeled Matthew/Kay werden korrekt gewählt; High-Confidence-Tiny-Boxes gewinnen nie; Kandidaten-Reihenfolge ist ergebnisneutral; Extra-Faces verschieben nichts; keine Box doppelt.
 
-Zusätzliche Fälle: N=1, N=2, N=4, Extra-Faces, zu wenige plausible Faces → fail-closed, duplizierte/nahezu identische Geometrie, umsortierter Detector-Output, hohe Confidence bei invalider Geometrie, korrekte Geometrie ohne Label, korrekte Geometrie mit widersprüchlichem Label.
+Zusätzliche Fälle: N=1, N=2, N=4, Extra-Faces, zu wenige plausible Faces → fail-closed (B.1a), unvollständige Bijektion → fail-closed (B.1b), **exakt identische/degenerierte Kandidatengeometrie bzw. Equal-Cost-Ambiguität → fail-closed (B.1c)**, umsortierter Detector-Output, hohe Confidence bei invalider Geometrie, korrekte Geometrie ohne Label, korrekte Geometrie mit widersprüchlichem Label. Kein Test darf einen Distanz-Cutoff voraussetzen; „near-identical" ohne exakte Gleichheit ist ausdrücklich kein Fehlerfall.
 
 ## Schritt 3 — Owner-/Scope-Matrix (Analyse, kein Code)
 
 - Kanonischer Sanity-Filter + Bijektion: `supabase/functions/_shared/plateFaceSlotRouter.ts` ist der vorgesehene Owner — er besitzt bereits Detection, Normalisierung und `optimalAssignmentMin()`. Der Filter gehört zwischen `detectFacesOnBytes()` und den Matrix-Aufbau.
 - Zu neutralisieren in `compose-dialog-segments/index.ts`: Bridge-Autorität, `anchorRekFacesByCid`-First-Match, `byIdRanked`-Auswahl, `trustedSlots`-Shortcut im `v239_repair_gate`.
 - Weitere Betroffene: `_shared/plate-face-identity.ts` (`resolvePlateFaceIdentities`), `_shared/pass-face-preclip.ts` (Crop-Transform, `computeFaceCrop`/`computeMouthCenteredCrop`), `_shared/asd-strategy.ts`, `sync-so-webhook/index.ts` (nur lesend geprüft), `_shared/scene-hard-reset.ts`.
-- Späterer minimaler Deploy-Scope: `compose-dialog-segments` (zieht `_shared` ein). Kein weiterer Function-Redeploy vorgesehen.
+- Deploy-Scope, statisch belegt: `plateFaceSlotRouter.ts` hat genau zwei Importer. `compose-video-clips/index.ts:71` importiert **nur** `buildAnchorLayoutFromV274` — dieser Export bleibt unverändert, also kein Redeploy. `compose-dialog-segments/index.ts:91` importiert `routePlateFacesToAnchor` und `AnchorFaceLayout` — nur das ist der geänderte Export. **Minimaler Deploy-Scope: ausschließlich `compose-dialog-segments`.** Keine pauschale Shared-Importer-Neuausrollung.
 
 ## Nicht im Scope (FROZEN)
 
