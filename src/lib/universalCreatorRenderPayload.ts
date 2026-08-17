@@ -197,7 +197,8 @@ export function buildUniversalCreatorCustomizations(input: BuildCustomizationsIn
     rawMediaMode: true as const,
     // Subtitles
     subtitles: subtitleConfig?.segments || [],
-    subtitleStyle: subtitleConfig?.style || DEFAULT_SUBTITLE_STYLE,
+    subtitleStyle: normalizeSubtitleStyleForRender(subtitleConfig?.style),
+
     // Scenes vs. background fallback
     scenes: validScenes.length > 0 ? validScenes : undefined,
     background:
