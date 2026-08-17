@@ -641,3 +641,135 @@ Die reale kanonische Turn-Dauer wird erst nach `compose-twoshot-audio` im Lauf
 geprüft.
 
 **FA-4 SETUP v2 READY → STOP.** Kein Render gestartet.
+
+---
+
+## FA-4/P0 — 4-Speaker Render: Pre-Dispatch Failure (Root Cause)
+
+**Status:** FA-4 P0 — ROOT CAUSE IDENTIFIED / AWAITING FIX CONTRACT.
+
+**Kein Fix, kein Retry, kein Reset, kein Cleanup, kein neuer Render, keine Migration, kein Deploy.**
+
+### Lauf-Identität
+
+```text
+Szene            = 42bcdda1-3a42-4d2a-b43e-21f1888cd1f2 (S08)
+Projekt          = 035273d7-ae9b-44e0-89e7-f9e28703530d
+run_id           = 56955451-fe9e-4116-8dd2-5734ba8653c9
+T_run_start      = 2026-08-17 00:22:56 UTC (active_run_started_at)
+plate_generation = 2
+Kostenbestätigung= 2.075 Cr / ~€6.30
+```
+
+### Failure-Owner
+
+`supabase/functions/compose-dialog-segments/index.ts`, Zweig
+`v161PreclipEligible → preclipResult !ok → speakers.length >= 2` (Zeilen 5367–5409):
+`logSyncDispatch(PREFLIGHT_BLOCKED)` → `failLipSync(...)` → HTTP 422 + Refund.
+
+### Endzustand (read-only)
+
+```text
+pipeline_state        = failed
+pipeline_substate     = lipsync_failed
+clip_status           = ready (Plate intakt)
+clip_url              = gesetzt
+processed_video_url   = NULL
+clip_error            = v187_preclip_required_no_fullplate_fallback:
+                        Preclip für „Sarah Dusatko" wurde nicht rechtzeitig fertig
+                        (invoke_502: 502 Bad Gateway). Kein Full-Plate-Fallback...
+dialog_shots.passes   = genau 1 Eintrag: idx=0, status=rendering_preflight
+refunded_credits      = true
+composer_pipeline_jobs= 1 Zeile: base_video/1/succeeded
+```
+
+### Zeitleiste
+
+```text
+00:23:06.341  idle            → plate_queued      legacy_wrapper_7
+00:29:40.870  audio_ready     → audio_ready       ccw:plate-complete (base_video succeeded)
+00:30:11.999  v278 anchor_layout_recovered, facemap 4/4
+00:30:35.250  pass 0 preflight-claim (rendering_preflight)
+00:30:38.171  video_renders 8d4596d3… angelegt
+00:30:38.287  video_renders → failed: "invoke 502: 502 Bad Gateway"
+00:30:38.994  dialog_shots  → failed, refunded=true
+00:30:39.642  composer_scenes → failed / lipsync_failed
+00:30:40.050  ccw:handoff_failed rejected (unexpected_from_state, applied=false)
+```
+
+Zwischen 00:30:39 und 00:39:30 passierte nichts. Ein Watchdog war nicht involviert;
+Stall und Failure sind dasselbe Ereignis.
+
+### Was erreicht wurde, bevor der Fehler eintrat
+
+- 6 kanonische Turns in `dialog_turns` geprägt.
+- 4 stabile `speaker_idx` 0..3, bijektiv zu den vier Characters.
+- `v278 anchor_layout_recovered` mit Face-Mapping 4/4.
+- Plate (`base_video`, HappyHorse) erfolgreich.
+
+### Was nicht erreicht wurde
+
+- Kein `sync_segment`-Ledger-Job wurde jemals erzeugt.
+- Kein `audio_mux`, kein Stitch, keine `processed_video_url`.
+
+### Warum kein `sync_segment`-Acquire
+
+Der Ledger-Acquire (`stage:"sync_segment"`, Zeile ~5980) liegt strikt hinter dem
+Preclip-Block (Zeile 5308). Der 422-Return bei 5402 verlässt die Funktion vor jeder
+Ledger-Interaktion. Das Ledger-Bild ist daher korrekt: genau 1 Job (`base_video`,
+succeeded).
+
+### Root Cause
+
+Ein **transienter HTTP 502 des `invoke-remotion-render`-Gateways** beim allerersten
+Preclip-Dispatch (Pass 0, Sarah Dusatko). `pass-face-preclip.ts` behandelt diesen
+Infrastrukturfehler (`errorClass: "dispatch_failed"`) ohne jeden Wiederholversuch
+wie einen inhaltlichen Preclip-Fehler. Ein 3-Sekunden-Gateway-Ausfall hat damit einen
+kompletten 4-Sprecher-Lauf nach bereits bezahlter Plate-Arbeit terminalisiert und
+refundet.
+
+### Guard-Matrix
+
+- `renderPassFacePreclip` (v69) läuft für alle N (1..4); keine N-Verzweigung.
+- `speakers.length >= 2` ist das Fail-closed-Kriterium „mehr als ein Gesicht auf der
+  Plate ⇒ kein Full-Plate-Fallback", kein Zweier-Cap.
+- Slots 0..3, 6 Turns, 4 stabile `speaker_idx` waren korrekt.
+- **Kein 4-Speaker-Limit (Klasse A ausgeschlossen).**
+- **Keine versteckte 2-Speaker-Annahme (Klasse B ausgeschlossen).**
+- **Kein Watchdog-Beteiligung (Stall = Failure).**
+
+### Klassifikation
+
+**C — allgemeiner Preflight-Resilienz-Bug.** Kein A, kein B, kein D.
+
+### Fix noch nicht freigegeben
+
+Ein Retry bei HTTP 5xx/Netzwerk ist potenziell `dispatch_uncertain`. Vor einer
+Implementation muss geklärt werden, wie derselbe logische Preclip-Render idempotent
+wiederaufgenommen werden kann, ohne einen Doppelrender zu erzeugen.
+
+Vorläufige Fakten aus der Code-Sichtung:
+
+- `pass-face-preclip.ts` legt die `video_renders`-Zeile **vor** dem Invoke an.
+- `invoke-remotion-render` nimmt eine stabile `pendingRenderId` entgegen.
+- Es gibt bereits einen `alreadyStarted`-Kurzschluss, wenn
+  `content_config.real_remotion_render_id` gesetzt oder der Render abgeschlossen ist.
+
+Offen bleiben:
+
+1. Das Race-Fenster zwischen Lambda-Start und Persistierung von `real_remotion_render_id`.
+2. Der heutige Fehlerpfad setzt die `video_renders`-Zeile sofort auf `failed`, was den
+   Wiederaufnahme-Zustand zerstört.
+3. Die Klassifikation muss von „dispatch_failed" zu „dispatch_uncertain" geändert werden.
+
+`lambda_failed`, inhaltlicher Preclip-Fehler, `invalid_input` und echter Poll-Timeout
+bleiben wie heute nicht retryable.
+
+Nebenbefund (reine Presenter-/Diagnoseebene): Die Meldung „wurde nicht rechtzeitig
+fertig" bei einem 116-ms-Dispatch-502 ist irreführend und sollte 502/Dispatch-Fehler
+klar von Timeout unterscheiden.
+
+### Nächster Schritt
+
+FA-4/P0 Fix Contract: ausschließlich die Frage beantworten, wie ein
+`dispatch_uncertain`-Preclip idempotent wiederaufgenommen werden kann. Erst danach Code.
