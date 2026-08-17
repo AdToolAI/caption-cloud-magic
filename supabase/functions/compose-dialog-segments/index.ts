@@ -2449,18 +2449,20 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           const box = speakerPlateBboxes[i];
           const anchor = anchorSpeakerCoords[i];
           if (!box || !anchor) return;
-          if (trustedSlots.includes(i)) {
-            goodSlots.push(i);
-            return;
-          }
+          // FA-4 Contract D — sanity ALWAYS runs after assignment. Trust /
+          // confidence is diagnostics only and can no longer skip the
+          // objective geometry check (root cause of the S11 tiny-box pass).
           const sanity = bboxSanity(box);
           if (sanity.ok) {
             goodSlots.push(i);
           } else {
             badSlots.push(i);
-            badReasons[i] = sanity.reason;
+            badReasons[i] = trustedSlots.includes(i)
+              ? `${sanity.reason}_despite_trust`
+              : sanity.reason;
           }
         });
+
 
         console.log(
           `[compose-dialog-segments] scene=${sceneId} v239_repair_gate ` +
