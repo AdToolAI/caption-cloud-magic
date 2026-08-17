@@ -193,7 +193,7 @@ Deno.test("T2: identity/assignment result is identical for N=1, N=2, N=4", async
     }));
     const similarities = Array.from({ length: n }, (_, i) => ({ [i]: 95 }));
 
-    const result = await runWithMockFetch({ faces, similarities }, async () => {
+    const { result } = await runWithMockFetch({ faces, similarities }, async () => {
       return await resolveIdentityViaRekognition({
         anchorUrl,
         anchorWidth: 1024,
@@ -201,6 +201,8 @@ Deno.test("T2: identity/assignment result is identical for N=1, N=2, N=4", async
         characters: makeChars(n),
       });
     });
+
+    console.log("T2 debug n=", n, JSON.stringify(result, null, 2));
 
     assertEquals(result.ok, true, `N=${n} should resolve ok`);
     assertEquals(result.resolvedCount, n, `N=${n} should resolve all characters`);
