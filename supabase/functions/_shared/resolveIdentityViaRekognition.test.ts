@@ -98,7 +98,9 @@ function runWithMockFetch<T>(opts: MockOptions, fn: () => Promise<T>): Promise<{
         },
         Similarity: sim,
       }));
-      return new Response(JSON.stringify({ FaceMatches: matches }), {
+      const responseBody = JSON.stringify({ FaceMatches: matches });
+      console.log("DEBUG compare idx", idx, "matches", matches, "response", responseBody);
+      return new Response(responseBody, {
         status: 200,
         headers: { "Content-Type": "application/x-amz-json-1.1" },
       });
