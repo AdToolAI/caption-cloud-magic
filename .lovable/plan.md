@@ -32,6 +32,7 @@ Legacy-Historie (inkl. der 6,30-€-Evidence mit `metadata IS NULL`) liegt bewus
 
 Atomarer Ablauf:
 
+0. Eingangsvalidierung: `p_refund_reason` muss NOT NULL und nach `btrim()` nicht leer sein — sonst Abbruch mit Fehler, keine finanzielle Transaktion. Der Grund ist dauerhafte Audit-Provenance.
 1. `SELECT ... FROM ai_video_transactions WHERE id = p_charge_id AND type = 'deduction' FOR UPDATE` — existiert die Row nicht: `no_charge`.
 2. **Provenance-Beweis DB-seitig** (Caller-Behauptung zählt nicht). Akzeptiert wird die Charge nur, wenn eine dieser Bedingungen gilt:
    - `generation_id = p_run_id`, oder
