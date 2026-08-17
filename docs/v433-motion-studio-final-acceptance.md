@@ -1354,7 +1354,7 @@ Render-GO.
 
 ---
 
-## FA-4 FINAL RETEST RENDER (S11) — Ergebnis: **TECHNICAL PASS / VISUAL REVIEW PENDING**
+## FA-4 FINAL RETEST RENDER (S11) — Ergebnis: **TECHNICAL PASS / VISUAL REVIEW: ISSUES**
 
 Genau ein kostenpflichtiger Render, keine Eingriffe (kein Retry, kein Reset,
 kein zweiter Confirm, kein manueller Cleanup). Die technischen
