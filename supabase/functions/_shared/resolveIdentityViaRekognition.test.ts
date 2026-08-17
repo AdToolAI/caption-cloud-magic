@@ -254,13 +254,15 @@ Deno.test("T4: each portrait payload stays bound to the correct character ID", a
   const faces = [
     { slot: 0, left: 0.0, top: 0.0, width: 0.5, height: 0.5 },
     { slot: 1, left: 0.5, top: 0.0, width: 0.5, height: 0.5 },
+    { slot: 2, left: 0.0, top: 0.5, width: 0.5, height: 0.5 },
+    { slot: 3, left: 0.5, top: 0.5, width: 0.5, height: 0.5 },
   ];
-  // Deliberately cross-map: char 0 -> slot 1, char 1 -> slot 0, char 2 -> slot 0, char 3 -> slot 1
+  // Deliberately cross-map every character to a different slot.
   const similarities = [
-    { 1: 96 },
-    { 0: 96 },
-    { 0: 94 },
-    { 1: 94 },
+    { 3: 96 }, // char 0 -> slot 3
+    { 2: 96 }, // char 1 -> slot 2
+    { 1: 96 }, // char 2 -> slot 1
+    { 0: 96 }, // char 3 -> slot 0
   ];
 
   const { result, calls } = await runWithMockFetch({ faces, similarities }, async () => {
@@ -279,11 +281,14 @@ Deno.test("T4: each portrait payload stays bound to the correct character ID", a
   // Verify the assignment reflects the cross-map.
   assertEquals(result.assignmentLock["0"], "char-0");
   assertEquals(result.assignmentLock["1"], "char-1");
+  assertEquals(result.assignmentLock["2"], "char-2");
+  assertEquals(result.assignmentLock["3"], "char-3");
+  assertEquals(result.resolvedCount, 4);
 
   const compareCalls = calls.filter((c) => c.headers.get("x-amz-target") === "RekognitionService.CompareFaces");
   // Even with cross-mapping, the i-th compare must use the i-th portrait URL's bytes.
-  // We can't assert bytes directly here, but T1 already proves SourceImage bytes equal
-  // the loaded portrait; this test guards that the i-th call corresponds to the i-th char.
+  // T1 already proves SourceImage bytes equal the loaded portrait; this test guards
+  // that the i-th call corresponds to the i-th char by checking the response order.
   assertEquals(compareCalls.length, 4);
 });
 
