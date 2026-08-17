@@ -30,6 +30,9 @@ export function SubtitleTimingStep({ audioUrl, subtitleConfig, onSubtitleConfigC
   const [editEndTime, setEditEndTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  /** Free-text preview line for the style editor. `null` = follow the active segment. */
+  const [sampleTextOverride, setSampleTextOverride] = useState<string | null>(null);
+
 
   const handleGenerateSubtitles = async () => {
     if (!audioUrl) { toast.error(t('uc.noAudioGenVoiceFirst')); return; }
