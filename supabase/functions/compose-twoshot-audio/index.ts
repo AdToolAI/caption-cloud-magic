@@ -1389,9 +1389,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           .map((it) => ({
             startSec: Math.round((it.segment._startSample / SAMPLE_RATE) * 1000) / 1000,
             endSec: Math.round((it.segment._endSample / SAMPLE_RATE) * 1000) / 1000,
+            // FA-4/P0 — kanonische Segmentidentität für den v431-Ledger.
+            turnId: it.segment.turn_id ?? null,
           }))
           .filter((w) => w.endSec > w.startSec)
           .sort((a, b) => a.startSec - b.startSec);
+
         (group as any).voicedRange = {
           startSec: Math.round(voicedStartSec * 1000) / 1000,
           endSec: Math.round(voicedEndSec * 1000) / 1000,
