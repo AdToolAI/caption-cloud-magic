@@ -6,29 +6,37 @@ Der Fix-Contract ist gelockt. Der Kern (`segment_id = dialog_turn.id`, kein Sche
 
 Heute entsteht die Bindung bereits am kanonischen Iterationsschritt (`passSpeakers.map` → `turns.map` in `compose-dialog-segments`), und der Split erbt exakt die `segment_id` seines eigenen Turns. Was fehlt, ist die harte Absicherung:
 
-- Vor jedem Ledger-Acquire: Prüfung, dass die Menge der `segment_id` der aktiven Sync-Passes eindeutig ist (keine Duplikate) und ausschließlich aus `dialog_turns.id` der Szene stammt.
-- Stimmen Anzahl oder Zuordnung nicht eindeutig überein → fail-closed mit eigenem Grund (`fa4_p0_turn_pass_mismatch`), bevor irgendein Provider-Dispatch passiert.
+- Der Guard gilt ausschließlich für **turn-backed** Passes (siehe Abschnitt 2). Für diese muss vor dem ersten turn-backed Ledger-Acquire gelten: Anzahl turn-backed Passes = Anzahl `dialog_turns`; jede `dialog_turn.id` genau einmal; keine fremde ID; keine doppelte ID; keine NULL-ID.
+- Verletzung → fail-closed mit eigenem Grund (`fa4_p0_turn_pass_mismatch`), bevor irgendein Provider-Dispatch oder Acquire passiert.
 - Kein Fallback über `speaker_idx`, `character_id`, Name oder Text — auch nicht als Notlösung. Wiederholte Sprecher (Sarah Turn 1 / Turn 5) ergeben zwei getrennte Jobs mit unterschiedlicher `segment_id` und identischer Geometrie.
 
-## 2. Offener Punkt: v194-Stabilizer
+## 2. v194-Stabilizer — geklärt (read-only belegt)
 
-Der Contract sagt „keine synthetischen UUIDs" und `set(sync_segment.segment_id) == set(dialog_turns.id)`. Die stillen v194-Stabilizer-Passes sind aber ebenfalls `sync_segment`-Jobs und haben per Definition keinen eigenen `dialog_turn`. Aktuell bekommen sie eine deterministische UUID aus `(scene, listenerIdx)`.
+Nachweis aus dem heutigen Dispatcher: Stabilizer-Passes tragen bereits zwei explizite Flags, die beim Erzeugen gesetzt und an mehreren Stellen als Erkennungsmerkmal verwendet werden — `stabilizer_pass === true` **und** `is_silent_stabilizer === true` (`compose-dialog-segments/index.ts`: gesetzt bei der Stabilizer-Injektion, geprüft im Tight-WAV-Pfad und im Silent-Gate-Bypass). Sie laufen im selben Dispatch-Pfad und erzeugen damit ebenfalls `stage='sync_segment'`-Ledger-Rows.
 
-Vorschlag (Standard, wenn nichts anderes gesagt wird): Stabilizer behalten ihre deterministische Identität, und die Kardinalitätsinvariante wird präzisiert auf die aktiven Dialog-Passes:
-`set(sync_segment.segment_id WHERE pass ist aktiv) == set(dialog_turns.id)`, Stabilizer zählen separat und dürfen die Turn-Menge nicht schneiden. Alternative wäre, Stabilizer aus dem Ledger herauszuhalten — das wäre ein Eingriff in die Lip-Sync-Kette und ist hier nicht Scope.
+Damit gilt festgezogen:
+
+- **Turn-backed Sync-Jobs**: jeder kanonische Dialog-Turn erzeugt genau einen turn-backed `sync_segment`-Job mit `segment_id = dialog_turn.id`.
+- **Stabilizer-Jobs**: bleiben unverändert separate, nicht-turn-backed `sync_segment`-Jobs mit ihrer bestehenden deterministischen Segmentidentität. Sie dürfen nie eine `dialog_turn.id` verwenden oder die Turn-ID-Menge schneiden.
+- Kardinalitätsinvariante: `set(turn_backed_sync_segment.segment_id) == set(dialog_turns.id)` — **nicht** über alle `sync_segment`-Rows.
+- Die Klassifikation turn-backed vs. stabilizer erfolgt ausschließlich über die bestehenden Pass-Flags, nie über „ID liegt nicht in `dialog_turns`" — sonst würden fehlerhafte Turn-Jobs als Stabilizer durchgewunken.
+- Stabilizer werden separat validiert (deterministische ID vorhanden, keine Kollision mit Turn-IDs) und beeinflussen den Gleichheitscheck nicht.
+- Keine Änderung der Stabilizer-Semantik.
 
 ## 3. Dokument-Cleanup
 
-`docs/v433-motion-studio-final-acceptance.md` (FA-4/P0-Abschnitt) wird bereinigt: alte/überlagerte Formulierungen raus, doppelte Abschnitte 5/6 zusammenführen, nur die gelockte Fassung bleibt stehen, ergänzt um die Pass↔Turn-Iterationsinvariante und die Stabilizer-Präzisierung.
+`docs/v433-motion-studio-final-acceptance.md` (FA-4/P0-Abschnitt) wird bereinigt: alte/überlagerte Formulierungen raus, doppelte Abschnitte 5/6 zusammenführen, nur die gelockte Fassung bleibt stehen, ergänzt um die Pass↔Turn-Iterationsinvariante, die turn-backed-Kardinalität und die Stabilizer-Abgrenzung (inkl. Hinweis für spätere Audits: gezählt werden 6 turn-backed Dialog-Jobs plus ggf. separate Stabilizer-Rows, nicht „insgesamt 6 sync_segment-Rows").
 
 ## 4. Tests (read-only, kein Render, kein Deploy)
 
-- Unit/Logik: N Turns → N Passes, `segment_id` je Pass = Turn-ID desselben Iterationsschritts.
+- Unit/Logik: N Turns → N turn-backed Passes, `segment_id` je Pass = Turn-ID desselben Iterationsschritts.
 - Wiederholter Sprecher: Sarah Turn 1 und Turn 5 ergeben zwei verschiedene `segment_id`, gleiche `speaker_idx`.
-- `segment_id = NULL` auf `sync_segment` → Dispatch blockiert (`fa4_p0_preflight_blocked`), kein Provider-Call.
+- `segment_id = NULL` auf turn-backed `sync_segment` → Dispatch blockiert (`fa4_p0_preflight_blocked`), kein Provider-Call.
 - Adoption: falsche `segment_id` → `preacquired_segment_mismatch`; gleiche Turn-ID beim Retry → Adoption derselben Zeile.
 - `audio_mux` bleibt genau ein Job mit `segment_id = NULL`.
-- Mismatch-Fall (Turns ≠ Passes) → fail-closed vor Acquire.
+- Mismatch-Fall (turn-backed Passes ≠ `dialog_turns`) → fail-closed vor Acquire.
+- **Stabilizer-Regression (verpflichtend)**: 6 Dialog-Turns + vorhandene v194-Stabilizer → exakt 6 turn-backed `sync_segment`-Jobs mit `segment_id == dialog_turn.id`; Stabilizer behalten ihre deterministische Identität; keine Stabilizer-ID schneidet die Turn-ID-Menge; kein Turn wird wegen eines Stabilizers als `already_completed`/`already_in_flight` geskippt; Stabilizer-Semantik unverändert.
+
 
 Danach: STOP mit Testbericht, kein Deploy, kein Render.
 
