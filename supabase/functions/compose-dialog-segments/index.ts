@@ -3866,50 +3866,15 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // Invariante: set(turn_backed_sync_segment.segment_id) == set(dialog_turns.id)
     // (NICHT über alle sync_segment-Rows — Stabilizer zählen separat).
     if (!isAdvance && canonicalDialogTurnIds.length > 0) {
-      const turnBacked = builtPasses.filter((p) => !isStabilizerPass(p));
-      const stabilizerPasses = builtPasses.filter((p) => isStabilizerPass(p));
-      const canonicalSet = new Set(canonicalDialogTurnIds);
-      const seen = new Map<string, number>();
-      const nullIds: number[] = [];
-      const foreignIds: string[] = [];
-      for (const p of turnBacked) {
-        const sid = typeof p.segment_id === "string" ? p.segment_id.trim() : "";
-        if (!sid) { nullIds.push(p.idx); continue; }
-        if (!canonicalSet.has(sid)) foreignIds.push(sid);
-        seen.set(sid, (seen.get(sid) ?? 0) + 1);
-      }
-      const duplicateIds = [...seen.entries()].filter(([, n]) => n > 1).map(([id]) => id);
-      const missingIds = canonicalDialogTurnIds.filter((id) => !seen.has(id));
-      // Stabilizer: eigene deterministische Identität, niemals NULL, niemals
-      // Kollision mit der Turn-ID-Menge.
-      const stabilizerNull: number[] = [];
-      const stabilizerCollisions: string[] = [];
-      for (const p of stabilizerPasses) {
-        const sid = typeof p.segment_id === "string" ? p.segment_id.trim() : "";
-        if (!sid) { stabilizerNull.push(p.idx); continue; }
-        if (canonicalSet.has(sid)) stabilizerCollisions.push(sid);
-      }
-      const violations = {
-        turn_backed_count: turnBacked.length,
-        canonical_turns: canonicalDialogTurnIds.length,
-        null_segment_pass_idx: nullIds,
-        foreign_segment_ids: foreignIds,
-        duplicate_segment_ids: duplicateIds,
-        missing_turn_ids: missingIds,
-        stabilizer_count: stabilizerPasses.length,
-        stabilizer_null_pass_idx: stabilizerNull,
-        stabilizer_turn_id_collisions: stabilizerCollisions,
-      };
-      const violated =
-        turnBacked.length !== canonicalDialogTurnIds.length ||
-        nullIds.length > 0 ||
-        foreignIds.length > 0 ||
-        duplicateIds.length > 0 ||
-        missingIds.length > 0 ||
-        stabilizerNull.length > 0 ||
-        stabilizerCollisions.length > 0;
+      const violations = evaluateTurnPassBinding(
+        builtPasses as unknown as TurnPassCandidate[],
+        canonicalDialogTurnIds,
+      );
+      const turnBackedCount = violations.turn_backed_count;
+      const stabilizerCount = violations.stabilizer_count;
 
-      if (violated) {
+      if (!violations.ok) {
+
         console.error(
           `[compose-dialog-segments] scene=${sceneId} FA4_P0_TURN_PASS_MISMATCH ${JSON.stringify(violations)}`,
         );
