@@ -32,11 +32,8 @@ Der Vertrag wird als Abschnitt „FA-4/P0 — Fix Contract" in
 ### A — Eine Preclip-Row, eine `pendingRenderId`
 `renderPassFacePreclip` erzeugt genau **eine** `video_renders`-Row und behält deren
 `renderId`. Jeder Resume-/Probe-Aufruf nutzt exakt dieselbe `pendingRenderId`. Ein 502
-erzeugt **nie** eine zweite Preclip-Row und **nie** eine neue UUID. Kein `preclip_key`,
-kein Unique-Index, keine Migration in diesem P0. (Ein persistenter logischer Key über
-mehrere `compose-dialog-segments`-Invocations hinweg ist ein späteres Thema und müsste
-dann volle Crop-Geometrie, Plate/Anchor, Run/Generation und Turn-Identität umfassen —
-`face_crop.size` allein wäre zu schwach.)
+erzeugt **nie** eine zweite Preclip-Row und **nie** eine neue UUID. Keine zusätzliche
+Identität, kein zusätzlicher Index, keine Migration in diesem P0.
 
 ### B — Atomic Dispatch Claim in `invoke-remotion-render`
 Für dieselbe `pendingRenderId` gilt, in dieser Reihenfolge:
