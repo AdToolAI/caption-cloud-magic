@@ -64,7 +64,7 @@ const getPreviewStyles = (style: SubtitleStyle): React.CSSProperties => {
   }
 };
 
-export const SubtitleStyleEditor = ({ style, onChange, sampleText, onSampleTextChange }: SubtitleStyleEditorProps) => {
+export const SubtitleStyleEditor = ({ style, onChange, sampleText, onSampleTextChange, onResetSampleText }: SubtitleStyleEditorProps) => {
   const { t } = useTranslation();
   const updateStyle = (updates: Partial<SubtitleStyle>) => onChange({ ...style, ...updates });
 
