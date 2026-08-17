@@ -1980,7 +1980,22 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       }
     }
     if (plateIdentityMap && plateIdentityMap.faces.length > 0) {
+      // FA-4 Face-Candidate Fix — when the v278 router produced this map, the
+      // assignment is already sanity-filtered and globally bijective
+      // (Contract A + B). All legacy authoritative selection paths (v183
+      // bridge, byIdRanked confidence ranking, v277 first-match lock,
+      // unlabeled fallback) are neutralised for that case: they may only act
+      // as diagnostics, never override geometry.
+      const fa4GeometryAuthoritative =
+        (plateIdentityMap as any)?.assignmentLockSource === "v278_hungarian_plate_router";
+      if (fa4GeometryAuthoritative) {
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} fa4_geometry_authoritative faces=${plateIdentityMap.faces.length} ` +
+          `resolved=${plateIdentityMap.resolvedCount} — legacy label paths are diagnostics only`,
+        );
+      }
       // v166 — Anchor-Identity Slot Bridge.
+
       // If the plate-identity step could not label faces (Gemini probe failed
       // or resolvedCount=0), but the anchor faceMap KNOWS the characterId of
       // every visual slot (sorted L→R), bridge anchor_slot → plate_slot by
