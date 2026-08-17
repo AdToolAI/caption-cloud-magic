@@ -574,6 +574,25 @@ export async function renderPassFacePreclip(
     }
   }
 
+  // FA-4/P0 — no progress within the budget. If the dispatch was uncertain we
+  // must NOT restart Lambda; the run stays fail-closed under v187 with its own
+  // diagnosis class so support can tell infrastructure from a real timeout.
+  if (dispatchUncertain) {
+    console.log(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} fa4p0_dispatch_uncertain_no_progress dispatch_ms=${dispatchMs} poll_wait_ms=${Date.now() - pollStart} total_ms=${Date.now() - t0} budget_ms=${pollTimeoutMs}`,
+    );
+    return {
+      ok: false,
+      error: `dispatch_uncertain_${Math.round(pollTimeoutMs / 1000)}s`,
+      errorClass: "dispatch_uncertain",
+      preclipRenderId: renderId,
+      crop,
+      durationSec: dur,
+      fps: FPS,
+      frameCount: durationInFrames,
+    };
+  }
+
   console.log(
     `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_timing poll_timeout dispatch_ms=${dispatchMs} poll_wait_ms=${Date.now() - pollStart} total_ms=${Date.now() - t0} budget_ms=${pollTimeoutMs}`,
   );
