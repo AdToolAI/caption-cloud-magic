@@ -22,6 +22,8 @@ WHERE type = 'refund'
 - gleiche Charge + anderer Grund → ebenfalls `already_refunded`
 - zwei verschiedene Charges → getrennt refundierbar
 
+Dies ist der **einzige** neue Index. Ein zusätzlicher Composite-Index auf `(refund_charge_id, refund_reason)` wird nicht angelegt — er wäre durch den strengeren Charge-Index redundant.
+
 Legacy-Historie (inkl. der 6,30-€-Evidence mit `metadata IS NULL`) liegt bewusst außerhalb der Idempotenzdomäne. Kein Backfill, keine Korrektur.
 
 ### b) Neue RPC `public.composer_refund_charge(p_charge_id uuid, p_run_id uuid, p_refund_reason text)`
