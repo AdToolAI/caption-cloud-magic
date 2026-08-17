@@ -41,9 +41,12 @@ Für dieselbe `pendingRenderId` gilt, in dieser Reihenfolge:
    kein AWS-Call.
 2. `lambda_invoked_at` vorhanden → `alreadyStarted:true, unresolved:true`, **kein**
    AWS-Call. Zeitablauf ändert daran nichts.
-3. Nur wenn `lambda_invoked_at` fehlt, darf **genau ein** Caller es **atomar** setzen
-   (Compare-and-set / conditional update auf „ist noch NULL", ein Row-Lock) und danach
-   AWS aufrufen. Zwei parallele Invokes dürfen nicht beide NULL sehen.
+3. Nur wenn `lambda_invoked_at` fehlt, darf **genau ein** Caller es setzen — als echter
+   **CAS**: ein einziges `UPDATE ... SET lambda_invoked_at = now() WHERE id = :renderId
+   AND lambda_invoked_at IS NULL RETURNING ...`. Kein `SELECT` → `UPDATE`. Nur der Caller
+   mit zurückgegebener Row darf AWS aufrufen; alle anderen lesen die Row erneut und
+   antworten `alreadyStarted:true, unresolved:true`. Kein DB-Row-Lock über den externen
+   AWS-Call hinweg.
 
 `lambda_invoked_at` ist damit der endgültige Start-Fence: einmal gesetzt, nie wieder ein
 zweiter AWS-Start — unabhängig von verstrichener Zeit oder Prozessneustart.
