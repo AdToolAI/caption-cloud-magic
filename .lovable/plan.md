@@ -1,63 +1,95 @@
-# FA-4/P0 — Reiner Doku-Nachtrag (kein Code)
+# FA-4/P0 Fix Contract — Idempotent Preclip Dispatch Resume
 
-Genehmigt ist ausschließlich: den FA-4/P0-Root-Cause-Befund in
-`docs/v433-motion-studio-final-acceptance.md` ergänzen. Danach **STOP**.
+Nur **Analyse + Contract Lock**. Kein Code, keine Migration, kein Deploy, kein Render.
+Ergebnis ist ein Vertragstext, der in `docs/v433-motion-studio-final-acceptance.md`
+(Abschnitt „FA-4/P0 — Fix Contract") abgelegt wird. Danach STOP.
 
-## Was passiert
+## Belegter Ist-Zustand (read-only geprüft)
 
-Eine einzige Datei wird angefasst: `docs/v433-motion-studio-final-acceptance.md`.
-Angehängt wird ein neuer Abschnitt „FA-4/P0 — Root Cause (Pre-Dispatch Failure)" mit
-exakt dem bereits abgenommenen Befund:
+`supabase/functions/_shared/pass-face-preclip.ts`:
 
-- **Failure-Owner**: `compose-dialog-segments`, Zweig
-  `v161PreclipEligible → preclipResult !ok → speakers.length >= 2` (Zeilen 5367–5409):
-  `logSyncDispatch(PREFLIGHT_BLOCKED)` → `failLipSync(...)` → HTTP 422 + Refund.
-- **Kein Stall, kein Watchdog**: Zeitleiste 00:23:06 plate_queued → 00:29:40 base_video
-  succeeded/audio_ready → 00:30:11 v278 facemap_recovery 4/4 → 00:30:35 pass-0-Preflight-Claim
-  → 00:30:38.171 `video_renders` angelegt → 00:30:38.287 „invoke 502: 502 Bad Gateway"
-  → 00:30:38.994 dialog_shots failed + refunded → 00:30:39.642 Szene failed.
-  Die Transition `ccw:handoff_failed` (00:30:40) wurde mit `unexpected_from_state`
-  abgelehnt (`applied=false`) und ist kein Owner.
-- **Kein `sync_segment`-Acquire**: Der Ledger-Acquire (`stage:"sync_segment"`, Zeile ~5980)
-  liegt strikt hinter dem Preclip-Block (Zeile 5308); der 422-Return bei 5402 verlässt die
-  Funktion davor. Ledger korrekt: genau 1 Job (`base_video`, succeeded).
-- **Guard-Matrix sauber**: Preclip gilt seit v69 für alle N; `speakers.length >= 2` ist das
-  Fail-closed-Kriterium „mehr als ein Gesicht auf der Plate ⇒ kein Full-Plate-Fallback",
-  kein Zweier-Cap. Slots 0..3 bijektiv, 6 kanonische Turns, 4 stabile `speaker_idx`.
-- **Klassifikation C** — allgemeiner Preflight-Resilienz-Bug. Nicht A (kein 4-Speaker-Limit),
-  nicht B (keine Zweier-Annahme), nicht D.
-- **Root Cause**: transienter HTTP 502 des `invoke-remotion-render`-Gateways beim ersten
-  Preclip-Dispatch; `pass-face-preclip.ts` behandelt `errorClass:"dispatch_failed"` ohne
-  jeden Wiederholversuch wie einen inhaltlichen Preclip-Fehler.
-- **Nebenbefund**: Meldungstext „wurde nicht rechtzeitig fertig" bei einem 116-ms-Dispatch-502.
-- **Status**: FA-4 P0 — ROOT CAUSE IDENTIFIED / AWAITING FIX CONTRACT. Kein Fix, kein Retry,
-  kein Reset; Szene bleibt im Fehlerzustand.
+- **Identität**: `const renderId = crypto.randomUUID()` wird **pro Aufruf neu** erzeugt und
+  als `video_renders.render_id` eingefügt (`source = "dialog-pass-preclip"`,
+  `status = "pending"`), **vor** dem Invoke. Die Identität ist also pro Dispatch stabil,
+  aber **nicht** über einen erneuten Funktionsaufruf hinweg — es gibt heute keinen
+  deterministischen Schlüssel aus (scene_id, pass_idx, crop-Geometrie, run_id).
+- **Vorhandener Wiederverwendungs-Pfad (v188 Reuse-Guard)**: vor dem Dispatch wird nach
+  einem `completed` Preclip derselben Szene/Pass **mit identischer `face_crop.size`**
+  aus den letzten 15 Minuten gesucht und dessen `video_url` wiederverwendet. Er greift
+  nur bei `status = 'completed'`, nicht bei laufenden Renders.
+- **Heutiger 502-Pfad**: `!invokeResp.ok` → `video_renders` sofort auf
+  `status='failed'` + `error_message = "invoke <status>: …"`, Rückgabe
+  `errorClass: "dispatch_failed"`. Damit wird der Wiederaufnahme-Zustand zerstört, obwohl
+  der Lambda-Start bereits erfolgt sein kann.
+- **Andere Klassen**: `insert_render:*` → `dispatch_failed`; Poll sieht `failed` →
+  `lambda_failed`; Deadline → `poll_timeout`.
 
-Der Abschnitt wird ausdrücklich ohne Implementierungsempfehlung geschrieben — der frühere
-Retry-Vorschlag wird als „offen, blockiert durch Idempotenz-Frage" vermerkt.
+`supabase/functions/invoke-remotion-render/index.ts`:
 
-## Danach: STOP
+- Nimmt `pendingRenderId` entgegen und hat einen **Idempotenz-Kurzschluss**: ist
+  `content_config.real_remotion_render_id` gesetzt **oder** `status='completed'`, antwortet
+  ein erneuter Invoke mit `alreadyStarted: true` ohne zweiten Lambda-Start.
+- Setzt **vor** dem AWS-Call `status='rendering'` + `content_config.lambda_invoked_at`,
+  ruft dann Lambda im RequestResponse-Modus und persistiert `real_remotion_render_id`
+  erst **nach** der Antwort. Genau hier liegt das kritische Fenster.
 
-Kein Code, keine Migration, kein Deploy, kein Render.
+`supabase/functions/compose-dialog-segments/index.ts`:
 
-## Vormerkung für den späteren FA-4/P0 Fix Contract (nicht Teil dieses Schritts)
+- Zweig `v161PreclipEligible → preclipResult !ok → speakers.length >= 2` (≈5367–5409):
+  `logSyncDispatch(PREFLIGHT_BLOCKED)` → `failLipSync(v187_…)` → HTTP 422 + Refund,
+  **vor** jedem `sync_segment`-Ledger-Acquire.
 
-Ein read-only Blick in `supabase/functions/invoke-remotion-render/index.ts` zeigt bereits
-eine Teilantwort auf die Doppelrender-Frage — das gehört in den Contract, nicht in diesen
-Doku-Schritt:
+## Der Vertrag (zu fixieren)
 
-- Die Funktion nimmt eine **stabile `pendingRenderId`** entgegen; `pass-face-preclip.ts`
-  legt die `video_renders`-Zeile **vor** dem Invoke an. Die Preclip-Identität existiert also
-  schon vor dem Dispatch.
-- Es gibt bereits einen Idempotenz-Kurzschluss: Ist
-  `content_config.real_remotion_render_id` gesetzt oder `status='completed'`, antwortet ein
-  erneuter Invoke derselben ID mit einem No-op (`alreadyStarted`) statt mit einem zweiten
-  Lambda-Start.
-- Verbleibende Lücken, die der Contract schließen muss: (a) das Zeitfenster zwischen
-  Lambda-Start und Persistieren von `real_remotion_render_id`, (b) dass der heutige
-  502-Pfad die `video_renders`-Zeile sofort auf `failed` setzt und damit den
-  Wiederaufnahme-Zustand zerstört, (c) die Klassifikation „dispatch uncertain" statt
-  „dispatch_failed" bei 5xx/Netzwerk.
+1. **Logische Preclip-Identität** = deterministischer Schlüssel
+   `(composer_scene_id, pass_idx, face_crop.size, active_run_id)`, materialisiert als
+   `video_renders.content_config.preclip_key`. `render_id` bleibt die technische
+   `pendingRenderId`; der Resume findet die Zeile über `preclip_key`, nicht über eine
+   neue UUID.
+2. **Fehlerklassifikation**: HTTP 5xx / Netzwerk-Abbruch / Timeout des Invoke ⇒
+   **`dispatch_uncertain`** (neu), nicht `dispatch_failed`. `dispatch_failed` bleibt
+   ausschließlich für beweisbar nicht gestartete Fälle: HTTP 4xx aus
+   `invoke-remotion-render` (`400 invalid_input`, `503 aws_credentials_missing`) und
+   `insert_render:*`.
+3. **Zustands-Erhalt bei `dispatch_uncertain`**: die `video_renders`-Zeile wird **nicht**
+   auf `failed` gesetzt, sondern behält `pending`/`rendering` und bekommt
+   `content_config.dispatch_uncertain_at`. Nur so bleibt der Resume möglich.
+4. **Resume-Regel**: bei `dispatch_uncertain` genau **ein** erneuter Invoke mit
+   **derselben** `pendingRenderId`. Der bestehende `alreadyStarted`-Kurzschluss
+   verhindert dabei den Doppel-Lambda, sobald `real_remotion_render_id` steht.
+5. **Kritisches Fenster (Lambda gestartet, `real_remotion_render_id` noch nicht
+   persistiert)**: wird durch eine Sperre in `invoke-remotion-render` geschlossen —
+   `lambda_invoked_at` gilt als Start-Beweis. Liegt es < `LAMBDA_START_GRACE` (Vorschlag
+   90 s) zurück und ist `real_remotion_render_id` leer, antwortet der Invoke mit
+   `alreadyStarted: true, unresolved: true` und startet **kein** zweites Lambda; der
+   Aufrufer geht direkt in den Poll. Erst nach Ablauf der Grace ohne Fortschritt darf
+   überhaupt neu gestartet werden.
+6. **Beweisbar erneut versuchbar** ist ein Invoke nur, wenn: `errorClass` =
+   `dispatch_uncertain` **und** `real_remotion_render_id` leer **und**
+   `lambda_invoked_at` fehlt oder älter als die Grace ist **und** die Zeile nicht
+   `completed` ist. Maximal **1** Resume pro logischer Preclip-Identität.
+7. **Nicht retrybar** bleiben: `lambda_failed` (echter Renderfehler), `invalid_input`,
+   `insert_render:*`, `poll_timeout`. Der v188-Reuse-Guard bleibt der einzige Pfad, über
+   den ein spät fertiggewordener Render nach Poll-Timeout wiederverwendet wird.
+8. **v187 bleibt fail-closed**: nach erschöpftem (oder nicht zulässigem) Resume greift
+   unverändert `v187_preclip_required_no_fullplate_fallback` → 422 + idempotenter Refund.
+   Kein Full-Plate-Fallback, keine Änderung an Gates oder Schwellenwerten.
+9. **Nutzermeldung**: Dispatch-/Infrastrukturfehler ≠ Timeout. `dispatch_uncertain` und
+   `dispatch_failed` erzeugen „Vorbereitung des Sprecher-Clips konnte nicht gestartet
+   werden (Infrastrukturfehler)"; nur `poll_timeout` behält „wurde nicht rechtzeitig
+   fertig". Reine Presenter-Ebene, in EN/DE/ES.
 
-Diese Punkte werden auf Anforderung als eigener FA-4/P0 Fix Contract ausgearbeitet — erst
-danach Code.
+## Offene Punkte, die der Lock beantworten muss
+
+- Grace-Wert für `LAMBDA_START_GRACE` (Vorschlag 90 s) — bestätigen oder setzen.
+- Ob `preclip_key` zusätzlich als Partial-Unique-Index abgesichert wird oder nur als
+  `content_config`-Feld geführt wird (Migration ja/nein).
+- Verhältnis zum Freeze: die Änderungen liegen in `pass-face-preclip.ts` und
+  `invoke-remotion-render` — `pass-face-preclip.ts` steht auf der Freeze-Liste. Der Fix
+  braucht daher ein ausdrückliches, eng umrissenes Unfreeze („dispatch resilience only,
+  keine Gates/Schwellen/Geometrie").
+
+## Danach
+
+STOP. Erst nach Abnahme dieses Contracts ein sehr kleiner Fix, dann ausschließlich
+Wiederholung von FA-4. FA-1 bis FA-3 bleiben PASS.
