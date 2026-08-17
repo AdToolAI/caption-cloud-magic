@@ -40,14 +40,26 @@ Jede Zeile bleibt ein natürlicher, vollständiger deutscher Satz — kurz genug
    Skript und die neue Prognose aktualisieren.
 6. STOP — kein kostenpflichtiger Render.
 
-## Verifikation
+## Verifikation (Pre-Run)
 
-- Turn-Anzahl bleibt exakt 6, Sprecheranzahl exakt 4, Cast-Zuordnung bijektiv.
-- Effektive Dialogdauer laut `resolveEffectiveDialog` deutlich unter der
-  15-s-Plate, damit weder `dialog_too_long_for_plate` noch automatisches
-  Duration-Clamping den 4-Speaker-Test verfälscht.
-- Erwartete Job-Kardinalität unverändert: 6 × sync_segment → 1 × audio_mux →
-  1 × Stitch.
+`resolveEffectiveDialog()` wird pre-run **nicht** als Dauernachweis herangezogen —
+solange `dialog_turns = []` ist, liefert die Funktion vertragsgemäß
+`reason='no_turns'` (wie bei FA-3). Stattdessen gilt:
+
+- `parseScriptLines()` → exakt 6 Zeilen / 4 Sprecher, Cast-Zuordnung bijektiv.
+- UI-TTS-Prognose → Ziel 8–10 s.
+- Vier persistierte, unterschiedliche Voices vorhanden.
+- 15-s-Plate deutlich über der prognostizierten Sprechzeit.
+
+Die reale kanonische Turn-Dauer wird erst nach `compose-twoshot-audio` im
+späteren Run geprüft.
+
+Der Preis wird nur abgelesen, nicht als Acceptance-Erwartung fixiert. Ein
+abweichender Betrag ist kein Finding, solange kein Routing- oder
+Konfigurationswechsel stattgefunden hat.
+
+Erwartete Job-Kardinalität im späteren Run unverändert: 6 × sync_segment →
+1 × audio_mux → 1 × Stitch.
 
 ## Ergebnis
 
