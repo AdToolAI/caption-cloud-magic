@@ -141,13 +141,14 @@ Zur Freigabe nach dem Lock, in dieser Reihenfolge:
   Kandidatensatz, bevor gematcht wird — unabhängig von ihrer Confidence.
 - **Trust-Gate darf Sanity nicht überspringen.** Confidence darf nur
   entscheiden, ob repariert wird — nicht, ob geprüft wird.
-- **Deterministisches Crop-Containment-Gate statt Probe-Zwang.** Vor
-  Provider-Dispatch muss deterministisch beweisbar sein, dass der Preclip-Crop
-  den für den gelockten Character ausgewählten Face-Kandidaten enthält und
-  keinen konkurrierenden Sprecher als Ziel übernehmen kann. Ein optionaler
-  Vision-Probe darf zusätzliche Evidenz liefern, aber `probe_unavailable` darf
-  nicht der einzige Schutz sein — sonst wird aus dem Identity-Bug ein
-  Availability-Bug.
+- **Deterministisches Crop-Containment-Gate statt Probe-Zwang.** Formal: die
+  Target-BBox des gelockten Characters muss vollständig im Preclip-Crop liegen,
+  und kein Zentrum eines anderen bereits zugewiesenen Speaker-Faces darf im
+  zulässigen Target-Bereich dieses Crops liegen. Ist das geometrisch nicht
+  erfüllbar, fail-closed vor Sync.so. Deterministisch, ohne externen
+  Vision-Service. Ein optionaler Vision-Probe darf zusätzliche Evidenz liefern,
+  aber `probe_unavailable` darf nicht der einzige Schutz sein — sonst wird aus
+  dem Identity-Bug ein Availability-Bug.
 - **Regressionsschutz.** Fixture aus genau diesem Detektionssatz (zehn
   Boxen, drei False-Positive-Labels) als Testfall.
 
