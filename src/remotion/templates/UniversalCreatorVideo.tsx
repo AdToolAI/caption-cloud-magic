@@ -2781,6 +2781,74 @@ const SubtitleLayer: React.FC<{
 
 };
 
+/**
+ * Single entry point for Universal Creator subtitles.
+ *
+ * Word-level karaoke (PrecisionSubtitleOverlay) is used ONLY for the
+ * animations that ask for it (`highlight`, `hormozi`, `wordByWord`) and it
+ * receives the customer's colours, font and box settings. Everything else
+ * renders through the style-faithful `SubtitleLayer`.
+ */
+const StyledSubtitles: React.FC<{
+  subtitles: Subtitle[];
+  subtitleStyle?: UniversalCreatorVideoProps['subtitleStyle'];
+  phonemeTimestamps?: { character: string; start_time: number; end_time: number }[];
+  frame: number;
+  fps: number;
+}> = ({ subtitles, subtitleStyle, phonemeTimestamps, frame, fps }) => {
+  if (!subtitles || subtitles.length === 0) return null;
+
+  const style = subtitleStyle ?? SUBTITLE_STYLE_FALLBACK;
+  const wantsWordLevel =
+    (style.animation === 'highlight' || style.animation === 'hormozi' || style.animation === 'wordByWord')
+    && Array.isArray(phonemeTimestamps)
+    && phonemeTimestamps.length > 0;
+
+  if (!wantsWordLevel) {
+    return <SubtitleLayer subtitles={subtitles} subtitleStyle={style} frame={frame} fps={fps} />;
+  }
+
+  const boxed = style.outlineStyle === 'box' || style.outlineStyle === 'box-stroke';
+
+  return (
+    <PrecisionSubtitleOverlay
+      subtitles={subtitles.map((s) => ({
+        text: s?.text || '',
+        startTime: s?.startTime || 0,
+        endTime: s?.endTime || 0,
+      }))}
+      phonemeTimestamps={phonemeTimestamps}
+      config={{
+        animationStyle: style.animation === 'wordByWord' ? 'typewriter' : 'karaoke',
+        fontFamily: `'${style.font || 'Inter'}', Inter, sans-serif`,
+        fontSize: style.fontSize,
+        textColor: style.fontColor,
+        highlightColor: style.highlightColor || '#F5C76A',
+        backgroundColor: boxed ? style.backgroundColor : 'transparent',
+        backgroundOpacity: boxed ? style.backgroundOpacity : 0,
+        position: style.position,
+      }}
+    />
+  );
+};
+
+const SUBTITLE_STYLE_FALLBACK = {
+  position: 'bottom' as const,
+  font: 'Inter',
+  fontSize: 48,
+  fontColor: '#FFFFFF',
+  backgroundColor: '#000000',
+  backgroundOpacity: 0.7,
+  animation: 'fade' as const,
+  animationSpeed: 1,
+  outlineStyle: 'stroke' as const,
+  outlineColor: '#000000',
+  outlineWidth: 2,
+  highlightColor: '#F5C76A',
+};
+
+
+
 
 // Progress Bar Component
 const ProgressBar: React.FC<{
