@@ -21,8 +21,9 @@
  *                          `clip_error LIKE 'watchdog_%'` guard).
  *     - processing/starting → only kill if age > 30 min; otherwise just log.
  *
- * Refunds use the same `refund_ai_video_credits` RPC + CLIP_COSTS table as
- * `compose-clip-webhook` so credits stay in lockstep.
+ * Refunds (FA-4/P1-A) go exclusively through `composer_refund_charge`: only a
+ * DB-proven, run-scoped `deduction` is refunded, at most once per charge.
+ * No proof → 0 €; the scene is terminalized either way.
  */
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { refundRunCharge } from "./refund-provenance.ts";
@@ -314,7 +315,7 @@ async function processScene(
       await markFailed(
         sb,
         sceneId,
-        `watchdog_hard_kill_after_${ageMin}min (status=${status}, refunded €${(refunded ?? 0).toFixed(2)})`,
+        `watchdog_hard_kill_after_${ageMin}min (status=${status}, ${refunded === null ? "no refund: no proven charge" : `refunded €${refunded.toFixed(2)}`})`,
         isCinematicSync,
       );
     }
