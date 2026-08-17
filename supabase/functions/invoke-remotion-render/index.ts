@@ -4,6 +4,8 @@ import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { normalizeStartPayload, payloadDiagnostics, type NormalizedStartPayload } from "../_shared/remotion-payload.ts";
 import { getLambdaFunctionName, AWS_REGION } from "../_shared/aws-lambda.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+// FA-4/P0 — exactly-once dispatch claim decisions (pure, unit-tested).
+import { decideInvokeAction } from "../_shared/preclip-dispatch-resume.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
