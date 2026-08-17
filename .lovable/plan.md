@@ -22,6 +22,8 @@ WHERE type = 'refund'
 - gleiche Charge + anderer Grund → ebenfalls `already_refunded`
 - zwei verschiedene Charges → getrennt refundierbar
 
+Dies ist der **einzige** neue Index. Ein zusätzlicher Composite-Index auf `(refund_charge_id, refund_reason)` wird nicht angelegt — er wäre durch den strengeren Charge-Index redundant.
+
 Legacy-Historie (inkl. der 6,30-€-Evidence mit `metadata IS NULL`) liegt bewusst außerhalb der Idempotenzdomäne. Kein Backfill, keine Korrektur.
 
 ### b) Neue RPC `public.composer_refund_charge(p_charge_id uuid, p_run_id uuid, p_refund_reason text)`
@@ -38,8 +40,8 @@ Atomarer Ablauf:
    Trifft nichts zu (heutiger Legacy-Pfad mit `generation_id = project_id`): `no_charge`, Wallet unverändert.
 3. Aggregat-Schutz: Ist die Charge nicht eindeutig diesem Run zuzuordnen (z. B. Project-Aggregat), `no_charge`. Ein Project-Aggregat wird niemals synthetisch aufgeteilt.
 4. Refund-Existenzprüfung innerhalb derselben Transaktion **allein auf `refund_charge_id`** (Grund ist nicht Teil der Identität): vorhanden → `already_refunded`, 0 €.
-5. Sonst atomar: Wallet-Gutschrift + Insert einer `type='refund'`-Transaction. **User/Wallet stammen ausschließlich aus der gelockten Charge** (`charge.user_id` → dessen Wallet), nie aus Caller-Parametern. Betrag `abs(charge.amount_euros)`, Metadata `{ refund_charge_id, run_id, refund_reason }` → `refunded`.
-6. Unique-Violation auf `ai_video_transactions_refund_charge_uniq` wird abgefangen und als `already_refunded` (0 €) zurückgegeben — nie als Fehler nach außen.
+5. Sonst in **einer** DB-Transaktion (die RPC ist der gesamte Transaktionsrahmen, keine Edge-seitige Zweischritt-Operation): Wallet-Gutschrift **und** Insert der `type='refund'`-Transaction. Schlägt der Insert fehl, wird die Wallet-Erhöhung mit zurückgerollt. **User/Wallet stammen ausschließlich aus der gelockten Charge** (`charge.user_id` → dessen Wallet), nie aus Caller-Parametern. Betrag `abs(charge.amount_euros)`, Metadata `{ refund_charge_id, run_id, refund_reason }` → `refunded`.
+6. Race-Schutz ist primär der Charge-Lock: Caller 2 wartet auf `FOR UPDATE` und sieht danach in Schritt 4 den Refund von Caller 1. Der Unique-Index ist nur die letzte harte DB-Sicherung. Falls er dennoch greift, wird **ausschließlich** die Verletzung des Constraints `ai_video_transactions_refund_charge_uniq` behandelt (Constraint-Name explizit geprüft, z. B. via `GET STACKED DIAGNOSTICS`): bestehende Refund-Row erneut lesen, `already_refunded` mit 0 € zurückgeben. Kein generisches `WHEN unique_violation`, jeder andere Constraint-Fehler propagiert unverändert.
 
 Rückgabe (jsonb): `{ outcome, amount_euros, refund_transaction_id }` mit `outcome ∈ {no_charge, already_refunded, refunded}`.
 Betrag ausschließlich aus der validierten Charge — kein `CLIP_COSTS`, kein Caller-Betrag.
