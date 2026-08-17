@@ -554,15 +554,16 @@ UI bestätigt: „Cast voll (max. 4)", vier verschiedene Stimmen, keine Doppelbe
 ### Dialog (6 kanonische Turns, DE)
 
 ```text
-1 Sarah Dusatko:   Guten Morgen, kurz die Zahlen von gestern.
-2 Samuel Dusatko:  Die Kampagne läuft stabil über Plan.
-3 Matthew Dusatko: Die neuen Creatives performen deutlich besser.
-4 Kay Mark:        Dann ziehen wir das Budget nach.
-5 Sarah Dusatko:   Gut, wir halten den Kurs.
-6 Samuel Dusatko:  Ich schicke euch die Übersicht.
+1 Sarah Dusatko:   Kurz die Zahlen von gestern.
+2 Samuel Dusatko:  Kampagne läuft über Plan.
+3 Matthew Dusatko: Neue Creatives performen besser.
+4 Kay Mark:        Dann Budget nachziehen.
+5 Sarah Dusatko:   Gut, Kurs halten.
+6 Samuel Dusatko:  Übersicht kommt gleich.
 ```
 
-UI-Anzeige: „6 Blöcke · 4 Sprecher · ~12s" — effektiver Dialog unter der Plate-Dauer (15s).
+UI-Anzeige nach der Kürzung (v2): „6 Blöcke · 4 Sprecher · **~9s**" — deutlicher
+Abstand zur 15-s-Plate (v1 lag bei ~12s und damit unnötig nah am Budget-Limit).
 
 ### Routing-Nachweis (UI)
 
@@ -602,3 +603,41 @@ cast_count = 4 · script_lines = 6
 3. Genau 1 audio_mux.
 4. Genau 1 Stitch mit atomarer `processed_video_url`-Materialisierung (FA-3/P1).
 5. Visuelle Sichtung: korrekter Mund/Stimme je Turn, kein Cross-Talk.
+
+### FA-4 SETUP v2 — Dialog-Kürzung (2026-08-17)
+
+Die sechs Zeilen wurden über das Skript-Studio (Szene S08) gekürzt. Struktur
+unverändert: 6 Turns, 4 Sprecher, Sarah und Samuel je zweimal, Plate 15s.
+
+Pre-Run-Verifikation (bewusst **ohne** `resolveEffectiveDialog()` als
+Dauernachweis — bei `dialog_turns = []` liefert die Funktion vertragsgemäß
+`reason='no_turns'`, wie bei FA-3):
+
+| Kriterium                              | Ergebnis |
+|----------------------------------------|----------|
+| Skriptzeilen / Sprecher                | 6 Zeilen / 4 Sprecher (UI: „Skript schreiben · 6 Zeilen", „6 Blöcke · 4 Sprecher") |
+| UI-TTS-Prognose                        | **~9s** (Ziel 8–10s) |
+| Persistierte Voices                    | 4 unterschiedliche, in `dialog_voices` gebunden (Sarah / George / Liam / Brian) |
+| Plate-Dauer vs. Sprechzeit             | 15s Plate ≫ ~9s Dialog |
+| Cast-Zuordnung                         | bijektiv, „Cast voll (max. 4)" |
+
+Persistierter DB-Stand (`composer_scenes`, Szene `42bcdda1-…`):
+
+```text
+dialog_script       = 6 gekürzte Zeilen (identisch zur UI)
+dialog_voices       = 4 Einträge, je eigene elevenlabsVoiceId
+dialog_turns        = []            (kanonische Prägung erst im Lauf)
+duration_seconds    = 15.0
+pipeline_state      = idle
+active_run_id       = NULL
+clip_url / processed_video_url / base_video_url = NULL
+composer_pipeline_jobs (scene)                  = 0
+```
+
+Kostenvoranschlag S08 (nur abgelesen, keine Acceptance-Erwartung): **€6.30** —
+unverändert gegenüber v1, kein Routing- oder Konfigurationswechsel.
+
+Die reale kanonische Turn-Dauer wird erst nach `compose-twoshot-audio` im Lauf
+geprüft.
+
+**FA-4 SETUP v2 READY → STOP.** Kein Render gestartet.
