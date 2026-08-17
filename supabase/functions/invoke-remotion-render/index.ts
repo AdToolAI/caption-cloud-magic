@@ -67,35 +67,34 @@ serve(async (req) => {
       .eq('render_id', pendingRenderId)
       .maybeSingle();
 
-    if (existingRender?.content_config && (existingRender.content_config as any).real_remotion_render_id) {
-      const existingRealId = (existingRender.content_config as any).real_remotion_render_id;
-      console.log(`⏭️ Already started: real_remotion_render_id=${existingRealId}, returning no-op`);
+    const existingCfg = (existingRender?.content_config as any) || {};
+    // ✅ FA-4/P0 — EXACTLY-ONCE START FENCE
+    // `content_config.lambda_invoked_at` is the dispatch claim. Once set for this
+    // pendingRenderId, NO caller may ever start AWS again — regardless of elapsed
+    // time or process restarts. A lost response is answered with
+    // alreadyStarted + unresolved so the caller polls instead of re-dispatching.
+    const invokeAction = decideInvokeAction({
+      lambdaInvokedAt: existingCfg.lambda_invoked_at ?? null,
+      realRemotionRenderId: existingCfg.real_remotion_render_id ?? null,
+      status: existingRender?.status ?? null,
+    });
+
+    if (invokeAction === 'already_started') {
+      const existingRealId = existingCfg.real_remotion_render_id ?? null;
+      console.log(`⏭️ Already started: real_remotion_render_id=${existingRealId ?? 'completed'}, returning no-op`);
       return new Response(
         JSON.stringify({
           success: true,
           renderId: pendingRenderId,
-          lambdaRenderId: existingRealId,
-          bucketName: (existingRender.content_config as any).bucket_name || 'remotionlambda-eucentral1-13gm4o6s90',
+          lambdaRenderId: existingRealId || pendingRenderId,
+          bucketName: existingCfg.bucket_name || 'remotionlambda-eucentral1-13gm4o6s90',
           alreadyStarted: true,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (existingRender?.status === 'completed') {
-      console.log(`⏭️ Render already completed, returning no-op`);
-      return new Response(
-        JSON.stringify({ success: true, renderId: pendingRenderId, alreadyStarted: true }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ✅ FA-4/P0 — EXACTLY-ONCE START FENCE
-    // `content_config.lambda_invoked_at` is the dispatch claim. Once set for this
-    // pendingRenderId, NO caller may ever start AWS again — regardless of elapsed
-    // time or process restarts. A lost response is answered with
-    // alreadyStarted + unresolved so the caller polls instead of re-dispatching.
-    if ((existingRender?.content_config as any)?.lambda_invoked_at) {
+    if (invokeAction === 'already_started_unresolved') {
       console.log(`⏭️ Dispatch claim already held (lambda_invoked_at) — no AWS call, unresolved`);
       return new Response(
         JSON.stringify({
@@ -107,6 +106,7 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
 
 
     // ✅ PAYLOAD MODE: strict-minimal bypasses normalizeStartPayload entirely
