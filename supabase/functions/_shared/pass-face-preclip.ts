@@ -38,6 +38,13 @@ import { DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
 import { computeMouthCenteredCrop } from "./compute-mouth-centered-crop.ts";
 // v400 Freeze: alle Tuning-Werte kommen aus dem eingefrorenen Vertrag.
 import { PRECLIP } from "./lipsync-frozen-contract.ts";
+// FA-4/P0 — exactly-once dispatch resume decisions (pure, unit-tested).
+import {
+  classifyDispatchOutcome,
+  type DispatchOutcome,
+  hasDispatchClaim,
+  terminalClassOnNoProgress,
+} from "./preclip-dispatch-resume.ts";
 
 export interface PassPreclipInput {
   sceneId: string;
