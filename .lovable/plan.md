@@ -9,6 +9,8 @@ Heute entsteht die Bindung bereits am kanonischen Iterationsschritt (`passSpeake
 - Der Guard gilt ausschließlich für **turn-backed** Passes (siehe Abschnitt 2). Für diese muss vor dem ersten turn-backed Ledger-Acquire gelten: Anzahl turn-backed Passes = Anzahl `dialog_turns`; jede `dialog_turn.id` genau einmal; keine fremde ID; keine doppelte ID; keine NULL-ID.
 - Verletzung → fail-closed mit eigenem Grund (`fa4_p0_turn_pass_mismatch`), bevor irgendein Provider-Dispatch oder Acquire passiert.
 - Kein Fallback über `speaker_idx`, `character_id`, Name oder Text — auch nicht als Notlösung. Wiederholte Sprecher (Sarah Turn 1 / Turn 5) ergeben zwei getrennte Jobs mit unterschiedlicher `segment_id` und identischer Geometrie.
+- Platzierung verbindlich: der Guard läuft **nach** vollständigem Pass-Aufbau inklusive Stabilizer-Injektion und **vor** dem allerersten turn-backed Ledger-Acquire — so validiert er beide Mengen vollständig, ohne dass bereits Jobs existieren.
+- Klassifikation verbindlich: es wird exakt die bestehende Produktionssemantik (`stabilizer_pass` / `is_silent_stabilizer`) als kanonisches Predicate wiederverwendet; kein neuer heuristischer Klassifikator.
 
 ## 2. v194-Stabilizer — geklärt (read-only belegt)
 
