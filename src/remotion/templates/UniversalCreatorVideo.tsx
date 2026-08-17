@@ -2752,8 +2752,9 @@ const SubtitleLayer: React.FC<{
     <AbsoluteFill
       style={{
         display: 'flex',
-        justifyContent: 'center',
-        ...getPositionStyles(),
+        flexDirection: 'column',
+        alignItems: 'center',
+        ...placement,
         opacity: subtitleStyle.animation === 'none' ? extraOpacity : baseOpacity,
         zIndex: 200,
       }}
@@ -2765,7 +2766,8 @@ const SubtitleLayer: React.FC<{
           fontFamily: `'${subtitleStyle.font || 'Inter'}', Inter, sans-serif`,
           fontWeight: 700,
           textAlign: 'center',
-          maxWidth: '84%',
+          maxWidth: UCC_SUBTITLE_MAX_WIDTH,
+
           lineHeight: 1.3,
           whiteSpace: 'pre-wrap',
           ...getOutlineStyle(),
