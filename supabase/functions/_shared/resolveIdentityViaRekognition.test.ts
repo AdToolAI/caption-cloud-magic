@@ -138,7 +138,7 @@ Deno.test("T1: N=4 — final anchor loaded and encoded exactly once, shared acro
     { 3: 95 },
   ];
 
-  await runWithMockFetch({ faces, similarities }, async () => {
+  const { calls } = await runWithMockFetch({ faces, similarities }, async () => {
     await resolveIdentityViaRekognition({
       anchorUrl,
       anchorWidth: 1024,
@@ -151,7 +151,6 @@ Deno.test("T1: N=4 — final anchor loaded and encoded exactly once, shared acro
     });
   });
 
-  const calls = getLastCalls();
   const anchorLoads = calls.filter((c) => c.method === "GET" && c.url === anchorUrl);
   const portraitLoads = portraitUrls.map((url) =>
     calls.filter((c) => c.method === "GET" && c.url === url).length
