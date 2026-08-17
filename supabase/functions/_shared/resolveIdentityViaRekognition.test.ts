@@ -47,7 +47,7 @@ interface MockCall {
 interface MockOptions {
   faces?: Array<{ slot: number; left: number; top: number; width: number; height: number }>;
   /** Per-character similarity map: charIdx -> slot -> similarity. */
-  similarities?: Array<Record<number, number>>;
+  similarities?: Array<Record<string, number>>;
   /** Indices of characters whose CompareFaces call should fail. */
   compareFailures?: Set<number>;
 }
