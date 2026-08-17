@@ -1584,6 +1584,24 @@ Durchgeführt read-only am finalen Clip der Szene `e658509d-cdeb-40f7-bd33-98e74
 15,08 s, 1284×718). Kein Render, kein Retry, kein Reset, keine DB-Writes.
 Evidenz unter `/tmp/browser/fa4-visual-review/`.
 
+**Methodik & technische Einschränkung (Browser/Audio):** Der beauftragte
+Browser-Weg wurde ausgeführt: Playwright/Chromium (headless) hat den finalen
+`processed_video_url` sowie eine lokale Kopie über `http://localhost:8899/final.mp4`
+in ein `<video>`-Element geladen. Das gebündelte Chromium der Sandbox enthält
+keine proprietären Codecs — `canPlayType('video/mp4; codecs="avc1.42E01E, mp4a.40.2"')`
+liefert einen leeren String, `readyState` bleibt 0, `networkState` = 3
+(`NETWORK_NO_SOURCE`). Der Clip ist im Browser daher **weder abspielbar noch
+über Screenshots aus dem Player erfassbar, und es ist im Sandbox-Kontext
+grundsätzlich keine hörbare Audiowiedergabe möglich**. Skripte:
+`/tmp/browser/fa4-visual-review/pw/review_clip.py`, `pw/probe_codec.py`.
+Ersatzweise wurden die Frames deterministisch per ffmpeg an den beauftragten
+Zeitpunkten (0,5 / 2 / 4 / 6 / 8,5 / 10,5 / 13 s) plus Filmstreifen je Slot
+extrahiert und die Tonspur signalanalytisch (RMS, Grundfrequenz je
+Sprecherfenster) statt hörend ausgewertet. Die auditive Prüfung ist damit
+**nur messtechnisch, nicht abhörend** erfolgt; dieser Punkt bleibt formal offen
+und rechtfertigt für sich allein kein PASS.
+
+
 **Slot-Layout (aus Szene-Konfiguration/Face-Boxen, nicht aus Bildinhalt abgeleitet):**
 Slot 1 = Sarah (links), Slot 2 = Samuel (Mitte-links), Slot 3 = Matthew
 (Mitte-rechts), Slot 4 = Kay (rechts).
@@ -1606,13 +1624,30 @@ dieselbe Figur im selben Slot, Samuel in T2 und T6 ebenfalls. Keine
 Doppelgesichter, keine Slot-Sprünge, keine Maskenränder, kein Flackern,
 keine Reprojektions-Morphs an den Segmentgrenzen erkennbar.
 
-**Voice-Map:** vier auditiv unterscheidbare Stimmen, konsistent pro Charakter
-über beide Auftritte (Sarah T1/T5, Samuel T2/T6). Keine Stimmvertauschung
-hörbar.
+**Voice-Map (messtechnisch, nicht abgehört):** In jedem der sechs Fenster liegt
+Sprachsignal an; die Grundfrequenz-Mediane bilden vier klar getrennte Cluster
+und sind pro Charakter über beide Auftritte konsistent:
+
+| Fenster | RMS | f0-Median | Stimmhafte Frames |
+|---|---|---|---|
+| T1 Sarah 0,000–1,625 | 0,0457 | 160 Hz | 16 |
+| T2 Samuel 1,875–3,408 | 0,0460 | 137 Hz | 21 |
+| T3 Matthew 3,658–5,190 | 0,0505 | 186 Hz | 17 |
+| T4 Kay 5,440–8,180 | 0,0454 | 95 Hz | 34 |
+| T5 Sarah 8,430–9,777 | 0,0589 | 180 Hz | 20 |
+| T6 Samuel 10,027–11,653 | 0,0414 | 142 Hz | 17 |
+| Tail 11,653–15,080 | 0,0000 | n/a | 0 |
+
+Sarah (160/180 Hz) und Samuel (137/142 Hz) sind über beide Auftritte
+konsistent; Matthew (186 Hz) und Kay (95 Hz) sind davon und voneinander
+getrennt. Es gibt keinen Messhinweis auf eine Stimmvertauschung. Eine
+abhörende Verifikation der Stimmidentität war technisch nicht möglich
+(siehe Einschränkung oben).
 
 **Endstille:** Dialog endet bei 11,653 s, Container läuft bis 15,083 s →
-3,43–3,75 s Standbild/Stille am Ende. Optisch ruhig, aber als Abschluss
-spürbar lang.
+3,43 s Standbild bei exakt RMS 0,0000 (vollständig stumm). Optisch ruhig, aber
+als Abschluss spürbar lang.
+
 
 **Bewertung:** Die visuelle Prüfung ist **nicht bestanden**. Muster: T1 ohne
 Animation, T3 ohne Animation, T4 auf dem falschen Gesicht (Slot 3 statt Slot 4).
@@ -1633,8 +1668,10 @@ Technische Pipeline-Kriterien bestanden: Plate, Preclip, 6/6 turn-backed
 Sync-Segmente, Audio-Mux, finaler Output und Ledger-Kardinalität korrekt.
 
 Visuelle Abnahme nicht bestanden: T4 animiert den falschen Mund (Slot 3 statt
-Slot 4), T1 und T3 zeigen keine Mundbewegung. FA-4 bleibt damit **nicht** auf
-PASS.
+Slot 4), T1 und T3 zeigen keine Mundbewegung. Zusätzlich formal offen: die
+abhörende Audioprüfung ist in der Sandbox technisch nicht möglich (Chromium
+ohne H.264/AAC), es liegt nur eine signalanalytische Auswertung vor. FA-4
+bleibt damit **nicht** auf PASS.
 
 Kein weiterer Render, kein Retry, kein Reset.
 
