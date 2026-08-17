@@ -6032,18 +6032,41 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       (body as any).pipeline_job_id.trim().length > 0
       ? String((body as any).pipeline_job_id).trim()
       : null;
+    // FA-4/P0 — Segmentidentität ist Pflicht. Ohne sie deduplizieren alle
+    // Turns eines Runs auf EINE Ledger-Zeile (`syncso_fanout_1_of_N`).
+    // Fail-closed VOR dem Provider-Call.
+    const v431SegmentId = typeof (pass as any)?.segment_id === "string" &&
+      String((pass as any).segment_id).trim().length > 0
+      ? String((pass as any).segment_id).trim()
+      : null;
+    if (!v431SegmentId) {
+      console.error("[compose-dialog-segments] FA4_P0_PREFLIGHT_BLOCKED missing_segment_id", JSON.stringify({
+        scene_id: sceneId,
+        pass_idx: currentPassIdx,
+        speaker_idx: (pass as any)?.speaker_idx ?? null,
+      }));
+      return await failBeforeProviderDispatch(
+        "sync_segment_missing_segment_id",
+        "fa4_p0_preflight_blocked",
+        "Sync-Segment ohne kanonische segment_id (dialog_turns.id) — Dispatch blockiert.",
+        422,
+        { pass_idx: currentPassIdx },
+      );
+    }
     const v431LedgerParams = {
       sceneId,
       runId: (passRunStamp.run_id as string | null) ?? null,
       stage: "sync_segment" as const,
       plateGeneration: Number(passRunStamp.plate_generation ?? 0),
       provider: "sync.so",
+      segmentId: v431SegmentId,
       metadata: {
         dispatcher: "compose-dialog-segments",
         pass_idx: currentPassIdx,
         total_passes: passes.length,
         diagnostic_id: diagnosticId,
         retry_variant: retryVariant,
+        segment_id: v431SegmentId,
       },
     };
     const v431SyncDecision = v431PreAcquiredJobId
@@ -6052,8 +6075,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           stage: "sync_segment",
           runId: v431LedgerParams.runId,
           plateGeneration: v431LedgerParams.plateGeneration,
+          segmentId: v431SegmentId,
         })
       : await resolveLedgerDispatch(supabase, v431LedgerParams, readRetryContext(body));
+
 
     // G3.1b — Race-Verlierer dispatcht nicht. Die fremde Zeile wird NICHT
     // gesettelt (sie gehört dem Gewinner) und nicht abgelöst.
