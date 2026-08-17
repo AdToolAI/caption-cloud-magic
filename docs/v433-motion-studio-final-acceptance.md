@@ -1354,7 +1354,7 @@ Render-GO.
 
 ---
 
-## FA-4 FINAL RETEST RENDER (S11) — Ergebnis: **TECHNICAL PASS / VISUAL REVIEW PENDING**
+## FA-4 FINAL RETEST RENDER (S11) — Ergebnis: **TECHNICAL PASS / VISUAL REVIEW: ISSUES**
 
 Genau ein kostenpflichtiger Render, keine Eingriffe (kein Retry, kein Reset,
 kein zweiter Confirm, kein manueller Cleanup). Die technischen
@@ -1576,23 +1576,65 @@ Renders `c5a53235`, also des letzten Jobs dieses Runs.
 | b | **`face_probe_unavailable` ×6** (`FACE_GATE_PROBE_UNAVAILABLE`, `v251_anchor_missing_probe_unavailable:no_cache_no_server_extract; source=none`), je einmal pro Pass 0–5, jeweils `non_blocking: true`, Dispatch danach HTTP 201 | Non-blocking Warning. Wird nicht hochgestuft, solange die Face-/Identity-Zuordnung im finalen Clip korrekt ist. |
 | c | **Keine `composer_scene_runs`-Zeile** für diesen Run (Tabelle projektweit leer, 0 Zeilen) | Beobachtung, kein FA-4-Blocker. Der aktuelle produktive Run-/Ledger-Vertrag setzt diese Tabelle nicht als Source of Truth voraus; Run-Wahrheit liegt in `composer_pipeline_jobs` + `composer_scenes.dialog_shots`. |
 
-### Visuelle Prüfung — offen
+### Visuelles Review — Ergebnis: **VISUAL REVIEW: ISSUES**
 
-Die abschließende visuelle/auditive Abnahme des finalen Clips steht noch aus
-und wird nach Durchführung hier ergänzt. Prüfumfang: Stimme ↔ Character-
-Zuordnung, richtiger sprechender Mund, stabile Face-/Slot-Zuordnung über alle
-sechs Turns (insbesondere Sarah Turn 1/5 und Samuel Turn 2/6), sichtbare
-Artefakte sowie die Wirkung der 3,751 s Endstille.
+Durchgeführt read-only am finalen Clip der Szene `e658509d-cdeb-40f7-bd33-98e74144fdc5`
+(Run `b9acfae3-8121-45ba-950a-9a1ad5373f5a`), Quelle: `processed_video_url`
+(`.../renders/nn4aqyifqp/dialog-stitch-muxed-e658509d-…-1786999742405.mp4`,
+15,08 s, 1284×718). Kein Render, kein Retry, kein Reset, keine DB-Writes.
+Evidenz unter `/tmp/browser/fa4-visual-review/`.
+
+**Slot-Layout (aus Szene-Konfiguration/Face-Boxen, nicht aus Bildinhalt abgeleitet):**
+Slot 1 = Sarah (links), Slot 2 = Samuel (Mitte-links), Slot 3 = Matthew
+(Mitte-rechts), Slot 4 = Kay (rechts).
+
+**Audio-Fenster laut `audio_plan`:** T1 Sarah 0,000–1,625 s · T2 Samuel
+1,875–3,408 s · T3 Matthew 3,658–5,190 s · T4 Kay 5,440–8,180 s · T5 Sarah
+8,430–9,777 s · T6 Samuel 10,027–11,653 s.
+
+| Turn | Erwarteter Mund | Beobachtung | Bewertung |
+|---|---|---|---|
+| T1 Sarah | Slot 1 | Keine erkennbare Lippenbewegung in Slot 1; auch kein anderer Slot animiert (`t1_slot3.png`, `t1_slot4.png`, `frame_0.5.png`) | **ISSUE** (Turn ohne sichtbare Animation) |
+| T2 Samuel | Slot 2 | Slot 2 spricht deutlich, Mundöffnung über das Fenster variierend (`t2_slot2.png`, `frame_2.png`) | PASS |
+| T3 Matthew | Slot 3 | Slot 3 im Fenster 3,658–5,190 s statisch, Mund geschlossen (`slot3_full.png`, obere Reihe; `frame_4.png`) | **ISSUE** |
+| T4 Kay | Slot 4 | Slot 4 über den **gesamten Clip** ohne jede Mundbewegung (`slot4_full.png`). Stattdessen bewegt sich im Fenster 5,44–8,18 s der Mund von **Slot 3 (Matthew)** (`slot3_full.png`, untere Reihe; `strip_slot3_kayturn.png`, `frame_6.png`, `frame_8.5.png`) | **P0 — falscher Mund** |
+| T5 Sarah | Slot 1 | Slot 1 spricht deutlich (`frame_8.5.png`, `strip_t5.png`) | PASS |
+| T6 Samuel | Slot 2 | Slot 2 mit erkennbarer, wenn auch schwächerer Mundbewegung (`frame_10.5.png`, `t6_slot4.png` zeigt Slot 4 weiterhin unbewegt) | PASS (schwach) |
+
+**Slot-/Identitätsstabilität:** über alle 15 s stabil. Sarah bleibt in T1 und T5
+dieselbe Figur im selben Slot, Samuel in T2 und T6 ebenfalls. Keine
+Doppelgesichter, keine Slot-Sprünge, keine Maskenränder, kein Flackern,
+keine Reprojektions-Morphs an den Segmentgrenzen erkennbar.
+
+**Voice-Map:** vier auditiv unterscheidbare Stimmen, konsistent pro Charakter
+über beide Auftritte (Sarah T1/T5, Samuel T2/T6). Keine Stimmvertauschung
+hörbar.
+
+**Endstille:** Dialog endet bei 11,653 s, Container läuft bis 15,083 s →
+3,43–3,75 s Standbild/Stille am Ende. Optisch ruhig, aber als Abschluss
+spürbar lang.
+
+**Bewertung:** Die visuelle Prüfung ist **nicht bestanden**. Muster: T1 ohne
+Animation, T3 ohne Animation, T4 auf dem falschen Gesicht (Slot 3 statt Slot 4).
+Slot 4 wird im gesamten Clip nie animiert. Damit liegt eine Fehl-/Nicht-Zuordnung
+zwischen Sync-Segment und Face-Slot vor, obwohl die Ledger-Kardinalität
+(6/6 turn-backed Segmente) technisch korrekt war. Die sechs
+`face_probe_unavailable`-Warnings aus dem forensischen Audit werden damit
+rückwirkend als relevanter Kontext markiert (Bedingung aus Zeile b nicht
+erfüllt).
+
+Neutral dokumentiert, kein Fix, kein Retry, kein Render.
 
 ---
 
-**FA-4 FINAL RETEST — TECHNICAL PASS / VISUAL REVIEW PENDING**
+**FA-4 FINAL RETEST — TECHNICAL PASS / VISUAL REVIEW: ISSUES**
 
 Technische Pipeline-Kriterien bestanden: Plate, Preclip, 6/6 turn-backed
 Sync-Segmente, Audio-Mux, finaler Output und Ledger-Kardinalität korrekt.
 
-Noch offen: finale visuelle/auditive Prüfung auf richtige Stimme ↔
-Character-Zuordnung, richtigen Mund, stabile Face-/Slot-Zuordnung und sichtbare
-Artefakte.
+Visuelle Abnahme nicht bestanden: T4 animiert den falschen Mund (Slot 3 statt
+Slot 4), T1 und T3 zeigen keine Mundbewegung. FA-4 bleibt damit **nicht** auf
+PASS.
 
 Kein weiterer Render, kein Retry, kein Reset.
+
