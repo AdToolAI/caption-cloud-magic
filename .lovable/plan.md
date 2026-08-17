@@ -4,9 +4,6 @@ Nur **Analyse + Contract Lock**. Kein Code, keine Migration, kein Deploy, kein R
 Der Vertrag wird als Abschnitt „FA-4/P0 — Fix Contract" in
 `docs/v433-motion-studio-final-acceptance.md` abgelegt. Danach STOP.
 
-Der frühere Entwurf (LAMBDA_START_GRACE als Neustart-Erlaubnis, `preclip_key` +
-Unique-Index, Klassifikation nach HTTP-Familie) ist **zurückgezogen**. Er verletzte
-Exactly-Once.
 
 ## Belegter Ist-Zustand (read-only geprüft)
 
@@ -35,11 +32,8 @@ Exactly-Once.
 ### A — Eine Preclip-Row, eine `pendingRenderId`
 `renderPassFacePreclip` erzeugt genau **eine** `video_renders`-Row und behält deren
 `renderId`. Jeder Resume-/Probe-Aufruf nutzt exakt dieselbe `pendingRenderId`. Ein 502
-erzeugt **nie** eine zweite Preclip-Row und **nie** eine neue UUID. Kein `preclip_key`,
-kein Unique-Index, keine Migration in diesem P0. (Ein persistenter logischer Key über
-mehrere `compose-dialog-segments`-Invocations hinweg ist ein späteres Thema und müsste
-dann volle Crop-Geometrie, Plate/Anchor, Run/Generation und Turn-Identität umfassen —
-`face_crop.size` allein wäre zu schwach.)
+erzeugt **nie** eine zweite Preclip-Row und **nie** eine neue UUID. Keine zusätzliche
+Identität, kein zusätzlicher Index, keine Migration in diesem P0.
 
 ### B — Atomic Dispatch Claim in `invoke-remotion-render`
 Für dieselbe `pendingRenderId` gilt, in dieser Reihenfolge:
@@ -52,7 +46,7 @@ Für dieselbe `pendingRenderId` gilt, in dieser Reihenfolge:
    AWS aufrufen. Zwei parallele Invokes dürfen nicht beide NULL sehen.
 
 `lambda_invoked_at` ist damit der endgültige Start-Fence: einmal gesetzt, nie wieder ein
-zweiter AWS-Start — auch nicht nach 90 s, 300 s oder einem Prozessneustart.
+zweiter AWS-Start — unabhängig von verstrichener Zeit oder Prozessneustart.
 
 ### C — Verhalten nach 5xx/Netzwerkfehler beim Preclip-Invoke
 Die Row wird **nicht** auf `failed` gesetzt. Stattdessen:
@@ -99,12 +93,16 @@ Sync-Ledger, RS3, G3.2.2/F1, Mux/Stitch.
 1. 502 **vor** dem Claim → Reinvoke derselben ID → genau **ein** AWS-Start → Preclip ok.
 2. Antwortverlust **nach** gesetztem `lambda_invoked_at` → Reinvoke → `alreadyStarted /
    unresolved`, kein zweiter AWS-Start → Row später `completed` → Preclip ok.
-3. `lambda_invoked_at` gesetzt, danach kein Fortschritt → kein zweiter Start (auch nicht
-   nach 90/300 s) → v187 fail-closed + genau ein Refund.
+3. `lambda_invoked_at` gesetzt, danach kein Fortschritt → kein zweiter Start, unabhängig
+   von der verstrichenen Zeit → v187 fail-closed + genau ein Refund.
 4. Zwei parallele Invokes derselben `pendingRenderId` → genau ein Claim/AWS-Start.
 5. `lambda_failed`, `invalid_input`, Credentials-/Config-Fehler → kein Retry.
 6. `poll_timeout` → kein AWS-Neustart; v188-Reuse unverändert.
-7. N=4 endgültiger Preclip-Failure → weiterhin 0 `sync_segment`-Ledger-Jobs + genau ein
+7. Claim atomar gesetzt, Prozess stirbt **vor** dem tatsächlichen AWS-Aufruf → Reinvoke
+   startet kein zweites Lambda → nach bestehendem Budget fail-closed. Bewusst akzeptierter
+   Preis von Exactly-Once: in diesem winzigen Fenster geht ggf. ein Render verloren, es
+   entstehen aber nie zwei.
+8. N=4 endgültiger Preclip-Failure → weiterhin 0 `sync_segment`-Ledger-Jobs + genau ein
    Refund (heutiges Verhalten vor dem Ledger bleibt korrekt).
 
 ## Danach
