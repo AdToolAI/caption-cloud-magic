@@ -6669,14 +6669,14 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const finalPeakDbFs = Number(finalAudioDiag?.wav?.peakDbFs);
     const finalVoicedSec = Number(finalAudioDiag?.vad?.voicedSec ?? 0);
     const finalLongestRun = Number(finalAudioDiag?.vad?.longestVoicedRun ?? 0);
-    const audioSilentOrInvalid = !isStabilizerPass && (
+    const audioSilentOrInvalid = !isStabilizer && (
       !finalAudioDiag ||
       !Number.isFinite(finalPeakDbFs) ||
       finalPeakDbFs <= -50 ||
       finalVoicedSec <= 0.04 ||
       finalLongestRun <= 0.04
     );
-    if (isStabilizerPass) {
+    if (isStabilizer) {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v194_stabilizer_bypass_silent_gate speaker_idx=${(pass as any).speaker_idx}`,
       );
