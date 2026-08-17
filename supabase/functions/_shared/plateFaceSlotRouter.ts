@@ -452,6 +452,16 @@ export async function routePlateFacesToAnchor(params: {
     countMismatch: false,
     maxDistance: assignment.maxDistance,
     reason: resolved === rows ? undefined : "incomplete_bijection",
+    detectSucceeded: true,
+    detectedCount: detected.length,
+    failureClass: resolved === rows
+      ? undefined
+      : classifyRouterFailure({
+        reason: "incomplete_bijection",
+        detectSucceeded: true,
+        detectedCount: detected.length,
+        expectedCount: rows,
+      }),
     msTotal: Date.now() - t0,
   };
 }
