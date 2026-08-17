@@ -205,8 +205,6 @@ Deno.test("T2: identity/assignment result is identical for N=1, N=2, N=4", async
       });
     });
 
-    console.log("T2 debug n=", n, JSON.stringify(result, null, 2));
-
     assertEquals(result.ok, true, `N=${n} should resolve ok`);
     assertEquals(result.resolvedCount, n, `N=${n} should resolve all characters`);
     for (let i = 0; i < n; i++) {
