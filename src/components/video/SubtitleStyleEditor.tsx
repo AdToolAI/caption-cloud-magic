@@ -237,12 +237,25 @@ export const SubtitleStyleEditor = ({ style, onChange, sampleText, onSampleTextC
 
         <div className="pt-4 border-t">
           <Label className="mb-3 block">{t('uc.previewLabel')}</Label>
-          <div className="relative bg-muted rounded-lg h-32 overflow-hidden flex items-center justify-center">
-            <div className={(style.outlineStyle === 'box' || style.outlineStyle === 'box-stroke') ? 'px-6 py-3 rounded-lg' : ''} style={getPreviewStyles(style)}>
+          {/* Mirrors the video: same vertical placement (top 8% / center /
+              bottom 10%) and the same horizontal centering. */}
+          <div
+            className="relative bg-muted rounded-lg aspect-video overflow-hidden flex flex-col items-center"
+            style={{
+              justifyContent:
+                style.position === 'top' ? 'flex-start'
+                  : style.position === 'center' ? 'center'
+                    : 'flex-end',
+              paddingTop: style.position === 'top' ? '8%' : 0,
+              paddingBottom: style.position === 'bottom' ? '10%' : 0,
+            }}
+          >
+            <div className={(style.outlineStyle === 'box' || style.outlineStyle === 'box-stroke') ? 'px-3 py-1.5 rounded-md' : ''} style={getPreviewStyles(style)}>
               {sampleText || t('uc.sampleSubtitleText')}
             </div>
           </div>
         </div>
+
       </CardContent>
     </Card>
   );
