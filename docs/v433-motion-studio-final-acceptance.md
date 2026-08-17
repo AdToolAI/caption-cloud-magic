@@ -871,3 +871,22 @@ Validierungspfad statt Boot-Fehler.
 **Status: FA-4/P0 DEPLOY VERIFIED — STOP, kein Render.** FA-1 bis FA-3 bleiben
 PASS. Der Retest erfolgt separat mit einer frischen 4-Speaker-/6-Turn-Szene;
 die fehlgeschlagene S08 bleibt als Evidence unangetastet.
+
+## FA-4 RETEST SETUP READY (2026-08-17)
+
+Szene S09 `ece6a71c-118e-436a-ac1a-15182cc88ddb` — kein Render gestartet.
+
+| Kriterium | Ist |
+| --- | --- |
+| dialog_voices | 4 distinct: `u86DavlmJKwP4sPOSkw7` (Samuel, Brand), `EXAVITQu4vr4xnSDxMaL` (Sarah/Julia), `pqHfZKP75CvOlQylNhV4` (Matthew/Stefan), `onwK4e9ZLuTAKqWW03F9` (Kay/Markus) |
+| Skript | 6 Zeilen, 4 Characters, Sarah 2×, Samuel 2× |
+| UI-TTS-Prognose | „6 Blöcke · 4 Sprecher · ~8s" |
+| dialog_mode / lip_sync_with_voiceover | true / true |
+| engine_override / clip_source | `cinematic-sync` / `ai-happyhorse` (zertifizierter Multi-Speaker-Pfad) |
+| C1 nach Reload | resolved, DB-konsistent (Toggle ON aus DB hydratisiert) |
+| active_run_id / pipeline_state | NULL / `idle` |
+| Ledger (`composer_pipeline_jobs`) | 0 |
+| Outputs (clip/base/base_video/processed/preview) | alle NULL |
+| Pass-/Job-Pointer | `plate_pipeline_job_id` NULL, `lip_sync_status`/`lip_sync_applied_at` NULL |
+| RS3-Marker | keiner |
+| Exactly-Once-Bundle-Smoke | `preclip-dispatch-resume.test.ts` 8/8 PASS |
