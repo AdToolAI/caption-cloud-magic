@@ -12,7 +12,8 @@ Bestätigter Ist-Zustand in `compose-dialog-segments/index.ts`: der Router läuf
   - Infrastructure (bisheriges Verhalten unverändert): `aws_credentials_missing`, `plate_fetch_failed`, `detect_failed:*`, geworfene Exceptions des Routers.
 - Bei contractual failure: kein `resolvePlateFaceIdentities()`, kein Provider-Dispatch. Abbruch über den bestehenden Failure-/Refund-Pfad der Function (`failLipSync`-Vertrag) mit klarer, lokalisierter Diagnose und der exakten Router-Reason in der Telemetrie.
 - Ledger/Fan-out, Job-Erzeugung und Webhook-Pfade werden nicht angefasst.
-- Klassifikation als exportierte, reine Hilfsfunktion (z. B. `classifyRouterFailure(reason)`) im Face-Candidate-Modul, damit sie testbar ist.
+- Klassifikation als exportierte, reine Hilfsfunktion `classifyRouterFailure({ reason, detectSucceeded, detectedCount, expectedCount, threw })` im Face-Candidate-Modul. Strukturierte Eingabe statt reinem Reason-String: `no_faces_detected` ist nur dann contractual, wenn die Detection nachweislich erfolgreich lief (`detectSucceeded`), Anchor-Slots existieren und 0 Kandidaten kamen — sonst infrastructure. Geworfene Router-Exceptions sind immer infrastructure. Der Router liefert die Klasse als Feld (`failureClass`) mit, damit compose-dialog-segments nicht neu klassifiziert.
+- Solver-Optimierung nur algorithmisch: Spaltenreihenfolge + admissible Best-Bound-Pruning, kein Epsilon, keine neue Schwelle; die exakte Tie-Erkennung (`equal_cost_ambiguity`) bleibt unverändert.
 
 ## 2. `input_too_large` entfernen
 
