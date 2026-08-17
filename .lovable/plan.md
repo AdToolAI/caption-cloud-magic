@@ -65,10 +65,10 @@ Die final gewählte BBox wird erneut objektiv validiert. Der `trustedSlots`-Shor
 
 Vor jedem Sync.so-Dispatch ohne externen Vision-Service beweisbar:
 
-1. Target-BBox des zugeordneten Characters liegt vollständig im Preclip-Crop.
+1. Die vollständige finale Target-BBox des zugeordneten Characters liegt innerhalb des Preclip-Crops.
 2. Der Crop stammt aus genau dieser final zugeordneten Plate-BBox.
-3. Kein Zentrum eines anderen zugeordneten Speaker-Faces liegt im zulässigen Target-Bereich des Crops.
-4. Plate-space → Crop-space-Transformation ist deterministisch und bounds-valid.
+3. Kein Center einer ANDEREN final zugeordneten Speaker-BBox liegt innerhalb der final transformierten Target-BBox in Crop-Space. Geprüft wird exakt gegen diese transformierte Box — keine erweiterte Target-Zone, kein Padding, keine neue Toleranz.
+4. Die Plate-space → Crop-space-Transformation dieser Target-BBox ist deterministisch und bounds-valid (alle vier Kanten innerhalb der Crop-Dimensionen, nicht-degeneriert).
 5. Die an `bounding_boxes_url` übergebene Box entspricht exakt dieser transformierten Target-BBox.
 
 Sonst FAIL CLOSED vor Sync.so. Fehlerklassen-Name noch offen: das bestehende Inventar (`face_validation_failed`, `v153_plate_bbox_required`, `v133_identity_ambiguous`, `v187_preclip_required_no_fullplate_fallback`) wird im Implementierungsschritt geprüft; erst dann wird entschieden, ob eine bestehende Klasse passt oder eine neue (Arbeitstitel `preclip_identity_geometry_mismatch`) eingeführt wird.
