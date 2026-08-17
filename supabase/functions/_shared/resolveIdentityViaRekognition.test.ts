@@ -52,7 +52,7 @@ interface MockOptions {
   compareFailures?: Set<number>;
 }
 
-function runWithMockFetch<T>(opts: MockOptions, fn: () => Promise<T>): Promise<T> {
+function runWithMockFetch<T>(opts: MockOptions, fn: () => Promise<T>): Promise<{ result: T; calls: MockCall[] }> {
   const originalFetch = globalThis.fetch;
   const calls: MockCall[] = [];
   let compareIndex = 0;
@@ -107,12 +107,11 @@ function runWithMockFetch<T>(opts: MockOptions, fn: () => Promise<T>): Promise<T
     return new Response("not found", { status: 404 });
   };
 
-  // Expose calls on the function object for assertions.
-  (runWithMockFetch as any).lastCalls = calls;
-
-  return fn().finally(() => {
-    globalThis.fetch = originalFetch;
-  });
+  return fn()
+    .then((result) => ({ result, calls }))
+    .finally(() => {
+      globalThis.fetch = originalFetch;
+    });
 }
 
 function getLastCalls(): MockCall[] {
