@@ -172,10 +172,12 @@ export function SubtitleTimingStep({ audioUrl, subtitleConfig, onSubtitleConfigC
               <SubtitleStyleEditor
                 style={subtitleConfig.style}
                 onChange={(style) => onSubtitleConfigChange({ ...subtitleConfig, style })}
-                sampleText={getCurrentSegment()?.text || t('uc.sampleSubtitle')}
-                onSampleTextChange={() => {}}
+                sampleText={sampleTextOverride ?? (getCurrentSegment()?.text || t('uc.sampleSubtitle'))}
+                onSampleTextChange={(value) => setSampleTextOverride(value)}
+                onResetSampleText={sampleTextOverride !== null ? () => setSampleTextOverride(null) : undefined}
               />
             </div>
+
           </div>
 
           {audioUrl && (
