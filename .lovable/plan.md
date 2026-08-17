@@ -40,19 +40,26 @@ Ja. **Keine Schemaänderung nötig.**
 
 Offen bleibt nur das **Durchreichen der bereits existierenden Turn-UUID** in die vorhandene Segmentdimension, da `dialog_shots.passes[]` sie heute nicht mitführt.
 
-## 4. Fix-Contract (LOCKED, Implementierung separat)
+## 4. Fix-Contract — LOCKED / IMPLEMENTATION GO
 
 **Logische Sync-Job-Identität:** `(scene_id, run_id, stage='sync_segment', segment_id = dialog_turn.id)`.
 `plate_generation` ist verpflichtende, eingefrorene Run-/Generation-Provenance und muss übereinstimmen — sie ist **nicht** Bestandteil des bestehenden Unique-Index (`scene_id, run_id, stage, segment_id, attempt_no NULLS NOT DISTINCT`).
 
-1. **Kanonische Segmentidentität.** `sync_segment.segment_id = dialog_turn.id`. Keine neue UUID pro Pass, keine deterministische Ableitung aus `(scene_id, plate_generation, pass.idx)`, keine zweite Identitätsebene. Ein Sync-Job pro Dialog-Turn.
-2. **Durchreichung.** Beim Bau von `dialog_shots.passes[]` wird die zugehörige `dialog_turn.id` als `turn_id`/`segment_id` am Pass mitgeführt; der Dispatcher in `compose-dialog-segments` übergibt exakt diesen Wert als `segmentId` an `resolveLedgerDispatch`/`acquireLedgerJob`. `metadata.pass_idx` bleibt reine Orchestrierungs-Telemetrie, `speaker_idx`/`character_id` bleiben Character-/Face-Geometrie und wirken nie identitätsbildend.
-3. **Fail-closed statt Ersatzidentität.** Löst ein Pass nicht eindeutig auf genau einen kanonischen `dialog_turn` auf, wird **vor** dem Ledger-Acquire mit `PREFLIGHT_BLOCKED` abgebrochen. Für `stage='sync_segment'` ist `segment_id IS NULL` unzulässig — kein stiller Rückfall auf den alten NULL-Key. `audio_mux` behält `segment_id = NULL` (anderer Stage-Key, keine Kollision).
-4. **Kardinalität.** 6 Turns ⇒ 6 Attempt-1-Jobs. Sarah in Turn 1 und Turn 5: gleiche `character_id`, gleicher `speaker_idx`, unterschiedliche `dialog_turn.id` ⇒ zwei Jobs. Kein Turn erhält je `already_completed`/`predecessor_exists` wegen eines Nachbar-Turns.
-5. **Retry.** Gleicher Turn ⇒ `composer_replace_pipeline_attempt` erzeugt Attempt N+1 mit identischem `segment_id`. Ein Retry darf nie einen fremden Turn ablösen (Identitätsprüfung im RPC + Segment-Vererbung).
-6. **Adoption.** `adoptPreAcquiredLedgerJob` adoptiert nur, wenn die Ledger-Row identisch ist in `scene_id`, `run_id`, `plate_generation`, `stage='sync_segment'` und `segment_id = dialog_turn.id` des dispatchenden Passes. Sonst keine Adoption.
-7. **Callback/Apply.** `pipeline_job_id` bleibt alleinige, authoritative Callback-Provenance. Der Callback sucht keine Turns und interpretiert kein `speaker_idx`; das befüllte `segment_id` macht die Row lediglich eindeutig. Keine Änderung an G3.2.2, RS3, F1, Preclip, Plate oder Accounting.
-8. **Audio-Mux.** Unverändert genau **ein** `audio_mux`-Job, erst nach Terminalität aller sechs Turn-Jobs.
+1. **Kanonische Segmentidentität.** `sync_segment.segment_id = dialog_turn.id`. Keine neue UUID pro Pass, keine deterministische Ableitung, keine zweite Identitätsebene. Ein Sync-Job pro Dialog-Turn.
+2. **Pass↔Turn-Bindung am Erzeugungsort.** Die Bindung entsteht **im selben kanonischen Iterationsschritt**, der `dialog_shots.passes[]` aus `dialog_turns` erzeugt: Turn i schreibt seine `dialog_turn.id` direkt als `segment_id`/`turn_id` in Pass i. Es gibt **keine** nachträgliche Auflösung über `speaker_idx`, `character_id`, Sprechername oder Text. Stimmen Anzahl oder Reihenfolge von Turns und Passes nicht eindeutig überein ⇒ fail-closed vor dem Ledger-Acquire.
+3. **Durchreichung.** Der Dispatcher in `compose-dialog-segments` übergibt exakt diesen Pass-Wert als `segmentId` an `resolveLedgerDispatch`/`acquireLedgerJob`. `metadata.pass_idx` bleibt reine Orchestrierungs-Telemetrie; `speaker_idx`/`character_id` bleiben Character-/Face-Geometrie und wirken nie identitätsbildend (Sarah Turn 1 → Turn-ID A → `segment_id` A → `speaker_idx` 0; Sarah Turn 5 → Turn-ID E → `segment_id` E → `speaker_idx` 0 ⇒ zwei Jobs).
+
+4. **Fail-closed statt Ersatzidentität.** Für `stage='sync_segment'` ist `segment_id IS NULL` unzulässig — kein stiller Rückfall auf den alten NULL-Key, Abbruch mit `PREFLIGHT_BLOCKED` vor dem Acquire. `audio_mux` behält `segment_id = NULL` (anderer Stage-Key, keine Kollision).
+5. **Kardinalität.** 6 Turns ⇒ 6 Attempt-1-Jobs. Kein Turn erhält je `already_completed`/`predecessor_exists` wegen eines Nachbar-Turns.
+6. **Retry.** Gleicher Turn ⇒ `composer_replace_pipeline_attempt` erzeugt Attempt N+1 mit identischem `segment_id`. Ein Retry darf nie einen fremden Turn ablösen.
+7. **Adoption.** `adoptPreAcquiredLedgerJob` adoptiert nur bei Übereinstimmung in `scene_id`, `run_id`, `plate_generation`, `stage='sync_segment'` und `segment_id`. Sonst keine Adoption.
+8. **Callback/Apply.** `pipeline_job_id` bleibt alleinige, authoritative Callback-Provenance; der Callback sucht keine Turns und interpretiert kein `speaker_idx`. Keine Änderung an G3.2.2, RS3, F1, Preclip, Plate oder Accounting.
+9. **Audio-Mux.** Unverändert genau **ein** `audio_mux`-Job, erst nach Terminalität aller sechs Turn-Jobs.
+
+## 4a. Implementierungsscope
+
+Turn-ID durch Pass → Dispatcher → Ledger-`segmentId` führen, `sync_segment` mit NULL fail-closed verbieten, Adoption härten, Tests aus Abschnitt 5. Kein Schema-Change, kein Ledger-RPC-Redesign. Danach Tests → **STOP vor Deploy**.
+
 
 ## 5. Testinvarianten
 
