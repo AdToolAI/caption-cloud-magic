@@ -22,10 +22,12 @@ Sarah, Samuel, Matthew, Kay erhalten je eine unterschiedliche ElevenLabs-Voice-I
 Speichern über den normalen Save-Pfad des Panels. Danach read-only prüfen:
 `dialog_voices` enthält 4 distinct Voice-IDs, je über die Character-ID gebunden.
 
-## Schritt 4 — Turn-Identität verifizieren (read-only)
+## Schritt 4 — Turn-Identität prüfen (read-only, zwei zulässige Ausgänge)
 
-Erwartung: 6 `dialog_turns` mit eindeutigen `turn_id`, auf exakt 4 distinct
-Character-IDs.
+`dialog_turns` vor dem Render ist **keine** harte Pre-Start-Bedingung. Nach dem
+Voice-Save read-only zählen:
+
+**Fall A — 6 Rows vorhanden:** IDs direkt verifizieren.
 
 | Turn | Character | Bedingung |
 |---|---|---|
@@ -33,6 +35,17 @@ Character-IDs.
 | 2 / 6 | Samuel | gleiche `character_id`, verschiedene `turn_id` |
 | 3 | Matthew | eigene `character_id` |
 | 4 | Kay | eigene `character_id` |
+
+**Fall B — 0 Rows:** kein P0/P1. Read-only belegen, dass der produktive Pfad die
+Turns weiterhin JIT materialisiert (`ensureDialogTurnsForScene` bzw. Äquivalent in
+`_shared/scene-dialog-turns.ts`) und zwar **vor** `compose-twoshot-audio` und damit
+vor Erzeugung des `turn_id`-Payloads. Ist das bestätigt, ist S11 gültig mit:
+
+- `dialog_turns_prestart = 0` (expected JIT)
+- Skript eindeutig auf die 4 Character-IDs auflösbar
+- 4 Voices korrekt ID-gebunden
+- die sechs realen `turn_id` werden unmittelbar beim Renderstart gesichert
+
 
 ## Schritt 5 — Reload und finaler Pre-Start-Snapshot (read-only)
 
@@ -51,19 +64,20 @@ Character-IDs.
 1. **Panel weiterhin nicht bedienbar** über den normalen UI-Pfad → STOP und als
    UI-/Setup-Blocker melden. Keine manuellen DB-Writes, keine Migration, kein
    direktes RPC-Setzen.
-2. **`dialog_turns` bleibt leer trotz korrekt gespeichertem Skript + Voices** →
-   ebenfalls STOP. Vorher read-only klären, ob die Turn-Materialisierung im
-   aktuellen Produktvertrag JIT beim Render passiert (`_shared/scene-dialog-turns.ts`,
-   `compose-twoshot-audio`) oder ob der neue `turn_id → segment_id`-Pfad eine
-   bereits persistierte Turn-Liste voraussetzt. Ergebnis dokumentieren, nicht fixen.
+2. **JIT-Pfad nicht mehr vorhanden** oder `compose-twoshot-audio` erwartet
+   `turn_id`, bevor Turns materialisiert sind → STOP als Setup-/Lifecycle-Blocker.
+   Kein künstlicher Fix nur damit Pre-Render bereits Rows existieren.
 
 ## Dokumentation
 
 Abschnitt „FA-4 FINAL RETEST SETUP (S11)“ in
 `docs/v433-motion-studio-final-acceptance.md` ergänzen: Voice-Tabelle,
-Turn-Identitätstabelle, Snapshot, Kostenvoranschlag — bzw. der Blocker-Befund.
+Turn-Status (Fall A/B), Snapshot, Kostenvoranschlag — bzw. der Blocker-Befund.
 
 ## Abschluss
 
-Bei Erfolg: **FA-4 FINAL RETEST SETUP READY → STOP.** Kein Render. Der finale
-FA-4-Render startet erst nach separatem GO.
+Bei Erfolg: **FA-4 FINAL RETEST SETUP READY** — oder, falls Turns
+erwartungsgemäß JIT bleiben: **FA-4 FINAL RETEST SETUP READY — dialog_turns JIT
+VERIFIED**. Danach STOP. Kein Render; der finale FA-4-Render startet erst nach
+separatem Render-GO.
+
