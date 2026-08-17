@@ -592,6 +592,19 @@ interface PassState {
   audio_tight?: { url: string; dur_sec: number; windows_secs: Array<[number, number]>; output_offsets_sec?: number[] };
 }
 
+/**
+ * FA-4/P0 — kanonisches Predicate für v194-Silent-Stabilizer-Passes.
+ * Nutzt exakt die bestehende Produktionssemantik (`stabilizer_pass` +
+ * `is_silent_stabilizer`); es gibt bewusst KEINEN heuristischen Klassifikator
+ * über „segment_id liegt nicht in dialog_turns".
+ */
+function isStabilizerPass(pass: unknown): boolean {
+  return (pass as any)?.stabilizer_pass === true &&
+    (pass as any)?.is_silent_stabilizer === true;
+}
+
+
+
 interface SegmentsState {
   version: 5;
   engine: "sync-segments";
