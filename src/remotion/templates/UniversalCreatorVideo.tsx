@@ -23,7 +23,7 @@ import { LottieIcons } from '../components/LottieIcons';
 import { MorphTransition } from '../components/MorphTransition';
 import { ProfessionalLottieCharacter, type PhonemeTimestamp as CharacterPhonemeTimestamp } from '../components/ProfessionalLottieCharacter';
 import { DrawOnEffect } from '../components/DrawOnEffect';
-import { PrecisionSubtitleOverlay } from '../components/PrecisionSubtitleOverlay';
+import { PrecisionSubtitleOverlay, withOpacity } from '../components/PrecisionSubtitleOverlay';
 import { SceneAudioManager, type SceneAudioConfig } from '../components/SceneAudioManager';
 import { getSoundUrlSync, type SoundEffectType } from '../components/EmbeddedSoundLibrary';
 
