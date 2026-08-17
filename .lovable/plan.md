@@ -1,5 +1,10 @@
 # FA-4 Root-Cause-Lock: Face-Candidate-Auswahl (read-only)
 
+Statuskontext: FA-4 bleibt auf **TECHNICAL PASS / VISUAL REVIEW: ISSUES**. Das
+visuelle Review ist bereits erfolgt und hat einen P0 gezeigt. Der Lock läuft
+unter diesem Status weiter; ein Zurücksetzen auf "VISUAL REVIEW PENDING" oder
+ein Setzen auf PASS ist in diesem Schritt ausgeschlossen.
+
 Ziel: beweisen, warum für Sarah, Matthew und Kay winzige False-Positive-Boxen
 statt der korrekten großen Gesichter benutzt wurden — und erst danach einen
 Fix-Contract festlegen. Kein Code, kein Render, kein Retry, keine DB-Writes.
