@@ -5978,22 +5978,58 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // Box in the dispatched video's pixel space.
       let dispatchBox: [number, number, number, number] | null = box;
       if (v161UsingPreclipForBbox && box && v161PreclipCrop) {
-        const scale = v161PreclipCrop.outputSize / Math.max(1, v161PreclipCrop.size);
-        const cx1 = Math.max(0, Math.round((box[0] - v161PreclipCrop.x) * scale));
-        const cy1 = Math.max(0, Math.round((box[1] - v161PreclipCrop.y) * scale));
-        const cx2 = Math.min(v161PreclipCrop.outputSize, Math.round((box[2] - v161PreclipCrop.x) * scale));
-        const cy2 = Math.min(v161PreclipCrop.outputSize, Math.round((box[3] - v161PreclipCrop.y) * scale));
-        if (cx2 > cx1 + 4 && cy2 > cy1 + 4) {
-          dispatchBox = [cx1, cy1, cx2, cy2];
-        } else {
-          // Fallback: most of the preclip IS the face.
-          const pad = Math.max(2, Math.round(v161PreclipCrop.outputSize * 0.08));
-          dispatchBox = [pad, pad, v161PreclipCrop.outputSize - pad, v161PreclipCrop.outputSize - pad];
+        // FA-4 Contract E — deterministic crop containment gate. The final
+        // target bbox must lie fully inside the crop, transform bounds-valid
+        // and non-degenerate, and no OTHER finally assigned speaker center may
+        // fall inside the transformed target box. No padding, no tolerance.
+        const otherCenters: Array<[number, number]> = [];
+        for (let si = 0; si < speakers.length; si++) {
+          if (si === pass.speaker_idx) continue;
+          const ob = speakerPlateBboxes?.[si];
+          if (Array.isArray(ob) && ob.length === 4) {
+            otherCenters.push([
+              Math.round((ob[0] + ob[2]) / 2),
+              Math.round((ob[1] + ob[3]) / 2),
+            ]);
+          }
         }
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_bbox_clip_space plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)} → clip_box=${JSON.stringify(dispatchBox)} windows_clip=${JSON.stringify(v124VoicedWindows)}`,
-        );
+        const containment = evaluatePreclipCropContainment({
+          crop: v161PreclipCrop,
+          targetBbox: box,
+          otherSpeakerCenters: otherCenters,
+        });
+        if (!containment.ok) {
+          (pass as any)._v152HardFail = {
+            reason: "preclip_identity_geometry_mismatch",
+            errorClass: "preclip_identity_geometry_mismatch",
+            message:
+              `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde vor Sync.so abgebrochen: ` +
+              tl({
+                de: "der Gesichtsausschnitt lässt sich nicht eindeutig diesem Sprecher zuordnen. Credits wurden zurückerstattet.",
+                en: "the face crop cannot be assigned unambiguously to this speaker. Credits have been refunded.",
+                es: "el recorte facial no se puede asignar de forma inequívoca a este hablante. Los créditos han sido reembolsados.",
+              }),
+            meta: {
+              fa4_containment_reason: containment.reason,
+              fa4_containment_detail: containment.detail ?? null,
+              plate_box: box,
+              preclip_crop: v161PreclipCrop,
+              other_speaker_centers: otherCenters,
+            },
+          };
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} fa4_preclip_containment_fail_closed ` +
+            `reason=${containment.reason} detail=${containment.detail ?? "-"} plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)}`,
+          );
+        } else {
+          // Contract E.5 — the wire box IS the transformed target bbox.
+          dispatchBox = containment.clipBox!;
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_bbox_clip_space plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)} → clip_box=${JSON.stringify(dispatchBox)} windows_clip=${JSON.stringify(v124VoicedWindows)} fa4_containment=ok`,
+          );
+        }
       }
+
 
       let usedUrl: string | null = null;
       let nonNullFrames = frameCount;
