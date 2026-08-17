@@ -148,25 +148,24 @@ Eintrag ist 23:07Z. Der Stdout-Beleg für `v278_router` /
 und ist auch nicht wiederherstellbar. Frage 1 bleibt deshalb offen — ohne
 weiteren Schritt dauerhaft.
 
-Drei Wege, den Lock zu schließen (Entscheidung des Auftraggebers, kein Default):
+**Entscheidung: Variante A (statischer/deduktiver Pfadbeweis).** Kein Render,
+keine Codeänderung, keine DB-Mutation. Varianten B (Telemetrie + Repro-Render)
+und C (Frage 1 offen lassen) sind verworfen.
 
-- **A — Statischer Pfadbeweis (kein Render, keine Kosten).** Aus dem Code
-  ableiten, unter welchen Bedingungen `routePlateFacesToAnchor()` ein Ergebnis
-  liefert, das nicht final wird, und zeigen, dass der persistierte Zustand (10
-  Faces in `plate_identity.faces`, Bridge-Signatur, First-Match-Reihenfolge)
-  nur mit genau einem dieser Pfade konsistent ist. Ergebnis wäre ein
-  *deduktiver* Beweis, kein Log-Beweis — der Lock würde als
-  "Frage 1: deduktiv geschlossen, ohne Laufzeitbeleg" dokumentiert.
-- **B — Persistente Entscheidungs-Telemetrie + Reproduktion.** Kleine
-  Code-Änderung, die die Face-Routing-Entscheidung (v278-Ergebnis, Bridge,
-  Trust-Grund, gewählte BBox pro Character) in die Szene persistiert statt nur
-  zu loggen, danach ein günstiger Plate-only-Repro-Run. Das schließt Frage 1
-  mit echtem Laufzeitbeleg und macht künftige Locks retention-unabhängig.
-  Kostet einen Render.
-- **C — Frage 1 offen lassen.** Der Zielvertrag ist Geometrie-first und
-  entwertet beide möglichen Pfade (v278 verworfen *oder* v278 überschrieben)
-  gleichermaßen. Der Fix wäre in beiden Fällen identisch. Frage 1 bliebe als
-  offener Punkt dokumentiert.
+Enger Beweisumfang für A — nur diese fünf Schritte:
+
+1. Alle möglichen Ausgänge von `routePlateFacesToAnchor()` im aktuellen Code
+   bestimmen (ok / nicht ok / verworfen, jeweils mit Bedingung).
+2. Zeigen, was bei einem angenommenen erfolgreichen 4/4-v278-Ergebnis
+   anschließend in `plateIdentityMap.faces` stehen müsste.
+3. Das gegen den persistierten S11-Zustand halten: 10 Faces, Bridge-Signaturen
+   (`confidence: 0` / `matchConfidence: 0.85`), v277-First-Match-Reihenfolge.
+4. Daraus deduktiv festlegen, welcher Pfad bzw. welche Pfadklasse mit diesem
+   Endzustand vereinbar ist — und welche ausgeschlossen sind.
+5. Explizit dokumentieren: **„deduktiv geschlossen; kein Runtime-Log mehr
+   verfügbar"** — nicht als Log-Beweis darstellen.
+
+Danach STOP: kein Fix, kein Deploy, kein Render.
 
 Ergebnis dokumentieren in `docs/v433-motion-studio-final-acceptance.md` als
 eigener Abschnitt "FA-4 Root-Cause-Lock — Face-Candidate-Auswahl", unter dem
