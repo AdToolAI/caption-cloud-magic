@@ -1410,12 +1410,189 @@ Kanonische Turn-UUIDs (JIT materialisiert beim Renderstart):
 Szenenendzustand: `pipeline_state = complete`, `lip_sync_status = done`,
 `twoshot_stage = done`, kein RS3-Marker, alle 6 Passes `status = done`.
 
-### Visuelle Prüfung
+---
 
-Artefakt 15,00 s Video / 15,08 s Audio, 1284×718. Frames bei 1/4/7/10/12/14 s:
-Cast-Anordnung stabil (Sarah, Samuel, Matthew, Kay von links), keine Slot- oder
-Identity-Sprünge, keine Doppelbelegung. Mundbewegung jeweils nur beim aktiven
-Sprecher, Listener bleiben ruhig; Stimmzuordnung passt zur ID-gebundenen
-Voice-Map (Lena/Stefan/Markus/Klaus).
+## FA-4 — Forensischer Audit des Runs `b9acfae3` (read-only)
 
-**FA-4 FINAL RETEST = PASS.**
+Neutrale Datenerhebung nach Abschluss des Runs. Keine Ursachenhypothese, kein
+Fix, kein Render, keine DB-Writes. Quelle der Rohdaten:
+`.lovable/plan/fa-4-forensischer-audit-run-b9acfae3-read-only-keine-änderun-2026-08-17.md`.
+
+### 1. Run / Scene
+
+| Feld | Wert |
+|---|---|
+| `run_id` | `b9acfae3-8121-45ba-950a-9a1ad5373f5a` |
+| `scene_id` | `e658509d-cdeb-40f7-bd33-98e74144fdc5` (S11, order_index 10) |
+| `T_run_start` | 2026-08-17 20:38:31Z (erster Ledger-Job 20:38:45Z) |
+| `T_run_end` | 2026-08-17 20:49:22.477Z (`scene.updated_at` = audio_mux finished) |
+| Gesamtlaufzeit | 10 min 51 s |
+| `pipeline_state` / `lip_sync_status` / `clip_status` | `complete` / `done` / `ready` |
+| `plate_generation` | 1 → 2 (alle Jobs des Runs tragen 2) |
+| `active_run_id` | `b9acfae3…` (unverändert) |
+
+Chronologie (Ledger + `syncso_dispatch_log`):
+
+```text
+20:38:45  base_video acquire (ai-happyhorse, ext 4jebpxfnf5rmt0d025st6bq6ag)
+20:44:30  base_video succeeded
+20:44:46  DISPATCH_ATTEMPT_STARTED (sync-segments)
+20:45:31  Pass 1 gestartet (preclip p1)
+20:45:54  sync_segment #1 im Ledger
+20:46:01  Pass 1 DISPATCHED (HTTP 201)
+20:46:42–49  Pässe 3 und 4 im Ledger + DISPATCHED
+20:47:05/11  Pass 2 im Ledger + DISPATCHED
+20:47:52–20:48:31  sync_segments #1–#4 succeeded
+20:48:03/07  Pass 5 im Ledger + DISPATCHED
+20:48:16/23  Pass 6 im Ledger + DISPATCHED
+20:49:00  sync_segment #6 succeeded → audio_mux acquire (remotion)
+20:49:22  audio_mux succeeded, Szene complete
+```
+
+Fehler/Timeouts/Cancels: keine. Kein `error_code`, kein Job ≠ `succeeded`,
+alle `attempt_no = 1`, `retry_count = 0`, `fallback_history = []`,
+`refunded = false`.
+
+### 2. Erwartete vs. tatsächliche Dauer
+
+| Stufe | Dauer |
+|---|---|
+| angeforderte Szenendauer | 15,0 s (`composer_scenes.duration_seconds`) |
+| Base-Video (HappyHorse) | Video 15,0417 s / Audio 15,1627 s, 1284×718, 24 fps |
+| Preclips (pro Pass) | 1,645 / 1,447 / 1,633 / 1,726 / 1,532 / 2,740 s (Σ 10,72 s) |
+| Sync-Segment-Outputs | 1,667 / 1,467 / 1,633 / 1,733 / 1,533 / 2,767 s (720×720, 30 fps, je AAC) |
+| Dialog-Timeline vor Stitch | 0,000–11,653 s |
+| Datei hinter `processed_video_url` | Video 15,000 s / Audio 15,0827 s, 1284×718, 30 fps, 8.891.024 Bytes |
+
+Keine Kürzung gegenüber der Anforderung, kein vorzeitig beendeter Job, kein
+Timeout.
+
+### 3. Jobs dieses Runs (Ledger, chronologisch)
+
+| created | completed | stage | job_id | att | status | provider | external_job_id |
+|---|---|---|---|---|---|---|---|
+| 20:38:45 | 20:44:30 | `base_video` | `f58fb52a` | 1 | succeeded | ai-happyhorse | `4jebpxfnf5rmt0d025st6bq6ag` |
+| 20:45:54 | 20:47:52 | `sync_segment` (pass 0) | `48c2a40a` | 1 | succeeded | sync.so | `b345cc40` |
+| 20:46:42 | 20:48:01 | `sync_segment` (pass 2) | `f1487aec` | 1 | succeeded | sync.so | `137e2942` |
+| 20:46:43 | 20:48:23 | `sync_segment` (pass 3) | `8c54e4cd` | 1 | succeeded | sync.so | `eee5e6d6` |
+| 20:47:05 | 20:48:09 | `sync_segment` (pass 1) | `01bcf9d9` | 1 | succeeded | sync.so | `b282a1bf` |
+| 20:48:03 | 20:48:31 | `sync_segment` (pass 4) | `ff4f3194` | 1 | succeeded | sync.so | `6c797595` |
+| 20:48:16 | 20:49:00 | `sync_segment` (pass 5) | `6f9d23ea` | 1 | succeeded | sync.so | `d795d8f5` |
+| 20:49:00 | 20:49:22 | `audio_mux` | `d106144d` | 1 | succeeded | remotion | `c5a53235` |
+
+Alle acht Jobs: `callback_delivery_status = succeeded`, `plate_generation = 2`,
+`ledger_source = v431_g31b_acquire`. Keine eigenen Ledger-Stages für `preclip`,
+`stabilizer` oder `stitch` — Preclip läuft inline in `compose-dialog-segments`,
+Stitch ist Teil des einen Remotion-`audio_mux`-Renders. Für die Szene existieren
+genau diese 8 Jobs.
+
+### 4. Dialog-Turns (6, kanonisch)
+
+| # | `dialog_turn_id` | Sprecher (`speaker_idx`) | Fenster | TTS-Audio | Status |
+|---|---|---|---|---|---|
+| 0 | `55385e38` | Sarah Dusatko (0) | 0,000–1,625 | pass-1-tight (1,645 s) | done |
+| 1 | `ab0ba4bd` | Samuel Dusatko (1) | 1,875–3,408 | pass-3-tight (1,633 s) | done |
+| 2 | `a4d8e837` | Matthew Dusatko (2) | 3,658–5,190 | pass-5-tight (1,632 s) | done |
+| 3 | `9a0bd588` | Kay Mark (3) | 5,440–8,180 | pass-6-tight (2,840 s) | done |
+| 4 | `1a97a4e2` | Sarah Dusatko (0) | 8,430–9,777 | pass-2-tight (1,447 s) | done |
+| 5 | `162210e9` | Samuel Dusatko (1) | 10,027–11,653 | pass-4-tight (1,726 s) | done |
+
+4 stabile `speaker_idx` (0–3), bijektiv zu 4 Character-IDs; wiederkehrende
+Sprecher behalten ihren Index. `assignmentLock`
+(`v277_anchor_rekognition_complete`) belegt 4 Slots.
+
+### 5. Sync-Segmente
+
+| pass | `segment_id` | Fenster | Input-Video | Input-Audio | Output | Status |
+|---|---|---|---|---|---|---|
+| 0 | `55385e38` | 0,000–1,625 | p1-preclip | pass-1-tight | `…-lipsync-pass-1.mp4` (1,667 s) | done |
+| 1 | `1a97a4e2` | 8,430–9,777 | p2-preclip | pass-2-tight | `…-lipsync-pass-2.mp4` (1,467 s) | done |
+| 2 | `ab0ba4bd` | 1,875–3,408 | p3-preclip | pass-3-tight | `…-lipsync-pass-3.mp4` (1,633 s) | done |
+| 3 | `162210e9` | 10,027–11,653 | p4-preclip | pass-4-tight | `…-lipsync-pass-4.mp4` (1,733 s) | done |
+| 4 | `a4d8e837` | 3,658–5,190 | p5-preclip | pass-5-tight | `…-lipsync-pass-5.mp4` (1,533 s) | done |
+| 5 | `9a0bd588` | 5,440–8,180 | p6-preclip | pass-6-tight | `…-lipsync-pass-6.mp4` (2,767 s) | done |
+
+`set(segment_id) == set(dialog_turns.id)` (6 = 6, keine Duplikate). Alle Fenster
+liegen in 0–15 s, keine Überlappung; größte Lücke 11,653–15,000 s (kein Dialog
+vorgesehen).
+
+### 6. Stitch
+
+- Kein separater Stitch-Job; Stitch und Mux sind derselbe Remotion-Lambda-Render
+  `c5a53235-2fbb-420c-b296-8ed01e25784f` (dispatched 20:49:02.648Z, finished
+  20:49:22.477Z).
+- Alle sechs Segmentoutputs `…-lipsync-pass-1..6.mp4` eingegangen, jeder Pass
+  `done`.
+- Timeline-Reihenfolge (nach `startTime`): pass1 (0,000) → pass3 (1,875) →
+  pass5 (3,658) → pass6 (5,440) → pass2 (8,430) → pass4 (10,027).
+- Output: `…/renders/nn4aqyifqp/dialog-stitch-muxed-e658509d-…-1786999742405.mp4`.
+
+### 7. Audio-Mux
+
+- Job `d106144d`, remotion, succeeded, attempt 1, keine Fehler/Warnings.
+- `mux_dispatch_requested_at` 20:49:00.420758Z, `dispatched_at` 20:49:02.648Z,
+  `finished_at` 20:49:22.477Z (19,8 s Renderzeit).
+- Input-Video: die 6 Lipsync-Pass-Clips über der Plate.
+- Audio-Inputs: die 6 `twoshot-vo/*-tight-*.wav` an ihren Turn-Positionen;
+  Gain/Volume-Felder sind im Job nicht persistiert.
+
+### 8. Finaler Output (ffprobe)
+
+| Merkmal | Wert |
+|---|---|
+| URL | `…/renders/nn4aqyifqp/dialog-stitch-muxed-e658509d-cdeb-40f7-bd33-98e74144fdc5-1786999742405.mp4` |
+| Container / Codecs | mov/mp4 · h264 + aac (1 Video, 1 Audio) |
+| Auflösung / fps | 1284×718 / 30 fps |
+| Dauer | Video 15,000 s · Audio 15,0827 s |
+| Dateigröße | 8.891.024 Bytes (8,48 MB) |
+| mean / max volume | −28,0 dBFS / −7,1 dBFS |
+
+Silence-Messung (`silencedetect -45 dB, 0,3 s`): 1,580–1,969 | 3,096–3,811 |
+4,994–5,569 | 7,906–8,554 | 9,554–10,172 | 11,331–15,083.
+
+Pegel pro Turn-Fenster (`mean_volume`): 0,000 s −26,7 dB | 1,875 s −26,7 dB |
+3,658 s −25,9 dB | 5,440 s −26,8 dB | 8,430 s −24,6 dB | 10,027 s −27,6 dB |
+11,653–15,0 s −91,0 dB (digitale Stille).
+
+### 9. Output-Kette
+
+```text
+base_video   ai-happyhorse  .../composer/035273d7…/e658509d….mp4            15,163 s
+  ↓ preclip (inline)  lipsync-plates/shared/e658509d…/p1..p6-preclip-*.mp4  1,645 / 1,447 / 1,633 / 1,726 / 1,532 / 2,740 s
+  ↓ sync.so (6 Jobs)  .../e658509d…-lipsync-pass-1..6.mp4                   1,667 / 1,467 / 1,633 / 1,733 / 1,533 / 2,767 s
+  ↓ stitch + audio_mux (ein Remotion-Render c5a53235)
+processed_video_url  .../dialog-stitch-muxed-e658509d…-1786999742405.mp4    15,083 s
+```
+
+`processed_video_url` == `clip_url` == `dialog_shots.final_url` == Output des
+Renders `c5a53235`, also des letzten Jobs dieses Runs.
+`resolveSceneOutput().source = 'processed'`.
+
+### 10. Auffälligkeiten (neutral dokumentiert, keine Bewertung)
+
+| # | Beobachtung | Einordnung |
+|---|---|---|
+| a | **3,751 s Stille am Szenenende** (Dialog endet 11,331 s, Container 15,083 s) | Kein P0/P1 aus den vorliegenden Daten. Die 15-s-Platte ist länger als die Dialog-Timeline; ob das Ergebnis störend wirkt, wird erst in der visuellen/auditiven Prüfung bewertet. |
+| b | **`face_probe_unavailable` ×6** (`FACE_GATE_PROBE_UNAVAILABLE`, `v251_anchor_missing_probe_unavailable:no_cache_no_server_extract; source=none`), je einmal pro Pass 0–5, jeweils `non_blocking: true`, Dispatch danach HTTP 201 | Non-blocking Warning. Wird nicht hochgestuft, solange die Face-/Identity-Zuordnung im finalen Clip korrekt ist. |
+| c | **Keine `composer_scene_runs`-Zeile** für diesen Run (Tabelle projektweit leer, 0 Zeilen) | Beobachtung, kein FA-4-Blocker. Der aktuelle produktive Run-/Ledger-Vertrag setzt diese Tabelle nicht als Source of Truth voraus; Run-Wahrheit liegt in `composer_pipeline_jobs` + `composer_scenes.dialog_shots`. |
+
+### Visuelle Prüfung — offen
+
+Die abschließende visuelle/auditive Abnahme des finalen Clips steht noch aus
+und wird nach Durchführung hier ergänzt. Prüfumfang: Stimme ↔ Character-
+Zuordnung, richtiger sprechender Mund, stabile Face-/Slot-Zuordnung über alle
+sechs Turns (insbesondere Sarah Turn 1/5 und Samuel Turn 2/6), sichtbare
+Artefakte sowie die Wirkung der 3,751 s Endstille.
+
+---
+
+**FA-4 FINAL RETEST — TECHNICAL PASS / VISUAL REVIEW PENDING**
+
+Technische Pipeline-Kriterien bestanden: Plate, Preclip, 6/6 turn-backed
+Sync-Segmente, Audio-Mux, finaler Output und Ledger-Kardinalität korrekt.
+
+Noch offen: finale visuelle/auditive Prüfung auf richtige Stimme ↔
+Character-Zuordnung, richtigen Mund, stabile Face-/Slot-Zuordnung und sichtbare
+Artefakte.
+
+Kein weiterer Render, kein Retry, kein Reset.
