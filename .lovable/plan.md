@@ -22,10 +22,12 @@ Sarah, Samuel, Matthew, Kay erhalten je eine unterschiedliche ElevenLabs-Voice-I
 Speichern über den normalen Save-Pfad des Panels. Danach read-only prüfen:
 `dialog_voices` enthält 4 distinct Voice-IDs, je über die Character-ID gebunden.
 
-## Schritt 4 — Turn-Identität verifizieren (read-only)
+## Schritt 4 — Turn-Identität prüfen (read-only, zwei zulässige Ausgänge)
 
-Erwartung: 6 `dialog_turns` mit eindeutigen `turn_id`, auf exakt 4 distinct
-Character-IDs.
+`dialog_turns` vor dem Render ist **keine** harte Pre-Start-Bedingung. Nach dem
+Voice-Save read-only zählen:
+
+**Fall A — 6 Rows vorhanden:** IDs direkt verifizieren.
 
 | Turn | Character | Bedingung |
 |---|---|---|
@@ -33,6 +35,17 @@ Character-IDs.
 | 2 / 6 | Samuel | gleiche `character_id`, verschiedene `turn_id` |
 | 3 | Matthew | eigene `character_id` |
 | 4 | Kay | eigene `character_id` |
+
+**Fall B — 0 Rows:** kein P0/P1. Read-only belegen, dass der produktive Pfad die
+Turns weiterhin JIT materialisiert (`ensureDialogTurnsForScene` bzw. Äquivalent in
+`_shared/scene-dialog-turns.ts`) und zwar **vor** `compose-twoshot-audio` und damit
+vor Erzeugung des `turn_id`-Payloads. Ist das bestätigt, ist S11 gültig mit:
+
+- `dialog_turns_prestart = 0` (expected JIT)
+- Skript eindeutig auf die 4 Character-IDs auflösbar
+- 4 Voices korrekt ID-gebunden
+- die sechs realen `turn_id` werden unmittelbar beim Renderstart gesichert
+
 
 ## Schritt 5 — Reload und finaler Pre-Start-Snapshot (read-only)
 
