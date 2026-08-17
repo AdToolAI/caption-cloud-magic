@@ -3403,30 +3403,22 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
         );
       })()}
       
-      {/* Phase 1: PrecisionSubtitleOverlay with word-level karaoke */}
+      {/* Subtitles — rendered exactly in the style the customer selected */}
       {!diagToggles.disablePrecisionSubtitles && subtitles && Array.isArray(subtitles) && subtitles.length > 0 && (() => {
         if (frame === 0) console.log(`[FORENSIC] ENTER_SUBTITLE_OVERLAY count=${subtitles?.length || 0}`);
         return (
-        <PrecisionSubtitleOverlay
-          subtitles={subtitles.map(s => ({
-            text: s?.text || '',
-            startTime: s?.startTime || 0,
-            endTime: s?.endTime || 0
-          }))}
+        <StyledSubtitles
+          subtitles={subtitles}
+          subtitleStyle={subtitleStyle}
           phonemeTimestamps={Array.isArray(phonemeTimestamps) ? phonemeTimestamps.filter((p): p is { character: string; start_time: number; end_time: number } => 
             typeof p?.character === 'string' && typeof p?.start_time === 'number' && typeof p?.end_time === 'number'
           ) : undefined}
-          config={{
-            animationStyle: 'karaoke',
-            fontSize: subtitleStyle?.fontSize || 48,
-            textColor: subtitleStyle?.fontColor || '#FFFFFF',
-            backgroundColor: subtitleStyle?.backgroundColor || 'rgba(0,0,0,0.75)',
-            position: subtitleStyle?.position || 'bottom',
-            highlightColor: primaryColor,
-          }}
+          frame={frame}
+          fps={fps}
         />
         );
       })()}
+
       
       {/* Progress bar */}
       {showProgressBar && (
