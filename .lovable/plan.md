@@ -7,8 +7,7 @@ Ziel: Der Watchdog erstattet nur noch gegen eine DB-seitig belegte, run-scharfe 
 ### a) Partial Unique Index (wie vom Nutzer formuliert)
 
 ```sql
-CREATE UNIQUE INDEX CONCURRENTLY-frei (in Migration normal)
-  ai_video_transactions_refund_provenance_uniq
+CREATE UNIQUE INDEX ai_video_transactions_refund_provenance_uniq
 ON public.ai_video_transactions (
   (metadata->>'refund_charge_id'),
   (metadata->>'refund_reason')
