@@ -97,7 +97,7 @@ Zusätzliche Fälle: N=1, N=2, N=4, Extra-Faces, zu wenige plausible Faces → f
 - Kanonischer Sanity-Filter + Bijektion: `supabase/functions/_shared/plateFaceSlotRouter.ts` ist der vorgesehene Owner — er besitzt bereits Detection, Normalisierung und `optimalAssignmentMin()`. Der Filter gehört zwischen `detectFacesOnBytes()` und den Matrix-Aufbau.
 - Zu neutralisieren in `compose-dialog-segments/index.ts`: Bridge-Autorität, `anchorRekFacesByCid`-First-Match, `byIdRanked`-Auswahl, `trustedSlots`-Shortcut im `v239_repair_gate`.
 - Weitere Betroffene: `_shared/plate-face-identity.ts` (`resolvePlateFaceIdentities`), `_shared/pass-face-preclip.ts` (Crop-Transform, `computeFaceCrop`/`computeMouthCenteredCrop`), `_shared/asd-strategy.ts`, `sync-so-webhook/index.ts` (nur lesend geprüft), `_shared/scene-hard-reset.ts`.
-- Späterer minimaler Deploy-Scope: `compose-dialog-segments` (zieht `_shared` ein). Kein weiterer Function-Redeploy vorgesehen.
+- Deploy-Scope, statisch belegt: `plateFaceSlotRouter.ts` hat genau zwei Importer. `compose-video-clips/index.ts:71` importiert **nur** `buildAnchorLayoutFromV274` — dieser Export bleibt unverändert, also kein Redeploy. `compose-dialog-segments/index.ts:91` importiert `routePlateFacesToAnchor` und `AnchorFaceLayout` — nur das ist der geänderte Export. **Minimaler Deploy-Scope: ausschließlich `compose-dialog-segments`.** Keine pauschale Shared-Importer-Neuausrollung.
 
 ## Nicht im Scope (FROZEN)
 
