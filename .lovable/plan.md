@@ -54,7 +54,7 @@ Ersetzt bzw. entwertet werden:
 
 - `anchorRekFacesByCid` First-Match-Autorität (Zeilen ~2126–2160) — entfällt als Auswahlquelle.
 - `v183_anchor_identity_slot_bridge` (~2000–2039) als autoritative Identity-Zuweisung — nur noch Diagnostik.
-- `byIdRanked`-Confidence-Ranking (~2054–2090) als Auswahlpfad — nur noch Supporting Score.
+- `byIdRanked`-Confidence-Ranking (~2054–2090) als Auswahlpfad — nur noch non-authoritative diagnostic/supporting evidence.
 - Jeder Confidence-Shortcut, der Geometrie/Sanity umgeht.
 
 ### Contract D — Sanity IMMER nach Assignment
