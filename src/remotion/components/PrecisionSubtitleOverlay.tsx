@@ -275,7 +275,7 @@ export const PrecisionSubtitleOverlay: React.FC<PrecisionSubtitleOverlayProps> =
     <div
       style={{
         position: 'absolute',
-        ...positionStyles[position],
+        ...placement.style,
         maxWidth: mergedConfig.maxWidth,
         padding: hasBox ? mergedConfig.padding : 0,
         backgroundColor: hasBox
