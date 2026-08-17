@@ -1668,8 +1668,10 @@ Technische Pipeline-Kriterien bestanden: Plate, Preclip, 6/6 turn-backed
 Sync-Segmente, Audio-Mux, finaler Output und Ledger-Kardinalität korrekt.
 
 Visuelle Abnahme nicht bestanden: T4 animiert den falschen Mund (Slot 3 statt
-Slot 4), T1 und T3 zeigen keine Mundbewegung. FA-4 bleibt damit **nicht** auf
-PASS.
+Slot 4), T1 und T3 zeigen keine Mundbewegung. Zusätzlich formal offen: die
+abhörende Audioprüfung ist in der Sandbox technisch nicht möglich (Chromium
+ohne H.264/AAC), es liegt nur eine signalanalytische Auswertung vor. FA-4
+bleibt damit **nicht** auf PASS.
 
 Kein weiterer Render, kein Retry, kein Reset.
 
