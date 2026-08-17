@@ -25,7 +25,7 @@ Nach Contract A: Anchor-Slots sind Character-Wahrheit, Plate-Faces sind rein geo
 - Ein Plate-Face darf nie zwei Characters tragen (Bijektion ist verpflichtend).
 - Extra-Faces bleiben im Ergebnis, aber ohne Character (bestehende v278.3-Semantik).
 - Weniger plausible Faces als Characters → `countMismatch` → fail-closed, kein Teil-Dispatch.
-- Identity-Labels wirken ausschließlich als Tie-Break/Zusatzscore und dürfen nie einen sanity- oder geometrie-invaliden Kandidaten erzwingen.
+- Identity labels only as non-authoritative diagnostic/supporting evidence: Character-/Identity-Labels dürfen weder in die Cost-Funktion eingehen noch die Gewinner-Bijektion verändern und niemals einen sanity- oder geometrie-invaliden Kandidaten erzwingen. Sie sind reine Telemetrie/Diagnostik.
 
 #### B.1 — Fail-closed-Bedingungen (Blocker geschlossen)
 
