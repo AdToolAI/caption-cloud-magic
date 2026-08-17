@@ -25,7 +25,7 @@
  * `compose-clip-webhook` so credits stay in lockstep.
  */
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
-import { CLIP_COSTS } from "../_shared/clip-costs.ts";
+import { refundRunCharge } from "./refund-provenance.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { logMissingReinjectPointer } from "../_shared/v431-ledger.ts";
@@ -172,7 +172,7 @@ async function processScene(
   const { data: scene, error } = await sb
     .from("composer_scenes")
     .select(
-      "id, project_id, replicate_prediction_id, plate_pipeline_job_id, clip_status, clip_url, duration_seconds, clip_source, clip_quality, updated_at, clip_error, engine_override",
+      "id, project_id, active_run_id, replicate_prediction_id, plate_pipeline_job_id, clip_status, clip_url, duration_seconds, clip_source, clip_quality, updated_at, clip_error, engine_override",
     )
     .eq("id", sceneId)
     .maybeSingle();
@@ -205,7 +205,7 @@ async function processScene(
       await markFailed(
         sb,
         sceneId,
-        `watchdog_no_prediction_id (refunded €${(refunded ?? 0).toFixed(2)})`,
+        `watchdog_no_prediction_id ${refunded === null ? "(no refund: no proven charge)" : `(refunded €${refunded.toFixed(2)})`}`,
         isCinematicSync,
       );
     }
@@ -245,7 +245,7 @@ async function processScene(
         await markFailed(
           sb,
           sceneId,
-          `watchdog_prediction_404 (refunded €${(refunded ?? 0).toFixed(2)})`,
+          `watchdog_prediction_404 ${refunded === null ? "(no refund: no proven charge)" : `(refunded €${refunded.toFixed(2)})`}`,
           isCinematicSync,
         );
         return { scene_id: sceneId, outcome: "clip_failed_refunded" };
@@ -298,7 +298,7 @@ async function processScene(
     if (!alreadyRefunded) {
       const refunded = await refundScene(sb, scene);
       const reason =
-        `watchdog_replicate_${status}: ${String(prediction?.error ?? "unknown").slice(0, 200)} (refunded €${(refunded ?? 0).toFixed(2)})`;
+        `watchdog_replicate_${status}: ${String(prediction?.error ?? "unknown").slice(0, 200)} ${refunded === null ? "(no refund: no proven charge)" : `(refunded €${refunded.toFixed(2)})`}`;
       await markFailed(sb, sceneId, reason, isCinematicSync);
     }
     console.log(
