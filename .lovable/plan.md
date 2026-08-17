@@ -25,7 +25,7 @@ Nach Contract A: Anchor-Slots sind Character-Wahrheit, Plate-Faces sind rein geo
 - Ein Plate-Face darf nie zwei Characters tragen (Bijektion ist verpflichtend).
 - Extra-Faces bleiben im Ergebnis, aber ohne Character (bestehende v278.3-Semantik).
 - Weniger plausible Faces als Characters → `countMismatch` → fail-closed, kein Teil-Dispatch.
-- Identity-Labels wirken ausschließlich als Tie-Break/Zusatzscore und dürfen nie einen sanity- oder geometrie-invaliden Kandidaten erzwingen.
+- Identity labels only as non-authoritative diagnostic/supporting evidence: Character-/Identity-Labels dürfen weder in die Cost-Funktion eingehen noch die Gewinner-Bijektion verändern und niemals einen sanity- oder geometrie-invaliden Kandidaten erzwingen. Sie sind reine Telemetrie/Diagnostik.
 
 #### B.1 — Fail-closed-Bedingungen (Blocker geschlossen)
 
@@ -35,15 +35,15 @@ Repo-weite read-only Prüfung: es existiert **kein** produktiver Grenzwert für 
 - `plate-face-identity.ts`: `minConfidence < 0.55 || minMargin < 0.15` (Zeile 553, N=3 verschärft auf 0.70/0.25) — das ist die **biometrische** Similarity-Ambiguity-Regel (v133), nicht Geometrie. Sie wird nicht auf Center-Distanzen übertragen.
 - Keine Router-/Identity-Tests und keine Doku definieren einen Geometrie-Cutoff.
 
-Contract-Festlegung: **Für diesen Fix wird kein neuer Distanz-Cutoff eingeführt.** Distanz, `maxDistance` und `matchConfidence` bleiben Telemetrie/Supporting Score.
+Contract-Festlegung: **Für diesen Fix wird kein neuer Distanz-Cutoff eingeführt.** Distanz, `maxDistance` und `matchConfidence` bleiben Telemetrie/Diagnostik. Die Assignment-Kosten bestehen ausschließlich aus der geometrischen Center-Distanz nach Candidate-Sanity — kein Identity-Term, kein Label-Tie-Break.
 
 Fail-closed gilt deterministisch genau bei:
 
 a) `plausible_candidates < expected_characters` (nach Contract A) — bestehende `countMismatch`-Semantik.
 b) Keine vollständige Bijektion möglich, d. h. mindestens ein Anchor-Slot bleibt ohne eigenen Kandidaten.
-c) Exakt degenerierte bzw. equal-cost Ambiguität: mehrere Bijektionen erreichen dieselben minimalen Gesamtkosten mit unterschiedlicher Character→Face-Zuordnung, oder zwei Kandidaten haben identische Center-Geometrie.
+c) **Exact equal-cost ambiguity**: es existieren mehrere unterschiedliche vollständige Bijektionen mit exakt derselben minimalen geometrischen Gesamtkosten, oder zwei Kandidaten haben exakt identische bzw. degenerierte Center-Geometrie. In beiden Fällen fail-closed — es wird nicht per Identity-Label aufgelöst.
 
-„near-identical" ist **kein** eigener Blocker — dafür existiert keine bestehende Toleranz. Der Testvertrag begrenzt sich auf exakt gleiche/degenerierte Geometrie und exakte Equal-Cost-Ambiguität.
+Kein Epsilon- und kein Near-Equal-Grenzwert. „near-identical" ohne exakte Gleichheit ist ausdrücklich **kein** Fehlerfall und kein Blocker.
 
 
 ### Contract C — assignmentLock-Semantik
@@ -54,21 +54,21 @@ Ersetzt bzw. entwertet werden:
 
 - `anchorRekFacesByCid` First-Match-Autorität (Zeilen ~2126–2160) — entfällt als Auswahlquelle.
 - `v183_anchor_identity_slot_bridge` (~2000–2039) als autoritative Identity-Zuweisung — nur noch Diagnostik.
-- `byIdRanked`-Confidence-Ranking (~2054–2090) als Auswahlpfad — nur noch Supporting Score.
+- `byIdRanked`-Confidence-Ranking (~2054–2090) als Auswahlpfad — nur noch non-authoritative diagnostic/supporting evidence.
 - Jeder Confidence-Shortcut, der Geometrie/Sanity umgeht.
 
 ### Contract D — Sanity IMMER nach Assignment
 
-Die final gewählte BBox wird erneut objektiv validiert. Der `trustedSlots`-Shortcut in `v239_repair_gate` (~2303–2420) darf `bboxSanity()` nicht mehr überspringen. Confidence darf nur Diagnostics, Supporting Score und die Frage „zusätzliche Identity-Prüfung nötig?“ beeinflussen — nie eine geometrisch invalide Box freigeben.
+Die final gewählte BBox wird erneut objektiv validiert. Der `trustedSlots`-Shortcut in `v239_repair_gate` (~2303–2420) darf `bboxSanity()` nicht mehr überspringen. Confidence ist non-authoritative diagnostic/supporting evidence und darf nur Diagnostics und die Frage „zusätzliche Identity-Prüfung nötig?“ beeinflussen — nie eine geometrisch invalide Box freigeben.
 
 ### Contract E — Deterministisches Preclip-Crop-Containment
 
 Vor jedem Sync.so-Dispatch ohne externen Vision-Service beweisbar:
 
-1. Target-BBox des zugeordneten Characters liegt vollständig im Preclip-Crop.
+1. Die vollständige finale Target-BBox des zugeordneten Characters liegt innerhalb des Preclip-Crops.
 2. Der Crop stammt aus genau dieser final zugeordneten Plate-BBox.
-3. Kein Zentrum eines anderen zugeordneten Speaker-Faces liegt im zulässigen Target-Bereich des Crops.
-4. Plate-space → Crop-space-Transformation ist deterministisch und bounds-valid.
+3. Kein Center einer ANDEREN final zugeordneten Speaker-BBox liegt innerhalb der final transformierten Target-BBox in Crop-Space. Geprüft wird exakt gegen diese transformierte Box — keine erweiterte Target-Zone, kein Padding, keine neue Toleranz.
+4. Die Plate-space → Crop-space-Transformation dieser Target-BBox ist deterministisch und bounds-valid (alle vier Kanten innerhalb der Crop-Dimensionen, nicht-degeneriert).
 5. Die an `bounding_boxes_url` übergebene Box entspricht exakt dieser transformierten Target-BBox.
 
 Sonst FAIL CLOSED vor Sync.so. Fehlerklassen-Name noch offen: das bestehende Inventar (`face_validation_failed`, `v153_plate_bbox_required`, `v133_identity_ambiguous`, `v187_preclip_required_no_fullplate_fallback`) wird im Implementierungsschritt geprüft; erst dann wird entschieden, ob eine bestehende Klasse passt oder eine neue (Arbeitstitel `preclip_identity_geometry_mismatch`) eingeführt wird.
@@ -90,7 +90,7 @@ Kay     → [1030,208,1099,296]
 
 Nachzuweisen: untergroße False Positives fallen vor Hungarian raus; genau die vier großen Faces bleiben; unlabeled Matthew/Kay werden korrekt gewählt; High-Confidence-Tiny-Boxes gewinnen nie; Kandidaten-Reihenfolge ist ergebnisneutral; Extra-Faces verschieben nichts; keine Box doppelt.
 
-Zusätzliche Fälle: N=1, N=2, N=4, Extra-Faces, zu wenige plausible Faces → fail-closed (B.1a), unvollständige Bijektion → fail-closed (B.1b), **exakt identische/degenerierte Kandidatengeometrie bzw. Equal-Cost-Ambiguität → fail-closed (B.1c)**, umsortierter Detector-Output, hohe Confidence bei invalider Geometrie, korrekte Geometrie ohne Label, korrekte Geometrie mit widersprüchlichem Label. Kein Test darf einen Distanz-Cutoff voraussetzen; „near-identical" ohne exakte Gleichheit ist ausdrücklich kein Fehlerfall.
+Zusätzliche Fälle: N=1, N=2, N=4, Extra-Faces, zu wenige plausible Faces → fail-closed (B.1a), unvollständige Bijektion → fail-closed (B.1b), exakt identische/degenerierte Candidate-Center → fail-closed (B.1c), unterschiedliche Bijektionen mit exakt gleicher minimaler Gesamtkosten → fail-closed (B.1c), umsortierter Detector-Output, hohe Confidence bei invalider Geometrie, korrekte Geometrie ohne Label, korrekte Geometrie mit widersprüchlichem Label. Kein Test darf einen Distanz-Cutoff oder Epsilon voraussetzen; near-identical ohne exakte Gleichheit ist ausdrücklich KEIN eigener Fehlerfall.
 
 ## Schritt 3 — Owner-/Scope-Matrix (Analyse, kein Code)
 
