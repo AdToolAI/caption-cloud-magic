@@ -302,7 +302,7 @@ Deno.test("T5: a failing CompareFaces call does not poison the cache or swallow 
     { 3: 95 },
   ];
 
-  const result = await runWithMockFetch({ faces, similarities, compareFailures: new Set([1]) }, async () => {
+  const { result, calls } = await runWithMockFetch({ faces, similarities, compareFailures: new Set([1]) }, async () => {
     return await resolveIdentityViaRekognition({
       anchorUrl,
       anchorWidth: 1024,
@@ -321,7 +321,6 @@ Deno.test("T5: a failing CompareFaces call does not poison the cache or swallow 
   assertEquals(result.assignmentLock["3"], "char-3");
   assertEquals(result.assignmentLock["1"], undefined, "failed compare character must stay unassigned");
 
-  const calls = getLastCalls();
   const anchorLoads = calls.filter((c) => c.method === "GET" && c.url === anchorUrl);
   assertEquals(anchorLoads.length, 1, "anchor must still be loaded only once despite one compare failure");
 });
