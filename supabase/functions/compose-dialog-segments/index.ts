@@ -6045,13 +6045,6 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         pass_idx: currentPassIdx,
         speaker_idx: (pass as any)?.speaker_idx ?? null,
       }));
-      return await failBeforeProviderDispatch(
-        "sync_segment_missing_segment_id",
-        "fa4_p0_preflight_blocked",
-        "Sync-Segment ohne kanonische segment_id (dialog_turns.id) — Dispatch blockiert.",
-        422,
-        { pass_idx: currentPassIdx },
-      );
     }
     const v431LedgerParams = {
       sceneId,
@@ -6069,7 +6062,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         segment_id: v431SegmentId,
       },
     };
-    const v431SyncDecision = v431PreAcquiredJobId
+    // Ohne Segmentidentität wird KEINE Ledger-Zeile akquiriert (sonst
+    // kollabieren alle Turns auf eine Zeile). Der Abbruch folgt unten,
+    // sobald `failBeforeProviderDispatch` definiert ist — vor jedem
+    // Provider-Call.
+    const v431SyncDecision = !v431SegmentId
+      ? ({ outcome: "unavailable", reason: "fa4_p0_missing_segment_id" } as const)
+      : v431PreAcquiredJobId
       ? await adoptPreAcquiredLedgerJob(supabase, v431PreAcquiredJobId, {
           sceneId,
           stage: "sync_segment",
@@ -6078,6 +6077,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           segmentId: v431SegmentId,
         })
       : await resolveLedgerDispatch(supabase, v431LedgerParams, readRetryContext(body));
+
 
 
     // G3.1b — Race-Verlierer dispatcht nicht. Die fremde Zeile wird NICHT
