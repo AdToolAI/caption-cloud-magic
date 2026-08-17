@@ -239,20 +239,59 @@ serve(async (req) => {
     let lambdaRequestId: string | null = null;
     let lambdaError: string | null = null;
 
-    // Mark as rendering BEFORE call
-    await supabase.from('video_renders').update({
-      status: 'rendering',
-      bucket_name: bucketName,
-      content_config: {
-        ...existingConfig,
-        lambda_invoked_at: new Date().toISOString(),
-        lambda_render_id: pendingRenderId,
+    // ✅ FA-4/P0 — ATOMIC DISPATCH CLAIM (true compare-and-set, no SELECT→UPDATE).
+    // The UPDATE only matches while content_config->>lambda_invoked_at IS NULL, so
+    // exactly one concurrent caller gets a row back and is allowed to call AWS.
+    // No DB row lock is held across the external AWS call.
+    const { data: claimedRows, error: claimError } = await supabase
+      .from('video_renders')
+      .update({
+        status: 'rendering',
         bucket_name: bucketName,
-        out_name: outName,
-        lambda_function: LAMBDA_FUNCTION_NAME,
-        serve_url: serveUrl.substring(0, 120),
-      },
-    }).eq('render_id', pendingRenderId);
+        content_config: {
+          ...existingConfig,
+          lambda_invoked_at: new Date().toISOString(),
+          lambda_render_id: pendingRenderId,
+          bucket_name: bucketName,
+          out_name: outName,
+          lambda_function: LAMBDA_FUNCTION_NAME,
+          serve_url: serveUrl.substring(0, 120),
+        },
+      })
+      .eq('render_id', pendingRenderId)
+      .is('content_config->>lambda_invoked_at', null)
+      .select('render_id');
+
+    if (claimError) {
+      console.error(`❌ Dispatch claim failed: ${claimError.message}`);
+      return new Response(
+        JSON.stringify({ error: `dispatch_claim_failed: ${claimError.message}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!claimedRows || claimedRows.length === 0) {
+      // Another caller won the CAS in the meantime → never start a second Lambda.
+      const { data: raced } = await supabase
+        .from('video_renders')
+        .select('status, content_config')
+        .eq('render_id', pendingRenderId)
+        .maybeSingle();
+      const racedRealId = (raced?.content_config as any)?.real_remotion_render_id ?? null;
+      console.log(`⏭️ Lost dispatch CAS for ${pendingRenderId} — no AWS call (real_id=${racedRealId ?? 'pending'})`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          renderId: pendingRenderId,
+          lambdaRenderId: racedRealId || pendingRenderId,
+          realRemotionRenderId: racedRealId,
+          alreadyStarted: true,
+          unresolved: !racedRealId,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
 
     if (progressId) {
       const { data: progressRow } = await supabase
