@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      _p1a_race_fixture: {
+        Row: {
+          charge_id: string
+          run_id: string
+          user_id: string
+        }
+        Insert: {
+          charge_id: string
+          run_id: string
+          user_id: string
+        }
+        Update: {
+          charge_id?: string
+          run_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      _p1a_race_log: {
+        Row: {
+          actor: string
+          created_at: string
+          id: number
+          result: Json | null
+        }
+        Insert: {
+          actor: string
+          created_at?: string
+          id?: number
+          result?: Json | null
+        }
+        Update: {
+          actor?: string
+          created_at?: string
+          id?: number
+          result?: Json | null
+        }
+        Relationships: []
+      }
       ab_test_events: {
         Row: {
           event_type: string
