@@ -6658,7 +6658,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // stabilizer AND the audio_url is our deterministic silence-track.
     const isStabilizer = isStabilizerPass(pass);
 
-    const finalAudioDiag = isStabilizerPass
+    const finalAudioDiag = isStabilizer
       ? null
       : await inspectSpeakerAudioWithRetry(pass.audio_url, 3).catch((audioErr) => {
           console.warn(
