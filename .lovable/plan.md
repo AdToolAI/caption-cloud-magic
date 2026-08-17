@@ -44,6 +44,8 @@ Atomarer Ablauf:
 5. Sonst in **einer** DB-Transaktion (die RPC ist der gesamte Transaktionsrahmen, keine Edge-seitige Zweischritt-Operation): Wallet-Gutschrift **und** Insert der `type='refund'`-Transaction. Schlägt der Insert fehl, wird die Wallet-Erhöhung mit zurückgerollt. **User/Wallet stammen ausschließlich aus der gelockten Charge** (`charge.user_id` → dessen Wallet), nie aus Caller-Parametern. Betrag `abs(charge.amount_euros)`, Metadata `{ refund_charge_id, run_id, refund_reason }` → `refunded`.
 6. Race-Schutz ist primär der Charge-Lock: Caller 2 wartet auf `FOR UPDATE` und sieht danach in Schritt 4 den Refund von Caller 1. Der Unique-Index ist nur die letzte harte DB-Sicherung. Falls er dennoch greift: Wallet-Update und Refund-Insert liegen zusammen in **einem** PL/pgSQL-`BEGIN ... EXCEPTION`-Block, sodass die Wallet-Erhöhung dieses Versuchs beim Insert-Fehler mit zurückgerollt ist, bevor `already_refunded` zurückgegeben wird. Behandelt wird **ausschließlich** die Verletzung von `ai_video_transactions_refund_charge_uniq` (Constraint-Name via `GET STACKED DIAGNOSTICS CONSTRAINT_NAME` geprüft): bestehende Refund-Row erneut lesen, `already_refunded` mit 0 € zurückgeben. Kein generisches `WHEN unique_violation`; jeder andere Constraint-Fehler wird re-raised.
 
+Die neue Refund-Row führt ihre Provenance ausschließlich in `metadata.refund_charge_id`, `metadata.run_id` und `metadata.refund_reason`. `generation_id` der Refund-Row ist **keine** Provenancequelle und wird von der Idempotenzlogik nie gelesen (historisch uneinheitliche Bedeutung).
+
 Rückgabe (jsonb): `{ outcome, amount_euros, refund_transaction_id }` mit `outcome ∈ {no_charge, already_refunded, refunded}`.
 Betrag ausschließlich aus der validierten Charge — kein `CLIP_COSTS`, kein Caller-Betrag.
 
@@ -64,7 +66,7 @@ Zweistufig: Resolver-/Caller-Logik als Deno-Unit-Tests (`recover-stuck-composer-
 1. **T1 (No/Weak Provenance)** — Legacy-Charge `generation_id = project_id` → `no_charge`, Wallet unverändert, Szene trotzdem `failed`. *(Unit + DB)*
 2. **T2 (Success)** — run-scharfe Charge → `refunded`, exakt `abs(amount_euros)` der Charge. *(Unit + DB)*
 3. **T3 (Idempotenz, echt in der DB)** — zweiter Aufruf, auch mit **anderem** `refund_reason` → `already_refunded`, 0 €; genau eine Refund-Row, Wallet-Differenz genau einmal. *(DB verpflichtend)*
-4. **T4 (Parallel-Race, echt in der DB)** — zwei gleichzeitige RPC-Aufrufe auf dieselbe Charge aus zwei separaten PostgreSQL-Sessions → genau eine Wallet-Gutschrift, genau eine Refund-Row, der Verlierer erhält `already_refunded`. Kein Fake-Lock, echtes `FOR UPDATE` + Unique-Constraint. *(DB verpflichtend)*
+4. **T4 (Parallel-Race, echt in der DB)** — zwei gleichzeitige RPC-Aufrufe auf dieselbe Charge aus **zwei separaten PostgreSQL-Sessions**. Geprüft werden neben den Outcomes drei Fakten: (a) genau eine Refund-Row für die Charge, (b) Wallet-Differenz exakt einmal `abs(amount_euros)`, (c) keine zweite finanzielle Transaction für dieselbe Charge. Kein Fake-Lock, echtes `FOR UPDATE` + Unique-Constraint. *(DB verpflichtend)*
 5. **T5 (Pricing-Drift)** — Pricing nach der Charge geändert → Refund unverändert aus der Charge. *(Unit + DB)*
 6. **T6 (Zwei Runs derselben Szene)** — zwei run-scharfe Charges → getrennt refundierbar, jeder Refund charge-spezifisch, keine Kollision. *(DB verpflichtend)*
 
