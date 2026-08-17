@@ -3136,27 +3136,19 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
           </div>
         </AbsoluteFill>
         
-        {/* Phase 1: PrecisionSubtitleOverlay with karaoke */}
+        {/* Subtitles — rendered exactly in the style the customer selected */}
         {subtitles && subtitles.length > 0 && (
-          <PrecisionSubtitleOverlay
-            subtitles={subtitles.map(s => ({
-              text: s.text,
-              startTime: s.startTime,
-              endTime: s.endTime
-            }))}
+          <StyledSubtitles
+            subtitles={subtitles}
+            subtitleStyle={subtitleStyle}
             phonemeTimestamps={phonemeTimestamps?.filter((p): p is { character: string; start_time: number; end_time: number } => 
               typeof p.character === 'string' && typeof p.start_time === 'number' && typeof p.end_time === 'number'
             )}
-            config={{
-              animationStyle: 'karaoke',
-              fontSize: subtitleStyle?.fontSize || 48,
-              textColor: subtitleStyle?.fontColor || '#FFFFFF',
-              backgroundColor: subtitleStyle?.backgroundColor || 'rgba(0,0,0,0.75)',
-              position: subtitleStyle?.position || 'bottom',
-              highlightColor: primaryColor,
-            }}
+            frame={frame}
+            fps={fps}
           />
         )}
+
       </AbsoluteFill>
     );
   }
