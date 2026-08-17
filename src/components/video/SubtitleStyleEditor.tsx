@@ -42,6 +42,15 @@ const generateStrokeShadow = (color: string, width: number) => {
   return shadows.join(', ');
 };
 
+/**
+ * The video composition is authored at 1080 px width, the panel preview box is
+ * much smaller. Scale the font down by the same factor so the panel shows what
+ * the customer will actually see in the player.
+ */
+const PREVIEW_BOX_WIDTH = 360;
+const COMPOSITION_REFERENCE_WIDTH = 1080;
+const PREVIEW_SCALE = PREVIEW_BOX_WIDTH / COMPOSITION_REFERENCE_WIDTH;
+
 const getPreviewStyles = (style: SubtitleStyle): React.CSSProperties => {
   // NOTE: no CSS `animation` here on purpose. The old implementation used
   // `${style.animation} 2s infinite` with keyframe names that don't exist,
@@ -49,10 +58,14 @@ const getPreviewStyles = (style: SubtitleStyle): React.CSSProperties => {
   // static look; motion is shown in the video player.
   const baseStyle: React.CSSProperties = {
     fontFamily: style.font || 'Inter',
-    fontSize: `${style.fontSize || 28}px`,
+    fontSize: `${Math.max(9, (style.fontSize || 28) * PREVIEW_SCALE)}px`,
     fontWeight: 600,
     color: style.color || '#FFFFFF',
+    textAlign: 'center',
+    maxWidth: '84%',
+    lineHeight: 1.3,
   };
+
 
   switch (style.outlineStyle) {
     case 'none': return { ...baseStyle, backgroundColor: 'transparent', textShadow: 'none' };
