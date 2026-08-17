@@ -122,10 +122,55 @@ Zuordnung vollständig dokumentieren. Erwartung: die vier großen realen
 Kandidaten sind aus den bereits vorhandenen Run-Daten eindeutig
 rekonstruierbar.
 
+## Stand der vier Lock-Fragen (Zwischenergebnis)
+
+| Frage | Status |
+|---|---|
+| 1 v278/Hungarian gelaufen, wo überschrieben? | **NICHT BEWIESEN** — Logs verfallen |
+| 2 `v183_anchor_identity_slot_bridge` gelaufen? | starke persistierte Evidenz (`confidence: 0` + exakt `matchConfidence: 0.85`), Logzeile fehlt |
+| 3 `v239_repair_gate` trusted trotz Untergröße? | **BEWIESEN** (Trusted-Shortcut überspringt `bboxSanity()`) |
+| 4 v277 First-Match autoritativ? | **BEWIESEN für Sarah**; Matthew/Kay zeigen zusätzlich: Ranking-only reicht nicht |
+
+Sanity-Gegenrechnung (Plate 1284×718, Produktionskriterien Area 0.003–0.25,
+Aspect 0.4–2.5): Sarah 0.0424 % / 0.739, Samuel 0.5901 % / 0.753, Matthew
+0.0195 % / 0.800, Kay 0.0387 % / 0.810 → drei von vier `area_too_small`, alle
+vier dennoch trusted (Sarah mconf 0.85, Samuel mconf 0.693, Matthew conf 0.890,
+Kay conf 0.773). Hungarian nach Sanity-Filter liefert exakt die Diagonale auf
+die vier großen Faces. Face-Gate: 6× `FACE_GATE_PROBE_UNAVAILABLE`, jeweils
+direkt gefolgt von `DISPATCHED` (fail-open bestätigt).
+
+## Blocker Frage 1: Log-Retention abgelaufen (read-only verifiziert)
+
+`compose-dialog-segments` liefert keine Logs mehr; die Analytics-Stdout-Tabelle
+enthält für 2026-08-17 20:30–21:00Z **null Zeilen**, frühester verfügbarer
+Eintrag ist 23:07Z. Der Stdout-Beleg für `v278_router` /
+`v183_anchor_identity_slot_bridge` aus Run `b9acfae3` existiert also nicht mehr
+und ist auch nicht wiederherstellbar. Frage 1 bleibt deshalb offen — ohne
+weiteren Schritt dauerhaft.
+
+Drei Wege, den Lock zu schließen (Entscheidung des Auftraggebers, kein Default):
+
+- **A — Statischer Pfadbeweis (kein Render, keine Kosten).** Aus dem Code
+  ableiten, unter welchen Bedingungen `routePlateFacesToAnchor()` ein Ergebnis
+  liefert, das nicht final wird, und zeigen, dass der persistierte Zustand (10
+  Faces in `plate_identity.faces`, Bridge-Signatur, First-Match-Reihenfolge)
+  nur mit genau einem dieser Pfade konsistent ist. Ergebnis wäre ein
+  *deduktiver* Beweis, kein Log-Beweis — der Lock würde als
+  "Frage 1: deduktiv geschlossen, ohne Laufzeitbeleg" dokumentiert.
+- **B — Persistente Entscheidungs-Telemetrie + Reproduktion.** Kleine
+  Code-Änderung, die die Face-Routing-Entscheidung (v278-Ergebnis, Bridge,
+  Trust-Grund, gewählte BBox pro Character) in die Szene persistiert statt nur
+  zu loggen, danach ein günstiger Plate-only-Repro-Run. Das schließt Frage 1
+  mit echtem Laufzeitbeleg und macht künftige Locks retention-unabhängig.
+  Kostet einen Render.
+- **C — Frage 1 offen lassen.** Der Zielvertrag ist Geometrie-first und
+  entwertet beide möglichen Pfade (v278 verworfen *oder* v278 überschrieben)
+  gleichermaßen. Der Fix wäre in beiden Fällen identisch. Frage 1 bliebe als
+  offener Punkt dokumentiert.
+
 Ergebnis dokumentieren in `docs/v433-motion-studio-final-acceptance.md` als
 eigener Abschnitt "FA-4 Root-Cause-Lock — Face-Candidate-Auswahl", unter dem
-bestehenden Status TECHNICAL PASS / VISUAL REVIEW: ISSUES. Erst wenn alle vier
-Übergänge mit Run-Daten/Logs belegt sind, wird der Fix-Contract eingefroren.
+bestehenden Status TECHNICAL PASS / VISUAL REVIEW: ISSUES.
 
 ## Fix-Contract-Skizze (nur Entwurf, noch nicht umsetzen)
 
