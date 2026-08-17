@@ -49,7 +49,9 @@ Nachzuweisen für S10:
 - 4 Cast-IDs bijektiv zu 4 Identitäten
 - 4 Voice-IDs eindeutig, keine Doppelbelegung, Keys = characterId
 - 6 Skriptzeilen eindeutig einem Sprecher zugeordnet
-- Identity Gate: 6 Turns → exakt 4 stabile Character-IDs, Turn 1 = Turn 5, Turn 2 = Turn 6
+- Identity Gate: 6 Turns → ID-Sequenz Sarah / Samuel / Matthew / Kay / Sarah / Samuel; Turn 1 = Turn 5 (identische Sarah-ID), Turn 2 = Turn 6 (identische Samuel-ID)
+- UI-TTS-Prognose im Korridor ~8–10 s bei 15-s-Plate
+- Anker-Frische: `reference_image_url` (und `lock_reference_url`) auf S10 sind vor dem Render **NULL** — kein Anker aus S08/S09 wird übernommen, damit P1-B real auf einer neuen Anchor-Sequenz greift
 - C1: nach vollem Reload ist der Lip-Sync-Intent **resolved** und stimmt mit dem persistierten DB-Wert überein (kein Draft-Overlay)
 
 ## Fix-spezifischer Nachweis (P1-A / P1-B)
