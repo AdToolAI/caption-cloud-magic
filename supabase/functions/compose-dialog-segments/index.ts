@@ -918,13 +918,19 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     let canonicalDialogTurnsCount = 0;
     let canonicalSpeakerIds: string[] = [];
     let speakersSource = "audio_plan";
+    /** FA-4/P0 — kanonische Turn-ID-Menge dieser Szene (Quelle: dialog_turns). */
+    let canonicalDialogTurnIds: string[] = [];
 
     if (await readIdOnlyEnabled(supabase)) {
       const ensuredTurns = await ensureDialogTurnsForScene(supabase, scene as any);
       if (ensuredTurns.ok) {
         canonicalDialogTurnsCount = ensuredTurns.turns.length;
         canonicalSpeakerIds = orderedSpeakerIdsFromTurns(ensuredTurns.turns);
+        canonicalDialogTurnIds = ensuredTurns.turns
+          .map((t) => (typeof t.turnId === "string" ? t.turnId.trim() : ""))
+          .filter((id) => id.length > 0);
         speakersSource = "dialog_turns";
+
         console.log(
           `[compose-dialog-segments] v201_id_only_cast scene=${sceneId} source=${ensuredTurns.source} turns=${canonicalDialogTurnsCount} cast=[${canonicalSpeakerIds.join(",")}]`,
         );
