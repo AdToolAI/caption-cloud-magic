@@ -350,17 +350,19 @@ export async function resolveIdentityViaRekognition(params: {
     return { ...empty, reason: "empty_input", msTotal: Date.now() - t0 };
   }
 
-  const anchorBytes = await fetchImageBytes(params.anchorUrl);
-  if (!anchorBytes) {
+  const cache = new ImageEncodingCache();
+
+  const anchorCached = await cache.load(params.anchorUrl);
+  if (!anchorCached) {
     return { ...empty, reason: "anchor_fetch_failed", msTotal: Date.now() - t0 };
   }
-  const probed = await probeImageDims(anchorBytes);
+  const probed = await probeImageDims(anchorCached.bytes);
   const W = params.anchorWidth ?? probed?.width ?? 1024;
   const H = params.anchorHeight ?? probed?.height ?? 1024;
 
   let detected: DetectedFace[];
   try {
-    detected = await detectFacesOnAnchor(anchorBytes, W, H);
+    detected = await detectFacesOnAnchor(anchorCached.base64, W, H);
   } catch (e) {
     return { ...empty, dims: { width: W, height: H }, reason: `detect_failed:${(e as Error).message}`, msTotal: Date.now() - t0 };
   }
@@ -368,17 +370,17 @@ export async function resolveIdentityViaRekognition(params: {
     return { ...empty, dims: { width: W, height: H }, reason: "detect_zero_faces", msTotal: Date.now() - t0 };
   }
 
-  // Fetch portraits in parallel.
-  const portraitBytesArr = await Promise.all(
-    params.characters.map((c) => fetchImageBytes(c.portraitUrl)),
+  // Fetch portraits in parallel through the same cache.
+  const portraitCachedArr = await Promise.all(
+    params.characters.map((c) => cache.load(c.portraitUrl)),
   );
 
   // Score matrix: rows=characters, cols=detected slots.
   const scoreMatrix: number[][] = [];
   for (let i = 0; i < params.characters.length; i++) {
-    const pb = portraitBytesArr[i];
-    if (!pb) { scoreMatrix.push(new Array(detected.length).fill(0)); continue; }
-    const simMap = await compareOnePortrait(pb, anchorBytes, detected);
+    const pc = portraitCachedArr[i];
+    if (!pc) { scoreMatrix.push(new Array(detected.length).fill(0)); continue; }
+    const simMap = await compareOnePortrait(pc.base64, anchorCached.base64, detected);
     scoreMatrix.push(detected.map((d) => simMap.get(d.slot) ?? 0));
   }
 
