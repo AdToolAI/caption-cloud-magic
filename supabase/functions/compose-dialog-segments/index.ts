@@ -3794,6 +3794,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               speaker_idx: listenerIdx,
               character_id: listenerSpeaker?.character_id ?? null,
               speaker_name: `stabilizer_${listenerSpeaker?.speaker ?? listenerIdx}`,
+              segment_id: await stabilizerSegmentId(listenerIdx),
+
               audio_url: silenceUrl,
               coords: [Number(coord[0]), Number(coord[1])] as [number, number],
               segments: otherSegs,
