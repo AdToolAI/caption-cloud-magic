@@ -35,15 +35,15 @@ Repo-weite read-only Prüfung: es existiert **kein** produktiver Grenzwert für 
 - `plate-face-identity.ts`: `minConfidence < 0.55 || minMargin < 0.15` (Zeile 553, N=3 verschärft auf 0.70/0.25) — das ist die **biometrische** Similarity-Ambiguity-Regel (v133), nicht Geometrie. Sie wird nicht auf Center-Distanzen übertragen.
 - Keine Router-/Identity-Tests und keine Doku definieren einen Geometrie-Cutoff.
 
-Contract-Festlegung: **Für diesen Fix wird kein neuer Distanz-Cutoff eingeführt.** Distanz, `maxDistance` und `matchConfidence` bleiben Telemetrie/Supporting Score.
+Contract-Festlegung: **Für diesen Fix wird kein neuer Distanz-Cutoff eingeführt.** Distanz, `maxDistance` und `matchConfidence` bleiben Telemetrie/Diagnostik. Die Assignment-Kosten bestehen ausschließlich aus der geometrischen Center-Distanz nach Candidate-Sanity — kein Identity-Term, kein Label-Tie-Break.
 
 Fail-closed gilt deterministisch genau bei:
 
 a) `plausible_candidates < expected_characters` (nach Contract A) — bestehende `countMismatch`-Semantik.
 b) Keine vollständige Bijektion möglich, d. h. mindestens ein Anchor-Slot bleibt ohne eigenen Kandidaten.
-c) Exakt degenerierte bzw. equal-cost Ambiguität: mehrere Bijektionen erreichen dieselben minimalen Gesamtkosten mit unterschiedlicher Character→Face-Zuordnung, oder zwei Kandidaten haben identische Center-Geometrie.
+c) **Exact equal-cost ambiguity**: es existieren mehrere unterschiedliche vollständige Bijektionen mit exakt derselben minimalen geometrischen Gesamtkosten, oder zwei Kandidaten haben exakt identische bzw. degenerierte Center-Geometrie. In beiden Fällen fail-closed — es wird nicht per Identity-Label aufgelöst.
 
-„near-identical" ist **kein** eigener Blocker — dafür existiert keine bestehende Toleranz. Der Testvertrag begrenzt sich auf exakt gleiche/degenerierte Geometrie und exakte Equal-Cost-Ambiguität.
+Kein Epsilon- und kein Near-Equal-Grenzwert. „near-identical" ohne exakte Gleichheit ist ausdrücklich **kein** Fehlerfall und kein Blocker.
 
 
 ### Contract C — assignmentLock-Semantik
