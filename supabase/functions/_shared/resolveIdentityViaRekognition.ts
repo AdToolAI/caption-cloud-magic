@@ -30,6 +30,7 @@
 
 import { bytesToBase64, ImageEncodingCache } from "./image-encoding-cache.ts";
 const DEFAULT_REKOGNITION_REGION = "eu-central-1";
+const AWS_REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;
 function resolveRekognitionRegion(): string {
   const override = (Deno.env.get("REKOGNITION_REGION") ?? "").trim();
   if (override && AWS_REGION_PATTERN.test(override)) return override;
