@@ -3860,6 +3860,97 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       );
     }
 
+    // ── FA-4/P0 — Turn↔Pass-Kardinalitäts-Guard ──────────────────────────
+    // Läuft NACH vollständigem Pass-Aufbau inkl. Stabilizer-Injektion und
+    // VOR dem allerersten turn-backed Ledger-Acquire.
+    // Invariante: set(turn_backed_sync_segment.segment_id) == set(dialog_turns.id)
+    // (NICHT über alle sync_segment-Rows — Stabilizer zählen separat).
+    if (!isAdvance && canonicalDialogTurnIds.length > 0) {
+      const turnBacked = builtPasses.filter((p) => !isStabilizerPass(p));
+      const stabilizerPasses = builtPasses.filter((p) => isStabilizerPass(p));
+      const canonicalSet = new Set(canonicalDialogTurnIds);
+      const seen = new Map<string, number>();
+      const nullIds: number[] = [];
+      const foreignIds: string[] = [];
+      for (const p of turnBacked) {
+        const sid = typeof p.segment_id === "string" ? p.segment_id.trim() : "";
+        if (!sid) { nullIds.push(p.idx); continue; }
+        if (!canonicalSet.has(sid)) foreignIds.push(sid);
+        seen.set(sid, (seen.get(sid) ?? 0) + 1);
+      }
+      const duplicateIds = [...seen.entries()].filter(([, n]) => n > 1).map(([id]) => id);
+      const missingIds = canonicalDialogTurnIds.filter((id) => !seen.has(id));
+      // Stabilizer: eigene deterministische Identität, niemals NULL, niemals
+      // Kollision mit der Turn-ID-Menge.
+      const stabilizerNull: number[] = [];
+      const stabilizerCollisions: string[] = [];
+      for (const p of stabilizerPasses) {
+        const sid = typeof p.segment_id === "string" ? p.segment_id.trim() : "";
+        if (!sid) { stabilizerNull.push(p.idx); continue; }
+        if (canonicalSet.has(sid)) stabilizerCollisions.push(sid);
+      }
+      const violations = {
+        turn_backed_count: turnBacked.length,
+        canonical_turns: canonicalDialogTurnIds.length,
+        null_segment_pass_idx: nullIds,
+        foreign_segment_ids: foreignIds,
+        duplicate_segment_ids: duplicateIds,
+        missing_turn_ids: missingIds,
+        stabilizer_count: stabilizerPasses.length,
+        stabilizer_null_pass_idx: stabilizerNull,
+        stabilizer_turn_id_collisions: stabilizerCollisions,
+      };
+      const violated =
+        turnBacked.length !== canonicalDialogTurnIds.length ||
+        nullIds.length > 0 ||
+        foreignIds.length > 0 ||
+        duplicateIds.length > 0 ||
+        missingIds.length > 0 ||
+        stabilizerNull.length > 0 ||
+        stabilizerCollisions.length > 0;
+
+      if (violated) {
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} FA4_P0_TURN_PASS_MISMATCH ${JSON.stringify(violations)}`,
+        );
+        const { data: wGuard } = await supabase
+          .from("wallets").select("balance").eq("user_id", userId).single();
+        await supabase
+          .from("wallets")
+          .update({
+            balance: Number(wGuard?.balance ?? 0) + totalCost,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", userId);
+        await supabase
+          .from("composer_scenes")
+          .update({
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_error: "fa4_p0_turn_pass_mismatch",
+          })
+          .eq("id", sceneId);
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId, user_id: userId, engine: "sync-segments",
+          sync_source_kind: "segments", video_url: sourceClipUrl,
+          sync_status: "PREFLIGHT_BLOCKED",
+          error_class: "fa4_p0_turn_pass_mismatch",
+          error_message: JSON.stringify(violations).slice(0, 900),
+        });
+        return json({
+          error: "fa4_p0_turn_pass_mismatch",
+          details: violations,
+          refunded: totalCost,
+        }, 422);
+      }
+
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} fa4_p0_turn_pass_guard_OK turn_backed=${turnBacked.length} stabilizers=${stabilizerPasses.length}`,
+      );
+    }
+
+
+
     // ── Stufe B: HEAD-probe inputs once before paying Sync.so ────────────
     const audioUrls = builtPasses.map((p) => p.audio_url);
     const probes = await Promise.all([
