@@ -100,8 +100,7 @@ export type AssignmentFailReason =
   | "count_mismatch"
   | "incomplete_bijection"
   | "equal_cost_ambiguity"
-  | "degenerate_candidate_centers"
-  | "input_too_large";
+  | "degenerate_candidate_centers";
 
 export interface BijectiveAssignmentResult {
   ok: boolean;
@@ -113,13 +112,15 @@ export interface BijectiveAssignmentResult {
   reason?: AssignmentFailReason;
 }
 
-/** Hard bound so brute-force permutation search stays deterministic + cheap. */
-const MAX_ROWS = 6;
-const MAX_COLS = 12;
-
 /**
  * Global minimum-cost bijection over plausible candidates.
  * Geometry only. Counts exact-cost ties → fail-closed on ambiguity.
+ *
+ * Exact branch-and-bound over permutations. Column ordering and the
+ * admissible lower bound are pure runtime optimizations: they never change
+ * which assignment wins, never introduce an epsilon and never add a
+ * business threshold. There is deliberately NO input-size gate — the solver
+ * must handle the productive maximum cast.
  */
 export function assignAnchorsToCandidatesBijective(
   anchors: AnchorPoint[],
@@ -132,7 +133,6 @@ export function assignAnchorsToCandidatesBijective(
   });
   if (rows === 0) return empty("count_mismatch");
   if (cols < rows) return empty("count_mismatch");
-  if (rows > MAX_ROWS || cols > MAX_COLS) return empty("input_too_large");
 
   // Exactly identical / degenerate candidate centers → fail-closed (B.1c).
   for (let i = 0; i < cols; i++) {
@@ -148,19 +148,37 @@ export function assignAnchorsToCandidatesBijective(
     candidates.map((p) => Math.sqrt((a.cx - p.cx) ** 2 + (a.cy - p.cy) ** 2))
   );
 
+  // Per-row visit order (cheapest column first) — finds a strong incumbent
+  // early so the admissible bound prunes hard. Result-neutral.
+  const order: number[][] = cost.map((row) => {
+    const idx = row.map((_, c) => c);
+    idx.sort((c1, c2) => (row[c1] - row[c2]) || (c1 - c2));
+    return idx;
+  });
+
+  // Admissible lower bound for the remaining rows: sum of per-row minima,
+  // ignoring the bijection constraint. Never overestimates → exact.
+  const rowMin = cost.map((row) => row.reduce((m, v) => (v < m ? v : m), Infinity));
+  const suffixMin = new Array(rows + 1).fill(0);
+  for (let r = rows - 1; r >= 0; r--) suffixMin[r] = suffixMin[r + 1] + rowMin[r];
+
   const used = new Array(cols).fill(false);
   const pick = new Array(rows).fill(-1);
   let best: number[] | null = null;
   let bestScore = Infinity;
   let bestCount = 0;
   const dfs = (r: number, sum: number) => {
-    if (sum > bestScore) return; // prune strictly-worse only (ties must be seen)
     if (r === rows) {
       if (sum < bestScore) { bestScore = sum; best = pick.slice(); bestCount = 1; }
       else if (sum === bestScore) { bestCount++; }
       return;
     }
-    for (let c = 0; c < cols; c++) {
+    // Prune strictly-worse branches only — equal-cost branches must still be
+    // enumerated so exact tie detection stays intact.
+    if (sum + suffixMin[r] > bestScore) return;
+    const colsForRow = order[r];
+    for (let k = 0; k < colsForRow.length; k++) {
+      const c = colsForRow[k];
       if (used[c]) continue;
       used[c] = true;
       pick[r] = c;
@@ -184,3 +202,58 @@ export function assignAnchorsToCandidatesBijective(
     distances,
   };
 }
+
+// ── FA-4 P0 — Router failure classification ──────────────────────────
+//
+// Contract-B (geometry) failures are integration-level FAIL-CLOSED: the
+// legacy `resolvePlateFaceIdentities()` route must never take over after a
+// confirmed geometry decision. Infrastructure failures keep the existing
+// legacy recovery contract.
+//
+// The classifier takes STRUCTURED input on purpose: `no_faces_detected`
+// alone is ambiguous — only a *successful* detection that returned zero
+// candidates while anchor slots exist is a contractual failure.
+
+export type RouterFailureClass = "contractual" | "infrastructure";
+
+export interface RouterFailureInput {
+  /** Raw router reason (may carry the `fa4_fail_closed:` prefix). */
+  reason?: string | null;
+  /** True when the DetectFaces call itself completed without error. */
+  detectSucceeded: boolean;
+  /** Faces returned by the detector (before sanity filtering). */
+  detectedCount: number;
+  /** Anchor slots expected by the layout. */
+  expectedCount: number;
+  /** True when the router threw instead of returning a result. */
+  threw?: boolean;
+}
+
+const CONTRACTUAL_GEOMETRY_REASONS: AssignmentFailReason[] = [
+  "count_mismatch",
+  "incomplete_bijection",
+  "equal_cost_ambiguity",
+  "degenerate_candidate_centers",
+];
+
+export function classifyRouterFailure(input: RouterFailureInput): RouterFailureClass {
+  if (input.threw) return "infrastructure";
+  const reason = String(input.reason ?? "");
+  const bare = reason.startsWith("fa4_fail_closed:")
+    ? reason.slice("fa4_fail_closed:".length).split(":")[0]
+    : reason.split(":")[0];
+  if (CONTRACTUAL_GEOMETRY_REASONS.includes(bare as AssignmentFailReason)) {
+    return "contractual";
+  }
+  if (bare === "no_faces_detected") {
+    // Successful detection with zero plate faces while anchors exist is a
+    // confirmed geometry statement → fail-closed. Anything else (no anchor
+    // slots, detector never ran) stays recoverable.
+    return input.detectSucceeded && input.expectedCount > 0 && input.detectedCount === 0
+      ? "contractual"
+      : "infrastructure";
+  }
+  // aws_credentials_missing, plate_fetch_failed, detect_failed:*, empty_input …
+  return "infrastructure";
+}
+
