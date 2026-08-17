@@ -224,7 +224,14 @@ interface DialogBlock {
    *  per-speaker grouping — the fix for the "SARAH says SAMUEL's line"
    *  and "SPRECHER 1: collapses onto wrong slot" failure modes. */
   characterId?: string;
+  /** FA-4/P0 — kanonische `dialog_turns[].turnId` dieses Blocks. Wird im
+   *  SELBEN Iterationsschritt gesetzt, der die Blöcke aus `dialog_turns`
+   *  erzeugt, und reist unverändert bis in `voicedRange.turns[].turnId`.
+   *  Sie ist später die Ledger-Segmentidentität (`segment_id`). Keine
+   *  nachträgliche Auflösung über Name/Slot/speaker_idx. */
+  turnId?: string;
 }
+
 
 /** Split "Matthew Dusatko: hi\nSarah: hello" into ordered blocks. */
 function parseDialogScript(script: string): DialogBlock[] {
