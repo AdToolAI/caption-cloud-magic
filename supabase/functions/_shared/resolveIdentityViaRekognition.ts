@@ -190,15 +190,15 @@ function iou(a: RekBox, b: RekBox): number {
 }
 
 async function compareOnePortrait(
-  portraitBytes: Uint8Array,
-  anchorBytes: Uint8Array,
+  portraitBase64: string,
+  anchorBase64: string,
   detected: DetectedFace[],
 ): Promise<Map<number, number>> {
   /** Returns Map<detectedSlot, similarity(0..100)>. */
   const out = new Map<number, number>();
   const payload = JSON.stringify({
-    SourceImage: { Bytes: bytesToBase64(portraitBytes) },
-    TargetImage: { Bytes: bytesToBase64(anchorBytes) },
+    SourceImage: { Bytes: portraitBase64 },
+    TargetImage: { Bytes: anchorBase64 },
     SimilarityThreshold: 0, // we filter later with MIN_SIMILARITY
     QualityFilter: "NONE",
   });
