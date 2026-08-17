@@ -396,6 +396,7 @@ export async function routePlateFacesToAnchor(params: {
 
   if (!assignment.ok) {
     const countMismatch = assignment.reason === "count_mismatch";
+    const reason = `fa4_fail_closed:${assignment.reason}:anchor=${rows}/plausible=${plausible.length}/detected=${detected.length}`;
     return {
       ok: false,
       method: "v278_hungarian_plate_router",
@@ -406,10 +407,19 @@ export async function routePlateFacesToAnchor(params: {
       expectedCount: rows,
       countMismatch,
       maxDistance: null,
-      reason: `fa4_fail_closed:${assignment.reason}:anchor=${rows}/plausible=${plausible.length}/detected=${detected.length}`,
+      reason,
+      detectSucceeded: true,
+      detectedCount: detected.length,
+      failureClass: classifyRouterFailure({
+        reason,
+        detectSucceeded: true,
+        detectedCount: detected.length,
+        expectedCount: rows,
+      }),
       msTotal: Date.now() - t0,
     };
   }
+
 
   const assignmentLock: Record<string, string> = {};
   let resolved = 0;
