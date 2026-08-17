@@ -72,26 +72,33 @@ tendenziell für Kay.
 
 ## Nächster Schritt: read-only Root-Cause-Lock
 
-1. **Herkunft der Plate-Faces belegen.** Aus den Edge-Logs des Runs
-   (Zeitfenster um 2026-08-17 20:38 UTC) die Zeilen `v278_router`,
-   `v183_plate_identity_mapping`, `v183_anchor_identity_slot_bridge`,
-   `v239_repair_gate` und `v277_anchor_lock_face_missing` ziehen. Damit ist
-   eindeutig, ob der geometrische v278-Hungarian-Router lief und warum sein
-   Ergebnis nicht die Wahrheit wurde (er hätte die vier Zentren korrekt
-   zugeordnet), oder ob der Legacy-Pfad übernommen hat.
-2. **Trust-Gate-Entscheidung pro Slot nachrechnen.** Für jede der vier
-   benutzten Boxen Flächenanteil, Seitenverhältnis und Trust-Grund
-   dokumentieren, um zu zeigen, dass der Sanity-Check nur wegen der
-   Confidence-Trust-Abkürzung ausgelassen wurde.
-3. **Gegenprobe zur Geometrie.** Anchor-Zentren gegen alle zehn
-   Plate-Kandidaten stellen und belegen, dass eine reine bijektive
-   Nächste-Nachbar-Zuordnung (Hungarian auf normalisierten Zentren) genau die
-   vier korrekten Gesichter liefert — als Beleg, dass die Information im Run
-   vorhanden war.
-4. **Ergebnis dokumentieren** in `docs/v433-motion-studio-final-acceptance.md`
-   als eigener Abschnitt "FA-4 Root-Cause-Lock — Face-Candidate-Auswahl",
-   inklusive der Erkenntnis aus Punkt 1 und einer klaren Aussage, ob der Fix
-   Ranking-only sein kann oder Geometrie-first sein muss.
+Der Lock beantwortet genau vier Fragen — nichts darüber hinaus:
+
+1. **Lief bei S11 der v278/Hungarian-Pfad?** Und falls ja: an welcher Stelle
+   wurde sein korrektes geometrisches Ergebnis später überschrieben? Beleg aus
+   den Edge-Logs des Runs (Zeitfenster um 2026-08-17 20:38 UTC), Zeilen
+   `v278_router`, `v183_plate_identity_mapping`,
+   `v277_anchor_lock_face_missing`.
+2. **Lief `v183_anchor_identity_slot_bridge`?** Wenn ja: welche Face-Slots
+   wurden dadurch gelabelt (Signatur `confidence: 0` / `matchConfidence: 0.85`)?
+3. **Warum akzeptierte `v239_repair_gate` Sarah/Matthew/Kay als trusted,**
+   obwohl ihre Boxflächen objektiv unter der Sanity-Schwelle liegen? Pro Slot
+   Flächenanteil, Seitenverhältnis und Trust-Grund nachrechnen.
+4. **Lief anschließend v277 First-Match auf diesen bereits falsch gelabelten
+   Kandidaten** und machte sie damit zur autoritativen `speakerPlateBBox`?
+
+Zusätzlich als Beweis-Gegenprobe (keine fünfte Frage, sondern Beleg zu 1):
+die vier Anchor-Zentren gegen die Plate-Kandidaten stellen, **zuerst objektiv
+unplausible Kandidaten entfernen** (Mindestfläche, Seitenverhältnis) und dann
+eine **global bijektive Zuordnung (Hungarian)** rechnen — nicht greedy nearest
+neighbor, da dieser bei dicht stehenden Gesichtern zufällig richtig liegen kann
+und den Produktionsvertrag nicht abbildet. Erwartung: die vier großen realen
+Kandidaten liegen praktisch exakt auf den vier Anchor-Slots.
+
+Ergebnis dokumentieren in `docs/v433-motion-studio-final-acceptance.md` als
+eigener Abschnitt "FA-4 Root-Cause-Lock — Face-Candidate-Auswahl", unter dem
+bestehenden Status TECHNICAL PASS / VISUAL REVIEW: ISSUES. Erst wenn alle vier
+Übergänge mit Run-Daten/Logs belegt sind, wird der Fix-Contract eingefroren.
 
 ## Fix-Contract-Skizze (nur Entwurf, noch nicht umsetzen)
 
