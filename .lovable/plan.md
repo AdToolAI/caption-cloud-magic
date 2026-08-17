@@ -46,7 +46,7 @@ Für dieselbe `pendingRenderId` gilt, in dieser Reihenfolge:
    AWS aufrufen. Zwei parallele Invokes dürfen nicht beide NULL sehen.
 
 `lambda_invoked_at` ist damit der endgültige Start-Fence: einmal gesetzt, nie wieder ein
-zweiter AWS-Start — auch nicht nach 90 s, 300 s oder einem Prozessneustart.
+zweiter AWS-Start — unabhängig von verstrichener Zeit oder Prozessneustart.
 
 ### C — Verhalten nach 5xx/Netzwerkfehler beim Preclip-Invoke
 Die Row wird **nicht** auf `failed` gesetzt. Stattdessen:
