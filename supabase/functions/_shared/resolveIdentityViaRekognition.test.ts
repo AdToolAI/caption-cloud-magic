@@ -114,9 +114,6 @@ function runWithMockFetch<T>(opts: MockOptions, fn: () => Promise<T>): Promise<{
     });
 }
 
-function getLastCalls(): MockCall[] {
-  return (runWithMockFetch as any).lastCalls ?? [];
-}
 
 // ── Tests ───────────────────────────────────────────────────────────────
 
