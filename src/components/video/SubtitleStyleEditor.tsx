@@ -190,7 +190,12 @@ export const SubtitleStyleEditor = ({ style, onChange, sampleText, onSampleTextC
               <SelectItem value="fade">{t('uc.fadeInOut')}</SelectItem>
               <SelectItem value="slide">{t('uc.slideInOut')}</SelectItem>
               <SelectItem value="bounce">{t('uc.bounce')}</SelectItem>
+              <SelectItem value="scaleUp">{tx({ de: 'Scale Up', en: 'Scale up', es: 'Escalar' })}</SelectItem>
+              <SelectItem value="typewriter">{tx({ de: 'Schreibmaschine', en: 'Typewriter', es: 'Máquina de escribir' })}</SelectItem>
+              <SelectItem value="highlight">{tx({ de: 'Wort-Highlight', en: 'Word highlight', es: 'Resaltado de palabra' })}</SelectItem>
+              <SelectItem value="glitch">{tx({ de: 'Glitch', en: 'Glitch', es: 'Glitch' })}</SelectItem>
               <SelectItem value="hormozi">✨ Hormozi (Word-by-Word + Highlights)</SelectItem>
+
             </SelectContent>
           </Select>
           {style.animation === 'hormozi' && (
