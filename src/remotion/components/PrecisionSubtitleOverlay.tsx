@@ -61,6 +61,29 @@ const DEFAULT_CONFIG: PrecisionSubtitleConfig = {
   animationStyle: 'karaoke',
 };
 
+/** Applies an opacity (0..1) to a hex or rgb(a)/named color. */
+export function withOpacity(color: string, opacity: number): string {
+  const a = Math.max(0, Math.min(1, Number.isFinite(opacity) ? opacity : 1));
+  const hex = color.trim();
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex);
+  if (m) {
+    const full = m[1].length === 3
+      ? m[1].split('').map((c) => c + c).join('')
+      : m[1];
+    const r = parseInt(full.slice(0, 2), 16);
+    const g = parseInt(full.slice(2, 4), 16);
+    const b = parseInt(full.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+  }
+  const rgb = /^rgba?\(([^)]+)\)$/i.exec(hex);
+  if (rgb) {
+    const parts = rgb[1].split(',').map((p) => p.trim());
+    return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${a})`;
+  }
+  return hex;
+}
+
+
 // Build word timings from phoneme timestamps
 function buildWordTimingsFromPhonemes(
   text: string, 
@@ -213,36 +236,63 @@ export const PrecisionSubtitleOverlay: React.FC<PrecisionSubtitleOverlayProps> =
 
   if (!activeSegment) return null;
 
-  // Entry animation
+  // Entry animation — anchored to the START OF THE ACTIVE SEGMENT.
+  // (Previously this used `frame % (fps * 0.5)`, which re-triggered the whole
+  // box every half second and made the subtitles flicker permanently.)
+  const framesSinceSegmentStart = Math.max(
+    0,
+    frame - Math.round((activeSegment.startTime || 0) * fps),
+  );
   const entryProgress = spring({
-    frame: frame % Math.floor(fps * 0.5), // Reset per segment
+    frame: framesSinceSegmentStart,
     fps,
     config: { damping: 15, stiffness: 120, mass: 0.5 },
   });
+  // Clean exit so the last frames don't hard-cut.
+  const framesUntilSegmentEnd = Math.max(
+    0,
+    Math.round((activeSegment.endTime || 0) * fps) - frame,
+  );
+  const exitOpacity = safeInterpolate(
+    framesUntilSegmentEnd,
+    [0, Math.max(1, Math.round(fps * 0.15))],
+    [0, 1],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+  );
 
   // Position styles
+  const position = mergedConfig.position || 'bottom';
   const positionStyles: Record<string, React.CSSProperties> = {
-    bottom: { bottom: '8%', left: '50%', transform: 'translateX(-50%)' },
-    top: { top: '8%', left: '50%', transform: 'translateX(-50%)' },
-    center: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
+    bottom: { bottom: '8%', left: '50%' },
+    top: { top: '8%', left: '50%' },
+    center: { top: '50%', left: '50%' },
   };
+  const baseTransform = position === 'center'
+    ? 'translate(-50%, -50%)'
+    : 'translateX(-50%)';
+
+  const hasBox = !!mergedConfig.backgroundColor
+    && mergedConfig.backgroundColor !== 'transparent'
+    && (mergedConfig.backgroundOpacity ?? 0) > 0;
 
   return (
     <div
       style={{
         position: 'absolute',
-        ...positionStyles[mergedConfig.position || 'bottom'],
+        ...positionStyles[position],
         maxWidth: mergedConfig.maxWidth,
-        padding: mergedConfig.padding,
-        backgroundColor: `rgba(0, 0, 0, ${mergedConfig.backgroundOpacity})`,
-        borderRadius: mergedConfig.borderRadius,
-        backdropFilter: 'blur(8px)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-        opacity: safeInterpolate(entryProgress, [0, 1], [0, 1]),
-        transform: `translateX(-50%) translateY(${safeInterpolate(entryProgress, [0, 1], [20, 0])}px)`,
+        padding: hasBox ? mergedConfig.padding : 0,
+        backgroundColor: hasBox
+          ? withOpacity(mergedConfig.backgroundColor!, mergedConfig.backgroundOpacity ?? 0.75)
+          : 'transparent',
+        borderRadius: hasBox ? mergedConfig.borderRadius : 0,
+        boxShadow: hasBox ? '0 8px 32px rgba(0, 0, 0, 0.3)' : 'none',
+        opacity: Math.min(safeInterpolate(entryProgress, [0, 1], [0, 1]), exitOpacity),
+        transform: `${baseTransform} translateY(${safeInterpolate(entryProgress, [0, 1], [20, 0])}px)`,
         zIndex: 200,
       }}
     >
+
       <div
         style={{
           display: 'flex',

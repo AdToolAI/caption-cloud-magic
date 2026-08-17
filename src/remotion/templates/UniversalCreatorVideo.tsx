@@ -23,7 +23,7 @@ import { LottieIcons } from '../components/LottieIcons';
 import { MorphTransition } from '../components/MorphTransition';
 import { ProfessionalLottieCharacter, type PhonemeTimestamp as CharacterPhonemeTimestamp } from '../components/ProfessionalLottieCharacter';
 import { DrawOnEffect } from '../components/DrawOnEffect';
-import { PrecisionSubtitleOverlay } from '../components/PrecisionSubtitleOverlay';
+import { PrecisionSubtitleOverlay, withOpacity } from '../components/PrecisionSubtitleOverlay';
 import { SceneAudioManager, type SceneAudioConfig } from '../components/SceneAudioManager';
 import { getSoundUrlSync, type SoundEffectType } from '../components/EmbeddedSoundLibrary';
 
@@ -296,15 +296,21 @@ export const UniversalCreatorVideoSchema = z.object({
   // Subtitle styling
   subtitleStyle: z.object({
     position: z.enum(['top', 'center', 'bottom']).default('bottom'),
+    /** Font family chosen in the Universal Creator subtitle editor. */
+    font: z.string().default('Inter'),
     fontSize: z.number().default(48),
     fontColor: z.string().default('#FFFFFF'),
     backgroundColor: z.string().default('#000000'),
     backgroundOpacity: z.number().default(0.7),
-    animation: z.enum(['none', 'fade', 'slide', 'bounce', 'typewriter', 'highlight', 'scaleUp', 'glitch', 'wordByWord']).default('highlight'),
-    outlineStyle: z.enum(['none', 'stroke', 'box', 'box-stroke', 'glow', 'shadow']).default('glow'),
+    animation: z.enum(['none', 'fade', 'slide', 'bounce', 'typewriter', 'highlight', 'scaleUp', 'glitch', 'wordByWord', 'hormozi']).default('fade'),
+    animationSpeed: z.number().default(1),
+    outlineStyle: z.enum(['none', 'stroke', 'box', 'box-stroke', 'glow', 'shadow']).default('stroke'),
     outlineColor: z.string().default('#000000'),
     outlineWidth: z.number().default(2),
+    /** Word-highlight colour for highlight/hormozi animations. */
+    highlightColor: z.string().default('#F5C76A'),
   }).optional(),
+
   
   // Features
   showProgressBar: z.boolean().default(false),
@@ -2601,7 +2607,10 @@ const TextOverlay: React.FC<{
   );
 };
 
-// Subtitle Layer Component
+// Subtitle Layer Component — style-faithful renderer.
+// Every option the customer picks in the Universal Creator subtitle editor
+// (position, font, size, colour, outline style/colour/width, background
+// colour + opacity, animation) is applied here. Do NOT hardcode a look.
 const SubtitleLayer: React.FC<{
   subtitles?: Subtitle[];
   subtitleStyle?: UniversalCreatorVideoProps['subtitleStyle'];
@@ -2609,60 +2618,125 @@ const SubtitleLayer: React.FC<{
   fps: number;
 }> = ({ subtitles, subtitleStyle, frame, fps }) => {
   if (!subtitles || !subtitleStyle) return null;
-  
+
   const currentTime = frame / fps;
   const currentSegment = subtitles.find(
     (s) => currentTime >= s.startTime && currentTime <= s.endTime
   );
-  
+
   if (!currentSegment) return null;
-  
-  const segmentProgress = (currentTime - currentSegment.startTime) / (currentSegment.endTime - currentSegment.startTime);
+
+  const segDuration = Math.max(0.01, currentSegment.endTime - currentSegment.startTime);
+  const localTime = currentTime - currentSegment.startTime;
+  const segmentProgress = Math.min(1, Math.max(0, localTime / segDuration));
   const words = currentSegment.text.split(' ');
-  
-  const entryOpacity = interpolate(currentTime - currentSegment.startTime, [0, 0.15], [0, 1], { extrapolateRight: 'clamp' });
-  const exitOpacity = interpolate(currentSegment.endTime - currentTime, [0, 0.15], [0, 1], { extrapolateRight: 'clamp' });
-  
-  const getPositionStyles = () => {
+
+  const speed = subtitleStyle.animationSpeed && subtitleStyle.animationSpeed > 0
+    ? subtitleStyle.animationSpeed
+    : 1;
+  const ramp = 0.25 / speed;
+
+  // One clean fade in / out per segment — never a repeating flicker.
+  const entryOpacity = interpolate(localTime, [0, ramp], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const exitOpacity = interpolate(currentSegment.endTime - currentTime, [0, ramp], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const baseOpacity = Math.min(entryOpacity, exitOpacity);
+
+  const getPositionStyles = (): React.CSSProperties => {
     switch (subtitleStyle.position) {
-      case 'top': return { top: 60 };
-      case 'center': return { top: '50%', transform: 'translateY(-50%)' };
-      default: return { bottom: 80 };
+      case 'top': return { top: '8%', alignItems: 'flex-start' };
+      case 'center': return { top: 0, bottom: 0, alignItems: 'center' };
+      default: return { bottom: '10%', alignItems: 'flex-end' };
     }
   };
-  
+
+  const bg = withOpacity(subtitleStyle.backgroundColor || '#000000', subtitleStyle.backgroundOpacity ?? 0.7);
+  const outlineWidth = subtitleStyle.outlineWidth ?? 2;
+  const outlineColor = subtitleStyle.outlineColor || '#000000';
+
   const getOutlineStyle = (): React.CSSProperties => {
     switch (subtitleStyle.outlineStyle) {
       case 'stroke':
-        return { WebkitTextStroke: `${subtitleStyle.outlineWidth}px ${subtitleStyle.outlineColor}` };
+        return { WebkitTextStroke: `${outlineWidth}px ${outlineColor}`, paintOrder: 'stroke fill' as React.CSSProperties['paintOrder'] };
       case 'glow':
-        return { textShadow: `0 0 ${subtitleStyle.outlineWidth * 3}px ${subtitleStyle.outlineColor}, 0 0 ${subtitleStyle.outlineWidth * 6}px ${subtitleStyle.outlineColor}` };
+        return { textShadow: `0 0 ${outlineWidth * 3}px ${outlineColor}, 0 0 ${outlineWidth * 6}px ${outlineColor}` };
       case 'shadow':
-        return { textShadow: `${subtitleStyle.outlineWidth}px ${subtitleStyle.outlineWidth}px ${subtitleStyle.outlineWidth * 2}px ${subtitleStyle.outlineColor}` };
+        return { textShadow: `${outlineWidth}px ${outlineWidth}px ${outlineWidth * 2}px ${outlineColor}` };
       case 'box':
-        return { backgroundColor: `rgba(0,0,0,${subtitleStyle.backgroundOpacity})`, padding: '8px 20px', borderRadius: 8 };
+        return { backgroundColor: bg, padding: '8px 20px', borderRadius: 12 };
+      case 'box-stroke':
+        return {
+          backgroundColor: bg,
+          padding: '8px 20px',
+          borderRadius: 12,
+          WebkitTextStroke: `${outlineWidth}px ${outlineColor}`,
+          paintOrder: 'stroke fill' as React.CSSProperties['paintOrder'],
+        };
       default:
         return {};
     }
   };
-  
+
+  // Animation-specific extra styling on the text block.
+  let animationStyle: React.CSSProperties = {};
+  let extraOpacity = 1;
+  switch (subtitleStyle.animation) {
+    case 'slide': {
+      const p = interpolate(localTime, [0, ramp], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      animationStyle = { transform: `translateY(${interpolate(p, [0, 1], [40, 0])}px)` };
+      break;
+    }
+    case 'bounce': {
+      const p = interpolate(localTime, [0, ramp * 1.6], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const y = interpolate(p, [0, 0.5, 0.75, 1], [-50, 10, -5, 0]);
+      animationStyle = { transform: `translateY(${y}px)` };
+      break;
+    }
+    case 'scaleUp': {
+      const p = interpolate(localTime, [0, ramp], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      animationStyle = { transform: `scale(${interpolate(p, [0, 1], [0.6, 1])})` };
+      break;
+    }
+    case 'glitch': {
+      const dx = [0, -2, 2, -1][Math.floor(frame / 2) % 4];
+      animationStyle = {
+        transform: `translateX(${dx}px)`,
+        textShadow: `${dx}px 0 #ff0040, ${-dx}px 0 #00fff0`,
+      };
+      break;
+    }
+    case 'none': {
+      extraOpacity = 1;
+      break;
+    }
+    default:
+      break;
+  }
+
   const renderText = () => {
     switch (subtitleStyle.animation) {
-      case 'wordByWord':
+      case 'typewriter': {
+        const chars = Math.floor(localTime * 15 * speed);
+        return currentSegment.text.substring(0, Math.min(chars, currentSegment.text.length));
+      }
+      case 'wordByWord': {
         const wordsToShow = Math.ceil(segmentProgress * words.length);
         return words.slice(0, wordsToShow).join(' ');
-      
+      }
       case 'highlight':
-        const highlightIndex = Math.floor(segmentProgress * words.length);
+      case 'hormozi': {
+        const highlightIndex = Math.min(words.length - 1, Math.floor(segmentProgress * words.length));
+        const highlight = subtitleStyle.highlightColor || '#F5C76A';
         return (
           <span>
             {words.map((word, i) => (
               <span
                 key={i}
                 style={{
-                  color: i === highlightIndex ? '#F5C76A' : subtitleStyle.fontColor,
+                  color: i === highlightIndex ? highlight : subtitleStyle.fontColor,
                   fontWeight: i === highlightIndex ? 800 : 600,
                   marginRight: '0.2em',
+                  display: 'inline-block',
+                  transform: i === highlightIndex ? 'scale(1.06)' : 'scale(1)',
                 }}
               >
                 {word}
@@ -2670,39 +2744,111 @@ const SubtitleLayer: React.FC<{
             ))}
           </span>
         );
-      
+      }
       default:
         return currentSegment.text;
     }
   };
-  
+
   return (
     <AbsoluteFill
       style={{
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'center',
         ...getPositionStyles(),
-        opacity: Math.min(entryOpacity, exitOpacity),
+        opacity: subtitleStyle.animation === 'none' ? extraOpacity : baseOpacity,
+        zIndex: 200,
       }}
     >
       <div
         style={{
           fontSize: subtitleStyle.fontSize,
           color: subtitleStyle.fontColor,
-          fontFamily: "'Inter', sans-serif",
-          fontWeight: 600,
+          fontFamily: `'${subtitleStyle.font || 'Inter'}', Inter, sans-serif`,
+          fontWeight: 700,
           textAlign: 'center',
-          maxWidth: '80%',
-          lineHeight: 1.4,
+          maxWidth: '84%',
+          lineHeight: 1.3,
+          whiteSpace: 'pre-wrap',
           ...getOutlineStyle(),
+          ...animationStyle,
         }}
       >
         {renderText()}
       </div>
     </AbsoluteFill>
   );
+
 };
+
+/**
+ * Single entry point for Universal Creator subtitles.
+ *
+ * Word-level karaoke (PrecisionSubtitleOverlay) is used ONLY for the
+ * animations that ask for it (`highlight`, `hormozi`, `wordByWord`) and it
+ * receives the customer's colours, font and box settings. Everything else
+ * renders through the style-faithful `SubtitleLayer`.
+ */
+const StyledSubtitles: React.FC<{
+  subtitles: Subtitle[];
+  subtitleStyle?: UniversalCreatorVideoProps['subtitleStyle'];
+  phonemeTimestamps?: { character: string; start_time: number; end_time: number }[];
+  frame: number;
+  fps: number;
+}> = ({ subtitles, subtitleStyle, phonemeTimestamps, frame, fps }) => {
+  if (!subtitles || subtitles.length === 0) return null;
+
+  const style = subtitleStyle ?? SUBTITLE_STYLE_FALLBACK;
+  const wantsWordLevel =
+    (style.animation === 'highlight' || style.animation === 'hormozi' || style.animation === 'wordByWord')
+    && Array.isArray(phonemeTimestamps)
+    && phonemeTimestamps.length > 0;
+
+  if (!wantsWordLevel) {
+    return <SubtitleLayer subtitles={subtitles} subtitleStyle={style} frame={frame} fps={fps} />;
+  }
+
+  const boxed = style.outlineStyle === 'box' || style.outlineStyle === 'box-stroke';
+
+  return (
+    <PrecisionSubtitleOverlay
+      subtitles={subtitles.map((s) => ({
+        text: s?.text || '',
+        startTime: s?.startTime || 0,
+        endTime: s?.endTime || 0,
+      }))}
+      phonemeTimestamps={phonemeTimestamps}
+      config={{
+        animationStyle: style.animation === 'wordByWord' ? 'typewriter' : 'karaoke',
+        fontFamily: `'${style.font || 'Inter'}', Inter, sans-serif`,
+        fontSize: style.fontSize,
+        textColor: style.fontColor,
+        highlightColor: style.highlightColor || '#F5C76A',
+        backgroundColor: boxed ? style.backgroundColor : 'transparent',
+        backgroundOpacity: boxed ? style.backgroundOpacity : 0,
+        position: style.position,
+      }}
+    />
+  );
+};
+
+const SUBTITLE_STYLE_FALLBACK = {
+  position: 'bottom' as const,
+  font: 'Inter',
+  fontSize: 48,
+  fontColor: '#FFFFFF',
+  backgroundColor: '#000000',
+  backgroundOpacity: 0.7,
+  animation: 'fade' as const,
+  animationSpeed: 1,
+  outlineStyle: 'stroke' as const,
+  outlineColor: '#000000',
+  outlineWidth: 2,
+  highlightColor: '#F5C76A',
+};
+
+
+
 
 // Progress Bar Component
 const ProgressBar: React.FC<{
@@ -3059,27 +3205,19 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
           </div>
         </AbsoluteFill>
         
-        {/* Phase 1: PrecisionSubtitleOverlay with karaoke */}
+        {/* Subtitles — rendered exactly in the style the customer selected */}
         {subtitles && subtitles.length > 0 && (
-          <PrecisionSubtitleOverlay
-            subtitles={subtitles.map(s => ({
-              text: s.text,
-              startTime: s.startTime,
-              endTime: s.endTime
-            }))}
+          <StyledSubtitles
+            subtitles={subtitles}
+            subtitleStyle={subtitleStyle}
             phonemeTimestamps={phonemeTimestamps?.filter((p): p is { character: string; start_time: number; end_time: number } => 
               typeof p.character === 'string' && typeof p.start_time === 'number' && typeof p.end_time === 'number'
             )}
-            config={{
-              animationStyle: 'karaoke',
-              fontSize: subtitleStyle?.fontSize || 48,
-              textColor: subtitleStyle?.fontColor || '#FFFFFF',
-              backgroundColor: subtitleStyle?.backgroundColor || 'rgba(0,0,0,0.75)',
-              position: subtitleStyle?.position || 'bottom',
-              highlightColor: primaryColor,
-            }}
+            frame={frame}
+            fps={fps}
           />
         )}
+
       </AbsoluteFill>
     );
   }
@@ -3326,30 +3464,22 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
         );
       })()}
       
-      {/* Phase 1: PrecisionSubtitleOverlay with word-level karaoke */}
+      {/* Subtitles — rendered exactly in the style the customer selected */}
       {!diagToggles.disablePrecisionSubtitles && subtitles && Array.isArray(subtitles) && subtitles.length > 0 && (() => {
         if (frame === 0) console.log(`[FORENSIC] ENTER_SUBTITLE_OVERLAY count=${subtitles?.length || 0}`);
         return (
-        <PrecisionSubtitleOverlay
-          subtitles={subtitles.map(s => ({
-            text: s?.text || '',
-            startTime: s?.startTime || 0,
-            endTime: s?.endTime || 0
-          }))}
+        <StyledSubtitles
+          subtitles={subtitles}
+          subtitleStyle={subtitleStyle}
           phonemeTimestamps={Array.isArray(phonemeTimestamps) ? phonemeTimestamps.filter((p): p is { character: string; start_time: number; end_time: number } => 
             typeof p?.character === 'string' && typeof p?.start_time === 'number' && typeof p?.end_time === 'number'
           ) : undefined}
-          config={{
-            animationStyle: 'karaoke',
-            fontSize: subtitleStyle?.fontSize || 48,
-            textColor: subtitleStyle?.fontColor || '#FFFFFF',
-            backgroundColor: subtitleStyle?.backgroundColor || 'rgba(0,0,0,0.75)',
-            position: subtitleStyle?.position || 'bottom',
-            highlightColor: primaryColor,
-          }}
+          frame={frame}
+          fps={fps}
         />
         );
       })()}
+
       
       {/* Progress bar */}
       {showProgressBar && (

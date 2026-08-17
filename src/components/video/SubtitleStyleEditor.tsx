@@ -4,6 +4,7 @@ import { Slider } from '@/components/ui/slider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useTranslation } from '@/hooks/useTranslation';
+import { tx } from '@/lib/i18nText';
 
 export interface SubtitleStyle {
   position: 'top' | 'center' | 'bottom';
@@ -26,7 +27,10 @@ interface SubtitleStyleEditorProps {
   onChange: (style: SubtitleStyle) => void;
   sampleText: string;
   onSampleTextChange: (value: string) => void;
+  /** Present when the preview text was manually overridden — restores the segment text. */
+  onResetSampleText?: () => void;
 }
+
 
 const generateStrokeShadow = (color: string, width: number) => {
   const shadows = [];
@@ -39,13 +43,17 @@ const generateStrokeShadow = (color: string, width: number) => {
 };
 
 const getPreviewStyles = (style: SubtitleStyle): React.CSSProperties => {
-  const baseStyle = {
+  // NOTE: no CSS `animation` here on purpose. The old implementation used
+  // `${style.animation} 2s infinite` with keyframe names that don't exist,
+  // which made the preview box flicker permanently. The preview shows the
+  // static look; motion is shown in the video player.
+  const baseStyle: React.CSSProperties = {
     fontFamily: style.font || 'Inter',
     fontSize: `${style.fontSize || 28}px`,
     fontWeight: 600,
     color: style.color || '#FFFFFF',
-    animation: style.animation !== 'none' ? `${style.animation} 2s infinite` : 'none',
   };
+
   switch (style.outlineStyle) {
     case 'none': return { ...baseStyle, backgroundColor: 'transparent', textShadow: 'none' };
     case 'stroke': return { ...baseStyle, backgroundColor: 'transparent', textShadow: generateStrokeShadow(style.outlineColor, style.outlineWidth) };
@@ -57,7 +65,7 @@ const getPreviewStyles = (style: SubtitleStyle): React.CSSProperties => {
   }
 };
 
-export const SubtitleStyleEditor = ({ style, onChange, sampleText, onSampleTextChange }: SubtitleStyleEditorProps) => {
+export const SubtitleStyleEditor = ({ style, onChange, sampleText, onSampleTextChange, onResetSampleText }: SubtitleStyleEditorProps) => {
   const { t } = useTranslation();
   const updateStyle = (updates: Partial<SubtitleStyle>) => onChange({ ...style, ...updates });
 
@@ -193,9 +201,21 @@ export const SubtitleStyleEditor = ({ style, onChange, sampleText, onSampleTextC
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="subtitle-sample">{t('uc.subtitleTextPreview')}</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="subtitle-sample">{t('uc.subtitleTextPreview')}</Label>
+            {onResetSampleText && (
+              <button
+                type="button"
+                onClick={onResetSampleText}
+                className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              >
+                {tx({ de: 'Zurücksetzen', en: 'Reset', es: 'Restablecer' })}
+              </button>
+            )}
+          </div>
           <Input id="subtitle-sample" value={sampleText} onChange={(e) => onSampleTextChange(e.target.value)} placeholder={t('uc.enterSampleSubtitle')} className="w-full" />
         </div>
+
 
         <div className="pt-4 border-t">
           <Label className="mb-3 block">{t('uc.previewLabel')}</Label>
