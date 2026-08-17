@@ -46,7 +46,10 @@ export function bytesToBase64(bytes: Uint8Array): string {
 
 async function fetchImageBytes(url: string): Promise<Uint8Array | null> {
   try {
-    const r = await fetch(url, { method: "GET" });
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    const r = await fetch(url, { method: "GET", signal: controller.signal });
+    clearTimeout(t);
     if (!r.ok) return null;
     const buf = await r.arrayBuffer();
     return new Uint8Array(buf);
