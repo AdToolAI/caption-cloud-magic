@@ -153,50 +153,80 @@ bestätigt das. Der exakte Zahlenwert ist aus dem Projekt heraus nicht
 auslesbar und wird bewusst nicht behauptet; für den Fix ist nur relevant,
 dass CPU eine eigene, kleine, nicht durch Warten entlastete Ressource ist.
 
-## 9. Entscheidungsvorschlag (Fix-Contract)
+## 9. Fix-Contract — LOCKED, Variante 1
 
-**Variante 1 — teure Zwischenergebnisse innerhalb derselben Anchor-Sequenz
-wiederverwenden. Empfohlen als alleinige Maßnahme.**
+**Variante 1 — teure Zwischenergebnisse innerhalb derselben Invocation
+wiederverwenden. Freigegeben als alleinige Maßnahme.**
 
 Vertrag:
 
-1. Ein Bild wird pro Lauf **höchstens einmal** geladen und **höchstens einmal**
-   nach Base64 encodiert; Schlüssel ist die Bild-URL. Der Anchor-Encode wird
-   aus der `compareOnePortrait`-Schleife herausgehoben und geteilt.
-2. Das Base64-Encoding wird auf ein blockweises Verfahren umgestellt
-   (Chunk-basiert statt Byte-für-Byte-String-Konkatenation) — identisches
-   Ergebnis, ohne quadratisches Speicher-/CPU-Verhalten.
-3. Kein Gate, kein Retry, kein Schwellwert, keine Attempt-Anzahl, keine
-   Reihenfolge und kein Ergebnisformat ändern sich. Die Ladder bleibt exakt
-   wie heute; vier Attempts bleiben vier Attempts.
-4. Damit sinkt die Anchor-CPU-Last von 7 auf 2 Voll-Anchor-Encodings und
-   wächst nicht mehr mit N.
+1. **Cache-Lebensdauer:** Innerhalb *einer* `compose-video-clips`-Invocation
+   wird dieselbe exakte Bild-URL höchstens einmal geladen und höchstens einmal
+   nach Base64 encodiert. Kein globaler Cache, keine Wiederverwendung über
+   Runs, Generations oder Invocations hinweg; der Cache lebt und stirbt mit
+   dem Request-Scope.
+2. **Encoding:** Die Byte-für-Byte-String-Konkatenation wird durch blockweises
+   bzw. native-kompatibles Encoding ersetzt, um CPU- und Allocation-Overhead
+   zu reduzieren. Der Output muss **byte-identisch** zum heutigen sein. Eine
+   Aussage über die konkrete Laufzeitkomplexität der Engine wird nicht
+   behauptet und ist für den Fix nicht nötig.
+3. **Keine Semantikänderung:** Kein Gate, kein Retry, kein Schwellwert, keine
+   Attempt-Anzahl, keine Compare-Reihenfolge und kein Ergebnisformat ändern
+   sich.
 
-Warum das allein tragfähig ist: der CPU-Verbrauch der Stage besteht praktisch
-vollständig aus diesen Encodings; alles andere ist Netzwerk-Wartezeit, die
-das CPU-Budget nicht belastet.
+**Messbare Fix-Invariante (N=4, finaler Anchor):**
 
-**Variante 2 — Phasen-Trennung am bestehenden Persistenzpunkt.
-Nur als Rückfallebene, falls Variante 1 messbar nicht reicht.**
+- finale Anchor-URL: genau 1 Load
+- finale Anchor-Bytes: genau 1 Base64-Encoding
+- alle 4 Rekognition-Compares verwenden denselben vorbereiteten
+  Anchor-Base64-Wert
+- Portraits: weiterhin je genau 1 Load + 1 Encoding
+- Compare-Reihenfolge, Assignment-, Face- und Identity-Ergebnisse unverändert
 
-Vertrag: nach erfolgreichem Anchor-Pin (Anchor-URL + `anchor_face_audit ok`
-persistiert) übernimmt ein frischer Worker die v274-Identity-Auflösung und den
-Plate-Dispatch; Wiedereintritt über den bereits vorhandenen Reuse-Zweig,
-Provenance über `active_run_id` + `plate_generation`. Voraussetzung wäre eine
-gesonderte Freigabe, weil der Wiedereintritt den bestehenden Ledger-Job
-berührt.
+Damit werden aus heute vier redundanten Anchor-Encodes in der Compare-Schleife
+genau einer.
 
-**Variante 3 — Worker-/Runtime-spezifischer Umbau.** Nur wenn 1 und 2
-nachweislich nicht reichen. Aktuell nicht indiziert.
+## 10. Freigegebener Implementierungsscope
 
-## 10. Explizit nicht geöffnet
+Nur:
 
-Ledger-/Reaper-Semantik, `dispatch_uncertain`, RS3, Refund/Accounting (P1-A
-frozen), HappyHorse-Providerlogik, Lip-Sync/Preclip, Face-/BBox-/Masken-
-geometrie und deren Qualitätsgates, Sprecherzahl und `speaker_idx`-Semantik.
-Insbesondere wird kein Retry- oder Qualitätsgate reduziert.
+- invocation-lokaler Image-/Encoding-Cache bzw. vorbereiteter Anchor-Payload;
+- `resolveIdentityViaRekognition` so umbauen, dass `compareOnePortrait` den
+  vorbereiteten Anchor nicht erneut encodiert;
+- blockweises Encoding statt Byte-für-Byte-Konkatenation;
+- falls ohne Semantikänderung möglich: denselben finalen Anchor-Encode auch
+  zwischen `detectFacesOnAnchor` und v274 wiederverwenden;
+- Tests/Instrumentation für Load-/Encode-Counts und Ergebnisgleichheit.
+
+Nicht ändern: Anchor-Ladder und Attempt-Anzahl, strict-/framing-/face-size-
+Gates, Rekognition-Thresholds, `optimalAssignment`, Face-Geometrie,
+Ledger/Reaper, `dispatch_uncertain`, P1-A Accounting, HappyHorse,
+Lip-Sync/Preclip.
+
+## 11. Verbindliche Tests (5)
+
+1. **N=4 Encode-Count:** vier Character-Compares, finaler Anchor genau 1×
+   geladen und 1× encodiert.
+2. **Ergebnisgleichheit:** N=1 / N=2 / N=4 liefern vor und nach dem Refactor
+   identisches Identity-/Assignment-Ergebnis.
+3. **Cache-Korrektheit:** zwei unterschiedliche Anchor-URLs → keine falsche
+   Wiederverwendung, zwei getrennte Payloads.
+4. **Zuordnung:** bei vier Portraits bleibt jeder Portrait-Payload der
+   korrekten Character-ID zugeordnet.
+5. **Fehlersemantik:** Fehler eines Rekognition-Calls → unveränderte
+   bestehende Fail-/Fallback-Semantik; der Cache darf keinen Fehler
+   verschlucken und keinen Fehlerzustand cachen.
+
+## 12. Fallback und Abschluss
+
+Variante 2 (Phasen-Trennung nach Anchor-Pin, zweiter Worker) bleibt
+ausdrücklich **nur Fallback** und wird erst geöffnet, wenn der optimierte
+N=4-Retest erneut am CPU-Budget stirbt. Kein neuer Recovery-/Ledger-Contract
+in diesem Schritt. Variante 3 ist nicht indiziert.
+
+Ablauf: kleiner Code-Fix → fünf Tests grün → **STOP vor Deploy**.
 
 ---
 
-**FA-4/P1-B ROOT CAUSE IDENTIFIED / FIX CONTRACT READY**
-Empfehlung zur Freigabe: Variante 1.
+**FA-4/P1-B FIX CONTRACT LOCKED — VARIANT 1**
+
