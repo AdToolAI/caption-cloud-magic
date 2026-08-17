@@ -2202,7 +2202,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         }
 
         // 1) Top-Ranked Face für cid nehmen, das noch nicht vergeben ist.
-        if (cid) {
+        if (cid && !fa4GeometryAuthoritative) {
           const ranked = byIdRanked.get(cid);
           if (!plateFace && ranked && ranked.length > 0) {
             for (const cand of ranked) {
@@ -2226,7 +2226,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         }
 
         // 2) Unlabeled-Fallback per Visual-L→R (nur wenn genug Faces vorhanden).
-        if (!plateFace) {
+        if (!plateFace && !fa4GeometryAuthoritative) {
           if (speakers.length === 1 && unlabeledPool.length > 0) {
             for (const cand of unlabeledPool) {
               const k = faceKey(cand);
