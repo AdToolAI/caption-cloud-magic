@@ -1215,3 +1215,54 @@ Stabilizer-Kollision, Stabilizer-NULL, Predicate-Semantik.
 Kein Schema-Change, kein Ledger-RPC-Redesign.
 
 **FA-4/P0 SYNC FAN-OUT IMPLEMENTED / TESTS GREEN → STOP vor Deploy.**
+
+---
+
+## FA-4/P0 — Sync Fan-out: Deploy Verification
+
+### Scope (unverändert gegenüber Deploy Review)
+
+Genau zwei Edge-Functions, Producer vor Consumer. Keine Migration, kein
+Ledger-RPC-Deploy, keine Redeploys der übrigen `_shared/v431-ledger.ts`-Importer,
+kein Render.
+
+### Pre-Deploy-Gate
+
+`deno test supabase/functions/_shared/fa4-turn-pass-guard.test.ts
+supabase/functions/_shared/v431-ledger-adoption.test.ts`
+→ **14 passed | 0 failed** (10 Guard-Tests, 4 Adoption-Tests), unmittelbar vor dem Deploy.
+
+### Deploys
+
+| # | Function | Rolle | Ergebnis |
+|---|---|---|---|
+| 1 | `compose-twoshot-audio` | Producer `turn_id` | Successfully deployed |
+| 2 | `compose-dialog-segments` | Consumer `segment_id = dialog_turn.id` | Successfully deployed |
+
+**`T_FA4_P0_FANOUT_effective` = 2026-08-17T19:51:45Z** (Zeitpunkt des
+`compose-dialog-segments`-Deploys; Producer war zu diesem Zeitpunkt bereits live).
+
+### Boot-Smoke (harmlose, ungültige Payload `{}`)
+
+| Function | HTTP | Body | Bewertung |
+|---|---|---|---|
+| `compose-twoshot-audio` | 401 | `{"error":"Unauthorized"}` | Bundle geladen, Auth-Gate vor Payload-Parsing, kein Import-/ReferenceError |
+| `compose-dialog-segments` | 400 | `{"error":"scene_id_required"}` | Bundle geladen, saubere Validierung, kein Import-/ReferenceError |
+
+Keine Szenen-ID, keine Render-Payload, keine Kosten.
+
+### Statische Sanity (produktiver Stand)
+
+- Producer: `compose-twoshot-audio/index.ts` führt `turnId` durch
+  `DialogBlock` (L232/281), `voicedRange.turns[]` (L748) bis
+  `turn_id` im Segment-Payload (L1142/1393).
+- Consumer: `compose-dialog-segments/index.ts` liest `pass.segment_id` und
+  übergibt es als `segmentId: v431SegmentId` an den Ledger-Acquire (L6105–6144);
+  `segment_id` fließt aus `passSegments[].turnId` (L3648).
+- Fail-closed: `fa4_p0_turn_pass_mismatch` sowie
+  `FA4_P0_PREFLIGHT_BLOCKED missing_segment_id` produktiv vorhanden.
+- Adoption: `_shared/v431-ledger.ts` L747 gibt
+  `preacquired_segment_mismatch` (skip) bei abweichender/fehlender `segment_id`.
+
+**FA-4/P0 SYNC FAN-OUT DEPLOY VERIFIED → STOP.**
+Keine S11, kein Render. S11 für den endgültigen FA-4-Retest erst nach separatem GO.
