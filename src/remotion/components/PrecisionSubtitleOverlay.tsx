@@ -61,6 +61,29 @@ const DEFAULT_CONFIG: PrecisionSubtitleConfig = {
   animationStyle: 'karaoke',
 };
 
+/** Applies an opacity (0..1) to a hex or rgb(a)/named color. */
+export function withOpacity(color: string, opacity: number): string {
+  const a = Math.max(0, Math.min(1, Number.isFinite(opacity) ? opacity : 1));
+  const hex = color.trim();
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex);
+  if (m) {
+    const full = m[1].length === 3
+      ? m[1].split('').map((c) => c + c).join('')
+      : m[1];
+    const r = parseInt(full.slice(0, 2), 16);
+    const g = parseInt(full.slice(2, 4), 16);
+    const b = parseInt(full.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+  }
+  const rgb = /^rgba?\(([^)]+)\)$/i.exec(hex);
+  if (rgb) {
+    const parts = rgb[1].split(',').map((p) => p.trim());
+    return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${a})`;
+  }
+  return hex;
+}
+
+
 // Build word timings from phoneme timestamps
 function buildWordTimingsFromPhonemes(
   text: string, 
