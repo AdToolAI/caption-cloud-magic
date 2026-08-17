@@ -44,7 +44,6 @@ const ENDPOINT = `https://${HOST}/`;
 const AWS_ACCESS_KEY_ID = Deno.env.get("AWS_ACCESS_KEY_ID") ?? "";
 const AWS_SECRET_ACCESS_KEY = Deno.env.get("AWS_SECRET_ACCESS_KEY") ?? "";
 
-const FETCH_TIMEOUT_MS = 12_000;
 const REK_TIMEOUT_MS = 15_000;
 /** Similarity threshold to accept a portrait→box match (Rekognition 0..100). */
 const MIN_SIMILARITY = 55;
