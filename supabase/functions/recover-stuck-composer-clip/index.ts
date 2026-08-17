@@ -21,11 +21,12 @@
  *                          `clip_error LIKE 'watchdog_%'` guard).
  *     - processing/starting → only kill if age > 30 min; otherwise just log.
  *
- * Refunds use the same `refund_ai_video_credits` RPC + CLIP_COSTS table as
- * `compose-clip-webhook` so credits stay in lockstep.
+ * Refunds (FA-4/P1-A) go exclusively through `composer_refund_charge`: only a
+ * DB-proven, run-scoped `deduction` is refunded, at most once per charge.
+ * No proof → 0 €; the scene is terminalized either way.
  */
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
-import { CLIP_COSTS } from "../_shared/clip-costs.ts";
+import { refundRunCharge } from "./refund-provenance.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { logMissingReinjectPointer } from "../_shared/v431-ledger.ts";
@@ -59,6 +60,10 @@ interface Result {
   detail?: string;
 }
 
+/**
+ * FA-4/P1-A — refunds only against a DB-proven, run-scoped charge.
+ * Returns the refunded amount, or null when nothing was refunded.
+ */
 async function refundScene(
   sb: ReturnType<typeof createClient>,
   scene: any,
@@ -70,29 +75,28 @@ async function refundScene(
     .single();
   if (!project) return null;
 
-  const tier: "standard" | "pro" =
-    scene.clip_quality === "pro" ? "pro" : "standard";
-  const costPerSec = CLIP_COSTS[scene.clip_source]?.[tier] ?? 0.15;
-  const refundAmount =
-    Number(scene.duration_seconds ?? 0) * costPerSec;
-
-  if (refundAmount <= 0) return 0;
-
-  try {
-    await sb.rpc("refund_ai_video_credits", {
-      p_user_id: (project as any).user_id,
-      p_amount_euros: refundAmount,
-      p_generation_id: scene.id,
-    });
-    return refundAmount;
-  } catch (err) {
-    console.error(
-      `[recover-stuck-composer-clip] refund failed scene=${scene.id}`,
-      err,
+  const runId = (scene as any).active_run_id as string | null;
+  if (!runId) {
+    console.log(
+      `[recover-stuck-composer-clip] p1a_no_active_run scene=${scene.id} → no_charge`,
     );
     return null;
   }
+
+  const result = await refundRunCharge(
+    sb as unknown as Parameters<typeof refundRunCharge>[0],
+    (project as any).user_id,
+    runId,
+    "watchdog_stuck_clip",
+  );
+
+  console.log(
+    `[recover-stuck-composer-clip] p1a_refund scene=${scene.id} run=${runId} outcome=${result.outcome} amount=${result.amount_euros}`,
+  );
+
+  return result.outcome === "refunded" ? result.amount_euros : null;
 }
+
 
 async function markFailed(
   sb: ReturnType<typeof createClient>,
@@ -169,7 +173,7 @@ async function processScene(
   const { data: scene, error } = await sb
     .from("composer_scenes")
     .select(
-      "id, project_id, replicate_prediction_id, plate_pipeline_job_id, clip_status, clip_url, duration_seconds, clip_source, clip_quality, updated_at, clip_error, engine_override",
+      "id, project_id, active_run_id, replicate_prediction_id, plate_pipeline_job_id, clip_status, clip_url, duration_seconds, clip_source, clip_quality, updated_at, clip_error, engine_override",
     )
     .eq("id", sceneId)
     .maybeSingle();
@@ -202,7 +206,7 @@ async function processScene(
       await markFailed(
         sb,
         sceneId,
-        `watchdog_no_prediction_id (refunded €${(refunded ?? 0).toFixed(2)})`,
+        `watchdog_no_prediction_id ${refunded === null ? "(no refund: no proven charge)" : `(refunded €${refunded.toFixed(2)})`}`,
         isCinematicSync,
       );
     }
@@ -242,7 +246,7 @@ async function processScene(
         await markFailed(
           sb,
           sceneId,
-          `watchdog_prediction_404 (refunded €${(refunded ?? 0).toFixed(2)})`,
+          `watchdog_prediction_404 ${refunded === null ? "(no refund: no proven charge)" : `(refunded €${refunded.toFixed(2)})`}`,
           isCinematicSync,
         );
         return { scene_id: sceneId, outcome: "clip_failed_refunded" };
@@ -295,7 +299,7 @@ async function processScene(
     if (!alreadyRefunded) {
       const refunded = await refundScene(sb, scene);
       const reason =
-        `watchdog_replicate_${status}: ${String(prediction?.error ?? "unknown").slice(0, 200)} (refunded €${(refunded ?? 0).toFixed(2)})`;
+        `watchdog_replicate_${status}: ${String(prediction?.error ?? "unknown").slice(0, 200)} ${refunded === null ? "(no refund: no proven charge)" : `(refunded €${refunded.toFixed(2)})`}`;
       await markFailed(sb, sceneId, reason, isCinematicSync);
     }
     console.log(
@@ -311,7 +315,7 @@ async function processScene(
       await markFailed(
         sb,
         sceneId,
-        `watchdog_hard_kill_after_${ageMin}min (status=${status}, refunded €${(refunded ?? 0).toFixed(2)})`,
+        `watchdog_hard_kill_after_${ageMin}min (status=${status}, ${refunded === null ? "no refund: no proven charge" : `refunded €${refunded.toFixed(2)}`})`,
         isCinematicSync,
       );
     }
