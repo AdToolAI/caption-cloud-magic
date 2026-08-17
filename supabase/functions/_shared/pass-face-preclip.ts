@@ -421,7 +421,7 @@ export async function renderPassFacePreclip(
   // The single re-invoke reuses the SAME pendingRenderId; whether AWS is
   // actually started is decided solely by the atomic dispatch claim inside
   // invoke-remotion-render.
-  type InvokeOutcome = { ok: boolean; status: number; body: string; networkError: string | null };
+  type InvokeOutcome = DispatchOutcome;
   const doInvoke = async (): Promise<InvokeOutcome> => {
     try {
       const resp = await fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
@@ -437,12 +437,8 @@ export async function renderPassFacePreclip(
   };
 
   /** Provably rejected before anything could be sent to AWS → no retry. */
-  const isDefinitiveRejection = (o: InvokeOutcome): boolean => {
-    if (o.networkError) return false;
-    if (o.status >= 400 && o.status < 500) return true;
-    return /aws_credentials_missing|invalid_input|dispatch_claim_failed|are required|scheduling conflict/i
-      .test(o.body);
-  };
+  const isDefinitiveRejection = (o: InvokeOutcome): boolean =>
+    classifyDispatchOutcome(o) === "definitive_rejection";
 
   const readClaimState = async (): Promise<{ claimed: boolean; completed: boolean; url: string }> => {
     const { data: row } = await supabase
@@ -453,11 +449,15 @@ export async function renderPassFacePreclip(
     const cfg = ((row as any)?.content_config ?? {}) as Record<string, unknown>;
     const status = String((row as any)?.status ?? "");
     return {
-      claimed: !!cfg.lambda_invoked_at || !!cfg.real_remotion_render_id ||
-        status === "rendering" || status === "completed",
+      claimed: hasDispatchClaim({
+        lambdaInvokedAt: (cfg.lambda_invoked_at as string | undefined) ?? null,
+        realRemotionRenderId: (cfg.real_remotion_render_id as string | undefined) ?? null,
+        status,
+      }),
       completed: status === "completed",
       url: String((row as any)?.video_url ?? ""),
     };
+
   };
 
   let invoke = await doInvoke();
