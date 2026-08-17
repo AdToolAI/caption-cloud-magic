@@ -139,8 +139,8 @@ interface DetectedFace {
   confidence: number;
 }
 
-async function detectFacesOnAnchor(anchorBytes: Uint8Array, imgW: number, imgH: number): Promise<DetectedFace[]> {
-  const payload = JSON.stringify({ Image: { Bytes: bytesToBase64(anchorBytes) }, Attributes: ["DEFAULT"] });
+async function detectFacesOnAnchor(anchorBase64: string, imgW: number, imgH: number): Promise<DetectedFace[]> {
+  const payload = JSON.stringify({ Image: { Bytes: anchorBase64 }, Attributes: ["DEFAULT"] });
   const res = await withTimeout(signedRekognitionCall("RekognitionService.DetectFaces", payload), REK_TIMEOUT_MS, "detect");
   if (!res.ok) {
     const body = await res.text().catch(() => "");
