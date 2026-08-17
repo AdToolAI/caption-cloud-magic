@@ -68,8 +68,12 @@ Zusätzlich wird belegt, dass der produktive Bundle-Stand von
 
 - erneuter Boot-/Validation-Smoke beider Functions unmittelbar vor dem Setup-Abschluss
   (ungültige Payload, erwartete 400er),
-- Auslesen der Function-Metadaten/Logs mit Deploy-Zeitstempel > T,
 - Festhalten des Prüfzeitpunkts im Report.
+
+Ein zusätzlicher Function-Deploy-Zeitstempel wird nur dokumentiert, falls die
+Plattform ihn verlässlich ausgibt. Andernfalls lautet der Report-Eintrag schlicht:
+„letzter bekannter Deploy > T_FA4_P0_effective, aktueller Bundle-Smoke erfolgreich" —
+daraus wird kein Finding gemacht.
 
 Damit ist später eindeutig, dass ein etwaiger Preclip-Dispatch über den neuen
 Exactly-Once-Code lief.
