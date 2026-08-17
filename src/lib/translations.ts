@@ -15295,9 +15295,10 @@ translations.de.uc = {
   previewLabel: "Vorschau",
   sampleSubtitleText: "Beispiel-Untertitel",
   scriptGenerator: "Voice-over Script Generator",
-  scriptGeneratorDesc: "Introduzca una idea sencilla y obtenga un texto natural y fácil de pronunciar",
-  yourIdea: "Deine Idee",
   scriptGeneratorDesc: "Gib eine einfache Idee ein und erhalte einen natürlichen, gut sprechbaren Text",
+  yourIdea: "Deine Idee",
+  ideaPlaceholder: "z. B. Ein Tutorial über gesunde Ernährung für Anfänger.",
+
   toneStyle: "Ton/Stil",
   toneFriendly: "Freundlich",
   toneProfessional: "Professionell",
