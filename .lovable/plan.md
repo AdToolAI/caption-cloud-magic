@@ -38,21 +38,34 @@ Ja. **Keine Schemaänderung nötig.**
 - `composer_replace_pipeline_attempt` arbeitet über `p_previous_job_id` + Identitätsprüfung, erbt also den Segment-Key des Vorgängers — Retry bleibt automatisch turn-lokal.
 - `composer_apply_sync_segment_result` adressiert über `_pipeline_job_id`; die Turn-Zuordnung wird mit befülltem `segment_id` erstmals eindeutig statt über `metadata.pass_idx`.
 
-Offen bleibt nur die **Herkunft eines stabilen Segment-UUID pro Pass**, da `dialog_shots.passes[]` heute keinen trägt.
+Offen bleibt nur das **Durchreichen der bereits existierenden Turn-UUID** in die vorhandene Segmentdimension, da `dialog_shots.passes[]` sie heute nicht mitführt.
 
 ## 4. Fix-Contract (LOCKED, Implementierung separat)
 
-**Identität:** `(scene_id, run_id, plate_generation, stage='sync_segment', segment_id)` mit `segment_id ≠ NULL` für jeden Pass.
+**Logische Sync-Job-Identität:** `(scene_id, run_id, stage='sync_segment', segment_id = dialog_turn.id)`.
+`plate_generation` ist verpflichtende, eingefrorene Run-/Generation-Provenance und muss übereinstimmen — sie ist **nicht** Bestandteil des bestehenden Unique-Index (`scene_id, run_id, stage, segment_id, attempt_no NULLS NOT DISTINCT`).
 
-1. **Segment-Key-Quelle.** Beim Bau von `dialog_shots.passes[]` erhält jeder Pass ein immutables `segment_id` (UUID). Für bestehende/rekonstruierte Passes ohne Feld gilt eine **deterministische Ableitung** aus `(scene_id, plate_generation, pass.idx)` — gleicher Pass ⇒ gleicher Key, nie kollidierend über Turns. Der Key ist an den Pass gebunden, nicht an `speaker_idx` und nicht an `character_id`.
-2. **Dispatcher.** `compose-dialog-segments` übergibt diesen Key als `segmentId` an `resolveLedgerDispatch`/`acquireLedgerJob`; `metadata.pass_idx` bleibt reine Orchestrierungs-Telemetrie. `speakerId` darf gesetzt werden, wirkt aber nie identitätsbildend.
-3. **Kardinalität.** 6 Turns ⇒ 6 Attempt-1-Jobs. Wiederholter Character ⇒ eigener Job pro Turn. Kein Turn erhält je `already_completed`/`predecessor_exists` wegen eines Nachbar-Turns.
-4. **Retry.** Gleicher Turn ⇒ `composer_replace_pipeline_attempt` erzeugt Attempt N+1 mit identischem `segment_id`. Ein Retry darf nie einen fremden Turn ablösen (Identitätsprüfung im RPC + Segment-Vererbung).
-5. **Adoption.** `adoptPreAcquiredLedgerJob` (NOOP-Escalate-Redispatch) prüft zusätzlich, dass der adoptierte Job denselben `segment_id` trägt wie der Pass, für den dispatcht wird.
-6. **Callback/Apply.** `pipeline_job_id` bleibt alleinige Callback-Provenance. Keine Änderung an G3.2.2, RS3, F1, Preclip, Plate oder Accounting.
-7. **Audio-Mux.** Unverändert genau **ein** `audio_mux`-Job (`segment_id = NULL`), erst nach Terminalität aller sechs Turn-Jobs.
-8. **Invariante/Test.** 6-Turn-Szene mit wiederholten Sprechern ⇒ genau 6 `sync_segment`-Rows mit sechs distinkten `segment_id`, `attempt_no = 1`, plus genau 1 `audio_mux`. Zweiter Aufruf desselben Passes ⇒ `already_in_flight` nur für **denselben** Segment-Key.
+1. **Kanonische Segmentidentität.** `sync_segment.segment_id = dialog_turn.id`. Keine neue UUID pro Pass, keine deterministische Ableitung aus `(scene_id, plate_generation, pass.idx)`, keine zweite Identitätsebene. Ein Sync-Job pro Dialog-Turn.
+2. **Durchreichung.** Beim Bau von `dialog_shots.passes[]` wird die zugehörige `dialog_turn.id` als `turn_id`/`segment_id` am Pass mitgeführt; der Dispatcher in `compose-dialog-segments` übergibt exakt diesen Wert als `segmentId` an `resolveLedgerDispatch`/`acquireLedgerJob`. `metadata.pass_idx` bleibt reine Orchestrierungs-Telemetrie, `speaker_idx`/`character_id` bleiben Character-/Face-Geometrie und wirken nie identitätsbildend.
+3. **Fail-closed statt Ersatzidentität.** Löst ein Pass nicht eindeutig auf genau einen kanonischen `dialog_turn` auf, wird **vor** dem Ledger-Acquire mit `PREFLIGHT_BLOCKED` abgebrochen. Für `stage='sync_segment'` ist `segment_id IS NULL` unzulässig — kein stiller Rückfall auf den alten NULL-Key. `audio_mux` behält `segment_id = NULL` (anderer Stage-Key, keine Kollision).
+4. **Kardinalität.** 6 Turns ⇒ 6 Attempt-1-Jobs. Sarah in Turn 1 und Turn 5: gleiche `character_id`, gleicher `speaker_idx`, unterschiedliche `dialog_turn.id` ⇒ zwei Jobs. Kein Turn erhält je `already_completed`/`predecessor_exists` wegen eines Nachbar-Turns.
+5. **Retry.** Gleicher Turn ⇒ `composer_replace_pipeline_attempt` erzeugt Attempt N+1 mit identischem `segment_id`. Ein Retry darf nie einen fremden Turn ablösen (Identitätsprüfung im RPC + Segment-Vererbung).
+6. **Adoption.** `adoptPreAcquiredLedgerJob` adoptiert nur, wenn die Ledger-Row identisch ist in `scene_id`, `run_id`, `plate_generation`, `stage='sync_segment'` und `segment_id = dialog_turn.id` des dispatchenden Passes. Sonst keine Adoption.
+7. **Callback/Apply.** `pipeline_job_id` bleibt alleinige, authoritative Callback-Provenance. Der Callback sucht keine Turns und interpretiert kein `speaker_idx`; das befüllte `segment_id` macht die Row lediglich eindeutig. Keine Änderung an G3.2.2, RS3, F1, Preclip, Plate oder Accounting.
+8. **Audio-Mux.** Unverändert genau **ein** `audio_mux`-Job, erst nach Terminalität aller sechs Turn-Jobs.
 
-## 5. Nicht enthalten
+## 5. Testinvarianten
 
-Kein Schema-Migrationsbedarf am Index, keine Änderung an `speaker_idx`-Semantik (bleibt Character-/Face-Geometrie), keine Reparatur von S10. Nach dem Fix wird eine **frische** Szene S11 für den Retest angelegt.
+- `set(sync_segment.segment_id) == set(dialog_turns.id)` für genau diese sechs Turns, alle `attempt_no = 1`.
+- Turn 1 (Sarah) vs. Turn 5 (Sarah): unterschiedliche `segment_id`, gleicher `speaker_idx`.
+- Turn 2 (Samuel) vs. Turn 6 (Samuel): unterschiedliche `segment_id`, gleicher `speaker_idx`.
+- Re-entry Turn 1 ⇒ `already_completed`/`already_in_flight` ausschließlich für den Turn-1-Job.
+- Re-entry Turn 2 ⇒ skippt niemals wegen Turn 1.
+- Retry Turn 3 ⇒ Attempt 2 mit derselben Turn-3-`segment_id`.
+- Pass ohne eindeutigen Turn ⇒ `PREFLIGHT_BLOCKED`, kein Acquire, keine Row.
+- Nach sechs terminalen Sync-Jobs ⇒ genau 1 `audio_mux` (`segment_id = NULL`).
+
+## 6. Nicht enthalten
+
+Kein Schema-Change, kein Ledger-RPC-Redesign, keine Änderung an `speaker_idx`-Semantik, keine Reparatur von S10. Nach dem Fix wird eine **frische** Szene S11 für den Retest angelegt.
+
