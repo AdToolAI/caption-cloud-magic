@@ -52,6 +52,10 @@ Kein neues Accounting-Modell. Die Lücke ist nicht die Tabelle, sondern die fehl
 
 ## 4. Offene Entscheidung für den nächsten Schritt (bewusst nicht vorweggenommen)
 
-Ob DB-Idempotenz eine kleine Migration braucht, hängt an einer Frage: Es gibt heute **keinen** Refund→Charge-Verweis (die `refund`-Zeile trägt nur `generation_id`, `metadata` ist NULL). Damit ist entweder ein Verweis-/Unique-Feld auf `ai_video_transactions` nötig oder eine RPC, die Idempotenz über einen Row-Lock der Charge plus deterministischen Existenz-Check herstellt. Diese Wahl wird erst nach diesem Lock getroffen.
+Heute existiert **kein** Refund→Charge-Verweis (die `refund`-Zeile trägt nur `generation_id`, `metadata` ist NULL). Zwei zulässige Wege, Entscheidung erst in der Implementation-Analyse:
 
-**FA-4/P1-A ACCOUNTING FIX CONTRACT LOCKED → STOP.**
+- **Ohne Migration:** die bestehende `metadata`-Spalte der Refund-Transaktion nimmt verbindlich `charge_id`, `run_id` und `refund_reason` auf, und die DB-RPC serialisiert unter Charge-Lock, sodass der zweite Caller unter demselben Lock den bereits existierenden Refund erkennt und als No-op zurückkehrt.
+- **Mit kleinem DB-Constraint:** falls sich „höchstens ein Refund pro (charge_id, refund_reason)" mit den bestehenden Strukturen nicht zuverlässig erzwingen lässt, kommt ein minimaler Unique-Index/Constraint dazu — sonst nichts.
+
+**FA-4/P1-A ACCOUNTING FIX CONTRACT LOCKED → STOP.** Nächster Schritt auf GO: Implementation-Analyse für die kleinste DB-/RPC-Lösung.
+
