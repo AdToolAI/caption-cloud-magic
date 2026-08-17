@@ -2149,15 +2149,43 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         }
       }
 
+      // FA-4 — geometry-authoritative selection map: characterId → the single
+      // plate face the bijective assignment gave that character.
+      const fa4FaceByCid = new Map<string, PlateIdentityFace>();
+      if (fa4GeometryAuthoritative) {
+        for (const face of plateIdentityMap.faces) {
+          const fcid = stripIdPrefix((face as any)?.characterId);
+          if (fcid && !fa4FaceByCid.has(fcid)) fa4FaceByCid.set(fcid, face);
+        }
+      }
+
       speakers.forEach((sp, idx) => {
         const cid = stripIdPrefix(sp.character_id);
         let plateFace: PlateIdentityFace | undefined;
         let source = "plate-identity";
 
+        // FA-4 — bijective geometry result wins. No label ranking, no
+        // first-match, no unlabeled fallback for this path.
+        if (fa4GeometryAuthoritative && cid) {
+          const geoFace = fa4FaceByCid.get(cid);
+          if (geoFace && !assignedFaceKeys.has(faceKey(geoFace))) {
+            plateFace = geoFace;
+            source = "fa4-geometry-bijection";
+          } else {
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} fa4_geometry_slot_unresolved ` +
+              `speaker=${sp.speaker ?? `idx${idx}`} cid=${cid} — slot stays empty (fail-closed)`,
+            );
+          }
+        }
+
         // v277 — Rekognition-Lock is authoritative per slot, even when only
         // partial (e.g. 3/4). Only unresolved slots may fall through to the
         // older cid/geometry fallback paths.
-        const lockedCid = stripIdPrefix(anchorRekLockSeed?.[String(idx)]);
+        const lockedCid = fa4GeometryAuthoritative
+          ? ""
+          : stripIdPrefix(anchorRekLockSeed?.[String(idx)]);
+
         if (lockedCid) {
           const lockedFace = anchorRekFacesByCid.get(lockedCid);
           if (lockedFace && !assignedFaceKeys.has(faceKey(lockedFace))) {
