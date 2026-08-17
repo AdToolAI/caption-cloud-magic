@@ -2607,7 +2607,10 @@ const TextOverlay: React.FC<{
   );
 };
 
-// Subtitle Layer Component
+// Subtitle Layer Component — style-faithful renderer.
+// Every option the customer picks in the Universal Creator subtitle editor
+// (position, font, size, colour, outline style/colour/width, background
+// colour + opacity, animation) is applied here. Do NOT hardcode a look.
 const SubtitleLayer: React.FC<{
   subtitles?: Subtitle[];
   subtitleStyle?: UniversalCreatorVideoProps['subtitleStyle'];
@@ -2615,60 +2618,125 @@ const SubtitleLayer: React.FC<{
   fps: number;
 }> = ({ subtitles, subtitleStyle, frame, fps }) => {
   if (!subtitles || !subtitleStyle) return null;
-  
+
   const currentTime = frame / fps;
   const currentSegment = subtitles.find(
     (s) => currentTime >= s.startTime && currentTime <= s.endTime
   );
-  
+
   if (!currentSegment) return null;
-  
-  const segmentProgress = (currentTime - currentSegment.startTime) / (currentSegment.endTime - currentSegment.startTime);
+
+  const segDuration = Math.max(0.01, currentSegment.endTime - currentSegment.startTime);
+  const localTime = currentTime - currentSegment.startTime;
+  const segmentProgress = Math.min(1, Math.max(0, localTime / segDuration));
   const words = currentSegment.text.split(' ');
-  
-  const entryOpacity = interpolate(currentTime - currentSegment.startTime, [0, 0.15], [0, 1], { extrapolateRight: 'clamp' });
-  const exitOpacity = interpolate(currentSegment.endTime - currentTime, [0, 0.15], [0, 1], { extrapolateRight: 'clamp' });
-  
-  const getPositionStyles = () => {
+
+  const speed = subtitleStyle.animationSpeed && subtitleStyle.animationSpeed > 0
+    ? subtitleStyle.animationSpeed
+    : 1;
+  const ramp = 0.25 / speed;
+
+  // One clean fade in / out per segment — never a repeating flicker.
+  const entryOpacity = interpolate(localTime, [0, ramp], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const exitOpacity = interpolate(currentSegment.endTime - currentTime, [0, ramp], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const baseOpacity = Math.min(entryOpacity, exitOpacity);
+
+  const getPositionStyles = (): React.CSSProperties => {
     switch (subtitleStyle.position) {
-      case 'top': return { top: 60 };
-      case 'center': return { top: '50%', transform: 'translateY(-50%)' };
-      default: return { bottom: 80 };
+      case 'top': return { top: '8%', alignItems: 'flex-start' };
+      case 'center': return { top: 0, bottom: 0, alignItems: 'center' };
+      default: return { bottom: '10%', alignItems: 'flex-end' };
     }
   };
-  
+
+  const bg = withOpacity(subtitleStyle.backgroundColor || '#000000', subtitleStyle.backgroundOpacity ?? 0.7);
+  const outlineWidth = subtitleStyle.outlineWidth ?? 2;
+  const outlineColor = subtitleStyle.outlineColor || '#000000';
+
   const getOutlineStyle = (): React.CSSProperties => {
     switch (subtitleStyle.outlineStyle) {
       case 'stroke':
-        return { WebkitTextStroke: `${subtitleStyle.outlineWidth}px ${subtitleStyle.outlineColor}` };
+        return { WebkitTextStroke: `${outlineWidth}px ${outlineColor}`, paintOrder: 'stroke fill' as React.CSSProperties['paintOrder'] };
       case 'glow':
-        return { textShadow: `0 0 ${subtitleStyle.outlineWidth * 3}px ${subtitleStyle.outlineColor}, 0 0 ${subtitleStyle.outlineWidth * 6}px ${subtitleStyle.outlineColor}` };
+        return { textShadow: `0 0 ${outlineWidth * 3}px ${outlineColor}, 0 0 ${outlineWidth * 6}px ${outlineColor}` };
       case 'shadow':
-        return { textShadow: `${subtitleStyle.outlineWidth}px ${subtitleStyle.outlineWidth}px ${subtitleStyle.outlineWidth * 2}px ${subtitleStyle.outlineColor}` };
+        return { textShadow: `${outlineWidth}px ${outlineWidth}px ${outlineWidth * 2}px ${outlineColor}` };
       case 'box':
-        return { backgroundColor: `rgba(0,0,0,${subtitleStyle.backgroundOpacity})`, padding: '8px 20px', borderRadius: 8 };
+        return { backgroundColor: bg, padding: '8px 20px', borderRadius: 12 };
+      case 'box-stroke':
+        return {
+          backgroundColor: bg,
+          padding: '8px 20px',
+          borderRadius: 12,
+          WebkitTextStroke: `${outlineWidth}px ${outlineColor}`,
+          paintOrder: 'stroke fill' as React.CSSProperties['paintOrder'],
+        };
       default:
         return {};
     }
   };
-  
+
+  // Animation-specific extra styling on the text block.
+  let animationStyle: React.CSSProperties = {};
+  let extraOpacity = 1;
+  switch (subtitleStyle.animation) {
+    case 'slide': {
+      const p = interpolate(localTime, [0, ramp], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      animationStyle = { transform: `translateY(${interpolate(p, [0, 1], [40, 0])}px)` };
+      break;
+    }
+    case 'bounce': {
+      const p = interpolate(localTime, [0, ramp * 1.6], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const y = interpolate(p, [0, 0.5, 0.75, 1], [-50, 10, -5, 0]);
+      animationStyle = { transform: `translateY(${y}px)` };
+      break;
+    }
+    case 'scaleUp': {
+      const p = interpolate(localTime, [0, ramp], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      animationStyle = { transform: `scale(${interpolate(p, [0, 1], [0.6, 1])})` };
+      break;
+    }
+    case 'glitch': {
+      const dx = [0, -2, 2, -1][Math.floor(frame / 2) % 4];
+      animationStyle = {
+        transform: `translateX(${dx}px)`,
+        textShadow: `${dx}px 0 #ff0040, ${-dx}px 0 #00fff0`,
+      };
+      break;
+    }
+    case 'none': {
+      extraOpacity = 1;
+      break;
+    }
+    default:
+      break;
+  }
+
   const renderText = () => {
     switch (subtitleStyle.animation) {
-      case 'wordByWord':
+      case 'typewriter': {
+        const chars = Math.floor(localTime * 15 * speed);
+        return currentSegment.text.substring(0, Math.min(chars, currentSegment.text.length));
+      }
+      case 'wordByWord': {
         const wordsToShow = Math.ceil(segmentProgress * words.length);
         return words.slice(0, wordsToShow).join(' ');
-      
+      }
       case 'highlight':
-        const highlightIndex = Math.floor(segmentProgress * words.length);
+      case 'hormozi': {
+        const highlightIndex = Math.min(words.length - 1, Math.floor(segmentProgress * words.length));
+        const highlight = subtitleStyle.highlightColor || '#F5C76A';
         return (
           <span>
             {words.map((word, i) => (
               <span
                 key={i}
                 style={{
-                  color: i === highlightIndex ? '#F5C76A' : subtitleStyle.fontColor,
+                  color: i === highlightIndex ? highlight : subtitleStyle.fontColor,
                   fontWeight: i === highlightIndex ? 800 : 600,
                   marginRight: '0.2em',
+                  display: 'inline-block',
+                  transform: i === highlightIndex ? 'scale(1.06)' : 'scale(1)',
                 }}
               >
                 {word}
@@ -2676,32 +2744,34 @@ const SubtitleLayer: React.FC<{
             ))}
           </span>
         );
-      
+      }
       default:
         return currentSegment.text;
     }
   };
-  
+
   return (
     <AbsoluteFill
       style={{
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'center',
         ...getPositionStyles(),
-        opacity: Math.min(entryOpacity, exitOpacity),
+        opacity: subtitleStyle.animation === 'none' ? extraOpacity : baseOpacity,
+        zIndex: 200,
       }}
     >
       <div
         style={{
           fontSize: subtitleStyle.fontSize,
           color: subtitleStyle.fontColor,
-          fontFamily: "'Inter', sans-serif",
-          fontWeight: 600,
+          fontFamily: `'${subtitleStyle.font || 'Inter'}', Inter, sans-serif`,
+          fontWeight: 700,
           textAlign: 'center',
-          maxWidth: '80%',
-          lineHeight: 1.4,
+          maxWidth: '84%',
+          lineHeight: 1.3,
+          whiteSpace: 'pre-wrap',
           ...getOutlineStyle(),
+          ...animationStyle,
         }}
       >
         {renderText()}
@@ -2709,6 +2779,7 @@ const SubtitleLayer: React.FC<{
     </AbsoluteFill>
   );
 };
+
 
 // Progress Bar Component
 const ProgressBar: React.FC<{
