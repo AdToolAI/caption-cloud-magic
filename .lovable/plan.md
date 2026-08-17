@@ -30,15 +30,16 @@ Legacy-Historie (inkl. der 6,30-€-Evidence mit `metadata IS NULL`) liegt bewus
 
 Atomarer Ablauf:
 
-1. `SELECT ... FROM ai_video_transactions WHERE id = p_charge_id AND type = 'deduction' FOR UPDATE` — existiert die Row nicht: `no_charge`. (Der reale Belastungstyp ist `deduction`, nicht `debit`.)
+1. `SELECT ... FROM ai_video_transactions WHERE id = p_charge_id AND type = 'deduction' FOR UPDATE` — existiert die Row nicht: `no_charge`.
 2. **Provenance-Beweis DB-seitig** (Caller-Behauptung zählt nicht). Akzeptiert wird die Charge nur, wenn eine dieser Bedingungen gilt:
    - `generation_id = p_run_id`, oder
    - `metadata->>'run_id' = p_run_id::text`, oder
-   - `metadata->>'reservation_id'` verweist auf genau eine `composer_run_reservations`-Row, deren Run `p_run_id` ist (Verifikation gegen die Reservation-Tabelle, keine neue Reservation-Semantik).
-   Trifft nichts zu (heutiger Legacy-Debit mit `generation_id = project_id`): `no_charge`, Wallet unverändert.
-3. Aggregat-Schutz: Ist die Charge nicht eindeutig diesem Run zuzuordnen (z. B. Project-Aggregat), `no_charge`. `abs(total project deduction)` wird nie verwendet.
-4. Refund-Existenzprüfung innerhalb derselben Transaktion auf `(refund_charge_id, refund_reason)`: vorhanden → `already_refunded`, 0 €.
+   - `metadata->>'reservation_id'` verweist auf genau eine `composer_run_reservations`-Row, deren Run `p_run_id` ist.
+   Trifft nichts zu (heutiger Legacy-Pfad mit `generation_id = project_id`): `no_charge`, Wallet unverändert.
+3. Aggregat-Schutz: Ist die Charge nicht eindeutig diesem Run zuzuordnen (z. B. Project-Aggregat), `no_charge`. Ein Project-Aggregat wird niemals synthetisch aufgeteilt.
+4. Refund-Existenzprüfung innerhalb derselben Transaktion **allein auf `refund_charge_id`** (Grund ist nicht Teil der Identität): vorhanden → `already_refunded`, 0 €.
 5. Sonst atomar: Wallet-Gutschrift + Insert einer `type='refund'`-Transaction. **User/Wallet stammen ausschließlich aus der gelockten Charge** (`charge.user_id` → dessen Wallet), nie aus Caller-Parametern. Betrag `abs(charge.amount_euros)`, Metadata `{ refund_charge_id, run_id, refund_reason }` → `refunded`.
+6. Unique-Violation auf `ai_video_transactions_refund_charge_uniq` wird abgefangen und als `already_refunded` (0 €) zurückgegeben — nie als Fehler nach außen.
 
 Rückgabe (jsonb): `{ outcome, amount_euros, refund_transaction_id }` mit `outcome ∈ {no_charge, already_refunded, refunded}`.
 Betrag ausschließlich aus der validierten Charge — kein `CLIP_COSTS`, kein Caller-Betrag.
