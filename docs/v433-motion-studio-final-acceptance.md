@@ -1125,3 +1125,23 @@ Keine weiteren produktiven Bundles. Keine Migration.
 Boot bestätigt 17:47:47Z).
 
 **Status:** FA-4/P1-B DEPLOY VERIFIED — **STOP. Kein FA-4-Render.**
+
+## FA-4 RETEST v2 SETUP READY (S10)
+
+- Scene S10 = `585da82a-4399-427d-9add-655c77933461` (order_index 9), Projekt `035273d7-…`
+- Konfiguration: `dialog_mode=true`, `lip_sync_with_voiceover=true` (intentional), `engine_override=cinematic-sync`, `clip_source=ai-happyhorse`, `duration_seconds=15.0`, non-tight
+- Cast = exakt 4 stabile Character-IDs:
+  - Sarah Dusatko `5c81f9bf-a5f1-4608-849f-e2a4adc84bcb`
+  - Samuel Dusatko `483f9cdc-eb31-4486-bf67-9c5e7d955016`
+  - Matthew Dusatko `54d90504-7253-482f-9c6f-1902e8a6749b`
+  - Kay Mark `c65de5c6-75e1-47aa-956c-cd0cc424e736`
+- 6 Turns, ID-Sequenz Sarah / Samuel / Matthew / Kay / Sarah / Samuel (Turn1=Turn5 Sarah-ID, Turn2=Turn6 Samuel-ID)
+- 4 distinct Voice-IDs, ausschließlich an Character-IDs gebunden:
+  Julia `EXAVITQu4vr4xnSDxMaL`, Brand voice `u86DavlmJKwP4sPOSkw7`, Stefan `pqHfZKP75CvOlQylNhV4`, Markus `onwK4e9ZLuTAKqWW03F9`
+- UI-TTS-Prognose: `6 Blöcke · 4 Sprecher · ~8s`
+- Pre-Start-Snapshot: `active_run_id=NULL`, `pipeline_state=idle`, Ledger-Jobs = 0, keine sync_segment/audio_mux/Stitch-Historie, keine Pass-/Job-Pointer, `clip_url=NULL`, `base_video_url=NULL`, `processed_video_url=NULL`, kein RS3-Marker
+- Anker-Frische: `reference_image_url = NULL` (kein Anchor aus S08/S09 übernommen)
+- Produktiver Fix-Stand: P1-A `T_FA4_P1A_effective = 2026-08-17T17:11Z`, P1-B `T_FA4_P1B_effective = 2026-08-17T17:47Z`; `compose-video-clips` und `compose-dialog-segments` booten ohne Import-/Cold-Boot-Fehler
+- S08/S09 unangetastet als Evidence
+
+**FA-4 RETEST v2 SETUP READY — STOP. Kein Render.**
