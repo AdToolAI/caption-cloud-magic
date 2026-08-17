@@ -338,79 +338,91 @@ export async function routePlateFacesToAnchor(params: {
 
   const anchorSlots = [...anchorLayout.slots].sort((a, b) => a.slotIndex - b.slotIndex);
   const rows = anchorSlots.length;
-  const cols = detected.length;
 
-  if (rows === 0 || cols === 0) {
-    return {
-      ...emptyResult("no_faces_detected"),
-      dims,
-      faces: detected.map((d) => ({
-        slot: d.slot, bbox: d.bbox, cx: d.cx, cy: d.cy,
-        characterId: null, distance: null, matchConfidence: 0,
-      })),
-      countMismatch: rows !== cols,
-    };
-  }
-
-  // Build square NxN distance matrix (pad with high cost for missing side).
-  const N = Math.max(rows, cols);
-  const HIGH = 10;
-  const cost: number[][] = [];
-  for (let r = 0; r < N; r++) {
-    const row: number[] = [];
-    for (let c = 0; c < N; c++) {
-      if (r >= rows || c >= cols) { row.push(HIGH); continue; }
-      const a = anchorSlots[r];
-      const p = detected[c];
-      const dx = a.cx - p.cx;
-      const dy = a.cy - p.cy;
-      row.push(Math.sqrt(dx * dx + dy * dy));
-    }
-    cost.push(row);
-  }
-
-  const assign = optimalAssignmentMin(cost); // assign[anchorRow] = plateCol
   const faces: RoutedPlateFace[] = detected.map((d) => ({
     slot: d.slot, bbox: d.bbox, cx: d.cx, cy: d.cy,
     characterId: null, distance: null, matchConfidence: 0,
   }));
+
+  if (rows === 0 || detected.length === 0) {
+    return {
+      ...emptyResult("no_faces_detected"),
+      dims,
+      faces,
+      countMismatch: rows !== detected.length,
+    };
+  }
+
+  // ── Contract A — candidate sanity BEFORE any assignment ────────────
+  const { plausible, rejected } = filterPlausibleCandidates(
+    detected.map((d, i) => ({ index: i, bbox: d.bbox, cx: d.cx, cy: d.cy })),
+    dims,
+  );
+  for (const r of rejected) {
+    const f = faces[r.index];
+    if (f) (f as any).sanityRejected = r.reason;
+  }
+  console.log(
+    `[plateFaceSlotRouter] fa4_candidate_sanity detected=${detected.length} ` +
+    `plausible=${plausible.length} rejected=${rejected.length} ` +
+    `reasons=${JSON.stringify(rejected)}`,
+  );
+
+  // ── Contract B — global bijective geometry assignment ──────────────
+  const assignment = assignAnchorsToCandidatesBijective(
+    anchorSlots.map((a) => ({ cx: a.cx, cy: a.cy })),
+    plausible.map((p) => ({ cx: p.cx, cy: p.cy })),
+  );
+
+  if (!assignment.ok) {
+    const countMismatch = assignment.reason === "count_mismatch";
+    return {
+      ok: false,
+      method: "v278_hungarian_plate_router",
+      dims,
+      faces,
+      assignmentLock: {},
+      resolvedCount: 0,
+      expectedCount: rows,
+      countMismatch,
+      maxDistance: null,
+      reason: `fa4_fail_closed:${assignment.reason}:anchor=${rows}/plausible=${plausible.length}/detected=${detected.length}`,
+      msTotal: Date.now() - t0,
+    };
+  }
+
   const assignmentLock: Record<string, string> = {};
   let resolved = 0;
-  let maxDist = 0;
-
   for (let r = 0; r < rows; r++) {
-    const c = assign[r];
-    if (c === undefined || c < 0 || c >= cols) continue;
+    const cand = plausible[assignment.assign[r]];
+    if (!cand) continue;
     const anchor = anchorSlots[r];
-    const plate = faces[c];
+    const plate = faces[cand.index];
     if (!plate) continue;
-    const dist = cost[r][c];
+    const dist = assignment.distances[r];
     plate.characterId = anchor.characterId;
     plate.distance = dist;
-    // Confidence: 1.0 at distance 0, 0 at distance 0.5 (half image diagonal-ish).
+    // Telemetry only — never a gate, never a tie-break (Contract B).
     plate.matchConfidence = Math.max(0, Math.min(1, 1 - dist / 0.5));
     assignmentLock[String(anchor.slotIndex)] = anchor.characterId;
     resolved++;
-    if (dist > maxDist) maxDist = dist;
   }
 
   // v278.3 — Extra faces are not a failure. Office/task scenes can contain
-  // reflections, background people, or poster faces. Hungarian assignment is
-  // already bijective, so the only hard count mismatch is "too few faces".
-  const countMismatch = cols < rows;
+  // reflections, background people, or poster faces. The assignment is
+  // bijective, so the only hard count mismatch is "too few plausible faces".
   return {
-    ok: resolved >= rows && !countMismatch,
+    ok: resolved === rows,
     method: "v278_hungarian_plate_router",
     dims,
     faces,
     assignmentLock,
     resolvedCount: resolved,
     expectedCount: rows,
-    countMismatch,
-    maxDistance: maxDist,
-    reason: countMismatch
-      ? `count_mismatch:anchor=${rows}/plate=${cols}`
-      : undefined,
+    countMismatch: false,
+    maxDistance: assignment.maxDistance,
+    reason: resolved === rows ? undefined : "incomplete_bijection",
     msTotal: Date.now() - t0,
   };
 }
+
