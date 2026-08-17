@@ -1266,3 +1266,88 @@ Keine Szenen-ID, keine Render-Payload, keine Kosten.
 
 **FA-4/P0 SYNC FAN-OUT DEPLOY VERIFIED → STOP.**
 Keine S11, kein Render. S11 für den endgültigen FA-4-Retest erst nach separatem GO.
+
+---
+
+## FA-4 FINAL RETEST SETUP (S11) — Voice-/Turn-Bindung, kein Render
+
+Szene **S11** = `e658509d-cdeb-40f7-bd33-98e74144fdc5`
+(Projekt `035273d7-ae9b-44e0-89e7-f9e28703530d`, `order_index = 10`).
+Aufbau ausschließlich über den normalen Studio-/UI-Pfad (Playwright gegen die
+laufende App). Keine manuellen DB-Writes, keine Migration, kein RPC-Setzen.
+S10 (`585da82a…`) und S08 (`42bcdda1…`) bleiben unangetastete Evidence.
+
+### Szenenkonfiguration
+
+| Merkmal | Wert |
+|---|---|
+| `scene_type` | `custom` |
+| `duration_seconds` | 15 |
+| `engine_override` | `cinematic-sync` |
+| `lip_sync_with_voiceover` / `dialog_mode` | `true` / `true` (intentional ON) |
+| Cast | 4 distinct Characters |
+| Dialog | 6 Zeilen, Turn 1 = Turn 5 (Sarah), Turn 2 = Turn 6 (Samuel) |
+
+### Voice-Bindung (UI-Pfad: Skript-Studio → „Stimme pro Sprecher")
+
+| Sprecher | `character_id` | Voice | ElevenLabs Voice-ID | `characterId`-Stempel |
+|---|---|---|---|---|
+| Sarah Dusatko | `5c81f9bf-a5f1-4608-849f-e2a4adc84bcb` | Lena | `FGY2WhTYpPnrIDTdsKH5` | ja |
+| Samuel Dusatko | `483f9cdc-eb31-4486-bf67-9c5e7d955016` | Stefan | `pqHfZKP75CvOlQylNhV4` | ja |
+| Matthew Dusatko | `54d90504-7253-482f-9c6f-1902e8a6749b` | Markus | `onwK4e9ZLuTAKqWW03F9` | ja |
+| Kay Mark | `c65de5c6-75e1-47aa-956c-cd0cc424e736` | Klaus | `nPczCjzI2devNBz1zQrb` | ja |
+
+4 distinct Voice-IDs, keine Doppelbelegung; jede Voice über die Character-ID
+gebunden und in `dialog_voices` persistiert. Der zuvor geerbte Brand-Default
+(`u86Davl…`, „Brand voice") wurde über den normalen Picker durch eine explizite
+Auswahl (Stefan) ersetzt.
+
+### Turn-Identität — Fall B: `dialog_turns_prestart = 0` (expected JIT)
+
+Nach dem Voice-Save enthält `dialog_turns` 0 Rows. Das ist **kein P0/P1**,
+sondern das unveränderte Lifecycle-Modell. Read-only belegt:
+
+- `system_config['composer.feature.id_only_cast_resolution'] = true`
+- `compose-twoshot-audio/index.ts` L650–657: bei `rawTurns.length === 0` und
+  vorhandenem `dialog_script` läuft `ensureDialogTurnsForScene(...)`
+  (`v201_dialog_turns_jit_backfill`) — **vor** dem Aufbau des
+  `turn_id`-Payloads (Segment-Payload L1142/1393).
+- `_shared/scene-dialog-turns.ts` L360–390: jeder Turn erhält eine eigene
+  `turnId = crypto.randomUUID()` und wird sofort nach `composer_scenes.dialog_turns`
+  persistiert; Rückgabe `source = "jit_backfill"`.
+- Sprecherauflösung ist eindeutig (4 unterschiedliche Voll- und Vornamen) →
+  weder `ambiguous_speaker` noch `unmatched_speaker` zu erwarten.
+- Der neue Fan-out-Pfad setzt keine vorab persistierte Turn-Liste voraus:
+  `segment_id` wird erst aus den — dann bereits materialisierten — Turn-UUIDs
+  gebildet (`passSegments[].turnId`), NULL bleibt fail-closed.
+
+Die sechs realen `turn_id` werden unmittelbar beim Renderstart gesichert.
+
+### Pre-Start-Snapshot (read-only, nach vollem Reload)
+
+| Feld | Wert |
+|---|---|
+| `active_run_id` | NULL |
+| `pipeline_state` | `idle` |
+| `lip_sync_status` / `twoshot_stage` | NULL / NULL |
+| `composer_pipeline_jobs` (Szene) | 0 Zeilen (`sync_segment` = 0, `audio_mux` = 0) |
+| `clip_url` / `base_video_url` / `processed_video_url` | NULL / NULL / NULL |
+| `reference_image_url` | NULL |
+| `dialog_shots` / `audio_plan` | `{}` / `{}` — keine Pass-/Job-Pointer |
+| RS3-Marker (`audio_plan.twoshot.rs3_reset`, `rs3_reset_id`) | nicht vorhanden |
+| `plate_generation` (Startwert, nur dokumentiert) | 1 |
+| `dialog_turns_prestart` | 0 (expected JIT) |
+
+**C1 — Lip-Sync-Intent:** nach vollem Reload keine Lip-Sync-Draft-Keys im
+localStorage; die UI zeigt den Intent **resolved** und identisch mit dem
+persistierten DB-Wert (`lip_sync_with_voiceover = true`) — kein Draft-Overlay.
+
+### Kostenvoranschlag (nur abgelesen)
+
+- Szene S11: **€6.30** (15 s Plate)
+- Lip-Sync-Hinweis der UI: ~€0,20/s, 4 Sprecher
+- Projekt-Gesamtschätzung: €48.72
+
+**FA-4 FINAL RETEST SETUP READY — dialog_turns JIT VERIFIED → STOP.**
+Kein Render gestartet. Der finale FA-4-Render startet erst nach separatem
+Render-GO.
