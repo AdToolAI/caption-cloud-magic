@@ -59,7 +59,7 @@ Ersetzt bzw. entwertet werden:
 
 ### Contract D — Sanity IMMER nach Assignment
 
-Die final gewählte BBox wird erneut objektiv validiert. Der `trustedSlots`-Shortcut in `v239_repair_gate` (~2303–2420) darf `bboxSanity()` nicht mehr überspringen. Confidence darf nur Diagnostics, Supporting Score und die Frage „zusätzliche Identity-Prüfung nötig?“ beeinflussen — nie eine geometrisch invalide Box freigeben.
+Die final gewählte BBox wird erneut objektiv validiert. Der `trustedSlots`-Shortcut in `v239_repair_gate` (~2303–2420) darf `bboxSanity()` nicht mehr überspringen. Confidence ist non-authoritative diagnostic/supporting evidence und darf nur Diagnostics und die Frage „zusätzliche Identity-Prüfung nötig?“ beeinflussen — nie eine geometrisch invalide Box freigeben.
 
 ### Contract E — Deterministisches Preclip-Crop-Containment
 
