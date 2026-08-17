@@ -305,19 +305,34 @@ export async function routePlateFacesToAnchor(params: {
 }): Promise<PlateFaceSlotRouterResult> {
   const t0 = Date.now();
   const { plateUrl, anchorLayout } = params;
-  const emptyResult = (reason: string): PlateFaceSlotRouterResult => ({
-    ok: false,
-    method: "v278_hungarian_plate_router",
-    dims: params.plateDims ?? { width: 0, height: 0 },
-    faces: [],
-    assignmentLock: {},
-    resolvedCount: 0,
-    expectedCount: anchorLayout.slots.length,
-    countMismatch: false,
-    maxDistance: null,
-    reason,
-    msTotal: Date.now() - t0,
-  });
+  const emptyResult = (
+    reason: string,
+    ctx?: { detectSucceeded?: boolean; detectedCount?: number },
+  ): PlateFaceSlotRouterResult => {
+    const detectSucceeded = ctx?.detectSucceeded ?? false;
+    const detectedCount = ctx?.detectedCount ?? 0;
+    return {
+      ok: false,
+      method: "v278_hungarian_plate_router",
+      dims: params.plateDims ?? { width: 0, height: 0 },
+      faces: [],
+      assignmentLock: {},
+      resolvedCount: 0,
+      expectedCount: anchorLayout.slots.length,
+      countMismatch: false,
+      maxDistance: null,
+      reason,
+      detectSucceeded,
+      detectedCount,
+      failureClass: classifyRouterFailure({
+        reason,
+        detectSucceeded,
+        detectedCount,
+        expectedCount: anchorLayout.slots.length,
+      }),
+      msTotal: Date.now() - t0,
+    };
+  };
 
   if (!plateUrl || !anchorLayout?.slots?.length) return emptyResult("empty_input");
   if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) return emptyResult("aws_credentials_missing");
@@ -343,13 +358,20 @@ export async function routePlateFacesToAnchor(params: {
   }));
 
   if (rows === 0 || detected.length === 0) {
+    // DetectFaces itself succeeded here — the classifier decides whether this
+    // is a confirmed geometry statement (anchors exist, 0 faces) or a
+    // recoverable precondition gap (no anchor slots).
     return {
-      ...emptyResult("no_faces_detected"),
+      ...emptyResult("no_faces_detected", {
+        detectSucceeded: true,
+        detectedCount: detected.length,
+      }),
       dims,
       faces,
       countMismatch: rows !== detected.length,
     };
   }
+
 
   // ── Contract A — candidate sanity BEFORE any assignment ────────────
   const { plausible, rejected } = filterPlausibleCandidates(
