@@ -536,7 +536,7 @@ async function inspectSpeakerAudioWithRetry(url: string, attempts = 3) {
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? "audio_fetch_failed"));
 }
 
-interface Turn { startSec: number; endSec: number }
+interface Turn { startSec: number; endSec: number; turnId?: string | null }
 interface TwoshotSpeaker {
   speaker?: string;
   character_id?: string | null;
@@ -550,6 +550,8 @@ interface SegmentItem {
   speakerIdx: number;
   speakerName: string;
   refId: string;
+  /** FA-4/P0 — kanonische `dialog_turns[].id` dieses Turn-Fensters. */
+  turnId?: string | null;
 }
 
 interface PassState {
@@ -557,6 +559,11 @@ interface PassState {
   speaker_idx: number;
   character_id: string | null;
   speaker_name: string;
+  /** FA-4/P0 — kanonische Ledger-Segmentidentität (`sync_segment.segment_id`).
+   *  Aktive Passes: `dialog_turns[].id`. Stabilizer: deterministische UUID
+   *  aus (scene, run, listener). NIEMALS null beim Dispatch. */
+  segment_id: string | null;
+
   audio_url: string;
   coords: [number, number] | null;
   segments: SegmentItem[];
