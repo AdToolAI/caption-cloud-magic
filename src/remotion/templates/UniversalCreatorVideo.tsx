@@ -296,15 +296,21 @@ export const UniversalCreatorVideoSchema = z.object({
   // Subtitle styling
   subtitleStyle: z.object({
     position: z.enum(['top', 'center', 'bottom']).default('bottom'),
+    /** Font family chosen in the Universal Creator subtitle editor. */
+    font: z.string().default('Inter'),
     fontSize: z.number().default(48),
     fontColor: z.string().default('#FFFFFF'),
     backgroundColor: z.string().default('#000000'),
     backgroundOpacity: z.number().default(0.7),
-    animation: z.enum(['none', 'fade', 'slide', 'bounce', 'typewriter', 'highlight', 'scaleUp', 'glitch', 'wordByWord']).default('highlight'),
-    outlineStyle: z.enum(['none', 'stroke', 'box', 'box-stroke', 'glow', 'shadow']).default('glow'),
+    animation: z.enum(['none', 'fade', 'slide', 'bounce', 'typewriter', 'highlight', 'scaleUp', 'glitch', 'wordByWord', 'hormozi']).default('fade'),
+    animationSpeed: z.number().default(1),
+    outlineStyle: z.enum(['none', 'stroke', 'box', 'box-stroke', 'glow', 'shadow']).default('stroke'),
     outlineColor: z.string().default('#000000'),
     outlineWidth: z.number().default(2),
+    /** Word-highlight colour for highlight/hormozi animations. */
+    highlightColor: z.string().default('#F5C76A'),
   }).optional(),
+
   
   // Features
   showProgressBar: z.boolean().default(false),
