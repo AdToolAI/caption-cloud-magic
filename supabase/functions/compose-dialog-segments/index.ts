@@ -5238,8 +5238,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // slicing/re-uploading that per stabilizer is wasteful and would emit a
     // near-empty audio window that Sync.so has historically rejected. Keep
     // the full silence WAV → mux uses absolute timing on segments.
-    const isStabilizerForTight = (pass as any).stabilizer_pass === true &&
-      (pass as any).is_silent_stabilizer === true;
+    const isStabilizerForTight = isStabilizerPass(pass);
     const allowTightSlice = passes.length >= 1 && !isStabilizerForTight;
     if (allowTightSlice && speakerWindowsSecs.length > 0) {
 
