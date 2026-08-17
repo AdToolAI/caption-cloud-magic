@@ -5366,8 +5366,31 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
         } else {
           (pass as any).preclip_error = preclipResult.error ?? "preclip_unknown";
+          (pass as any).preclip_error_class = preclipResult.errorClass ?? null;
           if (speakers.length >= 2) {
-            const reason = `v187_preclip_required_no_fullplate_fallback: Preclip für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`} wurde nicht rechtzeitig fertig (${preclipResult.error ?? "preclip_unknown"}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
+            // FA-4/P0 — presenter only: an infrastructure/dispatch problem is NOT a
+            // timeout. `dispatch_uncertain` keeps its own diagnosis class.
+            const speakerLabel = pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`;
+            const detail = preclipResult.error ?? "preclip_unknown";
+            const isDispatchIssue = preclipResult.errorClass === "dispatch_uncertain" ||
+              preclipResult.errorClass === "dispatch_failed";
+            const cause = isDispatchIssue
+              ? tl({
+                de: `Die Vorbereitung des Sprecher-Clips für „${speakerLabel}" konnte wegen eines Infrastrukturfehlers nicht gestartet bzw. bestätigt werden (${detail}).`,
+                en: `Preparing the speaker clip for "${speakerLabel}" could not be started or confirmed due to an infrastructure error (${detail}).`,
+                es: `La preparación del clip del hablante para "${speakerLabel}" no se pudo iniciar ni confirmar debido a un error de infraestructura (${detail}).`,
+              })
+              : tl({
+                de: `Der Sprecher-Clip für „${speakerLabel}" wurde nicht rechtzeitig fertig (${detail}).`,
+                en: `The speaker clip for "${speakerLabel}" was not finished in time (${detail}).`,
+                es: `El clip del hablante para "${speakerLabel}" no se terminó a tiempo (${detail}).`,
+              });
+            const reason = `v187_preclip_required_no_fullplate_fallback: ${cause} ` +
+              tl({
+                de: `Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst. Credits wurden zurückerstattet.`,
+                en: `No full-plate fallback, so Sync.so does not trigger generation_input_face_selection_invalid again. Credits have been refunded.`,
+                es: `Sin respaldo de placa completa, para que Sync.so no vuelva a activar generation_input_face_selection_invalid. Los créditos han sido reembolsados.`,
+              });
             console.error(
               `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v187_preclip_required_no_fullplate_fallback speaker=${pass.speaker_name ?? "?"} err=${preclipResult.error ?? "preclip_unknown"} class=${preclipResult.errorClass ?? "unknown"} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] — refusing full-plate dispatch`,
             );
