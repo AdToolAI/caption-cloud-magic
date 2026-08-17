@@ -31,6 +31,36 @@ export interface BuildCustomizationsInput {
 }
 
 /**
+ * The Universal Creator editor stores `color` / `font`, the Remotion
+ * composition schema expects `fontColor` / `font`. Without this mapping Zod
+ * silently replaced every customer choice with its defaults — which is why
+ * subtitles always looked identical no matter what was selected.
+ * Used by BOTH preview and export so they can never diverge.
+ */
+export function normalizeSubtitleStyleForRender(
+  style?: SubtitleConfig['style'] | null,
+): Record<string, unknown> {
+  const s = { ...DEFAULT_SUBTITLE_STYLE, ...(style || {}) } as SubtitleConfig['style'] & {
+    highlightColor?: string;
+  };
+  return {
+    position: s.position ?? 'bottom',
+    font: s.font || 'Inter',
+    fontSize: Number.isFinite(Number(s.fontSize)) ? Number(s.fontSize) : 48,
+    fontColor: s.color || '#FFFFFF',
+    backgroundColor: s.backgroundColor || '#000000',
+    backgroundOpacity: Number.isFinite(Number(s.backgroundOpacity)) ? Number(s.backgroundOpacity) : 0.7,
+    animation: s.animation ?? 'fade',
+    animationSpeed: Number.isFinite(Number(s.animationSpeed)) && Number(s.animationSpeed) > 0 ? Number(s.animationSpeed) : 1,
+    outlineStyle: s.outlineStyle ?? 'stroke',
+    outlineColor: s.outlineColor || '#000000',
+    outlineWidth: Number.isFinite(Number(s.outlineWidth)) ? Number(s.outlineWidth) : 2,
+    highlightColor: s.highlightColor || '#F5C76A',
+  };
+}
+
+
+/**
  * Validates + clamps scenes so preview + Lambda see an identical timeline.
  * Filters out zero/invalid durations, clamps to [0.1, 600] seconds.
  */
