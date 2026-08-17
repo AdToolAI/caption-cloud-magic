@@ -1,99 +1,111 @@
-# FA-4 Forensischer Audit übernehmen + Visuelles Review
+# FA-4 Root-Cause-Lock: Face-Candidate-Auswahl (read-only)
 
-Ziel: Den bereits erhobenen forensischen Audit des Runs `b9acfae3-8121-45ba-950a-9a1ad5373f5a` (S11) in `docs/v433-motion-studio-final-acceptance.md` einbauen, den Status auf **TECHNICAL PASS / VISUAL REVIEW PENDING** setzen und anschließend den finalen Clip visuell/auditiv prüfen.
+Ziel: beweisen, warum für Sarah, Matthew und Kay winzige False-Positive-Boxen
+statt der korrekten großen Gesichter benutzt wurden — und erst danach einen
+Fix-Contract festlegen. Kein Code, kein Render, kein Retry, keine DB-Writes.
 
-Keine Code-Änderungen, kein neuer Render, keine Retry/Reset-Operationen.
+## Was heute schon belegt ist (aus Code + persistierter Szene S11)
 
----
+Der Anchor ist sauber. `anchor_face_layout` (v278) enthält vier eindeutige
+Slots mit korrekten Character-IDs und plausiblen normalisierten Zentren
+(Sarah 0.243, Samuel 0.386, Matthew 0.601, Kay 0.828 — exakt L→R).
+`assignmentLock` ist vollständig und korrekt, Quelle
+`v277_anchor_rekognition_complete`.
 
-## 1. Dokumentation: Audit in v433-FA-Dokument einbauen
+Die Plate-Detektion enthält zehn Gesichter. Die vier real plausiblen
+Gesichter liegen bei `[226,244,286,327]`, `[476,209,540,294]`,
+`[753,187,819,277]`, `[1030,208,1099,296]` — deren normalisierte Zentren
+(0.199 / 0.396 / 0.611 / 0.829) decken sich fast perfekt mit dem Anchor.
+Die Geometrie war also eindeutig lösbar.
 
-**Datei:** `docs/v433-motion-studio-final-acceptance.md`
+Trotzdem wurden diese Boxen benutzt:
 
-### 1.1 Überschrift und Status korrigieren
-- Den Abschnitt `## FA-4 FINAL RETEST RENDER (S11) — Ergebnis: **PASS**` umbenennen in:
-  `## FA-4 FINAL RETEST RENDER (S11) — Ergebnis: **TECHNICAL PASS / VISUAL REVIEW PENDING**`
-- Den Einleitungssatz anpassen: technische Pipeline-Kriterien bestanden, finale visuelle/auditive Prüfung steht noch aus.
+| Speaker | verwendete Box | Befund |
+|---|---|---|
+| Sarah | `[1125,7,1142,30]` | 17×23 px, oben rechts, `confidence: 0`, `matchConfidence: 0.85` |
+| Samuel | `[476,209,540,294]` | korrektes Gesicht, `confidence: 0.69` |
+| Matthew | `[819,113,831,128]` | 12×15 px, `confidence: 0.89` (Detektor-gelabelt) |
+| Kay | `[923,98,940,119]` | 17×21 px, `confidence: 0.77` (Detektor-gelabelt) |
 
-### 1.2 Bestehende "Visuelle Prüfung" ersetzen
-- Die aktuelle `### Visuelle Prüfung` (Zeilen 1411–1417) entfernen/überschreiben.
-- Ersatz durch einen neutralen Absatz, der erklärt, dass die visuelle Prüfung noch aussteht und separat dokumentiert wird.
+Die daraus abgeleiteten Preclip-Crops passen dazu: Sarah `x=1024…1244, y=0…220`
+(ihr Slot liegt links, nicht dort), Kay `x=734…1128, y=0…394` (überdeckt
+Matthews Slot mit).
 
-### 1.3 Neuer Unterabschnitt: `### Forensischer Audit (read-only)`
-Inhalt aus `.lovable/plan/fa-4-forensischer-audit-run-b9acfae3-read-only-keine-änderun-2026-08-17.md` übernehmen, komprimiert auf die 10 Audit-Punkte:
+Drei Mechanismen im Code, die dazu passen — alle im aktuellen
+`compose-dialog-segments`:
 
-1. Run / Scene (run_id, scene_id, Zeiten, Status)
-2. Erwartete vs. tatsächliche Dauer
-3. Jobs dieses Runs (Ledger, chronologisch)
-4. Dialog-Turns (6, kanonisch)
-5. Sync-Segmente (segment_id == dialog_turn.id)
-6. Stitch (kein separater Job, Teil von audio_mux)
-7. Audio-Mux (Fakten)
-8. Finaler Output (ffprobe)
-9. Output-Kette
-10. Neutraler Abschluss
+1. **First-Match statt Ranking im v277-Lock.** Die Map `characterId → PlateFace`
+   wird über `!anchorRekFacesByCid.has(faceCid)` befüllt, also in
+   Detektor-Reihenfolge. Für Sarah steht die winzige Box vor dem korrekten
+   Kandidaten `[226,244,286,327]` — der große Kandidat wird nie erreicht.
+   Das direkt danach existierende Confidence-Ranking (`byIdRanked`) greift
+   nur, wenn der Lock nichts liefert.
+2. **Der L→R-Bridge-Fallback labelt False Positives.** Zwei der benutzten
+   Boxen tragen `confidence: 0` und exakt `matchConfidence: 0.85` — das ist
+   die Signatur des Anchor-Slot-Bridges, der Anchor-Slot i auf Plate-Face i
+   in Slot-Reihenfolge schreibt. Die persistierten Plate-Slots sind aber
+   nicht nach x sortiert (Slot 0 liegt bei x=1125). Die Annahme "beide
+   Detektoren sortieren L→R" trifft hier nicht zu.
+3. **Der v239-Trust-Gate hebelt den Sanity-Check aus.** Slots gelten als
+   vertrauenswürdig ab `confidence >= 0.70` oder `matchConfidence >= 0.55`.
+   Alle drei falschen Boxen erfüllen das (0.85 / 0.89 / 0.77) und werden
+   deshalb nie gegen die objektiven Kriterien (Fläche 0.3 %–25 %,
+   Seitenverhältnis) geprüft — obwohl sie mit ~0.04 % Plate-Fläche klar
+   darunter liegen. Die Reparatur (`v185-anchor-repair`) läuft nie an.
 
-### 1.4 Auffälligkeiten neutral dokumentieren
-- **3,751 s Stille am Szenenende**: als Beobachtung dokumentieren, keine P0/P1-Bewertung; erst visuell/auditiv bewerten.
-- **face_probe_unavailable ×6**: als non-blocking Warning dokumentieren; nicht hochstufen, solange Face-/Identity-Zuordnung im finalen Clip korrekt ist.
-- **keine composer_scene_runs-Row**: als Beobachtung dokumentieren, kein FA-4-Blocker, solange der aktuelle produktive Run-/Ledger-Vertrag diese Tabelle nicht als SoT voraussetzt.
+Danach fällt der letzte Schutz aus: der Face-Probe vor Sync.so meldet
+`probe_unavailable` und wird ausdrücklich als `non_blocking: true` behandelt;
+alle sechs Pässe liefen so durch.
 
-### 1.5 Abschlussstatus im Dokument
-Einen klaren Abschlussblock einfügen:
+**Wichtige Einschränkung der bisherigen Hypothese:** "locked Character →
+gerankter Kandidat statt First Match" repariert Sarah, aber **nicht** Matthew.
+Für Matthews Character-ID existiert im Detektionssatz nur ein einziger
+gelabelter Kandidat, und der ist die winzige Box; sein echtes Gesicht
+`[753,187,819,277]` ist unlabeled (`characterId: null`). Ein reines
+Re-Ranking pro Character-ID hätte hier nichts zu wählen. Dasselbe gilt
+tendenziell für Kay.
 
-```text
-FA-4 FINAL RETEST — TECHNICAL PASS / VISUAL REVIEW PENDING
+## Nächster Schritt: read-only Root-Cause-Lock
 
-Technische Pipeline-Kriterien bestanden: Plate, Preclip, 6/6 turn-backed Sync-Segmente, Audio-Mux, finaler Output und Ledger-Kardinalität korrekt.
-Noch offen: finale visuelle/auditive Prüfung auf richtige Stimme ↔ Character-Zuordnung, richtigen Mund, stabile Face-/Slot-Zuordnung und sichtbare Artefakte.
-Kein weiterer Render, kein Retry, kein Reset.
-```
+1. **Herkunft der Plate-Faces belegen.** Aus den Edge-Logs des Runs
+   (Zeitfenster um 2026-08-17 20:38 UTC) die Zeilen `v278_router`,
+   `v183_plate_identity_mapping`, `v183_anchor_identity_slot_bridge`,
+   `v239_repair_gate` und `v277_anchor_lock_face_missing` ziehen. Damit ist
+   eindeutig, ob der geometrische v278-Hungarian-Router lief und warum sein
+   Ergebnis nicht die Wahrheit wurde (er hätte die vier Zentren korrekt
+   zugeordnet), oder ob der Legacy-Pfad übernommen hat.
+2. **Trust-Gate-Entscheidung pro Slot nachrechnen.** Für jede der vier
+   benutzten Boxen Flächenanteil, Seitenverhältnis und Trust-Grund
+   dokumentieren, um zu zeigen, dass der Sanity-Check nur wegen der
+   Confidence-Trust-Abkürzung ausgelassen wurde.
+3. **Gegenprobe zur Geometrie.** Anchor-Zentren gegen alle zehn
+   Plate-Kandidaten stellen und belegen, dass eine reine bijektive
+   Nächste-Nachbar-Zuordnung (Hungarian auf normalisierten Zentren) genau die
+   vier korrekten Gesichter liefert — als Beleg, dass die Information im Run
+   vorhanden war.
+4. **Ergebnis dokumentieren** in `docs/v433-motion-studio-final-acceptance.md`
+   als eigener Abschnitt "FA-4 Root-Cause-Lock — Face-Candidate-Auswahl",
+   inklusive der Erkenntnis aus Punkt 1 und einer klaren Aussage, ob der Fix
+   Ranking-only sein kann oder Geometrie-first sein muss.
 
----
+## Fix-Contract-Skizze (nur Entwurf, noch nicht umsetzen)
 
-## 2. Visuelles/auditives Review des finalen Clips
+Zur Freigabe nach dem Lock, in dieser Reihenfolge:
 
-**Vorgehen:** Playwright gegen die laufende App, authentifizierter Zugriff auf Szene S11 (`e658509d-cdeb-40f7-bd33-98e74144fdc5`).
+- **Geometrie ist Wahrheit, Label ist Hinweis.** Für jeden gelockten
+  Character wird der Kandidat gewählt, der dem Anchor-Slot geometrisch am
+  nächsten liegt (bijektiv, normalisierte Zentren), nicht der erste oder der
+  labelstärkste. Unlabeled Kandidaten sind dabei gleichberechtigt — sonst
+  bleibt Matthew unlösbar.
+- **Plausibilitätsfilter vor der Auswahl.** Kandidaten unterhalb einer
+  Mindestfläche oder mit unplausiblem Seitenverhältnis fliegen aus dem
+  Kandidatensatz, bevor gematcht wird — unabhängig von ihrer Confidence.
+- **Trust-Gate darf Sanity nicht überspringen.** Confidence darf nur
+  entscheiden, ob repariert wird — nicht, ob geprüft wird.
+- **Preclip-Identity-Validation fail-closed.** Ein Pass, dessen Crop nicht
+  nachweislich das Ziel-Gesicht enthält, darf nicht an Sync.so gehen.
+- **Regressionsschutz.** Fixture aus genau diesem Detektionssatz (zehn
+  Boxen, drei False-Positive-Labels) als Testfall.
 
-### 2.1 Vorbereitung
-- Session aus `LOVABLE_BROWSER_SUPABASE_*` wiederherstellen (sofern vorhanden) oder via `lovable auth-session --json` eine Session für `info@useadtool.ai` minten.
-- Zur Szene S11 im Studio navigieren (`/video-composer` oder direkter Szenen-Link).
-- Den finalen Output (`processed_video_url`) abrufen und in einem frischen Browser-Tab laden.
-
-### 2.2 Prüfpunkte während der Wiedergabe
-- Video abspielen (Ton eingeschaltet).
-- Screenshots bei ca. 0,5 s / 2 s / 4 s / 6 s / 8,5 s / 10,5 s / 13 s (je nach Turn-Fenstern).
-- Folgendes bewerten:
-  - [ ] Alle 4 Personen (Sarah, Samuel, Matthew, Kay) sind im Frame und behalten ihre Position/Slot.
-  - [ ] Sarah spricht in Turn 1 und Turn 5, behält dabei denselben Character/Slot.
-  - [ ] Samuel spricht in Turn 2 und Turn 6, behält dabei denselben Character/Slot.
-  - [ ] Matthew (Turn 3) und Kay (Turn 4) sprechen korrekt zugeordnet.
-  - [ ] Stimmen passen zur Voice-Map (Lena/Stefan/Markus/Klaus).
-  - [ ] Mundbewegung ist nur beim aktiven Sprecher sichtbar; Listener bleiben ruhig.
-  - [ ] Keine sichtbaren Artefakte (Flackern, Slot-Sprünge, Doppelgesichter, Ränder).
-  - [ ] Die 3,751 s Stille am Ende wirken nicht störend (normales Ausklingen der 15-s-Platte).
-
-### 2.3 Ergebnisdokumentation
-- Befund in `docs/v433-motion-studio-final-acceptance.md` unter einem neuen `### Visuelles Review` eintragen.
-- Screenshots unter `/tmp/browser/fa4-visual-review/` speichern und im Bericht referenzieren.
-
----
-
-## 3. Finaler Status nach visuellem Review
-
-### Falls alle Prüfpunkte bestanden
-- Abschnitt `## FA-4 FINAL RETEST RENDER (S11)` auf `**PASS**` ändern.
-- `FA-4 FINAL RETEST = PASS.` eintragen.
-
-### Falls Auffälligkeiten
-- Status bleibt `TECHNICAL PASS / VISUAL REVIEW PENDING` oder wird zu `VISUAL REVIEW: ISSUES`.
-- Jede Auffälligkeit neutral beschrieben, mit Timestamp/Screenshot.
-- Kein automatischer Retry/Fix/Render ohne separates GO.
-
----
-
-## Abgrenzung / Nicht im Scope
-
-- Keine Code-Änderungen an der Lip-Sync-Pipeline, dem Composer, dem Ledger oder dem UI.
-- Kein neuer Render, kein Retry, kein RS3-Reset, keine manuellen DB-Writes.
-- Keine weiteren FA-Blöcke (FA-1, FA-2, FA-3) werden neu bewertet.
+Ledger, Fan-out, Turn-ID, `speaker_idx`, RS3, Mux und Finalizer bleiben
+unberührt.
