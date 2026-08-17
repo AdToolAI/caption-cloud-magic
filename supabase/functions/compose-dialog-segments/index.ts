@@ -6656,8 +6656,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // regular silent-audio gate would (correctly, for user audio) reject
     // them. We bypass ONLY when the pass is explicitly flagged as a
     // stabilizer AND the audio_url is our deterministic silence-track.
-    const isStabilizerPass = (pass as any).stabilizer_pass === true &&
-      (pass as any).is_silent_stabilizer === true;
+    const isStabilizer = isStabilizerPass(pass);
 
     const finalAudioDiag = isStabilizerPass
       ? null
