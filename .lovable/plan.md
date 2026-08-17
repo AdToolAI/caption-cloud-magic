@@ -176,15 +176,16 @@ Vertrag:
 
 **Messbare Fix-Invariante (N=4, finaler Anchor):**
 
-- finale Anchor-URL: genau 1 Load
-- finale Anchor-Bytes: genau 1 Base64-Encoding
+- finale Anchor-URL innerhalb der gesamten Invocation: genau 1 Load
+- finale Anchor-Bytes innerhalb der gesamten Invocation: genau 1 Base64-Encoding
 - alle 4 Rekognition-Compares verwenden denselben vorbereiteten
   Anchor-Base64-Wert
+- `detectFacesOnAnchor` und die 4 Compares verwenden denselben Anchor-Base64-Wert
 - Portraits: weiterhin je genau 1 Load + 1 Encoding
 - Compare-Reihenfolge, Assignment-, Face- und Identity-Ergebnisse unverändert
 
 Damit werden aus heute vier redundanten Anchor-Encodes in der Compare-Schleife
-genau einer.
+und mindestens einem weiteren in `detectFacesOnAnchor` genau einer.
 
 ## 10. Freigegebener Implementierungsscope
 
@@ -194,8 +195,9 @@ Nur:
 - `resolveIdentityViaRekognition` so umbauen, dass `compareOnePortrait` den
   vorbereiteten Anchor nicht erneut encodiert;
 - blockweises Encoding statt Byte-für-Byte-Konkatenation;
-- falls ohne Semantikänderung möglich: denselben finalen Anchor-Encode auch
-  zwischen `detectFacesOnAnchor` und v274 wiederverwenden;
+- **verbindlich:** derselbe finale Anchor-Encode wird auch zwischen
+  `detectFacesOnAnchor` und der v274-Compare-Schleife wiederverwendet, weil
+  beide denselben Request-Scope und dieselbe URL sehen;
 - Tests/Instrumentation für Load-/Encode-Counts und Ergebnisgleichheit.
 
 Nicht ändern: Anchor-Ladder und Attempt-Anzahl, strict-/framing-/face-size-
