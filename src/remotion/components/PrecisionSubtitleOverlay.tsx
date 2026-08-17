@@ -9,6 +9,8 @@ import React, { useMemo } from 'react';
 import { useCurrentFrame, useVideoConfig } from 'remotion';
 import { safeInterpolate, safeSpring as spring } from '../utils/safeInterpolate';
 import type { PhonemeTimestamp } from '../utils/phonemeMapping';
+import { getUccSubtitleAbsolutePlacement } from '../utils/subtitleConstants';
+
 
 export interface PrecisionSubtitleConfig {
   fontSize?: number;
