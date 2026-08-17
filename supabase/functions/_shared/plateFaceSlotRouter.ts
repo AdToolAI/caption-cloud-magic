@@ -20,6 +20,13 @@
  * one standalone as well simplifies auditing.
  */
 
+// FA-4 Face-Candidate Fix — Contract A (sanity before assignment) and
+// Contract B (global bijective geometry assignment) live in a pure module.
+import {
+  assignAnchorsToCandidatesBijective,
+  filterPlausibleCandidates,
+} from "./plate-face-candidates.ts";
+
 // ── AWS Rekognition config (duplicated for auditability) ────────────
 const AWS_REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;
 const DEFAULT_REKOGNITION_REGION = "eu-central-1";
