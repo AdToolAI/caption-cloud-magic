@@ -554,15 +554,16 @@ UI bestätigt: „Cast voll (max. 4)", vier verschiedene Stimmen, keine Doppelbe
 ### Dialog (6 kanonische Turns, DE)
 
 ```text
-1 Sarah Dusatko:   Guten Morgen, kurz die Zahlen von gestern.
-2 Samuel Dusatko:  Die Kampagne läuft stabil über Plan.
-3 Matthew Dusatko: Die neuen Creatives performen deutlich besser.
-4 Kay Mark:        Dann ziehen wir das Budget nach.
-5 Sarah Dusatko:   Gut, wir halten den Kurs.
-6 Samuel Dusatko:  Ich schicke euch die Übersicht.
+1 Sarah Dusatko:   Kurz die Zahlen von gestern.
+2 Samuel Dusatko:  Kampagne läuft über Plan.
+3 Matthew Dusatko: Neue Creatives performen besser.
+4 Kay Mark:        Dann Budget nachziehen.
+5 Sarah Dusatko:   Gut, Kurs halten.
+6 Samuel Dusatko:  Übersicht kommt gleich.
 ```
 
-UI-Anzeige: „6 Blöcke · 4 Sprecher · ~12s" — effektiver Dialog unter der Plate-Dauer (15s).
+UI-Anzeige nach der Kürzung (v2): „6 Blöcke · 4 Sprecher · **~9s**" — deutlicher
+Abstand zur 15-s-Plate (v1 lag bei ~12s und damit unnötig nah am Budget-Limit).
 
 ### Routing-Nachweis (UI)
 
