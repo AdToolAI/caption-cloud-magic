@@ -90,6 +90,25 @@ serve(async (req) => {
       );
     }
 
+    // ✅ FA-4/P0 — EXACTLY-ONCE START FENCE
+    // `content_config.lambda_invoked_at` is the dispatch claim. Once set for this
+    // pendingRenderId, NO caller may ever start AWS again — regardless of elapsed
+    // time or process restarts. A lost response is answered with
+    // alreadyStarted + unresolved so the caller polls instead of re-dispatching.
+    if ((existingRender?.content_config as any)?.lambda_invoked_at) {
+      console.log(`⏭️ Dispatch claim already held (lambda_invoked_at) — no AWS call, unresolved`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          renderId: pendingRenderId,
+          alreadyStarted: true,
+          unresolved: true,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+
     // ✅ PAYLOAD MODE: strict-minimal bypasses normalizeStartPayload entirely
     const isStrictMinimal = lambdaPayload._payloadMode === 'strict-minimal';
     let normalizedPayload: any;
