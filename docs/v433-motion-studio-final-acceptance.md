@@ -1351,3 +1351,69 @@ persistierten DB-Wert (`lip_sync_with_voiceover = true`) — kein Draft-Overlay.
 **FA-4 FINAL RETEST SETUP READY — dialog_turns JIT VERIFIED → STOP.**
 Kein Render gestartet. Der finale FA-4-Render startet erst nach separatem
 Render-GO.
+
+---
+
+## FA-4 FINAL RETEST RENDER (S11) — Ergebnis: **PASS**
+
+Genau ein kostenpflichtiger Render, keine Eingriffe (kein Retry, kein Reset,
+kein zweiter Confirm, kein manueller Cleanup).
+
+### Start-Snapshot
+
+| Feld | Wert |
+|---|---|
+| `T_run_start` (Confirm-Klick) | 2026-08-17T20:38:31Z |
+| Ledger-Insert `base_video` | 2026-08-17T20:38:45.525Z |
+| `run_id` | `b9acfae3-8121-45ba-950a-9a1ad5373f5a` |
+| `plate_generation` | 1 → **2** |
+| `dialog_turns` (JIT) | 6 Rows, 6 distinct UUIDs |
+| Initialer Ledger | 1 Job: `base_video`/`dispatching`/`ai-happyhorse`/attempt 1/`segment_id` NULL |
+
+Kanonische Turn-UUIDs (JIT materialisiert beim Renderstart):
+
+| # | `turnId` | `character_id` |
+|---|---|---|
+| 1 | `55385e38-3783-4732-93e0-7030d0b3e32e` | Sarah `5c81f9bf…` |
+| 2 | `ab0ba4bd-9adf-4d70-b8c2-c5b5d167f6d4` | Samuel `483f9cdc…` |
+| 3 | `a4d8e837-d335-4a4f-9fcb-395b187e3b20` | Matthew `54d90504…` |
+| 4 | `9a0bd588-8ad5-4fce-92ce-8e88ade9717a` | Kay `c65de5c6…` |
+| 5 | `1a97a4e2-a47a-4a11-83d0-cca2040f2281` | Sarah `5c81f9bf…` |
+| 6 | `162210e9-cc1f-4318-94b2-1b95af76f5a8` | Samuel `483f9cdc…` |
+
+### Ledger-Verlauf (finale Wahrheit, 8 Jobs, alle `succeeded`, alle attempt_no = 1, alle plate_generation = 2)
+
+| Stage | Provider | `segment_id` | created | completed |
+|---|---|---|---|---|
+| `base_video` | ai-happyhorse | NULL | 20:38:45 | 20:44:30 |
+| `sync_segment` | sync.so | `55385e38…` | 20:45:54 | 20:47:52 |
+| `sync_segment` | sync.so | `ab0ba4bd…` | 20:46:42 | 20:48:01 |
+| `sync_segment` | sync.so | `162210e9…` | 20:46:43 | 20:48:23 |
+| `sync_segment` | sync.so | `1a97a4e2…` | 20:47:05 | 20:48:09 |
+| `sync_segment` | sync.so | `a4d8e837…` | 20:48:03 | 20:48:31 |
+| `sync_segment` | sync.so | `9a0bd588…` | 20:48:16 | 20:49:00 |
+| `audio_mux` | remotion | NULL | 20:49:00 | 20:49:22 |
+
+### Kernkriterien
+
+| Kriterium | Ergebnis |
+|---|---|
+| Plate/P1-B: kein CPU-Abbruch, HappyHorse-Dispatch, `base_video` succeeded | **PASS** (1 Job, attempt 1, 5m45s) |
+| Preclip/P0: Exactly-Once, kein Doppel-Dispatch | **PASS** (kein Job mit attempt_no > 1, kein `replaced_by`, keine Duplikate) |
+| Fan-out-Kardinalität: `set(sync_segment.segment_id) == set(dialog_turns.id)` | **PASS** — 6 turn-backed Segmente, exakt die 6 Turn-UUIDs, keine Extra-/Fehlsegmente. Stabilizer separat: 0 stabilizer-Passes in diesem Run. |
+| Wiederholte Sprecher: gleiche `speaker_idx`, andere `segment_id` | **PASS** — idx 0: `55385e38…` + `1a97a4e2…`; idx 1: `ab0ba4bd…` + `162210e9…`; idx 2: `a4d8e837…`; idx 3: `9a0bd588…` |
+| Genau 1 `audio_mux`, Stitch/Finalizer einmal | **PASS** (1 Remotion-Mux, ein Stitch-Output) |
+| `processed_video_url` final, `isSceneOutputFinal()` = true | **PASS** — `processed_video_url` = `clip_url` = `…dialog-stitch-muxed-e658509d…-1786999742405.mp4`; Intent ON + processed gesetzt ⇒ `isSceneOutputFinal() = true` |
+
+Szenenendzustand: `pipeline_state = complete`, `lip_sync_status = done`,
+`twoshot_stage = done`, kein RS3-Marker, alle 6 Passes `status = done`.
+
+### Visuelle Prüfung
+
+Artefakt 15,00 s Video / 15,08 s Audio, 1284×718. Frames bei 1/4/7/10/12/14 s:
+Cast-Anordnung stabil (Sarah, Samuel, Matthew, Kay von links), keine Slot- oder
+Identity-Sprünge, keine Doppelbelegung. Mundbewegung jeweils nur beim aktiven
+Sprecher, Listener bleiben ruhig; Stimmzuordnung passt zur ID-gebundenen
+Voice-Map (Lena/Stefan/Markus/Klaus).
+
+**FA-4 FINAL RETEST = PASS.**
