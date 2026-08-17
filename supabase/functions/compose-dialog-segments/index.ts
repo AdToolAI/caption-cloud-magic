@@ -3910,7 +3910,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       }
 
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} fa4_p0_turn_pass_guard_OK turn_backed=${turnBacked.length} stabilizers=${stabilizerPasses.length}`,
+        `[compose-dialog-segments] scene=${sceneId} fa4_p0_turn_pass_guard_OK turn_backed=${turnBackedCount} stabilizers=${stabilizerCount}`,
       );
     }
 
