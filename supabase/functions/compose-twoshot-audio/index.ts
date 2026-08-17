@@ -1138,7 +1138,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         // Public timestamps in seconds (3-decimal precision = ~1 ms).
         startSec: Math.round((startSample / SAMPLE_RATE) * 1000) / 1000,
         endSec: Math.round((endSample / SAMPLE_RATE) * 1000) / 1000,
-        // Internal sample-exact positions used for per-speaker track placement.
+        // FA-4/P0 — Turn-Identität aus demselben Iterationsschritt.
+        turn_id: block.turnId ? String(block.turnId) : null,
+
         _startSample: startSample,
         _endSample: endSample,
       });
