@@ -42,6 +42,15 @@ const generateStrokeShadow = (color: string, width: number) => {
   return shadows.join(', ');
 };
 
+/**
+ * The video composition is authored at 1080 px width, the panel preview box is
+ * much smaller. Scale the font down by the same factor so the panel shows what
+ * the customer will actually see in the player.
+ */
+const PREVIEW_BOX_WIDTH = 360;
+const COMPOSITION_REFERENCE_WIDTH = 1080;
+const PREVIEW_SCALE = PREVIEW_BOX_WIDTH / COMPOSITION_REFERENCE_WIDTH;
+
 const getPreviewStyles = (style: SubtitleStyle): React.CSSProperties => {
   // NOTE: no CSS `animation` here on purpose. The old implementation used
   // `${style.animation} 2s infinite` with keyframe names that don't exist,
@@ -49,10 +58,14 @@ const getPreviewStyles = (style: SubtitleStyle): React.CSSProperties => {
   // static look; motion is shown in the video player.
   const baseStyle: React.CSSProperties = {
     fontFamily: style.font || 'Inter',
-    fontSize: `${style.fontSize || 28}px`,
+    fontSize: `${Math.max(9, (style.fontSize || 28) * PREVIEW_SCALE)}px`,
     fontWeight: 600,
     color: style.color || '#FFFFFF',
+    textAlign: 'center',
+    maxWidth: '84%',
+    lineHeight: 1.3,
   };
+
 
   switch (style.outlineStyle) {
     case 'none': return { ...baseStyle, backgroundColor: 'transparent', textShadow: 'none' };
@@ -177,7 +190,12 @@ export const SubtitleStyleEditor = ({ style, onChange, sampleText, onSampleTextC
               <SelectItem value="fade">{t('uc.fadeInOut')}</SelectItem>
               <SelectItem value="slide">{t('uc.slideInOut')}</SelectItem>
               <SelectItem value="bounce">{t('uc.bounce')}</SelectItem>
+              <SelectItem value="scaleUp">{tx({ de: 'Scale Up', en: 'Scale up', es: 'Escalar' })}</SelectItem>
+              <SelectItem value="typewriter">{tx({ de: 'Schreibmaschine', en: 'Typewriter', es: 'Máquina de escribir' })}</SelectItem>
+              <SelectItem value="highlight">{tx({ de: 'Wort-Highlight', en: 'Word highlight', es: 'Resaltado de palabra' })}</SelectItem>
+              <SelectItem value="glitch">{tx({ de: 'Glitch', en: 'Glitch', es: 'Glitch' })}</SelectItem>
               <SelectItem value="hormozi">✨ Hormozi (Word-by-Word + Highlights)</SelectItem>
+
             </SelectContent>
           </Select>
           {style.animation === 'hormozi' && (
@@ -219,12 +237,25 @@ export const SubtitleStyleEditor = ({ style, onChange, sampleText, onSampleTextC
 
         <div className="pt-4 border-t">
           <Label className="mb-3 block">{t('uc.previewLabel')}</Label>
-          <div className="relative bg-muted rounded-lg h-32 overflow-hidden flex items-center justify-center">
-            <div className={(style.outlineStyle === 'box' || style.outlineStyle === 'box-stroke') ? 'px-6 py-3 rounded-lg' : ''} style={getPreviewStyles(style)}>
+          {/* Mirrors the video: same vertical placement (top 8% / center /
+              bottom 10%) and the same horizontal centering. */}
+          <div
+            className="relative bg-muted rounded-lg aspect-video overflow-hidden flex flex-col items-center"
+            style={{
+              justifyContent:
+                style.position === 'top' ? 'flex-start'
+                  : style.position === 'center' ? 'center'
+                    : 'flex-end',
+              paddingTop: style.position === 'top' ? '8%' : 0,
+              paddingBottom: style.position === 'bottom' ? '10%' : 0,
+            }}
+          >
+            <div className={(style.outlineStyle === 'box' || style.outlineStyle === 'box-stroke') ? 'px-3 py-1.5 rounded-md' : ''} style={getPreviewStyles(style)}>
               {sampleText || t('uc.sampleSubtitleText')}
             </div>
           </div>
         </div>
+
       </CardContent>
     </Card>
   );

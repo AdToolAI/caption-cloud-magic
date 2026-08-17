@@ -24,6 +24,8 @@ import { MorphTransition } from '../components/MorphTransition';
 import { ProfessionalLottieCharacter, type PhonemeTimestamp as CharacterPhonemeTimestamp } from '../components/ProfessionalLottieCharacter';
 import { DrawOnEffect } from '../components/DrawOnEffect';
 import { PrecisionSubtitleOverlay, withOpacity } from '../components/PrecisionSubtitleOverlay';
+import { getUccSubtitleFlexPlacement, UCC_SUBTITLE_MAX_WIDTH } from '../utils/subtitleConstants';
+
 import { SceneAudioManager, type SceneAudioConfig } from '../components/SceneAudioManager';
 import { getSoundUrlSync, type SoundEffectType } from '../components/EmbeddedSoundLibrary';
 
@@ -2641,13 +2643,11 @@ const SubtitleLayer: React.FC<{
   const exitOpacity = interpolate(currentSegment.endTime - currentTime, [0, ramp], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
   const baseOpacity = Math.min(entryOpacity, exitOpacity);
 
-  const getPositionStyles = (): React.CSSProperties => {
-    switch (subtitleStyle.position) {
-      case 'top': return { top: '8%', alignItems: 'flex-start' };
-      case 'center': return { top: 0, bottom: 0, alignItems: 'center' };
-      default: return { bottom: '10%', alignItems: 'flex-end' };
-    }
-  };
+  // Vertical placement comes from `justifyContent` (AbsoluteFill is a COLUMN
+  // flex container), horizontal centering always from `alignItems: center`.
+  // Getting these two axes wrong is what pinned every subtitle to the middle.
+  const placement = getUccSubtitleFlexPlacement(subtitleStyle.position);
+
 
   const bg = withOpacity(subtitleStyle.backgroundColor || '#000000', subtitleStyle.backgroundOpacity ?? 0.7);
   const outlineWidth = subtitleStyle.outlineWidth ?? 2;
@@ -2754,8 +2754,9 @@ const SubtitleLayer: React.FC<{
     <AbsoluteFill
       style={{
         display: 'flex',
-        justifyContent: 'center',
-        ...getPositionStyles(),
+        flexDirection: 'column',
+        alignItems: 'center',
+        ...placement,
         opacity: subtitleStyle.animation === 'none' ? extraOpacity : baseOpacity,
         zIndex: 200,
       }}
@@ -2767,7 +2768,8 @@ const SubtitleLayer: React.FC<{
           fontFamily: `'${subtitleStyle.font || 'Inter'}', Inter, sans-serif`,
           fontWeight: 700,
           textAlign: 'center',
-          maxWidth: '84%',
+          maxWidth: UCC_SUBTITLE_MAX_WIDTH,
+
           lineHeight: 1.3,
           whiteSpace: 'pre-wrap',
           ...getOutlineStyle(),

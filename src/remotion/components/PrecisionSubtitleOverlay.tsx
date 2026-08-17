@@ -9,6 +9,8 @@ import React, { useMemo } from 'react';
 import { useCurrentFrame, useVideoConfig } from 'remotion';
 import { safeInterpolate, safeSpring as spring } from '../utils/safeInterpolate';
 import type { PhonemeTimestamp } from '../utils/phonemeMapping';
+import { getUccSubtitleAbsolutePlacement } from '../utils/subtitleConstants';
+
 
 export interface PrecisionSubtitleConfig {
   fontSize?: number;
@@ -260,16 +262,12 @@ export const PrecisionSubtitleOverlay: React.FC<PrecisionSubtitleOverlayProps> =
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
   );
 
-  // Position styles
+  // Position styles — shared with the segment renderer so switching the
+  // animation never moves the subtitle vertically.
   const position = mergedConfig.position || 'bottom';
-  const positionStyles: Record<string, React.CSSProperties> = {
-    bottom: { bottom: '8%', left: '50%' },
-    top: { top: '8%', left: '50%' },
-    center: { top: '50%', left: '50%' },
-  };
-  const baseTransform = position === 'center'
-    ? 'translate(-50%, -50%)'
-    : 'translateX(-50%)';
+  const placement = getUccSubtitleAbsolutePlacement(position);
+  const baseTransform = placement.transform;
+
 
   const hasBox = !!mergedConfig.backgroundColor
     && mergedConfig.backgroundColor !== 'transparent'
@@ -279,7 +277,7 @@ export const PrecisionSubtitleOverlay: React.FC<PrecisionSubtitleOverlayProps> =
     <div
       style={{
         position: 'absolute',
-        ...positionStyles[position],
+        ...placement.style,
         maxWidth: mergedConfig.maxWidth,
         padding: hasBox ? mergedConfig.padding : 0,
         backgroundColor: hasBox
