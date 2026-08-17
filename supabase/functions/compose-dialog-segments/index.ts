@@ -3742,6 +3742,22 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           // segments). Turns where the listener speaks are excluded
           // (their active-pass overlay wins in those windows anyway).
           const stabilizers: PassState[] = [];
+          // FA-4/P0 — Stabilizer haben keinen eigenen dialog_turn, brauchen
+          // aber eine stabile, kollisionsfreie Segmentidentität. Deterministisch
+          // aus (scene, listener) abgeleitet → Retries adoptieren dieselbe Zeile.
+          const stabilizerSegmentId = async (listenerIdx: number): Promise<string> => {
+            const bytes = new Uint8Array(
+              await crypto.subtle.digest(
+                "SHA-256",
+                new TextEncoder().encode(`v194-stabilizer:${sceneId}:${listenerIdx}`),
+              ),
+            ).slice(0, 16);
+            bytes[6] = (bytes[6] & 0x0f) | 0x50; // Version 5-artig
+            bytes[8] = (bytes[8] & 0x3f) | 0x80; // RFC-4122-Variante
+            const hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+            return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+          };
+
           for (const listenerIdx of activeSpeakerIdxs) {
             const bbox = (speakerPlateBboxes as any)?.[listenerIdx] ?? null;
             const coord = speakerCoords[listenerIdx];
