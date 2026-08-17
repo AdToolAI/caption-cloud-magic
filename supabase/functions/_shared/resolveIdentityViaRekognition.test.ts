@@ -92,15 +92,21 @@ function runWithMockFetch<T>(opts: MockOptions, fn: () => Promise<T>): Promise<{
         return new Response("Internal Server Error", { status: 500 });
       }
       const sims = opts.similarities?.[idx] ?? {};
-      const matches = Object.entries(sims).map(([slot, sim]) => ({
-        Face: {
-          BoundingBox: opts.faces?.[Number(slot)] ?? { Left: 0, Top: 0, Width: 0, Height: 0 },
-        },
-        Similarity: sim,
-      }));
-      const responseBody = JSON.stringify({ FaceMatches: matches });
-      console.log("DEBUG compare idx", idx, "matches", matches, "response", responseBody);
-      return new Response(responseBody, {
+      const matches = Object.entries(sims).map(([slot, sim]) => {
+        const src = opts.faces?.[Number(slot)] ?? { left: 0, top: 0, width: 0, height: 0 };
+        return {
+          Face: {
+            BoundingBox: {
+              Left: src.left,
+              Top: src.top,
+              Width: src.width,
+              Height: src.height,
+            },
+          },
+          Similarity: sim,
+        };
+      });
+      return new Response(JSON.stringify({ FaceMatches: matches }), {
         status: 200,
         headers: { "Content-Type": "application/x-amz-json-1.1" },
       });
