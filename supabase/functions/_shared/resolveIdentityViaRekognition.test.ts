@@ -257,7 +257,7 @@ Deno.test("T4: each portrait payload stays bound to the correct character ID", a
     { 1: 94 },
   ];
 
-  const result = await runWithMockFetch({ faces, similarities }, async () => {
+  const { result, calls } = await runWithMockFetch({ faces, similarities }, async () => {
     return await resolveIdentityViaRekognition({
       anchorUrl,
       anchorWidth: 1024,
@@ -274,7 +274,6 @@ Deno.test("T4: each portrait payload stays bound to the correct character ID", a
   assertEquals(result.assignmentLock["0"], "char-0");
   assertEquals(result.assignmentLock["1"], "char-1");
 
-  const calls = getLastCalls();
   const compareCalls = calls.filter((c) => c.headers.get("x-amz-target") === "RekognitionService.CompareFaces");
   // Even with cross-mapping, the i-th compare must use the i-th portrait URL's bytes.
   // We can't assert bytes directly here, but T1 already proves SourceImage bytes equal
