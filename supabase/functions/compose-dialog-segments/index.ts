@@ -89,6 +89,8 @@ import {
 import { detectPlateFaces, validatePlateFacesGeometry } from "../_shared/plate-face-detect.ts";
 import { resolvePlateFaceIdentities, PlateIdentityFace } from "../_shared/plate-face-identity.ts";
 import { buildAnchorLayoutFromV274, routePlateFacesToAnchor, type AnchorFaceLayout } from "../_shared/plateFaceSlotRouter.ts";
+// FA-4 Contract E — deterministic preclip crop containment gate.
+import { evaluatePreclipCropContainment } from "../_shared/preclip-crop-containment.ts";
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
@@ -1980,7 +1982,22 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       }
     }
     if (plateIdentityMap && plateIdentityMap.faces.length > 0) {
+      // FA-4 Face-Candidate Fix — when the v278 router produced this map, the
+      // assignment is already sanity-filtered and globally bijective
+      // (Contract A + B). All legacy authoritative selection paths (v183
+      // bridge, byIdRanked confidence ranking, v277 first-match lock,
+      // unlabeled fallback) are neutralised for that case: they may only act
+      // as diagnostics, never override geometry.
+      const fa4GeometryAuthoritative =
+        (plateIdentityMap as any)?.assignmentLockSource === "v278_hungarian_plate_router";
+      if (fa4GeometryAuthoritative) {
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} fa4_geometry_authoritative faces=${plateIdentityMap.faces.length} ` +
+          `resolved=${plateIdentityMap.resolvedCount} — legacy label paths are diagnostics only`,
+        );
+      }
       // v166 — Anchor-Identity Slot Bridge.
+
       // If the plate-identity step could not label faces (Gemini probe failed
       // or resolvedCount=0), but the anchor faceMap KNOWS the characterId of
       // every visual slot (sorted L→R), bridge anchor_slot → plate_slot by
@@ -2003,6 +2020,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // Anchor kannte (Statisten, Reflexionen). Zuweisung bleibt Visual-L→R,
       // begrenzt auf die Anzahl der Anchor-Slots — der Rest bleibt `unlabeled`.
       if (
+        !fa4GeometryAuthoritative &&
         anchorHasIdentities &&
         anchorFaces.length >= 1 &&
         anchorFaces.length <= plateIdentityMap.faces.length &&
@@ -2133,15 +2151,43 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         }
       }
 
+      // FA-4 — geometry-authoritative selection map: characterId → the single
+      // plate face the bijective assignment gave that character.
+      const fa4FaceByCid = new Map<string, PlateIdentityFace>();
+      if (fa4GeometryAuthoritative) {
+        for (const face of plateIdentityMap.faces) {
+          const fcid = stripIdPrefix((face as any)?.characterId);
+          if (fcid && !fa4FaceByCid.has(fcid)) fa4FaceByCid.set(fcid, face);
+        }
+      }
+
       speakers.forEach((sp, idx) => {
         const cid = stripIdPrefix(sp.character_id);
         let plateFace: PlateIdentityFace | undefined;
         let source = "plate-identity";
 
+        // FA-4 — bijective geometry result wins. No label ranking, no
+        // first-match, no unlabeled fallback for this path.
+        if (fa4GeometryAuthoritative && cid) {
+          const geoFace = fa4FaceByCid.get(cid);
+          if (geoFace && !assignedFaceKeys.has(faceKey(geoFace))) {
+            plateFace = geoFace;
+            source = "fa4-geometry-bijection";
+          } else {
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} fa4_geometry_slot_unresolved ` +
+              `speaker=${sp.speaker ?? `idx${idx}`} cid=${cid} — slot stays empty (fail-closed)`,
+            );
+          }
+        }
+
         // v277 — Rekognition-Lock is authoritative per slot, even when only
         // partial (e.g. 3/4). Only unresolved slots may fall through to the
         // older cid/geometry fallback paths.
-        const lockedCid = stripIdPrefix(anchorRekLockSeed?.[String(idx)]);
+        const lockedCid = fa4GeometryAuthoritative
+          ? ""
+          : stripIdPrefix(anchorRekLockSeed?.[String(idx)]);
+
         if (lockedCid) {
           const lockedFace = anchorRekFacesByCid.get(lockedCid);
           if (lockedFace && !assignedFaceKeys.has(faceKey(lockedFace))) {
@@ -2158,7 +2204,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         }
 
         // 1) Top-Ranked Face für cid nehmen, das noch nicht vergeben ist.
-        if (cid) {
+        if (cid && !fa4GeometryAuthoritative) {
           const ranked = byIdRanked.get(cid);
           if (!plateFace && ranked && ranked.length > 0) {
             for (const cand of ranked) {
@@ -2182,7 +2228,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         }
 
         // 2) Unlabeled-Fallback per Visual-L→R (nur wenn genug Faces vorhanden).
-        if (!plateFace) {
+        if (!plateFace && !fa4GeometryAuthoritative) {
           if (speakers.length === 1 && unlabeledPool.length > 0) {
             for (const cand of unlabeledPool) {
               const k = faceKey(cand);
@@ -2405,18 +2451,20 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           const box = speakerPlateBboxes[i];
           const anchor = anchorSpeakerCoords[i];
           if (!box || !anchor) return;
-          if (trustedSlots.includes(i)) {
-            goodSlots.push(i);
-            return;
-          }
+          // FA-4 Contract D — sanity ALWAYS runs after assignment. Trust /
+          // confidence is diagnostics only and can no longer skip the
+          // objective geometry check (root cause of the S11 tiny-box pass).
           const sanity = bboxSanity(box);
           if (sanity.ok) {
             goodSlots.push(i);
           } else {
             badSlots.push(i);
-            badReasons[i] = sanity.reason;
+            badReasons[i] = trustedSlots.includes(i)
+              ? `${sanity.reason}_despite_trust`
+              : sanity.reason;
           }
         });
+
 
         console.log(
           `[compose-dialog-segments] scene=${sceneId} v239_repair_gate ` +
@@ -5932,22 +5980,58 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // Box in the dispatched video's pixel space.
       let dispatchBox: [number, number, number, number] | null = box;
       if (v161UsingPreclipForBbox && box && v161PreclipCrop) {
-        const scale = v161PreclipCrop.outputSize / Math.max(1, v161PreclipCrop.size);
-        const cx1 = Math.max(0, Math.round((box[0] - v161PreclipCrop.x) * scale));
-        const cy1 = Math.max(0, Math.round((box[1] - v161PreclipCrop.y) * scale));
-        const cx2 = Math.min(v161PreclipCrop.outputSize, Math.round((box[2] - v161PreclipCrop.x) * scale));
-        const cy2 = Math.min(v161PreclipCrop.outputSize, Math.round((box[3] - v161PreclipCrop.y) * scale));
-        if (cx2 > cx1 + 4 && cy2 > cy1 + 4) {
-          dispatchBox = [cx1, cy1, cx2, cy2];
-        } else {
-          // Fallback: most of the preclip IS the face.
-          const pad = Math.max(2, Math.round(v161PreclipCrop.outputSize * 0.08));
-          dispatchBox = [pad, pad, v161PreclipCrop.outputSize - pad, v161PreclipCrop.outputSize - pad];
+        // FA-4 Contract E — deterministic crop containment gate. The final
+        // target bbox must lie fully inside the crop, transform bounds-valid
+        // and non-degenerate, and no OTHER finally assigned speaker center may
+        // fall inside the transformed target box. No padding, no tolerance.
+        const otherCenters: Array<[number, number]> = [];
+        for (let si = 0; si < speakers.length; si++) {
+          if (si === pass.speaker_idx) continue;
+          const ob = speakerPlateBboxes?.[si];
+          if (Array.isArray(ob) && ob.length === 4) {
+            otherCenters.push([
+              Math.round((ob[0] + ob[2]) / 2),
+              Math.round((ob[1] + ob[3]) / 2),
+            ]);
+          }
         }
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_bbox_clip_space plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)} → clip_box=${JSON.stringify(dispatchBox)} windows_clip=${JSON.stringify(v124VoicedWindows)}`,
-        );
+        const containment = evaluatePreclipCropContainment({
+          crop: v161PreclipCrop,
+          targetBbox: box,
+          otherSpeakerCenters: otherCenters,
+        });
+        if (!containment.ok) {
+          (pass as any)._v152HardFail = {
+            reason: "preclip_identity_geometry_mismatch",
+            errorClass: "preclip_identity_geometry_mismatch",
+            message:
+              `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde vor Sync.so abgebrochen: ` +
+              tl({
+                de: "der Gesichtsausschnitt lässt sich nicht eindeutig diesem Sprecher zuordnen. Credits wurden zurückerstattet.",
+                en: "the face crop cannot be assigned unambiguously to this speaker. Credits have been refunded.",
+                es: "el recorte facial no se puede asignar de forma inequívoca a este hablante. Los créditos han sido reembolsados.",
+              }),
+            meta: {
+              fa4_containment_reason: containment.reason,
+              fa4_containment_detail: containment.detail ?? null,
+              plate_box: box,
+              preclip_crop: v161PreclipCrop,
+              other_speaker_centers: otherCenters,
+            },
+          };
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} fa4_preclip_containment_fail_closed ` +
+            `reason=${containment.reason} detail=${containment.detail ?? "-"} plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)}`,
+          );
+        } else {
+          // Contract E.5 — the wire box IS the transformed target bbox.
+          dispatchBox = containment.clipBox!;
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_bbox_clip_space plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)} → clip_box=${JSON.stringify(dispatchBox)} windows_clip=${JSON.stringify(v124VoicedWindows)} fa4_containment=ok`,
+          );
+        }
       }
+
 
       let usedUrl: string | null = null;
       let nonNullFrames = frameCount;

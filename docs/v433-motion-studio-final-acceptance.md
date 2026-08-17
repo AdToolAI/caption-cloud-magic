@@ -1862,7 +1862,7 @@ Anchor layout korrekt
 - **FA-4 ROOT-CAUSE LOCKED — Face-Candidate-Auswahl**
 - Ranking-only ausreichend: **NEIN**
 - Geometrie-first mit Plausibilitätsfilter: **JA**
-- Fix-Contract bleibt **nur Entwurf**, nicht implementiert:
+- Fix-Contract **implementiert** (siehe Abschnitt unten):
 
 ```text
 Anchor Character Lock
@@ -1880,6 +1880,56 @@ confidence → dispatch`.
 **Unberührt bleiben:** Ledger, Fan-out, Turn-ID, `speaker_idx`, RS3, Mux,
 Finalizer.
 
-**STOP.** Kein Fix, kein Deploy, kein Render.
+---
+
+## FA-4 FACE-CANDIDATE FIX — IMPLEMENTATION (Code komplett, kein Deploy/Render)
+
+Scope strikt nach eingefrorenem Contract; kein Architektur-Umbau.
+
+### Neue reine Module (unit-getestet)
+
+| Datei | Contract | Inhalt |
+| --- | --- | --- |
+| `supabase/functions/_shared/plate-face-candidates.ts` | A + B | `plateFaceSanity` (area_ratio 0.003–0.25, aspect 0.4–2.5), `filterPlausibleCandidates`, `assignAnchorsToCandidatesBijective` (Hungarian-Brute-Force N ≤ 6, fail-closed bei exakter Equal-Cost-Ambiguität und degenerierten Centern) |
+| `supabase/functions/_shared/preclip-crop-containment.ts` | E | `evaluatePreclipCropContainment`: E.1 Target-Containment, E.3 Fremd-Center-Exklusion (Center im transformierten Target-Box ⇒ fail), E.4 Bounds-/Degeneriertheits-Check, E.5 Wire-Box = transformierte Target-Box |
+
+Tests: `plate-face-candidates.test.ts` (inkl. S11-Regressionsfixture) und
+`preclip-crop-containment.test.ts` — 15/15 PASS via `deno test`.
+
+### Integration
+
+1. **`_shared/plateFaceSlotRouter.ts`** — Sanity-Filter läuft **vor** dem
+   Matrixaufbau; lokale `optimalAssignmentMin` entfernt und durch Contract B
+   ersetzt. Ergebnis-Quelle bleibt `v278_hungarian_plate_router`.
+2. **`compose-dialog-segments/index.ts`**
+   - Neues Flag `fa4GeometryAuthoritative`
+     (`assignmentLockSource === "v278_hungarian_plate_router"`).
+   - v183-Bridge, `byIdRanked`-Ranking, Unlabeled-L→R-Fallback und der
+     v277-Anchor-Lock sind für den autoritativen Pfad **neutralisiert**;
+     Auswahl erfolgt ausschließlich über `fa4-geometry-bijection`.
+     Unauflösbarer Slot bleibt leer (fail-closed, Log
+     `fa4_geometry_slot_unresolved`).
+   - **Contract D:** v239-Trust-Shortcut entfernt — `bboxSanity` läuft jetzt
+     für **jeden** Slot nach der Zuordnung; Trust ist nur noch Diagnostik
+     (Reason-Suffix `_despite_trust`).
+   - **Contract E:** vor dem Setzen von `bounding_boxes_url` prüft
+     `evaluatePreclipCropContainment` die Crop-Zuordnung. Bei Verstoß
+     Hard-Fail `preclip_identity_geometry_mismatch` (lokalisiert, mit
+     Credit-Refund über den bestehenden `_v152HardFail`-Pfad), sonst wird die
+     transformierte Box als Wire-Box verwendet (Log-Suffix
+     `fa4_containment=ok`).
+
+### Identity-Labels
+
+Rein diagnostisch. Sie fließen nur als Support-Score in die Kostenmatrix und
+können keine Geometrie mehr überstimmen.
+
+### Status
+
+- Typcheck der neuen Module: sauber. `compose-dialog-segments` zeigt nur die
+  bereits vorher bestehenden Strict-Null/`speaker_name`-Meldungen; keine neuen.
+- **Kein Deploy, kein Render.** Deploy-Scope wäre ausschließlich
+  `compose-dialog-segments`.
+
 
 
