@@ -1584,6 +1584,24 @@ Durchgeführt read-only am finalen Clip der Szene `e658509d-cdeb-40f7-bd33-98e74
 15,08 s, 1284×718). Kein Render, kein Retry, kein Reset, keine DB-Writes.
 Evidenz unter `/tmp/browser/fa4-visual-review/`.
 
+**Methodik & technische Einschränkung (Browser/Audio):** Der beauftragte
+Browser-Weg wurde ausgeführt: Playwright/Chromium (headless) hat den finalen
+`processed_video_url` sowie eine lokale Kopie über `http://localhost:8899/final.mp4`
+in ein `<video>`-Element geladen. Das gebündelte Chromium der Sandbox enthält
+keine proprietären Codecs — `canPlayType('video/mp4; codecs="avc1.42E01E, mp4a.40.2"')`
+liefert einen leeren String, `readyState` bleibt 0, `networkState` = 3
+(`NETWORK_NO_SOURCE`). Der Clip ist im Browser daher **weder abspielbar noch
+über Screenshots aus dem Player erfassbar, und es ist im Sandbox-Kontext
+grundsätzlich keine hörbare Audiowiedergabe möglich**. Skripte:
+`/tmp/browser/fa4-visual-review/pw/review_clip.py`, `pw/probe_codec.py`.
+Ersatzweise wurden die Frames deterministisch per ffmpeg an den beauftragten
+Zeitpunkten (0,5 / 2 / 4 / 6 / 8,5 / 10,5 / 13 s) plus Filmstreifen je Slot
+extrahiert und die Tonspur signalanalytisch (RMS, Grundfrequenz je
+Sprecherfenster) statt hörend ausgewertet. Die auditive Prüfung ist damit
+**nur messtechnisch, nicht abhörend** erfolgt; dieser Punkt bleibt formal offen
+und rechtfertigt für sich allein kein PASS.
+
+
 **Slot-Layout (aus Szene-Konfiguration/Face-Boxen, nicht aus Bildinhalt abgeleitet):**
 Slot 1 = Sarah (links), Slot 2 = Samuel (Mitte-links), Slot 3 = Matthew
 (Mitte-rechts), Slot 4 = Kay (rechts).
