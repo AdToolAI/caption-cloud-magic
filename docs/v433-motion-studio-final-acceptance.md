@@ -911,3 +911,27 @@ Identity Gate vor Render, S09 `ece6a71c-118e-436a-ac1a-15182cc88ddb` — kein Re
 - Frontend-Parser `src/lib/talking-head/parseDialogScript.ts` setzt `speakerId = cast.id`; unauflösbare Zeilen werden als Fortsetzungstext angehängt, nie als neuer Sprecher.
 
 Status: **FA-4 RETEST IDENTITY READY → STOP** (Render erst nach explizitem GO).
+
+## FA-4 RETEST — 4-Speaker Render START (S09)
+
+- Szene: `ece6a71c-118e-436a-ac1a-15182cc88ddb` (S09, order_index 8)
+- Trigger: UI-Button „🎭 6 Dialog-Shots in echte Szene rendern" → Confirm „Rendern…" (2.075 Cr / €20.75)
+- **T_run_start (DB, autoritativ): 2026-08-17T10:40:03.109622Z**
+- **run_id: `d669dd27-a9b9-4c0c-b3bf-7f597e3fc862`**
+- **plate_generation: 2** (vorher 1)
+- pipeline_state bei Start: `plate_rendering`
+- Ledger bei T+3s: genau 1 Job — `base_video` / `ai-happyhorse` / `dispatching` / attempt_no 1 (`2a2c796b-f38e-4927-bce6-fc14b0a146da`)
+- Genau ein Run: ein früherer Confirm-Versuch (10:38:06Z) hat KEINEN Run erzeugt (kein Ledger-Job, kein active_run_id) — keine Doppelbuchung.
+
+### Kanonische dialog_turns nach JIT-Backfill (6 Turns, 4 stabile Character-IDs)
+
+| # | turnId | characterId | Text |
+|---|--------|-------------|------|
+| 0 | 489b83a3-cb0c-4924-8c1f-ad94f6697e81 | 5c81f9bf-a5f1-4608-849f-e2a4adc84bcb (Sarah) | Team, der Launch startet in zehn Minuten. |
+| 1 | 65674928-6a98-4902-afa0-12429fb6008a | 483f9cdc-eb31-4486-bf67-9c5e7d955016 (Samuel) | Alle Anzeigen sind bereit. |
+| 2 | 0d1909d2-17cc-492d-bd16-162a601fff8e | 54d90504-7253-482f-9c6f-1902e8a6749b (Matthew) | Das Budget steht. |
+| 3 | 7a9a6851-cacc-48f6-9173-e5c65c6f7a22 | c65de5c6-75e1-47aa-956c-cd0cc424e736 (Kay) | Zielgruppe ist geprüft. |
+| 4 | db38f696-8dd9-4d4f-bd8b-4805e00b3e65 | 5c81f9bf-… (Sarah, Reuse) | Dann starten wir jetzt. |
+| 5 | ef99f131-a0d8-410e-96e2-8a73bda8bdc0 | 483f9cdc-… (Samuel, Reuse) | Wir sind live. |
+
+Status: Render läuft (Plate). Audit von Preclip-Dispatch, 6 `sync_segment`-Jobs, Mux und Stitch folgt nach Abschluss.
