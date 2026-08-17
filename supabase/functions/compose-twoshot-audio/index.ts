@@ -935,9 +935,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       voice: string;
       startSec: number;
       endSec: number;
+      /** FA-4/P0 — kanonische dialog_turns[].turnId dieses Segments. */
+      turn_id: string | null;
       _startSample: number; // internal — stripped from public output
       _endSample: number;
       track_url?: string;
+
     }> = [];
     // cursorSamples is declared below at the assembly loop (after parallel TTS)
     // Inter-speaker pause inserted as real silence — NEVER appended as text
