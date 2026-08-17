@@ -41,9 +41,12 @@ Für dieselbe `pendingRenderId` gilt, in dieser Reihenfolge:
    kein AWS-Call.
 2. `lambda_invoked_at` vorhanden → `alreadyStarted:true, unresolved:true`, **kein**
    AWS-Call. Zeitablauf ändert daran nichts.
-3. Nur wenn `lambda_invoked_at` fehlt, darf **genau ein** Caller es **atomar** setzen
-   (Compare-and-set / conditional update auf „ist noch NULL", ein Row-Lock) und danach
-   AWS aufrufen. Zwei parallele Invokes dürfen nicht beide NULL sehen.
+3. Nur wenn `lambda_invoked_at` fehlt, darf **genau ein** Caller es setzen — als echter
+   **CAS**: ein einziges `UPDATE ... SET lambda_invoked_at = now() WHERE id = :renderId
+   AND lambda_invoked_at IS NULL RETURNING ...`. Kein `SELECT` → `UPDATE`. Nur der Caller
+   mit zurückgegebener Row darf AWS aufrufen; alle anderen lesen die Row erneut und
+   antworten `alreadyStarted:true, unresolved:true`. Kein DB-Row-Lock über den externen
+   AWS-Call hinweg.
 
 `lambda_invoked_at` ist damit der endgültige Start-Fence: einmal gesetzt, nie wieder ein
 zweiter AWS-Start — unabhängig von verstrichener Zeit oder Prozessneustart.
@@ -74,7 +77,10 @@ idempotenter Refund → kein Full-Plate-Fallback.
 | `poll_timeout` | kein AWS-Neustart; v188-Reuse unverändert |
 | abgeschlossener alter Render | v188-Reuse wie bisher |
 
-### F — Nutzermeldung (Presenter-Ebene, DE/EN/ES)
+### F — Nutzermeldung + Diagnose-Durchleitung (Presenter-Ebene, DE/EN/ES)
+- `dispatch_uncertain` bleibt eine **eigene Diagnoseklasse** im Preclip-Ergebnis und wird
+  unverändert bis `compose-dialog-segments` durchgereicht — es darf unterwegs nie zu
+  `dispatch_failed` oder `poll_timeout` kollabieren.
 - Dispatch-/Gatewayproblem: „Vorbereitung des Sprecher-Clips konnte wegen eines
   Infrastrukturfehlers nicht gestartet bzw. bestätigt werden."
 - echter Poll-Timeout: „wurde nicht rechtzeitig fertig."
@@ -88,24 +94,31 @@ Freigegeben ausschließlich:
 Weiter frozen: Face-/BBox-/Maskengeometrie, v187/v331-Gates, Schwellenwerte,
 Sync-Ledger, RS3, G3.2.2/F1, Mux/Stitch.
 
-## Verbindliche Tests für den späteren Fix
+## Verbindliche Tests (8)
 
 1. 502 **vor** dem Claim → Reinvoke derselben ID → genau **ein** AWS-Start → Preclip ok.
 2. Antwortverlust **nach** gesetztem `lambda_invoked_at` → Reinvoke → `alreadyStarted /
    unresolved`, kein zweiter AWS-Start → Row später `completed` → Preclip ok.
 3. `lambda_invoked_at` gesetzt, danach kein Fortschritt → kein zweiter Start, unabhängig
    von der verstrichenen Zeit → v187 fail-closed + genau ein Refund.
-4. Zwei parallele Invokes derselben `pendingRenderId` → genau ein Claim/AWS-Start.
+4. **(kritisch)** Zwei parallele Invokes derselben `pendingRenderId` → genau ein
+   CAS-Gewinner, genau ein AWS-Start.
 5. `lambda_failed`, `invalid_input`, Credentials-/Config-Fehler → kein Retry.
 6. `poll_timeout` → kein AWS-Neustart; v188-Reuse unverändert.
-7. Claim atomar gesetzt, Prozess stirbt **vor** dem tatsächlichen AWS-Aufruf → Reinvoke
-   startet kein zweites Lambda → nach bestehendem Budget fail-closed. Bewusst akzeptierter
-   Preis von Exactly-Once: in diesem winzigen Fenster geht ggf. ein Render verloren, es
-   entstehen aber nie zwei.
+7. **(kritisch)** Claim gesetzt, Prozess stirbt **vor** dem AWS-Aufruf → Reinvoke startet
+   kein zweites Lambda → nach bestehendem Budget fail-closed. Bewusst akzeptierter Preis
+   von Exactly-Once: ggf. ein verlorener Render, aber nie zwei.
 8. N=4 endgültiger Preclip-Failure → weiterhin 0 `sync_segment`-Ledger-Jobs + genau ein
    Refund (heutiges Verhalten vor dem Ledger bleibt korrekt).
 
-## Danach
+## Umsetzung (nach GO)
 
-STOP. Erst nach Contract-Abnahme ein sehr kleiner Fix, dann ausschließlich Wiederholung
-von FA-4. FA-1 bis FA-3 bleiben PASS.
+1. `invoke-remotion-render/index.ts`: CAS-Claim + `alreadyStarted/unresolved`-Antwort.
+2. `_shared/pass-face-preclip.ts`: 5xx/Netzwerk → `dispatch_uncertain`, Row nicht auf
+   `failed` setzen, Recheck + höchstens ein Reinvoke derselben `pendingRenderId`.
+3. `compose-dialog-segments/index.ts`: nur Presentertext/Diagnoseklasse (kein Kollaps von
+   `dispatch_uncertain` zu `dispatch_failed`/`poll_timeout`), DE/EN/ES.
+4. Tests 1–8 ausführen, Doku-Nachtrag in
+   `docs/v433-motion-studio-final-acceptance.md`.
+5. **STOP vor Deploy.** Danach nur dieser kleine Fix deployen und ausschließlich FA-4 mit
+   einer frischen Szene wiederholen. FA-1 bis FA-3 bleiben PASS.
