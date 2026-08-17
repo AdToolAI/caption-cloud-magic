@@ -19940,6 +19940,10 @@ export type Database = {
           state: Database["public"]["Enums"]["composer_scene_state"]
         }[]
       }
+      composer_refund_charge: {
+        Args: { p_charge_id: string; p_refund_reason: string; p_run_id: string }
+        Returns: Json
+      }
       composer_release_run_reservation: {
         Args: { p_reason?: string; p_reservation_id: string }
         Returns: number
