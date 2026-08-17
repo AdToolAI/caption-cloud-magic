@@ -3623,12 +3623,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         speakerIdx: originalIdx,
         speakerName: String(sp.speaker ?? `Speaker ${originalIdx + 1}`),
         refId: "a1",
+        // FA-4/P0 — Turn↔Pass-Bindung entsteht hier, nicht später über Namen.
+        turnId: t.turnId ? String(t.turnId) : null,
       }));
       return {
         idx: passIdx,
         speaker_idx: originalIdx,
         character_id: sp.character_id ?? null,
         speaker_name: String(sp.speaker ?? `Speaker ${originalIdx + 1}`),
+        // Mehr-Turn-Pass vor dem Split: erst der Split erzeugt die
+        // 1:1-Identität. Wird direkt darunter gesetzt.
+        segment_id: passSegments.length === 1 ? (passSegments[0].turnId ?? null) : null,
         audio_url: String(sp.track_url),
         coords: speakerCoords[originalIdx] ?? [0.5, 0.5],
         segments: passSegments,
@@ -3657,12 +3662,15 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       ? builtPassesRaw.flatMap((p) => {
           if (!Array.isArray(p.segments) || p.segments.length <= 1) return [p];
           // Expand into N single-turn passes; preserves all identity fields.
+          // FA-4/P0: jeder Split-Pass erbt exakt die `segment_id` SEINES Turns.
           return p.segments.map((seg) => ({
             ...p,
             segments: [seg],
+            segment_id: seg.turnId ?? null,
           }));
         }).map((p, i) => ({ ...p, idx: i }))
       : builtPassesRaw;
+
 
     if (splitMultiTurnFlagOn && builtPasses.length !== builtPassesRaw.length) {
       console.log(
