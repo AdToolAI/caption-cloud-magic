@@ -224,7 +224,14 @@ interface DialogBlock {
    *  per-speaker grouping — the fix for the "SARAH says SAMUEL's line"
    *  and "SPRECHER 1: collapses onto wrong slot" failure modes. */
   characterId?: string;
+  /** FA-4/P0 — kanonische `dialog_turns[].turnId` dieses Blocks. Wird im
+   *  SELBEN Iterationsschritt gesetzt, der die Blöcke aus `dialog_turns`
+   *  erzeugt, und reist unverändert bis in `voicedRange.turns[].turnId`.
+   *  Sie ist später die Ledger-Segmentidentität (`segment_id`). Keine
+   *  nachträgliche Auflösung über Name/Slot/speaker_idx. */
+  turnId?: string;
 }
+
 
 /** Split "Matthew Dusatko: hi\nSarah: hello" into ordered blocks. */
 function parseDialogScript(script: string): DialogBlock[] {
@@ -270,7 +277,10 @@ function blocksFromDialogTurns(
       rawSpeaker,
       text: t.text,
       characterId: t.characterId,
+      // FA-4/P0 — Turn-Identität am kanonischen Erzeugungsort binden.
+      turnId: t.turnId ? String(t.turnId) : undefined,
     });
+
   }
   return out.length > 0 ? out : null;
 }
@@ -925,9 +935,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       voice: string;
       startSec: number;
       endSec: number;
+      /** FA-4/P0 — kanonische dialog_turns[].turnId dieses Segments. */
+      turn_id: string | null;
       _startSample: number; // internal — stripped from public output
       _endSample: number;
       track_url?: string;
+
     }> = [];
     // cursorSamples is declared below at the assembly loop (after parallel TTS)
     // Inter-speaker pause inserted as real silence — NEVER appended as text
@@ -1125,7 +1138,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         // Public timestamps in seconds (3-decimal precision = ~1 ms).
         startSec: Math.round((startSample / SAMPLE_RATE) * 1000) / 1000,
         endSec: Math.round((endSample / SAMPLE_RATE) * 1000) / 1000,
-        // Internal sample-exact positions used for per-speaker track placement.
+        // FA-4/P0 — Turn-Identität aus demselben Iterationsschritt.
+        turn_id: block.turnId ? String(block.turnId) : null,
+
         _startSample: startSample,
         _endSample: endSample,
       });
@@ -1374,9 +1389,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           .map((it) => ({
             startSec: Math.round((it.segment._startSample / SAMPLE_RATE) * 1000) / 1000,
             endSec: Math.round((it.segment._endSample / SAMPLE_RATE) * 1000) / 1000,
+            // FA-4/P0 — kanonische Segmentidentität für den v431-Ledger.
+            turnId: it.segment.turn_id ?? null,
           }))
           .filter((w) => w.endSec > w.startSec)
           .sort((a, b) => a.startSec - b.startSec);
+
         (group as any).voicedRange = {
           startSec: Math.round(voicedStartSec * 1000) / 1000,
           endSec: Math.round(voicedEndSec * 1000) / 1000,

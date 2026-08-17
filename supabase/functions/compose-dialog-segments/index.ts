@@ -536,7 +536,7 @@ async function inspectSpeakerAudioWithRetry(url: string, attempts = 3) {
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? "audio_fetch_failed"));
 }
 
-interface Turn { startSec: number; endSec: number }
+interface Turn { startSec: number; endSec: number; turnId?: string | null }
 interface TwoshotSpeaker {
   speaker?: string;
   character_id?: string | null;
@@ -550,6 +550,8 @@ interface SegmentItem {
   speakerIdx: number;
   speakerName: string;
   refId: string;
+  /** FA-4/P0 — kanonische `dialog_turns[].id` dieses Turn-Fensters. */
+  turnId?: string | null;
 }
 
 interface PassState {
@@ -557,6 +559,11 @@ interface PassState {
   speaker_idx: number;
   character_id: string | null;
   speaker_name: string;
+  /** FA-4/P0 — kanonische Ledger-Segmentidentität (`sync_segment.segment_id`).
+   *  Aktive Passes: `dialog_turns[].id`. Stabilizer: deterministische UUID
+   *  aus (scene, run, listener). NIEMALS null beim Dispatch. */
+  segment_id: string | null;
+
   audio_url: string;
   coords: [number, number] | null;
   segments: SegmentItem[];
@@ -3616,12 +3623,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         speakerIdx: originalIdx,
         speakerName: String(sp.speaker ?? `Speaker ${originalIdx + 1}`),
         refId: "a1",
+        // FA-4/P0 — Turn↔Pass-Bindung entsteht hier, nicht später über Namen.
+        turnId: t.turnId ? String(t.turnId) : null,
       }));
       return {
         idx: passIdx,
         speaker_idx: originalIdx,
         character_id: sp.character_id ?? null,
         speaker_name: String(sp.speaker ?? `Speaker ${originalIdx + 1}`),
+        // Mehr-Turn-Pass vor dem Split: erst der Split erzeugt die
+        // 1:1-Identität. Wird direkt darunter gesetzt.
+        segment_id: passSegments.length === 1 ? (passSegments[0].turnId ?? null) : null,
         audio_url: String(sp.track_url),
         coords: speakerCoords[originalIdx] ?? [0.5, 0.5],
         segments: passSegments,
@@ -3650,12 +3662,15 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       ? builtPassesRaw.flatMap((p) => {
           if (!Array.isArray(p.segments) || p.segments.length <= 1) return [p];
           // Expand into N single-turn passes; preserves all identity fields.
+          // FA-4/P0: jeder Split-Pass erbt exakt die `segment_id` SEINES Turns.
           return p.segments.map((seg) => ({
             ...p,
             segments: [seg],
+            segment_id: seg.turnId ?? null,
           }));
         }).map((p, i) => ({ ...p, idx: i }))
       : builtPassesRaw;
+
 
     if (splitMultiTurnFlagOn && builtPasses.length !== builtPassesRaw.length) {
       console.log(
@@ -3727,6 +3742,22 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           // segments). Turns where the listener speaks are excluded
           // (their active-pass overlay wins in those windows anyway).
           const stabilizers: PassState[] = [];
+          // FA-4/P0 — Stabilizer haben keinen eigenen dialog_turn, brauchen
+          // aber eine stabile, kollisionsfreie Segmentidentität. Deterministisch
+          // aus (scene, listener) abgeleitet → Retries adoptieren dieselbe Zeile.
+          const stabilizerSegmentId = async (listenerIdx: number): Promise<string> => {
+            const bytes = new Uint8Array(
+              await crypto.subtle.digest(
+                "SHA-256",
+                new TextEncoder().encode(`v194-stabilizer:${sceneId}:${listenerIdx}`),
+              ),
+            ).slice(0, 16);
+            bytes[6] = (bytes[6] & 0x0f) | 0x50; // Version 5-artig
+            bytes[8] = (bytes[8] & 0x3f) | 0x80; // RFC-4122-Variante
+            const hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+            return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+          };
+
           for (const listenerIdx of activeSpeakerIdxs) {
             const bbox = (speakerPlateBboxes as any)?.[listenerIdx] ?? null;
             const coord = speakerCoords[listenerIdx];
@@ -3763,6 +3794,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               speaker_idx: listenerIdx,
               character_id: listenerSpeaker?.character_id ?? null,
               speaker_name: `stabilizer_${listenerSpeaker?.speaker ?? listenerIdx}`,
+              segment_id: await stabilizerSegmentId(listenerIdx),
+
               audio_url: silenceUrl,
               coords: [Number(coord[0]), Number(coord[1])] as [number, number],
               segments: otherSegs,
@@ -5999,28 +6032,53 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       (body as any).pipeline_job_id.trim().length > 0
       ? String((body as any).pipeline_job_id).trim()
       : null;
+    // FA-4/P0 — Segmentidentität ist Pflicht. Ohne sie deduplizieren alle
+    // Turns eines Runs auf EINE Ledger-Zeile (`syncso_fanout_1_of_N`).
+    // Fail-closed VOR dem Provider-Call.
+    const v431SegmentId = typeof (pass as any)?.segment_id === "string" &&
+      String((pass as any).segment_id).trim().length > 0
+      ? String((pass as any).segment_id).trim()
+      : null;
+    if (!v431SegmentId) {
+      console.error("[compose-dialog-segments] FA4_P0_PREFLIGHT_BLOCKED missing_segment_id", JSON.stringify({
+        scene_id: sceneId,
+        pass_idx: currentPassIdx,
+        speaker_idx: (pass as any)?.speaker_idx ?? null,
+      }));
+    }
     const v431LedgerParams = {
       sceneId,
       runId: (passRunStamp.run_id as string | null) ?? null,
       stage: "sync_segment" as const,
       plateGeneration: Number(passRunStamp.plate_generation ?? 0),
       provider: "sync.so",
+      segmentId: v431SegmentId,
       metadata: {
         dispatcher: "compose-dialog-segments",
         pass_idx: currentPassIdx,
         total_passes: passes.length,
         diagnostic_id: diagnosticId,
         retry_variant: retryVariant,
+        segment_id: v431SegmentId,
       },
     };
-    const v431SyncDecision = v431PreAcquiredJobId
+    // Ohne Segmentidentität wird KEINE Ledger-Zeile akquiriert (sonst
+    // kollabieren alle Turns auf eine Zeile). Der Abbruch folgt unten,
+    // sobald `failBeforeProviderDispatch` definiert ist — vor jedem
+    // Provider-Call.
+    const v431SyncDecision = !v431SegmentId
+      ? ({ outcome: "unavailable", reason: "fa4_p0_missing_segment_id" } as const)
+      : v431PreAcquiredJobId
       ? await adoptPreAcquiredLedgerJob(supabase, v431PreAcquiredJobId, {
           sceneId,
           stage: "sync_segment",
           runId: v431LedgerParams.runId,
           plateGeneration: v431LedgerParams.plateGeneration,
+          segmentId: v431SegmentId,
         })
       : await resolveLedgerDispatch(supabase, v431LedgerParams, readRetryContext(body));
+
+
 
     // G3.1b — Race-Verlierer dispatcht nicht. Die fremde Zeile wird NICHT
     // gesettelt (sie gehört dem Gewinner) und nicht abgelöst.
@@ -6142,6 +6200,20 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       });
       return json({ error: reason, message, refunded: alreadyRefunded ? 0 : costCredits, ...meta }, status);
     };
+
+    // FA-4/P0 — fail-closed: Sync-Segment ohne kanonische `segment_id`
+    // (= dialog_turns.id bzw. deterministische Stabilizer-UUID) darf niemals
+    // beim Provider landen.
+    if (!v431SegmentId) {
+      return await failBeforeProviderDispatch(
+        "sync_segment_missing_segment_id",
+        "fa4_p0_preflight_blocked",
+        "Sync-Segment ohne kanonische segment_id (dialog_turns.id) — Dispatch blockiert.",
+        422,
+        { pass_idx: currentPassIdx, speaker_idx: (pass as any)?.speaker_idx ?? null },
+      );
+    }
+
 
     if (canonicalDialogTurnsCount > 0) {
       const passCharacterId = String(pass.character_id ?? "").trim();

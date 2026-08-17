@@ -720,13 +720,15 @@ export async function adoptPreAcquiredLedgerJob(
     stage: PipelineStage;
     runId: string | null | undefined;
     plateGeneration?: number | null;
+    /** FA-4/P0 — kanonische Segmentidentität; muss exakt übereinstimmen. */
+    segmentId?: string | null;
   },
 ): Promise<LedgerDispatchDecision> {
   let row: any = null;
   try {
     const { data } = await admin
       .from("composer_pipeline_jobs")
-      .select("id, scene_id, run_id, stage, plate_generation, attempt_no, status, external_job_id, replaced_by")
+      .select("id, scene_id, run_id, stage, segment_id, plate_generation, attempt_no, status, external_job_id, replaced_by")
       .eq("id", jobId)
       .maybeSingle();
     row = data ?? null;
@@ -741,6 +743,9 @@ export async function adoptPreAcquiredLedgerJob(
   if (expect.runId && String(row.run_id) !== String(expect.runId)) {
     return { outcome: "skip", reason: "preacquired_stale_run" };
   }
+  if (expect.segmentId && String(row.segment_id ?? "") !== String(expect.segmentId)) {
+    return { outcome: "skip", reason: "preacquired_segment_mismatch" };
+  }
   if (
     expect.plateGeneration != null &&
     typeof row.plate_generation === "number" &&
@@ -748,6 +753,7 @@ export async function adoptPreAcquiredLedgerJob(
   ) {
     return { outcome: "skip", reason: "preacquired_stale_generation" };
   }
+
   if (row.external_job_id || row.replaced_by) {
     return { outcome: "skip", reason: "preacquired_already_bound" };
   }
