@@ -59,6 +59,10 @@ interface Result {
   detail?: string;
 }
 
+/**
+ * FA-4/P1-A — refunds only against a DB-proven, run-scoped charge.
+ * Returns the refunded amount, or null when nothing was refunded.
+ */
 async function refundScene(
   sb: ReturnType<typeof createClient>,
   scene: any,
@@ -70,29 +74,28 @@ async function refundScene(
     .single();
   if (!project) return null;
 
-  const tier: "standard" | "pro" =
-    scene.clip_quality === "pro" ? "pro" : "standard";
-  const costPerSec = CLIP_COSTS[scene.clip_source]?.[tier] ?? 0.15;
-  const refundAmount =
-    Number(scene.duration_seconds ?? 0) * costPerSec;
-
-  if (refundAmount <= 0) return 0;
-
-  try {
-    await sb.rpc("refund_ai_video_credits", {
-      p_user_id: (project as any).user_id,
-      p_amount_euros: refundAmount,
-      p_generation_id: scene.id,
-    });
-    return refundAmount;
-  } catch (err) {
-    console.error(
-      `[recover-stuck-composer-clip] refund failed scene=${scene.id}`,
-      err,
+  const runId = (scene as any).active_run_id as string | null;
+  if (!runId) {
+    console.log(
+      `[recover-stuck-composer-clip] p1a_no_active_run scene=${scene.id} → no_charge`,
     );
     return null;
   }
+
+  const result = await refundRunCharge(
+    sb as unknown as Parameters<typeof refundRunCharge>[0],
+    (project as any).user_id,
+    runId,
+    "watchdog_stuck_clip",
+  );
+
+  console.log(
+    `[recover-stuck-composer-clip] p1a_refund scene=${scene.id} run=${runId} outcome=${result.outcome} amount=${result.amount_euros}`,
+  );
+
+  return result.outcome === "refunded" ? result.amount_euros : null;
 }
+
 
 async function markFailed(
   sb: ReturnType<typeof createClient>,
