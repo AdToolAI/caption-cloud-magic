@@ -1673,5 +1673,213 @@ abhörende Audioprüfung ist in der Sandbox technisch nicht möglich (Chromium
 ohne H.264/AAC), es liegt nur eine signalanalytische Auswertung vor. FA-4
 bleibt damit **nicht** auf PASS.
 
-Kein weiterer Render, kein Retry, kein Reset.
+## FA-4 Root-Cause-Lock — Face-Candidate-Auswahl
+
+**Scope:** read-only / deduktiv. Kein Code, kein Render, kein Retry, kein Reset,
+keine DB-Mutation. Der übergeordnete FA-4-Status bleibt
+**TECHNICAL PASS / VISUAL REVIEW: ISSUES**.
+
+**Einschätzungsmethode:** `deduktiv geschlossen; kein Runtime-Log mehr
+verfügbar`. Die relevanten `compose-dialog-segments`-Stdout-Logs aus dem
+S11-Zeitfenster (2026-08-17 20:39Z–20:49Z) sind aus der Edge-Function-Log-
+Retention gefallen (frühester verfügbarer Eintrag liegt bei 23:07Z). Die
+folgende Kette wird deshalb aus dem aktuellen Code und den persistierten
+Run-Daten von Szene `e658509d-cdeb-40f7-bd33-98e74144fdc5` / Run
+`b9acfae3-8121-45ba-950a-9a1ad5373f5a` abgeleitet.
+
+### 1) v278 lief deduktiv erfolgreich
+
+`plateFaceSlotRouter.ts` baut eine globale bijektive Minimum-Distance-Zuordnung
+über **alle** Detektionen, ohne Area-/Aspect-Plausibilitätsfilter. Für S11 mit
+den Anchor-Centern
+
+- Sarah `(0.243096, 0.222005)`
+- Samuel `(0.386265, 0.196615)`
+- Matthew `(0.601017, 0.203125)`
+- Kay `(0.827762, 0.200521)`
+
+und den 10 persistierten Face-Kandidaten ergibt die globale v278-Zuordnung
+**vor** der Bridge:
+
+| Character | Plate-Face | BBox | Distanz | matchConfidence | Befund |
+|---|---|---|---|---|---|
+| Sarah | slot 4 | `[226,244,286,327]` | ~0.18099 | ~0.638 | korrektes großes Face |
+| Samuel | slot 7 | `[476,209,540,294]` | ~0.15395 | ~0.693 | korrekt |
+| Matthew | slot 1 | `[819,113,831,128]` | ~0.05449 | ~0.890 | **False Positive** (12×15 px) |
+| Kay | slot 2 | `[923,98,940,119]` | ~0.11360 | ~0.773 | **False Positive** (17×21 px) |
+
+Die Confidence-Werte stimmen mit den persistierten Werten überein und folgen der
+v278-Formel `1 - distance / 0.5`. Damit ist v278 deduktiv belegt, obwohl das
+Runtime-Stdout verfallen ist.
+
+**Wichtige Korrektur einer früheren Inferenz:** 10 persistierte Faces schließen
+einen erfolgreichen v278-Lauf **nicht** aus. `routePlateFacesToAnchor()` gibt
+alle erkannten Faces zurück, auch Extra-Faces; `ok` bleibt true, solange
+`resolved >= anchor rows` und nicht `cols < rows`.
+
+### 2) Ursache innerhalb v278: kein Plausibilitätsfilter vor Hungarian
+
+Die winzigen False Positives für Matthew/Kay liegen geometrisch näher an den
+Anchor-Centern als die realen großen Faces. Daher gewinnt die mathematisch
+korrekte Hungarian-Minimierung auf einem falschen Kandidatensatz. v278 war also
+nicht „korrekt und später komplett überschrieben“; es war für Matthew/Kay
+bereits falsch.
+
+### 3) `v183_anchor_identity_slot_bridge` ist ebenfalls deduktiv belegt
+
+Nach v278 sind unter den ersten vier `faces` nach `slot`:
+
+- slot 0: unlabeled
+- slot 1: Matthew (False Positive)
+- slot 2: Kay (False Positive)
+- slot 3: unlabeled
+
+Die Bridge iteriert `platesByVisual` nach `f.slot` und schreibt nur unlabeled
+Faces mit `anchorByVisual[visualIdx]`, `matchConfidence = 0.85`. Daher:
+
+- slot 0 `[1125,7,1142,30]` bekommt Sarah + `matchConfidence 0.85`
+- slot 3 `[52,272,65,303]` bekommt Kay + `matchConfidence 0.85`
+
+Das entspricht exakt dem persistierten Zustand. Die Bridge-Annahme „beide
+Detektoren sortieren L→R“ ist hier falsch: v278 `slot` stammt aus der
+Rekognition-Sortierung (row-major-artig über `cy`/`x`), nicht aus reiner
+visueller L→R-Slotordnung. Die Bridge verschlechtert dadurch Sarah und erzeugt
+einen zweiten Kay-Labelkandidaten.
+
+### 4) v277 First-Match wird danach autoritativ
+
+`anchorRekFacesByCid` nimmt pro gelocktem Character den **ersten** Face-Eintrag
+in `plateIdentityMap.faces` (`!map.has(faceCid)`). Nach der Bridge ist die
+Reihenfolge relevant:
+
+- **Sarah:** slot 0 (False Positive) zuerst, korrektes Sarah slot 4 später →
+  False Positive gewinnt.
+- **Matthew:** slot 1 (False Positive) gewinnt; reales großes Face slot 8 ist
+  unlabeled.
+- **Kay:** slot 2 (False Positive) gewinnt; slot 3 (duplizierter False
+  Positive) kommt später; reales großes Face slot 9 ist unlabeled.
+- **Samuel:** slot 7 (korrekt) gewinnt.
+
+Damit entstehen exakt die persistierten `speakerPlateBboxes`:
+
+| Character | `speakerPlateBbox` |
+|---|---|
+| Sarah | `[1125,7,1142,30]` |
+| Samuel | `[476,209,540,294]` |
+| Matthew | `[819,113,831,128]` |
+| Kay | `[923,98,940,119]` |
+
+Frage 4 ist damit für **alle vier** Speaker deduktiv geschlossen, nicht nur
+für Sarah.
+
+### 5) `v239_repair_gate`: Confidence überspringt objektive Sanity
+
+Plate-Auflösung: 1284×718. Produktions-Sanity verlangt Area 0.003–0.25 und
+Aspect 0.4–2.5. Die tatsächlich verwendeten Boxen:
+
+| Character | BBox | Area % | Aspect | Sanity | Trust-Grund |
+|---|---|---|---|---|---|
+| Sarah | `[1125,7,1142,30]` | 0.0424 % | 0.739 | `area_too_small` | `matchConfidence 0.85` |
+| Samuel | `[476,209,540,294]` | 0.5901 % | 0.753 | sane | `matchConfidence ~0.693` |
+| Matthew | `[819,113,831,128]` | 0.0195 % | 0.800 | `area_too_small` | `confidence ~0.890` |
+| Kay | `[923,98,940,119]` | 0.0387 % | 0.810 | `area_too_small` | `confidence ~0.773` |
+
+Im Code führt `trustedSlots.includes(i)` direkt zu
+`goodSlots.push(i); return;` — `bboxSanity()` wird für trusted Slots **nicht**
+ausgeführt. Deshalb repariert `v185` die drei untergroßen Boxen nie.
+
+### 6) Geometrie-Gegenprobe nach existierendem Sanity-Filter
+
+Werden die 10 Kandidaten zuerst mit den **bereits existierenden**
+Produktionskriterien gefiltert, bleiben exakt diese vier großen Faces:
+
+- slot 4 `[226,244,286,327]`
+- slot 7 `[476,209,540,294]`
+- slot 8 `[753,187,819,277]`
+- slot 9 `[1030,208,1099,296]`
+
+Vollständige 4×4-Distanzmatrix (Zeilen: Anchor-Slots Sarah/Samuel/Matthew/Kay;
+Spalten: Face-Slots 4/7/8/9):
+
+```text
+         slot 4   slot 7   slot 8   slot 9
+Sarah    0.18099  0.19931  0.38265  0.59998
+Samuel   0.27447  0.15395  0.25890  0.46892
+Matthew  0.44626  0.25266  0.12051  0.27177
+Kay      0.65857  0.45734  0.24803  0.15046
+```
+
+Das global minimale bijektive Optimum ist die **Diagonale**:
+
+- Sarah → slot 4
+- Samuel → slot 7
+- Matthew → slot 8
+- Kay → slot 9
+
+Damit war die korrekte Geometrie vollständig im Run vorhanden; der Fehler liegt
+im fehlenden Kandidatenfilter, der Bridge und dem Trust-Gate — nicht in einem
+Informationsmangel.
+
+### 7) Preclip-Folge und letztes Gate
+
+Die falschen BBoxes erzeugen falsche Crops, z. B.:
+
+- Sarah: `x = 1024…1244, y = 0…220` (ihr Slot liegt links)
+- Kay: `x = 734…1128, y = 0…394` (überlappt Matthews Zone)
+
+Die persistierte Dispatch-Timeline enthält 6×
+`FACE_GATE_PROBE_UNAVAILABLE`, jeweils unmittelbar gefolgt von `DISPATCHED`.
+Der letzte Gate war also non-blocking / fail-open und konnte die falsche
+Geometrie nicht mehr stoppen.
+
+---
+
+### Beantwortung der vier Lock-Fragen
+
+| Frage | Ergebnis |
+|---|---|
+| Q1: Lief `v278`/Hungarian? | **JA** — deduktiv bewiesen, Runtime-Log verfallen. v278 war für Matthew/Kay selbst schon falsch, weil der Kandidatensatz ungefiltert war; nicht erst später überschrieben. |
+| Q2: Lief `v183_anchor_identity_slot_bridge`? | **JA** — deduktiv bewiesen anhand exakt reproduzierbarer `matchConfidence 0.85`-Labels auf slot 0/slot 3. |
+| Q3: Hat `v239` die falschen Boxen als trusted durchgelassen? | **JA** — bewiesen; Sanity wurde durch den trusted-Shortcut übersprungen. |
+| Q4: Machte `v277` First-Match die falschen Kandidaten autoritativ? | **JA** — deduktiv für Sarah/Matthew/Kay/Samuel geschlossen; ergibt exakt die finalen `speakerPlateBboxes`. |
+
+### Root Cause als Kette
+
+```text
+Anchor layout korrekt
+  → v278 Hungarian auf ungefilterten 10-Face-Kandidaten
+    → Matthew/Kay False Positives gewinnen
+    → v183 slot-index Bridge labelt zusätzlichen False Positive als Sarah
+      → v277 first-match bevorzugt falsche Labels
+        → v239 Confidence-Trust überspringt Sanity
+          → falsche Preclip-Crops
+            → Face-Probe unavailable / fail-open
+              → Sync.so verarbeitet falsche Geometrie erfolgreich
+```
+
+### Lock-Abschluss
+
+- **FA-4 ROOT-CAUSE LOCKED — Face-Candidate-Auswahl**
+- Ranking-only ausreichend: **NEIN**
+- Geometrie-first mit Plausibilitätsfilter: **JA**
+- Fix-Contract bleibt **nur Entwurf**, nicht implementiert:
+
+```text
+Anchor Character Lock
+  → plausible Plate-Face candidates
+    → global bijective geometry assignment
+      → identity labels only as supporting score
+        → sanity always enforced
+          → deterministic crop containment gate
+            → Sync.so
+```
+
+Nicht mehr gültig: `Character label → first matching PlateFace → trust by
+confidence → dispatch`.
+
+**Unberührt bleiben:** Ledger, Fan-out, Turn-ID, `speaker_idx`, RS3, Mux,
+Finalizer.
+
+**STOP.** Kein Fix, kein Deploy, kein Render.
+
 
