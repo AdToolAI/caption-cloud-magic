@@ -1145,3 +1145,73 @@ Boot bestätigt 17:47:47Z).
 - S08/S09 unangetastet als Evidence
 
 **FA-4 RETEST v2 SETUP READY — STOP. Kein Render.**
+
+---
+
+## FA-4/P0 — Sync Fan-out: Invarianten-Härtung (IMPLEMENTED / TESTS GREEN, kein Deploy)
+
+### Kanonische Segmentidentität
+
+`segment_id = dialog_turn.id`. Keine synthetischen UUIDs, keine Rekonstruktion
+über Name, Text, `speaker_idx` oder `character_id`. Die Bindung entsteht im
+selben kanonischen Iterationsschritt, der `dialog_shots.passes[]` aus
+`dialog_turns` erzeugt: Turn *i* → Pass *i* → `segment_id = dialog_turns[i].id`.
+
+### Cardinality-Invariante (verbindlich)
+
+```text
+set(turn_backed_sync_segment.segment_id) == set(dialog_turns.id)
+```
+
+Ausdrücklich **nicht** `set(all sync_segment.segment_id) == set(dialog_turns.id)`.
+
+Bedingungen:
+- Anzahl turn-backed Passes == Anzahl `dialog_turns`
+- jede `dialog_turn.id` kommt genau einmal vor
+- keine fremde ID, keine Dublette, kein NULL
+- wiederholter Sprecher (Turn 1 == Turn 5, gleiche `speaker_idx`) erzeugt zwei
+  Jobs mit unterschiedlicher `segment_id`
+
+### v194-Silent-Stabilizer (Abgrenzung)
+
+Stabilizer sind **nicht turn-backed**: separate Sync-Jobs mit eigener
+deterministischer Identität (aus `sceneId` + `listenerIdx`). Klassifikation
+erfolgt ausschließlich über die bestehenden Produktionsflags
+`stabilizer_pass === true && is_silent_stabilizer === true` — es gibt bewusst
+keinen heuristischen Klassifikator „segment_id liegt nicht in dialog_turns".
+Stabilizer zählen nicht in die Turn-Kardinalität, dürfen aber weder NULL tragen
+noch mit einer Turn-ID kollidieren.
+
+### Fail-closed
+
+Verletzung der Invariante ⇒ Abbruch **vor dem ersten turn-backed
+Ledger-Acquire**, ohne Provider-Dispatch, mit automatischem Refund:
+`error_class = fa4_p0_turn_pass_mismatch`, `sync_status = PREFLIGHT_BLOCKED`,
+HTTP 422 inkl. Violation-Report. `sync_segment` mit `segment_id = NULL` ist
+verboten.
+
+### Retry-Härtung
+
+`adoptPreAcquiredLedgerJob()` adoptiert eine vorab erzeugte Ledger-Zeile nur bei
+exakt gleicher `segment_id`; sonst `preacquired_segment_mismatch` (skip). Eine
+Ledger-Zeile ohne `segment_id` wird von einem turn-backed Retry nie adoptiert.
+
+### Code
+
+- `supabase/functions/_shared/fa4-turn-pass-guard.ts` — `isStabilizerPass()`,
+  `evaluateTurnPassBinding()` (reine Funktion, testbar)
+- `supabase/functions/compose-dialog-segments/index.ts` — Guard nach vollständigem
+  Pass-Aufbau inkl. Stabilizer-Injektion, vor dem ersten turn-backed Acquire
+- `supabase/functions/_shared/v431-ledger.ts` — Segment-Validierung in der Adoption
+
+### Tests (grün)
+
+`_shared/fa4-turn-pass-guard.test.ts` — 10 Tests: N-Turns-1:1, wiederholter
+Sprecher, NULL, Dublette, fremde ID, Anzahl-Mismatch, 6 Turns + 4 Stabilizer,
+Stabilizer-Kollision, Stabilizer-NULL, Predicate-Semantik.
+`_shared/v431-ledger-adoption.test.ts` — 4 Tests: Adoption nur bei identischer
+`segment_id`, Mismatch, NULL-Ledger-Zeile, bereits gebundene Zeile.
+
+Kein Schema-Change, kein Ledger-RPC-Redesign.
+
+**FA-4/P0 SYNC FAN-OUT IMPLEMENTED / TESTS GREEN → STOP vor Deploy.**

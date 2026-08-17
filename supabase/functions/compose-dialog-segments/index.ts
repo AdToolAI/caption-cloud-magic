@@ -118,6 +118,7 @@ import { rehostPlate } from "../_shared/rehostPlate.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { adoptPreAcquiredLedgerJob, bindSyncPassAttempt, readRetryContext, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
+import { evaluateTurnPassBinding, isStabilizerPass, type TurnPassCandidate } from "../_shared/fa4-turn-pass-guard.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -592,6 +593,11 @@ interface PassState {
   audio_tight?: { url: string; dur_sec: number; windows_secs: Array<[number, number]>; output_offsets_sec?: number[] };
 }
 
+// FA-4/P0 — `isStabilizerPass` / `evaluateTurnPassBinding` leben in
+// `_shared/fa4-turn-pass-guard.ts` (siehe Import oben).
+
+
+
 interface SegmentsState {
   version: 5;
   engine: "sync-segments";
@@ -918,13 +924,19 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     let canonicalDialogTurnsCount = 0;
     let canonicalSpeakerIds: string[] = [];
     let speakersSource = "audio_plan";
+    /** FA-4/P0 — kanonische Turn-ID-Menge dieser Szene (Quelle: dialog_turns). */
+    let canonicalDialogTurnIds: string[] = [];
 
     if (await readIdOnlyEnabled(supabase)) {
       const ensuredTurns = await ensureDialogTurnsForScene(supabase, scene as any);
       if (ensuredTurns.ok) {
         canonicalDialogTurnsCount = ensuredTurns.turns.length;
         canonicalSpeakerIds = orderedSpeakerIdsFromTurns(ensuredTurns.turns);
+        canonicalDialogTurnIds = ensuredTurns.turns
+          .map((t) => (typeof t.turnId === "string" ? t.turnId.trim() : ""))
+          .filter((id) => id.length > 0);
         speakersSource = "dialog_turns";
+
         console.log(
           `[compose-dialog-segments] v201_id_only_cast scene=${sceneId} source=${ensuredTurns.source} turns=${canonicalDialogTurnsCount} cast=[${canonicalSpeakerIds.join(",")}]`,
         );
@@ -3841,6 +3853,62 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       );
     }
 
+    // ── FA-4/P0 — Turn↔Pass-Kardinalitäts-Guard ──────────────────────────
+    // Läuft NACH vollständigem Pass-Aufbau inkl. Stabilizer-Injektion und
+    // VOR dem allerersten turn-backed Ledger-Acquire.
+    // Invariante: set(turn_backed_sync_segment.segment_id) == set(dialog_turns.id)
+    // (NICHT über alle sync_segment-Rows — Stabilizer zählen separat).
+    if (!isAdvance && canonicalDialogTurnIds.length > 0) {
+      const violations = evaluateTurnPassBinding(
+        builtPasses as unknown as TurnPassCandidate[],
+        canonicalDialogTurnIds,
+      );
+      const turnBackedCount = violations.turn_backed_count;
+      const stabilizerCount = violations.stabilizer_count;
+
+      if (!violations.ok) {
+
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} FA4_P0_TURN_PASS_MISMATCH ${JSON.stringify(violations)}`,
+        );
+        const { data: wGuard } = await supabase
+          .from("wallets").select("balance").eq("user_id", userId).single();
+        await supabase
+          .from("wallets")
+          .update({
+            balance: Number(wGuard?.balance ?? 0) + totalCost,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", userId);
+        await supabase
+          .from("composer_scenes")
+          .update({
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_error: "fa4_p0_turn_pass_mismatch",
+          })
+          .eq("id", sceneId);
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId, user_id: userId, engine: "sync-segments",
+          sync_source_kind: "segments", video_url: sourceClipUrl,
+          sync_status: "PREFLIGHT_BLOCKED",
+          error_class: "fa4_p0_turn_pass_mismatch",
+          error_message: JSON.stringify(violations).slice(0, 900),
+        });
+        return json({
+          error: "fa4_p0_turn_pass_mismatch",
+          details: violations,
+          refunded: totalCost,
+        }, 422);
+      }
+
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} fa4_p0_turn_pass_guard_OK turn_backed=${turnBackedCount} stabilizers=${stabilizerCount}`,
+      );
+    }
+
+
+
     // ── Stufe B: HEAD-probe inputs once before paying Sync.so ────────────
     const audioUrls = builtPasses.map((p) => p.audio_url);
     const probes = await Promise.all([
@@ -5128,8 +5196,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // slicing/re-uploading that per stabilizer is wasteful and would emit a
     // near-empty audio window that Sync.so has historically rejected. Keep
     // the full silence WAV → mux uses absolute timing on segments.
-    const isStabilizerForTight = (pass as any).stabilizer_pass === true &&
-      (pass as any).is_silent_stabilizer === true;
+    const isStabilizerForTight = isStabilizerPass(pass);
     const allowTightSlice = passes.length >= 1 && !isStabilizerForTight;
     if (allowTightSlice && speakerWindowsSecs.length > 0) {
 
@@ -6547,10 +6614,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // regular silent-audio gate would (correctly, for user audio) reject
     // them. We bypass ONLY when the pass is explicitly flagged as a
     // stabilizer AND the audio_url is our deterministic silence-track.
-    const isStabilizerPass = (pass as any).stabilizer_pass === true &&
-      (pass as any).is_silent_stabilizer === true;
+    const isStabilizer = isStabilizerPass(pass);
 
-    const finalAudioDiag = isStabilizerPass
+    const finalAudioDiag = isStabilizer
       ? null
       : await inspectSpeakerAudioWithRetry(pass.audio_url, 3).catch((audioErr) => {
           console.warn(
@@ -6561,14 +6627,14 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const finalPeakDbFs = Number(finalAudioDiag?.wav?.peakDbFs);
     const finalVoicedSec = Number(finalAudioDiag?.vad?.voicedSec ?? 0);
     const finalLongestRun = Number(finalAudioDiag?.vad?.longestVoicedRun ?? 0);
-    const audioSilentOrInvalid = !isStabilizerPass && (
+    const audioSilentOrInvalid = !isStabilizer && (
       !finalAudioDiag ||
       !Number.isFinite(finalPeakDbFs) ||
       finalPeakDbFs <= -50 ||
       finalVoicedSec <= 0.04 ||
       finalLongestRun <= 0.04
     );
-    if (isStabilizerPass) {
+    if (isStabilizer) {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v194_stabilizer_bypass_silent_gate speaker_idx=${(pass as any).speaker_idx}`,
       );
