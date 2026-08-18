@@ -272,9 +272,26 @@ function defaultRenderStill(): RenderStillFn {
     const bytes = new Uint8Array(await dl.arrayBuffer());
     if (bytes.byteLength < 1024) throw new Error("still_too_small");
     return bytes;
-
   };
 }
+
+/**
+ * Combines the run-scoped root signal with the remaining-budget timeout, so a
+ * single request can never outlive the global measurement deadline.
+ */
+function linkedSignal(budget: MeasurementBudget, remainingMs: number): AbortSignal {
+  const anySignal = (AbortSignal as unknown as { any?: (s: AbortSignal[]) => AbortSignal }).any;
+  const timeoutSignal = AbortSignal.timeout(Math.max(1, remainingMs));
+  if (typeof anySignal === "function") return anySignal([budget.signal, timeoutSignal]);
+  const c = new AbortController();
+  const abort = () => c.abort(new Error("measurement_deadline_exceeded"));
+  if (budget.signal.aborted || timeoutSignal.aborted) abort();
+  budget.signal.addEventListener("abort", abort, { once: true });
+  timeoutSignal.addEventListener("abort", abort, { once: true });
+  return c.signal;
+}
+
+
 
 function unmeasurable(reason: string): MeasureProviderMotionSyncResult {
   return {
