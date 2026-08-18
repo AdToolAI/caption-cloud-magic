@@ -4543,7 +4543,14 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             !!(p as any).noop_retry_attempt_id &&
             Number((p as any).noop_escalation_step ?? 0) > 0 &&
             p.status === "pending";
-          if (isTerminal && !inActiveNoopRetry) {
+          // v405 P1-A — an active NOOP retry is FROZEN: the replacement
+          // attempt must reuse the EXACT same preclip / audio / Contract-E
+          // box. A coords refresh here would null the preclip fields (below)
+          // and, because `v161PreclipEligible` never re-renders on a NOOP
+          // escalation, the retry would die on the v204 preclip guard.
+          // The preservation decision therefore runs BEFORE any invalidation.
+          if (isFrozenNoopRetryPass(p as any) || (isTerminal && !inActiveNoopRetry)) {
+            const frozenNoopRetry = isFrozenNoopRetryPass(p as any);
             (p as any).candidate_coords = [freshCoord[0], freshCoord[1]];
             (p as any).candidate_coords_at = new Date().toISOString();
             (p as any).candidate_coords_source = freshSource;
@@ -4553,9 +4560,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
                 user_id: userId,
                 engine: "sync-segments",
                 sync_status: "COORD_REFRESH_SKIPPED",
-                error_class: "coord_refresh_terminal_blocked",
+                error_class: frozenNoopRetry
+                  ? "coord_refresh_noop_retry_preserved"
+                  : "coord_refresh_terminal_blocked",
                 meta: {
-                  v128_guard: true,
+                  v128_guard: !frozenNoopRetry,
+                  v405_noop_retry_preserved: frozenNoopRetry,
                   pass_idx: p.idx,
                   speaker_idx: idx,
                   speaker_name: p.speaker_name,
@@ -4563,22 +4573,18 @@ serve((req: Request) => withLang(req, () => (async (req) => {
                   new_coord: [freshCoord[0], freshCoord[1]],
                   source: freshSource,
                   terminal_status: p.status,
+                  noop_escalation_step: (p as any).noop_escalation_step ?? null,
                   dispatch_source: "coord-refresh-skipped",
                 },
               });
             } catch { /* best-effort */ }
             console.warn(
-              `[compose-dialog-segments] scene=${sceneId} v128 COORD-REFRESH-SKIPPED ` +
-              `pass=${p.idx} speaker=${p.speaker_name} status=${p.status} (terminal, candidate stored)`,
+              `[compose-dialog-segments] scene=${sceneId} ${frozenNoopRetry ? "v405 COORD-REFRESH-SKIPPED (noop retry frozen)" : "v128 COORD-REFRESH-SKIPPED"} ` +
+              `pass=${p.idx} speaker=${p.speaker_name} status=${p.status} (candidate stored, preclip preserved)`,
             );
             continue;
           }
-          if (inActiveNoopRetry) {
-            console.log(
-              `[compose-dialog-segments] scene=${sceneId} v134 COORD-REFRESH-ALLOWED (active NOOP retry) ` +
-              `pass=${p.idx} speaker=${p.speaker_name} step=${(p as any).noop_escalation_step} old=${JSON.stringify(oldCoord)} new=${JSON.stringify([freshCoord[0], freshCoord[1]])}`,
-            );
-          }
+
           // Non-terminal: legacy v123 stale-preclip invalidation path.
           (p as any).preclip_url = null;
           (p as any).preclip_crop = null;
