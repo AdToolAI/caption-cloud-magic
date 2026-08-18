@@ -107,6 +107,9 @@ import {
   buildAsdStrategy,
   type PreflightFaceResult,
 } from "../_shared/asd-strategy.ts";
+// FA-4 v404 §9 — NOOP-Retry darf den Preclip nie entfernen (v148/v204).
+import { shouldPreserveNoopRetryPreclip } from "../_shared/noop-retry-preclip.ts";
+
 import {
   ensureDialogTurnsForScene,
   orderedSpeakerIdsFromTurns,
@@ -142,7 +145,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v402-fa4-face-candidate-geometry-fix";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v404-fa4-noop-retry-preclip-preservation";
 
 // v249 — Slice A: surface v247 mouth-anchor preclip metrics as top-level columns
 // on `syncso_dispatch_log` so v248-Slice-4 ladder in `report-lipsync-motion-probe`
@@ -4861,30 +4864,26 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       );
     }
 
-    // ── v148 — NOOP-Eskalation bypassed Rule 0 (Preclip-Auto-Detect) ─────
-    // sync-so-webhook eskaliert NOOPs via v134-Ladder mit explizitem
-    // Variant (bbox-url-pro → coords-pro-box). Wenn ein Preclip existiert,
-    // greift jedoch Rule 0 (v131.2 auto_detect_unconditional_on_preclip) und
-    // kollabiert den Dispatch wieder auf `auto_detect` — die exakt selbe
-    // ASD-Shape, die gerade NOOP'd hat. Resultat: 2 identische Dispatches,
-    // Ladder erschöpft, Hard-Fail.
-    //
-    // Fix: Bei einer NOOP-Eskalation mit deterministischem Variant droppen
-    // wir den per-Pass Preclip lokal (analog v120), damit der Full-Plate
-    // bbox-url-pro / coords-pro-box Pfad greift. Rule 0 wird so für genau
-    // diesen eskalierten Pass übergangen, nicht generell.
-    const v148NoopBypassEligible =
-      body?.noop_auto_escalation === true &&
-      (requestedRetryVariant === "bbox-url-pro" || requestedRetryVariant === "coords-pro-box") &&
-      !!(pass as any).preclip_url;
-    if (v148NoopBypassEligible) {
-      (pass as any).preclip_url = null;
-      (pass as any).preclip_render_id = null;
-      (pass as any).preclip_crop = null;
-      console.warn(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v148_noop_bypass_preclip step=${body?.noop_escalation_step ?? "?"} variant=${requestedRetryVariant} speaker=${pass.speaker_name ?? "?"} — dropping preclip to allow full-plate deterministic ASD`,
+    // ── v404 §9 — v148/v204 Preclip-Konflikt geschlossen ─────────────────
+    // v148 droppte bei `noop_auto_escalation` den per-Pass Preclip, damit der
+    // Full-Plate-Pfad greift. Der frozen v404 NOOP-Retry-Wire verlangt aber
+    // EXAKT denselben Single-Face-Preclip, dasselbe Audio und dieselbe
+    // Contract-E-Box — der einzige fachliche Unterschied ist
+    // `bounding_boxes_url` → inline `bounding_boxes`. Ein Preclip-Drop würde
+    // zudem den v204 Multi-Speaker-Preclip-Guard fail-closed auslösen.
+    // Deshalb bleibt der Preclip bei NOOP-Eskalation unangetastet.
+    if (
+      shouldPreserveNoopRetryPreclip({
+        noopAutoEscalation: body?.noop_auto_escalation === true,
+        requestedRetryVariant,
+        hasPreclipUrl: !!(pass as any).preclip_url,
+      })
+    ) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v404_noop_retry_preclip_preserved step=${body?.noop_escalation_step ?? "?"} variant=${requestedRetryVariant} speaker=${pass.speaker_name ?? "?"} preclip=${(pass as any).preclip_url ? "kept" : "none"}`,
       );
     }
+
 
     // ── v153.1 — Single-Path bbox-url-pro Pipeline (N=1..4 einheitlich) ──
     // PRECLIP IS DEAD. Es gibt nur noch einen einzigen Dispatch-Pfad:

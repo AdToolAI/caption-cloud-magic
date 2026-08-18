@@ -1,22 +1,32 @@
 /**
- * FA-4 Provider-No-op Fix Contract — Motion Probe Classifier (v403)
+ * FA-4 v404 — Motion Probe Classifier (PURE)
  * ------------------------------------------------------------------
  * PURE function. No DB access, no side effects, no Ledger touch.
  *
- * Input:  motion metrics for the exact Provider-Input-Preclip and the
- *         exact Provider-Output (both produced by the same mouth-band
- *         variance algorithm).
- * Output: motion | noop | indeterminate + measurements + reason.
+ * Authoritative scalar (frozen, FA-4 MOTION METRIC RE-SELECTION):
  *
- * The classifier is intentionally conservative around the frozen S11
- * fixture.  It never classifies on HTTP status, file size, ETag or
- * resolution alone — those remain supplementary evidence only.
+ *   deltaMean = provider.mean - preclip.mean
+ *
+ * `peak` / `deltaPeak` remain TELEMETRY ONLY. The v403 Δpeak rule is
+ * withdrawn: the calibration sweep proved Δpeak does not separate the
+ * frozen S11 labels at any N (p4/T3 motion is negative, p3/T6 noop is
+ * positive), while ΔMean separates cleanly at N = 6, 8, 10 and 12.
+ *
+ * Thresholds are derived from the full-precision N = 6 calibration run
+ * (gap/4 rule) and are hard-frozen — no rounding in code, no zero
+ * heuristic, no speaker-specific rule:
+ *
+ *   server_delta_min_motion = 21.267221764950364   (p1/T5)
+ *   server_delta_max_noop   = -2.1788457676476156  (p5/T4)
+ *   gapMean                 = 23.44606753259798
+ *   MOTION_THRESHOLD        = 15.405704881800869
+ *   NOOP_THRESHOLD          = 3.682671115501879
  */
 
 export interface MotionMetric {
-  /** Mean mouth-band motion energy (normalised, >= 0). */
+  /** Mean mouth-band temporal luma variance (>= 0). AUTHORITATIVE. */
   mean: number;
-  /** Peak mouth-band motion energy (normalised, >= 0). */
+  /** Peak mouth-band temporal luma variance (>= 0). TELEMETRY ONLY. */
   peak: number;
   /** Number of sampled frames (diagnostic only). */
   frames?: number;
@@ -27,7 +37,7 @@ export interface MotionMetric {
 export interface MotionProbeInput {
   preclip: MotionMetric;
   provider: MotionMetric;
-  /** Optional supplementary signals; never the sole basis for a decision. */
+  /** Optional supplementary signals; never the basis for a decision. */
   supplementary?: {
     syncOutputUnchanged?: boolean;
     syncOutputResolutionRegression?: boolean;
@@ -48,122 +58,104 @@ export interface MotionProbeResult {
   reason: string;
 }
 
-/**
- * Frozen S11 fixture (from RCA run 8b0f659d…, Scene e658509d…).
- *
- * The binding sensitivity anchor is T2 (Δpeak = +0.13) versus the strongest
- * noop case p3/T6 (Δpeak = -0.07).  A threshold must leave a documented
- * margin between these two values.
- *
- * | Pass | Turn       | Pre (mean/peak) | Provider (mean/peak) | Δpeak | Expected |
- * | p0   | T1 Sarah   | 1.076 / 2.907   | 1.157 / 3.768          | +0.86 | motion   |
- * | p1   | T5 Sarah   | 0.635 / 1.981   | 0.717 / 2.953          | +0.97 | motion   |
- * | p2   | T2 Samuel  | 0.328 / 0.886   | 0.340 / 1.019          | +0.13 | motion   |
- * | p3   | T6 Samuel  | 0.355 / 0.936   | 0.356 / 0.864          | -0.07 | noop     |
- * | p4   | T3 Matthew | 0.329 / 1.073   | 0.357 / 2.213          | +1.14 | motion   |
- * | p5   | T4 Kay     | 0.307 / 0.836   | 0.292 / 0.688          | -0.15 | noop     |
- */
-
-// Sensitivity margin: halfway between the weakest motion case (+0.13)
-// and the strongest noop case (-0.07).  This is the documented gap that
-// separates the frozen fixture classes.
-const MOTION_NOOP_GAP = 0.13 - (-0.07); // 0.20
-const MOTION_THRESHOLD = 0.13 - MOTION_NOOP_GAP / 4; // +0.08
-const NOOP_THRESHOLD = -0.07 + MOTION_NOOP_GAP / 4;  // -0.02
+export const MOTION_THRESHOLD = 15.405704881800869;
+export const NOOP_THRESHOLD = 3.682671115501879;
 
 export function classifyMotionProbe(input: MotionProbeInput): MotionProbeResult {
   const pre = input.preclip;
   const prov = input.provider;
 
-  const preclipMean = Number.isFinite(pre.mean) ? pre.mean : 0;
-  const preclipPeak = Number.isFinite(pre.peak) ? pre.peak : 0;
-  const providerMean = Number.isFinite(prov.mean) ? prov.mean : 0;
-  const providerPeak = Number.isFinite(prov.peak) ? prov.peak : 0;
+  const preclipMean = Number.isFinite(pre?.mean) ? pre.mean : 0;
+  const preclipPeak = Number.isFinite(pre?.peak) ? pre.peak : 0;
+  const providerMean = Number.isFinite(prov?.mean) ? prov.mean : 0;
+  const providerPeak = Number.isFinite(prov?.peak) ? prov.peak : 0;
 
   const deltaMean = providerMean - preclipMean;
   const deltaPeak = providerPeak - preclipPeak;
 
-  // Sanity: both inputs must be valid, non-negative motion metrics.
-  const inputsValid =
+  const inputsValid = !!pre && !!prov &&
     Number.isFinite(pre.mean) &&
     Number.isFinite(pre.peak) &&
     Number.isFinite(prov.mean) &&
     Number.isFinite(prov.peak) &&
+    pre.mean >= 0 &&
+    prov.mean >= 0 &&
     pre.peak >= 0 &&
     prov.peak >= 0;
 
+  const base = { deltaMean, deltaPeak, preclipMean, preclipPeak, providerMean, providerPeak };
+
   if (!inputsValid) {
-    return {
-      verdict: "indeterminate",
-      deltaMean,
-      deltaPeak,
-      preclipMean,
-      preclipPeak,
-      providerMean,
-      providerPeak,
-      reason: "motion_probe_indeterminate:invalid_metric",
-    };
+    return { ...base, verdict: "indeterminate", reason: "motion_probe_indeterminate:invalid_metric" };
   }
 
-  // Primary rule: Δpeak must show a clear increase (motion) or decrease/no-gain
-  // (noop).  The gap between +0.08 and -0.02 is the indeterminate band.
-  if (deltaPeak > MOTION_THRESHOLD) {
+  if (deltaMean > MOTION_THRESHOLD) {
     return {
+      ...base,
       verdict: "motion",
-      deltaMean,
-      deltaPeak,
-      preclipMean,
-      preclipPeak,
-      providerMean,
-      providerPeak,
-      reason: `motion:delta_peak=${deltaPeak.toFixed(4)}>motion_threshold=${MOTION_THRESHOLD.toFixed(4)}`,
+      reason: `motion:delta_mean=${deltaMean}>motion_threshold=${MOTION_THRESHOLD}`,
     };
   }
 
-  if (deltaPeak <= NOOP_THRESHOLD) {
+  if (deltaMean <= NOOP_THRESHOLD) {
     return {
+      ...base,
       verdict: "noop",
-      deltaMean,
-      deltaPeak,
-      preclipMean,
-      preclipPeak,
-      providerMean,
-      providerPeak,
-      reason: `noop:delta_peak=${deltaPeak.toFixed(4)}<=noop_threshold=${NOOP_THRESHOLD.toFixed(4)}`,
+      reason: `noop:delta_mean=${deltaMean}<=noop_threshold=${NOOP_THRESHOLD}`,
     };
   }
 
-  // Indeterminate band: the motion change is too close to the noise floor
-  // to make a fail-open decision.  Fail closed.
   return {
+    ...base,
     verdict: "indeterminate",
-    deltaMean,
-    deltaPeak,
-    preclipMean,
-    preclipPeak,
-    providerMean,
-    providerPeak,
-    reason: `indeterminate:delta_peak=${deltaPeak.toFixed(4)} between noop_threshold=${NOOP_THRESHOLD.toFixed(4)} and motion_threshold=${MOTION_THRESHOLD.toFixed(4)}`,
+    reason:
+      `motion_probe_indeterminate:delta_mean=${deltaMean} between noop_threshold=${NOOP_THRESHOLD} and motion_threshold=${MOTION_THRESHOLD}`,
   };
 }
 
 /**
- * Convenience: frozen S11 fixture as a test harness.  Returns the expected
- * classification for each pass index p0..p5.
+ * Frozen S11 measurement fixture — full-precision N = 6 server calibration
+ * values (scripts/calibration/fa4-v404-sweep-report.json, run 8b0f659d…,
+ * scene e658509d…). ROI for every asset: bx=461 by=411 bw=358 bh=154.
  */
 export function getS11FrozenFixture(): Array<{
   passIdx: number;
   turn: string;
+  speaker: string;
   preclip: MotionMetric;
   provider: MotionMetric;
   expected: MotionVerdict;
 }> {
   return [
-    { passIdx: 0, turn: "T1 Sarah", preclip: { mean: 1.076, peak: 2.907 }, provider: { mean: 1.157, peak: 3.768 }, expected: "motion" },
-    { passIdx: 1, turn: "T5 Sarah", preclip: { mean: 0.635, peak: 1.981 }, provider: { mean: 0.717, peak: 2.953 }, expected: "motion" },
-    { passIdx: 2, turn: "T2 Samuel", preclip: { mean: 0.328, peak: 0.886 }, provider: { mean: 0.340, peak: 1.019 }, expected: "motion" },
-    { passIdx: 3, turn: "T6 Samuel", preclip: { mean: 0.355, peak: 0.936 }, provider: { mean: 0.356, peak: 0.864 }, expected: "noop" },
-    { passIdx: 4, turn: "T3 Matthew", preclip: { mean: 0.329, peak: 1.073 }, provider: { mean: 0.357, peak: 2.213 }, expected: "motion" },
-    { passIdx: 5, turn: "T4 Kay", preclip: { mean: 0.307, peak: 0.836 }, provider: { mean: 0.292, peak: 0.688 }, expected: "noop" },
+    {
+      passIdx: 0, turn: "T1", speaker: "Sarah Dusatko", expected: "motion",
+      preclip: { mean: 161.4640145256557, peak: 8797.595820249995 },
+      provider: { mean: 297.43606692826916, peak: 14683.017102249998 },
+    },
+    {
+      passIdx: 1, turn: "T5", speaker: "Sarah Dusatko", expected: "motion",
+      preclip: { mean: 187.99165791958958, peak: 7401.6197337777785 },
+      provider: { mean: 209.25887968453995, peak: 9656.042980027773 },
+    },
+    {
+      passIdx: 2, turn: "T2", speaker: "Samuel Dusatko", expected: "motion",
+      preclip: { mean: 50.96659481748442, peak: 4402.322500000001 },
+      provider: { mean: 100.99510151406523, peak: 7169.770950250001 },
+    },
+    {
+      passIdx: 3, turn: "T6", speaker: "Samuel Dusatko", expected: "noop",
+      preclip: { mean: 47.708638094135566, peak: 5436.850224999997 },
+      provider: { mean: 42.490909239192135, peak: 5485.402032249998 },
+    },
+    {
+      passIdx: 4, turn: "T3", speaker: "Matthew Dusatko", expected: "motion",
+      preclip: { mean: 168.78734640928786, peak: 16408.79871002778 },
+      provider: { mean: 220.67172708891837, peak: 16025.618858777772 },
+    },
+    {
+      passIdx: 5, turn: "T4", speaker: "Kay Mark", expected: "noop",
+      preclip: { mean: 22.148069293884582, peak: 4442.5779737777775 },
+      provider: { mean: 19.969223526236966, peak: 2745.6202684444434 },
+    },
   ];
 }
