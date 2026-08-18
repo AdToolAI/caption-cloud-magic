@@ -1,30 +1,22 @@
 /**
- * v248 — report-lipsync-motion-probe (Slice 3 + Slice 4)
+ * v403 — report-lipsync-motion-probe
  * ------------------------------------------------------------------
  * Client (computeMouthYavg) posts here after a lipsync pass completes.
  *
- * Slice 3: persist yavg to `syncso_dispatch_log` + flag pass with
- *          `motion_noop=true` when below threshold.
+ * This function is a PURE measurement helper. It persists mouth-band
+ * motion metrics to `syncso_dispatch_log.meta_yavg_probe` and marks the
+ * pass as probed (`yavg_probed_at`). It does NOT own retry decisions,
+ * hard-fail states, or scene mutations.
  *
- * Slice 4 (NEW): when motion-noop is detected, plug into the existing
- *          v134/v150 NOOP ladder used by `sync-so-webhook`:
- *            - if escalation slot available (step < NOOP_LADDER.length,
- *              plate coords + preclip crop present) → reset the pass to
- *              `pending`, bump `noop_escalation_step`, set
- *              `retry_variant = 'coords-pro-box'`, and fire the same
- *              re-dispatch call to `compose-dialog-segments`.
- *            - else → hard-fail the pass with
- *              `sync_noop_unrecoverable`, mark the scene
- *              `needs_clip_rerender`, log NOOP_LADDER_EXHAUSTED. The
- *              existing failure-credit-refund automation
- *              (mem: architecture/failure-credit-refund-automation) picks
- *              this up.
+ * The authoritative motion/noop/indeterminate verdict lives in
+ * `sync-so-webhook` (multi-speaker classifier, FA-4 Provider-No-op
+ * Fix Contract C′) or the existing byte-based single-speaker gate.
  *
  * Auth: user JWT (scene must belong to the caller's project).
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { tl, withLang } from "../_shared/i18n.ts";
+import { withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -33,21 +25,12 @@ const corsHeaders = {
 
 const YAVG_NOOP_THRESHOLD = 4.0;
 
-// v249 Slice C: face-share-aware ladder. When the persisted
-// `preclip_face_share` is below SMALL_FACE_THRESHOLD we suspect the mouth
-// region is too small for Sync.so to lock onto — try a mouth-anchored
-// re-zoom preclip first, before falling back to the sync-3 bounding-box ASD
-// rung. Above threshold, the classic `coords-pro-box` rung (v150) stays as
-// the first rung so we don't waste an extra provider call on a preclip that
-// is already correctly framed.
-const SMALL_FACE_THRESHOLD = 0.30;
-const LADDER_SMALL_FACE: Array<{ step: number; variant: string; label: string }> = [
-  { step: 0, variant: "mouth-anchored-zoom", label: "mouth-anchored re-zoom preclip (v247)" },
-  { step: 1, variant: "coords-pro-box", label: "bounding-box ASD (sync-3)" },
-];
-const LADDER_NORMAL_FACE: Array<{ step: number; variant: string; label: string }> = [
-  { step: 0, variant: "coords-pro-box", label: "bounding-box ASD (sync-3)" },
-];
+interface MotionMetricPayload {
+  mean: number;
+  peak: number;
+  frames?: number;
+  method?: string;
+}
 
 interface Payload {
   scene_id: string;
@@ -57,6 +40,15 @@ interface Payload {
   yavg_normalized?: number;
   frames?: number;
   method?: string;
+  // v403 — paired motion metrics for the multi-speaker classifier.
+  preclip_metric?: MotionMetricPayload;
+  provider_metric?: MotionMetricPayload;
+}
+
+function isMotionMetric(x: unknown): x is MotionMetricPayload {
+  if (!x || typeof x !== "object") return false;
+  const m = x as Record<string, unknown>;
+  return typeof m.mean === "number" && typeof m.peak === "number";
 }
 
 function isPayload(x: unknown): x is Payload {
@@ -64,7 +56,9 @@ function isPayload(x: unknown): x is Payload {
   const p = x as Record<string, unknown>;
   return typeof p.scene_id === "string" &&
     typeof p.pass_idx === "number" &&
-    typeof p.yavg === "number";
+    typeof p.yavg === "number" &&
+    (p.preclip_metric === undefined || isMotionMetric(p.preclip_metric)) &&
+    (p.provider_metric === undefined || isMotionMetric(p.provider_metric));
 }
 
 Deno.serve((req: Request) => withLang(req, () => (async (req) => {
@@ -110,21 +104,29 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
     const isNoop = body.yavg < YAVG_NOOP_THRESHOLD;
     const nowIso = new Date().toISOString();
 
+    // v403 — Build paired motion metrics when available, otherwise fall back
+    // to the legacy single-metric shape.
+    const metaYavgProbe: Record<string, unknown> = {
+      yavg: body.yavg,
+      yavg_normalized: body.yavg_normalized ?? null,
+      frames: body.frames ?? null,
+      method: body.method ?? "canvas-mouth-band-v248",
+      is_noop: isNoop,
+      threshold: YAVG_NOOP_THRESHOLD,
+      reported_at: nowIso,
+    };
+    if (isMotionMetric(body.preclip_metric) && isMotionMetric(body.provider_metric)) {
+      metaYavgProbe.preclip_metric = body.preclip_metric;
+      metaYavgProbe.provider_metric = body.provider_metric;
+    }
+
     // Persist metric to dispatch log (best-effort, latest row for this job/pass).
     try {
       const query = admin
         .from("syncso_dispatch_log")
         .update({
           noop_mouth_yavg: body.yavg,
-          meta_yavg_probe: {
-            yavg: body.yavg,
-            yavg_normalized: body.yavg_normalized ?? null,
-            frames: body.frames ?? null,
-            method: body.method ?? "canvas-mouth-band-v248",
-            is_noop: isNoop,
-            threshold: YAVG_NOOP_THRESHOLD,
-            reported_at: nowIso,
-          },
+          meta_yavg_probe: metaYavgProbe,
         })
         .eq("scene_id", body.scene_id);
       if (body.job_id) await query.eq("job_id", body.job_id);
@@ -164,7 +166,6 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       return json({ ok: true, ignored: "job_slot_mismatch" });
     }
 
-
     try {
       await admin.rpc("update_dialog_pass_slot", {
         _scene_id: body.scene_id,
@@ -172,244 +173,26 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
         _patch: {
           yavg_probed_at: nowIso,
           yavg_value: body.yavg,
-          ...(isNoop ? { motion_noop: true, motion_noop_yavg: body.yavg, motion_noop_reported_at: nowIso } : {}),
         },
       });
     } catch (e) {
       console.warn(`[report-lipsync-motion-probe] pass probe patch failed: ${(e as Error).message}`);
     }
 
-    if (!isNoop) {
-      console.log(
-        `[report-lipsync-motion-probe] v248 scene=${body.scene_id} pass=${body.pass_idx} yavg=${body.yavg.toFixed(3)} OK`,
-      );
-      return json({ ok: true, is_noop: false, threshold: YAVG_NOOP_THRESHOLD, run_id: passRunId, plate_generation: passPlateGeneration });
-    }
-
-    console.warn(
-      `[report-lipsync-motion-probe] v248 scene=${body.scene_id} pass=${body.pass_idx} yavg=${body.yavg.toFixed(3)} → MOTION_NOOP (slice-4 escalation)`,
+    // v403 — report-lipsync-motion-probe is a pure measurement helper.
+    // The authoritative motion/noop/indeterminate verdict and any retry
+    // decision live in sync-so-webhook (multi-speaker classifier) or the
+    // existing byte-based single-speaker gate. We do NOT mutate scene state
+    // or fire redispatches from here.
+    console.log(
+      `[report-lipsync-motion-probe] v403 scene=${body.scene_id} pass=${body.pass_idx} yavg=${body.yavg.toFixed(3)} metrics_persisted`,
     );
-
-    // ---------- Slice 4: NOOP-Ladder escalation ----------
-    const passSpeakerName = String(pass.speaker_name ?? "Speaker");
-    const passTurnIdx = Number(pass.idx ?? body.pass_idx);
-    const noopEscalationStep = Number(pass.noop_escalation_step ?? 0);
-    const havePlateCoords = Array.isArray(pass.coords) &&
-      (pass.coords as unknown[]).length === 2;
-    const havePreclipCrop = !!pass.preclip_crop &&
-      Number.isFinite(Number((pass.preclip_crop as { size?: number }).size));
-    const haveReferenceFrame = Number.isFinite(Number(pass.reference_frame_number));
-    const faceShare = Number((pass as any).preclip_face_share);
-    const NOOP_LADDER = Number.isFinite(faceShare) && faceShare < SMALL_FACE_THRESHOLD
-      ? LADDER_SMALL_FACE
-      : LADDER_NORMAL_FACE;
-    const nextRung = NOOP_LADDER.find((r) => r.step === noopEscalationStep);
-    const canEscalate = !!nextRung && havePlateCoords && havePreclipCrop && haveReferenceFrame;
-
-    const jobId = body.job_id ?? String(pass.job_id ?? "") ?? null;
-
-    if (canEscalate && nextRung) {
-      const newAttemptId = crypto.randomUUID();
-      const nextStep = nextRung.step + 1;
-      const noopReason = "sync_output_motion_noop_yavg";
-
-      const prevHistory = Array.isArray(pass.retry_history)
-        ? (pass.retry_history as unknown[]).slice(-7)
-        : [];
-      const newRetryEntry = {
-        ts: nowIso,
-        reason: "yavg_below_threshold",
-        from_variant: pass.retry_variant ?? null,
-        to_variant: nextRung.variant,
-        step: nextStep,
-        noop_reason: noopReason,
-        yavg: body.yavg,
-      };
-
-      try {
-        await admin.rpc("update_dialog_pass_slot", {
-          _scene_id: body.scene_id,
-          _pass_idx: body.pass_idx,
-          _patch: {
-            status: "pending",
-            job_id: null,
-            pipeline_job_id: null,
-            output_url: null,
-            finished_at: null,
-            retry_variant: nextRung.variant,
-            noop_escalation_step: nextStep,
-            noop_retry_attempted: true,
-            noop_retry_attempt_id: newAttemptId,
-            noop_retry_reason: noopReason,
-            previous_noop_output_url: pass.output_url ?? null,
-            retry_history: [...prevHistory, newRetryEntry],
-          },
-        });
-      } catch (e) {
-        console.warn(`[report-lipsync-motion-probe] escalation patch failed: ${(e as Error).message}`);
-      }
-
-      await logDispatch(admin, {
-        scene_id: body.scene_id,
-        job_id: jobId,
-        turn_idx: passTurnIdx,
-        sync_status: "NOOP_ESCALATING",
-        error_class: "sync_completed_noop",
-        meta: {
-          v248_slice4_yavg: true,
-          pass_idx: body.pass_idx,
-          speaker_name: passSpeakerName,
-          noop_escalation_step: nextStep,
-          from_variant: pass.retry_variant ?? null,
-          to_variant: nextRung.variant,
-          rung_label: nextRung.label,
-          noop_reason: noopReason,
-          yavg: body.yavg,
-          attempt_id: newAttemptId,
-        },
-      });
-
-      // Fire-and-forget re-dispatch with the same shape sync-so-webhook uses.
-      try {
-        fetch(`${url}/functions/v1/compose-dialog-segments`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${service}` },
-          body: JSON.stringify({
-            scene_id: body.scene_id,
-            retry: true,
-            pass_idx: body.pass_idx,
-            retry_variant: nextRung.variant,
-            user_retry_flag: true,
-            new_attempt_id: newAttemptId,
-            credit_charge_result: "skip",
-            noop_auto_escalation: true,
-            noop_escalation_step: nextStep,
-          }),
-        }).catch((e) => console.warn(`[report-lipsync-motion-probe] redispatch fetch failed: ${(e as Error).message}`));
-      } catch (e) {
-        console.warn(`[report-lipsync-motion-probe] redispatch dispatch failed: ${(e as Error).message}`);
-      }
-
-      console.warn(
-        `[report-lipsync-motion-probe] v248_slice4 scene=${body.scene_id} pass=${body.pass_idx} → escalating step=${nextStep} variant=${nextRung.variant}`,
-      );
-      return json({ ok: true, is_noop: true, escalated: true, step: nextStep, variant: nextRung.variant, run_id: passRunId, plate_generation: passPlateGeneration });
-    }
-
-    // Ladder exhausted → hard fail + needs_clip_rerender (refund automation picks it up).
-    const noopReasonHard = "sync_output_motion_noop_yavg_unrecoverable";
-    try {
-      await admin.rpc("update_dialog_pass_slot", {
-        _scene_id: body.scene_id,
-        _pass_idx: body.pass_idx,
-        _patch: {
-          status: "failed",
-          job_id: null,
-          pipeline_job_id: null,
-          finished_at: nowIso,
-          error: "sync_noop_unrecoverable",
-          last_error: "sync_noop_unrecoverable",
-          last_error_class: "sync_noop_unrecoverable",
-          noop_escalation_step: noopEscalationStep,
-          noop_reason: noopReasonHard,
-        },
-      });
-    } catch (e) {
-      console.warn(`[report-lipsync-motion-probe] hard-fail patch failed: ${(e as Error).message}`);
-    }
-
-    const turnStart = Number(
-      (Array.isArray(pass.segments) && (pass.segments as Array<{ startTime?: number }>)[0]?.startTime) ?? 0,
-    ).toFixed(1);
-    const turnEnd = Number(
-      (Array.isArray(pass.segments) && (pass.segments as Array<{ endTime?: number }>)[0]?.endTime) ?? 0,
-    ).toFixed(1);
-    const userMsg = tl({ de: `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) konnte nach ${NOOP_LADDER.length + 1} Versuchen nicht erzeugt werden. Bitte Plate neu rendern.`, en: `Lip-sync for ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) could not be generated after ${NOOP_LADDER.length + 1} attempts. Please re-render plate.`, es: `La sincronización labial para ${passSpeakerName} (Turno ${turnStart}s–${turnEnd}s) no pudo generarse después de ${NOOP_LADDER.length + 1} intentos. Por favor, vuelve a renderizar la placa.` });
-
-    // v431 G2.2 — kanonischer State + Substate + Legacy-Spiegel atomar unter
-    // demselben Row Lock mit Run-/Generations-Guard. Fehlt der Slot-Snapshot,
-    // wird die Szene gar nicht angefasst (fail-closed, kein Legacy-Fallback).
-    if (typeof passRunId !== "string" || typeof passPlateGeneration !== "number") {
-      console.warn(
-        `[report-lipsync-motion-probe] v431_g2_2 write=hard-fail scene=${body.scene_id} ` +
-          `pass=${body.pass_idx} result=missing_run_provenance`,
-      );
-    } else {
-      const { data: failRes, error: failErr } = await admin.rpc("composer_fail_scene_with_mirrors", {
-        _scene_id: body.scene_id,
-        _run_id: passRunId,
-        _generation: passPlateGeneration,
-        _write_id: "motion_probe_noop_unrecoverable",
-        _error_text: userMsg,
-        _substate: "needs_clip_rerender",
-        _lip_sync_status: "failed",
-        _twoshot_stage: "needs_clip_rerender",
-      });
-      const fr = (failRes ?? {}) as { applied?: boolean; reason?: string };
-      console.log(
-        `[report-lipsync-motion-probe] v431_g2_2 write=hard-fail scene=${body.scene_id} pass=${body.pass_idx} ` +
-          `run=${passRunId} gen=${passPlateGeneration} ` +
-          `result=${failErr ? `rpc_error:${failErr.message}` : (fr.applied ? "applied" : (fr.reason ?? "not_applied"))}`,
-      );
-    }
-
-
-    await logDispatch(admin, {
-      scene_id: body.scene_id,
-      job_id: jobId,
-      turn_idx: passTurnIdx,
-      sync_status: "NOOP_LADDER_EXHAUSTED",
-      error_class: "sync_noop_unrecoverable",
-      error_message: userMsg,
-      meta: {
-        v248_slice4_yavg: true,
-        pass_idx: body.pass_idx,
-        speaker_name: passSpeakerName,
-        noop_escalation_step: noopEscalationStep,
-        noop_reason: noopReasonHard,
-        ladder_size: NOOP_LADDER.length,
-        previous_noop_output_url: pass.output_url ?? null,
-        yavg: body.yavg,
-      },
-    });
-
-    console.error(
-      `[report-lipsync-motion-probe] v248_slice4 scene=${body.scene_id} pass=${body.pass_idx} speaker="${passSpeakerName}" NOOP-LADDER-EXHAUSTED → hard-fail`,
-    );
-
-    return json({ ok: true, is_noop: true, escalated: false, hard_failed: true, run_id: passRunId, plate_generation: passPlateGeneration });
+    return json({ ok: true, is_noop: isNoop, threshold: YAVG_NOOP_THRESHOLD, run_id: passRunId, plate_generation: passPlateGeneration });
   } catch (e) {
     console.error(`[report-lipsync-motion-probe] error: ${(e as Error).message}`);
     return json({ error: "internal", message: (e as Error).message }, 500);
   }
 })(req)));
-
-interface DispatchLog {
-  scene_id: string;
-  job_id?: string | null;
-  turn_idx?: number;
-  sync_status: string;
-  error_class?: string;
-  error_message?: string;
-  meta?: Record<string, unknown>;
-}
-
-async function logDispatch(admin: ReturnType<typeof createClient>, row: DispatchLog) {
-  try {
-    await admin.from("syncso_dispatch_log").insert({
-      scene_id: row.scene_id,
-      engine: "sync-segments",
-      job_id: row.job_id ?? null,
-      turn_idx: row.turn_idx ?? null,
-      sync_status: row.sync_status,
-      error_class: row.error_class ?? null,
-      error_message: row.error_message ?? null,
-      meta: row.meta ?? {},
-    });
-  } catch (e) {
-    console.warn(`[report-lipsync-motion-probe] logDispatch failed: ${(e as Error).message}`);
-  }
-}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

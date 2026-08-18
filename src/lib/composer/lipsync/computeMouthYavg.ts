@@ -1,14 +1,18 @@
 /**
- * v248 — Client-side Mouth-Band YAVG Probe
+ * v403 — Client-side Mouth-Band Motion Probe
  * ------------------------------------------------------------------
  * After a Sync.so lipsync pass completes, we sample N evenly-spaced
- * frames from the muxed output video and compute the temporal
- * luminance variance in the MOUTH BAND (a horizontal strip around
- * the speaker's mouth landmark).
+ * frames from the Provider-Input-Preclip and the Provider-Output and
+ * compute the temporal luminance variance in the MOUTH BAND (a
+ * horizontal strip around the speaker's mouth landmark).
  *
  * A truly silent / "no-op" Sync.so output shows near-zero variance
  * in that band because the mouth pixels never change between frames.
  * A real lipsync produces yavg ≫ threshold.
+ *
+ * v403 returns both mean (yavg) and peak variance so the multi-speaker
+ * classifier in sync-so-webhook can evaluate the delta between preclip
+ * and provider output.
  *
  * We keep this on the CLIENT (Canvas) because:
  *   - Deno edge has no ffmpeg / DOM
@@ -16,7 +20,7 @@
  *   - The rendered output URL is already public and cheap to sample
  *
  * The caller uploads the result to `report-lipsync-motion-probe`
- * which persists `noop_mouth_yavg` into `syncso_dispatch_log`.
+ * which persists the paired metrics into `syncso_dispatch_log`.
  */
 
 export interface MouthYavgInput {
@@ -36,6 +40,8 @@ export interface MouthYavgInput {
 export interface MouthYavgResult {
   yavg: number;            // mean per-pixel temporal variance in mouth band
   yavgNormalized: number;  // yavg / 255^2, clamped 0..1
+  peak: number;            // max per-pixel temporal variance in mouth band
+  peakNormalized: number;  // peak / 255^2, clamped 0..1
   frames: number;
   sampledSec: number[];
   method: "canvas-mouth-band-v248";
@@ -131,20 +137,27 @@ export async function computeMouthYavg(input: MouthYavgInput): Promise<MouthYavg
   for (let p = 0; p < px; p++) means[p] /= frames.length;
 
   let sumVar = 0;
+  let peakVar = 0;
   for (const data of frames) {
     for (let p = 0; p < px; p++) {
       const off = p * 4;
       const y = 0.299 * data[off] + 0.587 * data[off + 1] + 0.114 * data[off + 2];
       const d = y - means[p];
-      sumVar += d * d;
+      const varHere = d * d;
+      sumVar += varHere;
+      if (varHere > peakVar) peakVar = varHere;
     }
   }
   const yavg = sumVar / (frames.length * px); // mean per-pixel variance (luma²)
   const yavgNormalized = Math.max(0, Math.min(1, yavg / (255 * 255)));
+  const peak = peakVar; // max per-pixel variance (luma²)
+  const peakNormalized = Math.max(0, Math.min(1, peak / (255 * 255)));
 
   return {
     yavg,
     yavgNormalized,
+    peak,
+    peakNormalized,
     frames: frames.length,
     sampledSec,
     method: "canvas-mouth-band-v248",

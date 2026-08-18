@@ -37,6 +37,12 @@ import { tl, withLang } from "../_shared/i18n.ts";
 // `materializeCompatibilityOutput` gehört ausschließlich dem Finalizer.
 
 import { acquireLedgerJob, observeCallbackProvenance, readPipelineJobId } from "../_shared/v431-ledger.ts";
+// FA-4 Provider-No-op Fix Contract C′ — PURE motion classifier.
+import {
+  classifyMotionProbe,
+  type MotionMetric,
+  type MotionProbeResult,
+} from "../_shared/motion-probe-classifier.ts";
 
 
 const corsHeaders = {
@@ -232,6 +238,62 @@ async function applySyncSegmentResult(
     `[sync-so-webhook] g322_apply write_id=${params.writeId} verdict=${res.verdict} segment_result=${res.segment_result ?? "-"} pass=${res.pass_idx ?? "-"} reason=${res.reason ?? "-"}`,
   );
   return res;
+}
+
+interface MotionProbeMetrics {
+  preclip: MotionMetric;
+  provider: MotionMetric;
+}
+
+/**
+ * FA-4 C′ — read motion metrics that the client persisted to
+ * `syncso_dispatch_log.meta_yavg_probe`.  The measurement is produced by the
+ * same mouth-band algorithm on both the Provider-Input-Preclip and the
+ * Provider-Output.  We poll briefly because the client probe and the
+ * Sync.so webhook race to completion.
+ *
+ * This helper is read-only: no writes, no retry, no Ledger access.
+ */
+async function readMotionProbeMetrics(
+  supabase: any,
+  sceneId: string,
+  jobId: string,
+  passIdx: number,
+  maxWaitMs = 5000,
+  intervalMs = 500,
+): Promise<MotionProbeMetrics | null> {
+  const deadline = Date.now() + maxWaitMs;
+  do {
+    const { data, error } = await supabase
+      .from("syncso_dispatch_log")
+      .select("meta_yavg_probe")
+      .eq("scene_id", sceneId)
+      .eq("job_id", jobId)
+      .maybeSingle();
+
+    if (!error && data?.meta_yavg_probe) {
+      const meta = data.meta_yavg_probe as Record<string, unknown>;
+      const pre = meta.preclip_metric as MotionMetric | undefined;
+      const prov = meta.provider_metric as MotionMetric | undefined;
+      if (
+        pre &&
+        prov &&
+        typeof pre.mean === "number" &&
+        typeof pre.peak === "number" &&
+        typeof prov.mean === "number" &&
+        typeof prov.peak === "number"
+      ) {
+        return { preclip: pre, provider: prov };
+      }
+      // Legacy single-output probe (provider only) is not sufficient for the
+      // classifier; keep polling/waiting for the client to post both metrics.
+    }
+
+    if (Date.now() + intervalMs > deadline) break;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  } while (Date.now() < deadline);
+
+  return null;
 }
 
 /** Wallet-Refund als Edge-Nebenwirkung; der Marker ist idempotent (DB-seitig). */
@@ -842,6 +904,44 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           `[sync-so-webhook] v150_bytes_heuristic_suppressed scene=${sceneId} pass=${currentPass} sizeRatio=${sizeRatio.toFixed(2)} — alte v128-Heuristik hätte fälschlich NOOP markiert, jetzt unterdrückt.`,
         );
       }
+      // v403 FA-4 Provider-No-op Fix Contract C′:
+      // For multi-speaker scenes, a PURE motion classifier evaluates the
+      // Provider-Output against the Provider-Input-Preclip BEFORE any
+      // ssw:success is committed. Single-speaker behavior is unchanged.
+      let motionProbeResult: MotionProbeResult | null = null;
+      let motionVerdictForMultiSpeaker: "motion" | "noop" | "indeterminate" | null = null;
+
+      if (!isSingleSpeakerScene) {
+        const metrics = await readMotionProbeMetrics(supabase, sceneId, jobId, currentPass);
+        if (metrics) {
+          motionProbeResult = classifyMotionProbe({
+            preclip: metrics.preclip,
+            provider: metrics.provider,
+            supplementary: {
+              syncOutputUnchanged,
+              syncOutputResolutionRegression,
+              sizeRatio,
+            },
+          });
+          motionVerdictForMultiSpeaker = motionProbeResult.verdict;
+        } else {
+          motionVerdictForMultiSpeaker = "indeterminate";
+          motionProbeResult = {
+            verdict: "indeterminate",
+            deltaMean: 0,
+            deltaPeak: 0,
+            preclipMean: 0,
+            preclipPeak: 0,
+            providerMean: 0,
+            providerPeak: 0,
+            reason: "motion_probe_indeterminate:metrics_unavailable",
+          };
+        }
+        console.log(
+          `[sync-so-webhook] v403_motion_gate scene=${sceneId} pass=${currentPass} verdict=${motionVerdictForMultiSpeaker} reason=${motionProbeResult.reason}`,
+        );
+      }
+
       if (noopSuspect) {
         const noopReason = syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
@@ -862,6 +962,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             syncOutputUnchanged, syncOutputResolutionRegression,
             reencodedPassthroughSuspect, sizeRatio,
             reason: noopReason,
+            // v403 — for multi-speaker this is supplementary evidence only;
+            // the authoritative verdict comes from the motion classifier.
+            motion_verdict: motionVerdictForMultiSpeaker,
           },
         });
         console.warn(
@@ -879,11 +982,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // step 2 instead of silently muxing a NOOP output (which made
       // Speaker 2 in 4-speaker scenes appear frozen).
       //
-      // Step 0 (1st NOOP)  → variant `bbox-url-pro`   (per-frame bounding_boxes_url, sync-3 conform)
-      // Step 1 (2nd NOOP)  → variant `coords-pro-box` (bounding-box ASD on plate coords)
-      // Step 2 (3rd NOOP)  → HARD FAIL + idempotent refund + `needs_clip_rerender`
+      // Step 0 (1st NOOP)  → variant `coords-pro-box` (inline bounding_boxes, sync-3 conform)
+      // Step 1 (2nd NOOP)  → HARD FAIL + idempotent refund + `needs_clip_rerender`
       //
-      // All three steps stay on `sync-3`. No model swap. ASD is rebuilt
+      // All steps stay on `sync-3`. No model swap. ASD is rebuilt
       // by compose-dialog-segments' v130 buildAsdStrategy() based on the
       // new retry_variant — single source of truth.
       const noopEscalationStep = Number(passBeforeDone?.noop_escalation_step ?? 0);
@@ -902,18 +1004,35 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         { step: 0, variant: "coords-pro-box", label: "bounding-box ASD (sync-3)" },
       ];
       const nextRung = NOOP_LADDER.find((r) => r.step === noopEscalationStep);
-      const canEscalate = noopSuspect && !!nextRung && havePlateCoords && havePreclipCrop &&
-        Number.isFinite(Number(passBeforeDone?.reference_frame_number));
 
-      if (noopSuspect && !canEscalate) {
+      // Single-speaker: keep legacy byte-based noopSuspect gate.
+      // Multi-speaker: motion classifier is authoritative.
+      const canEscalateSingleSpeaker = isSingleSpeakerScene &&
+        noopSuspect && !!nextRung && havePlateCoords && havePreclipCrop &&
+        Number.isFinite(Number(passBeforeDone?.reference_frame_number));
+      const canEscalateMultiSpeaker = !isSingleSpeakerScene &&
+        motionVerdictForMultiSpeaker === "noop" && !!nextRung && havePlateCoords && havePreclipCrop &&
+        Number.isFinite(Number(passBeforeDone?.reference_frame_number));
+      const canEscalate = canEscalateSingleSpeaker || canEscalateMultiSpeaker;
+
+      // Single-speaker: hard-fail when byte-based NOOP suspect and no ladder rung.
+      // Multi-speaker: ladder-exhausted motion noop also hard-fails.
+      // Multi-speaker: fail-closed when motion classifier is indeterminate.
+      const shouldHardFailNoopLadderExhausted =
+        (isSingleSpeakerScene && noopSuspect && !canEscalate) ||
+        (!isSingleSpeakerScene && motionVerdictForMultiSpeaker === "noop" && !canEscalate);
+
+      if (shouldHardFailNoopLadderExhausted) {
         // Ladder erschöpft ODER fehlende Inputs → fachliches Segment-Fail.
         // v431 G3.2.2: der Apply gehört ausschließlich dem RPC (write_id
         // `ssw:noop_fail`); Refund + Folge-Dispatch sind Edge-Nebenwirkungen.
-        const noopReasonHard = syncOutputResolutionRegression
-          ? "sync_output_resolution_regression"
-          : syncOutputUnchanged
-            ? "sync_output_unchanged"
-            : "sync_output_reencoded_passthrough_suspect";
+        const noopReasonHard = isSingleSpeakerScene
+          ? (syncOutputResolutionRegression
+            ? "sync_output_resolution_regression"
+            : syncOutputUnchanged
+              ? "sync_output_unchanged"
+              : "sync_output_reencoded_passthrough_suspect")
+          : (motionProbeResult?.reason ?? "sync_output_motion_noop_ladder_exhausted");
         const turnStart = Number(passBeforeDone?.segments?.[0]?.startTime ?? 0).toFixed(1);
         const turnEnd = Number(passBeforeDone?.segments?.[0]?.endTime ?? 0).toFixed(1);
         const userMsg = tl({ de: `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) konnte nach ${NOOP_LADDER.length + 1} Versuchen nicht erzeugt werden. Bitte Plate neu rendern.`, en: `Lip-sync for ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) could not be generated after ${NOOP_LADDER.length + 1} attempts. Please re-render plate.`, es: `La sincronización labial para ${passSpeakerName} (Turno ${turnStart}s–${turnEnd}s) no pudo generarse después de ${NOOP_LADDER.length + 1} intentos. Por favor, vuelve a renderizar la placa.` });
@@ -935,6 +1054,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             ladder_size: NOOP_LADDER.length,
             previous_noop_output_url: rehostedUrl ?? outputUrl,
             size_ratio: sizeRatio,
+            ...(isSingleSpeakerScene
+              ? {}
+              : {
+                motion_verdict: motionVerdictForMultiSpeaker,
+                motion_delta_peak: motionProbeResult?.deltaPeak ?? null,
+                motion_delta_mean: motionProbeResult?.deltaMean ?? null,
+              }),
           },
         });
 
@@ -950,7 +1076,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           return ok({ ok: true, skipped: "apply_unavailable", scene_id: sceneId, job_id: jobId });
         }
         console.error(
-          `[sync-so-webhook] v134/g322 scene=${sceneId} pass=${currentPass} speaker="${passSpeakerName}" NOOP-LADDER-EXHAUSTED step=${noopEscalationStep} verdict=${noopFailRes.verdict}`,
+          `[sync-so-webhook] ${isSingleSpeakerScene ? "v134" : "v403"}/g322 scene=${sceneId} pass=${currentPass} speaker="${passSpeakerName}" NOOP-LADDER-EXHAUSTED step=${noopEscalationStep} verdict=${noopFailRes.verdict}`,
         );
         return await settleVerdict(noopFailRes, {
           escalated: "noop_ladder_exhausted_v134",
@@ -958,14 +1084,40 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         });
       }
 
+      if (!isSingleSpeakerScene && motionVerdictForMultiSpeaker === "indeterminate") {
+        // v403 — Fail-closed: an unclassified multi-speaker pass must never be
+        // muxed as success. The existing G3.2.2 failure-apply owns the terminal
+        // state and refund/scene-verdict.
+        const indeterminateRes = await applySyncSegmentResult(supabase, {
+          pipelineJobId: v431CallbackJobId,
+          externalJobId: jobId,
+          writeId: "ssw:failed",
+          providerStatus: "COMPLETED",
+          outputUrl: null,
+          errorText: "motion_probe_indeterminate",
+        });
+        if (!indeterminateRes) {
+          return ok({ ok: true, skipped: "apply_unavailable", scene_id: sceneId, job_id: jobId });
+        }
+        console.error(
+          `[sync-so-webhook] v403/g322 scene=${sceneId} pass=${currentPass} speaker="${passSpeakerName}" INDETERMINATE reason=${motionProbeResult?.reason ?? "unknown"} → ssw:failed`,
+        );
+        return await settleVerdict(indeterminateRes, {
+          motion_probe: "indeterminate",
+          reason: motionProbeResult?.reason ?? "unknown",
+        });
+      }
+
       if (canEscalate && nextRung) {
         const newAttemptId = crypto.randomUUID();
         const nextStep = nextRung.step + 1;
-        const noopReason = syncOutputResolutionRegression
-          ? "sync_output_resolution_regression"
-          : syncOutputUnchanged
-            ? "sync_output_unchanged"
-            : "sync_output_reencoded_passthrough_suspect";
+        const noopReason = isSingleSpeakerScene
+          ? (syncOutputResolutionRegression
+            ? "sync_output_resolution_regression"
+            : syncOutputUnchanged
+              ? "sync_output_unchanged"
+              : "sync_output_reencoded_passthrough_suspect")
+          : (motionProbeResult?.reason ?? "sync_output_motion_noop");
 
         await logSyncDispatch(supabase, {
           scene_id: sceneId,
@@ -985,6 +1137,14 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             noop_reason: noopReason,
             size_ratio: sizeRatio,
             attempt_id: newAttemptId,
+            // v403 — motion classifier diagnostics for multi-speaker retry.
+            ...(isSingleSpeakerScene
+              ? {}
+              : {
+                motion_verdict: motionVerdictForMultiSpeaker,
+                motion_delta_peak: motionProbeResult?.deltaPeak ?? null,
+                motion_delta_mean: motionProbeResult?.deltaMean ?? null,
+              }),
           },
         });
 
@@ -1029,7 +1189,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         } catch { /* ignore */ }
 
         console.warn(
-          `[sync-so-webhook] v134/g322 scene=${sceneId} pass=${currentPass} NOOP → escalating step ${nextStep} variant=${nextRung.variant} replacement=${escalateRes.replacement_job_id}`,
+          `[sync-so-webhook] ${isSingleSpeakerScene ? "v134" : "v403"}/g322 scene=${sceneId} pass=${currentPass} NOOP → escalating step ${nextStep} variant=${nextRung.variant} replacement=${escalateRes.replacement_job_id}`,
         );
         return ok({
           ok: true,
