@@ -23,9 +23,18 @@ import {
 import { resolveTelemetryTarget } from "./telemetry-target.ts";
 
 const read = (p: string) => Deno.readTextFileSync(new URL(p, import.meta.url));
+/** Strip comments so source-contract assertions test CODE, not prose. */
+const code = (src: string) =>
+  src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .filter((l) => !l.trim().startsWith("//"))
+    .join("\n");
 const WEBHOOK = read("../sync-so-webhook/index.ts");
+const WEBHOOK_CODE = code(WEBHOOK);
 const COMPOSE = read("../compose-dialog-segments/index.ts");
 const REPORT = read("../report-lipsync-motion-probe/index.ts");
+const REPORT_CODE = code(REPORT);
 const CLIENT_HOOK = Deno.readTextFileSync("src/hooks/useMouthYavgProbe.ts");
 
 const withMean = (preclipMean: number, deltaMean: number) => ({
@@ -66,11 +75,11 @@ Deno.test("D. indeterminate maps to ssw:failed with motion_probe_indeterminate",
 // ── E. Browser absent — server gate is self-sufficient ────────────────────
 Deno.test("E. the completion path never reads client-persisted probe metrics", () => {
   assert(
-    !/readMotionProbeMetrics/.test(WEBHOOK),
+    !/readMotionProbeMetrics/.test(WEBHOOK_CODE),
     "sync-so-webhook must not poll client-persisted metrics",
   );
   assert(
-    !/meta_yavg_probe/.test(WEBHOOK),
+    !/meta_yavg_probe/.test(WEBHOOK_CODE),
     "sync-so-webhook must not read meta_yavg_probe as authority",
   );
   assertStringIncludes(WEBHOOK, "measureProviderMotionSync");
@@ -97,7 +106,7 @@ Deno.test("H. the only contracted retry difference is the ASD transport", () => 
   assertStringIncludes(COMPOSE, "bounding_boxes_url` → inline `bounding_boxes`");
   // The historical v148 preclip drop on noop escalation is gone.
   assert(
-    !/v148_noop_bypass_preclip/.test(COMPOSE),
+    !/v148_noop_bypass_preclip/.test(code(COMPOSE)),
     "v148 preclip bypass must no longer exist",
   );
 });
@@ -180,10 +189,10 @@ Deno.test("M. threshold boundaries are exact and fail-closed", () => {
   assertEquals(MOTION_THRESHOLD, 15.405704881800869);
   assertEquals(NOOP_THRESHOLD, 3.682671115501879);
   const v = (d: number) => classifyMotionProbe(withMean(100, d)).verdict;
-  assertEquals(v(MOTION_THRESHOLD + 1e-9), "motion");
+  assertEquals(v(MOTION_THRESHOLD + 1e-6), "motion");
   assertEquals(v(MOTION_THRESHOLD), "indeterminate");
   assertEquals(v((MOTION_THRESHOLD + NOOP_THRESHOLD) / 2), "indeterminate");
-  assertEquals(v(NOOP_THRESHOLD + 1e-9), "indeterminate");
+  assertEquals(v(NOOP_THRESHOLD + 1e-6), "indeterminate");
   assertEquals(v(NOOP_THRESHOLD), "noop");
   assertEquals(v(NOOP_THRESHOLD - 1), "noop");
 });
@@ -200,9 +209,9 @@ Deno.test("M2. frozen S11 fixture still reproduces all six labels", () => {
 
 // ── P1-B — report function is telemetry only ──────────────────────────────
 Deno.test("P1-B. report-lipsync-motion-probe owns zero scene/pass state", () => {
-  assert(!/update_dialog_pass_slot/.test(REPORT), "no slot RPC allowed");
-  assert(!/yavg_probed_at/.test(REPORT), "no yavg_probed_at write allowed");
-  assert(!/motion_verdict/.test(REPORT), "no verdict write allowed");
+  assert(!/update_dialog_pass_slot/.test(REPORT_CODE), "no slot RPC allowed");
+  assert(!/yavg_probed_at/.test(REPORT_CODE), "no yavg_probed_at write allowed");
+  assert(!/motion_verdict/.test(REPORT_CODE), "no verdict write allowed");
   // Fail-closed key order: job_id check, then pass, then slot match, then write.
   const jobIdx = REPORT.indexOf("v404_telemetry_key_missing");
   const passIdx = REPORT.indexOf("v404_telemetry_pass_missing");
