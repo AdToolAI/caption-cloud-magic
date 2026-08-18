@@ -54,6 +54,28 @@ export interface MotionMetricValue {
 
 export type MeasurementStatus = "measured" | "unmeasurable";
 
+/**
+ * v404 P1-C — remaining wall-clock budget of the WHOLE measurement run,
+ * handed to every network operation. `signal` is the run-scoped root signal.
+ */
+export interface MeasurementBudget {
+  remainingMs: number;
+  signal: AbortSignal;
+}
+
+/** PURE — remaining budget, never negative-by-accident. */
+export function remainingBudgetMs(nowMs: number, absoluteDeadlineMs: number): number {
+  const rest = absoluteDeadlineMs - nowMs;
+  return Number.isFinite(rest) ? rest : 0;
+}
+
+export type RenderStillFn = (
+  videoUrl: string,
+  totalSec: number,
+  frame: number,
+  budget: MeasurementBudget,
+) => Promise<Uint8Array>;
+
 export interface MeasureProviderMotionSyncArgs {
   preclipUrl: string;
   providerOutputUrl: string;
@@ -63,7 +85,7 @@ export interface MeasureProviderMotionSyncArgs {
   preclipDims?: { width: number; height: number } | null;
   providerDims?: { width: number; height: number } | null;
   /** Injected for tests. Returns raw JPEG bytes of one still. */
-  renderStill?: (videoUrl: string, totalSec: number, frame: number) => Promise<Uint8Array>;
+  renderStill?: RenderStillFn;
   /** Injected for tests. Returns source dimensions of a video. */
   probeDims?: (url: string) => Promise<{ width: number; height: number } | null>;
   /** Injected for tests. */
@@ -71,6 +93,7 @@ export interface MeasureProviderMotionSyncArgs {
   deadlineMs?: number;
   sampleCount?: number;
 }
+
 
 export interface MeasureProviderMotionSyncResult {
   preclip_metric: MotionMetricValue | null;
