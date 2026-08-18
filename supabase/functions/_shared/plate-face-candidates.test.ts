@@ -209,7 +209,7 @@ const CONTRACTUAL: AssignmentFailReason[] = [
   "degenerate_candidate_centers",
 ];
 
-Deno.test("contractual geometry failures never allow the legacy fallback", () => {
+Deno.test("classifyRouterFailure() marks the four Contract-B reasons as contractual", () => {
   for (const reason of CONTRACTUAL) {
     assertEquals(
       classifyRouterFailure({
