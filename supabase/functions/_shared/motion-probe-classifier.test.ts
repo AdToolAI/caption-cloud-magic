@@ -20,35 +20,32 @@ Deno.test("A. Frozen S11 fixture — all six cases classify as expected", () => 
   }
 });
 
-Deno.test("A. T2 sensitivity anchor — just above indeterminate band stays motion", () => {
-  // T2 Δpeak = +0.13.  Perturb downward slightly; it must still be motion
-  // as long as it stays above the motion threshold (+0.08).
+Deno.test("A. deltaMean just above MOTION_THRESHOLD is motion", () => {
   const input: MotionProbeInput = {
-    preclip: { mean: 0.328, peak: 0.886 },
-    provider: { mean: 0.335, peak: 0.970 }, // Δpeak = +0.084
+    preclip: { mean: 100, peak: 500 },
+    provider: { mean: 100 + MOTION_THRESHOLD + 0.01, peak: 500 },
   };
   const r = classifyMotionProbe(input);
-  assertEquals(r.verdict, "motion", `T2-perturbed: ${r.reason}`);
+  assertEquals(r.verdict, "motion", r.reason);
 });
 
-Deno.test("A. Noop boundary — strongest noop p3 stays noop even with small upward perturbation", () => {
-  // p3 Δpeak = -0.07.  Perturb upward to -0.03; it must still be noop
-  // because it is below the noop threshold (-0.02).
+Deno.test("A. deltaMean exactly at NOOP_THRESHOLD is noop (fail-closed boundary)", () => {
   const input: MotionProbeInput = {
-    preclip: { mean: 0.355, peak: 0.936 },
-    provider: { mean: 0.356, peak: 0.906 }, // Δpeak = -0.03
+    preclip: { mean: 100, peak: 500 },
+    provider: { mean: 100 + NOOP_THRESHOLD, peak: 500 },
   };
   const r = classifyMotionProbe(input);
-  assertEquals(r.verdict, "noop", `p3-perturbed: ${r.reason}`);
+  assertEquals(r.verdict, "noop", r.reason);
 });
 
-Deno.test("A. Indeterminate band — delta_peak inside the gap is indeterminate", () => {
+Deno.test("A. Indeterminate band — deltaMean inside the gap is indeterminate", () => {
+  const mid = (MOTION_THRESHOLD + NOOP_THRESHOLD) / 2;
   const input: MotionProbeInput = {
-    preclip: { mean: 0.3, peak: 0.8 },
-    provider: { mean: 0.31, peak: 0.85 }, // Δpeak = +0.05 (inside -0.02..+0.08)
+    preclip: { mean: 100, peak: 500 },
+    provider: { mean: 100 + mid, peak: 500 },
   };
   const r = classifyMotionProbe(input);
-  assertEquals(r.verdict, "indeterminate", `band: ${r.reason}`);
+  assertEquals(r.verdict, "indeterminate", r.reason);
 });
 
 Deno.test("A. Invalid metrics (NaN/negative) are indeterminate", () => {
@@ -64,22 +61,23 @@ Deno.test("A. Invalid metrics (NaN/negative) are indeterminate", () => {
   assertEquals(r2.verdict, "indeterminate");
 });
 
-Deno.test("A. Motion output must have higher peak than preclip", () => {
+Deno.test("A. deltaPeak has no authority — large positive peak with noop mean stays noop", () => {
   const input: MotionProbeInput = {
-    preclip: { mean: 1.0, peak: 2.0 },
-    provider: { mean: 1.2, peak: 3.0 }, // Δpeak = +1.0
+    preclip: { mean: 100, peak: 100 },
+    provider: { mean: 100, peak: 100_000 },
   };
   const r = classifyMotionProbe(input);
-  assertEquals(r.verdict, "motion");
-  assertAlmostEquals(r.deltaPeak, 1.0, 1e-10);
+  assertEquals(r.verdict, "noop", r.reason);
+  assertAlmostEquals(r.deltaMean, 0, 1e-10);
 });
 
-Deno.test("A. Noop output must have equal or lower peak than preclip", () => {
+Deno.test("A. deltaPeak has no authority — negative peak with motion mean stays motion", () => {
   const input: MotionProbeInput = {
-    preclip: { mean: 0.5, peak: 1.0 },
-    provider: { mean: 0.5, peak: 0.9 }, // Δpeak = -0.1
+    preclip: { mean: 100, peak: 20_000 },
+    provider: { mean: 200, peak: 10 },
   };
   const r = classifyMotionProbe(input);
-  assertEquals(r.verdict, "noop");
-  assertAlmostEquals(r.deltaPeak, -0.1, 1e-10);
+  assertEquals(r.verdict, "motion", r.reason);
+  assertAlmostEquals(r.deltaMean, 100, 1e-10);
 });
+
