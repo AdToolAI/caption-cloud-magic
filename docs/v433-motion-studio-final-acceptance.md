@@ -2004,3 +2004,27 @@ keine neuen Fehler in den geänderten Bereichen.
 
 
 
+
+## FA-4 T4/T6 No-Lip-Motion — Read-only Root-Cause-Lock (Run 8b0f659d-7e40-41e5-9761-e870709824ff)
+
+Methode: Frame-Differenz-Energie (Graustufen, 180x180, 9x9-Blockraster) je Messpunkt.
+Werte = global mean | peak block.
+
+| Pass | Turn / Speaker | A: Preclip-Input | C: Sync.so-Output | Delta (peak) | D: Final-Mux (Slot-Fenster) |
+|---|---|---|---|---|---|
+| p0 / pass-1 | T1 Sarah | 1.076 \| 2.907 | 1.157 \| 3.768 | **+0.86** | 1.186 \| 3.529 |
+| p1 / pass-2 | T5 Sarah | 0.635 \| 1.981 | 0.717 \| 2.953 | **+0.97** | 0.784 \| 2.791 |
+| p2 / pass-3 | T2 Samuel | 0.328 \| 0.886 | 0.340 \| 1.019 | +0.13 | 0.394 \| 1.172 |
+| p3 / pass-4 | **T6 Samuel** | 0.355 \| 0.936 | 0.356 \| 0.864 | **−0.07** | 0.405 \| 0.940 |
+| p4 / pass-5 | T3 Matthew | 0.329 \| 1.073 | 0.357 \| 2.213 | **+1.14** | 0.380 \| 2.067 |
+| p5 / pass-6 | **T4 Kay** | 0.307 \| 0.836 | 0.292 \| 0.688 | **−0.15** | 0.336 \| 0.769 |
+
+Befunde:
+- **Messpunkt A (Preclip-Input)**: alle 6 Preclips valide, korrekte Crops/Slots, Bewegung vorhanden (Plate-Eigenbewegung). Kein Input-Defekt.
+- **Messpunkt B (Provider-Input)**: alle 6 Tight-Audios vorhanden und voiced (first_voiced 0.10–0.20 s, voiced_end 1.22–1.48 s), Fenster passen zu den Turn-Zeiten. Kein Audio-Defekt, keine Stille.
+- **Messpunkt C (Sync.so-Output)**: p3 und p5 liefern **keine zusätzliche Mundbewegung** gegenüber ihrem Preclip-Input (Delta ≤ 0) — der Provider-Output ist praktisch ein Pass-Through, obwohl der Ledger-Job „succeeded“ meldet. p0/p1/p4 fügen klar Bewegung hinzu (+0.86 … +1.14). p2 ist grenzwertig (+0.13).
+- **Messpunkt D (Mux/Final)**: Final-Werte reproduzieren die Provider-Outputs 1:1 (Δ < 0.05); Overlay-Fenster, Slot-Koordinaten und Timing sind korrekt. Kein Mux-Verlust.
+
+**Root-Cause-Lock**: Der Ausfall liegt ausschließlich bei Messpunkt C (Sync.so-Generierung für p3/T6 und p5/T4) — silent no-op des Providers bei formal erfolgreichem Job. Face-Candidate/Geometrie-Layer (v402), Fan-out, Preclip-Erzeugung, Audio-Erzeugung und Mux sind entlastet.
+
+Status: **FA-4 T4/T6 ROOT-CAUSE-LOCK = MESSPUNKT C (Provider silent no-op) → STOP**
