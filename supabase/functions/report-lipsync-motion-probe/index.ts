@@ -26,6 +26,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { withLang } from "../_shared/i18n.ts";
+import { resolveTelemetryTarget } from "../_shared/telemetry-target.ts";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
