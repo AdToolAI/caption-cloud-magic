@@ -11,10 +11,15 @@
  *
  * Client-reported metrics are therefore persisted under a dedicated
  * `client_telemetry` namespace in `syncso_dispatch_log.meta_yavg_probe`
- * so they can never be mistaken for the authoritative measurement, and
- * the only slot write left is the non-authoritative `yavg_probed_at`
- * de-dupe marker that stops the browser from re-probing.
+ * so they can never be mistaken for the authoritative measurement.
  *
+ * v404 P1-B: this function owns NO scene/pass state at all — there is no
+ * `update_dialog_pass_slot` call and no `yavg_probed_at` write. Browser
+ * de-dupe is session-local (`probedThisSession` in useMouthYavgProbe).
+ * Every telemetry write requires the complete key scene_id + job_id +
+ * pass_idx AND an exact job-slot match; otherwise ZERO writes happen.
+ *
+
  * Auth: user JWT (scene must belong to the caller's project).
  */
 
