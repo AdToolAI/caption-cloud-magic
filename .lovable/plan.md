@@ -1,153 +1,97 @@
-# FA-4 v404 — Remotion Source→Still Transform Proof (READ-ONLY REPORT)
+# FA-4 v404 — Server Motion Calibration / Performance Gate (Execution Plan)
 
-Scope executed: §6 proof only. No code, no deploy, no render, no migration, no calibration.
+This gate requires *running* measurements (Remotion Lambda still-invokes, JPEG decode, latency
+sampling). That is execution work, so it needs approval before it can start. Below is exactly
+what will be run, in order, with zero production-code diff.
 
-## A. Source Dimensions
+## Frozen inputs (carried in unchanged)
 
-Provider-input preclips of S11 are rendered by composition `DialogTurnFaceCropVideo`
-(`src/remotion/Root.tsx` L512-531): registered 512×512, `calculateMetadata` overrides to
-`width = height = even(outputSize, 512)`. `DialogTurnFaceCropVideo` renders a square
-`cover` crop of the plate (`src/remotion/templates/DialogTurnFaceCropVideo.tsx`).
+- Run `8b0f659d-7e40-41e5-9761-e870709824ff`, Scene `e658509d-cdeb-40f7-bd33-98e74144fdc5`
+- Labels (provenance only, never numeric anchors): p0/T1 Sarah motion, p1/T5 Sarah motion,
+  p2/T2 Samuel motion, p3/T6 Samuel noop, p4/T3 Matthew motion, p5/T4 Kay noop
+- Source→Still (PASS/FROZEN): 720×720 → 1280×720, `u_still = u_src`,
+  `v_still = 1.7777778 * v_src - 0.3888889`
+- Still ROI: center (0.5, 0.6777778), size (0.28, 0.2133333) → px x 460.8..819.2, y 411.2..564.8
+- frame N ↔ source time N/30 s, zero offset
 
-For FA-4/S11 the materialised preclips are **720×720** square MP4s.
-`cropSize` differences (Sarah/Samuel size=250, Matthew/Kay size=394) are already consumed
-*inside* that preclip render; the resulting file is 720×720 in every case. The
-Source→Still proof therefore starts from a 720×720 source, per §3.
+## Step 1 — Artifact map (read-only)
 
-## B. Still / Composition Dimensions
+Read-only queries against the ledger / dispatch log for that run to resolve, per p0..p5:
+`pass_idx`, turn id, speaker, provider-input preclip URL, Sync.so provider-output URL, duration,
+job id, run_id, plate_generation. No Sync.so dispatch, no new artifacts, no DB writes.
+If any of the 12 URLs is no longer resolvable → BLOCKED, stop.
 
-Still primitive: `supabase/functions/_shared/transition-frame.ts`, payload
-`type: "still"`, `composition: "DialogStitchVideo"`, `imageFormat: "jpeg"`,
-`jpegQuality: 85`, `scale: 1`, `forceWidth: null`, `forceHeight: null`.
+## Step 2 — Calibration harness (test-only)
 
-`inputProps.payload` carries exactly:
-`{ masterVideoUrl, masterAudioUrl: "", totalSec, shots: [] }`.
-It does **not** carry `targetWidth` / `targetHeight` / `srcWidth` / `srcHeight`.
+New file(s) only under `scripts/calibration/` (plus a fixture JSON of the artifact map).
+No import into, and no edit of, `sync-so-webhook`, `compose-dialog-segments`,
+`report-lipsync-motion-probe`, shared production helpers, the Remotion composition,
+v402 geometry, or Contract E. Production diff stays ZERO.
 
-`DialogStitchVideo` `calculateMetadata` (`Root.tsx` L484-504):
+Harness behaviour, per video:
+1. `N` timestamps evenly distributed between 5% and 95% of duration
+2. `frame_i = round(t_i * 30)`
+3. Remotion Lambda `type:"still"`, composition `DialogStitchVideo`,
+   inputProps payload `{ masterVideoUrl, masterAudioUrl:"", totalSec, shots: [] }`,
+   `imageFormat:"jpeg"`, `jpegQuality:85`, `scale:1`, no force dims → 1280×720
+4. Decode JPEG locally, sample only the frozen still ROI box
+5. Rec.601 luma `Y = 0.299R + 0.587G + 0.114B`
+6. Temporal per-pixel variance across the N stills → `mean`, `peak`
+7. Per pair: `deltaMean`, `deltaPeak` = provider − preclip
 
-```text
-fps    = 30 (hard-coded)
-width  = even(props.targetWidth,  1280)  -> 1280   (prop absent)
-height = even(props.targetHeight,  720)  ->  720   (prop absent)
-durationInFrames = max(30, ceil(totalSec * 30))
-```
+No face/landmark detection, no PNG, no direct MP4 decode, no browser canvas.
 
-Still canvas with the current invoke = **1280 × 720**, `scale: 1`, no force dims.
+## Step 3 — N-sweep
 
-## C. Rendering primitive
+Measure all six pairs for N = 6, 8, 10, 12. Emit the full table
+(N, pass, label, preMean, prePeak, providerMean, providerPeak, deltaMean, deltaPeak).
 
-`DialogStitchVideo` (`src/remotion/templates/DialogStitchVideo.tsx`), master-plate layer:
+## Step 4 — Separation gate
 
-```tsx
-<AbsoluteFill style={{ backgroundColor: '#000' }}>
-  <AbsoluteFill>
-    <Video                     // OffthreadVideo (aliased import)
-      src={masterVideoUrl} muted playbackRate={1}
-      style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-  </AbsoluteFill>
-  ...
-</AbsoluteFill>
-```
+Per N: `minMotion = min Δpeak(p0,p1,p2,p4)`, `maxNoop = max Δpeak(p3,p5)`,
+`gap = minMotion − maxNoop`. PASS only when `gap > 0` and p2/T2 sits clearly on the motion side.
+If no N reaches `gap > 0` → BLOCKED — server metric does not separate the frozen S11 labels.
+No threshold invention, no manual re-labelling.
 
-With `shots: []` and `masterImageUrl` absent, every other layer (silent freezes,
-mouth mattes, tail freeze, overlays) evaluates to `null` / empty array. No wrapper
-applies `transform`, `scale`, rotation or additional crop. `srcWidth`/`srcHeight`
-only feed `scaleX`/`scaleY` for overlay slots — with `shots: []` they are unused.
+## Step 5 — N selection and thresholds
 
-## D. object-fit / scaling behavior
-
-`objectFit: 'cover'` on a `100% × 100%` element inside a `1280 × 720` AbsoluteFill:
-uniform scale by the **larger** ratio, then **center crop**. Not contain, not stretch,
-no letterbox/pillarbox (background `#000` is never visible).
-
-General case (source `sw × sh`, composition `cw × ch`):
+Smallest passing N wins (not automatically 12). For that N only:
 
 ```text
-s  = max(cw/sw, ch/sh)
-dx = (cw - sw*s) / 2      // <= 0, i.e. horizontal center crop
-dy = (ch - sh*s) / 2      // <= 0, i.e. vertical center crop
+MOTION_THRESHOLD = server_delta_min_motion - gap/4
+NOOP_THRESHOLD   = server_delta_max_noop  + gap/4
 ```
 
-- source AR > comp AR  → left/right cropped (dx < 0, dy = 0)
-- source AR < comp AR  → top/bottom cropped (dy < 0, dx = 0)
-- source AR = comp AR  → s uniform, dx = dy = 0 → identity in normalized space
+Report raw values, full-precision thresholds, and display-rounded thresholds; rounding must not
+alter the separation. The indeterminate zone between both thresholds stays intact.
 
-## E. Exact Source→Still transform (S11: 720×720 → 1280×720)
+## Step 6 — Performance and concurrency
 
-```text
-s  = max(1280/720, 720/720) = 16/9 = 1.7777778
-scaled source = 1280 × 1280
-dx = (1280 - 1280)/2 = 0
-dy = (720  - 1280)/2 = -280 px
+- Per still-invoke latency: count, min, p50, p95, max — over several repetitions, never a single run.
+- Per video (N stills) and per pair (2×N stills) wall-clock under the tested concurrency.
+- Concurrency swept from a small bounded pool (e.g. 2, 4, 6) — no unbounded `Promise.all` will be
+  recommended; record error rate and any AWS/Lambda throttling.
+- Pick the smallest safe concurrency.
 
-pixel:      x_still = x_src * 1.7777778
-            y_still = y_src * 1.7777778 - 280
+## Step 7 — Deadline
 
-normalized: u_still = u_src                              (x is identity)
-            v_still = (v_src * 1280 - 280) / 720
-                    = 1.7777778 * v_src - 0.3888889
-```
+Derive `measurement_deadline_ms` from the measured pair p95/max — finite, comfortably covering p95,
+no unbounded Lambda wait. No pre-set number is carried over.
 
-Visible source band: `v_src ∈ [0.21875, 0.78125]`; the outer 21.875% top and bottom
-of the 720×720 preclip are cropped away by the still.
+## Report (A–L)
 
-## F. Frozen ROI through the transform
-
-Frozen source-space ROI: `centerX 0.5, centerY 0.6, width 0.28, height 0.12`
-→ source normalized box `x ∈ [0.36, 0.64]`, `y ∈ [0.54, 0.66]`.
-
-```text
-still centerX = 0.5
-still centerY = 1.7777778*0.6 - 0.3888889 = 0.6777778
-still width   = 0.28
-still height  = 0.12 * 1.7777778 = 0.2133333
-
-still normalized box: x ∈ [0.36, 0.64],  y ∈ [0.5711111, 0.7844444]
-still pixels (1280×720): x ∈ [460.8, 819.2], y ∈ [411.2, 564.8]
-```
-
-The full ROI stays inside the visible band (0.5711 > 0.21875·(scaled) equivalent,
-i.e. never clipped): measurable, no clamping needed for the S11 case.
-
-## G. Frame / time transform
-
-- Composition fps: hard-coded `30` in `calculateMetadata`; source fps is irrelevant —
-  `OffthreadVideo` seeks by timestamp, not by source frame index.
-- Master `<Video>` is mounted at composition frame 0, at the root (no `<Sequence>`
-  wrapper on that layer), `playbackRate={1}`, **no `startFrom`**, `masterImageUrl`
-  absent, `tailFreezeFromSec` absent, `shots: []` → no sequence/start offset at all.
-- Therefore still `frame = N` shows source time `t = N / 30` seconds, offset 0.
-- `durationInFrames = max(30, ceil(totalSec*30))`; the sampling frame must satisfy
-  `0 <= frame < durationInFrames` (the existing caller already clamps to
-  `totalFrames - 1`).
-
-## H. Conclusion
-
-```text
-SOURCE_TO_STILL = DETERMINISTIC_TRANSFORM
-
-u_still = (u_src * sw * s + dx) / cw
-v_still = (v_src * sh * s + dy) / ch
-with s = max(cw/sw, ch/sh), dx = (cw - sw*s)/2, dy = (ch - sh*s)/2
-
-S11 (720×720 → 1280×720):
-  u_still = u_src
-  v_still = 1.7777778 * v_src - 0.3888889
-frozen ROI → center (0.5, 0.6777778), size (0.28, 0.2133333)
-frame N ↔ source time N/30 s, zero offset
-```
-
-Identity is reached only when source AR == composition AR — which the existing invoke
-does **not** produce, because it omits `targetWidth`/`targetHeight` and thus falls back
-to 1280×720.
-
-Non-blocking notes for later gates (not part of this proof): the cover crop discards
-21.875% of the preclip vertically, and the still is JPEG q85 — both are metric-scale
-concerns that belong to the calibration gate, not to this transform proof.
+Artifact map · Source→Still parameters used · N-sweep table · separation per N · selected N ·
+final thresholds · T2 sensitivity proof · latency statistics · selected concurrency · proposed
+deadline · failures/throttling · exact test-only diff scope.
 
 ## Gate
 
-FA-4 REMOTION SOURCE→STILL TRANSFORM PROOF = PASS
-SOURCE_TO_STILL = DETERMINISTIC_TRANSFORM
-→ STOP
+Ends with exactly one of:
+`FA-4 v404 SERVER MOTION CALIBRATION / PERFORMANCE GATE = PASS → STOP`
+or `... = BLOCKED — <exact reason> → STOP`.
+No implementation-GO, no deploy, no Motion-Studio render, no Sync.so dispatch, no DB mutation.
+
+## Cost note
+
+Worst case (N-sweep 6+8+10+12 over 12 videos) is 432 Lambda still-invokes plus repetitions for
+latency statistics. All are `type:"still"` on the already deployed bundle; no scene is touched.
