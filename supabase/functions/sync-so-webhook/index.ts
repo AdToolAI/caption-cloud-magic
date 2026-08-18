@@ -1186,6 +1186,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               pass_idx: currentPass,
               retry_variant: nextRung.variant,
               user_retry_flag: true,
+              // v404 §10 — `new_attempt_id` hat KEINE Ledger-Autorität: es
+              // wird ausschliesslich vom v128-Terminal-Transition-Guard
+              // (`canLeaveTerminal`) geprueft. Die Ledger-Identitaet des
+              // Retries ist `escalateRes.replacement_job_id` (im RPC erzeugt).
               new_attempt_id: newAttemptId,
               // §5a Schritt 5 — vorab erzeugte Ledger-Identität, kein neuer Attempt.
               pipeline_job_id: escalateRes.replacement_job_id,
