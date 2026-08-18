@@ -139,13 +139,29 @@ Deno.test("sanity limits match the production thresholds", () => {
 // Anchor centers are taken HARD from the persisted S11 anchor layout, they
 // are deliberately NOT derived from the expected plate faces.
 const S11_ANCHOR_CENTERS = [
-  { name: "Sarah", cx: 256 / 1284, cy: 285.5 / 718 },
-  { name: "Samuel", cx: 508 / 1284, cy: 251.5 / 718 },
-  { name: "Matthew", cx: 786 / 1284, cy: 232 / 718 },
-  { name: "Kay", cx: 1064.5 / 1284, cy: 252 / 718 },
+  { name: "Sarah", cx: 0.24309593023255813, cy: 0.22200520833333334 },
+  { name: "Samuel", cx: 0.3862645348837209, cy: 0.19661458333333334 },
+  { name: "Matthew", cx: 0.6010174418604651, cy: 0.203125 },
+  { name: "Kay", cx: 0.8277616279069767, cy: 0.20052083333333334 },
+];
+// The exact ten detector boxes persisted for S11, in persisted order.
+const S11_PERSISTED_DETECTED: Box[] = [
+  [1125, 7, 1142, 30],
+  [819, 113, 831, 128],
+  [923, 98, 940, 119],
+  [52, 272, 65, 303],
+  [226, 244, 286, 327],
+  [344, 287, 364, 314],
+  [445, 285, 461, 305],
+  [476, 209, 540, 294],
+  [753, 187, 819, 277],
+  [1030, 208, 1099, 296],
 ];
 const S11_EXPECTED: Record<string, Box> = {
-  Sarah: SARAH, Samuel: SAMUEL, Matthew: MATTHEW, Kay: KAY,
+  Sarah: [226, 244, 286, 327],
+  Samuel: [476, 209, 540, 294],
+  Matthew: [753, 187, 819, 277],
+  Kay: [1030, 208, 1099, 296],
 };
 
 function routeExactS11(detected: Box[]) {
@@ -159,7 +175,7 @@ function routeExactS11(detected: Box[]) {
 }
 
 Deno.test("S11 exact persisted fixture → Sarah/Samuel/Matthew/Kay", () => {
-  const { plausible, res } = routeExactS11(S11_DETECTED);
+  const { plausible, res } = routeExactS11(S11_PERSISTED_DETECTED);
   assertEquals(res.ok, true);
   S11_ANCHOR_CENTERS.forEach((a, i) => {
     assertEquals(plausible[res.assign[i]].bbox, S11_EXPECTED[a.name]);
@@ -167,15 +183,14 @@ Deno.test("S11 exact persisted fixture → Sarah/Samuel/Matthew/Kay", () => {
 });
 
 Deno.test("S11 exact persisted fixture — reordered detector output is invariant", () => {
-  const reordered = [
-    EXTRA_2, KAY, FP_SARAH, MATTHEW, EXTRA_3, SAMUEL, FP_KAY, SARAH, FP_MATTHEW, EXTRA_1,
-  ];
+  const reordered = [...S11_PERSISTED_DETECTED].reverse();
   const { plausible, res } = routeExactS11(reordered);
   assertEquals(res.ok, true);
   S11_ANCHOR_CENTERS.forEach((a, i) => {
     assertEquals(plausible[res.assign[i]].bbox, S11_EXPECTED[a.name]);
   });
 });
+
 
 Deno.test("no uncontracted input-size gate — large cast still solves", () => {
   const anchors = Array.from({ length: 8 }, (_, i) => ({ cx: 0.05 + i * 0.11, cy: 0.4 }));
@@ -194,7 +209,7 @@ const CONTRACTUAL: AssignmentFailReason[] = [
   "degenerate_candidate_centers",
 ];
 
-Deno.test("contractual geometry failures never allow the legacy fallback", () => {
+Deno.test("classifyRouterFailure() marks the four Contract-B reasons as contractual", () => {
   for (const reason of CONTRACTUAL) {
     assertEquals(
       classifyRouterFailure({
