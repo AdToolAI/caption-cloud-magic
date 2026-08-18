@@ -40,9 +40,51 @@ import { acquireLedgerJob, observeCallbackProvenance, readPipelineJobId } from "
 // FA-4 Provider-No-op Fix Contract C′ — PURE motion classifier.
 import {
   classifyMotionProbe,
-  type MotionMetric,
   type MotionProbeResult,
 } from "../_shared/motion-probe-classifier.ts";
+// FA-4 v404 — server-side synchronous measurement owner (Remotion stills).
+import {
+  measureProviderMotionSync,
+  type MeasureProviderMotionSyncResult,
+} from "../_shared/measure-provider-motion-sync.ts";
+
+/** Cold-start / deploy marker for the v404 server-measurement wire. */
+const SYNC_SO_WEBHOOK_VERSION = "v404-fa4-server-motion-measurement";
+
+/**
+ * v404 §5 — Rehost the provider output to `ai-videos` OUTSIDE the dialog lock.
+ * Pure I/O, no scene-state mutation, safe to run before locking.
+ */
+async function rehostSyncOutput(
+  supabase: any,
+  sceneId: string,
+  passIdx: number,
+  outputUrl: string,
+): Promise<string | null> {
+  try {
+    const { data: row } = await supabase
+      .from("composer_scenes").select("project_id").eq("id", sceneId).single();
+    const { data: proj } = await supabase
+      .from("composer_projects").select("user_id").eq("id", (row as any)?.project_id).single();
+    const uid = (proj as any)?.user_id;
+    if (!uid) return null;
+    const dl = await fetch(outputUrl, { signal: AbortSignal.timeout(60_000) });
+    if (!dl.ok) return null;
+    const bytes = new Uint8Array(await dl.arrayBuffer());
+    const objectPath = `composer/${uid}/${sceneId}-lipsync-pass-${passIdx + 1}.mp4`;
+    const up = await supabase.storage.from("ai-videos").upload(
+      objectPath, bytes, { contentType: "video/mp4", upsert: true },
+    );
+    if (up.error) return null;
+    const { data: pub } = supabase.storage.from("ai-videos").getPublicUrl(objectPath);
+    return pub?.publicUrl ?? null;
+  } catch (err) {
+    console.warn(`[sync-so-webhook] scene=${sceneId} pass ${passIdx + 1} re-host: ${(err as Error).message}`);
+    return null;
+  }
+}
+
+
 
 
 const corsHeaders = {
@@ -240,61 +282,12 @@ async function applySyncSegmentResult(
   return res;
 }
 
-interface MotionProbeMetrics {
-  preclip: MotionMetric;
-  provider: MotionMetric;
-}
+// v404 — `readMotionProbeMetrics()` (client-persisted `meta_yavg_probe` poll)
+// ist ersatzlos entfallen. Die Motion-Metrik wird ausschließlich serverseitig
+// und synchron von `measureProviderMotionSync()` erzeugt; der Client hat keine
+// Autorität mehr (nur noch Telemetrie).
 
-/**
- * FA-4 C′ — read motion metrics that the client persisted to
- * `syncso_dispatch_log.meta_yavg_probe`.  The measurement is produced by the
- * same mouth-band algorithm on both the Provider-Input-Preclip and the
- * Provider-Output.  We poll briefly because the client probe and the
- * Sync.so webhook race to completion.
- *
- * This helper is read-only: no writes, no retry, no Ledger access.
- */
-async function readMotionProbeMetrics(
-  supabase: any,
-  sceneId: string,
-  jobId: string,
-  passIdx: number,
-  maxWaitMs = 5000,
-  intervalMs = 500,
-): Promise<MotionProbeMetrics | null> {
-  const deadline = Date.now() + maxWaitMs;
-  do {
-    const { data, error } = await supabase
-      .from("syncso_dispatch_log")
-      .select("meta_yavg_probe")
-      .eq("scene_id", sceneId)
-      .eq("job_id", jobId)
-      .maybeSingle();
 
-    if (!error && data?.meta_yavg_probe) {
-      const meta = data.meta_yavg_probe as Record<string, unknown>;
-      const pre = meta.preclip_metric as MotionMetric | undefined;
-      const prov = meta.provider_metric as MotionMetric | undefined;
-      if (
-        pre &&
-        prov &&
-        typeof pre.mean === "number" &&
-        typeof pre.peak === "number" &&
-        typeof prov.mean === "number" &&
-        typeof prov.peak === "number"
-      ) {
-        return { preclip: pre, provider: prov };
-      }
-      // Legacy single-output probe (provider only) is not sufficient for the
-      // classifier; keep polling/waiting for the client to post both metrics.
-    }
-
-    if (Date.now() + intervalMs > deadline) break;
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  } while (Date.now() < deadline);
-
-  return null;
-}
 
 /** Wallet-Refund als Edge-Nebenwirkung; der Marker ist idempotent (DB-seitig). */
 async function refundSceneIfDue(
@@ -700,11 +693,66 @@ serve((req: Request) => withLang(req, () => (async (req) => {
   // without it (poller reconciliation is the safety net) so Sync.so never
   // sees a 5xx and starts retrying.
   if (state.version === 5 && state.engine === "sync-segments") {
+    // ── FA-4 v404 §5 — KEIN AWS-WAIT IM DIALOG LOCK ───────────────────────
+    // Rehost + serverseitige Motion-Messung laufen VOR dem Dialog-Lock auf
+    // einem immutablen Snapshot. Unter `withDialogLock` findet kein Lambda-
+    // Invoke, kein Still-Download, kein JPEG-Decode und keine Messung statt.
+    let v404RehostedUrl: string | null = null;
+    let v404MotionProbe: MotionProbeResult | null = null;
+    let v404MotionMeasurement: MeasureProviderMotionSyncResult | null = null;
+    if (status === "COMPLETED" && outputUrl) {
+      const snapPasses: any[] = Array.isArray((state as any).passes) ? (state as any).passes : [];
+      const snapMatchedIdx = snapPasses.findIndex((p: any) => p?.job_id === jobId);
+      const snapTotalPasses = Number((state as any).total_passes ?? snapPasses.length ?? 1);
+      const snapPassIdx = snapMatchedIdx >= 0
+        ? snapMatchedIdx
+        : Number((state as any).current_pass ?? 0);
+      const snapPass = snapPasses[snapPassIdx] ?? null;
+
+      v404RehostedUrl = await rehostSyncOutput(supabase, sceneId, snapPassIdx, outputUrl);
+
+      if (snapTotalPasses > 1) {
+        const snapPreclipUrl = String(
+          snapPass?.preclip_url ?? snapPass?._v105_probe?.payload_video_url ?? "",
+        );
+        const seg = Array.isArray(snapPass?.segments) ? snapPass.segments[0] : null;
+        const snapDuration = Number(snapPass?.preclip_duration_sec ?? NaN) ||
+          (seg ? Number(seg.endTime) - Number(seg.startTime) : NaN);
+        v404MotionMeasurement = await measureProviderMotionSync({
+          preclipUrl: snapPreclipUrl,
+          providerOutputUrl: v404RehostedUrl ?? outputUrl,
+          durationSeconds: snapDuration,
+        });
+        v404MotionProbe = v404MotionMeasurement.measurement_status === "measured" &&
+            v404MotionMeasurement.preclip_metric && v404MotionMeasurement.provider_metric
+          ? classifyMotionProbe({
+            preclip: v404MotionMeasurement.preclip_metric,
+            provider: v404MotionMeasurement.provider_metric,
+          })
+          : {
+            verdict: "indeterminate",
+            deltaMean: v404MotionMeasurement.deltaMean ?? 0,
+            deltaPeak: v404MotionMeasurement.deltaPeak ?? 0,
+            preclipMean: v404MotionMeasurement.preclip_metric?.mean ?? 0,
+            preclipPeak: v404MotionMeasurement.preclip_metric?.peak ?? 0,
+            providerMean: v404MotionMeasurement.provider_metric?.mean ?? 0,
+            providerPeak: v404MotionMeasurement.provider_metric?.peak ?? 0,
+            reason: v404MotionMeasurement.reason,
+          };
+        console.log(
+          `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} server_motion_measure scene=${sceneId} pass=${snapPassIdx} ` +
+            `status=${v404MotionMeasurement.measurement_status} delta_mean=${v404MotionMeasurement.deltaMean ?? "n/a"} ` +
+            `verdict=${v404MotionProbe.verdict} reason=${v404MotionProbe.reason}`,
+        );
+      }
+    }
+
     const { result: __v5Result } = await withDialogLock(
       supabase,
       sceneId,
       "sync-so-webhook",
       async () => {
+
     // v25 Fan-Out: match the job_id against passes[].job_id (preferred) OR
     // the legacy top-level state.sync_job_id (single-pass scenes).
     //
@@ -791,37 +839,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const totalPasses = Number((state as any).total_passes ?? passes.length ?? 1);
       const currentPass = matchedIdx >= 0 ? matchedIdx : Number((state as any).current_pass ?? 0);
 
-      // Re-host this pass's output to ai-videos for a stable, redirect-free URL.
-      let rehostedUrl: string | null = null;
-      try {
-        const { data: row } = await supabase
-          .from("composer_scenes")
-          .select("project_id")
-          .eq("id", sceneId)
-          .single();
-        const { data: proj } = await supabase
-          .from("composer_projects")
-          .select("user_id")
-          .eq("id", (row as any)?.project_id)
-          .single();
-        const uid = (proj as any)?.user_id;
-        if (uid) {
-          const dl = await fetch(outputUrl, { signal: AbortSignal.timeout(60_000) });
-          if (dl.ok) {
-            const bytes = new Uint8Array(await dl.arrayBuffer());
-            const objectPath = `composer/${uid}/${sceneId}-lipsync-pass-${currentPass + 1}.mp4`;
-            const up = await supabase.storage.from("ai-videos").upload(
-              objectPath, bytes, { contentType: "video/mp4", upsert: true },
-            );
-            if (!up.error) {
-              const { data: pub } = supabase.storage.from("ai-videos").getPublicUrl(objectPath);
-              if (pub?.publicUrl) rehostedUrl = pub.publicUrl;
-            }
-          }
-        }
-      } catch (err) {
-        console.warn(`[sync-so-webhook] v25 scene=${sceneId} pass ${currentPass + 1} re-host: ${(err as Error).message}`);
-      }
+      // v404 §5 — the rehost already happened OUTSIDE the dialog lock.
+      const rehostedUrl: string | null = v404RehostedUrl;
+
 
       // v29: Re-read the latest passes[] from the DB and merge ONLY our
       // pass's done-patch so concurrent COMPLETED/FAILED webhooks for sibling
@@ -904,43 +924,33 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           `[sync-so-webhook] v150_bytes_heuristic_suppressed scene=${sceneId} pass=${currentPass} sizeRatio=${sizeRatio.toFixed(2)} — alte v128-Heuristik hätte fälschlich NOOP markiert, jetzt unterdrückt.`,
         );
       }
-      // v403 FA-4 Provider-No-op Fix Contract C′:
-      // For multi-speaker scenes, a PURE motion classifier evaluates the
-      // Provider-Output against the Provider-Input-Preclip BEFORE any
-      // ssw:success is committed. Single-speaker behavior is unchanged.
-      let motionProbeResult: MotionProbeResult | null = null;
-      let motionVerdictForMultiSpeaker: "motion" | "noop" | "indeterminate" | null = null;
-
+      // v404 FA-4 Server-Side Synchronous Motion Measurement:
+      // For multi-speaker scenes the authoritative motion/noop/indeterminate
+      // verdict comes from the SERVER measurement executed before this lock
+      // (measureProviderMotionSync + PURE classifyMotionProbe). No browser,
+      // no client telemetry, no `meta_yavg_probe` dependency.
+      // Single-speaker behavior is unchanged.
+      const motionProbeResult: MotionProbeResult | null = isSingleSpeakerScene
+        ? null
+        : (v404MotionProbe ?? {
+          verdict: "indeterminate",
+          deltaMean: 0,
+          deltaPeak: 0,
+          preclipMean: 0,
+          preclipPeak: 0,
+          providerMean: 0,
+          providerPeak: 0,
+          reason: "motion_probe_indeterminate:measurement_missing",
+        });
+      const motionVerdictForMultiSpeaker: "motion" | "noop" | "indeterminate" | null =
+        isSingleSpeakerScene ? null : (motionProbeResult!.verdict);
       if (!isSingleSpeakerScene) {
-        const metrics = await readMotionProbeMetrics(supabase, sceneId, jobId, currentPass);
-        if (metrics) {
-          motionProbeResult = classifyMotionProbe({
-            preclip: metrics.preclip,
-            provider: metrics.provider,
-            supplementary: {
-              syncOutputUnchanged,
-              syncOutputResolutionRegression,
-              sizeRatio,
-            },
-          });
-          motionVerdictForMultiSpeaker = motionProbeResult.verdict;
-        } else {
-          motionVerdictForMultiSpeaker = "indeterminate";
-          motionProbeResult = {
-            verdict: "indeterminate",
-            deltaMean: 0,
-            deltaPeak: 0,
-            preclipMean: 0,
-            preclipPeak: 0,
-            providerMean: 0,
-            providerPeak: 0,
-            reason: "motion_probe_indeterminate:metrics_unavailable",
-          };
-        }
         console.log(
-          `[sync-so-webhook] v403_motion_gate scene=${sceneId} pass=${currentPass} verdict=${motionVerdictForMultiSpeaker} reason=${motionProbeResult.reason}`,
+          `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} motion_gate scene=${sceneId} pass=${currentPass} ` +
+            `verdict=${motionVerdictForMultiSpeaker} delta_mean=${motionProbeResult!.deltaMean} reason=${motionProbeResult!.reason}`,
         );
       }
+
 
       if (noopSuspect) {
         const noopReason = syncOutputResolutionRegression
@@ -1176,6 +1186,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               pass_idx: currentPass,
               retry_variant: nextRung.variant,
               user_retry_flag: true,
+              // v404 §10 — `new_attempt_id` hat KEINE Ledger-Autorität: es
+              // wird ausschliesslich vom v128-Terminal-Transition-Guard
+              // (`canLeaveTerminal`) geprueft. Die Ledger-Identitaet des
+              // Retries ist `escalateRes.replacement_job_id` (im RPC erzeugt).
               new_attempt_id: newAttemptId,
               // §5a Schritt 5 — vorab erzeugte Ledger-Identität, kein neuer Attempt.
               pipeline_job_id: escalateRes.replacement_job_id,

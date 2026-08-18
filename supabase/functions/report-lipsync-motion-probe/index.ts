@@ -1,19 +1,23 @@
 /**
- * v403 — report-lipsync-motion-probe
+ * v404 — report-lipsync-motion-probe (TELEMETRY ONLY)
  * ------------------------------------------------------------------
  * Client (computeMouthYavg) posts here after a lipsync pass completes.
  *
- * This function is a PURE measurement helper. It persists mouth-band
- * motion metrics to `syncso_dispatch_log.meta_yavg_probe` and marks the
- * pass as probed (`yavg_probed_at`). It does NOT own retry decisions,
- * hard-fail states, or scene mutations.
+ * v404: this function has NO role in the motion/noop decision anymore.
+ * The authoritative metric is measured SERVER-SIDE and SYNCHRONOUSLY in
+ * `sync-so-webhook` via `measureProviderMotionSync()` (Remotion stills →
+ * Rec.601 luma variance → PURE `classifyMotionProbe`). Nothing in the
+ * completion path reads what this endpoint writes.
  *
- * The authoritative motion/noop/indeterminate verdict lives in
- * `sync-so-webhook` (multi-speaker classifier, FA-4 Provider-No-op
- * Fix Contract C′) or the existing byte-based single-speaker gate.
+ * Client-reported metrics are therefore persisted under a dedicated
+ * `client_telemetry` namespace in `syncso_dispatch_log.meta_yavg_probe`
+ * so they can never be mistaken for the authoritative measurement, and
+ * the only slot write left is the non-authoritative `yavg_probed_at`
+ * de-dupe marker that stops the browser from re-probing.
  *
  * Auth: user JWT (scene must belong to the caller's project).
  */
+
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { withLang } from "../_shared/i18n.ts";
@@ -104,21 +108,25 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
     const isNoop = body.yavg < YAVG_NOOP_THRESHOLD;
     const nowIso = new Date().toISOString();
 
-    // v403 — Build paired motion metrics when available, otherwise fall back
-    // to the legacy single-metric shape.
+    // v404 — client metrics are TELEMETRY. They live in their own namespace
+    // and are never read by the completion path (`sync-so-webhook` measures
+    // server-side). `preclip_metric` / `provider_metric` are no longer
+    // written at top level, so no consumer can bind to them as authority.
     const metaYavgProbe: Record<string, unknown> = {
-      yavg: body.yavg,
-      yavg_normalized: body.yavg_normalized ?? null,
-      frames: body.frames ?? null,
-      method: body.method ?? "canvas-mouth-band-v248",
-      is_noop: isNoop,
-      threshold: YAVG_NOOP_THRESHOLD,
+      client_telemetry: {
+        yavg: body.yavg,
+        yavg_normalized: body.yavg_normalized ?? null,
+        frames: body.frames ?? null,
+        method: body.method ?? "canvas-mouth-band-v248",
+        is_noop_hint: isNoop,
+        threshold: YAVG_NOOP_THRESHOLD,
+        preclip_metric: isMotionMetric(body.preclip_metric) ? body.preclip_metric : null,
+        provider_metric: isMotionMetric(body.provider_metric) ? body.provider_metric : null,
+      },
+      authority: "server:measure-provider-motion-sync",
       reported_at: nowIso,
     };
-    if (isMotionMetric(body.preclip_metric) && isMotionMetric(body.provider_metric)) {
-      metaYavgProbe.preclip_metric = body.preclip_metric;
-      metaYavgProbe.provider_metric = body.provider_metric;
-    }
+
 
     // Persist metric to dispatch log (best-effort, latest row for this job/pass).
     try {
@@ -179,13 +187,13 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       console.warn(`[report-lipsync-motion-probe] pass probe patch failed: ${(e as Error).message}`);
     }
 
-    // v403 — report-lipsync-motion-probe is a pure measurement helper.
+    // v404 — telemetry only: no verdict, no retry, no scene mutation.
     // The authoritative motion/noop/indeterminate verdict and any retry
     // decision live in sync-so-webhook (multi-speaker classifier) or the
     // existing byte-based single-speaker gate. We do NOT mutate scene state
     // or fire redispatches from here.
     console.log(
-      `[report-lipsync-motion-probe] v403 scene=${body.scene_id} pass=${body.pass_idx} yavg=${body.yavg.toFixed(3)} metrics_persisted`,
+      `[report-lipsync-motion-probe] v404_telemetry scene=${body.scene_id} pass=${body.pass_idx} yavg=${body.yavg.toFixed(3)} metrics_persisted`,
     );
     return json({ ok: true, is_noop: isNoop, threshold: YAVG_NOOP_THRESHOLD, run_id: passRunId, plate_generation: passPlateGeneration });
   } catch (e) {
