@@ -1,13 +1,14 @@
 /**
- * v248 — useMouthYavgProbe
+ * v403 — useMouthYavgProbe
  * ------------------------------------------------------------------
  * When a Cinematic-Sync scene's lipsync pipeline finishes (each pass
- * has status='done' and an output_url), we sample the muxed pass
- * output on the CLIENT (canvas) to detect motion-noop lipsyncs.
+ * has status='done' and an output_url), we sample BOTH the Provider-
+ * Input-Preclip and the Provider-Output on the CLIENT (canvas) to
+ * compute paired mouth-band motion metrics.
  *
  * Each pass is probed AT MOST ONCE per session; results are stored
- * server-side by `report-lipsync-motion-probe`, and the pass is
- * flagged with `motion_noop=true` when yavg < threshold.
+ * server-side by `report-lipsync-motion-probe`. The authoritative
+ * motion/noop/indeterminate verdict lives in sync-so-webhook, not here.
  *
  * We probe the per-pass output (not the final muxed clip) because:
  *   - each pass is a mouth-centered pre-clip (v247), so mouth is at
@@ -24,6 +25,7 @@ interface PassEntry {
   idx: number;
   status?: string;
   output_url?: string | null;
+  preclip_url?: string | null;
   job_id?: string | null;
   motion_noop?: boolean;
   yavg_probed_at?: string | null;
@@ -70,12 +72,23 @@ export function useMouthYavgProbe(scene: ComposerScene | null | undefined) {
 
       (async () => {
         try {
-          const result = await computeMouthYavg({
-            videoUrl: pass.output_url as string,
-            mouthCx,
-            mouthCy,
-            samples: 12,
-          });
+          // v403 — FA-4 Provider-No-op Fix Contract C′.
+          // We measure BOTH the Provider-Input-Preclip and the Provider-Output
+          // with the same mouth-band algorithm. The classifier in
+          // sync-so-webhook evaluates the delta, not an absolute threshold.
+          const preclipUrl = pass.preclip_url ?? null;
+          const providerUrl = pass.output_url as string;
+          if (!preclipUrl) {
+            console.warn(
+              `[useMouthYavgProbe] scene=${scene.id} pass=${pass.idx} missing preclip_url; skipping motion probe`,
+            );
+            return;
+          }
+
+          const [preclipResult, providerResult] = await Promise.all([
+            computeMouthYavg({ videoUrl: preclipUrl, mouthCx, mouthCy, samples: 12 }),
+            computeMouthYavg({ videoUrl: providerUrl, mouthCx, mouthCy, samples: 12 }),
+          ]);
           probedThisSession.add(key);
 
           const { data: sessionData } = await supabase.auth.getSession();
@@ -87,11 +100,25 @@ export function useMouthYavgProbe(scene: ComposerScene | null | undefined) {
               scene_id: scene.id,
               job_id: pass.job_id ?? null,
               pass_idx: pass.idx,
-              yavg: result.yavg,
-              yavg_normalized: result.yavgNormalized,
-              frames: result.frames,
-              method: result.method,
-              // v344 — telemetry only. A browser-side best-effort measurement
+              // Legacy single-metric fields (kept for backward compatibility).
+              yavg: providerResult.yavg,
+              yavg_normalized: providerResult.yavgNormalized,
+              frames: providerResult.frames,
+              method: providerResult.method,
+              // v403 — paired motion metrics for the multi-speaker classifier.
+              preclip_metric: {
+                mean: preclipResult.yavg,
+                peak: preclipResult.peak,
+                frames: preclipResult.frames,
+                method: preclipResult.method,
+              },
+              provider_metric: {
+                mean: providerResult.yavg,
+                peak: providerResult.peak,
+                frames: providerResult.frames,
+                method: providerResult.method,
+              },
+              // v344/v403 — telemetry only. A browser-side best-effort measurement
               // must never decide whether a production render is released.
               observe_only: true,
             },
