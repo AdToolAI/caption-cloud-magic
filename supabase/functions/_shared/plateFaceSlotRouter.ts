@@ -24,7 +24,9 @@
 // Contract B (global bijective geometry assignment) live in a pure module.
 import {
   assignAnchorsToCandidatesBijective,
+  classifyRouterFailure,
   filterPlausibleCandidates,
+  type RouterFailureClass,
 } from "./plate-face-candidates.ts";
 
 // ── AWS Rekognition config (duplicated for auditability) ────────────
@@ -171,6 +173,16 @@ export interface PlateFaceSlotRouterResult {
   countMismatch: boolean;
   maxDistance: number | null;
   reason?: string;
+  /**
+   * FA-4 P0 — failure classification. `contractual` = confirmed geometry
+   * decision → integration MUST fail closed (no legacy face routing).
+   * `infrastructure` = recoverable, legacy fallback contract unchanged.
+   */
+  failureClass?: RouterFailureClass;
+  /** Faces returned by DetectFaces before sanity filtering. */
+  detectedCount?: number;
+  /** True when the DetectFaces call itself completed without error. */
+  detectSucceeded?: boolean;
   msTotal: number;
 }
 
@@ -293,19 +305,34 @@ export async function routePlateFacesToAnchor(params: {
 }): Promise<PlateFaceSlotRouterResult> {
   const t0 = Date.now();
   const { plateUrl, anchorLayout } = params;
-  const emptyResult = (reason: string): PlateFaceSlotRouterResult => ({
-    ok: false,
-    method: "v278_hungarian_plate_router",
-    dims: params.plateDims ?? { width: 0, height: 0 },
-    faces: [],
-    assignmentLock: {},
-    resolvedCount: 0,
-    expectedCount: anchorLayout.slots.length,
-    countMismatch: false,
-    maxDistance: null,
-    reason,
-    msTotal: Date.now() - t0,
-  });
+  const emptyResult = (
+    reason: string,
+    ctx?: { detectSucceeded?: boolean; detectedCount?: number },
+  ): PlateFaceSlotRouterResult => {
+    const detectSucceeded = ctx?.detectSucceeded ?? false;
+    const detectedCount = ctx?.detectedCount ?? 0;
+    return {
+      ok: false,
+      method: "v278_hungarian_plate_router",
+      dims: params.plateDims ?? { width: 0, height: 0 },
+      faces: [],
+      assignmentLock: {},
+      resolvedCount: 0,
+      expectedCount: anchorLayout.slots.length,
+      countMismatch: false,
+      maxDistance: null,
+      reason,
+      detectSucceeded,
+      detectedCount,
+      failureClass: classifyRouterFailure({
+        reason,
+        detectSucceeded,
+        detectedCount,
+        expectedCount: anchorLayout.slots.length,
+      }),
+      msTotal: Date.now() - t0,
+    };
+  };
 
   if (!plateUrl || !anchorLayout?.slots?.length) return emptyResult("empty_input");
   if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) return emptyResult("aws_credentials_missing");
@@ -331,13 +358,20 @@ export async function routePlateFacesToAnchor(params: {
   }));
 
   if (rows === 0 || detected.length === 0) {
+    // DetectFaces itself succeeded here — the classifier decides whether this
+    // is a confirmed geometry statement (anchors exist, 0 faces) or a
+    // recoverable precondition gap (no anchor slots).
     return {
-      ...emptyResult("no_faces_detected"),
+      ...emptyResult("no_faces_detected", {
+        detectSucceeded: true,
+        detectedCount: detected.length,
+      }),
       dims,
       faces,
       countMismatch: rows !== detected.length,
     };
   }
+
 
   // ── Contract A — candidate sanity BEFORE any assignment ────────────
   const { plausible, rejected } = filterPlausibleCandidates(
@@ -362,6 +396,7 @@ export async function routePlateFacesToAnchor(params: {
 
   if (!assignment.ok) {
     const countMismatch = assignment.reason === "count_mismatch";
+    const reason = `fa4_fail_closed:${assignment.reason}:anchor=${rows}/plausible=${plausible.length}/detected=${detected.length}`;
     return {
       ok: false,
       method: "v278_hungarian_plate_router",
@@ -372,10 +407,19 @@ export async function routePlateFacesToAnchor(params: {
       expectedCount: rows,
       countMismatch,
       maxDistance: null,
-      reason: `fa4_fail_closed:${assignment.reason}:anchor=${rows}/plausible=${plausible.length}/detected=${detected.length}`,
+      reason,
+      detectSucceeded: true,
+      detectedCount: detected.length,
+      failureClass: classifyRouterFailure({
+        reason,
+        detectSucceeded: true,
+        detectedCount: detected.length,
+        expectedCount: rows,
+      }),
       msTotal: Date.now() - t0,
     };
   }
+
 
   const assignmentLock: Record<string, string> = {};
   let resolved = 0;
@@ -408,6 +452,16 @@ export async function routePlateFacesToAnchor(params: {
     countMismatch: false,
     maxDistance: assignment.maxDistance,
     reason: resolved === rows ? undefined : "incomplete_bijection",
+    detectSucceeded: true,
+    detectedCount: detected.length,
+    failureClass: resolved === rows
+      ? undefined
+      : classifyRouterFailure({
+        reason: "incomplete_bijection",
+        detectSucceeded: true,
+        detectedCount: detected.length,
+        expectedCount: rows,
+      }),
     msTotal: Date.now() - t0,
   };
 }

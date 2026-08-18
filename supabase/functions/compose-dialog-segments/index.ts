@@ -91,6 +91,8 @@ import { resolvePlateFaceIdentities, PlateIdentityFace } from "../_shared/plate-
 import { buildAnchorLayoutFromV274, routePlateFacesToAnchor, type AnchorFaceLayout } from "../_shared/plateFaceSlotRouter.ts";
 // FA-4 Contract E — deterministic preclip crop containment gate.
 import { evaluatePreclipCropContainment } from "../_shared/preclip-crop-containment.ts";
+// FA-4 Contract A/D — single canonical owner of the plate-face sanity limits.
+import { plateFaceSanity } from "../_shared/plate-face-candidates.ts";
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
@@ -1909,6 +1911,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // when: N < 3 (legacy is cheap and reliable there), the anchor
       // layout is missing (older scenes), face-count mismatch, or the
       // AWS DetectFaces call fails.
+      // FA-4 P0 — a CONTRACTUAL geometry failure of the v278/FA-4 router is a
+      // confirmed statement about the plate. The legacy identity resolver must
+      // NOT take over in that case (it is exactly the path that produced the
+      // wrong-face runs). Infrastructure failures keep the legacy recovery.
+      let fa4ContractualFailure: { reason: string; detail: string } | null = null;
       if (
         hasCompleteV278AnchorLayout &&
         anchorLayoutRaw
@@ -1929,7 +1936,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             `[compose-dialog-segments] scene=${sceneId} v278_router ok=${routed.ok ? 1 : 0} ` +
             `resolved=${routed.resolvedCount}/${routed.expectedCount} faces=${routed.faces.length} ` +
             `mismatch=${routed.countMismatch ? 1 : 0} maxDist=${routed.maxDistance?.toFixed(3) ?? "-"} ` +
-            `ms=${routed.msTotal} reason=${routed.reason ?? "-"}`,
+            `ms=${routed.msTotal} reason=${routed.reason ?? "-"} class=${routed.failureClass ?? "-"}`,
           );
           if (routed.ok && routed.resolvedCount === speakers.length) {
             // Adapt router output to PlateIdentityMap shape.
@@ -1955,12 +1962,49 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               minMargin: 1,
               ambiguous: false,
             } as any;
+          } else if (routed.failureClass === "contractual") {
+            fa4ContractualFailure = {
+              reason: routed.reason ?? "fa4_fail_closed:unknown",
+              detail:
+                `anchor=${routed.expectedCount} detected=${routed.detectedCount ?? routed.faces.length} ` +
+                `resolved=${routed.resolvedCount}`,
+            };
           }
         } catch (err) {
+          // Thrown router errors are ALWAYS infrastructure → legacy recovery.
           console.warn(
             `[compose-dialog-segments] scene=${sceneId} v278_router threw — falling back to legacy: ${(err as Error)?.message}`,
           );
         }
+      }
+      if (fa4ContractualFailure) {
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} fa4_contract_b_fail_closed ` +
+          `reason=${fa4ContractualFailure.reason} ${fa4ContractualFailure.detail} — ` +
+          `legacy resolvePlateFaceIdentities suppressed, no provider dispatch`,
+        );
+        await failLipSync({
+          supabase,
+          sceneId,
+          reason: fa4ContractualFailure.reason,
+          userId,
+          refundCredits: totalCost,
+          syncApiKey,
+        });
+        return json(
+          {
+            error: "plate_identity_geometry_fail_closed",
+            reason: fa4ContractualFailure.reason,
+            detail: fa4ContractualFailure.detail,
+            message: tl({
+              de: "Die Gesichter im Plate lassen sich den Sprechern nicht eindeutig zuordnen. Der Lip-Sync wurde vor dem Start abgebrochen und die Credits wurden zurückerstattet.",
+              en: "The faces on the plate cannot be assigned unambiguously to the speakers. Lip-sync was aborted before dispatch and credits have been refunded.",
+              es: "Las caras del plano no se pueden asignar de forma inequívoca a los hablantes. El lip-sync se canceló antes de iniciarse y los créditos han sido reembolsados.",
+            }),
+            refunded: totalCost,
+          },
+          422,
+        );
       }
       if (!plateIdentityMap) try {
         plateIdentityMap = await resolvePlateFaceIdentities({
@@ -1980,6 +2024,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           `[compose-dialog-segments] scene=${sceneId} plate-identity resolve threw: ${(err as Error)?.message}`,
         );
       }
+
     }
     if (plateIdentityMap && plateIdentityMap.faces.length > 0) {
       // FA-4 Face-Candidate Fix — when the v278 router produced this map, the
@@ -2410,39 +2455,23 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           }
         });
 
-        // v239 — Objective bbox sanity check. Replaces the anchor-in-bbox
-        // test for non-trusted slots. A bbox is "sane" when it lies inside
-        // the plate (with 5% tolerance), covers between 0.3% and 25% of
-        // plate area, and has an aspect ratio between 0.4 and 2.5.
-        const plateArea = Math.max(1, plateDims.width * plateDims.height);
-        const inPlateTol = Math.max(
-          8,
-          Math.round(Math.min(plateDims.width, plateDims.height) * 0.05),
-        );
+        // v239 / FA-4 Contract D — objective bbox sanity check. There is
+        // exactly ONE canonical owner of the thresholds: `plateFaceSanity()`
+        // in `_shared/plate-face-candidates.ts` (area 0.003..0.25, aspect
+        // 0.4..2.5, degenerate, out_of_plate with the 5% in-plate tolerance).
+        // This local helper is only a thin wrapper that preserves the existing
+        // reason formatting used downstream.
         const bboxSanity = (
           box: [number, number, number, number],
         ): { ok: boolean; reason: string } => {
-          const [bx1, by1, bx2, by2] = box;
-          const w = bx2 - bx1;
-          const h = by2 - by1;
-          if (w <= 0 || h <= 0) return { ok: false, reason: "degenerate" };
-          if (
-            bx1 < -inPlateTol ||
-            by1 < -inPlateTol ||
-            bx2 > plateDims.width + inPlateTol ||
-            by2 > plateDims.height + inPlateTol
-          ) {
-            return { ok: false, reason: "out_of_plate" };
+          const s = plateFaceSanity(box, plateDims);
+          if (s.ok) return { ok: true, reason: "ok" };
+          if (s.reason === "aspect_invalid") {
+            return { ok: false, reason: `aspect=${s.aspect.toFixed(2)}` };
           }
-          const areaRatio = (w * h) / plateArea;
-          if (areaRatio < 0.003) return { ok: false, reason: "area_too_small" };
-          if (areaRatio > 0.25) return { ok: false, reason: "area_too_large" };
-          const aspect = w / h;
-          if (aspect < 0.4 || aspect > 2.5) {
-            return { ok: false, reason: `aspect=${aspect.toFixed(2)}` };
-          }
-          return { ok: true, reason: "ok" };
+          return { ok: false, reason: s.reason };
         };
+
 
         const goodSlots: number[] = [];
         const badSlots: number[] = [];

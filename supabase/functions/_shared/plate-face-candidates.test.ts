@@ -1,8 +1,10 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   assignAnchorsToCandidatesBijective,
+  classifyRouterFailure,
   filterPlausibleCandidates,
   plateFaceSanity,
+  type AssignmentFailReason,
   type CandidateFace,
 } from "./plate-face-candidates.ts";
 
@@ -132,3 +134,111 @@ Deno.test("sanity limits match the production thresholds", () => {
   assertEquals(plateFaceSanity([1280, 700, 1600, 1100], DIMS).reason, "out_of_plate");
   assertEquals(plateFaceSanity(SARAH, DIMS).ok, true);
 });
+
+// ── FA-4 P0 — exact persisted S11 fixture ─────────────────────────────
+// Anchor centers are taken HARD from the persisted S11 anchor layout, they
+// are deliberately NOT derived from the expected plate faces.
+const S11_ANCHOR_CENTERS = [
+  { name: "Sarah", cx: 256 / 1284, cy: 285.5 / 718 },
+  { name: "Samuel", cx: 508 / 1284, cy: 251.5 / 718 },
+  { name: "Matthew", cx: 786 / 1284, cy: 232 / 718 },
+  { name: "Kay", cx: 1064.5 / 1284, cy: 252 / 718 },
+];
+const S11_EXPECTED: Record<string, Box> = {
+  Sarah: SARAH, Samuel: SAMUEL, Matthew: MATTHEW, Kay: KAY,
+};
+
+function routeExactS11(detected: Box[]) {
+  const candidates = detected.map((b, i) => cand(i, b));
+  const { plausible } = filterPlausibleCandidates(candidates, DIMS);
+  const res = assignAnchorsToCandidatesBijective(
+    S11_ANCHOR_CENTERS.map((a) => ({ cx: a.cx, cy: a.cy })),
+    plausible.map((p) => ({ cx: p.cx, cy: p.cy })),
+  );
+  return { plausible, res };
+}
+
+Deno.test("S11 exact persisted fixture → Sarah/Samuel/Matthew/Kay", () => {
+  const { plausible, res } = routeExactS11(S11_DETECTED);
+  assertEquals(res.ok, true);
+  S11_ANCHOR_CENTERS.forEach((a, i) => {
+    assertEquals(plausible[res.assign[i]].bbox, S11_EXPECTED[a.name]);
+  });
+});
+
+Deno.test("S11 exact persisted fixture — reordered detector output is invariant", () => {
+  const reordered = [
+    EXTRA_2, KAY, FP_SARAH, MATTHEW, EXTRA_3, SAMUEL, FP_KAY, SARAH, FP_MATTHEW, EXTRA_1,
+  ];
+  const { plausible, res } = routeExactS11(reordered);
+  assertEquals(res.ok, true);
+  S11_ANCHOR_CENTERS.forEach((a, i) => {
+    assertEquals(plausible[res.assign[i]].bbox, S11_EXPECTED[a.name]);
+  });
+});
+
+Deno.test("no uncontracted input-size gate — large cast still solves", () => {
+  const anchors = Array.from({ length: 8 }, (_, i) => ({ cx: 0.05 + i * 0.11, cy: 0.4 }));
+  const candidates = Array.from({ length: 20 }, (_, i) => ({ cx: 0.02 + i * 0.045, cy: 0.4 + i * 0.001 }));
+  const res = assignAnchorsToCandidatesBijective(anchors, candidates);
+  assertEquals(res.ok, true);
+  assertEquals(new Set(res.assign).size, anchors.length);
+  assertEquals((res as any).reason, undefined);
+});
+
+// ── FA-4 P0 — router failure classification ───────────────────────────
+const CONTRACTUAL: AssignmentFailReason[] = [
+  "count_mismatch",
+  "incomplete_bijection",
+  "equal_cost_ambiguity",
+  "degenerate_candidate_centers",
+];
+
+Deno.test("contractual geometry failures never allow the legacy fallback", () => {
+  for (const reason of CONTRACTUAL) {
+    assertEquals(
+      classifyRouterFailure({
+        reason: `fa4_fail_closed:${reason}:anchor=4/plausible=3/detected=10`,
+        detectSucceeded: true,
+        detectedCount: 10,
+        expectedCount: 4,
+      }),
+      "contractual",
+    );
+  }
+});
+
+Deno.test("infrastructure failures keep the legacy fallback", () => {
+  for (const reason of ["aws_credentials_missing", "plate_fetch_failed", "detect_failed:timeout", "empty_input"]) {
+    assertEquals(
+      classifyRouterFailure({ reason, detectSucceeded: false, detectedCount: 0, expectedCount: 4 }),
+      "infrastructure",
+    );
+  }
+  assertEquals(
+    classifyRouterFailure({
+      reason: "fa4_fail_closed:count_mismatch",
+      detectSucceeded: true,
+      detectedCount: 10,
+      expectedCount: 4,
+      threw: true,
+    }),
+    "infrastructure",
+  );
+});
+
+Deno.test("no_faces_detected is contractual only after a successful detection", () => {
+  assertEquals(
+    classifyRouterFailure({ reason: "no_faces_detected", detectSucceeded: true, detectedCount: 0, expectedCount: 4 }),
+    "contractual",
+  );
+  assertEquals(
+    classifyRouterFailure({ reason: "no_faces_detected", detectSucceeded: false, detectedCount: 0, expectedCount: 4 }),
+    "infrastructure",
+  );
+  assertEquals(
+    classifyRouterFailure({ reason: "no_faces_detected", detectSucceeded: true, detectedCount: 0, expectedCount: 0 }),
+    "infrastructure",
+  );
+});
+
