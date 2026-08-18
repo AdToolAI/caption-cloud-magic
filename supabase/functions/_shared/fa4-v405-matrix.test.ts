@@ -188,7 +188,8 @@ Deno.test("L. ROI is bx=461 by=411 bw=358 bh=154", () => {
 Deno.test("M. threshold boundaries are exact and fail-closed", () => {
   assertEquals(MOTION_THRESHOLD, 15.405704881800869);
   assertEquals(NOOP_THRESHOLD, 3.682671115501879);
-  const v = (d: number) => classifyMotionProbe(withMean(100, d)).verdict;
+  // preclip mean 0 → deltaMean is exactly the requested value (no fp drift).
+  const v = (d: number) => classifyMotionProbe(withMean(0, d)).verdict;
   assertEquals(v(MOTION_THRESHOLD + 1e-6), "motion");
   assertEquals(v(MOTION_THRESHOLD), "indeterminate");
   assertEquals(v((MOTION_THRESHOLD + NOOP_THRESHOLD) / 2), "indeterminate");
