@@ -119,7 +119,7 @@ Das Measurement ist read-only gegenüber Composer/DB/Ledger. Ein Duplicate Callb
 
 Bleibt reine Telemetrie. Aus der Authority entfernt werden: `readMotionProbeMetrics()`, Client-Polling als Voraussetzung, `update_dialog_pass_slot` für die Motion-Entscheidung, Retry-/Apply-Ownership. Der Produktionspfad muss bei komplett geschlossenem Browser vollständig funktionieren.
 
-## 7. Geforderte Tests der späteren Implementierung
+## 10. Geforderte Tests der späteren Implementierung
 
 A. COMPLETED + serverseitig `motion` → `ssw:success`
 B. COMPLETED + serverseitig `noop` → `ssw:noop_escalate`, genau ein Replacement-Attempt
@@ -132,14 +132,15 @@ H. S11-Fixture (nach Kalibrierung, Server-Werte): T1/T2/T3/T5 = motion, T4/T6 = 
 I. Single-Speaker-Pfad unverändert
 J. Geometry / Audio / Fan-out / Mux / RS3 unverändert
 
-## 8. Frozen (nicht Teil dieses Contracts)
+## 11. Frozen (nicht Teil dieses Contracts)
 
 v402 Face-Candidate / Hungarian / AssignmentLock, Contract E / Preclip-Geometrie, Audio-Preparation, Turn-ID / Fan-out, `speaker_idx`, Ledger / G3.2.2, RS3, Mux / Finalizer, `processed_video_url`-Semantik, Fresh = `bounding_boxes_url` / Retry = inline `bounding_boxes`, Sync-3-Modellentscheidung.
 
-## 9. Restrisiken (offen zu bestätigen)
+## 12. Restrisiken (im Calibration-Gate zu klären)
 
-- Laufzeit: 2 × N Still-Invokes pro Segment innerhalb des Webhook-Zeitbudgets; N wird in der Kalibrierung so klein wie möglich gewählt.
-- Kosten: zusätzliche Lambda-Still-Invokes pro Lip-Sync-Pass.
+- Laufzeit: 2 × N Still-Invokes pro Segment außerhalb des Dialog-Locks, innerhalb des Webhook-Gesamtbudgets.
+- Kosten: zusätzliche Lambda-Still-Invokes pro Lip-Sync-Pass, inkl. möglicher Duplicate-Callback-Duplikate (nur Cost/Telemetry).
 - Der serverseitige JPEG-Decoder ist eine neue Abhängigkeit (reine Dekodierbibliothek, kein Frame-/Face-Provider).
+- Source→Still-Transform (§6) ist noch unbewiesen und ist harte Voraussetzung für Implementation-GO.
 
-FA-4 SERVER-SIDE SYNCHRONOUS MOTION MEASUREMENT FIX CONTRACT = READY FOR APPROVAL
+FA-4 SERVER-SIDE SYNCHRONOUS MOTION MEASUREMENT FIX CONTRACT = FINAL CORRECTION READY
