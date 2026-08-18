@@ -54,6 +54,28 @@ export interface MotionMetricValue {
 
 export type MeasurementStatus = "measured" | "unmeasurable";
 
+/**
+ * v404 P1-C — remaining wall-clock budget of the WHOLE measurement run,
+ * handed to every network operation. `signal` is the run-scoped root signal.
+ */
+export interface MeasurementBudget {
+  remainingMs: number;
+  signal: AbortSignal;
+}
+
+/** PURE — remaining budget, never negative-by-accident. */
+export function remainingBudgetMs(nowMs: number, absoluteDeadlineMs: number): number {
+  const rest = absoluteDeadlineMs - nowMs;
+  return Number.isFinite(rest) ? rest : 0;
+}
+
+export type RenderStillFn = (
+  videoUrl: string,
+  totalSec: number,
+  frame: number,
+  budget: MeasurementBudget,
+) => Promise<Uint8Array>;
+
 export interface MeasureProviderMotionSyncArgs {
   preclipUrl: string;
   providerOutputUrl: string;
@@ -63,7 +85,7 @@ export interface MeasureProviderMotionSyncArgs {
   preclipDims?: { width: number; height: number } | null;
   providerDims?: { width: number; height: number } | null;
   /** Injected for tests. Returns raw JPEG bytes of one still. */
-  renderStill?: (videoUrl: string, totalSec: number, frame: number) => Promise<Uint8Array>;
+  renderStill?: RenderStillFn;
   /** Injected for tests. Returns source dimensions of a video. */
   probeDims?: (url: string) => Promise<{ width: number; height: number } | null>;
   /** Injected for tests. */
@@ -71,6 +93,7 @@ export interface MeasureProviderMotionSyncArgs {
   deadlineMs?: number;
   sampleCount?: number;
 }
+
 
 export interface MeasureProviderMotionSyncResult {
   preclip_metric: MotionMetricValue | null;
@@ -180,7 +203,7 @@ async function pool<T>(tasks: Array<() => Promise<T>>, concurrency: number): Pro
 }
 
 /** Production still primitive: Remotion Lambda `type:"still"` (AWS-only). */
-function defaultRenderStill(): (v: string, t: number, f: number) => Promise<Uint8Array> {
+function defaultRenderStill(): RenderStillFn {
   const accessKeyId = Deno.env.get("AWS_ACCESS_KEY_ID") ?? "";
   const secretAccessKey = Deno.env.get("AWS_SECRET_ACCESS_KEY") ?? "";
   const sessionToken = Deno.env.get("AWS_SESSION_TOKEN") ?? undefined;
@@ -191,7 +214,16 @@ function defaultRenderStill(): (v: string, t: number, f: number) => Promise<Uint
   const lambdaUrl =
     `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${getLambdaFunctionName()}/invocations`;
 
-  return async (videoUrl: string, totalSec: number, frame: number): Promise<Uint8Array> => {
+  return async (
+    videoUrl: string,
+    totalSec: number,
+    frame: number,
+    budget: MeasurementBudget,
+  ): Promise<Uint8Array> => {
+    // v404 P1-C — every timeout below is capped by the REMAINING global budget,
+    // never by a fresh full-length timeout.
+    if (budget.remainingMs <= 0) throw new Error("measurement_deadline_exceeded");
+    const invokeBudget = Math.max(1, Math.floor(budget.remainingMs));
     const payload = {
       type: "still",
       serveUrl,
@@ -213,7 +245,7 @@ function defaultRenderStill(): (v: string, t: number, f: number) => Promise<Uint
       attempt: 1,
       logLevel: "warn",
       outName: `fa4v404-${crypto.randomUUID()}.jpeg`,
-      timeoutInMilliseconds: 120000,
+      timeoutInMilliseconds: invokeBudget,
       chromiumOptions: {},
       scale: 1,
       downloadBehavior: { type: "play-in-browser", fileName: null },
@@ -229,19 +261,37 @@ function defaultRenderStill(): (v: string, t: number, f: number) => Promise<Uint
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(MEASUREMENT_DEADLINE_MS),
+      signal: linkedSignal(budget, invokeBudget),
     });
     if (!res.ok) throw new Error(`lambda_http_${res.status}`);
     const parsed = JSON.parse(await res.text());
     const output: string | undefined = parsed?.output ?? parsed?.url;
     if (!output || typeof output !== "string") throw new Error("lambda_no_output");
-    const dl = await fetch(output, { signal: AbortSignal.timeout(MEASUREMENT_DEADLINE_MS) });
+    const dl = await fetch(output, { signal: linkedSignal(budget, invokeBudget) });
     if (!dl.ok) throw new Error(`still_download_${dl.status}`);
     const bytes = new Uint8Array(await dl.arrayBuffer());
     if (bytes.byteLength < 1024) throw new Error("still_too_small");
     return bytes;
   };
 }
+
+/**
+ * Combines the run-scoped root signal with the remaining-budget timeout, so a
+ * single request can never outlive the global measurement deadline.
+ */
+function linkedSignal(budget: MeasurementBudget, remainingMs: number): AbortSignal {
+  const anySignal = (AbortSignal as unknown as { any?: (s: AbortSignal[]) => AbortSignal }).any;
+  const timeoutSignal = AbortSignal.timeout(Math.max(1, remainingMs));
+  if (typeof anySignal === "function") return anySignal([budget.signal, timeoutSignal]);
+  const c = new AbortController();
+  const abort = () => c.abort(new Error("measurement_deadline_exceeded"));
+  if (budget.signal.aborted || timeoutSignal.aborted) abort();
+  budget.signal.addEventListener("abort", abort, { once: true });
+  timeoutSignal.addEventListener("abort", abort, { once: true });
+  return c.signal;
+}
+
+
 
 function unmeasurable(reason: string): MeasureProviderMotionSyncResult {
   return {
@@ -266,91 +316,172 @@ export async function measureProviderMotionSync(
   const deadlineMs = args.deadlineMs ?? MEASUREMENT_DEADLINE_MS;
   const n = args.sampleCount ?? MOTION_SAMPLE_COUNT;
   const t0 = now();
-  const expired = () => now() - t0 > deadlineMs;
+  const absoluteDeadline = t0 + deadlineMs;
+  const remaining = () => remainingBudgetMs(now(), absoluteDeadline);
 
-  if (!args.preclipUrl) return unmeasurable("motion_probe_indeterminate:preclip_url_missing");
-  if (!args.providerOutputUrl) {
-    return unmeasurable("motion_probe_indeterminate:provider_url_missing");
-  }
-  const duration = Number(args.durationSeconds);
-  if (!Number.isFinite(duration) || duration <= 0) {
-    return unmeasurable("motion_probe_indeterminate:duration_unknown");
-  }
+  // v404 P1-C — ONE root controller for the ENTIRE measurement run. Every
+  // network operation (Lambda invoke, still download, dimension probe)
+  // inherits this signal, so the wall clock — not per-request timeouts —
+  // bounds the whole run at `deadlineMs`.
+  const rootController = new AbortController();
+  const rootTimer = setTimeout(() => {
+    try {
+      rootController.abort(new Error("measurement_deadline_exceeded"));
+    } catch { /* already aborted */ }
+  }, Math.max(0, deadlineMs));
 
-  let renderStill: (v: string, t: number, f: number) => Promise<Uint8Array>;
   try {
-    renderStill = args.renderStill ?? defaultRenderStill();
-  } catch (e) {
-    return unmeasurable(`motion_probe_indeterminate:${(e as Error).message}`);
-  }
+    if (!args.preclipUrl) return unmeasurable("motion_probe_indeterminate:preclip_url_missing");
+    if (!args.providerOutputUrl) {
+      return unmeasurable("motion_probe_indeterminate:provider_url_missing");
+    }
+    const duration = Number(args.durationSeconds);
+    if (!Number.isFinite(duration) || duration <= 0) {
+      return unmeasurable("motion_probe_indeterminate:duration_unknown");
+    }
 
-  const probeDims = args.probeDims ??
-    (async (url: string) => {
-      const { probeMp4Dims } = await import("./twoshot-face-map.ts");
-      return await probeMp4Dims(url).catch(() => null);
-    });
+    let renderStill: RenderStillFn;
+    try {
+      renderStill = args.renderStill ?? defaultRenderStill();
+    } catch (e) {
+      return unmeasurable(`motion_probe_indeterminate:${(e as Error).message}`);
+    }
 
-  const frames = motionSampleFrames(duration, n);
+    const probeDims = args.probeDims ??
+      (async (url: string) => {
+        const { probeMp4Dims } = await import("./twoshot-face-map.ts");
+        return await probeMp4Dims(url).catch(() => null);
+      });
 
-  const measureOne = async (
-    url: string,
-    dimHint: { width: number; height: number } | null | undefined,
-  ): Promise<MotionMetricValue> => {
-    const dims = dimHint && dimHint.width > 0 && dimHint.height > 0
-      ? dimHint
-      : await probeDims(url);
-    if (!dims || !(dims.width > 0) || !(dims.height > 0)) throw new Error("dimensions_unknown");
-    if (expired()) throw new Error("measurement_deadline_exceeded");
+    const frames = motionSampleFrames(duration, n);
 
-    const stills = await pool(
-      frames.map((f) => async () => {
-        if (expired()) throw new Error("measurement_deadline_exceeded");
-        return await renderStill(url, duration, f);
-      }),
-      MOTION_STILL_CONCURRENCY,
-    );
-    const decoded: DecodedFrame[] = stills.map((bytes) =>
-      jpeg.decode(bytes, { useTArray: true }) as DecodedFrame
-    );
-    if (decoded.length < n) throw new Error("insufficient_frames");
-    const stillWidth = decoded[0].width;
-    const stillHeight = decoded[0].height;
-    if (!(stillWidth > 0) || !(stillHeight > 0)) throw new Error("still_dimensions_invalid");
-    const roi = stillRoiForSource(dims.width, dims.height, stillWidth, stillHeight);
-    if (!(roi.bw > 0) || !(roi.bh > 0) || roi.bx < 0 || roi.by < 0) throw new Error("roi_invalid");
-    const { mean, peak } = computeMotionMetric(decoded, roi);
-    if (!Number.isFinite(mean) || !Number.isFinite(peak)) throw new Error("metric_not_finite");
-    return {
-      mean,
-      peak,
-      frames: decoded.length,
-      method: "server-remotion-still-mouthband-v404",
-      roi,
-      stillWidth,
-      stillHeight,
+    /** Fail-closed budget gate — throws the frozen deadline error. */
+    const budget = (): MeasurementBudget => {
+      const remainingMs = remaining();
+      if (remainingMs <= 0) throw new Error("measurement_deadline_exceeded");
+      return { remainingMs, signal: rootController.signal };
     };
-  };
 
-  let preclip: MotionMetricValue;
-  let provider: MotionMetricValue;
-  try {
-    preclip = await measureOne(args.preclipUrl, args.preclipDims);
-  } catch (e) {
-    return unmeasurable(`motion_probe_indeterminate:preclip_${(e as Error).message}`);
-  }
-  try {
-    provider = await measureOne(args.providerOutputUrl, args.providerDims);
-  } catch (e) {
-    return unmeasurable(`motion_probe_indeterminate:provider_${(e as Error).message}`);
-  }
-  if (expired()) return unmeasurable("motion_probe_indeterminate:measurement_deadline_exceeded");
+    const measureOne = async (
+      url: string,
+      dimHint: { width: number; height: number } | null | undefined,
+    ): Promise<MotionMetricValue> => {
+      const dims = dimHint && dimHint.width > 0 && dimHint.height > 0
+        ? dimHint
+        // The dimension probe is budgeted too — it can never outlive the root
+        // deadline even though it has no own abort signal.
+        : await withBudget(budget(), probeDims(url));
+      if (!dims || !(dims.width > 0) || !(dims.height > 0)) throw new Error("dimensions_unknown");
 
-  return {
-    preclip_metric: preclip,
-    provider_metric: provider,
-    deltaMean: provider.mean - preclip.mean,
-    deltaPeak: provider.peak - preclip.peak,
-    measurement_status: "measured",
-    reason: "measured",
-  };
+      const stills = await pool(
+        // `budget()` is evaluated per task, i.e. AFTER the previous tasks have
+        // consumed wall clock — no request ever gets the full deadline twice.
+        frames.map((f) => async () => await renderStill(url, duration, f, budget())),
+        MOTION_STILL_CONCURRENCY,
+      );
+      if (remaining() <= 0) throw new Error("measurement_deadline_exceeded");
+      const decoded: DecodedFrame[] = stills.map((bytes) =>
+        jpeg.decode(bytes, { useTArray: true }) as DecodedFrame
+      );
+      if (decoded.length < n) throw new Error("insufficient_frames");
+      const stillWidth = decoded[0].width;
+      const stillHeight = decoded[0].height;
+      if (!(stillWidth > 0) || !(stillHeight > 0)) throw new Error("still_dimensions_invalid");
+      const roi = stillRoiForSource(dims.width, dims.height, stillWidth, stillHeight);
+      if (!(roi.bw > 0) || !(roi.bh > 0) || roi.bx < 0 || roi.by < 0) throw new Error("roi_invalid");
+      const { mean, peak } = computeMotionMetric(decoded, roi);
+      if (!Number.isFinite(mean) || !Number.isFinite(peak)) throw new Error("metric_not_finite");
+      return {
+        mean,
+        peak,
+        frames: decoded.length,
+        method: "server-remotion-still-mouthband-v404",
+        roi,
+        stillWidth,
+        stillHeight,
+      };
+    };
+
+    let preclip: MotionMetricValue;
+    let provider: MotionMetricValue;
+    try {
+      preclip = await measureOne(args.preclipUrl, args.preclipDims);
+    } catch (e) {
+      return deadlineAwareUnmeasurable(e, "preclip");
+    }
+    try {
+      provider = await measureOne(args.providerOutputUrl, args.providerDims);
+    } catch (e) {
+      return deadlineAwareUnmeasurable(e, "provider");
+    }
+    if (remaining() <= 0) {
+      return unmeasurable("motion_probe_indeterminate:measurement_deadline_exceeded");
+    }
+
+    return {
+      preclip_metric: preclip,
+      provider_metric: provider,
+      deltaMean: provider.mean - preclip.mean,
+      deltaPeak: provider.peak - preclip.peak,
+      measurement_status: "measured",
+      reason: "measured",
+    };
+  } finally {
+    clearTimeout(rootTimer);
+    // Release anything still hanging on the root signal.
+    try {
+      if (!rootController.signal.aborted) {
+        rootController.abort(new Error("measurement_finished"));
+      }
+    } catch { /* noop */ }
+  }
 }
+
+/**
+ * Any deadline breach — wherever it surfaced — collapses to the single frozen
+ * reason. Everything else keeps its stage-prefixed diagnostic reason.
+ */
+export function deadlineAwareUnmeasurable(
+  e: unknown,
+  stage: "preclip" | "provider",
+): MeasureProviderMotionSyncResult {
+  const msg = (e as Error)?.message ?? String(e);
+  if (isDeadlineError(msg)) {
+    return unmeasurable("motion_probe_indeterminate:measurement_deadline_exceeded");
+  }
+  return unmeasurable(`motion_probe_indeterminate:${stage}_${msg}`);
+}
+
+/** PURE — recognises every shape of "the global wall clock ran out". */
+export function isDeadlineError(message: string): boolean {
+  return message.includes("measurement_deadline_exceeded") ||
+    message.includes("TimeoutError") ||
+    message.includes("AbortError") ||
+    message.includes("aborted");
+}
+
+/** Races a promise without its own abort support against the remaining budget. */
+function withBudget<T>(b: MeasurementBudget, p: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const fail = () => reject(new Error("measurement_deadline_exceeded"));
+    const t = setTimeout(fail, Math.max(0, b.remainingMs));
+    const onAbort = () => {
+      clearTimeout(t);
+      fail();
+    };
+    b.signal.addEventListener("abort", onAbort, { once: true });
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        b.signal.removeEventListener("abort", onAbort);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        b.signal.removeEventListener("abort", onAbort);
+        reject(e);
+      },
+    );
+  });
+}
+

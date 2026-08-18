@@ -11,16 +11,23 @@
  *
  * Client-reported metrics are therefore persisted under a dedicated
  * `client_telemetry` namespace in `syncso_dispatch_log.meta_yavg_probe`
- * so they can never be mistaken for the authoritative measurement, and
- * the only slot write left is the non-authoritative `yavg_probed_at`
- * de-dupe marker that stops the browser from re-probing.
+ * so they can never be mistaken for the authoritative measurement.
  *
+ * v404 P1-B: this function owns NO scene/pass state at all — there is no
+ * `update_dialog_pass_slot` call and no `yavg_probed_at` write. Browser
+ * de-dupe is session-local (`probedThisSession` in useMouthYavgProbe).
+ * Every telemetry write requires the complete key scene_id + job_id +
+ * pass_idx AND an exact job-slot match; otherwise ZERO writes happen.
+ *
+
  * Auth: user JWT (scene must belong to the caller's project).
  */
 
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { withLang } from "../_shared/i18n.ts";
+import { resolveTelemetryTarget } from "../_shared/telemetry-target.ts";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -108,10 +115,55 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
     const isNoop = body.yavg < YAVG_NOOP_THRESHOLD;
     const nowIso = new Date().toISOString();
 
+    // ── v404 P1-B — TELEMETRY ONLY, FAIL-CLOSED KEY ────────────────────────
+    // This function owns NO scene/pass state. Before ANY write we require the
+    // complete key (scene_id + job_id + pass_idx) AND an exact job-slot match
+    // against the immutable dispatch snapshot. Anything short of that is a
+    // strict no-op with ZERO database writes.
+    const reportedJobId = typeof body.job_id === "string" && body.job_id.length > 0
+      ? body.job_id
+      : null;
+    if (!reportedJobId) {
+      console.warn(
+        `[report-lipsync-motion-probe] v404_telemetry_key_missing scene=${body.scene_id} pass=${body.pass_idx} job_id=none → no-op`,
+      );
+      return json({ ok: true, ignored: "job_id_missing" });
+    }
+
+    const dialogShots = (scene as { dialog_shots?: { passes?: unknown[] } }).dialog_shots ?? {};
+    const passes = Array.isArray((dialogShots as { passes?: unknown[] }).passes)
+      ? (dialogShots as { passes: Record<string, unknown>[] }).passes
+      : [];
+    const pass = passes[body.pass_idx] as Record<string, unknown> | undefined;
+    if (!pass) {
+      console.warn(
+        `[report-lipsync-motion-probe] v404_telemetry_pass_missing scene=${body.scene_id} pass=${body.pass_idx} → no-op`,
+      );
+      return json({ ok: true, ignored: "pass_not_found" });
+    }
+
+    // v431 G2.1/G2.2 — run provenance comes exclusively from the pass slot
+    // frozen at dispatch time (immutable), never from the live scene.
+    const passRunId = (pass as Record<string, unknown>).run_id ?? null;
+    const passPlateGeneration = (pass as Record<string, unknown>).plate_generation ?? null;
+    const slotJobId = typeof pass.job_id === "string" && pass.job_id.length > 0 ? pass.job_id : null;
+    const jobSlotMatch = !!slotJobId && slotJobId === reportedJobId;
+    console.log(
+      `[report-lipsync-motion-probe] v431_g2_2 scene=${body.scene_id} pass=${body.pass_idx} ` +
+        `run=${passRunId ?? "none"} gen=${passPlateGeneration ?? "none"} ` +
+        `slot_job=${slotJobId ?? "none"} reported_job=${reportedJobId} match=${jobSlotMatch}`,
+    );
+    if (!jobSlotMatch) {
+      console.warn(
+        `[report-lipsync-motion-probe] v431_g2_2 job_slot_mismatch scene=${body.scene_id} pass=${body.pass_idx} ` +
+          `expected=${slotJobId ?? "none"} got=${reportedJobId} → no-op`,
+      );
+      return json({ ok: true, ignored: "job_slot_mismatch" });
+    }
+
     // v404 — client metrics are TELEMETRY. They live in their own namespace
     // and are never read by the completion path (`sync-so-webhook` measures
-    // server-side). `preclip_metric` / `provider_metric` are no longer
-    // written at top level, so no consumer can bind to them as authority.
+    // server-side), so no consumer can bind to them as authority.
     const metaYavgProbe: Record<string, unknown> = {
       client_telemetry: {
         yavg: body.yavg,
@@ -127,75 +179,47 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       reported_at: nowIso,
     };
 
-
-    // Persist metric to dispatch log (best-effort, latest row for this job/pass).
+    // Exact-row resolution. `job_id` is dispatch-unique; if it still resolves
+    // to more than one row we narrow by the persisted pass identity
+    // (`turn_idx`) and otherwise fail closed — never a bulk update.
+    let telemetryRows = 0;
     try {
-      const query = admin
+      const { data: candidates } = await admin
         .from("syncso_dispatch_log")
-        .update({
-          noop_mouth_yavg: body.yavg,
-          meta_yavg_probe: metaYavgProbe,
-        })
-        .eq("scene_id", body.scene_id);
-      if (body.job_id) await query.eq("job_id", body.job_id);
-      else await query;
+        .select("id, turn_idx")
+        .eq("scene_id", body.scene_id)
+        .eq("job_id", reportedJobId);
+      const target = resolveTelemetryTarget(
+        (candidates ?? []) as Array<{ id: string; turn_idx: number | null }>,
+        body.pass_idx,
+      );
+      if (!target.ok) {
+        console.warn(
+          `[report-lipsync-motion-probe] v404_telemetry_key_unresolved scene=${body.scene_id} ` +
+            `job=${reportedJobId} pass=${body.pass_idx} reason=${target.reason} → no write`,
+        );
+        return json({ ok: true, ignored: `telemetry_key_${target.reason}` });
+      }
+      const { error: updErr } = await admin
+        .from("syncso_dispatch_log")
+        .update({ noop_mouth_yavg: body.yavg, meta_yavg_probe: metaYavgProbe })
+        .eq("id", target.id);
+      if (updErr) throw new Error(updErr.message);
+      telemetryRows = 1;
+
     } catch (e) {
       console.warn(`[report-lipsync-motion-probe] log update failed: ${(e as Error).message}`);
     }
 
-    // Always mark the pass as probed so we don't re-probe on the client.
-    const dialogShots = (scene as { dialog_shots?: { passes?: unknown[] } }).dialog_shots ?? {};
-    const passes = Array.isArray((dialogShots as { passes?: unknown[] }).passes)
-      ? (dialogShots as { passes: Record<string, unknown>[] }).passes
-      : [];
-    const pass = passes[body.pass_idx] as Record<string, unknown> | undefined;
-    if (!pass) return json({ ok: true, is_noop: isNoop, threshold: YAVG_NOOP_THRESHOLD });
-
-    // v431 G2.1/G2.2 — Run-Provenienz stammt ausschliesslich aus dem beim
-    // Dispatch eingefrorenen Pass-Slot (immutable), nie aus der Live-Szene.
-    // G2.2: bevor der Snapshot ueberhaupt genutzt wird, muss die gemeldete
-    // job_id exakt zur Slot-job_id passen (fail-closed, No-op bei Mismatch).
-    const passRunId = (pass as Record<string, unknown>).run_id ?? null;
-    const passPlateGeneration = (pass as Record<string, unknown>).plate_generation ?? null;
-    const slotJobId = typeof pass.job_id === "string" && pass.job_id.length > 0 ? pass.job_id : null;
-    const reportedJobId = typeof body.job_id === "string" && body.job_id.length > 0 ? body.job_id : null;
-    const jobSlotMatch = !!slotJobId && !!reportedJobId && slotJobId === reportedJobId;
+    // v404 — telemetry only: no verdict, no retry, no scene/pass mutation.
+    // The authoritative motion/noop/indeterminate verdict lives in
+    // sync-so-webhook (server-side measurement + PURE classifier).
     console.log(
-      `[report-lipsync-motion-probe] v431_g2_2 scene=${body.scene_id} pass=${body.pass_idx} ` +
-        `run=${passRunId ?? "none"} gen=${passPlateGeneration ?? "none"} ` +
-        `slot_job=${slotJobId ?? "none"} reported_job=${reportedJobId ?? "none"} match=${jobSlotMatch}`,
-    );
-
-    if (!jobSlotMatch) {
-      console.warn(
-        `[report-lipsync-motion-probe] v431_g2_2 job_slot_mismatch scene=${body.scene_id} pass=${body.pass_idx} ` +
-          `expected=${slotJobId ?? "none"} got=${reportedJobId ?? "none"} → no-op`,
-      );
-      return json({ ok: true, ignored: "job_slot_mismatch" });
-    }
-
-    try {
-      await admin.rpc("update_dialog_pass_slot", {
-        _scene_id: body.scene_id,
-        _pass_idx: body.pass_idx,
-        _patch: {
-          yavg_probed_at: nowIso,
-          yavg_value: body.yavg,
-        },
-      });
-    } catch (e) {
-      console.warn(`[report-lipsync-motion-probe] pass probe patch failed: ${(e as Error).message}`);
-    }
-
-    // v404 — telemetry only: no verdict, no retry, no scene mutation.
-    // The authoritative motion/noop/indeterminate verdict and any retry
-    // decision live in sync-so-webhook (multi-speaker classifier) or the
-    // existing byte-based single-speaker gate. We do NOT mutate scene state
-    // or fire redispatches from here.
-    console.log(
-      `[report-lipsync-motion-probe] v404_telemetry scene=${body.scene_id} pass=${body.pass_idx} yavg=${body.yavg.toFixed(3)} metrics_persisted`,
+      `[report-lipsync-motion-probe] v404_telemetry scene=${body.scene_id} pass=${body.pass_idx} ` +
+        `yavg=${body.yavg.toFixed(3)} rows=${telemetryRows} slot_writes=0`,
     );
     return json({ ok: true, is_noop: isNoop, threshold: YAVG_NOOP_THRESHOLD, run_id: passRunId, plate_generation: passPlateGeneration });
+
   } catch (e) {
     console.error(`[report-lipsync-motion-probe] error: ${(e as Error).message}`);
     return json({ error: "internal", message: (e as Error).message }, 500);
