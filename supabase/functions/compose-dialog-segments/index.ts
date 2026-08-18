@@ -108,7 +108,7 @@ import {
   type PreflightFaceResult,
 } from "../_shared/asd-strategy.ts";
 // FA-4 v404 §9 — NOOP-Retry darf den Preclip nie entfernen (v148/v204).
-import { shouldPreserveNoopRetryPreclip } from "../_shared/noop-retry-preclip.ts";
+import { shouldPreserveNoopRetryPreclip, isFrozenNoopRetryPass } from "../_shared/noop-retry-preclip.ts";
 
 import {
   ensureDialogTurnsForScene,
