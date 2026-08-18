@@ -302,26 +302,53 @@ async function sweep() {
   console.log("wrote fa4-v404-sweep-report.json");
 }
 
+/**
+ * FA-4 v404 §5 — one complete PAIR measurement = 6 preclip stills + 6 provider
+ * stills = 12 still invokes, executed through ONE bounded pool at `conc`.
+ * Never a cached still (perf latencies must be real), never unbounded Promise.all.
+ */
+async function measurePairWallTime(
+  a: Asset,
+  n: number,
+  conc: number,
+): Promise<{ ms: number; latencies: number[] }> {
+  const ts = timestamps(a.duration, n);
+  const frames = ts.map((t) => Math.round(t * FPS));
+  const tasks: (() => Promise<StillResult>)[] = [];
+  for (const f of frames) tasks.push(() => renderStill(a.pre, a.duration, f, false));
+  for (const f of frames) tasks.push(() => renderStill(a.out, a.duration, f, false));
+  const t0 = performance.now();
+  const stills = await pool(tasks, conc);
+  const ms = performance.now() - t0;
+  return {
+    ms,
+    latencies: stills.map((s) => s.latencyMs).filter((v): v is number => v !== null),
+  };
+}
+
 async function perf(n: number, conc: number, pairsWanted: number) {
   const keys = Object.keys(artifactMap);
   const pairTimes: { pass: number; ms: number }[] = [];
   const stillLat: number[] = [];
   let failures = 0;
+  let throttles = 0;
+  let timeouts = 0;
+  const errors: string[] = [];
   for (let i = 0; i < pairsWanted; i++) {
+    // Round-robin across all six S11 pairs — never repeat one pair only.
     const a = artifactMap[keys[i % keys.length]];
-    const t0 = performance.now();
     try {
-      const [pre, out] = await Promise.all([
-        measureVideo(a.pre, a.width, a.height, a.duration, n, conc, false),
-        measureVideo(a.out, a.width, a.height, a.duration, n, conc, false),
-      ]);
-      const ms = performance.now() - t0;
-      pairTimes.push({ pass: a.pass_idx, ms });
-      stillLat.push(...pre.latencies, ...out.latencies);
-      console.log(`pair#${i} p${a.pass_idx} conc=${conc} ${ms.toFixed(0)}ms`);
+      const r = await measurePairWallTime(a, n, conc);
+      pairTimes.push({ pass: a.pass_idx, ms: r.ms });
+      stillLat.push(...r.latencies);
+      console.log(`pair#${i} p${a.pass_idx} conc=${conc} ${r.ms.toFixed(0)}ms`);
     } catch (e) {
       failures++;
-      console.log(`pair#${i} p${a.pass_idx} FAILED ${(e as Error).message}`);
+      const msg = (e as Error).message;
+      errors.push(`p${a.pass_idx}:${msg.slice(0, 160)}`);
+      if (/429|Throttl|TooManyRequests/i.test(msg)) throttles++;
+      if (/timeout|timed out|504/i.test(msg)) timeouts++;
+      console.log(`pair#${i} p${a.pass_idx} FAILED ${msg}`);
     }
   }
   const pt = pairTimes.map((p) => p.ms).sort((x, y) => x - y);
@@ -329,7 +356,12 @@ async function perf(n: number, conc: number, pairsWanted: number) {
   const out = {
     N: n,
     concurrency: conc,
+    percentile_method: "nearest-rank on ascending sample: index = ceil(q*n)-1",
+    attempts: pairsWanted,
     failures,
+    throttles,
+    timeouts,
+    errors,
     pair: { n: pt.length, p50: pct(pt, 0.5), p95: pct(pt, 0.95), max: pt[pt.length - 1] },
     still: { n: sl.length, min: sl[0], p50: pct(sl, 0.5), p95: pct(sl, 0.95), max: sl[sl.length - 1] },
     samples: pairTimes,
@@ -338,6 +370,7 @@ async function perf(n: number, conc: number, pairsWanted: number) {
   const file = new URL(`./fa4-v404-perf-N${n}-c${conc}.json`, import.meta.url);
   await Deno.writeTextFile(file, JSON.stringify(out, null, 2));
 }
+
 
 if (import.meta.main) {
   const [cmd, ...rest] = Deno.args;
