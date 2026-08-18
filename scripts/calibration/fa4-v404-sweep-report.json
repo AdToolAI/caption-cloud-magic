@@ -1,0 +1,672 @@
+{
+  "generated_at": "2026-08-18T22:26:05.602Z",
+  "sweep": [
+    {
+      "N": 6,
+      "rows": [
+        {
+          "N": 6,
+          "pass": 0,
+          "turn": "T1",
+          "speaker": "Sarah Dusatko",
+          "label": "motion",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 161.4640145256557,
+          "prePeak": 8797.595820249995,
+          "providerMean": 297.43606692826916,
+          "providerPeak": 14683.017102249998,
+          "deltaMean": 135.97205240261346,
+          "deltaPeak": 5885.421282000003
+        },
+        {
+          "N": 6,
+          "pass": 1,
+          "turn": "T5",
+          "speaker": "Sarah Dusatko",
+          "label": "motion",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 187.99165791958958,
+          "prePeak": 7401.6197337777785,
+          "providerMean": 209.25887968453995,
+          "providerPeak": 9656.042980027773,
+          "deltaMean": 21.267221764950364,
+          "deltaPeak": 2254.423246249994
+        },
+        {
+          "N": 6,
+          "pass": 2,
+          "turn": "T2",
+          "speaker": "Samuel Dusatko",
+          "label": "motion",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 50.96659481748442,
+          "prePeak": 4402.322500000001,
+          "providerMean": 100.99510151406523,
+          "providerPeak": 7169.770950250001,
+          "deltaMean": 50.028506696580806,
+          "deltaPeak": 2767.44845025
+        },
+        {
+          "N": 6,
+          "pass": 3,
+          "turn": "T6",
+          "speaker": "Samuel Dusatko",
+          "label": "noop",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 47.708638094135566,
+          "prePeak": 5436.850224999997,
+          "providerMean": 42.490909239192135,
+          "providerPeak": 5485.402032249998,
+          "deltaMean": -5.217728854943431,
+          "deltaPeak": 48.55180725000082
+        },
+        {
+          "N": 6,
+          "pass": 4,
+          "turn": "T3",
+          "speaker": "Matthew Dusatko",
+          "label": "motion",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 168.78734640928786,
+          "prePeak": 16408.79871002778,
+          "providerMean": 220.67172708891837,
+          "providerPeak": 16025.618858777772,
+          "deltaMean": 51.88438067963051,
+          "deltaPeak": -383.1798512500063
+        },
+        {
+          "N": 6,
+          "pass": 5,
+          "turn": "T4",
+          "speaker": "Kay Mark",
+          "label": "noop",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 22.148069293884582,
+          "prePeak": 4442.5779737777775,
+          "providerMean": 19.969223526236966,
+          "providerPeak": 2745.6202684444434,
+          "deltaMean": -2.1788457676476156,
+          "deltaPeak": -1696.9577053333342
+        }
+      ],
+      "minMotion": -383.1798512500063,
+      "maxNoop": 48.55180725000082,
+      "gap": -431.73165850000714,
+      "pass": false
+    },
+    {
+      "N": 8,
+      "rows": [
+        {
+          "N": 8,
+          "pass": 0,
+          "turn": "T1",
+          "speaker": "Sarah Dusatko",
+          "label": "motion",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 144.97638842319142,
+          "prePeak": 9500.303430249996,
+          "providerMean": 306.4451497864906,
+          "providerPeak": 18075.424413765617,
+          "deltaMean": 161.4687613632992,
+          "deltaPeak": 8575.12098351562
+        },
+        {
+          "N": 8,
+          "pass": 1,
+          "turn": "T5",
+          "speaker": "Sarah Dusatko",
+          "label": "motion",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 183.95471853604062,
+          "prePeak": 7321.7542725625,
+          "providerMean": 215.77204159782676,
+          "providerPeak": 7697.210889062498,
+          "deltaMean": 31.81732306178614,
+          "deltaPeak": 375.45661649999784
+        },
+        {
+          "N": 8,
+          "pass": 2,
+          "turn": "T2",
+          "speaker": "Samuel Dusatko",
+          "label": "motion",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 47.13416375620885,
+          "prePeak": 4424.045682249999,
+          "providerMean": 97.9275742446931,
+          "providerPeak": 6770.594943140627,
+          "deltaMean": 50.793410488484255,
+          "deltaPeak": 2346.549260890628
+        },
+        {
+          "N": 8,
+          "pass": 3,
+          "turn": "T6",
+          "speaker": "Samuel Dusatko",
+          "label": "noop",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 44.86587441370418,
+          "prePeak": 5337.270456390626,
+          "providerMean": 38.69196296210716,
+          "providerPeak": 5651.036308890626,
+          "deltaMean": -6.173911451597014,
+          "deltaPeak": 313.7658524999997
+        },
+        {
+          "N": 8,
+          "pass": 4,
+          "turn": "T3",
+          "speaker": "Matthew Dusatko",
+          "label": "motion",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 164.2058920850414,
+          "prePeak": 17228.761007640616,
+          "providerMean": 218.4483280901771,
+          "providerPeak": 16454.732176,
+          "deltaMean": 54.242436005135716,
+          "deltaPeak": -774.028831640615
+        },
+        {
+          "N": 8,
+          "pass": 5,
+          "turn": "T4",
+          "speaker": "Kay Mark",
+          "label": "noop",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 20.342534708873746,
+          "prePeak": 4735.091343999998,
+          "providerMean": 18.018858138456523,
+          "providerPeak": 3181.016400249999,
+          "deltaMean": -2.3236765704172235,
+          "deltaPeak": -1554.0749437499985
+        }
+      ],
+      "minMotion": -774.028831640615,
+      "maxNoop": 313.7658524999997,
+      "gap": -1087.7946841406147,
+      "pass": false
+    },
+    {
+      "N": 10,
+      "rows": [
+        {
+          "N": 10,
+          "pass": 0,
+          "turn": "T1",
+          "speaker": "Sarah Dusatko",
+          "label": "motion",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 132.3052943735388,
+          "prePeak": 9905.146005159993,
+          "providerMean": 283.7262031246538,
+          "providerPeak": 16622.068187560002,
+          "deltaMean": 151.420908751115,
+          "deltaPeak": 6716.922182400009
+        },
+        {
+          "N": 10,
+          "pass": 1,
+          "turn": "T5",
+          "speaker": "Sarah Dusatko",
+          "label": "motion",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 178.39525775996788,
+          "prePeak": 7659.102765690002,
+          "providerMean": 205.13749696519065,
+          "providerPeak": 7773.931266010002,
+          "deltaMean": 26.742239205222774,
+          "deltaPeak": 114.82850031999988
+        },
+        {
+          "N": 10,
+          "pass": 2,
+          "turn": "T2",
+          "speaker": "Samuel Dusatko",
+          "label": "motion",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 46.141243976318215,
+          "prePeak": 4449.74380096,
+          "providerMean": 93.97737170632264,
+          "providerPeak": 7011.432996489998,
+          "deltaMean": 47.83612773000443,
+          "deltaPeak": 2561.689195529998
+        },
+        {
+          "N": 10,
+          "pass": 3,
+          "turn": "T6",
+          "speaker": "Samuel Dusatko",
+          "label": "noop",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 43.429491255308264,
+          "prePeak": 5644.697213440003,
+          "providerMean": 38.59739527191347,
+          "providerPeak": 5762.722838760002,
+          "deltaMean": -4.832095983394794,
+          "deltaPeak": 118.02562531999865
+        },
+        {
+          "N": 10,
+          "pass": 4,
+          "turn": "T3",
+          "speaker": "Matthew Dusatko",
+          "label": "motion",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 158.64419912650726,
+          "prePeak": 17211.288387239994,
+          "providerMean": 223.33049904227062,
+          "providerPeak": 16364.16600625,
+          "deltaMean": 64.68629991576336,
+          "deltaPeak": -847.1223809899948
+        },
+        {
+          "N": 10,
+          "pass": 5,
+          "turn": "T4",
+          "speaker": "Kay Mark",
+          "label": "noop",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 19.447882532869908,
+          "prePeak": 5208.68210944,
+          "providerMean": 16.58639601250395,
+          "providerPeak": 3416.975334009998,
+          "deltaMean": -2.8614865203659576,
+          "deltaPeak": -1791.7067754300024
+        }
+      ],
+      "minMotion": -847.1223809899948,
+      "maxNoop": 118.02562531999865,
+      "gap": -965.1480063099934,
+      "pass": false
+    },
+    {
+      "N": 12,
+      "rows": [
+        {
+          "N": 12,
+          "pass": 0,
+          "turn": "T1",
+          "speaker": "Sarah Dusatko",
+          "label": "motion",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 119.92564155860764,
+          "prePeak": 10351.892408062493,
+          "providerMean": 284.49261083229135,
+          "providerPeak": 18004.63021511111,
+          "deltaMean": 164.5669692736837,
+          "deltaPeak": 7652.737807048616
+        },
+        {
+          "N": 12,
+          "pass": 1,
+          "turn": "T5",
+          "speaker": "Sarah Dusatko",
+          "label": "motion",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 178.11768896289507,
+          "prePeak": 7462.929738062505,
+          "providerMean": 211.53315863342183,
+          "providerPeak": 9677.7881880625,
+          "deltaMean": 33.41546967052676,
+          "deltaPeak": 2214.8584499999943
+        },
+        {
+          "N": 12,
+          "pass": 2,
+          "turn": "T2",
+          "speaker": "Samuel Dusatko",
+          "label": "motion",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 45.33606085987253,
+          "prePeak": 4411.339654340276,
+          "providerMean": 91.79023136070398,
+          "providerPeak": 7107.838864000001,
+          "deltaMean": 46.45417050083145,
+          "deltaPeak": 2696.4992096597252
+        },
+        {
+          "N": 12,
+          "pass": 3,
+          "turn": "T6",
+          "speaker": "Samuel Dusatko",
+          "label": "noop",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 42.97264529494883,
+          "prePeak": 5605.966129,
+          "providerMean": 38.26416622418115,
+          "providerPeak": 5876.410635062501,
+          "deltaMean": -4.70847907076768,
+          "deltaPeak": 270.4445060625003
+        },
+        {
+          "N": 12,
+          "pass": 4,
+          "turn": "T3",
+          "speaker": "Matthew Dusatko",
+          "label": "motion",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 149.8197618402547,
+          "prePeak": 17986.74381511111,
+          "providerMean": 217.45883194963173,
+          "providerPeak": 17341.092857840278,
+          "deltaMean": 67.63907010937703,
+          "deltaPeak": -645.650957270831
+        },
+        {
+          "N": 12,
+          "pass": 5,
+          "turn": "T4",
+          "speaker": "Kay Mark",
+          "label": "noop",
+          "roi_pre": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "roi_out": {
+            "bx": 461,
+            "by": 411,
+            "bw": 358,
+            "bh": 154
+          },
+          "still": "1280x720",
+          "preMean": 18.652993666689586,
+          "prePeak": 5324.718193777777,
+          "providerMean": 15.818341851942385,
+          "providerPeak": 3512.359980027776,
+          "deltaMean": -2.8346518147472004,
+          "deltaPeak": -1812.3582137500007
+        }
+      ],
+      "minMotion": -645.650957270831,
+      "maxNoop": 270.4445060625003,
+      "gap": -916.0954633333313,
+      "pass": false
+    }
+  ],
+  "still_latency": {
+    "n": 324,
+    "min": 718.0687550000002,
+    "p50": 841.4375310000032,
+    "p95": 989.6469670000079,
+    "max": 4864.211526
+  }
+}
