@@ -203,7 +203,7 @@ async function pool<T>(tasks: Array<() => Promise<T>>, concurrency: number): Pro
 }
 
 /** Production still primitive: Remotion Lambda `type:"still"` (AWS-only). */
-function defaultRenderStill(): (v: string, t: number, f: number) => Promise<Uint8Array> {
+function defaultRenderStill(): RenderStillFn {
   const accessKeyId = Deno.env.get("AWS_ACCESS_KEY_ID") ?? "";
   const secretAccessKey = Deno.env.get("AWS_SECRET_ACCESS_KEY") ?? "";
   const sessionToken = Deno.env.get("AWS_SESSION_TOKEN") ?? undefined;
@@ -214,7 +214,16 @@ function defaultRenderStill(): (v: string, t: number, f: number) => Promise<Uint
   const lambdaUrl =
     `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${getLambdaFunctionName()}/invocations`;
 
-  return async (videoUrl: string, totalSec: number, frame: number): Promise<Uint8Array> => {
+  return async (
+    videoUrl: string,
+    totalSec: number,
+    frame: number,
+    budget: MeasurementBudget,
+  ): Promise<Uint8Array> => {
+    // v404 P1-C — every timeout below is capped by the REMAINING global budget,
+    // never by a fresh full-length timeout.
+    if (budget.remainingMs <= 0) throw new Error("measurement_deadline_exceeded");
+    const invokeBudget = Math.max(1, Math.floor(budget.remainingMs));
     const payload = {
       type: "still",
       serveUrl,
@@ -236,7 +245,7 @@ function defaultRenderStill(): (v: string, t: number, f: number) => Promise<Uint
       attempt: 1,
       logLevel: "warn",
       outName: `fa4v404-${crypto.randomUUID()}.jpeg`,
-      timeoutInMilliseconds: 120000,
+      timeoutInMilliseconds: invokeBudget,
       chromiumOptions: {},
       scale: 1,
       downloadBehavior: { type: "play-in-browser", fileName: null },
@@ -252,17 +261,18 @@ function defaultRenderStill(): (v: string, t: number, f: number) => Promise<Uint
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(MEASUREMENT_DEADLINE_MS),
+      signal: linkedSignal(budget, invokeBudget),
     });
     if (!res.ok) throw new Error(`lambda_http_${res.status}`);
     const parsed = JSON.parse(await res.text());
     const output: string | undefined = parsed?.output ?? parsed?.url;
     if (!output || typeof output !== "string") throw new Error("lambda_no_output");
-    const dl = await fetch(output, { signal: AbortSignal.timeout(MEASUREMENT_DEADLINE_MS) });
+    const dl = await fetch(output, { signal: linkedSignal(budget, invokeBudget) });
     if (!dl.ok) throw new Error(`still_download_${dl.status}`);
     const bytes = new Uint8Array(await dl.arrayBuffer());
     if (bytes.byteLength < 1024) throw new Error("still_too_small");
     return bytes;
+
   };
 }
 
