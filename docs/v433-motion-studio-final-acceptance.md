@@ -1921,8 +1921,10 @@ Tests: `plate-face-candidates.test.ts` (inkl. S11-Regressionsfixture) und
 
 ### Identity-Labels
 
-Rein diagnostisch. Sie fließen nur als Support-Score in die Kostenmatrix und
-können keine Geometrie mehr überstimmen.
+Rein diagnostisch. Sie fließen **nicht** in die Kostenmatrix ein, beeinflussen
+weder Kosten noch Gewinner-Bijektion und dienen ausschließlich Telemetrie und
+Fehlersuche. Kostenbasis ist ausschließlich die euklidische Distanz
+normalisierter Zentren.
 
 ### Status
 
@@ -1930,6 +1932,75 @@ können keine Geometrie mehr überstimmen.
   bereits vorher bestehenden Strict-Null/`speaker_name`-Meldungen; keine neuen.
 - **Kein Deploy, kein Render.** Deploy-Scope wäre ausschließlich
   `compose-dialog-segments`.
+
+---
+
+## FA-4 Face-Candidate — P0 Integration Correction (2026-08-17)
+
+Vier enge Korrekturen an der bereits akzeptierten Grundimplementation. Kein
+Deploy, kein Render, kein Retry/Reset.
+
+### 1. Contract-B ist integration-level fail-closed
+
+Ein **contractual** Geometrie-Fehlschlag des v278/FA-4-Routers darf nicht mehr
+in den Legacy-Pfad `resolvePlateFaceIdentities()` fallen. Neu klassifiziert
+`classifyRouterFailure({ reason, detectSucceeded, detectedCount, expectedCount, threw })`
+in `_shared/plate-face-candidates.ts`:
+
+- **contractual** (fail-closed, kein Legacy, kein Provider-Dispatch):
+  `count_mismatch`, `incomplete_bijection`, `equal_cost_ambiguity`,
+  `degenerate_candidate_centers` sowie `no_faces_detected`, wenn die Detection
+  nachweislich erfolgreich lief, Anchor-Slots existieren und 0 Kandidaten kamen.
+- **infrastructure** (Legacy-Recovery unverändert): `aws_credentials_missing`,
+  `plate_fetch_failed`, `detect_failed:*`, `empty_input` und jede geworfene
+  Router-Exception.
+
+Der Router liefert die Klasse als Feld `failureClass` mit (plus
+`detectSucceeded` / `detectedCount`); `compose-dialog-segments` klassifiziert
+nicht neu. Bei contractual failure: Abbruch über `failLipSync` mit
+Credit-Refund und HTTP 422 `plate_identity_geometry_fail_closed` (lokalisierte
+Meldung DE/EN/ES), Log `fa4_contract_b_fail_closed`. Ledger/Fan-out und
+Webhook-Pfade sind unverändert.
+
+### 2. `input_too_large` entfernt
+
+`MAX_ROWS`/`MAX_COLS` und die Fail-Reason `input_too_large` sind ersatzlos
+entfernt — sie waren nicht Teil des eingefrorenen Contracts. Der Solver bleibt
+exakt und verarbeitet den produktiven Max-Cast ohne neue fachliche Grenze:
+Vorsortierung der Kandidaten je Anchor nach Distanz plus admissible
+Best-Bound-Pruning (Suffix-Summe der Zeilenminima). Nur strikt schlechtere
+Zweige werden abgeschnitten, damit die exakte Tie-Erkennung
+(`equal_cost_ambiguity`) unverändert bleibt. Kein Epsilon, keine neue Schwelle.
+
+### 3. Echte S11 Regression Fixture
+
+`_shared/plate-face-candidates.test.ts` nutzt den exakt persistierten
+S11-Datensatz: Plate 1284×718, 10 Kandidatenboxen in persistierter Reihenfolge,
+vier **hart hinterlegte** Anchor-Center (nicht aus den Plate-Faces abgeleitet).
+Erwartete Bijektion: Sarah `[226,244,286,327]`, Samuel `[476,209,540,294]`,
+Matthew `[753,187,819,277]`, Kay `[1030,208,1099,296]`. Ein zweiter Test fährt
+denselben Datensatz in umsortierter Detector-Reihenfolge und erwartet ein
+identisches Ergebnis.
+
+### 4. Ein kanonischer Sanity-Owner
+
+`plateFaceSanity()` ist die einzige Quelle für area `0.003..0.25`, aspect
+`0.4..2.5`, `degenerate` und `out_of_plate` (5 % In-Plate-Toleranz). Das lokale
+`bboxSanity()` in `compose-dialog-segments/index.ts` ist nur noch ein dünner
+Wrapper, der die bestehende Reason-Formatierung (inkl. `_despite_trust`)
+beibehält. Schwellen und Toleranz sind semantisch unverändert.
+
+### Verification
+
+`deno test _shared/plate-face-candidates.test.ts _shared/preclip-crop-containment.test.ts`
+→ **21 passed / 0 failed**, inklusive: exakte S11-Fixture, umsortierte
+S11-Fixture, großer Cast ohne Size-Gate, contractual-Klassifikation aller vier
+Geometrie-Reasons, Infrastructure-Klassifikation inkl. `threw`, sowie die
+`no_faces_detected`-Differenzierung. `deno check compose-dialog-segments` zeigt
+keine neuen Fehler in den geänderten Bereichen.
+
+`FA-4 FACE-CANDIDATE IMPLEMENTATION CORRECTION READY → STOP`
+
 
 
 
