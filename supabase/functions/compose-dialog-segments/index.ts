@@ -91,6 +91,8 @@ import { resolvePlateFaceIdentities, PlateIdentityFace } from "../_shared/plate-
 import { buildAnchorLayoutFromV274, routePlateFacesToAnchor, type AnchorFaceLayout } from "../_shared/plateFaceSlotRouter.ts";
 // FA-4 Contract E — deterministic preclip crop containment gate.
 import { evaluatePreclipCropContainment } from "../_shared/preclip-crop-containment.ts";
+// FA-4 Contract A/D — single canonical owner of the plate-face sanity limits.
+import { plateFaceSanity } from "../_shared/plate-face-candidates.ts";
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
