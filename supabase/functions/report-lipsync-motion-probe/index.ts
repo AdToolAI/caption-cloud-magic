@@ -187,24 +187,24 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
         .select("id, turn_idx")
         .eq("scene_id", body.scene_id)
         .eq("job_id", reportedJobId);
-      const rows = Array.isArray(candidates) ? candidates as Array<{ id: string; turn_idx: number | null }> : [];
-      let target = rows;
-      if (rows.length > 1) {
-        target = rows.filter((r) => Number(r.turn_idx) === Number(body.pass_idx));
-      }
-      if (target.length !== 1) {
+      const target = resolveTelemetryTarget(
+        (candidates ?? []) as Array<{ id: string; turn_idx: number | null }>,
+        body.pass_idx,
+      );
+      if (!target.ok) {
         console.warn(
-          `[report-lipsync-motion-probe] v404_telemetry_key_ambiguous scene=${body.scene_id} ` +
-            `job=${reportedJobId} pass=${body.pass_idx} candidates=${rows.length} resolved=${target.length} → no write`,
+          `[report-lipsync-motion-probe] v404_telemetry_key_unresolved scene=${body.scene_id} ` +
+            `job=${reportedJobId} pass=${body.pass_idx} reason=${target.reason} → no write`,
         );
-        return json({ ok: true, ignored: "telemetry_key_ambiguous" });
+        return json({ ok: true, ignored: `telemetry_key_${target.reason}` });
       }
       const { error: updErr } = await admin
         .from("syncso_dispatch_log")
         .update({ noop_mouth_yavg: body.yavg, meta_yavg_probe: metaYavgProbe })
-        .eq("id", target[0].id);
+        .eq("id", target.id);
       if (updErr) throw new Error(updErr.message);
       telemetryRows = 1;
+
     } catch (e) {
       console.warn(`[report-lipsync-motion-probe] log update failed: ${(e as Error).message}`);
     }
