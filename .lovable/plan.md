@@ -20,55 +20,106 @@ Ergebnis: Es existiert **genau ein** freigegebener, im Code nachweisbarer server
 `supabase/functions/_shared/measure-provider-motion-sync.ts` → `measureProviderMotionSync()`
 
 - läuft serverseitig, wird ausschließlich aus dem `COMPLETED`-Pfad von `sync-so-webhook` synchron aufgerufen
-- Input: `{ preclipUrl, providerOutputUrl, passIdx, mouthRoi (bestehende Preclip-space-Geometrie), sampleCount, deadlineMs }`
-- berechnet **keine** neue Face-Geometrie, ruft **kein** Face-Detection, kein Replicate, kein Full-Plate-Recompute
-- Ablauf je Video: N gleichverteilte Stills über Remotion-Lambda (`type:"still"`, `frame = round(t*fps)`), parallel invoked, JPEG-Bytes laden, Luminanz in der Mouth-ROI decodieren, temporale Varianz je Pixel → `mean` und `peak` (identische Formel wie `computeMouthYavg`, nur andere Frame-Quelle)
+- Input: `{ preclipUrl, providerOutputUrl, passIdx, roi (frozen, siehe §5), sampleCount, deadlineMs }`
+- berechnet **keine** neue Face-/Mouth-Geometrie, kein Face-Detection, kein Landmark-Detection, kein Replicate, kein Full-Plate-Recompute
+- Ablauf je Video: N gleichverteilte Stills über Remotion-Lambda (`type:"still"`, `frame = round(t*fps)`), parallel invoked, JPEG-Bytes laden, Luminanz in der frozen ROI decodieren, temporale Varianz je Pixel → `mean` und `peak`
 - mutiert weder Scene-, noch Ledger-, noch Dispatch-State und startet keinen Retry
 - Output ausschließlich `{ preclip_metric, provider_metric, measurement_status: 'ok'|'timeout'|'error', reason }`
 
 `classifyMotionProbe()` bleibt unverändert PURE und einziger Classifier.
 
-## 3. Produktionspfad nach dem Fix
+## 3. Produktionspfad — Measurement läuft AUSSERHALB des Dialog-Locks
+
+`sync-so-webhook` hält heute den v5-Pfad unter `withDialogLock(..., { ttlSeconds: 30, maxAttempts: 4 })` (Zeilen 703 / 1298). Ein AWS/Lambda-Wait darf niemals in diesem Lock stattfinden.
 
 ```text
-Sync.so COMPLETED
-  -> Output rehosten (unverändert)
-  -> measureProviderMotionSync(preclip, output)   [synchron, serverseitig]
-  -> classifyMotionProbe(...)
+1  Webhook-Auth / Scene-Lookup / Run-Guard
+2  authoritative pipeline_job_id + pass binding auflösen
+3  immutable Measurement-Snapshot:
+     pipeline_job_id, external_job_id, scene_id, pass_idx,
+     run_id, plate_generation, exact preclip_url,
+     exact rehosted provider_output_url, frozen ROI/Sampling-Config
+4  KEIN Dialog-Lock während:
+     Lambda-Still-Invokes | Still-Downloads | JPEG-Decode | Measurement
+5  PURE classifyMotionProbe(...)
+6  danach authoritative composer_apply_sync_segment_result(...)
        motion        -> ssw:success
-       noop          -> ssw:noop_escalate  (genau 1 Replacement-Attempt, Retry-Wire = inline bounding_boxes)
-       indeterminate -> ssw:failed, output_url=null, error_text='motion_probe_indeterminate'
+       noop          -> ssw:noop_escalate (genau 1 Replacement-Attempt,
+                        Retry-Wire = inline bounding_boxes)
+       indeterminate -> ssw:failed, output_url=null,
+                        error_text='motion_probe_indeterminate'
 ```
+
+Der G3.2.2-RPC bleibt alleinige Stale-/Idempotency-/Apply-Authority. Ist zwischen Snapshot und Apply `run_id` / `plate_generation` / Job-Binding stale geworden, lehnt der RPC ab — keine manuelle Recovery-Mutation.
 
 Vor Abschluss der Messkette: kein `ssw:success`, kein Segment `done`, kein `audio_mux`, kein Replacement-Attempt, keine Client-Voraussetzung.
 
-## 4. Metrik-Kompatibilität — verbindliches Kalibriergate
+## 4. Metrik-Provenance und Kalibriergate
 
-Die Lambda-Still-Quelle liefert andere Encoder-/Skalierungspfade als der Browser-Canvas. Die frozen Thresholds (`MOTION_THRESHOLD=+0.08`, `NOOP_THRESHOLD=-0.02`) dürfen **nicht** ungeprüft auf die neue Quelle gelegt werden.
+Die historischen S11-Zahlen (T1 1.076/2.907 → 1.157/3.768 usw.) stammen aus der abgeschlossenen RCA (ffmpeg grayscale frame-difference energy, globaler Mittelwert + 9×9-Peak-Block) — **nicht** aus `computeMouthYavg`. Sie sind damit ausschließlich historische Evidenz für die frozen Labels:
 
-Kalibrierschritt (eigener, später freizugebender Gate-Schritt, vor jedem Deploy des Gates):
+T1 = motion, T2 = motion, T3 = motion, T4 = noop, T5 = motion, T6 = noop
 
-1. Die sechs eingefrorenen S11-Artefaktpaare (p0..p5, Preclip + Provider-Output) mit `measureProviderMotionSync()` **offline** neu messen — nur Messung, kein Apply.
-2. Ergebnis tabellarisch gegen die frozen Client-Werte stellen (T1 1.076/2.907→1.157/3.768, T5 0.635/1.981→0.717/2.953, T2 0.328/0.886→0.340/1.019, T6 0.355/0.936→0.356/0.864, T3 0.329/1.073→0.357/2.213, T4 0.307/0.836→0.292/0.688).
-3. Akzeptanz nur wenn die serverseitige Messung dieselbe Ordnung erzeugt: Δpeak(T1,T5,T2,T3) > 0 und Δpeak(T6,T4) ≤ 0.
-4. Thresholds werden aus den **gemessenen** Server-Werten abgeleitet, exakt nach der bestehenden Regel: `gap = Δpeak_min(motion) − Δpeak_max(noop)`, `MOTION_THRESHOLD = Δpeak_min(motion) − gap/4`, `NOOP_THRESHOLD = Δpeak_max(noop) + gap/4`. Keine Wunschwerte, keine manuelle Justage.
-5. Wenn `gap ≤ 0` (T2 nicht sauber von T6/T4 trennbar): **BLOCKED**, kein Deploy, keine Threshold-Erfindung.
-6. Der Fixture-Kommentar im Classifier wird um die Server-Spalte ergänzt; die Client-Werte bleiben als historischer Anker stehen.
+Sie werden **nicht** als numerisch kompatible Fixture behandelt und **nicht** mit den heutigen Thresholds (+0.08 / −0.02) verknüpft.
 
-Sampling-Parameter (N Frames, ROI-Größe) sind Teil der Kalibrierung und werden danach eingefroren.
+Calibration Gate (eigener, später freizugebender Schritt, vor jedem Deploy des Gates):
 
-## 5. Fail-closed / Timeout
+1. Dieselben sechs S11-Artefaktpaare (p0..p5, Preclip + Provider-Output) mit dem neuen serverseitigen Algorithmus **neu messen** — nur Messung, kein Apply.
+2. Aus den Server-Werten ableiten: `server_delta_min_motion` (min Δpeak über T1/T2/T3/T5), `server_delta_max_noop` (max Δpeak über T4/T6), `gap = server_delta_min_motion − server_delta_max_noop`.
+3. Nur wenn `gap > 0`: `MOTION_THRESHOLD = server_delta_min_motion − gap/4`, `NOOP_THRESHOLD = server_delta_max_noop + gap/4`.
+4. Wenn `gap ≤ 0`: **BLOCKED**, kein Deploy, keine Threshold-Erfindung, keine manuelle Justage.
+5. Die historischen RCA-Werte bleiben im Test nur als Provenance-/Label-Kommentar erhalten.
 
-- harte, endliche Gesamt-Deadline für die Messung im Webhook (Vorschlag: 45 s, final in der Implementierung fixiert), pro Still-Invoke eigener Timeout; keine nichtterminale Warteschleife
+## 5. ROI- und Sampling-Semantik (frozen)
+
+Für die erste Server-Kalibrierung exakt die heutige normalisierte ROI des Browser-Probes, ohne jede neue Geometrie:
+
+- center x = 0.5, center y = 0.6
+- width = 0.28, height = 0.12
+
+Sampling:
+
+- N gleichmäßig verteilte Samples
+- 5 % Start-Padding, 5 % End-Padding
+- identische N-Zahl für Preclip und Provider-Output
+- N wird im Calibration Gate bestimmt und danach frozen
+
+Kein Face Detection, kein Landmark Detection, kein Geometry-Recompute.
+
+## 6. Remotion Source→Still Transform (Beweispflicht vor Implementation-GO)
+
+`transition-frame.ts` beweist nur den erlaubten Primitive (`type: "still"`, Composition `DialogStitchVideo`, `masterVideoUrl`, `frame`, JPEG). Daraus folgt **nicht**, dass ein 720×720-Preclip pixelidentisch und ungecroppt im Still liegt.
+
+Vor Implementation-GO ist zu beweisen und im Contract festzuhalten:
+
+- Still-Output width/height
+- Source-Video width/height
+- object-fit / scale / crop / letterbox-Verhalten der Composition
+- exakte Transformation source-space → still-space
+
+Zulässige Ergebnisse:
+
+- **A**: Still-Space = Source-Space exakt → normalisierte ROI direkt verwendbar
+- **B**: deterministische Transformation existiert → dieselbe normalisierte Source-ROI wird mathematisch in Still-Space transformiert
+
+Ist die Transformation nicht eindeutig beweisbar: **BLOCKED**. Keine visuelle Schätzung.
+
+## 7. Duplicate Callback
+
+Das Measurement ist read-only gegenüber Composer/DB/Ledger. Ein Duplicate Callback darf nie einen zweiten Apply-Effekt, zweiten Replacement-Attempt, zweiten Mux oder eine zweite Refund-Wirkung erzeugen — das garantiert weiterhin der bestehende G3.2.2-Apply-Vertrag. Führen zwei parallele identische Callbacks ausnahmsweise dieselbe read-only Lambda-Messung aus, ist das kein State-Correctness-Fail, sondern als Cost-/Telemetry-Duplikat zu loggen. Keine neue Measurement-Lock-/Ledger-Architektur in FA-4.
+
+## 8. Fail-closed / Deadline
+
+- Die Deadline wird **nicht** vorab als Wunschzahl eingefroren. Im Calibration-/Performance-Gate zu messen: N, Still-Latenz p50/p95, Gesamtzeit für 2 × N Stills, Webhook-Gesamtbudget. Danach eine endliche, deterministische Deadline festlegen; pro Still-Invoke eigener Timeout; keine nichtterminale Warteschleife.
 - Messung nicht startbar / Timeout / Preclip nicht lesbar / Output nicht lesbar / keine verwertbare Metrik ⇒ `measurement_status != 'ok'` ⇒ Verdict `indeterminate`
 - `indeterminate` ⇒ `composer_apply_sync_segment_result(write_id='ssw:failed', provider_status='COMPLETED', output_url=null, error_text='motion_probe_indeterminate')`
 - kein stilles Success, kein Mux, kein automatischer Retry bei `indeterminate`
 
-## 6. report-lipsync-motion-probe
+## 9. report-lipsync-motion-probe
 
-Wird auf reine Telemetrie reduziert: schreibt nur ein Diagnosefeld, kein Scene-State (`yavg_probed_at`-Patch entfällt), kein Freischalten des Webhooks, kein Success, kein Retry, kein Replacement-Attempt. `readMotionProbeMetrics()` in `sync-so-webhook` entfällt ersatzlos.
+Bleibt reine Telemetrie. Aus der Authority entfernt werden: `readMotionProbeMetrics()`, Client-Polling als Voraussetzung, `update_dialog_pass_slot` für die Motion-Entscheidung, Retry-/Apply-Ownership. Der Produktionspfad muss bei komplett geschlossenem Browser vollständig funktionieren.
 
-## 7. Geforderte Tests der späteren Implementierung
+## 10. Geforderte Tests der späteren Implementierung
 
 A. COMPLETED + serverseitig `motion` → `ssw:success`
 B. COMPLETED + serverseitig `noop` → `ssw:noop_escalate`, genau ein Replacement-Attempt
@@ -81,14 +132,15 @@ H. S11-Fixture (nach Kalibrierung, Server-Werte): T1/T2/T3/T5 = motion, T4/T6 = 
 I. Single-Speaker-Pfad unverändert
 J. Geometry / Audio / Fan-out / Mux / RS3 unverändert
 
-## 8. Frozen (nicht Teil dieses Contracts)
+## 11. Frozen (nicht Teil dieses Contracts)
 
 v402 Face-Candidate / Hungarian / AssignmentLock, Contract E / Preclip-Geometrie, Audio-Preparation, Turn-ID / Fan-out, `speaker_idx`, Ledger / G3.2.2, RS3, Mux / Finalizer, `processed_video_url`-Semantik, Fresh = `bounding_boxes_url` / Retry = inline `bounding_boxes`, Sync-3-Modellentscheidung.
 
-## 9. Restrisiken (offen zu bestätigen)
+## 12. Restrisiken (im Calibration-Gate zu klären)
 
-- Laufzeit: 2 × N Still-Invokes pro Segment innerhalb des Webhook-Zeitbudgets; N wird in der Kalibrierung so klein wie möglich gewählt.
-- Kosten: zusätzliche Lambda-Still-Invokes pro Lip-Sync-Pass.
+- Laufzeit: 2 × N Still-Invokes pro Segment außerhalb des Dialog-Locks, innerhalb des Webhook-Gesamtbudgets.
+- Kosten: zusätzliche Lambda-Still-Invokes pro Lip-Sync-Pass, inkl. möglicher Duplicate-Callback-Duplikate (nur Cost/Telemetry).
 - Der serverseitige JPEG-Decoder ist eine neue Abhängigkeit (reine Dekodierbibliothek, kein Frame-/Face-Provider).
+- Source→Still-Transform (§6) ist noch unbewiesen und ist harte Voraussetzung für Implementation-GO.
 
-FA-4 SERVER-SIDE SYNCHRONOUS MOTION MEASUREMENT FIX CONTRACT = READY FOR APPROVAL
+FA-4 SERVER-SIDE SYNCHRONOUS MOTION MEASUREMENT FIX CONTRACT = FINAL CORRECTION READY
