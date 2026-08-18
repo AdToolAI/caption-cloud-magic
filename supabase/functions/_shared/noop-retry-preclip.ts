@@ -38,3 +38,27 @@ export function applyNoopRetryPreclipPolicy<
 >(pass: T, _input: NoopRetryPreclipInput): T {
   return pass;
 }
+
+/**
+ * v405 P1-A — PURE: is this pass an ACTIVE NOOP retry whose input vector is
+ * frozen? Such a pass must never have its `coords` overwritten nor any of its
+ * preclip fields invalidated: the replacement attempt reuses the exact same
+ * preclip / audio / Contract-E bounding box, and the only allowed difference
+ * on the wire is `bounding_boxes_url` → inline `bounding_boxes`.
+ *
+ * The production coords-refresh path branches on THIS predicate before any
+ * invalidation happens, so the invariant is structural, not advisory.
+ */
+export interface NoopRetryPassState {
+  status?: unknown;
+  noop_retry_attempt_id?: unknown;
+  noop_escalation_step?: unknown;
+}
+
+export function isFrozenNoopRetryPass(pass: NoopRetryPassState | null | undefined): boolean {
+  if (!pass) return false;
+  const attemptId = pass.noop_retry_attempt_id;
+  const hasAttempt = typeof attemptId === "string" && attemptId.length > 0;
+  const step = Number(pass.noop_escalation_step ?? 0);
+  return hasAttempt && Number.isFinite(step) && step > 0 && pass.status === "pending";
+}
