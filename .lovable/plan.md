@@ -71,9 +71,23 @@ Bei `noop`:
 
 Bei `indeterminate`:
 
-KEIN stilles Success. Der Contract verlangt einen fail-closed / deferred-for-evidence Outcome. Kein Mux darf aus einer unbewerteten Motion-Probe entstehen.
+FAIL CLOSED und terminal über den bestehenden Failure-Apply:
 
-Der RPC bleibt Owner von Segment-Fail/Retryable, Slot-Reset, Replacement-Attempt und Ledger-Provenienz. Der folgende Redispatch adoptiert ausschließlich `replacement_job_id`. RS3 / `run_id` / `plate_generation` bleiben unverändert.
+`composer_apply_sync_segment_result(
+  write_id='ssw:failed',
+  provider_status='COMPLETED',
+  output_url=null,
+  error_text='motion_probe_indeterminate'
+)`
+
+Damit gilt:
+- kein Segment bleibt nichtterminal hängen
+- kein Mux startet
+- kein Provider-No-op wird als Success akzeptiert
+- kein neuer Write-ID / kein neuer State-Owner wird erfunden
+- Refund/Scene-Verdict bleiben beim bestehenden G3.2.2-Vertrag
+
+Kein automatischer Retry für `indeterminate` in diesem Contract.
 
 ## 6. Measurement Owner
 
@@ -90,20 +104,24 @@ Seine bestehende Client-/Mutation-Architektur wird nicht zur neuen Authority.
 ## 7. Alternative Wire-Konfiguration (genau eine)
 
 Fresh:
-- `sync-3`
-- SAME Single-Face Preclip
-- `bounding_boxes_url`
+- model = sync-3
+- video = Single-Face-Preclip
+- audio = bestehendes Provider-Audio
+- target bbox = Contract-E-transformierte BBox
+- ASD = bounding_boxes_url
 
-Retry:
-- `sync-3`
-- SAME Single-Face Preclip
-- SAME Audio
-- SAME transformed target bbox
-- inline `bounding_boxes`
+Retry C′:
+- model = sync-3
+- video = EXAKT derselbe Single-Face-Preclip
+- audio = EXAKT dasselbe Provider-Audio
+- target bbox = EXAKT dieselbe transformierte BBox
+- ASD = inline bounding_boxes
 
-Nur die ASD-Transportform unterscheidet sich.
+Einziger Wire-Unterschied:
 
-Kein v148 Preclip-Drop. Kein Full-Plate. Kein `auto_detect`. Kein coordinate-only. Kein Modellwechsel.
+`bounding_boxes_url` → inline `bounding_boxes`
+
+Kein Full-Plate. Kein Preclip-Drop. Kein `auto_detect`. Kein coordinate-only. Kein Modellwechsel. Kein Geometry-Recompute.
 
 ## 8. P1 Integration Conflict — Auflösung
 
@@ -122,22 +140,24 @@ NICHT: video = full plate
 - A. Classifier: T1/T2/T3/T5 → motion; T4/T6 → noop
 - B. COMPLETED + motion → `ssw:success`, kein Retry
 - C. COMPLETED + noop → `ssw:noop_escalate`, genau ein Replacement-Attempt
-- D. Duplicate Callback → kein zweiter Replacement-Attempt
-- E. Stale run/generation → kein Apply/Redispatch
-- F. Wire-Diff: Fresh `bbox-url-pro` vs. Retry inline-bbox unterscheiden sich ausschließlich in der ASD-Transportform
-- G. Multi-Speaker-Retry: Preclip bleibt gesetzt, `v204_preclip_required` feuert nicht
-- H. Single-Speaker: unverändert
-- I. Geometry / Contract E / `speaker_idx` / `segment_id`: unverändert
+- D. COMPLETED + indeterminate → `ssw:failed` mit `error_text='motion_probe_indeterminate'`, kein Mux
+- E. Duplicate Callback → kein zweiter Replacement-Attempt
+- F. Stale run/generation → kein Apply/Redispatch
+- G. Wire-Diff: Fresh `bbox-url-pro` vs. Retry inline-bbox unterscheiden sich ausschließlich in der ASD-Transportform
+- H. Multi-Speaker-Retry: Preclip bleibt gesetzt, `v204_preclip_required` feuert nicht
+- I. Single-Speaker: unverändert
+- J. Geometry / Contract E / `speaker_idx` / `segment_id`: unverändert
 
 ## 10. Success Contract (Unit-/Contract-Ebene)
 
 - Alle frozen Motion-Fixtures korrekt klassifiziert
 - Keine Control-False-Positives (T2 bindend)
-- Genau ein autoritativer Replacement-Attempt
+- `indeterminate` fail-closed in `ssw:failed`
+- Genau ein autoritativer Replacement-Attempt bei `noop`
 - Retry-Wire nachweislich anders
 - Preclip identisch
 - Keine Änderung an Geometry / Audio / Mux / Fan-out
 
 Danach STOP. Kein Deploy, kein Render. Ein einzelner Controlled Retest erst nach separatem Deploy-GO.
 
-FA-4 PROVIDER-NO-OP FIX CONTRACT FINAL CLEANUP READY → STOP
+FA-4 PROVIDER-NO-OP FIX CONTRACT FINAL PRECISION READY → STOP
