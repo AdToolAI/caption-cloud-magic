@@ -1,4 +1,4 @@
-# FA-4 Provider-No-op Fix Contract — CORRECTED (Option C′)
+# FA-4 Provider-No-op Fix Contract — C′
 
 Status: `FA-4 CONTROLLED RETEST = BLOCKED`
 - T4 Kay / p5 = `SYNCSO_PROVIDER_NOOP`
@@ -6,23 +6,11 @@ Status: `FA-4 CONTROLLED RETEST = BLOCKED`
 
 Kein Code, kein Deploy, kein Render in diesem Schritt.
 
-## 0. Korrektur der Ausgangsannahmen
-
-Die frühere „Option A: auf `bounding_boxes_url` wechseln“ ist gestrichen. Der aktuelle Production-Pfad IST bereits:
-
-- `model = sync-3` (kein `lipsync-2-pro` als Primary)
-- Multi-Speaker = Single-Face-Preclip
-- Fresh ASD = `bbox-url-pro` via `active_speaker_detection.bounding_boxes_url`
-- Contract-E-transformierte Ziel-BBox im Preclip-Raum
-- `auto_detect` im finalen Dialog-Wire verboten, coordinate-only kein Happy-Path
-
-Kein Modellwechsel in diesem Contract.
-
-## 1. Frozen — nicht zu öffnen
+## 0. Frozen — nicht zu öffnen
 
 v402 Face-Candidate / Hungarian / AssignmentLock · Contract E / Preclip-Crop-Geometrie · Audio-Preparation · Turn-ID / Fan-out · Ledger / RS3 · Mux / Finalizer · `processed_video_url`-Semantik.
 
-## 2. Gewählte Option — C′
+## 1. Gewählte Option — C′
 
 Multi-Speaker Provider-Output Motion Gate
 + bestehender autoritativer G3.2.2 NOOP-Escalate-Vertrag
@@ -30,9 +18,26 @@ Multi-Speaker Provider-Output Motion Gate
 
 Keine neue Retry-Architektur.
 
-## 3. Motion-Noop Classifier (PURE)
+## 2. Motion-Gate Integration Point (eingefroren)
 
-Nach Sync.so `COMPLETED` bewertet ein reiner Classifier für Multi-Speaker-Passes den Provider-Output gegen den exakten Provider-Input-Preclip.
+Für Multi-Speaker `sync_segment` muss der Provider-Callback exakt diese Reihenfolge haben:
+
+1. Sync.so terminal `COMPLETED`
+2. Provider-Output abrufen/rehosten
+3. PURE Motion-Metrik berechnen für:
+   - exakten Provider-Input-Preclip
+   - exakten Provider-Output
+4. PURE Classifier: `motion | noop | indeterminate`
+5. erst DANACH autoritativer Apply
+
+Vor Abschluss der Motion-Probe darf:
+- kein `ssw:success` committet werden
+- kein Segment als done gelten
+- kein `audio_mux` ausgelöst werden
+
+`composer_apply_sync_segment_result` bleibt alleiniger State-/Ledger-Owner.
+
+## 3. Motion-Noop Classifier (PURE)
 
 - Keine DB-Writes, kein Pass-Patch, kein Retry, kein Ledger-Zugriff.
 - Input: Motion-Metrik Preclip, Motion-Metrik Provider-Output, optional normalisierte Begleitmetriken.
@@ -54,32 +59,51 @@ Pflicht: T1/T2/T3/T5 nie `noop`; T4/T6 immer `noop`. Der schwache positive Contr
 
 Kein frei erfundener Epsilon. Ein Runtime-Threshold darf nur aus einer dokumentierten Classifier-Regel entstehen, die alle sechs frozen Cases trennt und eine explizite Sensitivity-Prüfung um T2 enthält (dokumentierter Abstand zwischen T2 und dem stärksten Noop-Case p3 = −0.07).
 
-## 5. Authoritative Retry Ownership
+## 5. Authoritative Apply Outcomes
 
-Bei `noop` NICHT: `dialog_shots` direkt patchen, `pipeline_job_id` nullen, eigenen Retry-Attempt erzeugen, freien Redispatch starten.
+Bei `motion`:
 
-Stattdessen ausschließlich über den eingefrorenen G3.2.2-Vertrag:
+`composer_apply_sync_segment_result(... write_id='ssw:success')`
 
-`composer_apply_sync_segment_result` mit `write_id = ssw:noop_escalate`
+Bei `noop`:
+
+`composer_apply_sync_segment_result(... write_id='ssw:noop_escalate')`
+
+Bei `indeterminate`:
+
+KEIN stilles Success. Der Contract verlangt einen fail-closed / deferred-for-evidence Outcome. Kein Mux darf aus einer unbewerteten Motion-Probe entstehen.
 
 Der RPC bleibt Owner von Segment-Fail/Retryable, Slot-Reset, Replacement-Attempt und Ledger-Provenienz. Der folgende Redispatch adoptiert ausschließlich `replacement_job_id`. RS3 / `run_id` / `plate_generation` bleiben unverändert.
 
-## 6. `report-lipsync-motion-probe` bleibt Nicht-Owner
+## 6. Measurement Owner
 
-Diese Function darf höchstens als Quelle PURER Motion-Metrik-/Classifier-Logik dienen. Ihre `update_dialog_pass_slot`-Mutation, Retry-State-Änderungen und eigene Redispatch-Logik sind NICHT der autoritative G3.2.2-Vertrag und werden für C′ weder kopiert noch aktiviert.
+Die Motion-Metrik muss serverseitig im Provider-Completion-Pfad oder über einen synchron autorisierten read-only Measurement-Helper verfügbar sein, BEVOR `ssw:success` entschieden wird.
+
+`report-lipsync-motion-probe` bleibt ausdrücklich:
+- kein State-Owner
+- kein Retry-Owner
+- kein Replacement-Attempt-Owner
+- kein post-hoc Mechanismus, auf den der Mux warten muss
+
+Seine bestehende Client-/Mutation-Architektur wird nicht zur neuen Authority.
 
 ## 7. Alternative Wire-Konfiguration (genau eine)
 
-Fresh: `sync-3` · Single-Face-Preclip · `bbox-url-pro` · `bounding_boxes_url` · v402/Contract-E-Geometrie · Provider-Audio.
+Fresh:
+- `sync-3`
+- SAME Single-Face Preclip
+- `bounding_boxes_url`
 
-Retry (C′):
-- `sync-3` unverändert
-- EXAKT derselbe Preclip
-- EXAKT dieselbe transformierte Ziel-BBox
-- EXAKT dasselbe Audio
-- statt `bounding_boxes_url`: inline `bounding_boxes`
+Retry:
+- `sync-3`
+- SAME Single-Face Preclip
+- SAME Audio
+- SAME transformed target bbox
+- inline `bounding_boxes`
 
-Einziger Unterschied = ASD-Transportform. Kein Full-Plate-Fallback, kein `auto_detect`, kein coordinate-only, kein Modellwechsel, kein Geometry-Recompute.
+Nur die ASD-Transportform unterscheidet sich.
+
+Kein v148 Preclip-Drop. Kein Full-Plate. Kein `auto_detect`. Kein coordinate-only. Kein Modellwechsel.
 
 ## 8. P1 Integration Conflict — Auflösung
 
@@ -116,4 +140,4 @@ NICHT: video = full plate
 
 Danach STOP. Kein Deploy, kein Render. Ein einzelner Controlled Retest erst nach separatem Deploy-GO.
 
-`FA-4 PROVIDER-NO-OP FIX CONTRACT CORRECTION READY → STOP`
+FA-4 PROVIDER-NO-OP FIX CONTRACT FINAL CLEANUP READY → STOP
