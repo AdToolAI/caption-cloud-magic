@@ -2453,39 +2453,23 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           }
         });
 
-        // v239 — Objective bbox sanity check. Replaces the anchor-in-bbox
-        // test for non-trusted slots. A bbox is "sane" when it lies inside
-        // the plate (with 5% tolerance), covers between 0.3% and 25% of
-        // plate area, and has an aspect ratio between 0.4 and 2.5.
-        const plateArea = Math.max(1, plateDims.width * plateDims.height);
-        const inPlateTol = Math.max(
-          8,
-          Math.round(Math.min(plateDims.width, plateDims.height) * 0.05),
-        );
+        // v239 / FA-4 Contract D — objective bbox sanity check. There is
+        // exactly ONE canonical owner of the thresholds: `plateFaceSanity()`
+        // in `_shared/plate-face-candidates.ts` (area 0.003..0.25, aspect
+        // 0.4..2.5, degenerate, out_of_plate with the 5% in-plate tolerance).
+        // This local helper is only a thin wrapper that preserves the existing
+        // reason formatting used downstream.
         const bboxSanity = (
           box: [number, number, number, number],
         ): { ok: boolean; reason: string } => {
-          const [bx1, by1, bx2, by2] = box;
-          const w = bx2 - bx1;
-          const h = by2 - by1;
-          if (w <= 0 || h <= 0) return { ok: false, reason: "degenerate" };
-          if (
-            bx1 < -inPlateTol ||
-            by1 < -inPlateTol ||
-            bx2 > plateDims.width + inPlateTol ||
-            by2 > plateDims.height + inPlateTol
-          ) {
-            return { ok: false, reason: "out_of_plate" };
+          const s = plateFaceSanity(box, plateDims);
+          if (s.ok) return { ok: true, reason: "ok" };
+          if (s.reason === "aspect_invalid") {
+            return { ok: false, reason: `aspect=${s.aspect.toFixed(2)}` };
           }
-          const areaRatio = (w * h) / plateArea;
-          if (areaRatio < 0.003) return { ok: false, reason: "area_too_small" };
-          if (areaRatio > 0.25) return { ok: false, reason: "area_too_large" };
-          const aspect = w / h;
-          if (aspect < 0.4 || aspect > 2.5) {
-            return { ok: false, reason: `aspect=${aspect.toFixed(2)}` };
-          }
-          return { ok: true, reason: "ok" };
+          return { ok: false, reason: s.reason };
         };
+
 
         const goodSlots: number[] = [];
         const badSlots: number[] = [];
