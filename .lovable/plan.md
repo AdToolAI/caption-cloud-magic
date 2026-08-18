@@ -1,78 +1,119 @@
-# FA-4 Provider-No-op Fix Contract
+# FA-4 Provider-No-op Fix Contract — CORRECTED (Option C′)
 
-Ausgangslage: `FA-4 CONTROLLED RETEST = BLOCKED` durch 2 x P0 provider silent no-op (T4 Kay / p5, T6 Samuel / p3). Root-Cause-Lock = `SYNCSO_PROVIDER_NOOP`. Geometry v402, Preclip, Audio-Preparation, Fan-out und Mux sind entlastet und bleiben eingefroren.
+Status: `FA-4 CONTROLLED RETEST = BLOCKED`
+- T4 Kay / p5 = `SYNCSO_PROVIDER_NOOP`
+- T6 Samuel / p3 = `SYNCSO_PROVIDER_NOOP`
 
-## Ziel
+Kein Code, kein Deploy, kein Render in diesem Schritt.
 
-Einen engen, messbaren Fix-Contract für die beiden Ausfälle definieren, bevor eine einzige Zeile Code geändert wird. Der Fix darf nur die Provider-Reaktion beeinflussen — nicht die bereits bewiesenen Stufen.
+## 0. Korrektur der Ausgangsannahmen
 
-## Nicht-Ziel / Frozen Scope
+Die frühere „Option A: auf `bounding_boxes_url` wechseln“ ist gestrichen. Der aktuelle Production-Pfad IST bereits:
 
-- Keine Änderung an `plate-face-candidates.ts` v402 (Geometry/Hungarian).
-- Keine Änderung an `preclip-crop-containment.ts` (Contract E).
-- Keine Änderung an Fan-out, Ledger-Identität, RS3 oder Mux-Timing.
-- Keine generelle Architektur-Umbau (z.B. Rückkehr zu vollplattiger Kette, segments[]-Single-Call, neuer Provider).
-- Kein neuer Render und kein Deploy in diesem Plan.
+- `model = sync-3` (kein `lipsync-2-pro` als Primary)
+- Multi-Speaker = Single-Face-Preclip
+- Fresh ASD = `bbox-url-pro` via `active_speaker_detection.bounding_boxes_url`
+- Contract-E-transformierte Ziel-BBox im Preclip-Raum
+- `auto_detect` im finalen Dialog-Wire verboten, coordinate-only kein Happy-Path
 
-## Hypothesen für Sync.so silent no-op
+Kein Modellwechsel in diesem Contract.
 
-Basierend auf den Forensik-Zahlen (T4/T6 Input valide, Output Δ ≤ 0) sind diese drei Hypothesen plausibel und testbar:
+## 1. Frozen — nicht zu öffnen
 
-1. **ASD-Modus-Heuristik**: Der für p3/p5 verwendete `active_speaker_detection`-Modus (z.B. `auto_detect` vs. Koordinaten vs. `bounding_boxes_url`) führt bei bestimmten Gesichts-/Crop-Konfigurationen zu einem stillen No-op, obwohl der Job `succeeded` meldet.
-2. **Audio-Window / Lead-in / LUFS**: Die aktuelle Audio-Normalisierung (lead-in 0.25s, LUFS -16, peak -1 dBFS) reicht für manche Stimmen/Sprechtempi nicht aus, um Sync.so über die interne VAD-Schwelle zu heben. T4/T6 könnten knapp unterhalb der Provider-internen Aktivierungsschwelle liegen.
-3. **Modell- / Retry-Varianten-Heuristik**: `lipsync-2-pro` (aktueller Primary) behandelt bestimmte Gesichtsgrößen, Kopfhaltungen oder Hintergründe als "still frame" und verweigert die Motion. `sync-3` oder eine andere Retry-Variante könnte dieselben Inputs anders bewerten.
+v402 Face-Candidate / Hungarian / AssignmentLock · Contract E / Preclip-Crop-Geometrie · Audio-Preparation · Turn-ID / Fan-out · Ledger / RS3 · Mux / Finalizer · `processed_video_url`-Semantik.
 
-## Fix-Contract-Optionen
+## 2. Gewählte Option — C′
 
-Nur diese drei Optionen sind im engen Scope zulässig. Eine davon wird im Plan ausgewählt; Kombinationen sind erst nach isolierter Validierung erlaubt.
+Multi-Speaker Provider-Output Motion Gate
++ bestehender autoritativer G3.2.2 NOOP-Escalate-Vertrag
++ genau EINE alternative Wire-Konfiguration.
 
-### Option A — ASD-Modus-Korrektur
+Keine neue Retry-Architektur.
 
-Für Multi-Speaker-Preclips mit sauberer Geometrie (v402) den ASD-Modus so wählen, dass Sync.so keine Heuristik-Entscheidung mehr treffen muss.
+## 3. Motion-Noop Classifier (PURE)
 
-- Vorschlag: Statt `auto_detect` oder Einzelkoordinaten auf dem 720px-Preclip für p3/p5 eine deterministische `bounding_boxes_url` (oder inline `bounding_boxes`) verwenden, die exakt das Zielgesicht pro Frame umschließt.
-- Bedingung: Die Boxen müssen aus derselben Geometrie-Quelle (`reference_image_url`, v402) stammen wie die Koordinaten; kein neues Face-Detection-Ergebnis.
-- Messung: Vor einem echten Render muss eine Fixture-basierte Unit-Test-Suite beweisen, dass für S11 p3/p5 die generierten Boxen die gleiche Mund-ROI wie die erfolgreichen Controls treffen.
+Nach Sync.so `COMPLETED` bewertet ein reiner Classifier für Multi-Speaker-Passes den Provider-Output gegen den exakten Provider-Input-Preclip.
 
-### Option B — Audio-Preparation-Anpassung
+- Keine DB-Writes, kein Pass-Patch, kein Retry, kein Ledger-Zugriff.
+- Input: Motion-Metrik Preclip, Motion-Metrik Provider-Output, optional normalisierte Begleitmetriken.
+- Output: `motion` | `noop` | `indeterminate` + Messwerte/Reason.
+- Klassifikation NIE allein über HTTP/Provider-Status, Dateigröße, ETag oder Resolution. Diese bleiben nur Zusatz-Evidenz.
 
-Die Audio-Normalisierung so verändern, dass Sync.so für T4/T6 dieselbe Aktivierungswahrscheinlichkeit sieht wie für T1/T2/T3/T5.
+## 4. Frozen S11 Motion Fixture (aus abgeschlossener RCA)
 
-- Zulässige Parameter: `leadInSec`, `targetLufs`, `peakDbFs`, VAD-Window-Slicing (`detectVoicedRange`), minimale Gesamtdauer.
-- Verboten: Veränderung der Sprech-Sample-Rate, Kanäle oder des eigentlichen Dialog-Inhalts.
-- Messung: Für jeden der 6 S11-Passes die exakt dispatch-bereite WAV nach dem neuen Schema messen und mit den erfolgreichen Controls angleichen (RMS, LUFS, voiced ratio, first/last voiced sec, peak dBFS).
+| Pass | Turn | Pre (mean/peak) | Provider (mean/peak) | Δpeak | Erwartet |
+|---|---|---|---|---|---|
+| p0 | T1 Sarah | 1.076 / 2.907 | 1.157 / 3.768 | +0.86 | motion |
+| p1 | T5 Sarah | 0.635 / 1.981 | 0.717 / 2.953 | +0.97 | motion |
+| p2 | T2 Samuel | 0.328 / 0.886 | 0.340 / 1.019 | +0.13 | motion |
+| p3 | T6 Samuel | 0.355 / 0.936 | 0.356 / 0.864 | −0.07 | noop |
+| p4 | T3 Matthew | 0.329 / 1.073 | 0.357 / 2.213 | +1.14 | motion |
+| p5 | T4 Kay | 0.307 / 0.836 | 0.292 / 0.688 | −0.15 | noop |
 
-### Option C — Retry-Ladder-Erweiterung für No-op
+Pflicht: T1/T2/T3/T5 nie `noop`; T4/T6 immer `noop`. Der schwache positive Control T2 (+0.13) ist der bindende Sensitivity-Anker.
 
-Nach Provider-Output eine automatische Motion-Probe durchführen; bei nachweislichem No-op denselben Pass mit einer alternativen, bewährten Konfiguration erneut dispatch.
+Kein frei erfundener Epsilon. Ein Runtime-Threshold darf nur aus einer dokumentierten Classifier-Regel entstehen, die alle sechs frozen Cases trennt und eine explizite Sensitivity-Prüfung um T2 enthält (dokumentierter Abstand zwischen T2 und dem stärksten Noop-Case p3 = −0.07).
 
-- Zulässig: Ein Retry-Varianten-Schritt, der bei `provider_no_op` (nicht bei generischem `succeeded`) auslöst.
-- Verboten: Beliebige Retry-Schleifen, Modell-Wechsel ohne Contract oder Auslösung bei jedem `succeeded`.
-- Messung: Unit-Tests für die Motion-Probe müssen T4/T6 als no-op und T1/T2/T3/T5 als motion erkennen; Retry muss idempotent und RS3-sicher sein.
+## 5. Authoritative Retry Ownership
 
-## Empfohlene Option
+Bei `noop` NICHT: `dialog_shots` direkt patchen, `pipeline_job_id` nullen, eigenen Retry-Attempt erzeugen, freien Redispatch starten.
 
-**Option A zuerst**, weil:
+Stattdessen ausschließlich über den eingefrorenen G3.2.2-Vertrag:
 
-- Die Geometrie bereits bewiesen korrekt ist — es fehlt nur die richtige Übergabe an Sync.so.
-- `bounding_boxes_url` ist der deterministischste ASD-Modus in der Sync.so-Doku.
-- Sie verändert keinen Audio-Pfad und braucht keinen zusätzlichen Render-Retry.
+`composer_apply_sync_segment_result` mit `write_id = ssw:noop_escalate`
 
-Falls Option A in einem kontrollierten Test nicht greift, wird Option B geprüft. Option C ist der Fallback, wenn A und B isoliert keine Wirkung zeigen.
+Der RPC bleibt Owner von Segment-Fail/Retryable, Slot-Reset, Replacement-Attempt und Ledger-Provenienz. Der folgende Redispatch adoptiert ausschließlich `replacement_job_id`. RS3 / `run_id` / `plate_generation` bleiben unverändert.
 
-## Akzeptanzkriterien für den Fix
+## 6. `report-lipsync-motion-probe` bleibt Nicht-Owner
 
-1. **Fixture-Test**: Mit denselben S11-Inputs (p3 Samuel, p5 Kay) muss der neue Dispatch-Payload in einer Unit-Test-Fixture erzeugt werden können und die Mund-ROI-Boxen müssen die erwarteten Slots treffen.
-2. **Vergleichbarkeit**: Die neuen Payloads für p0/p1/p2/p4 (erfolgreiche Controls) dürfen sich nicht verschlechtern; ihre ASD-Information muss entweder identisch bleiben oder eine bewiesene Verbesserung darstellen.
-3. **Keine Regression**: Single-Speaker-Szenen, die aktuell funktionieren, müssen unverändert bleiben.
-4. **Messbarer Erfolg**: Ein nachfolgender Controlled Retest auf S11 muss für T4 und T6 ein positives Provider-Output-Delta (Δ peak > 0) zeigen, bevor visuelle Abnahme erlaubt ist.
+Diese Function darf höchstens als Quelle PURER Motion-Metrik-/Classifier-Logik dienen. Ihre `update_dialog_pass_slot`-Mutation, Retry-State-Änderungen und eigene Redispatch-Logik sind NICHT der autoritative G3.2.2-Vertrag und werden für C′ weder kopiert noch aktiviert.
 
-## Nächster Schritt nach Plan-Approval
+## 7. Alternative Wire-Konfiguration (genau eine)
 
-1. Implementiere Option A in `compose-dialog-segments/index.ts` (nur ASD-Modus-Selektion für Multi-Speaker-Preclips).
-2. Erstelle Unit-Tests mit der echten S11-Fixture (4 Anchor-Center + 10 Kandidatenboxen).
-3. Kein Deploy, kein Render, bis Unit-Tests PASS und du den Payload-Diff freigibst.
+Fresh: `sync-3` · Single-Face-Preclip · `bbox-url-pro` · `bounding_boxes_url` · v402/Contract-E-Geometrie · Provider-Audio.
 
-## Abschluss dieses Plans
+Retry (C′):
+- `sync-3` unverändert
+- EXAKT derselbe Preclip
+- EXAKT dieselbe transformierte Ziel-BBox
+- EXAKT dasselbe Audio
+- statt `bounding_boxes_url`: inline `bounding_boxes`
 
-Nach Approval: `FA-4 PROVIDER-NO-OP FIX CONTRACT = APPROVED → STOP`.
+Einziger Unterschied = ASD-Transportform. Kein Full-Plate-Fallback, kein `auto_detect`, kein coordinate-only, kein Modellwechsel, kein Geometry-Recompute.
+
+## 8. P1 Integration Conflict — Auflösung
+
+Bestehender Konflikt: v148 entfernt bei NOOP-Eskalation (`coords-pro-box`) den Preclip; v204 blockiert Multi-Speaker-Dispatch ohne Preclip (`v204_preclip_required`).
+
+Für C′ verbindlich: Der NOOP-Retry BEHÄLT den bewiesenen Single-Face-Preclip. Der Payload-Test muss beweisen:
+
+```text
+Fresh: video = preclip, ASD = bounding_boxes_url
+Retry: video = SAME preclip, ASD = inline bounding_boxes
+NICHT: video = full plate
+```
+
+## 9. Unit-/Contract-Tests vor Deploy
+
+- A. Classifier: T1/T2/T3/T5 → motion; T4/T6 → noop
+- B. COMPLETED + motion → `ssw:success`, kein Retry
+- C. COMPLETED + noop → `ssw:noop_escalate`, genau ein Replacement-Attempt
+- D. Duplicate Callback → kein zweiter Replacement-Attempt
+- E. Stale run/generation → kein Apply/Redispatch
+- F. Wire-Diff: Fresh `bbox-url-pro` vs. Retry inline-bbox unterscheiden sich ausschließlich in der ASD-Transportform
+- G. Multi-Speaker-Retry: Preclip bleibt gesetzt, `v204_preclip_required` feuert nicht
+- H. Single-Speaker: unverändert
+- I. Geometry / Contract E / `speaker_idx` / `segment_id`: unverändert
+
+## 10. Success Contract (Unit-/Contract-Ebene)
+
+- Alle frozen Motion-Fixtures korrekt klassifiziert
+- Keine Control-False-Positives (T2 bindend)
+- Genau ein autoritativer Replacement-Attempt
+- Retry-Wire nachweislich anders
+- Preclip identisch
+- Keine Änderung an Geometry / Audio / Mux / Fan-out
+
+Danach STOP. Kein Deploy, kein Render. Ein einzelner Controlled Retest erst nach separatem Deploy-GO.
+
+`FA-4 PROVIDER-NO-OP FIX CONTRACT CORRECTION READY → STOP`
