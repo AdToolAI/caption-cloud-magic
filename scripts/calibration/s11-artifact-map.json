@@ -1,0 +1,80 @@
+{
+  "0": {
+    "speaker": "Sarah Dusatko",
+    "label": "motion",
+    "turn": "T1",
+    "pre": "https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/sign/lipsync-plates/shared/e658509d-cdeb-40f7-bd33-98e74144fdc5/p1-preclip-3b596080c7655a8d.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84ZGMxNTg3OC0xZDYxLTQzYTAtYWQ0MS1mZGUxOTZjYzc4ZGQiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsaXBzeW5jLXBsYXRlcy9zaGFyZWQvZTY1ODUwOWQtY2RlYi00MGY3LWJkMzMtOThlNzQxNDRmZGM1L3AxLXByZWNsaXAtM2I1OTYwODBjNzY1NWE4ZC5tcDQiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzg3MDg0NDQ5LCJleHAiOjE3ODc2ODkyNDl9.lsYlAMQTmACjTV5erv3b0CMJ3YGy783rGBK0n3XTEAw",
+    "out": "https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/public/ai-videos/composer/8948d3d9-2c5e-4405-9e9c-1624448e7189/e658509d-cdeb-40f7-bd33-98e74144fdc5-lipsync-pass-1.mp4",
+    "pass_idx": 0,
+    "width": 720,
+    "height": 720,
+    "fps": 30,
+    "duration": 1.766667,
+    "frames": 53
+  },
+  "1": {
+    "speaker": "Sarah Dusatko",
+    "label": "motion",
+    "turn": "T5",
+    "pre": "https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/sign/lipsync-plates/shared/e658509d-cdeb-40f7-bd33-98e74144fdc5/p2-preclip-be4ba28f13c536bd.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84ZGMxNTg3OC0xZDYxLTQzYTAtYWQ0MS1mZGUxOTZjYzc4ZGQiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsaXBzeW5jLXBsYXRlcy9zaGFyZWQvZTY1ODUwOWQtY2RlYi00MGY3LWJkMzMtOThlNzQxNDRmZGM1L3AyLXByZWNsaXAtYmU0YmEyOGYxM2M1MzZiZC5tcDQiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzg3MDg0NTM2LCJleHAiOjE3ODc2ODkzMzZ9.CvxyrZPPrlUTGOPFKh0oajT3YdawHa_mazdUNJ7isVQ",
+    "out": "https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/public/ai-videos/composer/8948d3d9-2c5e-4405-9e9c-1624448e7189/e658509d-cdeb-40f7-bd33-98e74144fdc5-lipsync-pass-2.mp4",
+    "pass_idx": 1,
+    "width": 720,
+    "height": 720,
+    "fps": 30,
+    "duration": 1.733333,
+    "frames": 52
+  },
+  "2": {
+    "speaker": "Samuel Dusatko",
+    "label": "motion",
+    "turn": "T2",
+    "pre": "https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/sign/lipsync-plates/shared/e658509d-cdeb-40f7-bd33-98e74144fdc5/p3-preclip-47a2358cc05f4785.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84ZGMxNTg3OC0xZDYxLTQzYTAtYWQ0MS1mZGUxOTZjYzc4ZGQiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsaXBzeW5jLXBsYXRlcy9zaGFyZWQvZTY1ODUwOWQtY2RlYi00MGY3LWJkMzMtOThlNzQxNDRmZGM1L3AzLXByZWNsaXAtNDdhMjM1OGNjMDVmNDc4NS5tcDQiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzg3MDg0NTIwLCJleHAiOjE3ODc2ODkzMjB9.9PVoq1IelloBmvq6mSaLYV1G6L7LIgoe7kZlyssYEDU",
+    "out": "https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/public/ai-videos/composer/8948d3d9-2c5e-4405-9e9c-1624448e7189/e658509d-cdeb-40f7-bd33-98e74144fdc5-lipsync-pass-3.mp4",
+    "pass_idx": 2,
+    "width": 720,
+    "height": 720,
+    "fps": 30,
+    "duration": 1.633333,
+    "frames": 49
+  },
+  "3": {
+    "speaker": "Samuel Dusatko",
+    "label": "noop",
+    "turn": "T6",
+    "pre": "https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/sign/lipsync-plates/shared/e658509d-cdeb-40f7-bd33-98e74144fdc5/p4-preclip-23f73a30d7e884c6.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84ZGMxNTg3OC0xZDYxLTQzYTAtYWQ0MS1mZGUxOTZjYzc4ZGQiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsaXBzeW5jLXBsYXRlcy9zaGFyZWQvZTY1ODUwOWQtY2RlYi00MGY3LWJkMzMtOThlNzQxNDRmZGM1L3A0LXByZWNsaXAtMjNmNzNhMzBkN2U4ODRjNi5tcDQiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzg3MDg0NTM2LCJleHAiOjE3ODc2ODkzMzZ9.sV0_qbaviVkKZnJFvVQKsp4-uhKMrQywpNkzwR6HRhc",
+    "out": "https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/public/ai-videos/composer/8948d3d9-2c5e-4405-9e9c-1624448e7189/e658509d-cdeb-40f7-bd33-98e74144fdc5-lipsync-pass-4.mp4",
+    "pass_idx": 3,
+    "width": 720,
+    "height": 720,
+    "fps": 30,
+    "duration": 1.6,
+    "frames": 48
+  },
+  "4": {
+    "speaker": "Matthew Dusatko",
+    "label": "motion",
+    "turn": "T3",
+    "pre": "https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/sign/lipsync-plates/shared/e658509d-cdeb-40f7-bd33-98e74144fdc5/p5-preclip-b77d027b30e8e77e.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84ZGMxNTg3OC0xZDYxLTQzYTAtYWQ0MS1mZGUxOTZjYzc4ZGQiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsaXBzeW5jLXBsYXRlcy9zaGFyZWQvZTY1ODUwOWQtY2RlYi00MGY3LWJkMzMtOThlNzQxNDRmZGM1L3A1LXByZWNsaXAtYjc3ZDAyN2IzMGU4ZTc3ZS5tcDQiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzg3MDg0NjE4LCJleHAiOjE3ODc2ODk0MTh9.V1K3bZ1IDNv4mIVhRb9rF2ziHo0tI-JFZ2UwRDZxoUU",
+    "out": "https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/public/ai-videos/composer/8948d3d9-2c5e-4405-9e9c-1624448e7189/e658509d-cdeb-40f7-bd33-98e74144fdc5-lipsync-pass-5.mp4",
+    "pass_idx": 4,
+    "width": 720,
+    "height": 720,
+    "fps": 30,
+    "duration": 1.533333,
+    "frames": 46
+  },
+  "5": {
+    "speaker": "Kay Mark",
+    "label": "noop",
+    "turn": "T4",
+    "pre": "https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/sign/lipsync-plates/shared/e658509d-cdeb-40f7-bd33-98e74144fdc5/p6-preclip-42a3149a7ecde1f9.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84ZGMxNTg3OC0xZDYxLTQzYTAtYWQ0MS1mZGUxOTZjYzc4ZGQiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsaXBzeW5jLXBsYXRlcy9zaGFyZWQvZTY1ODUwOWQtY2RlYi00MGY3LWJkMzMtOThlNzQxNDRmZGM1L3A2LXByZWNsaXAtNDJhMzE0OWE3ZWNkZTFmOS5tcDQiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzg3MDg0NjMwLCJleHAiOjE3ODc2ODk0MzB9.Sfl0Dmp3xokW0-vX5yVZ7c8S_y8lHJau3-HoBtS9FT0",
+    "out": "https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/public/ai-videos/composer/8948d3d9-2c5e-4405-9e9c-1624448e7189/e658509d-cdeb-40f7-bd33-98e74144fdc5-lipsync-pass-6.mp4",
+    "pass_idx": 5,
+    "width": 720,
+    "height": 720,
+    "fps": 30,
+    "duration": 1.466667,
+    "frames": 44
+  }
+}
