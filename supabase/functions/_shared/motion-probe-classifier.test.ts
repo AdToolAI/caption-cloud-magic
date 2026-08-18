@@ -3,7 +3,13 @@
  * Run: deno test supabase/functions/_shared/motion-probe-classifier.test.ts
  */
 import { assertAlmostEquals, assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
-import { classifyMotionProbe, getS11FrozenFixture, type MotionProbeInput } from "./motion-probe-classifier.ts";
+import {
+  classifyMotionProbe,
+  getS11FrozenFixture,
+  MOTION_THRESHOLD,
+  NOOP_THRESHOLD,
+  type MotionProbeInput,
+} from "./motion-probe-classifier.ts";
 
 Deno.test("A. Frozen S11 fixture — all six cases classify as expected", () => {
   const fixture = getS11FrozenFixture();
