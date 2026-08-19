@@ -996,30 +996,50 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
       const passBeforeDone = freshDonePasses[currentPass] ?? null;
 
-      // ── FA-4 v409 Residual — aufgeschobene Multi-Speaker-Messung nachholen ──
+      // ── FA-4 v410 — aufgeschobene Multi-Speaker-Messung NICHT unter Lock ──
       // Der Pre-Lock-Snapshot war unvollständig (Fan-Out-Race), das frische
-      // Set ist jetzt echtes Multi-Speaker. Ohne Nachmessung liefe der Pass in
-      // `measurement_missing` → falscher Hard-Fail. Gleiche Messfunktion,
-      // gleiche Metrik/Threshold/Deadline/ROI, gleiche rehostete Output-URL,
-      // genau EINMAL, keine zweite DB-Autorität, kein Retry/Mux.
-      const catchUpPlan = planUnderLockSpeakerMeasurement({
+      // Set ist jetzt echtes Multi-Speaker. Die fehlende Messung wird
+      // angefordert, der Lock freigegeben, ausserhalb gemessen und dieser
+      // Abschnitt danach mit frisch gelesenem Zustand erneut betreten.
+      // Kein Apply, kein Mux, kein Retry in dieser Phase.
+      const ioDecision = decideUnderLockIoAction({
         fresh: speakerCardinality,
         preLockDeferred: v404MeasurementDeferred,
         hasMeasurement: v404MotionProbe !== null,
       });
-      if (catchUpPlan.action === "measure" && status === "COMPLETED" && outputUrl) {
-        await runServerMotionMeasurement(passBeforeDone, currentPass, "under_lock_catch_up");
+      if (
+        ioDecision.action === "needs_catch_up_measurement" &&
+        status === "COMPLETED" && outputUrl
+      ) {
+        catchUpMeasurePass = passBeforeDone;
+        console.log(
+          `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} motion_measure_catch_up_requested scene=${sceneId} ` +
+            `pass=${currentPass} reason=${ioDecision.reason} — releasing dialog lock before measurement`,
+        );
+        throw new Fa4OutOfLockIoRequired({ kind: "measurement", passIdx: currentPass });
       }
 
-
-
       const inputPreclipUrl = String(passBeforeDone?.preclip_url ?? passBeforeDone?._v105_probe?.payload_video_url ?? "");
-      const [inputHead, outputHead, inputDims, outputDims] = await Promise.all([
-        headAsset(inputPreclipUrl),
-        headAsset(rehostedUrl ?? outputUrl),
-        inputPreclipUrl ? probeMp4Dims(inputPreclipUrl).catch(() => null) : Promise.resolve(null),
-        probeMp4Dims(rehostedUrl ?? outputUrl).catch(() => null),
-      ]);
+      const outputProbeUrl = String(rehostedUrl ?? outputUrl ?? "");
+      // v410: HEAD-/MP4-Probes sind Netz-I/O → nur ausserhalb des Locks.
+      const missingHeadUrls = [inputPreclipUrl, outputProbeUrl].filter(
+        (u) => !!u && !headCache.has(u),
+      );
+      const missingDimUrls = [inputPreclipUrl, outputProbeUrl].filter(
+        (u) => !!u && !dimCache.has(u),
+      );
+      if (missingHeadUrls.length > 0 || missingDimUrls.length > 0) {
+        throw new Fa4OutOfLockIoRequired({
+          kind: "media_probe",
+          headUrls: missingHeadUrls,
+          dimUrls: missingDimUrls,
+        });
+      }
+      const inputHead = inputPreclipUrl ? (headCache.get(inputPreclipUrl) ?? null) : null;
+      const outputHead = outputProbeUrl ? (headCache.get(outputProbeUrl) ?? null) : null;
+      const inputDims = inputPreclipUrl ? (dimCache.get(inputPreclipUrl) ?? null) : null;
+      const outputDims = outputProbeUrl ? (dimCache.get(outputProbeUrl) ?? null) : null;
+
       const minOutputAxis = Math.min(Number(outputDims?.width ?? 0), Number(outputDims?.height ?? 0));
       const expectedPreclipAxis = Number(passBeforeDone?.preclip_crop?.outputSize ?? 0);
       const syncOutputUnchanged = !!(
