@@ -14,9 +14,15 @@ Deno.test("readLang: explicit x-app-lang wins", () => {
   assertEquals(readLang(req({ "x-app-lang": "en", "accept-language": "de-DE" })), "en");
 });
 
-Deno.test("readLang: accept-language honoured only as explicit signal", () => {
-  assertEquals(readLang(req({ "accept-language": "de-DE,de;q=0.9" })), "de");
+Deno.test("readLang: accept-language / browser locale NEVER selects de/es", () => {
+  assertEquals(readLang(req({ "accept-language": "de-DE,de;q=0.9" })), "en");
+  assertEquals(readLang(req({ "accept-language": "es-ES" })), "en");
   assertEquals(readLang(req({ "accept-language": "fr-FR" })), "en");
+});
+
+Deno.test("readLang: invalid x-app-lang falls back to English, not browser locale", () => {
+  assertEquals(readLang(req({ "x-app-lang": "fr", "accept-language": "de-DE,de;q=0.9" })), "en");
+  assertEquals(readLang(req({ "x-app-lang": "", "accept-language": "es-ES" })), "en");
 });
 
 Deno.test("normalizeLang: unknown/absent -> English", () => {
