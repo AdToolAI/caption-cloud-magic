@@ -207,7 +207,7 @@ export function VoiceProfileCard({ avatarId, avatar }: VoiceProfileCardProps) {
         />
         {avatar.default_voice_name && (
           <p className="mt-1.5 text-[10px] text-muted-foreground">
-            Aktive Stimme: <span className="text-foreground">{avatar.default_voice_name}</span>
+            {tx({ de: "Aktive Stimme:", en: "Active voice:", es: "Voz activa:" })} <span className="text-foreground">{avatar.default_voice_name}</span>
           </p>
         )}
         {!avatar.default_voice_id && (

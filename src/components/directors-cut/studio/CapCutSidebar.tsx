@@ -133,7 +133,7 @@ interface Caption {
 const CAPTION_STYLES = [
   { id: 'standard', name: 'Standard', description: tx({ de: 'Weiß auf Schwarz', en: 'White on black', es: 'blanco sobre negro' }) },
   { id: 'tiktok', name: 'TikTok', description: 'Bunt & animiert' },
-  { id: 'subtitle', name: 'Untertitel', description: 'Klassisch' },
+  { id: 'subtitle', name: tx({ de: 'Untertitel', en: 'Subtitles', es: 'Subtítulos' }), description: tx({ de: 'Klassisch', en: 'Classic', es: 'Clásico' }) },
   { id: 'highlight', name: 'Highlight', description: 'Wort-Animation' },
 ];
 
@@ -388,7 +388,7 @@ const SubtitleVoiceoverSection: React.FC<{
         name: v.name,
         language: (v.language as VoiceMeta['language']) || 'en',
         gender: 'neutral',
-        description: 'Meine Stimme',
+        description: tx({ de: 'Meine Stimme', en: 'My voice', es: 'Mi voz' }),
         tier: 'cloned' as const,
         supportedLanguages: ['de', 'en', 'es'],
       }));
@@ -1105,7 +1105,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a] min-w-0 max-w-full overflow-hidden">
               <p className="text-[11px] text-white/50 font-medium uppercase tracking-wider">{t('dc.previewVisibility')}</p>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-white/70">💬 Untertitel</span>
+                <span className="text-[11px] text-white/70">💬 {tx({ de: "Untertitel", en: "Subtitles", es: "Subtítulos" })}</span>
                 <Switch
                   checked={showSubtitles}
                   onCheckedChange={(v) => onShowSubtitlesChange?.(v)}
@@ -1682,7 +1682,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Upload className="h-4 w-4 text-pink-400" />
-                <span className="text-sm font-medium text-white">Audio hochladen</span>
+                <span className="text-sm font-medium text-white">{tx({ de: "Audio hochladen", en: "Upload audio", es: "Subir audio" })}</span>
               </div>
 
               {/* Audio Dropzone */}

@@ -50,7 +50,7 @@ export const AvatarVoicePicker = ({
     if (!value) return null;
     const custom = customList.find((v) => v.elevenlabs_voice_id === value);
     if (custom) {
-      return { name: custom.name || 'Custom voice', sub: 'Meine Stimme', cloned: true };
+      return { name: custom.name || 'Custom voice', sub: tx({ de: 'Meine Stimme', en: 'My voice', es: 'Mi voz' }), cloned: true };
     }
     if (pickedMeta && pickedMeta.id === value) {
       return {
@@ -59,7 +59,7 @@ export const AvatarVoicePicker = ({
         cloned: false,
       };
     }
-    return { name: 'Stimme aktiv', sub: voiceLanguageLabel(targetLanguage), cloned: false };
+    return { name: tx({ de: 'Stimme aktiv', en: 'Voice active', es: 'Voz activa' }), sub: voiceLanguageLabel(targetLanguage), cloned: false };
   }, [value, customList, pickedMeta, targetLanguage]);
 
   const handleSelect = (voice: VoiceMeta, lang: string) => {
@@ -109,7 +109,7 @@ export const AvatarVoicePicker = ({
               size="icon"
               disabled={disabled}
               onClick={() => { setPickedMeta(null); onChange(null); }}
-              title="Stimme entfernen"
+              title={tx({ de: "Stimme entfernen", en: "Remove voice", es: "Quitar voz" })}
             >
               <X className="h-4 w-4" />
             </Button>

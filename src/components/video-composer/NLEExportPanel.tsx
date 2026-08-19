@@ -218,7 +218,7 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
                         className="h-7 px-2 text-xs"
                         disabled={expired}
                         onClick={() => reDownload(rec)}
-                        title={expired ? 'Abgelaufen' : 'Erneut herunterladen'}
+                        title={expired ? tx({ de: 'Abgelaufen', en: 'Expired', es: 'Caducado' }) : tx({ de: 'Erneut herunterladen', en: 'Download again', es: 'Descargar de nuevo' })}
                       >
                         <Download className="h-3 w-3" />
                       </Button>

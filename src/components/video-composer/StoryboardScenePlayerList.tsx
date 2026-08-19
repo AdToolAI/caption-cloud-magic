@@ -180,7 +180,7 @@ export default function StoryboardScenePlayerList({
         onClick={onAddScene}
         className="w-full gap-1.5 text-xs border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5"
       >
-        <Plus className="h-3.5 w-3.5" /> Szene hinzufügen
+        <Plus className="h-3.5 w-3.5" /> {tx({ de: "Szene hinzufügen", en: "Add scene", es: "Añadir escena" })}
       </Button>
     </div>
   );

@@ -44,7 +44,7 @@ export function StarterPlanPreview({ plans, loading, error, onComplete, onRetry 
     return (
       <div className="flex flex-col items-center justify-center py-16 space-y-4">
         <p className="text-destructive font-medium">{error}</p>
-        <Button onClick={onRetry} variant="outline">Erneut versuchen</Button>
+        <Button onClick={onRetry} variant="outline">{tx({ de: "Erneut versuchen", en: "Try again", es: "Reintentar" })}</Button>
       </div>
     );
   }

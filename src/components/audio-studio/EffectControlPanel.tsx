@@ -51,13 +51,13 @@ const EFFECT_GROUPS: EffectGroup[] = [
   },
   {
     id: 'voice',
-    label: 'Stimme',
+    label: tx({ de: 'Stimme', en: 'Voice', es: 'Voz' }),
     icon: Mic,
     effects: [
       { key: 'voiceEQ', label: 'Voice EQ', shortLabel: '+3dB 3kHz', description: 'Klarheit boosten' },
       { key: 'deEsser', label: 'De-Esser', shortLabel: '-4dB 6.5kHz', description: 'S-Laute reduzieren' },
       { key: 'plosiveReducer', label: 'Plosive', shortLabel: '-6dB 120Hz', description: 'P/B-Laute dämpfen' },
-      { key: 'warmthBoost', label: 'Wärme', shortLabel: '+1.5dB 200Hz', description: 'Stimme voller' },
+      { key: 'warmthBoost', label: tx({ de: 'Wärme', en: 'Warmth', es: 'Calidez' }), shortLabel: '+1.5dB 200Hz', description: tx({ de: 'Stimme voller', en: 'Fuller voice', es: 'Voz más plena' }) },
     ]
   },
   {

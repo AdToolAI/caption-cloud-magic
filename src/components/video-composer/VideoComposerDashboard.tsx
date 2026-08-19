@@ -1117,7 +1117,7 @@ export default function VideoComposerDashboard() {
     briefing: 'Produkt, Zielgruppe & Tonalität',
     storyboard: tx({ de: "Szenen planen & anordnen", en: "Plan & arrange scenes", es: "Planificar y organizar escenas" }),
     clips: 'AI-Clips generieren',
-    text: 'Voiceover & Untertitel',
+    text: tx({ de: 'Voiceover & Untertitel', en: 'Voiceover & subtitles', es: 'Voz en off y subtítulos' }),
     audio: 'Musik & Sound-Mix',
     export: 'Render & Download',
     campaign: 'Cutdowns & A/B-Varianten',

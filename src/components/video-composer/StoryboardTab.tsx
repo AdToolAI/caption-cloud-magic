@@ -572,7 +572,7 @@ export default function StoryboardTab({
                 : tr({ de: `Budget voll (max. ${formatDuration(MAX_PROJECT_SECONDS)}) — kürze oder lösche eine Szene.`, en: `Budget full (max. ${formatDuration(MAX_PROJECT_SECONDS)}) — shorten or delete a scene.`, es: `Presupuesto lleno (máx. ${formatDuration(MAX_PROJECT_SECONDS)}) — acorta o elimina una escena.` })
             }
           >
-            <Plus className="h-3.5 w-3.5" /> Szene
+            <Plus className="h-3.5 w-3.5" /> {tx({ de: "Szene", en: "Scene", es: "Escena" })}
           </Button>
           {scenes.length > 1 && scenes[0]?.clipSource?.startsWith('ai-') && (
             <Button

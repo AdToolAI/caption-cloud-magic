@@ -765,7 +765,7 @@ export default function AdDirectorWizard({
                         />
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Stimme passend zur Tonalität:{' '}
+                        {tx({ de: 'Stimme passend zur Tonalität:', en: 'Voice matching the tonality:', es: 'Voz acorde con la tonalidad:' })}{' '}
                         <span className="text-foreground font-medium">
                           {getTonalityVoice(tonality).voiceLabel}
                         </span>{' '}

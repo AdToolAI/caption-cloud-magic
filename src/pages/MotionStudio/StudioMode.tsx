@@ -713,7 +713,7 @@ function StoryboardStep({
               <Library className="h-4 w-4" /> Snippets
             </Button>
             <Button variant="outline" onClick={addScene} className="gap-2">
-              <Plus className="h-4 w-4" /> Szene
+              <Plus className="h-4 w-4" /> {tx({ de: "Szene", en: "Scene", es: "Escena" })}
             </Button>
           </div>
         }
