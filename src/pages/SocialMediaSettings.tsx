@@ -1,5 +1,4 @@
 import { tx } from '@/lib/i18nText';
-import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';

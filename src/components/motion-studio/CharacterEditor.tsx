@@ -19,7 +19,6 @@ import {
   type CharacterDraft,
   type MotionStudioCharacter,
 } from '@/types/motion-studio';
-import { tx } from "@/lib/i18nText";
 
 interface CharacterEditorProps {
   open: boolean;

@@ -1,5 +1,4 @@
 import { tx } from '@/lib/i18nText';
-import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import {
   Dialog,
