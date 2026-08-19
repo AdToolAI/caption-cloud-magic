@@ -30,20 +30,24 @@ Der Snapshot entsteht erst, wenn alle Felder endgültig feststehen (dispatch vid
 
 Danach `update_dialog_pass_slot(provider_input_frozen)` — dieser Write MUSS erfolgreich sein, bevor Sync.so `/generate` aufgerufen wird. Persist-Fehler ⇒ fail closed über den bestehenden `failBeforeProviderDispatch`-Pfad mit `provider_call_made=false`, kein Provider-Call, bestehende Refund-Idempotenz unverändert.
 
+## 1c. Snapshot-Reihenfolge (Fresh)
+
+1. final video bestimmen → 2. final provider audio → 3. Contract-E bbox → 4. canonical `bounding_boxes` EINMAL erzeugen → 5. `frame_count`/`dispatch_fps`/`voiced_windows` → 6. model/`sync_mode`/provenance → 7. `buildProviderWireSnapshot(...)` → 8. `update_dialog_pass_slot(provider_input_frozen)` → 9. Persist-Erfolg zwingend bestätigen → 10. Bounding-Box-JSON AUS `frozen.bounding_boxes` hochladen → 11. `buildProviderWire(snapshot, asdTransport:"url")` → 12. Dispatch.
+
 ## 2. NOOP Retry reuse
 
-Bedingung: `isFrozenNoopRetryPass(pass)` bzw. `noop_auto_escalation === true` mit `retry_variant ∈ {coords-pro-box, bbox-url-pro}`.
+Gate ist ausschließlich `const frozenInput = resolveFrozenProviderInput(pass)`. Nur bei `frozenInput !== null` darf der NOOP-Retry dispatchen; ein unvollständiger Snapshot zählt wie ein fehlender: fail closed mit `reason = noop_retry_frozen_input_missing`, `provider_call_made = false`, ZERO Sync.so-Calls, KEIN Legacy-Rebuild. Kein Gating auf ein Einzelfeld wie `provider_input_frozen.audio_url`.
 
-Dann strukturell übersprungen (Branch vor der jeweiligen Stelle, nicht danach):
+Retry-Reihenfolge: 1. `resolveFrozenProviderInput(pass)` → 2. fehlt/unvollständig ⇒ fail closed → 3. KEIN v40-Restore → 4. KEIN Tight-Slicing → 5. KEINE v129.3-Normalisierung → 6. KEIN Video-/BBox-/Box-Recompute → 7. `buildProviderWire(snapshot, asdTransport:"inline")` → 8. Dispatch.
+
+Strukturell übersprungen (Branch vor der jeweiligen Stelle, nicht danach):
 - v40 Canonical-Restore (`audio_url` bleibt, `audio_tight` wird nicht genullt),
 - Tight-Slicing inkl. Upload (`Date.now()`-Pfad wird nicht betreten),
-- v129.3-Trim/Upload — `sync_audio_url` wird direkt aus dem Snapshot gesetzt,
+- v129.3-Trim/Upload — `sync_audio_url` kommt direkt aus dem Snapshot,
 - Video-Rehost/-Recompute und bbox-/bounding_boxes-Recompute.
 
-Alles Übrige kommt aus dem Snapshot statt aus Neuberechnung: Preclip-/Video-URL, Contract-E-Box, `bounding_boxes`, Frame-Count, `dispatch_fps`, Voiced-Windows, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`.
-Einziger Unterschied auf dem Wire: `bounding_boxes_url` (fresh) → inline `bounding_boxes` (retry).
+Frozen Invariante: fresh und retry teilen `video_url`, `audio_url`, `bbox`, canonical `bounding_boxes`, `frame_count`, `dispatch_fps`, `voiced_windows`, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`. Einziger fachlicher Unterschied: ASD-Transport — fresh `{auto_detect:false, bounding_boxes_url:<JSON-Inhalt == frozen.bounding_boxes>}`, retry `{auto_detect:false, bounding_boxes: frozen.bounding_boxes}`. Nicht-NOOP-Retries und Fresh-Dispatches bleiben unverändert.
 
-Fehlt der Snapshot oder ist er unvollständig: KEIN Legacy-Rebuild. Fail closed vor dem Provider-Dispatch (`noop_retry_frozen_input_missing`), `provider_call_made=false`. Nicht-NOOP-Retries und Fresh-Dispatches bleiben unverändert.
 
 
 ## 3. Tests
