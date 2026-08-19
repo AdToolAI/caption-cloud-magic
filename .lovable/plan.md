@@ -14,10 +14,11 @@ Nur dieser P1 + echter Wire-Parity-Test. Kein Deploy, kein Render, keine Migrati
 
 Neuer PURE Helper `supabase/functions/_shared/provider-wire-snapshot.ts`:
 
-- `buildProviderWireSnapshot(input)` → normalisiertes Snapshot-Objekt mit exakt:
-  `video_url`, `audio_url` (der tatsächlich gesendete `sync_audio_url ?? audio_url`), `bbox` (transformierte Contract-E-Box), `bounding_boxes` (kanonisches Box-Array), `frame_count`, `dispatch_fps`, `voiced_windows`, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`.
-- `buildProviderWire(snapshot, { asdTransport: "url" | "inline", boundingBoxesUrl? })` → konkretes Wire-Objekt. Diese Funktion wird vom Produktionspfad tatsächlich als Quelle für den Audio-/Video-/ASD-Teil des Payloads verwendet, damit der Test keinen Parallelpfad prüft.
+- `buildProviderWireSnapshot(input)` → normalisiertes Snapshot-Objekt mit exakt diesen Feldern, jedes genau einmal:
+  `video_url`, `audio_url` (der tatsächlich gesendete `sync_audio_url ?? audio_url`), `bbox` (transformierte Contract-E-Box), `bounding_boxes` (kanonisches Box-Array), `frame_count`, `dispatch_fps`, `voiced_windows`, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`. Kein zweites Frame-Count-Feld, kein Alias.
+- `buildProviderWire(snapshot, { asdTransport: "url" | "inline", boundingBoxesUrl? })` → konkretes Wire-Objekt. Diese Funktion ist die EINZIGE Production-Quelle für alle frozen Wire-Felder: nach dem Aufruf werden `video_url`, `audio_url`, `model`, `sync_mode`, ASD, `bbox`/`bounding_boxes` sowie `frame_count`/`dispatch_fps` (soweit sie den Wire beeinflussen) nicht mehr überschrieben oder neu berechnet. Der Payload, der an Sync.so geht, wird aus diesem Objekt gebildet — kein Parallel-/Mirror-Payload.
 - `resolveFrozenProviderInput(pass)` → vollständiger Snapshot oder `null` (unvollständig ⇒ `null`).
+
 
 Box-Sequenz wird genau einmal berechnet und eingefroren:
 - Fresh: frozen `bounding_boxes` → JSON-Upload → `bounding_boxes_url`.
@@ -29,29 +30,34 @@ Der Snapshot entsteht erst, wenn alle Felder endgültig feststehen (dispatch vid
 
 Danach `update_dialog_pass_slot(provider_input_frozen)` — dieser Write MUSS erfolgreich sein, bevor Sync.so `/generate` aufgerufen wird. Persist-Fehler ⇒ fail closed über den bestehenden `failBeforeProviderDispatch`-Pfad mit `provider_call_made=false`, kein Provider-Call, bestehende Refund-Idempotenz unverändert.
 
+## 1c. Snapshot-Reihenfolge (Fresh)
+
+1. final video bestimmen → 2. final provider audio → 3. Contract-E bbox → 4. canonical `bounding_boxes` EINMAL erzeugen → 5. `frame_count`/`dispatch_fps`/`voiced_windows` → 6. model/`sync_mode`/provenance → 7. `buildProviderWireSnapshot(...)` → 8. `update_dialog_pass_slot(provider_input_frozen)` → 9. Persist-Erfolg zwingend bestätigen → 10. Bounding-Box-JSON AUS `frozen.bounding_boxes` hochladen → 11. `buildProviderWire(snapshot, asdTransport:"url")` → 12. Dispatch.
+
 ## 2. NOOP Retry reuse
 
-Bedingung: `isFrozenNoopRetryPass(pass)` bzw. `noop_auto_escalation === true` mit `retry_variant ∈ {coords-pro-box, bbox-url-pro}`.
+Gate ist ausschließlich `const frozenInput = resolveFrozenProviderInput(pass)`. Nur bei `frozenInput !== null` darf der NOOP-Retry dispatchen; ein unvollständiger Snapshot zählt wie ein fehlender: fail closed mit `reason = noop_retry_frozen_input_missing`, `provider_call_made = false`, ZERO Sync.so-Calls, KEIN Legacy-Rebuild. Kein Gating auf ein Einzelfeld wie `provider_input_frozen.audio_url`.
 
-Dann strukturell übersprungen (Branch vor der jeweiligen Stelle, nicht danach):
+Retry-Reihenfolge: 1. `resolveFrozenProviderInput(pass)` → 2. fehlt/unvollständig ⇒ fail closed → 3. KEIN v40-Restore → 4. KEIN Tight-Slicing → 5. KEINE v129.3-Normalisierung → 6. KEIN Video-/BBox-/Box-Recompute → 7. `buildProviderWire(snapshot, asdTransport:"inline")` → 8. Dispatch.
+
+Strukturell übersprungen (Branch vor der jeweiligen Stelle, nicht danach):
 - v40 Canonical-Restore (`audio_url` bleibt, `audio_tight` wird nicht genullt),
 - Tight-Slicing inkl. Upload (`Date.now()`-Pfad wird nicht betreten),
-- v129.3-Trim/Upload — `sync_audio_url` wird direkt aus dem Snapshot gesetzt,
+- v129.3-Trim/Upload — `sync_audio_url` kommt direkt aus dem Snapshot,
 - Video-Rehost/-Recompute und bbox-/bounding_boxes-Recompute.
 
-Alles Übrige kommt aus dem Snapshot statt aus Neuberechnung: Preclip-/Video-URL, Contract-E-Box, `bounding_boxes`, Frame-Count, `dispatch_fps`, Voiced-Windows, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`.
-Einziger Unterschied auf dem Wire: `bounding_boxes_url` (fresh) → inline `bounding_boxes` (retry).
+Frozen Invariante: fresh und retry teilen `video_url`, `audio_url`, `bbox`, canonical `bounding_boxes`, `frame_count`, `dispatch_fps`, `voiced_windows`, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`. Einziger fachlicher Unterschied: ASD-Transport — fresh `{auto_detect:false, bounding_boxes_url:<JSON-Inhalt == frozen.bounding_boxes>}`, retry `{auto_detect:false, bounding_boxes: frozen.bounding_boxes}`. Nicht-NOOP-Retries und Fresh-Dispatches bleiben unverändert.
 
-Fehlt der Snapshot oder ist er unvollständig: KEIN Legacy-Rebuild. Fail closed vor dem Provider-Dispatch (`noop_retry_frozen_input_missing`), `provider_call_made=false`. Nicht-NOOP-Retries und Fresh-Dispatches bleiben unverändert.
 
 
 ## 3. Tests
 
-- **Matrix H — Actual Wire Parity**: realistischer Multi-Speaker-Pass, `freshWire` und `retryWire` über `buildProviderWire` erzeugen, Deep-Equality über alle Felder außer `active_speaker_detection`; zusätzlich einzelne Asserts für `audio_url`, `video_url`, `bbox`, `frame_count`, `dispatch_fps`, `voiced_windows`, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`. ASD fresh `{auto_detect:false, bounding_boxes_url}` vs. retry `{auto_detect:false, bounding_boxes:[...]}`.
-- **Box-Sequenz-Parität**: Inhalt des beim Fresh hochgeladenen bounding-box-JSON deep-equals dem inline `bounding_boxes` des Retry.
-- **No-Date-Now-Rebuild**: Prädikat-Test, dass der Tight-Audio-/Normalisierungspfad bei vorhandenem frozen Input nicht betreten wird (kein neuer `*-tight-<ts>.wav`).
-- **Snapshot-Persist-Failure**: Persist schlägt fehl ⇒ zero provider calls, `provider_call_made=false`.
-- **Missing snapshot on NOOP retry**: unvollständiger/fehlender Snapshot ⇒ zero provider calls, kein Legacy-Rebuild.
+- **Matrix H — Actual Wire Parity (echter Payload-Beweis, kein Source-String-/Kommentar-Test)**: realistischer Multi-Speaker-Pass; `freshWire` und `retryWire` mit demselben Production-Helper `buildProviderWire` erzeugen, nur `active_speaker_detection` entfernen, dann `deepEqual(freshCore, retryCore)`. Zusätzlich explizite Einzel-Asserts für `audio_url`, `video_url`, `model`, `sync_mode`, `bbox`, `frame_count`, `dispatch_fps`, `voiced_windows`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`.
+- **Box-Sequenz-Parität**: `uploadedFreshBoundingBoxesJson` deep-equals `retry.active_speaker_detection.bounding_boxes`.
+- **Snapshot-Persist-Failure**: ZERO Sync.so-Calls, `provider_call_made=false`.
+- **Missing snapshot on NOOP retry**: ZERO Sync.so-Calls.
+- **Incomplete snapshot on NOOP retry**: ZERO Sync.so-Calls, kein Legacy-Rebuild.
+- **Frozen snapshot vorhanden**: Tight-Slicing-Counter = 0, Audio-Normalization-Counter = 0, bbox-Recompute-Counter = 0.
 - Re-Run: Matrix B–M, Deadline-Tests, Classifier, Plate-Face-Frozen-Tests.
 
 ## 4. Version
