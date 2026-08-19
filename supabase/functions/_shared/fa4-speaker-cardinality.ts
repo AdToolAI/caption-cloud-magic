@@ -27,6 +27,10 @@ export interface SpeakerCardinality {
   isUnknown: boolean;
   /** Nur zur Forensik: reine Pass-Kardinalität (entscheidet NICHTS). */
   totalPasses: number;
+  /** Beobachtete Passes im übergebenen Set. */
+  observedPassCount: number;
+  /** false => Teil-Set (Fan-Out-Race); darf nie `single` ergeben. */
+  passSetComplete: boolean;
   reason: string;
 }
 
@@ -118,6 +122,8 @@ export function classifySpeakerCardinality(
     isMultiSpeaker: classification === "multi",
     isUnknown: classification === "unknown",
     totalPasses,
+    observedPassCount,
+    passSetComplete: !passSetIncomplete,
     reason,
   };
 }
