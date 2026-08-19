@@ -20211,6 +20211,20 @@ export type Database = {
       }
       get_ai_superuser_id: { Args: never; Returns: string }
       get_conversion_funnel: { Args: { days?: number }; Returns: Json }
+      get_shared_brand_kit: {
+        Args: { p_token: string }
+        Returns: {
+          accent_color: string
+          brand_name: string
+          brand_tone: string
+          brand_values: Json
+          color_palette: Json
+          id: string
+          primary_color: string
+          secondary_color: string
+          target_audience: string
+        }[]
+      }
       get_template_performance_summary: {
         Args: { p_days?: number; p_template_id: string }
         Returns: {
