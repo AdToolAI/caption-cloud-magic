@@ -132,7 +132,7 @@ export const VoiceOverEditor = ({
     <div className="space-y-6">
       {/* Voice Selection */}
       <div className="space-y-2">
-        <Label htmlFor="voice">Stimme</Label>
+        <Label htmlFor="voice">{tx({ de: "Stimme", en: "Voice", es: "Voz" })}</Label>
         <Select value={voiceStyle} onValueChange={onVoiceStyleChange}>
           <SelectTrigger id="voice">
             <SelectValue />
@@ -162,7 +162,7 @@ export const VoiceOverEditor = ({
         ) : (
           <>
             <Play className="h-4 w-4 mr-2" />
-            Stimme anhören
+            {tx({ de: "Stimme anhören", en: "Preview voice", es: "Escuchar voz" })}
           </>
         )}
       </Button>

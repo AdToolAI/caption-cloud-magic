@@ -89,7 +89,7 @@ async function fetchVoicePool(language: string): Promise<LibraryVoice[]> {
     const pool = voices
       .map((v) => ({
         voice_id: String(v.voice_id ?? v.id ?? ''),
-        name: String(v.name ?? 'Stimme'),
+        name: String(v.name ?? tx({ de: 'Stimme', en: 'Voice', es: 'Voz' })),
         gender: (v.gender as string) ?? null,
       }))
       .filter((v) => v.voice_id.length > 0);
@@ -125,7 +125,7 @@ export async function resolveVoices(
     if (member.voiceId) {
       result[member.id] = {
         voiceId: member.voiceId,
-        voiceName: member.voiceName || 'Eigene Stimme',
+        voiceName: member.voiceName || tx({ de: 'Eigene Stimme', en: 'My voice', es: 'Mi voz' }),
         auto: false,
       };
       taken.add(member.voiceId);

@@ -187,7 +187,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       findings.push({
         id: 'subtitle-empty',
         severity: 'info',
-        title: `${empty.length} leere Untertitel-Clips`,
+        title: tx({ de: `${empty.length} leere Untertitel-Clips`, en: `${empty.length} empty subtitle clips`, es: `${empty.length} clips de subtítulos vacíos` }),
         hint: tx({ de: 'Diese werden beim Export automatisch entfernt.', en: 'These will be automatically removed upon export.', es: 'Estos se eliminarán automáticamente al exportar.' }),
       });
     }

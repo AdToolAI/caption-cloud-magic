@@ -630,7 +630,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
           <div className="mb-1 flex flex-wrap items-center gap-2">
             <Badge variant="outline">{getRecipe(plannedTreatment.genre).label}</Badge>
             <Badge variant="outline">{plannedTreatment.aspect}</Badge>
-            <Badge variant="outline">{plannedTreatment.scenes.length} Szenen</Badge>
+            <Badge variant="outline">{plannedTreatment.scenes.length} {tr({ de: 'Szenen', en: 'scenes', es: 'escenas' })}</Badge>
             <Badge variant="outline">
               {Math.round(
                 plannedTreatment.scenes.reduce((sum, scene) => sum + scene.durationSeconds, 0),
@@ -700,7 +700,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
                         </span>
                         <span className="italic">„{turn.text}“</span>
                         {!turn.voiceId && (
-                          <span className="ml-2 text-xs text-destructive">Stimme fehlt</span>
+                          <span className="ml-2 text-xs text-destructive">{tr({ de: 'Stimme fehlt', en: 'Voice missing', es: 'Falta la voz' })}</span>
                         )}
                       </p>
                     ))}
