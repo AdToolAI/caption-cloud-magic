@@ -26,10 +26,6 @@ const TONALITIES = ['professional', 'playful', 'bold', 'minimal', 'editorial', '
 
 const AUP_TEXT = `KURZFASSUNG DER ACCEPTABLE USE POLICY
 
-1. Keine Deepfakes von realen Personen ohne nachweisbare schriftliche Einwilligung.
-2. Keine Verwendung urheberrechtlich geschützter Marken, Logos, Songs, Charaktere oder Filmszenen.
-3. Keine politischen, medizinischen, finanziellen oder juristischen Aussagen.
-4. Keine Identitätstäuschung — die KI darf sich nie als reale Person, Behörde oder Marke ausgeben.
 5. Alle KI-Inhalte werden automatisch als "Made with AI" gekennzeichnet (C2PA + Caption-Tag).
 6. Strike-System: Soft (Hinweis) → Hard (7 Tage Sperre ab 2 aktiven) → Critical (sofortige Account-Löschung ohne Rückerstattung).
 7. Missbrauchsversuche (Prompt-Injection, Bypass-Versuche, Bulk-Spam, Hate Speech, NSFW, illegale Inhalte) führen zur fristlosen Löschung deines Accounts ohne jede Rückerstattung.

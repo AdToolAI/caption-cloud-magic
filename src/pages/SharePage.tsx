@@ -86,7 +86,7 @@ export default function SharePage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-destructive">
                 <AlertCircle className="h-5 w-5" />
-                Link nicht verfügbar
+                {tx({ de: "Link nicht verfügbar", en: "Link not available", es: "Enlace no disponible" })}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">

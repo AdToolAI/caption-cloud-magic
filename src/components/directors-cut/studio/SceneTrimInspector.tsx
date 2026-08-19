@@ -310,7 +310,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
           className="border-white/10 text-white/70 hover:text-white hover:bg-white/5"
         >
           <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-          {tx({ de: "Zurücksetzen", en: "Reset", es: "Restablecer" })}
+          {tx({ de: "{tx({ de: \"Zurücksetzen\", en: \"Reset\", es: \"Restablecer\" })}", en: "Reset", es: "Restablecer" })}
         </Button>
         {(() => {
           const EDGE = 0.05;
@@ -367,7 +367,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
                 className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
               >
                 <MapPin className="h-3.5 w-3.5 mr-1.5" />
-                {tx({ de: "In Szene springen", en: "Jump to scene", es: "Saltar a escena" })}
+                {tx({ de: "{tx({ de: \"In Szene springen\", en: \"Jump to scene\", es: \"Saltar a escena\" })}", en: "Jump to scene", es: "Saltar a escena" })}
               </Button>
             );
           }
@@ -395,7 +395,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
           onClick={() => onDelete(scene.id)}
           className="w-full text-red-400 hover:text-red-300 hover:bg-red-500/10"
         >
-          {tx({ de: "Szene löschen", en: "Delete scene", es: "Eliminar escena" })}
+          {tx({ de: "{tx({ de: \"Szene löschen\", en: \"Delete scene\", es: \"Eliminar escena\" })}", en: "Delete scene", es: "Eliminar escena" })}
         </Button>
       )}
     </div>

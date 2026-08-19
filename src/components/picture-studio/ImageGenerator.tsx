@@ -608,7 +608,7 @@ export function ImageGenerator() {
                     onClick={() => { setHelperAutoEnhance(true); setHelperOpen(true); }}
                   >
                     <Wand2 className="h-3.5 w-3.5 mr-1.5" />
-                    {tx({ de: "✨ Bild übernehmen & verbessern", en: "✨ Adopt & improve image", es: "✨ Adoptar y mejorar imagen" })}
+                    {tx({ de: "{tx({ de: \"✨ Bild übernehmen & verbessern\", en: \"✨ Adopt & improve image\", es: \"✨ Adoptar y mejorar imagen\" })}", en: "✨ Adopt & improve image", es: "✨ Adoptar y mejorar imagen" })}
                   </Button>
                 )}
                 <Button
@@ -836,7 +836,7 @@ export function ImageGenerator() {
                   onClick={handleRealisticReproduction}
                 >
                   <Camera className="h-3.5 w-3.5 mr-1.5" />
-                  {tx({ de: "📸 Bild realistisch & detailliert reproduzieren", en: "📸 Reproduce image realistically & detailed", es: "📸 Reproducir imagen de forma realista y detallada" })}
+                  {tx({ de: "{tx({ de: \"📸 Bild realistisch & detailliert reproduzieren\", en: \"📸 Reproduce image realistically & detailed\", es: \"📸 Reproducir imagen de forma realista y detallada\" })}", en: "📸 Reproduce image realistically & detailed", es: "📸 Reproducir imagen de forma realista y detallada" })}
                 </Button>
               )}
             </div>

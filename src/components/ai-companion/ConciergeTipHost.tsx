@@ -121,7 +121,7 @@ export function ConciergeTipHost() {
                         type="button"
                         onClick={() => void dismiss()}
                         className="text-[11px] text-white/50 transition hover:text-white/80"
-                      >
+                      {tx({ de: ">", en: "later", es: "más tarde" })}
                         {tx({ de: "später", en: "later", es: "más tarde" })}
                       </button>
                     </motion.div>

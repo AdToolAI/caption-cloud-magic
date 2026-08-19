@@ -37,7 +37,7 @@ export function BrandAssetFactory({ brandKitId }: { brandKitId: string | null })
               <h3 className="font-display text-lg">Brand Asset Factory</h3>
             </div>
             <p className="text-xs text-muted-foreground max-w-md">
-              {tx({ de: "Generiert in einem Schritt Logo-Varianten, App-Icon, Social-Cover, Pattern und Email-Header — alles im Stil deiner Marke.", en: "Generates logo variants, app icon, social cover, pattern, and email header in one step — all in your brand's style.", es: "Genera variantes de logo, icono de app, portada social, patrón y encabezado de email en un solo paso — todo al estilo de tu marca." })}
+              {tx({ de: "{tx({ de: \"Generiert in einem Schritt Logo-Varianten, App-Icon, Social-Cover, Pattern und Email-Header — alles im Stil deiner Marke.\", en: \"Generates logo variants, app icon, social cover, pattern, and email header in one step — all in your brand's style.\", es: \"Genera variantes de logo, icono de app, portada social, patrón y encabezado de email en un solo paso — todo al estilo de tu marca.\" })}", en: "Generates logo variants, app icon, social cover, pattern, and email header in one step — all in your brand's style.", es: "Genera variantes de logo, icono de app, portada social, patrón y encabezado de email en un solo paso — todo al estilo de tu marca." })}
             </p>
           </div>
           <Button onClick={generatePack} disabled={generating} className="shrink-0">

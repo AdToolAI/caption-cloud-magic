@@ -145,7 +145,7 @@ export const VideoTimeline = ({ clips, onClipsChange, totalDuration = 0 }: Video
       <CardHeader>
         <CardTitle>Video-Timeline</CardTitle>
         <CardDescription>
-          {tx({ de: "Clips neu anordnen, Übergänge hinzufügen und Dauer anpassen", en: "Rearrange clips, add transitions, and adjust duration", es: "Reorganizar clips, añadir transiciones y ajustar la duración" })}
+          {tx({ de: "{tx({ de: \"Clips neu anordnen, Übergänge hinzufügen und Dauer anpassen\", en: \"Rearrange clips, add transitions, and adjust duration\", es: \"Reorganizar clips, añadir transiciones y ajustar la duración\" })}", en: "Rearrange clips, add transitions, and adjust duration", es: "Reorganizar clips, añadir transiciones y ajustar la duración" })}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -191,7 +191,7 @@ export const VideoTimeline = ({ clips, onClipsChange, totalDuration = 0 }: Video
         {/* Add Clip Button */}
         <Button onClick={handleAddClip} variant="outline" className="w-full">
           <Plus className="h-4 w-4 mr-2" />
-          {tx({ de: "Clip hinzufügen", en: "Add clip", es: "Añadir clip" })}
+          {tx({ de: "{tx({ de: \"Clip hinzufügen\", en: \"Add clip\", es: \"Añadir clip\" })}", en: "Add clip", es: "Añadir clip" })}
         </Button>
 
         {/* Audio Track Info */}

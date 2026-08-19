@@ -516,7 +516,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
           <div>
             <h2 className="font-serif text-xl">Regietisch</h2>
             <p className="text-sm text-muted-foreground">
-              {tx({ de: "Sag, was du brauchst. Die KI entwickelt Konzept, Storyboard und Film.", en: "Tell us what you need. The AI develops concept, storyboard, and film.", es: "Dinos qué necesitas. La IA desarrolla el concepto, el guion gráfico y la película." })}
+              {tx({ de: "{tx({ de: \"Sag, was du brauchst. Die KI entwickelt Konzept, Storyboard und Film.\", en: \"Tell us what you need. The AI develops concept, storyboard, and film.\", es: \"Dinos qué necesitas. La IA desarrolla el concepto, el guion gráfico y la película.\" })}", en: "Tell us what you need. The AI develops concept, storyboard, and film.", es: "Dinos qué necesitas. La IA desarrolla el concepto, el guion gráfico y la película." })}
             </p>
           </div>
         </div>
@@ -737,7 +737,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
               ) : (
                 <>
                   <CheckCircle2 className="mr-2 h-4 w-4" />
-                  {tx({ de: "Freigeben und produzieren", en: "Approve and produce", es: "Aprobar y producir" })}
+                  {tx({ de: "{tx({ de: \"Freigeben und produzieren\", en: \"Approve and produce\", es: \"Aprobar y producir\" })}", en: "Approve and produce", es: "Aprobar y producir" })}
                 </>
               )}
             </Button>
@@ -762,8 +762,6 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
           <AlertDialogHeader>
             <AlertDialogTitle>Produktion freigeben</AlertDialogTitle>
             <AlertDialogDescription>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
 
           {cost && (
             <div className="space-y-2 rounded-lg border border-border/50 bg-muted/20 p-4 text-sm">

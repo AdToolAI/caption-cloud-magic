@@ -93,7 +93,7 @@ const ErrorFallback = ({ error }: { error?: unknown }) => {
       <div className="max-w-md w-full bg-card border border-border rounded-lg p-6 shadow-lg">
         <h2 className="text-xl font-semibold text-foreground mb-2">{tx({ de: "Ein Fehler ist aufgetreten", en: "An error occurred", es: "Ha ocurrido un error" })}</h2>
         <p className="text-muted-foreground mb-4">
-          {tx({ de: "Die Seite konnte nicht geladen werden. Bitte lade die Seite neu.", en: "The page could not be loaded. Please reload the page.", es: "No se pudo cargar la página. Por favor, recarga la página." })}
+          {tx({ de: "{tx({ de: \"Die Seite konnte nicht geladen werden. Bitte lade die Seite neu.\", en: \"The page could not be loaded. Please reload the page.\", es: \"No se pudo cargar la página. Por favor, recarga la página.\" })}", en: "The page could not be loaded. Please reload the page.", es: "No se pudo cargar la página. Por favor, recarga la página." })}
         </p>
         {errorMessage && (
           <p className="text-sm text-destructive bg-destructive/10 p-2 rounded mb-4 font-mono">
@@ -104,7 +104,7 @@ const ErrorFallback = ({ error }: { error?: unknown }) => {
           onClick={() => window.location.reload()}
           className="w-full bg-primary text-primary-foreground py-2 px-4 rounded hover:bg-primary/90 transition-colors"
         >
-          {tx({ de: "Seite neu laden", en: "Reload page", es: "Recargar página" })}
+          {tx({ de: "{tx({ de: \"Seite neu laden\", en: \"Reload page\", es: \"Recargar página\" })}", en: "Reload page", es: "Recargar página" })}
         </button>
       </div>
     </div>

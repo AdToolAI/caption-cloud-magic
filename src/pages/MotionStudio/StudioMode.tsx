@@ -299,7 +299,7 @@ export default function StudioMode() {
                 <SystemLoadPill className="hidden sm:inline-flex" />
                 <Badge variant="outline" className="gap-1.5">
                   <Wand2 className="h-3 w-3 text-primary" />
-                  {tx({ de: "Studio Mode · Geführter Flow", en: "Studio Mode · Guided Flow", es: "Modo Estudio · Flujo Guiado" })}
+                  {tx({ de: "{tx({ de: \"Studio Mode · Geführter Flow\", en: \"Studio Mode · Guided Flow\", es: \"Modo Estudio · Flujo Guiado\" })}", en: "Studio Mode · Guided Flow", es: "Modo Estudio · Flujo Guiado" })}
                 </Badge>
               </div>
             </div>
@@ -365,14 +365,14 @@ export default function StudioMode() {
               className="gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              {tx({ de: "Zurück", en: "Back", es: "Atrás" })}
+              {tx({ de: "{tx({ de: \"Zurück\", en: \"Back\", es: \"Atrás\" })}", en: "Back", es: "Atrás" })}
             </Button>
             <div className="text-xs text-muted-foreground hidden sm:block">
               Schritt {stepIndex + 1} {tx({ de: "von", en: "of", es: "de" })} {STEPS.length} · {STEPS[stepIndex].title}
             </div>
             {!isLast ? (
               <Button onClick={goNext} disabled={!canAdvance} className="gap-2">
-                {tx({ de: "Weiter", en: "Next", es: "Siguiente" })}
+                {tx({ de: "{tx({ de: \"Weiter\", en: \"Next\", es: \"Siguiente\" })}", en: "Next", es: "Siguiente" })}
                 <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
@@ -388,7 +388,7 @@ export default function StudioMode() {
                   ) : (
                     <Sparkles className="h-4 w-4" />
                   )}
-                  {tx({ de: "In Composer öffnen", en: "Open in Composer", es: "Abrir en Composer" })}
+                  {tx({ de: "{tx({ de: \"In Composer öffnen\", en: \"Open in Composer\", es: \"Abrir en Composer\" })}", en: "Open in Composer", es: "Abrir en Composer" })}
                 </Button>
               </div>
             )}
@@ -785,7 +785,7 @@ function StoryboardStep({
                     />
                     <div className="flex items-center gap-3">
                       <Label className="text-[11px] text-muted-foreground">
-                        {tx({ de: "Dauer", en: "Duration", es: "Duración" })}
+                        {tx({ de: "{tx({ de: \"Dauer\", en: \"Duration\", es: \"Duración\" })}", en: "Duration", es: "Duración" })}
                       </Label>
                       <Input
                         type="number"
@@ -918,8 +918,6 @@ function RenderStep({
             <Film className="h-7 w-7 text-primary" />
             <h3 className="text-lg font-bold">{tx({ de: "Im Composer öffnen", en: "Open in Composer", es: "Abrir en el Compositor" })}</h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              (Sora, Kling, Hailuo …), generierst Clips parallel und exportierst.
-            </p>
           </div>
           <Button
             onClick={onLaunch}
@@ -934,10 +932,10 @@ function RenderStep({
             )}
             {tx({ de: "Studio-Projekt erstellen", en: "Create Studio Project", es: "Crear Proyecto de Estudio" })}
           </Button>
-          <p className="text-[10px] text-muted-foreground text-center">
+          {tx({ de: "<p className=\"text-[10px] text-muted-foreground text-center\">", en: "Create Studio Project", es: "Crear Proyecto de Estudio" })}
             {tx({ de: "Du kannst alles im Composer noch anpassen.", en: "You can still adjust everything in the Composer.", es: "Aún puedes ajustar todo en el Composer." })}
           </p>
-        </Card>
+        {tx({ de: "</Card>", en: "You can still adjust everything in the Composer.", es: "Aún puedes ajustar todo en el Composer." })}
       </div>
     </section>
   );

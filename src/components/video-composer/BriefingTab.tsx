@@ -766,8 +766,6 @@ export default function BriefingTab({
             </div>
             {briefing.duration > 180 && (
               <p className="text-[11px] text-amber-300/80 leading-snug">
-                Gesamtdauer begrenzt.
-              </p>
             )}
           </div>
 
@@ -827,7 +825,7 @@ export default function BriefingTab({
               <p className="text-[10px] text-muted-foreground/70">
                 {tx({ de: "Pro-Szene überschreibbar im Storyboard.", en: "Overridable per scene in the storyboard.", es: "Anulable por escena en el guion gráfico." })}
               </p>
-          </div>
+          {tx({ de: "</div>", en: "Overridable per scene in the storyboard.", es: "Anulable por escena en el guion gráfico." })}
         </div>
       </StagePanel>
 

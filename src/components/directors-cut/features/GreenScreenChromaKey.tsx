@@ -184,7 +184,7 @@ export function GreenScreenChromaKey({
           </div>
           {isPicking && (
             <p className="text-[10px] text-muted-foreground">
-              Klicke im Video auf die zu entfernende Farbe
+              {tx({ de: "Klicke im Video auf die zu entfernende Farbe", en: "Click on the color to remove in the video", es: "Haz clic en el color a eliminar en el video" })}
             </p>
           )}
         </div>

@@ -620,7 +620,7 @@ export function EventCreateDialog({
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4" />
-                    {tx({ de: "Caption mit AI generieren", en: "Generate Caption with AI", es: "Generar pie de foto con IA" })}
+                    {tx({ de: "{tx({ de: \"Caption mit AI generieren\", en: \"Generate Caption with AI\", es: \"Generar pie de foto con IA\" })}", en: "Generate Caption with AI", es: "Generar pie de foto con IA" })}
                   </>
                 )}
               </Button>

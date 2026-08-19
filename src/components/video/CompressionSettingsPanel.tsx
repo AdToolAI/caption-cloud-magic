@@ -58,7 +58,7 @@ export const CompressionSettingsPanel = ({
           Komprimierungseinstellungen
         </CardTitle>
         <CardDescription>
-          {tx({ de: "Wähle ein Profil oder passe die Einstellungen manuell an", en: "Select a profile or adjust settings manually", es: "Selecciona un perfil o ajusta la configuración manualmente" })}
+          {tx({ de: "{tx({ de: \"Wähle ein Profil oder passe die Einstellungen manuell an\", en: \"Select a profile or adjust settings manually\", es: \"Selecciona un perfil o ajusta la configuración manualmente\" })}", en: "Select a profile or adjust settings manually", es: "Selecciona un perfil o ajusta la configuración manualmente" })}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -146,7 +146,7 @@ export const CompressionSettingsPanel = ({
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              {tx({ de: "Komprimierung läuft...", en: "Compression in progress...", es: "Comprimiendo..." })}
+              {tx({ de: "{tx({ de: \"Komprimierung läuft...\", en: \"Compression in progress...\", es: \"Comprimiendo...\" })}", en: "Compression in progress...", es: "Comprimiendo..." })}
             </>
           ) : (
             tx({ de: "Komprimierung starten", en: "Start compression", es: "Iniciar compresión" })

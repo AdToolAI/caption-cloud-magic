@@ -159,7 +159,7 @@ export function AutoMatchPanel({
             </p>
             <Button size="lg" className="bg-gradient-to-r from-cyan-500 to-primary hover:opacity-90">
               <Film className="w-5 h-5 mr-2" />
-              {tx({ de: "Video auswählen", en: "Select video", es: "Seleccionar video" })}
+              {tx({ de: "{tx({ de: \"Video auswählen\", en: \"Select video\", es: \"Seleccionar video\" })}", en: "Select video", es: "Seleccionar video" })}
             </Button>
           </div>
         </Card>

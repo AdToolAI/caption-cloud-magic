@@ -224,8 +224,6 @@ export default function CharacterEditor({
             {character ? 'Charakter bearbeiten' : tx({ de: "Neuen Charakter anlegen", en: "Create new character", es: "Crear nuevo personaje" })}
           </DialogTitle>
           <DialogDescription>
-          </DialogDescription>
-        </DialogHeader>
 
         <div className="space-y-5 py-2">
           {/* Pro-Tip Banner */}
@@ -237,8 +235,6 @@ export default function CharacterEditor({
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
                   verbessert die Konsistenz nochmal deutlich.
                 </p>
-              </div>
-            </div>
           </div>
 
           {/* Name */}
@@ -398,7 +394,7 @@ export default function CharacterEditor({
               </Button>
             </div>
             {draft.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
+              {tx({ de: "<div className=\"flex flex-wrap gap-1.5 pt-1\">", en: "Add", es: "Añadir" })}
                 {draft.tags.map((tag) => (
                   <Badge
                     key={tag}

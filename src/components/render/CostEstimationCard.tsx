@@ -14,10 +14,10 @@ export const CostEstimationCard = ({ estimation }: CostEstimationCardProps) => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <DollarSign className="w-4 h-4" />
-          Kosten-Schätzung
+          {tx({ de: "Kosten-Schätzung", en: "Cost Estimation", es: "Estimación de Costo" })}
         </CardTitle>
         <CardDescription>
-          Basierend auf Video-Parametern
+          {tx({ de: "Basierend auf Video-Parametern", en: "Based on video parameters", es: "Basado en parámetros de video" })}
         </CardDescription>
       </CardHeader>
       <CardContent>

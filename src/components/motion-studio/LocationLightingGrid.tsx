@@ -154,7 +154,7 @@ export default function LocationLightingGrid({
         </div>
       ) : variants.length === 0 ? (
         <div className="rounded-md border border-dashed border-border/60 p-3 text-center text-[11px] text-muted-foreground">
-          {tx({ de: "Noch keine Variationen — wähle oben eine Stimmung.", en: "No variations yet — select a mood above.", es: "Aún no hay variaciones — selecciona un ambiente arriba." })}
+          {tx({ de: "{tx({ de: \"Noch keine Variationen — wähle oben eine Stimmung.\", en: \"No variations yet — select a mood above.\", es: \"Aún no hay variaciones — selecciona un ambiente arriba.\" })}", en: "No variations yet — select a mood above.", es: "Aún no hay variaciones — selecciona un ambiente arriba." })}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -196,7 +196,7 @@ export default function LocationLightingGrid({
                       onClick={() => handleSetPrimary(v)}
                     >
                       <Wand2 className="h-2.5 w-2.5" />
-                      {tx({ de: "Übernehmen", en: "Apply", es: "Aplicar" })}
+                      {tx({ de: "{tx({ de: \"Übernehmen\", en: \"Apply\", es: \"Aplicar\" })}", en: "Apply", es: "Aplicar" })}
                     </Button>
                   )}
                   <Button

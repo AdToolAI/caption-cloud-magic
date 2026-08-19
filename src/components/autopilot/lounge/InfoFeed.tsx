@@ -50,7 +50,7 @@ export function InfoFeed({ brandKitId, language = 'de' }: Props) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          Tagesaktuell, gefiltert auf deine Marke.
+          {tx({ de: "Tagesaktuell, gefiltert auf deine Marke.", en: "Daily updated, filtered for your brand.", es: "Actualizado diariamente, filtrado para tu marca." })}
         </p>
         <Button size="sm" variant="outline" onClick={refresh} disabled={query.isFetching}>
           <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${query.isFetching ? 'animate-spin' : ''}`} />
@@ -66,7 +66,7 @@ export function InfoFeed({ brandKitId, language = 'de' }: Props) {
         </p>
       ) : (query.data ?? []).length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Noch keine Signale für deine Marke. Aktualisieren anstoßen.
+          {tx({ de: "Noch keine Signale für deine Marke. Aktualisieren anstoßen.", en: "No signals yet for your brand. Trigger update.", es: "Aún no hay señales para tu marca. Iniciar actualización." })}
         </p>
       ) : (
         <div className="space-y-2">

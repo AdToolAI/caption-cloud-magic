@@ -345,12 +345,12 @@ export default function AudioStudio() {
                       <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">{tx({ de: "Studio-Qualität", en: "Studio Quality", es: "Calidad de estudio" })}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {tx({ de: "Generiere kommerziell nutzbare Musik aus Text — ab €0.10. Cinematic, Lo-Fi, Corporate, Electronic & mehr.", en: "Generate commercially usable music from text — from €0.10. Cinematic, Lo-Fi, Corporate, Electronic & more.", es: "Genera música de uso comercial a partir de texto — desde 0,10 €. Cinemática, Lo-Fi, Corporativa, Electrónica y más." })}
+                      {tx({ de: "{tx({ de: \"Generiere kommerziell nutzbare Musik aus Text — ab €0.10. Cinematic, Lo-Fi, Corporate, Electronic & mehr.\", en: \"Generate commercially usable music from text — from €0.10. Cinematic, Lo-Fi, Corporate, Electronic & more.\", es: \"Genera música de uso comercial a partir de texto — desde 0,10 €. Cinemática, Lo-Fi, Corporativa, Electrónica y más.\" })}", en: "Generate commercially usable music from text — from €0.10. Cinematic, Lo-Fi, Corporate, Electronic & more.", es: "Genera música de uso comercial a partir de texto — desde 0,10 €. Cinemática, Lo-Fi, Corporativa, Electrónica y más." })}
                     </p>
                   </div>
                   <Button className="bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-500/90 shrink-0 hidden sm:flex">
                     <Sparkles className="w-4 h-4 mr-2" />
-                    {tx({ de: "Track erstellen", en: "Create track", es: "Crear pista" })}
+                    {tx({ de: "{tx({ de: \"Track erstellen\", en: \"Create track\", es: \"Crear pista\" })}", en: "Create track", es: "Crear pista" })}
                   </Button>
                 </div>
               </Card>
@@ -469,7 +469,7 @@ export default function AudioStudio() {
                           }}
                           className="border-border/50"
                         >
-                          {tx({ de: "Neue Datei", en: "New file", es: "Nuevo archivo" })}
+                          {tx({ de: "{tx({ de: \"Neue Datei\", en: \"New file\", es: \"Nuevo archivo\" })}", en: "New file", es: "Nuevo archivo" })}
                         </Button>
                       </div>
                     </div>

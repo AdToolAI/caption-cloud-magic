@@ -120,8 +120,6 @@ export function ConciergeIntroScreen() {
                     transition={{ duration: 0.25 }}
                   >
                     <p className="mb-5 text-sm leading-relaxed text-white/70">
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
                       {(Object.keys(PERSONA_PROFILES) as LearningPace[]).map((id) => {
                         const p = PERSONA_PROFILES[id];
                         const selected = pace === id;
@@ -156,7 +154,7 @@ export function ConciergeIntroScreen() {
                       >
                         {tx({ de: "Weiter", en: "Next", es: "Siguiente" })}
                       </Button>
-                    </div>
+                    {tx({ de: "</div>", en: "Next", es: "Siguiente" })}
                   </motion.div>
                 )}
 
@@ -171,7 +169,7 @@ export function ConciergeIntroScreen() {
                     <p className="mb-5 text-sm leading-relaxed text-white/70">
                       {tx({ de: "Was steht als Nächstes an? Ich richte meine Tipps danach aus.", en: "What's next? I'll align my tips accordingly.", es: "¿Qué sigue? Adaptaré mis consejos a ello." })}
                     </p>
-                    <div className="space-y-2">
+                    {tx({ de: "<div className=\"space-y-2\">", en: "What's next? I'll align my tips accordingly.", es: "¿Qué sigue? Adaptaré mis consejos a ello." })}
                       {GOALS.map((g) => {
                         const selected = goal === g.id;
                         return (
@@ -200,14 +198,14 @@ export function ConciergeIntroScreen() {
                       >
                         {tx({ de: "zurück", en: "back", es: "atrás" })}
                       </button>
-                      <Button
+                      {tx({ de: "<Button", en: "back", es: "atrás" })}
                         size="sm"
                         onClick={() => setStep(2)}
                         className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90"
                       >
                         {tx({ de: "Weiter", en: "Next", es: "Siguiente" })}
                       </Button>
-                    </div>
+                    {tx({ de: "</div>", en: "Next", es: "Siguiente" })}
                   </motion.div>
                 )}
 
@@ -222,8 +220,6 @@ export function ConciergeIntroScreen() {
                     <p className="mb-5 text-sm leading-relaxed text-white/70">
                       jederzeit umstimmen.
                     </p>
-                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                      <div className="flex items-center gap-3">
                         <PersonaSignature pace={pace} size={40} />
                         <div className="text-sm text-white/85">
                           <div className="font-medium">{PERSONA_PROFILES[pace].labelDe}</div>
@@ -243,7 +239,7 @@ export function ConciergeIntroScreen() {
                       </button>
                       <Button
                         size="sm"
-                        onClick={() => void finish()}
+                        {tx({ de: "onClick={() => void finish()}", en: "back", es: "atrás" })}
                         className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90"
                       >
                         Loslegen

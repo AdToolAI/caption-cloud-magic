@@ -30,7 +30,7 @@ export const VideoHistoryTable = ({ videos, templatesById }: VideoHistoryTablePr
 
   if (videos.length === 0) {
     return (
-      <div className="text-center py-12 text-muted-foreground">
+      {tx({ de: "<div className=\"text-center py-12 text-muted-foreground\">", en: "No videos created yet", es: "Aún no se han creado videos" })}
         {tx({ de: "Noch keine Videos erstellt", en: "No videos created yet", es: "Aún no se han creado videos" })}
       </div>
     );

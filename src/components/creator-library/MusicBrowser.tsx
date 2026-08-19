@@ -176,7 +176,7 @@ export default function MusicBrowser() {
       {loading && results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
-          {tx({ de: "Lade Tracks …", en: "Loading tracks …", es: "Cargando pistas …" })}
+          {tx({ de: "{tx({ de: \"Lade Tracks …\", en: \"Loading tracks …\", es: \"Cargando pistas …\" })}", en: "Loading tracks …", es: "Cargando pistas …" })}
         </Card>
       ) : results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">

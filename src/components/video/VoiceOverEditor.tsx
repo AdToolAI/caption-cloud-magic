@@ -157,7 +157,7 @@ export const VoiceOverEditor = ({
         {isPreviewPlaying ? (
           <>
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            {tx({ de: "Generiere Hörprobe...", en: "Generating audio preview...", es: "Generando vista previa de audio..." })}
+            {tx({ de: "{tx({ de: \"Generiere Hörprobe...\", en: \"Generating audio preview...\", es: \"Generando vista previa de audio...\" })}", en: "Generating audio preview...", es: "Generando vista previa de audio..." })}
           </>
         ) : (
           <>

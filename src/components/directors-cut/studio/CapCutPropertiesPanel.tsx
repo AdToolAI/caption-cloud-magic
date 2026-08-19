@@ -444,7 +444,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                   />
                 </div>
               </div>
-              <p className="text-[10px] text-white/40 mt-1.5 leading-tight">
+              {tx({ de: "<p className=\"text-[10px] text-white/40 mt-1.5 leading-tight\">", en: "Trim shortens the visible length of the clip on the timeline. Press Enter to apply.", es: "Recortar acorta la duración visible del clip en la línea de tiempo. Pulsa Enter para aplicar." })}
                 {tx({ de: "Trim kürzt die sichtbare Länge des Clips auf der Timeline. Enter zum Anwenden.", en: "Trim shortens the visible length of the clip on the timeline. Press Enter to apply.", es: "Recortar acorta la duración visible del clip en la línea de tiempo. Pulsa Enter para aplicar." })}
               </p>
               {/* Length + End time (calculated, live) */}

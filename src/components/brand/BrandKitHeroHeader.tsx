@@ -77,7 +77,7 @@ export function BrandKitHeroHeader({ brandKitCount, onCreateNew }: BrandKitHeroH
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
               className="text-lg text-muted-foreground max-w-xl"
-            >
+            {tx({ de: ">", en: "AI-powered brand identity for all your content", es: "Identidad de marca impulsada por IA para todo tu contenido" })}
               {tx({ de: "KI-gestützte Markenidentität für alle deine Inhalte", en: "AI-powered brand identity for all your content", es: "Identidad de marca impulsada por IA para todo tu contenido" })}
             </motion.p>
 
@@ -118,7 +118,7 @@ export function BrandKitHeroHeader({ brandKitCount, onCreateNew }: BrandKitHeroH
                   <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                 </div>
                 
-                <Sparkles className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
+                {tx({ de: "<Sparkles className=\"mr-2 h-5 w-5 group-hover:rotate-12 transition-transform\" />", en: "Create new set", es: "Crear nuevo conjunto" })}
                 {tx({ de: "Neues Set erstellen", en: "Create new set", es: "Crear nuevo conjunto" })}
               </Button>
             </motion.div>

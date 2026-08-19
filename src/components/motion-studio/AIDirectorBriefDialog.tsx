@@ -111,8 +111,6 @@ export default function AIDirectorBriefDialog({
             AI-Director casten
           </DialogTitle>
           <DialogDescription>
-          </DialogDescription>
-        </DialogHeader>
 
         {!plan ? (
           <div className="space-y-4 overflow-y-auto pr-1">
@@ -129,7 +127,7 @@ export default function AIDirectorBriefDialog({
               <p className="text-[11px] text-muted-foreground">
                 {tx({ de: "Tipp: Stil, Stimmung und Hauptbild kurz nennen. Cast/Location werden", en: "Tip: Briefly mention style, mood, and main image. Cast/Location will be", es: "Consejo: Menciona brevemente el estilo, el ambiente y la imagen principal. El reparto/la ubicación serán" })}
                 automatisch verwendet, wenn passend.
-              </p>
+              {tx({ de: "</p>", en: "Tip: Briefly mention style, mood, and main image. Cast/Location will be", es: "Consejo: Menciona brevemente el estilo, el ambiente y la imagen principal. El reparto/la ubicación serán" })}
             </div>
 
             <div className="space-y-2">
@@ -205,7 +203,7 @@ export default function AIDirectorBriefDialog({
               <div className="text-[10px] uppercase tracking-wider text-primary mb-1">
                 {tx({ de: "Vorschlag", en: "Suggestion", es: "Sugerencia" })}
               </div>
-              <h3 className="text-base font-bold leading-tight">{plan.title}</h3>
+              {tx({ de: "<h3 className=\"text-base font-bold leading-tight\">{plan.title}</h3>", en: "Suggestion", es: "Sugerencia" })}
               <p className="text-xs text-muted-foreground mt-1">{plan.logline}</p>
               <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
                 <span className="flex items-center gap-1">

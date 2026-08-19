@@ -615,7 +615,7 @@ export function UniversalCreator() {
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
                 <Plus className="w-4 h-4" />
-                {tx({ de: "Neues Projekt", en: "New Project", es: "Nuevo Proyecto" })}
+                {tx({ de: "{tx({ de: \"Neues Projekt\", en: \"New Project\", es: \"Nuevo Proyecto\" })}", en: "New Project", es: "Nuevo Proyecto" })}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -628,7 +628,7 @@ export function UniversalCreator() {
               <AlertDialogFooter>
                 <AlertDialogCancel>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
                 <AlertDialogAction onClick={handleNewProject}>
-                  {tx({ de: "Neues Projekt starten", en: "Start New Project", es: "Iniciar Nuevo Proyecto" })}
+                  {tx({ de: "{tx({ de: \"Neues Projekt starten\", en: \"Start New Project\", es: \"Iniciar Nuevo Proyecto\" })}", en: "Start New Project", es: "Iniciar Nuevo Proyecto" })}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

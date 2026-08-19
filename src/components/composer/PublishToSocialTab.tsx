@@ -203,7 +203,7 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
               onChange={(e) => setCoverUrl(e.target.value)}
               placeholder="https://…/cover.jpg"
             />
-            <p className="text-xs text-muted-foreground mt-1">
+            {tx({ de: "<p className=\"text-xs text-muted-foreground mt-1\">", en: "Publicly accessible JPG/PNG. Leave blank for auto-cover.", es: "JPG/PNG accesible públicamente. Deja en blanco para portada automática." })}
               {tx({ de: "Öffentlich erreichbares JPG/PNG. Leer lassen für Auto-Cover.", en: "Publicly accessible JPG/PNG. Leave blank for auto-cover.", es: "JPG/PNG accesible públicamente. Deja en blanco para portada automática." })}
             </p>
           </div>
@@ -221,7 +221,7 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
               placeholder="Hashtag-Wolke, Call-to-Action, Link…"
               rows={3}
             />
-            <p className="text-xs text-muted-foreground mt-1">
+            {tx({ de: "<p className=\"text-xs text-muted-foreground mt-1\">", en: "Will be automatically published as a separate comment after the post.", es: "Se publicará automáticamente como un comentario separado después de la publicación." })}
               {tx({ de: "Wird nach dem Post automatisch als eigener Kommentar veröffentlicht.", en: "Will be automatically published as a separate comment after the post.", es: "Se publicará automáticamente como un comentario separado después de la publicación." })}
             </p>
           </div>

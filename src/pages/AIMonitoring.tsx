@@ -192,7 +192,7 @@ export default function AIMonitoring() {
             <CardContent>
               <p className="text-sm">
                 Du hast heute bereits {stats.today} AI Calls gemacht. 
-                {tx({ de: "Bei sehr hoher Nutzung könntest du Lovable AI Rate Limits erreichen.", en: "With very high usage, you might hit Lovable AI Rate Limits.", es: "Con un uso muy elevado, podrías alcanzar los límites de tasa de Lovable AI." })}
+                {tx({ de: "{tx({ de: \"Bei sehr hoher Nutzung könntest du Lovable AI Rate Limits erreichen.\", en: \"With very high usage, you might hit Lovable AI Rate Limits.\", es: \"Con un uso muy elevado, podrías alcanzar los límites de tasa de Lovable AI.\" })}", en: "With very high usage, you might hit Lovable AI Rate Limits.", es: "Con un uso muy elevado, podrías alcanzar los límites de tasa de Lovable AI." })}
               </p>
             </CardContent>
           </Card>

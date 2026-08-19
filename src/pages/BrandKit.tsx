@@ -586,12 +586,12 @@ const BrandKit = () => {
                         {isGenerating ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            {tx({ de: "Wird erstellt...", en: "Creating...", es: "Creando..." })}
+                            {tx({ de: "{tx({ de: \"Wird erstellt...\", en: \"Creating...\", es: \"Creando...\" })}", en: "Creating...", es: "Creando..." })}
                           </>
                         ) : (
                           <>
                             <Sparkles className="mr-2 h-4 w-4 group-hover:rotate-12 transition-transform" />
-                            {tx({ de: "Mit KI erstellen", en: "Create with AI", es: "Crear con IA" })}
+                            {tx({ de: "{tx({ de: \"Mit KI erstellen\", en: \"Create with AI\", es: \"Crear con IA\" })}", en: "Create with AI", es: "Crear con IA" })}
                           </>
                         )}
                       </Button>
@@ -726,10 +726,10 @@ const BrandKit = () => {
                       <Paintbrush className="h-16 w-16 text-muted-foreground mb-4" />
                       <h3 className="text-lg font-semibold mb-2">Kein Marken-Set vorhanden</h3>
                       <p className="text-sm text-muted-foreground mb-4">
-                        {tx({ de: "Erstelle dein erstes Marken-Set, um es hier zu sehen", en: "Create your first brand kit to see it here", es: "Crea tu primer kit de marca para verlo aquí" })}
+                        {tx({ de: "{tx({ de: \"Erstelle dein erstes Marken-Set, um es hier zu sehen\", en: \"Create your first brand kit to see it here\", es: \"Crea tu primer kit de marca para verlo aquí\" })}", en: "Create your first brand kit to see it here", es: "Crea tu primer kit de marca para verlo aquí" })}
                       </p>
                       <Button onClick={() => setActiveTab("create")}>
-                        {tx({ de: "Jetzt erstellen", en: "Create now", es: "Crear ahora" })}
+                        {tx({ de: "{tx({ de: \"Jetzt erstellen\", en: \"Create now\", es: \"Crear ahora\" })}", en: "Create now", es: "Crear ahora" })}
                       </Button>
                     </CardContent>
                   </Card>
@@ -768,7 +768,7 @@ const BrandKit = () => {
                       <div className="p-6 border-b border-white/10">
                         <h3 className="text-lg font-semibold">Empfohlene Hashtags</h3>
                         <p className="text-sm text-muted-foreground mt-1">
-                          {tx({ de: "Nutze diese Hashtags für maximale Reichweite", en: "Use these hashtags for maximum reach", es: "Usa estos hashtags para máximo alcance" })}
+                          {tx({ de: "{tx({ de: \"Nutze diese Hashtags für maximale Reichweite\", en: \"Use these hashtags for maximum reach\", es: \"Usa estos hashtags para máximo alcance\" })}", en: "Use these hashtags for maximum reach", es: "Usa estos hashtags para máximo alcance" })}
                         </p>
                       </div>
                       <div className="p-6">

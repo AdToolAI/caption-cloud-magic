@@ -109,7 +109,7 @@ export const ThumbnailManager = ({
           Thumbnail-Verwaltung
         </CardTitle>
         <CardDescription>
-          {tx({ de: "Thumbnail automatisch generieren oder eigenes hochladen", en: "Auto-generate thumbnail or upload your own", es: "Generar miniatura automáticamente o subir la tuya" })}
+          {tx({ de: "{tx({ de: \"Thumbnail automatisch generieren oder eigenes hochladen\", en: \"Auto-generate thumbnail or upload your own\", es: \"Generar miniatura automáticamente o subir la tuya\" })}", en: "Auto-generate thumbnail or upload your own", es: "Generar miniatura automáticamente o subir la tuya" })}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

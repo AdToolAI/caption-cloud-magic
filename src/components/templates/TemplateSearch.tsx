@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { tx } from '@/lib/i18nText';
 
 export interface SearchFilters {
   query: string;
@@ -234,7 +235,7 @@ export const TemplateSearch = ({
         {hasActiveFilters && (
           <Button variant="ghost" size="sm" onClick={resetFilters}>
             <X className="h-4 w-4 mr-2" />
-            Filter zurücksetzen
+            {tx({ de: "Filter zurücksetzen", en: "Reset filters", es: "Restablecer filtros" })}
           </Button>
         )}
       </div>

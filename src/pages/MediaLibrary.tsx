@@ -1216,7 +1216,7 @@ export default function MediaLibrary() {
                 )}
                 {item.isSuperseded && (
                   <div className="absolute bottom-2 left-2 z-10 rounded-md bg-background/80 px-2 py-1 text-xs backdrop-blur">
-                    {tx({ de: "Ältere Version", en: "Older Version", es: "Versión anterior" })}
+                    {tx({ de: "{tx({ de: \"Ältere Version\", en: \"Older Version\", es: \"Versión anterior\" })}", en: "Older Version", es: "Versión anterior" })}
                   </div>
                 )}
 
@@ -1433,7 +1433,7 @@ export default function MediaLibrary() {
             <Button asChild>
               <label htmlFor="file-upload" className="cursor-pointer">
                 <Upload className="h-4 w-4 mr-2" />
-                {tx({ de: "Datei hochladen", en: "Upload File", es: "Subir archivo" })}
+                {tx({ de: "{tx({ de: \"Datei hochladen\", en: \"Upload File\", es: \"Subir archivo\" })}", en: "Upload File", es: "Subir archivo" })}
               </label>
             </Button>
           </div>

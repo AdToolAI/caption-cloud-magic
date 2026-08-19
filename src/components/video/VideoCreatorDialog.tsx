@@ -524,7 +524,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                           Text-Overlays aktivieren
                         </Label>
                         <p className="text-xs text-muted-foreground">
-                          {tx({ de: "Zeigt automatisch generierte Untertitel basierend auf deinem Skript", en: "Shows auto-generated subtitles based on your script", es: "Muestra subtítulos generados automáticamente según tu guion" })}
+                          {tx({ de: "{tx({ de: \"Zeigt automatisch generierte Untertitel basierend auf deinem Skript\", en: \"Shows auto-generated subtitles based on your script\", es: \"Muestra subtítulos generados automáticamente según tu guion\" })}", en: "Shows auto-generated subtitles based on your script", es: "Muestra subtítulos generados automáticamente según tu guion" })}
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -541,7 +541,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                     <div className="space-y-4 p-4 border rounded-lg">
                       <div className="space-y-2">
                         <Label htmlFor="voice-style" className="text-sm font-medium">
-                          {tx({ de: "Voiceover Stimme", en: "Voiceover Voice", es: "Voz en off" })}
+                          {tx({ de: "{tx({ de: \"Voiceover Stimme\", en: \"Voiceover Voice\", es: \"Voz en off\" })}", en: "Voiceover Voice", es: "Voz en off" })}
                         </Label>
                         <select
                           id="voice-style"
@@ -571,7 +571,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                           <option value="bill">{tx({ de: "Bill (Männlich, erfahren)", en: "Bill (Male, experienced)", es: "Bill (Masculino, experimentado)" })}</option>
                         </select>
                         <p className="text-xs text-muted-foreground">
-                          {tx({ de: "Wähle die Stimme für dein professionelles Voiceover", en: "Choose the voice for your professional voiceover", es: "Elige la voz para tu voz en off profesional" })}
+                          {tx({ de: "{tx({ de: \"Wähle die Stimme für dein professionelles Voiceover\", en: \"Choose the voice for your professional voiceover\", es: \"Elige la voz para tu voz en off profesional\" })}", en: "Choose the voice for your professional voiceover", es: "Elige la voz para tu voz en off profesional" })}
                         </p>
                       </div>
                       
@@ -660,7 +660,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                   ) : (
                     <>
                       <Sparkles className="mr-2 h-4 w-4" />
-                      {tx({ de: "Video erstellen", en: "Create video", es: "Crear video" })}
+                      {tx({ de: "{tx({ de: \"Video erstellen\", en: \"Create video\", es: \"Crear video\" })}", en: "Create video", es: "Crear video" })}
                     </>
                   )}
                 </Button>
@@ -674,7 +674,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
               <div className="text-center space-y-2">
                 <h3 className="font-semibold text-lg">{tx({ de: "Dein Video wird erstellt", en: "Your video is being created", es: "Tu video se está creando" })}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {tx({ de: "Dies kann einige Minuten dauern. Du kannst das Fenster schließen und später zurückkommen.", en: "This may take a few minutes. You can close the window and come back later.", es: "Esto puede tardar unos minutos. Puedes cerrar la ventana y volver más tarde." })}
+                  {tx({ de: "{tx({ de: \"Dies kann einige Minuten dauern. Du kannst das Fenster schließen und später zurückkommen.\", en: \"This may take a few minutes. You can close the window and come back later.\", es: \"Esto puede tardar unos minutos. Puedes cerrar la ventana y volver más tarde.\" })}", en: "This may take a few minutes. You can close the window and come back later.", es: "Esto puede tardar unos minutos. Puedes cerrar la ventana y volver más tarde." })}
                 </p>
                 {polling && (
                   <Badge variant="secondary">{tx({ de: "Rendering läuft...", en: "Rendering in progress...", es: "Renderizando..." })}</Badge>

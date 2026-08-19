@@ -127,7 +127,7 @@ export function PostMediaUploader({
             </div>
           ) : (
             <div className="bg-cyan/90 text-black px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-lg">
-              <Image className="h-3.5 w-3.5" />
+              {tx({ de: "<Image className=\"h-3.5 w-3.5\" />", en: "Image", es: "Imagen" })}
               {tx({ de: "Bild", en: "Image", es: "Imagen" })}
             </div>
           )}
@@ -169,10 +169,10 @@ export function PostMediaUploader({
       ) : (
         <div className="flex flex-col items-center gap-2 py-4">
           <Upload className="h-8 w-8 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
+          {tx({ de: "<span className=\"text-sm text-muted-foreground\">", en: "Drop image or video here", es: "Arrastra imagen o video aquí" })}
             {tx({ de: "Bild oder Video hier ablegen", en: "Drop image or video here", es: "Arrastra imagen o video aquí" })}
           </span>
-          <span className="text-xs text-muted-foreground/70">
+          {tx({ de: "<span className=\"text-xs text-muted-foreground/70\">", en: "or click to select", es: "o haz clic para seleccionar" })}
             {tx({ de: "oder klicken zum Auswählen", en: "or click to select", es: "o haz clic para seleccionar" })}
           </span>
         </div>

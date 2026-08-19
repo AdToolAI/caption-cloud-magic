@@ -98,7 +98,7 @@ export const SecurityNotificationsCard = () => {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label>Sicherheitswarnungen</Label>
-            <p className="text-xs text-muted-foreground">
+            {tx({ de: "<p className=\"text-xs text-muted-foreground\">", en: "Email for suspicious activity", es: "Correo electrónico para actividad sospechosa" })}
               {tx({ de: "E-Mail bei verdächtigen Aktivitäten", en: "Email for suspicious activity", es: "Correo electrónico para actividad sospechosa" })}
             </p>
           </div>
@@ -112,7 +112,7 @@ export const SecurityNotificationsCard = () => {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label>Login-Benachrichtigungen</Label>
-            <p className="text-xs text-muted-foreground">
+            {tx({ de: "<p className=\"text-xs text-muted-foreground\">", en: "Email for every new login", es: "Correo electrónico para cada nuevo inicio de sesión" })}
               {tx({ de: "E-Mail bei jeder neuen Anmeldung", en: "Email for every new login", es: "Correo electrónico para cada nuevo inicio de sesión" })}
             </p>
           </div>

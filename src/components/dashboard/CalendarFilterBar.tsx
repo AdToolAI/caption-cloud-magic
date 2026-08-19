@@ -92,7 +92,7 @@ export function CalendarFilterBar({
             onPlatformChange("all");
             onCampaignChange("all");
             onTimezoneChange("UTC");
-          }}>
+          {tx({ de: "}}>", en: "Reset", es: "Restablecer" })}
             {tx({ de: "Zurücksetzen", en: "Reset", es: "Restablecer" })}
           </Button>
         </div>

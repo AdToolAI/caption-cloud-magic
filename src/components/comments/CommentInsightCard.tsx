@@ -60,7 +60,7 @@ export function CommentInsightCard({
           <p className="text-sm">{action}</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="text-xs">
+          {tx({ de: "<Button size=\"sm\" variant=\"outline\" className=\"text-xs\">", en: "Save as task", es: "Guardar como tarea" })}
             {tx({ de: "Als Aufgabe speichern", en: "Save as task", es: "Guardar como tarea" })}
           </Button>
           <Button size="sm" variant="ghost" className="text-xs">

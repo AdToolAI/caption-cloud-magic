@@ -514,7 +514,7 @@ export default function StoryboardTab({
       <div className="rounded-lg bg-card/60 border border-border/40 px-3 py-2">
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            {tx({ de: "Projekt-Budget", en: "Project budget", es: "Presupuesto del proyecto" })}
+            {tx({ de: "{tx({ de: \"Projekt-Budget\", en: \"Project budget\", es: \"Presupuesto del proyecto\" })}", en: "Project budget", es: "Presupuesto del proyecto" })}
           </span>
           <span className={`text-xs font-medium tabular-nums ${budgetTextColor}`}>
             {formatDuration(totalDuration)} / {formatDuration(MAX_PROJECT_SECONDS)}

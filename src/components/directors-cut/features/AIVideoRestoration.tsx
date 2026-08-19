@@ -270,7 +270,7 @@ export function AIVideoRestoration({
           <div className="p-3 bg-muted/50 rounded-lg">
             <p className="text-xs text-muted-foreground">
               <strong>{tx({ de: "Perfekt für:", en: "Perfect for:", es: "Perfecto para:" })}</strong> Alte Familienvideos, VHS-Aufnahmen, 
-              {tx({ de: "historisches Filmmaterial und beschädigte Aufnahmen.", en: "historical footage and damaged recordings.", es: "material histórico y grabaciones dañadas." })}
+              {tx({ de: "{tx({ de: \"historisches Filmmaterial und beschädigte Aufnahmen.\", en: \"historical footage and damaged recordings.\", es: \"material histórico y grabaciones dañadas.\" })}", en: "historical footage and damaged recordings.", es: "material histórico y grabaciones dañadas." })}
             </p>
           </div>
         </div>

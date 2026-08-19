@@ -296,7 +296,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
         <div>
           <h2 className="font-serif text-xl">{tx({ de: "Was sollen wir für dich drehen?", en: "What should we shoot for you?", es: "¿Qué deberíamos grabar para ti?" })}</h2>
           <p className="text-sm text-muted-foreground">
-            {tx({ de: "Ein Satz genügt. Du bekommst fünf Ideen, die wir auch wirklich umsetzen können.", en: "One sentence is enough. You'll get five ideas that we can actually implement.", es: "Una frase es suficiente. Obtendrás cinco ideas que realmente podemos implementar." })}
+            {tx({ de: "{tx({ de: \"Ein Satz genügt. Du bekommst fünf Ideen, die wir auch wirklich umsetzen können.\", en: \"One sentence is enough. You'll get five ideas that we can actually implement.\", es: \"Una frase es suficiente. Obtendrás cinco ideas que realmente podemos implementar.\" })}", en: "One sentence is enough. You'll get five ideas that we can actually implement.", es: "Una frase es suficiente. Obtendrás cinco ideas que realmente podemos implementar." })}
           </p>
         </div>
       </div>
@@ -448,7 +448,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
             step={5}
           />
           <p className="text-xs text-muted-foreground">
-            {tx({ de: "Mehr als 180 Sekunden produzieren wir bewusst nicht — darunter leidet die Qualität.", en: "We deliberately don't produce more than 180 seconds — quality suffers otherwise.", es: "Deliberadamente no producimos más de 180 segundos — la calidad sufre de lo contrario." })}
+            {tx({ de: "{tx({ de: \"Mehr als 180 Sekunden produzieren wir bewusst nicht — darunter leidet die Qualität.\", en: \"We deliberately don't produce more than 180 seconds — quality suffers otherwise.\", es: \"Deliberadamente no producimos más de 180 segundos — la calidad sufre de lo contrario.\" })}", en: "We deliberately don't produce more than 180 seconds — quality suffers otherwise.", es: "Deliberadamente no producimos más de 180 segundos — la calidad sufre de lo contrario." })}
           </p>
         </div>
 
@@ -542,7 +542,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
       )}
 
       <Badge variant="outline" className="mt-4 border-primary/30 text-[11px] font-normal text-muted-foreground">
-        {tx({ de: "Bis hierhin kostet dich nichts außer der Ideenrunde — produziert wird erst nach deiner Freigabe.", en: "Up to this point, it costs you nothing but the idea round — production only starts after your approval.", es: "Hasta este punto, no te cuesta nada más que la ronda de ideas — la producción solo comienza después de tu aprobación." })}
+        {tx({ de: "{tx({ de: \"Bis hierhin kostet dich nichts außer der Ideenrunde — produziert wird erst nach deiner Freigabe.\", en: \"Up to this point, it costs you nothing but the idea round — production only starts after your approval.\", es: \"Hasta este punto, no te cuesta nada más que la ronda de ideas — la producción solo comienza después de tu aprobación.\" })}", en: "Up to this point, it costs you nothing but the idea round — production only starts after your approval.", es: "Hasta este punto, no te cuesta nada más que la ronda de ideas — la producción solo comienza después de tu aprobación." })}
       </Badge>
     </Card>
   );

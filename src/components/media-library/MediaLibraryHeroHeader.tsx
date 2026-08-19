@@ -265,7 +265,7 @@ export const MediaLibraryHeroHeader = ({
               <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent
                                -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
               <Upload className="mr-2 h-4 w-4" />
-              {tx({ de: "Medien hochladen", en: "Upload media", es: "Subir medios" })}
+              {tx({ de: "{tx({ de: \"Medien hochladen\", en: \"Upload media\", es: \"Subir medios\" })}", en: "Upload media", es: "Subir medios" })}
             </Button>
           </motion.div>
         </div>

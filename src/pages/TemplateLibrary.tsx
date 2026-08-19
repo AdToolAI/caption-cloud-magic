@@ -86,12 +86,12 @@ export default function TemplateLibrary() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Template-Bibliothek</h1>
-          <p className="text-muted-foreground mt-1">
+          {tx({ de: "<p className=\"text-muted-foreground mt-1\">", en: "Select a template and create your video in minutes", es: "Selecciona una plantilla y crea tu video en minutos" })}
             {tx({ de: "Wähle ein Template aus und erstelle dein Video in wenigen Minuten", en: "Select a template and create your video in minutes", es: "Selecciona una plantilla y crea tu video en minutos" })}
           </p>
         </div>
         <Button onClick={() => navigate('/template-editor')}>
-          <Plus className="mr-2 h-4 w-4" />
+          {tx({ de: "<Plus className=\"mr-2 h-4 w-4\" />", en: "New Template", es: "Nueva plantilla" })}
           {tx({ de: "Neues Template", en: "New Template", es: "Nueva plantilla" })}
         </Button>
       </div>

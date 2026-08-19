@@ -14,7 +14,7 @@ export function MediaPreview({ config }: MediaPreviewProps) {
         <CardHeader>
           <CardTitle className="text-sm">Preview</CardTitle>
         </CardHeader>
-        <CardContent className="flex items-center justify-center h-[400px] text-muted-foreground">
+        {tx({ de: "<CardContent className=\"flex items-center justify-center h-[400px] text-muted-foreground\">", en: "Loading configuration...", es: "Cargando configuración..." })}
           {tx({ de: "Konfiguration laden...", en: "Loading configuration...", es: "Cargando configuración..." })}
         </CardContent>
       </Card>

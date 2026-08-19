@@ -514,7 +514,7 @@ export default function AdDirectorWizard({
             </Badge>
           </DialogTitle>
           <DialogDescription>
-            {tx({ de: "Professionelle TVC- und Long-Form-Werbespots mit Brand-Kit, A/B-Varianten und Auto-Voiceover.", en: "Professional TVC and long-form commercials with brand kit, A/B variants, and auto-voiceover.", es: "Anuncios profesionales de TVC y formato largo con kit de marca, variantes A/B y voz en off automática." })}
+            {tx({ de: "{tx({ de: \"Professionelle TVC- und Long-Form-Werbespots mit Brand-Kit, A/B-Varianten und Auto-Voiceover.\", en: \"Professional TVC and long-form commercials with brand kit, A/B variants, and auto-voiceover.\", es: \"Anuncios profesionales de TVC y formato largo con kit de marca, variantes A/B y voz en off automática.\" })}", en: "Professional TVC and long-form commercials with brand kit, A/B variants, and auto-voiceover.", es: "Anuncios profesionales de TVC y formato largo con kit de marca, variantes A/B y voz en off automática." })}
           </DialogDescription>
         </DialogHeader>
 
@@ -630,10 +630,10 @@ export default function AdDirectorWizard({
             {step === 'tonality' && (
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  {tx({ de: "Tonalität", en: "Tone", es: "Tono" })}
+                  {tx({ de: "{tx({ de: \"Tonalität\", en: \"Tone\", es: \"Tono\" })}", en: "Tone", es: "Tono" })}
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  {tx({ de: "Sprachliche Profile basierend auf Werbetheorie — keine geschützten Markennamen.", en: "Linguistic profiles based on advertising theory — no protected brand names.", es: "Perfiles lingüísticos basados en la teoría publicitaria — sin nombres de marca protegidos." })}
+                  {tx({ de: "{tx({ de: \"Sprachliche Profile basierend auf Werbetheorie — keine geschützten Markennamen.\", en: \"Linguistic profiles based on advertising theory — no protected brand names.\", es: \"Perfiles lingüísticos basados en la teoría publicitaria — sin nombres de marca protegidos.\" })}", en: "Linguistic profiles based on advertising theory — no protected brand names.", es: "Perfiles lingüísticos basados en la teoría publicitaria — sin nombres de marca protegidos." })}
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {AD_TONALITY_PROFILES.map((t) => (
@@ -783,7 +783,7 @@ export default function AdDirectorWizard({
                   A/B Skript-Varianten
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  {tx({ de: "Wähle die Variante, die am besten zu deinem Spot passt — alle drei nutzen dieselbe Tonalität, aber unterschiedliche Hook-Strategien.", en: "Choose the variant that best suits your ad — all three use the same tone, but different hook strategies.", es: "Elige la variante que mejor se adapte a tu anuncio — las tres usan el mismo tono, pero diferentes estrategias de gancho." })}
+                  {tx({ de: "{tx({ de: \"Wähle die Variante, die am besten zu deinem Spot passt — alle drei nutzen dieselbe Tonalität, aber unterschiedliche Hook-Strategien.\", en: \"Choose the variant that best suits your ad — all three use the same tone, but different hook strategies.\", es: \"Elige la variante que mejor se adapte a tu anuncio — las tres usan el mismo tono, pero diferentes estrategias de gancho.\" })}", en: "Choose the variant that best suits your ad — all three use the same tone, but different hook strategies.", es: "Elige la variante que mejor se adapte a tu anuncio — las tres usan el mismo tono, pero diferentes estrategias de gancho." })}
                 </p>
 
                 {variantsLoading && (
@@ -832,7 +832,7 @@ export default function AdDirectorWizard({
                             </ol>
                           ) : (
                             <p className="text-xs text-muted-foreground italic">
-                              {tx({ de: "Keine Skript-Zeilen — Spot wird ohne Voiceover-Text erstellt.", en: "No script lines — ad will be created without voiceover text.", es: "Sin líneas de guion — el anuncio se creará sin texto de voz en off." })}
+                              {tx({ de: "{tx({ de: \"Keine Skript-Zeilen — Spot wird ohne Voiceover-Text erstellt.\", en: \"No script lines — ad will be created without voiceover text.\", es: \"Sin líneas de guion — el anuncio se creará sin texto de voz en off.\" })}", en: "No script lines — ad will be created without voiceover text.", es: "Sin líneas de guion — el anuncio se creará sin texto de voz en off." })}
                             </p>
                           )}
                         </Card>
@@ -862,7 +862,7 @@ export default function AdDirectorWizard({
                   Kampagnen-Skalierung
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  {tx({ de: "Optional — vervielfache deinen Spot in Cutdowns oder allen drei Skript-Varianten.", en: "Optional — multiply your ad in cutdowns or all three script variants.", es: "Opcional — multiplica tu anuncio en versiones cortas o en las tres variantes de guion." })}
+                  {tx({ de: "{tx({ de: \"Optional — vervielfache deinen Spot in Cutdowns oder allen drei Skript-Varianten.\", en: \"Optional — multiply your ad in cutdowns or all three script variants.\", es: \"Opcional — multiplica tu anuncio en versiones cortas o en las tres variantes de guion.\" })}", en: "Optional — multiply your ad in cutdowns or all three script variants.", es: "Opcional — multiplica tu anuncio en versiones cortas o en las tres variantes de guion." })}
                 </p>
 
                 <div className="rounded-lg border border-border/40 bg-card/50 p-4">
@@ -901,7 +901,7 @@ export default function AdDirectorWizard({
                         <Switch id="cd-6s" checked={cutdown6sHook} onCheckedChange={setCutdown6sHook} />
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {tx({ de: "Cutdowns recyceln die Master-Clips — kein zusätzlicher AI-Cost.", en: "Cutdowns recycle master clips — no additional AI cost.", es: "Las versiones cortas reciclan los clips maestros — sin costo adicional de IA." })}
+                        {tx({ de: "{tx({ de: \"Cutdowns recyceln die Master-Clips — kein zusätzlicher AI-Cost.\", en: \"Cutdowns recycle master clips — no additional AI cost.\", es: \"Las versiones cortas reciclan los clips maestros — sin costo adicional de IA.\" })}", en: "Cutdowns recycle master clips — no additional AI cost.", es: "Las versiones cortas reciclan los clips maestros — sin costo adicional de IA." })}
                       </p>
                     </div>
                   </div>
@@ -926,7 +926,7 @@ export default function AdDirectorWizard({
                         <Switch id="ar-4x5" checked={aspect4x5} onCheckedChange={setAspect4x5} />
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {tx({ de: "Klont den Master in Format-Varianten — kein zusätzlicher AI-Cost. Master bleibt 16:9.", en: "Clones the master into format variants — no additional AI cost. Master remains 16:9.", es: "Clona el maestro en variantes de formato — sin costo adicional de IA. El maestro permanece en 16:9." })}
+                        {tx({ de: "{tx({ de: \"Klont den Master in Format-Varianten — kein zusätzlicher AI-Cost. Master bleibt 16:9.\", en: \"Clones the master into format variants — no additional AI cost. Master remains 16:9.\", es: \"Clona el maestro en variantes de formato — sin costo adicional de IA. El maestro permanece en 16:9.\" })}", en: "Clones the master into format variants — no additional AI cost. Master remains 16:9.", es: "Clona el maestro en variantes de formato — sin costo adicional de IA. El maestro permanece en 16:9." })}
                       </p>
                     </div>
                   </div>
@@ -958,7 +958,7 @@ export default function AdDirectorWizard({
             {step === 'compliance' && (
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  {tx({ de: "Compliance & Bestätigung", en: "Compliance & Confirmation", es: "Cumplimiento y Confirmación" })}
+                  {tx({ de: "{tx({ de: \"Compliance & Bestätigung\", en: \"Compliance & Confirmation\", es: \"Cumplimiento y Confirmación\" })}", en: "Compliance & Confirmation", es: "Cumplimiento y Confirmación" })}
                 </h3>
                 <AdComplianceDisclaimer
                   acknowledged={acknowledged}
@@ -1036,7 +1036,7 @@ export default function AdDirectorWizard({
             disabled={!canBack || generating || variantsLoading}
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
-            {tx({ de: "Zurück", en: "Back", es: "Atrás" })}
+            {tx({ de: "{tx({ de: \"Zurück\", en: \"Back\", es: \"Atrás\" })}", en: "Back", es: "Atrás" })}
           </Button>
           {step === 'compliance' ? (
             <Button
@@ -1063,7 +1063,7 @@ export default function AdDirectorWizard({
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <>
-                  {tx({ de: "Weiter", en: "Next", es: "Siguiente" })}
+                  {tx({ de: "{tx({ de: \"Weiter\", en: \"Next\", es: \"Siguiente\" })}", en: "Next", es: "Siguiente" })}
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}

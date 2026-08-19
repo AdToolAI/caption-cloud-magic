@@ -222,7 +222,7 @@ export default function StockMediaBrowser({
             </span>
           </DialogTitle>
           <p className="text-xs text-muted-foreground">
-            {tx({ de: "Pexels × Pixabay × Mixkit · 2M+ royalty-free Videos, Bilder, Musik & SFX — ohne Credit-Verbrauch", en: "Pexels × Pixabay × Mixkit · 2M+ royalty-free videos, images, music & SFX — no credit consumption", es: "Pexels × Pixabay × Mixkit · Más de 2M de videos, imágenes, música y SFX libres de derechos — sin consumo de créditos" })}
+            {tx({ de: "{tx({ de: \"Pexels × Pixabay × Mixkit · 2M+ royalty-free Videos, Bilder, Musik & SFX — ohne Credit-Verbrauch\", en: \"Pexels × Pixabay × Mixkit · 2M+ royalty-free videos, images, music & SFX — no credit consumption\", es: \"Pexels × Pixabay × Mixkit · Más de 2M de videos, imágenes, música y SFX libres de derechos — sin consumo de créditos\" })}", en: "Pexels × Pixabay × Mixkit · 2M+ royalty-free videos, images, music & SFX — no credit consumption", es: "Pexels × Pixabay × Mixkit · Más de 2M de videos, imágenes, música y SFX libres de derechos — sin consumo de créditos" })}
           </p>
         </DialogHeader>
 

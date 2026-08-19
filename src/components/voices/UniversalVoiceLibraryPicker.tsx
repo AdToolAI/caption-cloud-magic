@@ -414,7 +414,7 @@ export function UniversalVoiceLibraryPicker({
             onClick={() => onOpenChange(false)}
             className="px-8 rounded-lg border border-white/10 bg-white/5 text-sm font-bold text-white hover:bg-white/10"
           >
-            {tx({ de: "Schließen", en: "Close", es: "Cerrar" })}
+            {tx({ de: "{tx({ de: \"Schließen\", en: \"Close\", es: \"Cerrar\" })}", en: "Close", es: "Cerrar" })}
           </Button>
         </div>
 

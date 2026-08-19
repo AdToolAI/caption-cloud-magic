@@ -50,7 +50,7 @@ export function CreateTestDialog({ onCreateTest }: Props) {
       <DialogTrigger asChild>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
-          {tx({ de: "Neuen A/B Test erstellen", en: "Create new A/B Test", es: "Crear nueva prueba A/B" })}
+          {tx({ de: "{tx({ de: \"Neuen A/B Test erstellen\", en: \"Create new A/B Test\", es: \"Crear nueva prueba A/B\" })}", en: "Create new A/B Test", es: "Crear nueva prueba A/B" })}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
@@ -117,10 +117,10 @@ export function CreateTestDialog({ onCreateTest }: Props) {
 
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => setOpen(false)}>
-              {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
+              {tx({ de: "{tx({ de: \"Abbrechen\", en: \"Cancel\", es: \"Cancelar\" })}", en: "Cancel", es: "Cancelar" })}
             </Button>
             <Button onClick={handleSubmit} disabled={!testName || !templateId}>
-              {tx({ de: "Test erstellen", en: "Create Test", es: "Crear prueba" })}
+              {tx({ de: "{tx({ de: \"Test erstellen\", en: \"Create Test\", es: \"Crear prueba\" })}", en: "Create Test", es: "Crear prueba" })}
             </Button>
           </div>
         </div>

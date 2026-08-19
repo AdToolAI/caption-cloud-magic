@@ -951,7 +951,7 @@ export default function InstagramPublishing() {
                           rel="noopener noreferrer" 
                           className="text-primary underline hover:no-underline"
                         >
-                          {tx({ de: "→ Graph API Explorer öffnen", en: "→ Open Graph API Explorer", es: "→ Abrir Explorador de API de Graph" })}
+                          {tx({ de: "{tx({ de: \"→ Graph API Explorer öffnen\", en: \"→ Open Graph API Explorer\", es: \"→ Abrir Explorador de API de Graph\" })}", en: "→ Open Graph API Explorer", es: "→ Abrir Explorador de API de Graph" })}
                         </a>
                       </div>
                     </li>
@@ -1013,7 +1013,7 @@ export default function InstagramPublishing() {
                           rel="noopener noreferrer" 
                           className="text-primary underline hover:no-underline"
                         >
-                          {tx({ de: "→ Graph API Explorer öffnen", en: "→ Open Graph API Explorer", es: "→ Abrir Explorador de API de Graph" })}
+                          {tx({ de: "{tx({ de: \"→ Graph API Explorer öffnen\", en: \"→ Open Graph API Explorer\", es: \"→ Abrir Explorador de API de Graph\" })}", en: "→ Open Graph API Explorer", es: "→ Abrir Explorador de API de Graph" })}
                         </a>
                       </div>
                     </li>
@@ -1106,7 +1106,7 @@ export default function InstagramPublishing() {
                 <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
                   <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
                   <AlertDescription className="text-green-800 dark:text-green-200 font-medium">
-                    {tx({ de: "✅ Token erfolgreich erneuert und automatisch gespeichert!", en: "✅ Token successfully renewed and automatically saved!", es: "✅ ¡Token renovado y guardado automáticamente con éxito!" })}
+                    {tx({ de: "{tx({ de: \"✅ Token erfolgreich erneuert und automatisch gespeichert!\", en: \"✅ Token successfully renewed and automatically saved!\", es: \"✅ ¡Token renovado y guardado automáticamente con éxito!\" })}", en: "✅ Token successfully renewed and automatically saved!", es: "✅ ¡Token renovado y guardado automáticamente con éxito!" })}
                   </AlertDescription>
                 </Alert>
 
@@ -1191,7 +1191,7 @@ export default function InstagramPublishing() {
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription className="text-sm">
-                    {tx({ de: "Die Diagnose wird automatisch aktualisiert. Du kannst jetzt wieder automatisch posten! 🚀", en: "The diagnosis is automatically updated. You can now post automatically again! 🚀", es: "El diagnóstico se actualiza automáticamente. ¡Ahora puedes volver a publicar automáticamente! 🚀" })}
+                    {tx({ de: "{tx({ de: \"Die Diagnose wird automatisch aktualisiert. Du kannst jetzt wieder automatisch posten! 🚀\", en: \"The diagnosis is automatically updated. You can now post automatically again! 🚀\", es: \"El diagnóstico se actualiza automáticamente. ¡Ahora puedes volver a publicar automáticamente! 🚀\" })}", en: "The diagnosis is automatically updated. You can now post automatically again! 🚀", es: "El diagnóstico se actualiza automáticamente. ¡Ahora puedes volver a publicar automáticamente! 🚀" })}
                   </AlertDescription>
                 </Alert>
               </div>
@@ -1205,7 +1205,7 @@ export default function InstagramPublishing() {
                   <strong>{tx({ de: "❌ Token konnte nicht validiert werden.", en: "❌ Token could not be validated.", es: "❌ No se pudo validar el token." })}</strong>
                   <p className="mt-1 text-sm">{error}</p>
                   <p className="mt-2 text-sm">
-                    {tx({ de: "Bitte prüfe:", en: "Please check:", es: "Por favor, verifica:" })}
+                    {tx({ de: "{tx({ de: \"Bitte prüfe:\", en: \"Please check:\", es: \"Por favor, verifica:\" })}", en: "Please check:", es: "Por favor, verifica:" })}
                   </p>
                   <ul className="list-disc list-inside text-sm mt-1">
                     <li>{tx({ de: "Hast du die richtige App gewählt?", en: "Did you choose the right app?", es: "¿Elegiste la aplicación correcta?" })}</li>

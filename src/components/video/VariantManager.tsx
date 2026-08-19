@@ -84,7 +84,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
             </div>
           ) : variants.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              {tx({ de: "Noch keine Varianten erstellt", en: "No variants created yet", es: "Aún no se han creado variantes" })}
+              {tx({ de: "{tx({ de: \"Noch keine Varianten erstellt\", en: \"No variants created yet\", es: \"Aún no se han creado variantes\" })}", en: "No variants created yet", es: "Aún no se han creado variantes" })}
             </div>
           ) : (
             <div className="space-y-4">
@@ -145,7 +145,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5" />
-            {tx({ de: "Neue Varianten erstellen", en: "Create new variants", es: "Crear nuevas variantes" })}
+            {tx({ de: "{tx({ de: \"Neue Varianten erstellen\", en: \"Create new variants\", es: \"Crear nuevas variantes\" })}", en: "Create new variants", es: "Crear nuevas variantes" })}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">

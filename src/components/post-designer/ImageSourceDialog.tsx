@@ -190,8 +190,6 @@ export function ImageSourceDialog({ open, onOpenChange, onPick }: ImageSourceDia
             </div>
             {stockState === "unavailable" ? (
               <p className="rounded-lg border border-border/60 bg-muted/30 p-4 text-sm text-muted-foreground">
-              </p>
-            ) : (
               <div className="grid max-h-[340px] grid-cols-4 gap-2 overflow-y-auto">
                 {stockResults.map((item) => (
                   <button

@@ -2790,7 +2790,7 @@ export default function SceneCard({
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex flex-col">
                         <span className="text-[10px] font-semibold text-primary flex items-center gap-1">
-                          {tx({ de: "🎙️ Lip-Sync zum Voiceover", en: "🎙️ Lip-sync to voiceover", es: "🎙️ Sincronización labial con voz en off" })}
+                          {tx({ de: "{tx({ de: \"🎙️ Lip-Sync zum Voiceover\", en: \"🎙️ Lip-sync to voiceover\", es: \"🎙️ Sincronización labial con voz en off\" })}", en: "🎙️ Lip-sync to voiceover", es: "🎙️ Sincronización labial con voz en off" })}
                           <span
                             className="px-1 py-0.5 rounded bg-amber-400/20 text-amber-200 text-[8px] font-bold ring-1 ring-amber-400/30"
                             title={tx({ de: "Premium-Lippensynchronisation — Artlist-grade fidelity, identity-locked, kein Face-Morph", en: "Premium-Lippensynchronisation — Artlist-grade fidelity, identity-locked, no face morph", es: "Premium-Lippensynchronisation — fidelidad de nivel Artlist, identidad bloqueada, sin transformación facial" })}

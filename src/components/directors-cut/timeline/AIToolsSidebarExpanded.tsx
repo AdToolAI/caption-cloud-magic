@@ -249,7 +249,7 @@ export function AIToolsSidebarExpanded({
             <div className="pt-2 border-t">
               <Button variant="outline" size="sm" className="w-full gap-2">
                 <Upload className="h-4 w-4" />
-                {tx({ de: "Audio hochladen", en: "Upload audio", es: "Subir audio" })}
+                {tx({ de: "{tx({ de: \"Audio hochladen\", en: \"Upload audio\", es: \"Subir audio\" })}", en: "Upload audio", es: "Subir audio" })}
               </Button>
             </div>
           </TabsContent>
@@ -266,7 +266,7 @@ export function AIToolsSidebarExpanded({
               </p>
               <Button size="sm" className="w-full gap-2" onClick={() => setMusicBrowserOpen(true)}>
                 <Music className="h-4 w-4" />
-                {tx({ de: "Bibliothek öffnen", en: "Open library", es: "Abrir biblioteca" })}
+                {tx({ de: "{tx({ de: \"Bibliothek öffnen\", en: \"Open library\", es: \"Abrir biblioteca\" })}", en: "Open library", es: "Abrir biblioteca" })}
               </Button>
             </div>
 
@@ -329,7 +329,7 @@ export function AIToolsSidebarExpanded({
                   <span className="text-sm font-medium">Noise Reduction</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {tx({ de: "Entferne Hintergrundgeräusche automatisch", en: "Automatically remove background noise", es: "Eliminar ruido de fondo automáticamente" })}
+                  {tx({ de: "{tx({ de: \"Entferne Hintergrundgeräusche automatisch\", en: \"Automatically remove background noise\", es: \"Eliminar ruido de fondo automáticamente\" })}", en: "Automatically remove background noise", es: "Eliminar ruido de fondo automáticamente" })}
                 </p>
                 <Slider defaultValue={[50]} max={100} className="mt-2" />
               </motion.div>
@@ -343,7 +343,7 @@ export function AIToolsSidebarExpanded({
                   <span className="text-sm font-medium">Voice Enhancement</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {tx({ de: "Verbessere Stimmen für klarere Sprache", en: "Enhance voices for clearer speech", es: "Mejorar voces para un habla más clara" })}
+                  {tx({ de: "{tx({ de: \"Verbessere Stimmen für klarere Sprache\", en: \"Enhance voices for clearer speech\", es: \"Mejorar voces para un habla más clara\" })}", en: "Enhance voices for clearer speech", es: "Mejorar voces para un habla más clara" })}
                 </p>
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-xs">Aktiviert</span>
@@ -360,7 +360,7 @@ export function AIToolsSidebarExpanded({
                   <span className="text-sm font-medium">Auto-Ducking</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {tx({ de: "Musik automatisch leiser bei Sprache", en: "Automatically lower music during speech", es: "Bajar música automáticamente durante el habla" })}
+                  {tx({ de: "{tx({ de: \"Musik automatisch leiser bei Sprache\", en: \"Automatically lower music during speech\", es: \"Bajar música automáticamente durante el habla\" })}", en: "Automatically lower music during speech", es: "Bajar música automáticamente durante el habla" })}
                 </p>
                 <Slider defaultValue={[70]} max={100} className="mt-2" />
               </motion.div>
@@ -374,7 +374,7 @@ export function AIToolsSidebarExpanded({
                   <span className="text-sm font-medium">Beat-Sync</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {tx({ de: "Synchronisiere Schnitte mit dem Beat", en: "Sync cuts to the beat", es: "Sincronizar cortes con el ritmo" })}
+                  {tx({ de: "{tx({ de: \"Synchronisiere Schnitte mit dem Beat\", en: \"Sync cuts to the beat\", es: \"Sincronizar cortes con el ritmo\" })}", en: "Sync cuts to the beat", es: "Sincronizar cortes con el ritmo" })}
                 </p>
                 <Button variant="outline" size="sm" className="w-full mt-2">
                   Beats analysieren
@@ -387,7 +387,7 @@ export function AIToolsSidebarExpanded({
           <TabsContent value="scenes" className="m-0 space-y-4">
             <Button className="w-full gap-2">
               <Sparkles className="h-4 w-4" />
-              {tx({ de: "KI-Szenenanalyse starten", en: "Start AI scene analysis", es: "Iniciar análisis de escena con IA" })}
+              {tx({ de: "{tx({ de: \"KI-Szenenanalyse starten\", en: \"Start AI scene analysis\", es: \"Iniciar análisis de escena con IA\" })}", en: "Start AI scene analysis", es: "Iniciar análisis de escena con IA" })}
             </Button>
 
             <div className="space-y-2">
@@ -419,7 +419,7 @@ export function AIToolsSidebarExpanded({
               </Button>
               <Button variant="outline" size="sm" className="w-full gap-2">
                 <Wand2 className="h-4 w-4" />
-                {tx({ de: "Übergänge generieren", en: "Generate transitions", es: "Generar transiciones" })}
+                {tx({ de: "{tx({ de: \"Übergänge generieren\", en: \"Generate transitions\", es: \"Generar transiciones\" })}", en: "Generate transitions", es: "Generar transiciones" })}
               </Button>
             </div>
           </TabsContent>

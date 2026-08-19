@@ -77,7 +77,7 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <Plus className="h-4 w-4 mr-2" />
-          {tx({ de: "Variante hinzufügen", en: "Add variant", es: "Añadir variante" })}
+          {tx({ de: "{tx({ de: \"Variante hinzufügen\", en: \"Add variant\", es: \"Añadir variante\" })}", en: "Add variant", es: "Añadir variante" })}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-3xl">
@@ -211,10 +211,10 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
 
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => setOpen(false)}>
-              {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
+              {tx({ de: "{tx({ de: \"Abbrechen\", en: \"Cancel\", es: \"Cancelar\" })}", en: "Cancel", es: "Cancelar" })}
             </Button>
             <Button onClick={handleSubmit} disabled={!variantName}>
-              {tx({ de: "Variante erstellen", en: "Create variant", es: "Crear variante" })}
+              {tx({ de: "{tx({ de: \"Variante erstellen\", en: \"Create variant\", es: \"Crear variante\" })}", en: "Create variant", es: "Crear variante" })}
             </Button>
           </div>
         </div>

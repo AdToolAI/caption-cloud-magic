@@ -842,7 +842,7 @@ export default function AITextStudio() {
             <AlertDialogAction
               onClick={() => branchPrompt && createBranch(branchPrompt.targetModel, true)}
             >
-              {tx({ de: "Mit Kontext übernehmen", en: "Take over with context", es: "Asumir con contexto" })}
+              {tx({ de: "{tx({ de: \"Mit Kontext übernehmen\", en: \"Take over with context\", es: \"Asumir con contexto\" })}", en: "Take over with context", es: "Asumir con contexto" })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

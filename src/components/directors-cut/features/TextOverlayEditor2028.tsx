@@ -553,7 +553,7 @@ export function TextOverlayEditor2028({
             onChange={(id, patch) => updateOverlay(id, patch)}
           />
           <p className="text-[11px] text-muted-foreground">
-            {tx({ de: "Ziehen zum Verschieben, Ecke zum Skalieren — die Position gilt 1:1 für den Export.", en: "Drag to move, corner to scale — position applies 1:1 to export.", es: "Arrastra para mover, esquina para escalar — la posición se aplica 1:1 a la exportación." })}
+            {tx({ de: "{tx({ de: \"Ziehen zum Verschieben, Ecke zum Skalieren — die Position gilt 1:1 für den Export.\", en: \"Drag to move, corner to scale — position applies 1:1 to export.\", es: \"Arrastra para mover, esquina para escalar — la posición se aplica 1:1 a la exportación.\" })}", en: "Drag to move, corner to scale — position applies 1:1 to export.", es: "Arrastra para mover, esquina para escalar — la posición se aplica 1:1 a la exportación." })}
           </p>
         </div>
 
@@ -823,7 +823,7 @@ export function TextOverlayEditor2028({
               className="mt-4"
             >
               <Sparkles className="h-4 w-4 mr-2" />
-              {tx({ de: "Vorlagen ansehen", en: "View Templates", es: "Ver Plantillas" })}
+              {tx({ de: "{tx({ de: \"Vorlagen ansehen\", en: \"View Templates\", es: \"Ver Plantillas\" })}", en: "View Templates", es: "Ver Plantillas" })}
             </Button>
           </div>
         )}

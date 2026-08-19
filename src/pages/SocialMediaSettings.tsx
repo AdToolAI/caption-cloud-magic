@@ -122,13 +122,13 @@ export default function SocialMediaSettings() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Social Media Verbindungen</h1>
         <p className="text-muted-foreground">
-          {tx({ de: "Verwalte deine Verbindungen zu verschiedenen Social Media Plattformen", en: "Manage your connections to various social media platforms", es: "Gestiona tus conexiones a varias plataformas de redes sociales" })}
+          {tx({ de: "{tx({ de: \"Verwalte deine Verbindungen zu verschiedenen Social Media Plattformen\", en: \"Manage your connections to various social media platforms\", es: \"Gestiona tus conexiones a varias plataformas de redes sociales\" })}", en: "Manage your connections to various social media platforms", es: "Gestiona tus conexiones a varias plataformas de redes sociales" })}
         </p>
       </div>
 
       <Alert className="mb-6">
         <AlertDescription>
-          {tx({ de: "Um Social Media Publishing zu nutzen, müssen die entsprechenden API-Tokens als Secrets konfiguriert werden.", en: "To use social media publishing, the corresponding API tokens must be configured as secrets.", es: "Para usar la publicación en redes sociales, los tokens API correspondientes deben configurarse como secretos." })}
+          {tx({ de: "{tx({ de: \"Um Social Media Publishing zu nutzen, müssen die entsprechenden API-Tokens als Secrets konfiguriert werden.\", en: \"To use social media publishing, the corresponding API tokens must be configured as secrets.\", es: \"Para usar la publicación en redes sociales, los tokens API correspondientes deben configurarse como secretos.\" })}", en: "To use social media publishing, the corresponding API tokens must be configured as secrets.", es: "Para usar la publicación en redes sociales, los tokens API correspondientes deben configurarse como secretos." })}
           Die Token-Namen sind: INSTAGRAM_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN, LINKEDIN_ACCESS_TOKEN, YOUTUBE_ACCESS_TOKEN, etc.
         </AlertDescription>
       </Alert>

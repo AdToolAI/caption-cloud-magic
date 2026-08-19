@@ -187,8 +187,6 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
               <Badge variant="outline" className="border-primary/40 text-primary">{tx({ de: 'Sendefertig', en: 'Ready to broadcast', es: 'Listo para emitir' })}</Badge>
             </div>
             <p className="text-sm text-muted-foreground">
-            </p>
-          </div>
         </div>
       </Card>
 
@@ -428,7 +426,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
             <Save className="w-4 h-4 mr-2" />
             {tx({ de: "In Bibliothek speichern", en: "Save to Library", es: "Guardar en la biblioteca" })}
           </Button>
-          <Button
+          {tx({ de: "<Button", en: "Save to Library", es: "Guardar en la biblioteca" })}
             variant={exportFormat === 'download' ? 'default' : 'outline'}
             onClick={() => setExportFormat('download')}
             className={exportFormat === 'download' ? 'bg-gradient-to-r from-emerald-500 to-primary' : ''}

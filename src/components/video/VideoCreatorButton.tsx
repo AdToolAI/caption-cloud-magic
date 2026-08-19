@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Video } from 'lucide-react';
 import { VideoCreatorDialog } from './VideoCreatorDialog';
+import { tx } from '@/lib/i18nText';
 
 interface VideoCreatorButtonProps {
   onVideoCreated?: (videoUrl: string) => void;
@@ -27,7 +28,7 @@ export const VideoCreatorButton = ({
         className={className}
       >
         <Video className="h-4 w-4 mr-2" />
-        Werbevideo erstellen
+        {tx({ de: "Werbevideo erstellen", en: "Create ad video", es: "Crear video publicitario" })}
       </Button>
 
       <VideoCreatorDialog

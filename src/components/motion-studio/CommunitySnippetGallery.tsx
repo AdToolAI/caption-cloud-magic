@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Heart, Loader2, Search, Copy, Sparkles } from 'lucide-react';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { SCENE_SNIPPET_CATEGORIES, type SceneSnippet } from '@/types/motion-studio';
+import { tx } from '@/lib/i18nText';
 
 interface Props {
   onUse: (snippet: SceneSnippet) => void;
@@ -122,7 +123,7 @@ export default function CommunitySnippetGallery({ onUse, onCloned }: Props) {
       ) : items.length === 0 ? (
         <div className="rounded-md border border-dashed border-border/60 p-8 text-center text-[11px] text-muted-foreground">
           <Sparkles className="h-5 w-5 mx-auto mb-2 text-primary/60" />
-          Noch keine öffentlichen Snippets in dieser Auswahl. Sei der Erste, der etwas teilt!
+          {tx({ de: "Noch keine öffentlichen Snippets in dieser Auswahl. Sei der Erste, der etwas teilt!", en: "No public snippets in this selection yet. Be the first to share something!", es: "Aún no hay fragmentos públicos en esta selección. ¡Sé el primero en compartir algo!" })}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -139,7 +140,7 @@ export default function CommunitySnippetGallery({ onUse, onCloned }: Props) {
                     <img src={thumb} alt={s.name} className="w-full h-full object-cover" loading="lazy" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground">
-                      Kein Bild
+                      {tx({ de: "Kein Bild", en: "No image", es: "Sin imagen" })}
                     </div>
                   )}
                   {s.category && (
@@ -174,7 +175,7 @@ export default function CommunitySnippetGallery({ onUse, onCloned }: Props) {
                       onClick={() => onUse(s)}
                       className="h-6 text-[10px] flex-1"
                     >
-                      Einfügen
+                      {tx({ de: "Einfügen", en: "Insert", es: "Insertar" })}
                     </Button>
                     <Button
                       size="sm"

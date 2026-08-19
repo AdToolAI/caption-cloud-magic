@@ -263,7 +263,7 @@ function VariantSlot({ index, variant, aspect, onPromote, promoting }: VariantSl
           {promoting
             ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
             : <Check className="h-3 w-3 mr-1" />}
-          {tx({ de: "Übernehmen", en: "Apply", es: "Aplicar" })}
+          {tx({ de: "{tx({ de: \"Übernehmen\", en: \"Apply\", es: \"Aplicar\" })}", en: "Apply", es: "Aplicar" })}
         </Button>
       </div>
     </div>

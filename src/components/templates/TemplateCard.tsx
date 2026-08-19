@@ -75,7 +75,7 @@ export const TemplateCard = ({
             variant="secondary"
             onClick={() => onPreview(template)}
           >
-            <Eye className="mr-2 h-4 w-4" />
+            {tx({ de: "<Eye className=\"mr-2 h-4 w-4\" />", en: "Preview", es: "Vista previa" })}
             {tx({ de: "Vorschau", en: "Preview", es: "Vista previa" })}
           </Button>
           <Button
@@ -135,7 +135,7 @@ export const TemplateCard = ({
                 onClick={() => onDelete(template.id)}
                 className="text-destructive"
               >
-                <Trash2 className="mr-2 h-4 w-4" />
+                {tx({ de: "<Trash2 className=\"mr-2 h-4 w-4\" />", en: "Delete", es: "Eliminar" })}
                 {tx({ de: "Löschen", en: "Delete", es: "Eliminar" })}
               </DropdownMenuItem>
             </DropdownMenuContent>

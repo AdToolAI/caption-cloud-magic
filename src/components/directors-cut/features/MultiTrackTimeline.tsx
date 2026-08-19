@@ -9,6 +9,7 @@ import {
   ChevronUp, ChevronDown, Scissors, Copy
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { tx } from '@/lib/i18nText';
 
 export interface TimelineTrack {
   id: string;
@@ -211,7 +212,7 @@ export function MultiTrackTimeline({
           <ScrollArea className="h-64">
             {tracks.length === 0 ? (
               <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-                Klicke oben um Tracks hinzuzufügen
+                {tx({ de: "Klicke oben um Tracks hinzuzufügen", en: "Click above to add tracks", es: "Haz clic arriba para añadir pistas" })}
               </div>
             ) : (
               tracks.map((track, index) => {
@@ -328,7 +329,7 @@ export function MultiTrackTimeline({
                       {track.clips.length === 0 && !track.locked && (
                         <div className="absolute inset-1 border-2 border-dashed border-border rounded flex items-center justify-center">
                           <span className="text-[10px] text-muted-foreground">
-                            + Clip hinzufügen
+                            {tx({ de: "+ Clip hinzufügen", en: "+ Add Clip", es: "+ Añadir Clip" })}
                           </span>
                         </div>
                       )}

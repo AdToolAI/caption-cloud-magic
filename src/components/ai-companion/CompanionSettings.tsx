@@ -214,7 +214,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
             className="bg-muted/30 border-white/10"
           />
           <p className="text-xs text-muted-foreground">
-            {tx({ de: "Dein Assistent wird sich mit diesem Namen vorstellen", en: "Your assistant will introduce itself with this name", es: "Tu asistente se presentará con este nombre" })}
+            {tx({ de: "{tx({ de: \"Dein Assistent wird sich mit diesem Namen vorstellen\", en: \"Your assistant will introduce itself with this name\", es: \"Tu asistente se presentará con este nombre\" })}", en: "Your assistant will introduce itself with this name", es: "Tu asistente se presentará con este nombre" })}
           </p>
         </div>
 
@@ -222,7 +222,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
             <Volume2 className="w-4 h-4" />
-            {tx({ de: "Stimme", en: "Voice", es: "Voz" })}
+            {tx({ de: "{tx({ de: \"Stimme\", en: \"Voice\", es: \"Voz\" })}", en: "Voice", es: "Voz" })}
           </Label>
           <Select
             value={settings.voice_id}
@@ -258,7 +258,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
             ) : (
               <Volume2 className="w-4 h-4 mr-2" />
             )}
-            {tx({ de: "Stimme anhören", en: "Listen to voice", es: "Escuchar voz" })}
+            {tx({ de: "{tx({ de: \"Stimme anhören\", en: \"Listen to voice\", es: \"Escuchar voz\" })}", en: "Listen to voice", es: "Escuchar voz" })}
           </Button>
         </div>
 
@@ -270,7 +270,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
               Sprachausgabe
             </Label>
             <p className="text-xs text-muted-foreground">
-              {tx({ de: "Bot-Antworten werden vorgelesen", en: "Bot responses are read aloud", es: "Las respuestas del bot se leen en voz alta" })}
+              {tx({ de: "{tx({ de: \"Bot-Antworten werden vorgelesen\", en: \"Bot responses are read aloud\", es: \"Las respuestas del bot se leen en voz alta\" })}", en: "Bot responses are read aloud", es: "Las respuestas del bot se leen en voz alta" })}
             </p>
           </div>
           <Switch
@@ -285,7 +285,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
             <div className="space-y-0.5">
               <Label>Automatisch vorlesen</Label>
               <p className="text-xs text-muted-foreground">
-                {tx({ de: "Jede Antwort wird automatisch vorgelesen", en: "Every response is automatically read aloud", es: "Cada respuesta se lee automáticamente en voz alta" })}
+                {tx({ de: "{tx({ de: \"Jede Antwort wird automatisch vorgelesen\", en: \"Every response is automatically read aloud\", es: \"Cada respuesta se lee automáticamente en voz alta\" })}", en: "Every response is automatically read aloud", es: "Cada respuesta se lee automáticamente en voz alta" })}
               </p>
             </div>
             <Switch
@@ -303,7 +303,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
               Spracheingabe
             </Label>
             <p className="text-xs text-muted-foreground">
-              {tx({ de: "Sprich mit dem Bot per Mikrofon", en: "Speak to the bot via microphone", es: "Habla con el bot por micrófono" })}
+              {tx({ de: "{tx({ de: \"Sprich mit dem Bot per Mikrofon\", en: \"Speak to the bot via microphone\", es: \"Habla con el bot por micrófono\" })}", en: "Speak to the bot via microphone", es: "Habla con el bot por micrófono" })}
             </p>
           </div>
           <Switch
@@ -347,7 +347,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
           ) : (
             <Save className="w-4 h-4 mr-2" />
           )}
-          {tx({ de: "Einstellungen speichern", en: "Save settings", es: "Guardar ajustes" })}
+          {tx({ de: "{tx({ de: \"Einstellungen speichern\", en: \"Save settings\", es: \"Guardar ajustes\" })}", en: "Save settings", es: "Guardar ajustes" })}
         </Button>
       </div>
     </motion.div>

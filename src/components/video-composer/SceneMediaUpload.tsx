@@ -142,7 +142,7 @@ export default function SceneMediaUpload({
         <div className="flex items-center justify-between">
           <span className="text-[10px] text-muted-foreground flex items-center gap-1.5">
             <Film className="h-3 w-3 text-primary" />
-            Eigenes Video hochgeladen
+            {tx({ de: "Eigenes Video hochgeladen", en: "Custom video uploaded", es: "Video personalizado subido" })}
           </span>
           <Button
             size="sm"

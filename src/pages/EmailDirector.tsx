@@ -249,7 +249,7 @@ export default function EmailDirector() {
               <Card className="p-12 text-center border-dashed">
                 <Mail className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
                 <p className="text-muted-foreground">
-                  {tx({ de: "Wähle eine Kampagne oder erstelle eine neue, um Subjects und Varianten zu sehen.", en: "Select a campaign or create a new one to see subjects and variants.", es: "Selecciona una campaña o crea una nueva para ver sujetos y variantes." })}
+                  {tx({ de: "{tx({ de: \"Wähle eine Kampagne oder erstelle eine neue, um Subjects und Varianten zu sehen.\", en: \"Select a campaign or create a new one to see subjects and variants.\", es: \"Selecciona una campaña o crea una nueva para ver sujetos y variantes.\" })}", en: "Select a campaign or create a new one to see subjects and variants.", es: "Selecciona una campaña o crea una nueva para ver sujetos y variantes." })}
                 </p>
               </Card>
             ) : (

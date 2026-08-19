@@ -67,7 +67,7 @@ export function LayerInspector({
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
         <p className="text-sm font-medium">{tx({ de: "Nichts ausgewählt", en: "Nothing selected", es: "Nada seleccionado" })}</p>
         <p className="text-xs text-muted-foreground">
-          {tx({ de: "Klicke ein Element auf der Bühne an, um Text, Farbe und Position zu ändern.", en: "Click an element on the stage to change text, color, and position.", es: "Haz clic en un elemento del escenario para cambiar texto, color y posición." })}
+          {tx({ de: "{tx({ de: \"Klicke ein Element auf der Bühne an, um Text, Farbe und Position zu ändern.\", en: \"Click an element on the stage to change text, color, and position.\", es: \"Haz clic en un elemento del escenario para cambiar texto, color y posición.\" })}", en: "Click an element on the stage to change text, color, and position.", es: "Haz clic en un elemento del escenario para cambiar texto, color y posición." })}
         </p>
       </div>
     );
@@ -216,7 +216,7 @@ export function LayerInspector({
         {layer.type === "image" && (
           <>
             <Button variant="outline" className="w-full" onClick={onReplaceImage}>
-              {tx({ de: "Bild ersetzen", en: "Replace image", es: "Reemplazar imagen" })}
+              {tx({ de: "{tx({ de: \"Bild ersetzen\", en: \"Replace image\", es: \"Reemplazar imagen\" })}", en: "Replace image", es: "Reemplazar imagen" })}
             </Button>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Zoom</Label>

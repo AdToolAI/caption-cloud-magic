@@ -64,7 +64,7 @@ export function TemplateDrawer({ open, onOpenChange }: { open: boolean; onOpenCh
           )}
           {!loading && !items.length && (
             <p className="py-6 text-sm text-muted-foreground">
-              {tx({ de: "Noch keine Vorlage. Im Schritt „Ausspielen“ lässt sich jedes Design sichern.", en: "No template yet. Any design can be saved in the 'Deploy' step.", es: "Aún no hay plantilla. Cualquier diseño se puede guardar en el paso 'Desplegar'." })}
+              {tx({ de: "{tx({ de: \"Noch keine Vorlage. Im Schritt „Ausspielen“ lässt sich jedes Design sichern.\", en: \"No template yet. Any design can be saved in the 'Deploy' step.\", es: \"Aún no hay plantilla. Cualquier diseño se puede guardar en el paso 'Desplegar'.\" })}", en: "No template yet. Any design can be saved in the 'Deploy' step.", es: "Aún no hay plantilla. Cualquier diseño se puede guardar en el paso 'Desplegar'." })}
             </p>
           )}
           <div className="space-y-2">

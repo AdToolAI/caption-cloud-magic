@@ -53,13 +53,11 @@ export function VoiceLibraryPanel() {
         <div>
           <h3 className="text-lg font-semibold">Custom Voices</h3>
           <p className="text-sm text-muted-foreground">
-            Erstelle eigene Stimmen per Skript, Mikrofon oder WhatsApp-Upload und nutze sie danach
-            für Voiceovers, Motion Studio und Directors Cut.
           </p>
         </div>
         <Button onClick={() => setShowCloneDialog(true)} size="sm" className="gap-2">
           <Plus className="h-4 w-4" />
-          Stimme erstellen
+          {tx({ de: "Stimme erstellen", en: "Create Voice", es: "Crear voz" })}
         </Button>
       </div>
 

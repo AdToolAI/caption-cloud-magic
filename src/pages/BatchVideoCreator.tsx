@@ -89,7 +89,7 @@ export default function BatchVideoCreator() {
           onClick={() => navigate(-1)}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          {tx({ de: "Zurück", en: "Back", es: "Volver" })}
+          {tx({ de: "{tx({ de: \"Zurück\", en: \"Back\", es: \"Volver\" })}", en: "Back", es: "Volver" })}
         </Button>
       </div>
 
@@ -183,7 +183,7 @@ export default function BatchVideoCreator() {
             disabled={step === 0}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            {tx({ de: "Zurück", en: "Back", es: "Volver" })}
+            {tx({ de: "{tx({ de: \"Zurück\", en: \"Back\", es: \"Volver\" })}", en: "Back", es: "Volver" })}
           </Button>
           
           {step === 0 && (
@@ -191,7 +191,7 @@ export default function BatchVideoCreator() {
               onClick={() => setStep(1)}
               disabled={csvData.length === 0}
             >
-              {tx({ de: "Weiter", en: "Next", es: "Siguiente" })}
+              {tx({ de: "{tx({ de: \"Weiter\", en: \"Next\", es: \"Siguiente\" })}", en: "Next", es: "Siguiente" })}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           )}

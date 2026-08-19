@@ -27,7 +27,7 @@ export function RecurringEventsList({ workspace_id }: RecurringEventsListProps) 
   if (loading) {
     return (
       <div className="text-center py-8 text-muted-foreground">
-        Lade Recurring Rules...
+        {tx({ de: "Lade Recurring Rules...", en: "Loading Recurring Rules...", es: "Cargando reglas recurrentes..." })}
       </div>
     );
   }

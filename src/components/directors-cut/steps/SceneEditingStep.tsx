@@ -767,10 +767,10 @@ export function SceneEditingStep({
         <div>
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <Scissors className="h-5 w-5 text-primary" />
-            {tx({ de: "Szenen-Editor", en: "Scene Editor", es: "Editor de escenas" })}
+            {tx({ de: "{tx({ de: \"Szenen-Editor\", en: \"Scene Editor\", es: \"Editor de escenas\" })}", en: "Scene Editor", es: "Editor de escenas" })}
           </h3>
           <p className="text-sm text-muted-foreground">
-            {tx({ de: "Bearbeite Szenen und konfiguriere Übergänge visuell", en: "Edit scenes and configure transitions visually", es: "Edita escenas y configura transiciones visualmente" })}
+            {tx({ de: "{tx({ de: \"Bearbeite Szenen und konfiguriere Übergänge visuell\", en: \"Edit scenes and configure transitions visually\", es: \"Edita escenas y configura transiciones visualmente\" })}", en: "Edit scenes and configure transitions visually", es: "Edita escenas y configura transiciones visualmente" })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -801,7 +801,7 @@ export function SceneEditingStep({
             className="text-xs border-green-500/50 text-green-600 hover:bg-green-500/10"
           >
             <Plus className="h-3.5 w-3.5 mr-1.5" />
-            {tx({ de: "Szene", en: "Scene", es: "Escena" })}
+            {tx({ de: "{tx({ de: \"Szene\", en: \"Scene\", es: \"Escena\" })}", en: "Scene", es: "Escena" })}
           </Button>
           <Button
             onClick={() => setShowAddMediaDialog(true)}
@@ -810,7 +810,7 @@ export function SceneEditingStep({
             className="text-xs border-blue-500/50 text-blue-600 hover:bg-blue-500/10"
           >
             <Film className="h-3.5 w-3.5 mr-1.5" />
-            {tx({ de: "Medien", en: "Media", es: "Medios" })}
+            {tx({ de: "{tx({ de: \"Medien\", en: \"Media\", es: \"Medios\" })}", en: "Media", es: "Medios" })}
           </Button>
           <Button
             onClick={applyAiSuggestions}
@@ -818,7 +818,7 @@ export function SceneEditingStep({
             className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
           >
             <Wand2 className="h-3.5 w-3.5 mr-1.5" />
-            {tx({ de: "AI Übergänge", en: "AI Transitions", es: "Transiciones de IA" })}
+            {tx({ de: "{tx({ de: \"AI Übergänge\", en: \"AI Transitions\", es: \"Transiciones de IA\" })}", en: "AI Transitions", es: "Transiciones de IA" })}
           </Button>
           <Button
             onClick={() => setShowRemixDialog(true)}
@@ -1019,7 +1019,7 @@ export function SceneEditingStep({
               <CardContent className="py-12 text-center">
                 <Scissors className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
                 <p className="text-sm text-muted-foreground">
-                  {tx({ de: "Keine Szenen vorhanden. Bitte zuerst die KI-Analyse durchführen.", en: "No scenes available. Please perform AI analysis first.", es: "No hay escenas disponibles. Por favor, realiza primero el análisis de IA." })}
+                  {tx({ de: "{tx({ de: \"Keine Szenen vorhanden. Bitte zuerst die KI-Analyse durchführen.\", en: \"No scenes available. Please perform AI analysis first.\", es: \"No hay escenas disponibles. Por favor, realiza primero el análisis de IA.\" })}", en: "No scenes available. Please perform AI analysis first.", es: "No hay escenas disponibles. Por favor, realiza primero el análisis de IA." })}
                 </p>
               </CardContent>
             </Card>
@@ -1160,7 +1160,7 @@ export function SceneEditingStep({
                             
                             {/* Ratio Info */}
                             <div className="text-[10px] text-muted-foreground mb-2">
-                              {tx({ de: "1:3 Ratio — Max 3x langsamer oder 3x schneller", en: "1:3 Ratio — Max 3x slower or 3x faster", es: "Relación 1:3 — Máx. 3x más lento o 3x más rápido" })}
+                              {tx({ de: "{tx({ de: \"1:3 Ratio — Max 3x langsamer oder 3x schneller\", en: \"1:3 Ratio — Max 3x slower or 3x faster\", es: \"Relación 1:3 — Máx. 3x más lento o 3x más rápido\" })}", en: "1:3 Ratio — Max 3x slower or 3x faster", es: "Relación 1:3 — Máx. 3x más lento o 3x más rápido" })}
                             </div>
                             
                             {/* Playback Rate Display */}
@@ -1292,10 +1292,10 @@ export function SceneEditingStep({
                   <CardContent className="py-8 text-center">
                     <Film className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
                     <p className="text-sm text-muted-foreground">
-                      {tx({ de: "Wähle eine Szene aus, um Details zu bearbeiten", en: "Select a scene to edit details", es: "Selecciona una escena para editar detalles" })}
+                      {tx({ de: "{tx({ de: \"Wähle eine Szene aus, um Details zu bearbeiten\", en: \"Select a scene to edit details\", es: \"Selecciona una escena para editar detalles\" })}", en: "Select a scene to edit details", es: "Selecciona una escena para editar detalles" })}
                     </p>
                     <p className="text-xs text-muted-foreground/70 mt-1">
-                      {tx({ de: "Nutze ← → Pfeiltasten zum Navigieren", en: "Use ← → arrow keys to navigate", es: "Usa las teclas de flecha ← → para navegar" })}
+                      {tx({ de: "{tx({ de: \"Nutze ← → Pfeiltasten zum Navigieren\", en: \"Use ← → arrow keys to navigate\", es: \"Usa las teclas de flecha ← → para navegar\" })}", en: "Use ← → arrow keys to navigate", es: "Usa las teclas de flecha ← → para navegar" })}
                     </p>
                   </CardContent>
                 </Card>

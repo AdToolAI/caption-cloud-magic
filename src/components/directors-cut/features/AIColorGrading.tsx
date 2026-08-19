@@ -119,7 +119,7 @@ export function AIColorGrading({
             {isSceneMode ? (
               <>
                 <Layers className="h-3 w-3 mr-1" />
-                {tx({ de: "Szene", en: "Scene", es: "Escena" })}
+                {tx({ de: "{tx({ de: \"Szene\", en: \"Scene\", es: \"Escena\" })}", en: "Scene", es: "Escena" })}
               </>
             ) : (
               <>

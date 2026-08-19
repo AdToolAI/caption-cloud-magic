@@ -261,7 +261,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
             <DialogHeader>
               <DialogTitle>{selectedTest.test_name} - Ergebnisse</DialogTitle>
               <DialogDescription>
-                {tx({ de: "Statistische Analyse der Test-Varianten", en: "Statistical analysis of test variants", es: "Análisis estadístico de las variantes de prueba" })}
+                {tx({ de: "{tx({ de: \"Statistische Analyse der Test-Varianten\", en: \"Statistical analysis of test variants\", es: \"Análisis estadístico de las variantes de prueba\" })}", en: "Statistical analysis of test variants", es: "Análisis estadístico de las variantes de prueba" })}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6 py-4">
@@ -364,7 +364,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                 <div className="flex gap-2 justify-end">
                   <Button onClick={() => handleCompleteTest(selectedTest.id, testResults.results.winner || undefined)}>
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    {tx({ de: "Test abschließen", en: "Complete test", es: "Completar prueba" })}
+                    {tx({ de: "{tx({ de: \"Test abschließen\", en: \"Complete test\", es: \"Completar prueba\" })}", en: "Complete test", es: "Completar prueba" })}
                   </Button>
                 </div>
               )}

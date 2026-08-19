@@ -103,7 +103,7 @@ export default function ContentProjects() {
         <div className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">Meine Videos</h1>
           <p className="text-muted-foreground">
-            {tx({ de: "Verwalte deine erstellten Video-Projekte aus dem Content Studio", en: "Manage your created video projects from the Content Studio", es: "Gestiona tus proyectos de vídeo creados desde el Content Studio" })}
+            {tx({ de: "{tx({ de: \"Verwalte deine erstellten Video-Projekte aus dem Content Studio\", en: \"Manage your created video projects from the Content Studio\", es: \"Gestiona tus proyectos de vídeo creados desde el Content Studio\" })}", en: "Manage your created video projects from the Content Studio", es: "Gestiona tus proyectos de vídeo creados desde el Content Studio" })}
           </p>
         </div>
 

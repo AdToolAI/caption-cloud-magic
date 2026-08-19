@@ -356,7 +356,7 @@ export const TimelineScriptEditor = ({
             <div>
               <CardTitle>Timeline Script Editor</CardTitle>
               <CardDescription>
-                {tx({ de: "Platziere Text-Segmente präzise auf der Zeitachse", en: "Precisely place text segments on the timeline", es: "Coloca segmentos de texto con precisión en la línea de tiempo" })}
+                {tx({ de: "{tx({ de: \"Platziere Text-Segmente präzise auf der Zeitachse\", en: \"Precisely place text segments on the timeline\", es: \"Coloca segmentos de texto con precisión en la línea de tiempo\" })}", en: "Precisely place text segments on the timeline", es: "Coloca segmentos de texto con precisión en la línea de tiempo" })}
               </CardDescription>
             </div>
             <div className="flex gap-2">

@@ -524,7 +524,7 @@ const SubtitleVoiceoverSection: React.FC<{
                     )}
                     {v.tier === 'cloned' && (
                       <Badge variant="outline" className="h-3.5 px-1 text-[8px] border-emerald-400/40 text-emerald-300 bg-emerald-500/10">
-                        {tx({ de: "Meine Stimme", en: "My Voice", es: "Mi Voz" })}
+                        {tx({ de: "{tx({ de: \"Meine Stimme\", en: \"My Voice\", es: \"Mi Voz\" })}", en: "My Voice", es: "Mi Voz" })}
                       </Badge>
                     )}
                   </div>

@@ -134,8 +134,6 @@ export default function RenderPipelinePanel({
           <div className="flex items-center gap-2">
             {status === 'idle' && !isAllReady && (
               <div className="text-[11px] text-muted-foreground italic max-w-[280px] text-right">
-                Rendere Szenen einzeln, um Kosten und Qualität zu kontrollieren.
-                Stitch wird verfügbar, sobald alle Szenen fertig sind.
               </div>
             )}
             {status === 'idle' && isAllReady && (

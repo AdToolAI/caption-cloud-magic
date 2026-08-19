@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { SceneAnalysis } from '@/types/directors-cut';
 import { Button } from '@/components/ui/button';
 import {
+import { tx } from '@/lib/i18nText';
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -172,7 +173,7 @@ function DraggableScene({
           <DropdownMenuContent align="end">
             <DropdownMenuItem>
               <Scissors className="h-3 w-3 mr-2" />
-              Szene splitten
+              {tx({ de: "Szene splitten", en: "Split scene", es: "Dividir escena" })}
             </DropdownMenuItem>
             <DropdownMenuItem>
               <Link className="h-3 w-3 mr-2" />

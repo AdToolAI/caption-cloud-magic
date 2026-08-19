@@ -90,7 +90,7 @@ export default function MotionStudioTemplatePicker({
               <div className="text-center px-4">
                 <h3 className="font-semibold text-foreground">{tx({ de: "Leeres Projekt", en: "Empty Project", es: "Proyecto vacío" })}</h3>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {tx({ de: "Ohne Vorlage von Grund auf starten", en: "Start from scratch without a template", es: "Empezar desde cero sin plantilla" })}
+                  {tx({ de: "{tx({ de: \"Ohne Vorlage von Grund auf starten\", en: \"Start from scratch without a template\", es: \"Empezar desde cero sin plantilla\" })}", en: "Start from scratch without a template", es: "Empezar desde cero sin plantilla" })}
                 </p>
               </div>
             </Card>

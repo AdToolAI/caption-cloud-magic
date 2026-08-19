@@ -290,7 +290,7 @@ export function KanbanView({
               className="gap-2 h-9 bg-white/[0.03] backdrop-blur-xl border border-white/10 hover:border-[#F5C76A]/40 hover:bg-white/[0.05] hover:text-[#F5C76A]"
             >
               <Filter className="h-3.5 w-3.5" />
-              {tx({ de: "Kanäle", en: "Channels", es: "Canales" })}
+              {tx({ de: "{tx({ de: \"Kanäle\", en: \"Channels\", es: \"Canales\" })}", en: "Channels", es: "Canales" })}
               {channelFilter.length > 0 && (
                 <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#F5C76A]/20 text-[10px] text-[#F5C76A] px-1">
                   {channelFilter.length}
@@ -461,14 +461,14 @@ function BoardEmptyState({
         </div>
         <h3 className="font-serif text-2xl tracking-tight text-foreground">{tx({ de: "Dein Content-Board ist bereit", en: "Your content board is ready", es: "Tu tablero de contenido está listo" })}</h3>
         <p className="mt-2 text-sm text-muted-foreground max-w-sm">
-          {tx({ de: "Erstelle deinen ersten Post, um die Pipeline vom Briefing bis zur Veröffentlichung zu starten.", en: "Create your first post to start the pipeline from briefing to publication.", es: "Crea tu primera publicación para iniciar el proceso desde el briefing hasta la publicación." })}
+          {tx({ de: "{tx({ de: \"Erstelle deinen ersten Post, um die Pipeline vom Briefing bis zur Veröffentlichung zu starten.\", en: \"Create your first post to start the pipeline from briefing to publication.\", es: \"Crea tu primera publicación para iniciar el proceso desde el briefing hasta la publicación.\" })}", en: "Create your first post to start the pipeline from briefing to publication.", es: "Crea tu primera publicación para iniciar el proceso desde el briefing hasta la publicación." })}
         </p>
         <button
           onClick={onCreate}
           className="mt-6 group relative inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#F5C76A] text-black font-medium text-sm shadow-[0_0_40px_-8px_rgba(245,199,106,0.6)] hover:shadow-[0_0_60px_-4px_rgba(245,199,106,0.8)] transition-shadow"
         >
           <Plus className="h-4 w-4" />
-          {tx({ de: "Ersten Post erstellen", en: "Create first post", es: "Crear primera publicación" })}
+          {tx({ de: "{tx({ de: \"Ersten Post erstellen\", en: \"Create first post\", es: \"Crear primera publicación\" })}", en: "Create first post", es: "Crear primera publicación" })}
         </button>
         <div className="mt-8 flex items-center gap-3 text-[11px] tracking-[0.2em] uppercase text-muted-foreground/60">
           {columns.slice(0, 5).map((c, i) => (
@@ -605,7 +605,7 @@ function Column({
             )}
           >
             <Plus className="h-3.5 w-3.5" />
-            {tx({ de: "Karte hinzufügen", en: "Add card", es: "Añadir tarjeta" })}
+            {tx({ de: "{tx({ de: \"Karte hinzufügen\", en: \"Add card\", es: \"Añadir tarjeta\" })}", en: "Add card", es: "Añadir tarjeta" })}
           </button>
         )}
       </div>

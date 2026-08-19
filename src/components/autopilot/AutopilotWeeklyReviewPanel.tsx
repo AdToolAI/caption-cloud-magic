@@ -23,7 +23,7 @@ export function AutopilotWeeklyReviewPanel() {
         <Sparkles className="h-8 w-8 text-primary mx-auto mb-3" />
         <h3 className="font-serif text-xl mb-2">{tx({ de: "Noch kein Wochen-Review", en: "No weekly review yet", es: "Aún no hay revisión semanal" })}</h3>
         <p className="text-sm text-muted-foreground mb-4">
-          {tx({ de: "Jeden Samstag um 10:00 UTC erstellt der Autopilot automatisch ein Review der vergangenen Woche.", en: "Every Saturday at 10:00 UTC, the Autopilot automatically creates a review of the past week.", es: "Cada sábado a las 10:00 UTC, el Piloto Automático crea automáticamente una revisión de la semana pasada." })}
+          {tx({ de: "{tx({ de: \"Jeden Samstag um 10:00 UTC erstellt der Autopilot automatisch ein Review der vergangenen Woche.\", en: \"Every Saturday at 10:00 UTC, the Autopilot automatically creates a review of the past week.\", es: \"Cada sábado a las 10:00 UTC, el Piloto Automático crea automáticamente una revisión de la semana pasada.\" })}", en: "Every Saturday at 10:00 UTC, the Autopilot automatically creates a review of the past week.", es: "Cada sábado a las 10:00 UTC, el Piloto Automático crea automáticamente una revisión de la semana pasada." })}
         </p>
         <Button variant="outline" onClick={() => trigger.mutate()} disabled={trigger.isPending}>
           {trigger.isPending ? tx({ de: 'Wird erstellt …', en: 'Creating…', es: 'Creando…' }) : tx({ de: "Jetzt manuell erstellen", en: "Now create manually", es: "Ahora crea manualmente" })}
@@ -139,7 +139,7 @@ export function AutopilotWeeklyReviewPanel() {
               className="gap-2"
             >
               <Send className="h-4 w-4" />
-              {tx({ de: "Vorschlag übernehmen & weiter", en: "Accept suggestion & continue", es: "Aceptar sugerencia y continuar" })}
+              {tx({ de: "{tx({ de: \"Vorschlag übernehmen & weiter\", en: \"Accept suggestion & continue\", es: \"Aceptar sugerencia y continuar\" })}", en: "Accept suggestion & continue", es: "Aceptar sugerencia y continuar" })}
             </Button>
             <Button
               variant="outline"

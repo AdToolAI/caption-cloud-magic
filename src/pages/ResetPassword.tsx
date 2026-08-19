@@ -102,7 +102,7 @@ const ResetPassword = () => {
                   onClick={() => navigate("/auth")}
                   className="w-full"
                 >
-                  {tx({ de: "Zurück zur Anmeldung", en: "Back to Login", es: "Volver al inicio de sesión" })}
+                  {tx({ de: "{tx({ de: \"Zurück zur Anmeldung\", en: \"Back to Login\", es: \"Volver al inicio de sesión\" })}", en: "Back to Login", es: "Volver al inicio de sesión" })}
                 </Button>
               </CardContent>
             </Card>
@@ -134,7 +134,7 @@ const ResetPassword = () => {
                 </motion.div>
                 <CardTitle className="text-2xl">{tx({ de: "Passwort geändert!", en: "Password changed!", es: "¡Contraseña cambiada!" })}</CardTitle>
                 <CardDescription>
-                  {tx({ de: "Ihr Passwort wurde erfolgreich zurückgesetzt. Sie werden zur Anmeldung weitergeleitet...", en: "Your password has been successfully reset. You will be redirected to login...", es: "Su contraseña ha sido restablecida con éxito. Será redirigido al inicio de sesión..." })}
+                  {tx({ de: "{tx({ de: \"Ihr Passwort wurde erfolgreich zurückgesetzt. Sie werden zur Anmeldung weitergeleitet...\", en: \"Your password has been successfully reset. You will be redirected to login...\", es: \"Su contraseña ha sido restablecida con éxito. Será redirigido al inicio de sesión...\" })}", en: "Your password has been successfully reset. You will be redirected to login...", es: "Su contraseña ha sido restablecida con éxito. Será redirigido al inicio de sesión..." })}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -199,10 +199,10 @@ const ResetPassword = () => {
               </motion.div>
 
               <CardTitle className="text-2xl font-bold">
-                {tx({ de: "Neues Passwort festlegen", en: "Set New Password", es: "Establecer nueva contraseña" })}
+                {tx({ de: "{tx({ de: \"Neues Passwort festlegen\", en: \"Set New Password\", es: \"Establecer nueva contraseña\" })}", en: "Set New Password", es: "Establecer nueva contraseña" })}
               </CardTitle>
               <CardDescription>
-                {tx({ de: "Geben Sie Ihr neues Passwort ein", en: "Enter your new password", es: "Introduzca su nueva contraseña" })}
+                {tx({ de: "{tx({ de: \"Geben Sie Ihr neues Passwort ein\", en: \"Enter your new password\", es: \"Introduzca su nueva contraseña\" })}", en: "Enter your new password", es: "Introduzca su nueva contraseña" })}
               </CardDescription>
             </CardHeader>
 

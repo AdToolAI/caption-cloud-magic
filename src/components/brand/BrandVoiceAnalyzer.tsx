@@ -90,7 +90,7 @@ export function BrandVoiceAnalyzer({ brandKitId, existingVoice, onAnalysisComple
             Brand Voice Assistent
           </CardTitle>
           <CardDescription>
-            {tx({ de: "Lade 2-5 eigene Texte hoch und lass die KI deine Marken-Stimme analysieren", en: "Upload 2-5 of your own texts and let the AI analyze your brand voice", es: "Sube 2-5 de tus propios textos y deja que la IA analice la voz de tu marca" })}
+            {tx({ de: "{tx({ de: \"Lade 2-5 eigene Texte hoch und lass die KI deine Marken-Stimme analysieren\", en: \"Upload 2-5 of your own texts and let the AI analyze your brand voice\", es: \"Sube 2-5 de tus propios textos y deja que la IA analice la voz de tu marca\" })}", en: "Upload 2-5 of your own texts and let the AI analyze your brand voice", es: "Sube 2-5 de tus propios textos y deja que la IA analice la voz de tu marca" })}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -129,7 +129,7 @@ export function BrandVoiceAnalyzer({ brandKitId, existingVoice, onAnalysisComple
                 className="flex-1"
               >
                 <Plus className="mr-2 h-4 w-4" />
-                {tx({ de: "Sample hinzufügen", en: "Add Sample", es: "Añadir muestra" })}
+                {tx({ de: "{tx({ de: \"Sample hinzufügen\", en: \"Add Sample\", es: \"Añadir muestra\" })}", en: "Add Sample", es: "Añadir muestra" })}
               </Button>
             )}
             <Button

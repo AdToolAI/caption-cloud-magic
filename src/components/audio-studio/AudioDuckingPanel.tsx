@@ -99,7 +99,7 @@ export function AudioDuckingPanel({
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                {tx({ de: "Musik wird automatisch leiser, wenn Sprache erkannt wird", en: "Music automatically lowers when speech is detected", es: "La música baja automáticamente cuando se detecta voz" })}
+                {tx({ de: "{tx({ de: \"Musik wird automatisch leiser, wenn Sprache erkannt wird\", en: \"Music automatically lowers when speech is detected\", es: \"La música baja automáticamente cuando se detecta voz\" })}", en: "Music automatically lowers when speech is detected", es: "La música baja automáticamente cuando se detecta voz" })}
               </p>
             </div>
           </div>
@@ -306,7 +306,7 @@ export function AudioDuckingPanel({
               onValueChange={([v]) => handleSettingChange({ threshold: v / 100 })}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              {tx({ de: "Tipp: Mit Transkript wird dieser Wert ignoriert — Wort-Timestamps sind präziser.", en: "Tip: With transcript, this value is ignored — word timestamps are more precise.", es: "Consejo: Con transcripción, este valor se ignora — las marcas de tiempo de palabras son más precisas." })}
+              {tx({ de: "{tx({ de: \"Tipp: Mit Transkript wird dieser Wert ignoriert — Wort-Timestamps sind präziser.\", en: \"Tip: With transcript, this value is ignored — word timestamps are more precise.\", es: \"Consejo: Con transcripción, este valor se ignora — las marcas de tiempo de palabras son más precisas.\" })}", en: "Tip: With transcript, this value is ignored — word timestamps are more precise.", es: "Consejo: Con transcripción, este valor se ignora — las marcas de tiempo de palabras son más precisas." })}
             </p>
           </div>
         )}

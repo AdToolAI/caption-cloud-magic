@@ -160,13 +160,13 @@ export function VisualEffectsStep({
         <div>
           <h3 className="text-lg font-semibold">Visuelle Effekte</h3>
           <p className="text-sm text-muted-foreground">
-            {tx({ de: "Passe Farben, Filter und visuelle Stile an", en: "Adjust colors, filters, and visual styles", es: "Ajusta colores, filtros y estilos visuales" })}
+            {tx({ de: "{tx({ de: \"Passe Farben, Filter und visuelle Stile an\", en: \"Adjust colors, filters, and visual styles\", es: \"Ajusta colores, filtros y estilos visuales\" })}", en: "Adjust colors, filters, and visual styles", es: "Ajusta colores, filtros y estilos visuales" })}
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleReset}>
             <RotateCcw className="h-4 w-4 mr-2" />
-            {tx({ de: "Zurücksetzen", en: "Reset", es: "Restablecer" })}
+            {tx({ de: "{tx({ de: \"Zurücksetzen\", en: \"Reset\", es: \"Restablecer\" })}", en: "Reset", es: "Restablecer" })}
           </Button>
           <Button 
             size="sm" 

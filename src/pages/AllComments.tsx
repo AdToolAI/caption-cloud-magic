@@ -378,7 +378,7 @@ const AllComments = () => {
             <div className="text-center py-12">{tx({ de: "Lädt...", en: "Loading...", es: "Cargando..." })}</div>
           ) : comments.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              {tx({ de: "Noch keine gespeicherten Kommentare – importiere Daten oder verbinde eine Quelle.", en: "No comments saved yet – import data or connect a source.", es: "Aún no hay comentarios guardados – importa datos o conecta una fuente." })}
+              {tx({ de: "{tx({ de: \"Noch keine gespeicherten Kommentare – importiere Daten oder verbinde eine Quelle.\", en: \"No comments saved yet – import data or connect a source.\", es: \"Aún no hay comentarios guardados – importa datos o conecta una fuente.\" })}", en: "No comments saved yet – import data or connect a source.", es: "Aún no hay comentarios guardados – importa datos o conecta una fuente." })}
             </div>
           ) : (
             <Table>
