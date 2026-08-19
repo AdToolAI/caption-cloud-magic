@@ -39,11 +39,13 @@ Deno.test("F: fresh state still incomplete => fail_closed speaker_cardinality_in
 });
 
 Deno.test("E: fresh state single => single path, measurement irrelevant", () => {
-  for (const [passes, total] of [
+  const cases: Array<[unknown[], number]> = [
     [[pass(0), pass(0)], 2],
     [[pass(0), pass(0), pass(0), pass(0), pass(0), pass(0)], 6],
-  ] as const) {
-    const fresh = card(passes as unknown[], total as number);
+  ];
+  for (const [passes, total] of cases) {
+    const fresh = card(passes, total);
+
     assertEquals(
       decideUnderLockIoAction({ fresh, preLockDeferred: true, hasMeasurement: true }).action,
       "single",
