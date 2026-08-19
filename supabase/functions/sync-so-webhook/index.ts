@@ -791,11 +791,59 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
 
 
-    const { result: __v5Result } = await withDialogLock(
-      supabase,
-      sceneId,
-      "sync-so-webhook",
-      async () => {
+    // ── FA-4 v410 — Medien-/AWS-I/O NIE unter dem Dialog-Lock ────────────
+    // Der Lease (TTL 30 s, kein Renewal) darf niemals über eine Messung
+    // (Deadline 27 s), einen HEAD-Probe oder einen MP4-Dimensions-Probe
+    // gehalten werden. Die Locked-Phase fordert fehlendes I/O per Sentinel
+    // an, der Lock wird freigegeben, das I/O läuft ausserhalb, danach wird
+    // frisch gelesen und der Lock neu erworben.
+    const headCache = new Map<string, Awaited<ReturnType<typeof headAsset>>>();
+    const dimCache = new Map<string, any>();
+    let catchUpMeasurePass: any = null;
+
+    const performOutOfLockIo = async (request: Fa4OutOfLockIoRequest): Promise<void> => {
+      if (request.kind === "measurement") {
+        await runServerMotionMeasurement(
+          catchUpMeasurePass,
+          request.passIdx,
+          "out_of_lock_catch_up",
+        );
+        return;
+      }
+      await Promise.all([
+        ...request.headUrls.map(async (u) => {
+          let v: Awaited<ReturnType<typeof headAsset>> = null;
+          try { v = await headAsset(u); } catch { v = null; }
+          headCache.set(u, v);
+        }),
+        ...request.dimUrls.map(async (u) => {
+          let v: any = null;
+          try { v = await probeMp4Dims(u); } catch { v = null; }
+          dimCache.set(u, v);
+        }),
+      ]);
+    };
+
+    const refreshStateBetweenRounds = async (): Promise<void> => {
+      const { data: refreshedRow } = await supabase
+        .from("composer_scenes")
+        .select("dialog_shots")
+        .eq("id", sceneId)
+        .maybeSingle();
+      const next = (refreshedRow as any)?.dialog_shots;
+      if (next) state = next;
+    };
+
+    const __v5PhaseRun = await runLockedPhasesWithOutOfLockIo<Response>({
+      performOutOfLockIo,
+      refreshBetweenRounds: refreshStateBetweenRounds,
+      runLockedPhase: async () => {
+        const { result } = await withDialogLock(
+          supabase,
+          sceneId,
+          "sync-so-webhook",
+          async () => {
+
 
     // v25 Fan-Out: match the job_id against passes[].job_id (preferred) OR
     // the legacy top-level state.sync_job_id (single-pass scenes).
