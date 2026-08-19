@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useEffect, useRef, useState } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
 import { useTheme } from 'next-themes';
@@ -50,7 +51,7 @@ export function MonacoJsonEditor({
         return false;
       }
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : 'Ungültiges JSON';
+      const errorMsg = e instanceof Error ? e.message : tx({ de: "Ungültiges JSON", en: "Invalid JSON", es: "JSON inválido" });
       setErrors([errorMsg]);
       onValidationChange(false, [errorMsg]);
       return false;

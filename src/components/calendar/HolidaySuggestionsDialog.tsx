@@ -74,7 +74,7 @@ export function HolidaySuggestionsDialog({
   };
 
   const monthNames = language === 'de' 
-    ? ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
+    ? ["Januar", "Februar", tx({ de: "März", en: "March", es: "Marzo" }), "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
     : language === 'es'
     ? ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
     : ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];

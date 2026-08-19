@@ -19,7 +19,7 @@ import { toast } from '@/hooks/use-toast';
 import { LicenseButton } from '@/components/licensing/LicenseButton';
 import { useDownloadQuota } from '@/hooks/useDownloadQuota';
 
-const MOODS = ['all', 'energetisch', 'entspannt', 'fröhlich', 'dramatisch', 'romantisch', 'traurig'];
+const MOODS = ['all', 'energetisch', 'entspannt', tx({ de: "fröhlich", en: "happy", es: "feliz" }), 'dramatisch', 'romantisch', 'traurig'];
 const GENRES = ['all', 'pop', 'rock', 'elektronisch', 'klassisch', 'jazz', 'hip hop', 'ambient'];
 
 function formatDuration(sec: number): string {

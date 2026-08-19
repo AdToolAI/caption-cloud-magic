@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * briefingTemplate.ts — the single source of truth for the "Muster-Briefing".
  *
@@ -13,7 +14,6 @@
  *  - briefingTemplate.test.ts (guards the template against parser drift)
  */
 
-import { tx } from '@/lib/i18nText';
 
 const TEMPLATE_DE = `Projekt: AdTool AI — Launch Spot
 Format: 9:16
@@ -35,7 +35,7 @@ Ort: @home-office
 Cast: @kundin
 Kamera: medium-close-up, eye-level, slow-push-in, soft-window
 Aktion: Sie scrollt durch ihren Feed, lehnt sich zurück, Stirn in Falten.
-Voiceover: "Jede Woche neuer Content — und du machst alles allein."
+Voiceover: tx({ de: "Jede Woche neuer Content — und du machst alles allein.", en: "New content every week — and you do it all alone.", es: "Contenido nuevo cada semana — y lo haces todo solo." })
 
 Szene 2 — Die Wende
 Dauer: 12 Sekunden
@@ -43,8 +43,8 @@ Ort: @home-office
 Cast: @founder, @kundin
 Kamera: medium, three-quarter, tracking, natural
 Dialog:
-@founder: "Du brauchst kein Team. Du brauchst ein Studio."
-@kundin: "Und das läuft wirklich in einem Tool?"
+@founder: tx({ de: "Du brauchst kein Team. Du brauchst ein Studio.", en: "You don't need a team. You need a studio.", es: "No necesitas un equipo. Necesitas un estudio." })
+@kundin: tx({ de: "Und das läuft wirklich in einem Tool?", en: "And that really runs in one tool?", es: "¿Y eso realmente funciona en una sola herramienta?" })
 @founder: "Briefing rein, fertiger Spot raus."
 
 Szene 3 — Der Beweis

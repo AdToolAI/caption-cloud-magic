@@ -149,7 +149,7 @@ export default function MultiEnginePromptPreview({
     <div className="rounded-md border border-primary/20 bg-background/40 p-2 space-y-2">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-          {t(language, 'Multi-Engine Vorschau', 'Multi-Engine Preview', 'Vista previa multi-motor')}
+          {t(language, tx({ de: "Multi-Engine Vorschau", en: "Multi-Engine Preview", es: "Vista previa multi-motor" }), 'Multi-Engine Preview', 'Vista previa multi-motor')}
         </span>
         <Badge variant="outline" className="text-[8px] h-3.5 px-1 border-primary/30 text-primary/80">
           {t(language, '6 Modelle', '6 models', '6 modelos')}
@@ -202,7 +202,7 @@ export default function MultiEnginePromptPreview({
                       >
                         {status.count}/{limit.hard}{' '}
                         {limit.unit === 'words'
-                          ? t(language, 'Wörter', 'words', 'palabras')
+                          ? t(language, tx({ de: "Wörter", en: "words", es: "palabras" }), 'words', 'palabras')
                           : t(language, 'Zeichen', 'chars', 'caracteres')}
                       </span>
                     )}

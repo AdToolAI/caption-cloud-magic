@@ -90,7 +90,7 @@ const T = {
     shot: { pass: 'Shot definiert', warn: 'Shot generisch', fail: tx({ de: 'Kein Shot', en: 'No shot', es: 'sin tiro' }) },
     dialog: { pass: 'Dialog gelockt', warn: 'Dialog Entwurf', fail: 'Voiceover-Timing fehlt' },
     negative: { pass: 'Negative gesetzt', warn: 'Negative schwach', fail: tx({ de: 'Kein Negative', en: 'No negative', es: 'No negativo' }) },
-    length: { pass: 'Länge passt', warn: 'Länge knapp', fail: tx({ de: "Länge daneben", en: "Length off", es: "Longitud incorrecta" }) },
+    length: { pass: tx({ de: "Länge passt", en: "Length OK", es: "Longitud OK" }), warn: tx({ de: "Länge knapp", en: "Length tight", es: "Longitud justa" }), fail: tx({ de: "Länge daneben", en: "Length off", es: "Longitud incorrecta" }) },
     consistency: { pass: tx({ de: "Kohärent", en: "Coherent", es: "Coherente" }), warn: 'Gemischte Cues', fail: 'Konflikt' },
     hints: {
       subjectFail: tx({ de: 'Füge mindestens ein Cast-Mitglied oder einen Brand-Character hinzu — Provider brauchen ein klares Subjekt.', en: 'Add at least one cast member or brand character — providers need a clear subject.', es: 'Añade al menos un miembro del reparto o un personaje de marca — los proveedores necesitan un sujeto claro.' }),

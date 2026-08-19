@@ -1064,7 +1064,7 @@ export default function InstagramPublishing() {
                   <Alert variant="destructive" className="mt-4">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription className="text-xs">
-                      <strong>Achtung:</strong> {tx({ de: "User Token Modus benötigt die Permission", en: "User token mode requires permission", es: "El modo token de usuario requiere permiso" })} <code>pages_show_list</code>. Falls dieser Fehler auftritt, verwende stattdessen einen Page Token (Option 1).
+                      <strong>{tx({ de: "Achtung:", en: "Attention:", es: "Atención:" })}</strong> {tx({ de: "User Token Modus benötigt die Permission", en: "User token mode requires permission", es: "El modo token de usuario requiere permiso" })} <code>pages_show_list</code>. Falls dieser Fehler auftritt, verwende stattdessen einen Page Token (Option 1).
                     </AlertDescription>
                   </Alert>
                 </CardContent>
@@ -1126,7 +1126,7 @@ export default function InstagramPublishing() {
                     <XCircle className="h-4 w-4 text-red-500" />
                   )}
                   <span className="font-medium">
-                    {renewResult.debug?.is_valid ? 'Token gültig' : tx({ de: "Token ungültig", en: "Token invalid", es: "Token inválido" })}
+                    {renewResult.debug?.is_valid ? tx({ de: "Token gültig", en: "Token valid", es: "Token válido" }) : tx({ de: "Token ungültig", en: "Token invalid", es: "Token inválido" })}
                   </span>
                 </div>
 

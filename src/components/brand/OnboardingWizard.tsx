@@ -26,13 +26,13 @@ interface OnboardingWizardProps {
 }
 
 const valueOptions = [
-  "Vertrauenswürdig", "Innovativ", "Nachhaltig", "Professionell", 
-  "Kreativ", "Authentisch", "Luxuriös", "Freundlich"
+  tx({ de: "Vertrauenswürdig", en: "Trustworthy", es: "Confiable" }), "Innovativ", "Nachhaltig", "Professionell", 
+  "Kreativ", "Authentisch", tx({ de: "Luxuriös", en: "Luxurious", es: "Lujoso" }), "Freundlich"
 ];
 
 const styleOptions = [
   { value: "minimalist", label: "Minimalistisch", emoji: "⚪" },
-  { value: "luxurious", label: "Luxuriös", emoji: "✨" },
+  { value: "luxurious", label: tx({ de: "Luxuriös", en: "Luxurious", es: "Lujoso" }), emoji: "✨" },
   { value: "playful", label: "Verspielt", emoji: "🎨" },
   { value: "urban", label: "Urban", emoji: "🏙️" },
   { value: "modern", label: "Modern", emoji: "🚀" },
@@ -40,7 +40,7 @@ const styleOptions = [
 ];
 
 const toneOptions = [
-  "seriös", "frech", "inspirierend", "professionell", "freundlich", "mutig"
+  tx({ de: "seriös", en: "serious", es: "serio" }), "frech", "inspirierend", "professionell", "freundlich", "mutig"
 ];
 
 export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) {

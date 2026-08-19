@@ -264,7 +264,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
               </label>
               <label className="flex items-start gap-2 text-sm">
                 <Checkbox checked={noDeepfake} onCheckedChange={(v) => setNoDeepfake(v === true)} disabled={!scrolled} />
-                <span>Ich werde <strong>keine Deepfakes</strong> {tx({ de: "realer Personen erstellen oder verbreiten.", en: "create or distribute real people.", es: "crear o distribuir personas reales." })}</span>
+                <span>Ich werde <strong>{tx({ de: "keine Deepfakes", en: "I will <strong>not create or distribute deepfakes</strong> of real people.", es: "No <strong>crearé ni distribuiré deepfakes</strong> de personas reales." })}</strong> {tx({ de: "realer Personen erstellen oder verbreiten.", en: "create or distribute real people.", es: "crear o distribuir personas reales." })}</span>
               </label>
               <label className="flex items-start gap-2 text-sm">
                 <Checkbox checked={noCopyright} onCheckedChange={(v) => setNoCopyright(v === true)} disabled={!scrolled} />

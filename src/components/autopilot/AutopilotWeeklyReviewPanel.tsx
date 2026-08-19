@@ -92,7 +92,7 @@ export function AutopilotWeeklyReviewPanel() {
           ) : (
             <Badge variant="default" className="ml-auto gap-1">
               <CheckCircle2 className="h-3 w-3" />
-              {review.user_decision === 'accepted' ? tx({ de: "Übernommen", en: "Accepted", es: "Aceptado" }) : 'Bestätigt'}
+              {review.user_decision === 'accepted' ? tx({ de: "Übernommen", en: "Accepted", es: "Aceptado" }) : tx({ de: "Bestätigt", en: "Confirmed", es: "Confirmado" })}
             </Badge>
           )}
         </div>

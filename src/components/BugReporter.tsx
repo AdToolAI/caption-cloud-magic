@@ -118,7 +118,7 @@ export function BugReporter() {
               {tx({ de: "Bug melden", en: "Report bug", es: "Reportar error" })}
             </DialogTitle>
             <DialogDescription>
-              {tx({ de: <>Hilf uns, die App zu verbessern. Aktuelle Seite: <code className="text-xs">{location.pathname}</code></>, en: <>Help us improve the app. Current page: <code className="text-xs">{location.pathname}</code></>, es: <>Ayúdanos a mejorar la app. Página actual: <code className="text-xs">{location.pathname}</code></> })}
+              {tx({ de: <>{tx({ de: "Hilf uns, die App zu verbessern. Aktuelle Seite:", en: "Help us improve the app. Current page:", es: "Ayúdanos a mejorar la app. Página actual:" })}<code className="text-xs">{location.pathname}</code></>, en: <>Help us improve the app. Current page: <code className="text-xs">{location.pathname}</code></>, es: <>Ayúdanos a mejorar la app. Página actual: <code className="text-xs">{location.pathname}</code></> })}
             </DialogDescription>
           </DialogHeader>
 

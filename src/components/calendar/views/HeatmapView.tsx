@@ -335,7 +335,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
               title="Konflikt-Warnung"
               body={
                 conflicts.length > 0
-                  ? tx({ de: `${conflicts.length} Slot${conflicts.length === 1 ? "" : "s"} mit ≥3 Posts gleichzeitig — Reach kannibalisiert sich.`, en: `${conflicts.length} slot${conflicts.length === 1 ? "" : "s"} with ≥3 posts at the same time — reach cannibalizes itself.`, es: `${conflicts.length} franja${conflicts.length === 1 ? "" : "s"} con ≥3 publicaciones a la vez: el alcance se canibaliza.` })
+                  ? tx({ de: `${conflicts.length} Slot${conflicts.length === 1 ? "" : "stx({ de: "} mit ≥3 Posts gleichzeitig — Reach kannibalisiert sich.`, en: `${conflicts.length} slot${conflicts.length === 1 ? ", en: "${conflicts.length} slot${conflicts.length === 1 ? \"\" : \"s\"} with ≥3 posts at the same time — reach cannibalizes itself.", es: "${conflicts.length} franja${conflicts.length === 1 ? \"\" : \"s\"} con ≥3 publicaciones al mismo tiempo — el alcance se canibaliza." })" : "s"} with ≥3 posts at the same time — reach cannibalizes itself.`, es: `${conflicts.length} franja${conflicts.length === 1 ? "" : "s"} con ≥3 publicaciones a la vez: el alcance se canibaliza.` })
                   : tx({ de: "Keine Stau-Slots. Saubere Verteilung.", en: "No traffic jam slots. Clean distribution.", es: "Sin espacios para atascos. Distribución limpia." })
               }
             />

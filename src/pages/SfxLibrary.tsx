@@ -115,7 +115,7 @@ export default function SfxLibrary() {
 
   async function toggleFavorite(item: SfxItem) {
     if (!user) {
-      toast({ title: "Login nötig", description: tx({ de: "Bitte einloggen, um Favoriten zu speichern.", en: "Please log in to save favorites.", es: "Por favor, inicia sesión para guardar favoritos." }) });
+      toast({ title: tx({ de: "Login nötig", en: "Login required", es: "Inicio de sesión requerido" }), description: tx({ de: "Bitte einloggen, um Favoriten zu speichern.", en: "Please log in to save favorites.", es: "Por favor, inicia sesión para guardar favoritos." }) });
       return;
     }
     const fav = isFavorite(item);

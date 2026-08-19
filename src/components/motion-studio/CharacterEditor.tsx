@@ -221,7 +221,7 @@ export default function CharacterEditor({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
-            {character ? 'Charakter bearbeiten' : tx({ de: "Neuen Charakter anlegen", en: "Create new character", es: "Crear nuevo personaje" })}
+            {character ? tx({ de: "Charakter bearbeiten", en: "Edit character", es: "Editar personaje" }) : tx({ de: "Neuen Charakter anlegen", en: "Create new character", es: "Crear nuevo personaje" })}
           </DialogTitle>
           <DialogDescription>
           </DialogDescription>

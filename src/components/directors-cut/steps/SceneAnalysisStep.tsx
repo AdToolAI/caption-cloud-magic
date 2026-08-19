@@ -825,7 +825,7 @@ export function SceneAnalysisStep({
             <div>
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-primary" />
-                {scenes.length} {scenes.length === 1 ? 'Szene' : tx({ de: "Szenen", en: "Scenes", es: "Escenas" })} erkannt
+                {scenes.length} {scenes.length === 1 ? tx({ de: "Szene", en: "Scene", es: "Escena" }) : tx({ de: "Szenen", en: "Scenes", es: "Escenas" })} erkannt
                 <Badge variant="outline" className="text-xs font-normal">
                   {scenes.length === 1 ? tx({ de: 'Keine Schnitte erkannt', en: 'No cuts detected', es: 'No se detectaron cortes' }) : 'Szenenanalyse'}
                 </Badge>

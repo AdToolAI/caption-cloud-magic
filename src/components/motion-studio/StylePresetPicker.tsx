@@ -103,14 +103,14 @@ export default function StylePresetPicker({
       return (
         <div className="flex items-center justify-center py-8 text-muted-foreground text-xs">
           <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          {t(language, 'Lade Presets…', 'Loading presets…', 'Cargando presets…')}
+          {t(language, tx({ de: "Lade Presets…", en: "Loading presets…", es: "Cargando presets…" }), 'Loading presets…', 'Cargando presets…')}
         </div>
       );
     }
     if (list.length === 0) {
       return (
         <div className="py-8 text-center text-muted-foreground text-xs">
-          {t(language, 'Keine Presets verfügbar.', 'No presets available.', 'Sin presets disponibles.')}
+          {t(language, tx({ de: "Keine Presets verfügbar.", en: "No presets available.", es: "Sin presets disponibles." }), 'No presets available.', 'Sin presets disponibles.')}
         </div>
       );
     }
@@ -244,7 +244,7 @@ export default function StylePresetPicker({
                   <div className="flex items-center gap-2">
                     <Switch checked={savePublic} onCheckedChange={setSavePublic} id="public-toggle" />
                     <Label htmlFor="public-toggle" className="text-[10px] text-muted-foreground cursor-pointer">
-                      {t(language, 'Öffentlich teilen', 'Share publicly', 'Compartir públicamente')}
+                      {t(language, tx({ de: "Öffentlich teilen", en: "Share publicly", es: "Compartir públicamente" }), 'Share publicly', 'Compartir públicamente')}
                     </Label>
                   </div>
                   <Button
@@ -254,7 +254,7 @@ export default function StylePresetPicker({
                     className="h-7 text-[10px]"
                   >
                     {saving && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
-                    {t(language, 'Speichern', 'Save', 'Guardar')}
+                    {t(language, tx({ de: "Speichern", en: "Save", es: "Guardar" }), 'Save', 'Guardar')}
                   </Button>
                 </div>
               </div>

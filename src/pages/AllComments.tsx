@@ -107,7 +107,7 @@ const AllComments = () => {
         // Create default project
         const { data: newProject, error } = await supabase
           .from("projects")
-          .insert({ name: "Standard Projekt", user_id: user.id })
+          .insert({ name: tx({ de: "Standard Projekt", en: "Default Project", es: "Proyecto predeterminado" }), user_id: user.id })
           .select("id")
           .single();
 

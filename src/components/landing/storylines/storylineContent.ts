@@ -515,8 +515,8 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       kind: "cinematic",
       imageSrc: voiceS1,
       copy: S(
-        ["Stimme klonen", "Clone a voice", "Clonar una voz"],
-        ["Deine Stimme. Als Asset.", "Your voice. As an asset.", "Tu voz. Como asset."],
+        [tx({ de: "Stimme klonen", en: "Clone a voice", es: "Clonar una voz" }), "Clone a voice", "Clonar una voz"],
+        [tx({ de: "Deine Stimme. Als Asset.", en: "Your voice. As an asset.", es: "Tu voz. Como asset." }), "Your voice. As an asset.", "Tu voz. Como asset."],
         [
           tx({ de: "Nimm 60 Sekunden auf — Voice Studio klont Timbre, Sprechrhythmus und Akzent. Ab dann kannst du beliebige Skripte in deiner Stimme sprechen lassen.", en: "Record 60 seconds — Voice Studio clones timbre, speech rhythm, and accent. From then on, you can have any script spoken in your voice.", es: "Graba 60 segundos — Voice Studio clona el timbre, el ritmo del habla y el acento. A partir de entonces, puedes hacer que cualquier guion se hable con tu voz." }),
           "Record 60 seconds — Voice Studio clones timbre, rhythm and accent. From then on any script can speak in your voice.",
@@ -567,7 +567,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       kind: "ui",
       UIComponent: VoiceLibraryVisual,
       copy: S(
-        ["Meine Stimmen", "My voices", "Mis voces"],
+        [tx({ de: "Meine Stimmen", en: "My voices", es: "Mis voces" }), "My voices", "Mis voces"],
         [tx({ de: "Alle Stimmen an einem Ort.", en: "All voices in one place.", es: "Todas las voces en un solo lugar." }), "All voices in one place.", "Todas las voces en un lugar."],
         [
           tx({ de: "Persönlich geklont oder aus der ElevenLabs-Library gewählt — deine Stimmen sind zentral abgelegt und in Motion, AI-Video und Music sofort abrufbar.", en: "Cloned personally or chosen from the ElevenLabs library — your voices are centrally stored and instantly available in Motion, AI-Video, and Music.", es: "Clonadas personalmente o elegidas de la biblioteca de ElevenLabs — tus voces se almacenan centralmente y están disponibles al instante en Motion, AI-Video y Music." }),
@@ -683,7 +683,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       durationMs: 5000,
       copy: S(
         ["Founders · 01", "Founders · 01", "Founders · 01"],
-        ["Nur 1 000 Founder-Plätze.", "Only 1,000 founder seats.", "Solo 1.000 plazas de founder."],
+        [tx({ de: "Nur 1 000 Founder-Plätze.", en: "Only 1,000 founder seats.", es: "Solo 1.000 plazas de founder." }), "Only 1,000 founder seats.", "Solo 1.000 plazas de founder."],
         [
           tx({ de: "Die ersten 1 000 Founders sichern sich exklusive Konditionen. Jeder Slot ist gezählt — wenn er weg ist, ist er weg.", en: "The first 1,000 Founders secure exclusive conditions. Each slot is counted — once it's gone, it's gone.", es: "Los primeros 1.000 Founders aseguran condiciones exclusivas. Cada plaza está contada — una vez que se agota, se agota." }),
           "The first 1,000 founders lock in exclusive terms. Every seat is counted — once it's gone, it's gone.",

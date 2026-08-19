@@ -422,7 +422,7 @@ export function UniversalVideoWizard() {
     if (!validation.valid) {
       console.warn('[UniversalVideoWizard] Consultation result validation failed:', validation.errors);
       result.storytellingStructure = result.storytellingStructure || 'problem-solution';
-      result.productDescription = result.productDescription || result.productName || 'Video-Projekt';
+      result.productDescription = result.productDescription || result.productName || tx({ de: "Video-Projekt", en: "Video Project", es: "Proyecto de Video" });
     }
 
     if (moodConfig) {

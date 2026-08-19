@@ -34,7 +34,7 @@ export const CampaignPostPreview = ({
     return (
       <div className="p-6 text-center text-muted-foreground text-sm border border-dashed border-white/20 rounded-xl">
         <VideoIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
-        <p>{tx({ de: `Vorschau für ${platforms.join(", ")} nicht verfügbar`, en: `Preview for ${platforms.join(", ")} not available`, es: `Vista previa para ${platforms.join(", ")} no disponible` })}</p>
+        <p>{tx({ de: `Vorschau für ${platforms.join(", tx({ de: ")} nicht verfügbar`, en: `Preview for ${platforms.join(", en: "Preview for ${platforms.join(\", \")} not available", es: "Vista previa para ${platforms.join(\", \")} no disponible" }), ")} not available`, es: `Vista previa para ${platforms.join(", ")} no disponible` })}</p>
       </div>
     );
   }

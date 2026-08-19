@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useMemo, useRef, useState } from 'react';
 import JSZip from 'jszip';
 import { Card } from '@/components/ui/card';
@@ -11,7 +12,6 @@ import {
   BookOpen, ChevronDown, ChevronUp, Download, FileUp, Loader2, Plus, Sparkles, Trash2, Wand2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { tx } from '@/lib/i18nText';
 import { useAudiobookProject } from '@/hooks/useAudiobookProject';
 import { AudiobookCastPanel } from './AudiobookCastPanel';
 import {
@@ -174,7 +174,7 @@ export function AudiobookPanel() {
           <Textarea
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
-            placeholder={'Text einfügen…\n\nÜberschriften („Kapitel 1{tx({ de: " oder „# Titel", en: "or “#Title", es: "o “#Título" })}) werden automatisch als Kapitel erkannt.'}
+            placeholder={tx({ de: "Text einfügen…\\n\\nÜberschriften („Kapitel 1{tx({ de: \" oder „# Titel\", en: \"or “#Title\", es: \"o “#Título\" })}) werden automatisch als Kapitel erkannt.", en: "Insert text…\n\nHeadings (“Chapter 1” or “# Title”) are automatically recognized as chapters.", es: "Insertar texto…\n\nLos encabezados (“Capítulo 1” o “# Título”) se reconocen automáticamente como capítulos." })}
             className="min-h-[180px] text-sm bg-background/40"
           />
           <div className="flex gap-2 flex-wrap">

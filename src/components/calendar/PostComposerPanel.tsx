@@ -237,7 +237,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
     const h = Math.floor(mins / 60);
     const m = mins % 60;
     toast.success(
-      tx({ de: `🚀 Eingeplant — wird in ${h > 0 ? `${h}h ` : ""}${m}min automatisch veröffentlicht`, en: `🚀 Scheduled — will be published automatically in ${h > 0 ? `${h}h ` : ""}${m}min`, es: `🚀 Programado — se publicará automáticamente en ${h > 0 ? `${h}h ` : ""}${m}min` }),
+      tx({ de: `🚀 Eingeplant — wird in ${h > 0 ? `${h}h ` : "tx({ de: "}${m}min automatisch veröffentlicht`, en: `🚀 Scheduled — will be published automatically in ${h > 0 ? `${h}h ` : ", en: "🚀 Scheduled — will be published automatically in ${h > 0 ? `${h}h ` : \"\"}${m}min", es: "🚀 Programado — se publicará automáticamente en ${h > 0 ? `${h}h ` : \"\"}${m}min" })"}${m}min`, es: `🚀 Programado — se publicará automáticamente en ${h > 0 ? `${h}h ` : ""}${m}min` }),
     );
     setAutoPublish(true);
   };

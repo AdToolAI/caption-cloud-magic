@@ -54,7 +54,7 @@ export default function PhotoBrowser() {
 
   async function toggleFavorite(img: StockImage) {
     if (!user) {
-      toast({ title: 'Login nötig', description: tx({ de: 'Bitte einloggen, um zu speichern.', en: 'Please log in to save.', es: 'Por favor, inicia sesión para guardar.' }) });
+      toast({ title: tx({ de: "Login nötig", en: "Login required", es: "Inicio de sesión requerido" }), description: tx({ de: 'Bitte einloggen, um zu speichern.', en: 'Please log in to save.', es: 'Por favor, inicia sesión para guardar.' }) });
       return;
     }
     const key = `${img.source}-${img.id}`;
@@ -98,7 +98,7 @@ export default function PhotoBrowser() {
     }
     setFavorites(new Set([...favorites, key]));
     quota.refresh();
-    toast({ title: 'Zur Library hinzugefügt', description: tx({ de: 'Lizenz-Zertifikat kann jetzt erzeugt werden.', en: 'License certificate can now be generated.', es: 'Ahora se puede generar el certificado de licencia.' }) });
+    toast({ title: tx({ de: "Zur Library hinzugefügt", en: "Added to Library", es: "Añadido a la biblioteca" }), description: tx({ de: 'Lizenz-Zertifikat kann jetzt erzeugt werden.', en: 'License certificate can now be generated.', es: 'Ahora se puede generar el certificado de licencia.' }) });
   }
 
   function useInPictureStudio(img: StockImage) {

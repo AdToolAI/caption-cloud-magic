@@ -10,7 +10,7 @@ import { DEFAULT_OVERLAY_BOX } from './overlayModel';
 export interface OverlayPreset {
   id: string;
   name: string;
-  category: 'Lower Third' | 'Banner' | 'Störer' | 'Schild' | 'CTA' | 'Ticker' | 'Marke' | 'Callout' | 'Zitat' | 'Info' | 'Text';
+  category: 'Lower Third' | 'Banner' | tx({ de: "Störer", en: "Disruptor", es: "Interrupción" }) | 'Schild' | 'CTA' | 'Ticker' | 'Marke' | 'Callout' | 'Zitat' | 'Info' | 'Text';
   description: string;
   kind: OverlayKind;
   build: () => Omit<TextOverlay, 'id' | 'startTime' | 'endTime'>;

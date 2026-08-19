@@ -228,7 +228,7 @@ export default function SnippetBuilderDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            {isEdit ? tx({ de: "Snippet bearbeiten", en: "Edit snippet", es: "Editar fragmento" }) : 'Neues Snippet'}
+            {isEdit ? tx({ de: "Snippet bearbeiten", en: "Edit snippet", es: "Editar fragmento" }) : tx({ de: "Neues Snippet", en: "New Snippet", es: "Nuevo fragmento" })}
           </DialogTitle>
           <DialogDescription>
             {tx({ de: "Speichere wiederverwendbare Szenen-Bausteine — optional teilbar mit der Community.", en: "Save reusable scene building blocks — optionally shareable with the community.", es: "Guarda bloques de construcción de escenas reutilizables — opcionalmente compartibles con la comunidad." })}

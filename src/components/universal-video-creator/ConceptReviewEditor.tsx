@@ -145,7 +145,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
         </div>
         <div className="flex-1">
           <h3 className="font-heading text-lg font-bold bg-gradient-to-r from-gold to-amber-300 bg-clip-text text-transparent">
-            {t('uvc.reviewTitle') !== 'uvc.reviewTitle' ? t('uvc.reviewTitle') : 'Konzept prüfen & anpassen'}
+            {t('uvc.reviewTitle') !== 'uvc.reviewTitle' ? t('uvc.reviewTitle') : tx({ de: "Konzept prüfen & anpassen", en: "Review & Adjust Concept", es: "Revisar y ajustar concepto" })}
           </h3>
           <p className="text-xs text-muted-foreground/70">
             {t('uvc.reviewSubtitle') !== 'uvc.reviewSubtitle' ? t('uvc.reviewSubtitle') : tx({ de: 'Überprüfe die gesammelten Informationen und passe sie bei Bedarf an.', en: 'Review the information you\'ve collected and adjust if necessary.', es: 'Revise la información que ha recopilado y ajústela si es necesario.' })}
@@ -289,7 +289,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
         </CollapsibleSection>
 
         {/* Audio */}
-        <CollapsibleSection icon={<Music className="h-4 w-4" />} title={t('uvc.reviewAudio') !== 'uvc.reviewAudio' ? t('uvc.reviewAudio') as string : 'Audio & Stimme'}>
+        <CollapsibleSection icon={<Music className="h-4 w-4" />} title={t('uvc.reviewAudio') !== 'uvc.reviewAudio' ? t('uvc.reviewAudio') as string : tx({ de: "Audio & Stimme", en: "Audio & Voice", es: "Audio y Voz" })}>
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <FieldLabel>{tx({ de: "Stimme", en: "Voice", es: "Voz" })}</FieldLabel>

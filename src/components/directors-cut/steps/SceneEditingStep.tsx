@@ -669,7 +669,7 @@ export function SceneEditingStep({
     
     toast({
       title: tx({ de: "Medien hinzugefügt", en: "Media added", es: "Medios añadidos" }),
-      description: tx({ de: `${media.type === 'video' ? 'Video' : 'Bild'} wurde als neue Szene hinzugefügt`, en: `${media.type === 'video' ? 'Video' : 'Image'} added as new scene`, es: `${media.type === 'video' ? 'Video' : 'Imagen'} añadida como nueva escena` }),
+      description: tx({ de: `${media.type === 'video' ? 'Video' : tx({ de: "Bild", en: "Image", es: "Imagen" })} wurde als neue Szene hinzugefügt`, en: `${media.type === 'video' ? 'Video' : 'Image'} added as new scene`, es: `${media.type === 'video' ? 'Video' : 'Imagen'} añadida como nueva escena` }),
     });
   }, [scenes, onScenesUpdate, toast]);
 

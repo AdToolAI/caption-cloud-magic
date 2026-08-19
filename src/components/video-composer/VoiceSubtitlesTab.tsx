@@ -61,7 +61,7 @@ interface VoiceSubtitlesTabProps {
   projectId?: string | null;
 }
 
-const FONT_FAMILIES = ['Inter', 'Roboto', 'Montserrat', 'Poppins', 'Bebas Neue', 'Playfair Display'];
+const FONT_FAMILIES = ['Inter', 'Roboto', 'Montserrat', 'Poppins', tx({ de: "Bebas Neue", en: "Bebas Neue", es: "Bebas Neue" }), 'Playfair Display'];
 
 const formatTimeShort = (s: number) => {
   if (!isFinite(s) || s < 0) s = 0;
