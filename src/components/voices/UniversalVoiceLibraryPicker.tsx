@@ -20,7 +20,7 @@ import {
   voiceLanguageLabel,
 } from '@/lib/voice-languages';
 import {
-  VOICE_CATEGORIES,
+  getVoiceCategories,
   getVoiceCategory,
   pushRecentVoice,
   readRecentVoices,
@@ -267,7 +267,7 @@ export function UniversalVoiceLibraryPicker({
 
           {/* Kategorien */}
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
-            {VOICE_CATEGORIES.map((c) => {
+            {getVoiceCategories().map((c) => {
               const active = c.id === category;
               return (
                 <button
