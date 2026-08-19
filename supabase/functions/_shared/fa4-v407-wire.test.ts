@@ -352,6 +352,7 @@ Deno.test("F4: NOOP activation never depends on recomputed geometry or model", (
   // Fresh gate, in contrast, requires both geometry inputs.
   assertEquals(
     isV407FreshWireContract({
+      isRetry: false,
       isMultiSpeaker: true,
       payloadModel: "sync-3",
       retryVariant: "bbox-url-pro",
