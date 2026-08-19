@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,7 +7,6 @@ import { toast } from "@/hooks/use-toast";
 import { useTranslation } from "@/hooks/useTranslation";
 import { Upload, X, Image, Video, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { tx } from '@/lib/i18nText';
 
 interface PostMediaUploaderProps {
   mediaUrl?: string;

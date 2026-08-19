@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * AI Video Model Registry
  * --------------------------------------------------------------
@@ -14,7 +15,6 @@ import {
   Film, Volume2, Zap, Wand2, Eye, Camera, Video, Sparkles, TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 import type { VisualInputProfile } from '@/lib/composer/visualInputs/types';
 
 

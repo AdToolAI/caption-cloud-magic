@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useEffect, useState } from 'react';
 import {
   Drawer,
@@ -12,7 +13,6 @@ import { History, Loader2 } from 'lucide-react';
 import { useContinuityDrift, driftSeverity, type DriftHistoryEntry } from '@/hooks/useContinuityDrift';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { tx } from '@/lib/i18nText';
 
 interface Props {
   open: boolean;

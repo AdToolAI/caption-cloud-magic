@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * QuotaBanner — Creator-Library plan/quota indicator.
  * Shows "Inklusive" for paid plans, monthly-counter for Free.
@@ -7,7 +8,6 @@ import { Sparkles, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useDownloadQuota } from '@/hooks/useDownloadQuota';
-import { tx } from '@/lib/i18nText';
 
 export default function QuotaBanner() {
   const q = useDownloadQuota();

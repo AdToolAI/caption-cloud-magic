@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { motion } from 'framer-motion';
 import { 
   Building2, ShoppingBag, BookOpen, Wand2,
@@ -8,7 +9,6 @@ import { type VideoCategory } from '@/types/universal-video-creator';
 import { ALL_CATEGORY_INTERVIEWS } from '@/config/universal-video-interviews';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLocalizedVideoCategories } from '@/hooks/useLocalizedVideoCategories';
-import { tx } from '@/lib/i18nText';
 
 interface CategorySelectorProps {
   selectedCategory: VideoCategory | null;

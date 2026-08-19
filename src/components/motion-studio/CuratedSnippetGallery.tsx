@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Sparkles, Clock, Tag, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import {
-import { tx } from '@/lib/i18nText';
   SCENE_SNIPPET_CATEGORIES,
   type SceneSnippet,
   type SceneSnippetCategory,

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,7 +8,6 @@ import { Play, Volume2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { AdvancedVoiceSettings, VoiceSettings } from './AdvancedVoiceSettings';
-import { tx } from '@/lib/i18nText';
 
 interface VoiceOverEditorProps {
   voiceStyle: string;

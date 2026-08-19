@@ -1,8 +1,8 @@
+import { tx } from '@/lib/i18nText';
 import { Card } from '@/components/ui/card';
 import { Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { tx } from '@/lib/i18nText';
 
 export default function VideoManagement() {
   const navigate = useNavigate();

@@ -1,7 +1,7 @@
+import { tx } from '@/lib/i18nText';
 import type { ComponentType } from "react";
 import type { Language } from "@/lib/translations";
 import {
-import { tx } from '@/lib/i18nText';
   HeatmapBuildVisual,
   SlotAutoPickVisual,
   ChannelMatrixVisual,

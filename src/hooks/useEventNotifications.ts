@@ -1,8 +1,8 @@
+import { tx } from '@/lib/i18nText';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getEventTranslation } from '@/lib/eventTranslations';
-import { tx } from '@/lib/i18nText';
 
 interface NotificationEvent {
   id: string;

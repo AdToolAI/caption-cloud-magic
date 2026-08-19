@@ -1,8 +1,8 @@
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Video } from 'lucide-react';
 import { VideoCreatorDialog } from './VideoCreatorDialog';
-import { tx } from '@/lib/i18nText';
 
 interface VideoCreatorButtonProps {
   onVideoCreated?: (videoUrl: string) => void;

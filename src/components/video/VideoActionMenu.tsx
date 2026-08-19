@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { MoreVertical, Download, Share2, Trash2, Eye, Edit } from 'lucide-react';
@@ -7,7 +8,6 @@ import { VideoPreviewPlayer } from './VideoPreviewPlayer';
 import { VideoShareDialog } from './VideoShareDialog';
 import { VideoEditorDialog } from './VideoEditorDialog';
 import type { VideoCreation } from '@/types/video';
-import { tx } from '@/lib/i18nText';
 
 interface VideoActionMenuProps {
   video: VideoCreation;

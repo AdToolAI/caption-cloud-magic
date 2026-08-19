@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,6 @@ import { useVideoVariants } from '@/hooks/useVideoVariants';
 import { Download, Trash2, Plus, Video, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FORMAT_PROFILES, ASPECT_RATIO_PROFILES, COMPRESSION_PROFILES } from '@/lib/compression-profiles';
-import { tx } from '@/lib/i18nText';
 
 interface VariantManagerProps {
   videoCreationId: string;

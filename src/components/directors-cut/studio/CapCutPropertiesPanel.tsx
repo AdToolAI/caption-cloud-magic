@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import React, { useMemo } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AudioTrack, AudioClip, SubtitleClip, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
@@ -10,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Volume2, Clock, Scissors, Music, MessageSquare, Trash2, Type, AlignVerticalJustifyCenter, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SceneTrimInspector } from './SceneTrimInspector';
-import { tx } from '@/lib/i18nText';
 
 interface CapCutPropertiesPanelProps {
   selectedClip: AudioClip | undefined;

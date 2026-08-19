@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
@@ -5,7 +6,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 
 interface ApprovalTimelineProps {
   event_id: string;

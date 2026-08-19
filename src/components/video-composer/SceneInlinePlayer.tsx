@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * SceneInlinePlayer — Stage 18: 16:9 mini-player tile for a single scene.
  *
@@ -14,7 +15,6 @@
  * Selection styling (gold border + glow) is controlled by `isActive`.
  */
 import { useEffect, useRef, useState } from 'react';
-import { tx } from '@/lib/i18nText';
 import { presentSceneError } from '@/lib/composer/errors/sceneErrorPresenter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, RefreshCw, Sparkles, ImageIcon, Loader2, AlertTriangle } from 'lucide-react';

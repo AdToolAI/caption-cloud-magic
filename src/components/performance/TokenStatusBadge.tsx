@@ -1,6 +1,6 @@
+import { tx } from '@/lib/i18nText';
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, AlertCircle, XCircle } from "lucide-react";
-import { tx } from '@/lib/i18nText';
 
 interface TokenStatusBadgeProps {
   lastSyncAt: string | null;

@@ -1,8 +1,8 @@
+import { tx } from '@/lib/i18nText';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, type LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { tx } from '@/lib/i18nText';
 
 export interface ProviderCardProps {
   name: string;

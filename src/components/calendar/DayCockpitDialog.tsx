@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * Day Cockpit Dialog
  * A single immersive "mission briefing" surface that unites the Quick Schedule
@@ -17,7 +18,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
 import { ScheduleQuickForm } from './ScheduleQuickForm';
 import heroImg from '@/assets/day-cockpit-hero.jpg';
-import { tx } from '@/lib/i18nText';
 
 interface DayCockpitDialogProps {
   open: boolean;

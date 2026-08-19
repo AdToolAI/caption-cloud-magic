@@ -1,6 +1,6 @@
+import { tx } from '@/lib/i18nText';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
-import { tx } from '@/lib/i18nText';
 
 interface CommentChartsProps {
   timeseries: { byDay: Array<{ date: string; pos: number; neu: number; neg: number }> };

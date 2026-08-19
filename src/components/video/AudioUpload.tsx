@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useCallback } from 'react';
 import { Upload, X, Music, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,6 @@ import { Progress } from '@/components/ui/progress';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { tx } from '@/lib/i18nText';
 
 interface AudioUploadProps {
   value: { url: string; volume: number } | null;

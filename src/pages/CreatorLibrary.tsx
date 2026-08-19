@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * CreatorLibrary — Unified asset-bundle hub.
  *
@@ -19,7 +20,6 @@ import VideoBrowser from '@/components/creator-library/VideoBrowser';
 import SfxBrowser from '@/components/creator-library/SfxBrowser';
 import MusicBrowser from '@/components/creator-library/MusicBrowser';
 import { useSearchParams } from 'react-router-dom';
-import { tx } from '@/lib/i18nText';
 
 const TABS = [
   { id: 'videos', label: 'Videos', icon: Film },

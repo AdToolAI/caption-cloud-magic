@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useEffect, useCallback } from 'react';
 import SceneStatusBadge from '@/components/video-composer/SceneStatusBadge';
 import { sceneState, clipStatusFromState, isSceneInFlight, legacyClipFailedEquivalentRow, legacyClipReadyEquivalentRow } from '@/lib/composer/sceneState';
@@ -11,7 +12,6 @@ import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Sear
 import { useFrameContinuity } from '@/hooks/useFrameContinuity';
 import { useSaveSceneToLibrary } from '@/hooks/useSaveSceneToLibrary';
 import { toast } from '@/hooks/use-toast';
-import { tx } from '@/lib/i18nText';
 import { beginIntentWrite, endIntentWrite } from '@/lib/video-composer/lipSyncIntentDraft';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { supabase } from '@/integrations/supabase/client';

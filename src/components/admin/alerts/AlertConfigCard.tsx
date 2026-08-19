@@ -1,6 +1,6 @@
+import { tx } from '@/lib/i18nText';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle2, Mail } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 
 const ADMIN_EMAIL = 'bestofproducts4u@gmail.com';
 

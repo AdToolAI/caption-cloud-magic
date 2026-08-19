@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SystemMonitor } from '@/components/admin/SystemMonitor';
 import { ConversionFunnel } from '@/components/admin/ConversionFunnel';
@@ -18,7 +19,6 @@ import { RenderLoadWidget } from '@/components/admin/RenderLoadWidget';
 import { LaunchRadarCard } from '@/components/admin/LaunchRadarCard';
 
 import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, Bot, Server, Film, Store, Sparkles, Zap } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 
 export default function Admin() {
   return (

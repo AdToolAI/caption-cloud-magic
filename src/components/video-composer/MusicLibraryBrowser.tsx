@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -10,7 +11,6 @@ import { Loader2, Pause, Play, Search, Star, Music as MusicIcon, Wand2, Library,
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/useTranslation';
-import { tx } from '@/lib/i18nText';
 
 export type LibraryAssetType = 'music' | 'sfx' | 'voice';
 

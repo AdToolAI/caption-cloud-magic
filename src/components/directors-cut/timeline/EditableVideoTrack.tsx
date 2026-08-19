@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -6,7 +7,6 @@ import { cn } from '@/lib/utils';
 import { SceneAnalysis } from '@/types/directors-cut';
 import { Button } from '@/components/ui/button';
 import {
-import { tx } from '@/lib/i18nText';
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,

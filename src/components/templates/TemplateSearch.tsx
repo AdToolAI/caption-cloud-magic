@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,6 @@ import {
 } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { tx } from '@/lib/i18nText';
 
 export interface SearchFilters {
   query: string;

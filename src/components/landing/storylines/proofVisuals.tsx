@@ -1,6 +1,6 @@
+import { tx } from '@/lib/i18nText';
 import { motion } from "framer-motion";
 import { Zap, Route, Shield, Coins, Timer, Layers, Users, Lock, Calendar, Percent, TrendingDown, Sparkles } from "lucide-react";
-import { tx } from '@/lib/i18nText';
 
 const Frame = ({ children, label }: { children: React.ReactNode; label?: string }) => (
   <div className="relative w-full h-full rounded-xl border border-primary/25 bg-gradient-to-br from-background/80 via-background/60 to-background/80 backdrop-blur-md overflow-hidden">

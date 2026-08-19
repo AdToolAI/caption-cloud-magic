@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,6 @@ import { SlideRenderer } from "./SlideRenderer";
 import { DESIGN_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/post-design/templates";
 import type { PostDesign } from "@/lib/post-design/schema";
 import { cn } from "@/lib/utils";
-import { tx } from '@/lib/i18nText';
 
 interface TemplateGalleryProps {
   open: boolean;

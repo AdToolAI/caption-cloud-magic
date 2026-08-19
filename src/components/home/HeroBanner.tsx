@@ -1,10 +1,10 @@
+import { tx } from '@/lib/i18nText';
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Calendar, TrendingUp, Link2, ArrowRight, Shield, Check, Sparkles } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useRef } from "react";
-import { tx } from '@/lib/i18nText';
 
 // Particle component for background effect
 const FloatingParticle = ({ delay, duration, x, y }: { delay: number; duration: number; x: number; y: number }) => (

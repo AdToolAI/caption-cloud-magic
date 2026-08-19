@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,6 @@ import { Save, X, Plus, Settings as SettingsIcon, Target } from 'lucide-react';
 import { useUpsertAutopilotBrief, type AutopilotBrief } from '@/hooks/useAutopilot';
 import { AutopilotGoalBriefingStep, type GoalBriefingValue } from './AutopilotGoalBriefingStep';
 import { useTx } from '@/lib/i18nText';
-import { tx } from '@/lib/i18nText';
 
 interface Props {
   brief: AutopilotBrief | null | undefined;

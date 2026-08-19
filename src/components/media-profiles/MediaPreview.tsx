@@ -1,7 +1,7 @@
+import { tx } from '@/lib/i18nText';
 import { MediaProfileConfig } from '@/lib/mediaProfileSchema';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { tx } from '@/lib/i18nText';
 
 interface MediaPreviewProps {
   config: MediaProfileConfig | null;

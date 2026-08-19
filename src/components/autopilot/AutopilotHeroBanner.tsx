@@ -1,8 +1,8 @@
+import { tx } from '@/lib/i18nText';
 import { Link } from 'react-router-dom';
 import { Sparkles, ArrowRight, Bot, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { tx } from '@/lib/i18nText';
 
 /**
  * Dashboard-Banner für den KI-Autopilot. Aktuell im "Coming Soon"-Modus —

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,6 @@ import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { useAuth } from "@/hooks/useAuth";
-import { tx } from '@/lib/i18nText';
 
 interface MultiBrandManagerProps {
   brandKits: any[];

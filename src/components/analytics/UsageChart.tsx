@@ -1,7 +1,7 @@
+import { tx } from '@/lib/i18nText';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { TrendingUp } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 
 interface UsageChartProps {
   data: Array<{

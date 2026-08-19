@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { motion } from "framer-motion";
@@ -6,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
 import { SithCommandDeck } from "./SithCommandDeck";
 import { FoundersBenefitsDialog } from "./FoundersBenefitsDialog";
-import { tx } from '@/lib/i18nText';
 
 export const BlackTieHero = () => {
   const { t } = useTranslation();

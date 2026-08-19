@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
@@ -25,7 +26,6 @@ import { RoleManager } from "@/components/team/RoleManager";
 import { EnterpriseUpgradePrompt } from "@/components/team/EnterpriseUpgradePrompt";
 import { EnterpriseSeatManager } from "@/components/team/EnterpriseSeatManager";
 import { cn } from "@/lib/utils";
-import { tx } from '@/lib/i18nText';
 
 /* ---------- Helpers ---------- */
 

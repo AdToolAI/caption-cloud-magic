@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 import { Play, ChevronLeft, ChevronRight, Video, Sparkles, Expand, Volume2, VolumeX, LucideIcon, Lightbulb, Infinity as InfinityIcon, Clock, CalendarPlus, CalendarDays, Edit3 } from 'lucide-react';
@@ -15,7 +16,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { DEMO_VIDEO, isDemoVideo } from '@/constants/demo-video';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AutopilotHeroBanner } from '@/components/autopilot/AutopilotHeroBanner';
-import { tx } from '@/lib/i18nText';
 
 interface QuickAction {
   label: string;

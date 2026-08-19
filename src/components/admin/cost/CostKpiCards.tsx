@@ -1,7 +1,7 @@
+import { tx } from '@/lib/i18nText';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Cloud, Sparkles, Server, TrendingUp } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
-import { tx } from '@/lib/i18nText';
 
 interface Summary {
   cloud_cost_usd: number;

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Player, PlayerRef } from '@remotion/player';
 import { UniversalVideo } from '@/remotion/templates/UniversalVideo';
@@ -5,7 +6,6 @@ import { UniversalCreatorVideo } from '@/remotion/templates/UniversalCreatorVide
 import { Volume2, VolumeX, Play, Pause, Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clampAudioVolume } from '@/lib/audioVolume';
-import { tx } from '@/lib/i18nText';
 
 const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   UniversalVideo,

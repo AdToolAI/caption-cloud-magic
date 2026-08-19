@@ -1,6 +1,6 @@
+import { tx } from '@/lib/i18nText';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 
 /**
  * CreditUsageDashboard — Beta 2026 Placeholder.

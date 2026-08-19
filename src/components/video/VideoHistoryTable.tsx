@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -8,7 +9,6 @@ import { VersionAnalytics } from './VersionAnalytics';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { History, ChevronDown, ChevronRight, BarChart3 } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 
 interface VideoHistoryTableProps {
   videos: any[];

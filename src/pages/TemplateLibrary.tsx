@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +25,6 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { tx } from '@/lib/i18nText';
 
 export default function TemplateLibrary() {
   const navigate = useNavigate();

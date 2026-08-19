@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -27,7 +28,6 @@ import {
   type VoiceCategoryId,
 } from '@/lib/voice-categories';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
-import { tx } from '@/lib/i18nText';
 
 interface UniversalVoiceLibraryPickerProps {
   open: boolean;

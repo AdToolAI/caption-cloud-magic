@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +13,6 @@ import {
   MoreVertical
 } from 'lucide-react';
 import {
-import { tx } from '@/lib/i18nText';
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,

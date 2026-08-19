@@ -1,9 +1,9 @@
+import { tx } from '@/lib/i18nText';
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRenderQueue } from '@/hooks/useRenderQueue';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { TrendingUp } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 
 export const QueueStatsChart = () => {
   const { getQueueStats } = useRenderQueue();

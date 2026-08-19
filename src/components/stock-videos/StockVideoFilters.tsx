@@ -1,8 +1,8 @@
+import { tx } from '@/lib/i18nText';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { StockVideoFilters } from "@/hooks/useStockVideoSearch";
-import { tx } from '@/lib/i18nText';
 
 interface FiltersProps {
   filters: StockVideoFilters;

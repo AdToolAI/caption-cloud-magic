@@ -1,8 +1,8 @@
+import { tx } from '@/lib/i18nText';
 import { useMemo } from "react";
 import { Joyride, EVENTS, STATUS, type Step, type EventData } from "react-joyride";
 import { useProductTour } from "@/hooks/useProductTour";
 import { useTranslation } from "@/hooks/useTranslation";
-import { tx } from '@/lib/i18nText';
 
 const tourCopy: Record<
   string,

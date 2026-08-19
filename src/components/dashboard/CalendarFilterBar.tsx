@@ -1,8 +1,8 @@
+import { tx } from '@/lib/i18nText';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "lucide-react";
-import { tx } from '@/lib/i18nText';
 
 interface CalendarFilterBarProps {
   timeRange: string;

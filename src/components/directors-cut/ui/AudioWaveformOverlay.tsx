@@ -1,7 +1,7 @@
+import { tx } from '@/lib/i18nText';
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Volume2 } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 
 interface AudioWaveformOverlayProps {
   videoUrl: string;

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useCallback, useRef, useState } from 'react';
 import { Upload, X, Film, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,6 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { tx } from '@/lib/i18nText';
 
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200 MB
 const ACCEPTED_VIDEO = ['video/mp4', 'video/quicktime', 'video/webm'];

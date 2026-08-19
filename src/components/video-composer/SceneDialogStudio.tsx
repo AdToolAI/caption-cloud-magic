@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * SceneDialogStudio — Inline per-scene "screenplay" editor.
  *
@@ -69,7 +70,6 @@ import {
 } from '@/lib/shotDirector/spawnCoverageScenes';
 import type { ShotSelection } from '@/config/shotDirector';
 import { Sparkles as SparklesIcon, Play, Clapperboard } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 import { isSceneInFlight, sceneState } from '@/lib/composer/sceneState';
 import {
   clampDialogMasterDuration,

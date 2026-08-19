@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Music, Zap, Upload, Loader2, Scissors } from 'lucide-react';
@@ -10,7 +11,6 @@ import { WaveformDisplay } from '@/components/directors-cut/timeline/WaveformDis
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useTx } from '@/lib/i18nText';
-import { tx } from '@/lib/i18nText';
 
 interface Beat {
   time: number;

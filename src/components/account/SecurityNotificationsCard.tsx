@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -7,7 +8,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Bell, Loader2 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
-import { tx } from '@/lib/i18nText';
 
 export const SecurityNotificationsCard = () => {
   const { user } = useAuth();

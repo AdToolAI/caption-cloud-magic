@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 // Stage 4 — "Save as Character / Location" UI
 //
 // Drop-in dropdown menu used on any image (Frame-First variants, Picture
@@ -28,7 +29,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { tx } from '@/lib/i18nText';
 
 interface Props {
   imageUrl: string;

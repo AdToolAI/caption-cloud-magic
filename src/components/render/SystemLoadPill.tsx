@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * SystemLoadPill — compact live indicator of global render-queue load.
  *
@@ -9,7 +10,6 @@ import { useRenderSystemLoad } from '@/hooks/useRenderSystemLoad';
 import { useFounderStatus } from '@/hooks/useFounderStatus';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Activity, Crown } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 
 interface Props {
   className?: string;

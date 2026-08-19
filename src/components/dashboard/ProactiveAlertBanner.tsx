@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, X, ArrowRight, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,6 @@ import { useProactiveTips } from '@/hooks/useProactiveTips';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { tx } from '@/lib/i18nText';
 
 export function ProactiveAlertBanner() {
   const navigate = useNavigate();

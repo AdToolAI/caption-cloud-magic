@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,7 +7,6 @@ import { QueueJobCard } from './QueueJobCard';
 import { QueuePositionBadge } from './QueuePositionBadge';
 import { Loader2, ListOrdered } from 'lucide-react';
 import { PriorityBadge } from '@/components/video/QueuePrioritySelector';
-import { tx } from '@/lib/i18nText';
 
 export const RenderQueuePanel = () => {
   const { getQueueJobs } = useRenderQueue();

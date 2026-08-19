@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,6 @@ import {
   ChevronUp, ChevronDown, Scissors, Copy
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { tx } from '@/lib/i18nText';
 
 export interface TimelineTrack {
   id: string;

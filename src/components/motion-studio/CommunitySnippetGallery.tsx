@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useCallback, useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Heart, Loader2, Search, Copy, Sparkles } from 'lucide-react';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { SCENE_SNIPPET_CATEGORIES, type SceneSnippet } from '@/types/motion-studio';
-import { tx } from '@/lib/i18nText';
 
 interface Props {
   onUse: (snippet: SceneSnippet) => void;

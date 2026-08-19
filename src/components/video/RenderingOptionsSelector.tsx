@@ -1,9 +1,9 @@
+import { tx } from '@/lib/i18nText';
 import { Settings } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { tx } from '@/lib/i18nText';
 
 export interface RenderingOptions {
   quality: '720p' | '1080p' | '4k';

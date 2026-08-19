@@ -1,7 +1,7 @@
+import { tx } from '@/lib/i18nText';
 import { motion } from "framer-motion";
 import { Coins, ShoppingCart, Sparkles, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { tx } from '@/lib/i18nText';
 
 interface CreditsHeroHeaderProps {
   planName: string;

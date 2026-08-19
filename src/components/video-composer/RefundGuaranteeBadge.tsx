@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * RefundGuaranteeBadge — surface the existing automated refund safety
  * net to the user at the moment they commit credits. The refund logic
@@ -5,7 +6,6 @@
  * this badge just communicates it.
  */
 import { ShieldCheck } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 
 interface Props {
   /** Compact form for inline placement next to a total. */

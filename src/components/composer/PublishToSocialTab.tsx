@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -19,7 +20,6 @@ import { de } from 'date-fns/locale';
 import { es } from 'date-fns/locale';
 import { enUS } from 'date-fns/locale';
 import { useTranslation } from '@/hooks/useTranslation';
-import { tx } from '@/lib/i18nText';
 
 interface PublishToSocialTabProps {
   videoUrl: string;

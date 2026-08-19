@@ -1,6 +1,6 @@
+import { tx } from '@/lib/i18nText';
 import { motion } from 'framer-motion';
 import { Headphones, Sparkles, Zap } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 
 export function AudioStudioHeroHeader() {
   return (

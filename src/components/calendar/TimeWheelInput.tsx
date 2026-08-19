@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * TimeWheelInput — Cockpit-style time picker (Bond 2028 design)
  * - Big Playfair HH:MM display with gold glow
@@ -10,7 +11,6 @@ import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronUp, ChevronDown, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { tx } from '@/lib/i18nText';
 
 interface TimeWheelInputProps {
   value: string; // "HH:MM"

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,6 @@ import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { VoiceStudioDialog } from '@/components/voice/studio/VoiceStudioDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { tx } from '@/lib/i18nText';
 
 export function VoiceLibraryPanel() {
   const { voices, loading, deleteVoice, toggleVoiceActive } = useCustomVoices();

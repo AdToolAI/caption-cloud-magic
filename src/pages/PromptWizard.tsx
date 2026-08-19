@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -12,7 +13,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Copy, Sparkles, ArrowRight, Info, CheckCircle2, RefreshCw } from "lucide-react";
 import PromptWizardHeroHeader from "@/components/prompt-wizard/PromptWizardHeroHeader";
-import { tx } from '@/lib/i18nText';
 
 const PromptWizard = () => {
   const { t } = useTranslation();

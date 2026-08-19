@@ -1,8 +1,8 @@
+import { tx } from '@/lib/i18nText';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Pause, Volume1, Zap, Leaf, Quote, Sparkles } from 'lucide-react';
 import { RefObject } from 'react';
-import { tx } from '@/lib/i18nText';
 
 interface ScriptTagToolbarProps {
   textareaRef: RefObject<HTMLTextAreaElement>;

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * ConciergeTipHost — global bottom-left Concierge card.
  *
@@ -13,7 +14,6 @@ import { useCompanionCoach } from '@/hooks/useCompanionCoach';
 import { cn } from '@/lib/utils';
 import { ConciergeStage } from './ConciergeStage';
 import { PersonaSignature } from './PersonaSignature';
-import { tx } from '@/lib/i18nText';
 
 const ACCENT_CLASS: Record<string, string> = {
   gold: 'from-[#F5C76A]/45 via-[#F5C76A]/10 to-transparent border-[#F5C76A]/40',

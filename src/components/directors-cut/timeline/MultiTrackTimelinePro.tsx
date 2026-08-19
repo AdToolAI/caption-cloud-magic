@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useRef, useCallback } from 'react';
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
@@ -11,7 +12,6 @@ import { TimelineRuler } from './TimelineRuler';
 import { EditableVideoTrack } from './EditableVideoTrack';
 import { AudioTrackRow } from './AudioTrackRow';
 import { AudioClipComponent } from './AudioClipComponent';
-import { tx } from '@/lib/i18nText';
 
 interface MultiTrackTimelineProProps {
   scenes: SceneAnalysis[];

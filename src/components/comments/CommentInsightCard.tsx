@@ -1,8 +1,8 @@
+import { tx } from '@/lib/i18nText';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, AlertTriangle, Target } from "lucide-react";
-import { tx } from '@/lib/i18nText';
 
 interface CommentInsightCardProps {
   title: string;

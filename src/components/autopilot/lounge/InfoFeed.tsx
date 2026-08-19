@@ -1,9 +1,9 @@
+import { tx } from '@/lib/i18nText';
 /**
  * Info-Feed der Warte-Lounge — tagesaktuelle, auf die Brand gerankte Signale.
  * Quelle: Edge Function `autopilot-lounge-feed` (24 h Cache pro Brand-Kit).
  */
 
-import { tx } from '@/lib/i18nText';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, RefreshCw, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
