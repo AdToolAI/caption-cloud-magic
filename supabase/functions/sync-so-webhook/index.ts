@@ -1486,10 +1486,26 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
 
     return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments" });
+          },
+          { ttlSeconds: 30, maxAttempts: 4 },
+        );
+        return result;
       },
-      { ttlSeconds: 30, maxAttempts: 4 },
-    );
-    return __v5Result;
+    });
+    if (__v5PhaseRun.outcome !== "done") {
+      console.error(
+        `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} lock_phase_io_rounds_exhausted scene=${sceneId} ` +
+          `job=${jobId} last_request=${__v5PhaseRun.lastRequest?.kind ?? "none"} — no apply, no mux, no retry`,
+      );
+      return ok({
+        ok: true,
+        skipped: "lock_phase_io_rounds_exhausted",
+        scene_id: sceneId,
+        job_id: jobId,
+      });
+    }
+    return __v5PhaseRun.result;
+
   }
 
   // ── v70: legacy v4 per-turn chain removed ─────────────────────────────
