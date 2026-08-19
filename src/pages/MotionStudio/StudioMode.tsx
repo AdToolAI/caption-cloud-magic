@@ -1,4 +1,4 @@
-import { tx } from "@/lib/i18nText";
+import { tx, getLang } from "@/lib/i18nText";
 import { useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate } from 'react-router-dom';
@@ -174,7 +174,7 @@ export default function StudioMode() {
     try {
       const title =
         projectTitle.trim() ||
-        `Studio Mode · ${new Date().toLocaleDateString('de-DE')}`;
+        `Studio Mode · ${new Date().toLocaleDateString(getLang())}`;
 
       // v228: Resolve selected characters to canonical brand_character UUIDs.
       // `selectedCharacters` may include synthetic outfit/catalog mentions —
@@ -713,7 +713,7 @@ function StoryboardStep({
               <Library className="h-4 w-4" /> Snippets
             </Button>
             <Button variant="outline" onClick={addScene} className="gap-2">
-              <Plus className="h-4 w-4" /> Szene
+              <Plus className="h-4 w-4" /> {tx({ de: "Szene", en: "Scene", es: "Escena" })}
             </Button>
           </div>
         }
@@ -867,7 +867,7 @@ function RenderStep({
             <Input
               value={title}
               onChange={(e) => onTitleChange(e.target.value)}
-              placeholder={`Studio Mode · ${new Date().toLocaleDateString('de-DE')}`}
+              placeholder={`Studio Mode · ${new Date().toLocaleDateString(getLang())}`}
               className="bg-background/60"
             />
           </div>

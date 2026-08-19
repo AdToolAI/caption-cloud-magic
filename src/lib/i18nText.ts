@@ -24,13 +24,14 @@ export function getLang(): Language {
   } catch {
     /* localStorage unavailable (SSR / private mode) */
   }
-  return 'de';
+  // Canonical default is English — never German.
+  return 'en';
 }
 
 export function pickText<T>(lang: Language | string, text: TriTextOf<T>): T {
-  if (lang === 'en') return text.en;
+  if (lang === 'de') return text.de;
   if (lang === 'es') return text.es ?? text.en;
-  return text.de;
+  return text.en;
 }
 
 /** For hooks, lib modules and any non-component code. */

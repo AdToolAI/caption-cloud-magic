@@ -35,7 +35,14 @@ interface Props {
   onApply: (result: PromptHelperResult, chosenPrompt: string) => void;
 }
 
-const GOALS = ['Werbung', 'Social', 'Portrait', 'Szene', 'Produkt', 'Kunst'];
+const GOALS = [
+  tx({ de: 'Werbung', en: 'Advertising', es: 'Publicidad' }),
+  'Social',
+  tx({ de: 'Portrait', en: 'Portrait', es: 'Retrato' }),
+  tx({ de: 'Szene', en: 'Scene', es: 'Escena' }),
+  tx({ de: 'Produkt', en: 'Product', es: 'Producto' }),
+  tx({ de: 'Kunst', en: 'Art', es: 'Arte' }),
+];
 const STYLES = ['Fotorealistisch', 'Cinematisch', 'Illustration', '3D', 'Anime', 'Aquarell'];
 const MOODS = ['Episch', 'Ruhig', 'Dramatisch', 'Hell', 'Düster', 'Verspielt'];
 

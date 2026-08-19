@@ -66,9 +66,9 @@ export default function BatchVideoCreator() {
   }
 
   const steps = [
-    { title: 'CSV hochladen', description: 'Videodaten importieren' },
-    { title: 'Bestätigen', description: tx({ de: 'Details überprüfen', en: 'Check details', es: 'Consultar detalles' }) },
-    { title: 'Fortschritt', description: tx({ de: 'Videos werden erstellt', en: 'Videos are being created', es: 'Se están creando videos' }) }
+    { title: tx({ de: 'CSV hochladen', en: 'Upload CSV', es: 'Subir CSV' }), description: tx({ de: 'Videodaten importieren', en: 'Import video data', es: 'Importar datos de vídeo' }) },
+    { title: tx({ de: 'Bestätigen', en: 'Confirm', es: 'Confirmar' }), description: tx({ de: 'Details überprüfen', en: 'Check details', es: 'Consultar detalles' }) },
+    { title: tx({ de: 'Fortschritt', en: 'Progress', es: 'Progreso' }), description: tx({ de: 'Videos werden erstellt', en: 'Videos are being created', es: 'Se están creando videos' }) }
   ];
 
   return (

@@ -4,6 +4,8 @@
  * (use_case / gender / age / accent) — kein zusätzlicher Server-Endpunkt nötig.
  */
 
+import { tx } from '@/lib/i18nText';
+
 export type VoiceCategoryId =
   | 'all'
   | 'mine'
@@ -28,19 +30,23 @@ export interface VoiceCategory {
   facets: VoiceCategoryFacets;
 }
 
-export const VOICE_CATEGORIES: VoiceCategory[] = [
-  { id: 'all',        icon: '🎧', label: 'Alle Stimmen',        hint: 'Komplette Bibliothek',            facets: {} },
-  { id: 'mine',       icon: '⭐', label: 'Meine Stimmen',        hint: 'Eigene Voice-Clones',             facets: {} },
-  { id: 'ads',        icon: '📣', label: 'Werbung & Ads',        hint: 'Energisch, verkaufsstark',        facets: { use_case: ['advertisement', 'social_media'] } },
-  { id: 'narration',  icon: '🎙️', label: 'Erzähler & Hörbuch',   hint: 'Ruhig, tragfähig, lange Texte',   facets: { use_case: 'narrative_story' } },
-  { id: 'characters', icon: '🎭', label: 'Charaktere & Rollen',  hint: 'Dialog, Rollen, Lip-Sync',        facets: { use_case: 'characters_animation' } },
-  { id: 'news',       icon: '📰', label: 'Nachrichten & Seriös', hint: 'Klar, sachlich, vertrauenswürdig', facets: { use_case: 'informative_educational' } },
-  { id: 'young',      icon: '🧒', label: 'Jung & Frisch',        hint: 'Junge Sprecher:innen',            facets: { age: 'young' } },
-  { id: 'mature',     icon: '👔', label: 'Reif & Autoritär',     hint: 'Erfahrene, tiefe Stimmen',        facets: { age: 'old' } },
-];
+/** Localized at call time so a language switch re-renders with fresh labels. */
+export function getVoiceCategories(): VoiceCategory[] {
+  return [
+    { id: 'all',        icon: '🎧', label: tx({ de: 'Alle Stimmen', en: 'All voices', es: 'Todas las voces' }), hint: tx({ de: 'Komplette Bibliothek', en: 'Complete library', es: 'Biblioteca completa' }), facets: {} },
+    { id: 'mine',       icon: '⭐', label: tx({ de: 'Meine Stimmen', en: 'My voices', es: 'Mis voces' }), hint: tx({ de: 'Eigene Voice-Clones', en: 'Your own voice clones', es: 'Tus clones de voz' }), facets: {} },
+    { id: 'ads',        icon: '📣', label: tx({ de: 'Werbung & Ads', en: 'Ads & promos', es: 'Anuncios y promos' }), hint: tx({ de: 'Energisch, verkaufsstark', en: 'Energetic, sales-driven', es: 'Enérgicas, orientadas a ventas' }), facets: { use_case: ['advertisement', 'social_media'] } },
+    { id: 'narration',  icon: '🎙️', label: tx({ de: 'Erzähler & Hörbuch', en: 'Narration & audiobook', es: 'Narración y audiolibro' }), hint: tx({ de: 'Ruhig, tragfähig, lange Texte', en: 'Calm, steady, long-form', es: 'Calmadas, estables, textos largos' }), facets: { use_case: 'narrative_story' } },
+    { id: 'characters', icon: '🎭', label: tx({ de: 'Charaktere & Rollen', en: 'Characters & roles', es: 'Personajes y roles' }), hint: tx({ de: 'Dialog, Rollen, Lip-Sync', en: 'Dialogue, roles, lip-sync', es: 'Diálogo, roles, lip-sync' }), facets: { use_case: 'characters_animation' } },
+    { id: 'news',       icon: '📰', label: tx({ de: 'Nachrichten & Seriös', en: 'News & serious', es: 'Noticias y formal' }), hint: tx({ de: 'Klar, sachlich, vertrauenswürdig', en: 'Clear, factual, trustworthy', es: 'Claras, objetivas, fiables' }), facets: { use_case: 'informative_educational' } },
+    { id: 'young',      icon: '🧒', label: tx({ de: 'Jung & Frisch', en: 'Young & fresh', es: 'Jóvenes y frescas' }), hint: tx({ de: 'Junge Sprecher:innen', en: 'Young speakers', es: 'Locutores jóvenes' }), facets: { age: 'young' } },
+    { id: 'mature',     icon: '👔', label: tx({ de: 'Reif & Autoritär', en: 'Mature & authoritative', es: 'Maduras y con autoridad' }), hint: tx({ de: 'Erfahrene, tiefe Stimmen', en: 'Experienced, deep voices', es: 'Voces experimentadas y graves' }), facets: { age: 'old' } },
+  ];
+}
 
 export function getVoiceCategory(id?: VoiceCategoryId | null): VoiceCategory {
-  return VOICE_CATEGORIES.find((c) => c.id === id) ?? VOICE_CATEGORIES[0];
+  const cats = getVoiceCategories();
+  return cats.find((c) => c.id === id) ?? cats[0];
 }
 
 /* ── „Zuletzt verwendet" ─────────────────────────────────────── */

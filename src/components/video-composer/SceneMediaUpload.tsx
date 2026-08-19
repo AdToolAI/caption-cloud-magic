@@ -163,7 +163,7 @@ export default function SceneMediaUpload({
 
   return (
     <div className="space-y-1">
-      <span className="text-[10px] text-muted-foreground">Eigenes Video hochladen</span>
+      <span className="text-[10px] text-muted-foreground">{tx({ de: "Eigenes Video hochladen", en: "Upload your own video", es: "Sube tu propio vídeo" })}</span>
       <div
         onDrop={handleDrop}
         onDragOver={(e) => {

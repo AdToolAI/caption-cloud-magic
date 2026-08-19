@@ -1345,7 +1345,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                   <div className="flex-1 min-w-0 flex flex-col justify-between overflow-hidden">
                     <div className="min-w-0 overflow-hidden">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-xs font-medium">Szene {i + 1}</span>
+                        <span className="text-xs font-medium">{tx({ de: "Szene", en: "Scene", es: "Escena" })} {i + 1}</span>
                         <Badge variant="secondary" className="text-[10px]">
                           {SCENE_TYPE_LABELS[scene.sceneType]?.de}
                         </Badge>

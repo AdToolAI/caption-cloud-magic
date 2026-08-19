@@ -20157,12 +20157,12 @@ Object.assign(translations.es, {
   },
 });
 
-export const detectBrowserLanguage = (): Language => {
-  const browserLang = navigator.language.toLowerCase();
-  if (browserLang.startsWith('de')) return 'de';
-  if (browserLang.startsWith('es')) return 'es';
-  return 'en';
-};
+/**
+ * Canonical product language is English. Browser locale must NOT switch the UI
+ * automatically — only an explicit user choice does. Kept as a pure helper for
+ * non-UI use (e.g. suggesting a language), never wired into locale resolution.
+ */
+export const detectBrowserLanguage = (): Language => 'en';
 // ============================================================
 // Connection Diagnostics (Social) — v413
 // ============================================================

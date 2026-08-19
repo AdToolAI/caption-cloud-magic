@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Language, translations, detectBrowserLanguage } from '@/lib/translations';
+import { Language, translations } from '@/lib/translations';
 import { translationsFill } from '@/lib/translationsFill';
 
 const { useState, useEffect, createContext, useContext } = React;
@@ -26,10 +26,10 @@ export const useTranslationState = () => {
     if (saved && (saved === 'en' || saved === 'de' || saved === 'es')) {
       return saved as Language;
     }
-    // Default to German
-    const defaultLang = 'de';
-    localStorage.setItem('adtool-ai-lang', defaultLang);
-    return defaultLang;
+    // Canonical product language is English. Browser locale / geography must
+    // NEVER auto-switch the UI to German or Spanish — only an explicit user
+    // choice (stored in `adtool-ai-lang`) does.
+    return 'en';
   });
 
   const setLanguage = (lang: Language) => {
@@ -58,7 +58,8 @@ export const useTranslationState = () => {
       return v;
     };
 
-    // Preferred language -> generated fill -> English -> German -> key
+    // Selected language -> generated fill -> English -> English fill -> key.
+    // German is NEVER a fallback: an English UI must never surface German copy.
     let value: any = lookup(translations[language]);
     if (value === undefined || value === null) {
       value = lookup((translationsFill as any)[language]);
@@ -67,7 +68,7 @@ export const useTranslationState = () => {
       value = lookup(translations.en);
     }
     if (value === undefined || value === null) {
-      value = lookup(translations.de);
+      value = lookup((translationsFill as any).en);
     }
 
     // Return key if nothing was found at all

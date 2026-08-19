@@ -44,7 +44,7 @@ export default function ContentProjects() {
       draft: { variant: "secondary" as const, icon: Clock, label: "Entwurf", className: "" },
       rendering: { variant: "default" as const, icon: RefreshCw, label: "Wird gerendert...", className: "" },
       completed: { variant: "outline" as const, icon: CheckCircle2, label: tx({ de: "Fertig", en: "Ready", es: "Listo" }), className: "border-green-500 text-green-700" },
-      failed: { variant: "destructive" as const, icon: XCircle, label: tx({ de: "Fehler", en: "Mistake", es: "Error" }), className: "" },
+      failed: { variant: "destructive" as const, icon: XCircle, label: tx({ de: "Fehler", en: "Failed", es: "Error" }), className: "" },
     };
 
     const config = variants[status as keyof typeof variants] || variants.draft;
@@ -142,7 +142,7 @@ export default function ContentProjects() {
             <TabsTrigger value="completed">Fertig ({statusCounts.completed})</TabsTrigger>
             <TabsTrigger value="rendering">Rendering ({statusCounts.rendering})</TabsTrigger>
             <TabsTrigger value="draft">Entwürfe ({statusCounts.draft})</TabsTrigger>
-            <TabsTrigger value="failed">Fehler ({statusCounts.failed})</TabsTrigger>
+            <TabsTrigger value="failed">{tx({ de: "Fehler", en: "Failed", es: "Error" })} ({statusCounts.failed})</TabsTrigger>
           </TabsList>
 
           <TabsContent value={selectedStatus} className="mt-6">

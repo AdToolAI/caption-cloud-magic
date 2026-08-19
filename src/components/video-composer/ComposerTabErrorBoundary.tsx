@@ -67,7 +67,7 @@ export class ComposerTabErrorBoundary extends Component<Props, State> {
             </div>
           </div>
           <Button size="sm" variant="outline" onClick={this.reset} className="gap-1.5">
-            <RotateCcw className="h-3.5 w-3.5" /> Erneut versuchen
+            <RotateCcw className="h-3.5 w-3.5" /> {tx({ de: "Erneut versuchen", en: "Try again", es: "Reintentar" })}
           </Button>
         </CardContent>
       </Card>

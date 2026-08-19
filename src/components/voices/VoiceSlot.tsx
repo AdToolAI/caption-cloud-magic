@@ -92,7 +92,7 @@ export function VoiceSlot({
           className="flex-1 justify-start h-9 font-normal bg-background/60 text-xs min-w-0"
         >
           <Mic className="h-3.5 w-3.5 mr-2 text-muted-foreground shrink-0" />
-          <span className="truncate">{voiceName || (voiceId ? 'Stimme aktiv' : tx({ de: 'Stimme wählen…', en: 'Select voice…', es: 'Seleccionar voz…' }))}</span>
+          <span className="truncate">{voiceName || (voiceId ? tx({ de: 'Stimme aktiv', en: 'Voice active', es: 'Voz activa' }) : tx({ de: 'Stimme wählen…', en: 'Select voice…', es: 'Seleccionar voz…' }))}</span>
           <Library className="h-3.5 w-3.5 ml-auto text-primary shrink-0" />
         </Button>
 
@@ -106,7 +106,7 @@ export function VoiceSlot({
             size="icon"
             disabled={disabled}
             onClick={onClear}
-            title="Stimme entfernen"
+            title={tx({ de: 'Stimme entfernen', en: 'Remove voice', es: 'Quitar voz' })}
             className="shrink-0"
           >
             <X className="h-4 w-4" />
@@ -121,7 +121,7 @@ export function VoiceSlot({
         category={category}
         enforceNative={enforceNative}
         currentVoiceId={voiceId ?? undefined}
-        title={pickerTitle || (label ? tx({ de: `Stimme für ${label}`, en: `Voice for ${label}`, es: `Voz para ${label}` }) : 'Voice-Bibliothek')}
+        title={pickerTitle || (label ? tx({ de: `Stimme für ${label}`, en: `Voice for ${label}`, es: `Voz para ${label}` }) : tx({ de: 'Voice-Bibliothek', en: 'Voice library', es: 'Biblioteca de voces' }))}
         onSelect={(voice, resolvedLanguage) =>
           onChange({
             voiceId: voice.id,

@@ -64,7 +64,7 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
     { id: 'clip-3', type: 'outro', duration: 3, transition: 'fade', content: 'Outro Scene' },
   ]);
   
-  const [subtitlePreviewText, setSubtitlePreviewText] = useState('Beispiel-Untertitel');
+  const [subtitlePreviewText, setSubtitlePreviewText] = useState(tx({ de: 'Beispiel-Untertitel', en: 'Sample subtitle', es: 'Subtítulo de ejemplo' }));
   
   const [subtitleStyle, setSubtitleStyle] = useState<SubtitleStyle>({
     position: 'bottom',
@@ -208,7 +208,7 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
       // Initialize subtitle preview with start of script
       if (video.customizations?.script_text) {
         const firstLine = String(video.customizations.script_text).split('\n')[0];
-        setSubtitlePreviewText(firstLine?.slice(0, 60) || 'Beispiel-Untertitel');
+        setSubtitlePreviewText(firstLine?.slice(0, 60) || tx({ de: 'Beispiel-Untertitel', en: 'Sample subtitle', es: 'Subtítulo de ejemplo' }));
       }
       
       // Load saved subtitle styles
@@ -291,7 +291,7 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
             <TabsTrigger value="voice">Voice-Over</TabsTrigger>
             <TabsTrigger value="media">Medien</TabsTrigger>
             <TabsTrigger value="timeline">Video-Timeline</TabsTrigger>
-            <TabsTrigger value="subtitles">Untertitel</TabsTrigger>
+            <TabsTrigger value="subtitles">{tx({ de: "Untertitel", en: "Subtitles", es: "Subtítulos" })}</TabsTrigger>
             <TabsTrigger value="export">Export</TabsTrigger>
             <TabsTrigger value="options">Optionen</TabsTrigger>
           </TabsList>

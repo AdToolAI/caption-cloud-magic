@@ -266,7 +266,7 @@ export default function DriftReportPanel({ projectId, scenes, onUpdateScene }: P
                 autoFix.patches.map((p) => (
                   <div key={p.sceneId} className="rounded border border-border/50 bg-background/40 p-2.5">
                     <div className="text-xs font-mono text-muted-foreground mb-1.5">
-                      Szene {String(p.sceneIndex).padStart(2, '0')}
+                      {tx({ de: "Szene", en: "Scene", es: "Escena" })} {String(p.sceneIndex).padStart(2, '0')}
                     </div>
                     <div className="space-y-1">
                       {p.diff.map((d, i) => (

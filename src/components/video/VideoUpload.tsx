@@ -17,7 +17,7 @@ export function VideoUpload({
   value,
   onChange,
   disabled = false,
-  label = 'Video hochladen',
+  label = tx({ de: 'Video hochladen', en: 'Upload video', es: 'Subir vídeo' }),
   maxSizeMB = 100
 }: VideoUploadProps) {
   const [uploading, setUploading] = useState(false);

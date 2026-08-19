@@ -1,4 +1,4 @@
-import { tx } from "@/lib/i18nText";
+import { tx, getLang } from "@/lib/i18nText";
 import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
@@ -341,7 +341,7 @@ export default function MotionStudioHub() {
                         <div className="min-w-0">
                           <div className="font-medium truncate">{p.title || tx({ de: "Unbenannt", en: "Untitled", es: "Sin nombre" })}</div>
                           <div className="text-xs text-muted-foreground">
-                            {new Date(p.updated_at).toLocaleString('de-DE', {
+                            {new Date(p.updated_at).toLocaleString(getLang(), {
                               dateStyle: 'short',
                               timeStyle: 'short',
                             })}

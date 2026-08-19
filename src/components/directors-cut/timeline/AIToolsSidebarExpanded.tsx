@@ -207,7 +207,7 @@ export function AIToolsSidebarExpanded({
             </div>
 
             <div>
-              <Label className="text-xs">Stimme</Label>
+              <Label className="text-xs">{tx({ de: "Stimme", en: "Voice", es: "Voz" })}</Label>
               <div className="grid grid-cols-2 gap-2 mt-1">
                 {['sarah', 'roger', 'aria', 'george'].map(voice => (
                   <Button

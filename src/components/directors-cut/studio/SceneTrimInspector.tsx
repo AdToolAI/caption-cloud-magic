@@ -112,7 +112,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
       {/* Header */}
       <div className="flex items-center gap-2 pb-2 border-b border-[#F5C76A]/10">
         <Film className="h-4 w-4 text-[#F5C76A]" />
-        <span className="text-sm text-white font-medium">Szene {sceneIndex + 1}</span>
+        <span className="text-sm text-white font-medium">{tx({ de: "Szene", en: "Scene", es: "Escena" })} {sceneIndex + 1}</span>
         <span className="ml-auto text-[10px] text-white/40">
           Quelle {hardMin.toFixed(1)}s → {hardMax.toFixed(1)}s
         </span>

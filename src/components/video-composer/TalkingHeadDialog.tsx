@@ -744,7 +744,7 @@ function DialogModeTab({
     for (const sp of speakers) {
       if (!voicePerSpeaker[sp.id]) {
         toast({
-          title: 'Stimme fehlt',
+          title: tx({ de: 'Stimme fehlt', en: 'Voice missing', es: 'Falta la voz' }),
           description: tx({ de: `Wähle eine Stimme für "${sp.name}".`, en: `Choose a voice for "${sp.name}".`, es: `Elige una voz para "${sp.name}".` }),
           variant: 'destructive',
         });

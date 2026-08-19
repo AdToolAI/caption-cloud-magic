@@ -17,13 +17,14 @@ export function readLang(req: Request): Lang {
   const explicit = req.headers.get("x-app-lang")?.toLowerCase().slice(0, 2);
   if (explicit === "en" || explicit === "es" || explicit === "de") return explicit;
   const accept = req.headers.get("accept-language")?.toLowerCase().slice(0, 2);
-  if (accept === "en" || accept === "es") return accept;
-  return "de";
+  if (accept === "en" || accept === "de" || accept === "es") return accept;
+  // Canonical default is English when no explicit language is provided.
+  return "en";
 }
 
 export function normalizeLang(value?: string | null): Lang {
   const v = value?.toLowerCase().slice(0, 2);
-  return v === "en" || v === "es" ? v : "de";
+  return v === "de" || v === "es" ? v : "en";
 }
 
 /** Run a handler with the request language bound to the async context. */
@@ -37,21 +38,21 @@ export function withLangValue<T>(lang: string | null | undefined, fn: () => T | 
 }
 
 export function currentLang(): Lang {
-  return store.getStore() ?? "de";
+  return store.getStore() ?? "en";
 }
 
 /** Pick the text for the current request language. */
 export function tl(text: Tri): string {
   const lang = currentLang();
-  if (lang === "en") return text.en;
+  if (lang === "de") return text.de;
   if (lang === "es") return text.es ?? text.en;
-  return text.de;
+  return text.en;
 }
 
 /** Pick the text for an explicit language. */
 export function pick(lang: string | null | undefined, text: Tri): string {
   const l = normalizeLang(lang);
-  if (l === "en") return text.en;
+  if (l === "de") return text.de;
   if (l === "es") return text.es ?? text.en;
-  return text.de;
+  return text.en;
 }
