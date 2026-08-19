@@ -26,10 +26,10 @@ export const useTranslationState = () => {
     if (saved && (saved === 'en' || saved === 'de' || saved === 'es')) {
       return saved as Language;
     }
-    // Default to German
-    const defaultLang = 'de';
-    localStorage.setItem('adtool-ai-lang', defaultLang);
-    return defaultLang;
+    // Canonical product language is English. Browser locale / geography must
+    // NEVER auto-switch the UI to German or Spanish — only an explicit user
+    // choice (stored in `adtool-ai-lang`) does.
+    return 'en';
   });
 
   const setLanguage = (lang: Language) => {
