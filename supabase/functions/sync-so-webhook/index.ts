@@ -47,9 +47,15 @@ import {
   measureProviderMotionSync,
   type MeasureProviderMotionSyncResult,
 } from "../_shared/measure-provider-motion-sync.ts";
+// FA-4 v409 — PURE Speaker-Cardinality (distinct speaker_idx, NOT pass count).
+import {
+  classifySpeakerCardinality,
+  decideCompletedSpeakerBranch,
+  shouldRunMultiSpeakerMotionMeasurement,
+} from "../_shared/fa4-speaker-cardinality.ts";
 
 /** Cold-start / deploy marker for the v404 server-measurement wire. */
-const SYNC_SO_WEBHOOK_VERSION = "v404-fa4-server-motion-measurement";
+const SYNC_SO_WEBHOOK_VERSION = "v409-fa4-speaker-cardinality-final";
 
 /**
  * v404 §5 — Rehost the provider output to `ai-videos` OUTSIDE the dialog lock.
@@ -704,6 +710,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const snapPasses: any[] = Array.isArray((state as any).passes) ? (state as any).passes : [];
       const snapMatchedIdx = snapPasses.findIndex((p: any) => p?.job_id === jobId);
       const snapTotalPasses = Number((state as any).total_passes ?? snapPasses.length ?? 1);
+      // FA-4 v409 — Sprecher-Klasse NIE aus der Pass-Kardinalität ableiten:
+      // der Per-Turn-Split erzeugt mehrere Passes für EINEN `speaker_idx`.
+      const snapSpeakerCardinality = classifySpeakerCardinality(snapPasses, {
+        totalPasses: snapTotalPasses,
+      });
       const snapPassIdx = snapMatchedIdx >= 0
         ? snapMatchedIdx
         : Number((state as any).current_pass ?? 0);
@@ -711,7 +722,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
       v404RehostedUrl = await rehostSyncOutput(supabase, sceneId, snapPassIdx, outputUrl);
 
-      if (snapTotalPasses > 1) {
+      if (shouldRunMultiSpeakerMotionMeasurement(snapSpeakerCardinality)) {
         const snapPreclipUrl = String(
           snapPass?.preclip_url ?? snapPass?._v105_probe?.payload_video_url ?? "",
         );
@@ -836,8 +847,43 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       //    compositor only when EVERY pass is done. No chained next-pass
       //    dispatch (compose-dialog-segments fans them out itself).
       const passes = passesPre;
+      // `totalPasses` bleibt reine PASS-Kardinalität (Aggregat, Done-Count,
+      // Mux-Fan-In) — sie entscheidet ab v409 NICHT mehr die Sprecher-Klasse.
       const totalPasses = Number((state as any).total_passes ?? passes.length ?? 1);
       const currentPass = matchedIdx >= 0 ? matchedIdx : Number((state as any).current_pass ?? 0);
+
+      // ── FA-4 v409 — kanonische Sprecher-Kardinalität ────────────────────
+      const speakerCardinality = classifySpeakerCardinality(passes, { totalPasses });
+      const speakerBranch = decideCompletedSpeakerBranch(speakerCardinality);
+      console.log(
+        `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} speaker_cardinality scene=${sceneId} pass=${currentPass} ` +
+          `distinct=${speakerCardinality.distinctSpeakerCount} total_passes=${totalPasses} ` +
+          `class=${speakerCardinality.classification} reason=${speakerCardinality.reason}`,
+      );
+      if (speakerBranch.branch === "fail_closed") {
+        // Fail-closed VOR jeder Motion-/Success-Semantik: eine Szene, deren
+        // Sprecher-Identität nicht bestimmbar ist, darf weder gemuxt noch
+        // retried werden. Terminal-State gehört dem G3.2.2-Apply.
+        const indeterminateCardinalityRes = await applySyncSegmentResult(supabase, {
+          pipelineJobId: v431CallbackJobId,
+          externalJobId: jobId,
+          writeId: speakerBranch.writeId,
+          providerStatus: "COMPLETED",
+          outputUrl: null,
+          errorText: speakerBranch.errorText,
+        });
+        if (!indeterminateCardinalityRes) {
+          return ok({ ok: true, skipped: "apply_unavailable", scene_id: sceneId, job_id: jobId });
+        }
+        console.error(
+          `[sync-so-webhook] v409/g322 scene=${sceneId} pass=${currentPass} ` +
+            `SPEAKER-CARDINALITY-INDETERMINATE reason=${speakerCardinality.reason} → ssw:failed`,
+        );
+        return await settleVerdict(indeterminateCardinalityRes, {
+          speaker_cardinality: "indeterminate",
+          reason: speakerCardinality.reason,
+        });
+      }
 
       // v404 §5 — the rehost already happened OUTSIDE the dialog lock.
       const rehostedUrl: string | null = v404RehostedUrl;
@@ -904,7 +950,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // Beinahe-Identitäts-Outputs trifft (real animiertes Lip-Sync
       // produziert typischerweise sizeRatio ≤ 0.90 durch veränderte
       // Keyframes im Mund-Bereich).
-      const isSingleSpeakerScene = totalPasses === 1;
+      // FA-4 v409 — Sprecher-Klasse aus distinkten `speaker_idx`, nicht aus
+      // der Pass-Anzahl (Per-Turn-Split!). Single-Speaker-Verhalten bleibt
+      // damit für 1-Sprecher/N-Turn-Szenen unverändert (v231-Gate aktiv).
+      const isSingleSpeakerScene = speakerBranch.branch === "single";
       const singleSpeakerMotionNoop = isSingleSpeakerScene &&
         !syncOutputUnchanged &&
         inBytes > 0 && outBytes > 0 &&
