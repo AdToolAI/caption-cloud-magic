@@ -8,8 +8,8 @@ import { translations, type Language } from '@/lib/translations';
 import { clearAllLocalDrafts } from '@/lib/local-draft-scope';
 
 const getLang = (): Language => {
-  const saved = (localStorage.getItem('adtool-ai-lang') || 'de').toLowerCase().slice(0, 2);
-  return (saved === 'en' || saved === 'de' || saved === 'es') ? (saved as Language) : 'de';
+  const saved = (localStorage.getItem('adtool-ai-lang') || 'en').toLowerCase().slice(0, 2);
+  return (saved === 'en' || saved === 'de' || saved === 'es') ? (saved as Language) : 'en';
 };
 
 const tr = (key: string): string => {
