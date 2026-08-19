@@ -5068,34 +5068,50 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // so the downstream slicer either rebuilds it cleanly or fails safely
     // without falling back to a doc-violating video segment hint.
     //
-    // ── FA-4 v406 — Frozen Provider Input / Retry-Wire-Parität ───────────
-    // Auf einem NOOP-Retry MUSS der Provider exakt denselben Wire sehen wie
-    // beim Fresh-Dispatch. Deshalb wird hier EINMAL entschieden, ob dieser
-    // Pass ein NOOP-Retry ist und ob sein frozen Snapshot vollständig ist.
-    // Unvollständig == fehlend ⇒ fail closed (kein Legacy-Rebuild, kein Call).
-    const v406IsNoopRetry =
-      body?.noop_auto_escalation === true || isFrozenNoopRetryPass(pass as any);
-    const v406FrozenInput: ProviderWireSnapshot | null = v406IsNoopRetry
-      ? resolveFrozenProviderInput(pass as unknown as Record<string, unknown>)
+    // ── FA-4 v407 — Frozen Provider Input / Retry-Wire-Parität ───────────
+    // Der Frozen-Contract gilt AUSSCHLIESSLICH für den contracted
+    // Multi-Speaker-BBox-Wire. Fresh und NOOP-Retry werden getrennt erkannt;
+    // die NOOP-Aktivierung hängt NICHT von neu berechneter Geometrie oder
+    // einem neu bestimmten payloadModel ab — der Snapshot ist die Authority.
+    const v407IsMultiSpeaker = speakers.length >= 2;
+    const v407NoopAutoEscalation = body?.noop_auto_escalation === true;
+    // Identisch zur finalen retryVariant-Ableitung weiter unten (v144 NOOP
+    // honoriert die angeforderte Variante unverändert).
+    const v407EffectiveRetryVariant = isRetry
+      ? (requestedRetryVariant === "coords-pro-box" ? "coords-pro-box" : "bbox-url-pro")
+      : "bbox-url-pro";
+    const v407NoopRetryCandidate = isV407NoopRetryCandidate({
+      isMultiSpeaker: v407IsMultiSpeaker,
+      noopAutoEscalation: v407NoopAutoEscalation,
+      retryVariant: v407EffectiveRetryVariant,
+    });
+    const v407NoopGate = v407NoopRetryCandidate
+      ? gateFrozenNoopRetry(
+        resolveFrozenProviderInput(pass as unknown as Record<string, unknown>),
+      )
       : null;
-    if (v406IsNoopRetry && !v406FrozenInput) {
+    const v406FrozenInput: ProviderWireSnapshot | null = v407NoopGate?.ok
+      ? v407NoopGate.snapshot
+      : null;
+    if (v407NoopGate && !v407NoopGate.ok) {
       // failBeforeProviderDispatch ist hier noch nicht deklariert — deferred
       // Hard-Fail (gleiches Muster wie v152), greift VOR jedem Provider-Call.
       (pass as any)._v406FrozenMissing = {
-        reason: "noop_retry_frozen_input_missing",
-        errorClass: "noop_retry_frozen_input_missing",
+        reason: v407NoopGate.reason,
+        errorClass: v407NoopGate.reason,
         message:
-          "NOOP-Retry ohne vollständigen frozen Provider-Input-Snapshot — Dispatch blockiert (kein Legacy-Rebuild).",
+          "NOOP-Retry ohne verwendbaren frozen Provider-Input-Snapshot — Dispatch blockiert (kein Legacy-Rebuild).",
         meta: {
-          fa4_v406: true,
+          fa4_v407: true,
           provider_call_made: false,
-          noop_auto_escalation: body?.noop_auto_escalation === true,
+          noop_auto_escalation: v407NoopAutoEscalation,
+          retry_variant: v407EffectiveRetryVariant,
           pass_idx: currentPassIdx,
           speaker_idx: (pass as any).speaker_idx ?? null,
         },
       };
       console.error(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v406_noop_retry_frozen_input_missing — fail closed, zero provider calls`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v407_${v407NoopGate.reason} — fail closed, zero provider calls`,
       );
     }
     const v406ReuseFrozen = !!v406FrozenInput;
