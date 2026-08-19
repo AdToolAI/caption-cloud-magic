@@ -269,6 +269,118 @@ export function boundingBoxesJsonFromSnapshot(
   return { bounding_boxes: snapshot.bounding_boxes };
 }
 
+/* ══ FA-4 v407 — Contract activation, persistence & ASD transport ═════════
+ *
+ * The frozen provider-input contract is scoped EXCLUSIVELY to the contracted
+ * multi-speaker bbox wire. Single-speaker and non-bbox dispatches keep their
+ * pre-v406 payload path untouched.
+ *
+ * `sync-3` is the provider MODEL (never `sync_mode`, which stays a separate
+ * frozen field such as `cut_off` / `loop`).
+ */
+
+export const V407_PROVIDER_MODEL = "sync-3";
+
+/** Fresh side: needs a real Contract-E dispatch box + canonical box sequence. */
+export function isV407FreshWireContract(input: {
+  isMultiSpeaker: boolean;
+  payloadModel: string;
+  retryVariant: string;
+  hasDispatchBox: boolean;
+  canonicalBoxesAvailable: boolean;
+}): boolean {
+  return (
+    input.isMultiSpeaker === true &&
+    input.payloadModel === V407_PROVIDER_MODEL &&
+    input.retryVariant === "bbox-url-pro" &&
+    input.hasDispatchBox === true &&
+    input.canonicalBoxesAvailable === true
+  );
+}
+
+/**
+ * NOOP-retry side: activation MUST NOT depend on a recomputed dispatch box,
+ * a canonical-box recompute or a freshly derived `payloadModel`. The frozen
+ * snapshot alone is the authority (including its `model`).
+ */
+export function isV407NoopRetryCandidate(input: {
+  isMultiSpeaker: boolean;
+  noopAutoEscalation: boolean;
+  retryVariant: string;
+}): boolean {
+  return (
+    input.isMultiSpeaker === true &&
+    input.noopAutoEscalation === true &&
+    input.retryVariant === "coords-pro-box"
+  );
+}
+
+export type FrozenNoopGateResult =
+  | { ok: true; snapshot: ProviderWireSnapshot }
+  | { ok: false; reason: "noop_retry_frozen_input_missing" | "noop_retry_frozen_model_mismatch" };
+
+/** Single owner of the NOOP-retry fail-closed decision. */
+export function gateFrozenNoopRetry(
+  snapshot: ProviderWireSnapshot | null,
+): FrozenNoopGateResult {
+  if (!snapshot) return { ok: false, reason: "noop_retry_frozen_input_missing" };
+  if (snapshot.model !== V407_PROVIDER_MODEL) {
+    return { ok: false, reason: "noop_retry_frozen_model_mismatch" };
+  }
+  return { ok: true, snapshot };
+}
+
+export type FrozenPersistRpc = (
+  fn: string,
+  args: Record<string, unknown>,
+) => Promise<{ error?: { message?: string } | null } | null | undefined>;
+
+/**
+ * Persist the frozen snapshot through the INSTALLED RPC signature
+ * `public.update_dialog_pass_slot(_scene_id uuid, _pass_idx integer, _patch jsonb)`.
+ * Any failure ⇒ caller MUST fail closed before the provider call.
+ */
+export async function persistFrozenProviderInput(
+  rpc: FrozenPersistRpc,
+  params: { sceneId: string; passIdx: number; snapshot: ProviderWireSnapshot },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const res = await rpc("update_dialog_pass_slot", {
+      _scene_id: params.sceneId,
+      _pass_idx: params.passIdx,
+      _patch: { provider_input_frozen: params.snapshot },
+    });
+    const err = res?.error;
+    if (err) return { ok: false, error: err.message ?? "update_dialog_pass_slot_failed" };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error)?.message ?? String(e) };
+  }
+}
+
+export type AsdTransportDecision =
+  | { ok: true; transport: AsdTransport; boundingBoxesUrl: string | null }
+  | { ok: false; reason: "v407_bbox_url_transport_failed" };
+
+/**
+ * Fresh = URL transport, hard. A failed / missing bounding-box upload is NOT
+ * downgraded to inline; the caller fails closed with zero provider calls.
+ * NOOP retry = inline frozen `bounding_boxes`.
+ */
+export function resolveAsdTransport(input: {
+  frozen: boolean;
+  wantsUrlTransport: boolean;
+  uploadedUrl: string | null | undefined;
+}): AsdTransportDecision {
+  if (input.frozen) return { ok: true, transport: "inline", boundingBoxesUrl: null };
+  if (!input.wantsUrlTransport) return { ok: true, transport: "inline", boundingBoxesUrl: null };
+  if (!isNonEmptyString(input.uploadedUrl)) {
+    return { ok: false, reason: "v407_bbox_url_transport_failed" };
+  }
+  return { ok: true, transport: "url", boundingBoxesUrl: String(input.uploadedUrl) };
+}
+
+
 /** Build the literal Sync.so /generate body from the wire. */
 export function toSyncGeneratePayload(
   wire: ProviderWire,
