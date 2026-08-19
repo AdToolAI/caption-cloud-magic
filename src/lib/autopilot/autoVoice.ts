@@ -8,6 +8,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { tx } from '@/lib/i18nText';
 import { normalizeVoiceLanguage } from '@/lib/voice-languages';
 
 export interface CastMember {
