@@ -334,7 +334,7 @@ export const VIDEO_CATEGORIES: VideoCategoryInfo[] = [
     color: 'from-green-500 to-emerald-500',
     recommendedDuration: tx({ de: '15-90 Sekunden', en: '15-90 seconds', es: '15-90 segundos' }),
     exampleUseCase: 'Produktlaunch, E-Commerce, Unboxing, Feature-Demo',
-    features: ['Produktbilder-Upload', 'KI-Bildbearbeitung', 'Kreative Drehbücher']
+    features: ['Produktbilder-Upload', 'KI-Bildbearbeitung', tx({ de: "Kreative Drehbücher", en: "Creative Storyboards", es: "Guiones Creativos" })]
   },
   {
     category: 'storytelling',
@@ -343,8 +343,8 @@ export const VIDEO_CATEGORIES: VideoCategoryInfo[] = [
     icon: '📖',
     color: 'from-purple-500 to-pink-500',
     recommendedDuration: tx({ de: '60-180 Sekunden', en: '60-180 seconds', es: '60-180 segundos' }),
-    exampleUseCase: 'Markenfilm, Kurzfilm, Gründergeschichte, fiktive Story',
-    features: ["Hero's Journey", 'Emotionale Bögen', 'Cinematic Stil']
+    exampleUseCase: tx({ de: "Markenfilm, Kurzfilm, Gründergeschichte, fiktive Story", en: "Brand film, short film, founder story, fictional story", es: "Película de marca, cortometraje, historia de fundador, historia ficticia" }),
+    features: ["Hero's Journey", tx({ de: "Emotionale Bögen", en: "Emotional Arcs", es: "Arcos Emocionales" }), 'Cinematic Stil']
   },
   {
     category: 'custom',
@@ -353,7 +353,7 @@ export const VIDEO_CATEGORIES: VideoCategoryInfo[] = [
     icon: '✨',
     color: 'from-violet-500 to-purple-600',
     recommendedDuration: 'Flexibel',
-    exampleUseCase: 'Tutorial, Erklärvideo, Social Content, Event, Promo',
+    exampleUseCase: tx({ de: "Tutorial, Erklärvideo, Social Content, Event, Promo", en: "Tutorial, explainer video, social content, event, promo", es: "Tutorial, video explicativo, contenido social, evento, promoción" }),
     features: [tx({ de: 'Volle Flexibilität', en: 'Full flexibility', es: 'Flexibilidad total' }), 'Individuelle Struktur', 'Kreative Freiheit']
   }
 ];

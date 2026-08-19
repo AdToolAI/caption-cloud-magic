@@ -10,7 +10,7 @@ import { DEFAULT_OVERLAY_BOX } from './overlayModel';
 export interface OverlayPreset {
   id: string;
   name: string;
-  category: 'Lower Third' | 'Banner' | tx({ de: "Störer", en: "Lower Third", es: "Tercios inferiores" }) | 'Schild' | 'CTA' | 'Ticker' | 'Marke' | 'Callout' | 'Zitat' | 'Info' | 'Text';
+  category: 'Lower Third' | 'Banner' | 'Störer' | 'Schild' | 'CTA' | 'Ticker' | 'Marke' | 'Callout' | 'Zitat' | 'Info' | 'Text';
   description: string;
   kind: OverlayKind;
   build: () => Omit<TextOverlay, 'id' | 'startTime' | 'endTime'>;
@@ -139,15 +139,15 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   {
     id: 'badge-discount',
     name: tx({ de: 'Störer — Rabatt', en: 'Badge — Discount', es: 'Insignia — Descuento' }),
-    category: tx({ de: "Störer", en: "Lower Third", es: "Tercios inferiores" }),
-    description: tx({ de: "Runder Preis-Störer", en: "Round Price Lower Third", es: "Tercios inferiores de precio redondo" }),
+    category: tx({ de: "Störer", en: "Stinger", es: "Stinger" }),
+    description: tx({ de: "Runder Preis-Störer", en: "Round Price Overlay", es: "Superposición de precio redonda" }),
     kind: 'badge',
     build: () => base('badge', '-30%', { fill: GOLD, color: INK, fontSizeRel: 0.06, uppercase: true }, { animation: 'pop' }),
   },
   {
     id: 'badge-new',
     name: tx({ de: 'Störer — NEU', en: 'Badge — NEW', es: 'Insignia — NUEVO' }),
-    category: tx({ de: "Störer", en: "Lower Third", es: "Tercios inferiores" }),
+    category: tx({ de: "Störer", en: "Overlay", es: "Superposición" }),
     description: tx({ de: 'Pill-Badge für Neuheiten', en: 'Pill badge for new products', es: 'Insignia de píldora para nuevos productos.' }),
     kind: 'badge',
     build: () =>
