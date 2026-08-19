@@ -52,11 +52,18 @@ import {
   classifySpeakerCardinality,
   decideCompletedSpeakerBranch,
   planPreLockSpeakerMeasurement,
-  planUnderLockSpeakerMeasurement,
 } from "../_shared/fa4-speaker-cardinality.ts";
+// FA-4 v410 — kein Medien-/AWS-I/O unter dem Dialog-Lock.
+import {
+  decideUnderLockIoAction,
+  Fa4OutOfLockIoRequired,
+  type Fa4OutOfLockIoRequest,
+  runLockedPhasesWithOutOfLockIo,
+} from "../_shared/fa4-lock-phase-orchestration.ts";
 
 /** Cold-start / deploy marker for the v404 server-measurement wire. */
-const SYNC_SO_WEBHOOK_VERSION = "v409-fa4-speaker-cardinality-final";
+const SYNC_SO_WEBHOOK_VERSION = "v410-fa4-no-media-io-under-dialog-lock-final";
+
 
 /**
  * v404 §5 — Rehost the provider output to `ai-videos` OUTSIDE the dialog lock.
