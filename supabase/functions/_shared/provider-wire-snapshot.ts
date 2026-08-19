@@ -281,8 +281,17 @@ export function boundingBoxesJsonFromSnapshot(
 
 export const V407_PROVIDER_MODEL = "sync-3";
 
-/** Fresh side: needs a real Contract-E dispatch box + canonical box sequence. */
+/**
+ * Fresh side: needs a real Contract-E dispatch box + canonical box sequence.
+ *
+ * FA-4 v408 P1-1 — the fresh frozen-wire contract is EXCLUSIVE to first
+ * provider dispatches. Any retry (`isRetry === true`) stays on the pre-v406
+ * retry behavior; the only frozen retry path is the separately gated
+ * NOOP `coords-pro-box` replacement (see `isV407NoopRetryCandidate`).
+ * A fresh fan-out pass (`advance:true`) is NOT a retry and stays eligible.
+ */
 export function isV407FreshWireContract(input: {
+  isRetry: boolean;
   isMultiSpeaker: boolean;
   payloadModel: string;
   retryVariant: string;
@@ -290,6 +299,7 @@ export function isV407FreshWireContract(input: {
   canonicalBoxesAvailable: boolean;
 }): boolean {
   return (
+    input.isRetry === false &&
     input.isMultiSpeaker === true &&
     input.payloadModel === V407_PROVIDER_MODEL &&
     input.retryVariant === "bbox-url-pro" &&
@@ -297,6 +307,7 @@ export function isV407FreshWireContract(input: {
     input.canonicalBoxesAvailable === true
   );
 }
+
 
 /**
  * NOOP-retry side: activation MUST NOT depend on a recomputed dispatch box,
@@ -333,30 +344,70 @@ export function gateFrozenNoopRetry(
 export type FrozenPersistRpc = (
   fn: string,
   args: Record<string, unknown>,
-) => Promise<{ error?: { message?: string } | null } | null | undefined>;
+) => Promise<
+  { data?: unknown; error?: { message?: string } | null } | null | undefined
+>;
+
+/** Exact semantic equality over ALL frozen snapshot fields. */
+export function frozenSnapshotsEqual(
+  a: ProviderWireSnapshot,
+  b: ProviderWireSnapshot,
+): boolean {
+  for (const field of PROVIDER_WIRE_SNAPSHOT_FIELDS) {
+    if (JSON.stringify(a[field] ?? null) !== JSON.stringify(b[field] ?? null)) return false;
+  }
+  return true;
+}
 
 /**
  * Persist the frozen snapshot through the INSTALLED RPC signature
  * `public.update_dialog_pass_slot(_scene_id uuid, _pass_idx integer, _patch jsonb)`.
- * Any failure ⇒ caller MUST fail closed before the provider call.
+ *
+ * FA-4 v408 P1-2 — persistence must be POSITIVELY CONFIRMED. The installed
+ * function returns the complete `dialog_shots` JSONB; a null/empty/missing or
+ * mismatched return does NOT count as persisted. Any failure ⇒ caller MUST
+ * fail closed before the provider call (`provider_call_made=false`).
  */
 export async function persistFrozenProviderInput(
   rpc: FrozenPersistRpc,
   params: { sceneId: string; passIdx: number; snapshot: ProviderWireSnapshot },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  let res: { data?: unknown; error?: { message?: string } | null } | null | undefined;
   try {
-    const res = await rpc("update_dialog_pass_slot", {
+    res = await rpc("update_dialog_pass_slot", {
       _scene_id: params.sceneId,
       _pass_idx: params.passIdx,
       _patch: { provider_input_frozen: params.snapshot },
     });
-    const err = res?.error;
-    if (err) return { ok: false, error: err.message ?? "update_dialog_pass_slot_failed" };
-    return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error)?.message ?? String(e) };
   }
+
+  const err = res?.error;
+  if (err) return { ok: false, error: err.message ?? "update_dialog_pass_slot_failed" };
+
+  const data = res?.data;
+  if (data === null || data === undefined || typeof data !== "object") {
+    return { ok: false, error: "v408_snapshot_persist_unconfirmed:no_data" };
+  }
+  const passes = (data as Record<string, unknown>)["passes"];
+  if (!Array.isArray(passes)) {
+    return { ok: false, error: "v408_snapshot_persist_unconfirmed:passes_missing" };
+  }
+  const slot = passes[params.passIdx];
+  if (!slot || typeof slot !== "object") {
+    return { ok: false, error: "v408_snapshot_persist_unconfirmed:pass_slot_missing" };
+  }
+  const persisted = resolveFrozenProviderInput(slot as Record<string, unknown>);
+  if (!persisted) {
+    return { ok: false, error: "v408_snapshot_persist_unconfirmed:frozen_input_invalid" };
+  }
+  if (!frozenSnapshotsEqual(persisted, params.snapshot)) {
+    return { ok: false, error: "v408_snapshot_persist_unconfirmed:snapshot_mismatch" };
+  }
+  return { ok: true };
 }
+
 
 export type AsdTransportDecision =
   | { ok: true; transport: AsdTransport; boundingBoxesUrl: string | null }

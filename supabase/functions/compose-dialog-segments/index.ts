@@ -159,7 +159,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v407-fa4-wire-parity-predeploy-final";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v408-fa4-predeploy-final";
 
 // v249 — Slice A: surface v247 mouth-anchor preclip metrics as top-level columns
 // on `syncso_dispatch_log` so v248-Slice-4 ladder in `report-lipsync-motion-probe`
@@ -6964,6 +6964,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // pre-v406-Payload-Pfad (kein Snapshot, kein snapshot_build_failed).
     const v407FreshWireInput = (pass as any)._v406FreshWireInput ?? null;
     const v407FreshWireContract = !v406FrozenInput && isV407FreshWireContract({
+      // v408 P1-1: Fresh-Contract nur auf Erst-Dispatches. Normale Retries
+      // (nicht der explizite NOOP-coords-pro-box-Pfad) bleiben pre-v406.
+      isRetry: isRetry === true,
       isMultiSpeaker: v407IsMultiSpeaker,
       payloadModel,
       retryVariant,
@@ -7011,14 +7014,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         }
         // Installierte RPC-Signatur: (_scene_id, _pass_idx, _patch).
         const persisted = await persistFrozenProviderInput(
-          async (fn, args) => await supabase.rpc(fn, args as any),
+          async (fn, args) => {
+            const r = await supabase.rpc(fn, args as any);
+            return { data: (r as any)?.data, error: (r as any)?.error ?? null };
+          },
           { sceneId, passIdx: currentPassIdx, snapshot: v406Snapshot },
         );
         if (!persisted.ok) {
           return await failBeforeProviderDispatch(
-            "v407_snapshot_persist_failed",
-            "v407_snapshot_persist_failed",
-            "Provider-Input-Snapshot konnte nicht persistiert werden — Dispatch blockiert.",
+            "v408_snapshot_persist_unconfirmed",
+            "v408_snapshot_persist_unconfirmed",
+            "Provider-Input-Snapshot konnte nicht bestätigt persistiert werden — Dispatch blockiert.",
             500,
             { error: persisted.error, pass_idx: currentPassIdx },
           );

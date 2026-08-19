@@ -57,7 +57,7 @@ const snapshotOf = (): ProviderWireSnapshot =>
  * → 5 ASD transport → 6 wire → 7 provider call.
  */
 interface HarnessDeps {
-  rpc: (fn: string, args: Record<string, unknown>) => Promise<{ error?: { message?: string } | null }>;
+  rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data?: unknown; error?: { message?: string } | null }>;
   uploadBoundingBoxes: (boxes: unknown) => Promise<{ url: string | null }>;
   providerCall: (payload: Record<string, unknown>) => Promise<void>;
 }
@@ -66,6 +66,7 @@ interface HarnessInput {
   payloadModel: string;
   retryVariant: string;
   noopAutoEscalation: boolean;
+  isRetry?: boolean;
   pass: Record<string, unknown>;
   freshWireInput: typeof freshWireInput | null;
 }
@@ -107,6 +108,7 @@ async function runDispatch(input: HarnessInput, deps: HarnessDeps): Promise<Harn
   const frozen = noopGate?.ok ? noopGate.snapshot : null;
 
   const freshContract = !frozen && isV407FreshWireContract({
+    isRetry: (input as any).isRetry === true,
     isMultiSpeaker: input.isMultiSpeaker,
     payloadModel: input.payloadModel,
     retryVariant: input.retryVariant,
@@ -199,7 +201,13 @@ const okDeps = (over: Partial<HarnessDeps> = {}): HarnessDeps & { rpcCalls: Arra
   const base: HarnessDeps = {
     rpc: async (fn, args) => {
       rpcCalls.push({ fn, args });
-      return { error: null };
+      // v408: the installed RPC returns the complete dialog_shots JSONB.
+      const patch = (args as any)._patch ?? {};
+      const passes: unknown[] = [];
+      passes[(args as any)._pass_idx as number] = {
+        provider_input_frozen: patch.provider_input_frozen,
+      };
+      return { data: { passes }, error: null };
     },
     uploadBoundingBoxes: async () => ({ url: "https://cdn.test/asd/s11-p3.json" }),
     providerCall: async () => {},
@@ -221,6 +229,7 @@ const retryInput = (pass: Record<string, unknown>): HarnessInput => ({
   payloadModel: "sync-3",
   retryVariant: "coords-pro-box",
   noopAutoEscalation: true,
+  isRetry: true,
   pass,
   freshWireInput: null,
 });
@@ -343,6 +352,7 @@ Deno.test("F4: NOOP activation never depends on recomputed geometry or model", (
   // Fresh gate, in contrast, requires both geometry inputs.
   assertEquals(
     isV407FreshWireContract({
+      isRetry: false,
       isMultiSpeaker: true,
       payloadModel: "sync-3",
       retryVariant: "bbox-url-pro",
