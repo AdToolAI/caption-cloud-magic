@@ -48,10 +48,17 @@ export interface ActiveTip {
 type Locale = 'de' | 'en' | 'es';
 
 function currentLocale(): Locale {
-  const raw = typeof navigator !== 'undefined' ? navigator.language.slice(0, 2) : 'de';
-  if (raw === 'en') return 'en';
-  if (raw === 'es') return 'es';
-  return 'de';
+  // Explicit user choice only — browser locale must never switch the UI away
+  // from the canonical English default.
+  let saved: string | null = null;
+  try {
+    saved = typeof localStorage !== 'undefined' ? localStorage.getItem('adtool-ai-lang') : null;
+  } catch {
+    /* localStorage unavailable */
+  }
+  if (saved === 'de') return 'de';
+  if (saved === 'es') return 'es';
+  return 'en';
 }
 
 /** Simple in-memory session guard so the same trigger doesn't fire twice per page-view spike. */
