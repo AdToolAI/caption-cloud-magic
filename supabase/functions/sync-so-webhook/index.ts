@@ -939,6 +939,23 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
       const passBeforeDone = freshDonePasses[currentPass] ?? null;
 
+      // ── FA-4 v409 Residual — aufgeschobene Multi-Speaker-Messung nachholen ──
+      // Der Pre-Lock-Snapshot war unvollständig (Fan-Out-Race), das frische
+      // Set ist jetzt echtes Multi-Speaker. Ohne Nachmessung liefe der Pass in
+      // `measurement_missing` → falscher Hard-Fail. Gleiche Messfunktion,
+      // gleiche Metrik/Threshold/Deadline/ROI, gleiche rehostete Output-URL,
+      // genau EINMAL, keine zweite DB-Autorität, kein Retry/Mux.
+      const catchUpPlan = planUnderLockSpeakerMeasurement({
+        fresh: speakerCardinality,
+        preLockDeferred: v404MeasurementDeferred,
+        hasMeasurement: v404MotionProbe !== null,
+      });
+      if (catchUpPlan.action === "measure" && status === "COMPLETED" && outputUrl) {
+        await runServerMotionMeasurement(passBeforeDone, currentPass, "under_lock_catch_up");
+      }
+
+
+
       const inputPreclipUrl = String(passBeforeDone?.preclip_url ?? passBeforeDone?._v105_probe?.payload_video_url ?? "");
       const [inputHead, outputHead, inputDims, outputDims] = await Promise.all([
         headAsset(inputPreclipUrl),
