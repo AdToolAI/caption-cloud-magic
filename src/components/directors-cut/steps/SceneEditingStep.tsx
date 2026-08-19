@@ -382,14 +382,14 @@ export function SceneEditingStep({
       id: `${scene.id}-a`,
       end_time: splitPoint,
       original_end_time: originalSplitPoint,
-      description: `${scene.description} (${tx({ de: "Teil 1", en: "Part 1", es: "Parte 1" })})`,
+      description: `${scene.description} ($${tx({ de: "Teil 1", en: "Part 1", es: "Parte 1" })})`,
     };
     const secondHalf: SceneAnalysis = {
       ...scene,
       id: `${scene.id}-b`,
       start_time: splitPoint,
       original_start_time: originalSplitPoint,
-      description: `${scene.description} (${tx({ de: "Teil 2", en: "Part 2", es: "Parte 2" })})`,
+      description: `${scene.description} ($${tx({ de: "Teil 2", en: "Part 2", es: "Parte 2" })})`,
     };
     
     newScenes.splice(sceneIndex, 1, firstHalf, secondHalf);
@@ -419,7 +419,7 @@ export function SceneEditingStep({
       id: `${scene.id}-copy-${Date.now()}`,
       start_time: lastScene.end_time,
       end_time: lastScene.end_time + duration,
-      description: `${scene.description} (${tx({ de: "Kopie", en: "Copy", es: "Copia" })})`,
+      description: `${scene.description} ($${tx({ de: "Kopie", en: "Copy", es: "Copia" })})`,
     };
     
     onScenesUpdate([...scenes, copiedScene]);
@@ -669,7 +669,7 @@ export function SceneEditingStep({
     
     toast({
       title: tx({ de: "Medien hinzugefügt", en: "Media added", es: "Medios añadidos" }),
-      description: tx({ de: `${media.type === 'video' ? 'Video' : tx({ de: "Bild", en: "Image", es: "Imagen" })} wurde als neue Szene hinzugefügt`, en: `${media.type === 'video' ? 'Video' : 'Image'} added as new scene`, es: `${media.type === 'video' ? 'Video' : 'Imagen'} añadida como nueva escena` }),
+      description: tx({ de: `${media.type === 'video' ? 'Video' : ${tx({ de: "Bild", en: "Image", es: "Imagen" })} wurde als neue Szene hinzugefügt`, en: `${media.type === 'video' ? 'Video' : 'Image'} added as new scene`, es: `${media.type === 'video' ? 'Video' : 'Imagen'} añadida como nueva escena` }),
     });
   }, [scenes, onScenesUpdate, toast]);
 

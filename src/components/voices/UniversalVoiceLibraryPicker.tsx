@@ -186,7 +186,7 @@ export function UniversalVoiceLibraryPicker({
           <DialogDescription className="text-[11px] uppercase tracking-[0.15em] text-white/45">
             {total.toLocaleString()} {tx({ de: "Stimmen", en: "Voices", es: "Voces" })}
             {language !== 'all' && <> in <span className="text-cyan">{voiceLanguageLabel(language)}</span></>}
-            {nativeSensitive && nativeOnly && ` · ${tx({ de: "nur native Sprecher", en: "native speakers only", es: "solo hablantes nativos" })}`}
+            {nativeSensitive && nativeOnly && ` · $${tx({ de: "nur native Sprecher", en: "native speakers only", es: "solo hablantes nativos" })}`}
           </DialogDescription>
         </DialogHeader>
 

@@ -110,7 +110,7 @@ export default function InstagramPublishing() {
       if (data.ok) {
         toast({
           title: tx({ de: "✅ Token gültig", en: "✅ Token valid", es: "✅ Token válido" }),
-          description: `${tx({ de: "Instagram Account", en: "Instagram account", es: "Cuenta de Instagram" })}: @${data.user?.username || 'unknown'}`,
+          description: `$${tx({ de: "Instagram Account", en: "Instagram account", es: "Cuenta de Instagram" })}: @${data.user?.username || 'unknown'}`,
         });
       } else {
         toast({
@@ -256,7 +256,7 @@ export default function InstagramPublishing() {
         const backupMsg = data.backup_created ? tx({ de: " Backup erstellt.", en: " Backup created.", es: " Copia de seguridad creada." }) : "";
         toast({
           title: tx({ de: "Erfolg!", en: "Success!", es: "¡Éxito!" }),
-          description: tx({ de: `${tx({ de: "Token erfolgreich erneuert und gespeichert!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, en: `${tx({ de: "Token successfully renewed and saved!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, es: `${tx({ de: "¡Token renovado y guardado exitosamente!", en: "¡Token renovado y guardado exitosamente!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}` }),
+          description: tx({ de: `$${tx({ de: "Token erfolgreich erneuert und gespeichert!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, en: `$${tx({ de: "Token successfully renewed and saved!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, es: `$${tx({ de: "¡Token renovado y guardado exitosamente!", en: "¡Token renovado y guardado exitosamente!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}` }),
         });
         
         // Automatically refresh diagnostics after successful save
@@ -527,7 +527,7 @@ export default function InstagramPublishing() {
                         {tokenDiagnostics.details.code && (
                           <p className="text-xs text-muted-foreground mb-1">
                             <strong>Code:</strong> {tokenDiagnostics.details.code}
-                            {tokenDiagnostics.details.subcode && ` (${tx({ de: "Subcode", en: "Subcode", es: "Subcódigo" })}: ${tokenDiagnostics.details.subcode})`}
+                            {tokenDiagnostics.details.subcode && ` ($${tx({ de: "Subcode", en: "Subcode", es: "Subcódigo" })}: ${tokenDiagnostics.details.subcode})`}
                           </p>
                         )}
                         {tokenDiagnostics.details.type && (

@@ -2070,10 +2070,10 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           placeholder={
             isMonologue
               ? `${sceneCast[0]?.name ?? 'Sarah'}: ${
-                  tx({ de: 'Hi, willkommen!', en: 'Hi, welcome!', es: '¡Hola, bienvenido!' })
+                  ${tx({ de: 'Hi, willkommen!', en: 'Hi, welcome!', es: '¡Hola, bienvenido!' })}
                 }`
               : `${sceneCast[0]?.name ?? 'Sarah'}: ${
-                  tx({ de: 'Hi!', en: 'Hi!', es: '¡Hola!' })
+                  ${tx({ de: 'Hi!', en: 'Hi!', es: '¡Hola!' })}
                 }\n${sceneCast[1]?.name ?? 'Matthew'}: ${
                   tx({ de: `Hi ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`, en: `Hi ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`, es: `¡Hola ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!` })
                 }`

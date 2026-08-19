@@ -307,7 +307,7 @@ export default function SceneInlinePlayer({
 
                     title = tx({ de: 'Lip-Sync läuft…', en: 'Lip-sync running…', es: 'Sincronización labial en curso…' });
                     sub = totalPasses > 0
-                      ? `${tx({ de: 'Durchgang', en: 'Pass', es: 'Pasada' })} ${Math.min(donePasses + 1, totalPasses)}/${totalPasses}`
+                      ? `$${tx({ de: 'Durchgang', en: 'Pass', es: 'Pasada' })} ${Math.min(donePasses + 1, totalPasses)}/${totalPasses}`
                       : tx({ de: '~60 s pro Sprecher', en: '~60s per speaker', es: '~60 s por hablante' });
                   } else if (pipelineState === 'audio_prep') {
                     if (audioUrl) {

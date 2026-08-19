@@ -347,7 +347,7 @@ export function AICompanionWidget() {
     const issues = diagnostics.filter((d: any) => d.status !== 'ok');
     
     if (issues.length === 0) {
-      return tx({ de: '✨ **Alles bestens!**\n\nDein Account ist optimal eingerichtet. Keine Probleme erkannt.', en: '✨ **All good!**\n\nYour account is set up optimally. No issues detected.', es: '✨ **¡Todo bien!**\n\nTu cuenta está configurada de forma óptima. No se detectaron problemas.' });
+      return ${tx({ de: '✨ **Alles bestens!**\n\nDein Account ist optimal eingerichtet. Keine Probleme erkannt.', en: '✨ **All good!**\n\nYour account is set up optimally. No issues detected.', es: '✨ **¡Todo bien!**\n\nTu cuenta está configurada de forma óptima. No se detectaron problemas.' })};
     }
     
     let tips = '💡 **Personalisierte Tipps:**\n\n';
@@ -476,7 +476,7 @@ export function AICompanionWidget() {
       console.error('AI Companion error:', error);
       setMessages(prev => prev.map(m => 
         m.id === assistantId 
-          ? { ...m, content: tx({ de: 'Entschuldigung, es gab einen Fehler. Bitte versuche es erneut.', en: 'Sorry, an error occurred. Please try again.', es: 'Lo sentimos, ha ocurrido un error. Por favor, inténtalo de nuevo.' }) }
+          ? { ...m, content: ${tx({ de: 'Entschuldigung, es gab einen Fehler. Bitte versuche es erneut.', en: 'Sorry, an error occurred. Please try again.', es: 'Lo sentimos, ha ocurrido un error. Por favor, inténtalo de nuevo.' })} }
           : m
       ));
     } finally {
@@ -631,7 +631,7 @@ export function AICompanionWidget() {
                 <div>
                   <h3 className="font-semibold text-foreground">{preferences.bot_name}</h3>
                   <p className="text-xs text-muted-foreground">
-                    {isListening ? tx({ de: 'Höre zu...', en: 'Listening...', es: 'Escuchando...' }) : isSpeaking ? tx({ de: 'Spricht...', en: 'Speaking...', es: 'Hablando...' }) : tx({ de: 'Dein persönlicher Assistent', en: 'Your personal assistant', es: 'Tu asistente personal' })}
+                    {isListening ? ${tx({ de: 'Höre zu...', en: 'Listening...', es: 'Escuchando...' })} : isSpeaking ? ${tx({ de: 'Spricht...', en: 'Speaking...', es: 'Hablando...' })} : ${tx({ de: 'Dein persönlicher Assistent', en: 'Your personal assistant', es: 'Tu asistente personal' })}
                   </p>
                 </div>
               </div>
@@ -641,7 +641,7 @@ export function AICompanionWidget() {
                   size="icon"
                   className="h-8 w-8 text-muted-foreground hover:text-foreground"
                   onClick={() => setShowSettings(true)}
-                  title={tx({ de: "Einstellungen", en: "Settings", es: "Configuración" })}
+                  title=${tx({ de: "Einstellungen", en: "Settings", es: "Configuración" })}
                 >
                   <Settings className="w-4 h-4" />
                 </Button>
@@ -650,7 +650,7 @@ export function AICompanionWidget() {
                   size="icon"
                   className="h-8 w-8 text-muted-foreground hover:text-foreground"
                   onClick={() => setShowHistory(true)}
-                  title={tx({ de: "Gesprächsverlauf", en: "Conversation history", es: "Historial de conversación" })}
+                  title=${tx({ de: "Gesprächsverlauf", en: "Conversation history", es: "Historial de conversación" })}
                 >
                   <History className="w-4 h-4" />
                 </Button>
@@ -722,9 +722,9 @@ export function AICompanionWidget() {
                   animate={{ opacity: 1, y: 0 }}
                   className="text-sm text-muted-foreground text-center"
                 >
-                  {isListening ? tx({ de: 'Ich höre zu... Sprich jetzt.', en: 'Listening... Speak now.', es: 'Escuchando... Habla ahora.' }) : 
+                  {isListening ? ${tx({ de: 'Ich höre zu... Sprich jetzt.', en: 'Listening... Speak now.', es: 'Escuchando... Habla ahora.' })} : 
                    isSpeaking ? `${preferences.bot_name} spricht...` : 
-                   tx({ de: 'Tippe auf das Mikrofon um zu sprechen', en: 'Tap the microphone to speak', es: 'Toca el micrófono para hablar' })}
+                   ${tx({ de: 'Tippe auf das Mikrofon um zu sprechen', en: 'Tap the microphone to speak', es: 'Toca el micrófono para hablar' })}
                 </motion.p>
                 
                 {/* Big Mic Button */}
@@ -837,7 +837,7 @@ export function AICompanionWidget() {
                       >
                         <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-2xl rounded-bl-md px-4 py-3">
                           <p className="text-sm text-foreground mb-2">
-                            {tx({ de: "Klingt nach einem Problem! Möchtest du das an unser Support-Team weiterleiten?", en: "Sounds like a problem! Would you like to report this to our support team?", es: "¡Parece un problema! ¿Quieres reportarlo a nuestro equipo de soporte?" })}
+                            ${tx({ de: "Klingt nach einem Problem! Möchtest du das an unser Support-Team weiterleiten?", en: "Sounds like a problem! Would you like to report this to our support team?", es: "¡Parece un problema! ¿Quieres reportarlo a nuestro equipo de soporte?" })}
                           </p>
                           <div className="flex gap-2">
                             <Button
@@ -874,7 +874,7 @@ export function AICompanionWidget() {
                       >
                         <div className="bg-red-500/10 border border-red-500/20 rounded-2xl rounded-bl-md px-4 py-3">
                           <p className="text-sm text-red-400 font-medium mb-1">
-                            {tx({ de: "⚠️ Fehler erkannt", en: "⚠️ Error detected", es: "⚠️ Error detectado" })}
+                            ${tx({ de: "⚠️ Fehler erkannt", en: "⚠️ Error detected", es: "⚠️ Error detectado" })}
                           </p>
                           <p className="text-xs text-red-300/80 mb-2 font-mono truncate max-w-[250px]">
                             {detectedError.message}
@@ -888,7 +888,7 @@ export function AICompanionWidget() {
                             className="h-7 text-xs border-red-500/30 hover:bg-red-500/10"
                           >
                             <HeadphonesIcon className="w-3 h-3 mr-1" />
-                            {tx({ de: "Fehler melden", en: "Report error", es: "Reportar error" })}
+                            ${tx({ de: "Fehler melden", en: "Report error", es: "Reportar error" })}
                           </Button>
                         </div>
                       </motion.div>
@@ -933,7 +933,7 @@ export function AICompanionWidget() {
                         setShowSlashCommands(e.target.value.startsWith('/'));
                       }}
                       onKeyDown={handleKeyDown}
-                      placeholder={tx({ de: "Frag mich etwas... (/ für Befehle)", en: "Ask me something... (/ for commands)", es: "Pregúntame algo... (/ para comandos)" })}
+                      placeholder=${tx({ de: "Frag mich etwas... (/ für Befehle)", en: "Ask me something... (/ for commands)", es: "Pregúntame algo... (/ para comandos)" })}
                       className="min-h-[44px] max-h-[120px] resize-none bg-muted/30 border-white/10 focus:border-primary/50 ai-companion-scrollbar"
                       rows={1}
                     />

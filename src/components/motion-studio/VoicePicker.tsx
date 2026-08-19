@@ -43,7 +43,7 @@ export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) 
     if (custom) {
       return {
         name: custom.name,
-        sub: `${tx({ de: 'Meine Stimme', en: 'My voice', es: 'Mi voz' })} · ${custom.language.toUpperCase()}`,
+        sub: `$${tx({ de: 'Meine Stimme', en: 'My voice', es: 'Mi voz' })} · ${custom.language.toUpperCase()}`,
         tone: 'emerald' as const,
       };
     }

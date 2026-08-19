@@ -137,7 +137,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
       for (const file of Array.from(files).slice(0, room)) {
         if (!file.type.startsWith('image/')) continue;
         if (file.size > 12 * 1024 * 1024) {
-          toast({ title: `${file.name} ${tx({ de: 'ist zu groß', en: 'is too large', es: 'es demasiado grande' })}`, description: tx({ de: 'Maximal 12 MB pro Bild.', en: 'Maximum 12 MB per image.', es: 'Máximo 12 MB por imagen.' }), variant: 'destructive' });
+          toast({ title: `${file.name} $${tx({ de: 'ist zu groß', en: 'is too large', es: 'es demasiado grande' })}`, description: tx({ de: 'Maximal 12 MB pro Bild.', en: 'Maximum 12 MB per image.', es: 'Máximo 12 MB por imagen.' }), variant: 'destructive' });
           continue;
         }
 

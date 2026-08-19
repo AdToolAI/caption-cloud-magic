@@ -269,7 +269,7 @@ export default function ContinuityGuardianStrip({
       });
       onUpdateScenes(updated);
       toast.success(
-        `tx({ de: 'Continuity geprüft:', en: 'Continuity checked:', es: 'Continuidad comprobada:' }) ${okCount} ok · ${warnCount} drift · ${brokenCount} bruch`
+        `${tx({ de: 'Continuity geprüft:', en: 'Continuity checked:', es: 'Continuidad comprobada:' })} ${okCount} ok · ${warnCount} drift · ${brokenCount} bruch`
       );
     } finally {
       setBulkRunning(false);
