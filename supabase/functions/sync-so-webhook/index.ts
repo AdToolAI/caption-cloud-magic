@@ -950,7 +950,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // Beinahe-Identitäts-Outputs trifft (real animiertes Lip-Sync
       // produziert typischerweise sizeRatio ≤ 0.90 durch veränderte
       // Keyframes im Mund-Bereich).
-      const isSingleSpeakerScene = totalPasses === 1;
+      // FA-4 v409 — Sprecher-Klasse aus distinkten `speaker_idx`, nicht aus
+      // der Pass-Anzahl (Per-Turn-Split!). Single-Speaker-Verhalten bleibt
+      // damit für 1-Sprecher/N-Turn-Szenen unverändert (v231-Gate aktiv).
+      const isSingleSpeakerScene = speakerBranch.branch === "single";
       const singleSpeakerMotionNoop = isSingleSpeakerScene &&
         !syncOutputUnchanged &&
         inBytes > 0 && outBytes > 0 &&
