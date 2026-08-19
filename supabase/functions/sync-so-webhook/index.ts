@@ -47,9 +47,15 @@ import {
   measureProviderMotionSync,
   type MeasureProviderMotionSyncResult,
 } from "../_shared/measure-provider-motion-sync.ts";
+// FA-4 v409 — PURE Speaker-Cardinality (distinct speaker_idx, NOT pass count).
+import {
+  classifySpeakerCardinality,
+  decideCompletedSpeakerBranch,
+  shouldRunMultiSpeakerMotionMeasurement,
+} from "../_shared/fa4-speaker-cardinality.ts";
 
 /** Cold-start / deploy marker for the v404 server-measurement wire. */
-const SYNC_SO_WEBHOOK_VERSION = "v404-fa4-server-motion-measurement";
+const SYNC_SO_WEBHOOK_VERSION = "v409-fa4-speaker-cardinality-final";
 
 /**
  * v404 §5 — Rehost the provider output to `ai-videos` OUTSIDE the dialog lock.
