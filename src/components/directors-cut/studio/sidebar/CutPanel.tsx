@@ -128,7 +128,7 @@ const TransitionBlock: React.FC<{
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-cyan-300 font-medium uppercase tracking-wider flex items-center gap-1">
               <ArrowRightLeft className="h-3 w-3" />
-              {tx({ de: "Übergang", en: "Transition", es: "Transición" })}
+              Übergang
             </span>
             <button
               onClick={() => setExpanded(false)}
@@ -468,6 +468,9 @@ export const CutPanel: React.FC<CutPanelProps> = ({
             </span>
           </div>
           <p className="mt-1 text-[10px] text-white/40 leading-snug">
+            Diese Szenen kommen direkt aus deinem Composer-Render – Auto-Cut
+            ist deaktiviert, damit die echten Schnittpunkte nicht überschrieben
+            werden.
           </p>
         </div>
       )}

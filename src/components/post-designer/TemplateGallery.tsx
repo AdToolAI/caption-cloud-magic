@@ -5,7 +5,6 @@ import { SlideRenderer } from "./SlideRenderer";
 import { DESIGN_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/post-design/templates";
 import type { PostDesign } from "@/lib/post-design/schema";
 import { cn } from "@/lib/utils";
-import { tx } from '@/lib/i18nText';
 
 interface TemplateGalleryProps {
   open: boolean;
@@ -26,7 +25,7 @@ export function TemplateGallery({ open, onOpenChange, image, onApply }: Template
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl">
         <DialogHeader>
-          <DialogTitle>{tx({ de: "Vorlagen", en: "Templates", es: "Plantillas" })}</DialogTitle>
+          <DialogTitle>Vorlagen</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-wrap gap-2 pb-2">

@@ -12,7 +12,6 @@ import {
   MoreVertical
 } from 'lucide-react';
 import {
-import { tx } from '@/lib/i18nText';
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -40,10 +39,10 @@ export const TemplateCard = ({
     const labels: Record<string, string> = {
       social_media: 'Social Media',
       advertising: 'Werbung',
-      explainer: tx({ de: "Erklärvideos", en: "Explainer Videos", es: "Videos explicativos" }),
+      explainer: 'Erklärvideos',
       tutorial: 'Tutorials',
       testimonial: 'Testimonials',
-      product_showcase: tx({ de: "Produktpräsentation", en: "Product Showcase", es: "Presentación de producto" }),
+      product_showcase: 'Produktpräsentation',
       event: 'Events',
       educational: 'Bildung',
       entertainment: 'Unterhaltung',
@@ -75,8 +74,8 @@ export const TemplateCard = ({
             variant="secondary"
             onClick={() => onPreview(template)}
           >
-            {tx({ de: "<Eye className=\"mr-2 h-4 w-4\" />", en: "Preview", es: "Vista previa" })}
-            {tx({ de: "Vorschau", en: "Preview", es: "Vista previa" })}
+            <Eye className="mr-2 h-4 w-4" />
+            Vorschau
           </Button>
           <Button
             size="sm"
@@ -135,8 +134,8 @@ export const TemplateCard = ({
                 onClick={() => onDelete(template.id)}
                 className="text-destructive"
               >
-                {tx({ de: "<Trash2 className=\"mr-2 h-4 w-4\" />", en: "Delete", es: "Eliminar" })}
-                {tx({ de: "Löschen", en: "Delete", es: "Eliminar" })}
+                <Trash2 className="mr-2 h-4 w-4" />
+                Löschen
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

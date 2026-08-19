@@ -228,7 +228,7 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
             onClick={() => onOpenChange(false)}
             disabled={applying}
           >
-            {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
+            Abbrechen
           </Button>
           <Button
             onClick={onConfirm}
@@ -237,7 +237,7 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
             {applying ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {tx({ de: "Übernehme…", en: "Applying…", es: "Aplicando…" })}
+                Übernehme…
               </>
             ) : (
               <>Änderungen übernehmen ({totalChanges})</>

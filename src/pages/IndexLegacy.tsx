@@ -42,9 +42,9 @@ const Index = () => {
       "name": "AdTool AI"
     },
     "featureList": [
-      tx({ de: "KI-gestützte Caption-Generierung", en: "AI-powered Caption Generation", es: "Generación de subtítulos con IA" }),
+      "KI-gestützte Caption-Generierung",
       "Plattform-optimierte Inhalte",
-      tx({ de: "Hashtag-Vorschläge", en: "Hashtag Suggestions", es: "Sugerencias de hashtags" }),
+      "Hashtag-Vorschläge",
       "Multi-Sprach-Support",
       "Brand Voice Anpassung"
     ]

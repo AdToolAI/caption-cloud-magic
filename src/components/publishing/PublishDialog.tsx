@@ -81,7 +81,7 @@ export function PublishDialog({ videoUrl, defaultCaption = '', defaultHashtags =
         {trigger || (
           <Button>
             <Send className="h-4 w-4 mr-2" />
-            {tx({ de: "Veröffentlichen", en: "Publish", es: "Publicar" })}
+            Veröffentlichen
           </Button>
         )}
       </DialogTrigger>
@@ -219,7 +219,7 @@ export function PublishDialog({ videoUrl, defaultCaption = '', defaultHashtags =
           {/* Publish Button */}
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button variant="outline" onClick={() => setOpen(false)}>
-              {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
+              Abbrechen
             </Button>
             <Button
               onClick={handlePublish}
@@ -228,7 +228,7 @@ export function PublishDialog({ videoUrl, defaultCaption = '', defaultHashtags =
               {isPublishing ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {tx({ de: "Veröffentliche...", en: "Publishing...", es: "Publicando..." })}
+                  Veröffentliche...
                 </>
               ) : (
                 <>

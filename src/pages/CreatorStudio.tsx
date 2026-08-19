@@ -60,7 +60,7 @@ export default function CreatorStudio() {
             ) : templates.length === 0 ? (
               <Card className="p-8 text-center">
                 <p className="text-muted-foreground mb-3">
-                  {tx({ de: "Du hast noch keine Templates erstellt. Baue eines im Motion Studio und teile es hier mit der Community.", en: "You haven't created any templates yet. Build one in Motion Studio and share it with the community here.", es: "Aún no has creado plantillas. Crea una en Motion Studio y compártela aquí con la comunidad." })}
+                  Du hast noch keine Templates erstellt. Baue eines im Motion Studio und teile es hier mit der Community.
                 </p>
                 <Button asChild><a href="/video-composer">Zum Motion Studio</a></Button>
               </Card>

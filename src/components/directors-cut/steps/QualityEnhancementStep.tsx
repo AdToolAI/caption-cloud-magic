@@ -88,7 +88,7 @@ export function QualityEnhancementStep({
       sceneEffects={sceneEffects}
       transitions={transitions}
       audio={audio}
-      title=tx({ de: "KI-Qualität", en: "AI Quality", es: "Calidad IA" })
+      title="KI-Qualität"
       description={tx({ de: "Verbessere Auflösung, Framerate und Bildqualität mit KI", en: "Improve resolution, framerate and image quality with AI", es: "Mejora la resolución, la velocidad de fotogramas y la calidad de imagen con IA" })}
       icon={Sparkles}
       showSceneSelector={false}

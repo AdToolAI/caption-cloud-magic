@@ -16,9 +16,9 @@ export default function VideoManagement() {
 
       <Card className="p-12 text-center space-y-4">
         <Video className="h-16 w-16 mx-auto text-muted-foreground" />
-        <h2 className="text-xl font-semibold">{tx({ de: "Videos erstellen", en: "Create Videos", es: "Crear Videos" })}</h2>
+        <h2 className="text-xl font-semibold">Videos erstellen</h2>
         <p className="text-muted-foreground max-w-md mx-auto">
-          {tx({ de: "{tx({ de: \"Nutze den Universal Content Creator um professionelle Videos zu erstellen.\", en: \"Use the Universal Content Creator to create professional videos.\", es: \"Usa el Creador de Contenido Universal para crear videos profesionales.\" })}", en: "Use the Universal Content Creator to create professional videos.", es: "Usa el Creador de Contenido Universal para crear videos profesionales." })}
+          Nutze den Universal Content Creator um professionelle Videos zu erstellen.
         </p>
         <Button onClick={() => navigate('/universal-creator')} size="lg">
           Zum Universal Creator

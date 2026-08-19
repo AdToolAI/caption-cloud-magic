@@ -21,7 +21,7 @@ export const SEEDANCE_VIDEO_MODELS = {
       EUR: tx({ de: 'Günstiger Draft-Renderer, 720p — ab 0,30€ pro 5 Sekunden', en: 'Cheap draft renderer, 720p — from €0.30 per 5 seconds', es: 'Renderizador de borradores económico, 720p: desde 0,30 € por 5 segundos' }),
       USD: 'Low-cost draft renderer, 720p — from $0.30 per 5 seconds',
     },
-    badge: tx({ de: "Schnell & Günstig", en: "Fast & Affordable", es: "Rápido y Económico" }),
+    badge: 'Schnell & Günstig',
   },
   'seedance-standard': {
     name: 'Seedance 2.0 Fast',

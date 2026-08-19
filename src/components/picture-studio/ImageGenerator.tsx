@@ -399,7 +399,7 @@ export function ImageGenerator() {
       if (successCount === 0) {
         if (safetyFilteredMsg) {
           const canRetryFast = tier !== 'fast';
-          toast.warning(tx({ de: "Sicherheitsfilter ausgelöst", en: "Security filter triggered", es: "Filtro de seguridad activado" }), {
+          toast.warning('Sicherheitsfilter ausgelöst', {
             description: safetyFilteredMsg + (canRetryFast ? tx({ de: ' Tipp: „Fast" (Seedream 4) hat tolerantere Filter.', en: 'Tip: “Fast” (Seedream 4) has more tolerant filters.', es: 'Consejo: "Rápido" (Seedream 4) tiene filtros más tolerantes.' }) : ''),
             duration: 14000,
             action: canRetryFast ? {
@@ -608,7 +608,7 @@ export function ImageGenerator() {
                     onClick={() => { setHelperAutoEnhance(true); setHelperOpen(true); }}
                   >
                     <Wand2 className="h-3.5 w-3.5 mr-1.5" />
-                    {tx({ de: "{tx({ de: \"✨ Bild übernehmen & verbessern\", en: \"✨ Adopt & improve image\", es: \"✨ Adoptar y mejorar imagen\" })}", en: "✨ Adopt & improve image", es: "✨ Adoptar y mejorar imagen" })}
+                    ✨ Bild übernehmen & verbessern
                   </Button>
                 )}
                 <Button
@@ -632,7 +632,7 @@ export function ImageGenerator() {
 
           {/* Quality-Tier-Picker */}
           <div className="space-y-2">
-            <Label>{tx({ de: "Qualität & Modell", en: "Quality & Model", es: "Calidad y Modelo" })}</Label>
+            <Label>Qualität & Modell</Label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {MAIN_TIERS.map((t) => {
                 const meta = TIER_META[t];
@@ -836,7 +836,7 @@ export function ImageGenerator() {
                   onClick={handleRealisticReproduction}
                 >
                   <Camera className="h-3.5 w-3.5 mr-1.5" />
-                  {tx({ de: "{tx({ de: \"📸 Bild realistisch & detailliert reproduzieren\", en: \"📸 Reproduce image realistically & detailed\", es: \"📸 Reproducir imagen de forma realista y detallada\" })}", en: "📸 Reproduce image realistically & detailed", es: "📸 Reproducir imagen de forma realista y detallada" })}
+                  📸 Bild realistisch & detailliert reproduzieren
                 </Button>
               )}
             </div>
@@ -891,7 +891,7 @@ export function ImageGenerator() {
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  {n}× {n === 4 && <span className="opacity-70">{tx({ de: "Bilder", en: "Images", es: "Imágenes" })}</span>}
+                  {n}× {n === 4 && <span className="opacity-70">Bilder</span>}
                 </button>
               ))}
             </div>

@@ -22,7 +22,7 @@ const ALL_LANGS = ['de', 'en', 'es'];
 const TONALITIES = ['professional', 'friendly', 'witty', 'inspirational', 'authoritative'];
 
 const VIDEO_PROVIDERS: { id: string; label: string; perSecCredits: number; bestFor: string }[] = [
-  { id: 'hailuo-standard', label: 'Hailuo Standard', perSecCredits: 5, bestFor: tx({ de: "Schnell · günstig · 6/10s", en: "Fast · affordable · 6/10s", es: "Rápido · asequible · 6/10s" }) },
+  { id: 'hailuo-standard', label: 'Hailuo Standard', perSecCredits: 5, bestFor: 'Schnell · günstig · 6/10s' },
   { id: 'seedance-lite',   label: 'Seedance Lite',   perSecCredits: 6, bestFor: 'Stilisiert · 6–12s' },
   { id: 'kling-std',       label: 'Kling 2.1',       perSecCredits: 8, bestFor: 'Premium-Realismus · 5/10s' },
 ];

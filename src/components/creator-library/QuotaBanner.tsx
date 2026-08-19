@@ -7,7 +7,6 @@ import { Sparkles, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useDownloadQuota } from '@/hooks/useDownloadQuota';
-import { tx } from '@/lib/i18nText';
 
 export default function QuotaBanner() {
   const q = useDownloadQuota();
@@ -23,7 +22,7 @@ export default function QuotaBanner() {
           </span>
         </div>
         <span className="text-[10px] text-muted-foreground">
-          {tx({ de: "vergleichbar mit Artlist €30/mo", en: "comparable to Artlist €30/mo", es: "comparable a Artlist €30/mes" })}
+          vergleichbar mit Artlist €30/mo
         </span>
       </div>
     );
@@ -46,7 +45,7 @@ export default function QuotaBanner() {
       <Progress value={pct} className="h-1.5" />
       {q.exceeded && (
         <p className="text-[11px] text-amber-300">
-          {tx({ de: "Monatslimit erreicht — Upgrade auf einen Paid-Plan für unbegrenzte Downloads.", en: "Monthly limit reached — Upgrade to a paid plan for unlimited downloads.", es: "Límite mensual alcanzado — Actualiza a un plan de pago para descargas ilimitadas." })}
+          Monatslimit erreicht — Upgrade auf einen Paid-Plan für unbegrenzte Downloads.
         </p>
       )}
     </div>

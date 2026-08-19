@@ -18,7 +18,6 @@ import { RenderLoadWidget } from '@/components/admin/RenderLoadWidget';
 import { LaunchRadarCard } from '@/components/admin/LaunchRadarCard';
 
 import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, Bot, Server, Film, Store, Sparkles, Zap } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 
 export default function Admin() {
   return (
@@ -26,7 +25,7 @@ export default function Admin() {
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-2">Admin Dashboard</h1>
         <p className="text-muted-foreground">
-          {tx({ de: "Überwache das System, die Conversion und Email-Zustellung", en: "Monitor system, conversion and email delivery", es: "Monitorizar sistema, conversión y entrega de correo electrónico" })}
+          Überwache das System, die Conversion und Email-Zustellung
         </p>
       </div>
 

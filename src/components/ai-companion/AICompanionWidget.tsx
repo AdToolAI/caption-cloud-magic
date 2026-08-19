@@ -650,7 +650,7 @@ export function AICompanionWidget() {
                   size="icon"
                   className="h-8 w-8 text-muted-foreground hover:text-foreground"
                   onClick={() => setShowHistory(true)}
-                  title=tx({ de: "Gesprächsverlauf", en: "Conversation history", es: "Historial de conversación" })
+                  title="Gesprächsverlauf"
                 >
                   <History className="w-4 h-4" />
                 </Button>
@@ -837,7 +837,7 @@ export function AICompanionWidget() {
                       >
                         <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-2xl rounded-bl-md px-4 py-3">
                           <p className="text-sm text-foreground mb-2">
-                            {tx({ de: "{tx({ de: \"Klingt nach einem Problem! Möchtest du das an unser Support-Team weiterleiten?\", en: \"Sounds like a problem! Would you like to report this to our support team?\", es: \"¡Parece un problema! ¿Quieres reportarlo a nuestro equipo de soporte?\" })}", en: "Sounds like a problem! Would you like to report this to our support team?", es: "¡Parece un problema! ¿Quieres reportarlo a nuestro equipo de soporte?" })}
+                            Klingt nach einem Problem! Möchtest du das an unser Support-Team weiterleiten?
                           </p>
                           <div className="flex gap-2">
                             <Button
@@ -874,7 +874,7 @@ export function AICompanionWidget() {
                       >
                         <div className="bg-red-500/10 border border-red-500/20 rounded-2xl rounded-bl-md px-4 py-3">
                           <p className="text-sm text-red-400 font-medium mb-1">
-                            {tx({ de: "{tx({ de: \"⚠️ Fehler erkannt\", en: \"⚠️ Error detected\", es: \"⚠️ Error detectado\" })}", en: "⚠️ Error detected", es: "⚠️ Error detectado" })}
+                            ⚠️ Fehler erkannt
                           </p>
                           <p className="text-xs text-red-300/80 mb-2 font-mono truncate max-w-[250px]">
                             {detectedError.message}
@@ -888,7 +888,7 @@ export function AICompanionWidget() {
                             className="h-7 text-xs border-red-500/30 hover:bg-red-500/10"
                           >
                             <HeadphonesIcon className="w-3 h-3 mr-1" />
-                            {tx({ de: "{tx({ de: \"Fehler melden\", en: \"Report error\", es: \"Reportar error\" })}", en: "Report error", es: "Reportar error" })}
+                            Fehler melden
                           </Button>
                         </div>
                       </motion.div>

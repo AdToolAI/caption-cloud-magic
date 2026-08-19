@@ -101,7 +101,7 @@ export function CIPreflightDialog({
         <DialogFooter className="gap-2 sm:gap-2">
           {allClean ? (
             <Button onClick={onIgnoreAndRender} className="w-full">
-              {tx({ de: "Render starten", en: "Start Render", es: "Iniciar Renderizado" })}
+              Render starten
             </Button>
           ) : (
             <>

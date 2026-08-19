@@ -766,6 +766,10 @@ export default function BriefingTab({
             </div>
             {briefing.duration > 180 && (
               <p className="text-[11px] text-amber-300/80 leading-snug">
+                Längere Filme bedeuten mehr Szenen, höhere Kosten und längere Renderzeit.
+                Du erstellst weiterhin jede Szene einzeln — das Projekt ist auf 10 Minuten
+                Gesamtdauer begrenzt.
+              </p>
             )}
           </div>
 
@@ -795,8 +799,8 @@ export default function BriefingTab({
               <Label className="text-xs">{tx({ de: "KI-Qualität (Standard für alle Szenen)", en: "AI Quality (Default for all scenes)", es: "Calidad de IA (predeterminado para todas las escenas)" })}</Label>
               <div className="grid grid-cols-2 gap-2">
                 {([
-                  { q: 'standard' as ClipQuality, title: 'Standard', desc: tx({ de: "768p / 720p — günstiger", en: "768p / 720p — cheaper", es: "768p / 720p — más económico" }), rate: '€0.15/s' },
-                  { q: 'pro' as ClipQuality, title: 'Pro', desc: tx({ de: "1080p — höhere Auflösung", en: "1080p — higher resolution", es: "1080p — mayor resolución" }), rate: 'ab €0.20/s' },
+                  { q: 'standard' as ClipQuality, title: 'Standard', desc: '768p / 720p — günstiger', rate: '€0.15/s' },
+                  { q: 'pro' as ClipQuality, title: 'Pro', desc: '1080p — höhere Auflösung', rate: 'ab €0.20/s' },
                 ]).map(({ q, title, desc, rate }) => {
                   const isActive = (briefing.defaultQuality || 'standard') === q;
                   return (
@@ -823,9 +827,9 @@ export default function BriefingTab({
                 })}
               </div>
               <p className="text-[10px] text-muted-foreground/70">
-                {tx({ de: "Pro-Szene überschreibbar im Storyboard.", en: "Overridable per scene in the storyboard.", es: "Anulable por escena en el guion gráfico." })}
+                Pro-Szene überschreibbar im Storyboard.
               </p>
-          {tx({ de: "</div>", en: "Overridable per scene in the storyboard.", es: "Anulable por escena en el guion gráfico." })}
+          </div>
         </div>
       </StagePanel>
 

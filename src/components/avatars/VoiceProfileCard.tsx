@@ -212,7 +212,7 @@ export function VoiceProfileCard({ avatarId, avatar }: VoiceProfileCardProps) {
         )}
         {!avatar.default_voice_id && (
           <p className="mt-1.5 text-[10px] text-amber-500/80">
-            {tx({ de: "Noch keine Stimme zugewiesen — wähle eine aus, damit dieser Charakter im Motion Studio & AI Video Studio spricht.", en: "No voice assigned yet — choose one so this character speaks in Motion Studio & AI Video Studio.", es: "Aún no hay voz asignada — elige una para que este personaje hable en Motion Studio y AI Video Studio." })}
+            Noch keine Stimme zugewiesen — wähle eine aus, damit dieser Charakter im Motion Studio & AI Video Studio spricht.
           </p>
         )}
       </div>

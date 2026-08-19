@@ -244,7 +244,7 @@ export function AddMediaDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Library className="h-5 w-5 text-primary" />
-            {tx({ de: "Medien hinzufügen", en: "Add media", es: "Añadir medios" })}
+            Medien hinzufügen
           </DialogTitle>
         </DialogHeader>
 
@@ -256,7 +256,7 @@ export function AddMediaDialog({
             </TabsTrigger>
             <TabsTrigger value="images" className="gap-1.5">
               <Image className="h-4 w-4" />
-              {tx({ de: "Bilder", en: "Images", es: "Imágenes" })}
+              Bilder
             </TabsTrigger>
             <TabsTrigger value="upload" className="gap-1.5">
               <Upload className="h-4 w-4" />
@@ -420,7 +420,7 @@ export function AddMediaDialog({
         {/* Footer */}
         <div className="flex justify-end gap-2 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
+            Abbrechen
           </Button>
           <Button 
             onClick={handleConfirm} 
@@ -428,7 +428,7 @@ export function AddMediaDialog({
             className="gap-1.5"
           >
             <Check className="h-4 w-4" />
-            {tx({ de: "Hinzufügen", en: "Add", es: "Añadir" })}
+            Hinzufügen
           </Button>
         </div>
       </DialogContent>

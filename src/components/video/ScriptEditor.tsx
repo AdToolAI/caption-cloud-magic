@@ -117,7 +117,7 @@ export const ScriptEditor = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleOptimize('shorten', tx({ de: "gekürzt", en: "shortened", es: "acortado" }))}
+              onClick={() => handleOptimize('shorten', 'gekürzt')}
               disabled={isOptimizing || !value.trim()}
               className="justify-start"
             >

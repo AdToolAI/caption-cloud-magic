@@ -103,7 +103,7 @@ export const TwoFactorChallenge = ({ open, onSuccess, onCancel }: TwoFactorChall
             Zwei-Faktor-Authentifizierung
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            {tx({ de: "{tx({ de: \"Gib den Code aus deiner Authenticator-App ein\", en: \"Enter the code from your authenticator app\", es: \"Introduce el código de tu aplicación de autenticación\" })}", en: "Enter the code from your authenticator app", es: "Introduce el código de tu aplicación de autenticación" })}
+            Gib den Code aus deiner Authenticator-App ein
           </DialogDescription>
         </DialogHeader>
 
@@ -153,7 +153,7 @@ export const TwoFactorChallenge = ({ open, onSuccess, onCancel }: TwoFactorChall
               onClick={handleCancel} 
               className="flex-1 h-11 bg-muted/30 border-border/50 hover:bg-muted/50 transition-all duration-300"
             >
-              {tx({ de: "{tx({ de: \"Abbrechen\", en: \"Cancel\", es: \"Cancelar\" })}", en: "Cancel", es: "Cancelar" })}
+              Abbrechen
             </Button>
             <Button 
               onClick={handleVerify} 

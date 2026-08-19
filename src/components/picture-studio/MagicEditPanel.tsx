@@ -448,7 +448,7 @@ export function MagicEditPanel() {
                             handleFile(file);
                           }}
                         >
-                          {tx({ de: "Weiter bearbeiten", en: "Continue editing", es: "Continuar editando" })}
+                          Weiter bearbeiten
                         </Button>
                       </div>
                     </motion.div>

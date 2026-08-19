@@ -5,7 +5,6 @@ import { UniversalCreatorVideo } from '@/remotion/templates/UniversalCreatorVide
 import { Volume2, VolumeX, Play, Pause, Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clampAudioVolume } from '@/lib/audioVolume';
-import { tx } from '@/lib/i18nText';
 
 const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   UniversalVideo,
@@ -616,7 +615,7 @@ export function RemotionPreviewPlayer({
               size="icon"
               variant="ghost"
               onClick={() => setLoop((l) => !l)}
-              title={loop ? tx({ de: "Loop aus", en: "Loop off", es: "Bucle desactivado" }) : 'Loop an'}
+              title={loop ? 'Loop aus' : 'Loop an'}
               aria-pressed={loop}
               className={`h-8 w-8 ${loop ? 'text-primary' : 'text-muted-foreground'} hover:text-foreground`}
             >

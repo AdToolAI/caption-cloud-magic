@@ -26,7 +26,7 @@ export function CalendarTimeline({ events, loading, onEventClick }: CalendarTime
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
       scheduled: { variant: "default", label: "Geplant" },
-      posted: { variant: "secondary", label: tx({ de: "Veröffentlicht", en: "Posted", es: "Publicado" }) },
+      posted: { variant: "secondary", label: "Veröffentlicht" },
       draft: { variant: "outline", label: "Entwurf" },
       failed: { variant: "destructive", label: "Fehlgeschlagen" },
     };

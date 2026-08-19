@@ -65,7 +65,7 @@ export function VoicePreviewButton({ voiceId, language = 'de', size = 'icon', cl
       className={className}
       onClick={handleClick}
       disabled={loading}
-      title={playing ? 'Stop' : tx({ de: "Hörprobe abspielen", en: "Play preview", es: "Reproducir vista previa" })}
+      title={playing ? 'Stop' : 'Hörprobe abspielen'}
     >
       {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : playing ? <Square className="h-3 w-3" /> : <Play className="h-3 w-3" />}
     </Button>

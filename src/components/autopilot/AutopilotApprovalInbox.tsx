@@ -20,7 +20,7 @@ const META: Record<string, { label: string; icon: typeof Bell; className: string
   autopilot_blocked: { label: 'Blockiert', icon: XCircle, className: 'text-destructive bg-destructive/10' },
   autopilot_failed: { label: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }), icon: XCircle, className: 'text-destructive bg-destructive/10' },
   autopilot_posted: { label: 'Live', icon: Sparkles, className: 'text-emerald-500 bg-emerald-500/10' },
-  autopilot_daily_digest: { label: tx({ de: "Tagesübersicht", en: "Daily Digest", es: "Resumen diario" }), icon: CalIcon, className: 'text-primary bg-primary/10' },
+  autopilot_daily_digest: { label: 'Tagesübersicht', icon: CalIcon, className: 'text-primary bg-primary/10' },
   autopilot_strike: { label: 'Strike', icon: ShieldAlert, className: 'text-destructive bg-destructive/10' },
   autopilot_locked: { label: 'Sperre', icon: ShieldAlert, className: 'text-destructive bg-destructive/10' },
 };
@@ -92,7 +92,7 @@ export function AutopilotApprovalInbox({ onOpenSlot }: Props) {
         </div>
 
         {isLoading ? (
-          <div className="text-sm text-muted-foreground">{tx({ de: "Lade…", en: "Loading…", es: "Cargando…" })}</div>
+          <div className="text-sm text-muted-foreground">Lade…</div>
         ) : notifications.length === 0 ? (
           <EmptyState icon={Bell} text={tx({ de: "Noch keine Notifications. Sobald die KI plant, postet oder prüft, erscheint es hier.", en: "No notifications yet. Once the AI plans, posts, or reviews, it will appear here.", es: "Aún no hay notificaciones. Una vez que la IA planifique, publique o revise, aparecerá aquí." })} />
         ) : (

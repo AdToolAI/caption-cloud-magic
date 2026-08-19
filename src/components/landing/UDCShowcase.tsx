@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { trackUDC } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Lock, Users, Scissors, ShieldCheck, Sparkles, ArrowRight } from "lucide-react";
-import { tx } from '@/lib/i18nText';
 
 const pillars = [
   {
@@ -71,7 +70,7 @@ export function UDCShowcase() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link to="/universal-directors-cut" onClick={() => trackUDC('udc_showcase_cta_clicked', { target: 'directors-cut' })}>
             <Button size="lg" className="gap-2">
-              {tx({ de: "Directors Cut öffnen", en: "Open Directors Cut", es: "Abrir Directors Cut" })}
+              Directors Cut öffnen
               <ArrowRight className="w-4 h-4" />
             </Button>
           </Link>

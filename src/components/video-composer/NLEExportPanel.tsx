@@ -90,7 +90,7 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
           NLE-Export (Premiere / Resolve / FCP)
         </CardTitle>
         <p className="text-xs text-muted-foreground mt-1">
-          {tx({ de: "Exportiere als professionelle Sequenz-Datei und schneide in deinem NLE weiter.", en: "Export as a professional sequence file and continue editing in your NLE.", es: "Exporta como archivo de secuencia profesional y continúa editando en tu NLE." })}
+          Exportiere als professionelle Sequenz-Datei und schneide in deinem NLE weiter.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -149,7 +149,7 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
         <div className="pt-2 border-t border-border/40 space-y-2">
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <Upload className="h-3 w-3" />
-            {tx({ de: "Roundtrip — geänderte Sequenz importieren", en: "Roundtrip — import modified sequence", es: "Roundtrip — importar secuencia modificada" })}
+            Roundtrip — geänderte Sequenz importieren
           </div>
           <input
             ref={fileInputRef}
@@ -170,7 +170,7 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
             ) : (
               <Upload className="h-4 w-4" />
             )}
-            {tx({ de: "FCPXML hochladen & Diff prüfen", en: "Upload FCPXML & check diff", es: "Subir FCPXML y comprobar diferencias" })}
+            FCPXML hochladen & Diff prüfen
           </Button>
           <p className="text-[10px] text-muted-foreground/80 leading-relaxed">
             Lade die in Resolve/Premiere geänderte <code>.fcpxml</code> hoch — wir zeigen dir alle Trims, Reorder & gelöschten Szenen vor der Übernahme.
@@ -233,7 +233,7 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
         {loadingHistory && history.length === 0 && (
           <p className="text-xs text-muted-foreground text-center py-2">
             <Loader2 className="h-3 w-3 animate-spin inline mr-1" />
-            {tx({ de: "Lade History…", en: "Loading history…", es: "Cargando historial…" })}
+            Lade History…
           </p>
         )}
       </CardContent>

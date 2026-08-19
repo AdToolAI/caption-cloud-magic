@@ -155,7 +155,7 @@ export default function PlatformAnalytics() {
               <CardContent>
                 {posts.length === 0 ? (
                   <p className="text-muted-foreground text-center py-8">
-                    {tx({ de: "Keine Posts für diesen Zeitraum gefunden", en: "No posts found for this period", es: "No se encontraron publicaciones para este período" })}
+                    Keine Posts für diesen Zeitraum gefunden
                   </p>
                 ) : (
                   <div className="space-y-3">

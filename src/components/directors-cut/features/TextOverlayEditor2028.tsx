@@ -492,7 +492,7 @@ export function TextOverlayEditor2028({
             className="ml-auto flex-shrink-0 px-2"
           >
             <Sparkles className="h-4 w-4 mr-1 flex-shrink-0" />
-            <span className="break-words [overflow-wrap:anywhere]">{tx({ de: "Vorlagen", en: "Templates", es: "Plantillas" })}</span>
+            <span className="break-words [overflow-wrap:anywhere]">Vorlagen</span>
           </Button>
         </CardTitle>
       </CardHeader>
@@ -532,7 +532,7 @@ export function TextOverlayEditor2028({
         {/* Bühne: Overlays direkt auf dem Bild platzieren */}
         <div className="space-y-2 min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <Label className="text-sm font-medium">{tx({ de: "Bühne", en: "Stage", es: "Escenario" })}</Label>
+            <Label className="text-sm font-medium">Bühne</Label>
             <Button
               variant="ghost"
               size="sm"
@@ -553,7 +553,7 @@ export function TextOverlayEditor2028({
             onChange={(id, patch) => updateOverlay(id, patch)}
           />
           <p className="text-[11px] text-muted-foreground">
-            {tx({ de: "{tx({ de: \"Ziehen zum Verschieben, Ecke zum Skalieren — die Position gilt 1:1 für den Export.\", en: \"Drag to move, corner to scale — position applies 1:1 to export.\", es: \"Arrastra para mover, esquina para escalar — la posición se aplica 1:1 a la exportación.\" })}", en: "Drag to move, corner to scale — position applies 1:1 to export.", es: "Arrastra para mover, esquina para escalar — la posición se aplica 1:1 a la exportación." })}
+            Ziehen zum Verschieben, Ecke zum Skalieren — die Position gilt 1:1 für den Export.
           </p>
         </div>
 
@@ -593,7 +593,7 @@ export function TextOverlayEditor2028({
           className="w-full min-w-0 p-3 rounded-xl border-2 border-dashed border-white/20 hover:border-primary/50 hover:bg-white/5 transition-all flex flex-wrap items-center justify-center gap-2 text-muted-foreground hover:text-foreground"
         >
           <Plus className="h-4 w-4" />
-          <span className="text-sm font-medium break-words text-center [overflow-wrap:anywhere]">{tx({ de: "Neues Text-Overlay", en: "New Text Overlay", es: "Nueva superposición de texto" })}</span>
+          <span className="text-sm font-medium break-words text-center [overflow-wrap:anywhere]">Neues Text-Overlay</span>
         </motion.button>
 
         {/* Overlay List */}
@@ -823,7 +823,7 @@ export function TextOverlayEditor2028({
               className="mt-4"
             >
               <Sparkles className="h-4 w-4 mr-2" />
-              {tx({ de: "{tx({ de: \"Vorlagen ansehen\", en: \"View Templates\", es: \"Ver Plantillas\" })}", en: "View Templates", es: "Ver Plantillas" })}
+              Vorlagen ansehen
             </Button>
           </div>
         )}

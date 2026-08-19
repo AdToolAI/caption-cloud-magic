@@ -119,7 +119,7 @@ export function AudioUpload({
             <>
               <Upload className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
               <p className="text-sm text-muted-foreground mb-1">
-                {tx({ de: "Audio hier ablegen", en: "Drop audio here", es: "Arrastra el audio aquí" })}
+                Audio hier ablegen
               </p>
               <p className="text-xs text-muted-foreground">
                 MP3, WAV, OGG bis 10MB

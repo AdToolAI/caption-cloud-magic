@@ -944,14 +944,14 @@ export default function InstagramPublishing() {
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
                       <div>
-                        <p className="font-medium">{tx({ de: "Öffne den Meta Graph API Explorer", en: "Open Meta Graph API Explorer", es: "Abrir el Explorador de la API de Meta Graph" })}</p>
+                        <p className="font-medium">Öffne den Meta Graph API Explorer</p>
                         <a 
                           href="https://developers.facebook.com/tools/explorer/" 
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className="text-primary underline hover:no-underline"
                         >
-                          {tx({ de: "{tx({ de: \"→ Graph API Explorer öffnen\", en: \"→ Open Graph API Explorer\", es: \"→ Abrir Explorador de API de Graph\" })}", en: "→ Open Graph API Explorer", es: "→ Abrir Explorador de API de Graph" })}
+                          → Graph API Explorer öffnen
                         </a>
                       </div>
                     </li>
@@ -1006,14 +1006,14 @@ export default function InstagramPublishing() {
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
                       <div>
-                        <p className="font-medium">{tx({ de: "Öffne den Meta Graph API Explorer", en: "Open Meta Graph API Explorer", es: "Abrir el Explorador de la API de Meta Graph" })}</p>
+                        <p className="font-medium">Öffne den Meta Graph API Explorer</p>
                         <a 
                           href="https://developers.facebook.com/tools/explorer/" 
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className="text-primary underline hover:no-underline"
                         >
-                          {tx({ de: "{tx({ de: \"→ Graph API Explorer öffnen\", en: \"→ Open Graph API Explorer\", es: \"→ Abrir Explorador de API de Graph\" })}", en: "→ Open Graph API Explorer", es: "→ Abrir Explorador de API de Graph" })}
+                          → Graph API Explorer öffnen
                         </a>
                       </div>
                     </li>
@@ -1048,7 +1048,7 @@ export default function InstagramPublishing() {
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">5</span>
                       <div>
-                        <p className="font-medium">{tx({ de: "Bestätige im Popup", en: "Confirm in the popup", es: "Confirmar en la ventana emergente" })}</p>
+                        <p className="font-medium">Bestätige im Popup</p>
                         <p className="text-muted-foreground">{tx({ de: "Klicke auf \"Als {'{'}Dein Name{'}'} fortfahren\"", en: "Click on \"Continue as {'{'}Your Name{'}'}\"", es: "Haz clic en \"Continuar como {'{'}Tu Nombre{'}'}\"" })}</p>
                       </div>
                     </li>
@@ -1106,7 +1106,7 @@ export default function InstagramPublishing() {
                 <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
                   <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
                   <AlertDescription className="text-green-800 dark:text-green-200 font-medium">
-                    {tx({ de: "{tx({ de: \"✅ Token erfolgreich erneuert und automatisch gespeichert!\", en: \"✅ Token successfully renewed and automatically saved!\", es: \"✅ ¡Token renovado y guardado automáticamente con éxito!\" })}", en: "✅ Token successfully renewed and automatically saved!", es: "✅ ¡Token renovado y guardado automáticamente con éxito!" })}
+                    ✅ Token erfolgreich erneuert und automatisch gespeichert!
                   </AlertDescription>
                 </Alert>
 
@@ -1126,7 +1126,7 @@ export default function InstagramPublishing() {
                     <XCircle className="h-4 w-4 text-red-500" />
                   )}
                   <span className="font-medium">
-                    {renewResult.debug?.is_valid ? 'Token gültig' : tx({ de: "Token ungültig", en: "Token invalid", es: "Token inválido" })}
+                    {renewResult.debug?.is_valid ? 'Token gültig' : 'Token ungültig'}
                   </span>
                 </div>
 
@@ -1143,7 +1143,7 @@ export default function InstagramPublishing() {
                       })}
                     </span>
                     {renewResult.debug.expires_at * 1000 < Date.now() + 7 * 24 * 60 * 60 * 1000 && (
-                      <Badge variant="destructive" className="ml-2">{tx({ de: "Läuft bald ab!", en: "Expires soon!", es: "¡Expira pronto!" })}</Badge>
+                      <Badge variant="destructive" className="ml-2">Läuft bald ab!</Badge>
                     )}
                   </div>
                 )}
@@ -1191,7 +1191,7 @@ export default function InstagramPublishing() {
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription className="text-sm">
-                    {tx({ de: "{tx({ de: \"Die Diagnose wird automatisch aktualisiert. Du kannst jetzt wieder automatisch posten! 🚀\", en: \"The diagnosis is automatically updated. You can now post automatically again! 🚀\", es: \"El diagnóstico se actualiza automáticamente. ¡Ahora puedes volver a publicar automáticamente! 🚀\" })}", en: "The diagnosis is automatically updated. You can now post automatically again! 🚀", es: "El diagnóstico se actualiza automáticamente. ¡Ahora puedes volver a publicar automáticamente! 🚀" })}
+                    Die Diagnose wird automatisch aktualisiert. Du kannst jetzt wieder automatisch posten! 🚀
                   </AlertDescription>
                 </Alert>
               </div>
@@ -1205,7 +1205,7 @@ export default function InstagramPublishing() {
                   <strong>{tx({ de: "❌ Token konnte nicht validiert werden.", en: "❌ Token could not be validated.", es: "❌ No se pudo validar el token." })}</strong>
                   <p className="mt-1 text-sm">{error}</p>
                   <p className="mt-2 text-sm">
-                    {tx({ de: "{tx({ de: \"Bitte prüfe:\", en: \"Please check:\", es: \"Por favor, verifica:\" })}", en: "Please check:", es: "Por favor, verifica:" })}
+                    Bitte prüfe:
                   </p>
                   <ul className="list-disc list-inside text-sm mt-1">
                     <li>{tx({ de: "Hast du die richtige App gewählt?", en: "Did you choose the right app?", es: "¿Elegiste la aplicación correcta?" })}</li>

@@ -71,7 +71,7 @@ export function AudioDuckingPanel({
         <AudioLines className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
         <h3 className="text-lg font-semibold mb-2">{tx({ de: "Sprache + Musik benötigt", en: "Voice + music required", es: "Se requiere voz + música" })}</h3>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Lade ein Voiceover hoch <span className="text-primary">{tx({ de: "und", en: "and", es: "y" })}</span> wähle einen
+          Lade ein Voiceover hoch <span className="text-primary">und</span> wähle einen
           Musik-Track (über AI Music, Beat-Sync oder die Bibliothek), um Audio Ducking zu nutzen.
         </p>
       </Card>
@@ -95,11 +95,11 @@ export function AudioDuckingPanel({
               <div className="flex items-center gap-2 mb-0.5">
                 <h3 className="text-lg font-bold">Audio Ducking</h3>
                 <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">
-                  {usingTranscript ? tx({ de: "Transkript-präzise", en: "Transcript-precise", es: "Precisión de transcripción" }) : 'RMS-Erkennung'}
+                  {usingTranscript ? 'Transkript-präzise' : 'RMS-Erkennung'}
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                {tx({ de: "{tx({ de: \"Musik wird automatisch leiser, wenn Sprache erkannt wird\", en: \"Music automatically lowers when speech is detected\", es: \"La música baja automáticamente cuando se detecta voz\" })}", en: "Music automatically lowers when speech is detected", es: "La música baja automáticamente cuando se detecta voz" })}
+                Musik wird automatisch leiser, wenn Sprache erkannt wird
               </p>
             </div>
           </div>
@@ -306,7 +306,7 @@ export function AudioDuckingPanel({
               onValueChange={([v]) => handleSettingChange({ threshold: v / 100 })}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              {tx({ de: "{tx({ de: \"Tipp: Mit Transkript wird dieser Wert ignoriert — Wort-Timestamps sind präziser.\", en: \"Tip: With transcript, this value is ignored — word timestamps are more precise.\", es: \"Consejo: Con transcripción, este valor se ignora — las marcas de tiempo de palabras son más precisas.\" })}", en: "Tip: With transcript, this value is ignored — word timestamps are more precise.", es: "Consejo: Con transcripción, este valor se ignora — las marcas de tiempo de palabras son más precisas." })}
+              Tipp: Mit Transkript wird dieser Wert ignoriert — Wort-Timestamps sind präziser.
             </p>
           </div>
         )}

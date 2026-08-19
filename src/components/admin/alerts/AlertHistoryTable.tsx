@@ -66,7 +66,7 @@ export function AlertHistoryTable() {
       </CardHeader>
       <CardContent>
         {loading ? (
-          <p className="text-sm text-muted-foreground">{tx({ de: "Lade…", en: "Loading…", es: "Cargando…" })}</p>
+          <p className="text-sm text-muted-foreground">Lade…</p>
         ) : rows.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">{tx({ de: "Keine Einträge.", en: "No entries.", es: "Sin entradas." })}</p>
         ) : (

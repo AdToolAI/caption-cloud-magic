@@ -188,7 +188,7 @@ export function AIVideoRestoration({
               {feature.hasStrength && settings[feature.id as keyof typeof settings] && (
                 <div className="pl-6 space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">{tx({ de: "Stärke", en: "Strength", es: "Intensidad" })}</span>
+                    <span className="text-xs text-muted-foreground">Stärke</span>
                     <span className="text-xs text-muted-foreground">
                       {settings[feature.strengthKey as keyof typeof settings]}%
                     </span>
@@ -270,7 +270,7 @@ export function AIVideoRestoration({
           <div className="p-3 bg-muted/50 rounded-lg">
             <p className="text-xs text-muted-foreground">
               <strong>{tx({ de: "Perfekt für:", en: "Perfect for:", es: "Perfecto para:" })}</strong> Alte Familienvideos, VHS-Aufnahmen, 
-              {tx({ de: "{tx({ de: \"historisches Filmmaterial und beschädigte Aufnahmen.\", en: \"historical footage and damaged recordings.\", es: \"material histórico y grabaciones dañadas.\" })}", en: "historical footage and damaged recordings.", es: "material histórico y grabaciones dañadas." })}
+              historisches Filmmaterial und beschädigte Aufnahmen.
             </p>
           </div>
         </div>

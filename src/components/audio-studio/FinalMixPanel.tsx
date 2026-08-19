@@ -46,7 +46,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
   }, []);
 
   const handleAddFromUrl = async () => {
-    const url = prompt(tx({ de: "Audio-URL einfügen (https://...)", en: "Insert audio URL (https://...)", es: "Insertar URL de audio (https://...)" }));
+    const url = prompt('Audio-URL einfügen (https://...)');
     if (!url) return;
     mixer.addSource({
       id: `url-${Date.now()}`,
@@ -102,7 +102,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
         a.download = `final-mix-${Date.now()}.wav`;
         a.click();
         URL.revokeObjectURL(a.href);
-        toast.success(tx({ de: "Download gestartet", en: "Download started", es: "Descarga iniciada" }));
+        toast.success('Download gestartet');
         return;
       }
 
@@ -187,6 +187,10 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
               <Badge variant="outline" className="border-primary/40 text-primary">{tx({ de: 'Sendefertig', en: 'Ready to broadcast', es: 'Listo para emitir' })}</Badge>
             </div>
             <p className="text-sm text-muted-foreground">
+              Voiceover + Music + Stems + SFX → ein finales 48kHz WAV mit Loudness-Normalisierung
+              für Spotify, YouTube oder Broadcast.
+            </p>
+          </div>
         </div>
       </Card>
 
@@ -424,9 +428,9 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
             className={exportFormat === 'wav' ? 'bg-gradient-to-r from-emerald-500 to-primary' : ''}
           >
             <Save className="w-4 h-4 mr-2" />
-            {tx({ de: "In Bibliothek speichern", en: "Save to Library", es: "Guardar en la biblioteca" })}
+            In Bibliothek speichern
           </Button>
-          {tx({ de: "<Button", en: "Save to Library", es: "Guardar en la biblioteca" })}
+          <Button
             variant={exportFormat === 'download' ? 'default' : 'outline'}
             onClick={() => setExportFormat('download')}
             className={exportFormat === 'download' ? 'bg-gradient-to-r from-emerald-500 to-primary' : ''}

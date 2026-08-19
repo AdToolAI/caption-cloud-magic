@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
-import { tx } from '@/lib/i18nText';
 
 interface CommentChartsProps {
   timeseries: { byDay: Array<{ date: string; pos: number; neu: number; neg: number }> };
@@ -22,7 +21,7 @@ export function CommentCharts({ timeseries, intentDistribution, heatmap, topTopi
       {/* Sentiment Over Time */}
       <Card>
         <CardHeader>
-          <CardTitle>{tx({ de: "Sentiment über Zeit", en: "Sentiment over Time", es: "Sentimiento a lo largo del tiempo" })}</CardTitle>
+          <CardTitle>Sentiment über Zeit</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>

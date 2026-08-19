@@ -160,7 +160,7 @@ export const useTemplateVersion = (templateId?: string) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['template-versions'] });
       toast({
-        title: tx({ de: "Version veröffentlicht", en: "Version published", es: "Versión publicada" }),
+        title: 'Version veröffentlicht',
         description: tx({ de: 'Die Version ist jetzt öffentlich sichtbar.', en: 'The version is now publicly visible.', es: 'La versión ahora es visible públicamente.' }),
       });
     },

@@ -37,7 +37,7 @@ export function BrandAssetFactory({ brandKitId }: { brandKitId: string | null })
               <h3 className="font-display text-lg">Brand Asset Factory</h3>
             </div>
             <p className="text-xs text-muted-foreground max-w-md">
-              {tx({ de: "{tx({ de: \"Generiert in einem Schritt Logo-Varianten, App-Icon, Social-Cover, Pattern und Email-Header — alles im Stil deiner Marke.\", en: \"Generates logo variants, app icon, social cover, pattern, and email header in one step — all in your brand's style.\", es: \"Genera variantes de logo, icono de app, portada social, patrón y encabezado de email en un solo paso — todo al estilo de tu marca.\" })}", en: "Generates logo variants, app icon, social cover, pattern, and email header in one step — all in your brand's style.", es: "Genera variantes de logo, icono de app, portada social, patrón y encabezado de email en un solo paso — todo al estilo de tu marca." })}
+              Generiert in einem Schritt Logo-Varianten, App-Icon, Social-Cover, Pattern und Email-Header — alles im Stil deiner Marke.
             </p>
           </div>
           <Button onClick={generatePack} disabled={generating} className="shrink-0">
@@ -51,7 +51,7 @@ export function BrandAssetFactory({ brandKitId }: { brandKitId: string | null })
       </Card>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">{tx({ de: "Lade Assets …", en: "Loading Assets …", es: "Cargando activos…" })}</p>
+        <p className="text-sm text-muted-foreground">Lade Assets …</p>
       ) : assets.length === 0 ? (
         <Card className="p-8 bg-card/40 border-dashed border-white/10 text-center">
           <Package className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />

@@ -6,7 +6,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import {
-import { tx } from '@/lib/i18nText';
   SCENE_SNIPPET_CATEGORIES,
   type SceneSnippet,
   type SceneSnippetCategory,
@@ -97,11 +96,11 @@ export default function CuratedSnippetGallery({
       {loading ? (
         <div className="flex items-center justify-center py-12 text-xs text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          {tx({ de: "Lade kuratierte Szenen...", en: "Loading curated scenes...", es: "Cargando escenas seleccionadas..." })}
+          Lade kuratierte Szenen...
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-md border border-dashed border-border/60 p-8 text-center text-xs text-muted-foreground">
-          {tx({ de: "Keine Szenen in dieser Kategorie.", en: "No scenes in this category.", es: "No hay escenas en esta categoría." })}
+          Keine Szenen in dieser Kategorie.
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

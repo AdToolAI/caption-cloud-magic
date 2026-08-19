@@ -137,13 +137,13 @@ const Billing = () => {
       subtitle: tx({ de: "Verwalten Sie Ihr Abonnement und Ihre Zahlungsmethoden", en: "Manage your subscription and payment methods", es: "Gestiona tu suscripción y métodos de pago" }),
       manageCard: "Abo verwalten",
       manageDesc: tx({ de: "Zahlungsmethode aktualisieren, Rechnungen anzeigen, Abo kündigen oder wechseln", en: "Update payment method, view invoices, cancel or switch subscription", es: "Actualizar método de pago, ver facturas, cancelar o cambiar de suscripción" }),
-      openPortal: tx({ de: "Abrechnungsportal öffnen", en: "Open Billing Portal", es: "Abrir portal de facturación" }),
+      openPortal: "Abrechnungsportal öffnen",
       invoicesCard: "Rechnungen",
       invoicesDesc: tx({ de: "Laden Sie Ihre Rechnungen und Zahlungshistorie herunter", en: "Download your invoices and payment history", es: "Descarga tus facturas e historial de pagos" }),
       noInvoices: "Keine Rechnungen",
       noCustomer: "Kein aktives Abo",
       upgradeMsg: tx({ de: "Sie haben noch kein aktives Abonnement. Wählen Sie einen Plan!", en: "You do not have an active subscription yet. Choose a plan!", es: "Aún no tienes una suscripción activa. ¡Elige un plan!" }),
-      upgradeCta: tx({ de: "Pläne anzeigen", en: "View Plans", es: "Ver planes" }),
+      upgradeCta: "Pläne anzeigen",
       number: "Rechnung",
       date: "Datum",
       amount: "Betrag",
@@ -255,7 +255,7 @@ const Billing = () => {
                   className="w-full sm:w-auto text-muted-foreground"
                 >
                   {language === "de"
-                    ? tx({ de: "Abo kündigen", en: "Cancel Subscription", es: "Cancelar suscripción" })
+                    ? "Abo kündigen"
                     : language === "es"
                     ? "Cancelar suscripción"
                     : "Cancel subscription"}

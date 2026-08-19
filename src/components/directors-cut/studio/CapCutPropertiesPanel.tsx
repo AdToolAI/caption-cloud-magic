@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Volume2, Clock, Scissors, Music, MessageSquare, Trash2, Type, AlignVerticalJustifyCenter, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SceneTrimInspector } from './SceneTrimInspector';
-import { tx } from '@/lib/i18nText';
 
 interface CapCutPropertiesPanelProps {
   selectedClip: AudioClip | undefined;
@@ -444,12 +443,12 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                   />
                 </div>
               </div>
-              {tx({ de: "<p className=\"text-[10px] text-white/40 mt-1.5 leading-tight\">", en: "Trim shortens the visible length of the clip on the timeline. Press Enter to apply.", es: "Recortar acorta la duración visible del clip en la línea de tiempo. Pulsa Enter para aplicar." })}
-                {tx({ de: "Trim kürzt die sichtbare Länge des Clips auf der Timeline. Enter zum Anwenden.", en: "Trim shortens the visible length of the clip on the timeline. Press Enter to apply.", es: "Recortar acorta la duración visible del clip en la línea de tiempo. Pulsa Enter para aplicar." })}
+              <p className="text-[10px] text-white/40 mt-1.5 leading-tight">
+                Trim kürzt die sichtbare Länge des Clips auf der Timeline. Enter zum Anwenden.
               </p>
               {/* Length + End time (calculated, live) */}
               <div className="flex justify-between text-xs text-white/50 bg-[#0a0a1a]/60 px-2 py-1.5 rounded mt-2">
-                <span>{tx({ de: "Länge", en: "Length", es: "Longitud" })}</span>
+                <span>Länge</span>
                 <span>{selectedClip.duration.toFixed(2)}s</span>
               </div>
               <div className="flex justify-between text-xs text-white/50 bg-[#0a0a1a]/60 px-2 py-1.5 rounded mt-1">

@@ -496,7 +496,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-[10px] uppercase tracking-[0.18em] font-semibold text-[hsl(var(--primary))]/80">
-            {tx({ de: "Live-Vorschau", en: "Live Preview", es: "Vista previa en vivo" })}
+            Live-Vorschau
           </h3>
         </div>
         <div className="flex flex-wrap gap-1.5">

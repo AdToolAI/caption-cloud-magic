@@ -516,14 +516,14 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
           <div>
             <h2 className="font-serif text-xl">Regietisch</h2>
             <p className="text-sm text-muted-foreground">
-              {tx({ de: "{tx({ de: \"Sag, was du brauchst. Die KI entwickelt Konzept, Storyboard und Film.\", en: \"Tell us what you need. The AI develops concept, storyboard, and film.\", es: \"Dinos qué necesitas. La IA desarrolla el concepto, el guion gráfico y la película.\" })}", en: "Tell us what you need. The AI develops concept, storyboard, and film.", es: "Dinos qué necesitas. La IA desarrolla el concepto, el guion gráfico y la película." })}
+              Sag, was du brauchst. Die KI entwickelt Konzept, Storyboard und Film.
             </p>
           </div>
         </div>
 
         <div className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="autopilot-brief">{tx({ de: "Was soll entstehen?", en: "What should be created?", es: "¿Qué debería crearse?" })}</Label>
+            <Label htmlFor="autopilot-brief">Was soll entstehen?</Label>
             <Textarea
               id="autopilot-brief"
               value={brief}
@@ -587,7 +587,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>{tx({ de: "Länge", en: "Length", es: "Longitud" })}</Label>
+              <Label>Länge</Label>
               <span className="text-sm font-medium text-primary">{duration} Sekunden</span>
             </div>
             <Slider
@@ -737,7 +737,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
               ) : (
                 <>
                   <CheckCircle2 className="mr-2 h-4 w-4" />
-                  {tx({ de: "{tx({ de: \"Freigeben und produzieren\", en: \"Approve and produce\", es: \"Aprobar y producir\" })}", en: "Approve and produce", es: "Aprobar y producir" })}
+                  Freigeben und produzieren
                 </>
               )}
             </Button>
@@ -762,6 +762,10 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
           <AlertDialogHeader>
             <AlertDialogTitle>Produktion freigeben</AlertDialogTitle>
             <AlertDialogDescription>
+              Abgerechnet wird stufenweise. Was nicht geliefert wird, bekommst du automatisch
+              zurück.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
 
           {cost && (
             <div className="space-y-2 rounded-lg border border-border/50 bg-muted/20 p-4 text-sm">

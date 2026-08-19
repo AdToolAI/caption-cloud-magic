@@ -486,7 +486,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   },
   {
     id: "announcement",
-    name: tx({ de: "Ankündigung", en: "Announcement", es: "Anuncio" }),
+    name: "Ankündigung",
     category: tx({ de: "Launch", en: "Launch", es: "Lanzamiento" }),
     build: ({ image }) =>
       base(
@@ -499,7 +499,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
             text("adtool.ai", { y: 0.88, size: 0.028, weight: 500, font: "mono", align: "center", x: 0.1, w: 0.8, h: 0.05, color: P.accent }),
           ],
         }],
-        tx({ de: "Ankündigung", en: "Announcement", es: "Anuncio" }), "Ankündigung",
+        "Ankündigung", "Ankündigung",
       ),
   },
   {

@@ -229,7 +229,7 @@ export function TransitionPicker({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{tx({ de: "Dauer", en: "Duration", es: "Duración" })}</span>
+              <span className="text-sm font-medium">Dauer</span>
             </div>
             <Badge variant="outline" className="font-mono">
               {duration.toFixed(1)}s

@@ -160,13 +160,13 @@ export function VisualEffectsStep({
         <div>
           <h3 className="text-lg font-semibold">Visuelle Effekte</h3>
           <p className="text-sm text-muted-foreground">
-            {tx({ de: "{tx({ de: \"Passe Farben, Filter und visuelle Stile an\", en: \"Adjust colors, filters, and visual styles\", es: \"Ajusta colores, filtros y estilos visuales\" })}", en: "Adjust colors, filters, and visual styles", es: "Ajusta colores, filtros y estilos visuales" })}
+            Passe Farben, Filter und visuelle Stile an
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleReset}>
             <RotateCcw className="h-4 w-4 mr-2" />
-            {tx({ de: "{tx({ de: \"Zurücksetzen\", en: \"Reset\", es: \"Restablecer\" })}", en: "Reset", es: "Restablecer" })}
+            Zurücksetzen
           </Button>
           <Button 
             size="sm" 
@@ -281,7 +281,7 @@ export function VisualEffectsStep({
 
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <Label className="text-xs">{tx({ de: "Sättigung", en: "Saturation", es: "Saturación" })}</Label>
+                  <Label className="text-xs">Sättigung</Label>
                   <span className="text-xs text-muted-foreground">{effects.saturation}%</span>
                 </div>
                 <Slider
@@ -295,7 +295,7 @@ export function VisualEffectsStep({
 
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <Label className="text-xs">{tx({ de: "Schärfe", en: "Sharpness", es: "Nitidez" })}</Label>
+                  <Label className="text-xs">Schärfe</Label>
                   <span className="text-xs text-muted-foreground">{effects.sharpness}</span>
                 </div>
                 <Slider

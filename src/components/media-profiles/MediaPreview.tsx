@@ -1,7 +1,6 @@
 import { MediaProfileConfig } from '@/lib/mediaProfileSchema';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { tx } from '@/lib/i18nText';
 
 interface MediaPreviewProps {
   config: MediaProfileConfig | null;
@@ -14,8 +13,8 @@ export function MediaPreview({ config }: MediaPreviewProps) {
         <CardHeader>
           <CardTitle className="text-sm">Preview</CardTitle>
         </CardHeader>
-        {tx({ de: "<CardContent className=\"flex items-center justify-center h-[400px] text-muted-foreground\">", en: "Loading configuration...", es: "Cargando configuración..." })}
-          {tx({ de: "Konfiguration laden...", en: "Loading configuration...", es: "Cargando configuración..." })}
+        <CardContent className="flex items-center justify-center h-[400px] text-muted-foreground">
+          Konfiguration laden...
         </CardContent>
       </Card>
     );
@@ -48,7 +47,7 @@ export function MediaPreview({ config }: MediaPreviewProps) {
           >
             <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-xs">
               <span className="bg-background/80 px-2 py-1 rounded">
-                {config.fitMode === 'cover' && tx({ de: "Cover: Füllt Frame, schneidet ab", en: "Cover: Fills frame, crops", es: "Cubrir: Rellena el marco, recorta" })}
+                {config.fitMode === 'cover' && 'Cover: Füllt Frame, schneidet ab'}
                 {config.fitMode === 'contain' && 'Contain: Passt rein, Letterbox'}
                 {config.fitMode === 'pad' && 'Pad: Zentriert, Padding'}
                 {config.fitMode === 'smart' && 'Smart: Intelligente Anpassung'}
@@ -100,13 +99,13 @@ export function MediaPreview({ config }: MediaPreviewProps) {
             <span className="font-mono">{config.fitMode}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">{tx({ de: "Größenlimit:", en: "Size limit:", es: "Límite de tamaño:" })}</span>
+            <span className="text-muted-foreground">Größenlimit:</span>
             <span className="font-mono">{config.sizeLimitMb} MB</span>
           </div>
           {config.video && (
             <>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">{tx({ de: "Dauer:", en: "Duration:", es: "Duración:" })}</span>
+                <span className="text-muted-foreground">Dauer:</span>
                 <span className="font-mono">
                   {config.video.minDurationSec || 0}s - {config.video.maxDurationSec || '∞'}s
                 </span>

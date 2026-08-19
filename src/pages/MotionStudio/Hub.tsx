@@ -217,7 +217,7 @@ export default function MotionStudioHub() {
                 <Button asChild size="lg" className="gap-2 bg-gradient-to-r from-primary to-accent shadow-lg shadow-primary/20">
                   <Link to="/motion-studio/studio">
                     <Wand2 className="h-4 w-4" />
-                    {tx({ de: "Studio Mode starten", en: "Start Studio Mode", es: "Iniciar Modo Estudio" })}
+                    Studio Mode starten
                   </Link>
                 </Button>
                 <Button asChild variant="outline" size="lg" className="gap-2">

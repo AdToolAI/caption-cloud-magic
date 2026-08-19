@@ -90,7 +90,7 @@ export function BrandVoiceAnalyzer({ brandKitId, existingVoice, onAnalysisComple
             Brand Voice Assistent
           </CardTitle>
           <CardDescription>
-            {tx({ de: "{tx({ de: \"Lade 2-5 eigene Texte hoch und lass die KI deine Marken-Stimme analysieren\", en: \"Upload 2-5 of your own texts and let the AI analyze your brand voice\", es: \"Sube 2-5 de tus propios textos y deja que la IA analice la voz de tu marca\" })}", en: "Upload 2-5 of your own texts and let the AI analyze your brand voice", es: "Sube 2-5 de tus propios textos y deja que la IA analice la voz de tu marca" })}
+            Lade 2-5 eigene Texte hoch und lass die KI deine Marken-Stimme analysieren
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -129,7 +129,7 @@ export function BrandVoiceAnalyzer({ brandKitId, existingVoice, onAnalysisComple
                 className="flex-1"
               >
                 <Plus className="mr-2 h-4 w-4" />
-                {tx({ de: "{tx({ de: \"Sample hinzufügen\", en: \"Add Sample\", es: \"Añadir muestra\" })}", en: "Add Sample", es: "Añadir muestra" })}
+                Sample hinzufügen
               </Button>
             )}
             <Button
@@ -162,7 +162,7 @@ export function BrandVoiceAnalyzer({ brandKitId, existingVoice, onAnalysisComple
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">{tx({ de: "Tonalität", en: "Tone of Voice", es: "Tono de Voz" })}</p>
+                <p className="text-sm font-medium text-muted-foreground">Tonalität</p>
                 <Badge variant="secondary" className="mt-1">{existingVoice.tone}</Badge>
               </div>
               <div>
@@ -181,7 +181,7 @@ export function BrandVoiceAnalyzer({ brandKitId, existingVoice, onAnalysisComple
 
             {existingVoice.personality_traits && (
               <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">{tx({ de: "Persönlichkeit", en: "Personality", es: "Personalidad" })}</p>
+                <p className="text-sm font-medium text-muted-foreground mb-2">Persönlichkeit</p>
                 <div className="flex flex-wrap gap-2">
                   {existingVoice.personality_traits.map((trait: string, idx: number) => (
                     <Badge key={idx} variant="outline">{trait}</Badge>

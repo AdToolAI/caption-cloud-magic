@@ -131,7 +131,7 @@ export function CampaignMediaUploader({
         >
           <Upload className="h-8 w-8 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
-            {tx({ de: "Bilder & Videos hochladen", en: "Upload images & videos", es: "Subir imágenes y videos" })}
+            Bilder & Videos hochladen
           </p>
           <p className="text-xs text-muted-foreground">
             Bis zu {maxFiles} Dateien • Max. 1GB pro Datei
@@ -233,7 +233,7 @@ export function CampaignMediaUploader({
               variant="outline"
               onClick={() => setTitleDialogOpen(false)}
             >
-              {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
+              Abbrechen
             </Button>
             <Button onClick={() => {
               if (editingMedia) {
@@ -246,7 +246,7 @@ export function CampaignMediaUploader({
                 toast.success(tr({ de: "Titel aktualisiert", en: "Title updated", es: "Título actualizado" }));
               }
             }}>
-              {tx({ de: "Speichern", en: "Save", es: "Guardar" })}
+              Speichern
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -272,7 +272,7 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>{tx({ de: "Video bearbeiten", en: "Edit Video", es: "Editar vídeo" })}</DialogTitle>
+          <DialogTitle>Video bearbeiten</DialogTitle>
           <DialogDescription>{tx({ de: "Neue Version mit angepassten Einstellungen erstellen", en: "Create new version with adjusted settings", es: "Crear nueva versión con ajustes modificados" })}</DialogDescription>
         </DialogHeader>
 
@@ -289,7 +289,7 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
             <TabsTrigger value="script">Skript</TabsTrigger>
             <TabsTrigger value="timeline-editor">📹 Timeline</TabsTrigger>
             <TabsTrigger value="voice">Voice-Over</TabsTrigger>
-            <TabsTrigger value="media">{tx({ de: "Medien", en: "Media", es: "Medios" })}</TabsTrigger>
+            <TabsTrigger value="media">Medien</TabsTrigger>
             <TabsTrigger value="timeline">Video-Timeline</TabsTrigger>
             <TabsTrigger value="subtitles">{tx({ de: "Untertitel", en: "Subtitles", es: "Subtítulos" })}</TabsTrigger>
             <TabsTrigger value="export">Export</TabsTrigger>

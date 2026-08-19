@@ -82,7 +82,7 @@ export default function CharacterEditor({
         const url = await uploadLibraryImage(file, 'character', tmpId);
         if (url) {
           setDraft((d) => ({ ...d, reference_image_url: url }));
-          toast.success(tx({ de: "Referenzbild hochgeladen", en: "Reference image uploaded", es: "Imagen de referencia subida" }));
+          toast.success('Referenzbild hochgeladen');
         }
       } finally {
         setUploading(false);
@@ -221,9 +221,13 @@ export default function CharacterEditor({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
-            {character ? 'Charakter bearbeiten' : tx({ de: "Neuen Charakter anlegen", en: "Create new character", es: "Crear nuevo personaje" })}
+            {character ? 'Charakter bearbeiten' : 'Neuen Charakter anlegen'}
           </DialogTitle>
           <DialogDescription>
+            Speichere wiederverwendbare Charaktere mit Reference-Image für visuelle Konsistenz
+            über alle Motion-Studio-Projekte hinweg.
+          </DialogDescription>
+        </DialogHeader>
 
         <div className="space-y-5 py-2">
           {/* Pro-Tip Banner */}
@@ -233,8 +237,12 @@ export default function CharacterEditor({
               <div className="space-y-1">
                 <p className="text-xs font-semibold">Sherlock-Holmes-Effekt</p>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  Markante Kleidung & Objekte beschreibst du am besten auf Englisch — die KI
+                  wiederholt diese viel zuverlässiger als Gesichter. Ein Reference-Image
                   verbessert die Konsistenz nochmal deutlich.
                 </p>
+              </div>
+            </div>
           </div>
 
           {/* Name */}
@@ -243,7 +251,7 @@ export default function CharacterEditor({
             <Input
               value={draft.name}
               onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-              placeholder=tx({ de: "z. B. Richard Löwenherz", en: "e.g. Richard the Lionheart", es: "ej. Ricardo Corazón de León" })
+              placeholder="z. B. Richard Löwenherz"
               className="bg-background/60"
             />
           </div>
@@ -390,11 +398,11 @@ export default function CharacterEditor({
                 className="bg-background/60 text-sm"
               />
               <Button variant="outline" size="sm" onClick={addTag}>
-                {tx({ de: "Hinzufügen", en: "Add", es: "Añadir" })}
+                Hinzufügen
               </Button>
             </div>
             {draft.tags.length > 0 && (
-              {tx({ de: "<div className=\"flex flex-wrap gap-1.5 pt-1\">", en: "Add", es: "Añadir" })}
+              <div className="flex flex-wrap gap-1.5 pt-1">
                 {draft.tags.map((tag) => (
                   <Badge
                     key={tag}

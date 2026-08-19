@@ -70,13 +70,13 @@ function SortableClip({ clip, onUpdate, onDelete }: {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs">{tx({ de: "Übergang", en: "Transition", es: "Transición" })}</Label>
+              <Label className="text-xs">Übergang</Label>
               <Select value={clip.transition} onValueChange={(value) => onUpdate(clip.id, { transition: value as TimelineClip['transition'] })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">{tx({ de: "Kein Übergang", en: "No transition", es: "Sin transición" })}</SelectItem>
+                  <SelectItem value="none">Kein Übergang</SelectItem>
                   <SelectItem value="fade">Fade</SelectItem>
                   <SelectItem value="wipe">Wipe</SelectItem>
                   <SelectItem value="zoom">Zoom</SelectItem>
@@ -145,7 +145,7 @@ export const VideoTimeline = ({ clips, onClipsChange, totalDuration = 0 }: Video
       <CardHeader>
         <CardTitle>Video-Timeline</CardTitle>
         <CardDescription>
-          {tx({ de: "{tx({ de: \"Clips neu anordnen, Übergänge hinzufügen und Dauer anpassen\", en: \"Rearrange clips, add transitions, and adjust duration\", es: \"Reorganizar clips, añadir transiciones y ajustar la duración\" })}", en: "Rearrange clips, add transitions, and adjust duration", es: "Reorganizar clips, añadir transiciones y ajustar la duración" })}
+          Clips neu anordnen, Übergänge hinzufügen und Dauer anpassen
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -157,7 +157,7 @@ export const VideoTimeline = ({ clips, onClipsChange, totalDuration = 0 }: Video
 
         {/* Timeline Visual Overview */}
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">{tx({ de: "Zeitleisten-Übersicht", en: "Timeline overview", es: "Vista general de la línea de tiempo" })}</Label>
+          <Label className="text-xs text-muted-foreground">Zeitleisten-Übersicht</Label>
           <div className="h-12 bg-muted rounded-lg overflow-hidden flex">
             {clips.map((clip, index) => (
               <div
@@ -191,7 +191,7 @@ export const VideoTimeline = ({ clips, onClipsChange, totalDuration = 0 }: Video
         {/* Add Clip Button */}
         <Button onClick={handleAddClip} variant="outline" className="w-full">
           <Plus className="h-4 w-4 mr-2" />
-          {tx({ de: "{tx({ de: \"Clip hinzufügen\", en: \"Add clip\", es: \"Añadir clip\" })}", en: "Add clip", es: "Añadir clip" })}
+          Clip hinzufügen
         </Button>
 
         {/* Audio Track Info */}

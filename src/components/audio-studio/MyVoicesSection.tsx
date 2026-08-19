@@ -91,7 +91,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
             className="bg-gradient-to-r from-primary to-cyan-500 hover:opacity-90"
           >
             <Sparkles className="w-4 h-4 mr-2" />
-            {tx({ de: "Erste Stimme erstellen", en: "Create first voice", es: "Crear primera voz" })}
+            Erste Stimme erstellen
           </Button>
         )}
       </Card>
@@ -250,7 +250,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>{tx({ de: "Stimme löschen?", en: "Delete voice?", es: "¿Eliminar voz?" })}</AlertDialogTitle>
             <AlertDialogDescription>
-              {tx({ de: "Diese Aktion kann nicht rückgängig gemacht werden. Die geklonte Stimme wird aus deiner", en: "This action cannot be undone. The cloned voice will be removed from your", es: "Esta acción no se puede deshacer. La voz clonada se eliminará de tu" })}
+              Diese Aktion kann nicht rückgängig gemacht werden. Die geklonte Stimme wird aus deiner
               Bibliothek entfernt.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -263,7 +263,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
               }}
               className="bg-destructive hover:bg-destructive/90"
             >
-              {tx({ de: "Löschen", en: "Delete", es: "Eliminar" })}
+              Löschen
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

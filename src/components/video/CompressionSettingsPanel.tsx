@@ -58,7 +58,7 @@ export const CompressionSettingsPanel = ({
           Komprimierungseinstellungen
         </CardTitle>
         <CardDescription>
-          {tx({ de: "{tx({ de: \"Wähle ein Profil oder passe die Einstellungen manuell an\", en: \"Select a profile or adjust settings manually\", es: \"Selecciona un perfil o ajusta la configuración manualmente\" })}", en: "Select a profile or adjust settings manually", es: "Selecciona un perfil o ajusta la configuración manualmente" })}
+          Wähle ein Profil oder passe die Einstellungen manuell an
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -74,7 +74,7 @@ export const CompressionSettingsPanel = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="social-media">Social Media</SelectItem>
-              <SelectItem value="presentation">{tx({ de: "Präsentation", en: "Presentation", es: "Presentación" })}</SelectItem>
+              <SelectItem value="presentation">Präsentation</SelectItem>
               <SelectItem value="archive">Archiv</SelectItem>
               <SelectItem value="custom">Benutzerdefiniert</SelectItem>
             </SelectContent>
@@ -102,7 +102,7 @@ export const CompressionSettingsPanel = ({
 
             {/* Quality */}
             <div className="space-y-2">
-              <Label htmlFor="quality">{tx({ de: "Qualität", en: "Quality", es: "Calidad" })}</Label>
+              <Label htmlFor="quality">Qualität</Label>
               <Select
                 value={quality}
                 onValueChange={(value) => setQuality(value as 'high' | 'medium' | 'low')}
@@ -146,10 +146,10 @@ export const CompressionSettingsPanel = ({
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              {tx({ de: "{tx({ de: \"Komprimierung läuft...\", en: \"Compression in progress...\", es: \"Comprimiendo...\" })}", en: "Compression in progress...", es: "Comprimiendo..." })}
+              Komprimierung läuft...
             </>
           ) : (
-            tx({ de: "Komprimierung starten", en: "Start compression", es: "Iniciar compresión" })
+            'Komprimierung starten'
           )}
         </Button>
       </CardContent>

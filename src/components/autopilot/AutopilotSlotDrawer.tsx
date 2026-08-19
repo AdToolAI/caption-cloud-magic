@@ -167,7 +167,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
           {/* Scheduled at */}
           <div>
             <Label htmlFor="scheduled_at" className="text-xs uppercase tracking-widest text-muted-foreground">
-              {tx({ de: "Veröffentlichungszeit", en: "Publication time", es: "Hora de publicación" })}
+              Veröffentlichungszeit
             </Label>
             <Input
               id="scheduled_at"

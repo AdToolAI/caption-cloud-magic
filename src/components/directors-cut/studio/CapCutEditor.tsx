@@ -2276,7 +2276,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             title={
               anchorDriftCount > 0
                 ? tx({ de: `Anchor-Refresh — ${anchorDriftCount} Szene(n) mit Drift`, en: `Anchor Refresh — ${anchorDriftCount} scene(s) with drift`, es: `Actualización de anclaje — ${anchorDriftCount} escena(s) con desviación` })
-                : tx({ de: "Anchor-Refresh — Character Consistency prüfen", en: "Anchor Refresh — Check Character Consistency", es: "Actualización de Anclaje — Comprobar Consistencia de Personajes" })
+                : 'Anchor-Refresh — Character Consistency prüfen'
             }
           >
             <Anchor className="h-3.5 w-3.5" />

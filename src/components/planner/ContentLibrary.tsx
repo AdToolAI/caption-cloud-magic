@@ -159,7 +159,7 @@ export function ContentLibrary({ workspaceId, onContentSelect }: ContentLibraryP
         <div className="relative mb-3">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder=tx({ de: "Suchen...", en: "Search...", es: "Buscar..." })
+            placeholder="Suchen..."
             className="pl-8"
             value={search}
             onChange={(e) => setSearch(e.target.value)}

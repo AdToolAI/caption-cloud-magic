@@ -54,7 +54,7 @@ export const AdvancedVoiceSettings = ({ onSettingsChange }: AdvancedVoiceSetting
         {showAdvanced && (
           <Button variant="ghost" size="sm" onClick={resetToDefaults}>
             <RotateCcw className="h-4 w-4 mr-2" />
-            {tx({ de: "{tx({ de: \"Zurücksetzen\", en: \"Reset\", es: \"Restablecer\" })}", en: "Reset", es: "Restablecer" })}
+            Zurücksetzen
           </Button>
         )}
       </div>
@@ -65,7 +65,7 @@ export const AdvancedVoiceSettings = ({ onSettingsChange }: AdvancedVoiceSetting
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label className="text-sm font-medium">
-                {tx({ de: "{tx({ de: \"Stabilität\", en: \"Stability\", es: \"Estabilidad\" })}", en: "Stability", es: "Estabilidad" })}
+                Stabilität
                 <span className="ml-2 text-xs text-muted-foreground">(Konsistenz)</span>
               </Label>
               <span className="text-sm text-muted-foreground">{settings.stability.toFixed(2)}</span>
@@ -86,8 +86,8 @@ export const AdvancedVoiceSettings = ({ onSettingsChange }: AdvancedVoiceSetting
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label className="text-sm font-medium">
-                {tx({ de: "{tx({ de: \"Ähnlichkeit\", en: \"Similarity\", es: \"Similitud\" })}", en: "Similarity", es: "Similitud" })}
-                <span className="ml-2 text-xs text-muted-foreground">{tx({ de: "(Authentizität)", en: "(Authenticity)", es: "(Autenticidad)" })}</span>
+                Ähnlichkeit
+                <span className="ml-2 text-xs text-muted-foreground">(Authentizität)</span>
               </Label>
               <span className="text-sm text-muted-foreground">{settings.similarityBoost.toFixed(2)}</span>
             </div>
@@ -99,7 +99,7 @@ export const AdvancedVoiceSettings = ({ onSettingsChange }: AdvancedVoiceSetting
               step={0.05}
             />
             <p className="text-xs text-muted-foreground">
-              {tx({ de: "{tx({ de: \"Wie sehr die Stimme dem Original ähneln soll\", en: \"How much the voice should resemble the original\", es: \"Cuánto debe parecerse la voz al original\" })}", en: "How much the voice should resemble the original", es: "Cuánto debe parecerse la voz al original" })}
+              Wie sehr die Stimme dem Original ähneln soll
             </p>
           </div>
 
@@ -107,7 +107,7 @@ export const AdvancedVoiceSettings = ({ onSettingsChange }: AdvancedVoiceSetting
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label className="text-sm font-medium">
-                {tx({ de: "{tx({ de: \"Stil-Verstärkung\", en: \"Style Exaggeration\", es: \"Exageración de estilo\" })}", en: "Style Exaggeration", es: "Exageración de estilo" })}
+                Stil-Verstärkung
                 <span className="ml-2 text-xs text-muted-foreground">(Emotion)</span>
               </Label>
               <span className="text-sm text-muted-foreground">{settings.styleExaggeration.toFixed(2)}</span>
@@ -120,7 +120,7 @@ export const AdvancedVoiceSettings = ({ onSettingsChange }: AdvancedVoiceSetting
               step={0.05}
             />
             <p className="text-xs text-muted-foreground">
-              {tx({ de: "{tx({ de: \"Verstärkt emotionale Ausdrücke in der Stimme\", en: \"Amplifies emotional expressions in the voice\", es: \"Amplifica las expresiones emocionales en la voz\" })}", en: "Amplifies emotional expressions in the voice", es: "Amplifica las expresiones emocionales en la voz" })}
+              Verstärkt emotionale Ausdrücke in der Stimme
             </p>
           </div>
 
@@ -129,7 +129,7 @@ export const AdvancedVoiceSettings = ({ onSettingsChange }: AdvancedVoiceSetting
             <div className="space-y-0.5">
               <Label className="text-sm font-medium">Speaker Boost</Label>
               <p className="text-xs text-muted-foreground">
-                {tx({ de: "{tx({ de: \"Verbessert die Stimmqualität für längere Texte\", en: \"Improves voice quality for longer texts\", es: \"Mejora la calidad de voz para textos largos\" })}", en: "Improves voice quality for longer texts", es: "Mejora la calidad de voz para textos largos" })}
+                Verbessert die Stimmqualität für längere Texte
               </p>
             </div>
             <Switch

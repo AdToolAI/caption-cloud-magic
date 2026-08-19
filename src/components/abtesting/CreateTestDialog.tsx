@@ -50,7 +50,7 @@ export function CreateTestDialog({ onCreateTest }: Props) {
       <DialogTrigger asChild>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
-          {tx({ de: "{tx({ de: \"Neuen A/B Test erstellen\", en: \"Create new A/B Test\", es: \"Crear nueva prueba A/B\" })}", en: "Create new A/B Test", es: "Crear nueva prueba A/B" })}
+          Neuen A/B Test erstellen
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
@@ -77,7 +77,7 @@ export function CreateTestDialog({ onCreateTest }: Props) {
               </SelectTrigger>
               <SelectContent>
                 {templatesLoading ? (
-                  <SelectItem value="loading" disabled>{tx({ de: "Lade Templates...", en: "Loading Templates...", es: "Cargando plantillas..." })}</SelectItem>
+                  <SelectItem value="loading" disabled>Lade Templates...</SelectItem>
                 ) : (
                   templates?.map(template => (
                     <SelectItem key={template.id} value={template.id}>
@@ -117,10 +117,10 @@ export function CreateTestDialog({ onCreateTest }: Props) {
 
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => setOpen(false)}>
-              {tx({ de: "{tx({ de: \"Abbrechen\", en: \"Cancel\", es: \"Cancelar\" })}", en: "Cancel", es: "Cancelar" })}
+              Abbrechen
             </Button>
             <Button onClick={handleSubmit} disabled={!testName || !templateId}>
-              {tx({ de: "{tx({ de: \"Test erstellen\", en: \"Create Test\", es: \"Crear prueba\" })}", en: "Create Test", es: "Crear prueba" })}
+              Test erstellen
             </Button>
           </div>
         </div>

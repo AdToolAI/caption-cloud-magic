@@ -98,7 +98,7 @@ export function useComposerHistory(projectId: string | undefined) {
       if (error) throw error;
       if (data?.restored) {
         toast({
-          title: tx({ de: "↶ Rückgängig", en: "↶ Undo", es: "↶ Deshacer" }),
+          title: '↶ Rückgängig',
           description: data.refunded > 0
             ? `${data.actionType} wiederhergestellt · ${data.refunded} Credits refundiert.`
             : `${data.actionType} wiederhergestellt.`,

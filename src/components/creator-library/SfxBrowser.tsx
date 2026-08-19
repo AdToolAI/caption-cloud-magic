@@ -101,7 +101,7 @@ export default function SfxBrowser() {
 
   async function toggleFavorite(t: SfxTrack) {
     if (!user) {
-      toast({ title: tx({ de: "Login nötig", en: "Login required", es: "Inicio de sesión requerido" }) });
+      toast({ title: 'Login nötig' });
       return;
     }
     const src = (t.source as any) ?? 'freesound';

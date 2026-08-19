@@ -82,7 +82,7 @@ export default function MusicBrowser() {
 
   async function toggleFavorite(track: StockMusicTrack) {
     if (!user) {
-      toast({ title: tx({ de: "Login nötig", en: "Login required", es: "Inicio de sesión requerido" }) });
+      toast({ title: 'Login nötig' });
       return;
     }
     if (favorites.has(track.id)) {
@@ -169,14 +169,14 @@ export default function MusicBrowser() {
           </SelectContent>
         </Select>
         <Button type="submit" disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : tx({ de: "Suchen", en: "Search", es: "Buscar" })}
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Suchen'}
         </Button>
       </form>
 
       {loading && results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
-          {tx({ de: "{tx({ de: \"Lade Tracks …\", en: \"Loading tracks …\", es: \"Cargando pistas …\" })}", en: "Loading tracks …", es: "Cargando pistas …" })}
+          Lade Tracks …
         </Card>
       ) : results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">

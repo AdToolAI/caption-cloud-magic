@@ -125,7 +125,7 @@ export function MultiImageUpload({
         />
         <Upload className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
         <p className="text-sm text-muted-foreground mb-1">
-          {tx({ de: "Bilder hier ablegen oder klicken zum Hochladen", en: "Drop images here or click to upload", es: "Arrastra imágenes aquí o haz clic para subir" })}
+          Bilder hier ablegen oder klicken zum Hochladen
         </p>
         <p className="text-xs text-muted-foreground">
           PNG, JPG, WebP bis 10MB • Max. {maxFiles} Bilder

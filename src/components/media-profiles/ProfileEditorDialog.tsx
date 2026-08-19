@@ -215,7 +215,7 @@ export function ProfileEditorDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
-            {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
+            Abbrechen
           </Button>
           <Button onClick={handleSave} disabled={!isValid || isSaving}>
             {isSaving ? tx({ de: 'Speichert...', en: 'Saving...', es: 'Guardando...' }) : tx({ de: 'Speichern', en: 'Save', es: 'Ahorrar' })}

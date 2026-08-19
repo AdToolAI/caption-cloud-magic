@@ -111,6 +111,10 @@ export default function AIDirectorBriefDialog({
             AI-Director casten
           </DialogTitle>
           <DialogDescription>
+            Beschreibe deine Idee in einem Satz — der KI-Regisseur baut daraus ein
+            komplettes Storyboard mit Shot-Plan, Kamera-Bewegungen und Prompts.
+          </DialogDescription>
+        </DialogHeader>
 
         {!plan ? (
           <div className="space-y-4 overflow-y-auto pr-1">
@@ -125,9 +129,9 @@ export default function AIDirectorBriefDialog({
                 className="resize-none"
               />
               <p className="text-[11px] text-muted-foreground">
-                {tx({ de: "Tipp: Stil, Stimmung und Hauptbild kurz nennen. Cast/Location werden", en: "Tip: Briefly mention style, mood, and main image. Cast/Location will be", es: "Consejo: Menciona brevemente el estilo, el ambiente y la imagen principal. El reparto/la ubicación serán" })}
+                Tipp: Stil, Stimmung und Hauptbild kurz nennen. Cast/Location werden
                 automatisch verwendet, wenn passend.
-              {tx({ de: "</p>", en: "Tip: Briefly mention style, mood, and main image. Cast/Location will be", es: "Consejo: Menciona brevemente el estilo, el ambiente y la imagen principal. El reparto/la ubicación serán" })}
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -150,7 +154,7 @@ export default function AIDirectorBriefDialog({
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="rounded-lg border border-border/40 bg-muted/30 p-3">
-                <div className="text-muted-foreground mb-1">{tx({ de: "Verfügbarer Cast", en: "Available Cast", es: "Elenco disponible" })}</div>
+                <div className="text-muted-foreground mb-1">Verfügbarer Cast</div>
                 <div className="flex flex-wrap gap-1">
                   {castNames.length === 0 ? (
                     <span className="text-muted-foreground">—</span>
@@ -164,7 +168,7 @@ export default function AIDirectorBriefDialog({
                 </div>
               </div>
               <div className="rounded-lg border border-border/40 bg-muted/30 p-3">
-                <div className="text-muted-foreground mb-1">{tx({ de: "Verfügbare Locations", en: "Available Locations", es: "Ubicaciones disponibles" })}</div>
+                <div className="text-muted-foreground mb-1">Verfügbare Locations</div>
                 <div className="flex flex-wrap gap-1">
                   {locationNames.length === 0 ? (
                     <span className="text-muted-foreground">—</span>
@@ -201,9 +205,9 @@ export default function AIDirectorBriefDialog({
           <div className="flex flex-col gap-3 overflow-hidden">
             <div className="rounded-lg bg-gradient-to-br from-primary/10 to-accent/5 p-4 border border-primary/30">
               <div className="text-[10px] uppercase tracking-wider text-primary mb-1">
-                {tx({ de: "Vorschlag", en: "Suggestion", es: "Sugerencia" })}
+                Vorschlag
               </div>
-              {tx({ de: "<h3 className=\"text-base font-bold leading-tight\">{plan.title}</h3>", en: "Suggestion", es: "Sugerencia" })}
+              <h3 className="text-base font-bold leading-tight">{plan.title}</h3>
               <p className="text-xs text-muted-foreground mt-1">{plan.logline}</p>
               <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
                 <span className="flex items-center gap-1">

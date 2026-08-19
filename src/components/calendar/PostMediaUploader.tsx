@@ -6,7 +6,6 @@ import { toast } from "@/hooks/use-toast";
 import { useTranslation } from "@/hooks/useTranslation";
 import { Upload, X, Image, Video, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { tx } from '@/lib/i18nText';
 
 interface PostMediaUploaderProps {
   mediaUrl?: string;
@@ -127,8 +126,8 @@ export function PostMediaUploader({
             </div>
           ) : (
             <div className="bg-cyan/90 text-black px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-lg">
-              {tx({ de: "<Image className=\"h-3.5 w-3.5\" />", en: "Image", es: "Imagen" })}
-              {tx({ de: "Bild", en: "Image", es: "Imagen" })}
+              <Image className="h-3.5 w-3.5" />
+              Bild
             </div>
           )}
         </div>
@@ -164,16 +163,16 @@ export function PostMediaUploader({
       {uploading ? (
         <div className="flex flex-col items-center gap-2 py-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="text-sm text-muted-foreground">{tx({ de: "Wird hochgeladen...", en: "Uploading...", es: "Subiendo..." })}</span>
+          <span className="text-sm text-muted-foreground">Wird hochgeladen...</span>
         </div>
       ) : (
         <div className="flex flex-col items-center gap-2 py-4">
           <Upload className="h-8 w-8 text-muted-foreground" />
-          {tx({ de: "<span className=\"text-sm text-muted-foreground\">", en: "Drop image or video here", es: "Arrastra imagen o video aquí" })}
-            {tx({ de: "Bild oder Video hier ablegen", en: "Drop image or video here", es: "Arrastra imagen o video aquí" })}
+          <span className="text-sm text-muted-foreground">
+            Bild oder Video hier ablegen
           </span>
-          {tx({ de: "<span className=\"text-xs text-muted-foreground/70\">", en: "or click to select", es: "o haz clic para seleccionar" })}
-            {tx({ de: "oder klicken zum Auswählen", en: "or click to select", es: "o haz clic para seleccionar" })}
+          <span className="text-xs text-muted-foreground/70">
+            oder klicken zum Auswählen
           </span>
         </div>
       )}

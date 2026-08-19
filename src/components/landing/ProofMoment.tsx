@@ -26,7 +26,7 @@ const COPY = {
     briefLabel: tx({ de: "Dein Briefing", en: "Your briefing", es: "Tu instrucción" }),
     brief: tx({ de: "Büroszene, vier Kolleg:innen im Dialog, deutsch gesprochen, 8 Sekunden.", en: "Office scene, four colleagues in dialogue, German spoken, 8 seconds.", es: "Escena de oficina, cuatro compañeros dialogando, alemán hablado, 8 segundos." }),
     resultLabel: tx({ de: "Das Ergebnis", en: "The result", es: "El resultado" }),
-    steps: ["Skript & Cast", tx({ de: "Stimmen", en: "Voices", es: "Voces" }), "Lip-Sync", "Fertiger Clip"],
+    steps: ["Skript & Cast", "Stimmen", "Lip-Sync", "Fertiger Clip"],
     meta: "8s · Deutsch · 4 Sprecher · Lip-Sync",
     note: tx({ de: "Skript, Stimme, Kamera, Schnitt, Lip-Sync — sonst ein Team und mehrere Tage.", en: "Script, voice, camera, editing, lip-sync — otherwise a team and several days.", es: "Guion, voz, cámara, edición, sincronización labial — de lo contrario, un equipo y varios días." }),
     cta: tx({ de: "Mit diesem Briefing starten", en: "Start with this briefing", es: "Empezar con esta instrucción" }),

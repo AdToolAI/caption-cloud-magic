@@ -92,7 +92,7 @@ const ResetPassword = () => {
                 <div className="w-16 h-16 mx-auto rounded-2xl bg-destructive/10 flex items-center justify-center">
                   <Lock className="h-8 w-8 text-destructive" />
                 </div>
-                <CardTitle className="text-2xl">{tx({ de: "Link ungültig", en: "Invalid link", es: "Enlace inválido" })}</CardTitle>
+                <CardTitle className="text-2xl">Link ungültig</CardTitle>
                 <CardDescription>
                   {error || tx({ de: "Der Passwort-Reset-Link ist ungültig oder abgelaufen.", en: "The password reset link is invalid or has expired.", es: "El enlace para restablecer la contraseña no es válido o ha caducado." })}
                 </CardDescription>
@@ -102,7 +102,7 @@ const ResetPassword = () => {
                   onClick={() => navigate("/auth")}
                   className="w-full"
                 >
-                  {tx({ de: "{tx({ de: \"Zurück zur Anmeldung\", en: \"Back to Login\", es: \"Volver al inicio de sesión\" })}", en: "Back to Login", es: "Volver al inicio de sesión" })}
+                  Zurück zur Anmeldung
                 </Button>
               </CardContent>
             </Card>
@@ -132,9 +132,9 @@ const ResetPassword = () => {
                 >
                   <CheckCircle2 className="h-10 w-10 text-green-500" />
                 </motion.div>
-                <CardTitle className="text-2xl">{tx({ de: "Passwort geändert!", en: "Password changed!", es: "¡Contraseña cambiada!" })}</CardTitle>
+                <CardTitle className="text-2xl">Passwort geändert!</CardTitle>
                 <CardDescription>
-                  {tx({ de: "{tx({ de: \"Ihr Passwort wurde erfolgreich zurückgesetzt. Sie werden zur Anmeldung weitergeleitet...\", en: \"Your password has been successfully reset. You will be redirected to login...\", es: \"Su contraseña ha sido restablecida con éxito. Será redirigido al inicio de sesión...\" })}", en: "Your password has been successfully reset. You will be redirected to login...", es: "Su contraseña ha sido restablecida con éxito. Será redirigido al inicio de sesión..." })}
+                  Ihr Passwort wurde erfolgreich zurückgesetzt. Sie werden zur Anmeldung weitergeleitet...
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -199,17 +199,17 @@ const ResetPassword = () => {
               </motion.div>
 
               <CardTitle className="text-2xl font-bold">
-                {tx({ de: "{tx({ de: \"Neues Passwort festlegen\", en: \"Set New Password\", es: \"Establecer nueva contraseña\" })}", en: "Set New Password", es: "Establecer nueva contraseña" })}
+                Neues Passwort festlegen
               </CardTitle>
               <CardDescription>
-                {tx({ de: "{tx({ de: \"Geben Sie Ihr neues Passwort ein\", en: \"Enter your new password\", es: \"Introduzca su nueva contraseña\" })}", en: "Enter your new password", es: "Introduzca su nueva contraseña" })}
+                Geben Sie Ihr neues Passwort ein
               </CardDescription>
             </CardHeader>
 
             <form onSubmit={handleSubmit}>
               <CardContent className="space-y-5 pt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="password">{tx({ de: "Neues Passwort", en: "New Password", es: "Nueva Contraseña" })}</Label>
+                  <Label htmlFor="password">Neues Passwort</Label>
                   <div className="relative">
                     <Input
                       id="password"
@@ -233,7 +233,7 @@ const ResetPassword = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">{tx({ de: "Passwort bestätigen", en: "Confirm Password", es: "Confirmar Contraseña" })}</Label>
+                  <Label htmlFor="confirmPassword">Passwort bestätigen</Label>
                   <div className="relative">
                     <Input
                       id="confirmPassword"

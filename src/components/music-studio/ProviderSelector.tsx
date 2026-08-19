@@ -140,7 +140,7 @@ export function ProviderSelector({ value, onChange, currencySymbol = '€', disa
               {engine.comingSoon && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <span className="text-[9.5px] font-semibold px-2 py-0.5 rounded bg-background/85 border border-primary/40 text-primary uppercase tracking-widest">
-                    {tx({ de: "Bald verfügbar", en: "Coming soon", es: "Próximamente" })}
+                    Bald verfügbar
                   </span>
                 </div>
               )}

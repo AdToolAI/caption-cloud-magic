@@ -164,7 +164,7 @@ export function SpeedRamping({
           Speed Ramping
           {selectedSceneId ? (
             <Badge variant="default" className="ml-2 bg-primary/20 text-primary text-[10px]">
-              {tx({ de: "Szene", en: "Scene", es: "Escena" })}
+              Szene
             </Badge>
           ) : (
             <Badge variant="secondary" className="ml-2 text-[10px]">

@@ -253,7 +253,7 @@ export function RenderLoadWidget() {
                   <th className="px-4 py-2 font-medium">Prio</th>
                   <th className="px-4 py-2 font-medium">Engine</th>
                   <th className="px-4 py-2 font-medium">Workers</th>
-                  <th className="px-4 py-2 font-medium">{tx({ de: "Dauer", en: "Duration", es: "Duración" })}</th>
+                  <th className="px-4 py-2 font-medium">Dauer</th>
                   <th className="px-4 py-2 font-medium">Alter</th>
                   <th className="px-4 py-2 font-medium">User</th>
                 </tr>

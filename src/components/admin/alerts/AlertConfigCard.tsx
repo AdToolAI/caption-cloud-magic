@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle2, Mail } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 
 const ADMIN_EMAIL = 'bestofproducts4u@gmail.com';
 
@@ -42,7 +41,7 @@ export function AlertConfigCard() {
         <div className="flex items-center justify-between py-2 mt-3 pt-3 border-t-2 border-primary/30">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-            <span className="text-sm font-medium">{tx({ de: "Wöchentlicher Health-Report", en: "Weekly Health Report", es: "Informe de salud semanal" })}</span>
+            <span className="text-sm font-medium">Wöchentlicher Health-Report</span>
           </div>
           <span className="text-xs text-muted-foreground">Sonntags 08:00</span>
         </div>

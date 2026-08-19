@@ -46,7 +46,7 @@ export function BrandVoiceLibrary({ brandKitId }: { brandKitId: string | null })
           <h3 className="font-display text-lg">Brand Voice Library</h3>
         </div>
         <p className="text-xs text-muted-foreground mb-4">
-          {tx({ de: "{tx({ de: \"Diese Regeln werden in Captions, E-Mails, Skripte und Dialoge automatisch injiziert.\", en: \"These rules are automatically injected into captions, emails, scripts, and dialogues.\", es: \"Estas reglas se inyectan automáticamente en subtítulos, correos electrónicos, guiones y diálogos.\" })}", en: "These rules are automatically injected into captions, emails, scripts, and dialogues.", es: "Estas reglas se inyectan automáticamente en subtítulos, correos electrónicos, guiones y diálogos." })}
+          Diese Regeln werden in Captions, E-Mails, Skripte und Dialoge automatisch injiziert.
         </p>
         <div className="flex flex-wrap gap-2 mb-3">
           {(Object.keys(KIND_META) as VoiceSampleKind[]).map((k) => {
@@ -76,7 +76,7 @@ export function BrandVoiceLibrary({ brandKitId }: { brandKitId: string | null })
               draftKind === "banned"
                 ? "Wort (z.B. 'cheap')"
                 : draftKind === "tagline"
-                ? tx({ de: "Tagline-Beispiel", en: "Tagline Example", es: "Ejemplo de Eslogan" })
+                ? "Tagline-Beispiel"
                 : tx({ de: "Satz oder Regel", en: "sentence or rule", es: "sentencia o regla" })
             }
             className="bg-background/60"
@@ -88,7 +88,7 @@ export function BrandVoiceLibrary({ brandKitId }: { brandKitId: string | null })
       </Card>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">{tx({ de: "Lade …", en: "Loading…", es: "Cargando…" })}</p>
+        <p className="text-sm text-muted-foreground">Lade …</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {grouped.map(({ kind, items }) => {

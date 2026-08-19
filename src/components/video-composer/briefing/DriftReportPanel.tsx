@@ -198,7 +198,7 @@ export default function DriftReportPanel({ projectId, scenes, onUpdateScene }: P
               disabled={loading}
             >
               {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-              {tx({ de: "Erneut prüfen", en: "Re-check", es: "Volver a verificar" })}
+              Erneut prüfen
             </Button>
             <CollapsibleTrigger asChild>
               <Button type="button" size="sm" variant="ghost" className="h-7 w-7 p-0">
@@ -251,10 +251,10 @@ export default function DriftReportPanel({ projectId, scenes, onUpdateScene }: P
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Wand2 className="h-4 w-4 text-emerald-400" />
-              {tx({ de: "Safe Auto-Fix Vorschau", en: "Safe Auto-Fix Preview", es: "Vista previa de Auto-Corrección Segura" })}
+              Safe Auto-Fix Vorschau
             </DialogTitle>
             <DialogDescription>
-              {tx({ de: "Nur sichere Felder werden überschrieben. Cast, Lip-Sync, Voiceover & Anchor bleiben unangetastet.", en: "Only safe fields will be overwritten. Cast, Lip-Sync, Voiceover & Anchor remain untouched.", es: "Solo se sobrescribirán campos seguros. Elenco, Sincronización labial, Voz en off y Ancla permanecen intactos." })}
+              Nur sichere Felder werden überschrieben. Cast, Lip-Sync, Voiceover & Anchor bleiben unangetastet.
             </DialogDescription>
           </DialogHeader>
 
@@ -302,7 +302,7 @@ export default function DriftReportPanel({ projectId, scenes, onUpdateScene }: P
 
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setPreviewOpen(false)} disabled={applying}>
-              {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
+              Abbrechen
             </Button>
             <Button
               type="button"

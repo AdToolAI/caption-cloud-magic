@@ -44,7 +44,7 @@ const GOALS = [
   tx({ de: 'Kunst', en: 'Art', es: 'Arte' }),
 ];
 const STYLES = ['Fotorealistisch', 'Cinematisch', 'Illustration', '3D', 'Anime', 'Aquarell'];
-const MOODS = ['Episch', 'Ruhig', 'Dramatisch', 'Hell', tx({ de: "Düster", en: "Gloomy", es: "Sombrío" }), 'Verspielt'];
+const MOODS = ['Episch', 'Ruhig', 'Dramatisch', 'Hell', 'Düster', 'Verspielt'];
 
 const CHIP_LABELS: Record<string, { de: string; en: string; es: string }> = {
   Werbung: { de: 'Werbung', en: 'Advertising', es: 'Publicidad' },
@@ -160,6 +160,10 @@ export function PromptHelperDialog({
             Prompt-Helfer
           </DialogTitle>
           <DialogDescription>
+            Sag mir mit deinen Worten was du willst — ich baue daraus den perfekten Prompt
+            und empfehle das beste Modell.
+          </DialogDescription>
+        </DialogHeader>
 
         <ScrollArea className="flex-1 -mx-6 px-6">
           <div className="space-y-4 py-2">

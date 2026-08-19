@@ -2,7 +2,6 @@ import { motion } from "framer-motion";
 import { Paintbrush, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandParticleField } from "./BrandParticleField";
-import { tx } from '@/lib/i18nText';
 
 interface BrandKitHeroHeaderProps {
   brandKitCount: number;
@@ -56,7 +55,7 @@ export function BrandKitHeroHeader({ brandKitCount, onCreateNew }: BrandKitHeroH
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
               </span>
-              <span className="text-sm font-medium text-primary">{tx({ de: "KI-Markenidentität", en: "AI Brand Identity", es: "Identidad de Marca IA" })}</span>
+              <span className="text-sm font-medium text-primary">KI-Markenidentität</span>
             </motion.div>
 
             {/* Gradient Headline */}
@@ -77,8 +76,8 @@ export function BrandKitHeroHeader({ brandKitCount, onCreateNew }: BrandKitHeroH
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
               className="text-lg text-muted-foreground max-w-xl"
-            {tx({ de: ">", en: "AI-powered brand identity for all your content", es: "Identidad de marca impulsada por IA para todo tu contenido" })}
-              {tx({ de: "KI-gestützte Markenidentität für alle deine Inhalte", en: "AI-powered brand identity for all your content", es: "Identidad de marca impulsada por IA para todo tu contenido" })}
+            >
+              KI-gestützte Markenidentität für alle deine Inhalte
             </motion.p>
 
             {/* Stats Badges */}
@@ -118,8 +117,8 @@ export function BrandKitHeroHeader({ brandKitCount, onCreateNew }: BrandKitHeroH
                   <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                 </div>
                 
-                {tx({ de: "<Sparkles className=\"mr-2 h-5 w-5 group-hover:rotate-12 transition-transform\" />", en: "Create new set", es: "Crear nuevo conjunto" })}
-                {tx({ de: "Neues Set erstellen", en: "Create new set", es: "Crear nuevo conjunto" })}
+                <Sparkles className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
+                Neues Set erstellen
               </Button>
             </motion.div>
           )}

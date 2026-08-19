@@ -7,12 +7,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Globe, Loader2 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
-import { tx } from '@/lib/i18nText';
 
 const TIMEZONES = [
   { value: "Europe/Berlin", label: "Berlin (MEZ/MESZ)" },
   { value: "Europe/Vienna", label: "Wien (MEZ/MESZ)" },
-  { value: "Europe/Zurich", label: tx({ de: "Zürich (MEZ/MESZ)", en: "Zurich (CET/CEST)", es: "Zúrich (CET/CEST)" }) },
+  { value: "Europe/Zurich", label: "Zürich (MEZ/MESZ)" },
   { value: "Europe/London", label: "London (GMT/BST)" },
   { value: "Europe/Paris", label: "Paris (MEZ/MESZ)" },
   { value: "Europe/Amsterdam", label: "Amsterdam (MEZ/MESZ)" },

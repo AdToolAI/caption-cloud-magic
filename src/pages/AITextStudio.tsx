@@ -547,7 +547,7 @@ export default function AITextStudio() {
             {/* Feineinstellungen */}
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
-                <Label className="text-xs">{tx({ de: "Antwortlänge", en: "Response Length", es: "Longitud de respuesta" })}</Label>
+                <Label className="text-xs">Antwortlänge</Label>
                 <Select value={responseLength} onValueChange={(v) => setResponseLength(v as ResponseLength)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -558,7 +558,7 @@ export default function AITextStudio() {
                 </Select>
               </div>
               <div>
-                <Label className="text-xs">{tx({ de: "Kreativität", en: "Creativity", es: "Creatividad" })}</Label>
+                <Label className="text-xs">Kreativität</Label>
                 <Select value={creativity} onValueChange={(v) => setCreativity(v as CreativityLevel)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -620,7 +620,7 @@ export default function AITextStudio() {
               }}
             >
               {pinned?.conversationId === conversationId ? (
-                <><PinOff className="h-3 w-3 mr-1" />{tx({ de: "Loslösen", en: "Unpin", es: "Desanclar" })}</>
+                <><PinOff className="h-3 w-3 mr-1" /> Loslösen</>
               ) : (
                 <><Pin className="h-3 w-3 mr-1" /> Anheften</>
               )}
@@ -745,7 +745,7 @@ export default function AITextStudio() {
               disabled={compareLoading || !comparePrompt.trim() || compareModels.length === 0}
             >
               {compareLoading ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{tx({ de: "Läuft…", en: "Running…", es: "Ejecutando…" })}</>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Läuft…</>
               ) : (
                 `Vergleich starten (${compareModels.length})`
               )}
@@ -842,7 +842,7 @@ export default function AITextStudio() {
             <AlertDialogAction
               onClick={() => branchPrompt && createBranch(branchPrompt.targetModel, true)}
             >
-              {tx({ de: "{tx({ de: \"Mit Kontext übernehmen\", en: \"Take over with context\", es: \"Asumir con contexto\" })}", en: "Take over with context", es: "Asumir con contexto" })}
+              Mit Kontext übernehmen
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

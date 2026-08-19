@@ -127,7 +127,7 @@ export function useComposerPersistence() {
           .from('composer_projects')
           .insert({
             user_id: user.id,
-            title: project.title || tx({ de: "Motion Studio Projekt", en: "Motion Studio Project", es: "Proyecto Motion Studio" }),
+            title: project.title || 'Motion Studio Projekt',
             category: project.category,
             briefing: project.briefing as any,
             status: project.status || 'draft',

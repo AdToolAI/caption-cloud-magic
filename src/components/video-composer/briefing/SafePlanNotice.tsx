@@ -12,7 +12,7 @@ interface SafePlanNoticeProps {
 const SOURCE_LABEL: Record<PlanNormalization['durationSource'], string> = {
   'briefing-slider': 'Videodauer-Slider',
   'canonical-briefing': 'Briefing/Skript',
-  'plan-project': tx({ de: "Projekt-Board", en: "Project Board", es: "Tablero de proyecto" }),
+  'plan-project': 'Projekt-Board',
   'scene-sum': 'Szenensumme',
   'default': 'Fallback',
 };

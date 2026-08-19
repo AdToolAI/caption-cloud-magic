@@ -100,7 +100,7 @@ const BrandKit = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['brand-kits'] });
       toast({
-        title: tx({ de: "Aktives Marken-Set geändert", en: "Active Brand Kit Changed", es: "Kit de marca activo cambiado" }),
+        title: "Aktives Marken-Set geändert",
         description: tx({ de: "Das neue Marken-Set wird jetzt in allen Tools verwendet", en: "The new brand set is now used across all tools", es: "El nuevo set de marca ahora se usa en todas las herramientas" })
       });
     }
@@ -525,7 +525,7 @@ const BrandKit = () => {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="primary-color">{tx({ de: "Primärfarbe", en: "Primary Color", es: "Color primario" })}</Label>
+                        <Label htmlFor="primary-color">Primärfarbe</Label>
                         <div className="flex gap-2 mt-2">
                           <div className="relative">
                             <Input
@@ -550,7 +550,7 @@ const BrandKit = () => {
                       </div>
 
                       <div>
-                        <Label htmlFor="secondary-color">{tx({ de: "Sekundärfarbe", en: "Secondary Color", es: "Color secundario" })}</Label>
+                        <Label htmlFor="secondary-color">Sekundärfarbe</Label>
                         <div className="flex gap-2 mt-2">
                           <Input
                             id="secondary-color"
@@ -586,12 +586,12 @@ const BrandKit = () => {
                         {isGenerating ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            {tx({ de: "{tx({ de: \"Wird erstellt...\", en: \"Creating...\", es: \"Creando...\" })}", en: "Creating...", es: "Creando..." })}
+                            Wird erstellt...
                           </>
                         ) : (
                           <>
                             <Sparkles className="mr-2 h-4 w-4 group-hover:rotate-12 transition-transform" />
-                            {tx({ de: "{tx({ de: \"Mit KI erstellen\", en: \"Create with AI\", es: \"Crear con IA\" })}", en: "Create with AI", es: "Crear con IA" })}
+                            Mit KI erstellen
                           </>
                         )}
                       </Button>
@@ -726,10 +726,10 @@ const BrandKit = () => {
                       <Paintbrush className="h-16 w-16 text-muted-foreground mb-4" />
                       <h3 className="text-lg font-semibold mb-2">Kein Marken-Set vorhanden</h3>
                       <p className="text-sm text-muted-foreground mb-4">
-                        {tx({ de: "{tx({ de: \"Erstelle dein erstes Marken-Set, um es hier zu sehen\", en: \"Create your first brand kit to see it here\", es: \"Crea tu primer kit de marca para verlo aquí\" })}", en: "Create your first brand kit to see it here", es: "Crea tu primer kit de marca para verlo aquí" })}
+                        Erstelle dein erstes Marken-Set, um es hier zu sehen
                       </p>
                       <Button onClick={() => setActiveTab("create")}>
-                        {tx({ de: "{tx({ de: \"Jetzt erstellen\", en: \"Create now\", es: \"Crear ahora\" })}", en: "Create now", es: "Crear ahora" })}
+                        Jetzt erstellen
                       </Button>
                     </CardContent>
                   </Card>
@@ -768,7 +768,7 @@ const BrandKit = () => {
                       <div className="p-6 border-b border-white/10">
                         <h3 className="text-lg font-semibold">Empfohlene Hashtags</h3>
                         <p className="text-sm text-muted-foreground mt-1">
-                          {tx({ de: "{tx({ de: \"Nutze diese Hashtags für maximale Reichweite\", en: \"Use these hashtags for maximum reach\", es: \"Usa estos hashtags para máximo alcance\" })}", en: "Use these hashtags for maximum reach", es: "Usa estos hashtags para máximo alcance" })}
+                          Nutze diese Hashtags für maximale Reichweite
                         </p>
                       </div>
                       <div className="p-6">
@@ -797,7 +797,7 @@ const BrandKit = () => {
                         </motion.div>
 
                         <div className="mt-6">
-                          <Label className="mb-2 block text-sm font-medium">{tx({ de: "Beispiel-Caption", en: "Example Caption", es: "Título de ejemplo" })}</Label>
+                          <Label className="mb-2 block text-sm font-medium">Beispiel-Caption</Label>
                           <div className="p-4 backdrop-blur-xl bg-muted/20 border border-white/10 rounded-xl relative group">
                             <p className="text-sm text-muted-foreground">{activeBrandKit.example_caption}</p>
                             <Button

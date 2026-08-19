@@ -299,7 +299,7 @@ export default function StudioMode() {
                 <SystemLoadPill className="hidden sm:inline-flex" />
                 <Badge variant="outline" className="gap-1.5">
                   <Wand2 className="h-3 w-3 text-primary" />
-                  {tx({ de: "{tx({ de: \"Studio Mode · Geführter Flow\", en: \"Studio Mode · Guided Flow\", es: \"Modo Estudio · Flujo Guiado\" })}", en: "Studio Mode · Guided Flow", es: "Modo Estudio · Flujo Guiado" })}
+                  Studio Mode · Geführter Flow
                 </Badge>
               </div>
             </div>
@@ -365,14 +365,14 @@ export default function StudioMode() {
               className="gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              {tx({ de: "{tx({ de: \"Zurück\", en: \"Back\", es: \"Atrás\" })}", en: "Back", es: "Atrás" })}
+              Zurück
             </Button>
             <div className="text-xs text-muted-foreground hidden sm:block">
               Schritt {stepIndex + 1} {tx({ de: "von", en: "of", es: "de" })} {STEPS.length} · {STEPS[stepIndex].title}
             </div>
             {!isLast ? (
               <Button onClick={goNext} disabled={!canAdvance} className="gap-2">
-                {tx({ de: "{tx({ de: \"Weiter\", en: \"Next\", es: \"Siguiente\" })}", en: "Next", es: "Siguiente" })}
+                Weiter
                 <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
@@ -388,7 +388,7 @@ export default function StudioMode() {
                   ) : (
                     <Sparkles className="h-4 w-4" />
                   )}
-                  {tx({ de: "{tx({ de: \"In Composer öffnen\", en: \"Open in Composer\", es: \"Abrir en Composer\" })}", en: "Open in Composer", es: "Abrir en Composer" })}
+                  In Composer öffnen
                 </Button>
               </div>
             )}
@@ -785,7 +785,7 @@ function StoryboardStep({
                     />
                     <div className="flex items-center gap-3">
                       <Label className="text-[11px] text-muted-foreground">
-                        {tx({ de: "{tx({ de: \"Dauer\", en: \"Duration\", es: \"Duración\" })}", en: "Duration", es: "Duración" })}
+                        Dauer
                       </Label>
                       <Input
                         type="number"
@@ -863,7 +863,7 @@ function RenderStep({
         {/* Summary */}
         <Card className="lg:col-span-2 p-6 bg-card/60 backdrop-blur border-border/40 space-y-5">
           <div className="space-y-1.5">
-            <Label className="text-xs">{tx({ de: "Projekt-Titel", en: "Project Title", es: "Título del Proyecto" })}</Label>
+            <Label className="text-xs">Projekt-Titel</Label>
             <Input
               value={title}
               onChange={(e) => onTitleChange(e.target.value)}
@@ -874,7 +874,7 @@ function RenderStep({
 
           <SummaryRow icon={Users} label="Cast">
             {characters.length === 0 ? (
-              <span className="text-muted-foreground text-sm">{tx({ de: "Keiner ausgewählt", en: "None selected", es: "Ninguno seleccionado" })}</span>
+              <span className="text-muted-foreground text-sm">Keiner ausgewählt</span>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {characters.map((c) => (
@@ -916,8 +916,12 @@ function RenderStep({
         <Card className="p-6 bg-gradient-to-br from-primary/15 via-card/60 to-accent/10 backdrop-blur border-primary/30 space-y-4">
           <div className="space-y-2">
             <Film className="h-7 w-7 text-primary" />
-            <h3 className="text-lg font-bold">{tx({ de: "Im Composer öffnen", en: "Open in Composer", es: "Abrir en el Compositor" })}</h3>
+            <h3 className="text-lg font-bold">Im Composer öffnen</h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
+              Dein Cast, deine Location und das Storyboard werden in ein neues
+              Video-Composer-Projekt übernommen. Dort wählst du die KI-Engine
+              (Sora, Kling, Hailuo …), generierst Clips parallel und exportierst.
+            </p>
           </div>
           <Button
             onClick={onLaunch}
@@ -930,12 +934,12 @@ function RenderStep({
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
-            {tx({ de: "Studio-Projekt erstellen", en: "Create Studio Project", es: "Crear Proyecto de Estudio" })}
+            Studio-Projekt erstellen
           </Button>
-          {tx({ de: "<p className=\"text-[10px] text-muted-foreground text-center\">", en: "Create Studio Project", es: "Crear Proyecto de Estudio" })}
-            {tx({ de: "Du kannst alles im Composer noch anpassen.", en: "You can still adjust everything in the Composer.", es: "Aún puedes ajustar todo en el Composer." })}
+          <p className="text-[10px] text-muted-foreground text-center">
+            Du kannst alles im Composer noch anpassen.
           </p>
-        {tx({ de: "</Card>", en: "You can still adjust everything in the Composer.", es: "Aún puedes ajustar todo en el Composer." })}
+        </Card>
       </div>
     </section>
   );

@@ -107,10 +107,10 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
           <div className="flex items-center justify-between mb-2">
             <Sparkles className="h-6 w-6 text-primary" />
             <Button variant="ghost" size="sm" onClick={onSkip}>
-              {tx({ de: "{tx({ de: \"Überspringen\", en: \"Skip\", es: \"Omitir\" })}", en: "Skip", es: "Omitir" })}
+              Überspringen
             </Button>
           </div>
-          <CardTitle className="text-2xl">{tx({ de: "Marken-Identität erstellen", en: "Create Brand Identity", es: "Crear Identidad de Marca" })}</CardTitle>
+          <CardTitle className="text-2xl">Marken-Identität erstellen</CardTitle>
           <CardDescription>
             Schritt {step} von {totalSteps}
           </CardDescription>
@@ -154,7 +154,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
               <div>
                 <Label>{tx({ de: "Welche Werte & Emotionen verkörpert deine Marke? *", en: "What values & emotions does your brand embody? *", es: "¿Qué valores y emociones encarna tu marca? *" })}</Label>
                 <p className="text-sm text-muted-foreground mb-3">
-                  {tx({ de: "{tx({ de: \"Wähle mindestens einen Wert\", en: \"Select at least one value\", es: \"Selecciona al menos un valor\" })}", en: "Select at least one value", es: "Selecciona al menos un valor" })}
+                  Wähle mindestens einen Wert
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {valueOptions.map(value => (
@@ -244,7 +244,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
               disabled={step === 1}
             >
               <ChevronLeft className="mr-2 h-4 w-4" />
-              {tx({ de: "{tx({ de: \"Zurück\", en: \"Back\", es: \"Atrás\" })}", en: "Back", es: "Atrás" })}
+              Zurück
             </Button>
 
             <Button
@@ -254,11 +254,11 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
               {step === totalSteps ? (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  {tx({ de: "{tx({ de: \"Marken-Set erstellen\", en: \"Create Brand Set\", es: \"Crear conjunto de marca\" })}", en: "Create Brand Set", es: "Crear conjunto de marca" })}
+                  Marken-Set erstellen
                 </>
               ) : (
                 <>
-                  {tx({ de: "{tx({ de: \"Weiter\", en: \"Next\", es: \"Siguiente\" })}", en: "Next", es: "Siguiente" })}
+                  Weiter
                   <ChevronRight className="ml-2 h-4 w-4" />
                 </>
               )}

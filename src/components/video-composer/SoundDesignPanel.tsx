@@ -143,7 +143,7 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
         </CardTitle>
         <Button onClick={generateMix} disabled={generating || !projectId} size="sm">
           {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-          {tx({ de: "Mix erstellen", en: "Create mix", es: "Crear mezcla" })}
+          Mix erstellen
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -152,14 +152,14 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
           Diese werden im finalen Render automatisch unter die Voiceover-Spur gemischt (Auto-Ducking, -14 LUFS).
         </p>
         <p className="text-[11px] text-muted-foreground/80 italic">
-          {tx({ de: "Hinweis:", en: "Note:", es: "Nota:" })}
+          Hinweis:
         </p>
 
         {loading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
 
         {!loading && clips.length === 0 && (
           <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            {tx({ de: "Noch kein AI Sound Design generiert. Klick Mix erstellen um Atmo + SFX vorschlagen und generieren zu lassen.", en: "No AI Sound Design generated yet. Click Create Mix to suggest and generate ambiance + SFX.", es: "Aún no se ha generado Diseño de Sonido con IA. Haz clic en Crear mezcla para sugerir y generar ambiente + SFX." })}
+            Noch kein AI Sound Design generiert. Klick Mix erstellen um Atmo + SFX vorschlagen und generieren zu lassen.
           </div>
         )}
 

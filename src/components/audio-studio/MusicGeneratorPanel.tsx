@@ -199,7 +199,7 @@ export function MusicGeneratorPanel({
               <Sparkles className="w-3.5 h-3.5 text-cyan-500" />
             </div>
             <h2 className="text-2xl md:text-3xl font-bold mb-1">
-              {tx({ de: "{tx({ de: \"Generiere Studio-Qualität Musik\", en: \"Generate Studio Quality Music\", es: \"Generar música con calidad de estudio\" })}", en: "Generate Studio Quality Music", es: "Generar música con calidad de estudio" })}
+              Generiere Studio-Qualität Musik
             </h2>
             <p className="text-sm text-muted-foreground">
               Beschreibe deinen Sound. KI komponiert Tracks mit eingebauten Sänger-Stimmen; eigene Stimmen sind für gesprochene Voiceovers verfügbar.
@@ -257,11 +257,11 @@ export function MusicGeneratorPanel({
       {/* Prompt + Options */}
       <Card className="backdrop-blur-xl bg-card/60 border-border/50 p-5 space-y-5">
         <div className="p-3 rounded-lg bg-muted/30 border border-border/30 text-xs text-muted-foreground">
-          {tx({ de: "{tx({ de: \"Custom Voices aus dem Voice Studio werden für gesprochene Voiceovers genutzt. Der Musik-Generator unterstützt aktuell keine extern geklonten Sänger-Stimmen.\", en: \"Custom Voices from the Voice Studio are used for spoken voiceovers. The music generator currently does not support externally cloned singer voices.\", es: \"Las voces personalizadas del Voice Studio se utilizan para locuciones habladas. El generador de música actualmente no admite voces de cantantes clonadas externamente.\" })}", en: "Custom Voices from the Voice Studio are used for spoken voiceovers. The music generator currently does not support externally cloned singer voices.", es: "Las voces personalizadas del Voice Studio se utilizan para locuciones habladas. El generador de música actualmente no admite voces de cantantes clonadas externamente." })}
+          Custom Voices aus dem Voice Studio werden für gesprochene Voiceovers genutzt. Der Musik-Generator unterstützt aktuell keine extern geklonten Sänger-Stimmen.
         </div>
 
         <div className="space-y-2">
-          <Label className="text-sm font-medium">{tx({ de: "Beschreibe deinen Track", en: "Describe your track", es: "Describe tu pista" })}</Label>
+          <Label className="text-sm font-medium">Beschreibe deinen Track</Label>
           <Textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value.slice(0, 500))}
@@ -328,7 +328,7 @@ export function MusicGeneratorPanel({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">{tx({ de: "Dauer", en: "Duration", es: "Duración" })}</Label>
+              <Label className="text-sm font-medium">Dauer</Label>
               <span className="text-xs text-muted-foreground">{effectiveDuration}s</span>
             </div>
             <Slider
@@ -358,7 +358,7 @@ export function MusicGeneratorPanel({
               <div>
                 <Label className="text-sm font-medium">Gesangssprache</Label>
                 <p className="text-xs text-muted-foreground">
-                  {tx({ de: "{tx({ de: \"Nur Sprachen, die dieser Provider sauber singt.\", en: \"Only languages that this provider sings cleanly.\", es: \"Solo idiomas que este proveedor canta limpiamente.\" })}", en: "Only languages that this provider sings cleanly.", es: "Solo idiomas que este proveedor canta limpiamente." })}
+                  Nur Sprachen, die dieser Provider sauber singt.
                 </p>
               </div>
               <Select value={vocalLanguage} onValueChange={setVocalLanguage} disabled={loading}>
@@ -468,7 +468,7 @@ export function MusicGeneratorPanel({
                     <span>•</span>
                     <span>{generatedTrack.engine}</span>
                     <Badge variant="outline" className="text-[10px] h-4 border-primary/40 text-primary">
-                      {tx({ de: "{tx({ de: \"In Bibliothek gespeichert\", en: \"Saved to Library\", es: \"Guardado en la biblioteca\" })}", en: "Saved to Library", es: "Guardado en la biblioteca" })}
+                      In Bibliothek gespeichert
                     </Badge>
                   </div>
                 </div>

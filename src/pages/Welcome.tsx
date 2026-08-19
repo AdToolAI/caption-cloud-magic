@@ -12,7 +12,7 @@ import { FounderStatusCard } from "@/components/founders/FounderStatusCard";
 
 const copy = {
   de: {
-    eyebrow: tx({ de: "Zahlung bestätigt", en: "Payment confirmed", es: "Pago confirmado" }),
+    eyebrow: "Zahlung bestätigt",
     title: "Willkommen in deinem Studio",
     sub: tx({ de: "Ein Creator. Ein ganzes Studio. Ab jetzt läuft alles auf deinem Konto — Skript, Stimmen, Charaktere, Schnitt und Export.", en: "One Creator. One entire studio. From now on, everything runs on your account — script, voices, characters, editing, and export.", es: "Un Creador. Un estudio completo. A partir de ahora, todo funciona en tu cuenta — guion, voces, personajes, edición y exportación." }),
     unlocked: "Ab sofort freigeschaltet",

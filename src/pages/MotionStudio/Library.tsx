@@ -92,7 +92,7 @@ export default function MotionStudioLibrary() {
               <Link to="/video-composer">
                 <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
                   <ArrowLeft className="h-3.5 w-3.5" />
-                  {tx({ de: "Zurück zu Motion Studio", en: "Back to Motion Studio", es: "Volver a Motion Studio" })}
+                  Zurück zu Motion Studio
                 </Button>
               </Link>
             </div>
@@ -102,7 +102,7 @@ export default function MotionStudioLibrary() {
                   Motion Studio Library
                 </h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {tx({ de: "Charaktere & Locations einmal definieren — überall wiederverwenden.", en: "Define characters & locations once — reuse everywhere.", es: "Define personajes y ubicaciones una vez — reutiliza en todas partes." })}
+                  Charaktere & Locations einmal definieren — überall wiederverwenden.
                 </p>
               </div>
               <div className="flex items-center gap-2">

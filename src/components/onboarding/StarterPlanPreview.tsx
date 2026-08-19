@@ -34,7 +34,7 @@ export function StarterPlanPreview({ plans, loading, error, onComplete, onRetry 
         </div>
         <h3 className="text-xl font-semibold">{tx({ de: "Dein Produktionsplan wird erstellt...", en: "Your production plan is being created...", es: "Tu plan de producción se está creando..." })}</h3>
         <p className="text-sm text-muted-foreground text-center max-w-md">
-          {tx({ de: "Unsere KI analysiert deine Nische und baut deinen ersten Wochenplan – Videoideen inklusive optimaler Veröffentlichungszeiten.", en: "Our AI analyzes your niche and builds your first weekly plan – including video ideas and optimal publishing times.", es: "Nuestra IA analiza tu nicho y crea tu primer plan semanal – incluyendo ideas de video y tiempos de publicación óptimos." })}
+          Unsere KI analysiert deine Nische und baut deinen ersten Wochenplan – Videoideen inklusive optimaler Veröffentlichungszeiten.
         </p>
       </div>
     );

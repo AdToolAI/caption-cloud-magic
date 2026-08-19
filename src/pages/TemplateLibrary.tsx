@@ -24,7 +24,6 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { tx } from '@/lib/i18nText';
 
 export default function TemplateLibrary() {
   const navigate = useNavigate();
@@ -47,10 +46,10 @@ export default function TemplateLibrary() {
     { value: 'all', label: 'Alle' },
     { value: 'social_media', label: 'Social Media' },
     { value: 'advertising', label: 'Werbung' },
-    { value: 'explainer', label: tx({ de: "Erklärvideos", en: "Explainer Videos", es: "Videos Explicativos" }) },
+    { value: 'explainer', label: 'Erklärvideos' },
     { value: 'tutorial', label: 'Tutorials' },
     { value: 'testimonial', label: 'Testimonials' },
-    { value: 'product_showcase', label: tx({ de: "Produktpräsentation", en: "Product Showcase", es: "Presentación de Producto" }) },
+    { value: 'product_showcase', label: 'Produktpräsentation' },
     { value: 'event', label: 'Events' },
     { value: 'educational', label: 'Bildung' },
     { value: 'entertainment', label: 'Unterhaltung' },
@@ -86,13 +85,13 @@ export default function TemplateLibrary() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Template-Bibliothek</h1>
-          {tx({ de: "<p className=\"text-muted-foreground mt-1\">", en: "Select a template and create your video in minutes", es: "Selecciona una plantilla y crea tu video en minutos" })}
-            {tx({ de: "Wähle ein Template aus und erstelle dein Video in wenigen Minuten", en: "Select a template and create your video in minutes", es: "Selecciona una plantilla y crea tu video en minutos" })}
+          <p className="text-muted-foreground mt-1">
+            Wähle ein Template aus und erstelle dein Video in wenigen Minuten
           </p>
         </div>
         <Button onClick={() => navigate('/template-editor')}>
-          {tx({ de: "<Plus className=\"mr-2 h-4 w-4\" />", en: "New Template", es: "Nueva plantilla" })}
-          {tx({ de: "Neues Template", en: "New Template", es: "Nueva plantilla" })}
+          <Plus className="mr-2 h-4 w-4" />
+          Neues Template
         </Button>
       </div>
 

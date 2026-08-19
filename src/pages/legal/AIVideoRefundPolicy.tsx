@@ -60,7 +60,7 @@ export default function AIVideoRefundPolicy() {
               <li>{tx({ de: "Sync.so Mux- oder Stitch-Fehler, Watchdog-Kill, Lambda-Crash", en: "Sync.so mux or stitch errors, watchdog kill, Lambda crash", es: "Errores de mux o stitch de Sync.so, watchdog kill, fallo de Lambda" })}</li>
               <li>{tx({ de: "Content-Filter des Providers, der", en: "Provider content filter that triggers", es: "Filtro de contenido del proveedor que actúa" })} <em>{tx({ de: "nach", en: "after", es: "después de" })}</em> {tx({ de: "deiner Bestätigung greift", en: "your confirmation", es: "tu confirmación" })}</li>
               <li>
-                {tx({ de: "Jeder Fehler, der intern mit einem der folgenden Codes klassifiziert wird:", en: "Any error internally classified with one of the following codes:", es: "Cualquier error clasificado internamente con uno de los siguientes códigos:" })}
+                Jeder Fehler, der intern mit einem der folgenden Codes klassifiziert wird:
                 <code className="text-xs ml-1">provider_timeout_*</code>,
                 <code className="text-xs ml-1">provider_5xx_*</code>,
                 <code className="text-xs ml-1">sync_watchdog_*</code>,
@@ -71,7 +71,7 @@ export default function AIVideoRefundPolicy() {
             </ul>
             <p className="text-xs text-muted-foreground mt-3">
               Abgewickelt durch unseren <code>credit-refund-automation</code>-Service. Gutschrift
-              {tx({ de: "erscheint in der Regel innerhalb weniger Minuten in deinem AI-Video-Wallet.", en: "will usually appear in your AI video wallet within a few minutes.", es: "aparecerá generalmente en tu billetera de video de IA en pocos minutos." })}
+              erscheint in der Regel innerhalb weniger Minuten in deinem AI-Video-Wallet.
             </p>
           </section>
 

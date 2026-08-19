@@ -985,7 +985,7 @@ export default function SceneCard({
       toast({
         title:
           lang === "de"
-            ? tx({ de: "🎲 Neue Szenenidee", en: "🎲 New scene idea", es: "🎲 Nueva idea de escena" })
+            ? "🎲 Neue Szenenidee"
             : lang === "es"
               ? "🎲 Nueva idea de escena"
               : "🎲 Fresh scene idea",
@@ -1698,7 +1698,7 @@ export default function SceneCard({
                             src: "stock-image" as ClipSource,
                             label:
                               lang === "de"
-                                ? tx({ de: "Bild", en: "Image", es: "Imagen" })
+                                ? "Bild"
                                 : lang === "es"
                                   ? "Imagen"
                                   : "Image",
@@ -2790,7 +2790,7 @@ export default function SceneCard({
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex flex-col">
                         <span className="text-[10px] font-semibold text-primary flex items-center gap-1">
-                          {tx({ de: "{tx({ de: \"🎙️ Lip-Sync zum Voiceover\", en: \"🎙️ Lip-sync to voiceover\", es: \"🎙️ Sincronización labial con voz en off\" })}", en: "🎙️ Lip-sync to voiceover", es: "🎙️ Sincronización labial con voz en off" })}
+                          🎙️ Lip-Sync zum Voiceover
                           <span
                             className="px-1 py-0.5 rounded bg-amber-400/20 text-amber-200 text-[8px] font-bold ring-1 ring-amber-400/30"
                             title={tx({ de: "Premium-Lippensynchronisation — Artlist-grade fidelity, identity-locked, kein Face-Morph", en: "Premium-Lippensynchronisation — Artlist-grade fidelity, identity-locked, no face morph", es: "Premium-Lippensynchronisation — fidelidad de nivel Artlist, identidad bloqueada, sin transformación facial" })}
@@ -3083,7 +3083,7 @@ export default function SceneCard({
                     }
                     placeholder={
                       lang === "de"
-                        ? tx({ de: "z. B. Vier Social-Media-Manager arbeiten parallel in einem hellen Open-Space-Büro", en: "e.g. Four social media managers working in parallel in a bright open-plan office", es: "ej. Cuatro gestores de redes sociales trabajando en paralelo en una oficina diáfana y luminosa" })
+                        ? "z. B. Vier Social-Media-Manager arbeiten parallel in einem hellen Open-Space-Büro"
                         : lang === "es"
                           ? "p. ej. Cuatro community managers trabajan en paralelo en una oficina luminosa"
                           : "e.g. Four social-media managers working in parallel inside a bright open-space office"
@@ -3283,7 +3283,7 @@ export default function SceneCard({
                     language={lang}
                   />
 
-                  {/* Phase 2 (Studio Set v2) — single chip + tx({ de: "Stil ändern", en: "Change Style", es: "Cambiar Estilo" })
+                  {/* Phase 2 (Studio Set v2) — single chip + "Stil ändern"
                     button replaces the previous trio of always-visible style
                     tools (DirectorPresetPicker + CinematicStylePresets +
                     SceneShotDirectorPanel). They now live behind
@@ -3304,7 +3304,7 @@ export default function SceneCard({
                     />
                   </div>
 
-                  {/* Phase 1 (Studio Set v2) — inline tx({ de: "Finaler Prompt (Vorschau)", en: "Final Prompt (Preview)", es: "Prompt Final (Vista Previa)" })
+                  {/* Phase 1 (Studio Set v2) — inline "Finaler Prompt (Vorschau)"
                     block was removed. The same composed prompt + layer
                     breakdown now lives inside ScenePromptDetailsSheet, opened
                     via the "Prompt-Details ansehen" button above. */}
@@ -3470,7 +3470,7 @@ export default function SceneCard({
                             1
                           </span>
                           {lang === "de"
-                            ? tx({ de: "Schritt 1 — Frame zuerst freezen", en: "Step 1 — Freeze frame first", es: "Paso 1 — Congelar fotograma primero" })
+                            ? "Schritt 1 — Frame zuerst freezen"
                             : lang === "es"
                               ? "Paso 1 — congela el fotograma primero"
                               : "Step 1 — freeze the frame first"}
@@ -3714,7 +3714,7 @@ export default function SceneCard({
                 toast({
                   title:
                     lang === "de"
-                      ? tx({ de: "Sieger übernommen", en: "Winner adopted", es: "Ganador adoptado" })
+                      ? "Sieger übernommen"
                       : lang === "es"
                         ? "Ganador aplicado"
                         : "Winner applied",

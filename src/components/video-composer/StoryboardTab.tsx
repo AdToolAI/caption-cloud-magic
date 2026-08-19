@@ -44,7 +44,7 @@ import { legacyClipReadyEquivalentRow } from '@/lib/composer/sceneState';
 const SCENE_TYPE_LABEL_DE: Record<string, string> = {
   hook: 'Hook',
   problem: 'Problem',
-  solution: tx({ de: "Lösung", en: "Solution", es: "Solución" }),
+  solution: 'Lösung',
   demo: 'Demo',
   'social-proof': 'Social Proof',
   cta: 'CTA',
@@ -344,7 +344,7 @@ export default function StoryboardTab({
     if (invalidatedAiClip) {
       // Lazy-import to avoid pulling sonner into module init
       import('sonner').then(({ toast }) => {
-        toast.info(tx({ de: "Engine geändert", en: "Engine changed", es: "Motor cambiado" }), {
+        toast.info('Engine geändert', {
           description: tr({ de: 'Szene wird mit dem neuen Modell neu generiert, sobald du auf „Alle generieren" klickst.', en: 'The scene will be regenerated with the new model once you click "Generate all".', es: 'La escena se regenerará con el nuevo modelo en cuanto hagas clic en "Generar todo".' }),
         });
       });
@@ -499,7 +499,7 @@ export default function StoryboardTab({
   const handleAddSceneClick = () => {
     if (!addSceneAllowed) {
       void import('sonner').then(({ toast }) => {
-        toast.error(tx({ de: "Projekt-Budget voll", en: "Project budget full", es: "Presupuesto del proyecto lleno" }), {
+        toast.error('Projekt-Budget voll', {
           description: tr({ de: `Maximal ${formatDuration(MAX_PROJECT_SECONDS)} pro Projekt. Kürze oder lösche eine andere Szene, um Platz zu schaffen.`, en: `Maximum ${formatDuration(MAX_PROJECT_SECONDS)} per project. Shorten or delete another scene to make room.`, es: `Máximo ${formatDuration(MAX_PROJECT_SECONDS)} por proyecto. Acorta o elimina otra escena para hacer espacio.` }),
         });
       });
@@ -514,7 +514,7 @@ export default function StoryboardTab({
       <div className="rounded-lg bg-card/60 border border-border/40 px-3 py-2">
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            {tx({ de: "{tx({ de: \"Projekt-Budget\", en: \"Project budget\", es: \"Presupuesto del proyecto\" })}", en: "Project budget", es: "Presupuesto del proyecto" })}
+            Projekt-Budget
           </span>
           <span className={`text-xs font-medium tabular-nums ${budgetTextColor}`}>
             {formatDuration(totalDuration)} / {formatDuration(MAX_PROJECT_SECONDS)}

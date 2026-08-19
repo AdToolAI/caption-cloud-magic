@@ -185,7 +185,7 @@ export function AIAutoCut({ videoUrl, videoDuration, audioUrl, onCutsGenerated }
         {/* Clip Duration */}
         <div className="space-y-2 pt-2 border-t">
           <div className="flex justify-between">
-            <span className="text-xs font-medium">{tx({ de: "Clip-Dauer", en: "Clip Duration", es: "Duración del clip" })}</span>
+            <span className="text-xs font-medium">Clip-Dauer</span>
             <span className="text-xs text-muted-foreground">
               {settings.minClipDuration}s - {settings.maxClipDuration}s
             </span>

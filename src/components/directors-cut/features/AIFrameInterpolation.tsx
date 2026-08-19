@@ -89,8 +89,8 @@ export function AIFrameInterpolation({
   };
 
   const fpsOptions = [
-    { value: 60, label: '60 FPS', description: tx({ de: "Flüssig", en: "Smooth", es: "Fluido" }), credits: 5 },
-    { value: 120, label: '120 FPS', description: tx({ de: "Ultra-Flüssig", en: "Ultra-Smooth", es: "Ultra-Fluido" }), credits: 10 },
+    { value: 60, label: '60 FPS', description: 'Flüssig', credits: 5 },
+    { value: 120, label: '120 FPS', description: 'Ultra-Flüssig', credits: 10 },
     { value: 240, label: '240 FPS', description: 'Slow-Mo Ready', credits: 15 },
   ];
 
@@ -232,7 +232,7 @@ export function AIFrameInterpolation({
 
           <div className="p-3 bg-muted/50 rounded-lg">
             <p className="text-xs text-muted-foreground">
-              <strong>{tx({ de: "Hinweis:", en: "Note:", es: "Nota:" })}</strong> Für beste Slow-Motion Ergebnisse 240 FPS wählen. 
+              <strong>Hinweis:</strong> Für beste Slow-Motion Ergebnisse 240 FPS wählen. 
               {tx({ de: "Die KI generiert fehlende Frames basierend auf Bewegungsanalyse.", en: "The AI ​​generates missing frames based on motion analysis.", es: "La IA genera fotogramas faltantes basándose en el análisis del movimiento." })}
             </p>
           </div>

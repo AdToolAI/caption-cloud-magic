@@ -7,7 +7,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Bell, Loader2 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
-import { tx } from '@/lib/i18nText';
 
 export const SecurityNotificationsCard = () => {
   const { user } = useAuth();
@@ -98,8 +97,8 @@ export const SecurityNotificationsCard = () => {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label>Sicherheitswarnungen</Label>
-            {tx({ de: "<p className=\"text-xs text-muted-foreground\">", en: "Email for suspicious activity", es: "Correo electrónico para actividad sospechosa" })}
-              {tx({ de: "E-Mail bei verdächtigen Aktivitäten", en: "Email for suspicious activity", es: "Correo electrónico para actividad sospechosa" })}
+            <p className="text-xs text-muted-foreground">
+              E-Mail bei verdächtigen Aktivitäten
             </p>
           </div>
           <Switch
@@ -112,8 +111,8 @@ export const SecurityNotificationsCard = () => {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label>Login-Benachrichtigungen</Label>
-            {tx({ de: "<p className=\"text-xs text-muted-foreground\">", en: "Email for every new login", es: "Correo electrónico para cada nuevo inicio de sesión" })}
-              {tx({ de: "E-Mail bei jeder neuen Anmeldung", en: "Email for every new login", es: "Correo electrónico para cada nuevo inicio de sesión" })}
+            <p className="text-xs text-muted-foreground">
+              E-Mail bei jeder neuen Anmeldung
             </p>
           </div>
           <Switch

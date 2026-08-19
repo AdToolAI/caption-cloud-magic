@@ -15,7 +15,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { DEMO_VIDEO, isDemoVideo } from '@/constants/demo-video';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AutopilotHeroBanner } from '@/components/autopilot/AutopilotHeroBanner';
-import { tx } from '@/lib/i18nText';
 
 interface QuickAction {
   label: string;
@@ -394,7 +393,7 @@ export const DashboardVideoCarousel = ({
                   onClick={() => {
                     const demoEl = document.querySelector('.demo-video-element') as HTMLVideoElement;
                     if (demoEl) demoEl.pause();
-                    setSelectedVideo({ url: demoVideoUrl, title: tx({ de: "AdTool AI: Die Lösung", en: "AdTool AI: The Solution", es: "AdTool AI: La Solución" }) });
+                    setSelectedVideo({ url: demoVideoUrl, title: 'AdTool AI: Die Lösung' });
                   }}
                   className="w-9 h-9 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-md hover:bg-primary/80 transition-colors"
                 >

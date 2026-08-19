@@ -72,7 +72,7 @@ export function NotificationCenter({ open, onClose }: NotificationCenterProps) {
           <div className="space-y-2">
             {isLoading && (
               <div className="text-center py-8 text-muted-foreground">
-                {tx({ de: "Lade Benachrichtigungen...", en: "Loading Notifications...", es: "Cargando notificaciones..." })}
+                Lade Benachrichtigungen...
               </div>
             )}
 

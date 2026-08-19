@@ -162,7 +162,7 @@ export const MediaLibraryHeroHeader = ({
                   <Images className="absolute inset-0 m-auto h-4 w-4 text-purple-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">{tx({ de: "Bilder", en: "Images", es: "Imágenes" })}</p>
+                  <p className="text-sm text-muted-foreground">Bilder</p>
                   <p className={`font-bold ${imagePercent >= 100 ? "text-destructive" : imagePercent > 80 ? "text-warning" : "text-foreground"}`}>
                     {imageCount.toLocaleString('de-DE')} / {maxImages.toLocaleString('de-DE')}
                   </p>
@@ -265,7 +265,7 @@ export const MediaLibraryHeroHeader = ({
               <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent
                                -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
               <Upload className="mr-2 h-4 w-4" />
-              {tx({ de: "{tx({ de: \"Medien hochladen\", en: \"Upload media\", es: \"Subir medios\" })}", en: "Upload media", es: "Subir medios" })}
+              Medien hochladen
             </Button>
           </motion.div>
         </div>

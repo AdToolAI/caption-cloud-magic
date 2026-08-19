@@ -87,11 +87,11 @@ const EXPRESSION_LABELS: Record<DirectorLanguage, Record<PerformanceExpression, 
   },
   de: {
     neutral: 'Neutral',
-    'warm-smile': tx({ de: "Warmes Lächeln", en: "Warm Smile", es: "Sonrisa Cálida" }),
+    'warm-smile': 'Warmes Lächeln',
     curious: 'Neugierig',
     concerned: 'Besorgt',
-    confident: tx({ de: "Souverän", en: "Confident", es: "Confiado" }),
-    surprised: tx({ de: "Überrascht", en: "Surprised", es: "Sorprendido" }),
+    confident: 'Souverän',
+    surprised: 'Überrascht',
   },
   es: {
     neutral: 'Neutral',
@@ -115,9 +115,9 @@ const GESTURE_LABELS: Record<DirectorLanguage, Record<PerformanceGesture, string
   de: {
     still: 'Ruhig',
     'hand-on-chin': 'Hand am Kinn',
-    'open-palms': tx({ de: "Offene Handflächen", en: "Open Palms", es: "Palmas Abiertas" }),
+    'open-palms': 'Offene Handflächen',
     point: 'Zeigt',
-    'cross-arms': tx({ de: "Arme verschränkt", en: "Crossed Arms", es: "Brazos Cruzados" }),
+    'cross-arms': 'Arme verschränkt',
     'lean-in': 'Beugt sich vor',
   },
   es: {
@@ -139,7 +139,7 @@ const GAZE_LABELS: Record<DirectorLanguage, Record<PerformanceGaze, string>> = {
   },
   de: {
     'to-camera': 'Zur Kamera',
-    'to-speaker': tx({ de: "Zum Gegenüber", en: "Towards Speaker", es: "Hacia el Orador" }),
+    'to-speaker': 'Zum Gegenüber',
     away: 'Weg',
     'down-thinking': 'Nach unten, denkend',
   },

@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 
 interface ApprovalTimelineProps {
   event_id: string;
@@ -27,7 +26,7 @@ export function ApprovalTimeline({ event_id }: ApprovalTimelineProps) {
   });
 
   if (isLoading) {
-    return <div className="text-sm text-muted-foreground">{tx({ de: "Lade Approvals...", en: "Loading Approvals...", es: "Cargando Aprobaciones..." })}</div>;
+    return <div className="text-sm text-muted-foreground">Lade Approvals...</div>;
   }
 
   if (!approvals || approvals.length === 0) {

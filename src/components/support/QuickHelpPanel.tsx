@@ -29,7 +29,7 @@ const TEXT = {
       { q: tx({ de: "Wie ändere oder kündige ich meinen Plan?", en: "How do I change or cancel my plan?", es: "¿Cómo cambio o cancelo mi plan?" }), a: tx({ de: "Öffne Account → Abrechnung und nutze das Kundenportal. Rechnungen werden nach jeder Zahlung automatisch per E-Mail verschickt.", en: "Open Account → Billing and use the customer portal. Invoices are automatically sent by email after each payment.", es: "Abre Cuenta → Facturación y usa el portal del cliente. Las facturas se envían automáticamente por correo electrónico después de cada pago." }) },
     ],
     statusBtn: "Live-Systemstatus ansehen",
-    faqBtn: tx({ de: "Vollständige FAQ durchsuchen", en: "Browse full FAQ", es: "Ver FAQ completa" }),
+    faqBtn: "Vollständige FAQ durchsuchen",
     whatsapp: tx({ de: "Dringend? Schreib uns auf WhatsApp", en: "Urgent? Write to us on WhatsApp", es: "¿Urgente? Escríbenos por WhatsApp" }),
   },
   es: {

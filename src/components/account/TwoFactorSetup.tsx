@@ -109,7 +109,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
       }, 2000);
     } catch (err: any) {
       console.error('MFA verify error:', err);
-      setError(err.message || tx({ de: "Ungültiger Code", en: "Invalid code", es: "Código inválido" }));
+      setError(err.message || 'Ungültiger Code');
     } finally {
       setLoading(false);
     }
@@ -154,7 +154,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
             Zwei-Faktor-Authentifizierung
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            {tx({ de: "{tx({ de: \"Schütze dein Konto mit einem zusätzlichen Sicherheitsfaktor\", en: \"Protect your account with an additional security factor\", es: \"Protege tu cuenta con un factor de seguridad adicional\" })}", en: "Protect your account with an additional security factor", es: "Protege tu cuenta con un factor de seguridad adicional" })}
+            Schütze dein Konto mit einem zusätzlichen Sicherheitsfaktor
           </DialogDescription>
         </DialogHeader>
 
@@ -234,7 +234,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
                 <div className="p-3 bg-muted/30 rounded-xl border border-border/50">
                   <Label className="text-xs text-muted-foreground flex items-center gap-1">
                     <QrCode className="h-3 w-3" />
-                    {tx({ de: "{tx({ de: \"Manueller Schlüssel:\", en: \"Manual key:\", es: \"Clave manual:\" })}", en: "Manual key:", es: "Clave manual:" })}
+                    Manueller Schlüssel:
                   </Label>
                   <div className="flex items-center gap-2 mt-2">
                     <code className="flex-1 text-xs font-mono bg-background/50 px-3 py-2 rounded-lg break-all border border-border/50">
@@ -289,7 +289,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
                     autoFocus
                   />
                   <p className="text-xs text-muted-foreground text-center">
-                    {tx({ de: "{tx({ de: \"Gib den 6-stelligen Code aus deiner Authenticator-App ein\", en: \"Enter the 6-digit code from your authenticator app\", es: \"Introduce el código de 6 dígitos de tu aplicación de autenticación\" })}", en: "Enter the 6-digit code from your authenticator app", es: "Introduce el código de 6 dígitos de tu aplicación de autenticación" })}
+                    Gib den 6-stelligen Code aus deiner Authenticator-App ein
                   </p>
                 </div>
 
@@ -313,7 +313,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
                     onClick={() => setStep('qr')} 
                     className="flex-1 h-11 bg-muted/30 border-border/50 hover:bg-muted/50 transition-all duration-300"
                   >
-                    {tx({ de: "{tx({ de: \"Zurück\", en: \"Back\", es: \"Atrás\" })}", en: "Back", es: "Atrás" })}
+                    Zurück
                   </Button>
                   <Button 
                     onClick={handleVerify} 

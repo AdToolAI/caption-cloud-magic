@@ -119,7 +119,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
         <div>
           <h3 className="text-lg font-semibold">Audio Enhancement</h3>
           <p className="text-sm text-muted-foreground">
-            {tx({ de: "{tx({ de: \"Optimiere die Audioqualität mit KI-gestützten Tools\", en: \"Optimize audio quality with AI-powered tools\", es: \"Optimiza la calidad de audio con herramientas de IA\" })}", en: "Optimize audio quality with AI-powered tools", es: "Optimiza la calidad de audio con herramientas de IA" })}
+            Optimiere die Audioqualität mit KI-gestützten Tools
           </p>
         </div>
         <Button
@@ -148,7 +148,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <Waves className="h-4 w-4" />
-              {tx({ de: "{tx({ de: \"Audio-Vorschau\", en: \"Audio Preview\", es: \"Vista previa de audio\" })}", en: "Audio Preview", es: "Vista previa de audio" })}
+              Audio-Vorschau
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -183,13 +183,13 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
               {audio.noise_reduction && (
                 <Badge variant="secondary">
                   <VolumeX className="h-3 w-3 mr-1" />
-                  {tx({ de: "{tx({ de: \"Rauschunterdrückung\", en: \"Noise Reduction\", es: \"Reducción de ruido\" })}", en: "Noise Reduction", es: "Reducción de ruido" })}
+                  Rauschunterdrückung
                 </Badge>
               )}
               {audio.voice_enhancement && (
                 <Badge variant="secondary">
                   <Mic className="h-3 w-3 mr-1" />
-                  {tx({ de: "{tx({ de: \"Stimme verbessert\", en: \"Voice Enhanced\", es: \"Voz mejorada\" })}", en: "Voice Enhanced", es: "Voz mejorada" })}
+                  Stimme verbessert
                 </Badge>
               )}
               {audio.auto_ducking && (
@@ -209,13 +209,13 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Volume2 className="h-4 w-4" />
-                {tx({ de: "{tx({ de: \"Master-Lautstärke\", en: \"Master Volume\", es: \"Volumen maestro\" })}", en: "Master Volume", es: "Volumen maestro" })}
+                Master-Lautstärke
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <Label className="text-xs">{tx({ de: "Lautstärke", en: "Volume", es: "Volumen" })}</Label>
+                  <Label className="text-xs">Lautstärke</Label>
                   <span className="text-xs text-muted-foreground">{audio.master_volume}%</span>
                 </div>
                 <Slider
@@ -234,7 +234,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <VolumeX className="h-4 w-4" />
-                {tx({ de: "{tx({ de: \"KI-Rauschunterdrückung\", en: \"AI Noise Reduction\", es: \"Reducción de ruido con IA\" })}", en: "AI Noise Reduction", es: "Reducción de ruido con IA" })}
+                KI-Rauschunterdrückung
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -248,7 +248,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
               {audio.noise_reduction && (
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <Label className="text-xs">{tx({ de: "Stärke", en: "Strength", es: "Intensidad" })}</Label>
+                    <Label className="text-xs">Stärke</Label>
                     <span className="text-xs text-muted-foreground">{audio.noise_reduction_level}%</span>
                   </div>
                   <Slider
@@ -276,7 +276,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
                 <div>
                   <Label className="text-sm">KI-Stimmoptimierung</Label>
                   <p className="text-xs text-muted-foreground">
-                    {tx({ de: "{tx({ de: \"Verbessert Klarheit und Verständlichkeit\", en: \"Improves clarity and intelligibility\", es: \"Mejora la claridad y la inteligibilidad\" })}", en: "Improves clarity and intelligibility", es: "Mejora la claridad y la inteligibilidad" })}
+                    Verbessert Klarheit und Verständlichkeit
                   </p>
                 </div>
                 <Switch
@@ -300,7 +300,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
                 <div>
                   <Label className="text-sm">Aktivieren</Label>
                   <p className="text-xs text-muted-foreground">
-                    {tx({ de: "{tx({ de: \"Senkt Musik automatisch bei Sprache\", en: \"Automatically lowers music during speech\", es: \"Baja automáticamente la música durante el habla\" })}", en: "Automatically lowers music during speech", es: "Baja automáticamente la música durante el habla" })}
+                    Senkt Musik automatisch bei Sprache
                   </p>
                 </div>
                 <Switch
@@ -311,7 +311,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
               {audio.auto_ducking && (
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <Label className="text-xs">{tx({ de: "Ducking-Stärke", en: "Ducking Strength", es: "Intensidad de atenuación" })}</Label>
+                    <Label className="text-xs">Ducking-Stärke</Label>
                     <span className="text-xs text-muted-foreground">{audio.ducking_level}%</span>
                   </div>
                   <Slider

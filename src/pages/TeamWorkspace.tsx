@@ -25,7 +25,6 @@ import { RoleManager } from "@/components/team/RoleManager";
 import { EnterpriseUpgradePrompt } from "@/components/team/EnterpriseUpgradePrompt";
 import { EnterpriseSeatManager } from "@/components/team/EnterpriseSeatManager";
 import { cn } from "@/lib/utils";
-import { tx } from '@/lib/i18nText';
 
 /* ---------- Helpers ---------- */
 
@@ -890,7 +889,7 @@ export default function TeamWorkspace() {
                 <SectionTitle eyebrow="Signal Log" title={t("team.activity")} />
                 {activityEvents.length === 0 ? (
                   <p className="py-12 text-center text-sm text-muted-foreground">
-                    {tx({ de: "Noch keine Signale in diesem Workspace.", en: "No signals in this workspace yet.", es: "Aún no hay señales en este espacio de trabajo." })}
+                    Noch keine Signale in diesem Workspace.
                   </p>
                 ) : (
                   <ol className="mt-5 relative space-y-4 border-l border-primary/20 pl-6">

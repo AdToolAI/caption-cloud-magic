@@ -2,7 +2,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, AlertTriangle, Target } from "lucide-react";
-import { tx } from '@/lib/i18nText';
 
 interface CommentInsightCardProps {
   title: string;
@@ -56,12 +55,12 @@ export function CommentInsightCard({
           <p className="text-sm">{interpretation}</p>
         </div>
         <div className="bg-muted/50 p-3 rounded-lg">
-          <p className="text-sm font-medium mb-2">{tx({ de: "📋 Empfohlene Maßnahme", en: "📋 Recommended Action", es: "📋 Acción recomendada" })}</p>
+          <p className="text-sm font-medium mb-2">📋 Empfohlene Maßnahme</p>
           <p className="text-sm">{action}</p>
         </div>
         <div className="flex gap-2">
-          {tx({ de: "<Button size=\"sm\" variant=\"outline\" className=\"text-xs\">", en: "Save as task", es: "Guardar como tarea" })}
-            {tx({ de: "Als Aufgabe speichern", en: "Save as task", es: "Guardar como tarea" })}
+          <Button size="sm" variant="outline" className="text-xs">
+            Als Aufgabe speichern
           </Button>
           <Button size="sm" variant="ghost" className="text-xs">
             In CSV exportieren

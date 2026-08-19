@@ -19,7 +19,6 @@ import { de } from 'date-fns/locale';
 import { es } from 'date-fns/locale';
 import { enUS } from 'date-fns/locale';
 import { useTranslation } from '@/hooks/useTranslation';
-import { tx } from '@/lib/i18nText';
 
 interface PublishToSocialTabProps {
   videoUrl: string;
@@ -146,7 +145,7 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
             </div>
             <div>
               <div className="text-sm font-semibold text-white">Cross-Post Magic</div>
-              <div className="text-xs text-muted-foreground">{tx({ de: "KI-optimierte Caption pro Plattform · 1 Klick veröffentlichen", en: "AI-optimized caption per platform · 1-click publish", es: "Caption optimizada por IA por plataforma · Publicación en 1 clic" })}</div>
+              <div className="text-xs text-muted-foreground">KI-optimierte Caption pro Plattform · 1 Klick veröffentlichen</div>
             </div>
           </div>
           <Switch checked={magicMode} onCheckedChange={setMagicMode} />
@@ -203,8 +202,8 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
               onChange={(e) => setCoverUrl(e.target.value)}
               placeholder="https://…/cover.jpg"
             />
-            {tx({ de: "<p className=\"text-xs text-muted-foreground mt-1\">", en: "Publicly accessible JPG/PNG. Leave blank for auto-cover.", es: "JPG/PNG accesible públicamente. Deja en blanco para portada automática." })}
-              {tx({ de: "Öffentlich erreichbares JPG/PNG. Leer lassen für Auto-Cover.", en: "Publicly accessible JPG/PNG. Leave blank for auto-cover.", es: "JPG/PNG accesible públicamente. Deja en blanco para portada automática." })}
+            <p className="text-xs text-muted-foreground mt-1">
+              Öffentlich erreichbares JPG/PNG. Leer lassen für Auto-Cover.
             </p>
           </div>
         )}
@@ -221,8 +220,8 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
               placeholder="Hashtag-Wolke, Call-to-Action, Link…"
               rows={3}
             />
-            {tx({ de: "<p className=\"text-xs text-muted-foreground mt-1\">", en: "Will be automatically published as a separate comment after the post.", es: "Se publicará automáticamente como un comentario separado después de la publicación." })}
-              {tx({ de: "Wird nach dem Post automatisch als eigener Kommentar veröffentlicht.", en: "Will be automatically published as a separate comment after the post.", es: "Se publicará automáticamente como un comentario separado después de la publicación." })}
+            <p className="text-xs text-muted-foreground mt-1">
+              Wird nach dem Post automatisch als eigener Kommentar veröffentlicht.
             </p>
           </div>
         )}
@@ -231,7 +230,7 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
           <div className="flex items-center gap-2">
             <Link2 className="h-4 w-4 text-[#F5C76A]" />
             <div>
-              <div className="text-sm font-medium">{tx({ de: "UTM-Tracking automatisch anhängen", en: "Automatically append UTM tracking", es: "Adjuntar seguimiento UTM automáticamente" })}</div>
+              <div className="text-sm font-medium">UTM-Tracking automatisch anhängen</div>
               <div className="text-xs text-muted-foreground">utm_source / utm_medium / utm_campaign pro Plattform</div>
             </div>
           </div>

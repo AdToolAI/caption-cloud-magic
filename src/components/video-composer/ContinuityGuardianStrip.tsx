@@ -570,7 +570,7 @@ function CutChip({
           {checking ? (
             <Loader2 className="h-3 w-3 animate-spin" />
           ) : score == null ? (
-            tx({ de: "Prüfen", en: "Check", es: "Comprobar" })
+            'Prüfen'
           ) : (
             'Re-check'
           )}

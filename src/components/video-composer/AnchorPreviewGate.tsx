@@ -214,6 +214,9 @@ export function AnchorPreviewGate({
         <DialogHeader>
           <DialogTitle>{tx({ de: "Anchor-Vorschau bestätigen", en: "Confirm anchor preview", es: "Confirmar vista previa del ancla" })}</DialogTitle>
           <DialogDescription>
+            Sieh dir das komponierte Anchor-Bild an, bevor Video + Lip-Sync
+            gerendert werden. So sparst du dir teure Re-Rolls, wenn Identitäten
+            vom Bildmodell verwechselt wurden.
           </DialogDescription>
         </DialogHeader>
 
@@ -222,7 +225,7 @@ export function AnchorPreviewGate({
             <>
               <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
               <div className="text-sm text-muted-foreground">
-                {tx({ de: "Anchor wird komponiert & Identitäten geprüft…", en: "Anchor is being composed & identities checked…", es: "Anclaje componiéndose e identidades verificándose…" })}
+                Anchor wird komponiert & Identitäten geprüft…
               </div>
             </>
           )}
@@ -270,6 +273,9 @@ export function AnchorPreviewGate({
               </div>
               {!auditOk && (
                 <div className="text-[11px] text-muted-foreground text-center max-w-md">
+                  Wenn du trotzdem bestätigst, wird der Render normal
+                  abgerechnet — ein automatischer Refund für Identitäts­drift
+                  entfällt dann.
                 </div>
               )}
             </>
@@ -279,7 +285,7 @@ export function AnchorPreviewGate({
             <>
               <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
               <div className="text-sm text-muted-foreground">
-                {tx({ de: "Render wird gestartet…", en: "Render is starting…", es: "El render está comenzando…" })}
+                Render wird gestartet…
               </div>
             </>
           )}
@@ -291,7 +297,7 @@ export function AnchorPreviewGate({
             onClick={() => onOpenChange(false)}
             disabled={phase === "confirming"}
           >
-            {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
+            Abbrechen
           </Button>
           <div className="flex gap-2">
             <Button
@@ -306,7 +312,7 @@ export function AnchorPreviewGate({
               onClick={handleConfirm}
               disabled={phase !== "ready" || !anchorUrl}
             >
-              {tx({ de: "Bestätigen & rendern", en: "Confirm & Render", es: "Confirmar y Renderizar" })}
+              Bestätigen & rendern
             </Button>
           </div>
         </DialogFooter>

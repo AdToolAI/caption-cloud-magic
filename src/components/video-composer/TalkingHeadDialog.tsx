@@ -196,7 +196,7 @@ export default function TalkingHeadDialog({
     setNewName('');
     setNewPhotoUrl('');
     toast({
-      title: tx({ de: "Charakter hinzugefügt", en: "Character added", es: "Personaje añadido" }),
+      title: 'Charakter hinzugefügt',
       description: tx({ de: `"${character.name}" ist jetzt Teil deines Briefing-Casts.`, en: `"${character.name}" is now part of your briefing cast.`, es: `"${character.name}" ahora forma parte de tu elenco del briefing.` }),
     });
   };
@@ -871,7 +871,7 @@ function DialogModeTab({
           </Select>
         </div>
         <div>
-          <Label>{tx({ de: "Qualität", en: "Quality", es: "Calidad" })}</Label>
+          <Label>Qualität</Label>
           <Select value={resolution} onValueChange={(v: '480p' | '720p') => setResolution(v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>

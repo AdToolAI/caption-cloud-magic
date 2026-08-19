@@ -61,7 +61,7 @@ export default function VideoBrowser() {
           />
         </div>
         <Button type="submit" disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : tx({ de: "Suchen", en: "Search", es: "Buscar" })}
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Suchen'}
         </Button>
       </form>
 

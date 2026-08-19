@@ -5,7 +5,6 @@ import { useProactiveTips } from '@/hooks/useProactiveTips';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { tx } from '@/lib/i18nText';
 
 export function ProactiveAlertBanner() {
   const navigate = useNavigate();
@@ -113,7 +112,7 @@ export function ProactiveAlertBanner() {
                 disabled={isLoading}
               >
                 <RefreshCw className={cn("w-3 h-3 mr-1", isLoading && "animate-spin")} />
-                {tx({ de: "Prüfen", en: "Check", es: "Comprobar" })}
+                Prüfen
               </Button>
             </div>
           </div>

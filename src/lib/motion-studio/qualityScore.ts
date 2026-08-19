@@ -90,8 +90,8 @@ const T = {
     shot: { pass: 'Shot definiert', warn: 'Shot generisch', fail: tx({ de: 'Kein Shot', en: 'No shot', es: 'sin tiro' }) },
     dialog: { pass: 'Dialog gelockt', warn: 'Dialog Entwurf', fail: 'Voiceover-Timing fehlt' },
     negative: { pass: 'Negative gesetzt', warn: 'Negative schwach', fail: tx({ de: 'Kein Negative', en: 'No negative', es: 'No negativo' }) },
-    length: { pass: 'Länge passt', warn: 'Länge knapp', fail: tx({ de: "Länge daneben", en: "Length off", es: "Longitud incorrecta" }) },
-    consistency: { pass: tx({ de: "Kohärent", en: "Coherent", es: "Coherente" }), warn: 'Gemischte Cues', fail: 'Konflikt' },
+    length: { pass: 'Länge passt', warn: 'Länge knapp', fail: 'Länge daneben' },
+    consistency: { pass: 'Kohärent', warn: 'Gemischte Cues', fail: 'Konflikt' },
     hints: {
       subjectFail: tx({ de: 'Füge mindestens ein Cast-Mitglied oder einen Brand-Character hinzu — Provider brauchen ein klares Subjekt.', en: 'Add at least one cast member or brand character — providers need a clear subject.', es: 'Añade al menos un miembro del reparto o un personaje de marca — los proveedores necesitan un sujeto claro.' }),
       subjectWarn: tx({ de: 'Nenne das On-Camera-Subjekt explizit (z. B. "@Anna" oder "die Gründerin").', en: 'Name the on-camera subject explicitly (e.g. “@Anna” or “the founder”).', es: 'Nombra explícitamente el tema que aparece en la cámara (por ejemplo, "@Anna" o "el fundador").' }),

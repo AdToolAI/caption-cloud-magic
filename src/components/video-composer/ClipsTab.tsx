@@ -1195,10 +1195,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                   <span className="font-semibold text-amber-400">
                     €{rerollTarget ? getClipCost(rerollTarget.clipSource, rerollTarget.clipQuality || 'standard', rerollTarget.durationSeconds).toFixed(2) : '0.00'}
                   </span>
-                  {tx({ de: ". Der vorherige Clip wird ersetzt.", en: ". The previous clip will be replaced.", es: ". El clip anterior será reemplazado." })}
+                  . Der vorherige Clip wird ersetzt.
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {tx({ de: "💡 Tipp: Passe vorher den Prompt im Storyboard-Tab oder den Charakter-Shot-Typ an, um ein anderes Ergebnis zu bekommen.", en: "💡 Tip: Adjust the prompt in the Storyboard tab or the character shot type beforehand to get a different result.", es: "💡 Consejo: Ajusta el prompt en la pestaña Storyboard o el tipo de toma del personaje de antemano para obtener un resultado diferente." })}
+                  💡 Tipp: Passe vorher den Prompt im Storyboard-Tab oder den Charakter-Shot-Typ an, um ein anderes Ergebnis zu bekommen.
                 </p>
               </div>
             </AlertDialogDescription>
@@ -1285,7 +1285,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                       className="bg-emerald-500 hover:bg-emerald-600 text-emerald-950"
                     >
                       <Clapperboard className="h-3.5 w-3.5 mr-1" />
-                      {tx({ de: "Lip-Sync starten €0.95", en: "Start Lip-Sync €0.95", es: "Iniciar Sincronización Labial €0.95" })}
+                      Lip-Sync starten €0.95
                     </AlertDialogAction>
                   )}
                 </AlertDialogFooter>
@@ -1477,7 +1477,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                         onClick={() => setCinematicSwitchTarget(scene)}
                       >
                         <Clapperboard className="h-3 w-3" />
-                        {tx({ de: "In echte Szene einbauen €0.95", en: "Insert into actual scene €0.95", es: "Insertar en escena real €0.95" })}
+                        In echte Szene einbauen €0.95
                       </Button>
                     )}
                     {legacyClipReadyEquivalentRow(scene) && scene.clipUrl && (() => {
@@ -1573,7 +1573,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                     {/* Upload missing */}
                     {isUpload && !hasUpload && (
                       <span className="text-[10px] text-muted-foreground italic px-2">
-                        {tx({ de: "Datei im Storyboard hochladen", en: "Upload file to storyboard", es: "Subir archivo al storyboard" })}
+                        Datei im Storyboard hochladen
                       </span>
                     )}
                     {/* Stock alt search button (always available) */}
@@ -1613,7 +1613,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                         className="h-7 text-xs gap-1"
                       >
                         {searchingStock[scene.id] ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />}
-                        {tx({ de: "Suchen", en: "Search", es: "Buscar" })}
+                        Suchen
                       </Button>
                       <Button
                         size="sm"

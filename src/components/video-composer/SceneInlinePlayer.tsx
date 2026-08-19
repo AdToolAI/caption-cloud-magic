@@ -39,7 +39,7 @@ interface Props {
 const SCENE_TYPE_LABEL: Record<string, string> = {
   hook: 'Hook',
   problem: 'Problem',
-  solution: tx({ de: "Lösung", en: "Solution", es: "Solución" }),
+  solution: 'Lösung',
   demo: 'Demo',
   'social-proof': 'Social Proof',
   cta: 'CTA',

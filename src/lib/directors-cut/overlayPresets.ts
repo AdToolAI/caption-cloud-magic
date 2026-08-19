@@ -65,7 +65,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
         'lowerThird',
         'Max Mustermann',
         { fill: 'rgba(10,10,15,0.82)', fontSizeRel: 0.036, align: 'left' },
-        { animation: 'slideRight', slots: { title: 'Max Mustermann', subtitle: tx({ de: "Gründer & CEO", en: "Founder & CEO", es: "Fundador y CEO" }) } },
+        { animation: 'slideRight', slots: { title: 'Max Mustermann', subtitle: 'Gründer & CEO' } },
       ),
   },
   {
@@ -140,7 +140,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     id: 'badge-discount',
     name: tx({ de: 'Störer — Rabatt', en: 'Badge — Discount', es: 'Insignia — Descuento' }),
     category: 'Störer',
-    description: tx({ de: "Runder Preis-Störer", en: "Round Price Overlay", es: "Superposición de Precio Redonda" }),
+    description: 'Runder Preis-Störer',
     kind: 'badge',
     build: () => base('badge', '-30%', { fill: GOLD, color: INK, fontSizeRel: 0.06, uppercase: true }, { animation: 'pop' }),
   },
@@ -167,7 +167,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     build: () =>
       base(
         'badge',
-        tx({ de: "NUR 1000 PLÄTZE", en: "ONLY 1000 SPOTS", es: "SOLO 1000 PLAZAS" }),
+        'NUR 1000 PLÄTZE',
         { fill: 'rgba(10,10,15,0.85)', color: GOLD, fontSizeRel: 0.026, uppercase: true },
         { animation: 'fadeIn', box: { x: 0.62, y: 0.07, w: 0.32, h: 0.08 } },
       ),
