@@ -14,11 +14,11 @@ export type Tri = { de: string; en: string; es?: string };
 const store = new AsyncLocalStorage<Lang>();
 
 export function readLang(req: Request): Lang {
+  // Only an explicit, valid `x-app-lang` header may select a non-English
+  // language. Browser locale (`Accept-Language`) MUST NOT switch the product
+  // language — English is the canonical default for everyone.
   const explicit = req.headers.get("x-app-lang")?.toLowerCase().slice(0, 2);
   if (explicit === "en" || explicit === "es" || explicit === "de") return explicit;
-  const accept = req.headers.get("accept-language")?.toLowerCase().slice(0, 2);
-  if (accept === "en" || accept === "de" || accept === "es") return accept;
-  // Canonical default is English when no explicit language is provided.
   return "en";
 }
 
