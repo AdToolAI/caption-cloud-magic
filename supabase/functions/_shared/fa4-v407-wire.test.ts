@@ -233,7 +233,7 @@ Deno.test("A: snapshot persist success → exact RPC param keys, exactly 1 provi
   assertEquals(res.providerCalls, 1);
   assertEquals(deps.rpcCalls.length, 1);
   assertEquals(deps.rpcCalls[0].fn, "update_dialog_pass_slot");
-  assertEquals(Object.keys(deps.rpcCalls[0].args).sort(), ["_パ"].length ? ["_pass_idx", "_patch", "_scene_id"] : []);
+  assertEquals(Object.keys(deps.rpcCalls[0].args).sort(), ["_pass_idx", "_patch", "_scene_id"]);
   const args = deps.rpcCalls[0].args as Record<string, unknown>;
   assert(!("p_scene_id" in args), "legacy p_scene_id key must not be sent");
   assert(!("p_pass_idx" in args), "legacy p_pass_idx key must not be sent");
