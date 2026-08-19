@@ -52,11 +52,12 @@ Frozen Invariante: fresh und retry teilen `video_url`, `audio_url`, `bbox`, cano
 
 ## 3. Tests
 
-- **Matrix H — Actual Wire Parity**: realistischer Multi-Speaker-Pass, `freshWire` und `retryWire` über `buildProviderWire` erzeugen, Deep-Equality über alle Felder außer `active_speaker_detection`; zusätzlich einzelne Asserts für `audio_url`, `video_url`, `bbox`, `frame_count`, `dispatch_fps`, `voiced_windows`, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`. ASD fresh `{auto_detect:false, bounding_boxes_url}` vs. retry `{auto_detect:false, bounding_boxes:[...]}`.
-- **Box-Sequenz-Parität**: Inhalt des beim Fresh hochgeladenen bounding-box-JSON deep-equals dem inline `bounding_boxes` des Retry.
-- **No-Date-Now-Rebuild**: Prädikat-Test, dass der Tight-Audio-/Normalisierungspfad bei vorhandenem frozen Input nicht betreten wird (kein neuer `*-tight-<ts>.wav`).
-- **Snapshot-Persist-Failure**: Persist schlägt fehl ⇒ zero provider calls, `provider_call_made=false`.
-- **Missing snapshot on NOOP retry**: unvollständiger/fehlender Snapshot ⇒ zero provider calls, kein Legacy-Rebuild.
+- **Matrix H — Actual Wire Parity (echter Payload-Beweis, kein Source-String-/Kommentar-Test)**: realistischer Multi-Speaker-Pass; `freshWire` und `retryWire` mit demselben Production-Helper `buildProviderWire` erzeugen, nur `active_speaker_detection` entfernen, dann `deepEqual(freshCore, retryCore)`. Zusätzlich explizite Einzel-Asserts für `audio_url`, `video_url`, `model`, `sync_mode`, `bbox`, `frame_count`, `dispatch_fps`, `voiced_windows`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`.
+- **Box-Sequenz-Parität**: `uploadedFreshBoundingBoxesJson` deep-equals `retry.active_speaker_detection.bounding_boxes`.
+- **Snapshot-Persist-Failure**: ZERO Sync.so-Calls, `provider_call_made=false`.
+- **Missing snapshot on NOOP retry**: ZERO Sync.so-Calls.
+- **Incomplete snapshot on NOOP retry**: ZERO Sync.so-Calls, kein Legacy-Rebuild.
+- **Frozen snapshot vorhanden**: Tight-Slicing-Counter = 0, Audio-Normalization-Counter = 0, bbox-Recompute-Counter = 0.
 - Re-Run: Matrix B–M, Deadline-Tests, Classifier, Plate-Face-Frozen-Tests.
 
 ## 4. Version
