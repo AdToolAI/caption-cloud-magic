@@ -1,4 +1,4 @@
-import { tx } from "@/lib/i18nText";
+import { tx, getLang } from "@/lib/i18nText";
 import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';

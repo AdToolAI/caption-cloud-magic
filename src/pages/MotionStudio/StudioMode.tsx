@@ -1,4 +1,4 @@
-import { tx } from "@/lib/i18nText";
+import { tx, getLang } from "@/lib/i18nText";
 import { useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate } from 'react-router-dom';
