@@ -34,6 +34,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const REPORT_LIPSYNC_MOTION_PROBE_VERSION = "v404-telemetry-only";
+
+// v404 observability — module-load boot marker. Proves which build is actually
+// running inside Edge Runtime (vs a stale cached copy). Look for this exact
+// string in logs immediately after any deploy to confirm the new code is live.
+console.log(
+  `[report-lipsync-motion-probe] BOOT version=${REPORT_LIPSYNC_MOTION_PROBE_VERSION} deploy_marker=${Date.now()} pid=${(globalThis as any).Deno?.pid ?? "?"}`,
+);
+
 const YAVG_NOOP_THRESHOLD = 4.0;
 
 interface MotionMetricPayload {

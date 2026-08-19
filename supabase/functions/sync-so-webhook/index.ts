@@ -64,6 +64,12 @@ import {
 /** Cold-start / deploy marker for the v404 server-measurement wire. */
 const SYNC_SO_WEBHOOK_VERSION = "v410-fa4-no-media-io-under-dialog-lock-final";
 
+// v410 observability — module-load boot marker. Proves which build is actually
+// running inside Edge Runtime (vs a stale cached copy). Look for this exact
+// string in logs immediately after any deploy to confirm the new code is live.
+console.log(
+  `[sync-so-webhook] BOOT version=${SYNC_SO_WEBHOOK_VERSION} deploy_marker=${Date.now()} pid=${(globalThis as any).Deno?.pid ?? "?"}`,
+);
 
 /**
  * v404 §5 — Rehost the provider output to `ai-videos` OUTSIDE the dialog lock.
