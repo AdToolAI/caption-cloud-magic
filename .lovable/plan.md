@@ -31,18 +31,33 @@ Ein neuer Helper `resolveAsdTransport({ frozen, wantsUrlTransport, uploadedUrl }
 
 Der bestehende `try/catch`-Warn-Pfad um `uploadBoundingBoxesJson` wird durch dieses Ergebnis-Objekt ersetzt.
 
-## P1-3 — v406/v407 nur auf dem contracted Multi-Speaker-BBox-Pfad
+## P1-3 — v407 nur auf dem contracted Multi-Speaker-BBox-Pfad (Fresh und NOOP getrennt)
 
-Eine einzige Production-Bedingung, direkt vor dem Snapshot-Block ausgewertet:
+Zwei getrennte Bedingungen, da der NOOP-Retry keine neu berechnete Geometrie besitzen darf:
 
 ```ts
-const v406WireContractActive = isMultiSpeaker && syncModeIsSync3 && hasContractedBboxWire;
+const v407FreshWireContract =
+  isMultiSpeaker &&
+  payloadModel === "sync-3" &&
+  retryVariant === "bbox-url-pro" &&
+  !!dispatchBox &&
+  canonicalBoxesAvailable;
+
+const v407NoopRetryWireContract =
+  isMultiSpeaker &&
+  payloadModel === "sync-3" &&
+  body?.noop_auto_escalation === true &&
+  retryVariant === "coords-pro-box";
+
+const v407WireContractActive = v407FreshWireContract || v407NoopRetryWireContract;
 ```
 
-(abgeleitet aus den bereits vorhandenen Größen: Sprecheranzahl ≥ 2, `sync_mode` = sync-3-Pfad, vorhandener Contract-E `dispatchBox` + canonical `bounding_boxes` / `retryVariant === "bbox-url-pro"`).
+Begriffstrennung verbindlich: `sync-3` ist das Provider-MODEL (`payloadModel` / finale Model-Authority), nicht `sync_mode`. `sync_mode` (z. B. `cut_off`/`loop`) bleibt ein separates Feld und wird ausschließlich aus dem Snapshot eingefroren. Keine Vermischung im Gate.
 
-- Aktiv ⇒ Snapshot bauen + persistieren, canonical boxes, Fresh-URL-Transport, NOOP-Retry-Frozen-Reuse.
-- Nicht aktiv ⇒ vollständig der pre-v406-Payload-Pfad; kein `provider_input_frozen`, kein `v406_snapshot_build_failed`, kein `v406_bbox_url_transport_failed`, kein Frozen-Gate auf Retries. Single-Speaker (N=1) bleibt bitgleich zum heutigen Verhalten.
+- Fresh aktiv ⇒ Snapshot bauen + persistieren, canonical boxes genau einmal, URL-Transport (P1-2).
+- NOOP-Retry aktiv ⇒ `resolveFrozenProviderInput(pass)` ist die EINZIGE Quelle für `video_url`, `audio_url`, `bbox`, `bounding_boxes`, `frame_count`, `dispatch_fps`, `voiced_windows`, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`. Keine Abhängigkeit von `dispatchBox` oder einer neu berechneten Box-Sequenz. Fehlender/unvollständiger Snapshot ⇒ `noop_retry_frozen_input_missing`, fail closed, ZERO Provider-Calls.
+- Nicht aktiv ⇒ vollständig der pre-v406-Payload-Pfad; kein `provider_input_frozen`, kein `v406_snapshot_build_failed`, kein `v406_bbox_url_transport_failed`, kein Frozen-Gate auf Retries. Single-Speaker (N=1) bleibt bitgleich zum heutigen Verhalten. Keine Verhaltenserweiterung für andere Retry-Varianten.
+
 
 Das NOOP-Retry-Fail-Closed (`noop_retry_frozen_input_missing`) gilt weiterhin nur, wenn `v406WireContractActive`.
 
