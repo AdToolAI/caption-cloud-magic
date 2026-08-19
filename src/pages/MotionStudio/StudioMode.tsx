@@ -174,7 +174,7 @@ export default function StudioMode() {
     try {
       const title =
         projectTitle.trim() ||
-        `Studio Mode · ${new Date().toLocaleDateString('de-DE')}`;
+        `Studio Mode · ${new Date().toLocaleDateString(getLang())}`;
 
       // v228: Resolve selected characters to canonical brand_character UUIDs.
       // `selectedCharacters` may include synthetic outfit/catalog mentions —
@@ -867,7 +867,7 @@ function RenderStep({
             <Input
               value={title}
               onChange={(e) => onTitleChange(e.target.value)}
-              placeholder={`Studio Mode · ${new Date().toLocaleDateString('de-DE')}`}
+              placeholder={`Studio Mode · ${new Date().toLocaleDateString(getLang())}`}
               className="bg-background/60"
             />
           </div>

@@ -283,7 +283,7 @@ export default function AudioStudio() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-xs font-bold tracking-wider text-primary">NEU</span>
+                      <span className="text-xs font-bold tracking-wider text-primary">{tx({ de: 'NEU', en: 'NEW', es: 'NUEVO' })}</span>
                       <h3 className="text-lg font-bold">{tx({ de: 'Hörbuch-Modus', en: 'Audiobook Mode', es: 'Modo audiolibro' })}</h3>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">9 Sprachen</span>
                     </div>
@@ -310,7 +310,7 @@ export default function AudioStudio() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-xs font-bold tracking-wider text-primary">NEU</span>
+                      <span className="text-xs font-bold tracking-wider text-primary">{tx({ de: 'NEU', en: 'NEW', es: 'NUEVO' })}</span>
                       <h3 className="text-lg font-bold">{tx({ de: "Eigene Stimme erstellen", en: "Create your own voice", es: "Crea tu propia voz" })}</h3>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">{tx({ de: 'Voice Studio', en: 'Voice Studio', es: 'Estudio de voz' })}</span>
                     </div>
@@ -340,7 +340,7 @@ export default function AudioStudio() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-xs font-bold tracking-wider text-primary">NEU</span>
+                      <span className="text-xs font-bold tracking-wider text-primary">{tx({ de: 'NEU', en: 'NEW', es: 'NUEVO' })}</span>
                       <h3 className="text-lg font-bold">AI Music Generator</h3>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">Studio-Qualität</span>
                     </div>
@@ -478,19 +478,19 @@ export default function AudioStudio() {
                   {/* Tab Navigation */}
                   <div className="flex gap-2 flex-wrap">
                     {[
-                      { id: 'enhance', label: 'KI-Optimierung', icon: Wand2 },
-                      { id: 'auto-match', label: 'Auto-Match', icon: Film, badge: 'NEU' },
+                      { id: 'enhance', label: tx({ de: 'KI-Optimierung', en: 'AI Enhance', es: 'Mejora IA' }), icon: Wand2 },
+                      { id: 'auto-match', label: 'Auto-Match', icon: Film, badge: tx({ de: 'NEU', en: 'NEW', es: 'NUEVO' }) },
                       { id: 'music', label: 'AI Music', icon: Music2 },
-                      { id: 'ducking', label: 'Ducking', icon: AudioLines, badge: musicUrl ? 'NEU' : undefined, disabled: !musicUrl },
-                      { id: 'stems', label: 'Stem-Mixer', icon: AudioLines, badge: stemSet ? `${stemSet.stems.length}` : 'NEU', disabled: !stemSet },
-                      { id: 'final-mix', label: 'Final Mix', icon: Layers, badge: 'NEU' },
-                      { id: 'compare', label: 'Vergleich', icon: Volume2, disabled: !enhancedAudioUrl },
+                      { id: 'ducking', label: 'Ducking', icon: AudioLines, badge: musicUrl ? tx({ de: 'NEU', en: 'NEW', es: 'NUEVO' }) : undefined, disabled: !musicUrl },
+                      { id: 'stems', label: 'Stem-Mixer', icon: AudioLines, badge: stemSet ? `${stemSet.stems.length}` : tx({ de: 'NEU', en: 'NEW', es: 'NUEVO' }), disabled: !stemSet },
+                      { id: 'final-mix', label: 'Final Mix', icon: Layers, badge: tx({ de: 'NEU', en: 'NEW', es: 'NUEVO' }) },
+                      { id: 'compare', label: tx({ de: 'Vergleich', en: 'Compare', es: 'Comparar' }), icon: Volume2, disabled: !enhancedAudioUrl },
                       { id: 'transcript', label: 'Transcript', icon: Mic },
                       { id: 'beat-sync', label: 'Beat-Sync', icon: Music },
-                      { id: 'filler', label: 'Filler-Wörter', icon: Volume2 },
-                      { id: 'library', label: 'Bibliothek', icon: Library },
-                      { id: 'voices', label: 'Custom Voices', icon: Mic, badge: 'NEU' },
-                      { id: 'audiobook', label: 'Hörbuch', icon: BookOpen, badge: 'NEU' }
+                      { id: 'filler', label: tx({ de: 'Filler-Wörter', en: 'Filler words', es: 'Muletillas' }), icon: Volume2 },
+                      { id: 'library', label: tx({ de: 'Bibliothek', en: 'Library', es: 'Biblioteca' }), icon: Library },
+                      { id: 'voices', label: 'Custom Voices', icon: Mic, badge: tx({ de: 'NEU', en: 'NEW', es: 'NUEVO' }) },
+                      { id: 'audiobook', label: tx({ de: 'Hörbuch', en: 'Audiobook', es: 'Audiolibro' }), icon: BookOpen, badge: tx({ de: 'NEU', en: 'NEW', es: 'NUEVO' }) }
                     ].map((tab) => (
                       <Button
                         key={tab.id}

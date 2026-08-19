@@ -102,7 +102,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
     <div id="my-voices" className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h2 className="text-xl font-semibold">Meine Stimmen</h2>
+          <h2 className="text-xl font-semibold">{tx({ de: 'Meine Stimmen', en: 'My voices', es: 'Mis voces' })}</h2>
           <Badge variant="secondary" className="bg-primary/15 border border-primary/30 text-primary">
             {voices.length}
           </Badge>
@@ -115,7 +115,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
             className="border-primary/30 hover:border-primary/60"
           >
             <Plus className="w-4 h-4 mr-1.5" />
-            Neue Stimme
+            {tx({ de: 'Neue Stimme', en: 'New voice', es: 'Nueva voz' })}
           </Button>
         )}
       </div>

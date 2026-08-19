@@ -341,7 +341,7 @@ export default function MotionStudioHub() {
                         <div className="min-w-0">
                           <div className="font-medium truncate">{p.title || tx({ de: "Unbenannt", en: "Untitled", es: "Sin nombre" })}</div>
                           <div className="text-xs text-muted-foreground">
-                            {new Date(p.updated_at).toLocaleString('de-DE', {
+                            {new Date(p.updated_at).toLocaleString(getLang(), {
                               dateStyle: 'short',
                               timeStyle: 'short',
                             })}
