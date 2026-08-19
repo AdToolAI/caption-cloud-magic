@@ -7011,7 +7011,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         }
         // Installierte RPC-Signatur: (_scene_id, _pass_idx, _patch).
         const persisted = await persistFrozenProviderInput(
-          (fn, args) => supabase.rpc(fn, args as any),
+          async (fn, args) => await supabase.rpc(fn, args as any),
           { sceneId, passIdx: currentPassIdx, snapshot: v406Snapshot },
         );
         if (!persisted.ok) {
