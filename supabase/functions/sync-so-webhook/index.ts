@@ -51,7 +51,8 @@ import {
 import {
   classifySpeakerCardinality,
   decideCompletedSpeakerBranch,
-  shouldRunMultiSpeakerMotionMeasurement,
+  planPreLockSpeakerMeasurement,
+  planUnderLockSpeakerMeasurement,
 } from "../_shared/fa4-speaker-cardinality.ts";
 
 /** Cold-start / deploy marker for the v404 server-measurement wire. */
