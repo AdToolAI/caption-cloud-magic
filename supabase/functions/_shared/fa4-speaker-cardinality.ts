@@ -163,3 +163,56 @@ export function decideCompletedSpeakerBranch(
     errorText: SPEAKER_CARDINALITY_INDETERMINATE_ERROR,
   };
 }
+
+// ── FA-4 v409 Residual — Measurement-Missing-Race ────────────────────────────
+// Ein unvollständiger Pre-Lock-Snapshot (`pass_set_incomplete_N_of_M`) darf die
+// Messung nur DEFERRIEREN, nicht endgültig überspringen: das frische Re-Read
+// unter dem Dialog-Lock kann dieselbe Szene als echtes Multi-Speaker-Set
+// ausweisen. Ohne Nachmessung liefe sie in `measurement_missing` und würde
+// fälschlich hart failen. Vollständige Single-Speaker-Sets messen NIE.
+
+/** `unknown` NUR wegen Teil-Set (Fan-Out-Race) — nicht wegen fehlender idx. */
+export function isIncompleteSpeakerPassSet(c: SpeakerCardinality): boolean {
+  return c.isUnknown && !c.passSetComplete;
+}
+
+/** Messung aufschieben statt verwerfen (Teil-Set kann noch multi werden). */
+export function shouldDeferSpeakerMeasurement(c: SpeakerCardinality): boolean {
+  return isIncompleteSpeakerPassSet(c);
+}
+
+export type SpeakerMeasurementAction = "measure" | "defer" | "skip";
+export interface SpeakerMeasurementPlan {
+  action: SpeakerMeasurementAction;
+  reason: string;
+}
+
+/** Vor dem Lock: messen nur bei bestätigtem multi, deferren bei Teil-Set. */
+export function planPreLockSpeakerMeasurement(
+  c: SpeakerCardinality,
+): SpeakerMeasurementPlan {
+  if (shouldRunMultiSpeakerMotionMeasurement(c)) {
+    return { action: "measure", reason: c.reason };
+  }
+  if (shouldDeferSpeakerMeasurement(c)) {
+    return { action: "defer", reason: c.reason };
+  }
+  return { action: "skip", reason: c.reason };
+}
+
+/**
+ * Unter dem Lock (frisches Pass-Set): nachmessen genau dann, wenn die Szene
+ * jetzt multi ist, noch keine Messung existiert und die Pre-Lock-Messung wegen
+ * eines Teil-Sets aufgeschoben wurde. Keine zweite DB-Autorität, kein Retry.
+ */
+export function planUnderLockSpeakerMeasurement(args: {
+  fresh: SpeakerCardinality;
+  preLockDeferred: boolean;
+  hasMeasurement: boolean;
+}): SpeakerMeasurementPlan {
+  const { fresh, preLockDeferred, hasMeasurement } = args;
+  if (!fresh.isMultiSpeaker) return { action: "skip", reason: fresh.reason };
+  if (hasMeasurement) return { action: "skip", reason: "measurement_already_present" };
+  if (preLockDeferred) return { action: "measure", reason: `deferred:${fresh.reason}` };
+  return { action: "skip", reason: "measurement_missing" };
+}

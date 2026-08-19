@@ -6,6 +6,10 @@ import {
   classifySpeakerCardinality,
   decideCompletedSpeakerBranch,
   distinctSpeakerIndices,
+  isIncompleteSpeakerPassSet,
+  planPreLockSpeakerMeasurement,
+  planUnderLockSpeakerMeasurement,
+  shouldDeferSpeakerMeasurement,
   shouldRunMultiSpeakerMotionMeasurement,
   SPEAKER_CARDINALITY_INDETERMINATE_ERROR,
 } from "./fa4-speaker-cardinality.ts";
@@ -206,4 +210,83 @@ Deno.test("M — partial set with two distinct speakers already confirms multi",
   assert(c.isMultiSpeaker);
   assertFalse(c.passSetComplete);
   assert(shouldRunMultiSpeakerMotionMeasurement(c));
+});
+
+// ── FA-4 v409 Residual — Measurement-Missing-Race ────────────────────────────
+
+Deno.test("N — incomplete one-pass set defers measurement (not multi, not single)", () => {
+  const c = classifySpeakerCardinality([{ speaker_idx: 0, job_id: "j0" }], { totalPasses: 4 });
+  assert(isIncompleteSpeakerPassSet(c));
+  assert(shouldDeferSpeakerMeasurement(c));
+  assertFalse(c.isMultiSpeaker);
+  assertFalse(c.isSingleSpeaker);
+  assertEquals(planPreLockSpeakerMeasurement(c).action, "defer");
+});
+
+Deno.test("N2 — missing speaker_idx unknown is NOT an incomplete pass set", () => {
+  const c = classifySpeakerCardinality([{ job_id: "a" }, { job_id: "b" }], { totalPasses: 2 });
+  assert(c.isUnknown);
+  assert(c.passSetComplete);
+  assertFalse(isIncompleteSpeakerPassSet(c));
+  assertFalse(shouldDeferSpeakerMeasurement(c));
+  assertEquals(planPreLockSpeakerMeasurement(c).action, "skip");
+});
+
+Deno.test("O — complete single two/six turn: no measurement pre-lock or under lock", () => {
+  for (const n of [2, 6]) {
+    const c = classifySpeakerCardinality(
+      Array.from({ length: n }, (_, i) => turnPass(0, i)),
+      { totalPasses: n },
+    );
+    assert(c.isSingleSpeaker);
+    assertEquals(planPreLockSpeakerMeasurement(c).action, "skip");
+    assertEquals(
+      planUnderLockSpeakerMeasurement({ fresh: c, preLockDeferred: true, hasMeasurement: false })
+        .action,
+      "skip",
+    );
+  }
+});
+
+Deno.test("P — complete multi requires measurement pre-lock", () => {
+  const c = classifySpeakerCardinality(
+    [0, 1, 0, 1].map((s, i) => turnPass(s, i)),
+    { totalPasses: 4 },
+  );
+  assertEquals(planPreLockSpeakerMeasurement(c).action, "measure");
+});
+
+Deno.test("Q — deferred pre-lock + fresh multi → catch-up measurement, not measurement_missing", () => {
+  const snap = classifySpeakerCardinality([{ speaker_idx: 0, job_id: "j0" }], { totalPasses: 4 });
+  const deferred = planPreLockSpeakerMeasurement(snap).action === "defer";
+  assert(deferred);
+  const fresh = classifySpeakerCardinality(
+    [0, 1, 0, 1].map((s, i) => turnPass(s, i)),
+    { totalPasses: 4 },
+  );
+  assert(fresh.isMultiSpeaker);
+  const plan = planUnderLockSpeakerMeasurement({
+    fresh,
+    preLockDeferred: deferred,
+    hasMeasurement: false,
+  });
+  assertEquals(plan.action, "measure");
+
+  // Already measured pre-lock → never measured twice.
+  assertEquals(
+    planUnderLockSpeakerMeasurement({ fresh, preLockDeferred: deferred, hasMeasurement: true })
+      .action,
+    "skip",
+  );
+});
+
+Deno.test("R — deferred pre-lock + still incomplete fresh state stays fail-closed", () => {
+  const fresh = classifySpeakerCardinality([{ speaker_idx: 0, job_id: "j0" }], { totalPasses: 4 });
+  assertEquals(
+    planUnderLockSpeakerMeasurement({ fresh, preLockDeferred: true, hasMeasurement: false }).action,
+    "skip",
+  );
+  const d = decideCompletedSpeakerBranch(fresh);
+  assertEquals(d.branch, "fail_closed");
+  assertEquals((d as { errorText: string }).errorText, SPEAKER_CARDINALITY_INDETERMINATE_ERROR);
 });

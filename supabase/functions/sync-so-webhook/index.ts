@@ -51,7 +51,8 @@ import {
 import {
   classifySpeakerCardinality,
   decideCompletedSpeakerBranch,
-  shouldRunMultiSpeakerMotionMeasurement,
+  planPreLockSpeakerMeasurement,
+  planUnderLockSpeakerMeasurement,
 } from "../_shared/fa4-speaker-cardinality.ts";
 
 /** Cold-start / deploy marker for the v404 server-measurement wire. */
@@ -706,6 +707,52 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     let v404RehostedUrl: string | null = null;
     let v404MotionProbe: MotionProbeResult | null = null;
     let v404MotionMeasurement: MeasureProviderMotionSyncResult | null = null;
+    // FA-4 v409 Residual — merkt sich, dass die Pre-Lock-Messung NUR wegen
+    // eines unvollständigen Pass-Sets (Fan-Out-Race) aufgeschoben wurde.
+    let v404MeasurementDeferred = false;
+
+    // Eine einzige Messroutine (gleiche Metrik/Threshold/Deadline/ROI/N=6,
+    // gleiche rehostete Output-URL) — pre-lock ODER nachgeholt unter Lock.
+    const runServerMotionMeasurement = async (
+      measurePass: any,
+      measurePassIdx: number,
+      phase: string,
+    ): Promise<void> => {
+      const preclipUrl = String(
+        measurePass?.preclip_url ?? measurePass?._v105_probe?.payload_video_url ?? "",
+      );
+      const seg = Array.isArray(measurePass?.segments) ? measurePass.segments[0] : null;
+      const duration = Number(measurePass?.preclip_duration_sec ?? NaN) ||
+        (seg ? Number(seg.endTime) - Number(seg.startTime) : NaN);
+      v404MotionMeasurement = await measureProviderMotionSync({
+        preclipUrl,
+        providerOutputUrl: v404RehostedUrl ?? outputUrl!,
+        durationSeconds: duration,
+      });
+      v404MotionProbe = v404MotionMeasurement.measurement_status === "measured" &&
+          v404MotionMeasurement.preclip_metric && v404MotionMeasurement.provider_metric
+        ? classifyMotionProbe({
+          preclip: v404MotionMeasurement.preclip_metric,
+          provider: v404MotionMeasurement.provider_metric,
+        })
+        : {
+          verdict: "indeterminate",
+          deltaMean: v404MotionMeasurement.deltaMean ?? 0,
+          deltaPeak: v404MotionMeasurement.deltaPeak ?? 0,
+          preclipMean: v404MotionMeasurement.preclip_metric?.mean ?? 0,
+          preclipPeak: v404MotionMeasurement.preclip_metric?.peak ?? 0,
+          providerMean: v404MotionMeasurement.provider_metric?.mean ?? 0,
+          providerPeak: v404MotionMeasurement.provider_metric?.peak ?? 0,
+          reason: v404MotionMeasurement.reason,
+        };
+      console.log(
+        `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} server_motion_measure scene=${sceneId} pass=${measurePassIdx} ` +
+          `phase=${phase} status=${v404MotionMeasurement.measurement_status} ` +
+          `delta_mean=${v404MotionMeasurement.deltaMean ?? "n/a"} ` +
+          `verdict=${v404MotionProbe.verdict} reason=${v404MotionProbe.reason}`,
+      );
+    };
+
     if (status === "COMPLETED" && outputUrl) {
       const snapPasses: any[] = Array.isArray((state as any).passes) ? (state as any).passes : [];
       const snapMatchedIdx = snapPasses.findIndex((p: any) => p?.job_id === jobId);
@@ -722,41 +769,18 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
       v404RehostedUrl = await rehostSyncOutput(supabase, sceneId, snapPassIdx, outputUrl);
 
-      if (shouldRunMultiSpeakerMotionMeasurement(snapSpeakerCardinality)) {
-        const snapPreclipUrl = String(
-          snapPass?.preclip_url ?? snapPass?._v105_probe?.payload_video_url ?? "",
-        );
-        const seg = Array.isArray(snapPass?.segments) ? snapPass.segments[0] : null;
-        const snapDuration = Number(snapPass?.preclip_duration_sec ?? NaN) ||
-          (seg ? Number(seg.endTime) - Number(seg.startTime) : NaN);
-        v404MotionMeasurement = await measureProviderMotionSync({
-          preclipUrl: snapPreclipUrl,
-          providerOutputUrl: v404RehostedUrl ?? outputUrl,
-          durationSeconds: snapDuration,
-        });
-        v404MotionProbe = v404MotionMeasurement.measurement_status === "measured" &&
-            v404MotionMeasurement.preclip_metric && v404MotionMeasurement.provider_metric
-          ? classifyMotionProbe({
-            preclip: v404MotionMeasurement.preclip_metric,
-            provider: v404MotionMeasurement.provider_metric,
-          })
-          : {
-            verdict: "indeterminate",
-            deltaMean: v404MotionMeasurement.deltaMean ?? 0,
-            deltaPeak: v404MotionMeasurement.deltaPeak ?? 0,
-            preclipMean: v404MotionMeasurement.preclip_metric?.mean ?? 0,
-            preclipPeak: v404MotionMeasurement.preclip_metric?.peak ?? 0,
-            providerMean: v404MotionMeasurement.provider_metric?.mean ?? 0,
-            providerPeak: v404MotionMeasurement.provider_metric?.peak ?? 0,
-            reason: v404MotionMeasurement.reason,
-          };
+      const prePlan = planPreLockSpeakerMeasurement(snapSpeakerCardinality);
+      v404MeasurementDeferred = prePlan.action === "defer";
+      if (prePlan.action === "measure") {
+        await runServerMotionMeasurement(snapPass, snapPassIdx, "pre_lock");
+      } else if (v404MeasurementDeferred) {
         console.log(
-          `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} server_motion_measure scene=${sceneId} pass=${snapPassIdx} ` +
-            `status=${v404MotionMeasurement.measurement_status} delta_mean=${v404MotionMeasurement.deltaMean ?? "n/a"} ` +
-            `verdict=${v404MotionProbe.verdict} reason=${v404MotionProbe.reason}`,
+          `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} motion_measure_deferred scene=${sceneId} ` +
+            `pass=${snapPassIdx} reason=${prePlan.reason}`,
         );
       }
     }
+
 
     const { result: __v5Result } = await withDialogLock(
       supabase,
@@ -914,6 +938,23 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       }
 
       const passBeforeDone = freshDonePasses[currentPass] ?? null;
+
+      // ── FA-4 v409 Residual — aufgeschobene Multi-Speaker-Messung nachholen ──
+      // Der Pre-Lock-Snapshot war unvollständig (Fan-Out-Race), das frische
+      // Set ist jetzt echtes Multi-Speaker. Ohne Nachmessung liefe der Pass in
+      // `measurement_missing` → falscher Hard-Fail. Gleiche Messfunktion,
+      // gleiche Metrik/Threshold/Deadline/ROI, gleiche rehostete Output-URL,
+      // genau EINMAL, keine zweite DB-Autorität, kein Retry/Mux.
+      const catchUpPlan = planUnderLockSpeakerMeasurement({
+        fresh: speakerCardinality,
+        preLockDeferred: v404MeasurementDeferred,
+        hasMeasurement: v404MotionProbe !== null,
+      });
+      if (catchUpPlan.action === "measure" && status === "COMPLETED" && outputUrl) {
+        await runServerMotionMeasurement(passBeforeDone, currentPass, "under_lock_catch_up");
+      }
+
+
 
       const inputPreclipUrl = String(passBeforeDone?.preclip_url ?? passBeforeDone?._v105_probe?.payload_video_url ?? "");
       const [inputHead, outputHead, inputDims, outputDims] = await Promise.all([
