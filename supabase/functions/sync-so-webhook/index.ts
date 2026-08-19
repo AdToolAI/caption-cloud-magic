@@ -710,6 +710,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const snapPasses: any[] = Array.isArray((state as any).passes) ? (state as any).passes : [];
       const snapMatchedIdx = snapPasses.findIndex((p: any) => p?.job_id === jobId);
       const snapTotalPasses = Number((state as any).total_passes ?? snapPasses.length ?? 1);
+      // FA-4 v409 — Sprecher-Klasse NIE aus der Pass-Kardinalität ableiten:
+      // der Per-Turn-Split erzeugt mehrere Passes für EINEN `speaker_idx`.
+      const snapSpeakerCardinality = classifySpeakerCardinality(snapPasses, {
+        totalPasses: snapTotalPasses,
+      });
       const snapPassIdx = snapMatchedIdx >= 0
         ? snapMatchedIdx
         : Number((state as any).current_pass ?? 0);
@@ -717,7 +722,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
       v404RehostedUrl = await rehostSyncOutput(supabase, sceneId, snapPassIdx, outputUrl);
 
-      if (snapTotalPasses > 1) {
+      if (shouldRunMultiSpeakerMotionMeasurement(snapSpeakerCardinality)) {
         const snapPreclipUrl = String(
           snapPass?.preclip_url ?? snapPass?._v105_probe?.payload_video_url ?? "",
         );
