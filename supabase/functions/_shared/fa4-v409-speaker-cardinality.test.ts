@@ -6,6 +6,10 @@ import {
   classifySpeakerCardinality,
   decideCompletedSpeakerBranch,
   distinctSpeakerIndices,
+  isIncompleteSpeakerPassSet,
+  planPreLockSpeakerMeasurement,
+  planUnderLockSpeakerMeasurement,
+  shouldDeferSpeakerMeasurement,
   shouldRunMultiSpeakerMotionMeasurement,
   SPEAKER_CARDINALITY_INDETERMINATE_ERROR,
 } from "./fa4-speaker-cardinality.ts";
