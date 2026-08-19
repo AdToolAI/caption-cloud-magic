@@ -52,11 +52,18 @@ import {
   classifySpeakerCardinality,
   decideCompletedSpeakerBranch,
   planPreLockSpeakerMeasurement,
-  planUnderLockSpeakerMeasurement,
 } from "../_shared/fa4-speaker-cardinality.ts";
+// FA-4 v410 — kein Medien-/AWS-I/O unter dem Dialog-Lock.
+import {
+  decideUnderLockIoAction,
+  Fa4OutOfLockIoRequired,
+  type Fa4OutOfLockIoRequest,
+  runLockedPhasesWithOutOfLockIo,
+} from "../_shared/fa4-lock-phase-orchestration.ts";
 
 /** Cold-start / deploy marker for the v404 server-measurement wire. */
-const SYNC_SO_WEBHOOK_VERSION = "v409-fa4-speaker-cardinality-final";
+const SYNC_SO_WEBHOOK_VERSION = "v410-fa4-no-media-io-under-dialog-lock-final";
+
 
 /**
  * v404 §5 — Rehost the provider output to `ai-videos` OUTSIDE the dialog lock.
@@ -672,7 +679,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
   }
 
-  const state = scene.dialog_shots ?? null;
+  // v410: `state` wird zwischen zwei kurzen Locked-Phasen frisch nachgeladen.
+  let state: any = scene.dialog_shots ?? null;
+
   if (!state) {
     return ok({ ok: true, skipped: "no_state" });
   }
@@ -782,11 +791,59 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
 
 
-    const { result: __v5Result } = await withDialogLock(
-      supabase,
-      sceneId,
-      "sync-so-webhook",
-      async () => {
+    // ── FA-4 v410 — Medien-/AWS-I/O NIE unter dem Dialog-Lock ────────────
+    // Der Lease (TTL 30 s, kein Renewal) darf niemals über eine Messung
+    // (Deadline 27 s), einen HEAD-Probe oder einen MP4-Dimensions-Probe
+    // gehalten werden. Die Locked-Phase fordert fehlendes I/O per Sentinel
+    // an, der Lock wird freigegeben, das I/O läuft ausserhalb, danach wird
+    // frisch gelesen und der Lock neu erworben.
+    const headCache = new Map<string, Awaited<ReturnType<typeof headAsset>>>();
+    const dimCache = new Map<string, any>();
+    let catchUpMeasurePass: any = null;
+
+    const performOutOfLockIo = async (request: Fa4OutOfLockIoRequest): Promise<void> => {
+      if (request.kind === "measurement") {
+        await runServerMotionMeasurement(
+          catchUpMeasurePass,
+          request.passIdx,
+          "out_of_lock_catch_up",
+        );
+        return;
+      }
+      await Promise.all([
+        ...request.headUrls.map(async (u) => {
+          let v: Awaited<ReturnType<typeof headAsset>> = null;
+          try { v = await headAsset(u); } catch { v = null; }
+          headCache.set(u, v);
+        }),
+        ...request.dimUrls.map(async (u) => {
+          let v: any = null;
+          try { v = await probeMp4Dims(u); } catch { v = null; }
+          dimCache.set(u, v);
+        }),
+      ]);
+    };
+
+    const refreshStateBetweenRounds = async (): Promise<void> => {
+      const { data: refreshedRow } = await supabase
+        .from("composer_scenes")
+        .select("dialog_shots")
+        .eq("id", sceneId)
+        .maybeSingle();
+      const next = (refreshedRow as any)?.dialog_shots;
+      if (next) state = next;
+    };
+
+    const __v5PhaseRun = await runLockedPhasesWithOutOfLockIo<Response>({
+      performOutOfLockIo,
+      refreshBetweenRounds: refreshStateBetweenRounds,
+      runLockedPhase: async () => {
+        const { result } = await withDialogLock(
+          supabase,
+          sceneId,
+          "sync-so-webhook",
+          async () => {
+
 
     // v25 Fan-Out: match the job_id against passes[].job_id (preferred) OR
     // the legacy top-level state.sync_job_id (single-pass scenes).
@@ -939,30 +996,50 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
       const passBeforeDone = freshDonePasses[currentPass] ?? null;
 
-      // ── FA-4 v409 Residual — aufgeschobene Multi-Speaker-Messung nachholen ──
+      // ── FA-4 v410 — aufgeschobene Multi-Speaker-Messung NICHT unter Lock ──
       // Der Pre-Lock-Snapshot war unvollständig (Fan-Out-Race), das frische
-      // Set ist jetzt echtes Multi-Speaker. Ohne Nachmessung liefe der Pass in
-      // `measurement_missing` → falscher Hard-Fail. Gleiche Messfunktion,
-      // gleiche Metrik/Threshold/Deadline/ROI, gleiche rehostete Output-URL,
-      // genau EINMAL, keine zweite DB-Autorität, kein Retry/Mux.
-      const catchUpPlan = planUnderLockSpeakerMeasurement({
+      // Set ist jetzt echtes Multi-Speaker. Die fehlende Messung wird
+      // angefordert, der Lock freigegeben, ausserhalb gemessen und dieser
+      // Abschnitt danach mit frisch gelesenem Zustand erneut betreten.
+      // Kein Apply, kein Mux, kein Retry in dieser Phase.
+      const ioDecision = decideUnderLockIoAction({
         fresh: speakerCardinality,
         preLockDeferred: v404MeasurementDeferred,
         hasMeasurement: v404MotionProbe !== null,
       });
-      if (catchUpPlan.action === "measure" && status === "COMPLETED" && outputUrl) {
-        await runServerMotionMeasurement(passBeforeDone, currentPass, "under_lock_catch_up");
+      if (
+        ioDecision.action === "needs_catch_up_measurement" &&
+        status === "COMPLETED" && outputUrl
+      ) {
+        catchUpMeasurePass = passBeforeDone;
+        console.log(
+          `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} motion_measure_catch_up_requested scene=${sceneId} ` +
+            `pass=${currentPass} reason=${ioDecision.reason} — releasing dialog lock before measurement`,
+        );
+        throw new Fa4OutOfLockIoRequired({ kind: "measurement", passIdx: currentPass });
       }
 
-
-
       const inputPreclipUrl = String(passBeforeDone?.preclip_url ?? passBeforeDone?._v105_probe?.payload_video_url ?? "");
-      const [inputHead, outputHead, inputDims, outputDims] = await Promise.all([
-        headAsset(inputPreclipUrl),
-        headAsset(rehostedUrl ?? outputUrl),
-        inputPreclipUrl ? probeMp4Dims(inputPreclipUrl).catch(() => null) : Promise.resolve(null),
-        probeMp4Dims(rehostedUrl ?? outputUrl).catch(() => null),
-      ]);
+      const outputProbeUrl = String(rehostedUrl ?? outputUrl ?? "");
+      // v410: HEAD-/MP4-Probes sind Netz-I/O → nur ausserhalb des Locks.
+      const missingHeadUrls = [inputPreclipUrl, outputProbeUrl].filter(
+        (u) => !!u && !headCache.has(u),
+      );
+      const missingDimUrls = [inputPreclipUrl, outputProbeUrl].filter(
+        (u) => !!u && !dimCache.has(u),
+      );
+      if (missingHeadUrls.length > 0 || missingDimUrls.length > 0) {
+        throw new Fa4OutOfLockIoRequired({
+          kind: "media_probe",
+          headUrls: missingHeadUrls,
+          dimUrls: missingDimUrls,
+        });
+      }
+      const inputHead = inputPreclipUrl ? (headCache.get(inputPreclipUrl) ?? null) : null;
+      const outputHead = outputProbeUrl ? (headCache.get(outputProbeUrl) ?? null) : null;
+      const inputDims = inputPreclipUrl ? (dimCache.get(inputPreclipUrl) ?? null) : null;
+      const outputDims = outputProbeUrl ? (dimCache.get(outputProbeUrl) ?? null) : null;
+
       const minOutputAxis = Math.min(Number(outputDims?.width ?? 0), Number(outputDims?.height ?? 0));
       const expectedPreclipAxis = Number(passBeforeDone?.preclip_crop?.outputSize ?? 0);
       const syncOutputUnchanged = !!(
@@ -1409,10 +1486,26 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
 
     return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments" });
+          },
+          { ttlSeconds: 30, maxAttempts: 4 },
+        );
+        return result;
       },
-      { ttlSeconds: 30, maxAttempts: 4 },
-    );
-    return __v5Result;
+    });
+    if (__v5PhaseRun.outcome !== "done") {
+      console.error(
+        `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} lock_phase_io_rounds_exhausted scene=${sceneId} ` +
+          `job=${jobId} last_request=${__v5PhaseRun.lastRequest?.kind ?? "none"} — no apply, no mux, no retry`,
+      );
+      return ok({
+        ok: true,
+        skipped: "lock_phase_io_rounds_exhausted",
+        scene_id: sceneId,
+        job_id: jobId,
+      });
+    }
+    return __v5PhaseRun.result;
+
   }
 
   // ── v70: legacy v4 per-turn chain removed ─────────────────────────────
