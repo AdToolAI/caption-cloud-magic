@@ -33,7 +33,7 @@ Der bestehende `try/catch`-Warn-Pfad um `uploadBoundingBoxesJson` wird durch die
 
 ## P1-3 — v407 nur auf dem contracted Multi-Speaker-BBox-Pfad (Fresh und NOOP getrennt)
 
-Zwei getrennte Bedingungen, da der NOOP-Retry keine neu berechnete Geometrie besitzen darf:
+Zwei getrennte Bedingungen, da der NOOP-Retry keine neu berechnete Geometrie und kein neu bestimmtes `payloadModel` als Aktivierungsquelle haben darf:
 
 ```ts
 const v407FreshWireContract =
@@ -43,23 +43,26 @@ const v407FreshWireContract =
   !!dispatchBox &&
   canonicalBoxesAvailable;
 
-const v407NoopRetryWireContract =
+const v407NoopRetryCandidate =
   isMultiSpeaker &&
-  payloadModel === "sync-3" &&
   body?.noop_auto_escalation === true &&
   retryVariant === "coords-pro-box";
 
-const v407WireContractActive = v407FreshWireContract || v407NoopRetryWireContract;
+const frozenInput = v407NoopRetryCandidate ? resolveFrozenProviderInput(pass) : null;
+
+const v407WireContractActive = v407FreshWireContract || v407NoopRetryCandidate;
 ```
 
 Begriffstrennung verbindlich: `sync-3` ist das Provider-MODEL (`payloadModel` / finale Model-Authority), nicht `sync_mode`. `sync_mode` (z. B. `cut_off`/`loop`) bleibt ein separates Feld und wird ausschließlich aus dem Snapshot eingefroren. Keine Vermischung im Gate.
 
 - Fresh aktiv ⇒ Snapshot bauen + persistieren, canonical boxes genau einmal, URL-Transport (P1-2).
-- NOOP-Retry aktiv ⇒ `resolveFrozenProviderInput(pass)` ist die EINZIGE Quelle für `video_url`, `audio_url`, `bbox`, `bounding_boxes`, `frame_count`, `dispatch_fps`, `voiced_windows`, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`. Keine Abhängigkeit von `dispatchBox` oder einer neu berechneten Box-Sequenz. Fehlender/unvollständiger Snapshot ⇒ `noop_retry_frozen_input_missing`, fail closed, ZERO Provider-Calls.
-- Nicht aktiv ⇒ vollständig der pre-v406-Payload-Pfad; kein `provider_input_frozen`, kein `v406_snapshot_build_failed`, kein `v406_bbox_url_transport_failed`, kein Frozen-Gate auf Retries. Single-Speaker (N=1) bleibt bitgleich zum heutigen Verhalten. Keine Verhaltenserweiterung für andere Retry-Varianten.
+- NOOP-Retry-Kandidat ⇒ der Snapshot ist die alleinige Authority für `video_url`, `audio_url`, `bbox`, `bounding_boxes`, `frame_count`, `dispatch_fps`, `voiced_windows`, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`. Keine Aktivierungsabhängigkeit von `dispatchBox`, canonical-boxes-Recompute oder neu berechnetem `payloadModel`.
+  - `frozenInput` fehlt/unvollständig ⇒ `noop_retry_frozen_input_missing`, fail closed, ZERO Provider-Calls.
+  - `frozenInput.model !== "sync-3"` ⇒ fail closed, ZERO Provider-Calls.
+- Nicht aktiv ⇒ vollständig der pre-v406-Payload-Pfad; kein `provider_input_frozen`, kein `v407_snapshot_build_failed`, kein `v407_bbox_url_transport_failed`, kein Frozen-Gate auf Retries. Single-Speaker (N=1) bleibt bitgleich zum heutigen Verhalten. Keine Verhaltenserweiterung für andere Retry-Varianten.
 
+Benennung im gesamten v407-Scope: `v406WireContractActive` → `v407WireContractActive`; die neuen Fail-Reasons tragen das `v407_`-Präfix.
 
-Das NOOP-Retry-Fail-Closed (`noop_retry_frozen_input_missing`) gilt weiterhin nur, wenn `v406WireContractActive`.
 
 ## Tests (echte Failure-Injection, ausführbar)
 
