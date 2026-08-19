@@ -166,7 +166,7 @@ export default function MediaLibrary() {
           scheduleReload();
           if (payload.eventType === 'INSERT') {
             toast({
-              title: "🎉 Neue Medien hinzugefügt!",
+              title: tx({ de: "🎉 Neue Medien hinzugefügt!", en: "🎉 New media added!", es: "🎉 ¡Nuevos medios añadidos!" }),
               description: tx({ de: "Deine Media Library wurde aktualisiert", en: "Your media library has been updated", es: "Su biblioteca multimedia ha sido actualizada" }),
             });
           }
@@ -380,7 +380,7 @@ export default function MediaLibrary() {
               : isDirectorsCut
                 ? `Director's Cut - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
                 : isMotionStudioClip
-                  ? tx({ de: `Motion Studio · Szene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}`, en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (previous version)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (versión anterior)' : ''}` })
+                  ? tx({ de: `Motion Studio · Szene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? tx({ de: " (Vorgängerversion)", en: " (previous version)", es: " (versión anterior)" }) : ''}`, en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (previous version)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (versión anterior)' : ''}` })
                   : isUniversalCreator
                     ? `Universal Creator Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
                     : `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`,
@@ -828,7 +828,7 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: "✉️ Medien gesendet",
+      title: tx({ de: "✉️ Medien gesendet", en: "✉️ Media sent", es: "✉️ Medios enviados" }),
       description: tx({ de: `${selectedItems.length} Dateien werden im Composer geladen...`, en: `${selectedItems.length} files are loaded in composer...`, es: `Los archivos ${selectedItems.length} están cargados en Composer...` }),
     });
     
@@ -1210,13 +1210,13 @@ export default function MediaLibrary() {
                     }}
                   >
                     {expandedScenes.includes(item.sceneId)
-                      ? 'Ältere Versionen ausblenden'
+                      ? tx({ de: "Ältere Versionen ausblenden", en: "Hide older versions", es: "Ocultar versiones anteriores" })
                       : `+${item.olderVersionCount} ältere Version${item.olderVersionCount > 1 ? 'en' : ''}`}
                   </button>
                 )}
                 {item.isSuperseded && (
                   <div className="absolute bottom-2 left-2 z-10 rounded-md bg-background/80 px-2 py-1 text-xs backdrop-blur">
-                    Ältere Version
+                    {tx({ de: "Ältere Version", en: "Older Version", es: "Versión Anterior" })}
                   </div>
                 )}
 
@@ -1433,7 +1433,7 @@ export default function MediaLibrary() {
             <Button asChild>
               <label htmlFor="file-upload" className="cursor-pointer">
                 <Upload className="h-4 w-4 mr-2" />
-                Datei hochladen
+                {tx({ de: "Datei hochladen", en: "Upload File", es: "Subir Archivo" })}
               </label>
             </Button>
           </div>

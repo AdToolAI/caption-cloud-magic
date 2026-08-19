@@ -826,8 +826,6 @@ export default function AITextStudio() {
               Mit {branchPrompt ? TEXT_MODELS[branchPrompt.targetModel].label : ""} fortfahren?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Beim Modellwechsel mitten im Chat können Provider-Fehler auftreten, weil jedes
-              Modell ein eigenes Format erwartet. Stattdessen erstellen wir einen neuen
               <strong> Branch</strong> in dieser Konversation. Beide Verläufe bleiben sichtbar.
             </AlertDialogDescription>
           </AlertDialogHeader>

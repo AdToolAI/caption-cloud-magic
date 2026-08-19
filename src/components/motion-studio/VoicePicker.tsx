@@ -164,8 +164,6 @@ export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) 
       </div>
 
       <p className="text-[10px] text-muted-foreground">
-        Diese Stimme wird automatisch für Voiceovers verwendet, wenn dieser Charakter in
-        einer Szene auftaucht.
       </p>
 
       <UniversalVoiceLibraryPicker

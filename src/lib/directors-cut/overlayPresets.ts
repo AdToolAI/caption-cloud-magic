@@ -10,7 +10,7 @@ import { DEFAULT_OVERLAY_BOX } from './overlayModel';
 export interface OverlayPreset {
   id: string;
   name: string;
-  category: 'Lower Third' | 'Banner' | 'Störer' | 'Schild' | 'CTA' | 'Ticker' | 'Marke' | 'Callout' | 'Zitat' | 'Info' | 'Text';
+  category: 'Lower Third' | 'Banner' | tx({ de: "Störer", en: "Lower Third", es: "Tercios inferiores" }) | 'Schild' | 'CTA' | 'Ticker' | 'Marke' | 'Callout' | 'Zitat' | 'Info' | 'Text';
   description: string;
   kind: OverlayKind;
   build: () => Omit<TextOverlay, 'id' | 'startTime' | 'endTime'>;
@@ -65,7 +65,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
         'lowerThird',
         'Max Mustermann',
         { fill: 'rgba(10,10,15,0.82)', fontSizeRel: 0.036, align: 'left' },
-        { animation: 'slideRight', slots: { title: 'Max Mustermann', subtitle: 'Gründer & CEO' } },
+        { animation: 'slideRight', slots: { title: 'Max Mustermann', subtitle: tx({ de: "Gründer & CEO", en: "Founder & CEO", es: "Fundador y CEO" }) } },
       ),
   },
   {
@@ -139,15 +139,15 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   {
     id: 'badge-discount',
     name: tx({ de: 'Störer — Rabatt', en: 'Badge — Discount', es: 'Insignia — Descuento' }),
-    category: 'Störer',
-    description: 'Runder Preis-Störer',
+    category: tx({ de: "Störer", en: "Lower Third", es: "Tercios inferiores" }),
+    description: tx({ de: "Runder Preis-Störer", en: "Round Price Lower Third", es: "Tercios inferiores de precio redondo" }),
     kind: 'badge',
     build: () => base('badge', '-30%', { fill: GOLD, color: INK, fontSizeRel: 0.06, uppercase: true }, { animation: 'pop' }),
   },
   {
     id: 'badge-new',
     name: tx({ de: 'Störer — NEU', en: 'Badge — NEW', es: 'Insignia — NUEVO' }),
-    category: 'Störer',
+    category: tx({ de: "Störer", en: "Lower Third", es: "Tercios inferiores" }),
     description: tx({ de: 'Pill-Badge für Neuheiten', en: 'Pill badge for new products', es: 'Insignia de píldora para nuevos productos.' }),
     kind: 'badge',
     build: () =>
@@ -161,13 +161,13 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   {
     id: 'badge-limited',
     name: tx({ de: 'Störer — Limitiert', en: 'Badge — Limited', es: 'Insignia — Limitado' }),
-    category: 'Störer',
+    category: tx({ de: "Störer", en: "Overlay", es: "Superposición" }),
     description: 'Dringlichkeit erzeugen',
     kind: 'badge',
     build: () =>
       base(
         'badge',
-        'NUR 1000 PLÄTZE',
+        tx({ de: "NUR 1000 PLÄTZE", en: "ONLY 1000 SPOTS", es: "SOLO 1000 PLAZAS" }),
         { fill: 'rgba(10,10,15,0.85)', color: GOLD, fontSizeRel: 0.026, uppercase: true },
         { animation: 'fadeIn', box: { x: 0.62, y: 0.07, w: 0.32, h: 0.08 } },
       ),

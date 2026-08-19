@@ -361,7 +361,7 @@ export default function CharacterEditor({
               className="bg-background/60 resize-none text-sm"
             />
             <p className="text-[10px] text-muted-foreground">
-              Diese Details werden in JEDER Szene wiederholt — der Zuschauer erkennt den Charakter
+              {tx({ de: "Diese Details werden in JEDER Szene wiederholt — der Zuschauer erkennt den Charakter", en: "These details are repeated in EVERY scene — the viewer recognizes the character", es: "Estos detalles se repiten en CADA escena — el espectador reconoce al personaje" })}
               daran.
             </p>
           </div>

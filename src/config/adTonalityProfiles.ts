@@ -126,7 +126,7 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
       de: [
         'Es begann an einem Mittwoch im November...',
         'Ich erinnere mich an den Geruch...',
-        'Damals, als alles noch einfacher schien...',
+        tx({ de: "Damals, als alles noch einfacher schien...", en: "Back when everything seemed simpler...", es: "Cuando todo parecía más simple..." }),
       ],
       en: [
         'It began on a Wednesday in November...',
@@ -165,9 +165,9 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     },
     hookPatterns: {
       de: [
-        '73 % der Befragten sagen...',
-        'Im April 2024 entschied sich Maria, alles zu ändern.',
-        'Das hier ist keine Werbung. Das hier ist passiert.',
+        tx({ de: "73 % der Befragten sagen...", en: "73% of respondents say...", es: "El 73% de los encuestados dice..." }),
+        tx({ de: "Im April 2024 entschied sich Maria, alles zu ändern.", en: "In April 2024, Maria decided to change everything.", es: "En abril de 2024, María decidió cambiarlo todo." }),
+        tx({ de: "Das hier ist keine Werbung. Das hier ist passiert.", en: "This is not an ad. This happened.", es: "Esto no es un anuncio. Esto pasó." }),
       ],
       en: [
         '73% of those surveyed say...',
@@ -206,9 +206,9 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     },
     hookPatterns: {
       de: [
-        'Weil Mittwoch der neue Freitag ist.',
-        'Spoiler: Es schmeckt nicht nach Brokkoli.',
-        'Klein. Aber nicht so klein, wie deine Geduld.',
+        tx({ de: "Weil Mittwoch der neue Freitag ist.", en: "Because Wednesday is the new Friday.", es: "Porque el miércoles es el nuevo viernes." }),
+        tx({ de: "Spoiler: Es schmeckt nicht nach Brokkoli.", en: "Spoiler: It doesn't taste like broccoli.", es: "Spoiler: No sabe a brócoli." }),
+        tx({ de: "Klein. Aber nicht so klein, wie deine Geduld.", en: "Small. But not as small as your patience.", es: "Pequeño. Pero no tan pequeño como tu paciencia." }),
       ],
       en: [
         'Because Wednesday is the new Friday.',

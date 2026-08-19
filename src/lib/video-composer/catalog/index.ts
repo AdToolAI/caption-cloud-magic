@@ -83,15 +83,15 @@ const entry = (
 const MIMIK: CatalogEntry[] = [
   entry('mimik', 'neutral',        'Neutral',           'Neutral',          'neutral expression'),
   entry('mimik', 'confident',      'Selbstbewusst',     'Confident',        'confident expression', ['selbstsicher','souverän','assured']),
-  entry('mimik', 'warm_smile',     'Warmes Lächeln',    'Warm smile',       'warm subtle smile', ['lächeln','smile','warmes lacheln']),
-  entry('mimik', 'big_smile',      'Breites Lächeln',   'Big smile',        'broad genuine smile', ['grinsen','grin']),
+  entry('mimik', 'warm_smile',     tx({ de: "Warmes Lächeln", en: "Warm Smile", es: "Sonrisa cálida" }),    'Warm smile',       'warm subtle smile', ['lächeln','smile','warmes lacheln']),
+  entry('mimik', 'big_smile',      tx({ de: "Breites Lächeln", en: "Big Smile", es: "Gran sonrisa" }),   'Big smile',        'broad genuine smile', ['grinsen','grin']),
   entry('mimik', 'serious',        'Ernst',             'Serious',          'serious focused expression', ['fokussiert','focused']),
   entry('mimik', 'curious',        'Neugierig',         'Curious',          'curious raised brows', ['interessiert','interested']),
   entry('mimik', 'concerned',      'Besorgt',           'Concerned',        'concerned worried expression', ['worried','sorgenvoll']),
-  entry('mimik', 'surprised',      'Überrascht',        'Surprised',        'surprised wide eyes', ['shocked','geschockt']),
+  entry('mimik', 'surprised',      tx({ de: "Überrascht", en: "Surprised", es: "Sorprendido" }),        'Surprised',        'surprised wide eyes', ['shocked','geschockt']),
   entry('mimik', 'thoughtful',     'Nachdenklich',      'Thoughtful',       'thoughtful pondering look', ['pondering','grübelnd']),
   entry('mimik', 'determined',     'Entschlossen',      'Determined',       'determined set jaw', ['resolute','willensstark']),
-  entry('mimik', 'amused',         'Amüsiert',          'Amused',           'amused playful look', ['playful','verspielt']),
+  entry('mimik', 'amused',         tx({ de: "Amüsiert", en: "Amused", es: "Divertido" }),          'Amused',           'amused playful look', ['playful','verspielt']),
   entry('mimik', 'empathetic',     'Empathisch',        'Empathetic',       'empathetic caring expression', ['caring','mitfühlend']),
 ];
 

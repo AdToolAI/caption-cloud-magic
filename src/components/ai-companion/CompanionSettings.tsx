@@ -34,9 +34,9 @@ const VOICE_OPTIONS = [
   { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', gender: 'Weiblich', accent: 'Britisch' },
   { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', gender: tx({ de: "Männlich", en: "Male", es: "Masculino" }), accent: 'Australisch' },
   { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', gender: tx({ de: "Männlich", en: "Male", es: "Masculino" }), accent: 'Britisch' },
-  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam', gender: 'Männlich', accent: 'Amerikanisch' },
-  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', gender: 'Männlich', accent: 'Amerikanisch' },
-  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', gender: 'Männlich', accent: 'Britisch' },
+  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam', gender: tx({ de: "Männlich", en: "Male", es: "Masculino" }), accent: 'Amerikanisch' },
+  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', gender: tx({ de: "Männlich", en: "Male", es: "Masculino" }), accent: 'Amerikanisch' },
+  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', gender: tx({ de: "Männlich", en: "Male", es: "Masculino" }), accent: 'Britisch' },
 ];
 
 const DEFAULT_PREFERENCES: CompanionPreferences = {

@@ -356,7 +356,7 @@ export default function RenderQueue() {
               }}
               className="bg-rose-500 hover:bg-rose-600"
             >
-              Abbrechen bestätigen
+              {tx({ de: "Abbrechen bestätigen", en: "Confirm Cancel", es: "Confirmar Cancelación" })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
