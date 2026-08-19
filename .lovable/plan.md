@@ -47,8 +47,11 @@ Fehlt der Snapshot oder ist er unvollständig: KEIN Legacy-Rebuild. Fail closed 
 
 ## 3. Tests
 
-- **Matrix H — Actual Wire Parity**: realistischer Multi-Speaker-Pass, `freshWire` und `retryWire` über `buildProviderWire` erzeugen, Deep-Equality über alle Felder außer `active_speaker_detection`; zusätzlich einzelne Asserts für `audio_url`, `video_url`, `bbox`, `frame_count`, `voiced_windows`, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`. ASD fresh `{auto_detect:false, bounding_boxes_url}` vs. retry `{auto_detect:false, bounding_boxes:[...]}`.
+- **Matrix H — Actual Wire Parity**: realistischer Multi-Speaker-Pass, `freshWire` und `retryWire` über `buildProviderWire` erzeugen, Deep-Equality über alle Felder außer `active_speaker_detection`; zusätzlich einzelne Asserts für `audio_url`, `video_url`, `bbox`, `frame_count`, `dispatch_fps`, `voiced_windows`, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`. ASD fresh `{auto_detect:false, bounding_boxes_url}` vs. retry `{auto_detect:false, bounding_boxes:[...]}`.
+- **Box-Sequenz-Parität**: Inhalt des beim Fresh hochgeladenen bounding-box-JSON deep-equals dem inline `bounding_boxes` des Retry.
 - **No-Date-Now-Rebuild**: Prädikat-Test, dass der Tight-Audio-/Normalisierungspfad bei vorhandenem frozen Input nicht betreten wird (kein neuer `*-tight-<ts>.wav`).
+- **Snapshot-Persist-Failure**: Persist schlägt fehl ⇒ zero provider calls, `provider_call_made=false`.
+- **Missing snapshot on NOOP retry**: unvollständiger/fehlender Snapshot ⇒ zero provider calls, kein Legacy-Rebuild.
 - Re-Run: Matrix B–M, Deadline-Tests, Classifier, Plate-Face-Frozen-Tests.
 
 ## 4. Version
