@@ -281,8 +281,17 @@ export function boundingBoxesJsonFromSnapshot(
 
 export const V407_PROVIDER_MODEL = "sync-3";
 
-/** Fresh side: needs a real Contract-E dispatch box + canonical box sequence. */
+/**
+ * Fresh side: needs a real Contract-E dispatch box + canonical box sequence.
+ *
+ * FA-4 v408 P1-1 — the fresh frozen-wire contract is EXCLUSIVE to first
+ * provider dispatches. Any retry (`isRetry === true`) stays on the pre-v406
+ * retry behavior; the only frozen retry path is the separately gated
+ * NOOP `coords-pro-box` replacement (see `isV407NoopRetryCandidate`).
+ * A fresh fan-out pass (`advance:true`) is NOT a retry and stays eligible.
+ */
 export function isV407FreshWireContract(input: {
+  isRetry: boolean;
   isMultiSpeaker: boolean;
   payloadModel: string;
   retryVariant: string;
@@ -290,6 +299,7 @@ export function isV407FreshWireContract(input: {
   canonicalBoxesAvailable: boolean;
 }): boolean {
   return (
+    input.isRetry === false &&
     input.isMultiSpeaker === true &&
     input.payloadModel === V407_PROVIDER_MODEL &&
     input.retryVariant === "bbox-url-pro" &&
@@ -297,6 +307,7 @@ export function isV407FreshWireContract(input: {
     input.canonicalBoxesAvailable === true
   );
 }
+
 
 /**
  * NOOP-retry side: activation MUST NOT depend on a recomputed dispatch box,
