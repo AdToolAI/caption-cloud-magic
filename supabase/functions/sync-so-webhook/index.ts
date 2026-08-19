@@ -847,8 +847,43 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       //    compositor only when EVERY pass is done. No chained next-pass
       //    dispatch (compose-dialog-segments fans them out itself).
       const passes = passesPre;
+      // `totalPasses` bleibt reine PASS-Kardinalität (Aggregat, Done-Count,
+      // Mux-Fan-In) — sie entscheidet ab v409 NICHT mehr die Sprecher-Klasse.
       const totalPasses = Number((state as any).total_passes ?? passes.length ?? 1);
       const currentPass = matchedIdx >= 0 ? matchedIdx : Number((state as any).current_pass ?? 0);
+
+      // ── FA-4 v409 — kanonische Sprecher-Kardinalität ────────────────────
+      const speakerCardinality = classifySpeakerCardinality(passes, { totalPasses });
+      const speakerBranch = decideCompletedSpeakerBranch(speakerCardinality);
+      console.log(
+        `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} speaker_cardinality scene=${sceneId} pass=${currentPass} ` +
+          `distinct=${speakerCardinality.distinctSpeakerCount} total_passes=${totalPasses} ` +
+          `class=${speakerCardinality.classification} reason=${speakerCardinality.reason}`,
+      );
+      if (speakerBranch.branch === "fail_closed") {
+        // Fail-closed VOR jeder Motion-/Success-Semantik: eine Szene, deren
+        // Sprecher-Identität nicht bestimmbar ist, darf weder gemuxt noch
+        // retried werden. Terminal-State gehört dem G3.2.2-Apply.
+        const indeterminateCardinalityRes = await applySyncSegmentResult(supabase, {
+          pipelineJobId: v431CallbackJobId,
+          externalJobId: jobId,
+          writeId: speakerBranch.writeId,
+          providerStatus: "COMPLETED",
+          outputUrl: null,
+          errorText: speakerBranch.errorText,
+        });
+        if (!indeterminateCardinalityRes) {
+          return ok({ ok: true, skipped: "apply_unavailable", scene_id: sceneId, job_id: jobId });
+        }
+        console.error(
+          `[sync-so-webhook] v409/g322 scene=${sceneId} pass=${currentPass} ` +
+            `SPEAKER-CARDINALITY-INDETERMINATE reason=${speakerCardinality.reason} → ssw:failed`,
+        );
+        return await settleVerdict(indeterminateCardinalityRes, {
+          speaker_cardinality: "indeterminate",
+          reason: speakerCardinality.reason,
+        });
+      }
 
       // v404 §5 — the rehost already happened OUTSIDE the dialog lock.
       const rehostedUrl: string | null = v404RehostedUrl;
