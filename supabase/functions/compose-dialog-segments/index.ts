@@ -7097,17 +7097,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // `active_speaker_detection` survive the call. When ASD has
     // `bounding_boxes`/`bounding_boxes_url`, `frame_number`/`coordinates`
     // are dropped (mutex). Stripped keys are logged with `v124_sync3_sanitize`.
-    const v124Sanitized = sanitizeSync3Options(v406Wire.model, syncOptions, {
+    const v124Sanitized = sanitizeSync3Options(wireModel, syncOptions, {
       scene: sceneId,
       pass: currentPassIdx + 1,
       speaker: String(pass.speaker_name ?? ""),
     });
     const payloadOptions = v124Sanitized.options;
     const payload: Record<string, unknown> = {
-      model: v406Wire.model,
+      model: wireModel,
       input: [
         videoInput,
-        { type: "audio", url: v406Wire.audio_url },
+        { type: "audio", url: wireAudioUrl },
       ],
       options: payloadOptions,
       webhookUrl: diagnosticWebhookUrl,
