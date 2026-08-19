@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +11,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useTx } from '@/lib/i18nText';
 import ReactCrop, { Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
-import { tx } from '@/lib/i18nText';
 
 interface MediaEditorProps {
   currentImageUrl?: string;
@@ -63,7 +63,7 @@ export const MediaEditor = ({
       filters: { brightness: 100, contrast: 100, saturation: 100, grayscale: 0, sepia: 0, hueRotate: 0 }
     },
     {
-      name: 'Schwarz/Weiß',
+      name: tx({ de: "Schwarz/Weiß", en: "Black/White", es: "Blanco/Negro" }),
       icon: '⚫',
       filters: { brightness: 100, contrast: 100, saturation: 0, grayscale: 100, sepia: 0, hueRotate: 0 }
     },
@@ -175,7 +175,7 @@ export const MediaEditor = ({
     
     toast({
       title: tx({ de: "Filter angewendet", en: "Filter applied", es: "Filtro aplicado" }),
-      description: `${preset.name} ${tx({ de: "wurde angewendet", en: "was applied", es: "fue aplicado" })}`,
+      description: `${preset.name} $${tx({ de: "wurde angewendet", en: "was applied", es: "fue aplicado" })}`,
     });
   };
 

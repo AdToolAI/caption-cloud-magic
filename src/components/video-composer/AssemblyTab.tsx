@@ -38,7 +38,7 @@ const MAX_POLL_DURATION_MS = 10 * 60 * 1000; // 10 min
 // even if a translation is missing. Used in conjunction with the t() helper.
 const FALLBACKS: Record<string, string> = {
   finalRender: 'Final Render',
-  renderingNow: 'Rendering läuft',
+  renderingNow: tx({ de: "Rendering läuft", en: "Rendering in progress", es: "Renderizando" }),
   renderProgressBadge: 'Live',
   lambdaStarting: 'Lambda startet …',
   framesRendering: tx({ de: 'Frames werden gerendert …', en: 'Rendering frames …', es: 'Renderizando fotogramas …' }),
@@ -49,7 +49,7 @@ const FALLBACKS: Record<string, string> = {
   download: 'Herunterladen',
   savedToLibrary: tx({ de: 'In Mediathek gespeichert', en: 'Saved to media library', es: 'Guardado en la biblioteca de medios' }),
   savedToLibraryDesc: tx({ de: 'Du findest dieses Video jetzt in der Mediathek.', en: 'You can now find this video in the media library.', es: 'Ahora puedes encontrar este video en la biblioteca de medios.' }),
-  viewInLibrary: 'Mediathek öffnen',
+  viewInLibrary: tx({ de: "Mediathek öffnen", en: "Open media library", es: "Abrir biblioteca multimedia" }),
   takingLonger: tx({ de: 'Dauert länger als üblich', en: 'Taking longer than usual', es: 'Está tardando más de lo habitual' }),
   checkLaterDesc: tx({ de: 'Du kannst die Seite verlassen und später wieder öffnen — der Status wird aus der Datenbank geladen.', en: 'You can leave the page and open it again later — the status will be loaded from the database.', es: 'Puedes salir de la página y volver a abrirla más tarde — el estado se cargará desde la base de datos.' }),
   renderFailed: tx({ de: 'Rendering fehlgeschlagen', en: 'Rendering failed', es: 'Error en el renderizado' }),
@@ -62,8 +62,8 @@ const FALLBACKS: Record<string, string> = {
   backgroundMusic: 'Hintergrundmusik',
   musicSelectedFallback: tx({ de: 'Track ausgewählt', en: 'Track selected', es: 'Pista seleccionada' }),
   musicWillBeMixed: tx({ de: 'Wird im finalen Export mit der unten gewählten Lautstärke gemischt.', en: 'Will be mixed into the final export with the volume selected below.', es: 'Se mezclará en la exportación final con el volumen seleccionado abajo.' }),
-  musicVolume: 'Lautstärke',
-  editInAudioTab: 'Im Audio-Tab ändern',
+  musicVolume: tx({ de: "Lautstärke", en: "Volume", es: "Volumen" }),
+  editInAudioTab: tx({ de: "Im Audio-Tab ändern", en: "Change in Audio tab", es: "Cambiar en pestaña Audio" }),
   musicEnabledNoTrack: tx({ de: 'Musik aktiviert, aber kein Track gewählt — wähle einen Track im Audio-Tab.', en: 'Music activated, but no track selected — choose a track in the Audio tab.', es: 'Música activada, pero no hay pista seleccionada — elige una pista en la pestaña Audio.' }),
   musicDisabledHint: tx({ de: 'Keine Hintergrundmusik gewählt — im Audio-Tab hinzufügen.', en: 'No background music selected — add one in the Audio tab.', es: 'No hay música de fondo seleccionada — añádela en la pestaña Audio.' }),
 };

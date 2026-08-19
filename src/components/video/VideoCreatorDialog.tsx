@@ -524,7 +524,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                           Text-Overlays aktivieren
                         </Label>
                         <p className="text-xs text-muted-foreground">
-                          Zeigt automatisch generierte Untertitel basierend auf deinem Skript
+                          {tx({ de: "Zeigt automatisch generierte Untertitel basierend auf deinem Skript", en: "Shows auto-generated subtitles based on your script", es: "Muestra subtítulos generados automáticamente según tu guion" })}
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -541,7 +541,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                     <div className="space-y-4 p-4 border rounded-lg">
                       <div className="space-y-2">
                         <Label htmlFor="voice-style" className="text-sm font-medium">
-                          Voiceover Stimme
+                          {tx({ de: "Voiceover Stimme", en: "Voiceover Voice", es: "Voz en off" })}
                         </Label>
                         <select
                           id="voice-style"
@@ -550,28 +550,28 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                           className="w-full px-3 py-2 border rounded-md bg-background"
                         >
                           <option value="aria">Aria (Weiblich, warm & freundlich)</option>
-                          <option value="roger">Roger (Männlich, professionell)</option>
+                          <option value="roger">{tx({ de: "Roger (Männlich, professionell)", en: "Roger (Male, professional)", es: "Roger (Masculino, profesional)" })}</option>
                           <option value="sarah">Sarah (Weiblich, energisch)</option>
                           <option value="laura">Laura (Weiblich, beruhigend)</option>
-                          <option value="charlie">Charlie (Männlich, jung & dynamisch)</option>
-                          <option value="george">George (Männlich, autoritativ)</option>
-                          <option value="callum">Callum (Männlich, britisch)</option>
+                          <option value="charlie">{tx({ de: "Charlie (Männlich, jung & dynamisch)", en: "Charlie (Male, young & dynamic)", es: "Charlie (Masculino, joven y dinámico)" })}</option>
+                          <option value="george">{tx({ de: "George (Männlich, autoritativ)", en: "George (Male, authoritative)", es: "George (Masculino, autoritario)" })}</option>
+                          <option value="callum">{tx({ de: "Callum (Männlich, britisch)", en: "Callum (Male, British)", es: "Callum (Masculino, británico)" })}</option>
                           <option value="river">River (Neutral, moderne)</option>
-                          <option value="liam">Liam (Männlich, kraftvoll)</option>
+                          <option value="liam">{tx({ de: "Liam (Männlich, kraftvoll)", en: "Liam (Male, powerful)", es: "Liam (Masculino, potente)" })}</option>
                           <option value="charlotte">Charlotte (Weiblich, elegant)</option>
                           <option value="alice">Alice (Weiblich, klar)</option>
                           <option value="matilda">Matilda (Weiblich, reif)</option>
-                          <option value="will">Will (Männlich, freundlich)</option>
+                          <option value="will">{tx({ de: "Will (Männlich, freundlich)", en: "Will (Male, friendly)", es: "Will (Masculino, amigable)" })}</option>
                           <option value="jessica">Jessica (Weiblich, selbstbewusst)</option>
-                          <option value="eric">Eric (Männlich, tief)</option>
-                          <option value="chris">Chris (Männlich, entspannt)</option>
-                          <option value="brian">Brian (Männlich, warm)</option>
-                          <option value="daniel">Daniel (Männlich, klar)</option>
+                          <option value="eric">{tx({ de: "Eric (Männlich, tief)", en: "Eric (Male, deep)", es: "Eric (Masculino, grave)" })}</option>
+                          <option value="chris">{tx({ de: "Chris (Männlich, entspannt)", en: "Chris (Male, relaxed)", es: "Chris (Masculino, relajado)" })}</option>
+                          <option value="brian">{tx({ de: "Brian (Männlich, warm)", en: "Brian (Male, warm)", es: "Brian (Masculino, cálido)" })}</option>
+                          <option value="daniel">{tx({ de: "Daniel (Männlich, klar)", en: "Daniel (Male, clear)", es: "Daniel (Masculino, claro)" })}</option>
                           <option value="lily">Lily (Weiblich, sanft)</option>
-                          <option value="bill">Bill (Männlich, erfahren)</option>
+                          <option value="bill">{tx({ de: "Bill (Männlich, erfahren)", en: "Bill (Male, experienced)", es: "Bill (Masculino, experimentado)" })}</option>
                         </select>
                         <p className="text-xs text-muted-foreground">
-                          Wähle die Stimme für dein professionelles Voiceover
+                          {tx({ de: "Wähle die Stimme für dein professionelles Voiceover", en: "Choose the voice for your professional voiceover", es: "Elige la voz para tu voz en off profesional" })}
                         </p>
                       </div>
                       
@@ -660,7 +660,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                   ) : (
                     <>
                       <Sparkles className="mr-2 h-4 w-4" />
-                      Video erstellen
+                      {tx({ de: "Video erstellen", en: "Create video", es: "Crear video" })}
                     </>
                   )}
                 </Button>
@@ -674,10 +674,10 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
               <div className="text-center space-y-2">
                 <h3 className="font-semibold text-lg">{tx({ de: "Dein Video wird erstellt", en: "Your video is being created", es: "Tu video se está creando" })}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Dies kann einige Minuten dauern. Du kannst das Fenster schließen und später zurückkommen.
+                  {tx({ de: "Dies kann einige Minuten dauern. Du kannst das Fenster schließen und später zurückkommen.", en: "This may take a few minutes. You can close the window and come back later.", es: "Esto puede tardar unos minutos. Puedes cerrar la ventana y volver más tarde." })}
                 </p>
                 {polling && (
-                  <Badge variant="secondary">Rendering läuft...</Badge>
+                  <Badge variant="secondary">{tx({ de: "Rendering läuft...", en: "Rendering in progress...", es: "Renderizando..." })}</Badge>
                 )}
               </div>
             </div>

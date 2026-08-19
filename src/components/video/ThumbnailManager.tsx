@@ -84,7 +84,7 @@ export const ThumbnailManager = ({
       if (updateError) throw updateError;
 
       toast({
-        title: 'Thumbnail hochgeladen',
+        title: tx({ de: "Thumbnail hochgeladen", en: "Thumbnail uploaded", es: "Miniatura subida" }),
         description: tx({ de: 'Ihr benutzerdefiniertes Thumbnail wurde gespeichert', en: 'Your custom thumbnail has been saved', es: 'Tu miniatura personalizada ha sido guardada' }),
       });
 
@@ -109,7 +109,7 @@ export const ThumbnailManager = ({
           Thumbnail-Verwaltung
         </CardTitle>
         <CardDescription>
-          Thumbnail automatisch generieren oder eigenes hochladen
+          {tx({ de: "Thumbnail automatisch generieren oder eigenes hochladen", en: "Auto-generate thumbnail or upload your own", es: "Generar miniatura automáticamente o subir la tuya" })}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -296,7 +296,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
       <div className="flex items-center justify-between text-xs bg-[#0a0a1a]/60 border border-white/10 px-3 py-2 rounded-lg">
         <div className="flex items-center gap-1.5 text-white/60">
           <Clock className="h-3.5 w-3.5" />
-          <span>Länge</span>
+          <span>{tx({ de: "Länge", en: "Length", es: "Longitud" })}</span>
         </div>
         <span className="text-[#F5C76A] font-semibold tabular-nums">{length.toFixed(2)}s</span>
       </div>
@@ -310,7 +310,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
           className="border-white/10 text-white/70 hover:text-white hover:bg-white/5"
         >
           <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-          Zurücksetzen
+          {tx({ de: "Zurücksetzen", en: "Reset", es: "Restablecer" })}
         </Button>
         {(() => {
           const EDGE = 0.05;
@@ -367,7 +367,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
                 className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
               >
                 <MapPin className="h-3.5 w-3.5 mr-1.5" />
-                In Szene springen
+                {tx({ de: "In Szene springen", en: "Jump to scene", es: "Saltar a escena" })}
               </Button>
             );
           }
@@ -395,7 +395,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
           onClick={() => onDelete(scene.id)}
           className="w-full text-red-400 hover:text-red-300 hover:bg-red-500/10"
         >
-          Szene löschen
+          {tx({ de: "Szene löschen", en: "Delete scene", es: "Eliminar escena" })}
         </Button>
       )}
     </div>

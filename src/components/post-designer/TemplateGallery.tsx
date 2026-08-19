@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ export function TemplateGallery({ open, onOpenChange, image, onApply }: Template
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl">
         <DialogHeader>
-          <DialogTitle>Vorlagen</DialogTitle>
+          <DialogTitle>{tx({ de: "Vorlagen", en: "Templates", es: "Plantillas" })}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-wrap gap-2 pb-2">

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * ConciergeTipHost — global bottom-left Concierge card.
  *
@@ -121,7 +122,7 @@ export function ConciergeTipHost() {
                         onClick={() => void dismiss()}
                         className="text-[11px] text-white/50 transition hover:text-white/80"
                       >
-                        später
+                        {tx({ de: "später", en: "later", es: "más tarde" })}
                       </button>
                     </motion.div>
                   )}

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { motion } from "framer-motion";
 import { Paintbrush, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -55,7 +56,7 @@ export function BrandKitHeroHeader({ brandKitCount, onCreateNew }: BrandKitHeroH
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
               </span>
-              <span className="text-sm font-medium text-primary">KI-Markenidentität</span>
+              <span className="text-sm font-medium text-primary">{tx({ de: "KI-Markenidentität", en: "AI Brand Identity", es: "Identidad de Marca IA" })}</span>
             </motion.div>
 
             {/* Gradient Headline */}
@@ -77,7 +78,7 @@ export function BrandKitHeroHeader({ brandKitCount, onCreateNew }: BrandKitHeroH
               transition={{ duration: 0.5, delay: 0.2 }}
               className="text-lg text-muted-foreground max-w-xl"
             >
-              KI-gestützte Markenidentität für alle deine Inhalte
+              {tx({ de: "KI-gestützte Markenidentität für alle deine Inhalte", en: "AI-powered brand identity for all your content", es: "Identidad de marca impulsada por IA para todo tu contenido" })}
             </motion.p>
 
             {/* Stats Badges */}
@@ -118,7 +119,7 @@ export function BrandKitHeroHeader({ brandKitCount, onCreateNew }: BrandKitHeroH
                 </div>
                 
                 <Sparkles className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
-                Neues Set erstellen
+                {tx({ de: "Neues Set erstellen", en: "Create new set", es: "Crear nuevo conjunto" })}
               </Button>
             </motion.div>
           )}

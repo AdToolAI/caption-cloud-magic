@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -345,7 +346,7 @@ export default function MusicLibraryBrowser({
             </span>
           </DialogTitle>
           <p className="text-xs text-muted-foreground">
-            Pixabay × Mixkit · Royalty-free Musik & Sound-Effekte — ohne Credit-Verbrauch
+            {tx({ de: "Pixabay × Mixkit · Royalty-free Musik & Sound-Effekte — ohne Credit-Verbrauch", en: "Pixabay × Mixkit · Royalty-free music & sound effects — no credit consumption", es: "Pixabay × Mixkit · Música y efectos de sonido libres de derechos — sin consumo de créditos" })}
           </p>
         </DialogHeader>
 

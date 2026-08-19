@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,6 @@ import {
   type CharacterDraft,
   type MotionStudioCharacter,
 } from '@/types/motion-studio';
-import { tx } from "@/lib/i18nText";
 
 interface CharacterEditorProps {
   open: boolean;
@@ -82,7 +82,7 @@ export default function CharacterEditor({
         const url = await uploadLibraryImage(file, 'character', tmpId);
         if (url) {
           setDraft((d) => ({ ...d, reference_image_url: url }));
-          toast.success('Referenzbild hochgeladen');
+          toast.success(tx({ de: "Referenzbild hochgeladen", en: "Reference image uploaded", es: "Imagen de referencia subida" }));
         }
       } finally {
         setUploading(false);
@@ -221,11 +221,9 @@ export default function CharacterEditor({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
-            {character ? 'Charakter bearbeiten' : 'Neuen Charakter anlegen'}
+            {character ? tx({ de: "Charakter bearbeiten", en: "Edit character", es: "Editar personaje" }) : tx({ de: "Neuen Charakter anlegen", en: "Create new character", es: "Crear nuevo personaje" })}
           </DialogTitle>
           <DialogDescription>
-            Speichere wiederverwendbare Charaktere mit Reference-Image für visuelle Konsistenz
-            über alle Motion-Studio-Projekte hinweg.
           </DialogDescription>
         </DialogHeader>
 
@@ -237,9 +235,7 @@ export default function CharacterEditor({
               <div className="space-y-1">
                 <p className="text-xs font-semibold">Sherlock-Holmes-Effekt</p>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Markante Kleidung & Objekte beschreibst du am besten auf Englisch — die KI
-                  wiederholt diese viel zuverlässiger als Gesichter. Ein Reference-Image
-                  verbessert die Konsistenz nochmal deutlich.
+                  {tx({ de: "verbessert die Konsistenz nochmal deutlich.", en: "further improves consistency significantly.", es: "mejora aún más la consistencia de forma notable." })}
                 </p>
               </div>
             </div>
@@ -251,7 +247,7 @@ export default function CharacterEditor({
             <Input
               value={draft.name}
               onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-              placeholder="z. B. Richard Löwenherz"
+              placeholder={tx({ de: "z. B. Richard Löwenherz", en: "e.g. Richard the Lionheart", es: "ej. Ricardo Corazón de León" })}
               className="bg-background/60"
             />
           </div>
@@ -297,7 +293,7 @@ export default function CharacterEditor({
                 />
                 <div className="flex-1 space-y-2">
                   <p className="text-[11px] text-muted-foreground">
-                    Wird als Image-to-Video-Referenz an Hailuo / Kling / Wan übergeben.
+                    {tx({ de: "Wird als Image-to-Video-Referenz an Hailuo / Kling / Wan übergeben.", en: "Passed to Hailuo / Kling / Wan as an image-to-video reference.", es: "Se pasa a Hailuo / Kling / Wan como referencia de imagen a vídeo." })}
                   </p>
                   <Button
                     variant="ghost"
@@ -365,7 +361,7 @@ export default function CharacterEditor({
               className="bg-background/60 resize-none text-sm"
             />
             <p className="text-[10px] text-muted-foreground">
-              Diese Details werden in JEDER Szene wiederholt — der Zuschauer erkennt den Charakter
+              {tx({ de: "Diese Details werden in JEDER Szene wiederholt — der Zuschauer erkennt den Charakter", en: "These details are repeated in EVERY scene — the viewer recognizes the character", es: "Estos detalles se repiten en CADA escena — el espectador reconoce al personaje" })}
               daran.
             </p>
           </div>
@@ -398,7 +394,7 @@ export default function CharacterEditor({
                 className="bg-background/60 text-sm"
               />
               <Button variant="outline" size="sm" onClick={addTag}>
-                Hinzufügen
+                {tx({ de: "Hinzufügen", en: "Add", es: "Añadir" })}
               </Button>
             </div>
             {draft.tags.length > 0 && (

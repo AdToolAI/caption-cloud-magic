@@ -52,7 +52,7 @@ export function TemplateDrawer({ open, onOpenChange }: { open: boolean; onOpenCh
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md">
         <SheetHeader>
-          <SheetTitle className="font-display">Vorlagen</SheetTitle>
+          <SheetTitle className="font-display">{tx({ de: "Vorlagen", en: "Templates", es: "Plantillas" })}</SheetTitle>
           <SheetDescription>Gesicherte Designs wiederverwenden — direkt im Layout-Schritt.</SheetDescription>
         </SheetHeader>
 
@@ -64,7 +64,7 @@ export function TemplateDrawer({ open, onOpenChange }: { open: boolean; onOpenCh
           )}
           {!loading && !items.length && (
             <p className="py-6 text-sm text-muted-foreground">
-              Noch keine Vorlage. Im Schritt „Ausspielen“ lässt sich jedes Design sichern.
+              {tx({ de: "Noch keine Vorlage. Im Schritt „Ausspielen“ lässt sich jedes Design sichern.", en: "No template yet. Any design can be saved in the 'Deploy' step.", es: "Aún no hay plantilla. Cualquier diseño se puede guardar en el paso 'Desplegar'." })}
             </p>
           )}
           <div className="space-y-2">

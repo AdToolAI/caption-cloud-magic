@@ -164,7 +164,7 @@ export default function EmailDirector() {
             <Card className="p-5 border-primary/20">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles className="w-4 h-4 text-primary" />
-                <h2 className="font-medium">Neue Kampagne</h2>
+                <h2 className="font-medium">{tx({ de: "Neue Kampagne", en: "New Campaign", es: "Nueva campaña" })}</h2>
               </div>
               <div className="space-y-3">
                 <div>
@@ -189,7 +189,7 @@ export default function EmailDirector() {
                   <Input value={goal} onChange={(e) => setGoal(e.target.value)} />
                 </div>
                 <div>
-                  <Label className="text-xs">Tonalität</Label>
+                  <Label className="text-xs">{tx({ de: "Tonalität", en: "Tone", es: "Tono" })}</Label>
                   <Select value={tonality} onValueChange={setTonality}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -249,7 +249,7 @@ export default function EmailDirector() {
               <Card className="p-12 text-center border-dashed">
                 <Mail className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
                 <p className="text-muted-foreground">
-                  Wähle eine Kampagne oder erstelle eine neue, um Subjects und Varianten zu sehen.
+                  {tx({ de: "Wähle eine Kampagne oder erstelle eine neue, um Subjects und Varianten zu sehen.", en: "Select a campaign or create a new one to see subjects and variants.", es: "Selecciona una campaña o crea una nueva para ver sujetos y variantes." })}
                 </p>
               </Card>
             ) : (

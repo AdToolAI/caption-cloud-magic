@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -172,7 +173,7 @@ function DraggableScene({
           <DropdownMenuContent align="end">
             <DropdownMenuItem>
               <Scissors className="h-3 w-3 mr-2" />
-              Szene splitten
+              {tx({ de: "Szene splitten", en: "Split scene", es: "Dividir escena" })}
             </DropdownMenuItem>
             <DropdownMenuItem>
               <Link className="h-3 w-3 mr-2" />

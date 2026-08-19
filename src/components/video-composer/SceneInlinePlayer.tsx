@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * SceneInlinePlayer — Stage 18: 16:9 mini-player tile for a single scene.
  *
@@ -14,7 +15,6 @@
  * Selection styling (gold border + glow) is controlled by `isActive`.
  */
 import { useEffect, useRef, useState } from 'react';
-import { tx } from '@/lib/i18nText';
 import { presentSceneError } from '@/lib/composer/errors/sceneErrorPresenter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, RefreshCw, Sparkles, ImageIcon, Loader2, AlertTriangle } from 'lucide-react';
@@ -39,7 +39,7 @@ interface Props {
 const SCENE_TYPE_LABEL: Record<string, string> = {
   hook: 'Hook',
   problem: 'Problem',
-  solution: 'Lösung',
+  solution: tx({ de: "Lösung", en: "Solution", es: "Solución" }),
   demo: 'Demo',
   'social-proof': 'Social Proof',
   cta: 'CTA',
@@ -307,7 +307,7 @@ export default function SceneInlinePlayer({
 
                     title = tx({ de: 'Lip-Sync läuft…', en: 'Lip-sync running…', es: 'Sincronización labial en curso…' });
                     sub = totalPasses > 0
-                      ? `${tx({ de: 'Durchgang', en: 'Pass', es: 'Pasada' })} ${Math.min(donePasses + 1, totalPasses)}/${totalPasses}`
+                      ? `$${tx({ de: 'Durchgang', en: 'Pass', es: 'Pasada' })} ${Math.min(donePasses + 1, totalPasses)}/${totalPasses}`
                       : tx({ de: '~60 s pro Sprecher', en: '~60s per speaker', es: '~60 s por hablante' });
                   } else if (pipelineState === 'audio_prep') {
                     if (audioUrl) {

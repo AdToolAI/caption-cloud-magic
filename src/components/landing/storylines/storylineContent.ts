@@ -167,7 +167,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       durationMs: 6500,
       copy: S(
         ["Schritt 06 · Character Loadout", "Step 06 · Character loadout", "Paso 06 · Loadout del personaje"],
-        ["Fünf Slots. Ein Loadout. Scene-Ready.", "Five slots. One loadout. Scene-ready.", "Cinco slots. Un loadout. Listo para escena."],
+        [tx({ de: "Fünf Slots. Ein Loadout. Scene-Ready.", en: "Five slots. One loadout. Scene-ready.", es: "Cinco ranuras. Un equipo. Listo para la escena." }), "Five slots. One loadout. Scene-ready.", "Cinco slots. Un loadout. Listo para escena."],
         [
           tx({ de: "Face Lock, Voice, Wardrobe, Prompt-Tokens und Scene-Ready-Status auf einem Blick — wie das Loadout eines Spielcharakters. 98 % Identity-Match, 96 % Voice-Bind, vier Looks im Preset. Alles verriegelt, alles reproduzierbar.", en: "Face Lock, Voice, Wardrobe, Prompt Tokens, and Scene-Ready Status at a glance — like a game character's loadout. 98% Identity Match, 96% Voice Bind, four looks in the preset. Everything locked, everything reproducible.", es: "Bloqueo facial, voz, vestuario, tokens de prompt y estado de listo para la escena de un vistazo — como el equipamiento de un personaje de juego. 98% de coincidencia de identidad, 96% de vinculación de voz, cuatro looks en el preset. Todo bloqueado, todo reproducible." }),
           "Face lock, voice, wardrobe, prompt tokens and scene-ready status in one view — like a game character's loadout. 98 % identity match, 96 % voice bind, four looks preset. All locked, all reproducible.",
@@ -222,7 +222,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       imageSrc: motionS3,
       copy: S(
         ["Task-Blocking", "Task blocking", "Blocking de tareas"],
-        ["Charaktere die wirklich etwas tun.", "Characters that actually do something.", "Personajes que realmente hacen algo."],
+        [tx({ de: "Charaktere die wirklich etwas tun.", en: "Characters that actually do something.", es: "Personajes que realmente hacen algo." }), "Characters that actually do something.", "Personajes que realmente hacen algo."],
         [
           tx({ de: "Einer telefoniert, einer druckt, einer präsentiert — Cast-Actions machen aus Standbildern eine echte Büroszene. Bewegung als Regieanweisung, nicht als Zufall.", en: "One on the phone, one printing, one presenting — Cast Actions turn still images into a real office scene. Movement as a directorial instruction, not as a coincidence.", es: "Uno al teléfono, uno imprimiendo, uno presentando — las Acciones de Reparto convierten imágenes fijas en una escena de oficina real. El movimiento como instrucción de dirección, no como coincidencia." }),
           "One on the phone, one at the printer, one presenting — Cast Actions turn stills into a real office scene. Movement as direction, not chance.",
@@ -261,7 +261,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       imageSrc: motionS6,
       copy: S(
         ["Emotionaler Lip-Sync", "Emotional lip-sync", "Lip-sync emocional"],
-        ["Lippen, die die Worte tatsächlich formen.", "Lips that actually form the words.", "Labios que realmente forman las palabras."],
+        [tx({ de: "Lippen, die die Worte tatsächlich formen.", en: "Lips that actually form the words.", es: "Labios que realmente forman las palabras." }), "Lips that actually form the words.", "Labios que realmente forman las palabras."],
         [
           tx({ de: "Deutsch, Englisch, Spanisch — Motion Studio zwingt die Engine auf die gewählte Sprache und synchronisiert jede Silbe. Keine Fantasiesprache, keine geschlossenen Münder.", en: "German, English, Spanish — Motion Studio forces the engine to the selected language and synchronizes every syllable. No fantasy language, no closed mouths.", es: "Alemán, inglés, español — Motion Studio fuerza el motor al idioma seleccionado y sincroniza cada sílaba. Sin lenguaje de fantasía, sin bocas cerradas." }),
           "German, English, Spanish — Motion Studio locks the engine to the chosen language and syncs every syllable. No gibberish, no closed mouths.",
@@ -382,7 +382,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       imageSrc: pictureS3,
       copy: S(
         ["Editorial-Cover", "Editorial cover", "Portada editorial"],
-        ["Cover-Qualität. In Minuten.", "Cover-grade. In minutes.", "Calidad portada. En minutos."],
+        [tx({ de: "Cover-Qualität. In Minuten.", en: "Cover-grade. In minutes.", es: "Calidad portada. En minutos." }), "Cover-grade. In minutes.", "Calidad portada. En minutos."],
         [
           tx({ de: "Portrait, Typografie-Gefühl, Farbe — Editorial-Cover in Vogue-Anmutung. Ideal für Landing-Hero, LinkedIn-Post oder Magazin-Mockup.", en: "Portrait, typography feel, color — editorial covers with a Vogue aesthetic. Ideal for landing page heroes, LinkedIn posts, or magazine mockups.", es: "Retrato, sensación tipográfica, color — portadas editoriales con estética Vogue. Ideal para héroes de landing pages, publicaciones de LinkedIn o maquetas de revistas." }),
           "Portrait, typographic feel, color — editorial covers with a Vogue vibe. Ideal for landing hero, LinkedIn post or magazine mockup.",
@@ -500,8 +500,8 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       kind: "cinematic",
       imageSrc: musicS6,
       copy: S(
-        ["Bühne", "On stage", "En escena"],
-        ["Musik, die deinen Spot trägt.", "Music that carries your spot.", "Música que sostiene tu spot."],
+        [tx({ de: "Bühne", en: "On stage", es: "En escena" }), "On stage", "En escena"],
+        [tx({ de: "Musik, die deinen Spot trägt.", en: "Music that carries your spot.", es: "Música que sostiene tu spot." }), "Music that carries your spot.", "Música que sostiene tu spot."],
         [
           tx({ de: "Sound ist die Hälfte deiner Werbung. Music Studio liefert dir die Hälfte, die die meisten Tools vergessen — produktionsreif, in Minuten, ohne Rechte-Risiko.", en: "Sound is half your advertising. Music Studio gives you the half most tools forget — production-ready, in minutes, without rights risk.", es: "El sonido es la mitad de tu publicidad. Music Studio te da la mitad que la mayoría de las herramientas olvidan — listo para producción, en minutos, sin riesgo de derechos." }),
           "Sound is half your ad. Music Studio delivers the half most tools forget — production-ready, in minutes, no rights risk.",
@@ -515,8 +515,8 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       kind: "cinematic",
       imageSrc: voiceS1,
       copy: S(
-        ["Stimme klonen", "Clone a voice", "Clonar una voz"],
-        ["Deine Stimme. Als Asset.", "Your voice. As an asset.", "Tu voz. Como asset."],
+        [tx({ de: "Stimme klonen", en: "Clone a voice", es: "Clonar una voz" }), "Clone a voice", "Clonar una voz"],
+        [tx({ de: "Deine Stimme. Als Asset.", en: "Your voice. As an asset.", es: "Tu voz. Como asset." }), "Your voice. As an asset.", "Tu voz. Como asset."],
         [
           tx({ de: "Nimm 60 Sekunden auf — Voice Studio klont Timbre, Sprechrhythmus und Akzent. Ab dann kannst du beliebige Skripte in deiner Stimme sprechen lassen.", en: "Record 60 seconds — Voice Studio clones timbre, speech rhythm, and accent. From then on, you can have any script spoken in your voice.", es: "Graba 60 segundos — Voice Studio clona el timbre, el ritmo del habla y el acento. A partir de entonces, puedes hacer que cualquier guion se hable con tu voz." }),
           "Record 60 seconds — Voice Studio clones timbre, rhythm and accent. From then on any script can speak in your voice.",
@@ -567,7 +567,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       kind: "ui",
       UIComponent: VoiceLibraryVisual,
       copy: S(
-        ["Meine Stimmen", "My voices", "Mis voces"],
+        [tx({ de: "Meine Stimmen", en: "My voices", es: "Mis voces" }), "My voices", "Mis voces"],
         [tx({ de: "Alle Stimmen an einem Ort.", en: "All voices in one place.", es: "Todas las voces en un solo lugar." }), "All voices in one place.", "Todas las voces en un lugar."],
         [
           tx({ de: "Persönlich geklont oder aus der ElevenLabs-Library gewählt — deine Stimmen sind zentral abgelegt und in Motion, AI-Video und Music sofort abrufbar.", en: "Cloned personally or chosen from the ElevenLabs library — your voices are centrally stored and instantly available in Motion, AI-Video, and Music.", es: "Clonadas personalmente o elegidas de la biblioteca de ElevenLabs — tus voces se almacenan centralmente y están disponibles al instante en Motion, AI-Video y Music." }),
@@ -683,7 +683,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       durationMs: 5000,
       copy: S(
         ["Founders · 01", "Founders · 01", "Founders · 01"],
-        ["Nur 1 000 Founder-Plätze.", "Only 1,000 founder seats.", "Solo 1.000 plazas de founder."],
+        [tx({ de: "Nur 1 000 Founder-Plätze.", en: "Only 1,000 founder seats.", es: "Solo 1.000 plazas de founder." }), "Only 1,000 founder seats.", "Solo 1.000 plazas de founder."],
         [
           tx({ de: "Die ersten 1 000 Founders sichern sich exklusive Konditionen. Jeder Slot ist gezählt — wenn er weg ist, ist er weg.", en: "The first 1,000 Founders secure exclusive conditions. Each slot is counted — once it's gone, it's gone.", es: "Los primeros 1.000 Founders aseguran condiciones exclusivas. Cada plaza está contada — una vez que se agota, se agota." }),
           "The first 1,000 founders lock in exclusive terms. Every seat is counted — once it's gone, it's gone.",

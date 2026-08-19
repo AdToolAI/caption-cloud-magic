@@ -148,7 +148,7 @@ export default function ScriptSpeakerMapper({ briefing, language, onUpdateBriefi
                         </span>
                       ) : (
                         <span className="text-destructive/70">
-                          ({t('kein Match', 'no match', 'sin coincidencia')})
+                          ({t(tx({ de: "kein Match", en: "no match", es: "sin coincidencia" }), 'no match', 'sin coincidencia')})
                         </span>
                       )}
                     </span>

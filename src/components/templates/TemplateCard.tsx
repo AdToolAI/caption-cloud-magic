@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,10 +40,10 @@ export const TemplateCard = ({
     const labels: Record<string, string> = {
       social_media: 'Social Media',
       advertising: 'Werbung',
-      explainer: 'Erklärvideos',
+      explainer: tx({ de: "Erklärvideos", en: "Explainer Videos", es: "Videos explicativos" }),
       tutorial: 'Tutorials',
       testimonial: 'Testimonials',
-      product_showcase: 'Produktpräsentation',
+      product_showcase: tx({ de: "Produktpräsentation", en: "Product Showcase", es: "Presentación de producto" }),
       event: 'Events',
       educational: 'Bildung',
       entertainment: 'Unterhaltung',
@@ -75,7 +76,7 @@ export const TemplateCard = ({
             onClick={() => onPreview(template)}
           >
             <Eye className="mr-2 h-4 w-4" />
-            Vorschau
+            {tx({ de: "Vorschau", en: "Preview", es: "Vista previa" })}
           </Button>
           <Button
             size="sm"
@@ -135,7 +136,7 @@ export const TemplateCard = ({
                 className="text-destructive"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-                Löschen
+                {tx({ de: "Löschen", en: "Delete", es: "Eliminar" })}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

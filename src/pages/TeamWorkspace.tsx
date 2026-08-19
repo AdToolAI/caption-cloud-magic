@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
@@ -889,7 +890,7 @@ export default function TeamWorkspace() {
                 <SectionTitle eyebrow="Signal Log" title={t("team.activity")} />
                 {activityEvents.length === 0 ? (
                   <p className="py-12 text-center text-sm text-muted-foreground">
-                    Noch keine Signale in diesem Workspace.
+                    {tx({ de: "Noch keine Signale in diesem Workspace.", en: "No signals in this workspace yet.", es: "Aún no hay señales en este espacio de trabajo." })}
                   </p>
                 ) : (
                   <ol className="mt-5 relative space-y-4 border-l border-primary/20 pl-6">

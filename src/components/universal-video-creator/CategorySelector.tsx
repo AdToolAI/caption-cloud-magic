@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { motion } from 'framer-motion';
 import { 
   Building2, ShoppingBag, BookOpen, Wand2,
@@ -30,7 +31,7 @@ const CATEGORY_COLORS: Record<VideoCategory, string> = {
 
 const CATEGORY_BADGES: Record<VideoCategory, { icon: React.ComponentType<{ className?: string }>; label: string } | null> = {
   'corporate-ad': null,
-  'product-ad': { icon: ImageIcon, label: 'Min. 4 Bilder' },
+  'product-ad': { icon: ImageIcon, label: tx({ de: "Min. 4 Bilder", en: "Min. 4 images", es: "Mín. 4 imágenes" }) },
   storytelling: { icon: Sparkles, label: 'KI-Story' },
   custom: null,
 };

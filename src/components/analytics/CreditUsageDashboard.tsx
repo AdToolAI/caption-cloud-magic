@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles } from 'lucide-react';
 
@@ -19,12 +20,9 @@ export const CreditUsageDashboard = () => {
       <CardContent className="text-sm text-muted-foreground space-y-2">
         <p>
           Mit dem Beta-Basic-Abo (14,99 €/Monat) sind Chat, Automatisierung,
-          Publishing und alle Plattform-Features unbegrenzt nutzbar.
+          {tx({ de: "Publishing und alle Plattform-Features unbegrenzt nutzbar.", en: "Publishing and all platform features are unlimited.", es: "Publicación y todas las funciones de la plataforma son ilimitadas." })}
         </p>
         <p>
-          Nur AI-Video, Music- und Bildgenerierung laufen über separate
-          Media-Credits. Deinen aktuellen Media-Credit-Stand siehst du direkt
-          im AI Video Studio bzw. bei jeder Generierung im Kosten-Vorschau-Dialog.
         </p>
       </CardContent>
     </Card>

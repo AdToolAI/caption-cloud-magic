@@ -228,10 +228,10 @@ export default function SnippetBuilderDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            {isEdit ? 'Snippet bearbeiten' : 'Neues Snippet'}
+            {isEdit ? tx({ de: "Snippet bearbeiten", en: "Edit snippet", es: "Editar fragmento" }) : tx({ de: "Neues Snippet", en: "New Snippet", es: "Nuevo fragmento" })}
           </DialogTitle>
           <DialogDescription>
-            Speichere wiederverwendbare Szenen-Bausteine — optional teilbar mit der Community.
+            {tx({ de: "Speichere wiederverwendbare Szenen-Bausteine — optional teilbar mit der Community.", en: "Save reusable scene building blocks — optionally shareable with the community.", es: "Guarda bloques de construcción de escenas reutilizables — opcionalmente compartibles con la comunidad." })}
           </DialogDescription>
         </DialogHeader>
 
@@ -314,7 +314,7 @@ export default function SnippetBuilderDialog({
 
           {/* Description */}
           <div>
-            <Label className="text-xs">Beschreibung (optional)</Label>
+            <Label className="text-xs">{tx({ de: "Beschreibung (optional)", en: "Description (optional)", es: "Descripción (opcional)" })}</Label>
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -393,7 +393,7 @@ export default function SnippetBuilderDialog({
                 <Switch checked={isPublic} onCheckedChange={setIsPublic} disabled={!canPublish && !isPublic} />
               </div>
               <p className="text-[10px] text-muted-foreground mt-1">
-                Öffentliche Snippets erscheinen in der Community-Library. Andere User können liken und klonen
+                {tx({ de: "Öffentliche Snippets erscheinen in der Community-Library. Andere User können liken und klonen", en: "Public snippets appear in the community library. Other users can like and clone", es: "Los fragmentos públicos aparecen en la biblioteca de la comunidad. Otros usuarios pueden dar 'me gusta' y clonar" })}
                 — Cast & Location bleiben privat.
               </p>
               {!canPublish && (
@@ -407,7 +407,7 @@ export default function SnippetBuilderDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Abbrechen
+            {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-1.5">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -284,7 +285,7 @@ const PromptWizard = () => {
                   </motion.div>
                   <div>
                     <h2 className="text-xl font-semibold">{t("wizard.results")}</h2>
-                    <p className="text-sm text-muted-foreground">Dein optimierter Prompt ist bereit</p>
+                    <p className="text-sm text-muted-foreground">{tx({ de: "Dein optimierter Prompt ist bereit", en: "Your optimized prompt is ready", es: "Tu prompt optimizado está listo" })}</p>
                   </div>
                 </div>
 

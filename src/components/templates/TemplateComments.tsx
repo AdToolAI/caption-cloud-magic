@@ -73,7 +73,7 @@ export const TemplateComments = ({ templateId }: TemplateCommentsProps) => {
 
           {comments?.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-8">
-              Noch keine Kommentare vorhanden
+              {tx({ de: "Noch keine Kommentare vorhanden", en: "No comments yet", es: "Aún no hay comentarios" })}
             </p>
           )}
         </div>

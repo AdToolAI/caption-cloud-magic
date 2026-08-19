@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -124,7 +125,7 @@ export function TimePickerDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={onCancel}>
-            Abbrechen
+            {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
           </Button>
           <Button onClick={() => onConfirm(hour, minute)}>
             Planen

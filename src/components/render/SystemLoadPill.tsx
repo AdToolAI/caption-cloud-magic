@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * SystemLoadPill — compact live indicator of global render-queue load.
  *
@@ -66,12 +67,12 @@ export function SystemLoadPill({ className = '', compact = false }: Props) {
             )}
             {!isFounder && load.state === 'founder_reserve' && (
               <div className="pt-1 text-muted-foreground">
-                Founders werden bevorzugt gerendert. Retry-Automatik ist aktiv.
+                {tx({ de: "Founders werden bevorzugt gerendert. Retry-Automatik ist aktiv.", en: "Founders are rendered preferentially. Automatic retry is active.", es: "Los fundadores se renderizan preferentemente. La reintentos automáticos están activos." })}
               </div>
             )}
             {load.state === 'saturated' && (
               <div className="pt-1 text-destructive">
-                System voll — neue Renders warten kurz auf freie Slots.
+                {tx({ de: "System voll — neue Renders warten kurz auf freie Slots.", en: "System full — new renders briefly wait for free slots.", es: "Sistema lleno — los nuevos renders esperan brevemente por slots libres." })}
               </div>
             )}
           </div>

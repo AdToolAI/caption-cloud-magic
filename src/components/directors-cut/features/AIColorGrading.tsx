@@ -119,7 +119,7 @@ export function AIColorGrading({
             {isSceneMode ? (
               <>
                 <Layers className="h-3 w-3 mr-1" />
-                Szene
+                {tx({ de: "Szene", en: "Scene", es: "Escena" })}
               </>
             ) : (
               <>
@@ -229,7 +229,7 @@ export function AIColorGrading({
         {selectedGrade && (
           <div className="space-y-2 pt-2 border-t">
             <div className="flex justify-between">
-              <span className="text-xs font-medium">Grading-Intensität</span>
+              <span className="text-xs font-medium">{tx({ de: "Grading-Intensität", en: "Grading Intensity", es: "Intensidad de gradación" })}</span>
               <span className="text-xs text-muted-foreground">{Math.round(gradeIntensity * 100)}%</span>
             </div>
             <Slider

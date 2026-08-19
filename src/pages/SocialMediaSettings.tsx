@@ -1,4 +1,4 @@
-import { tx } from "@/lib/i18nText";
+import { tx } from '@/lib/i18nText';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -40,7 +40,7 @@ const platformConfig = [
     icon: Youtube,
     color: 'text-red-600',
     setupUrl: 'https://console.cloud.google.com',
-    description: 'Aktiviere YouTube Data API v3 in der Google Cloud Console.',
+    description: tx({ de: "Aktiviere YouTube Data API v3 in der Google Cloud Console.", en: "Enable YouTube Data API v3 in Google Cloud Console.", es: "Habilita la API de datos de YouTube v3 en la Consola de Google Cloud." }),
   },
   {
     id: 'facebook' as Platform,
@@ -90,7 +90,7 @@ export default function SocialMediaSettings() {
             { 
               description: reconnectPlatform 
                 ? tx({ de: 'Klicke auf den Developer Portal Button um dein Token zu erneuern.', en: 'Click on the Developer Portal button to renew your token.', es: 'Haga clic en el botón Portal de desarrollador para renovar su token.' })
-                : 'Folge den Schritten um die Plattform zu verbinden.'
+                : tx({ de: "Folge den Schritten um die Plattform zu verbinden.", en: "Follow the steps to connect the platform.", es: "Sigue los pasos para conectar la plataforma." })
             }
           );
         }
@@ -122,20 +122,20 @@ export default function SocialMediaSettings() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Social Media Verbindungen</h1>
         <p className="text-muted-foreground">
-          Verwalte deine Verbindungen zu verschiedenen Social Media Plattformen
+          {tx({ de: "Verwalte deine Verbindungen zu verschiedenen Social Media Plattformen", en: "Manage your connections to various social media platforms", es: "Gestiona tus conexiones a varias plataformas de redes sociales" })}
         </p>
       </div>
 
       <Alert className="mb-6">
         <AlertDescription>
-          Um Social Media Publishing zu nutzen, müssen die entsprechenden API-Tokens als Secrets konfiguriert werden.
-          Die Token-Namen sind: INSTAGRAM_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN, LINKEDIN_ACCESS_TOKEN, YOUTUBE_ACCESS_TOKEN, etc.
+          {tx({ de: "Um Social Media Publishing zu nutzen, müssen die entsprechenden API-Tokens als Secrets konfiguriert werden.", en: "To use social media publishing, the corresponding API tokens must be configured as secrets.", es: "Para usar la publicación en redes sociales, los tokens API correspondientes deben configurarse como secretos." })}
+          {tx({ de: "Die Token-Namen sind:", en: "The token names are:", es: "Los nombres de los tokens son:" })} INSTAGRAM_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN, LINKEDIN_ACCESS_TOKEN, YOUTUBE_ACCESS_TOKEN, etc.
         </AlertDescription>
       </Alert>
 
       {loading ? (
         <div className="text-center py-12">
-          <p className="text-muted-foreground">Lade Verbindungen...</p>
+          <p className="text-muted-foreground">{tx({ de: "Lade Verbindungen...", en: "Loading connections...", es: "Cargando conexiones..." })}</p>
         </div>
       ) : (
         <div className="grid gap-6">

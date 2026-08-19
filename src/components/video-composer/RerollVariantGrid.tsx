@@ -76,7 +76,7 @@ export default function RerollVariantGrid({
       });
       if (error) throw error;
       toast({
-        title: parentSeed != null ? '🔁 Variationen gestartet' : '⚡ 4 Takes gestartet',
+        title: parentSeed != null ? tx({ de: "🔁 Variationen gestartet", en: "🔁 Variations started", es: "🔁 Variaciones iniciadas" }) : tx({ de: "⚡ 4 Takes gestartet", en: "⚡ 4 Takes started", es: "⚡ 4 Tomas iniciadas" }),
         description: tx({ de: 'Fast-Previews ~10 Sek. — werden hier live aktualisiert.', en: 'Fast-Previews ~10 sec. — updated live here.', es: 'Vistas previas rápidas ~10 seg. — se actualizan en vivo aquí.' }),
       });
     } catch (err) {
@@ -105,7 +105,7 @@ export default function RerollVariantGrid({
         .eq('id', scene.id);
       if (error) throw error;
       toast({
-        title: '✓ Take übernommen',
+        title: tx({ de: "✓ Take übernommen", en: "✓ Take adopted", es: "✓ Toma adoptada" }),
         description: tx({ de: `Seed ${v.seed} ist jetzt der Master für die HQ-Generierung.`, en: `Seed ${v.seed} is now the master for HQ generation.`, es: `La semilla ${v.seed} es ahora la maestra para la generación de alta calidad.` }),
       });
       onOpenChange(false);
@@ -126,7 +126,7 @@ export default function RerollVariantGrid({
         .from('composer_scenes')
         .update({ seed: null } as any)
         .eq('id', scene.id);
-      toast({ title: 'Seed entsperrt', description: 'Nächster Reroll nutzt zufällige Seeds.' });
+      toast({ title: 'Seed entsperrt', description: tx({ de: "Nächster Reroll nutzt zufällige Seeds.", en: "Next reroll uses random seeds.", es: "La próxima repetición usará semillas aleatorias." }) });
     } catch (err) {
       console.warn(err);
     }
@@ -189,7 +189,7 @@ export default function RerollVariantGrid({
               {busy || anyGenerating
                 ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                 : <RefreshCw className="h-3 w-3 mr-1" />}
-              {scene.seed != null ? 'Variationen' : 'Neue 4 Takes'}
+              {scene.seed != null ? 'Variationen' : tx({ de: "Neue 4 Takes", en: "New 4 Takes", es: "4 Tomas nuevas" })}
             </Button>
           </div>
         </div>
@@ -263,7 +263,7 @@ function VariantSlot({ index, variant, aspect, onPromote, promoting }: VariantSl
           {promoting
             ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
             : <Check className="h-3 w-3 mr-1" />}
-          Übernehmen
+          {tx({ de: "Übernehmen", en: "Apply", es: "Aplicar" })}
         </Button>
       </div>
     </div>

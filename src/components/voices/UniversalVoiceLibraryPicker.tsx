@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -27,7 +28,6 @@ import {
   type VoiceCategoryId,
 } from '@/lib/voice-categories';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
-import { tx } from '@/lib/i18nText';
 
 interface UniversalVoiceLibraryPickerProps {
   open: boolean;
@@ -186,7 +186,7 @@ export function UniversalVoiceLibraryPicker({
           <DialogDescription className="text-[11px] uppercase tracking-[0.15em] text-white/45">
             {total.toLocaleString()} {tx({ de: "Stimmen", en: "Voices", es: "Voces" })}
             {language !== 'all' && <> in <span className="text-cyan">{voiceLanguageLabel(language)}</span></>}
-            {nativeSensitive && nativeOnly && ` · ${tx({ de: "nur native Sprecher", en: "native speakers only", es: "solo hablantes nativos" })}`}
+            {nativeSensitive && nativeOnly && ` · $${tx({ de: "nur native Sprecher", en: "native speakers only", es: "solo hablantes nativos" })}`}
           </DialogDescription>
         </DialogHeader>
 
@@ -400,7 +400,7 @@ export function UniversalVoiceLibraryPicker({
                     onClick={() => fetchNextPage()}
                     className="mt-1 rounded-lg bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-gold/30 normal-case tracking-normal"
                   >
-                    {isFetchingNextPage ? <><Loader2 className="h-3 w-3 animate-spin mr-2" />Lade weitere…</> : 'Weitere Stimmen laden'}
+                    {isFetchingNextPage ? <><Loader2 className="h-3 w-3 animate-spin mr-2" />{tx({ de: "Lade weitere…", en: "Loading more…", es: "Cargando más…" })}</> : tx({ de: "Weitere Stimmen laden", en: "Load more voices", es: "Cargar más voces" })}
                   </Button>
                 )}
               </div>
@@ -414,7 +414,7 @@ export function UniversalVoiceLibraryPicker({
             onClick={() => onOpenChange(false)}
             className="px-8 rounded-lg border border-white/10 bg-white/5 text-sm font-bold text-white hover:bg-white/10"
           >
-            Schließen
+            {tx({ de: "Schließen", en: "Close", es: "Cerrar" })}
           </Button>
         </div>
 

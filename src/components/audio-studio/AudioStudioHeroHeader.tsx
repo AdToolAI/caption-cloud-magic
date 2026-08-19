@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { motion } from 'framer-motion';
 import { Headphones, Sparkles, Zap } from 'lucide-react';
 
@@ -50,8 +51,6 @@ export function AudioStudioHeroHeader() {
         transition={{ delay: 0.3 }}
         className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6"
       >
-        KI-gestützte Audiobearbeitung wie bei den Profis. 
-        Rauschentfernung, Transcript-Editing, Beat-Sync und mehr.
       </motion.p>
 
       {/* Feature Pills */}

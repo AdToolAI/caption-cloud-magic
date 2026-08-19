@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -234,7 +235,7 @@ export const TemplateSearch = ({
         {hasActiveFilters && (
           <Button variant="ghost" size="sm" onClick={resetFilters}>
             <X className="h-4 w-4 mr-2" />
-            Filter zurücksetzen
+            {tx({ de: "Filter zurücksetzen", en: "Reset filters", es: "Restablecer filtros" })}
           </Button>
         )}
       </div>

@@ -107,7 +107,7 @@ const AllComments = () => {
         // Create default project
         const { data: newProject, error } = await supabase
           .from("projects")
-          .insert({ name: "Standard Projekt", user_id: user.id })
+          .insert({ name: tx({ de: "Standard Projekt", en: "Default Project", es: "Proyecto predeterminado" }), user_id: user.id })
           .select("id")
           .single();
 
@@ -293,7 +293,7 @@ const AllComments = () => {
                 value={importText}
                 onChange={(e) => setImportText(e.target.value)}
               />
-              <Button onClick={handleImport}>Import starten</Button>
+              <Button onClick={handleImport}>{tx({ de: "Import starten", en: "Start Import", es: "Iniciar importación" })}</Button>
             </DialogContent>
           </Dialog>
           <Button variant="outline">
@@ -378,7 +378,7 @@ const AllComments = () => {
             <div className="text-center py-12">{tx({ de: "Lädt...", en: "Loading...", es: "Cargando..." })}</div>
           ) : comments.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              Noch keine gespeicherten Kommentare – importiere Daten oder verbinde eine Quelle.
+              {tx({ de: "Noch keine gespeicherten Kommentare – importiere Daten oder verbinde eine Quelle.", en: "No comments saved yet – import data or connect a source.", es: "Aún no hay comentarios guardados – importa datos o conecta una fuente." })}
             </div>
           ) : (
             <Table>
@@ -393,7 +393,7 @@ const AllComments = () => {
                   <TableHead>Kommentar</TableHead>
                   <TableHead>Sentiment</TableHead>
                   <TableHead>Intent</TableHead>
-                  <TableHead>Priorität</TableHead>
+                  <TableHead>{tx({ de: "Priorität", en: "Priority", es: "Prioridad" })}</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Aktionen</TableHead>
                 </TableRow>

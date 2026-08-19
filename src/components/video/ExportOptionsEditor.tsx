@@ -83,7 +83,7 @@ export const ExportOptionsEditor = ({ options, onChange }: ExportOptionsEditorPr
 
         {/* Aspect Ratio */}
         <div className="space-y-3">
-          <Label>Seitenverhältnis</Label>
+          <Label>{tx({ de: "Seitenverhältnis", en: "Aspect Ratio", es: "Relación de aspecto" })}</Label>
           <Select value={options.aspectRatio} onValueChange={(value) => updateOptions({ aspectRatio: value as ExportOptions['aspectRatio'] })}>
             <SelectTrigger>
               <SelectValue />
@@ -113,7 +113,7 @@ export const ExportOptionsEditor = ({ options, onChange }: ExportOptionsEditorPr
         {/* Quality (only for video formats) */}
         {options.format !== 'gif' && (
           <div className="space-y-2">
-            <Label>Qualität</Label>
+            <Label>{tx({ de: "Qualität", en: "Quality", es: "Calidad" })}</Label>
             <Select value={options.quality} onValueChange={(value) => updateOptions({ quality: value as ExportOptions['quality'] })}>
               <SelectTrigger>
                 <SelectValue />
@@ -157,7 +157,7 @@ export const ExportOptionsEditor = ({ options, onChange }: ExportOptionsEditorPr
 
         {/* Additional Options */}
         <div className="space-y-4">
-          <Label>Zusätzliche Optionen</Label>
+          <Label>{tx({ de: "Zusätzliche Optionen", en: "Additional Options", es: "Opciones adicionales" })}</Label>
           
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
             <div>
@@ -185,7 +185,7 @@ export const ExportOptionsEditor = ({ options, onChange }: ExportOptionsEditorPr
         {/* File Size Estimate */}
         <div className="pt-4 border-t">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Geschätzte Dateigröße:</span>
+            <span className="text-muted-foreground">{tx({ de: "Geschätzte Dateigröße:", en: "Estimated file size:", es: "Tamaño de archivo estimado:" })}</span>
             <span className="font-medium">
               {options.format === 'gif' ? '~2-5 MB' : 
                options.quality === '4k' ? '~50-100 MB' :

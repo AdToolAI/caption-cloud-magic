@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,7 +12,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 const TIMEZONES = [
   { value: "Europe/Berlin", label: "Berlin (MEZ/MESZ)" },
   { value: "Europe/Vienna", label: "Wien (MEZ/MESZ)" },
-  { value: "Europe/Zurich", label: "Zürich (MEZ/MESZ)" },
+  { value: "Europe/Zurich", label: tx({ de: "Zürich (MEZ/MESZ)", en: "Zurich (CET/CEST)", es: "Zúrich (CET/CEST)" }) },
   { value: "Europe/London", label: "London (GMT/BST)" },
   { value: "Europe/Paris", label: "Paris (MEZ/MESZ)" },
   { value: "Europe/Amsterdam", label: "Amsterdam (MEZ/MESZ)" },

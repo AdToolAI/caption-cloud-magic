@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -98,7 +99,7 @@ export const SecurityNotificationsCard = () => {
           <div className="space-y-0.5">
             <Label>Sicherheitswarnungen</Label>
             <p className="text-xs text-muted-foreground">
-              E-Mail bei verdächtigen Aktivitäten
+              {tx({ de: "E-Mail bei verdächtigen Aktivitäten", en: "Email for suspicious activity", es: "Correo electrónico para actividad sospechosa" })}
             </p>
           </div>
           <Switch
@@ -112,7 +113,7 @@ export const SecurityNotificationsCard = () => {
           <div className="space-y-0.5">
             <Label>Login-Benachrichtigungen</Label>
             <p className="text-xs text-muted-foreground">
-              E-Mail bei jeder neuen Anmeldung
+              {tx({ de: "E-Mail bei jeder neuen Anmeldung", en: "Email for every new login", es: "Correo electrónico para cada nuevo inicio de sesión" })}
             </p>
           </div>
           <Switch

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useCallback } from 'react';
 import { Upload, X, Music, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,6 @@ import { Progress } from '@/components/ui/progress';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { tx } from '@/lib/i18nText';
 
 interface AudioUploadProps {
   value: { url: string; volume: number } | null;
@@ -119,7 +119,7 @@ export function AudioUpload({
             <>
               <Upload className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
               <p className="text-sm text-muted-foreground mb-1">
-                Audio hier ablegen
+                {tx({ de: "Audio hier ablegen", en: "Drop audio here", es: "Arrastra el audio aquí" })}
               </p>
               <p className="text-xs text-muted-foreground">
                 MP3, WAV, OGG bis 10MB

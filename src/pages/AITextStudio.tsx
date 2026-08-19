@@ -1,10 +1,10 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Brain, Send, Sparkles, Loader2, Lock, Trash2, GitBranch, Pin, PinOff } from "lucide-react";
 import { usePinnedChat } from "@/contexts/PinnedChatContext";
-import { tx } from "@/lib/i18nText";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -547,7 +547,7 @@ export default function AITextStudio() {
             {/* Feineinstellungen */}
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
-                <Label className="text-xs">Antwortlänge</Label>
+                <Label className="text-xs">{tx({ de: "Antwortlänge", en: "Response Length", es: "Longitud de respuesta" })}</Label>
                 <Select value={responseLength} onValueChange={(v) => setResponseLength(v as ResponseLength)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -558,7 +558,7 @@ export default function AITextStudio() {
                 </Select>
               </div>
               <div>
-                <Label className="text-xs">Kreativität</Label>
+                <Label className="text-xs">{tx({ de: "Kreativität", en: "Creativity", es: "Creatividad" })}</Label>
                 <Select value={creativity} onValueChange={(v) => setCreativity(v as CreativityLevel)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -570,7 +570,7 @@ export default function AITextStudio() {
               </div>
               {selectedModel.supportsReasoningEffort ? (
                 <div>
-                  <Label className="text-xs">Denk-Tiefe</Label>
+                  <Label className="text-xs">{tx({ de: "Denk-Tiefe", en: "Reasoning depth", es: "Profundidad de razonamiento" })}</Label>
                   <Select value={reasoning} onValueChange={(v) => setReasoning(v as ReasoningEffort)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -582,7 +582,7 @@ export default function AITextStudio() {
                 </div>
               ) : (
                 <div className="text-[11px] text-muted-foreground self-end pb-2">
-                  Denk-Tiefe ist bei {selectedModel.label} nicht einstellbar.
+                  {tx({ de: "Denk-Tiefe ist nicht einstellbar bei", en: "Reasoning depth is not adjustable for", es: "La profundidad de razonamiento no es ajustable para" })} {selectedModel.label}.
                 </div>
               )}
             </div>
@@ -620,7 +620,7 @@ export default function AITextStudio() {
               }}
             >
               {pinned?.conversationId === conversationId ? (
-                <><PinOff className="h-3 w-3 mr-1" /> Loslösen</>
+                <><PinOff className="h-3 w-3 mr-1" />{tx({ de: "Loslösen", en: "Unpin", es: "Desanclar" })}</>
               ) : (
                 <><Pin className="h-3 w-3 mr-1" /> Anheften</>
               )}
@@ -632,7 +632,7 @@ export default function AITextStudio() {
               className="h-7"
               title={tx({ de: "Setzt den aktuellen Chat zurück. Dein bisheriges Gespräch findest du jederzeit unter History.", en: "Resets the current chat. You can find your previous conversation at any time under History.", es: "Restablece el chat actual. Puedes encontrar tu conversación anterior en cualquier momento en Historial." })}
             >
-              <Sparkles className="h-3 w-3 mr-1" /> Neue Konversation
+              <Sparkles className="h-3 w-3 mr-1" /> {tx({ de: "Neue Konversation", en: "New conversation", es: "Nueva conversación" })}
             </Button>
           </div>
 
@@ -745,7 +745,7 @@ export default function AITextStudio() {
               disabled={compareLoading || !comparePrompt.trim() || compareModels.length === 0}
             >
               {compareLoading ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Läuft…</>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{tx({ de: "Läuft…", en: "Running…", es: "Ejecutando…" })}</>
               ) : (
                 `Vergleich starten (${compareModels.length})`
               )}
@@ -826,8 +826,6 @@ export default function AITextStudio() {
               Mit {branchPrompt ? TEXT_MODELS[branchPrompt.targetModel].label : ""} fortfahren?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Beim Modellwechsel mitten im Chat können Provider-Fehler auftreten, weil jedes
-              Modell ein eigenes Format erwartet. Stattdessen erstellen wir einen neuen
               <strong> Branch</strong> in dieser Konversation. Beide Verläufe bleiben sichtbar.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -842,7 +840,7 @@ export default function AITextStudio() {
             <AlertDialogAction
               onClick={() => branchPrompt && createBranch(branchPrompt.targetModel, true)}
             >
-              Mit Kontext übernehmen
+              {tx({ de: "Mit Kontext übernehmen", en: "Take over with context", es: "Asumir con contexto" })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

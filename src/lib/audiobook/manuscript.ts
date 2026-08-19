@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * Manuskript-Verarbeitung für den Hörbuch-Modus.
  * Reine Frontend-Logik: Kapitel-Erkennung, Sprecher-Zuordnung, Kosten.
@@ -118,7 +119,7 @@ export function buildRenderSegments(
       ? cast.characters.find((c) => c.name === seg.speaker)
       : cast.narrator;
     if (!ref?.voiceId) {
-      missing.add(seg.speaker ?? 'Erzähler');
+      missing.add(seg.speaker ?? tx({ de: "Erzähler", en: "Narrator", es: "Narrador" }));
       continue;
     }
     segments.push({ voiceId: ref.voiceId, voiceName: ref.voiceName, text: seg.text });

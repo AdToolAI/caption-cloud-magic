@@ -32,11 +32,11 @@ const VOICE_OPTIONS = [
   { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura', gender: 'Weiblich', accent: 'Amerikanisch' },
   { id: 'XrExE9yKIg1WjnnlVkGX', name: 'Matilda', gender: 'Weiblich', accent: 'Amerikanisch' },
   { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', gender: 'Weiblich', accent: 'Britisch' },
-  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', gender: 'Männlich', accent: 'Australisch' },
-  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', gender: 'Männlich', accent: 'Britisch' },
-  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam', gender: 'Männlich', accent: 'Amerikanisch' },
-  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', gender: 'Männlich', accent: 'Amerikanisch' },
-  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', gender: 'Männlich', accent: 'Britisch' },
+  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', gender: tx({ de: "Männlich", en: "Male", es: "Masculino" }), accent: 'Australisch' },
+  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', gender: tx({ de: "Männlich", en: "Male", es: "Masculino" }), accent: 'Britisch' },
+  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam', gender: tx({ de: "Männlich", en: "Male", es: "Masculino" }), accent: 'Amerikanisch' },
+  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', gender: tx({ de: "Männlich", en: "Male", es: "Masculino" }), accent: 'Amerikanisch' },
+  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', gender: tx({ de: "Männlich", en: "Male", es: "Masculino" }), accent: 'Britisch' },
 ];
 
 const DEFAULT_PREFERENCES: CompanionPreferences = {
@@ -214,7 +214,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
             className="bg-muted/30 border-white/10"
           />
           <p className="text-xs text-muted-foreground">
-            Dein Assistent wird sich mit diesem Namen vorstellen
+            {tx({ de: "Dein Assistent wird sich mit diesem Namen vorstellen", en: "Your assistant will introduce itself with this name", es: "Tu asistente se presentará con este nombre" })}
           </p>
         </div>
 
@@ -222,7 +222,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
             <Volume2 className="w-4 h-4" />
-            Stimme
+            {tx({ de: "Stimme", en: "Voice", es: "Voz" })}
           </Label>
           <Select
             value={settings.voice_id}
@@ -258,7 +258,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
             ) : (
               <Volume2 className="w-4 h-4 mr-2" />
             )}
-            Stimme anhören
+            {tx({ de: "Stimme anhören", en: "Listen to voice", es: "Escuchar voz" })}
           </Button>
         </div>
 
@@ -270,7 +270,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
               Sprachausgabe
             </Label>
             <p className="text-xs text-muted-foreground">
-              Bot-Antworten werden vorgelesen
+              {tx({ de: "Bot-Antworten werden vorgelesen", en: "Bot responses are read aloud", es: "Las respuestas del bot se leen en voz alta" })}
             </p>
           </div>
           <Switch
@@ -285,7 +285,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
             <div className="space-y-0.5">
               <Label>Automatisch vorlesen</Label>
               <p className="text-xs text-muted-foreground">
-                Jede Antwort wird automatisch vorgelesen
+                {tx({ de: "Jede Antwort wird automatisch vorgelesen", en: "Every response is automatically read aloud", es: "Cada respuesta se lee automáticamente en voz alta" })}
               </p>
             </div>
             <Switch
@@ -303,7 +303,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
               Spracheingabe
             </Label>
             <p className="text-xs text-muted-foreground">
-              Sprich mit dem Bot per Mikrofon
+              {tx({ de: "Sprich mit dem Bot per Mikrofon", en: "Speak to the bot via microphone", es: "Habla con el bot por micrófono" })}
             </p>
           </div>
           <Switch
@@ -314,7 +314,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
 
         {/* Personality */}
         <div className="space-y-3">
-          <Label>Persönlichkeit</Label>
+          <Label>{tx({ de: "Persönlichkeit", en: "Personality", es: "Personalidad" })}</Label>
           <div className="grid grid-cols-3 gap-2">
             {[
               { value: 'professional', label: '💼 Professionell' },
@@ -347,7 +347,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
           ) : (
             <Save className="w-4 h-4 mr-2" />
           )}
-          Einstellungen speichern
+          {tx({ de: "Einstellungen speichern", en: "Save settings", es: "Guardar ajustes" })}
         </Button>
       </div>
     </motion.div>

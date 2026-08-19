@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * RefundGuaranteeBadge — surface the existing automated refund safety
  * net to the user at the moment they commit credits. The refund logic
@@ -23,7 +24,7 @@ export default function RefundGuaranteeBadge({ compact = false }: Props) {
   return (
     <div className="rounded-md bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-[11px] text-emerald-300 flex items-start gap-1.5">
       <ShieldCheck className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-      Bei Render-Fehlern werden alle Credits automatisch zurückerstattet.
+      {tx({ de: "Bei Render-Fehlern werden alle Credits automatisch zurückerstattet.", en: "In case of rendering errors, all credits are automatically refunded.", es: "En caso de errores de renderizado, todos los créditos se reembolsan automáticamente." })}
     </div>
   );
 }

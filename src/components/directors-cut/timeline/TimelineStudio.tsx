@@ -280,7 +280,7 @@ export function TimelineStudio({
                 <Undo2 className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Rückgängig (Ctrl+Z)</TooltipContent>
+            <TooltipContent>{tx({ de: "Rückgängig (Ctrl+Z)", en: "Undo (Ctrl+Z)", es: "Deshacer (Ctrl+Z)" })}</TooltipContent>
           </Tooltip>
           
           <Tooltip>

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -70,7 +71,7 @@ export const RenderQueuePanel = () => {
           </div>
         ) : jobs.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            Keine Jobs in der Queue
+            {tx({ de: "Keine Jobs in der Queue", en: "No jobs in queue", es: "No hay trabajos en la cola" })}
           </div>
         ) : (
           <div className="space-y-3">

@@ -91,7 +91,7 @@ const m = (
 
 // Reused caps
 const T2V = cap("Text→Video", "Text→Video", "Texto→Vídeo");
-const I2V = cap("Image→Video", "Bild→Video", "Imagen→Vídeo");
+const I2V = cap("Image→Video", tx({ de: "Bild→Video", en: "Image→Video", es: "Imagen→Vídeo" }), "Imagen→Vídeo");
 const V2V = cap("Video→Video", "Video→Video", "Vídeo→Vídeo");
 const P1080 = cap("1080p", "1080p", "1080p");
 const NATIVE_LIP = cap("Native Lip-Sync", "Native Lip-Sync", "Lip-Sync Nativo");
@@ -100,7 +100,7 @@ const DIR = cap("Director Ctrl", "Regie-Ctrl", "Ctrl. Director");
 const FAST = cap("Fast", "Schnell", "Rápido");
 const KEYS = cap("Keyframes", "Keyframes", "Keyframes");
 const MULTIREF = cap("Multi-Ref", "Multi-Ref", "Multi-Ref");
-const T2I = cap("Text→Image", "Text→Bild", "Texto→Imagen");
+const T2I = cap("Text→Image", tx({ de: "Text→Bild", en: "Text→Image", es: "Texto→Imagen" }), "Texto→Imagen");
 const EDIT = cap("Edit", "Edit", "Editar");
 const INPAINT = cap("Inpaint", "Inpaint", "Inpaint");
 const UPS4 = cap("4× Upscale", "4× Upscale", "Escalado 4×");
@@ -406,7 +406,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Google Lyria 3 Pro", "Google Lyria 3 Pro", "Google Lyria 3 Pro"],
     [
       "Cinematic music generation from Google DeepMind.",
-      "Cinematische Musik-Generation von Google DeepMind.",
+      tx({ de: "Cinematische Musik-Generation von Google DeepMind.", en: "Cinematic music generation by Google DeepMind.", es: "Generación de música cinematográfica por Google DeepMind." }),
       "Generación musical cinematográfica de Google DeepMind.",
     ],
     [MUSIC, SFX],

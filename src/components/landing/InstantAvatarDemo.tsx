@@ -409,7 +409,7 @@ export const InstantAvatarDemo = () => {
                 <div className="text-center px-6">
                   <Sparkles className="w-8 h-8 text-primary/40 mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">
-                    Lade links ein Foto hoch und starte die Generierung.
+                    {tx({ de: "Lade links ein Foto hoch und starte die Generierung.", en: "Upload a photo on the left and start generating.", es: "Sube una foto a la izquierda y empieza a generar." })}
                   </p>
                 </div>
               )}
@@ -486,10 +486,10 @@ export const InstantAvatarDemo = () => {
           <div className="mt-10 animate-fade-in">
             <div className="text-center mb-5">
               <p className="text-[10px] uppercase tracking-[0.3em] text-primary/70 mb-1">
-                So könnte dein Spot aussehen
+                {tx({ de: "So könnte dein Spot aussehen", en: "This is what your spot could look like", es: "Así podría verse tu anuncio" })}
               </p>
               <h3 className="font-serif text-xl md:text-2xl font-semibold">
-                Dein Avatar in echten AdTool-AI-Szenen
+                {tx({ de: "Dein Avatar in echten AdTool-AI-Szenen", en: "Your avatar in real AdTool AI scenes", es: "Tu avatar en escenas reales de AdTool AI" })}
               </h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 max-h-[320px]">
@@ -526,7 +526,7 @@ export const InstantAvatarDemo = () => {
               </Button>
               <p className="mt-3 text-xs text-muted-foreground inline-flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-primary/70" />
-                14,99 €/Monat · Founder: 20 % auf alle KI-Credits für die ersten 1000 Nutzer
+                {tx({ de: "14,99 €/Monat · Founder: 20 % auf alle KI-Credits für die ersten 1000 Nutzer", en: "€14.99/month · Founder: 20% off all AI credits for the first 1000 users", es: "14,99 €/mes · Fundador: 20% de descuento en todos los créditos de IA para los primeros 1000 usuarios" })}
               </p>
             </div>
           </div>

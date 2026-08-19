@@ -121,7 +121,7 @@ export function useSocialPublishing() {
       }
 
       toast({
-        title: variant === 'STORIES' ? '📸 Instagram Story veröffentlicht' : '📸 Instagram veröffentlicht',
+        title: variant === 'STORIES' ? tx({ de: "📸 Instagram Story veröffentlicht", en: "📸 Instagram Story published", es: "📸 Historia de Instagram publicada" }) : tx({ de: "📸 Instagram veröffentlicht", en: "📸 Instagram published", es: "📸 Instagram publicado" }),
         description: data.message,
       });
       return result;
@@ -147,7 +147,7 @@ export function useSocialPublishing() {
         },
       });
       if (error) throw error;
-      toast({ title: '🎵 TikTok veröffentlicht', description: data.message });
+      toast({ title: tx({ de: "🎵 TikTok veröffentlicht", en: "🎵 TikTok published", es: "🎵 TikTok publicado" }), description: data.message });
       return data;
     } catch (error: any) {
       console.error('TikTok publish error:', error);
@@ -180,7 +180,7 @@ export function useSocialPublishing() {
         result.firstCommentReason = fc.reason;
       }
 
-      toast({ title: '💼 LinkedIn veröffentlicht', description: data.message });
+      toast({ title: tx({ de: "💼 LinkedIn veröffentlicht", en: "💼 LinkedIn published", es: "💼 LinkedIn publicado" }), description: data.message });
       return result;
     } catch (error: any) {
       console.error('LinkedIn publish error:', error);
@@ -244,7 +244,7 @@ export function useSocialPublishing() {
       }
 
       toast({
-        title: '📺 YouTube veröffentlicht',
+        title: tx({ de: "📺 YouTube veröffentlicht", en: "📺 YouTube published", es: "📺 YouTube publicado" }),
         description: ytResult.permalink || tx({ de: 'Video wurde hochgeladen.', en: 'Video has been uploaded.', es: 'El video ha sido subido.' }),
       });
       return {

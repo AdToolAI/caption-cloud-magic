@@ -1,4 +1,4 @@
-import { tx } from "@/lib/i18nText";
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import {
   Dialog,
@@ -88,9 +88,9 @@ export default function MotionStudioTemplatePicker({
                 <FileX className="h-7 w-7 text-primary" />
               </div>
               <div className="text-center px-4">
-                <h3 className="font-semibold text-foreground">Leeres Projekt</h3>
+                <h3 className="font-semibold text-foreground">{tx({ de: "Leeres Projekt", en: "Empty Project", es: "Proyecto vacío" })}</h3>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Ohne Vorlage von Grund auf starten
+                  {tx({ de: "Ohne Vorlage von Grund auf starten", en: "Start from scratch without a template", es: "Empezar desde cero sin plantilla" })}
                 </p>
               </div>
             </Card>
@@ -111,7 +111,7 @@ export default function MotionStudioTemplatePicker({
 
             {!isLoading && templates.length === 0 && (
               <div className="col-span-full text-center py-12 text-muted-foreground text-sm">
-                Keine Templates gefunden.
+                {tx({ de: "Keine Templates gefunden.", en: "No templates found.", es: "No se encontraron plantillas." })}
               </div>
             )}
           </div>

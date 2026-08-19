@@ -524,7 +524,7 @@ const SubtitleVoiceoverSection: React.FC<{
                     )}
                     {v.tier === 'cloned' && (
                       <Badge variant="outline" className="h-3.5 px-1 text-[8px] border-emerald-400/40 text-emerald-300 bg-emerald-500/10">
-                        Meine Stimme
+                        {tx({ de: "Meine Stimme", en: "My Voice", es: "Mi Voz" })}
                       </Badge>
                     )}
                   </div>
@@ -1352,7 +1352,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                   <SelectItem value="de" className="text-white">🇩🇪 Deutsch</SelectItem>
                   <SelectItem value="en" className="text-white">🇬🇧 Englisch</SelectItem>
                   <SelectItem value="es" className="text-white">🇪🇸 Spanisch</SelectItem>
-                  <SelectItem value="fr" className="text-white">🇫🇷 Französisch</SelectItem>
+                  <SelectItem value="fr" className="text-white">{tx({ de: "🇫🇷 Französisch", en: "🇫🇷 French", es: "🇫🇷 Francés" })}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

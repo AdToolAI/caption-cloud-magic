@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import React, { useMemo } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AudioTrack, AudioClip, SubtitleClip, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
@@ -444,11 +445,11 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                 </div>
               </div>
               <p className="text-[10px] text-white/40 mt-1.5 leading-tight">
-                Trim kürzt die sichtbare Länge des Clips auf der Timeline. Enter zum Anwenden.
+                {tx({ de: "Trim kürzt die sichtbare Länge des Clips auf der Timeline. Enter zum Anwenden.", en: "Trim shortens the visible length of the clip on the timeline. Press Enter to apply.", es: "Recortar acorta la duración visible del clip en la línea de tiempo. Pulsa Enter para aplicar." })}
               </p>
               {/* Length + End time (calculated, live) */}
               <div className="flex justify-between text-xs text-white/50 bg-[#0a0a1a]/60 px-2 py-1.5 rounded mt-2">
-                <span>Länge</span>
+                <span>{tx({ de: "Länge", en: "Length", es: "Longitud" })}</span>
                 <span>{selectedClip.duration.toFixed(2)}s</span>
               </div>
               <div className="flex justify-between text-xs text-white/50 bg-[#0a0a1a]/60 px-2 py-1.5 rounded mt-1">

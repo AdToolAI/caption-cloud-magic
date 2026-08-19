@@ -192,7 +192,7 @@ export default function AIMonitoring() {
             <CardContent>
               <p className="text-sm">
                 Du hast heute bereits {stats.today} AI Calls gemacht. 
-                Bei sehr hoher Nutzung könntest du Lovable AI Rate Limits erreichen.
+                {tx({ de: "Bei sehr hoher Nutzung könntest du Lovable AI Rate Limits erreichen.", en: "With very high usage, you might hit Lovable AI Rate Limits.", es: "Con un uso muy elevado, podrías alcanzar los límites de tasa de Lovable AI." })}
               </p>
             </CardContent>
           </Card>
@@ -207,7 +207,7 @@ export default function AIMonitoring() {
           <CardContent>
             <div className="space-y-3">
               {loading ? (
-                <div className="text-sm text-muted-foreground">Lade...</div>
+                <div className="text-sm text-muted-foreground">{tx({ de: "Lade...", en: "Loading...", es: "Cargando..." })}</div>
               ) : recentCalls.length === 0 ? (
                 <div className="text-sm text-muted-foreground">{tx({ de: "Keine AI Calls gefunden", en: "No AI calls found", es: "No se encontraron llamadas de IA" })}</div>
               ) : (

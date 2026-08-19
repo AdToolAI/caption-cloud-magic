@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,10 +47,10 @@ export default function TemplateLibrary() {
     { value: 'all', label: 'Alle' },
     { value: 'social_media', label: 'Social Media' },
     { value: 'advertising', label: 'Werbung' },
-    { value: 'explainer', label: 'Erklärvideos' },
+    { value: 'explainer', label: tx({ de: "Erklärvideos", en: "Explainer Videos", es: "Videos Explicativos" }) },
     { value: 'tutorial', label: 'Tutorials' },
     { value: 'testimonial', label: 'Testimonials' },
-    { value: 'product_showcase', label: 'Produktpräsentation' },
+    { value: 'product_showcase', label: tx({ de: "Produktpräsentation", en: "Product Showcase", es: "Presentación de Producto" }) },
     { value: 'event', label: 'Events' },
     { value: 'educational', label: 'Bildung' },
     { value: 'entertainment', label: 'Unterhaltung' },
@@ -86,12 +87,12 @@ export default function TemplateLibrary() {
         <div>
           <h1 className="text-3xl font-bold">Template-Bibliothek</h1>
           <p className="text-muted-foreground mt-1">
-            Wähle ein Template aus und erstelle dein Video in wenigen Minuten
+            {tx({ de: "Wähle ein Template aus und erstelle dein Video in wenigen Minuten", en: "Select a template and create your video in minutes", es: "Selecciona una plantilla y crea tu video en minutos" })}
           </p>
         </div>
         <Button onClick={() => navigate('/template-editor')}>
           <Plus className="mr-2 h-4 w-4" />
-          Neues Template
+          {tx({ de: "Neues Template", en: "New Template", es: "Nueva plantilla" })}
         </Button>
       </div>
 
@@ -204,7 +205,7 @@ export default function TemplateLibrary() {
         ) : (
           <Card className="p-12 text-center">
             <p className="text-muted-foreground">
-              Keine Templates gefunden. Versuche eine andere Suche.
+              {tx({ de: "Keine Templates gefunden. Versuche eine andere Suche.", en: "No templates found. Try a different search.", es: "No se encontraron plantillas. Prueba otra búsqueda." })}
             </p>
           </Card>
         )}

@@ -269,7 +269,7 @@ export default function ContinuityGuardianStrip({
       });
       onUpdateScenes(updated);
       toast.success(
-        `tx({ de: 'Continuity geprüft:', en: 'Continuity checked:', es: 'Continuidad comprobada:' }) ${okCount} ok · ${warnCount} drift · ${brokenCount} bruch`
+        `${tx({ de: 'Continuity geprüft:', en: 'Continuity checked:', es: 'Continuidad comprobada:' })} ${okCount} ok · ${warnCount} drift · ${brokenCount} bruch`
       );
     } finally {
       setBulkRunning(false);
@@ -570,7 +570,7 @@ function CutChip({
           {checking ? (
             <Loader2 className="h-3 w-3 animate-spin" />
           ) : score == null ? (
-            'Prüfen'
+            tx({ de: "Prüfen", en: "Check", es: "Comprobar" })
           ) : (
             'Re-check'
           )}

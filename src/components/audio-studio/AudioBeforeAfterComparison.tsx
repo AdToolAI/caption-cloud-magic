@@ -402,7 +402,7 @@ export function AudioBeforeAfterComparison({
                   className="gap-1 border-primary/30 hover:border-primary/60 hover:bg-primary/10"
                 >
                   <Save className="w-4 h-4" />
-                  In Bibliothek speichern
+                  {tx({ de: "In Bibliothek speichern", en: "Save to library", es: "Guardar en la biblioteca" })}
                 </Button>
                 
                 <Button
@@ -614,7 +614,7 @@ export function AudioBeforeAfterComparison({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Save className="w-5 h-5 text-primary" />
-              In Bibliothek speichern
+              {tx({ de: "In Bibliothek speichern", en: "Save to library", es: "Guardar en la biblioteca" })}
             </DialogTitle>
           </DialogHeader>
           
@@ -641,7 +641,7 @@ export function AudioBeforeAfterComparison({
               onClick={() => setShowSaveDialog(false)}
               disabled={isSaving}
             >
-              Abbrechen
+              {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
             </Button>
             <Button
               onClick={handleSaveToLibrary}
@@ -656,7 +656,7 @@ export function AudioBeforeAfterComparison({
               ) : (
                 <>
                   <Check className="w-4 h-4 mr-2" />
-                  Speichern
+                  {tx({ de: "Speichern", en: "Save", es: "Guardar" })}
                 </>
               )}
             </Button>

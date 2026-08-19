@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -5,7 +6,6 @@ import { Switch } from '@/components/ui/switch';
 import { useRecurringEvents } from '@/hooks/useRecurringEvents';
 import { Repeat, Trash2, Calendar } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { tx } from '@/lib/i18nText';
 import { de } from 'date-fns/locale';
 
 interface RecurringEventsListProps {
@@ -27,7 +27,7 @@ export function RecurringEventsList({ workspace_id }: RecurringEventsListProps) 
   if (loading) {
     return (
       <div className="text-center py-8 text-muted-foreground">
-        Lade Recurring Rules...
+        {tx({ de: "Lade Recurring Rules...", en: "Loading Recurring Rules...", es: "Cargando reglas recurrentes..." })}
       </div>
     );
   }

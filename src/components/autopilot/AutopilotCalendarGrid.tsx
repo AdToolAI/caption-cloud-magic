@@ -59,7 +59,7 @@ export function AutopilotCalendarGrid({ queue, hasBrief, onSelectSlot }: Props) 
         <CalendarIcon className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
         <h3 className="font-serif text-xl mb-1">{tx({ de: "Noch kein Plan", en: "No plan yet", es: "Aún no hay plan" })}</h3>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Aktiviere den Autopilot oben — die KI erstellt automatisch einen 14-Tage-Plan basierend auf deinem Brief und den aktuellen Trends.
+          {tx({ de: "Aktiviere den Autopilot oben — die KI erstellt automatisch einen 14-Tage-Plan basierend auf deinem Brief und den aktuellen Trends.", en: "Activate Autopilot above — the AI automatically creates a 14-day plan based on your brief and current trends.", es: "Activa el Piloto Automático arriba — la IA crea automáticamente un plan de 14 días basado en tu informe y las tendencias actuales." })}
         </p>
       </Card>
     );

@@ -19,7 +19,7 @@ import { toast } from '@/hooks/use-toast';
 import { LicenseButton } from '@/components/licensing/LicenseButton';
 import { useDownloadQuota } from '@/hooks/useDownloadQuota';
 
-const MOODS = ['all', 'energetisch', 'entspannt', 'fröhlich', 'dramatisch', 'romantisch', 'traurig'];
+const MOODS = ['all', 'energetisch', 'entspannt', tx({ de: "fröhlich", en: "happy", es: "feliz" }), 'dramatisch', 'romantisch', 'traurig'];
 const GENRES = ['all', 'pop', 'rock', 'elektronisch', 'klassisch', 'jazz', 'hip hop', 'ambient'];
 
 function formatDuration(sec: number): string {
@@ -82,7 +82,7 @@ export default function MusicBrowser() {
 
   async function toggleFavorite(track: StockMusicTrack) {
     if (!user) {
-      toast({ title: 'Login nötig' });
+      toast({ title: tx({ de: "Login nötig", en: "Login required", es: "Inicio de sesión requerido" }) });
       return;
     }
     if (favorites.has(track.id)) {
@@ -169,14 +169,14 @@ export default function MusicBrowser() {
           </SelectContent>
         </Select>
         <Button type="submit" disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Suchen'}
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : tx({ de: "Suchen", en: "Search", es: "Buscar" })}
         </Button>
       </form>
 
       {loading && results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
-          Lade Tracks …
+          {tx({ de: "Lade Tracks …", en: "Loading tracks …", es: "Cargando pistas …" })}
         </Card>
       ) : results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">

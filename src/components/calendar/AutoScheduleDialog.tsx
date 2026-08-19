@@ -161,7 +161,7 @@ export function AutoScheduleDialog({
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="quick" className="flex items-center gap-2">
               <Sparkles className="w-4 h-4" />
-              Schnelle Vorschläge
+              {tx({ de: "Schnelle Vorschläge", en: "Quick Suggestions", es: "Sugerencias rápidas" })}
             </TabsTrigger>
             <TabsTrigger value="timeline" className="flex items-center gap-2">
               <CalendarRange className="w-4 h-4" />
@@ -279,7 +279,7 @@ export function AutoScheduleDialog({
               />
             ) : (
               <p className="text-sm text-muted-foreground text-center py-8">
-                Bitte wähle zuerst ein Event aus
+                {tx({ de: "Bitte wähle zuerst ein Event aus", en: "Please select an event first", es: "Por favor, selecciona un evento primero" })}
               </p>
             )}
           </TabsContent>

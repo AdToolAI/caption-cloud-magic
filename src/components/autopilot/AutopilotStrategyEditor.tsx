@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,6 @@ import { Save, X, Plus, Settings as SettingsIcon, Target } from 'lucide-react';
 import { useUpsertAutopilotBrief, type AutopilotBrief } from '@/hooks/useAutopilot';
 import { AutopilotGoalBriefingStep, type GoalBriefingValue } from './AutopilotGoalBriefingStep';
 import { useTx } from '@/lib/i18nText';
-import { tx } from '@/lib/i18nText';
 
 interface Props {
   brief: AutopilotBrief | null | undefined;
@@ -22,7 +22,7 @@ const ALL_LANGS = ['de', 'en', 'es'];
 const TONALITIES = ['professional', 'friendly', 'witty', 'inspirational', 'authoritative'];
 
 const VIDEO_PROVIDERS: { id: string; label: string; perSecCredits: number; bestFor: string }[] = [
-  { id: 'hailuo-standard', label: 'Hailuo Standard', perSecCredits: 5, bestFor: 'Schnell · günstig · 6/10s' },
+  { id: 'hailuo-standard', label: 'Hailuo Standard', perSecCredits: 5, bestFor: tx({ de: "Schnell · günstig · 6/10s", en: "Fast · affordable · 6/10s", es: "Rápido · asequible · 6/10s" }) },
   { id: 'seedance-lite',   label: 'Seedance Lite',   perSecCredits: 6, bestFor: 'Stilisiert · 6–12s' },
   { id: 'kling-std',       label: 'Kling 2.1',       perSecCredits: 8, bestFor: 'Premium-Realismus · 5/10s' },
 ];

@@ -20,10 +20,10 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
     // Generate CSV template with example row
     const headers = templateFields.map(f => f.key);
     const exampleRow = templateFields.map(f => {
-      if (f.type === 'text') return 'Beispiel Text';
+      if (f.type === 'text') return tx({ de: "Beispiel Text", en: "Example Text", es: "Texto de ejemplo" });
       if (f.type === 'number') return '100';
       if (f.type === 'url') return 'https://example.com/image.jpg';
-      return 'Beispiel';
+      return tx({ de: "Beispiel", en: "Example", es: "Ejemplo" });
     });
 
     const csv = Papa.unparse([headers, exampleRow]);
@@ -76,7 +76,7 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
         onDataParsed(data);
         toast({
           title: tx({ de: 'CSV erfolgreich hochgeladen', en: 'CSV uploaded successfully', es: 'CSV cargado exitosamente' }),
-          description: tx({ de: `${data.length} {tx({ de: 'Videos', en: 'Videos', es: 'Videos' })} werden erstellt.`, en: `${data.length} videos are being created.`, es: `Se están creando ${data.length} videos.` })
+          description: tx({ de: `${data.length} ${tx({ de: 'Videos', en: 'Videos', es: 'Videos' })} werden erstellt.`, en: `${data.length} videos are being created.`, es: `Se están creando ${data.length} videos.` })
         });
       },
       error: (error) => {

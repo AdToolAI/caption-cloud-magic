@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, X, ArrowRight, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -112,7 +113,7 @@ export function ProactiveAlertBanner() {
                 disabled={isLoading}
               >
                 <RefreshCw className={cn("w-3 h-3 mr-1", isLoading && "animate-spin")} />
-                Prüfen
+                {tx({ de: "Prüfen", en: "Check", es: "Comprobar" })}
               </Button>
             </div>
           </div>

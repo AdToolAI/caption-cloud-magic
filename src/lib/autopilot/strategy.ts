@@ -29,7 +29,7 @@ export interface AngleSpec {
 export const NARRATIVE_ANGLES: AngleSpec[] = [
   {
     id: 'problem_solution',
-    label: 'Problem → Lösung',
+    label: tx({ de: "Problem → Lösung", en: "Problem → Solution", es: "Problema → Solución" }),
     mechanism:
       tx({ de: 'Zeige zuerst den konkreten Ärger im Alltag der Zielgruppe, dann die Lösung als sichtbare Erleichterung. Kein Text erklärt das Problem — man sieht es.', en: 'First, show the specific annoyance in the target group\'s daily life, then the solution as a visible relief. No text explains the problem — you see it.', es: 'Primero, muestra la molestia concreta en la vida diaria del grupo objetivo, luego la solución como un alivio visible. Ningún texto explica el problema — se ve.' }),
     beats: ['hook', 'problem', 'reveal', 'proof', 'cta'],

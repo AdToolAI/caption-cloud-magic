@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * AI Video Model Registry
  * --------------------------------------------------------------
@@ -14,7 +15,6 @@ import {
   Film, Volume2, Zap, Wand2, Eye, Camera, Video, Sparkles, TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { tx } from '@/lib/i18nText';
 import type { VisualInputProfile } from '@/lib/composer/visualInputs/types';
 
 
@@ -359,7 +359,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     resolutions: ['1080p', '2k', '4k'],
     aspectRatios: ltxAspect,
     costPerSecond: LTX_VIDEO_MODELS['ltx-standard'].costPerSecond,
-    badge: 'Schnell & Günstig',
+    badge: tx({ de: "Schnell & Günstig", en: "Fast & Affordable", es: "Rápido y Económico" }),
     tagline: 'Schnellster Generator',
     legacyRoute: '/ltx-video-studio',
   },
@@ -575,7 +575,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: lumaRay32Aspect,
     costPerSecond: LUMA_VIDEO_MODELS['luma-ray32-10s'].costPerSecond,
     badge: 'Neu · 10s',
-    tagline: tx({ de: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Sekunden am Stück', en: 'seconds straight', es: 'segundos seguidos' })}`, en: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'seconds straight', en: 'seconds straight', es: 'segundos seguidos' })}`, es: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Segundos seguidos', en: 'segundos seguidos', es: 'segundos seguidos' })}` }),
+    tagline: tx({ de: `Ray 3.2 $${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 $${tx({ de: 'Sekunden am Stück', en: 'seconds straight', es: 'segundos seguidos' })}`, en: `Ray 3.2 $${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 $${tx({ de: 'seconds straight', en: 'seconds straight', es: 'segundos seguidos' })}`, es: `Ray 3.2 $${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 $${tx({ de: 'Segundos seguidos', en: 'segundos seguidos', es: 'segundos seguidos' })}` }),
     legacyRoute: '/luma-video-studio',
   },
   {
@@ -594,7 +594,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: seedanceAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-mini'].costPerSecond,
     badge: 'Draft',
-    tagline: 'Seedance 1 Lite · günstigster Draft-Renderer',
+    tagline: tx({ de: "Seedance 1 Lite · günstigster Draft-Renderer", en: "Seedance 1 Lite · cheapest draft renderer", es: "Seedance 1 Lite · renderizador de borrador más económico" }),
     legacyRoute: '/seedance-video-studio',
   },
   {
@@ -628,7 +628,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: seedanceAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-pro'].costPerSecond,
     badge: 'Premium',
-    tagline: 'Seedance 2.0 Flagship · beste Motion-Kohärenz',
+    tagline: tx({ de: "Seedance 2.0 Flagship · beste Motion-Kohärenz", en: "Seedance 2.0 Flagship · best motion coherence", es: "Seedance 2.0 Flagship · mejor coherencia de movimiento" }),
     legacyRoute: '/seedance-video-studio',
   },
   {
@@ -698,7 +698,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
 
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-2-5'].costPerSecond,
     badge: 'Neu',
-    tagline: tx({ de: `Seedance 2.5 · ${tx({ de: 'bis 30 s pro Szene', en: 'up to 30s per scene', es: 'hasta 30 s por escena' })} · 720p`, en: `Seedance 2.5 · ${tx({ de: 'up to 30 s per scene', en: 'up to 30s per scene', es: 'hasta 30 s por escena' })} · 720p`, es: `Seedance 2.5 · ${tx({ de: 'hasta 30 s por escena', en: 'hasta 30 s por escena', es: 'hasta 30 s por escena' })} · 720p` }),
+    tagline: tx({ de: `Seedance 2.5 · $${tx({ de: 'bis 30 s pro Szene', en: 'up to 30s per scene', es: 'hasta 30 s por escena' })} · 720p`, en: `Seedance 2.5 · $${tx({ de: 'up to 30 s per scene', en: 'up to 30s per scene', es: 'hasta 30 s por escena' })} · 720p`, es: `Seedance 2.5 · $${tx({ de: 'hasta 30 s por escena', en: 'hasta 30 s por escena', es: 'hasta 30 s por escena' })} · 720p` }),
     legacyRoute: '/seedance-video-studio',
   },
 

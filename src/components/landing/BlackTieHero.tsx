@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { motion } from "framer-motion";
@@ -125,7 +126,7 @@ export const BlackTieHero = () => {
                 onClick={() => setFoundersOpen(true)}
                 className="text-xs text-primary/70 hover:text-primary transition-colors underline underline-offset-4"
               >
-                → Klicken für Founders-Vorteile
+                {tx({ de: "→ Klicken für Founders-Vorteile", en: "→ Click for Founder benefits", es: "→ Clic para beneficios de Fundador" })}
               </button>
             </motion.div>
           </motion.div>

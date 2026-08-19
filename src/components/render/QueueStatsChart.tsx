@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRenderQueue } from '@/hooks/useRenderQueue';
@@ -36,7 +37,7 @@ export const QueueStatsChart = () => {
           Queue Statistiken
         </CardTitle>
         <CardDescription>
-          Render-Jobs der letzten 30 Tage nach Engine
+          {tx({ de: "Render-Jobs der letzten 30 Tage nach Engine", en: "Render jobs of the last 30 days by engine", es: "Trabajos de renderizado de los últimos 30 días por motor" })}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -54,7 +55,7 @@ export const QueueStatsChart = () => {
           </ResponsiveContainer>
         ) : (
           <div className="text-center py-8 text-muted-foreground">
-            Noch keine Statistiken verfügbar
+            {tx({ de: "Noch keine Statistiken verfügbar", en: "No statistics available yet", es: "Aún no hay estadísticas disponibles" })}
           </div>
         )}
       </CardContent>

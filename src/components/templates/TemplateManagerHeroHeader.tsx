@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { motion } from "framer-motion";
 import { Calendar, Sparkles, FolderOpen } from "lucide-react";
 
@@ -33,7 +34,7 @@ export const TemplateManagerHeroHeader = ({ templateCount }: TemplateManagerHero
           <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
         </span>
         <span className="text-xs font-medium text-primary uppercase tracking-wider">
-          Kampagnen-Vorlagen
+          {tx({ de: "Kampagnen-Vorlagen", en: "Campaign Templates", es: "Plantillas de campaña" })}
         </span>
         <FolderOpen className="h-3 w-3 text-primary" />
       </motion.div>
@@ -45,7 +46,7 @@ export const TemplateManagerHeroHeader = ({ templateCount }: TemplateManagerHero
 
       {/* Subtitle */}
       <p className="text-lg text-muted-foreground max-w-2xl">
-        Erstelle wiederverwendbare Kampagnen-Vorlagen für deine Social-Media-Strategien
+        {tx({ de: "Erstelle wiederverwendbare Kampagnen-Vorlagen für deine Social-Media-Strategien", en: "Create reusable campaign templates for your social media strategies", es: "Crea plantillas de campaña reutilizables para tus estrategias de redes sociales" })}
       </p>
 
       {/* Stats Pills */}

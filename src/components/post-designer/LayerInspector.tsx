@@ -65,9 +65,9 @@ export function LayerInspector({
   if (!layer) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-        <p className="text-sm font-medium">Nichts ausgewählt</p>
+        <p className="text-sm font-medium">{tx({ de: "Nichts ausgewählt", en: "Nothing selected", es: "Nada seleccionado" })}</p>
         <p className="text-xs text-muted-foreground">
-          Klicke ein Element auf der Bühne an, um Text, Farbe und Position zu ändern.
+          {tx({ de: "Klicke ein Element auf der Bühne an, um Text, Farbe und Position zu ändern.", en: "Click an element on the stage to change text, color, and position.", es: "Haz clic en un elemento del escenario para cambiar texto, color y posición." })}
         </p>
       </div>
     );
@@ -127,7 +127,7 @@ export function LayerInspector({
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="display">Display</SelectItem>
-                    <SelectItem value="body">Fließtext</SelectItem>
+                    <SelectItem value="body">{tx({ de: "Fließtext", en: "Body text", es: "Texto del cuerpo" })}</SelectItem>
                     <SelectItem value="mono">Mono</SelectItem>
                   </SelectContent>
                 </Select>
@@ -185,7 +185,7 @@ export function LayerInspector({
         {layer.type === "badge" && (
           <>
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Beschriftung</Label>
+              <Label className="text-xs text-muted-foreground">{tx({ de: "Beschriftung", en: "Caption", es: "Leyenda" })}</Label>
               <Input
                 value={(layer as BadgeLayer).text}
                 onChange={(e) => onChange({ text: e.target.value } as Partial<Layer>)}
@@ -216,7 +216,7 @@ export function LayerInspector({
         {layer.type === "image" && (
           <>
             <Button variant="outline" className="w-full" onClick={onReplaceImage}>
-              Bild ersetzen
+              {tx({ de: "Bild ersetzen", en: "Replace image", es: "Reemplazar imagen" })}
             </Button>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Zoom</Label>
@@ -254,7 +254,7 @@ export function LayerInspector({
                   <SelectItem value="bottom">Unten</SelectItem>
                   <SelectItem value="top">Oben</SelectItem>
                   <SelectItem value="left">Links</SelectItem>
-                  <SelectItem value="full">Ganzflächig</SelectItem>
+                  <SelectItem value="full">{tx({ de: "Ganzflächig", en: "Full-width", es: "Ancho completo" })}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

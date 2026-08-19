@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * Day Cockpit Dialog
  * A single immersive "mission briefing" surface that unites the Quick Schedule
@@ -93,7 +94,7 @@ export function DayCockpitDialog({ open, onOpenChange, date, workspaceId, onSucc
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-sm bg-[#050816] border border-primary/20">
           <VisuallyHidden><DialogTitle>Loading</DialogTitle></VisuallyHidden>
-          <p className="text-sm text-white/60 py-6 text-center">Lade Tagesübersicht…</p>
+          <p className="text-sm text-white/60 py-6 text-center">{tx({ de: "Lade Tagesübersicht…", en: "Loading daily overview…", es: "Cargando resumen diario…" })}</p>
         </DialogContent>
       </Dialog>
     );

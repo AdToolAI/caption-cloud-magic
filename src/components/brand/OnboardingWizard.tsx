@@ -26,13 +26,13 @@ interface OnboardingWizardProps {
 }
 
 const valueOptions = [
-  "Vertrauenswürdig", "Innovativ", "Nachhaltig", "Professionell", 
-  "Kreativ", "Authentisch", "Luxuriös", "Freundlich"
+  tx({ de: "Vertrauenswürdig", en: "Trustworthy", es: "Confiable" }), "Innovativ", "Nachhaltig", "Professionell", 
+  "Kreativ", "Authentisch", tx({ de: "Luxuriös", en: "Luxurious", es: "Lujoso" }), "Freundlich"
 ];
 
 const styleOptions = [
   { value: "minimalist", label: "Minimalistisch", emoji: "⚪" },
-  { value: "luxurious", label: "Luxuriös", emoji: "✨" },
+  { value: "luxurious", label: tx({ de: "Luxuriös", en: "Luxurious", es: "Lujoso" }), emoji: "✨" },
   { value: "playful", label: "Verspielt", emoji: "🎨" },
   { value: "urban", label: "Urban", emoji: "🏙️" },
   { value: "modern", label: "Modern", emoji: "🚀" },
@@ -40,7 +40,7 @@ const styleOptions = [
 ];
 
 const toneOptions = [
-  "seriös", "frech", "inspirierend", "professionell", "freundlich", "mutig"
+  tx({ de: "seriös", en: "serious", es: "serio" }), "frech", "inspirierend", "professionell", "freundlich", "mutig"
 ];
 
 export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) {
@@ -107,10 +107,10 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
           <div className="flex items-center justify-between mb-2">
             <Sparkles className="h-6 w-6 text-primary" />
             <Button variant="ghost" size="sm" onClick={onSkip}>
-              Überspringen
+              {tx({ de: "Überspringen", en: "Skip", es: "Omitir" })}
             </Button>
           </div>
-          <CardTitle className="text-2xl">Marken-Identität erstellen</CardTitle>
+          <CardTitle className="text-2xl">{tx({ de: "Marken-Identität erstellen", en: "Create Brand Identity", es: "Crear Identidad de Marca" })}</CardTitle>
           <CardDescription>
             Schritt {step} von {totalSteps}
           </CardDescription>
@@ -154,7 +154,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
               <div>
                 <Label>{tx({ de: "Welche Werte & Emotionen verkörpert deine Marke? *", en: "What values & emotions does your brand embody? *", es: "¿Qué valores y emociones encarna tu marca? *" })}</Label>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Wähle mindestens einen Wert
+                  {tx({ de: "Wähle mindestens einen Wert", en: "Select at least one value", es: "Selecciona al menos un valor" })}
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {valueOptions.map(value => (
@@ -244,7 +244,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
               disabled={step === 1}
             >
               <ChevronLeft className="mr-2 h-4 w-4" />
-              Zurück
+              {tx({ de: "Zurück", en: "Back", es: "Atrás" })}
             </Button>
 
             <Button
@@ -254,11 +254,11 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
               {step === totalSteps ? (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Marken-Set erstellen
+                  {tx({ de: "Marken-Set erstellen", en: "Create Brand Set", es: "Crear conjunto de marca" })}
                 </>
               ) : (
                 <>
-                  Weiter
+                  {tx({ de: "Weiter", en: "Next", es: "Siguiente" })}
                   <ChevronRight className="ml-2 h-4 w-4" />
                 </>
               )}

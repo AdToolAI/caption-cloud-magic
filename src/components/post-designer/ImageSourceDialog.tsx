@@ -182,16 +182,14 @@ export function ImageSourceDialog({ open, onOpenChange, onPick }: ImageSourceDia
                 value={stockQuery}
                 onChange={(e) => setStockQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleStockSearch()}
-                placeholder="Suchbegriff, z. B. Kaffee, Büro, Sommer"
+                placeholder={tx({ de: "Suchbegriff, z. B. Kaffee, Büro, Sommer", en: "Search term, e.g. coffee, office, summer", es: "Término de búsqueda, ej. café, oficina, verano" })}
               />
               <Button onClick={handleStockSearch} disabled={stockState === "loading"}>
-                {stockState === "loading" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Suchen"}
+                {stockState === "loading" ? <Loader2 className="h-4 w-4 animate-spin" /> : tx({ de: "Suchen", en: "Search", es: "Buscar" })}
               </Button>
             </div>
             {stockState === "unavailable" ? (
               <p className="rounded-lg border border-border/60 bg-muted/30 p-4 text-sm text-muted-foreground">
-                Die Stock-Bibliothek ist noch nicht freigeschaltet. Sobald der Zugang hinterlegt ist, kannst du hier
-                direkt suchen — Upload, KI-Bild und Mediathek funktionieren wie gewohnt.
               </p>
             ) : (
               <div className="grid max-h-[340px] grid-cols-4 gap-2 overflow-y-auto">

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 import { Play, ChevronLeft, ChevronRight, Video, Sparkles, Expand, Volume2, VolumeX, LucideIcon, Lightbulb, Infinity as InfinityIcon, Clock, CalendarPlus, CalendarDays, Edit3 } from 'lucide-react';
@@ -393,7 +394,7 @@ export const DashboardVideoCarousel = ({
                   onClick={() => {
                     const demoEl = document.querySelector('.demo-video-element') as HTMLVideoElement;
                     if (demoEl) demoEl.pause();
-                    setSelectedVideo({ url: demoVideoUrl, title: 'AdTool AI: Die Lösung' });
+                    setSelectedVideo({ url: demoVideoUrl, title: tx({ de: "AdTool AI: Die Lösung", en: "AdTool AI: The Solution", es: "AdTool AI: La Solución" }) });
                   }}
                   className="w-9 h-9 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-md hover:bg-primary/80 transition-colors"
                 >

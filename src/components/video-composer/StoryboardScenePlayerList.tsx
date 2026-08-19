@@ -138,7 +138,7 @@ export default function StoryboardScenePlayerList({
         <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">
           Szenen · {scenes.length}
         </span>
-        <span className="text-[10px] text-muted-foreground/80">Klick = bearbeiten</span>
+        <span className="text-[10px] text-muted-foreground/80">{tx({ de: "Klick = bearbeiten", en: "Click = edit", es: "Clic = editar" })}</span>
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

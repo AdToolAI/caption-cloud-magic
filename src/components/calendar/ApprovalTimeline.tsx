@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
@@ -26,7 +27,7 @@ export function ApprovalTimeline({ event_id }: ApprovalTimelineProps) {
   });
 
   if (isLoading) {
-    return <div className="text-sm text-muted-foreground">Lade Approvals...</div>;
+    return <div className="text-sm text-muted-foreground">{tx({ de: "Lade Approvals...", en: "Loading Approvals...", es: "Cargando Aprobaciones..." })}</div>;
   }
 
   if (!approvals || approvals.length === 0) {

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useRef, useCallback } from 'react';
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
@@ -303,7 +304,7 @@ export function MultiTrackTimelinePro({
             <div className="h-10 border-b flex items-center justify-center">
               <Button variant="ghost" size="sm" onClick={onAddTrack} className="gap-1 text-xs">
                 <Plus className="h-3 w-3" />
-                Track hinzufügen
+                {tx({ de: "Track hinzufügen", en: "Add track", es: "Añadir pista" })}
               </Button>
             </div>
           </div>

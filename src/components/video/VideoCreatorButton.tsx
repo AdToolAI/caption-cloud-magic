@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Video } from 'lucide-react';
@@ -27,7 +28,7 @@ export const VideoCreatorButton = ({
         className={className}
       >
         <Video className="h-4 w-4 mr-2" />
-        Werbevideo erstellen
+        {tx({ de: "Werbevideo erstellen", en: "Create ad video", es: "Crear video publicitario" })}
       </Button>
 
       <VideoCreatorDialog

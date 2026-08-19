@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { MoreVertical, Download, Share2, Trash2, Eye, Edit } from 'lucide-react';
@@ -38,7 +39,7 @@ export const VideoActionMenu = ({ video }: VideoActionMenuProps) => {
             <>
               <DropdownMenuItem onClick={() => setShowPreview(true)}>
                 <Eye className="h-4 w-4 mr-2" />
-                Vorschau
+                {tx({ de: "Vorschau", en: "Preview", es: "Vista previa" })}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleDownload}>
                 <Download className="h-4 w-4 mr-2" />
@@ -61,7 +62,7 @@ export const VideoActionMenu = ({ video }: VideoActionMenuProps) => {
             className="text-destructive"
           >
             <Trash2 className="h-4 w-4 mr-2" />
-            Löschen
+            {tx({ de: "Löschen", en: "Delete", es: "Eliminar" })}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

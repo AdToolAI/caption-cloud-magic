@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,7 +8,6 @@ import { Play, Volume2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { AdvancedVoiceSettings, VoiceSettings } from './AdvancedVoiceSettings';
-import { tx } from '@/lib/i18nText';
 
 interface VoiceOverEditorProps {
   voiceStyle: string;
@@ -19,14 +19,14 @@ interface VoiceOverEditorProps {
 
 const VOICE_OPTIONS = [
   { id: '9BWtsMINqrJLrRacOk9x', name: 'Aria (weiblich, warm)' },
-  { id: 'CwhRBWXzGAHq8TQ4Fs17', name: 'Roger (männlich, tief)' },
+  { id: 'CwhRBWXzGAHq8TQ4Fs17', name: tx({ de: "Roger (männlich, tief)", en: "Roger (male, deep)", es: "Roger (masculino, grave)" }) },
   { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah (weiblich, freundlich)' },
   { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura (weiblich, professionell)' },
-  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie (männlich, jung)' },
-  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George (männlich, autoritär)' },
-  { id: 'N2lVS1w4EtoT3dr4eOWO', name: 'Callum (männlich, energisch)' },
+  { id: 'IKne3meq5aSn9XLyUdCD', name: tx({ de: "Charlie (männlich, jung)", en: "Charlie (male, young)", es: "Charlie (masculino, joven)" }) },
+  { id: 'JBFqnCBsd6RMkjVDRZzb', name: tx({ de: "George (männlich, autoritär)", en: "George (male, authoritative)", es: "George (masculino, autoritario)" }) },
+  { id: 'N2lVS1w4EtoT3dr4eOWO', name: tx({ de: "Callum (männlich, energisch)", en: "Callum (male, energetic)", es: "Callum (masculino, enérgico)" }) },
   { id: 'SAz9YHcvj6GT2YYXdXww', name: 'River (neutral, modern)' },
-  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam (männlich, britisch)' },
+  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: tx({ de: "Liam (männlich, britisch)", en: "Liam (male, British)", es: "Liam (masculino, británico)" }) },
   { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte (weiblich, elegant)' },
 ];
 
@@ -157,7 +157,7 @@ export const VoiceOverEditor = ({
         {isPreviewPlaying ? (
           <>
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Generiere Hörprobe...
+            {tx({ de: "Generiere Hörprobe...", en: "Generating audio preview...", es: "Generando vista previa de audio..." })}
           </>
         ) : (
           <>

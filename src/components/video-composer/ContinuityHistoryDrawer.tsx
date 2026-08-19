@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useEffect, useState } from 'react';
 import {
   Drawer,
@@ -47,7 +48,7 @@ export default function ContinuityHistoryDrawer({ open, onOpenChange, projectId 
             Continuity-Verlauf
           </DrawerTitle>
           <DrawerDescription>
-            Alle Drift-Prüfungen dieses Projekts, neueste zuerst.
+            {tx({ de: "Alle Drift-Prüfungen dieses Projekts, neueste zuerst.", en: "All drift checks for this project, newest first.", es: "Todas las comprobaciones de deriva de este proyecto, las más recientes primero." })}
           </DrawerDescription>
         </DrawerHeader>
         <ScrollArea className="px-4 pb-6 max-h-[70vh]">
@@ -57,7 +58,7 @@ export default function ContinuityHistoryDrawer({ open, onOpenChange, projectId 
             </div>
           ) : entries.length === 0 ? (
             <div className="text-center py-12 text-sm text-muted-foreground">
-              Noch keine Drift-Prüfungen für dieses Projekt.
+              {tx({ de: "Noch keine Drift-Prüfungen für dieses Projekt.", en: "No drift checks for this project yet.", es: "Aún no hay comprobaciones de deriva para este proyecto." })}
             </div>
           ) : (
             <div className="space-y-2">

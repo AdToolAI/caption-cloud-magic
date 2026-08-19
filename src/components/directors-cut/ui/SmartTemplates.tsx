@@ -88,7 +88,7 @@ const templates: SmartTemplate[] = [
         temperature: 3,
       },
     },
-    tags: ['Authentisch', 'Persönlich', 'Casual'],
+    tags: ['Authentisch', tx({ de: "Persönlich", en: "Personal", es: "Personal" }), 'Casual'],
   },
   {
     id: 'music-video',

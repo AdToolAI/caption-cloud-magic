@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Music, Zap, Upload, Loader2, Scissors } from 'lucide-react';
@@ -10,7 +11,6 @@ import { WaveformDisplay } from '@/components/directors-cut/timeline/WaveformDis
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useTx } from '@/lib/i18nText';
-import { tx } from '@/lib/i18nText';
 
 interface Beat {
   time: number;
@@ -247,8 +247,6 @@ export function BeatSyncTimeline({
             </div>
             <h3 className="text-lg font-semibold mb-2">{tr({ de: "Musik für Beat-Sync hinzufügen", en: "Add music for beat-sync", es: "Agregar música para sincronización de ritmo" })}</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Lade eine Musikdatei hoch, um automatisch Beats zu erkennen 
-              und Video-Schnitte darauf zu synchronisieren.
             </p>
           </div>
         ) : isAnalyzing ? (

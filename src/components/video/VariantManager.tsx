@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,6 @@ import { useVideoVariants } from '@/hooks/useVideoVariants';
 import { Download, Trash2, Plus, Video, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FORMAT_PROFILES, ASPECT_RATIO_PROFILES, COMPRESSION_PROFILES } from '@/lib/compression-profiles';
-import { tx } from '@/lib/i18nText';
 
 interface VariantManagerProps {
   videoCreationId: string;
@@ -84,7 +84,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
             </div>
           ) : variants.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              Noch keine Varianten erstellt
+              {tx({ de: "Noch keine Varianten erstellt", en: "No variants created yet", es: "Aún no se han creado variantes" })}
             </div>
           ) : (
             <div className="space-y-4">
@@ -145,7 +145,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5" />
-            Neue Varianten erstellen
+            {tx({ de: "Neue Varianten erstellen", en: "Create new variants", es: "Crear nuevas variantes" })}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -177,7 +177,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
 
           {/* Aspect Ratios */}
           <div className="space-y-3">
-            <Label className="text-base font-semibold">Seitenverhältnisse</Label>
+            <Label className="text-base font-semibold">{tx({ de: "Seitenverhältnisse", en: "Aspect Ratios", es: "Relaciones de aspecto" })}</Label>
             <div className="grid grid-cols-2 gap-3">
               {ASPECT_RATIO_PROFILES.map(ratio => (
                 <div
@@ -203,7 +203,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
 
           {/* Quality */}
           <div className="space-y-3">
-            <Label className="text-base font-semibold">Qualität</Label>
+            <Label className="text-base font-semibold">{tx({ de: "Qualität", en: "Quality", es: "Calidad" })}</Label>
             <div className="grid grid-cols-4 gap-3">
               {COMPRESSION_PROFILES.map(quality => (
                 <Button

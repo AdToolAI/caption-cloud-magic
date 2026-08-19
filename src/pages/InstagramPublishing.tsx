@@ -110,7 +110,7 @@ export default function InstagramPublishing() {
       if (data.ok) {
         toast({
           title: tx({ de: "✅ Token gültig", en: "✅ Token valid", es: "✅ Token válido" }),
-          description: `${tx({ de: "Instagram Account", en: "Instagram account", es: "Cuenta de Instagram" })}: @${data.user?.username || 'unknown'}`,
+          description: `$${tx({ de: "Instagram Account", en: "Instagram account", es: "Cuenta de Instagram" })}: @${data.user?.username || 'unknown'}`,
         });
       } else {
         toast({
@@ -256,7 +256,7 @@ export default function InstagramPublishing() {
         const backupMsg = data.backup_created ? tx({ de: " Backup erstellt.", en: " Backup created.", es: " Copia de seguridad creada." }) : "";
         toast({
           title: tx({ de: "Erfolg!", en: "Success!", es: "¡Éxito!" }),
-          description: tx({ de: `${tx({ de: "Token erfolgreich erneuert und gespeichert!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, en: `${tx({ de: "Token successfully renewed and saved!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, es: `${tx({ de: "¡Token renovado y guardado exitosamente!", en: "¡Token renovado y guardado exitosamente!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}` }),
+          description: tx({ de: `$${tx({ de: "Token erfolgreich erneuert und gespeichert!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, en: `$${tx({ de: "Token successfully renewed and saved!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, es: `$${tx({ de: "¡Token renovado y guardado exitosamente!", en: "¡Token renovado y guardado exitosamente!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}` }),
         });
         
         // Automatically refresh diagnostics after successful save
@@ -527,7 +527,7 @@ export default function InstagramPublishing() {
                         {tokenDiagnostics.details.code && (
                           <p className="text-xs text-muted-foreground mb-1">
                             <strong>Code:</strong> {tokenDiagnostics.details.code}
-                            {tokenDiagnostics.details.subcode && ` (${tx({ de: "Subcode", en: "Subcode", es: "Subcódigo" })}: ${tokenDiagnostics.details.subcode})`}
+                            {tokenDiagnostics.details.subcode && ` ($${tx({ de: "Subcode", en: "Subcode", es: "Subcódigo" })}: ${tokenDiagnostics.details.subcode})`}
                           </p>
                         )}
                         {tokenDiagnostics.details.type && (
@@ -944,14 +944,14 @@ export default function InstagramPublishing() {
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
                       <div>
-                        <p className="font-medium">Öffne den Meta Graph API Explorer</p>
+                        <p className="font-medium">{tx({ de: "Öffne den Meta Graph API Explorer", en: "Open Meta Graph API Explorer", es: "Abrir el Explorador de la API de Meta Graph" })}</p>
                         <a 
                           href="https://developers.facebook.com/tools/explorer/" 
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className="text-primary underline hover:no-underline"
                         >
-                          → Graph API Explorer öffnen
+                          {tx({ de: "→ Graph API Explorer öffnen", en: "→ Open Graph API Explorer", es: "→ Abrir Explorador de API de Graph" })}
                         </a>
                       </div>
                     </li>
@@ -1006,14 +1006,14 @@ export default function InstagramPublishing() {
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
                       <div>
-                        <p className="font-medium">Öffne den Meta Graph API Explorer</p>
+                        <p className="font-medium">{tx({ de: "Öffne den Meta Graph API Explorer", en: "Open Meta Graph API Explorer", es: "Abrir el Explorador de la API de Meta Graph" })}</p>
                         <a 
                           href="https://developers.facebook.com/tools/explorer/" 
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className="text-primary underline hover:no-underline"
                         >
-                          → Graph API Explorer öffnen
+                          {tx({ de: "→ Graph API Explorer öffnen", en: "→ Open Graph API Explorer", es: "→ Abrir Explorador de API de Graph" })}
                         </a>
                       </div>
                     </li>
@@ -1048,7 +1048,7 @@ export default function InstagramPublishing() {
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">5</span>
                       <div>
-                        <p className="font-medium">Bestätige im Popup</p>
+                        <p className="font-medium">{tx({ de: "Bestätige im Popup", en: "Confirm in the popup", es: "Confirmar en la ventana emergente" })}</p>
                         <p className="text-muted-foreground">{tx({ de: "Klicke auf \"Als {'{'}Dein Name{'}'} fortfahren\"", en: "Click on \"Continue as {'{'}Your Name{'}'}\"", es: "Haz clic en \"Continuar como {'{'}Tu Nombre{'}'}\"" })}</p>
                       </div>
                     </li>
@@ -1064,7 +1064,7 @@ export default function InstagramPublishing() {
                   <Alert variant="destructive" className="mt-4">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription className="text-xs">
-                      <strong>Achtung:</strong> {tx({ de: "User Token Modus benötigt die Permission", en: "User token mode requires permission", es: "El modo token de usuario requiere permiso" })} <code>pages_show_list</code>. Falls dieser Fehler auftritt, verwende stattdessen einen Page Token (Option 1).
+                      <strong>{tx({ de: "Achtung:", en: "Attention:", es: "Atención:" })}</strong> {tx({ de: "User Token Modus benötigt die Permission", en: "User token mode requires permission", es: "El modo token de usuario requiere permiso" })} <code>pages_show_list</code>. Falls dieser Fehler auftritt, verwende stattdessen einen Page Token (Option 1).
                     </AlertDescription>
                   </Alert>
                 </CardContent>
@@ -1106,7 +1106,7 @@ export default function InstagramPublishing() {
                 <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
                   <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
                   <AlertDescription className="text-green-800 dark:text-green-200 font-medium">
-                    ✅ Token erfolgreich erneuert und automatisch gespeichert!
+                    {tx({ de: "✅ Token erfolgreich erneuert und automatisch gespeichert!", en: "✅ Token successfully renewed and automatically saved!", es: "✅ ¡Token renovado y guardado automáticamente con éxito!" })}
                   </AlertDescription>
                 </Alert>
 
@@ -1126,7 +1126,7 @@ export default function InstagramPublishing() {
                     <XCircle className="h-4 w-4 text-red-500" />
                   )}
                   <span className="font-medium">
-                    {renewResult.debug?.is_valid ? 'Token gültig' : 'Token ungültig'}
+                    {renewResult.debug?.is_valid ? tx({ de: "Token gültig", en: "Token valid", es: "Token válido" }) : tx({ de: "Token ungültig", en: "Token invalid", es: "Token inválido" })}
                   </span>
                 </div>
 
@@ -1143,7 +1143,7 @@ export default function InstagramPublishing() {
                       })}
                     </span>
                     {renewResult.debug.expires_at * 1000 < Date.now() + 7 * 24 * 60 * 60 * 1000 && (
-                      <Badge variant="destructive" className="ml-2">Läuft bald ab!</Badge>
+                      <Badge variant="destructive" className="ml-2">{tx({ de: "Läuft bald ab!", en: "Expires soon!", es: "¡Expira pronto!" })}</Badge>
                     )}
                   </div>
                 )}
@@ -1191,7 +1191,7 @@ export default function InstagramPublishing() {
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription className="text-sm">
-                    Die Diagnose wird automatisch aktualisiert. Du kannst jetzt wieder automatisch posten! 🚀
+                    {tx({ de: "Die Diagnose wird automatisch aktualisiert. Du kannst jetzt wieder automatisch posten! 🚀", en: "The diagnosis is automatically updated. You can now post automatically again! 🚀", es: "El diagnóstico se actualiza automáticamente. ¡Ahora puedes volver a publicar automáticamente! 🚀" })}
                   </AlertDescription>
                 </Alert>
               </div>
@@ -1205,7 +1205,7 @@ export default function InstagramPublishing() {
                   <strong>{tx({ de: "❌ Token konnte nicht validiert werden.", en: "❌ Token could not be validated.", es: "❌ No se pudo validar el token." })}</strong>
                   <p className="mt-1 text-sm">{error}</p>
                   <p className="mt-2 text-sm">
-                    Bitte prüfe:
+                    {tx({ de: "Bitte prüfe:", en: "Please check:", es: "Por favor, verifica:" })}
                   </p>
                   <ul className="list-disc list-inside text-sm mt-1">
                     <li>{tx({ de: "Hast du die richtige App gewählt?", en: "Did you choose the right app?", es: "¿Elegiste la aplicación correcta?" })}</li>

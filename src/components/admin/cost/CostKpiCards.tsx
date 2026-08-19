@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Cloud, Sparkles, Server, TrendingUp } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
@@ -39,7 +40,7 @@ export function CostKpiCards({ summary, days }: { summary: Summary; days: number
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{fmt(summary.ai_cost_usd)}</div>
-          <p className="text-xs text-muted-foreground mt-1">Lovable AI Gateway · von $1 Free</p>
+          <p className="text-xs text-muted-foreground mt-1">{tx({ de: "Lovable AI Gateway · von $1 Free", en: "Lovable AI Gateway · from $1 Free", es: "Lovable AI Gateway · desde $1 Gratis" })}</p>
           <Progress value={Math.min(summary.ai_percent_of_free, 100)} className="mt-2 h-1.5" />
         </CardContent>
       </Card>

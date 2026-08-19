@@ -166,7 +166,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
               <HoverCardContent side="top" className="w-[320px] text-[11px]">
                 <div className="font-medium mb-1">{tx({ de: 'Skript gewinnt vor Board-Dauer', en: 'Script wins over board duration', es: 'El guion gana sobre la duración del tablero' })}</div>
                 <div className="text-muted-foreground">
-                  Dein Skript enthält {scriptTiming!.mode === 'SHOT_MARKERS' ? 'explizite Shot-Marker' : 'strukturierte Sprecher-Blöcke'}.
+                  Dein Skript enthält {scriptTiming!.mode === 'SHOT_MARKERS' ? 'explizite Shot-Marker' : tx({ de: "strukturierte Sprecher-Blöcke", en: "structured speaker blocks", es: "bloques de orador estructurados" })}.
                   {tx({ de: 'Die im Board eingetragene Gesamtdauer wurde ignoriert und die Szenen folgen dem Skript.', en: 'The total duration entered in the board was ignored and the scenes follow the script.', es: 'Se ignoró la duración total ingresada en el tablero y las escenas siguen el guion.' })}
                 </div>
               </HoverCardContent>
@@ -214,7 +214,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
                 <Badge variant="outline" className="border-orange-400/40 text-orange-300 gap-1 cursor-help">
                   <Timer className="h-3 w-3" />
                   {tx({ de: 'Auto-Extend', en: 'Auto-Extend', es: 'Extensión automática' })}
-                  <span className="opacity-70">· {extendCount} {tx({ de: extendCount === 1 ? 'Szene' : 'Szenen', en: extendCount === 1 ? 'Scene' : 'Scenes', es: extendCount === 1 ? 'Escena' : 'Escenas' })}</span>
+                  <span className="opacity-70">· {extendCount} {tx({ de: extendCount === 1 ? tx({ de: "Szene", en: "Scene", es: "Escena" }) : tx({ de: "Szenen", en: "Scenes", es: "Escenas" }), en: extendCount === 1 ? 'Scene' : 'Scenes', es: extendCount === 1 ? 'Escena' : 'Escenas' })}</span>
                 </Badge>
               </HoverCardTrigger>
               <HoverCardContent side="top" className="w-[340px] text-[11px]">

@@ -228,7 +228,7 @@ export function UniversalCreator() {
       next.delete('project');
       setSearchParams(next, { replace: true });
     }
-    toast.success(t('uc.newProjectStarted') || 'Neues Projekt gestartet');
+    toast.success(t('uc.newProjectStarted') || tx({ de: "Neues Projekt gestartet", en: "New project started", es: "Nuevo proyecto iniciado" }));
   };
 
   const saveProgress = async () => {
@@ -615,12 +615,12 @@ export function UniversalCreator() {
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
                 <Plus className="w-4 h-4" />
-                Neues Projekt
+                {tx({ de: "Neues Projekt", en: "New Project", es: "Nuevo Proyecto" })}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Neues Projekt starten?</AlertDialogTitle>
+                <AlertDialogTitle>{tx({ de: "Neues Projekt starten?", en: "Start new project?", es: "¿Iniciar nuevo proyecto?" })}</AlertDialogTitle>
                 <AlertDialogDescription>
                   Der aktuelle Entwurf wird endgültig gelöscht — auch nach einem Reload (F5) kommt er nicht zurück. Diese Aktion kann nicht rückgängig gemacht werden.
                 </AlertDialogDescription>
@@ -628,7 +628,7 @@ export function UniversalCreator() {
               <AlertDialogFooter>
                 <AlertDialogCancel>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
                 <AlertDialogAction onClick={handleNewProject}>
-                  Neues Projekt starten
+                  {tx({ de: "Neues Projekt starten", en: "Start New Project", es: "Iniciar Nuevo Proyecto" })}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

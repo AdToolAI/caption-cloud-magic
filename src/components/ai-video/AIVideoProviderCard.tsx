@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, type LucideIcon } from 'lucide-react';
@@ -90,7 +91,7 @@ export function AIVideoProviderCard({
               <p className="text-xs font-semibold text-foreground mt-0.5">{maxDuration}</p>
             </div>
             <div>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Qualität</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{tx({ de: "Qualität", en: "Quality", es: "Calidad" })}</p>
               <p className="text-xs font-semibold text-foreground mt-0.5">{quality}</p>
             </div>
           </div>

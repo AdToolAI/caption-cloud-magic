@@ -62,7 +62,7 @@ export const ImageAnalysisPanel = ({ imageUrl, brandKitId }: ImageAnalysisPanelP
       {/* Quality Score */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-sm">Qualitäts-Check</h3>
+          <h3 className="font-semibold text-sm">{tx({ de: "Qualitäts-Check", en: "Quality Check", es: "Control de calidad" })}</h3>
           <Badge variant={analysis.quality.qualityScore >= 80 ? "default" : "secondary"}>
             {analysis.quality.qualityScore >= 80 ? (
               <CheckCircle className="w-3 h-3 mr-1" />
@@ -96,11 +96,11 @@ export const ImageAnalysisPanel = ({ imageUrl, brandKitId }: ImageAnalysisPanelP
           <h3 className="font-semibold text-sm">CI-Farbtreffer</h3>
           <div className="space-y-1 text-xs">
             <div className="flex justify-between">
-              <span>Primärfarbe:</span>
+              <span>{tx({ de: "Primärfarbe:", en: "Primary color:", es: "Color primario:" })}</span>
               <Badge variant="outline">{analysis.ciMatch.primaryColorMatch}%</Badge>
             </div>
             <div className="flex justify-between">
-              <span>Sekundärfarbe:</span>
+              <span>{tx({ de: "Sekundärfarbe:", en: "Secondary color:", es: "Color secundario:" })}</span>
               <Badge variant="outline">{analysis.ciMatch.secondaryColorMatch}%</Badge>
             </div>
             <div className="flex justify-between font-semibold">

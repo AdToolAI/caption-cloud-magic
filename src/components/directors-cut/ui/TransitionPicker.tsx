@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
@@ -5,7 +6,6 @@ import { Slider } from '@/components/ui/slider';
 import { Sparkles, Check, Zap, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TransitionPreviewTile, type TransitionId } from '@/components/studio-visual/TransitionPreviewTile';
-import { tx } from '@/lib/i18nText';
 
 interface TransitionType {
   id: string;
@@ -229,7 +229,7 @@ export function TransitionPicker({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Dauer</span>
+              <span className="text-sm font-medium">{tx({ de: "Dauer", en: "Duration", es: "Duración" })}</span>
             </div>
             <Badge variant="outline" className="font-mono">
               {duration.toFixed(1)}s

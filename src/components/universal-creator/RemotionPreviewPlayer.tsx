@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Player, PlayerRef } from '@remotion/player';
 import { UniversalVideo } from '@/remotion/templates/UniversalVideo';
@@ -615,7 +616,7 @@ export function RemotionPreviewPlayer({
               size="icon"
               variant="ghost"
               onClick={() => setLoop((l) => !l)}
-              title={loop ? 'Loop aus' : 'Loop an'}
+              title={loop ? tx({ de: "Loop aus", en: "Loop off", es: "Bucle desactivado" }) : 'Loop an'}
               aria-pressed={loop}
               className={`h-8 w-8 ${loop ? 'text-primary' : 'text-muted-foreground'} hover:text-foreground`}
             >

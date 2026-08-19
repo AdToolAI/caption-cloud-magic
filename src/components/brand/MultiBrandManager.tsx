@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -130,7 +131,7 @@ export function MultiBrandManager({
                         className="text-destructive"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
-                        Löschen
+                        {tx({ de: "Löschen", en: "Delete", es: "Eliminar" })}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -185,7 +186,7 @@ export function MultiBrandManager({
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Sparkles className="h-12 w-12 text-muted-foreground mb-3" />
             <p className="text-sm text-muted-foreground">
-              Noch keine Marken-Sets vorhanden
+              {tx({ de: "Noch keine Marken-Sets vorhanden", en: "No brand sets yet", es: "Aún no hay conjuntos de marca" })}
             </p>
           </CardContent>
         </Card>

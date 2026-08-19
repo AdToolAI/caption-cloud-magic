@@ -42,7 +42,7 @@ export const PERSONA_PROFILES: Record<LearningPace, PersonaProfile> = {
     id: 'balanced',
     labelDe: 'Balanced',
     labelEn: 'Balanced',
-    descriptionDe: 'Freundlich, kurz, hilft bei Meilensteinen. Empfohlener Standard.',
+    descriptionDe: tx({ de: "Freundlich, kurz, hilft bei Meilensteinen. Empfohlener Standard.", en: "Friendly, concise, helps with milestones. Recommended standard.", es: "Amigable, conciso, ayuda con hitos. Estándar recomendado." }),
     descriptionEn: 'Friendly, concise, appears at milestones. Recommended default.',
     dailyPopupCap: 3,
     minGapSeconds: 60 * 25,

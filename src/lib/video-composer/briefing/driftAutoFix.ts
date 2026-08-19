@@ -102,7 +102,7 @@ export function buildAutoFixPlan(
       if (target > 0 && Math.abs(target - current) > 0.5) {
         entry.patch.durationSeconds = target;
         entry.fieldsFixed.push('durationSeconds');
-        entry.diff.push({ field: 'Dauer', before: `${current}s`, after: `${target}s` });
+        entry.diff.push({ field: tx({ de: "Dauer", en: "Duration", es: "Duración" }), before: `${current}s`, after: `${target}s` });
       } else {
         skipped.push(f);
       }
@@ -122,7 +122,7 @@ export function buildAutoFixPlan(
           after: target.length > 80 ? target.slice(0, 80) + '…' : target,
         });
       } else {
-        skipped.push({ ...f, message: f.message + ' (übersprungen: vorhandener Prompt bleibt erhalten)' });
+        skipped.push({ ...f, message: f.message + tx({ de: " (übersprungen: vorhandener Prompt bleibt erhalten)", en: " (skipped: existing prompt retained)", es: " (omitido: el prompt existente se mantiene)" }) });
       }
       continue;
     }

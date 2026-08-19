@@ -194,7 +194,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
                   <Line type="monotone" dataKey="views" stroke="#3b82f6" name="Views" />
                   <Line type="monotone" dataKey="selections" stroke="#10b981" name="Auswahlen" />
                   <Line type="monotone" dataKey="creates" stroke="#f59e0b" name="Erstellt" />
-                  <Line type="monotone" dataKey="publishes" stroke="#8b5cf6" name="Veröffentlicht" />
+                  <Line type="monotone" dataKey="publishes" stroke="#8b5cf6" name={tx({ de: "Veröffentlicht", en: "Published", es: "Publicado" })} />
                 </LineChart>
               </ResponsiveContainer>
             </TabsContent>

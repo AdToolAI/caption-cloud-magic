@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SystemMonitor } from '@/components/admin/SystemMonitor';
 import { ConversionFunnel } from '@/components/admin/ConversionFunnel';
@@ -25,7 +26,7 @@ export default function Admin() {
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-2">Admin Dashboard</h1>
         <p className="text-muted-foreground">
-          Überwache das System, die Conversion und Email-Zustellung
+          {tx({ de: "Überwache das System, die Conversion und Email-Zustellung", en: "Monitor system, conversion and email delivery", es: "Monitorizar sistema, conversión y entrega de correo electrónico" })}
         </p>
       </div>
 

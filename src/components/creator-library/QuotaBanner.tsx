@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * QuotaBanner — Creator-Library plan/quota indicator.
  * Shows "Inklusive" for paid plans, monthly-counter for Free.
@@ -22,7 +23,7 @@ export default function QuotaBanner() {
           </span>
         </div>
         <span className="text-[10px] text-muted-foreground">
-          vergleichbar mit Artlist €30/mo
+          {tx({ de: "vergleichbar mit Artlist €30/mo", en: "comparable to Artlist €30/mo", es: "comparable a Artlist €30/mes" })}
         </span>
       </div>
     );
@@ -45,7 +46,7 @@ export default function QuotaBanner() {
       <Progress value={pct} className="h-1.5" />
       {q.exceeded && (
         <p className="text-[11px] text-amber-300">
-          Monatslimit erreicht — Upgrade auf einen Paid-Plan für unbegrenzte Downloads.
+          {tx({ de: "Monatslimit erreicht — Upgrade auf einen Paid-Plan für unbegrenzte Downloads.", en: "Monthly limit reached — Upgrade to a paid plan for unlimited downloads.", es: "Límite mensual alcanzado — Actualiza a un plan de pago para descargas ilimitadas." })}
         </p>
       )}
     </div>
