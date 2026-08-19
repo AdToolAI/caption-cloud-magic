@@ -109,6 +109,15 @@ import {
 } from "../_shared/asd-strategy.ts";
 // FA-4 v404 §9 — NOOP-Retry darf den Preclip nie entfernen (v148/v204).
 import { shouldPreserveNoopRetryPreclip, isFrozenNoopRetryPass } from "../_shared/noop-retry-preclip.ts";
+// FA-4 v406 — Frozen Provider Input Snapshot / Retry-Wire-Parität.
+import {
+  buildProviderWire,
+  buildProviderWireSnapshot,
+  boundingBoxesJsonFromSnapshot,
+  resolveFrozenProviderInput,
+  toSyncGeneratePayload,
+  type ProviderWireSnapshot,
+} from "../_shared/provider-wire-snapshot.ts";
 
 import {
   ensureDialogTurnsForScene,
@@ -145,7 +154,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v405-fa4-noop-retry-preservation-final";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v406-fa4-noop-retry-wire-parity-final";
 
 // v249 — Slice A: surface v247 mouth-anchor preclip metrics as top-level columns
 // on `syncso_dispatch_log` so v248-Slice-4 ladder in `report-lipsync-motion-probe`
@@ -402,6 +411,10 @@ async function uploadBoundingBoxesJson(
     passIdx: number;
     box: [number, number, number, number];
     frameCount: number;
+    // FA-4 v406 — wenn gesetzt, wird EXAKT dieses (bereits eingefrorene)
+    // Array hochgeladen. Kein zweiter Build ⇒ URL-JSON und Retry-Inline sind
+    // per Konstruktion identisch.
+    boxes?: ([number, number, number, number] | null)[];
     // v124 — when provided, build per-frame array with `null` outside the
     // speaker's voiced windows. Sync.so requires this to avoid animating
     // neighbour faces during turns this speaker is silent.
@@ -414,7 +427,9 @@ async function uploadBoundingBoxesJson(
     const ts = Date.now();
     const path = `${params.userId}/${sub}/asd/${params.sceneId}-p${params.passIdx + 1}-${ts}.json`;
     const totalFrames = Math.max(1, params.frameCount);
-    const boxes = params.voicedWindowsSec && params.voicedWindowsSec.length > 0 && params.fps
+    const boxes = params.boxes
+      ? params.boxes
+      : params.voicedWindowsSec && params.voicedWindowsSec.length > 0 && params.fps
       ? buildPerFrameBoxes({
           box: params.box,
           frameCount: totalFrames,
@@ -5047,16 +5062,56 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // `audio_url_full` before re-slicing. Also clear stale `audio_tight`
     // so the downstream slicer either rebuilds it cleanly or fails safely
     // without falling back to a doc-violating video segment hint.
+    //
+    // ── FA-4 v406 — Frozen Provider Input / Retry-Wire-Parität ───────────
+    // Auf einem NOOP-Retry MUSS der Provider exakt denselben Wire sehen wie
+    // beim Fresh-Dispatch. Deshalb wird hier EINMAL entschieden, ob dieser
+    // Pass ein NOOP-Retry ist und ob sein frozen Snapshot vollständig ist.
+    // Unvollständig == fehlend ⇒ fail closed (kein Legacy-Rebuild, kein Call).
+    const v406IsNoopRetry =
+      body?.noop_auto_escalation === true || isFrozenNoopRetryPass(pass as any);
+    const v406FrozenInput: ProviderWireSnapshot | null = v406IsNoopRetry
+      ? resolveFrozenProviderInput(pass as unknown as Record<string, unknown>)
+      : null;
+    if (v406IsNoopRetry && !v406FrozenInput) {
+      // failBeforeProviderDispatch ist hier noch nicht deklariert — deferred
+      // Hard-Fail (gleiches Muster wie v152), greift VOR jedem Provider-Call.
+      (pass as any)._v406FrozenMissing = {
+        reason: "noop_retry_frozen_input_missing",
+        errorClass: "noop_retry_frozen_input_missing",
+        message:
+          "NOOP-Retry ohne vollständigen frozen Provider-Input-Snapshot — Dispatch blockiert (kein Legacy-Rebuild).",
+        meta: {
+          fa4_v406: true,
+          provider_call_made: false,
+          noop_auto_escalation: body?.noop_auto_escalation === true,
+          pass_idx: currentPassIdx,
+          speaker_idx: (pass as any).speaker_idx ?? null,
+        },
+      };
+      console.error(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v406_noop_retry_frozen_input_missing — fail closed, zero provider calls`,
+      );
+    }
+    const v406ReuseFrozen = !!v406FrozenInput;
+    const v406SkipRebuild = v406ReuseFrozen || !!(pass as any)._v406FrozenMissing;
+
     const canonicalAudioUrl = String(
       (pass as any).audio_url_full ?? pass.audio_url ?? "",
     );
-    if (canonicalAudioUrl && canonicalAudioUrl !== pass.audio_url) {
+    if (v406SkipRebuild) {
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v40_restore_canonical_audio from=…${String(pass.audio_url).slice(-60)} to=…${canonicalAudioUrl.slice(-60)}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v406_skip_v40_canonical_restore frozen=${v406ReuseFrozen}`,
       );
+    } else {
+      if (canonicalAudioUrl && canonicalAudioUrl !== pass.audio_url) {
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v40_restore_canonical_audio from=…${String(pass.audio_url).slice(-60)} to=…${canonicalAudioUrl.slice(-60)}`,
+        );
+      }
+      if (canonicalAudioUrl) pass.audio_url = canonicalAudioUrl;
+      (pass as any).audio_tight = null;
     }
-    if (canonicalAudioUrl) pass.audio_url = canonicalAudioUrl;
-    (pass as any).audio_tight = null;
 
     // Each pass targets a DIFFERENT face with its own validated coords. Never
     // inherit a fallback variant from a sibling pass — that would drop the
@@ -5279,7 +5334,14 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // near-empty audio window that Sync.so has historically rejected. Keep
     // the full silence WAV → mux uses absolute timing on segments.
     const isStabilizerForTight = isStabilizerPass(pass);
-    const allowTightSlice = passes.length >= 1 && !isStabilizerForTight;
+    // FA-4 v406 — auf einem frozen NOOP-Retry wird NIE neu tight-gesliced:
+    // der Provider-Audio-Input kommt 1:1 aus dem Snapshot.
+    const allowTightSlice = passes.length >= 1 && !isStabilizerForTight && !v406SkipRebuild;
+    if (v406SkipRebuild) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v406_skip_tight_slicing frozen=${v406ReuseFrozen}`,
+      );
+    }
     if (allowTightSlice && speakerWindowsSecs.length > 0) {
 
 
@@ -5791,7 +5853,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     //   • no tight (v56 official segments / force_v56 with master VO) → `loop`
     //     (v63). The master VO may outrun the plate; loop keeps the locked
     //     plate playing for the full audio duration so no freeze.
-    const payloadSyncMode = tightAudioInfo ? "cut_off" : "loop";
+    const payloadSyncMode = v406FrozenInput
+      ? v406FrozenInput.sync_mode
+      : (tightAudioInfo ? "cut_off" : "loop");
     // v160 — sync-3 doc-strict from construction: only send public-schema
     // options Sync.so accepts. The sanitizer remains as a safety net, but we
     // no longer create `temperature` / `occlusion_detection_enabled` and rely
@@ -5800,7 +5864,19 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       sync_mode: payloadSyncMode,
     };
 
-    if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
+    if (v406SkipRebuild) {
+      // FA-4 v406 — NOOP-Retry: KEIN bbox-/Box-/Framecount-Recompute. Die ASD
+      // kommt ausschließlich aus dem frozen Snapshot (inline-Transport).
+      if (v406FrozenInput) {
+        const frozenWire = buildProviderWire(v406FrozenInput, { asdTransport: "inline" });
+        syncOptions.active_speaker_detection = frozenWire.active_speaker_detection;
+        (pass as any)._v406Wire = frozenWire;
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v406_frozen_retry_wire boxes=${v406FrozenInput.bounding_boxes.length} frames=${v406FrozenInput.frame_count} fps=${v406FrozenInput.dispatch_fps} sync_mode=${v406FrozenInput.sync_mode}`,
+        );
+      }
+    } else if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
+
 
       // Sync.so canonical ActiveSpeaker DTO (per
       // https://sync.so/docs/developer-guides/speaker-selection):
@@ -6067,29 +6143,28 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       }
 
 
-      let usedUrl: string | null = null;
-      let nonNullFrames = frameCount;
-      if (retryVariant === "bbox-url-pro" && dispatchBox) {
-        const up = await uploadBoundingBoxesJson(supabase, {
-          userId,
-          projectId: String((scene as any).project_id ?? ""),
-          sceneId,
-          passIdx: currentPassIdx,
-          box: dispatchBox,
-          frameCount,
-          voicedWindowsSec: v124VoicedWindows,
-          fps: dispatchFps,
-        });
-        usedUrl = up.url;
-        nonNullFrames = up.nonNullFrames;
-      }
+      // ── FA-4 v406 — canonical bounding_boxes: GENAU EINMAL gebaut ──────
+      // Die Box-Sequenz ist ab hier eingefroren. Der Fresh-Upload schreibt
+      // exakt DIESES Array als JSON; der NOOP-Retry sendet exakt DIESES Array
+      // inline. Kein zweiter Build, keine zweite Quelle.
+      const v406CanonicalBoxes: ([number, number, number, number] | null)[] = dispatchBox
+        ? (v124VoicedWindows.length > 0
+            ? buildPerFrameBoxes({
+                box: dispatchBox,
+                frameCount,
+                fps: dispatchFps ?? ASSUMED_FPS,
+                voicedWindowsSec: v124VoicedWindows,
+              })
+            : new Array(frameCount).fill(dispatchBox))
+        : [];
+      const nonNullFrames = v406CanonicalBoxes.reduce((a, v) => a + (v ? 1 : 0), 0);
+      // Der Upload passiert NACH der Snapshot-Persistenz (Contract-Reihenfolge
+      // 8→9→10). Hier wird nur der gewünschte Transport festgehalten.
+      const v406WantsUrlTransport = retryVariant === "bbox-url-pro" && !!dispatchBox;
 
-
-      // v147 — Pre-Dispatch Validation: bbox-url muss mind. 1 voiced frame
-      // enthalten. Sonst: deterministischer Downgrade auf coords-pro (kein
-      // stiller inline-Fallback, der bei kaputter URL den v126-Provider-
-      // Unknown wieder triggern würde).
-      const v147BboxValid = !!usedUrl && nonNullFrames >= 1;
+      // v147 — Pre-Dispatch Validation: bbox muss mind. 1 voiced frame
+      // enthalten.
+      const v147BboxValid = v406WantsUrlTransport && nonNullFrames >= 1;
       // v152 — Bbox-Geometrie Sanity-Gate auf dem DISPATCHED video. Im
       // Preclip-Modus ist die Box-Fläche praktisch das ganze Bild (≈ 60-95 %),
       // also wird der upper-bound für Preclip auf 0.98 angehoben.
@@ -6102,40 +6177,26 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const v152BboxSane = boxAreaPct >= 0.002 && boxAreaPct <= v152UpperBound;
       (pass as any)._v152BboxAreaPct = Number(boxAreaPct.toFixed(4));
 
-      if (v147BboxValid && v152BboxSane) {
+      if ((v147BboxValid || (retryVariant === "coords-pro-box" && nonNullFrames >= 1)) && v152BboxSane) {
+        // Provisorische ASD für die nachgelagerten Shape-Gates. Der echte Wire
+        // wird ausschließlich von `buildProviderWire(snapshot, …)` erzeugt.
         syncOptions.active_speaker_detection = {
           auto_detect: false,
-          bounding_boxes_url: usedUrl!,
+          bounding_boxes: v406CanonicalBoxes,
+        };
+        (pass as any)._v406FreshWireInput = {
+          bbox: dispatchBox,
+          bounding_boxes: v406CanonicalBoxes,
+          frame_count: frameCount,
+          dispatch_fps: dispatchFps ?? ASSUMED_FPS,
+          voiced_windows: v124VoicedWindows,
+          wants_url_transport: v406WantsUrlTransport,
         };
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_BBOX_URL_PRIMARY speaker=${pass.speaker_name} space=${v161UsingPreclipForBbox ? "clip" : "plate"} box=${JSON.stringify(dispatchBox)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
-        );
-      } else if (
-        retryVariant === "coords-pro-box" ||
-        // v279 — Graceful-Degrade: wenn NUR der Storage-Upload gescheitert ist,
-        // aber Geometrie sane und voiced-frames vorhanden → inline bboxes statt
-        // Hard-Fail/Refund. Entspricht dem in v82 dokumentierten Default-Pfad.
-        (!usedUrl && v152BboxSane && dispatchBox)
-      ) {
-        const boundingBoxes: ([number, number, number, number] | null)[] =
-          v124VoicedWindows.length > 0
-            ? buildPerFrameBoxes({
-                box: dispatchBox ?? box,
-                frameCount,
-                fps: dispatchFps ?? ASSUMED_FPS,
-                voicedWindowsSec: v124VoicedWindows,
-              })
-            : new Array(frameCount).fill(dispatchBox ?? box);
-        const inlineNonNull = boundingBoxes.reduce((a, v) => a + (v ? 1 : 0), 0);
-        syncOptions.active_speaker_detection = {
-          auto_detect: false,
-          bounding_boxes: boundingBoxes,
-        };
-        const degradeReason = retryVariant === "coords-pro-box" ? "explicit_variant" : "v279_upload_degrade";
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v279_BBOX_INLINE_FALLBACK reason=${degradeReason} speaker=${pass.speaker_name} box=${JSON.stringify(dispatchBox ?? box)} source=${bboxSource} frames=${frameCount} voiced_frames=${inlineNonNull} area_pct=${(boxAreaPct * 100).toFixed(2)}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v406_canonical_boxes_frozen speaker=${pass.speaker_name} space=${v161UsingPreclipForBbox ? "clip" : "plate"} box=${JSON.stringify(dispatchBox)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} transport=${v406WantsUrlTransport ? "url" : "inline"} windows=${JSON.stringify(v124VoicedWindows)}`,
         );
       } else {
+
         // v152 — Hard-Fail nur noch für echte Datenprobleme (zero voiced frames
         // oder geometrisch unsinnige Boxen). Upload-Fehler werden oben durch
         // v279 Inline-Fallback abgefangen.
@@ -6145,7 +6206,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             ? "plate_face_missing"
             : !v152BboxSane
               ? `bbox_geometry_insane:area_pct=${(boxAreaPct * 100).toFixed(2)}`
-              : "bbox_url_upload_failed";
+              : "bbox_transport_unavailable";
 
         (pass as any)._v152HardFail = {
           reason: v152FailReason,
@@ -6156,7 +6217,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             `Credits wurden zurückerstattet.`,
           meta: {
             v152_unified_path: true,
-            usedUrl: !!usedUrl,
+            url_transport_requested: v406WantsUrlTransport,
             non_null_frames: nonNullFrames,
             frame_count: frameCount,
             box,
@@ -6166,7 +6227,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           },
         };
         console.error(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v152_BBOX_HARD_FAIL reason=${v152FailReason} usedUrl=${!!usedUrl} non_null=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} — refund + abort`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v152_BBOX_HARD_FAIL reason=${v152FailReason} url_transport=${v406WantsUrlTransport} non_null=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} — refund + abort`,
         );
         syncOptions.active_speaker_detection = {
           auto_detect: false,
@@ -6425,6 +6486,19 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // versagt. Wir können dort noch nicht refunden weil failBeforeProviderDispatch
     // erst hier deklariert ist. Hier triggern wir den Hard-Fail bevor Sync.so
     // jemals einen Request sieht.
+    // ── FA-4 v406 — NOOP-Retry ohne vollständigen frozen Snapshot ───────
+    // Fail closed VOR jedem Provider-Call. Kein Legacy-Rebuild, kein Call.
+    if ((pass as any)._v406FrozenMissing) {
+      const hf = (pass as any)._v406FrozenMissing;
+      return await failBeforeProviderDispatch(
+        hf.reason,
+        hf.errorClass,
+        hf.message,
+        422,
+        hf.meta ?? {},
+      );
+    }
+
     if ((pass as any)._v152HardFail) {
       const hf = (pass as any)._v152HardFail;
       return await failBeforeProviderDispatch(
@@ -6476,7 +6550,19 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // Strategy: voiced-window trim with 150ms pre-roll + 200ms post-roll.
     // If the trimmed audio still doesn't fit the preclip, the post-trim
     // preflight gate (below) blocks the dispatch terminal with refund.
-    try {
+    if (v406FrozenInput) {
+      // FA-4 v406 — frozen NOOP-Retry: KEINE v129.3-Normalisierung. Der
+      // Provider-Audio-Input kommt unverändert aus dem Snapshot.
+      (pass as any).sync_audio_url = v406FrozenInput.audio_url;
+      (pass as any).audio_normalization = {
+        mode: "skipped_v406_frozen_retry",
+        used_for: "syncso_input_only",
+        frozen_audio_url: v406FrozenInput.audio_url,
+      };
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v406_skip_audio_normalization frozen_audio=…${v406FrozenInput.audio_url.slice(-60)}`,
+      );
+    } else try {
       const preclipDurForGate = typeof (pass as any).preclip_duration_sec === "number"
         && Number.isFinite((pass as any).preclip_duration_sec)
         && (pass as any).preclip_duration_sec > 0
@@ -6805,16 +6891,25 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
     const dispatchVideoKind = usePassPreclip ? "preclip" : "full_plate";
     const dispatchInputSpace = usePassPreclip ? "clip" : "plate";
-    const rawDispatchVideoUrl = v204MultiSpeakerPreclipDispatch
-      ? (passPreclipUrl as string)
-      : (usePassPreclip ? (passPreclipUrl as string) : passInputUrl);
+    const rawDispatchVideoUrl = v406FrozenInput
+      ? v406FrozenInput.video_url
+      : (v204MultiSpeakerPreclipDispatch
+        ? (passPreclipUrl as string)
+        : (usePassPreclip ? (passPreclipUrl as string) : passInputUrl));
     // v143 — Rehost the plate into our own bucket before sending to Sync.so.
     // Presigned Replicate/S3 URLs expire after ~60 min; multi-pass dialogs
     // routinely exceed that window, causing Sync.so to silently return 422
     // `generation_input_video_inaccessible` which our pipeline mis-read as
     // a NOOP. The signed `lipsync-plates` URL is valid for 7 days.
+    // FA-4 v406: auf einem frozen NOOP-Retry wird NICHT erneut rehostet —
+    // die Video-URL ist Teil des eingefrorenen Wire.
     let dispatchVideoUrl = rawDispatchVideoUrl;
     let rehostInfo: { uploaded: boolean; ms: number; bytes: number } | null = null;
+    if (v406FrozenInput) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v406_skip_rehost frozen_video=…${dispatchVideoUrl.slice(-60)}`,
+      );
+    } else {
     try {
       const rh = await rehostPlate(supabase, rawDispatchVideoUrl, {
         sceneId,
@@ -6832,6 +6927,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v143_rehost FAILED — falling back to raw URL: ${(e as Error)?.message}`,
       );
     }
+    }
     // v189 (Fix E) — Persistence honesty. `pass.input_url` was set to the
     // master plate at the top of the dispatch, but Sync.so actually receives
     // `dispatchVideoUrl` (the per-speaker preclip when `usePassPreclip`).
@@ -6840,28 +6936,115 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     try {
       (pass as any).input_url = dispatchVideoUrl;
     } catch { /* noop */ }
-    const videoInput: Record<string, unknown> = { type: "video", url: dispatchVideoUrl };
+
+    // ══ FA-4 v406 — Frozen Provider Input Snapshot ═════════════════════
+    // Reihenfolge (frozen contract): Video/Audio/BBox finalisiert → Snapshot
+    // bauen → persistieren → (Fresh) bounding_boxes JSON hochladen →
+    // Dispatch. Persist-Failure = failBeforeProviderDispatch, kein Call.
+    let v406Snapshot: ProviderWireSnapshot;
+    if (v406FrozenInput) {
+      v406Snapshot = v406FrozenInput;
+    } else {
+      const freshWireInput = (pass as any)._v406FreshWireInput ?? null;
+      try {
+        v406Snapshot = buildProviderWireSnapshot({
+          videoUrl: dispatchVideoUrl,
+          audioUrl: String((pass as any).sync_audio_url ?? pass.audio_url ?? ""),
+          bbox: freshWireInput?.bbox ?? null,
+          boundingBoxes: freshWireInput?.bounding_boxes ?? [],
+          frameCount: freshWireInput?.frame_count ?? 0,
+          dispatchFps: freshWireInput?.dispatch_fps ?? 0,
+          voicedWindows: freshWireInput?.voiced_windows ?? [],
+          syncMode: payloadSyncMode,
+          model: payloadModel,
+          speakerIdx: Number((pass as any).speaker_idx ?? currentPassIdx),
+          segmentId: v431SegmentId ?? "",
+          runId: (passRunStamp.run_id as string | null) ?? null,
+          plateGeneration: Number(passRunStamp.plate_generation ?? 0),
+        });
+      } catch (e) {
+        return await failBeforeProviderDispatch(
+          "v406_snapshot_build_failed",
+          "v406_snapshot_build_failed",
+          "Provider-Input konnte nicht eingefroren werden — Dispatch blockiert.",
+          422,
+          { error: (e as Error)?.message ?? String(e), pass_idx: currentPassIdx },
+        );
+      }
+      const persisted = await supabase.rpc("update_dialog_pass_slot", {
+        p_scene_id: sceneId,
+        p_pass_idx: currentPassIdx,
+        p_patch: { provider_input_frozen: v406Snapshot },
+      });
+      if (persisted.error) {
+        return await failBeforeProviderDispatch(
+          "v406_snapshot_persist_failed",
+          "v406_snapshot_persist_failed",
+          "Provider-Input-Snapshot konnte nicht persistiert werden — Dispatch blockiert.",
+          500,
+          { error: persisted.error.message, pass_idx: currentPassIdx },
+        );
+      }
+      (pass as any).provider_input_frozen = v406Snapshot;
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v406_snapshot_persisted boxes=${v406Snapshot.bounding_boxes.length} frames=${v406Snapshot.frame_count} fps=${v406Snapshot.dispatch_fps}`,
+      );
+    }
+
+    // Fresh: bounding_boxes JSON hochladen (Transport-Detail, keine neue
+    // Geometrie). Upload-Fehler ⇒ inline-Transport (v279 graceful degrade).
+    let v406BoundingBoxesUrl: string | null = null;
+    if (!v406FrozenInput && (pass as any)._v406FreshWireInput?.wants_url_transport) {
+      try {
+        const up = await uploadBoundingBoxesJson(supabase, {
+          userId,
+          projectId: String((scene as any).project_id ?? ""),
+          sceneId,
+          passIdx: currentPassIdx,
+          boxes: v406Snapshot.bounding_boxes,
+          box: v406Snapshot.bbox,
+          frameCount: v406Snapshot.frame_count,
+          voicedWindowsSec: v406Snapshot.voiced_windows,
+          fps: v406Snapshot.dispatch_fps,
+        } as any);
+        v406BoundingBoxesUrl = up.url;
+      } catch (e) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v406_bbox_upload_failed → inline transport: ${(e as Error)?.message}`,
+        );
+      }
+    }
+
+    const v406Wire = buildProviderWire(v406Snapshot, {
+      asdTransport: v406FrozenInput ? "inline" : (v406BoundingBoxesUrl ? "url" : "inline"),
+      boundingBoxesUrl: v406BoundingBoxesUrl,
+    });
+    syncOptions.active_speaker_detection = v406Wire.active_speaker_detection;
+    syncOptions.sync_mode = v406Wire.sync_mode;
+
+    const videoInput: Record<string, unknown> = { type: "video", url: v406Wire.video_url };
     // v124 — Hard whitelist sanitizer + ASD mutex. Supersedes the partial
     // v106 blacklist scrub. For `model: "sync-3"` ONLY `sync_mode` and
     // `active_speaker_detection` survive the call. When ASD has
     // `bounding_boxes`/`bounding_boxes_url`, `frame_number`/`coordinates`
     // are dropped (mutex). Stripped keys are logged with `v124_sync3_sanitize`.
-    const v124Sanitized = sanitizeSync3Options(payloadModel, syncOptions, {
+    const v124Sanitized = sanitizeSync3Options(v406Wire.model, syncOptions, {
       scene: sceneId,
       pass: currentPassIdx + 1,
       speaker: String(pass.speaker_name ?? ""),
     });
     const payloadOptions = v124Sanitized.options;
     const payload: Record<string, unknown> = {
-      model: payloadModel,
+      model: v406Wire.model,
       input: [
         videoInput,
-        { type: "audio", url: (pass as any).sync_audio_url ?? pass.audio_url },
+        { type: "audio", url: v406Wire.audio_url },
       ],
       options: payloadOptions,
       webhookUrl: diagnosticWebhookUrl,
       webhook_url: diagnosticWebhookUrl,
     };
+
 
     // v105 — Compliance probe of the ACTUAL outgoing Sync.so payload.
     // We previously persisted v102/v103 probes computed from the per-speaker

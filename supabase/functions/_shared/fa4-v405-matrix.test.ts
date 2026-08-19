@@ -21,6 +21,13 @@ import {
   shouldPreserveNoopRetryPreclip,
 } from "./noop-retry-preclip.ts";
 import { resolveTelemetryTarget } from "./telemetry-target.ts";
+import {
+  boundingBoxesJsonFromSnapshot,
+  buildProviderWire,
+  buildProviderWireSnapshot,
+  resolveFrozenProviderInput,
+  toSyncGeneratePayload,
+} from "./provider-wire-snapshot.ts";
 
 const read = (p: string) => Deno.readTextFileSync(new URL(p, import.meta.url));
 /** Strip comments so source-contract assertions test CODE, not prose. */
@@ -100,16 +107,95 @@ Deno.test("G. run and plate_generation provenance are enforced", () => {
 });
 
 // ── H. Fresh vs NOOP retry wire parity ────────────────────────────────────
-Deno.test("H. the only contracted retry difference is the ASD transport", () => {
-  // Preservation comment + code path state the invariant explicitly.
-  assertStringIncludes(COMPOSE, "v404_noop_retry_preclip_preserved");
-  assertStringIncludes(COMPOSE, "bounding_boxes_url` → inline `bounding_boxes`");
-  // The historical v148 preclip drop on noop escalation is gone.
+Deno.test("H. fresh and NOOP retry produce byte-identical payloads except ASD", () => {
+  const snapshot = buildProviderWireSnapshot({
+    videoUrl: "https://cdn.example/preclip-p3.mp4",
+    audioUrl: "https://cdn.example/turn-3.wav",
+    bbox: [461, 411, 819, 565],
+    boundingBoxes: [[461, 411, 819, 565], null, [461, 411, 819, 565]],
+    frameCount: 3,
+    dispatchFps: 24,
+    voicedWindows: [[0.12, 1.84]],
+    syncMode: "cut_off",
+    model: "sync-3",
+    speakerIdx: 2,
+    segmentId: "seg-uuid-1",
+    runId: "run-uuid-1",
+    plateGeneration: 4,
+  });
+
+  // Fresh: identical snapshot, url transport.
+  const freshWire = buildProviderWire(snapshot, {
+    asdTransport: "url",
+    boundingBoxesUrl: "https://cdn.example/asd.json",
+  });
+  // NOOP retry: snapshot round-tripped through persistence, inline transport.
+  const rehydrated = resolveFrozenProviderInput({
+    provider_input_frozen: JSON.parse(JSON.stringify(snapshot)),
+  });
+  assert(rehydrated, "rehydrated snapshot must resolve");
+  const retryWire = buildProviderWire(rehydrated!, { asdTransport: "inline" });
+
+  const freshPayload = toSyncGeneratePayload(freshWire, { webhookUrl: "https://hook" }) as any;
+  const retryPayload = toSyncGeneratePayload(retryWire, { webhookUrl: "https://hook" }) as any;
+
+  // The bounding-box JSON behind the fresh URL is exactly the retry inline array.
+  assertEquals(
+    boundingBoxesJsonFromSnapshot(snapshot).bounding_boxes,
+    (retryPayload.options.active_speaker_detection as any).bounding_boxes,
+  );
+
+  const strip = (p: any) => {
+    const c = JSON.parse(JSON.stringify(p));
+    delete c.options.active_speaker_detection;
+    return c;
+  };
+  assertEquals(strip(freshPayload), strip(retryPayload));
+  // The only difference is the transport key.
+  assertEquals(
+    Object.keys(freshPayload.options.active_speaker_detection).sort(),
+    ["auto_detect", "bounding_boxes_url"],
+  );
+  assertEquals(
+    Object.keys(retryPayload.options.active_speaker_detection).sort(),
+    ["auto_detect", "bounding_boxes"].sort(),
+  );
+
+  // Production wiring: no rebuild on the frozen retry path, snapshot persisted
+  // before dispatch, and buildProviderWire is the exclusive wire source.
+  assertStringIncludes(COMPOSE, "v406_skip_v40_canonical_restore");
+  assertStringIncludes(COMPOSE, "v406_skip_tight_slicing");
+  assertStringIncludes(COMPOSE, "v406_skip_audio_normalization");
+  assertStringIncludes(COMPOSE, "v406_skip_rehost");
+  assertStringIncludes(COMPOSE, "v406_snapshot_persisted");
+  assertStringIncludes(COMPOSE, "buildProviderWire(v406Snapshot");
   assert(
     !/v148_noop_bypass_preclip/.test(code(COMPOSE)),
     "v148 preclip bypass must no longer exist",
   );
 });
+
+Deno.test("H2. incomplete frozen snapshot fails closed — no provider call", () => {
+  const partial = {
+    provider_input_frozen: {
+      video_url: "https://cdn.example/p.mp4",
+      audio_url: "https://cdn.example/a.wav",
+      // bbox / bounding_boxes / frame_count missing
+      sync_mode: "cut_off",
+      model: "sync-3",
+    },
+  };
+  assertEquals(resolveFrozenProviderInput(partial), null);
+  assertEquals(resolveFrozenProviderInput({}), null);
+  assertStringIncludes(COMPOSE, "noop_retry_frozen_input_missing");
+  assertStringIncludes(COMPOSE, "_v406FrozenMissing");
+});
+
+Deno.test("H3. snapshot persist failure blocks the dispatch", () => {
+  assertStringIncludes(COMPOSE, "v406_snapshot_persist_failed");
+  assertStringIncludes(COMPOSE, "v406_snapshot_build_failed");
+});
+
 
 // ── I. NOOP preclip preservation ──────────────────────────────────────────
 Deno.test("I. frozen NOOP retry keeps preclip, crop, render id and coords", () => {
