@@ -6958,92 +6958,140 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       (pass as any).input_url = dispatchVideoUrl;
     } catch { /* noop */ }
 
-    // ══ FA-4 v406 — Frozen Provider Input Snapshot ═════════════════════
-    // Reihenfolge (frozen contract): Video/Audio/BBox finalisiert → Snapshot
-    // bauen → persistieren → (Fresh) bounding_boxes JSON hochladen →
-    // Dispatch. Persist-Failure = failBeforeProviderDispatch, kein Call.
-    let v406Snapshot: ProviderWireSnapshot;
-    if (v406FrozenInput) {
-      v406Snapshot = v406FrozenInput;
-    } else {
-      const freshWireInput = (pass as any)._v406FreshWireInput ?? null;
-      try {
-        v406Snapshot = buildProviderWireSnapshot({
-          videoUrl: dispatchVideoUrl,
-          audioUrl: String((pass as any).sync_audio_url ?? pass.audio_url ?? ""),
-          bbox: freshWireInput?.bbox ?? null,
-          boundingBoxes: freshWireInput?.bounding_boxes ?? [],
-          frameCount: freshWireInput?.frame_count ?? 0,
-          dispatchFps: freshWireInput?.dispatch_fps ?? 0,
-          voicedWindows: freshWireInput?.voiced_windows ?? [],
-          syncMode: payloadSyncMode,
-          model: payloadModel,
-          speakerIdx: Number((pass as any).speaker_idx ?? currentPassIdx),
-          segmentId: v431SegmentId ?? "",
-          runId: (passRunStamp.run_id as string | null) ?? null,
-          plateGeneration: Number(passRunStamp.plate_generation ?? 0),
-        });
-      } catch (e) {
-        return await failBeforeProviderDispatch(
-          "v406_snapshot_build_failed",
-          "v406_snapshot_build_failed",
-          "Provider-Input konnte nicht eingefroren werden — Dispatch blockiert.",
-          422,
-          { error: (e as Error)?.message ?? String(e), pass_idx: currentPassIdx },
-        );
-      }
-      const persisted = await supabase.rpc("update_dialog_pass_slot", {
-        p_scene_id: sceneId,
-        p_pass_idx: currentPassIdx,
-        p_patch: { provider_input_frozen: v406Snapshot },
-      });
-      if (persisted.error) {
-        return await failBeforeProviderDispatch(
-          "v406_snapshot_persist_failed",
-          "v406_snapshot_persist_failed",
-          "Provider-Input-Snapshot konnte nicht persistiert werden — Dispatch blockiert.",
-          500,
-          { error: persisted.error.message, pass_idx: currentPassIdx },
-        );
-      }
-      (pass as any).provider_input_frozen = v406Snapshot;
-      console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v406_snapshot_persisted boxes=${v406Snapshot.bounding_boxes.length} frames=${v406Snapshot.frame_count} fps=${v406Snapshot.dispatch_fps}`,
-      );
-    }
-
-    // Fresh: bounding_boxes JSON hochladen (Transport-Detail, keine neue
-    // Geometrie). Upload-Fehler ⇒ inline-Transport (v279 graceful degrade).
-    let v406BoundingBoxesUrl: string | null = null;
-    if (!v406FrozenInput && (pass as any)._v406FreshWireInput?.wants_url_transport) {
-      try {
-        const up = await uploadBoundingBoxesJson(supabase, {
-          userId,
-          projectId: String((scene as any).project_id ?? ""),
-          sceneId,
-          passIdx: currentPassIdx,
-          boxes: v406Snapshot.bounding_boxes,
-          box: v406Snapshot.bbox,
-          frameCount: v406Snapshot.frame_count,
-          voicedWindowsSec: v406Snapshot.voiced_windows,
-          fps: v406Snapshot.dispatch_fps,
-        } as any);
-        v406BoundingBoxesUrl = up.url;
-      } catch (e) {
-        console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v406_bbox_upload_failed → inline transport: ${(e as Error)?.message}`,
-        );
-      }
-    }
-
-    const v406Wire = buildProviderWire(v406Snapshot, {
-      asdTransport: v406FrozenInput ? "inline" : (v406BoundingBoxesUrl ? "url" : "inline"),
-      boundingBoxesUrl: v406BoundingBoxesUrl,
+    // ══ FA-4 v407 — Frozen Provider Input Snapshot (contracted path only) ══
+    // Gilt AUSSCHLIESSLICH für den contracted Multi-Speaker-BBox-Wire.
+    // Single-Speaker / Nicht-BBox-Pfade laufen unverändert über den
+    // pre-v406-Payload-Pfad (kein Snapshot, kein snapshot_build_failed).
+    const v407FreshWireInput = (pass as any)._v406FreshWireInput ?? null;
+    const v407FreshWireContract = !v406FrozenInput && isV407FreshWireContract({
+      isMultiSpeaker: v407IsMultiSpeaker,
+      payloadModel,
+      retryVariant,
+      hasDispatchBox: Array.isArray(v407FreshWireInput?.bbox) &&
+        v407FreshWireInput.bbox.length === 4,
+      canonicalBoxesAvailable: Array.isArray(v407FreshWireInput?.bounding_boxes) &&
+        v407FreshWireInput.bounding_boxes.length > 0,
     });
-    syncOptions.active_speaker_detection = v406Wire.active_speaker_detection;
-    syncOptions.sync_mode = v406Wire.sync_mode;
+    const v407WireContractActive = v407FreshWireContract || !!v406FrozenInput;
 
-    const videoInput: Record<string, unknown> = { type: "video", url: v406Wire.video_url };
+    let v406Snapshot: ProviderWireSnapshot | null = null;
+    let v406Wire: ReturnType<typeof buildProviderWire> | null = null;
+
+    if (v407WireContractActive) {
+      // Reihenfolge (frozen contract): Video/Audio/BBox finalisiert → Snapshot
+      // bauen → persistieren → (Fresh) bounding_boxes JSON hochladen →
+      // Dispatch. Persist-Failure = failBeforeProviderDispatch, kein Call.
+      if (v406FrozenInput) {
+        v406Snapshot = v406FrozenInput;
+      } else {
+        try {
+          v406Snapshot = buildProviderWireSnapshot({
+            videoUrl: dispatchVideoUrl,
+            audioUrl: String((pass as any).sync_audio_url ?? pass.audio_url ?? ""),
+            bbox: v407FreshWireInput?.bbox ?? null,
+            boundingBoxes: v407FreshWireInput?.bounding_boxes ?? [],
+            frameCount: v407FreshWireInput?.frame_count ?? 0,
+            dispatchFps: v407FreshWireInput?.dispatch_fps ?? 0,
+            voicedWindows: v407FreshWireInput?.voiced_windows ?? [],
+            syncMode: payloadSyncMode,
+            model: payloadModel,
+            speakerIdx: Number((pass as any).speaker_idx ?? currentPassIdx),
+            segmentId: v431SegmentId ?? "",
+            runId: (passRunStamp.run_id as string | null) ?? null,
+            plateGeneration: Number(passRunStamp.plate_generation ?? 0),
+          });
+        } catch (e) {
+          return await failBeforeProviderDispatch(
+            "v407_snapshot_build_failed",
+            "v407_snapshot_build_failed",
+            "Provider-Input konnte nicht eingefroren werden — Dispatch blockiert.",
+            422,
+            { error: (e as Error)?.message ?? String(e), pass_idx: currentPassIdx },
+          );
+        }
+        // Installierte RPC-Signatur: (_scene_id, _pass_idx, _patch).
+        const persisted = await persistFrozenProviderInput(
+          (fn, args) => supabase.rpc(fn, args as any),
+          { sceneId, passIdx: currentPassIdx, snapshot: v406Snapshot },
+        );
+        if (!persisted.ok) {
+          return await failBeforeProviderDispatch(
+            "v407_snapshot_persist_failed",
+            "v407_snapshot_persist_failed",
+            "Provider-Input-Snapshot konnte nicht persistiert werden — Dispatch blockiert.",
+            500,
+            { error: persisted.error, pass_idx: currentPassIdx },
+          );
+        }
+        (pass as any).provider_input_frozen = v406Snapshot;
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v407_snapshot_persisted boxes=${v406Snapshot.bounding_boxes.length} frames=${v406Snapshot.frame_count} fps=${v406Snapshot.dispatch_fps}`,
+        );
+      }
+
+      // Fresh: bounding_boxes JSON hochladen (Transport-Detail, keine neue
+      // Geometrie). KEIN inline graceful-degrade mehr — Upload-Fehler ⇒ fail
+      // closed vor jedem Provider-Call.
+      let v406BoundingBoxesUrl: string | null = null;
+      let v407UploadError: string | null = null;
+      const v407WantsUrlTransport = !v406FrozenInput &&
+        v407FreshWireInput?.wants_url_transport === true;
+      if (v407WantsUrlTransport) {
+        try {
+          const up = await uploadBoundingBoxesJson(supabase, {
+            userId,
+            projectId: String((scene as any).project_id ?? ""),
+            sceneId,
+            passIdx: currentPassIdx,
+            boxes: v406Snapshot.bounding_boxes,
+            box: v406Snapshot.bbox,
+            frameCount: v406Snapshot.frame_count,
+            voicedWindowsSec: v406Snapshot.voiced_windows,
+            fps: v406Snapshot.dispatch_fps,
+          } as any);
+          v406BoundingBoxesUrl = up.url;
+        } catch (e) {
+          v407UploadError = (e as Error)?.message ?? String(e);
+        }
+      }
+
+      const transport = resolveAsdTransport({
+        frozen: !!v406FrozenInput,
+        wantsUrlTransport: v407WantsUrlTransport,
+        uploadedUrl: v406BoundingBoxesUrl,
+      });
+      if (!transport.ok) {
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v407_bbox_url_transport_failed — fail closed, zero provider calls`,
+        );
+        return await failBeforeProviderDispatch(
+          transport.reason,
+          transport.reason,
+          "Die bounding_boxes-URL für den Multi-Speaker-Wire konnte nicht erzeugt werden — Dispatch blockiert.",
+          500,
+          {
+            error: v407UploadError,
+            provider_call_made: false,
+            pass_idx: currentPassIdx,
+          },
+        );
+      }
+
+      v406Wire = buildProviderWire(v406Snapshot, {
+        asdTransport: transport.transport,
+        boundingBoxesUrl: transport.boundingBoxesUrl,
+      });
+      syncOptions.active_speaker_detection = v406Wire.active_speaker_detection;
+      syncOptions.sync_mode = v406Wire.sync_mode;
+    }
+
+    // Pre-v406 Payload-Pfad bleibt für alle nicht-contracted Dispatches gültig.
+    const wireModel = v406Wire?.model ?? payloadModel;
+    const wireVideoUrl = v406Wire?.video_url ?? dispatchVideoUrl;
+    const wireAudioUrl = v406Wire?.audio_url ??
+      String((pass as any).sync_audio_url ?? pass.audio_url ?? "");
+
+    const videoInput: Record<string, unknown> = { type: "video", url: wireVideoUrl };
     // v124 — Hard whitelist sanitizer + ASD mutex. Supersedes the partial
     // v106 blacklist scrub. For `model: "sync-3"` ONLY `sync_mode` and
     // `active_speaker_detection` survive the call. When ASD has
