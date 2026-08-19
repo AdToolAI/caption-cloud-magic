@@ -121,8 +121,6 @@ export default function FramePickerOverlay({
             {tx({ de: "Frame wählen", en: "Pick frame", es: "Elegir fotograma" })} → {tx({ de: "Szene", en: "Scene", es: "Escena" })} {targetSceneIndex}
           </DialogTitle>
           <DialogDescription>
-            Scrubbe durch den Clip und wähle den exakten Frame, der als nahtloses
-            Startbild der nächsten Szene dienen soll.
           </DialogDescription>
         </DialogHeader>
 

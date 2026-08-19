@@ -27,7 +27,7 @@ const GAME_KEY = 'autopilot.lounge.game';
 type GameId = 'solitaire' | 'chess' | '2048' | 'minesweeper' | 'memory' | 'snake';
 
 const GAMES: Array<{ id: GameId; label: string }> = [
-  { id: 'solitaire', label: 'Solitär' },
+  { id: 'solitaire', label: tx({ de: "Solitär", en: "Solitaire", es: "Solitario" }) },
   { id: 'chess', label: 'Schach' },
   { id: '2048', label: '2048' },
   { id: 'minesweeper', label: 'Minesweeper' },
@@ -51,7 +51,7 @@ export function LoungePanel({ brandKitId, language }: Props) {
     <Card className="border-primary/20 bg-card/60 p-4 backdrop-blur">
       <h3 className="font-display text-sm font-semibold text-foreground">Warte-Lounge</h3>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        Die Produktion läuft im Hintergrund weiter — auch wenn du hier spielst.
+        {tx({ de: "Die Produktion läuft im Hintergrund weiter — auch wenn du hier spielst.", en: "Production continues in the background — even if you're playing here.", es: "La producción continúa en segundo plano — incluso si estás jugando aquí." })}
       </p>
 
       <Tabs

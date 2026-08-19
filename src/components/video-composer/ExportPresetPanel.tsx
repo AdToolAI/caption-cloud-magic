@@ -169,7 +169,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
           if (analyzeErr) {
             console.warn('[smart-reframe] analyze failed, falling back to center crop', analyzeErr);
             toast({
-              title: 'Smart Reframe übersprungen',
+              title: tx({ de: "Smart Reframe übersprungen", en: "Smart Reframe skipped", es: "Reencuadre inteligente omitido" }),
               description: tx({ de: 'Subjekt-Tracking fehlgeschlagen — es wird zentriert zugeschnitten.', en: 'Subject tracking failed — cropping centrally.', es: 'Fallo en el seguimiento del sujeto — se está recortando centralmente.' }),
             });
           }
@@ -304,7 +304,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
                 )}
               </div>
               <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
-                Folgt dem Hauptmotiv beim Zuschnitt zwischen Formaten — perfekt für 16:9 → 9:16.
+                {tx({ de: "Folgt dem Hauptmotiv beim Zuschnitt zwischen Formaten — perfekt für 16:9 → 9:16.", en: "Follows the main subject when cropping between formats — perfect for 16:9 → 9:16.", es: "Sigue al sujeto principal al recortar entre formatos — perfecto para 16:9 → 9:16." })}
               </p>
             </div>
           </div>
@@ -430,7 +430,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
             </div>
             <div className="flex items-center gap-2">
               <Button size="sm" variant="ghost" onClick={clearAll} disabled={batchLoading}>
-                Abbrechen
+                {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
               </Button>
               <Button
                 size="sm"
@@ -456,12 +456,12 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
 
         {!masterReady && (
           <p className="text-[10px] text-muted-foreground mt-3 text-center">
-            Erstelle erst dein Hauptvideo, dann kannst du es in einem Klick für jede Plattform exportieren.
+            {tx({ de: "Erstelle erst dein Hauptvideo, dann kannst du es in einem Klick für jede Plattform exportieren.", en: "First create your main video, then you can export it for any platform in one click.", es: "Primero crea tu video principal, luego podrás exportarlo para cualquier plataforma con un solo clic." })}
           </p>
         )}
         {loading && exports.length === 0 && (
           <p className="text-[10px] text-muted-foreground mt-3 text-center">
-            Lade Export-Verlauf…
+            {tx({ de: "Lade Export-Verlauf…", en: "Loading export history…", es: "Cargando historial de exportación…" })}
           </p>
         )}
       </CardContent>

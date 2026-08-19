@@ -359,7 +359,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     resolutions: ['1080p', '2k', '4k'],
     aspectRatios: ltxAspect,
     costPerSecond: LTX_VIDEO_MODELS['ltx-standard'].costPerSecond,
-    badge: 'Schnell & Günstig',
+    badge: tx({ de: "Schnell & Günstig", en: "Fast & Affordable", es: "Rápido y Económico" }),
     tagline: 'Schnellster Generator',
     legacyRoute: '/ltx-video-studio',
   },
@@ -594,7 +594,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: seedanceAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-mini'].costPerSecond,
     badge: 'Draft',
-    tagline: 'Seedance 1 Lite · günstigster Draft-Renderer',
+    tagline: tx({ de: "Seedance 1 Lite · günstigster Draft-Renderer", en: "Seedance 1 Lite · cheapest draft renderer", es: "Seedance 1 Lite · renderizador de borrador más económico" }),
     legacyRoute: '/seedance-video-studio',
   },
   {
@@ -628,7 +628,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: seedanceAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-pro'].costPerSecond,
     badge: 'Premium',
-    tagline: 'Seedance 2.0 Flagship · beste Motion-Kohärenz',
+    tagline: tx({ de: "Seedance 2.0 Flagship · beste Motion-Kohärenz", en: "Seedance 2.0 Flagship · best motion coherence", es: "Seedance 2.0 Flagship · mejor coherencia de movimiento" }),
     legacyRoute: '/seedance-video-studio',
   },
   {

@@ -159,7 +159,7 @@ export function AutoMatchPanel({
             </p>
             <Button size="lg" className="bg-gradient-to-r from-cyan-500 to-primary hover:opacity-90">
               <Film className="w-5 h-5 mr-2" />
-              Video auswählen
+              {tx({ de: "Video auswählen", en: "Select video", es: "Seleccionar video" })}
             </Button>
           </div>
         </Card>
@@ -247,7 +247,7 @@ export function AutoMatchPanel({
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
                   <StatTile icon={Gauge} label="BPM" value={String(result.recommendation.bpm)} accent="primary" />
-                  <StatTile icon={Clock} label="Dauer" value={`${result.recommendation.durationSec}s`} accent="cyan" />
+                  <StatTile icon={Clock} label=tx({ de: "Dauer", en: "Duration", es: "Duración" }) value={`${result.recommendation.durationSec}s`} accent="cyan" />
                   <StatTile icon={Activity} label="Schnitte/s" value={result.analysis.cutsPerSecond.toFixed(2)} accent="primary" />
                   <StatTile icon={Palette} label="Energie" value={`${Math.round(result.analysis.energy * 100)}%`} accent="cyan" />
                 </div>

@@ -13,6 +13,7 @@ import { useCompanionCoach } from '@/hooks/useCompanionCoach';
 import { cn } from '@/lib/utils';
 import { ConciergeStage } from './ConciergeStage';
 import { PersonaSignature } from './PersonaSignature';
+import { tx } from '@/lib/i18nText';
 
 const ACCENT_CLASS: Record<string, string> = {
   gold: 'from-[#F5C76A]/45 via-[#F5C76A]/10 to-transparent border-[#F5C76A]/40',
@@ -121,7 +122,7 @@ export function ConciergeTipHost() {
                         onClick={() => void dismiss()}
                         className="text-[11px] text-white/50 transition hover:text-white/80"
                       >
-                        später
+                        {tx({ de: "später", en: "later", es: "más tarde" })}
                       </button>
                     </motion.div>
                   )}

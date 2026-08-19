@@ -11,6 +11,7 @@ import { TimelineRuler } from './TimelineRuler';
 import { EditableVideoTrack } from './EditableVideoTrack';
 import { AudioTrackRow } from './AudioTrackRow';
 import { AudioClipComponent } from './AudioClipComponent';
+import { tx } from '@/lib/i18nText';
 
 interface MultiTrackTimelineProProps {
   scenes: SceneAnalysis[];
@@ -303,7 +304,7 @@ export function MultiTrackTimelinePro({
             <div className="h-10 border-b flex items-center justify-center">
               <Button variant="ghost" size="sm" onClick={onAddTrack} className="gap-1 text-xs">
                 <Plus className="h-3 w-3" />
-                Track hinzufügen
+                {tx({ de: "Track hinzufügen", en: "Add track", es: "Añadir pista" })}
               </Button>
             </div>
           </div>

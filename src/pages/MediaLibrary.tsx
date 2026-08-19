@@ -166,7 +166,7 @@ export default function MediaLibrary() {
           scheduleReload();
           if (payload.eventType === 'INSERT') {
             toast({
-              title: "🎉 Neue Medien hinzugefügt!",
+              title: tx({ de: "🎉 Neue Medien hinzugefügt!", en: "🎉 New media added!", es: "🎉 ¡Nuevos medios añadidos!" }),
               description: tx({ de: "Deine Media Library wurde aktualisiert", en: "Your media library has been updated", es: "Su biblioteca multimedia ha sido actualizada" }),
             });
           }
@@ -828,7 +828,7 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: "✉️ Medien gesendet",
+      title: tx({ de: "✉️ Medien gesendet", en: "✉️ Media sent", es: "✉️ Medios enviados" }),
       description: tx({ de: `${selectedItems.length} Dateien werden im Composer geladen...`, en: `${selectedItems.length} files are loaded in composer...`, es: `Los archivos ${selectedItems.length} están cargados en Composer...` }),
     });
     
@@ -1210,13 +1210,13 @@ export default function MediaLibrary() {
                     }}
                   >
                     {expandedScenes.includes(item.sceneId)
-                      ? 'Ältere Versionen ausblenden'
+                      ? tx({ de: "Ältere Versionen ausblenden", en: "Hide older versions", es: "Ocultar versiones anteriores" })
                       : `+${item.olderVersionCount} ältere Version${item.olderVersionCount > 1 ? 'en' : ''}`}
                   </button>
                 )}
                 {item.isSuperseded && (
                   <div className="absolute bottom-2 left-2 z-10 rounded-md bg-background/80 px-2 py-1 text-xs backdrop-blur">
-                    Ältere Version
+                    {tx({ de: "Ältere Version", en: "Older Version", es: "Versión anterior" })}
                   </div>
                 )}
 
@@ -1433,7 +1433,7 @@ export default function MediaLibrary() {
             <Button asChild>
               <label htmlFor="file-upload" className="cursor-pointer">
                 <Upload className="h-4 w-4 mr-2" />
-                Datei hochladen
+                {tx({ de: "Datei hochladen", en: "Upload File", es: "Subir archivo" })}
               </label>
             </Button>
           </div>

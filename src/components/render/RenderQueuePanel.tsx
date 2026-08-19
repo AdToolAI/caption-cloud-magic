@@ -6,6 +6,7 @@ import { QueueJobCard } from './QueueJobCard';
 import { QueuePositionBadge } from './QueuePositionBadge';
 import { Loader2, ListOrdered } from 'lucide-react';
 import { PriorityBadge } from '@/components/video/QueuePrioritySelector';
+import { tx } from '@/lib/i18nText';
 
 export const RenderQueuePanel = () => {
   const { getQueueJobs } = useRenderQueue();
@@ -70,7 +71,7 @@ export const RenderQueuePanel = () => {
           </div>
         ) : jobs.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            Keine Jobs in der Queue
+            {tx({ de: "Keine Jobs in der Queue", en: "No jobs in queue", es: "No hay trabajos en la cola" })}
           </div>
         ) : (
           <div className="space-y-3">

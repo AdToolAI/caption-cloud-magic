@@ -78,7 +78,7 @@ const content: Record<string, { heading: string; updated: string; sections: Sect
       },
       {
         icon: Scale,
-        title: '7. Haftungsbeschränkung',
+        title: tx({ de: "7. Haftungsbeschränkung", en: "7. Limitation of Liability", es: "7. Limitación de responsabilidad" }),
         items: [
           tx({ de: 'Die Haftung ist in jedem Fall auf den vom Nutzer tatsächlich gezahlten Betrag für die betroffene Videogenerierung begrenzt.', en: 'Liability is in any case limited to the amount actually paid by the user for the video generation concerned.', es: 'La responsabilidad se limita en cualquier caso al importe realmente pagado por el usuario por la generación de vídeo en cuestión.' }),
           tx({ de: 'Für mittelbare Schäden, entgangenen Gewinn, Reputationsverluste oder Folgeschäden jeglicher Art wird keine Haftung übernommen.', en: 'No liability is assumed for indirect damages, lost profits, loss of reputation, or consequential damages of any kind.', es: 'No se asume ninguna responsabilidad por daños indirectos, lucro cesante, pérdida de reputación o daños consecuentes de cualquier tipo.' }),

@@ -120,8 +120,6 @@ export function ConciergeIntroScreen() {
                     transition={{ duration: 0.25 }}
                   >
                     <p className="mb-5 text-sm leading-relaxed text-white/70">
-                      Ich begleite dich diskret durch AdTool AI — nur so viel wie du willst.
-                      Wähle das Tempo, mit dem ich dir Hinweise geben soll:
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       {(Object.keys(PERSONA_PROFILES) as LearningPace[]).map((id) => {
@@ -156,7 +154,7 @@ export function ConciergeIntroScreen() {
                         onClick={() => setStep(1)}
                         className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90"
                       >
-                        Weiter
+                        {tx({ de: "Weiter", en: "Next", es: "Siguiente" })}
                       </Button>
                     </div>
                   </motion.div>
@@ -171,7 +169,7 @@ export function ConciergeIntroScreen() {
                     transition={{ duration: 0.25 }}
                   >
                     <p className="mb-5 text-sm leading-relaxed text-white/70">
-                      Was steht als Nächstes an? Ich richte meine Tipps danach aus.
+                      {tx({ de: "Was steht als Nächstes an? Ich richte meine Tipps danach aus.", en: "What's next? I'll align my tips accordingly.", es: "¿Qué sigue? Adaptaré mis consejos a ello." })}
                     </p>
                     <div className="space-y-2">
                       {GOALS.map((g) => {
@@ -200,14 +198,14 @@ export function ConciergeIntroScreen() {
                         onClick={() => setStep(0)}
                         className="text-xs text-white/50 hover:text-white/80"
                       >
-                        zurück
+                        {tx({ de: "zurück", en: "back", es: "atrás" })}
                       </button>
                       <Button
                         size="sm"
                         onClick={() => setStep(2)}
                         className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90"
                       >
-                        Weiter
+                        {tx({ de: "Weiter", en: "Next", es: "Siguiente" })}
                       </Button>
                     </div>
                   </motion.div>
@@ -222,8 +220,6 @@ export function ConciergeIntroScreen() {
                     transition={{ duration: 0.25 }}
                   >
                     <p className="mb-5 text-sm leading-relaxed text-white/70">
-                      Fertig. Ich melde mich, wenn du ein Studio zum ersten Mal betrittst oder
-                      wenn etwas Aufmerksamkeit braucht. Du kannst mich in den Einstellungen
                       jederzeit umstimmen.
                     </p>
                     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
@@ -243,7 +239,7 @@ export function ConciergeIntroScreen() {
                         onClick={() => setStep(1)}
                         className="text-xs text-white/50 hover:text-white/80"
                       >
-                        zurück
+                        {tx({ de: "zurück", en: "back", es: "atrás" })}
                       </button>
                       <Button
                         size="sm"

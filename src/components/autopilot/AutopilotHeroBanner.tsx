@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Sparkles, ArrowRight, Bot, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { tx } from '@/lib/i18nText';
 
 /**
  * Dashboard-Banner für den KI-Autopilot. Aktuell im "Coming Soon"-Modus —
@@ -64,7 +65,7 @@ export const AutopilotHeroBanner = () => {
             </Badge>
           </div>
           <p className="text-xs md:text-sm text-muted-foreground line-clamp-2">
-            Vollautonome Content-Pipeline mit Wochenplan, Compliance-Score und Legal-Shield. Launch in Kürze — sichere dir deinen Early-Access-Slot.
+            {tx({ de: "Vollautonome Content-Pipeline mit Wochenplan, Compliance-Score und Legal-Shield. Launch in Kürze — sichere dir deinen Early-Access-Slot.", en: "Fully autonomous content pipeline with weekly schedule, compliance score, and Legal Shield. Launching soon — secure your early access slot.", es: "Pipeline de contenido totalmente autónomo con programación semanal, puntuación de cumplimiento y Legal Shield. Lanzamiento pronto — asegura tu acceso anticipado." })}
           </p>
         </div>
 

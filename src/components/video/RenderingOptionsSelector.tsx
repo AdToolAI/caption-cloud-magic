@@ -3,6 +3,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { tx } from '@/lib/i18nText';
 
 export interface RenderingOptions {
   quality: '720p' | '1080p' | '4k';
@@ -42,7 +43,7 @@ export const RenderingOptionsSelector = ({ value, onChange }: RenderingOptionsSe
       
       <CollapsibleContent className="space-y-4 pt-2">
         <div className="space-y-2">
-          <Label>Qualität</Label>
+          <Label>{tx({ de: "Qualität", en: "Quality", es: "Calidad" })}</Label>
           <Select 
             value={value.quality} 
             onValueChange={(q) => onChange({ ...value, quality: q as RenderingOptions['quality'] })}
@@ -76,7 +77,7 @@ export const RenderingOptionsSelector = ({ value, onChange }: RenderingOptionsSe
         </div>
 
         <div className="space-y-2">
-          <Label>Seitenverhältnis</Label>
+          <Label>{tx({ de: "Seitenverhältnis", en: "Aspect Ratio", es: "Relación de aspecto" })}</Label>
           <Select 
             value={value.aspectRatio} 
             onValueChange={(a) => onChange({ ...value, aspectRatio: a as RenderingOptions['aspectRatio'] })}

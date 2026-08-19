@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Copy, Sparkles, ArrowRight, Info, CheckCircle2, RefreshCw } from "lucide-react";
 import PromptWizardHeroHeader from "@/components/prompt-wizard/PromptWizardHeroHeader";
+import { tx } from '@/lib/i18nText';
 
 const PromptWizard = () => {
   const { t } = useTranslation();
@@ -284,7 +285,7 @@ const PromptWizard = () => {
                   </motion.div>
                   <div>
                     <h2 className="text-xl font-semibold">{t("wizard.results")}</h2>
-                    <p className="text-sm text-muted-foreground">Dein optimierter Prompt ist bereit</p>
+                    <p className="text-sm text-muted-foreground">{tx({ de: "Dein optimierter Prompt ist bereit", en: "Your optimized prompt is ready", es: "Tu prompt optimizado está listo" })}</p>
                   </div>
                 </div>
 

@@ -222,7 +222,7 @@ export default function StockMediaBrowser({
             </span>
           </DialogTitle>
           <p className="text-xs text-muted-foreground">
-            Pexels × Pixabay × Mixkit · 2M+ royalty-free Videos, Bilder, Musik & SFX — ohne Credit-Verbrauch
+            {tx({ de: "Pexels × Pixabay × Mixkit · 2M+ royalty-free Videos, Bilder, Musik & SFX — ohne Credit-Verbrauch", en: "Pexels × Pixabay × Mixkit · 2M+ royalty-free videos, images, music & SFX — no credit consumption", es: "Pexels × Pixabay × Mixkit · Más de 2M de videos, imágenes, música y SFX libres de derechos — sin consumo de créditos" })}
           </p>
         </DialogHeader>
 
@@ -234,7 +234,7 @@ export default function StockMediaBrowser({
             </TabsTrigger>
             <TabsTrigger value="image" className="gap-1.5">
               <ImageIcon className="h-3.5 w-3.5" />
-              {t('videoComposer.stock.tabs.images') || 'Bilder'}
+              {t('videoComposer.stock.tabs.images') || tx({ de: "Bilder", en: "Images", es: "Imágenes" })}
             </TabsTrigger>
             <TabsTrigger value="library" className="gap-1.5">
               <Library className="h-3.5 w-3.5" />
@@ -269,7 +269,7 @@ export default function StockMediaBrowser({
                   <Input
                     value={query}
                     onChange={(e) => { setQuery(e.target.value); setActiveCategory(null); }}
-                    placeholder={t('videoComposer.stock.searchPlaceholder') || 'Suche nach Stock-Medien…'}
+                    placeholder={t('videoComposer.stock.searchPlaceholder') || tx({ de: "Suche nach Stock-Medien…", en: "Search stock media…", es: "Buscar medios de stock…" })}
                     className="pl-9 bg-background/50"
                   />
                 </div>
@@ -393,7 +393,7 @@ export default function StockMediaBrowser({
         </Tabs>
 
         <p className="text-[10px] text-muted-foreground/70 text-center pt-1">
-          {t('videoComposer.stock.creditAttribution') || 'Stock-Medien von Pixabay & Pexels — kostenlos & royalty-free.'}
+          {t('videoComposer.stock.creditAttribution') || tx({ de: "Stock-Medien von Pixabay & Pexels — kostenlos & royalty-free.", en: "Stock media from Pixabay & Pexels — free & royalty-free.", es: "Medios de stock de Pixabay & Pexels — gratis y sin derechos de autor." })}
         </p>
       </DialogContent>
     </Dialog>

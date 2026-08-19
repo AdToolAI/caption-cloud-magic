@@ -151,7 +151,7 @@ export function AutoCutDownDialog({
             onClick={() => onOpenChange(false)}
             className="text-white/60"
           >
-            Abbrechen
+            {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
           </Button>
           <Button
             disabled={plan.scenes.length === 0}

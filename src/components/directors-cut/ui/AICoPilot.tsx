@@ -176,7 +176,7 @@ export function AICoPilot({
                         <div className="text-center py-8">
                           <Sparkles className="w-8 h-8 mx-auto text-muted-foreground/50 mb-3" />
                           <p className="text-sm text-muted-foreground">
-                            Frag mich etwas oder nutze einen Befehl!
+                            {tx({ de: "Frag mich etwas oder nutze einen Befehl!", en: "Ask me something or use a command!", es: "¡Pregúntame algo o usa un comando!" })}
                           </p>
                           <div className="flex flex-wrap gap-2 justify-center mt-4">
                             {quickCommands.map(cmd => (
@@ -264,7 +264,7 @@ export function AICoPilot({
                     <div className="text-center py-8">
                       <Lightbulb className="w-8 h-8 mx-auto text-muted-foreground/50 mb-3" />
                       <p className="text-sm text-muted-foreground">
-                        Keine Vorschläge momentan
+                        {tx({ de: "Keine Vorschläge momentan", en: "No suggestions at the moment", es: "No hay sugerencias por el momento" })}
                       </p>
                     </div>
                   ) : (

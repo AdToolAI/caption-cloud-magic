@@ -299,7 +299,7 @@ export default function StudioMode() {
                 <SystemLoadPill className="hidden sm:inline-flex" />
                 <Badge variant="outline" className="gap-1.5">
                   <Wand2 className="h-3 w-3 text-primary" />
-                  Studio Mode · Geführter Flow
+                  {tx({ de: "Studio Mode · Geführter Flow", en: "Studio Mode · Guided Flow", es: "Modo Estudio · Flujo Guiado" })}
                 </Badge>
               </div>
             </div>
@@ -365,14 +365,14 @@ export default function StudioMode() {
               className="gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              Zurück
+              {tx({ de: "Zurück", en: "Back", es: "Atrás" })}
             </Button>
             <div className="text-xs text-muted-foreground hidden sm:block">
               Schritt {stepIndex + 1} {tx({ de: "von", en: "of", es: "de" })} {STEPS.length} · {STEPS[stepIndex].title}
             </div>
             {!isLast ? (
               <Button onClick={goNext} disabled={!canAdvance} className="gap-2">
-                Weiter
+                {tx({ de: "Weiter", en: "Next", es: "Siguiente" })}
                 <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
@@ -388,7 +388,7 @@ export default function StudioMode() {
                   ) : (
                     <Sparkles className="h-4 w-4" />
                   )}
-                  In Composer öffnen
+                  {tx({ de: "In Composer öffnen", en: "Open in Composer", es: "Abrir en Composer" })}
                 </Button>
               </div>
             )}
@@ -785,7 +785,7 @@ function StoryboardStep({
                     />
                     <div className="flex items-center gap-3">
                       <Label className="text-[11px] text-muted-foreground">
-                        Dauer
+                        {tx({ de: "Dauer", en: "Duration", es: "Duración" })}
                       </Label>
                       <Input
                         type="number"
@@ -863,7 +863,7 @@ function RenderStep({
         {/* Summary */}
         <Card className="lg:col-span-2 p-6 bg-card/60 backdrop-blur border-border/40 space-y-5">
           <div className="space-y-1.5">
-            <Label className="text-xs">Projekt-Titel</Label>
+            <Label className="text-xs">{tx({ de: "Projekt-Titel", en: "Project Title", es: "Título del Proyecto" })}</Label>
             <Input
               value={title}
               onChange={(e) => onTitleChange(e.target.value)}
@@ -874,7 +874,7 @@ function RenderStep({
 
           <SummaryRow icon={Users} label="Cast">
             {characters.length === 0 ? (
-              <span className="text-muted-foreground text-sm">Keiner ausgewählt</span>
+              <span className="text-muted-foreground text-sm">{tx({ de: "Keiner ausgewählt", en: "None selected", es: "Ninguno seleccionado" })}</span>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {characters.map((c) => (
@@ -916,10 +916,8 @@ function RenderStep({
         <Card className="p-6 bg-gradient-to-br from-primary/15 via-card/60 to-accent/10 backdrop-blur border-primary/30 space-y-4">
           <div className="space-y-2">
             <Film className="h-7 w-7 text-primary" />
-            <h3 className="text-lg font-bold">Im Composer öffnen</h3>
+            <h3 className="text-lg font-bold">{tx({ de: "Im Composer öffnen", en: "Open in Composer", es: "Abrir en el Compositor" })}</h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Dein Cast, deine Location und das Storyboard werden in ein neues
-              Video-Composer-Projekt übernommen. Dort wählst du die KI-Engine
               (Sora, Kling, Hailuo …), generierst Clips parallel und exportierst.
             </p>
           </div>
@@ -934,10 +932,10 @@ function RenderStep({
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
-            Studio-Projekt erstellen
+            {tx({ de: "Studio-Projekt erstellen", en: "Create Studio Project", es: "Crear Proyecto de Estudio" })}
           </Button>
           <p className="text-[10px] text-muted-foreground text-center">
-            Du kannst alles im Composer noch anpassen.
+            {tx({ de: "Du kannst alles im Composer noch anpassen.", en: "You can still adjust everything in the Composer.", es: "Aún puedes ajustar todo en el Composer." })}
           </p>
         </Card>
       </div>

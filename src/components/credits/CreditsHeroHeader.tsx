@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Coins, ShoppingCart, Sparkles, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { tx } from '@/lib/i18nText';
 
 interface CreditsHeroHeaderProps {
   planName: string;
@@ -62,7 +63,7 @@ export const CreditsHeroHeader = ({ planName, creditsAvailable, onBuyCredits }: 
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-muted-foreground max-w-lg"
           >
-            Verwalten Sie Ihr Credit-Guthaben und sehen Sie Ihre Transaktionen
+            {tx({ de: "Verwalten Sie Ihr Credit-Guthaben und sehen Sie Ihre Transaktionen", en: "Manage your credit balance and view your transactions", es: "Gestiona tu saldo de créditos y consulta tus transacciones" })}
           </motion.p>
 
           {/* Stats Badges */}

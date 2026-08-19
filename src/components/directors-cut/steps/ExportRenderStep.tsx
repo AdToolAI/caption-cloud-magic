@@ -75,7 +75,7 @@ const QUALITY_OPTIONS = [
   { 
     value: 'hd', 
     label: 'HD 1080p', 
-    description: 'Full HD Qualität',
+    description: tx({ de: "Full HD Qualität", en: "Full HD Quality", es: "Calidad Full HD" }),
     baseCredits: 10,
   },
   { 
@@ -562,7 +562,7 @@ export function ExportRenderStep({
       <div>
         <h3 className="text-lg font-semibold">Export & Render</h3>
         <p className="text-sm text-muted-foreground">
-          Wähle Qualität und Format für dein fertiges Video
+          {tx({ de: "Wähle Qualität und Format für dein fertiges Video", en: "Choose quality and format for your finished video", es: "Elige calidad y formato para tu video final" })}
         </p>
       </div>
 
@@ -571,7 +571,7 @@ export function ExportRenderStep({
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
             <Film className="h-4 w-4" />
-            Vorschau mit allen Effekten
+            {tx({ de: "Vorschau mit allen Effekten", en: "Preview with all effects", es: "Vista previa con todos los efectos" })}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-4">
@@ -623,7 +623,7 @@ export function ExportRenderStep({
               <div className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-2">
                   <Film className="h-4 w-4 text-muted-foreground" />
-                  Szenen analysiert
+                  {tx({ de: "Szenen analysiert", en: "Scenes analyzed", es: "Escenas analizadas" })}
                 </span>
                 <Badge variant="secondary">{scenes.length}</Badge>
               </div>
@@ -698,7 +698,7 @@ export function ExportRenderStep({
                 <div className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-amber-500" />
-                    Szenen Color Grading
+                    {tx({ de: "Szenen Color Grading", en: "Scene Color Grading", es: "Gradación de color de escena" })}
                   </span>
                   <Badge variant="secondary">{Object.keys(sceneColorGrading).length} Szenen</Badge>
                 </div>
@@ -707,14 +707,14 @@ export function ExportRenderStep({
               <div className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-muted-foreground" />
-                  Video-Länge
+                  {tx({ de: "Video-Länge", en: "Video Length", es: "Duración del video" })}
                 </span>
                 <Badge variant="outline">{Math.round(videoDuration)}s</Badge>
               </div>
 
               <div className="border-t pt-3 mt-3">
                 <div className="flex items-center justify-between font-medium">
-                  <span>Geschätzte Credits</span>
+                  <span>{tx({ de: "Geschätzte Credits", en: "Estimated Credits", es: "Créditos estimados" })}</span>
                   <span className="text-primary">{calculateCredits()} Credits</span>
                 </div>
               </div>
@@ -727,7 +727,7 @@ export function ExportRenderStep({
           {/* Quality Selection */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Qualität</CardTitle>
+              <CardTitle className="text-sm">{tx({ de: "Qualität", en: "Quality", es: "Calidad" })}</CardTitle>
             </CardHeader>
             <CardContent>
               <RadioGroup
@@ -818,7 +818,7 @@ export function ExportRenderStep({
                   <div>
                     <h4 className="font-semibold">Rendering abgeschlossen!</h4>
                     <p className="text-sm text-muted-foreground">
-                      Dein Video ist fertig und kann heruntergeladen werden
+                      {tx({ de: "Dein Video ist fertig und kann heruntergeladen werden", en: "Your video is ready and can be downloaded", es: "Tu video está listo y se puede descargar" })}
                     </p>
                   </div>
                   
@@ -886,7 +886,7 @@ export function ExportRenderStep({
                     </span>
                   </div>
                   <p className="text-xs text-center text-muted-foreground">
-                    Status-Updates werden automatisch empfangen. Bitte diese Seite nicht schließen.
+                    {tx({ de: "Status-Updates werden automatisch empfangen. Bitte diese Seite nicht schließen.", en: "Status updates are received automatically. Please do not close this page.", es: "Las actualizaciones de estado se reciben automáticamente. Por favor, no cierres esta página." })}
                   </p>
                 </div>
               ) : (

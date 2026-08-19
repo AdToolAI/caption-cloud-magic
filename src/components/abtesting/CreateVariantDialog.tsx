@@ -77,7 +77,7 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <Plus className="h-4 w-4 mr-2" />
-          Variante hinzufügen
+          {tx({ de: "Variante hinzufügen", en: "Add variant", es: "Añadir variante" })}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-3xl">
@@ -162,7 +162,7 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="text-size">Textgröße</Label>
+                <Label htmlFor="text-size">{tx({ de: "Textgröße", en: "Text size", es: "Tamaño del texto" })}</Label>
                 <Select value={textSize} onValueChange={setTextSize}>
                   <SelectTrigger>
                     <SelectValue />
@@ -170,7 +170,7 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
                   <SelectContent>
                     <SelectItem value="small">Klein</SelectItem>
                     <SelectItem value="medium">Mittel</SelectItem>
-                    <SelectItem value="large">Groß</SelectItem>
+                    <SelectItem value="large">{tx({ de: "Groß", en: "Large", es: "Grande" })}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -188,7 +188,7 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
 
             <TabsContent value="colors" className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="primary-color">Primärfarbe</Label>
+                <Label htmlFor="primary-color">{tx({ de: "Primärfarbe", en: "Primary color", es: "Color primario" })}</Label>
                 <Input
                   id="primary-color"
                   type="color"
@@ -198,7 +198,7 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="secondary-color">Sekundärfarbe</Label>
+                <Label htmlFor="secondary-color">{tx({ de: "Sekundärfarbe", en: "Secondary color", es: "Color secundario" })}</Label>
                 <Input
                   id="secondary-color"
                   type="color"
@@ -211,10 +211,10 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
 
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => setOpen(false)}>
-              Abbrechen
+              {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
             </Button>
             <Button onClick={handleSubmit} disabled={!variantName}>
-              Variante erstellen
+              {tx({ de: "Variante erstellen", en: "Create variant", es: "Crear variante" })}
             </Button>
           </div>
         </div>

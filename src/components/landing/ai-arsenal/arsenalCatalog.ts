@@ -406,7 +406,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Google Lyria 3 Pro", "Google Lyria 3 Pro", "Google Lyria 3 Pro"],
     [
       "Cinematic music generation from Google DeepMind.",
-      "Cinematische Musik-Generation von Google DeepMind.",
+      tx({ de: "Cinematische Musik-Generation von Google DeepMind.", en: "Cinematic music generation by Google DeepMind.", es: "Generación de música cinematográfica por Google DeepMind." }),
       "Generación musical cinematográfica de Google DeepMind.",
     ],
     [MUSIC, SFX],

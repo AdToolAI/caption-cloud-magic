@@ -39,8 +39,8 @@ const SLIDERS: Array<{
 }> = [
   { key: 'brightness', label: 'Helligkeit', icon: Sun, min: 50, max: 150, default: 100, unit: '%' },
   { key: 'contrast', label: 'Kontrast', icon: Contrast, min: 50, max: 150, default: 100, unit: '%' },
-  { key: 'saturation', label: 'Sättigung', icon: Droplets, min: 0, max: 200, default: 100, unit: '%' },
-  { key: 'sharpness', label: 'Schärfe', icon: Focus, min: 0, max: 100, default: 0, unit: '' },
+  { key: 'saturation', label: tx({ de: "Sättigung", en: "Saturation", es: "Saturación" }), icon: Droplets, min: 0, max: 200, default: 100, unit: '%' },
+  { key: 'sharpness', label: tx({ de: "Schärfe", en: "Sharpness", es: "Nitidez" }), icon: Focus, min: 0, max: 100, default: 0, unit: '' },
   { key: 'temperature', label: 'Temperatur', icon: Thermometer, min: -50, max: 50, default: 0, unit: '', showSign: true },
   { key: 'vignette', label: 'Vignette', icon: Circle, min: 0, max: 100, default: 0, unit: '%' },
 ];

@@ -225,7 +225,7 @@ export default function HubPage() {
               <span className="text-[10px] uppercase tracking-widest text-amber-400 border border-amber-400/30 rounded-full px-2 py-0.5">In Vorbereitung</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              Dieser Bereich ist noch nicht für alle Kunden freigeschaltet. Wir polieren die letzten Integrationen und melden uns beim Launch.
+              {tx({ de: "Dieser Bereich ist noch nicht für alle Kunden freigeschaltet. Wir polieren die letzten Integrationen und melden uns beim Launch.", en: "This area is not yet enabled for all customers. We are polishing the final integrations and will notify you at launch.", es: "Esta área aún no está habilitada para todos los clientes. Estamos puliendo las integraciones finales y te avisaremos en el lanzamiento." })}
             </p>
           </div>
         </motion.div>

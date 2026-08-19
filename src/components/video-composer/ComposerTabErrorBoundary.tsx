@@ -62,7 +62,7 @@ export class ComposerTabErrorBoundary extends Component<Props, State> {
                 </div>
               )}
               <div className="text-xs text-muted-foreground mt-1">
-                Häufige Ursache: ein Charakter / Asset ohne Namen in deiner Library.
+                {tx({ de: "Häufige Ursache: ein Charakter / Asset ohne Namen in deiner Library.", en: "Common cause: a character / asset without a name in your library.", es: "Causa común: un personaje / activo sin nombre en tu biblioteca." })}
               </div>
             </div>
           </div>

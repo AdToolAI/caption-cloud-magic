@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getEventTranslation } from '@/lib/eventTranslations';
+import { tx } from '@/lib/i18nText';
 
 interface NotificationEvent {
   id: string;
@@ -89,7 +90,7 @@ export function useEventNotifications(language: string = 'en') {
             if (newEvent.event_type === 'goal.completed') {
               toast({
                 title: getEventTranslation('goalCompleted', language),
-                description: '🎉 Herzlichen Glückwunsch!',
+                description: tx({ de: "🎉 Herzlichen Glückwunsch!", en: "🎉 Congratulations!", es: "🎉 ¡Felicidades!" }),
                 duration: 5000,
               });
             }

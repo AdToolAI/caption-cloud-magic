@@ -105,7 +105,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
                   Heatmap-Radar
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Geplante Posts · Optimale Zeiten · Konflikte — auf einen Blick
+                  {tx({ de: "Geplante Posts · Optimale Zeiten · Konflikte — auf einen Blick", en: "Scheduled Posts · Optimal Times · Conflicts — at a glance", es: "Publicaciones programadas · Horas óptimas · Conflictos — de un vistazo" })}
                 </p>
               </div>
             </div>
@@ -271,12 +271,12 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
                               )}
                               {!hasPosts && !score && (
                                 <div className="text-[10px] text-muted-foreground">
-                                  Klick: Post für diesen Slot erstellen
+                                  {tx({ de: "Klick: Post für diesen Slot erstellen", en: "Click: Create post for this slot", es: "Clic: Crear publicación para este espacio" })}
                                 </div>
                               )}
                               {!hasPosts && score && (
                                 <div className="text-[10px] text-primary/80 italic">
-                                  Goldene Lücke — Klick zum Befüllen
+                                  {tx({ de: "Goldene Lücke — Klick zum Befüllen", en: "Golden Gap — Click to fill", es: "Brecha Dorada — Haz clic para rellenar" })}
                                 </div>
                               )}
                             </div>
@@ -314,7 +314,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
             <InsightCard
               icon={<Sparkles className="w-4 h-4" />}
               tone="gold"
-              title="Goldene Lücke"
+              title=tx({ de: "Goldene Lücke", en: "Golden Gap", es: "Brecha Dorada" })
               body={
                 goldenGap
                   ? `${DAY_LABELS_LONG_DE[goldenGap.day]} ${String(goldenGap.hour).padStart(2, "0")}:00 — Score ${goldenGap.score}, kein Post geplant.`
@@ -364,10 +364,10 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
             >
               <CalendarPlus className="w-8 h-8 text-primary/60 mx-auto mb-2" />
               <p className="text-sm text-foreground/90 mb-1">
-                Noch keine Posts geplant — die cyan-Schimmer zeigen dir bereits, wann deine Audience aktiv ist.
+                {tx({ de: "Noch keine Posts geplant — die cyan-Schimmer zeigen dir bereits, wann deine Audience aktiv ist.", en: "No posts scheduled yet — the cyan shimmer already shows you when your audience is active.", es: "Aún no hay publicaciones programadas — el brillo cian ya te muestra cuándo tu audiencia está activa." })}
               </p>
               <p className="text-xs text-muted-foreground mb-3">
-                Klick auf eine Zelle, um direkt einen Post für diesen Slot zu erstellen.
+                {tx({ de: "Klick auf eine Zelle, um direkt einen Post für diesen Slot zu erstellen.", en: "Click on a cell to directly create a post for this slot.", es: "Haz clic en una celda para crear directamente una publicación para este espacio." })}
               </p>
               <Button
                 size="sm"

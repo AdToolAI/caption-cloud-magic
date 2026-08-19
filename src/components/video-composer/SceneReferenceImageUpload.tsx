@@ -206,7 +206,7 @@ export default function SceneReferenceImageUpload({
           <div className="flex items-center justify-center gap-2">
             <Upload className="h-3.5 w-3.5 text-muted-foreground" />
             <p className="text-[10px] text-foreground">
-              Bild hochladen — die KI orientiert sich daran
+              {tx({ de: "Bild hochladen — die KI orientiert sich daran", en: "Upload image — the AI will use it as reference", es: "Subir imagen — la IA la usará como referencia" })}
             </p>
           </div>
         )}

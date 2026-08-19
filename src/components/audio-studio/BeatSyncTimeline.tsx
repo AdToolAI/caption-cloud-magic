@@ -247,8 +247,6 @@ export function BeatSyncTimeline({
             </div>
             <h3 className="text-lg font-semibold mb-2">{tr({ de: "Musik für Beat-Sync hinzufügen", en: "Add music for beat-sync", es: "Agregar música para sincronización de ritmo" })}</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Lade eine Musikdatei hoch, um automatisch Beats zu erkennen 
-              und Video-Schnitte darauf zu synchronisieren.
             </p>
           </div>
         ) : isAnalyzing ? (

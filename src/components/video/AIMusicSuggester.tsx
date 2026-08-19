@@ -39,7 +39,7 @@ export const AIMusicSuggester = ({ onSelect }: AIMusicSuggesterProps) => {
 
       setRecommendations(data.recommendations);
       toast({
-        title: 'Musik-Vorschläge generiert!',
+        title: tx({ de: "Musik-Vorschläge generiert!", en: "Music suggestions generated!", es: "¡Sugerencias de música generadas!" }),
         description: `${data.recommendations.length} passende Tracks gefunden`
       });
     } catch (error) {
@@ -58,7 +58,7 @@ export const AIMusicSuggester = ({ onSelect }: AIMusicSuggesterProps) => {
     <div className="space-y-4 p-4 border border-border rounded-lg bg-card">
       <div className="flex items-center gap-2">
         <Music className="h-5 w-5 text-primary" />
-        <h3 className="font-semibold text-foreground">AI Musik-Vorschläge</h3>
+        <h3 className="font-semibold text-foreground">{tx({ de: "AI Musik-Vorschläge", en: "AI Music Suggestions", es: "Sugerencias de música con IA" })}</h3>
       </div>
 
       <div className="space-y-3">

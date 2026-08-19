@@ -142,7 +142,7 @@ export default function SfxLibrary() {
         tags: item.tags,
         is_favorite: true,
       });
-      toast({ title: "Zu Favoriten hinzugefügt", description: item.title });
+      toast({ title: tx({ de: "Zu Favoriten hinzugefügt", en: "Added to favorites", es: "Añadido a favoritos" }), description: item.title });
     }
     loadFavorites();
   }
@@ -320,7 +320,7 @@ export default function SfxLibrary() {
           </div>
           <Button type="submit" disabled={loading} className="bg-yellow-500/90 text-black hover:bg-yellow-500">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            <span className="ml-2">Suchen</span>
+            <span className="ml-2">{tx({ de: "Suchen", en: "Search", es: "Buscar" })}</span>
           </Button>
         </form>
 

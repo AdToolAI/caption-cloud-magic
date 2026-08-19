@@ -443,7 +443,7 @@ export default function StructuredPromptBuilder({
           <p className="text-[9px] text-destructive">
             {t(
               language,
-              `⚠ Über dem Limit von ${limit.hard} ${limit.unit === 'words' ? 'Wörtern' : 'Zeichen'} — ${limit.label} schneidet ab.`,
+              `⚠ Über dem Limit von ${limit.hard} ${limit.unit === 'words' ? tx({ de: "Wörtern", en: "words", es: "palabras" }) : 'Zeichen'} — ${limit.label} schneidet ab.`,
               `⚠ Over the ${limit.hard}-${limit.unit} limit — ${limit.label} will truncate.`,
               `⚠ Por encima del límite de ${limit.hard} ${limit.unit === 'words' ? 'palabras' : 'caracteres'} — ${limit.label} truncará.`
             )}

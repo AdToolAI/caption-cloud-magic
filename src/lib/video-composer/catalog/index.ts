@@ -99,17 +99,17 @@ const GESTIK: CatalogEntry[] = [
   entry('gestik', 'still',            'Ruhig / still',     'Still',            'still upper body, hands at rest'),
   entry('gestik', 'open_palms',       'Offene Hände',      'Open palms',       'open palms gesture', ['offene handflächen','open hands']),
   entry('gestik', 'point_to_camera',  tx({ de: 'Zur Kamera zeigen', en: 'Point to the camera', es: 'Apunta a la cámara' }), 'Point to camera',  'pointing toward the camera', ['zeigen','pointing']),
-  entry('gestik', 'count_fingers',    'Finger zählen',     'Counting fingers', 'counting on fingers gesture', ['aufzählen','enumerate']),
+  entry('gestik', 'count_fingers',    tx({ de: "Finger zählen", en: "Counting fingers", es: "Contar con los dedos" }),     'Counting fingers', 'counting on fingers gesture', ['aufzählen','enumerate']),
   entry('gestik', 'thumbs_up',        'Daumen hoch',       'Thumbs up',        'thumbs up gesture'),
-  entry('gestik', 'hands_explain',    'Erklärende Hände',  'Explaining hands', 'natural explaining hand motion', ['erklärend','gesticulating']),
+  entry('gestik', 'hands_explain',    tx({ de: "Erklärende Hände", en: "Explaining hands", es: "Manos que explican" }),  'Explaining hands', 'natural explaining hand motion', ['erklärend','gesticulating']),
   entry('gestik', 'hand_to_chest',    tx({ de: 'Hand auf Brust', en: 'Hand on chest', es: 'Mano en el pecho' }),    'Hand on chest',    'hand to chest sincere gesture', ['sincere','aufrichtig']),
-  entry('gestik', 'arms_crossed',     'Arme verschränkt',  'Arms crossed',     'arms crossed posture'),
+  entry('gestik', 'arms_crossed',     tx({ de: "Arme verschränkt", en: "Arms crossed", es: "Brazos cruzados" }),  'Arms crossed',     'arms crossed posture'),
   entry('gestik', 'lean_forward',     'Nach vorne lehnen', 'Lean forward',     'leaning forward into the camera', ['lean in']),
   entry('gestik', 'shrug',            'Schulterzucken',    'Shrug',            'casual shoulder shrug'),
 ];
 
 const BLICK: CatalogEntry[] = [
-  entry('blick', 'to_camera',     'In die Kamera',    'To camera',     'eye contact with camera', ['direkt','direct']),
+  entry('blick', 'to_camera',     tx({ de: "In die Kamera", en: "To camera", es: "A cámara" }),    'To camera',     'eye contact with camera', ['direkt','direct']),
   entry('blick', 'away',          'Weggewandt',       'Looking away',  'gaze averted off-camera'),
   entry('blick', 'down',          'Nach unten',       'Looking down',  'gaze downward', ['nachdenklich blick']),
   entry('blick', 'up',            'Nach oben',        'Looking up',    'gaze upward, contemplative'),
@@ -133,17 +133,17 @@ const FRAMING: CatalogEntry[] = [
   entry('framing', 'medium_wide',      'Halbtotale',      'Medium wide',      'medium wide shot',      ['mws','medium-wide']),
   entry('framing', 'medium',           'Halbnah',         'Medium',           'medium shot',           ['ms','medium shot']),
   entry('framing', 'medium_close_up',  'Nahe',            'Medium close-up',  'medium close-up shot',  ['mcu','medium-close-up','nah']),
-  entry('framing', 'close_up',         'Großaufnahme',    'Close-up',         'close-up shot',         ['cu','close-up','nahaufnahme']),
+  entry('framing', 'close_up',         tx({ de: "Großaufnahme", en: "Close-up", es: "Primer plano" }),    'Close-up',         'close-up shot',         ['cu','close-up','nahaufnahme']),
   entry('framing', 'extreme_close_up', 'Detail',          'Extreme close-up', 'extreme close-up shot', ['ecu','extreme-close-up','makro']),
   entry('framing', 'establishing',     'Establishing',    'Establishing',     'establishing shot',     ['etablierende einstellung']),
 ];
 
 const ANGLE: CatalogEntry[] = [
-  entry('angle', 'eye_level',         'Augenhöhe',          'Eye-level',         'eye-level angle',           ['neutral angle','augenhohe']),
+  entry('angle', 'eye_level',         tx({ de: "Augenhöhe", en: "Eye-level", es: "A la altura de los ojos" }),          'Eye-level',         'eye-level angle',           ['neutral angle','augenhohe']),
   entry('angle', 'low',               'Untersicht',         'Low angle',         'low angle looking up',      ['froschperspektive','low-angle']),
   entry('angle', 'high',              'Aufsicht',           'High angle',        'high angle looking down',   ['vogelperspektive','high-angle']),
-  entry('angle', 'dutch',             'Dutch / Schräg',     'Dutch angle',       'dutch tilted angle',        ['canted','schräg','dutch-angle']),
-  entry('angle', 'over_shoulder',     'Über Schulter',      'Over the shoulder', 'over-the-shoulder angle',   ['ots','schulter']),
+  entry('angle', 'dutch',             tx({ de: "Dutch / Schräg", en: "Dutch / Tilted", es: "Holandés / Inclinado" }),     'Dutch angle',       'dutch tilted angle',        ['canted','schräg','dutch-angle']),
+  entry('angle', 'over_shoulder',     tx({ de: "Über Schulter", en: "Over shoulder", es: "Sobre el hombro" }),      'Over the shoulder', 'over-the-shoulder angle',   ['ots','schulter']),
   entry('angle', 'three_quarter',     'Dreiviertel',        'Three-quarter',     'three-quarter angle',       ['3/4']),
   entry('angle', 'profile',           'Profil',             'Profile',           'profile side angle'),
   entry('angle', 'frontal',           'Frontal',            'Frontal',           'frontal angle facing camera'),
@@ -167,7 +167,7 @@ const MOVEMENT: CatalogEntry[] = [
 ];
 
 const LIGHTING: CatalogEntry[] = [
-  entry('lighting', 'natural',         'Natürlich',         'Natural',         'natural ambient light'),
+  entry('lighting', 'natural',         tx({ de: "Natürlich", en: "Natural", es: "Natural" }),         'Natural',         'natural ambient light'),
   entry('lighting', 'soft_window',     'Weiches Fensterlicht','Soft window',   'soft window light',           ['fensterlicht','soft daylight']),
   entry('lighting', 'hard_window',     'Hartes Fensterlicht','Hard window',    'hard directional window light'),
   entry('lighting', 'golden_hour',     'Golden Hour',       'Golden hour',     'warm golden hour light',      ['goldene stunde']),
@@ -179,7 +179,7 @@ const LIGHTING: CatalogEntry[] = [
   entry('lighting', 'practical',       'Praktisch (Lampen)','Practical',       'practical in-scene lamps',    ['lampen']),
   entry('lighting', 'studio_softbox',  'Studio Softbox',    'Studio softbox',  'studio softbox key light'),
   entry('lighting', 'neon',            'Neon',              'Neon',            'neon colored lighting',       ['cyberpunk']),
-  entry('lighting', 'overcast',        'Bewölkt',           'Overcast',        'overcast diffuse light'),
+  entry('lighting', 'overcast',        tx({ de: "Bewölkt", en: "Overcast", es: "Nublado" }),           'Overcast',        'overcast diffuse light'),
 ];
 
 const DELIVERY: CatalogEntry[] = [
@@ -187,9 +187,9 @@ const DELIVERY: CatalogEntry[] = [
   entry('delivery', 'calm',         'Ruhig',         'Calm',         'calm measured delivery',         ['gelassen','measured']),
   entry('delivery', 'urgent',       'Dringend',      'Urgent',       'urgent pressing delivery',       ['eilig','pressing']),
   entry('delivery', 'energetic',    'Energetisch',   'Energetic',    'energetic upbeat delivery',      ['upbeat','schwungvoll']),
-  entry('delivery', 'authoritative','Autoritär',     'Authoritative','authoritative confident delivery', ['bestimmt','commanding']),
+  entry('delivery', 'authoritative',tx({ de: "Autoritär", en: "Authoritative", es: "Autoritario" }),     'Authoritative','authoritative confident delivery', ['bestimmt','commanding']),
   entry('delivery', 'conversational','Locker',       'Conversational','conversational casual delivery', ['casual','natürlich']),
-  entry('delivery', 'whisper',      'Flüstern',      'Whisper',      'soft whispered delivery'),
+  entry('delivery', 'whisper',      tx({ de: "Flüstern", en: "Whisper", es: "Susurro" }),      'Whisper',      'soft whispered delivery'),
   entry('delivery', 'inspirational','Inspirierend',  'Inspirational','inspirational uplifting delivery', ['motivierend']),
 ];
 

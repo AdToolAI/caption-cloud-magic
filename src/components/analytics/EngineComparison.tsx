@@ -159,11 +159,11 @@ export function EngineComparison({ engineData }: Props) {
             <p className="text-xl font-bold">{winner.speed}</p>
           </div>
           <div className="text-center p-4 rounded-lg bg-muted/30">
-            <p className="text-sm text-muted-foreground mb-1">✅ Zuverlässigster</p>
+            <p className="text-sm text-muted-foreground mb-1">{tx({ de: "✅ Zuverlässigster", en: "✅ Most Reliable", es: "✅ Más fiable" })}</p>
             <p className="text-xl font-bold">{winner.reliability}</p>
           </div>
           <div className="text-center p-4 rounded-lg bg-muted/30">
-            <p className="text-sm text-muted-foreground mb-1">💰 Kostengünstigster</p>
+            <p className="text-sm text-muted-foreground mb-1">{tx({ de: "💰 Kostengünstigster", en: "💰 Most Cost-Effective", es: "💰 Más rentable" })}</p>
             <p className="text-xl font-bold">{winner.cost}</p>
           </div>
         </div>

@@ -668,7 +668,7 @@ export function SceneEditingStep({
     setSelectedSceneId(newScene.id);
     
     toast({
-      title: 'Medien hinzugefügt',
+      title: tx({ de: "Medien hinzugefügt", en: "Media added", es: "Medios añadidos" }),
       description: tx({ de: `${media.type === 'video' ? 'Video' : 'Bild'} wurde als neue Szene hinzugefügt`, en: `${media.type === 'video' ? 'Video' : 'Image'} added as new scene`, es: `${media.type === 'video' ? 'Video' : 'Imagen'} añadida como nueva escena` }),
     });
   }, [scenes, onScenesUpdate, toast]);
@@ -767,10 +767,10 @@ export function SceneEditingStep({
         <div>
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <Scissors className="h-5 w-5 text-primary" />
-            Szenen-Editor
+            {tx({ de: "Szenen-Editor", en: "Scene Editor", es: "Editor de escenas" })}
           </h3>
           <p className="text-sm text-muted-foreground">
-            Bearbeite Szenen und konfiguriere Übergänge visuell
+            {tx({ de: "Bearbeite Szenen und konfiguriere Übergänge visuell", en: "Edit scenes and configure transitions visually", es: "Edita escenas y configura transiciones visualmente" })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -801,7 +801,7 @@ export function SceneEditingStep({
             className="text-xs border-green-500/50 text-green-600 hover:bg-green-500/10"
           >
             <Plus className="h-3.5 w-3.5 mr-1.5" />
-            Szene
+            {tx({ de: "Szene", en: "Scene", es: "Escena" })}
           </Button>
           <Button
             onClick={() => setShowAddMediaDialog(true)}
@@ -810,7 +810,7 @@ export function SceneEditingStep({
             className="text-xs border-blue-500/50 text-blue-600 hover:bg-blue-500/10"
           >
             <Film className="h-3.5 w-3.5 mr-1.5" />
-            Medien
+            {tx({ de: "Medien", en: "Media", es: "Medios" })}
           </Button>
           <Button
             onClick={applyAiSuggestions}
@@ -818,7 +818,7 @@ export function SceneEditingStep({
             className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
           >
             <Wand2 className="h-3.5 w-3.5 mr-1.5" />
-            AI Übergänge
+            {tx({ de: "AI Übergänge", en: "AI Transitions", es: "Transiciones de IA" })}
           </Button>
           <Button
             onClick={() => setShowRemixDialog(true)}
@@ -847,7 +847,7 @@ export function SceneEditingStep({
                   {[
                     { key: '← →', action: tx({ de: 'Szene wechseln', en: 'Change scene', es: 'cambiar de escena' }) },
                     { key: 'T', action: 'Transition öffnen' },
-                    { key: '1-6', action: 'Transition wählen' },
+                    { key: '1-6', action: tx({ de: "Transition wählen", en: "Select Transition", es: "Seleccionar transición" }) },
                     { key: 'ESC', action: tx({ de: 'Schließen', en: 'Close', es: 'Cerrar' }) },
                     { key: '?', action: tx({ de: 'Hilfe ein/aus', en: 'Help on/off', es: 'Ayuda activada/desactivada' }) },
                     { key: 'Space', action: 'Play/Pause' },
@@ -1019,7 +1019,7 @@ export function SceneEditingStep({
               <CardContent className="py-12 text-center">
                 <Scissors className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
                 <p className="text-sm text-muted-foreground">
-                  Keine Szenen vorhanden. Bitte zuerst die KI-Analyse durchführen.
+                  {tx({ de: "Keine Szenen vorhanden. Bitte zuerst die KI-Analyse durchführen.", en: "No scenes available. Please perform AI analysis first.", es: "No hay escenas disponibles. Por favor, realiza primero el análisis de IA." })}
                 </p>
               </CardContent>
             </Card>
@@ -1107,7 +1107,7 @@ export function SceneEditingStep({
                     <div className="mb-4 p-3 rounded-lg bg-muted/50 border">
                       <div className="flex items-center gap-2 mb-3">
                         <Timer className="h-4 w-4 text-primary" />
-                        <Label className="text-xs font-medium">Dauer anpassen</Label>
+                        <Label className="text-xs font-medium">{tx({ de: "Dauer anpassen", en: "Adjust duration", es: "Ajustar duración" })}</Label>
                       </div>
                       
                       {(() => {
@@ -1160,7 +1160,7 @@ export function SceneEditingStep({
                             
                             {/* Ratio Info */}
                             <div className="text-[10px] text-muted-foreground mb-2">
-                              1:3 Ratio — Max 3x langsamer oder 3x schneller
+                              {tx({ de: "1:3 Ratio — Max 3x langsamer oder 3x schneller", en: "1:3 Ratio — Max 3x slower or 3x faster", es: "Relación 1:3 — Máx. 3x más lento o 3x más rápido" })}
                             </div>
                             
                             {/* Playback Rate Display */}
@@ -1193,7 +1193,7 @@ export function SceneEditingStep({
                             {Math.abs(totalDurationChange) > 0.1 && (
                               <div className="mt-3 pt-2 border-t border-border/50">
                                 <div className="flex items-center justify-between text-xs">
-                                  <span className="text-muted-foreground">Neue Gesamtlänge:</span>
+                                  <span className="text-muted-foreground">{tx({ de: "Neue Gesamtlänge:", en: "New total length:", es: "Nueva duración total:" })}</span>
                                   <span className="font-mono font-medium">
                                     {totalDuration.toFixed(1)}s
                                     <span className={cn(
@@ -1216,7 +1216,7 @@ export function SceneEditingStep({
                       <div className="mb-4">
                         <div className="flex items-center gap-2 mb-2">
                           <Lightbulb className="h-4 w-4 text-yellow-500" />
-                          <span className="text-xs font-medium">AI Vorschläge</span>
+                          <span className="text-xs font-medium">{tx({ de: "AI Vorschläge", en: "AI Suggestions", es: "Sugerencias IA" })}</span>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {selectedScene.ai_suggestions.map((suggestion, i) => (
@@ -1292,10 +1292,10 @@ export function SceneEditingStep({
                   <CardContent className="py-8 text-center">
                     <Film className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
                     <p className="text-sm text-muted-foreground">
-                      Wähle eine Szene aus, um Details zu bearbeiten
+                      {tx({ de: "Wähle eine Szene aus, um Details zu bearbeiten", en: "Select a scene to edit details", es: "Selecciona una escena para editar detalles" })}
                     </p>
                     <p className="text-xs text-muted-foreground/70 mt-1">
-                      Nutze ← → Pfeiltasten zum Navigieren
+                      {tx({ de: "Nutze ← → Pfeiltasten zum Navigieren", en: "Use ← → arrow keys to navigate", es: "Usa las teclas de flecha ← → para navegar" })}
                     </p>
                   </CardContent>
                 </Card>

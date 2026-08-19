@@ -553,7 +553,7 @@ export default function Planner() {
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <p className="text-destructive font-medium">{error}</p>
         <Button onClick={() => window.location.reload()} variant="outline">
-          Neu laden
+          {tx({ de: "Neu laden", en: "Reload", es: "Recargar" })}
         </Button>
       </div>
     );
@@ -564,7 +564,7 @@ export default function Planner() {
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <p className="text-muted-foreground">{tx({ de: "Kein Workspace gefunden", en: "No workspace found", es: "No se encontró ningún espacio de trabajo" })}</p>
         <Button onClick={() => window.location.reload()} variant="outline">
-          Neu laden
+          {tx({ de: "Neu laden", en: "Reload", es: "Recargar" })}
         </Button>
       </div>
     );

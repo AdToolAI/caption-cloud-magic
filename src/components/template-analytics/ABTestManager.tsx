@@ -261,7 +261,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
             <DialogHeader>
               <DialogTitle>{selectedTest.test_name} - Ergebnisse</DialogTitle>
               <DialogDescription>
-                Statistische Analyse der Test-Varianten
+                {tx({ de: "Statistische Analyse der Test-Varianten", en: "Statistical analysis of test variants", es: "Análisis estadístico de las variantes de prueba" })}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6 py-4">
@@ -301,7 +301,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                       <span className="font-medium">{testResults.results.variant_a.selections}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Projekte:</span>
+                      <span className="text-sm text-muted-foreground">{tx({ de: "Projekte:", en: "Projects:", es: "Proyectos:" })}</span>
                       <span className="font-medium">{testResults.results.variant_a.creates}</span>
                     </div>
                     <div className="flex justify-between">
@@ -325,7 +325,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                       <span className="font-medium">{testResults.results.variant_b.selections}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Projekte:</span>
+                      <span className="text-sm text-muted-foreground">{tx({ de: "Projekte:", en: "Projects:", es: "Proyectos:" })}</span>
                       <span className="font-medium">{testResults.results.variant_b.creates}</span>
                     </div>
                     <div className="flex justify-between">
@@ -364,7 +364,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                 <div className="flex gap-2 justify-end">
                   <Button onClick={() => handleCompleteTest(selectedTest.id, testResults.results.winner || undefined)}>
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    Test abschließen
+                    {tx({ de: "Test abschließen", en: "Complete test", es: "Completar prueba" })}
                   </Button>
                 </div>
               )}

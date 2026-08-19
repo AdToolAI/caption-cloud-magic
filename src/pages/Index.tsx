@@ -56,9 +56,9 @@ const Index = () => {
         "name": "AdTool AI"
       },
       "featureList": [
-        "KI-gestützte Content-Generierung",
+        tx({ de: "KI-gestützte Content-Generierung", en: "AI-powered Content Generation", es: "Generación de contenido con IA" }),
         "Plattform-optimierte Inhalte",
-        "Hashtag-Vorschläge",
+        tx({ de: "Hashtag-Vorschläge", en: "Hashtag Suggestions", es: "Sugerencias de hashtags" }),
         "Multi-Sprach-Support",
         "Brand Voice Anpassung"
       ]

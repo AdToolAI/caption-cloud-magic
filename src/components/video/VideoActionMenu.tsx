@@ -7,6 +7,7 @@ import { VideoPreviewPlayer } from './VideoPreviewPlayer';
 import { VideoShareDialog } from './VideoShareDialog';
 import { VideoEditorDialog } from './VideoEditorDialog';
 import type { VideoCreation } from '@/types/video';
+import { tx } from '@/lib/i18nText';
 
 interface VideoActionMenuProps {
   video: VideoCreation;
@@ -38,7 +39,7 @@ export const VideoActionMenu = ({ video }: VideoActionMenuProps) => {
             <>
               <DropdownMenuItem onClick={() => setShowPreview(true)}>
                 <Eye className="h-4 w-4 mr-2" />
-                Vorschau
+                {tx({ de: "Vorschau", en: "Preview", es: "Vista previa" })}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleDownload}>
                 <Download className="h-4 w-4 mr-2" />
@@ -61,7 +62,7 @@ export const VideoActionMenu = ({ video }: VideoActionMenuProps) => {
             className="text-destructive"
           >
             <Trash2 className="h-4 w-4 mr-2" />
-            Löschen
+            {tx({ de: "Löschen", en: "Delete", es: "Eliminar" })}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

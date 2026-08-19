@@ -10,6 +10,7 @@ import { Loader2, Pause, Play, Search, Star, Music as MusicIcon, Wand2, Library,
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/useTranslation';
+import { tx } from '@/lib/i18nText';
 
 export type LibraryAssetType = 'music' | 'sfx' | 'voice';
 
@@ -345,7 +346,7 @@ export default function MusicLibraryBrowser({
             </span>
           </DialogTitle>
           <p className="text-xs text-muted-foreground">
-            Pixabay × Mixkit · Royalty-free Musik & Sound-Effekte — ohne Credit-Verbrauch
+            {tx({ de: "Pixabay × Mixkit · Royalty-free Musik & Sound-Effekte — ohne Credit-Verbrauch", en: "Pixabay × Mixkit · Royalty-free music & sound effects — no credit consumption", es: "Pixabay × Mixkit · Música y efectos de sonido libres de derechos — sin consumo de créditos" })}
           </p>
         </DialogHeader>
 

@@ -159,11 +159,11 @@ export default function LeadInTrimSheet({ scene, open, onOpenChange }: LeadInTri
 
         <div className="mt-auto flex items-center justify-end gap-2 pt-3 border-t border-border/40">
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} disabled={busy}>
-            Abbrechen
+            {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
           </Button>
           <Button size="sm" onClick={save} disabled={busy}>
             {busy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
-            Speichern
+            {tx({ de: "Speichern", en: "Save", es: "Guardar" })}
           </Button>
         </div>
       </SheetContent>

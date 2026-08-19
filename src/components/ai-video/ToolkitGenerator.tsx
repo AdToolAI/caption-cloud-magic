@@ -1231,7 +1231,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                   <SelectContent>
                     <SelectItem value="feature">
                       {language === 'de'
-                        ? 'Feature — Stil & Bewegung übernehmen'
+                        ? tx({ de: "Feature — Stil & Bewegung übernehmen", en: "Feature — Adopt Style & Motion", es: "Característica — Adoptar estilo y movimiento" })
                         : 'Feature — copy style & motion'}
                     </SelectItem>
                     <SelectItem value="base">

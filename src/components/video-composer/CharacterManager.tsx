@@ -34,7 +34,7 @@ const labels = {
     pickerSectionTitle: tx({ de: 'Cast & World (mit Referenzbild)', en: 'Cast & World (with reference image)', es: 'Cast & World (con imagen de referencia)' }),
     openCastWorld: tx({ de: 'Cast & World öffnen', en: 'Open Cast & World', es: 'Abrir Cast & World' }),
 
-    use: 'Verknüpfen',
+    use: tx({ de: "Verknüpfen", en: "Link", es: "Vincular" }),
     anchorBadge: 'Look-Referenz',
     anchorBadgeLocked: 'Erster Frame fixiert',
     anchorHint:

@@ -85,7 +85,7 @@ export function TestPerformanceComparison({ variants, targetMetric }: Props) {
 
         {!hasSignificantData && (
           <div className="mt-3 p-3 rounded-lg bg-yellow-500/10 text-sm">
-            ⚠️ Warte auf mindestens 100 Views pro Variante für statistisch signifikante Ergebnisse
+            {tx({ de: "⚠️ Warte auf mindestens 100 Views pro Variante für statistisch signifikante Ergebnisse", en: "⚠️ Wait for at least 100 views per variant for statistically significant results", es: "⚠️ Espera al menos 100 vistas por variante para resultados estadísticamente significativos" })}
           </div>
         )}
       </Card>

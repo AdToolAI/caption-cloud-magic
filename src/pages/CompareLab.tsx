@@ -67,7 +67,7 @@ export default function CompareLab() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Compare Lab</h1>
             <p className="text-sm text-muted-foreground">
-              Ein Prompt — bis zu 6 Engines parallel. AI-Judge wählt den Sieger.
+              {tx({ de: "Ein Prompt — bis zu 6 Engines parallel. AI-Judge wählt den Sieger.", en: "One prompt — up to 6 engines in parallel. AI-Judge selects the winner.", es: "Un prompt — hasta 6 motores en paralelo. AI-Judge selecciona al ganador." })}
             </p>
           </div>
         </div>
@@ -86,13 +86,13 @@ export default function CompareLab() {
             {historyLoading ? (
               <Card className="bg-card/60 border-white/10">
                 <CardContent className="p-4 text-sm text-muted-foreground">
-                  Lade…
+                  {tx({ de: "Lade…", en: "Loading…", es: "Cargando…" })}
                 </CardContent>
               </Card>
             ) : history.length === 0 ? (
               <Card className="bg-card/60 border-white/10">
                 <CardContent className="p-4 text-sm text-muted-foreground">
-                  Noch keine Vergleiche. Starte oben deinen ersten.
+                  {tx({ de: "Noch keine Vergleiche. Starte oben deinen ersten.", en: "No comparisons yet. Start your first one above.", es: "Aún no hay comparaciones. Inicia la primera arriba." })}
                 </CardContent>
               </Card>
             ) : (

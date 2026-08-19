@@ -452,7 +452,7 @@ const Carousel = () => {
 
                 {isPro && (
                   <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                    <Label htmlFor="ab-variant" className="text-sm">A/B-Variante erstellen</Label>
+                    <Label htmlFor="ab-variant" className="text-sm">{tx({ de: "A/B-Variante erstellen", en: "Create A/B Variant", es: "Crear variante A/B" })}</Label>
                     <Switch
                       id="ab-variant"
                       checked={createABVariant}

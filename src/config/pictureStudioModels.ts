@@ -178,7 +178,7 @@ export const PICTURE_MODES: Record<PictureMode, {
     needsReference: true,
   },
   restyle: {
-    label: 'Stil übernehmen',
+    label: tx({ de: "Stil übernehmen", en: "Adopt Style", es: "Adoptar Estilo" }),
     description: tx({ de: 'Nutze Farben & Mood eines Referenzbildes für ein neues Motiv.', en: 'Use colors & mood of a reference image for a new visual.', es: 'Usa los colores y el ambiente de una imagen de referencia para un nuevo visual.' }),
     needsReference: true,
   },

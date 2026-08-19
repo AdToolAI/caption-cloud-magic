@@ -356,7 +356,7 @@ export const TimelineScriptEditor = ({
             <div>
               <CardTitle>Timeline Script Editor</CardTitle>
               <CardDescription>
-                Platziere Text-Segmente präzise auf der Zeitachse
+                {tx({ de: "Platziere Text-Segmente präzise auf der Zeitachse", en: "Precisely place text segments on the timeline", es: "Coloca segmentos de texto con precisión en la línea de tiempo" })}
               </CardDescription>
             </div>
             <div className="flex gap-2">
@@ -365,7 +365,7 @@ export const TimelineScriptEditor = ({
                 size="sm" 
                 variant="outline"
                 disabled={isAutoSyncing || segments.length === 0}
-                title="Text intelligent in mehrere Segmente aufteilen"
+                title=tx({ de: "Text intelligent in mehrere Segmente aufteilen", en: "Intelligently split text into multiple segments", es: "Dividir texto inteligentemente en varios segmentos" })
               >
                 {isAutoSyncing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -499,7 +499,7 @@ export const TimelineScriptEditor = ({
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Dauer (s)</Label>
+                    <Label>{tx({ de: "Dauer (s)", en: "Duration (s)", es: "Duración (s)" })}</Label>
                     <Input
                       type="number"
                       step="0.5"

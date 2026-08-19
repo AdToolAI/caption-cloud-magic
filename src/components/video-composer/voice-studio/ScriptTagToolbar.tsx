@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Pause, Volume1, Zap, Leaf, Quote, Sparkles } from 'lucide-react';
 import { RefObject } from 'react';
+import { tx } from '@/lib/i18nText';
 
 interface ScriptTagToolbarProps {
   textareaRef: RefObject<HTMLTextAreaElement>;
@@ -19,11 +20,11 @@ interface TagDef {
 
 const TAGS: TagDef[] = [
   { label: 'Pause', icon: Pause, insert: '[pause 0.5s]', tooltip: 'Kurze Sprechpause (0.5s)' },
-  { label: 'Whisper', icon: Volume1, insert: '[whisper]', wraps: true, tooltip: 'Geflüstert sprechen' },
+  { label: 'Whisper', icon: Volume1, insert: '[whisper]', wraps: true, tooltip: tx({ de: "Geflüstert sprechen", en: "Speak whispered", es: "Hablar susurrando" }) },
   { label: 'Excited', icon: Zap, insert: '[excited]', wraps: true, tooltip: 'Begeistert / energetisch' },
   { label: 'Calm', icon: Leaf, insert: '[soft]', wraps: true, tooltip: 'Ruhig / weich' },
-  { label: 'Emphasize', icon: Quote, insert: '[emphasize]', wraps: true, tooltip: 'Betont / nachdrücklich' },
-  { label: 'Laugh', icon: Sparkles, insert: '[laugh]', tooltip: 'Lachen einfügen' },
+  { label: 'Emphasize', icon: Quote, insert: '[emphasize]', wraps: true, tooltip: tx({ de: "Betont / nachdrücklich", en: "Emphasized / emphatic", es: "Enfático / con énfasis" }) },
+  { label: 'Laugh', icon: Sparkles, insert: '[laugh]', tooltip: tx({ de: "Lachen einfügen", en: "Insert laugh", es: "Insertar risa" }) },
 ];
 
 export function ScriptTagToolbar({ textareaRef, value, onChange }: ScriptTagToolbarProps) {

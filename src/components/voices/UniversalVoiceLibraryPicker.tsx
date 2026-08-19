@@ -400,7 +400,7 @@ export function UniversalVoiceLibraryPicker({
                     onClick={() => fetchNextPage()}
                     className="mt-1 rounded-lg bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-gold/30 normal-case tracking-normal"
                   >
-                    {isFetchingNextPage ? <><Loader2 className="h-3 w-3 animate-spin mr-2" />Lade weitere…</> : 'Weitere Stimmen laden'}
+                    {isFetchingNextPage ? <><Loader2 className="h-3 w-3 animate-spin mr-2" />Lade weitere…</> : tx({ de: "Weitere Stimmen laden", en: "Load more voices", es: "Cargar más voces" })}
                   </Button>
                 )}
               </div>
@@ -414,7 +414,7 @@ export function UniversalVoiceLibraryPicker({
             onClick={() => onOpenChange(false)}
             className="px-8 rounded-lg border border-white/10 bg-white/5 text-sm font-bold text-white hover:bg-white/10"
           >
-            Schließen
+            {tx({ de: "Schließen", en: "Close", es: "Cerrar" })}
           </Button>
         </div>
 

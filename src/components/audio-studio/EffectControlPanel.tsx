@@ -40,7 +40,7 @@ interface EffectGroup {
 const EFFECT_GROUPS: EffectGroup[] = [
   {
     id: 'noise',
-    label: 'Rauschunterdrückung',
+    label: tx({ de: "Rauschunterdrückung", en: "Noise Reduction", es: "Reducción de ruido" }),
     icon: Volume2,
     effects: [
       { key: 'highPassFilter', label: 'Hochpass', shortLabel: 'HP 120Hz', description: 'Entfernt tiefes Rumpeln' },
@@ -56,7 +56,7 @@ const EFFECT_GROUPS: EffectGroup[] = [
     effects: [
       { key: 'voiceEQ', label: 'Voice EQ', shortLabel: '+3dB 3kHz', description: 'Klarheit boosten' },
       { key: 'deEsser', label: 'De-Esser', shortLabel: '-4dB 6.5kHz', description: 'S-Laute reduzieren' },
-      { key: 'plosiveReducer', label: 'Plosive', shortLabel: '-6dB 120Hz', description: 'P/B-Laute dämpfen' },
+      { key: 'plosiveReducer', label: 'Plosive', shortLabel: '-6dB 120Hz', description: tx({ de: "P/B-Laute dämpfen", en: "Dampen P/B sounds", es: "Amortiguar sonidos P/B" }) },
       { key: 'warmthBoost', label: tx({ de: 'Wärme', en: 'Warmth', es: 'Calidez' }), shortLabel: '+1.5dB 200Hz', description: tx({ de: 'Stimme voller', en: 'Fuller voice', es: 'Voz más plena' }) },
     ]
   },
@@ -78,7 +78,7 @@ const EFFECT_GROUPS: EffectGroup[] = [
     icon: Music,
     effects: [
       { key: 'stereoWidener', label: 'Stereo Widener', shortLabel: '15ms Haas', description: tx({ de: 'Stereo-Bild verbreitern', en: 'Widen stereo image', es: 'Ampliar imagen estéreo' }) },
-      { key: 'normalize', label: 'Normalize', shortLabel: '-1dB Peak', description: 'Lautstärke normalisieren' },
+      { key: 'normalize', label: 'Normalize', shortLabel: '-1dB Peak', description: tx({ de: "Lautstärke normalisieren", en: "Normalize volume", es: "Normalizar volumen" }) },
     ]
   }
 ];

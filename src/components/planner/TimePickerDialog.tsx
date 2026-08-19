@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
+import { tx } from '@/lib/i18nText';
 
 interface TimePickerDialogProps {
   open: boolean;
@@ -124,7 +125,7 @@ export function TimePickerDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={onCancel}>
-            Abbrechen
+            {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
           </Button>
           <Button onClick={() => onConfirm(hour, minute)}>
             Planen

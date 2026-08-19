@@ -318,7 +318,7 @@ const DraggableScene: React.FC<{
             className="cursor-pointer hover:bg-white/10 focus:bg-white/10"
           >
             <ArrowLeftToLine className="h-3.5 w-3.5 mr-2 text-white/60" />
-            Anfang zum Playhead
+            {tx({ de: "Anfang zum Playhead", en: "Start to Playhead", es: "Inicio al Cabezal de Reproducción" })}
           </ContextMenuItem>
         )}
         {canTrimEndToPlayhead && (
@@ -327,7 +327,7 @@ const DraggableScene: React.FC<{
             className="cursor-pointer hover:bg-white/10 focus:bg-white/10"
           >
             <ArrowRightToLine className="h-3.5 w-3.5 mr-2 text-white/60" />
-            Ende zum Playhead
+            {tx({ de: "Ende zum Playhead", en: "End to Playhead", es: "Fin al Cabezal de Reproducción" })}
           </ContextMenuItem>
         )}
         {onDelete && (
@@ -845,7 +845,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                       className="text-white/80 hover:bg-white/10 focus:bg-white/10 cursor-pointer"
                     >
                       <SplitSquareHorizontal className="h-4 w-4 mr-2 text-cyan-300" />
-                      Am Playhead einfügen
+                      {tx({ de: "Am Playhead einfügen", en: "Insert at Playhead", es: "Insertar en el Cabezal de Reproducción" })}
                     </DropdownMenuItem>
                   </>
                 )}
@@ -1086,10 +1086,10 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                 >
                   <div className="flex flex-col items-center gap-1 text-center px-4">
                     <span className="text-[11px] uppercase tracking-wider text-[#F5C76A]/70 font-semibold">
-                      Timeline ist leer
+                      {tx({ de: "Timeline ist leer", en: "Timeline is empty", es: "La línea de tiempo está vacía" })}
                     </span>
                     <span className="text-[10px] text-white/40">
-                      Ziehe ein Video hierher — oder starte mit einer Szene
+                      {tx({ de: "Ziehe ein Video hierher — oder starte mit einer Szene", en: "Drag a video here — or start with a scene", es: "Arrastra un video aquí — o empieza con una escena" })}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1108,7 +1108,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                         className="h-8 px-3 rounded-md flex items-center gap-1.5 text-[11px] font-medium bg-[#F5C76A]/20 text-[#F5C76A] hover:bg-[#F5C76A]/30 border border-[#F5C76A]/40 transition-colors"
                       >
                         <PlusCircle className="h-3.5 w-3.5" />
-                        Leere Szene
+                        {tx({ de: "Leere Szene", en: "Empty Scene", es: "Escena Vacía" })}
                       </button>
                     )}
                   </div>

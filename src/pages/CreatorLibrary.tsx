@@ -19,6 +19,7 @@ import VideoBrowser from '@/components/creator-library/VideoBrowser';
 import SfxBrowser from '@/components/creator-library/SfxBrowser';
 import MusicBrowser from '@/components/creator-library/MusicBrowser';
 import { useSearchParams } from 'react-router-dom';
+import { tx } from '@/lib/i18nText';
 
 const TABS = [
   { id: 'videos', label: 'Videos', icon: Film },
@@ -45,7 +46,7 @@ export default function CreatorLibrary() {
           <p className="text-sm text-muted-foreground max-w-2xl">
             Royalty-free Videos · Photos · Music · SFX — alles in einem Bundle, gratis
             inklusive in jedem Paid-Plan. Direkter Handoff in Composer & Director's Cut,
-            Lizenz-Zertifikat mit einem Klick.
+            {tx({ de: "Lizenz-Zertifikat mit einem Klick.", en: "License certificate with one click.", es: "Certificado de licencia con un clic." })}
           </p>
         </header>
 
@@ -55,7 +56,7 @@ export default function CreatorLibrary() {
           <ShieldCheck className="h-3.5 w-3.5 text-primary" />
           <span className="text-muted-foreground">
             Alle Treffer aus Pexels · Pixabay · Jamendo · Freesound (royalty-free, kommerziell nutzbar).
-            Auto-Lizenz-PDF mit Verify-URL bei jedem Download.
+            {tx({ de: "Auto-Lizenz-PDF mit Verify-URL bei jedem Download.", en: "Auto-license PDF with Verify-URL on every download.", es: "PDF de licencia automática con URL de verificación en cada descarga." })}
           </span>
         </Card>
 

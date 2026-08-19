@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, AlertCircle, XCircle } from "lucide-react";
+import { tx } from '@/lib/i18nText';
 
 interface TokenStatusBadgeProps {
   lastSyncAt: string | null;
@@ -11,7 +12,7 @@ export const TokenStatusBadge = ({ lastSyncAt, hasError }: TokenStatusBadgeProps
     return (
       <Badge variant="destructive" className="text-xs gap-1">
         <XCircle className="h-3 w-3" />
-        Token ungültig
+        {tx({ de: "Token ungültig", en: "Invalid token", es: "Token inválido" })}
       </Badge>
     );
   }
@@ -20,7 +21,7 @@ export const TokenStatusBadge = ({ lastSyncAt, hasError }: TokenStatusBadgeProps
     return (
       <Badge variant="outline" className="text-xs gap-1 bg-yellow-50 text-yellow-700 border-yellow-200">
         <AlertCircle className="h-3 w-3" />
-        Noch nicht synchronisiert
+        {tx({ de: "Noch nicht synchronisiert", en: "Not yet synchronized", es: "Aún no sincronizado" })}
       </Badge>
     );
   }
@@ -42,7 +43,7 @@ export const TokenStatusBadge = ({ lastSyncAt, hasError }: TokenStatusBadgeProps
     return (
       <Badge variant="outline" className="text-xs gap-1 bg-yellow-50 text-yellow-700 border-yellow-200">
         <AlertCircle className="h-3 w-3" />
-        Token möglicherweise abgelaufen
+        {tx({ de: "Token möglicherweise abgelaufen", en: "Token possibly expired", es: "Token posiblemente caducado" })}
       </Badge>
     );
   }
@@ -50,7 +51,7 @@ export const TokenStatusBadge = ({ lastSyncAt, hasError }: TokenStatusBadgeProps
   return (
     <Badge variant="outline" className="text-xs gap-1 bg-orange-50 text-orange-700 border-orange-200">
       <AlertCircle className="h-3 w-3" />
-      Lange nicht synchronisiert
+      {tx({ de: "Lange nicht synchronisiert", en: "Not synchronized for a long time", es: "No sincronizado en mucho tiempo" })}
     </Badge>
   );
 };

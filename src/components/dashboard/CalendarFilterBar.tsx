@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "lucide-react";
+import { tx } from '@/lib/i18nText';
 
 interface CalendarFilterBarProps {
   timeRange: string;
@@ -41,7 +42,7 @@ export function CalendarFilterBar({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="week">Diese Woche</SelectItem>
-              <SelectItem value="2weeks">Nächste 2 Wochen</SelectItem>
+              <SelectItem value="2weeks">{tx({ de: "Nächste 2 Wochen", en: "Next 2 weeks", es: "Próximas 2 semanas" })}</SelectItem>
               <SelectItem value="custom">Benutzerdefiniert</SelectItem>
             </SelectContent>
           </Select>
@@ -92,7 +93,7 @@ export function CalendarFilterBar({
             onCampaignChange("all");
             onTimezoneChange("UTC");
           }}>
-            Zurücksetzen
+            {tx({ de: "Zurücksetzen", en: "Reset", es: "Restablecer" })}
           </Button>
         </div>
       </CardContent>

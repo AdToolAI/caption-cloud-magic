@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { TrendingUp } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 
 interface UsageChartProps {
   data: Array<{
@@ -18,7 +19,7 @@ export const UsageChart = ({ data }: UsageChartProps) => {
           Credit-Verbrauch
         </CardTitle>
         <CardDescription>
-          Täglicher Verbrauch über die Zeit
+          {tx({ de: "Täglicher Verbrauch über die Zeit", en: "Daily consumption over time", es: "Consumo diario a lo largo del tiempo" })}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -41,7 +42,7 @@ export const UsageChart = ({ data }: UsageChartProps) => {
           </ResponsiveContainer>
         ) : (
           <div className="text-center py-8 text-muted-foreground">
-            Keine Daten verfügbar
+            {tx({ de: "Keine Daten verfügbar", en: "No data available", es: "No hay datos disponibles" })}
           </div>
         )}
       </CardContent>

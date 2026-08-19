@@ -8,6 +8,7 @@ import { type VideoCategory } from '@/types/universal-video-creator';
 import { ALL_CATEGORY_INTERVIEWS } from '@/config/universal-video-interviews';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLocalizedVideoCategories } from '@/hooks/useLocalizedVideoCategories';
+import { tx } from '@/lib/i18nText';
 
 interface CategorySelectorProps {
   selectedCategory: VideoCategory | null;
@@ -30,7 +31,7 @@ const CATEGORY_COLORS: Record<VideoCategory, string> = {
 
 const CATEGORY_BADGES: Record<VideoCategory, { icon: React.ComponentType<{ className?: string }>; label: string } | null> = {
   'corporate-ad': null,
-  'product-ad': { icon: ImageIcon, label: 'Min. 4 Bilder' },
+  'product-ad': { icon: ImageIcon, label: tx({ de: "Min. 4 Bilder", en: "Min. 4 images", es: "Mín. 4 imágenes" }) },
   storytelling: { icon: Sparkles, label: 'KI-Story' },
   custom: null,
 };

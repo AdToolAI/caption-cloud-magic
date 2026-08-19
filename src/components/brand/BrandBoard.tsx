@@ -138,7 +138,7 @@ export function BrandBoard({ brandKit }: BrandBoardProps) {
           </Badge>
           <div className="space-y-3">
             <div>
-              <p className="text-sm text-muted-foreground mb-2">Tonalität</p>
+              <p className="text-sm text-muted-foreground mb-2">{tx({ de: "Tonalität", en: "Tone", es: "Tono" })}</p>
               <Badge variant="outline">{brandKit.brand_tone || brandKit.mood}</Badge>
             </div>
             <div>
