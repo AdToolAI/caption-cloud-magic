@@ -620,7 +620,7 @@ export function EventCreateDialog({
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4" />
-                    Caption mit AI generieren
+                    {tx({ de: "Caption mit AI generieren", en: "Generate Caption with AI", es: "Generar pie de foto con IA" })}
                   </>
                 )}
               </Button>
@@ -728,7 +728,7 @@ export function EventCreateDialog({
               </div>
               
               <div>
-                <Label htmlFor="videoProject">Video Projekt verknüpfen</Label>
+                <Label htmlFor="videoProject">{tx({ de: "Video Projekt verknüpfen", en: "Link Video Project", es: "Vincular Proyecto de Video" })}</Label>
                 <Select value={videoProjectId} onValueChange={setVideoProjectId}>
                   <SelectTrigger id="videoProject">
                     <SelectValue placeholder={tx({ de: "Video Projekt auswählen (optional)", en: "Select video project (optional)", es: "Seleccionar proyecto de vídeo (opcional)" })} />

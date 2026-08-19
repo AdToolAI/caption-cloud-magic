@@ -342,15 +342,15 @@ export default function AudioStudio() {
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-xs font-bold tracking-wider text-primary">{tx({ de: 'NEU', en: 'NEW', es: 'NUEVO' })}</span>
                       <h3 className="text-lg font-bold">AI Music Generator</h3>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">Studio-Qualität</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">{tx({ de: "Studio-Qualität", en: "Studio Quality", es: "Calidad de estudio" })}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Generiere kommerziell nutzbare Musik aus Text — ab €0.10. Cinematic, Lo-Fi, Corporate, Electronic & mehr.
+                      {tx({ de: "Generiere kommerziell nutzbare Musik aus Text — ab €0.10. Cinematic, Lo-Fi, Corporate, Electronic & mehr.", en: "Generate commercially usable music from text — from €0.10. Cinematic, Lo-Fi, Corporate, Electronic & more.", es: "Genera música de uso comercial a partir de texto — desde 0,10 €. Cinemática, Lo-Fi, Corporativa, Electrónica y más." })}
                     </p>
                   </div>
                   <Button className="bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-500/90 shrink-0 hidden sm:flex">
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Track erstellen
+                    {tx({ de: "Track erstellen", en: "Create track", es: "Crear pista" })}
                   </Button>
                 </div>
               </Card>
@@ -469,7 +469,7 @@ export default function AudioStudio() {
                           }}
                           className="border-border/50"
                         >
-                          Neue Datei
+                          {tx({ de: "Neue Datei", en: "New file", es: "Nuevo archivo" })}
                         </Button>
                       </div>
                     </div>

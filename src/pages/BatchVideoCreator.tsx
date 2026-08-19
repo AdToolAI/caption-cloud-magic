@@ -89,7 +89,7 @@ export default function BatchVideoCreator() {
           onClick={() => navigate(-1)}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Zurück
+          {tx({ de: "Zurück", en: "Back", es: "Volver" })}
         </Button>
       </div>
 
@@ -143,7 +143,7 @@ export default function BatchVideoCreator() {
                   id="job-name"
                   value={jobName}
                   onChange={(e) => setJobName(e.target.value)}
-                  placeholder="z.B. Produktvideos März 2024"
+                  placeholder=tx({ de: "z.B. Produktvideos März 2024", en: "e.g. Product Videos March 2024", es: "ej. Videos de productos marzo 2024" })
                 />
               </div>
 
@@ -161,7 +161,7 @@ export default function BatchVideoCreator() {
                   <p className="font-medium">{csvData.length * 50} Credits</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Geschätzte Dauer</p>
+                  <p className="text-sm text-muted-foreground">{tx({ de: "Geschätzte Dauer", en: "Estimated Duration", es: "Duración estimada" })}</p>
                   <p className="font-medium">~{Math.ceil(csvData.length * 1.5)} Minuten</p>
                 </div>
               </div>
@@ -183,7 +183,7 @@ export default function BatchVideoCreator() {
             disabled={step === 0}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Zurück
+            {tx({ de: "Zurück", en: "Back", es: "Volver" })}
           </Button>
           
           {step === 0 && (
@@ -191,7 +191,7 @@ export default function BatchVideoCreator() {
               onClick={() => setStep(1)}
               disabled={csvData.length === 0}
             >
-              Weiter
+              {tx({ de: "Weiter", en: "Next", es: "Siguiente" })}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           )}

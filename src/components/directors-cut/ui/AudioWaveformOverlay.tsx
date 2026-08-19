@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Volume2 } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 
 interface AudioWaveformOverlayProps {
   videoUrl: string;
@@ -91,7 +92,7 @@ export function AudioWaveformOverlay({
         className="w-full flex items-center justify-center bg-muted/30 rounded-lg"
         style={{ height }}
       >
-        <span className="text-xs text-muted-foreground">Lade Audio...</span>
+        <span className="text-xs text-muted-foreground">{tx({ de: "Lade Audio...", en: "Loading Audio...", es: "Cargando Audio..." })}</span>
       </div>
     );
   }

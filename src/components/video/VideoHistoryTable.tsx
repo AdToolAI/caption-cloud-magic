@@ -8,6 +8,7 @@ import { VersionAnalytics } from './VersionAnalytics';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { History, ChevronDown, ChevronRight, BarChart3 } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 
 interface VideoHistoryTableProps {
   videos: any[];
@@ -30,7 +31,7 @@ export const VideoHistoryTable = ({ videos, templatesById }: VideoHistoryTablePr
   if (videos.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
-        Noch keine Videos erstellt
+        {tx({ de: "Noch keine Videos erstellt", en: "No videos created yet", es: "Aún no se han creado videos" })}
       </div>
     );
   }
@@ -52,7 +53,7 @@ export const VideoHistoryTable = ({ videos, templatesById }: VideoHistoryTablePr
           <TableHead>Template</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Erstellt</TableHead>
-          <TableHead>Qualität</TableHead>
+          <TableHead>{tx({ de: "Qualität", en: "Quality", es: "Calidad" })}</TableHead>
           <TableHead className="text-right">Aktionen</TableHead>
         </TableRow>
       </TableHeader>

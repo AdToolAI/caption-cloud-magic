@@ -20,10 +20,10 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
     // Generate CSV template with example row
     const headers = templateFields.map(f => f.key);
     const exampleRow = templateFields.map(f => {
-      if (f.type === 'text') return 'Beispiel Text';
+      if (f.type === 'text') return tx({ de: "Beispiel Text", en: "Example Text", es: "Texto de ejemplo" });
       if (f.type === 'number') return '100';
       if (f.type === 'url') return 'https://example.com/image.jpg';
-      return 'Beispiel';
+      return tx({ de: "Beispiel", en: "Example", es: "Ejemplo" });
     });
 
     const csv = Papa.unparse([headers, exampleRow]);

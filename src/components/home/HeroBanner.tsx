@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Calendar, TrendingUp, Link2, ArrowRight, Shield, Check, Sparkles } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useRef } from "react";
+import { tx } from '@/lib/i18nText';
 
 // Particle component for background effect
 const FloatingParticle = ({ delay, duration, x, y }: { delay: number; duration: number; x: number; y: number }) => (
@@ -128,7 +129,7 @@ export function HeroBanner() {
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/30 text-primary text-xs font-medium"
               >
                 <Sparkles className="h-3 w-3" />
-                <span>KI-gestützt</span>
+                <span>{tx({ de: "KI-gestützt", en: "AI-powered", es: "Con IA" })}</span>
               </motion.div>
               
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight">

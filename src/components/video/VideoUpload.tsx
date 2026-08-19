@@ -57,7 +57,7 @@ export function VideoUpload({
       const url = URL.createObjectURL(file);
       onChange(url);
       setProgress(100);
-      toast.success('Video hochgeladen');
+      toast.success(tx({ de: "Video hochgeladen", en: "Video uploaded", es: "Video subido" }));
     } catch (error) {
       console.error('Upload error:', error);
       toast.error(tx({ de: 'Fehler beim Hochladen', en: 'Upload error', es: 'Error al subir' }));
@@ -116,7 +116,7 @@ export function VideoUpload({
             <>
               <Upload className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
               <p className="text-sm text-muted-foreground mb-1">
-                Video hier ablegen oder klicken
+                {tx({ de: "Video hier ablegen oder klicken", en: "Drop video here or click", es: "Arrastra el video aquí o haz clic" })}
               </p>
               <p className="text-xs text-muted-foreground">
                 MP4, MOV, AVI bis {maxSizeMB}MB

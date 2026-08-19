@@ -19,7 +19,7 @@ export const LTX_VIDEO_MODELS = {
       EUR: tx({ de: 'Schnelle, günstige Generierung ab 0,24€ pro 4 Sekunden', en: 'Fast, cheap generation from €0.24 per 4 seconds', es: 'Generación rápida y económica desde 0,24€ cada 4 segundos' }),
       USD: 'Fast and affordable from $0.24 per 4 seconds',
     },
-    badge: 'Schnell & Günstig',
+    badge: tx({ de: "Schnell & Günstig", en: "Fast & Affordable", es: "Rápido y Económico" }),
   },
   'ltx-pro': {
     name: 'LTX 2.3 Pro',

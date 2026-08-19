@@ -150,7 +150,7 @@ export default function CompareLabGrid({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-xs flex items-center justify-between">
-                  <span>Dauer</span>
+                  <span>{tx({ de: "Dauer", en: "Duration", es: "Duración" })}</span>
                   <span className="tabular-nums">{duration}s</span>
                 </Label>
                 <Slider
@@ -218,7 +218,7 @@ export default function CompareLabGrid({
             {isJudging ? (
               <><Loader2 className="h-3 w-3 mr-2 animate-spin" /> Judge analysiert…</>
             ) : (
-              <><Wand2 className="h-3 w-3 mr-2" /> AI-Judge: Sieger küren</>
+              <><Wand2 className="h-3 w-3 mr-2" />{tx({ de: "AI-Judge: Sieger küren", en: "AI-Judge: Pick Winner", es: "Juez IA: Elegir ganador" })}</>
             )}
           </Button>
         </div>
@@ -231,7 +231,7 @@ export default function CompareLabGrid({
             <div className="flex items-start gap-2">
               <Trophy className="h-4 w-4 text-primary shrink-0 mt-0.5" />
               <div>
-                <div className="font-medium text-primary mb-1">AI-Judge Begründung</div>
+                <div className="font-medium text-primary mb-1">{tx({ de: "AI-Judge Begründung", en: "AI-Judge Reasoning", es: "Razonamiento del Juez IA" })}</div>
                 <div className="text-muted-foreground">{run.ai_judge_reasoning}</div>
               </div>
             </div>

@@ -103,7 +103,7 @@ export default function ContentProjects() {
         <div className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">Meine Videos</h1>
           <p className="text-muted-foreground">
-            Verwalte deine erstellten Video-Projekte aus dem Content Studio
+            {tx({ de: "Verwalte deine erstellten Video-Projekte aus dem Content Studio", en: "Manage your created video projects from the Content Studio", es: "Gestiona tus proyectos de vídeo creados desde el Content Studio" })}
           </p>
         </div>
 
@@ -129,7 +129,7 @@ export default function ContentProjects() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Entwürfe</CardDescription>
+              <CardDescription>{tx({ de: "Entwürfe", en: "Drafts", es: "Borradores" })}</CardDescription>
               <CardTitle className="text-3xl text-gray-600">{statusCounts.draft}</CardTitle>
             </CardHeader>
           </Card>

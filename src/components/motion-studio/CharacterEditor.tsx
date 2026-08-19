@@ -82,7 +82,7 @@ export default function CharacterEditor({
         const url = await uploadLibraryImage(file, 'character', tmpId);
         if (url) {
           setDraft((d) => ({ ...d, reference_image_url: url }));
-          toast.success('Referenzbild hochgeladen');
+          toast.success(tx({ de: "Referenzbild hochgeladen", en: "Reference image uploaded", es: "Imagen de referencia subida" }));
         }
       } finally {
         setUploading(false);
@@ -221,11 +221,9 @@ export default function CharacterEditor({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
-            {character ? 'Charakter bearbeiten' : 'Neuen Charakter anlegen'}
+            {character ? 'Charakter bearbeiten' : tx({ de: "Neuen Charakter anlegen", en: "Create new character", es: "Crear nuevo personaje" })}
           </DialogTitle>
           <DialogDescription>
-            Speichere wiederverwendbare Charaktere mit Reference-Image für visuelle Konsistenz
-            über alle Motion-Studio-Projekte hinweg.
           </DialogDescription>
         </DialogHeader>
 
@@ -237,8 +235,6 @@ export default function CharacterEditor({
               <div className="space-y-1">
                 <p className="text-xs font-semibold">Sherlock-Holmes-Effekt</p>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Markante Kleidung & Objekte beschreibst du am besten auf Englisch — die KI
-                  wiederholt diese viel zuverlässiger als Gesichter. Ein Reference-Image
                   verbessert die Konsistenz nochmal deutlich.
                 </p>
               </div>
@@ -251,7 +247,7 @@ export default function CharacterEditor({
             <Input
               value={draft.name}
               onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-              placeholder="z. B. Richard Löwenherz"
+              placeholder=tx({ de: "z. B. Richard Löwenherz", en: "e.g. Richard the Lionheart", es: "ej. Ricardo Corazón de León" })
               className="bg-background/60"
             />
           </div>
@@ -398,7 +394,7 @@ export default function CharacterEditor({
                 className="bg-background/60 text-sm"
               />
               <Button variant="outline" size="sm" onClick={addTag}>
-                Hinzufügen
+                {tx({ de: "Hinzufügen", en: "Add", es: "Añadir" })}
               </Button>
             </div>
             {draft.tags.length > 0 && (

@@ -145,7 +145,7 @@ export default function PhotoBrowser() {
       {loading && results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
-          Lade Photos …
+          {tx({ de: "Lade Photos …", en: "Loading photos …", es: "Cargando fotos …" })}
         </Card>
       ) : results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">

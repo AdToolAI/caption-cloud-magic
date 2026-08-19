@@ -28,6 +28,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { tx } from '@/lib/i18nText';
 
 interface Props {
   imageUrl: string;
@@ -184,11 +185,11 @@ export default function SaveAsAssetMenu({
 
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={saving}>
-              {t(language, 'Cancel', 'Abbrechen', 'Cancelar')}
+              {t(language, 'Cancel', tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" }), 'Cancelar')}
             </Button>
             <Button size="sm" onClick={save} disabled={saving}>
               {saving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-              {t(language, 'Save', 'Speichern', 'Guardar')}
+              {t(language, 'Save', tx({ de: "Speichern", en: "Save", es: "Guardar" }), 'Guardar')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -6,6 +6,7 @@ import { toast } from "@/hooks/use-toast";
 import { useTranslation } from "@/hooks/useTranslation";
 import { Upload, X, Image, Video, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { tx } from '@/lib/i18nText';
 
 interface PostMediaUploaderProps {
   mediaUrl?: string;
@@ -127,7 +128,7 @@ export function PostMediaUploader({
           ) : (
             <div className="bg-cyan/90 text-black px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-lg">
               <Image className="h-3.5 w-3.5" />
-              Bild
+              {tx({ de: "Bild", en: "Image", es: "Imagen" })}
             </div>
           )}
         </div>
@@ -163,16 +164,16 @@ export function PostMediaUploader({
       {uploading ? (
         <div className="flex flex-col items-center gap-2 py-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="text-sm text-muted-foreground">Wird hochgeladen...</span>
+          <span className="text-sm text-muted-foreground">{tx({ de: "Wird hochgeladen...", en: "Uploading...", es: "Subiendo..." })}</span>
         </div>
       ) : (
         <div className="flex flex-col items-center gap-2 py-4">
           <Upload className="h-8 w-8 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">
-            Bild oder Video hier ablegen
+            {tx({ de: "Bild oder Video hier ablegen", en: "Drop image or video here", es: "Arrastra imagen o video aquí" })}
           </span>
           <span className="text-xs text-muted-foreground/70">
-            oder klicken zum Auswählen
+            {tx({ de: "oder klicken zum Auswählen", en: "or click to select", es: "o haz clic para seleccionar" })}
           </span>
         </div>
       )}

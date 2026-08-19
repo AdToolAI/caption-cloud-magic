@@ -63,7 +63,7 @@ export const MediaEditor = ({
       filters: { brightness: 100, contrast: 100, saturation: 100, grayscale: 0, sepia: 0, hueRotate: 0 }
     },
     {
-      name: 'Schwarz/Weiß',
+      name: tx({ de: "Schwarz/Weiß", en: "Black/White", es: "Blanco/Negro" }),
       icon: '⚫',
       filters: { brightness: 100, contrast: 100, saturation: 0, grayscale: 100, sepia: 0, hueRotate: 0 }
     },

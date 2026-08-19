@@ -25,7 +25,7 @@ const copy: Record<Lang, {
   proceed: string;
 }> = {
   de: {
-    title: "Bevor du kündigst",
+    title: tx({ de: "Bevor du kündigst", en: "Before you cancel", es: "Antes de cancelar" }),
     desc: tx({ de: "Sag uns kurz, woran es liegt — ein Klick genügt. Das hilft uns, das Studio besser zu machen.", en: "Tell us briefly what the reason is — one click is enough. It helps us make the studio better.", es: "Cuéntanos brevemente el motivo — un clic es suficiente. Esto nos ayuda a mejorar el estudio." }),
     reasonsLabel: "Grund",
     reasons: [
@@ -36,7 +36,7 @@ const copy: Record<Lang, {
       { key: "temporary", label: tx({ de: "Nur eine Pause", en: "Just a pause", es: "Solo una pausa" }) },
       { key: "other", label: tx({ de: "Anderer Grund", en: "Other reason", es: "Otro motivo" }) },
     ],
-    warnTitle: "Dein Gründer-Vorteil verfällt",
+    warnTitle: tx({ de: "Dein Gründer-Vorteil verfällt", en: "Your founder benefit will expire", es: "Tu beneficio de fundador caducará" }),
     warnBody:
       tx({ de: "Mit der Kündigung verlierst du deinen dauerhaften Gründer-Rabatt von 20 %. Bei einer späteren Rückkehr gilt der reguläre Preis.", en: "By canceling, you will lose your permanent founder discount of 20%. If you return later, the regular price will apply.", es: "Al cancelar, perderás tu descuento permanente de fundador del 20%. Si regresas más tarde, se aplicará el precio regular." }),
     stay: tx({ de: "Doch bleiben", en: "Stay after all", es: "Mejor me quedo" }),

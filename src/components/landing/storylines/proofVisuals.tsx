@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Zap, Route, Shield, Coins, Timer, Layers, Users, Lock, Calendar, Percent, TrendingDown, Sparkles } from "lucide-react";
+import { tx } from '@/lib/i18nText';
 
 const Frame = ({ children, label }: { children: React.ReactNode; label?: string }) => (
   <div className="relative w-full h-full rounded-xl border border-primary/25 bg-gradient-to-br from-background/80 via-background/60 to-background/80 backdrop-blur-md overflow-hidden">
@@ -293,7 +294,7 @@ export const SavingsCurveVisual = () => (
         <motion.circle cx="300" cy="110" r="4" fill="hsl(var(--primary))" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.8 }} />
       </svg>
       <div className="font-display text-3xl text-primary">− 90,96 €</div>
-      <div className="text-[10px] uppercase tracking-widest text-muted-foreground">ÜBER 24 MONATE</div>
+      <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{tx({ de: "ÜBER 24 MONATE", en: "OVER 24 MONTHS", es: "MÁS DE 24 MESES" })}</div>
     </div>
   </Frame>
 );

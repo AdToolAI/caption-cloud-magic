@@ -274,14 +274,14 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
                 <Select value={data.characterGender || 'neutral'} onValueChange={v => update('characterGender', v as any)}>
                   <SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="male">Männlich</SelectItem>
+                    <SelectItem value="male">{tx({ de: "Männlich", en: "Male", es: "Masculino" })}</SelectItem>
                     <SelectItem value="female">Weiblich</SelectItem>
                     <SelectItem value="neutral">Neutral</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="col-span-2 space-y-1.5">
-                <FieldLabel>Beschreibung</FieldLabel>
+                <FieldLabel>{tx({ de: "Beschreibung", en: "Description", es: "Descripción" })}</FieldLabel>
                 <Textarea value={data.characterDescription || ''} onChange={e => update('characterDescription', e.target.value)} className={cn(fieldClass, 'min-h-[50px]')} rows={2} />
               </div>
             </div>
@@ -292,11 +292,11 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
         <CollapsibleSection icon={<Music className="h-4 w-4" />} title={t('uvc.reviewAudio') !== 'uvc.reviewAudio' ? t('uvc.reviewAudio') as string : 'Audio & Stimme'}>
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <FieldLabel>Stimme</FieldLabel>
+              <FieldLabel>{tx({ de: "Stimme", en: "Voice", es: "Voz" })}</FieldLabel>
               <Select value={data.voiceGender} onValueChange={v => update('voiceGender', v as any)}>
                 <SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="male">Männlich</SelectItem>
+                  <SelectItem value="male">{tx({ de: "Männlich", en: "Male", es: "Masculino" })}</SelectItem>
                   <SelectItem value="female">Weiblich</SelectItem>
                 </SelectContent>
               </Select>
@@ -327,7 +327,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
           <div className="space-y-3">
             <div className="space-y-1.5">
               <div className="flex justify-between">
-                <FieldLabel>Dauer</FieldLabel>
+                <FieldLabel>{tx({ de: "Dauer", en: "Duration", es: "Duración" })}</FieldLabel>
                 <span className="text-xs text-gold font-medium">{data.videoDuration}s</span>
               </div>
               <Slider 
@@ -339,7 +339,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <FieldLabel>Seitenverhältnis</FieldLabel>
+              <FieldLabel>{tx({ de: "Seitenverhältnis", en: "Aspect Ratio", es: "Relación de aspecto" })}</FieldLabel>
               <Select value={data.aspectRatio} onValueChange={v => update('aspectRatio', v as any)}>
                 <SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger>
                 <SelectContent>

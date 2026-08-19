@@ -730,7 +730,7 @@ export function SceneAnalysisStep({
                             className={`w-2 cursor-col-resize flex items-center justify-center group/divider z-30
                               hover:bg-white/30 transition-colors ${dragIndex === index ? 'bg-white/50' : ''}`}
                             onMouseDown={(e) => handleDividerDragStart(index, e)}
-                            title="Ziehen um Szenenlänge anzupassen"
+                            title=tx({ de: "Ziehen um Szenenlänge anzupassen", en: "Drag to adjust scene length", es: "Arrastrar para ajustar duración de escena" })
                           >
                             <div className={`w-0.5 h-full bg-white/40 group-hover/divider:bg-white group-hover/divider:w-1 transition-all
                               ${dragIndex === index ? 'bg-white w-1' : ''}`} />
@@ -800,7 +800,7 @@ export function SceneAnalysisStep({
               <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
               <h3 className="text-lg font-semibold">{tx({ de: "KI analysiert dein Video...", en: "AI analyzes your video...", es: "La IA analiza tu vídeo..." })}</h3>
               <p className="text-muted-foreground">
-                Die KI erkennt Szenen und erstellt Verbesserungsvorschläge
+                {tx({ de: "Die KI erkennt Szenen und erstellt Verbesserungsvorschläge", en: "The AI recognizes scenes and creates suggestions for improvement", es: "La IA reconoce escenas y crea sugerencias de mejora" })}
               </p>
               <Progress value={analysisProgress} className="w-full max-w-md mx-auto" />
               <p className="text-sm text-muted-foreground">{Math.round(analysisProgress)}% abgeschlossen</p>
@@ -808,14 +808,12 @@ export function SceneAnalysisStep({
           ) : (
             <div className="space-y-4">
               <Sparkles className="w-12 h-12 text-primary mx-auto" />
-              <h3 className="text-lg font-semibold">KI-Szenenanalyse starten</h3>
+              <h3 className="text-lg font-semibold">{tx({ de: "KI-Szenenanalyse starten", en: "Start AI Scene Analysis", es: "Iniciar análisis de escena IA" })}</h3>
               <p className="text-muted-foreground max-w-md mx-auto">
-                Unsere KI analysiert dein Video, erkennt automatisch Szenen und 
-                gibt dir personalisierte Verbesserungsvorschläge für jeden Abschnitt.
               </p>
               <Button onClick={onStartAnalysis} size="lg" className="mt-4">
                 <Wand2 className="w-4 h-4 mr-2" />
-                Analyse starten
+                {tx({ de: "Analyse starten", en: "Start analysis", es: "Iniciar análisis" })}
               </Button>
             </div>
           )}
@@ -840,7 +838,7 @@ export function SceneAnalysisStep({
             </div>
             <Button variant="outline" onClick={applyAllSuggestions}>
               <Wand2 className="w-4 h-4 mr-2" />
-              Alle Vorschläge anwenden
+              {tx({ de: "Alle Vorschläge anwenden", en: "Apply all suggestions", es: "Aplicar todas las sugerencias" })}
             </Button>
           </div>
 
@@ -959,7 +957,7 @@ export function SceneAnalysisStep({
                         <div className="bg-muted/30 rounded-lg p-3">
                           <h5 className="text-sm font-medium mb-3 flex items-center gap-2">
                             <Palette className="w-4 h-4 text-purple-500" />
-                            Szenen-Effekte manuell
+                            {tx({ de: "Szenen-Effekte manuell", en: "Scene effects manually", es: "Efectos de escena manualmente" })}
                           </h5>
                           
                           {/* Filter Selection */}
@@ -1036,7 +1034,7 @@ export function SceneAnalysisStep({
                             {/* Saturation */}
                             <div className="flex items-center gap-3">
                               <Droplets className="w-4 h-4 text-green-500 shrink-0" />
-                              <span className="text-xs w-16 shrink-0">Sättigung</span>
+                              <span className="text-xs w-16 shrink-0">{tx({ de: "Sättigung", en: "Saturation", es: "Saturación" })}</span>
                               <Slider
                                 value={[sceneEffects[scene.id]?.saturation ?? 100]}
                                 onValueChange={(v) => {
@@ -1059,7 +1057,7 @@ export function SceneAnalysisStep({
                         <div className="bg-muted/30 rounded-lg p-3">
                           <h5 className="text-sm font-medium mb-3 flex items-center gap-2">
                             <Clock className="w-4 h-4 text-primary" />
-                            Szenenlänge anpassen
+                            {tx({ de: "Szenenlänge anpassen", en: "Adjust scene length", es: "Ajustar duración de escena" })}
                           </h5>
                           <div className="grid grid-cols-3 gap-4 mb-3">
                             <div className="text-center">
@@ -1071,7 +1069,7 @@ export function SceneAnalysisStep({
                               <span className="text-sm font-medium">{formatTime(scene.end_time)}</span>
                             </div>
                             <div className="text-center">
-                              <span className="text-xs text-muted-foreground block">Dauer</span>
+                              <span className="text-xs text-muted-foreground block">{tx({ de: "Dauer", en: "Duration", es: "Duración" })}</span>
                               <span className="text-sm font-medium">{(scene.end_time - scene.start_time).toFixed(1)}s</span>
                             </div>
                           </div>
@@ -1098,7 +1096,7 @@ export function SceneAnalysisStep({
                             </div>
                           ) : (
                             <p className="text-xs text-muted-foreground text-center">
-                              Die letzte Szene endet automatisch mit dem Video
+                              {tx({ de: "Die letzte Szene endet automatisch mit dem Video", en: "The last scene automatically ends with the video", es: "La última escena termina automáticamente con el video" })}
                             </p>
                           )}
                         </div>
@@ -1108,7 +1106,7 @@ export function SceneAnalysisStep({
                           <div className="bg-muted/30 rounded-lg p-3">
                             <h5 className="text-sm font-medium mb-3 flex items-center gap-2">
                               <Play className="w-4 h-4 text-blue-500" />
-                              Übergang zur nächsten Szene
+                              {tx({ de: "Übergang zur nächsten Szene", en: "Transition to next scene", es: "Transición a la siguiente escena" })}
                             </h5>
                             <div className="grid grid-cols-4 gap-2">
                               {TRANSITION_TYPES.slice(0, 8).map((transition) => (
@@ -1135,7 +1133,7 @@ export function SceneAnalysisStep({
                             {/* Duration Slider */}
                             {sceneTransitions[scene.id]?.type && (
                               <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/50">
-                                <span className="text-xs font-medium">Dauer:</span>
+                                <span className="text-xs font-medium">{tx({ de: "Dauer:", en: "Duration:", es: "Duración:" })}</span>
                                 <Slider
                                   value={[sceneTransitions[scene.id]?.duration || 1.2]}
                                   onValueChange={(v) => handleSetSceneTransitionDuration(scene.id, v[0])}
@@ -1156,7 +1154,7 @@ export function SceneAnalysisStep({
                         <div className="flex gap-2">
                           <Button variant="default" size="sm">
                             <Play className="w-3 h-3 mr-1" />
-                            Szene abspielen
+                            {tx({ de: "Szene abspielen", en: "Play scene", es: "Reproducir escena" })}
                           </Button>
                           <Button 
                             variant="outline" 
@@ -1165,7 +1163,7 @@ export function SceneAnalysisStep({
                             disabled={!onApplySuggestions || scene.suggested_effects.length === 0}
                           >
                             <Wand2 className="w-3 h-3 mr-1" />
-                            Vorschläge anwenden
+                            {tx({ de: "Vorschläge anwenden", en: "Apply suggestions", es: "Aplicar sugerencias" })}
                           </Button>
                           {hasSceneEffects(scene.id) && (
                             <Button 
@@ -1174,7 +1172,7 @@ export function SceneAnalysisStep({
                               onClick={() => clearSceneEffects(scene.id)}
                             >
                               <X className="w-3 h-3 mr-1" />
-                              Zurücksetzen
+                              {tx({ de: "Zurücksetzen", en: "Reset", es: "Restablecer" })}
                             </Button>
                           )}
                         </div>

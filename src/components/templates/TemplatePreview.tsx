@@ -113,7 +113,7 @@ export const TemplatePreview = ({
 
                 {template.duration && (
                   <div>
-                    <h4 className="text-sm font-medium mb-2">Dauer</h4>
+                    <h4 className="text-sm font-medium mb-2">{tx({ de: "Dauer", en: "Duration", es: "Duración" })}</h4>
                     <div className="flex items-center gap-1 text-sm">
                       <Clock className="h-4 w-4" />
                       {template.duration}s
@@ -188,7 +188,7 @@ export const TemplatePreview = ({
                               Version {version.version_number}
                             </span>
                             {version.is_published && (
-                              <Badge variant="secondary">Veröffentlicht</Badge>
+                              <Badge variant="secondary">{tx({ de: "Veröffentlicht", en: "Published", es: "Publicado" })}</Badge>
                             )}
                           </div>
                           {version.change_notes && (

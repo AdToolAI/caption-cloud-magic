@@ -1114,7 +1114,7 @@ export default function VideoComposerDashboard() {
   }, [project]);
 
   const STEP_HINTS: Record<TabId, string> = {
-    briefing: 'Produkt, Zielgruppe & Tonalität',
+    briefing: tx({ de: "Produkt, Zielgruppe & Tonalität", en: "Product, target audience & tone", es: "Producto, público objetivo y tono" }),
     storyboard: tx({ de: "Szenen planen & anordnen", en: "Plan & arrange scenes", es: "Planificar y organizar escenas" }),
     clips: 'AI-Clips generieren',
     text: tx({ de: 'Voiceover & Untertitel', en: 'Voiceover & subtitles', es: 'Voz en off y subtítulos' }),

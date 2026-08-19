@@ -68,7 +68,7 @@ export const TRIGGER_REGISTRY: TriggerDefinition[] = [
       de: {
         title: 'Motion Studio',
         body: tx({ de: 'Der geführte Flow durch Cast → Skript → Szene → Composer. Ideal für deinen ersten Spot.', en: 'The guided flow through Cast → Script → Scene → Composer. Ideal for your first spot.', es: 'El flujo guiado a través de Elenco → Guion → Escena → Compositor. Ideal para tu primer anuncio.' }),
-        cta: 'Studio Mode starten',
+        cta: tx({ de: "Studio Mode starten", en: "Start Studio Mode", es: "Iniciar Modo Estudio" }),
       },
       en: {
         title: 'Motion Studio',

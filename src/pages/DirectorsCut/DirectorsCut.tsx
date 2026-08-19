@@ -684,7 +684,7 @@ export function DirectorsCut() {
       };
       toast(tx({ de: 'Szenen werden überschrieben', en: 'Scenes will be overwritten', es: 'Las escenas serán sobrescritas' }), {
         action: {
-          label: 'Rückgängig',
+          label: tx({ de: "Rückgängig", en: "Undo", es: "Deshacer" }),
           onClick: () => {
             const b = lastEdlBackupRef.current;
             if (b) {

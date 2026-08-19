@@ -9,7 +9,7 @@ const TRANSITIONS = [
   { id: 'slide', name: 'Slide', description: 'Seitliches Gleiten' },
   { id: 'zoom', name: 'Zoom', description: 'Hinein-/Herauszoomen' },
   { id: 'wipe', name: 'Wipe', description: 'Wischbewegung' },
-  { id: 'blur', name: 'Blur', description: 'Weichzeichner-Übergang' },
+  { id: 'blur', name: 'Blur', description: tx({ de: "Weichzeichner-Übergang", en: "Blur transition", es: "Transición de desenfoque" }) },
   { id: 'push', name: 'Push', description: tx({ de: 'Szene schiebt Szene', en: 'Scene pushes scene', es: 'La escena empuja la escena' }) },
 ] as const;
 
@@ -29,7 +29,7 @@ export function TransitionSelector({
   // available, but only when a caller explicitly opts in.
   availableTransitions = ['none', 'crossfade'],
   disabled = false,
-  label = 'Übergangseffekt'
+  label = tx({ de: "Übergangseffekt", en: "Transition effect", es: "Efecto de transición" })
 }: TransitionSelectorProps) {
   const filteredTransitions = TRANSITIONS.filter(t =>
     availableTransitions.includes(t.id)

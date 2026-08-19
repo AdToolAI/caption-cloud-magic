@@ -296,7 +296,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
         <div>
           <h2 className="font-serif text-xl">{tx({ de: "Was sollen wir für dich drehen?", en: "What should we shoot for you?", es: "¿Qué deberíamos grabar para ti?" })}</h2>
           <p className="text-sm text-muted-foreground">
-            Ein Satz genügt. Du bekommst fünf Ideen, die wir auch wirklich umsetzen können.
+            {tx({ de: "Ein Satz genügt. Du bekommst fünf Ideen, die wir auch wirklich umsetzen können.", en: "One sentence is enough. You'll get five ideas that we can actually implement.", es: "Una frase es suficiente. Obtendrás cinco ideas que realmente podemos implementar." })}
           </p>
         </div>
       </div>
@@ -312,7 +312,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
       {/* -------------------------------------------------------- own images */}
       <div className="mt-5">
         <div className="mb-2 flex items-center justify-between">
-          <Label className="text-sm">Eigene Bilder (optional)</Label>
+          <Label className="text-sm">{tx({ de: "Eigene Bilder (optional)", en: "Own images (optional)", es: "Imágenes propias (opcional)" })}</Label>
           <span className="text-xs text-muted-foreground">{assets.length}/{MAX_ASSETS}</span>
         </div>
 
@@ -437,7 +437,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
 
         <div className="space-y-2 md:col-span-2">
           <div className="flex items-center justify-between">
-            <Label className="text-sm">Länge</Label>
+            <Label className="text-sm">{tx({ de: "Länge", en: "Length", es: "Longitud" })}</Label>
             <span className="text-sm text-muted-foreground">{options.duration} Sekunden</span>
           </div>
           <Slider
@@ -448,7 +448,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
             step={5}
           />
           <p className="text-xs text-muted-foreground">
-            Mehr als 180 Sekunden produzieren wir bewusst nicht — darunter leidet die Qualität.
+            {tx({ de: "Mehr als 180 Sekunden produzieren wir bewusst nicht — darunter leidet die Qualität.", en: "We deliberately don't produce more than 180 seconds — quality suffers otherwise.", es: "Deliberadamente no producimos más de 180 segundos — la calidad sufre de lo contrario." })}
           </p>
         </div>
 
@@ -542,7 +542,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
       )}
 
       <Badge variant="outline" className="mt-4 border-primary/30 text-[11px] font-normal text-muted-foreground">
-        Bis hierhin kostet dich nichts außer der Ideenrunde — produziert wird erst nach deiner Freigabe.
+        {tx({ de: "Bis hierhin kostet dich nichts außer der Ideenrunde — produziert wird erst nach deiner Freigabe.", en: "Up to this point, it costs you nothing but the idea round — production only starts after your approval.", es: "Hasta este punto, no te cuesta nada más que la ronda de ideas — la producción solo comienza después de tu aprobación." })}
       </Badge>
     </Card>
   );
