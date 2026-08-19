@@ -237,7 +237,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
     const h = Math.floor(mins / 60);
     const m = mins % 60;
     toast.success(
-      tx({ de: `🚀 Eingeplant — wird in ${h > 0 ? `${h}h ` : "tx({ de: "}${m}min automatisch veröffentlicht`, en: `🚀 Scheduled — will be published automatically in ${h > 0 ? `${h}h ` : ", en: "🚀 Scheduled — will be published automatically in ${h > 0 ? `${h}h ` : \"\"}${m}min", es: "🚀 Programado — se publicará automáticamente en ${h > 0 ? `${h}h ` : \"\"}${m}min" })"}${m}min`, es: `🚀 Programado — se publicará automáticamente en ${h > 0 ? `${h}h ` : ""}${m}min` }),
+      tx({ de: `🚀 Eingeplant — wird in ${h > 0 ? `${h}h ` : ""}${m}min automatisch veröffentlicht`, en: `🚀 Scheduled — will be published automatically in ${h > 0 ? `${h}h ` : ""}${m}min`, es: `🚀 Programado — se publicará automáticamente en ${h > 0 ? `${h}h ` : ""}${m}min` }),
     );
     setAutoPublish(true);
   };
@@ -496,7 +496,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-[10px] uppercase tracking-[0.18em] font-semibold text-[hsl(var(--primary))]/80">
-            {tx({ de: "Live-Vorschau", en: "Live Preview", es: "Vista previa en vivo" })}
+            Live-Vorschau
           </h3>
         </div>
         <div className="flex flex-wrap gap-1.5">

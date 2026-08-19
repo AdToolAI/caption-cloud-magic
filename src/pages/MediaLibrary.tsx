@@ -166,7 +166,7 @@ export default function MediaLibrary() {
           scheduleReload();
           if (payload.eventType === 'INSERT') {
             toast({
-              title: tx({ de: "🎉 Neue Medien hinzugefügt!", en: "🎉 New media added!", es: "🎉 ¡Nuevos medios añadidos!" }),
+              title: "🎉 Neue Medien hinzugefügt!",
               description: tx({ de: "Deine Media Library wurde aktualisiert", en: "Your media library has been updated", es: "Su biblioteca multimedia ha sido actualizada" }),
             });
           }
@@ -380,7 +380,7 @@ export default function MediaLibrary() {
               : isDirectorsCut
                 ? `Director's Cut - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
                 : isMotionStudioClip
-                  ? tx({ de: `Motion Studio · Szene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? tx({ de: " (Vorgängerversion)", en: " (previous version)", es: " (versión anterior)" }) : ''}`, en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (previous version)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (versión anterior)' : ''}` })
+                  ? tx({ de: `Motion Studio · Szene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}`, en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (previous version)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (versión anterior)' : ''}` })
                   : isUniversalCreator
                     ? `Universal Creator Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
                     : `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`,
@@ -608,7 +608,7 @@ export default function MediaLibrary() {
         }
         toast({
           title: 'Platz geschaffen',
-          description: tx({ de: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurdentx({ de: "} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`, en: `${decision.toDelete.length} older medium${decision.toDelete.length === 1 ? ", en: "} automatically removed. Tip: Connect Google Drive to securely offload media instead.", es: "} eliminados automáticamente. Consejo: Conecta Google Drive para descargar medios de forma segura." })' : 's'} automatically removed. Tip: Connect Google Drive to offload media safely instead.`, es: `${decision.toDelete.length} medio${decision.toDelete.length === 1 ? '' : 's'} antiguo${decision.toDelete.length === 1 ? '' : 's'} eliminado${decision.toDelete.length === 1 ? '' : 's'} automáticamente. Consejo: Conecta Google Drive para descargar medios de forma segura en su lugar.` }),
+          description: tx({ de: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`, en: `${decision.toDelete.length} older medium${decision.toDelete.length === 1 ? '' : 's'} automatically removed. Tip: Connect Google Drive to offload media safely instead.`, es: `${decision.toDelete.length} medio${decision.toDelete.length === 1 ? '' : 's'} antiguo${decision.toDelete.length === 1 ? '' : 's'} eliminado${decision.toDelete.length === 1 ? '' : 's'} automáticamente. Consejo: Conecta Google Drive para descargar medios de forma segura en su lugar.` }),
         });
       } catch (cleanupErr: any) {
         toast({
@@ -828,7 +828,7 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: tx({ de: "✉️ Medien gesendet", en: "✉️ Media sent", es: "✉️ Medios enviados" }),
+      title: "✉️ Medien gesendet",
       description: tx({ de: `${selectedItems.length} Dateien werden im Composer geladen...`, en: `${selectedItems.length} files are loaded in composer...`, es: `Los archivos ${selectedItems.length} están cargados en Composer...` }),
     });
     
@@ -1210,13 +1210,13 @@ export default function MediaLibrary() {
                     }}
                   >
                     {expandedScenes.includes(item.sceneId)
-                      ? tx({ de: "Ältere Versionen ausblenden", en: "Hide older versions", es: "Ocultar versiones anteriores" })
+                      ? 'Ältere Versionen ausblenden'
                       : `+${item.olderVersionCount} ältere Version${item.olderVersionCount > 1 ? 'en' : ''}`}
                   </button>
                 )}
                 {item.isSuperseded && (
                   <div className="absolute bottom-2 left-2 z-10 rounded-md bg-background/80 px-2 py-1 text-xs backdrop-blur">
-                    {tx({ de: "Ältere Version", en: "Older Version", es: "Versión anterior" })}
+                    Ältere Version
                   </div>
                 )}
 
@@ -1433,7 +1433,7 @@ export default function MediaLibrary() {
             <Button asChild>
               <label htmlFor="file-upload" className="cursor-pointer">
                 <Upload className="h-4 w-4 mr-2" />
-                {tx({ de: "Datei hochladen", en: "Upload File", es: "Subir archivo" })}
+                Datei hochladen
               </label>
             </Button>
           </div>

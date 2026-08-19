@@ -105,7 +105,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
                   Heatmap-Radar
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {tx({ de: "Geplante Posts · Optimale Zeiten · Konflikte — auf einen Blick", en: "Scheduled Posts · Optimal Times · Conflicts — at a glance", es: "Publicaciones programadas · Horas óptimas · Conflictos — de un vistazo" })}
+                  Geplante Posts · Optimale Zeiten · Konflikte — auf einen Blick
                 </p>
               </div>
             </div>
@@ -271,12 +271,12 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
                               )}
                               {!hasPosts && !score && (
                                 <div className="text-[10px] text-muted-foreground">
-                                  {tx({ de: "Klick: Post für diesen Slot erstellen", en: "Click: Create post for this slot", es: "Clic: Crear publicación para este espacio" })}
+                                  Klick: Post für diesen Slot erstellen
                                 </div>
                               )}
                               {!hasPosts && score && (
                                 <div className="text-[10px] text-primary/80 italic">
-                                  {tx({ de: "Goldene Lücke — Klick zum Befüllen", en: "Golden Gap — Click to fill", es: "Brecha Dorada — Haz clic para rellenar" })}
+                                  Goldene Lücke — Klick zum Befüllen
                                 </div>
                               )}
                             </div>
@@ -314,7 +314,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
             <InsightCard
               icon={<Sparkles className="w-4 h-4" />}
               tone="gold"
-              title={tx({ de: "Goldene Lücke", en: "Golden Gap", es: "Brecha Dorada" })}
+              title="Goldene Lücke"
               body={
                 goldenGap
                   ? `${DAY_LABELS_LONG_DE[goldenGap.day]} ${String(goldenGap.hour).padStart(2, "0")}:00 — Score ${goldenGap.score}, kein Post geplant.`
@@ -335,7 +335,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
               title="Konflikt-Warnung"
               body={
                 conflicts.length > 0
-                  ? tx({ de: `${conflicts.length} Slot${conflicts.length === 1 ? "" : "stx({ de: "} mit ≥3 Posts gleichzeitig — Reach kannibalisiert sich.`, en: `${conflicts.length} slot${conflicts.length === 1 ? ", en: "${conflicts.length} slot${conflicts.length === 1 ? \"\" : \"s\"} with ≥3 posts at the same time — reach cannibalizes itself.", es: "${conflicts.length} franja${conflicts.length === 1 ? \"\" : \"s\"} con ≥3 publicaciones al mismo tiempo — el alcance se canibaliza." })" : "s"} with ≥3 posts at the same time — reach cannibalizes itself.`, es: `${conflicts.length} franja${conflicts.length === 1 ? "" : "s"} con ≥3 publicaciones a la vez: el alcance se canibaliza.` })
+                  ? tx({ de: `${conflicts.length} Slot${conflicts.length === 1 ? "" : "s"} mit ≥3 Posts gleichzeitig — Reach kannibalisiert sich.`, en: `${conflicts.length} slot${conflicts.length === 1 ? "" : "s"} with ≥3 posts at the same time — reach cannibalizes itself.`, es: `${conflicts.length} franja${conflicts.length === 1 ? "" : "s"} con ≥3 publicaciones a la vez: el alcance se canibaliza.` })
                   : tx({ de: "Keine Stau-Slots. Saubere Verteilung.", en: "No traffic jam slots. Clean distribution.", es: "Sin espacios para atascos. Distribución limpia." })
               }
             />
@@ -364,10 +364,10 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
             >
               <CalendarPlus className="w-8 h-8 text-primary/60 mx-auto mb-2" />
               <p className="text-sm text-foreground/90 mb-1">
-                {tx({ de: "Noch keine Posts geplant — die cyan-Schimmer zeigen dir bereits, wann deine Audience aktiv ist.", en: "No posts scheduled yet — the cyan shimmer already shows you when your audience is active.", es: "Aún no hay publicaciones programadas — el brillo cian ya te muestra cuándo tu audiencia está activa." })}
+                Noch keine Posts geplant — die cyan-Schimmer zeigen dir bereits, wann deine Audience aktiv ist.
               </p>
               <p className="text-xs text-muted-foreground mb-3">
-                {tx({ de: "Klick auf eine Zelle, um direkt einen Post für diesen Slot zu erstellen.", en: "Click on a cell to directly create a post for this slot.", es: "Haz clic en una celda para crear directamente una publicación para este espacio." })}
+                Klick auf eine Zelle, um direkt einen Post für diesen Slot zu erstellen.
               </p>
               <Button
                 size="sm"
