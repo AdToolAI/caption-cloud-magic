@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import {
@@ -111,7 +112,7 @@ export default function MotionStudioTemplatePicker({
 
             {!isLoading && templates.length === 0 && (
               <div className="col-span-full text-center py-12 text-muted-foreground text-sm">
-                Keine Templates gefunden.
+                {tx({ de: "Keine Templates gefunden.", en: "No templates found.", es: "No se encontraron plantillas." })}
               </div>
             )}
           </div>

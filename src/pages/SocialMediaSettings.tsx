@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -129,7 +130,7 @@ export default function SocialMediaSettings() {
       <Alert className="mb-6">
         <AlertDescription>
           {tx({ de: "Um Social Media Publishing zu nutzen, müssen die entsprechenden API-Tokens als Secrets konfiguriert werden.", en: "To use social media publishing, the corresponding API tokens must be configured as secrets.", es: "Para usar la publicación en redes sociales, los tokens API correspondientes deben configurarse como secretos." })}
-          Die Token-Namen sind: INSTAGRAM_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN, LINKEDIN_ACCESS_TOKEN, YOUTUBE_ACCESS_TOKEN, etc.
+          {tx({ de: "Die Token-Namen sind:", en: "The token names are:", es: "Los nombres de los tokens son:" })} INSTAGRAM_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN, LINKEDIN_ACCESS_TOKEN, YOUTUBE_ACCESS_TOKEN, etc.
         </AlertDescription>
       </Alert>
 

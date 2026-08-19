@@ -181,7 +181,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
       }
       toast({
         title: tx({ de: 'Renderpfad neu gestartet', en: 'Render path restarted', es: 'Ruta de renderizado reiniciada' }),
-        description: tx({ de: 'Die Szene läuft jetzt über die Lip-Sync-Pipeline.', en: 'The scene is now running via die Lip-Sync-Pipeline.', es: 'La escena se está ejecutando ahora a través de die Lip-Sync-Pipeline.' }),
+        description: tx({ de: 'Die Szene läuft jetzt über die Lip-Sync-Pipeline.', en: 'The scene is now running via the lip-sync pipeline.', es: 'La escena se ejecuta ahora a través del pipeline de lip-sync.' }),
       });
     } catch (err) {
       toast({

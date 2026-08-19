@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
@@ -570,7 +571,7 @@ export default function AITextStudio() {
               </div>
               {selectedModel.supportsReasoningEffort ? (
                 <div>
-                  <Label className="text-xs">Denk-Tiefe</Label>
+                  <Label className="text-xs">{tx({ de: "Denk-Tiefe", en: "Reasoning depth", es: "Profundidad de razonamiento" })}</Label>
                   <Select value={reasoning} onValueChange={(v) => setReasoning(v as ReasoningEffort)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -582,7 +583,7 @@ export default function AITextStudio() {
                 </div>
               ) : (
                 <div className="text-[11px] text-muted-foreground self-end pb-2">
-                  Denk-Tiefe ist bei {selectedModel.label} nicht einstellbar.
+                  {tx({ de: "Denk-Tiefe ist nicht einstellbar bei", en: "Reasoning depth is not adjustable for", es: "La profundidad de razonamiento no es ajustable para" })} {selectedModel.label}.
                 </div>
               )}
             </div>
@@ -632,7 +633,7 @@ export default function AITextStudio() {
               className="h-7"
               title={tx({ de: "Setzt den aktuellen Chat zurück. Dein bisheriges Gespräch findest du jederzeit unter History.", en: "Resets the current chat. You can find your previous conversation at any time under History.", es: "Restablece el chat actual. Puedes encontrar tu conversación anterior en cualquier momento en Historial." })}
             >
-              <Sparkles className="h-3 w-3 mr-1" /> Neue Konversation
+              <Sparkles className="h-3 w-3 mr-1" /> {tx({ de: "Neue Konversation", en: "New conversation", es: "Nueva conversación" })}
             </Button>
           </div>
 

@@ -205,7 +205,7 @@ export default function TemplateLibrary() {
         ) : (
           <Card className="p-12 text-center">
             <p className="text-muted-foreground">
-              Keine Templates gefunden. Versuche eine andere Suche.
+              {tx({ de: "Keine Templates gefunden. Versuche eine andere Suche.", en: "No templates found. Try a different search.", es: "No se encontraron plantillas. Prueba otra búsqueda." })}
             </p>
           </Card>
         )}

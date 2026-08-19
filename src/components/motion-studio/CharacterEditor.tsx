@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -235,7 +236,7 @@ export default function CharacterEditor({
               <div className="space-y-1">
                 <p className="text-xs font-semibold">Sherlock-Holmes-Effekt</p>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  verbessert die Konsistenz nochmal deutlich.
+                  {tx({ de: "verbessert die Konsistenz nochmal deutlich.", en: "further improves consistency significantly.", es: "mejora aún más la consistencia de forma notable." })}
                 </p>
               </div>
             </div>
@@ -293,7 +294,7 @@ export default function CharacterEditor({
                 />
                 <div className="flex-1 space-y-2">
                   <p className="text-[11px] text-muted-foreground">
-                    Wird als Image-to-Video-Referenz an Hailuo / Kling / Wan übergeben.
+                    {tx({ de: "Wird als Image-to-Video-Referenz an Hailuo / Kling / Wan übergeben.", en: "Passed to Hailuo / Kling / Wan as an image-to-video reference.", es: "Se pasa a Hailuo / Kling / Wan como referencia de imagen a vídeo." })}
                   </p>
                   <Button
                     variant="ghost"
