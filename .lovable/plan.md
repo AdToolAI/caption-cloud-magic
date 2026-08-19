@@ -15,24 +15,35 @@ Nur dieser P1 + echter Wire-Parity-Test. Kein Deploy, kein Render, keine Migrati
 Neuer PURE Helper `supabase/functions/_shared/provider-wire-snapshot.ts`:
 
 - `buildProviderWireSnapshot(input)` → normalisiertes Snapshot-Objekt mit exakt:
-  `video_url`, `audio_url` (der tatsächlich gesendete `sync_audio_url ?? audio_url`), `bbox` (transformierte Contract-E-Box), `frame_count`, `voiced_windows`, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`.
-- `buildProviderWire(snapshot, { asdTransport: "url" | "inline", boundingBoxesUrl?, boundingBoxes? })` → konkretes Wire-Objekt. Diese Funktion wird vom Produktionspfad tatsächlich als Quelle für den Audio-/Video-/ASD-Teil des Payloads verwendet, damit der Test keinen Parallelpfad prüft.
-- `resolveFrozenProviderInput(pass)` → Snapshot oder `null`.
+  `video_url`, `audio_url` (der tatsächlich gesendete `sync_audio_url ?? audio_url`), `bbox` (transformierte Contract-E-Box), `bounding_boxes` (kanonisches Box-Array), `frame_count`, `dispatch_fps`, `voiced_windows`, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`.
+- `buildProviderWire(snapshot, { asdTransport: "url" | "inline", boundingBoxesUrl? })` → konkretes Wire-Objekt. Diese Funktion wird vom Produktionspfad tatsächlich als Quelle für den Audio-/Video-/ASD-Teil des Payloads verwendet, damit der Test keinen Parallelpfad prüft.
+- `resolveFrozenProviderInput(pass)` → vollständiger Snapshot oder `null` (unvollständig ⇒ `null`).
 
-Persistenz: unmittelbar vor dem Sync.so-Dispatch wird der Snapshot als `pass.provider_input_frozen` in den Pass-Slot geschrieben (gleicher Persist-Pfad wie die bestehenden `_v105_probe`/Preclip-Felder, keine neue Tabelle, keine Migration).
+Box-Sequenz wird genau einmal berechnet und eingefroren:
+- Fresh: frozen `bounding_boxes` → JSON-Upload → `bounding_boxes_url`.
+- Retry: EXAKT dasselbe frozen `bounding_boxes` → inline `bounding_boxes`. Keine Neuberechnung auf einer der beiden Seiten.
+
+## 1b. Snapshot-Persistenz ist verbindlich (kein best-effort)
+
+Der Snapshot entsteht erst, wenn alle Felder endgültig feststehen (dispatch video URL, provider audio URL, Contract-E dispatch bbox, bounding_boxes, frame_count, dispatch_fps, voiced_windows, sync_mode, model, speaker_idx, segment_id, run_id, plate_generation).
+
+Danach `update_dialog_pass_slot(provider_input_frozen)` — dieser Write MUSS erfolgreich sein, bevor Sync.so `/generate` aufgerufen wird. Persist-Fehler ⇒ fail closed über den bestehenden `failBeforeProviderDispatch`-Pfad mit `provider_call_made=false`, kein Provider-Call, bestehende Refund-Idempotenz unverändert.
 
 ## 2. NOOP Retry reuse
 
-Bedingung: `isFrozenNoopRetryPass(pass)` bzw. `noop_auto_escalation === true` mit `retry_variant ∈ {coords-pro-box, bbox-url-pro}` UND vorhandenem `provider_input_frozen.audio_url`.
+Bedingung: `isFrozenNoopRetryPass(pass)` bzw. `noop_auto_escalation === true` mit `retry_variant ∈ {coords-pro-box, bbox-url-pro}`.
 
 Dann strukturell übersprungen (Branch vor der jeweiligen Stelle, nicht danach):
 - v40 Canonical-Restore (`audio_url` bleibt, `audio_tight` wird nicht genullt),
 - Tight-Slicing inkl. Upload (`Date.now()`-Pfad wird nicht betreten),
-- v129.3-Trim/Upload — `sync_audio_url` wird direkt aus dem Snapshot gesetzt.
+- v129.3-Trim/Upload — `sync_audio_url` wird direkt aus dem Snapshot gesetzt,
+- Video-Rehost/-Recompute und bbox-/bounding_boxes-Recompute.
 
-Ebenfalls aus dem Snapshot übernommen statt neu berechnet: Preclip-/Video-URL, Contract-E-Box, Frame-Count, Voiced-Windows, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`.
+Alles Übrige kommt aus dem Snapshot statt aus Neuberechnung: Preclip-/Video-URL, Contract-E-Box, `bounding_boxes`, Frame-Count, `dispatch_fps`, Voiced-Windows, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`.
 Einziger Unterschied auf dem Wire: `bounding_boxes_url` (fresh) → inline `bounding_boxes` (retry).
-Fehlt der Snapshot, bleibt exakt das heutige Verhalten (kein neuer Fail-Pfad). Nicht-NOOP-Retries bleiben unverändert.
+
+Fehlt der Snapshot oder ist er unvollständig: KEIN Legacy-Rebuild. Fail closed vor dem Provider-Dispatch (`noop_retry_frozen_input_missing`), `provider_call_made=false`. Nicht-NOOP-Retries und Fresh-Dispatches bleiben unverändert.
+
 
 ## 3. Tests
 
