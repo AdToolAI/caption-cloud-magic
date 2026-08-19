@@ -14,10 +14,11 @@ Nur dieser P1 + echter Wire-Parity-Test. Kein Deploy, kein Render, keine Migrati
 
 Neuer PURE Helper `supabase/functions/_shared/provider-wire-snapshot.ts`:
 
-- `buildProviderWireSnapshot(input)` → normalisiertes Snapshot-Objekt mit exakt:
-  `video_url`, `audio_url` (der tatsächlich gesendete `sync_audio_url ?? audio_url`), `bbox` (transformierte Contract-E-Box), `bounding_boxes` (kanonisches Box-Array), `frame_count`, `dispatch_fps`, `voiced_windows`, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`.
-- `buildProviderWire(snapshot, { asdTransport: "url" | "inline", boundingBoxesUrl? })` → konkretes Wire-Objekt. Diese Funktion wird vom Produktionspfad tatsächlich als Quelle für den Audio-/Video-/ASD-Teil des Payloads verwendet, damit der Test keinen Parallelpfad prüft.
+- `buildProviderWireSnapshot(input)` → normalisiertes Snapshot-Objekt mit exakt diesen Feldern, jedes genau einmal:
+  `video_url`, `audio_url` (der tatsächlich gesendete `sync_audio_url ?? audio_url`), `bbox` (transformierte Contract-E-Box), `bounding_boxes` (kanonisches Box-Array), `frame_count`, `dispatch_fps`, `voiced_windows`, `sync_mode`, `model`, `speaker_idx`, `segment_id`, `run_id`, `plate_generation`. Kein zweites Frame-Count-Feld, kein Alias.
+- `buildProviderWire(snapshot, { asdTransport: "url" | "inline", boundingBoxesUrl? })` → konkretes Wire-Objekt. Diese Funktion ist die EINZIGE Production-Quelle für alle frozen Wire-Felder: nach dem Aufruf werden `video_url`, `audio_url`, `model`, `sync_mode`, ASD, `bbox`/`bounding_boxes` sowie `frame_count`/`dispatch_fps` (soweit sie den Wire beeinflussen) nicht mehr überschrieben oder neu berechnet. Der Payload, der an Sync.so geht, wird aus diesem Objekt gebildet — kein Parallel-/Mirror-Payload.
 - `resolveFrozenProviderInput(pass)` → vollständiger Snapshot oder `null` (unvollständig ⇒ `null`).
+
 
 Box-Sequenz wird genau einmal berechnet und eingefroren:
 - Fresh: frozen `bounding_boxes` → JSON-Upload → `bounding_boxes_url`.
