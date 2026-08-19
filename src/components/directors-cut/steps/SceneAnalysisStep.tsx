@@ -730,7 +730,7 @@ export function SceneAnalysisStep({
                             className={`w-2 cursor-col-resize flex items-center justify-center group/divider z-30
                               hover:bg-white/30 transition-colors ${dragIndex === index ? 'bg-white/50' : ''}`}
                             onMouseDown={(e) => handleDividerDragStart(index, e)}
-                            title=tx({ de: "Ziehen um Szenenlänge anzupassen", en: "Drag to adjust scene length", es: "Arrastrar para ajustar duración de escena" })
+                            title={tx({ de: "Ziehen um Szenenlänge anzupassen", en: "Drag to adjust scene length", es: "Arrastrar para ajustar duración de escena" })}
                           >
                             <div className={`w-0.5 h-full bg-white/40 group-hover/divider:bg-white group-hover/divider:w-1 transition-all
                               ${dragIndex === index ? 'bg-white w-1' : ''}`} />

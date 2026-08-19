@@ -314,7 +314,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
             <InsightCard
               icon={<Sparkles className="w-4 h-4" />}
               tone="gold"
-              title=tx({ de: "Goldene Lücke", en: "Golden Gap", es: "Brecha Dorada" })
+              title={tx({ de: "Goldene Lücke", en: "Golden Gap", es: "Brecha Dorada" })}
               body={
                 goldenGap
                   ? `${DAY_LABELS_LONG_DE[goldenGap.day]} ${String(goldenGap.hour).padStart(2, "0")}:00 — Score ${goldenGap.score}, kein Post geplant.`

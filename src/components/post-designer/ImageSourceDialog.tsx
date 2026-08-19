@@ -182,7 +182,7 @@ export function ImageSourceDialog({ open, onOpenChange, onPick }: ImageSourceDia
                 value={stockQuery}
                 onChange={(e) => setStockQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleStockSearch()}
-                placeholder=tx({ de: "Suchbegriff, z. B. Kaffee, Büro, Sommer", en: "Search term, e.g. coffee, office, summer", es: "Término de búsqueda, ej. café, oficina, verano" })
+                placeholder={tx({ de: "Suchbegriff, z. B. Kaffee, Büro, Sommer", en: "Search term, e.g. coffee, office, summer", es: "Término de búsqueda, ej. café, oficina, verano" })}
               />
               <Button onClick={handleStockSearch} disabled={stockState === "loading"}>
                 {stockState === "loading" ? <Loader2 className="h-4 w-4 animate-spin" /> : tx({ de: "Suchen", en: "Search", es: "Buscar" })}

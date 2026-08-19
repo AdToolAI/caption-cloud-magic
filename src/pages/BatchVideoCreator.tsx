@@ -143,7 +143,7 @@ export default function BatchVideoCreator() {
                   id="job-name"
                   value={jobName}
                   onChange={(e) => setJobName(e.target.value)}
-                  placeholder=tx({ de: "z.B. Produktvideos März 2024", en: "e.g. Product Videos March 2024", es: "ej. Videos de productos marzo 2024" })
+                  placeholder={tx({ de: "z.B. Produktvideos März 2024", en: "e.g. Product Videos March 2024", es: "ej. Videos de productos marzo 2024" })}
                 />
               </div>
 

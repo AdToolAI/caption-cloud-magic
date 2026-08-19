@@ -247,7 +247,7 @@ export default function CharacterEditor({
             <Input
               value={draft.name}
               onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-              placeholder=tx({ de: "z. B. Richard Löwenherz", en: "e.g. Richard the Lionheart", es: "ej. Ricardo Corazón de León" })
+              placeholder={tx({ de: "z. B. Richard Löwenherz", en: "e.g. Richard the Lionheart", es: "ej. Ricardo Corazón de León" })}
               className="bg-background/60"
             />
           </div>

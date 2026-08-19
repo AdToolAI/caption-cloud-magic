@@ -700,7 +700,7 @@ export default function AdDirectorWizard({
                       id="ad-audience"
                       value={targetAudience}
                       onChange={(e) => setTargetAudience(e.target.value)}
-                      placeholder=tx({ de: "z. B. urbane Frauen, 28–42, qualitätsbewusst", en: "e.g. urban women, 28–42, quality-conscious", es: "ej. mujeres urbanas, 28–42, conscientes de la calidad" })
+                      placeholder={tx({ de: "z. B. urbane Frauen, 28–42, qualitätsbewusst", en: "e.g. urban women, 28–42, quality-conscious", es: "ej. mujeres urbanas, 28–42, conscientes de la calidad" })}
                     />
                   </div>
                 </div>

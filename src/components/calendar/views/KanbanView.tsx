@@ -277,7 +277,7 @@ export function KanbanView({
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder=tx({ de: "Suchen…", en: "Search…", es: "Buscar…" })
+            placeholder={tx({ de: "Suchen…", en: "Search…", es: "Buscar…" })}
             className="pl-9 h-9 bg-white/[0.03] backdrop-blur-xl border-white/10 focus-visible:border-[#F5C76A]/40 focus-visible:ring-0 placeholder:text-muted-foreground/50"
           />
         </div>

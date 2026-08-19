@@ -365,7 +365,7 @@ export const TimelineScriptEditor = ({
                 size="sm" 
                 variant="outline"
                 disabled={isAutoSyncing || segments.length === 0}
-                title=tx({ de: "Text intelligent in mehrere Segmente aufteilen", en: "Intelligently split text into multiple segments", es: "Dividir texto inteligentemente en varios segmentos" })
+                title={tx({ de: "Text intelligent in mehrere Segmente aufteilen", en: "Intelligently split text into multiple segments", es: "Dividir texto inteligentemente en varios segmentos" })}
               >
                 {isAutoSyncing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />

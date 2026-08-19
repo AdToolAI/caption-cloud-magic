@@ -257,7 +257,7 @@ export default function MediaProfiles() {
   return (
     <>
       <SEO
-        title=tx({ de: "Medien-Profile", en: "Media Profiles", es: "Perfiles de medios" })
+        title={tx({ de: "Medien-Profile", en: "Media Profiles", es: "Perfiles de medios" })}
         description={tx({ de: "Verwalte deine Medien-Profile für verschiedene Social-Media-Kanäle.", en: "Manage your media profiles for different social channels.", es: "Gestiona tus perfiles de medios para distintos canales sociales." })}
       />
 
