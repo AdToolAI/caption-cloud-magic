@@ -679,7 +679,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
   }
 
-  const state = scene.dialog_shots ?? null;
+  // v410: `state` wird zwischen zwei kurzen Locked-Phasen frisch nachgeladen.
+  let state: any = scene.dialog_shots ?? null;
+
   if (!state) {
     return ok({ ok: true, skipped: "no_state" });
   }
