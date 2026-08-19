@@ -4,6 +4,8 @@
  * (use_case / gender / age / accent) — kein zusätzlicher Server-Endpunkt nötig.
  */
 
+import { tx } from '@/lib/i18nText';
+
 export type VoiceCategoryId =
   | 'all'
   | 'mine'
