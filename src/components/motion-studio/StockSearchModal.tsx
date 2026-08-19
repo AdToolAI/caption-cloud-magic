@@ -262,7 +262,7 @@ function EmptyHint({ mediaType }: { mediaType: 'video' | 'image' }) {
   return (
     <div className="rounded-md border border-dashed border-border/60 p-6 text-center text-[11px] text-muted-foreground">
       <Film className="h-5 w-5 mx-auto mb-1 opacity-60" />
-      {tx({ de: `Suche ${mediaType === 'video' ? 'Stock-Videos' : ${tx({ de: "Stock-Bilder", en: "Stock images", es: "Imágenes de archivo" })} oder wähle einen Quick-Chip oben.`, en: `Search ${mediaType === 'video' ? 'stock videos' : 'stock images'} or choose a quick chip above.`, es: `Busca ${mediaType === 'video' ? 'videos de archivo' : 'imágenes de archivo'} o elige un chip rápido arriba.` })}
+      {tx({ de: `Suche ${mediaType === 'video' ? 'Stock-Videos' : 'Stock-Bilder'} oder wähle einen Quick-Chip oben.`, en: `Search ${mediaType === 'video' ? 'stock videos' : 'stock images'} or choose a quick chip above.`, es: `Busca ${mediaType === 'video' ? 'videos de archivo' : 'imágenes de archivo'} o elige un chip rápido arriba.` })}
     </div>
   );
 }

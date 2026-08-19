@@ -1,4 +1,3 @@
-import { tx } from '@/lib/i18nText';
 /**
  * SceneDialogStudio — Inline per-scene "screenplay" editor.
  *
@@ -70,6 +69,7 @@ import {
 } from '@/lib/shotDirector/spawnCoverageScenes';
 import type { ShotSelection } from '@/config/shotDirector';
 import { Sparkles as SparklesIcon, Play, Clapperboard } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 import { isSceneInFlight, sceneState } from '@/lib/composer/sceneState';
 import {
   clampDialogMasterDuration,
@@ -234,7 +234,7 @@ const PROJECT_REQUIRED = {
 
 const T = {
   de: {
-    title: tx({ de: "Szenen-Skript", en: "Scene Script", es: "Guion de Escena" }),
+    title: 'Szenen-Skript',
     subtitle: tx({ de: 'Schreibe ein Drehbuch — der Dialog läuft als Voiceover in DIESER Szene.', en: 'Write a script — the dialogue will be voiceover in THIS scene.', es: 'Escribe un guión: el diálogo será una voz en off en ESTA escena.' }),
     subtitleMono: tx({ de: 'Monolog — der Charakter spricht zur Kamera. Läuft als Voiceover in dieser Szene.', en: 'Monologue — the character speaks to the camera. Runs as a voiceover in this scene.', es: 'Monólogo — el personaje habla a la cámara. Se reproduce como voz en off en esta escena.' }),
     script: 'Drehbuch',
@@ -247,7 +247,7 @@ const T = {
     blocks: (n: number) => `${n} Block${n === 1 ? '' : 'e'}`,
     speakers: (n: number) => `${n} Sprecher`,
     sec: (n: number) => `~${n}s`,
-    needCast: tx({ de: "Mindestens 1 Charakter im Cast nötig.", en: "At least 1 character needed in cast.", es: "Se necesita al menos 1 personaje en el elenco." }),
+    needCast: 'Mindestens 1 Charakter im Cast nötig.',
     voiceMissing: (name: string) => tx({ de: `Wähle eine Stimme für „${name}".`, en: `Choose a voice for "${name}".`, es: `Elige una voz para "${name}".` }),
     parseEmpty: tx({ de: 'Kein gültiges Skript. Format: "Sarah: Hallo!"', en: 'Not a valid script. Format: "Sarah: Hello!"', es: 'No es un guión válido. Formato: "Sarah: ¡Hola!"' }),
     success: (n: number) => tx({ de: `${n} Lip-Sync-Clip${n === 1 ? '' : 's'} werden generiert (1–3 Min).`, en: `${n} lip sync clip${n === 1 ? '' : 's'} are being generated (1–3 min).`, es: `Se están generando ${n} clip${n === 1 ? '' : 's'} de sincronización labial (1–3 min).` }),
@@ -2070,10 +2070,10 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           placeholder={
             isMonologue
               ? `${sceneCast[0]?.name ?? 'Sarah'}: ${
-                  ${tx({ de: 'Hi, willkommen!', en: 'Hi, welcome!', es: '¡Hola, bienvenido!' })}
+                  tx({ de: 'Hi, willkommen!', en: 'Hi, welcome!', es: '¡Hola, bienvenido!' })
                 }`
               : `${sceneCast[0]?.name ?? 'Sarah'}: ${
-                  ${tx({ de: 'Hi!', en: 'Hi!', es: '¡Hola!' })}
+                  tx({ de: 'Hi!', en: 'Hi!', es: '¡Hola!' })
                 }\n${sceneCast[1]?.name ?? 'Matthew'}: ${
                   tx({ de: `Hi ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`, en: `Hi ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`, es: `¡Hola ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!` })
                 }`

@@ -203,7 +203,7 @@ function SlotRow({
             size="sm"
             variant="ghost"
             tabIndex={-1}
-            aria-label={t(language, tx({ de: "KI-Vorschlag", en: "AI suggestion", es: "Sugerencia IA" }), 'AI suggestion', 'Sugerencia IA')}
+            aria-label={t(language, 'KI-Vorschlag', 'AI suggestion', 'Sugerencia IA')}
             className="h-5 px-1.5 text-[9px] gap-1 text-primary/70 hover:text-primary"
             onClick={() => onRequestSuggestion(slotKey)}
             disabled={isSuggesting}
@@ -304,7 +304,7 @@ export default function StructuredPromptBuilder({
       if (suggestion) {
         updateSlot(key, suggestion);
         toast({
-          title: t(language, tx({ de: "✨ Vorschlag eingefügt", en: "✨ Suggestion inserted", es: "✨ Sugerencia insertada" }), '✨ Suggestion inserted', '✨ Sugerencia insertada'),
+          title: t(language, '✨ Vorschlag eingefügt', '✨ Suggestion inserted', '✨ Sugerencia insertada'),
         });
       } else {
         throw new Error('Empty suggestion');
@@ -419,7 +419,7 @@ export default function StructuredPromptBuilder({
       <div className="space-y-1 pt-1 border-t border-border/50">
         <div className="flex items-center justify-between text-[9px]">
           <span className="text-muted-foreground">
-            {t(language, tx({ de: "Länge", en: "Length", es: "Longitud" }), 'Length', 'Longitud')} ({limit.label})
+            {t(language, 'Länge', 'Length', 'Longitud')} ({limit.label})
           </span>
           <span
             className={
@@ -443,7 +443,7 @@ export default function StructuredPromptBuilder({
           <p className="text-[9px] text-destructive">
             {t(
               language,
-              `⚠ Über dem Limit von ${limit.hard} ${limit.unit === 'words' ? ${tx({ de: "Wörtern", en: "words", es: "palabras" })} : 'Zeichen'} — ${limit.label} schneidet ab.`,
+              `⚠ Über dem Limit von ${limit.hard} ${limit.unit === 'words' ? 'Wörtern' : 'Zeichen'} — ${limit.label} schneidet ab.`,
               `⚠ Over the ${limit.hard}-${limit.unit} limit — ${limit.label} will truncate.`,
               `⚠ Por encima del límite de ${limit.hard} ${limit.unit === 'words' ? 'palabras' : 'caracteres'} — ${limit.label} truncará.`
             )}
