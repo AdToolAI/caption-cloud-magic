@@ -12,14 +12,11 @@ export default function SharedBrandKit() {
     queryKey: ["shared-brand-kit", token],
     enabled: !!token,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("brand_kits")
-        .select("*")
-        .eq("share_token", token!)
-        .maybeSingle();
+      const { data, error } = await (supabase as any).rpc("get_shared_brand_kit", { p_token: token! });
       if (error) throw error;
-      if (!data) throw new Error("not_found");
-      return data as any;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) throw new Error("not_found");
+      return row as any;
     },
   });
 
