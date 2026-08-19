@@ -426,7 +426,7 @@ export const VoiceLibraryVisual = () => (
   <Frame label="Voice · My Voices">
     <div className="w-full max-w-md space-y-2">
       {[
-        { n: "Meine Stimme", tag: "CLONED" },
+        { n: tx({ de: "Meine Stimme", en: "My voice", es: "Mi voz" }), tag: "CLONED" },
         { n: "Marcus DE", tag: "ELEVEN" },
         { n: "Sarah EN", tag: "ELEVEN" },
         { n: "Founder Voice", tag: "CLONED" },
