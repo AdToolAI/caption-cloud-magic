@@ -27,6 +27,10 @@ export interface SpeakerCardinality {
   isUnknown: boolean;
   /** Nur zur Forensik: reine Pass-Kardinalität (entscheidet NICHTS). */
   totalPasses: number;
+  /** Beobachtete Passes im übergebenen Set. */
+  observedPassCount: number;
+  /** false => Teil-Set (Fan-Out-Race); darf nie `single` ergeben. */
+  passSetComplete: boolean;
   reason: string;
 }
 
@@ -62,10 +66,17 @@ export function distinctSpeakerIndices(passes: unknown): number[] {
  * Klassifiziert die Sprecher-Kardinalität eines v5-Pass-Sets.
  *
  * Kompatibilitätsregel (fail-closed):
- *  - distinctSpeakerCount === 1                      → single
  *  - distinctSpeakerCount >= 2                       → multi
+ *  - Pass-Set unvollständig (observed < totalPasses) → unknown (v409-Race)
+ *  - distinctSpeakerCount === 1                      → single
  *  - distinctSpeakerCount === 0 && totalPasses === 1 → single (historisch)
  *  - distinctSpeakerCount === 0 && totalPasses > 1   → unknown (NIE multi!)
+ *
+ * v409 Partial-Pass-Race: `compose-dialog-segments` schreibt Pass 0 + Root
+ * `total_passes=N` BEVOR die Sibling-Skeletons geseedet sind. Ein sehr
+ * schneller COMPLETED-Callback sieht dann `passes=[pass0]` bei `total_passes=N`.
+ * Ein solches Teil-Set darf NIEMALS `single` ergeben. Die Pass-Anzahl
+ * entscheidet weiterhin NIE „multi" — nur „unknown/incomplete" (fail-closed).
  */
 export function classifySpeakerCardinality(
   passes: unknown,
@@ -78,15 +89,22 @@ export function classifySpeakerCardinality(
   const totalPasses = Number.isFinite(rawTotal) && rawTotal > 0
     ? Math.trunc(rawTotal)
     : list.length;
+  const observedPassCount = list.length;
+  const passSetIncomplete = totalPasses > 1 && observedPassCount < totalPasses;
 
   let classification: SpeakerCardinalityClass;
   let reason: string;
-  if (distinctSpeakerCount === 1) {
-    classification = "single";
-    reason = "distinct_speaker_idx_1";
-  } else if (distinctSpeakerCount >= 2) {
+  if (distinctSpeakerCount >= 2) {
+    // Zwei bestätigte Identitäten sind monoton — ein späterer Seed kann das
+    // nicht zurücknehmen. Multi bleibt auch auf einem Teil-Set korrekt.
     classification = "multi";
     reason = `distinct_speaker_idx_${distinctSpeakerCount}`;
+  } else if (passSetIncomplete) {
+    classification = "unknown";
+    reason = `pass_set_incomplete_${observedPassCount}_of_${totalPasses}`;
+  } else if (distinctSpeakerCount === 1) {
+    classification = "single";
+    reason = "distinct_speaker_idx_1";
   } else if (totalPasses <= 1) {
     classification = "single";
     reason = "legacy_single_pass_without_speaker_idx";
@@ -94,6 +112,7 @@ export function classifySpeakerCardinality(
     classification = "unknown";
     reason = "speaker_idx_missing_on_multi_pass_state";
   }
+
 
   return {
     distinctSpeakerCount,
@@ -103,6 +122,8 @@ export function classifySpeakerCardinality(
     isMultiSpeaker: classification === "multi",
     isUnknown: classification === "unknown",
     totalPasses,
+    observedPassCount,
+    passSetComplete: !passSetIncomplete,
     reason,
   };
 }

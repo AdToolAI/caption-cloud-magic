@@ -145,3 +145,65 @@ Deno.test("regression — pass count alone never decides multi-speaker", () => {
   assertFalse(c.isMultiSpeaker);
   assertFalse(shouldRunMultiSpeakerMotionMeasurement(c));
 });
+
+// ── v409 Partial-Pass-Race (Fan-Out: pass0 + root total_passes vor Seeding) ──
+
+Deno.test("J — totalPasses=4 with only pass0 observed → unknown, fail closed", () => {
+  const c = classifySpeakerCardinality([{ speaker_idx: 0, job_id: "job-0" }], { totalPasses: 4 });
+  assert(c.isUnknown);
+  assertFalse(c.isSingleSpeaker);
+  assertFalse(c.isMultiSpeaker);
+  assertFalse(c.passSetComplete);
+  assertEquals(c.observedPassCount, 1);
+  assertFalse(shouldRunMultiSpeakerMotionMeasurement(c));
+  const d = decideCompletedSpeakerBranch(c);
+  assertEquals(d.branch, "fail_closed");
+  assertEquals((d as { writeId: string }).writeId, "ssw:failed");
+  assertEquals(
+    (d as { errorText: string }).errorText,
+    SPEAKER_CARDINALITY_INDETERMINATE_ERROR,
+  );
+});
+
+Deno.test("K — totalPasses=6 with only pass0 observed → unknown, fail closed", () => {
+  const c = classifySpeakerCardinality([{ speaker_idx: 0, job_id: "job-0" }], { totalPasses: 6 });
+  assert(c.isUnknown);
+  assertEquals(c.reason, "pass_set_incomplete_1_of_6");
+  assertFalse(shouldRunMultiSpeakerMotionMeasurement(c));
+  assertEquals(decideCompletedSpeakerBranch(c).branch, "fail_closed");
+});
+
+Deno.test("L — complete single-speaker multi-turn sets stay single", () => {
+  const two = classifySpeakerCardinality([turnPass(0, 0), turnPass(0, 1)], { totalPasses: 2 });
+  assert(two.isSingleSpeaker);
+  assert(two.passSetComplete);
+
+  const six = classifySpeakerCardinality(
+    [0, 1, 2, 3, 4, 5].map((i) => turnPass(0, i)),
+    { totalPasses: 6 },
+  );
+  assert(six.isSingleSpeaker);
+  assertFalse(shouldRunMultiSpeakerMotionMeasurement(six));
+
+  // Complete multi-speaker sets stay multi.
+  const multi = classifySpeakerCardinality(
+    [0, 1, 0, 1].map((s, i) => turnPass(s, i)),
+    { totalPasses: 4 },
+  );
+  assert(multi.isMultiSpeaker);
+  const multi6 = classifySpeakerCardinality(
+    [0, 1, 2, 3, 0, 1].map((s, i) => turnPass(s, i)),
+    { totalPasses: 6 },
+  );
+  assert(multi6.isMultiSpeaker);
+});
+
+Deno.test("M — partial set with two distinct speakers already confirms multi", () => {
+  const c = classifySpeakerCardinality(
+    [turnPass(0, 0), turnPass(1, 1)],
+    { totalPasses: 6 },
+  );
+  assert(c.isMultiSpeaker);
+  assertFalse(c.passSetComplete);
+  assert(shouldRunMultiSpeakerMotionMeasurement(c));
+});

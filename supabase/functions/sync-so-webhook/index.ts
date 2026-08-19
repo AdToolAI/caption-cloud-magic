@@ -852,13 +852,41 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const totalPasses = Number((state as any).total_passes ?? passes.length ?? 1);
       const currentPass = matchedIdx >= 0 ? matchedIdx : Number((state as any).current_pass ?? 0);
 
+      // v404 §5 — the rehost already happened OUTSIDE the dialog lock.
+      const rehostedUrl: string | null = v404RehostedUrl;
+
+
+      // v29: Re-read the latest passes[] from the DB and merge ONLY our
+      // pass's done-patch so concurrent COMPLETED/FAILED webhooks for sibling
+      // passes don't clobber each other's job_ids/status.
+      const { data: freshDoneRow } = await supabase
+        .from("composer_scenes")
+        // v430 Step 1 — the plate columns come along so the finalize below can
+        // keep base_video_url intact while writing the processed result.
+        .select("dialog_shots, base_video_url, lip_sync_source_clip_url")
+        .eq("id", sceneId)
+        .maybeSingle();
+      const freshDoneState: any = (freshDoneRow as any)?.dialog_shots ?? state;
+      const freshDonePasses: any[] = Array.isArray(freshDoneState?.passes)
+        ? freshDoneState.passes.map((p: any) => ({ ...p }))
+        : passes;
+
       // ── FA-4 v409 — kanonische Sprecher-Kardinalität ────────────────────
-      const speakerCardinality = classifySpeakerCardinality(passes, { totalPasses });
+      // Klassifikation IMMER auf dem frischesten Pass-Set UNTER dem Dialog-
+      // Lock: der Pre-Lock-Snapshot kann durch das Fan-Out-Race (Pass 0 +
+      // root total_passes vor dem Sibling-Seeding) unvollständig sein.
+      const freshTotalPasses = Number(
+        freshDoneState?.total_passes ?? totalPasses ?? freshDonePasses.length ?? 1,
+      );
+      const speakerCardinality = classifySpeakerCardinality(freshDonePasses, {
+        totalPasses: freshTotalPasses,
+      });
       const speakerBranch = decideCompletedSpeakerBranch(speakerCardinality);
       console.log(
         `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} speaker_cardinality scene=${sceneId} pass=${currentPass} ` +
-          `distinct=${speakerCardinality.distinctSpeakerCount} total_passes=${totalPasses} ` +
-          `class=${speakerCardinality.classification} reason=${speakerCardinality.reason}`,
+          `distinct=${speakerCardinality.distinctSpeakerCount} total_passes=${freshTotalPasses} ` +
+          `observed=${freshDonePasses.length} class=${speakerCardinality.classification} ` +
+          `reason=${speakerCardinality.reason}`,
       );
       if (speakerBranch.branch === "fail_closed") {
         // Fail-closed VOR jeder Motion-/Success-Semantik: eine Szene, deren
@@ -885,25 +913,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         });
       }
 
-      // v404 §5 — the rehost already happened OUTSIDE the dialog lock.
-      const rehostedUrl: string | null = v404RehostedUrl;
-
-
-      // v29: Re-read the latest passes[] from the DB and merge ONLY our
-      // pass's done-patch so concurrent COMPLETED/FAILED webhooks for sibling
-      // passes don't clobber each other's job_ids/status.
-      const { data: freshDoneRow } = await supabase
-        .from("composer_scenes")
-        // v430 Step 1 — the plate columns come along so the finalize below can
-        // keep base_video_url intact while writing the processed result.
-        .select("dialog_shots, base_video_url, lip_sync_source_clip_url")
-        .eq("id", sceneId)
-        .maybeSingle();
-      const freshDoneState: any = (freshDoneRow as any)?.dialog_shots ?? state;
-      const freshDonePasses: any[] = Array.isArray(freshDoneState?.passes)
-        ? freshDoneState.passes.map((p: any) => ({ ...p }))
-        : passes;
       const passBeforeDone = freshDonePasses[currentPass] ?? null;
+
       const inputPreclipUrl = String(passBeforeDone?.preclip_url ?? passBeforeDone?._v105_probe?.payload_video_url ?? "");
       const [inputHead, outputHead, inputDims, outputDims] = await Promise.all([
         headAsset(inputPreclipUrl),
