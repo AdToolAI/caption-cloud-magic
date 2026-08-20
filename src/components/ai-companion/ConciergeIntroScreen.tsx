@@ -118,7 +118,7 @@ export function ConciergeIntroScreen() {
                   <div className="text-[10px] font-medium uppercase tracking-[0.28em] text-[#F5C76A]/80">
                     AdTool Concierge
                   </div>
-                  <div className="text-lg font-semibold text-white">Willkommen an Bord.</div>
+                  <div className="text-lg font-semibold text-white">{tx({ de: 'Willkommen an Bord.', en: 'Welcome aboard.', es: 'Bienvenido a bordo.' })}</div>
                 </div>
               </div>
 
