@@ -122,7 +122,7 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
   const stageBadge = scene.selectedOutfit
     ? `${scene.selectedOutfit.label} · Showroom`
     : activeChar?.default_voice_id
-      ? 'Voice gesetzt'
+      ? tx({ de: 'Voice gesetzt', en: 'Voice set', es: 'Voz asignada' })
       : undefined;
 
   const lipSyncOn = !!scene.lipSyncWithVoiceover;
