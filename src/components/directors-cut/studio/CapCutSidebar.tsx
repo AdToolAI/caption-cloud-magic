@@ -1741,12 +1741,12 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Music className="h-4 w-4 text-pink-400" />
-                <span className="text-sm font-medium text-white">Musik-Bibliothek</span>
+                <span className="text-sm font-medium text-white">{tx({ de: 'Musik-Bibliothek', en: 'Music library', es: 'Biblioteca de música' })}</span>
               </div>
 
               <div className="flex gap-2">
                 <Input
-                  placeholder="Musik suchen..."
+                  placeholder={tx({ de: 'Musik suchen...', en: 'Search music...', es: 'Buscar música...' })}
                   value={musicSearchQuery}
                   onChange={(e) => setMusicSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleMusicSearch()}

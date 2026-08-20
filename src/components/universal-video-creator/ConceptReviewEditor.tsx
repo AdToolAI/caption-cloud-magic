@@ -214,12 +214,12 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
               </Select>
             </div>
             <div className="space-y-1.5">
-              <FieldLabel>Emotionaler Ton</FieldLabel>
+              <FieldLabel>{tx({ de: 'Emotionaler Ton', en: 'Emotional tone', es: 'Tono emocional' })}</FieldLabel>
               <Input value={data.emotionalTone} onChange={e => update('emotionalTone', e.target.value)} className={fieldClass} />
             </div>
           </div>
           <div className="space-y-1.5">
-            <FieldLabel>Kernbotschaft</FieldLabel>
+            <FieldLabel>{tx({ de: 'Kernbotschaft', en: 'Core message', es: 'Mensaje central' })}</FieldLabel>
             <Input value={data.keyMessage} onChange={e => update('keyMessage', e.target.value)} className={fieldClass} />
           </div>
         </CollapsibleSection>

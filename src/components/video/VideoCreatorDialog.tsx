@@ -506,9 +506,9 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
               {/* AI Features */}
               <Tabs defaultValue="rendering" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="rendering">Rendering-Optionen</TabsTrigger>
+                  <TabsTrigger value="rendering">{tx({ de: 'Rendering-Optionen', en: 'Rendering options', es: 'Opciones de renderizado' })}</TabsTrigger>
                   <TabsTrigger value="ai-script">AI Script</TabsTrigger>
-                  <TabsTrigger value="ai-music">AI Musik</TabsTrigger>
+                  <TabsTrigger value="ai-music">{tx({ de: 'AI Musik', en: 'AI Music', es: 'Música IA' })}</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="rendering" className="mt-4">

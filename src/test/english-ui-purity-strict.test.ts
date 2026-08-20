@@ -141,7 +141,33 @@ const BANNED_WORDS = [
   'statt',
   'Generiere',
   'Suche',
+  // v-final-14: auth-gated onboarding / media / studio residual class.
+  'Loslegen',
+  'umstimmen',
+  'Erstelltes',
+  'gesendet',
+  'Schnell-Filter',
+  'Kurz-Variante',
+  'Emotionaler',
+  'Kernbotschaft',
+  'Rendering-Optionen',
+  'Channel-Ziel',
+  'Musik-Bibliothek',
+  'Korrektur',
+  'Korrekturen',
+  'Briefing passt',
+  // `Neu` is deliberately NOT a bare banned word (it collides with identifiers
+  // and English "Neural"). It is caught contextually by the rule below.
 ];
+
+/**
+ * Contextual `Neu` detection: only where it is unambiguously rendered copy —
+ * a JSX text node, a quoted display string, or a `Neu (…)` / `Neu <participle>`
+ * phrase. Keeps identifiers like `isNeu`, `neuralNet`, `neuePosts` out.
+ */
+const NEU_CONTEXT =
+  /(>\s*Neu[\s(<]|["'`]\s*Neu\s*\(|["'`]Neu\s+(geplant|hinzugefügt|erstellt|verfügbar)|>\s*Neu\s*<)/;
+
 
 const BANNED = new RegExp(`(?<![\\w-])(${BANNED_WORDS.join('|')})(?![\\w-])`);
 
@@ -265,7 +291,15 @@ function key(rel: string, line: string): string {
   return `${rel}::${line.trim().slice(0, 140)}`;
 }
 
-function scan(predicate: (line: string) => boolean): string[] {
+/**
+ * German-language signal for free-form strings: umlauts/eszett, or a German
+ * function word / typical German label morphology. Deliberately narrow so
+ * English and Spanish label values do not trip it.
+ */
+const GERMAN_SIGNAL =
+  /[äöüßÄÖÜ]|(?<![\w-])(der|die|das|den|dem|des|ein|eine|einen|einem|einer|und|oder|mit|ohne|f\u00fcr|von|zum|zur|auf|aus|bei|nach|nicht|kein|keine|dein|deine|mein|meine|wird|werden|sind|ist|nur|mehr|neue|neuer|neues|alle|jede|jeder|Erstellen|Bearbeiten|L\u00f6schen|Speichern|Hinzuf\u00fcgen|Ausw\u00e4hlen|Weiter|Zur\u00fcck|Abbrechen)(?![\w-])/;
+
+function scan(predicate: (line: string, rel: string) => boolean): string[] {
   const offenders: string[] = [];
   for (const file of FILES) {
     const src = fs.readFileSync(file, 'utf8');
@@ -274,8 +308,8 @@ function scan(predicate: (line: string) => boolean): string[] {
     src.split('\n').forEach((line, idx) => {
       if (isIgnorableLine(line)) return;
       if (deLines.has(idx) || tupleLines.has(idx)) return;
-      if (!predicate(line)) return;
       const rel = path.relative(SRC, file);
+      if (!predicate(line, rel)) return;
       if (SEMANTIC_GERMAN_IDS.has(key(rel, line))) return;
       offenders.push(`${rel}:${idx + 1}: ${line.trim().slice(0, 140)}`);
     });
@@ -328,4 +362,35 @@ describe('English UI purity (strict, line-local)', () => {
       `localize the fragment before interpolating it into every language variant:\n${offenders.join('\n')}`,
     ).toEqual([]);
   });
+
+  it('flags contextual `Neu` rendered as display copy', () => {
+    const offenders = scan((line) => NEU_CONTEXT.test(line) && !LANG_SELECT.test(line));
+    expect(
+      offenders,
+      `German "Neu" rendered as UI copy — wrap in tx({ de, en, es }):\n${offenders.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('has no German label-like values in src/lib and src/config data modules', () => {
+    // Data modules feed labels straight into UI (chips, categories, tiles).
+    // A German string assigned to a label-like key there is a leak unless it
+    // is an explicit DE branch, a tri-language tuple, or a proven semantic id.
+    const labelField =
+      /\b(label|title|name|description|desc|hint|tagline|tooltip|placeholder|caption|subtitle|summary|cta|badge|tags|category)\s*:\s*(\[[^\]]*)?['"`]([^'"`]{3,})['"`]/;
+    const offenders = scan((line, rel) => {
+      if (!/^(lib|config)[\\/]/.test(rel)) return false;
+      if (LANG_SELECT.test(line)) return false;
+      // Language tables list endonyms (Türkçe, Português, Français). Non-ASCII
+      // there is the language's own spelling, not German copy.
+      if (/\b(code|locale|flag|iso|bcp47)\s*:\s*['"`]/.test(line)) return false;
+      const m = labelField.exec(line);
+      if (!m) return false;
+      return GERMAN_SIGNAL.test(m[3]);
+    });
+    expect(
+      offenders,
+      `German label values in data modules must be localized (tx / TriText):\n${offenders.join('\n')}`,
+    ).toEqual([]);
+  });
 });
+

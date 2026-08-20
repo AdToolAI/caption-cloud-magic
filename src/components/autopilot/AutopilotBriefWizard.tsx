@@ -158,7 +158,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
             <div className="rounded-lg border bg-primary/5 p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Target className="h-4 w-4 text-primary" />
-                <span className="text-sm font-semibold tracking-wide uppercase text-primary">Channel-Ziel & Budget</span>
+                <span className="text-sm font-semibold tracking-wide uppercase text-primary">{tx({ de: 'Channel-Ziel & Budget', en: 'Channel goal & budget', es: 'Objetivo de canal y presupuesto' })}</span>
               </div>
               <AutopilotGoalBriefingStep value={goal} onChange={setGoal} />
             </div>

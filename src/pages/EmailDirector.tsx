@@ -132,7 +132,7 @@ export default function EmailDirector() {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success(`Test gesendet an ${data.recipient}`);
+      toast.success(tx({ de: `Test gesendet an ${data.recipient}`, en: `Test sent to ${data.recipient}`, es: `Prueba enviada a ${data.recipient}` }));
     } catch (e: any) {
       toast.error(e.message || tx({ de: "Versand fehlgeschlagen", en: "Sending failed", es: "Envío fallido" }));
     } finally {
