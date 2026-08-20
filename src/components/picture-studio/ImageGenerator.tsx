@@ -656,7 +656,7 @@ export function ImageGenerator() {
                     </div>
                     <p className="text-[10px] text-muted-foreground mb-1.5">{meta.model}</p>
                     <Badge variant={tierCost === 0 ? 'secondary' : 'outline'} className="text-[10px] h-5">
-                      {tierCost === 0 ? tx({ de: tx({ de: "Gratis im Abo", en: "Free with subscription", es: "Gratis con la suscripción" }), en: 'Free with subscription', es: 'Gratis con suscripción' }) : tx({ de: `${currencySymbol}${tierCost.toFixed(2)}/Bild`, en: `${currencySymbol}${tierCost.toFixed(2)}/image`, es: `${currencySymbol}${tierCost.toFixed(2)}/imagen` })}
+                      {tierCost === 0 ? tx({ de: "Gratis im Abo", en: "Free with subscription", es: "Gratis con la suscripción" }) : tx({ de: `${currencySymbol}${tierCost.toFixed(2)}/Bild`, en: `${currencySymbol}${tierCost.toFixed(2)}/image`, es: `${currencySymbol}${tierCost.toFixed(2)}/imagen` })}
                     </Badge>
                   </button>
                 );
@@ -866,7 +866,7 @@ export function ImageGenerator() {
                     ))}
                 </div>
                 <p className="text-xs text-muted-foreground truncate">
-                  {activeBrandKit.brand_name || 'Aktiver Brand-Kit'}
+                  {activeBrandKit.brand_name || tx({ de: "Aktiver Brand-Kit", en: "Active brand kit", es: "Brand Kit activo" })}
                 </p>
               </div>
             ) : (

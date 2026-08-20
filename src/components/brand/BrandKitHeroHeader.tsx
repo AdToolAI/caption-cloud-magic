@@ -67,7 +67,7 @@ export function BrandKitHeroHeader({ brandKitCount, onCreateNew }: BrandKitHeroH
               className="text-4xl lg:text-5xl font-bold"
             >
               <span className="bg-gradient-to-r from-primary via-primary/80 to-accent bg-clip-text text-transparent">
-                Automatisches Marken-Set
+                {tx({ de: "Automatisches Marken-Set", en: "Automatic brand set", es: "Conjunto de marca automático" })}
               </span>
             </motion.h1>
 

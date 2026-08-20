@@ -342,7 +342,7 @@ export function UniversalVideoWizard() {
       }
     } catch (err: any) {
       console.error('Product image upload error:', err);
-      toast.error(language === 'de' ? tx({ de: 'Fehler beim Hochladen', en: 'Upload error', es: 'Error al subir' }) : tx({ de: 'Upload failed', en: 'Upload failed', es: 'Error al subir' }));
+      toast.error(tx({ de: 'Fehler beim Hochladen', en: 'Upload failed', es: 'Error al subir' }));
     } finally {
       setIsUploadingImages(false);
     }
@@ -849,7 +849,7 @@ export function UniversalVideoWizard() {
                     ? tx({ de: 'Lade mindestens 4 Fotos deines Produkts hoch. Diese werden per KI in die passenden Szenen eingebettet.', en: 'Upload at least 4 photos of your product. These will be embedded into the appropriate scenes by AI.', es: 'Sube al menos 4 fotos de tu producto. Estas serán incrustadas por IA en las escenas apropiadas.' })
                     : language === 'es'
                     ? 'Sube al menos 4 fotos de tu producto. Serán integradas en las escenas por IA.'
-                    : tx({ de: 'Upload at least 4 photos of your product. They will be AI-enhanced to fit each scene.', en: 'Upload at least 4 photos of your product. They will be AI-enhanced to fit each scene.', es: 'Sube al menos 4 fotos de tu producto. Serán mejorados por IA para adaptarse a cada escena.' })}
+                    : 'Upload at least 4 photos of your product. They will be AI-enhanced to fit each scene.'}
                 </p>
               </div>
               <MultiImageUpload

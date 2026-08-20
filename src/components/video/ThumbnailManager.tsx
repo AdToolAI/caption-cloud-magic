@@ -116,7 +116,7 @@ export const ThumbnailManager = ({
         {/* Current Thumbnail Preview */}
         {currentThumbnailUrl && (
           <div className="space-y-2">
-            <Label>Aktuelles Thumbnail</Label>
+            <Label>{tx({ de: "Aktuelles Thumbnail", en: "Current thumbnail", es: "Miniatura actual" })}</Label>
             <img
               src={currentThumbnailUrl}
               alt="Video thumbnail"

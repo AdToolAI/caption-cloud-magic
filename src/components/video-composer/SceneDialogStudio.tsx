@@ -1393,7 +1393,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             : tx({ de: 'Dialog-Szene rendern?', en: 'Render dialog scene?', es: '¿Renderizar escena de diálogo?' }),
         description:
           turnCount > 1
-            ? tx({ de: tx({ de: "Pro Sprecher-Turn läuft ein eigener Basis-Clip + dedizierter Lippensynchronisation. Gesamtkosten siehe unten.", en: "Each speaker turn runs its own base clip plus dedicated lip-sync. See the total cost below.", es: "Cada turno de hablante genera su propio clip base más lip-sync dedicado. Consulta el coste total abajo." }), en: 'Each speaker turn runs its own base clip + dedicated lip-sync. See total cost below.', es: 'Cada turno del orador ejecuta su propia clip base + lip-sync dedicado. Ver el costo total abajo.' })
+            ? tx({ de: "Pro Sprecher-Turn läuft ein eigener Basis-Clip + dedizierter Lippensynchronisation. Gesamtkosten siehe unten.", en: "Each speaker turn runs its own base clip plus dedicated lip-sync. See the total cost below.", es: "Cada turno de hablante genera su propio clip base más lip-sync dedicado. Consulta el coste total abajo." })
             : tx({ de: 'Voiceover + Lip-Sync werden mitberechnet.', en: 'Voiceover + lip-sync will be included in the cost.', es: 'La voz en off + lip-sync se incluirán en el costo.' }),
       });
       if (!ok) return;
@@ -1858,7 +1858,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         okCount = 1;
         toast({
           title: tx({ de: 'Dialog-Shots werden gerendert', en: 'Rendering Dialog Shots', es: 'Renderizando Dialog-Shots' }),
-          description: tx({ de: `Pro Sprecher-Turn wird ein eigener Shot (Hailuo + Lippensynchronisation) gerendert und am Ende zu einer ${masterDuration}s-Szene gestitcht. Live-Fortschritt im Clip-Karten-Overlay.`, en: `For each speaker turn, a separate shot (Hailuo + Lippensynchronisation) is rendered and then stitched together into a ${masterDuration}s scene. Live progress in the clip card overlay.`, es: `Para cada turno de orador, se renderiza una toma separada (Hailuo + Lippensynchronisation) y luego se une en una escena de ${masterDuration}s. Progreso en vivo en la superposición de la tarjeta de clip.` }),
+          description: tx({ de: `Pro Sprecher-Turn wird ein eigener Shot (Hailuo + Lippensynchronisation) gerendert und am Ende zu einer ${masterDuration}s-Szene gestitcht. Live-Fortschritt im Clip-Karten-Overlay.`, en: `For each speaker turn, a separate shot (Hailuo + lip-sync) is rendered and then stitched together into a ${masterDuration}s scene. Live progress in the clip card overlay.`, es: `Para cada turno de orador, se renderiza una toma separada (Hailuo + sincronización labial) y luego se une en una escena de ${masterDuration}s. Progreso en vivo en la superposición de la tarjeta de clip.` }),
         });
         if (onClose) onClose();
       } catch (twoShotErr) {
@@ -2348,7 +2348,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         } else if (isSyncSegments && portraitsAll) {
           tone = 'primary';
           // sync-segments pricing ≈ €0.20/s; show flat cost note instead of per-speaker.
-          label = tx({ de: `⚡ Lip-Sync via schnelle Lippensynchronisation — Mund passt zum Audio${speakers.length > 1 ? ` · ${speakers.length} Sprecher in einem Clip` : ''} (~€0,20/s)`, en: `⚡ Lip-sync via schnelle Lippensynchronisation — mouth matches the audio${speakers.length > 1 ? ` · ${speakers.length} speakers in one clip` : ''} (~€0.20/s)`, es: `⚡ Lip-sync vía schnelle Lippensynchronisation — la boca coincide con el audio${speakers.length > 1 ? ` · ${speakers.length} hablantes en un solo clip` : ''} (~€0,20/s)` });
+          label = tx({ de: `⚡ Lip-Sync via schnelle Lippensynchronisation — Mund passt zum Audio${speakers.length > 1 ? ` · ${speakers.length} Sprecher in einem Clip` : ''} (~€0,20/s)`, en: `⚡ Lip-sync via fast lip-sync — mouth matches the audio${speakers.length > 1 ? ` · ${speakers.length} speakers in one clip` : ''} (~€0.20/s)`, es: `⚡ Lip-sync vía sincronización labial rápida — la boca coincide con el audio${speakers.length > 1 ? ` · ${speakers.length} hablantes en un solo clip` : ''} (~€0,20/s)` });
         } else {
           label = tx({ de: '🔊 Audio-Overlay (kein Lip-Sync möglich ohne Cast-Portrait)', en: '🔊 Audio overlay (no lip-sync possible without a cast portrait)', es: '🔊 Solo audio (sin retrato, no hay lip-sync posible)' });
         }

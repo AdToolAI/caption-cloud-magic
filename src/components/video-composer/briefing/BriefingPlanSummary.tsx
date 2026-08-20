@@ -203,7 +203,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
                 <div className="font-medium mb-1">{tx({ de: 'Widersprüchliche Dauer repariert', en: 'Conflicting duration repaired', es: 'Duración en conflicto reparada' })}</div>
                 <div className="text-muted-foreground">
                   {tx({ de: 'Die sichtbaren Szenendauern wurden als Wahrheit verwendet, weil die erkannte Dauer nicht zur Szenensumme passte.', en: 'The visible scene durations were used as truth because the detected duration did not match the sum of scenes.', es: 'Las duraciones de las escenas visibles se utilizaron como verdad porque la duración detectada no coincidía con la suma de las escenas.' })}
-                  {typeof canonicalDuration === 'number' ? ` Ignorierter Wert: ${canonicalDuration}s.` : ''}
+                  {typeof canonicalDuration === 'number' ? ` ${tx({ de: 'Ignorierter Wert:', en: 'Ignored value:', es: 'Valor ignorado:' })} ${canonicalDuration}s.` : ''}
                 </div>
               </HoverCardContent>
             </HoverCard>

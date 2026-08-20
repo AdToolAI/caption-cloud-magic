@@ -1253,7 +1253,7 @@ export default function SceneCard({
                               📺 B-Roll (Off-Screen-VO)
                             </SelectItem>
                             <SelectItem value="sync-polish" className="text-xs">
-                              ✨ Premium-Lippensynchronisation
+                              ✨ {tx({ de: 'Premium-Lippensynchronisation', en: 'Premium lip-sync', es: 'Sincronización labial premium' })}
                             </SelectItem>
                             {/* v70: cinematic-sync-legacy option removed — all
                                 dialog scenes use v69 unified single-face preclip. */}
@@ -2795,7 +2795,7 @@ export default function SceneCard({
                           {tx({ de: "🎙️ Lip-Sync zum Voiceover", en: "🎙️ Lip-sync to voiceover", es: "🎙️ Sincronización labial con voz en off" })}
                           <span
                             className="px-1 py-0.5 rounded bg-amber-400/20 text-amber-200 text-[8px] font-bold ring-1 ring-amber-400/30"
-                            title={tx({ de: "Premium-Lippensynchronisation — Artlist-grade fidelity, identity-locked, kein Face-Morph", en: "Premium-Lippensynchronisation — Artlist-grade fidelity, identity-locked, no face morph", es: "Premium-Lippensynchronisation — fidelidad de nivel Artlist, identidad bloqueada, sin transformación facial" })}
+                            title={tx({ de: "Premium-Lippensynchronisation — Artlist-grade fidelity, identity-locked, kein Face-Morph", en: "Premium lip-sync — Artlist-grade fidelity, identity-locked, no face morph", es: "Sincronización labial premium — fidelidad de nivel Artlist, identidad bloqueada, sin transformación facial" })}
                           >
                             PRO
                           </span>
@@ -2824,7 +2824,7 @@ export default function SceneCard({
                         <span className="text-[9px] text-muted-foreground">
                           {scene.lipSyncAppliedAt
                             ? "Charakter spricht wortgenau · lipsync-2-pro · ~14 Credits"
-                            : tx({ de: "Auto: Premium-Lippensynchronisation nach Generate (~14 Credits, Artlist-Qualität)", en: "Auto: Premium-Lippensynchronisation after generate (~14 credits, Artlist quality)", es: "Auto: Premium-Lippensynchronisation tras la generación (~14 créditos, calidad Artlist)" })}
+                            : tx({ de: "Auto: Premium-Lippensynchronisation nach Generate (~14 Credits, Artlist-Qualität)", en: "Auto: premium lip-sync after generate (~14 credits, Artlist quality)", es: "Auto: sincronización labial premium tras la generación (~14 créditos, calidad Artlist)" })}
                         </span>
                       </div>
                       <button

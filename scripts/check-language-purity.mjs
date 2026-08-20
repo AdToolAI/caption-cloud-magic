@@ -23,7 +23,9 @@ const MARKERS = {
   en: /\b(the|your|please|could not|failed to|will be|has been)\b/i,
 };
 
-const ENTRY = /^(\s*)([A-Za-z0-9_]+)(:\s*)('|")((?:\\.|(?!\4)[^\\])*)\4(,?\s*)$/;
+// Accepts both source-style (`key: 'value'`) and generated JSON-style
+// (`"key": "value"`) entries — translationsFill.ts is machine-written.
+const ENTRY = /^(\s*)"?([A-Za-z0-9_]+)"?(:\s*)('|")((?:\\.|(?!\4)[^\\])*)\4(,?\s*)$/;
 
 /** Values that legitimately look the same in every language. */
 const NEUTRAL =
@@ -39,7 +41,7 @@ function langAt(lines) {
       /^\s*translations\.(de|en|es)\.[A-Za-z0-9_]+\s*=/.exec(l) ||
       /^\s*translations\.(de|en|es)\s*=/.exec(l);
     if (m) cur = m[1];
-    else if (/^  (de|en|es): \{/.test(l)) cur = /^  (de|en|es)/.exec(l)[1];
+    else if (/^  "?(de|en|es)"?: \{/.test(l)) cur = /^  "?(de|en|es)/.exec(l)[1];
     map[i] = cur;
   }
   return map;

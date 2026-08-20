@@ -299,7 +299,7 @@ export function KanbanView({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-48 bg-popover/95 backdrop-blur-xl border-white/10">
-            <DropdownMenuLabel>Kanal-Filter</DropdownMenuLabel>
+            <DropdownMenuLabel>{tx({ de: "Kanal-Filter", en: "Channel filter", es: "Filtro de canal" })}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {channels.length === 0 && (
               <div className="px-2 py-1.5 text-xs text-muted-foreground">{tx({ de: "Noch keine Kanäle", en: "No channels yet", es: "Aún no hay canales" })}</div>

@@ -42,11 +42,11 @@ export function BrandAssetFactory({ brandKitId }: { brandKitId: string | null })
           </div>
           <Button onClick={generatePack} disabled={generating} className="shrink-0">
             {generating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
-            {generating ? "Erzeuge Pack …" : "Brand-Pack erzeugen"}
+            {generating ? tx({ de: "Erzeuge Pack …", en: "Generating pack …", es: "Generando pack …" }) : tx({ de: "Brand-Pack erzeugen", en: "Generate brand pack", es: "Generar pack de marca" })}
           </Button>
         </div>
         <p className="text-[10px] text-muted-foreground/70 mt-3">
-          ~8 Assets pro Lauf · Nano Banana 2 · ca. 30–60 s
+          {tx({ de: "~8 Assets pro Lauf · Nano Banana 2 · ca. 30–60 s", en: "~8 assets per run · Nano Banana 2 · approx. 30–60 s", es: "~8 recursos por ejecución · Nano Banana 2 · aprox. 30–60 s" })}
         </p>
       </Card>
 

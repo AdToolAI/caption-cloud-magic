@@ -1069,7 +1069,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 <ImagePlus className="h-6 w-6 text-muted-foreground" />
               )}
               <span className="text-xs text-muted-foreground">
-                {language === 'de' ? tx({ de: 'Bild hochladen für Image-to-Video', en: 'Upload image for Image-to-Video', es: 'Subir imagen para Imagen a Video' }) : tx({ de: 'Upload an image for Image-to-Video', en: 'Upload an image for Image-to-Video', es: 'Sube una imagen para Imagen a Video' })}
+                {tx({ de: 'Bild hochladen für Image-to-Video', en: 'Upload an image for Image-to-Video', es: 'Sube una imagen para Imagen a Video' })}
               </span>
               <input
                 id="toolkit-image-upload"
