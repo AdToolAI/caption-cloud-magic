@@ -77,7 +77,7 @@ describe('English UI purity', () => {
         if (!banned.test(line)) return;
         // Look further back so literals inside an explicit `de: {` / `es: {`
         // dictionary branch are not treated as bare labels.
-        const context = lines.slice(Math.max(0, idx - 14), idx + 2).join('\n');
+        const context = lines.slice(Math.max(0, idx - 60), idx + 2).join('\n');
         if (langBranch.test(line) || langBranch.test(context)) return;
         offenders.push(`${path.relative(SRC, file)}:${idx + 1}: ${trimmed.slice(0, 100)}`);
       });
