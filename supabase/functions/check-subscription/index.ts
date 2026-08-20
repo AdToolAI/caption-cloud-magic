@@ -67,6 +67,25 @@ serve(withTelemetry("check-subscription", async (req) => {
     // Beta: only one plan exists — normalize everything to Beta-Basic.
     const BETA_BASIC_PRODUCT_ID = 'prod_TIRSoTyzmRpbpT';
 
+    // Creator accounts have full out-of-band access (no Stripe subscription).
+    if (profile?.account_type === 'creator') {
+      return new Response(
+        JSON.stringify({
+          subscribed: true,
+          product_id: BETA_BASIC_PRODUCT_ID,
+          plan: 'beta-basic',
+          account_type: 'creator',
+          ai_discount_percent: profile.ai_discount_percent ?? 0,
+          subscription_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+          plan_based: true,
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    }
+
     // Check for test mode first
     if (profile?.test_mode_plan) {
       return new Response(
