@@ -35,16 +35,10 @@ interface Props {
   onApply: (result: PromptHelperResult, chosenPrompt: string) => void;
 }
 
-const GOALS = [
-  tx({ de: 'Werbung', en: 'Advertising', es: 'Publicidad' }),
-  'Social',
-  tx({ de: 'Portrait', en: 'Portrait', es: 'Retrato' }),
-  tx({ de: 'Szene', en: 'Scene', es: 'Escena' }),
-  tx({ de: 'Produkt', en: 'Product', es: 'Producto' }),
-  tx({ de: 'Kunst', en: 'Art', es: 'Arte' }),
-];
+// Semantic IDs (stable, never translated) — display labels come from CHIP_LABELS.
+const GOALS = ['Werbung', 'Social', 'Portrait', 'Szene', 'Produkt', 'Kunst'];
 const STYLES = ['Fotorealistisch', 'Cinematisch', 'Illustration', '3D', 'Anime', 'Aquarell'];
-const MOODS = ['Episch', 'Ruhig', 'Dramatisch', 'Hell', tx({ de: "Düster", en: "Gloomy", es: "Sombrío" }), 'Verspielt'];
+const MOODS = ['Episch', 'Ruhig', 'Dramatisch', 'Hell', 'Düster', 'Verspielt'];
 
 const CHIP_LABELS: Record<string, { de: string; en: string; es: string }> = {
   Werbung: { de: 'Werbung', en: 'Advertising', es: 'Publicidad' },
