@@ -36,14 +36,15 @@ interface Props {
 }
 
 // Semantic IDs (stable, never translated) — display labels come from CHIP_LABELS.
-const GOALS = ['Werbung', 'Social', 'Portrait', tx({ de: "Szene", en: "Scene", es: "Escena" }), 'Produkt', 'Kunst'];
+const GOALS = ['Werbung', 'Social', 'Portrait', 'Szene', 'Produkt', 'Kunst'];
 const STYLES = ['Fotorealistisch', 'Cinematisch', 'Illustration', '3D', 'Anime', 'Aquarell'];
-const MOODS = ['Episch', 'Ruhig', 'Dramatisch', tx({ de: "Hell", en: "Bright", es: "Brillante" }), 'Düster', 'Verspielt'];
+const MOODS = ['Episch', 'Ruhig', 'Dramatisch', 'Hell', 'Düster', 'Verspielt'];
 
 const CHIP_LABELS: Record<string, { de: string; en: string; es: string }> = {
   Werbung: { de: 'Werbung', en: 'Advertising', es: 'Publicidad' },
   Social: { de: 'Social', en: 'Social', es: 'Social' },
-  Portrait: { de: 'Portrait', en: 'Portrait', es: 'Retrato' }{tx({ de: ",\n  Szene:", en: ", Scene:", es: ", Escena:" })} { de: 'Szene', en: 'Scene', es: 'Escena' },
+  Portrait: { de: 'Portrait', en: 'Portrait', es: 'Retrato' },
+  Szene: { de: 'Szene', en: 'Scene', es: 'Escena' },
   Produkt: { de: 'Produkt', en: 'Product', es: 'Producto' },
   Kunst: { de: 'Kunst', en: 'Art', es: 'Arte' },
   Fotorealistisch: { de: 'Fotorealistisch', en: 'Photorealistic', es: 'Fotorrealista' },
@@ -54,7 +55,8 @@ const CHIP_LABELS: Record<string, { de: string; en: string; es: string }> = {
   Aquarell: { de: 'Aquarell', en: 'Watercolor', es: 'Acuarela' },
   Episch: { de: 'Episch', en: 'Epic', es: 'Épico' },
   Ruhig: { de: 'Ruhig', en: 'Calm', es: 'Tranquilo' },
-  Dramatisch: { de: 'Dramatisch', en: 'Dramatic', es: 'Dramático' }{tx({ de: ",\n  Hell:", en: ", Bright:", es: ", Brillante:" })} { de: 'Hell', en: 'Bright', es: 'Brillante' },
+  Dramatisch: { de: 'Dramatisch', en: 'Dramatic', es: 'Dramático' },
+  Hell: { de: 'Hell', en: 'Bright', es: 'Brillante' },
   Düster: { de: 'Düster', en: 'Dark', es: 'Sombrío' },
   Verspielt: { de: 'Verspielt', en: 'Playful', es: 'Juguetón' },
 };
