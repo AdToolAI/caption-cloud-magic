@@ -1,4 +1,4 @@
-import { tx } from "@/lib/i18nText";
+import { tx, type TriText } from "@/lib/i18nText";
 /**
  * MusicBrowser — curated royalty-free music search (Jamendo via
  * `search-stock-music`). This is the library counterpart to AI-Music-
@@ -19,8 +19,30 @@ import { toast } from '@/hooks/use-toast';
 import { LicenseButton } from '@/components/licensing/LicenseButton';
 import { useDownloadQuota } from '@/hooks/useDownloadQuota';
 
-const MOODS = ['all', 'energetisch', 'entspannt', tx({ de: "fröhlich", en: "happy", es: "feliz" }), 'dramatisch', 'romantisch', 'traurig'];
+// Stable semantic filter values (sent to the search API) — never translated.
+const MOODS = ['all', 'energetisch', 'entspannt', 'fröhlich', 'dramatisch', 'romantisch', 'traurig'];
 const GENRES = ['all', 'pop', 'rock', 'elektronisch', 'klassisch', 'jazz', 'hip hop', 'ambient'];
+
+// Display labels resolved at render time.
+const MOOD_LABELS: Record<string, TriText> = {
+  all: { de: 'Alle', en: 'All', es: 'Todos' },
+  energetisch: { de: 'Energetisch', en: 'Energetic', es: 'Enérgico' },
+  entspannt: { de: 'Entspannt', en: 'Relaxed', es: 'Relajado' },
+  'fröhlich': { de: 'Fröhlich', en: 'Happy', es: 'Feliz' },
+  dramatisch: { de: 'Dramatisch', en: 'Dramatic', es: 'Dramático' },
+  romantisch: { de: 'Romantisch', en: 'Romantic', es: 'Romántico' },
+  traurig: { de: 'Traurig', en: 'Sad', es: 'Triste' },
+};
+const GENRE_LABELS: Record<string, TriText> = {
+  all: { de: 'Alle', en: 'All', es: 'Todos' },
+  pop: { de: 'Pop', en: 'Pop', es: 'Pop' },
+  rock: { de: 'Rock', en: 'Rock', es: 'Rock' },
+  elektronisch: { de: 'Elektronisch', en: 'Electronic', es: 'Electrónica' },
+  klassisch: { de: 'Klassisch', en: 'Classical', es: 'Clásica' },
+  jazz: { de: 'Jazz', en: 'Jazz', es: 'Jazz' },
+  'hip hop': { de: 'Hip Hop', en: 'Hip hop', es: 'Hip hop' },
+  ambient: { de: 'Ambient', en: 'Ambient', es: 'Ambient' },
+};
 
 function formatDuration(sec: number): string {
   if (!sec) return '–';
@@ -159,13 +181,13 @@ export default function MusicBrowser() {
         <Select value={mood} onValueChange={setMood}>
           <SelectTrigger className="w-full sm:w-[140px]"><SelectValue placeholder="Mood" /></SelectTrigger>
           <SelectContent>
-            {MOODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+            {MOODS.map((m) => <SelectItem key={m} value={m}>{MOOD_LABELS[m] ? tx(MOOD_LABELS[m]) : m}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={genre} onValueChange={setGenre}>
           <SelectTrigger className="w-full sm:w-[140px]"><SelectValue placeholder="Genre" /></SelectTrigger>
           <SelectContent>
-            {GENRES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+            {GENRES.map((g) => <SelectItem key={g} value={g}>{GENRE_LABELS[g] ? tx(GENRE_LABELS[g]) : g}</SelectItem>)}
           </SelectContent>
         </Select>
         <Button type="submit" disabled={loading}>
