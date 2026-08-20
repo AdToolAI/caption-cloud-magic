@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SplitSquareHorizontal, Eye, EyeOff, GripVertical, Play, Pause } from 'lucide-react';
