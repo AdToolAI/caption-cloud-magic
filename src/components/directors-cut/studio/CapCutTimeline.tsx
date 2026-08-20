@@ -308,7 +308,7 @@ const DraggableScene: React.FC<{
         {onDuplicate && (
           <ContextMenuItem onClick={onDuplicate} className="cursor-pointer hover:bg-white/10 focus:bg-white/10">
             <Copy className="h-3.5 w-3.5 mr-2 text-white/60" />
-            Duplizieren
+            {tx({ de: "Duplizieren", en: "Duplicate", es: "Duplicar" })}
           </ContextMenuItem>
         )}
         {(canTrimStartToPlayhead || canTrimEndToPlayhead) && <ContextMenuSeparator className="bg-white/10" />}

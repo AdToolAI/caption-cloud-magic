@@ -94,7 +94,7 @@ export function PlannerToolbar({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>Duplizieren</DropdownMenuItem>
+            <DropdownMenuItem>{tx({ de: "Duplizieren", en: "Duplicate", es: "Duplicar" })}</DropdownMenuItem>
             <DropdownMenuItem>Leeren</DropdownMenuItem>
             <DropdownMenuItem>Export</DropdownMenuItem>
           </DropdownMenuContent>

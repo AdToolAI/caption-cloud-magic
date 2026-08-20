@@ -86,7 +86,7 @@ export const DesignPreview = ({ slides, brandKit, template }: DesignPreviewProps
                   {isTextTooLong && (
                     <Badge variant="destructive" className="text-xs">
                       <AlertCircle className="h-3 w-3 mr-1" />
-                      Zu lang
+                      {tx({ de: "Zu lang", en: "Too long", es: "Demasiado largo" })}
                     </Badge>
                   )}
                   {!hasCTA && isLastSlide && (

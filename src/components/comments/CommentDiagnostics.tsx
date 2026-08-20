@@ -108,7 +108,7 @@ export const CommentDiagnostics = ({ data, loading }: CommentDiagnosticsProps) =
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             {getMoodIcon()}
-            <span className="font-semibold">Stimmung</span>
+            <span className="font-semibold">{tx({ de: "Stimmung", en: "Sentiment", es: "Sentimiento" })}</span>
           </div>
           <Badge className={`border ${getMoodBadgeClass()}`}>{data.mood}</Badge>
         </div>

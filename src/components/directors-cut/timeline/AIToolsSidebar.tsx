@@ -319,7 +319,7 @@ export function AIToolsSidebar({
                   Music Library
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Jamendo, Pixabay, Uploads & KI-generierte Tracks.
+                  {tx({ de: "Jamendo, Pixabay, Uploads & KI-generierte Tracks.", en: "Jamendo, Pixabay, uploads & AI-generated tracks.", es: "Jamendo, Pixabay, subidas y pistas generadas por IA." })}
                 </CardDescription>
               </CardHeader>
               <CardContent>

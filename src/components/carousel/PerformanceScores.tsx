@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Lightbulb, Target, MessageSquare } from "lucide-react";
+import { tx } from '@/lib/i18nText';
 
 interface PerformanceScoresProps {
   hookScore?: number;
@@ -63,7 +64,7 @@ export const PerformanceScores = ({
         {/* Readability Score */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Lesbarkeit</span>
+            <span className="text-sm font-medium">{tx({ de: "Lesbarkeit", en: "Readability", es: "Legibilidad" })}</span>
             <div className="flex items-center gap-2">
               <span className={`text-2xl font-bold ${getScoreColor(readabilityScore)}`}>
                 {readabilityScore}
@@ -79,7 +80,7 @@ export const PerformanceScores = ({
         {/* CTA Score */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">CTA Klarheit</span>
+            <span className="text-sm font-medium">{tx({ de: "CTA Klarheit", en: "CTA clarity", es: "Claridad del CTA" })}</span>
             <div className="flex items-center gap-2">
               <span className={`text-2xl font-bold ${getScoreColor(ctaScore)}`}>
                 {ctaScore}
@@ -115,7 +116,7 @@ export const PerformanceScores = ({
               <span className={ctaScore >= 70 ? "text-success" : "text-muted-foreground"}>
                 {ctaScore >= 70 ? "✓" : "○"}
               </span>
-              <span>Klare Handlungsaufforderung</span>
+              <span>{tx({ de: "Klare Handlungsaufforderung", en: "Clear call to action", es: "Llamada a la acción clara" })}</span>
             </li>
           </ul>
         </div>

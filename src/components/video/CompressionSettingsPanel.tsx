@@ -55,7 +55,7 @@ export const CompressionSettingsPanel = ({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Settings className="w-5 h-5" />
-          Komprimierungseinstellungen
+          {tx({ de: "Komprimierungseinstellungen", en: "Compression settings", es: "Compression settings" })}
         </CardTitle>
         <CardDescription>
           {tx({ de: "Wähle ein Profil oder passe die Einstellungen manuell an", en: "Select a profile or adjust settings manually", es: "Selecciona un perfil o ajusta la configuración manualmente" })}
@@ -76,7 +76,7 @@ export const CompressionSettingsPanel = ({
               <SelectItem value="social-media">Social Media</SelectItem>
               <SelectItem value="presentation">{tx({ de: "Präsentation", en: "Presentation", es: "Presentación" })}</SelectItem>
               <SelectItem value="archive">Archiv</SelectItem>
-              <SelectItem value="custom">Benutzerdefiniert</SelectItem>
+              <SelectItem value="custom">{tx({ de: "Benutzerdefiniert", en: "Custom", es: "Personalizado" })}</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-sm text-muted-foreground">

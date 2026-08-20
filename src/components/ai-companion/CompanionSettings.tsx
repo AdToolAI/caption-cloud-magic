@@ -283,7 +283,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
         {settings.voice_enabled && (
           <div className="flex items-center justify-between pl-6 border-l-2 border-primary/30">
             <div className="space-y-0.5">
-              <Label>Automatisch vorlesen</Label>
+              <Label>{tx({ de: "Automatisch vorlesen", en: "Read aloud automatically", es: "Leer en voz alta automáticamente" })}</Label>
               <p className="text-xs text-muted-foreground">
                 {tx({ de: "Jede Antwort wird automatisch vorgelesen", en: "Every response is automatically read aloud", es: "Cada respuesta se lee automáticamente en voz alta" })}
               </p>

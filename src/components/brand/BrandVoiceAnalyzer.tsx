@@ -63,7 +63,7 @@ export function BrandVoiceAnalyzer({ brandKitId, existingVoice, onAnalysisComple
       if (error) throw error;
 
       toast({
-        title: "Brand Voice analysiert! 🎉",
+        title: tx({ de: "Brand Voice analysiert! 🎉", en: "Brand voice analyzed! 🎉", es: "¡Voz de marca analizada! 🎉" }),
         description: tx({ de: "Deine Marken-Stimme wurde erfolgreich erfasst", en: "Your brand voice has been successfully captured", es: "Tu voz de marca ha sido capturada con éxito" }),
         duration: 5000
       });
@@ -145,7 +145,7 @@ export function BrandVoiceAnalyzer({ brandKitId, existingVoice, onAnalysisComple
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Voice analysieren
+                  {tx({ de: "Voice analysieren", en: "Analyze voice", es: "Analizar voz" })}
                 </>
               )}
             </Button>

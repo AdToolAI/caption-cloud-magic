@@ -631,7 +631,7 @@ const Carousel = () => {
 
                         <TabsContent value="flow" className="mt-4">
                           <div className="p-6 text-center text-muted-foreground">
-                            <p>Story-Flow Visualisierung kommt bald!</p>
+                            <p>{tx({ de: "Story-Flow Visualisierung kommt bald!", en: "Story flow visualization coming soon!", es: "¡La visualización del flujo narrativo llegará pronto!" })}</p>
                           </div>
                         </TabsContent>
                       </Tabs>

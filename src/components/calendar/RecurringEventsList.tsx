@@ -40,7 +40,7 @@ export function RecurringEventsList({ workspace_id }: RecurringEventsListProps) 
             <Repeat className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>{tx({ de: 'Keine Recurring Rules', en: 'No recurring rules', es: 'No hay reglas recurrentes' })}</p>
             <p className="text-sm mt-2">
-              Erstelle automatisch wiederkehrende Events
+              {tx({ de: "Erstelle automatisch wiederkehrende Events", en: "Create automatically recurring events", es: "Crea eventos recurrentes automáticamente" })}
             </p>
           </div>
         </CardContent>

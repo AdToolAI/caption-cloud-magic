@@ -490,7 +490,7 @@ export function useMotionStudioLibrary() {
         toast.error(tx({ de: `Snippet aktualisieren fehlgeschlagen: ${error.message}`, en: `Update snippet failed: ${error.message}`, es: `Fragmento de actualización fallido: ${error.message}` }));
         return null;
       }
-      toast.success('Snippet aktualisiert');
+      toast.success(tx({ de: "Snippet aktualisiert", en: "Snippet updated", es: "Fragmento actualizado" }));
       return data as SceneSnippet;
     },
     [],

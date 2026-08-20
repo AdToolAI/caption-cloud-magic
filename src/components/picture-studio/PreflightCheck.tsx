@@ -52,7 +52,7 @@ export function PreflightCheck({
     tips.push({
       icon: 'info',
       text: tx({ de: `4 Varianten = ${currencySymbol}${cost.toFixed(2)}. Lieber mit 1× starten und nur skalieren wenn das Ergebnis stimmt.`, en: `4 variants = ${currencySymbol}${cost.toFixed(2)}. Better to start with 1× and only scale if the result is good.`, es: `4 variantes = ${currencySymbol}${cost.toFixed(2)}. Mejor empezar con 1× y escalar solo si el resultado es bueno.` }),
-      action: { label: 'Auf 1× setzen', run: () => onSetVariants(1) },
+      action: { label: tx({ de: "Auf 1× setzen", en: "Set to 1×", es: "Establecer en 1×" }), run: () => onSetVariants(1) },
     });
   }
 

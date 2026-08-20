@@ -443,7 +443,7 @@ export const CampaignFormCard = ({
 
         {userPlan === "free" && (
           <p className="text-xs text-muted-foreground text-center">
-            Free: 1 Kampagne (1 Woche) • Pro: Unbegrenzt (bis 8 Wochen)
+            {tx({ de: "Free: 1 Kampagne (1 Woche) • Pro: Unbegrenzt (bis 8 Wochen)", en: "Free: 1 campaign (1 week) • Pro: unlimited (up to 8 weeks)", es: "Gratis: 1 campaña (1 semana) • Pro: ilimitado (hasta 8 semanas)" })}
           </p>
         )}
       </div>

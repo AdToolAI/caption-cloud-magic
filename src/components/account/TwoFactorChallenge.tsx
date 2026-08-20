@@ -100,7 +100,7 @@ export const TwoFactorChallenge = ({ open, onSuccess, onCancel }: TwoFactorChall
           </motion.div>
           
           <DialogTitle className="text-xl font-bold">
-            Zwei-Faktor-Authentifizierung
+            {tx({ de: "Zwei-Faktor-Authentifizierung", en: "Two-factor authentication", es: "Autenticación de dos factores" })}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {tx({ de: "Gib den Code aus deiner Authenticator-App ein", en: "Enter the code from your authenticator app", es: "Introduce el código de tu aplicación de autenticación" })}

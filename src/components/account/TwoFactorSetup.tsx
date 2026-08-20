@@ -99,7 +99,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
 
       setStep('success');
       toast({
-        title: "2FA aktiviert",
+        title: tx({ de: "2FA aktiviert", en: "2FA enabled", es: "2FA activado" }),
         description: tx({ de: "Zwei-Faktor-Authentifizierung wurde erfolgreich eingerichtet", en: "Two-factor authentication was successfully set up", es: "La autenticación de dos factores se configuró correctamente" })
       });
       
@@ -126,7 +126,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
   const steps = [
     { id: 'intro', label: 'Start' },
     { id: 'qr', label: 'QR-Code' },
-    { id: 'verify', label: 'Verifizieren' },
+    { id: 'verify', label: tx({ de: "Verifizieren", en: "Verify", es: "Verificar" }) },
     { id: 'success', label: tx({ de: 'Fertig', en: 'Ready', es: 'Listo' }) }
   ];
 
@@ -151,7 +151,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
           </motion.div>
           
           <DialogTitle className="text-xl font-bold">
-            Zwei-Faktor-Authentifizierung
+            {tx({ de: "Zwei-Faktor-Authentifizierung", en: "Two-factor authentication", es: "Autenticación de dos factores" })}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {tx({ de: "Schütze dein Konto mit einem zusätzlichen Sicherheitsfaktor", en: "Protect your account with an additional security factor", es: "Protege tu cuenta con un factor de seguridad adicional" })}
@@ -322,7 +322,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
                   >
                     <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                     {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    <span className="relative">Verifizieren</span>
+                    <span className="relative">{tx({ de: "Verifizieren", en: "Verify", es: "Verificar" })}</span>
                   </Button>
                 </div>
               </motion.div>

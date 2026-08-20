@@ -64,7 +64,7 @@ const remixOptions: RemixOption[] = [
   },
   {
     id: 'chronological',
-    name: 'Chronologisch',
+    name: tx({ de: "Chronologisch", en: "Chronological", es: "Cronológico" }),
     description: tx({ de: 'Original-Reihenfolge beibehalten', en: 'Keep original order', es: 'Mantener el orden original' }),
     icon: <Clock className="w-5 h-5" />,
     color: 'from-slate-500 to-slate-600',
@@ -81,7 +81,7 @@ const remixOptions: RemixOption[] = [
 const platformOptions: RemixOption[] = [
   {
     id: 'tiktok',
-    name: 'TikTok Optimiert',
+    name: tx({ de: "TikTok Optimiert", en: "TikTok optimized", es: "Optimizado para TikTok" }),
     description: tx({ de: 'Hook in ersten 3 Sekunden, schnelle Cuts', en: 'Hook in the first 3 seconds, fast cuts', es: 'Gancho en los primeros 3 segundos, cortes rápidos' }),
     icon: <Target className="w-5 h-5" />,
     color: 'from-pink-500 to-rose-500',

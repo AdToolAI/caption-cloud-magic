@@ -44,25 +44,25 @@ function briefFromIdea(round: Round, idea: AutopilotIdea): string {
         ? tx({ de: 'wird als saubere Einblendung gelegt, nicht generieren', en: 'is placed as a clean fade-in, do not generate', es: 'se coloca como una entrada limpia, no generar' })
         : spec.styleOnly
           ? tx({ de: 'nur Look übernehmen, nicht den Inhalt', en: 'only adopt the look, not the content', es: 'Adopta solo la apariencia, no el contenido.' })
-          : 'als Bildreferenz verwenden';
+          : tx({ de: 'als Bildreferenz verwenden', en: 'use as image reference', es: 'usar como referencia visual' });
       return `- ${spec.label}: ${asset.description ?? asset.fileName} (${handling})${
-        asset.note ? ` — Wunsch: ${asset.note}` : ''
+        asset.note ? ` — ${tx({ de: 'Wunsch', en: 'Request', es: 'Petición' })}: ${asset.note}` : ''
       }`;
     });
 
   return [
-    `Ursprüngliches Briefing: ${round.brief}`,
+    `${tx({ de: 'Ursprüngliches Briefing', en: 'Original briefing', es: 'Briefing original' })}: ${round.brief}`,
     '',
-    `Gewählte Idee: ${idea.title}`,
-    `Aufhänger (Sekunde 1): ${idea.hook}`,
+    `${tx({ de: 'Gewählte Idee', en: 'Selected idea', es: 'Idea seleccionada' })}: ${idea.title}`,
+    `${tx({ de: 'Aufhänger (Sekunde 1)', en: 'Hook (second 1)', es: 'Gancho (segundo 1)' })}: ${idea.hook}`,
     `Logline: ${idea.logline}`,
-    `Bildwelt: ${idea.visualWorld}`,
+    `${tx({ de: 'Bildwelt', en: 'Visual world', es: 'Mundo visual' })}: ${idea.visualWorld}`,
     '',
-    'Szenenfolge, exakt so umsetzen:',
+    tx({ de: 'Szenenfolge, exakt so umsetzen:', en: 'Scene sequence, implement exactly like this:', es: 'Secuencia de escenas, impleméntala exactamente así:' }),
     ...idea.beats.map((b, i) => `${i + 1}. [${b.beat}] ${b.description} (~${b.seconds}s)`),
     '',
     `${tx({ de: 'Zielgruppe', en: 'Target audience', es: 'Público objetivo' })}: ${round.strategy.audience}`,
-    `Nutzen: ${round.strategy.benefit}`,
+    `${tx({ de: 'Nutzen', en: 'Benefit', es: 'Beneficio' })}: ${round.strategy.benefit}`,
     tx({ de: `Kaufhemmnis, das entkräftet wird: ${round.strategy.objection}`, en: `Purchase barrier that is being refuted: ${round.strategy.objection}`, es: `Barrera de compra que se está refutando: ${round.strategy.objection}` }),
     `${tx({ de: 'Tonalität', en: 'Tone', es: 'Tono' })}: ${round.strategy.tone}`,
     round.options.lipSync

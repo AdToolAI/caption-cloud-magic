@@ -457,7 +457,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
           {saving ? (
             <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Exportiere...</>
           ) : (
-            <><Sparkles className="w-5 h-5 mr-2" /> Mix exportieren · 48kHz Stereo WAV</>
+            <><Sparkles className="w-5 h-5 mr-2" /> {tx({ de: "Mix exportieren · 48kHz Stereo WAV", en: "Export mix · 48kHz stereo WAV", es: "Exportar mezcla · WAV estéreo 48 kHz" })}</>
           )}
         </Button>
         <p className="text-[11px] text-muted-foreground text-center mt-2">

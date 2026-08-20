@@ -123,7 +123,7 @@ export const TemplatePreview = ({
                 )}
 
                 <div>
-                  <h4 className="text-sm font-medium mb-2">Verwendungen</h4>
+                  <h4 className="text-sm font-medium mb-2">{tx({ de: "Verwendungen", en: "Uses", es: "Usos" })}</h4>
                   <p className="text-sm">{template.usage_count || 0}×</p>
                 </div>
               </div>

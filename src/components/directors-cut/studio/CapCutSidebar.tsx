@@ -132,7 +132,7 @@ interface Caption {
 
 const CAPTION_STYLES = [
   { id: 'standard', name: 'Standard', description: tx({ de: 'Weiß auf Schwarz', en: 'White on black', es: 'blanco sobre negro' }) },
-  { id: 'tiktok', name: 'TikTok', description: 'Bunt & animiert' },
+  { id: 'tiktok', name: 'TikTok', description: tx({ de: "Bunt & animiert", en: "Colorful & animated", es: "Colorido y animado" }) },
   { id: 'subtitle', name: tx({ de: 'Untertitel', en: 'Subtitles', es: 'Subtítulos' }), description: tx({ de: 'Klassisch', en: 'Classic', es: 'Clásico' }) },
   { id: 'highlight', name: 'Highlight', description: 'Wort-Animation' },
 ];
@@ -1258,7 +1258,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                         </div>
                         <div className="space-y-1">
                           <div className="flex justify-between">
-                            <label className="text-[10px] text-white/50">Verschiebung ↑</label>
+                            <label className="text-[10px] text-white/50">{tx({ de: "Verschiebung ↑", en: "Offset ↑", es: "Desplazamiento ↑" })}</label>
                             <span className="text-[10px] text-white/40">{Math.abs(subtitleSafeZone.offsetY)}%</span>
                           </div>
                           <Slider
@@ -1350,8 +1350,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 </SelectTrigger>
                 <SelectContent className="bg-[#2a2a2a] border-[#3a3a3a]">
                   <SelectItem value="de" className="text-white">🇩🇪 Deutsch</SelectItem>
-                  <SelectItem value="en" className="text-white">🇬🇧 Englisch</SelectItem>
-                  <SelectItem value="es" className="text-white">🇪🇸 Spanisch</SelectItem>
+                  <SelectItem value="en" className="text-white">{tx({ de: "🇬🇧 Englisch", en: "🇬🇧 English", es: "🇬🇧 Inglés" })}</SelectItem>
+                  <SelectItem value="es" className="text-white">{tx({ de: "🇪🇸 Spanisch", en: "🇪🇸 Spanish", es: "🇪🇸 Español" })}</SelectItem>
                   <SelectItem value="fr" className="text-white">{tx({ de: "🇫🇷 Französisch", en: "🇫🇷 French", es: "🇫🇷 Francés" })}</SelectItem>
                 </SelectContent>
               </Select>

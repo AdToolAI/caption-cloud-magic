@@ -151,7 +151,7 @@ export function useSubmitTemplateToMarketplace() {
     onSuccess: (data) => {
       const isPublished = data.status === 'published';
       toast({
-        title: isPublished ? 'Live im Marketplace' : 'Eingereicht',
+        title: isPublished ? tx({ de: "Live im Marketplace", en: "Live in marketplace", es: "En vivo en el marketplace" }) : 'Eingereicht',
         description: isPublished
           ? tx({ de: 'Dein Free-Template ist jetzt öffentlich verfügbar.', en: 'Your free template is now publicly available.', es: 'Tu plantilla gratuita ya está disponible públicamente.' })
           : tx({ de: 'Dein Premium-Template wartet auf Admin-Freigabe.', en: 'Your premium template is waiting for admin approval.', es: 'Su plantilla premium está esperando la aprobación del administrador.' }),

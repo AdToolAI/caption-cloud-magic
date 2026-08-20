@@ -337,7 +337,7 @@ export function KanbanView({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56 bg-popover/95 backdrop-blur-xl border-white/10">
-            <DropdownMenuLabel>Sortierung</DropdownMenuLabel>
+            <DropdownMenuLabel>{tx({ de: "Sortierung", en: "Sorting", es: "Ordenación" })}</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => setSettings((s) => ({ ...s, sort: "date_asc" }))}>
               {settings.sort === "date_asc" ? "✓ " : ""}Datum aufsteigend
             </DropdownMenuItem>

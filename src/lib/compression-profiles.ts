@@ -115,7 +115,7 @@ export const ASPECT_RATIO_PROFILES: AspectRatioProfile[] = [
   },
   {
     id: '1:1',
-    label: 'Quadratisch (1:1)',
+    label: tx({ de: "Quadratisch (1:1)", en: "Square (1:1)", es: "Cuadrado (1:1)" }),
     ratio: '1:1',
     width: 1080,
     height: 1080,

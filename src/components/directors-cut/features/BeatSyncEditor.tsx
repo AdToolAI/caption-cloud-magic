@@ -179,7 +179,7 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
             ) : beats.length > 0 ? (
               <>
                 <Zap className="h-4 w-4 mr-2" />
-                Erneut analysieren
+                {tx({ de: "Erneut analysieren", en: "Analyze again", es: "Analizar de nuevo" })}
               </>
             ) : (
               <>

@@ -960,7 +960,7 @@ export default function InstagramPublishing() {
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">2</span>
                       <div>
                         <p className="font-medium">{tx({ de: "Wähle deine App", en: "Choose your app", es: "Elige tu aplicación" })}</p>
-                        <p className="text-muted-foreground">Oben rechts im Dropdown: <strong>AdTool AI Integration</strong></p>
+                        <p className="text-muted-foreground">{tx({ de: "Oben rechts im Dropdown:", en: "Top right in the dropdown:", es: "Arriba a la derecha en el desplegable:" })} <strong>AdTool AI Integration</strong></p>
                       </div>
                     </li>
                     <li className="flex gap-3">
@@ -980,7 +980,7 @@ export default function InstagramPublishing() {
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">5</span>
                       <div>
-                        <p className="font-medium">Kopiere den generierten Token</p>
+                        <p className="font-medium">{tx({ de: "Kopiere den generierten Token", en: "Copy the generated token", es: "Copia el token generado" })}</p>
                         <p className="text-muted-foreground">{tx({ de: "Der Token wird direkt angezeigt - einfach kopieren!", en: "The token is displayed directly - just copy it!", es: "El token se muestra directamente, ¡simplemente cópielo!" })}</p>
                       </div>
                     </li>
@@ -1056,7 +1056,7 @@ export default function InstagramPublishing() {
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">6</span>
                       <div>
-                        <p className="font-medium">Kopiere den generierten Token</p>
+                        <p className="font-medium">{tx({ de: "Kopiere den generierten Token", en: "Copy the generated token", es: "Copia el token generado" })}</p>
                         <p className="text-muted-foreground">{tx({ de: "Beginnt mit \"EAAG…\" oder \"EAABsb…\"", en: "Starts with \"EAAG…\" or \"EAABsb…\"", es: "Comienza con \"EAAG…\" o \"EAABsb…\"" })}</p>
                       </div>
                     </li>
@@ -1161,7 +1161,7 @@ export default function InstagramPublishing() {
 
                 {renewResult.debug?.scopes && (
                   <div className="space-y-2">
-                    <div className="text-sm font-medium">Berechtigungen:</div>
+                    <div className="text-sm font-medium">{tx({ de: "Berechtigungen:", en: "Permissions:", es: "Permisos:" })}</div>
                     <div className="flex flex-wrap gap-2">
                       {requiredScopes.map(scope => {
                         const hasScope = renewResult.debug.scopes.includes(scope);

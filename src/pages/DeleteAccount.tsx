@@ -187,7 +187,7 @@ const DeleteAccount = () => {
                   {tx({ de: "Ich habe die", en: "I have read the", es: "He leído los" })}{" "}
                   <Link to="/legal/terms" className="text-primary underline">AGB</Link>{" "}
                   {tx({ de: "und", en: "and", es: "y" })}{" "}
-                  <Link to="/privacy" className="text-primary underline">Datenschutzbestimmungen</Link>{" "}
+                  <Link to="/privacy" className="text-primary underline">{tx({ de: "Datenschutzbestimmungen", en: "Privacy Policy", es: "Política de privacidad" })}</Link>{" "}
                   {tx({ de: "zur Kenntnis genommen.", en: "noticed.", es: "avisos." })}
                 </Label>
               </div>

@@ -66,7 +66,7 @@ export const TemplateManagerHeroHeader = ({ templateCount }: TemplateManagerHero
                        backdrop-blur-md bg-card/40 border border-white/10
                        text-sm text-muted-foreground">
           <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
-          Wiederverwendbar
+          {tx({ de: "Wiederverwendbar", en: "Reusable", es: "Reutilizable" })}
         </div>
       </motion.div>
     </motion.div>

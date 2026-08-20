@@ -95,7 +95,7 @@ const QUALITY_OPTIONS = [
 
 const FORMAT_OPTIONS = [
   { value: 'mp4', label: 'MP4', description: 'Universell kompatibel' },
-  { value: 'webm', label: 'WebM', description: 'Web-optimiert' },
+  { value: 'webm', label: 'WebM', description: tx({ de: "Web-optimiert", en: "Web-optimized", es: "Optimizado para web" }) },
   { value: 'mov', label: 'MOV', description: 'Apple ProRes' },
 ];
 
@@ -618,7 +618,7 @@ export function ExportRenderStep({
           {/* Applied Changes Summary */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Zusammenfassung</CardTitle>
+              <CardTitle className="text-sm">{tx({ de: "Zusammenfassung", en: "Summary", es: "Resumen" })}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between text-sm">

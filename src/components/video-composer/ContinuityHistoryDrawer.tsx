@@ -97,7 +97,7 @@ export default function ContinuityHistoryDrawer({ open, onOpenChange, projectId 
                         )}
                         {e.repaired && (
                           <Badge variant="outline" className="text-emerald-400 border-emerald-500/40">
-                            ✓ repariert
+                            {tx({ de: "✓ repariert", en: "✓ repaired", es: "✓ reparado" })}
                           </Badge>
                         )}
                       </div>

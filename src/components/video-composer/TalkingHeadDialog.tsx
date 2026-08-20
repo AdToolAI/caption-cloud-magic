@@ -232,7 +232,7 @@ export default function TalkingHeadDialog({
     if (av.default_voice_id) setVoiceId(av.default_voice_id);
     setShowLibrary(false);
     toast({
-      title: 'Avatar importiert',
+      title: tx({ de: "Avatar importiert", en: "Avatar imported", es: "Avatar importado" }),
       description: tx({ de: `"${av.name}" wurde in deinen Briefing-Cast übernommen.`, en: `"${av.name}" has been added to your briefing cast.`, es: `"${av.name}" se ha añadido a tu elenco del briefing.` }),
     });
   };
@@ -454,7 +454,7 @@ export default function TalkingHeadDialog({
                         type="button"
                         onClick={() => importFromLibrary(av as any)}
                         className="aspect-square rounded-lg overflow-hidden border border-border/40 hover:border-primary/60 group relative"
-                        title={`${av.name} importieren`}
+                        title={`${av.name} — ${tx({ de: "importieren", en: "import", es: "importar" })}`}
                       >
                         {url ? (
                           <img src={url} alt={av.name} className="w-full h-full object-cover" />

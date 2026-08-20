@@ -94,9 +94,9 @@ export default function AIMonitoring() {
 
   const getEventTypeLabel = (eventType: string) => {
     const labels: Record<string, string> = {
-      'caption.created': 'Caption generiert',
-      'background.generated': 'Background generiert',
-      'bio.generated': 'Bio generiert',
+      'caption.created': tx({ de: "Caption generiert", en: "Caption generated", es: "Subtítulo generado" }),
+      'background.generated': tx({ de: "Background generiert", en: "Background generated", es: "Fondo generado" }),
+      'bio.generated': tx({ de: "Bio generiert", en: "Bio generated", es: "Biografía generada" }),
     };
     return labels[eventType] || eventType;
   };

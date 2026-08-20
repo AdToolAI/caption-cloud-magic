@@ -34,7 +34,7 @@ export default function QuotaBanner() {
     <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-2.5 space-y-2">
       <div className="flex items-center justify-between gap-3 text-sm">
         <span className="text-amber-200">
-          Free-Plan: <strong>{q.used} / {q.limit}</strong> Downloads diesen Monat
+          Free-Plan: <strong>{q.used} / {q.limit}</strong> {tx({ de: "Downloads diesen Monat", en: "downloads this month", es: "descargas este mes" })}
         </span>
         <Button asChild size="sm" variant="outline" className="h-7">
           <Link to="/pricing">

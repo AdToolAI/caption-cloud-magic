@@ -175,7 +175,7 @@ export function SmartCropping({
           ) : (
             <>
               <Wand2 className="h-4 w-4 mr-2" />
-              AI Auto-Erkennung
+              {tx({ de: "AI Auto-Erkennung", en: "AI auto detection", es: "Detección automática con IA" })}
             </>
           )}
         </Button>

@@ -195,7 +195,7 @@ const ResetPassword = () => {
                 className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-sm font-medium text-primary mx-auto"
               >
                 <Shield className="h-4 w-4" />
-                Sicherheit
+                {tx({ de: "Sicherheit", en: "Security", es: "Seguridad" })}
               </motion.div>
 
               <CardTitle className="text-2xl font-bold">

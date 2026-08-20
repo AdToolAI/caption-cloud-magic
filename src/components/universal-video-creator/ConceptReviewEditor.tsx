@@ -178,7 +178,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
             </div>
           </div>
           <div className="space-y-1.5">
-            <FieldLabel>Produktbeschreibung</FieldLabel>
+            <FieldLabel>{tx({ de: "Produktbeschreibung", en: "Product description", es: "Descripción del producto" })}</FieldLabel>
             <Textarea value={data.productDescription} onChange={e => update('productDescription', e.target.value)} className={cn(fieldClass, 'min-h-[60px]')} rows={2} />
           </div>
         </CollapsibleSection>
@@ -316,7 +316,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
               <Input value={data.musicStyle} onChange={e => update('musicStyle', e.target.value)} className={fieldClass} />
             </div>
             <div className="space-y-1.5">
-              <FieldLabel>Musik-Stimmung</FieldLabel>
+              <FieldLabel>{tx({ de: "Musik-Stimmung", en: "Music mood", es: "Ambiente musical" })}</FieldLabel>
               <Input value={data.musicMood} onChange={e => update('musicMood', e.target.value)} className={fieldClass} />
             </div>
           </div>

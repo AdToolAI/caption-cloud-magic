@@ -64,7 +64,7 @@ export function CommentInsightCard({
             {tx({ de: "Als Aufgabe speichern", en: "Save as task", es: "Guardar como tarea" })}
           </Button>
           <Button size="sm" variant="ghost" className="text-xs">
-            In CSV exportieren
+            {tx({ de: "In CSV exportieren", en: "Export to CSV", es: "Exportar a CSV" })}
           </Button>
         </div>
       </CardContent>

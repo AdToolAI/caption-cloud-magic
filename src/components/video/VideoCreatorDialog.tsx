@@ -521,7 +521,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                       <div className="space-y-1">
                         <Label htmlFor="subtitles-toggle" className="text-sm font-medium">
-                          Text-Overlays aktivieren
+                          {tx({ de: "Text-Overlays aktivieren", en: "Enable text overlays", es: "Activar superposiciones de texto" })}
                         </Label>
                         <p className="text-xs text-muted-foreground">
                           {tx({ de: "Zeigt automatisch generierte Untertitel basierend auf deinem Skript", en: "Shows auto-generated subtitles based on your script", es: "Muestra subtítulos generados automáticamente según tu guion" })}
@@ -612,7 +612,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                   {scriptText && (
                     <div className="space-y-2">
                       <Label htmlFor="script-editor" className="text-sm font-medium">
-                        Generiertes Script (bearbeitbar)
+                        {tx({ de: "Generiertes Script (bearbeitbar)", en: "Generated script (editable)", es: "Guion generado (editable)" })}
                       </Label>
                       <textarea
                         id="script-editor"

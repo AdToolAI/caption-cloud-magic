@@ -60,9 +60,9 @@ const ASPECT_RATIOS = [
 ];
 
 const SORT_OPTIONS = [
-  { value: 'popular', label: 'Beliebtheit' },
+  { value: 'popular', label: tx({ de: "Beliebtheit", en: "Popularity", es: "Popularidad" }) },
   { value: 'recent', label: 'Neueste' },
-  { value: 'rating', label: 'Bewertung' },
+  { value: 'rating', label: tx({ de: "Bewertung", en: "Rating", es: "Valoración" }) },
   { value: 'name', label: 'Name' },
 ];
 

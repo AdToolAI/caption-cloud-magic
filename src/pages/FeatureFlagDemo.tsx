@@ -59,7 +59,7 @@ const FeatureFlagDemo = () => {
           <div className="space-y-2">
             <h1 className="text-4xl font-bold">Feature Flags Demo</h1>
             <p className="text-muted-foreground">
-              Übersicht aller Feature Flags und deren Status in deinem Account
+              {tx({ de: "Übersicht aller Feature Flags und deren Status in deinem Account", en: "Overview of all feature flags and their status in your account", es: "Resumen de todos los feature flags y su estado en tu cuenta" })}
             </p>
           </div>
 
@@ -118,15 +118,15 @@ const FeatureFlagDemo = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Zap className="h-5 w-5 text-purple-500" />
-                    AI Queue Worker V2 ist aktiv
+                    {tx({ de: "AI Queue Worker V2 ist aktiv", en: "AI Queue Worker V2 is active", es: "AI Queue Worker V2 está activo" })}
                   </CardTitle>
                   <CardDescription>
-                    Der neue AI Queue Worker wird verwendet für optimierte AI-Anfragen
+                    {tx({ de: "Der neue AI Queue Worker wird verwendet für optimierte AI-Anfragen", en: "The new AI queue worker is used for optimized AI requests", es: "Se usa el nuevo AI queue worker para solicitudes de IA optimizadas" })}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
-                    Besuche den Hook Generator um den neuen Worker in Aktion zu sehen.
+                    {tx({ de: "Besuche den Hook Generator um den neuen Worker in Aktion zu sehen.", en: "Visit the Hook Generator to see the new worker in action.", es: "Visita el Hook Generator para ver el nuevo worker en acción." })}
                   </p>
                 </CardContent>
               </Card>
@@ -138,15 +138,15 @@ const FeatureFlagDemo = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Database className="h-5 w-5 text-blue-500" />
-                    Connection Pooling ist aktiv
+                    {tx({ de: "Connection Pooling ist aktiv", en: "Connection pooling is active", es: "El pooling de conexiones está activo" })}
                   </CardTitle>
                   <CardDescription>
-                    Datenbankverbindungen werden effizient wiederverwendet
+                    {tx({ de: "Datenbankverbindungen werden effizient wiederverwendet", en: "Database connections are reused efficiently", es: "Las conexiones de base de datos se reutilizan de forma eficiente" })}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
-                    Alle Datenbankoperationen profitieren automatisch von verbesserter Performance.
+                    {tx({ de: "Alle Datenbankoperationen profitieren automatisch von verbesserter Performance.", en: "All database operations automatically benefit from improved performance.", es: "Todas las operaciones de base de datos se benefician automáticamente de un mejor rendimiento." })}
                   </p>
                 </CardContent>
               </Card>
@@ -160,10 +160,10 @@ const FeatureFlagDemo = () => {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-muted-foreground">
                       <BarChart3 className="h-5 w-5" />
-                      Advanced Analytics ist inaktiv
+                      {tx({ de: "Advanced Analytics ist inaktiv", en: "Advanced analytics is inactive", es: "La analítica avanzada está inactiva" })}
                     </CardTitle>
                     <CardDescription>
-                      Dieses Feature ist aktuell nicht für deinen Account aktiviert
+                      {tx({ de: "Dieses Feature ist aktuell nicht für deinen Account aktiviert", en: "This feature is currently not enabled for your account", es: "Esta función no está activada actualmente para tu cuenta" })}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -173,15 +173,15 @@ const FeatureFlagDemo = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="h-5 w-5 text-green-500" />
-                    Advanced Analytics ist aktiv
+                    {tx({ de: "Advanced Analytics ist aktiv", en: "Advanced analytics is active", es: "La analítica avanzada está activa" })}
                   </CardTitle>
                   <CardDescription>
-                    Erweiterte Analytics-Features sind verfügbar
+                    {tx({ de: "Erweiterte Analytics-Features sind verfügbar", en: "Advanced analytics features are available", es: "Las funciones avanzadas de analítica están disponibles" })}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
-                    Besuche den Calendar um erweiterte Metriken zu sehen.
+                    {tx({ de: "Besuche den Calendar um erweiterte Metriken zu sehen.", en: "Visit the Calendar to see advanced metrics.", es: "Visita el Calendario para ver métricas avanzadas." })}
                   </p>
                 </CardContent>
               </Card>
@@ -195,10 +195,10 @@ const FeatureFlagDemo = () => {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-muted-foreground">
                       <Layout className="h-5 w-5" />
-                      New Planner UI ist inaktiv
+                      {tx({ de: "New Planner UI ist inaktiv", en: "New Planner UI is inactive", es: "La nueva UI del Planificador está inactiva" })}
                     </CardTitle>
                     <CardDescription>
-                      Du siehst die Standard-Version des Planners
+                      {tx({ de: "Du siehst die Standard-Version des Planners", en: "You are seeing the standard version of the Planner", es: "Estás viendo la versión estándar del Planificador" })}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -208,15 +208,15 @@ const FeatureFlagDemo = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Layout className="h-5 w-5 text-orange-500" />
-                    New Planner UI ist aktiv
+                    {tx({ de: "New Planner UI ist aktiv", en: "New Planner UI is active", es: "La nueva UI del Planificador está activa" })}
                   </CardTitle>
                   <CardDescription>
-                    Die neue Planner-Oberfläche ist für dich verfügbar
+                    {tx({ de: "Die neue Planner-Oberfläche ist für dich verfügbar", en: "The new Planner interface is available to you", es: "La nueva interfaz del Planificador está disponible para ti" })}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
-                    Besuche den Planner um die neue UI zu erleben.
+                    {tx({ de: "Besuche den Planner um die neue UI zu erleben.", en: "Visit the Planner to experience the new UI.", es: "Visita el Planificador para conocer la nueva interfaz." })}
                   </p>
                 </CardContent>
               </Card>

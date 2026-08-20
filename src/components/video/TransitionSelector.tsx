@@ -5,10 +5,10 @@ import { TransitionPreviewTile, type TransitionId } from '@/components/studio-vi
 const TRANSITIONS = [
   { id: 'none', name: 'Cut', description: 'Harter Schnitt — Artlist-Standard' },
   { id: 'crossfade', name: 'Crossfade', description: tx({ de: 'Sanftes Morphing zwischen Szenen', en: 'Smooth morphing between scenes', es: 'Transformación suave entre escenas' }) },
-  { id: 'fade', name: 'Fade', description: 'Sanftes Ein-/Ausblenden' },
+  { id: 'fade', name: 'Fade', description: tx({ de: "Sanftes Ein-/Ausblenden", en: "Smooth fade in/out", es: "Fundido suave de entrada/salida" }) },
   { id: 'slide', name: 'Slide', description: 'Seitliches Gleiten' },
   { id: 'zoom', name: 'Zoom', description: 'Hinein-/Herauszoomen' },
-  { id: 'wipe', name: 'Wipe', description: 'Wischbewegung' },
+  { id: 'wipe', name: 'Wipe', description: tx({ de: "Wischbewegung", en: "Wipe motion", es: "Movimiento de barrido" }) },
   { id: 'blur', name: 'Blur', description: tx({ de: "Weichzeichner-Übergang", en: "Blur transition", es: "Transición de desenfoque" }) },
   { id: 'push', name: 'Push', description: tx({ de: 'Szene schiebt Szene', en: 'Scene pushes scene', es: 'La escena empuja la escena' }) },
 ] as const;

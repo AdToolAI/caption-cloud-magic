@@ -71,7 +71,7 @@ export function AudioDuckingPanel({
         <AudioLines className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
         <h3 className="text-lg font-semibold mb-2">{tx({ de: "Sprache + Musik benötigt", en: "Voice + music required", es: "Se requiere voz + música" })}</h3>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Lade ein Voiceover hoch <span className="text-primary">{tx({ de: "und", en: "and", es: "y" })}</span> {tx({ de: "wähle einen\n          Musik-Track (über AI Music, Beat-Sync oder die Bibliothek), um Audio Ducking zu nutzen.", en: "select a\n          music track (via AI Music, Beat-Sync or the library) to use audio ducking.", es: "selecciona una\n          pista de música (a través de AI Music, Beat-Sync o la biblioteca) para usar la atenuación de audio." })}
+          {tx({ de: "Lade ein Voiceover hoch", en: "Upload a voiceover", es: "Sube una voz en off" })} <span className="text-primary">{tx({ de: "und", en: "and", es: "y" })}</span> {tx({ de: "wähle einen\n          Musik-Track (über AI Music, Beat-Sync oder die Bibliothek), um Audio Ducking zu nutzen.", en: "select a\n          music track (via AI Music, Beat-Sync or the library) to use audio ducking.", es: "selecciona una\n          pista de música (a través de AI Music, Beat-Sync o la biblioteca) para usar la atenuación de audio." })}
         </p>
       </Card>
     );
@@ -121,7 +121,7 @@ export function AudioDuckingPanel({
             >
               {isExporting
                 ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Exportiere…</>
-                : <><Download className="w-5 h-5 mr-2" />Mix exportieren</>}
+                : <><Download className="w-5 h-5 mr-2" />{tx({ de: "Mix exportieren", en: "Export mix", es: "Exportar mezcla" })}</>}
             </Button>
           </div>
         </div>
@@ -267,7 +267,7 @@ export function AudioDuckingPanel({
         </div>
         <div>
           <div className="flex items-center justify-between mb-2">
-            <Label className="text-sm">Attack (Geschwindigkeit runter)</Label>
+            <Label className="text-sm">{tx({ de: "Attack (Geschwindigkeit runter)", en: "Attack (ramp-down speed)", es: "Attack (velocidad de bajada)" })}</Label>
             <span className="text-sm tabular-nums text-primary font-medium">{settings.attackMs} ms</span>
           </div>
           <Slider
@@ -280,7 +280,7 @@ export function AudioDuckingPanel({
         </div>
         <div>
           <div className="flex items-center justify-between mb-2">
-            <Label className="text-sm">Release (Geschwindigkeit hoch)</Label>
+            <Label className="text-sm">{tx({ de: "Release (Geschwindigkeit hoch)", en: "Release (ramp-up speed)", es: "Release (velocidad de subida)" })}</Label>
             <span className="text-sm tabular-nums text-primary font-medium">{settings.releaseMs} ms</span>
           </div>
           <Slider

@@ -761,7 +761,7 @@ export default function ProductionPlanSheet({
     const briefing = text.trim();
     if (briefing.length < 40) {
       toast({
-        title: 'Briefing zu kurz',
+        title: tx({ de: "Briefing zu kurz", en: "Briefing too short", es: "Briefing demasiado corto" }),
         description: tx({ de: 'Mindestens ein paar Sätze einfügen.', en: 'Please insert at least a few sentences.', es: 'Por favor, inserta al menos unas frases.' }),
         variant: 'destructive',
       });

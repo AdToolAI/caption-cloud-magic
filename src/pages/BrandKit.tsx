@@ -312,7 +312,7 @@ const BrandKit = () => {
 
       queryClient.invalidateQueries({ queryKey: ['brand-kits'] });
       toast({
-        title: "Dupliziert",
+        title: tx({ de: "Dupliziert", en: "Duplicated", es: "Duplicado" }),
         description: tx({ de: "Brand Kit wurde kopiert", en: "Brand Kit has been copied", es: "El kit de marca ha sido copiado." })
       });
     } catch (error) {
@@ -513,7 +513,7 @@ const BrandKit = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="description">Markenbeschreibung *</Label>
+                      <Label htmlFor="description">{tx({ de: "Markenbeschreibung *", en: "Brand description *", es: "Descripción de la marca *" })}</Label>
                       <Textarea
                         id="description"
                         value={formData.brandDescription}
@@ -688,7 +688,7 @@ const BrandKit = () => {
                         className="border-white/10 hover:bg-primary/10 hover:border-primary/30 group"
                       >
                         <Download className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" />
-                        Als PDF exportieren
+                        {tx({ de: "Als PDF exportieren", en: "Export as PDF", es: "Exportar como PDF" })}
                       </Button>
                     </div>
 
@@ -709,7 +709,7 @@ const BrandKit = () => {
                           >
                             <Sparkles className="h-5 w-5 text-primary" />
                           </motion.div>
-                          <h3 className="text-lg font-semibold">KI-Analyse & Empfehlung</h3>
+                          <h3 className="text-lg font-semibold">{tx({ de: "KI-Analyse & Empfehlung", en: "AI analysis & recommendation", es: "Análisis y recomendación con IA" })}</h3>
                         </div>
                       </div>
                       <div className="p-6">
@@ -916,7 +916,7 @@ const BrandKit = () => {
                               className="flex-1 border-white/10 hover:bg-primary/10 hover:border-primary/30"
                               onClick={() => setActiveMutation.mutate(kit.id)}
                             >
-                              Aktivieren
+                              {tx({ de: "Aktivieren", en: "Enable", es: "Activar" })}
                             </Button>
                           )}
                           <Button

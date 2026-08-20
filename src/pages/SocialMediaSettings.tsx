@@ -120,7 +120,7 @@ export default function SocialMediaSettings() {
   return (
     <div className="container max-w-5xl mx-auto py-8 px-4">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Social Media Verbindungen</h1>
+        <h1 className="text-3xl font-bold mb-2">{tx({ de: "Social Media Verbindungen", en: "Social media connections", es: "Conexiones de redes sociales" })}</h1>
         <p className="text-muted-foreground">
           {tx({ de: "Verwalte deine Verbindungen zu verschiedenen Social Media Plattformen", en: "Manage your connections to various social media platforms", es: "Gestiona tus conexiones a varias plataformas de redes sociales" })}
         </p>

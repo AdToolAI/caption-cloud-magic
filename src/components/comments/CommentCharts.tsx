@@ -44,7 +44,7 @@ export function CommentCharts({ timeseries, intentDistribution, heatmap, topTopi
         {/* Intent Distribution */}
         <Card>
           <CardHeader>
-            <CardTitle>Intent-Verteilung</CardTitle>
+            <CardTitle>{tx({ de: "Intent-Verteilung", en: "Intent distribution", es: "Distribución de intención" })}</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>

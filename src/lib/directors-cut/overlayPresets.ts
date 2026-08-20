@@ -162,7 +162,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     id: 'badge-limited',
     name: tx({ de: 'Störer — Limitiert', en: 'Badge — Limited', es: 'Insignia — Limitado' }),
     category: 'Störer',
-    description: 'Dringlichkeit erzeugen',
+    description: tx({ de: "Dringlichkeit erzeugen", en: "Create urgency", es: "Crear urgencia" }),
     kind: 'badge',
     build: () =>
       base(

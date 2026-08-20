@@ -259,7 +259,7 @@ export default function Analytics() {
                   </motion.div>
                   <div>
                     <h3 className="text-xl font-bold text-foreground">Hashtag Performance</h3>
-                    <p className="text-sm text-muted-foreground">Verfolge welche Hashtags am meisten Engagement bringen</p>
+                    <p className="text-sm text-muted-foreground">{tx({ de: "Verfolge welche Hashtags am meisten Engagement bringen", en: "Track which hashtags drive the most engagement", es: "Descubre qué hashtags generan más interacción" })}</p>
                   </div>
                 </div>
                 <Button 
@@ -367,7 +367,7 @@ export default function Analytics() {
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
                                   -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                   <TrendingUp className={`h-4 w-4 mr-2 ${analyzing ? "animate-spin" : ""}`} />
-                  Best identifizieren
+                  {tx({ de: "Best identifizieren", en: "Identify best", es: "Identificar los mejores" })}
                 </Button>
               </div>
 

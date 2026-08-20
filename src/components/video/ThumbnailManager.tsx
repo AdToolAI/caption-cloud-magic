@@ -39,7 +39,7 @@ export const ThumbnailManager = ({
       if (error) throw error;
 
       toast({
-        title: 'Thumbnail generiert',
+        title: tx({ de: "Thumbnail generiert", en: "Thumbnail generated", es: "Miniatura generada" }),
         description: tx({ de: 'Das Thumbnail wurde erfolgreich erstellt', en: 'The thumbnail was created successfully', es: 'La miniatura se creó correctamente' }),
       });
 
@@ -106,7 +106,7 @@ export const ThumbnailManager = ({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Image className="w-5 h-5" />
-          Thumbnail-Verwaltung
+          {tx({ de: "Thumbnail-Verwaltung", en: "Thumbnail management", es: "Gestión de miniaturas" })}
         </CardTitle>
         <CardDescription>
           {tx({ de: "Thumbnail automatisch generieren oder eigenes hochladen", en: "Auto-generate thumbnail or upload your own", es: "Generar miniatura automáticamente o subir la tuya" })}

@@ -237,7 +237,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
             className="w-full mt-1.5 h-7 text-[10px] text-cyan-300 hover:text-cyan-200 hover:bg-cyan-500/10 disabled:opacity-30"
           >
             <MapPin className="h-3 w-3 mr-1" />
-            Auf Playhead
+            {tx({ de: "Auf Playhead", en: "To playhead", es: "Al cabezal" })}
           </Button>
         </div>
 
@@ -287,7 +287,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
             className="w-full mt-1.5 h-7 text-[10px] text-cyan-300 hover:text-cyan-200 hover:bg-cyan-500/10 disabled:opacity-30"
           >
             <MapPin className="h-3 w-3 mr-1" />
-            Auf Playhead
+            {tx({ de: "Auf Playhead", en: "To playhead", es: "Al cabezal" })}
           </Button>
         </div>
       </div>
@@ -334,7 +334,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
                 className="border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10"
               >
                 <Scissors className="h-3.5 w-3.5 mr-1.5" />
-                Am Playhead teilen
+                {tx({ de: "Am Playhead teilen", en: "Split at playhead", es: "Dividir en el cabezal" })}
               </Button>
             );
           }

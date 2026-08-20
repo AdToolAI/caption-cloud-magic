@@ -18,7 +18,7 @@ interface Props {
 
 const META: Record<string, { label: string; icon: typeof Bell; className: string }> = {
   autopilot_qa_review: { label: 'QA-Review', icon: AlertTriangle, className: 'text-amber-500 bg-amber-500/10' },
-  autopilot_blocked: { label: 'Blockiert', icon: XCircle, className: 'text-destructive bg-destructive/10' },
+  autopilot_blocked: { label: tx({ de: "Blockiert", en: "Blocked", es: "Bloqueado" }), icon: XCircle, className: 'text-destructive bg-destructive/10' },
   autopilot_failed: { label: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }), icon: XCircle, className: 'text-destructive bg-destructive/10' },
   autopilot_posted: { label: 'Live', icon: Sparkles, className: 'text-emerald-500 bg-emerald-500/10' },
   autopilot_daily_digest: { label: tx({ de: "Tagesübersicht", en: "Daily Digest", es: "Resumen diario" }), icon: CalIcon, className: 'text-primary bg-primary/10' },
@@ -83,7 +83,7 @@ export function AutopilotApprovalInbox({ onOpenSlot }: Props) {
                 <Badge className="bg-primary/20 text-primary border-primary/30">{unreadCount} {tx({ de: 'neu', en: 'new', es: 'nuevo' })}</Badge>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">Push & In-App-Updates des Autopiloten.</p>
+            <p className="text-xs text-muted-foreground">{tx({ de: "Push & In-App-Updates des Autopiloten.", en: "Push & in-app updates from Autopilot.", es: "Notificaciones push y en la app del Autopiloto." })}</p>
           </div>
           {unreadCount > 0 && (
             <Button variant="ghost" size="sm" onClick={() => markAllRead()} className="text-xs">

@@ -117,7 +117,7 @@ export default function LocationLightingGrid({
     <div className="space-y-3">
       <div className="space-y-0.5">
         <p className="text-xs font-semibold tracking-wide text-foreground/90">
-          Lichtstimmungen · Location-Scouting
+          {tx({ de: "Lichtstimmungen · Location-Scouting", en: "Lighting moods · location scouting", es: "Ambientes de luz · scouting de localizaciones" })}
         </p>
         <p className="text-[11px] text-muted-foreground">
           {tx({ de: "Lass die Location in verschiedenen Tageszeiten / Stimmungen rendern.", en: "Render the location in different times of day / moods.", es: "Renderiza la ubicación en diferentes momentos del día / estados de ánimo." })}

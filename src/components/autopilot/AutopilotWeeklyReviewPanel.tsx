@@ -156,7 +156,7 @@ export function AutopilotWeeklyReviewPanel() {
       {/* Platform breakdown */}
       {Object.keys(review.platform_breakdown).length > 0 && (
         <Card className="p-4">
-          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Plattform-Verteilung</div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{tx({ de: "Plattform-Verteilung", en: "Platform distribution", es: "Distribución por plataforma" })}</div>
           <div className="flex flex-wrap gap-2">
             {Object.entries(review.platform_breakdown).map(([p, c]) => (
               <Badge key={p} variant="secondary">{p}: {c}</Badge>

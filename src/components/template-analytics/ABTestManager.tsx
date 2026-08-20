@@ -233,7 +233,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                           <>
                             <Button size="sm" variant="outline" onClick={() => handlePauseTest(test.id)}>
                               <Pause className="h-4 w-4 mr-1" />
-                              Pausieren
+                              {tx({ de: "Pausieren", en: "Pause", es: "Pausar" })}
                             </Button>
                             <Button size="sm" onClick={() => handleViewResults(test)}>
                               Ergebnisse
@@ -242,7 +242,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                         )}
                         {test.status === 'completed' && (
                           <Button size="sm" variant="outline" onClick={() => handleViewResults(test)}>
-                            Ergebnisse anzeigen
+                            {tx({ de: "Ergebnisse anzeigen", en: "View results", es: "Ver resultados" })}
                           </Button>
                         )}
                       </div>

@@ -135,7 +135,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
           ) : (
             <>
               <Sparkles className="h-4 w-4 mr-2" />
-              AI Audio-Optimierung
+              {tx({ de: "AI Audio-Optimierung", en: "AI audio optimization", es: "Optimización de audio con IA" })}
             </>
           )}
           <Badge variant="secondary" className="ml-2 text-[10px]">3 Credits</Badge>
@@ -239,7 +239,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label className="text-sm">Aktivieren</Label>
+                <Label className="text-sm">{tx({ de: "Aktivieren", en: "Enable", es: "Activar" })}</Label>
                 <Switch
                   checked={audio.noise_reduction}
                   onCheckedChange={(v) => handleToggle('noise_reduction', v)}
@@ -268,13 +268,13 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Mic className="h-4 w-4" />
-                Stimmverbesserung
+                {tx({ de: "Stimmverbesserung", en: "Voice enhancement", es: "Mejora de voz" })}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-sm">KI-Stimmoptimierung</Label>
+                  <Label className="text-sm">{tx({ de: "KI-Stimmoptimierung", en: "AI voice optimization", es: "Optimización de voz con IA" })}</Label>
                   <p className="text-xs text-muted-foreground">
                     {tx({ de: "Verbessert Klarheit und Verständlichkeit", en: "Improves clarity and intelligibility", es: "Mejora la claridad y la inteligibilidad" })}
                   </p>
@@ -298,7 +298,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-sm">Aktivieren</Label>
+                  <Label className="text-sm">{tx({ de: "Aktivieren", en: "Enable", es: "Activar" })}</Label>
                   <p className="text-xs text-muted-foreground">
                     {tx({ de: "Senkt Musik automatisch bei Sprache", en: "Automatically lowers music during speech", es: "Baja automáticamente la música durante el habla" })}
                   </p>
