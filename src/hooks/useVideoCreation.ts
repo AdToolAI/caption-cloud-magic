@@ -100,7 +100,7 @@ export const useVideoCreation = () => {
       
       if (!result) {
         setPolling(false);
-        onError?.(tx({ de: 'Fehler beim Status-Check', en: 'Error during status check', es: 'Error durante la verificación de estado' }));
+        onError?.(tx({ de: tx({ de: "Fehler beim Status-Check", en: "Status check failed", es: "Error en la comprobación de estado" }), en: 'Error during status check', es: 'Error durante la verificación de estado' }));
         return;
       }
 

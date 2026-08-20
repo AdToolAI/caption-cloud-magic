@@ -280,7 +280,7 @@ export function CrossPostMagicPanel({
       {hasAnyDraft && (
         <div className="flex items-center justify-between border-t border-white/5 bg-black/30 p-4">
           <div className="text-xs text-muted-foreground">
-            {allReady ? tx({ de: "Alle Kanäle bereit", en: "All channels ready", es: "Todos los canales listos" }) : tx({ de: `${activeChannels.filter((c) => drafts[c]).length}/${activeChannels.length} Drafts bereit`, en: `${activeChannels.filter((c) => drafts[c]).length}/${activeChannels.length} drafts ready`, es: `${activeChannels.filter((c) => drafts[c]).length}/${activeChannels.length} borradores listos` })}
+            {allReady ? tx({ de: tx({ de: "Alle Kanäle bereit", en: "All channels ready", es: "Todos los canales listos" }), en: "All channels ready", es: "Todos los canales listos" }) : tx({ de: `${activeChannels.filter((c) => drafts[c]).length}/${activeChannels.length} Drafts bereit`, en: `${activeChannels.filter((c) => drafts[c]).length}/${activeChannels.length} drafts ready`, es: `${activeChannels.filter((c) => drafts[c]).length}/${activeChannels.length} borradores listos` })}
           </div>
           <Button
             onClick={handlePublish}

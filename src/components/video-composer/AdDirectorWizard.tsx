@@ -947,7 +947,7 @@ export default function AdDirectorWizard({
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         {activeBrandKit?.logo_url
-                          ? tx({ de: 'Statische Brand-Endcard mit Logo + Tagline. 0 AI-Credits.', en: 'Static brand end card with logo + tagline. 0 AI credits.', es: 'Tarjeta final de marca estática con logo + eslogan. 0 créditos de IA.' })
+                          ? tx({ de: tx({ de: "Statische Brand-Endcard mit Logo + Tagline. 0 AI-Credits.", en: "Static brand end card with logo + tagline. 0 AI credits.", es: "Tarjeta final de marca estática con logo y eslogan. 0 créditos de IA." }), en: 'Static brand end card with logo + tagline. 0 AI credits.', es: 'Tarjeta final de marca estática con logo + eslogan. 0 créditos de IA.' })
                           : tx({ de: 'Lade ein Logo in dein Brand-Kit, um dies zu nutzen.', en: 'To use this, upload a logo to your brand kit.', es: 'Para utilizar esto, cargue un logotipo en el kit de su marca.' })}
                       </p>
                     </div>
@@ -997,7 +997,7 @@ export default function AdDirectorWizard({
                     <li>
                       <span className="text-foreground">Brand-Kit:</span>{' '}
                       {useBrandKit && activeBrandKit
-                        ? `✓ ${activeBrandKit.brand_name ?? 'aktiv'}`
+                        ? `✓ ${activeBrandKit.brand_name ?? tx({ de: "aktiv", en: "active", es: "activo" })}`
                         : '—'}
                     </li>
                     <li>
@@ -1012,7 +1012,7 @@ export default function AdDirectorWizard({
                     </li>
                     <li>
                       <span className="text-foreground">A/B-Renders:</span>{' '}
-                      {renderAllVariants ? tx({ de: '✓ Alle 3 Varianten', en: '✓ All 3 variants', es: '✓ Las 3 variantes' }) : '1 Variante'}
+                      {renderAllVariants ? tx({ de: tx({ de: "✓ Alle 3 Varianten", en: "✓ All 3 variants", es: "✓ Las 3 variantes" }), en: '✓ All 3 variants', es: '✓ Las 3 variantes' }) : '1 Variante'}
                     </li>
                     <li>
                       <span className="text-foreground">Cutdowns:</span>{' '}
@@ -1051,7 +1051,7 @@ export default function AdDirectorWizard({
               ) : (
                 <Wand2 className="h-4 w-4" />
               )}
-              Spot generieren
+              {tx({ de: "Spot generieren", en: "Generate spot", es: "Generar spot" })}
             </Button>
           ) : (
             <Button

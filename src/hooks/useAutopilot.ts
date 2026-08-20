@@ -244,16 +244,16 @@ export function useToggleAutopilot() {
         qc.invalidateQueries({ queryKey: ['autopilot-activity'] });
         toast({
           title: res.is_active
-            ? tx({ de: 'Autopilot aktiviert', en: 'Autopilot activated', es: 'Autopiloto activado' })
+            ? tx({ de: tx({ de: "Autopilot aktiviert", en: "Autopilot enabled", es: "Autopiloto activado" }), en: 'Autopilot activated', es: 'Autopiloto activado' })
             : tx({ de: 'Autopilot deaktiviert', en: 'Autopilot deactivated', es: 'Autopiloto desactivado' }),
           description: res.is_active
-            ? tx({ de: 'Die KI plant jetzt deine nächsten 14 Tage. Erste Slots erscheinen in Kürze.', en: 'The AI is now planning your next 14 days. First slots will appear shortly.', es: 'La IA está planificando tus próximos 14 días. Las primeras franjas aparecerán en breve.' })
+            ? tx({ de: tx({ de: "Die KI plant jetzt deine nächsten 14 Tage. Erste Slots erscheinen in Kürze.", en: "The AI is now planning your next 14 days. First slots will appear shortly.", es: "La IA está planificando tus próximos 14 días. Los primeros espacios aparecerán en breve." }), en: 'The AI is now planning your next 14 days. First slots will appear shortly.', es: 'La IA está planificando tus próximos 14 días. Las primeras franjas aparecerán en breve.' })
             : tx({ de: 'Alle automatischen Aktionen sind gestoppt. Bereits geplante Posts werden nicht veröffentlicht.', en: 'All automatic actions are stopped. Already scheduled posts will not be published.', es: 'Todas las acciones automáticas están detenidas. Las publicaciones ya programadas no se publicarán.' }),
         });
       } else {
         toast({
           title: tx({ de: "Aktivierung blockiert", en: "Activation blocked", es: "Activación bloqueada" }),
-          description: res.error ?? res.lock_reason ?? tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }),
+          description: res.error ?? res.lock_reason ?? tx({ de: tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }), en: "Unknown error", es: "Error desconocido" }),
           variant: 'destructive',
         });
       }

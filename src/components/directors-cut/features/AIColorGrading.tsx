@@ -251,7 +251,7 @@ export function AIColorGrading({
             onClick={() => setShowComparison(!showComparison)}
           >
             <Eye className="h-4 w-4 mr-2" />
-            {showComparison ? 'Vergleich ausblenden' : 'Vorher/Nachher'}
+            {showComparison ? tx({ de: "Vergleich ausblenden", en: "Hide comparison", es: "Ocultar comparación" }) : 'Vorher/Nachher'}
           </Button>
         )}
 
@@ -263,7 +263,7 @@ export function AIColorGrading({
             className="w-full"
             onClick={() => onGradeSelect(null)}
           >
-            {isSceneMode ? tx({ de: 'Szenen-Grading entfernen', en: 'Remove scene grading', es: 'Quitar clasificación de escena' }) : tx({ de: 'Grading entfernen', en: 'Remove grading', es: 'Quitar clasificación' })}
+            {isSceneMode ? tx({ de: tx({ de: "Szenen-Grading entfernen", en: "Remove scene grading", es: "Quitar el grading de la escena" }), en: 'Remove scene grading', es: 'Quitar clasificación de escena' }) : tx({ de: 'Grading entfernen', en: 'Remove grading', es: 'Quitar clasificación' })}
           </Button>
         )}
       </CardContent>

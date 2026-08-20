@@ -219,7 +219,7 @@ export default function InstagramPublishing() {
         });
         await checkScopesAndExpiry();
       } else {
-        throw new Error(data?.error || tx({ de: 'Wiederherstellung fehlgeschlagen', en: 'Restore failed', es: 'Error al restaurar' }));
+        throw new Error(data?.error || tx({ de: tx({ de: "Wiederherstellung fehlgeschlagen", en: "Restore failed", es: "Error al restaurar" }), en: 'Restore failed', es: 'Error al restaurar' }));
       }
     } catch (err: any) {
       console.error('Restore error:', err);
@@ -254,7 +254,7 @@ export default function InstagramPublishing() {
 
       if (data?.ok && data?.saved) {
         setRenewResult(data);
-        const backupMsg = data.backup_created ? tx({ de: " Backup erstellt.", en: " Backup created.", es: " Copia de seguridad creada." }) : "";
+        const backupMsg = data.backup_created ? tx({ de: tx({ de: " Backup erstellt.", en: "Backup created.", es: "Copia de seguridad creada." }), en: " Backup created.", es: " Copia de seguridad creada." }) : "";
         toast({
           title: tx({ de: "Erfolg!", en: "Success!", es: "¡Éxito!" }),
           description: tx({ de: `${"Token erfolgreich erneuert und gespeichert!"}${backupMsg}`, en: `${"Token successfully renewed and saved!"}${backupMsg}`, es: `${"¡Token renovado y guardado correctamente!"}${backupMsg}` }),
@@ -271,7 +271,7 @@ export default function InstagramPublishing() {
           setShortUserToken('');
         }, 2000);
       } else {
-        throw new Error(data?.error || tx({ de: 'Token-Erneuerung fehlgeschlagen', en: 'Token renewal failed', es: 'Error al renovar el token' }));
+        throw new Error(data?.error || tx({ de: tx({ de: "Token-Erneuerung fehlgeschlagen", en: "Token renewal failed", es: "Error al renovar el token" }), en: 'Token renewal failed', es: 'Error al renovar el token' }));
       }
     } catch (err: any) {
       console.error('Token renewal error:', err);
@@ -575,11 +575,11 @@ export default function InstagramPublishing() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-green-500" />
-                  {result.dryRun ? tx({ de: 'Dry-Run Erfolgreich', en: 'Dry Run Successful', es: 'Prueba en Seco Exitosa' }) : tx({ de: 'Erfolgreich Veröffentlicht', en: 'Successfully Published', es: 'Publicado con Éxito' })}
+                  {result.dryRun ? tx({ de: tx({ de: "Dry-Run Erfolgreich", en: "Dry run successful", es: "Simulación correcta" }), en: 'Dry Run Successful', es: 'Prueba en Seco Exitosa' }) : tx({ de: 'Erfolgreich Veröffentlicht', en: 'Successfully Published', es: 'Publicado con Éxito' })}
                 </CardTitle>
                 <CardDescription>
                   {result.dryRun 
-                    ? tx({ de: 'Container wurde erstellt, aber nicht veröffentlicht', en: 'Container was created but not published', es: 'El contenedor se creó pero no se publicó' })
+                    ? tx({ de: tx({ de: "Container wurde erstellt, aber nicht veröffentlicht", en: "Container was created but not published", es: "El contenedor se creó pero no se publicó" }), en: 'Container was created but not published', es: 'El contenedor se creó pero no se publicó' })
                     : tx({ de: 'Dein Post ist jetzt auf Instagram live', en: 'Your post is now live on Instagram', es: 'Tu publicación ya está en vivo en Instagram' })}
                 </CardDescription>
               </CardHeader>
@@ -1086,7 +1086,7 @@ export default function InstagramPublishing() {
                 className="font-mono text-xs"
               />
               <p className="text-xs text-muted-foreground">
-                {tx({ de: "ℹ️ Dieser Token wird", en: "ℹ️ This token will", es: "ℹ️ Este token se" })} {tokenTypeChoice === "page" ? tx({ de: "direkt in einen Long-Lived Page Token umgewandelt", en: "converted directly into a long-lived page token", es: "convertido directamente en un token de página de larga duración" }) : tx({ de: "verwendet, um einen Long-Lived Page Token zu generieren", en: "used to generate a long-lived page token", es: "utilizado para generar un token de página de larga duración" })} {tx({ de: "und nicht gespeichert.", en: "and not saved.", es: "y no guardado." })}
+                {tx({ de: "ℹ️ Dieser Token wird", en: "ℹ️ This token will", es: "ℹ️ Este token se" })} {tokenTypeChoice === "page" ? tx({ de: tx({ de: "direkt in einen Long-Lived Page Token umgewandelt", en: "converted directly into a long-lived page token", es: "convertido directamente en un token de página de larga duración" }), en: "converted directly into a long-lived page token", es: "convertido directamente en un token de página de larga duración" }) : tx({ de: "verwendet, um einen Long-Lived Page Token zu generieren", en: "used to generate a long-lived page token", es: "utilizado para generar un token de página de larga duración" })} {tx({ de: "und nicht gespeichert.", en: "and not saved.", es: "y no guardado." })}
               </p>
             </div>
 
@@ -1098,7 +1098,7 @@ export default function InstagramPublishing() {
               size="lg"
             >
               {renewLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {renewLoading ? tx({ de: "Token wird geprüft und erneuert...", en: "Token is being checked and renewed...", es: "El token se está verificando y renovando..." }) : tx({ de: `3️⃣ ${tokenTypeChoice === "page" ? "Page" : "User"}-Token prüfen und speichern`, en: `3️⃣ Check and save ${tokenTypeChoice === "page" ? "Page" : "User"} token`, es: `3️⃣ Verificar y guardar el token de ${tokenTypeChoice === "page" ? "página" : "usuario"}` })}
+              {renewLoading ? tx({ de: tx({ de: "Token wird geprüft und erneuert...", en: "Checking and renewing token...", es: "Comprobando y renovando el token..." }), en: "Token is being checked and renewed...", es: "El token se está verificando y renovando..." }) : tx({ de: `3️⃣ ${tokenTypeChoice === "page" ? "Page" : "User"}-Token prüfen und speichern`, en: `3️⃣ Check and save ${tokenTypeChoice === "page" ? "Page" : "User"} token`, es: `3️⃣ Verificar y guardar el token de ${tokenTypeChoice === "page" ? "página" : "usuario"}` })}
             </Button>
 
             {/* Success Result */}

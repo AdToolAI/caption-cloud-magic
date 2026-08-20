@@ -53,7 +53,7 @@ export default function SceneReferenceImageSlot({ scene, onUpdate, className }: 
       onUpdate({ referenceImageUrl: publicUrl } as Partial<ComposerScene>);
       toast.success(tx({ de: 'Referenzbild gesetzt — wird als i2v-Startframe verwendet.', en: 'Reference image set — used as i2v start frame.', es: 'Conjunto de imágenes de referencia: utilizado como cuadro de inicio de i2v.' }));
     } catch (err: any) {
-      toast.error(err?.message ?? tx({ de: 'Upload fehlgeschlagen', en: 'Upload failed', es: 'Error al subir' }));
+      toast.error(err?.message ?? tx({ de: tx({ de: "Upload fehlgeschlagen", en: "Upload failed", es: "Error al subir" }), en: 'Upload failed', es: 'Error al subir' }));
     } finally {
       setUploading(false);
     }
@@ -123,7 +123,7 @@ export default function SceneReferenceImageSlot({ scene, onUpdate, className }: 
           className="w-full gap-2 border-dashed border-primary/30 hover:border-primary/60 hover:bg-primary/5"
         >
           <Upload className="h-3.5 w-3.5" />
-          {uploading ? tx({ de: 'Lädt hoch…', en: 'Uploading…', es: 'Cargando…' }) : tx({ de: 'Bild hochladen (PNG/JPG/WEBP · max. 10 MB)', en: 'Upload image (PNG/JPG/WEBP · max. 10 MB)', es: 'Subir imagen (PNG/JPG/WEBP · máx. 10 MB)' })}
+          {uploading ? tx({ de: tx({ de: "Lädt hoch…", en: "Uploading…", es: "Subiendo…" }), en: 'Uploading…', es: 'Cargando…' }) : tx({ de: 'Bild hochladen (PNG/JPG/WEBP · max. 10 MB)', en: 'Upload image (PNG/JPG/WEBP · max. 10 MB)', es: 'Subir imagen (PNG/JPG/WEBP · máx. 10 MB)' })}
         </Button>
       )}
     </div>

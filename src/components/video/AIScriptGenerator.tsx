@@ -162,7 +162,7 @@ ${script.cta}`;
                      t === 'casual' ? tx({ de: 'Locker', en: 'Casual', es: 'Informal' }) :
                      t === 'enthusiastic' ? tx({ de: 'Begeistert', en: 'Enthusiastic', es: 'Entusiasta' }) :
                      t === 'informative' ? tx({ de: 'Informativ', en: 'Informative', es: 'Informativo' }) :
-                     t === 'personal' ? tx({ de: 'Persönlich', en: 'Personal', es: 'Personal' }) :
+                     t === 'personal' ? tx({ de: tx({ de: "Persönlich", en: "Personal", es: "Personal" }), en: 'Personal', es: 'Personal' }) :
                      t === 'authentic' ? tx({ de: 'Authentisch', en: 'Authentic', es: 'Auténtico' }) :
                      t === 'energetic' ? tx({ de: 'Energetisch', en: 'Energetic', es: 'Energético' }) :
                      t === 'funny' ? tx({ de: 'Lustig', en: 'Funny', es: 'Divertido' }) :

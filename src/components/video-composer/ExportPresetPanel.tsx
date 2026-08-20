@@ -183,7 +183,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
       });
 
       if (error || !data?.success) {
-        throw new Error(error?.message || data?.error || tx({ de: 'Batch-Export fehlgeschlagen', en: 'Batch export failed', es: 'Error en la exportación por lotes' }));
+        throw new Error(error?.message || data?.error || tx({ de: tx({ de: "Batch-Export fehlgeschlagen", en: "Batch export failed", es: "Error en la exportación por lotes" }), en: 'Batch export failed', es: 'Error en la exportación por lotes' }));
       }
 
       toast({
@@ -223,7 +223,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
         })
         .select('id')
         .single();
-      if (insertErr || !row) throw new Error(insertErr?.message || tx({ de: 'Export konnte nicht angelegt werden', en: 'Export could not be created', es: 'No se pudo crear la exportación' }));
+      if (insertErr || !row) throw new Error(insertErr?.message || tx({ de: tx({ de: "Export konnte nicht angelegt werden", en: "Export could not be created", es: "No se pudo crear la exportación" }), en: 'Export could not be created', es: 'No se pudo crear la exportación' }));
 
       const { data, error } = await supabase.functions.invoke('compose-video-assemble', {
         body: { projectId, aspectOverride: preset.aspect, exportId: row.id },
@@ -231,9 +231,9 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
       if (error || !data?.success) {
         await supabase.from('composer_exports').update({
           status: 'failed',
-          error_message: error?.message || data?.error || tx({ de: 'Render fehlgeschlagen', en: 'Render failed', es: 'Error en el renderizado' }),
+          error_message: error?.message || data?.error || tx({ de: tx({ de: "Render fehlgeschlagen", en: "Render failed", es: "Error al renderizar" }), en: 'Render failed', es: 'Error en el renderizado' }),
         }).eq('id', row.id);
-        throw new Error(error?.message || data?.error || tx({ de: 'Render fehlgeschlagen', en: 'Render failed', es: 'Error en el renderizado' }));
+        throw new Error(error?.message || data?.error || tx({ de: tx({ de: "Render fehlgeschlagen", en: "Render failed", es: "Error al renderizar" }), en: 'Render failed', es: 'Error en el renderizado' }));
       }
 
       toast({
@@ -276,7 +276,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
               onClick={selectedKeys.size === PRESETS.length ? clearAll : selectAll}
               disabled={!masterReady}
             >
-              {selectedKeys.size === PRESETS.length ? tx({ de: 'Auswahl löschen', en: 'Clear selection', es: 'Borrar selección' }) : tx({ de: 'Alle auswählen', en: 'Select all', es: 'Seleccionar todo' })}
+              {selectedKeys.size === PRESETS.length ? tx({ de: tx({ de: "Auswahl löschen", en: "Clear selection", es: "Borrar selección" }), en: 'Clear selection', es: 'Borrar selección' }) : tx({ de: 'Alle auswählen', en: 'Select all', es: 'Seleccionar todo' })}
             </Button>
           </div>
         </div>
@@ -404,7 +404,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
                     ) : (
                       <Sparkles className="h-3 w-3 mr-1" />
                     )}
-                    Einzeln exportieren
+                    {tx({ de: "Einzeln exportieren", en: "Export individually", es: "Exportar por separado" })}
                   </Button>
                 )}
               </div>

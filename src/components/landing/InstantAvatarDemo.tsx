@@ -114,7 +114,7 @@ export const InstantAvatarDemo = () => {
       });
       if (error) throw error;
       if (data?.error) {
-        toast.error(data.message ?? tx({ de: "Generierung fehlgeschlagen.", en: "Generation failed.", es: "La generación fracasó." }));
+        toast.error(data.message ?? tx({ de: tx({ de: "Generierung fehlgeschlagen.", en: "Generation failed.", es: "Error al generar." }), en: "Generation failed.", es: "La generación fracasó." }));
         return;
       }
       const received: Frame[] = data?.frames ?? [];
@@ -128,7 +128,7 @@ export const InstantAvatarDemo = () => {
       window.setTimeout(() => setSweep(false), 1300);
       toast.success(tx({ de: "Dein Avatar ist bereit — dreh ihn mit dem Scrubber.", en: "Your avatar is ready — rotate it with the scrubber.", es: "Tu avatar está listo, gíralo con el control deslizante." }));
     } catch (err) {
-      const msg = (err as Error)?.message ?? tx({ de: "Unbekannter Fehler.", en: "Unknown error.", es: "Error desconocido." });
+      const msg = (err as Error)?.message ?? tx({ de: tx({ de: "Unbekannter Fehler.", en: "Unknown error.", es: "Error desconocido." }), en: "Unknown error.", es: "Error desconocido." });
       if (msg.includes("429") || msg.toLowerCase().includes("rate")) {
         toast.error(tx({ de: "Demo-Kontingent erreicht. Starte kostenlos für unbegrenzte Avatare.", en: "Demo quota reached. Start free for unlimited avatars.", es: "Cuota de demostración alcanzada. Comience gratis para obtener avatares ilimitados." }));
       } else {

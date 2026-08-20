@@ -48,7 +48,7 @@ export function SafePlanNotice({ normalization }: SafePlanNoticeProps) {
       : 'text-emerald-300';
 
   const headline = inconsistent
-    ? tx({ de: 'Plan noch nicht konsistent', en: 'Plan not yet consistent', es: 'El plan aún no es consistente' })
+    ? tx({ de: tx({ de: "Plan noch nicht konsistent", en: "Plan not consistent yet", es: "El plan aún no es consistente" }), en: 'Plan not yet consistent', es: 'El plan aún no es consistente' })
     : hasRepairs
       ? tx({
           de: `${repairs.length} automatische Korrektur${repairs.length === 1 ? '' : 'en'}`,
@@ -58,9 +58,9 @@ export function SafePlanNotice({ normalization }: SafePlanNoticeProps) {
       : tx({ de: 'Plan passt zu deinem Briefing', en: 'Plan matches your briefing', es: 'El plan coincide con tu briefing' });
 
   const subline = inconsistent
-    ? tx({ de: 'Bitte Szenendauern anpassen oder Briefing neu analysieren.', en: 'Please adjust scene durations or re-analyze the briefing.', es: 'Por favor, ajusta las duraciones de las escenas o vuelve a analizar el briefing.' })
+    ? tx({ de: tx({ de: "Bitte Szenendauern anpassen oder Briefing neu analysieren.", en: "Please adjust the scene durations or re-analyze the briefing.", es: "Ajusta las duraciones de las escenas o vuelve a analizar el briefing." }), en: 'Please adjust scene durations or re-analyze the briefing.', es: 'Por favor, ajusta las duraciones de las escenas o vuelve a analizar el briefing.' })
     : hasRepairs
-      ? tx({ de: 'Wir haben Widersprüche zwischen Briefing, Board und Skript sauber aufgelöst.', en: 'We have cleanly resolved contradictions between briefing, board, and script.', es: 'Hemos resuelto limpiamente las contradicciones entre el briefing, el storyboard y el guion.' })
+      ? tx({ de: tx({ de: "Wir haben Widersprüche zwischen Briefing, Board und Skript sauber aufgelöst.", en: "We cleanly resolved contradictions between briefing, board and script.", es: "Hemos resuelto las contradicciones entre briefing, board y guion." }), en: 'We have cleanly resolved contradictions between briefing, board, and script.', es: 'Hemos resuelto limpiamente las contradicciones entre el briefing, el storyboard y el guion.' })
       : tx({ de: 'Keine Widersprüche gefunden — dein Plan ist bereit.', en: 'No contradictions found — your plan is ready.', es: 'No se encontraron contradicciones — tu plan está listo.' });
 
   return (

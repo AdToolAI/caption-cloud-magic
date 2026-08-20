@@ -40,7 +40,7 @@ export function BrandDnaExtractor({ onApply }: Props) {
         onError: (e) => {
           toast({
             title: tx({ de: "Extraktion fehlgeschlagen", en: "Extraction failed", es: "Error de extracción" }),
-            description: e.message ?? tx({ de: "Bitte versuche es erneut.", en: "Please try again.", es: "Por favor, inténtalo de nuevo." }),
+            description: e.message ?? tx({ de: tx({ de: "Bitte versuche es erneut.", en: "Please try again.", es: "Inténtalo de nuevo." }), en: "Please try again.", es: "Por favor, inténtalo de nuevo." }),
             variant: "destructive",
           });
         },

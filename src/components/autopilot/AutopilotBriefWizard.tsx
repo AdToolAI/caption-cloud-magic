@@ -151,7 +151,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
             {step === 3 && <><Lock className="h-5 w-5 text-destructive" /> {tx({ de: 'Aktivierung bestätigen', en: 'Confirm activation', es: 'Confirmar activación' })}</>}
           </DialogTitle>
           <DialogDescription>
-            {tx({ de: 'Schritt', en: 'Step', es: 'Paso' })} {step} {tx({ de: 'von', en: 'of', es: 'de' })} 3 — {step === 1 ? tx({ de: 'Definiere deine Strategie', en: 'Define your strategy', es: 'Define tu estrategia' }) : step === 2 ? tx({ de: 'Lies und akzeptiere die Regeln', en: 'Read and accept the rules', es: 'Lee y acepta las reglas' }) : tx({ de: 'Letzte Sicherheits-Bestätigung', en: 'Final safety confirmation', es: 'Confirmación de seguridad final' })}
+            {tx({ de: 'Schritt', en: 'Step', es: 'Paso' })} {step} {tx({ de: 'von', en: 'of', es: 'de' })} 3 — {step === 1 ? tx({ de: 'Definiere deine Strategie', en: 'Define your strategy', es: 'Define tu estrategia' }) : step === 2 ? tx({ de: tx({ de: "Lies und akzeptiere die Regeln", en: "Read and accept the rules", es: "Lee y acepta las reglas" }), en: 'Read and accept the rules', es: 'Lee y acepta las reglas' }) : tx({ de: 'Letzte Sicherheits-Bestätigung', en: 'Final safety confirmation', es: 'Confirmación de seguridad final' })}
           </DialogDescription>
         </DialogHeader>
 
@@ -336,7 +336,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
                 onClick={handleActivate}
                 className="gap-1.5 bg-primary hover:bg-primary/90"
               >
-                {toggle.isPending ? tx({ de: "Aktiviere…", en: "Activating…", es: "Activando…" }) : tx({ de: "Autopilot aktivieren", en: "Activate autopilot", es: "Activar autopiloto" })}
+                {toggle.isPending ? tx({ de: tx({ de: "Aktiviere…", en: "Activating…", es: "Activando…" }), en: "Activating…", es: "Activando…" }) : tx({ de: "Autopilot aktivieren", en: "Activate autopilot", es: "Activar autopiloto" })}
                 <ShieldCheck className="h-4 w-4" />
               </Button>
             </div>

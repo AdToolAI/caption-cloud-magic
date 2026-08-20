@@ -145,7 +145,7 @@ export function useComposerPersistence() {
           .single();
 
         if (insErr || !inserted) {
-          throw new Error(insErr?.message || tx({ de: 'Projekt konnte nicht angelegt werden', en: 'Project could not be created', es: 'No se pudo crear el proyecto' }));
+          throw new Error(insErr?.message || tx({ de: tx({ de: "Projekt konnte nicht angelegt werden", en: "Project could not be created", es: "No se pudo crear el proyecto" }), en: 'Project could not be created', es: 'No se pudo crear el proyecto' }));
         }
         projectId = inserted.id;
       }

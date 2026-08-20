@@ -2255,7 +2255,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           <button
             type="button"
             onClick={() => setRippleMode((v) => !v)}
-            title={rippleMode ? tx({ de: 'Ripple Delete AN — Lücken schließen automatisch', en: 'Ripple Delete ON — gaps close automatically', es: 'Ripple Delete activado: los huecos se cierran automáticamente' }) : tx({ de: 'Ripple Delete AUS — Lücken bleiben stehen', en: 'Ripple Delete OFF — gaps remain', es: 'Ripple Delete desactivado: los huecos permanecen' })}
+            title={rippleMode ? tx({ de: tx({ de: "Ripple Delete AN — Lücken schließen automatisch", en: "Ripple delete ON — gaps close automatically", es: "Ripple delete activado — los huecos se cierran automáticamente" }), en: 'Ripple Delete ON — gaps close automatically', es: 'Ripple Delete activado: los huecos se cierran automáticamente' }) : tx({ de: 'Ripple Delete AUS — Lücken bleiben stehen', en: 'Ripple Delete OFF — gaps remain', es: 'Ripple Delete desactivado: los huecos permanecen' })}
             className={cn(
               'h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium border transition-colors',
               rippleMode
@@ -2663,7 +2663,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                   <SlidersHorizontal className="h-3.5 w-3.5 text-[#F5C76A]" />
                   <span className="text-[11px] uppercase tracking-wider text-[#F5C76A]/70 font-semibold">Inspector</span>
                   <span className="ml-auto text-[10px] text-white/50">
-                    {selectedSubtitle ? tx({ de: 'Untertitel', en: 'Subtitles', es: 'Subtítulos' }) : selectedClip ? tx({ de: 'Audio-Clip', en: 'Audio clip', es: 'Clip de audio' }) : selectedSceneId ? tx({ de: 'Szene', en: 'Scene', es: 'Escena' }) : tx({ de: 'Nichts ausgewählt', en: 'Nothing selected', es: 'Nada seleccionado' })}
+                    {selectedSubtitle ? tx({ de: tx({ de: "Untertitel", en: "Subtitles", es: "Subtítulos" }), en: 'Subtitles', es: 'Subtítulos' }) : selectedClip ? tx({ de: 'Audio-Clip', en: 'Audio clip', es: 'Clip de audio' }) : selectedSceneId ? tx({ de: tx({ de: "Szene", en: "Scene", es: "Escena" }), en: 'Scene', es: 'Escena' }) : tx({ de: 'Nichts ausgewählt', en: 'Nothing selected', es: 'Nada seleccionado' })}
                   </span>
                 </div>
                 <div className="flex-1 min-h-0">

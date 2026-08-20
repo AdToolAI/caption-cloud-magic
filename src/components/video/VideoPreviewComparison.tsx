@@ -202,7 +202,7 @@ export const VideoPreviewComparison = ({
       return (
         <div className="flex items-center justify-center h-full bg-muted">
           <p className="text-sm text-muted-foreground">
-            {type === 'original' ? tx({ de: 'Kein Original-Video verfügbar', en: 'No original video available', es: 'No hay vídeo original disponible' }) : tx({ de: 'Keine bearbeitete Version verfügbar', en: 'No edited version available', es: 'No hay versión editada disponible' })}
+            {type === 'original' ? tx({ de: tx({ de: "Kein Original-Video verfügbar", en: "No original video available", es: "No hay vídeo original disponible" }), en: 'No original video available', es: 'No hay vídeo original disponible' }) : tx({ de: 'Keine bearbeitete Version verfügbar', en: 'No edited version available', es: 'No hay versión editada disponible' })}
           </p>
         </div>
       );

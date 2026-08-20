@@ -52,7 +52,7 @@ export function OverlayLibrary({ onPick }: OverlayLibraryProps) {
               className={category === c ? 'bg-primary/20 text-primary border-primary/40' : 'border-white/15'}
             >
               {c === 'All'
-                ? tx({ de: 'Alle', en: 'All', es: 'Todos' })
+                ? tx({ de: tx({ de: "Alle", en: "All", es: "Todos" }), en: 'All', es: 'Todos' })
                 : OVERLAY_CATEGORY_LABELS[c]
                   ? tx(OVERLAY_CATEGORY_LABELS[c])
                   : c}

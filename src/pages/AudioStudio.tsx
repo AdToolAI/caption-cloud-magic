@@ -381,7 +381,7 @@ export default function AudioStudio() {
                   </motion.div>
 
                   <h3 className="text-2xl font-semibold mb-2">
-                    {isDragActive ? tx({ de: 'Datei hier ablegen', en: 'Drop file here', es: 'Arrastra el archivo aquí' }) : tx({ de: 'Audio oder Video hochladen', en: 'Upload audio or video', es: 'Subir audio o video' })}
+                    {isDragActive ? tx({ de: tx({ de: "Datei hier ablegen", en: "Drop file here", es: "Suelta el archivo aquí" }), en: 'Drop file here', es: 'Arrastra el archivo aquí' }) : tx({ de: 'Audio oder Video hochladen', en: 'Upload audio or video', es: 'Subir audio o video' })}
                   </h3>
                   <p className="text-muted-foreground mb-6">
                     MP3, WAV, M4A, MP4, MOV • Max. 500MB

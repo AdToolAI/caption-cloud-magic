@@ -50,7 +50,7 @@ export function useStemSeparation() {
       }
 
       if (!data?.success) {
-        toast.error(data?.error || tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }));
+        toast.error(data?.error || tx({ de: tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }), en: 'Unknown error', es: 'Error desconocido' }));
         return null;
       }
 

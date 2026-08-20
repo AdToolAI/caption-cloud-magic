@@ -52,7 +52,7 @@ export function useCalendarApprovals() {
 
       toast({
         title: '✅ Freigabe erteilt',
-        description: data.all_approved ? tx({ de: 'Alle Freigaben erteilt!', en: 'All approvals granted!', es: '¡Todas las aprobaciones concedidas!' }) : tx({ de: 'Freigabe erfolgreich', en: 'Release successful', es: 'Lanzamiento exitoso' }),
+        description: data.all_approved ? tx({ de: tx({ de: "Alle Freigaben erteilt!", en: "All permissions granted!", es: "¡Todos los permisos concedidos!" }), en: 'All approvals granted!', es: '¡Todas las aprobaciones concedidas!' }) : tx({ de: 'Freigabe erfolgreich', en: 'Release successful', es: 'Lanzamiento exitoso' }),
       });
 
       return data;

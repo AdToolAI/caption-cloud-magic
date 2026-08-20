@@ -373,7 +373,7 @@ export function MagicEditPanel() {
                             size="sm"
                             onClick={() => setDirection(d)}
                           >
-                            {d === 'all' ? tx({ de: 'Alle', en: 'All', es: 'Todos' }) : d === 'left' ? '←' : d === 'right' ? '→' : d === 'top' ? '↑' : '↓'}
+                            {d === 'all' ? tx({ de: tx({ de: "Alle", en: "All", es: "Todos" }), en: 'All', es: 'Todos' }) : d === 'left' ? '←' : d === 'right' ? '→' : d === 'top' ? '↑' : '↓'}
                           </Button>
                         ))}
                       </div>
@@ -392,7 +392,7 @@ export function MagicEditPanel() {
                       onChange={(e) => setPrompt(e.target.value)}
                       placeholder={
                         mode === 'inpaint'
-                          ? tx({ de: 'z.B. "ein roter Sportwagen, fotorealistisch, dramatisches Licht"', en: 'e.g. "a red sports car, photorealistic, dramatic lighting"', es: 'p. ej. "un coche deportivo rojo, fotorrealista, luz dramática"' })
+                          ? tx({ de: tx({ de: "z.B. \"ein roter Sportwagen, fotorealistisch, dramatisches Licht\"", en: "e.g. \"a red sports car, photorealistic, dramatic lighting\"", es: "p. ej. \"un coche deportivo rojo, fotorrealista, luz dramática\"" }), en: 'e.g. "a red sports car, photorealistic, dramatic lighting"', es: 'p. ej. "un coche deportivo rojo, fotorrealista, luz dramática"' })
                           : tx({ de: 'z.B. "weiter Sandstrand mit Palmen, goldene Stunde"', en: 'e.g. "wide sandy beach with palm trees, golden hour"', es: 'p. ej. "amplia playa de arena con palmeras, hora dorada"' })
                       }
                       rows={4}
@@ -413,7 +413,7 @@ export function MagicEditPanel() {
                     ) : (
                       <>
                         <Wand2 className="h-4 w-4" />
-                        {mode === 'inpaint' ? tx({ de: 'Magic Edit anwenden', en: 'Apply Magic Edit', es: 'Aplicar Magic Edit' }) : tx({ de: 'Bild erweitern', en: 'Extend image', es: 'Extender imagen' })}
+                        {mode === 'inpaint' ? tx({ de: tx({ de: "Magic Edit anwenden", en: "Apply Magic Edit", es: "Aplicar Magic Edit" }), en: 'Apply Magic Edit', es: 'Aplicar Magic Edit' }) : tx({ de: 'Bild erweitern', en: 'Extend image', es: 'Extender imagen' })}
                         <Badge variant="secondary" className="ml-1">{sym}{cost.toFixed(2)}</Badge>
                       </>
                     )}

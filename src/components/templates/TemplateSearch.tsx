@@ -147,7 +147,7 @@ export const TemplateSearch = ({
               <h4 className="font-medium">Erweiterte Filter</h4>
 
               <div className="space-y-2">
-                <Label>Mindestbewertung: {filters.minRating} Sterne</Label>
+                <Label>{tx({ de: "Mindestbewertung:", en: "Minimum rating:", es: "Valoración mínima:" })} {filters.minRating} Sterne</Label>
                 <Slider
                   value={[filters.minRating]}
                   onValueChange={([value]) => updateFilter('minRating', value)}

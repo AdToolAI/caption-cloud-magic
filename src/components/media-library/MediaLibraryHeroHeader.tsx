@@ -244,7 +244,7 @@ export const MediaLibraryHeroHeader = ({
                 >
                   <AlertTriangle className="h-4 w-4" />
                   <span className="text-sm font-medium">
-                    {isCritical ? "Limit erreicht" : "Fast voll"}
+                    {isCritical ? tx({ de: "Limit erreicht", en: "Limit reached", es: "Límite alcanzado" }) : "Fast voll"}
                   </span>
                 </motion.div>
               )}

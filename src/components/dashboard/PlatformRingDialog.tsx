@@ -317,7 +317,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
           </Button>
           <Button size="sm" onClick={handleSubmitToCalendar} disabled={isSubmittingToCalendar}>
             <CalendarPlus className="h-4 w-4 mr-1" />
-            {autoPublish ? tx({ de: "Speichern & Auto-Publish", en: "Save & auto-publish", es: "Guardar y publicar automáticamente" }) : tx({ de: "In Kalender übernehmen", en: "Add to calendar", es: "Añadir al calendario" })}
+            {autoPublish ? tx({ de: tx({ de: "Speichern & Auto-Publish", en: "Save & auto-publish", es: "Guardar y autopublicar" }), en: "Save & auto-publish", es: "Guardar y publicar automáticamente" }) : tx({ de: "In Kalender übernehmen", en: "Add to calendar", es: "Añadir al calendario" })}
           </Button>
         </DialogFooter>
       </DialogContent>

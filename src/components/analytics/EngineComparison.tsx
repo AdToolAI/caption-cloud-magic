@@ -215,8 +215,8 @@ export function EngineComparison({ engineData }: Props) {
             {tx({ de: 'Mehr Flexibilität und React-Power, trotz', en: 'More flexibility and React power, despite', es: 'Más flexibilidad y potencia de React, pese a' })} {engineData.remotion.avg_render_time}s {tx({ de: 'Renderzeit', en: 'render time', es: 'tiempo de render' })}
           </p>
           <p className="text-muted-foreground mt-3">
-            💰 Potenzielle Einsparung durch optimale Engine-Wahl: 
-            ${Math.abs(engineData.remotion.total_cost - engineData.shotstack.total_cost).toFixed(2)} pro Monat
+            {tx({ de: "💰 Potenzielle Einsparung durch optimale Engine-Wahl: \n            $", en: "💰 Potential savings from the optimal engine choice: $", es: "💰 Ahorro potencial con la mejor elección de motor: $" })}{Math.abs(engineData.remotion.total_cost - engineData.shotstack.total_cost).toFixed(2)} pro Monat
+          {tx({ de: "", en: "% uploaded", es: "% subido" })}
           </p>
         </div>
       </Card>

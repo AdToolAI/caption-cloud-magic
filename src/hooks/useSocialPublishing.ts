@@ -121,7 +121,7 @@ export function useSocialPublishing() {
       }
 
       toast({
-        title: variant === 'STORIES' ? tx({ de: "📸 Instagram Story veröffentlicht", en: "📸 Instagram Story published", es: "📸 Historia de Instagram publicada" }) : tx({ de: "📸 Instagram veröffentlicht", en: "📸 Instagram published", es: "📸 Instagram publicado" }),
+        title: variant === 'STORIES' ? tx({ de: tx({ de: "📸 Instagram Story veröffentlicht", en: "📸 Instagram story published", es: "📸 Historia de Instagram publicada" }), en: "📸 Instagram Story published", es: "📸 Historia de Instagram publicada" }) : tx({ de: "📸 Instagram veröffentlicht", en: "📸 Instagram published", es: "📸 Instagram publicado" }),
         description: data.message,
       });
       return result;

@@ -40,7 +40,7 @@ export function ImageSourceDialog({ open, onOpenChange, onPick }: ImageSourceDia
       .then(({ data }) => {
         const items = (data ?? [])
           .filter((row) => (row.file_type ?? "").startsWith("image") || /\.(png|jpe?g|webp)$/i.test(row.file_url ?? ""))
-          .map((row) => ({ url: row.file_url as string, name: (row.file_name as string) ?? tx({ de: "Bild", en: "Image", es: "Imagen" }) }));
+          .map((row) => ({ url: row.file_url as string, name: (row.file_name as string) ?? tx({ de: tx({ de: "Bild", en: "Image", es: "Imagen" }), en: "Image", es: "Imagen" }) }));
         setLibraryItems(items);
         setLoadingLibrary(false);
       });
@@ -80,7 +80,7 @@ export function ImageSourceDialog({ open, onOpenChange, onPick }: ImageSourceDia
         body: { prompt: prompt.trim(), style: "realistic", aspectRatio: "1:1", quality: "fast" },
       });
       if (error) throw error;
-      if (data?.ok === false || data?.error) throw new Error(data.error || tx({ de: "Generierung fehlgeschlagen", en: "Generation failed", es: "Error en la generación" }));
+      if (data?.ok === false || data?.error) throw new Error(data.error || tx({ de: tx({ de: "Generierung fehlgeschlagen", en: "Generation failed", es: "Error al generar" }), en: "Generation failed", es: "Error en la generación" }));
       const url = data?.image?.url ?? data?.image;
       if (!url) throw new Error(tx({ de: "Kein Bild erhalten", en: "No image received", es: "No se recibió ninguna imagen" }));
       onPick(url);

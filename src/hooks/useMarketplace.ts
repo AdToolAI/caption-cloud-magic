@@ -90,7 +90,7 @@ export function useTemplatePurchase() {
           result.error === 'INSUFFICIENT_CREDITS'
             ? tx({ de: `Nicht genug Credits — du brauchst ${result.required}, hast aber nur ${result.balance}.`, en: `Not enough credits — you need ${result.required} but only have ${result.balance}.`, es: `No hay suficientes créditos: necesitas ${result.required} pero solo tienes ${result.balance}.` })
             : result.error === 'CANNOT_BUY_OWN_TEMPLATE'
-            ? tx({ de: 'Du kannst dein eigenes Template nicht kaufen.', en: 'You cannot buy your own template.', es: 'No puedes comprar tu propia plantilla.' })
+            ? tx({ de: tx({ de: "Du kannst dein eigenes Template nicht kaufen.", en: "You can't buy your own template.", es: "No puedes comprar tu propia plantilla." }), en: 'You cannot buy your own template.', es: 'No puedes comprar tu propia plantilla.' })
             : tx({ de: `Kauf fehlgeschlagen: ${result.error}`, en: `Purchase failed: ${result.error}`, es: `Error en la compra: ${result.error}` });
         toast({ title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }), description: msg, variant: 'destructive' });
         return;
@@ -153,7 +153,7 @@ export function useSubmitTemplateToMarketplace() {
       toast({
         title: isPublished ? tx({ de: "Live im Marketplace", en: "Live in marketplace", es: "En vivo en el marketplace" }) : 'Eingereicht',
         description: isPublished
-          ? tx({ de: 'Dein Free-Template ist jetzt öffentlich verfügbar.', en: 'Your free template is now publicly available.', es: 'Tu plantilla gratuita ya está disponible públicamente.' })
+          ? tx({ de: tx({ de: "Dein Free-Template ist jetzt öffentlich verfügbar.", en: "Your free template is now publicly available.", es: "Tu plantilla gratuita ya está disponible públicamente." }), en: 'Your free template is now publicly available.', es: 'Tu plantilla gratuita ya está disponible públicamente.' })
           : tx({ de: 'Dein Premium-Template wartet auf Admin-Freigabe.', en: 'Your premium template is waiting for admin approval.', es: 'Su plantilla premium está esperando la aprobación del administrador.' }),
       });
       queryClient.invalidateQueries({ queryKey: ['my-marketplace-templates'] });
@@ -260,7 +260,7 @@ export function useReviewTemplate() {
       toast({
         title: vars.decision === 'approve' ? 'Freigegeben' : 'Abgelehnt',
         description: vars.decision === 'approve'
-          ? tx({ de: 'Template ist jetzt im Marketplace live.', en: 'Template is now live on the Marketplace.', es: 'La plantilla ya está disponible en el Marketplace.' })
+          ? tx({ de: tx({ de: "Template ist jetzt im Marketplace live.", en: "Template is now live in the marketplace.", es: "La plantilla ya está publicada en el marketplace." }), en: 'Template is now live on the Marketplace.', es: 'La plantilla ya está disponible en el Marketplace.' })
           : tx({ de: 'Creator wurde über die Ablehnung informiert.', en: 'Creator has been informed about the rejection.', es: 'Se ha informado al creador sobre el rechazo.' }),
       });
       queryClient.invalidateQueries({ queryKey: ['admin-pending-templates'] });

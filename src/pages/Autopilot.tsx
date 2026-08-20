@@ -138,7 +138,7 @@ function AutopilotReal() {
                 )} />
                 <div>
                   <div className="font-semibold text-sm">
-                    {isLocked ? tx({ de: 'GESPERRT', en: 'LOCKED', es: 'BLOQUEADO' }) : isPaused ? tx({ de: `PAUSIERT bis ${new Date(brief!.paused_until!).toLocaleString()}`, en: `PAUSED until ${new Date(brief!.paused_until!).toLocaleString()}`, es: `PAUSADO hasta ${new Date(brief!.paused_until!).toLocaleString()}` }) : isActive ? tx({ de: 'AUTOPILOT AKTIV', en: 'AUTOPILOT ACTIVE', es: 'PILOTO AUTOMÁTICO ACTIVO' }) : tx({ de: 'AUTOPILOT INAKTIV', en: 'AUTOPILOT INACTIVE', es: 'PILOTO AUTOMÁTICO INACTIVO' })}
+                    {isLocked ? tx({ de: 'GESPERRT', en: 'LOCKED', es: 'BLOQUEADO' }) : isPaused ? tx({ de: `PAUSIERT bis ${new Date(brief!.paused_until!).toLocaleString()}`, en: `PAUSED until ${new Date(brief!.paused_until!).toLocaleString()}`, es: `PAUSADO hasta ${new Date(brief!.paused_until!).toLocaleString()}` }) : isActive ? tx({ de: tx({ de: "AUTOPILOT AKTIV", en: "AUTOPILOT ACTIVE", es: "AUTOPILOTO ACTIVO" }), en: 'AUTOPILOT ACTIVE', es: 'PILOTO AUTOMÁTICO ACTIVO' }) : tx({ de: 'AUTOPILOT INAKTIV', en: 'AUTOPILOT INACTIVE', es: 'PILOTO AUTOMÁTICO INACTIVO' })}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {brief
@@ -296,7 +296,7 @@ function ActivationToggle({
   }
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-muted-foreground hidden md:inline">{isActive ? tx({ de: 'AKTIV', en: 'ACTIVE', es: 'ACTIVO' }) : tx({ de: 'INAKTIV', en: 'INACTIVE', es: 'INACTIVO' })}</span>
+      <span className="text-xs text-muted-foreground hidden md:inline">{isActive ? tx({ de: tx({ de: "AKTIV", en: "ACTIVE", es: "ACTIVO" }), en: 'ACTIVE', es: 'ACTIVO' }) : tx({ de: 'INAKTIV', en: 'INACTIVE', es: 'INACTIVO' })}</span>
       <Switch
         checked={isActive}
         disabled={isPending}

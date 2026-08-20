@@ -386,9 +386,9 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
         title: tx({ de: 'Treatment fehlgeschlagen', en: 'Treatment failed', es: 'Error en el treatment' }),
         description:
           message === 'credits_exhausted'
-            ? tx({ de: 'Dein KI-Guthaben ist aufgebraucht.', en: 'Your AI credits are used up.', es: 'Tus créditos de IA se han agotado.' })
+            ? tx({ de: tx({ de: "Dein KI-Guthaben ist aufgebraucht.", en: "Your AI credits are used up.", es: "Tus créditos de IA se han agotado." }), en: 'Your AI credits are used up.', es: 'Tus créditos de IA se han agotado.' })
             : message === 'rate_limited'
-              ? tx({ de: 'Zu viele Anfragen — bitte kurz warten.', en: 'Too many requests — please wait a moment.', es: 'Demasiadas solicitudes — espera un momento.' })
+              ? tx({ de: tx({ de: "Zu viele Anfragen — bitte kurz warten.", en: "Too many requests — please wait a moment.", es: "Demasiadas solicitudes — espera un momento." }), en: 'Too many requests — please wait a moment.', es: 'Demasiadas solicitudes — espera un momento.' })
               : message,
         variant: 'destructive',
       });
@@ -588,7 +588,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label>{tx({ de: "Länge", en: "Length", es: "Longitud" })}</Label>
-              <span className="text-sm font-medium text-primary">{duration} Sekunden</span>
+              <span className="text-sm font-medium text-primary">{duration} {tx({ de: "Sekunden", en: "seconds", es: "segundos" })}</span>
             </div>
             <Slider
               value={[duration]}
@@ -789,7 +789,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
                     walletEuros < cost.totalEuros ? 'text-destructive' : 'text-muted-foreground',
                   )}
                 >
-                  Guthaben: {formatEuro(walletEuros)}
+                  {tx({ de: "Guthaben:", en: "Balance:", es: "Saldo:" })} {formatEuro(walletEuros)}
                   {walletEuros < cost.totalEuros && tr({ de: ' — reicht nicht für den kompletten Film.', en: ' — not enough for the complete film.', es: ' — no alcanza para la película completa.' })}
                 </p>
               )}

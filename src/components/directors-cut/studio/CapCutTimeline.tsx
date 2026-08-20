@@ -301,7 +301,7 @@ const DraggableScene: React.FC<{
         {onSplit && isPlayheadInside && (
           <ContextMenuItem onClick={onSplit} className="cursor-pointer hover:bg-white/10 focus:bg-white/10">
             <Scissors className="h-3.5 w-3.5 mr-2 text-cyan-300" />
-            {t('dc.splitAtPlayhead') || 'Am Playhead teilen'}
+            {t('dc.splitAtPlayhead') || tx({ de: "Am Playhead teilen", en: "Split at playhead", es: "Dividir en el cabezal" })}
             <kbd className="ml-auto text-[9px] text-white/40 border border-white/10 rounded px-1">S</kbd>
           </ContextMenuItem>
         )}
@@ -796,7 +796,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
           {onSplitAtPlayhead && (
             <button
               onClick={onSplitAtPlayhead}
-              title={`${t('dc.splitAtPlayhead') || 'Am Playhead teilen'} (S)`}
+              title={`${t('dc.splitAtPlayhead') || tx({ de: "Am Playhead teilen", en: "Split at playhead", es: "Dividir en el cabezal" })} (S)`}
               className="h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 border border-cyan-500/30 transition-colors"
             >
               <Scissors className="h-3 w-3" />

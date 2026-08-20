@@ -108,7 +108,7 @@ export function AutoCutDownDialog({
                     : 'bg-amber-500/15 text-amber-300',
                 )}
               >
-                {plan.feasible ? tx({ de: 'Bereit', en: 'Ready', es: 'Listo' }) : tx({ de: 'Näherung', en: 'Approximation', es: 'Aproximación' })}
+                {plan.feasible ? tx({ de: tx({ de: "Bereit", en: "Ready", es: "Listo" }), en: 'Ready', es: 'Listo' }) : tx({ de: 'Näherung', en: 'Approximation', es: 'Aproximación' })}
               </Badge>
             </div>
             <div className="text-xs text-white/60">{plan.reason}</div>

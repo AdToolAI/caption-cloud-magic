@@ -363,7 +363,7 @@ export function AddMediaDialog({
               <div className="space-y-2 pt-2 border-t">
                 <Label className="flex items-center gap-2 text-sm">
                   <Clock className="h-4 w-4" />
-                  Anzeigedauer: {imageDuration}s
+                  {tx({ de: "Anzeigedauer:", en: "Display duration:", es: "Duración:" })} {imageDuration}s
                 </Label>
                 <Slider
                   value={[imageDuration]}

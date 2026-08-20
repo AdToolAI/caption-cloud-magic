@@ -532,7 +532,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium">
-                        {isRecording ? tx({ de: "Aufnahme läuft…", en: "Recording…", es: "Grabando…" }) : tx({ de: "Bereit zum Aufnehmen", en: "Ready to record", es: "Listo para grabar" })}
+                        {isRecording ? tx({ de: tx({ de: "Aufnahme läuft…", en: "Recording…", es: "Grabando…" }), en: "Recording…", es: "Grabando…" }) : tx({ de: "Bereit zum Aufnehmen", en: "Ready to record", es: "Listo para grabar" })}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {tx({ de: "Ziel: 60–90 Sekunden pro Aufnahme, in ruhiger Umgebung.", en: "Target: 60–90 seconds per recording, in a quiet environment.", es: "Objetivo: 60–90 segundos por grabación, en un entorno tranquilo." })}

@@ -53,7 +53,7 @@ export default function LeadInTrimSheet({ scene, open, onOpenChange }: LeadInTri
       toast({
         title: trimSeconds > 0 ? tx({ de: `✂️ Lead-In erkannt: ${trimSeconds}s`, en: `✂️ Lead-in detected: ${trimSeconds}s`, es: `✂️ Lead-in detectado: ${trimSeconds}s` }) : tx({ de: "Kein Freeze erkannt", en: "No freeze detected", es: "No se detectó congelamiento" }),
         description: trimSeconds > 0
-          ? tx({ de: 'Slider angepasst. „Speichern" zum Übernehmen.', en: 'Slider adjusted. "Save" to apply.', es: 'Control deslizante ajustado. "Guardar" para aplicar.' })
+          ? tx({ de: tx({ de: "Slider angepasst. „Speichern\" zum Übernehmen.", en: "Slider adjusted. Hit “Save” to apply.", es: "Control ajustado. Pulsa «Guardar» para aplicar." }), en: 'Slider adjusted. "Save" to apply.', es: 'Control deslizante ajustado. "Guardar" para aplicar.' })
           : tx({ de: 'Der Clip startet sauber mit Bewegung.', en: 'The clip starts cleanly with movement.', es: 'El clip comienza limpiamente con movimiento.' }),
       });
     } catch (err) {

@@ -425,7 +425,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         .getPublicUrl(path);
       setStartImageUrl(publicUrl);
     } catch (err: any) {
-      toast.error(err?.message ?? tx({ de: 'Upload fehlgeschlagen', en: 'Upload failed', es: 'Error al subir' }));
+      toast.error(err?.message ?? tx({ de: tx({ de: "Upload fehlgeschlagen", en: "Upload failed", es: "Error al subir" }), en: 'Upload failed', es: 'Error al subir' }));
     } finally {
       setUploading(false);
     }
@@ -451,7 +451,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         .getPublicUrl(path);
       setReferenceVideoUrl(publicUrl);
     } catch (err: any) {
-      toast.error(err?.message ?? tx({ de: 'Upload fehlgeschlagen', en: 'Upload failed', es: 'Error al subir' }));
+      toast.error(err?.message ?? tx({ de: tx({ de: "Upload fehlgeschlagen", en: "Upload failed", es: "Error al subir" }), en: 'Upload failed', es: 'Error al subir' }));
     } finally {
       setUploadingVideo(false);
     }
@@ -834,7 +834,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       refetchWallet();
       onAfterGenerate?.();
     } catch (err: any) {
-      toast.error(err?.message ?? tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error en la generación' }));
+      toast.error(err?.message ?? tx({ de: tx({ de: "Generierung fehlgeschlagen", en: "Generation failed", es: "Error al generar" }), en: 'Generation failed', es: 'Error en la generación' }));
     } finally {
       setGenerating(false);
     }
@@ -1107,7 +1107,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                     key: 'anchor' as const,
                     label: language === 'de' ? 'Nur Anker' : 'Anchor only',
                     hint: model.capabilities.anchorOnly
-                      ? tx({ de: 'Nur Identitäts-Referenz, kein fester Frame', en: 'Identity reference only, no forced frame', es: 'Solo referencia de identidad, sin fotograma fijo' })
+                      ? tx({ de: tx({ de: "Nur Identitäts-Referenz, kein fester Frame", en: "Identity reference only, no fixed frame", es: "Solo referencia de identidad, sin fotograma fijo" }), en: 'Identity reference only, no forced frame', es: 'Solo referencia de identidad, sin fotograma fijo' })
                       : (language === 'de' ? tx({ de: 'Nur mit Vidu Q2 oder Kling 3 möglich', en: 'Only possible with Vidu Q2 or Kling 3', es: 'Solo es posible con Vidu Q2 o Kling 3' }) : 'Only available with Vidu Q2 or Kling 3'),
                     supportedByCurrent: !!model.capabilities.anchorOnly,
                   },
@@ -1718,7 +1718,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>
               {pendingPlacement?.placement === 'end'
-                ? tx({ de: 'Endframe nur mit Luma Ray 2', en: 'End-frame only with Luma Ray 2', es: 'Fotograma final solo con Luma Ray 2' })
+                ? tx({ de: tx({ de: "Endframe nur mit Luma Ray 2", en: "End frame only with Luma Ray 2", es: "Fotograma final solo con Luma Ray 2" }), en: 'End-frame only with Luma Ray 2', es: 'Fotograma final solo con Luma Ray 2' })
                 : (language === 'de' ? tx({ de: 'Anker-Modus benötigt Vidu Q2 oder Kling 3', en: 'Anchor mode requires Vidu Q2 or Kling 3', es: 'El modo Ancla requiere Vidu Q2 o Kling 3' }) : 'Anchor mode needs Vidu Q2 or Kling 3')}
             </AlertDialogTitle>
             <AlertDialogDescription>

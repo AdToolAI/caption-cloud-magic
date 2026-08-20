@@ -72,7 +72,7 @@ export async function startSceneGeneration(params: {
   if (data?.ok === false) {
     throw new SceneGenerationStartError(
       String(data.error ?? 'start_failed'),
-      String(data.message ?? data.error ?? tx({ de: 'Der Render konnte nicht gestartet werden.', en: 'The render could not be started.', es: 'No se pudo iniciar el renderizado.' })),
+      String(data.message ?? data.error ?? tx({ de: tx({ de: "Der Render konnte nicht gestartet werden.", en: "The render could not be started.", es: "No se pudo iniciar el renderizado." }), en: 'The render could not be started.', es: 'No se pudo iniciar el renderizado.' })),
     );
   }
 
@@ -98,7 +98,7 @@ export async function prepareSceneRuns(params: {
   if (error || data?.ok === false) {
     throw new SceneGenerationStartError(
       String(data?.error ?? 'prepare_failed'),
-      error?.message || String(data?.message ?? data?.error ?? tx({ de: 'Der vorherige Lauf konnte nicht sicher beendet werden.', en: 'The previous run could not be safely terminated.', es: 'No se pudo finalizar de forma segura la ejecución anterior.' })),
+      error?.message || String(data?.message ?? data?.error ?? tx({ de: tx({ de: "Der vorherige Lauf konnte nicht sicher beendet werden.", en: "The previous run could not be safely finished.", es: "No se pudo finalizar de forma segura la ejecución anterior." }), en: 'The previous run could not be safely terminated.', es: 'No se pudo finalizar de forma segura la ejecución anterior.' })),
     );
   }
   return data?.runs ?? {};

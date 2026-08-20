@@ -81,7 +81,7 @@ function StudioBody({
         <Collapsible open={mobilePreview} onOpenChange={setMobilePreview} className="mb-5 lg:hidden">
           <CollapsibleTrigger asChild>
             <Button variant="outline" size="sm" className="w-full justify-between">
-              {tx({ de: "Vorschau", en: "Preview", es: "Vista previa" })} {mobilePreview ? tx({ de: "ausblenden", en: "hide", es: "ocultar" }) : tx({ de: "anzeigen", en: "show", es: "mostrar" })}
+              {tx({ de: "Vorschau", en: "Preview", es: "Vista previa" })} {mobilePreview ? tx({ de: tx({ de: "ausblenden", en: "hide", es: "ocultar" }), en: "hide", es: "ocultar" }) : tx({ de: "anzeigen", en: "show", es: "mostrar" })}
               <ChevronDown className={`h-4 w-4 transition-transform ${mobilePreview ? "rotate-180" : ""}`} />
             </Button>
           </CollapsibleTrigger>

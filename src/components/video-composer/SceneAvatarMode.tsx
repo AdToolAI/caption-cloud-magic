@@ -88,7 +88,7 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
       onUpdate({ referenceImageUrl: publicUrl } as Partial<ComposerScene>);
       toast.success(tx({ de: 'Referenzbild gesetzt — wird als i2v-Startframe verwendet.', en: 'Reference image set — used as i2v start frame.', es: 'Conjunto de imágenes de referencia: utilizado como cuadro de inicio de i2v.' }));
     } catch (err: any) {
-      toast.error(err?.message ?? tx({ de: 'Upload fehlgeschlagen', en: 'Upload failed', es: 'Error al subir' }));
+      toast.error(err?.message ?? tx({ de: tx({ de: "Upload fehlgeschlagen", en: "Upload failed", es: "Error al subir" }), en: 'Upload failed', es: 'Error al subir' }));
     } finally {
       setUploadingRef(false);
     }
@@ -267,7 +267,7 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
               </div>
               <p className="text-[10px] text-muted-foreground line-clamp-1">
                 {noActive
-                  ? tx({ de: 'Bitte erst einen Cast wählen.', en: 'Please select a cast first.', es: 'Por favor, selecciona un elenco primero.' })
+                  ? tx({ de: tx({ de: "Bitte erst einen Cast wählen.", en: "Please pick a cast member first.", es: "Selecciona primero un miembro del reparto." }), en: 'Please select a cast first.', es: 'Por favor, selecciona un elenco primero.' })
                   : 'Lifestyle · Historical · Fantasy · Sci-Fi · Sport — Identity-locked.'}
               </p>
             </div>
@@ -316,7 +316,7 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
             <div className="min-w-0 flex-1">
               <div className="text-[11px] font-semibold text-foreground">Pose-Sheet</div>
               <p className="text-[10px] text-muted-foreground line-clamp-1">
-                {noActive ? tx({ de: 'Bitte erst einen Cast wählen.', en: 'Please select a cast first.', es: 'Por favor, selecciona un elenco primero.' }) : '4 Stand-/Action-Posen — Identity-locked.'}
+                {noActive ? tx({ de: tx({ de: "Bitte erst einen Cast wählen.", en: "Please pick a cast member first.", es: "Selecciona primero un miembro del reparto." }), en: 'Please select a cast first.', es: 'Por favor, selecciona un elenco primero.' }) : '4 Stand-/Action-Posen — Identity-locked.'}
               </p>
             </div>
             <ChevronDown

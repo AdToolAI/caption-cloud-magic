@@ -41,9 +41,9 @@ function briefFromIdea(round: Round, idea: AutopilotIdea): string {
     .map((asset) => {
       const spec = ASSET_ROLES[asset.role];
       const handling = spec.useAsOverlay
-        ? tx({ de: 'wird als saubere Einblendung gelegt, nicht generieren', en: 'is placed as a clean fade-in, do not generate', es: 'se coloca como una entrada limpia, no generar' })
+        ? tx({ de: tx({ de: "wird als saubere Einblendung gelegt, nicht generieren", en: "is placed as a clean overlay, not generated", es: "se coloca como superposición limpia, no se genera" }), en: 'is placed as a clean fade-in, do not generate', es: 'se coloca como una entrada limpia, no generar' })
         : spec.styleOnly
-          ? tx({ de: 'nur Look übernehmen, nicht den Inhalt', en: 'only adopt the look, not the content', es: 'Adopta solo la apariencia, no el contenido.' })
+          ? tx({ de: tx({ de: "nur Look übernehmen, nicht den Inhalt", en: "adopt the look only, not the content", es: "adopta solo el estilo, no el contenido" }), en: 'only adopt the look, not the content', es: 'Adopta solo la apariencia, no el contenido.' })
           : tx({ de: 'als Bildreferenz verwenden', en: 'use as image reference', es: 'usar como referencia visual' });
       return `- ${spec.label}: ${asset.description ?? asset.fileName} (${handling})${
         asset.note ? ` — ${tx({ de: 'Wunsch', en: 'Request', es: 'Petición' })}: ${asset.note}` : ''

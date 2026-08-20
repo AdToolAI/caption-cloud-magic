@@ -279,11 +279,11 @@ function EmptyContentLibrary({ campaignFilter }: { campaignFilter: boolean }) {
         <FolderOpen className="h-8 w-8 text-muted-foreground" />
       </div>
       <h3 className="font-semibold text-sm mb-2">
-        {campaignFilter ? tx({ de: "Keine Kampagnen-Inhalte", en: "No campaign content", es: "Sin contenido de campaña" }) : tx({ de: "Keine Inhalte gefunden", en: "No content found", es: "No se encontró contenido" })}
+        {campaignFilter ? tx({ de: tx({ de: "Keine Kampagnen-Inhalte", en: "No campaign content", es: "Sin contenido de campaña" }), en: "No campaign content", es: "Sin contenido de campaña" }) : tx({ de: "Keine Inhalte gefunden", en: "No content found", es: "No se encontró contenido" })}
       </h3>
       <p className="text-xs text-muted-foreground mb-4 max-w-xs">
         {campaignFilter 
-          ? tx({ de: "Erstellen Sie Inhalte für diese Kampagne oder laden Sie Medien in die Mediathek hoch.", en: "Create content for this campaign or upload media to the media library.", es: "Crea contenido para esta campaña o sube medios a la biblioteca de medios." })
+          ? tx({ de: tx({ de: "Erstellen Sie Inhalte für diese Kampagne oder laden Sie Medien in die Mediathek hoch.", en: "Create content for this campaign or upload media to the library.", es: "Crea contenido para esta campaña o sube archivos a la mediateca." }), en: "Create content for this campaign or upload media to the media library.", es: "Crea contenido para esta campaña o sube medios a la biblioteca de medios." })
           : tx({ de: "Laden Sie Medien in die Mediathek hoch oder erstellen Sie Kampagnen, um Inhalte hier zu planen.", en: "Upload media to the media library or create campaigns to schedule content here.", es: "Sube medios a la biblioteca de medios o crea campañas para programar contenido aquí." })}
       </p>
       {!campaignFilter && (

@@ -224,7 +224,7 @@ export default function AITextStudio() {
         .select("id,title,model,updated_at,parent_conversation_id,branch_label")
         .single();
       if (rootErr || !rootConv) {
-        toast.error(rootErr?.message || tx({ de: "Wurzel-Chat konnte nicht angelegt werden", en: "Root chat could not be created", es: "No se pudo crear el chat raíz" }));
+        toast.error(rootErr?.message || tx({ de: tx({ de: "Wurzel-Chat konnte nicht angelegt werden", en: "Root chat could not be created", es: "No se pudo crear el chat raíz" }), en: "Root chat could not be created", es: "No se pudo crear el chat raíz" }));
         return;
       }
       if (messages.length > 0) {
@@ -257,7 +257,7 @@ export default function AITextStudio() {
       .select("id,title,model,updated_at,parent_conversation_id,branch_label")
       .single();
     if (error || !newConv) {
-      toast.error(error?.message || tx({ de: "Branch konnte nicht erstellt werden", en: "Branch could not be created", es: "No se pudo crear la rama" }));
+      toast.error(error?.message || tx({ de: tx({ de: "Branch konnte nicht erstellt werden", en: "Branch could not be created", es: "No se pudo crear la rama" }), en: "Branch could not be created", es: "No se pudo crear la rama" }));
       return;
     }
 
@@ -435,7 +435,7 @@ export default function AITextStudio() {
       if (error) throw error;
       setCompareResults(data?.results || null);
     } catch (e: any) {
-      toast.error(e?.message || tx({ de: "Compare fehlgeschlagen", en: "Compare failed", es: "Comparación fallida" }));
+      toast.error(e?.message || tx({ de: tx({ de: "Compare fehlgeschlagen", en: "Compare failed", es: "Error en la comparación" }), en: "Compare failed", es: "Comparación fallida" }));
     } finally {
       setCompareLoading(false);
     }
@@ -600,7 +600,7 @@ export default function AITextStudio() {
               variant="ghost"
               className="ml-auto h-7"
               disabled={!conversationId && messages.length === 0}
-              title={!conversationId && messages.length === 0 ? tx({ de: "Erst eine Nachricht senden, dann anheften", en: "Send a message first, then pin", es: "Envía un mensaje primero y luego fíjalo" }) : undefined}
+              title={!conversationId && messages.length === 0 ? tx({ de: tx({ de: "Erst eine Nachricht senden, dann anheften", en: "Send a message first, then pin it", es: "Envía un mensaje primero y luego fíjalo" }), en: "Send a message first, then pin", es: "Envía un mensaje primero y luego fíjalo" }) : undefined}
               onClick={() => {
                 if (!conversationId) return;
                 if (pinned?.conversationId === conversationId) {

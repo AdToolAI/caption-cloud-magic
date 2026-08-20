@@ -171,7 +171,7 @@ export function MultiImageUpload({
                     <ImageIcon className="h-8 w-8 mb-2 text-muted-foreground animate-pulse" />
                     <Progress value={image.progress} className="w-3/4" />
                     <p className="text-xs text-muted-foreground mt-2">
-                      {image.progress}% hochgeladen
+                      {image.progress}{tx({ de: "% hochgeladen", en: "% uploaded", es: "% subido" })}
                     </p>
                   </div>
                 ) : (

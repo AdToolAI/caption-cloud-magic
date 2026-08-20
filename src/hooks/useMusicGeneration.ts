@@ -96,7 +96,7 @@ export function useMusicGeneration() {
       }
 
       if (!data?.success) {
-        toast.error(data?.error || tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }));
+        toast.error(data?.error || tx({ de: tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }), en: 'Unknown error', es: 'Error desconocido' }));
         return null;
       }
 
@@ -133,7 +133,7 @@ export function useMusicGeneration() {
         return null;
       }
       if (!data?.success) {
-        toast.error(data?.error || tx({ de: 'Lyrics-Generierung fehlgeschlagen', en: 'Lyrics generation failed', es: 'La generación de letras falló' }));
+        toast.error(data?.error || tx({ de: tx({ de: "Lyrics-Generierung fehlgeschlagen", en: "Lyrics generation failed", es: "Error al generar la letra" }), en: 'Lyrics generation failed', es: 'La generación de letras falló' }));
         return null;
       }
       toast.success(tx({ de: "✍️ Lyrics generiert!", en: "✍️ Lyrics generated!", es: "✍️ ¡Letra generada!" }));

@@ -115,7 +115,7 @@ export const InstagramPostPreview = ({
               onClick={() => setShowFullCaption(!showFullCaption)}
               className="text-muted-foreground ml-1"
             >
-              {showFullCaption ? tx({ de: "weniger", en: "less", es: "menos" }) : tx({ de: "mehr", en: "more", es: "más" })}
+              {showFullCaption ? tx({ de: tx({ de: "weniger", en: "less", es: "menos" }), en: "less", es: "menos" }) : tx({ de: "mehr", en: "more", es: "más" })}
             </button>
           )}
           {(showFullCaption || !shouldTruncate) && hashtags.length > 0 && (

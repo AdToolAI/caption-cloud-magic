@@ -185,7 +185,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
                           : 'bg-muted/40 border-border/50 text-muted-foreground text-[10px]'
                       }
                     >
-                      {v.is_active ? tx({ de: 'Aktiv', en: 'Active', es: 'Activo' }) : tx({ de: 'Inaktiv', en: 'Inactive', es: 'Inactivo' })}
+                      {v.is_active ? tx({ de: tx({ de: "Aktiv", en: "Active", es: "Activo" }), en: 'Active', es: 'Activo' }) : tx({ de: 'Inaktiv', en: 'Inactive', es: 'Inactivo' })}
                     </Badge>
                   )}
                 </div>

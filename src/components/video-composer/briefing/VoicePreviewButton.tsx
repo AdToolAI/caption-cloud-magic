@@ -76,8 +76,8 @@ export function VoicePreviewButton({ voiceId, text, label }: Props) {
       type="button"
       onClick={play}
       disabled={disabled}
-      title={label ?? tx({ de: 'Stimme anhören', en: 'Preview voice', es: 'Escuchar voz' })}
-      aria-label={label ?? tx({ de: 'Stimme anhören', en: 'Preview voice', es: 'Escuchar voz' })}
+      title={label ?? tx({ de: tx({ de: "Stimme anhören", en: "Preview voice", es: "Escuchar voz" }), en: 'Preview voice', es: 'Escuchar voz' })}
+      aria-label={label ?? tx({ de: tx({ de: "Stimme anhören", en: "Preview voice", es: "Escuchar voz" }), en: 'Preview voice', es: 'Escuchar voz' })}
       className="inline-flex items-center justify-center h-5 w-5 rounded-full border border-border/50 bg-background/40 hover:bg-background/70 disabled:opacity-50 transition"
     >
       {icon}

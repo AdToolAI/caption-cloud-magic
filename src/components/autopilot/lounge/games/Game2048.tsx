@@ -214,7 +214,7 @@ export default function Game2048() {
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        {dead ? tx({ de: "Kein Zug mehr möglich — neu starten.", en: "No moves left — start over.", es: "No quedan movimientos — reinicia." }) : tx({ de: "Pfeiltasten, Wischen oder Buttons.", en: "Arrow keys, swiping or buttons.", es: "Teclas de flecha, deslizar o botones." })}
+        {dead ? tx({ de: tx({ de: "Kein Zug mehr möglich — neu starten.", en: "No moves left — start again.", es: "No quedan movimientos — empieza de nuevo." }), en: "No moves left — start over.", es: "No quedan movimientos — reinicia." }) : tx({ de: "Pfeiltasten, Wischen oder Buttons.", en: "Arrow keys, swiping or buttons.", es: "Teclas de flecha, deslizar o botones." })}
       </p>
     </div>
   );

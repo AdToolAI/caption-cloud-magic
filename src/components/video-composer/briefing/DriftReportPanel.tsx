@@ -321,7 +321,7 @@ export default function DriftReportPanel({ projectId, scenes, onUpdateScene }: P
               className="gap-1.5"
             >
               {applying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
-              Auf Storyboard anwenden
+              {tx({ de: "Auf Storyboard anwenden", en: "Apply to storyboard", es: "Aplicar al storyboard" })}
             </Button>
           </DialogFooter>
         </DialogContent>

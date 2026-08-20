@@ -276,9 +276,9 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
         title: tx({ de: 'Ideen konnten nicht entwickelt werden', en: 'Ideas could not be developed', es: 'No se pudieron desarrollar ideas' }),
         description:
           message === 'credits_exhausted'
-            ? tx({ de: 'Dein KI-Guthaben ist aufgebraucht.', en: 'Your AI credit balance is used up.', es: 'Tu saldo de créditos de IA se ha agotado.' })
+            ? tx({ de: tx({ de: "Dein KI-Guthaben ist aufgebraucht.", en: "Your AI credits are used up.", es: "Tus créditos de IA se han agotado." }), en: 'Your AI credit balance is used up.', es: 'Tu saldo de créditos de IA se ha agotado.' })
             : message === 'rate_limited'
-              ? tx({ de: 'Zu viele Anfragen — bitte kurz warten.', en: 'Too many requests — please wait a moment.', es: 'Demasiadas solicitudes — espera un momento.' })
+              ? tx({ de: tx({ de: "Zu viele Anfragen — bitte kurz warten.", en: "Too many requests — please wait a moment.", es: "Demasiadas solicitudes — espera un momento." }), en: 'Too many requests — please wait a moment.', es: 'Demasiadas solicitudes — espera un momento.' })
               : message,
         variant: 'destructive',
       });
@@ -438,7 +438,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
         <div className="space-y-2 md:col-span-2">
           <div className="flex items-center justify-between">
             <Label className="text-sm">{tx({ de: "Länge", en: "Length", es: "Longitud" })}</Label>
-            <span className="text-sm text-muted-foreground">{options.duration} Sekunden</span>
+            <span className="text-sm text-muted-foreground">{options.duration} {tx({ de: "Sekunden", en: "seconds", es: "segundos" })}</span>
           </div>
           <Slider
             value={[options.duration]}

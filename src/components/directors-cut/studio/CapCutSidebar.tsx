@@ -420,7 +420,7 @@ const SubtitleVoiceoverSection: React.FC<{
   const selectedVoiceMeta = useMemo(() => allVoices.find(v => v.id === selectedVoice), [allVoices, selectedVoice]);
 
   const tipText = activeLang === 'de'
-    ? tx({ de: '💡 Premium-Stimmen klingen am natürlichsten. Tipp: Nutze Satzzeichen für realistische Pausen.', en: '💡 Premium voices sound most natural. Tip: Use punctuation for realistic pauses.', es: '💡 Las voces premium suenan más naturales. Consejo: Usa la puntuación para pausas realistas.' })
+    ? tx({ de: tx({ de: "💡 Premium-Stimmen klingen am natürlichsten. Tipp: Nutze Satzzeichen für realistische Pausen.", en: "💡 Premium voices sound the most natural. Tip: use punctuation for realistic pauses.", es: "💡 Las voces premium suenan más naturales. Consejo: usa la puntuación para pausas realistas." }), en: '💡 Premium voices sound most natural. Tip: Use punctuation for realistic pauses.', es: '💡 Las voces premium suenan más naturales. Consejo: Usa la puntuación para pausas realistas.' })
     : activeLang === 'es'
     ? '💡 Las voces Premium suenan más naturales. Consejo: usa puntuación para pausas realistas.'
     : '💡 Premium voices sound most natural. Tip: use punctuation for realistic pauses.';
@@ -1639,7 +1639,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-medium text-white/70">
-                    Untertitel ({existingCaptions.length})
+                    Untertitel ({{tx({ de: "existingCaptions.length})", en: "Subtitles (", es: "Subtítulos (" })}
                   </h4>
                 </div>
                 <ScrollArea className="max-h-48 min-w-0 max-w-full overflow-hidden">

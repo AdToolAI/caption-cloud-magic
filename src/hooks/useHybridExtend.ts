@@ -81,15 +81,15 @@ export function useHybridExtend() {
 
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
-        if (!data?.newSceneId) throw new Error(tx({ de: 'Keine neue Szene zurückgegeben', en: 'No new scene returned', es: 'No se devolvió ninguna escena nueva' }));
+        if (!data?.newSceneId) throw new Error(tx({ de: tx({ de: "Keine neue Szene zurückgegeben", en: "No new scene returned", es: "No se devolvió ninguna escena nueva" }), en: 'No new scene returned', es: 'No se devolvió ninguna escena nueva' }));
 
         const successMsg =
           params.mode === 'forward'
-            ? tx({ de: '🎬 Sequel wird gedreht…', en: '🎬 Shooting sequel…', es: '🎬 Rodando la secuela…' })
+            ? tx({ de: tx({ de: "🎬 Sequel wird gedreht…", en: "🎬 Shooting the sequel…", es: "🎬 Rodando la secuela…" }), en: '🎬 Shooting sequel…', es: '🎬 Rodando la secuela…' })
             : params.mode === 'backward'
-            ? tx({ de: '⏮ Prequel wird gedreht…', en: '⏮ Shooting prequel…', es: '⏮ Rodando la precuela…' })
+            ? tx({ de: tx({ de: "⏮ Prequel wird gedreht…", en: "⏮ Shooting the prequel…", es: "⏮ Rodando la precuela…" }), en: '⏮ Shooting prequel…', es: '⏮ Rodando la precuela…' })
             : params.mode === 'bridge'
-            ? tx({ de: '🌉 Crossfade wird gefilmt…', en: '🌉 Filming crossfade…', es: '🌉 Filmando la transición…' })
+            ? tx({ de: tx({ de: "🌉 Crossfade wird gefilmt…", en: "🌉 Filming the crossfade…", es: "🌉 Filmando el crossfade…" }), en: '🌉 Filming crossfade…', es: '🌉 Filmando la transición…' })
             : tx({ de: '🎨 Style-Echo wird komponiert…', en: '🎨 Composing style echo…', es: '🎨 Componiendo el eco de estilo…' });
         toast.success(successMsg);
         return data as HybridExtendResult;

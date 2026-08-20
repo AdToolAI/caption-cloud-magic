@@ -208,7 +208,7 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
       // Initialize subtitle preview with start of script
       if (video.customizations?.script_text) {
         const firstLine = String(video.customizations.script_text).split('\n')[0];
-        setSubtitlePreviewText(firstLine?.slice(0, 60) || tx({ de: 'Beispiel-Untertitel', en: 'Sample subtitle', es: 'Subtítulo de ejemplo' }));
+        setSubtitlePreviewText(firstLine?.slice(0, 60) || tx({ de: tx({ de: "Beispiel-Untertitel", en: "Sample subtitle", es: "Subtítulo de ejemplo" }), en: 'Sample subtitle', es: 'Subtítulo de ejemplo' }));
       }
       
       // Load saved subtitle styles
@@ -279,7 +279,7 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
         {hasChanges && (
           <Alert className="border-primary/50 bg-primary/5">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>{changeCount} Änderung(en) - {estimatedCost} Credits</AlertTitle>
+            <AlertTitle>{changeCount} {tx({ de: "Änderung(en) -", en: "change(s) -", es: "cambio(s) -" })} {estimatedCost} Credits</AlertTitle>
           </Alert>
         )}
 
@@ -390,7 +390,7 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
               variant="secondary"
               onClick={() => setShowQuickPreview(true)}
               disabled={!script || loading}
-              title={mediaUrls.length === 0 ? tx({ de: "⚠️ Keine Medien - Vorschau zeigt nur Text/Audio", en: "⚠️ No media - preview shows text/audio only", es: "⚠️ Sin medios - la vista previa solo muestra texto/audio" }) : tx({ de: "Schnelle kostenlose Vorschau deines Videos", en: "Quick free preview of your video", es: "Vista previa rápida y gratuita de tu video" })}
+              title={mediaUrls.length === 0 ? tx({ de: tx({ de: "⚠️ Keine Medien - Vorschau zeigt nur Text/Audio", en: "⚠️ No media - preview shows text/audio only", es: "⚠️ Sin archivos - la vista previa solo muestra texto/audio" }), en: "⚠️ No media - preview shows text/audio only", es: "⚠️ Sin medios - la vista previa solo muestra texto/audio" }) : tx({ de: "Schnelle kostenlose Vorschau deines Videos", en: "Quick free preview of your video", es: "Vista previa rápida y gratuita de tu video" })}
             >
               <Eye className="mr-2 h-4 w-4" />
               {tx({ de: "Schnelle Vorschau", en: "Quick preview", es: "Vista previa rápida" })}

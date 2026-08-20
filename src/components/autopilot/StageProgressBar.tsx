@@ -40,7 +40,7 @@ export function StageProgressBar({ value, label, hint, className, compact }: Pro
       {indeterminate ? (
         <div
           role="progressbar"
-          aria-label={label ?? tx({ de: 'Wird geladen', en: 'Is loading', es: 'esta cargando' })}
+          aria-label={label ?? tx({ de: tx({ de: "Wird geladen", en: "Loading", es: "Cargando" }), en: 'Is loading', es: 'esta cargando' })}
           className={cn(
             'relative overflow-hidden rounded-full bg-muted/40',
             compact ? 'h-1' : 'h-2',

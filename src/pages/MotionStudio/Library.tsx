@@ -405,11 +405,11 @@ function EmptyState({ kind, onCreate }: { kind: 'characters' | 'locations'; onCr
         )}
       </div>
       <h3 className="text-lg font-semibold mb-1.5">
-        {isChars ? tx({ de: 'Noch keine Charaktere', en: 'No characters yet', es: 'Aún no hay personajes' }) : tx({ de: 'Noch keine Locations', en: 'No locations yet', es: 'Aún no hay ubicaciones' })}
+        {isChars ? tx({ de: tx({ de: "Noch keine Charaktere", en: "No characters yet", es: "Aún no hay personajes" }), en: 'No characters yet', es: 'Aún no hay personajes' }) : tx({ de: 'Noch keine Locations', en: 'No locations yet', es: 'Aún no hay ubicaciones' })}
       </h3>
       <p className="text-sm text-muted-foreground max-w-md mb-5">
         {isChars
-          ? tx({ de: 'Lege wiederverwendbare Charaktere mit Reference-Image an, damit deine KI-Videos über alle Szenen hinweg konsistent bleiben.', en: 'Create reusable characters with a reference image to keep your AI videos consistent across all scenes.', es: 'Crea personajes reutilizables con una imagen de referencia para mantener la coherencia de tus videos de IA en todas las escenas.' })
+          ? tx({ de: tx({ de: "Lege wiederverwendbare Charaktere mit Reference-Image an, damit deine KI-Videos über alle Szenen hinweg konsistent bleiben.", en: "Create reusable characters with a reference image so your AI videos stay consistent across all scenes.", es: "Crea personajes reutilizables con imagen de referencia para que tus vídeos de IA sean consistentes en todas las escenas." }), en: 'Create reusable characters with a reference image to keep your AI videos consistent across all scenes.', es: 'Crea personajes reutilizables con una imagen de referencia para mantener la coherencia de tus videos de IA en todas las escenas.' })
           : tx({ de: 'Speichere Schauplätze einmal mit Foto-Referenz und nutze sie in jedem Motion-Studio-Projekt.', en: 'Save locations once with a photo reference and use them in every Motion Studio project.', es: 'Guarda las ubicaciones una vez con una referencia fotográfica y úsalas en cada proyecto de Motion Studio.' })}
       </p>
       <Button onClick={onCreate} className="gap-2">

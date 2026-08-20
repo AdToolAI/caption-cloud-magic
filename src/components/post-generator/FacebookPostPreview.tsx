@@ -104,7 +104,7 @@ export const FacebookPostPreview = ({
               onClick={() => setShowFullCaption(!showFullCaption)}
               className="text-muted-foreground hover:underline ml-1"
             >
-              {showFullCaption ? tx({ de: 'Weniger anzeigen', en: 'See less', es: 'Ver menos' }) : tx({ de: 'Mehr anzeigen', en: 'See more', es: 'Ver más' })}
+              {showFullCaption ? tx({ de: tx({ de: "Weniger anzeigen", en: "Show less", es: "Mostrar menos" }), en: 'See less', es: 'Ver menos' }) : tx({ de: 'Mehr anzeigen', en: 'See more', es: 'Ver más' })}
             </button>
           )}
         </div>

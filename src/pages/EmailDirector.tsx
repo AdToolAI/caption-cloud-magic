@@ -203,7 +203,7 @@ export default function EmailDirector() {
                 </div>
                 <Button onClick={handleGenerate} disabled={generating} className="w-full">
                   {generating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
-                  Kampagne generieren
+                  {tx({ de: "Kampagne generieren", en: "Generate campaign", es: "Generar campaña" })}
                 </Button>
               </div>
             </Card>

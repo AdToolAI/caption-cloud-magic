@@ -90,7 +90,7 @@ export const aggregateHashtags = (posts: any[]) => {
 export const aggregateCaptionLength = (posts: any[]) => {
   const grouped = posts.reduce((acc, post) => {
     const len = (post.caption_text || '').length;
-    const bucket = len < 80 ? 'kurz' : len <= 220 ? tx({ de: "mittel", en: "medium", es: "medio" }) : 'lang';
+    const bucket = len < 80 ? tx({ de: "kurz", en: "short", es: "corto" }) : len <= 220 ? tx({ de: "mittel", en: "medium", es: "medio" }) : 'lang';
 
     if (!acc[bucket]) {
       acc[bucket] = { bucket, total: 0, count: 0 };

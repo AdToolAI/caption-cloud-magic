@@ -147,11 +147,11 @@ export default function BriefingImportDialog({
       setManifest(parsed.data);
       setStep('review');
     } catch (e: any) {
-      const msg = e?.message ?? tx({ de: 'Parsing fehlgeschlagen', en: 'Parsing failed', es: 'El análisis falló' });
+      const msg = e?.message ?? tx({ de: tx({ de: "Parsing fehlgeschlagen", en: "Parsing failed", es: "Error al analizar" }), en: 'Parsing failed', es: 'El análisis falló' });
       toast({
         title: tx({ de: 'Briefing konnte nicht gelesen werden', en: 'Could not read briefing', es: 'No se pudo leer el briefing' }),
-        description: msg.includes('402') ? tx({ de: 'Keine AI-Credits mehr.', en: 'No more AI credits.', es: 'No quedan créditos de IA.' })
-          : msg.includes('429') ? tx({ de: 'Zu viele Anfragen — bitte kurz warten.', en: 'Too many requests — please wait a moment.', es: 'Demasiadas solicitudes — espera un momento.' }) : msg,
+        description: msg.includes('402') ? tx({ de: tx({ de: "Keine AI-Credits mehr.", en: "Out of AI credits.", es: "Sin créditos de IA." }), en: 'No more AI credits.', es: 'No quedan créditos de IA.' })
+          : msg.includes('429') ? tx({ de: tx({ de: "Zu viele Anfragen — bitte kurz warten.", en: "Too many requests — please wait a moment.", es: "Demasiadas solicitudes — espera un momento." }), en: 'Too many requests — please wait a moment.', es: 'Demasiadas solicitudes — espera un momento.' }) : msg,
         variant: 'destructive',
       });
     } finally {
@@ -213,7 +213,7 @@ export default function BriefingImportDialog({
                 onClick={() => setShowGuide((v) => !v)}
               >
                 {showGuide
-                  ? tx({ de: 'Aufbau ausblenden', en: 'Hide structure', es: 'Ocultar estructura' })
+                  ? tx({ de: tx({ de: "Aufbau ausblenden", en: "Hide structure", es: "Ocultar estructura" }), en: 'Hide structure', es: 'Ocultar estructura' })
                   : tx({ de: 'Aufbau & Regeln', en: 'Structure & rules', es: 'Estructura y reglas' })}
               </Button>
             </div>

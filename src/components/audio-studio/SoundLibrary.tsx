@@ -326,7 +326,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
             >
               <FileAudio className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
               <p className="text-muted-foreground">
-                {searchQuery ? tx({ de: 'Keine Ergebnisse gefunden', en: 'No results found', es: 'No se encontraron resultados' }) : tx({ de: 'Noch keine Sounds gespeichert', en: 'No sounds saved yet', es: 'Aún no hay sonidos guardados' })}
+                {searchQuery ? tx({ de: tx({ de: "Keine Ergebnisse gefunden", en: "No results found", es: "No se encontraron resultados" }), en: 'No results found', es: 'No se encontraron resultados' }) : tx({ de: 'Noch keine Sounds gespeichert', en: 'No sounds saved yet', es: 'Aún no hay sonidos guardados' })}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 {tx({ de: 'Optimiere Audio und speichere es in der Bibliothek', en: 'Optimize audio and save it to the library', es: 'Optimiza el audio y guárdalo en la biblioteca.' })}
@@ -457,7 +457,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
                       className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                     >
                       <Settings2 className="w-3 h-3" />
-                      {Object.values(sound.effect_config).filter(Boolean).length} Effekte aktiv
+                      {Object.values(sound.effect_config).filter(Boolean).length} {tx({ de: "Effekte aktiv", en: "effects active", es: "efectos activos" })}
                     </button>
                   </div>
                 )}

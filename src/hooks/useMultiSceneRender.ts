@@ -128,12 +128,12 @@ export function useMultiSceneRender(opts: Options) {
           }
         );
         if (invErr) throw invErr;
-        if (!data?.success) throw new Error(data?.error || tx({ de: 'Stitching fehlgeschlagen', en: 'Stitching failed', es: 'La costura falló' }));
+        if (!data?.success) throw new Error(data?.error || tx({ de: tx({ de: "Stitching fehlgeschlagen", en: "Stitching failed", es: "Error al unir los clips" }), en: 'Stitching failed', es: 'La costura falló' }));
         setRenderId(data.renderId);
         toast.success(tx({ de: `Stitching gestartet — ${data.scenesCount} Szenen`, en: `Stitching started — ${data.scenesCount} scenes`, es: `Unión iniciada — ${data.scenesCount} escenas` }));
       } catch (e: any) {
         console.error('[useMultiSceneRender] stitch failed', e);
-        const msg = e?.message || tx({ de: 'Stitching fehlgeschlagen', en: 'Stitching failed', es: 'La costura falló' });
+        const msg = e?.message || tx({ de: tx({ de: "Stitching fehlgeschlagen", en: "Stitching failed", es: "Error al unir los clips" }), en: 'Stitching failed', es: 'La costura falló' });
         setError(msg);
         setStatus('failed');
         await updateRun({ status: 'failed', error_message: msg });
@@ -176,7 +176,7 @@ export function useMultiSceneRender(opts: Options) {
       } catch (e: any) {
         if (cancelled) return;
         console.error('[useMultiSceneRender] poll failed', e);
-        const msg = e?.message || tx({ de: 'Render fehlgeschlagen', en: 'Render failed', es: 'Error de renderizado' });
+        const msg = e?.message || tx({ de: tx({ de: "Render fehlgeschlagen", en: "Render failed", es: "Error al renderizar" }), en: 'Render failed', es: 'Error de renderizado' });
         setError(msg);
         setStatus('failed');
         await updateRun({ status: 'failed', error_message: msg });
@@ -231,7 +231,7 @@ export function useMultiSceneRender(opts: Options) {
         setStatus('generating');
         await updateRun({ status: 'generating' });
       } catch (e: any) {
-        const msg = e?.message || tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' });
+        const msg = e?.message || tx({ de: tx({ de: "Generierung fehlgeschlagen", en: "Generation failed", es: "Error al generar" }), en: 'Generation failed', es: 'Error de generación' });
         setError(msg);
         setStatus('failed');
         await updateRun({ status: 'failed', error_message: msg });

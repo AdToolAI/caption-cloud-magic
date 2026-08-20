@@ -50,7 +50,7 @@ export function ProviderSelector({ value, onChange, currencySymbol = '€', disa
               type="button"
               disabled={isDisabled}
               onClick={() => onChange(id as MusicEngineId)}
-              title={engine.comingSoon ? tx({ de: 'Preview-Access wird in Kürze freigeschaltet', en: 'Preview access will be activated shortly', es: 'El acceso a la vista previa se activará en breve' }) : undefined}
+              title={engine.comingSoon ? tx({ de: tx({ de: "Preview-Access wird in Kürze freigeschaltet", en: "Preview access will be unlocked shortly", es: "El acceso a la vista previa se habilitará en breve" }), en: 'Preview access will be activated shortly', es: 'El acceso a la vista previa se activará en breve' }) : undefined}
               className={cn(
                 'group relative text-left rounded-lg overflow-hidden transition-all',
                 'border backdrop-blur-sm',

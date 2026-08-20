@@ -106,9 +106,9 @@ export function AutopilotGoalBriefingStep({ value, onChange }: Props) {
         </div>
         <p className="text-xs text-muted-foreground">
           {value.weekly_budget_eur < 20
-            ? tx({ de: '⚠️ Niedriges Budget: KI-Videos werden automatisch deaktiviert. Fokus auf KI-Bilder und Stock-Reels.', en: '⚠️ Low budget: AI videos are automatically disabled. Focus on AI images and stock reels.', es: '⚠️ Presupuesto bajo: los videos de IA se desactivan automáticamente. Concéntrate en imágenes de IA y reels de stock.' })
+            ? tx({ de: tx({ de: "⚠️ Niedriges Budget: KI-Videos werden automatisch deaktiviert. Fokus auf KI-Bilder und Stock-Reels.", en: "⚠️ Low budget: AI videos are disabled automatically. Focus on AI images and stock reels.", es: "⚠️ Presupuesto bajo: los vídeos de IA se desactivan automáticamente. Foco en imágenes de IA y reels de stock." }), en: '⚠️ Low budget: AI videos are automatically disabled. Focus on AI images and stock reels.', es: '⚠️ Presupuesto bajo: los videos de IA se desactivan automáticamente. Concéntrate en imágenes de IA y reels de stock.' })
             : value.weekly_budget_eur < 50
-            ? tx({ de: 'Mittleres Budget: gemischte Strategie aus Bildern, Stock & einzelnen KI-Videos.', en: 'Medium budget: mixed strategy of images, stock & individual AI videos.', es: 'Presupuesto medio: estrategia mixta de imágenes, stock y vídeos individuales de IA.' })
+            ? tx({ de: tx({ de: "Mittleres Budget: gemischte Strategie aus Bildern, Stock & einzelnen KI-Videos.", en: "Medium budget: mixed strategy of images, stock & selected AI videos.", es: "Presupuesto medio: estrategia mixta de imágenes, stock y algunos vídeos de IA." }), en: 'Medium budget: mixed strategy of images, stock & individual AI videos.', es: 'Presupuesto medio: estrategia mixta de imágenes, stock y vídeos individuales de IA.' })
             : tx({ de: 'Hohes Budget: Volle KI-Video-Pipeline möglich.', en: 'High budget: Full AI video pipeline possible.', es: 'Presupuesto alto: posible canalización completa de videos con IA.' })}
         </p>
       </div>

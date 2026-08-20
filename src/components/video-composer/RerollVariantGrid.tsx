@@ -76,7 +76,7 @@ export default function RerollVariantGrid({
       });
       if (error) throw error;
       toast({
-        title: parentSeed != null ? tx({ de: "🔁 Variationen gestartet", en: "🔁 Variations started", es: "🔁 Variaciones iniciadas" }) : tx({ de: "⚡ 4 Takes gestartet", en: "⚡ 4 Takes started", es: "⚡ 4 Tomas iniciadas" }),
+        title: parentSeed != null ? tx({ de: tx({ de: "🔁 Variationen gestartet", en: "🔁 Variations started", es: "🔁 Variaciones iniciadas" }), en: "🔁 Variations started", es: "🔁 Variaciones iniciadas" }) : tx({ de: "⚡ 4 Takes gestartet", en: "⚡ 4 Takes started", es: "⚡ 4 Tomas iniciadas" }),
         description: tx({ de: 'Fast-Previews ~10 Sek. — werden hier live aktualisiert.', en: 'Fast-Previews ~10 sec. — updated live here.', es: 'Vistas previas rápidas ~10 seg. — se actualizan en vivo aquí.' }),
       });
     } catch (err) {

@@ -78,7 +78,7 @@ export function AIAutoCut({ videoUrl, videoDuration, audioUrl, onCutsGenerated }
                 cut.type === 'speech_pause' ? 'speech' : 
                 cut.type === 'action' ? 'action' : 'manual',
           confidence: cut.confidence || 0.7,
-          description: cut.reason || 'AI-generierter Schnitt',
+          description: cut.reason || tx({ de: "AI-generierter Schnitt", en: "AI-generated cut", es: "Corte generado por IA" }),
         }));
 
         setCuts(formattedCuts);
@@ -252,7 +252,7 @@ export function AIAutoCut({ videoUrl, videoDuration, audioUrl, onCutsGenerated }
         {cuts.length > 0 && (
           <div className="space-y-2 pt-2 border-t">
             <div className="flex justify-between items-center">
-              <label className="text-xs font-medium">Generierte Schnitte ({cuts.length})</label>
+              <label className="text-xs font-medium">{tx({ de: "Generierte Schnitte (", en: "Generated cuts (", es: "Cortes generados (" })}{cuts.length})</label>
               <Button
                 variant="ghost"
                 size="sm"

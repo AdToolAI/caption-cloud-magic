@@ -191,7 +191,7 @@ export default function CompareLabGrid({
               {isStarting ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {tx({ de: 'Starte', en: 'Starting', es: 'Iniciando' })} {selectedEngines.length} Engines…</>
               ) : (
-                <><Sparkles className="h-4 w-4 mr-2" /> Vergleich starten ({totalCost.toFixed(2)}€)</>
+                <><Sparkles className="h-4 w-4 mr-2" /> Verg{tx({ de: "leich starten (", en: "Start comparison (", es: "Iniciar comparación (" })}{totalCost.toFixed(2)}€)</>
               )}
             </Button>
           </CardContent>
@@ -297,7 +297,7 @@ function OutputCard({
         {isFailed && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center">
             <AlertCircle className="h-6 w-6 text-destructive" />
-            <span className="text-xs text-muted-foreground">{output.error_message ?? tx({ de: 'Fehler', en: 'Mistake', es: 'Error' })}</span>
+            <span className="text-xs text-muted-foreground">{output.error_message ?? tx({ de: tx({ de: "Fehler", en: "Error", es: "Error" }), en: 'Mistake', es: 'Error' })}</span>
           </div>
         )}
         {output.video_url && (

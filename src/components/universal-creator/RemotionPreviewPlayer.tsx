@@ -616,7 +616,7 @@ export function RemotionPreviewPlayer({
               size="icon"
               variant="ghost"
               onClick={() => setLoop((l) => !l)}
-              title={loop ? tx({ de: "Loop aus", en: "Loop off", es: "Bucle desactivado" }) : 'Loop an'}
+              title={loop ? tx({ de: tx({ de: "Loop aus", en: "Loop off", es: "Bucle desactivado" }), en: "Loop off", es: "Bucle desactivado" }) : 'Loop an'}
               aria-pressed={loop}
               className={`h-8 w-8 ${loop ? 'text-primary' : 'text-muted-foreground'} hover:text-foreground`}
             >

@@ -240,7 +240,7 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
                 {tx({ de: "Übernehme…", en: "Applying…", es: "Aplicando…" })}
               </>
             ) : (
-              <>Änderungen übernehmen ({totalChanges})</>
+              <>{tx({ de: "Änderungen übernehmen (", en: "Apply changes (", es: "Aplicar cambios (" })}{totalChanges})</>
             )}
           </Button>
         </DialogFooter>

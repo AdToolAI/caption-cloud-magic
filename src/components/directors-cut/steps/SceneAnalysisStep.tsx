@@ -825,14 +825,14 @@ export function SceneAnalysisStep({
             <div>
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-primary" />
-                {scenes.length} {scenes.length === 1 ? tx({ de: "Szene", en: "Scene", es: "Escena" }) : tx({ de: "Szenen", en: "Scenes", es: "Escenas" })} erkannt
+                {scenes.length} {scenes.length === 1 ? tx({ de: tx({ de: "Szene", en: "Scene", es: "Escena" }), en: "Scene", es: "Escena" }) : tx({ de: "Szenen", en: "Scenes", es: "Escenas" })} {tx({ de: "erkannt", en: "detected", es: "detectado" })}
                 <Badge variant="outline" className="text-xs font-normal">
-                  {scenes.length === 1 ? tx({ de: 'Keine Schnitte erkannt', en: 'No cuts detected', es: 'No se detectaron cortes' }) : 'Szenenanalyse'}
+                  {scenes.length === 1 ? tx({ de: tx({ de: "Keine Schnitte erkannt", en: "No cuts detected", es: "No se detectaron cortes" }), en: 'No cuts detected', es: 'No se detectaron cortes' }) : 'Szenenanalyse'}
                 </Badge>
               </h3>
               <p className="text-sm text-muted-foreground">
                 {scenes.length === 1 
-                  ? tx({ de: "Kein Szenenwechsel im Video gefunden", en: "No scene change found in the video", es: "No se encontró ningún cambio de escena en el video." }) 
+                  ? tx({ de: tx({ de: "Kein Szenenwechsel im Video gefunden", en: "No scene change found in the video", es: "No se encontró ningún cambio de escena en el vídeo" }), en: "No scene change found in the video", es: "No se encontró ningún cambio de escena en el video." }) 
                   : tx({ de: 'Szenengrenzen basieren auf visueller Videoanalyse', en: 'Scene boundaries are based on visual video analysis', es: 'Los límites de la escena se basan en el análisis de vídeo visual.' })}
               </p>
             </div>

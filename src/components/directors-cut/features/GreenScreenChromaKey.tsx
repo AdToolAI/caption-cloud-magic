@@ -307,7 +307,7 @@ export function GreenScreenChromaKey({
             onClick={() => setPreviewEnabled(!previewEnabled)}
           >
             <Eye className="h-4 w-4 mr-2" />
-            {previewEnabled ? tx({ de: 'Vorschau deaktivieren', en: 'Disable preview', es: 'Desactivar vista previa' }) : tx({ de: 'Vorschau aktivieren', en: 'Enable preview', es: 'Activar vista previa' })}
+            {previewEnabled ? tx({ de: tx({ de: "Vorschau deaktivieren", en: "Disable preview", es: "Desactivar vista previa" }), en: 'Disable preview', es: 'Desactivar vista previa' }) : tx({ de: 'Vorschau aktivieren', en: 'Enable preview', es: 'Activar vista previa' })}
           </Button>
         )}
 

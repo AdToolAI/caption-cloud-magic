@@ -272,9 +272,9 @@ export const useCloudStorage = () => {
       setConnection(prev => prev ? { ...prev, auto_sync: enabled } : null);
 
       toast({
-        title: enabled ? tx({ de: "Auto-Sync aktiviert", en: "Auto-sync enabled", es: "Sincronización automática activada" }) : tx({ de: "Auto-Sync deaktiviert", en: "Auto-sync disabled", es: "Sincronización automática desactivada" }),
+        title: enabled ? tx({ de: tx({ de: "Auto-Sync aktiviert", en: "Auto-sync enabled", es: "Sincronización automática activada" }), en: "Auto-sync enabled", es: "Sincronización automática activada" }) : tx({ de: "Auto-Sync deaktiviert", en: "Auto-sync disabled", es: "Sincronización automática desactivada" }),
         description: enabled 
-          ? tx({ de: 'Neue Medien werden automatisch in Google Drive gespeichert.', en: 'New media is automatically saved to Google Drive.', es: 'Los nuevos medios se guardan automáticamente en Google Drive.' })
+          ? tx({ de: tx({ de: "Neue Medien werden automatisch in Google Drive gespeichert.", en: "New media is saved to Google Drive automatically.", es: "Los nuevos archivos se guardan automáticamente en Google Drive." }), en: 'New media is automatically saved to Google Drive.', es: 'Los nuevos medios se guardan automáticamente en Google Drive.' })
           : tx({ de: 'Medien werden nicht mehr automatisch hochgeladen.', en: 'Media is no longer uploaded automatically.', es: 'Los medios ya no se suben automáticamente.' }),
       });
     } catch (err) {

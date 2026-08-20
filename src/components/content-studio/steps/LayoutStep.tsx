@@ -35,7 +35,7 @@ export function LayoutStep() {
           <div>
             <h2 className="font-display text-3xl tracking-tight">{tx({ de: "Wähle deine Richtung", en: "Choose your direction", es: "Elige tu dirección" })}</h2>
             <p className="text-sm text-muted-foreground">
-              {s.imageBusy ? tx({ de: "Motiv wird gerendert — die Layouts stehen schon.", en: "Motif is rendering — layouts are already available.", es: "El motivo se está renderizando — los diseños ya están disponibles." }) : tx({ de: "Alles bleibt danach frei editierbar.", en: "Everything remains freely editable afterwards.", es: "Todo permanece libremente editable después." })}
+              {s.imageBusy ? tx({ de: tx({ de: "Motiv wird gerendert — die Layouts stehen schon.", en: "Visual is rendering — the layouts are already in place.", es: "El motivo se está renderizando — los diseños ya están listos." }), en: "Motif is rendering — layouts are already available.", es: "El motivo se está renderizando — los diseños ya están disponibles." }) : tx({ de: "Alles bleibt danach frei editierbar.", en: "Everything remains freely editable afterwards.", es: "Todo permanece libremente editable después." })}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -118,7 +118,7 @@ export function LayoutStep() {
                 >
                   {layer.type === "text" || layer.type === "badge"
                     ? (layer as TextLayer).text?.slice(0, 24) || layer.type
-                    : layer.type === "image" ? tx({ de: "Bild", en: "Image", es: "Imagen" }) : layer.type === "logo" ? tx({ de: "Logo", en: "Logo", es: "Logo" }) : tx({ de: "Form", en: "Shape", es: "Forma" })}
+                    : layer.type === "image" ? tx({ de: tx({ de: "Bild", en: "Image", es: "Imagen" }), en: "Image", es: "Imagen" }) : layer.type === "logo" ? tx({ de: "Logo", en: "Logo", es: "Logo" }) : tx({ de: "Form", en: "Shape", es: "Forma" })}
                 </button>
               ))}
             </div>

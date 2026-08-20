@@ -81,7 +81,7 @@ export default function LibraryPicker({
             {title}
           </DialogTitle>
           <DialogDescription>
-            {tx({ de: 'Wähle gespeicherte', en: 'Choose saved', es: 'Elige' })} {modes.includes('character') && modes.includes('location') ? tx({ de: 'Charaktere und Locations', en: 'Characters and locations', es: 'Personajes y ubicaciones' }) : modes[0] === 'character' ? tx({ de: 'Charaktere', en: 'Characters', es: 'Personajes' }) : tx({ de: 'Locations', en: 'Locations', es: 'Ubicaciones' })} {tx({ de: 'oder lege neue in der Library an.', en: 'or create new ones in the library.', es: 'o crea nuevos en la biblioteca.' })}
+            {tx({ de: 'Wähle gespeicherte', en: 'Choose saved', es: 'Elige' })} {modes.includes('character') && modes.includes('location') ? tx({ de: tx({ de: "Charaktere und Locations", en: "Characters and locations", es: "Personajes y localizaciones" }), en: 'Characters and locations', es: 'Personajes y ubicaciones' }) : modes[0] === 'character' ? tx({ de: 'Charaktere', en: 'Characters', es: 'Personajes' }) : tx({ de: 'Locations', en: 'Locations', es: 'Ubicaciones' })} {tx({ de: 'oder lege neue in der Library an.', en: 'or create new ones in the library.', es: 'o crea nuevos en la biblioteca.' })}
           </DialogDescription>
         </DialogHeader>
 
@@ -115,7 +115,7 @@ export default function LibraryPicker({
             <div className="text-center py-12 px-6">
               <p className="text-sm text-muted-foreground mb-3">
                 {items.length === 0
-                  ? tx({ de: 'Du hast noch keine gespeicherten Einträge.', en: 'You don\'t have any saved entries yet.', es: 'Aún no tienes entradas guardadas.' })
+                  ? tx({ de: tx({ de: "Du hast noch keine gespeicherten Einträge.", en: "You don't have any saved entries yet.", es: "Todavía no tienes entradas guardadas." }), en: 'You don\'t have any saved entries yet.', es: 'Aún no tienes entradas guardadas.' })
                   : tx({ de: 'Keine Ergebnisse für deine Suche.', en: 'No results for your search.', es: 'No hay resultados para tu búsqueda.' })}
               </p>
               {items.length === 0 && (

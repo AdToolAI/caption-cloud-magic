@@ -36,15 +36,14 @@ interface Props {
 }
 
 // Semantic IDs (stable, never translated) — display labels come from CHIP_LABELS.
-const GOALS = ['Werbung', 'Social', 'Portrait', 'Szene', 'Produkt', 'Kunst'];
+const GOALS = ['Werbung', 'Social', 'Portrait', tx({ de: "Szene", en: "Scene", es: "Escena" }), 'Produkt', 'Kunst'];
 const STYLES = ['Fotorealistisch', 'Cinematisch', 'Illustration', '3D', 'Anime', 'Aquarell'];
-const MOODS = ['Episch', 'Ruhig', 'Dramatisch', 'Hell', 'Düster', 'Verspielt'];
+const MOODS = ['Episch', 'Ruhig', 'Dramatisch', tx({ de: "Hell", en: "Bright", es: "Brillante" }), 'Düster', 'Verspielt'];
 
 const CHIP_LABELS: Record<string, { de: string; en: string; es: string }> = {
   Werbung: { de: 'Werbung', en: 'Advertising', es: 'Publicidad' },
   Social: { de: 'Social', en: 'Social', es: 'Social' },
-  Portrait: { de: 'Portrait', en: 'Portrait', es: 'Retrato' },
-  Szene: { de: 'Szene', en: 'Scene', es: 'Escena' },
+  Portrait: { de: 'Portrait', en: 'Portrait', es: 'Retrato' }{tx({ de: ",\n  Szene:", en: ", Scene:", es: ", Escena:" })} { de: 'Szene', en: 'Scene', es: 'Escena' },
   Produkt: { de: 'Produkt', en: 'Product', es: 'Producto' },
   Kunst: { de: 'Kunst', en: 'Art', es: 'Arte' },
   Fotorealistisch: { de: 'Fotorealistisch', en: 'Photorealistic', es: 'Fotorrealista' },
@@ -55,8 +54,7 @@ const CHIP_LABELS: Record<string, { de: string; en: string; es: string }> = {
   Aquarell: { de: 'Aquarell', en: 'Watercolor', es: 'Acuarela' },
   Episch: { de: 'Episch', en: 'Epic', es: 'Épico' },
   Ruhig: { de: 'Ruhig', en: 'Calm', es: 'Tranquilo' },
-  Dramatisch: { de: 'Dramatisch', en: 'Dramatic', es: 'Dramático' },
-  Hell: { de: 'Hell', en: 'Bright', es: 'Brillante' },
+  Dramatisch: { de: 'Dramatisch', en: 'Dramatic', es: 'Dramático' }{tx({ de: ",\n  Hell:", en: ", Bright:", es: ", Brillante:" })} { de: 'Hell', en: 'Bright', es: 'Brillante' },
   Düster: { de: 'Düster', en: 'Dark', es: 'Sombrío' },
   Verspielt: { de: 'Verspielt', en: 'Playful', es: 'Juguetón' },
 };
@@ -102,7 +100,7 @@ export function PromptHelperDialog({
       setResult(data as PromptHelperResult);
     } catch (err: any) {
       console.error('[PromptHelper] error', err);
-      toast.error(err?.message || tx({ de: "Prompt-Helfer konnte nicht antworten.", en: "Prompt helper couldn't respond.", es: "El ayudante de prompts no pudo responder." }));
+      toast.error(err?.message || tx({ de: tx({ de: "Prompt-Helfer konnte nicht antworten.", en: "The prompt helper couldn't respond.", es: "El asistente de prompts no pudo responder." }), en: "Prompt helper couldn't respond.", es: "El ayudante de prompts no pudo responder." }));
     } finally {
       setLoading(false);
     }
@@ -164,7 +162,7 @@ export function PromptHelperDialog({
                 <ImageIcon className="h-4 w-4 text-primary shrink-0" />
                 <span>
                   {autoEnhance
-                    ? tx({ de: 'Bild übernehmen & verbessern — Modell, Modus und Strength werden automatisch gesetzt.', en: 'Adopt & enhance image — model, mode, and strength are set automatically.', es: 'Adoptar y mejorar imagen — el modelo, modo y fuerza se configuran automáticamente.' })
+                    ? tx({ de: tx({ de: "Bild übernehmen & verbessern — Modell, Modus und Strength werden automatisch gesetzt.", en: "Take over the image & enhance it — model, mode and strength are set automatically.", es: "Reutiliza la imagen y mejórala — modelo, modo e intensidad se ajustan automáticamente." }), en: 'Adopt & enhance image — model, mode, and strength are set automatically.', es: 'Adoptar y mejorar imagen — el modelo, modo y fuerza se configuran automáticamente.' })
                     : tx({ de: 'Dein Referenzbild wird mitanalysiert.', en: 'Your reference image will be analyzed too.', es: 'Tu imagen de referencia también se analizará.' })}
                 </span>
                 <img src={referenceImageUrl} alt="ref" className="ml-auto h-10 w-10 object-cover rounded" />
@@ -218,7 +216,7 @@ export function PromptHelperDialog({
                   <p className="text-xs text-muted-foreground">{result.reasoning}</p>
                   {result.referenceSummary && (
                     <p className="text-[11px] italic text-muted-foreground">
-                      Erkannt im Referenzbild: {result.referenceSummary}
+                      {tx({ de: "Erkannt im Referenzbild:", en: "Detected in the reference image:", es: "Detectado en la imagen de referencia:" })} {result.referenceSummary}
                     </p>
                   )}
                 </div>

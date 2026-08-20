@@ -1032,7 +1032,7 @@ export function usePipelineProgress({
     hasFailure,
     isStalled,
     stallHint: isStalled
-      ? tx({ de: 'Pipeline scheint zu hängen — bitte erneut auf „Alle generieren" klicken.', en: 'Pipeline seems to be stuck — please click "Generate all" again.', es: 'La canalización parece estar bloqueada — haz clic de nuevo en "Generar todo".' })
+      ? tx({ de: tx({ de: "Pipeline scheint zu hängen — bitte erneut auf „Alle generieren\" klicken.", en: "The pipeline seems stuck — please click “Generate all” again.", es: "El pipeline parece atascado — vuelve a hacer clic en «Generar todo»." }), en: 'Pipeline seems to be stuck — please click "Generate all" again.', es: 'La canalización parece estar bloqueada — haz clic de nuevo en "Generar todo".' })
       : null,
   };
 }

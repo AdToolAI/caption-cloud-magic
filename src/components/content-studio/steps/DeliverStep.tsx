@@ -86,7 +86,7 @@ export function DeliverStep() {
         .upload(path, blob, { cacheControl: "3600", upsert: true, contentType: "image/png" });
       if (error) throw new Error(error.message);
       const { data } = supabase.storage.from("composer-uploads").getPublicUrl(path);
-      if (!data?.publicUrl) throw new Error(tx({ de: "Öffentliche URL konnte nicht erstellt werden", en: "Public URL could not be created", es: "No se pudo crear la URL pública" }));
+      if (!data?.publicUrl) throw new Error(tx({ de: tx({ de: "Öffentliche URL konnte nicht erstellt werden", en: "Public URL could not be created", es: "No se pudo crear la URL pública" }), en: "Public URL could not be created", es: "No se pudo crear la URL pública" }));
       return {
         mediaUrl: data.publicUrl,
         mediaType: "image",

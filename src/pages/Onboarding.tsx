@@ -179,11 +179,11 @@ export default function Onboarding() {
             <span className="text-2xl font-bold">AdTool AI</span>
           </div>
           <CardTitle className="text-3xl">
-            {currentStep === "launch" ? tx({ de: "Dein Studio ist offen", en: "Your studio is open", es: "Tu estudio está abierto" }) : tx({ de: "Ein Creator. Ein ganzes Studio.", en: "One creator. A whole studio.", es: "Un creador. Todo un estudio." })}
+            {currentStep === "launch" ? tx({ de: tx({ de: "Dein Studio ist offen", en: "Your studio is open", es: "Tu estudio está abierto" }), en: "Your studio is open", es: "Tu estudio está abierto" }) : tx({ de: "Ein Creator. Ein ganzes Studio.", en: "One creator. A whole studio.", es: "Un creador. Todo un estudio." })}
           </CardTitle>
           <CardDescription>
             {currentStep === "launch"
-              ? tx({ de: "Deine erste Produktion steht bereit", en: "Your first production is ready", es: "Tu primera producción está lista" })
+              ? tx({ de: tx({ de: "Deine erste Produktion steht bereit", en: "Your first production is ready", es: "Tu primera producción está lista" }), en: "Your first production is ready", es: "Tu primera producción está lista" })
               : tx({ de: `Studio-Setup — Schritt ${stepIndex + 1} von ${STEPS.length - 1}`, en: `Studio setup — step ${stepIndex + 1} of ${STEPS.length - 1}`, es: `Configuración del estudio — paso ${stepIndex + 1} de ${STEPS.length - 1}` })}
           </CardDescription>
 
@@ -292,7 +292,7 @@ export default function Onboarding() {
                   {tx({ de: "Zurück", en: "Back", es: "Atrás" })}
                 </Button>
                 <Button onClick={handleFinishSetup} size="lg" className="w-full" disabled={loading || !brandName}>
-                  {loading ? tx({ de: "Studio wird eingerichtet...", en: "Setting up studio...", es: "Configurando estudio..." }) : tx({ de: "Studio öffnen", en: "Open studio", es: "Abrir estudio" })}
+                  {loading ? tx({ de: tx({ de: "Studio wird eingerichtet...", en: "Setting up your studio...", es: "Preparando tu estudio..." }), en: "Setting up studio...", es: "Configurando estudio..." }) : tx({ de: "Studio öffnen", en: "Open studio", es: "Abrir estudio" })}
                 </Button>
               </div>
             </div>

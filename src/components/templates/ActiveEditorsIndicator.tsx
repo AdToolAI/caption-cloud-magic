@@ -30,7 +30,7 @@ export const ActiveEditorsIndicator = ({ templateId }: ActiveEditorsIndicatorPro
                 </Avatar>
               </TooltipTrigger>
               <TooltipContent>
-                <p className="text-xs">Benutzer: {session.user_id.slice(0, 8)}</p>
+                <p className="text-xs">{tx({ de: "Benutzer:", en: "User:", es: "Usuario:" })} {session.user_id.slice(0, 8)}</p>
               </TooltipContent>
             </Tooltip>
           ))}

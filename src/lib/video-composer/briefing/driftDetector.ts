@@ -141,7 +141,7 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
         field: 'lipSync',
         severity: 'warn',
         message: planLs
-          ? tx({ de: 'Plan verlangt Lip-Sync, Szene ist aber B-Roll/HeyGen.', en: 'Plan requires lip-sync, but the scene is B-roll/HeyGen.', es: 'El plan requiere sincronización labial, pero la escena es B-roll/HeyGen.' })
+          ? tx({ de: tx({ de: "Plan verlangt Lip-Sync, Szene ist aber B-Roll/HeyGen.", en: "The plan requires lip-sync, but the scene is B-roll/HeyGen.", es: "El plan requiere lip-sync, pero la escena es B-roll/HeyGen." }), en: 'Plan requires lip-sync, but the scene is B-roll/HeyGen.', es: 'El plan requiere sincronización labial, pero la escena es B-roll/HeyGen.' })
           : tx({ de: 'Plan ist B-Roll, Szene rendert aber mit Lip-Sync.', en: 'Plan is B-roll, but the scene renders with lip-sync.', es: 'El plan es B-roll, pero la escena se renderiza con sincronización labial.' }),
         expected: planLs ? 'lipsync' : 'broll',
         actual: sceneLs ? 'lipsync' : 'broll',
@@ -239,7 +239,7 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
         field: 'textOverlay.text',
         severity: sev,
         message: aiFilled.has('textOverlay.text')
-          ? tx({ de: 'Overlay war KI-Vorschlag und kam nicht durch — Composer rendert ohne, OK.', en: 'Overlay was an AI suggestion and did not come through — composer renders without it, OK.', es: 'La superposición era una sugerencia de la IA y no se aplicó — el composer renderiza sin ella, OK.' })
+          ? tx({ de: tx({ de: "Overlay war KI-Vorschlag und kam nicht durch — Composer rendert ohne, OK.", en: "Overlay was an AI suggestion and didn't make it through — the composer renders without it, that's fine.", es: "El overlay era una sugerencia de IA y no pasó — el composer renderiza sin él, sin problema." }), en: 'Overlay was an AI suggestion and did not come through — composer renders without it, OK.', es: 'La superposición era una sugerencia de la IA y no se aplicó — el composer renderiza sin ella, OK.' })
           : tx({ de: 'Burnt-in Text-Overlay aus dem Plan fehlt in der Szene.', en: 'Burnt-in text overlay from the plan is missing in the scene.', es: 'Falta la superposición de texto incrustada del plan en la escena.' }),
         expected: planOverlay.slice(0, 80) + (planOverlay.length > 80 ? '…' : ''),
         actual: '—',
@@ -293,7 +293,7 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
         field: 'tone',
         severity: 'info',
         message: aiFilled.has('tone')
-          ? tx({ de: 'Tone war KI-Vorschlag — kein Realism-Preset gemappt, Composer-Default greift.', en: 'Tone was an AI suggestion — no realism preset mapped, composer default applies.', es: 'El tono era una sugerencia de la IA — no se asignó un preset de realismo, se aplica el valor predeterminado.' })
+          ? tx({ de: tx({ de: "Tone war KI-Vorschlag — kein Realism-Preset gemappt, Composer-Default greift.", en: "Tone was an AI suggestion — no realism preset mapped, the composer default applies.", es: "El tono era una sugerencia de IA — sin preset de realismo asignado, se aplica el valor por defecto del composer." }), en: 'Tone was an AI suggestion — no realism preset mapped, composer default applies.', es: 'El tono era una sugerencia de la IA — no se asignó un preset de realismo, se aplica el valor predeterminado.' })
           : tx({ de: 'Szene-Tone aus dem Plan ergab keinen Realism-Preset.', en: 'Scene tone from the plan did not yield a realism preset.', es: 'El tono de la escena del plan no generó un preset de realismo.' }),
         expected: planTone,
       });

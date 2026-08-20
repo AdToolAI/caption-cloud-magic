@@ -103,7 +103,7 @@ export function AnchorPreviewGate({
     } catch (e: any) {
       setPhase("error");
       setErrMsg(
-        e?.message || tx({ de: "Der vorherige Lauf dieser Szene konnte nicht beendet werden.", en: "The previous run of this scene could not be completed.", es: "La ejecución anterior de esta escena no pudo completarse." }),
+        e?.message || tx({ de: tx({ de: "Der vorherige Lauf dieser Szene konnte nicht beendet werden.", en: "The previous run of this scene could not be finished.", es: "No se pudo finalizar la ejecución anterior de esta escena." }), en: "The previous run of this scene could not be completed.", es: "La ejecución anterior de esta escena no pudo completarse." }),
       );
       return;
     }
@@ -199,7 +199,7 @@ export function AnchorPreviewGate({
       onOpenChange(false);
     } catch (e: any) {
       setPhase("error");
-      setErrMsg(e?.message || tx({ de: "Render konnte nicht gestartet werden.", en: "Render could not be started.", es: "No se pudo iniciar el renderizado." }));
+      setErrMsg(e?.message || tx({ de: tx({ de: "Render konnte nicht gestartet werden.", en: "Render could not be started.", es: "No se pudo iniciar el renderizado." }), en: "Render could not be started.", es: "No se pudo iniciar el renderizado." }));
     }
   };
 

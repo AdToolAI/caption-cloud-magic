@@ -402,7 +402,7 @@ export function TextOverlayEditor2028({
   const addOverlay = (template?: typeof TEXT_OVERLAY_TEMPLATES[number]) => {
     const newOverlay: TextOverlay = {
       id: `overlay-${Date.now()}`,
-      text: template?.text || tx({ de: 'Neuer Text', en: 'New text', es: 'Nuevo texto' }),
+      text: template?.text || tx({ de: tx({ de: "Neuer Text", en: "New text", es: "Nuevo texto" }), en: 'New text', es: 'Nuevo texto' }),
       animation: template?.animation || 'fadeIn',
       position: template?.position || 'center',
       startTime: currentTime,
@@ -741,7 +741,7 @@ export function TextOverlayEditor2028({
                       onCheckedChange={(v) => updateOverlayStyle(selectedOverlay.id, { shadow: v })}
                     />
                     <span className="text-sm text-muted-foreground break-words [overflow-wrap:anywhere]">
-                      {selectedOverlay.style.shadow ? 'Aktiv' : tx({ de: "Aus", en: "Off", es: "Desactivado" })}
+                      {selectedOverlay.style.shadow ? tx({ de: "Aktiv", en: "Active", es: "Activo" }) : tx({ de: "Aus", en: "Off", es: "Desactivado" })}
                     </span>
                   </div>
                 </div>
