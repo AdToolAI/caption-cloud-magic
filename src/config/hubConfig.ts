@@ -143,8 +143,8 @@ export const hubDefinitions: HubDefinition[] = [
   {
     key: "erstellen",
     icon: Film,
-    titleKey: tx({ de: "hubs.erstellen", en: "hubs.create", es: "hubs.crear" }),
-    descKey: tx({ de: "hubDesc.erstellen", en: "create hubDesc", es: "crear hubDesc" }),
+    titleKey: "hubs.erstellen",
+    descKey: "hubDesc.erstellen",
     items: [
       { route: "/media-library", titleKey: "nav.mediaLibrary", descKey: "hubItemDesc.mediaLibrary", icon: FolderOpen, cover: coverErstMediaLibrary },
       { route: "/audio-studio", titleKey: "VoicePro", descKey: "hubItemDesc.audioStudio", icon: Mic2, cover: coverErstAudioStudio },
