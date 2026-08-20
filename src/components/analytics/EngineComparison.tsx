@@ -216,7 +216,7 @@ export function EngineComparison({ engineData }: Props) {
           </p>
           <p className="text-muted-foreground mt-3">
             {tx({ de: "💰 Potenzielle Einsparung durch optimale Engine-Wahl: \n            $", en: "💰 Potential savings from the optimal engine choice: $", es: "💰 Ahorro potencial con la mejor elección de motor: $" })}{Math.abs(engineData.remotion.total_cost - engineData.shotstack.total_cost).toFixed(2)} pro Monat
-          {tx({ de: "", en: "% uploaded", es: "% subido" })}
+          {tx({ de: "", en: "% uploaded", es: "% subido" })}         {tx({ de: "", en: "% uploaded", es: "% subido" })}         {tx({ de: "", en: "% uploaded", es: "% subido" })}         {tx({ de: "", en: "% uploaded", es: "% subido" })}         {tx({ de: "", en: "% uploaded", es: "% subido" })}
           </p>
         </div>
       </Card>

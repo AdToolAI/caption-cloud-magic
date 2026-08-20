@@ -422,7 +422,7 @@ export const GadgetCardDynamic = () => {
           >
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-primary" />
-              <span className="text-sm text-foreground">{gadget?.bestTime || tx({ de: "Beste Zeit", en: "Best time", es: "Mejor hora" })}:</span>
+              <span className="text-sm text-foreground">{gadget?.bestTime || tx({ de: tx({ de: "Beste Zeit", en: "Best time", es: "Mejor hora" }), en: "Best time", es: "Mejor hora" })}:</span>
               <span className="text-sm font-bold text-primary">19:00</span>
             </div>
             <div className="flex items-center gap-1">

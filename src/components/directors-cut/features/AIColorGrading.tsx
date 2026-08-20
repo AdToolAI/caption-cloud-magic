@@ -251,7 +251,7 @@ export function AIColorGrading({
             onClick={() => setShowComparison(!showComparison)}
           >
             <Eye className="h-4 w-4 mr-2" />
-            {showComparison ? tx({ de: "Vergleich ausblenden", en: "Hide comparison", es: "Ocultar comparación" }) : 'Vorher/Nachher'}
+            {showComparison ? tx({ de: tx({ de: "Vergleich ausblenden", en: "Hide comparison", es: "Ocultar comparación" }), en: "Hide comparison", es: "Ocultar comparación" }) : 'Vorher/Nachher'}
           </Button>
         )}
 

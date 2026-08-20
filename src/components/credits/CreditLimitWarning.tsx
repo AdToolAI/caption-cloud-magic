@@ -28,7 +28,7 @@ export const CreditLimitWarning = ({ balance, monthlyCredits, planCode }: Credit
         <Zap className="h-4 w-4" />
       )}
       <AlertTitle>
-        {isCritical ? tx({ de: "Credits fast aufgebraucht!", en: "Credits almost used up!", es: "¡Créditos casi agotados!" }) : tx({ de: 'Credits werden knapp', en: 'Credits are becoming scarce', es: 'Los créditos son cada vez más escasos.' })}
+        {isCritical ? tx({ de: tx({ de: "Credits fast aufgebraucht!", en: "Credits almost used up!", es: "¡Créditos casi agotados!" }), en: "Credits almost used up!", es: "¡Créditos casi agotados!" }) : tx({ de: 'Credits werden knapp', en: 'Credits are becoming scarce', es: 'Los créditos son cada vez más escasos.' })}
       </AlertTitle>
       <AlertDescription className="flex items-center justify-between">
         <span>

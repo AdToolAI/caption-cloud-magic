@@ -99,7 +99,7 @@ const FeatureFlagDemo = () => {
                       {flag.status === undefined
                         ? "Loading..."
                         : flag.status
-                        ? tx({ de: "Aktiv", en: "Active", es: "Activo" })
+                        ? tx({ de: tx({ de: "Aktiv", en: "Active", es: "Activo" }), en: "Active", es: "Activo" })
                         : "Inaktiv"}
                     </Badge>
                   </CardContent>

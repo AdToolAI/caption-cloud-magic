@@ -997,7 +997,7 @@ export default function AdDirectorWizard({
                     <li>
                       <span className="text-foreground">Brand-Kit:</span>{' '}
                       {useBrandKit && activeBrandKit
-                        ? `✓ ${activeBrandKit.brand_name ?? tx({ de: "aktiv", en: "active", es: "activo" })}`
+                        ? `✓ ${activeBrandKit.brand_name ?? tx({ de: tx({ de: "aktiv", en: "active", es: "activo" }), en: "active", es: "activo" })}`
                         : '—'}
                     </li>
                     <li>

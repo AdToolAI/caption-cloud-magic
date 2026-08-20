@@ -102,7 +102,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
               {summary?.publish_rate?.toFixed(1) || 0}%
             </div>
             <p className="text-xs text-muted-foreground">
-              {summary?.total_publishes || 0} {tx({ de: "veröffentlicht", en: "published", es: "publicado" })}
+              {summary?.total_publishes || 0} {tx({ de: tx({ de: "veröffentlicht", en: "published", es: "publicado" }), en: "published", es: "publicado" })}
             </p>
           </CardContent>
         </Card>
