@@ -275,7 +275,7 @@ export default function EmailDirector() {
                       <div key={i} className="p-3 rounded-md border border-border flex items-center justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium truncate">{s.text}</div>
-                          <div className="text-xs text-muted-foreground">{s.angle} · {s.text.length} Zeichen</div>
+                          <div className="text-xs text-muted-foreground">{s.angle} · {s.text.length} Z{tx({ de: "Zeichen", en: "Characters", es: "Caracteres" })}</div>
                         </div>
                         <Badge variant="secondary">A/B {String.fromCharCode(65 + i)}</Badge>
                       </div>
@@ -315,7 +315,7 @@ export default function EmailDirector() {
                             ))}
                           </div>
                           <p className="text-[10px] text-muted-foreground mt-2">
-                            Test wird an deine Account-Email (${user?.email}) gesendet.
+                            Test wird an deine Account-Em{tx({ de: "Test wird an deine Account-Email ($", en: "Test will be sent to your account email ($", es: "La prueba se enviará a tu correo electrónico de cuenta ($" })}{user?.email}) gesendet.
                           </p>
                         </div>
                       </Card>

@@ -156,7 +156,7 @@ export default function SceneReferenceImageUpload({
             />
           </div>
           <p className="text-[10px] text-muted-foreground leading-snug pt-0.5">
-            Die KI orientiert sich am Bildinhalt und Stil dieses Bildes (Image-to-Video).
+            Die KI orient{tx({ de: "Die KI orientiert sich am Bildinhalt und Stil dieses Bildes (Image-to-Video).", en: "The AI is guided by the image content and style of this image (Image-to-Video).", es: "La IA se guía por el contenido y el estilo de esta imagen (Imagen a Video)." })}
           </p>
         </div>
       </div>

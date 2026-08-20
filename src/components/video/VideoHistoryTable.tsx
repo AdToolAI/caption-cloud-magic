@@ -52,7 +52,7 @@ export const VideoHistoryTable = ({ videos, templatesById }: VideoHistoryTablePr
         <TableRow>
           <TableHead>Template</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead>Erstellt</TableHead>
+          <TableHead>{tx({ de: "Erstellt", en: "Created", es: "Creado" })}</TableHead>
           <TableHead>{tx({ de: "Qualität", en: "Quality", es: "Calidad" })}</TableHead>
           <TableHead className="text-right">Aktionen</TableHead>
         </TableRow>
@@ -134,6 +134,7 @@ export const VideoHistoryTable = ({ videos, templatesById }: VideoHistoryTablePr
                         <h4 className="text-sm font-medium flex items-center gap-2">
                           <BarChart3 className="h-4 w-4" />
                           Alle Versionen
+            {tx({ de: "Alle Versionen", en: "All versions", es: "Todas las versiones" })}
                         </h4>
                         <div className="space-y-2">
                           {groupVideos

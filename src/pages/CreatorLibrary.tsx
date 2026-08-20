@@ -44,8 +44,7 @@ export default function CreatorLibrary() {
             </span>
           </div>
           <p className="text-sm text-muted-foreground max-w-2xl">
-            Royalty-free Videos · Photos · Music · SFX — alles in einem Bundle, gratis
-            inklusive in jedem Paid-Plan. Direkter Handoff in Composer & Director's Cut,
+            Royalty-free {tx({ de: "Royalty-free Videos · Photos · Music · SFX — alles in einem Bundle, gratis\n            inklusive in jedem Paid-Plan. Direkter Handoff in Composer & Director's Cut,", en: "Royalty-free Videos · Photos · Music · SFX — all in one bundle, free\n            of charge with every paid plan. Direct handoff to Composer & Director's Cut,", es: "Videos · Fotos · Música · SFX libres de derechos — todo en un solo paquete, incluido\n            gratuitamente en cada plan de pago. Traspaso directo a Composer & Director's Cut," })}
             {tx({ de: "Lizenz-Zertifikat mit einem Klick.", en: "License certificate with one click.", es: "Certificado de licencia con un clic." })}
           </p>
         </header>
@@ -55,7 +54,7 @@ export default function CreatorLibrary() {
         <Card className="p-2 border-primary/20 bg-primary/5 flex items-center gap-2 text-[11px] text-primary-foreground/80">
           <ShieldCheck className="h-3.5 w-3.5 text-primary" />
           <span className="text-muted-foreground">
-            Alle Treffer aus Pexels · Pixabay · Jamendo · Freesound (royalty-free, kommerziell nutzbar).
+            Alle Treffer {tx({ de: "Alle Treffer aus Pexels · Pixabay · Jamendo · Freesound (royalty-free, kommerziell nutzbar).", en: "All matches from Pexels · Pixabay · Jamendo · Freesound (royalty-free, commercially usable).", es: "Todos los resultados de Pexels · Pixabay · Jamendo · Freesound (sin royalties, uso comercial)." })}
             {tx({ de: "Auto-Lizenz-PDF mit Verify-URL bei jedem Download.", en: "Auto-license PDF with Verify-URL on every download.", es: "PDF de licencia automática con URL de verificación en cada descarga." })}
           </span>
         </Card>

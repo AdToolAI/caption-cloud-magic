@@ -29,7 +29,7 @@ interface SfxItem {
 }
 
 const CATEGORIES = [
-  { key: "", label: "Alle" },
+  { key: "", label: tx({ de: "Alle", en: "All", es: "Todos" }) },
   { key: "whoosh transition", label: "Whoosh & Transitions" },
   { key: "impact cinematic", label: "Cinematic Impact" },
   { key: "ui click", label: "UI Clicks" },
@@ -127,7 +127,7 @@ export default function SfxLibrary() {
         .eq("type", "sfx")
         .eq("source", item.source as any)
         .eq("external_id", item.id.replace(/^[^-]+-/, ""));
-      toast({ title: "Aus Favoriten entfernt" });
+      toast({ title: tx({ de: "Aus Favoriten entfernt", en: "Removed from favorites", es: "Eliminado de favoritos" }) });
     } else {
       await supabase.from("user_audio_library").insert({
         user_id: user.id,
@@ -371,8 +371,7 @@ export default function SfxLibrary() {
         </Tabs>
 
         <p className="text-[10px] text-muted-foreground/70 mt-8 text-center">
-          Sounds stammen von Pixabay (Pixabay Content License) und Freesound (Creative Commons).
-          Beim Verwenden bleibt die Original-Lizenz des jeweiligen Anbieters gültig — siehe spätere License-Certificate-Funktion (Phase 6.2).
+          Sounds stam{tx({ de: "Sounds stammen von Pixabay (Pixabay Content License) und Freesound (Creative Commons).\n          Beim Verwenden bleibt die Original-Lizenz des jeweiligen Anbieters gültig — siehe spätere License-Certificate-Funktion (Phase 6.2).", en: "Sounds are from Pixabay (Pixabay Content License) and Freesound (Creative Commons).\n          When used, the original license of the respective provider remains valid — see future License Certificate function (Phase 6.2).", es: "Los sonidos provienen de Pixabay (Licencia de contenido de Pixabay) y Freesound (Creative Commons).\n          Al usarlos, la licencia original del proveedor respectivo sigue siendo válida — consulte la futura función de Certificado de Licencia (Fase 6.2)." })}
         </p>
       </div>
     </div>

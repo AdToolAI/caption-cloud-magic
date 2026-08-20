@@ -211,7 +211,7 @@ export default function SocialMediaSettings() {
             <strong>Schritt 2:</strong> {tx({ de: 'Generiere Access Tokens mit den benötigten Permissions', en: 'Generate access tokens with the required permissions', es: 'Genera tokens de acceso con los permisos necesarios' })}
           </p>
           <p>
-            <strong>Schritt 3:</strong> Füge die Tokens als Secrets hinzu (z.B. INSTAGRAM_ACCESS_TOKEN)
+            <strong>Schritt 3:</strong> F{tx({ de: "Füge die Tokens als Secrets hinzu (z.B. INSTAGRAM_ACCESS_TOKEN)", en: "Add the tokens as secrets (e.g. INSTAGRAM_ACCESS_TOKEN)", es: "Añade los tokens como secretos (por ejemplo, INSTAGRAM_ACCESS_TOKEN)" })}
           </p>
           <p>
             <strong>Schritt 4:</strong> {tx({ de: 'Aktiviere die Verbindung hier im Dashboard', en: 'Activate the connection here in the dashboard', es: 'Activa la conexión aquí en el panel' })}

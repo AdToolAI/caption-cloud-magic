@@ -232,7 +232,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
   const handleGenerate = async () => {
     if (brief.trim().length < 8) {
       toast({
-        title: 'Noch zu knapp',
+        title: tx({ de: "Noch zu knapp", en: "Still too short", es: "Todavía demasiado corto" }),
         description: tx({ de: 'Ein Satz reicht — sag, worum es gehen soll und für wen.', en: 'One sentence is enough — say what it should be about and for whom.', es: 'Una frase es suficiente: di de qué se trata y para quién.' }),
         variant: 'destructive',
       });
@@ -490,7 +490,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
       {characters.length > 0 && (
         <div className="mt-6">
           <Label className="mb-2 flex items-center gap-2 text-sm">
-            <Users className="h-4 w-4" /> Cast aus Cast &amp; World (max. 4)
+            <Users className="h-4 w-4" /> C{tx({ de: "Cast aus Cast &amp; World (max. 4)", en: "Cast from Cast &amp; World (max. 4)", es: "Elenco de Cast &amp; World (máx. 4)" })}
           </Label>
           <div className="flex flex-wrap gap-2">
             {characters.map((character) => {

@@ -208,7 +208,7 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
                 {tx({ de: 'Validierung erfolgreich', en: 'Validation successful', es: 'Validación exitosa' })}
               </p>
               <p className="text-blue-700 dark:text-blue-300">
-                Alle Pflichtfelder sind vorhanden. Kosten: {csvData.length * 50} Credits
+                Alle Pflichtfelde{tx({ de: "Alle Pflichtfelder sind vorhanden. Kosten:", en: "All required fields are present. Cost:", es: "Todos los campos obligatorios están presentes. Coste:" })} {csvData.length * 50} Credits
               </p>
             </div>
           </div>

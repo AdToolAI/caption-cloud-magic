@@ -655,7 +655,7 @@ export const VideoQuickPreview = ({
       {/* Segment Progress */}
       <div className="text-sm text-muted-foreground space-y-1">
         <div>
-          Segment {currentSegmentIndex + 1} von {segments.length}
+          Segment {currentSegmentIndex + 1} von {tx({ de: "von", en: "of", es: "de" })}egments.length}
         </div>
         {currentSegment && (
           <div className="text-xs">

@@ -32,7 +32,7 @@ export const CreditLimitWarning = ({ balance, monthlyCredits, planCode }: Credit
       </AlertTitle>
       <AlertDescription className="flex items-center justify-between">
         <span>
-          Sie haben nur noch <strong>{balance} Credits</strong> ({usagePercent.toFixed(0)}%) übrig.
+          Sie haben n{tx({ de: "Sie haben nur noch", en: "You only have", es: "Solo tienes" })} <strong>{balance} Credits</strong> ({usagePercent.toFixed(0)}%) übrig.
           {planCode === 'free' && tx({ de: ' Upgraden Sie für mehr Credits!', en: ' Upgrade for more credits!', es: ' ¡Actualiza para obtener más créditos!' })}
         </span>
         <Button 

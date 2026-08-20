@@ -767,7 +767,7 @@ export function SceneEditingStep({
         <div>
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <Scissors className="h-5 w-5 text-primary" />
-            Szenen-Editor
+            Szenen-Editor{tx({ de: "Szenen-Editor", en: "Scene Editor", es: "Editor de escenas" })}
           </h3>
           <p className="text-sm text-muted-foreground">
             {tx({ de: 'Bearbeite Szenen und konfiguriere Übergänge visuell', en: 'Edit scenes and configure transitions visually', es: 'Edita escenas y configura transiciones visualmente' })}

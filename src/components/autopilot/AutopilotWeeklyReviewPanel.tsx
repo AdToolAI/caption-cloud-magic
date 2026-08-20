@@ -73,7 +73,7 @@ export function AutopilotWeeklyReviewPanel() {
         <Card className="p-4">
           <div className="text-xs text-muted-foreground mb-1">Credits</div>
           <div className="text-2xl font-serif text-primary">{review.credits_spent}</div>
-          <div className="text-xs text-muted-foreground">von {review.credits_budgeted} Budget</div>
+          <div className="text-xs text-muted-foreground">{tx({ de: "von", en: "of", es: "de" })} {review.credits_budgeted} Budget</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground mb-1">Top-Pillar</div>

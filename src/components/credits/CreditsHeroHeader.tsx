@@ -53,7 +53,7 @@ export const CreditsHeroHeader = ({ planName, creditsAvailable, onBuyCredits }: 
             transition={{ duration: 0.6, delay: 0.1 }}
             className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary via-amber-400 to-cyan-400 bg-clip-text text-transparent"
           >
-            Ihr Credit-Guthaben
+            Ihr Credit-Gu{tx({ de: "Ihr Credit-Guthaben", en: "Your credit balance", es: "Tu saldo de créditos" })}
           </motion.h1>
 
           {/* Subtitle */}

@@ -918,7 +918,7 @@ function RenderStep({
             <Film className="h-7 w-7 text-primary" />
             <h3 className="text-lg font-bold">{tx({ de: "Im Composer öffnen", en: "Open in Composer", es: "Abrir en el Compositor" })}</h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              (Sora, Kling, Hailuo …), generierst Clips parallel und exportierst.
+              (Sora, Kling, H{tx({ de: "(Sora, Kling, Hailuo …), generierst Clips parallel und exportierst.", en: "(Sora, Kling, Hailuo…), generate clips in parallel and export.", es: "(Sora, Kling, Hailuo…), generas clips en paralelo y exportas." })}
             </p>
           </div>
           <Button

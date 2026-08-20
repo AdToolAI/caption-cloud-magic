@@ -225,7 +225,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
               <span className="font-semibold text-foreground">
                 {selectedFormats.length * selectedRatios.length} {tx({ de: 'Varianten', en: 'variants', es: 'variantes' })}
               </span>
-              {' '}erstellt
+              {' '}{tx({ de: "erstellt", en: "created", es: "creado" })}
             </div>
           </div>
 

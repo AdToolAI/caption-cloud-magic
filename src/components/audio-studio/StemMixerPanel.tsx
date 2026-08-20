@@ -142,7 +142,7 @@ export function StemMixerPanel({ stems, sourceTitle, onMixSaved }: StemMixerPane
             <h3 className="text-xl font-bold tracking-tight">{tx({ de: 'Stem-Mixer', en: 'Stem Mixer', es: 'Mezclador de pistas' })}</h3>
             <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
               {tx({ de: 'Wähle einen Track in der Bibliothek und klicke auf ', en: 'Select a track in the library and click on ', es: 'Selecciona una pista en la biblioteca y haz clic en ' })}
-              <strong>Stems extrahieren</strong>. Die separierten Spuren erscheinen
+              <strong>Stems extrahieren</strong>{tx({ de: ". Die separierten Spuren erscheinen", en: ". The separated tracks appear", es: ". Las pistas separadas aparecen" })}
               {tx({ de: "automatisch hier zum Mixen.", en: "automatically here for mixing.", es: "automáticamente aquí para mezclar." })}
             </p>
           </div>

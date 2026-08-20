@@ -266,7 +266,7 @@ export function BatchGeneratePanel() {
             {running ? (
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generiere {completed}/{items.length}…</>
             ) : (
-              <><Sparkles className="h-4 w-4 mr-2" /> Batch starten ({prompts.length} Bilder)</>
+              <><Sparkles className="h-4 w-4 mr-2" /> Batch starten ({prompts.length} B{tx({ de: "Bilder)", en: "images)", es: "imágenes)" })}</>
             )}
           </Button>
 

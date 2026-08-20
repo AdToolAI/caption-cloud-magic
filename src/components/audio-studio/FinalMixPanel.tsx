@@ -461,7 +461,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
           )}
         </Button>
         <p className="text-[11px] text-muted-foreground text-center mt-2">
-          Kostenlos · Loudness-Normalisierung mit Soft-Limiter (Clip-Schutz)
+          Kostenlos ·{tx({ de: "Kostenlos · Loudness-Normalisierung mit Soft-Limiter (Clip-Schutz)", en: "Free · Loudness normalization with soft limiter (clip protection)", es: "Gratis · Normalización de sonoridad con limitador suave (protección contra recortes)" })}
         </p>
       </Card>
     </div>

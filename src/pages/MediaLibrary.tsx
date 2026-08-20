@@ -1418,7 +1418,7 @@ export default function MediaLibrary() {
             variant="outline"
             onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
           >
-            Mehr laden ({visibleCount} von {filteredMedia.length})
+            Mehr laden ({visibleCount} von {filteredMe{tx({ de: "von", en: "of", es: "de" })}a.length})
           </Button>
         </div>
       )}
@@ -1435,7 +1435,7 @@ export default function MediaLibrary() {
               <label htmlFor="file-upload" className="cursor-pointer">
                 <Upload className="h-4 w-4 mr-2" />
                 Datei hochladen
-              </label>
+              <{tx({ de: "Datei hochladen", en: "Upload file", es: "Subir archivo" })} </label>
             </Button>
           </div>
         </Card>

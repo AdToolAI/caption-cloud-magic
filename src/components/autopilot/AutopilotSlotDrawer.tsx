@@ -288,9 +288,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
           <Card className="p-3 bg-muted/30 text-[11px] text-muted-foreground flex gap-2">
             <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
             <span>
-              Manuelle Edits werden im Audit-Log geführt und unterliegen denselben AUP-Regeln (kein Deepfake, kein Copyright,
-              keine Identitätstäuschung).
-            </span>
+              Manuelle Edits wer{tx({ de: "Manuelle Edits werden im Audit-Log geführt und unterliegen denselben AUP-Regeln (kein Deepfake, kein Copyright,\n              keine Identitätstäuschung).", en: "Manual edits are logged in the audit log and are subject to the same AUP rules (no deepfake, no copyright,\n              no identity deception).", es: "Las ediciones manuales se registran en el registro de auditoría y están sujetas a las mismas reglas de AUP (sin deepfake, sin derechos de autor,\n              sin suplantación de identidad)." })}          </span>
           </Card>
         </div>
       </SheetContent>

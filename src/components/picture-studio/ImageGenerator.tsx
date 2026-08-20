@@ -822,7 +822,7 @@ export function ImageGenerator() {
                   />
                   <div className="flex justify-between text-[10px] text-muted-foreground">
                     <span>nah am Original</span>
-                    <span>nur Inspiration</span>
+                    <span>{tx({ de: "nur Inspiration", en: "inspiration only", es: "solo inspiración" })}</span>
                   </div>
                 </div>
               )}
@@ -871,7 +871,7 @@ export function ImageGenerator() {
               </div>
             ) : (
               <p className="text-[11px] text-muted-foreground">
-                Kein aktives Brand-Kit. <button onClick={() => navigate('/brand-kit')} className="text-primary underline">Anlegen</button>
+                Kein aktives Brand-K{tx({ de: "Kein aktives Brand-Kit.", en: "No active brand kit.", es: "Ningún Brand Kit activo." })}utton onClick={() => navigate('/brand-kit')} className="text-primary underline">Anlegen</button>
               </p>
             )}
           </div>

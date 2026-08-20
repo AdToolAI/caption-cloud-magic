@@ -391,7 +391,7 @@ export function UniversalVoiceLibraryPicker({
                 );
               })}
               <div ref={sentinelRef} className="col-span-full flex flex-col items-center justify-center gap-2 py-6 text-white/40 text-[11px] uppercase tracking-widest">
-                <span>{voices.length.toLocaleString(uiLocale())} von {total.toLocaleString(uiLocale())} geladen</span>
+                <span>{voices.length.toLocaleString(uiLocale())} vo{tx({ de: "von", en: "of", es: "de" })}{total.toLocaleString(uiLocale())} geladen</span>
                 {hasNextPage && (
                   <Button
                     type="button"

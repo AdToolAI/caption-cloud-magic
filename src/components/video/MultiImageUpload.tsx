@@ -128,7 +128,7 @@ export function MultiImageUpload({
           {tx({ de: "Bilder hier ablegen oder klicken zum Hochladen", en: "Drop images here or click to upload", es: "Arrastra imágenes aquí o haz clic para subir" })}
         </p>
         <p className="text-xs text-muted-foreground">
-          PNG, JPG, WebP bis 10MB • Max. {maxFiles} Bilder
+          PNG, JPG, WebP bis 10MB • Max. {maxFiles} B{tx({ de: "Bilder", en: "Images", es: "Imágenes" })}
         </p>
       </div>
 
@@ -195,7 +195,7 @@ export function MultiImageUpload({
       {/* Info Message */}
       {value.length > 0 && value.length < minFiles && (
         <p className="text-sm text-destructive">
-          Noch {minFiles - value.length} Bild(er) erforderlich
+          Noch {minFi{tx({ de: "Noch", en: "Still", es: "Todavía" })} {minFiles - value.length} B{tx({ de: "Bild(er) erforderlich", en: "Image(s) required", es: "Imagen(es) requerida(s)" })}
         </p>
       )}
     </div>

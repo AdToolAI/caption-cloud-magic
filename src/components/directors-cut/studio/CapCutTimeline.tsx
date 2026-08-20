@@ -1100,7 +1100,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                       >
                         <Film className="h-3.5 w-3.5" />
                         Aus Bibliothek
-                      </button>
+           {tx({ de: "Aus Bibliothek", en: "From library", es: "De la biblioteca" })}                      </button>
                     )}
                     {onSceneAdd && (
                       <button
