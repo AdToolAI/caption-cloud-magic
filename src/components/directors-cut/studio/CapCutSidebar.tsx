@@ -1639,7 +1639,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-medium text-white/70">
-                    Untertitel ({{t{tx({ de: "", en: "% uploaded", es: "% subido" })}{tx({ de: "", en: "% uploaded", es: "% subido" })}{tx({ de: "", en: "% uploaded", es: "% subido" })}{tx({ de: "x(", en: "Subtitles (", es: "Subtítulos (" })}{ de: "existingCaptions.length})", en: "Subtitles (", es: "Subtítulos (" })}
+                    {tx({ de: "Untertitel", en: "Subtitles", es: "Subtítulos" })} ({existingCaptions.length})
                   </h4>
                 </div>
                 <ScrollArea className="max-h-48 min-w-0 max-w-full overflow-hidden">

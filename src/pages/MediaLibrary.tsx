@@ -1426,7 +1426,7 @@ export default function MediaLibrary() {
             variant="outline"
             onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
           >
-            Mehr laden ({{tx({ de: "", en: "% uploaded", es: "% subido" })}{tx({ de: "", en: "% uploaded", es: "% subido" })}{tx({ de: "", en: "% uploaded", es: "% subido" })}{tx({ de: "", en: "% uploaded", es: "% subido" })}{tx({ de: "visibleCount}", en: "Load more (", es: "Cargar más (" })} {tx({ de: "von", en: "of", es: "de" })} {filteredMedia.length})
+            {tx({ de: "Mehr laden", en: "Load more", es: "Cargar más" })} ({visibleCount} {tx({ de: "von", en: "of", es: "de" })} {filteredMedia.length})
           </Button>
         </div>
       )}
