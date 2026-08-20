@@ -3,6 +3,7 @@ import { ShieldAlert } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { getLang } from '@/lib/i18nText';
 
 interface AdComplianceDisclaimerProps {
   acknowledged: boolean;
@@ -32,7 +33,7 @@ const COPY = {
 export default function AdComplianceDisclaimer({
   acknowledged,
   onAcknowledge,
-  language = 'de',
+  language = getLang(),
   className,
 }: AdComplianceDisclaimerProps) {
   const copy = COPY[language] ?? COPY.en;

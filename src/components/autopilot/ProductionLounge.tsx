@@ -21,6 +21,7 @@ import type {
   ProductionSceneRow,
 } from '@/hooks/useAutopilotProduction';
 import { tx } from "@/lib/i18nText";
+import { getLang } from '@/lib/i18nText';
 
 interface Props {
   production: ProductionRow;
@@ -29,7 +30,7 @@ interface Props {
   language?: string;
 }
 
-export function ProductionLounge({ production, scenes, log, language = 'de' }: Props) {
+export function ProductionLounge({ production, scenes, log, language = getLang() }: Props) {
   const { data: brandKits } = useBrandKits();
   const brandKitId = brandKits?.[0]?.id ?? null;
   const { toast } = useToast();

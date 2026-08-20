@@ -19,6 +19,7 @@ import { Loader2, RefreshCw, Link2, ArrowDown } from 'lucide-react';
 import type { ComposerScene } from '@/types/video-composer';
 import { useContinuityDrift, driftSeverity } from '@/hooks/useContinuityDrift';
 import { cn } from '@/lib/utils';
+import { getLang } from '@/lib/i18nText';
 
 interface Props {
   prev: ComposerScene;
@@ -39,9 +40,9 @@ export default function SceneCutDriftIndicator({
   next,
   projectId,
   onUpdateNext,
-  language = 'de',
+  language = getLang(),
 }: Props) {
-  const t = TXT[language];
+  const t = TXT[language] ?? TXT.en;
   const { checkDrift, checkingPairId } = useContinuityDrift();
   const [score, setScore] = useState<number | null>(
     typeof next.continuityDriftScore === 'number' ? next.continuityDriftScore : null,
