@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Bell, Sparkles } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { uiLocale } from '@/lib/uiLocale';
 
 export const FloatingAppHeader = () => {
   const { t } = useTranslation();
@@ -60,7 +61,7 @@ export const FloatingAppHeader = () => {
         {/* Credits ticker */}
         <div className="flex items-baseline gap-1 ml-1">
           <span className="text-[12px] font-mono font-bold tabular-nums text-foreground">
-            {credits.toLocaleString("de-DE")}
+            {credits.toLocaleString(uiLocale())}
           </span>
           <span className="text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
             {t("landing.hero.deck.headerCredits")}

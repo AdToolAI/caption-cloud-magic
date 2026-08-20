@@ -44,7 +44,7 @@ export function MultiImageUpload({
     }
 
     if (value.length + imageFiles.length > maxFiles) {
-      toast.error(`Maximal ${maxFiles} Bilder erlaubt`);
+      toast.error(tx({ de: `Maximal ${maxFiles} Bilder erlaubt`, en: `A maximum of ${maxFiles} images is allowed`, es: `Se permiten como máximo ${maxFiles} imágenes` }));
       return;
     }
 

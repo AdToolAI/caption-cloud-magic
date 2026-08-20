@@ -2,6 +2,7 @@ import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { uiLocale } from '@/lib/uiLocale';
 
 export type Platform = 'instagram' | 'tiktok' | 'linkedin' | 'youtube';
 
@@ -60,7 +61,7 @@ export function useScheduledPublishing() {
 
       toast({
         title: tx({ de: '⏰ Veröffentlichung geplant', en: '⏰ Publication scheduled', es: '⏰ Publicación programada' }),
-        description: tx({ de: `Post wird am ${config.publishAt.toLocaleString('de-DE')} auf ${config.platform} veröffentlicht`, en: `Post will be published on ${config.publishAt.toLocaleString('de-DE')} on ${config.platform}`, es: `La publicación se publicará en ${config.publishAt.toLocaleString('de-DE')} en ${config.platform}` }),
+        description: tx({ de: `Post wird am ${config.publishAt.toLocaleString(uiLocale())} auf ${config.platform} veröffentlicht`, en: `Post will be published on ${config.publishAt.toLocaleString(uiLocale())} on ${config.platform}`, es: `La publicación se publicará en ${config.publishAt.toLocaleString(uiLocale())} en ${config.platform}` }),
       });
 
       return true;

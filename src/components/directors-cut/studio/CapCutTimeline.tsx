@@ -786,7 +786,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
               const activeIdx = idx >= 0 ? idx + 1 : Math.min(scenes.length, Math.max(1, Math.ceil((currentTime / Math.max(1, duration)) * scenes.length)));
               return (
                 <span className="text-[10px] text-white/40 border-l border-white/10 pl-2">
-                  Szene {activeIdx}/{scenes.length}
+                  {tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} {activeIdx}/{scenes.length}
                 </span>
               );
             })()}

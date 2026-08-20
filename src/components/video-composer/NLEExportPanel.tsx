@@ -204,12 +204,12 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
                           {rec.warnings && rec.warnings.length > 0 && (
                             <AlertTriangle
                               className="h-3 w-3 text-warning"
-                              aria-label={`${rec.warnings.length} Hinweis(e)`}
+                              aria-label={tx({ de: `${rec.warnings.length} Hinweis(e)`, en: `${rec.warnings.length} warning(s)`, es: `${rec.warnings.length} aviso(s)` })}
                             />
                           )}
                         </div>
                         <div className="text-[10px] text-muted-foreground/70">
-                          {rec.scene_count} Szenen · {rec.total_duration_sec.toFixed(1)}s
+                          {rec.scene_count} {tx({ de: 'Szenen', en: 'scenes', es: 'escenas' })} · {rec.total_duration_sec.toFixed(1)}s
                         </div>
                       </div>
                       <Button

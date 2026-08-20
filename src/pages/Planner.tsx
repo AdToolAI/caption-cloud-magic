@@ -410,7 +410,7 @@ export default function Planner() {
       if (data && data.suggestions && data.suggestions.length > 0) {
         // Apply the suggestions by creating blocks
         toast.loading(
-          `${mode === "redistribute" ? "Verteile" : "Erstelle"} ${data.suggestions.length} Posts...`,
+          tx({ de: `${mode === "redistribute" ? "Verteile" : "Erstelle"} ${data.suggestions.length} Posts...`, en: `${mode === "redistribute" ? "Redistributing" : "Creating"} ${data.suggestions.length} posts...`, es: `${mode === "redistribute" ? "Redistribuyendo" : "Creando"} ${data.suggestions.length} publicaciones...` }),
           { id: loadingToast }
         );
 

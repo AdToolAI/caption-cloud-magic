@@ -61,7 +61,7 @@ export const RenderQueuePanel = () => {
           Render Queue
         </CardTitle>
         <CardDescription>
-          {queuedJobs.length} wartend • {processingJobs.length} in Bearbeitung • {completedJobs.length} fertig
+          {queuedJobs.length} {tx({ de: 'wartend', en: 'queued', es: 'en cola' })} • {processingJobs.length} {tx({ de: 'in Bearbeitung', en: 'processing', es: 'en proceso' })} • {completedJobs.length} {tx({ de: 'fertig', en: 'done', es: 'listos' })}
         </CardDescription>
       </CardHeader>
       <CardContent>

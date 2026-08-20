@@ -272,7 +272,7 @@ export function DayCockpitDialog({ open, onOpenChange, date, workspaceId, onSucc
                             )}
                           </div>
                           <span className="text-[10px] uppercase tracking-widest text-primary/60 opacity-0 group-hover:opacity-100 transition-opacity self-center">
-                            Bearbeiten →
+                            {tx({ de: 'Bearbeiten', en: 'Edit', es: 'Editar' })} →
                           </span>
                         </div>
                       </motion.button>

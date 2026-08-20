@@ -5,6 +5,7 @@ import { Mic, MicOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface VoiceInputProps {
   onTranscription: (text: string) => void;
@@ -32,7 +33,7 @@ export function VoiceInput({ onTranscription, onListeningChange, disabled }: Voi
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'de-DE'; // German
+    recognition.lang = uiLocale(); // follows the selected UI language
 
     recognition.onstart = () => {
       setIsListening(true);

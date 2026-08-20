@@ -645,7 +645,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
               {/* Action Button */}
               <div className="flex items-center justify-between pt-4 border-t">
                 <div className="text-sm text-muted-foreground">
-                  Geschätzte Kosten: <Badge variant="secondary">{50} Credits</Badge>
+                  {tx({ de: 'Geschätzte Kosten:', en: 'Estimated cost:', es: 'Coste estimado:' })} <Badge variant="secondary">{50} Credits</Badge>
                 </div>
                 <Button
                   onClick={handleGenerate}
@@ -655,7 +655,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Erstelle Video...
+                      {tx({ de: 'Erstelle Video...', en: 'Creating video...', es: 'Creando video...' })}
                     </>
                   ) : (
                     <>

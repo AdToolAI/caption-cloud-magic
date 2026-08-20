@@ -464,7 +464,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                   : composerLockSource === 'sceneGeometry-fallback'
                     ? 'Geometrie'
                     : 'Nur Dauern'}{' '}
-              · {composerLockSceneCount} Szenen
+              · {composerLockSceneCount} {tx({ de: 'Szenen', en: 'scenes', es: 'escenas' })}
             </span>
           </div>
           <p className="mt-1 text-[10px] text-white/40 leading-snug">

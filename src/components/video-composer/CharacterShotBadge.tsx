@@ -57,7 +57,7 @@ export function CharacterShotBadge({ shot, characterName }: BadgeProps) {
           <p className="font-medium mb-1">Shot-Strategie: {meta.label}</p>
           <p className="text-muted-foreground">{meta.hint}</p>
           <p className="text-[10px] text-muted-foreground/80 mt-1.5 italic">
-            Weniger Gesichts-Closeups → konsistentere Charakter-Wahrnehmung.
+            {tx({ de: 'Weniger Gesichts-Closeups → konsistentere Charakter-Wahrnehmung.', en: 'Fewer face close-ups → more consistent character perception.', es: 'Menos primeros planos del rostro → percepción del personaje más consistente.' })}
           </p>
         </TooltipContent>
       </Tooltip>

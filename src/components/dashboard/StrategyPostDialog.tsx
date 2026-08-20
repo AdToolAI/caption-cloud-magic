@@ -5,6 +5,7 @@ import { CalendarPlus, Trash2, Lightbulb, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import type { StrategyPost } from "@/hooks/useStrategyMode";
+import { tx } from '@/lib/i18nText';
 
 interface Props {
   open: boolean;
@@ -65,7 +66,7 @@ export function StrategyPostDialog({ open, onOpenChange, post, onDismiss, onAddT
             size="sm"
             onClick={() => { onDismiss(post.id); onOpenChange(false); }}
           >
-            <Trash2 className="h-4 w-4 mr-1" /> Verwerfen
+            <Trash2 className="h-4 w-4 mr-1" /> {tx({ de: 'Verwerfen', en: 'Discard', es: 'Descartar' })}
           </Button>
           <Button
             size="sm"

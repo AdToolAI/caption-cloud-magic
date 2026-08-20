@@ -274,7 +274,7 @@ export function BatchGeneratePanel() {
             <div className="space-y-3">
               <Progress value={progress} className="h-2" />
               <p className="text-xs text-center text-muted-foreground">
-                {successCount} erfolgreich · {items.filter(i => i.status === 'failed').length} fehlgeschlagen · {completed} / {items.length}
+                {successCount} {tx({ de: 'erfolgreich', en: 'succeeded', es: 'con éxito' })} · {items.filter(i => i.status === 'failed').length} {tx({ de: 'fehlgeschlagen', en: 'failed', es: 'fallidos' })} · {completed} / {items.length}
               </p>
             </div>
           )}

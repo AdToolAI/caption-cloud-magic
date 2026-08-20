@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Play, Pause, CheckCircle, TrendingUp, Trophy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { uiLocale } from '@/lib/uiLocale';
 
 interface ABTestManagerProps {
   templateId: string;
@@ -124,7 +125,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
               <DialogTrigger asChild>
                 <Button>
                   <TrendingUp className="h-4 w-4 mr-2" />
-                  Neuer Test
+                  {tx({ de: 'Neuer Test', en: 'New test', es: 'Nueva prueba' })}
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
@@ -219,7 +220,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                   <CardContent>
                     <div className="flex items-center justify-between">
                       <div className="text-sm text-muted-foreground">
-                        Gestartet: {test.started_at ? new Date(test.started_at).toLocaleDateString('de-DE') : tx({ de: 'Noch nicht gestartet', en: 'Not started yet', es: 'Aún no iniciado' })}
+                        Gestartet: {test.started_at ? new Date(test.started_at).toLocaleDateString(uiLocale()) : tx({ de: 'Noch nicht gestartet', en: 'Not started yet', es: 'Aún no iniciado' })}
                       </div>
                       <div className="flex gap-2">
                         {test.status === 'draft' && (

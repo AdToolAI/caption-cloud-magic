@@ -10,27 +10,27 @@ interface FiltersProps {
 }
 
 const QUALITY: Array<{ k: undefined | "hd" | "4k"; label: string }> = [
-  { k: undefined, label: "Alle" },
+  { k: undefined, label: "All" },
   { k: "hd", label: "HD+" },
   { k: "4k", label: "4K only" },
 ];
 
 const ORIENTATION: Array<{ k: undefined | "landscape" | "portrait" | "square"; label: string }> = [
-  { k: undefined, label: "Alle" },
+  { k: undefined, label: "All" },
   { k: "landscape", label: "16:9" },
   { k: "portrait", label: "9:16" },
   { k: "square", label: "1:1" },
 ];
 
 const DURATION: Array<{ label: string; min?: number; max?: number }> = [
-  { label: "Alle" },
+  { label: "All" },
   { label: "<10s", max: 10 },
   { label: "10–30s", min: 10, max: 30 },
   { label: ">30s", min: 30 },
 ];
 
 const FPS: Array<{ k: undefined | number; label: string }> = [
-  { k: undefined, label: "Alle FPS" },
+  { k: undefined, label: tx({ de: 'Alle FPS', en: 'All FPS', es: 'Todos los FPS' }) },
   { k: 30, label: "30+" },
   { k: 50, label: "Slow-Mo (50+)" },
 ];

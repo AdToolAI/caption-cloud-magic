@@ -26,6 +26,7 @@ import { useCloudStorage } from "@/hooks/useCloudStorage";
 import { enforceLimits, deleteMediaItem, type CleanupMediaItem } from "@/lib/media-library/autoCleanup";
 import { LicenseButton } from "@/components/licensing/LicenseButton";
 import { tx } from "@/lib/i18nText";
+import { uiLocale } from '@/lib/uiLocale';
 
 // Storage Limits
 const MAX_VIDEOS = 500;
@@ -378,12 +379,12 @@ export default function MediaLibrary() {
             : isDirectorCutEnhancement
               ? tx({ de: `KI-Szene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, en: `AI scene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, es: `Escena de IA: ${metadata?.prompt?.slice(0, 40) || 'Realce'}...` })
               : isDirectorsCut
-                ? `Director's Cut - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
+                ? `Director's Cut - ${new Date(video.created_at).toLocaleDateString(uiLocale())}`
                 : isMotionStudioClip
                   ? tx({ de: `Motion Studio · Szene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}`, en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (previous version)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (versión anterior)' : ''}` })
                   : isUniversalCreator
-                    ? `Universal Creator Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
-                    : `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`,
+                    ? `Universal Creator Video - ${new Date(video.created_at).toLocaleDateString(uiLocale())}`
+                    : `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString(uiLocale())}`,
           caption: isSoraAI 
             ? `Sora 2 ${metadata?.model === 'sora-2-pro' ? 'Pro' : 'Standard'} · ${metadata?.duration_seconds}s`
             : isDirectorCutEnhancement
@@ -769,7 +770,7 @@ export default function MediaLibrary() {
   // Send to Calendar
   const sendToCalendar = (mediaItem: NormalizedMediaItem) => {
     sessionStorage.setItem('calendar_prefill', JSON.stringify({
-      title: mediaItem.title || tx({ de: `Post vom ${new Date().toLocaleDateString('de-DE')}`, en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }),
+      title: mediaItem.title || tx({ de: `Post vom ${new Date().toLocaleDateString(uiLocale())}`, en: `Post from ${new Date().toLocaleDateString(uiLocale())}`, es: `Publicar desde ${new Date().toLocaleDateString(uiLocale())}` }),
       caption: mediaItem.caption || '',
       mediaUrl: mediaItem.url,
       mediaType: mediaItem.type,
@@ -868,7 +869,7 @@ export default function MediaLibrary() {
     const firstItem = selectedItems[0];
     
     sessionStorage.setItem('calendar_prefill', JSON.stringify({
-      title: firstItem.title || tx({ de: `Post vom ${new Date().toLocaleDateString('de-DE')}`, en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }),
+      title: firstItem.title || tx({ de: `Post vom ${new Date().toLocaleDateString(uiLocale())}`, en: `Post from ${new Date().toLocaleDateString(uiLocale())}`, es: `Publicar desde ${new Date().toLocaleDateString(uiLocale())}` }),
       caption: firstItem.caption || '',
       mediaUrl: firstItem.url,
       mediaType: firstItem.type,
@@ -1022,7 +1023,7 @@ export default function MediaLibrary() {
                   className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
                 >
                   <FolderOpen className="h-4 w-4" />
-                  Alle
+                  {tx({ de: 'Alle', en: 'All', es: 'Todos' })}
                 </TabsTrigger>
                 <TabsTrigger 
                   value="upload" 
@@ -1159,7 +1160,7 @@ export default function MediaLibrary() {
                   }}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Löschen ({selectedAssets.length})
+                  {tx({ de: 'Löschen', en: 'Delete', es: 'Eliminar' })} ({selectedAssets.length})
                 </Button>
               </div>
             </div>
@@ -1325,7 +1326,7 @@ export default function MediaLibrary() {
                             <Download className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Herunterladen</TooltipContent>
+                        <TooltipContent>{tx({ de: 'Herunterladen', en: 'Download', es: 'Descargar' })}</TooltipContent>
                       </Tooltip>
                     )}
                     

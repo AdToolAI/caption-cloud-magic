@@ -111,7 +111,7 @@ export default function ContentProjects() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Gesamt</CardDescription>
+              <CardDescription>{tx({ de: 'Gesamt', en: 'Total', es: 'Total' })}</CardDescription>
               <CardTitle className="text-3xl">{statusCounts.all}</CardTitle>
             </CardHeader>
           </Card>

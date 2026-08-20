@@ -43,16 +43,16 @@ export const VideoActionMenu = ({ video }: VideoActionMenuProps) => {
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleDownload}>
                 <Download className="h-4 w-4 mr-2" />
-                Herunterladen
+                {tx({ de: 'Herunterladen', en: 'Download', es: 'Descargar' })}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setShowShare(true)}>
                 <Share2 className="h-4 w-4 mr-2" />
-                Teilen
+                {tx({ de: 'Teilen', en: 'Share', es: 'Compartir' })}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setShowEditor(true)}>
                 <Edit className="h-4 w-4 mr-2" />
-                Bearbeiten
+                {tx({ de: 'Bearbeiten', en: 'Edit', es: 'Editar' })}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>

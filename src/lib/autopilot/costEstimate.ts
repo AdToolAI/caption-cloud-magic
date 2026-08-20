@@ -8,6 +8,7 @@ import { tx } from "@/lib/i18nText";
  */
 
 import { needsChapterMode } from './ideaFeasibility';
+import { uiLocale } from '@/lib/uiLocale';
 
 export const CREDITS_PER_EUR = 100;
 
@@ -116,5 +117,5 @@ export function estimateProductionCost(input: CostInput): CostEstimate {
 }
 
 export function formatEuro(value: number): string {
-  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
+  return new Intl.NumberFormat(uiLocale(), { style: 'currency', currency: 'EUR' }).format(value);
 }

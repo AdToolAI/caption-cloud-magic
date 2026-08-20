@@ -130,7 +130,7 @@ export default function SnakeGame() {
           Bestwert <span className="font-mono text-foreground">{best}</span>
         </span>
         <Button size="sm" variant="outline" onClick={reset}>
-          Neu
+          {tx({ de: 'Neu', en: 'New', es: 'Nuevo' })}
         </Button>
       </div>
 

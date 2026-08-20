@@ -28,6 +28,7 @@ import {
   type VoiceCategoryId,
 } from '@/lib/voice-categories';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface UniversalVoiceLibraryPickerProps {
   open: boolean;
@@ -186,7 +187,7 @@ export function UniversalVoiceLibraryPicker({
           <DialogDescription className="text-[11px] uppercase tracking-[0.15em] text-white/45">
             {total.toLocaleString()} {tx({ de: "Stimmen", en: "Voices", es: "Voces" })}
             {language !== 'all' && <> in <span className="text-cyan">{voiceLanguageLabel(language)}</span></>}
-            {nativeSensitive && nativeOnly && ` · $${tx({ de: "nur native Sprecher", en: "native speakers only", es: "solo hablantes nativos" })}`}
+            {nativeSensitive && nativeOnly && ` · ${tx({ de: "nur native Sprecher", en: "native speakers only", es: "solo hablantes nativos" })}`}
           </DialogDescription>
         </DialogHeader>
 
@@ -390,7 +391,7 @@ export function UniversalVoiceLibraryPicker({
                 );
               })}
               <div ref={sentinelRef} className="col-span-full flex flex-col items-center justify-center gap-2 py-6 text-white/40 text-[11px] uppercase tracking-widest">
-                <span>{voices.length.toLocaleString('de-DE')} von {total.toLocaleString('de-DE')} geladen</span>
+                <span>{voices.length.toLocaleString(uiLocale())} von {total.toLocaleString(uiLocale())} geladen</span>
                 {hasNextPage && (
                   <Button
                     type="button"

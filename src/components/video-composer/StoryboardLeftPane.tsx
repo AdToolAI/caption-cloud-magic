@@ -9,6 +9,7 @@
 import { ReactNode, useState } from 'react';
 import { Pencil, Palette, UserSquare2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { tx } from '@/lib/i18nText';
 
 export type LeftPaneMode = 'editor' | 'style' | 'avatar';
 
@@ -58,7 +59,7 @@ export default function StoryboardLeftPane({
               Studio
             </span>
             <span className="text-[10px] text-muted-foreground">
-              Szene {sceneNumber}
+              {tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} {sceneNumber}
               {totalScenes ? ` / ${totalScenes}` : ''}
               {sceneTypeLabel ? ` · ${sceneTypeLabel}` : ''}
             </span>

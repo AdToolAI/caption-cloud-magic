@@ -7,6 +7,7 @@ import lookExecutive from "@/assets/landing/storylines/cast/cast-look-executive.
 import lookEditorial from "@/assets/landing/storylines/cast/cast-look-editorial.jpg";
 import anchorPortrait from "@/assets/landing/storylines/cast/cast-anchor-portrait.jpg";
 import storyboardTile from "@/assets/landing/storylines/cast/cast-storyboard-tile.jpg";
+import { tx } from '@/lib/i18nText';
 
 /* ─────────────────────────────────────────────────────────
    Cast & World — Character Creation Journey visuals
@@ -42,7 +43,7 @@ const StepBadge = ({ n, label }: { n: string; label: string }) => (
 
 /* ── 1. Brief → Tokens ─────────────────────────────────── */
 export const BriefTokensVisual = () => {
-  const tokens = ["age: 32", "warmes lächeln", "berlin", "founder", "warm-braun", "sanfte stimme"];
+  const tokens = ["age: 32", tx({ de: 'warmes lächeln', en: 'warm smile', es: 'sonrisa cálida' }), "berlin", "founder", tx({ de: 'warm-braun', en: 'warm brown', es: 'marrón cálido' }), tx({ de: 'sanfte stimme', en: 'soft voice', es: 'voz suave' })];
   return (
     <Shell>
       <StepBadge n="01" label="Brief" />

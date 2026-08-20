@@ -148,7 +148,7 @@ export default function ChessGame() {
             setFen(game.fen());
           }}
         >
-          Neu
+          {tx({ de: 'Neu', en: 'New', es: 'Nuevo' })}
         </Button>
       </div>
 

@@ -115,7 +115,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     build: () =>
       base(
         'banner',
-        'NEUE KOLLEKTION',
+        tx({ de: 'NEUE KOLLEKTION', en: 'NEW COLLECTION', es: 'NUEVA COLECCIÓN' }),
         { gradient: [GOLD, '#C79B3F'], color: INK, uppercase: true, radius: 0 },
         { animation: 'slideDown', box: { x: 0, y: 0.04, w: 1, h: 0.11 } },
       ),
@@ -153,7 +153,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     build: () =>
       base(
         'badge',
-        'NEU',
+        'NEW',
         { fill: '#E5484D', color: '#FFFFFF', fontSizeRel: 0.032, uppercase: true },
         { animation: 'pop', box: { x: 0.06, y: 0.08, w: 0.14, h: 0.08 } },
       ),

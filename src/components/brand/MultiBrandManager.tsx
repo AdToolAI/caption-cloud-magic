@@ -62,7 +62,7 @@ export function MultiBrandManager({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Deine Marken-Sets</h3>
+          <h3 className="text-lg font-semibold">{tx({ de: 'Deine Marken-Sets', en: 'Your brand sets', es: 'Tus sets de marca' })}</h3>
           <p className="text-sm text-muted-foreground">
             {brandKits.length} {brandKits.length === 1 ? 'Set' : 'Sets'} gespeichert
           </p>

@@ -110,7 +110,7 @@ export default function SceneReferenceImageSlot({ scene, onUpdate, className }: 
             title={tx({ de: "Referenzbild entfernen", en: "Remove reference image", es: "Eliminar imagen de referencia" })}
           >
             <X className="h-3 w-3" />
-            Entfernen
+            {tx({ de: 'Entfernen', en: 'Remove', es: 'Quitar' })}
           </button>
         </div>
       ) : (

@@ -142,7 +142,7 @@ const ResetPassword = () => {
                   onClick={() => navigate("/auth")}
                   className="w-full"
                 >
-                  Jetzt anmelden
+                  {tx({ de: 'Jetzt anmelden', en: 'Sign in now', es: 'Inicia sesión ahora' })}
                 </Button>
               </CardContent>
             </Card>

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface AlertRow {
   id: string;
@@ -81,7 +82,7 @@ export function ActiveAlertsCard() {
                     </Badge>
                     <span className="text-xs text-muted-foreground font-mono">{a.alert_type}</span>
                     <span className="text-xs text-muted-foreground">
-                      {new Date(a.sent_at).toLocaleString('de-DE')}
+                      {new Date(a.sent_at).toLocaleString(uiLocale())}
                     </span>
                   </div>
                   <p className="text-sm">{a.message}</p>

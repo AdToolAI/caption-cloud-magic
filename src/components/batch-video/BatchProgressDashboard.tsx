@@ -139,7 +139,7 @@ export function BatchProgressDashboard({ batchJobId }: BatchProgressDashboardPro
           <div>
             <h3 className="text-lg font-semibold">{batchJob.job_name}</h3>
             <p className="text-sm text-muted-foreground">
-              {batchJob.completed_videos} / {batchJob.total_videos} Videos fertig
+              {batchJob.completed_videos} / {batchJob.total_videos} {tx({ de: 'Videos fertig', en: 'videos done', es: 'videos listos' })}
             </p>
           </div>
           <div className="flex gap-2">
@@ -149,7 +149,7 @@ export function BatchProgressDashboard({ batchJobId }: BatchProgressDashboardPro
               onClick={fetchVideoCreations}
             >
               <RefreshCw className="h-4 w-4 mr-2" />
-              Aktualisieren
+              {tx({ de: 'Aktualisieren', en: 'Refresh', es: 'Actualizar' })}
             </Button>
             <Button
               size="sm"
@@ -157,7 +157,7 @@ export function BatchProgressDashboard({ batchJobId }: BatchProgressDashboardPro
               disabled={batchJob.completed_videos === 0}
             >
               <Download className="h-4 w-4 mr-2" />
-              Alle herunterladen
+              {tx({ de: 'Alle herunterladen', en: 'Download all', es: 'Descargar todo' })}
             </Button>
           </div>
         </div>
@@ -167,7 +167,7 @@ export function BatchProgressDashboard({ batchJobId }: BatchProgressDashboardPro
         <div className="grid grid-cols-3 gap-4 text-sm">
           <div className="flex items-center gap-2">
             <CheckCircle className="h-4 w-4 text-green-500" />
-            <span>{batchJob.completed_videos} Erfolgreich</span>
+            <span>{batchJob.completed_videos} {tx({ de: 'Erfolgreich', en: 'successful', es: 'correctos' })}</span>
           </div>
           <div className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
@@ -175,7 +175,7 @@ export function BatchProgressDashboard({ batchJobId }: BatchProgressDashboardPro
           </div>
           <div className="flex items-center gap-2">
             <XCircle className="h-4 w-4 text-red-500" />
-            <span>{batchJob.failed_videos} Fehlgeschlagen</span>
+            <span>{batchJob.failed_videos} {tx({ de: 'Fehlgeschlagen', en: 'failed', es: 'fallidos' })}</span>
           </div>
         </div>
       </Card>
@@ -242,7 +242,7 @@ export function BatchProgressDashboard({ batchJobId }: BatchProgressDashboardPro
             ))}
             {batchJob.error_log.length > 5 && (
               <p className="text-xs text-red-600 dark:text-red-400">
-                ... und {batchJob.error_log.length - 5} weitere Fehler
+                ... {batchJob.error_log.length - 5} {tx({ de: 'weitere Fehler', en: 'more errors', es: 'errores más' })}
               </p>
             )}
           </div>

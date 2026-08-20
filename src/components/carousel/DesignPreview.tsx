@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle } from "lucide-react";
+import { tx } from '@/lib/i18nText';
 
 interface Slide {
   role: "title" | "content" | "cta";
@@ -91,7 +92,7 @@ export const DesignPreview = ({ slides, brandKit, template }: DesignPreviewProps
                   {!hasCTA && isLastSlide && (
                     <Badge variant="destructive" className="text-xs">
                       <AlertCircle className="h-3 w-3 mr-1" />
-                      Keine CTA
+                      {tx({ de: 'Keine CTA', en: 'No CTA', es: 'Sin CTA' })}
                     </Badge>
                   )}
                   {!isTextTooLong && (

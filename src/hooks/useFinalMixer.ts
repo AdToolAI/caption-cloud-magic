@@ -39,7 +39,7 @@ export const LOUDNESS_TARGETS: LoudnessTarget[] = [
   { id: 'youtube', label: 'YouTube / TikTok / Insta', lufs: -14, truePeakDb: -1 },
   { id: 'broadcast', label: 'Broadcast / TV (EBU R128)', lufs: -23, truePeakDb: -1 },
   { id: 'cinema', label: 'Cinema (ATSC A/85)', lufs: -27, truePeakDb: -2 },
-  { id: 'none', label: 'Keine Normalisierung', lufs: 0, truePeakDb: 0 },
+  { id: 'none', label: tx({ de: 'Keine Normalisierung', en: 'No normalization', es: 'Sin normalización' }), lufs: 0, truePeakDb: 0 },
 ];
 
 const TARGET_SR = 48000;

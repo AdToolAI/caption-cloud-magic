@@ -157,7 +157,7 @@ export default function BatchVideoCreator() {
                   <p className="font-medium">{csvData.length}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Kosten</p>
+                  <p className="text-sm text-muted-foreground">{tx({ de: 'Kosten', en: 'Cost', es: 'Coste' })}</p>
                   <p className="font-medium">{csvData.length * 50} Credits</p>
                 </div>
                 <div>

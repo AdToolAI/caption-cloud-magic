@@ -10,6 +10,7 @@ import {
   rmsBasedSpeechDetection,
   intervalsToGainAutomation,
 } from '@/lib/duckingEnvelope';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface TranscriptWord {
   word: string;
@@ -322,7 +323,7 @@ export function useAudioDucking({
           .insert({
             user_id: user.id,
             type: 'voiceover',
-            title: title || `Ducked Mix · ${new Date().toLocaleString('de-DE')}`,
+            title: title || `Ducked Mix · ${new Date().toLocaleString(uiLocale())}`,
             url: publicUrl,
             storage_url: publicUrl,
             storage_path: fileName,

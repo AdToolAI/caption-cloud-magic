@@ -108,7 +108,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
                           <div>Größe: {variant.file_size_mb.toFixed(2)} MB</div>
                         )}
                         {variant.duration_sec && (
-                          <div>Dauer: {variant.duration_sec}s</div>
+                          <div>{tx({ de: 'Dauer', en: 'Duration', es: 'Duración' })}: {variant.duration_sec}s</div>
                         )}
                       </div>
                     </div>
@@ -239,12 +239,12 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Erstelle Varianten...
+                {tx({ de: 'Erstelle Varianten...', en: 'Creating variants...', es: 'Creando variantes...' })}
               </>
             ) : (
               <>
                 <Plus className="mr-2 h-4 w-4" />
-                {selectedFormats.length * selectedRatios.length} Varianten erstellen
+                {selectedFormats.length * selectedRatios.length} {tx({ de: 'Varianten erstellen', en: 'create variants', es: 'crear variantes' })}
               </>
             )}
           </Button>

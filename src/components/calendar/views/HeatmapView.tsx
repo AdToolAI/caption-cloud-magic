@@ -35,7 +35,7 @@ interface HeatmapViewProps {
 }
 
 const CHANNELS = [
-  { id: "all", label: "Alle" },
+  { id: "all", label: "All" },
   { id: "instagram", label: "Instagram" },
   { id: "tiktok", label: "TikTok" },
   { id: "linkedin", label: "LinkedIn" },
@@ -374,7 +374,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
                 onClick={() => onDateClick?.(new Date())}
                 className="h-8 text-xs bg-gradient-to-r from-primary to-amber-500"
               >
-                <CalendarPlus className="w-3.5 h-3.5 mr-1.5" /> Ersten Post erstellen
+                <CalendarPlus className="w-3.5 h-3.5 mr-1.5" /> {tx({ de: 'Ersten Post erstellen', en: 'Create first post', es: 'Crear primer post' })}
               </Button>
             </motion.div>
           )}

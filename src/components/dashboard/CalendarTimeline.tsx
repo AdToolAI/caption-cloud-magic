@@ -28,7 +28,7 @@ export function CalendarTimeline({ events, loading, onEventClick }: CalendarTime
       scheduled: { variant: "default", label: "Geplant" },
       posted: { variant: "secondary", label: tx({ de: "Veröffentlicht", en: "Posted", es: "Publicado" }) },
       draft: { variant: "outline", label: "Entwurf" },
-      failed: { variant: "destructive", label: "Fehlgeschlagen" },
+      failed: { variant: "destructive", label: tx({ de: 'Fehlgeschlagen', en: 'Failed', es: 'Fallidos' }) },
     };
     
     const config = variants[status] || variants.draft;

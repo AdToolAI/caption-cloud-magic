@@ -382,7 +382,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
               className="border-white/10 text-white/40 disabled:opacity-40"
             >
               <Scissors className="h-3.5 w-3.5 mr-1.5" />
-              Teilen
+              {tx({ de: 'Teilen', en: 'Share', es: 'Compartir' })}
             </Button>
           );
         })()}

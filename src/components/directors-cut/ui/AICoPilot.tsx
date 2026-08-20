@@ -110,7 +110,7 @@ export function AICoPilot({
                   </div>
                   <div>
                     <h3 className="font-semibold text-sm">KI Co-Pilot</h3>
-                    <p className="text-xs text-muted-foreground">Dein Video-Assistent</p>
+                    <p className="text-xs text-muted-foreground">{tx({ de: 'Dein Video-Assistent', en: 'Your video assistant', es: 'Tu asistente de video' })}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">

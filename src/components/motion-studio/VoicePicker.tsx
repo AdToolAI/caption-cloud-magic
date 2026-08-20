@@ -43,7 +43,7 @@ export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) 
     if (custom) {
       return {
         name: custom.name,
-        sub: `$${tx({ de: 'Meine Stimme', en: 'My voice', es: 'Mi voz' })} · ${custom.language.toUpperCase()}`,
+        sub: `${tx({ de: 'Meine Stimme', en: 'My voice', es: 'Mi voz' })} · ${custom.language.toUpperCase()}`,
         tone: 'emerald' as const,
       };
     }
@@ -155,7 +155,7 @@ export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) 
                 onChange(null);
                 setPickedMeta(null);
               }}
-              title="Voice entfernen"
+              title={tx({ de: 'Voice entfernen', en: 'Remove voice', es: 'Quitar voz' })}
             >
               <X className="h-4 w-4" />
             </Button>

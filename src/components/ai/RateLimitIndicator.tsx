@@ -41,7 +41,7 @@ export function RateLimitIndicator({ remainingCalls, maxCalls, resetTime }: Rate
           <div className="flex items-center gap-2">
             <Zap className={`h-4 w-4 ${isLow ? 'text-destructive' : 'text-primary'}`} />
             <span className="text-sm font-medium">
-              AI Calls verfügbar: {remainingCalls}/{maxCalls}
+              {tx({ de: 'AI Calls verfügbar:', en: 'AI calls available:', es: 'Llamadas de IA disponibles:' })} {remainingCalls}/{maxCalls}
             </span>
           </div>
           {countdown > 0 && (

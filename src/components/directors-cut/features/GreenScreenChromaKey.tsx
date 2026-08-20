@@ -291,7 +291,7 @@ export function GreenScreenChromaKey({
                   className="absolute top-2 right-2 h-6 text-xs"
                   onClick={() => onSettingsChange({ ...settings, backgroundUrl: undefined })}
                 >
-                  Entfernen
+                  {tx({ de: 'Entfernen', en: 'Remove', es: 'Quitar' })}
                 </Button>
               </div>
             )}

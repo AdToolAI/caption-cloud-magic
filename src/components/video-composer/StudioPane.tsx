@@ -10,6 +10,7 @@
 import { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { Sparkles } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 
 interface StudioPaneProps {
   sceneNumber?: number;
@@ -40,7 +41,7 @@ export function StudioPane({
             </div>
             {sceneNumber !== undefined && (
               <div className="text-[10px] text-muted-foreground mt-0.5">
-                Szene {sceneNumber}
+                {tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} {sceneNumber}
                 {totalScenes ? ` / ${totalScenes}` : ''}
                 {sceneTypeLabel ? ` · ${sceneTypeLabel}` : ''}
               </div>

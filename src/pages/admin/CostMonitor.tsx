@@ -11,6 +11,7 @@ import { CostTrendChart } from '@/components/admin/cost/CostTrendChart';
 import { CostAlertsCard } from '@/components/admin/cost/CostAlertsCard';
 import { VideoProviderMarginCard } from '@/components/admin/cost/VideoProviderMarginCard';
 import { toast } from 'sonner';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface Snapshot {
   timestamp: string;
@@ -99,7 +100,7 @@ export function CostMonitor() {
           <CostTrendChart trend={data.trend} />
 
           <p className="text-xs text-muted-foreground text-center pt-2">
-            {tx({ de: "Letzte Aktualisierung:", en: "Last updated:", es: "Última actualización:" })} {new Date(data.timestamp).toLocaleString('de-DE')} · {tx({ de: "Schätzungen basieren auf dokumentierten Stückpreisen × gezähltem Call-Volumen", en: "Estimates are based on documented unit prices × counted call volume", es: "Las estimaciones se basan en precios unitarios documentados × volumen de llamadas contado" })}
+            {tx({ de: "Letzte Aktualisierung:", en: "Last updated:", es: "Última actualización:" })} {new Date(data.timestamp).toLocaleString(uiLocale())} · {tx({ de: "Schätzungen basieren auf dokumentierten Stückpreisen × gezähltem Call-Volumen", en: "Estimates are based on documented unit prices × counted call volume", es: "Las estimaciones se basan en precios unitarios documentados × volumen de llamadas contado" })}
           </p>
         </>
       )}

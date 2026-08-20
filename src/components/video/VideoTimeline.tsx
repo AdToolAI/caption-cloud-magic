@@ -133,7 +133,7 @@ export const VideoTimeline = ({ clips, onClipsChange, totalDuration = 0 }: Video
       type: 'custom',
       duration: 3,
       transition: 'fade',
-      content: 'Neuer Clip',
+      content: tx({ de: 'Neuer Clip', en: 'New clip', es: 'Nuevo clip' }),
     };
     onClipsChange([...clips, newClip]);
   };

@@ -180,7 +180,7 @@ export default function Solitaire() {
             setSource(null);
           }}
         >
-          Neu
+          {tx({ de: 'Neu', en: 'New', es: 'Nuevo' })}
         </Button>
       </div>
 

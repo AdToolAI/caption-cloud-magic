@@ -189,7 +189,7 @@ export default function CompareLabGrid({
               className="w-full"
             >
               {isStarting ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Starte {selectedEngines.length} Engines…</>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {tx({ de: 'Starte', en: 'Starting', es: 'Iniciando' })} {selectedEngines.length} Engines…</>
               ) : (
                 <><Sparkles className="h-4 w-4 mr-2" /> Vergleich starten ({totalCost.toFixed(2)}€)</>
               )}
@@ -202,7 +202,7 @@ export default function CompareLabGrid({
       {run && outputs.length > 0 && (
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm text-muted-foreground">
-            {completedCount}/{outputs.length} fertig
+            {completedCount}/{outputs.length} {tx({ de: 'fertig', en: 'done', es: 'listo' })}
             {run.ai_judge_winner_engine && (
               <span className="ml-2 text-primary">
                 · 🏆 AI-Pick: <strong>{ENGINE_META[run.ai_judge_winner_engine as CompareEngine]?.name}</strong>

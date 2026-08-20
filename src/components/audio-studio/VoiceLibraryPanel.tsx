@@ -9,6 +9,7 @@ import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { VoiceStudioDialog } from '@/components/voice/studio/VoiceStudioDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { uiLocale } from '@/lib/uiLocale';
 
 export function VoiceLibraryPanel() {
   const { voices, loading, deleteVoice, toggleVoiceActive } = useCustomVoices();
@@ -153,7 +154,7 @@ export function VoiceLibraryPanel() {
             </div>
 
             <p className="text-[10px] text-muted-foreground">
-              Erstellt: {new Date(voice.created_at).toLocaleDateString('de-DE')}
+              Erstellt: {new Date(voice.created_at).toLocaleDateString(uiLocale())}
             </p>
           </Card>
         ))}

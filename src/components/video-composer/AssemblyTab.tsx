@@ -46,7 +46,7 @@ const FALLBACKS: Record<string, string> = {
   renderingPercent: tx({ de: 'Video wird gerendert … {percent}%', en: 'Rendering video … {percent}%', es: 'Renderizando video … {percent}%' }),
   videoReady: tx({ de: 'Dein Video ist fertig', en: 'Your video is ready', es: 'Tu video está listo' }),
   videoReadyDesc: tx({ de: 'Vorschau, Download oder direkt in der Mediathek öffnen.', en: 'Preview, download or open directly in the media library.', es: 'Previsualiza, descarga o abre directamente en la biblioteca de medios.' }),
-  download: 'Herunterladen',
+  download: tx({ de: 'Herunterladen', en: 'Download', es: 'Descargar' }),
   savedToLibrary: tx({ de: 'In Mediathek gespeichert', en: 'Saved to media library', es: 'Guardado en la biblioteca de medios' }),
   savedToLibraryDesc: tx({ de: 'Du findest dieses Video jetzt in der Mediathek.', en: 'You can now find this video in the media library.', es: 'Ahora puedes encontrar este video en la biblioteca de medios.' }),
   viewInLibrary: tx({ de: "Mediathek öffnen", en: "Open media library", es: "Abrir biblioteca multimedia" }),

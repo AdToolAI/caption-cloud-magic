@@ -97,7 +97,7 @@ export default function CommunitySnippetGallery({ onUse, onCloned }: Props) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Alle Kategorien</SelectItem>
+            <SelectItem value="all">{tx({ de: 'Alle Kategorien', en: 'All categories', es: 'Todas las categorías' })}</SelectItem>
             {SCENE_SNIPPET_CATEGORIES.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.emoji} {c.label}
@@ -118,7 +118,7 @@ export default function CommunitySnippetGallery({ onUse, onCloned }: Props) {
 
       {loading ? (
         <div className="flex items-center justify-center py-8 text-xs text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin mr-2" /> Community lädt...
+          <Loader2 className="h-4 w-4 animate-spin mr-2" /> {tx({ de: 'Community lädt...', en: 'Loading community...', es: 'Cargando comunidad...' })}
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-md border border-dashed border-border/60 p-8 text-center text-[11px] text-muted-foreground">

@@ -4,6 +4,7 @@ import { VideoTemplateCard } from './VideoTemplateCard';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import type { VideoTemplate } from '@/types/video';
+import { tx } from '@/lib/i18nText';
 
 const CATEGORIES = [
   { value: '', label: 'Alle' },
@@ -57,7 +58,7 @@ export const VideoTemplateGallery = ({ onTemplateSelect }: VideoTemplateGalleryP
 
       {templates?.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
-          Keine Templates in dieser Kategorie gefunden
+          {tx({ de: 'Keine Templates in dieser Kategorie gefunden', en: 'No templates found in this category', es: 'No se encontraron plantillas en esta categoría' })}
         </div>
       )}
     </div>

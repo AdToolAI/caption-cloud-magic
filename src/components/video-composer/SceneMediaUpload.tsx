@@ -151,7 +151,7 @@ export default function SceneMediaUpload({
             onClick={handleRemove}
             disabled={disabled}
           >
-            <X className="h-3 w-3 mr-1" /> Entfernen
+            <X className="h-3 w-3 mr-1" /> {tx({ de: 'Entfernen', en: 'Remove', es: 'Quitar' })}
           </Button>
         </div>
         <div className="relative rounded-md overflow-hidden border border-border/40 bg-black">

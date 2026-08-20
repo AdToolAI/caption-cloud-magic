@@ -15,10 +15,10 @@ interface TemplateGalleryProps {
 }
 
 export function TemplateGallery({ open, onOpenChange, image, onApply }: TemplateGalleryProps) {
-  const [category, setCategory] = useState<string>("Alle");
+  const [category, setCategory] = useState<string>("All");
 
   const templates = useMemo(() => {
-    const list = category === "Alle" ? DESIGN_TEMPLATES : DESIGN_TEMPLATES.filter((t) => t.category === category);
+    const list = category === "All" ? DESIGN_TEMPLATES : DESIGN_TEMPLATES.filter((t) => t.category === category);
     return list.map((t) => ({ meta: t, design: t.build({ image }) }));
   }, [category, image]);
 
@@ -30,7 +30,7 @@ export function TemplateGallery({ open, onOpenChange, image, onApply }: Template
         </DialogHeader>
 
         <div className="flex flex-wrap gap-2 pb-2">
-          {["Alle", ...TEMPLATE_CATEGORIES].map((cat) => (
+          {["All", ...TEMPLATE_CATEGORIES].map((cat) => (
             <Button
               key={cat}
               size="sm"

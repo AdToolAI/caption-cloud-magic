@@ -60,7 +60,7 @@ export function useImageUpscaler() {
 
       if (data?.image) {
         const sym = data.currency === 'USD' ? '$' : '€';
-        toast.success(`Upscale ${factor}× fertig! Verbleibend: ${sym}${(data.newBalance ?? 0).toFixed(2)}`);
+        toast.success(tx({ de: `Upscale ${factor}× fertig! Verbleibend: ${sym}${(data.newBalance ?? 0).toFixed(2)}`, en: `Upscale ${factor}× done! Remaining: ${sym}${(data.newBalance ?? 0).toFixed(2)}`, es: `¡Escalado ${factor}× listo! Restante: ${sym}${(data.newBalance ?? 0).toFixed(2)}` }));
         return data.image as UpscaleResult;
       }
       return null;

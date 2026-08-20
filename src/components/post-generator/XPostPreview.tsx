@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MoreHorizontal, MessageCircle, Repeat2, Heart, Bookmark, Share, BarChart3 } from "lucide-react";
+import { uiLocale } from '@/lib/uiLocale';
 
 interface XPostPreviewProps {
   mediaUrl: string;
@@ -119,7 +120,7 @@ export const XPostPreview = ({
               </div>
               <div className="flex items-center gap-1">
                 <BarChart3 className="h-4 w-4" />
-                <span>{views.toLocaleString('de-DE')}</span>
+                <span>{views.toLocaleString(uiLocale())}</span>
               </div>
             </div>
 

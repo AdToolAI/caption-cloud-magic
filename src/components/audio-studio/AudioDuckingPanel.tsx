@@ -144,7 +144,7 @@ export function AudioDuckingPanel({
                   {speechLabel}
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {intervals.length} Sprach-Block{intervals.length === 1 ? '' : 'e'} · {speechCoverage.toFixed(0)}% Sprache
+                  {intervals.length} {tx({ de: intervals.length === 1 ? 'Sprach-Block' : 'Sprach-Blöcke', en: intervals.length === 1 ? 'speech block' : 'speech blocks', es: intervals.length === 1 ? 'bloque de voz' : 'bloques de voz' })} · {speechCoverage.toFixed(0)}% {tx({ de: 'Sprache', en: 'speech', es: 'voz' })}
                 </span>
               </div>
               <div className="relative h-20 rounded-lg bg-muted/30 border border-border/50 overflow-hidden cursor-pointer"
@@ -194,7 +194,7 @@ export function AudioDuckingPanel({
                   <Music className="w-4 h-4 text-primary" />
                   {musicLabel}
                   <Badge variant="secondary" className="text-[10px]">
-                    -{settings.reductionDb} dB beim Sprechen
+                    -{settings.reductionDb} dB {tx({ de: 'beim Sprechen', en: 'while speaking', es: 'al hablar' })}
                   </Badge>
                 </div>
                 <span className="text-xs text-muted-foreground tabular-nums">

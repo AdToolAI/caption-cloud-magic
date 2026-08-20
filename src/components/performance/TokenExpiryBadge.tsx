@@ -63,7 +63,7 @@ export const TokenExpiryBadge = ({ provider }: TokenExpiryBadgeProps) => {
     <div className="flex items-center gap-2">
       <Badge variant="outline" className="text-xs gap-1 bg-orange-50 text-orange-700 border-orange-200">
         <AlertCircle className="h-3 w-3" />
-        Token läuft in {expiringInDays} {expiringInDays === 1 ? 'Tag' : 'Tagen'} ab
+        {tx({ de: `Token läuft in ${expiringInDays} ${expiringInDays === 1 ? 'Tag' : 'Tagen'} ab`, en: `Token expires in ${expiringInDays} ${expiringInDays === 1 ? 'day' : 'days'}`, es: `El token caduca en ${expiringInDays} ${expiringInDays === 1 ? 'día' : 'días'}` })}
       </Badge>
       {provider === 'x' && (
         <Button

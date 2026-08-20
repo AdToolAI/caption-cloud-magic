@@ -2358,7 +2358,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             <div className="h-8 flex items-center gap-2 px-3 border-b border-[#F5C76A]/10 bg-[#050816]/60 min-w-0 flex-shrink-0 overflow-hidden">
               <Library className="h-3.5 w-3.5 text-[#F5C76A] flex-shrink-0" />
               <span className="text-[11px] uppercase tracking-wider text-[#F5C76A]/70 font-semibold min-w-0 truncate">Bibliothek</span>
-              <span className="ml-auto text-[10px] text-white/40 flex-shrink-0">{scenes.length} Szenen</span>
+              <span className="ml-auto text-[10px] text-white/40 flex-shrink-0">{scenes.length} {tx({ de: 'Szenen', en: 'scenes', es: 'escenas' })}</span>
             </div>
             <CapCutSidebar 
               onAddFromLibrary={() => setShowAddMediaDialog(true)}

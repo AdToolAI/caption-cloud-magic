@@ -117,7 +117,7 @@ export default function LeadInTrimSheet({ scene, open, onOpenChange }: LeadInTri
           </div>
         ) : (
           <div className="rounded-lg bg-muted/30 aspect-video flex items-center justify-center text-xs text-muted-foreground">
-            Kein gerenderter Clip vorhanden.
+            {tx({ de: 'Kein gerenderter Clip vorhanden.', en: 'No rendered clip available.', es: 'No hay clip renderizado disponible.' })}
           </div>
         )}
 

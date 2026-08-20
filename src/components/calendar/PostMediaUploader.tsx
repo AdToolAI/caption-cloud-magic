@@ -116,7 +116,7 @@ export function PostMediaUploader({
             className="h-8"
           >
             <X className="h-4 w-4 mr-1" />
-            Entfernen
+            {tx({ de: 'Entfernen', en: 'Remove', es: 'Quitar' })}
           </Button>
         </div>
         <div className="absolute top-2 left-2">

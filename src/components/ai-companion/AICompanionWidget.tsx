@@ -837,7 +837,7 @@ export function AICompanionWidget() {
                       >
                         <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-2xl rounded-bl-md px-4 py-3">
                           <p className="text-sm text-foreground mb-2">
-                            Klingt nach einem Problem! Möchtest du das an unser Support-Team weiterleiten?
+                            {tx({ de: 'Klingt nach einem Problem! Möchtest du das an unser Support-Team weiterleiten?', en: 'Sounds like a problem! Do you want to forward this to our support team?', es: '¡Parece un problema! ¿Quieres enviarlo a nuestro equipo de soporte?' })}
                           </p>
                           <div className="flex gap-2">
                             <Button
@@ -874,7 +874,7 @@ export function AICompanionWidget() {
                       >
                         <div className="bg-red-500/10 border border-red-500/20 rounded-2xl rounded-bl-md px-4 py-3">
                           <p className="text-sm text-red-400 font-medium mb-1">
-                            ⚠️ Fehler erkannt
+                            ⚠️ {tx({ de: 'Fehler erkannt', en: 'Error detected', es: 'Error detectado' })}
                           </p>
                           <p className="text-xs text-red-300/80 mb-2 font-mono truncate max-w-[250px]">
                             {detectedError.message}
@@ -888,7 +888,7 @@ export function AICompanionWidget() {
                             className="h-7 text-xs border-red-500/30 hover:bg-red-500/10"
                           >
                             <HeadphonesIcon className="w-3 h-3 mr-1" />
-                            Fehler melden
+                            {tx({ de: 'Fehler melden', en: 'Report error', es: 'Informar del error' })}
                           </Button>
                         </div>
                       </motion.div>

@@ -189,7 +189,7 @@ export function SceneSelector({
               {/* Scene Number */}
               <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
                 <span className="text-xs font-medium text-white">
-                  Szene {index + 1}
+                  {tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} {index + 1}
                 </span>
                 <span className="text-[10px] text-white/70">
                   {(scene.end_time - scene.start_time).toFixed(1)}s

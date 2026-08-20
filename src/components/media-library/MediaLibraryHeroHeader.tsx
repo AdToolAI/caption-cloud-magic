@@ -2,6 +2,7 @@ import { tx } from '@/lib/i18nText';
 import { motion } from "framer-motion";
 import { FolderOpen, Upload, HardDrive, AlertTriangle, Film, Cloud, Images } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { uiLocale } from '@/lib/uiLocale';
 
 interface MediaLibraryHeroHeaderProps {
   videoCount: number;
@@ -128,7 +129,7 @@ export const MediaLibraryHeroHeader = ({
                 <div>
                   <p className="text-sm text-muted-foreground">Videos</p>
                   <p className={`font-bold ${videoPercent >= 100 ? "text-destructive" : videoPercent > 80 ? "text-warning" : "text-foreground"}`}>
-                    {videoCount} / {maxVideos.toLocaleString('de-DE')}
+                    {videoCount} / {maxVideos.toLocaleString(uiLocale())}
                   </p>
                 </div>
               </div>
@@ -164,7 +165,7 @@ export const MediaLibraryHeroHeader = ({
                 <div>
                   <p className="text-sm text-muted-foreground">{tx({ de: "Bilder", en: "Images", es: "Imágenes" })}</p>
                   <p className={`font-bold ${imagePercent >= 100 ? "text-destructive" : imagePercent > 80 ? "text-warning" : "text-foreground"}`}>
-                    {imageCount.toLocaleString('de-DE')} / {maxImages.toLocaleString('de-DE')}
+                    {imageCount.toLocaleString(uiLocale())} / {maxImages.toLocaleString(uiLocale())}
                   </p>
                 </div>
               </div>
@@ -281,7 +282,7 @@ export const MediaLibraryHeroHeader = ({
             <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
             <span>
               <strong>{tx({ de: 'Speicherlimit:', en: 'Storage limit:', es: 'Límite de almacenamiento:' })}</strong>{' '}
-              {tx({ de: `Maximal ${maxVideos.toLocaleString('de-DE')} Videos oder ${maxImages.toLocaleString('de-DE')} Bilder oder ${maxGB} GB. Bei Überschreitung werden automatisch die ältesten Medien gelöscht. Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`, en: `Maximum ${maxVideos.toLocaleString('en-US')} videos or ${maxImages.toLocaleString('en-US')} images or ${maxGB} GB. If exceeded, the oldest media is deleted automatically. Connect Google Drive to safely offload media instead.`, es: `Máximo ${maxVideos.toLocaleString('es-ES')} vídeos o ${maxImages.toLocaleString('es-ES')} imágenes o ${maxGB} GB. Si se supera, los medios más antiguos se eliminan automáticamente. Conecta Google Drive para externalizarlos de forma segura.` })}
+              {tx({ de: `Maximal ${maxVideos.toLocaleString(uiLocale())} Videos oder ${maxImages.toLocaleString(uiLocale())} Bilder oder ${maxGB} GB. Bei Überschreitung werden automatisch die ältesten Medien gelöscht. Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`, en: `Maximum ${maxVideos.toLocaleString('en-US')} videos or ${maxImages.toLocaleString('en-US')} images or ${maxGB} GB. If exceeded, the oldest media is deleted automatically. Connect Google Drive to safely offload media instead.`, es: `Máximo ${maxVideos.toLocaleString('es-ES')} vídeos o ${maxImages.toLocaleString('es-ES')} imágenes o ${maxGB} GB. Si se supera, los medios más antiguos se eliminan automáticamente. Conecta Google Drive para externalizarlos de forma segura.` })}
             </span>
           </p>
         </motion.div>

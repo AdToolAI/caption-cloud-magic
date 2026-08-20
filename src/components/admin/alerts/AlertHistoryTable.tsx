@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { History } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface Row {
   id: string;
@@ -85,7 +86,7 @@ export function AlertHistoryTable() {
                 {rows.map((r) => (
                   <tr key={r.id} className="border-b border-border/50">
                     <td className="py-2 pr-3 whitespace-nowrap text-xs text-muted-foreground">
-                      {new Date(r.sent_at).toLocaleString('de-DE', {
+                      {new Date(r.sent_at).toLocaleString(uiLocale(), {
                         day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
                       })}
                     </td>

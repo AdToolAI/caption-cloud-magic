@@ -34,6 +34,7 @@ import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
 import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
 import type { AudioTrack, SubtitleTrack } from '@/types/timeline';
 import type { SubtitleSafeZone } from '@/lib/directors-cut-draft';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface PremiumFeatureState {
   styleTransfer?: { enabled: boolean; style: string | null };
@@ -152,7 +153,7 @@ export function ExportRenderStep({
       const { error } = await supabase.from('video_creations').insert({
         user_id: userData.user.id,
         output_url: url,
-        title: `Director's Cut - ${new Date().toLocaleDateString('de-DE')}`,
+        title: `Director's Cut - ${new Date().toLocaleDateString(uiLocale())}`,
         status: 'completed',
         metadata: {
           source: 'directors-cut',
@@ -700,7 +701,7 @@ export function ExportRenderStep({
                     <Sparkles className="h-4 w-4 text-amber-500" />
                     {tx({ de: "Szenen Color Grading", en: "Scene Color Grading", es: "Gradación de color de escena" })}
                   </span>
-                  <Badge variant="secondary">{Object.keys(sceneColorGrading).length} Szenen</Badge>
+                  <Badge variant="secondary">{Object.keys(sceneColorGrading).length} {tx({ de: 'Szenen', en: 'scenes', es: 'escenas' })}</Badge>
                 </div>
               )}
 
@@ -822,7 +823,7 @@ export function ExportRenderStep({
                     </p>
                   </div>
                   
-                  {/* Herunterladen · Veröffentlichen · Einplanen */}
+                  {/* Download · Publish · Schedule */}
                   <ExportActionBar
                     className="justify-center"
                     onDownload={handleDownload}
@@ -861,7 +862,7 @@ export function ExportRenderStep({
                       setCurrentRenderId(null);
                     }}
                   >
-                    Neu rendern
+                    {tx({ de: 'Neu rendern', en: 'Re-render', es: 'Renderizar de nuevo' })}
                   </Button>
                 </div>
               ) : isRendering ? (

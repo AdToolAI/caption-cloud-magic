@@ -37,9 +37,9 @@ function PresetTile({ preset, onPick }: { preset: OverlayPreset; onPick: () => v
 }
 
 export function OverlayLibrary({ onPick }: OverlayLibraryProps) {
-  const [category, setCategory] = useState<string>('Alle');
-  const categories = ['Alle', ...OVERLAY_CATEGORIES];
-  const items = category === 'Alle' ? OVERLAY_PRESETS : OVERLAY_PRESETS.filter((p) => p.category === category);
+  const [category, setCategory] = useState<string>('All');
+  const categories = ['All', ...OVERLAY_CATEGORIES];
+  const items = category === 'All' ? OVERLAY_PRESETS : OVERLAY_PRESETS.filter((p) => p.category === category);
 
   return (
     <div className="space-y-3 min-w-0">

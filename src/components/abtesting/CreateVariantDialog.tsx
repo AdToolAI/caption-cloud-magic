@@ -147,7 +147,7 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
 
             <TabsContent value="text" className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="text-font">Schriftart</Label>
+                <Label htmlFor="text-font">{tx({ de: 'Schriftart', en: 'Font', es: 'Fuente' })}</Label>
                 <Select value={textFont} onValueChange={setTextFont}>
                   <SelectTrigger>
                     <SelectValue placeholder={tx({ de: 'Schriftart auswählen', en: 'Select font', es: 'Seleccionar fuente' })} />

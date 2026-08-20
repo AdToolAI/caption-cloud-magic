@@ -16,6 +16,7 @@ import { useRef } from 'react';
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { User, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { tx } from '@/lib/i18nText';
 
 interface Props {
   imageUrl?: string | null;
@@ -124,7 +125,7 @@ export default function AvatarStage3D({
             <div className="h-20 w-20 rounded-full bg-card/40 border border-border/40 flex items-center justify-center mb-2">
               <User className="h-8 w-8" />
             </div>
-            <p className="text-[11px] uppercase tracking-[0.18em]">Kein Avatar</p>
+            <p className="text-[11px] uppercase tracking-[0.18em]">{tx({ de: 'Kein Avatar', en: 'No avatar', es: 'Sin avatar' })}</p>
           </div>
         )}
       </motion.div>

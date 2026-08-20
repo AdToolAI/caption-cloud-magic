@@ -2,6 +2,7 @@ import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { uiLocale } from '@/lib/uiLocale';
 
 export type StemType = 'vocals' | 'drums' | 'bass' | 'other';
 
@@ -319,7 +320,7 @@ export function useStemMixer({ stems, state, masterVolume }: UseStemMixerArgs) {
           .insert({
             user_id: user.id,
             type: 'voiceover',
-            title: title || `Stem Mix · ${new Date().toLocaleString('de-DE')}`,
+            title: title || `Stem Mix · ${new Date().toLocaleString(uiLocale())}`,
             url: publicUrl,
             storage_url: publicUrl,
             storage_path: fileName,

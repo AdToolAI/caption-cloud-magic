@@ -23,7 +23,7 @@ export const HAPPYHORSE_VIDEO_MODELS = {
     minDuration: 3,
     maxDuration: 15,
     description: 'Multi-shot consistency · 720p · 3-15s',
-    badge: 'Neu',
+    badge: 'New',
   },
   'happyhorse-pro': {
     name: 'HappyHorse 1.0 Pro',

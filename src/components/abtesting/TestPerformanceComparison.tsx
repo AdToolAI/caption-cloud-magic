@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Database } from '@/integrations/supabase/types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { Badge } from '@/components/ui/badge';
+import { uiLocale } from '@/lib/uiLocale';
 
 type ABTestVariant = Database['public']['Tables']['ab_test_variants']['Row'];
 
@@ -72,7 +73,7 @@ export function TestPerformanceComparison({ variants, targetMetric }: Props) {
           <div>
             <p className="text-2xl font-bold">{leader.variant_name}</p>
             <p className="text-sm text-muted-foreground">
-              {targetMetric === 'views' && `${leaderValue.toLocaleString('de-DE')} Views`}
+              {targetMetric === 'views' && `${leaderValue.toLocaleString(uiLocale())} Views`}
               {targetMetric === 'engagement_rate' && `${leaderValue.toFixed(1)}% Engagement`}
               {targetMetric === 'conversion_rate' && `${leaderValue.toFixed(1)}% Conversion`}
               {targetMetric === 'watch_time' && `${leaderValue.toFixed(0)}s Watch Time`}
@@ -161,7 +162,7 @@ export function TestPerformanceComparison({ variants, targetMetric }: Props) {
 
                 <div className="text-right">
                   <p className="text-lg font-bold">
-                    {targetMetric === 'views' && metricValue.toLocaleString('de-DE')}
+                    {targetMetric === 'views' && metricValue.toLocaleString(uiLocale())}
                     {targetMetric !== 'views' && `${metricValue.toFixed(1)}%`}
                   </p>
                   {idx > 0 && (

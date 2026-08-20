@@ -1467,7 +1467,7 @@ export default function SceneCard({
                               className="h-6 px-3 text-[10px]"
                               disabled={overBudget}
                               onClick={() => onUpdate({ durationSeconds: sec })}
-                              title={overBudget ? tx({ de: 'Projekt-Budget überschritten', en: 'Project budget exceeded', es: 'Presupuesto del proyecto excedido' }) : `${sec}s $${tx({ de: 'nativ', en: 'native', es: 'nativo' })}`}
+                              title={overBudget ? tx({ de: 'Projekt-Budget überschritten', en: 'Project budget exceeded', es: 'Presupuesto del proyecto excedido' }) : `${sec}s ${tx({ de: 'nativ', en: 'native', es: 'nativo' })}`}
                             >
                               {sec}s
                             </Button>
@@ -1790,7 +1790,7 @@ export default function SceneCard({
                                   {intentUnresolved
                                     ? tx({ de: "Status wird geladen …", en: "Loading status …", es: "Cargando estado …" })
                                     : dialogMode
-                                    ? `${modelsForPicker.length} ${lang === "es" ? "modelos" : lang === "en" ? "models" : "Modelle"} · $${tx({ de: "für Lippensynchronisation zertifiziert", en: "certified for lip-sync", es: "certificados para sincronización labial" })}`
+                                    ? `${modelsForPicker.length} ${lang === "es" ? "modelos" : lang === "en" ? "models" : "Modelle"} · ${tx({ de: "für Lippensynchronisation zertifiziert", en: "certified for lip-sync", es: "certificados para sincronización labial" })}`
 
                                   : lang === "de"
                                     ? tx({ de: `B-Roll-Modus · ${modelsForPicker.length} Modelle verfügbar`, en: `B-roll mode · ${modelsForPicker.length} models available`, es: `Modo B-roll · ${modelsForPicker.length} modelos disponibles` })
@@ -2967,7 +2967,7 @@ export default function SceneCard({
                             }}
                             className="text-[9px] text-destructive hover:underline"
                           >
-                            ✕ Lip-Sync abbrechen
+                            ✕ {tx({ de: 'Lip-Sync abbrechen', en: 'Cancel lip-sync', es: 'Cancelar lip-sync' })}
                           </button>
                         </div>
                       )}

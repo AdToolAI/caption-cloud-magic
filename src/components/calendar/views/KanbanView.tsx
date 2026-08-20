@@ -97,7 +97,7 @@ const STATUS_FALLBACK: Record<string, string> = {
   scheduled: "Geplant",
   published: tx({ de: "Veröffentlicht", en: "Published", es: "Publicado" }),
   draft: "Entwurf",
-  failed: "Fehlgeschlagen",
+  failed: "Failed",
 };
 
 const CHANNEL_ICON: Record<string, React.ComponentType<any>> = {

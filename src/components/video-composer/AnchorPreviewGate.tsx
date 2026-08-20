@@ -300,7 +300,7 @@ export function AnchorPreviewGate({
               disabled={phase === "composing" || phase === "confirming"}
             >
               <RefreshCw className="w-4 h-4 mr-1" />
-              Neuer Preview
+              {tx({ de: 'Neuer Preview', en: 'New preview', es: 'Nueva vista previa' })}
             </Button>
             <Button
               onClick={handleConfirm}

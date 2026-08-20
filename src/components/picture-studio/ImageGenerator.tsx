@@ -768,7 +768,7 @@ export function ImageGenerator() {
                     onClick={() => mode === 'transform' ? setReferenceImage(null) : setStyleReference(null)}
                     className="text-[10px] text-muted-foreground hover:text-destructive"
                   >
-                    Entfernen
+                    {tx({ de: 'Entfernen', en: 'Remove', es: 'Quitar' })}
                   </button>
                 )}
               </div>
