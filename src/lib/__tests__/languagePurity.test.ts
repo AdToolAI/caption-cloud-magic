@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { translations } from "@/lib/translations";
+import { translationsFill } from "@/lib/translationsFill";
 
 /**
  * Guards the DE/EN/ES dictionaries against the failure class that produced
@@ -23,7 +24,7 @@ describe("i18n dictionaries", () => {
     expect(output).toContain("passed");
   });
 
-  it("reports key parity across de / en / es", () => {
+  it("has exact key parity across de / en / es (dictionary + fill)", () => {
     const flatten = (obj: any, prefix = "", out = new Set<string>()) => {
       for (const [k, v] of Object.entries(obj ?? {})) {
         const path = prefix ? `${prefix}.${k}` : k;
@@ -32,23 +33,33 @@ describe("i18n dictionaries", () => {
       }
       return out;
     };
+    const deepMerge = (base: any, extra: any): any => {
+      const out: any = { ...(base ?? {}) };
+      for (const [k, v] of Object.entries(extra ?? {})) {
+        out[k] =
+          v && typeof v === "object" && !Array.isArray(v)
+            ? deepMerge(out[k] ?? {}, v)
+            : v;
+      }
+      return out;
+    };
+    const effective = (lang: "de" | "en" | "es") =>
+      flatten(deepMerge((translations as any)[lang], (translationsFill as any)[lang]));
 
-    const de = flatten(translations.de);
-    const en = flatten(translations.en);
-    const es = flatten(translations.es);
+    const de = effective("de");
+    const en = effective("en");
+    const es = effective("es");
     const missing = (base: Set<string>, other: Set<string>) =>
       [...base].filter((k) => !other.has(k));
 
-    // Missing keys fall back (language -> fill -> EN -> DE), so this is a
-    // signal, not a hard failure — but the counts must stay visible.
-    const gaps = {
-      enMissing: missing(de, en).length,
-      esMissing: missing(de, es).length,
-      deMissing: missing(en, de).length,
-    };
-    if (gaps.enMissing || gaps.esMissing || gaps.deMissing) {
-      console.warn("i18n key parity gaps:", gaps);
-    }
     expect(de.size).toBeGreaterThan(0);
+    // Every creator-facing key must resolve in its own locale — no cross-locale fallback.
+    expect(missing(de, en)).toEqual([]);
+    expect(missing(de, es)).toEqual([]);
+    expect(missing(en, de)).toEqual([]);
+    expect(missing(en, es)).toEqual([]);
+    expect(missing(es, de)).toEqual([]);
+    expect(missing(es, en)).toEqual([]);
   });
+
 });

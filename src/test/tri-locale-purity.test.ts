@@ -56,6 +56,12 @@ const ALLOWLIST: Record<string, Array<{ text: string; reason: string }>> = {
   'components/creator-library/MusicBrowser.tsx': [
     { text: 'fröhlich', reason: 'semantic mood search key in track metadata' },
   ],
+  'components/video-composer/VoiceSubtitlesTab.tsx': [
+    { text: 'Bebas Neue', reason: 'CSS font-family name in FONT_FAMILIES, identical in every locale' },
+  ],
+  'lib/directors-cut/overlayPresets.ts': [
+    { text: 'Sarah Klein', reason: 'sample person name inside a lower-third preset, not translatable copy' },
+  ],
 };
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -175,7 +181,47 @@ describe('tri-locale detector trust', () => {
     expect(isSpanish('Elemente')).toBe(false);
     expect(isGerman('Español')).toBe(false);
   });
+
+  /* Regressions for detector bugs fixed in the convergence gate. */
+
+  it('does not lose sink classes across consecutive files (regex lastIndex)', () => {
+    // Module-level /g regexes used to keep `lastIndex` between analyzeFile
+    // calls, so the same leak was found in file 1 and missed in file 2.
+    const file = '<input placeholder="Titel eingeben" />';
+    const first = analyzeFile(file, true);
+    const second = analyzeFile(file, true);
+    const third = analyzeFile('const o = { label: "Alle Szenen anzeigen" };', false);
+    expect(first.length).toBeGreaterThan(0);
+    expect(second.length).toBe(first.length);
+    expect(third.length).toBeGreaterThan(0);
+  });
+
+  it('treats "leer" as German alone but as Spanish "to read" in a sentence', () => {
+    expect(isGerman('leer')).toBe(true);
+    expect(isGerman('Leer un guion')).toBe(false);
+    expect(isGerman('No se pudo leer el briefing')).toBe(false);
+    expect(isGerman('Leer reglas')).toBe(false);
+  });
+
+  it('ignores semantic IDs that a tri-locale label map translates', () => {
+    const src = [
+      "const GOALS = ['Werbung', 'Szene'];",
+      'const CHIP_LABELS = {',
+      "  Werbung: { de: 'Werbung', en: 'Advertising', es: 'Publicidad' },",
+      "  Szene: { de: 'Szene', en: 'Scene', es: 'Escena' },",
+      '};',
+    ].join('\n');
+    expect(analyzeFile(src, false)).toEqual([]);
+    // …but an untranslated German array entry is still a leak.
+    expect(analyzeFile("const GOALS = ['Werbung', 'Szene anzeigen'];", false).length).toBeGreaterThan(0);
+  });
+
+  it('covers short one-word labels and document.title sinks', () => {
+    expect(analyzeFile('document.title = "Meine Medienbibliothek";', false).length).toBeGreaterThan(0);
+    expect(analyzeFile('<span>Titel</span>', true).length).toBeGreaterThan(0);
+  });
 });
+
 
 /* ------------------------------------------------------------------ */
 /* Cross-locale contamination                                          */

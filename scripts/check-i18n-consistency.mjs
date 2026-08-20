@@ -129,9 +129,17 @@ for (const file of ["src/lib/translations.ts", "src/lib/translationsFill.ts"]) {
   }
   let block = null;
   source.split("\n").forEach((line, i) => {
-    const head = line.match(/^\s*(?:Object\.assign\(translations\.(en|de|es),|(en|de|es):\s*\{)/);
-    if (head) block = head[1] || head[2];
+    // Block attribution must cover the three top-level dictionaries AND the
+    // `translations.<lang>.<ns> = {` / `Object.assign(translations.<lang>…)`
+    // add-on blocks appended at the end of the file. A bare `es: {` at any
+    // indent would otherwise mis-attribute whole namespaces (it did).
+    const head =
+      line.match(/^\s*Object\.assign\(translations\.(en|de|es)\b/) ||
+      line.match(/^\s*translations\.(en|de|es)(?:\.[A-Za-z0-9_]+)?\s*=/) ||
+      line.match(/^ {2}"?(en|de|es)"?:\s*\{/);
+    if (head) block = head[1];
     if (!block) return;
+
     const entry = line.match(/^\s*[A-Za-z0-9_]+:\s*(['"])(.{4,}?)\1,?\s*$/);
     if (!entry) return;
     const value = entry[2];

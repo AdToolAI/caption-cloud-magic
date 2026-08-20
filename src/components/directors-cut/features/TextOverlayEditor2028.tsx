@@ -677,7 +677,7 @@ export function TextOverlayEditor2028({
                 <Textarea
                   value={selectedOverlay.text}
                   onChange={(e) => updateOverlay(selectedOverlay.id, { text: e.target.value })}
-                  placeholder="Text eingeben..."
+                  placeholder={tx({ de: 'Text eingeben …', en: 'Enter text …', es: 'Introduce el texto …' })}
                   rows={3}
                   className="min-h-20 resize-y bg-white/5 border-white/20 focus:border-primary whitespace-normal break-words [overflow-wrap:anywhere]"
                 />

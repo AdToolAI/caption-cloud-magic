@@ -638,7 +638,7 @@ export default function Planner() {
         <DragOverlay>
           {activeId ? (
             <Card className="p-2 bg-primary text-primary-foreground opacity-80">
-              <div className="text-xs font-semibold">Verschieben...</div>
+              <div className="text-xs font-semibold">{tx({ de: 'Verschieben …', en: 'Moving …', es: 'Moviendo …' })}</div>
             </Card>
           ) : null}
         </DragOverlay>
