@@ -17,7 +17,6 @@ import { CrossPostMagicPanel } from './CrossPostMagicPanel';
 import { Instagram, Music, Linkedin, Youtube, Clock, Send, CalendarIcon, Sparkles, Camera, MessageSquare, Link2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { dateFnsLocale } from '@/lib/uiLocale';
-import { enUS } from 'date-fns/locale';
 import { useTranslation } from '@/hooks/useTranslation';
 
 interface PublishToSocialTabProps {
