@@ -1,6 +1,7 @@
-// AUTO-GENERATED: fills keys that exist in the German dictionary but were
-// missing from the English/Spanish ones. Deep-merged in useTranslation.
-export const translationsFill: Record<'en' | 'es', any> = {
+// AUTO-GENERATED: fills keys that exist in one dictionary but were missing
+// from the others. Deep-merged in useTranslation, so every locale resolves
+// its own copy instead of falling back to another language.
+export const translationsFill: Record<'en' | 'de' | 'es', any> = {
   "en": {
     "calendar": {
       "messages": {
@@ -55,27 +56,397 @@ export const translationsFill: Record<'en' | 'es', any> = {
       }
     }
   },
+  "de": {
+    "analytics": {
+      "empty": {
+        "title": "Noch keine Analysedaten",
+        "body": "Synchronisiere die letzten 30 Tage, um deine Performance zu sehen.",
+        "cta": "Jetzt synchronisieren"
+      }
+    },
+    "mediaLibrary": {
+      "title": "Medienbibliothek",
+      "subtitle": "Verwalte alle deine Content-Assets an einem Ort",
+      "upload": "Datei hochladen",
+      "uploadSuccess": "Datei erfolgreich hochgeladen",
+      "deleteSuccess": "Datei erfolgreich gelöscht",
+      "searchPlaceholder": "Dateien suchen …",
+      "fileType": "Dateityp",
+      "allTypes": "Alle Typen",
+      "images": "Bilder",
+      "videos": "Videos",
+      "documents": "Dokumente",
+      "noMedia": "Noch keine Mediendateien",
+      "uploadFirst": "Lade deine erste Datei hoch, um zu starten"
+    },
+    "search": "Suchen",
+    "email": "E-Mail",
+    "error": "Fehler",
+    "success": "Erfolg",
+    "cancel": "Abbrechen",
+    "hubs": {
+      "einstellungen": "Einstellungen"
+    },
+    "onb": {
+      "accounts": "Konten verbinden",
+      "brandkit": "Brand Kit einrichten",
+      "goal": "Ziel festlegen",
+      "plan": "1-Wochen-Plan erstellen",
+      "automation": "Auto-Posting aktivieren",
+      "planGenerated": "Dein 1-Wochen-Plan wurde erstellt!"
+    },
+    "heatmap": {
+      "empty": {
+        "cta": "Konten verbinden"
+      }
+    },
+    "wl": {
+      "poweredByDesc": "AdTool-AI-Badge im Footer anzeigen"
+    },
+    "calendar": {
+      "autoSchedule": {
+        "subtitle": "Lass die KI die besten Zeiten für deinen Content finden",
+        "selectEvents": "Events auswählen",
+        "noEvents": "Keine Events ausgewählt",
+        "generate": "Zeitplan erstellen",
+        "generating": "Beste Zeiten werden analysiert …",
+        "apply": "Vorschläge übernehmen",
+        "noSuggestions": "Keine Vorschläge verfügbar",
+        "success": "Events erfolgreich geplant",
+        "error": "Zeitplan konnte nicht erstellt werden",
+        "reasons": {
+          "best_time": "Optimale Posting-Zeit",
+          "high_engagement": "Fenster mit hoher Interaktion",
+          "low_competition": "Slot mit wenig Konkurrenz",
+          "audience_active": "Zielgruppe am aktivsten"
+        }
+      },
+      "templates": {
+        "title": "Kampagnen-Vorlagen",
+        "subtitle": "Kampagnen aus fertigen Vorlagen erstellen",
+        "select": "Vorlage auswählen",
+        "campaignName": "Kampagnenname",
+        "startDate": "Startdatum",
+        "generate": "Kampagne erstellen",
+        "generating": "Kampagne wird erstellt …",
+        "preview": "Vorschau",
+        "duration": "Dauer",
+        "postsCount": "Beiträge",
+        "success": "Kampagne erfolgreich erstellt",
+        "error": "Kampagne konnte nicht erstellt werden",
+        "types": {
+          "launch": "Produkt-Launch",
+          "sale": "Verkaufskampagne",
+          "season": "Saisonaler Content",
+          "always_on": "Always-On-Content"
+        }
+      },
+      "blackout": {
+        "subtitle": "Termine sperren, an denen nicht gepostet werden darf",
+        "startTime": "Startzeit",
+        "endTime": "Endzeit",
+        "save": "Speichern",
+        "success": "Sperrtermin hinzugefügt",
+        "error": "Sperrtermin konnte nicht hinzugefügt werden",
+        "reasons": {
+          "holiday": "Feiertag",
+          "maintenance": "Systemwartung",
+          "event": "Besonderes Event",
+          "other": "Sonstiges"
+        }
+      },
+      "api": {
+        "success": {
+          "scheduled": "Beiträge erfolgreich geplant",
+          "campaignGenerated": "Kampagne erfolgreich erstellt",
+          "blackoutAdded": "Sperrtermin hinzugefügt",
+          "holidaysFetched": "Feiertags-Ideen erstellt"
+        },
+        "errors": {
+          "BLACKOUT_CONFLICT": "Diese Zeit kollidiert mit einem Sperrtermin"
+        },
+        "timeQuality": {
+          "high": "Sehr guter Zeitslot",
+          "medium": "Guter Zeitslot",
+          "low": "Akzeptabler Zeitslot"
+        }
+      },
+      "copySuccess": "Link in die Zwischenablage kopiert",
+      "exportSuccess": "Export erfolgreich",
+      "loadFailed": "Events konnten nicht geladen werden",
+      "moveFailed": "Event konnte nicht verschoben werden",
+      "statusFailed": "Status konnte nicht aktualisiert werden",
+      "statusUpdated": "Status aktualisiert",
+      "noEventsToExport": "Keine Events zum Exportieren",
+      "pdfPrintDialog": "Druckdialog für den PDF-Export wird geöffnet …",
+      "saving": "Wird gespeichert …",
+      "createEventComingSoon": "Event-Erstellung kommt bald",
+      "addNoteComingSoon": "Notiz hinzufügen kommt bald",
+      "filterComingSoon": "Filterfunktion kommt bald",
+      "shareComingSoon": "Teilen-Funktion kommt bald",
+      "workspaceCreated": "Workspace erfolgreich erstellt",
+      "defaultWorkspace": "Mein Workspace",
+      "apiDuplicate": {
+        "errors": {
+          "UNAUTHORIZED": "Nicht autorisiert",
+          "MISSING_REQUIRED_FIELDS": "Pflichtfelder fehlen",
+          "TEMPLATE_NOT_FOUND": "Vorlage nicht gefunden",
+          "NO_DRAFTS_AVAILABLE": "Keine Entwürfe verfügbar",
+          "NO_POSTS_IN_RANGE": "Keine Beiträge im Zeitraum",
+          "POST_NOT_FOUND": "Beitrag nicht gefunden",
+          "SCHEDULE_CONFLICT": "Terminkonflikt",
+          "CAPACITY_EXCEEDED": "Kapazität überschritten",
+          "GENERATION_FAILED": "Erstellung fehlgeschlagen",
+          "EXPORT_FAILED": "Export fehlgeschlagen",
+          "INTERNAL_ERROR": "Interner Fehler"
+        },
+        "success": {
+          "POSTS_SCHEDULED": "{count} Beiträge geplant",
+          "SCHEDULE_APPLIED": "Zeitplan übernommen",
+          "CAMPAIGN_CREATED": "Kampagne mit {count} Events erstellt",
+          "EVENT_RESCHEDULED": "Event neu geplant",
+          "EXPORT_READY": "Export bereit"
+        },
+        "timeQuality": {
+          "BEST_TIME": "Beste Zeit",
+          "GOOD_TIME": "Gute Zeit"
+        }
+      }
+    },
+    "pricing": {
+      "quickPost": {
+        "locked": {
+          "title": "Auto-Planung gesperrt",
+          "description": "Quick Post im Kalender ist ab dem Pro-Plan verfügbar (2.500 Credits/Monat)."
+        },
+        "includedIn": "Enthalten in"
+      }
+    }
+  },
   "es": {
     "calendar": {
       "actions": {
         "addNoteLabel": "Añadir nota"
+      },
+      "messages": {
+        "copySuccess": "Enlace copiado",
+        "exportSuccess": "Exportación exitosa",
+        "loadFailed": "No se pudieron cargar los eventos",
+        "moveFailed": "Error al mover",
+        "statusFailed": "Error al actualizar el estado",
+        "statusUpdated": "Estado actualizado",
+        "noEventsToExport": "No hay eventos para exportar",
+        "pdfPrintDialog": "Abriendo el diálogo de impresión para exportar a PDF…",
+        "saving": "Guardando…",
+        "createEventComingSoon": "La creación de eventos estará disponible pronto",
+        "addNoteComingSoon": "Añadir nota estará disponible pronto",
+        "filterComingSoon": "La función de filtro estará disponible pronto",
+        "shareComingSoon": "La función de compartir estará disponible pronto",
+        "workspaceCreated": "Espacio de trabajo creado correctamente",
+        "defaultWorkspace": "Mi espacio de trabajo"
+      },
+      "autoSchedule": {
+        "description": "La IA sugiere las franjas horarias óptimas",
+        "analyze": "Analizar",
+        "applyAll": "Aceptar todo",
+        "bestTime": "Mejor hora",
+        "reason": "Motivo",
+        "subtitle": "Deja que la IA encuentre las mejores horas para tu contenido",
+        "selectEvents": "Seleccionar eventos",
+        "noEvents": "Ningún evento seleccionado",
+        "generate": "Generar programación",
+        "generating": "Analizando las mejores horas…",
+        "apply": "Aplicar sugerencias",
+        "noSuggestions": "No hay sugerencias disponibles",
+        "success": "Eventos programados correctamente",
+        "error": "No se pudo generar la programación",
+        "reasons": {
+          "best_time": "Hora óptima de publicación",
+          "high_engagement": "Franja de alta interacción",
+          "low_competition": "Franja con poca competencia",
+          "audience_active": "Audiencia más activa"
+        }
+      },
+      "api": {
+        "errors": {
+          "MISSING_REQUIRED_FIELDS": "Faltan campos obligatorios",
+          "TEMPLATE_NOT_FOUND": "Plantilla no encontrada",
+          "NO_POSTS_IN_RANGE": "No hay publicaciones en el periodo",
+          "POST_NOT_FOUND": "Publicación no encontrada",
+          "SCHEDULE_CONFLICT": "Conflicto de programación",
+          "GENERATION_FAILED": "Error de generación",
+          "EXPORT_FAILED": "Error de exportación",
+          "BLACKOUT_CONFLICT": "Esta hora entra en conflicto con una fecha bloqueada"
+        },
+        "success": {
+          "POSTS_SCHEDULED": "{count} publicaciones programadas",
+          "SCHEDULE_APPLIED": "Programación aplicada",
+          "CAMPAIGN_CREATED": "Campaña con {count} eventos creada",
+          "EVENT_RESCHEDULED": "Evento reprogramado",
+          "EXPORT_READY": "Exportación lista",
+          "scheduled": "Publicaciones programadas correctamente",
+          "campaignGenerated": "Campaña generada correctamente",
+          "blackoutAdded": "Fecha bloqueada añadida",
+          "holidaysFetched": "Ideas de días festivos generadas"
+        },
+        "timeQuality": {
+          "BEST_TIME": "Mejor hora",
+          "high": "Franja horaria excelente",
+          "medium": "Buena franja horaria",
+          "low": "Franja horaria aceptable"
+        }
+      },
+      "templates": {
+        "title": "Plantillas de campaña",
+        "subtitle": "Genera campañas a partir de plantillas predefinidas",
+        "select": "Seleccionar plantilla",
+        "campaignName": "Nombre de la campaña",
+        "startDate": "Fecha de inicio",
+        "generate": "Generar campaña",
+        "generating": "Creando campaña…",
+        "preview": "Vista previa",
+        "duration": "Duración",
+        "postsCount": "Publicaciones",
+        "success": "Campaña generada correctamente",
+        "error": "No se pudo generar la campaña",
+        "types": {
+          "launch": "Lanzamiento de producto",
+          "sale": "Campaña de ventas",
+          "season": "Contenido de temporada",
+          "always_on": "Contenido siempre activo"
+        }
+      },
+      "blackout": {
+        "subtitle": "Bloquea las fechas en las que no se puede publicar",
+        "startTime": "Hora de inicio",
+        "endTime": "Hora de fin",
+        "save": "Guardar",
+        "success": "Fecha bloqueada añadida",
+        "error": "No se pudo añadir la fecha bloqueada",
+        "reasons": {
+          "holiday": "Día festivo",
+          "maintenance": "Mantenimiento del sistema",
+          "event": "Evento especial",
+          "other": "Otro"
+        }
+      },
+      "copySuccess": "Enlace copiado al portapapeles",
+      "exportSuccess": "Exportación exitosa",
+      "loadFailed": "No se pudieron cargar los eventos",
+      "moveFailed": "No se pudo mover el evento",
+      "statusFailed": "No se pudo actualizar el estado",
+      "statusUpdated": "Estado actualizado",
+      "noEventsToExport": "No hay eventos para exportar",
+      "pdfPrintDialog": "Abriendo el diálogo de impresión para exportar a PDF…",
+      "saving": "Guardando…",
+      "createEventComingSoon": "La creación de eventos estará disponible pronto",
+      "addNoteComingSoon": "Añadir nota estará disponible pronto",
+      "filterComingSoon": "La función de filtro estará disponible pronto",
+      "shareComingSoon": "La función de compartir estará disponible pronto",
+      "workspaceCreated": "Espacio de trabajo creado correctamente",
+      "defaultWorkspace": "Mi espacio de trabajo",
+      "apiDuplicate": {
+        "errors": {
+          "UNAUTHORIZED": "No autorizado",
+          "MISSING_REQUIRED_FIELDS": "Faltan campos obligatorios",
+          "TEMPLATE_NOT_FOUND": "Plantilla no encontrada",
+          "NO_DRAFTS_AVAILABLE": "No hay borradores disponibles",
+          "NO_POSTS_IN_RANGE": "No hay publicaciones en el rango",
+          "POST_NOT_FOUND": "Publicación no encontrada",
+          "SCHEDULE_CONFLICT": "Conflicto de programación",
+          "CAPACITY_EXCEEDED": "Capacidad superada",
+          "GENERATION_FAILED": "Error de generación",
+          "EXPORT_FAILED": "Error de exportación",
+          "INTERNAL_ERROR": "Error interno"
+        },
+        "success": {
+          "POSTS_SCHEDULED": "{count} publicaciones programadas",
+          "SCHEDULE_APPLIED": "Programación aplicada",
+          "CAMPAIGN_CREATED": "Campaña creada con {count} eventos",
+          "EVENT_RESCHEDULED": "Evento reprogramado",
+          "EXPORT_READY": "Exportación lista"
+        },
+        "timeQuality": {
+          "BEST_TIME": "Mejor hora",
+          "GOOD_TIME": "Buena hora"
+        }
       }
     },
     "pricingPage": {
       "plans": {
         "basic": {
-          "description": "Perfecto para creadores de contenido y pequeñas empresas"
+          "description": "Perfecto para creadores de contenido y pequeñas empresas",
+          "name": "Basic",
+          "price": "14.99",
+          "currency": "$",
+          "period": "mes",
+          "credits": "800 créditos",
+          "features": [
+            "Todas las plantillas premium",
+            "Generador de hashtags",
+            "Gestiona hasta 2 marcas",
+            "Sin marca de agua",
+            "Programación manual de publicaciones",
+            "Soporte prioritario por correo",
+            "Panel de analítica"
+          ],
+          "button": "Mejorar a Basic"
         },
         "pro": {
-          "description": "Ideal para agencias y equipos"
+          "description": "Ideal para agencias y equipos",
+          "name": "Pro",
+          "price": "34.95",
+          "currency": "$",
+          "period": "mes",
+          "credits": "2.500 créditos",
+          "features": [
+            "Todo lo de Basic",
+            "Programación automática con IA",
+            "Modelos de IA avanzados",
+            "Herramientas de colaboración en equipo",
+            "Panel de analítica",
+            "Exportaciones de marca blanca",
+            "Soporte prioritario y onboarding"
+          ],
+          "button": "Mejorar a Pro"
         },
         "enterprise": {
-          "description": "Para grandes equipos y agencias"
+          "description": "Para grandes equipos y agencias",
+          "name": "Enterprise",
+          "price": "69.95",
+          "currency": "$",
+          "period": "mes",
+          "credits": "Créditos ilimitados",
+          "features": [
+            "Todo lo de Pro",
+            "Acceso a API e integraciones",
+            "Soporte prioritario",
+            "Herramientas de agencia y marca blanca",
+            "Integraciones personalizadas",
+            "Gestor de cuenta dedicado"
+          ],
+          "button": "Mejorar a Enterprise"
         }
-      }
+      },
+      "title": "Precios sencillos y transparentes",
+      "subtitle": "Elige el plan que encaje con tu flujo de trabajo. Empieza gratis y mejora cuando quieras."
     },
     "heroBanner": {
-      "title": "Planifica, publica y analiza publicaciones sociales – más rápido con IA."
+      "title": "Planifica, publica y analiza publicaciones sociales – más rápido con IA.",
+      "heading": "Planifica, publica y analiza publicaciones sociales: más rápido con IA.",
+      "subheading": "Empieza gratis. Mejora cuando quieras.",
+      "ctaPrimary": "Plan rápido",
+      "ctaSecondary": "Abrir calendario",
+      "stats": {
+        "engagement": "Tasa de interacción ↑",
+        "posts": "Publicaciones publicadas",
+        "accounts": "Cuentas conectadas"
+      },
+      "trust": {
+        "title": "Conforme al RGPD • Pago seguro",
+        "subtitle": "Tus datos están seguros",
+        "integrations": "Integraciones"
+      }
     },
     "socialProof": {
       "title": "Lo que dicen nuestros usuarios",
@@ -92,7 +463,24 @@ export const translationsFill: Record<'en' | 'es', any> = {
       "emotional": "Emocional",
       "informative": "Informativo",
       "playful": "Juguetón",
-      "close": "Cerrar"
+      "close": "Cerrar",
+      "language": "es",
+      "error": "Error",
+      "success": "Éxito",
+      "warning": "Aviso",
+      "metaDisconnected": "Conexión eliminada.",
+      "metaGrantRemains": "Meta sigue mostrando esta app en tu perfil de Facebook. Abre Facebook → Configuración → Apps y sitios web y elimina «AdTool AI» para que la próxima conexión muestre el diálogo de permisos completo.",
+      "cancel": "Cancelar",
+      "generating": "Generando…",
+      "uploading": "Subiendo…",
+      "comingSoon": "Próximamente",
+      "featureComingSoon": "¡Esta función estará disponible pronto!",
+      "upgradeRequired": "Se requiere mejorar de plan",
+      "upgradeToPro": "Mejorar a Pro",
+      "locked": "Bloqueado",
+      "requiresPro": "Requiere el plan Pro",
+      "getStarted": "Empezar",
+      "startNow": "Empieza ahora"
     },
     "calendar_title": "Calendario de Contenido Inteligente",
     "calendar_add_post": "Añadir Publicación",
@@ -262,6 +650,58 @@ export const translationsFill: Record<'en' | 'es', any> = {
       "notLoggedIn": "Por favor, inicia sesión de nuevo para reenviar el correo electrónico",
       "problemsContact": "¿Necesitas ayuda? Contacta con nuestro",
       "support": "Soporte"
+    },
+    "analytics": {
+      "empty": {
+        "title": "Aún no hay datos de analítica",
+        "body": "Sincroniza los últimos 30 días para ver tu rendimiento.",
+        "cta": "Sincronizar ahora"
+      }
+    },
+    "mediaLibrary": {
+      "title": "Biblioteca de medios",
+      "subtitle": "Gestiona todos tus recursos de contenido en un solo lugar",
+      "upload": "Subir archivo",
+      "uploadSuccess": "Archivo subido correctamente",
+      "deleteSuccess": "Archivo eliminado correctamente",
+      "searchPlaceholder": "Buscar archivos…",
+      "fileType": "Tipo de archivo",
+      "allTypes": "Todos los tipos",
+      "images": "Imágenes",
+      "videos": "Vídeos",
+      "documents": "Documentos",
+      "noMedia": "Aún no hay archivos multimedia",
+      "uploadFirst": "Sube tu primer archivo para empezar"
+    },
+    "search": "Buscar",
+    "email": "Correo electrónico",
+    "error": "Error",
+    "success": "Éxito",
+    "cancel": "Cancelar",
+    "hubs": {
+      "einstellungen": "Ajustes"
+    },
+    "onb": {
+      "accounts": "Conectar cuentas",
+      "brandkit": "Configurar Brand Kit",
+      "goal": "Definir objetivo",
+      "plan": "Generar plan de 1 semana",
+      "automation": "Activar publicación automática",
+      "planGenerated": "¡Tu plan de 1 semana se ha creado!"
+    },
+    "heatmap": {
+      "empty": {
+        "cta": "Conectar cuentas"
+      }
+    },
+    "pricing": {
+      "quickPost": {
+        "locked": {
+          "title": "Programación automática bloqueada",
+          "description": "Quick Post en el calendario está disponible a partir del plan Pro (2500 créditos/mes)."
+        },
+        "includedIn": "Incluido en"
+      }
     }
   }
 };

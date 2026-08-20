@@ -147,7 +147,7 @@ export function AutopilotWeeklyReviewPanel() {
               onClick={() => accept.mutate({ reviewId: review.id, applySuggestion: false })}
               disabled={accept.isPending}
             >
-              Aktuelles Briefing beibehalten
+              {tx({ de: "Aktuelles Briefing beibehalten", en: "Keep current briefing", es: "Mantener el briefing actual" })}
             </Button>
           </div>
         )}

@@ -104,7 +104,7 @@ export function SmartCropping({
 
         onVariantsChange(updatedVariants);
         toast.success(tx({ de: 'Subjekte erkannt', en: 'Subjects recognized', es: 'Materias reconocidas' }), {
-          description: `${subjects.length} Elemente • ${data.credits_used} Credits`,
+          description: `${subjects.length} ${tx({ de: "Elemente", en: "elements", es: "elementos" })} • ${data.credits_used} Credits`,
         });
       }
     } catch (error: any) {
@@ -183,7 +183,7 @@ export function SmartCropping({
         {/* Detected Subjects */}
         {detectedSubjects.length > 0 && (
           <div className="space-y-2">
-            <label className="text-xs font-medium">Erkannte Elemente</label>
+            <label className="text-xs font-medium">{tx({ de: "Erkannte Elemente", en: "Detected elements", es: "Elementos detectados" })}</label>
             <div className="flex flex-wrap gap-1">
               {detectedSubjects.map((subject, i) => (
                 <Badge key={i} variant="outline" className="text-[10px]">

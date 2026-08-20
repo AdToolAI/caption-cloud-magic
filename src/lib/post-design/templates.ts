@@ -229,7 +229,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   },
   {
     id: "tips",
-    name: "Tipp-Liste",
+    name: tx({ de: "Tipp-Liste", en: "Tip list", es: "Lista de consejos" }),
     category: tx({ de: "Wissen", en: "Knowledge", es: "Conocimiento" }),
     build: ({ image }) =>
       base(
@@ -248,7 +248,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   },
   {
     id: "before-after",
-    name: "Vorher / Nachher",
+    name: tx({ de: "Vorher / Nachher", en: "Before / After", es: "Antes / Después" }),
     category: tx({ de: "Beweis", en: "Proof", es: "Prueba" }),
     build: ({ image }) =>
       base(
@@ -267,7 +267,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   },
   {
     id: "launch",
-    name: "Produkt-Launch",
+    name: tx({ de: "Produkt-Launch", en: "Product launch", es: "Lanzamiento de producto" }),
     category: tx({ de: "Launch", en: "Launch", es: "Lanzamiento" }),
     build: ({ image }) =>
       base(
@@ -341,7 +341,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   },
   {
     id: "framed",
-    name: "Rahmen",
+    name: tx({ de: "Rahmen", en: "Frame", es: "Marco" }),
     category: tx({ de: "Minimal", en: "Minimal", es: "Mínimo" }),
     build: ({ image }) =>
       base(
@@ -358,7 +358,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   },
   {
     id: "question",
-    name: "Frage",
+    name: tx({ de: "Frage", en: "Question", es: "Pregunta" }),
     category: tx({ de: "Engagement", en: "Engagement", es: "Compromiso" }),
     build: ({ image }) =>
       base(
@@ -376,7 +376,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   },
   {
     id: "checklist",
-    name: "Checkliste",
+    name: tx({ de: "Checkliste", en: "Checklist", es: "Lista de verificación" }),
     category: tx({ de: "Wissen", en: "Knowledge", es: "Conocimiento" }),
     build: ({ image }) =>
       base(
@@ -432,8 +432,8 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   },
   {
     id: "cover-carousel",
-    name: "Karussell-Cover",
-    category: "Karussell",
+    name: tx({ de: "Karussell-Cover", en: "Carousel cover", es: "Portada de carrusel" }),
+    category: tx({ de: "Karussell", en: "Carousel", es: "Carrusel" }),
     build: ({ image }) =>
       base(
         [{

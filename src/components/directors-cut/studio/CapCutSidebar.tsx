@@ -330,7 +330,7 @@ import { sortVoicesPremiumFirst, DEFAULT_VOICE_SETTINGS, DEFAULT_MODEL, type Voi
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
 import { Badge } from '@/components/ui/badge';
-import { useTx, tx } from '@/lib/i18nText';
+import { useTx, tx, pickText } from '@/lib/i18nText';
 
 const VOICE_LANG_TABS: Array<{ code: 'de' | 'en' | 'es'; flag: string; label: string }> = [
   { code: 'de', flag: '🇩🇪', label: 'DE' },
@@ -419,11 +419,11 @@ const SubtitleVoiceoverSection: React.FC<{
 
   const selectedVoiceMeta = useMemo(() => allVoices.find(v => v.id === selectedVoice), [allVoices, selectedVoice]);
 
-  const tipText = activeLang === 'de'
-    ? tx({ de: tx({ de: "💡 Premium-Stimmen klingen am natürlichsten. Tipp: Nutze Satzzeichen für realistische Pausen.", en: "💡 Premium voices sound the most natural. Tip: use punctuation for realistic pauses.", es: "💡 Las voces premium suenan más naturales. Consejo: usa la puntuación para pausas realistas." }), en: '💡 Premium voices sound most natural. Tip: Use punctuation for realistic pauses.', es: '💡 Las voces premium suenan más naturales. Consejo: Usa la puntuación para pausas realistas.' })
-    : activeLang === 'es'
-    ? '💡 Las voces Premium suenan más naturales. Consejo: usa puntuación para pausas realistas.'
-    : '💡 Premium voices sound most natural. Tip: use punctuation for realistic pauses.';
+  const tipText = pickText(activeLang, {
+    de: '💡 Premium-Stimmen klingen am natürlichsten. Tipp: Nutze Satzzeichen für realistische Pausen.',
+    en: '💡 Premium voices sound most natural. Tip: use punctuation for realistic pauses.',
+    es: '💡 Las voces premium suenan más naturales. Consejo: usa la puntuación para pausas realistas.',
+  });
 
   const handleGenerate = async () => {
     if (!combinedText.trim() || !selectedVoice) return;
@@ -1218,7 +1218,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                     <div className="space-y-1">
                       <div className="flex justify-between">
                         <label className="text-[10px] text-white/50 flex items-center gap-1">
-                          <Crop className="h-2.5 w-2.5" /> Zuschnittbereich
+                          <Crop className="h-2.5 w-2.5" /> {tx({ de: "Zuschnittbereich", en: "Crop area", es: "Área de recorte" })}
                         </label>
                         <span className="text-[10px] text-white/40">{subtitleSafeZone.bottomBandPercent}%</span>
                       </div>
@@ -1766,7 +1766,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <Select value={selectedMood} onValueChange={setSelectedMood}>
                   <SelectTrigger className="h-7 text-[10px] bg-[#2a2a2a] border-[#3a3a3a] text-white">
-                    <SelectValue placeholder="Stimmung" />
+                    <SelectValue placeholder={tx({ de: "Stimmung", en: "Mood", es: "Estado de ánimo" })} />
                   </SelectTrigger>
                   <SelectContent className="bg-[#2a2a2a] border-[#3a3a3a]">
                     <SelectItem value="happy" className="text-white text-xs">Happy</SelectItem>

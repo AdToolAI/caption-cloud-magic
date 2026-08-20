@@ -179,11 +179,11 @@ export function MultiReferenceUploader({
       </div>
 
       <p className="text-[11px] text-muted-foreground leading-relaxed">
-        {language === 'de'
-          ? tx({ de: `Lade Charakter, Produkt, Setting und Style — ${engine} kombiniert sie in einer Szene.${required ? '' : ' Ohne Bild wird rein aus dem Text generiert.'}`, en: `Load character, product, setting and style — ${engine} combines them into one scene.${required ? '' : ' Without an image, generation is purely text-based.'}`, es: `Cargue carácter, producto, entorno y estilo: ${engine} los combina en una sola escena.${required ? '' : ' Sin imagen, la generación se basa puramente en texto.'}` })
-          : language === 'es'
-          ? `Sube personaje, producto, ubicación y estilo — ${engine} los combina en una escena.${required ? '' : ' Sin imagen se genera solo a partir del texto.'}`
-          : tx({ de: `Upload character, product, location and style — ${engine} blends them into one scene.${required ? '' : ' Without an image it generates from text only.'}`, en: `Upload character, product, location and style — ${engine} blends them into one scene.${required ? '' : 'Without an image it generates from text only.'}`, es: `Sube personajes, productos, ubicaciones y estilos: ${engine} los combina en una sola escena.${required ? '' : 'Sin una imagen, se genera solo a partir de texto.'}` })}
+        {tx({
+          de: `Lade Charakter, Produkt, Setting und Style — ${engine} kombiniert sie in einer Szene.${required ? '' : ' Ohne Bild wird rein aus dem Text generiert.'}`,
+          en: `Upload character, product, location and style — ${engine} blends them into one scene.${required ? '' : ' Without an image it generates from text only.'}`,
+          es: `Sube personaje, producto, ubicación y estilo — ${engine} los combina en una escena.${required ? '' : ' Sin imagen se genera solo a partir del texto.'}`,
+        })}
       </p>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">

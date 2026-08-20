@@ -1,4 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { tx } from "@/lib/i18nText";
 import { Badge } from "@/components/ui/badge";
 import { Paintbrush } from "lucide-react";
 import { motion } from "framer-motion";
@@ -32,7 +33,7 @@ export function ActiveBrandSelector({ brandKits, activeKitId, onSelect }: Active
       {/* Content */}
       <div className="flex-1">
         <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-          Aktives Marken-Set
+          {tx({ de: "Aktives Marken-Set", en: "Active brand set", es: "Conjunto de marca activo" })}
         </p>
         <Select value={activeKitId || brandKits[0]?.id} onValueChange={onSelect}>
           <SelectTrigger className="border-0 h-auto p-0 focus:ring-0 font-semibold text-lg hover:text-primary transition-colors">

@@ -656,7 +656,7 @@ export default function MediaLibrary() {
       if (dbError) throw dbError;
 
       toast({
-        title: tx({ de: 'Upload successful', en: 'Upload successful', es: 'Subida exitosa' }),
+        title: tx({ de: 'Upload erfolgreich', en: 'Upload successful', es: 'Subida exitosa' }),
         description: 'Media uploaded successfully',
       });
 
@@ -664,7 +664,7 @@ export default function MediaLibrary() {
       loadStorageQuota();
     } catch (error: any) {
       toast({
-        title: tx({ de: 'Upload failed', en: 'Upload failed', es: 'Error al subir' }),
+        title: tx({ de: 'Upload fehlgeschlagen', en: 'Upload failed', es: 'Error al subir' }),
         description: error.message,
         variant: 'destructive',
       });

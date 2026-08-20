@@ -1186,12 +1186,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} {(rerollTarget?.orderIndex ?? 0) + 1} {tx({ de: tx({ de: "neu generieren?", en: "regenerate?", es: "¿regenerar?" }), en: 'regenerate?', es: '¿regenerar?' })}
+              {tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} {(rerollTarget?.orderIndex ?? 0) + 1} {tx({ de: 'neu generieren?', en: 'regenerate?', es: '¿regenerar?' })}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2">
                 <p>
-                  Dies kostet erneut{' '}
+                  {tx({ de: 'Dies kostet erneut', en: 'This costs another', es: 'Esto cuesta de nuevo' })}{' '}
                   <span className="font-semibold text-amber-400">
                     €{rerollTarget ? getClipCost(rerollTarget.clipSource, rerollTarget.clipQuality || 'standard', rerollTarget.durationSeconds).toFixed(2) : '0.00'}
                   </span>
@@ -1257,7 +1257,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                       ) : (
                         <>
                           <p>
-                            {tx({ de: 'Statt des HeyGen-Avatar-Bilds rendert', en: 'Instead of the HeyGen avatar image,', es: 'En lugar de la imagen del avatar de HeyGen,' })} <span className="font-semibold text-emerald-300">Hailuo</span> {tx({ de: 'die echte Storyboard-Szene (Umgebung, Kamera, Licht). Danach wird der Charakter via', en: 'renders the real storyboard scene (environment, camera, lighting). Then the character is placed into the scene via', es: 'renderiza la escena real del guion gráfico (entorno, cámara, luz). Luego el personaje se incorpora a la escena mediante' })} <span className="font-semibold">Lippensynchronisation</span> {tx({ de: 'in die Szene eingebaut — wie bei Artlist.', en: '— just like Artlist.', es: '— igual que en Artlist.' })}
+                            {tx({ de: 'Statt des HeyGen-Avatar-Bilds rendert', en: 'Instead of the HeyGen avatar image,', es: 'En lugar de la imagen del avatar de HeyGen,' })} <span className="font-semibold text-emerald-300">Hailuo</span> {tx({ de: 'die echte Storyboard-Szene (Umgebung, Kamera, Licht). Danach wird der Charakter via', en: 'renders the real storyboard scene (environment, camera, lighting). Then the character is placed into the scene via', es: 'renderiza la escena real del guion gráfico (entorno, cámara, luz). Luego el personaje se incorpora a la escena mediante' })} <span className="font-semibold">{tx({ de: 'Lippensynchronisation', en: 'lip-sync', es: 'sincronización labial' })}</span> {tx({ de: 'in die Szene eingebaut — wie bei Artlist.', en: '— just like Artlist.', es: '— igual que en Artlist.' })}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {tx({ de: 'Falls dein Voiceover länger ist als die aktuelle Szenen-Dauer, wird die Szene', en: 'If your voiceover is longer than the current scene duration, the scene is', es: 'Si tu locución es más larga que la duración actual de la escena, la escena se' })} <span className="font-semibold">{tx({ de: 'automatisch verlängert', en: 'automatically extended', es: 'extiende automáticamente' })}</span> {tx({ de: 'damit die Lippensynchronisation vollständig läuft.', en: 'so the lip-sync runs completely.', es: 'para que la sincronización labial se ejecute por completo.' })}
@@ -1445,7 +1445,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                         ) : (
                           <RefreshCw className="h-3 w-3" />
                         )}
-                        Erneut versuchen
+                        {tx({ de: 'Erneut versuchen', en: 'Try again', es: 'Intentar de nuevo' })}
                       </Button>
                     )}
                     {/* Ready → Re-roll */}
