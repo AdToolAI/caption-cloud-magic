@@ -213,7 +213,7 @@ export function MusicGeneratorPanel({
             </Badge>
             {onOpenLibrary && (
               <Button variant="ghost" size="sm" onClick={onOpenLibrary} className="text-xs h-7">
-                <LibraryIcon className="w-3.5 h-3.5 mr-1" /> Bibliothek
+                <LibraryIcon className="w-3.5 h-3.5 mr-1" /> {tx({ de: 'Bibliothek', en: 'Library', es: 'Biblioteca' })}
               </Button>
             )}
           </div>

@@ -32,7 +32,7 @@ export const VideoShareDialog = ({ open, onOpenChange, video }: VideoShareDialog
   const copyLink = () => {
     if (video.output_url) {
       navigator.clipboard.writeText(video.output_url);
-      toast({ title: 'Link kopiert' });
+      toast({ title: tx({ de: 'Link kopiert', en: 'Link copied', es: 'Enlace copiado' }) });
     }
   };
 

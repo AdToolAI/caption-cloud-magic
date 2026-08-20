@@ -53,9 +53,17 @@ export function ProactiveAlertBanner() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h4 className="font-semibold text-foreground">
-                {errorCount > 0 
-                  ? `${errorCount} kritische${errorCount > 1 ? ' Probleme' : 's Problem'} erkannt`
-                  : `${warningCount} Warnung${warningCount > 1 ? 'en' : ''}`
+                {errorCount > 0
+                  ? tx({
+                      de: `${errorCount} kritische${errorCount > 1 ? ' Probleme' : 's Problem'} erkannt`,
+                      en: `${errorCount} critical issue${errorCount > 1 ? 's' : ''} detected`,
+                      es: `${errorCount} problema${errorCount > 1 ? 's' : ''} crítico${errorCount > 1 ? 's' : ''} detectado${errorCount > 1 ? 's' : ''}`,
+                    })
+                  : tx({
+                      de: `${warningCount} Warnung${warningCount > 1 ? 'en' : ''}`,
+                      en: `${warningCount} warning${warningCount > 1 ? 's' : ''}`,
+                      es: `${warningCount} advertencia${warningCount > 1 ? 's' : ''}`,
+                    })
                 }
               </h4>
               {isLoading && (

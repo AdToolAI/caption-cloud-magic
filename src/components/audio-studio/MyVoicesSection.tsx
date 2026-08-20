@@ -250,8 +250,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>{tx({ de: "Stimme löschen?", en: "Delete voice?", es: "¿Eliminar voz?" })}</AlertDialogTitle>
             <AlertDialogDescription>
-              {tx({ de: "Diese Aktion kann nicht rückgängig gemacht werden. Die geklonte Stimme wird aus deiner", en: "This action cannot be undone. The cloned voice will be removed from your", es: "Esta acción no se puede deshacer. La voz clonada se eliminará de tu" })}
-              Bibliothek entfernt.
+              {tx({ de: "Diese Aktion kann nicht rückgängig gemacht werden. Die geklonte Stimme wird aus deiner Bibliothek entfernt.", en: "This action cannot be undone. The cloned voice will be removed from your library.", es: "Esta acción no se puede deshacer. La voz clonada se eliminará de tu biblioteca." })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

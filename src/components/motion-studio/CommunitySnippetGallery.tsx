@@ -183,9 +183,9 @@ export default function CommunitySnippetGallery({ onUse, onCloned }: Props) {
                       onClick={() => handleClone(s)}
                       disabled={busy[s.id]}
                       className="h-6 text-[10px] gap-1"
-                      title="In meine Library kopieren"
+                      title={tx({ de: 'In meine Library kopieren', en: 'Copy to my library', es: 'Copiar a mi biblioteca' })}
                     >
-                      <Copy className="h-3 w-3" /> Klonen
+                      <Copy className="h-3 w-3" /> {tx({ de: 'Klonen', en: 'Clone', es: 'Clonar' })}
                     </Button>
                   </div>
                 </div>
