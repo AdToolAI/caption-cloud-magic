@@ -120,6 +120,20 @@ const BANNED_WORDS = [
   'Charaktere',
   'ältere',
   'Ältere',
+  // v-final: wider vocabulary class found by the independent secondary scan
+  // (variant labels, speaker/face mapping, Remotion error fallback, portrait
+  // fallback name). Each of these leaked while EN was selected.
+  'Variante',
+  'Varianten',
+  'Variantenname',
+  'Sprecher',
+  'Gesicht',
+  'Gesichter',
+  'zuordnen',
+  'Auswahlen',
+  'gefunden',
+  'Verfügbare',
+  'Portrait fehlt',
 ];
 
 const BANNED = new RegExp(`(?<![\\w-])(${BANNED_WORDS.join('|')})(?![\\w-])`);

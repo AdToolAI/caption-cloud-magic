@@ -253,7 +253,7 @@ export function FaceMapReviewDialog({ open, onOpenChange, scene }: FaceMapReview
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Sprecher ↔ Gesicht zuordnen</DialogTitle>
+          <DialogTitle>{tx({ de: "Sprecher ↔ Gesicht zuordnen", en: "Map speaker ↔ face", es: "Asignar hablante ↔ rostro" })}</DialogTitle>
           <DialogDescription>
             {tx({ de: `Auf dem Anker wurden ${faces.length} Gesichter erkannt, aber die automatische Zuordnung konnte nicht alle ${speakers.length} Sprecher eindeutig zuordnen.`, en: `${faces.length} faces were detected on the anchor, but automatic mapping could not clearly assign all ${speakers.length} speakers.`, es: `Se detectaron ${faces.length} rostros en el ancla, pero la asignación automática no pudo asignar con claridad a los ${speakers.length} hablantes.` })}
             
@@ -306,7 +306,7 @@ export function FaceMapReviewDialog({ open, onOpenChange, scene }: FaceMapReview
                   <div className="w-10 h-10 rounded bg-muted" />
                 )}
                 <div className="flex-1">
-                  <div className="text-sm font-medium">Sprecher {sp.idx + 1}: {sp.name}</div>
+                  <div className="text-sm font-medium">{tx({ de: `Sprecher ${sp.idx + 1}: ${sp.name}`, en: `Speaker ${sp.idx + 1}: ${sp.name}`, es: `Hablante ${sp.idx + 1}: ${sp.name}` })}</div>
                 </div>
                 <select
                   className="border rounded px-2 py-1 text-sm bg-background"

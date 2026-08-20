@@ -51,9 +51,9 @@ export const DynamicCompositionLoader: React.FC<DynamicCompositionLoaderProps> =
       }}>
         <div>
           <div style={{ fontSize: 48, marginBottom: 20 }}>⚠️</div>
-          <div>Component nicht gefunden: {componentId}</div>
+          <div>Component not found: {componentId}</div>
           <div style={{ fontSize: 14, marginTop: 10, opacity: 0.7 }}>
-            Verfügbare Components: {Object.keys(COMPONENT_REGISTRY).join(', ')}
+            Available components: {Object.keys(COMPONENT_REGISTRY).join(', ')}
           </div>
         </div>
       </div>
