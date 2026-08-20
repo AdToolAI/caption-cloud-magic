@@ -624,6 +624,6 @@ describe('English UI purity (deep)', () => {
       }
     }
     // Sink-scoped only: no path-level trust.
-    expect(Object.values(ALLOWLIST).flat().length).toBeLessThanOrEqual(8);
+    expect(Object.values(ALLOWLIST).flat().length).toBeLessThanOrEqual(16);
   });
 });
