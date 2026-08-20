@@ -350,7 +350,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
             return (
               <div
                 className="absolute bottom-1 right-1 bg-amber-400/90 text-black rounded px-1.5 py-0.5 text-[9px] font-semibold shadow"
-                title={txe('Identität: %R/%E biometrisch bestätigt (AWS Rekognition). Restliche Sprecher via Reihenfolge zugeordnet.','Identity: %R/%E biometrically confirmed (AWS Rekognition). Remaining speakers matched by order.','Identidad: %R/%E confirmada biométricamente (AWS Rekognition). El resto de hablantes se asignan por orden.')}
+                title={tx({ de: `Identität: ${r}/${e} biometrisch bestätigt (AWS Rekognition). Restliche Sprecher via Reihenfolge zugeordnet.`, en: `Identity: ${r}/${e} biometrically confirmed (AWS Rekognition). Remaining speakers matched by order.`, es: `Identidad: ${r}/${e} confirmada biométricamente (AWS Rekognition). El resto de hablantes se asignan por orden.` })}
               >
                 ⓘ ID {r}/{e}
               </div>

@@ -299,7 +299,7 @@ export function ImageGenerator() {
     if (result.recommendedMode === 'transform') {
       setStrength(result.recommendedStrength);
     }
-    toast.success(txe(`Prompt übernommen — Modell: ${result.recommendedTier}`, `Prompt applied — model: ${result.recommendedTier}`, `Prompt aplicado — modelo: ${result.recommendedTier}`));
+    toast.success(tx({ de: `Prompt übernommen — Modell: ${result.recommendedTier}`, en: `Prompt applied — model: ${result.recommendedTier}`, es: `Prompt aplicado — modelo: ${result.recommendedTier}` }));
   };
 
   const generateOne = async (): Promise<any | null> => {

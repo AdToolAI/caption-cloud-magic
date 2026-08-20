@@ -470,7 +470,7 @@ export function SceneAnalysisStep({
     });
     
     const transitionName = TRANSITION_TYPES.find(t => t.id === transitionType)?.name || transitionType;
-    toast.success(txe(`Übergang "${transitionName}" gesetzt`, `Transition "${transitionName}" applied`, `Transición "${transitionName}" aplicada`));
+    toast.success(tx({ de: `Übergang "${transitionName}" gesetzt`, en: `Transition "${transitionName}" applied`, es: `Transición "${transitionName}" aplicada` }));
   };
 
   // Handle scene transition duration change
