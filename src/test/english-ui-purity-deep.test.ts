@@ -494,6 +494,19 @@ describe('deep detector self-tests — negative controls', () => {
     expect(flags(`<p>{tx({ de: 'Credits kaufen', en: 'Buy credits', es: 'Comprar créditos' })}</p>`)).toEqual([]);
   });
 
+  it('flags every historical real leak in the regression corpus', () => {
+    // 157 literals that genuinely leaked into the English UI and were fixed.
+    // The previous guard missed most of them; this corpus pins that gap shut.
+    const corpus: string[] = JSON.parse(
+      fs.readFileSync(path.join(__dirname, 'fixtures', 'german-leak-corpus.json'), 'utf8'),
+    );
+    const missed = corpus.filter((t) => !isGerman(t));
+    expect(missed, `detector regressed on:\n${missed.join('\n')}`).toEqual([]);
+    expect(corpus.length).toBeGreaterThan(150);
+  });
+
+
+
   it('ignores de:/es: dictionary values', () => {
     expect(flags(`const M = { de: 'Einstellungen speichern', en: 'Save settings', es: 'Guardar' };`)).toEqual([]);
   });
