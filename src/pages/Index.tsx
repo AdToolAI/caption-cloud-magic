@@ -103,6 +103,9 @@ const Index = () => {
           {/* Proof Moment — Briefing links, echter Clip rechts */}
           <ProofMoment />
 
+          {/* AI Arsenal - all integrated AI modules */}
+          <AIArsenalShowcase />
+
           {/* Social Proof Strip */}
           <SocialProofStrip />
 
@@ -118,8 +121,6 @@ const Index = () => {
           {/* UDC — Consistency-First moat */}
           <UDCShowcase />
 
-          {/* AI Arsenal - all integrated AI modules */}
-          <AIArsenalShowcase />
 
           {/* Pricing — was 14,99 € konkret enthält */}
           <PricingSection />
