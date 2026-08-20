@@ -37,7 +37,7 @@ const SLIDERS: Array<{
   unit: string;
   showSign?: boolean;
 }> = [
-  { key: 'brightness', label: 'Helligkeit', icon: Sun, min: 50, max: 150, default: 100, unit: '%' },
+  { key: 'brightness', label: tx({ de: "Helligkeit", en: "Brightness", es: "Brillo" }), icon: Sun, min: 50, max: 150, default: 100, unit: '%' },
   { key: 'contrast', label: 'Kontrast', icon: Contrast, min: 50, max: 150, default: 100, unit: '%' },
   { key: 'saturation', label: tx({ de: "Sättigung", en: "Saturation", es: "Saturación" }), icon: Droplets, min: 0, max: 200, default: 100, unit: '%' },
   { key: 'sharpness', label: tx({ de: "Schärfe", en: "Sharpness", es: "Nitidez" }), icon: Focus, min: 0, max: 100, default: 0, unit: '' },

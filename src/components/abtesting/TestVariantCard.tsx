@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Trophy, TrendingUp, Eye, Target } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
 import { uiLocale } from '@/lib/uiLocale';
+import { tx } from '@/lib/i18nText';
 
 type ABTestVariant = Database['public']['Tables']['ab_test_variants']['Row'];
 
@@ -36,7 +37,7 @@ export function TestVariantCard({ variant, isWinner, onDeclareWinner, showAction
         {showActions && !isWinner && onDeclareWinner && views >= 100 && (
           <Button size="sm" onClick={onDeclareWinner}>
             <Trophy className="h-4 w-4 mr-2" />
-            Als Winner deklarieren
+            {tx({ de: "Als Winner deklarieren", en: "Declare winner", es: "Declarar ganador" })}
           </Button>
         )}
       </div>

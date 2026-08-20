@@ -194,7 +194,7 @@ export default function AIDirectorBriefDialog({
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  Storyboard generieren
+                  {tx({ de: "Storyboard generieren", en: "Generate storyboard", es: "Generar storyboard" })}
                 </>
               )}
             </Button>

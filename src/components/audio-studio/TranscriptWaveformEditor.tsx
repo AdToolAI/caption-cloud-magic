@@ -187,7 +187,7 @@ export function TranscriptWaveformEditor({
               ) : (
                 <>
                   <Wand2 className="w-4 h-4 mr-2" />
-                  Transcript generieren
+                  {tx({ de: "Transcript generieren", en: "Generate transcript", es: "Generar transcripción" })}
                 </>
               )}
             </Button>

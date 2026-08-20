@@ -318,7 +318,7 @@ export interface VideoCategoryInfo {
 export const VIDEO_CATEGORIES: VideoCategoryInfo[] = [
   {
     category: 'corporate-ad',
-    name: 'Unternehmenswerbung',
+    name: tx({ de: "Unternehmenswerbung", en: "Corporate ad", es: "Publicidad corporativa" }),
     description: tx({ de: 'Professionelle Werbevideos für Unternehmen und Dienstleistungen', en: 'Professional promotional videos for businesses and services', es: 'Videos promocionales profesionales para empresas y servicios' }),
     icon: '🏢',
     color: 'from-blue-500 to-indigo-500',
@@ -328,7 +328,7 @@ export const VIDEO_CATEGORIES: VideoCategoryInfo[] = [
   },
   {
     category: 'product-ad',
-    name: 'Produktwerbung',
+    name: tx({ de: "Produktwerbung", en: "Product ad", es: "Publicidad de producto" }),
     description: tx({ de: 'Kreative Produktvideos mit deinen eigenen Produktfotos', en: 'Creative product videos with your own product photos', es: 'Videos de productos creativos con tus propias fotos de productos' }),
     icon: '📦',
     color: 'from-green-500 to-emerald-500',

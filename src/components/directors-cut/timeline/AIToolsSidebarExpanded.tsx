@@ -241,7 +241,7 @@ export function AIToolsSidebarExpanded({
               ) : (
                 <>
                   <Wand2 className="h-4 w-4" />
-                  Voiceover generieren
+                  {tx({ de: "Voiceover generieren", en: "Generate voiceover", es: "Generar voz en off" })}
                 </>
               )}
             </Button>
@@ -346,7 +346,7 @@ export function AIToolsSidebarExpanded({
                   {tx({ de: "Verbessere Stimmen für klarere Sprache", en: "Enhance voices for clearer speech", es: "Mejorar voces para un habla más clara" })}
                 </p>
                 <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs">Aktiviert</span>
+                  <span className="text-xs">{tx({ de: "Aktiviert", en: "Enabled", es: "Activado" })}</span>
                   <Switch defaultChecked />
                 </div>
               </motion.div>
@@ -377,7 +377,7 @@ export function AIToolsSidebarExpanded({
                   {tx({ de: "Synchronisiere Schnitte mit dem Beat", en: "Sync cuts to the beat", es: "Sincronizar cortes con el ritmo" })}
                 </p>
                 <Button variant="outline" size="sm" className="w-full mt-2">
-                  Beats analysieren
+                  {tx({ de: "Beats analysieren", en: "Analyze beats", es: "Analizar beats" })}
                 </Button>
               </motion.div>
             </div>
@@ -415,7 +415,7 @@ export function AIToolsSidebarExpanded({
             <div className="pt-2 border-t space-y-2">
               <Button variant="outline" size="sm" className="w-full gap-2">
                 <Scissors className="h-4 w-4" />
-                Auto-Cut generieren
+                {tx({ de: "Auto-Cut generieren", en: "Generate auto cut", es: "Generar corte automático" })}
               </Button>
               <Button variant="outline" size="sm" className="w-full gap-2">
                 <Wand2 className="h-4 w-4" />
@@ -446,7 +446,7 @@ export function AIToolsSidebarExpanded({
               
               <div>
                 <div className="flex justify-between text-xs mb-1">
-                  <span>Helligkeit</span>
+                  <span>{tx({ de: "Helligkeit", en: "Brightness", es: "Brillo" })}</span>
                   <span>0</span>
                 </div>
                 <Slider defaultValue={[50]} max={100} />
@@ -476,7 +476,7 @@ export function AIToolsSidebarExpanded({
       <div className="p-3 border-t">
         <Button className="w-full gap-2" onClick={onExport}>
           <Download className="h-4 w-4" />
-          Video exportieren
+          {tx({ de: "Video exportieren", en: "Export video", es: "Exportar vídeo" })}
         </Button>
       </div>
 

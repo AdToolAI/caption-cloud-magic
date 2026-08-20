@@ -1462,7 +1462,7 @@ export default function VideoComposerDashboard() {
         stockKeywords: Array.isArray(p.tags) ? p.tags.slice(0, 6).join(', ') : undefined,
       } as any);
       toast({
-        title: t('composer.stockImported', { defaultValue: 'Stock-Clip importiert' }),
+        title: t('composer.stockImported', { defaultValue: tx({ de: "Stock-Clip importiert", en: "Stock clip imported", es: "Clip de stock importado" }) }),
         description: p.title || p.url,
       });
     } catch (err) {

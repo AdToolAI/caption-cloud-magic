@@ -240,7 +240,7 @@ export function AnchorPreviewGate({
                 className="mt-2"
               >
                 <RefreshCw className="w-4 h-4 mr-1" />
-                Erneut versuchen
+                {tx({ de: "Erneut versuchen", en: "Try again", es: "Inténtalo de nuevo" })}
               </Button>
             </>
           )}

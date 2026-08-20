@@ -100,7 +100,7 @@ export function useMusicGeneration() {
         return null;
       }
 
-      toast.success('🎵 Track generiert!', {
+      toast.success(tx({ de: "🎵 Track generiert!", en: "🎵 Track generated!", es: "🎵 ¡Pista generada!" }), {
         description: `${data.track.title} • ${data.track.duration_sec}s`,
       });
 
@@ -136,7 +136,7 @@ export function useMusicGeneration() {
         toast.error(data?.error || tx({ de: 'Lyrics-Generierung fehlgeschlagen', en: 'Lyrics generation failed', es: 'La generación de letras falló' }));
         return null;
       }
-      toast.success('✍️ Lyrics generiert!');
+      toast.success(tx({ de: "✍️ Lyrics generiert!", en: "✍️ Lyrics generated!", es: "✍️ ¡Letra generada!" }));
       return data.lyrics as string;
     } catch (err: any) {
       console.error('Lyrics generation error:', err);

@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Sparkles, Target, Zap } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { tx } from '@/lib/i18nText';
 
 export const CampaignHeroHeader = () => {
   const { t } = useTranslation();
@@ -52,7 +53,7 @@ export const CampaignHeroHeader = () => {
         className="flex flex-wrap gap-3 mt-6"
       >
         {[
-          { icon: Sparkles, label: "KI-Generiert" },
+          { icon: Sparkles, label: tx({ de: "KI-Generiert", en: "AI-generated", es: "Generado por IA" }) },
           { icon: Target, label: "Multi-Plattform" },
           { icon: Zap, label: "Auto-Schedule" },
         ].map((feature, idx) => (

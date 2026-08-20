@@ -55,7 +55,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
         .eq('id', slot.id);
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ['autopilot-queue'] });
-      toast({ title: 'Slot aktualisiert', description: tx({ de: 'Änderungen gespeichert.', en: 'Changes saved.', es: 'Cambios guardados.' }) });
+      toast({ title: tx({ de: "Slot aktualisiert", en: "Slot updated", es: "Espacio actualizado" }), description: tx({ de: 'Änderungen gespeichert.', en: 'Changes saved.', es: 'Cambios guardados.' }) });
     } catch (e: unknown) {
       toast({
         title: tx({ de: "Speichern fehlgeschlagen", en: "Save failed", es: "Error al guardar" }),

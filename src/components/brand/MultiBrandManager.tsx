@@ -119,16 +119,16 @@ export function MultiBrandManager({
                       {!isActive && (
                         <DropdownMenuItem onClick={() => onSetActive(kit.id)}>
                           <Star className="mr-2 h-4 w-4" />
-                          Als aktiv setzen
+                          {tx({ de: "Als aktiv setzen", en: "Set as active", es: "Establecer como activo" })}
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuItem onClick={() => handleDuplicate(kit)}>
                         <Copy className="mr-2 h-4 w-4" />
-                        Duplizieren
+                        {tx({ de: "Duplizieren", en: "Duplicate", es: "Duplicar" })}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onExport(kit)}>
                         <Download className="mr-2 h-4 w-4" />
-                        Als PDF exportieren
+                        {tx({ de: "Als PDF exportieren", en: "Export as PDF", es: "Exportar como PDF" })}
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => handleDelete(kit.id)}

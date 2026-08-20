@@ -915,7 +915,7 @@ export function SceneAnalysisStep({
                         <div>
                           <h5 className="text-sm font-medium mb-2 flex items-center gap-2">
                             <Sparkles className="w-4 h-4 text-primary" />
-                            KI-Empfehlungen
+                            {tx({ de: "KI-Empfehlungen", en: "AI recommendations", es: "Recomendaciones de IA" })}
                           </h5>
                           <ul className="space-y-2">
                             {scene.ai_suggestions.map((suggestion, i) => (
@@ -994,7 +994,7 @@ export function SceneAnalysisStep({
                             {/* Brightness */}
                             <div className="flex items-center gap-3">
                               <Sun className="w-4 h-4 text-yellow-500 shrink-0" />
-                              <span className="text-xs w-16 shrink-0">Helligkeit</span>
+                              <span className="text-xs w-16 shrink-0">{tx({ de: "Helligkeit", en: "Brightness", es: "Brillo" })}</span>
                               <Slider
                                 value={[sceneEffects[scene.id]?.brightness ?? 100]}
                                 onValueChange={(v) => {

@@ -173,7 +173,7 @@ export function AIAutoCut({ videoUrl, videoDuration, audioUrl, onCutsGenerated }
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Zap className="h-4 w-4 text-orange-500" />
-              <Label className="text-xs">Action-Erkennung</Label>
+              <Label className="text-xs">{tx({ de: "Action-Erkennung", en: "Action detection", es: "Detección de acción" })}</Label>
             </div>
             <Switch
               checked={settings.actionDetection}
@@ -217,7 +217,7 @@ export function AIAutoCut({ videoUrl, videoDuration, audioUrl, onCutsGenerated }
         {/* Sensitivity */}
         <div className="space-y-2">
           <div className="flex justify-between">
-            <span className="text-xs font-medium">Empfindlichkeit</span>
+            <span className="text-xs font-medium">{tx({ de: "Empfindlichkeit", en: "Sensitivity", es: "Sensibilidad" })}</span>
             <span className="text-xs text-muted-foreground">{settings.sensitivity}%</span>
           </div>
           <Slider
@@ -243,7 +243,7 @@ export function AIAutoCut({ videoUrl, videoDuration, audioUrl, onCutsGenerated }
           ) : (
             <>
               <Scissors className="h-4 w-4 mr-2" />
-              Auto-Schnitte generieren
+              {tx({ de: "Auto-Schnitte generieren", en: "Generate auto cuts", es: "Generar cortes automáticos" })}
             </>
           )}
         </Button>

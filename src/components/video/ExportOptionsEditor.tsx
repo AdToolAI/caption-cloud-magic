@@ -64,7 +64,7 @@ export const ExportOptionsEditor = ({ options, onChange }: ExportOptionsEditorPr
             >
               <Film className="h-6 w-6 mx-auto mb-2" />
               <div className="text-sm font-medium">WebM</div>
-              <div className="text-xs text-muted-foreground">Web-optimiert</div>
+              <div className="text-xs text-muted-foreground">{tx({ de: "Web-optimiert", en: "Web-optimized", es: "Optimizado para web" })}</div>
             </button>
             <button
               onClick={() => updateOptions({ format: 'gif' })}
@@ -161,7 +161,7 @@ export const ExportOptionsEditor = ({ options, onChange }: ExportOptionsEditorPr
           
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
             <div>
-              <div className="font-medium text-sm">Wasserzeichen</div>
+              <div className="font-medium text-sm">{tx({ de: "Wasserzeichen", en: "Watermark", es: "Marca de agua" })}</div>
               <div className="text-xs text-muted-foreground">{tx({ de: 'Logo im Video anzeigen', en: 'Show logo in the video', es: 'Mostrar el logotipo en el vídeo' })}</div>
             </div>
             <Switch

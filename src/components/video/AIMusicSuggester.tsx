@@ -67,7 +67,7 @@ export const AIMusicSuggester = ({ onSelect }: AIMusicSuggesterProps) => {
 
       <div className="space-y-3">
         <div className="space-y-2">
-          <Label>Stimmung</Label>
+          <Label>{tx({ de: "Stimmung", en: "Mood", es: "Ambiente" })}</Label>
           <Select value={mood} onValueChange={setMood} disabled={loading}>
             <SelectTrigger>
               <SelectValue />

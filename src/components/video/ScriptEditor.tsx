@@ -56,7 +56,7 @@ export const ScriptEditor = ({
       if (data?.optimizedText) {
         onChange(data.optimizedText);
         toast({
-          title: "✨ Optimiert!",
+          title: tx({ de: "✨ Optimiert!", en: "✨ Optimized!", es: "✨ ¡Optimizado!" }),
           description: tx({ de: `Skript wurde ${label}.`, en: `Script became ${label}.`, es: `El script se convirtió en ${label}.` }),
         });
       }

@@ -28,7 +28,7 @@ export const ExportBundle = ({ onExportPNG, onExportPDF, onExportBundle, isPro }
         className="gap-2"
       >
         <FileImage className="h-4 w-4" />
-        PNG exportieren
+        {tx({ de: "PNG exportieren", en: "Export PNG", es: "Exportar PNG" })}
       </Button>
       
       <Button 

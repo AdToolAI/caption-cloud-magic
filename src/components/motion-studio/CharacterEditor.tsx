@@ -153,7 +153,7 @@ export default function CharacterEditor({
             reference_image_url: url,
             reference_image_seed: data.styleSeed ?? d.reference_image_seed,
           }));
-          toast.success('Character Sheet generiert ✨');
+          toast.success(tx({ de: "Character Sheet generiert ✨", en: "Character sheet generated ✨", es: "Hoja de personaje generada ✨" }));
           return;
         }
       } catch (uploadErr) {
@@ -166,7 +166,7 @@ export default function CharacterEditor({
         reference_image_url: data.imageUrl,
         reference_image_seed: data.styleSeed ?? d.reference_image_seed,
       }));
-      toast.success('Character Sheet generiert ✨');
+      toast.success(tx({ de: "Character Sheet generiert ✨", en: "Character sheet generated ✨", es: "Hoja de personaje generada ✨" }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' });
       toast.error(msg);
@@ -351,7 +351,7 @@ export default function CharacterEditor({
 
           {/* Signature Items */}
           <div className="space-y-1.5">
-            <Label className="text-xs">Markante Kleidung & Objekte (Englisch empfohlen)</Label>
+            <Label className="text-xs">{tx({ de: "Markante Kleidung & Objekte (Englisch empfohlen)", en: "Distinctive clothing & objects (English recommended)", es: "Ropa y objetos distintivos (se recomienda inglés)" })}</Label>
             <Textarea
               value={draft.signature_items}
               onChange={(e) => setDraft((d) => ({ ...d, signature_items: e.target.value }))}

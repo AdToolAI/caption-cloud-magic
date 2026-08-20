@@ -139,7 +139,7 @@ export default function DriftReportPanel({ projectId, scenes, onUpdateScene }: P
         allFixed.push(...p.fieldsFixed.map((f) => `S${p.sceneIndex}.${f}`));
       }
       await persist({ autoFixApplied: true, fixedFields: allFixed });
-      toast.success('Storyboard angeglichen', {
+      toast.success(tx({ de: "Storyboard angeglichen", en: "Storyboard aligned", es: "Storyboard alineado" }), {
         description: tx({ de: `${autoFix.fixableCount} Feld(er) in ${autoFix.patches.length} Szene(n) aktualisiert.`, en: `Updated ${autoFix.fixableCount} field(s) in ${autoFix.patches.length} scene(s).`, es: `Se actualizaron los campos ${autoFix.fixableCount} en las escenas ${autoFix.patches.length}.` }),
       });
       setPreviewOpen(false);

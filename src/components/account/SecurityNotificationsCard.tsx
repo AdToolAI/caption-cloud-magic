@@ -97,7 +97,7 @@ export const SecurityNotificationsCard = () => {
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
-            <Label>Sicherheitswarnungen</Label>
+            <Label>{tx({ de: "Sicherheitswarnungen", en: "Security alerts", es: "Alertas de seguridad" })}</Label>
             <p className="text-xs text-muted-foreground">
               {tx({ de: "E-Mail bei verdächtigen Aktivitäten", en: "Email for suspicious activity", es: "Correo electrónico para actividad sospechosa" })}
             </p>
@@ -111,7 +111,7 @@ export const SecurityNotificationsCard = () => {
         
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
-            <Label>Login-Benachrichtigungen</Label>
+            <Label>{tx({ de: "Login-Benachrichtigungen", en: "Login notifications", es: "Notificaciones de inicio de sesión" })}</Label>
             <p className="text-xs text-muted-foreground">
               {tx({ de: "E-Mail bei jeder neuen Anmeldung", en: "Email for every new login", es: "Correo electrónico para cada nuevo inicio de sesión" })}
             </p>

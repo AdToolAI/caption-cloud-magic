@@ -172,7 +172,7 @@ export function ProductionStage({ production, scenes, log }: Props) {
                   {scene.fallback_kind === 'still' && (
                     <Badge variant="outline" className="text-[10px]">
                       <ImageIcon className="mr-1 h-3 w-3" />
-                      Als Standbild gerettet
+                      {tx({ de: "Als Standbild gerettet", en: "Saved as still", es: "Guardado como fotograma" })}
                     </Badge>
                   )}
                 </div>

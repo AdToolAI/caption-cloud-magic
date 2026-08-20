@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { HeadphonesIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { tx } from '@/lib/i18nText';
 
 interface EscalationButtonProps {
   onClick: () => void;
@@ -40,7 +41,7 @@ export function EscalationButton({ onClick, variant = 'inline' }: EscalationButt
       className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground hover:bg-orange-500/10 border border-transparent hover:border-orange-500/20"
     >
       <HeadphonesIcon className="w-3 h-3" />
-      <span>Support kontaktieren</span>
+      <span>{tx({ de: "Support kontaktieren", en: "Contact support", es: "Contactar con soporte" })}</span>
     </Button>
   );
 }

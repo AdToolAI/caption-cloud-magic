@@ -279,7 +279,7 @@ export function CastConsistencyMap({ scenes, characters, embedded = false, onUpd
                 onClick={handleRepair}
               >
                 <Wrench className="h-3 w-3 mr-1" />
-                Anker automatisch reparieren
+                {tx({ de: "Anker automatisch reparieren", en: "Auto-repair anchor", es: "Reparar el ancla automáticamente" })}
               </Button>
             )}
           </div>

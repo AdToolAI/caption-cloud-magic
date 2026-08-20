@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { tx } from '@/lib/i18nText';
 
 const PromptWizardHeroHeader = () => {
   const { t } = useTranslation();
@@ -30,7 +31,7 @@ const PromptWizardHeroHeader = () => {
           <span className="relative rounded-full h-2 w-2 bg-primary" />
         </span>
         <span className="text-xs font-medium text-primary uppercase tracking-wider">
-          KI-Prompt-Optimierung
+          {tx({ de: "KI-Prompt-Optimierung", en: "AI prompt optimization", es: "Optimización de prompts con IA" })}
         </span>
         <Sparkles className="h-3.5 w-3.5 text-primary" />
       </motion.div>

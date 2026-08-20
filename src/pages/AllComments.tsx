@@ -228,7 +228,7 @@ const AllComments = () => {
         prev.map(c => (c.id === commentId ? { ...c, status: newStatus } : c))
       );
 
-      toast({ title: "Status aktualisiert" });
+      toast({ title: tx({ de: "Status aktualisiert", en: "Status updated", es: "Estado actualizado" }) });
     } catch (error) {
       console.error("Error updating status:", error);
       toast({
@@ -286,7 +286,7 @@ const AllComments = () => {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Kommentare importieren</DialogTitle>
+                <DialogTitle>{tx({ de: "Kommentare importieren", en: "Import comments", es: "Importar comentarios" })}</DialogTitle>
               </DialogHeader>
               <Textarea
                 placeholder={tx({ de: "Ein Kommentar pro Zeile...", en: "One comment per line...", es: "Un comentario por línea..." })}
@@ -432,8 +432,8 @@ const AllComments = () => {
                         <SelectContent>
                           <SelectItem value="open">Offen</SelectItem>
                           <SelectItem value="replied">Beantwortet</SelectItem>
-                          <SelectItem value="ignored">Ignoriert</SelectItem>
-                          <SelectItem value="flagged">Markiert</SelectItem>
+                          <SelectItem value="ignored">{tx({ de: "Ignoriert", en: "Ignored", es: "Ignorado" })}</SelectItem>
+                          <SelectItem value="flagged">{tx({ de: "Markiert", en: "Flagged", es: "Marcado" })}</SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>

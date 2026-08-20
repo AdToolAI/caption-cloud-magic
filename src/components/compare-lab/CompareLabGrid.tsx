@@ -216,7 +216,7 @@ export default function CompareLabGrid({
             size="sm"
           >
             {isJudging ? (
-              <><Loader2 className="h-3 w-3 mr-2 animate-spin" /> Judge analysiert…</>
+              <><Loader2 className="h-3 w-3 mr-2 animate-spin" /> {tx({ de: "Judge analysiert…", en: "Judge analyzing…", es: "El juez analiza…" })}</>
             ) : (
               <><Wand2 className="h-3 w-3 mr-2" />{tx({ de: "AI-Judge: Sieger küren", en: "AI-Judge: Pick Winner", es: "Juez IA: Elegir ganador" })}</>
             )}
@@ -291,7 +291,7 @@ function OutputCard({
         {isLoading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            <span className="text-xs text-muted-foreground">Generiert…</span>
+            <span className="text-xs text-muted-foreground">{tx({ de: "Generiert…", en: "Generating…", es: "Generando…" })}</span>
           </div>
         )}
         {isFailed && (

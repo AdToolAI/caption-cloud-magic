@@ -57,7 +57,7 @@ const TIER_COSTS: Record<QualityTier, number> = {
 };
 
 const TIER_META: Record<QualityTier, { label: string; model: string; icon: any; gradient: string }> = {
-  standard: { label: 'Standard', model: 'Gemini (im Abo)', icon: Sparkles, gradient: 'from-emerald-500/20 to-teal-500/20' },
+  standard: { label: 'Standard', model: tx({ de: "Gemini (im Abo)", en: "Gemini (included)", es: "Gemini (incluido)" }), icon: Sparkles, gradient: 'from-emerald-500/20 to-teal-500/20' },
   fast: { label: 'Fast', model: 'Seedream 4', icon: Zap, gradient: 'from-blue-500/20 to-cyan-500/20' },
   pro: { label: 'Pro', model: 'Imagen 4 Ultra', icon: Crown, gradient: 'from-purple-500/20 to-pink-500/20' },
   ultra: { label: 'Ultra', model: 'Nano Banana 2', icon: Gem, gradient: 'from-amber-500/20 to-orange-500/20' },
@@ -821,7 +821,7 @@ export function ImageGenerator() {
                     step={5}
                   />
                   <div className="flex justify-between text-[10px] text-muted-foreground">
-                    <span>nah am Original</span>
+                    <span>{tx({ de: "nah am Original", en: "close to original", es: "cerca del original" })}</span>
                     <span>{tx({ de: "nur Inspiration", en: "inspiration only", es: "solo inspiración" })}</span>
                   </div>
                 </div>
@@ -1015,7 +1015,7 @@ export function ImageGenerator() {
           modelBadge: tier.toUpperCase(),
           lines: [
             {
-              label: variantsCount > 1 ? `${variantsCount} Varianten × Preis` : tx({ de: 'Preis pro Bild', en: 'Price per image', es: 'Precio por imagen' }),
+              label: variantsCount > 1 ? `${variantsCount} ${tx({ de: 'Varianten × Preis', en: 'variants × price', es: 'variantes × precio' })}` : tx({ de: 'Preis pro Bild', en: 'Price per image', es: 'Precio por imagen' }),
               value: `${variantsCount} × ${currencySymbol}${baseCost.toFixed(2)}`,
               detail: `${aspectRatio} · ${style}`,
             },

@@ -464,7 +464,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                   className="w-full mt-2 border-[#00d4ff]/30 text-[#00d4ff] hover:bg-[#00d4ff]/10"
                 >
                   <Scissors className="h-3.5 w-3.5 mr-2" />
-                  Am Playhead schneiden
+                  {tx({ de: "Am Playhead schneiden", en: "Cut at playhead", es: "Cortar en el cabezal" })}
                 </Button>
               )}
             </div>

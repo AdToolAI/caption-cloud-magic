@@ -151,7 +151,7 @@ export function LayerInspector({
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Ausrichtung</Label>
+              <Label className="text-xs text-muted-foreground">{tx({ de: "Ausrichtung", en: "Alignment", es: "Alineación" })}</Label>
               <div className="flex gap-1">
                 {([["left", AlignLeft], ["center", AlignCenter], ["right", AlignRight]] as const).map(([a, Icon]) => (
                   <Button
@@ -230,7 +230,7 @@ export function LayerInspector({
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Abdunkeln (Lesbarkeit)</Label>
+              <Label className="text-xs text-muted-foreground">{tx({ de: "Abdunkeln (Lesbarkeit)", en: "Darken (readability)", es: "Oscurecer (legibilidad)" })}</Label>
               <Slider
                 value={[Math.round(((layer as ImageLayer).scrim ?? 0) * 100)]}
                 min={0}
@@ -241,7 +241,7 @@ export function LayerInspector({
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Verlaufsrichtung</Label>
+              <Label className="text-xs text-muted-foreground">{tx({ de: "Verlaufsrichtung", en: "Gradient direction", es: "Dirección del degradado" })}</Label>
               <Select
                 value={(layer as ImageLayer).scrimDirection ?? "bottom"}
                 onValueChange={(v) => {

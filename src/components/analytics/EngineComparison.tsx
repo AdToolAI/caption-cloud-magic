@@ -204,7 +204,7 @@ export function EngineComparison({ engineData }: Props) {
 
       {/* Recommendation */}
       <Card className="p-6 bg-primary/5">
-        <h3 className="text-lg font-semibold mb-3">💡 Empfehlung</h3>
+        <h3 className="text-lg font-semibold mb-3">{tx({ de: "💡 Empfehlung", en: "💡 Recommendation", es: "💡 Recomendación" })}</h3>
         <div className="space-y-2 text-sm">
           <p>
             <strong>{tx({ de: 'Für schnelle, einfache Videos:', en: 'For fast, simple videos:', es: 'Para videos rápidos y sencillos:' })}</strong> {tx({ de: 'Nutze Shotstack -', en: 'Use Shotstack -', es: 'Usa Shotstack -' })} 

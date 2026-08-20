@@ -147,7 +147,7 @@ export function GreenScreenChromaKey({
           ) : (
             <>
               <Wand2 className="h-4 w-4 mr-2" />
-              AI Auto-Erkennung
+              {tx({ de: "AI Auto-Erkennung", en: "AI auto detection", es: "Detección automática con IA" })}
             </>
           )}
         </Button>
@@ -322,7 +322,7 @@ export function GreenScreenChromaKey({
               setAiConfidence(null);
             }}
           >
-            Chroma Key deaktivieren
+            {tx({ de: "Chroma Key deaktivieren", en: "Disable chroma key", es: "Desactivar croma" })}
           </Button>
         )}
       </CardContent>

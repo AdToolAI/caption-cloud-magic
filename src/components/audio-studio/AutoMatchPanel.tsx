@@ -230,7 +230,7 @@ export function AutoMatchPanel({
                 <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
                   <div>
                     <Badge className="mb-2 bg-gradient-to-r from-primary to-cyan-500 border-0 text-primary-foreground">
-                      <Sparkles className="w-3 h-3 mr-1" /> EMPFEHLUNG
+                      <Sparkles className="w-3 h-3 mr-1" /> {tx({ de: "EMPFEHLUNG", en: "RECOMMENDATION", es: "RECOMENDACIÓN" })}
                     </Badge>
                     <h3 className="text-xl font-bold capitalize mb-1">
                       {result.recommendation.genre} · {result.recommendation.mood}

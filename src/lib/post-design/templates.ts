@@ -323,7 +323,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   },
   {
     id: "stat",
-    name: "Zahl im Fokus",
+    name: tx({ de: "Zahl im Fokus", en: "Number in focus", es: "Cifra destacada" }),
     category: tx({ de: "Wissen", en: "Knowledge", es: "Conocimiento" }),
     build: ({ image }) =>
       base(

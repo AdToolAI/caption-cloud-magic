@@ -389,7 +389,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
                       disabled={isActive || !masterReady}
                       className="w-full h-7 text-xs"
                     >
-                      Erneut versuchen
+                      {tx({ de: "Erneut versuchen", en: "Try again", es: "Inténtalo de nuevo" })}
                     </Button>
                   </div>
                 ) : (

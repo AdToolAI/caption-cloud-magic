@@ -218,7 +218,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
 
             {/* Individual Enhancements */}
             <div className="space-y-4">
-              <Label className="text-xs text-muted-foreground">Einzelne Optimierungen</Label>
+              <Label className="text-xs text-muted-foreground">{tx({ de: "Einzelne Optimierungen", en: "Individual enhancements", es: "Mejoras individuales" })}</Label>
               
               {enhancements.map((enhancement) => (
                 <motion.div

@@ -46,14 +46,14 @@ export default function TemplateLibrary() {
   const categories = [
     { value: 'all', label: 'All' },
     { value: 'social_media', label: 'Social Media' },
-    { value: 'advertising', label: 'Werbung' },
+    { value: 'advertising', label: tx({ de: "Werbung", en: "Advertising", es: "Publicidad" }) },
     { value: 'explainer', label: tx({ de: "Erklärvideos", en: "Explainer Videos", es: "Videos Explicativos" }) },
     { value: 'tutorial', label: 'Tutorials' },
     { value: 'testimonial', label: 'Testimonials' },
     { value: 'product_showcase', label: tx({ de: "Produktpräsentation", en: "Product Showcase", es: "Presentación de Producto" }) },
     { value: 'event', label: 'Events' },
-    { value: 'educational', label: 'Bildung' },
-    { value: 'entertainment', label: 'Unterhaltung' },
+    { value: 'educational', label: tx({ de: "Bildung", en: "Education", es: "Educación" }) },
+    { value: 'entertainment', label: tx({ de: "Unterhaltung", en: "Entertainment", es: "Entretenimiento" }) },
     { value: 'other', label: 'Sonstige' },
   ];
 

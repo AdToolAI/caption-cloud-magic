@@ -53,7 +53,7 @@ export function NotificationCenter({ open, onClose }: NotificationCenterProps) {
           <SheetTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
-              Benachrichtigungen
+              {tx({ de: "Benachrichtigungen", en: "Notifications", es: "Notificaciones" })}
             </span>
             {notifications.length > 0 && (
               <Button

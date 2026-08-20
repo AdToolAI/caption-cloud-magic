@@ -43,7 +43,7 @@ export function CalendarFilterBar({
             <SelectContent>
               <SelectItem value="week">{tx({ de: 'Diese Woche', en: 'This week', es: 'Esta semana' })}</SelectItem>
               <SelectItem value="2weeks">{tx({ de: "Nächste 2 Wochen", en: "Next 2 weeks", es: "Próximas 2 semanas" })}</SelectItem>
-              <SelectItem value="custom">Benutzerdefiniert</SelectItem>
+              <SelectItem value="custom">{tx({ de: "Benutzerdefiniert", en: "Custom", es: "Personalizado" })}</SelectItem>
             </SelectContent>
           </Select>
 

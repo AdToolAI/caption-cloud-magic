@@ -676,7 +676,7 @@ export default function AdDirectorWizard({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="ad-product-desc">Kurzbeschreibung*</Label>
+                    <Label htmlFor="ad-product-desc">{tx({ de: "Kurzbeschreibung*", en: "Short description*", es: "Descripción breve*" })}</Label>
                     <Textarea
                       id="ad-product-desc"
                       value={productDescription}
@@ -757,7 +757,7 @@ export default function AdDirectorWizard({
                     <div className="flex-1 pt-2">
                       <div className="flex items-center justify-between gap-3">
                         <Label htmlFor="ad-vo" className="cursor-pointer">
-                          Voiceover automatisch generieren
+                          {tx({ de: "Voiceover automatisch generieren", en: "Generate voiceover automatically", es: "Generar la voz en off automáticamente" })}
                         </Label>
                         <Switch
                           id="ad-vo"
@@ -860,7 +860,7 @@ export default function AdDirectorWizard({
             {step === 'scaling' && (
               <div className="space-y-5">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  Kampagnen-Skalierung
+                  {tx({ de: "Kampagnen-Skalierung", en: "Campaign scaling", es: "Escalado de campaña" })}
                 </h3>
                 <p className="text-xs text-muted-foreground">
                   {tx({ de: "Optional — vervielfache deinen Spot in Cutdowns oder allen drei Skript-Varianten.", en: "Optional — multiply your ad in cutdowns or all three script variants.", es: "Opcional — multiplica tu anuncio en versiones cortas o en las tres variantes de guion." })}

@@ -514,7 +514,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
             <Clapperboard className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h2 className="font-serif text-xl">Regietisch</h2>
+            <h2 className="font-serif text-xl">{tx({ de: "Regietisch", en: "Director's table", es: "Mesa de dirección" })}</h2>
             <p className="text-sm text-muted-foreground">
               {tx({ de: "Sag, was du brauchst. Die KI entwickelt Konzept, Storyboard und Film.", en: "Tell us what you need. The AI develops concept, storyboard, and film.", es: "Dinos qué necesitas. La IA desarrolla el concepto, el guion gráfico y la película." })}
             </p>
@@ -536,13 +536,13 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
 
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
-              <Label>Art des Videos</Label>
+              <Label>{tx({ de: "Art des Videos", en: "Type of video", es: "Tipo de vídeo" })}</Label>
               <Select value={genre} onValueChange={(value) => setGenre(value as AutopilotGenre | 'auto')}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">Automatisch erkennen</SelectItem>
+                  <SelectItem value="auto">{tx({ de: "Automatisch erkennen", en: "Detect automatically", es: "Detectar automáticamente" })}</SelectItem>
                   {GENRE_LIST.map((recipe) => (
                     <SelectItem key={recipe.id} value={recipe.id}>
                       {recipe.label}
@@ -609,7 +609,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Regie denkt nach…
+                {tx({ de: "Regie denkt nach…", en: "Director is thinking…", es: "La dirección está pensando…" })}
               </>
             ) : (
               <>
@@ -804,7 +804,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
                 void handleStartProduction();
               }}
             >
-              Kostenpflichtig produzieren
+              {tx({ de: "Kostenpflichtig produzieren", en: "Produce (paid)", es: "Producir (de pago)" })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

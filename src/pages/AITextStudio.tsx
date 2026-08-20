@@ -710,7 +710,7 @@ export default function AITextStudio() {
             <Textarea
               value={comparePrompt}
               onChange={(e) => setComparePrompt(e.target.value)}
-              placeholder="Denselben Prompt an bis zu 3 Modelle gleichzeitig senden…"
+              placeholder={tx({ de: "Denselben Prompt an bis zu 3 Modelle gleichzeitig senden…", en: "Send the same prompt to up to 3 models at once…", es: "Envía el mismo prompt a hasta 3 modelos a la vez…" })}
               className="min-h-[100px]"
             />
             <div>

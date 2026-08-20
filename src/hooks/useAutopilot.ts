@@ -252,7 +252,7 @@ export function useToggleAutopilot() {
         });
       } else {
         toast({
-          title: 'Aktivierung blockiert',
+          title: tx({ de: "Aktivierung blockiert", en: "Activation blocked", es: "Activación bloqueada" }),
           description: res.error ?? res.lock_reason ?? tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }),
           variant: 'destructive',
         });

@@ -58,7 +58,7 @@ export const BriefTokensVisual = () => {
           >
             <div className="text-[9px] uppercase tracking-widest text-primary/60 mb-2">Brief</div>
             <div className="font-mono text-[11px] leading-relaxed text-foreground/85">
-              „Gründerin, 32, warmes Lächeln, Berlin, ruhig-charismatisch, warm-braune Farben."
+              {tx({ de: '„Gründerin, 32, warmes Lächeln, Berlin, ruhig-charismatisch, warm-braune Farben."', en: '"Founder, 32, warm smile, Berlin, calm and charismatic, warm brown palette."', es: '"Fundadora, 32, sonrisa cálida, Berlín, tranquila y carismática, paleta marrón cálida."' })}
             </div>
             <div className="mt-3 flex items-center gap-1.5 text-[9px] text-primary/70">
               <Sparkles className="h-3 w-3" />

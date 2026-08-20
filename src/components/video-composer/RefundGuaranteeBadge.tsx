@@ -17,7 +17,7 @@ export default function RefundGuaranteeBadge({ compact = false }: Props) {
     return (
       <div className="inline-flex items-center gap-1 text-[10px] text-emerald-400/90">
         <ShieldCheck className="h-3 w-3" />
-        Refund-garantiert
+        {tx({ de: "Refund-garantiert", en: "Refund guaranteed", es: "Reembolso garantizado" })}
       </div>
     );
   }

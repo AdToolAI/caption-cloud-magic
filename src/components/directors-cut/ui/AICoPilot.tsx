@@ -26,9 +26,9 @@ interface AICoPilotProps {
 
 const quickCommands = [
   { label: tx({ de: 'Szenen analysieren', en: 'Analyze scenes', es: 'Analizar escenas' }), command: tx({ de: 'Analysiere Szenen', en: 'Analyze scenes', es: 'Analizar escenas' }) },
-  { label: tx({ de: 'Übergänge generieren', en: 'Generate transitions', es: 'Generar transiciones' }), command: 'Generiere Übergänge' },
+  { label: tx({ de: 'Übergänge generieren', en: 'Generate transitions', es: 'Generar transiciones' }), command: tx({ de: "Generiere Übergänge", en: "Generate transitions", es: "Generar transiciones" }) },
   { label: tx({ de: 'Auto-Cut', en: 'Auto-Cut', es: 'Auto-Cut' }), command: 'Aktiviere Auto-Cut' },
-  { label: tx({ de: 'Style Transfer', en: 'Style Transfer', es: 'Style Transfer' }), command: 'Öffne Style Transfer' },
+  { label: tx({ de: 'Style Transfer', en: 'Style Transfer', es: 'Style Transfer' }), command: tx({ de: "Öffne Style Transfer", en: "Open style transfer", es: "Abrir transferencia de estilo" }) },
 ];
 
 export function AICoPilot({

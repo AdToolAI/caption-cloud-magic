@@ -116,7 +116,7 @@ const TOOLBOX_ITEMS = [
   },
   {
     icon: Zap,
-    title: 'Bulk-Generierung',
+    title: tx({ de: "Bulk-Generierung", en: "Bulk generation", es: "Generación masiva" }),
     desc: tx({ de: 'Mehrere Szenen parallel rendern – wie ein echtes Studio-Pipeline-Setup.', en: 'Render multiple scenes in parallel – like a real studio pipeline setup.', es: 'Renderice múltiples escenas en paralelo, como una configuración de canal de estudio real.' }),
   },
 ];

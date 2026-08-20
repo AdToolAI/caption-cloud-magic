@@ -41,7 +41,7 @@ export function AudioStudioHeroHeader() {
           Professioneller Sound.
         </span>
         <br />
-        <span className="text-foreground">Ein Klick.</span>
+        <span className="text-foreground">{tx({ de: "Ein Klick.", en: "One click.", es: "Un clic." })}</span>
       </motion.h1>
 
       {/* Subtitle */}

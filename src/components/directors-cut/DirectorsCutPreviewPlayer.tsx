@@ -14,6 +14,7 @@ import { NativePreviewEffects } from './preview/NativePreviewEffects';
 import { NativeTextOverlayRenderer } from './preview/NativeTextOverlayRenderer';
 import { resolveTransitions, findActiveTransition as resolverFindActiveTransition, findFreezePhase } from '@/utils/transitionResolver';
 import { getEffectiveBackgroundMusicVolume } from '@/lib/audioVolume';
+import { tx } from '@/lib/i18nText';
 
 const SUBTITLE_FONT_SIZES = {
   small: '16px',
@@ -1998,7 +1999,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           <button onClick={handleMuteToggle} className="absolute top-2 left-2 z-10 group">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-black/70 text-white text-xs font-medium cursor-pointer hover:bg-primary/80 hover:scale-105 transition-all duration-200 border border-white/20 hover:border-primary/50">
               <Volume2 className="w-4 h-4 group-hover:animate-pulse" />
-              <span>🔊 Audio aktivieren</span>
+              <span>{tx({ de: "🔊 Audio aktivieren", en: "🔊 Enable audio", es: "🔊 Activar audio" })}</span>
             </div>
           </button>
         )}

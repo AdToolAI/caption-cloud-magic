@@ -84,8 +84,8 @@ const ASPECTS = [
 
 const LANGUAGES = [
   { value: 'de', label: 'Deutsch' },
-  { value: 'en', label: 'Englisch' },
-  { value: 'es', label: 'Spanisch' },
+  { value: 'en', label: tx({ de: "Englisch", en: "English", es: "Inglés" }) },
+  { value: 'es', label: tx({ de: "Spanisch", en: "Spanish", es: "Español" }) },
 ];
 
 export function AutopilotIdeaLauncher({ onIdeas }: Props) {

@@ -350,7 +350,7 @@ export function MultiTrackTimeline({
             </Button>
             <Button size="sm" variant="outline" disabled={!selectedClip}>
               <Copy className="h-3 w-3 mr-1" />
-              Duplizieren
+              {tx({ de: "Duplizieren", en: "Duplicate", es: "Duplicar" })}
             </Button>
           </div>
           <div className="text-xs text-muted-foreground">

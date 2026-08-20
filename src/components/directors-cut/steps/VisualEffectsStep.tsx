@@ -253,7 +253,7 @@ export function VisualEffectsStep({
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <Label className="text-xs">Helligkeit</Label>
+                  <Label className="text-xs">{tx({ de: "Helligkeit", en: "Brightness", es: "Brillo" })}</Label>
                   <span className="text-xs text-muted-foreground">{effects.brightness}%</span>
                 </div>
                 <Slider

@@ -53,7 +53,7 @@ export const useUsageReports = () => {
 
       if (error) throw error;
 
-      toast.success('Report generiert!');
+      toast.success(tx({ de: "Report generiert!", en: "Report generated!", es: "¡Informe generado!" }));
       await fetchReports();
       return data;
     } catch (error: any) {

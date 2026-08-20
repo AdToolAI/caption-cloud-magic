@@ -368,8 +368,8 @@ export function AudioBeforeAfterComparison({
 
   const modeButtons: { id: PlaybackMode; label: string; shortcut: string }[] = [
     { id: 'original', label: 'Original', shortcut: 'A' },
-    { id: 'enhanced', label: 'Optimiert', shortcut: 'B' },
-    { id: 'both', label: 'Beide', shortcut: '' }
+    { id: 'enhanced', label: tx({ de: 'Optimiert', en: 'Enhanced', es: 'Mejorado' }), shortcut: 'B' },
+    { id: 'both', label: tx({ de: 'Beide', en: 'Both', es: 'Ambos' }), shortcut: '' }
   ];
 
   return (
@@ -624,7 +624,7 @@ export function AudioBeforeAfterComparison({
               <Input
                 value={saveTitle}
                 onChange={(e) => setSaveTitle(e.target.value)}
-                placeholder="z.B. Interview optimiert"
+                placeholder={tx({ de: "z.B. Interview optimiert", en: "e.g. Interview optimized", es: "p. ej. Entrevista optimizada" })}
                 className="bg-muted/20 border-border/50"
               />
             </div>
