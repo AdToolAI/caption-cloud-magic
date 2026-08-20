@@ -912,7 +912,7 @@ function DialogModeTab({
       {progress && (
         <Card className="p-3 bg-primary/5 border-primary/30">
           <div className="text-xs">
-            Generiere Block {progress.current} / {progress.total} …
+            {tx({ de: `Generiere Block ${progress.current} / ${progress.total} …`, en: `Generating block ${progress.current} / ${progress.total} …`, es: `Generando bloque ${progress.current} / ${progress.total} …` })}
           </div>
           <div className="mt-2 h-1.5 bg-muted rounded overflow-hidden">
             <div
@@ -930,7 +930,7 @@ function DialogModeTab({
         size="lg"
       >
         {generating ? (
-          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generiere Dialog ({progress?.current ?? 0}/{progress?.total ?? blocks.length}) …</>
+          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {tx({ de: `Generiere Dialog (${progress?.current ?? 0}/${progress?.total ?? blocks.length}) …`, en: `Generating dialogue (${progress?.current ?? 0}/${progress?.total ?? blocks.length}) …`, es: `Generando diálogo (${progress?.current ?? 0}/${progress?.total ?? blocks.length}) …` })}</>
         ) : (
           <><Mic className="h-4 w-4 mr-2" /> Dialog generieren ({blocks.length} Clips · €{totalCost.toFixed(2)})</>
         )}

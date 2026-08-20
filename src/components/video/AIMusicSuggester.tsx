@@ -106,7 +106,7 @@ export const AIMusicSuggester = ({ onSelect }: AIMusicSuggesterProps) => {
           {loading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Suche passende Musik...
+              {tx({ de: 'Suche passende Musik...', en: 'Searching for matching music...', es: 'Buscando música adecuada...' })}
             </>
           ) : (
             <>

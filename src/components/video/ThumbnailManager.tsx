@@ -151,7 +151,7 @@ export const ThumbnailManager = ({
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">
-            Generiere Thumbnail an bestimmter Stelle im Video
+            {tx({ de: 'Generiere Thumbnail an bestimmter Stelle im Video', en: 'Generate a thumbnail from a specific point in the video', es: 'Genera una miniatura en un punto concreto del vídeo' })}
           </p>
         </div>
 

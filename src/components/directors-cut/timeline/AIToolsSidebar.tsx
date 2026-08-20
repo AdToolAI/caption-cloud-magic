@@ -290,7 +290,7 @@ export function AIToolsSidebar({
                 {isGeneratingVoice ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generiere...
+                    {tx({ de: 'Generiere...', en: 'Generating...', es: 'Generando...' })}
                   </>
                 ) : (
                   <>
@@ -366,7 +366,7 @@ export function AIToolsSidebar({
                 {isGeneratingSfx ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generiere...
+                    {tx({ de: 'Generiere...', en: 'Generating...', es: 'Generando...' })}
                   </>
                 ) : (
                   <>

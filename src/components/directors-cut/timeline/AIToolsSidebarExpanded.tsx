@@ -236,7 +236,7 @@ export function AIToolsSidebarExpanded({
                   >
                     <Sparkles className="h-4 w-4" />
                   </motion.div>
-                  Generiere...
+                  {tx({ de: 'Generiere...', en: 'Generating...', es: 'Generando...' })}
                 </>
               ) : (
                 <>
