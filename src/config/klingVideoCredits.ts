@@ -1,7 +1,7 @@
 import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
 
-// Margin policy: exactly 3.00× Replicate cost (updated 14.07.2026 for Kling 3.0 Omni).
+// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 // Prices here MUST match _shared/videoPricingCatalog.ts — the backend reads
 // from the catalog, and the frontend reads from useVideoPricingCatalog() with
 // this file as fallback only.

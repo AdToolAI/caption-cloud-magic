@@ -145,8 +145,7 @@ export const AI_VIDEO_PRICING = {
   defaultDuration: 10, // seconds
 } as const;
 
-// Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
-// Std: $0.20/s → €0.60/s | Pro: $0.45/s → €1.35/s
+// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 export const AI_VIDEO_MODELS = {
   'sora-2-standard': {
     name: 'Sora 2 Standard',

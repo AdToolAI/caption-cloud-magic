@@ -1,8 +1,7 @@
 import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
 
-// Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
-// Std: $0.07/s → €0.21/s | Pro: $0.12/s → €0.36/s
+// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 export const LUMA_VIDEO_MODELS = {
   'luma-standard': {
     name: 'Luma Ray 2 Standard',

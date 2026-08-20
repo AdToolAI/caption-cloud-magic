@@ -1,8 +1,7 @@
 import { Currency } from './pricing';
 import { tx } from '@/lib/i18nText';
 
-// Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
-// Std: $0.04/s → €0.12/s | Pro: $0.07/s → €0.21/s
+// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 export const WAN_VIDEO_MODELS = {
   'wan-standard': {
     name: 'Wan 2.5 Standard',

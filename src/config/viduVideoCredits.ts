@@ -11,8 +11,7 @@ import { tx } from "@/lib/i18nText";
  * other providers (= flat / 5).
  */
 
-// Margin policy: exactly 3.00× Replicate flat cost (normalized 14.07.2026)
-// Ref: $0.22/clip → €0.66 | I2V/T2V: $0.20/clip → €0.60
+// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 export const VIDU_VIDEO_MODELS = {
   'vidu-q2-reference': {
     name: 'Vidu Q3 Reference',
