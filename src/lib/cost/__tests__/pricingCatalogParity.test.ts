@@ -41,16 +41,21 @@ function parseSharedSourceMap(): Record<string, { standard: string; pro: string 
   return out;
 }
 
-describe('pricing catalog — 3.00× margin policy', () => {
-  it('every model sells at 2.95×–3.12× provider cost (rounded price points)', () => {
+describe('pricing catalog — 1.75× minimum margin policy', () => {
+  it('every model sells at >= 1.75× provider cost (20.08.2026 re-pricing)', () => {
     const offenders: string[] = [];
     for (const entry of Object.values(VIDEO_PRICING_CATALOG)) {
       const factor = entry.sellEUR / entry.costEUR;
-      if (factor < 2.95 || factor > 3.12) {
+      if (factor < 1.75) {
         offenders.push(`${entry.id}: ${factor.toFixed(2)}×`);
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it('Seedance 2.5 keeps the agreed 30 s price points (720p 11.95 EUR / 480p 6.95 EUR)', () => {
+    expect(VIDEO_PRICING_CATALOG['seedance-2-5'].sellEUR * 30).toBeCloseTo(11.95, 2);
+    expect(VIDEO_PRICING_CATALOG['seedance-2-5-480p'].sellEUR * 30).toBeCloseTo(6.95, 2);
   });
 
   it('sellUSD mirrors sellEUR 1:1', () => {
@@ -132,7 +137,7 @@ describe('admin margin table', () => {
       expect(row.sellEUR).toBe(entry.sellEUR);
       expect(row.costEUR).toBe(entry.costEUR);
       expect(row.tier).toBe(PREMIUM_ENGINE_CATALOG_IDS.has(row.id) ? 'premium-engine' : 'standard');
-      expect(computeMarginPct(row)).toBeGreaterThan(0.66);
+      expect(computeMarginPct(row)).toBeGreaterThan(0.42);
     }
   });
 });
