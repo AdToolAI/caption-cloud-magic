@@ -126,7 +126,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
                   id="brandName"
                   value={data.brandName}
                   onChange={(e) => setData({ ...data, brandName: e.target.value })}
-                  placeholder="z.B. Fashion Studio Berlin"
+                  placeholder={tx({ de: "z.B. Fashion Studio Berlin", en: "e.g. Fashion Studio Berlin", es: "p. ej. Fashion Studio Berlin" })}
                   className="mt-2"
                 />
               </div>
