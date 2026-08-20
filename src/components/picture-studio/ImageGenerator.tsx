@@ -871,7 +871,7 @@ export function ImageGenerator() {
               </div>
             ) : (
               <p className="text-[11px] text-muted-foreground">
-                {tx({ de: "Kein aktives Brand-Kit.", en: "No active brand kit.", es: "Ningún Brand Kit activo." })} <button onClick={() => navigate('/brand-kit')} className="text-primary underline">Anlegen</button>
+                {tx({ de: "Kein aktives Brand-Kit.", en: "No active brand kit.", es: "Ningún Brand Kit activo." })} <button onClick={() => navigate('/brand-kit')} className="text-primary underline">{tx({ de: "Anlegen", en: "Create", es: "Crear" })}</button>
               </p>
             )}
           </div>
