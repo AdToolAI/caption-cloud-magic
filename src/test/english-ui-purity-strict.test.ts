@@ -140,6 +140,7 @@ const BANNED_WORDS = [
   'Gegenlicht',
   'statt',
   'Generiere',
+  'Suche',
 ];
 
 const BANNED = new RegExp(`(?<![\\w-])(${BANNED_WORDS.join('|')})(?![\\w-])`);
