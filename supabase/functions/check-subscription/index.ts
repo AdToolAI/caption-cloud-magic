@@ -44,7 +44,7 @@ serve(withTelemetry("check-subscription", async (req) => {
         if (!user) return { data: null };
         return supabaseClient
           .from("profiles")
-          .select("stripe_customer_id, test_mode_plan, plan")
+          .select("stripe_customer_id, test_mode_plan, plan, account_type, ai_discount_percent")
           .eq("id", user.id)
           .single();
       })
