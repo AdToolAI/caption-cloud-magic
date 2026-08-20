@@ -65,7 +65,7 @@ export const SEEDANCE_VIDEO_MODELS = {
     minDuration: 4,
     maxDuration: 30,
     description: {
-      EUR: tx({ de: 'Seedance 2.5 · 720p · bis 30 s pro Szene — 11,95€ für 30 Sekunden', en: 'Seedance 2.5 · 720p · up to 30 s per scene — €11.95 for 30 seconds', es: 'Seedance 2,5 · 720p · hasta 30 s por escena — 11,95 € por 30 segundos' }),
+      EUR: tx({ de: 'Seedance 2.5 · bis 30 s pro Szene — 720p 11,95€ / 480p 6,95€ pro 30 Sekunden', en: 'Seedance 2.5 · up to 30 s per scene — 720p €11.95 / 480p €6.95 per 30 seconds', es: 'Seedance 2.5 · hasta 30 s por escena — 720p 11,95 € / 480p 6,95 € por 30 segundos' }),
       USD: 'Seedance 2.5 · 720p · up to 30 s per scene — $19.90 for 30 seconds',
     },
     badge: 'New',
