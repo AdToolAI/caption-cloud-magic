@@ -76,7 +76,7 @@ export default function MotionStudioLibrary() {
   return (
     <>
       <Helmet>
-        <title>Motion Studio Library | Charaktere & Locations</title>
+        <title>Motion Studio Library | Characters & Locations</title>
         <meta
           name="description"
           content={tx({ de: "Wiederverwendbare Charaktere und Locations für deine AI-Video-Projekte. Konsistenz über alle Szenen hinweg.", en: "Reusable characters and locations for your AI video projects. Consistency across all scenes.", es: "Personajes y ubicaciones reutilizables para tus proyectos de video con IA. Consistencia en todas las escenas." })}
@@ -108,7 +108,7 @@ export default function MotionStudioLibrary() {
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="gap-1.5">
                   <Sparkles className="h-3 w-3 text-primary" />
-                  {characters.length} Charaktere · {locations.length} Locations
+                  {characters.length} {tx({ de: 'Charaktere', en: 'Characters', es: 'Personajes' })} · {locations.length} Locations
                 </Badge>
               </div>
             </div>
@@ -128,7 +128,7 @@ export default function MotionStudioLibrary() {
                 }`}
               >
                 <User className="h-3.5 w-3.5" />
-                Charaktere
+                {tx({ de: 'Charaktere', en: 'Characters', es: 'Personajes' })}
                 <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
                   {characters.length}
                 </Badge>

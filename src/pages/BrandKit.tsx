@@ -501,7 +501,7 @@ const BrandKit = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="audience">Zielgruppe</Label>
+                      <Label htmlFor="audience">{tx({ de: "Zielgruppe", en: "Target audience", es: "Público objetivo" })}</Label>
                       <Textarea
                         id="audience"
                         value={formData.targetAudience}
@@ -862,7 +862,7 @@ const BrandKit = () => {
                     >
                       {kit.is_active && (
                         <Badge className="absolute -top-2 -right-2 z-10 bg-primary text-primary-foreground shadow-[0_0_15px_hsla(43,90%,68%,0.4)]">
-                          Aktiv
+                          {tx({ de: "Aktiv", en: "Active", es: "Activo" })}
                         </Badge>
                       )}
                       

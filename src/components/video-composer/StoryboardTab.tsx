@@ -459,7 +459,7 @@ export default function StoryboardTab({
   const previousSceneOfSelected =
     selectedIndex > 0 ? scenes[selectedIndex - 1] : undefined;
 
-  // Stage 18 — 3-mode left pane (Editor / Stil / Avatar)
+  // Stage 18 — 3-mode left pane (Editor / Style / Avatar)
   const [leftMode, setLeftMode] = useState<LeftPaneMode>('editor');
 
   // Stage 18 — inline scene generation directly from the player tile
@@ -738,7 +738,7 @@ export default function StoryboardTab({
 
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
-          {/* Left: 3-mode editor pane (Editor / Stil / Avatar) */}
+          {/* Left: 3-mode editor pane (Editor / Style / Avatar) */}
           <div className="lg:col-span-8 min-w-0">
             {selectedScene && (
               <StoryboardLeftPane

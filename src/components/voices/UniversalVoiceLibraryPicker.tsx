@@ -242,8 +242,8 @@ export function UniversalVoiceLibraryPicker({
               <SelectContent>
                 <SelectItem value="all">{tx({ de: "Alle Einsätze", en: "All uses", es: "Todos los usos" })}</SelectItem>
                 <SelectItem value="narration">Narration</SelectItem>
-                <SelectItem value="conversational">Konversation</SelectItem>
-                <SelectItem value="characters">Charaktere</SelectItem>
+                <SelectItem value="conversational">{tx({ de: "Konversation", en: "Conversational", es: "Conversacional" })}</SelectItem>
+                <SelectItem value="characters">{tx({ de: "Charaktere", en: "Characters", es: "Personajes" })}</SelectItem>
                 <SelectItem value="social_media">Social Media</SelectItem>
                 <SelectItem value="news">News</SelectItem>
               </SelectContent>

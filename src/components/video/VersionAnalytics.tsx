@@ -1,4 +1,5 @@
 import { VideoCreation } from '@/types/video';
+import { useTx } from '@/lib/i18nText';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
@@ -9,6 +10,7 @@ interface VersionAnalyticsProps {
 }
 
 export const VersionAnalytics = ({ versions }: VersionAnalyticsProps) => {
+  const tx = useTx();
   // Calculate analytics data
   const analyticsData = versions.map(v => ({
     name: `v${v.version_number}`,
@@ -35,7 +37,7 @@ export const VersionAnalytics = ({ versions }: VersionAnalyticsProps) => {
         <Card className="p-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
             <Eye className="h-4 w-4" />
-            Versionen
+            {tx({ de: "Versionen", en: "Versions", es: "Versiones" })}
           </div>
           <p className="text-2xl font-bold">{versions.length}</p>
         </Card>
@@ -73,7 +75,7 @@ export const VersionAnalytics = ({ versions }: VersionAnalyticsProps) => {
       {/* Charts */}
       <div className="grid grid-cols-2 gap-4">
         <Card className="p-4">
-          <h3 className="text-sm font-medium mb-4">Downloads pro Version</h3>
+          <h3 className="text-sm font-medium mb-4">{tx({ de: "Downloads pro Version", en: "Downloads per version", es: "Descargas por versión" })}</h3>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={analyticsData}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -86,7 +88,7 @@ export const VersionAnalytics = ({ versions }: VersionAnalyticsProps) => {
         </Card>
 
         <Card className="p-4">
-          <h3 className="text-sm font-medium mb-4">Shares pro Version</h3>
+          <h3 className="text-sm font-medium mb-4">{tx({ de: "Shares pro Version", en: "Shares per version", es: "Compartidos por versión" })}</h3>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={analyticsData}>
               <CartesianGrid strokeDasharray="3 3" />

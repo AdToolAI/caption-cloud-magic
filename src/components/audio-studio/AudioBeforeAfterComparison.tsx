@@ -443,7 +443,7 @@ export function AudioBeforeAfterComparison({
                     animate={{ opacity: 1, x: 0 }}
                     className="text-xs text-muted-foreground ml-auto"
                   >
-                    🔊 Aktiv
+                    {tx({ de: '🔊 Aktiv', en: '🔊 Active', es: '🔊 Activo' })}
                   </motion.span>
                 )}
               </div>
@@ -457,7 +457,7 @@ export function AudioBeforeAfterComparison({
             {/* Sync indicator */}
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
               <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
-              <span className="px-2">⟷ Synchronisiert</span>
+              <span className="px-2">{tx({ de: '⟷ Synchronisiert', en: '⟷ Synchronized', es: '⟷ Sincronizado' })}</span>
               <div className="h-px flex-1 bg-gradient-to-l from-transparent via-border to-transparent" />
             </div>
 
@@ -475,14 +475,14 @@ export function AudioBeforeAfterComparison({
             >
               <div className="flex items-center gap-2 mb-2">
                 <div className={`w-2 h-2 rounded-full ${playbackMode === 'enhanced' ? 'bg-primary animate-pulse' : 'bg-primary/50'}`} />
-                <span className="text-xs font-medium text-primary uppercase tracking-wider">Optimiert</span>
+                <span className="text-xs font-medium text-primary uppercase tracking-wider">{tx({ de: 'Optimiert', en: 'Enhanced', es: 'Optimizado' })}</span>
                 {playbackMode === 'enhanced' && (
                   <motion.span 
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     className="text-xs text-primary ml-auto"
                   >
-                    🔊 Aktiv
+                    {tx({ de: '🔊 Aktiv', en: '🔊 Active', es: '🔊 Activo' })}
                   </motion.span>
                 )}
               </div>

@@ -160,7 +160,7 @@ const TEXT = {
     },
     promptBanner: "Je präziser du bist, desto schneller antworten wir — bei blockierenden Fällen meist unter 2 Std.",
     pastedTitle: "Screenshot angehängt",
-    pastedDesc: "Aus Zwischenablage übernommen ✓",
+    pastedDesc: "From clipboard ✓",
     coachTitle: "Ohne Screenshot senden?",
     coachDesc: "Tickets mit Screenshot oder kurzem Recording werden im Schnitt 60 % schneller gelöst. Möchtest du noch eins anhängen?",
     coachAddMedia: "Screenshot / Recording hinzufügen",

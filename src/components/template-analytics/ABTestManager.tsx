@@ -137,7 +137,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="testName">Test Name</Label>
+                    <Label htmlFor="testName">{tx({ de: "Testname", en: "Test Name", es: "Nombre de la prueba" })}</Label>
                     <Input
                       id="testName"
                       value={testName}
@@ -146,7 +146,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="hypothesis">Hypothese (Optional)</Label>
+                    <Label htmlFor="hypothesis">{tx({ de: "Hypothese (Optional)", en: "Hypothesis (Optional)", es: "Hipótesis (Opcional)" })}</Label>
                     <Textarea
                       id="hypothesis"
                       value={hypothesis}
@@ -156,7 +156,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="variantA">Variante A (Original)</Label>
+                      <Label htmlFor="variantA">{tx({ de: "Variante A (Original)", en: "Variant A (Original)", es: "Variante A (Original)" })}</Label>
                       <Input
                         id="variantA"
                         value={variantAName}
@@ -164,7 +164,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="variantB">Variante B</Label>
+                      <Label htmlFor="variantB">{tx({ de: "Variante B", en: "Variant B", es: "Variante B" })}</Label>
                       <Input
                         id="variantB"
                         value={variantBName}
@@ -173,7 +173,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="sampleSize">Ziel Sample Size</Label>
+                    <Label htmlFor="sampleSize">{tx({ de: "Ziel Sample Size", en: "Target Sample Size", es: "Tamaño de muestra objetivo" })}</Label>
                     <Input
                       id="sampleSize"
                       type="number"

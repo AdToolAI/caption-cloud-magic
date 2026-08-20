@@ -1,4 +1,5 @@
 import { dateFnsLocale } from '@/lib/uiLocale';
+import { tx } from '@/lib/i18nText';
 import { useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -63,11 +64,11 @@ export function MiniCalendar({
             <div className="p-3 border-t text-xs text-muted-foreground space-y-1">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-blue-500" />
-                <span>Geplant</span>
+                <span>{tx({ de: "Geplant", en: "Scheduled", es: "Programado" })}</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-green-500" />
-                <span>Genehmigt</span>
+                <span>{tx({ de: "Genehmigt", en: "Approved", es: "Aprobado" })}</span>
               </div>
             </div>
           }

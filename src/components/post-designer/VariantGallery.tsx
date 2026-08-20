@@ -1,4 +1,4 @@
-import { tx } from "@/lib/i18nText";
+import { useTx } from "@/lib/i18nText";
 import { motion } from "framer-motion";
 import { SlideRenderer } from "./SlideRenderer";
 import type { PostDesign } from "@/lib/post-design/schema";
@@ -15,9 +15,15 @@ interface VariantGalleryProps {
   onShuffle?: (index: number) => void;
 }
 
-const STAGES = ["Motiv", "Typografie", "Marke", "Feinschliff"];
+const STAGES = [
+  { de: "Motiv", en: "Visual", es: "Motivo" },
+  { de: "Typografie", en: "Typography", es: "Tipografía" },
+  { de: "Marke", en: "Brand", es: "Marca" },
+  { de: "Feinschliff", en: "Finishing", es: "Acabado" },
+];
 
 export function VariantGallery({ variants, loading, stage, imagePending, onPick, onShuffle }: VariantGalleryProps) {
+  const tx = useTx();
 
   if (loading) {
     return (
@@ -33,7 +39,7 @@ export function VariantGallery({ variants, loading, stage, imagePending, onPick,
               />
             </div>
             <p className="text-center text-[11px] tracking-wide text-muted-foreground">
-              {stage ?? STAGES[i % STAGES.length]}
+              {stage ?? tx(STAGES[i % STAGES.length])}
             </p>
           </div>
         ))}

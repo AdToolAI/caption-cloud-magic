@@ -3243,7 +3243,7 @@ export default function SceneCard({
                   </div>
 
                   {/* Phase 1 (Studio Set v2) — single "Prompt-Details" button
-                    replaces the former Erweitert toggle + inline Multi-Engine
+                    replaces the former "Advanced" toggle + inline Multi-Engine
                     + inline Compare-Lab + inline Final-Prompt-Preview triplet.
                     Everything now lives inside ScenePromptDetailsSheet so the
                     customer sees the prompt textarea exactly once. */}

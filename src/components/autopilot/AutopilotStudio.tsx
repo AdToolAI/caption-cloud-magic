@@ -61,10 +61,10 @@ function briefFromIdea(round: Round, idea: AutopilotIdea): string {
     'Szenenfolge, exakt so umsetzen:',
     ...idea.beats.map((b, i) => `${i + 1}. [${b.beat}] ${b.description} (~${b.seconds}s)`),
     '',
-    `Zielgruppe: ${round.strategy.audience}`,
+    `${tx({ de: 'Zielgruppe', en: 'Target audience', es: 'Público objetivo' })}: ${round.strategy.audience}`,
     `Nutzen: ${round.strategy.benefit}`,
     tx({ de: `Kaufhemmnis, das entkräftet wird: ${round.strategy.objection}`, en: `Purchase barrier that is being refuted: ${round.strategy.objection}`, es: `Barrera de compra que se está refutando: ${round.strategy.objection}` }),
-    `Tonalität: ${round.strategy.tone}`,
+    `${tx({ de: 'Tonalität', en: 'Tone', es: 'Tono' })}: ${round.strategy.tone}`,
     round.options.lipSync
       ? tx({ de: `Bis zu ${round.options.lipSyncSpeakers} Person(en) sprechen sichtbar in die Kamera.`, en: `Up to ${round.options.lipSyncSpeakers} person(s) speak visibly into the camera.`, es: `Hasta ${round.options.lipSyncSpeakers} persona(s) hablan visiblemente a la cámara.` })
       : tx({ de: 'Niemand spricht sichtbar in die Kamera.', en: 'Nobody speaks visibly into the camera.', es: 'Nadie habla visiblemente a la cámara.' }),

@@ -1238,7 +1238,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
                     {/* Advanced: Zoom & Offset */}
                     <details className="group">
-                      <summary className="text-[10px] text-white/30 cursor-pointer hover:text-white/50">Erweitert</summary>
+                      <summary className="text-[10px] text-white/30 cursor-pointer hover:text-white/50">{tx({ de: "Erweitert", en: "Advanced", es: "Avanzado" })}</summary>
                       <div className="space-y-2 pt-1.5">
                         <div className="space-y-1">
                           <div className="flex justify-between">

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { tx } from '@/lib/i18nText';
 import { motion } from 'framer-motion';
 import { Activity } from 'lucide-react';
 import { SceneAnalysis } from '@/types/directors-cut';
@@ -125,15 +126,15 @@ export function MotionIntensityOverlay({
       <div className="absolute top-1 right-2 flex items-center gap-2 z-10">
         <div className="flex items-center gap-1">
           <div className="w-2 h-2 rounded-full bg-cyan-500" />
-          <span className="text-[9px] text-muted-foreground">Ruhig</span>
+          <span className="text-[9px] text-muted-foreground">{tx({ de: "Ruhig", en: "Calm", es: "Suave" })}</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-2 h-2 rounded-full bg-yellow-500" />
-          <span className="text-[9px] text-muted-foreground">Mittel</span>
+          <span className="text-[9px] text-muted-foreground">{tx({ de: "Mittel", en: "Medium", es: "Medio" })}</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-2 h-2 rounded-full bg-orange-500" />
-          <span className="text-[9px] text-muted-foreground">Intensiv</span>
+          <span className="text-[9px] text-muted-foreground">{tx({ de: "Intensiv", en: "Intense", es: "Intenso" })}</span>
         </div>
       </div>
 

@@ -180,12 +180,12 @@ export default function EmailDirector() {
                   <Textarea
                     value={briefing}
                     onChange={(e) => setBriefing(e.target.value)}
-                    placeholder="Worum geht's? Zielgruppe, Angebot, Kontext…"
+                    placeholder={tx({ de: "Worum geht's? Zielgruppe, Angebot, Kontext…", en: "What's it about? Audience, offer, context…", es: "¿De qué se trata? Público, oferta, contexto…" })}
                     rows={5}
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Ziel</Label>
+                  <Label className="text-xs">{tx({ de: "Ziel", en: "Goal", es: "Objetivo" })}</Label>
                   <Input value={goal} onChange={(e) => setGoal(e.target.value)} />
                 </div>
                 <div>

@@ -255,7 +255,7 @@ export default function Onboarding() {
             />
           )}
 
-          {/* Schritt 4: Look & Marke */}
+          {/* Step 4: Look & brand */}
           {currentStep === "brand" && (
             <div className="space-y-4">
               <h3 className="text-xl font-semibold text-center">{tx({ de: "Gib deinem Studio einen Namen", en: "Give your studio a name", es: "Ponle un nombre a tu estudio" })}</h3>

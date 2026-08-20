@@ -218,7 +218,7 @@ export function AIColorGrading({
                 <span className="text-[10px] font-medium block">{preset.name}</span>
                 <span className="text-[8px] text-muted-foreground">{preset.description}</span>
                 {selectedGrade === preset.id && (
-                  <Badge className="absolute top-1 right-1 h-4 px-1 text-[8px]">Aktiv</Badge>
+                  <Badge className="absolute top-1 right-1 h-4 px-1 text-[8px]">{tx({ de: "Aktiv", en: "Active", es: "Activo" })}</Badge>
                 )}
               </button>
             ))}

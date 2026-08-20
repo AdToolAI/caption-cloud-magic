@@ -70,9 +70,9 @@ function Section({
 }
 
 const TONALITIES = [
-  { id: "professional", label: "Professionell" },
+  { id: "professional", label: tx({ de: "Professionell", en: "Professional", es: "Profesional" }) },
   { id: "casual",       label: "Casual" },
-  { id: "bold",         label: "Bold & Hook-driven" },
+  { id: "bold",         label: tx({ de: "Bold & Hook-driven", en: "Bold & Hook-driven", es: "Audaz y con gancho" }) },
   { id: "storytelling", label: "Storytelling" },
 ];
 

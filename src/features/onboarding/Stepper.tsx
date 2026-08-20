@@ -1,4 +1,4 @@
-import { tx } from "@/lib/i18nText";
+import { tx, useTx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Link2, Palette, Target, Calendar, Zap, Check } from 'lucide-react';
@@ -11,7 +11,7 @@ import { trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
 
 interface OnboardingStep {
   id: string;
-  label: string;
+  label: { de: string; en: string; es: string };
   icon: any;
   route?: string;
   action?: () => void | Promise<void>;
@@ -20,37 +20,38 @@ interface OnboardingStep {
 const ONBOARDING_STEPS: OnboardingStep[] = [
   { 
     id: 'accounts', 
-    label: 'Konten verbinden', 
+    label: { de: 'Konten verbinden', en: 'Connect accounts', es: 'Conectar cuentas' }, 
     icon: Link2, 
     route: '/instagram-publishing' 
   },
   { 
     id: 'brandkit', 
-    label: 'Brand-Kit einrichten', 
+    label: { de: 'Brand-Kit einrichten', en: 'Set up brand kit', es: 'Configurar kit de marca' }, 
     icon: Palette, 
     route: '/brand-kit' 
   },
   { 
     id: 'goal', 
-    label: 'Ziel festlegen', 
+    label: { de: 'Ziel festlegen', en: 'Set a goal', es: 'Definir un objetivo' }, 
     icon: Target, 
     route: '/goals-dashboard' 
   },
   { 
     id: 'plan', 
-    label: '1-Wochen-Plan generieren', 
+    label: { de: '1-Wochen-Plan generieren', en: 'Generate 1-week plan', es: 'Generar plan de 1 semana' }, 
     icon: Calendar, 
     route: '/calendar' 
   },
   { 
     id: 'automation', 
-    label: 'Auto-Posting aktivieren', 
+    label: { de: 'Auto-Posting aktivieren', en: 'Enable auto-posting', es: 'Activar publicación automática' }, 
     icon: Zap, 
     route: '/calendar' 
   }
 ];
 
 export const OnboardingStepper = () => {
+  const localTx = useTx();
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [dismissed, setDismissed] = useState(false);
@@ -112,7 +113,7 @@ export const OnboardingStepper = () => {
     trackEvent(ANALYTICS_EVENTS.ONBOARDING_STEP_COMPLETED, {
       step: stepId,
       step_number: currentStep + 1,
-      step_name: ONBOARDING_STEPS[currentStep]?.label,
+      step_name: ONBOARDING_STEPS[currentStep]?.label.en,
       total_steps: ONBOARDING_STEPS.length
     });
 
@@ -198,7 +199,7 @@ export const OnboardingStepper = () => {
                     ) : (
                       <Icon className="h-4 w-4" />
                     )}
-                    <span className="hidden sm:inline">{step.label}</span>
+                    <span className="hidden sm:inline">{localTx(step.label)}</span>
                   </Button>
                 );
               })}

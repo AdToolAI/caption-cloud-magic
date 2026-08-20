@@ -39,7 +39,7 @@ export interface SceneAnalysis {
   media_source_end?: number;
   playbackRate?: number; // 1.0 = normal, <1 = slow-mo, >1 = fast
   // Additional media fields for extended scenes
-  isFromOriginalVideo?: boolean; // false = neu hinzugefügt
+  isFromOriginalVideo?: boolean; // false = newly added
   isBlackscreen?: boolean; // true = leere Szene ohne Video/Bild (legacy, prefer sourceMode)
   /**
    * Source for this scene's visual:

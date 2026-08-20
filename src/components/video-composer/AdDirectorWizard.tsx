@@ -537,7 +537,7 @@ export default function AdDirectorWizard({
             {step === 'format' && (
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  Format & Ziel
+                  {tx({ de: "Format & Ziel", en: "Format & goal", es: "Formato y objetivo" })}
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
                   {FORMATS.map((f) => (
@@ -696,7 +696,7 @@ export default function AdDirectorWizard({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="ad-audience">Zielgruppe</Label>
+                    <Label htmlFor="ad-audience">{tx({ de: "Zielgruppe", en: "Target audience", es: "Público objetivo" })}</Label>
                     <Input
                       id="ad-audience"
                       value={targetAudience}
@@ -967,18 +967,18 @@ export default function AdDirectorWizard({
                   language={lang}
                 />
                 <div className="rounded-lg border border-border/40 bg-card/50 p-4 space-y-2 text-sm">
-                  <p className="font-medium">Zusammenfassung</p>
+                  <p className="font-medium">{tx({ de: "Zusammenfassung", en: "Summary", es: "Resumen" })}</p>
                   <ul className="text-xs text-muted-foreground space-y-1">
                     <li>
-                      <span className="text-foreground">Format:</span>{' '}
+                      <span className="text-foreground">{tx({ de: "Format:", en: "Format:", es: "Formato:" })}</span>{' '}
                       {FORMATS.find((f) => f.id === format)?.label}
                     </li>
                     <li>
-                      <span className="text-foreground">Ziel:</span>{' '}
+                      <span className="text-foreground">{tx({ de: "Ziel:", en: "Goal:", es: "Objetivo:" })}</span>{' '}
                       {GOALS.find((g) => g.id === goal)?.label[lang]}
                     </li>
                     <li>
-                      <span className="text-foreground">Framework:</span>{' '}
+                      <span className="text-foreground">{tx({ de: "Framework:", en: "Framework:", es: "Framework:" })}</span>{' '}
                       {AD_STORY_FRAMEWORKS.find((f) => f.id === framework)?.label[lang]}
                     </li>
                     <li>

@@ -1542,7 +1542,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                                       ? tx({ de: 'Deutsch/Spanisch sind für Kling Omni gesperrt, um Fantasie-Sprache zu verhindern.', en: 'German/Spanish are blocked for Kling Omni to prevent fantasy language.', es: 'El alemán/español están bloqueados para Kling Omni para evitar el lenguaje de fantasía.' })
                                       : 'Non-English lip-sync is blocked for Kling Omni to prevent fantasy speech.')
                                   : language === 'de'
-                                  ? 'Kling Omni erlaubt max. 2 sprechende Charaktere pro Clip.'
+                                  ? tx({ de: 'Kling Omni erlaubt max. 2 sprechende Charaktere pro Clip.', en: 'Kling Omni allows a max. of 2 speaking characters per clip.', es: 'Kling Omni permite un máximo de 2 personajes que hablen por clip.' })
                                   : 'Kling Omni allows max. 2 speaking characters per clip.')
                               : undefined
                           }
