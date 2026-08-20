@@ -63,7 +63,7 @@ export const MediaLibraryHeroHeader = ({
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
           </span>
-          <span className="text-sm font-medium text-primary">Mediathek</span>
+          <span className="text-sm font-medium text-primary">{tx({ de: 'Mediathek', en: 'Media Library', es: 'Mediateca' })}</span>
         </motion.div>
 
         {/* Main Content */}
@@ -199,7 +199,7 @@ export const MediaLibraryHeroHeader = ({
                   <HardDrive className="absolute inset-0 m-auto h-4 w-4 text-cyan-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Speicher</p>
+                  <p className="text-sm text-muted-foreground">{tx({ de: 'Speicher', en: 'Storage', es: 'Almacenamiento' })}</p>
                   <p className={`font-bold ${storagePercent >= 100 ? "text-destructive" : storagePercent > 80 ? "text-warning" : "text-foreground"}`}>
                     {usedGB.toFixed(2)} / {maxGB} GB
                   </p>

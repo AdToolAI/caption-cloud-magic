@@ -95,13 +95,13 @@ export default function ContentProjects() {
   return (
     <>
       <SEO 
-        title="Meine Videos | Content Studio"
+        title={tx({ de: "Meine Videos | Content Studio", en: "My Videos | Content Studio", es: "Mis vídeos | Content Studio" })}
         description={tx({ de: "Verwalte deine erstellten Video-Projekte aus dem Content Studio", en: "Manage your created video projects from the Content Studio", es: "Gestiona tus proyectos de vídeo creados desde el Content Studio" })}
       />
       <div className="container max-w-7xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Meine Videos</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{tx({ de: "Meine Videos", en: "My Videos", es: "Mis vídeos" })}</h1>
           <p className="text-muted-foreground">
             {tx({ de: "Verwalte deine erstellten Video-Projekte aus dem Content Studio", en: "Manage your created video projects from the Content Studio", es: "Gestiona tus proyectos de vídeo creados desde el Content Studio" })}
           </p>
@@ -123,7 +123,7 @@ export default function ContentProjects() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>In Bearbeitung</CardDescription>
+              <CardDescription>{tx({ de: "In Bearbeitung", en: "In progress", es: "En proceso" })}</CardDescription>
               <CardTitle className="text-3xl text-blue-600">{statusCounts.rendering}</CardTitle>
             </CardHeader>
           </Card>
