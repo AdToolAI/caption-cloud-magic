@@ -315,12 +315,20 @@ export function AICompanionWidget() {
     const ok = diagnostics.filter((d: any) => d.status === 'ok');
 
     if (errors.length > 0) {
-      status += `🔴 **${errors.length} Problem${errors.length > 1 ? 'e' : ''}:**\n`;
+      status += tx({
+        de: `🔴 **${errors.length} Problem${errors.length > 1 ? 'e' : ''}:**\n`,
+        en: `🔴 **${errors.length} issue${errors.length > 1 ? 's' : ''}:**\n`,
+        es: `🔴 **${errors.length} problema${errors.length > 1 ? 's' : ''}:**\n`,
+      });
       errors.forEach((e: any) => { status += `- ${e.message}\n`; });
       status += '\n';
     }
     if (warnings.length > 0) {
-      status += `🟡 **${warnings.length} Warnung${warnings.length > 1 ? 'en' : ''}:**\n`;
+      status += tx({
+        de: `🟡 **${warnings.length} Warnung${warnings.length > 1 ? 'en' : ''}:**\n`,
+        en: `🟡 **${warnings.length} warning${warnings.length > 1 ? 's' : ''}:**\n`,
+        es: `🟡 **${warnings.length} advertencia${warnings.length > 1 ? 's' : ''}:**\n`,
+      });
       warnings.forEach((w: any) => { status += `- ${w.message}\n`; });
       status += '\n';
     }
