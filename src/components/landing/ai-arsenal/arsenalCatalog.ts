@@ -118,7 +118,18 @@ const CONS = cap("Char Lock", "Char-Lock", "Char-Lock");
 // -------------- catalog --------------
 export const ARSENAL_CATALOG: ArsenalModel[] = [
   // ============ VIDEO ============
+  m("seedance-2-5", "video",
+    ["Seedance 2.5", "Seedance 2.5", "Seedance 2.5"],
+    [
+      "Flagship motion model — native lip-sync and pro character expression.",
+      "Flaggschiff-Motion-Modell — natives Lip-Sync und Pro-Charakterausdruck.",
+      "Modelo insignia de movimiento — lip-sync nativo y expresión Pro.",
+    ],
+    [T2V, I2V, NATIVE_LIP, P1080],
+    { cover: coverSeedancePro, hero: true, recommended: true }
+  ),
   m("kling-omni", "video",
+
     ["Kling Omni", "Kling Omni", "Kling Omni"],
     [
       "Native lip-sync in the model itself — no post-sync needed.",
