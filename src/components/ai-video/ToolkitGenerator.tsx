@@ -1455,7 +1455,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-primary" />
                   <Label className="text-sm">
-                    {language === 'de' ? 'Cast & Omni Anchor (Lip-Sync nur EN)' : 'Cast & Omni Anchor (Lip-Sync EN only)'}
+                    {language === 'de' ? tx({ de: "Cast & Omni Anchor (Lip-Sync nur EN)", en: "Cast & Omni Anchor (Lip-Sync EN only)", es: "Cast & Omni Anchor (sincronización labial solo EN)" }) : 'Cast & Omni Anchor (Lip-Sync EN only)'}
                   </Label>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1526,7 +1526,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                             </SelectContent>
                           </Select>
                           <p className="text-[10px] text-muted-foreground truncate">
-                            {language === 'de' ? 'Aus Cast & World' : 'From Cast & World'}
+                            {language === 'de' ? tx({ de: "Aus Cast & World", en: "From Cast & World", es: "Desde Cast & World" }) : 'From Cast & World'}
                           </p>
                         </div>
                         <div
@@ -1573,7 +1573,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                         <>
                           <div className="flex items-center justify-between gap-2">
                             <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                              {language === 'de' ? 'Stimme' : 'Voice'}
+                              {language === 'de' ? tx({ de: "Stimme", en: "Voice", es: "Voz" }) : 'Voice'}
                             </Label>
                             <Select value={row.voicePreset} onValueChange={(v) => updateRow(idx, { voicePreset: v as OmniVoicePreset })}>
                               <SelectTrigger className="h-8 w-[180px] text-xs">

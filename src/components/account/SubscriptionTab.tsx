@@ -155,7 +155,7 @@ export const SubscriptionTab = () => {
             onClick={() => navigate('/credits')}
           >
             <Sparkles className="h-4 w-4 mr-2" />
-            {language === 'de' ? 'Credit-Übersicht öffnen' : language === 'es' ? 'Abrir resumen de créditos' : 'Open credit overview'}
+            {language === 'de' ? tx({ de: "Credit-Übersicht öffnen", en: "Open Credit Overview", es: "Abrir resumen de créditos" }) : language === 'es' ? 'Abrir resumen de créditos' : 'Open credit overview'}
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         </CardContent>

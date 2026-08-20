@@ -430,7 +430,7 @@ export default function StructuredPromptBuilder({
                 : 'text-muted-foreground'
             }
           >
-            {status.count} / {limit.hard} {limit.unit === 'words' ? (language === 'de' ? 'Wörter' : language === 'es' ? 'palabras' : 'words') : (language === 'de' ? 'Zeichen' : language === 'es' ? 'caracteres' : 'chars')}
+            {status.count} / {limit.hard} {limit.unit === 'words' ? (language === 'de' ? 'Wörter' : language === 'es' ? 'palabras' : 'words') : (language === 'de' ? tx({ de: "Zeichen", en: "Characters", es: "Personajes" }) : language === 'es' ? 'caracteres' : 'chars')}
           </span>
         </div>
         <div className="h-1 rounded-full bg-muted overflow-hidden">

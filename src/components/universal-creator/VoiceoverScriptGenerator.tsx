@@ -268,7 +268,7 @@ export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, def
                         <li key={s.order} className="p-2 rounded bg-background/60 border border-border/40">
                           <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
                             <span>
-                              {(language === 'en' ? 'Scene' : language === 'es' ? 'Escena' : 'Szene')} {s.order + 1}
+                              {(language === 'en' ? 'Scene' : language === 'es' ? 'Escena' : tx({ de: "Szene", en: "Scene", es: "Escena" }))} {s.order + 1}
                               {sc ? ` · ${sc.durationSeconds.toFixed(1)}s` : ''}
                             </span>
                             <span>{s.words} {t('uc.words')}</span>

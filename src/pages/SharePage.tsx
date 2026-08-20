@@ -116,7 +116,7 @@ export default function SharePage() {
                     🎬 {project?.project_name || 'Shared Project'}
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    {tx({ de: "Geteilt von", en: "Shared by", es: "Compartido por" })} {shareData?.created_by || 'einem Creator'}
+                    {tx({ de: "Geteilt von", en: "Shared by", es: "Compartido por" })} {shareData?.created_by || tx({ de: "einem Creator", en: "a Creator", es: "un Creador" })}
                   </p>
                 </div>
                 <Badge variant="secondary">

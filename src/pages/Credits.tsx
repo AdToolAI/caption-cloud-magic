@@ -78,7 +78,7 @@ const Credits = () => {
             <Sparkles className="h-5 w-5 text-primary" />
             <h2 className="text-xl font-semibold">{language === 'de' ? 'Credit-Pakete' : language === 'es' ? 'Paquetes de créditos' : 'Credit Packages'}</h2>
           </div>
-          <p className="text-muted-foreground text-sm mb-6">{language === 'de' ? 'Kaufen Sie zusätzliche Credits' : language === 'es' ? 'Compre créditos adicionales' : 'Buy additional credits'}</p>
+          <p className="text-muted-foreground text-sm mb-6">{language === 'de' ? tx({ de: "Kaufen Sie zusätzliche Credits", en: "Buy additional credits", es: "Comprar créditos adicionales" }) : language === 'es' ? 'Compre créditos adicionales' : 'Buy additional credits'}</p>
           
           <div className="space-y-4">
             {packages.map((pkg, index) => {

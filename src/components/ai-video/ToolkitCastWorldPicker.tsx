@@ -428,7 +428,7 @@ function MotionAssetPicker({
               className="text-xs text-primary hover:underline inline-flex items-center gap-1"
               onClick={() => setOpen(false)}
             >
-              {language === 'de' ? 'Zur Library' : language === 'es' ? 'Abrir biblioteca' : 'Open library'}
+              {language === 'de' ? tx({ de: "Zur Library", en: "To Library", es: "A la biblioteca" }) : language === 'es' ? 'Abrir biblioteca' : 'Open library'}
               <ExternalLink className="h-3 w-3" />
             </Link>
           </div>

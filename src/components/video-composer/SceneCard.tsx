@@ -2722,7 +2722,7 @@ export default function SceneCard({
                         }`}
                       >
                         Face-Lock{" "}
-                        {scene.forcePortraitAsFirstFrame ? "AN" : "AUS"}
+                        {scene.forcePortraitAsFirstFrame ? "AN" : tx({ de: "AUS", en: "OFF", es: "DESACTIVADO" })}
                       </button>
                     </div>
                   );
@@ -2908,7 +2908,7 @@ export default function SceneCard({
                             : "text-muted-foreground hover:text-foreground border border-border"
                         }`}
                       >
-                        {lipSyncIntentUnresolved ? "…" : scene.lipSyncWithVoiceover ? "AN" : "AUS"}
+                        {lipSyncIntentUnresolved ? "…" : scene.lipSyncWithVoiceover ? "AN" : tx({ de: "AUS", en: "OFF", es: "DESACTIVADO" })}
                       </button>
                     </div>
                     {/* v18: Cancel button — visible while lip-sync is in flight so the
