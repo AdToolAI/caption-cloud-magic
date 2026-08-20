@@ -62,7 +62,7 @@ export function SystemLoadPill({ className = '', compact = false }: Props) {
             </div>
             {isFounder && load.state !== 'idle' && (
               <div className="pt-1 text-amber-500 flex items-center gap-1">
-                <Crown className="h-3 w-3" /> Deine Founder-Priorität zieht dich vor.
+                <Crown className="h-3 w-3" /> {tx({ de: 'Deine Founder-Priorität zieht dich vor.', en: 'Your founder priority moves you ahead.', es: 'Tu prioridad de fundador te adelanta.' })}
               </div>
             )}
             {!isFounder && load.state === 'founder_reserve' && (

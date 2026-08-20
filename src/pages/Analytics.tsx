@@ -15,6 +15,7 @@ import { TopPostsTable } from "@/components/analytics/TopPostsTable";
 import { AnalyticsHeroHeader } from "@/components/analytics/AnalyticsHeroHeader";
 import { BestTimeHeatmap } from "@/components/dashboard/BestTimeHeatmap";
 import { Badge } from "@/components/ui/badge";
+import { uiLocale } from '@/lib/uiLocale';
 
 interface MetricsSummary {
   provider: string;
@@ -271,7 +272,7 @@ export default function Analytics() {
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
                                   -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                   <RefreshCw className={`h-4 w-4 mr-2 ${analyzing ? "animate-spin" : ""}`} />
-                  Jetzt analysieren
+                  {tx({ de: 'Jetzt analysieren', en: 'Analyze now', es: 'Analizar ahora' })}
                 </Button>
               </div>
 
@@ -317,7 +318,7 @@ export default function Analytics() {
                         <div>
                           <p className="font-semibold text-foreground">{hashtag.hashtag}</p>
                           <p className="text-sm text-muted-foreground">
-                            {hashtag.posts_count} Posts · {hashtag.total_reach.toLocaleString("de-DE")} Reach
+                            {hashtag.posts_count} Posts · {hashtag.total_reach.toLocaleString(uiLocale())} Reach
                           </p>
                         </div>
                       </div>
@@ -407,7 +408,7 @@ export default function Analytics() {
                         <div className="flex-1">
                           <p className="text-sm text-foreground/80 line-clamp-2 mb-2">{content.caption_text}</p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(content.posted_at).toLocaleDateString("de-DE")}
+                            {new Date(content.posted_at).toLocaleDateString(uiLocale())}
                           </p>
                         </div>
                         <Badge className="bg-gradient-to-r from-primary/20 to-cyan-500/20 

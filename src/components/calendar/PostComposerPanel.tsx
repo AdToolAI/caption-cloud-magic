@@ -486,7 +486,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
               size="sm"
               className="bg-[hsl(var(--primary))] text-black font-bold shadow-[0_0_22px_-4px_hsla(43,90%,68%,0.7)] hover:bg-[hsl(var(--primary))]/90"
             >
-              <Rocket className="h-3.5 w-3.5 mr-1.5" /> Bereit zum Auto-Publish
+              <Rocket className="h-3.5 w-3.5 mr-1.5" /> {tx({ de: 'Bereit zum Auto-Publish', en: 'Ready for auto-publish', es: 'Listo para autopublicación' })}
             </Button>
           </motion.div>
         </div>

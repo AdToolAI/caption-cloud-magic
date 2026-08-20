@@ -164,7 +164,7 @@ export default function MotionStudioLibrary() {
                 className="gap-1.5"
               >
                 <Plus className="h-4 w-4" />
-                Neu
+                {tx({ de: 'Neu', en: 'New', es: 'Nuevo' })}
               </Button>
             </div>
           </div>
@@ -246,7 +246,7 @@ function CharacterGrid({
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground/50">
                 <User className="h-12 w-12" />
-                <span className="text-[10px]">Kein Reference-Image</span>
+                <span className="text-[10px]">{tx({ de: 'Kein Reference-Image', en: 'No reference image', es: 'Sin imagen de referencia' })}</span>
               </div>
             )}
             <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -340,7 +340,7 @@ function LocationGrid({
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground/50">
                 <MapPin className="h-12 w-12" />
-                <span className="text-[10px]">Kein Reference-Image</span>
+                <span className="text-[10px]">{tx({ de: 'Kein Reference-Image', en: 'No reference image', es: 'Sin imagen de referencia' })}</span>
               </div>
             )}
             <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

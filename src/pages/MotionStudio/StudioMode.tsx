@@ -812,7 +812,7 @@ function StoryboardStep({
                           onClick={() => removeScene(scene.id)}
                           className="ml-auto h-8 text-xs text-destructive hover:bg-destructive/10"
                         >
-                          Entfernen
+                          {tx({ de: 'Entfernen', en: 'Remove', es: 'Quitar' })}
                         </Button>
                       )}
                     </div>

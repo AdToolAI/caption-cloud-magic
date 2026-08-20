@@ -237,7 +237,7 @@ export function MultiTrackTimelinePro({
               <span className="text-lg">🎬</span>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">Video</div>
-                <div className="text-[10px] text-muted-foreground">{scenes.length} Szenen</div>
+                <div className="text-[10px] text-muted-foreground">{scenes.length} {tx({ de: 'Szenen', en: 'scenes', es: 'escenas' })}</div>
               </div>
             </div>
 

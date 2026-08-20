@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Radar, RefreshCw, Users, Film, CreditCard, Activity, Trophy } from 'lucide-react';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface RadarStats {
   days_since_launch: number;
@@ -21,7 +22,7 @@ interface RadarStats {
 }
 
 const fmt = (iso: string) =>
-  new Date(iso).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+  new Date(iso).toLocaleString(uiLocale(), { dateStyle: 'short', timeStyle: 'short' });
 
 export function LaunchRadarCard() {
   const [stats, setStats] = useState<RadarStats | null>(null);

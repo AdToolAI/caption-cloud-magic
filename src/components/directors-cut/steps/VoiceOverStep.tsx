@@ -12,6 +12,7 @@ import type {
   AudioEnhancements,
   TextOverlay 
 } from '@/types/directors-cut';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface VoiceOverStepProps {
   onVoiceOverGenerated?: (url: string) => void;
@@ -68,7 +69,7 @@ export function VoiceOverStep({
     enabled: false,
     scriptText: '',
     voiceId: 'sarah',
-    language: 'de-DE',
+    language: uiLocale(),
     speed: 1,
     pitch: 0,
     volume: 80,

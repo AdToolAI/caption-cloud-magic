@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Rocket, Calendar as CalendarIcon, FileText, Globe, User, Library } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { tx } from "@/lib/i18nText";
+import { uiLocale } from '@/lib/uiLocale';
 
 interface CampaignTemplateDialogProps {
   open: boolean;
@@ -351,13 +352,13 @@ export function CampaignTemplateDialog({
                     <CardContent className="p-4 pt-0 text-xs space-y-1">
                       <p>
                         <span className="text-muted-foreground">{tx({ de: "Start:", en: "Start:", es: "Inicio:" })}</span>{" "}
-                        {startDate.toLocaleDateString("de-DE")}
+                        {startDate.toLocaleDateString(uiLocale())}
                       </p>
                       <p>
                         <span className="text-muted-foreground">{tx({ de: "Ende:", en: "End:", es: "Fin:" })}</span>{" "}
                         {new Date(
                           startDate.getTime() + selectedTemplate.duration_days * 24 * 60 * 60 * 1000
-                        ).toLocaleDateString("de-DE")}
+                        ).toLocaleDateString(uiLocale())}
                       </p>
                       <p>
                         <span className="text-muted-foreground">{tx({ de: "Dauer:", en: "Duration:", es: "Duración:" })}</span>{" "}

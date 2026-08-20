@@ -33,6 +33,7 @@ import { BrandShareExport } from "@/components/brand/BrandShareExport";
 import { BrandTrendsRadar } from "@/components/brand/BrandTrendsRadar";
 import type { BrandDnaResult } from "@/hooks/useBrandDnaExtractor";
 import { tx } from "@/lib/i18nText";
+import { uiLocale } from '@/lib/uiLocale';
 
 const BrandKit = () => {
   const { t } = useTranslation();
@@ -394,7 +395,7 @@ const BrandKit = () => {
               className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)] transition-all duration-300 flex items-center gap-2"
             >
               <Sparkles className="h-4 w-4" />
-              Erstellen
+              {tx({ de: 'Erstellen', en: 'Create', es: 'Crear' })}
             </TabsTrigger>
             <TabsTrigger 
               value="brandboard" 
@@ -676,9 +677,9 @@ const BrandKit = () => {
                   <div className="space-y-6">
                     <div className="flex justify-between items-center">
                       <div>
-                        <h2 className="text-2xl font-bold">{activeBrandKit.brand_name || "Dein Marken-Set"}</h2>
+                        <h2 className="text-2xl font-bold">{activeBrandKit.brand_name || tx({ de: 'Dein Marken-Set', en: 'Your brand set', es: 'Tu set de marca' })}</h2>
                         <p className="text-muted-foreground">
-                          Erstellt am {new Date(activeBrandKit.created_at).toLocaleDateString('de-DE')}
+                          {tx({ de: 'Erstellt am', en: 'Created on', es: 'Creado el' })} {new Date(activeBrandKit.created_at).toLocaleDateString(uiLocale())}
                         </p>
                       </div>
                       <Button 
@@ -877,7 +878,7 @@ const BrandKit = () => {
                         <div>
                           <h3 className="font-semibold text-lg">{kit.brand_name || "Unnamed"}</h3>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(kit.created_at).toLocaleDateString('de-DE')}
+                            {new Date(kit.created_at).toLocaleDateString(uiLocale())}
                           </p>
                         </div>
 

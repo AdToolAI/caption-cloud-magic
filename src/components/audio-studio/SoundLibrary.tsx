@@ -15,6 +15,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { EnhancementOptions } from '@/hooks/useAudioEnhancement';
 import { useStemSeparation, STEM_SEPARATION_COST_EUR } from '@/hooks/useStemSeparation';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface SoundLibraryItem {
   id: string;
@@ -206,7 +207,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
 
   // Format date
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('de-DE', {
+    return new Date(dateStr).toLocaleDateString(uiLocale(), {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',

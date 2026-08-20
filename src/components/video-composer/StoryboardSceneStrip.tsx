@@ -120,7 +120,7 @@ export function StoryboardSceneStrip({
     <div className={cn('flex flex-col gap-3', className)}>
       <div className="flex items-center justify-between px-1">
         <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">
-          Szenen · {scenes.length}
+          {tx({ de: 'Szenen', en: 'Scenes', es: 'Escenas' })} · {scenes.length}
         </span>
       </div>
 

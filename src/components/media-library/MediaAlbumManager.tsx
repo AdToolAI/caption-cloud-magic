@@ -422,7 +422,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</Button>
             <Button onClick={createAlbum} disabled={creating || !newAlbumName.trim()}>
               {creating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FolderPlus className="h-4 w-4 mr-1" />}
-              Erstellen
+              {tx({ de: 'Erstellen', en: 'Create', es: 'Crear' })}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useState, useRef } from "react";
 import { motion, useMotionValue, useSpring, useTransform, useInView } from "framer-motion";
+import { uiLocale } from '@/lib/uiLocale';
 
 interface MetricCardProps {
   label: string;
@@ -41,7 +42,7 @@ function AnimatedCounter({ value, duration = 2 }: { value: string; duration?: nu
         const formatted = (current / 1000).toFixed(hasDecimal ? 1 : 0);
         setDisplayValue(`${formatted}K${suffix.replace('K', '')}`);
       } else {
-        setDisplayValue(`${current.toLocaleString('de-DE')}${suffix}`);
+        setDisplayValue(`${current.toLocaleString(uiLocale())}${suffix}`);
       }
       
       if (progress < 1) {

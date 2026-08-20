@@ -3,6 +3,8 @@ import { Badge } from '@/components/ui/badge';
 import { TemplateROI } from '@/hooks/useContentAnalytics';
 import { TrendingUp, DollarSign, Video, Eye } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { tx } from '@/lib/i18nText';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface Props {
   templates: TemplateROI[];
@@ -102,20 +104,20 @@ export function TemplateROIAnalysis({ templates }: Props) {
                     <p className="font-medium">{template.template_name}</p>
                     {isTopPerformer && <Badge variant="default">Top Performer</Badge>}
                   </div>
-                  <p className="text-sm text-muted-foreground">{template.total_videos} Videos erstellt</p>
+                  <p className="text-sm text-muted-foreground">{template.total_videos} {tx({ de: 'Videos erstellt', en: 'videos created', es: 'videos creados' })}</p>
                 </div>
 
                 <div className="grid grid-cols-5 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground">Views</p>
-                    <p className="font-semibold">{template.total_views.toLocaleString('de-DE')}</p>
+                    <p className="font-semibold">{template.total_views.toLocaleString(uiLocale())}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Engagement</p>
                     <p className="font-semibold">{template.avg_engagement.toFixed(1)}%</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Kosten</p>
+                    <p className="text-muted-foreground">{tx({ de: 'Kosten', en: 'Cost', es: 'Coste' })}</p>
                     <p className="font-semibold">${template.total_cost.toFixed(2)}</p>
                   </div>
                   <div>

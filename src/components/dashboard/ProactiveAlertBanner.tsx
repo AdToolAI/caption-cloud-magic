@@ -102,7 +102,7 @@ export function ProactiveAlertBanner() {
                   className="gap-1"
                   onClick={() => navigate(criticalIssue.action!)}
                 >
-                  {criticalIssue.actionLabel || 'Jetzt beheben'}
+                  {criticalIssue.actionLabel || tx({ de: 'Jetzt beheben', en: 'Fix now', es: 'Corregir ahora' })}
                   <ArrowRight className="w-3 h-3" />
                 </Button>
               )}

@@ -44,7 +44,7 @@ export default function TemplateLibrary() {
   } = useTemplates();
 
   const categories = [
-    { value: 'all', label: 'Alle' },
+    { value: 'all', label: 'All' },
     { value: 'social_media', label: 'Social Media' },
     { value: 'advertising', label: 'Werbung' },
     { value: 'explainer', label: tx({ de: "Erklärvideos", en: "Explainer Videos", es: "Videos Explicativos" }) },
@@ -163,7 +163,7 @@ export default function TemplateLibrary() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold">
-            Alle Templates
+            {tx({ de: 'Alle Templates', en: 'All templates', es: 'Todas las plantillas' })}
             {filteredTemplates && (
               <Badge variant="secondary" className="ml-2">
                 {filteredTemplates.length}

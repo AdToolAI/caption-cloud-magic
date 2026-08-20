@@ -121,7 +121,7 @@ export function AutoMatchPanel({
             </h2>
             <p className="text-sm text-muted-foreground max-w-xl">
               KI analysiert Schnittfrequenz, Mood &amp; Länge deines Videos und komponiert
-              automatisch einen perfekt passenden Track. <span className="text-primary font-medium">Analyse kostenlos.</span>
+              {tx({ de: 'automatisch einen perfekt passenden Track.', en: 'a perfectly matching track automatically.', es: 'automáticamente una pista perfecta.' })} <span className="text-primary font-medium">{tx({ de: 'Analyse kostenlos.', en: 'Analysis is free.', es: 'El análisis es gratis.' })}</span>
             </p>
           </div>
           <Badge variant="outline" className="border-primary/40 bg-primary/5">
@@ -329,7 +329,7 @@ export function AutoMatchPanel({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
                         <Badge variant="outline" className="border-green-500/40 bg-green-500/5 text-green-400 text-[10px]">
-                          ✓ FERTIG
+                          ✓ {tx({ de: 'FERTIG', en: 'DONE', es: 'LISTO' })}
                         </Badge>
                         <span className="text-xs text-muted-foreground">{generatedTrack.duration_sec}s</span>
                       </div>

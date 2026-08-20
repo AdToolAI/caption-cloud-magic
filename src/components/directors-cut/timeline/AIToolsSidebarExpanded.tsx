@@ -407,7 +407,7 @@ export function AIToolsSidebarExpanded({
               ))}
               {scenes.length > 5 && (
                 <p className="text-xs text-muted-foreground text-center">
-                  +{scenes.length - 5} weitere Szenen
+                  +{scenes.length - 5} {tx({ de: 'weitere Szenen', en: 'more scenes', es: 'escenas más' })}
                 </p>
               )}
             </div>

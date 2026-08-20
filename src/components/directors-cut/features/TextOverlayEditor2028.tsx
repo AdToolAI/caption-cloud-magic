@@ -402,7 +402,7 @@ export function TextOverlayEditor2028({
   const addOverlay = (template?: typeof TEXT_OVERLAY_TEMPLATES[number]) => {
     const newOverlay: TextOverlay = {
       id: `overlay-${Date.now()}`,
-      text: template?.text || 'Neuer Text',
+      text: template?.text || tx({ de: 'Neuer Text', en: 'New text', es: 'Nuevo texto' }),
       animation: template?.animation || 'fadeIn',
       position: template?.position || 'center',
       startTime: currentTime,
@@ -770,7 +770,7 @@ export function TextOverlayEditor2028({
                 </div>
                 
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Hintergrund</Label>
+                  <Label className="text-sm font-medium">{tx({ de: 'Hintergrund', en: 'Background', es: 'Fondo' })}</Label>
                   <div className="flex flex-wrap gap-1.5">
                     <motion.button
                       whileHover={{ scale: 1.15 }}

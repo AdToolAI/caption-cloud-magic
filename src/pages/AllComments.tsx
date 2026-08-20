@@ -45,6 +45,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { uiLocale } from '@/lib/uiLocale';
 
 interface Comment {
   id: string;
@@ -280,7 +281,7 @@ const AllComments = () => {
             <DialogTrigger asChild>
               <Button variant="outline">
                 <Upload className="h-4 w-4 mr-2" />
-                Importieren
+                {tx({ de: 'Importieren', en: 'Import', es: 'Importar' })}
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -298,7 +299,7 @@ const AllComments = () => {
           </Dialog>
           <Button variant="outline">
             <Download className="h-4 w-4 mr-2" />
-            Exportieren
+            {tx({ de: 'Exportieren', en: 'Export', es: 'Exportar' })}
           </Button>
         </div>
       </div>
@@ -306,7 +307,7 @@ const AllComments = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-5 gap-4">
         <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Gesamt</div>
+          <div className="text-sm text-muted-foreground">{tx({ de: 'Gesamt', en: 'Total', es: 'Total' })}</div>
           <div className="text-2xl font-bold">{kpiData.total}</div>
         </Card>
         <Card className="p-4">
@@ -343,7 +344,7 @@ const AllComments = () => {
             <SelectValue placeholder="Plattform" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Alle</SelectItem>
+            <SelectItem value="">{tx({ de: 'Alle', en: 'All', es: 'Todos' })}</SelectItem>
             <SelectItem value="instagram">Instagram</SelectItem>
             <SelectItem value="tiktok">TikTok</SelectItem>
             <SelectItem value="youtube">YouTube</SelectItem>
@@ -354,7 +355,7 @@ const AllComments = () => {
             <SelectValue placeholder="Sentiment" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Alle</SelectItem>
+            <SelectItem value="">{tx({ de: 'Alle', en: 'All', es: 'Todos' })}</SelectItem>
             <SelectItem value="positive">Positiv</SelectItem>
             <SelectItem value="neutral">Neutral</SelectItem>
             <SelectItem value="negative">Negativ</SelectItem>
@@ -364,7 +365,7 @@ const AllComments = () => {
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
         <TabsList>
-          <TabsTrigger value="alle">Alle</TabsTrigger>
+          <TabsTrigger value="alle">{tx({ de: 'Alle', en: 'All', es: 'Todos' })}</TabsTrigger>
           <TabsTrigger value="inbox">Inbox</TabsTrigger>
           <TabsTrigger value="leads">Leads</TabsTrigger>
           <TabsTrigger value="fragen">Fragen</TabsTrigger>
@@ -405,7 +406,7 @@ const AllComments = () => {
                       <Checkbox />
                     </TableCell>
                     <TableCell className="text-sm">
-                      {new Date(comment.created_at_platform).toLocaleDateString("de-DE")}
+                      {new Date(comment.created_at_platform).toLocaleDateString(uiLocale())}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{comment.comment_sources?.platform || "—"}</Badge>

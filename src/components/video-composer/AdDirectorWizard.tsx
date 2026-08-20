@@ -850,7 +850,7 @@ export default function AdDirectorWizard({
                     className="w-full"
                   >
                     <Wand2 className="h-3.5 w-3.5 mr-2" />
-                    Neu generieren
+                    {tx({ de: 'Neu generieren', en: 'Regenerate', es: 'Regenerar' })}
                   </Button>
                 )}
               </div>
@@ -871,7 +871,7 @@ export default function AdDirectorWizard({
                     <div className="flex-1">
                       <div className="flex items-center justify-between gap-3">
                         <Label htmlFor="ad-multi-variant" className="cursor-pointer">
-                          Alle 3 A/B-Varianten rendern
+                          {tx({ de: 'Alle 3 A/B-Varianten rendern', en: 'Render all 3 A/B variants', es: 'Renderizar las 3 variantes A/B' })}
                         </Label>
                         <Switch
                           id="ad-multi-variant"

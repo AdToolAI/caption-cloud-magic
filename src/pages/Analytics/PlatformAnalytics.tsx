@@ -110,7 +110,7 @@ export default function PlatformAnalytics() {
                 <SelectItem value="7">7 Tage</SelectItem>
                 <SelectItem value="30">30 Tage</SelectItem>
                 <SelectItem value="90">90 Tage</SelectItem>
-                <SelectItem value="all">Alle</SelectItem>
+                <SelectItem value="all">{tx({ de: 'Alle', en: 'All', es: 'Todos' })}</SelectItem>
               </SelectContent>
             </Select>
           </div>

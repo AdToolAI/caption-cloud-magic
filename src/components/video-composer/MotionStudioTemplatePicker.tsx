@@ -42,7 +42,7 @@ export default function MotionStudioTemplatePicker({
   );
 
   const styleOptions: { value: string; label: string }[] = [
-    { value: ALL_STYLE_FILTER, label: 'Alle Stile' },
+    { value: ALL_STYLE_FILTER, label: tx({ de: 'Alle Stile', en: 'All styles', es: 'Todos los estilos' }) },
     ...(Object.entries(STYLE_LABELS) as [TemplateStyle, string][]).map(([value, label]) => ({
       value,
       label,
@@ -203,7 +203,7 @@ function TemplateCard({ template, onSelect }: TemplateCardProps) {
           </span>
           <span className="flex items-center gap-1">
             <LayoutGrid className="h-3 w-3" />
-            {sceneCount} Szenen
+            {sceneCount} {tx({ de: 'Szenen', en: 'scenes', es: 'escenas' })}
           </span>
           <span className="ml-auto text-primary/80 capitalize truncate">
             {USE_CASE_LABELS[template.use_case] ?? template.use_case}

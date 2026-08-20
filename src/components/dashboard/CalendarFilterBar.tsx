@@ -52,7 +52,7 @@ export function CalendarFilterBar({
               <SelectValue placeholder="Plattform" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Alle Plattformen</SelectItem>
+              <SelectItem value="all">{tx({ de: 'Alle Plattformen', en: 'All platforms', es: 'Todas las plataformas' })}</SelectItem>
               <SelectItem value="instagram">Instagram</SelectItem>
               <SelectItem value="facebook">Facebook</SelectItem>
               <SelectItem value="tiktok">TikTok</SelectItem>
@@ -66,7 +66,7 @@ export function CalendarFilterBar({
               <SelectValue placeholder="Kampagne" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Alle Kampagnen</SelectItem>
+              <SelectItem value="all">{tx({ de: 'Alle Kampagnen', en: 'All campaigns', es: 'Todas las campañas' })}</SelectItem>
               {campaigns.map((campaign) => (
                 <SelectItem key={campaign.id} value={campaign.id}>
                   {campaign.title}

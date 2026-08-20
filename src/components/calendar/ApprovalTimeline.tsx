@@ -35,7 +35,7 @@ export function ApprovalTimeline({ event_id }: ApprovalTimelineProps) {
       <Card>
         <CardContent className="pt-6">
           <p className="text-sm text-muted-foreground text-center">
-            Keine Approval-Anfragen
+            {tx({ de: 'Keine Approval-Anfragen', en: 'No approval requests', es: 'Sin solicitudes de aprobación' })}
           </p>
         </CardContent>
       </Card>

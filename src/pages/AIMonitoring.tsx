@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Activity, TrendingUp, Clock, Zap, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface AIUsageStats {
   today: number;
@@ -102,7 +103,7 @@ export default function AIMonitoring() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return new Intl.DateTimeFormat('de-DE', {
+    return new Intl.DateTimeFormat(uiLocale(), {
       day: '2-digit',
       month: '2-digit',
       hour: '2-digit',

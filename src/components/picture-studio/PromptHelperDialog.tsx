@@ -264,7 +264,7 @@ function PromptCard({ label, prompt, highlight, onUse }: {
       <div className="flex items-center justify-between">
         <Label className="text-xs font-semibold">{label}</Label>
         <Button size="sm" variant={highlight ? "default" : "outline"} onClick={onUse}>
-          <Check className="h-3.5 w-3.5 mr-1" /> Übernehmen
+          <Check className="h-3.5 w-3.5 mr-1" /> {tx({ de: 'Übernehmen', en: 'Apply', es: 'Aplicar' })}
         </Button>
       </div>
       <p className="text-xs text-foreground/90 leading-relaxed">{prompt}</p>

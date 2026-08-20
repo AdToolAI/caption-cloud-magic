@@ -23,6 +23,7 @@ import { computeProviderEta } from '@/hooks/useProviderEta';
 import { getRenderWarnings, aggregateWarnings, type RenderWarning } from '@/lib/video-composer/renderWarnings';
 import { getRiskyLipsyncInfo, type RiskyLipsyncInfo } from '@/config/lipsyncProviderSafety';
 import { countSceneSpeakers } from './countSceneSpeakers';
+import { uiLocale } from '@/lib/uiLocale';
 
 const CREDIT_PER_EUR = 100;     // 1 credit = €0.01
 const VO_CREDITS_PER_SCENE = 5; // ~€0.05 ElevenLabs avg
@@ -215,5 +216,5 @@ export function formatEur(eur: number): string {
   return `€${eur.toFixed(2)}`;
 }
 export function formatCredits(credits: number): string {
-  return `${credits.toLocaleString('de-DE')} Cr`;
+  return `${credits.toLocaleString(uiLocale())} Cr`;
 }

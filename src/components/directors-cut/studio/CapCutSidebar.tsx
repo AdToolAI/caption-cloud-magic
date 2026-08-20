@@ -844,7 +844,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
         audioUrl: url,
         imageUrl: '',
       });
-      toast.success(`${file.name} zur Timeline hinzugefügt`);
+      toast.success(tx({ de: `${file.name} zur Timeline hinzugefügt`, en: `${file.name} added to the timeline`, es: `${file.name} añadido a la línea de tiempo` }));
     });
     audio.addEventListener('error', () => {
       // Fallback if metadata can't be loaded
@@ -856,7 +856,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
         audioUrl: url,
         imageUrl: '',
       });
-      toast.success(`${file.name} zur Timeline hinzugefügt`);
+      toast.success(tx({ de: `${file.name} zur Timeline hinzugefügt`, en: `${file.name} added to the timeline`, es: `${file.name} añadido a la línea de tiempo` }));
     });
   };
 
@@ -1049,7 +1049,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                     onClick={onRemoveOriginalSubtitles}
                     className="h-auto min-h-6 text-[10px] border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 px-2 whitespace-normal leading-tight"
                   >
-                    Entfernen
+                    {tx({ de: 'Entfernen', en: 'Remove', es: 'Quitar' })}
                   </Button>
                   <Button
                     size="sm"
@@ -1059,7 +1059,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                     className="h-auto min-h-6 text-[10px] border-[#00d4ff]/30 text-[#00d4ff] hover:bg-[#00d4ff]/10 px-2 whitespace-normal leading-tight"
                   >
                     <Sparkles className="h-2.5 w-2.5 mr-1" />
-                    Neu generieren
+                    {tx({ de: 'Neu generieren', en: 'Regenerate', es: 'Regenerar' })}
                   </Button>
                 </div>
               </div>

@@ -62,7 +62,7 @@ export function NotificationCenter({ open, onClose }: NotificationCenterProps) {
                 onClick={() => markAllAsRead()}
               >
                 <CheckCheck className="h-4 w-4 mr-2" />
-                Alle lesen
+                {tx({ de: 'Alle lesen', en: 'Mark all read', es: 'Marcar todo como leído' })}
               </Button>
             )}
           </SheetTitle>
@@ -99,7 +99,7 @@ export function NotificationCenter({ open, onClose }: NotificationCenterProps) {
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <h4 className="font-medium text-sm">{notification.title}</h4>
                       {!notification.read && (
-                        <Badge variant="default" className="shrink-0">Neu</Badge>
+                        <Badge variant="default" className="shrink-0">{tx({ de: 'Neu', en: 'New', es: 'Nuevo' })}</Badge>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground line-clamp-2">

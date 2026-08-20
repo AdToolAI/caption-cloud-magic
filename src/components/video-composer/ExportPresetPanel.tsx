@@ -365,7 +365,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
                 {isDone ? (
                   <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                     <Badge variant="outline" className="text-[10px] h-5 gap-1 border-emerald-500/40 text-emerald-500 bg-emerald-500/5">
-                      <CheckCircle className="h-3 w-3" /> Fertig
+                      <CheckCircle className="h-3 w-3" /> {tx({ de: 'Fertig', en: 'Done', es: 'Listo' })}
                     </Badge>
                     <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs ml-auto">
                       <a href={latest!.video_url!} download target="_blank" rel="noopener noreferrer">
@@ -381,7 +381,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
                 ) : isFailed ? (
                   <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
                     <Badge variant="outline" className="text-[10px] h-5 gap-1 border-destructive/40 text-destructive bg-destructive/5">
-                      <AlertCircle className="h-3 w-3" /> Fehlgeschlagen
+                      <AlertCircle className="h-3 w-3" /> {tx({ de: 'Fehlgeschlagen', en: 'Failed', es: 'Fallidos' })}
                     </Badge>
                     <Button
                       size="sm" variant="outline"
@@ -424,7 +424,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
                   {selectedKeys.size} Formate ausgewählt
                 </p>
                 <p className="text-[11px] text-muted-foreground">
-                  Geschätzte Kosten: <span className="font-medium text-foreground">€{batchCost.toFixed(2)}</span> · Parallele Verarbeitung
+                  {tx({ de: 'Geschätzte Kosten:', en: 'Estimated cost:', es: 'Coste estimado:' })} <span className="font-medium text-foreground">€{batchCost.toFixed(2)}</span> · {tx({ de: 'Parallele Verarbeitung', en: 'Parallel processing', es: 'Procesamiento en paralelo' })}
                 </p>
               </div>
             </div>

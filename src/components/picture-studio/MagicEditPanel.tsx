@@ -373,7 +373,7 @@ export function MagicEditPanel() {
                             size="sm"
                             onClick={() => setDirection(d)}
                           >
-                            {d === 'all' ? 'Alle' : d === 'left' ? '←' : d === 'right' ? '→' : d === 'top' ? '↑' : '↓'}
+                            {d === 'all' ? tx({ de: 'Alle', en: 'All', es: 'Todos' }) : d === 'left' ? '←' : d === 'right' ? '→' : d === 'top' ? '↑' : '↓'}
                           </Button>
                         ))}
                       </div>

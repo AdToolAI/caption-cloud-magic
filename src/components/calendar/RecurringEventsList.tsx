@@ -104,7 +104,7 @@ export function RecurringEventsList({ workspace_id }: RecurringEventsListProps) 
                           addSuffix: true,
                           locale: de,
                         })
-                      : 'Nicht geplant'}
+                      : tx({ de: 'Nicht geplant', en: 'Not scheduled', es: 'No programado' })}
                   </span>
                 </div>
                 {rule.last_execution && (

@@ -52,9 +52,9 @@ export function StarterPlanPreview({ plans, loading, error, onComplete, onRetry 
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h3 className="text-xl font-semibold">Dein Produktionsplan steht! 🎉</h3>
+        <h3 className="text-xl font-semibold">{tx({ de: 'Dein Produktionsplan steht!', en: 'Your production plan is ready!', es: '¡Tu plan de producción está listo!' })} 🎉</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          {plans.length} Videoideen für deine erste Woche — von der Idee bis zur Veröffentlichung
+          {plans.length} {tx({ de: 'Videoideen für deine erste Woche — von der Idee bis zur Veröffentlichung', en: 'video ideas for your first week — from idea to publishing', es: 'ideas de video para tu primera semana — de la idea a la publicación' })}
         </p>
       </div>
 

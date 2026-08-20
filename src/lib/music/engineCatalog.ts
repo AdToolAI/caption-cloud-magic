@@ -147,7 +147,7 @@ export const ENGINE_CATALOG: Record<string, MusicEngine> = {
     route: 'replicate',
     replicateModel: 'google/lyria-3-pro',
     order: 50,
-    badge: 'NEU',
+    badge: 'NEW',
   },
 };
 

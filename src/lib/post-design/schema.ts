@@ -134,7 +134,7 @@ export function emptySlide(palette = DEFAULT_PALETTE): PostSlide {
   return { id: uid("s"), background: palette.background, layers: [] };
 }
 
-export function emptyDesign(title = "Neuer Post"): PostDesign {
+export function emptyDesign(title = tx({ de: 'Neuer Post', en: 'New post', es: 'Nueva publicación' })): PostDesign {
   return {
     title,
     format: "square",

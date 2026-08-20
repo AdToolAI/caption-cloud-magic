@@ -209,10 +209,10 @@ export default function AIDirectorBriefDialog({
               <p className="text-xs text-muted-foreground mt-1">{plan.logline}</p>
               <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  <Film className="h-3 w-3" /> {plan.scenes.length} Szenen
+                  <Film className="h-3 w-3" /> {plan.scenes.length} {tx({ de: 'Szenen', en: 'scenes', es: 'escenas' })}
                 </span>
                 <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" /> {plan.totalDurationSeconds}s gesamt
+                  <Clock className="h-3 w-3" /> {plan.totalDurationSeconds}s {tx({ de: 'gesamt', en: 'total', es: 'en total' })}
                 </span>
               </div>
             </div>
@@ -259,13 +259,13 @@ export default function AIDirectorBriefDialog({
 
             <div className="flex gap-2">
               <Button variant="outline" onClick={reset} className="flex-1">
-                Verwerfen
+                {tx({ de: 'Verwerfen', en: 'Discard', es: 'Descartar' })}
               </Button>
               <Button
                 onClick={apply}
                 className="flex-1 gap-2 bg-gradient-to-r from-primary to-accent"
               >
-                <Sparkles className="h-4 w-4" /> Übernehmen
+                <Sparkles className="h-4 w-4" /> {tx({ de: 'Übernehmen', en: 'Apply', es: 'Aplicar' })}
               </Button>
             </div>
           </div>

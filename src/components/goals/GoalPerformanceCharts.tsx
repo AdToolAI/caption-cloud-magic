@@ -1,6 +1,7 @@
 import { Card } from '@/components/ui/card';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useTranslation } from '@/hooks/useTranslation';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface PerformanceChartsProps {
   metrics: any[];
@@ -13,7 +14,7 @@ export function GoalPerformanceCharts({ metrics, timeframe }: PerformanceChartsP
   // Prepare engagement trend data
   const engagementData = metrics
     .map(m => ({
-      date: new Date(m.posted_at).toLocaleDateString('de-DE', { month: 'short', day: 'numeric' }),
+      date: new Date(m.posted_at).toLocaleDateString(uiLocale(), { month: 'short', day: 'numeric' }),
       rate: m.engagement_rate || 0,
     }))
     .reverse()

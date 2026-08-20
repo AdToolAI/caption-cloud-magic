@@ -1186,7 +1186,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Szene {(rerollTarget?.orderIndex ?? 0) + 1} neu generieren?
+              {tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} {(rerollTarget?.orderIndex ?? 0) + 1} {tx({ de: 'neu generieren?', en: 'regenerate?', es: '¿regenerar?' })}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2">
@@ -1234,7 +1234,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                   <AlertDialogTitle>
                     <span className="inline-flex items-center gap-2">
                       <Clapperboard className="h-4 w-4 text-emerald-400" />
-                      Szene {(target?.orderIndex ?? 0) + 1} in echte Szene einbauen?
+                      {tx({ de: `Szene ${(target?.orderIndex ?? 0) + 1} in echte Szene einbauen?`, en: `Insert scene ${(target?.orderIndex ?? 0) + 1} into the real scene?`, es: `¿Insertar la escena ${(target?.orderIndex ?? 0) + 1} en la escena real?` })}
                     </span>
                   </AlertDialogTitle>
                   <AlertDialogDescription asChild>
@@ -1400,7 +1400,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                         {isAi && scene.referenceImageUrl && (
                           <span className="px-1.5 py-0 rounded text-[9px] border border-primary/40 bg-primary/10 text-primary inline-flex items-center gap-1">
                             <Sparkles className="h-2.5 w-2.5" />
-                            Mit Referenzbild
+                            {tx({ de: 'Mit Referenzbild', en: 'With reference image', es: 'Con imagen de referencia' })}
                           </span>
                         )}
                         {clipStatusFromState(sceneState(scene)) === 'generating' && isAi && (
@@ -1552,7 +1552,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                     {clipStatusFromState(sceneState(scene)) === 'generating' && (
                       <Button size="sm" disabled className="gap-1 text-[10px] h-7 px-2">
                         <Loader2 className="h-3 w-3 animate-spin" />
-                        Wird generiert…
+                        {tx({ de: 'Wird generiert…', en: 'Generating…', es: 'Generando…' })}
                       </Button>
                     )}
                     {/* Stock pending */}

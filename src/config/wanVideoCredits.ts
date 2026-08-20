@@ -56,7 +56,7 @@ export const WAN_VIDEO_MODELS = {
       EUR: 'Verbesserte Motion-Konsistenz · gleiche Preise',
       USD: 'Improved motion consistency · same price',
     },
-    badge: 'Neu',
+    badge: 'New',
   },
   'wan-2-6-pro': {
     name: 'Wan 2.6 Pro',
@@ -92,7 +92,7 @@ export const WAN_VIDEO_MODELS = {
       EUR: '27B MoE · natives Audio · 720p',
       USD: '27B MoE · native audio · 720p',
     },
-    badge: 'Neu',
+    badge: 'New',
   },
   'wan-2-7-pro': {
     name: 'Wan 2.7 Pro',

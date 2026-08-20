@@ -14,6 +14,7 @@ import { TimelineScheduler } from "./TimelineScheduler";
 import { canQuickCalendarPost } from "@/lib/entitlements";
 import { useAuth } from "@/hooks/useAuth";
 import { QuickPostUpsellModal } from "@/components/pricing/QuickPostUpsellModal";
+import { uiLocale } from '@/lib/uiLocale';
 
 interface AutoScheduleDialogProps {
   open: boolean;
@@ -212,7 +213,7 @@ export function AutoScheduleDialog({
                           <div className="flex items-center gap-2 text-sm">
                             <Calendar className="w-4 h-4 text-primary" />
                             <span className="font-semibold text-foreground">
-                              {new Date(suggestion.suggested_time).toLocaleString('de-DE', {
+                              {new Date(suggestion.suggested_time).toLocaleString(uiLocale(), {
                                 timeZone: 'Europe/Berlin',
                                 weekday: 'long',
                                 day: '2-digit',

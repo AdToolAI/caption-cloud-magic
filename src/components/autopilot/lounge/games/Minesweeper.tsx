@@ -5,6 +5,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { tx } from '@/lib/i18nText';
 
 const SIZE = 9;
 const MINES = 10;
@@ -137,7 +138,7 @@ export default function Minesweeper() {
           {state === 'lost' ? 'Verloren' : state === 'won' ? 'Geschafft' : 'Im Spiel'}
         </span>
         <Button size="sm" variant="outline" onClick={reset}>
-          Neu
+          {tx({ de: 'Neu', en: 'New', es: 'Nuevo' })}
         </Button>
       </div>
 
@@ -192,7 +193,7 @@ export default function Minesweeper() {
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        Tippen zum Öffnen, Rechtsklick oder langes Drücken für die Flagge.
+        {tx({ de: 'Tippen zum Öffnen, Rechtsklick oder langes Drücken für die Flagge.', en: 'Tap to open, right-click or long-press to flag.', es: 'Toca para abrir, clic derecho o pulsación larga para marcar.' })}
       </p>
     </div>
   );

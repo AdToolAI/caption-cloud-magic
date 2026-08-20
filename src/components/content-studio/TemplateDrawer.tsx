@@ -59,7 +59,7 @@ export function TemplateDrawer({ open, onOpenChange }: { open: boolean; onOpenCh
         <ScrollArea className="mt-4 h-[calc(100vh-9rem)] pr-3">
           {loading && (
             <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Lädt …
+              <Loader2 className="h-4 w-4 animate-spin" /> {tx({ de: 'Lädt …', en: 'Loading …', es: 'Cargando …' })}
             </div>
           )}
           {!loading && !items.length && (

@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Activity, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface JobMetrics {
   pending: number;
@@ -79,7 +80,7 @@ export function LiveJobsMonitor() {
 
       // Update timeline
       setTimeline(prev => {
-        const now = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+        const now = new Date().toLocaleTimeString(uiLocale(), { hour: '2-digit', minute: '2-digit' });
         const newData = [...prev, { time: now, pending, processing }];
         return newData.slice(-20); // Keep last 20 data points
       });

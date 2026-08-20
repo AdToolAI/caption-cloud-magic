@@ -268,7 +268,7 @@ export default function SnippetBuilderDialog({
                   className="h-7 gap-1.5 text-[11px]"
                 >
                   {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-                  Hochladen
+                  {tx({ de: 'Hochladen', en: 'Upload', es: 'Subir' })}
                 </Button>
                 {thumbnailUrl && (
                   <Button
@@ -277,7 +277,7 @@ export default function SnippetBuilderDialog({
                     onClick={() => setThumbnailUrl(null)}
                     className="h-7 text-[11px] text-muted-foreground"
                   >
-                    Entfernen
+                    {tx({ de: 'Entfernen', en: 'Remove', es: 'Quitar' })}
                   </Button>
                 )}
               </div>

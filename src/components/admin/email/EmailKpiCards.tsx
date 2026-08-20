@@ -1,6 +1,7 @@
 import { tx } from '@/lib/i18nText';
 import { Card } from '@/components/ui/card';
 import { Mail, Ban, AlertTriangle, TrendingDown, ShieldAlert, UserMinus, FlaskConical } from 'lucide-react';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface Props {
   sent: number;
@@ -48,7 +49,7 @@ export function EmailKpiCards({
             <span className="text-xs uppercase tracking-wide text-muted-foreground">{it.label}</span>
             <it.icon className={`h-4 w-4 ${it.accent}`} />
           </div>
-          <div className={`text-3xl font-bold ${it.accent}`}>{it.value.toLocaleString('de-DE')}</div>
+          <div className={`text-3xl font-bold ${it.accent}`}>{it.value.toLocaleString(uiLocale())}</div>
           {it.label === 'Test-Bounces' && it.value > 0 && (
             <p className="text-[10px] text-muted-foreground mt-1">{tx({ de: 'Resend-Testadressen (ignoriert)', en: 'Resend test addresses (ignored)', es: 'Reenviar direcciones de prueba (ignoradas)' })}</p>
           )}

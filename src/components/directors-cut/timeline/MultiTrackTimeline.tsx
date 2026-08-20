@@ -7,6 +7,7 @@ import { VideoTrack } from './VideoTrack';
 import { AudioTrackRow } from './AudioTrackRow';
 import { AudioClipComponent } from './AudioClipComponent';
 import { cn } from '@/lib/utils';
+import { tx } from '@/lib/i18nText';
 
 interface MultiTrackTimelineProps {
   videoScenes: VideoTrackScene[];
@@ -127,7 +128,7 @@ export function MultiTrackTimeline({
             <span className="text-lg">🎬</span>
             <div>
               <div className="text-sm font-medium">Video</div>
-              <div className="text-xs text-muted-foreground">{videoScenes.length} Szenen</div>
+              <div className="text-xs text-muted-foreground">{videoScenes.length} {tx({ de: 'Szenen', en: 'scenes', es: 'escenas' })}</div>
             </div>
           </div>
           

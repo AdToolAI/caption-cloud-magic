@@ -14,6 +14,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { PostComposerPanel } from "./PostComposerPanel";
 import { tx } from '@/lib/i18nText';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface EventDrawerProps {
   open: boolean;
@@ -135,10 +136,10 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
 
   const dateObj = event?.start_at ? new Date(event.start_at) : null;
   const dateStr = dateObj
-    ? dateObj.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })
+    ? dateObj.toLocaleDateString(uiLocale(), { weekday: "short", day: "2-digit", month: "short", year: "numeric" })
     : "—";
   const timeStr = dateObj
-    ? dateObj.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
+    ? dateObj.toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" })
     : "—";
 
   return (

@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { tx } from '@/lib/i18nText';
 
 const SYMBOLS = ['★', '♠', '♦', '☾', '⚑', '✧', '❖', '⌘'];
 
@@ -90,7 +91,7 @@ export default function MemoryGame() {
             lock.current = false;
           }}
         >
-          Neu
+          {tx({ de: 'Neu', en: 'New', es: 'Nuevo' })}
         </Button>
       </div>
 
@@ -121,7 +122,7 @@ export default function MemoryGame() {
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        {done ? `Alle Paare in ${moves} Zügen — ${time}.` : 'Zwei Karten aufdecken, Paare merken.'}
+        {done ? tx({ de: `Alle Paare in ${moves} Zügen — ${time}.`, en: `All pairs in ${moves} moves — ${time}.`, es: `Todos los pares en ${moves} movimientos — ${time}.` }) : tx({ de: 'Zwei Karten aufdecken, Paare merken.', en: 'Flip two cards, remember the pairs.', es: 'Voltea dos cartas y memoriza los pares.' })}
       </p>
     </div>
   );

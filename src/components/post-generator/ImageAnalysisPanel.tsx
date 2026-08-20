@@ -104,7 +104,7 @@ export const ImageAnalysisPanel = ({ imageUrl, brandKitId }: ImageAnalysisPanelP
               <Badge variant="outline">{analysis.ciMatch.secondaryColorMatch}%</Badge>
             </div>
             <div className="flex justify-between font-semibold">
-              <span>Gesamt:</span>
+              <span>{tx({ de: 'Gesamt:', en: 'Total:', es: 'Total:' })}</span>
               <Badge variant={analysis.ciMatch.overallMatch >= 60 ? "default" : "secondary"}>
                 {analysis.ciMatch.overallMatch}%
               </Badge>

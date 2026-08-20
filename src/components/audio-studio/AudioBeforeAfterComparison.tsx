@@ -631,7 +631,7 @@ export function AudioBeforeAfterComparison({
             
             <div className="text-xs text-muted-foreground space-y-1">
               <p>• {Object.values(effectOptions).filter(Boolean).length} Effekte aktiv</p>
-              <p>• Dauer: {formatTime(duration)}</p>
+              <p>• {tx({ de: 'Dauer', en: 'Duration', es: 'Duración' })}: {formatTime(duration)}</p>
             </div>
           </div>
           

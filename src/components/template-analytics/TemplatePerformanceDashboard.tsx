@@ -4,6 +4,7 @@ import { useTemplateAnalytics } from "@/hooks/useTemplateAnalytics";
 import { TrendingUp, Eye, MousePointer, FileText, Share2 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { tx } from "@/lib/i18nText";
+import { uiLocale } from '@/lib/uiLocale';
 
 interface TemplatePerformanceDashboardProps {
   templateId: string;
@@ -39,7 +40,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
 
   // Prepare chart data
   const chartData = daily_metrics.map(metric => ({
-    date: new Date(metric.date).toLocaleDateString('de-DE', { month: 'short', day: 'numeric' }),
+    date: new Date(metric.date).toLocaleDateString(uiLocale(), { month: 'short', day: 'numeric' }),
     views: metric.total_views,
     selections: metric.total_selections,
     creates: metric.projects_created,
@@ -86,7 +87,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
               {summary?.conversion_rate?.toFixed(1) || 0}%
             </div>
             <p className="text-xs text-muted-foreground">
-              {summary?.total_projects || 0} Projekte erstellt
+              {summary?.total_projects || 0} {tx({ de: 'Projekte erstellt', en: 'projects created', es: 'proyectos creados' })}
             </p>
           </CardContent>
         </Card>
@@ -233,7 +234,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
                   <div>
                     <div className="font-medium">{test.test_name}</div>
                     <div className="text-sm text-muted-foreground">
-                      Gestartet: {new Date(test.started_at).toLocaleDateString('de-DE')}
+                      Gestartet: {new Date(test.started_at).toLocaleDateString(uiLocale())}
                     </div>
                   </div>
                   <div className="text-sm font-medium text-primary">

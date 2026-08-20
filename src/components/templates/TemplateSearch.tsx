@@ -36,7 +36,7 @@ interface TemplateSearchProps {
 }
 
 const CATEGORIES = [
-  { value: 'all', label: 'Alle Kategorien' },
+  { value: 'all', label: tx({ de: 'Alle Kategorien', en: 'All categories', es: 'Todas las categorías' }) },
   { value: 'product', label: 'Produkt' },
   { value: 'service', label: 'Service' },
   { value: 'event', label: 'Event' },
@@ -45,7 +45,7 @@ const CATEGORIES = [
 ];
 
 const PLATFORMS = [
-  { value: 'all', label: 'Alle Plattformen' },
+  { value: 'all', label: tx({ de: 'Alle Plattformen', en: 'All platforms', es: 'Todas las plataformas' }) },
   { value: 'instagram', label: 'Instagram' },
   { value: 'tiktok', label: 'TikTok' },
   { value: 'youtube', label: 'YouTube' },
@@ -53,7 +53,7 @@ const PLATFORMS = [
 ];
 
 const ASPECT_RATIOS = [
-  { value: 'all', label: 'Alle Formate' },
+  { value: 'all', label: tx({ de: 'Alle Formate', en: 'All formats', es: 'Todos los formatos' }) },
   { value: '9:16', label: '9:16 (Stories)' },
   { value: '16:9', label: '16:9 (Landscape)' },
   { value: '1:1', label: '1:1 (Square)' },

@@ -141,7 +141,7 @@ export default function DirectorPresetPicker({
         </Tabs>
         {activeCount > 0 && (
           <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" onClick={clearAll}>
-            <X className="h-3 w-3 mr-1" /> Alle Modifier zurücksetzen
+            <X className="h-3 w-3 mr-1" /> {tx({ de: 'Alle Modifier zurücksetzen', en: 'Reset all modifiers', es: 'Restablecer todos los modificadores' })}
           </Button>
         )}
       </div>

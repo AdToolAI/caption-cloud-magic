@@ -14,6 +14,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { tx } from '@/lib/i18nText';
+import { uiLocale } from '@/lib/uiLocale';
 
 type Row = {
   id: string;
@@ -177,7 +178,7 @@ export function EmailLogTable({ range }: Props) {
           </div>
 
           <div className="flex items-center justify-between mt-4 text-xs text-muted-foreground">
-            <span>{tx({ de: `${total.toLocaleString('de-DE')} Einträge · Seite ${page + 1} / ${totalPages}`, en: `${total.toLocaleString('en-US')} entries · page ${page + 1} / ${totalPages}`, es: `${total.toLocaleString('es-ES')} entradas · página ${page + 1} / ${totalPages}` })}</span>
+            <span>{tx({ de: `${total.toLocaleString(uiLocale())} Einträge · Seite ${page + 1} / ${totalPages}`, en: `${total.toLocaleString('en-US')} entries · page ${page + 1} / ${totalPages}`, es: `${total.toLocaleString('es-ES')} entradas · página ${page + 1} / ${totalPages}` })}</span>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>{tx({ de: "Zurück", en: "Back", es: "Atrás" })}</Button>
               <Button size="sm" variant="outline" disabled={page + 1 >= totalPages} onClick={() => setPage((p) => p + 1)}>{tx({ de: "Weiter", en: "Next", es: "Siguiente" })}</Button>

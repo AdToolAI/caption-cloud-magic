@@ -6,6 +6,7 @@ import { Sparkles, TrendingUp, TrendingDown, Clock, Send, AlertTriangle, CheckCi
 import { useLatestWeeklyReview, useAcceptWeeklyReview, useTriggerWeeklyReview, useAutopilotBrief } from '@/hooks/useAutopilot';
 import { formatDistanceToNow, isAfter } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { uiLocale } from '@/lib/uiLocale';
 
 export function AutopilotWeeklyReviewPanel() {
   const { data: review, isLoading } = useLatestWeeklyReview();
@@ -48,7 +49,7 @@ export function AutopilotWeeklyReviewPanel() {
               <div className="font-medium text-sm">
                 {deadlinePassed
                   ? tx({ de: "Briefing-Deadline überschritten — Autopilot wird pausiert", en: "Briefing deadline exceeded — autopilot is paused", es: "Se superó la fecha límite para la sesión informativa: el piloto automático está en pausa" })
-                  : tx({ de: `Bitte bis ${deadline.toLocaleString('de-DE', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC bestätigen`, en: `Please confirm by ${deadline.toLocaleString('en-US', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC`, es: `Confirma antes de ${deadline.toLocaleString('es-ES', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC` })}
+                  : tx({ de: `Bitte bis ${deadline.toLocaleString(uiLocale(), { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC bestätigen`, en: `Please confirm by ${deadline.toLocaleString('en-US', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC`, es: `Confirma antes de ${deadline.toLocaleString('es-ES', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC` })}
               </div>
               <div className="text-xs text-muted-foreground">
                 {deadline && !deadlinePassed && `Noch ${formatDistanceToNow(deadline, { locale: de })}`}
@@ -67,7 +68,7 @@ export function AutopilotWeeklyReviewPanel() {
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground mb-1">Engagement</div>
-          <div className="text-2xl font-serif text-primary">{review.total_engagement.toLocaleString('de-DE')}</div>
+          <div className="text-2xl font-serif text-primary">{review.total_engagement.toLocaleString(uiLocale())}</div>
           <div className="text-xs text-muted-foreground">Summe (Like+Cmt+Share+Save)</div>
         </Card>
         <Card className="p-4">

@@ -175,7 +175,7 @@ export const MediaEditor = ({
     
     toast({
       title: tx({ de: "Filter angewendet", en: "Filter applied", es: "Filtro aplicado" }),
-      description: `${preset.name} $${tx({ de: "wurde angewendet", en: "was applied", es: "fue aplicado" })}`,
+      description: `${preset.name} ${tx({ de: "wurde angewendet", en: "was applied", es: "fue aplicado" })}`,
     });
   };
 

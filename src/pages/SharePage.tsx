@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Download, Sparkles, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { uiLocale } from '@/lib/uiLocale';
 
 export default function SharePage() {
   const { token } = useParams<{ token: string }>();
@@ -153,7 +154,7 @@ export default function SharePage() {
               <div>
                 <div className="text-sm text-muted-foreground">{tx({ de: "Erstellt am", en: "Created at", es: "Creado el" })}</div>
                 <div className="font-medium">
-                  {new Date(project?.created_at).toLocaleDateString('de-DE')}
+                  {new Date(project?.created_at).toLocaleDateString(uiLocale())}
                 </div>
               </div>
               {project?.customizations?.duration && (

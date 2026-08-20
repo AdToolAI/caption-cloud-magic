@@ -7,6 +7,7 @@ import { BarChart3, TrendingUp, Video, Eye, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { uiLocale } from '@/lib/uiLocale';
 
 interface AnalyticsData {
   overview: {
@@ -251,11 +252,11 @@ export default function AnalyticsDashboard() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="date" 
-                  tickFormatter={(date: string | number) => new Date(date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                  tickFormatter={(date: string | number) => new Date(date).toLocaleDateString(uiLocale(), { day: '2-digit', month: '2-digit' })}
                 />
                 <YAxis />
                 <Tooltip 
-                  labelFormatter={(date: any) => new Date(date).toLocaleDateString('de-DE')}
+                  labelFormatter={(date: any) => new Date(date).toLocaleDateString(uiLocale())}
                 />
                 <Line 
                   type="monotone" 

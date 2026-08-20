@@ -770,7 +770,7 @@ export function SceneEditingStep({
             Szenen-Editor
           </h3>
           <p className="text-sm text-muted-foreground">
-            Bearbeite Szenen und konfiguriere Übergänge visuell
+            {tx({ de: 'Bearbeite Szenen und konfiguriere Übergänge visuell', en: 'Edit scenes and configure transitions visually', es: 'Edita escenas y configura transiciones visualmente' })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -801,7 +801,7 @@ export function SceneEditingStep({
             className="text-xs border-green-500/50 text-green-600 hover:bg-green-500/10"
           >
             <Plus className="h-3.5 w-3.5 mr-1.5" />
-            Szene
+            {tx({ de: 'Szene', en: 'Scene', es: 'Escena' })}
           </Button>
           <Button
             onClick={() => setShowAddMediaDialog(true)}
@@ -908,7 +908,7 @@ export function SceneEditingStep({
                 <div className="flex items-center gap-3">
                   <Badge variant="secondary" className="bg-primary/20 text-primary border-primary/30">
                     <Film className="h-3 w-3 mr-1" />
-                    Szene {scenes.findIndex(s => s.id === currentScene.id) + 1}
+                    {tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} {scenes.findIndex(s => s.id === currentScene.id) + 1}
                   </Badge>
                   <span className="text-xs text-white/80 font-mono">
                     {currentScene.start_time.toFixed(1)}s – {currentScene.end_time.toFixed(1)}s
@@ -1019,7 +1019,7 @@ export function SceneEditingStep({
               <CardContent className="py-12 text-center">
                 <Scissors className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
                 <p className="text-sm text-muted-foreground">
-                  Keine Szenen vorhanden. Bitte zuerst die KI-Analyse durchführen.
+                  {tx({ de: 'Keine Szenen vorhanden. Bitte zuerst die KI-Analyse durchführen.', en: 'No scenes yet. Please run the AI analysis first.', es: 'Aún no hay escenas. Ejecuta primero el análisis de IA.' })}
                 </p>
               </CardContent>
             </Card>
@@ -1058,7 +1058,7 @@ export function SceneEditingStep({
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-2">
                         <Badge variant="secondary" className="font-mono">
-                          Szene {selectedSceneIndex + 1}
+                          {tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} {selectedSceneIndex + 1}
                         </Badge>
                         {selectedScene.mood && (
                           <Badge variant="outline" className="capitalize">
@@ -1107,7 +1107,7 @@ export function SceneEditingStep({
                     <div className="mb-4 p-3 rounded-lg bg-muted/50 border">
                       <div className="flex items-center gap-2 mb-3">
                         <Timer className="h-4 w-4 text-primary" />
-                        <Label className="text-xs font-medium">Dauer anpassen</Label>
+                        <Label className="text-xs font-medium">{tx({ de: 'Dauer anpassen', en: 'Adjust duration', es: 'Ajustar duración' })}</Label>
                       </div>
                       
                       {(() => {
@@ -1160,7 +1160,7 @@ export function SceneEditingStep({
                             
                             {/* Ratio Info */}
                             <div className="text-[10px] text-muted-foreground mb-2">
-                              1:3 Ratio — Max 3x langsamer oder 3x schneller
+                              {tx({ de: '1:3 Ratio — Max 3x langsamer oder 3x schneller', en: '1:3 ratio — max 3x slower or 3x faster', es: 'Relación 1:3 — máx. 3x más lento o 3x más rápido' })}
                             </div>
                             
                             {/* Playback Rate Display */}
@@ -1193,7 +1193,7 @@ export function SceneEditingStep({
                             {Math.abs(totalDurationChange) > 0.1 && (
                               <div className="mt-3 pt-2 border-t border-border/50">
                                 <div className="flex items-center justify-between text-xs">
-                                  <span className="text-muted-foreground">Neue Gesamtlänge:</span>
+                                  <span className="text-muted-foreground">{tx({ de: 'Neue Gesamtlänge:', en: 'New total length:', es: 'Nueva duración total:' })}</span>
                                   <span className="font-mono font-medium">
                                     {totalDuration.toFixed(1)}s
                                     <span className={cn(
@@ -1292,10 +1292,10 @@ export function SceneEditingStep({
                   <CardContent className="py-8 text-center">
                     <Film className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
                     <p className="text-sm text-muted-foreground">
-                      Wähle eine Szene aus, um Details zu bearbeiten
+                      {tx({ de: 'Wähle eine Szene aus, um Details zu bearbeiten', en: 'Select a scene to edit its details', es: 'Selecciona una escena para editar sus detalles' })}
                     </p>
                     <p className="text-xs text-muted-foreground/70 mt-1">
-                      Nutze ← → Pfeiltasten zum Navigieren
+                      {tx({ de: 'Nutze ← → Pfeiltasten zum Navigieren', en: 'Use the ← → arrow keys to navigate', es: 'Usa las flechas ← → para navegar' })}
                     </p>
                   </CardContent>
                 </Card>
@@ -1314,7 +1314,7 @@ export function SceneEditingStep({
           <div className="flex items-center justify-center gap-6 py-4 border-t">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Scissors className="h-4 w-4" />
-              <span>{scenes.length} Szenen</span>
+              <span>{scenes.length} {tx({ de: 'Szenen', en: 'scenes', es: 'escenas' })}</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Sparkles className="h-4 w-4" />
@@ -1323,7 +1323,7 @@ export function SceneEditingStep({
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Clock className="h-4 w-4" />
               <span>
-                {actualTotalDuration.toFixed(1)}s gesamt
+                {actualTotalDuration.toFixed(1)}s {tx({ de: 'gesamt', en: 'total', es: 'en total' })}
                 {Math.abs(durationChange) > 0.1 && (
                   <span className={cn(
                     "ml-1 text-xs",

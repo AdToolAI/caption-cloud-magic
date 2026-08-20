@@ -2,6 +2,7 @@ import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
+import { uiLocale } from '@/lib/uiLocale';
 
 interface WeekGridProps {
   weeks: number;
@@ -53,7 +54,7 @@ export function WeekGrid({
                   <div className="h-12 border-b px-2 flex items-center justify-between sticky top-0 bg-background z-10">
                     <span className="text-sm font-semibold">Woche {weekIdx + 1}</span>
                     <span className="text-xs text-muted-foreground">
-                      {weekStart.toLocaleDateString("de-DE", { day: "2-digit", month: "short" })}
+                      {weekStart.toLocaleDateString(uiLocale(), { day: "2-digit", month: "short" })}
                     </span>
                   </div>
 
@@ -105,7 +106,7 @@ function DayColumn({
     <div ref={setNodeRef} className="relative border-r min-h-[56rem]">
       {/* Day Header */}
       <div className="sticky top-12 bg-background/95 backdrop-blur p-1 text-center border-b z-10">
-        <div className="text-xs font-medium">{date.toLocaleDateString("de-DE", { weekday: "short" })}</div>
+        <div className="text-xs font-medium">{date.toLocaleDateString(uiLocale(), { weekday: "short" })}</div>
         <div className="text-xs text-muted-foreground">{date.getDate()}</div>
       </div>
 

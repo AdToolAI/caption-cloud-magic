@@ -176,7 +176,7 @@ export function SpeedRamping({
         {durationFeedback && (
           <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
             <Clock className="h-3 w-3" />
-            Dauer: {durationFeedback.original.toFixed(1)}s → {durationFeedback.newDuration.toFixed(1)}s
+            {tx({ de: 'Dauer', en: 'Duration', es: 'Duración' })}: {durationFeedback.original.toFixed(1)}s → {durationFeedback.newDuration.toFixed(1)}s
             <span className={durationFeedback.avgSpeed < 1 ? 'text-blue-400' : durationFeedback.avgSpeed > 1 ? 'text-orange-400' : 'text-green-400'}>
               ({durationFeedback.avgSpeed.toFixed(2)}x)
             </span>
@@ -349,7 +349,7 @@ export function SpeedRamping({
             onClick={() => { onKeyframesChange([]); setSelectedKeyframe(null); }}
           >
             <RotateCcw className="h-4 w-4 mr-2" />
-            Alle Keyframes entfernen
+            {tx({ de: 'Alle Keyframes entfernen', en: 'Remove all keyframes', es: 'Eliminar todos los fotogramas clave' })}
           </Button>
         )}
 

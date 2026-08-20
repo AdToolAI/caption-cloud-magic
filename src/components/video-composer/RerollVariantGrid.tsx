@@ -235,7 +235,7 @@ function VariantSlot({ index, variant, aspect, onPromote, promoting }: VariantSl
       <div className={cn('relative rounded border border-destructive/40 bg-destructive/10 flex flex-col items-center justify-center gap-1', aspectClass)}>
         <XCircle className="h-4 w-4 text-destructive" />
         <span className="text-[10px] text-destructive font-medium">Take {index + 1}</span>
-        <span className="text-[9px] text-destructive/70">Seed {variant.seed} fehlgeschlagen</span>
+        <span className="text-[9px] text-destructive/70">{tx({ de: `Seed ${variant.seed} fehlgeschlagen`, en: `Seed ${variant.seed} failed`, es: `Seed ${variant.seed} falló` })}</span>
       </div>
     );
   }

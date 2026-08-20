@@ -4,6 +4,7 @@ import { MapPin, Sparkles, Lightbulb, TrendingUp, Brain, Target, Clock, Flame } 
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import type { StrategyPost, CreatorLevel } from "@/hooks/useStrategyMode";
+import { uiLocale } from '@/lib/uiLocale';
 
 interface Props {
   post: StrategyPost;
@@ -89,7 +90,7 @@ export function StrategyContextPanel({
     : (DEFAULT_TIPS_BY_PLATFORM[platformKey] || DEFAULT_TIPS_BY_PLATFORM.instagram);
 
   const weekDate = new Date(weekStart);
-  const weekLabel = weekDate.toLocaleDateString("de-DE", { day: "numeric", month: "long" });
+  const weekLabel = weekDate.toLocaleDateString(uiLocale(), { day: "numeric", month: "long" });
 
   return (
     <div className="space-y-3">

@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Download, FileText, FileSpreadsheet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AnalyticsData } from '@/hooks/useContentAnalytics';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface Props {
   data: AnalyticsData;
@@ -103,7 +104,7 @@ export function AnalyticsExport({ data, dateRange }: Props) {
 
         {dateRange && (
           <div className="text-xs text-muted-foreground">
-            {tx({ de: 'Zeitraum', en: 'Period', es: 'Periodo' })}: {new Date(dateRange.start).toLocaleDateString('de-DE')} - {new Date(dateRange.end).toLocaleDateString('de-DE')}
+            {tx({ de: 'Zeitraum', en: 'Period', es: 'Periodo' })}: {new Date(dateRange.start).toLocaleDateString(uiLocale())} - {new Date(dateRange.end).toLocaleDateString(uiLocale())}
           </div>
         )}
 

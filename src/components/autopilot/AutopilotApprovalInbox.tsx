@@ -10,6 +10,7 @@ import { useAutopilotQueue, useApproveSlot, useSkipSlot, type AutopilotSlot } fr
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface Props {
   onOpenSlot?: (slot: AutopilotSlot) => void;
@@ -79,14 +80,14 @@ export function AutopilotApprovalInbox({ onOpenSlot }: Props) {
             <div className="flex items-center gap-2">
               <h3 className="font-serif text-lg">Inbox</h3>
               {unreadCount > 0 && (
-                <Badge className="bg-primary/20 text-primary border-primary/30">{unreadCount} neu</Badge>
+                <Badge className="bg-primary/20 text-primary border-primary/30">{unreadCount} {tx({ de: 'neu', en: 'new', es: 'nuevo' })}</Badge>
               )}
             </div>
             <p className="text-xs text-muted-foreground">Push & In-App-Updates des Autopiloten.</p>
           </div>
           {unreadCount > 0 && (
             <Button variant="ghost" size="sm" onClick={() => markAllRead()} className="text-xs">
-              Alle gelesen
+              {tx({ de: 'Alle gelesen', en: 'All read', es: 'Todo leído' })}
             </Button>
           )}
         </div>
@@ -129,7 +130,7 @@ function ReviewRow({
           <div className="flex items-center gap-2 mb-1">
             <Badge variant="outline" className="text-[10px] uppercase">{slot.platform}</Badge>
             <span className="text-[10px] text-muted-foreground">
-              {new Date(slot.scheduled_at).toLocaleString('de-DE', { weekday: 'short', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
+              {new Date(slot.scheduled_at).toLocaleString(uiLocale(), { weekday: 'short', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
             </span>
             {typeof slot.qa_score === 'number' && (
               <Badge className={cn('text-[10px]',

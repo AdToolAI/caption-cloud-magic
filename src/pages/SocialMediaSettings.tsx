@@ -205,16 +205,16 @@ export default function SocialMediaSettings() {
         <h3 className="text-lg font-semibold mb-4">Setup-Anleitung</h3>
         <div className="space-y-3 text-sm text-muted-foreground">
           <p>
-            <strong>Schritt 1:</strong> Erstelle Developer Apps auf den jeweiligen Plattformen
+            <strong>Schritt 1:</strong> {tx({ de: 'Erstelle Developer Apps auf den jeweiligen Plattformen', en: 'Create developer apps on the respective platforms', es: 'Crea apps de desarrollador en las plataformas correspondientes' })}
           </p>
           <p>
-            <strong>Schritt 2:</strong> Generiere Access Tokens mit den benötigten Permissions
+            <strong>Schritt 2:</strong> {tx({ de: 'Generiere Access Tokens mit den benötigten Permissions', en: 'Generate access tokens with the required permissions', es: 'Genera tokens de acceso con los permisos necesarios' })}
           </p>
           <p>
             <strong>Schritt 3:</strong> Füge die Tokens als Secrets hinzu (z.B. INSTAGRAM_ACCESS_TOKEN)
           </p>
           <p>
-            <strong>Schritt 4:</strong> Aktiviere die Verbindung hier im Dashboard
+            <strong>Schritt 4:</strong> {tx({ de: 'Aktiviere die Verbindung hier im Dashboard', en: 'Activate the connection here in the dashboard', es: 'Activa la conexión aquí en el panel' })}
           </p>
         </div>
       </Card>

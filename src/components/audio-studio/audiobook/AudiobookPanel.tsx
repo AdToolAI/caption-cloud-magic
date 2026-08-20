@@ -23,6 +23,7 @@ import {
   formatDuration,
   type AudiobookLanguage,
 } from '@/lib/audiobook/manuscript';
+import { uiLocale } from '@/lib/uiLocale';
 
 export function AudiobookPanel() {
   const {
@@ -72,7 +73,7 @@ export function AudiobookPanel() {
       folder.file('info.txt', [
         `Titel: ${project?.title ?? ''}`,
         `Autor: ${project?.author ?? ''}`,
-        `Sprache: ${project?.language ?? ''}`,
+        `${tx({ de: 'Sprache', en: 'Language', es: 'Idioma' })}: ${project?.language ?? ''}`,
         `Kapitel: ${done.length}`,
       ].join('\n'));
 
@@ -150,10 +151,10 @@ export function AudiobookPanel() {
           </div>
           <div className="text-right text-xs text-muted-foreground space-y-1">
             <div><span className="text-foreground font-semibold">{chapters.length}</span> {tx({ de: "Kapitel", en: "Chapters", es: "Capítulos" })}</div>
-            <div>{totals.chars.toLocaleString('de-DE')} {tx({ de: 'Zeichen', en: 'Characters', es: 'Caracteres' })}</div>
+            <div>{totals.chars.toLocaleString(uiLocale())} {tx({ de: 'Zeichen', en: 'Characters', es: 'Caracteres' })}</div>
             <div>≈ {formatDuration(totals.duration)}</div>
             <div className="text-primary font-semibold">
-              {totals.credits.toLocaleString('de-DE')} Cr · {totals.euros.toFixed(2)} €
+              {totals.credits.toLocaleString(uiLocale())} Cr · {totals.euros.toFixed(2)} €
             </div>
           </div>
         </div>
@@ -220,7 +221,7 @@ export function AudiobookPanel() {
                 </div>
                 <div className="flex items-center gap-1 mt-1.5">
                   <span className="text-[10px] text-muted-foreground flex-1">
-                    {countChars(chapter.body).toLocaleString('de-DE')} {tx({ de: 'Zeichen', en: 'Characters', es: 'Caracteres' })}
+                    {countChars(chapter.body).toLocaleString(uiLocale())} {tx({ de: 'Zeichen', en: 'Characters', es: 'Caracteres' })}
                   </span>
                   <Button size="icon" variant="ghost" className="h-6 w-6"
                     onClick={(e) => { e.stopPropagation(); void moveChapter(chapter.id, -1); }}>
@@ -259,10 +260,10 @@ export function AudiobookPanel() {
                 />
 
                 <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
-                  <span>{countChars(active.body).toLocaleString('de-DE')} {tx({ de: 'Zeichen', en: 'Characters', es: 'Caracteres' })}</span>
+                  <span>{countChars(active.body).toLocaleString(uiLocale())} {tx({ de: 'Zeichen', en: 'Characters', es: 'Caracteres' })}</span>
                   <span>≈ {formatDuration(estimateDurationSeconds(countChars(active.body)))}</span>
                   <span className="text-primary font-semibold">
-                    {estimateCostCredits(countChars(active.body)).toLocaleString('de-DE')} Cr ·{' '}
+                    {estimateCostCredits(countChars(active.body)).toLocaleString(uiLocale())} Cr ·{' '}
                     {estimateCostEuros(countChars(active.body)).toFixed(2)} €
                   </span>
                 </div>

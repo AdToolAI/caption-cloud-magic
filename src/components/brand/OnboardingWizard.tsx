@@ -217,7 +217,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
               </div>
 
               <div>
-                <Label htmlFor="color">Deine Hauptfarbe</Label>
+                <Label htmlFor="color">{tx({ de: 'Deine Hauptfarbe', en: 'Your primary color', es: 'Tu color principal' })}</Label>
                 <div className="flex gap-2 mt-2">
                   <Input
                     id="color"

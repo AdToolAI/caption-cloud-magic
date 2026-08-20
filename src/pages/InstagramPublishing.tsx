@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { tx } from "@/lib/i18nText";
+import { uiLocale } from '@/lib/uiLocale';
 
 // Required Instagram API scopes
 const requiredScopes = [
@@ -110,7 +111,7 @@ export default function InstagramPublishing() {
       if (data.ok) {
         toast({
           title: tx({ de: "✅ Token gültig", en: "✅ Token valid", es: "✅ Token válido" }),
-          description: `$${tx({ de: "Instagram Account", en: "Instagram account", es: "Cuenta de Instagram" })}: @${data.user?.username || 'unknown'}`,
+          description: `${tx({ de: "Instagram Account", en: "Instagram account", es: "Cuenta de Instagram" })}: @${data.user?.username || 'unknown'}`,
         });
       } else {
         toast({
@@ -256,7 +257,7 @@ export default function InstagramPublishing() {
         const backupMsg = data.backup_created ? tx({ de: " Backup erstellt.", en: " Backup created.", es: " Copia de seguridad creada." }) : "";
         toast({
           title: tx({ de: "Erfolg!", en: "Success!", es: "¡Éxito!" }),
-          description: tx({ de: `$${tx({ de: "Token erfolgreich erneuert und gespeichert!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, en: `$${tx({ de: "Token successfully renewed and saved!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, es: `$${tx({ de: "¡Token renovado y guardado exitosamente!", en: "¡Token renovado y guardado exitosamente!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}` }),
+          description: tx({ de: `${tx({ de: "Token erfolgreich erneuert und gespeichert!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, en: `${tx({ de: "Token successfully renewed and saved!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, es: `${tx({ de: "¡Token renovado y guardado exitosamente!", en: "¡Token renovado y guardado exitosamente!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}` }),
         });
         
         // Automatically refresh diagnostics after successful save
@@ -527,7 +528,7 @@ export default function InstagramPublishing() {
                         {tokenDiagnostics.details.code && (
                           <p className="text-xs text-muted-foreground mb-1">
                             <strong>Code:</strong> {tokenDiagnostics.details.code}
-                            {tokenDiagnostics.details.subcode && ` ($${tx({ de: "Subcode", en: "Subcode", es: "Subcódigo" })}: ${tokenDiagnostics.details.subcode})`}
+                            {tokenDiagnostics.details.subcode && ` (${tx({ de: "Subcode", en: "Subcode", es: "Subcódigo" })}: ${tokenDiagnostics.details.subcode})`}
                           </p>
                         )}
                         {tokenDiagnostics.details.type && (
@@ -646,7 +647,7 @@ export default function InstagramPublishing() {
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-sm font-medium">{tx({ de: "Veröffentlicht", en: "Published", es: "Publicado" })}</p>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(result.timestamp).toLocaleString('de-DE')}
+                      {new Date(result.timestamp).toLocaleString(uiLocale())}
                     </p>
                   </div>
                 )}
@@ -691,7 +692,7 @@ export default function InstagramPublishing() {
                             {tx({ de: "Läuft ab", en: "Expires", es: "Caduca" })}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {new Date(debugResult.token.expires_at * 1000).toLocaleDateString('de-DE', {
+                            {new Date(debugResult.token.expires_at * 1000).toLocaleDateString(uiLocale(), {
                               year: 'numeric',
                               month: 'long',
                               day: 'numeric',
@@ -796,13 +797,13 @@ export default function InstagramPublishing() {
                               ...{backup.token_last6}
                             </Badge>
                             <span className="text-sm text-muted-foreground">
-                              {new Date(backup.created_at).toLocaleString("de-DE")}
+                              {new Date(backup.created_at).toLocaleString(uiLocale())}
                             </span>
                           </div>
                           {backup.expires_at && (
                             <div className="text-xs text-muted-foreground">
                               {tx({ de: "Ablauf:", en: "Expires:", es: "Caduca:" })}{" "}
-                              {new Date(backup.expires_at).toLocaleString("de-DE")}
+                              {new Date(backup.expires_at).toLocaleString(uiLocale())}
                             </div>
                           )}
                           {backup.scopes && (
@@ -988,7 +989,7 @@ export default function InstagramPublishing() {
                   <Alert className="mt-4">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription className="text-xs">
-                      <strong>Tipp:</strong> Mit einem Page Token brauchst du keine zusätzlichen Scopes auswählen - alles ist bereits enthalten!
+                      <strong>Tipp:</strong> {tx({ de: 'Mit einem Page Token brauchst du keine zusätzlichen Scopes auswählen - alles ist bereits enthalten!', en: 'With a page token you do not need to select extra scopes — everything is already included!', es: 'Con un token de página no necesitas seleccionar permisos adicionales: ya está todo incluido.' })}
                     </AlertDescription>
                   </Alert>
                 </CardContent>
@@ -1074,7 +1075,7 @@ export default function InstagramPublishing() {
             {/* Token Input */}
             <div className="space-y-2">
               <Label htmlFor="shortToken" className="text-base font-semibold">
-                2️⃣ Füge deinen {tokenTypeChoice === "page" ? "Page" : "User"} Access Token ein
+                2️⃣ {tx({ de: 'Füge deinen', en: 'Paste your', es: 'Pega tu' })} {tokenTypeChoice === "page" ? "Page" : "User"} {tx({ de: 'Access Token ein', en: 'access token', es: 'token de acceso' })}
               </Label>
               <Textarea
                 id="shortToken"
@@ -1134,7 +1135,7 @@ export default function InstagramPublishing() {
                   <div className="text-sm">
                     <strong>Ablaufdatum:</strong>{' '}
                     <span className="text-muted-foreground">
-                      {new Date(renewResult.debug.expires_at * 1000).toLocaleDateString('de-DE', {
+                      {new Date(renewResult.debug.expires_at * 1000).toLocaleDateString(uiLocale(), {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',

@@ -219,7 +219,7 @@ export function TranscriptWaveformEditor({
                       onClick={deleteSelectedWords}
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
-                      {selectedWords.size} löschen
+                      {selectedWords.size} {tx({ de: 'löschen', en: 'delete', es: 'eliminar' })}
                     </Button>
                   </motion.div>
                 )}

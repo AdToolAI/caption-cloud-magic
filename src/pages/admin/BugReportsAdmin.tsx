@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface BugReport {
   id: string;
@@ -241,7 +242,7 @@ export function BugReportsAdmin() {
                   <div>
                     <p className="font-medium">Erstellt</p>
                     <p className="text-muted-foreground">
-                      {new Date(selected.created_at).toLocaleString('de-DE')}
+                      {new Date(selected.created_at).toLocaleString(uiLocale())}
                     </p>
                   </div>
                 </div>

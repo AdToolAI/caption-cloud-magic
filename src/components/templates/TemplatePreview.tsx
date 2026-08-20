@@ -6,6 +6,7 @@ import { Play, Download, Copy, Clock, Video } from 'lucide-react';
 import { useTemplateVersion } from '@/hooks/useTemplateVersion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface TemplatePreviewProps {
   template: any | null;
@@ -197,7 +198,7 @@ export const TemplatePreview = ({
                             </p>
                           )}
                           <p className="text-xs text-muted-foreground mt-1">
-                            {new Date(version.created_at).toLocaleDateString('de-DE')}
+                            {new Date(version.created_at).toLocaleDateString(uiLocale())}
                           </p>
                         </div>
                       ))}

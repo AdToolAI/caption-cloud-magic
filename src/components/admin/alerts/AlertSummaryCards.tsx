@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Bell, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface Stats {
   critical: number;
@@ -36,7 +37,7 @@ export function AlertSummaryCards() {
   }, []);
 
   const lastCheckStr = stats.lastCheck
-    ? new Date(stats.lastCheck).toLocaleString('de-DE', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
+    ? new Date(stats.lastCheck).toLocaleString(uiLocale(), { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
     : '—';
 
   const cards = [

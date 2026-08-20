@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
+import { uiLocale } from '@/lib/uiLocale';
 
 interface TimePickerDialogProps {
   open: boolean;
@@ -68,7 +69,7 @@ export function TimePickerDialog({
           <div>
             <Label className="text-xs text-muted-foreground">Datum</Label>
             <div className="text-lg font-semibold mt-1">
-              {date.toLocaleDateString("de-DE", {
+              {date.toLocaleDateString(uiLocale(), {
                 weekday: "long",
                 day: "2-digit",
                 month: "long",

@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { VideoPerformance } from '@/hooks/useContentAnalytics';
 import { TrendingUp, Eye, Clock, Target } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface Props {
   videos: VideoPerformance[];
@@ -33,7 +34,7 @@ export function VideoPerformanceMetrics({ videos }: Props) {
             <Eye className="h-4 w-4" />
             Durchschn. Views
           </div>
-          <p className="text-2xl font-bold">{avgMetrics.views.toLocaleString('de-DE', { maximumFractionDigits: 0 })}</p>
+          <p className="text-2xl font-bold">{avgMetrics.views.toLocaleString(uiLocale(), { maximumFractionDigits: 0 })}</p>
         </Card>
 
         <Card className="p-4">
@@ -99,7 +100,7 @@ export function VideoPerformanceMetrics({ videos }: Props) {
               <div className="flex gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground">Views</p>
-                  <p className="font-semibold">{video.views.toLocaleString('de-DE')}</p>
+                  <p className="font-semibold">{video.views.toLocaleString(uiLocale())}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Engagement</p>

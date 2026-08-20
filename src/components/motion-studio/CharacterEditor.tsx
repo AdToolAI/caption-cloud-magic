@@ -302,7 +302,7 @@ export default function CharacterEditor({
                     onClick={() => setDraft((d) => ({ ...d, reference_image_url: null }))}
                   >
                     <X className="h-3 w-3 mr-1" />
-                    Entfernen
+                    {tx({ de: 'Entfernen', en: 'Remove', es: 'Quitar' })}
                   </Button>
                 </div>
               </div>
@@ -320,7 +320,7 @@ export default function CharacterEditor({
                 />
                 {uploading ? (
                   <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Lädt hoch...
+                    <Loader2 className="h-4 w-4 animate-spin" /> {tx({ de: 'Lädt hoch...', en: 'Uploading...', es: 'Subiendo...' })}
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-2 text-xs">

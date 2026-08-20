@@ -169,7 +169,7 @@ export function ContentLibrary({ workspaceId, onContentSelect }: ContentLibraryP
         <Tabs value={filter} onValueChange={setFilter}>
           <TabsList className="grid grid-cols-4 w-full">
             <TabsTrigger value="all" className="text-xs">
-              Alle
+              All
             </TabsTrigger>
             <TabsTrigger value="image" className="text-xs">
               <Image className="h-3 w-3" />
@@ -294,7 +294,7 @@ function EmptyContentLibrary({ campaignFilter }: { campaignFilter: boolean }) {
           className="gap-2"
         >
           <Upload className="h-4 w-4" />
-          Zur Mediathek
+          {tx({ de: 'Zur Mediathek', en: 'Go to media library', es: 'Ir a la mediateca' })}
         </Button>
       )}
     </div>

@@ -67,7 +67,7 @@ export function SafePlanNotice({ normalization }: SafePlanNoticeProps) {
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-foreground">{headline}</span>
             <Badge variant="outline" className="text-[10px] border-cyan-400/40 text-cyan-300">
-              {normalization.totalDurationSec}s · {normalization.sceneCount} Szenen
+              {normalization.totalDurationSec}s · {normalization.sceneCount} {tx({ de: 'Szenen', en: 'scenes', es: 'escenas' })}
             </Badge>
             <Badge variant="outline" className="text-[10px] border-muted-foreground/40">
               Quelle: {SOURCE_LABEL[normalization.durationSource] ?? 'Auto'}

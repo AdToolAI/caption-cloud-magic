@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { uiLocale } from '@/lib/uiLocale';
 
 interface ProviderRow {
   provider: string;
@@ -124,7 +125,7 @@ export const ProviderHealth = () => {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Provider Health</h2>
           <p className="text-sm text-muted-foreground">
-            {tx({ de: "Live-Auslastung externer Anbieter • Stand: ", en: "Live usage of external providers • As of: ", es: "Uso en vivo de proveedores externos • A partir de: " })}{lastUpdate.toLocaleTimeString('de-DE')}
+            {tx({ de: "Live-Auslastung externer Anbieter • Stand: ", en: "Live usage of external providers • As of: ", es: "Uso en vivo de proveedores externos • A partir de: " })}{lastUpdate.toLocaleTimeString(uiLocale())}
           </p>
         </div>
         <div className="flex items-center gap-3">

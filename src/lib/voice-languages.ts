@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * Central language catalogue for the ElevenLabs voice library.
  * Keep in sync with `supabase/functions/_shared/tts-language.ts`.
@@ -50,7 +51,7 @@ export function toPickerLanguage(input?: string | null): string {
 
 export function voiceLanguageLabel(code?: string | null): string {
   const norm = normalizeVoiceLanguage(code);
-  if (!norm) return 'Alle Sprachen';
+  if (!norm) return tx({ de: 'Alle Sprachen', en: 'All languages', es: 'Todos los idiomas' });
   const found = VOICE_LANGUAGES.find((l) => l.code === norm);
   return found ? `${found.flag} ${found.label}` : norm.toUpperCase();
 }

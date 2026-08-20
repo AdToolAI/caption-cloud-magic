@@ -125,7 +125,7 @@ export const TemplateCard = ({
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => onEdit(template)}>
                 <Edit className="mr-2 h-4 w-4" />
-                Bearbeiten
+                {tx({ de: 'Bearbeiten', en: 'Edit', es: 'Editar' })}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDuplicate(template.id)}>
                 <Copy className="mr-2 h-4 w-4" />

@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Trophy, TrendingUp, Eye, Target } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
+import { uiLocale } from '@/lib/uiLocale';
 
 type ABTestVariant = Database['public']['Tables']['ab_test_variants']['Row'];
 
@@ -47,7 +48,7 @@ export function TestVariantCard({ variant, isWinner, onDeclareWinner, showAction
             <Eye className="h-3 w-3" />
             Impressions
           </div>
-          <p className="text-xl font-bold">{impressions.toLocaleString('de-DE')}</p>
+          <p className="text-xl font-bold">{impressions.toLocaleString(uiLocale())}</p>
         </div>
 
         <div>
@@ -55,7 +56,7 @@ export function TestVariantCard({ variant, isWinner, onDeclareWinner, showAction
             <Eye className="h-3 w-3" />
             Views
           </div>
-          <p className="text-xl font-bold">{views.toLocaleString('de-DE')}</p>
+          <p className="text-xl font-bold">{views.toLocaleString(uiLocale())}</p>
         </div>
 
         <div>

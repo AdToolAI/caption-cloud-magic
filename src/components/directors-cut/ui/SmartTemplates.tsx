@@ -267,7 +267,7 @@ export function SmartTemplates({ onApply, currentTemplateId }: SmartTemplatesPro
                     >
                       <Button size="sm" className={cn('bg-gradient-to-r text-white shadow-lg', template.color)}>
                         <Eye className="w-4 h-4 mr-1.5" />
-                        Anwenden
+                        {tx({ de: 'Anwenden', en: 'Apply', es: 'Aplicar' })}
                       </Button>
                     </motion.div>
                   )}

@@ -662,7 +662,7 @@ export default function AITextStudio() {
           <Card className="p-4 h-[480px] overflow-y-auto" ref={scrollRef as any}>
             {messages.length === 0 && (
               <div className="text-sm text-muted-foreground text-center py-12">
-                Stelle eine Frage. {selectedModel.label} antwortet.
+                {tx({ de: 'Stelle eine Frage.', en: 'Ask a question.', es: 'Haz una pregunta.' })} {selectedModel.label} {tx({ de: 'antwortet.', en: 'answers.', es: 'responde.' })}
               </div>
             )}
             <div className="space-y-4">

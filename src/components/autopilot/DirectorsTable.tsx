@@ -732,7 +732,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
               {starting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Produktion startet …
+                  {tx({ de: 'Produktion startet …', en: 'Production starting …', es: 'Iniciando producción …' })}
                 </>
               ) : (
                 <>
@@ -777,7 +777,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
                 </div>
               ))}
               <div className="flex items-baseline justify-between border-t border-border/50 pt-2 font-medium">
-                <span>Gesamt</span>
+                <span>{tx({ de: 'Gesamt', en: 'Total', es: 'Total' })}</span>
                 <span className="font-mono">
                   {formatEuro(cost.totalEuros)} · {cost.totalCredits} Cr
                 </span>

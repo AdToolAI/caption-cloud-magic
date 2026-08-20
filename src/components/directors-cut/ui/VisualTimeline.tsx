@@ -306,7 +306,7 @@ export function VisualTimeline({
           )}
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>Gesamt: {actualTotalDuration.toFixed(1)}s</span>
+          <span>{tx({ de: 'Gesamt', en: 'Total', es: 'Total' })}: {actualTotalDuration.toFixed(1)}s</span>
           {Math.abs(actualTotalDuration - videoDuration) > 0.1 && (
             <Badge variant="secondary" className="text-[9px] h-4">
               {actualTotalDuration > videoDuration ? '+' : ''}{(actualTotalDuration - videoDuration).toFixed(1)}s
@@ -509,7 +509,7 @@ export function VisualTimeline({
                         <span className="text-[10px] font-medium capitalize">{transition.transitionType}</span>
                       </div>
                       <div className="text-[9px] text-muted-foreground">
-                        Dauer: {transition.duration.toFixed(1)}s
+                        {tx({ de: 'Dauer', en: 'Duration', es: 'Duración' })}: {transition.duration.toFixed(1)}s
                       </div>
                       
                       {transition.aiSuggested && (

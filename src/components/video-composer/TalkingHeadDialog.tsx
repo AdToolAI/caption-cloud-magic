@@ -827,7 +827,7 @@ function DialogModeTab({
           className="mt-1 font-mono text-sm"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          {blocks.length} Block{blocks.length === 1 ? '' : 'e'} erkannt · {speakers.length} Sprecher · ~{estimatedDurationSec}s gesamt
+          {tx({ de: `${blocks.length} Block${blocks.length === 1 ? '' : 'e'} erkannt · ${speakers.length} Sprecher · ~${estimatedDurationSec}s gesamt`, en: `${blocks.length} block${blocks.length === 1 ? '' : 's'} detected · ${speakers.length} speaker${speakers.length === 1 ? '' : 's'} · ~${estimatedDurationSec}s total`, es: `${blocks.length} bloque${blocks.length === 1 ? '' : 's'} detectado${blocks.length === 1 ? '' : 's'} · ${speakers.length} hablante${speakers.length === 1 ? '' : 's'} · ~${estimatedDurationSec}s en total` })}
         </p>
       </div>
 
@@ -905,7 +905,7 @@ function DialogModeTab({
         <div className="flex items-start gap-2 text-xs text-muted-foreground">
           <AlertCircle className="h-4 w-4 mt-0.5 text-primary shrink-0" />
           <div>
-            Geschätzte Gesamt-Kosten: <span className="text-primary font-semibold">€{totalCost.toFixed(2)}</span>{' '}
+            {tx({ de: 'Geschätzte Gesamt-Kosten:', en: 'Estimated total cost:', es: 'Coste total estimado:' })} <span className="text-primary font-semibold">€{totalCost.toFixed(2)}</span>{' '}
             ({blocks.length} × HeyGen Talking-Head) · Generierung läuft sequentiell
           </div>
         </div>

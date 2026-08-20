@@ -553,7 +553,7 @@ export default function StoryboardTab({
       {/* Summary Bar */}
       <div className="flex items-center justify-between p-3 rounded-lg bg-card/60 border border-border/40">
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
-          <span>{scenes.length} Szenen</span>
+          <span>{scenes.length} {tx({ de: 'Szenen', en: 'scenes', es: 'escenas' })}</span>
           <span>•</span>
           <span>{totalDuration}s Gesamtdauer</span>
           <span>•</span>
@@ -613,7 +613,7 @@ export default function StoryboardTab({
               ) : null}
               <span className="tabular-nums">
                 {readyCount}/{scenes.length} Clips
-                {generatingCount > 0 ? ` · ${generatingCount} läuft` : ''}
+                {generatingCount > 0 ? tx({ de: ` · ${generatingCount} läuft`, en: ` · ${generatingCount} running`, es: ` · ${generatingCount} en curso` }) : ''}
               </span>
             </div>
           )}

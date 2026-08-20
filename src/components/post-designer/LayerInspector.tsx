@@ -171,7 +171,7 @@ export function LayerInspector({
               </div>
             </div>
             <ColorRow
-              label="Farbe"
+              label={tx({ de: 'Farbe', en: 'Color', es: 'Color' })}
               value={(layer as TextLayer).color}
               palette={design.palette}
               onPick={(c) => {
@@ -193,7 +193,7 @@ export function LayerInspector({
               />
             </div>
             <ColorRow
-              label="Hintergrund"
+              label={tx({ de: 'Hintergrund', en: 'Background', es: 'Fondo' })}
               value={(layer as BadgeLayer).bg}
               palette={design.palette}
               onPick={(c) => {
@@ -294,7 +294,7 @@ export function LayerInspector({
               </Select>
             </div>
             <ColorRow
-              label="Farbe"
+              label={tx({ de: 'Farbe', en: 'Color', es: 'Color' })}
               value={(layer as ShapeLayer).color}
               palette={design.palette}
               onPick={(c) => {
