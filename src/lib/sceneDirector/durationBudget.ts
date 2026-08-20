@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // Hard limits for what an AI video model can actually deliver in N seconds.
 // These bound how complex a single scene can be — the Scene Director enforces
 // these in its system prompt and the UI surfaces them so the user sees what's

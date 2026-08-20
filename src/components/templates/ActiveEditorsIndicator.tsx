@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useTemplateCollaboration } from '@/hooks/useTemplateCollaboration';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
