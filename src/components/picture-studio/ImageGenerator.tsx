@@ -403,7 +403,7 @@ export function ImageGenerator() {
             description: safetyFilteredMsg + (canRetryFast ? tx({ de: ' Tipp: „Fast" (Seedream 4) hat tolerantere Filter.', en: 'Tip: “Fast” (Seedream 4) has more tolerant filters.', es: 'Consejo: "Rápido" (Seedream 4) tiene filtros más tolerantes.' }) : ''),
             duration: 14000,
             action: canRetryFast ? {
-              label: 'Mit Fast erneut',
+              label: tx({ de: 'Mit Fast erneut', en: 'Retry with Fast', es: 'Reintentar con Fast' }),
               onClick: () => {
                 setTier('fast');
                 setTimeout(() => { void runGenerate(); }, 50);

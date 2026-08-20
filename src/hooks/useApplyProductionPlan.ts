@@ -1109,7 +1109,7 @@ export function useApplyProductionPlan() {
       .eq('project_id', projectId)
       .order('order_index', { ascending: true });
     if (verifyError) {
-      throw new Error(`Storyboard-Verifikation fehlgeschlagen: ${verifyError.message}`);
+      throw new Error(`${tx({ de: 'Storyboard-Verifikation fehlgeschlagen', en: 'Storyboard verification failed', es: 'Falló la verificación del storyboard' })}: ${verifyError.message}`);
     }
     const newIds = new Set(newScenes.filter((s) => isUuid(s.id)).map((s) => s.id));
     const persistedNewRows = (verifyRows ?? []).filter((r: any) => newIds.has(String(r.id)));

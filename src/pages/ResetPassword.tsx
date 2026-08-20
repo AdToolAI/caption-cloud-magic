@@ -219,7 +219,7 @@ const ResetPassword = () => {
                       required
                       disabled={loading}
                       minLength={6}
-                      placeholder="Mindestens 6 Zeichen"
+                      placeholder={tx({ de: 'Mindestens 6 Zeichen', en: 'At least 6 characters', es: 'Al menos 6 caracteres' })}
                       className="h-12 pr-10 bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                     />
                     <button

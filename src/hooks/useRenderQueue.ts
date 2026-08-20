@@ -38,7 +38,7 @@ export const useRenderQueue = () => {
 
       if (error) throw error;
 
-      toast.success(`Job zur Queue hinzugefügt! Geschätzte Kosten: ${data.estimatedCost} Credits`);
+      toast.success(`${tx({ de: 'Job zur Queue hinzugefügt! Geschätzte Kosten', en: 'Job added to the queue! Estimated cost', es: '¡Trabajo añadido a la cola! Coste estimado' })}: ${data.estimatedCost} Credits`);
       return data;
     } catch (error: any) {
       console.error('Error adding to queue:', error);

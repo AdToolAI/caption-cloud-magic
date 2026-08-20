@@ -394,7 +394,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
                   {tx({ de: "🎬 Echte Szene wird gerendert", en: "🎬 Real scene rendering", es: "🎬 Escena real renderizando" })}
                 </div>
                 <div className="text-[8px] text-emerald-100/80 truncate">
-                  Hailuo · ~60 s · danach Lip-Sync
+                  Hailuo · ~60 s · {tx({ de: 'danach Lip-Sync', en: 'then lip-sync', es: 'luego lip-sync' })}
                 </div>
               </div>
             </div>

@@ -90,13 +90,13 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 
 const STATUS_FALLBACK: Record<string, string> = {
   briefing: "Briefing",
-  in_progress: "In Arbeit",
+  in_progress: "In progress",
   review: "Review",
-  pending_approval: "Zur Freigabe",
-  approved: "Freigegeben",
-  scheduled: "Geplant",
+  pending_approval: "Pending approval",
+  approved: "Approved",
+  scheduled: "Scheduled",
   published: tx({ de: "Veröffentlicht", en: "Published", es: "Publicado" }),
-  draft: "Entwurf",
+  draft: "Draft",
   failed: "Failed",
 };
 

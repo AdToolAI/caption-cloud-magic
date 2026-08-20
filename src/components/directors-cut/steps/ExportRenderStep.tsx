@@ -843,7 +843,7 @@ export function ExportRenderStep({
                       onClick={() => navigate('/media-library?tab=rendered')}
                     >
                       <Image className="h-4 w-4 mr-2" />
-                      Zur Mediathek
+                      {tx({ de: 'Zur Mediathek', en: 'Open media library', es: 'Abrir biblioteca' })}
                     </Button>
                     <Button 
                       variant="outline"

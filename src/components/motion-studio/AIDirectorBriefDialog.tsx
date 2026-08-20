@@ -128,7 +128,7 @@ export default function AIDirectorBriefDialog({
               />
               <p className="text-[11px] text-muted-foreground">
                 {tx({ de: "Tipp: Stil, Stimmung und Hauptbild kurz nennen. Cast/Location werden", en: "Tip: Briefly mention style, mood, and main image. Cast/Location will be", es: "Consejo: Menciona brevemente el estilo, el ambiente y la imagen principal. El reparto/la ubicación serán" })}
-                automatisch verwendet, wenn passend.
+                {tx({ de: 'automatisch verwendet, wenn passend.', en: 'used automatically when they fit.', es: 'usados automáticamente cuando encajen.' })}
               </p>
             </div>
 

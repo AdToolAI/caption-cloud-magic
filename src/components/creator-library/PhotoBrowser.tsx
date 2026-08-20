@@ -149,7 +149,7 @@ export default function PhotoBrowser() {
         </Card>
       ) : results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">
-          Keine Treffer. Versuche einen anderen Begriff.
+          {tx({ de: 'Keine Treffer. Versuche einen anderen Begriff.', en: 'No results. Try a different term.', es: 'Sin resultados. Prueba otro término.' })}
         </Card>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">

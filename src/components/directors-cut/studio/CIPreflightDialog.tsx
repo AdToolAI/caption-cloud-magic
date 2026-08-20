@@ -106,7 +106,7 @@ export function CIPreflightDialog({
           ) : (
             <>
               <Button variant="outline" onClick={onFixIssues}>
-                Zuerst beheben
+                {tx({ de: 'Zuerst beheben', en: 'Fix first', es: 'Corregir primero' })}
               </Button>
               <Button
                 onClick={() => {

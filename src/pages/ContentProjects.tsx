@@ -41,8 +41,8 @@ export default function ContentProjects() {
 
   const getStatusBadge = (status: string) => {
     const variants = {
-      draft: { variant: "secondary" as const, icon: Clock, label: "Entwurf", className: "" },
-      rendering: { variant: "default" as const, icon: RefreshCw, label: "Wird gerendert...", className: "" },
+      draft: { variant: "secondary" as const, icon: Clock, label: tx({ de: 'Entwurf', en: 'Draft', es: 'Borrador' }), className: "" },
+      rendering: { variant: "default" as const, icon: RefreshCw, label: tx({ de: 'Wird gerendert...', en: 'Rendering...', es: 'Renderizando...' }), className: "" },
       completed: { variant: "outline" as const, icon: CheckCircle2, label: tx({ de: "Fertig", en: "Ready", es: "Listo" }), className: "border-green-500 text-green-700" },
       failed: { variant: "destructive" as const, icon: XCircle, label: tx({ de: "Fehler", en: "Failed", es: "Error" }), className: "" },
     };
@@ -227,7 +227,7 @@ export default function ContentProjects() {
                       : tx({ de: `Keine Videos mit Status "${selectedStatus}"`, en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` })}
                   </CardDescription>
                   <Button className="mt-4" onClick={() => window.location.href = "/content-studio"}>
-                    Zum Content Studio
+                    {tx({ de: 'Zum Content Studio', en: 'Go to Content Studio', es: 'Ir a Content Studio' })}
                   </Button>
                 </CardContent>
               </Card>

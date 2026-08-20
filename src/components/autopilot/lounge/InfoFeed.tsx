@@ -1,4 +1,4 @@
-import { tx } from '@/lib/i18nText';
+import { tx, getLang } from '@/lib/i18nText';
 /**
  * Info-Feed der Warte-Lounge — tagesaktuelle, auf die Brand gerankte Signale.
  * Quelle: Edge Function `autopilot-lounge-feed` (24 h Cache pro Brand-Kit).
@@ -26,7 +26,7 @@ interface Props {
   language?: string;
 }
 
-export function InfoFeed({ brandKitId, language = 'de' }: Props) {
+export function InfoFeed({ brandKitId, language = getLang() }: Props) {
   const query = useQuery({
     queryKey: ['autopilot-lounge-feed', brandKitId ?? 'none', language],
     staleTime: 30 * 60 * 1000,

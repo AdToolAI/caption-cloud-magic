@@ -21,7 +21,7 @@ export default function VideoManagement() {
           {tx({ de: "Nutze den Universal Content Creator um professionelle Videos zu erstellen.", en: "Use the Universal Content Creator to create professional videos.", es: "Usa el Creador de Contenido Universal para crear videos profesionales." })}
         </p>
         <Button onClick={() => navigate('/universal-creator')} size="lg">
-          Zum Universal Creator
+          {tx({ de: 'Zum Universal Creator', en: 'Go to Universal Creator', es: 'Ir a Universal Creator' })}
         </Button>
       </Card>
     </div>

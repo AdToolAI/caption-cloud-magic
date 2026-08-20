@@ -47,6 +47,7 @@ import type {
   VoiceoverConfig,
 } from '@/types/video-composer';
 import AdComplianceDisclaimer from './AdComplianceDisclaimer';
+import { getLang } from '@/lib/i18nText';
 
 type Lang = 'de' | 'en' | 'es';
 
@@ -150,11 +151,11 @@ const VARIANT_LABELS: Record<string, { de: string; en: string; es: string; desc:
 export default function AdDirectorWizard({
   open,
   onOpenChange,
-  language = 'de',
+  language = getLang(),
   projectId,
   onScenesGenerated,
 }: AdDirectorWizardProps) {
-  const lang = (['de', 'en', 'es'].includes(language) ? language : 'de') as Lang;
+  const lang = (['de', 'en', 'es'].includes(language) ? language : 'en') as Lang;
   const { data: activeBrandKit } = useActiveBrandKit();
 
   // Persist wizard state per-project so leaving Motion Studio doesn't reset progress.

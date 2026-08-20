@@ -289,7 +289,7 @@ export function SmartCropping({
         {enabledCount > 0 && (
           <div className="bg-muted/50 rounded-lg p-3">
             <p className="text-[10px] text-muted-foreground">
-              <strong>{enabledCount} Varianten</strong> werden beim Export erstellt. 
+              <strong>{enabledCount} Varianten</strong> {tx({ de: 'werden beim Export erstellt.', en: 'are created on export.', es: 'se crean al exportar.' })} 
               {tx({ de: "Jede Variante wird mit KI-gestütztem Tracking optimiert.", en: "Each variant is optimized with AI-powered tracking.", es: "Cada variante se optimiza con seguimiento impulsado por IA." })}
             </p>
           </div>

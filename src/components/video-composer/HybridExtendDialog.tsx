@@ -43,6 +43,7 @@ import {
   type HybridEngine,
 } from '@/hooks/useHybridExtend';
 import { getClipCost, type ClipQuality } from '@/types/video-composer';
+import { getLang } from '@/lib/i18nText';
 
 /** Minimal scene shape needed by the dialog for the bridge target picker. */
 export interface HybridDialogScene {
@@ -254,9 +255,9 @@ export default function HybridExtendDialog({
   sourceSceneNumber,
   availableScenes = [],
   onSuccess,
-  language = 'de',
+  language = getLang(),
 }: HybridExtendDialogProps) {
-  const t = T[language] ?? T.de;
+  const t = T[language] ?? T.en;
   const [mode, setMode] = useState<HybridMode>(defaultMode);
   const [engine, setEngine] = useState<HybridEngine>('ai-kling');
   const [quality, setQuality] = useState<ClipQuality>('standard');

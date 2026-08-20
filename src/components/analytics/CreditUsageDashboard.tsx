@@ -15,7 +15,7 @@ export const CreditUsageDashboard = () => {
     <Card>
       <CardHeader className="flex flex-row items-center gap-3">
         <Sparkles className="h-5 w-5 text-primary" />
-        <CardTitle className="text-base">Alles im Beta-Abo enthalten</CardTitle>
+        <CardTitle className="text-base">{tx({ de: 'Alles im Beta-Abo enthalten', en: 'Everything included in the beta plan', es: 'Todo incluido en el plan beta' })}</CardTitle>
       </CardHeader>
       <CardContent className="text-sm text-muted-foreground space-y-2">
         <p>

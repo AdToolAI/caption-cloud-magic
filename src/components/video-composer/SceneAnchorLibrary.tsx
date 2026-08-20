@@ -13,7 +13,7 @@ import { Link2, User, MapPin, X, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters } from '@/hooks/useBrandCharacters';
-import { tx } from '@/lib/i18nText';
+import { tx, getLang } from '@/lib/i18nText';
 
 interface Props {
   selectedReferenceUrl?: string;
@@ -34,9 +34,9 @@ export default function SceneAnchorLibrary({
   previousSceneLastFrameUrl,
   previousSceneIndex,
   onPick,
-  language = 'de',
+  language = getLang(),
 }: Props) {
-  const t = TXT[language];
+  const t = TXT[language] ?? TXT.en;
   const { locations } = useUnifiedMentionLibrary();
   const { characters } = useBrandCharacters();
   const brand = characters.find((c) => c.is_favorite) ?? characters[0];

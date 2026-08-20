@@ -478,7 +478,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
         >
           <Button onClick={handleSaveDraft} variant="outline" size="sm"
             className="border-white/10 bg-white/[0.02] hover:bg-white/[0.05]">
-            <Save className="h-3.5 w-3.5 mr-1.5" /> Entwurf speichern
+            <Save className="h-3.5 w-3.5 mr-1.5" /> {tx({ de: 'Entwurf speichern', en: 'Save draft', es: 'Guardar borrador' })}
           </Button>
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="ml-auto">
             <Button
