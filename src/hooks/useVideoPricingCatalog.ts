@@ -12,13 +12,18 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './useAuth';
 
 export type CatalogModel = {
   id: string;
   label: string;
   unit: 'per-second' | 'per-clip';
+  /** Effective price for the current account (already discounted). */
   sellEUR: number;
   sellUSD: number;
+  /** Undiscounted list price, for strike-through display. */
+  listEUR?: number;
+  listUSD?: number;
   minDuration?: number;
   maxDuration?: number;
   fixedClipSeconds?: number;
@@ -26,6 +31,7 @@ export type CatalogModel = {
 
 type CatalogResponse = {
   version: string;
+  discountPercent?: number;
   models: CatalogModel[];
 };
 
@@ -38,8 +44,10 @@ async function fetchCatalog(): Promise<CatalogResponse> {
 }
 
 export function useVideoPricingCatalog() {
+  // The catalog is personalized (creator discount), so cache it per user.
+  const { user } = useAuth();
   const query = useQuery({
-    queryKey: ['video-pricing-catalog'],
+    queryKey: ['video-pricing-catalog', user?.id ?? 'anon'],
     queryFn: fetchCatalog,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 30 * 60 * 1000,
