@@ -191,7 +191,7 @@ export default function CompareLabGrid({
               {isStarting ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {tx({ de: 'Starte', en: 'Starting', es: 'Iniciando' })} {selectedEngines.length} Engines…</>
               ) : (
-                <><Sparkles className="h-4 w-4 mr-2" /> Verg{tx({ de: "leich starten (", en: "Start comparison (", es: "Iniciar comparación (" })}{totalCost.toFixed(2)}€)</>
+                <><Sparkles className="h-4 w-4 mr-2" /> {tx({ de: "Vergleich starten (", en: "Start comparison (", es: "Iniciar comparación (" })}{totalCost.toFixed(2)}€)</>
               )}
             </Button>
           </CardContent>
