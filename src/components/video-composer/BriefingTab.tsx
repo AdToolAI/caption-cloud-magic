@@ -879,7 +879,7 @@ export default function BriefingTab({
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
             {VISUAL_STYLES.map((style) => {
-              const lang = (uiLang === 'de' || uiLang === 'es' ? language : 'en') as 'de' | 'en' | 'es';
+              const lang = (uiLang === 'de' || uiLang === 'es' ? uiLang : 'en') as 'de' | 'en' | 'es';
               const isActive = (briefing.visualStyle || 'realistic') === style.id;
               return (
                 <button
@@ -901,7 +901,7 @@ export default function BriefingTab({
                             : s,
                         );
                         onUpdateScenes(updated);
-                        const lang2 = (uiLang === 'de' || uiLang === 'es' ? language : 'en') as 'de' | 'en' | 'es';
+                        const lang2 = (uiLang === 'de' || uiLang === 'es' ? uiLang : 'en') as 'de' | 'en' | 'es';
                         const styleLabel = getStyleLabel(styleId, lang2);
                         toast({
                           title:
