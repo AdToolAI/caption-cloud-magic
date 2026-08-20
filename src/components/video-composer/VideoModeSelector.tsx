@@ -82,13 +82,12 @@ const MODES: Array<{
 
 export default function VideoModeSelector({ value, language, onChange }: VideoModeSelectorProps) {
   const lang = (language === 'de' || language === 'es' ? language : 'en') as 'de' | 'en' | 'es';
-  const headerTitle =
-    lang === 'de' ? tx({ de: "Video-Modus", en: "Video mode", es: "Modo vídeo" }) : lang === 'es' ? tx({ de: "Modo de Video", en: "Modo de video", es: "Modo de vídeo" }) : tx({ de: "Video Mode", en: "Video fashion", es: "Vídeo moda" });
+  const headerTitle = lang === 'de' ? 'Video-Modus' : lang === 'es' ? 'Modo de vídeo' : 'Video Mode';
   const headerDesc =
     lang === 'de'
-      ? tx({ de: 'Wähle, wie deine Szenen erstellt werden — Video, animierte Bilder oder eine Mischung.', en: 'Choose how your scenes are created — video, animated images, or a mix.', es: 'Elige cómo se crean tus escenas — vídeo, imágenes animadas o una mezcla.' })
+      ? 'Wähle, wie deine Szenen erstellt werden — Video, animierte Bilder oder eine Mischung.'
       : lang === 'es'
-        ? 'Elige cómo se crean tus escenas — video, imágenes animadas o una combinación.'
+        ? 'Elige cómo se crean tus escenas — vídeo, imágenes animadas o una combinación.'
         : 'Choose how your scenes are produced — video, animated images, or a mix.';
 
   return (
