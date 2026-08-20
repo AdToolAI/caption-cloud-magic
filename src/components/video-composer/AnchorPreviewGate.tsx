@@ -266,7 +266,11 @@ export function AnchorPreviewGate({
                 )}
                 {auditOk
                   ? tx({ de: `Identität ok — ${audit?.face_count ?? "?"}/${audit?.expected_faces ?? "?"} Gesichter erkannt.`, en: `Identity ok — ${audit?.face_count ?? "?"}/${audit?.expected_faces ?? "?"} Faces detected.`, es: `Identidad correcta: ${audit?.face_count?? "?"}/${audit?.expected_faces ?? "?"} Rostros detectados.` })
-                  : `Prüfung: ${auditReason}${missing.length ? ` · fehlend: ${missing.join(", ")}` : ""}${duplicated.length ? ` · doppelt: ${duplicated.join(", ")}` : ""}`}
+                  : tx({
+                      de: `Prüfung: ${auditReason}${missing.length ? ` · fehlend: ${missing.join(", ")}` : ""}${duplicated.length ? ` · doppelt: ${duplicated.join(", ")}` : ""}`,
+                      en: `Check: ${auditReason}${missing.length ? ` · missing: ${missing.join(", ")}` : ""}${duplicated.length ? ` · duplicated: ${duplicated.join(", ")}` : ""}`,
+                      es: `Comprobación: ${auditReason}${missing.length ? ` · faltan: ${missing.join(", ")}` : ""}${duplicated.length ? ` · duplicados: ${duplicated.join(", ")}` : ""}`,
+                    })}
               </div>
               {!auditOk && (
                 <div className="text-[11px] text-muted-foreground text-center max-w-md">

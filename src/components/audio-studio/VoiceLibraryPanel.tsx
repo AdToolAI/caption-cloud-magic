@@ -117,7 +117,7 @@ export function VoiceLibraryPanel() {
                 className="flex-1"
                 onClick={() => toggleVoiceActive(voice.id, !voice.is_active)}
               >
-                {voice.is_active ? 'Aktiv' : 'Inaktiv'}
+                {voice.is_active ? tx({ de: 'Aktiv', en: 'Active', es: 'Activo' }) : tx({ de: 'Inaktiv', en: 'Inactive', es: 'Inactivo' })}
               </Button>
             </div>
 
@@ -125,7 +125,7 @@ export function VoiceLibraryPanel() {
             <div className="space-y-2 pt-2 border-t border-border/50">
               <p className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
                 <Sparkles className="h-3 w-3" />
-                Test-Synthese
+                {tx({ de: 'Test-Synthese', en: 'Test synthesis', es: 'Síntesis de prueba' })}
               </p>
               <div className="flex gap-2">
                 <Input

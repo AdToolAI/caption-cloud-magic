@@ -52,7 +52,7 @@ const templates: SmartTemplate[] = [
         temperature: 5,
       },
     },
-    tags: ['Schnell', 'Energetisch', 'Social'],
+    tags: [tx({ de: 'Schnell', en: 'Fast', es: 'Rápido' }), tx({ de: 'Energetisch', en: 'Energetic', es: 'Enérgico' }), 'Social'],
   },
   {
     id: 'cinematic',
@@ -70,7 +70,7 @@ const templates: SmartTemplate[] = [
         temperature: -10,
       },
     },
-    tags: ['Elegant', 'Professionell', 'Film'],
+    tags: [tx({ de: 'Elegant', en: 'Elegant', es: 'Elegante' }), tx({ de: 'Professionell', en: 'Professional', es: 'Profesional' }), 'Film'],
   },
   {
     id: 'vlog-style',
@@ -88,7 +88,7 @@ const templates: SmartTemplate[] = [
         temperature: 3,
       },
     },
-    tags: ['Authentisch', tx({ de: "Persönlich", en: "Personal", es: "Personal" }), 'Casual'],
+    tags: [tx({ de: 'Authentisch', en: 'Authentic', es: 'Auténtico' }), tx({ de: "Persönlich", en: "Personal", es: "Personal" }), 'Casual'],
   },
   {
     id: 'music-video',
@@ -106,7 +106,7 @@ const templates: SmartTemplate[] = [
         temperature: 0,
       },
     },
-    tags: ['Rhythmisch', 'Intensiv', 'Kreativ'],
+    tags: [tx({ de: 'Rhythmisch', en: 'Rhythmic', es: 'Rítmico' }), tx({ de: 'Intensiv', en: 'Intense', es: 'Intenso' }), tx({ de: 'Kreativ', en: 'Creative', es: 'Creativo' })],
   },
   {
     id: 'documentary',
@@ -124,7 +124,7 @@ const templates: SmartTemplate[] = [
         temperature: -5,
       },
     },
-    tags: ['Informativ', 'Ruhig', 'Fokussiert'],
+    tags: [tx({ de: 'Informativ', en: 'Informative', es: 'Informativo' }), tx({ de: 'Ruhig', en: 'Calm', es: 'Tranquilo' }), tx({ de: 'Fokussiert', en: 'Focused', es: 'Enfocado' })],
   },
 ];
 

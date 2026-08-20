@@ -573,7 +573,11 @@ function CastStep({
 
       {selectedIds.length > 0 && (
         <SelectionBar
-          label={`${selectedIds.length} Charakter${selectedIds.length > 1 ? 'e' : ''} ausgewählt`}
+          label={tx({
+            de: `${selectedIds.length} Charakter${selectedIds.length > 1 ? 'e' : ''} ausgewählt`,
+            en: `${selectedIds.length} character${selectedIds.length > 1 ? 's' : ''} selected`,
+            es: `${selectedIds.length} personaje${selectedIds.length > 1 ? 's' : ''} seleccionado${selectedIds.length > 1 ? 's' : ''}`,
+          })}
         />
       )}
     </section>

@@ -1348,7 +1348,7 @@ export function useStoryboardTransition({
 
       if (dropped > 0) {
         toast({
-          title: 'Plan teilweise übernommen',
+          title: tx({ de: 'Plan teilweise übernommen', en: 'Plan partially applied', es: 'Plan aplicado parcialmente' }),
           description: tx({ de: `${dropped} Szene(n) konnten nicht validiert werden und wurden übersprungen.`, en: `${dropped} scene(s) could not be validated and were skipped.`, es: `No se pudieron validar ${dropped} escena(s) y se omitieron.` }),
         });
       }
@@ -1554,7 +1554,7 @@ export function useStoryboardTransition({
                 toast({
                   title: sheetWasClosed
                     ? tx({ de: '✨ Vollständiger Plan nachgeladen — bitte erneut anwenden', en: '✨ Full plan reloaded — please apply again', es: '✨ Plan completo recargado — por favor, aplica de nuevo' })
-                    : '✨ Vollständiger Plan nachgeladen',
+                    : tx({ de: '✨ Vollständiger Plan nachgeladen', en: '✨ Full plan reloaded', es: '✨ Plan completo recargado' }),
                   description: sheetWasClosed
                     ? tx({ de: 'Dein Briefing wurde im Hintergrund analysiert. Klicke „Plan anwenden", um Fallback-Szenen zu ersetzen.', en: 'Your briefing has been analyzed in the background. Click "Apply Plan" to replace fallback scenes.', es: 'Tu briefing ha sido analizado en segundo plano. Haz clic en "Aplicar plan" para reemplazar las escenas de respaldo.' })
                     : tx({ de: 'Der AI-generierte Plan ist jetzt verfügbar.', en: 'The AI-generated plan is now available.', es: 'El plan generado por IA ya está disponible.' }),
