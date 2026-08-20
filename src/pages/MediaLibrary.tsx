@@ -1030,35 +1030,35 @@ export default function MediaLibrary() {
                   className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
                 >
                   <Upload className="h-4 w-4" />
-                  Uploads
+                  {tx({ de: 'Uploads', en: 'Uploads', es: 'Subidas' })}
                 </TabsTrigger>
                 <TabsTrigger 
                   value="ai" 
                   className="flex items-center gap-2 data-[state=active]:bg-purple-500/20 data-[state=active]:shadow-[0_0_15px_hsla(270,80%,60%,0.2)]"
                 >
                   <Sparkles className="h-4 w-4" />
-                  KI
+                  {tx({ de: 'KI', en: 'AI', es: 'IA' })}
                 </TabsTrigger>
                 <TabsTrigger 
                   value="video-creator" 
                   className="flex items-center gap-2 data-[state=active]:bg-cyan-500/20 data-[state=active]:shadow-[0_0_15px_hsla(180,80%,60%,0.2)]"
                 >
                   <Video className="h-4 w-4" />
-                  Gerendert
+                  {tx({ de: 'Gerendert', en: 'Rendered', es: 'Renderizado' })}
                 </TabsTrigger>
                 <TabsTrigger 
                   value="campaign" 
                   className="flex items-center gap-2 data-[state=active]:bg-orange-500/20 data-[state=active]:shadow-[0_0_15px_hsla(30,80%,60%,0.2)]"
                 >
                   <Layers className="h-4 w-4" />
-                  Kampagnen
+                  {tx({ de: 'Kampagnen', en: 'Campaigns', es: 'Campañas' })}
                 </TabsTrigger>
                 <TabsTrigger 
                   value="albums" 
                   className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
                 >
                   <Images className="h-4 w-4" />
-                  Alben
+                  {tx({ de: 'Alben', en: 'Albums', es: 'Álbumes' })}
                 </TabsTrigger>
                 <TabsTrigger 
                   value="cloud" 

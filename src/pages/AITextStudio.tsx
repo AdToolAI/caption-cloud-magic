@@ -499,7 +499,7 @@ export default function AITextStudio() {
               </div>
               <div className="flex items-center gap-2">
                 <Switch id="priv" checked={isPrivate} onCheckedChange={setIsPrivate} />
-                <Label htmlFor="priv" className="text-xs">Privat</Label>
+                <Label htmlFor="priv" className="text-xs">{tx({ de: "Privat", en: "Private", es: "Privado" })}</Label>
               </div>
             </div>
 
@@ -531,8 +531,9 @@ export default function AITextStudio() {
                       {TIER_DESCRIPTIONS[tier]}
                     </div>
                     <div className="text-[11px] text-muted-foreground mt-2">
-                      {formatEUR(m.inputPricePer1k)} / {formatEUR(m.outputPricePer1k)} pro 1k Tokens ·{" "}
-                      {(m.contextWindow / 1000).toFixed(0)}k Kontext
+                      {formatEUR(m.inputPricePer1k)} / {formatEUR(m.outputPricePer1k)}{" "}
+                      {tx({ de: "pro 1k Tokens", en: "per 1k tokens", es: "por 1k tokens" })} ·{" "}
+                      {(m.contextWindow / 1000).toFixed(0)}k {tx({ de: "Kontext", en: "context", es: "contexto" })}
                     </div>
                   </button>
                 );
@@ -622,7 +623,7 @@ export default function AITextStudio() {
               {pinned?.conversationId === conversationId ? (
                 <><PinOff className="h-3 w-3 mr-1" />{tx({ de: "Loslösen", en: "Unpin", es: "Desanclar" })}</>
               ) : (
-                <><Pin className="h-3 w-3 mr-1" /> Anheften</>
+                <><Pin className="h-3 w-3 mr-1" /> {tx({ de: "Anheften", en: "Pin", es: "Fijar" })}</>
               )}
             </Button>
             <Button

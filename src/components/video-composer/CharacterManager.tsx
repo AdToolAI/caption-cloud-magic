@@ -1,4 +1,5 @@
 import { tx } from "@/lib/i18nText";
+import { useTranslation } from "@/hooks/useTranslation";
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -160,7 +161,9 @@ function makeId(name: string): string {
 }
 
 export default function CharacterManager({ characters, language, onChange }: CharacterManagerProps) {
-  const lang = (language === 'de' || language === 'es' ? language : 'en') as 'de' | 'en' | 'es';
+  // UI copy follows the *interface* language, never the video/content language prop.
+  const { language: uiLanguage } = useTranslation();
+  const lang = (uiLanguage === 'de' || uiLanguage === 'es' ? uiLanguage : 'en') as 'de' | 'en' | 'es';
   const t = labels[lang];
 
   const [draft, setDraft] = useState({ name: '', appearance: '', signatureItems: '' });

@@ -150,7 +150,7 @@ export function CostComparisonWidget() {
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">
-              vs. typisches Markt-Abo ({fmt(MARKET_REFERENCE_EUR_PER_MONTH)}/Monat)
+              {tx({ de: 'vs. typisches Markt-Abo', en: 'vs. typical market subscription', es: 'vs. suscripción típica del mercado' })} ({fmt(MARKET_REFERENCE_EUR_PER_MONTH)}/{tx({ de: 'Monat', en: 'month', es: 'mes' })})
             </p>
           </div>
         )}
