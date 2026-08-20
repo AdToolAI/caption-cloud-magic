@@ -202,7 +202,7 @@ export function SmartTemplates({ onApply, currentTemplateId }: SmartTemplatesPro
                       {isActive && (
                         <Badge variant="default" className="text-[10px] px-1.5 py-0 mt-0.5">
                           <Check className="w-3 h-3 mr-0.5" />
-                          Aktiv
+                          {tx({ de: 'Aktiv', en: 'Active', es: 'Activo' })}
                         </Badge>
                       )}
                     </div>

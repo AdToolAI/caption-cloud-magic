@@ -65,6 +65,7 @@ function isIgnorableLine(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return true;
   if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) return true;
+  if (/^\{\s*\/\*.*\*\/\s*\}$/.test(trimmed)) return true; // JSX comment, never rendered
   if (/\bconsole\.(log|debug|info|warn|error)\b/.test(trimmed)) return true;
   if (/^import\s|^export\s+\*|^export\s+\{/.test(trimmed)) return true;
   return false;
@@ -152,7 +153,6 @@ const OUT_OF_GATE_RESIDUALS = new Set<string>([
   "components/directors-cut/studio/CapCutSidebar.tsx::<summary className=\"text-[10px] text-white/30 cursor-pointer hover:text-white/50\">Erweitert</summary>",
   "components/directors-cut/ui/MotionIntensityOverlay.tsx::<span className=\"text-[9px] text-muted-foreground\">Intensiv</span>",
   "components/directors-cut/ui/MotionIntensityOverlay.tsx::<span className=\"text-[9px] text-muted-foreground\">Ruhig</span>",
-  "components/directors-cut/ui/SmartTemplates.tsx::Aktiv",
   "components/landing/BlackTieHero.tsx::{/* Headline - Elegant Serif with Gold Gradient */}",
   "components/landing/ai-arsenal/arsenalCatalog.ts::\"Flaggschiff-Motion-Modell — natives Lip-Sync und Pro-Charakterausdruck.\",",
   "components/landing/ai-arsenal/arsenalCatalog.ts::\"Persistente Charaktere über alle Studios hinweg.\",",
@@ -236,8 +236,6 @@ const OUT_OF_GATE_RESIDUALS = new Set<string>([
   "pages/Carousel.tsx::<SelectItem value=\"elegant\">Elegant</SelectItem>",
   "pages/EmailDirector.tsx::<Label className=\"text-xs\">Ziel</Label>",
   "pages/EmailDirector.tsx::placeholder=\"Worum geht's? Zielgruppe, Angebot, Kontext…\"",
-  "pages/MediaLibrary.tsx::{/* Motion-Studio Versionen */}",
-  "pages/MediaLibrary.tsx::{selectedAssets.length} ausgewählt",
   "pages/MotionStudio/Library.tsx::<title>Motion Studio Library | Charaktere & Locations</title>",
   "pages/MotionStudio/Library.tsx::Charaktere",
   "pages/MotionStudio/Library.tsx::{characters.length} Charaktere · {locations.length} Locations",

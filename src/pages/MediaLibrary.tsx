@@ -1113,7 +1113,7 @@ export default function MediaLibrary() {
           {selectedAssets.length > 0 && (
             <div className="flex items-center gap-4 p-4 border-t bg-muted/30 flex-wrap mt-4">
               <span className="text-sm text-muted-foreground">
-                {selectedAssets.length} ausgewählt
+                {tx({ de: `${selectedAssets.length} ausgewählt`, en: `${selectedAssets.length} selected`, es: `${selectedAssets.length} seleccionados` })}
               </span>
               <div className="flex gap-2 flex-wrap">
                 <Button
