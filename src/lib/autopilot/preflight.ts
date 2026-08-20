@@ -78,7 +78,9 @@ export function preflightScene(scene: SceneGrammar): PreflightFinding[] {
     // Multi-speaker: every turn needs a cast speaker and a voice of its own,
     // otherwise the Sync.so pass for that speaker has nothing to animate.
     turns.forEach((turn, i) => {
-      const label = turn.speakerName ?? `Sprecher ${i + 1}`;
+      const label =
+        turn.speakerName ??
+        tx({ de: `Sprecher ${i + 1}`, en: `Speaker ${i + 1}`, es: `Hablante ${i + 1}` });
       if (!turn.speakerCharacterId) {
         findings.push(warn('turn_no_speaker', tx({ de: `Redebeitrag ${i + 1}: Sprecher wird automatisch besetzt.`, en: `Speech ${i + 1}: Speaker will be assigned automatically.`, es: `Discurso ${i + 1}: El orador se asignará automáticamente.` }), id));
       } else if (
