@@ -142,7 +142,7 @@ export default function ChessGame() {
                   : 'border-border/50 text-muted-foreground hover:text-foreground',
               )}
             >
-              {l}
+              {tx(LEVEL_LABELS[l])}
             </button>
           ))}
         </div>
