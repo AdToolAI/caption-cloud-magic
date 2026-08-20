@@ -9,6 +9,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { discountFactor, normalizeDiscountPercent } from '@/lib/aiDiscount';
 
 export type AccountType = 'standard' | 'creator';
 
@@ -40,15 +41,12 @@ export function useAccountType(): AccountTypeInfo {
   });
 
   const accountType = (data?.account_type as AccountType) ?? 'standard';
-  const rawPct = Number(data?.ai_discount_percent ?? 0);
-  const discountPercent = Number.isFinite(rawPct)
-    ? Math.min(Math.max(Math.round(rawPct), 0), 100)
-    : 0;
+  const discountPercent = normalizeDiscountPercent(data?.ai_discount_percent);
 
   return {
     accountType,
     discountPercent,
-    discountFactor: (100 - discountPercent) / 100,
+    discountFactor: discountFactor(discountPercent),
     isCreator: accountType === 'creator',
     isLoading,
   };
