@@ -615,7 +615,7 @@ export function EventCreateDialog({
                 {isGeneratingCaption ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Generiere...
+                    {tx({ de: 'Generiere...', en: 'Generating...', es: 'Generando...' })}
                   </>
                 ) : (
                   <>
