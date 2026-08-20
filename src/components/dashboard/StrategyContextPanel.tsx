@@ -2,6 +2,7 @@ import { tx } from "@/lib/i18nText";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Sparkles, Lightbulb, TrendingUp, Brain, Target, Clock, Flame } from "lucide-react";
 import { format } from "date-fns";
+import { dateFnsLocale } from "@/lib/uiLocale";
 import type { StrategyPost, CreatorLevel } from "@/hooks/useStrategyMode";
 import { uiLocale } from '@/lib/uiLocale';
 

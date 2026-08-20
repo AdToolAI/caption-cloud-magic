@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sparkles, TrendingUp, TrendingDown, Clock, Send, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useLatestWeeklyReview, useAcceptWeeklyReview, useTriggerWeeklyReview, useAutopilotBrief } from '@/hooks/useAutopilot';
 import { formatDistanceToNow, isAfter } from 'date-fns';
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { uiLocale } from '@/lib/uiLocale';
 
 export function AutopilotWeeklyReviewPanel() {

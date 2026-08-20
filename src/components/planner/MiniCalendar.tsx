@@ -49,7 +49,7 @@ export function MiniCalendar({
           mode="single"
           selected={selectedDate}
           onSelect={handleDateSelect}
-          locale={de}
+          locale={dateFnsLocale()}
           modifiers={{
             hasContent: (date) => {
               const dateKey = format(date, "yyyy-MM-dd");
