@@ -40,7 +40,11 @@ export const AIMusicSuggester = ({ onSelect }: AIMusicSuggesterProps) => {
       setRecommendations(data.recommendations);
       toast({
         title: tx({ de: "Musik-Vorschläge generiert!", en: "Music suggestions generated!", es: "¡Sugerencias de música generadas!" }),
-        description: `${data.recommendations.length} passende Tracks gefunden`
+        description: tx({
+          de: `${data.recommendations.length} passende Tracks gefunden`,
+          en: `${data.recommendations.length} matching tracks found`,
+          es: `${data.recommendations.length} pistas coincidentes encontradas`,
+        })
       });
     } catch (error) {
       console.error('Music suggestion error:', error);

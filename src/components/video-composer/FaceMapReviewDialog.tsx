@@ -79,7 +79,10 @@ export function FaceMapReviewDialog({ open, onOpenChange, scene }: FaceMapReview
     return shots.map((s, i) => ({
       idx: i,
       characterId: s.characterId as string,
-      name: (s as any)?.characterName || (s as any)?.name || `Sprecher ${i + 1}`,
+      name:
+        (s as any)?.characterName ||
+        (s as any)?.name ||
+        tx({ de: `Sprecher ${i + 1}`, en: `Speaker ${i + 1}`, es: `Hablante ${i + 1}` }),
       portraitUrl: (s as any)?.referenceImageUrl || (s as any)?.portraitUrl || null,
     }));
   }, [scene.characterShots]);

@@ -696,7 +696,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
                     {scene.turns!.map((turn, turnIndex) => (
                       <p key={turn.id} className="text-sm">
                         <span className="mr-2 font-medium text-primary">
-                          {turn.speakerName ?? `Sprecher ${turnIndex + 1}`}
+                          {turn.speakerName ?? tr({ de: `Sprecher ${turnIndex + 1}`, en: `Speaker ${turnIndex + 1}`, es: `Hablante ${turnIndex + 1}` })}
                         </span>
                         <span className="italic">„{turn.text}“</span>
                         {!turn.voiceId && (

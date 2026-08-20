@@ -280,8 +280,11 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                 <div className="flex items-center justify-center gap-2 p-4 bg-primary/10 rounded-lg">
                   <Trophy className="h-5 w-5 text-primary" />
                   <span className="font-medium">
-                    Gewinner: Variante {testResults.results.winner} 
-                    (+{testResults.results.winner_lift.toFixed(1)}% Improvement)
+                    {tx({
+                      de: `Gewinner: Variante ${testResults.results.winner} (+${testResults.results.winner_lift.toFixed(1)}% Verbesserung)`,
+                      en: `Winner: Variant ${testResults.results.winner} (+${testResults.results.winner_lift.toFixed(1)}% improvement)`,
+                      es: `Ganador: Variante ${testResults.results.winner} (+${testResults.results.winner_lift.toFixed(1)}% de mejora)`,
+                    })}
                   </span>
                 </div>
               )}
@@ -298,7 +301,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                       <span className="font-medium">{testResults.results.variant_a.views}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Auswahlen:</span>
+                      <span className="text-sm text-muted-foreground">{tx({ de: "Auswahlen:", en: "Selections:", es: "Selecciones:" })}</span>
                       <span className="font-medium">{testResults.results.variant_a.selections}</span>
                     </div>
                     <div className="flex justify-between">
@@ -322,7 +325,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                       <span className="font-medium">{testResults.results.variant_b.views}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Auswahlen:</span>
+                      <span className="text-sm text-muted-foreground">{tx({ de: "Auswahlen:", en: "Selections:", es: "Selecciones:" })}</span>
                       <span className="font-medium">{testResults.results.variant_b.selections}</span>
                     </div>
                     <div className="flex justify-between">

@@ -155,7 +155,11 @@ export function estimateSceneRenderCost(
       eur: lipsyncCredits / CREDIT_PER_EUR,
       detail:
         passes > 1
-          ? `${passes} Sprecher · ${durationSec}s × ${LIPSYNC_CREDITS_PER_SEC_PER_PASS} Cr/s × ${passes} Passes`
+          ? tx({
+              de: `${passes} Sprecher · ${durationSec}s × ${LIPSYNC_CREDITS_PER_SEC_PER_PASS} Cr/s × ${passes} Passes`,
+              en: `${passes} speakers · ${durationSec}s × ${LIPSYNC_CREDITS_PER_SEC_PER_PASS} Cr/s × ${passes} passes`,
+              es: `${passes} hablantes · ${durationSec}s × ${LIPSYNC_CREDITS_PER_SEC_PER_PASS} Cr/s × ${passes} pases`,
+            })
           : `${durationSec}s × ${LIPSYNC_CREDITS_PER_SEC_PER_PASS} Cr/s · 1 Pass`,
     });
   }

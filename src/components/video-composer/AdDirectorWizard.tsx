@@ -790,7 +790,7 @@ export default function AdDirectorWizard({
                 {variantsLoading && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Generiere 3 Varianten parallel…
+                    {tx({ de: 'Generiere 3 Varianten parallel…', en: 'Generating 3 variants in parallel…', es: 'Generando 3 variantes en paralelo…' })}
                   </div>
                 )}
 

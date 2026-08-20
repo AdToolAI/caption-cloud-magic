@@ -226,7 +226,7 @@ export default function EmailDirector() {
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium truncate">{c.title}</div>
                         <div className="text-xs text-muted-foreground">
-                          {format(new Date(c.created_at), "PP")} · {c.variants?.length || 0} Varianten
+                          {format(new Date(c.created_at), "PP")} · {c.variants?.length || 0} {tx({ de: "Varianten", en: "variants", es: "variantes" })}
                         </div>
                       </div>
                       <Trash2

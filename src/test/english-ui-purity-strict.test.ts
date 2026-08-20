@@ -134,6 +134,12 @@ const BANNED_WORDS = [
   'gefunden',
   'Verfügbare',
   'Portrait fehlt',
+  // v-final-15: analytics winner/selection copy, music toast, shot hints.
+  'Gewinner',
+  'passende',
+  'Gegenlicht',
+  'statt',
+  'Generiere',
 ];
 
 const BANNED = new RegExp(`(?<![\\w-])(${BANNED_WORDS.join('|')})(?![\\w-])`);
@@ -156,6 +162,24 @@ const SEMANTIC_GERMAN_IDS = new Set<string>([
   "lib/directors-cut/overlayPresets.ts::category: 'Zitat',",
   // Picture Studio mood chip ids — localized via CHIP_LABELS at render.
   "components/picture-studio/PromptHelperDialog.tsx::const MOODS = ['Episch', 'Ruhig', 'Dramatisch', 'Hell', 'Düster', 'Verspielt'];",
+  // Persisted production-plan cast defaults. `mentionKey` / `characterName` are
+  // matching keys written into the plan and compared against briefing mentions;
+  // translating them would break speaker↔cast resolution. Never rendered raw as
+  // a label — the UI shows the matched cast name or a localized fallback.
+  "components/video-composer/briefing/ProductionPlanSheet.tsx::mentionKey: `S${String(sceneIndex).padStart(2, '0')} Sprecher`,",
+  "components/video-composer/briefing/ProductionPlanSheet.tsx::characterName: 'Sprecher',",
+  "components/video-composer/briefing/ProductionPlanSheet.tsx::mentionKey: slot.mentionKey || `S${String(sceneIndex).padStart(2, '0')} Sprecher`,",
+  "components/video-composer/briefing/ProductionPlanSheet.tsx::characterName: slot.characterName || 'Sprecher',",
+  "components/video-composer/briefing/ProductionPlanSheet.tsx::characterName: matched?.name ?? speakerLabel.get(k) ?? 'Sprecher',",
+  "components/video-composer/briefing/ProductionPlanSheet.tsx::mentionKey: matched?.name ?? dialogTurns[turnIndex].speakerMentionKey ?? 'Sprecher',",
+  "components/video-composer/briefing/ProductionPlanSheet.tsx::characterName: matched?.name ?? 'Sprecher',",
+  "components/video-composer/briefing/ProductionPlanSheet.tsx::if (!isRealSpeakerTurn(turn)) return; // Blocklabels sind keine Sprecher.",
+  "hooks/useApplyProductionPlan.ts::mentionKey: `S${String(sceneIndex).padStart(2, '0')} Sprecher`,",
+  "hooks/useApplyProductionPlan.ts::characterName: 'Sprecher',",
+  "hooks/useApplyProductionPlan.ts::? { ...sourceCast, mentionKey: sourceCast.mentionKey || `S${String(scene.index).padStart(2, '0')} Sprecher` }",
+  // Trailing code comments, never rendered.
+  "hooks/useGenerateAllClips.ts::isLipSyncIntentional(scene as any) || // v430.1 Schritt 2B — SSoT statt cinematic-sync-Teilcheck",
+  "remotion/templates/ExplainerVideo.tsx::solution: 'celebrating',   // Charakter feiert (Lösung gefunden)",
 ]);
 
 /**

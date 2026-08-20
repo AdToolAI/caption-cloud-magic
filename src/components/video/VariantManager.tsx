@@ -74,7 +74,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Video className="h-5 w-5" />
-            Video Varianten ({variants.length})
+            {tx({ de: 'Video Varianten', en: 'Video variants', es: 'Variantes de vídeo' })} ({variants.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
