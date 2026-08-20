@@ -504,7 +504,14 @@ export function SceneEditingStep({
     const recalc = ns.map(s => { const dur = s.end_time - s.start_time; const upd = { ...s, start_time: curT, end_time: curT + dur }; curT += dur; return upd; });
     onScenesUpdate(recalc);
     setCutSegmentMode(false); setCutSegmentIn(null); setCutSegmentOut(null);
-    toast({ title: 'Segment entfernt', description: `${cutDur.toFixed(1)}s herausgeschnitten` });
+    toast({
+      title: tx({ de: 'Segment entfernt', en: 'Segment removed', es: 'Segmento eliminado' }),
+      description: tx({
+        de: `${cutDur.toFixed(1)}s herausgeschnitten`,
+        en: `${cutDur.toFixed(1)}s cut out`,
+        es: `${cutDur.toFixed(1)}s recortados`,
+      }),
+    });
   }, [cutSegmentIn, cutSegmentOut, scenes, onScenesUpdate, toast]);
 
   const handleDeleteScene = useCallback(() => {

@@ -181,7 +181,7 @@ export function TimeWheelInput({ value, onChange, disabled, recommended }: TimeW
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         className="sr-only"
-        aria-label="Uhrzeit"
+        aria-label={tx({ de: 'Uhrzeit', en: 'Time', es: 'Hora' })}
         tabIndex={-1}
       />
     </div>

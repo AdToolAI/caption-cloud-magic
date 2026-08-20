@@ -187,7 +187,7 @@ export default function AIMonitoring() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-5 w-5 text-warning" />
-                <CardTitle className="text-warning">Hohe Nutzung erkannt</CardTitle>
+                <CardTitle className="text-warning">{tx({ de: 'Hohe Nutzung erkannt', en: 'High usage detected', es: 'Uso elevado detectado' })}</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
