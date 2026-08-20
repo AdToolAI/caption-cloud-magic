@@ -2776,7 +2776,9 @@ export default function SceneCard({
                             : "bg-cyan-500/20 text-cyan-200 ring-1 ring-cyan-500/40"
                         }`}
                       >
-                        {ignored ? "Aktivieren" : "Ignorieren"}
+                        {ignored
+                          ? tx({ de: "Aktivieren", en: "Activate", es: "Activar" })
+                          : tx({ de: "Ignorieren", en: "Ignore", es: "Ignorar" })}
                       </button>
                     </div>
                   );
