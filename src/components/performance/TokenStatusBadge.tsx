@@ -34,7 +34,7 @@ export const TokenStatusBadge = ({ lastSyncAt, hasError }: TokenStatusBadgeProps
     return (
       <Badge variant="outline" className="text-xs gap-1 bg-green-50 text-green-700 border-green-200">
         <CheckCircle className="h-3 w-3" />
-        Aktiv
+        {tx({ de: "Aktiv", en: "Active", es: "Activo" })}
       </Badge>
     );
   }

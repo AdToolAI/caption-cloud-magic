@@ -205,7 +205,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
             text(tx({ de: "— Name, Rolle", en: "— Name, role", es: "— Nombre, rol" }), { y: 0.74, size: 0.028, weight: 500, font: "body", align: "center", x: 0.12, w: 0.76, h: 0.05, color: P.accent }),
           ],
         }],
-        "Zitat", "Zitat",
+        tx({ de: "Zitat", en: "Quote", es: "Cita" }), tx({ de: "Zitat", en: "Quote", es: "Cita" }),
       ),
   },
   {

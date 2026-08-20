@@ -218,7 +218,7 @@ export default function DirectorPresetPicker({
                               </div>
                               {isActive && (
                                 <Badge variant="default" className="h-4 px-1 text-[9px] shrink-0">
-                                  Aktiv
+                                  {tx({ de: "Aktiv", en: "Active", es: "Activo" })}
                                 </Badge>
                               )}
                             </button>

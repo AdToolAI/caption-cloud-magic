@@ -53,7 +53,7 @@ export const WAN_VIDEO_MODELS = {
     maxDuration: 10,
     allowedDurations: [5, 10] as const,
     description: {
-      EUR: 'Verbesserte Motion-Konsistenz · gleiche Preise',
+      EUR: 'Improved motion consistency · same price',
       USD: 'Improved motion consistency · same price',
     },
     badge: 'New',
@@ -71,10 +71,10 @@ export const WAN_VIDEO_MODELS = {
     maxDuration: 10,
     allowedDurations: [5, 10] as const,
     description: {
-      EUR: 'Wan 2.6 Pro · 1080p · beste Motion-Konsistenz',
+      EUR: 'Wan 2.6 Pro · 1080p · best motion consistency',
       USD: 'Wan 2.6 Pro · 1080p · best motion consistency',
     },
-    badge: 'Neu Premium',
+    badge: 'New Premium',
   },
   'wan-2-7-standard': {
     name: 'Wan 2.7',
@@ -89,7 +89,7 @@ export const WAN_VIDEO_MODELS = {
     maxDuration: 15,
     allowedDurations: [5, 10, 15] as const,
     description: {
-      EUR: '27B MoE · natives Audio · 720p',
+      EUR: '27B MoE · native audio · 720p',
       USD: '27B MoE · native audio · 720p',
     },
     badge: 'New',
@@ -107,7 +107,7 @@ export const WAN_VIDEO_MODELS = {
     maxDuration: 15,
     allowedDurations: [5, 10, 15] as const,
     description: {
-      EUR: '27B MoE · natives Audio · 1080p',
+      EUR: '27B MoE · native audio · 1080p',
       USD: '27B MoE · native audio · 1080p',
     },
     badge: 'Premium',

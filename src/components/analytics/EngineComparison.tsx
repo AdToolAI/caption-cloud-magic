@@ -17,12 +17,12 @@ export function EngineComparison({ engineData }: Props) {
       Shotstack: engineData.shotstack.total_renders
     },
     {
-      metric: 'Avg. Zeit (s)',
+      metric: tx({ de: 'Avg. Zeit (s)', en: 'Avg. time (s)', es: 'Tiempo prom. (s)' }),
       Remotion: engineData.remotion.avg_render_time,
       Shotstack: engineData.shotstack.avg_render_time
     },
     {
-      metric: 'Erfolgsrate (%)',
+      metric: tx({ de: 'Erfolgsrate (%)', en: 'Success rate (%)', es: 'Tasa de éxito (%)' }),
       Remotion: engineData.remotion.success_rate,
       Shotstack: engineData.shotstack.success_rate
     }
@@ -100,7 +100,7 @@ export function EngineComparison({ engineData }: Props) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <DollarSign className="h-4 w-4" />
-                Gesamtkosten
+                {tx({ de: 'Gesamtkosten', en: 'Total cost', es: 'Costo total' })}
               </div>
               <p className="text-2xl font-bold">${engineData.remotion.total_cost.toFixed(2)}</p>
             </div>
@@ -142,7 +142,7 @@ export function EngineComparison({ engineData }: Props) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <DollarSign className="h-4 w-4" />
-                Gesamtkosten
+                {tx({ de: 'Gesamtkosten', en: 'Total cost', es: 'Costo total' })}
               </div>
               <p className="text-2xl font-bold">${engineData.shotstack.total_cost.toFixed(2)}</p>
             </div>
@@ -155,7 +155,7 @@ export function EngineComparison({ engineData }: Props) {
         <h3 className="text-lg font-semibold mb-4">Performance Winner</h3>
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center p-4 rounded-lg bg-muted/30">
-            <p className="text-sm text-muted-foreground mb-1">🏃 Schnellster</p>
+            <p className="text-sm text-muted-foreground mb-1">{tx({ de: "🏃 Schnellster", en: "🏃 Fastest", es: "🏃 Más rápido" })}</p>
             <p className="text-xl font-bold">{winner.speed}</p>
           </div>
           <div className="text-center p-4 rounded-lg bg-muted/30">
@@ -172,7 +172,7 @@ export function EngineComparison({ engineData }: Props) {
       <div className="grid grid-cols-2 gap-6">
         {/* Bar Comparison */}
         <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Direktvergleich</h3>
+          <h3 className="text-lg font-semibold mb-4">{tx({ de: "Direktvergleich", en: "Direct Comparison", es: "Comparación directa" })}</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={comparisonData}>
               <CartesianGrid strokeDasharray="3 3" />

@@ -421,7 +421,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
               </div>
               <div>
                 <p className="text-sm font-semibold">
-                  {selectedKeys.size} Formate ausgewählt
+                  {tx({ de: `${selectedKeys.size} Formate ausgewählt`, en: `${selectedKeys.size} formats selected`, es: `${selectedKeys.size} formatos seleccionados` })}
                 </p>
                 <p className="text-[11px] text-muted-foreground">
                   {tx({ de: 'Geschätzte Kosten:', en: 'Estimated cost:', es: 'Coste estimado:' })} <span className="font-medium text-foreground">€{batchCost.toFixed(2)}</span> · {tx({ de: 'Parallele Verarbeitung', en: 'Parallel processing', es: 'Procesamiento en paralelo' })}
@@ -446,7 +446,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
                 ) : (
                   <>
                     <Sparkles className="h-3.5 w-3.5" />
-                    {selectedKeys.size} Versionen exportieren
+                    {tx({ de: `${selectedKeys.size} Versionen exportieren`, en: `Export ${selectedKeys.size} versions`, es: `Exportar ${selectedKeys.size} versiones` })}
                   </>
                 )}
               </Button>

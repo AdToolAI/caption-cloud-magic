@@ -84,7 +84,7 @@ export function MultiBrandManager({
                 <div className="absolute -top-2 -right-2">
                   <Badge variant="default" className="shadow-lg">
                     <Star className="h-3 w-3 mr-1 fill-current" />
-                    Aktiv
+                    {tx({ de: "Aktiv", en: "Active", es: "Activo" })}
                   </Badge>
                 </div>
               )}

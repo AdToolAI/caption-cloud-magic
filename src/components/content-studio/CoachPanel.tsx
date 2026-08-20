@@ -56,7 +56,7 @@ export function CoachPanel({ open, onOpenChange }: { open: boolean; onOpenChange
             Authorization: `Bearer ${sessionData.session?.access_token ?? ""}`,
           },
           body: JSON.stringify({
-            message: `${question}\n\n--- Aktueller Entwurf ---\n${draftContext()}`,
+            message: `${question}\n\n--- ${tx({ de: 'Aktueller Entwurf', en: 'Current draft', es: 'Borrador actual' })} ---\n${draftContext()}`,
             messages: messages.map((m) => ({ role: m.role, content: m.content })),
           }),
         },

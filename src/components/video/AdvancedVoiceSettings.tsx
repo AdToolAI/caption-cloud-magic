@@ -140,7 +140,7 @@ export const AdvancedVoiceSettings = ({ onSettingsChange }: AdvancedVoiceSetting
 
           {/* Presets */}
           <div className="pt-4 border-t space-y-2">
-            <Label className="text-sm font-medium">Voreinstellungen</Label>
+            <Label className="text-sm font-medium">{tx({ de: "Voreinstellungen", en: "Presets", es: "Preajustes" })}</Label>
             <div className="grid grid-cols-2 gap-2">
               <Button
                 variant="outline"
@@ -151,7 +151,7 @@ export const AdvancedVoiceSettings = ({ onSettingsChange }: AdvancedVoiceSetting
                   onSettingsChange(preset);
                 }}
               >
-                Professionell
+                {tx({ de: "Professionell", en: "Professional", es: "Profesional" })}
               </Button>
               <Button
                 variant="outline"
@@ -162,7 +162,7 @@ export const AdvancedVoiceSettings = ({ onSettingsChange }: AdvancedVoiceSetting
                   onSettingsChange(preset);
                 }}
               >
-                Energisch
+                {tx({ de: "Energisch", en: "Energetic", es: "Enérgico" })}
               </Button>
               <Button
                 variant="outline"

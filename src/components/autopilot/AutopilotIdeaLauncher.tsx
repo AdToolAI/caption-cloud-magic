@@ -464,7 +464,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">Lip-Sync</p>
-              <p className="text-xs text-muted-foreground">Charaktere sprechen sichtbar</p>
+              <p className="text-xs text-muted-foreground">{tx({ de: "Charaktere sprechen sichtbar", en: "Characters speak visibly", es: "Los personajes hablan visiblemente" })}</p>
             </div>
             <Switch checked={options.lipSync} onCheckedChange={(v) => set('lipSync', v)} />
           </div>

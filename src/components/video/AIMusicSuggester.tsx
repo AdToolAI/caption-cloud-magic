@@ -69,11 +69,11 @@ export const AIMusicSuggester = ({ onSelect }: AIMusicSuggesterProps) => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="upbeat">Upbeat / Energetisch</SelectItem>
-              <SelectItem value="calm">Ruhig / Entspannt</SelectItem>
-              <SelectItem value="dramatic">Dramatisch</SelectItem>
-              <SelectItem value="corporate">Corporate / Business</SelectItem>
-              <SelectItem value="inspirational">Inspirierend</SelectItem>
+              <SelectItem value="upbeat">{tx({ de: "Upbeat / Energetisch", en: "Upbeat / Energetic", es: "Animado / Enérgico" })}</SelectItem>
+              <SelectItem value="calm">{tx({ de: "Ruhig / Entspannt", en: "Calm / Relaxed", es: "Tranquilo / Relajado" })}</SelectItem>
+              <SelectItem value="dramatic">{tx({ de: "Dramatisch", en: "Dramatic", es: "Dramático" })}</SelectItem>
+              <SelectItem value="corporate">{tx({ de: "Corporate / Business", en: "Corporate / Business", es: "Corporativo / Negocios" })}</SelectItem>
+              <SelectItem value="inspirational">{tx({ de: "Inspirierend", en: "Inspirational", es: "Inspirador" })}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -86,8 +86,8 @@ export const AIMusicSuggester = ({ onSelect }: AIMusicSuggesterProps) => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="any">{tx({ de: "Alle Genres", en: "All genres", es: "Todos los géneros" })}</SelectItem>
-              <SelectItem value="electronic">Elektronisch</SelectItem>
-              <SelectItem value="acoustic">Akustisch</SelectItem>
+              <SelectItem value="electronic">{tx({ de: "Elektronisch", en: "Electronic", es: "Electrónica" })}</SelectItem>
+              <SelectItem value="acoustic">{tx({ de: "Akustisch", en: "Acoustic", es: "Acústica" })}</SelectItem>
               <SelectItem value="cinematic">Cinematic</SelectItem>
               <SelectItem value="pop">Pop</SelectItem>
             </SelectContent>

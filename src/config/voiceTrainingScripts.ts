@@ -18,7 +18,7 @@ export const VOICE_TRAINING_SCRIPTS: Record<
 > = {
   de: {
     title: "Deutsches Trainingsskript",
-    hint: "Sprich in normalem Tempo, natürlich und ruhig. Ziel: 60–90 Sekunden. Ersetze {NAME} durch deinen eigenen Namen.",
+    hint: "Sprich in normalem Tempo, natürlich und ruhig. Ziel: 60–90 Sekunden. Ersetze {NAME} durch deinen eigenen Namen.", // German script hint, intentionally German (script-specific)
     text: `Hallo, mein Name ist {NAME} und ich nehme diese Aufnahme auf, um meine eigene Stimme zu klonen.
 
 Heute ist ein sonniger Tag, und ich sitze in einem ruhigen Raum ohne Hintergrundgeräusche. Ich spreche gleichmäßig, deutlich und in meinem natürlichen Tonfall.

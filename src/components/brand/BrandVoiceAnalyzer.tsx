@@ -166,15 +166,15 @@ export function BrandVoiceAnalyzer({ brandKitId, existingVoice, onAnalysisComple
                 <Badge variant="secondary" className="mt-1">{existingVoice.tone}</Badge>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Stil</p>
+                <p className="text-sm font-medium text-muted-foreground">{tx({ de: "Stil", en: "Style", es: "Estilo" })}</p>
                 <Badge variant="secondary" className="mt-1">{existingVoice.style}</Badge>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Tempo</p>
+                <p className="text-sm font-medium text-muted-foreground">{tx({ de: "Tempo", en: "Pacing", es: "Ritmo" })}</p>
                 <Badge variant="secondary" className="mt-1">{existingVoice.pacing}</Badge>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Wortschatz</p>
+                <p className="text-sm font-medium text-muted-foreground">{tx({ de: "Wortschatz", en: "Vocabulary", es: "Vocabulario" })}</p>
                 <Badge variant="secondary" className="mt-1">{existingVoice.vocabulary_level}</Badge>
               </div>
             </div>

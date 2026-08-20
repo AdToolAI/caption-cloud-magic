@@ -121,11 +121,11 @@ export const ExportOptionsEditor = ({ options, onChange }: ExportOptionsEditorPr
               <SelectContent>
                 <SelectItem value="720p">
                   HD (720p)
-                  <Badge variant="secondary" className="ml-2">Schnell</Badge>
+                  <Badge variant="secondary" className="ml-2">{tx({ de: "Schnell", en: "Fast", es: "Rápido" })}</Badge>
                 </SelectItem>
                 <SelectItem value="1080p">
                   Full HD (1080p)
-                  <Badge variant="secondary" className="ml-2">Empfohlen</Badge>
+                  <Badge variant="secondary" className="ml-2">{tx({ de: "Empfohlen", en: "Recommended", es: "Recomendado" })}</Badge>
                 </SelectItem>
                 <SelectItem value="4k">
                   4K (2160p)

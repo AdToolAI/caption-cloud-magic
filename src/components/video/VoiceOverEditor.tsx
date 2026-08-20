@@ -172,7 +172,7 @@ export const VoiceOverEditor = ({
         <div className="flex items-center justify-between">
           <Label htmlFor="speed" className="flex items-center gap-2">
             <Volume2 className="h-4 w-4" />
-            Sprechgeschwindigkeit
+            {tx({ de: "Sprechgeschwindigkeit", en: "Speech speed", es: "Velocidad del habla" })}
           </Label>
           <span className="text-sm text-muted-foreground">{voiceSpeed.toFixed(1)}x</span>
         </div>
@@ -185,9 +185,9 @@ export const VoiceOverEditor = ({
           onValueChange={([value]) => onVoiceSpeedChange(value)}
         />
         <div className="flex justify-between text-xs text-muted-foreground">
-          <span>Langsamer (0.5x)</span>
+          <span>{tx({ de: "Langsamer (0.5x)", en: "Slower (0.5x)", es: "Más lento (0.5x)" })}</span>
           <span>Normal (1.0x)</span>
-          <span>Schneller (2.0x)</span>
+          <span>{tx({ de: "Schneller (2.0x)", en: "Faster (2.0x)", es: "Más rápido (2.0x)" })}</span>
         </div>
       </div>
 

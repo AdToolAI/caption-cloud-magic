@@ -1,4 +1,4 @@
-import { tx } from '@/lib/i18nText';
+import { useTx } from '@/lib/i18nText';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Pause, Volume1, Zap, Leaf, Quote, Sparkles } from 'lucide-react';
@@ -15,19 +15,20 @@ interface TagDef {
   icon: React.ComponentType<{ className?: string }>;
   insert: string;        // raw token to insert
   wraps?: boolean;       // wraps current selection: [tag]...[/tag]
-  tooltip: string;
+  tooltip: { de: string; en: string; es: string };
 }
 
 const TAGS: TagDef[] = [
-  { label: 'Pause', icon: Pause, insert: '[pause 0.5s]', tooltip: 'Kurze Sprechpause (0.5s)' },
-  { label: 'Whisper', icon: Volume1, insert: '[whisper]', wraps: true, tooltip: tx({ de: "Geflüstert sprechen", en: "Speak whispered", es: "Hablar susurrando" }) },
-  { label: 'Excited', icon: Zap, insert: '[excited]', wraps: true, tooltip: 'Begeistert / energetisch' },
-  { label: 'Calm', icon: Leaf, insert: '[soft]', wraps: true, tooltip: 'Ruhig / weich' },
-  { label: 'Emphasize', icon: Quote, insert: '[emphasize]', wraps: true, tooltip: tx({ de: "Betont / nachdrücklich", en: "Emphasized / emphatic", es: "Enfático / con énfasis" }) },
-  { label: 'Laugh', icon: Sparkles, insert: '[laugh]', tooltip: tx({ de: "Lachen einfügen", en: "Insert laugh", es: "Insertar risa" }) },
+  { label: 'Pause', icon: Pause, insert: '[pause 0.5s]', tooltip: { de: 'Kurze Sprechpause (0.5s)', en: 'Short speaking pause (0.5s)', es: 'Pausa breve al hablar (0.5s)' } },
+  { label: 'Whisper', icon: Volume1, insert: '[whisper]', wraps: true, tooltip: { de: 'Geflüstert sprechen', en: 'Speak whispered', es: 'Hablar susurrando' } },
+  { label: 'Excited', icon: Zap, insert: '[excited]', wraps: true, tooltip: { de: 'Begeistert / energetisch', en: 'Excited / energetic', es: 'Entusiasmado / enérgico' } },
+  { label: 'Calm', icon: Leaf, insert: '[soft]', wraps: true, tooltip: { de: 'Ruhig / weich', en: 'Calm / soft', es: 'Calmado / suave' } },
+  { label: 'Emphasize', icon: Quote, insert: '[emphasize]', wraps: true, tooltip: { de: 'Betont / nachdrücklich', en: 'Emphasized / emphatic', es: 'Enfático / con énfasis' } },
+  { label: 'Laugh', icon: Sparkles, insert: '[laugh]', tooltip: { de: 'Lachen einfügen', en: 'Insert laugh', es: 'Insertar risa' } },
 ];
 
 export function ScriptTagToolbar({ textareaRef, value, onChange }: ScriptTagToolbarProps) {
+  const tx = useTx();
   const insertTag = (def: TagDef) => {
     const ta = textareaRef.current;
     if (!ta) {
@@ -84,7 +85,7 @@ export function ScriptTagToolbar({ textareaRef, value, onChange }: ScriptTagTool
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="top">
-                <span className="text-xs">{def.tooltip}</span>
+                <span className="text-xs">{tx(def.tooltip)}</span>
               </TooltipContent>
             </Tooltip>
           );

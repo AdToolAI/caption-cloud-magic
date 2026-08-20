@@ -186,16 +186,16 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
         {/* Target Audience */}
         <CollapsibleSection icon={<Target className="h-4 w-4" />} title={t('uvc.reviewTargetAudience') !== 'uvc.reviewTargetAudience' ? t('uvc.reviewTargetAudience') as string : 'Zielgruppe'}>
           <div className="space-y-1.5">
-            <FieldLabel>Zielgruppe</FieldLabel>
+            <FieldLabel>{tx({ de: "Zielgruppe", en: "Target Audience", es: "Público objetivo" })}</FieldLabel>
             <Input value={data.targetAudience} onChange={e => update('targetAudience', e.target.value)} className={fieldClass} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <FieldLabel>Alter</FieldLabel>
+              <FieldLabel>{tx({ de: "Alter", en: "Age", es: "Edad" })}</FieldLabel>
               <Input value={data.targetAudienceAge || ''} onChange={e => update('targetAudienceAge', e.target.value)} className={fieldClass} placeholder="z.B. 25-45" />
             </div>
             <div className="space-y-1.5">
-              <FieldLabel>Geschlecht</FieldLabel>
+              <FieldLabel>{tx({ de: "Geschlecht", en: "Gender", es: "Género" })}</FieldLabel>
               <Input value={data.targetAudienceGender || ''} onChange={e => update('targetAudienceGender', e.target.value)} className={fieldClass} placeholder={tx({ de: "z.B. Alle", en: "e.g. All", es: "p.ej. Todo" })} />
             </div>
           </div>
@@ -227,7 +227,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
         {/* Visual Style */}
         <CollapsibleSection icon={<Palette className="h-4 w-4" />} title={t('uvc.reviewVisualStyle') !== 'uvc.reviewVisualStyle' ? t('uvc.reviewVisualStyle') as string : 'Visueller Stil'}>
           <div className="space-y-1.5">
-            <FieldLabel>Stil</FieldLabel>
+            <FieldLabel>{tx({ de: "Stil", en: "Style", es: "Estilo" })}</FieldLabel>
             <Select value={data.visualStyle} onValueChange={v => update('visualStyle', v as UniversalVideoStyle)}>
               <SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -236,7 +236,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
             </Select>
           </div>
           <div className="space-y-1.5">
-            <FieldLabel>Markenfarben (kommagetrennt)</FieldLabel>
+            <FieldLabel>{tx({ de: "Markenfarben (kommagetrennt)", en: "Brand colors (comma-separated)", es: "Colores de marca (separados por comas)" })}</FieldLabel>
             <Input 
               value={(data.brandColors || []).join(', ')} 
               onChange={e => update('brandColors', e.target.value.split(',').map(c => c.trim()).filter(Boolean))} 

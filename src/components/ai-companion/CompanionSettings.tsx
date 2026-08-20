@@ -317,9 +317,9 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
           <Label>{tx({ de: "Persönlichkeit", en: "Personality", es: "Personalidad" })}</Label>
           <div className="grid grid-cols-3 gap-2">
             {[
-              { value: 'professional', label: '💼 Professionell' },
-              { value: 'friendly', label: '😊 Freundlich' },
-              { value: 'casual', label: '🎉 Locker' },
+              { value: 'professional', label: `💼 ${tx({ de: 'Professionell', en: 'Professional', es: 'Profesional' })}` },
+              { value: 'friendly', label: `😊 ${tx({ de: 'Freundlich', en: 'Friendly', es: 'Amigable' })}` },
+              { value: 'casual', label: `🎉 ${tx({ de: 'Locker', en: 'Casual', es: 'Informal' })}` },
             ].map(option => (
               <Button
                 key={option.value}
