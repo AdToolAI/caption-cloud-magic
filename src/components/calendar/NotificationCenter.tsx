@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { tx } from "@/lib/i18nText";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { useCalendarNotifications } from '@/hooks/useCalendarNotifications';
 import { formatDistanceToNow } from 'date-fns';
-import { de } from 'date-fns/locale';
 import { Bell, Check, CheckCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -108,7 +108,7 @@ export function NotificationCenter({ open, onClose }: NotificationCenterProps) {
                     <p className="text-xs text-muted-foreground mt-1">
                       {formatDistanceToNow(new Date(notification.created_at), {
                         addSuffix: true,
-                        locale: de,
+                        locale: dateFnsLocale(),
                       })}
                     </p>
                   </div>

@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { tx } from '@/lib/i18nText';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -101,7 +101,7 @@ export function MultiBrandManager({
                       {kit.brand_name}
                     </CardTitle>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {format(new Date(kit.created_at), 'dd. MMM yyyy', { locale: de })}
+                      {format(new Date(kit.created_at), 'dd. MMM yyyy', { locale: dateFnsLocale() })}
                     </p>
                   </div>
 

@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, Trash2, CalendarClock, Send } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
 import type { StrategyPost } from "@/hooks/useStrategyMode";
 import { tx } from "@/lib/i18nText";
 
@@ -23,7 +23,7 @@ export function MissedPostDialog({ open, onOpenChange, post, onDismiss, onResche
 
   if (!post) return null;
 
-  const originalDate = format(new Date(post.scheduled_at), "EEEE, d. MMM yyyy 'um' HH:mm", { locale: de });
+  const originalDate = format(new Date(post.scheduled_at), "EEEE, d. MMM yyyy 'um' HH:mm", { locale: dateFnsLocale() });
 
   const handleReschedule = () => {
     if (!newDateTime) return;

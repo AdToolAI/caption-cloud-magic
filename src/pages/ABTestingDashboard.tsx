@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { Footer } from '@/components/Footer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
@@ -10,7 +11,6 @@ import { CreateVariantDialog } from '@/components/abtesting/CreateVariantDialog'
 import { TestVariantCard } from '@/components/abtesting/TestVariantCard';
 import { TestPerformanceComparison } from '@/components/abtesting/TestPerformanceComparison';
 import { format } from 'date-fns';
-import { de } from 'date-fns/locale';
 import { tx } from '@/lib/i18nText';
 
 export default function ABTestingDashboard() {
@@ -92,7 +92,7 @@ export default function ABTestingDashboard() {
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground">
-                          {tx({ de: 'Gestartet', en: 'Started', es: 'Iniciado' })}: {test.started_at && format(new Date(test.started_at), 'dd.MM.yyyy HH:mm', { locale: de })}
+                          {tx({ de: 'Gestartet', en: 'Started', es: 'Iniciado' })}: {test.started_at && format(new Date(test.started_at), 'dd.MM.yyyy HH:mm', { locale: dateFnsLocale() })}
                         </p>
                       </div>
                       <Button variant="outline" onClick={() => stopTest(test.id)}>
@@ -194,7 +194,7 @@ export default function ABTestingDashboard() {
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            {tx({ de: 'Beendet', en: 'Ended', es: 'Finalizada' })}: {test.ended_at && format(new Date(test.ended_at), 'dd.MM.yyyy HH:mm', { locale: de })}
+                            {tx({ de: 'Beendet', en: 'Ended', es: 'Finalizada' })}: {test.ended_at && format(new Date(test.ended_at), 'dd.MM.yyyy HH:mm', { locale: dateFnsLocale() })}
                           </p>
                           {winner && (
                             <p className="text-sm mt-2">

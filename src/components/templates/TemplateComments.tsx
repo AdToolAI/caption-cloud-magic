@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { useTemplateCollaboration } from '@/hooks/useTemplateCollaboration';
@@ -6,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { MessageSquare, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { de } from 'date-fns/locale';
 
 interface TemplateCommentsProps {
   templateId: string;
@@ -63,7 +63,7 @@ export const TemplateComments = ({ templateId }: TemplateCommentsProps) => {
                 <span className="text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(comment.created_at), {
                     addSuffix: true,
-                    locale: de,
+                    locale: dateFnsLocale(),
                   })}
                 </span>
               </div>

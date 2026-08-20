@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,6 @@ import { Download, Play, RefreshCw, Loader2, Film, Clock, CheckCircle2, XCircle 
 import { useTranslation } from "@/hooks/useTranslation";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
 import { SEO } from "@/components/SEO";
 
 export default function ContentProjects() {
@@ -176,7 +176,7 @@ export default function ContentProjects() {
                           {getStatusBadge(project.status)}
                         </div>
                         <CardDescription>
-                          {format(new Date(project.created_at), "PPP", { locale: de })}
+                          {format(new Date(project.created_at), "PPP", { locale: dateFnsLocale() })}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-2">

@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { useTemplateCollaboration } from '@/hooks/useTemplateCollaboration';
@@ -7,7 +8,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { de } from 'date-fns/locale';
 
 interface TemplateApprovalWorkflowProps {
   templateId: string;
@@ -60,7 +60,7 @@ export const TemplateApprovalWorkflow = ({ templateId }: TemplateApprovalWorkflo
                 <p className="text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(approval.submitted_at), {
                     addSuffix: true,
-                    locale: de,
+                    locale: dateFnsLocale(),
                   })}
                 </p>
               </div>

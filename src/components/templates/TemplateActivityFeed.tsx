@@ -1,9 +1,9 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { useTemplateCollaboration } from '@/hooks/useTemplateCollaboration';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Activity } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { de } from 'date-fns/locale';
 import { tx } from '@/lib/i18nText';
 
 interface TemplateActivityFeedProps {
@@ -41,7 +41,7 @@ export const TemplateActivityFeed = ({ templateId }: TemplateActivityFeedProps) 
                   <span className="text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(item.created_at), {
                       addSuffix: true,
-                      locale: de,
+                      locale: dateFnsLocale(),
                     })}
                   </span>
                 </div>

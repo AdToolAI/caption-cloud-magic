@@ -1,10 +1,10 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { tx } from "@/lib/i18nText";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Clock, Edit, ExternalLink } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { de } from "date-fns/locale";
 
 interface Event {
   id: string;
@@ -112,7 +112,7 @@ export function CalendarTimeline({ events, loading, onEventClick }: CalendarTime
           {Object.entries(groupedEvents).map(([day, dayEvents]) => (
             <div key={day}>
               <h3 className="text-sm font-medium text-muted-foreground mb-3">
-                {format(parseISO(day), "EEEE, dd. MMMM yyyy", { locale: de })}
+                {format(parseISO(day), "EEEE, dd. MMMM yyyy", { locale: dateFnsLocale() })}
               </h3>
               <div className="space-y-2">
                 {dayEvents.map((event) => (

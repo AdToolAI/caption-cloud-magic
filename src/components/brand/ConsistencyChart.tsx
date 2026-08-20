@@ -1,10 +1,10 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { TrendingUp } from "lucide-react";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
 import { tx } from "@/lib/i18nText";
 
 interface ConsistencyChartProps {
@@ -28,7 +28,7 @@ export function ConsistencyChart({ brandKitId }: ConsistencyChartProps) {
   });
 
   const chartData = historyData.map((item: any) => ({
-    date: format(new Date(item.analyzed_at), 'dd.MM', { locale: de }),
+    date: format(new Date(item.analyzed_at), 'dd.MM', { locale: dateFnsLocale() }),
     score: item.score,
     type: item.content_type
   }));

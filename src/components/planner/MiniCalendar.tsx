@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -5,7 +6,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { CalendarDays } from "lucide-react";
 import { format, startOfWeek, addDays, isSameDay } from "date-fns";
-import { de } from "date-fns/locale";
 
 interface MiniCalendarProps {
   startDate: string;
@@ -40,8 +40,8 @@ export function MiniCalendar({
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
           <CalendarDays className="h-4 w-4" />
-          {format(new Date(startDate), "dd.MM.yy", { locale: de })} -{" "}
-          {format(endDate, "dd.MM.yy", { locale: de })}
+          {format(new Date(startDate), "dd.MM.yy", { locale: dateFnsLocale() })} -{" "}
+          {format(endDate, "dd.MM.yy", { locale: dateFnsLocale() })}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
