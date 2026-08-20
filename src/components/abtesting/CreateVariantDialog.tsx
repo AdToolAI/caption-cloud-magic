@@ -88,7 +88,7 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
         <div className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="variant-name">Varianten Name *</Label>
+              <Label htmlFor="variant-name">{tx({ de: "Variantenname *", en: "Variant name *", es: "Nombre de la variante *" })}</Label>
               <Input
                 id="variant-name"
                 placeholder="z.B. Rotes Thumbnail"

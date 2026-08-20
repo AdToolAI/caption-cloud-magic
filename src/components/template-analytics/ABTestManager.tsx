@@ -290,7 +290,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
               <div className="grid md:grid-cols-2 gap-4">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Variante A</CardTitle>
+                    <CardTitle className="text-base">{tx({ de: "Variante A", en: "Variant A", es: "Variante A" })}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div className="flex justify-between">
@@ -314,7 +314,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Variante B</CardTitle>
+                    <CardTitle className="text-base">{tx({ de: "Variante B", en: "Variant B", es: "Variante B" })}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div className="flex justify-between">

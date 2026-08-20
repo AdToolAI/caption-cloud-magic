@@ -989,7 +989,7 @@ export default function AdDirectorWizard({
                       <span className="text-foreground">Produkt:</span> {productName || '—'}
                     </li>
                     <li>
-                      <span className="text-foreground">Variante:</span>{' '}
+                      <span className="text-foreground">{tx({ de: "Variante:", en: "Variant:", es: "Variante:" })}</span>{' '}
                       {chosenVariantId
                         ? VARIANT_LABELS[chosenVariantId]?.[lang] ?? chosenVariantId
                         : '—'}

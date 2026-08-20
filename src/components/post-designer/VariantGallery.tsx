@@ -84,7 +84,7 @@ export function VariantGallery({ variants, loading, stage, imagePending, onPick,
             />
 
             <div className="flex items-center justify-between gap-2 border-t border-border/60 px-3 py-2">
-              <span className="truncate text-xs font-medium">{variant.variantName ?? `Variante ${i + 1}`}</span>
+              <span className="truncate text-xs font-medium">{variant.variantName ?? tx({ de: `Variante ${i + 1}`, en: `Variant ${i + 1}`, es: `Variante ${i + 1}` })}</span>
               <Sparkles className="h-3.5 w-3.5 shrink-0 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
             </div>
           </button>

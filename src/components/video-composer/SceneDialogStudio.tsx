@@ -1451,7 +1451,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // Portrait fehlt bei 1 Sprecher → sofortiger Hinweis statt Silent-Kill.
     if (blocks.length === 1 && !allHavePortraits) {
       const missingPortrait = speakers[0];
-      const name = missingPortrait ? (sceneCast.find((c) => c.id === missingPortrait.id)?.name || missingPortrait.name || 'Sprecher') : 'Sprecher';
+      const fallbackSpeakerName = tx({ de: 'Sprecher', en: 'Speaker', es: 'Hablante' });
+      const name = missingPortrait ? (sceneCast.find((c) => c.id === missingPortrait.id)?.name || missingPortrait.name || fallbackSpeakerName) : fallbackSpeakerName;
       toast({
         title: tx({ de: `Kein Portrait für ${name}`, en: `No portrait for ${name}`, es: `Sin retrato para ${name}` }),
         description: tx({ de: `Weise ${name} im Cast einen Brand-Character mit Portrait zu — sonst ist kein Lip-Sync möglich.`, en: `Assign a brand character with a portrait to ${name} in the cast — otherwise, lip-sync is not possible.`, es: `Asigna un personaje de marca con un retrato a ${name} en el elenco; de lo contrario, no es posible la sincronización labial.` }),
