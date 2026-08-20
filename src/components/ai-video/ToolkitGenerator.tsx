@@ -49,6 +49,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { useVideoPricingCatalog } from '@/hooks/useVideoPricingCatalog';
+import { useAccountType } from '@/hooks/useAccountType';
 import { useTranslation } from '@/hooks/useTranslation';
 import { getCurrencyForLanguage } from '@/lib/currency';
 import {
