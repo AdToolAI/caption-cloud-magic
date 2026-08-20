@@ -294,7 +294,7 @@ function deBranchLines(src: string): Set<number> {
     // `language === 'de'` / `lang === 'de'` on the previous line, German value
     // on the next line of a multi-line ternary.
     const prev = lines[idx - 1] ?? '';
-    if (/^\s*\?/.test(line) && /[Ll]ang(uage)?\s*===\s*['"]de['"]/.test(prev)) {
+    if (/^\s*\?/.test(line) && /[Ll]ang\w*\s*===\s*['"]de['"]/.test(prev)) {
       inside.add(idx);
       return;
     }
