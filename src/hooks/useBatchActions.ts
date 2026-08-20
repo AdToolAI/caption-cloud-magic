@@ -32,7 +32,7 @@ export const useBatchActions = () => {
         })
         .eq('id', batchJobId);
 
-      toast.success(`${videos?.length || 0} Videos abgebrochen`);
+      toast.success(tx({ de: `${videos?.length || 0} Videos abgebrochen`, en: `${videos?.length || 0} videos cancelled`, es: `${videos?.length || 0} vídeos cancelados` }));
     } catch (error) {
       toast.error(tx({ de: 'Abbruch fehlgeschlagen', en: 'Abort failed', es: 'Abortar falló' }));
     } finally {

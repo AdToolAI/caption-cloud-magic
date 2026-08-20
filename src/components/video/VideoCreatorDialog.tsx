@@ -179,7 +179,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
       }
 
       handleFieldChange(key, JSON.stringify(uploadedUrls));
-      toast.success(`${uploadedUrls.length} Video(s) hochgeladen`);
+      toast.success(tx({ de: `${uploadedUrls.length} Video(s) hochgeladen`, en: `${uploadedUrls.length} video(s) uploaded`, es: `${uploadedUrls.length} vídeo(s) subido(s)` }));
     } catch (error) {
       console.error('Upload error:', error);
       toast.error(tx({ de: "Video-Upload fehlgeschlagen", en: "Video upload failed", es: "Error al subir el vídeo" }));

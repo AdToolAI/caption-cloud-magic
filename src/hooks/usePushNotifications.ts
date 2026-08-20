@@ -107,7 +107,7 @@ export function usePushNotifications() {
       if (error) throw error;
 
       setPushEnabled(true);
-      toast.success("Push-Benachrichtigungen aktiviert! 🔔");
+      toast.success(tx({ de: "Push-Benachrichtigungen aktiviert! 🔔", en: "Push notifications activated! 🔔", es: "¡Notificaciones push activadas! 🔔" }));
     } catch (err: any) {
       console.error("Push subscription error:", err);
       toast.error(tx({ de: "Fehler beim Aktivieren der Push-Benachrichtigungen", en: "Error activating push notifications", es: "Error al activar las notificaciones push" }));
@@ -139,7 +139,7 @@ export function usePushNotifications() {
       if (error) throw error;
 
       setPushEnabled(false);
-      toast.success("Push-Benachrichtigungen deaktiviert");
+      toast.success(tx({ de: "Push-Benachrichtigungen deaktiviert", en: "Push notifications deactivated", es: "Notificaciones push desactivadas" }));
     } catch (err: any) {
       console.error("Push unsubscribe error:", err);
       toast.error(tx({ de: "Fehler beim Deaktivieren", en: "Error deactivating", es: "Error al desactivar" }));

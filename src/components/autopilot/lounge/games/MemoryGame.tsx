@@ -76,10 +76,10 @@ export default function MemoryGame() {
     <div className="space-y-3">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
-          Züge <span className="font-mono text-foreground">{moves}</span>
+          {tx({ de: 'Züge', en: 'Moves', es: 'Movimientos' })} <span className="font-mono text-foreground">{moves}</span>
         </span>
         <span>
-          Zeit <span className="font-mono text-foreground">{time}</span>
+          {tx({ de: 'Zeit', en: 'Time', es: 'Tiempo' })} <span className="font-mono text-foreground">{time}</span>
         </span>
         <Button
           size="sm"
