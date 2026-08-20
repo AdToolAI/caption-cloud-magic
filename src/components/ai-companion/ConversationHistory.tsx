@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { History, MessageCircle, Trash2, ChevronLeft, Loader2 } from 'lucide-react';
@@ -150,7 +151,7 @@ export function ConversationHistory({
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {formatDistanceToNow(new Date(conv.updated_at), { 
                         addSuffix: true, 
-                        locale: de 
+                        locale: dateFnsLocale() 
                       })}
                     </p>
                   </div>
