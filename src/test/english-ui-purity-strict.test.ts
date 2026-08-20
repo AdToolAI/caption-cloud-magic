@@ -61,8 +61,6 @@ const FILES = walk(SRC);
 // tri-language helper. It is an explicit language selection, exactly like
 // `tx({de,en,es})`, so its German first argument is a DE branch — not a leak.
 // Requires the language argument, so a plain `t('key')` lookup is unaffected.
-const POSITIONAL_TRI = /\bt\(\s*(language|lang)\b\s*,/;
-
 const LANG_SELECT =
   /(\btx\(|\buseTx\b|pickText\(|\bde:\s|\bes:\s|language\s*===|[Ll]ang\s*===|locale\s*===|\bt\(\s*['"]|\bt\(\s*(language|lang)\b\s*,|TriText|\bcap\(|\bentry\()/;
 
@@ -72,6 +70,9 @@ function isIgnorableLine(line: string): boolean {
   if (!trimmed) return true;
   if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) return true;
   if (/^\{\s*\/\*.*\*\/\s*\}$/.test(trimmed)) return true; // JSX comment, never rendered
+  // Opening line of a MULTI-line JSX block comment (`{/* … ` with no closer on
+  // this line). Proven non-UI: strictly narrower than ignoring the whole block.
+  if (/^\{\s*\/\*/.test(trimmed) && !trimmed.includes('*/')) return true;
   if (/\bconsole\.(log|debug|info|warn|error)\b/.test(trimmed)) return true;
   if (/^import\s|^export\s+\*|^export\s+\{/.test(trimmed)) return true;
   return false;
