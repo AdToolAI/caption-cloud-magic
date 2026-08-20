@@ -210,6 +210,19 @@ const BANNED_WORDS = [
   'im Einklang',
   'geteilt',
   'Hohe Nutzung',
+  // v-final-12: upload progress copy, autopilot/push toggle toasts, batch
+  // cancel toast, stock library fallback tab, caption limit warning, calendar
+  // takeover button, memory-game HUD labels.
+  'hochgeladen',
+  'aktiviert',
+  'deaktiviert',
+  'Benachrichtigungen',
+  'abgebrochen',
+  'Meine Bibliothek',
+  'Überschreitet',
+  'Kalender übernehmen',
+  'Züge',
+  'Zeit',
   // `Neu` is deliberately NOT a bare banned word (it collides with identifiers
   // and English "Neural"). It is caught contextually by the rule below.
 ];
