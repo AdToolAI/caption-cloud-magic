@@ -174,7 +174,7 @@ export default function DriftReportPanel({ projectId, scenes, onUpdateScene }: P
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium">Plan ↔ Storyboard Drift-Check</span>
                 <Badge variant="outline" className={cn('text-[10px]', severityBadgeClass(sev))}>
-                  {SEV_LABEL[sev]}
+                  {sevLabel(sev)}
                 </Badge>
                 {count > 0 && (
                   <span className="text-[11px] text-muted-foreground">
