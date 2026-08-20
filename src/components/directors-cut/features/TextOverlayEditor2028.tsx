@@ -741,7 +741,7 @@ export function TextOverlayEditor2028({
                       onCheckedChange={(v) => updateOverlayStyle(selectedOverlay.id, { shadow: v })}
                     />
                     <span className="text-sm text-muted-foreground break-words [overflow-wrap:anywhere]">
-                      {selectedOverlay.style.shadow ? 'Aktiv' : 'Aus'}
+                      {selectedOverlay.style.shadow ? 'Aktiv' : tx({ de: "Aus", en: "Off", es: "Desactivado" })}
                     </span>
                   </div>
                 </div>

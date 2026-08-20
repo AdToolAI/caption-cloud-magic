@@ -221,11 +221,11 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
           {/* Summary */}
           <div className="p-4 bg-muted rounded-lg">
             <div className="text-sm text-muted-foreground">
-              Es werden {selectedFormats.length} × {selectedRatios.length} = {' '}
+              {tx({ de: 'Es werden', en: 'This creates', es: 'Esto crea' })} {selectedFormats.length} × {selectedRatios.length} = {' '}
               <span className="font-semibold text-foreground">
-                {selectedFormats.length * selectedRatios.length} Varianten
+                {selectedFormats.length * selectedRatios.length} {tx({ de: 'Varianten', en: 'variants', es: 'variantes' })}
               </span>
-              {' '}erstellt
+              {' '}{tx({ de: "erstellt", en: "created", es: "creado" })}
             </div>
           </div>
 

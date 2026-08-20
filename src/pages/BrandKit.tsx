@@ -725,7 +725,7 @@ const BrandKit = () => {
                   <Card className="backdrop-blur-xl bg-card/60 border border-white/10">
                     <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                       <Paintbrush className="h-16 w-16 text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">Kein Marken-Set vorhanden</h3>
+                      <h3 className="text-lg font-semibold mb-2">{tx({ de: "Kein Marken-Set vorhanden", en: "No brand set available", es: "Ningún conjunto de marca disponible" })}</h3>
                       <p className="text-sm text-muted-foreground mb-4">
                         {tx({ de: "Erstelle dein erstes Marken-Set, um es hier zu sehen", en: "Create your first brand kit to see it here", es: "Crea tu primer kit de marca para verlo aquí" })}
                       </p>

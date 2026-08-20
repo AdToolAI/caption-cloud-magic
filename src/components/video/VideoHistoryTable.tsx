@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -7,7 +8,6 @@ import { VideoStatusBadge } from './VideoStatusBadge';
 import { VideoActionMenu } from './VideoActionMenu';
 import { VersionAnalytics } from './VersionAnalytics';
 import { formatDistanceToNow } from 'date-fns';
-import { de } from 'date-fns/locale';
 import { History, ChevronDown, ChevronRight, BarChart3 } from 'lucide-react';
 
 interface VideoHistoryTableProps {
@@ -52,7 +52,7 @@ export const VideoHistoryTable = ({ videos, templatesById }: VideoHistoryTablePr
         <TableRow>
           <TableHead>Template</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead>Erstellt</TableHead>
+          <TableHead>{tx({ de: "Erstellt", en: "Created", es: "Creado" })}</TableHead>
           <TableHead>{tx({ de: "Qualität", en: "Quality", es: "Calidad" })}</TableHead>
           <TableHead className="text-right">Aktionen</TableHead>
         </TableRow>
@@ -108,7 +108,7 @@ export const VideoHistoryTable = ({ videos, templatesById }: VideoHistoryTablePr
                 <TableCell className="text-sm text-muted-foreground">
                   {formatDistanceToNow(new Date(mainVideo.created_at), {
                     addSuffix: true,
-                    locale: de,
+                    locale: dateFnsLocale(),
                   })}
                 </TableCell>
                 <TableCell>
@@ -133,7 +133,7 @@ export const VideoHistoryTable = ({ videos, templatesById }: VideoHistoryTablePr
                       <div className="space-y-2">
                         <h4 className="text-sm font-medium flex items-center gap-2">
                           <BarChart3 className="h-4 w-4" />
-                          Alle Versionen
+                          {tx({ de: "Alle Versionen", en: "All versions", es: "Todas las versiones" })}
                         </h4>
                         <div className="space-y-2">
                           {groupVideos
@@ -162,7 +162,7 @@ export const VideoHistoryTable = ({ videos, templatesById }: VideoHistoryTablePr
                                         <span>
                                           {formatDistanceToNow(new Date(version.created_at), {
                                             addSuffix: true,
-                                            locale: de,
+                                            locale: dateFnsLocale(),
                                           })}
                                         </span>
                                         <span>{version.download_count || 0} Downloads</span>

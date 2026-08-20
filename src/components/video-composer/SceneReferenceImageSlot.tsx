@@ -76,10 +76,10 @@ export default function SceneReferenceImageSlot({ scene, onUpdate, className }: 
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-[11px] font-semibold text-foreground">
-            Szenen-Referenzbild (optional)
+            {tx({ de: 'Szenen-Referenzbild (optional)', en: 'Scene reference image (optional)', es: 'Imagen de referencia de escena (opcional)' })}
           </div>
           <p className="text-[10px] text-muted-foreground line-clamp-2">
-            Wird als Startframe (i2v-Anchor) an das AI-Video-Modell übergeben. Nur verfügbar, wenn Lip-Sync deaktiviert ist.
+            {tx({ de: 'Wird als Startframe (i2v-Anchor) an das AI-Video-Modell übergeben. Nur verfügbar, wenn Lip-Sync deaktiviert ist.', en: 'Passed to the AI video model as the start frame (i2v anchor). Only available when lip-sync is disabled.', es: 'Se envía al modelo de vídeo IA como fotograma inicial (ancla i2v). Solo disponible si el lip-sync está desactivado.' })}
           </p>
         </div>
       </div>

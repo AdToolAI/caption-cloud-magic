@@ -186,7 +186,7 @@ const DeleteAccount = () => {
                 <Label htmlFor="check-legal" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
                   {tx({ de: "Ich habe die", en: "I have read the", es: "He leído los" })}{" "}
                   <Link to="/legal/terms" className="text-primary underline">AGB</Link>{" "}
-                  und{" "}
+                  {tx({ de: "und", en: "and", es: "y" })}{" "}
                   <Link to="/privacy" className="text-primary underline">Datenschutzbestimmungen</Link>{" "}
                   {tx({ de: "zur Kenntnis genommen.", en: "noticed.", es: "avisos." })}
                 </Label>

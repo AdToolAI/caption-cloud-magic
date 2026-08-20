@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { tx } from '@/lib/i18nText';
 import { useEffect, useState } from 'react';
 import {
@@ -12,7 +13,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { History, Loader2 } from 'lucide-react';
 import { useContinuityDrift, driftSeverity, type DriftHistoryEntry } from '@/hooks/useContinuityDrift';
 import { formatDistanceToNow } from 'date-fns';
-import { de } from 'date-fns/locale';
 
 interface Props {
   open: boolean;
@@ -105,7 +105,7 @@ export default function ContinuityHistoryDrawer({ open, onOpenChange, projectId 
                         <p className="text-xs text-foreground/80 line-clamp-2">{e.label}</p>
                       )}
                       <p className="text-[10px] text-muted-foreground mt-1">
-                        {formatDistanceToNow(new Date(e.created_at), { addSuffix: true, locale: de })}
+                        {formatDistanceToNow(new Date(e.created_at), { addSuffix: true, locale: dateFnsLocale() })}
                         {e.recommendation ? ` · ${e.recommendation}` : ''}
                       </p>
                     </div>

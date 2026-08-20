@@ -44,7 +44,7 @@ export const TRIGGER_REGISTRY: TriggerDefinition[] = [
     copy: {
       de: {
         title: 'Cast & World',
-        body: tx({ de: 'Hier lebt dein Ensemble. Lege Charaktere, Locations und Requisiten an — sie werden dann in jedem Studio wiederverwendet.', en: 'This is where your ensemble lives. Create characters, locations, and props — they will then be reused in every studio.', es: 'Aquí vive tu elenco. Crea personajes, ubicaciones y accesorios — luego se reutilizarán en cada estudio.' }),
+        body: 'Hier lebt dein Ensemble. Lege Charaktere, Locations und Requisiten an — sie werden dann in jedem Studio wiederverwendet.',
         cta: 'Ersten Charakter anlegen',
       },
       en: {
@@ -67,8 +67,8 @@ export const TRIGGER_REGISTRY: TriggerDefinition[] = [
     copy: {
       de: {
         title: 'Motion Studio',
-        body: tx({ de: 'Der geführte Flow durch Cast → Skript → Szene → Composer. Ideal für deinen ersten Spot.', en: 'The guided flow through Cast → Script → Scene → Composer. Ideal for your first spot.', es: 'El flujo guiado a través de Elenco → Guion → Escena → Compositor. Ideal para tu primer anuncio.' }),
-        cta: tx({ de: "Studio Mode starten", en: "Start Studio Mode", es: "Iniciar Modo Estudio" }),
+        body: 'Der geführte Flow durch Cast → Skript → Szene → Composer. Ideal für deinen ersten Spot.',
+        cta: "Studio Mode starten",
       },
       en: {
         title: 'Motion Studio',
@@ -90,7 +90,7 @@ export const TRIGGER_REGISTRY: TriggerDefinition[] = [
     copy: {
       de: {
         title: 'AI Video Studio',
-        body: tx({ de: 'Direktzugang zu 29+ Video-Modellen. Für schnelle Shots ohne Composer-Overhead.', en: 'Direct access to 29+ video models. For quick shots without composer overhead.', es: 'Acceso directo a más de 29 modelos de vídeo. Para tomas rápidas sin que el compositor esté por encima.' }),
+        body: 'Direktzugang zu 29+ Video-Modellen. Für schnelle Shots ohne Composer-Overhead.',
       },
       en: {
         title: 'AI Video Studio',
@@ -110,7 +110,7 @@ export const TRIGGER_REGISTRY: TriggerDefinition[] = [
     copy: {
       de: {
         title: 'Music & Voice Studio',
-        body: tx({ de: 'Erzeuge Songs mit 4 Engines oder klone deine eigene Stimme. Alle Ergebnisse landen in deiner Library.', en: 'Generate songs with 4 engines or clone your own voice. All results land in your Library.', es: 'Genera canciones con 4 motores o clona tu propia voz. Todos los resultados se guardan en tu Biblioteca.' }),
+        body: 'Erzeuge Songs mit 4 Engines oder klone deine eigene Stimme. Alle Ergebnisse landen in deiner Library.',
       },
       en: {
         title: 'Music & Voice Studio',
@@ -130,7 +130,7 @@ export const TRIGGER_REGISTRY: TriggerDefinition[] = [
     copy: {
       de: {
         title: 'Picture Studio',
-        body: tx({ de: 'Storyboards, Keyframes, Anchor-Frames — hier entstehen die Bilder für deine Szenen.', en: 'Storyboards, keyframes, anchor frames — this is where the images for your scenes are created.', es: 'Storyboards, fotogramas clave, fotogramas de anclaje — aquí se crean las imágenes para tus escenas.' }),
+        body: 'Storyboards, Keyframes, Anchor-Frames — hier entstehen die Bilder für deine Szenen.',
       },
       en: {
         title: 'Picture Studio',
@@ -150,7 +150,7 @@ export const TRIGGER_REGISTRY: TriggerDefinition[] = [
     copy: {
       de: {
         title: "Director's Cut Composer",
-        body: tx({ de: 'Der finale Editor: Timeline, Subtitles, Music-Mix, Export. WYSIWYG bis zum Render.', en: 'The final editor: timeline, subtitles, music mix, export. WYSIWYG to render.', es: 'El editor final: línea de tiempo, subtítulos, mezcla de música, exportación. WYSIWYG para renderizar.' }),
+        body: 'Der finale Editor: Timeline, Subtitles, Music-Mix, Export. WYSIWYG bis zum Render.',
       },
       en: {
         title: "Director's Cut Composer",
@@ -172,7 +172,7 @@ export const TRIGGER_REGISTRY: TriggerDefinition[] = [
     copy: {
       de: {
         title: 'Wallet-Guthaben niedrig',
-        body: tx({ de: 'Dein AI-Guthaben ist fast leer. Rendern läuft weiter, sobald du auflädst.', en: 'Your AI credit is almost depleted. Rendering will resume once you top up.', es: 'Tu crédito de IA está casi agotado. El renderizado continuará una vez que recargues.' }),
+        body: 'Dein AI-Guthaben ist fast leer. Rendern läuft weiter, sobald du auflädst.',
         cta: 'Guthaben aufladen',
         ctaHref: '/ai-video-toolkit#purchase',
       },
@@ -198,7 +198,7 @@ export const TRIGGER_REGISTRY: TriggerDefinition[] = [
     copy: {
       de: {
         title: 'Klemmt gerade etwas?',
-        body: tx({ de: 'Ich sehe mehrere Fehlversuche. Willst du dass ich mir das anschaue oder direkt einen Support-Ticket öffne?', en: 'I see multiple failed attempts. Do you want me to look into it or open a support ticket directly?', es: 'Veo varios intentos fallidos. ¿Quieres que lo revise o que abra un ticket de soporte directamente?' }),
+        body: 'Ich sehe mehrere Fehlversuche. Willst du dass ich mir das anschaue oder direkt einen Support-Ticket öffne?',
       },
       en: {
         title: 'Something stuck?',
@@ -218,8 +218,8 @@ export const TRIGGER_REGISTRY: TriggerDefinition[] = [
     cooldownDays: 365,
     copy: {
       de: {
-        title: tx({ de: 'Erste Szene gerendert 🎬', en: 'First scene rendered 🎬', es: 'Primera escena renderizada 🎬' }),
-        body: tx({ de: 'Sehr gut. Als nächstes: eigene Musik im Audio Studio dazu — oder direkt in den Composer für den finalen Cut.', en: 'Very good. Next: add your own music in the Audio Studio — or directly to the Composer for the final cut.', es: 'Muy bien. Siguiente: añade tu propia música en el Estudio de Audio — o directamente al Compositor para el corte final.' }),
+        title: 'Erste Szene gerendert 🎬',
+        body: 'Sehr gut. Als nächstes: eigene Musik im Audio Studio dazu — oder direkt in den Composer für den finalen Cut.',
         cta: 'Zum Audio Studio',
         ctaHref: '/audio-studio',
       },
@@ -244,7 +244,7 @@ export const TRIGGER_REGISTRY: TriggerDefinition[] = [
     copy: {
       de: {
         title: 'Cast Master',
-        body: tx({ de: '5 Charaktere im Ensemble — Zeit für ein Ensemble-Spot mit mehreren Sprechern.', en: '5 characters in the ensemble — time for an ensemble spot with multiple speakers.', es: '5 personajes en el elenco — es hora de un anuncio de conjunto con varios oradores.' }),
+        body: '5 Charaktere im Ensemble — Zeit für ein Ensemble-Spot mit mehreren Sprechern.',
       },
       en: {
         title: 'Cast Master',
@@ -263,7 +263,7 @@ export const TRIGGER_REGISTRY: TriggerDefinition[] = [
     copy: {
       de: {
         title: 'Voice Pioneer',
-        body: tx({ de: 'Eigene Stimme geklont. Weise sie einem Charakter in Cast & World fest zu — dann greifen alle Studios automatisch darauf zurück.', en: 'Own voice cloned. Assign it permanently to a character in Cast & World — then all studios will automatically use it.', es: 'Voz propia clonada. Asígnala permanentemente a un personaje en Elenco y Mundo — entonces todos los estudios la usarán automáticamente.' }),
+        body: 'Eigene Stimme geklont. Weise sie einem Charakter in Cast & World fest zu — dann greifen alle Studios automatisch darauf zurück.',
       },
       en: {
         title: 'Voice Pioneer',

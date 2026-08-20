@@ -173,7 +173,7 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
             {tx({ de: "FCPXML hochladen & Diff prüfen", en: "Upload FCPXML & check diff", es: "Subir FCPXML y comprobar diferencias" })}
           </Button>
           <p className="text-[10px] text-muted-foreground/80 leading-relaxed">
-            Lade die in Resolve/Premiere geänderte <code>.fcpxml</code> hoch — wir zeigen dir alle Trims, Reorder & gelöschten Szenen vor der Übernahme.
+            {tx({ de: "Lade die in Resolve/Premiere geänderte", en: "Upload the one modified in Resolve/Premiere", es: "Sube el modificado en Resolve/Premiere" })} <code>.fcpxml</code> {tx({ de: "hoch — wir zeigen dir alle Trims, Reorder & gelöschten Szenen vor der Übernahme.", en: "high — we'll show you all trims, reorders & deleted scenes before applying.", es: "alto — te mostraremos todos los recortes, reordenamientos y escenas eliminadas antes de aplicar." })}
           </p>
         </div>
 

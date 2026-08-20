@@ -30,7 +30,7 @@ export const RefundPolicyMini = ({ compact = false }: { compact?: boolean }) => 
           </h4>
           <ul className="text-xs text-muted-foreground space-y-1 mb-2">
             <li>
-              <span className="text-emerald-500">✓</span> {tx({ de: <>{tx({ de: "Technische Fehler (Timeout, Provider 5xx, Mux-Crash) →", en: "Technical errors (timeout, provider 5xx, Mux crash) →", es: "Errores técnicos (tiempo de espera, proveedor 5xx, fallo de Mux) →" })}<strong>automatischer Refund</strong>.</>, en: <>Technical errors (timeout, provider 5xx, Mux crash) → <strong>automatic refund</strong>.</>, es: <>Errores técnicos (tiempo de espera, proveedor 5xx, fallo de Mux) → <strong>reembolso automático</strong>.</> })}
+              <span className="text-emerald-500">✓</span> {tx({ de: <>{"Technische Fehler (Timeout, Provider 5xx, Mux-Crash) →"}<strong>automatischer Refund</strong>.</>, en: <>Technical errors (timeout, provider 5xx, Mux crash) → <strong>automatic refund</strong>.</>, es: <>Errores técnicos (tiempo de espera, proveedor 5xx, fallo de Mux) → <strong>reembolso automático</strong>.</> })}
             </li>
             <li>
               <span className="text-destructive">✗</span> {tx({ de: 'Im Preview bestätigte Ergebnisse (Framing, Style, Face-Drift) → kein automatischer Refund.', en: 'Results confirmed in the preview (framing, style, face drift) → no automatic refund.', es: 'Resultados confirmados en la vista previa (encuadre, estilo, deriva facial) → sin reembolso automático.' })}

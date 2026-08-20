@@ -91,7 +91,7 @@ export function BrandKitHeroHeader({ brandKitCount, onCreateNew }: BrandKitHeroH
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full backdrop-blur-xl bg-primary/10 border border-primary/20">
                 <Paintbrush className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium">
-                  {brandKitCount} {brandKitCount === 1 ? "Set" : "Sets"} erstellt
+                  {brandKitCount} {brandKitCount === 1 ? "Set" : "Sets"} {tx({ de: 'erstellt', en: 'created', es: 'creados' })}
                 </span>
               </div>
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full backdrop-blur-xl bg-accent/10 border border-accent/20">

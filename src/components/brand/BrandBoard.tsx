@@ -97,7 +97,7 @@ export function BrandBoard({ brandKit }: BrandBoardProps) {
                 <img src={brandKit.logo_url} alt="Logo" className="w-10 h-10 rounded-full object-cover" />
               )}
               <div>
-                <p className="font-semibold">{brandKit.brand_name || "Deine Marke"}</p>
+                <p className="font-semibold">{brandKit.brand_name || tx({ de: "Deine Marke", en: "Your Brand", es: "Tu marca" })}</p>
                 <p className="text-xs text-muted-foreground">{tx({ de: 'Gesponsert', en: 'Sponsored', es: 'Patrocinado' })}</p>
               </div>
             </div>
@@ -109,7 +109,7 @@ export function BrandBoard({ brandKit }: BrandBoardProps) {
                 background: `linear-gradient(135deg, ${brandKit.color_palette.primary}, ${brandKit.color_palette.accent})`
               }}
             >
-              {brandKit.brand_name || "Deine Marke"}
+              {brandKit.brand_name || tx({ de: "Deine Marke", en: "Your Brand", es: "Tu marca" })}
             </div>
 
             {/* Caption */}

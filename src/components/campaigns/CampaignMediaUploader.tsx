@@ -52,7 +52,7 @@ export function CampaignMediaUploader({
       const isVideo = file.type.startsWith('video/');
       
       if (!isImage && !isVideo) {
-        toast.error(tr({ de: tx({ de: `${file.name} ist kein Bild oder Video`, en: `${file.name} is not an image or video`, es: `${file.name} no es una imagen ni un vídeo` }), en: `${file.name} is not an image or video`, es: `${file.name} no es una imagen ni un video` }));
+        toast.error(tr({ de: `${file.name} ist kein Bild oder Video`, en: `${file.name} is not an image or video`, es: `${file.name} no es una imagen ni un video` }));
         return;
       }
 
@@ -107,7 +107,7 @@ export function CampaignMediaUploader({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium">
-          Medien für Kampagne hochladen (optional)
+          {tx({ de: 'Medien für Kampagne hochladen (optional)', en: 'Upload media for campaign (optional)', es: 'Subir medios para la campaña (opcional)' })}
         </label>
         <span className="text-xs text-muted-foreground">
           {uploadedMedia.length}/{maxFiles}
@@ -134,7 +134,7 @@ export function CampaignMediaUploader({
             {tx({ de: "Bilder & Videos hochladen", en: "Upload images & videos", es: "Subir imágenes y videos" })}
           </p>
           <p className="text-xs text-muted-foreground">
-            Bis zu {maxFiles} Dateien • Max. 1GB pro Datei
+            Bis zu {maxFiles} {tx({ de: "Dateien • Max. 1GB pro Datei", en: "Files • Max. 1GB per file", es: "Archivos • Máx. 1GB por archivo" })}
           </p>
         </label>
       </Card>

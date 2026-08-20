@@ -91,7 +91,7 @@ const m = (
 
 // Reused caps
 const T2V = cap("Text→Video", "Text→Video", "Texto→Vídeo");
-const I2V = cap("Image→Video", tx({ de: "Bild→Video", en: "Image→Video", es: "Imagen→Vídeo" }), "Imagen→Vídeo");
+const I2V = cap("Image→Video", "Bild→Video", "Imagen→Vídeo");
 const V2V = cap("Video→Video", "Video→Video", "Vídeo→Vídeo");
 const P1080 = cap("1080p", "1080p", "1080p");
 const NATIVE_LIP = cap("Native Lip-Sync", "Native Lip-Sync", "Lip-Sync Nativo");
@@ -100,7 +100,7 @@ const DIR = cap("Director Ctrl", "Regie-Ctrl", "Ctrl. Director");
 const FAST = cap("Fast", "Schnell", "Rápido");
 const KEYS = cap("Keyframes", "Keyframes", "Keyframes");
 const MULTIREF = cap("Multi-Ref", "Multi-Ref", "Multi-Ref");
-const T2I = cap("Text→Image", tx({ de: "Text→Bild", en: "Text→Image", es: "Texto→Imagen" }), "Texto→Imagen");
+const T2I = cap("Text→Image", "Text→Bild", "Texto→Imagen");
 const EDIT = cap("Edit", "Edit", "Editar");
 const INPAINT = cap("Inpaint", "Inpaint", "Inpaint");
 const UPS4 = cap("4× Upscale", "4× Upscale", "Escalado 4×");
@@ -122,7 +122,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Kling Omni", "Kling Omni", "Kling Omni"],
     [
       "Native lip-sync in the model itself — no post-sync needed.",
-      tx({ de: "Natives Lip-Sync direkt im Modell — kein Nachsyncen mehr.", en: "Native lip-sync directly in the model — no more re-syncing.", es: "Sincronización labial nativa directamente en el modelo, sin necesidad de volver a sincronizar." }),
+      "Natives Lip-Sync direkt im Modell — kein Nachsyncen mehr.",
       "Lip-sync nativo dentro del propio modelo — sin post-sync.",
     ],
     [T2V, I2V, NATIVE_LIP, P1080],
@@ -132,7 +132,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["OpenAI Sora 2", "OpenAI Sora 2", "OpenAI Sora 2"],
     [
       "Photoreal storytelling with deep prompt understanding.",
-      tx({ de: "Fotorealistisches Storytelling mit tiefem Prompt-Verständnis.", en: "Photorealistic storytelling with deep prompt understanding.", es: "Narración fotorrealista con una comprensión rápida y profunda." }),
+      "Fotorealistisches Storytelling mit tiefem Prompt-Verständnis.",
       "Narrativa fotorrealista con comprensión profunda del prompt.",
     ],
     [T2V, I2V, P1080],
@@ -142,7 +142,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Google Veo 3.1 Pro", "Google Veo 3.1 Pro", "Google Veo 3.1 Pro"],
     [
       "Google flagship — cinematic quality with tight controls.",
-      tx({ de: "Googles Flaggschiff — cinematisch mit präziser Kontrolle.", en: "Google's flagship - cinematic with precise control.", es: "El buque insignia de Google: cinematográfico con control preciso." }),
+      "Googles Flaggschiff — cinematisch mit präziser Kontrolle.",
       "Buque insignia de Google — calidad cinematográfica.",
     ],
     [T2V, I2V, P1080],
@@ -152,7 +152,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Veo 3.1 Fast", "Veo 3.1 Fast", "Veo 3.1 Fast"],
     [
       "Speed-tuned Veo for rapid iteration.",
-      tx({ de: "Auf Geschwindigkeit optimiertes Veo für schnelle Iterationen.", en: "Veo optimized for speed for rapid iterations.", es: "Veo optimizado para velocidad para iteraciones rápidas." }),
+      "Auf Geschwindigkeit optimiertes Veo für schnelle Iterationen.",
       "Veo optimizado para iteración rápida.",
     ],
     [T2V, FAST, P1080],
@@ -162,7 +162,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Wan 2.6 Pro", "Wan 2.6 Pro", "Wan 2.6 Pro"],
     [
       "Native 1080p cinematic frames with strong physics.",
-      tx({ de: "Native 1080p Kino-Frames mit starker Physik.", en: "Native 1080p cinematic frames with strong physics.", es: "Fotogramas cinematográficos nativos de 1080p con física sólida." }),
+      "Native 1080p Kino-Frames mit starker Physik.",
       "Fotogramas cinematográficos 1080p con física sólida.",
     ],
     [T2V, I2V, P1080],
@@ -172,7 +172,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Wan 2.6", "Wan 2.6", "Wan 2.6"],
     [
       "Balanced 1080p generation for everyday production.",
-      tx({ de: "Ausbalancierte 1080p-Generation für den Produktionsalltag.", en: "Balanced 1080p generation for everyday production.", es: "Generación equilibrada de 1080p para la producción diaria." }),
+      "Ausbalancierte 1080p-Generation für den Produktionsalltag.",
       "Generación 1080p equilibrada para producción diaria.",
     ],
     [T2V, P1080],
@@ -182,7 +182,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Luma Ray 2 Pro", "Luma Ray 2 Pro", "Luma Ray 2 Pro"],
     [
       "Photoreal lighting with advanced camera control.",
-      tx({ de: "Fotorealistisches Licht mit Kamera-Kontrolle.", en: "Photorealistic light with camera control.", es: "Luz fotorrealista con control de cámara." }),
+      "Fotorealistisches Licht mit Kamera-Kontrolle.",
       "Iluminación fotorrealista con control de cámara.",
     ],
     [T2V, I2V, CAM],
@@ -192,7 +192,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Hailuo 2.3 Pro", "Hailuo 2.3 Pro", "Hailuo 2.3 Pro"],
     [
       "Director-grade character control.",
-      tx({ de: "Regie-Kontrolle auf Studio-Niveau.", en: "Studio-level directorial control.", es: "Control de dirección a nivel de estudio." }),
+      "Regie-Kontrolle auf Studio-Niveau.",
       "Control de personajes al nivel de un director.",
     ],
     [T2V, I2V, DIR],
@@ -202,7 +202,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Seedance 2.0 Mini", "Seedance 2.0 Mini", "Seedance 2.0 Mini"],
     [
       "Fast, expressive motion at value pricing.",
-      tx({ de: "Schnelle, ausdrucksstarke Bewegung zum Sparpreis.", en: "Fast, expressive movement at a bargain price.", es: "Movimiento rápido y expresivo a un precio de ganga." }),
+      "Schnelle, ausdrucksstarke Bewegung zum Sparpreis.",
       "Movimiento rápido y expresivo a precio reducido.",
     ],
     [T2V, FAST],
@@ -212,7 +212,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Seedance 2 Pro", "Seedance 2 Pro", "Seedance 2 Pro"],
     [
       "Pro-tier motion and character expression.",
-      tx({ de: "Pro-Motion und Charakter-Ausdruck.", en: "Pro-motion and character expression.", es: "Pro-movimiento y expresión de personajes." }),
+      "Pro-Motion und Charakter-Ausdruck.",
       "Movimiento y expresión a nivel Pro.",
     ],
     [T2V, I2V],
@@ -222,7 +222,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Veo 3.1 Lite", "Veo 3.1 Lite", "Veo 3.1 Lite"],
     [
       "Cost-efficient Veo tier at 720p.",
-      tx({ de: "Kosteneffiziente Veo-Stufe mit 720p.", en: "Cost-effective Veo tier at 720p.", es: "Nivel Veo rentable a 720p." }),
+      "Kosteneffiziente Veo-Stufe mit 720p.",
       "Nivel Veo económico a 720p.",
     ],
     [T2V, FAST],
@@ -232,7 +232,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Grok Imagine", "Grok Imagine", "Grok Imagine"],
     [
       "xAI's expressive video model with distinctive style.",
-      tx({ de: "xAIs ausdrucksstarkes Video-Modell mit unverkennbarem Stil.", en: "xAI's expressive video model with distinctive style.", es: "El modelo de vídeo expresivo de xAI con un estilo distintivo." }),
+      "xAIs ausdrucksstarkes Video-Modell mit unverkennbarem Stil.",
       "Modelo expresivo de xAI con estilo distintivo.",
     ],
     [T2V, I2V],
@@ -242,7 +242,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Kling 3.0", "Kling 3.0", "Kling 3.0"],
     [
       "Flagship Kling with best motion & physics.",
-      tx({ de: "Kling-Flaggschiff mit bester Bewegung & Physik.", en: "Sound flagship with the best movement and physics.", es: "Sonido insignia con el mejor movimiento y física." }),
+      "Kling-Flaggschiff mit bester Bewegung & Physik.",
       "Buque insignia Kling con mejor movimiento y física.",
     ],
     [T2V, I2V, V2V, P1080],
@@ -252,7 +252,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Kling 2.6", "Kling 2.6", "Kling 2.6"],
     [
       "Refined Kling generation with tight controls.",
-      tx({ de: "Verfeinerte Kling-Generation mit präziser Kontrolle.", en: "Refined sound generation with precise control.", es: "Generación de sonido refinada con control preciso." }),
+      "Verfeinerte Kling-Generation mit präziser Kontrolle.",
       "Kling refinado con controles precisos.",
     ],
     [T2V, I2V, P1080],
@@ -262,7 +262,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Kling 2.5 Turbo", "Kling 2.5 Turbo", "Kling 2.5 Turbo"],
     [
       "Speed-tuned Kling for rapid drafts.",
-      tx({ de: "Geschwindigkeitsoptimiertes Kling für schnelle Drafts.", en: "Speed-optimized sound for quick drafts.", es: "Sonido de velocidad optimizada para borradores rápidos." }),
+      "Geschwindigkeitsoptimiertes Kling für schnelle Drafts.",
       "Kling optimizado para bocetos rápidos.",
     ],
     [T2V, FAST],
@@ -272,7 +272,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Pika 2.2 Pro", "Pika 2.2 Pro", "Pika 2.2 Pro"],
     [
       "Start-/end-frame control for tight cuts.",
-      tx({ de: "Start-/End-Frame-Kontrolle für präzise Schnitte.", en: "Start/end frame control for precise cuts.", es: "Control de inicio/final del marco para cortes precisos." }),
+      "Start-/End-Frame-Kontrolle für präzise Schnitte.",
       "Control de fotograma inicio/fin para cortes precisos.",
     ],
     [I2V, KEYS],
@@ -282,7 +282,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Pika 2.2", "Pika 2.2", "Pika 2.2"],
     [
       "Reliable everyday I2V with keyframe control.",
-      tx({ de: "Zuverlässiges I2V mit Keyframe-Kontrolle.", en: "Reliable I2V with keyframe control.", es: "I2V confiable con control de fotogramas clave." }),
+      "Zuverlässiges I2V mit Keyframe-Kontrolle.",
       "I2V fiable con control por keyframes.",
     ],
     [I2V, KEYS],
@@ -292,7 +292,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Vidu Q2 Reference", "Vidu Q2 Reference", "Vidu Q2 Reference"],
     [
       "Multi-reference for character consistency.",
-      tx({ de: "Multi-Referenz für Charakter-Konsistenz.", en: "Multi-reference for character consistency.", es: "Multireferencia para la consistencia del personaje." }),
+      "Multi-Referenz für Charakter-Konsistenz.",
       "Multi-referencia para consistencia de personajes.",
     ],
     [MULTIREF, I2V],
@@ -302,7 +302,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Vidu Q2 I2V", "Vidu Q2 I2V", "Vidu Q2 I2V"],
     [
       "Image-to-video with reference locking.",
-      tx({ de: "Bild-zu-Video mit Referenz-Lock.", en: "Image-to-video with reference lock.", es: "Imagen a video con bloqueo de referencia." }),
+      "Bild-zu-Video mit Referenz-Lock.",
       "Imagen a vídeo con anclaje de referencia.",
     ],
     [I2V, MULTIREF],
@@ -312,7 +312,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Runway Gen-4 Aleph", "Runway Gen-4 Aleph", "Runway Gen-4 Aleph"],
     [
       "Premium video-to-video specialist.",
-      tx({ de: "Premium-Spezialist für Video-zu-Video.", en: "Premium video-to-video specialist.", es: "Especialista premium de video a video." }),
+      "Premium-Spezialist für Video-zu-Video.",
       "Especialista premium en vídeo a vídeo.",
     ],
     [V2V],
@@ -322,7 +322,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["LTX Pro", "LTX Pro", "LTX Pro"],
     [
       "Studio LTX quality at practical costs.",
-      tx({ de: "Studio-LTX-Qualität zu praktikablen Kosten.", en: "Studio LTX quality at practical costs.", es: "Calidad de estudio LTX a costes prácticos." }),
+      "Studio-LTX-Qualität zu praktikablen Kosten.",
       "Calidad LTX estudio a coste práctico.",
     ],
     [T2V, I2V],
@@ -332,7 +332,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["HappyHorse 1.1 Pro", "HappyHorse 1.1 Pro", "HappyHorse 1.1 Pro"],
     [
       "Cost-efficient T2V & I2V for high volume.",
-      tx({ de: "Kosteneffizientes T2V & I2V für Volumen-Produktion.", en: "Cost-effective T2V & I2V for volume production.", es: "T2V e I2V rentables para producción en volumen." }),
+      "Kosteneffizientes T2V & I2V für Volumen-Produktion.",
       "T2V e I2V rentables para gran volumen.",
     ],
     [T2V, I2V, FAST],
@@ -344,7 +344,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Gemini 3 Pro Image", "Gemini 3 Pro Image", "Gemini 3 Pro Image"],
     [
       "Google's next-gen image generation with typography-grade text.",
-      tx({ de: "Googles Next-Gen-Bild-Generation mit sauberer Typo.", en: "Google's next-gen image generation with clean typography.", es: "Generación de imágenes de próxima generación de Google con tipografía limpia." }),
+      "Googles Next-Gen-Bild-Generation mit sauberer Typo.",
       "Nueva generación de imágenes de Google con tipografía nítida.",
     ],
     [T2I, EDIT],
@@ -354,7 +354,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Nano Banana 2", "Nano Banana 2", "Nano Banana 2"],
     [
       "Fast Gemini image generation & precise editing.",
-      tx({ de: "Schnelle Gemini-Bild-Generation & präzises Editing.", en: "Fast Gemini image generation & precise editing.", es: "Generación rápida de imágenes Gemini y edición precisa." }),
+      "Schnelle Gemini-Bild-Generation & präzises Editing.",
       "Generación rápida y edición precisa con Gemini.",
     ],
     [T2I, EDIT, FAST],
@@ -364,7 +364,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Gemini 3.1 Flash Image", "Gemini 3.1 Flash Image", "Gemini 3.1 Flash Image"],
     [
       "Ultra-fast image editing at pro quality.",
-      tx({ de: "Ultraschnelles Bild-Editing in Pro-Qualität.", en: "Ultra-fast, pro-quality image editing.", es: "Edición de imágenes ultrarrápida y de calidad profesional." }),
+      "Ultraschnelles Bild-Editing in Pro-Qualität.",
       "Edición de imágenes ultrarrápida a calidad pro.",
     ],
     [T2I, EDIT, FAST],
@@ -384,7 +384,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Clarity Upscaler", "Clarity Upscaler", "Clarity Upscaler"],
     [
       "Up to 4× sharper, no detail loss.",
-      tx({ de: "Bis zu 4× schärfer, ohne Detailverlust.", en: "Up to 4x sharper, without loss of detail.", es: "Hasta 4 veces más nítido, sin pérdida de detalle." }),
+      "Bis zu 4× schärfer, ohne Detailverlust.",
       "Hasta 4× más nítido, sin pérdida de detalle.",
     ],
     [UPS4],
@@ -394,7 +394,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Style Reference", "Style Reference", "Referencia de Estilo"],
     [
       "Lock your brand look across renders.",
-      tx({ de: "Fixiere deinen Brand-Look über alle Renders.", en: "Fix your brand look across all renders.", es: "Fija el aspecto de tu marca en todos los renders." }),
+      "Fixiere deinen Brand-Look über alle Renders.",
       "Fija el look de marca en todos los renders.",
     ],
     [STYLE, CONS],
@@ -406,7 +406,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Google Lyria 3 Pro", "Google Lyria 3 Pro", "Google Lyria 3 Pro"],
     [
       "Cinematic music generation from Google DeepMind.",
-      tx({ de: "Cinematische Musik-Generation von Google DeepMind.", en: "Cinematic music generation by Google DeepMind.", es: "Generación de música cinematográfica por Google DeepMind." }),
+      "Cinematische Musik-Generation von Google DeepMind.",
       "Generación musical cinematográfica de Google DeepMind.",
     ],
     [MUSIC, SFX],
@@ -416,7 +416,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["ElevenLabs Music v2", "ElevenLabs Music v2", "ElevenLabs Music v2"],
     [
       "Song-length tracks with lyrics & vocals.",
-      tx({ de: "Track-lange Songs mit Lyrics & Vocals.", en: "Track-long songs with lyrics & vocals.", es: "Canciones de larga duración con letras y voces." }),
+      "Track-lange Songs mit Lyrics & Vocals.",
       "Pistas completas con letras y voces.",
     ],
     [MUSIC, VOCAL],
@@ -426,7 +426,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["MiniMax Music 1.5", "MiniMax Music 1.5", "MiniMax Music 1.5"],
     [
       "Vocal tracks with AI-written lyrics.",
-      tx({ de: "Vocal-Tracks mit KI-geschriebenen Lyrics.", en: "Vocal tracks with AI-written lyrics.", es: "Pistas vocales con letras escritas por IA." }),
+      "Vocal-Tracks mit KI-geschriebenen Lyrics.",
       "Pistas vocales con letras escritas por IA.",
     ],
     [VOCAL, MUSIC],
@@ -456,7 +456,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Voice Studio Clone", "Voice Studio Klon", "Clon Voice Studio"],
     [
       "Clone your own voice from a WhatsApp note.",
-      tx({ de: "Klone deine eigene Stimme aus einer WhatsApp-Notiz.", en: "Clone your own voice from a WhatsApp note.", es: "Clona tu propia voz desde una nota de WhatsApp." }),
+      "Klone deine eigene Stimme aus einer WhatsApp-Notiz.",
       "Clona tu propia voz desde una nota de WhatsApp.",
     ],
     [CLONE, VOICE],
@@ -478,7 +478,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Brand Character Lock", "Brand-Character-Lock", "Anclaje de Personaje"],
     [
       "Persistent characters across every studio.",
-      tx({ de: "Persistente Charaktere über alle Studios hinweg.", en: "Persistent characters across all studios.", es: "Personajes persistentes en todos los estudios." }),
+      "Persistente Charaktere über alle Studios hinweg.",
       "Personajes persistentes en todos los estudios.",
     ],
     [CONS],
@@ -488,7 +488,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Cast & World", "Cast & World", "Cast & World"],
     [
       "Your cast, wardrobe and locations — reusable everywhere.",
-      tx({ de: "Cast, Wardrobe und Locations — überall wiederverwendbar.", en: "Cast, wardrobe and locations — reusable everywhere.", es: "Elenco, vestuario y localizaciones: reutilizables en todas partes." }),
+      "Cast, Wardrobe und Locations — überall wiederverwendbar.",
       "Reparto, vestuario y localizaciones reutilizables.",
     ],
     [CONS, MULTIREF],

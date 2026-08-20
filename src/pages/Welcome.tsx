@@ -12,19 +12,19 @@ import { FounderStatusCard } from "@/components/founders/FounderStatusCard";
 
 const copy = {
   de: {
-    eyebrow: tx({ de: "Zahlung bestätigt", en: "Payment confirmed", es: "Pago confirmado" }),
+    eyebrow: "Zahlung bestätigt",
     title: "Willkommen in deinem Studio",
-    sub: tx({ de: "Ein Creator. Ein ganzes Studio. Ab jetzt läuft alles auf deinem Konto — Skript, Stimmen, Charaktere, Schnitt und Export.", en: "One Creator. One entire studio. From now on, everything runs on your account — script, voices, characters, editing, and export.", es: "Un Creador. Un estudio completo. A partir de ahora, todo funciona en tu cuenta — guion, voces, personajes, edición y exportación." }),
+    sub: "Ein Creator. Ein ganzes Studio. Ab jetzt läuft alles auf deinem Konto — Skript, Stimmen, Charaktere, Schnitt und Export.",
     unlocked: "Ab sofort freigeschaltet",
     items: [
-      tx({ de: "Autopilot: von der Idee bis zum fertigen Clip", en: "Autopilot: from the idea to the finished clip", es: "Piloto automático: de la idea al clip terminado" }),
-      tx({ de: "Cast & World: eigene Charaktere mit fester Identität", en: "Cast & World: own characters with a fixed identity", es: "Cast & World: personajes propios con una identidad fija" }),
-      tx({ de: "Lip-Sync in Deutsch, Englisch und Spanisch", en: "Lip sync in German, English and Spanish", es: "Sincronización labial en alemán, inglés y español." }),
-      tx({ de: "Director's Cut: Schnitt, Untertitel, Musik, Export in 1080p", en: "Director's Cut: editing, subtitles, music, 1080p export", es: "Director's Cut: edición, subtítulos, música, exportación a 1080p" }),
+      "Autopilot: von der Idee bis zum fertigen Clip",
+      "Cast & World: eigene Charaktere mit fester Identität",
+      "Lip-Sync in Deutsch, Englisch und Spanisch",
+      "Director's Cut: Schnitt, Untertitel, Musik, Export in 1080p",
     ],
     cta: "Ersten Clip bauen",
     secondary: "Abo & Rechnungen ansehen",
-    note: tx({ de: "Deine Rechnung liegt in deinem Postfach und jederzeit unter Abrechnung bereit.", en: "Your invoice is in your inbox and available anytime under Billing.", es: "Tu factura está en tu bandeja de entrada y disponible en cualquier momento en Facturación." }),
+    note: "Deine Rechnung liegt in deinem Postfach und jederzeit unter Abrechnung bereit.",
   },
   en: {
     eyebrow: "Payment confirmed",

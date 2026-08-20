@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { tx } from "@/lib/i18nText";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -6,7 +7,6 @@ import { TrendingUp, AlertCircle, CheckCircle, Trophy, Target } from "lucide-rea
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
 
 interface ConsistencyScoreProps {
   score: number;
@@ -129,7 +129,7 @@ export function ConsistencyScore({ score, brandKit }: ConsistencyScoreProps) {
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="text-xs">{check.content_type}</Badge>
                     <span className="text-xs text-muted-foreground">
-                      {format(new Date(check.analyzed_at), 'dd.MM.', { locale: de })}
+                      {format(new Date(check.analyzed_at), 'dd.MM.', { locale: dateFnsLocale() })}
                     </span>
                   </div>
                   <span className={`font-semibold ${

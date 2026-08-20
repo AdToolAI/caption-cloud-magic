@@ -110,7 +110,7 @@ export default function SceneStillFrameStudio({
     onPick(url);
     toast.success(
       language === 'de'
-        ? tx({ de: tx({ de: 'Als Referenz-Frame gesetzt', en: 'Set as reference frame', es: 'Establecido como fotograma de referencia' }), en: 'Set as reference frame', es: 'Establecido como fotograma de referencia' })
+        ? tx({ de: 'Als Referenz-Frame gesetzt', en: 'Set as reference frame', es: 'Establecido como fotograma de referencia' })
         : language === 'es'
         ? 'Establecido como fotograma de referencia'
         : 'Set as reference frame',

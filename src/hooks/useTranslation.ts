@@ -33,8 +33,15 @@ export const useTranslationState = () => {
   });
 
   const setLanguage = (lang: Language) => {
+    const previous = localStorage.getItem('adtool-ai-lang');
     setLanguageState(lang);
     localStorage.setItem('adtool-ai-lang', lang);
+    // Some module-scope display constants resolve their language once at module
+    // evaluation time. Reloading on an explicit switch guarantees the whole UI
+    // renders in the newly selected language instead of a stale mix.
+    if (previous && previous !== lang) {
+      window.setTimeout(() => window.location.reload(), 150);
+    }
     // Persist for server-side copy (emails, cron jobs) — best effort.
     void (async () => {
       try {

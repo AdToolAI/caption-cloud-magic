@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { History, MessageCircle, Trash2, ChevronLeft, Loader2 } from 'lucide-react';
@@ -5,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
-import { de } from 'date-fns/locale';
 import { tx } from '@/lib/i18nText';
 
 interface Conversation {
@@ -151,7 +151,7 @@ export function ConversationHistory({
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {formatDistanceToNow(new Date(conv.updated_at), { 
                         addSuffix: true, 
-                        locale: de 
+                        locale: dateFnsLocale() 
                       })}
                     </p>
                   </div>

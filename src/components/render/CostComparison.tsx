@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -35,7 +36,7 @@ export const CostComparison = ({ remotionCost, shotstackCost }: CostComparisonPr
             </div>
             <Progress value={remotionPercent} className="h-2" />
             <div className="text-xs text-muted-foreground mt-1">
-              {remotionPercent.toFixed(1)}% der Gesamtkosten
+              {remotionPercent.toFixed(1)}{tx({ de: "% der Gesamtkosten", en: "% of total cost", es: "% del coste total" })}
             </div>
           </div>
 
@@ -49,16 +50,16 @@ export const CostComparison = ({ remotionCost, shotstackCost }: CostComparisonPr
             </div>
             <Progress value={shotstackPercent} className="h-2" />
             <div className="text-xs text-muted-foreground mt-1">
-              {shotstackPercent.toFixed(1)}% der Gesamtkosten
+              {shotstackPercent.toFixed(1)}% {tx({ de: 'der Gesamtkosten', en: 'of total cost', es: 'del coste total' })}
             </div>
           </div>
 
           <div className="pt-4 border-t">
             <div className="flex items-center justify-center gap-2 text-sm">
-              <span className="text-muted-foreground">{cheaperOption} ist</span>
+              <span className="text-muted-foreground">{cheaperOption} {tx({ de: 'ist', en: 'is', es: 'es' })}</span>
               <Badge variant="default" className="flex items-center gap-1">
                 <ArrowRight className="w-3 h-3" />
-                {savings} Credits günstiger
+                {savings} {tx({ de: 'Credits günstiger', en: 'credits cheaper', es: 'créditos más barato' })}
               </Badge>
             </div>
           </div>

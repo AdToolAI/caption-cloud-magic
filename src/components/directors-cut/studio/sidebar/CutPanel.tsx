@@ -463,7 +463,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                   ? 'EDL rekonstruiert'
                   : composerLockSource === 'sceneGeometry-fallback'
                     ? 'Geometrie'
-                    : 'Nur Dauern'}{' '}
+                    : tx({ de: "Nur Dauern", en: "Only durations", es: "Solo duraciones" })}{' '}
               · {composerLockSceneCount} {tx({ de: 'Szenen', en: 'scenes', es: 'escenas' })}
             </span>
           </div>

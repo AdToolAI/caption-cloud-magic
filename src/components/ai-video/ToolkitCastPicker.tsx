@@ -268,7 +268,7 @@ function CharacterPicker({
               className="text-xs text-primary hover:underline inline-flex items-center gap-1"
               onClick={() => setOpen(false)}
             >
-              {language === 'de' ? 'Zur Library' : 'Open library'}
+              {language === 'de' ? tx({ de: "Zur Library", en: "To Library", es: "A la biblioteca" }) : 'Open library'}
               <ExternalLink className="h-3 w-3" />
             </Link>
           </div>
@@ -325,7 +325,7 @@ function LocationPicker({
           className="w-full justify-start gap-2 h-9 border-dashed"
         >
           <Plus className="h-3.5 w-3.5" />
-          {language === 'de' ? 'Location wählen' : language === 'es' ? 'Elegir ubicación' : 'Pick location'}
+          {language === 'de' ? tx({ de: "Location wählen", en: "Select location", es: "Seleccionar ubicación" }) : language === 'es' ? 'Elegir ubicación' : 'Pick location'}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-2 max-h-[300px] overflow-y-auto" align="start">
@@ -343,7 +343,7 @@ function LocationPicker({
               className="text-xs text-primary hover:underline inline-flex items-center gap-1"
               onClick={() => setOpen(false)}
             >
-              {language === 'de' ? 'Zur Library' : 'Open library'}
+              {language === 'de' ? tx({ de: "Zur Library", en: "To Library", es: "A la biblioteca" }) : 'Open library'}
               <ExternalLink className="h-3 w-3" />
             </Link>
           </div>

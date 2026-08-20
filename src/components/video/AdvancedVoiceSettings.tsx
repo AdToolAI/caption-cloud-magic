@@ -78,7 +78,7 @@ export const AdvancedVoiceSettings = ({ onSettingsChange }: AdvancedVoiceSetting
               step={0.05}
             />
             <p className="text-xs text-muted-foreground">
-              Höhere Werte = konsistentere Stimme, niedrigere Werte = mehr Variation
+              {tx({ de: "Höhere Werte = konsistentere Stimme, niedrigere Werte = mehr Variation", en: "Higher values = more consistent voice, lower values = more variation", es: "Valores más altos = voz más consistente, valores más bajos = más variación" })}
             </p>
           </div>
 

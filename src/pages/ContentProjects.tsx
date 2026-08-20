@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,6 @@ import { Download, Play, RefreshCw, Loader2, Film, Clock, CheckCircle2, XCircle 
 import { useTranslation } from "@/hooks/useTranslation";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
 import { SEO } from "@/components/SEO";
 
 export default function ContentProjects() {
@@ -138,10 +138,10 @@ export default function ContentProjects() {
         {/* Filter Tabs */}
         <Tabs value={selectedStatus} onValueChange={setSelectedStatus} className="w-full">
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="all">Alle ({statusCounts.all})</TabsTrigger>
-            <TabsTrigger value="completed">Fertig ({statusCounts.completed})</TabsTrigger>
+            <TabsTrigger value="all">{tx({ de: 'Alle', en: 'All', es: 'Todos' })} ({statusCounts.all})</TabsTrigger>
+            <TabsTrigger value="completed">{tx({ de: 'Fertig', en: 'Done', es: 'Listo' })} ({statusCounts.completed})</TabsTrigger>
             <TabsTrigger value="rendering">Rendering ({statusCounts.rendering})</TabsTrigger>
-            <TabsTrigger value="draft">Entwürfe ({statusCounts.draft})</TabsTrigger>
+            <TabsTrigger value="draft">{tx({ de: 'Entwürfe', en: 'Drafts', es: 'Borradores' })} ({statusCounts.draft})</TabsTrigger>
             <TabsTrigger value="failed">{tx({ de: "Fehler", en: "Failed", es: "Error" })} ({statusCounts.failed})</TabsTrigger>
           </TabsList>
 
@@ -176,7 +176,7 @@ export default function ContentProjects() {
                           {getStatusBadge(project.status)}
                         </div>
                         <CardDescription>
-                          {format(new Date(project.created_at), "PPP", { locale: de })}
+                          {format(new Date(project.created_at), "PPP", { locale: dateFnsLocale() })}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-2">

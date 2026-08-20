@@ -9,7 +9,6 @@ import { useAutopilotNotifications, type AutopilotNotification } from '@/hooks/u
 import { useAutopilotQueue, useApproveSlot, useSkipSlot, type AutopilotSlot } from '@/hooks/useAutopilot';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
-import { de } from 'date-fns/locale';
 import { uiLocale } from '@/lib/uiLocale';
 
 interface Props {
@@ -179,7 +178,7 @@ function NotificationRow({ n, onClick }: { n: AutopilotNotification; onClick: ()
         </div>
         {n.message && <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{n.message}</p>}
         <p className="text-[10px] text-muted-foreground mt-1">
-          {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: de })}
+          {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: dateFnsLocale() })}
         </p>
       </div>
     </button>

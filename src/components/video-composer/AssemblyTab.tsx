@@ -641,7 +641,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
                       }}
                     >
                       <Scissors className="h-4 w-4" />
-                      In Director's Cut öffnen
+                      {tx({ de: 'In Director\'s Cut öffnen', en: 'Open in Director\'s Cut', es: 'Abrir en Director\'s Cut' })}
                     </Button>
                   )}
                   <Button asChild size="sm" className="gap-2">

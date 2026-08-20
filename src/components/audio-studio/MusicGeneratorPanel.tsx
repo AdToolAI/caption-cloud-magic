@@ -202,7 +202,7 @@ export function MusicGeneratorPanel({
               {tx({ de: "Generiere Studio-Qualität Musik", en: "Generate Studio Quality Music", es: "Generar música con calidad de estudio" })}
             </h2>
             <p className="text-sm text-muted-foreground">
-              Beschreibe deinen Sound. KI komponiert Tracks mit eingebauten Sänger-Stimmen; eigene Stimmen sind für gesprochene Voiceovers verfügbar.
+              {tx({ de: "Beschreibe deinen Sound. KI komponiert Tracks mit eingebauten Sänger-Stimmen; eigene Stimmen sind für gesprochene Voiceovers verfügbar.", en: "Describe your sound. AI composes tracks with built-in singer voices; custom voices are available for spoken voiceovers.", es: "Describe tu sonido. La IA compone pistas con voces de cantantes incorporadas; las voces personalizadas están disponibles para locuciones habladas." })}
             </p>
           </div>
 

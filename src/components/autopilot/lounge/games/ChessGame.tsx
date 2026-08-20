@@ -16,8 +16,15 @@ const GLYPH: Record<string, string> = {
 
 const VALUE: Record<string, number> = { p: 1, n: 3, b: 3.2, r: 5, q: 9, k: 0 };
 
-type Level = string;
-const DEPTH: Record<Level, number> = {  [tx({ de: 'leicht', en: 'easy', es: 'fácil' })]: 0, [tx({ de: 'mittel', en: 'medium', es: 'medio' })]: 1, [tx({ de: 'schwer', en: 'hard', es: 'difícil' })]: 2  };
+// Stable semantic level IDs — translation is display-only (LEVEL_LABELS).
+type Level = 'easy' | 'medium' | 'hard';
+const LEVELS: Level[] = ['easy', 'medium', 'hard'];
+const DEPTH: Record<Level, number> = { easy: 0, medium: 1, hard: 2 };
+const LEVEL_LABELS: Record<Level, { de: string; en: string; es: string }> = {
+  easy: { de: 'leicht', en: 'easy', es: 'fácil' },
+  medium: { de: 'mittel', en: 'medium', es: 'medio' },
+  hard: { de: 'schwer', en: 'hard', es: 'difícil' },
+};
 
 function evaluate(game: Chess): number {
   // Positiv = gut für Schwarz (die KI spielt Schwarz).
@@ -71,7 +78,7 @@ export default function ChessGame() {
   const [game] = useState(() => new Chess());
   const [fen, setFen] = useState(game.fen());
   const [from, setFrom] = useState<Square | null>(null);
-  const [level, setLevel] = useState<string>(tx({ de: 'mittel', en: 'medium', es: 'medio' }));
+  const [level, setLevel] = useState<Level>('medium');
   const [thinking, setThinking] = useState(false);
 
   const board = useMemo(() => new Chess(fen).board(), [fen]);
@@ -123,7 +130,7 @@ export default function ChessGame() {
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 text-xs">
         <div className="flex gap-1">
-          {([tx({ de: 'leicht', en: 'easy', es: 'fácil' }), tx({ de: 'mittel', en: 'medium', es: 'medio' }), tx({ de: 'schwer', en: 'hard', es: 'difícil' })]).map((l) => (
+          {LEVELS.map((l) => (
             <button
               key={l}
               type="button"
@@ -135,7 +142,7 @@ export default function ChessGame() {
                   : 'border-border/50 text-muted-foreground hover:text-foreground',
               )}
             >
-              {l}
+              {tx(LEVEL_LABELS[l])}
             </button>
           ))}
         </div>

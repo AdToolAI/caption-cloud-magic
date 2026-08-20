@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
@@ -8,7 +9,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ArrowDown, ArrowUp, Clock, History, Sparkles } from "lucide-react";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
 
 interface Transaction {
   id: string;
@@ -177,7 +177,7 @@ export const CreditHistory = () => {
                         className="border-white/5 hover:bg-white/5 transition-colors"
                       >
                         <TableCell className="text-sm text-muted-foreground">
-                          {format(new Date(tx.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}
+                          {format(new Date(tx.created_at), 'dd.MM.yyyy HH:mm', { locale: dateFnsLocale() })}
                         </TableCell>
                         <TableCell className="text-sm font-medium">
                           {getFeatureLabel(tx.feature_code)}

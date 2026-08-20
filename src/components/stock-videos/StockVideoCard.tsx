@@ -116,7 +116,7 @@ export function StockVideoCard({
           <button
             onClick={(e) => { e.stopPropagation(); onToggleFavorite(video); }}
             className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center hover:bg-black/80 transition-colors"
-            title={isFavorite ? "Aus Favoriten entfernen" : tx({ de: "Zu Favoriten hinzufügen", en: "Add to favorites", es: "Añadir a favoritos" })}
+            title={isFavorite ? tx({ de: "Aus Favoriten entfernen", en: "Remove from Favorites", es: "Quitar de favoritos" }) : tx({ de: "Zu Favoriten hinzufügen", en: "Add to favorites", es: "Añadir a favoritos" })}
           >
             <Heart className={cn("h-3.5 w-3.5", isFavorite ? "fill-red-500 text-red-500" : "text-white")} />
           </button>

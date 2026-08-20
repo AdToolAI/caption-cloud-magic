@@ -131,11 +131,11 @@ export function SpeakerMappingBar({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Users className="h-4 w-4 text-primary" />
-          Multi-Speaker Modus
-          <Badge variant="secondary" className="ml-2">{speakers.length} Stimmen</Badge>
+          {tx({ de: 'Multi-Speaker Modus', en: 'Multi-speaker mode', es: 'Modo multi-hablante' })}
+          <Badge variant="secondary" className="ml-2">{speakers.length} {tx({ de: 'Stimmen', en: 'voices', es: 'voces' })}</Badge>
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Erkannt aus deinem Skript. Wähle pro Sprecher Engine + Stimme. Mische ElevenLabs (Library) mit Hume Octave (emotional, oft natürlicher).
+          {tx({ de: 'Erkannt aus deinem Skript. Wähle pro Sprecher Engine + Stimme. Mische ElevenLabs (Library) mit Hume Octave (emotional, oft natürlicher).', en: 'Detected from your script. Pick an engine + voice per speaker. Mix ElevenLabs (library) with Hume Octave (emotional, often more natural).', es: 'Detectado desde tu guion. Elige motor + voz por hablante. Combina ElevenLabs (biblioteca) con Hume Octave (emocional, a menudo más natural).' })}
         </p>
       </CardHeader>
       <CardContent className="space-y-3">

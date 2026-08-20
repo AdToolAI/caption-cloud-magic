@@ -534,7 +534,7 @@ export const TimelineScriptEditor = ({
                         <SelectItem value="-1">{tx({ de: "Kein Bild", en: "No picture", es: "Sin imagen" })}</SelectItem>
                         {mediaUrls.map((url, index) => (
                           <SelectItem key={index} value={index.toString()}>
-                            Bild {index + 1}
+                            {tx({ de: "Bild", en: "Image", es: "Imagen" })} {index + 1}
                           </SelectItem>
                         ))}
                       </SelectContent>

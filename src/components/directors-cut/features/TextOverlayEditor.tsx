@@ -414,7 +414,7 @@ export function TextOverlayEditor({
                     size="sm"
                     onClick={() => updateOverlayStyle(selectedOverlay.id, { shadow: !selectedOverlay.style.shadow })}
                   >
-                    {selectedOverlay.style.shadow ? 'An' : 'Aus'}
+                    {selectedOverlay.style.shadow ? 'An' : tx({ de: "Aus", en: "Off", es: "Desactivado" })}
                   </Button>
                 </div>
               </motion.div>

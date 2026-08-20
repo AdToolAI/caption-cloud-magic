@@ -164,11 +164,11 @@ const pushCopy: Record<string, { title: string; desc: string; label: string; sub
   },
   de: {
     title: "Push-Erinnerungen",
-    desc: tx({ de: "Browser-Push-Benachrichtigungen in deiner ersten Woche.", en: "Browser push notifications in your first week.", es: "Notificaciones push del navegador en tu primera semana." }),
+    desc: "Browser-Push-Benachrichtigungen in deiner ersten Woche.",
     label: "Push-Erinnerungen erhalten",
-    sublabel: tx({ de: "Bis zu 3 kurze Erinnerungen (Tag 1, 3, 7). Push-Berechtigung erforderlich.", en: "Up to 3 short reminders (Day 1, 3, 7). Push permission required.", es: "Hasta 3 recordatorios cortos (Día 1, 3, 7). Se requiere permiso de inserción." }),
-    saved: tx({ de: "Einstellungen aktualisiert", en: "Settings updated", es: "Configuraciones actualizadas" }),
-    error: tx({ de: "Einstellungen konnten nicht aktualisiert werden", en: "Could not update settings", es: "No se pudieron actualizar los ajustes" }),
+    sublabel: "Bis zu 3 kurze Erinnerungen (Tag 1, 3, 7). Push-Berechtigung erforderlich.",
+    saved: "Einstellungen aktualisiert",
+    error: "Einstellungen konnten nicht aktualisiert werden",
   },
   es: {
     title: "Recordatorios push",
@@ -258,11 +258,11 @@ const dripCopy: Record<string, { title: string; desc: string; label: string; sub
   },
   de: {
     title: "E-Mail-Erinnerungen",
-    desc: tx({ de: "Onboarding-Tipps in deiner ersten Woche.", en: "Onboarding tips in your first week.", es: "Consejos de incorporación en tu primera semana." }),
+    desc: "Onboarding-Tipps in deiner ersten Woche.",
     label: "Onboarding-Erinnerungen erhalten",
-    sublabel: tx({ de: "Bis zu 3 hilfreiche E-Mails (Tag 1, 3, 7) für deinen Start.", en: "Up to 3 helpful emails (day 1, 3, 7) to get you started.", es: "Hasta 3 correos electrónicos útiles (días 1, 3, 7) para empezar." }),
-    saved: tx({ de: "Einstellungen aktualisiert", en: "Settings updated", es: "Configuraciones actualizadas" }),
-    error: tx({ de: "Einstellungen konnten nicht aktualisiert werden", en: "Could not update settings", es: "No se pudieron actualizar los ajustes" }),
+    sublabel: "Bis zu 3 hilfreiche E-Mails (Tag 1, 3, 7) für deinen Start.",
+    saved: "Einstellungen aktualisiert",
+    error: "Einstellungen konnten nicht aktualisiert werden",
   },
   es: {
     title: "Recordatorios por correo",
@@ -347,9 +347,9 @@ const restartCopy: Record<string, { title: string; desc: string; cta: string; to
   },
   de: {
     title: "Produkt-Tour",
-    desc: tx({ de: "Starte die geführte Onboarding-Tour erneut, um die Plattform neu zu entdecken.", en: "Restart the guided onboarding tour to rediscover the platform.", es: "Reinicia el tour guiado para redescubrir la plataforma." }),
-    cta: tx({ de: "Tour erneut starten", en: "Restart tour", es: "Reiniciar tour" }),
-    toast: tx({ de: "Tour startet auf dem Dashboard", en: "Tour starts on the dashboard", es: "El recorrido comienza en el tablero." }),
+    desc: "Starte die geführte Onboarding-Tour erneut, um die Plattform neu zu entdecken.",
+    cta: "Tour erneut starten",
+    toast: "Tour startet auf dem Dashboard",
   },
   es: {
     title: "Tour del producto",

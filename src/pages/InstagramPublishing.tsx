@@ -257,7 +257,7 @@ export default function InstagramPublishing() {
         const backupMsg = data.backup_created ? tx({ de: " Backup erstellt.", en: " Backup created.", es: " Copia de seguridad creada." }) : "";
         toast({
           title: tx({ de: "Erfolg!", en: "Success!", es: "¡Éxito!" }),
-          description: tx({ de: `${tx({ de: "Token erfolgreich erneuert und gespeichert!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, en: `${tx({ de: "Token successfully renewed and saved!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, es: `${tx({ de: "¡Token renovado y guardado exitosamente!", en: "¡Token renovado y guardado exitosamente!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}` }),
+          description: tx({ de: `${"Token erfolgreich erneuert und gespeichert!"}${backupMsg}`, en: `${"Token successfully renewed and saved!"}${backupMsg}`, es: `${"¡Token renovado y guardado correctamente!"}${backupMsg}` }),
         });
         
         // Automatically refresh diagnostics after successful save
@@ -1065,7 +1065,7 @@ export default function InstagramPublishing() {
                   <Alert variant="destructive" className="mt-4">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription className="text-xs">
-                      <strong>{tx({ de: "Achtung:", en: "Attention:", es: "Atención:" })}</strong> {tx({ de: "User Token Modus benötigt die Permission", en: "User token mode requires permission", es: "El modo token de usuario requiere permiso" })} <code>pages_show_list</code>. Falls dieser Fehler auftritt, verwende stattdessen einen Page Token (Option 1).
+                      <strong>{tx({ de: "Achtung:", en: "Attention:", es: "Atención:" })}</strong> {tx({ de: "User Token Modus benötigt die Permission", en: "User token mode requires permission", es: "El modo token de usuario requiere permiso" })} <code>pages_show_list</code>{tx({ de: ". Falls dieser Fehler auftritt, verwende stattdessen einen Page Token (Option 1).", en: ". If this error occurs, use a Page Token instead (Option 1).", es: ". Si ocurre este error, usa un Page Token en su lugar (Opción 1)." })}
                     </AlertDescription>
                   </Alert>
                 </CardContent>
@@ -1086,7 +1086,7 @@ export default function InstagramPublishing() {
                 className="font-mono text-xs"
               />
               <p className="text-xs text-muted-foreground">
-                ℹ️ Dieser Token wird {tokenTypeChoice === "page" ? tx({ de: "direkt in einen Long-Lived Page Token umgewandelt", en: "converted directly into a long-lived page token", es: "convertido directamente en un token de página de larga duración" }) : tx({ de: "verwendet, um einen Long-Lived Page Token zu generieren", en: "used to generate a long-lived page token", es: "utilizado para generar un token de página de larga duración" })} und nicht gespeichert.
+                {tx({ de: "ℹ️ Dieser Token wird", en: "ℹ️ This token will", es: "ℹ️ Este token se" })} {tokenTypeChoice === "page" ? tx({ de: "direkt in einen Long-Lived Page Token umgewandelt", en: "converted directly into a long-lived page token", es: "convertido directamente en un token de página de larga duración" }) : tx({ de: "verwendet, um einen Long-Lived Page Token zu generieren", en: "used to generate a long-lived page token", es: "utilizado para generar un token de página de larga duración" })} {tx({ de: "und nicht gespeichert.", en: "and not saved.", es: "y no guardado." })}
               </p>
             </div>
 
@@ -1220,7 +1220,7 @@ export default function InstagramPublishing() {
                     <Alert className="mt-3 border-orange-500">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription className="text-xs">
-                        <strong>💡 Tipp:</strong> {tx({ de: "Dieser Fehler tritt oft auf, wenn", en: "This error often occurs when", es: "Este error ocurre a menudo cuando" })} <code>pages_show_list</code> {tx({ de: "fehlt. Verwende stattdessen einen", en: "missing. Use one instead", es: "desaparecido. Utilice uno en su lugar" })} <strong>Page Token</strong> (Option 1 oben) - das ist einfacher!
+                        <strong>💡 Tipp:</strong> {tx({ de: "Dieser Fehler tritt oft auf, wenn", en: "This error often occurs when", es: "Este error ocurre a menudo cuando" })} <code>pages_show_list</code> {tx({ de: "fehlt. Verwende stattdessen einen", en: "missing. Use one instead", es: "desaparecido. Utilice uno en su lugar" })} <strong>Page Token</strong> {tx({ de: "(Option 1 oben) - das ist einfacher!", en: "(Option 1 above) - that's easier!", es: "(Opción 1 arriba) - ¡es más fácil!" })}
                       </AlertDescription>
                     </Alert>
                   )}

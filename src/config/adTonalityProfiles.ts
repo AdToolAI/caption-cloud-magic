@@ -126,7 +126,7 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
       de: [
         'Es begann an einem Mittwoch im November...',
         'Ich erinnere mich an den Geruch...',
-        tx({ de: "Damals, als alles noch einfacher schien...", en: "Back when everything seemed simpler...", es: "Cuando todo parecía más simple..." }),
+        "Damals, als alles noch einfacher schien...",
       ],
       en: [
         'It began on a Wednesday in November...',
@@ -165,9 +165,9 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     },
     hookPatterns: {
       de: [
-        tx({ de: "73 % der Befragten sagen...", en: "73% of respondents say...", es: "El 73% de los encuestados dice..." }),
-        tx({ de: "Im April 2024 entschied sich Maria, alles zu ändern.", en: "In April 2024, Maria decided to change everything.", es: "En abril de 2024, María decidió cambiarlo todo." }),
-        tx({ de: "Das hier ist keine Werbung. Das hier ist passiert.", en: "This is not an ad. This happened.", es: "Esto no es un anuncio. Esto pasó." }),
+        "73 % der Befragten sagen...",
+        "Im April 2024 entschied sich Maria, alles zu ändern.",
+        "Das hier ist keine Werbung. Das hier ist passiert.",
       ],
       en: [
         '73% of those surveyed say...',
@@ -206,9 +206,9 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     },
     hookPatterns: {
       de: [
-        tx({ de: "Weil Mittwoch der neue Freitag ist.", en: "Because Wednesday is the new Friday.", es: "Porque el miércoles es el nuevo viernes." }),
-        tx({ de: "Spoiler: Es schmeckt nicht nach Brokkoli.", en: "Spoiler: It doesn't taste like broccoli.", es: "Spoiler: No sabe a brócoli." }),
-        tx({ de: "Klein. Aber nicht so klein, wie deine Geduld.", en: "Small. But not as small as your patience.", es: "Pequeño. Pero no tan pequeño como tu paciencia." }),
+        "Weil Mittwoch der neue Freitag ist.",
+        "Spoiler: Es schmeckt nicht nach Brokkoli.",
+        "Klein. Aber nicht so klein, wie deine Geduld.",
       ],
       en: [
         'Because Wednesday is the new Friday.',
@@ -247,9 +247,9 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     },
     hookPatterns: {
       de: [
-        tx({ de: "Wir wissen, wie sich das anfühlt.", en: "We know how that feels.", es: "Sabemos cómo se siente eso." }),
-        tx({ de: "Du bist nicht allein damit.", en: "You are not alone.", es: "No estás solo con eso." }),
-        tx({ de: "Manche Tage sind schwerer als andere.", en: "Some days are harder than others.", es: "Algunos días son más difíciles que otros." }),
+        "Wir wissen, wie sich das anfühlt.",
+        "Du bist nicht allein damit.",
+        "Manche Tage sind schwerer als andere.",
       ],
       en: [
         'We know how that feels.',
@@ -288,9 +288,9 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     },
     hookPatterns: {
       de: [
-        tx({ de: "Was wäre, wenn alles möglich wäre?", en: "What if everything was possible?", es: "¿Y si todo fuera posible?" }),
-        tx({ de: "Stell dir eine Welt vor, in der...", en: "Imagine a world where...", es: "Imagina un mundo donde..." }),
-        tx({ de: "Die Zukunft beginnt nicht morgen.", en: "The future doesn't start tomorrow.", es: "El futuro no empieza mañana." }),
+        "Was wäre, wenn alles möglich wäre?",
+        "Stell dir eine Welt vor, in der...",
+        "Die Zukunft beginnt nicht morgen.",
       ],
       en: [
         'What if everything were possible?',
@@ -329,9 +329,9 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     },
     hookPatterns: {
       de: [
-        tx({ de: "In drei Schritten zum Ergebnis.", en: "Results in three steps.", es: "Resultados en tres pasos." }),
+        "In drei Schritten zum Ergebnis.",
         'So funktioniert es. Wirklich.',
-        tx({ de: "Brauchst du nur 60 Sekunden.", en: "You only need 60 seconds.", es: "Solo necesitas 60 segundos." }),
+        "Brauchst du nur 60 Sekunden.",
       ],
       en: ['Three steps to the result.', 'How it works. Really.', "It only takes 60 seconds."],
       es: ['Tres pasos al resultado.', 'Cómo funciona. De verdad.', 'Solo 60 segundos.'],
@@ -362,9 +362,9 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     },
     hookPatterns: {
       de: [
-        tx({ de: "Vergiss alles, was du wusstest.", en: "Forget everything you knew.", es: "Olvida todo lo que sabías." }),
-        tx({ de: "Wir sind die Schlechten. Aber wir liefern.", en: "We are the bad guys. But we deliver.", es: "Somos los malos. Pero cumplimos." }),
-        tx({ de: "Sicherheit ist überbewertet.", en: "Safety is overrated.", es: "La seguridad está sobrevalorada." }),
+        "Vergiss alles, was du wusstest.",
+        "Wir sind die Schlechten. Aber wir liefern.",
+        "Sicherheit ist überbewertet.",
       ],
       en: [
         'Forget everything you knew.',
@@ -432,8 +432,8 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     },
     hookPatterns: {
       de: [
-        tx({ de: "Klinisch geprüft seit 1987.", en: "Clinically tested since 1987.", es: "Clínicamente probado desde 1987." }),
-        tx({ de: "Drei unabhängige Studien. Ein Ergebnis.", en: "Three independent studies. One result.", es: "Tres estudios independientes. Un resultado." }),
+        "Klinisch geprüft seit 1987.",
+        "Drei unabhängige Studien. Ein Ergebnis.",
         'Wir messen, was andere versprechen.',
       ],
       en: [
@@ -474,8 +474,8 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     hookPatterns: {
       de: [
         'Gemeinsam machen wir den Tag bunter.',
-        tx({ de: "Heute ist ein guter Tag, oder?", en: "Today is a good day, isn't it?", es: "Hoy es un buen día, ¿verdad?" }),
-        tx({ de: "Lass uns lächeln. Aus einem Grund.", en: "Let's smile. For a reason.", es: "Sonriamos. Por una razón." }),
+        "Heute ist ein guter Tag, oder?",
+        "Lass uns lächeln. Aus einem Grund.",
       ],
       en: [
         'Together we make the day brighter.',

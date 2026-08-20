@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { Sparkles, TrendingUp, TrendingDown, Clock, Send, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useLatestWeeklyReview, useAcceptWeeklyReview, useTriggerWeeklyReview, useAutopilotBrief } from '@/hooks/useAutopilot';
 import { formatDistanceToNow, isAfter } from 'date-fns';
-import { de } from 'date-fns/locale';
 import { uiLocale } from '@/lib/uiLocale';
 
 export function AutopilotWeeklyReviewPanel() {
@@ -52,7 +51,7 @@ export function AutopilotWeeklyReviewPanel() {
                   : tx({ de: `Bitte bis ${deadline.toLocaleString(uiLocale(), { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC bestätigen`, en: `Please confirm by ${deadline.toLocaleString('en-US', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC`, es: `Confirma antes de ${deadline.toLocaleString('es-ES', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC` })}
               </div>
               <div className="text-xs text-muted-foreground">
-                {deadline && !deadlinePassed && `Noch ${formatDistanceToNow(deadline, { locale: de })}`}
+                {deadline && !deadlinePassed && `Noch ${formatDistanceToNow(deadline, { locale: dateFnsLocale() })}`}
               </div>
             </div>
           </div>
@@ -74,7 +73,7 @@ export function AutopilotWeeklyReviewPanel() {
         <Card className="p-4">
           <div className="text-xs text-muted-foreground mb-1">Credits</div>
           <div className="text-2xl font-serif text-primary">{review.credits_spent}</div>
-          <div className="text-xs text-muted-foreground">von {review.credits_budgeted} Budget</div>
+          <div className="text-xs text-muted-foreground">{tx({ de: "von", en: "of", es: "de" })} {review.credits_budgeted} Budget</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground mb-1">Top-Pillar</div>

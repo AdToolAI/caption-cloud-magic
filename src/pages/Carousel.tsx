@@ -165,7 +165,7 @@ const Carousel = () => {
         setActiveVariant("A");
       }
       
-      toast.success(`Carousel ${isVariantB ? "Variante B" : ""} erfolgreich erstellt!`);
+      toast.success(`${tx({ de: "Carousel", en: "Carousel", es: "Carrusel" })} ${isVariantB ? tx({ de: "Variante B", en: "Variant B", es: "Variante B" }) : ""} ${tx({ de: "erfolgreich erstellt!", en: "created successfully!", es: "¡creado con éxito!" })}`);
 
       // Save to database
       await supabase.from("carousel_projects").insert({
@@ -363,7 +363,7 @@ const Carousel = () => {
                     className="min-h-[200px] mt-2"
                   />
                   <p className="text-sm text-muted-foreground mt-1">
-                    {text.length}/2500 Zeichen
+                    {text.length}{tx({ de: "/2500 Zeichen", en: "/2500 characters", es: "/2500 caracteres" })}
                   </p>
                 </div>
 

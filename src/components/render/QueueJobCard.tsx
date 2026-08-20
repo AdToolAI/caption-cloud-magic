@@ -1,10 +1,10 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { QueueJob, useRenderQueue } from '@/hooks/useRenderQueue';
 import { Clock, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { de } from 'date-fns/locale';
 import { tx } from "@/lib/i18nText";
 
 interface QueueJobCardProps {
@@ -64,7 +64,7 @@ export const QueueJobCard = ({ job, onUpdate }: QueueJobCardProps) => {
               <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                 <span>{job.estimated_cost} {tx({ de: "Credits", en: "Credits", es: "Créditos" })}</span>
                 <span>•</span>
-                <span>{formatDistanceToNow(new Date(job.created_at), { addSuffix: true, locale: de })}</span>
+                <span>{formatDistanceToNow(new Date(job.created_at), { addSuffix: true, locale: dateFnsLocale() })}</span>
               </div>
             </div>
           </div>

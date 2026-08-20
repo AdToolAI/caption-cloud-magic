@@ -842,7 +842,7 @@ export function UniversalVideoWizard() {
             <div className="max-w-2xl mx-auto space-y-6">
               <div className="text-center mb-6">
                 <h2 className="text-2xl font-bold mb-2 text-[#F5C76A]">
-                  {language === 'de' ? 'Produktbilder hochladen' : language === 'es' ? 'Subir imágenes del producto' : tx({ de: 'Upload Product Images', en: 'Upload product images', es: 'Subir imágenes de productos' })}
+                  {language === 'de' ? tx({ de: "Produktbilder hochladen", en: "Upload product images", es: "Subir imágenes de producto" }) : language === 'es' ? 'Subir imágenes del producto' : tx({ de: 'Upload Product Images', en: 'Upload product images', es: 'Subir imágenes de productos' })}
                 </h2>
                 <p className="text-muted-foreground">
                   {language === 'de' 
@@ -866,7 +866,7 @@ export function UniversalVideoWizard() {
                   className="px-8 py-3 rounded-xl font-semibold text-black bg-gradient-to-r from-[#F5C76A] to-amber-500 hover:shadow-[0_0_30px_rgba(245,199,106,0.4)] transition-all duration-300 disabled:opacity-50"
                 >
                   {isUploadingImages 
-                    ? (language === 'de' ? 'Wird hochgeladen...' : 'Uploading...') 
+                    ? (language === 'de' ? tx({ de: "Wird hochgeladen...", en: "Uploading...", es: "Cargando..." }) : 'Uploading...') 
                     : (language === 'de' ? tx({ de: `Weiter mit ${productImages.length} Bildern`, en: `Continue with ${productImages.length} images`, es: `Continuar con ${productImages.length} imágenes` }) : `Continue with ${productImages.length} images`)}
                 </Button>
               </div>

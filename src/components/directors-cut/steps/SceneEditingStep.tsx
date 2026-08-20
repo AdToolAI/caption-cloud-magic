@@ -767,7 +767,7 @@ export function SceneEditingStep({
         <div>
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <Scissors className="h-5 w-5 text-primary" />
-            Szenen-Editor
+            {tx({ de: "Szenen-Editor", en: "Scene Editor", es: "Editor de escenas" })}
           </h3>
           <p className="text-sm text-muted-foreground">
             {tx({ de: 'Bearbeite Szenen und konfiguriere Übergänge visuell', en: 'Edit scenes and configure transitions visually', es: 'Edita escenas y configura transiciones visualmente' })}
@@ -791,7 +791,7 @@ export function SceneEditingStep({
               className="text-xs border-orange-500/50 text-orange-600 hover:bg-orange-500/10"
             >
               <Undo2 className="h-3.5 w-3.5 mr-1.5" />
-              Rückgängig ({deletedScenes.length})
+              {tx({ de: 'Rückgängig', en: 'Undo', es: 'Deshacer' })} ({deletedScenes.length})
             </Button>
           )}
           <Button
@@ -818,7 +818,7 @@ export function SceneEditingStep({
             className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
           >
             <Wand2 className="h-3.5 w-3.5 mr-1.5" />
-            AI Übergänge
+            {tx({ de: 'AI Übergänge', en: 'AI transitions', es: 'Transiciones IA' })}
           </Button>
           <Button
             onClick={() => setShowRemixDialog(true)}
@@ -846,8 +846,8 @@ export function SceneEditingStep({
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                   {[
                     { key: '← →', action: tx({ de: 'Szene wechseln', en: 'Change scene', es: 'cambiar de escena' }) },
-                    { key: 'T', action: 'Transition öffnen' },
-                    { key: '1-6', action: 'Transition wählen' },
+                    { key: 'T', action: tx({ de: 'Transition öffnen', en: 'Open transition', es: 'Abrir transición' }) },
+                    { key: '1-6', action: tx({ de: 'Transition wählen', en: 'Choose transition', es: 'Elegir transición' }) },
                     { key: 'ESC', action: tx({ de: 'Schließen', en: 'Close', es: 'Cerrar' }) },
                     { key: '?', action: tx({ de: 'Hilfe ein/aus', en: 'Help on/off', es: 'Ayuda activada/desactivada' }) },
                     { key: 'Space', action: 'Play/Pause' },
@@ -1216,7 +1216,7 @@ export function SceneEditingStep({
                       <div className="mb-4">
                         <div className="flex items-center gap-2 mb-2">
                           <Lightbulb className="h-4 w-4 text-yellow-500" />
-                          <span className="text-xs font-medium">AI Vorschläge</span>
+                          <span className="text-xs font-medium">{tx({ de: 'AI Vorschläge', en: 'AI suggestions', es: 'Sugerencias IA' })}</span>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {selectedScene.ai_suggestions.map((suggestion, i) => (

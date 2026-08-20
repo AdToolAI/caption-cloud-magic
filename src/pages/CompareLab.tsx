@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { tx } from "@/lib/i18nText";
 // Compare Lab — Standalone Page
 //
@@ -13,7 +14,6 @@ import CompareLabGrid from '@/components/compare-lab/CompareLabGrid';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatDistanceToNow } from 'date-fns';
-import { de } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
 interface RunHistoryItem {
@@ -124,7 +124,7 @@ export default function CompareLab() {
                         </div>
                       )}
                       <div className="text-[10px] text-muted-foreground">
-                        {formatDistanceToNow(new Date(h.created_at), { addSuffix: true, locale: de })}
+                        {formatDistanceToNow(new Date(h.created_at), { addSuffix: true, locale: dateFnsLocale() })}
                       </div>
                     </CardContent>
                   </Card>

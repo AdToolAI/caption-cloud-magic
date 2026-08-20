@@ -66,7 +66,7 @@ describe('English UI purity', () => {
     // Short, high-traffic German UI labels that must never appear bare.
     const banned =
       /(?<![\w-])(Abbrechen|Speichern|Löschen|Bearbeiten|Herunterladen|Hochladen|Entfernen|Zurücksetzen|Übernehmen|Verwerfen|Fehlgeschlagen|Erfolgreich|Einstellungen|Hinzufügen|Schriftart)(?![\w-])/;
-    const langBranch = /(tx\(|t\(\s*language|useTranslation|i18nText|\bde:\s|\bes:\s|language\s*===|lang\s*===)/;
+    const langBranch = /(tx\(|t\(\s*language|useTranslation|i18nText|\bde:\s|\bes:\s|\bde:\s*\{|\bes:\s*\{|language\s*===|lang\s*===)/;
     const offenders: string[] = [];
     for (const file of FILES) {
       const src = fs.readFileSync(file, 'utf8');
@@ -75,7 +75,9 @@ describe('English UI purity', () => {
         const trimmed = line.trim();
         if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) return;
         if (!banned.test(line)) return;
-        const context = lines.slice(Math.max(0, idx - 2), idx + 2).join('\n');
+        // Look further back so literals inside an explicit `de: {` / `es: {`
+        // dictionary branch are not treated as bare labels.
+        const context = lines.slice(Math.max(0, idx - 60), idx + 2).join('\n');
         if (langBranch.test(line) || langBranch.test(context)) return;
         offenders.push(`${path.relative(SRC, file)}:${idx + 1}: ${trimmed.slice(0, 100)}`);
       });

@@ -112,7 +112,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
           </div>
           <CardTitle className="text-2xl">{tx({ de: "Marken-Identität erstellen", en: "Create Brand Identity", es: "Crear Identidad de Marca" })}</CardTitle>
           <CardDescription>
-            Schritt {step} von {totalSteps}
+            Schritt {step} {tx({ de: "von", en: "of", es: "de" })} {totalSteps}
           </CardDescription>
           <Progress value={progress} className="mt-2" />
         </CardHeader>

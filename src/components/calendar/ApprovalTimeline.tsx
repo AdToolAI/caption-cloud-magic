@@ -1,10 +1,10 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { tx } from '@/lib/i18nText';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
-import { de } from 'date-fns/locale';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
 
 interface ApprovalTimelineProps {
@@ -91,7 +91,7 @@ export function ApprovalTimeline({ event_id }: ApprovalTimelineProps) {
                   <span className="text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(approval.created_at), {
                       addSuffix: true,
-                      locale: de,
+                      locale: dateFnsLocale(),
                     })}
                   </span>
                 </div>

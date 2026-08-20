@@ -1,3 +1,4 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -5,7 +6,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { de } from "date-fns/locale";
 
 interface LiveEvent {
   id: string;
@@ -121,7 +121,7 @@ export function LiveEventFeed() {
                   <div className="text-xs text-muted-foreground whitespace-nowrap ml-2">
                     {formatDistanceToNow(new Date(event.occurred_at), {
                       addSuffix: true,
-                      locale: de,
+                      locale: dateFnsLocale(),
                     })}
                   </div>
                 </div>

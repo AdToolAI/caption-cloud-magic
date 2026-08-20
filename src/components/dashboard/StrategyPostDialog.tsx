@@ -1,9 +1,9 @@
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CalendarPlus, Trash2, Lightbulb, Clock } from "lucide-react";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
 import type { StrategyPost } from "@/hooks/useStrategyMode";
 import { tx } from '@/lib/i18nText';
 
@@ -18,7 +18,7 @@ interface Props {
 export function StrategyPostDialog({ open, onOpenChange, post, onDismiss, onAddToCalendar }: Props) {
   if (!post) return null;
 
-  const dateLabel = format(new Date(post.scheduled_at), "EEEE, d. MMM 'um' HH:mm", { locale: de });
+  const dateLabel = format(new Date(post.scheduled_at), "EEEE, d. MMM 'um' HH:mm", { locale: dateFnsLocale() });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -1,3 +1,4 @@
+import { de as dfDe, enUS as dfEn, es as dfEs } from 'date-fns/locale';
 import { getLang } from '@/lib/i18nText';
 import { useTranslation } from '@/hooks/useTranslation';
 import type { Language } from '@/lib/translations';
@@ -26,4 +27,16 @@ export function uiLocale(): string {
 export function useUiLocale(): string {
   const { language } = useTranslation();
   return localeForLanguage(language);
+}
+
+/**
+ * date-fns locale object for the currently selected UI language.
+ * Keeps relative/absolute date strings in the user's language instead of
+ * hardcoding German.
+ */
+export function dateFnsLocale(language?: Language | string | null) {
+  const lang = (language ?? getLang()) as Language;
+  if (lang === 'de') return dfDe;
+  if (lang === 'es') return dfEs;
+  return dfEn;
 }

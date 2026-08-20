@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { tx } from "@/lib/i18nText";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -198,7 +199,7 @@ export function PreviewTabs({
               caption={caption}
               hook={hooks?.A}
               hashtags={hashtags?.reach || []}
-              profileName={draft.brand_name || "Ihr Profil"}
+              profileName={draft.brand_name || tx({ de: "Ihr Profil", en: "Your Profile", es: "Tu perfil" })}
               profileImage={undefined}
             />
           )}
@@ -220,7 +221,7 @@ export function PreviewTabs({
               caption={caption}
               hook={hooks?.A}
               hashtags={hashtags?.niche?.slice(0, 5) || []}
-              profileName={draft.brand_name || "Ihr Name"}
+              profileName={draft.brand_name || tx({ de: "Ihr Name", en: "Your Name", es: "Tu nombre" })}
               jobTitle="Marketing Manager"
               profileImage={undefined}
             />
@@ -231,7 +232,7 @@ export function PreviewTabs({
               mediaType={draft.media_type || mediaType || 'image'}
               caption={caption.slice(0, 280)}
               hashtags={hashtags?.reach?.slice(0, 3) || []}
-              displayName={draft.brand_name || "Ihr Name"}
+              displayName={draft.brand_name || tx({ de: "Ihr Name", en: "Your Name", es: "Tu nombre" })}
               handle={`@${draft.brand_name?.toLowerCase().replace(/\s+/g, '_') || 'ihr_handle'}`}
               profileImage={undefined}
               verified={false}

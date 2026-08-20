@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { tx } from "@/lib/i18nText";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,8 +22,8 @@ export const XPostPreview = ({
   mediaType = 'image',
   caption,
   hashtags = [],
-  displayName = "Ihr Name",
-  handle = "@ihr_handle",
+  displayName = tx({ de: "Ihr Name", en: "Your name", es: "Tu nombre" }),
+  handle = tx({ de: "@ihr_handle", en: "@your_handle", es: "@tu_perfil" }),
   profileImage,
   verified = false,
 }: XPostPreviewProps) => {

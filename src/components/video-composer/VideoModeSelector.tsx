@@ -1,4 +1,3 @@
-import { tx } from "@/lib/i18nText";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Film, Image as ImageIcon, Layers, Sparkles } from 'lucide-react';
@@ -23,17 +22,17 @@ const MODES: Array<{
     icon: Film,
     badge: { label: { de: 'Premium', en: 'Premium', es: 'Premium' }, tone: 'gold' },
     title: {
-      de: tx({ de: "KI Video-Clips", en: "AI video clips", es: "Videoclips de IA" }),
-      en: tx({ de: "AI Video Clips", en: "AI video clips", es: "videoclips de IA" }),
+      de: "KI Video-Clips",
+      en: "AI video clips",
       es: 'Clips de Video IA',
     },
     desc: {
-      de: tx({ de: "Echte AI-Videoclips (Hailuo / Kling / Sora). Höchste Qualität, dynamische Bewegung.", en: "Real AI video clips (Hailuo / Kling / Sora). Top quality, dynamic motion.", es: "Clips de vídeo IA reales (Hailuo / Kling / Sora). Máxima calidad, movimiento dinámico." }),
+      de: "Echte AI-Videoclips (Hailuo / Kling / Sora). Höchste Qualität, dynamische Bewegung.",
       en: 'Real AI video clips (Hailuo / Kling / Sora). Top quality, dynamic motion.',
       es: 'Clips de video IA reales (Hailuo / Kling / Sora). Máxima calidad y movimiento dinámico.',
     },
     cost: {
-      de: tx({ de: "~€0.15 – 0.53 / Sek", en: "~€0.15 – 0.53 / sec", es: "~€0.15 – 0.53 / seg" }),
+      de: "~€0.15 – 0.53 / Sek",
       en: '~€0.15 – 0.53 / sec',
       es: '~€0.15 – 0.53 / seg',
     },
@@ -43,17 +42,17 @@ const MODES: Array<{
     icon: ImageIcon,
     badge: { label: { de: 'Günstig', en: 'Budget', es: 'Económico' }, tone: 'green' },
     title: {
-      de: tx({ de: "KI Bild-Szenen", en: "AI image scenes", es: "Escenas de imagen de IA" }),
+      de: "KI Bild-Szenen",
       en: 'AI Image Scenes',
       es: 'Escenas de Imagen IA',
     },
     desc: {
-      de: tx({ de: "Gemini-Bilder mit cineastischer Ken-Burns-Animation und Glow-Effekten. ~6× günstiger.", en: "Gemini images with cinematic Ken-Burns animation and glow effects. ~6× cheaper.", es: "Imágenes de Gemini con animación Ken-Burns cinematográfica y efectos de brillo. ~6 veces más barato." }),
+      de: "Gemini-Bilder mit cineastischer Ken-Burns-Animation und Glow-Effekten. ~6× günstiger.",
       en: 'Gemini images with cinematic Ken-Burns animation and glow effects. ~6× cheaper.',
       es: 'Imágenes de Gemini con animación Ken-Burns cinematográfica y efectos de brillo. ~6× más barato.',
     },
     cost: {
-      de: tx({ de: "~€0.05 / Szene", en: "~€0.05 / scene", es: "~€0.05 / escena" }),
+      de: "~€0.05 / Szene",
       en: '~€0.05 / scene',
       es: '~€0.05 / escena',
     },
@@ -68,12 +67,12 @@ const MODES: Array<{
       es: 'Modo Mixto',
     },
     desc: {
-      de: tx({ de: "Hero-Szenen (Hook & CTA) als Video, Rest als animierte Bilder. Beste Balance.", en: "Hero scenes (hook & CTA) as video, rest as animated images. Best balance.", es: "Escenas hero (hook y CTA) como vídeo, el resto como imágenes animadas. El mejor equilibrio." }),
+      de: "Hero-Szenen (Hook & CTA) als Video, Rest als animierte Bilder. Beste Balance.",
       en: 'Hero scenes (hook & CTA) as video, rest as animated images. Best balance.',
       es: 'Escenas hero (hook y CTA) como video, el resto como imágenes animadas. Mejor balance.',
     },
     cost: {
-      de: tx({ de: "~50 % Ersparnis", en: "~50% savings", es: "~50% de ahorro" }),
+      de: "~50 % Ersparnis",
       en: '~50% savings',
       es: '~50% de ahorro',
     },
@@ -82,13 +81,12 @@ const MODES: Array<{
 
 export default function VideoModeSelector({ value, language, onChange }: VideoModeSelectorProps) {
   const lang = (language === 'de' || language === 'es' ? language : 'en') as 'de' | 'en' | 'es';
-  const headerTitle =
-    lang === 'de' ? tx({ de: "Video-Modus", en: "Video mode", es: "Modo vídeo" }) : lang === 'es' ? tx({ de: "Modo de Video", en: "Modo de video", es: "Modo de vídeo" }) : tx({ de: "Video Mode", en: "Video fashion", es: "Vídeo moda" });
+  const headerTitle = lang === 'de' ? 'Video-Modus' : lang === 'es' ? 'Modo de vídeo' : 'Video Mode';
   const headerDesc =
     lang === 'de'
-      ? tx({ de: 'Wähle, wie deine Szenen erstellt werden — Video, animierte Bilder oder eine Mischung.', en: 'Choose how your scenes are created — video, animated images, or a mix.', es: 'Elige cómo se crean tus escenas — vídeo, imágenes animadas o una mezcla.' })
+      ? 'Wähle, wie deine Szenen erstellt werden — Video, animierte Bilder oder eine Mischung.'
       : lang === 'es'
-        ? 'Elige cómo se crean tus escenas — video, imágenes animadas o una combinación.'
+        ? 'Elige cómo se crean tus escenas — vídeo, imágenes animadas o una combinación.'
         : 'Choose how your scenes are produced — video, animated images, or a mix.';
 
   return (

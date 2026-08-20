@@ -25,22 +25,22 @@ const copy: Record<Lang, {
   proceed: string;
 }> = {
   de: {
-    title: tx({ de: "Bevor du kündigst", en: "Before you cancel", es: "Antes de cancelar" }),
-    desc: tx({ de: "Sag uns kurz, woran es liegt — ein Klick genügt. Das hilft uns, das Studio besser zu machen.", en: "Tell us briefly what the reason is — one click is enough. It helps us make the studio better.", es: "Cuéntanos brevemente el motivo — un clic es suficiente. Esto nos ayuda a mejorar el estudio." }),
+    title: "Bevor du kündigst",
+    desc: "Sag uns kurz, woran es liegt — ein Klick genügt. Das hilft uns, das Studio besser zu machen.",
     reasonsLabel: "Grund",
     reasons: [
-      { key: "too_expensive", label: tx({ de: "Zu teuer", en: "Too expensive", es: "Demasiado caro" }) },
-      { key: "not_using", label: tx({ de: "Ich nutze es zu selten", en: "I use it too rarely", es: "Lo uso muy poco" }) },
-      { key: "quality", label: tx({ de: "Ergebnisse überzeugen mich nicht", en: "Not convinced by the results", es: "No me convencen los resultados" }) },
-      { key: "missing_feature", label: tx({ de: "Eine Funktion fehlt mir", en: "A feature is missing", es: "Me falta una función" }) },
-      { key: "temporary", label: tx({ de: "Nur eine Pause", en: "Just a pause", es: "Solo una pausa" }) },
-      { key: "other", label: tx({ de: "Anderer Grund", en: "Other reason", es: "Otro motivo" }) },
+      { key: "too_expensive", label: "Zu teuer" },
+      { key: "not_using", label: "Ich nutze es zu selten" },
+      { key: "quality", label: "Ergebnisse überzeugen mich nicht" },
+      { key: "missing_feature", label: "Eine Funktion fehlt mir" },
+      { key: "temporary", label: "Nur eine Pause" },
+      { key: "other", label: "Anderer Grund" },
     ],
-    warnTitle: tx({ de: "Dein Gründer-Vorteil verfällt", en: "Your founder benefit will expire", es: "Tu beneficio de fundador caducará" }),
+    warnTitle: "Dein Gründer-Vorteil verfällt",
     warnBody:
-      tx({ de: "Mit der Kündigung verlierst du deinen dauerhaften Gründer-Rabatt von 20 %. Bei einer späteren Rückkehr gilt der reguläre Preis.", en: "By canceling, you will lose your permanent founder discount of 20%. If you return later, the regular price will apply.", es: "Al cancelar, perderás tu descuento permanente de fundador del 20%. Si regresas más tarde, se aplicará el precio regular." }),
-    stay: tx({ de: "Doch bleiben", en: "Stay after all", es: "Mejor me quedo" }),
-    proceed: tx({ de: "Weiter zur Kündigung", en: "Continue to cancellation", es: "Continuar con la cancelación" }),
+      "Mit der Kündigung verlierst du deinen dauerhaften Gründer-Rabatt von 20 %. Bei einer späteren Rückkehr gilt der reguläre Preis.",
+    stay: "Doch bleiben",
+    proceed: "Weiter zur Kündigung",
   },
   en: {
     title: "Before you cancel",

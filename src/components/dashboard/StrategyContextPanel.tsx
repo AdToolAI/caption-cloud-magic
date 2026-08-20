@@ -2,7 +2,6 @@ import { tx } from "@/lib/i18nText";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Sparkles, Lightbulb, TrendingUp, Brain, Target, Clock, Flame } from "lucide-react";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
 import type { StrategyPost, CreatorLevel } from "@/hooks/useStrategyMode";
 import { uiLocale } from '@/lib/uiLocale';
 
@@ -103,7 +102,7 @@ export function StrategyContextPanel({
           <div>
             <div className="text-[10px] text-muted-foreground uppercase">{tx({ de: "Post in der Woche", en: "Post of the week", es: "Publicación de la semana" })}</div>
             <div className="font-semibold">
-              {postIndex >= 0 ? `${postIndex + 1} von ${totalInWeek}` : `— / ${totalInWeek}`}
+              {postIndex >= 0 ? `${postIndex + 1} ${tx({ de: 'von', en: 'of', es: 'de' })} ${totalInWeek}` : `— / ${totalInWeek}`}
             </div>
             <div className="text-[11px] text-muted-foreground">{tx({ de: "Woche ab", en: "Week from", es: "Semana desde" })} {weekLabel}</div>
           </div>
@@ -142,7 +141,7 @@ export function StrategyContextPanel({
             </div>
             <div className="flex-1">
               <div className="text-sm font-semibold flex items-center gap-1.5">
-                {format(new Date(post.scheduled_at), "EEEE, HH:mm", { locale: de })}
+                {format(new Date(post.scheduled_at), "EEEE, HH:mm", { locale: dateFnsLocale() })}
                 {post.slot_score >= 85 && <Flame className="h-3.5 w-3.5 text-warning" />}
               </div>
               <div className="text-[11px] text-muted-foreground">

@@ -71,8 +71,7 @@ export function AudioDuckingPanel({
         <AudioLines className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
         <h3 className="text-lg font-semibold mb-2">{tx({ de: "Sprache + Musik benötigt", en: "Voice + music required", es: "Se requiere voz + música" })}</h3>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Lade ein Voiceover hoch <span className="text-primary">{tx({ de: "und", en: "and", es: "y" })}</span> wähle einen
-          Musik-Track (über AI Music, Beat-Sync oder die Bibliothek), um Audio Ducking zu nutzen.
+          Lade ein Voiceover hoch <span className="text-primary">{tx({ de: "und", en: "and", es: "y" })}</span> {tx({ de: "wähle einen\n          Musik-Track (über AI Music, Beat-Sync oder die Bibliothek), um Audio Ducking zu nutzen.", en: "select a\n          music track (via AI Music, Beat-Sync or the library) to use audio ducking.", es: "selecciona una\n          pista de música (a través de AI Music, Beat-Sync o la biblioteca) para usar la atenuación de audio." })}
         </p>
       </Card>
     );

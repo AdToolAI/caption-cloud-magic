@@ -44,17 +44,17 @@ interface Props {
 
 const t = {
   de: {
-    looks: tx({ de: 'Looks', en: 'Looks', es: 'Aspectos' }),
-    fine: tx({ de: 'Feintuning', en: 'Fine-tuning', es: 'Ajuste fino' }),
-    modifiers: tx({ de: 'Modifier', en: 'Modifiers', es: 'Modificadores' }),
-    activeNone: tx({ de: 'Noch kein Stil gesetzt — wähle einen Look oder feinjustiere unten.', en: 'No style set yet — choose a look or fine-tune below.', es: 'Aún no hay estilo establecido; elige un aspecto o ajústalo a continuación.' }),
-    active: tx({ de: 'Aktiv', en: 'Active', es: 'Activo' }),
-    resetAll: tx({ de: 'Alles zurücksetzen', en: 'Reset all', es: 'Restablecer todo' }),
-    preview: tx({ de: 'Vorschau', en: 'Preview', es: 'Vista previa' }),
-    previewEmpty: tx({ de: "Noch keine Cinematography gesetzt.", en: "No cinematography set yet.", es: "Aún no se ha establecido ninguna cinematografía." }),
+    looks: 'Looks',
+    fine: 'Feintuning',
+    modifiers: 'Modifier',
+    activeNone: 'Noch kein Stil gesetzt — wähle einen Look oder feinjustiere unten.',
+    active: 'Aktiv',
+    resetAll: 'Alles zurücksetzen',
+    preview: 'Vorschau',
+    previewEmpty: "Noch keine Cinematography gesetzt.",
   },
   en: {
-    looks: tx({ de: 'Looks', en: 'Looks', es: 'Aspectos' }),
+    looks: 'Looks',
     fine: 'Fine-tune',
     modifiers: 'Modifiers',
     activeNone: 'No style set yet — pick a look or fine-tune below.',
@@ -64,7 +64,7 @@ const t = {
     previewEmpty: 'No cinematography set yet.',
   },
   es: {
-    looks: tx({ de: 'Looks', en: 'Looks', es: 'Aspectos' }),
+    looks: 'Aspectos',
     fine: 'Ajuste fino',
     modifiers: 'Modificadores',
     activeNone: 'Sin estilo aún — elige un look o ajusta abajo.',

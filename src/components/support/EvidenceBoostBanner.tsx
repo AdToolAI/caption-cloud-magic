@@ -11,9 +11,9 @@ const COPY = {
   },
   de: {
     badge: "+60% schneller",
-    title: tx({ de: "Tickets mit Screenshot oder Screen-Recording werden im Schnitt 60 % schneller gelöst.", en: "Tickets with a screenshot or screen recording are resolved 60% faster on average.", es: "Los tickets con una captura de pantalla o grabación de pantalla se resuelven un 60% más rápido en promedio." }),
-    sub: tx({ de: "Ein Bild oder 30-Sek-Clip spart meist 10 Nachrichten hin und her.", en: "A picture or 30-sec clip usually saves 10 messages back and forth.", es: "Una imagen o un clip de 30 segundos suele ahorrar 10 mensajes de ida y vuelta." }),
-    urgent: tx({ de: "Ohne Visual können wir diesen Fall meist nicht reproduzieren — bitte Screenshot oder Recording anhängen.", en: "Without a visual, we usually can't reproduce this case — please attach a screenshot or recording.", es: "Sin una imagen, normalmente no podemos reproducir este caso — adjunta una captura de pantalla o grabación." }),
+    title: "Tickets mit Screenshot oder Screen-Recording werden im Schnitt 60 % schneller gelöst.",
+    sub: "Ein Bild oder 30-Sek-Clip spart meist 10 Nachrichten hin und her.",
+    urgent: "Ohne Visual können wir diesen Fall meist nicht reproduzieren — bitte Screenshot oder Recording anhängen.",
   },
   es: {
     badge: "+60% más rápido",
