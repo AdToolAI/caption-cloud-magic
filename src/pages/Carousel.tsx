@@ -165,7 +165,7 @@ const Carousel = () => {
         setActiveVariant("A");
       }
       
-      toast.success(`Carousel ${isVariantB ? "Variante B" : ""} erfolgreich erstellt!`);
+      toast.success(`${tx({ de: "Carousel", en: "Carousel", es: "Carrusel" })} ${isVariantB ? tx({ de: "Variante B", en: "Variant B", es: "Variante B" }) : ""} ${tx({ de: "erfolgreich erstellt!", en: "created successfully!", es: "¡creado con éxito!" })}`);
 
       // Save to database
       await supabase.from("carousel_projects").insert({

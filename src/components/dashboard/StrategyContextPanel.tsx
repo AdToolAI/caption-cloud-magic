@@ -102,7 +102,7 @@ export function StrategyContextPanel({
           <div>
             <div className="text-[10px] text-muted-foreground uppercase">{tx({ de: "Post in der Woche", en: "Post of the week", es: "Publicación de la semana" })}</div>
             <div className="font-semibold">
-              {postIndex >= 0 ? `${postIndex + 1} von ${totalInWeek}` : `— / ${totalInWeek}`}
+              {postIndex >= 0 ? `${postIndex + 1} ${tx({ de: 'von', en: 'of', es: 'de' })} ${totalInWeek}` : `— / ${totalInWeek}`}
             </div>
             <div className="text-[11px] text-muted-foreground">{tx({ de: "Woche ab", en: "Week from", es: "Semana desde" })} {weekLabel}</div>
           </div>

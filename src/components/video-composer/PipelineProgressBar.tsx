@@ -172,7 +172,7 @@ export default function PipelineProgressBar({
                 title={
                   syncsoSlots >= SYNCSO_MAX_SLOTS
                     ? tx({ de: 'Alle 3 Lip-Sync-Slots belegt — weitere Szenen werden eingereiht und automatisch nachgezogen.', en: 'All 3 lip-sync slots occupied — additional scenes will be queued and automatically processed.', es: 'Los 3 espacios de sincronización labial están ocupados — las escenas adicionales se pondrán en cola y se procesarán automáticamente.' })
-                    : `${syncsoSlots} von ${SYNCSO_MAX_SLOTS} Lip-Sync-Slots aktiv (parallele Lipsync-Jobs).`
+                    : `${syncsoSlots}/${SYNCSO_MAX_SLOTS} ${tx({ de: 'Lip-Sync-Slots aktiv (parallele Lipsync-Jobs).', en: 'lip-sync slots active (parallel lip-sync jobs).', es: 'espacios de lip-sync activos (trabajos paralelos de lip-sync).' })}`
                 }
               >
                 <Zap className="h-3 w-3" />

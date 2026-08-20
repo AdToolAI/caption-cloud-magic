@@ -846,8 +846,8 @@ export function SceneEditingStep({
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                   {[
                     { key: '← →', action: tx({ de: 'Szene wechseln', en: 'Change scene', es: 'cambiar de escena' }) },
-                    { key: 'T', action: 'Transition öffnen' },
-                    { key: '1-6', action: 'Transition wählen' },
+                    { key: 'T', action: tx({ de: 'Transition öffnen', en: 'Open transition', es: 'Abrir transición' }) },
+                    { key: '1-6', action: tx({ de: 'Transition wählen', en: 'Choose transition', es: 'Elegir transición' }) },
                     { key: 'ESC', action: tx({ de: 'Schließen', en: 'Close', es: 'Cerrar' }) },
                     { key: '?', action: tx({ de: 'Hilfe ein/aus', en: 'Help on/off', es: 'Ayuda activada/desactivada' }) },
                     { key: 'Space', action: 'Play/Pause' },

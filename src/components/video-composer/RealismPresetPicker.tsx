@@ -19,7 +19,7 @@ interface Props {
 
 const STRINGS = {
   trigger: 'Realismus',
-  none: 'Kein Preset',
+  none: tx({ de: 'Kein Preset', en: 'No preset', es: 'Sin preajuste' }),
   noneDesc: tx({ de: "Kein Realismus-Preset – Scene-Director arbeitet ohne Voreinstellung.", en: "No realism preset – Scene Director works without preset.", es: "Sin preajuste de realismo – Scene Director funciona sin preajuste." }),
   applyAll: tx({ de: 'Auf alle Szenen anwenden', en: 'Apply to all scenes', es: 'Aplicar a todas las escenas' }),
 };
