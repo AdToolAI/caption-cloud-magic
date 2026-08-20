@@ -54,7 +54,7 @@ export function TranscriptWaveformEditor({
         .from('audio-temp')
         .upload(tempFileName, blob, { contentType: blob.type || 'audio/mpeg' });
       
-      if (uploadError) throw new Error(`{tx({ de: "Upload fehlgeschlagen: ", en: "Upload failed: ", es: "Error de carga: " })}${uploadError.message}`);
+      if (uploadError) throw new Error(tx({ de: 'Upload fehlgeschlagen: ', en: 'Upload failed: ', es: 'Error de carga: ' }) + uploadError.message);
       
       // 3. Get public URL
       const { data: urlData } = supabase.storage

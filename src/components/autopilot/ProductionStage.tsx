@@ -82,7 +82,7 @@ export function ProductionStage({ production, scenes, log }: Props) {
         <Badge variant="outline">
           {done}/{scenes.length} {tx({ de: "Szenen", en: "Scenes", es: "Escenas" })}
         </Badge>
-        {production.status === 'failed' && <Badge variant="destructive">Abgebrochen</Badge>}
+        {production.status === 'failed' && <Badge variant="destructive">{tx({ de: 'Abgebrochen', en: 'Cancelled', es: 'Cancelado' })}</Badge>}
       </div>
 
       <Progress value={production.progress} className="mt-4" />

@@ -497,7 +497,7 @@ export function SceneEditingStep({
     } else {
       ns.splice(sIdx, 1,
         { ...affected, id: `${affected.id}-cut-a`, end_time: inT, description: `${affected.description} (vor Schnitt)` },
-        { ...affected, id: `${affected.id}-cut-b`, start_time: outT, description: `${affected.description} (nach Schnitt)` }
+        { ...affected, id: `${affected.id}-cut-b`, start_time: outT, description: `${affected.description} ${tx({ de: '(nach Schnitt)', en: '(after cut)', es: '(después del corte)' })}` }
       );
     }
     let curT = 0;
@@ -1146,7 +1146,7 @@ export function SceneEditingStep({
                                 <div className="font-mono font-medium">{originalDuration.toFixed(1)}s</div>
                               </div>
                               <div>
-                                <span className="text-muted-foreground">Aktuell</span>
+                                <span className="text-muted-foreground">{tx({ de: 'Aktuell', en: 'Current', es: 'Actual' })}</span>
                                 <div className="font-mono font-medium text-primary">{currentDuration.toFixed(1)}s</div>
                               </div>
                               <div>

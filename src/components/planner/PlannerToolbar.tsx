@@ -56,10 +56,10 @@ export function PlannerToolbar({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="1">1 Woche</SelectItem>
-              <SelectItem value="2">2 Wochen</SelectItem>
-              <SelectItem value="3">3 Wochen</SelectItem>
-              <SelectItem value="4">4 Wochen</SelectItem>
+              <SelectItem value="1">{tx({ de: '1 Woche', en: '1 week', es: '1 semana' })}</SelectItem>
+              <SelectItem value="2">{tx({ de: '2 Wochen', en: '2 weeks', es: '2 semanas' })}</SelectItem>
+              <SelectItem value="3">{tx({ de: '3 Wochen', en: '3 weeks', es: '3 semanas' })}</SelectItem>
+              <SelectItem value="4">{tx({ de: '4 Wochen', en: '4 weeks', es: '4 semanas' })}</SelectItem>
             </SelectContent>
           </Select>
         </div>

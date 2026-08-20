@@ -226,17 +226,15 @@ const FeatureFlagDemo = () => {
           {/* Info Box */}
           <Card className="bg-muted/50">
             <CardHeader>
-              <CardTitle>Über Feature Flags</CardTitle>
+              <CardTitle>{tx({ de: 'Über Feature Flags', en: 'About feature flags', es: 'Acerca de los feature flags' })}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <p className="text-sm text-muted-foreground">
                 Feature Flags ermöglichen es uns, neue Features schrittweise auszurollen und zu testen.
-                Deine Feature Flag Konfiguration wird von PostHog gesteuert und kann sich basierend auf
-                verschiedenen Faktoren ändern.
+                {tx({ de: 'Deine Feature-Flag-Konfiguration wird von PostHog gesteuert und kann sich basierend auf verschiedenen Faktoren ändern.', en: 'Your feature flag configuration is controlled by PostHog and can change based on various factors.', es: 'Tu configuración de feature flags la controla PostHog y puede cambiar según varios factores.' })}
               </p>
               <p className="text-sm text-muted-foreground">
-                <strong>Hinweis:</strong> Ein Feature kann auch inaktiv sein, wenn es noch in Entwicklung
-                ist oder nur für bestimmte Benutzergruppen freigeschaltet wurde.
+                <strong>{tx({ de: 'Hinweis:', en: 'Note:', es: 'Nota:' })}</strong> {tx({ de: 'Ein Feature kann auch inaktiv sein, wenn es noch in Entwicklung ist oder nur für bestimmte Benutzergruppen freigeschaltet wurde.', en: 'A feature can also be inactive if it is still in development or has only been enabled for certain user groups.', es: 'Una función también puede estar inactiva si aún está en desarrollo o solo se ha habilitado para ciertos grupos de usuarios.' })}
               </p>
             </CardContent>
           </Card>

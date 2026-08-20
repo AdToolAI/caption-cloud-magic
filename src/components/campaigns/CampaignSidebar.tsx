@@ -168,7 +168,7 @@ export const CampaignSidebar = ({
                         </p>
                       )}
                       <p className="text-xs text-muted-foreground/70 mt-1">
-                        {campaign.duration_weeks} {campaign.duration_weeks === 1 ? "Woche" : "Wochen"} • {campaign.post_frequency} Posts/Woche
+                        {campaign.duration_weeks} {tx({ de: campaign.duration_weeks === 1 ? "Woche" : "Wochen", en: campaign.duration_weeks === 1 ? "week" : "weeks", es: campaign.duration_weeks === 1 ? "semana" : "semanas" })} • {campaign.post_frequency} {tx({ de: "Posts/Woche", en: "posts/week", es: "publicaciones/semana" })}
                       </p>
                     </div>
                   </div>

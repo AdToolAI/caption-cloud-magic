@@ -162,7 +162,7 @@ export const ExportOptionsEditor = ({ options, onChange }: ExportOptionsEditorPr
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
             <div>
               <div className="font-medium text-sm">Wasserzeichen</div>
-              <div className="text-xs text-muted-foreground">Logo im Video anzeigen</div>
+              <div className="text-xs text-muted-foreground">{tx({ de: 'Logo im Video anzeigen', en: 'Show logo in the video', es: 'Mostrar el logotipo en el vídeo' })}</div>
             </div>
             <Switch
               checked={options.includeWatermark}

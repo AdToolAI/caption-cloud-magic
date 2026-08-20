@@ -18,16 +18,16 @@ interface VoiceOverEditorProps {
 }
 
 const VOICE_OPTIONS = [
-  { id: '9BWtsMINqrJLrRacOk9x', name: 'Aria (weiblich, warm)' },
+  { id: '9BWtsMINqrJLrRacOk9x', name: tx({ de: "Aria (weiblich, warm)", en: "Aria (female, warm)", es: "Aria (femenina, cálida)" }) },
   { id: 'CwhRBWXzGAHq8TQ4Fs17', name: tx({ de: "Roger (männlich, tief)", en: "Roger (male, deep)", es: "Roger (masculino, grave)" }) },
-  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah (weiblich, freundlich)' },
-  { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura (weiblich, professionell)' },
+  { id: 'EXAVITQu4vr4xnSDxMaL', name: tx({ de: "Sarah (weiblich, freundlich)", en: "Sarah (female, friendly)", es: "Sarah (femenina, amable)" }) },
+  { id: 'FGY2WhTYpPnrIDTdsKH5', name: tx({ de: "Laura (weiblich, professionell)", en: "Laura (female, professional)", es: "Laura (femenina, profesional)" }) },
   { id: 'IKne3meq5aSn9XLyUdCD', name: tx({ de: "Charlie (männlich, jung)", en: "Charlie (male, young)", es: "Charlie (masculino, joven)" }) },
   { id: 'JBFqnCBsd6RMkjVDRZzb', name: tx({ de: "George (männlich, autoritär)", en: "George (male, authoritative)", es: "George (masculino, autoritario)" }) },
   { id: 'N2lVS1w4EtoT3dr4eOWO', name: tx({ de: "Callum (männlich, energisch)", en: "Callum (male, energetic)", es: "Callum (masculino, enérgico)" }) },
-  { id: 'SAz9YHcvj6GT2YYXdXww', name: 'River (neutral, modern)' },
+  { id: 'SAz9YHcvj6GT2YYXdXww', name: tx({ de: "River (neutral, modern)", en: "River (neutral, modern)", es: "River (neutra, moderna)" }) },
   { id: 'TX3LPaxmHKxFdv7VOQHJ', name: tx({ de: "Liam (männlich, britisch)", en: "Liam (male, British)", es: "Liam (masculino, británico)" }) },
-  { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte (weiblich, elegant)' },
+  { id: 'XB0fDUnXU5powFXDhCwa', name: tx({ de: "Charlotte (weiblich, elegant)", en: "Charlotte (female, elegant)", es: "Charlotte (femenina, elegante)" }) },
 ];
 
 export const VoiceOverEditor = ({

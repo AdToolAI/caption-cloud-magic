@@ -414,7 +414,7 @@ function EmptyState({ kind, onCreate }: { kind: 'characters' | 'locations'; onCr
       </p>
       <Button onClick={onCreate} className="gap-2">
         <Plus className="h-4 w-4" />
-        {isChars ? 'Ersten Charakter anlegen' : 'Erste Location anlegen'}
+        {isChars ? tx({ de: 'Ersten Charakter anlegen', en: 'Create first character', es: 'Crear el primer personaje' }) : tx({ de: 'Erste Location anlegen', en: 'Create first location', es: 'Crear la primera localización' })}
       </Button>
     </div>
   );

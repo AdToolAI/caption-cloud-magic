@@ -85,7 +85,7 @@ export default function TemplateLibrary() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Template-Bibliothek</h1>
+          <h1 className="text-3xl font-bold">{tx({ de: 'Template-Bibliothek', en: 'Template library', es: 'Biblioteca de plantillas' })}</h1>
           <p className="text-muted-foreground mt-1">
             {tx({ de: "Wähle ein Template aus und erstelle dein Video in wenigen Minuten", en: "Select a template and create your video in minutes", es: "Selecciona una plantilla y crea tu video en minutos" })}
           </p>

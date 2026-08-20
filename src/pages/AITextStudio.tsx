@@ -281,7 +281,7 @@ export default function AITextStudio() {
     setConversationId(newConv.id);
     setModel(targetModel);
     setBranchPrompt(null);
-    toast.success(`Neuer Branch: ${targetLabel}`);
+    toast.success(tx({ de: `Neuer Branch: ${targetLabel}`, en: `New branch: ${targetLabel}`, es: `Nueva rama: ${targetLabel}` }));
   }
 
   async function send() {
@@ -748,7 +748,7 @@ export default function AITextStudio() {
               {compareLoading ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{tx({ de: "Läuft…", en: "Running…", es: "Ejecutando…" })}</>
               ) : (
-                `Vergleich starten (${compareModels.length})`
+                tx({ de: `Vergleich starten (${compareModels.length})`, en: `Start comparison (${compareModels.length})`, es: `Iniciar comparación (${compareModels.length})` })
               )}
             </Button>
           </Card>

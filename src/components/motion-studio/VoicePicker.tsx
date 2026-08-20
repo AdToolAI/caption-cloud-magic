@@ -139,7 +139,7 @@ export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) 
               size="icon"
               onClick={handlePreview}
               disabled={previewing}
-              title="Voice testen"
+              title={tx({ de: 'Voice testen', en: 'Test voice', es: 'Probar voz' })}
             >
               {previewing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

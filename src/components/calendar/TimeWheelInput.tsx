@@ -85,7 +85,7 @@ export function TimeWheelInput({ value, onChange, disabled, recommended }: TimeW
               onClick={() => stepH(-1)}
               disabled={disabled}
               className="h-7 w-12 grid place-items-center rounded-lg bg-white/5 hover:bg-primary/15 border border-white/10 hover:border-primary/40 transition-all disabled:opacity-40"
-              aria-label="Stunde verringern"
+              aria-label={tx({ de: 'Stunde verringern', en: 'Decrease hour', es: 'Reducir hora' })}
             >
               <ChevronDown className="h-4 w-4 text-primary" />
             </button>

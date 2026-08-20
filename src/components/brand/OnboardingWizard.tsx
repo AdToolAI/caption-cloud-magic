@@ -31,7 +31,7 @@ const valueOptions = [
 ];
 
 const styleOptions = [
-  { value: "minimalist", label: "Minimalistisch", emoji: "⚪" },
+  { value: "minimalist", label: tx({ de: 'Minimalistisch', en: 'Minimalist', es: 'Minimalista' }), emoji: "⚪" },
   { value: "luxurious", label: tx({ de: "Luxuriös", en: "Luxurious", es: "Lujoso" }), emoji: "✨" },
   { value: "playful", label: "Verspielt", emoji: "🎨" },
   { value: "urban", label: "Urban", emoji: "🏙️" },

@@ -255,7 +255,7 @@ export default function CharacterEditor({
           {/* Reference Image */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs">Referenzbild (optional, sehr empfohlen)</Label>
+              <Label className="text-xs">{tx({ de: 'Referenzbild (optional, sehr empfohlen)', en: 'Reference image (optional, highly recommended)', es: 'Imagen de referencia (opcional, muy recomendada)' })}</Label>
               <Button
                 type="button"
                 variant="ghost"
@@ -339,7 +339,7 @@ export default function CharacterEditor({
           )}
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Aussehen (Englisch empfohlen) *</Label>
+            <Label className="text-xs">{tx({ de: 'Aussehen (Englisch empfohlen) *', en: 'Appearance (English recommended) *', es: 'Aspecto (se recomienda inglés) *' })}</Label>
             <Textarea
               value={draft.description}
               onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}

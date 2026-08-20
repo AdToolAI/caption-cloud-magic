@@ -275,7 +275,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
                   <SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="male">{tx({ de: "Männlich", en: "Male", es: "Masculino" })}</SelectItem>
-                    <SelectItem value="female">Weiblich</SelectItem>
+                    <SelectItem value="female">{tx({ de: 'Weiblich', en: 'Female', es: 'Femenino' })}</SelectItem>
                     <SelectItem value="neutral">Neutral</SelectItem>
                   </SelectContent>
                 </Select>
@@ -297,7 +297,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
                 <SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="male">{tx({ de: "Männlich", en: "Male", es: "Masculino" })}</SelectItem>
-                  <SelectItem value="female">Weiblich</SelectItem>
+                  <SelectItem value="female">{tx({ de: 'Weiblich', en: 'Female', es: 'Femenino' })}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

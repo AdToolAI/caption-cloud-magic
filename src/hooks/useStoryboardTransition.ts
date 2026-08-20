@@ -1170,7 +1170,7 @@ export function useStoryboardTransition({
       warRoomOpen: true,
       phase: 'A',
       progress: 2,
-      phaseLabel: 'Schritt 1/4 · Briefing-Modus erkennen …',
+      phaseLabel: tx({ de: 'Schritt 1/4 · Briefing-Modus erkennen …', en: 'Step 1/4 · Detecting briefing mode …', es: 'Paso 1/4 · Detectando el modo de briefing …' }),
       planSheetOpen: false,
       initialPlan: null,
       activeProjectId,
@@ -1487,7 +1487,7 @@ export function useStoryboardTransition({
           const fallback = normalizedFallback.plan;
           const isNetwork = !status && !isAbort;
           toast({
-            title: isNetwork ? 'Basis-Plan bereit' : 'Basis-Plan bereit',
+            title: tx({ de: 'Basis-Plan bereit', en: 'Base plan ready', es: 'Plan base listo' }),
             description: isNetwork
               ? tx({ de: 'Verbindung war kurz instabil — wir haben einen Basis-Plan vorbereitet. Du kannst ihn wie gewohnt anpassen oder die Analyse erneut starten.', en: 'Connection was briefly unstable — we have prepared a basic plan. You can adjust it as usual or restart the analysis.', es: 'La conexión fue brevemente inestable — hemos preparado un plan básico. Puedes ajustarlo como de costumbre o reiniciar el análisis.' })
               : tx({ de: 'Analyse übersprungen — Basis-Plan als Startpunkt eingeblendet. Passe Werte an oder starte die Analyse neu.', en: 'Analysis skipped — a basic plan has been shown as a starting point. Adjust values or restart the analysis.', es: 'Análisis omitido — se ha mostrado un plan básico como punto de partida. Ajusta los valores o reinicia el análisis.' }),

@@ -68,7 +68,7 @@ export function TestPerformanceComparison({ variants, targetMetric }: Props) {
     <div className="space-y-6">
       {/* Leader Board */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">🏆 Aktueller Leader</h3>
+        <h3 className="text-lg font-semibold mb-4">{tx({ de: '🏆 Aktueller Leader', en: '🏆 Current leader', es: '🏆 Líder actual' })}</h3>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-2xl font-bold">{leader.variant_name}</p>

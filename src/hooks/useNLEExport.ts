@@ -98,7 +98,7 @@ export function useNLEExport(projectId?: string) {
         triggerDownload(data.downloadUrl, `composer-${projectId.slice(0, 8)}.${ext}`);
 
         toast.success(
-          `${format.toUpperCase()} bereit (${(data.sizeBytes / 1024).toFixed(1)} KB)`,
+          tx({ de: `${format.toUpperCase()} bereit (${(data.sizeBytes / 1024).toFixed(1)} KB)`, en: `${format.toUpperCase()} ready (${(data.sizeBytes / 1024).toFixed(1)} KB)`, es: `${format.toUpperCase()} listo (${(data.sizeBytes / 1024).toFixed(1)} KB)` }),
           {
             id: toastId,
             description:

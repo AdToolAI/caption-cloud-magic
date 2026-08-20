@@ -104,7 +104,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     category: 'Banner',
     description: tx({ de: 'Vollbreiter Balken mit Aussage', en: 'Full-width bar with a statement', es: 'Barra de ancho completo con una declaración.' }),
     kind: 'banner',
-    build: () => base('banner', 'NUR HEUTE: 30 % RABATT', { fill: 'rgba(10,10,15,0.85)', uppercase: true, radius: 0 }, { animation: 'slideUp' }),
+    build: () => base('banner', tx({ de: 'NUR HEUTE: 30 % RABATT', en: 'TODAY ONLY: 30% OFF', es: 'SOLO HOY: 30 % DE DESCUENTO' }), { fill: 'rgba(10,10,15,0.85)', uppercase: true, radius: 0 }, { animation: 'slideUp' }),
   },
   {
     id: 'banner-top-gold',

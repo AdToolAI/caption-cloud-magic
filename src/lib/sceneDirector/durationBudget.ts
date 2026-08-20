@@ -27,7 +27,7 @@ export function getSceneBudget(durationSeconds: number): SceneBudget {
 
 export function summarizeBudget(b: SceneBudget, lang: 'en' | 'de' | 'es' = 'en'): string {
   if (lang === 'de') {
-    return `${b.durationSeconds}s · max ${b.maxActions} Aktion${b.maxActions === 1 ? '' : 'en'} · ~${b.maxScriptWords} Wörter Skript · ${b.maxAssets} Assets`;
+    return tx({ de: `${b.durationSeconds}s · max ${b.maxActions} Aktion${b.maxActions === 1 ? '' : 'en'} · ~${b.maxScriptWords} Wörter Skript · ${b.maxAssets} Assets`, en: `${b.durationSeconds}s · max ${b.maxActions} action${b.maxActions === 1 ? '' : 's'} · ~${b.maxScriptWords} script words · ${b.maxAssets} assets`, es: `${b.durationSeconds}s · máx. ${b.maxActions} acción${b.maxActions === 1 ? '' : 'es'} · ~${b.maxScriptWords} palabras de guion · ${b.maxAssets} recursos` });
   }
   if (lang === 'es') {
     return `${b.durationSeconds}s · máx ${b.maxActions} acción${b.maxActions === 1 ? '' : 'es'} · ~${b.maxScriptWords} palabras · ${b.maxAssets} assets`;

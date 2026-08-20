@@ -83,7 +83,7 @@ export function BeatSyncTimeline({
         setBeats(data.beats);
         setDetectedBpm(bpm);
         onBpmDetected?.(bpm);
-        toast.success('Beat-Analyse abgeschlossen', {
+        toast.success(tx({ de: 'Beat-Analyse abgeschlossen', en: 'Beat analysis complete', es: 'Análisis de ritmo completado' }), {
           description: tr({ de: `${data.beats.length} Beats erkannt bei ~${bpm} BPM`, en: `${data.beats.length} beats detected at ~${bpm} BPM`, es: `${data.beats.length} ritmos detectados a ~${bpm} BPM` })
         });
       } else {
@@ -92,7 +92,7 @@ export function BeatSyncTimeline({
         setBeats(mockBeats);
         setDetectedBpm(bpm);
         onBpmDetected?.(bpm);
-        toast.success('Beat-Analyse abgeschlossen', {
+        toast.success(tx({ de: 'Beat-Analyse abgeschlossen', en: 'Beat analysis complete', es: 'Análisis de ritmo completado' }), {
           description: tr({ de: `${mockBeats.length} Beats erkannt`, en: `${mockBeats.length} beats detected`, es: `${mockBeats.length} ritmos detectados` })
         });
       }
@@ -103,7 +103,7 @@ export function BeatSyncTimeline({
       setBeats(mockBeats);
       setDetectedBpm(120);
       onBpmDetected?.(120);
-      toast.success('Beat-Analyse abgeschlossen (lokal)', {
+      toast.success(tx({ de: 'Beat-Analyse abgeschlossen (lokal)', en: 'Beat analysis complete (local)', es: 'Análisis de ritmo completado (local)' }), {
         description: tr({ de: `${mockBeats.length} Beats erkannt`, en: `${mockBeats.length} beats detected`, es: `${mockBeats.length} ritmos detectados` })
       });
     } finally {

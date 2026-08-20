@@ -256,7 +256,7 @@ export default function AudioStudio() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-xs font-bold tracking-wider text-cyan-400">NEU · KOSTENLOS</span>
+                      <span className="text-xs font-bold tracking-wider text-cyan-400">{tx({ de: 'NEU · KOSTENLOS', en: 'NEW · FREE', es: 'NUEVO · GRATIS' })}</span>
                       <h3 className="text-lg font-bold">{tx({ de: 'Music-to-Video Auto-Match', en: 'Music-to-Video Auto-Match', es: 'Sincronización automática de música y video' })}</h3>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-400">1-Click</span>
                     </div>
@@ -285,7 +285,7 @@ export default function AudioStudio() {
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-xs font-bold tracking-wider text-primary">{tx({ de: 'NEU', en: 'NEW', es: 'NUEVO' })}</span>
                       <h3 className="text-lg font-bold">{tx({ de: 'Hörbuch-Modus', en: 'Audiobook Mode', es: 'Modo audiolibro' })}</h3>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">9 Sprachen</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">{tx({ de: '9 Sprachen', en: '9 languages', es: '9 idiomas' })}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {tx({ de: 'Manuskript einfügen → Kapitel & Figuren erkennen → Erzähler- und Charakterstimmen aus der Bibliothek → MP3-Export.', en: 'Insert manuscript → recognize chapters & characters → narrator and character voices from library → MP3 export.', es: 'Insertar manuscrito → reconocer capítulos y personajes → voces de narrador y personajes de la biblioteca → exportación a MP3.' })}

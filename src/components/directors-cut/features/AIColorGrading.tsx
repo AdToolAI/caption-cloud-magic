@@ -263,7 +263,7 @@ export function AIColorGrading({
             className="w-full"
             onClick={() => onGradeSelect(null)}
           >
-            {isSceneMode ? tx({ de: 'Szenen-Grading entfernen', en: 'Remove scene grading', es: 'Quitar clasificación de escena' }) : 'Grading entfernen'}
+            {isSceneMode ? tx({ de: 'Szenen-Grading entfernen', en: 'Remove scene grading', es: 'Quitar clasificación de escena' }) : tx({ de: 'Grading entfernen', en: 'Remove grading', es: 'Quitar clasificación' })}
           </Button>
         )}
       </CardContent>

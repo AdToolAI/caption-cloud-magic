@@ -830,7 +830,7 @@ export function AICompanionWidget() {
                         <div className="bg-muted/50 rounded-2xl rounded-bl-md px-4 py-3 border border-white/5">
                           <div className="flex items-center gap-2">
                             <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                            <span className="text-sm text-muted-foreground">Denke nach...</span>
+                            <span className="text-sm text-muted-foreground">{tx({ de: 'Denke nach…', en: 'Thinking…', es: 'Pensando…' })}</span>
                           </div>
                         </div>
                       </motion.div>

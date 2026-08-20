@@ -183,7 +183,7 @@ export default function PipelineProgressBar({
               {hasFailure ? tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }) : `${overallPercent}%`}
             </span>
             <span className="text-muted-foreground/70 tabular-nums hidden sm:inline">
-              {hasFailure ? 'Lip-Sync abgebrochen' : `${formatTime(elapsedSeconds)} / ~${formatTime(elapsedSeconds + etaSeconds)}`}
+              {hasFailure ? tx({ de: 'Lip-Sync abgebrochen', en: 'Lip-sync cancelled', es: 'Lip-sync cancelado' }) : `${formatTime(elapsedSeconds)} / ~${formatTime(elapsedSeconds + etaSeconds)}`}
             </span>
             {hasFailure && (
               <ResetFailedButton scenes={scenes} />
