@@ -36,7 +36,7 @@ export function StrategyPostDialog({ open, onOpenChange, post, onDismiss, onAddT
         <div className="space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className="capitalize">{post.platform}</Badge>
-            {post.status === "rescheduled" && <Badge variant="secondary">Neu geplant</Badge>}
+            {post.status === "rescheduled" && <Badge variant="secondary">{tx({ de: 'Neu geplant', en: 'Rescheduled', es: 'Reprogramado' })}</Badge>}
           </div>
 
           {post.caption_draft && (

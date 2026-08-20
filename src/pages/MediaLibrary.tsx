@@ -384,7 +384,11 @@ export default function MediaLibrary() {
                   ? tx({ de: `Motion Studio · Szene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}`, en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (previous version)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (versión anterior)' : ''}` })
                   : isUniversalCreator
                     ? `Universal Creator Video - ${new Date(video.created_at).toLocaleDateString(uiLocale())}`
-                    : `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString(uiLocale())}`,
+                    : tx({
+                        de: `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString(uiLocale())}`,
+                        en: `Created video - ${new Date(video.created_at).toLocaleDateString(uiLocale())}`,
+                        es: `Vídeo creado - ${new Date(video.created_at).toLocaleDateString(uiLocale())}`,
+                      }),
           caption: isSoraAI 
             ? `Sora 2 ${metadata?.model === 'sora-2-pro' ? 'Pro' : 'Standard'} · ${metadata?.duration_seconds}s`
             : isDirectorCutEnhancement
@@ -760,7 +764,7 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: "✉️ Media gesendet",
+      title: tx({ de: '✉️ Medien gesendet', en: '✉️ Media sent', es: '✉️ Medios enviados' }),
       description: tx({ de: "Wird im Composer geladen...", en: "Loading in composer...", es: "Cargando en compositor..." }),
     });
     
@@ -779,7 +783,7 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: "📅 Media gesendet",
+      title: tx({ de: '📅 Medien gesendet', en: '📅 Media sent', es: '📅 Medios enviados' }),
       description: tx({ de: "Wird im Kalender geladen...", en: "Loading in calendar...", es: "Cargando en calendario..." }),
     });
     
@@ -804,7 +808,7 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: "🎨 Media gesendet",
+      title: tx({ de: '🎨 Medien gesendet', en: '🎨 Media sent', es: '🎨 Medios enviados' }),
       description: tx({ de: "Wird in Smart Background geladen...", en: "Loading in Smart Background...", es: "Cargando en Fondo inteligente..." }),
     });
     
@@ -829,7 +833,7 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: "✉️ Medien gesendet",
+      title: tx({ de: '✉️ Medien gesendet', en: '✉️ Media sent', es: '✉️ Medios enviados' }),
       description: tx({ de: `${selectedItems.length} Dateien werden im Composer geladen...`, en: `${selectedItems.length} files are loaded in composer...`, es: `Los archivos ${selectedItems.length} están cargados en Composer...` }),
     });
     
@@ -852,7 +856,7 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: "📸 Media gesendet",
+      title: tx({ de: '📸 Medien gesendet', en: '📸 Media sent', es: '📸 Medios enviados' }),
       description: tx({ de: `Erstes Medium wird im KI-Post-Generator geladen...`, en: `First medium is loaded in the AI ​​post generator...`, es: `El primer medio se carga en el generador de publicaciones de IA...` }),
     });
     
@@ -878,7 +882,7 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: "📅 Media gesendet",
+      title: tx({ de: '📅 Medien gesendet', en: '📅 Media sent', es: '📅 Medios enviados' }),
       description: tx({ de: `Erstes Medium wird im Kalender geladen...`, en: `First medium is loaded in the calendar...`, es: `El primer medio está cargado en el calendario...` }),
     });
     
@@ -909,7 +913,7 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: "🎨 Media gesendet",
+      title: tx({ de: '🎨 Medien gesendet', en: '🎨 Media sent', es: '🎨 Medios enviados' }),
       description: tx({ de: `Erstes Bild wird in Smart Background geladen...`, en: `First image is loading into Smart Background...`, es: `La primera imagen se está cargando en Smart Background...` }),
     });
     

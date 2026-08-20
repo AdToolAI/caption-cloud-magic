@@ -183,7 +183,7 @@ export function PromptHelperDialog({
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Schnell-Filter (optional)</Label>
+              <Label className="text-xs text-muted-foreground">{tx({ de: 'Schnell-Filter (optional)', en: 'Quick filters (optional)', es: 'Filtros rápidos (opcional)' })}</Label>
               <div className="space-y-1.5">
                 <div className="flex flex-wrap gap-1.5">
                   {GOALS.map(g => <Chip key={g} value={g} active={goal === g} onClick={() => setGoal(goal === g ? null : g)} />)}
@@ -234,7 +234,7 @@ export function PromptHelperDialog({
                 {result.alternatives.map((alt, i) => (
                   <PromptCard
                     key={i}
-                    label={`Kurz-Variante ${i + 1}`}
+                    label={tx({ de: `Kurz-Variante ${i + 1}`, en: `Short variant ${i + 1}`, es: `Variante corta ${i + 1}` })}
                     prompt={alt}
                     onUse={() => handleApply(alt)}
                   />

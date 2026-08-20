@@ -88,7 +88,7 @@ export default function CommunitySnippetGallery({ onUse, onCloned }: Props) {
             onKeyDown={(e) => {
               if (e.key === 'Enter') reload();
             }}
-            placeholder="Suche Community-Snippets..."
+            placeholder={tx({ de: 'Suche Community-Snippets...', en: 'Search community snippets...', es: 'Buscar fragmentos de la comunidad...' })}
             className="pl-8 h-8 text-sm bg-background/60"
           />
         </div>

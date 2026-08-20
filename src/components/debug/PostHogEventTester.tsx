@@ -279,7 +279,7 @@ export function PostHogEventTester() {
     setIsFiring(false);
     
     toast({
-      title: 'Dashboard Events gesendet',
+      title: tx({ de: 'Dashboard Events gesendet', en: 'Dashboard events sent', es: 'Eventos del panel enviados' }),
       description: tx({ de: `${successCount} Events für alle Plans gesendet! Check PostHog in ~1 Minute.`, en: `${successCount} events sent for all plans! Check PostHog in ~1 minute.`, es: `¡${successCount} eventos enviados para todos los planes! Revisa PostHog en ~1 minuto.` }),
     });
   };
@@ -324,8 +324,8 @@ export function PostHogEventTester() {
     setIsFiring(false);
     
     toast({
-      title: `${category.title} Events gefeuert`,
-      description: `${successCount} von ${category.events.length} Events gesendet`,
+      title: tx({ de: `${category.title} Events gefeuert`, en: `${category.title} events fired`, es: `Eventos de ${category.title} disparados` }),
+      description: tx({ de: `${successCount} von ${category.events.length} Events gesendet`, en: `${successCount} of ${category.events.length} events sent`, es: `${successCount} de ${category.events.length} eventos enviados` }),
     });
   };
 

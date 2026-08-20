@@ -125,7 +125,7 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
             </div>
             <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
               <h4 className="font-semibold text-foreground">Berichtigungsrecht (Art. 16)</h4>
-              <p className="text-sm">Korrektur falscher Daten im Account-Bereich</p>
+              <p className="text-sm">{tx({ de: "Korrektur falscher Daten im Account-Bereich", en: "Correction of incorrect data in the account area", es: "Corrección de datos incorrectos en el área de la cuenta" })}</p>
             </div>
             <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
               <h4 className="font-semibold text-foreground">Löschungsrecht (Art. 17)</h4>

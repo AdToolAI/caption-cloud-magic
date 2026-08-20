@@ -50,8 +50,12 @@ export function SafePlanNotice({ normalization }: SafePlanNoticeProps) {
   const headline = inconsistent
     ? tx({ de: 'Plan noch nicht konsistent', en: 'Plan not yet consistent', es: 'El plan aún no es consistente' })
     : hasRepairs
-      ? `${repairs.length} automatische Korrektur${repairs.length === 1 ? '' : 'en'}`
-      : 'Plan passt zu deinem Briefing';
+      ? tx({
+          de: `${repairs.length} automatische Korrektur${repairs.length === 1 ? '' : 'en'}`,
+          en: `${repairs.length} automatic correction${repairs.length === 1 ? '' : 's'}`,
+          es: `${repairs.length} corrección${repairs.length === 1 ? '' : 'es'} automática${repairs.length === 1 ? '' : 's'}`,
+        })
+      : tx({ de: 'Plan passt zu deinem Briefing', en: 'Plan matches your briefing', es: 'El plan coincide con tu briefing' });
 
   const subline = inconsistent
     ? tx({ de: 'Bitte Szenendauern anpassen oder Briefing neu analysieren.', en: 'Please adjust scene durations or re-analyze the briefing.', es: 'Por favor, ajusta las duraciones de las escenas o vuelve a analizar el briefing.' })

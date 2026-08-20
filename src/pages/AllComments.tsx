@@ -311,11 +311,11 @@ const AllComments = () => {
           <div className="text-2xl font-bold">{kpiData.total}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Neu (24h)</div>
+          <div className="text-sm text-muted-foreground">{tx({ de: 'Neu (24h)', en: 'New (24h)', es: 'Nuevos (24 h)' })}</div>
           <div className="text-2xl font-bold">{kpiData.new24h}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Offene Fragen</div>
+          <div className="text-sm text-muted-foreground">{tx({ de: 'Offene Fragen', en: 'Open questions', es: 'Preguntas abiertas' })}</div>
           <div className="text-2xl font-bold">{kpiData.openQuestions}</div>
         </Card>
         <Card className="p-4">

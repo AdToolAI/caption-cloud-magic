@@ -132,6 +132,11 @@ export function ConciergeIntroScreen() {
                     transition={{ duration: 0.25 }}
                   >
                     <p className="mb-5 text-sm leading-relaxed text-white/70">
+                      {tx({
+                        de: 'Wie soll ich dich begleiten? Wähle das Tempo, das zu dir passt.',
+                        en: 'How should I guide you? Pick the pace that suits you.',
+                        es: '¿Cómo quieres que te acompañe? Elige el ritmo que te convenga.',
+                      })}
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       {(Object.keys(PERSONA_PROFILES) as LearningPace[]).map((id) => {
@@ -232,7 +237,11 @@ export function ConciergeIntroScreen() {
                     transition={{ duration: 0.25 }}
                   >
                     <p className="mb-5 text-sm leading-relaxed text-white/70">
-                      jederzeit umstimmen.
+                      {tx({
+                        de: 'Alles gesetzt. Du kannst dich jederzeit umstimmen.',
+                        en: "You're all set. You can change your mind at any time.",
+                        es: 'Todo listo. Puedes cambiar de opinión en cualquier momento.',
+                      })}
                     </p>
                     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
                       <div className="flex items-center gap-3">
@@ -258,7 +267,7 @@ export function ConciergeIntroScreen() {
                         onClick={() => void finish()}
                         className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90"
                       >
-                        Loslegen
+                        {tx({ de: 'Loslegen', en: "Let's go", es: 'Vamos' })}
                       </Button>
                     </div>
                   </motion.div>
