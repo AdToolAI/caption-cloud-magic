@@ -988,7 +988,7 @@ export default function MediaLibrary() {
           <CardContent className="pt-6">
             <div className="flex gap-3">
               <Input 
-                placeholder="Externe URL importieren (z.B. https://...)" 
+                placeholder={tx({ de: "Externe URL importieren (z.B. https://...)", en: "Import external URL (e.g. https://...)", es: "Importar URL externa (p. ej. https://...)" })} 
                 value={importUrl}
                 onChange={(e) => setImportUrl(e.target.value)}
                 className="bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
