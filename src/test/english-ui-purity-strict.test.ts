@@ -177,7 +177,8 @@ const SEMANTIC_GERMAN_IDS = new Set<string>([
   "hooks/useApplyProductionPlan.ts::mentionKey: `S${String(sceneIndex).padStart(2, '0')} Sprecher`,",
   "hooks/useApplyProductionPlan.ts::characterName: 'Sprecher',",
   "hooks/useApplyProductionPlan.ts::? { ...sourceCast, mentionKey: sourceCast.mentionKey || `S${String(scene.index).padStart(2, '0')} Sprecher` }",
-  // Trailing code comment, never rendered.
+  // Trailing code comments, never rendered.
+  "hooks/useGenerateAllClips.ts::isLipSyncIntentional(scene as any) || // v430.1 Schritt 2B — SSoT statt cinematic-sync-Teilcheck",
   "remotion/templates/ExplainerVideo.tsx::solution: 'celebrating',   // Charakter feiert (Lösung gefunden)",
 ]);
 
