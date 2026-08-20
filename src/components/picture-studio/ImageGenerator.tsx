@@ -871,14 +871,14 @@ export function ImageGenerator() {
               </div>
             ) : (
               <p className="text-[11px] text-muted-foreground">
-                {tx({ de: "Kein aktives Brand-Kit.", en: "No active brand kit.", es: "Ningún Brand Kit activo." })} <button onClick={() => navigate('/brand-kit')} className="text-primary underline">Anlegen</button>
+                {tx({ de: "Kein aktives Brand-Kit.", en: "No active brand kit.", es: "Ningún Brand Kit activo." })} <button onClick={() => navigate('/brand-kit')} className="text-primary underline">{tx({ de: "Anlegen", en: "Create", es: "Crear" })}</button>
               </p>
             )}
           </div>
 
           {/* Variants */}
           <div className="flex items-center gap-2 ml-auto">
-            <Label className="text-sm text-muted-foreground">Varianten:</Label>
+            <Label className="text-sm text-muted-foreground">{tx({ de: "Varianten:", en: "Variants:", es: "Variantes:" })}</Label>
             <div className="flex items-center rounded-lg border border-border/50 bg-background/30 p-0.5">
               {([1, 4] as const).map((n) => (
                 <button
