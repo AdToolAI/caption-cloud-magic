@@ -11864,7 +11864,9 @@ export type Database = {
       profiles: {
         Row: {
           account_paused: boolean | null
+          account_type: string
           activation_emails_sent: Json | null
+          ai_discount_percent: number
           analytics_enabled: boolean | null
           api_key: string | null
           autopilot_permanently_locked: boolean
@@ -11919,7 +11921,9 @@ export type Database = {
         }
         Insert: {
           account_paused?: boolean | null
+          account_type?: string
           activation_emails_sent?: Json | null
+          ai_discount_percent?: number
           analytics_enabled?: boolean | null
           api_key?: string | null
           autopilot_permanently_locked?: boolean
@@ -11974,7 +11978,9 @@ export type Database = {
         }
         Update: {
           account_paused?: boolean | null
+          account_type?: string
           activation_emails_sent?: Json | null
+          ai_discount_percent?: number
           analytics_enabled?: boolean | null
           api_key?: string | null
           autopilot_permanently_locked?: boolean
@@ -20209,6 +20215,7 @@ export type Database = {
           revoked_reason: string
         }[]
       }
+      get_ai_discount_factor: { Args: { p_user_id: string }; Returns: number }
       get_ai_superuser_id: { Args: never; Returns: string }
       get_conversion_funnel: { Args: { days?: number }; Returns: Json }
       get_shared_brand_kit: {

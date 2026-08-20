@@ -49,6 +49,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { useVideoPricingCatalog } from '@/hooks/useVideoPricingCatalog';
+import { useAccountType } from '@/hooks/useAccountType';
 import { useTranslation } from '@/hooks/useTranslation';
 import { getCurrencyForLanguage } from '@/lib/currency';
 import {
@@ -393,7 +394,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
   // Canonical per-second price from server catalog (falls back to local config).
   const { getPricePerSecond } = useVideoPricingCatalog();
-  const pricePerSecond = getPricePerSecond(model.id, currency) ?? model.costPerSecond[currency];
+  const { discountFactor } = useAccountType();
+  // Catalog prices are already personalized; the local fallback is a list price.
+  const pricePerSecond =
+    getPricePerSecond(model.id, currency) ?? model.costPerSecond[currency] * discountFactor;
   // Smart duration (-1) is reserved at the model's maximum length; the unused
   // seconds are refunded once the provider reports the real clip length.
   const billedSeconds = duration === -1

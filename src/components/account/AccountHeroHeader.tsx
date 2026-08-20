@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { getProductInfo, isSubscribed } from "@/config/pricing";
 import { Settings, Shield, CheckCircle2, Crown } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { CreatorDiscountBadge } from "@/components/account/CreatorDiscountBadge";
 
 export const AccountHeroHeader = () => {
   const { user, subscribed, productId } = useAuth();
@@ -105,6 +106,11 @@ export const AccountHeroHeader = () => {
               <Settings className="h-4 w-4 text-muted-foreground" />
             )}
             <span className="text-sm font-medium">{planInfo.name}</span>
+          </div>
+
+          {/* Creator Discount Badge */}
+          <div className="flex items-center">
+            <CreatorDiscountBadge className="px-4 py-2 rounded-xl text-sm" />
           </div>
 
           {/* Security Badge */}
