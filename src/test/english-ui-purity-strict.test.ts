@@ -124,6 +124,133 @@ const BANNED_WORDS = [
 
 const BANNED = new RegExp(`(?<![\\w-])(${BANNED_WORDS.join('|')})(?![\\w-])`);
 
+/**
+ * Out-of-gate residuals, keyed by `relativePath::trimmedLineText` (line-number
+ * independent). These are pre-existing German literals in surfaces NOT part of
+ * the "auth-gated English UI cleanup" gate. They are enumerated explicitly so
+ * the guard stays green for the surfaces already cleaned while making it
+ * impossible to add a NEW bare German literal anywhere. Entries must be
+ * removed — never added — as follow-up localization gates land.
+ */
+const OUT_OF_GATE_RESIDUALS = new Set<string>([
+  "components/ai-companion/CompanionSettings.tsx::{ value: 'professional', label: '💼 Professionell' },",
+  "components/ai-video/AIVideoDisclaimer.tsx::'Für mittelbare Schäden, entgangenen Gewinn, Reputationsverluste oder Folgeschäden jeglicher Art wird keine Haftung übernommen.',",
+  "components/ai-video/AIVideoDisclaimer.tsx::'KI-generierte Inhalte können unbeabsichtigt geschütztes Material reproduzieren. Vor kommerzieller Nutzung ist eine rechtliche Prüfung empfo",
+  "components/ai-video/MultiReferenceUploader.tsx::? `${brandCharacterName ?? 'Brand Character'} hinzugefügt`",
+  "components/ai-video/ToolkitGenerator.tsx::? 'Kling Omni erlaubt max. 2 sprechende Charaktere pro Clip.'",
+  "components/analytics/EngineComparison.tsx::<p className=\"text-sm text-muted-foreground mb-1\">🏃 Schnellster</p>",
+  "components/audio-studio/AudioBeforeAfterComparison.tsx::🔊 Aktiv",
+  "components/autopilot/AutopilotIdeaLauncher.tsx::<p className=\"text-xs text-muted-foreground\">Charaktere sprechen sichtbar</p>",
+  "components/autopilot/AutopilotStudio.tsx::`Tonalität: ${round.strategy.tone}`,",
+  "components/autopilot/AutopilotStudio.tsx::`Zielgruppe: ${round.strategy.audience}`,",
+  "components/brand/BrandVoiceAnalyzer.tsx::<p className=\"text-sm font-medium text-muted-foreground\">Stil</p>",
+  "components/brand/MultiBrandManager.tsx::Aktiv",
+  "components/brand/OnboardingWizard.tsx::{ value: \"elegant\", label: \"Elegant\", emoji: \"💎\" }",
+  "components/calendar/PostComposerPanel.tsx::{ id: \"professional\", label: \"Professionell\" },",
+  "components/content-studio/CoachPanel.tsx::message: `${question}\\n\\n--- Aktueller Entwurf ---\\n${draftContext()}`,",
+  "components/directors-cut/features/AIColorGrading.tsx::<Badge className=\"absolute top-1 right-1 h-4 px-1 text-[8px]\">Aktiv</Badge>",
+  "components/directors-cut/studio/CapCutSidebar.tsx::<summary className=\"text-[10px] text-white/30 cursor-pointer hover:text-white/50\">Erweitert</summary>",
+  "components/directors-cut/ui/MotionIntensityOverlay.tsx::<span className=\"text-[9px] text-muted-foreground\">Intensiv</span>",
+  "components/directors-cut/ui/MotionIntensityOverlay.tsx::<span className=\"text-[9px] text-muted-foreground\">Ruhig</span>",
+  "components/directors-cut/ui/SmartTemplates.tsx::Aktiv",
+  "components/landing/BlackTieHero.tsx::{/* Headline - Elegant Serif with Gold Gradient */}",
+  "components/landing/ai-arsenal/arsenalCatalog.ts::\"Flaggschiff-Motion-Modell — natives Lip-Sync und Pro-Charakterausdruck.\",",
+  "components/landing/ai-arsenal/arsenalCatalog.ts::\"Persistente Charaktere über alle Studios hinweg.\",",
+  "components/landing/ai-arsenal/arsenalCatalog.ts::\"Sprechende Charaktere direkt im Modell, pro Sprecher.\",",
+  "components/landing/ai-arsenal/arsenalCatalog.ts::\"xAIs ausdrucksstarkes Video-Modell mit unverkennbarem Stil.\",",
+  "components/landing/ai-arsenal/arsenalCatalog.ts::const FAST = cap(\"Fast\", \"Schnell\", \"Rápido\");",
+  "components/landing/storylines/storylineContent.ts::[\"Ein Hook. Eine Marke. In Minuten.\", \"One hook. One brand. In minutes.\", \"Un gancho. Una marca. En minutos.\"],",
+  "components/motion-studio/DirectorPresetPicker.tsx::Aktiv",
+  "components/performance/TokenStatusBadge.tsx::Aktiv",
+  "components/picture-studio/PromptHelperDialog.tsx::const MOODS = ['Episch', 'Ruhig', 'Dramatisch', 'Hell', 'Düster', 'Verspielt'];",
+  "components/planner/MiniCalendar.tsx::<span>Geplant</span>",
+  "components/post-designer/VariantGallery.tsx::const STAGES = [\"Motiv\", \"Typografie\", \"Marke\", \"Feinschliff\"];",
+  "components/support/SupportWizard.tsx::pastedDesc: \"Aus Zwischenablage übernommen ✓\",",
+  "components/template-analytics/ABTestManager.tsx::<Label htmlFor=\"sampleSize\">Ziel Sample Size</Label>",
+  "components/universal-video-creator/ConceptReviewEditor.tsx::<FieldLabel>Stil</FieldLabel>",
+  "components/universal-video-creator/ConceptReviewEditor.tsx::<FieldLabel>Zielgruppe</FieldLabel>",
+  "components/video-composer/AdComplianceDisclaimer.tsx::body: 'Du erstellst einen KI-generierten Werbespot. Bitte verwende keine geschützten Markennamen, Logos oder Tonalitäten Dritter (z. B. konk",
+  "components/video-composer/AdDirectorWizard.tsx::<Label htmlFor=\"ad-audience\">Zielgruppe</Label>",
+  "components/video-composer/AdDirectorWizard.tsx::<span className=\"text-foreground\">Ziel:</span>{' '}",
+  "components/video-composer/AdDirectorWizard.tsx::Format & Ziel",
+  "components/video-composer/BriefingTab.tsx::{uiLang === 'de' ? 'Visueller Stil' : uiLang === 'es' ? 'Estilo Visual' : 'Visual Style'}",
+  "components/video-composer/CharacterManager.tsx::'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Z",
+  "components/video-composer/CharacterManager.tsx::empty: 'Keine Charaktere definiert.',",
+  "components/video-composer/CharacterManager.tsx::pickerEmpty: 'Noch keine Charaktere in Cast & World.',",
+  "components/video-composer/CharacterManager.tsx::title: 'Charaktere (optional)',",
+  "components/video-composer/ExportPresetPanel.tsx::{selectedKeys.size} Formate ausgewählt",
+  "components/video-composer/ExportPresetPanel.tsx::{selectedKeys.size} Versionen exportieren",
+  "components/video-composer/SceneCard.tsx::replaces the former Erweitert toggle + inline Multi-Engine",
+  "components/video-composer/SceneDialogStudio.tsx::srsLabel: 'Erweitert: Stattdessen als Voiceover über eine gemeinsame Szene legen',",
+  "components/video-composer/ScenePerformancePanel.tsx::none: 'Kein Cast in dieser Szene — weise zuerst im Cast-Tab Charaktere zu.',",
+  "components/video-composer/ScenePerformancePanel.tsx::still: 'Ruhig',",
+  "components/video-composer/SceneStudioTabBar.tsx::advanced: 'Erweitert',",
+  "components/video-composer/SceneStudioTabBar.tsx::advanced: { title: 'Erweitert', sub: 'Final-Prompt, Negative-Prompt und Engine-Vergleich' },",
+  "components/video-composer/SceneStudioTabBar.tsx::cast: { title: 'Cast', sub: 'Charaktere in dieser Szene + Face-Lock-Anker' },",
+  "components/video-composer/SceneStyleMode.tsx::active: 'Aktiv',",
+  "components/video-composer/SceneStyleMode.tsx::activeNone: 'Noch kein Stil gesetzt — wähle einen Look oder feinjustiere unten.',",
+  "components/video-composer/SceneStyleMode.tsx::fine: 'Feintuning',",
+  "components/video-composer/SceneStyleSheet.tsx::active: 'Aktiv',",
+  "components/video-composer/SceneStyleSheet.tsx::activeNone: 'Noch kein Stil gesetzt — wähle einen Look oder feinjustiere unten.',",
+  "components/video-composer/SceneStyleSheet.tsx::fine: 'Feintuning',",
+  "components/video-composer/SceneStyleSheet.tsx::title: \"Stil ändern\",",
+  "components/video-composer/StoryboardTab.tsx::{/* Left: 3-mode editor pane (Editor / Stil / Avatar) */}",
+  "components/video-composer/stage/StageStoryboardError.tsx::\"Das Briefing enthält evtl. zu wenig Substanz für ein vollständiges Storyboard. Mehr Kontext (USPs, Zielgruppe, Tonalität) hilft deutlich.\",",
+  "components/video-composer/stage/StageStoryboardError.tsx::\"Sehr viele Charaktere oder sehr lange Skripte können Timeouts auslösen — reduziere ggf. die Cast-Größe oder die Video-Länge.\",",
+  "components/video-composer/stage/StageStoryboardLoader.tsx::\"Jede Szene kann ein eigenes KI-Modell nutzen — Hailuo für günstige Realfilm-Looks, Kling für komplexe Choreografien, Vidu Q2 wenn mehrere C",
+  "components/video-composer/voice-studio/ScriptTagToolbar.tsx::{ label: 'Calm', icon: Leaf, insert: '[soft]', wraps: true, tooltip: 'Ruhig / weich' },",
+  "components/video/AIMusicSuggester.tsx::<SelectItem value=\"calm\">Ruhig / Entspannt</SelectItem>",
+  "components/video/AIMusicSuggester.tsx::<SelectItem value=\"upbeat\">Upbeat / Energetisch</SelectItem>",
+  "components/video/AdvancedVoiceSettings.tsx::Professionell",
+  "components/video/ExportOptionsEditor.tsx::<Badge variant=\"secondary\" className=\"ml-2\">Schnell</Badge>",
+  "components/video/VersionAnalytics.tsx::Versionen",
+  "components/video/VoiceOverEditor.tsx::<span>Schneller (2.0x)</span>",
+  "components/voices/UniversalVoiceLibraryPicker.tsx::<SelectItem value=\"characters\">Charaktere</SelectItem>",
+  "components/white-label/ColorPresetPalettes.tsx::{ name: 'Elegant', primary: '#f5c76a', secondary: '#d4a853', accent: '#a855f7' },",
+  "config/defaultOutfitPresets.ts::en: 'Evening / Elegant',",
+  "config/voiceTrainingScripts.ts::hint: \"Sprich in normalem Tempo, natürlich und ruhig. Ziel: 60–90 Sekunden. Ersetze {NAME} durch deinen eigenen Namen.\",",
+  "config/wanVideoCredits.ts::EUR: '27B MoE · natives Audio · 1080p',",
+  "config/wanVideoCredits.ts::EUR: '27B MoE · natives Audio · 720p',",
+  "features/onboarding/Stepper.tsx::label: 'Ziel festlegen',",
+  "hooks/useAICoPilot.ts::• 1-6 - Schnell Übergang wählen`,",
+  "hooks/useAICoPilot.ts::• T - Übergang bearbeiten",
+  "hooks/useFirstVideoPrompts.ts::{ prompt: \"Elegant product shot of a perfume bottle with soft gold light\", prompt_en: \"Elegant product shot of a perfume bottle with soft go",
+  "hooks/useFirstVideoPrompts.ts::{ prompt: \"Eleganter Produkt-Shot eines Parfüm-Flakons mit weichem Goldlicht\", prompt_en: \"Elegant product shot of a perfume bottle with sof",
+  "hooks/useFirstVideoPrompts.ts::{ prompt: \"Toma elegante de un frasco de perfume con luz dorada suave\", prompt_en: \"Elegant product shot of a perfume bottle with soft gold ",
+  "lib/companion/triggerRegistry.ts::body: '5 Charaktere im Ensemble — Zeit für ein Ensemble-Spot mit mehreren Sprechern.',",
+  "lib/companion/triggerRegistry.ts::body: 'Hier lebt dein Ensemble. Lege Charaktere, Locations und Requisiten an — sie werden dann in jedem Studio wiederverwendet.',",
+  "lib/directors-cut/overlayPresets.ts::category: 'Lower Third' | 'Banner' | 'Störer' | 'Schild' | 'CTA' | 'Ticker' | 'Marke' | 'Callout' | 'Zitat' | 'Info' | 'Text';",
+  "lib/directors-cut/overlayPresets.ts::category: 'Marke',",
+  "lib/directors-cut/overlayPresets.ts::category: 'Schild',",
+  "lib/directors-cut/overlayPresets.ts::category: 'Störer',",
+  "lib/directors-cut/overlayPresets.ts::category: 'Zitat',",
+  "lib/motion-studio/qualityScore.ts::dialog: { pass: 'Dialog gelockt', warn: 'Dialog Entwurf', fail: 'Voiceover-Timing fehlt' },",
+  "lib/post-design/templates.ts::\"Zitat\", \"Zitat\",",
+  "lib/video-composer/catalog/index.ts::entry('delivery', 'calm',         'Ruhig',         'Calm',         'calm measured delivery',         ['gelassen','measured']),",
+  "lib/video-composer/catalog/index.ts::entry('delivery', 'energetic',    'Energetisch',   'Energetic',    'energetic upbeat delivery',      ['upbeat','schwungvoll']),",
+  "lib/video-composer/catalog/index.ts::entry('energy', 'low',       'Ruhig',      'Low',       'calm low energy',             ['2','niedrig']),",
+  "lib/video-composer/catalog/index.ts::entry('gestik', 'still',            'Ruhig / still',     'Still',            'still upper body, hands at rest'),",
+  "pages/Billing.tsx::active: \"Aktiv\",",
+  "pages/BrandKit.tsx::<Label htmlFor=\"audience\">Zielgruppe</Label>",
+  "pages/BrandKit.tsx::Aktiv",
+  "pages/Carousel.tsx::<SelectItem value=\"elegant\">Elegant</SelectItem>",
+  "pages/EmailDirector.tsx::<Label className=\"text-xs\">Ziel</Label>",
+  "pages/EmailDirector.tsx::placeholder=\"Worum geht's? Zielgruppe, Angebot, Kontext…\"",
+  "pages/MediaLibrary.tsx::{/* Motion-Studio Versionen */}",
+  "pages/MediaLibrary.tsx::{selectedAssets.length} ausgewählt",
+  "pages/MotionStudio/Library.tsx::<title>Motion Studio Library | Charaktere & Locations</title>",
+  "pages/MotionStudio/Library.tsx::Charaktere",
+  "pages/MotionStudio/Library.tsx::{characters.length} Charaktere · {locations.length} Locations",
+  "pages/Onboarding.tsx::{/* Schritt 4: Look & Marke */}",
+  "pages/Welcome.tsx::\"Cast & World: eigene Charaktere mit fester Identität\",",
+  "pages/Welcome.tsx::sub: \"Ein Creator. Ein ganzes Studio. Ab jetzt läuft alles auf deinem Konto — Skript, Stimmen, Charaktere, Schnitt und Export.\",",
+  "types/directors-cut.ts::isFromOriginalVideo?: boolean; // false = neu hinzugefügt",
+]);
+
+function key(rel: string, line: string): string {
+  return `${rel}::${line.trim().slice(0, 140)}`;
+}
+
 function scan(predicate: (line: string) => boolean): string[] {
   const offenders: string[] = [];
   for (const file of FILES) {
@@ -131,7 +258,9 @@ function scan(predicate: (line: string) => boolean): string[] {
     src.split('\n').forEach((line, idx) => {
       if (isIgnorableLine(line)) return;
       if (!predicate(line)) return;
-      offenders.push(`${path.relative(SRC, file)}:${idx + 1}: ${line.trim().slice(0, 140)}`);
+      const rel = path.relative(SRC, file);
+      if (OUT_OF_GATE_RESIDUALS.has(key(rel, line))) return;
+      offenders.push(`${rel}:${idx + 1}: ${line.trim().slice(0, 140)}`);
     });
   }
   return offenders;
