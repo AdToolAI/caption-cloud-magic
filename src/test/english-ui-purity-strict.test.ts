@@ -156,6 +156,20 @@ const BANNED_WORDS = [
   'Korrektur',
   'Korrekturen',
   'Briefing passt',
+  // v-final-6: comments reply toasts/tooltips, preflight severity label,
+  // Director's Cut library column header, comments tab label, reset-password
+  // placeholder. Semantic values (`fragen` tab id) stay untouched.
+  'Antwort',
+  'Antworten',
+  'kopiert',
+  'kopieren',
+  'Warnung',
+  'Warnungen',
+  'Bibliothek',
+  'Fragen',
+  'Passwort',
+  'Passwörter',
+  'wiederholen',
   // `Neu` is deliberately NOT a bare banned word (it collides with identifiers
   // and English "Neural"). It is caught contextually by the rule below.
 ];
