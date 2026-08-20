@@ -57,8 +57,14 @@ function walk(dir: string, out: string[] = []): string[] {
 const FILES = walk(SRC);
 
 /** Same-line language selection — the only accepted escape hatch. */
+// `t(language, '<de>', '<en>', '<es>')` is the sanctioned file-local positional
+// tri-language helper. It is an explicit language selection, exactly like
+// `tx({de,en,es})`, so its German first argument is a DE branch — not a leak.
+// Requires the language argument, so a plain `t('key')` lookup is unaffected.
+const POSITIONAL_TRI = /\bt\(\s*(language|lang)\b\s*,/;
+
 const LANG_SELECT =
-  /(\btx\(|\buseTx\b|pickText\(|\bde:\s|\bes:\s|language\s*===|[Ll]ang\s*===|locale\s*===|\bt\(\s*['"]|TriText|\bcap\(|\bentry\()/;
+  /(\btx\(|\buseTx\b|pickText\(|\bde:\s|\bes:\s|language\s*===|[Ll]ang\s*===|locale\s*===|\bt\(\s*['"]|\bt\(\s*(language|lang)\b\s*,|TriText|\bcap\(|\bentry\()/;
 
 /** Non-UI lines: comments, logging, imports. */
 function isIgnorableLine(line: string): boolean {
@@ -156,6 +162,20 @@ const BANNED_WORDS = [
   'Korrektur',
   'Korrekturen',
   'Briefing passt',
+  // v-final-6: comments reply toasts/tooltips, preflight severity label,
+  // Director's Cut library column header, comments tab label, reset-password
+  // placeholder. Semantic values (`fragen` tab id) stay untouched.
+  'Antwort',
+  'Antworten',
+  'kopiert',
+  'kopieren',
+  'Warnung',
+  'Warnungen',
+  'Bibliothek',
+  'Fragen',
+  'Passwort',
+  'Passwörter',
+  'wiederholen',
   // `Neu` is deliberately NOT a bare banned word (it collides with identifiers
   // and English "Neural"). It is caught contextually by the rule below.
 ];

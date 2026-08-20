@@ -18,7 +18,7 @@ interface CIPreflightDialogProps {
 
 const SEVERITY_META = {
   fail: { icon: AlertCircle, color: 'text-destructive', bg: 'bg-destructive/10 border-destructive/30', label: 'Blocker' },
-  warn: { icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/30', label: 'Warnung' },
+  warn: { icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/30', label: tx({ de: 'Warnung', en: 'Warning', es: 'Advertencia' }) },
   info: { icon: Info, color: 'text-cyan-500', bg: 'bg-cyan-500/10 border-cyan-500/30', label: tx({ de: 'Hinweis', en: 'Notice', es: 'Aviso' }) },
 } as const;
 
