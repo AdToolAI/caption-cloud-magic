@@ -110,7 +110,7 @@ export function VideoUpload({
             <div className="space-y-4">
               <Film className="h-10 w-10 mx-auto text-primary animate-pulse" />
               <Progress value={progress} className="max-w-xs mx-auto" />
-              <p className="text-sm text-muted-foreground">{progress}% hochgeladen</p>
+              <p className="text-sm text-muted-foreground">{tx({ de: `${progress}% hochgeladen`, en: `${progress}% uploaded`, es: `${progress}% subido` })}</p>
             </div>
           ) : (
             <>

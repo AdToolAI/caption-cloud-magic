@@ -72,7 +72,7 @@ export function StrategyPostDialog({ open, onOpenChange, post, onDismiss, onAddT
             size="sm"
             onClick={() => { onAddToCalendar(post); onOpenChange(false); }}
           >
-            <CalendarPlus className="h-4 w-4 mr-1" /> In Kalender übernehmen
+            <CalendarPlus className="h-4 w-4 mr-1" /> {tx({ de: 'In Kalender übernehmen', en: 'Add to calendar', es: 'Añadir al calendario' })}
           </Button>
         </DialogFooter>
       </DialogContent>

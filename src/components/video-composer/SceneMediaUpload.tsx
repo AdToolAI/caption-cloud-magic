@@ -195,7 +195,7 @@ export default function SceneMediaUpload({
           <div className="space-y-2 py-2">
             <Loader2 className="h-5 w-5 mx-auto text-primary animate-spin" />
             <Progress value={progress} className="h-1.5 max-w-[180px] mx-auto" />
-            <p className="text-[10px] text-muted-foreground">{progress}% hochgeladen…</p>
+            <p className="text-[10px] text-muted-foreground">{tx({ de: `${progress}% hochgeladen…`, en: `${progress}% uploaded…`, es: `${progress}% subido…` })}</p>
           </div>
         ) : (
           <>

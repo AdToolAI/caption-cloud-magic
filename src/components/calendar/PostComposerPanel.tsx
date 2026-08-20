@@ -381,7 +381,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
           />
           {overLimit && (
             <p className="text-xs text-destructive flex items-center gap-1 mt-2">
-              <AlertTriangle className="h-3 w-3" /> Überschreitet {PLATFORMS.find(p=>p.id===previewPlatform)?.name}-Limit
+              <AlertTriangle className="h-3 w-3" /> {(() => { const pname = PLATFORMS.find(p=>p.id===previewPlatform)?.name; return tx({ de: `Überschreitet ${pname}-Limit`, en: `Exceeds ${pname} limit`, es: `Supera el límite de ${pname}` }); })()}
             </p>
           )}
         </Section>

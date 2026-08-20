@@ -238,7 +238,7 @@ export default function StockMediaBrowser({
             </TabsTrigger>
             <TabsTrigger value="library" className="gap-1.5">
               <Library className="h-3.5 w-3.5" />
-              {t('videoComposer.stock.tabs.library') || 'Meine Bibliothek'}
+              {t('videoComposer.stock.tabs.library') || tx({ de: 'Meine Bibliothek', en: 'My library', es: 'Mi biblioteca' })}
             </TabsTrigger>
           </TabsList>
 
