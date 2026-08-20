@@ -19,7 +19,7 @@ export const HAPPYHORSE_VIDEO_MODELS = {
     provider: 'Alibaba (Replicate)',
     resolution: '720p',
     // Replicate $0.14/s → user €0.42/s (3.00× margin)
-    costPerSecond: { EUR: 0.42, USD: 0.42 },
+    costPerSecond: { EUR: 0.27, USD: 0.27 },
     minDuration: 3,
     maxDuration: 15,
     description: 'Multi-shot consistency · 720p · 3-15s',
@@ -30,7 +30,7 @@ export const HAPPYHORSE_VIDEO_MODELS = {
     provider: 'Alibaba (Replicate)',
     resolution: '1080p',
     // Replicate $0.28/s → user €0.84/s (3.00× margin)
-    costPerSecond: { EUR: 0.84, USD: 0.84 },
+    costPerSecond: { EUR: 0.55, USD: 0.55 },
     minDuration: 3,
     maxDuration: 15,
     description: 'Multi-shot consistency · 1080p · 3-15s',

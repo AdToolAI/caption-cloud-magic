@@ -7,15 +7,15 @@ export const HAILUO_VIDEO_MODELS = {
     provider: 'MiniMax (Replicate)',
     quality: '768p',
     costPerSecond: {
-      EUR: 0.14,
-      USD: 0.14,
+      EUR: 0.09,
+      USD: 0.09,
     },
     minDuration: 6,
     maxDuration: 10,
     allowedDurations: [6, 10] as const,
     allowedResolutions: ['768p', '1080p'] as const,
     description: {
-      EUR: tx({ de: 'Realistische AI-Videos ab 0,84€ pro 6 Sekunden', en: 'Realistic AI videos from €0.84 per 6 seconds', es: 'Vídeos realistas con IA desde 0,84€ cada 6 segundos' }),
+      EUR: tx({ de: 'Realistische AI-Videos ab 0,54€ pro 6 Sekunden', en: 'Realistic AI videos from €0.54 per 6 seconds', es: 'Vídeos realistas con IA desde 0,54€ cada 6 segundos' }),
       USD: 'Realistic AI videos from $0.84 per 6 seconds',
     },
     badge: 'Empfohlen',
@@ -26,15 +26,15 @@ export const HAILUO_VIDEO_MODELS = {
     quality: '1080p',
     // Replicate $0.075/s → user €0.23/s (3.00× margin)
     costPerSecond: {
-      EUR: 0.23,
-      USD: 0.23,
+      EUR: 0.15,
+      USD: 0.15,
     },
     minDuration: 6,
     maxDuration: 10,
     allowedDurations: [6, 10] as const,
     allowedResolutions: ['768p', '1080p'] as const,
     description: {
-      EUR: tx({ de: 'Premium 1080p-Qualität ab 1,38€ pro 6 Sekunden', en: 'Premium 1080p quality from €1.38 per 6 seconds', es: 'Calidad premium 1080p desde 1,38€ por 6 segundos' }),
+      EUR: tx({ de: 'Premium 1080p-Qualität ab 0,90€ pro 6 Sekunden', en: 'Premium 1080p quality from €0.90 per 6 seconds', es: 'Calidad premium 1080p desde 0,90€ por 6 segundos' }),
       USD: 'Premium 1080p quality from $1.38 per 6 seconds',
     },
     badge: 'Premium',
