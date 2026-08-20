@@ -111,7 +111,7 @@ export default function StockSearchPanel({
       try {
         toast.loading(tx({ de: "Frame wird extrahiert…", en: "Frame is being extracted…", es: "Se está extrayendo el marco..." }), { id: `extract-${v.id}` });
         const url = await extractFrameFromVideoUrl(v.url, user.id, { atSeconds: 1 });
-        toast.success('Reference gesetzt', { id: `extract-${v.id}` });
+        toast.success(tx({ de: 'Reference gesetzt', en: 'Reference set', es: 'Referencia asignada' }), { id: `extract-${v.id}` });
         onUseAsReference(url, { source: v.source, author: v.user.name });
       } catch (e) {
         console.error('Frame extraction failed:', e);
@@ -130,7 +130,7 @@ export default function StockSearchPanel({
         return;
       }
       onUseAsReference(img.url, { source: img.source, author: img.user.name });
-      toast.success('Reference gesetzt');
+      toast.success(tx({ de: 'Reference gesetzt', en: 'Reference set', es: 'Referencia asignada' }));
     },
     [onUseAsReference]
   );

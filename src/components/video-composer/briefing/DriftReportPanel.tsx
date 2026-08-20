@@ -41,11 +41,21 @@ interface Props {
   onUpdateScene?: (id: string, updates: Partial<ComposerScene>) => void;
 }
 
-const SEV_LABEL: Record<DriftReport['severity'], string> = {
-  none: 'Plan & Storyboard im Einklang',
-  info: 'Kleine Abweichungen',
-  warn: 'Abweichungen erkannt',
-  error: 'Kritische Abweichungen',
+const sevLabel = (severity: DriftReport['severity']): string => {
+  switch (severity) {
+    case 'info':
+      return tx({ de: 'Kleine Abweichungen', en: 'Minor deviations', es: 'Desviaciones menores' });
+    case 'warn':
+      return tx({ de: 'Abweichungen erkannt', en: 'Deviations detected', es: 'Desviaciones detectadas' });
+    case 'error':
+      return tx({ de: 'Kritische Abweichungen', en: 'Critical deviations', es: 'Desviaciones críticas' });
+    default:
+      return tx({
+        de: 'Plan & Storyboard im Einklang',
+        en: 'Plan & storyboard in sync',
+        es: 'Plan y guion gráfico en sintonía',
+      });
+  }
 };
 
 export default function DriftReportPanel({ projectId, scenes, onUpdateScene }: Props) {
