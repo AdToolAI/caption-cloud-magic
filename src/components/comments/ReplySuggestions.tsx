@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Copy, MessageCircle, Sparkles, Loader2 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { tx } from "@/lib/i18nText";
 
 interface ReplySuggestion {
   type: "freundlich" | "werblich" | "locker";
@@ -67,7 +68,7 @@ export function ReplySuggestions({
     navigator.clipboard.writeText(text);
     toast({
       title: t("comments.copiedToClipboard"),
-      description: `${type} Antwort kopiert`,
+      description: `${type} ${tx({ de: "Antwort kopiert", en: "reply copied", es: "respuesta copiada" })}`,
     });
   };
 

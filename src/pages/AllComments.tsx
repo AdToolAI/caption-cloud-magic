@@ -368,7 +368,7 @@ const AllComments = () => {
           <TabsTrigger value="alle">{tx({ de: 'Alle', en: 'All', es: 'Todos' })}</TabsTrigger>
           <TabsTrigger value="inbox">Inbox</TabsTrigger>
           <TabsTrigger value="leads">Leads</TabsTrigger>
-          <TabsTrigger value="fragen">Fragen</TabsTrigger>
+          <TabsTrigger value="fragen">{tx({ de: 'Fragen', en: 'Questions', es: 'Preguntas' })}</TabsTrigger>
           <TabsTrigger value="beschwerden">Beschwerden</TabsTrigger>
           <TabsTrigger value="toxisch">Toxisch</TabsTrigger>
           <TabsTrigger value="erledigt">Erledigt</TabsTrigger>
@@ -439,7 +439,7 @@ const AllComments = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" title="Antwort kopieren">
+                        <Button variant="ghost" size="sm" title={tx({ de: "Antwort kopieren", en: "Copy reply", es: "Copiar respuesta" })}>
                           <Copy className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="sm" title={tx({ de: "Als erledigt markieren", en: "Mark as done", es: "Marcar como hecho" })}>
