@@ -70,6 +70,7 @@ export function useVideoPricingCatalog() {
     isLoading: query.isLoading,
     isError: query.isError,
     version: query.data?.version,
+    discountPercent: query.data?.discountPercent ?? 0,
     getPricePerSecond,
     getEntry: (modelId: string) => map.get(modelId) ?? null,
   };
