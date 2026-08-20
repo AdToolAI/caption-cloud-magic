@@ -72,7 +72,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
               {summary?.selection_rate?.toFixed(1) || 0}%
             </div>
             <p className="text-xs text-muted-foreground">
-              {summary?.total_selections || 0} Auswahlen
+              {summary?.total_selections || 0} {tx({ de: "Auswahlen", en: "selections", es: "selecciones" })}
             </p>
           </CardContent>
         </Card>
@@ -131,7 +131,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-green-500" />
-                  <span className="text-sm">Auswahlen</span>
+                  <span className="text-sm">{tx({ de: "Auswahlen", en: "Selections", es: "Selecciones" })}</span>
                 </div>
                 <div className="text-right">
                   <div className="font-bold">{conversion.total_selections}</div>
@@ -209,7 +209,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
                   <Tooltip />
                   <Legend />
                   <Bar dataKey="views" fill="#3b82f6" name="Views" />
-                  <Bar dataKey="selections" fill="#10b981" name="Auswahlen" />
+                  <Bar dataKey="selections" fill="#10b981" name={tx({ de: "Auswahlen", en: "Selections", es: "Selecciones" })} />
                 </BarChart>
               </ResponsiveContainer>
             </TabsContent>

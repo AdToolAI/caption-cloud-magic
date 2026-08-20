@@ -301,7 +301,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                       <span className="font-medium">{testResults.results.variant_a.views}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Auswahlen:</span>
+                      <span className="text-sm text-muted-foreground">{tx({ de: "Auswahlen:", en: "Selections:", es: "Selecciones:" })}</span>
                       <span className="font-medium">{testResults.results.variant_a.selections}</span>
                     </div>
                     <div className="flex justify-between">
@@ -325,7 +325,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                       <span className="font-medium">{testResults.results.variant_b.views}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Auswahlen:</span>
+                      <span className="text-sm text-muted-foreground">{tx({ de: "Auswahlen:", en: "Selections:", es: "Selecciones:" })}</span>
                       <span className="font-medium">{testResults.results.variant_b.selections}</span>
                     </div>
                     <div className="flex justify-between">
