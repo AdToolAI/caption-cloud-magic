@@ -98,7 +98,7 @@ export function RecurringEventsList({ workspace_id }: RecurringEventsListProps) 
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
                   <span>
-                    Nächste Ausführung:{' '}
+                    {tx({ de: 'Nächste Ausführung:', en: 'Next run:', es: 'Próxima ejecución:' })}{' '}
                     {rule.next_execution
                       ? formatDistanceToNow(new Date(rule.next_execution), {
                           addSuffix: true,
@@ -109,7 +109,7 @@ export function RecurringEventsList({ workspace_id }: RecurringEventsListProps) 
                 </div>
                 {rule.last_execution && (
                   <span>
-                    Letzte Ausführung:{' '}
+                    {tx({ de: 'Letzte Ausführung:', en: 'Last run:', es: 'Última ejecución:' })}{' '}
                     {formatDistanceToNow(new Date(rule.last_execution), {
                       addSuffix: true,
                       locale: de,

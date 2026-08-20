@@ -466,7 +466,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
           <div className="flex items-center gap-2 pt-3">
             <Switch checked={autoPublish} onCheckedChange={setAutoPublish} />
             <span className="text-xs text-muted-foreground">
-              Automatisch veröffentlichen wenn Status = <span className="text-indigo-300 font-semibold">scheduled</span>
+              {tx({ de: 'Automatisch veröffentlichen wenn Status =', en: 'Publish automatically when status =', es: 'Publicar automáticamente cuando el estado =' })} <span className="text-indigo-300 font-semibold">scheduled</span>
             </span>
           </div>
         </Section>

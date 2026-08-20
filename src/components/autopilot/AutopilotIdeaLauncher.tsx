@@ -537,7 +537,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
 
       {options.lipSync && options.characterIds.length === 0 && (
         <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-amber-500">
-          <AlertTriangle className="h-3 w-3" /> Für Lip-Sync brauchst du mindestens einen Charakter aus Cast &amp; World.
+          <AlertTriangle className="h-3 w-3" /> {tx({ de: 'Für Lip-Sync brauchst du mindestens einen Charakter aus Cast & World.', en: 'For lip-sync you need at least one character from Cast & World.', es: 'Para el lip-sync necesitas al menos un personaje de Cast & World.' })}
         </p>
       )}
 

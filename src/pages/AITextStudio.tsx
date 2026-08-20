@@ -593,7 +593,7 @@ export default function AITextStudio() {
             {selectedModel.strengths.map((s) => (
               <Badge key={s} variant="secondary">{s}</Badge>
             ))}
-            <Badge variant="outline">~{formatEUR(estCostEur)} geschätzt</Badge>
+            <Badge variant="outline">~{formatEUR(estCostEur)} {tx({ de: 'geschätzt', en: 'estimated', es: 'estimado' })}</Badge>
             <Button
               size="sm"
               variant="ghost"

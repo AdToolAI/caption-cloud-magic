@@ -163,7 +163,7 @@ export const OnboardingStepper = () => {
           <div className="flex-1">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-foreground">
-                Willkommen! Richte dein Konto ein ({completedSteps.length}/{ONBOARDING_STEPS.length})
+                {tx({ de: 'Willkommen! Richte dein Konto ein', en: 'Welcome! Set up your account', es: '¡Bienvenido! Configura tu cuenta' })} ({completedSteps.length}/{ONBOARDING_STEPS.length})
               </h3>
               <Button
                 variant="ghost"

@@ -650,7 +650,7 @@ export function AICompanionWidget() {
                   size="icon"
                   className="h-8 w-8 text-muted-foreground hover:text-foreground"
                   onClick={() => setShowHistory(true)}
-                  title="Gesprächsverlauf"
+                  title={tx({ de: 'Gesprächsverlauf', en: 'Conversation history', es: 'Historial de conversación' })}
                 >
                   <History className="w-4 h-4" />
                 </Button>

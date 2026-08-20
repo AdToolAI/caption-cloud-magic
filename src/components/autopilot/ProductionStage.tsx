@@ -124,7 +124,7 @@ export function ProductionStage({ production, scenes, log }: Props) {
             <Button asChild size="sm" variant="outline">
               <a href="/universal-directors-cut">
                 <Scissors className="mr-2 h-4 w-4" />
-                In Director's Cut öffnen
+                {tx({ de: 'In Director\'s Cut öffnen', en: 'Open in Director\'s Cut', es: 'Abrir en Director\'s Cut' })}
               </a>
             </Button>
           </div>

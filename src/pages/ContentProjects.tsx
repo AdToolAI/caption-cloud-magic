@@ -138,10 +138,10 @@ export default function ContentProjects() {
         {/* Filter Tabs */}
         <Tabs value={selectedStatus} onValueChange={setSelectedStatus} className="w-full">
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="all">Alle ({statusCounts.all})</TabsTrigger>
-            <TabsTrigger value="completed">Fertig ({statusCounts.completed})</TabsTrigger>
+            <TabsTrigger value="all">{tx({ de: 'Alle', en: 'All', es: 'Todos' })} ({statusCounts.all})</TabsTrigger>
+            <TabsTrigger value="completed">{tx({ de: 'Fertig', en: 'Done', es: 'Listo' })} ({statusCounts.completed})</TabsTrigger>
             <TabsTrigger value="rendering">Rendering ({statusCounts.rendering})</TabsTrigger>
-            <TabsTrigger value="draft">Entwürfe ({statusCounts.draft})</TabsTrigger>
+            <TabsTrigger value="draft">{tx({ de: 'Entwürfe', en: 'Drafts', es: 'Borradores' })} ({statusCounts.draft})</TabsTrigger>
             <TabsTrigger value="failed">{tx({ de: "Fehler", en: "Failed", es: "Error" })} ({statusCounts.failed})</TabsTrigger>
           </TabsList>
 

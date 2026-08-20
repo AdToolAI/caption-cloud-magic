@@ -119,7 +119,7 @@ export function SpeechDurationHint({ text, targetDurationSec, language = 'de' }:
     <div className={`flex items-center gap-2 rounded-md border px-2 py-1.5 text-[11px] ${toneClass}`}>
       <Clock className="h-3 w-3 shrink-0" />
       <span className="tabular-nums">
-        ~{seconds}s Sprech-Dauer <span className="opacity-60">({words} Wörter)</span> · Ziel {targetDurationSec}s
+        ~{seconds}s {tx({ de: 'Sprech-Dauer', en: 'speaking time', es: 'tiempo de habla' })} <span className="opacity-60">({words} {tx({ de: 'Wörter', en: 'words', es: 'palabras' })})</span> · {tx({ de: 'Ziel', en: 'target', es: 'objetivo' })} {targetDurationSec}s
       </span>
       <span className="opacity-80 truncate">— {message}</span>
     </div>

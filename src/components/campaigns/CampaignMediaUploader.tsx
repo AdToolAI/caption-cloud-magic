@@ -107,7 +107,7 @@ export function CampaignMediaUploader({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium">
-          Medien für Kampagne hochladen (optional)
+          {tx({ de: 'Medien für Kampagne hochladen (optional)', en: 'Upload media for campaign (optional)', es: 'Subir medios para la campaña (opcional)' })}
         </label>
         <span className="text-xs text-muted-foreground">
           {uploadedMedia.length}/{maxFiles}

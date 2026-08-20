@@ -278,8 +278,7 @@ export default function CharacterEditor({
               <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5">
                 <ShieldCheck className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  Beim ersten Upload bestätigst du einmalig die Bildrechte (DSGVO &
-                  Persönlichkeitsrechte). Danach läuft jeder weitere Upload ohne Rückfrage.
+                  {tx({ de: 'Beim ersten Upload bestätigst du einmalig die Bildrechte (DSGVO & Persönlichkeitsrechte). Danach läuft jeder weitere Upload ohne Rückfrage.', en: 'On your first upload you confirm the image rights once (GDPR & personality rights). Every further upload then runs without asking again.', es: 'En tu primera subida confirmas una vez los derechos de imagen (RGPD y derechos de personalidad). Las siguientes subidas ya no preguntan.' })}
                 </p>
               </div>
             )}

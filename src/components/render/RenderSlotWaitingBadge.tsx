@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useEffect, useState } from 'react';
 import { Clock, Sparkles } from 'lucide-react';
 import type { WaitingState } from '@/hooks/useEnqueuedRender';
@@ -39,7 +40,7 @@ export function RenderSlotWaitingBadge({ waiting }: { waiting: WaitingState | nu
         <Clock className="h-3.5 w-3.5 animate-pulse" />
       )}
       <span>
-        Warte auf Render-Slot — nächster Versuch in {remaining}s
+        {tx({ de: 'Warte auf Render-Slot — nächster Versuch in', en: 'Waiting for a render slot — next attempt in', es: 'Esperando un espacio de renderizado — próximo intento en' })} {remaining}s
         <span className="ml-1 opacity-60">(#{waiting.attempt}/{waiting.maxRetries})</span>
       </span>
     </div>

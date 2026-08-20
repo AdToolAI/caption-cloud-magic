@@ -286,7 +286,7 @@ export default function DriftReportPanel({ projectId, scenes, onUpdateScene }: P
               {autoFix.skipped.length > 0 && (
                 <details className="text-[11px] text-muted-foreground">
                   <summary className="cursor-pointer hover:text-foreground">
-                    {autoFix.skipped.length} Befund(e) übersprungen (manuell prüfen)
+                    {autoFix.skipped.length} {tx({ de: 'Befund(e) übersprungen (manuell prüfen)', en: 'finding(s) skipped (check manually)', es: 'hallazgo(s) omitido(s) (revisar manualmente)' })}
                   </summary>
                   <ul className="mt-2 space-y-1 pl-3 list-disc list-inside">
                     {autoFix.skipped.slice(0, 8).map((s, i) => (

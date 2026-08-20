@@ -150,7 +150,7 @@ export default function LocationLightingGrid({
 
       {loading ? (
         <div className="flex items-center justify-center py-4 text-xs text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin mr-2" /> Lädt Varianten...
+          <Loader2 className="h-4 w-4 animate-spin mr-2" /> {tx({ de: 'Lädt Varianten…', en: 'Loading variants…', es: 'Cargando variantes…' })}
         </div>
       ) : variants.length === 0 ? (
         <div className="rounded-md border border-dashed border-border/60 p-3 text-center text-[11px] text-muted-foreground">

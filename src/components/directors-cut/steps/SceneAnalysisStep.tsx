@@ -470,7 +470,7 @@ export function SceneAnalysisStep({
     });
     
     const transitionName = TRANSITION_TYPES.find(t => t.id === transitionType)?.name || transitionType;
-    toast.success(`Übergang "${transitionName}" gesetzt`);
+    toast.success(txe(`Übergang "${transitionName}" gesetzt`, `Transition "${transitionName}" applied`, `Transición "${transitionName}" aplicada`));
   };
 
   // Handle scene transition duration change
@@ -893,7 +893,7 @@ export function SceneAnalysisStep({
                           </span>
                           <span className="flex items-center gap-1">
                             <Lightbulb className="w-3 h-3" />
-                            {scene.suggested_effects.length} Vorschläge
+                            {scene.suggested_effects.length} {tx({ de: 'Vorschläge', en: 'suggestions', es: 'sugerencias' })}
                           </span>
                         </div>
                       </div>

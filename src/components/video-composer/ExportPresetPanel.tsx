@@ -259,13 +259,13 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
           <div>
             <CardTitle className="text-base flex items-center gap-2">
               <Share2 className="h-4 w-4 text-primary" />
-              Plattform-Versionen
+              {tx({ de: 'Plattform-Versionen', en: 'Platform versions', es: 'Versiones de plataforma' })}
               <Badge variant="secondary" className="ml-2 text-[10px] font-normal">
                 Multi-Format Export
               </Badge>
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              Wähle mehrere Formate aus und exportiere sie in einem Klick (€{COST_PER_EXPORT.toFixed(2)} pro Export)
+              {tx({ de: 'Wähle mehrere Formate aus und exportiere sie in einem Klick', en: 'Select multiple formats and export them in one click', es: 'Selecciona varios formatos y expórtalos con un clic' })} (€{COST_PER_EXPORT.toFixed(2)} {tx({ de: 'pro Export', en: 'per export', es: 'por exportación' })})
             </p>
           </div>
           <div className="flex items-center gap-1.5">

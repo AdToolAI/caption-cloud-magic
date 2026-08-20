@@ -791,7 +791,7 @@ export function SceneEditingStep({
               className="text-xs border-orange-500/50 text-orange-600 hover:bg-orange-500/10"
             >
               <Undo2 className="h-3.5 w-3.5 mr-1.5" />
-              Rückgängig ({deletedScenes.length})
+              {tx({ de: 'Rückgängig', en: 'Undo', es: 'Deshacer' })} ({deletedScenes.length})
             </Button>
           )}
           <Button
@@ -818,7 +818,7 @@ export function SceneEditingStep({
             className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
           >
             <Wand2 className="h-3.5 w-3.5 mr-1.5" />
-            AI Übergänge
+            {tx({ de: 'AI Übergänge', en: 'AI transitions', es: 'Transiciones IA' })}
           </Button>
           <Button
             onClick={() => setShowRemixDialog(true)}
@@ -1216,7 +1216,7 @@ export function SceneEditingStep({
                       <div className="mb-4">
                         <div className="flex items-center gap-2 mb-2">
                           <Lightbulb className="h-4 w-4 text-yellow-500" />
-                          <span className="text-xs font-medium">AI Vorschläge</span>
+                          <span className="text-xs font-medium">{tx({ de: 'AI Vorschläge', en: 'AI suggestions', es: 'Sugerencias IA' })}</span>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {selectedScene.ai_suggestions.map((suggestion, i) => (
