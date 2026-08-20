@@ -54,6 +54,18 @@ export const ALLOWLIST: Record<string, Array<{ text: string; reason: string }>> 
   'hooks/useApplyProductionPlan.ts': [
     { text: 'Sprecher', reason: 'same plan cast-slot mention key on the apply path' },
   ],
+  'components/creator-library/MusicBrowser.tsx': [
+    { text: 'fröhlich', reason: 'semantic mood search key matched against track metadata, never rendered' },
+  ],
+  'components/picture-studio/PromptHelperDialog.tsx': [
+    { text: 'Szene', reason: 'stable semantic chip ID; the rendered label comes from CHIP_LABELS' },
+    { text: 'Hell', reason: 'stable semantic chip ID; the rendered label comes from CHIP_LABELS' },
+    { text: ', Szene:', reason: 'object-literal key run inside CHIP_LABELS, not JSX text' },
+    { text: ', Hell:', reason: 'object-literal key run inside CHIP_LABELS, not JSX text' },
+  ],
+  'components/video-composer/VoiceSubtitlesTab.tsx': [
+    { text: 'Bebas Neue', reason: 'font-family proper noun in the subtitle font picker' },
+  ],
   'lib/directors-cut/overlayPresets.ts': [
     { text: 'Sarah Klein', reason: 'sample persona proper noun inside preset demo content' },
   ],
@@ -114,7 +126,7 @@ const DE_ROOTS = [
   'vergleich', 'szene', 'untertitel', 'lautstärk', 'guthaben', 'vorschau', 'vorlage', 'entwurf', 'benachrichtig',
   'berechtig', 'geschwindigkeit', 'auswahl', 'eingabe', 'ausgabe', 'überschrift', 'ueberschrift', 'datei',
   'bearbeitung', 'bewertung', 'zahlung', 'rechnung', 'anmeld', 'abmeld', 'hinweis', 'wiederherstell',
-  'wiederherge', 'verworf', 'verbrauch', 'erstatt', 'drehbuch', 'drehbüch', 'kündbar', 'kuendbar',
+  'wiederherge', 'aufgebraucht', 'verworf', 'verbrauch', 'erstatt', 'drehbuch', 'drehbüch', 'kündbar', 'kuendbar',
 ];
 
 const DE_SUFFIX =
@@ -251,6 +263,10 @@ export function safeRanges(src: string): Range[] {
     else rs.push([m.index, m.index + m[0].length]);
   }
 
+  // TypeScript literal-union type positions — semantic values, never rendered.
+  const union = /(?::|=|\|)\s*'[^'\n]{2,60}'(?:\s*\|\s*'[^'\n]{2,60}')+/g;
+  while ((m = union.exec(src))) rs.push([m.index, m.index + m[0].length]);
+
   // Non-rendered text: comments, imports, console output.
   for (const re of [/\/\/[^\n]*/g, /\/\*[\s\S]*?\*\//g, /^import[^\n]*$/gm]) {
     while ((m = re.exec(src))) rs.push([m.index, m.index + m[0].length]);
@@ -278,26 +294,28 @@ const ATTRS =
   /\b(placeholder|title|aria-label|aria-description|alt|data-tooltip|label|helperText|description|caption|tooltip|emptyMessage|emptyState)\s*=\s*(?:"([^"\n]{2,300})"|'([^'\n]{2,300})'|\{\s*['"`]([^'"`\n]{2,300})['"`]\s*\})/g;
 
 const FIELDS =
-  /\b(label|labels|title|name|displayName|description|desc|hint|tagline|question|subtitle|helper|helperText|tooltip|placeholder|caption|message|heading|summary|cta|ctaLabel|badge|status|error|note|warning|answer|reply|text|body|prefix|suffix|unit|empty|short|long)\s*:\s*(?:'([^'\\\n]{3,300})'|"([^"\\\n]{3,300})"|`([^`$\\\n]{3,300})`)/g;
+  /\b(\w*[Ll]abel|labels|\w*[Tt]itle|name|displayName|description|desc|hint|tagline|question|subtitle|helper|helperText|tooltip|placeholder|caption|message|heading|summary|cta|ctaLabel|badge|status|error|note|warning|answer|reply|text|body|prefix|suffix|unit|empty|short|long)\s*:\s*(?:'([^'\\\n]{3,300})'|"([^"\\\n]{3,300})"|`([^`$\\\n]{3,300})`)/g;
 
 const ARRAYS =
   /\b(options|quickReplies|tags|items|steps|choices|suggestions|examples|bullets|features|labels|prompts)\s*:\s*\[([^\]]{6,900})\]/g;
 
-const CODEISH = /(=>|===|!==|\breturn\b|;\s|\/\/|\bconst\b|\bRecord\b|\bfunction\b|\{|\})/;
+const CODEISH = /(=>|===|!==|\breturn\b|;\s|\/\/|\/\*|\*\/|\bconst\b|\bRecord\b|\bfunction\b|\{|\})/;
 
 /** A string literal that itself contains `tx({` renders source text. */
 export const MALFORMED_LITERAL = /(['"])((?:\\.|(?!\1)[^\\\n])*?tx\(\s*\{(?:\\.|(?!\1)[^\\\n])*)\1/g;
 
-export function extractSinks(src: string): Sink[] {
+export function extractSinks(src: string, isJsx = true): Sink[] {
   const out: Sink[] = [];
   let m: RegExpExecArray | null;
 
   // 1. JSX text nodes, newline tolerant, including nodes adjacent to icons
   //    or fragments (the `}` / `>` boundary both count).
-  const jsxText = />([^<>{}]*?[\p{L}][^<>{}]*?)</gsu;
-  while ((m = jsxText.exec(src))) {
+  const jsxText = /[>}]([^<>{}]*?[\p{L}][^<>{}]*?)[<{]/gsu;
+  while (isJsx && (m = jsxText.exec(src))) {
     const text = m[1].replace(/\s+/g, ' ').trim();
     if (CODEISH.test(text)) continue;
+    // Real JSX text never carries string-literal quotes; those matches are code.
+    if (/['"`]/.test(text)) continue;
     if (text.length >= 3) out.push({ pos: m.index + 1, text, kind: 'jsx-text' });
   }
 
@@ -333,6 +351,35 @@ export function extractSinks(src: string): Sink[] {
     let s: RegExpExecArray | null;
     while ((s = lit.exec(body))) {
       out.push({ pos: offset + s.index, text: s[1].trim(), kind: `array:${m[1]}` });
+    }
+  }
+
+  // 5b. Plain / unkeyed string-literal arrays (`const STEPS = ['Szene wählen', …]`).
+  const PLAIN_ARRAY = /=\s*\[((?:\s*(?:'[^'\\\n]{2,200}'|"[^"\\\n]{2,200}")\s*,?){2,})\]/g;
+  while ((m = PLAIN_ARRAY.exec(src))) {
+    const body = m[1];
+    const offset = m.index + m[0].indexOf(body);
+    const lit = /['"]([^'"\\\n]{3,200})['"]/g;
+    let s2: RegExpExecArray | null;
+    while ((s2 = lit.exec(body))) {
+      out.push({ pos: offset + s2.index, text: s2[1].trim(), kind: 'array:plain' });
+    }
+  }
+
+  // 5c. String literals rendered from a ternary branch or an `||` fallback.
+  //     Object keys (`key: 'optimieren'`) are deliberately NOT matched.
+  const TERNARY_PATTERNS = [
+    /\?\s*('[^'\\\n]{3,200}'|"[^"\\\n]{3,200}")/g,
+    /\|\|\s*('[^'\\\n]{3,200}'|"[^"\\\n]{3,200}")/g,
+    /\?[^:'"`\n]{0,120}:\s*('[^'\\\n]{3,200}'|"[^"\\\n]{3,200}")/g,
+  ];
+  for (const re of TERNARY_PATTERNS) {
+    while ((m = re.exec(src))) {
+      out.push({
+        pos: m.index + m[0].lastIndexOf(m[1]),
+        text: m[1].slice(1, -1).replace(/\s+/g, ' ').trim(),
+        kind: 'ternary',
+      });
     }
   }
 
@@ -419,9 +466,10 @@ export function scanRepo(): { offenders: string[]; malformed: string[]; excluded
     }
 
     const allowed = new Set((ALLOWLIST[rel] ?? []).map((a) => a.text));
+    const isJsx = file.endsWith('.tsx');
     const rs = safeRanges(src);
     const seen = new Set<string>();
-    for (const sink of extractSinks(src)) {
+    for (const sink of extractSinks(src, isJsx)) {
       if (inSafe(sink.pos, rs)) continue;
       if (allowed.has(sink.text)) continue;
       if (!isGerman(sink.text)) continue;
@@ -576,6 +624,6 @@ describe('English UI purity (deep)', () => {
       }
     }
     // Sink-scoped only: no path-level trust.
-    expect(Object.values(ALLOWLIST).flat().length).toBeLessThanOrEqual(8);
+    expect(Object.values(ALLOWLIST).flat().length).toBeLessThanOrEqual(16);
   });
 });

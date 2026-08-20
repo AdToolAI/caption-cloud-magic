@@ -82,7 +82,7 @@ export function useNLEExport(projectId?: string) {
       setExporting(format);
       const toastId = toast.loading(
         format === 'bundle'
-          ? tx({ de: 'Bundle wird gepackt — kann 30–60 s dauern…', en: 'Bundle is being packaged — may take 30–60 s…', es: 'El paquete se está empaquetando — puede tardar 30–60 s…' })
+          ? tx({ de: tx({ de: "Bundle wird gepackt — kann 30–60 s dauern…", en: "Packing bundle — this can take 30–60 s…", es: "Empaquetando — puede tardar 30–60 s…" }), en: 'Bundle is being packaged — may take 30–60 s…', es: 'El paquete se está empaquetando — puede tardar 30–60 s…' })
           : tx({ de: `${format.toUpperCase()} wird exportiert…`, en: `${format.toUpperCase()} is exported…`, es: `${format.toUpperCase()} se exporta...` }),
       );
       try {
@@ -124,7 +124,7 @@ export function useNLEExport(projectId?: string) {
       const { data, error } = await supabase.storage
         .from('composer-nle-exports')
         .createSignedUrl(record.storage_path, 3600);
-      if (error || !data?.signedUrl) throw new Error(tx({ de: 'Datei nicht mehr verfügbar', en: 'File no longer available', es: 'Archivo no disponible' }));
+      if (error || !data?.signedUrl) throw new Error(tx({ de: tx({ de: "Datei nicht mehr verfügbar", en: "File no longer available", es: "El archivo ya no está disponible" }), en: 'File no longer available', es: 'Archivo no disponible' }));
       const ext = record.format === 'bundle' ? 'zip' : record.format;
       triggerDownload(data.signedUrl, `composer-${record.project_id.slice(0, 8)}.${ext}`);
     } catch (err) {
@@ -144,7 +144,7 @@ export function useNLEExport(projectId?: string) {
           body: { projectId, fcpxmlContent, apply: false },
         });
         if (error) throw new Error(error.message);
-        if (!data?.success) throw new Error(data?.error || tx({ de: 'Import-Vorschau fehlgeschlagen', en: 'Import preview failed', es: 'Error en la vista previa de importación' }));
+        if (!data?.success) throw new Error(data?.error || tx({ de: tx({ de: "Import-Vorschau fehlgeschlagen", en: "Import preview failed", es: "Error en la vista previa de importación" }), en: 'Import preview failed', es: 'Error en la vista previa de importación' }));
         return data;
       } catch (err) {
         const msg = err instanceof Error ? err.message : tx({ de: 'Import-Vorschau fehlgeschlagen', en: 'Import preview failed', es: 'Error en la vista previa de importación' });
@@ -165,7 +165,7 @@ export function useNLEExport(projectId?: string) {
           body: { projectId, fcpxmlContent, apply: true },
         });
         if (error) throw new Error(error.message);
-        if (!data?.success) throw new Error(data?.error || tx({ de: 'Import fehlgeschlagen', en: 'Import failed', es: 'Importación fallida' }));
+        if (!data?.success) throw new Error(data?.error || tx({ de: tx({ de: "Import fehlgeschlagen", en: "Import failed", es: "Error al importar" }), en: 'Import failed', es: 'Importación fallida' }));
         const a = data.applied;
         toast.success(
           tx({ de: `Übernommen: ${a?.reordered ?? 0} umsortiert, ${a?.trimmed ?? 0} getrimmt`, en: `Applied: ${a?.reordered ?? 0} reordered, ${a?.trimmed ?? 0} trimmed`, es: `Aplicado: ${a?.reordered ?? 0} reordenado, ${a?.trimmed ?? 0} recortado` }),

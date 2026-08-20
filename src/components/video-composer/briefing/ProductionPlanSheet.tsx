@@ -825,8 +825,8 @@ export default function ProductionPlanSheet({
       console.error('[ProductionPlanSheet] deep-parse failed', { status, msg, body: details.body });
       toast({
         title: tx({ de: 'Briefing konnte nicht verarbeitet werden', en: 'Could not process briefing', es: 'No se pudo procesar el briefing' }),
-        description: status === 402 || /402/.test(msg) ? tx({ de: 'Keine AI-Credits mehr.', en: 'No more AI credits.', es: 'No quedan créditos de IA.' })
-          : status === 429 || /429/.test(msg) ? tx({ de: 'Zu viele Anfragen — bitte kurz warten.', en: 'Too many requests — please wait a moment.', es: 'Demasiadas solicitudes — espera un momento.' })
+        description: status === 402 || /402/.test(msg) ? tx({ de: tx({ de: "Keine AI-Credits mehr.", en: "Out of AI credits.", es: "Sin créditos de IA." }), en: 'No more AI credits.', es: 'No quedan créditos de IA.' })
+          : status === 429 || /429/.test(msg) ? tx({ de: tx({ de: "Zu viele Anfragen — bitte kurz warten.", en: "Too many requests — please wait a moment.", es: "Demasiadas solicitudes — espera un momento." }), en: 'Too many requests — please wait a moment.', es: 'Demasiadas solicitudes — espera un momento.' })
           : status ? `${status}: ${msg}` : msg,
         variant: 'destructive',
       });
@@ -903,7 +903,7 @@ export default function ProductionPlanSheet({
         warnings,
       });
       toast({
-        title: warnings.length ? tx({ de: 'Plan übernommen — bitte Hinweise prüfen', en: 'Plan applied — please check notes', es: 'Plan aplicado — revisa las notas' }) : tx({ de: 'Plan übernommen und verifiziert', en: 'Plan applied and verified', es: 'Plan aplicado y verificado' }),
+        title: warnings.length ? tx({ de: tx({ de: "Plan übernommen — bitte Hinweise prüfen", en: "Plan applied — please review the notes", es: "Plan aplicado — revisa las notas" }), en: 'Plan applied — please check notes', es: 'Plan aplicado — revisa las notas' }) : tx({ de: 'Plan übernommen und verifiziert', en: 'Plan applied and verified', es: 'Plan aplicado y verificado' }),
         description: warnings.length
           ? warnings.join(' · ')
           : tx({
@@ -1145,7 +1145,7 @@ export default function ProductionPlanSheet({
           : tx({ de: `„${created.name}“ ist jetzt in der Library.`, en: `“${created.name}” is now in the library.`, es: `«${created.name}» ahora está en la biblioteca.` }),
       });
     } catch (e: any) {
-      toast({ title: tx({ de: 'Konnte Location nicht anlegen', en: 'Could not create location', es: 'No se pudo crear la ubicación' }), description: e?.message || tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }), variant: 'destructive' });
+      toast({ title: tx({ de: 'Konnte Location nicht anlegen', en: 'Could not create location', es: 'No se pudo crear la ubicación' }), description: e?.message || tx({ de: tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }), en: 'Unknown error', es: 'Error desconocido' }), variant: 'destructive' });
     } finally {
       setCreatingLoc(null);
     }
@@ -1330,7 +1330,7 @@ export default function ProductionPlanSheet({
           </DialogTitle>
           <DialogDescription className="text-xs">
             {safePlan?._meta?.source === 'local-fallback'
-              ? tx({ de: 'Achtung: Die AI-Analyse ist fehlgeschlagen — dieser Plan wurde nur lokal aus deinem Briefing-Text extrahiert. Prüfe Prompts und Dialoge, oder starte die Analyse über „Briefing analysieren" erneut.', en: 'Attention: AI analysis failed — this plan was only extracted locally from your briefing text. Check prompts and dialogues, or restart the analysis via "Analyze Briefing" again.', es: 'Atención: El análisis de IA falló — este plan solo se extrajo localmente de tu texto de briefing. Revisa los prompts y diálogos, o reinicia el análisis a través de "Analizar Briefing" de nuevo.' })
+              ? tx({ de: tx({ de: "Achtung: Die AI-Analyse ist fehlgeschlagen — dieser Plan wurde nur lokal aus deinem Briefing-Text extrahiert. Prüfe Prompts und Dialoge, oder starte die Analyse über „Briefing analysieren\" erneut.", en: "Heads up: the AI analysis failed — this plan was extracted locally from your briefing text only. Check prompts and scenes carefully.", es: "Atención: el análisis de IA falló — este plan se extrajo localmente de tu texto de briefing. Revisa los prompts y las escenas con cuidado." }), en: 'Attention: AI analysis failed — this plan was only extracted locally from your briefing text. Check prompts and dialogues, or restart the analysis via "Analyze Briefing" again.', es: 'Atención: El análisis de IA falló — este plan solo se extrajo localmente de tu texto de briefing. Revisa los prompts y diálogos, o reinicia el análisis a través de "Analizar Briefing" de nuevo.' })
               : tx({ de: 'Editierbarer Drehplan aus deinem Briefing. Bereits gerenderte oder Lip-Sync-aktive Szenen werden nie überschrieben.', en: 'Editable shooting schedule from your briefing. Already rendered or lip-sync active scenes will never be overwritten.', es: 'Plan de rodaje editable de tu briefing. Las escenas ya renderizadas o con sincronización labial activa nunca se sobrescribirán.' })}
 
           </DialogDescription>

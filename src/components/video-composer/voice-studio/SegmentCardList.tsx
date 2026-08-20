@@ -68,7 +68,7 @@ export function SegmentCardList({ script, speakerMap, overrides, onOverridesChan
         },
       });
       if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || tx({ de: 'Re-Roll fehlgeschlagen', en: 'Re-roll failed', es: 'Re-roll fallido' }));
+      if (!data?.success) throw new Error(data?.error || tx({ de: tx({ de: "Re-Roll fehlgeschlagen", en: "Re-roll failed", es: "Error al regenerar" }), en: 'Re-roll failed', es: 'Re-roll fallido' }));
       const audioBase64 = data.segments?.[0]?.audioBase64;
       if (!audioBase64) throw new Error(tx({ de: 'Kein Audio zurück', en: 'No audio returned', es: 'No se recibió audio' }));
       const url = `data:audio/mpeg;base64,${audioBase64}`;

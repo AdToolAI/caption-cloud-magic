@@ -75,7 +75,7 @@ export function TextOverlayEditor({
   const addOverlay = (template?: typeof TEXT_OVERLAY_TEMPLATES[number]) => {
     const newOverlay: TextOverlay = {
       id: `overlay-${Date.now()}`,
-      text: template?.text || tx({ de: "Neuer Text", en: "New Text", es: "Nuevo texto" }),
+      text: template?.text || tx({ de: tx({ de: "Neuer Text", en: "New text", es: "Nuevo texto" }), en: "New Text", es: "Nuevo texto" }),
       animation: template?.animation || 'fadeIn',
       position: template?.position || 'center',
       startTime: currentTime,

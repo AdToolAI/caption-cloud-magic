@@ -49,7 +49,7 @@ export const AdvancedVoiceSettings = ({ onSettingsChange }: AdvancedVoiceSetting
           className="gap-2"
         >
           <Settings className="h-4 w-4" />
-          {showAdvanced ? tx({ de: 'Erweiterte Einstellungen ausblenden', en: 'Hide advanced settings', es: 'Ocultar configuración avanzada' }) : tx({ de: 'Erweiterte Einstellungen', en: 'Advanced Settings', es: 'Configuración avanzada' })}
+          {showAdvanced ? tx({ de: tx({ de: "Erweiterte Einstellungen ausblenden", en: "Hide advanced settings", es: "Ocultar ajustes avanzados" }), en: 'Hide advanced settings', es: 'Ocultar configuración avanzada' }) : tx({ de: 'Erweiterte Einstellungen', en: 'Advanced Settings', es: 'Configuración avanzada' })}
         </Button>
         {showAdvanced && (
           <Button variant="ghost" size="sm" onClick={resetToDefaults}>

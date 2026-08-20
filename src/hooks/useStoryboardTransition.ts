@@ -311,7 +311,7 @@ function mergeScenesToSingleScene(scenes: TProductionPlan['scenes'], targetDurat
   return [{
     ...base,
     index: 1,
-    label: base.label ?? tx({ de: 'Durchgehende Szene', en: 'Continuous scene', es: 'Escena continua' }),
+    label: base.label ?? tx({ de: tx({ de: "Durchgehende Szene", en: "Continuous scene", es: "Escena continua" }), en: 'Continuous scene', es: 'Escena continua' }),
     durationSec: targetDurationSec,
     cast: Array.from(castByKey.values()),
     lipSync: base.lipSync || dialogTurns.length > 0 || Array.from(castByKey.values()).length > 0,
@@ -1077,9 +1077,9 @@ export function useStoryboardTransition({
           next < 20
             ? tx({ de: 'Schritt 1/4 · Briefing-Modus erkennen', en: 'Step 1/4 · Detecting briefing mode', es: 'Paso 1/4 · Detectando modo del briefing' })
             : next < 45
-              ? tx({ de: 'Schritt 2/4 · Research & Wissens-Anreicherung (KI füllt Lücken)', en: 'Step 2/4 · Research & knowledge enrichment (AI fills gaps)', es: 'Paso 2/4 · Investigación y enriquecimiento de conocimiento (la IA rellena huecos)' })
+              ? tx({ de: tx({ de: "Schritt 2/4 · Research & Wissens-Anreicherung (KI füllt Lücken)", en: "Step 2/4 · Research & knowledge enrichment (AI fills the gaps)", es: "Paso 2/4 · Investigación y enriquecimiento (la IA rellena los huecos)" }), en: 'Step 2/4 · Research & knowledge enrichment (AI fills gaps)', es: 'Paso 2/4 · Investigación y enriquecimiento de conocimiento (la IA rellena huecos)' })
               : next < 65
-                ? tx({ de: 'Schritt 3/4 · Strukturextraktion (Szenen, VO, Cast)', en: 'Step 3/4 · Structure extraction (scenes, VO, cast)', es: 'Paso 3/4 · Extracción de estructura (escenas, VO, reparto)' })
+                ? tx({ de: tx({ de: "Schritt 3/4 · Strukturextraktion (Szenen, VO, Cast)", en: "Step 3/4 · Structure extraction (scenes, VO, cast)", es: "Paso 3/4 · Extracción de estructura (escenas, VO, reparto)" }), en: 'Step 3/4 · Structure extraction (scenes, VO, cast)', es: 'Paso 3/4 · Extracción de estructura (escenas, VO, reparto)' })
                 : tx({ de: 'Schritt 4/4 · Cast & Locations gegen Library auflösen', en: 'Step 4/4 · Resolving cast & locations against the library', es: 'Paso 4/4 · Resolviendo reparto y localizaciones con la biblioteca' });
         return { ...s, progress: next, phase, phaseLabel };
       });
@@ -1373,7 +1373,7 @@ export function useStoryboardTransition({
 
       const isAbort = e?.name === 'AbortError';
       const status: number | undefined = e?.status;
-      const msg: string = isAbort ? tx({ de: `Timeout nach ${Math.round(CLIENT_TIMEOUT_MS / 1000)}s`, en: `Timeout after ${Math.round(CLIENT_TIMEOUT_MS / 1000)}s`, es: `Tiempo de espera agotado tras ${Math.round(CLIENT_TIMEOUT_MS / 1000)}s` }) : (e?.message || tx({ de: 'Deep-Parse fehlgeschlagen', en: 'Deep-parse failed', es: 'Error en el análisis profundo' }));
+      const msg: string = isAbort ? tx({ de: `Timeout nach ${Math.round(CLIENT_TIMEOUT_MS / 1000)}s`, en: `Timeout after ${Math.round(CLIENT_TIMEOUT_MS / 1000)}s`, es: `Tiempo de espera agotado tras ${Math.round(CLIENT_TIMEOUT_MS / 1000)}s` }) : (e?.message || tx({ de: tx({ de: "Deep-Parse fehlgeschlagen", en: "Deep parse failed", es: "Error en el análisis profundo" }), en: 'Deep-parse failed', es: 'Error en el análisis profundo' }));
       console.error('[useStoryboardTransition] deep-parse failed', {
         status,
         msg,
@@ -1389,8 +1389,8 @@ export function useStoryboardTransition({
       if (status === 402 || status === 429 || status === 413) {
         toast({
           title: tx({ de: 'Briefing-Analyse fehlgeschlagen', en: 'Briefing analysis failed', es: 'Error en el análisis del briefing' }),
-          description: status === 402 ? tx({ de: 'Keine AI-Credits mehr — bitte aufladen.', en: 'No AI credits left — please top up.', es: 'No quedan créditos de IA — por favor, recarga.' })
-            : status === 429 ? tx({ de: 'Zu viele Anfragen — bitte kurz warten und erneut versuchen.', en: 'Too many requests — please wait briefly and try again.', es: 'Demasiadas solicitudes — por favor, espera brevemente e inténtalo de nuevo.' })
+          description: status === 402 ? tx({ de: tx({ de: "Keine AI-Credits mehr — bitte aufladen.", en: "Out of AI credits — please top up.", es: "Sin créditos de IA — recarga tu saldo." }), en: 'No AI credits left — please top up.', es: 'No quedan créditos de IA — por favor, recarga.' })
+            : status === 429 ? tx({ de: tx({ de: "Zu viele Anfragen — bitte kurz warten und erneut versuchen.", en: "Too many requests — please wait a moment and try again.", es: "Demasiadas solicitudes — espera un momento e inténtalo de nuevo." }), en: 'Too many requests — please wait briefly and try again.', es: 'Demasiadas solicitudes — por favor, espera brevemente e inténtalo de nuevo.' })
             : tx({ de: 'Briefing zu lang — bitte kürzen.', en: 'Briefing too long — please shorten it.', es: 'El briefing es demasiado largo — por favor, acórtalo.' }),
           variant: 'destructive',
         });
@@ -1489,7 +1489,7 @@ export function useStoryboardTransition({
           toast({
             title: tx({ de: 'Basis-Plan bereit', en: 'Base plan ready', es: 'Plan base listo' }),
             description: isNetwork
-              ? tx({ de: 'Verbindung war kurz instabil — wir haben einen Basis-Plan vorbereitet. Du kannst ihn wie gewohnt anpassen oder die Analyse erneut starten.', en: 'Connection was briefly unstable — we have prepared a basic plan. You can adjust it as usual or restart the analysis.', es: 'La conexión fue brevemente inestable — hemos preparado un plan básico. Puedes ajustarlo como de costumbre o reiniciar el análisis.' })
+              ? tx({ de: tx({ de: "Verbindung war kurz instabil — wir haben einen Basis-Plan vorbereitet. Du kannst ihn wie gewohnt anpassen oder die Analyse erneut starten.", en: "The connection was briefly unstable — we prepared a base plan. You can adjust it as usual or run the analysis again.", es: "La conexión fue inestable un momento — preparamos un plan base. Puedes ajustarlo como siempre o repetir el análisis." }), en: 'Connection was briefly unstable — we have prepared a basic plan. You can adjust it as usual or restart the analysis.', es: 'La conexión fue brevemente inestable — hemos preparado un plan básico. Puedes ajustarlo como de costumbre o reiniciar el análisis.' })
               : tx({ de: 'Analyse übersprungen — Basis-Plan als Startpunkt eingeblendet. Passe Werte an oder starte die Analyse neu.', en: 'Analysis skipped — a basic plan has been shown as a starting point. Adjust values or restart the analysis.', es: 'Análisis omitido — se ha mostrado un plan básico como punto de partida. Ajusta los valores o reinicia el análisis.' }),
             // v238 — neutral, not destructive: fallback is a valid path.
           });
@@ -1553,10 +1553,10 @@ export function useStoryboardTransition({
                 const sheetWasClosed = !s.planSheetOpen;
                 toast({
                   title: sheetWasClosed
-                    ? tx({ de: '✨ Vollständiger Plan nachgeladen — bitte erneut anwenden', en: '✨ Full plan reloaded — please apply again', es: '✨ Plan completo recargado — por favor, aplica de nuevo' })
+                    ? tx({ de: tx({ de: "✨ Vollständiger Plan nachgeladen — bitte erneut anwenden", en: "✨ Full plan reloaded — please apply again", es: "✨ Plan completo recargado — vuelve a aplicarlo" }), en: '✨ Full plan reloaded — please apply again', es: '✨ Plan completo recargado — por favor, aplica de nuevo' })
                     : tx({ de: '✨ Vollständiger Plan nachgeladen', en: '✨ Full plan reloaded', es: '✨ Plan completo recargado' }),
                   description: sheetWasClosed
-                    ? tx({ de: 'Dein Briefing wurde im Hintergrund analysiert. Klicke „Plan anwenden", um Fallback-Szenen zu ersetzen.', en: 'Your briefing has been analyzed in the background. Click "Apply Plan" to replace fallback scenes.', es: 'Tu briefing ha sido analizado en segundo plano. Haz clic en "Aplicar plan" para reemplazar las escenas de respaldo.' })
+                    ? tx({ de: tx({ de: "Dein Briefing wurde im Hintergrund analysiert. Klicke „Plan anwenden\", um Fallback-Szenen zu ersetzen.", en: "Your briefing was analyzed in the background. Click “Apply plan” to replace the fallback scenes.", es: "Tu briefing se analizó en segundo plano. Haz clic en «Aplicar plan» para sustituir las escenas de reserva." }), en: 'Your briefing has been analyzed in the background. Click "Apply Plan" to replace fallback scenes.', es: 'Tu briefing ha sido analizado en segundo plano. Haz clic en "Aplicar plan" para reemplazar las escenas de respaldo.' })
                     : tx({ de: 'Der AI-generierte Plan ist jetzt verfügbar.', en: 'The AI-generated plan is now available.', es: 'El plan generado por IA ya está disponible.' }),
                 });
                 return { ...s, planSheetOpen: true, initialPlan: latePlan, activeProjectId };

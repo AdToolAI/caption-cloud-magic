@@ -151,7 +151,7 @@ export default function StockVideos() {
     const key = target === "composer" ? "composer:incoming-stock-video" : "directors-cut:incoming-stock-video";
     sessionStorage.setItem(key, JSON.stringify(payload));
     toast({
-      title: target === "composer" ? tx({ de: "Im Composer geladen", en: "Loaded in composer", es: "Cargado en compositor" }) : tx({ de: "In Director's Cut geladen", en: "Loaded into Director's Cut", es: "Cargado en la versión del director" }),
+      title: target === "composer" ? tx({ de: tx({ de: "Im Composer geladen", en: "Loaded in the composer", es: "Cargado en el composer" }), en: "Loaded in composer", es: "Cargado en compositor" }) : tx({ de: "In Director's Cut geladen", en: "Loaded into Director's Cut", es: "Cargado en la versión del director" }),
       description: tx({ de: "Clip wird automatisch hinzugefügt.", en: "Clip will be added automatically.", es: "El clip se agregará automáticamente." }),
     });
     navigate(target === "composer" ? "/video-composer" : "/universal-directors-cut");
@@ -262,7 +262,7 @@ export default function StockVideos() {
                 renderGrid(
                   favorites,
                   user
-                    ? tx({ de: "Noch keine Favoriten — klicke das Herz auf einem Clip.", en: "No favorites yet — click the heart on a clip.", es: "Aún no hay favoritos — haz clic en el corazón de un clip." })
+                    ? tx({ de: tx({ de: "Noch keine Favoriten — klicke das Herz auf einem Clip.", en: "No favorites yet — tap the heart on a clip.", es: "Aún no hay favoritos — pulsa el corazón en un clip." }), en: "No favorites yet — click the heart on a clip.", es: "Aún no hay favoritos — haz clic en el corazón de un clip." })
                     : tx({ de: "Bitte einloggen, um Favoriten zu speichern.", en: "Please log in to save favorites.", es: "Por favor, inicia sesión para guardar favoritos." }),
                 )
               )}

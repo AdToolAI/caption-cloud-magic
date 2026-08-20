@@ -87,7 +87,7 @@ export default function SceneMediaUpload({
         setProgress(85);
 
         const { data: pub } = supabase.storage.from('composer-uploads').getPublicUrl(fileName);
-        if (!pub?.publicUrl) throw new Error(tx({ de: 'Public URL konnte nicht erstellt werden', en: 'Public URL could not be created', es: 'No se pudo crear la URL pública' }));
+        if (!pub?.publicUrl) throw new Error(tx({ de: tx({ de: "Public URL konnte nicht erstellt werden", en: "Public URL could not be created", es: "No se pudo crear la URL pública" }), en: 'Public URL could not be created', es: 'No se pudo crear la URL pública' }));
 
         setProgress(100);
         onChange(pub.publicUrl, 'video');

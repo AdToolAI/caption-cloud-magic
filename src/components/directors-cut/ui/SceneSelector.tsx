@@ -236,7 +236,7 @@ export function SceneSelector({
       {/* Info text */}
       <p className="text-xs text-muted-foreground mt-2">
         {selectedSceneId 
-          ? tx({ de: "Änderungen gelten nur für diese Szene", en: "Changes apply to this scene only", es: "Los cambios se aplican solo a esta escena" })
+          ? tx({ de: tx({ de: "Änderungen gelten nur für diese Szene", en: "Changes apply to this scene only", es: "Los cambios solo se aplican a esta escena" }), en: "Changes apply to this scene only", es: "Los cambios se aplican solo a esta escena" })
           : tx({ de: "Änderungen gelten für das gesamte Video", en: "Changes apply to the entire video", es: "Los cambios se aplican a todo el video" })
         }
       </p>

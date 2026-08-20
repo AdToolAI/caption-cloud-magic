@@ -542,7 +542,7 @@ export default function Planner() {
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="text-sm text-muted-foreground">
-          {!workspaceId ? tx({ de: "Workspace wird geladen...", en: "Loading workspace...", es: "Cargando workspace..." }) : tx({ de: "Wochenplan wird erstellt...", en: "Building weekly plan...", es: "Creando el plan semanal..." })}
+          {!workspaceId ? tx({ de: tx({ de: "Workspace wird geladen...", en: "Loading workspace...", es: "Cargando el espacio de trabajo..." }), en: "Loading workspace...", es: "Cargando workspace..." }) : tx({ de: "Wochenplan wird erstellt...", en: "Building weekly plan...", es: "Creando el plan semanal..." })}
         </p>
       </div>
     );

@@ -117,7 +117,7 @@ export function VoiceLibraryPanel() {
                 className="flex-1"
                 onClick={() => toggleVoiceActive(voice.id, !voice.is_active)}
               >
-                {voice.is_active ? tx({ de: 'Aktiv', en: 'Active', es: 'Activo' }) : tx({ de: 'Inaktiv', en: 'Inactive', es: 'Inactivo' })}
+                {voice.is_active ? tx({ de: tx({ de: "Aktiv", en: "Active", es: "Activo" }), en: 'Active', es: 'Activo' }) : tx({ de: 'Inaktiv', en: 'Inactive', es: 'Inactivo' })}
               </Button>
             </div>
 

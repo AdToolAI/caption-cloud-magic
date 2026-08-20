@@ -175,7 +175,7 @@ export function useGenerateAllClips({
         } catch (err: any) {
           toast({
             title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
-            description: err?.message || tx({ de: 'Projekt konnte nicht gespeichert werden', en: 'Project could not be saved', es: 'No se pudo guardar el proyecto' }),
+            description: err?.message || tx({ de: tx({ de: "Projekt konnte nicht gespeichert werden", en: "Project could not be saved", es: "No se pudo guardar el proyecto" }), en: 'Project could not be saved', es: 'No se pudo guardar el proyecto' }),
             variant: 'destructive',
           });
           emitPipelineEvent({ type: 'clips:end' });

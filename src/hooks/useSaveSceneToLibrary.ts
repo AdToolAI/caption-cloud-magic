@@ -63,7 +63,7 @@ export function useSaveSceneToLibrary() {
           },
         });
         if (error) throw error;
-        if (!data?.ok) throw new Error(data?.error || tx({ de: 'Speichern fehlgeschlagen', en: 'Save failed', es: 'Guardado fallido' }));
+        if (!data?.ok) throw new Error(data?.error || tx({ de: tx({ de: "Speichern fehlgeschlagen", en: "Saving failed", es: "Error al guardar" }), en: 'Save failed', es: 'Guardado fallido' }));
 
         setSavedSceneIds((prev) => {
           const next = new Set(prev);
@@ -76,7 +76,7 @@ export function useSaveSceneToLibrary() {
         queryClient.invalidateQueries({ queryKey: ['media-library'] });
 
         toast({
-          title: data.already ? tx({ de: 'Bereits in Mediathek', en: 'Already in library', es: 'Ya está en la biblioteca' }) : tx({ de: 'In Mediathek gespeichert', en: 'Saved to library', es: 'Guardado en la biblioteca' }),
+          title: data.already ? tx({ de: tx({ de: "Bereits in Mediathek", en: "Already in media library", es: "Ya está en la mediateca" }), en: 'Already in library', es: 'Ya está en la biblioteca' }) : tx({ de: 'In Mediathek gespeichert', en: 'Saved to library', es: 'Guardado en la biblioteca' }),
           description: tx({ de: 'Die Szene ist jetzt als eigenständiger Clip verfügbar.', en: 'The scene is now available as a standalone clip.', es: 'La escena ya está disponible como un clip independiente.' }),
         });
         return true;

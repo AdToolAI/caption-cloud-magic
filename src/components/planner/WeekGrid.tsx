@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +53,7 @@ export function WeekGrid({
                 <div key={weekIdx} className="border-r">
                   {/* Week Header */}
                   <div className="h-12 border-b px-2 flex items-center justify-between sticky top-0 bg-background z-10">
-                    <span className="text-sm font-semibold">Woche {weekIdx + 1}</span>
+                    <span className="text-sm font-semibold">{tx({ de: "Woche", en: "Week", es: "Semana" })} {weekIdx + 1}</span>
                     <span className="text-xs text-muted-foreground">
                       {weekStart.toLocaleDateString(uiLocale(), { day: "2-digit", month: "short" })}
                     </span>

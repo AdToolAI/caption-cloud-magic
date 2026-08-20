@@ -49,7 +49,7 @@ export const TokenExpiryBadge = ({ provider }: TokenExpiryBadgeProps) => {
         toast.success(tx({ de: 'Token erfolgreich erneuert', en: 'Token renewed successfully', es: 'Token renovado exitosamente' }));
         refetch();
       } else {
-        throw new Error(refreshData?.error || tx({ de: 'Token-Refresh fehlgeschlagen', en: 'Token refresh failed', es: 'Error al actualizar el token' }));
+        throw new Error(refreshData?.error || tx({ de: tx({ de: "Token-Refresh fehlgeschlagen", en: "Token refresh failed", es: "Error al refrescar el token" }), en: 'Token refresh failed', es: 'Error al actualizar el token' }));
       }
     } catch (error: any) {
       console.error('[TokenExpiryBadge] Refresh error:', error);

@@ -280,7 +280,7 @@ export function AutoMatchPanel({
                           <span className="text-xs font-bold">{currencySymbol}{info.eur.toFixed(2)}</span>
                         </div>
                         <div className="text-xs font-semibold capitalize">{t}</div>
-                        <div className="text-[10px] text-muted-foreground">bis {info.maxDuration}s</div>
+                        <div className="text-[10px] text-muted-foreground">{tx({ de: "bis", en: "to", es: "a" })} {info.maxDuration}s</div>
                       </button>
                     );
                   })}

@@ -116,11 +116,11 @@ export default function SharePage() {
                     🎬 {project?.project_name || 'Shared Project'}
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    {tx({ de: "Geteilt von", en: "Shared by", es: "Compartido por" })} {shareData?.created_by || tx({ de: "einem Creator", en: "a Creator", es: "un Creador" })}
+                    {tx({ de: "Geteilt von", en: "Shared by", es: "Compartido por" })} {shareData?.created_by || tx({ de: tx({ de: "einem Creator", en: "one creator", es: "un creador" }), en: "a Creator", es: "un Creador" })}
                   </p>
                 </div>
                 <Badge variant="secondary">
-                  {project?.status === 'completed' ? tx({ de: '✅ Fertig', en: '✅ Done', es: '✅ Hecho' }) : tx({ de: '🔄 In Bearbeitung', en: '🔄 In progress', es: '🔄 En progreso' })}
+                  {project?.status === 'completed' ? tx({ de: tx({ de: "✅ Fertig", en: "✅ Done", es: "✅ Listo" }), en: '✅ Done', es: '✅ Hecho' }) : tx({ de: '🔄 In Bearbeitung', en: '🔄 In progress', es: '🔄 En progreso' })}
                 </Badge>
               </div>
             </CardHeader>

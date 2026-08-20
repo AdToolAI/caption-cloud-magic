@@ -139,7 +139,7 @@ export default function CharacterEditor({
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      if (!data?.imageUrl) throw new Error(tx({ de: 'Kein Bild generiert', en: 'No image generated', es: 'No se genera ninguna imagen' }));
+      if (!data?.imageUrl) throw new Error(tx({ de: tx({ de: "Kein Bild generiert", en: "No image generated", es: "No se generó ninguna imagen" }), en: 'No image generated', es: 'No se genera ninguna imagen' }));
 
       // Convert data: URL → File and upload to library bucket for persistence
       try {
@@ -221,7 +221,7 @@ export default function CharacterEditor({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
-            {character ? tx({ de: "Charakter bearbeiten", en: "Edit character", es: "Editar personaje" }) : tx({ de: "Neuen Charakter anlegen", en: "Create new character", es: "Crear nuevo personaje" })}
+            {character ? tx({ de: tx({ de: "Charakter bearbeiten", en: "Edit character", es: "Editar personaje" }), en: "Edit character", es: "Editar personaje" }) : tx({ de: "Neuen Charakter anlegen", en: "Create new character", es: "Crear nuevo personaje" })}
           </DialogTitle>
           <DialogDescription>
           </DialogDescription>
@@ -263,14 +263,14 @@ export default function CharacterEditor({
                 disabled={generatingSheet || !draft.description.trim()}
                 onClick={handleGenerateSheet}
                 className="h-7 text-[11px] gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
-                title={!draft.description.trim() ? tx({ de: 'Beschreibung erforderlich', en: 'Description required', es: 'Descripción requerida' }) : 'Foto-realistisches 4-View Sheet erzeugen'}
+                title={!draft.description.trim() ? tx({ de: tx({ de: "Beschreibung erforderlich", en: "Description required", es: "Descripción obligatoria" }), en: 'Description required', es: 'Descripción requerida' }) : 'Foto-realistisches 4-View Sheet erzeugen'}
               >
                 {generatingSheet ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
                   <Wand2 className="h-3 w-3" />
                 )}
-                Sheet generieren
+                {tx({ de: "Sheet generieren", en: "Generate sheet", es: "Generar hoja" })}
               </Button>
             </div>
 
@@ -420,7 +420,7 @@ export default function CharacterEditor({
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {character ? tx({ de: 'Änderungen speichern', en: 'Save changes', es: 'Guardar cambios' }) : tx({ de: 'Charakter anlegen', en: 'Create character', es: 'Crear personaje' })}
+            {character ? tx({ de: tx({ de: "Änderungen speichern", en: "Save changes", es: "Guardar cambios" }), en: 'Save changes', es: 'Guardar cambios' }) : tx({ de: 'Charakter anlegen', en: 'Create character', es: 'Crear personaje' })}
           </Button>
         </div>
       </DialogContent>

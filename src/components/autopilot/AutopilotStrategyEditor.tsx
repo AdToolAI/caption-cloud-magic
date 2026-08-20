@@ -314,7 +314,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
           </div>
           <p className="text-[11px] text-muted-foreground">
             {autoPublish
-              ? tx({ de: '🟢 Aktiv: Posts werden nach QA-Gate automatisch veröffentlicht.', en: '🟢 Active: Posts are published automatically after the QA gate.', es: '🟢 Activo: las publicaciones se publican automáticamente después del control de calidad.' })
+              ? tx({ de: tx({ de: "🟢 Aktiv: Posts werden nach QA-Gate automatisch veröffentlicht.", en: "🟢 Active: posts are published automatically after the QA gate.", es: "🟢 Activo: las publicaciones se publican automáticamente tras el control de calidad." }), en: '🟢 Active: Posts are published automatically after the QA gate.', es: '🟢 Activo: las publicaciones se publican automáticamente después del control de calidad.' })
               : tx({ de: '🟡 Co-Pilot-Modus: Du musst jeden Slot vor Veröffentlichung freigeben.', en: '🟡 Co-pilot mode: You must approve every slot before publishing.', es: '🟡 Modo copiloto: debes aprobar cada franja antes de publicarla.' })}
           </p>
         </Card>
@@ -408,11 +408,11 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       <div className="sticky bottom-4 z-20">
         <Card className="p-3 flex items-center gap-3 bg-card/80 backdrop-blur border-primary/30">
           <span className="text-xs text-muted-foreground flex-1">
-            {dirty ? tx({ de: 'Änderungen noch nicht gespeichert', en: 'Changes not saved yet', es: 'Cambios aún no guardados' }) : tx({ de: 'Alle Änderungen gespeichert', en: 'All changes saved', es: 'Todos los cambios guardados' })}
+            {dirty ? tx({ de: tx({ de: "Änderungen noch nicht gespeichert", en: "Changes not saved yet", es: "Cambios sin guardar" }), en: 'Changes not saved yet', es: 'Cambios aún no guardados' }) : tx({ de: 'Alle Änderungen gespeichert', en: 'All changes saved', es: 'Todos los cambios guardados' })}
           </span>
           <Button onClick={save} disabled={!dirty || upsert.isPending} size="sm" className="gap-1.5">
             <Save className="h-3.5 w-3.5" />
-            {upsert.isPending ? tx({ de: 'Speichere…', en: 'Saving…', es: 'Guardando…' }) : tx({ de: 'Strategie speichern', en: 'Save strategy', es: 'Guardar estrategia' })}
+            {upsert.isPending ? tx({ de: tx({ de: "Speichere…", en: "Saving…", es: "Guardando…" }), en: 'Saving…', es: 'Guardando…' }) : tx({ de: 'Strategie speichern', en: 'Save strategy', es: 'Guardar estrategia' })}
           </Button>
         </Card>
       </div>

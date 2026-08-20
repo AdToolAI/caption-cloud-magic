@@ -161,7 +161,7 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
     label: tx({ de: '🎬 B-Roll', en: '🎬 B-roll', es: '🎬 B-roll' }),
     reason:
       hasDialog && hasCast
-        ? tx({ de: 'Off-Screen-Narration — aktiviere den Lip-Sync-Toggle für echte Mundbewegung.', en: 'Off-screen narration — activate the lip sync toggle for real mouth movement.', es: 'Narración fuera de pantalla: activa la sincronización de labios para un movimiento real de la boca.' })
+        ? tx({ de: tx({ de: "Off-Screen-Narration — aktiviere den Lip-Sync-Toggle für echte Mundbewegung.", en: "Off-screen narration — enable the lip-sync toggle for real mouth movement.", es: "Narración en off — activa el interruptor de lip-sync para un movimiento de boca real." }), en: 'Off-screen narration — activate the lip sync toggle for real mouth movement.', es: 'Narración fuera de pantalla: activa la sincronización de labios para un movimiento real de la boca.' })
         : tx({ de: 'Off-Screen-Narration — Voiceover läuft über die Szene, keine Lip-Sync nötig.', en: 'Off-Screen Narration — Voiceover plays over the scene, no Lip-Sync needed.', es: 'Narración fuera de pantalla — La voz en off se reproduce sobre la escena, no se necesita sincronización labial.' }),
     extraCostEur: 0,
   };

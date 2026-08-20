@@ -573,7 +573,7 @@ export const VideoQuickPreview = ({
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
             <div className="text-center space-y-4 p-8 max-w-2xl">
               <div className="text-2xl font-bold text-white animate-fade-in">
-                {subtitleText || currentSegment?.text || tx({ de: 'Text wird geladen...', en: 'Loading text...', es: 'Cargando texto...' })}
+                {subtitleText || currentSegment?.text || tx({ de: tx({ de: "Text wird geladen...", en: "Loading text...", es: "Cargando texto..." }), en: 'Loading text...', es: 'Cargando texto...' })}
               </div>
               <div className="text-sm text-white/50">
                 {tx({ de: "📸 Füge Medien hinzu für vollständige Vorschau", en: "📸 Add media for a full preview", es: "📸 Añade medios para una vista previa completa" })}

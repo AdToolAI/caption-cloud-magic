@@ -922,7 +922,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       const realMsg = await extractFunctionsError(err);
       toast({
         title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),
-        description: realMsg || err?.message || tx({ de: 'Re-Roll fehlgeschlagen — bitte erneut versuchen.', en: 'Re-roll failed — please try again.', es: 'Error al repetir — inténtalo de nuevo.' }),
+        description: realMsg || err?.message || tx({ de: tx({ de: "Re-Roll fehlgeschlagen — bitte erneut versuchen.", en: "Re-roll failed — please try again.", es: "Error al regenerar — inténtalo de nuevo." }), en: 'Re-roll failed — please try again.', es: 'Error al repetir — inténtalo de nuevo.' }),
         variant: 'destructive',
       });
     } finally {
@@ -1162,7 +1162,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             >
               {isGeneratingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
               {pendingScenes.length === 0
-                ? tx({ de: 'Alle Clips bereit', en: 'All clips ready', es: 'Todos los clips listos' })
+                ? tx({ de: tx({ de: "Alle Clips bereit", en: "All clips ready", es: "Todos los clips listos" }), en: 'All clips ready', es: 'Todos los clips listos' })
                 : tx({ de: `Alle generieren (${pendingScenes.length} • €${remainingCost.toFixed(2)})`, en: `Generate all (${pendingScenes.length} • €${remainingCost.toFixed(2)})`, es: `Generar todo (${pendingScenes.length} • €${remainingCost.toFixed(2)})` })}
             </Button>
             <Button
@@ -1186,7 +1186,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} {(rerollTarget?.orderIndex ?? 0) + 1} {tx({ de: 'neu generieren?', en: 'regenerate?', es: '¿regenerar?' })}
+              {tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} {(rerollTarget?.orderIndex ?? 0) + 1} {tx({ de: tx({ de: "neu generieren?", en: "regenerate?", es: "¿regenerar?" }), en: 'regenerate?', es: '¿regenerar?' })}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2">
@@ -1215,7 +1215,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
               }}
               className="bg-amber-500 hover:bg-amber-600 text-amber-950"
             >
-              Neu generieren €{rerollTarget ? getClipCost(rerollTarget.clipSource, rerollTarget.clipQuality || 'standard', rerollTarget.durationSeconds).toFixed(2) : '0.00'}
+              {tx({ de: "Neu generieren €", en: "Regenerate €", es: "Regenerar €" })}{rerollTarget ? getClipCost(rerollTarget.clipSource, rerollTarget.clipQuality || 'standard', rerollTarget.durationSeconds).toFixed(2) : '0.00'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1428,7 +1428,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                         ) : (
                           <Sparkles className="h-3 w-3" />
                         )}
-                        Generieren €{costPerClip.toFixed(2)}
+                        {tx({ de: "Generieren €", en: "Generate €", es: "Generar €" })}{costPerClip.toFixed(2)}
                       </Button>
                     )}
                     {/* Failed → Retry */}
@@ -1463,7 +1463,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                         ) : (
                           <RefreshCw className="h-3 w-3" />
                         )}
-                        Neu generieren €{costPerClip.toFixed(2)}
+                        {tx({ de: "Neu generieren €", en: "Regenerate €", es: "Regenerar €" })}{costPerClip.toFixed(2)}
                       </Button>
                     )}
                     {/* Lip-Sync Switch — Artlist-style: render real scene with Hailuo + auto lip-sync */}
@@ -1488,7 +1488,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                           size="sm"
                           variant="outline"
                           className="gap-1 text-[10px] h-7 px-2 border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-60"
-                          title={isSaved ? tx({ de: 'Diese Szene ist bereits in deiner Mediathek', en: 'This scene is already in your media library', es: 'Esta escena ya está en tu biblioteca multimedia' }) : tx({ de: 'Diese Szene als eigenständigen Clip in deiner Mediathek ablegen', en: 'Save this scene as a standalone clip in your media library', es: 'Guardar esta escena como clip independiente en tu biblioteca multimedia' })}
+                          title={isSaved ? tx({ de: tx({ de: "Diese Szene ist bereits in deiner Mediathek", en: "This scene is already in your media library", es: "Esta escena ya está en tu mediateca" }), en: 'This scene is already in your media library', es: 'Esta escena ya está en tu biblioteca multimedia' }) : tx({ de: 'Diese Szene als eigenständigen Clip in deiner Mediathek ablegen', en: 'Save this scene as a standalone clip in your media library', es: 'Guardar esta escena como clip independiente en tu biblioteca multimedia' })}
                           disabled={isSaving || isSaved}
                           onClick={() => saveSceneToLibrary(scene, projectId)}
                         >
@@ -1499,7 +1499,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                           ) : (
                             <Save className="h-3 w-3" />
                           )}
-                          {isSaved ? tx({ de: 'Gespeichert', en: 'Saved', es: 'Guardado' }) : tx({ de: 'In Mediathek', en: 'To media library', es: 'A la biblioteca' })}
+                          {isSaved ? tx({ de: tx({ de: "Gespeichert", en: "Saved", es: "Guardado" }), en: 'Saved', es: 'Guardado' }) : tx({ de: 'In Mediathek', en: 'To media library', es: 'A la biblioteca' })}
                         </Button>
                       );
                     })()}

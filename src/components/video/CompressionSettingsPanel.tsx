@@ -89,7 +89,7 @@ export const CompressionSettingsPanel = ({
           <>
             {/* Max File Size */}
             <div className="space-y-2">
-              <Label>Maximale Dateigröße: {maxSizeMb} MB</Label>
+              <Label>{tx({ de: "Maximale Dateigröße:", en: "Maximum file size:", es: "Tamaño máximo:" })} {maxSizeMb} MB</Label>
               <Slider
                 value={[maxSizeMb]}
                 onValueChange={([value]) => setMaxSizeMb(value)}

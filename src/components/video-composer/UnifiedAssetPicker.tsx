@@ -327,7 +327,7 @@ export function UnifiedAssetPicker({
                     {lang === 'de'
                       ? tx({ de: 'In der Library öffnen…', en: 'Open in Library…', es: 'Abrir en la biblioteca…' })
                       : lang === 'es'
-                      ? tx({ de: 'In der Library öffnen…', en: 'Open in Library…', es: 'Abrir en la biblioteca…' })
+                      ? tx({ de: tx({ de: "In der Library öffnen…", en: "Open in the library…", es: "Abrir en la biblioteca…" }), en: 'Open in Library…', es: 'Abrir en la biblioteca…' })
                       : tx({ de: 'In der Library öffnen…', en: 'Open in Library…', es: 'Abrir en la biblioteca…' })}
                   </a>
                 </PopoverContent>
@@ -346,7 +346,7 @@ export function UnifiedAssetPicker({
                 {lang === 'de'
                   ? tx({ de: 'Aus Foto (KI)', en: 'From Photo (AI)', es: 'Desde foto (IA)' })
                   : lang === 'es'
-                  ? tx({ de: 'Aus Foto (KI)', en: 'From Photo (AI)', es: 'Desde foto (IA)' })
+                  ? tx({ de: tx({ de: "Aus Foto (KI)", en: "From photo (AI)", es: "Desde foto (IA)" }), en: 'From Photo (AI)', es: 'Desde foto (IA)' })
                   : tx({ de: 'Aus Foto (KI)', en: 'From Photo (AI)', es: 'Desde foto (IA)' })}
               </Button>
             )}

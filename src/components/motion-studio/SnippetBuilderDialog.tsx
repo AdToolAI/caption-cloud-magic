@@ -228,7 +228,7 @@ export default function SnippetBuilderDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            {isEdit ? tx({ de: "Snippet bearbeiten", en: "Edit snippet", es: "Editar fragmento" }) : tx({ de: "Neues Snippet", en: "New Snippet", es: "Nuevo fragmento" })}
+            {isEdit ? tx({ de: tx({ de: "Snippet bearbeiten", en: "Edit snippet", es: "Editar snippet" }), en: "Edit snippet", es: "Editar fragmento" }) : tx({ de: "Neues Snippet", en: "New Snippet", es: "Nuevo fragmento" })}
           </DialogTitle>
           <DialogDescription>
             {tx({ de: "Speichere wiederverwendbare Szenen-Bausteine — optional teilbar mit der Community.", en: "Save reusable scene building blocks — optionally shareable with the community.", es: "Guarda bloques de construcción de escenas reutilizables — opcionalmente compartibles con la comunidad." })}
@@ -411,7 +411,7 @@ export default function SnippetBuilderDialog({
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-1.5">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            {isEdit ? tx({ de: 'Speichern', en: 'Save', es: 'Ahorrar' }) : 'Snippet anlegen'}
+            {isEdit ? tx({ de: tx({ de: "Speichern", en: "Save", es: "Guardar" }), en: 'Save', es: 'Ahorrar' }) : 'Snippet anlegen'}
           </Button>
         </DialogFooter>
       </DialogContent>

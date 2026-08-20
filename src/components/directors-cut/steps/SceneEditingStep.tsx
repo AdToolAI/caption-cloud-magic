@@ -355,7 +355,7 @@ export function SceneEditingStep({
     
     toast({
       title: `Speed: ${speed}x`,
-      description: speed < 1 ? tx({ de: "Zeitlupe aktiviert", en: "Slow motion activated", es: "Cámara lenta activada" }) : speed === 1 ? tx({ de: "Normale Geschwindigkeit", en: "Normal speed", es: "Velocidad normal" }) : tx({ de: "Zeitraffer aktiviert", en: "Time lapse activated", es: "Cámara rápida activada" }),
+      description: speed < 1 ? tx({ de: tx({ de: "Zeitlupe aktiviert", en: "Slow motion enabled", es: "Cámara lenta activada" }), en: "Slow motion activated", es: "Cámara lenta activada" }) : speed === 1 ? tx({ de: tx({ de: "Normale Geschwindigkeit", en: "Normal speed", es: "Velocidad normal" }), en: "Normal speed", es: "Velocidad normal" }) : tx({ de: "Zeitraffer aktiviert", en: "Time lapse activated", es: "Cámara rápida activada" }),
     });
   }, [selectedSceneId, scenes, handleSceneDurationChange, toast]);
 

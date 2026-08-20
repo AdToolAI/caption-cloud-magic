@@ -58,7 +58,7 @@ export const TemplateComments = ({ templateId }: TemplateCommentsProps) => {
             <div key={comment.id} className="p-3 bg-muted rounded-lg">
               <div className="flex justify-between items-start mb-2">
                 <span className="text-sm font-medium text-foreground">
-                  Benutzer {comment.user_id.slice(0, 8)}
+                  {tx({ de: "Benutzer", en: "User", es: "Usuario" })} {comment.user_id.slice(0, 8)}
                 </span>
                 <span className="text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(comment.created_at), {

@@ -148,7 +148,7 @@ export function VoiceCloneDialog({ open, onOpenChange }: VoiceCloneDialogProps) 
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              {audioFiles.length}/5 Samples ({audioFiles.length < 1 ? tx({ de: 'mindestens 1 erforderlich', en: 'at least 1 required', es: 'se requiere al menos 1' }) : tx({ de: 'bereit zum Klonen', en: 'ready to clone', es: 'listo para clonar' })})
+              {audioFiles.length}/5 Samples ({audioFiles.length < 1 ? tx({ de: tx({ de: "mindestens 1 erforderlich", en: "at least 1 required", es: "se requiere al menos 1" }), en: 'at least 1 required', es: 'se requiere al menos 1' }) : tx({ de: 'bereit zum Klonen', en: 'ready to clone', es: 'listo para clonar' })})
             </p>
           </div>
 
@@ -157,7 +157,7 @@ export function VoiceCloneDialog({ open, onOpenChange }: VoiceCloneDialogProps) 
             disabled={loading || uploading || audioFiles.length < 1}
             className="w-full"
           >
-            {uploading ? tx({ de: 'Lädt hoch...', en: 'Uploading...', es: 'Subiendo...' }) : loading ? tx({ de: 'Klont Voice...', en: 'Cloning voice...', es: 'Clonando voz...' }) : tx({ de: 'Voice klonen', en: 'Clone voice', es: 'Clonar voz' })}
+            {uploading ? tx({ de: tx({ de: "Lädt hoch...", en: "Uploading...", es: "Subiendo..." }), en: 'Uploading...', es: 'Subiendo...' }) : loading ? tx({ de: 'Klont Voice...', en: 'Cloning voice...', es: 'Clonando voz...' }) : tx({ de: 'Voice klonen', en: 'Clone voice', es: 'Clonar voz' })}
           </Button>
         </div>
       </DialogContent>

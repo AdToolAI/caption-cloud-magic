@@ -162,7 +162,7 @@ export default function BatchVideoCreator() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">{tx({ de: "Geschätzte Dauer", en: "Estimated Duration", es: "Duración estimada" })}</p>
-                  <p className="font-medium">~{Math.ceil(csvData.length * 1.5)} Minuten</p>
+                  <p className="font-medium">~{Math.ceil(csvData.length * 1.5)} {tx({ de: "Minuten", en: "minutes", es: "minutos" })}</p>
                 </div>
               </div>
             </div>
@@ -201,7 +201,7 @@ export default function BatchVideoCreator() {
               onClick={handleStartBatch}
               disabled={loading || !jobName}
             >
-              {loading ? tx({ de: 'Wird gestartet...', en: 'Starting...', es: 'A partir de...' }) : tx({ de: `${csvData.length} Videos erstellen`, en: `${csvData.length} Create videos`, es: `${csvData.length} Crear vídeos` })}
+              {loading ? tx({ de: tx({ de: "Wird gestartet...", en: "Starting...", es: "Iniciando..." }), en: 'Starting...', es: 'A partir de...' }) : tx({ de: `${csvData.length} Videos erstellen`, en: `${csvData.length} Create videos`, es: `${csvData.length} Crear vídeos` })}
               <Sparkles className="ml-2 h-4 w-4" />
             </Button>
           )}

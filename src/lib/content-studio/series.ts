@@ -38,7 +38,7 @@ export async function generateSeries(options: SeriesOptions): Promise<SeriesResu
 
   if (error) throw error;
   if (!data?.success || !data?.campaign) {
-    throw new Error(data?.error || tx({ de: "Serie konnte nicht erzeugt werden", en: "Series could not be created", es: "No se pudo crear la serie" }));
+    throw new Error(data?.error || tx({ de: tx({ de: "Serie konnte nicht erzeugt werden", en: "Series could not be generated", es: "No se pudo generar la serie" }), en: "Series could not be created", es: "No se pudo crear la serie" }));
   }
 
   return {

@@ -260,7 +260,7 @@ export function FaceMapReviewDialog({ open, onOpenChange, scene }: FaceMapReview
           <DialogDescription>
             {tx({ de: `Auf dem Anker wurden ${faces.length} Gesichter erkannt, aber die automatische Zuordnung konnte nicht alle ${speakers.length} Sprecher eindeutig zuordnen.`, en: `${faces.length} faces were detected on the anchor, but automatic mapping could not clearly assign all ${speakers.length} speakers.`, es: `Se detectaron ${faces.length} rostros en el ancla, pero la asignación automática no pudo asignar con claridad a los ${speakers.length} hablantes.` })}
             
-            {tx({ de: "Bitte weise jedem Sprecher das passende Gesicht (Slot 1…", en: "Please assign the correct face to each speaker (Slot 1…", es: "Por favor, asigna la cara correcta a cada orador (Slot 1…" })}{faces.length}) zu.
+            {tx({ de: "Bitte weise jedem Sprecher das passende Gesicht (Slot 1…", en: "Please assign the correct face to each speaker (Slot 1…", es: "Por favor, asigna la cara correcta a cada orador (Slot 1…" })}{faces.length}{tx({ de: ") zu.", en: ") to.", es: ") a." })}
           </DialogDescription>
         </DialogHeader>
 

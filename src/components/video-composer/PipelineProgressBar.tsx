@@ -171,7 +171,7 @@ export default function PipelineProgressBar({
                 )}
                 title={
                   syncsoSlots >= SYNCSO_MAX_SLOTS
-                    ? tx({ de: 'Alle 3 Lip-Sync-Slots belegt — weitere Szenen werden eingereiht und automatisch nachgezogen.', en: 'All 3 lip-sync slots occupied — additional scenes will be queued and automatically processed.', es: 'Los 3 espacios de sincronización labial están ocupados — las escenas adicionales se pondrán en cola y se procesarán automáticamente.' })
+                    ? tx({ de: tx({ de: "Alle 3 Lip-Sync-Slots belegt — weitere Szenen werden eingereiht und automatisch nachgezogen.", en: "All 3 lip-sync slots are busy — further scenes are queued and processed automatically.", es: "Los 3 espacios de lip-sync están ocupados — las escenas adicionales se ponen en cola y se procesan automáticamente." }), en: 'All 3 lip-sync slots occupied — additional scenes will be queued and automatically processed.', es: 'Los 3 espacios de sincronización labial están ocupados — las escenas adicionales se pondrán en cola y se procesarán automáticamente.' })
                     : `${syncsoSlots}/${SYNCSO_MAX_SLOTS} ${tx({ de: 'Lip-Sync-Slots aktiv (parallele Lipsync-Jobs).', en: 'lip-sync slots active (parallel lip-sync jobs).', es: 'espacios de lip-sync activos (trabajos paralelos de lip-sync).' })}`
                 }
               >
@@ -180,10 +180,10 @@ export default function PipelineProgressBar({
               </span>
             )}
             <span className={cn('tabular-nums', hasFailure ? 'text-destructive' : 'text-foreground')}>
-              {hasFailure ? tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }) : `${overallPercent}%`}
+              {hasFailure ? tx({ de: tx({ de: "Fehler", en: "Error", es: "Error" }), en: 'Mistake', es: 'Error' }) : `${overallPercent}%`}
             </span>
             <span className="text-muted-foreground/70 tabular-nums hidden sm:inline">
-              {hasFailure ? tx({ de: 'Lip-Sync abgebrochen', en: 'Lip-sync cancelled', es: 'Lip-sync cancelado' }) : `${formatTime(elapsedSeconds)} / ~${formatTime(elapsedSeconds + etaSeconds)}`}
+              {hasFailure ? tx({ de: tx({ de: "Lip-Sync abgebrochen", en: "Lip-sync cancelled", es: "Lip-sync cancelado" }), en: 'Lip-sync cancelled', es: 'Lip-sync cancelado' }) : `${formatTime(elapsedSeconds)} / ~${formatTime(elapsedSeconds + etaSeconds)}`}
             </span>
             {hasFailure && (
               <ResetFailedButton scenes={scenes} />
@@ -210,7 +210,7 @@ function ResetFailedButton({ scenes }: { scenes: ComposerScene[] }) {
       className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-[11px] font-medium hover:bg-destructive/20 disabled:opacity-60"
       title={tx({ de: "Storniert offene Jobs, refundiert Credits und startet einen sauberen neuen Versuch.", en: "Cancels open jobs, refunds credits, and starts a clean new attempt.", es: "Cancela trabajos abiertos, reembolsa créditos y comienza un nuevo intento limpio." })}
     >
-      {busy ? tx({ de: 'Setze zurück…', en: 'Reset…', es: 'Reiniciar…' }) : tx({ de: "Sauber neu starten", en: "Clean Restart", es: "Reiniciar Limpio" })}
+      {busy ? tx({ de: tx({ de: "Setze zurück…", en: "Resetting…", es: "Restableciendo…" }), en: 'Reset…', es: 'Reiniciar…' }) : tx({ de: "Sauber neu starten", en: "Clean Restart", es: "Reiniciar Limpio" })}
     </button>
   );
 }

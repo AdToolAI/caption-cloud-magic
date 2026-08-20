@@ -243,7 +243,7 @@ export const MediaEditor = ({
               onKeyPress={(e) => e.key === 'Enter' && handleUnsplashSearch()}
             />
             <Button onClick={handleUnsplashSearch} disabled={isSearching}>
-              {isSearching ? tx({ de: 'Suche...', en: 'Searching...', es: 'Buscando...' }) : tx({ de: 'Suchen', en: 'Search', es: 'Buscar' })}
+              {isSearching ? tx({ de: tx({ de: "Suche...", en: "Searching...", es: "Buscando..." }), en: 'Searching...', es: 'Buscando...' }) : tx({ de: 'Suchen', en: 'Search', es: 'Buscar' })}
             </Button>
           </div>
 

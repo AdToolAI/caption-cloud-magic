@@ -570,7 +570,7 @@ export default function TalkingHeadDialog({
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
                   {targetSceneId === '__none__'
-                    ? tx({ de: 'Video erscheint nur in deiner Video-History.', en: 'Video will only appear in your video history.', es: 'El video solo aparecerá en tu historial de videos.' })
+                    ? tx({ de: tx({ de: "Video erscheint nur in deiner Video-History.", en: "The video only appears in your video history.", es: "El vídeo solo aparece en tu historial de vídeos." }), en: 'Video will only appear in your video history.', es: 'El video solo aparecerá en tu historial de videos.' })
                     : tx({ de: 'Video wird automatisch der gewählten Szene als Clip zugewiesen.', en: 'Video is automatically assigned to the selected scene as a clip.', es: 'El video se asigna automáticamente a la escena seleccionada como un clip.' })}
                 </p>
               </div>
@@ -904,7 +904,7 @@ function DialogModeTab({
           <AlertCircle className="h-4 w-4 mt-0.5 text-primary shrink-0" />
           <div>
             {tx({ de: 'Geschätzte Gesamt-Kosten:', en: 'Estimated total cost:', es: 'Coste total estimado:' })} <span className="text-primary font-semibold">€{totalCost.toFixed(2)}</span>{' '}
-            ({blocks.length} × HeyGen Talking-Head) · Generierung läuft sequentiell
+            ({blocks.length} {tx({ de: "× HeyGen Talking-Head) · Generierung läuft sequentiell", en: "× HeyGen talking head) · generation runs sequentially", es: "× HeyGen talking head) · la generación es secuencial" })}
           </div>
         </div>
       </Card>
@@ -932,7 +932,7 @@ function DialogModeTab({
         {generating ? (
           <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {tx({ de: `Generiere Dialog (${progress?.current ?? 0}/${progress?.total ?? blocks.length}) …`, en: `Generating dialogue (${progress?.current ?? 0}/${progress?.total ?? blocks.length}) …`, es: `Generando diálogo (${progress?.current ?? 0}/${progress?.total ?? blocks.length}) …` })}</>
         ) : (
-          <><Mic className="h-4 w-4 mr-2" /> Dialog generieren ({blocks.length} Clips · €{totalCost.toFixed(2)})</>
+          <><Mic className="h-4 w-4 mr-2" /> {tx({ de: "Dialog generieren (", en: "Generate dialog (", es: "Generar diálogo (" })}{blocks.length} Clips · €{totalCost.toFixed(2)})</>
         )}
       </Button>
     </div>

@@ -130,7 +130,7 @@ export function VoiceProfileCard({ avatarId, avatar }: VoiceProfileCardProps) {
           : tx({ de: 'Voice entfernt', en: 'Voice removed', es: 'Voz eliminada' })
       );
     } catch (e: any) {
-      toast.error(e?.message || tx({ de: 'Konnte Voice nicht speichern', en: 'Could not save voice', es: 'No se pudo guardar la voz' }));
+      toast.error(e?.message || tx({ de: tx({ de: "Konnte Voice nicht speichern", en: "Could not save voice", es: "No se pudo guardar la voz" }), en: 'Could not save voice', es: 'No se pudo guardar la voz' }));
     } finally {
       setSaving(false);
     }

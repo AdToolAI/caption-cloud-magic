@@ -117,7 +117,7 @@ export function ProfileEditorDialog({
       });
       toast({
         title: tx({ de: 'Erfolg', en: 'Success', es: 'Éxito' }),
-        description: profile ? tx({ de: "Profil wurde aktualisiert.", en: "Profile has been updated.", es: "El perfil ha sido actualizado." }) : tx({ de: 'Profil wurde erstellt.', en: 'Profile created.', es: 'Perfil creado.' })
+        description: profile ? tx({ de: tx({ de: "Profil wurde aktualisiert.", en: "Profile updated.", es: "Perfil actualizado." }), en: "Profile has been updated.", es: "El perfil ha sido actualizado." }) : tx({ de: 'Profil wurde erstellt.', en: 'Profile created.', es: 'Perfil creado.' })
       });
       onOpenChange(false);
     } catch (error) {
@@ -136,7 +136,7 @@ export function ProfileEditorDialog({
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>
-            {profile ? tx({ de: 'Profil bearbeiten', en: 'Edit profile', es: 'Editar perfil' }) : tx({ de: "Neues Profil erstellen", en: "Create new profile", es: "Crear nuevo perfil" })}
+            {profile ? tx({ de: tx({ de: "Profil bearbeiten", en: "Edit profile", es: "Editar perfil" }), en: 'Edit profile', es: 'Editar perfil' }) : tx({ de: "Neues Profil erstellen", en: "Create new profile", es: "Crear nuevo perfil" })}
           </DialogTitle>
         </DialogHeader>
 
@@ -218,7 +218,7 @@ export function ProfileEditorDialog({
             {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
           </Button>
           <Button onClick={handleSave} disabled={!isValid || isSaving}>
-            {isSaving ? tx({ de: 'Speichert...', en: 'Saving...', es: 'Guardando...' }) : tx({ de: 'Speichern', en: 'Save', es: 'Ahorrar' })}
+            {isSaving ? tx({ de: tx({ de: "Speichert...", en: "Saving...", es: "Guardando..." }), en: 'Saving...', es: 'Guardando...' }) : tx({ de: 'Speichern', en: 'Save', es: 'Ahorrar' })}
           </Button>
         </DialogFooter>
       </DialogContent>

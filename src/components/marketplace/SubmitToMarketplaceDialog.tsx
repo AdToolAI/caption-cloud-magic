@@ -96,7 +96,7 @@ export function SubmitToMarketplaceDialog({ template, open, onOpenChange }: Prop
           <Button variant="outline" onClick={() => onOpenChange(false)}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</Button>
           <Button onClick={handleSubmit} disabled={submit.isPending}>
             {submit.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {pricingType === 'free' ? tx({ de: 'Sofort veröffentlichen', en: 'Publish immediately', es: 'Publicar de inmediato' }) : tx({ de: 'Zur Prüfung einreichen', en: 'Submit for review', es: 'Enviar para revisión' })}
+            {pricingType === 'free' ? tx({ de: tx({ de: "Sofort veröffentlichen", en: "Publish now", es: "Publicar ahora" }), en: 'Publish immediately', es: 'Publicar de inmediato' }) : tx({ de: 'Zur Prüfung einreichen', en: 'Submit for review', es: 'Enviar para revisión' })}
           </Button>
         </DialogFooter>
       </DialogContent>

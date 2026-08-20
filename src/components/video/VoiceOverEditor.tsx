@@ -71,7 +71,7 @@ export const VoiceOverEditor = ({
 
       if (error) {
         console.error('[VoicePreview] Error details:', error);
-        const errorMsg = (error as any)?.message || (error as any)?.error || tx({ de: 'Hörprobe konnte nicht generiert werden.', en: 'Could not generate voice preview.', es: 'No se pudo generar la muestra de voz.' });
+        const errorMsg = (error as any)?.message || (error as any)?.error || tx({ de: tx({ de: "Hörprobe konnte nicht generiert werden.", en: "Voice preview could not be generated.", es: "No se pudo generar la muestra de voz." }), en: 'Could not generate voice preview.', es: 'No se pudo generar la muestra de voz.' });
         toast({
           title: tx({ de: "Fehler bei Voice-Preview", en: "Voice preview error", es: "Error en la vista previa de voz" }),
           description: errorMsg,
@@ -116,7 +116,7 @@ export const VoiceOverEditor = ({
       console.error('[VoicePreview] Full error:', error);
       const errorMessage = error instanceof Error 
         ? error.message 
-        : (error as any)?.error || (error as any)?.message || tx({ de: "Hörprobe konnte nicht generiert werden. Überprüfe die Browser-Konsole für Details.", en: "Could not generate voice preview. Check the browser console for details.", es: "No se pudo generar la muestra de voz. Consulta la consola del navegador para más detalles." });
+        : (error as any)?.error || (error as any)?.message || tx({ de: tx({ de: "Hörprobe konnte nicht generiert werden. Überprüfe die Browser-Konsole für Details.", en: "Voice preview could not be generated. Check the browser console for details.", es: "No se pudo generar la muestra de voz. Consulta la consola del navegador para más detalles." }), en: "Could not generate voice preview. Check the browser console for details.", es: "No se pudo generar la muestra de voz. Consulta la consola del navegador para más detalles." });
       
       toast({
         title: tx({ de: "Fehler bei Voice-Preview", en: "Voice preview error", es: "Error en la vista previa de voz" }),

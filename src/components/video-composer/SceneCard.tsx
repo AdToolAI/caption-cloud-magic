@@ -1032,7 +1032,7 @@ export default function SceneCard({
                         console.warn("[SceneCard] re-sync failed", e);
                         toast({
                           title: tx({ de: "Lip-Sync fehlgeschlagen", en: "Lip sync failed", es: "Sincronización labial fallida" }),
-                          description: (e as any)?.message ?? tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }),
+                          description: (e as any)?.message ?? tx({ de: tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }), en: "Unknown error", es: "Error desconocido" }),
                           variant: "destructive",
                         });
                       }
@@ -2501,7 +2501,7 @@ export default function SceneCard({
                         toast({
                           title: tx({ de: "Zurücksetzen fehlgeschlagen", en: "Reset failed", es: "Error al restablecer" }),
                           description:
-                            (e as any)?.message ?? tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }),
+                            (e as any)?.message ?? tx({ de: tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }), en: "Unknown error", es: "Error desconocido" }),
                           variant: "destructive",
                         });
                       }
@@ -2776,7 +2776,9 @@ export default function SceneCard({
                             : "bg-cyan-500/20 text-cyan-200 ring-1 ring-cyan-500/40"
                         }`}
                       >
-                        {ignored ? "Aktivieren" : "Ignorieren"}
+                        {ignored
+                          ? tx({ de: "Aktivieren", en: "Activate", es: "Activar" })
+                          : tx({ de: "Ignorieren", en: "Ignore", es: "Ignorar" })}
                       </button>
                     </div>
                   );

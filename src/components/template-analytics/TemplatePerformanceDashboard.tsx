@@ -72,7 +72,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
               {summary?.selection_rate?.toFixed(1) || 0}%
             </div>
             <p className="text-xs text-muted-foreground">
-              {summary?.total_selections || 0} {tx({ de: "Auswahlen", en: "selections", es: "selecciones" })}
+              {summary?.total_selections || 0} {tx({ de: tx({ de: "Auswahlen", en: "Selections", es: "Selecciones" }), en: "selections", es: "selecciones" })}
             </p>
           </CardContent>
         </Card>
@@ -87,7 +87,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
               {summary?.conversion_rate?.toFixed(1) || 0}%
             </div>
             <p className="text-xs text-muted-foreground">
-              {summary?.total_projects || 0} {tx({ de: 'Projekte erstellt', en: 'projects created', es: 'proyectos creados' })}
+              {summary?.total_projects || 0} {tx({ de: tx({ de: "Projekte erstellt", en: "projects created", es: "proyectos creados" }), en: 'projects created', es: 'proyectos creados' })}
             </p>
           </CardContent>
         </Card>
@@ -102,7 +102,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
               {summary?.publish_rate?.toFixed(1) || 0}%
             </div>
             <p className="text-xs text-muted-foreground">
-              {summary?.total_publishes || 0} veröffentlicht
+              {summary?.total_publishes || 0} {tx({ de: tx({ de: "veröffentlicht", en: "published", es: "publicado" }), en: "published", es: "publicado" })}
             </p>
           </CardContent>
         </Card>
@@ -234,7 +234,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
                   <div>
                     <div className="font-medium">{test.test_name}</div>
                     <div className="text-sm text-muted-foreground">
-                      Gestartet: {new Date(test.started_at).toLocaleDateString(uiLocale())}
+                      {tx({ de: "Gestartet:", en: "Started:", es: "Iniciado:" })} {new Date(test.started_at).toLocaleDateString(uiLocale())}
                     </div>
                   </div>
                   <div className="text-sm font-medium text-primary">

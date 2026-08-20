@@ -176,7 +176,7 @@ export function useMusicAutoMatch() {
         },
       });
       if (fnErr) throw new Error(fnErr.message || tx({ de: 'Analyse fehlgeschlagen', en: 'Analysis failed', es: 'Error en el análisis' }));
-      if (!data?.success) throw new Error(data?.error || tx({ de: 'Analyse lieferte kein Ergebnis', en: 'Analysis returned no result', es: 'El análisis no arrojó resultado' }));
+      if (!data?.success) throw new Error(data?.error || tx({ de: tx({ de: "Analyse lieferte kein Ergebnis", en: "Analysis returned no result", es: "El análisis no devolvió resultados" }), en: 'Analysis returned no result', es: 'El análisis no arrojó resultado' }));
 
       setProgress(100);
       setPhase('done');

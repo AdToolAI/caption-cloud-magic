@@ -1279,12 +1279,12 @@ export default function ComposerSequencePreview({
             (() => {
               const stage = String(sceneSubstate(currentScene) ?? sceneState(currentScene) ?? '');
               const label =
-                stage === 'audio' ? tx({ de: 'Voiceover wird erstellt…', en: 'Voiceover is being created…', es: 'Se está creando la locución…' })
-                : stage === 'anchor' ? tx({ de: 'Ausgangsbild wird erstellt…', en: 'Reference image is being created…', es: 'Se está creando la imagen de referencia…' })
-                : stage === 'master_clip' ? tx({ de: 'Video wird gerendert…', en: 'Video is rendering…', es: 'El video se está renderizando…' })
-                : stage === 'lipsync_1' ? tx({ de: 'Lippensynchronisation läuft (1/2)…', en: 'Lip-sync running (1/2)…', es: 'Sincronización labial en curso (1/2)…' })
-                : stage === 'lipsync_2' ? tx({ de: 'Lippensynchronisation läuft (2/2)…', en: 'Lip-sync running (2/2)…', es: 'Sincronización labial en curso (2/2)…' })
-                : stage === 'continuity' ? tx({ de: 'Übergang wird geprüft…', en: 'Checking the transition…', es: 'Comprobando la transición…' })
+                stage === 'audio' ? tx({ de: tx({ de: "Voiceover wird erstellt…", en: "Creating voiceover…", es: "Creando la voz en off…" }), en: 'Voiceover is being created…', es: 'Se está creando la locución…' })
+                : stage === 'anchor' ? tx({ de: tx({ de: "Ausgangsbild wird erstellt…", en: "Creating base image…", es: "Creando imagen base…" }), en: 'Reference image is being created…', es: 'Se está creando la imagen de referencia…' })
+                : stage === 'master_clip' ? tx({ de: tx({ de: "Video wird gerendert…", en: "Rendering video…", es: "Renderizando vídeo…" }), en: 'Video is rendering…', es: 'El video se está renderizando…' })
+                : stage === 'lipsync_1' ? tx({ de: tx({ de: "Lippensynchronisation läuft (1/2)…", en: "Lip-sync running (1/2)…", es: "Lip-sync en curso (1/2)…" }), en: 'Lip-sync running (1/2)…', es: 'Sincronización labial en curso (1/2)…' })
+                : stage === 'lipsync_2' ? tx({ de: tx({ de: "Lippensynchronisation läuft (2/2)…", en: "Lip-sync running (2/2)…", es: "Lip-sync en curso (2/2)…" }), en: 'Lip-sync running (2/2)…', es: 'Sincronización labial en curso (2/2)…' })
+                : stage === 'continuity' ? tx({ de: tx({ de: "Übergang wird geprüft…", en: "Checking transition…", es: "Comprobando la transición…" }), en: 'Checking the transition…', es: 'Comprobando la transición…' })
                 : tx({ de: 'Lippensynchronisation wird vorbereitet…', en: 'Lip-sync is being prepared…', es: 'Se está preparando la sincronización labial…' });
               return (
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-500/90 backdrop-blur text-[11px] text-black font-semibold flex items-center gap-1.5 z-20 animate-pulse">

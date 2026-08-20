@@ -634,7 +634,7 @@ export function ExportRenderStep({
                   <Sparkles className="h-4 w-4 text-muted-foreground" />
                   Visuelle Effekte
                 </span>
-                <Badge variant="secondary">{appliedEffectsCount} aktiv</Badge>
+                <Badge variant="secondary">{appliedEffectsCount} {tx({ de: "aktiv", en: "active", es: "activo" })}</Badge>
               </div>
               
               <div className="flex items-center justify-between text-sm">
@@ -642,7 +642,7 @@ export function ExportRenderStep({
                   <Sparkles className="h-4 w-4 text-muted-foreground" />
                   Audio Enhancements
                 </span>
-                <Badge variant="secondary">{appliedAudioCount} aktiv</Badge>
+                <Badge variant="secondary">{appliedAudioCount} {tx({ de: "aktiv", en: "active", es: "activo" })}</Badge>
               </div>
 
               {voiceOverUrl && (
@@ -661,7 +661,7 @@ export function ExportRenderStep({
                     <Zap className="h-4 w-4 text-purple-500" />
                     Premium Features
                   </span>
-                  <Badge variant="secondary">{appliedPremiumCount} aktiv</Badge>
+                  <Badge variant="secondary">{appliedPremiumCount} {tx({ de: "aktiv", en: "active", es: "activo" })}</Badge>
                 </div>
               )}
 
@@ -875,7 +875,7 @@ export function ExportRenderStep({
                   <div className="flex items-center justify-between text-sm">
                     <span className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      {slotWaiting ? tx({ de: 'Warte auf Slot…', en: 'Waiting for slot…', es: 'Esperando cupo...' }) : 'Rendering...'}
+                      {slotWaiting ? tx({ de: tx({ de: "Warte auf Slot…", en: "Waiting for a slot…", es: "Esperando un espacio…" }), en: 'Waiting for slot…', es: 'Esperando cupo...' }) : 'Rendering...'}
                     </span>
                     <span>{Math.round(renderProgress)}%</span>
                   </div>

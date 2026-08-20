@@ -119,7 +119,7 @@ export function VideoUpload({
                 {tx({ de: "Video hier ablegen oder klicken", en: "Drop video here or click", es: "Arrastra el video aquí o haz clic" })}
               </p>
               <p className="text-xs text-muted-foreground">
-                MP4, MOV, AVI bis {maxSizeMB}MB
+                {tx({ de: "MP4, MOV, AVI bis", en: "MP4, MOV, AVI up to", es: "MP4, MOV, AVI hasta" })} {maxSizeMB}MB
               </p>
             </>
           )}

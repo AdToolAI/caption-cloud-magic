@@ -180,7 +180,7 @@ export default function RenderQueue() {
       toast.success(tx({ de: `${n} Job${n === 1 ? '' : 's'} abgebrochen · ${label}`, en: `${n} job${n === 1 ? '' : 's'} canceled · ${label}`, es: `${n} trabajo${n === 1 ? '' : 's'} cancelado(s) · ${label}` }));
       await refresh();
     } catch (e: any) {
-      toast.error(e?.message ?? tx({ de: 'Abbruch fehlgeschlagen', en: 'Abort failed', es: 'Abortar falló' }));
+      toast.error(e?.message ?? tx({ de: tx({ de: "Abbruch fehlgeschlagen", en: "Cancellation failed", es: "Error al cancelar" }), en: 'Abort failed', es: 'Abortar falló' }));
     } finally {
       setBusy(null);
       setConfirm(null);

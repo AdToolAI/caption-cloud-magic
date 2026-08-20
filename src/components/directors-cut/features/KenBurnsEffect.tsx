@@ -173,7 +173,7 @@ export function KenBurnsEffect({
               </Badge>
             )}
             <Badge variant="outline" className="text-xs">
-              {selectedSceneId ? tx({ de: 'Szene', en: 'Scene', es: 'Escena' }) : tx({ de: 'Global', en: 'Global', es: 'Global' })}
+              {selectedSceneId ? tx({ de: tx({ de: "Szene", en: "Scene", es: "Escena" }), en: 'Scene', es: 'Escena' }) : tx({ de: 'Global', en: 'Global', es: 'Global' })}
             </Badge>
           </div>
         </div>

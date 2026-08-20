@@ -308,7 +308,7 @@ export function MultiVideoUpload({
       {/* Validation Message */}
       {value.length < minFiles && (
         <p className="text-sm text-destructive">
-          Mindestens {minFiles} Video{minFiles > 1 ? 's' : ''} {tx({ de: 'erforderlich', en: 'required', es: 'obligatorio' })}
+          {tx({ de: "Mindestens", en: "At least", es: "Al menos" })} {minFiles} Video{minFiles > 1 ? 's' : ''} {tx({ de: 'erforderlich', en: 'required', es: 'obligatorio' })}
         </p>
       )}
     </div>

@@ -364,7 +364,7 @@ export function AISceneRemix({
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-medium flex items-center gap-2">
                 <Film className="w-4 h-4 text-primary" />
-                {isPreviewMode ? tx({ de: 'Vorschau der neuen Reihenfolge', en: 'Preview new order', es: 'Previsualizar nuevo orden' }) : tx({ de: 'Aktuelle Reihenfolge', en: 'Current order', es: 'Orden actual' })}
+                {isPreviewMode ? tx({ de: tx({ de: "Vorschau der neuen Reihenfolge", en: "Preview of the new order", es: "Vista previa del nuevo orden" }), en: 'Preview new order', es: 'Previsualizar nuevo orden' }) : tx({ de: 'Aktuelle Reihenfolge', en: 'Current order', es: 'Orden actual' })}
               </h4>
               {!isPreviewMode && (
                 <Button size="sm" variant="outline" onClick={handlePreview}>
@@ -435,7 +435,7 @@ export function AISceneRemix({
           </Button>
           <Button onClick={handleApply} className="bg-gradient-to-r from-purple-500 to-pink-500">
             <Sparkles className="w-4 h-4 mr-1.5" />
-            {isPreviewMode ? tx({ de: 'Anwenden', en: 'Apply', es: 'Aplicar' }) : tx({ de: 'Remix & Anwenden', en: 'Remix & apply', es: 'Remix y aplicar' })}
+            {isPreviewMode ? tx({ de: tx({ de: "Anwenden", en: "Apply", es: "Aplicar" }), en: 'Apply', es: 'Aplicar' }) : tx({ de: 'Remix & Anwenden', en: 'Remix & apply', es: 'Remix y aplicar' })}
             <ArrowRight className="w-4 h-4 ml-1.5" />
           </Button>
         </DialogFooter>

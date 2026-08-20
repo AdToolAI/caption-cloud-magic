@@ -75,7 +75,7 @@ export default function SfxLibrary() {
       if (error) throw error;
       setResults((data?.results ?? []) as SfxItem[]);
     } catch (err: any) {
-      toast({ title: tx({ de: "Suche fehlgeschlagen", en: "Search failed", es: "La búsqueda falló" }), description: err?.message ?? tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }), variant: "destructive" });
+      toast({ title: tx({ de: "Suche fehlgeschlagen", en: "Search failed", es: "La búsqueda falló" }), description: err?.message ?? tx({ de: tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }), en: "Unknown error", es: "Error desconocido" }), variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -345,7 +345,7 @@ export default function SfxLibrary() {
 
         <Tabs defaultValue="results">
           <TabsList className="bg-black/40 border border-yellow-500/15">
-            <TabsTrigger value="results">Ergebnisse ({results.length})</TabsTrigger>
+            <TabsTrigger value="results">{tx({ de: "Ergebnisse (", en: "Results (", es: "Resultados (" })}{results.length})</TabsTrigger>
             <TabsTrigger value="favorites">Favoriten ({favorites.length})</TabsTrigger>
           </TabsList>
 
@@ -365,7 +365,7 @@ export default function SfxLibrary() {
                 <Loader2 className="h-6 w-6 animate-spin text-yellow-400" />
               </div>
             ) : (
-              renderGrid(favorites, user ? tx({ de: "Noch keine Favoriten — klicke das Herz auf einem Sound.", en: "No favorites yet — click the heart on a sound.", es: "Aún no hay favoritos — haz clic en el corazón de un sonido." }) : tx({ de: "Bitte einloggen, um Favoriten zu speichern.", en: "Please log in to save favorites.", es: "Por favor, inicia sesión para guardar favoritos." }))
+              renderGrid(favorites, user ? tx({ de: tx({ de: "Noch keine Favoriten — klicke das Herz auf einem Sound.", en: "No favorites yet — tap the heart on a sound.", es: "Aún no hay favoritos — pulsa el corazón en un sonido." }), en: "No favorites yet — click the heart on a sound.", es: "Aún no hay favoritos — haz clic en el corazón de un sonido." }) : tx({ de: "Bitte einloggen, um Favoriten zu speichern.", en: "Please log in to save favorites.", es: "Por favor, inicia sesión para guardar favoritos." }))
             )}
           </TabsContent>
         </Tabs>

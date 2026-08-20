@@ -92,7 +92,7 @@ export function VoiceSlot({
           className="flex-1 justify-start h-9 font-normal bg-background/60 text-xs min-w-0"
         >
           <Mic className="h-3.5 w-3.5 mr-2 text-muted-foreground shrink-0" />
-          <span className="truncate">{voiceName || (voiceId ? tx({ de: 'Stimme aktiv', en: 'Voice active', es: 'Voz activa' }) : tx({ de: 'Stimme wählen…', en: 'Select voice…', es: 'Seleccionar voz…' }))}</span>
+          <span className="truncate">{voiceName || (voiceId ? tx({ de: tx({ de: "Stimme aktiv", en: "Voice active", es: "Voz activa" }), en: 'Voice active', es: 'Voz activa' }) : tx({ de: 'Stimme wählen…', en: 'Select voice…', es: 'Seleccionar voz…' }))}</span>
           <Library className="h-3.5 w-3.5 ml-auto text-primary shrink-0" />
         </Button>
 

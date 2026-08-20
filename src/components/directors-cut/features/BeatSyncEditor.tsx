@@ -225,7 +225,7 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
               </div>
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded bg-gray-400" />
-                <span>{beats.length - kickBeats - snareBeats} Andere</span>
+                <span>{beats.length - kickBeats - snareBeats} {tx({ de: "Andere", en: "Other", es: "Otros" })}</span>
               </div>
             </div>
           </div>

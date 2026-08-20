@@ -230,7 +230,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
             size="sm"
             onClick={toggleVoiceLock}
             className="h-7 px-2 text-xs gap-1"
-            title={lockedVoiceId ? tx({ de: "Voice-Lock entfernen", en: "Remove voice lock", es: "Eliminar bloqueo de voz" }) : tx({ de: 'Aktuelle Stimme für dieses Projekt sperren', en: 'Lock current voice for this project', es: 'Bloquear voz actual para este proyecto' })}
+            title={lockedVoiceId ? tx({ de: tx({ de: "Voice-Lock entfernen", en: "Remove voice lock", es: "Quitar el bloqueo de voz" }), en: "Remove voice lock", es: "Eliminar bloqueo de voz" }) : tx({ de: 'Aktuelle Stimme für dieses Projekt sperren', en: 'Lock current voice for this project', es: 'Bloquear voz actual para este proyecto' })}
           >
             {lockedVoiceId ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
             {lockedVoiceId ? tx({ de: 'Entsperren', en: 'Unlock', es: 'Desbloquear' }) : tx({ de: 'Sperren', en: 'Lock', es: 'Bloquear' })}
@@ -451,7 +451,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
               {isGenerating ? (
                 <><Loader2 className="h-4 w-4 animate-spin" />{tx({ de: 'Generiert...', en: 'Generating...', es: 'Generando...' })}</>
               ) : (
-                <><Sparkles className="h-4 w-4" />{generatedUrl ? tx({ de: 'Neu generieren', en: 'Regenerate', es: 'Regenerar' }) : tx({ de: 'Voice-Over erstellen', en: 'Create voice-over', es: 'Crear voz en off' })}</>
+                <><Sparkles className="h-4 w-4" />{generatedUrl ? tx({ de: tx({ de: "Neu generieren", en: "Regenerate", es: "Regenerar" }), en: 'Regenerate', es: 'Regenerar' }) : tx({ de: 'Voice-Over erstellen', en: 'Create voice-over', es: 'Crear voz en off' })}</>
               )}
             </Button>
           </div>

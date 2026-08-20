@@ -332,7 +332,7 @@ export function ContentStudioProvider({
           {
             ...filled,
             variantName: v?.name || template.name,
-            title: source.headline?.slice(0, 60) || tx({ de: 'Neuer Post', en: 'New post', es: 'Nueva publicación' }),
+            title: source.headline?.slice(0, 60) || tx({ de: tx({ de: "Neuer Post", en: "New post", es: "Nueva publicación" }), en: 'New post', es: 'Nueva publicación' }),
           },
           brandKit,
         );
@@ -372,7 +372,7 @@ export function ContentStudioProvider({
       body: { prompt: prompt.trim(), style: "realistic", aspectRatio: "1:1", quality: "fast", textFree: true },
     });
     if (error) throw error;
-    if (data?.ok === false || data?.error) throw new Error(data.error || tx({ de: "Bildgenerierung fehlgeschlagen", en: "Image generation failed", es: "Error al generar la imagen" }));
+    if (data?.ok === false || data?.error) throw new Error(data.error || tx({ de: tx({ de: "Bildgenerierung fehlgeschlagen", en: "Image generation failed", es: "Error al generar la imagen" }), en: "Image generation failed", es: "Error al generar la imagen" }));
     const url: string | undefined = data?.image?.url ?? data?.image;
     if (!url) throw new Error(tx({ de: "Kein Bild erhalten", en: "No picture received", es: "No se recibió ninguna foto" }));
     return url;

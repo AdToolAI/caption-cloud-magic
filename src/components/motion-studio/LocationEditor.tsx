@@ -155,7 +155,7 @@ export default function LocationEditor({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5 text-primary" />
-            {location ? tx({ de: 'Location bearbeiten', en: 'Edit Location', es: 'Editar ubicación' }) : tx({ de: 'Neue Location anlegen', en: 'Create New Location', es: 'Crear nueva ubicación' })}
+            {location ? tx({ de: tx({ de: "Location bearbeiten", en: "Edit location", es: "Editar localización" }), en: 'Edit Location', es: 'Editar ubicación' }) : tx({ de: 'Neue Location anlegen', en: 'Create New Location', es: 'Crear nueva ubicación' })}
           </DialogTitle>
           <DialogDescription>
             {tx({ de: 'Schauplätze einmal definieren — in jedem Projekt wiederverwenden.', en: 'Define locations once — reuse them in every project.', es: 'Define escenarios una vez y reutilízalos en cada proyecto.' })}
@@ -311,7 +311,7 @@ export default function LocationEditor({
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {location ? tx({ de: 'Änderungen speichern', en: 'Save changes', es: 'Guardar cambios' }) : tx({ de: 'Location anlegen', en: 'Create Location', es: 'Crear ubicación' })}
+            {location ? tx({ de: tx({ de: "Änderungen speichern", en: "Save changes", es: "Guardar cambios" }), en: 'Save changes', es: 'Guardar cambios' }) : tx({ de: 'Location anlegen', en: 'Create Location', es: 'Crear ubicación' })}
           </Button>
         </div>
       </DialogContent>

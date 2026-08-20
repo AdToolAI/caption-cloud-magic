@@ -48,7 +48,7 @@ export function ConsistencyScore({ score, brandKit }: ConsistencyScoreProps) {
       type: score >= 80 ? "success" : "tip",
       icon: score >= 80 ? CheckCircle : AlertCircle,
       text: score >= 80 
-        ? tx({ de: "Deine Marke ist konsistent! Weiter so!", en: "Your brand is consistent! Keep it up!", es: "¡Tu marca es consistente! ¡Sigue así!" }) 
+        ? tx({ de: tx({ de: "Deine Marke ist konsistent! Weiter so!", en: "Your brand is consistent! Keep it up!", es: "¡Tu marca es consistente! ¡Sigue así!" }), en: "Your brand is consistent! Keep it up!", es: "¡Tu marca es consistente! ¡Sigue así!" }) 
         : tx({ de: "Nutze deine Primärfarbe häufiger in Posts", en: "Use your primary color more often in posts", es: "Usa tu color primario con más frecuencia en las publicaciones" })
     },
     {

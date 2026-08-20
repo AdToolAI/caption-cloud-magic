@@ -184,7 +184,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                     />
                   </div>
                   <Button onClick={handleCreateTest} className="w-full" disabled={loading}>
-                    {loading ? tx({ de: "Erstelle...", en: "Creating...", es: "Creando..." }) : tx({ de: "Test erstellen", en: "Create test", es: "Crear prueba" })}
+                    {loading ? tx({ de: tx({ de: "Erstelle...", en: "Creating...", es: "Creando..." }), en: "Creating...", es: "Creando..." }) : tx({ de: "Test erstellen", en: "Create test", es: "Crear prueba" })}
                   </Button>
                 </div>
               </DialogContent>
@@ -220,7 +220,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                   <CardContent>
                     <div className="flex items-center justify-between">
                       <div className="text-sm text-muted-foreground">
-                        Gestartet: {test.started_at ? new Date(test.started_at).toLocaleDateString(uiLocale()) : tx({ de: 'Noch nicht gestartet', en: 'Not started yet', es: 'Aún no iniciado' })}
+                        {tx({ de: "Gestartet:", en: "Started:", es: "Iniciado:" })} {test.started_at ? new Date(test.started_at).toLocaleDateString(uiLocale()) : tx({ de: 'Noch nicht gestartet', en: 'Not started yet', es: 'Aún no iniciado' })}
                       </div>
                       <div className="flex gap-2">
                         {test.status === 'draft' && (
@@ -260,7 +260,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
         <Dialog open={!!selectedTest} onOpenChange={() => setSelectedTest(null)}>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{selectedTest.test_name} - Ergebnisse</DialogTitle>
+              <DialogTitle>{selectedTest.test_name} {tx({ de: "- Ergebnisse", en: "- Results", es: "- Resultados" })}</DialogTitle>
               <DialogDescription>
                 {tx({ de: "Statistische Analyse der Test-Varianten", en: "Statistical analysis of test variants", es: "Análisis estadístico de las variantes de prueba" })}
               </DialogDescription>

@@ -152,7 +152,7 @@ export const TemplateCard = ({
           )}
           {template.usage_count > 0 && (
             <span className="text-xs text-muted-foreground">
-              {template.usage_count}× verwendet
+              {template.usage_count}{tx({ de: "× verwendet", en: "× used", es: "× usado" })}
             </span>
           )}
         </div>

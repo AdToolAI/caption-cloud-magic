@@ -39,7 +39,7 @@ export function useResetLipSync() {
     } catch (e) {
       toast({
         title: tx({ de: 'Reset fehlgeschlagen', en: 'Reset failed', es: 'Error al restablecer' }),
-        description: (e as Error)?.message ?? tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }),
+        description: (e as Error)?.message ?? tx({ de: tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }), en: 'Unknown error', es: 'Error desconocido' }),
         variant: 'destructive',
       });
     } finally {

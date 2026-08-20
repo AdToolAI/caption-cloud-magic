@@ -78,7 +78,7 @@ export const LinkedInPostPreview = ({
               onClick={() => setShowFullCaption(!showFullCaption)}
               className="text-muted-foreground hover:text-primary ml-1 font-medium"
             >
-              {showFullCaption ? tx({ de: '...weniger anzeigen', en: '...show less', es: '...ver menos' }) : tx({ de: '...mehr anzeigen', en: '...show more', es: '...ver más' })}
+              {showFullCaption ? tx({ de: tx({ de: "...weniger anzeigen", en: "...show less", es: "...mostrar menos" }), en: '...show less', es: '...ver menos' }) : tx({ de: '...mehr anzeigen', en: '...show more', es: '...ver más' })}
             </button>
           )}
           {hashtags.length > 0 && (

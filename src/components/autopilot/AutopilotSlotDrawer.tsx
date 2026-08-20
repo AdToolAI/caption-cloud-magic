@@ -122,7 +122,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
                   </div>
                   {slot.video_started_at && (
                     <div className="text-[11px] text-muted-foreground mt-0.5">
-                      Gestartet: {new Date(slot.video_started_at).toLocaleTimeString()}
+                      {tx({ de: "Gestartet:", en: "Started:", es: "Iniciado:" })} {new Date(slot.video_started_at).toLocaleTimeString()}
                     </div>
                   )}
                   <div className="text-[11px] text-muted-foreground mt-2">
@@ -132,7 +132,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
               ) : (
                 <div className="text-center text-muted-foreground p-6">
                   <ImageIcon className="h-10 w-10 mx-auto mb-2 opacity-40" />
-                  <div className="text-sm">{slot.status === 'generating' ? tx({ de: 'Wird generiert…', en: 'Generating…', es: 'Generando…' }) : tx({ de: 'Noch kein Asset erstellt', en: 'No asset created yet', es: 'Aún no se ha creado ningún activo' })}</div>
+                  <div className="text-sm">{slot.status === 'generating' ? tx({ de: tx({ de: "Wird generiert…", en: "Generating…", es: "Generando…" }), en: 'Generating…', es: 'Generando…' }) : tx({ de: 'Noch kein Asset erstellt', en: 'No asset created yet', es: 'Aún no se ha creado ningún activo' })}</div>
                 </div>
               )}
             </Card>
@@ -153,7 +153,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
               disabled={!isEditable}
               rows={5}
               className="mt-2 font-mono text-sm"
-              placeholder={slot.status === 'generating' ? tx({ de: 'Wird generiert…', en: 'Generating…', es: 'Generando…' }) : tx({ de: "Noch keine Caption", en: "No caption yet", es: "Aún no hay subtítulos" })}
+              placeholder={slot.status === 'generating' ? tx({ de: tx({ de: "Wird generiert…", en: "Generating…", es: "Generando…" }), en: 'Generating…', es: 'Generando…' }) : tx({ de: "Noch keine Caption", en: "No caption yet", es: "Aún no hay subtítulos" })}
             />
             {slot.hashtags && slot.hashtags.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">

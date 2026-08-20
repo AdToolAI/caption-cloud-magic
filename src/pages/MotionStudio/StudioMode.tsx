@@ -236,7 +236,7 @@ export default function StudioMode() {
         .single();
 
       if (insErr || !inserted) {
-        throw new Error(insErr?.message || tx({ de: 'Projekt konnte nicht erstellt werden', en: 'Project could not be created', es: 'No se pudo crear el proyecto' }));
+        throw new Error(insErr?.message || tx({ de: tx({ de: "Projekt konnte nicht erstellt werden", en: "Project could not be created", es: "No se pudo crear el proyecto" }), en: 'Project could not be created', es: 'No se pudo crear el proyecto' }));
       }
 
       // Insert scenes — ID-only: character_shots carries per-character outfit binding.

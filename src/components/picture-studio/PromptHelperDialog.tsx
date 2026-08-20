@@ -102,7 +102,7 @@ export function PromptHelperDialog({
       setResult(data as PromptHelperResult);
     } catch (err: any) {
       console.error('[PromptHelper] error', err);
-      toast.error(err?.message || tx({ de: "Prompt-Helfer konnte nicht antworten.", en: "Prompt helper couldn't respond.", es: "El ayudante de prompts no pudo responder." }));
+      toast.error(err?.message || tx({ de: tx({ de: "Prompt-Helfer konnte nicht antworten.", en: "The prompt helper couldn't respond.", es: "El asistente de prompts no pudo responder." }), en: "Prompt helper couldn't respond.", es: "El ayudante de prompts no pudo responder." }));
     } finally {
       setLoading(false);
     }
@@ -164,7 +164,7 @@ export function PromptHelperDialog({
                 <ImageIcon className="h-4 w-4 text-primary shrink-0" />
                 <span>
                   {autoEnhance
-                    ? tx({ de: 'Bild übernehmen & verbessern — Modell, Modus und Strength werden automatisch gesetzt.', en: 'Adopt & enhance image — model, mode, and strength are set automatically.', es: 'Adoptar y mejorar imagen — el modelo, modo y fuerza se configuran automáticamente.' })
+                    ? tx({ de: tx({ de: "Bild übernehmen & verbessern — Modell, Modus und Strength werden automatisch gesetzt.", en: "Take over the image & enhance it — model, mode and strength are set automatically.", es: "Reutiliza la imagen y mejórala — modelo, modo e intensidad se ajustan automáticamente." }), en: 'Adopt & enhance image — model, mode, and strength are set automatically.', es: 'Adoptar y mejorar imagen — el modelo, modo y fuerza se configuran automáticamente.' })
                     : tx({ de: 'Dein Referenzbild wird mitanalysiert.', en: 'Your reference image will be analyzed too.', es: 'Tu imagen de referencia también se analizará.' })}
                 </span>
                 <img src={referenceImageUrl} alt="ref" className="ml-auto h-10 w-10 object-cover rounded" />
@@ -218,7 +218,7 @@ export function PromptHelperDialog({
                   <p className="text-xs text-muted-foreground">{result.reasoning}</p>
                   {result.referenceSummary && (
                     <p className="text-[11px] italic text-muted-foreground">
-                      Erkannt im Referenzbild: {result.referenceSummary}
+                      {tx({ de: "Erkannt im Referenzbild:", en: "Detected in the reference image:", es: "Detectado en la imagen de referencia:" })} {result.referenceSummary}
                     </p>
                   )}
                 </div>

@@ -394,11 +394,11 @@ export default function MediaLibrary() {
             : isDirectorCutEnhancement
               ? `Director's Cut · Sora 2 ${metadata?.model === 'sora-2-pro' ? 'Pro' : 'Standard'} · ${metadata?.duration_seconds}s`
               : isDirectorsCut
-                ? tx({ de: "Exportiert mit Universal Director's Cut", en: "Exported with Universal Director's Cut", es: "Exportado con Universal Director's Cut" })
+                ? tx({ de: tx({ de: "Exportiert mit Universal Director's Cut", en: "Exported with Universal Director's Cut", es: "Exportado con Universal Director's Cut" }), en: "Exported with Universal Director's Cut", es: "Exportado con Universal Director's Cut" })
                 : isMotionStudioClip
                   ? `${motionModel} · ${metadata?.duration_seconds ?? '?'}s${metadata?.prompt ? ` · ${String(metadata.prompt).slice(0, 50)}…` : ''}`
                   : isUniversalCreator
-                    ? tx({ de: 'Gerendert mit Universal Creator', en: 'Rendered with Universal Creator', es: 'Renderizado con Universal Creator' })
+                    ? tx({ de: tx({ de: "Gerendert mit Universal Creator", en: "Rendered with Universal Creator", es: "Renderizado con Universal Creator" }), en: 'Rendered with Universal Creator', es: 'Renderizado con Universal Creator' })
                     : '',
           url: video.output_url || '',
           thumbUrl: video.output_url || '',
@@ -618,7 +618,7 @@ export default function MediaLibrary() {
       } catch (cleanupErr: any) {
         toast({
           title: tx({ de: 'Auto-Cleanup fehlgeschlagen', en: 'Auto cleanup failed', es: 'Error en la limpieza automática' }),
-          description: cleanupErr?.message || tx({ de: 'Bitte manuell ältere Medien löschen.', en: 'Please delete older media manually.', es: 'Elimina manualmente los medios antiguos.' }),
+          description: cleanupErr?.message || tx({ de: tx({ de: "Bitte manuell ältere Medien löschen.", en: "Please delete older media manually.", es: "Elimina manualmente los archivos antiguos." }), en: 'Please delete older media manually.', es: 'Elimina manualmente los medios antiguos.' }),
           variant: 'destructive',
         });
         const fileInput = document.getElementById('file-upload') as HTMLInputElement;
@@ -1426,7 +1426,7 @@ export default function MediaLibrary() {
             variant="outline"
             onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
           >
-            Mehr laden ({visibleCount} {tx({ de: "von", en: "of", es: "de" })} {filteredMedia.length})
+            {tx({ de: "Mehr laden", en: "Load more", es: "Cargar más" })} ({visibleCount} {tx({ de: "von", en: "of", es: "de" })} {filteredMedia.length})
           </Button>
         </div>
       )}

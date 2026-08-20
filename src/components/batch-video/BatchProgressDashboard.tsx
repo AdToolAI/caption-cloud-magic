@@ -171,7 +171,7 @@ export function BatchProgressDashboard({ batchJobId }: BatchProgressDashboardPro
           </div>
           <div className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
-            <span>{processing} In Bearbeitung</span>
+            <span>{processing} {tx({ de: "In Bearbeitung", en: "In progress", es: "En curso" })}</span>
           </div>
           <div className="flex items-center gap-2">
             <XCircle className="h-4 w-4 text-red-500" />

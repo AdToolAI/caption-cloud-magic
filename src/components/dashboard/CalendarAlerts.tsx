@@ -128,7 +128,7 @@ export function CalendarAlerts({
                         {getPriorityBadge(config.priority)}
                         <span className={`text-sm font-medium ${config.color}`}>
                           {alert.type === 'conflict'
-                          ? tx({ de: 'Konflikt erkannt', en: 'Conflict detected', es: 'Conflicto detectado' })
+                          ? tx({ de: tx({ de: "Konflikt erkannt", en: "Conflict detected", es: "Conflicto detectado" }), en: 'Conflict detected', es: 'Conflicto detectado' })
                           : alert.type === 'overdue'
                           ? tx({ de: 'Überfällig', en: 'Overdue', es: 'Atrasado' })
                           : tx({ de: 'Leere Tage', en: 'Empty days', es: 'Días vacíos' })}

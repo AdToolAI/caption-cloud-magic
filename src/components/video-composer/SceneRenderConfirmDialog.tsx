@@ -78,7 +78,7 @@ export default function SceneRenderConfirmDialog({
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            {title || (multi ? tx({ de: 'Mehrere Szenen rendern?', en: 'Render multiple scenes?', es: '¿Renderizar múltiples escenas?' }) : tx({ de: 'Szene rendern?', en: 'Render scene?', es: '¿Renderizar escena?' }))}
+            {title || (multi ? tx({ de: tx({ de: "Mehrere Szenen rendern?", en: "Render multiple scenes?", es: "¿Renderizar varias escenas?" }), en: 'Render multiple scenes?', es: '¿Renderizar múltiples escenas?' }) : tx({ de: 'Szene rendern?', en: 'Render scene?', es: '¿Renderizar escena?' }))}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {description ||

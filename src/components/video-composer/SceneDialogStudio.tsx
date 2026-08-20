@@ -1393,7 +1393,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             : tx({ de: 'Dialog-Szene rendern?', en: 'Render dialog scene?', es: '¿Renderizar escena de diálogo?' }),
         description:
           turnCount > 1
-            ? tx({ de: 'Pro Sprecher-Turn läuft ein eigener Basis-Clip + dedizierter Lippensynchronisation. Gesamtkosten siehe unten.', en: 'Each speaker turn runs its own base clip + dedicated lip-sync. See total cost below.', es: 'Cada turno del orador ejecuta su propia clip base + lip-sync dedicado. Ver el costo total abajo.' })
+            ? tx({ de: tx({ de: "Pro Sprecher-Turn läuft ein eigener Basis-Clip + dedizierter Lippensynchronisation. Gesamtkosten siehe unten.", en: "Each speaker turn runs its own base clip plus dedicated lip-sync. See the total cost below.", es: "Cada turno de hablante genera su propio clip base más lip-sync dedicado. Consulta el coste total abajo." }), en: 'Each speaker turn runs its own base clip + dedicated lip-sync. See total cost below.', es: 'Cada turno del orador ejecuta su propia clip base + lip-sync dedicado. Ver el costo total abajo.' })
             : tx({ de: 'Voiceover + Lip-Sync werden mitberechnet.', en: 'Voiceover + lip-sync will be included in the cost.', es: 'La voz en off + lip-sync se incluirán en el costo.' }),
       });
       if (!ok) return;

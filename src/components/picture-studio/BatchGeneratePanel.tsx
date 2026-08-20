@@ -270,7 +270,7 @@ export function BatchGeneratePanel() {
             {running ? (
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {tx({ de: `Generiere ${completed}/${items.length}…`, en: `Generating ${completed}/${items.length}…`, es: `Generando ${completed}/${items.length}…` })}</>
             ) : (
-              <><Sparkles className="h-4 w-4 mr-2" /> Batch starten ({prompts.length} {tx({ de: "Bilder)", en: "images)", es: "imágenes)" })}</>
+              <><Sparkles className="h-4 w-4 mr-2" /> {tx({ de: "Batch starten (", en: "Start batch (", es: "Iniciar lote (" })}{prompts.length} {tx({ de: "Bilder)", en: "images)", es: "imágenes)" })}</>
             )}
           </Button>
 

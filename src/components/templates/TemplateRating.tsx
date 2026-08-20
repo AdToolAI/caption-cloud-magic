@@ -48,7 +48,7 @@ export const TemplateRating = ({
         </div>
         {averageRating !== undefined && (
           <span className="text-sm text-muted-foreground">
-            {averageRating.toFixed(1)} ({totalRatings || 0} Bewertungen)
+            {averageRating.toFixed(1)} ({totalRatings || 0} {tx({ de: "Bewertungen)", en: "ratings)", es: "valoraciones)" })}
           </span>
         )}
       </div>
@@ -57,7 +57,7 @@ export const TemplateRating = ({
       {showForm && (
         <div className="space-y-3 p-4 border rounded-lg bg-card">
           <p className="text-sm font-medium">
-            {userRating ? tx({ de: 'Ihre Bewertung bearbeiten', en: 'Edit your rating', es: 'Editar tu calificación' }) : tx({ de: 'Template bewerten', en: 'Rate template', es: 'Calificar plantilla' })}
+            {userRating ? tx({ de: tx({ de: "Ihre Bewertung bearbeiten", en: "Edit your rating", es: "Editar tu valoración" }), en: 'Edit your rating', es: 'Editar tu calificación' }) : tx({ de: 'Template bewerten', en: 'Rate template', es: 'Calificar plantilla' })}
           </p>
           
           <div className="flex gap-1">
@@ -93,7 +93,7 @@ export const TemplateRating = ({
             disabled={rating === 0 || isPending}
             size="sm"
           >
-            {isPending ? tx({ de: 'Speichern...', en: 'Saving...', es: 'Guardando...' }) : userRating ? tx({ de: 'Bewertung aktualisieren', en: 'Update rating', es: 'Actualizar calificación' }) : tx({ de: 'Bewertung abgeben', en: 'Submit rating', es: 'Enviar calificación' })}
+            {isPending ? tx({ de: tx({ de: "Speichern...", en: "Saving...", es: "Guardando..." }), en: 'Saving...', es: 'Guardando...' }) : userRating ? tx({ de: tx({ de: "Bewertung aktualisieren", en: "Update rating", es: "Actualizar valoración" }), en: 'Update rating', es: 'Actualizar calificación' }) : tx({ de: 'Bewertung abgeben', en: 'Submit rating', es: 'Enviar calificación' })}
           </Button>
         </div>
       )}

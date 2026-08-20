@@ -577,7 +577,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                       
                       <div className="space-y-2">
                         <Label htmlFor="voice-speed" className="text-sm font-medium">
-                          Sprechgeschwindigkeit: {voiceSpeed.toFixed(1)}x
+                          {tx({ de: "Sprechgeschwindigkeit:", en: "Speaking rate:", es: "Velocidad de habla:" })} {voiceSpeed.toFixed(1)}x
                         </Label>
                         <input
                           id="voice-speed"

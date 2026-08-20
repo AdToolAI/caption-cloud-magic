@@ -120,13 +120,13 @@ export function mapAuthError(
 
   const fallbackTitle =
     context === "signup"
-      ? tx({ de: "Registrierung fehlgeschlagen", en: "Sign-up failed", es: "Registro fallido" })
+      ? tx({ de: tx({ de: "Registrierung fehlgeschlagen", en: "Sign-up failed", es: "Error al registrarse" }), en: "Sign-up failed", es: "Registro fallido" })
       : context === "signin"
-        ? tx({ de: "Anmeldung fehlgeschlagen", en: "Sign-in failed", es: "Acceso fallido" })
+        ? tx({ de: tx({ de: "Anmeldung fehlgeschlagen", en: "Sign-in failed", es: "Error al iniciar sesión" }), en: "Sign-in failed", es: "Acceso fallido" })
         : context === "reset"
-          ? tx({ de: "Passwort-Reset fehlgeschlagen", en: "Password reset failed", es: "Restablecimiento de contraseña fallido" })
+          ? tx({ de: tx({ de: "Passwort-Reset fehlgeschlagen", en: "Password reset failed", es: "Error al restablecer la contraseña" }), en: "Password reset failed", es: "Restablecimiento de contraseña fallido" })
           : context === "update"
-            ? tx({ de: "Aktualisierung fehlgeschlagen", en: "Update failed", es: "Actualización fallida" })
+            ? tx({ de: tx({ de: "Aktualisierung fehlgeschlagen", en: "Update failed", es: "Error al actualizar" }), en: "Update failed", es: "Actualización fallida" })
             : tx({ de: "Ein Fehler ist aufgetreten", en: "Something went wrong", es: "Se ha producido un error" });
 
   return {

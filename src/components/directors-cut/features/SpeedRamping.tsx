@@ -359,7 +359,7 @@ export function SpeedRamping({
             <Gauge className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-xs">
               {selectedSceneId 
-                ? tx({ de: 'Füge Keyframes für diese Szene hinzu', en: 'Add keyframes for this scene', es: 'Añadir fotogramas clave para esta escena' })
+                ? tx({ de: tx({ de: "Füge Keyframes für diese Szene hinzu", en: "Add keyframes for this scene", es: "Añade keyframes para esta escena" }), en: 'Add keyframes for this scene', es: 'Añadir fotogramas clave para esta escena' })
                 : tx({ de: 'Füge globale Keyframes hinzu um Speed Ramping zu nutzen', en: 'Add global keyframes to use speed ramping', es: 'Agregue fotogramas clave globales para usar el aumento de velocidad' })
               }
             </p>

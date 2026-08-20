@@ -224,7 +224,7 @@ export function InspectorDrawer({
               
               <Button onClick={() => setShowOptimization(!showOptimization)} variant="outline">
                 <Sparkles className="h-4 w-4 mr-2" />
-                {showOptimization ? tx({ de: 'Schließen', en: 'Close', es: 'Cerrar' }) : tx({ de: 'Optimieren', en: 'Optimize', es: 'Optimizar' })}
+                {showOptimization ? tx({ de: tx({ de: "Schließen", en: "Close", es: "Cerrar" }), en: 'Close', es: 'Cerrar' }) : tx({ de: 'Optimieren', en: 'Optimize', es: 'Optimizar' })}
               </Button>
               
               {status !== "approved" && (

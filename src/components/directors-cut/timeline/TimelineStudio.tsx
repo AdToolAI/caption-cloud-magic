@@ -497,7 +497,7 @@ export function TimelineStudio({
           className="fixed right-2 top-16 z-50"
           onClick={() => setShowSidebar(s => !s)}
         >
-          {showSidebar ? 'Sidebar ausblenden' : 'AI Tools'}
+          {showSidebar ? tx({ de: tx({ de: "Sidebar ausblenden", en: "Hide sidebar", es: "Ocultar barra lateral" }), en: "Hide sidebar", es: "Ocultar barra lateral" }) : 'AI Tools'}
         </Button>
       </div>
     </div>

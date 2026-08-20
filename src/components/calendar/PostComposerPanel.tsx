@@ -290,7 +290,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
           <Collapsible open={briefOpen} onOpenChange={setBriefOpen}>
             <CollapsibleTrigger asChild>
               <button className="flex items-center justify-between w-full text-left text-xs text-muted-foreground hover:text-[hsl(var(--primary))] transition">
-                <span>{briefOpen ? tx({ de: 'Ausblenden', en: 'Hide', es: 'Ocultar' }) : tx({ de: 'Briefing bearbeiten', en: 'Edit briefing', es: 'Editar instrucciones' })}</span>
+                <span>{briefOpen ? tx({ de: tx({ de: "Ausblenden", en: "Hide", es: "Ocultar" }), en: 'Hide', es: 'Ocultar' }) : tx({ de: 'Briefing bearbeiten', en: 'Edit briefing', es: 'Editar instrucciones' })}</span>
                 <ChevronDown className={cn("h-3.5 w-3.5 transition", briefOpen && "rotate-180")} />
               </button>
             </CollapsibleTrigger>

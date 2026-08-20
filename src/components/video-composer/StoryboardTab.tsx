@@ -568,7 +568,7 @@ export default function StoryboardTab({
             className="gap-1 text-xs"
             title={
               addSceneAllowed
-                ? tx({ de: 'Neue Szene hinzufügen', en: 'Add new scene', es: 'Añadir nueva escena' })
+                ? tx({ de: tx({ de: "Neue Szene hinzufügen", en: "Add new scene", es: "Añadir nueva escena" }), en: 'Add new scene', es: 'Añadir nueva escena' })
                 : tr({ de: `Budget voll (max. ${formatDuration(MAX_PROJECT_SECONDS)}) — kürze oder lösche eine Szene.`, en: `Budget full (max. ${formatDuration(MAX_PROJECT_SECONDS)}) — shorten or delete a scene.`, es: `Presupuesto lleno (máx. ${formatDuration(MAX_PROJECT_SECONDS)}) — acorta o elimina una escena.` })
             }
           >
@@ -630,7 +630,7 @@ export default function StoryboardTab({
               <Play className="h-3.5 w-3.5" />
             )}
             {pendingScenes.length === 0
-              ? tx({ de: 'Alle Clips bereit', en: 'All clips ready', es: 'Todos los clips listos' })
+              ? tx({ de: tx({ de: "Alle Clips bereit", en: "All clips ready", es: "Todos los clips listos" }), en: 'All clips ready', es: 'Todos los clips listos' })
               : tx({ de: `Alle generieren (${pendingScenes.length} · €${remainingCost.toFixed(2)})`, en: `Generate all (${pendingScenes.length} · €${remainingCost.toFixed(2)})`, es: `Generar todo (${pendingScenes.length} · €${remainingCost.toFixed(2)})` })}
           </Button>
         </div>

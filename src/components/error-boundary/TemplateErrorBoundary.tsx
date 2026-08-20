@@ -83,7 +83,7 @@ export class TemplateErrorBoundary extends Component<Props, State> {
               <div className="flex-1 space-y-4">
                 <div>
                   <h2 className="text-2xl font-bold mb-2">
-                    {isTemplateError ? tx({ de: 'Template-Fehler', en: 'Template error', es: 'Error de plantilla' }) : tx({ de: 'Etwas ist schief gelaufen', en: 'Something went wrong', es: 'Algo salió mal' })}
+                    {isTemplateError ? tx({ de: tx({ de: "Template-Fehler", en: "Template error", es: "Error de plantilla" }), en: 'Template error', es: 'Error de plantilla' }) : tx({ de: 'Etwas ist schief gelaufen', en: 'Something went wrong', es: 'Algo salió mal' })}
                   </h2>
                   <p className="text-muted-foreground">
                     {errorDetails.message}

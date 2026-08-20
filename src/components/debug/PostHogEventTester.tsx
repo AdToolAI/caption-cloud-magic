@@ -488,7 +488,7 @@ export function PostHogEventTester() {
           </CardTitle>
           <CardDescription>
             {isPostHogConfigured 
-              ? tx({ de: "PostHog ist bereit, Events zu empfangen", en: "PostHog is ready to receive events", es: "PostHog está listo para recibir eventos" })
+              ? tx({ de: tx({ de: "PostHog ist bereit, Events zu empfangen", en: "PostHog is ready to receive events", es: "PostHog está listo para recibir eventos" }), en: "PostHog is ready to receive events", es: "PostHog está listo para recibir eventos" })
               : tx({ de: 'PostHog API Key fehlt. Setze VITE_PUBLIC_POSTHOG_KEY in deinen Environment Variables.', en: 'PostHog API key missing. Set VITE_PUBLIC_POSTHOG_KEY in your environment variables.', es: 'Falta la clave de API de PostHog. Configura VITE_PUBLIC_POSTHOG_KEY en tus variables de entorno.' })
             }
           </CardDescription>

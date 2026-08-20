@@ -81,7 +81,7 @@ export const ShortcutOverlay: React.FC<Props> = ({ open, onOpenChange }) => {
             {tx({ de: 'Tastatur-Shortcuts', en: 'Keyboard shortcuts', es: 'Atajos de teclado' })}
           </DialogTitle>
           <DialogDescription className="text-white/50">
-            {tx({ de: 'Pro-Editing Shortcuts für den Universal Cut. Drücke', en: 'Pro editing shortcuts for the Universal Cut. Press', es: 'Atajos de edición pro para el Universal Cut. Pulsa' })} <kbd className="px-1 border border-white/20 rounded text-[10px]">?</kbd> {tx({ de: "jederzeit, um diese Übersicht zu öffnen.", en: "anytime to open this overview.", es: "en cualquier momento para abrir este resumen." })}
+            {tx({ de: 'Pro-Editing Shortcuts für den Universal Cut. Drücke', en: 'Pro editing shortcuts for the Universal Cut. Press', es: 'Atajos de edición pro para el Universal Cut. Pulsa' })} <kbd className="px-1 border border-white/20 rounded text-[10px]">?</kbd> {tx({ de: tx({ de: "jederzeit, um diese Übersicht zu öffnen.", en: "at any time to open this overview.", es: "en cualquier momento para abrir este resumen." }), en: "anytime to open this overview.", es: "en cualquier momento para abrir este resumen." })}
           </DialogDescription>
         </DialogHeader>
 

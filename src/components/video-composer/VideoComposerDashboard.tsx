@@ -748,7 +748,7 @@ export default function VideoComposerDashboard() {
       setActiveTab('storyboard');
     } catch (err: any) {
       console.error('[VideoComposerDashboard] persist failed:', err);
-      const msg = err?.message || tx({ de: 'Projekt konnte nicht gespeichert werden', en: 'Project could not be saved', es: 'No se pudo guardar el proyecto' });
+      const msg = err?.message || tx({ de: tx({ de: "Projekt konnte nicht gespeichert werden", en: "Project could not be saved", es: "No se pudo guardar el proyecto" }), en: 'Project could not be saved', es: 'No se pudo guardar el proyecto' });
       setError(msg);
       toast({ title: tx({ de: 'Fehler beim Speichern', en: 'Error saving', es: 'Error al guardar' }), description: msg, variant: 'destructive' });
     } finally {

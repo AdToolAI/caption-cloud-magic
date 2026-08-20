@@ -38,7 +38,7 @@ export const ExportBundle = ({ onExportPNG, onExportPDF, onExportBundle, isPro }
         className="gap-2"
       >
         <FileText className="h-4 w-4" />
-        PDF exportieren
+        {tx({ de: "PDF exportieren", en: "Export PDF", es: "Exportar PDF" })}
         {!isPro && " 🔒"}
       </Button>
       
@@ -49,7 +49,7 @@ export const ExportBundle = ({ onExportPNG, onExportPDF, onExportBundle, isPro }
         className="gap-2"
       >
         <Package className="h-4 w-4" />
-        Bundle exportieren
+        {tx({ de: "Bundle exportieren", en: "Export bundle", es: "Exportar paquete" })}
         {!isPro && " 🔒"}
       </Button>
     </div>

@@ -74,8 +74,8 @@ export const ImageAnalysisPanel = ({ imageUrl, brandKitId }: ImageAnalysisPanelP
         </div>
 
         <div className="text-xs space-y-1 text-muted-foreground">
-          <p>Auflösung: {analysis.quality.resolution.width} x {analysis.quality.resolution.height}px</p>
-          <p>Dateigröße: {(analysis.quality.fileSize / 1024 / 1024).toFixed(2)} MB</p>
+          <p>{tx({ de: "Auflösung:", en: "Resolution:", es: "Resolución:" })} {analysis.quality.resolution.width} x {analysis.quality.resolution.height}px</p>
+          <p>{tx({ de: "Dateigröße:", en: "File size:", es: "Tamaño:" })} {(analysis.quality.fileSize / 1024 / 1024).toFixed(2)} MB</p>
         </div>
 
         {analysis.quality.issues.length > 0 && (

@@ -68,7 +68,7 @@ export function StockVideoFilters({ filters, onChange }: FiltersProps) {
         {activeCount > 0 && (
           <>
             <Badge variant="outline" className="border-yellow-500/40 text-yellow-400 text-[10px] h-4">
-              {activeCount} aktiv
+              {activeCount} {tx({ de: "aktiv", en: "active", es: "activo" })}
             </Badge>
             <button
               className="text-[11px] text-yellow-400 hover:underline"

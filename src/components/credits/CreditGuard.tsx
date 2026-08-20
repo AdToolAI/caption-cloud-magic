@@ -70,7 +70,7 @@ export const CreditGuard = ({ children, feature_code, estimated_cost }: CreditGu
             <AlertDialogDescription className="space-y-2">
               <p>
                 {tx({ de: 'Diese Aktion benötigt', en: 'This action requires', es: 'Esta acción requiere' })} <strong>{insufficientData?.required || 0} Credits</strong>,
-                {tx({ de: 'aber Sie haben nur', en: 'but you only have', es: 'pero solo tienes' })} <strong>{insufficientData?.available || 0} Credits</strong> {tx({ de: 'verfügbar.', en: 'available.', es: 'disponibles.' })}
+                {tx({ de: 'aber Sie haben nur', en: 'but you only have', es: 'pero solo tienes' })} <strong>{insufficientData?.available || 0} Credits</strong> {tx({ de: tx({ de: "verfügbar.", en: "available.", es: "disponible." }), en: 'available.', es: 'disponibles.' })}
               </p>
               <p className="text-sm">
                 {tx({ de: 'Bitte kaufen Sie Credits nach, um diese Funktion zu nutzen.', en: 'Please purchase more credits to use this feature.', es: 'Compra más créditos para usar esta función.' })}

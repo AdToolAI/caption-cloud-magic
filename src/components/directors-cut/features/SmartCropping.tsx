@@ -208,7 +208,7 @@ export function SmartCropping({
           <div className="flex justify-between items-center">
             <label className="text-xs font-medium">Export-Formate</label>
             <Badge variant="secondary" className="text-[10px]">
-              {enabledCount} aktiv
+              {enabledCount} {tx({ de: "aktiv", en: "active", es: "activo" })}
             </Badge>
           </div>
           <div className="grid grid-cols-3 gap-2">

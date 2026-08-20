@@ -29,8 +29,8 @@ export function SystemLoadPill({ className = '', compact = false }: Props) {
     'bg-emerald-400';
 
   const label =
-    load.state === 'saturated' ? 'Voll ausgelastet' :
-    load.state === 'founder_reserve' ? 'Founder-Reserve aktiv' :
+    load.state === 'saturated' ? tx({ de: tx({ de: "Voll ausgelastet", en: "At full capacity", es: "Capacidad completa" }), en: "At full capacity", es: "Capacidad completa" }) :
+    load.state === 'founder_reserve' ? tx({ de: tx({ de: "Founder-Reserve aktiv", en: "Founder reserve active", es: "Reserva de fundadores activa" }), en: "Founder reserve active", es: "Reserva de fundadores activa" }) :
     load.state === 'busy' ? `Queue belegt (${load.slotsUsed}/${load.slotBudget})` :
     'Queue frei';
 

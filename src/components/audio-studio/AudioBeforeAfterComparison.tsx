@@ -600,7 +600,7 @@ export function AudioBeforeAfterComparison({
             <div className="flex flex-col items-center gap-2">
               <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
               <span className="text-sm text-muted-foreground">
-                {isReprocessing ? tx({ de: "Audio wird neu verarbeitet...", en: "Audio is reprocessed...", es: "El audio se reprocesa..." }) : tx({ de: "Waveforms werden geladen...", en: "Loading waveforms...", es: "Cargando formas de onda..." })}
+                {isReprocessing ? tx({ de: tx({ de: "Audio wird neu verarbeitet...", en: "Reprocessing audio...", es: "Reprocesando audio..." }), en: "Audio is reprocessed...", es: "El audio se reprocesa..." }) : tx({ de: "Waveforms werden geladen...", en: "Loading waveforms...", es: "Cargando formas de onda..." })}
               </span>
             </div>
           </motion.div>
@@ -630,7 +630,7 @@ export function AudioBeforeAfterComparison({
             </div>
             
             <div className="text-xs text-muted-foreground space-y-1">
-              <p>• {Object.values(effectOptions).filter(Boolean).length} Effekte aktiv</p>
+              <p>• {Object.values(effectOptions).filter(Boolean).length} {tx({ de: "Effekte aktiv", en: "effects active", es: "efectos activos" })}</p>
               <p>• {tx({ de: 'Dauer', en: 'Duration', es: 'Duración' })}: {formatTime(duration)}</p>
             </div>
           </div>

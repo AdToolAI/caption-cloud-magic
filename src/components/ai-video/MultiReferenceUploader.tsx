@@ -78,7 +78,7 @@ export function MultiReferenceUploader({
 
   const isFull = slots.length >= maxReferences;
   const rangeLabel = `${required ? 1 : 0}–${maxReferences}`;
-  const engine = modelLabel ?? 'Das Modell';
+  const engine = modelLabel ?? tx({ de: tx({ de: "Das Modell", en: "The model", es: "El modelo" }), en: "The model", es: "El modelo" });
 
   const uploadFile = async (file: File, role: ViduReferenceRole) => {
     if (!user) {

@@ -118,7 +118,7 @@ export function buildAutoFixPlan(
         entry.fieldsFixed.push('aiPrompt');
         entry.diff.push({
           field: 'AI-Prompt',
-          before: current || '(leer)',
+          before: current || tx({ de: "(leer)", en: "(empty)", es: "(vacío)" }),
           after: target.length > 80 ? target.slice(0, 80) + '…' : target,
         });
       } else {

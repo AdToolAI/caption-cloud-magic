@@ -258,7 +258,7 @@ export default function RenderPreFlightDialog({
 
   const summary = canRender
     ? warnings.length === 0
-      ? tx({ de: 'Alles klar — Pipeline bereit.', en: 'All clear — pipeline ready.', es: 'Todo listo — pipeline preparada.' })
+      ? tx({ de: tx({ de: "Alles klar — Pipeline bereit.", en: "All good — pipeline ready.", es: "Todo listo — pipeline preparado." }), en: 'All clear — pipeline ready.', es: 'Todo listo — pipeline preparada.' })
       : `${warnings.length} ${tx({ de: `Warnung${warnings.length === 1 ? '' : 'en'}`, en: `warning${warnings.length === 1 ? '' : 'en'}`, es: `advertencia${warnings.length === 1 ? '' : 'en'}` })} — ${tx({ de: 'du kannst trotzdem starten.', en: 'you can still start.', es: 'aún puedes iniciar.' })}`
     : `${blockers.length} ${tx({ de: `Problem${blockers.length === 1 ? '' : 'e'}`, en: `issue${blockers.length === 1 ? '' : 'e'}`, es: `problema${blockers.length === 1 ? '' : 'e'}` })} ${tx({ de: 'verhindern den Render.', en: 'prevent rendering.', es: 'impiden el renderizado.' })}`;
 
@@ -311,7 +311,7 @@ export default function RenderPreFlightDialog({
             className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
           >
             <Rocket className="h-3.5 w-3.5 mr-1.5" />
-            {warnings.length > 0 ? tx({ de: 'Trotzdem starten', en: 'Start anyway', es: 'Iniciar de todos modos' }) : tx({ de: 'Render starten', en: 'Start render', es: 'Iniciar renderizado' })}
+            {warnings.length > 0 ? tx({ de: tx({ de: "Trotzdem starten", en: "Start anyway", es: "Iniciar de todos modos" }), en: 'Start anyway', es: 'Iniciar de todos modos' }) : tx({ de: 'Render starten', en: 'Start render', es: 'Iniciar renderizado' })}
           </Button>
         </DialogFooter>
       </DialogContent>

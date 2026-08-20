@@ -99,7 +99,7 @@ const FeatureFlagDemo = () => {
                       {flag.status === undefined
                         ? "Loading..."
                         : flag.status
-                        ? "Aktiv"
+                        ? tx({ de: tx({ de: "Aktiv", en: "Active", es: "Activo" }), en: "Active", es: "Activo" })
                         : "Inaktiv"}
                     </Badge>
                   </CardContent>
@@ -230,7 +230,7 @@ const FeatureFlagDemo = () => {
             </CardHeader>
             <CardContent className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Feature Flags ermöglichen es uns, neue Features schrittweise auszurollen und zu testen.
+                {tx({ de: "Feature Flags ermöglichen es uns, neue Features schrittweise auszurollen und zu testen.", en: "Feature flags let us roll out and test new features gradually.", es: "Los feature flags nos permiten desplegar y probar nuevas funciones de forma gradual." })}
                 {tx({ de: 'Deine Feature-Flag-Konfiguration wird von PostHog gesteuert und kann sich basierend auf verschiedenen Faktoren ändern.', en: 'Your feature flag configuration is controlled by PostHog and can change based on various factors.', es: 'Tu configuración de feature flags la controla PostHog y puede cambiar según varios factores.' })}
               </p>
               <p className="text-sm text-muted-foreground">

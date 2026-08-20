@@ -89,7 +89,7 @@ export default function SocialMediaSettings() {
               : `${targetPlatform} verbinden`,
             { 
               description: reconnectPlatform 
-                ? tx({ de: 'Klicke auf den Developer Portal Button um dein Token zu erneuern.', en: 'Click on the Developer Portal button to renew your token.', es: 'Haga clic en el botón Portal de desarrollador para renovar su token.' })
+                ? tx({ de: tx({ de: "Klicke auf den Developer Portal Button um dein Token zu erneuern.", en: "Click the Developer Portal button to renew your token.", es: "Haz clic en el botón del Developer Portal para renovar tu token." }), en: 'Click on the Developer Portal button to renew your token.', es: 'Haga clic en el botón Portal de desarrollador para renovar su token.' })
                 : tx({ de: "Folge den Schritten um die Plattform zu verbinden.", en: "Follow the steps to connect the platform.", es: "Sigue los pasos para conectar la plataforma." })
             }
           );
@@ -185,7 +185,7 @@ export default function SocialMediaSettings() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Label htmlFor={`toggle-${platform.id}`} className="text-sm">
-                      {connected ? tx({ de: 'Aktiv', en: 'Active', es: 'Activo' }) : tx({ de: 'Inaktiv', en: 'Inactive', es: 'Inactivo' })}
+                      {connected ? tx({ de: tx({ de: "Aktiv", en: "Active", es: "Activo" }), en: 'Active', es: 'Activo' }) : tx({ de: 'Inaktiv', en: 'Inactive', es: 'Inactivo' })}
                     </Label>
                     <Switch
                       id={`toggle-${platform.id}`}

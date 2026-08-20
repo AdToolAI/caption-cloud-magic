@@ -27,7 +27,7 @@ export function AutopilotWeeklyReviewPanel() {
           {tx({ de: "Jeden Samstag um 10:00 UTC erstellt der Autopilot automatisch ein Review der vergangenen Woche.", en: "Every Saturday at 10:00 UTC, the Autopilot automatically creates a review of the past week.", es: "Cada sábado a las 10:00 UTC, el Piloto Automático crea automáticamente una revisión de la semana pasada." })}
         </p>
         <Button variant="outline" onClick={() => trigger.mutate()} disabled={trigger.isPending}>
-          {trigger.isPending ? tx({ de: 'Wird erstellt …', en: 'Creating…', es: 'Creando…' }) : tx({ de: "Jetzt manuell erstellen", en: "Now create manually", es: "Ahora crea manualmente" })}
+          {trigger.isPending ? tx({ de: tx({ de: "Wird erstellt …", en: "Creating …", es: "Creando …" }), en: 'Creating…', es: 'Creando…' }) : tx({ de: "Jetzt manuell erstellen", en: "Now create manually", es: "Ahora crea manualmente" })}
         </Button>
       </Card>
     );
@@ -48,7 +48,7 @@ export function AutopilotWeeklyReviewPanel() {
             <div className="flex-1">
               <div className="font-medium text-sm">
                 {deadlinePassed
-                  ? tx({ de: "Briefing-Deadline überschritten — Autopilot wird pausiert", en: "Briefing deadline exceeded — autopilot is paused", es: "Se superó la fecha límite para la sesión informativa: el piloto automático está en pausa" })
+                  ? tx({ de: tx({ de: "Briefing-Deadline überschritten — Autopilot wird pausiert", en: "Briefing deadline missed — autopilot will be paused", es: "Plazo del briefing superado — el autopiloto se pausará" }), en: "Briefing deadline exceeded — autopilot is paused", es: "Se superó la fecha límite para la sesión informativa: el piloto automático está en pausa" })
                   : tx({ de: `Bitte bis ${deadline.toLocaleString(uiLocale(), { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC bestätigen`, en: `Please confirm by ${deadline.toLocaleString('en-US', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC`, es: `Confirma antes de ${deadline.toLocaleString('es-ES', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC` })}
               </div>
               <div className="text-xs text-muted-foreground">

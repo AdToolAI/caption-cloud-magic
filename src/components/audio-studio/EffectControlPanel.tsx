@@ -152,7 +152,7 @@ export function EffectControlPanel({
           onClick={() => toggleAll(enabledCount < totalEffects / 2)}
           className="text-xs h-7"
         >
-          {enabledCount > totalEffects / 2 ? tx({ de: 'Alle aus', en: 'All off', es: 'Todo apagado' }) : tx({ de: 'Alle an', en: 'All on', es: 'Todo encendido' })}
+          {enabledCount > totalEffects / 2 ? tx({ de: tx({ de: "Alle aus", en: "All off", es: "Todo apagado" }), en: 'All off', es: 'Todo apagado' }) : tx({ de: 'Alle an', en: 'All on', es: 'Todo encendido' })}
         </Button>
       </div>
       

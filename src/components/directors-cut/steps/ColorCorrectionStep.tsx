@@ -205,7 +205,7 @@ export function ColorCorrectionStep({
           className="backdrop-blur-sm bg-white/5 border-white/10 hover:bg-white/10"
         >
           <RotateCcw className="h-4 w-4 mr-2" />
-          {selectedSceneId ? tx({ de: 'Szene zurücksetzen', en: 'Reset scene', es: 'Restablecer escena' }) : tx({ de: 'Alle zurücksetzen', en: 'Reset all', es: 'Restablecer todo' })}
+          {selectedSceneId ? tx({ de: tx({ de: "Szene zurücksetzen", en: "Reset scene", es: "Restablecer escena" }), en: 'Reset scene', es: 'Restablecer escena' }) : tx({ de: 'Alle zurücksetzen', en: 'Reset all', es: 'Restablecer todo' })}
         </Button>
         <Button 
           size="sm" 

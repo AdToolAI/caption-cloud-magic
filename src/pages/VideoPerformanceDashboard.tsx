@@ -145,7 +145,7 @@ export default function VideoPerformanceDashboard() {
             className="cursor-pointer"
             onClick={() => setPeriod(p)}
           >
-            {p === '24h' ? tx({ de: '24 Stunden', en: '24 hours', es: '24 horas' }) : p === '7d' ? tx({ de: '7 Tage', en: '7 days', es: '7 días' }) : tx({ de: '30 Tage', en: '30 days', es: '30 días' })}
+            {p === '24h' ? tx({ de: tx({ de: "24 Stunden", en: "24 hours", es: "24 horas" }), en: '24 hours', es: '24 horas' }) : p === '7d' ? tx({ de: tx({ de: "7 Tage", en: "7 days", es: "7 días" }), en: '7 days', es: '7 días' }) : tx({ de: '30 Tage', en: '30 days', es: '30 días' })}
           </Badge>
         ))}
       </div>
