@@ -176,6 +176,23 @@ const BANNED_WORDS = [
   'Passwort',
   'Passwörter',
   'wiederholen',
+  // v-final-6b: AI-companion status markdown, dashboard alert copy, audio
+  // library labels, community snippet clone control, share toast.
+  // `Problem` and `Link` are NOT banned bare — both are identical in English.
+  // They are caught through unambiguously German inflections/phrases instead.
+  'kritisch',
+  'kritische',
+  'kritischer',
+  'kritisches',
+  'kritischen',
+  'Probleme',
+  'Problemen',
+  'Problem erkannt',
+  'erkannt',
+  'entfernt',
+  'Klonen',
+  'Library kopieren',
+  'Link kopiert',
   // `Neu` is deliberately NOT a bare banned word (it collides with identifiers
   // and English "Neural"). It is caught contextually by the rule below.
 ];
