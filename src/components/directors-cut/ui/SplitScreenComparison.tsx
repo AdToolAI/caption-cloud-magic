@@ -181,7 +181,7 @@ export function SplitScreenComparison({
                 )}
                 {/* Edited Label */}
                 <div className="absolute top-3 right-3 px-2 py-1 rounded-md bg-gradient-to-r from-purple-500/60 to-pink-500/60 backdrop-blur-sm border border-white/20">
-                  <span className="text-xs font-medium text-white">Bearbeitet</span>
+                  <span className="text-xs font-medium text-white">{tx({ de: 'Bearbeitet', en: 'Edited', es: 'Editado' })}</span>
                 </div>
               </div>
 

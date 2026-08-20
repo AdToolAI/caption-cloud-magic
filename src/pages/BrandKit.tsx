@@ -834,7 +834,7 @@ const BrandKit = () => {
                 className="space-y-6"
               >
                 <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold">Meine Marken-Sets</h2>
+                  <h2 className="text-2xl font-bold">{tx({ de: 'Meine Marken-Sets', en: 'My brand sets', es: 'Mis kits de marca' })}</h2>
                   <Badge 
                     variant="secondary"
                     className="backdrop-blur-xl bg-primary/10 border border-primary/20 text-primary font-medium"

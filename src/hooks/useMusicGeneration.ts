@@ -81,7 +81,7 @@ export function useMusicGeneration() {
           toast.error(msg, {
             description: tx({ de: 'Bitte AI Credits aufladen.', en: 'Please top up AI credits.', es: 'Recargue créditos de IA.' }),
             action: {
-              label: 'Credits kaufen',
+              label: tx({ de: 'Credits kaufen', en: 'Buy credits', es: 'Comprar créditos' }),
               onClick: () => { window.location.href = '/ai-video-purchase-credits'; },
             },
           });

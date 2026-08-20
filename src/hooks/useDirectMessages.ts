@@ -49,8 +49,8 @@ export function useDirectMessages(partnerId: string | null) {
       const partnerId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
       const partnerEmail =
         msg.sender_id === user.id
-          ? msg.receiver_profile?.email || "Unbekannt"
-          : msg.sender_profile?.email || "Unbekannt";
+          ? msg.receiver_profile?.email || tx({ de: 'Unbekannt', en: 'Unknown', es: 'Desconocido' })
+          : msg.sender_profile?.email || tx({ de: 'Unbekannt', en: 'Unknown', es: 'Desconocido' });
 
       if (!convMap.has(partnerId)) {
         convMap.set(partnerId, {

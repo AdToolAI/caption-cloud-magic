@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Activity, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { tx } from "@/lib/i18nText";
 
 interface AnalyticsHeroHeaderProps {
   lastUpdated: Date;
@@ -77,7 +78,7 @@ export const AnalyticsHeroHeader = ({
               transition={{ delay: 0.2 }}
               className="flex items-center gap-3"
             >
-              <span className="text-muted-foreground">Control Room • Letzte Aktualisierung:</span>
+              <span className="text-muted-foreground">{tx({ de: 'Control Room • Letzte Aktualisierung:', en: 'Control room • last update:', es: 'Sala de control • última actualización:' })}</span>
               <motion.div
                 animate={{ opacity: [0.7, 1, 0.7] }}
                 transition={{ duration: 2, repeat: Infinity }}
@@ -120,8 +121,8 @@ export const AnalyticsHeroHeader = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="backdrop-blur-xl bg-card/90 border-white/10">
-                <SelectItem value="7">7 Tage</SelectItem>
-                <SelectItem value="30">30 Tage</SelectItem>
+                <SelectItem value="7">{tx({ de: '7 Tage', en: '7 days', es: '7 días' })}</SelectItem>
+                <SelectItem value="30">{tx({ de: '30 Tage', en: '30 days', es: '30 días' })}</SelectItem>
               </SelectContent>
             </Select>
 

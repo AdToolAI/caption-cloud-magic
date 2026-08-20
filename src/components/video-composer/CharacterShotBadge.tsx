@@ -28,7 +28,7 @@ export const SHOT_TYPE_META: Record<
   detail:     { label: 'Detail', icon: Hand,        hint: tx({ de: "Detail-Shot (Hände, Schwert, Krone) — sehr konsistent.", en: "Detail shot (hands, sword, crown) — very consistent.", es: "Toma de detalle (manos, espada, corona) — muy consistente." }), tone: 'text-violet-400 border-violet-500/40 bg-violet-500/10' },
   pov:        { label: 'POV',    icon: Eye,         hint: tx({ de: 'POV — Charakter unsichtbar, zeigt was er sieht.', en: 'POV — Character invisible, shows what he sees.', es: 'POV: personaje invisible, muestra lo que ve.' }), tone: 'text-cyan-400 border-cyan-500/40 bg-cyan-500/10' },
   silhouette: { label: 'Silhouette', icon: Sun,     hint: tx({ de: 'Silhouette / Gegenlicht — Identifier statt Gesicht.', en: 'Silhouette / backlight — identifier instead of face.', es: 'Silueta / contraluz: identificador en lugar del rostro.' }), tone: 'text-orange-400 border-orange-500/40 bg-orange-500/10' },
-  absent:     { label: 'Ohne',   icon: Minus,       hint: tx({ de: 'Charakter nicht in dieser Szene.', en: 'Character not in this scene.', es: 'Personaje no en esta escena.' }), tone: 'text-muted-foreground border-border/40 bg-muted/40' },
+  absent:     { label: tx({ de: 'Ohne', en: 'None', es: 'Ninguno' }),   icon: Minus,       hint: tx({ de: 'Charakter nicht in dieser Szene.', en: 'Character not in this scene.', es: 'Personaje no en esta escena.' }), tone: 'text-muted-foreground border-border/40 bg-muted/40' },
 };
 
 const SHOT_ORDER: CharacterShotType[] = ['full', 'profile', 'back', 'detail', 'pov', 'silhouette', 'absent'];

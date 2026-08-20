@@ -289,7 +289,7 @@ export function AIToolsSidebarExpanded({
 
           {/* SFX Tab */}
           <TabsContent value="sfx" className="m-0 space-y-3">
-            <Input placeholder="Sound Effect suchen..." className="text-sm" />
+            <Input placeholder={tx({ de: 'Sound Effect suchen…', en: 'Search sound effect…', es: 'Buscar efecto de sonido…' })} className="text-sm" />
             
             <div className="grid grid-cols-2 gap-2">
               {SAMPLE_SFX.map(sfx => (

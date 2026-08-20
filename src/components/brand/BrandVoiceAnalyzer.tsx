@@ -157,7 +157,7 @@ export function BrandVoiceAnalyzer({ brandKitId, existingVoice, onAnalysisComple
       {existingVoice && Object.keys(existingVoice).length > 0 && (
         <Card className="border-primary">
           <CardHeader>
-            <CardTitle className="text-lg">Aktuelle Brand Voice</CardTitle>
+            <CardTitle className="text-lg">{tx({ de: 'Aktuelle Brand Voice', en: 'Current brand voice', es: 'Voz de marca actual' })}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">

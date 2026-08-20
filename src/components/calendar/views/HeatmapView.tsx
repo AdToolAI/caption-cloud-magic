@@ -46,6 +46,13 @@ const CHANNELS = [
 
 const HOURS: HourIndex[] = Array.from({ length: 24 }, (_, i) => i as HourIndex);
 
+const DAY_SHORT_EN = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+const DAY_SHORT_ES = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
+const DAY_LONG_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const DAY_LONG_ES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+const dayShort = (d: number) => tx({ de: DAY_LABELS_DE[d], en: DAY_SHORT_EN[d], es: DAY_SHORT_ES[d] }) as string;
+const dayLong = (d: number) => tx({ de: DAY_LABELS_LONG_DE[d], en: DAY_LONG_EN[d], es: DAY_LONG_ES[d] }) as string;
+
 export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProps) {
   const [channel, setChannel] = useState<string>("all");
 
@@ -187,7 +194,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
                       className="text-[10px] font-semibold tracking-widest text-primary/80"
                       style={{ fontFamily: "'Playfair Display', serif" }}
                     >
-                      {DAY_LABELS_DE[day]}
+                      {dayShort(day)}
                     </div>
                     {HOURS.map((hour) => {
                       const k = bucketKey(day, hour);
@@ -243,7 +250,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
                           >
                             <div className="space-y-1.5">
                               <div className="font-semibold text-foreground text-xs">
-                                {DAY_LABELS_LONG_DE[day]} · {String(hour).padStart(2, "0")}:00
+                                {dayLong(day)} · {String(hour).padStart(2, "0")}:00
                               </div>
                               {score && (
                                 <div className="text-[11px] text-cyan-300">
@@ -317,13 +324,13 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
               title={tx({ de: "Goldene Lücke", en: "Golden Gap", es: "Brecha Dorada" })}
               body={
                 goldenGap
-                  ? `${DAY_LABELS_LONG_DE[goldenGap.day]} ${String(goldenGap.hour).padStart(2, "0")}:00 — Score ${goldenGap.score}, kein Post geplant.`
+                  ? tx({ de: `${dayLong(goldenGap.day)} ${String(goldenGap.hour).padStart(2, "0")}:00 — Score ${goldenGap.score}, kein Post geplant.`, en: `${dayLong(goldenGap.day)} ${String(goldenGap.hour).padStart(2, "0")}:00 — score ${goldenGap.score}, no post scheduled.`, es: `${dayLong(goldenGap.day)} ${String(goldenGap.hour).padStart(2, "0")}:00 — puntuación ${goldenGap.score}, sin publicación programada.` })
                   : tx({ de: "Keine ungenutzten Top-Slots in den nächsten 14 Tagen.", en: "No unused top slots in the next 14 days.", es: "No habrá primeros puestos no utilizados en los próximos 14 días." })
               }
               cta={
                 goldenGap
                   ? {
-                      label: "Slot nutzen",
+                      label: tx({ de: 'Slot nutzen', en: 'Use slot', es: 'Usar franja' }),
                       onClick: () => onDateClick?.(nextDateFor(goldenGap.day, goldenGap.hour)),
                     }
                   : undefined
@@ -332,7 +339,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
             <InsightCard
               icon={<AlertTriangle className="w-4 h-4" />}
               tone={conflicts.length > 0 ? "red" : "muted"}
-              title="Konflikt-Warnung"
+              title={tx({ de: 'Konflikt-Warnung', en: 'Conflict warning', es: 'Aviso de conflicto' })}
               body={
                 conflicts.length > 0
                   ? tx({ de: `${conflicts.length} Slot${conflicts.length === 1 ? "" : "s"} mit ≥3 Posts gleichzeitig — Reach kannibalisiert sich.`, en: `${conflicts.length} slot${conflicts.length === 1 ? "" : "s"} with ≥3 posts at the same time — reach cannibalizes itself.`, es: `${conflicts.length} franja${conflicts.length === 1 ? "" : "s"} con ≥3 publicaciones a la vez: el alcance se canibaliza.` })

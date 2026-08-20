@@ -156,18 +156,44 @@ export function parseSlashCommand(input: string): { command: string; args: strin
 export function generateSlashCommandResponse(command: string, args: string[]): string | null {
   switch (command) {
     case '/help':
-      return `📋 **Verfügbare {tx({ de: "Befehle", en: "Commands", es: "Comandos" })}:**
+      return tx({
+        de: `📋 **Verfügbare Befehle:**
 
-\`/status\` - tx({ de: "Zeigt vollständige Account-Übersicht", en: "Shows complete account overview", es: "Muestra la descripción completa de la cuenta" })
-\`/credits\` - tx({ de: "Zeigt deine Credit-Balance", en: "Shows your credit balance", es: "Muestra tu saldo de crédito" })
-\`/render\` - tx({ de: "Zeigt aktive Video-Renderings", en: "Shows active video renderings", es: "Muestra representaciones de vídeo activas" })
-\`/reconnect [platform]\` - tx({ de: "Erneuert Social Media Verbindung", en: "Renews social media connection", es: "Renueva la conexión a las redes sociales" })
-\`/calendar\` - tx({ de: "Zeigt geplante Posts diese Woche", en: "Shows scheduled posts this week", es: "Muestra las publicaciones programadas de esta semana" })
-\`/tips\` - tx({ de: "Zeigt personalisierte Tipps", en: "Shows personalized tips", es: "Muestra consejos personalizados" })
-\`/settings\` - tx({ de: "Öffnet Account-Einstellungen", en: "Opens account settings", es: "Abre la configuración de la cuenta" })
-\`/help\` - tx({ de: "Zeigt diese Hilfe", en: "Shows this help", es: "Muestra esta ayuda" })
+\`/status\` - Zeigt vollständige Account-Übersicht
+\`/credits\` - Zeigt deine Credit-Balance
+\`/render\` - Zeigt aktive Video-Renderings
+\`/reconnect [platform]\` - Erneuert Social-Media-Verbindung
+\`/calendar\` - Zeigt geplante Posts diese Woche
+\`/tips\` - Zeigt personalisierte Tipps
+\`/settings\` - Öffnet Account-Einstellungen
+\`/help\` - Zeigt diese Hilfe
 
-tx({ de: "💡 **Tipp:** Du kannst auch einfach Fragen stellen, ich verstehe natürliche Sprache!", en: "💡 **Tip:** You can also just ask questions, I understand natural language!", es: "💡 **Consejo:** ¡También puedes hacer preguntas, entiendo el lenguaje natural!" })`;
+💡 **Tipp:** Du kannst auch einfach Fragen stellen, ich verstehe natürliche Sprache!`,
+        en: `📋 **Available commands:**
+
+\`/status\` - Shows the complete account overview
+\`/credits\` - Shows your credit balance
+\`/render\` - Shows active video renders
+\`/reconnect [platform]\` - Renews a social media connection
+\`/calendar\` - Shows posts scheduled this week
+\`/tips\` - Shows personalized tips
+\`/settings\` - Opens account settings
+\`/help\` - Shows this help
+
+💡 **Tip:** You can also just ask questions — I understand natural language!`,
+        es: `📋 **Comandos disponibles:**
+
+\`/status\` - Muestra el resumen completo de la cuenta
+\`/credits\` - Muestra tu saldo de créditos
+\`/render\` - Muestra los renderizados de vídeo activos
+\`/reconnect [platform]\` - Renueva la conexión con una red social
+\`/calendar\` - Muestra las publicaciones programadas esta semana
+\`/tips\` - Muestra consejos personalizados
+\`/settings\` - Abre la configuración de la cuenta
+\`/help\` - Muestra esta ayuda
+
+💡 **Consejo:** ¡También puedes preguntar lo que quieras, entiendo el lenguaje natural!`,
+      });
 
     case '/status':
       return '[COMMAND:status]'; // Will be processed specially

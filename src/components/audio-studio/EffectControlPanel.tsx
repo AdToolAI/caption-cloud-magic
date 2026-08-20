@@ -43,9 +43,9 @@ const EFFECT_GROUPS: EffectGroup[] = [
     label: tx({ de: "Rauschunterdrückung", en: "Noise Reduction", es: "Reducción de ruido" }),
     icon: Volume2,
     effects: [
-      { key: 'highPassFilter', label: 'Hochpass', shortLabel: 'HP 120Hz', description: 'Entfernt tiefes Rumpeln' },
-      { key: 'lowPassFilter', label: 'Tiefpass', shortLabel: 'LP 10kHz', description: 'Entfernt Zischen' },
-      { key: 'notchFilter', label: 'Notch', shortLabel: '50/60Hz', description: 'Entfernt Netzbrummen' },
+      { key: 'highPassFilter', label: tx({ de: 'Hochpass', en: 'High-pass', es: 'Paso alto' }), shortLabel: 'HP 120Hz', description: tx({ de: 'Entfernt tiefes Rumpeln', en: 'Removes low rumble', es: 'Elimina retumbos graves' }) },
+      { key: 'lowPassFilter', label: tx({ de: 'Tiefpass', en: 'Low-pass', es: 'Paso bajo' }), shortLabel: 'LP 10kHz', description: tx({ de: 'Entfernt Zischen', en: 'Removes hiss', es: 'Elimina siseos' }) },
+      { key: 'notchFilter', label: 'Notch', shortLabel: '50/60Hz', description: tx({ de: 'Entfernt Netzbrummen', en: 'Removes mains hum', es: 'Elimina el zumbido de red' }) },
       { key: 'noiseGate', label: 'Gate', shortLabel: '-40dB', description: tx({ de: 'Schaltet Stille stumm', en: 'Mutes silence', es: 'Silencia el silencio' }) },
     ]
   },
@@ -54,8 +54,8 @@ const EFFECT_GROUPS: EffectGroup[] = [
     label: tx({ de: 'Stimme', en: 'Voice', es: 'Voz' }),
     icon: Mic,
     effects: [
-      { key: 'voiceEQ', label: 'Voice EQ', shortLabel: '+3dB 3kHz', description: 'Klarheit boosten' },
-      { key: 'deEsser', label: 'De-Esser', shortLabel: '-4dB 6.5kHz', description: 'S-Laute reduzieren' },
+      { key: 'voiceEQ', label: 'Voice EQ', shortLabel: '+3dB 3kHz', description: tx({ de: 'Klarheit boosten', en: 'Boost clarity', es: 'Aumenta la claridad' }) },
+      { key: 'deEsser', label: 'De-Esser', shortLabel: '-4dB 6.5kHz', description: tx({ de: 'S-Laute reduzieren', en: 'Reduce sibilance', es: 'Reduce las sibilantes' }) },
       { key: 'plosiveReducer', label: 'Plosive', shortLabel: '-6dB 120Hz', description: tx({ de: "P/B-Laute dämpfen", en: "Dampen P/B sounds", es: "Amortiguar sonidos P/B" }) },
       { key: 'warmthBoost', label: tx({ de: 'Wärme', en: 'Warmth', es: 'Calidez' }), shortLabel: '+1.5dB 200Hz', description: tx({ de: 'Stimme voller', en: 'Fuller voice', es: 'Voz más plena' }) },
     ]
@@ -65,11 +65,11 @@ const EFFECT_GROUPS: EffectGroup[] = [
     label: 'Finishing',
     icon: Sparkles,
     effects: [
-      { key: 'boxinessCut', label: 'Box-Cut', shortLabel: '-2.5dB 250Hz', description: 'Boxy Sound entfernen' },
-      { key: 'mudCut', label: 'Mud-Cut', shortLabel: '-2dB 500Hz', description: 'Schlammigkeit' },
+      { key: 'boxinessCut', label: 'Box-Cut', shortLabel: '-2.5dB 250Hz', description: tx({ de: 'Boxy Sound entfernen', en: 'Remove boxy sound', es: 'Elimina el sonido enlatado' }) },
+      { key: 'mudCut', label: 'Mud-Cut', shortLabel: '-2dB 500Hz', description: tx({ de: 'Schlammigkeit', en: 'Muddiness', es: 'Turbiedad' }) },
       { key: 'airBoost', label: 'Air', shortLabel: '+1.5dB 10kHz+', description: tx({ de: 'Brillanz hinzufügen', en: 'Add brilliance', es: 'Añade brillo' }) },
-      { key: 'compression', label: 'Komp.', shortLabel: '4:1 -24dB', description: 'Dynamik komprimieren' },
-      { key: 'limiter', label: 'Limiter', shortLabel: '-1dB 20:1', description: 'Clipping verhindern' },
+      { key: 'compression', label: 'Komp.', shortLabel: '4:1 -24dB', description: tx({ de: 'Dynamik komprimieren', en: 'Compress dynamics', es: 'Comprime la dinámica' }) },
+      { key: 'limiter', label: 'Limiter', shortLabel: '-1dB 20:1', description: tx({ de: 'Clipping verhindern', en: 'Prevent clipping', es: 'Evita el recorte' }) },
     ]
   },
   {

@@ -549,25 +549,25 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                           onChange={(e) => setVoiceStyle(e.target.value)}
                           className="w-full px-3 py-2 border rounded-md bg-background"
                         >
-                          <option value="aria">Aria (Weiblich, warm & freundlich)</option>
+                          <option value="aria">{tx({ de: "Aria (Weiblich, warm & freundlich)", en: "Aria (Female, warm & friendly)", es: "Aria (Femenina, cálida y amable)" })}</option>
                           <option value="roger">{tx({ de: "Roger (Männlich, professionell)", en: "Roger (Male, professional)", es: "Roger (Masculino, profesional)" })}</option>
-                          <option value="sarah">Sarah (Weiblich, energisch)</option>
-                          <option value="laura">Laura (Weiblich, beruhigend)</option>
+                          <option value="sarah">{tx({ de: "Sarah (Weiblich, energisch)", en: "Sarah (Female, energetic)", es: "Sarah (Femenina, enérgica)" })}</option>
+                          <option value="laura">{tx({ de: "Laura (Weiblich, beruhigend)", en: "Laura (Female, soothing)", es: "Laura (Femenina, relajante)" })}</option>
                           <option value="charlie">{tx({ de: "Charlie (Männlich, jung & dynamisch)", en: "Charlie (Male, young & dynamic)", es: "Charlie (Masculino, joven y dinámico)" })}</option>
                           <option value="george">{tx({ de: "George (Männlich, autoritativ)", en: "George (Male, authoritative)", es: "George (Masculino, autoritario)" })}</option>
                           <option value="callum">{tx({ de: "Callum (Männlich, britisch)", en: "Callum (Male, British)", es: "Callum (Masculino, británico)" })}</option>
-                          <option value="river">River (Neutral, moderne)</option>
+                          <option value="river">{tx({ de: "River (Neutral, moderne)", en: "River (Neutral, modern)", es: "River (Neutra, moderna)" })}</option>
                           <option value="liam">{tx({ de: "Liam (Männlich, kraftvoll)", en: "Liam (Male, powerful)", es: "Liam (Masculino, potente)" })}</option>
-                          <option value="charlotte">Charlotte (Weiblich, elegant)</option>
-                          <option value="alice">Alice (Weiblich, klar)</option>
-                          <option value="matilda">Matilda (Weiblich, reif)</option>
+                          <option value="charlotte">{tx({ de: "Charlotte (Weiblich, elegant)", en: "Charlotte (Female, elegant)", es: "Charlotte (Femenina, elegante)" })}</option>
+                          <option value="alice">{tx({ de: "Alice (Weiblich, klar)", en: "Alice (Female, clear)", es: "Alice (Femenina, clara)" })}</option>
+                          <option value="matilda">{tx({ de: "Matilda (Weiblich, reif)", en: "Matilda (Female, mature)", es: "Matilda (Femenina, madura)" })}</option>
                           <option value="will">{tx({ de: "Will (Männlich, freundlich)", en: "Will (Male, friendly)", es: "Will (Masculino, amigable)" })}</option>
-                          <option value="jessica">Jessica (Weiblich, selbstbewusst)</option>
+                          <option value="jessica">{tx({ de: "Jessica (Weiblich, selbstbewusst)", en: "Jessica (Female, confident)", es: "Jessica (Femenina, segura)" })}</option>
                           <option value="eric">{tx({ de: "Eric (Männlich, tief)", en: "Eric (Male, deep)", es: "Eric (Masculino, grave)" })}</option>
                           <option value="chris">{tx({ de: "Chris (Männlich, entspannt)", en: "Chris (Male, relaxed)", es: "Chris (Masculino, relajado)" })}</option>
                           <option value="brian">{tx({ de: "Brian (Männlich, warm)", en: "Brian (Male, warm)", es: "Brian (Masculino, cálido)" })}</option>
                           <option value="daniel">{tx({ de: "Daniel (Männlich, klar)", en: "Daniel (Male, clear)", es: "Daniel (Masculino, claro)" })}</option>
-                          <option value="lily">Lily (Weiblich, sanft)</option>
+                          <option value="lily">{tx({ de: "Lily (Weiblich, sanft)", en: "Lily (Female, gentle)", es: "Lily (Femenina, suave)" })}</option>
                           <option value="bill">{tx({ de: "Bill (Männlich, erfahren)", en: "Bill (Male, experienced)", es: "Bill (Masculino, experimentado)" })}</option>
                         </select>
                         <p className="text-xs text-muted-foreground">

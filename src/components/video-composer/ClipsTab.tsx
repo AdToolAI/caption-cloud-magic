@@ -1499,7 +1499,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                           ) : (
                             <Save className="h-3 w-3" />
                           )}
-                          {isSaved ? tx({ de: 'Gespeichert', en: 'Saved', es: 'Guardado' }) : 'In Mediathek'}
+                          {isSaved ? tx({ de: 'Gespeichert', en: 'Saved', es: 'Guardado' }) : tx({ de: 'In Mediathek', en: 'To media library', es: 'A la biblioteca' })}
                         </Button>
                       );
                     })()}
@@ -1582,7 +1582,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                         size="icon"
                         variant="ghost"
                         className="h-7 w-7"
-                        title="Stock-Alternative suchen"
+                        title={tx({ de: 'Stock-Alternative suchen', en: 'Search stock alternative', es: 'Buscar alternativa de stock' })}
                         onClick={() => {
                           setStockSearch(prev => ({ ...prev, [scene.id]: scene.stockKeywords || scene.aiPrompt || '' }));
                           setStockResults(prev => ({ ...prev, [scene.id]: prev[scene.id] || [] }));

@@ -191,7 +191,7 @@ export default function SnakeGame() {
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        {dead ? 'Vorbei — neu starten.' : tx({ de: 'Pfeiltasten, Wischen oder Buttons.', en: 'Arrow keys, swipe or buttons.', es: 'Teclas de flecha, deslizar o botones.' })}
+        {dead ? tx({ de: 'Vorbei — neu starten.', en: 'Game over — restart.', es: 'Fin de la partida: reinicia.' }) : tx({ de: 'Pfeiltasten, Wischen oder Buttons.', en: 'Arrow keys, swipe or buttons.', es: 'Teclas de flecha, deslizar o botones.' })}
       </p>
     </div>
   );

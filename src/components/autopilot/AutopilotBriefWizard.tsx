@@ -24,12 +24,26 @@ const PLATFORMS = ['instagram', 'tiktok', 'x', 'facebook', 'linkedin', 'youtube'
 const LANGUAGES = ['de', 'en', 'es'] as const;
 const TONALITIES = ['professional', 'playful', 'bold', 'minimal', 'editorial', 'inspirational'];
 
-const AUP_TEXT = `KURZFASSUNG DER ACCEPTABLE USE POLICY
+const aupText = () => tx({
+  de: `KURZFASSUNG DER ACCEPTABLE USE POLICY
 
 5. Alle KI-Inhalte werden automatisch als "Made with AI" gekennzeichnet (C2PA + Caption-Tag).
 6. Strike-System: Soft (Hinweis) → Hard (7 Tage Sperre ab 2 aktiven) → Critical (sofortige Account-Löschung ohne Rückerstattung).
 7. Missbrauchsversuche (Prompt-Injection, Bypass-Versuche, Bulk-Spam, Hate Speech, NSFW, illegale Inhalte) führen zur fristlosen Löschung deines Accounts ohne jede Rückerstattung.
-8. Vollständiger AUP-Text unter /legal/autopilot-aup — durch Aktivierung bestätigst du, diesen vollständig gelesen und akzeptiert zu haben.`;
+8. Vollständiger AUP-Text unter /legal/autopilot-aup — durch Aktivierung bestätigst du, diesen vollständig gelesen und akzeptiert zu haben.`,
+  en: `ACCEPTABLE USE POLICY — SHORT VERSION
+
+5. All AI content is automatically labelled "Made with AI" (C2PA + caption tag).
+6. Strike system: Soft (notice) → Hard (7-day suspension from 2 active strikes) → Critical (immediate account deletion without refund).
+7. Abuse attempts (prompt injection, bypass attempts, bulk spam, hate speech, NSFW, illegal content) lead to immediate deletion of your account without any refund.
+8. Full AUP text at /legal/autopilot-aup — by activating you confirm that you have read and accepted it in full.`,
+  es: `RESUMEN DE LA POLÍTICA DE USO ACEPTABLE
+
+5. Todo el contenido de IA se etiqueta automáticamente como "Made with AI" (C2PA + etiqueta de subtítulo).
+6. Sistema de sanciones: leve (aviso) → grave (7 días de bloqueo a partir de 2 activas) → crítica (eliminación inmediata de la cuenta sin reembolso).
+7. Los intentos de abuso (inyección de prompts, elusión, spam masivo, discurso de odio, NSFW, contenido ilegal) conllevan la eliminación inmediata de tu cuenta sin reembolso alguno.
+8. Texto completo de la AUP en /legal/autopilot-aup: al activar confirmas que lo has leído y aceptado íntegramente.`,
+});
 
 export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props) {
   const [step, setStep] = useState(1);
@@ -249,7 +263,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
                 if (t && t.scrollTop + t.clientHeight >= t.scrollHeight - 20) setScrolled(true);
               }}
             >
-              <pre className="text-xs whitespace-pre-wrap font-sans leading-relaxed text-foreground/90">{AUP_TEXT}</pre>
+              <pre className="text-xs whitespace-pre-wrap font-sans leading-relaxed text-foreground/90">{aupText()}</pre>
             </ScrollArea>
             {!scrolled && (
               <p className="text-[11px] text-amber-400 flex items-center gap-1">

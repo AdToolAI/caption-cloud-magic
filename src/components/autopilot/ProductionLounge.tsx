@@ -58,7 +58,7 @@ export function ProductionLounge({ production, scenes, log, language = getLang()
   useEffect(() => {
     if (production.status !== 'completed' || notified.current) return;
     notified.current = true;
-    document.title = '(fertig) AdTool AI';
+    document.title = tx({ de: '(fertig) AdTool AI', en: '(done) AdTool AI', es: '(listo) AdTool AI' });
     toast({ title: tx({ de: 'Dein Film ist fertig', en: 'Your film is ready', es: 'Tu película está lista' }), description: tx({ de: 'Der Clip wartet in der Produktion.', en: 'The clip is waiting in the production.', es: 'El clip está esperando en la producción.' }) });
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       new Notification('AdTool AI', { body: tx({ de: 'Dein Film ist fertig.', en: 'Your film is ready.', es: 'Tu película está lista.' }) });

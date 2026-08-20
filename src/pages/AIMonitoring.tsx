@@ -123,7 +123,7 @@ export default function AIMonitoring() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Heute</CardTitle>
+              <CardTitle className="text-sm font-medium">{tx({ de: 'Heute', en: 'Today', es: 'Hoy' })}</CardTitle>
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -154,7 +154,7 @@ export default function AIMonitoring() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.thisMonth}</div>
-              <p className="text-xs text-muted-foreground">AI Calls gesamt</p>
+              <p className="text-xs text-muted-foreground">{tx({ de: 'AI Calls gesamt', en: 'Total AI calls', es: 'Llamadas de IA totales' })}</p>
               <div className="text-xs text-muted-foreground mt-2">
                 Est. €{stats.estimatedCost.toFixed(2)}
               </div>
@@ -202,7 +202,7 @@ export default function AIMonitoring() {
         {/* Recent Calls */}
         <Card>
           <CardHeader>
-            <CardTitle>Letzte AI Calls</CardTitle>
+            <CardTitle>{tx({ de: 'Letzte AI Calls', en: 'Recent AI calls', es: 'Llamadas de IA recientes' })}</CardTitle>
             <CardDescription>{tx({ de: "Die 10 neuesten AI Aufrufe", en: "The 10 latest AI calls", es: "Las 10 últimas llamadas de IA" })}</CardDescription>
           </CardHeader>
           <CardContent>

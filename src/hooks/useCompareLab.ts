@@ -172,7 +172,7 @@ export function useCompareLab() {
       const runId: string = data.runId;
       await refreshOutputs(runId);
       subscribe(runId);
-      toast.success(`Compare Lab gestartet — ${args.engines.length} Engines parallel`);
+      toast.success(tx({ de: `Compare Lab gestartet — ${args.engines.length} Engines parallel`, en: `Compare Lab started — ${args.engines.length} engines in parallel`, es: `Compare Lab iniciado — ${args.engines.length} motores en paralelo` }));
       return runId;
     } catch (err) {
       const msg = err instanceof Error ? err.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' });

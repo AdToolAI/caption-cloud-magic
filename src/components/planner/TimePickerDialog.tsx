@@ -80,7 +80,7 @@ export function TimePickerDialog({
           {/* Hour Slider */}
           <div>
             <Label className="flex justify-between">
-              <span>Stunde</span>
+              <span>{tx({ de: 'Stunde', en: 'Hour', es: 'Hora' })}</span>
               <span className="font-mono text-lg">{hour.toString().padStart(2, "0")}:00</span>
             </Label>
             <Slider

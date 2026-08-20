@@ -42,7 +42,7 @@ export const ActiveEditorsIndicator = ({ templateId }: ActiveEditorsIndicatorPro
           )}
         </div>
         <span className="text-xs text-muted-foreground">
-          {activeSessions.length} {activeSessions.length === 1 ? 'Benutzer' : 'Benutzer'} aktiv
+          {activeSessions.length} {tx({ de: activeSessions.length === 1 ? 'Benutzer aktiv' : 'Benutzer aktiv', en: activeSessions.length === 1 ? 'user active' : 'users active', es: activeSessions.length === 1 ? 'usuario activo' : 'usuarios activos' })}
         </span>
       </div>
     </TooltipProvider>

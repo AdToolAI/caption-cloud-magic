@@ -203,7 +203,7 @@ export const CampaignFormCard = ({
               <SelectContent className="bg-card border-white/10">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                   <SelectItem key={n} value={n.toString()} disabled={userPlan === "free" && n > 1}>
-                    {n} {n === 1 ? "Woche" : "Wochen"} {userPlan === "free" && n > 1 && "🔒"}
+                    {n} {tx({ de: n === 1 ? "Woche" : "Wochen", en: n === 1 ? "week" : "weeks", es: n === 1 ? "semana" : "semanas" })} {userPlan === "free" && n > 1 && "🔒"}
                   </SelectItem>
                 ))}
               </SelectContent>

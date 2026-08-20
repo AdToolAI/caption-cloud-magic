@@ -3,8 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 const getBrowserInfo = () => {
   const ua = navigator.userAgent;
-  let browser = "Unbekannt";
-  let os = "Unbekannt";
+  let browser = tx({ de: 'Unbekannt', en: 'Unknown', es: 'Desconocido' });
+  let os = tx({ de: 'Unbekannt', en: 'Unknown', es: 'Desconocido' });
 
   // Detect browser
   if (ua.includes("Firefox")) {

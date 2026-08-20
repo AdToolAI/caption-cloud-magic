@@ -135,7 +135,7 @@ export default function AIDirectorBriefDialog({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5" /> Ziel-Dauer
+                  <Clock className="h-3.5 w-3.5" /> {tx({ de: 'Ziel-Dauer', en: 'Target duration', es: 'Duración objetivo' })}
                 </Label>
                 <span className="text-sm font-bold tabular-nums text-primary">
                   {duration}s

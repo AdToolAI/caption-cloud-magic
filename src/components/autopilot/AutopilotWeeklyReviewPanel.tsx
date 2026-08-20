@@ -52,7 +52,7 @@ export function AutopilotWeeklyReviewPanel() {
                   : tx({ de: `Bitte bis ${deadline.toLocaleString(uiLocale(), { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC bestätigen`, en: `Please confirm by ${deadline.toLocaleString('en-US', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC`, es: `Confirma antes de ${deadline.toLocaleString('es-ES', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC` })}
               </div>
               <div className="text-xs text-muted-foreground">
-                {deadline && !deadlinePassed && `Noch ${formatDistanceToNow(deadline, { locale: dateFnsLocale() })}`}
+                {deadline && !deadlinePassed && tx({ de: `Noch ${formatDistanceToNow(deadline, { locale: dateFnsLocale() })}`, en: `${formatDistanceToNow(deadline, { locale: dateFnsLocale() })} left`, es: `Quedan ${formatDistanceToNow(deadline, { locale: dateFnsLocale() })}` })}
               </div>
             </div>
           </div>

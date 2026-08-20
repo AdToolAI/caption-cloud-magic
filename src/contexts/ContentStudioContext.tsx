@@ -181,7 +181,7 @@ export function ContentStudioProvider({
   const [brief, setBrief] = useState("");
   const [platform, setPlatform] = useState("instagram");
   const [language, setLanguage] = useState("de");
-  const [tone, setTone] = useState("selbstbewusst, klar");
+  const [tone, setTone] = useState(tx({ de: 'selbstbewusst, klar', en: 'confident, clear', es: 'seguro, claro' }));
 
   const [copy, setCopy] = useState<CopyPayload | null>(null);
   const [copyIndex, setCopyIndex] = useState(0);
@@ -224,7 +224,7 @@ export function ContentStudioProvider({
       setBrief(draft.brief ?? "");
       setPlatform(draft.platform ?? "instagram");
       setLanguage(draft.language ?? "de");
-      setTone(draft.tone ?? "selbstbewusst, klar");
+      setTone(draft.tone ?? tx({ de: 'selbstbewusst, klar', en: 'confident, clear', es: 'seguro, claro' }));
       setCopy(draft.copy ?? null);
       setCopyIndex(draft.copyIndex ?? 0);
       setCaption(draft.caption ?? "");
@@ -332,7 +332,7 @@ export function ContentStudioProvider({
           {
             ...filled,
             variantName: v?.name || template.name,
-            title: source.headline?.slice(0, 60) || "Neuer Post",
+            title: source.headline?.slice(0, 60) || tx({ de: 'Neuer Post', en: 'New post', es: 'Nueva publicación' }),
           },
           brandKit,
         );

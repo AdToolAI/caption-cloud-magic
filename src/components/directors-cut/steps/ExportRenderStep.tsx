@@ -817,7 +817,7 @@ export function ExportRenderStep({
                     <CheckCircle className="h-8 w-8 text-green-500" />
                   </div>
                   <div>
-                    <h4 className="font-semibold">Rendering abgeschlossen!</h4>
+                    <h4 className="font-semibold">{tx({ de: 'Rendering abgeschlossen!', en: 'Rendering complete!', es: '¡Renderizado completado!' })}</h4>
                     <p className="text-sm text-muted-foreground">
                       {tx({ de: "Dein Video ist fertig und kann heruntergeladen werden", en: "Your video is ready and can be downloaded", es: "Tu video está listo y se puede descargar" })}
                     </p>

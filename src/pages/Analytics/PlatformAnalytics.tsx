@@ -107,9 +107,9 @@ export default function PlatformAnalytics() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="7">7 Tage</SelectItem>
-                <SelectItem value="30">30 Tage</SelectItem>
-                <SelectItem value="90">90 Tage</SelectItem>
+                <SelectItem value="7">{tx({ de: '7 Tage', en: '7 days', es: '7 días' })}</SelectItem>
+                <SelectItem value="30">{tx({ de: '30 Tage', en: '30 days', es: '30 días' })}</SelectItem>
+                <SelectItem value="90">{tx({ de: '90 Tage', en: '90 days', es: '90 días' })}</SelectItem>
                 <SelectItem value="all">{tx({ de: 'Alle', en: 'All', es: 'Todos' })}</SelectItem>
               </SelectContent>
             </Select>

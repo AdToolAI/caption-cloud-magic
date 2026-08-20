@@ -53,7 +53,7 @@ export function TemplateDrawer({ open, onOpenChange }: { open: boolean; onOpenCh
       <SheetContent side="right" className="w-full sm:max-w-md">
         <SheetHeader>
           <SheetTitle className="font-display">{tx({ de: "Vorlagen", en: "Templates", es: "Plantillas" })}</SheetTitle>
-          <SheetDescription>Gesicherte Designs wiederverwenden — direkt im Layout-Schritt.</SheetDescription>
+          <SheetDescription>{tx({ de: 'Gesicherte Designs wiederverwenden — direkt im Layout-Schritt.', en: 'Reuse saved designs — right in the layout step.', es: 'Reutiliza diseños guardados, directamente en el paso de maquetación.' })}</SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="mt-4 h-[calc(100vh-9rem)] pr-3">

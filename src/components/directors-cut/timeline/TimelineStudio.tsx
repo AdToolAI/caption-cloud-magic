@@ -394,7 +394,7 @@ export function TimelineStudio({
                 {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{isFullscreen ? 'Vollbild beenden' : 'Vollbild'}</TooltipContent>
+            <TooltipContent>{isFullscreen ? tx({ de: 'Vollbild beenden', en: 'Exit fullscreen', es: 'Salir de pantalla completa' }) : tx({ de: 'Vollbild', en: 'Fullscreen', es: 'Pantalla completa' })}</TooltipContent>
           </Tooltip>
         </div>
       </div>

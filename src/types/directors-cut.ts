@@ -287,7 +287,7 @@ export const OVERLAY_ANIMATIONS: { id: OverlayAnimation; name: string; descripti
   { id: 'blurIn', name: 'Blur In', description: tx({ de: 'Aus der Unschärfe', en: 'Out of focus', es: 'Fuera de foco' }) },
   { id: 'stagger', name: 'Zeilen-Stagger', description: tx({ de: 'Wörter nacheinander', en: 'Words one after another', es: 'Palabras una tras otra' }) },
   { id: 'tickerLoop', name: 'Ticker', description: tx({ de: 'Endlos durchlaufend', en: 'Continuously running', es: 'Corriendo continuamente' }) },
-  { id: 'none', name: 'Ohne', description: tx({ de: 'Hart einblenden', en: 'Hard fade-in', es: 'Fundido de entrada duro' }) },
+  { id: 'none', name: tx({ de: 'Ohne', en: 'None', es: 'Ninguno' }), description: tx({ de: 'Hart einblenden', en: 'Hard fade-in', es: 'Fundido de entrada duro' }) },
 ];
 
 export interface OverlayStyle {

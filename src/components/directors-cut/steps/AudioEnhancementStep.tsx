@@ -84,7 +84,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
         }
 
         toast({
-          title: 'AI Audio-Optimierung abgeschlossen',
+          title: tx({ de: 'AI Audio-Optimierung abgeschlossen', en: 'AI audio optimization complete', es: 'Optimización de audio con IA completada' }),
           description: tx({ de: `Audio-Settings wurden optimiert. (${data.credits_used || 3} Credits)`, en: `Audio settings have been optimized. (${data.credits_used || 3} credits)`, es: `La configuración de audio se ha optimizado. (${data.credits_used || 3} créditos)` }),
         });
       } else {

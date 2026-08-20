@@ -240,7 +240,7 @@ export function AutoMatchPanel({
                     </p>
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => { reset(); setGeneratedTrack(null); }}>
-                    <RefreshCw className="w-3.5 h-3.5 mr-1" /> Neues Video
+                    <RefreshCw className="w-3.5 h-3.5 mr-1" /> {tx({ de: 'Neues Video', en: 'New video', es: 'Nuevo vídeo' })}
                   </Button>
                 </div>
 

@@ -76,7 +76,7 @@ export function MultiVideoUpload({
     // Check file size
     const oversizedFiles = videoFiles.filter(file => file.size > maxSizeMB * 1024 * 1024);
     if (oversizedFiles.length > 0) {
-      toast.error(`Maximale Dateigröße: ${maxSizeMB}MB {tx({ de: 'pro Video', en: 'per video', es: 'por video' })}`);
+      toast.error(tx({ de: `Maximale Dateigröße: ${maxSizeMB}MB pro Video`, en: `Maximum file size: ${maxSizeMB}MB per video`, es: `Tamaño máximo de archivo: ${maxSizeMB}MB por vídeo` }));
       return;
     }
 

@@ -438,7 +438,7 @@ export function useTriggerPerformanceAnalysis() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['autopilot-insights'] });
       toast({
-        title: 'Analyse abgeschlossen',
+        title: tx({ de: 'Analyse abgeschlossen', en: 'Analysis complete', es: 'Análisis completado' }),
         description: `${data?.analyzed_briefs ?? 0} Brief(s) ausgewertet.`,
       });
     },

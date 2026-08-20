@@ -40,7 +40,7 @@ export const CreditLimitWarning = ({ balance, monthlyCredits, planCode }: Credit
           variant={isCritical ? 'default' : 'outline'}
           onClick={() => navigate(planCode === 'free' ? '/pricing' : '/credits')}
         >
-          {planCode === 'free' ? 'Plan upgraden' : 'Credits kaufen'}
+          {planCode === 'free' ? tx({ de: 'Plan upgraden', en: 'Upgrade plan', es: 'Mejorar plan' }) : tx({ de: 'Credits kaufen', en: 'Buy credits', es: 'Comprar créditos' })}
         </Button>
       </AlertDescription>
     </Alert>

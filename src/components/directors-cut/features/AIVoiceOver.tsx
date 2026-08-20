@@ -474,7 +474,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
         onOpenChange={setLibraryOpen}
         language={selectedLanguageTab}
         currentVoiceId={settings.voiceId}
-        title="Voice-Bibliothek – Director's Cut"
+        title={tx({ de: 'Voice-Bibliothek – Director\'s Cut', en: 'Voice library – Director\'s Cut', es: 'Biblioteca de voces – Director\'s Cut' })}
         enforceNative
         onSelect={(voice) => {
           // Merge into local voices list so downstream lookups (name / recommended_model) work.
