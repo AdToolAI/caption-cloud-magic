@@ -64,7 +64,11 @@ export function MultiBrandManager({
         <div>
           <h3 className="text-lg font-semibold">{tx({ de: 'Deine Marken-Sets', en: 'Your brand sets', es: 'Tus sets de marca' })}</h3>
           <p className="text-sm text-muted-foreground">
-            {brandKits.length} {brandKits.length === 1 ? 'Set' : 'Sets'} gespeichert
+            {tx({
+              de: `${brandKits.length} ${brandKits.length === 1 ? 'Set' : 'Sets'} gespeichert`,
+              en: `${brandKits.length} ${brandKits.length === 1 ? 'set' : 'sets'} saved`,
+              es: `${brandKits.length} ${brandKits.length === 1 ? 'set' : 'sets'} guardados`,
+            })}
           </p>
         </div>
       </div>

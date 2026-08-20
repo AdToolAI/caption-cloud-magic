@@ -157,7 +157,11 @@ export function BatchGeneratePanel() {
               disabled={running}
             />
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{prompts.length} Prompt{prompts.length !== 1 ? 's' : ''} erkannt</span>
+              <span>{tx({
+                de: `${prompts.length} Prompt${prompts.length !== 1 ? 's' : ''} erkannt`,
+                en: `${prompts.length} prompt${prompts.length !== 1 ? 's' : ''} detected`,
+                es: `${prompts.length} indicación${prompts.length !== 1 ? 'es' : ''} detectada${prompts.length !== 1 ? 's' : ''}`,
+              })}</span>
               {prompts.length > 20 && <span className="text-destructive">{tx({ de: "Max. 20 Prompts erlaubt", en: "Max. 20 prompts allowed", es: "Máx. 20 indicaciones permitidas" })}</span>}
             </div>
           </div>

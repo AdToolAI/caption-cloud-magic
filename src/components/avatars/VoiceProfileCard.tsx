@@ -124,7 +124,11 @@ export function VoiceProfileCard({ avatarId, avatar }: VoiceProfileCardProps) {
         .eq('id', avatarId);
       if (error) throw error;
       await qc.invalidateQueries({ queryKey: ['avatar-detail', avatarId] });
-      toast.success(v ? `Voice gesetzt: ${v.name}` : 'Voice entfernt');
+      toast.success(
+        v
+          ? tx({ de: `Voice gesetzt: ${v.name}`, en: `Voice set: ${v.name}`, es: `Voz asignada: ${v.name}` })
+          : tx({ de: 'Voice entfernt', en: 'Voice removed', es: 'Voz eliminada' })
+      );
     } catch (e: any) {
       toast.error(e?.message || tx({ de: 'Konnte Voice nicht speichern', en: 'Could not save voice', es: 'No se pudo guardar la voz' }));
     } finally {

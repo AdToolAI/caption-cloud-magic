@@ -41,11 +41,21 @@ interface Props {
   onUpdateScene?: (id: string, updates: Partial<ComposerScene>) => void;
 }
 
-const SEV_LABEL: Record<DriftReport['severity'], string> = {
-  none: 'Plan & Storyboard im Einklang',
-  info: 'Kleine Abweichungen',
-  warn: 'Abweichungen erkannt',
-  error: 'Kritische Abweichungen',
+const sevLabel = (severity: DriftReport['severity']): string => {
+  switch (severity) {
+    case 'info':
+      return tx({ de: 'Kleine Abweichungen', en: 'Minor deviations', es: 'Desviaciones menores' });
+    case 'warn':
+      return tx({ de: 'Abweichungen erkannt', en: 'Deviations detected', es: 'Desviaciones detectadas' });
+    case 'error':
+      return tx({ de: 'Kritische Abweichungen', en: 'Critical deviations', es: 'Desviaciones críticas' });
+    default:
+      return tx({
+        de: 'Plan & Storyboard im Einklang',
+        en: 'Plan & storyboard in sync',
+        es: 'Plan y guion gráfico en sintonía',
+      });
+  }
 };
 
 export default function DriftReportPanel({ projectId, scenes, onUpdateScene }: Props) {
@@ -164,7 +174,7 @@ export default function DriftReportPanel({ projectId, scenes, onUpdateScene }: P
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium">Plan ↔ Storyboard Drift-Check</span>
                 <Badge variant="outline" className={cn('text-[10px]', severityBadgeClass(sev))}>
-                  {SEV_LABEL[sev]}
+                  {sevLabel(sev)}
                 </Badge>
                 {count > 0 && (
                   <span className="text-[11px] text-muted-foreground">

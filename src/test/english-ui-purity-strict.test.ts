@@ -194,6 +194,22 @@ const BANNED_WORDS = [
   'Klonen',
   'Library kopieren',
   'Link kopiert',
+  // v-final-13: avatar voice status, brand-set counter, time-wheel aria label,
+  // Director's Cut cut-segment toast, Motion Studio reference toasts, batch
+  // prompt counter, drift-report severity labels, share toast, AI monitoring.
+  // Ambiguous-but-valid-English words (`Set`, `Reference`, `Prompt`) are NOT
+  // banned bare — they are caught via German morphology/phrase context below.
+  'gesetzt',
+  'gespeichert',
+  'Uhrzeit',
+  'herausgeschnitten',
+  'Abweichung',
+  'Abweichungen',
+  'Kritische',
+  'Kleine',
+  'im Einklang',
+  'geteilt',
+  'Hohe Nutzung',
   // `Neu` is deliberately NOT a bare banned word (it collides with identifiers
   // and English "Neural"). It is caught contextually by the rule below.
 ];
@@ -278,7 +294,7 @@ function deBranchLines(src: string): Set<number> {
     // `language === 'de'` / `lang === 'de'` on the previous line, German value
     // on the next line of a multi-line ternary.
     const prev = lines[idx - 1] ?? '';
-    if (/^\s*\?/.test(line) && /[Ll]ang(uage)?\s*===\s*['"]de['"]/.test(prev)) {
+    if (/^\s*\?/.test(line) && /[Ll]ang\w*\s*===\s*['"]de['"]/.test(prev)) {
       inside.add(idx);
       return;
     }

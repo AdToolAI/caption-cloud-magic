@@ -24,7 +24,7 @@ export const VideoShareDialog = ({ open, onOpenChange, video }: VideoShareDialog
     });
 
     toast({
-      title: 'Video geteilt',
+      title: tx({ de: 'Video geteilt', en: 'Video shared', es: 'Vídeo compartido' }),
       description: tx({ de: `Video auf ${platform} geteilt`, en: `Video shared on ${platform}`, es: `Vídeo compartido en ${platform}` })
     });
   };
