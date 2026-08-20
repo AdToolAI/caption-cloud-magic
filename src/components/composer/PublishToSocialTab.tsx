@@ -16,7 +16,7 @@ import { PlatformOptimizationHelper } from '@/components/publishing/PlatformOpti
 import { CrossPostMagicPanel } from './CrossPostMagicPanel';
 import { Instagram, Music, Linkedin, Youtube, Clock, Send, CalendarIcon, Sparkles, Camera, MessageSquare, Link2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { enUS } from 'date-fns/locale';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -52,7 +52,7 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
   const { schedulePublication, loading: scheduling } = useScheduledPublishing();
   const { isConnected } = usePlatformCredentials();
 
-  const dateLocale = language === 'de' ? de : language === 'es' ? es : enUS;
+  const dateLocale = dateFnsLocale(language);
 
   const platforms = [
     { id: 'instagram' as Platform, name: 'Instagram', icon: Instagram, color: 'text-pink-500' },

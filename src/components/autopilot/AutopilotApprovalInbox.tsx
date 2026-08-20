@@ -9,6 +9,7 @@ import { useAutopilotNotifications, type AutopilotNotification } from '@/hooks/u
 import { useAutopilotQueue, useApproveSlot, useSkipSlot, type AutopilotSlot } from '@/hooks/useAutopilot';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import { dateFnsLocale } from '@/lib/uiLocale';
 import { uiLocale } from '@/lib/uiLocale';
 
 interface Props {
