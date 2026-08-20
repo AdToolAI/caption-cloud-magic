@@ -246,7 +246,7 @@ const TransitionBlock: React.FC<{
                   <div className="absolute inset-0 flex items-center justify-center text-[9px] font-mono text-white/90">
                     {resolvedTransition?.placement === 'centered'
                       ? `-${(activeDuration / 2).toFixed(1)}s | Cut | +${(activeDuration / 2).toFixed(1)}s`
-                      : `Cut | +${activeDuration.toFixed(1)}s Übergang`}
+                      : tx({ de: `Cut | +${activeDuration.toFixed(1)}s Übergang`, en: `Cut | +${activeDuration.toFixed(1)}s transition`, es: `Corte | +${activeDuration.toFixed(1)}s transición` })}
                   </div>
                 </div>
                 {resolvedTransition?.placement !== 'centered' && (

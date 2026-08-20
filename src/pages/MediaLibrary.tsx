@@ -167,7 +167,7 @@ export default function MediaLibrary() {
           scheduleReload();
           if (payload.eventType === 'INSERT') {
             toast({
-              title: "🎉 Neue Medien hinzugefügt!",
+              title: tx({ de: "🎉 Neue Medien hinzugefügt!", en: "🎉 New media added!", es: "🎉 ¡Nuevos medios añadidos!" }),
               description: tx({ de: "Deine Media Library wurde aktualisiert", en: "Your media library has been updated", es: "Su biblioteca multimedia ha sido actualizada" }),
             });
           }
@@ -1113,7 +1113,7 @@ export default function MediaLibrary() {
           {selectedAssets.length > 0 && (
             <div className="flex items-center gap-4 p-4 border-t bg-muted/30 flex-wrap mt-4">
               <span className="text-sm text-muted-foreground">
-                {selectedAssets.length} ausgewählt
+                {tx({ de: `${selectedAssets.length} ausgewählt`, en: `${selectedAssets.length} selected`, es: `${selectedAssets.length} seleccionados` })}
               </span>
               <div className="flex gap-2 flex-wrap">
                 <Button
@@ -1211,13 +1211,17 @@ export default function MediaLibrary() {
                     }}
                   >
                     {expandedScenes.includes(item.sceneId)
-                      ? 'Ältere Versionen ausblenden'
-                      : `+${item.olderVersionCount} ältere Version${item.olderVersionCount > 1 ? 'en' : ''}`}
+                      ? tx({ de: 'Ältere Versionen ausblenden', en: 'Hide older versions', es: 'Ocultar versiones anteriores' })
+                      : tx({
+                          de: `+${item.olderVersionCount} ältere Version${item.olderVersionCount > 1 ? 'en' : ''}`,
+                          en: `+${item.olderVersionCount} older version${item.olderVersionCount > 1 ? 's' : ''}`,
+                          es: `+${item.olderVersionCount} versión${item.olderVersionCount > 1 ? 'es' : ''} anterior${item.olderVersionCount > 1 ? 'es' : ''}`,
+                        })}
                   </button>
                 )}
                 {item.isSuperseded && (
                   <div className="absolute bottom-2 left-2 z-10 rounded-md bg-background/80 px-2 py-1 text-xs backdrop-blur">
-                    Ältere Version
+                    {tx({ de: 'Ältere Version', en: 'Older version', es: 'Versión anterior' })}
                   </div>
                 )}
 

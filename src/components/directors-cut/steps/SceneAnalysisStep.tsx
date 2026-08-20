@@ -356,7 +356,7 @@ export function SceneAnalysisStep({
     // Pass empty global effects, but scene-specific effects
     onApplySuggestions({}, newSceneEffects);
     
-    const transitionInfo = skippedTransitions > 0 ? ` (${skippedTransitions} Transitions übersprungen)` : '';
+    const transitionInfo = skippedTransitions > 0 ? tx({ de: ` (${skippedTransitions} Transitions übersprungen)`, en: ` (${skippedTransitions} transitions skipped)`, es: ` (${skippedTransitions} transiciones omitidas)` }) : '';
     toast.success(tx({ de: `${appliedCount} visuelle Effekte für ${scenes.length} Szenen angewendet${transitionInfo}`, en: `${appliedCount} visual effects applied to ${scenes.length} scenes${transitionInfo}`, es: `${appliedCount} efectos visuales aplicados a ${scenes.length} escenas${transitionInfo}` }));
   };
 
@@ -394,7 +394,7 @@ export function SceneAnalysisStep({
     // Pass only this scene's effects
     onApplySuggestions({}, { [scene.id]: sceneEffect as SceneEffects });
     
-    const transitionInfo = skippedTransitions > 0 ? ` (${skippedTransitions} Transition übersprungen)` : '';
+    const transitionInfo = skippedTransitions > 0 ? tx({ de: ` (${skippedTransitions} Transition übersprungen)`, en: ` (${skippedTransitions} transition skipped)`, es: ` (${skippedTransitions} transición omitida)` }) : '';
     toast.success(tx({ de: `${appliedCount} Effekte für Szene angewendet${transitionInfo} (${formatTime(scene.start_time)} - ${formatTime(scene.end_time)})`, en: `${appliedCount} effects applied to scene${transitionInfo} (${formatTime(scene.start_time)} - ${formatTime(scene.end_time)})`, es: `${appliedCount} efectos aplicados a la escena${transitionInfo} (${formatTime(scene.start_time)} - ${formatTime(scene.end_time)})` }));
   };
 

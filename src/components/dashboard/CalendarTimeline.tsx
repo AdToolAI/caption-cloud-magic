@@ -25,9 +25,9 @@ interface CalendarTimelineProps {
 export function CalendarTimeline({ events, loading, onEventClick }: CalendarTimelineProps) {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-      scheduled: { variant: "default", label: "Geplant" },
+      scheduled: { variant: "default", label: tx({ de: "Geplant", en: "Scheduled", es: "Programado" }) },
       posted: { variant: "secondary", label: tx({ de: "Veröffentlicht", en: "Posted", es: "Publicado" }) },
-      draft: { variant: "outline", label: "Entwurf" },
+      draft: { variant: "outline", label: tx({ de: "Entwurf", en: "Draft", es: "Borrador" }) },
       failed: { variant: "destructive", label: tx({ de: 'Fehlgeschlagen', en: 'Failed', es: 'Fallidos' }) },
     };
     

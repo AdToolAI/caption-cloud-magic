@@ -668,7 +668,7 @@ export function SceneEditingStep({
     setSelectedSceneId(newScene.id);
     
     toast({
-      title: 'Medien hinzugefügt',
+      title: tx({ de: 'Medien hinzugefügt', en: 'Media added', es: 'Medios añadidos' }),
       description: tx({ de: `${media.type === 'video' ? 'Video' : 'Bild'} wurde als neue Szene hinzugefügt`, en: `${media.type === 'video' ? 'Video' : 'Image'} added as new scene`, es: `${media.type === 'video' ? 'Video' : 'Imagen'} añadida como nueva escena` }),
     });
   }, [scenes, onScenesUpdate, toast]);
@@ -854,7 +854,7 @@ export function SceneEditingStep({
                     { key: 'S', action: tx({ de: 'Szene teilen', en: 'Split scene', es: 'Dividir escena' }) },
                     { key: 'D', action: tx({ de: 'Szene duplizieren', en: 'Duplicate scene', es: 'Duplicar escena' }) },
                     { key: '⌫', action: tx({ de: 'Szene löschen', en: 'Delete scene', es: 'eliminar escena' }) },
-                    { key: '⌘Z', action: 'Rückgängig' },
+                    { key: '⌘Z', action: tx({ de: 'Rückgängig', en: 'Undo', es: 'Deshacer' }) },
                   ].map(({ key, action }) => (
                     <div key={key} className="flex items-center gap-2">
                       <kbd className="px-2 py-1 rounded bg-background border text-[10px] font-mono">

@@ -344,6 +344,25 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
 
 export const OVERLAY_CATEGORIES = Array.from(new Set(OVERLAY_PRESETS.map((p) => p.category)));
 
+/**
+ * Display labels for the semantic (German-valued) category union above.
+ * The raw category values stay untouched — they are used as filter/enum values.
+ */
+export const OVERLAY_CATEGORY_LABELS: Record<string, { de: string; en: string; es: string }> = {
+  'Lower Third': { de: 'Lower Third', en: 'Lower Third', es: 'Rótulo inferior' },
+  Banner: { de: 'Banner', en: 'Banner', es: 'Banner' },
+  'Störer': { de: 'Störer', en: 'Flash Badge', es: 'Distintivo' },
+  Schild: { de: 'Schild', en: 'Sign', es: 'Letrero' },
+  CTA: { de: 'CTA', en: 'CTA', es: 'CTA' },
+  Ticker: { de: 'Ticker', en: 'Ticker', es: 'Ticker' },
+  Marke: { de: 'Marke', en: 'Brand', es: 'Marca' },
+  Callout: { de: 'Callout', en: 'Callout', es: 'Llamada' },
+  Zitat: { de: 'Zitat', en: 'Quote', es: 'Cita' },
+  Info: { de: 'Info', en: 'Info', es: 'Info' },
+  Text: { de: 'Text', en: 'Text', es: 'Texto' },
+};
+
+
 /** Preset zu einem einsatzbereiten Overlay machen. */
 export function instantiatePreset(preset: OverlayPreset, startTime: number, endTime: number | null): TextOverlay {
   return {

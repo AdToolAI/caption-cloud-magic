@@ -185,7 +185,7 @@ export default function SocialMediaSettings() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Label htmlFor={`toggle-${platform.id}`} className="text-sm">
-                      {connected ? 'Aktiv' : 'Inaktiv'}
+                      {connected ? tx({ de: 'Aktiv', en: 'Active', es: 'Activo' }) : tx({ de: 'Inaktiv', en: 'Inactive', es: 'Inactivo' })}
                     </Label>
                     <Switch
                       id={`toggle-${platform.id}`}

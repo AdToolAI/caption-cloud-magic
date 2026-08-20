@@ -1114,13 +1114,13 @@ export default function VideoComposerDashboard() {
   }, [project]);
 
   const STEP_HINTS: Record<TabId, string> = {
-    briefing: 'Produkt, Zielgruppe & Tonalität',
+    briefing: tx({ de: 'Produkt, Zielgruppe & Tonalität', en: 'Product, audience & tone', es: 'Producto, audiencia y tono' }),
     storyboard: tx({ de: "Szenen planen & anordnen", en: "Plan & arrange scenes", es: "Planificar y organizar escenas" }),
-    clips: 'AI-Clips generieren',
+    clips: tx({ de: 'AI-Clips generieren', en: 'Generate AI clips', es: 'Generar clips de IA' }),
     text: tx({ de: 'Voiceover & Untertitel', en: 'Voiceover & subtitles', es: 'Voz en off y subtítulos' }),
-    audio: 'Musik & Sound-Mix',
+    audio: tx({ de: 'Musik & Sound-Mix', en: 'Music & sound mix', es: 'Música y mezcla de sonido' }),
     export: 'Render & Download',
-    campaign: 'Cutdowns & A/B-Varianten',
+    campaign: tx({ de: 'Cutdowns & A/B-Varianten', en: 'Cutdowns & A/B variants', es: 'Versiones cortas y variantes A/B' }),
   };
 
   // User-visible workflow steps — Stage 19: Clips-Step ist komplett entfernt,

@@ -31,8 +31,8 @@ const TABS: Array<{
   icon: typeof Pencil;
   hint: string;
 }> = [
-  { id: 'editor', label: 'Editor', icon: Pencil, hint: 'Prompt · Cast · Audio · Look · Erweitert' },
-  { id: 'style', label: 'Stil', icon: Palette, hint: 'Looks · Feintuning · Modifier' },
+  { id: 'editor', label: 'Editor', icon: Pencil, hint: tx({ de: 'Prompt · Cast · Audio · Look · Erweitert', en: 'Prompt · Cast · Audio · Look · Advanced', es: 'Prompt · Reparto · Audio · Look · Avanzado' }) },
+  { id: 'style', label: tx({ de: 'Stil', en: 'Style', es: 'Estilo' }), icon: Palette, hint: tx({ de: 'Looks · Feintuning · Modifier', en: 'Looks · Fine-tuning · Modifiers', es: 'Looks · Ajuste fino · Modificadores' }) },
   { id: 'avatar', label: 'Avatar', icon: UserSquare2, hint: 'Character Workshop · Wardrobe · Voice' },
 ];
 

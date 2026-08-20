@@ -11,9 +11,9 @@ export type LearningPace = 'espresso' | 'balanced' | 'guided' | 'playful';
 
 export interface PersonaProfile {
   id: LearningPace;
-  labelDe: string;
+  label: string;
   labelEn: string;
-  descriptionDe: string;
+  description: string;
   descriptionEn: string;
   /** Max proactive popups per calendar day. */
   dailyPopupCap: number;
@@ -28,9 +28,9 @@ export interface PersonaProfile {
 export const PERSONA_PROFILES: Record<LearningPace, PersonaProfile> = {
   espresso: {
     id: 'espresso',
-    labelDe: 'Espresso',
+    label: 'Espresso',
     labelEn: 'Espresso',
-    descriptionDe: tx({ de: 'Nur das Nötigste. Ein Tipp pro Session, keine Umwege.', en: 'Only the bare essentials. One tip per session, no detours.', es: 'Sólo lo esencial. Un consejo por sesión, sin desvíos.' }),
+    description: tx({ de: 'Nur das Nötigste. Ein Tipp pro Session, keine Umwege.', en: 'Only the bare essentials. One tip per session, no detours.', es: 'Sólo lo esencial. Un consejo por sesión, sin desvíos.' }),
     descriptionEn: 'Only what matters. One tip per session, no detours.',
     dailyPopupCap: 1,
     minGapSeconds: 60 * 60 * 4,
@@ -40,9 +40,9 @@ export const PERSONA_PROFILES: Record<LearningPace, PersonaProfile> = {
   },
   balanced: {
     id: 'balanced',
-    labelDe: 'Balanced',
+    label: 'Balanced',
     labelEn: 'Balanced',
-    descriptionDe: tx({ de: "Freundlich, kurz, hilft bei Meilensteinen. Empfohlener Standard.", en: "Friendly, concise, helps with milestones. Recommended standard.", es: "Amigable, conciso, ayuda con hitos. Estándar recomendado." }),
+    description: tx({ de: "Freundlich, kurz, hilft bei Meilensteinen. Empfohlener Standard.", en: "Friendly, concise, helps with milestones. Recommended standard.", es: "Amigable, conciso, ayuda con hitos. Estándar recomendado." }),
     descriptionEn: 'Friendly, concise, appears at milestones. Recommended default.',
     dailyPopupCap: 3,
     minGapSeconds: 60 * 25,
@@ -52,9 +52,9 @@ export const PERSONA_PROFILES: Record<LearningPace, PersonaProfile> = {
   },
   guided: {
     id: 'guided',
-    labelDe: 'Guided Tour',
+    label: 'Guided Tour',
     labelEn: 'Guided Tour',
-    descriptionDe: tx({ de: 'Schritt für Schritt durch jedes Studio. Für Einsteiger.', en: 'Step by step through each studio. For beginners.', es: 'Paso a paso por cada estudio. Para principiantes.' }),
+    description: tx({ de: 'Schritt für Schritt durch jedes Studio. Für Einsteiger.', en: 'Step by step through each studio. For beginners.', es: 'Paso a paso por cada estudio. Para principiantes.' }),
     descriptionEn: 'Step-by-step across every studio. For newcomers.',
     dailyPopupCap: 6,
     minGapSeconds: 60 * 5,
@@ -64,9 +64,9 @@ export const PERSONA_PROFILES: Record<LearningPace, PersonaProfile> = {
   },
   playful: {
     id: 'playful',
-    labelDe: 'Playful',
+    label: 'Playful',
     labelEn: 'Playful',
-    descriptionDe: 'Balanced + dezente Micro-Achievements. Nie albern.',
+    description: tx({ de: 'Balanced + dezente Micro-Achievements. Nie albern.', en: 'Balanced + subtle micro-achievements. Never silly.', es: 'Equilibrado + micrologros sutiles. Nunca tonto.' }),
     descriptionEn: 'Balanced + subtle micro-achievements. Never silly.',
     dailyPopupCap: 4,
     minGapSeconds: 60 * 20,

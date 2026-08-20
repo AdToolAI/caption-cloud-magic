@@ -194,7 +194,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: klingAspect,
     costPerSecond: KLING_VIDEO_MODELS['kling-2.5-turbo'].costPerSecond,
     badge: 'Fast',
-    tagline: 'Schneller Draft · Iteration',
+    tagline: tx({ de: 'Schneller Draft · Iteration', en: 'Fast draft · iteration', es: 'Borrador rápido · iteración' }),
     legacyRoute: '/kling-video-studio',
   },
   {
@@ -232,7 +232,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: klingAspect,
     costPerSecond: KLING_VIDEO_MODELS['kling-3'].costPerSecond,
     badge: 'Empfohlen',
-    tagline: 'Realistische Bewegungen · Native Audio',
+    tagline: tx({ de: 'Realistische Bewegungen · Native Audio', en: 'Realistic motion · native audio', es: 'Movimiento realista · audio nativo' }),
     legacyRoute: '/kling-video-studio',
   },
   {
@@ -297,7 +297,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     resolution: '1080p',
     aspectRatios: ['16:9', '9:16'],
     costPerSecond: VEO_VIDEO_MODELS['veo-3.1-fast'].costPerSecond,
-    tagline: 'Schnell · 1080p · Audio',
+    tagline: tx({ de: 'Schnell · 1080p · Audio', en: 'Fast · 1080p · audio', es: 'Rápido · 1080p · audio' }),
     legacyRoute: '/veo-video-studio',
   },
   {
@@ -360,7 +360,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: ltxAspect,
     costPerSecond: LTX_VIDEO_MODELS['ltx-standard'].costPerSecond,
     badge: tx({ de: "Schnell & Günstig", en: "Fast & Affordable", es: "Rápido y Económico" }),
-    tagline: 'Schnellster Generator',
+    tagline: tx({ de: 'Schnellster Generator', en: 'Fastest generator', es: 'Generador más rápido' }),
     legacyRoute: '/ltx-video-studio',
   },
   {
@@ -396,7 +396,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: wanLegacyAspect,
     costPerSecond: WAN_VIDEO_MODELS['wan-2-6-standard'].costPerSecond,
     badge: 'New',
-    tagline: 'Wan 2.6 · Budget-Champion',
+    tagline: tx({ de: 'Wan 2.6 · Budget-Champion', en: 'Wan 2.6 · budget champion', es: 'Wan 2.6 · campeón económico' }),
     legacyRoute: '/wan-video-studio',
   },
   {
@@ -430,7 +430,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: wan27Aspect,
     costPerSecond: WAN_VIDEO_MODELS['wan-2-7-standard'].costPerSecond,
     badge: 'New',
-    tagline: '27B MoE · natives Audio',
+    tagline: tx({ de: '27B MoE · natives Audio', en: '27B MoE · native audio', es: '27B MoE · audio nativo' }),
     legacyRoute: '/wan-video-studio',
   },
   {
@@ -447,7 +447,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: wan27Aspect,
     costPerSecond: WAN_VIDEO_MODELS['wan-2-7-pro'].costPerSecond,
     badge: 'Premium',
-    tagline: '27B MoE · natives Audio · 1080p',
+    tagline: tx({ de: '27B MoE · natives Audio · 1080p', en: '27B MoE · native audio · 1080p', es: '27B MoE · audio nativo · 1080p' }),
     legacyRoute: '/wan-video-studio',
   },
   {
@@ -464,7 +464,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     resolution: '720p',
     aspectRatios: wanLegacyAspect,
     costPerSecond: WAN_VIDEO_MODELS['wan-standard'].costPerSecond,
-    tagline: 'Wan 2.5 · stabile Klassik',
+    tagline: tx({ de: 'Wan 2.5 · stabile Klassik', en: 'Wan 2.5 · stable classic', es: 'Wan 2.5 · clásico estable' }),
     legacyRoute: '/wan-video-studio',
   },
 
@@ -484,7 +484,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     // 16:9, I2V inherits the ratio of the start image.
     aspectRatios: ['16:9'],
     costPerSecond: HAILUO_VIDEO_MODELS['hailuo-standard'].costPerSecond,
-    tagline: 'Realistische Gesichter & Bewegung',
+    tagline: tx({ de: 'Realistische Gesichter & Bewegung', en: 'Realistic faces & motion', es: 'Rostros y movimiento realistas' }),
     legacyRoute: '/hailuo-video-studio',
   },
   {
@@ -555,7 +555,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: lumaRay32Aspect,
     costPerSecond: LUMA_VIDEO_MODELS['luma-ray32-5s'].costPerSecond,
     badge: 'New',
-    tagline: 'Ray 3.2 · neueste Luma-Generation',
+    tagline: tx({ de: 'Ray 3.2 · neueste Luma-Generation', en: 'Ray 3.2 · newest Luma generation', es: 'Ray 3.2 · última generación Luma' }),
     legacyRoute: '/luma-video-studio',
   },
   {
@@ -611,7 +611,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: seedanceAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-standard'].costPerSecond,
     badge: 'New',
-    tagline: 'Seedance 2.0 Fast · dynamische Motion',
+    tagline: tx({ de: 'Seedance 2.0 Fast · dynamische Motion', en: 'Seedance 2.0 Fast · dynamic motion', es: 'Seedance 2.0 Fast · movimiento dinámico' }),
     legacyRoute: '/seedance-video-studio',
   },
   {
