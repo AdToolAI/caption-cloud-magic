@@ -107,6 +107,11 @@ export const AccountHeroHeader = () => {
             <span className="text-sm font-medium">{planInfo.name}</span>
           </div>
 
+          {/* Creator Discount Badge */}
+          <div className="flex items-center">
+            <CreatorDiscountBadge className="px-4 py-2 rounded-xl text-sm" />
+          </div>
+
           {/* Security Badge */}
           <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-muted/30 border border-white/10">
             <Shield className="h-4 w-4 text-cyan-400" />
