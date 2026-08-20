@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { getProductInfo, isSubscribed } from "@/config/pricing";
 import { Settings, Shield, CheckCircle2, Crown } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { CreatorDiscountBadge } from "@/components/account/CreatorDiscountBadge";
 
 export const AccountHeroHeader = () => {
   const { user, subscribed, productId } = useAuth();
