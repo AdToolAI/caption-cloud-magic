@@ -237,7 +237,7 @@ export default function BriefingTab({
   onUpdateScenes,
   retryStoryboardNonce = 0,
 }: BriefingTabProps) {
-  const { t } = useTranslation();
+  const { t, language: uiLang } = useTranslation();
   const [uspInput, setUspInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   // briefingImportOpen state removed — auto-analyse handled by dashboard hook.
@@ -833,7 +833,7 @@ export default function BriefingTab({
 
       <VideoModeSelector
           value={briefing.videoMode || 'video'}
-          language={language}
+          language={uiLang}
           onChange={(mode: VideoMode) => onUpdateBriefing({ videoMode: mode })}
       />
 
@@ -850,9 +850,9 @@ export default function BriefingTab({
 
       {/* Director's Note — Direct & Studio only */}
       <DirectorsNote>
-          {language === 'de'
+          {uiLang === 'de'
             ? tx({ de: 'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Für echte Gesichts-Konsistenz nutze einen Avatar aus der Bibliothek.', en: 'Describe distinctive clothing & objects in detail (coat, crown, weapon). The AI repeats these much more reliably than faces — the viewer recognizes the person by them. For true facial consistency, use an avatar from the library.', es: 'Describe la ropa y los objetos distintivos en detalle (abrigo, corona, arma). La IA los repite de forma mucho más fiable que los rostros; el espectador reconoce a la persona por ellos. Para una verdadera consistencia facial, utiliza un avatar de la biblioteca.' })
-            : language === 'es'
+            : uiLang === 'es'
               ? 'Describe ropa y objetos distintivos en detalle (abrigo, corona, arma). La IA los repite con mucha más fiabilidad que las caras — el espectador reconoce al personaje por ellos. Para consistencia facial real, usa un avatar de la biblioteca.'
               : 'Describe distinctive clothing & props in detail (coat, crown, weapon). The AI repeats those far more reliably than faces — your audience recognises the character by them. For true face consistency, use an avatar from the library.'}
       </DirectorsNote>
@@ -866,20 +866,20 @@ export default function BriefingTab({
           title={
             <span className="flex items-center gap-2">
               <Palette className="h-4 w-4 text-amber-300" />
-              {language === 'de' ? 'Visueller Stil' : language === 'es' ? 'Estilo Visual' : 'Visual Style'}
+              {uiLang === 'de' ? 'Visueller Stil' : uiLang === 'es' ? 'Estilo Visual' : 'Visual Style'}
             </span>
           }
         >
           <p className="text-xs text-muted-foreground mb-3">
-            {language === 'de'
+            {uiLang === 'de'
               ? tx({ de: 'Wird auf alle KI-generierten Szenen angewendet — sorgt für einheitlichen Look.', en: 'Applied to all AI-generated scenes — ensures a consistent look.', es: 'Se aplica a todas las escenas generadas por IA, lo que garantiza un aspecto uniforme.' })
-              : language === 'es'
+              : uiLang === 'es'
                 ? 'Se aplica a todas las escenas generadas por IA — garantiza un aspecto uniforme.'
                 : 'Applied to every AI-generated scene — ensures a consistent look.'}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
             {VISUAL_STYLES.map((style) => {
-              const lang = (language === 'de' || language === 'es' ? language : 'en') as 'de' | 'en' | 'es';
+              const lang = (uiLang === 'de' || uiLang === 'es' ? language : 'en') as 'de' | 'en' | 'es';
               const isActive = (briefing.visualStyle || 'realistic') === style.id;
               return (
                 <button
@@ -901,7 +901,7 @@ export default function BriefingTab({
                             : s,
                         );
                         onUpdateScenes(updated);
-                        const lang2 = (language === 'de' || language === 'es' ? language : 'en') as 'de' | 'en' | 'es';
+                        const lang2 = (uiLang === 'de' || uiLang === 'es' ? language : 'en') as 'de' | 'en' | 'es';
                         const styleLabel = getStyleLabel(styleId, lang2);
                         toast({
                           title:
