@@ -203,7 +203,7 @@ export default function AIMonitoring() {
         <Card>
           <CardHeader>
             <CardTitle>Letzte AI Calls</CardTitle>
-            <CardDescription>Die 10 neuesten AI Aufrufe</CardDescription>
+            <CardDescription>{tx({ de: "Die 10 neuesten AI Aufrufe", en: "The 10 latest AI calls", es: "Las 10 últimas llamadas de IA" })}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">

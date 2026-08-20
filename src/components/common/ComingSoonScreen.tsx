@@ -161,7 +161,7 @@ export function ComingSoonScreen({
                 onClick={() => setPreviewMode(true)}
                 className="gap-2 h-11 border-amber-400/40 text-amber-400 hover:bg-amber-400/10"
               >
-                <Eye className="h-4 w-4" /> Preview öffnen (Admin)
+                <Eye className="h-4 w-4" /> {tx({ de: "Preview öffnen (Admin)", en: "Open preview (Admin)", es: "Abrir vista previa (Administrador)" })}
               </Button>
             )}
           </div>

@@ -435,8 +435,7 @@ const Pricing = () => {
 
             {currency === "EUR" && (
               <p className="text-xs text-muted-foreground text-center mb-6">
-                Alle Preise inkl. 19% MwSt. (Deutschland). Rechnung wird automatisch per E-Mail
-                zugestellt.
+                {tx({ de: "Alle Preise inkl. 19% MwSt. (Deutschland). Rechnung wird automatisch per E-Mail\n                zugestellt.", en: "All prices include 19% VAT (Germany). Invoice will be automatically sent via email.", es: "Todos los precios incluyen el 19% de IVA (Alemania). La factura se enviará automáticamente por correo electrónico." })}
               </p>
             )}
 

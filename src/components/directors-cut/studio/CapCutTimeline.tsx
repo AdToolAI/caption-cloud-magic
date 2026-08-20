@@ -1099,7 +1099,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                         className="h-8 px-3 rounded-md flex items-center gap-1.5 text-[11px] font-medium bg-indigo-500/20 text-indigo-200 hover:bg-indigo-500/30 border border-indigo-400/40 transition-colors"
                       >
                         <Film className="h-3.5 w-3.5" />
-                        Aus Bibliothek
+                        {tx({ de: "Aus Bibliothek", en: "From library", es: "De la biblioteca" })}
                       </button>
                     )}
                     {onSceneAdd && (

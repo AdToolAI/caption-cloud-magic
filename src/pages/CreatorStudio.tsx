@@ -62,7 +62,7 @@ export default function CreatorStudio() {
                 <p className="text-muted-foreground mb-3">
                   {tx({ de: "Du hast noch keine Templates erstellt. Baue eines im Motion Studio und teile es hier mit der Community.", en: "You haven't created any templates yet. Build one in Motion Studio and share it with the community here.", es: "Aún no has creado plantillas. Crea una en Motion Studio y compártela aquí con la comunidad." })}
                 </p>
-                <Button asChild><a href="/video-composer">Zum Motion Studio</a></Button>
+                <Button asChild><a href="/video-composer">{tx({ de: "Zum Motion Studio", en: "To Motion Studio", es: "Al Motion Studio" })}</a></Button>
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

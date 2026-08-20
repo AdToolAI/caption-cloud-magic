@@ -363,7 +363,7 @@ const Carousel = () => {
                     className="min-h-[200px] mt-2"
                   />
                   <p className="text-sm text-muted-foreground mt-1">
-                    {text.length}/2500 Zeichen
+                    {text.length}{tx({ de: "/2500 Zeichen", en: "/2500 characters", es: "/2500 caracteres" })}
                   </p>
                 </div>
 
