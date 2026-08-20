@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { OVERLAY_PRESETS, OVERLAY_CATEGORIES, type OverlayPreset } from '@/lib/directors-cut/overlayPresets';
+import { OVERLAY_PRESETS, OVERLAY_CATEGORIES, OVERLAY_CATEGORY_LABELS, type OverlayPreset } from '@/lib/directors-cut/overlayPresets';
+import { tx } from '@/lib/i18nText';
 import { OverlayGraphic } from '@/remotion/components/OverlayGraphic';
 
 interface OverlayLibraryProps {
@@ -50,7 +51,11 @@ export function OverlayLibrary({ onPick }: OverlayLibraryProps) {
               variant={category === c ? 'default' : 'outline'}
               className={category === c ? 'bg-primary/20 text-primary border-primary/40' : 'border-white/15'}
             >
-              {c}
+              {c === 'All'
+                ? tx({ de: 'Alle', en: 'All', es: 'Todos' })
+                : OVERLAY_CATEGORY_LABELS[c]
+                  ? tx(OVERLAY_CATEGORY_LABELS[c])
+                  : c}
             </Badge>
           </button>
         ))}
