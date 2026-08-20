@@ -122,7 +122,7 @@ export function AudioUpload({
                 {tx({ de: "Audio hier ablegen", en: "Drop audio here", es: "Arrastra el audio aquí" })}
               </p>
               <p className="text-xs text-muted-foreground">
-                MP3, WAV, OGG bis 10MB
+                {tx({ de: 'MP3, WAV, OGG bis 10MB', en: 'MP3, WAV, OGG up to 10MB', es: 'MP3, WAV, OGG hasta 10 MB' })}
               </p>
             </>
           )}

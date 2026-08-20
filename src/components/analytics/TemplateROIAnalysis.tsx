@@ -66,7 +66,7 @@ export function TemplateROIAnalysis({ templates }: Props) {
 
       {/* ROI Chart */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Template ROI Vergleich</h3>
+        <h3 className="text-lg font-semibold mb-4">{tx({ de: 'Template ROI Vergleich', en: 'Template ROI comparison', es: 'Comparación de ROI de plantillas' })}</h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" />

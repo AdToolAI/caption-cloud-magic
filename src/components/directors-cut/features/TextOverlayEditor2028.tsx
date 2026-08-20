@@ -541,7 +541,7 @@ export function TextOverlayEditor2028({
               className="px-2"
             >
               <Palette className="h-4 w-4 mr-1" />
-              Markenfarben anwenden
+              {tx({ de: 'Markenfarben anwenden', en: 'Apply brand colours', es: 'Aplicar colores de marca' })}
             </Button>
           </div>
           <OverlayCanvasEditor
@@ -750,7 +750,7 @@ export function TextOverlayEditor2028({
               {/* Colors */}
               <div className="grid grid-cols-2 gap-4 min-w-0">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Textfarbe</Label>
+                  <Label className="text-sm font-medium">{tx({ de: 'Textfarbe', en: 'Text colour', es: 'Color del texto' })}</Label>
                   <div className="flex flex-wrap gap-1.5">
                     {PRESET_COLORS.map((color) => (
                       <motion.button

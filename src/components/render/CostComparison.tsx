@@ -19,9 +19,9 @@ export const CostComparison = ({ remotionCost, shotstackCost }: CostComparisonPr
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Kosten-Vergleich</CardTitle>
+        <CardTitle className="text-base">{tx({ de: 'Kosten-Vergleich', en: 'Cost comparison', es: 'Comparación de costes' })}</CardTitle>
         <CardDescription>
-          Side-by-side Engine Vergleich
+          {tx({ de: 'Side-by-side Engine Vergleich', en: 'Side-by-side engine comparison', es: 'Comparación de motores lado a lado' })}
         </CardDescription>
       </CardHeader>
       <CardContent>

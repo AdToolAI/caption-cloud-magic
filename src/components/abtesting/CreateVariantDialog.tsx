@@ -115,7 +115,7 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="thumbnail">Thumbnail</TabsTrigger>
               <TabsTrigger value="text">Text</TabsTrigger>
-              <TabsTrigger value="colors">Farben</TabsTrigger>
+              <TabsTrigger value="colors">{tx({ de: 'Farben', en: 'Colours', es: 'Colores' })}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="thumbnail" className="space-y-4">
@@ -135,7 +135,7 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="thumb-color">Hintergrundfarbe</Label>
+                <Label htmlFor="thumb-color">{tx({ de: 'Hintergrundfarbe', en: 'Background colour', es: 'Color de fondo' })}</Label>
                 <Input
                   id="thumb-color"
                   type="color"
@@ -168,7 +168,7 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="small">Klein</SelectItem>
+                    <SelectItem value="small">{tx({ de: 'Klein', en: 'Small', es: 'Pequeño' })}</SelectItem>
                     <SelectItem value="medium">Mittel</SelectItem>
                     <SelectItem value="large">{tx({ de: "Groß", en: "Large", es: "Grande" })}</SelectItem>
                   </SelectContent>
@@ -176,7 +176,7 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="text-color">Textfarbe</Label>
+                <Label htmlFor="text-color">{tx({ de: 'Textfarbe', en: 'Text colour', es: 'Color del texto' })}</Label>
                 <Input
                   id="text-color"
                   type="color"

@@ -111,9 +111,9 @@ export const CompressionSettingsPanel = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="high">Hoch</SelectItem>
+                  <SelectItem value="high">{tx({ de: 'Hoch', en: 'High', es: 'Alta' })}</SelectItem>
                   <SelectItem value="medium">Mittel</SelectItem>
-                  <SelectItem value="low">Niedrig</SelectItem>
+                  <SelectItem value="low">{tx({ de: 'Niedrig', en: 'Low', es: 'Baja' })}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

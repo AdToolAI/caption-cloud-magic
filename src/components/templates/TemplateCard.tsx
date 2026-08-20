@@ -83,7 +83,7 @@ export const TemplateCard = ({
             onClick={() => onUse(template)}
           >
             <Play className="mr-2 h-4 w-4" />
-            Verwenden
+            {tx({ de: 'Verwenden', en: 'Use', es: 'Usar' })}
           </Button>
         </div>
 

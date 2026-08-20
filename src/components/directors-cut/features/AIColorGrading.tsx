@@ -141,7 +141,7 @@ export function AIColorGrading({
           {isAnalyzing ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Analysiere Farben...
+              {tx({ de: 'Analysiere Farben...', en: 'Analysing colours...', es: 'Analizando colores...' })}
             </>
           ) : (
             <>

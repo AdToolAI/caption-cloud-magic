@@ -418,7 +418,7 @@ export const InstantAvatarDemo = () => {
             {hasResult && (
               <div className="mt-5">
                 <div className="flex items-center justify-between text-[9px] uppercase tracking-[0.25em] text-muted-foreground mb-3">
-                  <span>← Ziehen</span>
+                  <span>{tx({ de: '← Ziehen', en: '← Drag', es: '← Arrastrar' })}</span>
                   <span>Pfeiltasten ↔</span>
                 </div>
                 <div

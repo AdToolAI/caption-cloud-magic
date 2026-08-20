@@ -47,7 +47,7 @@ export const VideoShareDialog = ({ open, onOpenChange, video }: VideoShareDialog
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Video teilen</DialogTitle>
+          <DialogTitle>{tx({ de: 'Video teilen', en: 'Share video', es: 'Compartir vídeo' })}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">

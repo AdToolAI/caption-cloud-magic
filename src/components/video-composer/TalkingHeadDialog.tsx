@@ -170,11 +170,11 @@ export default function TalkingHeadDialog({
 
   const commitNewCharacter = () => {
     if (!newName.trim()) {
-      toast({ title: 'Name fehlt', description: tx({ de: 'Bitte gib dem Charakter einen Namen.', en: 'Please give the character a name.', es: 'Por favor, dale un nombre al personaje.' }), variant: 'destructive' });
+      toast({ title: tx({ de: 'Name fehlt', en: 'Name missing', es: 'Falta el nombre' }), description: tx({ de: 'Bitte gib dem Charakter einen Namen.', en: 'Please give the character a name.', es: 'Por favor, dale un nombre al personaje.' }), variant: 'destructive' });
       return;
     }
     if (!newPhotoUrl) {
-      toast({ title: 'Foto fehlt', description: tx({ de: 'Bitte lade ein Foto hoch.', en: 'Please upload a photo.', es: 'Por favor sube una foto.' }), variant: 'destructive' });
+      toast({ title: tx({ de: 'Foto fehlt', en: 'Photo missing', es: 'Falta la foto' }), description: tx({ de: 'Bitte lade ein Foto hoch.', en: 'Please upload a photo.', es: 'Por favor sube una foto.' }), variant: 'destructive' });
       return;
     }
     if (!canAddToBriefing) return;
@@ -243,14 +243,14 @@ export default function TalkingHeadDialog({
   const handleGenerate = async () => {
     if (!imageUrl || !selectedCharId) {
       toast({
-        title: 'Charakter fehlt',
+        title: tx({ de: 'Charakter fehlt', en: 'Character missing', es: 'Falta el personaje' }),
         description: tx({ de: 'Bitte wähle einen Charakter aus deinem Briefing-Cast oder lege einen neuen an.', en: 'Please select a character from your briefing cast or create a new one.', es: 'Por favor, selecciona un personaje de tu elenco de briefing o crea uno nuevo.' }),
         variant: 'destructive',
       });
       return;
     }
     if (!script.trim()) {
-      toast({ title: 'Skript fehlt', description: tx({ de: 'Bitte schreibe einen Text.', en: 'Please write some text.', es: 'Por favor, escribe un texto.' }), variant: 'destructive' });
+      toast({ title: tx({ de: 'Skript fehlt', en: 'Script missing', es: 'Falta el guion' }), description: tx({ de: 'Bitte schreibe einen Text.', en: 'Please write some text.', es: 'Por favor, escribe un texto.' }), variant: 'destructive' });
       return;
     }
 

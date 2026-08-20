@@ -22,7 +22,7 @@ export const SHOT_TYPE_META: Record<
   CharacterShotType,
   { label: string; icon: any; hint: string; tone: string }
 > = {
-  full:       { label: 'Voll', icon: User,        hint: tx({ de: "Full Shot — Gesicht & Körper sichtbar (Establishing).", en: "Full Shot — Face & body visible (Establishing).", es: "Plano General — Cara y cuerpo visibles (Establecimiento)." }), tone: 'text-amber-400 border-amber-500/40 bg-amber-500/10' },
+  full:       { label: tx({ de: 'Voll', en: 'Full', es: 'Completo' }), icon: User,        hint: tx({ de: "Full Shot — Gesicht & Körper sichtbar (Establishing).", en: "Full Shot — Face & body visible (Establishing).", es: "Plano General — Cara y cuerpo visibles (Establecimiento)." }), tone: 'text-amber-400 border-amber-500/40 bg-amber-500/10' },
   profile:    { label: 'Profil', icon: UserSquare2, hint: tx({ de: 'Profil/Seitenansicht — Konsistenz über Kleidung.', en: 'Profile/Side View — Consistency over clothing.', es: 'Vista de perfil/lateral: consistencia sobre la ropa.' }), tone: 'text-sky-400 border-sky-500/40 bg-sky-500/10' },
   back:       { label: tx({ de: "Rücken", en: "Back", es: "Espalda" }), icon: Footprints,  hint: tx({ de: 'Rückenansicht / über die Schulter.', en: 'Back view / over the shoulder.', es: 'Vista posterior/sobre el hombro.' }), tone: 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10' },
   detail:     { label: 'Detail', icon: Hand,        hint: tx({ de: "Detail-Shot (Hände, Schwert, Krone) — sehr konsistent.", en: "Detail shot (hands, sword, crown) — very consistent.", es: "Toma de detalle (manos, espada, corona) — muy consistente." }), tone: 'text-violet-400 border-violet-500/40 bg-violet-500/10' },

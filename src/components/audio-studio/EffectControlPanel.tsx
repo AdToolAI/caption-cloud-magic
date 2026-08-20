@@ -87,7 +87,7 @@ const PRESETS = [
   { id: 'minimal', label: 'Minimal', icon: Settings2, config: PRESET_MINIMAL },
   { id: 'podcast', label: 'Podcast', icon: Mic, config: PRESET_PODCAST },
   { id: 'radio', label: 'Radio', icon: Radio, config: PRESET_RADIO },
-  { id: 'maximal', label: 'Maximal', icon: Zap, config: PRESET_MAXIMAL },
+  { id: 'maximal', label: tx({ de: 'Maximal', en: 'Maximum', es: 'Máximo' }), icon: Zap, config: PRESET_MAXIMAL },
 ];
 
 export function EffectControlPanel({ 

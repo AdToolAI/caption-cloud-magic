@@ -103,7 +103,7 @@ export const VersionAnalytics = ({ versions }: VersionAnalyticsProps) => {
 
       {/* Version Comparison */}
       <Card className="p-4">
-        <h3 className="text-sm font-medium mb-4">Versions-Vergleich</h3>
+        <h3 className="text-sm font-medium mb-4">{tx({ de: 'Versions-Vergleich', en: 'Version comparison', es: 'Comparación de versiones' })}</h3>
         <div className="space-y-2">
           {versions.sort((a, b) => (b.download_count || 0) - (a.download_count || 0)).map((version) => {
             const isBest = version.id === bestPerformer?.id;

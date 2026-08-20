@@ -95,7 +95,7 @@ export function TestPerformanceComparison({ variants, targetMetric }: Props) {
       <div className="grid grid-cols-2 gap-6">
         {/* Bar Chart */}
         <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Metriken-Vergleich</h3>
+          <h3 className="text-lg font-semibold mb-4">{tx({ de: 'Metriken-Vergleich', en: 'Metrics comparison', es: 'Comparación de métricas' })}</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={barChartData}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -136,7 +136,7 @@ export function TestPerformanceComparison({ variants, targetMetric }: Props) {
 
       {/* Detailed Comparison Table */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Detaillierter Vergleich</h3>
+        <h3 className="text-lg font-semibold mb-4">{tx({ de: 'Detaillierter Vergleich', en: 'Detailed comparison', es: 'Comparación detallada' })}</h3>
         <div className="space-y-3">
           {sortedVariants.map((variant, idx) => {
             const metricValue = getMetricValue(variant);

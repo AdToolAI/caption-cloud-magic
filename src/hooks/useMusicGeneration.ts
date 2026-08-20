@@ -86,7 +86,7 @@ export function useMusicGeneration() {
             },
           });
         } else if (code === 'RATE_LIMIT') {
-          toast.error('Rate limit erreicht', { description: tx({ de: 'Bitte kurz warten und erneut versuchen.', en: 'Please wait briefly and try again.', es: 'Espera un momento y vuelve a intentarlo.' }) });
+          toast.error(tx({ de: 'Rate limit erreicht', en: 'Rate limit reached', es: 'Límite de solicitudes alcanzado' }), { description: tx({ de: 'Bitte kurz warten und erneut versuchen.', en: 'Please wait briefly and try again.', es: 'Espera un momento y vuelve a intentarlo.' }) });
         } else if (code === 'MISSING_LYRICS') {
           toast.error(tx({ de: 'Lyrics fehlen', en: 'Lyrics missing', es: 'Faltan las letras' }), { description: tx({ de: 'Für Vocal-Tracks bitte Songtext eingeben.', en: 'Please enter lyrics for vocal tracks.', es: 'Por favor, introduce la letra para las pistas vocales.' }) });
         } else {

@@ -74,7 +74,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   {
     command: '/help',
     label: tx({ de: "Hilfe", en: "Help", es: "Ayuda" }),
-    description: tx({ de: 'Zeigt alle verfügbaren {tx({ de: "Befehle", en: "Commands", es: "Comandos" })}', en: 'Shows all available commands', es: 'Muestra todos los comandos disponibles' }),
+    description: tx({ de: 'Zeigt alle verfügbaren Befehle', en: 'Shows all available commands', es: 'Muestra todos los comandos disponibles' }),
     icon: <HelpCircle className="w-4 h-4" />,
     category: 'help'
   }

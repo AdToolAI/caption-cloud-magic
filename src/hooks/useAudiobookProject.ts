@@ -217,7 +217,7 @@ export function useAudiobookProject() {
         throw new Error(message);
       }
       toast.success(`„${chapter.title}" vertont`, {
-        description: `${((data?.cost ?? 0) as number).toFixed(2)} € verbraucht`,
+        description: tx({ de: `${((data?.cost ?? 0) as number).toFixed(2)} € verbraucht`, en: `${((data?.cost ?? 0) as number).toFixed(2)} € used`, es: `${((data?.cost ?? 0) as number).toFixed(2)} € consumidos` }),
       });
       await loadChapters(project.id);
     } catch (err) {

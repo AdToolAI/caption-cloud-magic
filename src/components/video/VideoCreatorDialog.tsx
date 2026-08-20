@@ -624,7 +624,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                       />
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                          ✓ Script bereit
+                          {tx({ de: '✓ Script bereit', en: '✓ Script ready', es: '✓ Guion listo' })}
                         </Badge>
                         <span>{tx({ de: "Wird für Voiceover, intelligentes Timing und Untertitel verwendet", en: "Used for voiceover, intelligent timing, and subtitles", es: "Se utiliza para voz en off, temporización inteligente y subtítulos" })}</span>
                       </div>

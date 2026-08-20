@@ -202,7 +202,7 @@ export function LayerInspector({
               }}
             />
             <ColorRow
-              label="Textfarbe"
+              label={tx({ de: 'Textfarbe', en: 'Text colour', es: 'Color del texto' })}
               value={(layer as BadgeLayer).color}
               palette={design.palette}
               onPick={(c) => {
@@ -251,8 +251,8 @@ export function LayerInspector({
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="bottom">Unten</SelectItem>
-                  <SelectItem value="top">Oben</SelectItem>
+                  <SelectItem value="bottom">{tx({ de: 'Unten', en: 'Bottom', es: 'Abajo' })}</SelectItem>
+                  <SelectItem value="top">{tx({ de: 'Oben', en: 'Top', es: 'Arriba' })}</SelectItem>
                   <SelectItem value="left">Links</SelectItem>
                   <SelectItem value="full">{tx({ de: "Ganzflächig", en: "Full-width", es: "Ancho completo" })}</SelectItem>
                 </SelectContent>
@@ -286,10 +286,10 @@ export function LayerInspector({
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="rect">Rechteck</SelectItem>
-                  <SelectItem value="pill">Pille</SelectItem>
-                  <SelectItem value="circle">Kreis</SelectItem>
-                  <SelectItem value="line">Linie</SelectItem>
-                  <SelectItem value="gradient">Verlauf</SelectItem>
+                  <SelectItem value="pill">{tx({ de: 'Pille', en: 'Pill', es: 'Píldora' })}</SelectItem>
+                  <SelectItem value="circle">{tx({ de: 'Kreis', en: 'Circle', es: 'Círculo' })}</SelectItem>
+                  <SelectItem value="line">{tx({ de: 'Linie', en: 'Line', es: 'Línea' })}</SelectItem>
+                  <SelectItem value="gradient">{tx({ de: 'Verlauf', en: 'Gradient', es: 'Degradado' })}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -323,8 +323,8 @@ export const VIDEO_CATEGORIES: VideoCategoryInfo[] = [
     icon: '🏢',
     color: 'from-blue-500 to-indigo-500',
     recommendedDuration: tx({ de: '15-90 Sekunden', en: '15-90 seconds', es: '15-90 segundos' }),
-    exampleUseCase: 'TV-Spot, Online-Werbung, Social Media Ads, Imagefilm',
-    features: ['AIDA-Struktur', 'Starke CTAs', 'Professioneller Ton']
+    exampleUseCase: tx({ de: 'TV-Spot, Online-Werbung, Social Media Ads, Imagefilm', en: 'TV spot, online advertising, social media ads, brand film', es: 'Anuncio de TV, publicidad online, anuncios en redes sociales, película de marca' }),
+    features: [tx({ de: 'AIDA-Struktur', en: 'AIDA structure', es: 'Estructura AIDA' }), tx({ de: 'Starke CTAs', en: 'Strong CTAs', es: 'CTA potentes' }), tx({ de: 'Professioneller Ton', en: 'Professional tone', es: 'Tono profesional' })]
   },
   {
     category: 'product-ad',
@@ -334,7 +334,7 @@ export const VIDEO_CATEGORIES: VideoCategoryInfo[] = [
     color: 'from-green-500 to-emerald-500',
     recommendedDuration: tx({ de: '15-90 Sekunden', en: '15-90 seconds', es: '15-90 segundos' }),
     exampleUseCase: 'Produktlaunch, E-Commerce, Unboxing, Feature-Demo',
-    features: ['Produktbilder-Upload', 'KI-Bildbearbeitung', tx({ de: "Kreative Drehbücher", en: "Creative Storyboards", es: "Guiones Creativos" })]
+    features: ['Produktbilder-Upload', tx({ de: 'KI-Bildbearbeitung', en: 'AI image editing', es: 'Edición de imágenes con IA' }), tx({ de: "Kreative Drehbücher", en: "Creative Storyboards", es: "Guiones Creativos" })]
   },
   {
     category: 'storytelling',
@@ -354,7 +354,7 @@ export const VIDEO_CATEGORIES: VideoCategoryInfo[] = [
     color: 'from-violet-500 to-purple-600',
     recommendedDuration: 'Flexibel',
     exampleUseCase: tx({ de: "Tutorial, Erklärvideo, Social Content, Event, Promo", en: "Tutorial, explainer video, social content, event, promo", es: "Tutorial, video explicativo, contenido social, evento, promoción" }),
-    features: [tx({ de: 'Volle Flexibilität', en: 'Full flexibility', es: 'Flexibilidad total' }), 'Individuelle Struktur', 'Kreative Freiheit']
+    features: [tx({ de: 'Volle Flexibilität', en: 'Full flexibility', es: 'Flexibilidad total' }), tx({ de: 'Individuelle Struktur', en: 'Custom structure', es: 'Estructura personalizada' }), tx({ de: 'Kreative Freiheit', en: 'Creative freedom', es: 'Libertad creativa' })]
   }
 ];
 

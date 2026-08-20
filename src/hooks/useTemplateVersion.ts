@@ -134,7 +134,7 @@ export const useTemplateVersion = (templateId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['templates'] });
       queryClient.invalidateQueries({ queryKey: ['template-versions'] });
       toast({
-        title: 'Version wiederhergestellt',
+        title: tx({ de: 'Version wiederhergestellt', en: 'Version restored', es: 'Versión restaurada' }),
         description: tx({ de: 'Das Template wurde auf diese Version zurückgesetzt.', en: 'The template has been reset to this version.', es: 'La plantilla se ha restablecido a esta versión.' }),
       });
     },

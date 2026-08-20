@@ -16,7 +16,7 @@ export const UsageChart = ({ data }: UsageChartProps) => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <TrendingUp className="w-5 h-5" />
-          Credit-Verbrauch
+          {tx({ de: 'Credit-Verbrauch', en: 'Credit usage', es: 'Consumo de créditos' })}
         </CardTitle>
         <CardDescription>
           {tx({ de: "Täglicher Verbrauch über die Zeit", en: "Daily consumption over time", es: "Consumo diario a lo largo del tiempo" })}

@@ -56,7 +56,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   // ---- Lower Thirds ----
   {
     id: 'lt-bar',
-    name: 'Lower Third — Balken',
+    name: tx({ de: 'Lower Third — Balken', en: 'Lower third — bar', es: 'Rótulo inferior — barra' }),
     category: 'Lower Third',
     description: tx({ de: 'Name und Rolle mit Akzentkante', en: 'Name and role with accent border', es: 'Nombre y rol con borde de acento' }),
     kind: 'lowerThird',
@@ -70,7 +70,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   },
   {
     id: 'lt-line',
-    name: 'Lower Third — Linie',
+    name: tx({ de: 'Lower Third — Linie', en: 'Lower third — line', es: 'Rótulo inferior — línea' }),
     category: 'Lower Third',
     description: tx({ de: 'Reduziert, ohne Fläche', en: 'Reduced, without space', es: 'Reducido, sin espacio' }),
     kind: 'lowerThird',
@@ -84,7 +84,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   },
   {
     id: 'lt-glass',
-    name: 'Lower Third — Glas',
+    name: tx({ de: 'Lower Third — Glas', en: 'Lower third — glass', es: 'Rótulo inferior — cristal' }),
     category: 'Lower Third',
     description: tx({ de: 'Glasoptik mit weichem Rand', en: 'Glass look with soft edge', es: 'Aspecto de cristal con borde suave.' }),
     kind: 'lowerThird',
@@ -100,7 +100,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   // ---- Banner ----
   {
     id: 'banner-bottom',
-    name: 'Banner unten',
+    name: tx({ de: 'Banner unten', en: 'Banner bottom', es: 'Banner inferior' }),
     category: 'Banner',
     description: tx({ de: 'Vollbreiter Balken mit Aussage', en: 'Full-width bar with a statement', es: 'Barra de ancho completo con una declaración.' }),
     kind: 'banner',
@@ -108,7 +108,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   },
   {
     id: 'banner-top-gold',
-    name: 'Banner oben — Gold',
+    name: tx({ de: 'Banner oben — Gold', en: 'Banner top — gold', es: 'Banner superior — oro' }),
     category: 'Banner',
     description: tx({ de: 'Goldverlauf für Ankündigungen', en: 'Gold gradient for announcements', es: 'Degradado dorado para anuncios.' }),
     kind: 'banner',
@@ -122,7 +122,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   },
   {
     id: 'banner-half',
-    name: 'Banner halb',
+    name: tx({ de: 'Banner halb', en: 'Banner half', es: 'Banner medio' }),
     category: 'Banner',
     description: tx({ de: 'Halbbreiter Balken mit Unterzeile', en: 'Half-width bar with subline', es: 'Barra de medio ancho con sublínea' }),
     kind: 'banner',
@@ -211,9 +211,9 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     build: () =>
       base(
         'card',
-        '14,99 € / Monat',
+        tx({ de: '14,99 € / Monat', en: '€14.99 / month', es: '14,99 € / mes' }),
         { fill: 'rgba(10,10,15,0.85)', color: GOLD, align: 'left', fontSizeRel: 0.042 },
-        { animation: 'pop', box: { x: 0.08, y: 0.62, w: 0.4, h: 0.18 }, slots: { title: '14,99 € / Monat', subtitle: tx({ de: 'jederzeit kündbar', en: 'cancel at any time', es: 'cancelable en cualquier momento' }) } },
+        { animation: 'pop', box: { x: 0.08, y: 0.62, w: 0.4, h: 0.18 }, slots: { title: tx({ de: '14,99 € / Monat', en: '€14.99 / month', es: '14,99 € / mes' }), subtitle: tx({ de: 'jederzeit kündbar', en: 'cancel at any time', es: 'cancelable en cualquier momento' }) } },
       ),
   },
 

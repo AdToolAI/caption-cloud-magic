@@ -120,7 +120,7 @@ export default function MusicBrowser() {
     }
     if (quota.exceeded) {
       toast({
-        title: 'Monatslimit erreicht',
+        title: tx({ de: 'Monatslimit erreicht', en: 'Monthly limit reached', es: 'Límite mensual alcanzado' }),
         description: tx({ de: 'Upgrade für unbegrenzte Downloads.', en: 'Upgrade for unlimited downloads.', es: 'Actualice para descargas ilimitadas.' }),
         variant: 'destructive',
       });

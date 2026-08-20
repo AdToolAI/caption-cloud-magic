@@ -113,8 +113,8 @@ export function AutoCutDownDialog({
             </div>
             <div className="text-xs text-white/60">{plan.reason}</div>
             <div className="grid grid-cols-3 gap-2 pt-1 text-center">
-              <Stat label="Behalten" value={`${plan.keptIndexes.length}`} />
-              <Stat label="Verworfen" value={`${plan.droppedIndexes.length}`} />
+              <Stat label={tx({ de: 'Behalten', en: 'Kept', es: 'Conservados' })} value={`${plan.keptIndexes.length}`} />
+              <Stat label={tx({ de: 'Verworfen', en: 'Dropped', es: 'Descartados' })} value={`${plan.droppedIndexes.length}`} />
               <Stat
                 label="Shrink"
                 value={`${Math.round(plan.shrinkRatio * 100)}%`}

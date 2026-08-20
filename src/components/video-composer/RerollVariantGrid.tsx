@@ -56,7 +56,7 @@ export default function RerollVariantGrid({
     if (busy || anyGenerating) return;
     if (!hasPrompt) {
       toast({
-        title: 'Prompt fehlt',
+        title: tx({ de: 'Prompt fehlt', en: 'Prompt missing', es: 'Falta el prompt' }),
         description: tx({ de: 'Bitte zuerst einen Prompt schreiben.', en: 'Please write a prompt first.', es: 'Por favor, escribe un prompt primero.' }),
         variant: 'destructive',
       });

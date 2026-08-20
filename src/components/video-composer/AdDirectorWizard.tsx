@@ -717,7 +717,7 @@ export default function AdDirectorWizard({
                     <div className="flex-1">
                       <div className="flex items-center justify-between gap-3">
                         <Label htmlFor="ad-brandkit" className="cursor-pointer">
-                          Brand-Kit verwenden
+                          {tx({ de: 'Brand-Kit verwenden', en: 'Use brand kit', es: 'Usar kit de marca' })}
                         </Label>
                         <Switch
                           id="ad-brandkit"

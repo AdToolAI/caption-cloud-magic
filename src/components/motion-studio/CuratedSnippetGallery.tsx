@@ -237,7 +237,7 @@ function SnippetCard({
             onClick={() => onUse(snippet)}
           >
             <Sparkles className="h-3 w-3" />
-            Verwenden
+            {tx({ de: 'Verwenden', en: 'Use', es: 'Usar' })}
           </Button>
         </div>
       </div>

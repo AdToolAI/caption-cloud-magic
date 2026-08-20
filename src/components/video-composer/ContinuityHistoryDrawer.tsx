@@ -45,7 +45,7 @@ export default function ContinuityHistoryDrawer({ open, onOpenChange, projectId 
         <DrawerHeader>
           <DrawerTitle className="flex items-center gap-2">
             <History className="h-5 w-5 text-primary" />
-            Continuity-Verlauf
+            {tx({ de: 'Continuity-Verlauf', en: 'Continuity history', es: 'Historial de continuidad' })}
           </DrawerTitle>
           <DrawerDescription>
             {tx({ de: "Alle Drift-Prüfungen dieses Projekts, neueste zuerst.", en: "All drift checks for this project, newest first.", es: "Todas las comprobaciones de deriva de este proyecto, las más recientes primero." })}
@@ -54,7 +54,7 @@ export default function ContinuityHistoryDrawer({ open, onOpenChange, projectId 
         <ScrollArea className="px-4 pb-6 max-h-[70vh]">
           {loading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin mr-2" /> Lade Verlauf …
+              <Loader2 className="h-5 w-5 animate-spin mr-2" /> {tx({ de: 'Lade Verlauf …', en: 'Loading history …', es: 'Cargando historial …' })}
             </div>
           ) : entries.length === 0 ? (
             <div className="text-center py-12 text-sm text-muted-foreground">

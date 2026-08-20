@@ -88,7 +88,7 @@ export default function VideoBrowser() {
 
       {loading && results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" /> Lade Videos …
+          <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" /> {tx({ de: 'Lade Videos …', en: 'Loading videos …', es: 'Cargando vídeos …' })}
         </Card>
       ) : results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">{tx({ de: "Keine Treffer.", en: "No hits.", es: "Sin aciertos." })}</Card>

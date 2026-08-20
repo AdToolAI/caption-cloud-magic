@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * FounderPriorityChip — inline hint next to render/generate buttons.
  *
@@ -28,7 +29,7 @@ export function FounderPriorityChip({ className = '' }: Props) {
         className={`inline-flex items-center gap-1.5 rounded-full border border-primary/45 bg-gradient-to-r from-primary/15 via-primary/5 to-primary/15 px-2.5 py-1 text-xs font-medium text-primary shadow-[0_0_18px_-6px_hsl(var(--primary)/0.7)] ${className}`}
       >
         <Crown className="h-3 w-3" />
-        Priority-Slot aktiv
+        {tx({ de: 'Priority-Slot aktiv', en: 'Priority slot active', es: 'Espacio prioritario activo' })}
       </span>
     );
   }
@@ -39,7 +40,7 @@ export function FounderPriorityChip({ className = '' }: Props) {
         className={`inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/5 px-2.5 py-1 text-xs text-amber-500/90 ${className}`}
       >
         <TriangleAlert className="h-3 w-3" />
-        System stark ausgelastet · Retry aktiv
+        {tx({ de: 'System stark ausgelastet · Retry aktiv', en: 'System under heavy load · retry active', es: 'Sistema muy cargado · reintento activo' })}
       </span>
     );
   }

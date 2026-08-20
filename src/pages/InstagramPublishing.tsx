@@ -1022,7 +1022,7 @@ export default function InstagramPublishing() {
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">2</span>
                       <div>
                         <p className="font-medium">{tx({ de: "Wähle deine App", en: "Choose your app", es: "Elige tu aplicación" })}</p>
-                        <p className="text-muted-foreground">Oben rechts: <strong>AdTool AI Integration</strong></p>
+                        <p className="text-muted-foreground">{tx({ de: 'Oben rechts:', en: 'Top right:', es: 'Arriba a la derecha:' })} <strong>AdTool AI Integration</strong></p>
                       </div>
                     </li>
                     <li className="flex gap-3">

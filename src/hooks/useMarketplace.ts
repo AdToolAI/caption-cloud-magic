@@ -96,7 +96,7 @@ export function useTemplatePurchase() {
         return;
       }
       if (result.already_owned) {
-        toast({ title: 'Bereits gekauft', description: tx({ de: 'Du besitzt dieses Template bereits.', en: 'You already own this template.', es: 'Ya posees esta plantilla.' }) });
+        toast({ title: tx({ de: 'Bereits gekauft', en: 'Already purchased', es: 'Ya comprado' }), description: tx({ de: 'Du besitzt dieses Template bereits.', en: 'You already own this template.', es: 'Ya posees esta plantilla.' }) });
       } else if (result.price_credits === 0) {
         toast({ title: tx({ de: 'Template hinzugefügt', en: 'Added template', es: 'Plantilla agregada' }), description: tx({ de: 'Free-Template ist jetzt in deiner Bibliothek.', en: 'Free template is now in your library.', es: 'La plantilla gratuita ya está en tu biblioteca.' }) });
       } else {

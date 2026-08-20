@@ -134,7 +134,7 @@ export function PostMediaUploader({
         </div>
         <div className="absolute bottom-2 right-2">
           <div className="bg-green-500/90 text-white px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 shadow-lg">
-            ✓ Hochgeladen
+            {tx({ de: '✓ Hochgeladen', en: '✓ Uploaded', es: '✓ Subido' })}
           </div>
         </div>
       </div>
