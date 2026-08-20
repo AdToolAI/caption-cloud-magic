@@ -83,8 +83,16 @@ serve(async (req) => {
 
   if (found) {
     userId = found.id;
+    // Reset password so the caller can hand it to the user.
+    generatedPassword = randomPassword(12);
+    const { error: updateError } = await admin.auth.admin.updateUserById(userId, {
+      password: generatedPassword,
+    });
+    if (updateError) {
+      return json({ error: "password_reset_failed", details: updateError.message }, 400);
+    }
   } else {
-    generatedPassword = randomPassword(10);
+    generatedPassword = randomPassword(12);
     const { data: created, error: createError } = await admin.auth.admin.createUser({
       email,
       password: generatedPassword,
