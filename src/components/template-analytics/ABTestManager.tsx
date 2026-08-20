@@ -280,8 +280,11 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                 <div className="flex items-center justify-center gap-2 p-4 bg-primary/10 rounded-lg">
                   <Trophy className="h-5 w-5 text-primary" />
                   <span className="font-medium">
-                    Gewinner: Variante {testResults.results.winner} 
-                    (+{testResults.results.winner_lift.toFixed(1)}% Improvement)
+                    {tx({
+                      de: `Gewinner: Variante ${testResults.results.winner} (+${testResults.results.winner_lift.toFixed(1)}% Verbesserung)`,
+                      en: `Winner: Variant ${testResults.results.winner} (+${testResults.results.winner_lift.toFixed(1)}% improvement)`,
+                      es: `Ganador: Variante ${testResults.results.winner} (+${testResults.results.winner_lift.toFixed(1)}% de mejora)`,
+                    })}
                   </span>
                 </div>
               )}
