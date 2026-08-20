@@ -79,7 +79,7 @@ export default function LocationLightingGrid({
         const persisted =
           (await persistRemoteImage(data.imageUrl, 'location', location.id)) ?? data.imageUrl;
         await insertLocationVariant(location.id, preset.id, persisted, data.seed ?? null);
-        toast.success(`„${preset.label}" generiert ✨`);
+        toast.success(tx({ de: `„${preset.label}" generiert ✨`, en: `"${preset.label}" generated ✨`, es: `«${preset.label}» generado ✨` }));
         await reload();
       } catch (err) {
         const msg = err instanceof Error ? err.message : tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' });

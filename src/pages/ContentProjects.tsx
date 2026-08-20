@@ -193,7 +193,7 @@ export default function ContentProjects() {
                               onClick={() => window.open(outputUrls[0], "_blank")}
                             >
                               <Play className="h-4 w-4 mr-2" />
-                              Ansehen
+                              {tx({ de: 'Ansehen', en: 'View', es: 'Ver' })}
                             </Button>
                             <Button
                               size="sm"

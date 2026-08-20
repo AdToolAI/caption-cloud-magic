@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -63,7 +64,7 @@ export const VideoTemplateCard = ({ template, onSelect }: VideoTemplateCardProps
             onClick={handleUseTemplate}
           >
             <Video className="h-4 w-4 mr-2" />
-            Template verwenden
+            {tx({ de: 'Template verwenden', en: 'Use template', es: 'Usar plantilla' })}
           </Button>
           <Button 
             variant="outline" 

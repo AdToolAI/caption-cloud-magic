@@ -385,7 +385,7 @@ export function AudioBeforeAfterComparison({
                   <Volume2 className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Vorher/Nachher Vergleich</h3>
+                  <h3 className="font-semibold">{tx({ de: 'Vorher/Nachher Vergleich', en: 'Before/after comparison', es: 'Comparación antes/después' })}</h3>
                   <p className="text-xs text-muted-foreground">{tx({ de: "Drücke A (Original) oder B (Optimiert) zum schnellen Wechseln", en: "Press A (Original) or B (Optimized) to switch quickly", es: "Pulsa A (Original) o B (Optimizado) para cambiar rápidamente" })}</p>
                 </div>
               </div>
@@ -412,9 +412,9 @@ export function AudioBeforeAfterComparison({
                   className="gap-1"
                 >
                   {showEffectPanel ? (
-                    <>Effekte ausblenden <ChevronRight className="w-4 h-4" /></>
+                    <>{tx({ de: 'Effekte ausblenden', en: 'Hide effects', es: 'Ocultar efectos' })} <ChevronRight className="w-4 h-4" /></>
                   ) : (
-                    <>Effekte einblenden <ChevronLeft className="w-4 h-4" /></>
+                    <>{tx({ de: 'Effekte einblenden', en: 'Show effects', es: 'Mostrar efectos' })} <ChevronLeft className="w-4 h-4" /></>
                   )}
                 </Button>
               </div>
@@ -651,7 +651,7 @@ export function AudioBeforeAfterComparison({
               {isSaving ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Speichert...
+                  {tx({ de: 'Speichert...', en: 'Saving...', es: 'Guardando...' })}
                 </>
               ) : (
                 <>

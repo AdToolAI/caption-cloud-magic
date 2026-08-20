@@ -64,7 +64,7 @@ export const ASSET_ROLES: Record<AssetRole, AssetRoleSpec> = {
   },
   style: {
     id: 'style',
-    label: 'Stil-Referenz',
+    label: tx({ de: 'Stil-Referenz', en: 'Style reference', es: 'Style reference' }),
     hint: tx({ de: 'Nur Farbwelt, Licht und Look werden übernommen — nie der Bildinhalt.', en: 'Only color palette, light and look are taken over — never the image content.', es: 'Solo se toman la paleta de colores, la luz y el estilo — nunca el contenido de la imagen.' }),
     useAsImageReference: true,
     useAsOverlay: false,

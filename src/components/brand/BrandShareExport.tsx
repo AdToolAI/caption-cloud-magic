@@ -79,7 +79,7 @@ export function BrandShareExport({ brandKit, onTokenChange }: Props) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Share2 className="h-4 w-4 text-primary" />
-          Teilen & Export
+          {tx({ de: 'Teilen & Export', en: 'Share & export', es: 'Compartir y exportar' })}
         </CardTitle>
         <CardDescription>{tx({ de: "Read-only Link für Kunden, oder PDF-Guidelines.", en: "Read-only link for customers, or PDF guidelines.", es: "Enlace de solo lectura para clientes, o directrices en PDF." })}</CardDescription>
       </CardHeader>

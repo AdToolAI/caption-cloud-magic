@@ -226,7 +226,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                         {test.status === 'draft' && (
                           <Button size="sm" onClick={() => handleStartTest(test.id)}>
                             <Play className="h-4 w-4 mr-1" />
-                            Starten
+                            {tx({ de: 'Starten', en: 'Start', es: 'Iniciar' })}
                           </Button>
                         )}
                         {test.status === 'active' && (
@@ -236,7 +236,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                               {tx({ de: "Pausieren", en: "Pause", es: "Pausar" })}
                             </Button>
                             <Button size="sm" onClick={() => handleViewResults(test)}>
-                              Ergebnisse
+                              {tx({ de: 'Ergebnisse', en: 'Results', es: 'Resultados' })}
                             </Button>
                           </>
                         )}

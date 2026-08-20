@@ -866,7 +866,7 @@ export function AICompanionWidget() {
                               onClick={() => setShouldOfferEscalation(false)}
                               className="h-7 text-xs"
                             >
-                              Nein, danke
+                              {tx({ de: 'Nein, danke', en: 'No, thanks', es: 'No, gracias' })}
                             </Button>
                           </div>
                         </div>

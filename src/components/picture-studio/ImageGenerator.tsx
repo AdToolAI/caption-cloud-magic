@@ -760,7 +760,7 @@ export function ImageGenerator() {
                   {mode === 'transform' ? (
                     <><ImageIcon className="h-3.5 w-3.5 text-primary" /> {tx({ de: "Vorlage-Bild (wird verwandelt)", en: "Template image (will be transformed)", es: "Imagen de plantilla (se transformará)" })}</>
                   ) : (
-                    <><Palette className="h-3.5 w-3.5 text-primary" /> Stil-Referenz (Farben/Mood)</>
+                    <><Palette className="h-3.5 w-3.5 text-primary" /> {tx({ de: 'Stil-Referenz (Farben/Mood)', en: 'Style reference (colours/mood)', es: 'Referencia de estilo (colores/ambiente)' })}</>
                   )}
                 </Label>
                 {(mode === 'transform' ? referenceImage : styleReference) && (

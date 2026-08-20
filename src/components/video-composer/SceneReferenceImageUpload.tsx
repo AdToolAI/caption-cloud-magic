@@ -135,7 +135,7 @@ export default function SceneReferenceImageUpload({
         <div className="flex items-center justify-between">
           <span className="text-[10px] text-primary flex items-center gap-1.5">
             <Sparkles className="h-3 w-3" />
-            Referenzbild aktiv
+            {tx({ de: 'Referenzbild aktiv', en: 'Reference image active', es: 'Imagen de referencia activa' })}
           </span>
           <Button
             size="sm"
@@ -167,7 +167,7 @@ export default function SceneReferenceImageUpload({
     <div className="space-y-1">
       <span className="text-[10px] text-muted-foreground flex items-center gap-1">
         <ImageIcon className="h-3 w-3" />
-        Referenzbild (optional)
+        {tx({ de: 'Referenzbild (optional)', en: 'Reference image (optional)', es: 'Imagen de referencia (opcional)' })}
       </span>
       <div
         onDrop={handleDrop}

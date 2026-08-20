@@ -513,7 +513,7 @@ export default function Planner() {
   };
 
   const scrollToDate = (date: Date) => {
-    toast.info(`Springe zu ${format(date, "dd.MM.yyyy")}`);
+    toast.info(tx({ de: `Springe zu ${format(date, "dd.MM.yyyy")}`, en: `Jumping to ${format(date, "dd.MM.yyyy")}`, es: `Saltando a ${format(date, "dd.MM.yyyy")}` }));
   };
 
   // Keyboard shortcuts

@@ -82,7 +82,7 @@ export function TemplateDrawer({ open, onOpenChange }: { open: boolean; onOpenCh
                     onOpenChange(false);
                   }}
                 >
-                  Verwenden
+                  {tx({ de: 'Verwenden', en: 'Use', es: 'Usar' })}
                 </Button>
                 <Button size="icon" variant="ghost" onClick={() => remove(item.id)} aria-label={tx({ de: "Vorlage löschen", en: "Delete template", es: "Eliminar plantilla" })}>
                   <Trash2 className="h-4 w-4" />

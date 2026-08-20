@@ -72,7 +72,7 @@ export default function PhotoBrowser() {
     }
     if (quota.exceeded) {
       toast({
-        title: 'Monatslimit erreicht',
+        title: tx({ de: 'Monatslimit erreicht', en: 'Monthly limit reached', es: 'Límite mensual alcanzado' }),
         description: tx({ de: 'Upgrade auf einen Paid-Plan für unbegrenzte Downloads.', en: 'Upgrade to a paid plan for unlimited downloads.', es: 'Actualiza a un plan de pago para descargas ilimitadas.' }),
         variant: 'destructive',
       });

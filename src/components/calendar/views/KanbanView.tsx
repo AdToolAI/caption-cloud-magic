@@ -345,7 +345,7 @@ export function KanbanView({
               {settings.sort === "date_desc" ? "✓ " : ""}Datum absteigend
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>Spalten</DropdownMenuLabel>
+            <DropdownMenuLabel>{tx({ de: 'Spalten', en: 'Columns', es: 'Columnas' })}</DropdownMenuLabel>
             {DEFAULT_COLUMNS.map((c) => (
               <DropdownMenuCheckboxItem
                 key={c.key}
@@ -579,7 +579,7 @@ function Column({
             >
               <Plus className="h-4 w-4 text-muted-foreground/60" />
             </div>
-            <div className="text-[11px] text-muted-foreground/70 tracking-wide">leer</div>
+            <div className="text-[11px] text-muted-foreground/70 tracking-wide">{tx({ de: 'leer', en: 'empty', es: 'vacío' })}</div>
           </div>
         ) : (
           posts.map((p) => (

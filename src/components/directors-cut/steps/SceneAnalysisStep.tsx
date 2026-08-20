@@ -425,7 +425,7 @@ export function SceneAnalysisStep({
     };
     
     onApplySuggestions({}, { [sceneId]: newEffects });
-    toast.success(`Filter "${filterId}" angewendet`);
+    toast.success(tx({ de: `Filter "${filterId}" angewendet`, en: `Filter "${filterId}" applied`, es: `Filtro "${filterId}" aplicado` }));
   }, [sceneEffects, onApplySuggestions]);
 
   // Set a specific effect value for a scene
@@ -674,7 +674,7 @@ export function SceneAnalysisStep({
                   return (
                     <Badge variant="secondary" className="ml-2 text-xs bg-primary/20 text-primary">
                       <Check className="w-3 h-3 mr-1" />
-                      Effekte aktiv
+                      {tx({ de: 'Effekte aktiv', en: 'Effects active', es: 'Efectos activos' })}
                     </Badge>
                   );
                 }
@@ -877,7 +877,7 @@ export function SceneAnalysisStep({
                           </Badge>
                           {hasEffects && (
                             <Badge variant="secondary" className="bg-green-500/20 text-green-700 dark:text-green-400">
-                              Effekte aktiv
+                              {tx({ de: 'Effekte aktiv', en: 'Effects active', es: 'Efectos activos' })}
                             </Badge>
                           )}
                           {sceneTransitions[scene.id]?.type && sceneTransitions[scene.id]?.type !== 'none' && (
@@ -1078,7 +1078,7 @@ export function SceneAnalysisStep({
                           {index < scenes.length - 1 ? (
                             <div className="space-y-2">
                               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                <span>Szenenende verschieben</span>
+                                <span>{tx({ de: 'Szenenende verschieben', en: 'Move scene end', es: 'Mover el final de la escena' })}</span>
                                 <span>{formatTime(scene.end_time)}</span>
                               </div>
                               <Slider

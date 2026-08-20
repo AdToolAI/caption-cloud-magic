@@ -103,7 +103,7 @@ export const BlackTieHero = () => {
               <button
                 type="button"
                 onClick={() => setFoundersOpen(true)}
-                aria-label="Founders-Vorteile ansehen"
+                aria-label={tx({ de: 'Founders-Vorteile ansehen', en: 'View founder benefits', es: 'Ver ventajas de fundador' })}
                 className="group flex items-center gap-8 rounded-2xl border border-transparent hover:border-primary/40 hover:bg-primary/5 px-6 py-3 transition-all duration-300 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
               >
                 <div className="text-center">

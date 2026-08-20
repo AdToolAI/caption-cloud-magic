@@ -330,7 +330,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={onSplitAtPlayhead}
-                title={`Am Playhead teilen (${currentTime.toFixed(2)}s)`}
+                title={tx({ de: `Am Playhead teilen (${currentTime.toFixed(2)}s)`, en: `Split at playhead (${currentTime.toFixed(2)}s)`, es: `Dividir en el cabezal (${currentTime.toFixed(2)}s)` })}
                 className="border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10"
               >
                 <Scissors className="h-3.5 w-3.5 mr-1.5" />
@@ -346,11 +346,11 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => onSplitAtTrim(scene.id)}
-                title={`An Trim-Grenzen teilen (${srcIn.toFixed(2)}s / ${srcOut.toFixed(2)}s)`}
+                title={tx({ de: `An Trim-Grenzen teilen (${srcIn.toFixed(2)}s / ${srcOut.toFixed(2)}s)`, en: `Split at trim bounds (${srcIn.toFixed(2)}s / ${srcOut.toFixed(2)}s)`, es: `Dividir en los límites de recorte (${srcIn.toFixed(2)}s / ${srcOut.toFixed(2)}s)` })}
                 className="border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10"
               >
                 <Scissors className="h-3.5 w-3.5 mr-1.5" />
-                An Trim teilen
+                {tx({ de: 'An Trim teilen', en: 'Split at trim', es: 'Dividir en el recorte' })}
               </Button>
             );
           }

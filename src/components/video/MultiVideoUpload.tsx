@@ -81,7 +81,7 @@ export function MultiVideoUpload({
     }
 
     if (value.length + videoFiles.length > maxFiles) {
-      toast.error(`Maximal ${maxFiles} Videos erlaubt`);
+      toast.error(tx({ de: `Maximal ${maxFiles} Videos erlaubt`, en: `A maximum of ${maxFiles} videos is allowed`, es: `Se permiten como máximo ${maxFiles} vídeos` }));
       return;
     }
 

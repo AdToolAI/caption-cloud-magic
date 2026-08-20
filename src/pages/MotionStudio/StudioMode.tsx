@@ -607,7 +607,7 @@ function LocationStep({
         subtitle={tx({ de: "Wähle einen Schauplatz aus deiner Library oder lege einen neuen an. Lighting-Varianten generierst du im Editor.", en: "Select a location from your library or create a new one. Generate lighting variations in the editor.", es: "Selecciona una ubicación de tu biblioteca o crea una nueva. Genera variaciones de iluminación en el editor." })}
         action={
           <Button onClick={onAddNew} className="gap-2">
-            <Plus className="h-4 w-4" /> Neue Location
+            <Plus className="h-4 w-4" /> {tx({ de: 'Neue Location', en: 'New location', es: 'Nueva ubicación' })}
           </Button>
         }
       />
@@ -760,7 +760,7 @@ function StoryboardStep({
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-semibold">{tx({ de: "Schnellstart mit kuratierten Szenen", en: "Quick start with curated scenes", es: "Inicio rápido con escenas seleccionadas" })}</h3>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                24+ ready-to-use Templates: Product Hero, Lifestyle, Talking Head, Establishing & mehr.
+                {tx({ de: '24+ einsatzbereite Templates: Product Hero, Lifestyle, Talking Head, Establishing & mehr.', en: '24+ ready-to-use templates: Product Hero, Lifestyle, Talking Head, Establishing & more.', es: 'Más de 24 plantillas listas para usar: Product Hero, Lifestyle, Talking Head, Establishing y más.' })}
               </p>
             </div>
             <ArrowRight className="h-4 w-4 text-primary group-hover:translate-x-1 transition-transform" />
@@ -807,7 +807,7 @@ function StoryboardStep({
                         className="w-20 h-8 bg-background/60 text-sm"
                       />
                       <span className="text-[11px] text-muted-foreground">
-                        Sekunden
+                        {tx({ de: 'Sekunden', en: 'Seconds', es: 'Segundos' })}
                       </span>
                       {scenes.length > 1 && (
                         <Button

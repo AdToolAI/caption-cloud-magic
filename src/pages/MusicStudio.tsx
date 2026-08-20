@@ -463,7 +463,7 @@ export default function MusicStudio() {
                       <div className="pointer-events-none absolute inset-0 opacity-30 bg-[repeating-linear-gradient(0deg,transparent_0,transparent_2px,hsl(var(--primary)/0.05)_2px,hsl(var(--primary)/0.05)_3px)]" />
                       <div className="relative flex items-end justify-between">
                         <div>
-                          <div className="text-[9.5px] uppercase tracking-widest text-muted-foreground">Kosten · max</div>
+                          <div className="text-[9.5px] uppercase tracking-widest text-muted-foreground">{tx({ de: 'Kosten · max', en: 'Cost · max', es: 'Coste · máx' })}</div>
                           {engine.pricingModel === 'per-second' && engine.priceEurPerSecond && (
                             <div className="text-[10px] font-mono text-muted-foreground/80 mt-0.5">
                               {currencySymbol}{engine.priceEurPerSecond.toFixed(3)}/s · pro Sek.

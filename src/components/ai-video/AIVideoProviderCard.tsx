@@ -83,7 +83,7 @@ export function AIVideoProviderCard({
           {/* Stats row */}
           <div className="grid grid-cols-3 gap-2 text-center pt-3 border-t border-border/30">
             <div>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Preis</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{tx({ de: 'Preis', en: 'Price', es: 'Precio' })}</p>
               <p className="text-xs font-semibold text-foreground mt-0.5">{pricing}</p>
             </div>
             <div>

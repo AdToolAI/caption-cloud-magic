@@ -419,7 +419,7 @@ const BrandKit = () => {
               className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)] transition-all duration-300 flex items-center gap-2"
             >
               <Settings className="h-4 w-4" />
-              Verwalten
+              {tx({ de: 'Verwalten', en: 'Manage', es: 'Gestionar' })}
             </TabsTrigger>
           </TabsList>
 
@@ -603,7 +603,7 @@ const BrandKit = () => {
                         size="lg"
                         className="border-white/10 hover:bg-primary/10 hover:border-primary/30 transition-all"
                       >
-                        Wizard nutzen
+                        {tx({ de: 'Wizard nutzen', en: 'Use wizard', es: 'Usar asistente' })}
                       </Button>
                     </div>
                   </div>

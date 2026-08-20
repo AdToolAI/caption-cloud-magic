@@ -496,7 +496,7 @@ export function SceneEditingStep({
       ns[sIdx] = { ...affected, end_time: inT };
     } else {
       ns.splice(sIdx, 1,
-        { ...affected, id: `${affected.id}-cut-a`, end_time: inT, description: `${affected.description} (vor Schnitt)` },
+        { ...affected, id: `${affected.id}-cut-a`, end_time: inT, description: `${affected.description} ${tx({ de: '(vor Schnitt)', en: '(before cut)', es: '(antes del corte)' })}` },
         { ...affected, id: `${affected.id}-cut-b`, start_time: outT, description: `${affected.description} ${tx({ de: '(nach Schnitt)', en: '(after cut)', es: '(después del corte)' })}` }
       );
     }
@@ -987,7 +987,7 @@ export function SceneEditingStep({
             className="h-7 text-xs gap-1.5"
           >
             <Palette className="w-3.5 h-3.5" />
-            Farben
+            {tx({ de: 'Farben', en: 'Colours', es: 'Colores' })}
           </Button>
         </div>
 

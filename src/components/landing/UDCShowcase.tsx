@@ -77,7 +77,7 @@ export function UDCShowcase() {
           </Link>
           <Link to="/pricing" onClick={() => trackUDC('udc_showcase_cta_clicked', { target: 'pricing' })}>
             <Button size="lg" variant="outline">
-              Preise ansehen
+              {tx({ de: 'Preise ansehen', en: 'View pricing', es: 'Ver precios' })}
             </Button>
           </Link>
         </div>

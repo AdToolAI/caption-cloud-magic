@@ -84,7 +84,7 @@ export function AIAutoCut({ videoUrl, videoDuration, audioUrl, onCutsGenerated }
         setCuts(formattedCuts);
         onCutsGenerated(formattedCuts);
         toast.success(tx({ de: `${formattedCuts.length} Schnittpunkte erkannt`, en: `${formattedCuts.length} Cut points detected`, es: `${formattedCuts.length} Puntos de corte detectados` }), {
-          description: `${data.credits_used} Credits verwendet`,
+          description: tx({ de: `${data.credits_used} Credits verwendet`, en: `${data.credits_used} credits used`, es: `${data.credits_used} créditos utilizados` }),
         });
       }
     } catch (error: any) {

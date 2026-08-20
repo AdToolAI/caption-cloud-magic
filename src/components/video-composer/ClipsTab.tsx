@@ -1567,7 +1567,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                         }}
                       >
                         <Search className="h-3 w-3" />
-                        Stock suchen
+                        {tx({ de: 'Stock suchen', en: 'Search stock', es: 'Buscar stock' })}
                       </Button>
                     )}
                     {/* Upload missing */}

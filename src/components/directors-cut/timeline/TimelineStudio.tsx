@@ -294,7 +294,7 @@ export function TimelineStudio({
                 <Redo2 className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Wiederholen (Ctrl+Y)</TooltipContent>
+            <TooltipContent>{tx({ de: 'Wiederholen (Ctrl+Y)', en: 'Redo (Ctrl+Y)', es: 'Rehacer (Ctrl+Y)' })}</TooltipContent>
           </Tooltip>
           
           <div className="w-px h-6 bg-border mx-2" />

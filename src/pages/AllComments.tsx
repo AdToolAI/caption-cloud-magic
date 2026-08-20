@@ -430,7 +430,7 @@ const AllComments = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="open">Offen</SelectItem>
+                          <SelectItem value="open">{tx({ de: 'Offen', en: 'Open', es: 'Abierto' })}</SelectItem>
                           <SelectItem value="replied">Beantwortet</SelectItem>
                           <SelectItem value="ignored">{tx({ de: "Ignoriert", en: "Ignored", es: "Ignorado" })}</SelectItem>
                           <SelectItem value="flagged">{tx({ de: "Markiert", en: "Flagged", es: "Marcado" })}</SelectItem>

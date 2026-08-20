@@ -426,7 +426,7 @@ export function MagicEditPanel() {
                       animate={{ opacity: 1, y: 0 }}
                       className="space-y-2"
                     >
-                      <Label className="text-sm font-semibold">Ergebnis</Label>
+                      <Label className="text-sm font-semibold">{tx({ de: 'Ergebnis', en: 'Result', es: 'Resultado' })}</Label>
                       <div className="relative w-full bg-muted rounded-lg overflow-hidden">
                         <img src={resultUrl} alt="result" className="w-full h-auto" />
                       </div>

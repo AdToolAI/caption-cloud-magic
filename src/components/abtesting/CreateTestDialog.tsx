@@ -63,7 +63,7 @@ export function CreateTestDialog({ onCreateTest }: Props) {
             <Label htmlFor="test-name">Test Name *</Label>
             <Input
               id="test-name"
-              placeholder="z.B. Thumbnail Farben Test"
+              placeholder={tx({ de: 'z.B. Thumbnail Farben Test', en: 'e.g. thumbnail colour test', es: 'p. ej. prueba de colores de miniatura' })}
               value={testName}
               onChange={(e) => setTestName(e.target.value)}
             />

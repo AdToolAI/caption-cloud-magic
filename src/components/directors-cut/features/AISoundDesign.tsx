@@ -130,7 +130,7 @@ export function AISoundDesign({ scenes, videoUrl, onSoundsGenerated }: AISoundDe
 
         setGeneratedSounds(sounds);
         onSoundsGenerated(sounds);
-        toast.success(`${sounds.length} Sounds generiert`, {
+        toast.success(tx({ de: `${sounds.length} Sounds generiert`, en: `${sounds.length} sounds generated`, es: `${sounds.length} sonidos generados` }), {
           description: tx({ de: `${data.credits_used} Credits verwendet`, en: `${data.credits_used} credits used`, es: `${data.credits_used} créditos utilizados` }),
         });
       }

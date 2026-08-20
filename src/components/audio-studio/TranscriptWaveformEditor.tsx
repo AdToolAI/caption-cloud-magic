@@ -96,7 +96,7 @@ export function TranscriptWaveformEditor({
       toast.success(tx({ de: 'Transcript erfolgreich generiert', en: 'Transcript generated successfully', es: 'Transcripción generada con éxito' }));
     } catch (error) {
       console.error('Transcript error:', error);
-      toast.error(tx({ de: 'Fehler beim {tx({ de: "Generiere...", en: "Generating...", es: "Generando..." })}es Transcripts', en: 'Error generating transcript', es: 'Error al generar la transcripción' }));
+      toast.error(tx({ de: 'Fehler beim Generieren des Transcripts', en: 'Error generating transcript', es: 'Error al generar la transcripción' }));
     } finally {
       // 5. Cleanup: Delete temp file
       if (tempFileName) {

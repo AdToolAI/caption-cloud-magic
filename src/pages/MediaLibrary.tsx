@@ -590,13 +590,13 @@ export default function MediaLibrary() {
     if (decision.blocked) {
       if (decision.blockReason === 'cloud_offload_required') {
         toast({
-          title: 'Speicher-Limit erreicht',
+          title: tx({ de: 'Speicher-Limit erreicht', en: 'Storage limit reached', es: 'Límite de almacenamiento alcanzado' }),
           description: tx({ de: 'Bitte lagere ältere Medien in deine verbundene Google Drive aus, um Platz zu schaffen.', en: 'Please offload older media to your connected Google Drive to free up space.', es: 'Traslada medios antiguos a tu Google Drive conectado para liberar espacio.' }),
           variant: 'destructive',
         });
       } else {
         toast({
-          title: 'Limit erreicht',
+          title: tx({ de: 'Limit erreicht', en: 'Limit reached', es: 'Límite alcanzado' }),
           description: tx({ de: 'Keine alten Medien zum Freigeben gefunden. Bitte manuell löschen oder Google Drive verbinden.', en: 'No older media found to free up. Please delete manually or connect Google Drive.', es: 'No se encontraron medios antiguos. Elimina manualmente o conecta Google Drive.' }),
           variant: 'destructive',
         });

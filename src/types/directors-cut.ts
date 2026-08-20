@@ -285,7 +285,7 @@ export const OVERLAY_ANIMATIONS: { id: OverlayAnimation; name: string; descripti
   { id: 'wipe', name: 'Wipe', description: tx({ de: 'Balken schiebt frei', en: 'Bar pushes free', es: 'La barra se libera' }) },
   { id: 'pop', name: 'Pop', description: tx({ de: 'Kurzer Feder-Impuls', en: 'Short spring pulse', es: 'Pulso de resorte corto' }) },
   { id: 'blurIn', name: 'Blur In', description: tx({ de: 'Aus der Unschärfe', en: 'Out of focus', es: 'Fuera de foco' }) },
-  { id: 'stagger', name: 'Zeilen-Stagger', description: tx({ de: 'Wörter nacheinander', en: 'Words one after another', es: 'Palabras una tras otra' }) },
+  { id: 'stagger', name: tx({ de: 'Zeilen-Stagger', en: 'Line stagger', es: 'Escalonado de líneas' }), description: tx({ de: 'Wörter nacheinander', en: 'Words one after another', es: 'Palabras una tras otra' }) },
   { id: 'tickerLoop', name: 'Ticker', description: tx({ de: 'Endlos durchlaufend', en: 'Continuously running', es: 'Corriendo continuamente' }) },
   { id: 'none', name: tx({ de: 'Ohne', en: 'None', es: 'Ninguno' }), description: tx({ de: 'Hart einblenden', en: 'Hard fade-in', es: 'Fundido de entrada duro' }) },
 ];

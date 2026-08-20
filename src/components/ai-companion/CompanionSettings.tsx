@@ -267,7 +267,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
           <div className="space-y-0.5">
             <Label className="flex items-center gap-2">
               <Volume2 className="w-4 h-4" />
-              Sprachausgabe
+              {tx({ de: 'Sprachausgabe', en: 'Speech output', es: 'Salida de voz' })}
             </Label>
             <p className="text-xs text-muted-foreground">
               {tx({ de: "Bot-Antworten werden vorgelesen", en: "Bot responses are read aloud", es: "Las respuestas del bot se leen en voz alta" })}
@@ -300,7 +300,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
           <div className="space-y-0.5">
             <Label className="flex items-center gap-2">
               <Mic className="w-4 h-4" />
-              Spracheingabe
+              {tx({ de: 'Spracheingabe', en: 'Speech input', es: 'Entrada de voz' })}
             </Label>
             <p className="text-xs text-muted-foreground">
               {tx({ de: "Sprich mit dem Bot per Mikrofon", en: "Speak to the bot via microphone", es: "Habla con el bot por micrófono" })}

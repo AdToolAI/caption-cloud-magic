@@ -874,7 +874,7 @@ export default function ProductionPlanSheet({
         && Number.isFinite(finalTarget)
         && Math.abs(finalTarget - finalSum) < 0.5;
       if (!finalConsistent) {
-        const message = `Plan inkonsistent — ${finalTarget || '—'}s Projekt vs. ${finalSum}s Szenensumme.`;
+        const message = tx({ de: `Plan inkonsistent — ${finalTarget || '—'}s Projekt vs. ${finalSum}s Szenensumme.`, en: `Plan inconsistent — ${finalTarget || '—'}s project vs. ${finalSum}s scene total.`, es: `Plan incoherente — ${finalTarget || '—'}s de proyecto vs. ${finalSum}s de suma de escenas.` });
         setApplyResult({ ok: false, message, warnings: [] });
         toast({ title: tx({ de: 'Plan blockiert', en: 'Plan blocked', es: 'Plan bloqueado' }), description: message, variant: 'destructive' });
         return;
@@ -1324,7 +1324,7 @@ export default function ProductionPlanSheet({
             )}
             {safePlan?._meta?.source === 'ai-recovered' && (
               <Badge variant="outline" className="ml-auto text-[10px] border-emerald-400/40 text-emerald-300 bg-emerald-400/[0.06]">
-                AI-Plan wiederhergestellt
+                {tx({ de: 'AI-Plan wiederhergestellt', en: 'AI plan restored', es: 'Plan de IA restaurado' })}
               </Badge>
             )}
           </DialogTitle>

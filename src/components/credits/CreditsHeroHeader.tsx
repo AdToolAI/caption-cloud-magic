@@ -102,7 +102,7 @@ export const CreditsHeroHeader = ({ planName, creditsAvailable, onBuyCredits }: 
             {/* Shimmer Effect */}
             <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
             <ShoppingCart className="mr-2 h-5 w-5" />
-            Credits kaufen
+            {tx({ de: 'Credits kaufen', en: 'Buy credits', es: 'Comprar créditos' })}
           </Button>
         </motion.div>
       </div>

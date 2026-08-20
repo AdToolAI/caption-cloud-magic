@@ -238,7 +238,7 @@ export default function SnippetBuilderDialog({
         <div className="space-y-4">
           {/* Thumbnail */}
           <div>
-            <Label className="text-xs">Vorschaubild</Label>
+            <Label className="text-xs">{tx({ de: 'Vorschaubild', en: 'Preview image', es: 'Imagen de vista previa' })}</Label>
             <div className="mt-1 flex items-center gap-3">
               <div className="h-24 w-40 rounded-md border border-border/60 bg-background/60 overflow-hidden flex items-center justify-center">
                 {thumbnailUrl ? (

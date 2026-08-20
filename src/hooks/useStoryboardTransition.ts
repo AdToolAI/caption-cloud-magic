@@ -1157,7 +1157,7 @@ export function useStoryboardTransition({
       }
       if (!isUuid(activeProjectId)) {
         toast({
-          title: 'Projekt-ID fehlt',
+          title: tx({ de: 'Projekt-ID fehlt', en: 'Project ID missing', es: 'Falta el ID del proyecto' }),
           description: tx({ de: 'Die Analyse wurde gestoppt, damit kein unverbundener Plan entsteht.', en: 'Analysis was stopped to avoid an unconnected plan.', es: 'El análisis se detuvo para evitar un plan desconectado.' }),
           variant: 'destructive',
         });
@@ -1419,7 +1419,7 @@ export function useStoryboardTransition({
           planSheetOpen: false,
           phase: 'B',
           progress: Math.max(s.progress || 0, 80),
-          phaseLabel: `${reason} — versuche nochmal (bis 45s) …`,
+          phaseLabel: tx({ de: `${reason} — versuche nochmal (bis 45s) …`, en: `${reason} — retrying (up to 45s) …`, es: `${reason} — reintentando (hasta 45 s) …` }),
         }));
 
         const GRACE_MS = 45_000;
@@ -1467,7 +1467,7 @@ export function useStoryboardTransition({
           if (cancelledRef.current) return;
           if (rescued) {
             toast({
-              title: '✨ Analyse-Ergebnis wiederhergestellt',
+              title: tx({ de: '✨ Analyse-Ergebnis wiederhergestellt', en: '✨ Analysis result restored', es: '✨ Resultado del análisis restaurado' }),
               description: tx({ de: 'Die Verbindung war instabil, der Plan war serverseitig aber fertig — dein Briefing wurde vollständig übernommen.', en: 'The connection was unstable, but the plan was ready server-side — your briefing was fully adopted.', es: 'La conexión fue inestable, pero el plan estaba listo en el servidor — tu briefing fue adoptado por completo.' }),
             });
             setState({

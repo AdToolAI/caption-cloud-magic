@@ -205,7 +205,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
         <CollapsibleSection icon={<BookOpen className="h-4 w-4" />} title={t('uvc.reviewStorytelling') !== 'uvc.reviewStorytelling' ? t('uvc.reviewStorytelling') as string : 'Storytelling'}>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <FieldLabel>Struktur</FieldLabel>
+              <FieldLabel>{tx({ de: 'Struktur', en: 'Structure', es: 'Estructura' })}</FieldLabel>
               <Select value={data.storytellingStructure} onValueChange={v => update('storytellingStructure', v as StorytellingStructure)}>
                 <SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -249,7 +249,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
         {/* Character */}
         <CollapsibleSection icon={<User className="h-4 w-4" />} title={t('uvc.reviewCharacter') !== 'uvc.reviewCharacter' ? t('uvc.reviewCharacter') as string : 'Charakter'}>
           <div className="flex items-center gap-3">
-            <FieldLabel>Charakter verwenden</FieldLabel>
+            <FieldLabel>{tx({ de: 'Charakter verwenden', en: 'Use character', es: 'Usar personaje' })}</FieldLabel>
             <button 
               onClick={() => update('hasCharacter', !data.hasCharacter)}
               className={cn(
@@ -351,7 +351,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
               </Select>
             </div>
             <div className="space-y-1.5">
-              <FieldLabel>Ausgabeformate</FieldLabel>
+              <FieldLabel>{tx({ de: 'Ausgabeformate', en: 'Output formats', es: 'Formatos de salida' })}</FieldLabel>
               <div className="flex gap-2 flex-wrap">
                 {(['16:9', '9:16', '1:1', '4:5'] as const).map(fmt => (
                   <button

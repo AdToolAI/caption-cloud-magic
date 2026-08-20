@@ -2248,7 +2248,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
             onClick={() => { history.commit(); history.redo(); }}
             disabled={!history.canRedo}
-            title={`Wiederherstellen (${navigator.platform.toUpperCase().includes('MAC') ? '⌘⇧' : 'Ctrl+Shift'}+Z)`}
+            title={`${tx({ de: 'Wiederherstellen', en: 'Redo', es: 'Rehacer' })} (${navigator.platform.toUpperCase().includes('MAC') ? '⌘⇧' : 'Ctrl+Shift'}+Z)`}
           >
             <Redo2 className="h-3.5 w-3.5" />
           </Button>
@@ -2304,9 +2304,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 commitHistory();
                 onScenesUpdate?.(masterSnapshot.scenes);
                 setMasterSnapshot(null);
-                toast.success('Master wiederhergestellt — Cut-Down verworfen.');
+                toast.success(tx({ de: 'Master wiederhergestellt — Cut-Down verworfen.', en: 'Master restored — cut-down discarded.', es: 'Master restaurado — versión corta descartada.' }));
               }}
-              title={`Master wiederherstellen (Cut-Down ${masterSnapshot.target}s aktiv)`}
+              title={tx({ de: `Master wiederherstellen (Cut-Down ${masterSnapshot.target}s aktiv)`, en: `Restore master (cut-down ${masterSnapshot.target}s active)`, es: `Restaurar master (versión corta de ${masterSnapshot.target}s activa)` })}
             >
               <Undo2 className="h-3.5 w-3.5" />
               <span className="text-[10px] font-semibold uppercase tracking-wide">Master</span>
@@ -2768,7 +2768,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         onScenesUpdate={(next) => {
           commitHistory();
           onScenesUpdate?.(next);
-          toast.success('Anchor-Refresh angewendet — Identity-Frames wiederhergestellt.');
+          toast.success(tx({ de: 'Anchor-Refresh angewendet — Identity-Frames wiederhergestellt.', en: 'Anchor refresh applied — identity frames restored.', es: 'Actualización de anclaje aplicada: fotogramas de identidad restaurados.' }));
         }}
       />
 
@@ -2785,7 +2785,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           commitHistory();
           onScenesUpdate?.(next);
           toast.success(
-            `Auto Cut-Down ${target}s angewendet — Master als Snapshot gesichert.`,
+            tx({ de: `Auto Cut-Down ${target}s angewendet — Master als Snapshot gesichert.`, en: `Auto cut-down ${target}s applied — master saved as a snapshot.`, es: `Auto cut-down de ${target}s aplicado: master guardado como instantánea.` }),
             {
               description: tx({ de: 'Über den ↺-Button in der Toolbar jederzeit wiederherstellbar.', en: 'Can be restored at any time via the ↺ button in the toolbar.', es: 'Se puede restaurar en cualquier momento mediante el botón ↺ de la barra de herramientas.' }),
             },

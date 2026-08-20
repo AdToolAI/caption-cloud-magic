@@ -285,7 +285,9 @@ export function usePauseAutopilot() {
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ['autopilot-brief'] });
       toast({
-        title: vars.hours ? `Pause ${vars.hours}h aktiv` : 'Pause aufgehoben',
+        title: vars.hours
+          ? tx({ de: `Pause ${vars.hours}h aktiv`, en: `Pause active for ${vars.hours}h`, es: `Pausa activa durante ${vars.hours} h` })
+          : tx({ de: 'Pause aufgehoben', en: 'Pause lifted', es: 'Pausa levantada' }),
       });
     },
   });

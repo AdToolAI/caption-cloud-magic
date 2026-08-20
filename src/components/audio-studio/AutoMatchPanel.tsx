@@ -155,7 +155,7 @@ export function AutoMatchPanel({
               {isDragActive ? tx({ de: "Video hier ablegen", en: "Drop video here", es: "Deja el vídeo aquí" }) : tx({ de: 'Video hochladen für Auto-Match', en: 'Upload video for Auto-Match', es: 'Subir video para Auto-Match' })}
             </h3>
             <p className="text-sm text-muted-foreground mb-6">
-              MP4, MOV, WEBM • bis 200 MB • Analyse dauert 10–20 Sekunden
+              {tx({ de: 'MP4, MOV, WEBM • bis 200 MB • Analyse dauert 10–20 Sekunden', en: 'MP4, MOV, WEBM • up to 200 MB • analysis takes 10–20 seconds', es: 'MP4, MOV, WEBM • hasta 200 MB • el análisis tarda 10–20 segundos' })}
             </p>
             <Button size="lg" className="bg-gradient-to-r from-cyan-500 to-primary hover:opacity-90">
               <Film className="w-5 h-5 mr-2" />

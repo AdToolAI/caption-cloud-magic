@@ -96,7 +96,7 @@ export function TestVariantCard({ variant, isWinner, onDeclareWinner, showAction
             )}
             {variant.color_config && (
               <div>
-                <span className="font-medium">Farben:</span>{' '}
+                <span className="font-medium">{tx({ de: 'Farben:', en: 'Colours:', es: 'Colores:' })}</span>{' '}
                 {JSON.stringify(variant.color_config)}
               </div>
             )}

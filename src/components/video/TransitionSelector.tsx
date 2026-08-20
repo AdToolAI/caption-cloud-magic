@@ -3,10 +3,10 @@ import { Label } from '@/components/ui/label';
 import { TransitionPreviewTile, type TransitionId } from '@/components/studio-visual/TransitionPreviewTile';
 
 const TRANSITIONS = [
-  { id: 'none', name: 'Cut', description: 'Harter Schnitt — Artlist-Standard' },
+  { id: 'none', name: 'Cut', description: tx({ de: 'Harter Schnitt — Artlist-Standard', en: 'Hard cut — Artlist standard', es: 'Corte duro — estándar de Artlist' }) },
   { id: 'crossfade', name: 'Crossfade', description: tx({ de: 'Sanftes Morphing zwischen Szenen', en: 'Smooth morphing between scenes', es: 'Transformación suave entre escenas' }) },
   { id: 'fade', name: 'Fade', description: tx({ de: "Sanftes Ein-/Ausblenden", en: "Smooth fade in/out", es: "Fundido suave de entrada/salida" }) },
-  { id: 'slide', name: 'Slide', description: 'Seitliches Gleiten' },
+  { id: 'slide', name: 'Slide', description: tx({ de: 'Seitliches Gleiten', en: 'Lateral slide', es: 'Deslizamiento lateral' }) },
   { id: 'zoom', name: 'Zoom', description: 'Hinein-/Herauszoomen' },
   { id: 'wipe', name: 'Wipe', description: tx({ de: "Wischbewegung", en: "Wipe motion", es: "Movimiento de barrido" }) },
   { id: 'blur', name: 'Blur', description: tx({ de: "Weichzeichner-Übergang", en: "Blur transition", es: "Transición de desenfoque" }) },

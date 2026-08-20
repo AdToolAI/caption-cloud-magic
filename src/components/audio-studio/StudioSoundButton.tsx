@@ -98,7 +98,7 @@ export function StudioSoundButton({ audioUrl, onEnhanced }: StudioSoundButtonPro
               className="flex items-center text-green-400"
             >
               <Check className="w-4 h-4 mr-2" />
-              Studio Sound aktiv
+              {tx({ de: 'Studio Sound aktiv', en: 'Studio sound active', es: 'Sonido de estudio activo' })}
             </motion.span>
           ) : (
             <motion.span

@@ -2815,7 +2815,7 @@ export default function SceneCard({
                           {/* legacy-mapping-allowed: 'no_voiceover' hat keine Entsprechung im Substate */}
                           {scene.lipSyncStatus === "no_voiceover" && (
                             <span className="px-1 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[8px] font-bold">
-                              VO FEHLT
+                              {tx({ de: 'VO FEHLT', en: 'VO MISSING', es: 'FALTA LA VOZ' })}
                             </span>
                           )}
                         </span>

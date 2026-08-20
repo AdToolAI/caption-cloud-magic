@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * Farbwelten für den Post Designer.
  * Ein Umschalter über der Varianten-Galerie wechselt alle Varianten gleichzeitig.
@@ -18,13 +19,13 @@ export const MOODS: Mood[] = [
   { id: "brand", label: "Brand Kit", swatch: ["#F5C76A", "#0A0A0F", "#FAFAF7"], palette: null },
   {
     id: "dark-gold",
-    label: "Dunkel-Gold",
+    label: tx({ de: 'Dunkel-Gold', en: 'Dark gold', es: 'Oro oscuro' }),
     swatch: ["#0A0A0F", "#15151F", "#F5C76A"],
     palette: { ...DEFAULT_PALETTE },
   },
   {
     id: "light",
-    label: "Hell",
+    label: tx({ de: 'Hell', en: 'Light', es: 'Claro' }),
     swatch: ["#FAF7F2", "#EDE7DD", "#B4884A"],
     palette: {
       background: "#FAF7F2",

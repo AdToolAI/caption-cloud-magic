@@ -100,8 +100,8 @@ export function useComposerHistory(projectId: string | undefined) {
         toast({
           title: tx({ de: "↶ Rückgängig", en: "↶ Undo", es: "↶ Deshacer" }),
           description: data.refunded > 0
-            ? `${data.actionType} wiederhergestellt · ${data.refunded} Credits refundiert.`
-            : `${data.actionType} wiederhergestellt.`,
+            ? tx({ de: `${data.actionType} wiederhergestellt · ${data.refunded} Credits refundiert.`, en: `${data.actionType} restored · ${data.refunded} credits refunded.`, es: `${data.actionType} restaurado · ${data.refunded} créditos reembolsados.` })
+            : tx({ de: `${data.actionType} wiederhergestellt.`, en: `${data.actionType} restored.`, es: `${data.actionType} restaurado.` }),
         });
         await onRestored?.();
       } else {

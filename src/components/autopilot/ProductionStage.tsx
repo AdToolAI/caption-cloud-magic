@@ -118,7 +118,7 @@ export function ProductionStage({ production, scenes, log }: Props) {
             <Button asChild size="sm">
               <a href={production.final_video_url} download target="_blank" rel="noreferrer">
                 <Download className="mr-2 h-4 w-4" />
-                Film herunterladen
+                {tx({ de: 'Film herunterladen', en: 'Download film', es: 'Descargar película' })}
               </a>
             </Button>
             <Button asChild size="sm" variant="outline">
@@ -211,9 +211,9 @@ export function ProductionStage({ production, scenes, log }: Props) {
 
       {(production.spent_credits ?? 0) > 0 && (
         <p className="mt-4 text-xs text-muted-foreground">
-          {tx({ de: "Verbraucht", en: "Used", es: "Usado" })} + ":" {Math.round(production.spent_credits ?? 0)} Cr
+          {tx({ de: "Verbraucht", en: "Used", es: "Usado" })}: {Math.round(production.spent_credits ?? 0)} Cr
           {(production.refunded_credits ?? 0) > 0 &&
-            ` + " · " + tx({ de: "erstattet", en: "refunded", es: "reembolsado" }) + ":" ${Math.round(production.refunded_credits ?? 0)} Cr`}
+            ` · ${tx({ de: "erstattet", en: "refunded", es: "reembolsado" })}: ${Math.round(production.refunded_credits ?? 0)} Cr`}
         </p>
       )}
 
