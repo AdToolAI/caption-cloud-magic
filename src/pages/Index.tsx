@@ -100,8 +100,8 @@ const Index = () => {
           {/* Hero Section - Black Tie */}
           <BlackTieHero />
 
-          {/* Proof Moment — Briefing links, echter Clip rechts */}
-          <ProofMoment />
+          {/* Proof Moment — nur DE: Clip hat 4 deutsche Sprecher */}
+          {language === 'de' && <ProofMoment />}
 
           {/* AI Arsenal - all integrated AI modules */}
           <AIArsenalShowcase />
