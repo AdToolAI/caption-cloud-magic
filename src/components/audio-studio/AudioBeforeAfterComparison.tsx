@@ -620,7 +620,7 @@ export function AudioBeforeAfterComparison({
           
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Titel</label>
+              <label className="text-sm font-medium">{tx({ de: 'Titel', en: 'Title', es: 'Título' })}</label>
               <Input
                 value={saveTitle}
                 onChange={(e) => setSaveTitle(e.target.value)}

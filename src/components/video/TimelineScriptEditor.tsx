@@ -480,7 +480,7 @@ export const TimelineScriptEditor = ({
                   <Textarea
                     value={selectedSegment.text}
                     onChange={(e) => updateSegment(selectedSegment.id, { text: e.target.value })}
-                    placeholder="Segment-Text eingeben..."
+                    placeholder={tx({ de: 'Segment-Text eingeben …', en: 'Enter segment text …', es: 'Introduce el texto del segmento …' })}
                     rows={3}
                   />
                 </div>

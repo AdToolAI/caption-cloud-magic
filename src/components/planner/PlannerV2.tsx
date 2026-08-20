@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/card";
+import { tx } from "@/lib/i18nText";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -610,7 +611,7 @@ export function PlannerV2({ className, embedded, forcedTab }: PlannerV2Props) {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="title">{t('planner.titleLabel')}</Label>
-              <Input id="title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Post-Titel" />
+              <Input id="title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder={tx({ de: 'Post-Titel', en: 'Post title', es: 'Título de la publicación' })} />
             </div>
             
             <div className="space-y-2">

@@ -168,7 +168,7 @@ export default function EmailDirector() {
               </div>
               <div className="space-y-3">
                 <div>
-                  <Label className="text-xs">Titel</Label>
+                  <Label className="text-xs">{tx({ de: 'Titel', en: 'Title', es: 'Título' })}</Label>
                   <Input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}

@@ -64,6 +64,7 @@ export const DE_WORDS = new Set(
     'geschlossen aktiv inaktiv der die das den dem des ein eine einen einem einer und oder nicht mit von zu ' +
     'zum zur für fuer auf aus bei nach über ueber unter durch ohne zwischen sowie damit dass weil wenn dann ' +
     'sonst jedoch gekauft erreicht angewendet anwenden ansehen erkannt inkonsistent erlaubt versuche nochmal ' +
+    'eingeben eingegeben titel meine mein meinen unsere unser bibliothek medienbibliothek leer ausfüllen ausfuellen eintragen benennen umbenennen verschieben kopieren einfügen einfuegen ' +
     'im abo aktuell aktuelles aktuelle aktives aktiver marken erneut erzeugt zuschnittbereich beibehalten ' +
     'keinen keiner bitte nochmals derzeit bereich bereiche seite seiten liste listen wert werte'
   ).split(/\s+/),
@@ -76,7 +77,7 @@ export const DE_ROOTS = [
   'verwend', 'verwalt', 'zurücksetz', 'zuruecksetz', 'sprecher', 'referenzbild', 'farbe', 'farben', 'kosten',
   'vergleich', 'szene', 'untertitel', 'lautstärk', 'guthaben', 'vorschau', 'vorlage', 'entwurf', 'benachrichtig',
   'berechtig', 'geschwindigkeit', 'auswahl', 'eingabe', 'ausgabe', 'überschrift', 'ueberschrift', 'datei',
-  'bearbeitung', 'bewertung', 'zahlung', 'rechnung', 'anmeld', 'abmeld', 'hinweis', 'wiederherstell',
+  'bearbeitung', 'bewertung', 'bibliothek', 'eingeb', 'zahlung', 'rechnung', 'anmeld', 'abmeld', 'hinweis', 'wiederherstell',
   'wiederherge', 'aufgebraucht', 'verworf', 'verbrauch', 'erstatt', 'drehbuch', 'drehbüch', 'kündbar', 'kuendbar',
   'zuschnitt', 'markenset', 'marken-set', 'lippensynchron', 'beibehalt', 'erzeug', 'bewegung', 'stimmung',
   'reihenfolge', 'schnellste', 'sprachaus', 'tonspur', 'werbung', 'nachricht', 'zeitplan',
@@ -96,7 +97,9 @@ export const NEUTRAL = new Set(
 );
 
 /** Short German function words that are ordinary Spanish words too. */
-const DE_AMBIGUOUS_IN_ES = new Set('das die der den dem des ein eine einen einer con no se'.split(' '));
+// `leer` is German "empty" but Spanish "to read"; `total`-style overlaps live
+// in SHARED_DE_ES. Keep this list to genuinely ambiguous tokens only.
+const DE_AMBIGUOUS_IN_ES = new Set('das die der den dem des ein eine einen einer con no se leer'.split(' '));
 
 const ENDONYM =
   /^(Español|Deutsch|English|Français|Italiano|Português|Nederlands|Svenska|Polski|Türkçe|Čeština|Русский|日本語|한국어|中文)$/;
@@ -109,11 +112,21 @@ export function germanEvidence(raw: string): number {
   if (text.length < 3) return 0;
   const tokens = (text.match(/[\p{L}]{2,}/gu) ?? []).map((w) => w.toLowerCase());
   if (!tokens.length) return 0;
-  const esLeaning = ES_ORTHO.test(text) && !UML.test(text);
+  // Spanish context: orthography, or at least two unmistakable Spanish words.
+  // Without the word-based branch, "No se pudo leer el briefing" (no accents)
+  // scored as German through the shared token "leer".
+  const esLeaning =
+    !UML.test(text) &&
+    (ES_ORTHO.test(text) || tokens.filter((w) => ES_WORDS.has(w)).length >= 2);
   let score = 0;
   for (const w of tokens) {
     if (NEUTRAL.has(w)) continue;
-    if (esLeaning && DE_AMBIGUOUS_IN_ES.has(w)) continue;
+    if (DE_AMBIGUOUS_IN_ES.has(w)) {
+      // Ambiguous tokens ("leer" = German "empty" / Spanish "to read", plus the
+      // article set) only carry full weight when they ARE the whole label.
+      if (!esLeaning && tokens.length === 1) score += 3;
+      continue;
+    }
     if (DE_WORDS.has(w)) score += 3;
     else if (w.length >= 5 && DE_ROOTS.some((r) => w.includes(r))) score += 3;
   }
@@ -373,6 +386,12 @@ export function extractSinks(src: string, isJsx = true): Sink[] {
   const out: Sink[] = [];
   let m: RegExpExecArray | null;
 
+  // Module-level /g regexes keep `lastIndex` between calls. Without this reset
+  // the second and every following file silently loses whole sink classes —
+  // exactly the recall regression this guard exists to prevent.
+  for (const re of [ATTRS, FIELDS, ARRAYS]) re.lastIndex = 0;
+
+
   const jsxText = /[>}]([^<>{}]*?[\p{L}][^<>{}]*?)[<{]/gsu;
   while (isJsx && (m = jsxText.exec(src))) {
     const text = m[1].replace(/\s+/g, ' ').trim();
@@ -458,15 +477,32 @@ export interface Finding {
   kind: string;
 }
 
+/**
+ * Keys of a tri-locale label map (`Foo: { de, en, es }`) are semantic IDs:
+ * the display copy lives in the map, the key never reaches the screen.
+ */
+export function semanticIds(src: string): Set<string> {
+  const ids = new Set<string>();
+  const re = /(?:^|[{,\n])\s*'?"?([\p{L}\d][\p{L}\d _-]{1,60}?)'?"?\s*:\s*\{[^{}]*\bde\s*:/gmu;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(src))) ids.add(m[1].trim());
+  return ids;
+}
+
 export function analyzeFile(src: string, isJsx: boolean, allowed = new Set<string>()): Finding[] {
   const findings: Finding[] = [];
+  const ids = semanticIds(src);
+  const isSemanticId = (t: string) => {
+    const bare = t.replace(/^[\s,]+|[\s,:]+$/g, '');
+    return ids.has(bare);
+  };
 
   // 1) EN mode — bare DE/ES in an ordinary sink.
   const rs = safeRanges(src);
   const seen = new Set<string>();
   for (const sink of extractSinks(src, isJsx)) {
     if (inSafe(sink.pos, rs)) continue;
-    if (allowed.has(sink.text)) continue;
+    if (allowed.has(sink.text) || isSemanticId(sink.text)) continue;
     const de = isGerman(sink.text);
     const es = isSpanish(sink.text);
     if (!de && !es) continue;

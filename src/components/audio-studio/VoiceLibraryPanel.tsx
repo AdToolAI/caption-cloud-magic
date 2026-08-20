@@ -129,7 +129,7 @@ export function VoiceLibraryPanel() {
               </p>
               <div className="flex gap-2">
                 <Input
-                  placeholder="Beispieltext eingeben..."
+                  placeholder={tx({ de: 'Beispieltext eingeben …', en: 'Enter sample text …', es: 'Introduce un texto de ejemplo …' })}
                   value={testTexts[voice.id] || ''}
                   onChange={(e) =>
                     setTestTexts((p) => ({ ...p, [voice.id]: e.target.value }))
