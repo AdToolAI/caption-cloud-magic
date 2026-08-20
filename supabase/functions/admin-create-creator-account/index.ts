@@ -22,8 +22,8 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-function randomPassword(length = 10): string {
-  const alphabet = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function randomPassword(length = 12): string {
+  const alphabet = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%^&*";
   const bytes = new Uint8Array(length);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
@@ -83,15 +83,28 @@ serve(async (req) => {
 
   if (found) {
     userId = found.id;
+    // Reset password so the caller can hand it to the user.
+    generatedPassword = randomPassword(12);
+    const { error: updateError } = await admin.auth.admin.updateUserById(userId, {
+      password: generatedPassword,
+    });
+    if (updateError) {
+      return json({ error: "password_reset_failed", details: updateError.message }, 400);
+    }
   } else {
-    generatedPassword = randomPassword(10);
+    generatedPassword = randomPassword(12);
     const { data: created, error: createError } = await admin.auth.admin.createUser({
       email,
       password: generatedPassword,
-      email_confirm: true,
     });
     if (createError || !created?.user) {
-      return json({ error: "create_user_failed", details: createError?.message }, 400);
+      console.error("createUser error:", createError);
+      return json({
+        error: "create_user_failed",
+        details: createError?.message,
+        code: createError?.code,
+        status: createError?.status,
+      }, 400);
     }
     userId = created.user.id;
   }
@@ -105,7 +118,7 @@ serve(async (req) => {
         email,
         account_type: "creator",
         ai_discount_percent: discountPercent,
-        plan: "beta-basic",
+        plan: "basic",
         updated_at: new Date().toISOString(),
       },
       { onConflict: "id" },
