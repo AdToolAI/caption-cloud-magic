@@ -43,7 +43,7 @@ export function useSaveSceneToLibrary() {
     async (scene: ComposerScene, projectId?: string): Promise<boolean> => {
       if (!scene.clipUrl) {
         toast({
-          title: tx({ de: "Kein Clip vorhanden", en: "No clip available", es: "Ningún clip disponible" }),
+          title: 'Kein Clip vorhanden',
           description: tx({ de: 'Diese Szene hat noch kein gerendertes Video.', en: 'This scene does not have a rendered video yet.', es: 'Esta escena aún no tiene un video renderizado.' }),
           variant: 'destructive',
         });

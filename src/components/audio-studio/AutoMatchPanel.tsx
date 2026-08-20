@@ -120,7 +120,7 @@ export function AutoMatchPanel({
               Video rein, Soundtrack raus
             </h2>
             <p className="text-sm text-muted-foreground max-w-xl">
-              KI analysiert S{tx({ de: "KI analysiert Schnittfrequenz, Mood &amp; Länge deines Videos und komponiert", en: "AI analyzes your video's edit frequency, mood &amp; length and composes", es: "La IA analiza la frecuencia de edición, el estado de ánimo y la duración de tu video y compone" })}
+              KI analysiert Schnittfrequenz, Mood &amp; Länge deines Videos und komponiert
               {tx({ de: 'automatisch einen perfekt passenden Track.', en: 'a perfectly matching track automatically.', es: 'automáticamente una pista perfecta.' })} <span className="text-primary font-medium">{tx({ de: 'Analyse kostenlos.', en: 'Analysis is free.', es: 'El análisis es gratis.' })}</span>
             </p>
           </div>

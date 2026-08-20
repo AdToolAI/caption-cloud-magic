@@ -274,7 +274,8 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
               </Badge>
             )}
           </h3>
-          <span className="text-sm text-muted-foreground">({albumImages.length} Bilder)</s{tx({ de: "Bilder)", en: "images)", es: "imágenes)" })}         {!selectedAlbum.is_system && (
+          <span className="text-sm text-muted-foreground">({albumImages.length} Bilder)</span>
+          {!selectedAlbum.is_system && (
             <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto text-destructive" onClick={() => deleteAlbum(selectedAlbum.id)}>
               <Trash2 className="h-4 w-4" />
             </Button>

@@ -201,7 +201,7 @@ export const SubtitleStyleEditor = ({ style, onChange, sampleText, onSampleTextC
           {style.animation === 'hormozi' && (
             <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
               <p className="text-[11px] text-muted-foreground">
-                Word-by-Word Pop-{tx({ de: "Word-by-Word Pop-In im Hormozi/MrBeast-Stil. Power-Wörter werden in einer farbigen Pill hervorgehoben. Keywords werden beim Export automatisch per AI extrahiert (oder manuell pro Segment überschrieben).", en: "Word-by-Word Pop-In in Hormozi/MrBeast style. Power words are highlighted in a colored pill. Keywords are automatically extracted by AI upon export (or manually overwritten per segment).", es: "Pop-in palabra por palabra al estilo Hormozi/MrBeast. Las palabras clave se resaltan en una píldora de color. Las palabras clave se extraen automáticamente por IA al exportar (o se sobrescriben manualmente por segmento)." })}
+                Word-by-Word Pop-In im Hormozi/MrBeast-Stil. Power-Wörter werden in einer farbigen Pill hervorgehoben. Keywords werden beim Export automatisch per AI extrahiert (oder manuell pro Segment überschrieben).
               </p>
               <div className="flex items-center gap-2">
                 <Label htmlFor="hormozi-color" className="text-xs">Highlight-Farbe</Label>

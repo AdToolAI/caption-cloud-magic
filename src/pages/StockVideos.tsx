@@ -270,7 +270,7 @@ export default function StockVideos() {
           </Tabs>
 
           <p className="text-[10px] text-muted-foreground/70 mt-8 text-center max-w-2xl mx-auto">
-            Clips stammen{tx({ de: "Clips stammen von Pexels (Pexels License) und Pixabay (Pixabay Content License). Beim Verwenden eines Clips", en: "Clips are from Pexels (Pexels License) and Pixabay (Pixabay Content License). When using a clip", es: "Los clips provienen de Pexels (Pexels License) y Pixabay (Pixabay Content License). Al usar un clip" })}
+            Clips stammen von Pexels (Pexels License) und Pixabay (Pixabay Content License). Beim Verwenden eines Clips
             {tx({ de: "kannst du jederzeit ein PDF-Lizenz-Zertifikat erzeugen, das die Original-Lizenz des jeweiligen Anbieters", en: "you can generate a PDF license certificate at any time, which includes the original license of the respective provider", es: "puedes generar un certificado de licencia en PDF en cualquier momento, que incluye la licencia original del proveedor respectivo" })}
             referenziert.
           </p>

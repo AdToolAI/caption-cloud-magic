@@ -539,7 +539,7 @@ export default function AITextStudio() {
               })}
               {availableTiers.length === 1 && (
                 <div className="sm:col-span-2 text-xs text-muted-foreground self-center">
-                  {PROVIDER_LABELS[providerKey]} b{tx({ de: "bietet in diesem Studio nur die Maximum-Stufe an.", en: "only offers the maximum tier in this studio.", es: "solo ofrece el nivel máximo en este estudio." })}
+                  {PROVIDER_LABELS[providerKey]} bietet in diesem Studio nur die Maximum-Stufe an.
                 </div>
               )}
             </div>

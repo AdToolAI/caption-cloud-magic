@@ -348,7 +348,8 @@ export const InstantAvatarDemo = () => {
             <div className="mt-3 flex items-start gap-2 text-[11px] text-muted-foreground">
               <Lock className="w-3 h-3 mt-0.5 flex-shrink-0 text-primary/70" />
               <p>
-                {tx({ de: 'Foto nur zur Generierung, nach 24 h automatisch gelöscht.', en: 'Photo only for generation, deleted automatically after 24h.', es: 'Foto solo para generación, se elimina automáticamente después de 24 horas.' })} K{tx({ de: "Keine\n                Weitergabe. 3 Versuche pro Stunde.", en: "No\n                sharing. 3 attempts per hour.", es: "No\n                compartir. 3 intentos por hora." })}
+                {tx({ de: 'Foto nur zur Generierung, nach 24 h automatisch gelöscht.', en: 'Photo only for generation, deleted automatically after 24h.', es: 'Foto solo para generación, se elimina automáticamente después de 24 horas.' })} Keine
+                Weitergabe. 3 Versuche pro Stunde.
               </p>
             </div>
           </div>
@@ -470,7 +471,6 @@ export const InstantAvatarDemo = () => {
                 <Button variant="outline" size="sm" onClick={handleDownloadZip}>
                   <Download className="w-3.5 h-3.5 mr-1.5" />
                   Alle 5 (ZIP)
-      {tx({ de: "Alle 5 (ZIP)", en: "All 5 (ZIP)", es: "Todos 5 (ZIP)" })}
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleReset}>
                   <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
@@ -520,7 +520,7 @@ export const InstantAvatarDemo = () => {
                 className="group bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
               >
                 <Link to="/auth">
-                  In Cast &amp; World{tx({ de: "In Cast &amp; World speichern", en: "Save to Cast &amp; World", es: "Guardar en Cast &amp; World" })}
+                  In Cast &amp; World speichern
                   <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>

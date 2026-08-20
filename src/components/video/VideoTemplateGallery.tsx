@@ -7,7 +7,7 @@ import type { VideoTemplate } from '@/types/video';
 import { tx } from '@/lib/i18nText';
 
 const CATEGORIES = [
-  { value: '', label: tx({ de: "Alle", en: "All", es: "Todos" }) },
+  { value: '', label: 'Alle' },
   { value: 'marketing', label: 'Marketing' },
   { value: 'social', label: 'Social Media' },
   { value: 'product', label: 'Produkt' },

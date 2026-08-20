@@ -154,7 +154,7 @@ export function VoiceLibraryPanel() {
             </div>
 
             <p className="text-[10px] text-muted-foreground">
-              Erstellt: {new {tx({ de: "Erstellt:", en: "Created:", es: "Creado:" })} {new Date(voice.created_at).toLocaleDateString(uiLocale())}
+              Erstellt: {new Date(voice.created_at).toLocaleDateString(uiLocale())}
             </p>
           </Card>
         ))}

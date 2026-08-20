@@ -175,7 +175,7 @@ export function RetentionDashboard({ data }: Props) {
                   <>
                     {data.cohorts.reduce((best, current) => 
                       current.day30 > best.day30 ? current : best
-                    ).cohortDate} m{tx({ de: "mit", en: "with", es: "con" })} {formatPercent(
+                    ).cohortDate} mit {formatPercent(
                       data.cohorts.reduce((best, current) => 
                         current.day30 > best.day30 ? current : best
                       ).day30

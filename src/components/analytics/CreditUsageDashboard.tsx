@@ -19,7 +19,7 @@ export const CreditUsageDashboard = () => {
       </CardHeader>
       <CardContent className="text-sm text-muted-foreground space-y-2">
         <p>
-          Mit dem Bet{tx({ de: "Mit dem Beta-Basic-Abo (14,99 €/Monat) sind Chat, Automatisierung,", en: "With the Beta Basic subscription (€14.99/month), chat, automation,", es: "Con la suscripción Beta Basic (14,99 €/mes), el chat, la automatización," })}
+          Mit dem Beta-Basic-Abo (14,99 €/Monat) sind Chat, Automatisierung,
           {tx({ de: "Publishing und alle Plattform-Features unbegrenzt nutzbar.", en: "Publishing and all platform features are unlimited.", es: "Publicación y todas las funciones de la plataforma son ilimitadas." })}
         </p>
         <p>

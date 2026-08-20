@@ -232,7 +232,7 @@ export function AIFrameInterpolation({
 
           <div className="p-3 bg-muted/50 rounded-lg">
             <p className="text-xs text-muted-foreground">
-              <strong>{tx({ de: "Hinweis:", en: "Note:", es: "Nota:" })}</strong> F{tx({ de: "Für beste Slow-Motion Ergebnisse 240 FPS wählen.", en: "For best slow-motion results, choose 240 FPS.", es: "Para obtener los mejores resultados de cámara lenta, elige 240 FPS." })} 
+              <strong>{tx({ de: "Hinweis:", en: "Note:", es: "Nota:" })}</strong> Für beste Slow-Motion Ergebnisse 240 FPS wählen. 
               {tx({ de: "Die KI generiert fehlende Frames basierend auf Bewegungsanalyse.", en: "The AI ​​generates missing frames based on motion analysis.", es: "La IA genera fotogramas faltantes basándose en el análisis del movimiento." })}
             </p>
           </div>

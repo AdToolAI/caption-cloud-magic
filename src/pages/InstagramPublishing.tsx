@@ -1065,7 +1065,8 @@ export default function InstagramPublishing() {
                   <Alert variant="destructive" className="mt-4">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription className="text-xs">
-                      <strong>{tx({ de: "Achtung:", en: "Attention:", es: "Atención:" })}</strong> {tx({ de: "User Token Modus benötigt die Permission", en: "User token mode requires permission", es: "El modo token de usuario requiere permiso" })} <code>pages_show_list</code>. Falls di{tx({ de: ". Falls dieser Fehler auftritt, verwende stattdessen einen Page Token (Option 1).", en: ". If this error occurs, use a Page Token instead (Option 1).", es: ". Si ocurre este error, usa un Page Token en su lugar (Opción 1)." })}           </AlertDescription>
+                      <strong>{tx({ de: "Achtung:", en: "Attention:", es: "Atención:" })}</strong> {tx({ de: "User Token Modus benötigt die Permission", en: "User token mode requires permission", es: "El modo token de usuario requiere permiso" })} <code>pages_show_list</code>. Falls dieser Fehler auftritt, verwende stattdessen einen Page Token (Option 1).
+                    </AlertDescription>
                   </Alert>
                 </CardContent>
               </Card>
@@ -1085,7 +1086,8 @@ export default function InstagramPublishing() {
                 className="font-mono text-xs"
               />
               <p className="text-xs text-muted-foreground">
-                ℹ️ Dieser Token wird {token{tx({ de: "ℹ️ Dieser Token wird", en: "ℹ️ This token will", es: "ℹ️ Este token se" })}eChoice === "page" ? tx({ de: "direkt in einen Long-Lived Page Token umgewandelt", en: "converted directly into a long-lived page token", es: "convertido directamente en un token de página de larga duración" }) : tx({ de: "verwendet, um einen Long-Lived Page Token zu generieren", en: "used to generate a long-lived page token", es: "utilizado para generar un token de página de larga duración" })} und nicht g{tx({ de: "und nicht gespeichert.", en: "and not saved.", es: "y no guardado." })}     </p>
+                ℹ️ Dieser Token wird {tokenTypeChoice === "page" ? tx({ de: "direkt in einen Long-Lived Page Token umgewandelt", en: "converted directly into a long-lived page token", es: "convertido directamente en un token de página de larga duración" }) : tx({ de: "verwendet, um einen Long-Lived Page Token zu generieren", en: "used to generate a long-lived page token", es: "utilizado para generar un token de página de larga duración" })} und nicht gespeichert.
+              </p>
             </div>
 
             {/* Action Button */}
@@ -1218,7 +1220,8 @@ export default function InstagramPublishing() {
                     <Alert className="mt-3 border-orange-500">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription className="text-xs">
-                        <strong>💡 Tipp:</strong> {tx({ de: "Dieser Fehler tritt oft auf, wenn", en: "This error often occurs when", es: "Este error ocurre a menudo cuando" })} <code>pages_show_list</code> {tx({ de: "fehlt. Verwende stattdessen einen", en: "missing. Use one instead", es: "desaparecido. Utilice uno en su lugar" })} <strong>Page Token</strong> (Option 1 oben){tx({ de: "(Option 1 oben) - das ist einfacher!", en: "(Option 1 above) - that's easier!", es: "(Opción 1 arriba) - ¡es más fácil!" })}         </AlertDescription>
+                        <strong>💡 Tipp:</strong> {tx({ de: "Dieser Fehler tritt oft auf, wenn", en: "This error often occurs when", es: "Este error ocurre a menudo cuando" })} <code>pages_show_list</code> {tx({ de: "fehlt. Verwende stattdessen einen", en: "missing. Use one instead", es: "desaparecido. Utilice uno en su lugar" })} <strong>Page Token</strong> (Option 1 oben) - das ist einfacher!
+                      </AlertDescription>
                     </Alert>
                   )}
                 </AlertDescription>

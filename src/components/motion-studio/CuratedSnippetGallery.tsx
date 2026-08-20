@@ -68,7 +68,7 @@ export default function CuratedSnippetGallery({
                 : 'bg-muted/40 text-muted-foreground border-border/40 hover:border-primary/40',
             )}
           >
-            <Sparkles className="h-3 w-3" /> A{tx({ de: "Alle (", en: "All (", es: "Todos (" })}{snippets.length})
+            <Sparkles className="h-3 w-3" /> Alle ({snippets.length})
           </button>
           {SCENE_SNIPPET_CATEGORIES.map((c) => {
             const count = snippets.filter((s) => s.category === c.id).length;

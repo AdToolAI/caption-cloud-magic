@@ -166,7 +166,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
               <HoverCardContent side="top" className="w-[320px] text-[11px]">
                 <div className="font-medium mb-1">{tx({ de: 'Skript gewinnt vor Board-Dauer', en: 'Script wins over board duration', es: 'El guion gana sobre la duración del tablero' })}</div>
                 <div className="text-muted-foreground">
-                  Dein Skript enthält{tx({ de: "Dein Skript enthält", en: "Your script contains", es: "Tu script contiene" })} {scriptTiming!.mode === 'SHOT_MARKERS' ? 'explizite Shot-Marker' : tx({ de: "strukturierte Sprecher-Blöcke", en: "structured speaker blocks", es: "bloques de orador estructurados" })}.
+                  Dein Skript enthält {scriptTiming!.mode === 'SHOT_MARKERS' ? 'explizite Shot-Marker' : tx({ de: "strukturierte Sprecher-Blöcke", en: "structured speaker blocks", es: "bloques de orador estructurados" })}.
                   {tx({ de: 'Die im Board eingetragene Gesamtdauer wurde ignoriert und die Szenen folgen dem Skript.', en: 'The total duration entered in the board was ignored and the scenes follow the script.', es: 'Se ignoró la duración total ingresada en el tablero y las escenas siguen el guion.' })}
                 </div>
               </HoverCardContent>
@@ -340,7 +340,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
                   )}
                 </div>
                 <div className="mt-2 pt-2 border-t border-border/40 text-[10px] font-sans text-muted-foreground">
-                  Nur sichtbar mit <c{tx({ de: "Nur sichtbar mit", en: "Only visible with", es: "Solo visible con" })} <code>?debug=1</code>.
+                  Nur sichtbar mit <code>?debug=1</code>.
                 </div>
               </HoverCardContent>
             </HoverCard>

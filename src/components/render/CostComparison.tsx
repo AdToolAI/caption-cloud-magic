@@ -36,7 +36,7 @@ export const CostComparison = ({ remotionCost, shotstackCost }: CostComparisonPr
             </div>
             <Progress value={remotionPercent} className="h-2" />
             <div className="text-xs text-muted-foreground mt-1">
-              {remotionPercent.toFixed(1)}{tx({ de: "% der Gesamtkosten", en: "% of total cost", es: "% del coste total" })}
+              {remotionPercent.toFixed(1)}% der Gesamtkosten
             </div>
           </div>
 

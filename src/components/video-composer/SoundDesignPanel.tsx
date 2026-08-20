@@ -148,7 +148,8 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-xs text-muted-foreground">
-          Generiert p{tx({ de: "Generiert pro Szene Hintergrund-Atmo (Wind, Stadt, Café…) und punktgenaue SFX/Foley via ElevenLabs.\n          Diese werden im finalen Render automatisch unter die Voiceover-Spur gemischt (Auto-Ducking, -14 LUFS).", en: "Generates per-scene background atmosphere (wind, city, cafe…) and pinpoint SFX/Foley via ElevenLabs.\n          These are automatically mixed under the voiceover track in the final render (auto-ducking, -14 LUFS).", es: "Genera atmósferas de fondo por escena (viento, ciudad, café…) y SFX/Foley precisos a través de ElevenLabs.\n          Estos se mezclan automáticamente bajo la pista de voz en off en el render final (reducción automática, -14 LUFS)." })}
+          Generiert pro Szene Hintergrund-Atmo (Wind, Stadt, Café…) und punktgenaue SFX/Foley via ElevenLabs.
+          Diese werden im finalen Render automatisch unter die Voiceover-Spur gemischt (Auto-Ducking, -14 LUFS).
         </p>
         <p className="text-[11px] text-muted-foreground/80 italic">
           {tx({ de: "Hinweis:", en: "Note:", es: "Nota:" })}

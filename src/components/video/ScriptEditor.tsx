@@ -38,7 +38,7 @@ export const ScriptEditor = ({
   const handleOptimize = async (action: string, label: string) => {
     if (!value.trim()) {
       toast({
-        title: tx({ de: "Kein Text vorhanden", en: "No text available", es: "Ningún texto disponible" }),
+        title: "Kein Text vorhanden",
         description: tx({ de: "Bitte gib zuerst einen Text ein.", en: "Please enter text first.", es: "Por favor, introduce un texto primero." }),
         variant: "destructive",
       });

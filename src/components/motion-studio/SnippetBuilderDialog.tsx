@@ -333,7 +333,7 @@ export default function SnippetBuilderDialog({
               placeholder="Cinematic shot description, camera move, lighting, mood..."
               className="bg-background/60 mt-1 font-mono text-xs"
             />
-            <p className="text-[10px] text-muted-foreground mt-1">{prompt.trim().length}/{MIN_PROMPT}{tx({ de: "+ Zeichen", en: "+ Characters", es: "+ Caracteres" })}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">{prompt.trim().length}/{MIN_PROMPT}+ Zeichen</p>
           </div>
 
           {/* Duration */}
@@ -398,7 +398,7 @@ export default function SnippetBuilderDialog({
               </p>
               {!canPublish && (
                 <p className="text-[10px] text-amber-500 mt-1">
-                  Voraussetzung: Name ≥ {MIN_NAME} Z{tx({ de: "Zeichen, Prompt ≥", en: "Characters, Prompt ≥", es: "Caracteres, Prompt ≥" })} {MIN_PROMPT} Z{tx({ de: "Zeichen, Vorschaubild gesetzt.", en: "Characters, thumbnail set.", es: "Caracteres, miniatura establecida." })}
+                  Voraussetzung: Name ≥ {MIN_NAME} Zeichen, Prompt ≥ {MIN_PROMPT} Zeichen, Vorschaubild gesetzt.
                 </p>
               )}
             </div>

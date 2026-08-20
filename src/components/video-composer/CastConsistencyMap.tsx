@@ -287,7 +287,8 @@ export function CastConsistencyMap({ scenes, characters, embedded = false, onUpd
       })()}
 
       <p className="text-[10px] text-muted-foreground leading-relaxed">
-        Reference-I{tx({ de: "Reference-Image (🟢) liefert die stärkste visuelle Konsistenz über mehrere Shots.", en: "Reference image (🟢) provides the strongest visual consistency across multiple shots.", es: "La imagen de referencia (🟢) proporciona la mayor coherencia visual en múltiples tomas." })}      {tx({ de: "Wenn ein Charakter ohne Anker erscheint, wird automatisch der letzte Frame der vorherigen Szene", en: "If a character appears without an anchor, the last frame of the previous scene is automatically used", es: "Si un personaje aparece sin anclaje, se utiliza automáticamente el último fotograma de la escena anterior" })}
+        Reference-Image (🟢) liefert die stärkste visuelle Konsistenz über mehrere Shots.
+        {tx({ de: "Wenn ein Charakter ohne Anker erscheint, wird automatisch der letzte Frame der vorherigen Szene", en: "If a character appears without an anchor, the last frame of the previous scene is automatically used", es: "Si un personaje aparece sin anclaje, se utiliza automáticamente el último fotograma de la escena anterior" })}
         als Continuity-Brücke genutzt (Frame-Chain 🔗).
       </p>
     </Wrapper>

@@ -262,7 +262,7 @@ export function AIToolsSidebarExpanded({
                 <span className="text-sm font-medium">Music Library</span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Durchsuche die vo{tx({ de: "Durchsuche die volle Bibliothek (Jamendo, Pixabay, deine Uploads & KI-generierte Tracks).", en: "Browse the full library (Jamendo, Pixabay, your uploads & AI-generated tracks).", es: "Explora la biblioteca completa (Jamendo, Pixabay, tus subidas y pistas generadas por IA)." })}
+                Durchsuche die volle Bibliothek (Jamendo, Pixabay, deine Uploads & KI-generierte Tracks).
               </p>
               <Button size="sm" className="w-full gap-2" onClick={() => setMusicBrowserOpen(true)}>
                 <Music className="h-4 w-4" />
@@ -391,7 +391,7 @@ export function AIToolsSidebarExpanded({
             </Button>
 
             <div className="space-y-2">
-              <Label className="text-xs">{tx({ de: "Szenen (", en: "Scenes (", es: "Escenas (" })}{scenes.length})</Label>
+              <Label className="text-xs">Szenen ({scenes.length})</Label>
               {scenes.slice(0, 5).map((scene, index) => (
                 <div key={scene.id} className="p-2 rounded border bg-card/50 text-sm">
                   <div className="flex items-center gap-2">

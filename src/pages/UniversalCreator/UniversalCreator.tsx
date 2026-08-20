@@ -622,7 +622,7 @@ export function UniversalCreator() {
               <AlertDialogHeader>
                 <AlertDialogTitle>{tx({ de: "Neues Projekt starten?", en: "Start new project?", es: "¿Iniciar nuevo proyecto?" })}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Der aktuelle Entwur{tx({ de: "Der aktuelle Entwurf wird endgültig gelöscht — auch nach einem Reload (F5) kommt er nicht zurück. Diese Aktion kann nicht rückgängig gemacht werden.", en: "The current draft will be permanently deleted — even after a reload (F5) it will not return. This action cannot be undone.", es: "El borrador actual se eliminará permanentemente — incluso después de una recarga (F5) no volverá. Esta acción no se puede deshacer." })}
+                  Der aktuelle Entwurf wird endgültig gelöscht — auch nach einem Reload (F5) kommt er nicht zurück. Diese Aktion kann nicht rückgängig gemacht werden.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

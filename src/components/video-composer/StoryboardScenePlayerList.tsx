@@ -136,7 +136,7 @@ export default function StoryboardScenePlayerList({
     <div className={cn('flex flex-col gap-3', className)}>
       <div className="flex items-center justify-between px-1">
         <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">
-          Szenen · {s{tx({ de: "Szenen ·", en: "Scenes ·", es: "Escenas ·" })} {scenes.length}
+          Szenen · {scenes.length}
         </span>
         <span className="text-[10px] text-muted-foreground/80">{tx({ de: "Klick = bearbeiten", en: "Click = edit", es: "Clic = editar" })}</span>
       </div>

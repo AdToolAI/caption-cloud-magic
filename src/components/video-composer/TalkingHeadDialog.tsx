@@ -810,7 +810,9 @@ function DialogModeTab({
       <Card className="p-3 bg-primary/5 border-primary/30">
         <div className="text-sm font-medium mb-1">{tx({ de: "Drehbuch-Modus für Multi-Speaker-Szenen", en: "Script mode for multi-speaker scenes", es: "Modo guion para escenas con varios oradores" })}</div>
         <p className="text-xs text-muted-foreground">
-          Schreibe ei{tx({ de: "Schreibe einen Dialog wie ein Drehbuch — pro Sprecher entsteht ein\n          eigener Talking-Head-Clip. Im Director's Cut werden sie als\n          Shot-Reverse-Shot zusammengeschnitten.", en: "Write a dialog like a script — a separate talking-head clip is created for each speaker.\n          In Director's Cut, they are edited together as shot-reverse-shot.", es: "Escribe un diálogo como un guion — se crea un clip de talking-head separado para cada orador.\n          En Director's Cut, se editan juntos como shot-reverse-shot." })}
+          Schreibe einen Dialog wie ein Drehbuch — pro Sprecher entsteht ein
+          eigener Talking-Head-Clip. Im Director's Cut werden sie als
+          Shot-Reverse-Shot zusammengeschnitten.
         </p>
       </Card>
 

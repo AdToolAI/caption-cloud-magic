@@ -134,7 +134,7 @@ export function CampaignMediaUploader({
             {tx({ de: "Bilder & Videos hochladen", en: "Upload images & videos", es: "Subir imágenes y videos" })}
           </p>
           <p className="text-xs text-muted-foreground">
-            Bis zu {maxFiles} D{tx({ de: "Dateien • Max. 1GB pro Datei", en: "Files • Max. 1GB per file", es: "Archivos • Máx. 1GB por archivo" })}
+            Bis zu {maxFiles} Dateien • Max. 1GB pro Datei
           </p>
         </label>
       </Card>
