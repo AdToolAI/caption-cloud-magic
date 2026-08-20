@@ -110,7 +110,7 @@ serve(async (req) => {
         email,
         account_type: "creator",
         ai_discount_percent: discountPercent,
-        plan: "beta-basic",
+        plan: "basic",
         updated_at: new Date().toISOString(),
       },
       { onConflict: "id" },
