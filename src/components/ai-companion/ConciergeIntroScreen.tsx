@@ -21,10 +21,22 @@ import { Button } from '@/components/ui/button';
 import { PersonaSignature } from './PersonaSignature';
 import { cn } from '@/lib/utils';
 
-const GOALS: Array<{ id: string; labelDe: string; hintDe: string }> = [
-  { id: 'quick_spot', labelDe: 'Schneller Spot', hintDe: tx({ de: 'Ein einzelnes Video, so schnell wie möglich.', en: 'A single video, as quickly as possible.', es: 'Un solo vídeo, lo más rápido posible.' }) },
-  { id: 'ensemble', labelDe: 'Ensemble & Serie', hintDe: 'Wiederkehrende Charaktere, konsistente Welt.' },
-  { id: 'explore', labelDe: 'Erstmal erkunden', hintDe: tx({ de: 'Nur schauen, was die Plattform kann.', en: 'Just see what the platform can do.', es: 'Solo vea lo que la plataforma puede hacer.' }) },
+const GOALS: Array<{ id: string; label: string; hint: string }> = [
+  {
+    id: 'quick_spot',
+    label: tx({ de: 'Schneller Spot', en: 'Quick spot', es: 'Spot rápido' }),
+    hint: tx({ de: 'Ein einzelnes Video, so schnell wie möglich.', en: 'A single video, as quickly as possible.', es: 'Un solo vídeo, lo más rápido posible.' }),
+  },
+  {
+    id: 'ensemble',
+    label: tx({ de: 'Ensemble & Serie', en: 'Ensemble & series', es: 'Reparto y serie' }),
+    hint: tx({ de: 'Wiederkehrende Charaktere, konsistente Welt.', en: 'Recurring characters, consistent world.', es: 'Personajes recurrentes, mundo coherente.' }),
+  },
+  {
+    id: 'explore',
+    label: tx({ de: 'Erstmal erkunden', en: 'Just explore first', es: 'Explorar primero' }),
+    hint: tx({ de: 'Nur schauen, was die Plattform kann.', en: 'Just see what the platform can do.', es: 'Solo vea lo que la plataforma puede hacer.' }),
+  },
 ];
 
 export function ConciergeIntroScreen() {
@@ -139,10 +151,10 @@ export function ConciergeIntroScreen() {
                           >
                             <div className="flex items-center gap-2">
                               <PersonaSignature pace={id} size={30} />
-                              <div className="text-sm font-semibold text-white">{p.labelDe}</div>
+                              <div className="text-sm font-semibold text-white">{p.label}</div>
                             </div>
                             <div className="mt-2 text-[11px] leading-relaxed text-white/55">
-                              {p.descriptionDe}
+                              {p.description}
                             </div>
                           </button>
                         );
@@ -186,8 +198,8 @@ export function ConciergeIntroScreen() {
                                 : 'border-white/10 bg-white/[0.02] hover:border-white/25',
                             )}
                           >
-                            <div className="text-sm font-semibold text-white">{g.labelDe}</div>
-                            <div className="mt-1 text-[11px] text-white/55">{g.hintDe}</div>
+                            <div className="text-sm font-semibold text-white">{g.label}</div>
+                            <div className="mt-1 text-[11px] text-white/55">{g.hint}</div>
                           </button>
                         );
                       })}
@@ -226,9 +238,9 @@ export function ConciergeIntroScreen() {
                       <div className="flex items-center gap-3">
                         <PersonaSignature pace={pace} size={40} />
                         <div className="text-sm text-white/85">
-                          <div className="font-medium">{PERSONA_PROFILES[pace].labelDe}</div>
+                          <div className="font-medium">{PERSONA_PROFILES[pace].label}</div>
                           <div className="text-[11px] text-white/50">
-                            Ziel: {GOALS.find((g) => g.id === goal)?.labelDe}
+                            {tx({ de: 'Ziel', en: 'Goal', es: 'Objetivo' })}: {GOALS.find((g) => g.id === goal)?.label}
                           </div>
                         </div>
                       </div>
