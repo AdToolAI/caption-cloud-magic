@@ -208,11 +208,11 @@ export function EngineComparison({ engineData }: Props) {
         <div className="space-y-2 text-sm">
           <p>
             <strong>{tx({ de: 'Für schnelle, einfache Videos:', en: 'For fast, simple videos:', es: 'Para videos rápidos y sencillos:' })}</strong> {tx({ de: 'Nutze Shotstack -', en: 'Use Shotstack -', es: 'Usa Shotstack -' })} 
-            {engineData.shotstack.avg_render_time}s Renderzeit und {engineData.shotstack.success_rate}% Erfolgsrate
+            {engineData.shotstack.avg_render_time}s {tx({ de: 'Renderzeit und', en: 'render time and', es: 'tiempo de render y' })} {engineData.shotstack.success_rate}% {tx({ de: 'Erfolgsrate', en: 'success rate', es: 'tasa de éxito' })}
           </p>
           <p>
             <strong>{tx({ de: 'Für komplexe, hochwertige Animationen:', en: 'For complex, high-quality animations:', es: 'Para animaciones complejas de alta calidad:' })}</strong> {tx({ de: 'Nutze Remotion -', en: 'Use Remotion -', es: 'Usa Remotion -' })} 
-            Mehr Flexibilität und React-Power, trotz {engineData.remotion.avg_render_time}s Renderzeit
+            {tx({ de: 'Mehr Flexibilität und React-Power, trotz', en: 'More flexibility and React power, despite', es: 'Más flexibilidad y potencia de React, pese a' })} {engineData.remotion.avg_render_time}s {tx({ de: 'Renderzeit', en: 'render time', es: 'tiempo de render' })}
           </p>
           <p className="text-muted-foreground mt-3">
             💰 Potenzielle Einsparung durch optimale Engine-Wahl: 

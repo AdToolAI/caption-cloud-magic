@@ -135,7 +135,7 @@ export default function AIMonitoring() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Diese Woche</CardTitle>
+              <CardTitle className="text-sm font-medium">{tx({ de: 'Diese Woche', en: 'This week', es: 'Esta semana' })}</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -149,7 +149,7 @@ export default function AIMonitoring() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Dieser Monat</CardTitle>
+              <CardTitle className="text-sm font-medium">{tx({ de: 'Dieser Monat', en: 'This month', es: 'Este mes' })}</CardTitle>
               <Zap className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -171,7 +171,7 @@ export default function AIMonitoring() {
                 <>
                   <div className="text-2xl font-bold">{stats.peakHour.hour}:00</div>
                   <p className="text-xs text-muted-foreground">
-                    {stats.peakHour.count} Calls diese Woche
+                    {stats.peakHour.count} {tx({ de: 'Calls diese Woche', en: 'calls this week', es: 'llamadas esta semana' })}
                   </p>
                 </>
               ) : (
@@ -192,7 +192,7 @@ export default function AIMonitoring() {
             </CardHeader>
             <CardContent>
               <p className="text-sm">
-                Du hast heute bereits {stats.today} AI Calls gemacht. 
+                {tx({ de: 'Du hast heute bereits', en: 'You have already made', es: 'Ya has hecho' })} {stats.today} {tx({ de: 'AI Calls gemacht.', en: 'AI calls today.', es: 'llamadas de IA hoy.' })} 
                 {tx({ de: "Bei sehr hoher Nutzung könntest du Lovable AI Rate Limits erreichen.", en: "With very high usage, you might hit Lovable AI Rate Limits.", es: "Con un uso muy elevado, podrías alcanzar los límites de tasa de Lovable AI." })}
               </p>
             </CardContent>

@@ -389,7 +389,7 @@ export default function SnippetBuilderDialog({
             <Globe2 className="h-4 w-4 text-primary mt-0.5" />
             <div className="flex-1">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-semibold">Mit Community teilen</Label>
+                <Label className="text-xs font-semibold">{tx({ de: 'Mit Community teilen', en: 'Share with community', es: 'Compartir con la comunidad' })}</Label>
                 <Switch checked={isPublic} onCheckedChange={setIsPublic} disabled={!canPublish && !isPublic} />
               </div>
               <p className="text-[10px] text-muted-foreground mt-1">

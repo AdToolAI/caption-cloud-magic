@@ -180,7 +180,7 @@ export default function MusicBrowser() {
         </Card>
       ) : results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">
-          Keine Tracks gefunden. Tipp: andere Mood + Genre Kombination probieren.
+          {tx({ de: 'Keine Tracks gefunden. Tipp: andere Mood + Genre Kombination probieren.', en: 'No tracks found. Tip: try a different mood + genre combination.', es: 'No se encontraron pistas. Consejo: prueba otra combinación de mood y género.' })}
         </Card>
       ) : (
         <div className="space-y-2">

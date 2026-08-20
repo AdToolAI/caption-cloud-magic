@@ -177,7 +177,7 @@ function DraggableScene({
             </DropdownMenuItem>
             <DropdownMenuItem>
               <Link className="h-3 w-3 mr-2" />
-              Mit vorheriger verbinden
+              {tx({ de: 'Mit vorheriger verbinden', en: 'Merge with previous', es: 'Combinar con la anterior' })}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem>

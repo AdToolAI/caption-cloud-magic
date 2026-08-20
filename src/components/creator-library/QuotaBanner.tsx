@@ -19,7 +19,7 @@ export default function QuotaBanner() {
         <div className="flex items-center gap-2 text-sm">
           <ShieldCheck className="h-4 w-4 text-emerald-400" />
           <span className="text-emerald-200">
-            Creator Library: <strong>unlimited inklusive</strong> in deinem {q.plan}-Plan
+            {tx({ de: 'Creator Library:', en: 'Creator Library:', es: 'Creator Library:' })} <strong>{tx({ de: 'unlimited inklusive', en: 'unlimited included', es: 'ilimitado incluido' })}</strong> {tx({ de: 'in deinem', en: 'in your', es: 'en tu' })} {q.plan}-{tx({ de: 'Plan', en: 'plan', es: 'plan' })}
           </span>
         </div>
         <span className="text-[10px] text-muted-foreground">

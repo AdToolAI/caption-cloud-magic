@@ -78,7 +78,7 @@ const Welcome = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <SEO
-        title="Willkommen in deinem Studio"
+        title={tx({ de: 'Willkommen in deinem Studio', en: 'Welcome to your studio', es: 'Bienvenido a tu estudio' })}
         description={tx({ de: "Dein Studio ist freigeschaltet. Starte jetzt deine erste Produktion.", en: "Your studio is activated. Start your first production now.", es: "Tu estudio está activado. Comienza tu primera producción ahora." })}
         canonical="/willkommen"
         lang={language}

@@ -823,10 +823,10 @@ export default function AITextStudio() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Mit {branchPrompt ? TEXT_MODELS[branchPrompt.targetModel].label : ""} fortfahren?
+              {tx({ de: 'Mit', en: 'Continue with', es: 'Continuar con' })} {branchPrompt ? TEXT_MODELS[branchPrompt.targetModel].label : ""}{tx({ de: ' fortfahren?', en: '?', es: '?' })}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              <strong> Branch</strong> in dieser Konversation. Beide Verläufe bleiben sichtbar.
+              <strong> Branch</strong> {tx({ de: 'in dieser Konversation. Beide Verläufe bleiben sichtbar.', en: 'in this conversation. Both histories stay visible.', es: 'en esta conversación. Ambos historiales siguen visibles.' })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
