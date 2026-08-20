@@ -11,14 +11,13 @@ import { tx } from "@/lib/i18nText";
  * other providers (= flat / 5).
  */
 
-// Margin policy: exactly 3.00× Replicate flat cost (normalized 14.07.2026)
-// Ref: $0.22/clip → €0.66 | I2V/T2V: $0.20/clip → €0.60
+// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 export const VIDU_VIDEO_MODELS = {
   'vidu-q2-reference': {
     name: 'Vidu Q3 Reference',
     provider: 'Shengshu AI (Replicate)',
-    flatCostEUR: 0.66,
-    flatCostUSD: 0.66,
+    flatCostEUR: 0.43,
+    flatCostUSD: 0.43,
     fixedDuration: 5,
     maxReferences: 7,
     description: tx({ de: 'Bis zu 7 Referenzbilder (Character + Produkt + Location) in einer 5s-Szene', en: 'Up to 7 reference images (character + product + location) in a 5s scene', es: 'Hasta 7 imágenes de referencia (personaje + producto + ubicación) en una escena de 5 segundos' }),
@@ -27,8 +26,8 @@ export const VIDU_VIDEO_MODELS = {
   'vidu-q2-i2v': {
     name: 'Vidu Q3 Image-to-Video',
     provider: 'Shengshu AI (Replicate)',
-    flatCostEUR: 0.60,
-    flatCostUSD: 0.60,
+    flatCostEUR: 0.39,
+    flatCostUSD: 0.39,
     fixedDuration: 5,
     description: tx({ de: 'Animiert ein Standbild zu einem 5s-Clip', en: 'Animates a still image into a 5s clip', es: 'Anima una imagen fija en un clip de 5 segundos.' }),
     badge: 'I2V',
@@ -36,8 +35,8 @@ export const VIDU_VIDEO_MODELS = {
   'vidu-q2-t2v': {
     name: 'Vidu Q3 Text-to-Video',
     provider: 'Shengshu AI (Replicate)',
-    flatCostEUR: 0.60,
-    flatCostUSD: 0.60,
+    flatCostEUR: 0.39,
+    flatCostUSD: 0.39,
     fixedDuration: 5,
     description: tx({ de: '5s Clip aus reinem Prompt', en: '5s clip from pure prompt', es: 'Clip de 5 segundos de Pure Prompt' }),
     badge: 'T2V',

@@ -1,22 +1,21 @@
 import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
 
-// Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
-// Std: $0.07/s → €0.21/s | Pro: $0.12/s → €0.36/s
+// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 export const LUMA_VIDEO_MODELS = {
   'luma-standard': {
     name: 'Luma Ray 2 Standard',
     provider: 'Luma AI (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.21,
-      USD: 0.21,
+      EUR: 0.14,
+      USD: 0.14,
     },
     minDuration: 5,
     maxDuration: 9,
     allowedDurations: [5, 9] as const,
     description: {
-      EUR: tx({ de: 'Cinematic AI-Videos ab 1,05€ pro 5 Sekunden', en: 'Cinematic AI videos from €1.05 per 5 seconds', es: 'Vídeos cinematográficos con IA desde 1,05 € por 5 segundos' }),
+      EUR: tx({ de: 'Cinematic AI-Videos ab 0,70€ pro 5 Sekunden', en: 'Cinematic AI videos from €0.70 per 5 seconds', es: 'Vídeos cinematográficos con IA desde 0,70 € por 5 segundos' }),
       USD: 'Cinematic AI videos from $1.05 per 5 seconds',
     },
     badge: tx({ de: 'Empfohlen', en: 'Recommended', es: 'Recomendado' }),
@@ -26,14 +25,14 @@ export const LUMA_VIDEO_MODELS = {
     provider: 'Luma AI (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.36,
-      USD: 0.36,
+      EUR: 0.23,
+      USD: 0.23,
     },
     minDuration: 5,
     maxDuration: 9,
     allowedDurations: [5, 9] as const,
     description: {
-      EUR: tx({ de: 'Premium cinematic Qualität ab 1,80€ pro 5 Sekunden', en: 'Premium cinematic quality from €1.80 per 5 seconds', es: 'Calidad cinematográfica premium desde 1,80 € por 5 segundos' }),
+      EUR: tx({ de: 'Premium cinematic Qualität ab 1,15€ pro 5 Sekunden', en: 'Premium cinematic quality from €1.15 per 5 seconds', es: 'Calidad cinematográfica premium desde 1,15 € por 5 segundos' }),
       USD: 'Premium cinematic quality from $1.80 per 5 seconds',
     },
     badge: tx({ de: 'Premium', en: 'Premium', es: 'Premium' }),
@@ -43,14 +42,14 @@ export const LUMA_VIDEO_MODELS = {
     provider: 'Luma AI (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.18,
-      USD: 0.18,
+      EUR: 0.12,
+      USD: 0.12,
     },
     minDuration: 5,
     maxDuration: 5,
     allowedDurations: [5] as const,
     description: {
-      EUR: tx({ de: 'Ray 3.2 · neueste Luma-Generation — 0,90€ pro Clip', en: 'Ray 3.2 · latest Luma generation — €0.90 per clip', es: 'Ray 3.2 · última generación de Luma — 0,90 € por clip' }),
+      EUR: tx({ de: 'Ray 3.2 · neueste Luma-Generation — 0,60€ pro Clip', en: 'Ray 3.2 · latest Luma generation — €0.60 per clip', es: 'Ray 3.2 · última generación de Luma — 0,60 € por clip' }),
       USD: 'Ray 3.2 · latest Luma generation — $0.90 per clip',
     },
     badge: tx({ de: 'Neu', en: 'New', es: 'Nuevo' }),
@@ -60,14 +59,14 @@ export const LUMA_VIDEO_MODELS = {
     provider: 'Luma AI (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.27,
-      USD: 0.27,
+      EUR: 0.18,
+      USD: 0.18,
     },
     minDuration: 10,
     maxDuration: 10,
     allowedDurations: [10] as const,
     description: {
-      EUR: tx({ de: 'Ray 3.2 · 10s Langclip — 2,70€ pro Clip', en: 'Ray 3.2 · 10s long clip — €2.70 per clip', es: 'Ray 3.2 · clip largo de 10 segundos — 2,70 € por clip' }),
+      EUR: tx({ de: 'Ray 3.2 · 10s Langclip — 1,80€ pro Clip', en: 'Ray 3.2 · 10s long clip — €1.80 per clip', es: 'Ray 3.2 · clip largo de 10 segundos — 1,80 € por clip' }),
       USD: 'Ray 3.2 · 10s long clip — $2.70 per clip',
     },
     badge: tx({ de: 'Neu', en: 'New', es: 'Nuevo' }),

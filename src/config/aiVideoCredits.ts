@@ -145,29 +145,28 @@ export const AI_VIDEO_PRICING = {
   defaultDuration: 10, // seconds
 } as const;
 
-// Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
-// Std: $0.20/s → €0.60/s | Pro: $0.45/s → €1.35/s
+// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 export const AI_VIDEO_MODELS = {
   'sora-2-standard': {
     name: 'Sora 2 Standard',
     provider: 'OpenAI (Replicate)',
     costPerSecond: {
-      EUR: 0.60,
-      USD: 0.60,
+      EUR: 0.2,
+      USD: 0.2,
     },
     maxDuration: 30,
-    description: tx({ de: 'Hochwertige AI-Videos ab 6,00€ pro 10 Sekunden', en: 'High-quality AI videos from €6.00 ​​per 10 seconds', es: 'Vídeos con IA de alta calidad desde 6,00 € por 10 segundos' }),
+    description: tx({ de: 'Hochwertige AI-Videos ab 2,00€ pro 10 Sekunden', en: 'High-quality AI videos from €2.00 ​​per 10 seconds', es: 'Vídeos con IA de alta calidad desde 2,00 € por 10 segundos' }),
     badge: 'Premium-Engine',
   },
   'sora-2-pro': {
     name: 'Sora 2 Pro',
     provider: 'OpenAI (Replicate)',
     costPerSecond: {
-      EUR: 1.35,
-      USD: 1.35,
+      EUR: 0.98,
+      USD: 0.98,
     },
     maxDuration: 30,
-    description: tx({ de: 'Premium-Qualität ab 13,50€ pro 10 Sekunden', en: 'Premium quality from €13.50 per 10 seconds', es: 'Calidad premium desde 13,50€ los 10 segundos' }),
+    description: tx({ de: 'Premium-Qualität ab 9,80€ pro 10 Sekunden', en: 'Premium quality from €9.80 per 10 seconds', es: 'Calidad premium desde 9,80€ los 10 segundos' }),
     badge: 'Premium-Engine',
   },
 } as const;

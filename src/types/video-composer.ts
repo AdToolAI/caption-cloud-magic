@@ -1073,7 +1073,7 @@ export const QUALITY_LABELS: Record<ClipSource, Record<ClipQuality, string>> = {
   'ai-sora':     { standard: 'Standard',      pro: 'Pro' },
   'ai-wan':      { standard: 'Standard 720p', pro: 'Pro 1080p' },
   'ai-seedance': { standard: 'Standard 720p', pro: 'Pro 1080p' },
-  'ai-seedance25': { standard: 'Seedance 2.5 720p', pro: 'Seedance 2.5 720p' },
+  'ai-seedance25': { standard: 'Seedance 2.5 480p', pro: 'Seedance 2.5 720p' },
   'ai-luma':     { standard: 'Ray 2 720p',    pro: 'Ray 2 720p+' },
   'ai-veo':      { standard: 'Lite 720p +Audio', pro: 'Pro 1080p +Audio' },
   'ai-runway':   { standard: 'Aleph 720p',        pro: 'Aleph 720p' },

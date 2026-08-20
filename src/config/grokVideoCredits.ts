@@ -1,22 +1,21 @@
 import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
 
-// Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
-// $0.05/s → €0.15/s (xai/grok-imagine-video)
+// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 export const GROK_VIDEO_MODELS = {
   'grok-imagine': {
     name: 'Grok Imagine',
     provider: 'xAI (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.15,
-      USD: 0.15,
+      EUR: 0.1,
+      USD: 0.1,
     },
     minDuration: 5,
     maxDuration: 15,
     allowedDurations: [5, 6, 10, 12, 15] as const,
     description: {
-      EUR: tx({ de: 'Trending AI-Videos mit nativer Audio-Spur ab 2,70€ pro 6 Sekunden', en: 'Trending AI videos with native audio track from €2.70 per 6 seconds', es: 'Vídeos de IA de tendencia con pista de audio nativa desde 2,70 € por 6 segundos' }),
+      EUR: tx({ de: 'Trending AI-Videos mit nativer Audio-Spur ab 0,60€ pro 6 Sekunden', en: 'Trending AI videos with native audio track from €0.60 per 6 seconds', es: 'Vídeos de IA de tendencia con pista de audio nativa desde 0,60 € por 6 segundos' }),
       USD: 'Trending AI videos with native audio from $2.70 per 6 seconds',
     },
     badge: 'Premium-Engine',

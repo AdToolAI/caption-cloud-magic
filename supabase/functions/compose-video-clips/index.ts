@@ -4685,8 +4685,10 @@ serve(async (req) => {
               generateAudio: __seed25GenerateAudio,
               duration: seed25Duration,
 
-              // Seedance 2.5 tops out at 720p output (ModelArk docs).
-              resolution: "720p",
+              // Seedance 2.5 tops out at 720p output (ModelArk docs). The
+              // quality tier drives the resolution AND the billed catalog tier:
+              // standard = 480p (6.95 EUR / 30 s), pro = 720p (11.95 EUR / 30 s).
+              resolution: quality === "pro" ? "720p" : "480p",
               aspectRatio: "16:9",
               // ModelArk's three image modes are mutually exclusive — the
               // resolver already picked exactly one, so only that one is sent.

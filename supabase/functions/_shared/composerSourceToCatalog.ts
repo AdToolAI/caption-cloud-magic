@@ -23,7 +23,7 @@ export const COMPOSER_SOURCE_TO_CATALOG: Record<string, Record<ClipQuality, stri
   // bytedance/seedance-1-lite (720p vs 1080p)
   'ai-seedance':   { standard: 'seedance-mini', pro: 'seedance-mini-1080p' },
   // BytePlus ModelArk direct API
-  'ai-seedance25': { standard: 'seedance-2-5', pro: 'seedance-2-5' },
+  'ai-seedance25': { standard: 'seedance-2-5-480p', pro: 'seedance-2-5' },
   // luma/ray-2-720p
   'ai-luma':       { standard: 'luma-standard', pro: 'luma-pro' },
   // google/veo-3.1-fast (standard) vs google/veo-3.1 (pro)

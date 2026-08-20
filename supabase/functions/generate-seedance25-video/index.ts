@@ -138,7 +138,10 @@ Deno.serve(async (req) => {
       .single();
 
     const currency = (walletPreview?.currency || "EUR") as "EUR" | "USD";
-    const costPerSecond = resolveCostPerSecond(MODEL_ID, currency) ?? 0.54;
+    // 480p and 720p are billed on separate catalog tiers (20.08.2026 re-pricing):
+    // 720p = 11.95 EUR / 30 s, 480p = 6.95 EUR / 30 s.
+    const pricingModelId = resolution === "480p" ? `${MODEL_ID}-480p` : MODEL_ID;
+    const costPerSecond = resolveCostPerSecond(pricingModelId, currency) ?? 0.3983;
     const totalCost = +(billedDuration * costPerSecond).toFixed(4);
 
     const { data: wallet, error: walletError } = await supabaseAdmin

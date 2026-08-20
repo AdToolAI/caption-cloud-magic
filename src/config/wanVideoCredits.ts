@@ -1,8 +1,7 @@
 import { Currency } from './pricing';
 import { tx } from '@/lib/i18nText';
 
-// Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
-// Std: $0.04/s → €0.12/s | Pro: $0.07/s → €0.21/s
+// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 export const WAN_VIDEO_MODELS = {
   'wan-standard': {
     name: 'Wan 2.5 Standard',
@@ -10,14 +9,14 @@ export const WAN_VIDEO_MODELS = {
     quality: '720p',
     version: '2.5',
     costPerSecond: {
-      EUR: 0.12,
-      USD: 0.12,
+      EUR: 0.08,
+      USD: 0.08,
     },
     minDuration: 5,
     maxDuration: 10,
     allowedDurations: [5, 10] as const,
     description: {
-      EUR: tx({ de: 'Schnelle AI-Videos ab 0,60€ pro 5 Sekunden', en: 'Fast AI videos from €0.60 per 5 seconds', es: 'Vídeos rápidos con IA desde 0,60 € por 5 segundos' }),
+      EUR: tx({ de: 'Schnelle AI-Videos ab 0,40€ pro 5 Sekunden', en: 'Fast AI videos from €0.40 per 5 seconds', es: 'Vídeos rápidos con IA desde 0,40 € por 5 segundos' }),
       USD: 'Fast AI videos from $0.60 per 5 seconds',
     },
     badge: 'Standard',
@@ -28,14 +27,14 @@ export const WAN_VIDEO_MODELS = {
     quality: '1080p',
     version: '2.5',
     costPerSecond: {
-      EUR: 0.21,
-      USD: 0.21,
+      EUR: 0.14,
+      USD: 0.14,
     },
     minDuration: 5,
     maxDuration: 10,
     allowedDurations: [5, 10] as const,
     description: {
-      EUR: tx({ de: 'Premium 1080p-Qualität ab 1,05€ pro 5 Sekunden', en: 'Premium 1080p quality from €1.05 per 5 seconds', es: 'Calidad premium 1080p desde 1,05€ por 5 segundos' }),
+      EUR: tx({ de: 'Premium 1080p-Qualität ab 0,70€ pro 5 Sekunden', en: 'Premium 1080p quality from €0.70 per 5 seconds', es: 'Calidad premium 1080p desde 0,70€ por 5 segundos' }),
       USD: 'Premium 1080p quality from $1.05 per 5 seconds',
     },
     badge: 'Premium',
@@ -46,8 +45,8 @@ export const WAN_VIDEO_MODELS = {
     quality: '720p',
     version: '2.6',
     costPerSecond: {
-      EUR: 0.12,
-      USD: 0.12,
+      EUR: 0.08,
+      USD: 0.08,
     },
     minDuration: 5,
     maxDuration: 10,
@@ -64,8 +63,8 @@ export const WAN_VIDEO_MODELS = {
     quality: '1080p',
     version: '2.6',
     costPerSecond: {
-      EUR: 0.21,
-      USD: 0.21,
+      EUR: 0.14,
+      USD: 0.14,
     },
     minDuration: 5,
     maxDuration: 10,
@@ -82,8 +81,8 @@ export const WAN_VIDEO_MODELS = {
     quality: '720p',
     version: '2.7',
     costPerSecond: {
-      EUR: 0.30,
-      USD: 0.30,
+      EUR: 0.2,
+      USD: 0.2,
     },
     minDuration: 5,
     maxDuration: 15,
@@ -100,8 +99,8 @@ export const WAN_VIDEO_MODELS = {
     quality: '1080p',
     version: '2.7',
     costPerSecond: {
-      EUR: 0.45,
-      USD: 0.45,
+      EUR: 0.29,
+      USD: 0.29,
     },
     minDuration: 5,
     maxDuration: 15,
