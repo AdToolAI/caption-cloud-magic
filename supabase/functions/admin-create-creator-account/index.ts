@@ -91,7 +91,13 @@ serve(async (req) => {
       email_confirm: true,
     });
     if (createError || !created?.user) {
-      return json({ error: "create_user_failed", details: createError?.message }, 400);
+      console.error("createUser error:", createError);
+      return json({
+        error: "create_user_failed",
+        details: createError?.message,
+        code: createError?.code,
+        status: createError?.status,
+      }, 400);
     }
     userId = created.user.id;
   }
