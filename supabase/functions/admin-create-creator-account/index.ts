@@ -87,6 +87,8 @@ serve(async (req) => {
     generatedPassword = randomPassword(12);
     const { error: updateError } = await admin.auth.admin.updateUserById(userId, {
       password: generatedPassword,
+      // Creator accounts are provisioned by an admin: no email confirmation step.
+      email_confirm: true,
     });
     if (updateError) {
       return json({ error: "password_reset_failed", details: updateError.message }, 400);
@@ -96,6 +98,8 @@ serve(async (req) => {
     const { data: created, error: createError } = await admin.auth.admin.createUser({
       email,
       password: generatedPassword,
+      // Admin-provisioned account -> already confirmed, can sign in immediately.
+      email_confirm: true,
     });
     if (createError || !created?.user) {
       console.error("createUser error:", createError);
