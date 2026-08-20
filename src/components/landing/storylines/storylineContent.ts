@@ -765,7 +765,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
 };
 
 export const STORYLINE_CHROME: Record<Language, { slide: string; open: string; pause: string; play: string; close: string }> = {
-  de: { slide: "Slide", open: "Studio öffnen", pause: "Pause", play: "Abspielen", close: tx({ de: "Schließen", en: "Close", es: "Cerrar" }) },
+  de: { slide: "Slide", open: "Studio öffnen", pause: "Pause", play: "Abspielen", close: "Schließen" },
   en: { slide: "Slide", open: "Open studio", pause: "Pause", play: "Play", close: "Close" },
   es: { slide: "Slide", open: "Abrir estudio", pause: "Pausar", play: "Reproducir", close: "Cerrar" },
 };

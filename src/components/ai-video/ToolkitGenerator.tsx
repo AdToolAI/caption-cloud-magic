@@ -1783,7 +1783,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       {/* Discreet hint about alternative models */}
       <p className="text-center text-[11px] text-muted-foreground">
         {tx({
-          de: tx({ de: `${AI_VIDEO_TOOLKIT_MODELS.length} Modelle verfügbar — wechsle oben das Modell, dein Prompt bleibt erhalten.`, en: `${AI_VIDEO_TOOLKIT_MODELS.length} models available — switch model above, your prompt will be kept.`, es: `${AI_VIDEO_TOOLKIT_MODELS.length} modelos disponibles — cambia el modelo arriba, tu prompt se mantendrá.` }),
+          de: `${AI_VIDEO_TOOLKIT_MODELS.length} Modelle verfügbar — wechsle oben das Modell, dein Prompt bleibt erhalten.`,
           en: `${AI_VIDEO_TOOLKIT_MODELS.length} models available — switch the model above, your prompt is preserved.`,
           es: `${AI_VIDEO_TOOLKIT_MODELS.length} modelos disponibles — cambia el modelo arriba, tu prompt se conserva.`,
         })}

@@ -21,11 +21,11 @@ const TEXT = {
   },
   de: {
     title: "Support-Center",
-    subtitle: tx({ de: "Melde Probleme mit vollem Kontext — Antwort meist innerhalb von 24h, bei blockierenden Fällen schneller.", en: "Report problems with full context — response usually within 24 hours, faster for blocking cases.", es: "Informe problemas con contexto completo: respuesta generalmente dentro de las 24 horas, más rápido para casos bloqueados." }),
+    subtitle: "Melde Probleme mit vollem Kontext — Antwort meist innerhalb von 24h, bei blockierenden Fällen schneller.",
     tNew: "Neuer Fall",
     tMine: "Meine Tickets",
     tHelp: "Schnelle Hilfe",
-    loginRequired: tx({ de: "Bitte melde dich an, um ein Support-Ticket zu öffnen.", en: "Please log in to open a support ticket.", es: "Inicia sesión para abrir un ticket de soporte." }),
+    loginRequired: "Bitte melde dich an, um ein Support-Ticket zu öffnen.",
   },
   es: {
     title: "Centro de Soporte",

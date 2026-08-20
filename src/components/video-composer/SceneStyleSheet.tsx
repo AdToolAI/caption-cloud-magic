@@ -70,16 +70,16 @@ interface Props {
 
 const t = {
   de: {
-    title: tx({ de: "Stil ändern", en: "Change Style", es: "Cambiar Estilo" }),
+    title: "Stil ändern",
     looks: 'Looks',
     fine: 'Feintuning',
     modifiers: 'Modifier',
-    activeNone: tx({ de: 'Noch kein Stil gesetzt — wähle einen Look oder feinjustiere unten.', en: 'No style set yet — choose a look or fine-tune below.', es: 'Aún no hay estilo establecido; elige un aspecto o ajústalo a continuación.' }),
+    activeNone: 'Noch kein Stil gesetzt — wähle einen Look oder feinjustiere unten.',
     active: 'Aktiv',
-    resetAll: tx({ de: "Alles zurücksetzen", en: "Reset all", es: "Restablecer todo" }),
+    resetAll: "Alles zurücksetzen",
     done: 'Fertig',
-    preview: tx({ de: "Vorschau", en: "Preview", es: "Vista previa" }),
-    previewEmpty: tx({ de: 'Noch keine Cinematography gesetzt.', en: 'No cinematography set yet.', es: 'Aún no se ha establecido ninguna cinematografía.' }),
+    preview: "Vorschau",
+    previewEmpty: 'Noch keine Cinematography gesetzt.',
     axisFraming: 'Bildausschnitt',
     axisAngle: 'Winkel',
     axisMovement: 'Bewegung',

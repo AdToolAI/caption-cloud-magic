@@ -37,7 +37,7 @@ interface Props {
 
 const T = {
   en: { auto: 'Auto-EN', locked: 'Manual override', empty: 'Director-generated', live: 'Translating…', err: 'Translation failed — original text will be used' },
-  de: { auto: 'Auto-EN', locked: 'Manuell — überstimmt Director', empty: 'Director-Output regiert', live: 'Übersetze…', err: tx({ de: 'Übersetzung fehlgeschlagen — Original wird verwendet', en: 'Translation failed — original will be used', es: 'Error de traducción — se usará el original' }) },
+  de: { auto: 'Auto-EN', locked: 'Manuell — überstimmt Director', empty: 'Director-Output regiert', live: 'Übersetze…', err: 'Übersetzung fehlgeschlagen — Original wird verwendet' },
   es: { auto: 'Auto-EN', locked: 'Manual — anula Director', empty: 'Output del Director', live: 'Traduciendo…', err: 'Falló la traducción — se usa el original' },
 } as const;
 

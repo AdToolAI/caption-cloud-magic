@@ -257,7 +257,7 @@ export default function InstagramPublishing() {
         const backupMsg = data.backup_created ? tx({ de: " Backup erstellt.", en: " Backup created.", es: " Copia de seguridad creada." }) : "";
         toast({
           title: tx({ de: "Erfolg!", en: "Success!", es: "¡Éxito!" }),
-          description: tx({ de: `${tx({ de: "Token erfolgreich erneuert und gespeichert!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, en: `${tx({ de: "Token successfully renewed and saved!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, es: `${tx({ de: "¡Token renovado y guardado exitosamente!", en: "¡Token renovado y guardado exitosamente!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}` }),
+          description: tx({ de: `${"Token erfolgreich erneuert und gespeichert!"}${backupMsg}`, en: `${"Token successfully renewed and saved!"}${backupMsg}`, es: `${"¡Token renovado y guardado correctamente!"}${backupMsg}` }),
         });
         
         // Automatically refresh diagnostics after successful save

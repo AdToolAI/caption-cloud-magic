@@ -52,7 +52,7 @@ export function CampaignMediaUploader({
       const isVideo = file.type.startsWith('video/');
       
       if (!isImage && !isVideo) {
-        toast.error(tr({ de: tx({ de: `${file.name} ist kein Bild oder Video`, en: `${file.name} is not an image or video`, es: `${file.name} no es una imagen ni un vídeo` }), en: `${file.name} is not an image or video`, es: `${file.name} no es una imagen ni un video` }));
+        toast.error(tr({ de: `${file.name} ist kein Bild oder Video`, en: `${file.name} is not an image or video`, es: `${file.name} no es una imagen ni un video` }));
         return;
       }
 

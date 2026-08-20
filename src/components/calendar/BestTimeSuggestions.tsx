@@ -16,7 +16,7 @@ interface BestTimeSuggestionsProps {
 }
 
 const COPY = {
-  de: { title: "Empfohlene Zeiten", veryGood: "sehr gut", good: "gut", ok: "okay", empty: tx({ de: "Wähle einen Kanal für Zeitempfehlungen.", en: "Choose a channel for time recommendations.", es: "Elija un canal para recomendaciones de tiempo." }) },
+  de: { title: "Empfohlene Zeiten", veryGood: "sehr gut", good: "gut", ok: "okay", empty: "Wähle einen Kanal für Zeitempfehlungen." },
   en: { title: "Recommended times", veryGood: "very good", good: "good", ok: "okay", empty: "Pick a channel to see time recommendations." },
   es: { title: "Horarios recomendados", veryGood: "muy bueno", good: "bueno", ok: "aceptable", empty: "Elige un canal para ver recomendaciones." },
 } as const;

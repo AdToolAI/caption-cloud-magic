@@ -199,7 +199,7 @@ export const GadgetCardDynamic = () => {
       username: "John Doe",
       handle: "@portfolio",
       
-      caption: tx({ de: "Perfekter Abend am Meer. Die Natur ist der beste Künstler.", en: "Perfect evening by the sea. Nature is the best artist.", es: "Tarde perfecta junto al mar. La naturaleza es el mejor artista." }),
+      caption: "Perfekter Abend am Meer. Die Natur ist der beste Künstler.",
     },
     en: {
       username: "John Doe",

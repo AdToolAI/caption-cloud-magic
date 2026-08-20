@@ -101,8 +101,8 @@ export default function Planner() {
     } catch (error: any) {
       clearTimeout(timeoutId);
       console.error("Unexpected error loading workspace:", error);
-      toast.error(tx({ de: tx({ de: "Unerwarteter Fehler: ", en: "Unexpected error: ", es: "Error inesperado: " }), en: "Unexpected error:", es: "Error inesperado:" }) + error.message);
-      setError(tx({ de: tx({ de: "Ein unerwarteter Fehler ist aufgetreten", en: "An unexpected error occurred", es: "Se ha producido un error inesperado" }), en: "An unexpected error occurred", es: "Se ha producido un error inesperado" }));
+      toast.error(tx({ de: "Unerwarteter Fehler: ", en: "Unexpected error:", es: "Error inesperado:" }) + error.message);
+      setError(tx({ de: "Ein unerwarteter Fehler ist aufgetreten", en: "An unexpected error occurred", es: "Se ha producido un error inesperado" }));
       setLoading(false);
     }
   };
@@ -212,7 +212,7 @@ export default function Planner() {
       }
     } catch (error: any) {
       console.error("Error loading/creating weekplan:", error);
-      toast.error(tx({ de: "Fehler beim Laden des Plans: ", en: "Failed to load plan: ", es: "Error al cargar el plan: " }) + (error.message || tx({ de: tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }), en: "Unknown error", es: "Error desconocido" })));
+      toast.error(tx({ de: "Fehler beim Laden des Plans: ", en: "Failed to load plan: ", es: "Error al cargar el plan: " }) + (error.message || tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" })));
     } finally {
       setLoading(false);
     }
@@ -320,7 +320,7 @@ export default function Planner() {
       toast.success(tx({ de: "Post wurde gelöscht", en: "Post deleted", es: "Publicación eliminada" }), { id: loadingToast });
     } catch (error: any) {
       console.error("Unexpected error:", error);
-      toast.error(tx({ de: tx({ de: "Unerwarteter Fehler: ", en: "Unexpected error: ", es: "Error inesperado: " }), en: "Unexpected error:", es: "Error inesperado:" }) + error.message, { id: loadingToast });
+      toast.error(tx({ de: "Unerwarteter Fehler: ", en: "Unexpected error:", es: "Error inesperado:" }) + error.message, { id: loadingToast });
     }
   };
 
@@ -441,7 +441,7 @@ export default function Planner() {
       }
     } catch (error: any) {
       console.error("Unexpected error:", error);
-      toast.error(tx({ de: tx({ de: "Unerwarteter Fehler: ", en: "Unexpected error: ", es: "Error inesperado: " }), en: "Unexpected error:", es: "Error inesperado:" }) + error.message, { id: loadingToast });
+      toast.error(tx({ de: "Unerwarteter Fehler: ", en: "Unexpected error:", es: "Error inesperado:" }) + error.message, { id: loadingToast });
     }
   };
 

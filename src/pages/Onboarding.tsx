@@ -311,7 +311,7 @@ export default function Onboarding() {
                   {brandName || tx({ de: "Dein Studio", en: "Your studio", es: "Tu estudio" })} {tx({ de: "ist bereit", en: "is ready", es: "está listo" })}
                 </h3>
                 <p className="text-muted-foreground">
-                  {tx({ de: "Wir haben eine erste Produktion für " + (niche || tx({ de: "deine Nische", en: "your niche", es: "tu nicho" })) + tx({ de: " vorbereitet. Du musst sie nur noch starten — den Rest übernimmt dein Studio.", en: "prepared. All you have to do is start it - your studio will take care of the rest.", es: "preparado. Todo lo que tienes que hacer es iniciarlo; tu estudio se encargará del resto." }), en: "We have prepared a first production for " + (niche || "your niche") + ". Just start it — your studio takes care of the rest.", es: "Hemos preparado una primera producción para " + (niche || "tu nicho") + ". Solo tienes que iniciarla — el resto lo hace tu estudio." })}
+                  {tx({ de: "Wir haben eine erste Produktion für " + (niche || "deine Nische") + " vorbereitet. Du musst sie nur noch starten — den Rest übernimmt dein Studio.", en: "We have prepared a first production for " + (niche || "your niche") + ". Just start it — your studio takes care of the rest.", es: "Hemos preparado una primera producción para " + (niche || "tu nicho") + ". Solo tienes que iniciarla — el resto lo hace tu estudio." })}
                 </p>
               </div>
               <Button onClick={startFirstProduction} size="lg" className="w-full">

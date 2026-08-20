@@ -118,7 +118,7 @@ export function useMotionStudioLibrary() {
         .select()
         .single();
       if (error) {
-        toast.error(tx({ de: `${tx({ de: 'Update fehlgeschlagen', en: 'Update failed', es: 'Error al actualizar' })}: ${error.message}`, en: `${tx({ de: 'Update failed', en: 'Update failed', es: 'Error al actualizar' })}: ${error.message}`, es: `${tx({ de: 'Actualización fallida', en: 'Actualización fallida', es: 'Error al actualizar' })}: ${error.message}` }));
+        toast.error(tx({ de: `${'Update fehlgeschlagen'}: ${error.message}`, en: `${'Update failed'}: ${error.message}`, es: `${'Error al actualizar'}: ${error.message}` }));
         return false;
       }
       setCharacters((prev) => prev.map((c) => (c.id === id ? (data as MotionStudioCharacter) : c)));
@@ -130,7 +130,7 @@ export function useMotionStudioLibrary() {
   const deleteCharacter = useCallback(async (id: string): Promise<boolean> => {
     const { error } = await supabase.from('motion_studio_characters').delete().eq('id', id);
     if (error) {
-      toast.error(tx({ de: `${tx({ de: 'Löschen fehlgeschlagen', en: 'Delete failed', es: 'Error al eliminar' })}: ${error.message}`, en: `${tx({ de: 'Delete failed', en: 'Delete failed', es: 'Error al eliminar' })}: ${error.message}`, es: `${tx({ de: 'Error al eliminar', en: 'Error al eliminar', es: 'Error al eliminar' })}: ${error.message}` }));
+      toast.error(tx({ de: `${'Löschen fehlgeschlagen'}: ${error.message}`, en: `${'Delete failed'}: ${error.message}`, es: `${'Error al eliminar'}: ${error.message}` }));
       return false;
     }
     setCharacters((prev) => prev.filter((c) => c.id !== id));
@@ -179,7 +179,7 @@ export function useMotionStudioLibrary() {
         .select()
         .single();
       if (error) {
-        toast.error(tx({ de: `${tx({ de: 'Update fehlgeschlagen', en: 'Update failed', es: 'Error al actualizar' })}: ${error.message}`, en: `${tx({ de: 'Update failed', en: 'Update failed', es: 'Error al actualizar' })}: ${error.message}`, es: `${tx({ de: 'Actualización fallida', en: 'Actualización fallida', es: 'Error al actualizar' })}: ${error.message}` }));
+        toast.error(tx({ de: `${'Update fehlgeschlagen'}: ${error.message}`, en: `${'Update failed'}: ${error.message}`, es: `${'Error al actualizar'}: ${error.message}` }));
         return false;
       }
       setLocations((prev) => prev.map((l) => (l.id === id ? (data as MotionStudioLocation) : l)));
@@ -191,7 +191,7 @@ export function useMotionStudioLibrary() {
   const deleteLocation = useCallback(async (id: string): Promise<boolean> => {
     const { error } = await supabase.from('motion_studio_locations').delete().eq('id', id);
     if (error) {
-      toast.error(tx({ de: `${tx({ de: 'Löschen fehlgeschlagen', en: 'Delete failed', es: 'Error al eliminar' })}: ${error.message}`, en: `${tx({ de: 'Delete failed', en: 'Delete failed', es: 'Error al eliminar' })}: ${error.message}`, es: `${tx({ de: 'Error al eliminar', en: 'Error al eliminar', es: 'Error al eliminar' })}: ${error.message}` }));
+      toast.error(tx({ de: `${'Löschen fehlgeschlagen'}: ${error.message}`, en: `${'Delete failed'}: ${error.message}`, es: `${'Error al eliminar'}: ${error.message}` }));
       return false;
     }
     setLocations((prev) => prev.filter((l) => l.id !== id));
@@ -216,7 +216,7 @@ export function useMotionStudioLibrary() {
         .from('motion-studio-library')
         .upload(path, file, { upsert: true, cacheControl: '3600', contentType: file.type });
       if (error) {
-        toast.error(tx({ de: `${tx({ de: 'Upload fehlgeschlagen', en: 'Upload failed', es: 'Error al subir' })}: ${error.message}`, en: `${tx({ de: 'Upload failed', en: 'Upload failed', es: 'Error al subir' })}: ${error.message}`, es: `${tx({ de: 'Error en la carga', en: 'Error en la carga', es: 'Error al subir' })}: ${error.message}` }));
+        toast.error(tx({ de: `${'Upload fehlgeschlagen'}: ${error.message}`, en: `${'Upload failed'}: ${error.message}`, es: `${'Error al subir'}: ${error.message}` }));
         return null;
       }
       // Bucket ist privat → wir geben einen lange-gültigen Signed-URL zurück
@@ -353,7 +353,7 @@ export function useMotionStudioLibrary() {
       .from('motion_studio_character_variants')
       .delete()
       .eq('id', variantId);
-    if (error) toast.error(tx({ de: `${tx({ de: 'Löschen fehlgeschlagen', en: 'Delete failed', es: 'Error al eliminar' })}: ${error.message}`, en: `${tx({ de: 'Delete failed', en: 'Delete failed', es: 'Error al eliminar' })}: ${error.message}`, es: `${tx({ de: 'Error al eliminar', en: 'Error al eliminar', es: 'Error al eliminar' })}: ${error.message}` }));
+    if (error) toast.error(tx({ de: `${'Löschen fehlgeschlagen'}: ${error.message}`, en: `${'Delete failed'}: ${error.message}`, es: `${'Error al eliminar'}: ${error.message}` }));
     return !error;
   }, []);
 
@@ -425,7 +425,7 @@ export function useMotionStudioLibrary() {
       .from('motion_studio_location_variants')
       .delete()
       .eq('id', variantId);
-    if (error) toast.error(tx({ de: `${tx({ de: 'Löschen fehlgeschlagen', en: 'Delete failed', es: 'Error al eliminar' })}: ${error.message}`, en: `${tx({ de: 'Delete failed', en: 'Delete failed', es: 'Error al eliminar' })}: ${error.message}`, es: `${tx({ de: 'Error al eliminar', en: 'Error al eliminar', es: 'Error al eliminar' })}: ${error.message}` }));
+    if (error) toast.error(tx({ de: `${'Löschen fehlgeschlagen'}: ${error.message}`, en: `${'Delete failed'}: ${error.message}`, es: `${'Error al eliminar'}: ${error.message}` }));
     return !error;
   }, []);
 
@@ -502,7 +502,7 @@ export function useMotionStudioLibrary() {
       .delete()
       .eq('id', id);
     if (error) {
-      toast.error(tx({ de: `${tx({ de: 'Löschen fehlgeschlagen', en: 'Delete failed', es: 'Error al eliminar' })}: ${error.message}`, en: `${tx({ de: 'Delete failed', en: 'Delete failed', es: 'Error al eliminar' })}: ${error.message}`, es: `${tx({ de: 'Error al eliminar', en: 'Error al eliminar', es: 'Error al eliminar' })}: ${error.message}` }));
+      toast.error(tx({ de: `${'Löschen fehlgeschlagen'}: ${error.message}`, en: `${'Delete failed'}: ${error.message}`, es: `${'Error al eliminar'}: ${error.message}` }));
       return false;
     }
     toast.success(tx({ de: 'Snippet gelöscht', en: 'Snippet deleted', es: 'Fragmento eliminado' }));

@@ -76,7 +76,7 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
         onDataParsed(data);
         toast({
           title: tx({ de: 'CSV erfolgreich hochgeladen', en: 'CSV uploaded successfully', es: 'CSV cargado exitosamente' }),
-          description: tx({ de: `${data.length} ${tx({ de: 'Videos', en: 'Videos', es: 'Videos' })} werden erstellt.`, en: `${data.length} videos are being created.`, es: `Se están creando ${data.length} videos.` })
+          description: tx({ de: `${data.length} ${'Videos'} werden erstellt.`, en: `${data.length} videos are being created.`, es: `Se están creando ${data.length} videos.` })
         });
       },
       error: (error) => {

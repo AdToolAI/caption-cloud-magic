@@ -307,7 +307,7 @@ export function SuppressionManager() {
           <AlertDialogHeader>
             <AlertDialogTitle>{tx({ de: "Adresse entfernen?", en: "Remove address?", es: "¿Eliminar dirección?" })}</AlertDialogTitle>
             <AlertDialogDescription>
-              {tx({ de: <><span className="font-mono">{removeTarget}</span>{tx({ de: "wird aus der Suppression-Liste entfernt und kann zukünftig wieder Mails empfangen.", en: "will be removed from the suppression list and can receive mail again in the future.", es: "será eliminado de la lista de supresión y podrá recibir correos de nuevo en el futuro." })}</>, en: <><span className="font-mono">{removeTarget}</span> will be removed from the suppression list and can receive mail again in the future.</>, es: <><span className="font-mono">{removeTarget}</span> será eliminado de la lista de supresión y podrá volver a recibir correos en el futuro.</> })}
+              {tx({ de: <><span className="font-mono">{removeTarget}</span>{"wird aus der Suppression-Liste entfernt und kann zukünftig wieder Mails empfangen."}</>, en: <><span className="font-mono">{removeTarget}</span> will be removed from the suppression list and can receive mail again in the future.</>, es: <><span className="font-mono">{removeTarget}</span> será eliminado de la lista de supresión y podrá volver a recibir correos en el futuro.</> })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -325,7 +325,7 @@ export function SuppressionManager() {
           <AlertDialogHeader>
             <AlertDialogTitle>{tx({ de: "Alle Test-Adressen entfernen?", en: "Remove all test addresses?", es: "¿Eliminar todas las direcciones de prueba?" })}</AlertDialogTitle>
             <AlertDialogDescription>
-              {tx({ de: <>{tx({ de: "Es werden alle Resend-Test-Adressen (", en: "All Resend test addresses (", es: "Todas las direcciones de prueba de Resend (" })}<span className="font-mono">*@resend.dev</span>{tx({ de: ") aus der Suppression-Liste gelöscht. Echte Bounces bleiben erhalten.", en: ") will be deleted from the suppression list. Real bounces remain.", es: ") serán eliminadas de la lista de supresión. Los rebotes reales se mantienen." })}</>, en: <>All Resend test addresses (<span className="font-mono">*@resend.dev</span>) will be deleted from the suppression list. Real bounces remain.</>, es: <>Se eliminarán todas las direcciones de prueba de Resend (<span className="font-mono">*@resend.dev</span>) de la lista de supresión. Los rebotes reales se conservan.</> })}
+              {tx({ de: <>{"Es werden alle Resend-Test-Adressen ("}<span className="font-mono">*@resend.dev</span>{") aus der Suppression-Liste gelöscht. Echte Bounces bleiben erhalten."}</>, en: <>All Resend test addresses (<span className="font-mono">*@resend.dev</span>) will be deleted from the suppression list. Real bounces remain.</>, es: <>Se eliminarán todas las direcciones de prueba de Resend (<span className="font-mono">*@resend.dev</span>) de la lista de supresión. Los rebotes reales se conservan.</> })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
