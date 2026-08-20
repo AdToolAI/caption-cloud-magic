@@ -7,7 +7,8 @@
 // by `src/lib/cost/__tests__/pricingCatalogParity.test.ts`, which parses the
 // shared file at test time and fails the build on any divergence.
 //
-// Margin policy: sell = exactly 3.00× provider cost for every AI video model.
+// Margin policy (20.08.2026 re-pricing): sell >= 1.75× provider cost for every
+// AI video model (prices cut ~35% vs. the old 3.00× policy).
 // Lip-Sync (Sync.so), ElevenLabs audio, Music and Picture Studio run on
 // separate rails and are intentionally NOT part of this catalog.
 // ============================================================================
@@ -94,4 +95,4 @@ export const PREMIUM_ENGINE_CATALOG_IDS = new Set<string>([
   'grok-imagine',
 ]);
 
-export const CATALOG_VERSION = '2026-08-10';
+export const CATALOG_VERSION = '2026-08-20';

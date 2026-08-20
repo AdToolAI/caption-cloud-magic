@@ -5,8 +5,10 @@
 // (via the /functions/v1/pricing-catalog endpoint) so the price shown to the
 // user before generation always matches the amount actually deducted after.
 //
-// Margin policy: exactly 3.00× the provider cost (Replicate/Runway/Fal),
-// enforced across all AI video models. Lipsync (Sync.so), Audio (ElevenLabs)
+// Margin policy (20.08.2026 re-pricing): every AI video model sells at a
+// minimum of 1.75× the provider cost. Prices were cut by ~35% versus the old
+// 3.00× policy to stay competitive; the 1.75× floor keeps us profitable even
+// with the 40% Creator discount. Lipsync (Sync.so), Audio (ElevenLabs)
 // and Picture models are NOT part of this catalog — they are billed on
 // separate rails and priced independently.
 // ============================================================================
@@ -47,8 +49,9 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   'seedance-standard':    { id: 'seedance-standard',    label: 'Seedance 2.0 Fast 720p',  unit: 'per-second', sellEUR: 0.29, sellUSD: 0.29, costEUR: 0.15,  minDuration: 3,  maxDuration: 15 },
   'seedance-pro':         { id: 'seedance-pro',         label: 'Seedance 2.0 720p',       unit: 'per-second', sellEUR: 0.35, sellUSD: 0.35, costEUR: 0.18,  minDuration: 3,  maxDuration: 15 },
   // Seedance 2.5 via BytePlus ModelArk (direct API, not Replicate) —
-  // long-form scenes up to 30 s, 720p. Verified ModelArk cost: 6.50 EUR / 30 s
-  // = 0.2167 EUR/s → sell 0.663 EUR/s (19.90 EUR per 30 s clip, ~3.06x margin).
+  // long-form scenes up to 30 s. Two resolution tiers (20.08.2026):
+  //   720p → 11.95 EUR per 30 s clip (0.3983 EUR/s, ~1.84x provider cost)
+  //   480p →  6.95 EUR per 30 s clip (0.2317 EUR/s, ~2.14x provider cost)
   'seedance-2-5':         { id: 'seedance-2-5',         label: 'Seedance 2.5 (ModelArk)', unit: 'per-second', sellEUR: 0.3983, sellUSD: 0.3983, costEUR: 0.217, minDuration: 4,  maxDuration: 30 },
   'seedance-2-5-480p':    { id: 'seedance-2-5-480p',    label: 'Seedance 2.5 480p (ModelArk)', unit: 'per-second', sellEUR: 0.2317, sellUSD: 0.2317, costEUR: 0.1085, minDuration: 4,  maxDuration: 30 },
 
@@ -121,4 +124,4 @@ export function computeTotalCost(modelId: string, durationSeconds: number, curre
   return +(price * durationSeconds).toFixed(4);
 }
 
-export const CATALOG_VERSION = '2026-08-10';
+export const CATALOG_VERSION = '2026-08-20';
