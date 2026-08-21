@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAIVideoWallet } from "@/hooks/useAIVideoWallet";
-import { formatPrice } from "@/lib/currency";
+import { formatPriceForLanguage } from "@/lib/currency";
 import { useFirstVideoPrompts } from "@/hooks/useFirstVideoPrompts";
 
 const copy = {
@@ -67,7 +67,7 @@ export const FirstVideoGuide = () => {
   if (wallet.total_purchased_euros > 0 || wallet.total_spent_euros > 0) return null;
 
   const t = copy[language as "de" | "en" | "es"] ?? copy.en;
-  const balanceFormatted = formatPrice(wallet.balance_euros, 'EUR');
+  const balanceFormatted = formatPriceForLanguage(wallet.balance_euros, language);
 
   return (
     <motion.div
