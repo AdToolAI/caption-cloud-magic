@@ -414,7 +414,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     };
 
     // Calculate credits with premium features
-    const creditsNeeded = calculateCredits(duration, quality, premiumFeatures);
+    const creditsNeeded = 0; // v428: rendering is free
+    void calculateCredits;
     activeCreditsNeeded = creditsNeeded;
 
     // Lambda slot admission — safety net so Founders keep priority under load.
