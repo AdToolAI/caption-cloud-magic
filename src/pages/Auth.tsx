@@ -66,7 +66,13 @@ const Auth = () => {
     setLoading(true);
 
     if (isLogin) {
-      await signIn(email, password);
+      const result = await signIn(email, password);
+      // Unverified account: send the user where they can resend the mail
+      const msg = (result?.error as { message?: string } | undefined)?.message?.toLowerCase() ?? "";
+      if (msg.includes("email not confirmed") || msg.includes("email_not_confirmed")) {
+        navigate(`/auth/check-email?email=${encodeURIComponent(email)}`);
+      }
+
     } else {
       const result = await signUp(email, password);
       
