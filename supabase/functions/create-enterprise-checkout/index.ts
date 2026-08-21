@@ -109,7 +109,7 @@ serve(async (req) => {
       billing_address_collection: "required",
       customer_update: { address: "auto", name: "auto" },
       success_url: `${req.headers.get("origin")}/team-workspace?upgrade=success`,
-      cancel_url: `${req.headers.get("origin")}/team?upgrade=cancelled`,
+      cancel_url: `${req.headers.get("origin")}/team-workspace?upgrade=cancelled`,
       metadata: {
         workspace_id: workspaceId,
         plan_type: "enterprise",
