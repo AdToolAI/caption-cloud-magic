@@ -18507,6 +18507,7 @@ Object.assign(translations.de, {
 });
 Object.assign(translations.es, {
   uvc: {
+    pageTitle: 'Creador de video universal',
     cat_corporate_ad: 'Anuncio corporativo',
     cat_corporate_ad_desc: 'Videos promocionales profesionales para empresas y servicios',
     cat_corporate_ad_duration: '15-90 segundos',
