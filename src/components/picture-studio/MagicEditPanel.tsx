@@ -45,7 +45,7 @@ export function MagicEditPanel() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const sym = wallet?.currency === 'USD' ? '$' : '€';
+  const sym = '€'; // Wallet-Guthaben wird immer in EUR geführt (balance_euros)
   const cost = COSTS[mode];
 
   // ── File upload ──

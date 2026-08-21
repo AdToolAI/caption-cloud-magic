@@ -96,10 +96,16 @@ export function useFirstVideoPrompts() {
 
         try {
           const { data, error } = await supabase.functions.invoke("generate-first-video-prompts", {
-            body: { language: lang },
+            body: { language: lang, force: true },
           });
           if (cancelled) return;
-          if (!error && Array.isArray(data?.prompts) && data.prompts.length === 3 && !data?.fallback) {
+          if (
+            !error &&
+            Array.isArray(data?.prompts) &&
+            data.prompts.length === 3 &&
+            !data?.fallback &&
+            matchesLanguage(data.prompts as FirstVideoPrompt[], lang)
+          ) {
             setPrompts(data.prompts as FirstVideoPrompt[]);
             setPersonalized(true);
           }

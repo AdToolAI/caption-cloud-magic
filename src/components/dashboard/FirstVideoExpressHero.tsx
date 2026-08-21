@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAIVideoWallet } from "@/hooks/useAIVideoWallet";
 import { useFirstVideoPrompts } from "@/hooks/useFirstVideoPrompts";
-import { formatPrice } from "@/lib/currency";
+import { formatPriceForLanguage } from "@/lib/currency";
 
 const copy = {
   de: {
@@ -67,7 +67,7 @@ export const FirstVideoExpressHero = () => {
   if (!wallet || wallet.balance_euros <= 0) return null;
 
   const t = copy[language as "de" | "en" | "es"] ?? copy.en;
-  const balanceFormatted = formatPrice(wallet.balance_euros, wallet.currency);
+  const balanceFormatted = formatPriceForLanguage(wallet.balance_euros, language);
 
   const buildLink = (idx: number) => {
     const p = prompts[idx];
