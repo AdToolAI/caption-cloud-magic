@@ -34,7 +34,7 @@ export function useDirectMessages(partnerId: string | null) {
 
     const { data, error } = await supabase
       .from("direct_messages")
-      .select("*, sender_profile:sender_id(email), receiver_profile:receiver_id(email)")
+      .select("*")
       .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
       .order("created_at", { ascending: false });
 
@@ -79,7 +79,7 @@ export function useDirectMessages(partnerId: string | null) {
 
     const { data, error } = await supabase
       .from("direct_messages")
-      .select("*, sender_profile:sender_id(email), receiver_profile:receiver_id(email)")
+      .select("*")
       .or(
         `and(sender_id.eq.${user.id},receiver_id.eq.${partnerId}),and(sender_id.eq.${partnerId},receiver_id.eq.${user.id})`
       )
