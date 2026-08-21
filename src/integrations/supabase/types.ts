@@ -18083,6 +18083,54 @@ export type Database = {
         }
         Relationships: []
       }
+      v434_artifact_pins: {
+        Row: {
+          byte_size: number | null
+          created_at: string
+          generation: number | null
+          id: string
+          kind: string
+          object_key: string | null
+          pass_idx: number | null
+          pinned_url: string | null
+          run_id: string | null
+          scene_id: string | null
+          sha256: string | null
+          source_url: string | null
+          status: string
+        }
+        Insert: {
+          byte_size?: number | null
+          created_at?: string
+          generation?: number | null
+          id?: string
+          kind: string
+          object_key?: string | null
+          pass_idx?: number | null
+          pinned_url?: string | null
+          run_id?: string | null
+          scene_id?: string | null
+          sha256?: string | null
+          source_url?: string | null
+          status: string
+        }
+        Update: {
+          byte_size?: number | null
+          created_at?: string
+          generation?: number | null
+          id?: string
+          kind?: string
+          object_key?: string | null
+          pass_idx?: number | null
+          pinned_url?: string | null
+          run_id?: string | null
+          scene_id?: string | null
+          sha256?: string | null
+          source_url?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       video_analytics: {
         Row: {
           created_at: string

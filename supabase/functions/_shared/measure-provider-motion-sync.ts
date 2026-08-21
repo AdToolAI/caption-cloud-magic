@@ -27,6 +27,19 @@
 import { AwsClient } from "npm:aws4fetch@1.0.18";
 import jpeg from "npm:jpeg-js@0.4.4";
 import { getLambdaFunctionName, AWS_REGION } from "./aws-lambda.ts";
+// V434 — additive telemetry helpers. Neither changes the frozen v404 verdict.
+import {
+  buildMadRatioTelemetry,
+  computeMadSummary,
+  type MadRatioTelemetry,
+  type MadSummary,
+} from "./v434-mad-ratio.ts";
+import {
+  deriveMouthRoi,
+  type DerivedMouthRoi,
+  type MouthRoiNormalized,
+  type PreclipRoiGeometry,
+} from "./v434-motion-roi.ts";
 
 /** Frozen production constants — no rounding, no heuristics. */
 export const MOTION_SAMPLE_COUNT = 6;
@@ -50,6 +63,8 @@ export interface MotionMetricValue {
   roi: { bx: number; by: number; bw: number; bh: number };
   stillWidth: number;
   stillHeight: number;
+  /** V434 telemetry — consecutive-frame MAD inside the geometry-coupled band. */
+  mad?: MadSummary | null;
 }
 
 export type MeasurementStatus = "measured" | "unmeasurable";
@@ -92,6 +107,18 @@ export interface MeasureProviderMotionSyncArgs {
   now?: () => number;
   deadlineMs?: number;
   sampleCount?: number;
+  /**
+   * V434 Step 4 — pre-clip geometry (`preclip_anchor` / `preclip_face_share` /
+   * `preclip_crop.size`). When it yields a geometry-coupled ROI, the mouth band
+   * is measured where the mouth actually is; otherwise the frozen v404 ROI is
+   * used unchanged.
+   */
+  preclipGeometry?: PreclipRoiGeometry | null;
+  /**
+   * V434 — when false (default) the frozen v404 ROI drives the AUTHORITATIVE
+   * metric and the geometry ROI is reported as telemetry only.
+   */
+  useGeometryRoiForVerdict?: boolean;
 }
 
 
@@ -102,6 +129,14 @@ export interface MeasureProviderMotionSyncResult {
   deltaPeak: number | null;
   measurement_status: MeasurementStatus;
   reason: string;
+  /** V434 telemetry — never authoritative. */
+  v434?: {
+    roi: DerivedMouthRoi;
+    roi_applied_to_verdict: boolean;
+    preclip_mad: MadSummary | null;
+    provider_mad: MadSummary | null;
+    mad_ratio: MadRatioTelemetry;
+  };
 }
 
 /**
@@ -114,14 +149,16 @@ export function stillRoiForSource(
   sourceHeight: number,
   stillWidth: number,
   stillHeight: number,
+  /** V434 — optional geometry-coupled band. Defaults to the frozen v404 ROI. */
+  roi: MouthRoiNormalized = MOTION_ROI,
 ): { bx: number; by: number; bw: number; bh: number } {
   const s = Math.max(stillWidth / sourceWidth, stillHeight / sourceHeight);
   const dx = (stillWidth - sourceWidth * s) / 2;
   const dy = (stillHeight - sourceHeight * s) / 2;
-  const cxStill = (MOTION_ROI.centerX * sourceWidth * s + dx) / stillWidth;
-  const cyStill = (MOTION_ROI.centerY * sourceHeight * s + dy) / stillHeight;
-  const wStill = (MOTION_ROI.width * sourceWidth * s) / stillWidth;
-  const hStill = (MOTION_ROI.height * sourceHeight * s) / stillHeight;
+  const cxStill = (roi.centerX * sourceWidth * s + dx) / stillWidth;
+  const cyStill = (roi.centerY * sourceHeight * s + dy) / stillHeight;
+  const wStill = (roi.width * sourceWidth * s) / stillWidth;
+  const hStill = (roi.height * sourceHeight * s) / stillHeight;
 
   const bw = Math.max(8, Math.round(stillWidth * wStill));
   const bh = Math.max(8, Math.round(stillHeight * hStill));
@@ -362,6 +399,12 @@ export async function measureProviderMotionSync(
       return { remainingMs, signal: rootController.signal };
     };
 
+    // V434 Step 4 — derived ONCE per run so both assets share one band.
+    const derivedRoi = deriveMouthRoi(args.preclipGeometry ?? null);
+    const applyGeometryRoi = args.useGeometryRoiForVerdict === true &&
+      derivedRoi.source === "geometry";
+    const verdictRoi: MouthRoiNormalized = applyGeometryRoi ? derivedRoi.roi : MOTION_ROI;
+
     const measureOne = async (
       url: string,
       dimHint: { width: number; height: number } | null | undefined,
@@ -387,10 +430,27 @@ export async function measureProviderMotionSync(
       const stillWidth = decoded[0].width;
       const stillHeight = decoded[0].height;
       if (!(stillWidth > 0) || !(stillHeight > 0)) throw new Error("still_dimensions_invalid");
-      const roi = stillRoiForSource(dims.width, dims.height, stillWidth, stillHeight);
+      const roi = stillRoiForSource(
+        dims.width,
+        dims.height,
+        stillWidth,
+        stillHeight,
+        verdictRoi,
+      );
       if (!(roi.bw > 0) || !(roi.bh > 0) || roi.bx < 0 || roi.by < 0) throw new Error("roi_invalid");
       const { mean, peak } = computeMotionMetric(decoded, roi);
       if (!Number.isFinite(mean) || !Number.isFinite(peak)) throw new Error("metric_not_finite");
+      // V434 Step 3/4 — the scale-free MAD is computed on the SAME already
+      // decoded stills inside the GEOMETRY-coupled band: zero extra Lambda
+      // invokes, zero extra downloads, zero effect on the v404 verdict.
+      const madRoi = stillRoiForSource(
+        dims.width,
+        dims.height,
+        stillWidth,
+        stillHeight,
+        derivedRoi.roi,
+      );
+      const mad = madRoi.bw > 0 && madRoi.bh > 0 ? computeMadSummary(decoded, madRoi) : null;
       return {
         mean,
         peak,
@@ -399,6 +459,7 @@ export async function measureProviderMotionSync(
         roi,
         stillWidth,
         stillHeight,
+        mad,
       };
     };
 
@@ -425,7 +486,16 @@ export async function measureProviderMotionSync(
       deltaPeak: provider.peak - preclip.peak,
       measurement_status: "measured",
       reason: "measured",
+      // V434 — reported alongside, never instead of, the frozen v404 verdict.
+      v434: {
+        roi: derivedRoi,
+        roi_applied_to_verdict: applyGeometryRoi,
+        preclip_mad: preclip.mad ?? null,
+        provider_mad: provider.mad ?? null,
+        mad_ratio: buildMadRatioTelemetry(preclip.mad ?? null, provider.mad ?? null),
+      },
     };
+
   } finally {
     clearTimeout(rootTimer);
     // Release anything still hanging on the root signal.

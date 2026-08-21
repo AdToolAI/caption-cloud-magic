@@ -71,6 +71,52 @@ console.log(
   `[sync-so-webhook] BOOT version=${SYNC_SO_WEBHOOK_VERSION} deploy_marker=${Date.now()} pid=${(globalThis as any).Deno?.pid ?? "?"}`,
 );
 
+// V434 Step 1 — immutable, sha256-pinned evidence copies. Purely additive:
+// the frozen FA-4 path keeps using the legacy re-hosted URL for mux/playback.
+import {
+  buildImmutableArtifactKey,
+  pinImmutableArtifact,
+  type PinnedArtifact,
+} from "../_shared/v434-immutable-artifact.ts";
+
+/**
+ * V434 Step 1 — records an immutable artifact pin. Never throws, never touches
+ * scene state; a failure only means this run has no evidence copy.
+ */
+async function recordV434Pin(
+  supabase: any,
+  row: {
+    scene_id: string;
+    run_id: string | null;
+    generation: number | null;
+    pass_idx: number;
+    kind: string;
+    source_url: string | null;
+    pin: PinnedArtifact;
+  },
+): Promise<void> {
+  try {
+    const { error } = await supabase.from("v434_artifact_pins").insert({
+      scene_id: row.scene_id,
+      run_id: row.run_id,
+      generation: row.generation,
+      pass_idx: row.pass_idx,
+      kind: row.kind,
+      source_url: row.source_url,
+      object_key: row.pin.key,
+      pinned_url: row.pin.url,
+      sha256: row.pin.sha256,
+      byte_size: row.pin.bytes,
+      status: row.pin.status,
+    });
+    if (error) {
+      console.warn(`[sync-so-webhook] v434_pin_log_failed scene=${row.scene_id}: ${error.message}`);
+    }
+  } catch (e) {
+    console.warn(`[sync-so-webhook] v434_pin_log_crash scene=${row.scene_id}: ${(e as Error).message}`);
+  }
+}
+
 /**
  * v404 §5 — Rehost the provider output to `ai-videos` OUTSIDE the dialog lock.
  * Pure I/O, no scene-state mutation, safe to run before locking.
@@ -743,6 +789,16 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         preclipUrl,
         providerOutputUrl: v404RehostedUrl ?? outputUrl!,
         durationSeconds: duration,
+        // V434 Step 4 — geometry the pre-clip renderer already persisted. The
+        // derived mouth band drives the SCALE-FREE TELEMETRY only; the frozen
+        // v404 ROI still produces the authoritative verdict.
+        preclipGeometry: {
+          anchor: (measurePass as any)?.preclip_anchor ?? null,
+          faceShareInCrop: (measurePass as any)?.preclip_face_share ?? null,
+          cropSize: (measurePass as any)?.preclip_crop?.size ?? null,
+          mouthOffsetPx: (measurePass as any)?.preclip_mouth_offset_px ?? null,
+          mouthOffset: (measurePass as any)?.preclip_mouth_offset_xy ?? null,
+        },
       });
       v404MotionProbe = v404MotionMeasurement.measurement_status === "measured" &&
           v404MotionMeasurement.preclip_metric && v404MotionMeasurement.provider_metric
@@ -766,6 +822,19 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           `delta_mean=${v404MotionMeasurement.deltaMean ?? "n/a"} ` +
           `verdict=${v404MotionProbe.verdict} reason=${v404MotionProbe.reason}`,
       );
+      // V434 Step 3/4 — scale-free outcome telemetry, printed next to (never
+      // instead of) the authoritative v404 verdict.
+      const v434 = (v404MotionMeasurement as any)?.v434;
+      if (v434) {
+        console.log(
+          `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} v434_telemetry scene=${sceneId} pass=${measurePassIdx} ` +
+            `mad_ratio=${v434.mad_ratio?.mad_ratio ?? "unknown"} ` +
+            `mad_ratio_median=${v434.mad_ratio?.mad_ratio_median ?? "unknown"} ` +
+            `preclip_mad=${v434.preclip_mad?.mean ?? "unknown"} provider_mad=${v434.provider_mad?.mean ?? "unknown"} ` +
+            `roi_source=${v434.roi?.source} roi_reason=${v434.roi?.reason} ` +
+            `roi_applied_to_verdict=${v434.roi_applied_to_verdict} authority=telemetry_only`,
+        );
+      }
     };
 
     if (status === "COMPLETED" && outputUrl) {
@@ -783,6 +852,52 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const snapPass = snapPasses[snapPassIdx] ?? null;
 
       v404RehostedUrl = await rehostSyncOutput(supabase, sceneId, snapPassIdx, outputUrl);
+
+      // ── V434 Step 1 — IMMUTABLE EVIDENCE COPY ──────────────────────────
+      // The legacy re-host key above is MUTABLE (scene+pass only) and was the
+      // proven cause of the corrupted v404 calibration ground truth
+      // (docs/v433-motion-studio-rca.md). We additionally pin the exact bytes
+      // under a run/generation/pass/attempt-qualified key with a recorded
+      // sha256. Playback and mux are untouched.
+      try {
+        const pinUserId = String((scene as any)?.user_id ?? "") ||
+          String(v404RehostedUrl?.split("/ai-videos/")[1]?.split("/")[1] ?? "") ||
+          "unknown";
+        const pinRunId = String((scene as any)?.active_run_id ?? "") || "unknown-run";
+        const pinGeneration = Number((scene as any)?.plate_generation ?? 0) || 0;
+        const pinAttempt = Number((snapPass as any)?.attempt ?? 0) || 0;
+        const key = buildImmutableArtifactKey({
+          userId: pinUserId,
+          sceneId,
+          runId: pinRunId,
+          generation: pinGeneration,
+          passIdx: snapPassIdx,
+          kind: "provider-output",
+          attempt: pinAttempt,
+        });
+        const pin = await pinImmutableArtifact({
+          supabase,
+          sourceUrl: v404RehostedUrl ?? outputUrl,
+          key,
+        });
+        console.log(
+          `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} v434_pin scene=${sceneId} pass=${snapPassIdx} ` +
+            `status=${pin.status} sha256=${pin.sha256 ?? "n/a"} key=${pin.key ?? "n/a"}`,
+        );
+        await recordV434Pin(supabase, {
+          scene_id: sceneId,
+          run_id: (scene as any)?.active_run_id ?? null,
+          generation: Number.isFinite(Number((scene as any)?.plate_generation))
+            ? Number((scene as any).plate_generation)
+            : null,
+          pass_idx: snapPassIdx,
+          kind: "provider-output",
+          source_url: v404RehostedUrl ?? outputUrl,
+          pin,
+        });
+      } catch (e) {
+        console.warn(`[sync-so-webhook] v434_pin_crash scene=${sceneId}: ${(e as Error).message}`);
+      }
 
       const prePlan = planPreLockSpeakerMeasurement(snapSpeakerCardinality);
       v404MeasurementDeferred = prePlan.action === "defer";
