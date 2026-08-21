@@ -264,11 +264,11 @@ const Legal = () => {
               <LegalSection title={tx({ de: '§ 1 Präambel & Definitionen', en: '§ 1 Preamble & Definitions', es: '§ 1 Preámbulo y definiciones' })} icon="scale" defaultOpen={true} index={0}>
                 <div className="space-y-3">
                   <p>{tx({ de: 'Dieser Auftragsverarbeitungsvertrag (AVV) gemäß Art. 28 DSGVO wird geschlossen zwischen dem Nutzer der AdTool AI Plattform („Verantwortlicher") und AdTool AI, Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau („Auftragsverarbeiter").', en: 'This Data Processing Agreement (DPA) pursuant to Art. 28 GDPR is concluded between the user of the AdTool AI platform ("Controller") and AdTool AI, Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau ("Processor").', es: 'Este contrato de encargo de tratamiento de datos (DPA) conforme al art. 28 del RGPD se celebra entre el usuario de la plataforma AdTool AI ("Responsable") y AdTool AI, Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau ("Encargado").' })}</p>
-                  <p className="font-medium text-foreground">Definitionen:</p>
+                  <p className="font-medium text-foreground">{tx({ de: 'Definitionen:', en: 'Definitions:', es: 'Definiciones:' })}</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
-                    <li><strong className="text-foreground">Personenbezogene Daten:</strong> {tx({ de: "Alle Informationen gemäß Art. 4 Nr. 1 DSGVO", en: "All information in accordance with Art. 4 No. 1 GDPR", es: "Toda la información de conformidad con el art. 4 n.º 1 del RGPD" })}</li>
-                    <li><strong className="text-foreground">Verarbeitung:</strong> Jeder Vorgang gemäß Art. 4 Nr. 2 DSGVO</li>
-                    <li><strong className="text-foreground">Betroffene Person:</strong> {tx({ de: "Identifizierte oder identifizierbare natürliche Person", en: "Identified or identifiable natural person", es: "Persona física identificada o identificable" })}</li>
+                    <li><strong className="text-foreground">{tx({ de: 'Personenbezogene Daten:', en: 'Personal data:', es: 'Datos personales:' })}</strong> {tx({ de: "Alle Informationen gemäß Art. 4 Nr. 1 DSGVO", en: "All information in accordance with Art. 4 No. 1 GDPR", es: "Toda la información de conformidad con el art. 4 n.º 1 del RGPD" })}</li>
+                    <li><strong className="text-foreground">{tx({ de: 'Verarbeitung:', en: 'Processing:', es: 'Tratamiento:' })}</strong> {tx({ de: 'Jeder Vorgang gemäß Art. 4 Nr. 2 DSGVO', en: 'Any operation in accordance with Art. 4 No. 2 GDPR', es: 'Cualquier operación conforme al art. 4 n.º 2 del RGPD' })}</li>
+                    <li><strong className="text-foreground">{tx({ de: 'Betroffene Person:', en: 'Data subject:', es: 'Interesado:' })}</strong> {tx({ de: "Identifizierte oder identifizierbare natürliche Person", en: "Identified or identifiable natural person", es: "Persona física identificada o identificable" })}</li>
                   </ul>
                 </div>
               </LegalSection>
