@@ -132,37 +132,8 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "LOVABLE_API_KEY not configured" }, 500);
     }
 
-    // --- Wallet check (estimated cost) ---
-    const inputText = messages.map((m) => m.content).join("\n") + (systemPrompt || "");
-    const estInputTokens = estimateTokens(inputText);
-    const estOutputTokens = 800;
-    const estCost = Number(
-      ((estInputTokens / 1000) * pricing.input + (estOutputTokens / 1000) * pricing.output).toFixed(4),
-    );
+    // v428: Text Studio is free — no wallet check, cost is telemetry only.
 
-    const { data: wallet, error: walletError } = await supabaseAdmin
-      .from("ai_video_wallets")
-      .select("balance_euros, currency")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (walletError || !wallet) {
-      return jsonResponse(
-        { error: "No wallet found. Please purchase credits first.", code: "NO_WALLET" },
-        402,
-      );
-    }
-    if (Number(wallet.balance_euros) < estCost) {
-      return jsonResponse(
-        {
-          error: `Insufficient credits. Estimated €${estCost.toFixed(2)}, have €${Number(wallet.balance_euros).toFixed(2)}`,
-          code: "INSUFFICIENT_CREDITS",
-          required: estCost,
-          available: Number(wallet.balance_euros),
-        },
-        402,
-      );
-    }
 
     // --- Ensure conversation exists ---
     let conversationId = convIdInput;
@@ -341,7 +312,7 @@ Deno.serve(async (req) => {
         } finally {
           controller.close();
 
-          // Background: persist messages + deduct wallet
+          // Background: persist messages (v428: Text Studio is free — no wallet deduction)
           // @ts-ignore
           EdgeRuntime.waitUntil(
             (async () => {
@@ -351,16 +322,6 @@ Deno.serve(async (req) => {
                   ((inputTokens / 1000) * pricing.input + (outputTokens / 1000) * pricing.output).toFixed(4),
                 );
 
-                // Deduct from wallet
-                try {
-                  await supabaseAdmin.rpc("deduct_text_studio_credits", {
-                    p_user_id: userId,
-                    p_amount: realCost,
-                    p_conversation_id: conversationId,
-                  });
-                } catch (e) {
-                  console.error("[text-studio-chat] deduct failed", e);
-                }
 
                 if (!isPrivate) {
                   // Persist last user message + assistant message

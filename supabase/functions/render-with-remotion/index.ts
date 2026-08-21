@@ -453,9 +453,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       }
     }
 
-    // Calculate credits based on video duration and quality
-    credits_required = calculateCredits(requestedVoiceoverDuration, quality);
-    console.log(`💰 Credits für ${requestedVoiceoverDuration}s ${quality.toUpperCase()} Video: ${credits_required}`);
+    // v428: rendering is included in every plan — no credits charged.
+    credits_required = 0;
+    void calculateCredits;
+
 
     // Lambda slot admission — safety net against AWS quota saturation.
     // Founders reserve band kicks in at 50/60 slots.
@@ -493,29 +494,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
 
 
-    // Check credits
-    const { data: wallet } = await supabaseAdmin
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', userId)
-      .single();
+    // v428: rendering is free — no wallet check, no deduction.
 
-    if (!wallet || wallet.balance < credits_required) {
-      return new Response(JSON.stringify({ 
-        error: 'Insufficient credits',
-        required: credits_required,
-        available: wallet?.balance || 0
-      }), {
-        status: 402,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Deduct credits
-    await supabaseAdmin.rpc('deduct_credits', {
-      p_user_id: userId,
-      p_amount: credits_required
-    });
 
     // NOTE: We intentionally do NOT overwrite content_projects.status here.
     // The 'status' column is the wizard/user lifecycle ('draft' | 'archived')

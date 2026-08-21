@@ -760,7 +760,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
     // 12. Deduct credits (non-blocking)
     try {
-      const totalCost = (scenes || []).reduce((sum: number, s: any) => sum + (s.cost_euros || 0), 0) + 0.10;
+      const totalCost = (scenes || []).reduce((sum: number, s: any) => sum + (s.cost_euros || 0), 0); // v428: no render surcharge
       if (totalCost > 0) {
         await supabase.rpc('deduct_ai_video_credits', {
           p_user_id: user.id,

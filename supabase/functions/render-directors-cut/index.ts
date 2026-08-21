@@ -414,7 +414,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     };
 
     // Calculate credits with premium features
-    const creditsNeeded = calculateCredits(duration, quality, premiumFeatures);
+    const creditsNeeded = 0; // v428: rendering is free
+    void calculateCredits;
     activeCreditsNeeded = creditsNeeded;
 
     // Lambda slot admission — safety net so Founders keep priority under load.
@@ -450,31 +451,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
 
 
-    // Check user credits
-    const { data: wallet, error: walletError } = await supabaseClient
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single();
+    // v428: no wallet check — rendering is included in every plan.
 
-    if (walletError || !wallet) {
-      return new Response(JSON.stringify({ error: 'Wallet not found' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (wallet.balance < creditsNeeded) {
-      return new Response(JSON.stringify({ 
-        error: 'INSUFFICIENT_CREDITS',
-        message: `Du benötigst ${creditsNeeded} Credits, hast aber nur ${wallet.balance}.`,
-        credits_needed: creditsNeeded,
-        credits_available: wallet.balance,
-      }), {
-        status: 402,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
 
     // Create render job record in director_cut_renders table
     const { data: renderJob, error: renderError } = await supabaseClient
@@ -523,19 +501,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     activeRenderJob = renderJob;
     const renderOutName = `directors-cut-${renderJob.id}.${format === 'webm' ? 'webm' : 'mp4'}`;
 
-    // Deduct credits
-    const { error: deductError } = await supabaseClient.rpc('deduct_credits', {
-      p_user_id: user.id,
-      p_amount: creditsNeeded,
-    });
+    // v428: Director's Cut rendering (incl. premium effects) is free.
+    creditsDeducted = false;
 
-    if (deductError) {
-      console.error('[RenderDirectorsCut] Error deducting credits:', deductError);
-      // Rollback render job
-      await supabaseClient.from('director_cut_renders').delete().eq('id', renderJob.id);
-      throw new Error('Failed to deduct credits');
-    }
-    creditsDeducted = true;
 
     // Calculate dimensions based on aspect ratio and quality
     let width: number, height: number;

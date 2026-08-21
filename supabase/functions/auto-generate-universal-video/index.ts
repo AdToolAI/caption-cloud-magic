@@ -1611,29 +1611,9 @@ async function runGenerationPipeline(
       return;
     }
 
-    // Credit check & deduction
-    const calculateCredits = (durationSeconds: number): number => {
-      if (durationSeconds < 30) return 10;
-      if (durationSeconds <= 60) return 20;
-      if (durationSeconds <= 180) return 50;
-      if (durationSeconds <= 300) return 100;
-      return 200;
-    };
-    const credits_required = calculateCredits(totalDuration);
-    console.log(`💰 Credits required: ${credits_required} for ${totalDuration}s video`);
+    // v428: rendering is included in every plan — no credit check/deduction.
+    const credits_required = 0;
 
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', userId)
-      .single();
-
-    if (!wallet || wallet.balance < credits_required) {
-      throw new Error(`Nicht genügend Credits. Benötigt: ${credits_required}, Verfügbar: ${wallet?.balance || 0}`);
-    }
-
-    await supabase.rpc('deduct_credits', { p_user_id: userId, p_amount: credits_required });
-    console.log(`💰 Deducted ${credits_required} credits`);
 
     const pendingRenderId = generateRemotionCompatibleId();
     const webhookUrl = appendWebhookToken(`${supabaseUrl}/functions/v1/remotion-webhook`);
@@ -1795,20 +1775,9 @@ async function runRenderOnlyPipeline(
     const newOutName = `universal-video-${newRenderId}.mp4`;
     const webhookUrl = appendWebhookToken(`${supabaseUrl}/functions/v1/remotion-webhook`);
     
-    // Credit check & deduction for render-only (cheaper)
-    const RENDER_ONLY_CREDITS = 5;
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', userId)
-      .single();
-    
-    if (!wallet || wallet.balance < RENDER_ONLY_CREDITS) {
-      throw new Error(`Nicht genügend Credits für Render-Retry. Benötigt: ${RENDER_ONLY_CREDITS}, Verfügbar: ${wallet?.balance || 0}`);
-    }
-    
-    await supabase.rpc('deduct_credits', { p_user_id: userId, p_amount: RENDER_ONLY_CREDITS });
-    console.log(`[render-only] 💰 Deducted ${RENDER_ONLY_CREDITS} credits (render-only)`);
+    // v428: render-only retries are free.
+    const RENDER_ONLY_CREDITS = 0;
+
     
     // Create new render record
     const bucketName = oldPayload.bucketName || 'remotionlambda-eucentral1-13gm4o6s90';

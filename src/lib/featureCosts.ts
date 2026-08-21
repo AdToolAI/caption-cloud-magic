@@ -1,4 +1,6 @@
-// Feature cost mapping für das Credit-System
+// Feature cost mapping.
+// v428: only external AI media (video models, music, premium image, voice) costs credits.
+// Rendering, exports, text and every ordinary feature are included in every plan (cost 0).
 export const FEATURE_COSTS = {
   // Content Generation
   CAPTION_GENERATE: 'caption_generate',
@@ -43,18 +45,18 @@ export type FeatureCost = typeof FEATURE_COSTS[keyof typeof FEATURE_COSTS];
 
 // Estimated credit costs for features
 export const ESTIMATED_COSTS: Record<string, number> = {
-  caption_generate: 1,
-  hashtag_analyze: 1,
-  bio_optimize: 2,
-  background_generate: 5,
-  coach_chat: 1,
+  caption_generate: 0,
+  hashtag_analyze: 0,
+  bio_optimize: 0,
+  background_generate: 0,
+  coach_chat: 0,
   post_schedule: 0,
-  trend_fetch: 3,
-  image_process: 2,
-  video_render: 5,
-  video_render_remotion: 5,
-  video_render_shotstack: 10,
-  comment_analyze: 1,
+  trend_fetch: 0,
+  image_process: 0,
+  video_render: 0,
+  video_render_remotion: 0,
+  video_render_shotstack: 0,
+  comment_analyze: 0,
   // Sora 2 Long-Form costs per second (mirrors VIDEO_PRICING_CATALOG, 3.00× margin)
   sora_longform_standard: 30, // €0.30/sec = 30 credits
   sora_longform_pro: 150,     // €1.50/sec = 150 credits
@@ -64,9 +66,9 @@ export const ESTIMATED_COSTS: Record<string, number> = {
   // KI Picture Studio
   studio_image_generate: 5,
   // AI Video Composer
-  composer_storyboard: 1,
+  composer_storyboard: 0,
   composer_clip_ai: 30, // ~€0.30 per AI clip = 30 credits
-  composer_render: 10,
+  composer_render: 0,
 };
 
 // Calculate Sora 2 Long-Form cost based on total duration

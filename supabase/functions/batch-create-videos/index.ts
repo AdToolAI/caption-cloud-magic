@@ -60,27 +60,9 @@ serve(async (req) => {
       throw new Error('Original video not found');
     }
 
-    // Check user has enough credits
-    const totalCost = variations.length * 5; // 5 credits per variant
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single();
+    // v428: batch variants are included in every plan — no credit check.
+    const totalCost = 0;
 
-    if (!wallet || wallet.balance < totalCost) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Insufficient credits',
-          required: totalCost,
-          available: wallet?.balance || 0
-        }),
-        {
-          status: 402,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
 
     // Get next version number
     const { data: versions } = await supabase
@@ -124,11 +106,8 @@ serve(async (req) => {
         continue;
       }
 
-      // Deduct credits
-      await supabase.rpc('deduct_credits', {
-        p_user_id: user.id,
-        p_amount: 5
-      });
+      // v428: variant creation is free — no credit deduction.
+
 
       // TODO: Trigger video generation (call Shotstack API or queue job)
       // For now, just mark as queued
