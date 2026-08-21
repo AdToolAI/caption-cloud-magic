@@ -52,22 +52,24 @@ export const getCurrencyFromLocale = (locale: string): Currency => {
 
 /**
  * Get currency based on UI language.
- * Billing runs in EUR for every locale (Stripe prices, top-ups, credits),
- * so the UI must not show a USD symbol on EUR amounts.
+ * Englische UI = USD, Deutsch/Spanisch = EUR. Alle Preise sind 1:1 gepflegt
+ * (Beta-Basic 14,99 € / $14.99, Credit-Packs 10/50/100/250), es gibt für jede
+ * Währung einen eigenen Stripe-Preis — es wird also nie EUR abgebucht,
+ * während USD angezeigt wird.
  */
-export const getCurrencyForLanguage = (_language: string): Currency => {
-  return 'EUR';
+export const getCurrencyForLanguage = (language: string): Currency => {
+  return language === 'de' || language === 'es' ? 'EUR' : 'USD';
 };
 
 /**
  * Format a price value for display based on language.
- * Amount stays EUR everywhere; only the decimal separator follows the locale.
+ * Betrag ist 1:1 in beiden Währungen; Symbol und Dezimaltrenner folgen der UI-Sprache.
  */
 export const formatPriceForLanguage = (amount: number, language: string): string => {
   const currency = getCurrencyForLanguage(language);
   if (currency === 'EUR') {
-    const value = language === 'en' ? amount.toFixed(2) : amount.toFixed(2).replace('.', ',');
-    return `€${value}`;
+    return `€${amount.toFixed(2).replace('.', ',')}`;
   }
   return `$${amount.toFixed(2)}`;
 };
+

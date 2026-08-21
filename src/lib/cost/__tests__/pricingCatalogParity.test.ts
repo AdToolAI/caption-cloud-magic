@@ -53,9 +53,9 @@ describe('pricing catalog — 1.75× minimum margin policy', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('Seedance 2.5 keeps the agreed 30 s price points (720p 11.95 EUR / 480p 6.95 EUR)', () => {
-    expect(VIDEO_PRICING_CATALOG['seedance-2-5'].sellEUR * 30).toBeCloseTo(11.95, 2);
-    expect(VIDEO_PRICING_CATALOG['seedance-2-5-480p'].sellEUR * 30).toBeCloseTo(6.95, 2);
+  it('Seedance 2.5 keeps the agreed 30 s price points (720p 13.20 EUR / 480p 7.65 EUR)', () => {
+    expect(VIDEO_PRICING_CATALOG['seedance-2-5'].sellEUR * 30).toBeCloseTo(13.2, 2);
+    expect(VIDEO_PRICING_CATALOG['seedance-2-5-480p'].sellEUR * 30).toBeCloseTo(7.65, 2);
   });
 
   it('sellUSD mirrors sellEUR 1:1', () => {

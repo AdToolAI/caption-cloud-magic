@@ -8,6 +8,9 @@
  * siehe `ai-video-purchase-credits` + Coupon FOUNDERS_CREDIT_COUPON.
  */
 
+/** USD-Pendant (englische UI) — 1:1 zum EUR-Preis. */
+export const STRIPE_PRICE_USD = "price_1U6vHG1xgyPAUyx68LGgwoij";
+
 export const STRIPE_PRICE_MAP: Record<string, string> = {
   basic: "price_1TzLNc1xgyPAUyx6exJw3ihw",      // Beta-Basic — 14,99 €/Monat
   pro: "price_1TzLNc1xgyPAUyx6exJw3ihw",        // Alias während der Beta
@@ -23,6 +26,7 @@ export const STRIPE_PRODUCT_MAP: Record<string, string> = {
 /** Alle aktiven Abo-Price-IDs (für den Founders-Slot-Claim im Checkout). */
 export const SUBSCRIPTION_PRICE_IDS = new Set<string>([
   STRIPE_PRICE_MAP.basic,
+  STRIPE_PRICE_USD,
 ]);
 
 /** Legacy-Alias — wird von bestehenden Imports weiterverwendet. */

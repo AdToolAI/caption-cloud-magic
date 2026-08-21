@@ -151,22 +151,22 @@ export const AI_VIDEO_MODELS = {
     name: 'Sora 2 Standard',
     provider: 'OpenAI (Replicate)',
     costPerSecond: {
-      EUR: 0.2,
-      USD: 0.2,
+      EUR: 0.22,
+      USD: 0.22,
     },
     maxDuration: 30,
-    description: tx({ de: 'Hochwertige AI-Videos ab 2,00€ pro 10 Sekunden', en: 'High-quality AI videos from €2.00 ​​per 10 seconds', es: 'Vídeos con IA de alta calidad desde 2,00 € por 10 segundos' }),
+    description: tx({ de: 'Hochwertige AI-Videos ab 2,20 € pro 10 Sekunden', en: 'High-quality AI videos from €2.20 ​​per 10 seconds', es: 'Vídeos con IA de alta calidad desde 2,20 € por 10 segundos' }),
     badge: 'Premium-Engine',
   },
   'sora-2-pro': {
     name: 'Sora 2 Pro',
     provider: 'OpenAI (Replicate)',
     costPerSecond: {
-      EUR: 0.98,
-      USD: 0.98,
+      EUR: 1.08,
+      USD: 1.08,
     },
     maxDuration: 30,
-    description: tx({ de: 'Premium-Qualität ab 9,80€ pro 10 Sekunden', en: 'Premium quality from €9.80 per 10 seconds', es: 'Calidad premium desde 9,80€ los 10 segundos' }),
+    description: tx({ de: 'Premium-Qualität ab 10,80 € pro 10 Sekunden', en: 'Premium quality from €10.80 per 10 seconds', es: 'Calidad premium desde 10,80 € los 10 segundos' }),
     badge: 'Premium-Engine',
   },
 } as const;

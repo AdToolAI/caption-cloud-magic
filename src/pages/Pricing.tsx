@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { pricingPlans, Currency } from "@/config/pricing";
 import { getCurrencyForLanguage, formatPrice } from "@/lib/currency";
+import { getStripePriceId } from "@/config/stripe";
 import { useUrlCoupon } from "@/hooks/useUrlCoupon";
 import { CouponBanner } from "@/components/pricing/CouponBanner";
 import { CompetitorComparisonCard } from "@/components/landing/CompetitorComparisonCard";
@@ -70,7 +71,7 @@ const Pricing = () => {
     setProLoading(true);
     trackEvent(ANALYTICS_EVENTS.CHECKOUT_STARTED, {
       plan: "pro",
-      price_id: pricingPlans.basic.priceId,
+      price_id: getStripePriceId("basic", currency),
       currency,
       coupon: couponCode || null,
       reactivation: isReactivation,
@@ -78,7 +79,7 @@ const Pricing = () => {
     try {
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: {
-          priceId: pricingPlans.basic.priceId,
+          priceId: getStripePriceId("basic", currency),
           ...(couponCode ? { promoCode: couponCode } : {}),
         },
       });
