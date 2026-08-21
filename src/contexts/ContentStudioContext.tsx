@@ -180,7 +180,7 @@ export function ContentStudioProvider({
 
   const [brief, setBrief] = useState("");
   const [platform, setPlatform] = useState("instagram");
-  const [language, setLanguage] = useState("de");
+  const [language, setLanguage] = useState(getLanguage());
   const [tone, setTone] = useState(tx({ de: 'selbstbewusst, klar', en: 'confident, clear', es: 'seguro, claro' }));
 
   const [copy, setCopy] = useState<CopyPayload | null>(null);
@@ -223,7 +223,7 @@ export function ContentStudioProvider({
       if (!draft.brief && !draft.copy && !draft.hasDesign) return;
       setBrief(draft.brief ?? "");
       setPlatform(draft.platform ?? "instagram");
-      setLanguage(draft.language ?? "de");
+      setLanguage(draft.language ?? getLanguage());
       setTone(draft.tone ?? tx({ de: 'selbstbewusst, klar', en: 'confident, clear', es: 'seguro, claro' }));
       setCopy(draft.copy ?? null);
       setCopyIndex(draft.copyIndex ?? 0);
