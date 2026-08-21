@@ -162,7 +162,15 @@ async function searchPixabay(query: string, perPage: number, orientation?: strin
         provider: "pixabay",
         external_id: String(v.id),
         title: (v.tags || "Pixabay Video").split(",")[0].trim() || "Pixabay Video",
-        thumbnail: `https://i.vimeocdn.com/video/${v.picture_id}_640x360.jpg`,
+        // Pixabay ships thumbnails on each size variant; the old
+        // `i.vimeocdn.com/<picture_id>` shape is dead and 404s with "undefined".
+        thumbnail:
+          best.thumbnail ||
+          sizes.large?.thumbnail ||
+          sizes.medium?.thumbnail ||
+          sizes.small?.thumbnail ||
+          sizes.tiny?.thumbnail ||
+          "",
         preview_url: best.url,
         download_url: best.url,
         width: w, height: h, duration: v.duration ?? 0, fps: 30,

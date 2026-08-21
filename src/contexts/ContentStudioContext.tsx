@@ -293,7 +293,7 @@ export function ContentStudioProvider({
       .from("brand_kits")
       .select("*")
       .eq("user_id", user.id)
-      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle()
       .then(({ data }) => setBrandKit((data as BrandKitLike) ?? null));
