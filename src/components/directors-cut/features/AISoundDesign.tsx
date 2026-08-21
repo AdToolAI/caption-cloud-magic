@@ -35,7 +35,6 @@ const SOUND_CATEGORIES = [
   { id: 'foley', name: tx({ de: 'Foley', en: 'Foley', es: 'Foley' }), icon: '👣', description: tx({ de: 'Bewegungsgeräusche', en: 'Movement sounds', es: 'Sonidos de movimiento' }) },
 ];
 
-const CREDITS_COST = 5;
 
 export function AISoundDesign({ scenes, videoUrl, onSoundsGenerated }: AISoundDesignProps) {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -131,15 +130,14 @@ export function AISoundDesign({ scenes, videoUrl, onSoundsGenerated }: AISoundDe
         setGeneratedSounds(sounds);
         onSoundsGenerated(sounds);
         toast.success(tx({ de: `${sounds.length} Sounds generiert`, en: `${sounds.length} sounds generated`, es: `${sounds.length} sonidos generados` }), {
-          description: tx({ de: `${data.credits_used} Credits verwendet`, en: `${data.credits_used} credits used`, es: `${data.credits_used} créditos utilizados` }),
         });
       }
     } catch (error: any) {
       console.error('Sound Design error:', error);
       
       if (error?.context?.status === 402) {
-        toast.error(tx({ de: 'Nicht genügend Credits', en: 'Not enough credits', es: 'Créditos insuficientes' }), {
-          description: tx({ de: `Du benötigst ${CREDITS_COST} Credits für AI Sound Design`, en: `You need ${CREDITS_COST} credits for AI Sound Design`, es: `Necesitas ${CREDITS_COST} créditos para diseño de sonido con IA` }),
+        toast.error(tx({ de: "Generierung fehlgeschlagen", en: "Generation failed", es: "Generación fallida" }), {
+          description: tx({ de: 'Bitte versuche es erneut', en: 'Please try again', es: 'Por favor, inténtalo de nuevo' }),
         });
       } else {
         toast.error(tx({ de: "Generierung fehlgeschlagen", en: "Generation failed", es: "Generación fallida" }), {
@@ -171,7 +169,7 @@ export function AISoundDesign({ scenes, videoUrl, onSoundsGenerated }: AISoundDe
         <CardTitle className="text-sm flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-yellow-500" />
           AI Sound Design
-          <Badge variant="secondary" className="ml-auto">{CREDITS_COST} Credits</Badge>
+          <Badge variant="secondary" className="ml-auto">{tx({ de: 'Inklusive', en: 'Included', es: 'Incluido' })}</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

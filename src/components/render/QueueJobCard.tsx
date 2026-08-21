@@ -62,7 +62,11 @@ export const QueueJobCard = ({ job, onUpdate }: QueueJobCardProps) => {
                 </Badge>
               </div>
               <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                <span>{job.estimated_cost} {tx({ de: "Credits", en: "Credits", es: "Créditos" })}</span>
+                <span>
+                  {Number(job.estimated_cost) > 0
+                    ? `${job.estimated_cost} ${tx({ de: "Credits", en: "Credits", es: "Créditos" })}`
+                    : tx({ de: "Im Plan enthalten", en: "Included in your plan", es: "Incluido en tu plan" })}
+                </span>
                 <span>•</span>
                 <span>{formatDistanceToNow(new Date(job.created_at), { addSuffix: true, locale: dateFnsLocale() })}</span>
               </div>
