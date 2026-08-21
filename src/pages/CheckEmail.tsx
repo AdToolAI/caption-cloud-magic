@@ -54,9 +54,23 @@ const CheckEmail = () => {
       });
       setCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err: any) {
-      toast.error(t("checkEmail.resendError"), {
-        description: err.message,
-      });
+      const rateLimited =
+        err?.status === 429 || /rate limit|too many|security purposes/i.test(err?.message ?? "");
+      if (rateLimited) {
+        setCooldown(RESEND_COOLDOWN_SECONDS);
+        toast.error(t("checkEmail.resendError"), {
+          description: tx({
+            de: "Bitte warte einen Moment, bevor du eine weitere E-Mail anforderst.",
+            en: "Please wait a moment before requesting another email.",
+            es: "Espera un momento antes de solicitar otro correo.",
+          }),
+        });
+      } else {
+        toast.error(t("checkEmail.resendError"), {
+          description: err.message,
+        });
+      }
+
     } finally {
       setResending(false);
     }
