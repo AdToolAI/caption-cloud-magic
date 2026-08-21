@@ -97,6 +97,27 @@ export function PublishingStatusPanel({ workspaceId }: { workspaceId: string }) 
     };
   }, [workspaceId, refetchEvents]);
 
+  // Backend-Logs sind sprachneutral codiert (meta.code) — hier lokalisiert dargestellt.
+  const formatLogMessage = (log: PublishLog) => {
+    const code = log.meta?.code as string | undefined;
+    switch (code) {
+      case 'started':
+        return t('calendar.logStarted')
+          .replace('{attempt}', String(log.meta?.attempt ?? ''))
+          .replace('{max}', String(log.meta?.max ?? ''));
+      case 'succeeded':
+        return t('calendar.logSucceeded');
+      case 'partial':
+        return t('calendar.logPartial');
+      case 'failed':
+        return log.meta?.detail
+          ? `${t('calendar.logFailed')}: ${log.meta.detail}`
+          : t('calendar.logFailed');
+      default:
+        return log.message;
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'queued':
