@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/hooks/useTranslation";
 import { getStripePriceId } from "@/config/stripe";
+import { getCurrencyForLanguage } from "@/lib/currency";
 
 type Redemption = {
   id: string;
@@ -112,7 +113,7 @@ export const PromoCodeSection = () => {
     setActivating(true);
     try {
       const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: { priceId: getStripePriceId("basic", "EUR") },
+        body: { priceId: getStripePriceId("basic", getCurrencyForLanguage(language)) },
       });
       if (error) throw error;
       if (data?.url) window.open(data.url, "_blank");

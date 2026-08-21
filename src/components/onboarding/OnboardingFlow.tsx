@@ -8,7 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Check, Sparkles } from "lucide-react";
 import { pricingPlans } from "@/config/pricing";
+import { getStripePriceId } from "@/config/stripe";
+import { getCurrencyForLanguage } from "@/lib/currency";
 import { toast } from "sonner";
+import { tx } from "@/lib/i18nText";
 
 export const OnboardingFlow = () => {
   const [step, setStep] = useState(1);
@@ -18,13 +21,12 @@ export const OnboardingFlow = () => {
   const [brandColor, setBrandColor] = useState("#6366F1");
   const [loading, setLoading] = useState(false);
   
-  const { setLanguage, t } = useTranslation();
+  const { setLanguage, t, language } = useTranslation();
   const navigate = useNavigate();
 
   const handleLanguageSelect = (lang: 'en' | 'de' | 'es') => {
     setSelectedLang(lang);
     setLanguage(lang);
-    localStorage.setItem('cg_lang', lang);
   };
 
   const handlePlanSelect = async (plan: 'free' | 'basic' | 'pro') => {
@@ -36,7 +38,7 @@ export const OnboardingFlow = () => {
         if (!user) throw new Error('Not authenticated');
 
         const { data, error } = await supabase.functions.invoke('create-checkout', {
-          body: { priceId: pricingPlans[plan].priceId }
+          body: { priceId: getStripePriceId(plan, getCurrencyForLanguage(language)) }
         });
 
         if (error) throw error;
@@ -45,7 +47,7 @@ export const OnboardingFlow = () => {
         }
       } catch (error) {
         console.error('Checkout error:', error);
-        toast.error('Failed to start checkout process');
+        toast.error(tx({ de: 'Checkout konnte nicht gestartet werden', en: 'Failed to start checkout process', es: 'No se pudo iniciar el proceso de pago' }));
       } finally {
         setLoading(false);
       }
@@ -69,11 +71,11 @@ export const OnboardingFlow = () => {
 
       if (error) throw error;
 
-      toast.success('Welcome to AdTool AI!');
+      toast.success(tx({ de: 'Willkommen bei AdTool AI!', en: 'Welcome to AdTool AI!', es: '¡Bienvenido a AdTool AI!' }));
       navigate('/home');
     } catch (error) {
       console.error('Onboarding completion error:', error);
-      toast.error('Failed to complete onboarding');
+      toast.error(tx({ de: 'Onboarding konnte nicht abgeschlossen werden', en: 'Failed to complete onboarding', es: 'No se pudo completar la incorporación' }));
     } finally {
       setLoading(false);
     }

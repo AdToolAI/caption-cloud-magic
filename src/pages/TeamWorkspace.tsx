@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { getCurrencyForLanguage } from "@/lib/currency";
 import {
   Users, Plus, Mail, CheckCircle, XCircle, ListTodo, Shield, Crown,
   Sparkles, Activity, Clock, TrendingUp, Circle, MoreHorizontal, Radar, Trash2, Check, X,
@@ -188,7 +189,7 @@ const PermissionMatrix = ({ t }: { t: (k: string) => any }) => (
 /* ---------- Component ---------- */
 
 export default function TeamWorkspace() {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -369,8 +370,7 @@ export default function TeamWorkspace() {
     if (!selectedWorkspace || !user) return;
     setUpgrading(true);
     try {
-      const userLanguage = localStorage.getItem("language") || "en";
-      const currency = userLanguage === "de" ? "EUR" : "USD";
+      const currency = getCurrencyForLanguage(language);
       const { trackEvent, ANALYTICS_EVENTS } = await import("@/lib/analytics");
       trackEvent(ANALYTICS_EVENTS.ENTERPRISE_CHECKOUT_STARTED, {
         workspace_id: selectedWorkspace, currency,
