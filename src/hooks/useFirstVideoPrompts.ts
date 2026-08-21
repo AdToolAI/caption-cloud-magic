@@ -81,7 +81,7 @@ export function useFirstVideoPrompts() {
       if (cancelled) return;
 
       const cached = (profile as any)?.first_video_prompts;
-      if (Array.isArray(cached) && cached.length === 3) {
+      if (Array.isArray(cached) && cached.length === 3 && matchesLanguage(cached as FirstVideoPrompt[], lang)) {
         setPrompts(cached as FirstVideoPrompt[]);
         setPersonalized(true);
         setLoading(false);
