@@ -1,6 +1,16 @@
 /**
  * FA-4 v404 — Motion Probe Classifier (PURE)
+ *
+ * ⚠️ V434 CALIBRATION NOTICE (doc-only; no value below is changed)
+ * The thresholds in this file are RETIRED AS GROUND TRUTH. `docs/v433-motion-
+ * studio-rca.md` proved they were fitted on samples stored at MUTABLE artifact
+ * keys that later runs overwrote, so the labelled set is not reproducible
+ * (T6 42.5 → 169.5, T4 20.0 → 73.6) and the real Samuel T2 no-op (+42.8) lands
+ * deep inside the "motion" class. They remain in force ONLY because the frozen
+ * FA-4 production gate runs on them; they must not be cited as evidence for any
+ * new decision. Replacement path: `docs/v434-motion-studio-immutability.md`.
  * ------------------------------------------------------------------
+
  * PURE function. No DB access, no side effects, no Ledger touch.
  *
  * Authoritative scalar (frozen, FA-4 MOTION METRIC RE-SELECTION):
