@@ -330,7 +330,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
         ["Kosten-Transparenz", "Cost transparency", "Transparencia de costes"],
         [tx({ de: "Preis vor dem Render, nicht danach.", en: "Price before render, not after.", es: "Precio antes de renderizar, no después." }), "Cost shown before render, not after.", "Coste antes del render, no después."],
         [
-          tx({ de: "Jeder Render zeigt vorher, wieviel Media-Credits er kostet. Kein Überraschungsverbrauch, keine versteckten Aufschläge — Beta-Preis 14,99 € eingerechnet.", en: "Every render shows beforehand how many media credits it costs. No surprise consumption, no hidden surcharges — Beta price €14.99 included.", es: "Cada render muestra de antemano cuántos créditos de medios cuesta. Sin consumo sorpresa, sin recargos ocultos — precio Beta de 14,99 € incluido." }),
+          tx({ de: "Jeder Render zeigt vorher, wieviel Media-Credits er kostet. Kein Überraschungsverbrauch, keine versteckten Aufschläge — Beta-Preis 14,99 € eingerechnet.", en: "Every render shows beforehand how many media credits it costs. No surprise consumption, no hidden surcharges — Beta price $14.99 included.", es: "Cada render muestra de antemano cuántos créditos de medios cuesta. Sin consumo sorpresa, sin recargos ocultos — precio Beta de 14,99 € incluido." }),
           "Every render shows how many media credits it costs — up front. No surprise burn, no hidden markup — beta price 14.99 € included.",
           "Cada render muestra su coste en créditos — antes de lanzarlo. Sin sorpresas, sin recargos ocultos — precio beta 14,99 € incluido.",
         ],
@@ -699,7 +699,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
         ["Founders · 02", "Founders · 02", "Founders · 02"],
         [tx({ de: "20 % auf KI-Credits — 24 Monate.", en: "20% on AI credits — 24 months.", es: "20 % en créditos de IA: 24 meses." }), "20% off AI credits — for 24 months.", "20 % en créditos IA — 24 meses."],
         [
-          tx({ de: "Das Abo kostet 14,99 € — für alle gleich. Als Founder bekommst du 24 Monate lang 20 % Rabatt auf jeden Kauf von KI-Credits.", en: "The subscription costs €14.99 — the same for everyone. As a Founder, you get a 20% discount on every AI credit purchase for 24 months.", es: "La suscripción cuesta 14,99 € — igual para todos. Como Founder, obtienes un 20% de descuento en cada compra de créditos de IA durante 24 meses." }),
+          tx({ de: "Das Abo kostet 14,99 € — für alle gleich. Als Founder bekommst du 24 Monate lang 20 % Rabatt auf jeden Kauf von KI-Credits.", en: "The subscription costs $14.99 — the same for everyone. As a Founder, you get a 20% discount on every AI credit purchase for 24 months.", es: "La suscripción cuesta 14,99 € — igual para todos. Como Founder, obtienes un 20% de descuento en cada compra de créditos de IA durante 24 meses." }),
           "The subscription is €14.99 for everyone. As a founder you get 20% off every AI credit purchase for 24 months.",
           "La suscripción cuesta 14,99 € para todos. Como founder obtienes un 20 % de descuento en cada compra de créditos IA durante 24 meses.",
         ],

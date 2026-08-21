@@ -341,7 +341,7 @@ const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProj
                   <dd className="font-medium">{duration}s ({editedScenes.length} {tx({ de: "Szenen", en: "scenes", es: "escenas" })})</dd>
                   <dt className="text-muted-foreground">{tx({ de: "Engine:", en: "Engine:", es: "Motor:" })}</dt>
                   <dd className="font-medium">{ENGINE_OPTIONS.find((e) => e.id === enginePref)?.label}</dd>
-                  <dt className="text-muted-foreground">{tx({ de: "Geschätzte Kosten:", en: "Estimated cost:", es: "Costo estimado:" })}</dt>
+                  <dt className="text-muted-foreground">{tx({ de: "Geschätzte Kosten: ", en: "Estimated cost:", es: "Costo estimado:" })}</dt>
                   <dd className="font-bold text-primary">{totalEstimate.toFixed(2)} €</dd>
                 </dl>
               </CardContent>

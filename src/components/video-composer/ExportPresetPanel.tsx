@@ -424,7 +424,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
                   {tx({ de: `${selectedKeys.size} Formate ausgewählt`, en: `${selectedKeys.size} formats selected`, es: `${selectedKeys.size} formatos seleccionados` })}
                 </p>
                 <p className="text-[11px] text-muted-foreground">
-                  {tx({ de: 'Geschätzte Kosten:', en: 'Estimated cost:', es: 'Coste estimado:' })} <span className="font-medium text-foreground">€{batchCost.toFixed(2)}</span> · {tx({ de: 'Parallele Verarbeitung', en: 'Parallel processing', es: 'Procesamiento en paralelo' })}
+                  {tx({ de: 'Geschätzte Kosten: ', en: 'Estimated cost:', es: 'Coste estimado:' })} <span className="font-medium text-foreground">€{batchCost.toFixed(2)}</span> · {tx({ de: 'Parallele Verarbeitung', en: 'Parallel processing', es: 'Procesamiento en paralelo' })}
                 </p>
               </div>
             </div>

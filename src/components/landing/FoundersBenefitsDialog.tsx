@@ -20,8 +20,8 @@ interface Props {
 const benefits = [
   {
     icon: ShieldCheck,
-    title: tx({ de: "Ein Abo. 14,99 € im Monat.", en: "One plan. €14.99 per month.", es: "Un plan. 14,99 € al mes." }),
-    text: tx({ de: "Es gibt genau ein Modell: 14,99 € pro Monat für den kompletten Studio-Zugang. Keine Tarifstufen, keine Upsells, keine versteckten Gebühren.", en: "There is exactly one model: €14.99 per month for complete Studio access. No tiers, no upsells, no hidden fees.", es: "Solo hay un modelo: 14,99 € al mes para acceso completo al Studio. Sin niveles, sin ventas adicionales, sin tarifas ocultas." }),
+    title: tx({ de: "Ein Abo. 14,99 € im Monat.", en: "One plan. $14.99 per month.", es: "Un plan. 14,99 € al mes." }),
+    text: tx({ de: "Es gibt genau ein Modell: 14,99 € pro Monat für den kompletten Studio-Zugang. Keine Tarifstufen, keine Upsells, keine versteckten Gebühren.", en: "There is exactly one model: $14.99 per month for complete Studio access. No tiers, no upsells, no hidden fees.", es: "Solo hay un modelo: 14,99 € al mes para acceso completo al Studio. Sin niveles, sin ventas adicionales, sin tarifas ocultas." }),
   },
   {
     icon: Percent,
