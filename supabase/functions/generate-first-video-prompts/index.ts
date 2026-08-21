@@ -17,6 +17,19 @@ interface PromptItem {
   style_hint: string;
 }
 
+
+const GERMAN_MARKERS = /\b(der|die|das|und|mit|ein|eine|einer|einem|auf|über|für|beim|dem|den|nicht|sich)\b/i;
+const SPANISH_MARKERS = /\b(el|la|los|las|con|una|sobre|para|del|que|desde)\b/i;
+
+function cacheMatchesLanguage(items: PromptItem[], lang: "de" | "en" | "es"): boolean {
+  const text = items.map((p) => p?.prompt ?? "").join(" ");
+  const isGerman = GERMAN_MARKERS.test(text);
+  const isSpanish = SPANISH_MARKERS.test(text);
+  if (lang === "de") return isGerman;
+  if (lang === "es") return isSpanish && !isGerman;
+  return !isGerman && !isSpanish;
+}
+
 const FALLBACK_PROMPTS: Record<string, PromptItem[]> = {
   de: [
     { prompt: "Cinematische Drohnenaufnahme über einer modernen Skyline bei Sonnenuntergang", prompt_en: "Cinematic drone shot over a modern skyline at sunset", style_hint: "cinematic" },
@@ -78,9 +91,12 @@ Deno.serve(async (req) => {
       console.error("[first-video-prompts] profile load error:", profileErr);
     }
 
-    // Idempotency: skip if already cached
+    // Idempotency: skip if already cached AND the cache is in the requested language.
+    // A cache written at signup in another language must never leak into the current UI.
     if (!force && profile?.first_video_prompts && Array.isArray(profile.first_video_prompts) && profile.first_video_prompts.length > 0) {
-      return json({ prompts: profile.first_video_prompts, cached: true });
+      if (cacheMatchesLanguage(profile.first_video_prompts as PromptItem[], language)) {
+        return json({ prompts: profile.first_video_prompts, cached: true });
+      }
     }
 
     // If we don't even have an onboarding profile, return localized defaults
