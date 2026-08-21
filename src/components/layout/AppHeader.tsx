@@ -27,7 +27,7 @@ export function AppHeader() {
       className="sticky top-0 z-[70] h-14 shrink-0 isolate border-b bg-background/70 dark:bg-background/30 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 before:absolute before:inset-0 before:bg-gradient-to-r before:from-primary/5 before:via-transparent before:to-accent/5 before:pointer-events-none"
       role="banner"
     >
-      <div className="relative container max-w-full h-14 px-4 flex items-center justify-between gap-4">
+      <div className="relative container max-w-full h-14 px-2 sm:px-4 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Mobile Menu + Brand */}
         <div className="flex items-center gap-3">
           <Button
@@ -59,17 +59,18 @@ export function AppHeader() {
         </div>
 
         {/* Right: Actions */}
-        <div data-tour="header-actions" className="flex items-center gap-2 ml-12">
+        <div data-tour="header-actions" className="flex items-center gap-1 sm:gap-2 lg:ml-12 shrink-0">
           {user && <StreakBadge />}
           <LanguageSwitcher />
           <ThemeToggle />
           {user && (
-            <Button asChild variant="ghost" size="icon" className="rounded-xl" aria-label="Community">
+            <Button asChild variant="ghost" size="icon" className="rounded-xl hidden sm:inline-flex" aria-label="Community">
               <Link to="/community">
                 <MessageSquare className="h-5 w-5" />
               </Link>
             </Button>
           )}
+
           {user && <NotificationBell />}
           <UserMenu />
         </div>
