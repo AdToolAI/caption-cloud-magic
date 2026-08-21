@@ -815,6 +815,10 @@ export const translations: Record<Language, any> = {
       viewLink: "View",
       retrySuccess: "Event will be reprocessed",
       retryFailed: "Retry failed",
+      logStarted: "Publishing started (attempt {attempt}/{max})",
+      logSucceeded: "Publishing succeeded on all platforms",
+      logPartial: "Publishing partially failed",
+      logFailed: "Publishing failed",
 
       // Quick Schedule Form
       quickSchedule: "Quick Schedule",
@@ -5782,6 +5786,10 @@ export const translations: Record<Language, any> = {
       viewLink: "Anzeigen",
       retrySuccess: "Event wird erneut verarbeitet",
       retryFailed: "Erneuter Versuch fehlgeschlagen",
+      logStarted: "Veröffentlichung gestartet (Versuch {attempt}/{max})",
+      logSucceeded: "Veröffentlichung auf allen Plattformen erfolgreich",
+      logPartial: "Veröffentlichung teilweise fehlgeschlagen",
+      logFailed: "Veröffentlichung fehlgeschlagen",
 
       // Quick Schedule Form
       quickSchedule: "Schnell-Planung",
@@ -10702,6 +10710,10 @@ export const translations: Record<Language, any> = {
       viewLink: "Ver",
       retrySuccess: "El evento se reprocesará",
       retryFailed: "Reintento fallido",
+      logStarted: "Publicación iniciada (intento {attempt}/{max})",
+      logSucceeded: "Publicación exitosa en todas las plataformas",
+      logPartial: "Publicación parcialmente fallida",
+      logFailed: "Publicación fallida",
 
       // Quick Schedule Form
       quickSchedule: "Programación Rápida",

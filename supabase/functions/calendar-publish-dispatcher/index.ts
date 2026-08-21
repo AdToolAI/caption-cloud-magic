@@ -88,7 +88,7 @@ Deno.serve(withTelemetry('calendar-publish-dispatcher', async (req) => {
           workspace_id: event.workspace_id,
           level: 'info',
           message: `Publishing started (attempt ${event.attempt_no + 1}/${MAX_ATTEMPTS})`,
-          meta: { channels: event.channels },
+          meta: { channels: event.channels, code: 'started', attempt: event.attempt_no + 1, max: MAX_ATTEMPTS },
         });
 
         // Prepare media for publish
@@ -139,7 +139,7 @@ Deno.serve(withTelemetry('calendar-publish-dispatcher', async (req) => {
             workspace_id: event.workspace_id,
             level: 'error',
             message: `Publishing failed: ${publishError.message}`,
-            meta: { error: publishError, next_retry_at: nextRetryAt },
+            meta: { error: publishError, next_retry_at: nextRetryAt, code: 'failed', detail: publishError.message },
           });
 
           failed++;
@@ -178,7 +178,7 @@ Deno.serve(withTelemetry('calendar-publish-dispatcher', async (req) => {
             workspace_id: event.workspace_id,
             level: 'info',
             message: 'Publishing succeeded on all platforms',
-            meta: { results: platformResults },
+            meta: { results: platformResults, code: 'succeeded' },
           });
 
           succeeded++;
@@ -206,7 +206,7 @@ Deno.serve(withTelemetry('calendar-publish-dispatcher', async (req) => {
             workspace_id: event.workspace_id,
             level: 'warn',
             message: 'Publishing partially failed',
-            meta: { results: platformResults, next_retry_at: nextRetryAt },
+            meta: { results: platformResults, next_retry_at: nextRetryAt, code: 'partial' },
           });
 
           failed++;
