@@ -65,6 +65,7 @@ const headlines: Record<string, { title: string; subtitle: string; allDone: stri
 export const GettingStartedChecklist = () => {
   const { user } = useAuth();
   const { language } = useTranslation();
+  const { pathname } = useLocation();
   const { data: progress, isLoading } = useGettingStartedProgress();
 
   const [collapsed, setCollapsed] = useState<boolean>(() => {
