@@ -100,19 +100,21 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
 
     const segments: Segment[] = Array.isArray(body?.segments) ? body.segments : [];
     const usable = segments.filter((s) => s?.voiceId && String(s?.text || '').trim().length > 0);
-    if (usable.length === 0) throw new Error('Kein Text zum Vertonen');
+    if (usable.length === 0) throw new Error(tl({ de: 'Kein Text zum Vertonen', en: 'No text to narrate', es: 'No hay texto para narrar' }));
 
     const totalChars = usable.reduce((sum, s) => sum + s.text.trim().length, 0);
     const cost = Math.round((totalChars / 1000) * PRICE_PER_1K_CHARS * 100) / 100;
 
     // --- Wallet check -------------------------------------------------------
     const { data: wallet } = await admin
-      .from('ai_video_wallets').select('balance_euros').eq('user_id', user.id).maybeSingle();
+      .from('ai_video_wallets').select('balance_euros, currency').eq('user_id', user.id).maybeSingle();
     const balance = Number(wallet?.balance_euros ?? 0);
+    // Wallet currency drives the symbol — EN users are billed in USD.
+    const sym = (wallet?.currency ?? 'EUR') === 'USD' ? '$' : '€';
     if (balance < cost) {
       return new Response(JSON.stringify({
         error: 'insufficient_credits',
-        message: tl({ de: `Nicht genug Guthaben: ${cost.toFixed(2)} € benötigt, ${balance.toFixed(2)} € verfügbar.`, en: `Not enough credit: ${cost.toFixed(2)} € needed, ${balance.toFixed(2)} € available.`, es: `Crédito insuficiente: se necesitan ${cost.toFixed(2)} €, disponibles ${balance.toFixed(2)} €.` }),
+        message: tl({ de: `Nicht genug Guthaben: ${sym}${cost.toFixed(2)} benötigt, ${sym}${balance.toFixed(2)} verfügbar.`, en: `Not enough credit: ${sym}${cost.toFixed(2)} needed, ${sym}${balance.toFixed(2)} available.`, es: `Crédito insuficiente: se necesitan ${sym}${cost.toFixed(2)}, disponibles ${sym}${balance.toFixed(2)}.` }),
         cost, balance,
       }), { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
