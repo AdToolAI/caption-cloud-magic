@@ -11,6 +11,7 @@ import { pricingPlans } from "@/config/pricing";
 import { getStripePriceId } from "@/config/stripe";
 import { getCurrencyForLanguage } from "@/lib/currency";
 import { toast } from "sonner";
+import { tx } from "@/lib/i18nText";
 
 export const OnboardingFlow = () => {
   const [step, setStep] = useState(1);
@@ -46,7 +47,7 @@ export const OnboardingFlow = () => {
         }
       } catch (error) {
         console.error('Checkout error:', error);
-        toast.error('Failed to start checkout process');
+        toast.error(tx({ de: 'Checkout konnte nicht gestartet werden', en: 'Failed to start checkout process', es: 'No se pudo iniciar el proceso de pago' }));
       } finally {
         setLoading(false);
       }
@@ -70,11 +71,11 @@ export const OnboardingFlow = () => {
 
       if (error) throw error;
 
-      toast.success('Welcome to AdTool AI!');
+      toast.success(tx({ de: 'Willkommen bei AdTool AI!', en: 'Welcome to AdTool AI!', es: '¡Bienvenido a AdTool AI!' }));
       navigate('/home');
     } catch (error) {
       console.error('Onboarding completion error:', error);
-      toast.error('Failed to complete onboarding');
+      toast.error(tx({ de: 'Onboarding konnte nicht abgeschlossen werden', en: 'Failed to complete onboarding', es: 'No se pudo completar la incorporación' }));
     } finally {
       setLoading(false);
     }
