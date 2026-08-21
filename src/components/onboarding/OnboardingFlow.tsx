@@ -38,7 +38,7 @@ export const OnboardingFlow = () => {
         if (!user) throw new Error('Not authenticated');
 
         const { data, error } = await supabase.functions.invoke('create-checkout', {
-          body: { priceId: getStripePriceId(plan, getCurrencyForLanguage(language)) }
+          body: { priceId: getStripePriceId(plan, getCurrencyForLanguage(language)), locale: language }
         });
 
         if (error) throw error;

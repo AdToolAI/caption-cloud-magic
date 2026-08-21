@@ -29,7 +29,10 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header");
 
-    const { priceId, promoCode, applyIntro, couponId } = await req.json();
+    const { priceId, promoCode, applyIntro, couponId, locale } = await req.json();
+    // Stripe Checkout must speak the UI language, not the browser locale.
+    const checkoutLocale: "en" | "de" | "es" =
+      locale === "de" ? "de" : locale === "es" ? "es" : "en";
     if (!priceId) throw new Error("Price ID is required");
 
     const supabaseClient = createClient(
@@ -142,6 +145,7 @@ serve(async (req) => {
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
+      locale: checkoutLocale,
       // Aktive Methoden im Stripe-Dashboard: Card, PayPal, Link.
       // Apple Pay & Google Pay laufen automatisch über 'card' (Domain verifiziert).
       // Zahlungsarten kommen aus den Stripe-Dashboard-Einstellungen (automatic payment methods).

@@ -80,6 +80,7 @@ const Pricing = () => {
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: {
           priceId: getStripePriceId("basic", currency),
+          locale: language,
           ...(couponCode ? { promoCode: couponCode } : {}),
         },
       });
