@@ -59,8 +59,9 @@ export function ConciergeIntroScreen() {
     return () => window.clearTimeout(t);
   }, [user, conciergeCompleted]);
 
-  // Never cover commerce or auth surfaces — the intro must not block checkout.
-  const suppressedRoute = /^\/(pricing|welcome|billing|checkout|auth|payment)/.test(pathname);
+  // Never cover commerce, auth or the studio-setup surface — the intro must not
+  // block checkout, and it must never stack on top of the onboarding wizard.
+  const suppressedRoute = /^\/(pricing|welcome|billing|checkout|auth|payment|onboarding)/.test(pathname);
 
   const shouldShow = ready && user && conciergeCompleted === false && visible && !suppressedRoute;
 
