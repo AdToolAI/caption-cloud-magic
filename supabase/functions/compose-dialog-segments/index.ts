@@ -5637,8 +5637,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             const v434Key = buildImmutableArtifactKey({
               userId,
               sceneId,
-              runId: String((sceneRow as any)?.active_run_id ?? "") || "unknown-run",
-              generation: Number((sceneRow as any)?.plate_generation ?? 0) || 0,
+              runId: String((scene as any)?.active_run_id ?? "") || "unknown-run",
+              generation: Number((scene as any)?.plate_generation ?? 0) || 0,
               passIdx: currentPassIdx,
               kind: "preclip",
               attempt: Number((pass as any)?.attempt ?? 0) || 0,
