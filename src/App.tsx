@@ -22,7 +22,6 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CookieConsent } from "@/components/CookieConsent";
 import { CommandBar } from "@/components/ui/CommandBar";
 import { NewsTicker } from "@/components/dashboard/NewsTicker";
-import { OnboardingStepper } from "@/features/onboarding/Stepper";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { EmailVerificationGate } from "@/components/auth/EmailVerificationGate";
 import { AICompanionWidget } from "@/components/ai-companion/AICompanionWidget";
