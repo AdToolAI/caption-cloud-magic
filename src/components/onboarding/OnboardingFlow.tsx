@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Check, Sparkles } from "lucide-react";
 import { pricingPlans } from "@/config/pricing";
+import { getStripePriceId } from "@/config/stripe";
+import { getCurrencyForLanguage } from "@/lib/currency";
 import { toast } from "sonner";
 
 export const OnboardingFlow = () => {
