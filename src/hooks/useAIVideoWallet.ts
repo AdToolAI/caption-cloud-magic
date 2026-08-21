@@ -26,9 +26,9 @@ export const useAIVideoWallet = () => {
         .from('ai_video_wallets')
         .select('balance_euros, total_purchased_euros, total_spent_euros, currency')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') { // Ignore "not found" error
+      if (error) {
         throw error;
       }
 
