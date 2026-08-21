@@ -1611,29 +1611,9 @@ async function runGenerationPipeline(
       return;
     }
 
-    // Credit check & deduction
-    const calculateCredits = (durationSeconds: number): number => {
-      if (durationSeconds < 30) return 10;
-      if (durationSeconds <= 60) return 20;
-      if (durationSeconds <= 180) return 50;
-      if (durationSeconds <= 300) return 100;
-      return 200;
-    };
-    const credits_required = calculateCredits(totalDuration);
-    console.log(`💰 Credits required: ${credits_required} for ${totalDuration}s video`);
+    // v428: rendering is included in every plan — no credit check/deduction.
+    const credits_required = 0;
 
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', userId)
-      .single();
-
-    if (!wallet || wallet.balance < credits_required) {
-      throw new Error(`Nicht genügend Credits. Benötigt: ${credits_required}, Verfügbar: ${wallet?.balance || 0}`);
-    }
-
-    await supabase.rpc('deduct_credits', { p_user_id: userId, p_amount: credits_required });
-    console.log(`💰 Deducted ${credits_required} credits`);
 
     const pendingRenderId = generateRemotionCompatibleId();
     const webhookUrl = appendWebhookToken(`${supabaseUrl}/functions/v1/remotion-webhook`);
