@@ -623,7 +623,11 @@ export function UniversalVideoWizard() {
         <p className="text-muted-foreground mb-6">
           {t('uvc.loginRequiredDesc')}
         </p>
+        <Button onClick={() => navigate('/auth')}>
+          {tx({ de: 'Jetzt anmelden', en: 'Sign in', es: 'Iniciar sesión' })}
+        </Button>
       </div>
+
     );
   }
 
