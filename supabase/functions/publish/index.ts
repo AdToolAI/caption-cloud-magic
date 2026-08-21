@@ -1372,17 +1372,33 @@ Deno.serve((req: Request) => withLang(req, () => (withTelemetry('publish', async
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const token = authHeader.replace('Bearer ', '').trim();
+    const payload: PublishPayload & { user_id?: string } = await req.json();
 
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Internal path: scheduled publishing (cron dispatchers) authenticates with the
+    // service role key and names the owning user explicitly in the body.
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    let user: { id: string } | null = null;
+
+    if (serviceRoleKey && token === serviceRoleKey) {
+      const ownerId = typeof payload.user_id === 'string' ? payload.user_id.trim() : '';
+      if (!/^[0-9a-f-]{36}$/i.test(ownerId)) {
+        return new Response(
+          JSON.stringify({ error: 'user_id is required for internal publish calls' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      user = { id: ownerId };
+    } else {
+      const { data: { user: authedUser }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !authedUser) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      user = authedUser;
     }
-
-    const payload: PublishPayload = await req.json();
 
     if (!payload.text || !payload.channels || payload.channels.length === 0) {
       return new Response(
