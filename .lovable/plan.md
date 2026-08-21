@@ -1,6 +1,8 @@
-# Gate: v400 Differential RCA (read-only, keine Produktionsänderung)
+# Gate v433: Motion Studio Differential RCA + Continuity Contract Audit (read-only)
 
-Ziel: die Ursache des Samuel-T2-No-ops belegen, statt sie zu vermuten. Kein Code der Lip-Sync-Kette wird angefasst, keine Schwelle verstellt, kein Render angestoßen. Ergebnis ist ein Befundbericht mit einer benannten Primärursache (T8 Preclip / T9 Face-Gate / T10 Provider / T12 Outcome-Gate) und dem Beleg dafür.
+Zwei Ebenen in einem Gate. Ebene 1: den Samuel-T2-No-op forensisch belegen statt vermuten (Primärursache T8 Preclip / T9 Face-Gate / T10 Provider / T12 Outcome-Gate). Ebene 2: read-only prüfen, ob die heutige Motion-Studio-Architektur die zentralen Produktions-Verträge tatsächlich besitzt — allen voran die Lineage `Szene N → Continuity-Frame → Szene N+1 Anchor`.
+
+v400 ist dabei Vergleichsmaßstab, nicht Rückbauziel. Der aktuelle Code bleibt Source of Truth; aus v400 wird nur übernommen, was einen Fehler erklärt oder die heutige Architektur nachweislich verbessert. Kein Code wird angefasst, keine Schwelle verstellt, kein Render angestoßen.
 
 ## Ausgangslage (verifiziert)
 
