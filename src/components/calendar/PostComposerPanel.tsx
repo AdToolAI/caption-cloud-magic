@@ -429,7 +429,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
         )}
 
         {/* Channels — Lightsaber Toggles */}
-        <Section title="Plattformen">
+        <Section title={tx({ de: "Plattformen", en: "Platforms", es: "Plataformas" })}>
           <div className="flex flex-wrap gap-2">
             {PLATFORMS.map((p) => {
               const active = channels.includes(p.id);
