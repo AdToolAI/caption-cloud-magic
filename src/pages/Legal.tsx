@@ -463,7 +463,7 @@ const Legal = () => {
             <LegalSection title={tx({ de: 'Kontakt', en: 'Contact', es: 'Contacto' })} icon="mail" index={1}>
               <div className="space-y-2">
                 <p><strong className="text-foreground">E-Mail:</strong> support@useadtool.ai</p>
-                <p><strong className="text-foreground">Datenschutz:</strong> privacy@useadtool.ai</p>
+                <p><strong className="text-foreground">{tx({ de: 'Datenschutz:', en: 'Privacy:', es: 'Privacidad:' })}</strong> privacy@useadtool.ai</p>
               </div>
             </LegalSection>
 
