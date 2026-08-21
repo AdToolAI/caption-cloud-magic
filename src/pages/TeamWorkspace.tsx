@@ -188,7 +188,7 @@ const PermissionMatrix = ({ t }: { t: (k: string) => any }) => (
 /* ---------- Component ---------- */
 
 export default function TeamWorkspace() {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
 
