@@ -59,17 +59,18 @@ export function AppHeader() {
         </div>
 
         {/* Right: Actions */}
-        <div data-tour="header-actions" className="flex items-center gap-2 ml-12">
+        <div data-tour="header-actions" className="flex items-center gap-1 sm:gap-2 lg:ml-12 shrink-0">
           {user && <StreakBadge />}
           <LanguageSwitcher />
           <ThemeToggle />
           {user && (
-            <Button asChild variant="ghost" size="icon" className="rounded-xl" aria-label="Community">
+            <Button asChild variant="ghost" size="icon" className="rounded-xl hidden sm:inline-flex" aria-label="Community">
               <Link to="/community">
                 <MessageSquare className="h-5 w-5" />
               </Link>
             </Button>
           )}
+
           {user && <NotificationBell />}
           <UserMenu />
         </div>
