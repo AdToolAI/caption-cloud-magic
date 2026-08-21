@@ -107,6 +107,7 @@ const AdminAnalytics = lazy(() => import("./pages/admin/AdminAnalytics"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
 const UnifiedAnalytics = lazy(() => import("./pages/UnifiedAnalytics"));
 const Integrations = lazy(() => import("./pages/Integrations"));
+const SocialMediaSettings = lazy(() => import("./pages/SocialMediaSettings"));
 const PostHogDashboard = lazy(() => import("./pages/PostHogDashboard"));
 const PostHogEventTester = lazy(() => import("./pages/debug/PostHogEventTester"));
 const DebugLipsync = lazy(() => import("./pages/DebugLipsync"));
