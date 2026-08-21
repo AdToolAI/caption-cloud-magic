@@ -11,12 +11,14 @@ import {
 import { loadFont as loadPlayfair } from "@remotion/google-fonts/PlayfairDisplay";
 import { loadFont as loadInter } from "@remotion/google-fonts/Inter";
 import { GOLD, CREAM } from "../theme";
+import { COPY, Lang } from "../copy";
 
 
 const playfair = loadPlayfair("normal", { weights: ["600"], subsets: ["latin"] });
 const inter = loadInter("normal", { weights: ["600"], subsets: ["latin"] });
 
-export const TitleScene: React.FC<{ duration: number }> = ({ duration }) => {
+export const TitleScene: React.FC<{ duration: number; lang: Lang }> = ({ duration, lang }) => {
+  const c = COPY[lang];
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -62,7 +64,7 @@ export const TitleScene: React.FC<{ duration: number }> = ({ duration }) => {
               marginBottom: 26,
             }}
           >
-            AdTool AI
+            {c.titleKicker}
           </div>
           <div
             style={{
@@ -73,9 +75,9 @@ export const TitleScene: React.FC<{ duration: number }> = ({ duration }) => {
               fontWeight: 600,
             }}
           >
-            One creator.
+            {c.titleLine1}
             <br />
-            <span style={{ color: GOLD }}>A whole studio.</span>
+            <span style={{ color: GOLD }}>{c.titleLine2}</span>
           </div>
         </div>
         <div
@@ -96,7 +98,7 @@ export const TitleScene: React.FC<{ duration: number }> = ({ duration }) => {
             color: "rgba(244,239,230,0.72)",
           }}
         >
-          Idea → script → video → publishing
+          {c.titleSub}
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

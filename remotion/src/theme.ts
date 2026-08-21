@@ -16,13 +16,13 @@ export const SCENES = {
   end: { from: 806, duration: 106 },
 } as const;
 
-export const SUBTITLES: { from: number; to: number; text: string }[] = [
-  { from: 21, to: 80, text: "One creator. A whole studio." },
-  { from: 87, to: 218, text: "AdTool AI brings every leading AI model into one continuous workflow." },
-  { from: 226, to: 313, text: "Write campaign copy with premium reasoning models." },
-  { from: 321, to: 484, text: "Direct cinematic video in Motion Studio — cast, location, storyboard, render." },
-  { from: 491, to: 601, text: "Build a consistent cast that stays recognizable in every scene." },
-  { from: 609, to: 726, text: "Schedule and publish across every platform from one command center." },
-  { from: 733, to: 802, text: "Then measure what actually performs." },
-  { from: 809, to: 901, text: "AdTool AI. Your whole studio, in one place." },
+export const SUB_TIMINGS: { from: number; to: number }[] = [
+  { from: 21, to: 80 },
+  { from: 87, to: 218 },
+  { from: 226, to: 313 },
+  { from: 321, to: 484 },
+  { from: 491, to: 601 },
+  { from: 609, to: 726 },
+  { from: 733, to: 802 },
+  { from: 809, to: 901 },
 ];
