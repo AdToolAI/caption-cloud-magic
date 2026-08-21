@@ -1,15 +1,18 @@
 import { motion } from "framer-motion";
 import { Check, X } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { getCurrencyForLanguage, getCurrencySymbol } from "@/lib/currency";
 
 export const CompetitorComparisonCard = () => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const sym = getCurrencySymbol(getCurrencyForLanguage(language));
+  const fmt = (v: string) => (sym === "$" ? `$${v.replace(",", ".")}` : `${v.replace(".", ",")} €`);
 
   const rows = [
-    { label: t("landing.pricing.competitorBuffer"), price: "€25", included: false },
-    { label: t("landing.pricing.competitorHootsuite"), price: "€99", included: false },
-    { label: t("landing.pricing.competitorLater"), price: "€25", included: false },
-    { label: t("landing.pricing.competitorOurLabel"), price: "€14.99", included: true, highlight: true },
+    { label: t("landing.pricing.competitorBuffer"), price: fmt("25"), included: false },
+    { label: t("landing.pricing.competitorHootsuite"), price: fmt("99"), included: false },
+    { label: t("landing.pricing.competitorLater"), price: fmt("25"), included: false },
+    { label: t("landing.pricing.competitorOurLabel"), price: fmt("14.99"), included: true, highlight: true },
   ];
 
   return (

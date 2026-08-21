@@ -525,7 +525,7 @@ export const InstantAvatarDemo = () => {
               </Button>
               <p className="mt-3 text-xs text-muted-foreground inline-flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-primary/70" />
-                {tx({ de: "14,99 €/Monat · Founder: 20 % auf alle KI-Credits für die ersten 1000 Nutzer", en: "€14.99/month · Founder: 20% off all AI credits for the first 1000 users", es: "14,99 €/mes · Fundador: 20% de descuento en todos los créditos de IA para los primeros 1000 usuarios" })}
+                {tx({ de: "14,99 €/Monat · Founder: 20 % auf alle KI-Credits für die ersten 1000 Nutzer", en: "$14.99/month · Founder: 20% off all AI credits for the first 1000 users", es: "14,99 €/mes · Fundador: 20% de descuento en todos los créditos de IA para los primeros 1000 usuarios" })}
               </p>
             </div>
           </div>

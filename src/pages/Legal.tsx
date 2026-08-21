@@ -264,9 +264,9 @@ const Legal = () => {
               <LegalSection title={tx({ de: '§ 1 Präambel & Definitionen', en: '§ 1 Preamble & Definitions', es: '§ 1 Preámbulo y definiciones' })} icon="scale" defaultOpen={true} index={0}>
                 <div className="space-y-3">
                   <p>{tx({ de: 'Dieser Auftragsverarbeitungsvertrag (AVV) gemäß Art. 28 DSGVO wird geschlossen zwischen dem Nutzer der AdTool AI Plattform („Verantwortlicher") und AdTool AI, Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau („Auftragsverarbeiter").', en: 'This Data Processing Agreement (DPA) pursuant to Art. 28 GDPR is concluded between the user of the AdTool AI platform ("Controller") and AdTool AI, Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau ("Processor").', es: 'Este contrato de encargo de tratamiento de datos (DPA) conforme al art. 28 del RGPD se celebra entre el usuario de la plataforma AdTool AI ("Responsable") y AdTool AI, Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau ("Encargado").' })}</p>
-                  <p className="font-medium text-foreground">{tx({ de: 'Definitionen:', en: 'Definitions:', es: 'Definiciones:' })}</p>
+                  <p className="font-medium text-foreground">{tx({ de: 'Definitionen: ', en: 'Definitions:', es: 'Definiciones:' })}</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
-                    <li><strong className="text-foreground">{tx({ de: 'Personenbezogene Daten:', en: 'Personal data:', es: 'Datos personales:' })}</strong> {tx({ de: "Alle Informationen gemäß Art. 4 Nr. 1 DSGVO", en: "All information in accordance with Art. 4 No. 1 GDPR", es: "Toda la información de conformidad con el art. 4 n.º 1 del RGPD" })}</li>
+                    <li><strong className="text-foreground">{tx({ de: 'Personenbezogene Daten: ', en: 'Personal data:', es: 'Datos personales:' })}</strong> {tx({ de: "Alle Informationen gemäß Art. 4 Nr. 1 DSGVO", en: "All information in accordance with Art. 4 No. 1 GDPR", es: "Toda la información de conformidad con el art. 4 n.º 1 del RGPD" })}</li>
                     <li><strong className="text-foreground">{tx({ de: 'Verarbeitung:', en: 'Processing:', es: 'Tratamiento:' })}</strong> {tx({ de: 'Jeder Vorgang gemäß Art. 4 Nr. 2 DSGVO', en: 'Any operation in accordance with Art. 4 No. 2 GDPR', es: 'Cualquier operación conforme al art. 4 n.º 2 del RGPD' })}</li>
                     <li><strong className="text-foreground">{tx({ de: 'Betroffene Person:', en: 'Data subject:', es: 'Interesado:' })}</strong> {tx({ de: "Identifizierte oder identifizierbare natürliche Person", en: "Identified or identifiable natural person", es: "Persona física identificada o identificable" })}</li>
                   </ul>
@@ -297,13 +297,13 @@ const Legal = () => {
 
               <LegalSection title={tx({ de: '§ 4 Kategorien betroffener Personen und Daten', en: '§ 4 Categories of Data Subjects and Data', es: '§ 4 Categorías de interesados y datos' })} icon="users" index={3}>
                 <div className="space-y-3">
-                  <p className="font-medium text-foreground">{tx({ de: "Kategorien betroffener Personen:", en: "Categories of data subjects:", es: "Categorías de interesados:" })}</p>
+                  <p className="font-medium text-foreground">{tx({ de: "Kategorien betroffener Personen: ", en: "Categories of data subjects:", es: "Categorías de interesados:" })}</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
                     <li>{tx({ de: "Nutzer der AdTool AI Plattform", en: "Users of the AdTool AI platform", es: "Usuarios de la plataforma AdTool AI" })}</li>
                     <li>{tx({ de: "Follower und Kontakte auf verbundenen Social Media Accounts", en: "Followers and contacts on connected social media accounts", es: "Seguidores y contactos en cuentas de redes sociales conectadas" })}</li>
                     <li>{tx({ de: "Personen, die in hochgeladenen Medien dargestellt werden", en: "People featured in uploaded media", es: "Personas que aparecen en los medios subidos" })}</li>
                   </ul>
-                  <p className="font-medium text-foreground mt-4">{tx({ de: "Kategorien personenbezogener Daten:", en: "Categories of personal data:", es: "Categorías de datos personales:" })}</p>
+                  <p className="font-medium text-foreground mt-4">{tx({ de: "Kategorien personenbezogener Daten: ", en: "Categories of personal data:", es: "Categorías de datos personales:" })}</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
                     <li>{tx({ de: "Kontaktdaten (Name, E-Mail)", en: "Contact data (name, email)", es: "Datos de contacto (nombre, correo electrónico)" })}</li>
                     <li>{tx({ de: "Account-Daten (Benutzername, Passwort-Hash)", en: "Account data (username, password hash)", es: "Datos de cuenta (nombre de usuario, hash de contraseña)" })}</li>
@@ -371,7 +371,7 @@ const Legal = () => {
 
               <LegalSection title={tx({ de: '§ 9 Rechte der betroffenen Personen', en: '§ 9 Rights of Data Subjects', es: '§ 9 Derechos de los interesados' })} icon="users" index={8}>
                 <div className="space-y-3">
-                  <p>{tx({ de: "Der Auftragsverarbeiter unterstützt den Verantwortlichen bei der Erfüllung von Betroffenenrechten:", en: "The processor supports the controller in fulfilling data subject rights:", es: "El encargado apoya al responsable en el cumplimiento de los derechos de los interesados:" })}</p>
+                  <p>{tx({ de: "Der Auftragsverarbeiter unterstützt den Verantwortlichen bei der Erfüllung von Betroffenenrechten: ", en: "The processor supports the controller in fulfilling data subject rights:", es: "El encargado apoya al responsable en el cumplimiento de los derechos de los interesados:" })}</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
                     <li>{tx({ de: "Auskunftsrecht (Art. 15 DSGVO)", en: "Right of access (Art. 15 GDPR)", es: "Derecho de acceso (art. 15 RGPD)" })}</li>
                     <li>{tx({ de: "Berichtigungsrecht (Art. 16 DSGVO)", en: "Right to rectification (Art. 16 GDPR)", es: "Derecho de rectificación (art. 16 RGPD)" })}</li>
@@ -524,7 +524,7 @@ const Legal = () => {
 
             <LegalSection title={tx({ de: 'Quellenangaben für Medien', en: 'Media attribution', es: 'Atribución de medios' })} icon="database" index={9}>
               <div className="space-y-3">
-                <p>{tx({ de: 'Auf dieser Website verwendete Bilder, Icons und Grafiken stammen aus folgenden lizenzierten Quellen:', en: 'Images, icons, and graphics used on this website originate from the following licensed sources:', es: 'Las imágenes, iconos y gráficos utilizados en este sitio web provienen de las siguientes fuentes con licencia:' })}</p>
+                <p>{tx({ de: 'Auf dieser Website verwendete Bilder, Icons und Grafiken stammen aus folgenden lizenzierten Quellen: ', en: 'Images, icons, and graphics used on this website originate from the following licensed sources:', es: 'Las imágenes, iconos y gráficos utilizados en este sitio web provienen de las siguientes fuentes con licencia:' })}</p>
                 <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
                   <li>Icons: Lucide Icons (ISC License)</li>
                   <li>Stock-Medien: Unsplash, Pexels (entsprechende Lizenzen)</li>

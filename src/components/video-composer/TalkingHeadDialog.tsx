@@ -580,7 +580,7 @@ export default function TalkingHeadDialog({
               <div className="flex items-start gap-2 text-xs text-muted-foreground">
                 <AlertCircle className="h-4 w-4 mt-0.5 text-primary shrink-0" />
                 <div>
-                  {tx({ de: "Geschätzte Kosten:", en: "Estimated cost:", es: "Costo estimado:" })} <span className="text-primary font-semibold">€{cost.toFixed(2)}</span> ·
+                  {tx({ de: "Geschätzte Kosten: ", en: "Estimated cost:", es: "Costo estimado:" })} <span className="text-primary font-semibold">€{cost.toFixed(2)}</span> ·
                   {tx({ de: "Generierung dauert 1–3 Minuten · Powered by HeyGen Photo-Avatar", en: "Generation takes 1-3 minutes · Powered by HeyGen Photo-Avatar", es: "La generación tarda de 1 a 3 minutos · Con tecnología de HeyGen Photo-Avatar" })}
                 </div>
               </div>
@@ -903,7 +903,7 @@ function DialogModeTab({
         <div className="flex items-start gap-2 text-xs text-muted-foreground">
           <AlertCircle className="h-4 w-4 mt-0.5 text-primary shrink-0" />
           <div>
-            {tx({ de: 'Geschätzte Gesamt-Kosten:', en: 'Estimated total cost:', es: 'Coste total estimado:' })} <span className="text-primary font-semibold">€{totalCost.toFixed(2)}</span>{' '}
+            {tx({ de: 'Geschätzte Gesamt-Kosten: ', en: 'Estimated total cost:', es: 'Coste total estimado:' })} <span className="text-primary font-semibold">€{totalCost.toFixed(2)}</span>{' '}
             ({blocks.length} {tx({ de: "× HeyGen Talking-Head) · Generierung läuft sequentiell", en: "× HeyGen talking head) · generation runs sequentially", es: "× HeyGen talking head) · la generación es secuencial" })}
           </div>
         </div>

@@ -49,7 +49,7 @@ export const TrialPromiseStrip = () => {
           </div>
 
           {/* Items: tighter, single row on lg+ */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-2 lg:gap-x-5 flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-2 lg:gap-x-5 flex-1">
             {items.map((item, idx) => {
               const Icon = item.icon;
               return (
