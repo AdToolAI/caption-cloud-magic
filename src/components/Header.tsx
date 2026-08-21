@@ -88,16 +88,16 @@ export const Header = () => {
           )}
         </nav>
 
-        <div className="flex items-center gap-2" role="toolbar" aria-label="User actions">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0" role="toolbar" aria-label="User actions">
           {testMode && (
-            <Badge variant="secondary" className="bg-warning/20 text-warning border-warning/30">
+            <Badge variant="secondary" className="hidden sm:inline-flex bg-warning/20 text-warning border-warning/30">
               🧪 Test Mode: {testMode.charAt(0).toUpperCase() + testMode.slice(1)}
             </Badge>
           )}
           <ThemeToggle />
           <LanguageSwitcher />
           {user && (
-            <Button asChild variant="ghost" size="icon" aria-label="Community">
+            <Button asChild variant="ghost" size="icon" className="hidden sm:inline-flex" aria-label="Community">
               <Link to="/community">
                 <MessageSquare className="h-4 w-4" aria-hidden="true" />
               </Link>
@@ -108,8 +108,8 @@ export const Header = () => {
             <>
               <Button asChild variant="ghost" size="sm" aria-label={t("auth.account")}>
                 <Link to="/account">
-                  <User className="h-4 w-4 mr-2" aria-hidden="true" />
-                  {t("auth.account")}
+                  <User className="h-4 w-4 sm:mr-2" aria-hidden="true" />
+                  <span className="hidden sm:inline">{t("auth.account")}</span>
                 </Link>
               </Button>
               <Button 
@@ -118,11 +118,12 @@ export const Header = () => {
                 size="sm"
                 aria-label={t("auth.logout")}
               >
-                <LogOut className="h-4 w-4 mr-2" aria-hidden="true" />
-                {t("auth.logout")}
+                <LogOut className="h-4 w-4 sm:mr-2" aria-hidden="true" />
+                <span className="hidden sm:inline">{t("auth.logout")}</span>
               </Button>
             </>
           ) : (
+
             <>
               <Button asChild variant="ghost" size="sm" aria-label={t("auth.login")}>
                 <Link to="/auth">{t("auth.login")}</Link>
