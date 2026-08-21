@@ -53,34 +53,10 @@ serve(async (req) => {
 
     const { formats, aspect_ratios, quality, include_watermark, include_subtitles } = export_settings;
     
-    // Calculate total variants and credits
+    // Calculate total variants (v428: multi-format rendering is free)
     const total_variants = formats.length * aspect_ratios.length;
-    const credits_per_variant = 5;
-    const total_credits = total_variants * credits_per_variant;
+    const total_credits = 0;
 
-    // Check credits
-    const { data: wallet } = await supabaseClient
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!wallet || wallet.balance < total_credits) {
-      return new Response(JSON.stringify({ 
-        error: 'Insufficient credits',
-        required: total_credits,
-        available: wallet?.balance || 0
-      }), {
-        status: 402,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Deduct credits
-    await supabaseClient.rpc('deduct_credits', {
-      p_user_id: user.id,
-      p_amount: total_credits
-    });
 
     // Create batch render record
     const { data: batchRender, error: batchError } = await supabaseClient
