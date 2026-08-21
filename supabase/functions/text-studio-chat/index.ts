@@ -341,7 +341,7 @@ Deno.serve(async (req) => {
         } finally {
           controller.close();
 
-          // Background: persist messages + deduct wallet
+          // Background: persist messages (v428: Text Studio is free — no wallet deduction)
           // @ts-ignore
           EdgeRuntime.waitUntil(
             (async () => {
@@ -351,16 +351,6 @@ Deno.serve(async (req) => {
                   ((inputTokens / 1000) * pricing.input + (outputTokens / 1000) * pricing.output).toFixed(4),
                 );
 
-                // Deduct from wallet
-                try {
-                  await supabaseAdmin.rpc("deduct_text_studio_credits", {
-                    p_user_id: userId,
-                    p_amount: realCost,
-                    p_conversation_id: conversationId,
-                  });
-                } catch (e) {
-                  console.error("[text-studio-chat] deduct failed", e);
-                }
 
                 if (!isPrivate) {
                   // Persist last user message + assistant message
