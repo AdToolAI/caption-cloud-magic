@@ -56,7 +56,7 @@ export const useBrandCharacters = () => {
         .order('is_favorite', { ascending: false })
         .order('updated_at', { ascending: false });
       if (error) throw error;
-      return (data || []) as BrandCharacter[];
+      return ((data || []) as unknown) as BrandCharacter[];
     },
     staleTime: 30_000,
   });
