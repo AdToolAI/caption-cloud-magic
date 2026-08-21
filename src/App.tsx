@@ -280,6 +280,7 @@ function AppLayout() {
                 <Route path="/universal-creator/library" element={<Navigate to="/media-library" replace />} />
                 <Route path="/universal-video-creator" element={<UniversalVideoCreator />} />
                 <Route path="/universal-directors-cut" element={<UniversalDirectorsCut />} />
+                <Route path="/directors-cut" element={<Navigate to="/universal-directors-cut" replace />} />
                 <Route path="/voice-library" element={<Navigate to="/audio-studio" replace />} />
                 <Route path="/personalized-dashboard" element={<PersonalizedDashboard />} />
           <Route path="/team-workspace" element={<TeamWorkspace />} />
