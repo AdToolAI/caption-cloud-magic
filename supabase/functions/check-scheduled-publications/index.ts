@@ -59,32 +59,44 @@ Deno.serve(async (req) => {
     const results = await Promise.allSettled(
       publications.map(async (pub: ScheduledPublication) => {
         try {
-          // Determine which edge function to call
-          const functionName = `publish-to-${pub.platform}`;
-          
-          // Prepare payload based on platform
+          // Route through the per-user publish orchestrator so the user's own
+          // connected social accounts are used (the legacy publish-to-* functions
+          // only work with a single global env token).
+          const caption = [pub.caption || '', (pub.hashtags || []).join(' ')]
+            .filter(Boolean)
+            .join('\n\n');
+
           const payload: any = {
-            videoUrl: pub.video_url,
-            caption: pub.caption || '',
-            hashtags: pub.hashtags || [],
+            user_id: pub.user_id,
+            text: caption || pub.title || 'Video',
+            channels: [pub.platform],
+            media: pub.video_url
+              ? [{ type: 'video', path: pub.video_url, mime: 'video/mp4', size: 0 }]
+              : [],
           };
 
-          // Platform-specific fields
           if (pub.platform === 'youtube') {
-            payload.title = pub.title || pub.caption?.substring(0, 100) || 'Video';
-            payload.description = pub.description || pub.caption || '';
-            payload.tags = pub.hashtags || [];
-          } else if (pub.platform === 'linkedin') {
-            payload.visibility = 'PUBLIC';
+            payload.youtubeConfig = {
+              title: pub.title || pub.caption?.substring(0, 100) || 'Video',
+              description: pub.description || pub.caption || '',
+              tags: pub.hashtags || [],
+            };
           }
 
-          // Call the appropriate publishing function
           const { data: publishResult, error: publishError } = await supabase.functions.invoke(
-            functionName,
+            'publish',
             { body: payload }
           );
 
           if (publishError) throw publishError;
+
+          const platformResult = publishResult?.results?.find(
+            (r: any) => r.provider === pub.platform,
+          );
+          if (platformResult && platformResult.ok === false) {
+            throw new Error(platformResult.error_message || 'Publishing failed');
+          }
+
 
           // Update scheduled publication status
           await supabase
