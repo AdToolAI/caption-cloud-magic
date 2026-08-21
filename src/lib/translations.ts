@@ -4200,7 +4200,7 @@ export const translations: Record<Language, any> = {
           title: "Our trial promise",
           p1Title: "14 days free",
           p1Desc: "Full Enterprise access — try every feature.",
-          p2Title: "€10 welcome bonus",
+          p2Title: "$10 welcome bonus",
           p2Desc: "One-time AI video credits to get you started.",
           p3Title: "No auto-subscription",
           p3Desc: "We never charge you automatically — you decide.",
