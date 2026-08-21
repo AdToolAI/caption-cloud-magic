@@ -18437,6 +18437,7 @@ Object.assign(translations.es, {
 // ============================================================
 Object.assign(translations.en, {
   uvc: {
+    pageTitle: 'Universal Video Creator',
     cat_corporate_ad: 'Corporate ad',
     cat_corporate_ad_desc: 'Professional promotional videos for businesses and services',
     cat_corporate_ad_duration: '15-90 seconds',
@@ -18471,6 +18472,7 @@ Object.assign(translations.en, {
 });
 Object.assign(translations.de, {
   uvc: {
+    pageTitle: 'Universal Video Creator',
     cat_corporate_ad: 'Unternehmens-Werbung',
     cat_corporate_ad_desc: 'Professionelle Image- und Werbevideos für Unternehmen und Dienstleister',
     cat_corporate_ad_duration: '15–90 Sekunden',
@@ -18505,6 +18507,7 @@ Object.assign(translations.de, {
 });
 Object.assign(translations.es, {
   uvc: {
+    pageTitle: 'Creador de video universal',
     cat_corporate_ad: 'Anuncio corporativo',
     cat_corporate_ad_desc: 'Videos promocionales profesionales para empresas y servicios',
     cat_corporate_ad_duration: '15-90 segundos',
