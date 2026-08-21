@@ -132,37 +132,8 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "LOVABLE_API_KEY not configured" }, 500);
     }
 
-    // --- Wallet check (estimated cost) ---
-    const inputText = messages.map((m) => m.content).join("\n") + (systemPrompt || "");
-    const estInputTokens = estimateTokens(inputText);
-    const estOutputTokens = 800;
-    const estCost = Number(
-      ((estInputTokens / 1000) * pricing.input + (estOutputTokens / 1000) * pricing.output).toFixed(4),
-    );
+    // v428: Text Studio is free — no wallet check, cost is telemetry only.
 
-    const { data: wallet, error: walletError } = await supabaseAdmin
-      .from("ai_video_wallets")
-      .select("balance_euros, currency")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (walletError || !wallet) {
-      return jsonResponse(
-        { error: "No wallet found. Please purchase credits first.", code: "NO_WALLET" },
-        402,
-      );
-    }
-    if (Number(wallet.balance_euros) < estCost) {
-      return jsonResponse(
-        {
-          error: `Insufficient credits. Estimated €${estCost.toFixed(2)}, have €${Number(wallet.balance_euros).toFixed(2)}`,
-          code: "INSUFFICIENT_CREDITS",
-          required: estCost,
-          available: Number(wallet.balance_euros),
-        },
-        402,
-      );
-    }
 
     // --- Ensure conversation exists ---
     let conversationId = convIdInput;
