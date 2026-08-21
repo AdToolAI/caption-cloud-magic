@@ -144,13 +144,15 @@ serve(async (req) => {
       mode: "subscription",
       // Aktive Methoden im Stripe-Dashboard: Card, PayPal, Link.
       // Apple Pay & Google Pay laufen automatisch über 'card' (Domain verifiziert).
-      payment_method_types: ["card", "paypal", "link"],
+      // Zahlungsarten kommen aus den Stripe-Dashboard-Einstellungen (automatic payment methods).
+      // Hartes Setzen von "paypal" ließ den Checkout mit 500 fehlschlagen, wenn die Methode
+      // für Währung/Land nicht aktiviert ist.
       // Sammle Rechnungsadresse + Name, damit Stripe-Rechnungen korrekt ausgestellt werden.
       // Stripe sendet die finalisierte Rechnung danach automatisch per E-Mail an den Kunden
       // (zusätzlich verschicken wir aus dem Webhook eine gebrandete Quittung).
       billing_address_collection: "required",
       customer_update: { address: "auto", name: "auto" },
-      success_url: `${req.headers.get("origin") || Deno.env.get("SITE_URL")}/willkommen?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${req.headers.get("origin") || Deno.env.get("SITE_URL")}/welcome?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get("origin") || Deno.env.get("SITE_URL")}/pricing?canceled=true`,
       metadata: {
         userId: user.id,
