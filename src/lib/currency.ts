@@ -60,12 +60,14 @@ export const getCurrencyForLanguage = (_language: string): Currency => {
 };
 
 /**
- * Format a price value for display based on language
+ * Format a price value for display based on language.
+ * Amount stays EUR everywhere; only the decimal separator follows the locale.
  */
 export const formatPriceForLanguage = (amount: number, language: string): string => {
   const currency = getCurrencyForLanguage(language);
   if (currency === 'EUR') {
-    return `€${amount.toFixed(2).replace('.', ',')}`;
+    const value = language === 'en' ? amount.toFixed(2) : amount.toFixed(2).replace('.', ',');
+    return `€${value}`;
   }
   return `$${amount.toFixed(2)}`;
 };
