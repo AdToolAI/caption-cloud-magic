@@ -165,16 +165,19 @@ function AppLayout() {
   
   // Landing page routes
   const isLandingRoute = ['/', '/auth', '/pricing', '/faq', '/legal', '/privacy', '/terms', '/imprint', '/delete-data', '/coming-soon'].includes(location.pathname) || location.pathname.startsWith('/legal/') || location.pathname.startsWith('/brand/');
-  
+  // Studio setup runs on a clean, distraction-free surface — no sidebar,
+  // header, trial banner or news ticker while the wizard is open.
+  const isSetupRoute = location.pathname.startsWith('/onboarding');
+
   return (
     <div className="flex w-full">
       <ScrollToTop />
-      {user && <FounderExperience />}
-      {user && !isLandingRoute && <AppSidebar />}
+      {user && !isSetupRoute && <FounderExperience />}
+      {user && !isLandingRoute && !isSetupRoute && <AppSidebar />}
       <div className="min-w-0 flex-1 flex flex-col">
-        {isLandingRoute ? <Header /> : <AppHeader />}
-        {user && !isLandingRoute && <TrialBanner />}
-        {user && <NewsTicker />}
+        {!isSetupRoute && (isLandingRoute ? <Header /> : <AppHeader />)}
+        {user && !isLandingRoute && !isSetupRoute && <TrialBanner />}
+        {user && !isSetupRoute && <NewsTicker />}
         {/* Genau EIN Onboarding-Surface: die GettingStartedChecklist. Der alte
             Sticky-Stepper zeigte eine zweite, widersprüchliche Schrittliste. */}
         <main className="flex-1">
