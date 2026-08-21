@@ -38,6 +38,7 @@ import { ASSET_ROLES, type AssetRole } from '@/lib/autopilot/assetRoles';
 import { MAX_TOTAL_SECONDS, MIN_TOTAL_SECONDS, clampTotalDuration } from '@/lib/autopilot/ideaFeasibility';
 import type { AutopilotIdea, AutopilotStrategy } from '@/lib/autopilot/strategy';
 import { useBrandCharacters } from '@/hooks/useBrandCharacters';
+import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
 
 const MAX_ASSETS = 8;
@@ -92,11 +93,12 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const { characters } = useBrandCharacters();
+  const { language: uiLanguage } = useTranslation();
 
   const [brief, setBrief] = useState('');
   const [options, setOptions] = useState<LauncherOptions>({
     aspect: '9:16',
-    language: 'de',
+    language: uiLanguage ?? 'en',
     duration: 30,
     voiceover: true,
     lipSync: false,
