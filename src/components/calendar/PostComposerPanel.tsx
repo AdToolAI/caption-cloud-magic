@@ -429,7 +429,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
         )}
 
         {/* Channels — Lightsaber Toggles */}
-        <Section title="Plattformen">
+        <Section title={tx({ de: "Plattformen", en: "Platforms", es: "Plataformas" })}>
           <div className="flex flex-wrap gap-2">
             {PLATFORMS.map((p) => {
               const active = channels.includes(p.id);
@@ -456,7 +456,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
         </Section>
 
         {/* Schedule + Auto-Publish */}
-        <Section title="Auto-Publish Zeitpunkt" accent="indigo" icon={<Clock className="h-3.5 w-3.5 text-indigo-300" />}>
+        <Section title={tx({ de: "Auto-Publish Zeitpunkt", en: "Auto-publish time", es: "Hora de publicación automática" })} accent="indigo" icon={<Clock className="h-3.5 w-3.5 text-indigo-300" />}>
           <Input
             type="datetime-local"
             value={startAt}
