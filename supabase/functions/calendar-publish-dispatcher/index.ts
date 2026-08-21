@@ -104,7 +104,8 @@ Deno.serve(withTelemetry('calendar-publish-dispatcher', async (req) => {
           'publish',
           {
             body: {
-              text_content: event.caption,
+              user_id: event.owner_id,
+              text: event.caption,
               media,
               channels: event.channels,
               calendar_event_id: event.id,
