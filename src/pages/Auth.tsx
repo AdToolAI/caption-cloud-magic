@@ -49,24 +49,31 @@ const Auth = () => {
     e.preventDefault();
     
     if (!email || !password) {
-      toast.error("Please fill in all fields");
+      toast.error(tx({ de: "Bitte fülle alle Felder aus", en: "Please fill in all fields", es: "Rellena todos los campos" }));
       return;
     }
 
     if (!isLogin && password !== confirmPassword) {
-      toast.error("Passwords don't match");
+      toast.error(tx({ de: "Passwörter stimmen nicht überein", en: "Passwords don't match", es: "Las contraseñas no coinciden" }));
       return;
     }
 
     if (password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+      toast.error(tx({ de: "Das Passwort muss mindestens 6 Zeichen haben", en: "Password must be at least 6 characters", es: "La contraseña debe tener al menos 6 caracteres" }));
       return;
     }
+
 
     setLoading(true);
 
     if (isLogin) {
-      await signIn(email, password);
+      const result = await signIn(email, password);
+      // Unverified account: send the user where they can resend the mail
+      const msg = (result?.error as { message?: string } | undefined)?.message?.toLowerCase() ?? "";
+      if (msg.includes("email not confirmed") || msg.includes("email_not_confirmed")) {
+        navigate(`/auth/check-email?email=${encodeURIComponent(email)}`);
+      }
+
     } else {
       const result = await signUp(email, password);
       

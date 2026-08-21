@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -32,27 +33,50 @@ const CheckEmail = () => {
     setResending(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) {
-        toast.error(t("checkEmail.notLoggedIn"));
-        navigate("/auth");
-        return;
+
+      if (user?.id) {
+        // Signed-in but unverified: use our branded verification mail
+        const { error } = await supabase.functions.invoke("send-verification-email", {
+          body: { email, userId: user.id, language, appUrl: window.location.origin },
+        });
+        if (error) throw error;
+      } else {
+        // No session (standard signup flow) — ask Supabase Auth to resend the confirmation
+        const { error } = await supabase.auth.resend({
+          type: "signup",
+          email,
+          options: { emailRedirectTo: `${window.location.origin}/verify-email` },
+        });
+        if (error) throw error;
       }
-      const { error } = await supabase.functions.invoke("send-verification-email", {
-        body: { email, userId: user.id, language, appUrl: window.location.origin },
-      });
-      if (error) throw error;
+
       toast.success(t("checkEmail.resentTitle"), {
         description: t("checkEmail.resentDesc"),
       });
       setCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err: any) {
-      toast.error(t("checkEmail.resendError"), {
-        description: err.message,
-      });
+      const rateLimited =
+        err?.status === 429 || /rate limit|too many|security purposes/i.test(err?.message ?? "");
+      if (rateLimited) {
+        setCooldown(RESEND_COOLDOWN_SECONDS);
+        toast.error(t("checkEmail.resendError"), {
+          description: tx({
+            de: "Bitte warte einen Moment, bevor du eine weitere E-Mail anforderst.",
+            en: "Please wait a moment before requesting another email.",
+            es: "Espera un momento antes de solicitar otro correo.",
+          }),
+        });
+      } else {
+        toast.error(t("checkEmail.resendError"), {
+          description: err.message,
+        });
+      }
+
     } finally {
       setResending(false);
     }
   };
+
 
   return (
     <div className="min-h-screen flex flex-col bg-muted/30">
