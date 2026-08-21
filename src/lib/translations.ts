@@ -3962,7 +3962,7 @@ export const translations: Record<Language, any> = {
         headline1: "One creator.",
         headline2: "A whole studio.",
         subline: "Produce complete AI videos with the leading models, voices and lip-sync tools in a single workflow — from idea to finished video, without a film crew and without switching platforms.",
-        pricingHint: "From €14.99/month · 14-day trial · No auto-subscription",
+        pricingHint: "From $14.99/month · 14-day trial · No auto-subscription",
         ctaPrimary: "Open your studio",
         ctaSecondary: "Watch demo",
         stats: {

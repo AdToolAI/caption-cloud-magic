@@ -211,9 +211,9 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     build: () =>
       base(
         'card',
-        tx({ de: '14,99 € / Monat', en: '€14.99 / month', es: '14,99 € / mes' }),
+        tx({ de: '14,99 € / Monat', en: '$14.99 / month', es: '14,99 € / mes' }),
         { fill: 'rgba(10,10,15,0.85)', color: GOLD, align: 'left', fontSizeRel: 0.042 },
-        { animation: 'pop', box: { x: 0.08, y: 0.62, w: 0.4, h: 0.18 }, slots: { title: tx({ de: '14,99 € / Monat', en: '€14.99 / month', es: '14,99 € / mes' }), subtitle: tx({ de: 'jederzeit kündbar', en: 'cancel at any time', es: 'cancelable en cualquier momento' }) } },
+        { animation: 'pop', box: { x: 0.08, y: 0.62, w: 0.4, h: 0.18 }, slots: { title: tx({ de: '14,99 € / Monat', en: '$14.99 / month', es: '14,99 € / mes' }), subtitle: tx({ de: 'jederzeit kündbar', en: 'cancel at any time', es: 'cancelable en cualquier momento' }) } },
       ),
   },
 
