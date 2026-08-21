@@ -2899,7 +2899,7 @@ export const translations: Record<Language, any> = {
     trial: {
       day: "day",
       days: "days",
-      bannerSuffix: "left in your Enterprise trial",
+      bannerSuffix: "left in your free trial",
       upgradeCta: "Upgrade",
       pausedTitle: "Your account is paused",
       pausedDescription: "Your 14-day Enterprise trial has ended. Choose a plan to keep creating, generating and publishing.",
@@ -7790,7 +7790,7 @@ export const translations: Record<Language, any> = {
     trial: {
       day: "Tag",
       days: "Tage",
-      bannerSuffix: "deines Enterprise-Trials verbleibend",
+      bannerSuffix: "deiner kostenlosen Testphase verbleibend",
       upgradeCta: "Upgraden",
       pausedTitle: "Dein Konto ist pausiert",
       pausedDescription: "Dein 14-Tage Enterprise-Trial ist beendet. Wähle einen Plan, um weiter zu erstellen, generieren und zu veröffentlichen.",
@@ -12459,7 +12459,7 @@ export const translations: Record<Language, any> = {
     trial: {
       day: "día",
       days: "días",
-      bannerSuffix: "restantes de tu prueba Enterprise",
+      bannerSuffix: "restantes de tu prueba gratuita",
       upgradeCta: "Mejorar",
       pausedTitle: "Tu cuenta está en pausa",
       pausedDescription: "Tu prueba Enterprise de 14 días ha terminado. Elige un plan para seguir creando, generando y publicando.",

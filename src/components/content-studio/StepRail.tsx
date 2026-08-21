@@ -1,14 +1,15 @@
 import { Check } from "lucide-react";
 import { STUDIO_STEPS, type StudioStep } from "@/contexts/ContentStudioContext";
 import { cn } from "@/lib/utils";
+import { tx } from "@/lib/i18nText";
 
-const LABELS: Record<StudioStep, string> = {
-  brief: "Briefing",
-  copy: "Copy",
-  motif: "Motiv",
-  layout: "Layout",
-  deliver: "Ausspielen",
-};
+const labels = (): Record<StudioStep, string> => ({
+  brief: tx({ de: "Briefing", en: "Briefing", es: "Briefing" }),
+  copy: tx({ de: "Copy", en: "Copy", es: "Copy" }),
+  motif: tx({ de: "Motiv", en: "Visual", es: "Visual" }),
+  layout: tx({ de: "Layout", en: "Layout", es: "Diseño" }),
+  deliver: tx({ de: "Ausspielen", en: "Publish", es: "Publicar" }),
+});
 
 /** Fortschrittsband durch den Studio-Ablauf. Erreichte Schritte bleiben anklickbar. */
 export function StepRail({
@@ -24,6 +25,7 @@ export function StepRail({
   canEnter?: (next: StudioStep) => boolean;
 }) {
   const index = STUDIO_STEPS.indexOf(step);
+  const LABELS = labels();
 
   return (
     <div className="relative">

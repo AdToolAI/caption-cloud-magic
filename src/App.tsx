@@ -22,7 +22,6 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CookieConsent } from "@/components/CookieConsent";
 import { CommandBar } from "@/components/ui/CommandBar";
 import { NewsTicker } from "@/components/dashboard/NewsTicker";
-import { OnboardingStepper } from "@/features/onboarding/Stepper";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { EmailVerificationGate } from "@/components/auth/EmailVerificationGate";
 import { AICompanionWidget } from "@/components/ai-companion/AICompanionWidget";
@@ -175,7 +174,8 @@ function AppLayout() {
         {isLandingRoute ? <Header /> : <AppHeader />}
         {user && !isLandingRoute && <TrialBanner />}
         {user && <NewsTicker />}
-        {user && !isLandingRoute && <OnboardingStepper />}
+        {/* Genau EIN Onboarding-Surface: die GettingStartedChecklist. Der alte
+            Sticky-Stepper zeigte eine zweite, widersprüchliche Schrittliste. */}
         <main className="flex-1">
           <ErrorBoundary>
             <AccountPausedGate>
@@ -280,6 +280,7 @@ function AppLayout() {
                 <Route path="/universal-creator/library" element={<Navigate to="/media-library" replace />} />
                 <Route path="/universal-video-creator" element={<UniversalVideoCreator />} />
                 <Route path="/universal-directors-cut" element={<UniversalDirectorsCut />} />
+                <Route path="/directors-cut" element={<Navigate to="/universal-directors-cut" replace />} />
                 <Route path="/voice-library" element={<Navigate to="/audio-studio" replace />} />
                 <Route path="/personalized-dashboard" element={<PersonalizedDashboard />} />
           <Route path="/team-workspace" element={<TeamWorkspace />} />
