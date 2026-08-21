@@ -23,7 +23,7 @@ const BackBreadcrumb = () => (
 const Legal = () => {
   const { page } = useParams<{ page: string }>();
   const { language } = useTranslation();
-  const [contentLang, setContentLang] = useState<"de" | "en">("de");
+  const [contentLang, setContentLang] = useState<"de" | "en">(language === "de" ? "de" : "en");
   
   const location = window.location.pathname;
   const actualPage = page || (location === '/privacy' ? 'privacy' : location === '/terms' ? 'terms' : location === '/imprint' ? 'imprint' : null);
@@ -157,52 +157,71 @@ const Legal = () => {
               <LegalSection id="section-8" title={tx({ de: '8. Abopreis und Founders-Vorteil', en: '8. Subscription Price and Founders Benefit', es: '8. Precio de suscripción y beneficio Founders' })} icon="alert" index={7}>
                 <div className="space-y-3">
                   <p>
-                    Es besteht genau ein kostenpflichtiges Abomodell zu
-                    <strong className="text-foreground"> € 14,99 pro Monat</strong> (inkl. USt., monatlich kündbar).
-                    Auf die Abogebühr wird kein Rabatt gewährt. Der Founders-Vorteil bezieht sich
-                    <strong className="text-foreground"> {tx({ de: "ausschließlich auf den Kauf von KI-Credits", en: "exclusively on the purchase of AI credits", es: "exclusivamente en la compra de créditos AI" })}</strong>.
+                    {tx({
+                      de: 'Es besteht genau ein kostenpflichtiges Abomodell zu € 14,99 pro Monat (inkl. USt., monatlich kündbar). Auf die Abogebühr wird kein Rabatt gewährt. Der Founders-Vorteil bezieht sich ausschließlich auf den Kauf von KI-Credits.',
+                      en: 'There is exactly one paid subscription plan at $14.99 per month (incl. tax, cancellable monthly). No discount is granted on the subscription fee. The Founders benefit applies exclusively to the purchase of AI credits.',
+                      es: 'Existe exactamente un plan de suscripción de pago por € 14,99 al mes (impuestos incluidos, cancelable mensualmente). No se concede ningún descuento sobre la cuota de suscripción. La ventaja Founders se aplica exclusivamente a la compra de créditos de IA.',
+                    })}
                   </p>
                   <ul className="list-disc list-inside space-y-2 text-muted-foreground">
                     <li>
-                      Die ersten <strong className="text-foreground">1.000 Abonnenten</strong> („Founders") erhalten für
-                      <strong className="text-foreground"> 24 Monate ab Reservierung des Founders-Platzes 20 % Rabatt</strong>
-                      auf jeden Kauf von KI-Credits (Video, Bild, Audio). Der Rabatt wird beim Checkout automatisch angewendet.
+                      {tx({
+                        de: 'Die ersten 1.000 Abonnenten („Founders") erhalten für 24 Monate ab Reservierung des Founders-Platzes 20 % Rabatt auf jeden Kauf von KI-Credits (Video, Bild, Audio). Der Rabatt wird beim Checkout automatisch angewendet.',
+                        en: 'The first 1,000 subscribers ("Founders") receive a 20% discount on every purchase of AI credits (video, image, audio) for 24 months from the reservation of their Founders slot. The discount is applied automatically at checkout.',
+                        es: 'Los primeros 1.000 suscriptores («Founders») reciben un 20 % de descuento en cada compra de créditos de IA (vídeo, imagen, audio) durante 24 meses desde la reserva de su plaza Founders. El descuento se aplica automáticamente en el pago.',
+                      })}
                     </li>
                     <li>
-                      Die Anzahl der Founders-Plätze ist auf <strong className="text-foreground">1.000</strong> begrenzt.
-                      Sind diese vergeben, entfällt der Vorteil für weitere Anmeldungen ohne Vorankündigung.
+                      {tx({
+                        de: 'Die Anzahl der Founders-Plätze ist auf 1.000 begrenzt. Sind diese vergeben, entfällt der Vorteil für weitere Anmeldungen ohne Vorankündigung.',
+                        en: 'The number of Founders slots is limited to 1,000. Once they are taken, the benefit ends for further sign-ups without prior notice.',
+                        es: 'El número de plazas Founders está limitado a 1.000. Una vez agotadas, la ventaja deja de aplicarse a nuevos registros sin previo aviso.',
+                      })}
                     </li>
                     <li>
-                      Der Founders-Vorteil ist an ein aktives Abonnement gebunden. Bei Kündigung des Abos oder Löschung
-                      des Kontos <strong className="text-foreground">{tx({ de: 'erlischt der Rabatt und der Platz wird freigegeben', en: 'the discount expires and the slot is released', es: 'el descuento caduca y la plaza queda liberada' })}</strong>;
-                      ein Wiederaufleben nach erneuter Anmeldung besteht nicht.
+                      {tx({
+                        de: 'Der Founders-Vorteil ist an ein aktives Abonnement gebunden. Bei Kündigung des Abos oder Löschung des Kontos erlischt der Rabatt und der Platz wird freigegeben; ein Wiederaufleben nach erneuter Anmeldung besteht nicht.',
+                        en: 'The Founders benefit is tied to an active subscription. If the subscription is cancelled or the account deleted, the discount expires and the slot is released; it is not reinstated upon re-registration.',
+                        es: 'La ventaja Founders está vinculada a una suscripción activa. Si se cancela la suscripción o se elimina la cuenta, el descuento caduca y la plaza queda liberada; no se restablece al registrarse de nuevo.',
+                      })}
                     </li>
                     <li>
-                      Der Anbieter behält sich vor, den regulären Abopreis, die Rabattbedingungen, die Slot-Anzahl und die
-                      Laufzeit <strong className="text-foreground">{tx({ de: 'für die Zukunft zu ändern, auszusetzen oder zu beenden', en: 'to change, suspend, or terminate for the future', es: 'modificar, suspender o finalizar para el futuro' })}</strong>.
-                      Preisänderungen für bestehende Abonnements werden mit angemessener Frist angekündigt; das Sonder­kündigungsrecht bleibt unberührt.
+                      {tx({
+                        de: 'Der Anbieter behält sich vor, den regulären Abopreis, die Rabattbedingungen, die Slot-Anzahl und die Laufzeit für die Zukunft zu ändern, auszusetzen oder zu beenden. Preisänderungen für bestehende Abonnements werden mit angemessener Frist angekündigt; das Sonderkündigungsrecht bleibt unberührt.',
+                        en: 'The provider reserves the right to change, suspend, or terminate the regular subscription price, discount terms, slot count, and duration for the future. Price changes for existing subscriptions will be announced with reasonable notice; the right to extraordinary termination remains unaffected.',
+                        es: 'El proveedor se reserva el derecho de modificar, suspender o finalizar en el futuro el precio regular de la suscripción, las condiciones del descuento, el número de plazas y la duración. Los cambios de precio para suscripciones existentes se anunciarán con una antelación razonable; el derecho de cancelación extraordinaria no se ve afectado.',
+                      })}
                     </li>
                     <li>
-                      Die Aktion gilt <strong className="text-foreground">{tx({ de: "ausschließlich für die Dauer des aktiven Betriebs des Dienstes", en: "exclusively for the duration of the active operation of the service", es: "exclusivamente durante la duración del funcionamiento activo del servicio" })}</strong>.
-                      Wird der Dienst eingestellt, erlischt jeder Anspruch auf den Rabatt. Bereits gezahlte
-                      Beträge werden anteilig nach geltendem Recht behandelt.
+                      {tx({
+                        de: 'Die Aktion gilt ausschließlich für die Dauer des aktiven Betriebs des Dienstes. Wird der Dienst eingestellt, erlischt jeder Anspruch auf den Rabatt. Bereits gezahlte Beträge werden anteilig nach geltendem Recht behandelt.',
+                        en: 'The offer applies exclusively for the duration of the active operation of the service. If the service is discontinued, any claim to the discount expires. Amounts already paid are handled pro rata under applicable law.',
+                        es: 'La promoción se aplica exclusivamente mientras el servicio esté en funcionamiento activo. Si el servicio se descontinúa, cualquier derecho al descuento caduca. Los importes ya pagados se tratarán a prorrata conforme a la legislación aplicable.',
+                      })}
                     </li>
                     <li>
-                      Rabatte werden technisch über Stripe automatisch beim Checkout angewendet. Es besteht
-                      kein Anspruch auf manuelle Eingabe oder nachträgliche Gewährung eines Rabatts.
+                      {tx({
+                        de: 'Rabatte werden technisch über Stripe automatisch beim Checkout angewendet. Es besteht kein Anspruch auf manuelle Eingabe oder nachträgliche Gewährung eines Rabatts.',
+                        en: 'Discounts are applied automatically at checkout via Stripe. There is no entitlement to manual entry or retroactive granting of a discount.',
+                        es: 'Los descuentos se aplican automáticamente en el pago a través de Stripe. No existe derecho a la introducción manual ni a la concesión retroactiva de un descuento.',
+                      })}
                     </li>
                     <li>
-                      Es handelt sich um ein freibleibendes Angebot. Maßgeblich für den abgeschlossenen Vertrag sind
-                      ausschließlich die im Stripe-Checkout finalisierten Konditionen.
+                      {tx({
+                        de: 'Es handelt sich um ein freibleibendes Angebot. Maßgeblich für den abgeschlossenen Vertrag sind ausschließlich die im Stripe-Checkout finalisierten Konditionen.',
+                        en: 'This is a non-binding offer. Only the terms finalised in the Stripe checkout are decisive for the concluded contract.',
+                        es: 'Se trata de una oferta sin compromiso. Solo las condiciones finalizadas en el pago de Stripe son determinantes para el contrato celebrado.',
+                      })}
                     </li>
                   </ul>
                 </div>
+
               </LegalSection>
 
               <LegalSection title={tx({ de: '9. Schlussbestimmungen', en: '9. Final Provisions', es: '9. Disposiciones finales' })} icon="scale" index={8}>
                 <ul className="list-disc list-inside space-y-2">
                   <li>{tx({ de: "Es gilt deutsches Recht", en: "German law applies", es: "Se aplica la legislación alemana" })}</li>
-                  <li>Gerichtsstand: München, Deutschland</li>
+                  <li>{tx({ de: 'Gerichtsstand: München, Deutschland', en: 'Place of jurisdiction: Munich, Germany', es: 'Jurisdicción: Múnich, Alemania' })}</li>
                   <li>{tx({ de: 'Änderungen werden per E-Mail mitgeteilt', en: 'Changes will be communicated via email', es: 'Los cambios se comunicarán por correo electrónico' })}</li>
                 </ul>
               </LegalSection>
@@ -245,11 +264,11 @@ const Legal = () => {
               <LegalSection title={tx({ de: '§ 1 Präambel & Definitionen', en: '§ 1 Preamble & Definitions', es: '§ 1 Preámbulo y definiciones' })} icon="scale" defaultOpen={true} index={0}>
                 <div className="space-y-3">
                   <p>{tx({ de: 'Dieser Auftragsverarbeitungsvertrag (AVV) gemäß Art. 28 DSGVO wird geschlossen zwischen dem Nutzer der AdTool AI Plattform („Verantwortlicher") und AdTool AI, Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau („Auftragsverarbeiter").', en: 'This Data Processing Agreement (DPA) pursuant to Art. 28 GDPR is concluded between the user of the AdTool AI platform ("Controller") and AdTool AI, Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau ("Processor").', es: 'Este contrato de encargo de tratamiento de datos (DPA) conforme al art. 28 del RGPD se celebra entre el usuario de la plataforma AdTool AI ("Responsable") y AdTool AI, Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau ("Encargado").' })}</p>
-                  <p className="font-medium text-foreground">Definitionen:</p>
+                  <p className="font-medium text-foreground">{tx({ de: 'Definitionen:', en: 'Definitions:', es: 'Definiciones:' })}</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
-                    <li><strong className="text-foreground">Personenbezogene Daten:</strong> {tx({ de: "Alle Informationen gemäß Art. 4 Nr. 1 DSGVO", en: "All information in accordance with Art. 4 No. 1 GDPR", es: "Toda la información de conformidad con el art. 4 n.º 1 del RGPD" })}</li>
-                    <li><strong className="text-foreground">Verarbeitung:</strong> Jeder Vorgang gemäß Art. 4 Nr. 2 DSGVO</li>
-                    <li><strong className="text-foreground">Betroffene Person:</strong> {tx({ de: "Identifizierte oder identifizierbare natürliche Person", en: "Identified or identifiable natural person", es: "Persona física identificada o identificable" })}</li>
+                    <li><strong className="text-foreground">{tx({ de: 'Personenbezogene Daten:', en: 'Personal data:', es: 'Datos personales:' })}</strong> {tx({ de: "Alle Informationen gemäß Art. 4 Nr. 1 DSGVO", en: "All information in accordance with Art. 4 No. 1 GDPR", es: "Toda la información de conformidad con el art. 4 n.º 1 del RGPD" })}</li>
+                    <li><strong className="text-foreground">{tx({ de: 'Verarbeitung:', en: 'Processing:', es: 'Tratamiento:' })}</strong> {tx({ de: 'Jeder Vorgang gemäß Art. 4 Nr. 2 DSGVO', en: 'Any operation in accordance with Art. 4 No. 2 GDPR', es: 'Cualquier operación conforme al art. 4 n.º 2 del RGPD' })}</li>
+                    <li><strong className="text-foreground">{tx({ de: 'Betroffene Person:', en: 'Data subject:', es: 'Interesado:' })}</strong> {tx({ de: "Identifizierte oder identifizierbare natürliche Person", en: "Identified or identifiable natural person", es: "Persona física identificada o identificable" })}</li>
                   </ul>
                 </div>
               </LegalSection>
@@ -444,7 +463,7 @@ const Legal = () => {
             <LegalSection title={tx({ de: 'Kontakt', en: 'Contact', es: 'Contacto' })} icon="mail" index={1}>
               <div className="space-y-2">
                 <p><strong className="text-foreground">E-Mail:</strong> support@useadtool.ai</p>
-                <p><strong className="text-foreground">Datenschutz:</strong> privacy@useadtool.ai</p>
+                <p><strong className="text-foreground">{tx({ de: 'Datenschutz:', en: 'Privacy:', es: 'Privacidad:' })}</strong> privacy@useadtool.ai</p>
               </div>
             </LegalSection>
 
