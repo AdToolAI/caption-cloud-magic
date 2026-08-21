@@ -1,3 +1,4 @@
+import { localizeTemplateDescription } from '@/lib/motion-studio/templateI18n';
 import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import {
@@ -194,7 +195,7 @@ function TemplateCard({ template, onSelect }: TemplateCardProps) {
           <h3 className="font-semibold text-sm leading-tight truncate">{template.name}</h3>
         </div>
         <p className="text-xs text-muted-foreground line-clamp-2 min-h-[2rem]">
-          {template.description}
+          {localizeTemplateDescription(template.name, template.description)}
         </p>
         <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-1">
           <span className="flex items-center gap-1">
