@@ -65,16 +65,16 @@ export function CookieConsent() {
           aria-label={t('consent.banner.ariaLabel')}
         >
           <Card className="max-w-5xl mx-auto p-4 sm:p-6 shadow-2xl pointer-events-auto bg-card border-2">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center min-w-0">
               {/* Icon & Text */}
-              <div className="flex-1 space-y-3">
+              <div className="flex-1 min-w-0 space-y-3">
                 <div className="flex items-start gap-3">
                   <Cookie className="h-6 w-6 text-primary flex-shrink-0 mt-0.5" aria-hidden="true" />
-                  <div className="space-y-2">
-                    <h2 className="text-lg font-semibold">
+                  <div className="space-y-2 min-w-0">
+                    <h2 className="text-lg font-semibold break-words">
                       {t('consent.banner.title')}
                     </h2>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
+                    <p className="text-sm text-muted-foreground leading-relaxed break-words">
                       {t('consent.banner.description')}
                     </p>
                     <div className="flex flex-wrap gap-2 text-xs">
@@ -97,7 +97,7 @@ export function CookieConsent() {
               </div>
 
               {/* Buttons */}
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto min-w-[200px]">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:min-w-[200px] shrink-0">
                 <Button
                   variant="outline"
                   onClick={handleRejectAll}
