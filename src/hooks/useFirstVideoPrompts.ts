@@ -28,10 +28,26 @@ const FALLBACK: Record<string, FirstVideoPrompt[]> = {
   ],
 };
 
+const GERMAN_MARKERS = /\b(der|die|das|und|mit|ein|eine|einer|einem|auf|über|für|beim|dem|den|nicht|sich)\b/i;
+const SPANISH_MARKERS = /\b(el|la|los|las|con|una|sobre|para|del|que|desde)\b/i;
+
+/**
+ * Cached prompts are stored in whatever language the user had at signup.
+ * A cached set in the wrong language must never leak into the current UI.
+ */
+function matchesLanguage(prompts: FirstVideoPrompt[], lang: "de" | "en" | "es"): boolean {
+  const text = prompts.map((p) => p.prompt).join(" ");
+  const isGerman = GERMAN_MARKERS.test(text);
+  const isSpanish = SPANISH_MARKERS.test(text);
+  if (lang === "de") return isGerman;
+  if (lang === "es") return isSpanish && !isGerman;
+  return !isGerman && !isSpanish;
+}
+
 /**
  * Loads the user's personalized first-video prompts.
  * Fallback chain:
- *   1. onboarding_profiles.first_video_prompts (DB cache)
+ *   1. onboarding_profiles.first_video_prompts (DB cache, language-checked)
  *   2. lazy-trigger generate-first-video-prompts edge function (backfill)
  *   3. localized static defaults
  */
