@@ -108,7 +108,7 @@ serve(async (req) => {
       // Sammle Rechnungsadresse + Name, damit Stripe-Rechnungen korrekt ausgestellt werden
       billing_address_collection: "required",
       customer_update: { address: "auto", name: "auto" },
-      success_url: `${req.headers.get("origin")}/team?upgrade=success`,
+      success_url: `${req.headers.get("origin")}/team-workspace?upgrade=success`,
       cancel_url: `${req.headers.get("origin")}/team?upgrade=cancelled`,
       metadata: {
         workspace_id: workspaceId,
