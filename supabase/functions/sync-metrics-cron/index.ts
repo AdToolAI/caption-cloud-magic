@@ -47,7 +47,7 @@ Deno.serve(withSentryCron('sync-metrics-cron', { schedule: '0 * * * *', maxRunti
     const { data: connections, error: connectionsError } = await supabase
       .from('social_connections')
       .select('*')
-      .eq('status', 'active');
+      .eq('auto_sync_enabled', true);
 
     if (connectionsError) {
       console.error('Error fetching connections:', connectionsError);

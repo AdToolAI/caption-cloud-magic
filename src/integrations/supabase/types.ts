@@ -19553,6 +19553,7 @@ export type Database = {
           likes: number | null
           provider: string | null
           shares: number | null
+          user_id: string | null
           views: number | null
         }
         Relationships: []
@@ -19601,6 +19602,32 @@ export type Database = {
           shares: number | null
           user_id: string | null
           views: number | null
+        }
+        Insert: {
+          caption_text?: string | null
+          comments?: number | null
+          engagement_rate?: never
+          external_id?: never
+          likes?: number | null
+          permalink?: string | null
+          posted_at?: string | null
+          provider?: string | null
+          shares?: number | null
+          user_id?: string | null
+          views?: never
+        }
+        Update: {
+          caption_text?: string | null
+          comments?: number | null
+          engagement_rate?: never
+          external_id?: never
+          likes?: number | null
+          permalink?: string | null
+          posted_at?: string | null
+          provider?: string | null
+          shares?: number | null
+          user_id?: string | null
+          views?: never
         }
         Relationships: []
       }

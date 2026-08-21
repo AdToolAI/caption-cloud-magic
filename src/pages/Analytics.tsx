@@ -84,6 +84,7 @@ export default function Analytics() {
       const { data: summaryData, error: summaryError } = await supabase
         .from("v_metrics_summary")
         .select("*")
+        .eq("provider", platform)
         .gte("day", cutoffDate.toISOString())
         .order("day", { ascending: true });
 
@@ -95,7 +96,10 @@ export default function Analytics() {
         .from("v_top_posts")
         .select("*")
         .eq("user_id", user.id)
-        .gte("posted_at", cutoffDate.toISOString());
+        .eq("provider", platform)
+        .gte("posted_at", cutoffDate.toISOString())
+        .order("engagement_rate", { ascending: false })
+        .limit(20);
 
       if (topPostsError) throw topPostsError;
       setTopPosts(topPostsData || []);
@@ -140,7 +144,7 @@ export default function Analytics() {
   }, [user, timeFilter, platform]);
 
   const handleManualRefresh = () => {
-    toast.info("Aktualisiere Analytics...");
+    toast.info(tx({ de: 'Analysedaten werden aktualisiert …', en: 'Refreshing analytics …', es: 'Actualizando los datos de análisis …' }));
     fetchAnalytics();
   };
 
@@ -199,12 +203,12 @@ export default function Analytics() {
           <TabsList className="w-full grid grid-cols-6 bg-muted/20 backdrop-blur-xl border border-white/10 
                                rounded-2xl p-2 h-auto gap-1">
             {[
-              { value: "overview", label: "Overview", icon: BarChart3 },
-              { value: "performance", label: "Performance", icon: TrendingUp },
+              { value: "overview", label: tx({ de: 'Überblick', en: 'Overview', es: 'Resumen' }), icon: BarChart3 },
+              { value: "performance", label: tx({ de: 'Performance', en: 'Performance', es: 'Rendimiento' }), icon: TrendingUp },
               { value: "platforms", label: tx({ de: 'Plattformen', en: 'Platforms', es: 'Plataformas' }), icon: Globe },
-              { value: "top-posts", label: "Top Posts", icon: Award },
+              { value: "top-posts", label: tx({ de: 'Top-Beiträge', en: 'Top posts', es: 'Mejores publicaciones' }), icon: Award },
               { value: "hashtags", label: "Hashtags", icon: Hash },
-              { value: "best-content", label: "Best Content", icon: Sparkles }
+              { value: "best-content", label: tx({ de: 'Bester Content', en: 'Best content', es: 'Mejor contenido' }), icon: Sparkles }
             ].map((tab) => (
               <TabsTrigger
                 key={tab.value}
