@@ -45,18 +45,15 @@ export function useDirectMessages(partnerId: string | null) {
     }
 
     // Group by conversation partner
+    const unknown = tx({ de: 'Unbekannt', en: 'Unknown', es: 'Desconocido' });
     const convMap = new Map<string, Conversation>();
     for (const msg of (data || []) as any[]) {
       const partnerId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
-      const partnerEmail =
-        msg.sender_id === user.id
-          ? msg.receiver_profile?.email || tx({ de: 'Unbekannt', en: 'Unknown', es: 'Desconocido' })
-          : msg.sender_profile?.email || tx({ de: 'Unbekannt', en: 'Unknown', es: 'Desconocido' });
 
       if (!convMap.has(partnerId)) {
         convMap.set(partnerId, {
           partner_id: partnerId,
-          partner_email: partnerEmail,
+          partner_email: unknown,
           last_message: msg.content,
           last_message_at: msg.created_at,
           unread_count: 0,
@@ -66,6 +63,20 @@ export function useDirectMessages(partnerId: string | null) {
       if (msg.receiver_id === user.id && !msg.read_at) {
         const conv = convMap.get(partnerId)!;
         conv.unread_count += 1;
+      }
+    }
+
+    // Resolve partner names in a separate query — `direct_messages` has no
+    // foreign key to `profiles`, so a PostgREST embed would 400.
+    const partnerIds = Array.from(convMap.keys());
+    if (partnerIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, name, email")
+        .in("id", partnerIds);
+      for (const p of (profiles || []) as any[]) {
+        const conv = convMap.get(p.id);
+        if (conv) conv.partner_email = p.name || p.email || unknown;
       }
     }
 
