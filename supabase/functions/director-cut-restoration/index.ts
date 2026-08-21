@@ -117,31 +117,7 @@ serve(async (req) => {
     // creditCost already includes base of 5
     creditCost = Math.max(creditCost, 5);
 
-    // Check user credits
-    const { data: wallet, error: walletError } = await supabaseAdmin
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single();
-
-    if (walletError || !wallet) {
-      return new Response(
-        JSON.stringify({ error: 'Could not retrieve wallet' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (wallet.balance < creditCost) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'INSUFFICIENT_CREDITS',
-          message: `Du benötigst ${creditCost} Credits für Video-Restaurierung. Aktuell: ${wallet.balance} Credits.`,
-          required: creditCost,
-          available: wallet.balance,
-        }),
-        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // v428: this feature is included in every plan — no wallet check.
 
     // Use Lovable AI for restoration analysis
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -231,7 +207,7 @@ Provide restoration recommendations as JSON with:
         job_id: jobId,
         status: 'processing',
         message: 'Video-Restaurierung gestartet.',
-        credits_required: creditCost,
+        credits_required: 0,
         active_features: enabledFeatures.length, // For frontend toast display
         settings: {
           features,

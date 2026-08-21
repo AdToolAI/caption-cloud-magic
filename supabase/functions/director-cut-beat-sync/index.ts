@@ -58,31 +58,7 @@ serve(async (req) => {
 
     console.log(`[Beat-Sync] Analyzing audio for user: ${user.id}, mode: ${sync_mode}`);
 
-    // Check user credits
-    const { data: wallet, error: walletError } = await supabaseAdmin
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single();
-
-    if (walletError || !wallet) {
-      return new Response(
-        JSON.stringify({ error: 'Could not retrieve wallet' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (wallet.balance < BEAT_SYNC_CREDITS) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'INSUFFICIENT_CREDITS',
-          message: `Du benötigst ${BEAT_SYNC_CREDITS} Credits für Beat-Sync Analyse. Aktuell: ${wallet.balance} Credits.`,
-          required: BEAT_SYNC_CREDITS,
-          available: wallet.balance,
-        }),
-        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // v428: this feature is included in every plan — no wallet check.
 
     // Use Lovable AI to analyze audio and detect beats
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -227,19 +203,12 @@ Generiere Beat-Analyse im Format:
       }
     }
 
-    // Deduct credits
-    await supabaseAdmin
-      .from('wallets')
-      .update({ 
-        balance: wallet.balance - BEAT_SYNC_CREDITS,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('user_id', user.id);
+    // v428: no credit deduction — this feature is free.
 
     return new Response(
       JSON.stringify({
         success: true,
-        credits_used: BEAT_SYNC_CREDITS,
+        credits_used: 0,
         analysis: beatAnalysis,
         settings: {
           sync_mode,

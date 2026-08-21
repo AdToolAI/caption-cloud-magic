@@ -71,31 +71,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
     console.log(`[Smart Crop] Analyzing for user: ${user.id}, targets: ${target_aspect_ratios.join(', ')}`);
 
-    // Check user credits
-    const { data: wallet, error: walletError } = await supabaseAdmin
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single();
-
-    if (walletError || !wallet) {
-      return new Response(
-        JSON.stringify({ error: 'Could not retrieve wallet' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (wallet.balance < SMART_CROP_CREDITS) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'INSUFFICIENT_CREDITS',
-          message: `Du benötigst ${SMART_CROP_CREDITS} Credits für Smart Cropping. Aktuell: ${wallet.balance} Credits.`,
-          required: SMART_CROP_CREDITS,
-          available: wallet.balance,
-        }),
-        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // v428: this feature is included in every plan — no wallet check.
 
     // Use Lovable AI to analyze video and detect subjects
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -224,19 +200,12 @@ Generiere Crop-Analyse im Format:
       };
     }
 
-    // Deduct credits
-    await supabaseAdmin
-      .from('wallets')
-      .update({ 
-        balance: wallet.balance - SMART_CROP_CREDITS,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('user_id', user.id);
+    // v428: no credit deduction — this feature is free.
 
     return new Response(
       JSON.stringify({
         success: true,
-        credits_used: SMART_CROP_CREDITS,
+        credits_used: 0,
         analysis: cropAnalysis,
         available_ratios: ASPECT_RATIOS,
         settings: {

@@ -110,31 +110,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const interpolationKey = `${srcFps}_to_${tgtFps}`;
     const creditCost = INTERPOLATION_CREDITS[interpolationKey as keyof typeof INTERPOLATION_CREDITS] || 10;
 
-    // Check user credits
-    const { data: wallet, error: walletError } = await supabaseAdmin
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single();
-
-    if (walletError || !wallet) {
-      return new Response(
-        JSON.stringify({ error: 'Could not retrieve wallet' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (wallet.balance < creditCost) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'INSUFFICIENT_CREDITS',
-          message: `Du benötigst ${creditCost} Credits für Frame Interpolation (${srcFps}→${tgtFps} FPS). Aktuell: ${wallet.balance} Credits.`,
-          required: creditCost,
-          available: wallet.balance,
-        }),
-        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // v428: this feature is included in every plan — no wallet check.
 
     // Simulation mode - in production would use AI model
     const jobId = crypto.randomUUID();
@@ -150,7 +126,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         job_id: jobId,
         status: 'processing',
         message: `Frame Interpolation ${srcFps}→${tgtFps} FPS gestartet.`,
-        credits_required: creditCost,
+        credits_required: 0,
         settings: {
           source_fps: srcFps,
           target_fps: tgtFps,

@@ -55,24 +55,8 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       throw new Error('Template not found');
     }
 
-    // Check user credits (batch cost = 50 * number of videos)
-    const totalCost = 50 * batch_data.length;
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!wallet || wallet.balance < totalCost) {
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          error: 'INSUFFICIENT_CREDITS',
-          message: tl({ de: `Batch benötigt ${totalCost} Credits, verfügbar: ${wallet?.balance || 0}`, en: `Batch requires ${totalCost} credits, available: ${wallet?.balance || 0}`, es: `El lote requiere ${totalCost} créditos, disponibles: ${wallet?.balance || 0}` })
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
-    }
+    // v428: template rendering is included in every plan — no credits charged.
+    const totalCost = 0;
 
     const creationIds: string[] = [];
 
@@ -109,11 +93,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       }
     }
 
-    // Deduct total credits
-    await supabase
-      .from('wallets')
-      .update({ balance: wallet.balance - totalCost })
-      .eq('user_id', user.id);
+    // v428: no credit deduction — rendering is free.
 
     return new Response(
       JSON.stringify({

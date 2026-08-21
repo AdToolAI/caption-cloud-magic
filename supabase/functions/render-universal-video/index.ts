@@ -295,8 +295,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
     if (insertError) {
       console.error('[render-universal-video] Failed to create render record:', insertError);
-      // Refund credits
-      await supabase.rpc('increment_balance', { p_user_id: userId, p_amount: credits_required });
+      // v428: rendering is free — refund only if credits were ever charged
+      if (credits_required > 0) await supabase.rpc('increment_balance', { p_user_id: userId, p_amount: credits_required });
       throw new Error(`Failed to create render record: ${insertError.message}`);
     }
 
@@ -412,8 +412,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         completed_at: new Date().toISOString(),
       }).eq('render_id', pendingRenderId).then(() => {});
 
-      // Refund credits
-      await supabase.rpc('increment_balance', { p_user_id: userId, p_amount: credits_required });
+      // v428: rendering is free — refund only if credits were ever charged
+      if (credits_required > 0) await supabase.rpc('increment_balance', { p_user_id: userId, p_amount: credits_required });
       console.log(`💰 Refunded ${credits_required} credits due to Lambda error`);
 
       throw new Error(`Lambda invocation failed with status ${lambdaResponse.status}: ${errorText}`);
