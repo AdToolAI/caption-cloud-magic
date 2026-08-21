@@ -29,8 +29,7 @@ export const LanguageSwitcher = () => {
           aria-label={`Change language. Current: ${currentLang?.label}`}
         >
           <Globe className="h-4 w-4" aria-hidden="true" />
-          <span className="hidden sm:inline">{currentLang?.flag} {currentLang?.code.toUpperCase()}</span>
-          <span className="sm:hidden">{currentLang?.flag}</span>
+          <span className="text-xs font-semibold tracking-wide">{currentLang?.code.toUpperCase()}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent 
@@ -50,7 +49,7 @@ export const LanguageSwitcher = () => {
             aria-checked={language === lang.code}
             aria-label={`Switch to ${lang.label}`}
           >
-            <span className="mr-2" aria-hidden="true">{lang.flag}</span>
+            <span className="mr-2 text-[10px] font-semibold tracking-wide text-muted-foreground" aria-hidden="true">{lang.code.toUpperCase()}</span>
             {lang.label}
           </DropdownMenuItem>
         ))}
