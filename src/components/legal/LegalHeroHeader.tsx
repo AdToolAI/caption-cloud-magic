@@ -105,7 +105,7 @@ export const LegalHeroHeader = ({ type, lastUpdated }: LegalHeroHeaderProps) => 
         transition={{ delay: 0.4, duration: 0.5 }}
         className="text-muted-foreground text-lg"
       >
-        {titles.en}
+        {secondaryTitle}
       </motion.p>
 
       {/* Last Updated Badge */}
