@@ -369,8 +369,7 @@ export default function TeamWorkspace() {
     if (!selectedWorkspace || !user) return;
     setUpgrading(true);
     try {
-      const userLanguage = localStorage.getItem("language") || "en";
-      const currency = userLanguage === "de" ? "EUR" : "USD";
+      const currency = getCurrencyForLanguage(language);
       const { trackEvent, ANALYTICS_EVENTS } = await import("@/lib/analytics");
       trackEvent(ANALYTICS_EVENTS.ENTERPRISE_CHECKOUT_STARTED, {
         workspace_id: selectedWorkspace, currency,
