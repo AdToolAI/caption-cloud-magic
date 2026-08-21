@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { tx } from "@/lib/i18nText";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useTranslation } from "@/hooks/useTranslation";
 import demoAsset from "@/assets/adtool-demo.mp4.asset.json";
 import demoAssetDe from "@/assets/adtool-demo-de.mp4.asset.json";
 
@@ -10,7 +10,7 @@ interface DemoVideoDialogProps {
 }
 
 export const DemoVideoDialog = ({ open, onOpenChange }: DemoVideoDialogProps) => {
-  const { language } = useLanguage();
+  const { language } = useTranslation();
   const src = language === 'de' ? demoAssetDe.url : demoAsset.url;
 
   return (
