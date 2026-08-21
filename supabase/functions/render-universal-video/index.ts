@@ -256,42 +256,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     };
 
     // ============================================
-    // ✅ CREDIT CHECK & DEDUCTION (ported from render-with-remotion)
+    // ✅ RENDERING IS FREE (v428): no credit check, no deduction.
+    // Only external AI providers (video/music/image/voice) are billed.
     // ============================================
-    const voiceoverDuration = totalDuration;
-    const calculateCredits = (durationSeconds: number): number => {
-      if (durationSeconds < 30) return 10;
-      if (durationSeconds <= 60) return 20;
-      if (durationSeconds <= 180) return 50;
-      if (durationSeconds <= 300) return 100;
-      return 200;
-    };
+    credits_required = 0;
 
-    credits_required = calculateCredits(voiceoverDuration);
-    console.log(`💰 Credits required: ${credits_required} for ${voiceoverDuration}s video`);
-
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', userId)
-      .single();
-
-    if (!wallet || wallet.balance < credits_required) {
-      return new Response(JSON.stringify({ 
-        error: 'Insufficient credits',
-        required: credits_required,
-        available: wallet?.balance || 0
-      }), {
-        status: 402,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    await supabase.rpc('deduct_credits', {
-      p_user_id: userId,
-      p_amount: credits_required
-    });
-    console.log(`💰 Deducted ${credits_required} credits`);
 
     // ============================================
     // ✅ CREATE RENDER RECORD
