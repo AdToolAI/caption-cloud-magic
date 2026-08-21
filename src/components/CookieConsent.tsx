@@ -64,17 +64,17 @@ export function CookieConsent() {
           role="region"
           aria-label={t('consent.banner.ariaLabel')}
         >
-          <Card className="max-w-5xl mx-auto p-4 sm:p-6 shadow-2xl pointer-events-auto bg-card border-2">
+          <Card className="max-w-5xl mx-auto p-3 sm:p-6 shadow-2xl pointer-events-auto bg-card border-2">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center min-w-0">
               {/* Icon & Text */}
               <div className="flex-1 min-w-0 space-y-3">
                 <div className="flex items-start gap-3">
                   <Cookie className="h-6 w-6 text-primary flex-shrink-0 mt-0.5" aria-hidden="true" />
                   <div className="space-y-2 min-w-0">
-                    <h2 className="text-lg font-semibold break-words">
+                    <h2 className="text-base sm:text-lg font-semibold break-words">
                       {t('consent.banner.title')}
                     </h2>
-                    <p className="text-sm text-muted-foreground leading-relaxed break-words">
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-snug sm:leading-relaxed break-words">
                       {t('consent.banner.description')}
                     </p>
                     <div className="flex flex-wrap gap-2 text-xs">
@@ -97,11 +97,11 @@ export function CookieConsent() {
               </div>
 
               {/* Buttons */}
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:min-w-[200px] shrink-0">
+              <div className="grid grid-cols-3 sm:flex sm:flex-row gap-2 w-full sm:w-auto sm:min-w-[200px] shrink-0">
                 <Button
                   variant="outline"
                   onClick={handleRejectAll}
-                  className="w-full sm:w-auto text-sm"
+                  className="w-full sm:w-auto text-xs sm:text-sm"
                   aria-label={t('consent.buttons.rejectAll')}
                 >
                   {t('consent.buttons.rejectAll')}
@@ -109,7 +109,7 @@ export function CookieConsent() {
                 <Button
                   variant="outline"
                   onClick={handleOpenPreferences}
-                  className="w-full sm:w-auto text-sm gap-2"
+                  className="w-full sm:w-auto text-xs sm:text-sm gap-1 sm:gap-2"
                   aria-label={t('consent.buttons.customize')}
                 >
                   <Settings className="h-4 w-4" aria-hidden="true" />
@@ -117,7 +117,7 @@ export function CookieConsent() {
                 </Button>
                 <Button
                   onClick={handleAcceptAll}
-                  className="w-full sm:w-auto text-sm bg-primary"
+                  className="w-full sm:w-auto text-xs sm:text-sm bg-primary"
                   aria-label={t('consent.buttons.acceptAll')}
                 >
                   {t('consent.buttons.acceptAll')}
