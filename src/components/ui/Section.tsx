@@ -37,15 +37,16 @@ export function Section({
           initial={{ opacity: 0, x: -20 }}
           animate={inView ? { opacity: 1, x: 0 } : { opacity: 0, x: -20 }}
           transition={{ duration: 0.4, delay: 0.1 }}
-          className="flex items-center justify-between mb-4"
+          className="flex flex-wrap items-center justify-between gap-2 mb-4"
         >
-          <div>
-            <h2 className="text-2xl font-heading font-bold text-foreground">{title}</h2>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl sm:text-2xl font-heading font-bold text-foreground break-words">{title}</h2>
             {description && (
-              <p className="text-sm text-muted-foreground mt-1">{description}</p>
+              <p className="text-sm text-muted-foreground mt-1 break-words">{description}</p>
             )}
           </div>
           {action}
+
         </motion.div>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
