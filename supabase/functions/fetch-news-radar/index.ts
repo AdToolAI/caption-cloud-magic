@@ -11,16 +11,37 @@ const corsHeaders = {
 
 const CACHE_TTL_HOURS = 1;
 
-const FALLBACK_NEWS = [
-  { headline: "📱 Instagram testet neues Creator-Abo-Modell", category: "platform", source: "The Verge" },
-  { headline: "💰 TikTok Shop expandiert in neue europäische Märkte", category: "monetization", source: "TechCrunch" },
-  { headline: "📊 LinkedIn-Algorithmus priorisiert jetzt Kommentare statt Reaktionen", category: "analytics", source: "Social Media Today" },
-  { headline: tl({ de: "🤖 Adobe Firefly bekommt neue KI-Video-Funktionen für Marketer", en: "🤖 Adobe Firefly gets new AI video features for marketers", es: "🤖 Adobe Firefly incorpora nuevas funciones de video con IA para especialistas en marketing" }), category: "ai_tools", source: "Adobe Blog" },
-  { headline: "📱 YouTube Shorts Monetarisierung erreicht 2M+ Creator", category: "monetization", source: "YouTube" },
-  { headline: "🤖 Canva launcht KI-gestützte Batch-Erstellung für Social Media", category: "ai_tools", source: "Canva" },
-  { headline: "📊 Kurzvideos generieren 2,5x mehr Engagement als statische Posts", category: "analytics", source: "HubSpot" },
-  { headline: "💬 Meta verbessert Community-Management-Tools für Facebook-Gruppen", category: "community", source: "Meta Newsroom" },
-];
+type Lang = 'de' | 'en' | 'es';
+
+function pick(lang: string, v: Record<Lang, string>): string {
+  return v[(lang === 'de' || lang === 'es' ? lang : 'en') as Lang];
+}
+
+function getFallbackNews(lang: string) {
+  return [
+    { headline: pick(lang, { de: "📱 Instagram testet neues Creator-Abo-Modell", en: "📱 Instagram tests a new creator subscription model", es: "📱 Instagram prueba un nuevo modelo de suscripción para creadores" }), category: "platform", source: "The Verge" },
+    { headline: pick(lang, { de: "💰 TikTok Shop expandiert in neue europäische Märkte", en: "💰 TikTok Shop expands into new European markets", es: "💰 TikTok Shop se expande a nuevos mercados europeos" }), category: "monetization", source: "TechCrunch" },
+    { headline: pick(lang, { de: "📊 LinkedIn-Algorithmus priorisiert jetzt Kommentare statt Reaktionen", en: "📊 LinkedIn algorithm now prioritizes comments over reactions", es: "📊 El algoritmo de LinkedIn ahora prioriza los comentarios sobre las reacciones" }), category: "analytics", source: "Social Media Today" },
+    { headline: pick(lang, { de: "🤖 Adobe Firefly bekommt neue KI-Video-Funktionen für Marketer", en: "🤖 Adobe Firefly gets new AI video features for marketers", es: "🤖 Adobe Firefly incorpora nuevas funciones de video con IA para especialistas en marketing" }), category: "ai_tools", source: "Adobe Blog" },
+    { headline: pick(lang, { de: "📱 YouTube Shorts Monetarisierung erreicht 2M+ Creator", en: "📱 YouTube Shorts monetization reaches 2M+ creators", es: "📱 La monetización de YouTube Shorts alcanza más de 2 millones de creadores" }), category: "monetization", source: "YouTube" },
+    { headline: pick(lang, { de: "🤖 Canva launcht KI-gestützte Batch-Erstellung für Social Media", en: "🤖 Canva launches AI-powered batch creation for social media", es: "🤖 Canva lanza la creación por lotes con IA para redes sociales" }), category: "ai_tools", source: "Canva" },
+    { headline: pick(lang, { de: "📊 Kurzvideos generieren 2,5x mehr Engagement als statische Posts", en: "📊 Short videos drive 2.5x more engagement than static posts", es: "📊 Los videos cortos generan 2,5 veces más interacción que las publicaciones estáticas" }), category: "analytics", source: "HubSpot" },
+    { headline: pick(lang, { de: "💬 Meta verbessert Community-Management-Tools für Facebook-Gruppen", en: "💬 Meta improves community management tools for Facebook groups", es: "💬 Meta mejora las herramientas de gestión de comunidades para grupos de Facebook" }), category: "community", source: "Meta Newsroom" },
+  ];
+}
+
+// Guard against language-contaminated cache rows (e.g. German headlines stored under 'en').
+const GERMAN_MARKERS = /(ä|ö|ü|ß|\b(und|für|neue|neues|mit|über|jetzt|nicht|wird|Nutzer|Funktionen|Creator-Abo)\b)/i;
+const SPANISH_MARKERS = /(¿|¡|ñ|\b(para|nuevo|nueva|con|los|las|más|según)\b)/i;
+
+function matchesLanguage(news: unknown, lang: string): boolean {
+  if (!Array.isArray(news) || news.length === 0) return false;
+  const text = news.map((n: any) => String(n?.headline ?? '')).join(' ');
+  if (lang === 'de') return true;
+  if (lang === 'es') return !GERMAN_MARKERS.test(text);
+  // English must not contain German or Spanish markers
+  return !GERMAN_MARKERS.test(text) && !SPANISH_MARKERS.test(text);
+}
 
 const CATEGORY_LABELS: Record<string, string> = {
   platform: "Platform Updates",
@@ -89,7 +110,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       .limit(1)
       .single();
 
-    if (cached) {
+    if (cached && matchesLanguage(cached.news_json, language)) {
       console.log('News Radar: serving from cache', cached.fetched_at);
       return new Response(
         JSON.stringify({ news: cached.news_json, cached: true }),
@@ -125,7 +146,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     if (!PERPLEXITY_API_KEY) {
       console.warn('PERPLEXITY_API_KEY not set, returning fallback');
       return new Response(
-        JSON.stringify({ news: FALLBACK_NEWS, cached: false, fallback: true }),
+        JSON.stringify({ news: getFallbackNews(language), cached: false, fallback: true }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -233,7 +254,7 @@ Focus on ACTIONABLE, BREAKING news from the last 24 hours that directly impacts 
     }
 
     if (!news || news.length === 0) {
-      news = FALLBACK_NEWS;
+      news = getFallbackNews(language);
     }
 
     // Store in cache
@@ -266,7 +287,7 @@ Focus on ACTIONABLE, BREAKING news from the last 24 hours that directly impacts 
   } catch (error) {
     console.error('Error in fetch-news-radar:', error);
     return new Response(
-      JSON.stringify({ news: FALLBACK_NEWS, error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ news: getFallbackNews(language), error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
