@@ -32,15 +32,23 @@ const CheckEmail = () => {
     setResending(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) {
-        toast.error(t("checkEmail.notLoggedIn"));
-        navigate("/auth");
-        return;
+
+      if (user?.id) {
+        // Signed-in but unverified: use our branded verification mail
+        const { error } = await supabase.functions.invoke("send-verification-email", {
+          body: { email, userId: user.id, language, appUrl: window.location.origin },
+        });
+        if (error) throw error;
+      } else {
+        // No session (standard signup flow) — ask Supabase Auth to resend the confirmation
+        const { error } = await supabase.auth.resend({
+          type: "signup",
+          email,
+          options: { emailRedirectTo: `${window.location.origin}/verify-email` },
+        });
+        if (error) throw error;
       }
-      const { error } = await supabase.functions.invoke("send-verification-email", {
-        body: { email, userId: user.id, language, appUrl: window.location.origin },
-      });
-      if (error) throw error;
+
       toast.success(t("checkEmail.resentTitle"), {
         description: t("checkEmail.resentDesc"),
       });
@@ -53,6 +61,7 @@ const CheckEmail = () => {
       setResending(false);
     }
   };
+
 
   return (
     <div className="min-h-screen flex flex-col bg-muted/30">
