@@ -1,4 +1,4 @@
-import { tx } from "@/lib/i18nText";
+import { tx, getLang } from "@/lib/i18nText";
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from "react";
@@ -180,7 +180,7 @@ export function ContentStudioProvider({
 
   const [brief, setBrief] = useState("");
   const [platform, setPlatform] = useState("instagram");
-  const [language, setLanguage] = useState(getLanguage());
+  const [language, setLanguage] = useState(getLang());
   const [tone, setTone] = useState(tx({ de: 'selbstbewusst, klar', en: 'confident, clear', es: 'seguro, claro' }));
 
   const [copy, setCopy] = useState<CopyPayload | null>(null);
@@ -223,7 +223,7 @@ export function ContentStudioProvider({
       if (!draft.brief && !draft.copy && !draft.hasDesign) return;
       setBrief(draft.brief ?? "");
       setPlatform(draft.platform ?? "instagram");
-      setLanguage(draft.language ?? getLanguage());
+      setLanguage(draft.language ?? getLang());
       setTone(draft.tone ?? tx({ de: 'selbstbewusst, klar', en: 'confident, clear', es: 'seguro, claro' }));
       setCopy(draft.copy ?? null);
       setCopyIndex(draft.copyIndex ?? 0);
