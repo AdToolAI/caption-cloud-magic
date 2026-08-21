@@ -82,7 +82,7 @@ export function AIVideoRestoration({
       if (data?.success) {
         toast({
           title: tx({ de: 'Video-Restaurierung gestartet', en: 'Video restoration started', es: 'Restauración de vídeo iniciada' }),
-          description: tx({ de: `${data.active_features} Features aktiv. ${data.credits_required} Credits reserviert.`, en: `${data.active_features} features active. ${data.credits_required} credits reserved.`, es: `${data.active_features} funciones activas. ${data.credits_required} créditos reservados.` })
+          description: tx({ de: `${data.active_features} Features aktiv.`, en: `${data.active_features} features active.`, es: `${data.active_features} funciones activas.` })
         });
         onRestorationComplete?.(data);
       }
@@ -172,7 +172,7 @@ export function AIVideoRestoration({
                   <div>
                     <div className="flex items-center gap-2">
                       <Label className="cursor-pointer">{feature.label}</Label>
-                      <span className="text-xs text-primary">+{feature.credits}</span>
+                      
                     </div>
                     <p className="text-xs text-muted-foreground">{feature.description}</p>
                   </div>
@@ -262,7 +262,7 @@ export function AIVideoRestoration({
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                {tx({ de: `Restaurierung starten (${calculateCredits()} Credits)`, en: `Start restoration (${calculateCredits()} credits)`, es: `Iniciar restauración (${calculateCredits()} créditos)` })}
+                {tx({ de: 'Restaurierung starten', en: 'Start restoration', es: 'Iniciar restauración' })}
               </>
             )}
           </Button>

@@ -71,7 +71,7 @@ export function AIFrameInterpolation({
       if (data?.success) {
         toast({
           title: tx({ de: 'Frame Interpolation gestartet', en: 'Frame interpolation started', es: 'Se inició la interpolación de cuadros.' }),
-          description: `${sourceFps}fps → ${settings.targetFps}fps. ${data.credits_required} Credits reserviert.`
+          description: `${sourceFps}fps → ${settings.targetFps}fps`
         });
         onInterpolationComplete?.(data);
       }
@@ -139,7 +139,7 @@ export function AIFrameInterpolation({
                   >
                     <span className="font-medium">{option.label}</span>
                     <span className="text-xs text-muted-foreground">{option.description}</span>
-                    <span className="text-xs text-primary font-medium mt-1">{option.credits} Credits</span>
+                    
                   </Label>
                 </div>
               ))}
@@ -225,7 +225,7 @@ export function AIFrameInterpolation({
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                {tx({ de: `Interpolation starten (${selectedOption?.credits} Credits)`, en: `Start interpolation (${selectedOption?.credits} credits)`, es: `Iniciar interpolación (${selectedOption?.credits} créditos)` })}
+                {tx({ de: 'Interpolation starten', en: 'Start interpolation', es: 'Iniciar interpolación' })}
               </>
             )}
           </Button>

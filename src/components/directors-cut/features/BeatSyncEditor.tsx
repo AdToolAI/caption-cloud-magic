@@ -105,7 +105,7 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
         setSettings(prev => ({ ...prev, enabled: true }));
         
         toast.success(tx({ de: `${formattedBeats.length} Beats erkannt`, en: `${formattedBeats.length} beats detected`, es: `${formattedBeats.length} latidos detectados` }), {
-          description: data.analysis.bpm ? `${data.analysis.bpm} BPM • ${data.credits_used} Credits` : `${data.credits_used} Credits`,
+          description: data.analysis.bpm ? `${data.analysis.bpm} BPM` : undefined,
         });
       }
     } catch (error: any) {
@@ -140,7 +140,7 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
         <CardTitle className="text-sm flex items-center gap-2">
           <Music className="h-4 w-4 text-green-500" />
           Beat-Sync Editor
-          <Badge variant="secondary" className="ml-auto">{CREDITS_COST} Credits</Badge>
+          <Badge variant="secondary" className="ml-auto">{tx({ de: 'Inklusive', en: 'Included', es: 'Incluido' })}</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -104,7 +104,7 @@ export function SmartCropping({
 
         onVariantsChange(updatedVariants);
         toast.success(tx({ de: 'Subjekte erkannt', en: 'Subjects recognized', es: 'Materias reconocidas' }), {
-          description: `${subjects.length} ${tx({ de: "Elemente", en: "elements", es: "elementos" })} • ${data.credits_used} Credits`,
+          description: `${subjects.length} ${tx({ de: "Elemente", en: "elements", es: "elementos" })}`,
         });
       }
     } catch (error: any) {
@@ -157,7 +157,7 @@ export function SmartCropping({
         <CardTitle className="text-sm flex items-center gap-2">
           <Crop className="h-4 w-4 text-blue-500" />
           Smart Cropping / Reframing
-          <Badge variant="secondary" className="ml-auto">{CREDITS_COST} Credits</Badge>
+          <Badge variant="secondary" className="ml-auto">{tx({ de: 'Inklusive', en: 'Included', es: 'Incluido' })}</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
