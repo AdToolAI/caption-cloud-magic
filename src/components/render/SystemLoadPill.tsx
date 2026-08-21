@@ -29,10 +29,10 @@ export function SystemLoadPill({ className = '', compact = false }: Props) {
     'bg-emerald-400';
 
   const label =
-    load.state === 'saturated' ? tx({ de: tx({ de: "Voll ausgelastet", en: "At full capacity", es: "Capacidad completa" }), en: "At full capacity", es: "Capacidad completa" }) :
-    load.state === 'founder_reserve' ? tx({ de: tx({ de: "Founder-Reserve aktiv", en: "Founder reserve active", es: "Reserva de fundadores activa" }), en: "Founder reserve active", es: "Reserva de fundadores activa" }) :
-    load.state === 'busy' ? `Queue belegt (${load.slotsUsed}/${load.slotBudget})` :
-    'Queue frei';
+    load.state === 'saturated' ? tx({ de: "Voll ausgelastet", en: "At full capacity", es: "Capacidad completa" }) :
+    load.state === 'founder_reserve' ? tx({ de: "Founder-Reserve aktiv", en: "Founder reserve active", es: "Reserva de fundadores activa" }) :
+    load.state === 'busy' ? `${tx({ de: 'Queue belegt', en: 'Queue busy', es: 'Cola ocupada' })} (${load.slotsUsed}/${load.slotBudget})` :
+    tx({ de: 'Queue frei', en: 'Queue free', es: 'Cola libre' });
 
   const isFounder = founder.isActive;
 
@@ -54,11 +54,11 @@ export function SystemLoadPill({ className = '', compact = false }: Props) {
         <TooltipContent side="bottom" className="max-w-xs">
           <div className="space-y-1 text-xs">
             <div>
-              <strong>Render-Slots:</strong> {load.slotsUsed} / {load.slotBudget}
+              <strong>{tx({ de: 'Render-Slots:', en: 'Render slots:', es: 'Slots de render:' })}</strong> {load.slotsUsed} / {load.slotBudget}
             </div>
             <div>
-              <strong>In Warteschlange:</strong> {load.queuedCount}
-              {load.founderQueued > 0 && ` (${load.founderQueued} Founder)`}
+              <strong>{tx({ de: 'In Warteschlange:', en: 'In queue:', es: 'En cola:' })}</strong> {load.queuedCount}
+              {load.founderQueued > 0 && ` (${load.founderQueued} ${tx({ de: 'Founder', en: 'founder', es: 'fundadores' })})`}
             </div>
             {isFounder && load.state !== 'idle' && (
               <div className="pt-1 text-amber-500 flex items-center gap-1">
