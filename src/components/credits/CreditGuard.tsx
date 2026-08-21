@@ -65,7 +65,7 @@ export const CreditGuard = ({ children, feature_code, estimated_cost }: CreditGu
           <AlertDialogHeader>
             <div className="flex items-center gap-2">
               <Coins className="h-5 w-5 text-amber-500" />
-              <AlertDialogTitle>{tx({ de: 'Nicht genügend Credits', en: 'Not enough credits', es: 'Créditos insuficientes' })}</AlertDialogTitle>
+              <AlertDialogTitle>{tx({ de: 'Nicht genügend KI-Guthaben', en: 'Not enough AI credits', es: 'Saldo de IA insuficiente' })}</AlertDialogTitle>
             </div>
             <AlertDialogDescription className="space-y-2">
               <p>
@@ -73,14 +73,14 @@ export const CreditGuard = ({ children, feature_code, estimated_cost }: CreditGu
                 {tx({ de: 'aber Sie haben nur', en: 'but you only have', es: 'pero solo tienes' })} <strong>{insufficientData?.available || 0} Credits</strong> {tx({ de: tx({ de: "verfügbar.", en: "available.", es: "disponible." }), en: 'available.', es: 'disponibles.' })}
               </p>
               <p className="text-sm">
-                {tx({ de: 'Bitte kaufen Sie Credits nach, um diese Funktion zu nutzen.', en: 'Please purchase more credits to use this feature.', es: 'Compra más créditos para usar esta función.' })}
+                {tx({ de: 'KI-Guthaben gilt nur für KI-Modelle (Video, Musik, Bild, Stimme). Bitte lade dein Guthaben auf.', en: 'AI credits apply only to AI models (video, music, image, voice). Please top up your balance.', es: 'Los créditos de IA solo se aplican a modelos de IA (vídeo, música, imagen, voz). Recarga tu saldo.' })}
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })}</AlertDialogCancel>
             <AlertDialogAction onClick={() => window.location.href = '/credits'}>
-              {tx({ de: 'Credits kaufen', en: 'Buy credits', es: 'Comprar créditos' })}
+              {tx({ de: 'KI-Guthaben aufladen', en: 'Top up AI credits', es: 'Recargar saldo de IA' })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
