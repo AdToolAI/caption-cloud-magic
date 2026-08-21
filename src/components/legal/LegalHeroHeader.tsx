@@ -82,7 +82,7 @@ export const LegalHeroHeader = ({ type, lastUpdated }: LegalHeroHeaderProps) => 
           <Icon className="w-4 h-4 text-primary" />
         </motion.div>
         <span className="text-sm font-medium text-primary tracking-wide">
-          {titles.badge}
+          {titles.badge[lang]}
         </span>
       </motion.div>
 
@@ -94,7 +94,7 @@ export const LegalHeroHeader = ({ type, lastUpdated }: LegalHeroHeaderProps) => 
         className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4"
       >
         <span className="bg-gradient-to-r from-primary via-primary/80 to-purple-400 bg-clip-text text-transparent font-serif">
-          {titles.de}
+          {primaryTitle}
         </span>
       </motion.h1>
 
@@ -118,7 +118,7 @@ export const LegalHeroHeader = ({ type, lastUpdated }: LegalHeroHeaderProps) => 
         >
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           <span className="text-sm text-muted-foreground">
-            Letzte Aktualisierung: {lastUpdated}
+            {lastUpdatedLabel[lang]}: {lastUpdated}
           </span>
         </motion.div>
       )}
