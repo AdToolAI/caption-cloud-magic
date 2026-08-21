@@ -7,10 +7,13 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
 import { SithCommandDeck } from "./SithCommandDeck";
 import { FoundersBenefitsDialog } from "./FoundersBenefitsDialog";
+import { DemoVideoDialog } from "./DemoVideoDialog";
 
 export const BlackTieHero = () => {
   const { t } = useTranslation();
   const [foundersOpen, setFoundersOpen] = useState(false);
+  const [demoOpen, setDemoOpen] = useState(false);
+
 
   return (
     <section className="relative flex items-center overflow-hidden pt-2 pb-8 md:pt-4 md:pb-12 px-4">
@@ -81,17 +84,17 @@ export const BlackTieHero = () => {
                 </Link>
               </Button>
               <Button 
-                asChild 
                 variant="outline" 
                 size="lg"
-                className="border-primary/50 text-primary hover:bg-primary/10 hover:border-primary transition-all duration-300 h-12 px-8 backdrop-blur-sm"
+                onClick={() => setDemoOpen(true)}
+                className="border-primary/50 text-primary hover:bg-primary/10 hover:border-primary transition-all duration-300 h-12 px-8 backdrop-blur-sm flex items-center gap-2"
               >
-                <a href="#live-demo" className="flex items-center gap-2">
-                  <Play className="h-4 w-4" />
-                  {t('landing.hero.ctaSecondary')}
-                </a>
+                <Play className="h-4 w-4" />
+                {t('landing.hero.ctaSecondary')}
               </Button>
             </div>
+            <DemoVideoDialog open={demoOpen} onOpenChange={setDemoOpen} />
+
 
             {/* Stats Row — honest Beta framing, klickbar für Founders-Vorteile */}
             <motion.div 
