@@ -113,7 +113,7 @@ export const PromoCodeSection = () => {
     setActivating(true);
     try {
       const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: { priceId: getStripePriceId("basic", getCurrencyForLanguage(language)) },
+        body: { priceId: getStripePriceId("basic", getCurrencyForLanguage(language)), locale: language },
       });
       if (error) throw error;
       if (data?.url) window.open(data.url, "_blank");
