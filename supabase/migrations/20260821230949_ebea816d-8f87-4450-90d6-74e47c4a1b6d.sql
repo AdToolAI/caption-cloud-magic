@@ -1,0 +1,1 @@
+drop policy if exists "Anyone can view role permissions" on public.role_permissions;
