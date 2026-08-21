@@ -222,7 +222,6 @@ export function AIVideoRestoration({
                   {tx({ de: "KI Gesichtsverbesserung", en: "AI face enhancement", es: "Mejora facial por IA" })}
                 </Label>
               </div>
-              <span className="text-xs text-primary">+5</span>
             </div>
 
             <div className="flex items-center justify-between">
@@ -238,7 +237,6 @@ export function AIVideoRestoration({
                   {tx({ de: "Deinterlacing (für alte TV-Aufnahmen)", en: "Deinterlacing (for old TV recordings)", es: "Desentrelazado (para grabaciones de TV antiguas)" })}
                 </Label>
               </div>
-              <span className="text-xs text-primary">+2</span>
             </div>
           </div>
 
@@ -269,7 +267,7 @@ export function AIVideoRestoration({
 
           <div className="p-3 bg-muted/50 rounded-lg">
             <p className="text-xs text-muted-foreground">
-              <strong>{tx({ de: "Perfekt für:", en: "Perfect for:", es: "Perfecto para:" })}</strong> Alte Familienvideos, VHS-Aufnahmen, 
+              <strong>{tx({ de: "Perfekt für:", en: "Perfect for:", es: "Perfecto para:" })}</strong> {tx({ de: "Alte Familienvideos, VHS-Aufnahmen, ", en: "Old family videos, VHS recordings, ", es: "Vídeos familiares antiguos, grabaciones VHS, " })}
               {tx({ de: "historisches Filmmaterial und beschädigte Aufnahmen.", en: "historical footage and damaged recordings.", es: "material histórico y grabaciones dañadas." })}
             </p>
           </div>

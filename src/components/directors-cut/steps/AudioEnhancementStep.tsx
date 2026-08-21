@@ -85,7 +85,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
 
         toast({
           title: tx({ de: 'AI Audio-Optimierung abgeschlossen', en: 'AI audio optimization complete', es: 'Optimización de audio con IA completada' }),
-          description: tx({ de: `Audio-Settings wurden optimiert. (${data.credits_used || 3} Credits)`, en: `Audio settings have been optimized. (${data.credits_used || 3} credits)`, es: `La configuración de audio se ha optimizado. (${data.credits_used || 3} créditos)` }),
+          description: tx({ de: 'Audio-Settings wurden optimiert.', en: 'Audio settings have been optimized.', es: 'La configuración de audio se ha optimizado.' }),
         });
       } else {
         throw new Error(tx({ de: 'Ungültige Antwort vom Server', en: 'Invalid response from server', es: 'Respuesta no válida del servidor' }));
@@ -130,7 +130,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
           {isAnalyzing ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Analysiere Audio...
+              {tx({ de: "Analysiere Audio...", en: "Analyzing audio...", es: "Analizando audio..." })}
             </>
           ) : (
             <>
@@ -138,7 +138,6 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
               {tx({ de: "AI Audio-Optimierung", en: "AI audio optimization", es: "Optimización de audio con IA" })}
             </>
           )}
-          <Badge variant="secondary" className="ml-2 text-[10px]">3 Credits</Badge>
         </Button>
       </div>
 
