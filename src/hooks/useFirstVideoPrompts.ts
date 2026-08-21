@@ -88,8 +88,8 @@ export function useFirstVideoPrompts() {
         return;
       }
 
-      // Step 2: backfill — only if user has an onboarding profile
-      if (profile?.niche) {
+      // Step 2: backfill — profile exists, or cache was in the wrong language
+      if (profile?.niche || Array.isArray(cached)) {
         // Show defaults while we generate
         setPrompts(FALLBACK[lang]);
         setLoading(false);
