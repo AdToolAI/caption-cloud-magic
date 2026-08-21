@@ -54,11 +54,11 @@ export function SystemLoadPill({ className = '', compact = false }: Props) {
         <TooltipContent side="bottom" className="max-w-xs">
           <div className="space-y-1 text-xs">
             <div>
-              <strong>Render-Slots:</strong> {load.slotsUsed} / {load.slotBudget}
+              <strong>{tx({ de: 'Render-Slots:', en: 'Render slots:', es: 'Slots de render:' })}</strong> {load.slotsUsed} / {load.slotBudget}
             </div>
             <div>
-              <strong>In Warteschlange:</strong> {load.queuedCount}
-              {load.founderQueued > 0 && ` (${load.founderQueued} Founder)`}
+              <strong>{tx({ de: 'In Warteschlange:', en: 'In queue:', es: 'En cola:' })}</strong> {load.queuedCount}
+              {load.founderQueued > 0 && ` (${load.founderQueued} ${tx({ de: 'Founder', en: 'founder', es: 'fundadores' })})`}
             </div>
             {isFounder && load.state !== 'idle' && (
               <div className="pt-1 text-amber-500 flex items-center gap-1">
