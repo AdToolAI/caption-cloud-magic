@@ -18472,6 +18472,7 @@ Object.assign(translations.en, {
 });
 Object.assign(translations.de, {
   uvc: {
+    pageTitle: 'Universal Video Creator',
     cat_corporate_ad: 'Unternehmens-Werbung',
     cat_corporate_ad_desc: 'Professionelle Image- und Werbevideos für Unternehmen und Dienstleister',
     cat_corporate_ad_duration: '15–90 Sekunden',
