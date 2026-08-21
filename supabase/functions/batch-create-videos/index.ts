@@ -124,11 +124,8 @@ serve(async (req) => {
         continue;
       }
 
-      // Deduct credits
-      await supabase.rpc('deduct_credits', {
-        p_user_id: user.id,
-        p_amount: 5
-      });
+      // v428: variant creation is free — no credit deduction.
+
 
       // TODO: Trigger video generation (call Shotstack API or queue job)
       // For now, just mark as queued
