@@ -193,8 +193,10 @@ Deno.serve(async (req) => {
           return undefined;
         }
         if (up?.path) {
-          const { data: pub } = supabase.storage.from("qa-screenshots").getPublicUrl(up.path);
-          return pub?.publicUrl;
+          const { data: signed } = await supabase.storage
+            .from("qa-screenshots")
+            .createSignedUrl(up.path, 60 * 60 * 24 * 7);
+          return signed?.signedUrl;
         }
       } catch (e: any) {
         console.warn(`[execute-mission] ${label} upload threw:`, e?.message ?? String(e));
