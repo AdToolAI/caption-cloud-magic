@@ -17,6 +17,7 @@ import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mappe
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/hooks/useTranslation';
+import { tx } from '@/lib/i18nText';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { describeRenderAdmissionError, tryParseAdmissionFromInvokeError } from '@/lib/render/admission';
 import { useEnqueuedRender } from '@/hooks/useEnqueuedRender';
@@ -582,7 +583,6 @@ export function PreviewExportStep({
               <div className="font-medium">{t('uc.hdQuality')}</div>
               <div className="text-sm text-muted-foreground">{t('uc.hdDesc')}</div>
             </Label>
-            <Badge variant="outline">1x Credits</Badge>
           </div>
           <div className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-accent/50 cursor-pointer">
             <RadioGroupItem value="4k" id="quality-4k" />
@@ -590,7 +590,6 @@ export function PreviewExportStep({
               <div className="font-medium">{t('uc.fourKQuality')}</div>
               <div className="text-sm text-muted-foreground">{t('uc.fourKDesc')}</div>
             </Label>
-            <Badge variant="secondary">2x Credits</Badge>
           </div>
         </RadioGroup>
       </Card>
