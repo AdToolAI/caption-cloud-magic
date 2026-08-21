@@ -278,7 +278,7 @@ export function PublishingStatusPanel({ workspaceId }: { workspaceId: string }) 
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">
-                        <div className="font-medium mb-1">{log.message}</div>
+                        <div className="font-medium mb-1">{formatLogMessage(log)}</div>
                         <div className="text-muted-foreground">
                           {new Date(log.at).toLocaleString(dateLocale)}
                         </div>
