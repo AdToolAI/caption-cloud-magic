@@ -175,7 +175,8 @@ function AppLayout() {
         {isLandingRoute ? <Header /> : <AppHeader />}
         {user && !isLandingRoute && <TrialBanner />}
         {user && <NewsTicker />}
-        {user && !isLandingRoute && <OnboardingStepper />}
+        {/* Genau EIN Onboarding-Surface: die GettingStartedChecklist. Der alte
+            Sticky-Stepper zeigte eine zweite, widersprüchliche Schrittliste. */}
         <main className="flex-1">
           <ErrorBoundary>
             <AccountPausedGate>
