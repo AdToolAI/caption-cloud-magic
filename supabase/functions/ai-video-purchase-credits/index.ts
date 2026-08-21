@@ -160,6 +160,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         },
       ],
       mode: 'payment',
+      locale: checkoutLocale,
+      billing_address_collection: 'required',
+
       currency: currency.toLowerCase(),
       allow_promotion_codes: !isFounder,
       discounts: isFounder ? [{ coupon: FOUNDERS_CREDIT_COUPON }] : undefined,
