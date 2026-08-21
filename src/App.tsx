@@ -205,7 +205,8 @@ function AppLayout() {
                     <Route path="/faq" element={<FAQ />} />
                     <Route path="/billing" element={<Billing />} />
                     <Route path="/willkommen" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
-                    <Route path="/welcome" element={<Navigate to="/willkommen" replace />} />
+                    {/* /welcome rendert dieselbe Seite (Query-Parameter wie session_id bleiben erhalten) */}
+                    <Route path="/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
                     {/* /credits retired — Beta abo deckt alles ab. Media-Credits im AI Video Studio. */}
                     <Route path="/credits" element={<Navigate to="/billing" replace />} />
                     {/* Beta: single plan only — legacy Enterprise upgrade path redirects to /pricing */}
