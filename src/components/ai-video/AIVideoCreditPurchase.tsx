@@ -23,7 +23,7 @@ export const AIVideoCreditPurchase = () => {
     setLoading(packId);
     try {
       const { data, error } = await supabase.functions.invoke('ai-video-purchase-credits', {
-        body: { packId, currency }
+        body: { packId, currency, locale: language }
       });
       if (error) throw error;
       if (data.url) window.open(data.url, '_blank');

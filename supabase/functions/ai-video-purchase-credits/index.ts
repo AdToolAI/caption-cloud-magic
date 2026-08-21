@@ -108,14 +108,25 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       console.warn("[ai-video-purchase-credits] founder check failed", e);
     }
 
-    // Parse request with currency
-    const { packId, currency } = await req.json() as PurchaseRequest;
+    // Parse request with currency — beides hart validieren, sonst 500 statt 400.
+    const body = await req.json() as Partial<PurchaseRequest> & { locale?: string };
+    const packId = body.packId as PurchaseRequest['packId'];
+    const currency = body.currency as PurchaseRequest['currency'];
+    const checkoutLocale: 'en' | 'de' | 'es' =
+      body.locale === 'de' ? 'de' : body.locale === 'es' ? 'es' : 'en';
+
+    const validCurrency = currency === 'EUR' || currency === 'USD';
+    const validPack = !!packId && ['starter', 'standard', 'pro', 'enterprise'].includes(packId);
+    if (!validCurrency || !validPack) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid pack ID or currency' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     const pack = CREDIT_PACKS[currency][packId];
     const priceId = STRIPE_PRICE_IDS[packId][currency];
 
-    if (!pack) {
-      throw new Error("Invalid pack ID or currency");
-    }
 
     // Initialize Stripe
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
@@ -149,6 +160,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         },
       ],
       mode: 'payment',
+      locale: checkoutLocale,
+      billing_address_collection: 'required',
+
       currency: currency.toLowerCase(),
       allow_promotion_codes: !isFounder,
       discounts: isFounder ? [{ coupon: FOUNDERS_CREDIT_COUPON }] : undefined,
