@@ -18,6 +18,7 @@ import { EntityIdBadge } from '@/components/cast-world/EntityIdBadge';
 import { AvatarDefaultPerformanceCard } from '@/components/avatars/AvatarDefaultPerformanceCard';
 
 import type { OutfitLook } from '@/hooks/useSavedOutfits';
+import { BRAND_CHARACTER_CLIENT_COLUMNS } from '@/lib/brandCharacterColumns';
 
 interface SelectedOutfit {
   outfitId: string;
@@ -39,7 +40,7 @@ const AvatarDetail = () => {
     queryKey: ['avatar-detail', id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('brand_characters').select('*').eq('id', id!).single();
+        .from('brand_characters').select(BRAND_CHARACTER_CLIENT_COLUMNS).eq('id', id!).single();
       if (error) throw error;
       return data as any;
     },

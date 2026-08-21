@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { BRAND_CHARACTER_CLIENT_COLUMNS } from '@/lib/brandCharacterColumns';
 
 export interface BrandCharacter {
   id: string;
@@ -50,7 +51,7 @@ export const useBrandCharacters = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('brand_characters')
-        .select('*')
+        .select(BRAND_CHARACTER_CLIENT_COLUMNS)
         .is('archived_at', null)
         .order('is_favorite', { ascending: false })
         .order('updated_at', { ascending: false });

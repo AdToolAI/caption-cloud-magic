@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { BrandCharacter } from './useBrandCharacters';
+import { BRAND_CHARACTER_CLIENT_COLUMNS } from '@/lib/brandCharacterColumns';
 
 /**
  * Returns ALL characters the current user can use:
@@ -43,7 +44,7 @@ export function useAccessibleCharacters() {
       // 1) Own
       const ownPromise = supabase
         .from('brand_characters')
-        .select('*')
+        .select(BRAND_CHARACTER_CLIENT_COLUMNS)
         .eq('user_id', u.user.id)
         .is('archived_at', null);
 
@@ -71,7 +72,7 @@ export function useAccessibleCharacters() {
       if (purchasedIds.length > 0) {
         const { data: chars, error: chErr } = await supabase
           .from('brand_characters')
-          .select('*')
+          .select(BRAND_CHARACTER_CLIENT_COLUMNS)
           .in('id', purchasedIds)
           .eq('marketplace_status', 'published');
         if (chErr) throw chErr;
