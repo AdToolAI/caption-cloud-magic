@@ -74,6 +74,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
   }
 
 
+  let requestedLanguage = 'en';
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -98,6 +100,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
 
     const { language = 'en' } = await req.json().catch(() => ({}));
+    requestedLanguage = language;
 
     // Check cache first
     const cacheThreshold = new Date(Date.now() - CACHE_TTL_HOURS * 60 * 60 * 1000).toISOString();
@@ -287,7 +290,7 @@ Focus on ACTIONABLE, BREAKING news from the last 24 hours that directly impacts 
   } catch (error) {
     console.error('Error in fetch-news-radar:', error);
     return new Response(
-      JSON.stringify({ news: getFallbackNews(language), error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ news: getFallbackNews(requestedLanguage), error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
