@@ -453,9 +453,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       }
     }
 
-    // Calculate credits based on video duration and quality
-    credits_required = calculateCredits(requestedVoiceoverDuration, quality);
-    console.log(`💰 Credits für ${requestedVoiceoverDuration}s ${quality.toUpperCase()} Video: ${credits_required}`);
+    // v428: rendering is included in every plan — no credits charged.
+    credits_required = 0;
+    void calculateCredits;
+
 
     // Lambda slot admission — safety net against AWS quota saturation.
     // Founders reserve band kicks in at 50/60 slots.
