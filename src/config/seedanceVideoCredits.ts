@@ -34,7 +34,7 @@ export const SEEDANCE_VIDEO_MODELS = {
       EUR: tx({ de: 'Seedance 2.0 Fast · 720p — ab 1,60 € pro 5 Sekunden', en: 'Seedance 2.0 Fast · 720p — from €1.60 per 5 seconds', es: 'Seedance 2.0 Fast · 720p — desde 1,60 € por 5 segundos' }),
       USD: 'Seedance 2.0 Fast · 720p — from $1.60 per 5 seconds',
     },
-    badge: 'Empfohlen',
+    badge: tx({ de: 'Empfohlen', en: 'Recommended', es: 'Recomendado' }),
   },
   'seedance-pro': {
     name: 'Seedance 2.0',
@@ -50,7 +50,7 @@ export const SEEDANCE_VIDEO_MODELS = {
       EUR: tx({ de: 'Seedance 2.0 Flagship · 720p — ab 1,93 € pro 5 Sekunden', en: 'Seedance 2.0 Flagship · 720p — from €1.93 per 5 seconds', es: 'Seedance 2.0 Flagship · 720p — desde 1,93 € por 5 segundos' }),
       USD: 'Seedance 2.0 flagship · 720p — from $1.93 per 5 seconds',
     },
-    badge: 'Premium',
+    badge: tx({ de: 'Premium', en: 'Premium', es: 'Premium' }),
   },
   // Seedance 2.5 — direkte ByteDance ModelArk API (nicht Replicate).
   // Long-Form: bis 30 s pro Szene, 1080p, First/Last-Frame + Multi-Reference.
@@ -65,10 +65,10 @@ export const SEEDANCE_VIDEO_MODELS = {
     minDuration: 4,
     maxDuration: 30,
     description: {
-      EUR: tx({ de: 'Seedance 2.5 · bis 30 s pro Szene — 720p 13,20 € / 480p 7,65 € pro 30 Sekunden', en: 'Seedance 2.5 · up to 30 s per scene — 720p $13.20 / 480p $7.65 per 30 seconds', es: 'Seedance 2.5 · hasta 30 s por escena — 720p 13,20 € / 480p 7,65 € por 30 segundos' }),
-      USD: 'Seedance 2.5 · 720p · up to 30 s per scene — $13.20 for 30 seconds',
+      EUR: tx({ de: 'Seedance 2.5 · bis 30 s pro Szene — 720p 13,20 € / 480p 7,65 € pro 30 Sekunden', en: 'Seedance 2.5 · up to 30 s per scene — 720p €13.20 / 480p €7.65 per 30 seconds', es: 'Seedance 2.5 · hasta 30 s por escena — 720p 13,20 € / 480p 7,65 € por 30 segundos' }),
+      USD: 'Seedance 2.5 · 720p/480p · up to 30 s per scene — $13.20 / $7.65 per 30 seconds',
     },
-    badge: 'New',
+    badge: tx({ de: 'Neu', en: 'New', es: 'Nuevo' }),
   },
 } as const;
 

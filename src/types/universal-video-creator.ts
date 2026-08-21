@@ -1,4 +1,3 @@
-import { tx } from "@/lib/i18nText";
 // ==========================================
 // Universal Video Creator - Type Definitions
 // ==========================================
@@ -318,43 +317,43 @@ export interface VideoCategoryInfo {
 export const VIDEO_CATEGORIES: VideoCategoryInfo[] = [
   {
     category: 'corporate-ad',
-    name: tx({ de: "Unternehmenswerbung", en: "Corporate ad", es: "Publicidad corporativa" }),
-    description: tx({ de: 'Professionelle Werbevideos für Unternehmen und Dienstleistungen', en: 'Professional promotional videos for businesses and services', es: 'Videos promocionales profesionales para empresas y servicios' }),
+    name: 'Corporate ad',
+    description: 'Professional promotional videos for businesses and services',
     icon: '🏢',
     color: 'from-blue-500 to-indigo-500',
-    recommendedDuration: tx({ de: '15-90 Sekunden', en: '15-90 seconds', es: '15-90 segundos' }),
-    exampleUseCase: tx({ de: 'TV-Spot, Online-Werbung, Social Media Ads, Imagefilm', en: 'TV spot, online advertising, social media ads, brand film', es: 'Anuncio de TV, publicidad online, anuncios en redes sociales, película de marca' }),
-    features: [tx({ de: 'AIDA-Struktur', en: 'AIDA structure', es: 'Estructura AIDA' }), tx({ de: 'Starke CTAs', en: 'Strong CTAs', es: 'CTA potentes' }), tx({ de: 'Professioneller Ton', en: 'Professional tone', es: 'Tono profesional' })]
+    recommendedDuration: '15-90 seconds',
+    exampleUseCase: 'TV spot, online advertising, social media ads, brand film',
+    features: ['AIDA structure', 'Strong CTAs', 'Professional tone']
   },
   {
     category: 'product-ad',
-    name: tx({ de: "Produktwerbung", en: "Product ad", es: "Publicidad de producto" }),
-    description: tx({ de: 'Kreative Produktvideos mit deinen eigenen Produktfotos', en: 'Creative product videos with your own product photos', es: 'Videos de productos creativos con tus propias fotos de productos' }),
+    name: 'Product ad',
+    description: 'Creative product videos with your own product photos',
     icon: '📦',
     color: 'from-green-500 to-emerald-500',
-    recommendedDuration: tx({ de: '15-90 Sekunden', en: '15-90 seconds', es: '15-90 segundos' }),
-    exampleUseCase: 'Produktlaunch, E-Commerce, Unboxing, Feature-Demo',
-    features: ['Produktbilder-Upload', tx({ de: 'KI-Bildbearbeitung', en: 'AI image editing', es: 'Edición de imágenes con IA' }), tx({ de: "Kreative Drehbücher", en: "Creative Storyboards", es: "Guiones Creativos" })]
+    recommendedDuration: '15-90 seconds',
+    exampleUseCase: 'Product launch, e-commerce, unboxing, feature demo',
+    features: ['Product image upload', 'AI image editing', 'Creative storyboards']
   },
   {
     category: 'storytelling',
     name: 'Storytelling',
-    description: tx({ de: 'Emotionale Geschichten — erfunden oder wahr, filmisch erzählt', en: 'Emotional stories – fictional or true, told on film', es: 'Historias emocionales, ficticias o reales, contadas en una película.' }),
+    description: 'Emotional stories – fictional or true, told on film',
     icon: '📖',
     color: 'from-purple-500 to-pink-500',
-    recommendedDuration: tx({ de: '60-180 Sekunden', en: '60-180 seconds', es: '60-180 segundos' }),
-    exampleUseCase: tx({ de: "Markenfilm, Kurzfilm, Gründergeschichte, fiktive Story", en: "Brand film, short film, founder story, fictional story", es: "Película de marca, cortometraje, historia de fundador, historia ficticia" }),
-    features: ["Hero's Journey", tx({ de: "Emotionale Bögen", en: "Emotional Arcs", es: "Arcos Emocionales" }), 'Cinematic Stil']
+    recommendedDuration: '60-180 seconds',
+    exampleUseCase: 'Brand film, short film, founder story, fictional story',
+    features: ["Hero's Journey", 'Emotional arcs', 'Cinematic style']
   },
   {
     category: 'custom',
-    name: 'Freier Editor',
-    description: tx({ de: 'Volle Kontrolle — erstelle jedes beliebige Video', en: 'Full control — create any video you want', es: 'Control total: crea cualquier vídeo que quieras' }),
+    name: 'Custom',
+    description: 'Full control — create any video you want',
     icon: '✨',
     color: 'from-violet-500 to-purple-600',
-    recommendedDuration: 'Flexibel',
-    exampleUseCase: tx({ de: "Tutorial, Erklärvideo, Social Content, Event, Promo", en: "Tutorial, explainer video, social content, event, promo", es: "Tutorial, video explicativo, contenido social, evento, promoción" }),
-    features: [tx({ de: 'Volle Flexibilität', en: 'Full flexibility', es: 'Flexibilidad total' }), tx({ de: 'Individuelle Struktur', en: 'Custom structure', es: 'Estructura personalizada' }), tx({ de: 'Kreative Freiheit', en: 'Creative freedom', es: 'Libertad creativa' })]
+    recommendedDuration: 'Flexible',
+    exampleUseCase: 'Tutorial, explainer video, social content, event, promo',
+    features: ['Full flexibility', 'Custom structure', 'Creative freedom']
   }
 ];
 
@@ -369,8 +368,8 @@ export const DEFAULT_CONSULTATION_RESULT: Partial<UniversalConsultationResult> =
   visualStyle: 'modern-3d',
   storytellingStructure: 'problem-solution',
   voiceGender: 'male',
-  voiceLanguage: 'de',
-  voiceTone: 'professionell',
+  voiceLanguage: 'en',
+  voiceTone: 'professional',
   musicStyle: 'corporate',
   musicMood: 'inspirational',
   aspectRatio: '16:9',

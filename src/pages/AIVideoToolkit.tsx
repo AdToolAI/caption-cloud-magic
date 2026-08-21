@@ -1,4 +1,3 @@
-import { tx } from "@/lib/i18nText";
 import { useEffect, useState, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
@@ -75,7 +74,7 @@ export default function AIVideoToolkit() {
       <div className="container mx-auto p-8">
         <Card className="p-12 text-center text-muted-foreground">
           <Sparkles className="w-10 h-10 mx-auto mb-4 animate-pulse opacity-60" />
-          AI Video Studio…
+          {t('aiVid.loading')}
         </Card>
       </div>
     );
@@ -84,11 +83,11 @@ export default function AIVideoToolkit() {
   if (!hasFullAccess) {
     return (
       <>
-        <Helmet><title>AI Video Toolkit | {t('aiVid.upgradeRequired')}</title></Helmet>
+        <Helmet><title>{t('aiVid.pageTitle')} | {t('aiVid.upgradeRequired')}</title></Helmet>
         <div className="container mx-auto p-8">
           <Card className="p-12 text-center">
             <Sparkles className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-            <h2 className="text-2xl font-bold mb-2">AI Video Toolkit</h2>
+            <h2 className="text-2xl font-bold mb-2">{t('aiVid.pageTitle')}</h2>
             <p className="text-muted-foreground mb-6">{t('aiVid.upgradeMessage')}</p>
             <Link to="/#pricing"><Button>{t('aiVid.upgradeNow')}</Button></Link>
           </Card>
@@ -98,16 +97,12 @@ export default function AIVideoToolkit() {
   }
 
 
-  const subtitle = language === 'de'
-    ? tx({ de: 'Ein Prompt. Alle Top-Modelle. Wechsle Anbieter ohne Kontextwechsel.', en: 'One prompt. All top models. Switch providers without changing context.', es: 'Un prompt. Todos los modelos principales. Cambia de proveedor sin cambiar de contexto.' })
-    : language === 'es'
-    ? 'Un prompt. Todos los modelos top. Cambia de proveedor sin perder el contexto.'
-    : 'One prompt. All top models. Switch providers without losing context.';
+  const subtitle = t('aiVid.pageSubtitle');
 
   return (
     <>
       <Helmet>
-        <title>AI Video Toolkit | Unified AI Video Generation</title>
+        <title>{t('aiVid.pageTitle')} | Unified AI Video Generation</title>
         <meta name="description" content={t('aiVid.metaDesc')} />
       </Helmet>
 
@@ -164,7 +159,7 @@ export default function AIVideoToolkit() {
                   WebkitTextFillColor: 'transparent',
                 }}
               >
-                AI Video Toolkit
+                {t('aiVid.pageTitle')}
               </h1>
               <p className="text-muted-foreground mt-1 text-sm md:text-base">{subtitle}</p>
             </div>
@@ -201,7 +196,7 @@ export default function AIVideoToolkit() {
           <TabsList className="grid w-full grid-cols-3 bg-card/60 backdrop-blur-sm border border-border">
             <TabsTrigger value="generate">
               <Wand2 className="w-4 h-4 mr-2" />
-              {language === 'de' ? 'Generieren' : 'Generate'}
+              {t('aiVid.tabGenerate')}
             </TabsTrigger>
             <TabsTrigger value="history">
               <History className="w-4 h-4 mr-2" />
@@ -224,25 +219,19 @@ export default function AIVideoToolkit() {
                   <Lock className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">
-                    {language === 'de' ? 'Brand Character Lock' : 'Brand Character Lock'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {language === 'de'
-                      ? tx({ de: "Speichere Charaktere einmal — nutze sie konsistent in jedem Video.", en: "Save characters once — use them consistently in every video.", es: "Guarde los personajes una vez: úselos de manera constante en cada video." })
-                      : 'Save a character once — reuse it consistently in every video.'}
-                  </p>
+                  <p className="text-sm font-medium">{t('aiVid.brandCharLock')}</p>
+                  <p className="text-xs text-muted-foreground">{t('aiVid.brandCharLockDesc')}</p>
                 </div>
               </div>
               <span className="text-xs text-primary group-hover:underline">
-                {language === 'de' ? 'Verwalten →' : 'Manage →'}
+                {t('aiVid.manage')} →
               </span>
             </Link>
             <ToolkitGenerator onAfterGenerate={handleAfterGenerate} />
             <details className="rounded-lg border border-border/40 bg-card/40 p-4 group">
               <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground flex items-center gap-2">
                 <ShieldAlert className="h-4 w-4" />
-                {language === 'de' ? 'Rechtliche Hinweise & EU AI Act' : 'Legal & EU AI Act'}
+                {t('aiVid.legalEUAIAct')}
               </summary>
               <div className="mt-4">
                 <AIVideoDisclaimer />
