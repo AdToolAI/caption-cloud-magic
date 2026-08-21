@@ -140,6 +140,10 @@ import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { adoptPreAcquiredLedgerJob, bindSyncPassAttempt, readRetryContext, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
 import { evaluateTurnPassBinding, isStabilizerPass, type TurnPassCandidate } from "../_shared/fa4-turn-pass-guard.ts";
+import {
+  buildImmutableArtifactKey,
+  pinImmutableArtifact,
+} from "../_shared/v434-immutable-artifact.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -5625,6 +5629,38 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             ? Number(preclipResult.mouthOffsetPx)
             : null;
           (pass as any).preclip_clamped = !!preclipResult.clamped;
+          // ── V434 Step 1 — IMMUTABLE PRE-CLIP EVIDENCE COPY ──────────────
+          // Calibration ground truth may only be built from bytes that cannot
+          // be overwritten by a later run (docs/v433-motion-studio-rca.md).
+          // Additive: `preclip_url` (what Sync.so receives) is NOT changed.
+          try {
+            const v434Key = buildImmutableArtifactKey({
+              userId,
+              sceneId,
+              runId: String((sceneRow as any)?.active_run_id ?? "") || "unknown-run",
+              generation: Number((sceneRow as any)?.plate_generation ?? 0) || 0,
+              passIdx: currentPassIdx,
+              kind: "preclip",
+              attempt: Number((pass as any)?.attempt ?? 0) || 0,
+            });
+            const v434Pin = await pinImmutableArtifact({
+              supabase,
+              sourceUrl: preclipResult.preclipUrl,
+              key: v434Key,
+            });
+            (pass as any)._v434_preclip_pin = {
+              key: v434Pin.key,
+              url: v434Pin.url,
+              sha256: v434Pin.sha256,
+              bytes: v434Pin.bytes,
+              status: v434Pin.status,
+            };
+            console.log(
+              `[compose-dialog-segments] v434_pin scene=${sceneId} pass=${currentPassIdx} kind=preclip status=${v434Pin.status} sha256=${v434Pin.sha256 ?? "n/a"}`,
+            );
+          } catch (e) {
+            console.warn(`[compose-dialog-segments] v434_pin_crash scene=${sceneId}: ${(e as Error).message}`);
+          }
           console.log(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} mouth_off_px=${(pass as any).preclip_mouth_offset_px}`,
           );
