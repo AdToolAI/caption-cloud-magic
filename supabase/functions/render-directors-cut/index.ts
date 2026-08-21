@@ -450,31 +450,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
 
 
-    // Check user credits
-    const { data: wallet, error: walletError } = await supabaseClient
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single();
+    // v428: no wallet check — rendering is included in every plan.
 
-    if (walletError || !wallet) {
-      return new Response(JSON.stringify({ error: 'Wallet not found' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (wallet.balance < creditsNeeded) {
-      return new Response(JSON.stringify({ 
-        error: 'INSUFFICIENT_CREDITS',
-        message: `Du benötigst ${creditsNeeded} Credits, hast aber nur ${wallet.balance}.`,
-        credits_needed: creditsNeeded,
-        credits_available: wallet.balance,
-      }), {
-        status: 402,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
 
     // Create render job record in director_cut_renders table
     const { data: renderJob, error: renderError } = await supabaseClient
