@@ -25,6 +25,7 @@ export function StepRail({
   canEnter?: (next: StudioStep) => boolean;
 }) {
   const index = STUDIO_STEPS.indexOf(step);
+  const LABELS = labels();
 
   return (
     <div className="relative">
