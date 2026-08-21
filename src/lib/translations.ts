@@ -815,6 +815,10 @@ export const translations: Record<Language, any> = {
       viewLink: "View",
       retrySuccess: "Event will be reprocessed",
       retryFailed: "Retry failed",
+      logStarted: "Publishing started (attempt {attempt}/{max})",
+      logSucceeded: "Publishing succeeded on all platforms",
+      logPartial: "Publishing partially failed",
+      logFailed: "Publishing failed",
 
       // Quick Schedule Form
       quickSchedule: "Quick Schedule",
