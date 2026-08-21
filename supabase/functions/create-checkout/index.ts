@@ -166,13 +166,37 @@ serve(async (req) => {
       },
     };
 
-    if (reservedPromotionCode) {
-      sessionOptions.discounts = [{ promotion_code: reservedPromotionCode }];
-    } else if (promoCode) {
-      sessionOptions.discounts = [{ promotion_code: promoCode }];
+    // Stripe erwartet unter `promotion_code` die ID (promo_…), NICHT den
+    // sichtbaren Code. Codes aus der URL (?coupon=XYZ) müssen deshalb zuerst
+    // aufgelöst werden — sonst bricht der Checkout mit einem 500er ab.
+    let resolvedPromotionCode: string | null = reservedPromotionCode;
+    if (!resolvedPromotionCode && promoCode) {
+      const raw = String(promoCode).trim();
+      if (raw.startsWith("promo_")) {
+        resolvedPromotionCode = raw;
+      } else {
+        try {
+          const found = await stripe.promotionCodes.list({
+            code: raw.toUpperCase(),
+            active: true,
+            limit: 1,
+          });
+          resolvedPromotionCode = found.data[0]?.id ?? null;
+          if (!resolvedPromotionCode) {
+            console.warn(`Unknown promotion code, continuing without discount: ${raw}`);
+          }
+        } catch (lookupError) {
+          console.error("Promotion code lookup failed:", lookupError);
+        }
+      }
+    }
+
+    if (resolvedPromotionCode) {
+      sessionOptions.discounts = [{ promotion_code: resolvedPromotionCode }];
     } else if (couponId) {
       sessionOptions.discounts = [{ coupon: couponId }];
     }
+
 
     const session = await stripe.checkout.sessions.create(sessionOptions);
 
