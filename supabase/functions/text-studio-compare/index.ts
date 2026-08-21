@@ -157,28 +157,8 @@ Deno.serve(async (req) => {
     const lovable = Deno.env.get("LOVABLE_API_KEY") || undefined;
     const anthropic = Deno.env.get("ANTHROPIC_API_KEY") || undefined;
 
-    // Wallet pre-check (estimate worst case)
-    const estTotal = Object.keys(PRICING).reduce((acc, m) => {
-      const p = PRICING[m];
-      const inT = estimateTokens(prompt + (systemPrompt || ""));
-      return acc + (inT / 1000) * p.input + (1500 / 1000) * p.output;
-    }, 0);
+    // v428: Text Studio Compare is free — no wallet pre-check.
 
-    const { data: wallet } = await admin
-      .from("ai_video_wallets")
-      .select("balance_euros")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (!wallet || Number(wallet.balance_euros) < estTotal) {
-      return jsonResponse(
-        {
-          error: `Insufficient credits for compare run (~€${estTotal.toFixed(2)})`,
-          code: "INSUFFICIENT_CREDITS",
-        },
-        402,
-      );
-    }
 
     const requested = Array.isArray((body as { models?: unknown }).models)
       ? ((body as { models: string[] }).models)
