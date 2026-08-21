@@ -23,7 +23,7 @@ const BackBreadcrumb = () => (
 const Legal = () => {
   const { page } = useParams<{ page: string }>();
   const { language } = useTranslation();
-  const [contentLang, setContentLang] = useState<"de" | "en">("de");
+  const [contentLang, setContentLang] = useState<"de" | "en">(language === "de" ? "de" : "en");
   
   const location = window.location.pathname;
   const actualPage = page || (location === '/privacy' ? 'privacy' : location === '/terms' ? 'terms' : location === '/imprint' ? 'imprint' : null);
