@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Shield, FileText, Scale, FileCheck } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface LegalHeroHeaderProps {
   type: "privacy" | "terms" | "imprint" | "avv";
@@ -17,28 +18,43 @@ const titleMap = {
   privacy: {
     de: "Datenschutzerklärung",
     en: "Privacy Policy",
-    badge: "DSGVO-konform"
+    es: "Política de privacidad",
+    badge: { de: "DSGVO-konform", en: "GDPR-compliant", es: "Conforme al RGPD" },
   },
   terms: {
     de: "Nutzungsbedingungen",
     en: "Terms of Service",
-    badge: "Rechtssicher"
+    es: "Términos del servicio",
+    badge: { de: "Rechtssicher", en: "Legally sound", es: "Jurídicamente seguro" },
   },
   imprint: {
     de: "Impressum",
     en: "Legal Notice",
-    badge: "§ 5 TMG"
+    es: "Aviso legal",
+    badge: { de: "§ 5 TMG", en: "§ 5 TMG", es: "§ 5 TMG" },
   },
   avv: {
     de: "Auftragsverarbeitungsvertrag",
     en: "Data Processing Agreement",
-    badge: "Art. 28 DSGVO"
-  }
+    es: "Contrato de tratamiento de datos",
+    badge: { de: "Art. 28 DSGVO", en: "Art. 28 GDPR", es: "Art. 28 RGPD" },
+  },
+};
+
+const lastUpdatedLabel = {
+  de: "Letzte Aktualisierung",
+  en: "Last updated",
+  es: "Última actualización",
 };
 
 export const LegalHeroHeader = ({ type, lastUpdated }: LegalHeroHeaderProps) => {
+  const { language } = useTranslation();
+  const lang = (language === "de" || language === "es" ? language : "en") as "de" | "en" | "es";
   const Icon = iconMap[type];
   const titles = titleMap[type];
+  const primaryTitle = titles[lang];
+  const secondaryTitle = lang === "en" ? titles.de : titles.en;
+
 
   return (
     <motion.div
