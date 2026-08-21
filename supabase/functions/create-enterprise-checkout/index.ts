@@ -102,7 +102,9 @@ serve(async (req) => {
         },
       ],
       // Aktive Methoden im Stripe-Dashboard: Card (inkl. Apple/Google Pay), PayPal, Link.
-      payment_method_types: ["card", "paypal", "link"],
+      // Zahlungsarten kommen aus den Stripe-Dashboard-Einstellungen (automatic payment methods).
+      // Hartes Setzen von "paypal" ließ den Checkout mit 500 fehlschlagen, wenn die Methode
+      // für Währung/Land nicht aktiviert ist.
       // Sammle Rechnungsadresse + Name, damit Stripe-Rechnungen korrekt ausgestellt werden
       billing_address_collection: "required",
       customer_update: { address: "auto", name: "auto" },
