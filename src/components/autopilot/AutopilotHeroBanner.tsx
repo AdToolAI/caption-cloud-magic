@@ -43,7 +43,7 @@ export const AutopilotHeroBanner = () => {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <h3 className="font-serif text-lg leading-tight text-foreground">
-              KI Autopilot
+              {tx({ de: "KI Autopilot", en: "AI Autopilot", es: "Piloto automático de IA" })}
             </h3>
             <Badge
               variant="outline"
@@ -78,7 +78,7 @@ export const AutopilotHeroBanner = () => {
               'group-hover:bg-amber-400 group-hover:text-background transition',
             )}
           >
-            Early Access sichern
+            {tx({ de: "Early Access sichern", en: "Get early access", es: "Consigue acceso anticipado" })}
             <ArrowRight className="h-4 w-4" />
           </div>
         </div>

@@ -125,7 +125,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) return json({ error: "LOVABLE_API_KEY missing" }, 500);
 
-    const language = String(body?.language ?? "de");
+    const language = String(body?.language ?? "en");
     const aspect = String(body?.aspect_ratio ?? "9:16");
     const duration = clampDuration(Number(body?.target_duration_seconds ?? 30));
     const characters = (Array.isArray(body?.characters) ? body.characters : []).slice(0, 8);
@@ -140,6 +140,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
     const userPrompt = [
       `Briefing des Kunden:\n"${brief}"`,
       `Plattform: ${options.platform} · Format: ${aspect} · Sprache: ${language}`,
+      `AUSGABESPRACHE (verbindlich): ${language === "de" ? "Deutsch" : language === "es" ? "Spanisch" : "Englisch"}. Titel, Hook, Logline, Beats und Begründung MÜSSEN in dieser Sprache verfasst sein — keine andere Sprache.`,
       `Gesamtlänge: ca. ${duration} Sekunden (harte Obergrenze 180 Sekunden)`,
       options.lipSync
         ? `Lip-Sync gewünscht: bis zu ${options.lipSyncSpeakers} sprechende Person(en) im Bild.`
