@@ -178,6 +178,78 @@ const happyhorseAspect = ['16:9', '9:16', '1:1', '4:3', '3:4'];
 const happyhorseDurations = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
 export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
+  /* ─────────── Seedance 2.5 (top model) ─────────── */
+  {
+    id: 'seedance-2-5',
+    name: SEEDANCE_VIDEO_MODELS['seedance-2-5'].name,
+    provider: 'ByteDance',
+    family: 'seedance',
+    edgeFunction: 'generate-seedance25-video',
+    group: 'premium',
+    icon: Video,
+    // ModelArk contract (docs verified 10.08.2026): 4-30 s or smart duration
+    // (-1), 480p/720p, first-frame OR first+last-frame OR multi-reference
+    // (mutually exclusive), up to 30 reference images + 10 reference videos +
+    // 10 reference audio clips, native audio via `generate_audio`.
+    capabilities: {
+      t2v: true,
+      i2v: true,
+      v2v: true,
+      audio: true,
+      multiRef: true,
+      maxReferences: 30,
+      maxReferenceVideos: 10,
+      maxReferenceAudios: 10,
+      refAudio: true,
+      refExclusive: true,
+      smartDuration: true,
+    },
+    /**
+     * ModelArk accepts exactly ONE input mode per task. First-frame,
+     * first+last-frame and multi-reference share a single exclusive slot, so
+     * "seamless transition" and "identity references" genuinely compete here.
+     * Reference videos live inside the reference budget — that is why
+     * `clip-reference` is the continuity mode of choice for this model.
+     * Lip-sync (v418, Phase 3a): certified as a master-plate provider behind
+     * the `composer.feature.seedance25_lipsync` flag. Plates stay silent
+     * unless the scene explicitly opts into the hybrid ambience mode, in
+     * which case the prompt forbids speech and a speech gate re-mutes the
+     * plate if the model talks anyway.
+     */
+    visualInputs: {
+      mode: 'exclusive',
+      modes: ['first-frame', 'first-last-frame', 'references'],
+      firstFrame: { supported: true, slot: 'visual-input' },
+      endFrame: { supported: true, slot: 'visual-input', requiresFirstFrame: true },
+      references: {
+        max: 30,
+        slot: 'visual-input',
+        videos: 10,
+        audios: 10,
+        character: true,
+        product: true,
+        location: true,
+      },
+      lipSync: {
+        supported: true,
+        requiresIdentityReference: true,
+        conflictsWithFirstFrame: false,
+        verification: { status: 'verified' },
+      },
+    },
+
+
+    durations: [4, 5, 8, 10, 12, 15, 20, 25, 30],
+    resolution: '720p',
+    resolutions: ['720p', '480p'],
+    aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+
+    costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-2-5'].costPerSecond,
+    badge: 'New',
+    tagline: tx({ de: `Seedance 2.5 · ${'bis 30 s pro Szene'} · 720p`, en: `Seedance 2.5 · ${'up to 30s per scene'} · 720p`, es: `Seedance 2.5 · ${'hasta 30 s por escena'} · 720p` }),
+    legacyRoute: '/seedance-video-studio',
+  },
+
   /* ─────────── Kling family ─────────── */
   {
     id: 'kling-2.5-turbo',
@@ -631,77 +703,6 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     tagline: tx({ de: "Seedance 2.0 Flagship · beste Motion-Kohärenz", en: "Seedance 2.0 Flagship · best motion coherence", es: "Seedance 2.0 Flagship · mejor coherencia de movimiento" }),
     legacyRoute: '/seedance-video-studio',
   },
-  {
-    id: 'seedance-2-5',
-    name: SEEDANCE_VIDEO_MODELS['seedance-2-5'].name,
-    provider: 'ByteDance',
-    family: 'seedance',
-    edgeFunction: 'generate-seedance25-video',
-    group: 'premium',
-    icon: Video,
-    // ModelArk contract (docs verified 10.08.2026): 4-30 s or smart duration
-    // (-1), 480p/720p, first-frame OR first+last-frame OR multi-reference
-    // (mutually exclusive), up to 30 reference images + 10 reference videos +
-    // 10 reference audio clips, native audio via `generate_audio`.
-    capabilities: {
-      t2v: true,
-      i2v: true,
-      v2v: true,
-      audio: true,
-      multiRef: true,
-      maxReferences: 30,
-      maxReferenceVideos: 10,
-      maxReferenceAudios: 10,
-      refAudio: true,
-      refExclusive: true,
-      smartDuration: true,
-    },
-    /**
-     * ModelArk accepts exactly ONE input mode per task. First-frame,
-     * first+last-frame and multi-reference share a single exclusive slot, so
-     * "seamless transition" and "identity references" genuinely compete here.
-     * Reference videos live inside the reference budget — that is why
-     * `clip-reference` is the continuity mode of choice for this model.
-     * Lip-sync (v418, Phase 3a): certified as a master-plate provider behind
-     * the `composer.feature.seedance25_lipsync` flag. Plates stay silent
-     * unless the scene explicitly opts into the hybrid ambience mode, in
-     * which case the prompt forbids speech and a speech gate re-mutes the
-     * plate if the model talks anyway.
-     */
-    visualInputs: {
-      mode: 'exclusive',
-      modes: ['first-frame', 'first-last-frame', 'references'],
-      firstFrame: { supported: true, slot: 'visual-input' },
-      endFrame: { supported: true, slot: 'visual-input', requiresFirstFrame: true },
-      references: {
-        max: 30,
-        slot: 'visual-input',
-        videos: 10,
-        audios: 10,
-        character: true,
-        product: true,
-        location: true,
-      },
-      lipSync: {
-        supported: true,
-        requiresIdentityReference: true,
-        conflictsWithFirstFrame: false,
-        verification: { status: 'verified' },
-      },
-    },
-
-
-    durations: [4, 5, 8, 10, 12, 15, 20, 25, 30],
-    resolution: '720p',
-    resolutions: ['720p', '480p'],
-    aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
-
-    costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-2-5'].costPerSecond,
-    badge: 'New',
-    tagline: tx({ de: `Seedance 2.5 · ${'bis 30 s pro Szene'} · 720p`, en: `Seedance 2.5 · ${'up to 30s per scene'} · 720p`, es: `Seedance 2.5 · ${'hasta 30 s por escena'} · 720p` }),
-    legacyRoute: '/seedance-video-studio',
-  },
-
 
 
   /* ─────────── V2V Specialist (Runway) ─────────── */
@@ -890,7 +891,7 @@ export function getToolkitModelById(id: string | null | undefined): ToolkitModel
 }
 
 export function getDefaultToolkitModel(): ToolkitModel {
-  return AI_VIDEO_TOOLKIT_MODELS[0];
+  return AI_VIDEO_TOOLKIT_MODELS.find((m) => m.id === 'seedance-2-5') ?? AI_VIDEO_TOOLKIT_MODELS[0];
 }
 
 /** Maps a legacy /<family>-video-studio route to a sensible default model id. */
