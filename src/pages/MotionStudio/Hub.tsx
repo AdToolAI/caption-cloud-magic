@@ -179,7 +179,7 @@ export default function MotionStudioHub() {
       value: walletLoading
         ? '—'
         : wallet
-          ? `${wallet.currency === 'USD' ? '$' : '€'}${wallet.balance_euros.toFixed(2)}`
+          ? `€${wallet.balance_euros.toFixed(2)}`
           : '—',
       icon: Wallet,
       loading: walletLoading,

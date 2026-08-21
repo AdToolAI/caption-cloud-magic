@@ -67,7 +67,7 @@ export const FirstVideoGuide = () => {
   if (wallet.total_purchased_euros > 0 || wallet.total_spent_euros > 0) return null;
 
   const t = copy[language as "de" | "en" | "es"] ?? copy.en;
-  const balanceFormatted = formatPrice(wallet.balance_euros, wallet.currency);
+  const balanceFormatted = formatPrice(wallet.balance_euros, 'EUR');
 
   return (
     <motion.div

@@ -149,7 +149,11 @@ export function MonthView({
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
   };
 
-  const weekDays = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+  const weekDays = tx({
+    de: ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"],
+    en: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    es: ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"],
+  });
 
   if (isMobile) {
     return (
