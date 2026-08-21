@@ -674,41 +674,29 @@ export function PreviewExportStep({
         </Card>
       )}
 
-      {/* Credit Balance & Render Button */}
+      {/* Rendering is included in every plan (v428) */}
       <Card className="p-4 bg-primary/5 border-primary/20">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Coins className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-sm font-medium">{t('uc.yourCredits')}</p>
-              <p className="text-2xl font-bold">{balance?.balance || 0}</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <p className="text-sm text-muted-foreground">{t('uc.renderCost')}</p>
-            <p className="text-xl font-semibold text-primary">{totalCost} Credits</p>
+        <div className="flex items-center gap-2">
+          <Coins className="h-5 w-5 text-primary" />
+          <div>
+            <p className="text-sm font-medium">
+              {tx({ de: 'Rendern & Export sind inklusive', en: 'Rendering & export are included', es: 'El renderizado y la exportación están incluidos' })}
+            </p>
             <p className="text-xs text-muted-foreground">
-              ({ESTIMATED_COSTS.video_render} {t('uc.perFormat')})
+              {tx({
+                de: 'Keine Credits nötig – Credits gelten nur für KI-Modelle (Video, Musik, Bild, Stimme).',
+                en: 'No credits needed – credits only apply to AI models (video, music, image, voice).',
+                es: 'No se necesitan créditos: los créditos solo se aplican a modelos de IA (vídeo, música, imagen, voz).',
+              })}
             </p>
           </div>
         </div>
-        
-        {balance && balance.balance < totalCost && (
-          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-            <p className="text-sm text-destructive font-medium">
-              ⚠️ {t('uc.notEnoughCredits')}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {t('uc.needMoreCredits', { count: String(totalCost - balance.balance) })}
-            </p>
-          </div>
-        )}
       </Card>
 
       <div className="flex gap-3">
         <Button
           onClick={handleRenderVideo}
-          disabled={isRendering || selectedFormats.length === 0 || (balance && balance.balance < totalCost)}
+          disabled={isRendering || selectedFormats.length === 0}
           size="lg"
           className="flex-1"
         >
