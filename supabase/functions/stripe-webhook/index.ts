@@ -274,7 +274,52 @@ serve(withTelemetry('stripe-webhook', async (req) => {
           }
         }
       }
+
+      // === Credit Top-up (mode=payment) ===
+      // Bisher wurden Credits NUR gutgeschrieben, wenn der Nutzer nach dem Checkout
+      // in die App zurückkehrte (ai-video-verify-purchase). Schließt er den Tab,
+      // war die Zahlung erfolgt, aber das Guthaben fehlte. Der Webhook bucht jetzt
+      // serverseitig — die RPC ist über stripe_checkout_session_id idempotent.
+      if (session.mode === 'payment' && session.metadata?.type === 'ai_video_credits') {
+        try {
+          if (session.payment_status !== 'paid') {
+            console.log('[STRIPE-WEBHOOK] Top-up not paid yet, skipping:', session.id);
+          } else {
+            const md = session.metadata;
+            const { data: newBalance, error: creditError } = await supabaseAdmin.rpc('add_ai_video_credits', {
+              p_user_id: md.user_id,
+              p_currency: md.currency || 'EUR',
+              p_base_amount: parseFloat(md.base_amount || '0'),
+              p_bonus_amount: parseFloat(md.bonus_amount || '0'),
+              p_pack_size: md.pack_id,
+              p_bonus_percent: parseInt(md.bonus_percent || '0', 10),
+              p_stripe_session_id: session.id,
+            });
+            if (creditError) {
+              console.error('[STRIPE-WEBHOOK] Top-up credit grant failed:', creditError);
+              return new Response(JSON.stringify({ error: 'Failed to grant credits' }), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+            }
+            console.log('[STRIPE-WEBHOOK] Top-up credits granted:', { user: md.user_id, pack: md.pack_id, newBalance });
+            await trackBusinessEvent('credit_topup_completed', md.user_id, {
+              amount: (session.amount_total || 0) / 100,
+              currency: session.currency,
+              pack_id: md.pack_id,
+              session_id: session.id,
+            });
+          }
+        } catch (topupError) {
+          console.error('[STRIPE-WEBHOOK] Top-up handling error:', topupError);
+          return new Response(JSON.stringify({ error: 'Top-up handling failed' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
     }
+
 
     if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
       const subscription = event.data.object as Stripe.Subscription;
