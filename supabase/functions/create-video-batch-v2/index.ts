@@ -88,24 +88,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check user credits (50 per video)
-    const totalCost = csv_data.length * 50;
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!wallet || wallet.balance < totalCost) {
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          error: 'INSUFFICIENT_CREDITS',
-          message: `Du brauchst ${totalCost} Credits für ${csv_data.length} Videos (du hast ${wallet?.balance || 0})`
-        }),
-        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // v428: batch rendering is included in every plan — no credits charged.
+    const totalCost = 0;
 
     // Create batch job
     const { data: batchJob, error: batchError } = await supabase
@@ -202,14 +186,7 @@ Deno.serve(async (req) => {
       })
       .eq('id', batchJob.id);
 
-    // Deduct credits
-    await supabase
-      .from('wallets')
-      .update({
-        balance: wallet.balance - totalCost,
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', user.id);
+    // v428: no credit deduction — rendering is free.
 
     console.log(`[Batch] Job ${batchJob.id}: ${creationIds.length}/${csv_data.length} videos queued`);
 

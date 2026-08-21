@@ -249,23 +249,8 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       }
     });
 
-    // Check credits
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!wallet || wallet.balance < creditsRequired) {
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          error: 'INSUFFICIENT_CREDITS',
-          message: tl({ de: `Nicht genügend Credits. ${creditsRequired} Credits benötigt für Video-Generierung.`, en: `Not enough credits. ${creditsRequired} credits needed for video generation.`, es: `Créditos insuficientes. Se requieren ${creditsRequired} créditos para generar el video.` })
-        }),
-        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // v428: template rendering is included in every plan — no wallet check.
+    creditsRequired = 0;
 
     // Create video_creation record
     const { data: creation, error: creationError } = await supabase
@@ -966,14 +951,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       })
       .eq('id', creation.id);
 
-    // Deduct credits
-    await supabase
-      .from('wallets')
-      .update({
-        balance: wallet.balance - 50,
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', user.id);
+    // v428: no credit deduction — rendering is free.
 
     console.log(`[Video Render] User ${user.id} | Template: ${template.name} | Render ID: ${shotstackData.response.id}`);
 
