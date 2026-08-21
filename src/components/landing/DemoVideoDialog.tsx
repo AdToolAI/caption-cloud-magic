@@ -1,6 +1,8 @@
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { tx } from "@/lib/i18nText";
+import { useLanguage } from "@/contexts/LanguageContext";
 import demoAsset from "@/assets/adtool-demo.mp4.asset.json";
+import demoAssetDe from "@/assets/adtool-demo-de.mp4.asset.json";
 
 interface DemoVideoDialogProps {
   open: boolean;
@@ -8,6 +10,9 @@ interface DemoVideoDialogProps {
 }
 
 export const DemoVideoDialog = ({ open, onOpenChange }: DemoVideoDialogProps) => {
+  const { language } = useLanguage();
+  const src = language === 'de' ? demoAssetDe.url : demoAsset.url;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl border-primary/25 bg-background/95 p-2 sm:p-3">
@@ -15,8 +20,8 @@ export const DemoVideoDialog = ({ open, onOpenChange }: DemoVideoDialogProps) =>
           {tx({ de: 'AdTool AI Produkt-Demo', en: 'AdTool AI product demo', es: 'Demo de producto de AdTool AI' })}
         </DialogTitle>
         <video
-          key={open ? "open" : "closed"}
-          src={demoAsset.url}
+          key={`${language}-${open ? "open" : "closed"}`}
+          src={src}
           controls
           autoPlay
           playsInline
