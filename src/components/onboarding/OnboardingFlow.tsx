@@ -18,13 +18,12 @@ export const OnboardingFlow = () => {
   const [brandColor, setBrandColor] = useState("#6366F1");
   const [loading, setLoading] = useState(false);
   
-  const { setLanguage, t } = useTranslation();
+  const { setLanguage, t, language } = useTranslation();
   const navigate = useNavigate();
 
   const handleLanguageSelect = (lang: 'en' | 'de' | 'es') => {
     setSelectedLang(lang);
     setLanguage(lang);
-    localStorage.setItem('cg_lang', lang);
   };
 
   const handlePlanSelect = async (plan: 'free' | 'basic' | 'pro') => {
@@ -36,7 +35,7 @@ export const OnboardingFlow = () => {
         if (!user) throw new Error('Not authenticated');
 
         const { data, error } = await supabase.functions.invoke('create-checkout', {
-          body: { priceId: pricingPlans[plan].priceId }
+          body: { priceId: getStripePriceId(plan, getCurrencyForLanguage(language)) }
         });
 
         if (error) throw error;

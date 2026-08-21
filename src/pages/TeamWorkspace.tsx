@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { getCurrencyForLanguage } from "@/lib/currency";
 import {
   Users, Plus, Mail, CheckCircle, XCircle, ListTodo, Shield, Crown,
   Sparkles, Activity, Clock, TrendingUp, Circle, MoreHorizontal, Radar, Trash2, Check, X,
