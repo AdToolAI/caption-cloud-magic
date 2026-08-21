@@ -1,6 +1,8 @@
-# Gate: v400 Differential RCA (read-only, keine Produktionsänderung)
+# Gate v433: Motion Studio Differential RCA + Continuity Contract Audit (read-only)
 
-Ziel: die Ursache des Samuel-T2-No-ops belegen, statt sie zu vermuten. Kein Code der Lip-Sync-Kette wird angefasst, keine Schwelle verstellt, kein Render angestoßen. Ergebnis ist ein Befundbericht mit einer benannten Primärursache (T8 Preclip / T9 Face-Gate / T10 Provider / T12 Outcome-Gate) und dem Beleg dafür.
+Zwei Ebenen in einem Gate. Ebene 1: den Samuel-T2-No-op forensisch belegen statt vermuten (Primärursache T8 Preclip / T9 Face-Gate / T10 Provider / T12 Outcome-Gate). Ebene 2: read-only prüfen, ob die heutige Motion-Studio-Architektur die zentralen Produktions-Verträge tatsächlich besitzt — allen voran die Lineage `Szene N → Continuity-Frame → Szene N+1 Anchor`.
+
+v400 ist dabei Vergleichsmaßstab, nicht Rückbauziel. Der aktuelle Code bleibt Source of Truth; aus v400 wird nur übernommen, was einen Fehler erklärt oder die heutige Architektur nachweislich verbessert. Kein Code wird angefasst, keine Schwelle verstellt, kein Render angestoßen.
 
 ## Ausgangslage (verifiziert)
 
@@ -53,19 +55,45 @@ Ergebnis ist eine Aussage der Form: „Der heutige Gate hätte diesen Fall (nich
 
 Die A/B/C/D-Matrix (Failure-Preclip × Failure-Audio, Failure-Preclip × Success-Audio, Success-Preclip × Failure-Audio, Direktaufruf am Provider unter Umgehung der Pipeline) wird in diesem Gate **beschrieben und vorbereitet**, nicht ausgeführt: sie ruft einen externen Provider auf, kostet Credits und ist damit keine Read-only-Operation. Sie ist der erste Schritt des Folge-Gates, sobald Block 1–4 die Hypothese eingegrenzt haben.
 
+## Block 6 — Motion-Studio-Verträge über Lip-Sync hinaus
+
+Systemweite Prüfung, jeder Vertrag mit Codebeleg und Verdikt `erfüllt / teilweise / verletzt / nicht prüfbar`:
+
+1. **Run- & Artefakt-Lineage** — Szene, Plate, Audio, Preclip, Provider-Ergebnis und Final-Render tragen dieselbe Run-Kennung; kein Artefakt ohne Zuordnung.
+2. **Cast & World als Identitätsquelle** — Charakteridentität stammt aus der registrierten Referenz, nicht aus einer Neuinterpretation pro Szene.
+3. **Scene Continuity / Frame Chaining** — die tatsächliche Kette wird an echten Projektdaten nachverfolgt:
+   ```text
+   Szene N Final-Output → gewählter Continuity-Frame → Frame-Metadaten/Hash
+   → Szene N+1 Referenz-/Anchor-Auswahl → Generierungs-Request → Ergebnis
+   ```
+   Gesucht wird, ob an irgendeiner Stelle noch ein älterer Anchor, eine Character-Reference oder ein Fallback dazwischenfunkt.
+4. **Anchor-Lineage & Trennung der Anchor-Typen** — ist jederzeit erkennbar, ob eine Szene von einer Character-Reference, einem Vorgänger-Frame oder einem bewusst gesetzten Alternativ-Anchor abstammt? Und werden **Character-Identity-Anchor** und **Scene-Continuity-Anchor** getrennt geführt (Frame für Pose/Kamera/Kleidung/Licht, Cast-Referenz für harte Identität)?
+5. **Generational Drift** — wird der Continuity-Frame gegen die Cast-Referenz rückgekoppelt, oder entsteht nach N Szenen eine Kopie-von-einer-Kopie? Belegt an einem realen Mehr-Szenen-Projekt: Identitäts-Distanz von Szene 1 zu Szene N.
+6. **Assignment Consistency** — Sprecher, Character-UUID, Face-Slot und Voice bleiben über die gesamte Kette identisch (Erweiterung von Vertrag 2 aus Block 2 auf Voice und Cross-Scene).
+7. **Outcome Gates** — an welchen Stellen gilt „Provider-Job done" implizit als „Ergebnis korrekt"? Jede solche Stelle wird gelistet.
+8. **Fail-closed** — bei unbelastbarer Identität, Geometrie, Lip-Sync oder Continuity: bricht die Pipeline ab oder liefert sie einen scheinbar fertigen Clip?
+9. **Final Composition Integrity** — können Stitching, Audio, Übergänge oder Reprojektion einen zuvor korrekten Zwischenstand wieder zerstören?
+
 ## Ergebnis dieses Gates
 
-Ein Bericht `docs/v433-differential-rca.md` mit:
+Ein Bericht `docs/v433-motion-studio-rca.md` mit:
 
 - Artefakt-Inventar beider Turns inklusive Lücken,
-- Vertrags-Matrix (5 Verträge × erfüllt/verletzt/nicht prüfbar, mit Codebeleg),
-- Messwerten aus der Preclip-Forensik,
-- Gate-Nachrechnung,
-- **einer** benannten wahrscheinlichsten Primärursache mit Begründung und den Gegenhypothesen, die die Artefakte ausschließen,
-- der Kreuztest-Spezifikation als Folgeschritt.
+- Lip-Sync-Vertragsmatrix (5 Verträge, Block 2) und Motion-Studio-Vertragsmatrix (9 Verträge, Block 6), jeweils mit Codebeleg,
+- Messwerten aus der Preclip-Forensik und der Gate-Nachrechnung,
+- der real nachverfolgten Continuity-Lineage eines Mehr-Szenen-Projekts,
+- einer Befundzeile in dieser Form:
+  ```text
+  Lip-Sync-Primärursache = <T8|T9|T10|T12> + Begründung
+  T12 heutiger Gate      = hätte gefangen / hätte nicht gefangen
+  Scene-Continuity       = erfüllt / teilweise / verletzt
+  Assignment/Anchor/Run  = je Vertrag belegt
+  Nächster minimaler Reparaturschritt = X
+  ```
+- der Kreuztest-Spezifikation (Block 5) als Folgeschritt.
 
 Kein Fix, keine Schwellenänderung, kein Deploy in diesem Gate. Der Freeze bleibt unangetastet.
 
 ## Technischer Hinweis
 
-Die Artefakt-Forensik läuft über Lesezugriffe auf `composer_scenes` / `composer_scene_jobs`, signierte Storage-URLs und lokale Frame-Analyse. Für Frame-Extraktion wird die lokale Sandbox genutzt, nicht die produktive Lambda-Still-Route — damit erzeugt der Gate keine Produktionslast und verändert keine Zählerstände.
+Die Artefakt-Forensik läuft über Lesezugriffe auf `composer_scenes` / `composer_scene_jobs` / Continuity-Queue, signierte Storage-URLs und lokale Frame-Analyse. Für Frame-Extraktion wird die lokale Sandbox genutzt, nicht die produktive Lambda-Still-Route — damit erzeugt der Gate keine Produktionslast und verändert keine Zählerstände. Identitäts-Distanz für den Drift-Test wird lokal auf heruntergeladenen Frames gemessen, ohne externen Modellaufruf.
