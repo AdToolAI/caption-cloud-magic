@@ -339,10 +339,10 @@ export function KanbanView({
           <DropdownMenuContent className="w-56 bg-popover/95 backdrop-blur-xl border-white/10">
             <DropdownMenuLabel>{tx({ de: "Sortierung", en: "Sorting", es: "Ordenación" })}</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => setSettings((s) => ({ ...s, sort: "date_asc" }))}>
-              {settings.sort === "date_asc" ? "✓ " : ""}Datum aufsteigend
+              {settings.sort === "date_asc" ? "✓ " : ""}{tx({ de: "Datum aufsteigend", en: "Date ascending", es: "Fecha ascendente" })}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setSettings((s) => ({ ...s, sort: "date_desc" }))}>
-              {settings.sort === "date_desc" ? "✓ " : ""}Datum absteigend
+              {settings.sort === "date_desc" ? "✓ " : ""}{tx({ de: "Datum absteigend", en: "Date descending", es: "Fecha descendente" })}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>{tx({ de: 'Spalten', en: 'Columns', es: 'Columnas' })}</DropdownMenuLabel>
