@@ -18437,6 +18437,7 @@ Object.assign(translations.es, {
 // ============================================================
 Object.assign(translations.en, {
   uvc: {
+    pageTitle: 'Universal Video Creator',
     cat_corporate_ad: 'Corporate ad',
     cat_corporate_ad_desc: 'Professional promotional videos for businesses and services',
     cat_corporate_ad_duration: '15-90 seconds',
