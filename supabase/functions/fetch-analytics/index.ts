@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { decryptToken } from "../_shared/crypto.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,9 +43,9 @@ Deno.serve(async (req) => {
     // Get all social connections with auto-sync enabled
     const { data: connections, error: connError } = await supabase
       .from("social_connections")
-      .select("id, user_id, provider, access_token, token_expires_at")
+      .select("id, user_id, provider, access_token_hash, token_expires_at")
       .eq("auto_sync_enabled", true)
-      .not("access_token", "is", null);
+      .not("access_token_hash", "is", null);
 
     if (connError) {
       console.error("[fetch-analytics] Error fetching connections:", connError);
@@ -65,13 +66,22 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      let accessToken: string;
+      try {
+        accessToken = await decryptToken(conn.access_token_hash);
+      } catch (decryptError) {
+        console.error(`[fetch-analytics] Could not decrypt token for ${conn.provider}:`, decryptError);
+        errorCount++;
+        continue;
+      }
+
       try {
         console.log(`[fetch-analytics] Fetching metrics for ${conn.provider} (user: ${conn.user_id})`);
         
         // Get recent posts from post_metrics to update
         const { data: posts } = await supabase
           .from("post_metrics")
-          .select("id, external_id, platform_post_id, provider")
+          .select("id, external_id, post_id, provider")
           .eq("user_id", conn.user_id)
           .eq("provider", conn.provider)
           .gte("posted_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
@@ -84,7 +94,7 @@ Deno.serve(async (req) => {
 
         // Fetch metrics per provider
         for (const post of posts) {
-          const postId = post.external_id || post.platform_post_id;
+          const postId = post.external_id || post.post_id;
           if (!postId) continue;
 
           let fetchedMetrics = { likes: 0, comments: 0, shares: 0, views: 0, impressions: 0 };
@@ -94,11 +104,11 @@ Deno.serve(async (req) => {
               case "instagram": {
                 // Try new IG metrics first, fallback to legacy
                 let igRes = await fetch(
-                  `https://graph.facebook.com/v24.0/${postId}?fields=like_count,comments_count,insights.metric(ig_reels_aggregated_all_plays_count,reach,saved)&access_token=${conn.access_token}`
+                  `https://graph.facebook.com/v24.0/${postId}?fields=like_count,comments_count,insights.metric(ig_reels_aggregated_all_plays_count,reach,saved)&access_token=${accessToken}`
                 );
                 if (!igRes.ok) {
                   igRes = await fetch(
-                    `https://graph.facebook.com/v24.0/${postId}?fields=like_count,comments_count,insights.metric(impressions,reach,saved)&access_token=${conn.access_token}`
+                    `https://graph.facebook.com/v24.0/${postId}?fields=like_count,comments_count,insights.metric(impressions,reach,saved)&access_token=${accessToken}`
                   );
                 }
                 if (igRes.ok) {
@@ -120,11 +130,11 @@ Deno.serve(async (req) => {
               case "facebook": {
                 // Try new FB metrics first, fallback to legacy
                 let fbRes = await fetch(
-                  `https://graph.facebook.com/v24.0/${postId}?fields=likes.summary(true),comments.summary(true),shares,insights.metric(post_total_media_view,post_engaged_users)&access_token=${conn.access_token}`
+                  `https://graph.facebook.com/v24.0/${postId}?fields=likes.summary(true),comments.summary(true),shares,insights.metric(post_total_media_view,post_engaged_users)&access_token=${accessToken}`
                 );
                 if (!fbRes.ok) {
                   fbRes = await fetch(
-                    `https://graph.facebook.com/v24.0/${postId}?fields=likes.summary(true),comments.summary(true),shares,insights.metric(post_impressions,post_engaged_users)&access_token=${conn.access_token}`
+                    `https://graph.facebook.com/v24.0/${postId}?fields=likes.summary(true),comments.summary(true),shares,insights.metric(post_impressions,post_engaged_users)&access_token=${accessToken}`
                   );
                 }
                 if (fbRes.ok) {
@@ -149,7 +159,7 @@ Deno.serve(async (req) => {
                   {
                     method: "POST",
                     headers: {
-                      "Authorization": `Bearer ${conn.access_token}`,
+                      "Authorization": `Bearer ${accessToken}`,
                       "Content-Type": "application/json",
                     },
                     body: JSON.stringify({ filters: { video_ids: [postId] } }),
@@ -175,7 +185,7 @@ Deno.serve(async (req) => {
                 const res = await fetch(
                   `https://api.twitter.com/2/tweets/${postId}?tweet.fields=public_metrics`,
                   {
-                    headers: { Authorization: `Bearer ${conn.access_token}` },
+                    headers: { Authorization: `Bearer ${accessToken}` },
                   }
                 );
                 if (res.ok) {
@@ -198,7 +208,7 @@ Deno.serve(async (req) => {
                 const res = await fetch(
                   `https://api.linkedin.com/v2/socialActions/${postId}`,
                   {
-                    headers: { Authorization: `Bearer ${conn.access_token}` },
+                    headers: { Authorization: `Bearer ${accessToken}` },
                   }
                 );
                 if (res.ok) {
