@@ -523,19 +523,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     activeRenderJob = renderJob;
     const renderOutName = `directors-cut-${renderJob.id}.${format === 'webm' ? 'webm' : 'mp4'}`;
 
-    // Deduct credits
-    const { error: deductError } = await supabaseClient.rpc('deduct_credits', {
-      p_user_id: user.id,
-      p_amount: creditsNeeded,
-    });
+    // v428: Director's Cut rendering (incl. premium effects) is free.
+    creditsDeducted = false;
 
-    if (deductError) {
-      console.error('[RenderDirectorsCut] Error deducting credits:', deductError);
-      // Rollback render job
-      await supabaseClient.from('director_cut_renders').delete().eq('id', renderJob.id);
-      throw new Error('Failed to deduct credits');
-    }
-    creditsDeducted = true;
 
     // Calculate dimensions based on aspect ratio and quality
     let width: number, height: number;
