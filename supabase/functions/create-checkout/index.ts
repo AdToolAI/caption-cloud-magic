@@ -209,7 +209,11 @@ serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify({ url: session.url, applied_coupon: couponId ?? null }),
+      JSON.stringify({
+        url: session.url,
+        applied_coupon: couponId ?? (resolvedPromotionCode ? (promoCode || reservation?.code || null) : null),
+      }),
+
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
     );
   } catch (error) {
