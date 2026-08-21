@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Check, X, Coins, ShieldAlert, FileText, ExternalLink } from 'lucide-react';
+import { BRAND_CHARACTER_CLIENT_COLUMNS } from '@/lib/brandCharacterColumns';
 
 interface PendingChar {
   id: string;
@@ -35,7 +36,7 @@ function usePendingCharacters() {
     queryFn: async (): Promise<PendingChar[]> => {
       const { data, error } = await supabase
         .from('brand_characters')
-        .select('*')
+        .select(BRAND_CHARACTER_CLIENT_COLUMNS)
         .in('marketplace_status', ['pending_review', 'under_investigation'])
         .order('updated_at', { ascending: true });
       if (error) throw error;

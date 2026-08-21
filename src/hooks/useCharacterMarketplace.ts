@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
+import { BRAND_CHARACTER_CLIENT_COLUMNS } from '@/lib/brandCharacterColumns';
 
 export interface MarketplaceCharacter {
   id: string;
@@ -33,7 +34,7 @@ export function useMarketplaceCharacters() {
     queryFn: async (): Promise<MarketplaceCharacter[]> => {
       const { data, error } = await supabase
         .from('brand_characters')
-        .select('*')
+        .select(BRAND_CHARACTER_CLIENT_COLUMNS)
         .eq('marketplace_status', 'published')
         .order('published_at', { ascending: false })
         .limit(200);
