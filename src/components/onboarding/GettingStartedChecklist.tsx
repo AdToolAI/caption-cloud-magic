@@ -1,6 +1,6 @@
 import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, ChevronLeft, ChevronRight, Sparkles, Video, Share2, Calendar, Palette, Rocket } from "lucide-react";
 import { toast } from "sonner";
@@ -94,6 +94,8 @@ export const GettingStartedChecklist = () => {
     });
   };
 
+  // Never stack on top of the studio-setup wizard.
+  if (pathname.startsWith("/onboarding")) return null;
   if (!user || isLoading || !progress || dismissed) return null;
   if (progress.totalCount === 0) return null;
 
