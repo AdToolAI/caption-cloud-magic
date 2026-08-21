@@ -210,18 +210,8 @@ Deno.serve(async (req) => {
       .select("id")
       .single();
 
-    // Deduct
-    if (totalCost > 0) {
-      try {
-        await admin.rpc("deduct_text_studio_credits", {
-          p_user_id: userId,
-          p_amount: Number(totalCost.toFixed(4)),
-          p_conversation_id: null,
-        });
-      } catch (e) {
-        console.error("[text-studio-compare] deduct failed", e);
-      }
-    }
+    // v428: Text Studio Compare is free — cost persisted as telemetry only.
+
 
     return jsonResponse({ id: row?.id, results: resultsObj, totalCost });
   } catch (e) {
