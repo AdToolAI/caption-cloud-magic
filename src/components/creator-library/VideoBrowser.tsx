@@ -98,11 +98,18 @@ export default function VideoBrowser() {
             <Card key={v.id} className="group overflow-hidden relative">
               <div className="aspect-video bg-muted/30 overflow-hidden relative">
                 <img
-                  src={v.thumbnail}
+                  src={v.thumbnail || v.preview_url}
                   alt={v.title}
                   loading="lazy"
+                  onError={(e) => {
+                    const el = e.currentTarget;
+                    if (el.dataset.fallback === '1') return;
+                    el.dataset.fallback = '1';
+                    el.style.visibility = 'hidden';
+                  }}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                 />
+
                 {v.is_4k && (
                   <Badge className="absolute top-1.5 left-1.5 text-[9px] bg-amber-500/90 text-black">
                     4K
