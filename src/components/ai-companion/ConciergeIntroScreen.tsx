@@ -9,7 +9,9 @@ import { tx } from "@/lib/i18nText";
  * on entry, curtain-close on finish — GPU-only.
  */
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompanionCoach } from '@/hooks/useCompanionCoach';
 import {
@@ -43,6 +45,7 @@ export function ConciergeIntroScreen() {
   const { user } = useAuth();
   const { conciergeCompleted, completeConcierge } = useCompanionCoach();
   const reduce = useReducedMotion();
+  const { pathname } = useLocation();
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [pace, setPace] = useState<LearningPace>(DEFAULT_LEARNING_PACE);
   const [goal, setGoal] = useState<string>('quick_spot');
@@ -56,12 +59,25 @@ export function ConciergeIntroScreen() {
     return () => window.clearTimeout(t);
   }, [user, conciergeCompleted]);
 
-  const shouldShow = ready && user && conciergeCompleted === false && visible;
+  // Never cover commerce or auth surfaces — the intro must not block checkout.
+  const suppressedRoute = /^\/(pricing|welcome|billing|checkout|auth|payment)/.test(pathname);
 
-  const finish = async () => {
+  const shouldShow = ready && user && conciergeCompleted === false && visible && !suppressedRoute;
+
+  const finish = useCallback(async () => {
     setVisible(false);
     await completeConcierge({ pace, primaryGoal: goal });
-  };
+  }, [completeConcierge, pace, goal]);
+
+  // Escape closes the intro and keeps the chosen defaults.
+  useEffect(() => {
+    if (!shouldShow) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') void finish();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [shouldShow, finish]);
 
   return (
     <AnimatePresence>
@@ -110,6 +126,15 @@ export function ConciergeIntroScreen() {
                   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E\")",
               }}
             />
+
+            <button
+              type="button"
+              onClick={() => void finish()}
+              aria-label={tx({ de: 'Überspringen', en: 'Skip', es: 'Omitir' })}
+              className="absolute right-3 top-3 z-10 rounded-full border border-white/10 bg-white/[0.04] p-1.5 text-white/60 transition hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
 
             <div className="relative">
               <div className="mb-4 flex items-center gap-3">
