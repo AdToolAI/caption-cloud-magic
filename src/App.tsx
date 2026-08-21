@@ -107,6 +107,7 @@ const AdminAnalytics = lazy(() => import("./pages/admin/AdminAnalytics"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
 const UnifiedAnalytics = lazy(() => import("./pages/UnifiedAnalytics"));
 const Integrations = lazy(() => import("./pages/Integrations"));
+const SocialMediaSettings = lazy(() => import("./pages/SocialMediaSettings"));
 const PostHogDashboard = lazy(() => import("./pages/PostHogDashboard"));
 const PostHogEventTester = lazy(() => import("./pages/debug/PostHogEventTester"));
 const DebugLipsync = lazy(() => import("./pages/DebugLipsync"));
@@ -373,6 +374,10 @@ function AppLayout() {
            <Route path="/analytics/usage-reports" element={<UsageReports />} />
            <Route path="/analytics/platform/:platform" element={<PlatformAnalytics />} />
           <Route path="/integrations" element={<Integrations />} />
+          <Route path="/settings" element={<ProtectedRoute><SocialMediaSettings /></ProtectedRoute>} />
+          <Route path="/settings/social-media" element={<ProtectedRoute><SocialMediaSettings /></ProtectedRoute>} />
+          <Route path="/team" element={<Navigate to="/team-workspace" replace />} />
+
           <Route path="/debug/posthog" element={<PostHogEventTester />} />
           <Route path="/debug/feature-flags" element={<FeatureFlagDemo />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
