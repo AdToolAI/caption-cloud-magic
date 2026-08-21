@@ -221,7 +221,7 @@ const Legal = () => {
               <LegalSection title={tx({ de: '9. Schlussbestimmungen', en: '9. Final Provisions', es: '9. Disposiciones finales' })} icon="scale" index={8}>
                 <ul className="list-disc list-inside space-y-2">
                   <li>{tx({ de: "Es gilt deutsches Recht", en: "German law applies", es: "Se aplica la legislación alemana" })}</li>
-                  <li>Gerichtsstand: München, Deutschland</li>
+                  <li>{tx({ de: 'Gerichtsstand: München, Deutschland', en: 'Place of jurisdiction: Munich, Germany', es: 'Jurisdicción: Múnich, Alemania' })}</li>
                   <li>{tx({ de: 'Änderungen werden per E-Mail mitgeteilt', en: 'Changes will be communicated via email', es: 'Los cambios se comunicarán por correo electrónico' })}</li>
                 </ul>
               </LegalSection>
