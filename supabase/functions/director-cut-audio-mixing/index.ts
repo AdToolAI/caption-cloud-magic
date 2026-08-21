@@ -8,7 +8,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-const AUDIO_MIXING_CREDITS = 3;
 
 interface AudioTrack {
   id: string;
@@ -78,31 +77,7 @@ serve(async (req) => {
 
     console.log(`[Director-Cut-Audio-Mixing] Analyzing ${audio_tracks.length} tracks for user: ${user.id}`);
 
-    // Check user credits
-    const { data: wallet, error: walletError } = await supabaseAdmin
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single();
-
-    if (walletError || !wallet) {
-      return new Response(
-        JSON.stringify({ error: 'Could not retrieve wallet' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (wallet.balance < AUDIO_MIXING_CREDITS) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'INSUFFICIENT_CREDITS',
-          message: `Du benötigst ${AUDIO_MIXING_CREDITS} Credits für Audio-Mixing-Analyse. Aktuell: ${wallet.balance} Credits.`,
-          required: AUDIO_MIXING_CREDITS,
-          available: wallet.balance,
-        }),
-        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // v428: audio-mixing analysis is included in every plan — no wallet check, no deduction.
 
     // Use Lovable AI for mixing analysis
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -299,19 +274,10 @@ Generiere Mixing-Analyse im Format:
       };
     }
 
-    // Deduct credits
-    await supabaseAdmin
-      .from('wallets')
-      .update({ 
-        balance: wallet.balance - AUDIO_MIXING_CREDITS,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('user_id', user.id);
-
     return new Response(
       JSON.stringify({
         success: true,
-        credits_used: AUDIO_MIXING_CREDITS,
+        credits_used: 0,
         analysis: mixingAnalysis,
         track_count: audio_tracks.length,
         mixing_style,
