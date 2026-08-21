@@ -5786,6 +5786,10 @@ export const translations: Record<Language, any> = {
       viewLink: "Anzeigen",
       retrySuccess: "Event wird erneut verarbeitet",
       retryFailed: "Erneuter Versuch fehlgeschlagen",
+      logStarted: "Veröffentlichung gestartet (Versuch {attempt}/{max})",
+      logSucceeded: "Veröffentlichung auf allen Plattformen erfolgreich",
+      logPartial: "Veröffentlichung teilweise fehlgeschlagen",
+      logFailed: "Veröffentlichung fehlgeschlagen",
 
       // Quick Schedule Form
       quickSchedule: "Schnell-Planung",
