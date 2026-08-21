@@ -486,7 +486,16 @@ export async function measureProviderMotionSync(
       deltaPeak: provider.peak - preclip.peak,
       measurement_status: "measured",
       reason: "measured",
+      // V434 — reported alongside, never instead of, the frozen v404 verdict.
+      v434: {
+        roi: derivedRoi,
+        roi_applied_to_verdict: applyGeometryRoi,
+        preclip_mad: preclip.mad ?? null,
+        provider_mad: provider.mad ?? null,
+        mad_ratio: buildMadRatioTelemetry(preclip.mad ?? null, provider.mad ?? null),
+      },
     };
+
   } finally {
     clearTimeout(rootTimer);
     // Release anything still hanging on the root signal.
