@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const out = process.argv[2] ?? "/tmp/demo/silent.mp4";
+const compId = process.argv[3] ?? "main";
 
 const bundled = await bundle({
   entryPoint: path.resolve(__dirname, "../src/index.ts"),
@@ -19,7 +20,7 @@ const browser = await openBrowser("chrome", {
 
 const composition = await selectComposition({
   serveUrl: bundled,
-  id: "main",
+  id: compId,
   puppeteerInstance: browser,
 });
 

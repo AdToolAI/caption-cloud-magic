@@ -1,13 +1,16 @@
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { loadFont as loadInter } from "@remotion/google-fonts/Inter";
-import { SUBTITLES } from "../theme";
+import { SUB_TIMINGS } from "../theme";
+import { COPY, Lang } from "../copy";
 
 const inter = loadInter("normal", { weights: ["500"], subsets: ["latin"] });
 
-export const Subtitles: React.FC = () => {
+export const Subtitles: React.FC<{ lang: Lang }> = ({ lang }) => {
   const frame = useCurrentFrame();
-  const active = SUBTITLES.find((s) => frame >= s.from - 6 && frame <= s.to + 8);
+  const lines = COPY[lang].subtitles;
+  const idx = SUB_TIMINGS.findIndex((s) => frame >= s.from - 6 && frame <= s.to + 8);
+  const active = SUB_TIMINGS.find((s) => frame >= s.from - 6 && frame <= s.to + 8);
   if (!active) return null;
 
   const opacity = interpolate(
@@ -34,7 +37,7 @@ export const Subtitles: React.FC = () => {
           textShadow: "0 6px 30px rgba(0,0,0,0.95)",
         }}
       >
-        {active.text}
+        {lines[idx]}
       </div>
     </AbsoluteFill>
   );
