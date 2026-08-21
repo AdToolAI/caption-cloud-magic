@@ -21,7 +21,6 @@ import {
   deriveMadRatioThreshold,
   validateManifest,
 } from "../../supabase/functions/_shared/v434-calibration-manifest";
-import { MOTION_ROI, stillRoiForSource } from "../../supabase/functions/_shared/measure-provider-motion-sync";
 
 const root = resolve(__dirname, "../..");
 
@@ -164,7 +163,7 @@ describe("V434 Step 4 — geometry-coupled mouth ROI", () => {
     expect(d.source).toBe("geometry");
     expect(d.roi.centerY).toBeCloseTo(0.5, 6);
     // The retired fixed band sat 10 points lower — on the nose / upper lip.
-    expect(d.roi.centerY).not.toBeCloseTo(MOTION_ROI.centerY, 3);
+    expect(d.roi.centerY).not.toBeCloseTo(V434_LEGACY_ROI.centerY, 3);
     expect(d.roi.width).toBeGreaterThan(0);
     expect(d.roi.height).toBeGreaterThan(0);
   });
@@ -196,20 +195,28 @@ describe("V434 Step 4 — geometry-coupled mouth ROI", () => {
 });
 
 describe("V434 — measurement helper stays backwards compatible", () => {
-  it("stillRoiForSource defaults bit-identically to the frozen v404 ROI", () => {
-    const withDefault = stillRoiForSource(720, 720, 1280, 720);
-    const withExplicit = stillRoiForSource(720, 720, 1280, 720, MOTION_ROI);
-    expect(withDefault).toEqual(withExplicit);
+  // The Deno edge module cannot be imported into vitest (npm: specifiers), so
+  // the invariant is guarded at source level: the ROI parameter must DEFAULT to
+  // the frozen v404 band, and the geometry ROI must not drive the verdict
+  // unless explicitly opted in.
+  const src = readFileSync(
+    resolve(root, "supabase/functions/_shared/measure-provider-motion-sync.ts"),
+    "utf8",
+  );
+
+  it("stillRoiForSource defaults to the frozen v404 ROI", () => {
+    expect(src).toContain("roi: MouthRoiNormalized = MOTION_ROI");
+    expect(src).toContain("export const MOTION_ROI = { centerX: 0.5, centerY: 0.6, width: 0.28, height: 0.12 }");
   });
 
-  it("an override actually moves the measured band", () => {
-    const moved = stillRoiForSource(720, 720, 1280, 720, {
-      centerX: 0.5,
-      centerY: 0.5,
-      width: 0.28,
-      height: 0.12,
-    });
-    expect(moved.by).not.toBe(stillRoiForSource(720, 720, 1280, 720).by);
+  it("the geometry ROI is opt-in only and never silently authoritative", () => {
+    expect(src).toContain("args.useGeometryRoiForVerdict === true");
+    expect(src).toContain("const verdictRoi: MouthRoiNormalized = applyGeometryRoi ? derivedRoi.roi : MOTION_ROI");
+  });
+
+  it("the MAD telemetry reuses the already decoded stills (no extra Lambda invokes)", () => {
+    expect(src).toContain("computeMadSummary(decoded, madRoi)");
+    expect(src.match(/renderStill\(url, duration, f, budget\(\)\)/g) ?? []).toHaveLength(1);
   });
 });
 
