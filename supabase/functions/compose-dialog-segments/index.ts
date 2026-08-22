@@ -5581,9 +5581,24 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       sanitizeMeasureSource(sourceClipUrl) ?? "unknown-plate",
       `hydration=${plateHydrationSource ?? "unknown"}`,
     ].join("#");
+    const v450NoopEscalation = body?.noop_auto_escalation === true;
     if (usePassPreclip && v445FinalBoxSig) {
       const cachedSig = faceBoxSignature((pass as any).preclip_from_bbox ?? null);
-      if (cachedSig !== v445FinalBoxSig) {
+      const decision = decideCachedPreclipDrop({
+        hasCachedPreclip: true,
+        cachedBoxSig: cachedSig,
+        finalBoxSig: v445FinalBoxSig,
+        noopAutoEscalation: v450NoopEscalation,
+      });
+      if (decision.tag === "v450_noop_retry_geometry_drift_ignored") {
+        // V450 §1 — the frozen wire snapshot is the authority on a NOOP retry.
+        // preclip_url / preclip_crop / audio / bbox / run identity stay as-is;
+        // the drift is telemetry only.
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v450_noop_retry_geometry_drift_ignored ` +
+            `cached_bbox=${cachedSig ?? "none"} final_bbox=${v445FinalBoxSig} → frozen wire preserved`,
+        );
+      } else if (decision.drop) {
         console.warn(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v445_cached_crop_geometry_mismatch ` +
             `cached_bbox=${cachedSig ?? "none"} final_bbox=${v445FinalBoxSig} → recompute crop from final plate measurement`,
@@ -5594,6 +5609,37 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         (pass as any).preclip_crop = null;
       }
     }
+
+    // ── V450 §2 — proof-bound recovery of a lost frozen preclip ───────────
+    // Only when run_id + plate_generation + pass index all match the immutable
+    // V434 pin AND the original crop geometry is reconstructible. A bare MP4
+    // URL without its crop is never enough — the v204 gate then stays
+    // fail-closed (including the idempotent refund path).
+    if (!usePassPreclip && v450NoopEscalation) {
+      const recovery = recoverFrozenPreclip({
+        noopAutoEscalation: true,
+        sceneId,
+        runId: (scene as any)?.active_run_id ?? null,
+        generation: Number((scene as any)?.plate_generation ?? Number.NaN),
+        passIdx: currentPassIdx,
+        pin: (pass as any)._v434_preclip_pin ?? null,
+        frozenCrop: (pass as any).preclip_crop ?? (pass as any)._v450_frozen_preclip_crop ?? null,
+      });
+      if (recovery.ok) {
+        passPreclipUrl = recovery.url;
+        usePassPreclip = true;
+        (pass as any).preclip_url = recovery.url;
+        (pass as any).preclip_crop = recovery.crop;
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v450_frozen_preclip_recovered source=${recovery.source}`,
+        );
+      } else {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v450_frozen_preclip_recovery_declined reason=${recovery.reason}`,
+        );
+      }
+    }
+
 
 
     const v161PreclipEligible =
