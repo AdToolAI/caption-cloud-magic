@@ -43,6 +43,9 @@ const COMPOSE = read("../compose-dialog-segments/index.ts");
 const REPORT = read("../report-lipsync-motion-probe/index.ts");
 const REPORT_CODE = code(REPORT);
 const CLIENT_HOOK = Deno.readTextFileSync("src/hooks/useMouthYavgProbe.ts");
+// v441 — Write-Contract-Guard-Quellen.
+const SPEAKER_CARDINALITY_SRC = code(read("./fa4-speaker-cardinality.ts"));
+const LOCK_PHASE_SRC = code(read("./fa4-lock-phase-orchestration.ts"));
 
 const withMean = (preclipMean: number, deltaMean: number) => ({
   preclip: { mean: preclipMean, peak: 500 },
