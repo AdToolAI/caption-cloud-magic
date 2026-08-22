@@ -158,8 +158,11 @@ async function userIdForProject(supabase: any, projectId: string): Promise<strin
 /**
  * Poll Sync.so for a single job_id and forward terminal status to our own
  * sync-so-webhook so the existing v25 fan-out branch handles re-host, pass
- * advance, and compositor dispatch. Returns true when the job had a terminal
- * status (regardless of success/failure).
+ * advance, and compositor dispatch. `terminal` says the provider was done;
+ * v441 additionally reports whether the webhook actually APPLIED the result
+ * (`applied`) or rejected it (`applyReason`, e.g. `write_id_mismatch`). A
+ * forward that is not applied is NOT progress and must not suppress the
+ * watchdog's own escalation.
  */
 async function pollAndForward(opts: {
   syncApiKey: string;
@@ -168,7 +171,7 @@ async function pollAndForward(opts: {
   supabaseUrl: string;
   serviceKey: string;
   pipelineJobId: string | null;
-}): Promise<{ terminal: boolean; status?: string }> {
+}): Promise<{ terminal: boolean; status?: string; applied?: boolean; applyReason?: string | null }> {
   const { syncApiKey, jobId, sceneId, supabaseUrl, serviceKey, pipelineJobId } = opts;
   try {
     const r = await fetch(`${SYNC_API_BASE}/generate/${jobId}`, {
@@ -205,8 +208,10 @@ async function pollAndForward(opts: {
       `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}` +
       `&pipeline_job_id=${encodeURIComponent(pipelineJobId)}` +
       (sharedSecret ? `&token=${encodeURIComponent(sharedSecret)}` : "");
+    let applied: boolean | undefined = undefined;
+    let applyReason: string | null = null;
     try {
-      await fetch(webhookUrl, {
+      const wr = await fetch(webhookUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -214,11 +219,19 @@ async function pollAndForward(opts: {
         },
         body: JSON.stringify(body),
       });
+      // v441 — der Webhook meldet `applied` + `reason` (settleVerdict). Nur ein
+      // angewandter Callback ist echter Fortschritt.
+      const wb: any = await wr.json().catch(() => ({}));
+      if (typeof wb?.applied === "boolean") applied = wb.applied;
+      applyReason = (wb?.reason as string | null) ?? (wb?.skipped as string | null) ?? null;
     } catch (e) {
       console.warn(`[lipsync-watchdog] forward webhook crash: ${(e as Error).message}`);
     }
-    console.log(`[lipsync-watchdog] polled job=${jobId} status=${status} → forwarded to webhook scene=${sceneId}`);
-    return { terminal: true, status };
+    console.log(
+      `[lipsync-watchdog] polled job=${jobId} status=${status} → forwarded to webhook scene=${sceneId} ` +
+        `applied=${applied ?? "?"} reason=${applyReason ?? "-"}`,
+    );
+    return { terminal: true, status, applied, applyReason };
   } catch (e) {
     console.warn(`[lipsync-watchdog] poll crash job=${jobId}: ${(e as Error).message}`);
     return { terminal: false };
@@ -279,6 +292,9 @@ serve(async (req) => {
   const now = Date.now();
   const failed: Array<{ scene_id: string; reason: string }> = [];
   const polled: Array<{ scene_id: string; job_id: string; status: string }> = [];
+  // v441 — nur Callbacks, die der Webhook tatsächlich angewandt hat, gelten als
+  // Fortschritt und dürfen die Provider-Timeout-Eskalation unterdrücken.
+  const progressed: Array<{ scene_id: string; job_id: string }> = [];
   const advanced: Array<{ scene_id: string; pass_idx: number }> = [];
 
   for (const d of (rows ?? []) as SceneRow[]) {
@@ -420,6 +436,11 @@ serve(async (req) => {
     }
 
     // ── (1) v25 Polling fallback: forward terminal Sync.so jobs we missed ──
+    // v441 — Apply-Rejection-Guard: ein Provider-COMPLETED, das der Webhook
+    // wiederholt NICHT anwenden kann (z. B. `write_id_mismatch`), ist kein
+    // Fortschritt. Ohne diesen Guard re-forwardet der Watchdog denselben
+    // abgelehnten Callback im Minutentakt endlos weiter.
+    let applyRejectedStuck = false;
     if (isV5Fanout && syncApiKey) {
       const renderingPasses = (ds.passes as any[])
         .map((p, i) => ({ p, i }))
@@ -431,7 +452,18 @@ serve(async (req) => {
         });
         if (r.terminal) {
           polled.push({ scene_id: d.id, job_id: p.job_id, status: r.status ?? "?" });
-          await releaseInflightSyncJob(supabase, p.job_id);
+          if (r.applied === false) {
+            const startedMs = typeof p?.started_at === "string" ? Date.parse(p.started_at) : NaN;
+            const passAge = Number.isFinite(startedMs) ? now - startedMs : Infinity;
+            console.warn(
+              `[lipsync-watchdog] v441 apply_rejected scene=${d.id} pass=${i} job=${p.job_id} ` +
+                `reason=${r.applyReason ?? "-"} age=${Math.round(passAge / 1000)}s`,
+            );
+            if (passAge > STALE_PROVIDER_MS) applyRejectedStuck = true;
+          } else {
+            progressed.push({ scene_id: d.id, job_id: p.job_id });
+            await releaseInflightSyncJob(supabase, p.job_id);
+          }
         }
         void i;
       }
@@ -591,7 +623,12 @@ serve(async (req) => {
       d.replicate_prediction_id.length > 0;
 
     let reason: string | null = null;
-    if (ageMs > STALE_HARD_MS) {
+    if (applyRejectedStuck) {
+      // v441 — Pass-Level-Cap: Provider fertig, Webhook lehnt den Write seit
+      // >10 min wiederholt ab. Kein Re-Forward mehr, sondern kontrollierte
+      // Terminalisierung inkl. Refund/Cleanup über failLipSync.
+      reason = "watchdog_apply_rejected_stuck";
+    } else if (ageMs > STALE_HARD_MS) {
       reason = "watchdog_hard_timeout";
     } else if (d.twoshot_stage === "circuit_open" && ageMs > STALE_PROVIDER_MS) {
       reason = "syncso_provider_unknown_no_code_after_retries";
@@ -623,7 +660,8 @@ serve(async (req) => {
               return Number.isFinite(sa) ? (now - sa) : Infinity;
             }),
           );
-      const polledThisTick = polled.some((p) => p.scene_id === d.id);
+      // v441 — nur ANGEWANDTE Callbacks unterdrücken die Eskalation.
+      const polledThisTick = progressed.some((p) => p.scene_id === d.id);
       if (renderingPasses.length === 0) {
         // Kein lebender Pass mehr — alter Pfad ist okay, aber wir geben uns
         // dem v5-Fanout-Branch (unten) den Vortritt, der den dispatch_log
@@ -689,7 +727,8 @@ serve(async (req) => {
                 syncApiKey, jobId: String(p.job_id), sceneId: d.id, supabaseUrl, serviceKey,
                 pipelineJobId: (p?.pipeline_job_id as string | null) ?? null,
               });
-              if (r.terminal && r.status === "COMPLETED") {
+              // v441 — ein abgelehnter Apply ist keine Rettung.
+              if (r.terminal && r.status === "COMPLETED" && r.applied !== false) {
                 liveCompletedRecovered = true;
                 polled.push({ scene_id: d.id, job_id: String(p.job_id), status: "COMPLETED" });
                 await releaseInflightSyncJob(supabase, String(p.job_id)).catch(() => {});

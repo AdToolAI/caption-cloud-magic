@@ -43,6 +43,9 @@ const COMPOSE = read("../compose-dialog-segments/index.ts");
 const REPORT = read("../report-lipsync-motion-probe/index.ts");
 const REPORT_CODE = code(REPORT);
 const CLIENT_HOOK = Deno.readTextFileSync("src/hooks/useMouthYavgProbe.ts");
+// v441 — Write-Contract-Guard-Quellen.
+const SPEAKER_CARDINALITY_SRC = code(read("./fa4-speaker-cardinality.ts"));
+const LOCK_PHASE_SRC = code(read("./fa4-lock-phase-orchestration.ts"));
 
 const withMean = (preclipMean: number, deltaMean: number) => ({
   preclip: { mean: preclipMean, peak: 500 },
@@ -69,14 +72,39 @@ Deno.test("C. noop verdict escalates once with exactly one replacement_job_id", 
   assertEquals(dispatches.length, 1);
 });
 
-// ── D. COMPLETED + indeterminate → ssw:failed, no mux, no retry ───────────
-Deno.test("D. indeterminate maps to ssw:failed with motion_probe_indeterminate", () => {
+// ── D. COMPLETED + indeterminate → ssw:noop_fail, no mux, no retry ────────
+// v441: `ssw:failed` ist im RPC ausschließlich für echte Provider-Fehler
+// (FAILED/REJECTED/CANCELED) zugelassen. Ein COMPLETED-Provider ohne
+// verwertbaren Output MUSS über `ssw:noop_fail` terminalisieren.
+Deno.test("D. indeterminate maps to ssw:noop_fail with motion_probe_indeterminate", () => {
   const r = classifyMotionProbe(withMean(100, (MOTION_THRESHOLD + NOOP_THRESHOLD) / 2));
   assertEquals(r.verdict, "indeterminate");
   assertStringIncludes(WEBHOOK, 'errorText: "motion_probe_indeterminate"');
   const idx = WEBHOOK.indexOf('errorText: "motion_probe_indeterminate"');
   const around = WEBHOOK.slice(Math.max(0, idx - 800), idx + 400);
-  assertStringIncludes(around, 'writeId: "ssw:failed"');
+  assertStringIncludes(around, 'writeId: "ssw:noop_fail"');
+});
+
+// ── D2. v441 permanenter Guard — kein `ssw:failed` mit COMPLETED ──────────
+Deno.test("D2. no caller emits ssw:failed together with providerStatus COMPLETED", () => {
+  const blocks = WEBHOOK_CODE.match(/writeId:[\s\S]{0,240}?providerStatus:\s*"[A-Z]+"/g) ?? [];
+  for (const b of blocks) {
+    if (/writeId:\s*"ssw:failed"/.test(b)) {
+      assert(
+        !/providerStatus:\s*"COMPLETED"/.test(b),
+        `ssw:failed must never be applied with providerStatus COMPLETED:\n${b}`,
+      );
+    }
+  }
+  // Die fail-closed-Zweige dürfen ebenfalls kein `ssw:failed` liefern.
+  assert(
+    !/writeId:\s*"ssw:failed"/.test(SPEAKER_CARDINALITY_SRC),
+    "fa4-speaker-cardinality must not emit ssw:failed (COMPLETED + null output)",
+  );
+  assert(
+    !/writeId:\s*"ssw:failed"/.test(LOCK_PHASE_SRC),
+    "fa4-lock-phase-orchestration must not emit ssw:failed (COMPLETED + null output)",
+  );
 });
 
 // ── E. Browser absent — server gate is self-sufficient ────────────────────

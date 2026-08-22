@@ -122,7 +122,7 @@ Deno.test("H — unknown: multi-pass state without valid speaker_idx fails close
     const d = decideCompletedSpeakerBranch(c);
     assertEquals(d.branch, "fail_closed");
     assertEquals(d.runMotionMeasurement, false);
-    assertEquals((d as { writeId: string }).writeId, "ssw:failed");
+    assertEquals((d as { writeId: string }).writeId, "ssw:noop_fail");
     assertEquals(
       (d as { errorText: string }).errorText,
       SPEAKER_CARDINALITY_INDETERMINATE_ERROR,
@@ -162,7 +162,7 @@ Deno.test("J — totalPasses=4 with only pass0 observed → unknown, fail closed
   assertFalse(shouldRunMultiSpeakerMotionMeasurement(c));
   const d = decideCompletedSpeakerBranch(c);
   assertEquals(d.branch, "fail_closed");
-  assertEquals((d as { writeId: string }).writeId, "ssw:failed");
+  assertEquals((d as { writeId: string }).writeId, "ssw:noop_fail");
   assertEquals(
     (d as { errorText: string }).errorText,
     SPEAKER_CARDINALITY_INDETERMINATE_ERROR,

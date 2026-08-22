@@ -33,7 +33,7 @@ Deno.test("F: fresh state still incomplete => fail_closed speaker_cardinality_in
   const d = decideUnderLockIoAction({ fresh, preLockDeferred: true, hasMeasurement: false });
   assertEquals(d.action, "fail_closed");
   if (d.action === "fail_closed") {
-    assertEquals(d.writeId, "ssw:failed");
+    assertEquals(d.writeId, "ssw:noop_fail");
     assertEquals(d.errorText, "speaker_cardinality_indeterminate");
   }
 });

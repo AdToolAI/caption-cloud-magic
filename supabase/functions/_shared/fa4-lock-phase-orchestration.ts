@@ -46,7 +46,9 @@ export function isFa4OutOfLockIoRequired(e: unknown): e is Fa4OutOfLockIoRequire
  * neu erwerben — KEIN Apply, KEIN Mux, KEIN Retry in dieser Phase.
  */
 export type UnderLockIoDecision =
-  | { action: "fail_closed"; writeId: "ssw:failed"; errorText: string; reason: string }
+  // v441 — COMPLETED + kein Output ⇒ `ssw:noop_fail` (die RPC-Matrix
+  // akzeptiert `ssw:failed` nur für echte Provider-Fehler).
+  | { action: "fail_closed"; writeId: "ssw:noop_fail"; errorText: string; reason: string }
   | { action: "single"; reason: string }
   | { action: "multi_apply"; reason: string }
   | { action: "needs_catch_up_measurement"; reason: string };
