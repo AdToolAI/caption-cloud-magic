@@ -894,7 +894,15 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
                 top={top}
                 size={size}
                 holdToEnd={!!shot.holdToEnd}
+                path={crop.path ?? null}
+                scaleX={scaleX}
+                scaleY={scaleY}
+                fps={fps}
+                pathOffsetSec={
+                  shot.sourceTiming === 'relative' ? Number(shot.sourceStartSec ?? 0) : 0
+                }
               />
+
             </Sequence>
           );
         }
