@@ -101,6 +101,13 @@ import { withDialogLock } from "../_shared/dialog-lock.ts";
 // bbox-url-pro pipeline (1..N speakers). v187 makes this fail-closed for
 // multi-speaker: no full-plate fallback after a preclip timeout/failure.
 import { renderPassFacePreclip } from "../_shared/pass-face-preclip.ts";
+import { classifySplitScreenLayout } from "../_shared/split-screen-layout.ts";
+import {
+  buildDispatchFaceBox,
+  faceBoxSignature,
+  sanitizeMeasureSource,
+} from "../_shared/plate-face-dispatch-box.ts";
+
 import { assertSafeDispatchEntry } from "../_shared/dialogPassTransition.ts";
 import { verifyFaceBeforeDispatch } from "../_shared/syncso-face-gate.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
