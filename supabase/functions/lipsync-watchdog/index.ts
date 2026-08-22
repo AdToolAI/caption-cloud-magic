@@ -208,8 +208,10 @@ async function pollAndForward(opts: {
       `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}` +
       `&pipeline_job_id=${encodeURIComponent(pipelineJobId)}` +
       (sharedSecret ? `&token=${encodeURIComponent(sharedSecret)}` : "");
+    let applied: boolean | undefined = undefined;
+    let applyReason: string | null = null;
     try {
-      await fetch(webhookUrl, {
+      const wr = await fetch(webhookUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -217,11 +219,19 @@ async function pollAndForward(opts: {
         },
         body: JSON.stringify(body),
       });
+      // v441 — der Webhook meldet `applied` + `reason` (settleVerdict). Nur ein
+      // angewandter Callback ist echter Fortschritt.
+      const wb: any = await wr.json().catch(() => ({}));
+      if (typeof wb?.applied === "boolean") applied = wb.applied;
+      applyReason = (wb?.reason as string | null) ?? (wb?.skipped as string | null) ?? null;
     } catch (e) {
       console.warn(`[lipsync-watchdog] forward webhook crash: ${(e as Error).message}`);
     }
-    console.log(`[lipsync-watchdog] polled job=${jobId} status=${status} → forwarded to webhook scene=${sceneId}`);
-    return { terminal: true, status };
+    console.log(
+      `[lipsync-watchdog] polled job=${jobId} status=${status} → forwarded to webhook scene=${sceneId} ` +
+        `applied=${applied ?? "?"} reason=${applyReason ?? "-"}`,
+    );
+    return { terminal: true, status, applied, applyReason };
   } catch (e) {
     console.warn(`[lipsync-watchdog] poll crash job=${jobId}: ${(e as Error).message}`);
     return { terminal: false };
