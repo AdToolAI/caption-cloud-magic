@@ -666,12 +666,19 @@ serve(async (req) => {
         });
       } catch (e) {
         clearTimeout(timeoutId);
-        console.warn(`[compose-scene-anchor] nano_banana ${(e as any)?.name === "AbortError" ? "timeout" : "network"} sceneId=${body.sceneId}`);
+        const kind = (e as any)?.name === "AbortError" ? "timeout" : "network";
+        lastFailureReason = `nano_banana_2_${kind}`;
+        console.warn(`[compose-scene-anchor] nano_banana ${kind} sceneId=${body.sceneId}`);
         return null;
       }
       clearTimeout(timeoutId);
       if (!aiResp.ok) {
-        console.error("[compose-scene-anchor] nano_banana error", aiResp.status, (await aiResp.text()).slice(0, 300));
+        const txt = (await aiResp.text()).slice(0, 300);
+        lastFailureReason = `nano_banana_2_provider_${aiResp.status}`;
+        if (/crawl|fetch content from the provided URL/i.test(txt)) {
+          lastFailureReason = "nano_banana_2_url_fetch_failed";
+        }
+        console.error("[compose-scene-anchor] nano_banana error", aiResp.status, txt);
         return null;
       }
       const aiJson = await aiResp.json();
