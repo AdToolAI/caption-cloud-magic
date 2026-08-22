@@ -2387,6 +2387,17 @@ serve(async (req) => {
           }
 
 
+          // V442 — truthful anchor failure classification. The v440 gate below
+          // used to blame "no portraits resolved" for every dead pointer, even
+          // when 4 valid portraits went into a composition that the image model
+          // failed to produce (S11, 2026-08-22). We record what actually
+          // happened here and let the gate pick the honest message.
+          const anchorAttempt: {
+            portraitCount: number;
+            attempted: boolean;
+            reason: string | null;
+          } = { portraitCount: 0, attempted: false, reason: null };
+
           // ── Server-side multi-cast anchor safety net ────────────────────
           // ALWAYS audit when 2+ cast members, even if a /scene-anchors/ image
           // is already pinned — a previously composed anchor can still contain
