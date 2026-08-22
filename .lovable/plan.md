@@ -1,56 +1,43 @@
-# V435 — Immutable Calibration Bootstrap + Samuel Cross-Test
+# V435 Phase 2 — Samuel A/B/C/D Cross-Test (startet nach deinem GO)
 
-Ziel: den Samuel-T2-No-op erstmals auf Bytes untersuchen, die sich nicht selbst überschreiben. Kein Umbau der Vier-Sprecher-Pipeline, kein Gate-Switch, keine neue autoritative Kalibrierung.
+Verstanden: Der Reset wird von dir als Owner manuell ausgelöst, genau einmal, ohne weitere Änderungen an der Szene und ohne zweiten Retry. Ich fasse die Szene bis zu deinem GO nicht an.
 
-Ausgangslage (verifiziert): V434-Module liegen unter `supabase/functions/_shared/v434-*.ts` und sind in `sync-so-webhook` + `compose-dialog-segments` verdrahtet; `scripts/calibration/v434/manifest.json` enthält ausschließlich sechs `legacy_non_reproducible` S11-Samples; der Lip-Sync-Freeze (`.lovable/LIPSYNC-FEATURE-FREEZE.md`) erlaubt reine Telemetrie und Infrastruktur außerhalb der Kette, keine Gate-/Threshold-/Payload-Änderungen.
+Stand jetzt: `v434_artifact_pins` enthält weiterhin **0 Zeilen** — der Lauf hat also noch keine Evidenz erzeugt. Die Instrumentierung (Preclip-Pin + Provider-Output-Pin inkl. `attempt`/`purpose`) ist deployt und schreibt die Zeilen automatisch, sobald der Lauf durchläuft.
 
-## Phase 1 — Kontrollierter Referenzlauf (erzeugt die ersten echten Pins)
+## Was nach GO passiert
 
-1. Vorflug-Check: bestätigen, dass `v434_artifact_pins` leer ist und die deployte Version der beiden Functions den Pin-Pfad enthält. Wenn nicht: stoppen und melden, nicht "reparieren".
-2. Eine isolierte Dialogszene mit dem Samuel-T2-/T6-Setup neu starten (frische `run_id`, neue `generation`) — über den normalen Produktionsweg, ohne Sonderpfad, damit der Lauf repräsentativ bleibt.
-3. Nach dem Lauf prüfen: für jeden Turn existiert je ein Pin für Preclip und Provider-Output mit `run_id`/`generation`/`pass_idx`/`attempt` und sha256. Fehlende Pins = Phase-1-Fail; Phase 2 startet dann nicht.
-4. Alle Pins der Szene als Referenzsatz protokollieren (Keys + sha256), damit spätere Messungen exakt dieselben Bytes ziehen.
+**1. Phase-1-Abnahme (read-only)**
+- Pins der neuen `run_id`/`generation` auslesen und prüfen: pro Pass genau ein `preclip` und ein `provider-output`, mit immutabler Objekt-Key, `sha256`, `byte_size`, `attempt`.
+- Samuel T2 (Pass 2) und T6 (Pass 3) über die characterId `483f9cdc…` und den gelockten Slot 1 erneut strukturell zuordnen — kein Namens-Matching.
+- Jede gepinnte Datei erneut laden und den Hash gegenprüfen. Jede Abweichung führt zur Verweigerung dieser Zelle, nicht zu einer Messung.
+- Fehlt eine Pin-Sorte, endet der Gate hier mit BLOCKED statt mit einem Ersatzweg über mutable Artefakte.
 
-Abbruchbedingung: Wenn der Referenzlauf selbst fehlschlägt (Provider-Fehler, Reset, Refund), wird das dokumentiert und Phase 2 verschoben — es wird nicht auf alte mutable Artefakte ausgewichen.
+**2. A/B/C/D-Matrix auf exakt diesen Pins**
 
-## Phase 2 — A/B/C/D-Matrix auf exakt diesen Pins
+| Zelle | Video-Input | Audio-Input |
+|---|---|---|
+| A | Samuel T2 Preclip-Pin | T2-Audio (Baseline-Reproduktion) |
+| B | Samuel T2 Preclip-Pin | Audio des erfolgreichen Samuel-Turns (T6) |
+| C | Preclip-Pin des erfolgreichen Turns (T6) | T2-Audio |
+| D | Samuel T2 Preclip-Pin | T2-Audio, zweiter Provider-Versuch |
 
-Offline-Harness (Script, keine Änderung an der Produktionskette). Er lädt ausschließlich gepinnte Bytes, verifiziert vor jeder Messung den sha256 und verweigert die Zelle bei Mismatch.
+Pro Zelle festgehalten: Input-/Output-Keys mit Hash, tatsächlich verwendete geometrie-gekoppelte Mund-ROI, MAD-Ratio, Alt-Metrik ΔMean (nur Telemetrie), Provider-Job-/Attempt-ID, Mundstreifen-Kontaktbogen, menschliches Label. Alle Cross-Test-Ausgaben werden mit `purpose='calibration'` und gesetzter `cell` gepinnt, damit sie nie mit Produktionsevidenz verwechselt werden.
 
-| Zelle | Variation |
-|---|---|
-| A | Referenzlauf T2 unverändert (Baseline-Wiederholung) |
-| B | T2-Audio gegen einen bekannt funktionierenden Turn getauscht |
-| C | T2-Audio auf dem Preclip/Face-Window eines funktionierenden Turns |
-| D | T2 identisch zu A, zweiter Provider-Attempt (Sporadik-Test) |
+**3. Auswertung nach vordeklarierten Regeln** (bereits im Harness verankert, wird nicht nachträglich angepasst)
+- A ≠ D → PROVIDER-SPORADIC, hat Vorrang vor allen Input-Schlüssen.
+- A+B no-op, C Bewegung → PRECLIP / Face-Window.
+- A+C no-op, B Bewegung → AUDIO/TURN.
+- Alles andere oder ein unklares Label → UNDECIDED.
 
-Pro Zelle erfasst: geometry-coupled Mouth-ROI, MAD-Ratio, alter ΔMean-Wert, menschliches Label aus einem Mouth-Strip-Contact-Sheet.
+**4. Kalibrierung bleibt nicht-autoritativ**
+Neue Samples werden als reproduzierbar erfasst, aber es wird kein Schwellwert abgeleitet und kein Produktions-Gate umgestellt, solange nicht mindestens drei saubere Samples pro Klasse über mehrere Sprecher, Cropgrößen und Turn-Längen vorliegen. MAD-Ratio bleibt `telemetry_only`.
 
-Auswertungsregeln (vorab festgelegt, damit das Ergebnis nicht nachträglich interpretiert wird):
+## Grenzen dieses Gates
 
-- A und B no-op, C motion → Preclip/Face-Window ist der Auslöser.
-- A und C no-op, B motion → T2-Audio bzw. Turn-Conditioning ist der Auslöser.
-- A ≠ D → Sync.so verhält sich sporadisch; Folgearbeit ist eine qualitätsgesteuerte Retry-Policy.
-- Alle vier durch MAD-Ratio sauber getrennt → starke Evidenz für die scale-free Metrik als künftigen Outcome-Gate-Kandidaten (noch keine Umstellung).
+Keine Änderung an Gate-Logik, Schwellwerten, Provider-Auswahl, Retry-Stufen, Dispatch, Mux, State-Machine oder Continuity. Kein Frontend-Publish. Die einzigen Aufrufe an den Provider sind die vier Zellen — falls dafür ein Key im Sandbox-Kontext fehlt, melde ich das offen, statt Ergebnisse zu schätzen.
 
-## Kalibrierung: sammeln, nicht abschließen
+## Ergebnis
 
-Die aus dem frischen Lauf entstehenden, menschlich gelabelten Samples werden als `reproducible` ins Manifest aufgenommen — mit Keys und sha256. Es wird **keine** Schwelle abgeleitet und keine autoritative Kalibrierung erklärt. Die Freigabekriterien für einen späteren autoritativen Gate werden im Manifest festgeschrieben: mehrere Sprecher, verschiedene Crop-Größen, verschiedene Turn-Längen, und ≥3 sauber gelabelte Samples pro Klasse als absolute Untergrenze.
-
-## Was ausdrücklich nicht passiert
-
-- Kein Umschalten des autoritativen Verdicts auf MAD-Ratio oder auf die neue ROI.
-- Keine Änderung an v404-Schwellen, Provider-Payload, Framing oder Zustandsmaschine.
-- Kein Fix des Samuel-T2-Fehlers in diesem Gate — V435 liefert die Ursache, nicht die Korrektur.
-
-## Technische Details
-
-- Neues Script `scripts/calibration/v435/cross-test.mjs`: liest Pins aus `v434_artifact_pins`, verifiziert sha256, ruft die reinen V434-Module (`v434-mad-ratio.ts`, `v434-motion-roi.ts`) auf, schreibt eine Zellen-Tabelle als JSON + Markdown.
-- Frame-Extraktion für Mouth-Strips folgt der bestehenden AWS-only-Motion-Probe-Regel; kein Replicate.
-- Manifest-Erweiterung über `scripts/calibration/v434-manifest.mjs`; Validierung bleibt die bestehende aus `v434-calibration-manifest.ts`.
-- Ergebnisbericht: `docs/v435-immutable-calibration-bootstrap.md`.
-- Tests: Harness-Einheiten (sha256-Verweigerung, Zellen-Auswertungsregeln) in `src/test/`; die zehn frozen-contract-Tests müssen unverändert grün bleiben.
-
-## Abschluss
-
-Ein Gate-Verdikt: `V435 = PASS/FAIL — <Phase-1-Pins ja/nein> + <Primärursache laut A/B/C/D oder "unentschieden">` → STOP.
+Ein Urteil in der Form:
+`V435 = PASS — PHASE-1 PINS COMPLETE + PRIMARY CAUSE <PRECLIP|AUDIO/TURN|PROVIDER-SPORADIC|UNDECIDED>, MAD-RATIO EVIDENCE <summary>, CALIBRATION STILL NON-AUTHORITATIVE`
+oder ein ehrliches BLOCKED mit Begründung.
