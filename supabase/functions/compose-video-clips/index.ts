@@ -71,6 +71,7 @@ import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 import { enforceMinFaceSize } from "../_shared/anchor-min-face-size.ts";
 import { classifySplitScreenLayout } from "../_shared/split-screen-layout.ts";
+import { probeAnchorSeams } from "../_shared/anchor-seam-probe.ts";
 import { resolveIdentityViaRekognition } from "../_shared/resolveIdentityViaRekognition.ts";
 import { buildAnchorLayoutFromV274 } from "../_shared/plateFaceSlotRouter.ts";
 
@@ -103,7 +104,7 @@ import {
 } from "../_shared/asset-ref.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { isLipSyncIntentionalPayload } from "../_shared/lipSyncIntent.ts";
-const ANCHOR_AUDIT_VERSION = 16;
+const ANCHOR_AUDIT_VERSION = 17;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1293,7 +1294,7 @@ serve(async (req) => {
           : asymBlocking
             ? asymBlocking
             : n >= 4
-              ? `all four standing in a single horizontal line facing the camera, evenly spaced with clear vertical gaps between neighbours, no overlap and no depth stacking. Each head occupies at least 18% of the frame width and is centred on a shared eye-line; every face is front- or three-quarter-facing with mouth and jaw clearly visible and unobstructed by hands, microphones or props. Identical ambient lighting across the whole line, waist-up framing captured in one continuous cinematic frame by a single locked camera in one take`
+              ? `all four together in the same physical environment as a natural ensemble captured in one continuous cinematic frame. Preserve the positions and actions described for each person. Use organic foreground, midground and background staging, varied eye-lines, natural personal distance and slight shoulder overlap so the group unmistakably shares one real 3D space. Each head occupies at least 15% of the frame width; every face is front-, three-quarter- or natural-profile-facing with mouth and jaw clearly visible and unobstructed by hands, microphones or props. Identical ambient lighting and one coherent perspective across the whole scene, waist-up framing captured by a single locked camera in one take`
               : `all standing together in the same physical room as a natural group, captured in one continuous cinematic frame by a single locked camera in one take. Wide medium group shot, ensemble composition: every person occupies real shared 3D space (overlapping depth planes, natural personal distance around shoulder-width, slight depth stagger so nobody is perfectly side-by-side). Each face stays clearly visible, front- or three-quarter-facing, mouth and jaw unobstructed by hands, microphones or props. Identical ambient lighting across the whole room`;
 
       // v173 (Jun 28 2026) — Single-speaker carve-out (revised v166): the
@@ -2776,6 +2777,7 @@ serve(async (req) => {
                         wardrobeLock: wardrobeLockNamesCS.length > 0,
                         wardrobeLockNames: wardrobeLockNamesCS,
                         framingSuffix,
+                        gridLayoutRequested: false,
                       }),
                     },
                   );
@@ -3180,14 +3182,31 @@ serve(async (req) => {
                       durationSec: 0,
                       prebuiltFrameUrls: [url],
                     });
-                    if (!det.ok || det.faces.length < 3) return null;
+                    const seam = await probeAnchorSeams(url);
+                    if (!det.ok || det.faces.length < 3) {
+                      return seam.isPanel
+                        ? {
+                            isSplitScreen: true,
+                            metrics: { seamScore: seam.score },
+                            reason: seam.reason,
+                          }
+                        : null;
+                    }
                     const boxes = det.faces.map((f) => ({
                       x: f.bbox[0],
                       y: f.bbox[1],
                       width: f.bbox[2] - f.bbox[0],
                       height: f.bbox[3] - f.bbox[1],
                     }));
-                    return classifySplitScreenLayout(boxes, 1000, 1000);
+                    const geometry = classifySplitScreenLayout(boxes, 1000, 1000);
+                    if (geometry.isSplitScreen) return geometry;
+                    return seam.isPanel
+                      ? {
+                          isSplitScreen: true,
+                          metrics: { ...geometry.metrics, seamScore: seam.score },
+                          reason: seam.reason,
+                        }
+                      : geometry;
                   };
                   try {
                     const v1 = await classifyAnchorLayout(composedUrl);
@@ -3218,7 +3237,7 @@ serve(async (req) => {
                           `[compose-video-clips] v446_anchor_panel_retry scene=${scene.id} ` +
                           `panel=${v2?.isSplitScreen ? 1 : 0} reason=${v2?.reason ?? "none"}`,
                         );
-                        if (!v2?.isSplitScreen) {
+                        if (v2 && !v2.isSplitScreen) {
                           const eRetry = await evaluate(retryUrl, "attempt-5-panel");
                           composedUrl = retryUrl;
                           faceCount = eRetry.faceCount;
