@@ -623,7 +623,12 @@ serve(async (req) => {
       d.replicate_prediction_id.length > 0;
 
     let reason: string | null = null;
-    if (ageMs > STALE_HARD_MS) {
+    if (applyRejectedStuck) {
+      // v441 — Pass-Level-Cap: Provider fertig, Webhook lehnt den Write seit
+      // >10 min wiederholt ab. Kein Re-Forward mehr, sondern kontrollierte
+      // Terminalisierung inkl. Refund/Cleanup über failLipSync.
+      reason = "watchdog_apply_rejected_stuck";
+    } else if (ageMs > STALE_HARD_MS) {
       reason = "watchdog_hard_timeout";
     } else if (d.twoshot_stage === "circuit_open" && ageMs > STALE_PROVIDER_MS) {
       reason = "syncso_provider_unknown_no_code_after_retries";
