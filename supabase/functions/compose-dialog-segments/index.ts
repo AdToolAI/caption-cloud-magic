@@ -5557,6 +5557,35 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     let passPreclipUrl: string | null = ((pass as any).preclip_url ?? null);
     let usePassPreclip: boolean = !!passPreclipUrl && !!(pass as any).preclip_crop;
 
+    // ── V445 — geometry-coherence guard for cached pre-clips ─────────────
+    // A crop measured on OTHER geometry (earlier anchor / earlier plate
+    // generation) can never satisfy the fail-closed containment gate.
+    // Drop such a cache so the crop is recomputed from the FINAL assigned
+    // plate bbox of this run. Assignment lock and run identity untouched.
+    const v445FinalDispatchBox = buildDispatchFaceBox(
+      speakerPlateBboxes?.[pass.speaker_idx] ?? null,
+      plateDims ?? null,
+    );
+    const v445FinalBoxSig = faceBoxSignature(v445FinalDispatchBox);
+    const v445MeasureSrc = [
+      sanitizeMeasureSource(sourceClipUrl) ?? "unknown-plate",
+      `hydration=${plateHydrationSource ?? "unknown"}`,
+    ].join("#");
+    if (usePassPreclip && v445FinalBoxSig) {
+      const cachedSig = faceBoxSignature((pass as any).preclip_from_bbox ?? null);
+      if (cachedSig !== v445FinalBoxSig) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v445_cached_crop_geometry_mismatch ` +
+            `cached_bbox=${cachedSig ?? "none"} final_bbox=${v445FinalBoxSig} → recompute crop from final plate measurement`,
+        );
+        usePassPreclip = false;
+        passPreclipUrl = null;
+        (pass as any).preclip_url = null;
+        (pass as any).preclip_crop = null;
+      }
+    }
+
+
     const v161PreclipEligible =
       !usePassPreclip &&
       !!tightAudioInfo &&
