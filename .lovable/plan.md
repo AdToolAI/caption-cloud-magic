@@ -76,6 +76,9 @@ Freigabe als eng begrenzte Ausnahme.
 
 - Neuer Unit-Test: NOOP-Retry mit abweichender Box-Signatur behält
   `preclip_url`/`preclip_crop`; Fresh-Dispatch verwirft sie weiterhin.
+- Neuer Unit-Test: Recovery greift nur bei vollständig bewiesenem Snapshot
+  (run_id + plate_generation + Pass + Crop); MP4-URL ohne Crop → fail-closed
+  mit `v204_preclip_required`.
 - Bestehende Deno- und Vitest-Suites müssen grün bleiben.
 - Deploy ausschließlich von `compose-dialog-segments`.
 - **Kein** Render, kein S01/S11-Rerender in diesem Gate.
