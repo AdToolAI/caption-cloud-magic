@@ -39,9 +39,13 @@ const corsHeaders = {
  * content-policy / invalid-input / NSFW / quota errors because those would
  * just fail identically a second time and waste another minute.
  */
-function isRetryableTransientError(predError: unknown): boolean {
+export function isRetryableTransientError(predError: unknown): boolean {
   const s = String(predError ?? '').toLowerCase();
   if (!s) return false;
+  // v455 — Provider-Eingabefilter (Green Net / InvalidParameter) sind für
+  // exakt diesen Payload terminal. Der Wrapper-Text enthält "prediction
+  // failed" und hat bisher denselben abgelehnten Prompt erneut eingereicht.
+  if (classifyProviderRejection(predError) !== 'none') return false;
   return (
     s.includes('read timed out') ||
     s.includes('read timeout') ||
