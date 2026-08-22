@@ -12,19 +12,34 @@ Sichern der lokalen remotion/-Dateien, den Pull sauber durchführen und anschlie
    - Kopiere den gesamten lokalen `remotion/`-Ordner an einen Ort außerhalb des Repositories, z. B. `C:\Users\dusat\Desktop\remotion-backup-<datum>`.
    - Damit ist garantiert nichts verloren, egal was danach passiert.
 
-2. **Stash wiederherstellen**
-   - Führe `git stash pop` aus, um die zuvor gesicherten Änderungen zurückzuholen.
+2. **Den lokalen Ordner aus dem Repository verschieben**
+   - `git clean -fd remotion/` hat nichts entfernt, sehr wahrscheinlich weil `remotion/` durch eine Ignore-Regel geschützt ist.
+   - Im aktuell geöffneten Ordner `C:\Users\dusat\caption-cloud-magic` exakt ausführen:
+     ```bat
+     move remotion ..\remotion-backup
+     ```
+   - Das verschiebt ihn sicher nach `C:\Users\dusat\remotion-backup`; es wird nichts gelöscht.
+   - Falls Windows meldet, dass `remotion-backup` bereits existiert, stattdessen einen neuen Namen verwenden:
+     ```bat
+     move remotion ..\remotion-backup-2
+     ```
 
-3. **Untracked remotion/-Dateien entfernen**
-   - Da ein Backup existiert, können die untracked Dateien im Repo-Ordner `remotion/` gelöscht werden.
-   - Alternativ: `git clean -fd remotion/` (löscht alle untracked Dateien/Ordner unter `remotion/`).
+3. **Pull durchführen**
+   - Danach ausführen:
+     ```bat
+     git pull origin main
+     ```
+   - Der Pull sollte nun durchlaufen, weil der störende lokale Ordner nicht mehr im Repository liegt.
 
-4. **Pull durchführen**
-   - `git pull origin main` erneut ausführen.
-   - Jetzt sollte der Merge durchlaufen, weil keine überschreibbaren untracked Dateien mehr im Weg sind.
+4. **Erst danach den Stash zurückholen**
+   - Wenn der Pull erfolgreich war:
+     ```bat
+     git stash pop
+     ```
+   - Falls dabei Konflikte gemeldet werden, nichts löschen und die Meldung prüfen.
 
 5. **Vergleichen und ggf. wiederherstellen**
-   - Nach dem Pull den neuen `remotion/`-Stand mit dem Backup vergleichen.
+   - Nach dem Pull den neuen `remotion/`-Stand mit `C:\Users\dusat\remotion-backup` vergleichen.
    - Falls die lokalen Dateien wichtige eigene Änderungen enthielten, diese manuell übertragen oder wieder einspielen.
    - Falls der Remote-Stand identisch oder besser ist, Backup verwerfen.
 
@@ -34,4 +49,4 @@ Sichern der lokalen remotion/-Dateien, den Pull sauber durchführen und anschlie
 
 ## Risiken
 - Ohne Backup besteht die Gefahr, lokal erstellte Remotion-Kompositionen, Assets oder Konfigurationen zu verlieren.
-- `git clean -fd` ist nicht rückgängig machbar; daher Schritt 1 zuerst.
+- Nicht `git clean -fdx` verwenden: Das würde auch ignorierte Dateien endgültig löschen.
