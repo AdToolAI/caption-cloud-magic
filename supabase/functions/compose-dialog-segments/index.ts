@@ -3085,12 +3085,19 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // y<=5% AND (gap<=15% OR h<=15%).
       const detectSplitScreenLayout = (): string | null => {
         if (!plateDims || !plateIdentityMap?.faces || plateIdentityMap.faces.length < 3) return null;
-        const faces = plateIdentityMap.faces as Array<{ bbox?: { x: number; y: number; width: number; height: number } }>;
+        // Plate identity faces carry bbox as [x1, y1, x2, y2] pixel tuples.
         const verdict = classifySplitScreenLayout(
-          faces.map((f) => f.bbox ?? null),
+          plateIdentityMap.faces.map((f) => {
+            const b = (f as { bbox?: unknown }).bbox;
+            if (!Array.isArray(b) || b.length !== 4) return null;
+            const [x1, y1, x2, y2] = b.map((n) => Number(n));
+            if (![x1, y1, x2, y2].every((n) => Number.isFinite(n))) return null;
+            return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
+          }),
           plateDims.width,
           plateDims.height,
         );
+
         return verdict.isSplitScreen ? verdict.reason : null;
       };
 
