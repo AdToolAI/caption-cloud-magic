@@ -20226,6 +20226,8 @@ export type Database = {
           _clip_status: string
           _clip_url: string
           _lip_sync_status: string
+          _plate_generation: number
+          _plate_ready_generation: number
           _twoshot_stage: string
         }
         Returns: Database["public"]["Enums"]["composer_scene_state"]
@@ -20233,7 +20235,10 @@ export type Database = {
       composer_substate_from_legacy: {
         Args: {
           _clip_status: string
+          _clip_url: string
           _lip_sync_status: string
+          _plate_generation: number
+          _plate_ready_generation: number
           _twoshot_stage: string
         }
         Returns: string
