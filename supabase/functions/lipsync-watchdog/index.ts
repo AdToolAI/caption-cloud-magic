@@ -158,8 +158,11 @@ async function userIdForProject(supabase: any, projectId: string): Promise<strin
 /**
  * Poll Sync.so for a single job_id and forward terminal status to our own
  * sync-so-webhook so the existing v25 fan-out branch handles re-host, pass
- * advance, and compositor dispatch. Returns true when the job had a terminal
- * status (regardless of success/failure).
+ * advance, and compositor dispatch. `terminal` says the provider was done;
+ * v441 additionally reports whether the webhook actually APPLIED the result
+ * (`applied`) or rejected it (`applyReason`, e.g. `write_id_mismatch`). A
+ * forward that is not applied is NOT progress and must not suppress the
+ * watchdog's own escalation.
  */
 async function pollAndForward(opts: {
   syncApiKey: string;
@@ -168,7 +171,7 @@ async function pollAndForward(opts: {
   supabaseUrl: string;
   serviceKey: string;
   pipelineJobId: string | null;
-}): Promise<{ terminal: boolean; status?: string }> {
+}): Promise<{ terminal: boolean; status?: string; applied?: boolean; applyReason?: string | null }> {
   const { syncApiKey, jobId, sceneId, supabaseUrl, serviceKey, pipelineJobId } = opts;
   try {
     const r = await fetch(`${SYNC_API_BASE}/generate/${jobId}`, {
