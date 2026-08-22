@@ -2710,6 +2710,8 @@ serve(async (req) => {
                   faceLock = false,
                   framingSuffix = "",
                 ): Promise<string | null> => {
+                  anchorAttempt.attempted = true;
+                  anchorAttempt.portraitCount = portraitUrls.length;
                   console.log(
                     `[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits, identityRefs=${identityPortraitUrls.length}, outfits=${outfitUrlById.size}/${outfitLookIds.length}) [${label}${strict ? ", strict" : ""}${swap ? ", swap" : ""}${faceLock ? ", face-lock" : ""}${framingSuffix ? ", framing-retry" : ""}]`,
                   );
