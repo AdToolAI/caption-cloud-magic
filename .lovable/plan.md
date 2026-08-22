@@ -1,123 +1,56 @@
-# V434 — Motion Studio: Immutable Artifacts, Rebuilt Calibration, Scale-Free Outcome Gate
+# V435 — Immutable Calibration Bootstrap + Samuel Cross-Test
 
-Follow-up to the V433 RCA. Four bounded changes plus one controlled cross-test.
-No threshold tweaking of the existing v404 scalar — the calibration it rests on
-is discarded, not re-fitted.
+Ziel: den Samuel-T2-No-op erstmals auf Bytes untersuchen, die sich nicht selbst überschreiben. Kein Umbau der Vier-Sprecher-Pipeline, kein Gate-Switch, keine neue autoritative Kalibrierung.
 
-## Scope guard
+Ausgangslage (verifiziert): V434-Module liegen unter `supabase/functions/_shared/v434-*.ts` und sind in `sync-so-webhook` + `compose-dialog-segments` verdrahtet; `scripts/calibration/v434/manifest.json` enthält ausschließlich sechs `legacy_non_reproducible` S11-Samples; der Lip-Sync-Freeze (`.lovable/LIPSYNC-FEATURE-FREEZE.md`) erlaubt reine Telemetrie und Infrastruktur außerhalb der Kette, keine Gate-/Threshold-/Payload-Änderungen.
 
-The FA-4 / lip-sync feature freeze stays in force for everything not listed
-here. Dispatch logic, provider selection, preclip cropping strategy, retry
-rungs and the mux path are not touched. This gate changes where artifacts are
-written, how the outcome is measured, and how the ROI is placed.
+## Phase 1 — Kontrollierter Referenzlauf (erzeugt die ersten echten Pins)
 
-## Step 1 — Immutable artifact paths per run and pass
+1. Vorflug-Check: bestätigen, dass `v434_artifact_pins` leer ist und die deployte Version der beiden Functions den Pin-Pfad enthält. Wenn nicht: stoppen und melden, nicht "reparieren".
+2. Eine isolierte Dialogszene mit dem Samuel-T2-/T6-Setup neu starten (frische `run_id`, neue `generation`) — über den normalen Produktionsweg, ohne Sonderpfad, damit der Lauf repräsentativ bleibt.
+3. Nach dem Lauf prüfen: für jeden Turn existiert je ein Pin für Preclip und Provider-Output mit `run_id`/`generation`/`pass_idx`/`attempt` und sha256. Fehlende Pins = Phase-1-Fail; Phase 2 startet dann nicht.
+4. Alle Pins der Szene als Referenzsatz protokollieren (Keys + sha256), damit spätere Messungen exakt dieselben Bytes ziehen.
 
-Today every provider result is written to a run-independent path
-(`composer/<uid>/<sceneId>-lipsync-pass-<N>.mp4`), so a re-run silently
-overwrites the bytes any earlier analysis referenced. That is the mechanism
-that corrupted the v404 ground truth and it will corrupt any future forensics,
-retry comparison or QA the same way.
+Abbruchbedingung: Wenn der Referenzlauf selbst fehlschlägt (Provider-Fehler, Reset, Refund), wird das dokumentiert und Phase 2 verschoben — es wird nicht auf alte mutable Artefakte ausgewichen.
 
-- Write provider outputs to a path that carries run id and plate generation, so
-  a given URL can never change content.
-- Same rule for pass preclips (they are already regenerated per run, but under
-  names that do not encode the run).
-- Record the resulting URL plus a content hash and byte size on the pass record
-  at write time, so any later measurement can prove it read the same bytes.
-- Keep a stable "latest" pointer for playback/mux so no consumer breaks; the
-  immutable URL is the analysis-grade reference.
-- Backfill is out of scope. Historical passes stay as they are and are marked
-  as non-reproducible.
+## Phase 2 — A/B/C/D-Matrix auf exakt diesen Pins
 
-## Step 2 — Rebuild the calibration from immutable samples
+Offline-Harness (Script, keine Änderung an der Produktionskette). Er lädt ausschließlich gepinnte Bytes, verifiziert vor jeder Messung den sha256 und verweigert die Zelle bei Mismatch.
 
-- Retire the frozen v404 fixture and the two thresholds derived from it. They
-  are documented as invalid, with the V433 evidence, rather than silently
-  edited.
-- Collect a fresh labelled set from runs produced after Step 1: each sample
-  pinned by run id, pass index, immutable preclip URL, immutable provider URL
-  and content hash.
-- Labels come from human review of mouth strips, not from any existing metric.
-- Target a clearly larger set than the six S11 passes and a real mix of speakers,
-  crop sizes and turn lengths — otherwise the new gate is only calibrated to one
-  scene again.
-- Store the set as a versioned fixture whose entries reference hashes, and add a
-  guard test that fails when a fixture entry's referenced bytes no longer match
-  its recorded hash.
+| Zelle | Variation |
+|---|---|
+| A | Referenzlauf T2 unverändert (Baseline-Wiederholung) |
+| B | T2-Audio gegen einen bekannt funktionierenden Turn getauscht |
+| C | T2-Audio auf dem Preclip/Face-Window eines funktionierenden Turns |
+| D | T2 identisch zu A, zweiter Provider-Attempt (Sporadik-Test) |
 
-## Step 3 — Outcome gate on a scale-free signal
+Pro Zelle erfasst: geometry-coupled Mouth-ROI, MAD-Ratio, alter ΔMean-Wert, menschliches Label aus einem Mouth-Strip-Contact-Sheet.
 
-- Candidate: ratio of the provider's mean consecutive-frame mouth-band
-  difference to the same statistic on its own preclip. On the S11 set it
-  separates cleanly (no-op 1.30 vs lowest genuine motion 1.68), and unlike the
-  current delta-of-variance it cancels re-encode gain and background energy.
-- The candidate is validated against the Step 2 set before it becomes
-  authoritative. Decision rule and thresholds are derived from that set, with
-  the derivation script and its output committed.
-- Until validation passes, the new statistic runs as telemetry alongside the old
-  verdict; the switch to authoritative is a separate, explicit change.
-- Keep the measured-vs-unmeasurable distinction: a missing or failed measurement
-  stays indeterminate and never silently reads as motion.
+Auswertungsregeln (vorab festgelegt, damit das Ergebnis nicht nachträglich interpretiert wird):
 
-## Step 4 — Couple the mouth ROI to real face geometry
+- A und B no-op, C motion → Preclip/Face-Window ist der Auslöser.
+- A und C no-op, B motion → T2-Audio bzw. Turn-Conditioning ist der Auslöser.
+- A ≠ D → Sync.so verhält sich sporadisch; Folgearbeit ist eine qualitätsgesteuerte Retry-Policy.
+- Alle vier durch MAD-Ratio sauber getrennt → starke Evidenz für die scale-free Metrik als künftigen Outcome-Gate-Kandidaten (noch keine Umstellung).
 
-- The ROI is currently a fixed fraction of the frame (`centerY 0.6`), so on the
-  S11 passes it sits on the nose/upper-lip line rather than on the aperture.
-- Derive the ROI from the geometry the preclip step already computes — the
-  mouth-centered crop helper produces a face share and a mouth offset — and
-  persist the ROI actually used on the pass record.
-- On the S11 passes those fields were written as zero with a `face_center`
-  anchor, so part of this step is establishing why the mouth anchor did not
-  apply there and making the fallback explicit and observable rather than
-  silent.
-- Re-measure the S11 set with the geometry-coupled ROI and report how the
-  separation changes; the ROI change lands together with the Step 2 fixture so
-  calibration and measurement stay consistent.
+## Kalibrierung: sammeln, nicht abschließen
 
-## Step 5 — Controlled cross-test A/B/C/D
+Die aus dem frischen Lauf entstehenden, menschlich gelabelten Samples werden als `reproducible` ins Manifest aufgenommen — mit Keys und sha256. Es wird **keine** Schwelle abgeleitet und keine autoritative Kalibrierung erklärt. Die Freigabekriterien für einen späteren autoritativen Gate werden im Manifest festgeschrieben: mehrere Sprecher, verschiedene Crop-Größen, verschiedene Turn-Längen, und ≥3 sauber gelabelte Samples pro Klasse als absolute Untergrenze.
 
-Once Steps 1 and 4 are in place, run one small matrix on the Samuel T2 case to
-answer whether the no-op is turn-specific or character-specific:
+## Was ausdrücklich nicht passiert
 
-```text
-A  Samuel T2 face + T2 audio   (reproduce the failure)
-B  Samuel T2 face + T6 audio   (audio that demonstrably worked)
-C  Samuel T6 face + T2 audio   (same audio, other preclip window)
-D  Samuel T2 face + T2 audio, second provider attempt (sporadic vs deterministic)
-```
+- Kein Umschalten des autoritativen Verdicts auf MAD-Ratio oder auf die neue ROI.
+- Keine Änderung an v404-Schwellen, Provider-Payload, Framing oder Zustandsmaschine.
+- Kein Fix des Samuel-T2-Fehlers in diesem Gate — V435 liefert die Ursache, nicht die Korrektur.
 
-Each cell writes to immutable paths and is measured with the new statistic.
-The result decides whether the follow-up is a provider-side retry policy or an
-input-conditioning fix.
+## Technische Details
 
-## Deliverables
+- Neues Script `scripts/calibration/v435/cross-test.mjs`: liest Pins aus `v434_artifact_pins`, verifiziert sha256, ruft die reinen V434-Module (`v434-mad-ratio.ts`, `v434-motion-roi.ts`) auf, schreibt eine Zellen-Tabelle als JSON + Markdown.
+- Frame-Extraktion für Mouth-Strips folgt der bestehenden AWS-only-Motion-Probe-Regel; kein Replicate.
+- Manifest-Erweiterung über `scripts/calibration/v434-manifest.mjs`; Validierung bleibt die bestehende aus `v434-calibration-manifest.ts`.
+- Ergebnisbericht: `docs/v435-immutable-calibration-bootstrap.md`.
+- Tests: Harness-Einheiten (sha256-Verweigerung, Zellen-Auswertungsregeln) in `src/test/`; die zehn frozen-contract-Tests müssen unverändert grün bleiben.
 
-- Immutable, hash-pinned artifact paths for provider outputs and pass preclips.
-- A versioned, reproducible calibration fixture plus a guard test against
-  artifact drift.
-- The new statistic measured and reported on every pass, authoritative only
-  after validation.
-- Geometry-coupled mouth ROI, persisted per pass.
-- A written cross-test result for Samuel T2.
+## Abschluss
 
-## Technical notes
-
-- Output path is built in `supabase/functions/sync-so-webhook/index.ts`
-  (`composer/${uid}/${sceneId}-lipsync-pass-${passIdx + 1}.mp4`).
-- Current ROI and measurement live in
-  `supabase/functions/_shared/measure-provider-motion-sync.ts`; the pure verdict
-  and the invalid fixture in `_shared/motion-probe-classifier.ts`.
-- Mouth geometry already exists in `_shared/compute-mouth-centered-crop.ts`
-  (`faceShareInCrop`, `mouthOffsetPx`), surfaced through
-  `_shared/pass-face-preclip.ts` and persisted in `compose-dialog-segments`.
-- Frame extraction stays AWS-only (Remotion Lambda stills), per the existing
-  motion-probe contract.
-- Evidence base: `docs/v433-motion-studio-rca.md`.
-
-## Not in this gate
-
-- Lowering or re-fitting the existing 15.4 / 3.68 thresholds.
-- Changes to provider selection, retry rungs, dispatch or mux.
-- Continuity work (`composer_continuity_queue` has no historical rows, S11
-  anchor coverage is 8/11 scenes) — tracked separately as its own gate.
+Ein Gate-Verdikt: `V435 = PASS/FAIL — <Phase-1-Pins ja/nein> + <Primärursache laut A/B/C/D oder "unentschieden">` → STOP.
