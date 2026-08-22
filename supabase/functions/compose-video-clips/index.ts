@@ -3290,7 +3290,9 @@ serve(async (req) => {
                         identityFailure,
                         notes: identityNotes || undefined,
                         min_face_check: minFaceCheck ?? undefined,
+                        panel_layout: panelVerdictMeta ?? undefined,
                         at: new Date().toISOString(),
+
                       },
                       // v131.6 — forensic trail per compose attempt.
                       anchor_attempts:
