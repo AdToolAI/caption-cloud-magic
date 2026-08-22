@@ -1642,6 +1642,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       return await settleVerdict(successRes, {
         rehosted: !!rehostedUrl,
         noop_suspect: noopSuspect || undefined,
+        motion_unverified: v443MotionUnverifiedPassthrough || undefined,
       });
 
     } else {
