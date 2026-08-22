@@ -292,6 +292,9 @@ serve(async (req) => {
   const now = Date.now();
   const failed: Array<{ scene_id: string; reason: string }> = [];
   const polled: Array<{ scene_id: string; job_id: string; status: string }> = [];
+  // v441 — nur Callbacks, die der Webhook tatsächlich angewandt hat, gelten als
+  // Fortschritt und dürfen die Provider-Timeout-Eskalation unterdrücken.
+  const progressed: Array<{ scene_id: string; job_id: string }> = [];
   const advanced: Array<{ scene_id: string; pass_idx: number }> = [];
 
   for (const d of (rows ?? []) as SceneRow[]) {
