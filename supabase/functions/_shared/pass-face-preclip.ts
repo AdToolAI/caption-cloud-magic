@@ -89,7 +89,15 @@ export interface PassPreclipInput {
    * `bbox_measure_src` and prove both share one measurement.
    */
   bboxMeasureSrc?: string | null;
+  /**
+   * V447 — Run-Identität des laufenden Durchgangs. Ohne beide Felder wird
+   * KEIN fertiger Preclip wiederverwendet (fail-closed): ein Artefakt aus
+   * einem früheren Lauf darf einen neuen Lauf nie betreten.
+   */
+  runId?: string | null;
+  plateGeneration?: number | null;
 }
+
 
 
 export interface PassPreclipResult {
@@ -143,6 +151,33 @@ function evenDimension(value: number, fallback: number): number {
   const safe = Number.isFinite(n) && n >= 64 ? Math.round(n) : fallback;
   return safe % 2 === 0 ? safe : safe - 1;
 }
+
+/**
+ * V447 — vollständige Artefakt-Signatur eines Preclips. `null` bedeutet:
+ * keine Run-Identität vorhanden ⇒ kein Reuse, kein Signatur-Stempel.
+ */
+export function buildPreclipSignature(args: {
+  runId: string | null;
+  generation: number | null;
+  plateKey: string;
+  crop: { x: number; y: number; size: number; outputSize: number };
+  bbox: [number, number, number, number] | null;
+  startSec: number;
+  endSec: number;
+}): string | null {
+  if (!args.runId || args.generation === null || !Number.isFinite(args.generation)) return null;
+  if (!args.plateKey) return null;
+  const bboxSig = args.bbox ? args.bbox.map((n) => Math.round(n)).join(",") : "nobbox";
+  return [
+    `r=${args.runId}`,
+    `g=${args.generation}`,
+    `p=${args.plateKey}`,
+    `c=${args.crop.x},${args.crop.y},${args.crop.size},${args.crop.outputSize}`,
+    `b=${bboxSig}`,
+    `w=${Number(args.startSec).toFixed(3)}-${Number(args.endSec).toFixed(3)}`,
+  ].join("|");
+}
+
 
 /**
  * Render a single-face preclip via Remotion Lambda and wait for it to finish.
@@ -303,16 +338,39 @@ export async function renderPassFacePreclip(
   const outH = crop.outputSize;
   const durationInFrames = Math.max(6, Math.ceil(dur * FPS));
 
+  // ── V447 — Reuse-Signatur (Run-Identität) ────────────────────────────
+  // Ein fertiger Preclip darf nur wiederverwendet werden, wenn er
+  // NACHWEISLICH zum selben Lauf, derselben Plate-Generation, derselben
+  // Plate-URL, derselben vollständigen Crop-Geometrie (x/y/size/outputSize),
+  // derselben BBox-Messung und demselben Renderfenster gehört. Fehlt die
+  // Run-Identität, wird gar nicht wiederverwendet (fail-closed).
+  const v447RunId = typeof input.runId === "string" && input.runId.length > 0 ? input.runId : null;
+  const v447Generation = Number.isFinite(Number(input.plateGeneration))
+    ? Number(input.plateGeneration)
+    : null;
+  const v447PlateKey = String(masterVideoUrl).split("?")[0];
+  const v447Signature = buildPreclipSignature({
+    runId: v447RunId,
+    generation: v447Generation,
+    plateKey: v447PlateKey,
+    crop,
+    bbox: cropFromBbox,
+    startSec,
+    endSec,
+  });
+
   const t0 = Date.now();
 
-  // v188 (Phase 1.2) — Reuse-Guard. If an earlier Lambda run for THIS exact
-  // scene+pass with the SAME crop geometry finished within the last 15 min
-  // (typical case: previous compose-dialog-segments hit its 180s poll timeout
-  // but the Lambda kept rendering and completed at ~190s), reuse that
-  // rendered mp4 instead of paying for a duplicate Lambda render. The
-  // `face_crop.size` match keeps v116 face-gate expansion retries (which
-  // change `size`) properly cache-missing.
+  // v188 (Phase 1.2) — Reuse-Guard, seit V447 an die Run-Identität gebunden.
+  // Reuse trifft nur noch bei exakt identischer `v447_signature`; Zeilen ohne
+  // Signatur (alle Alt-Renders) sind grundsätzlich nicht wiederverwendbar.
   try {
+    if (!v447Signature) {
+      console.log(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v447_reuse_disabled reason=no_run_identity run=${v447RunId ?? "null"} gen=${v447Generation ?? "null"}`,
+      );
+      throw new Error("v447_no_run_identity");
+    }
     const cutoffIso = new Date(Date.now() - 15 * 60_000).toISOString();
     const { data: prior } = await supabase
       .from("video_renders")
@@ -322,12 +380,13 @@ export async function renderPassFacePreclip(
       .contains("content_config", {
         composer_scene_id: sceneId,
         pass_idx: passIdx,
-        face_crop: { size: crop.size },
+        v447_signature: v447Signature,
       })
       .gte("started_at", cutoffIso)
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
     if (prior?.video_url) {
       console.log(
         `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_reuse_hit render=${prior.render_id} url=…${String(prior.video_url).slice(-60)} dispatch_ms=0 poll_wait_ms=0 total_ms=${Date.now() - t0}`,
@@ -391,6 +450,17 @@ export async function renderPassFacePreclip(
         composer_scene_id: sceneId,
         pass_idx: passIdx,
         face_crop: { x: crop.x, y: crop.y, size: crop.size, outputSize: crop.outputSize },
+        // V447 — Run-Identität des Artefakts. Nur Zeilen mit identischer
+        // Signatur dürfen später wiederverwendet werden.
+        ...(v447Signature
+          ? {
+            v447_signature: v447Signature,
+            run_id: v447RunId,
+            plate_generation: v447Generation,
+            plate_key: v447PlateKey,
+          }
+          : {}),
+
       },
       subtitle_config: {},
     });

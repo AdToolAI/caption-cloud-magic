@@ -4821,6 +4821,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
                   {
                     sceneId,
                     projectId: String((scene as any).project_id ?? ""),
+                    // V447 — Run-Identität: bindet den Preclip an Lauf + Generation.
+                    runId: String((scene as any).active_run_id ?? "") || null,
+                    plateGeneration: Number.isFinite(Number((scene as any).plate_generation)) ? Number((scene as any).plate_generation) : null,
                     userId,
                     passIdx: idx,
                     masterVideoUrl: sourceClipUrl,
@@ -5631,6 +5634,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           {
             sceneId,
             projectId: String((scene as any).project_id ?? ""),
+            // V447 — Run-Identität: bindet den Preclip an Lauf + Generation.
+            runId: String((scene as any).active_run_id ?? "") || null,
+            plateGeneration: Number.isFinite(Number((scene as any).plate_generation)) ? Number((scene as any).plate_generation) : null,
             userId,
             passIdx: currentPassIdx,
             masterVideoUrl: sourceClipUrl,
@@ -8567,6 +8573,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
                     {
                       sceneId,
                       projectId: String((scene as any).project_id ?? ""),
+                      // V447 — Run-Identität: bindet den Preclip an Lauf + Generation.
+                      runId: String((scene as any).active_run_id ?? "") || null,
+                      plateGeneration: Number.isFinite(Number((scene as any).plate_generation)) ? Number((scene as any).plate_generation) : null,
                       userId,
                       passIdx: waitIdx,
                       masterVideoUrl: sourceClipUrl,

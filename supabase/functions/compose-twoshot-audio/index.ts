@@ -22,6 +22,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+// V447 — der Dialogpfad nutzt denselben Sprach-Hardlock wie generate-voiceover.
+import { withTtsLanguage } from "../_shared/tts-language.ts";
 import {
   ensureDialogTurnsForScene,
   normalizeTurns,
@@ -394,6 +396,7 @@ async function elevenlabsPcm(
   apiKey: string,
   voiceId: string,
   text: string,
+  language?: string | null,
 ): Promise<ElevenPcmResult> {
   // ── v89 — `with-timestamps` endpoint ─────────────────────────────────
   // Plan §2: use ElevenLabs `with-timestamps` so we can hard-cap the PCM
@@ -404,9 +407,11 @@ async function elevenlabsPcm(
   const SOURCE_RATE = 24000;
   const tsUrl =
     `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps?output_format=pcm_${SOURCE_RATE}`;
-  const body = JSON.stringify({
+  // V447 — `eleven_multilingual_v2` ignoriert `language_code` und driftet bei
+  // deutschen Skripten in EN/Fantasie-Aussprache. `withTtsLanguage` pinnt die
+  // Sprache und wählt ein Modell, das den Parameter tatsächlich erzwingt.
+  const body = JSON.stringify(withTtsLanguage({
     text,
-    model_id: "eleven_multilingual_v2",
     voice_settings: {
       stability: 0.45,
       similarity_boost: 0.75,
@@ -414,7 +419,7 @@ async function elevenlabsPcm(
       use_speaker_boost: true,
       speed: 1.0,
     },
-  });
+  }, language ?? null));
 
   try {
     const res = await fetch(tsUrl, {
@@ -627,7 +632,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
     const { data: project } = await supabase
       .from("composer_projects")
-      .select("id, user_id")
+      .select("id, user_id, language")
       .eq("id", scene.project_id)
       .single();
     if (!project) return json({ error: "project not found" }, 404);
@@ -984,6 +989,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       resolved.push({ voice, block });
     }
 
+    // V447 — eine Sprachquelle für alle Sprecher dieser Szene.
+    const ttsLanguage: string | null = (() => {
+      const raw = String((project as any)?.language ?? "").trim();
+      return raw.length > 0 ? raw : null;
+    })();
+
     async function synthOne(idx: number): Promise<void> {
       const { voice, block } = resolved[idx]!;
       const utterance = block.text;
@@ -995,7 +1006,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           pcm = await humePcm(humeKey, voice.voiceId, voice.provider ?? "HUME_AI", utterance);
         } else {
           if (!elevenKey) throw new Error("ELEVENLABS_API_KEY not configured");
-          const res = await elevenlabsPcm(elevenKey, voice.voiceId, utterance);
+          const res = await elevenlabsPcm(elevenKey, voice.voiceId, utterance, ttsLanguage);
           pcm = res.pcm;
           ttsDiag = {
             speaker: block.rawSpeaker,
@@ -1033,7 +1044,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           return;
         }
         try {
-          const res = await elevenlabsPcm(elevenKey, FALLBACK_ELEVEN_VOICE, utterance);
+          const res = await elevenlabsPcm(elevenKey, FALLBACK_ELEVEN_VOICE, utterance, ttsLanguage);
           pcm = res.pcm;
           ttsDiag = {
             speaker: block.rawSpeaker,
