@@ -313,7 +313,7 @@ export default function BriefingTab({
   };
 
   const handleGenerateStoryboard = async () => {
-    if (!briefing.productName.trim()) {
+    if (!(briefing.productName ?? "").trim()) {
       toast({ title: cfg.missingPrimaryToast, variant: 'destructive' });
       return;
     }
@@ -498,7 +498,7 @@ export default function BriefingTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retryStoryboardNonce]);
 
-  const canProceed = briefing.productName.trim().length > 0;
+  const canProceed = (briefing.productName ?? "").trim().length > 0;
 
   // Storytelling stores protagonist + conflict in targetAudience as "Protagonist: ... | Conflict: ..."
   const storyMeta = (() => {
