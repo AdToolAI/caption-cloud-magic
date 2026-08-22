@@ -23,7 +23,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
-import { getSyncApiKey, releaseInflightSyncJob } from "../_shared/syncso-preflight.ts";
+import { getSyncApiKey, releaseInflightSyncJob, logSyncDispatch } from "../_shared/syncso-preflight.ts";
+// V443 — exactly-once re-measure of `motion_unverified` passes. Measurement
+// only: same immutable provider output, never a new provider job.
+import { measureProviderMotionSync } from "../_shared/measure-provider-motion-sync.ts";
+import { classifyMotionProbe } from "../_shared/motion-probe-classifier.ts";
+import {
+  classifyMeasurementFailure,
+  MOTION_UNVERIFIED_STATE,
+} from "../_shared/motion-probe-infra.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { logMissingReinjectPointer } from "../_shared/v431-ledger.ts";
