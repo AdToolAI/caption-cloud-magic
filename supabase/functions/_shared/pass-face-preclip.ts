@@ -344,6 +344,9 @@ export async function renderPassFacePreclip(
         faceShareInCrop,
         mouthOffsetPx,
         clamped: clampedAnchor,
+        cropMeasureSrc: measureSrc,
+        bboxMeasureSrc: measureSrc,
+        cropFromBbox,
       };
     }
   } catch (reuseErr) {
@@ -606,6 +609,9 @@ export async function renderPassFacePreclip(
         faceShareInCrop,
         mouthOffsetPx,
         clamped: clampedAnchor,
+        cropMeasureSrc: measureSrc,
+        bboxMeasureSrc: measureSrc,
+        cropFromBbox,
       };
     }
     if (status === "failed") {
