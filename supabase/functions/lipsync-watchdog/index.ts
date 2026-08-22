@@ -727,7 +727,8 @@ serve(async (req) => {
                 syncApiKey, jobId: String(p.job_id), sceneId: d.id, supabaseUrl, serviceKey,
                 pipelineJobId: (p?.pipeline_job_id as string | null) ?? null,
               });
-              if (r.terminal && r.status === "COMPLETED") {
+              // v441 — ein abgelehnter Apply ist keine Rettung.
+              if (r.terminal && r.status === "COMPLETED" && r.applied !== false) {
                 liveCompletedRecovered = true;
                 polled.push({ scene_id: d.id, job_id: String(p.job_id), status: "COMPLETED" });
                 await releaseInflightSyncJob(supabase, String(p.job_id)).catch(() => {});
