@@ -166,14 +166,60 @@ async function replayWebhook(
   }
 }
 
+/**
+ * v455 — Kandidaten-Tupel aus dem Watchdog. Wird unmittelbar vor jeder
+ * Mutation gegen den aktuellen DB-Stand geprüft, damit ein alter Watchdog-Lauf
+ * niemals einen neueren Run/Job terminalisiert.
+ */
+interface Candidate {
+  scene_id: string;
+  run_id?: string | null;
+  plate_generation?: number | null;
+  pipeline_job_id?: string | null;
+  external_job_id?: string | null;
+}
+
+async function candidateStillCurrent(
+  sb: ReturnType<typeof createClient>,
+  scene: any,
+  candidate: Candidate | undefined,
+): Promise<boolean> {
+  if (!candidate) return true;
+  if (candidate.run_id && String(scene.active_run_id ?? "") !== String(candidate.run_id)) {
+    return false;
+  }
+  if (
+    candidate.plate_generation != null &&
+    Number(scene.plate_generation ?? -1) !== Number(candidate.plate_generation)
+  ) {
+    return false;
+  }
+  if (
+    candidate.external_job_id &&
+    String(scene.replicate_prediction_id ?? "") !== String(candidate.external_job_id)
+  ) {
+    return false;
+  }
+  if (candidate.pipeline_job_id) {
+    const { data: job } = await sb
+      .from("composer_pipeline_jobs")
+      .select("id, status, external_job_id")
+      .eq("id", candidate.pipeline_job_id)
+      .maybeSingle();
+    if (!job || String((job as any).status) !== "dispatched") return false;
+  }
+  return true;
+}
+
 async function processScene(
   sb: ReturnType<typeof createClient>,
   sceneId: string,
+  candidate?: Candidate,
 ): Promise<Result> {
   const { data: scene, error } = await sb
     .from("composer_scenes")
     .select(
-      "id, project_id, active_run_id, replicate_prediction_id, plate_pipeline_job_id, clip_status, clip_url, duration_seconds, clip_source, clip_quality, updated_at, clip_error, engine_override",
+      "id, project_id, active_run_id, plate_generation, replicate_prediction_id, plate_pipeline_job_id, clip_status, clip_url, duration_seconds, clip_source, clip_quality, updated_at, clip_error, engine_override",
     )
     .eq("id", sceneId)
     .maybeSingle();
@@ -189,6 +235,20 @@ async function processScene(
   ) {
     return { scene_id: sceneId, outcome: "skipped_already_resolved" };
   }
+
+  // v455 — Race-Guard: Szene ist inzwischen auf einen neueren Run/Job/
+  // Prediction gewechselt → dieser Kandidat ist veraltet, kein No-Op-Schaden.
+  if (!(await candidateStillCurrent(sb, scene, candidate))) {
+    console.log(
+      `[recover-stuck-composer-clip] v455_stale_candidate_discarded scene=${sceneId} run=${candidate?.run_id ?? "null"} job=${candidate?.pipeline_job_id ?? "null"}`,
+    );
+    return {
+      scene_id: sceneId,
+      outcome: "skipped_already_resolved",
+      detail: "v455_stale_candidate_discarded",
+    };
+  }
+
 
   const isCinematicSync =
     String((scene as any).engine_override ?? "") === "cinematic-sync";
@@ -343,6 +403,13 @@ Deno.serve(async (req) => {
     const sceneIds: string[] = Array.isArray(body?.scene_ids)
       ? body.scene_ids.filter((x: unknown) => typeof x === "string")
       : [];
+    // v455 — optionale Tupel-Kandidaten (scene/run/gen/job/external).
+    const candidateByScene = new Map<string, Candidate>();
+    if (Array.isArray(body?.candidates)) {
+      for (const c of body.candidates) {
+        if (c && typeof c.scene_id === "string") candidateByScene.set(c.scene_id, c as Candidate);
+      }
+    }
 
     if (sceneIds.length === 0) {
       return new Response(
@@ -360,7 +427,7 @@ Deno.serve(async (req) => {
     const results: Result[] = [];
     for (const id of sceneIds.slice(0, 50)) {
       try {
-        results.push(await processScene(sb, id));
+        results.push(await processScene(sb, id, candidateByScene.get(id)));
       } catch (err) {
         console.error(
           `[recover-stuck-composer-clip] processScene threw scene=${id}`,

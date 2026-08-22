@@ -5,7 +5,11 @@ import Replicate from "npm:replicate@0.25.2";
 import { verifyWebhookRequest, appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { CLIP_COSTS } from "../_shared/clip-costs.ts";
 import { countDialogSpeakers as detectSpeakerCount } from "../_shared/dialog-speakers.ts";
-import { isGreenNetRejection } from "../_shared/happyhorse-green-net.ts";
+import {
+  isGreenNetRejection,
+  classifyProviderRejection,
+  PROVIDER_INPUT_FILTER_CLASS,
+} from "../_shared/happyhorse-green-net.ts";
 import { isAmbientAudioRow, runAmbientSpeechGate } from "../_shared/ambient-audio.ts";
 
 
@@ -35,9 +39,13 @@ const corsHeaders = {
  * content-policy / invalid-input / NSFW / quota errors because those would
  * just fail identically a second time and waste another minute.
  */
-function isRetryableTransientError(predError: unknown): boolean {
+export function isRetryableTransientError(predError: unknown): boolean {
   const s = String(predError ?? '').toLowerCase();
   if (!s) return false;
+  // v455 — Provider-Eingabefilter (Green Net / InvalidParameter) sind für
+  // exakt diesen Payload terminal. Der Wrapper-Text enthält "prediction
+  // failed" und hat bisher denselben abgelehnten Prompt erneut eingereicht.
+  if (classifyProviderRejection(predError) !== 'none') return false;
   return (
     s.includes('read timed out') ||
     s.includes('read timeout') ||
@@ -707,7 +715,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const isGreenNet =
         isGreenNetRejection(enrichedError) &&
         String((scene as any)?.clip_source ?? '') === 'ai-happyhorse';
-      const taggedError = (isGreenNet ? '[green_net_rejected] ' : '') +
+      // v455 — stabile interne Klasse + ungekürzter (nur längenbegrenzter)
+      // Providergrund. Es wird KEIN auslösendes Wort erfunden.
+      const rejectionClass = classifyProviderRejection(enrichedError);
+      const classTag = rejectionClass !== 'none'
+        ? `[${PROVIDER_INPUT_FILTER_CLASS}:${rejectionClass}] `
+        : '';
+      const taggedError = classTag + (isGreenNet ? '[green_net_rejected] ' : '') +
         (String(enrichedError ?? '').slice(0, 480) || 'unknown_error');
 
       // v431 G3.2.1 — RPC D (`ccw:failed`): Scene-Fail, Legacy-Spiegel,

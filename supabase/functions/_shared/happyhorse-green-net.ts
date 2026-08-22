@@ -104,6 +104,70 @@ function dedupeSentences(s: string): { out: string; touched: boolean } {
 
 const NON_ASCII = /[^\x00-\x7F]/g;
 
+/**
+ * v455 — Negations-Kompression (nur HappyHorse).
+ *
+ * Lange "no X, no Y, no Z"-Ketten sind semantisch redundant: die gleiche
+ * Absicht lässt sich positiv formulieren. Wir entfernen sie deshalb aus dem
+ * Payload und ersetzen sie durch kurze positive Direktiven. Topologie-,
+ * Identitäts- und Handlungsvorgaben bleiben erhalten (die positiven
+ * Ersatzsätze tragen exakt dieselbe Anforderung).
+ *
+ * Das ist reine Risikoreduktion — der Provider hat KEIN auslösendes Wort
+ * genannt.
+ */
+const POSITIVE_DIRECTIVES: Array<[RegExp, string]> = [
+  [
+    /\b(cut|cuts|zoom|push-?in|pull-?out|dolly|crane|pan|tilt|reframing|shot change|transition|split-?screen|grid|panel)\b/i,
+    "one single continuous shot in one shared frame, camera locked on a tripod with constant framing",
+  ],
+  [
+    /\b(lip-?flap|chewing|muttering|mouth|jaw|syllable|whisper|nodding|bobbing|squint|sleepy|closed eyes)\b/i,
+    "mouths stay calmly closed in a natural resting position and eyes stay open and alert",
+  ],
+  [
+    /\b(humans?|bystanders?|people|person|character|posters?|screens?)\b/i,
+    "only the described cast is present in the frame",
+  ],
+  [
+    /\b(rendered text|text|caption|subtitle|watermark|logo)\b/i,
+    "a clean frame free of on-screen text",
+  ],
+];
+
+function positiveFor(negClauses: string[]): string[] {
+  const out: string[] = [];
+  for (const [re, positive] of POSITIVE_DIRECTIVES) {
+    if (negClauses.some((c) => re.test(c)) && !out.includes(positive)) {
+      out.push(positive);
+    }
+  }
+  return out;
+}
+
+const NEG_CLAUSE = /^\s*(?:and\s+)?(?:no|never|not)\b/i;
+
+export function compressNegations(input: string): { out: string; touched: boolean } {
+  const sentences = String(input ?? "").split(/(?<=[.!?])\s+/);
+  let touched = false;
+  const rebuilt = sentences.map((sentence) => {
+    const clauses = sentence.split(/,\s*/);
+    const negatives = clauses.filter((c) => NEG_CLAUSE.test(c));
+    if (negatives.length < 2) return sentence;
+    touched = true;
+    const positives = clauses.filter((c) => !NEG_CLAUSE.test(c));
+    const trailing = /[.!?]\s*$/.test(sentence) ? "." : "";
+    const kept = positives
+      .join(", ")
+      .replace(/[\s,;.]+$/, "")
+      .trim();
+    const directives = positiveFor(negatives).join("; ");
+    const merged = [kept, directives].filter(Boolean).join(kept ? "; " : "");
+    return merged ? merged + trailing : "";
+  });
+  return { out: rebuilt.filter((s) => s.trim().length > 0).join(" ").trim(), touched };
+}
+
 export function sanitizeForHappyHorse(input: string): GreenNetSanitizeResult {
   const touched: string[] = [];
   let s = String(input ?? "");
@@ -123,6 +187,11 @@ export function sanitizeForHappyHorse(input: string): GreenNetSanitizeResult {
   const dd = dedupeSentences(s);
   if (dd.touched) touched.push("dedupe-sentences");
   s = dd.out;
+
+  // v455 — harte Negativlisten in positive Direktiven überführen.
+  const cn = compressNegations(s);
+  if (cn.touched) touched.push("compress-negations");
+  s = cn.out;
 
   // forensics: flag if still heavily non-English (>20% non-ASCII).
   const nonAscii = (s.match(NON_ASCII) ?? []).length;
@@ -146,3 +215,24 @@ export function isGreenNetRejection(err: unknown): boolean {
   const msg = typeof err === "string" ? err : (err as any)?.message ?? String(err ?? "");
   return /DataInspectionFailed|Green\s?net|inappropriate content/i.test(msg);
 }
+
+/** v455 — stabile interne Klasse für Provider-Eingabefilter. */
+export const PROVIDER_INPUT_FILTER_CLASS = "provider_input_filter";
+
+export type ProviderRejectionClass = "none" | "input_filter" | "invalid_prompt";
+
+/**
+ * v455 — Provider-Ablehnungen, die AM IDENTISCHEN PAYLOAD terminal sind.
+ * Ein automatischer Retry mit exakt demselben Prompt kann hier nur erneut
+ * scheitern und verbrennt Zeit/Kredit.
+ */
+export function classifyProviderRejection(err: unknown): ProviderRejectionClass {
+  const msg = typeof err === "string" ? err : (err as any)?.message ?? String(err ?? "");
+  if (!msg) return "none";
+  if (isGreenNetRejection(msg)) return "input_filter";
+  if (/InvalidParameter|could not process with this prompt/i.test(msg)) {
+    return "invalid_prompt";
+  }
+  return "none";
+}
+
