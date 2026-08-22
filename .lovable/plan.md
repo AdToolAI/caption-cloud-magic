@@ -1,54 +1,25 @@
-# V443 — Messfehler von Messergebnis trennen (bounded Re-Measure)
+# V444 — Read-only Typecheck-Baseline für die 7 Deno-Fehler
 
-Belegte Ursache auf S11, Plate-Generation 9: Pass 0 hatte einen guten Provider-Output. Die Bewegungsmessung starb an einem Transportfehler (`Unexpected end of JSON input`), das Webhook wertete das als `indeterminate` und terminalisierte über `ssw:noop_fail`. Vier Minuten später ergab dieselbe unveränderliche Datei `delta_mean=130.7` → klar Motion. Die Szene starb also an der Messinfrastruktur, nicht am Lip-Sync.
+Ziel: beweisen (oder widerlegen), dass alle 7 strikten Deno-Typecheck-Fehler in `sync-so-webhook` und `lipsync-watchdog` schon vor dem V443-Diff bestanden. Nur dann darf V443 als change-clean freigegeben werden.
 
-## Scope
+Dieses Gate ist strikt read-only: keine Code-Änderung, kein Deploy, kein Provider-Lauf, kein S11-Rerender.
 
-### 1. Zwei getrennte Ausgänge statt einem `indeterminate`
-In `_shared/motion-probe-classifier.ts` / `_shared/measure-provider-motion-sync.ts`:
-- `probe_infra_error` — leere/abgeschnittene Antwort, JSON-Parse-Fehler, HTTP-/Extraktions-Fehler, Timeout, Transportfehler.
-- `measured_ambiguous` — Messung lief durch, Wert liegt in der bestehenden Grauzone. Verhalten unverändert fail-closed.
+## Vorgehen
 
-Schwellenwerte werden nicht angefasst.
+1. **Ist-Aufnahme**: strikter Deno-Typecheck auf beiden Funktionen am aktuellen HEAD. Alle 7 Fehler exakt erfassen (Datei, Zeile, Code, Meldung).
+2. **Baseline-Aufnahme**: denselben Typecheck auf dem Vor-V443-Stand ausführen — über eine schreibgeschützte Kopie des Vor-V443-Zustands der betroffenen Dateien in einem temporären Verzeichnis ausserhalb des Projekts (`/tmp`). Kein Checkout, kein Branch-Wechsel, kein Git-State-Eingriff im Projekt.
+3. **Differenz**: 1:1-Zuordnung Ist ↔ Baseline. Ein Fehler gilt nur dann als vorbestehend, wenn er in der Baseline mit gleicher Datei/gleichem Fehlercode/gleicher Ursache auftritt; reine Zeilenverschiebung durch den V443-Diff ist zulässig.
+4. **Klassifikation je Fehler**: `pre-existing` oder `introduced-by-v443`.
 
-### 2. Bounded Re-Measure bei `probe_infra_error`
-Erneutes Messen auf demselben v434-gepinnten, unveränderlichen Provider-Output: maximal 2 Versuche mit kurzem Backoff. Keine neue Sync.so-Generierung, kein Provider-Rerender, keine zusätzlichen Credits. Run-/Generation-/Pass-Identität und Artefakt-SHA bleiben identisch.
+## Verdikt
 
-### 3. `motion_unverified` statt Terminalisierung
-Schlägt die Messung auch nach den Wiederholungen aus Infrastrukturgründen fehl:
-- Szene wird **nicht** terminalisiert,
-- das Segment geht als erfolgreich durch, Telemetriezustand `motion_unverified`,
-- Grund wird in `syncso_dispatch_log` persistiert.
+- Alle 7 `pre-existing` → `V443 = CHANGE-CLEAN` und Freigabe für genau einen S11-Owner-Rerender im nächsten Gate.
+- Mindestens einer `introduced-by-v443` → BLOCKED, mit exakter Fehlerliste; der Fix wäre dann ein eigenes, minimales Folge-Gate.
 
-Nur ein **gemessenes** Noop darf weiterhin über den bestehenden Noop-Pfad terminalisieren.
+## Report
 
-### 4. Watchdog-Nachmessung
-`lipsync-watchdog` misst einen `motion_unverified`-Pass genau einmal aus demselben unveränderlichen Output nach:
-- Motion → Erfolg bleibt,
-- Noop → bestehender bewiesener Noop-Terminalisierungspfad,
-- erneut Infra-Fehler → bleibt `motion_unverified`, kein neuer Provider-Job.
-
-### 5. Credits
-Refund-Logik, Beträge und Idempotenz unverändert.
-
-## Unangetastet (Freeze-Invarianten)
-Anchor-Kohärenz, Run-/Generation-Identität, Webhook-Run-Guard, Assignment-Lock, Provider-Vertrag und Dispatch-Semantik, Motion-Schwellen, alle Retry-Schwellen ausserhalb der Mess-Infrastruktur, Mux-Logik, Storage-Policies, Credit-Beträge.
-
-## Regressionstests (permanent)
-1. `probe_infra_error` failt die Szene nicht sofort.
-2. Genau maximal 2 gebundene Re-Measure-Versuche auf demselben Pin.
-3. Erschöpfte Infra-Messung ergibt `motion_unverified`.
-4. Kein neuer Provider-Dispatch auf diesem Pfad.
-5. Gemessenes Noop failt exakt wie bisher.
-6. Gemessenes Motion bleibt Erfolg.
-7. Watchdog misst `motion_unverified` genau einmal nach.
-8. Refund bleibt idempotent.
-9. Bestehende V441-Write-Contract-Tests bleiben grün.
-
-Ausgeführt werden die betroffenen Deno- und vitest-Suites plus Typecheck/Build.
-
-## Deployment
-Nur `sync-so-webhook` und `lipsync-watchdog` samt ihrer statisch importierten Shared-Module.
+Eine Tabelle mit den 7 Einträgen (Datei, Zeile Ist, Zeile Baseline, TS-Code, Meldung, Klassifikation) plus die beiden vollständigen Typecheck-Ausgaben.
 
 ## Ausdrücklich nicht in diesem Gate
-Kein S11-Rerender, kein Owner-Render. Der Rerender erfolgt danach genau einmal manuell durch dich.
+
+Keine Typecheck-Fixes, kein erneutes Deploy, kein S11-Rerender, keine Änderung an Freeze-Invarianten, Motion-Schwellen, Provider-Vertrag oder Credits.
