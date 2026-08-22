@@ -30,6 +30,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
+import { shouldUseCameraPath } from "../_shared/dynamic-camera-path.ts";
 import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
@@ -551,8 +552,9 @@ serve(async (req) => {
                   // rendered with. Pathless passes keep the fixed rect.
                   path: (() => {
                     const cp = (p as any)?.preclip_camera_path;
-                    const kf = cp?.keyframes;
-                    if (!cp || !Array.isArray(kf) || kf.length === 0) return null;
+                    // A.2 — EXACTLY the predicate the preclip renderer used.
+                    if (!shouldUseCameraPath(cp)) return null;
+                    const kf = cp.keyframes;
                     console.log(
                       `[render-sync-segments-audio-mux] scene=${sceneId} speaker=${(p as any).speaker_idx} v452_dynamic_reprojection sig=${cp.signature} keys=${kf.length}`,
                     );

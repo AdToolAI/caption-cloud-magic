@@ -39,3 +39,25 @@ type: architecture
 ## Deploy-Hinweis
 Änderungen an den Remotion-Templates wirken erst nach erneutem Bundle-Deploy
 (`scripts/deploy-remotion-bundle.sh`).
+
+
+## V452 Reconciliation (verbindlich)
+
+- **Planer**: `planCameraPath` (v359, `_shared/camera-path.ts`) ist der AUTORITATIVE
+  Bewegungsplaner. `dynamic-camera-path.ts` ist nur noch ein Adapter: bounded
+  Rekognition-Samples werden deterministisch auf eine Per-Frame-Boxserie (30 fps,
+  lineare Interpolation zwischen gemessenen Samples, Halten an den Rändern)
+  verdichtet, der Planer liefert die Trajektorie, danach wird die Trajektorie mit
+  der EINGEFRORENEN Crop-Größe neu gefenstert (v359-Konstant-Zoom würde die Größe
+  ändern und V445/V450 verletzen). Es existiert KEIN zweites Glättungssystem mehr.
+- **Statische Äquivalenz**: Liegt der Travel unter `STATIC_TRAVEL_EPSILON`, wird
+  exakt der eingefrorene Static-Crop zurückgegeben (`reason=static_equivalent`) —
+  niemals eine mundabgeleitete Alternative.
+- **Ein Prädikat**: `shouldUseCameraPath` (Edge) und `isDynamicPathRuntime`
+  (Runtime-Spiegel) entscheiden identisch (`moving===true` + >1 Keyframe +
+  Signatur). Preclip-Render, Mux und T13-Overlay nutzen ausschließlich dieses
+  Prädikat — sonst beide den statischen Crop.
+- **Identität**: `pickAssignedFace` hat zusätzlich ein Ambiguitäts-/Kreuzungs-Veto
+  (zwei fast gleich plausible Kandidaten ⇒ `null`, kein Wechsel).
+- **Metrik**: v404-Schwellen, Klassifizierer und NOOP-Leiter unverändert;
+  Mundgeometrie bleibt reine Telemetrie.

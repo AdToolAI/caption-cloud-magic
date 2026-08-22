@@ -30,8 +30,9 @@ echo "🔧 Building Remotion bundle from $PROJECT_ROOT/src/remotion ..."
 
 # Bundle the Remotion site (output goes to $PROJECT_ROOT/build by default)
 cd "$PROJECT_ROOT"
-npx remotion bundle \
-  --entry-point src/remotion/index.ts \
+# NOTE: the entry point must be POSITIONAL. With `--entry-point` the CLI
+# auto-selects /remotion/index.ts (the demo-video project) and fails.
+npx remotion bundle src/remotion/index.ts \
   --public-path "/$S3_SITE_PATH/" \
   --log=verbose
 

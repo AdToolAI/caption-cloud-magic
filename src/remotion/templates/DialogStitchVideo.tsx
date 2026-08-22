@@ -39,7 +39,7 @@ import {
   useVideoConfig,
 } from 'remotion';
 import { z } from 'zod';
-import { sampleCameraPathRuntime } from '../../lib/composer/cameraPathRuntime';
+import { isDynamicPathRuntime, sampleCameraPathRuntime } from '../../lib/composer/cameraPathRuntime';
 
 
 /** V452 — one keyframe of the shared dynamic camera path (plate pixels). */
@@ -299,10 +299,9 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   // V452/T13 — reproject along the SAME path that produced the preclip. The
   // path is authoritative whenever present; only a pathless shot keeps the
   // legacy fixed rect. Mask contract is untouched.
+  // A.2 parity — identical predicate to the preclip renderer.
   const sampled =
-    path && Array.isArray(path.keyframes) && path.keyframes.length > 0 && fps
-      ? sampleCameraPathRuntime(path, (pathOffsetSec ?? 0) + frame / fps)
-      : null;
+    fps && isDynamicPathRuntime(path) ? sampleCameraPathRuntime(path, (pathOffsetSec ?? 0) + frame / fps) : null;
   const sX = Number.isFinite(Number(scaleX)) ? Number(scaleX) : 1;
   const sY = Number.isFinite(Number(scaleY)) ? Number(scaleY) : 1;
   const overlayScale = Math.max(sX, sY);
