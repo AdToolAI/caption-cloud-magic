@@ -5304,6 +5304,17 @@ serve(async (req) => {
           errorCode: String(r.error ?? "dispatch_failed"),
           outcome: classifyDispatchFailure(r.error),
         });
+        // v440 — keep the attempt ledger in lockstep with the job ledger: a
+        // scene that never reached (or was rejected by) the provider must not
+        // leave an open `rendering` attempt behind. Idempotent + run-fenced.
+        try {
+          const stamp = sceneRunStamps.get(r.sceneId);
+          await failPlateAttemptForRun(supabaseAdmin, {
+            sceneId: r.sceneId,
+            runId: stamp?.runId ?? null,
+            expectedGeneration: stamp?.generation ?? null,
+          });
+        } catch (_) { /* best-effort */ }
       }
     }
 
