@@ -3720,11 +3720,22 @@ serve(async (req) => {
         );
         if (blocksProviderDispatch(v440AnchorVerdict)) {
           const pointerless = v440AnchorVerdict === "anchor_pointer_missing";
-          const msg = pointerless
+          // V442 — a pointerless anchor is only a "portraits missing" problem
+          // when no composition was even attempted with portraits. If we DID
+          // feed portraits into compose-scene-anchor and the model failed, say
+          // so — and carry the sanitized provider reason.
+          const recomposeFailed = anchorAttempt.attempted &&
+            anchorAttempt.portraitCount > 0;
+          const reasonSuffix = recomposeFailed && anchorAttempt.reason
+            ? ` (${sanitizeAnchorReason(anchorAttempt.reason)})`
+            : "";
+          const msg = pointerless && !recomposeFailed
             ? tl({ de: "cinematic_sync_anchor_missing: Für Cinematic-Sync konnte kein Charakter-Anchor komponiert werden (keine Portraits aufgelöst). Bitte einen Brand Character mit Portrait dem Cast zuweisen und erneut versuchen.", en: "cinematic_sync_anchor_missing: No character anchor could be composed for Cinematic-Sync (no portraits resolved). Please assign a Brand Character with a portrait to the cast and try again.", es: "cinematic_sync_anchor_missing: No se pudo componer un ancla de personaje para Cinematic-Sync (no se resolvieron retratos). Por favor, asigne un Personaje de Marca con un retrato al elenco e intente de nuevo." })
+            : recomposeFailed
+            ? tl({ de: `anchor_recompose_failed: Die Portraits des Casts waren vorhanden (${anchorAttempt.portraitCount}), aber das Bildmodell konnte den Szenen-Anchor nicht erzeugen${reasonSuffix}. Es wurde kein Render gestartet (keine Kosten). Bitte erneut versuchen.`, en: `anchor_recompose_failed: Cast portraits were available (${anchorAttempt.portraitCount}), but the image model could not produce the scene anchor${reasonSuffix}. No render was started (no cost). Please try again.`, es: `anchor_recompose_failed: Los retratos del elenco estaban disponibles (${anchorAttempt.portraitCount}), pero el modelo de imagen no pudo generar el ancla de escena${reasonSuffix}. No se inició ningún renderizado (sin coste). Inténtalo de nuevo.` })
             : tl({ de: "anchor_recompose_failed: Der Szenen-Anchor existiert nicht mehr im Speicher und konnte nicht neu komponiert werden. Es wurde kein Render gestartet (keine Kosten). Bitte erneut versuchen.", en: "anchor_recompose_failed: The scene anchor no longer exists in storage and could not be re-composed. No render was started (no cost). Please try again.", es: "anchor_recompose_failed: El ancla de escena ya no existe en el almacenamiento y no se pudo recomponer. No se inició ningún renderizado (sin coste). Inténtalo de nuevo." });
           console.warn(
-            `[compose-video-clips] scene ${scene.id}: v440_anchor_gate verdict=${v440AnchorVerdict} → hard-fail before provider dispatch (zero spend)`,
+            `[compose-video-clips] scene ${scene.id}: v440_anchor_gate verdict=${v440AnchorVerdict} attempted=${anchorAttempt.attempted ? 1 : 0} portraits=${anchorAttempt.portraitCount} reason=${sanitizeAnchorReason(anchorAttempt.reason ?? "none")} → hard-fail before provider dispatch (zero spend)`,
           );
           await safeMarkSceneFailed(scene.id, msg, {
             isCinematicSyncScene: true,
