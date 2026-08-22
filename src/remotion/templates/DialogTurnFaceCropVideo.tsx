@@ -19,7 +19,7 @@
 import React from 'react';
 import { AbsoluteFill, Video, useCurrentFrame, useVideoConfig } from 'remotion';
 import { z } from 'zod';
-import { sampleCameraPathRuntime } from '../../lib/composer/cameraPathRuntime';
+import { isDynamicPathRuntime, sampleCameraPathRuntime } from '../../lib/composer/cameraPathRuntime';
 
 export const CameraPathKeyframeSchema = z.object({
   t: z.number().min(0),
@@ -77,10 +77,8 @@ export const DialogTurnFaceCropVideo: React.FC<DialogTurnFaceCropVideoProps> = (
 
   // V452 — sample the shared camera path at this frame's preclip-relative
   // time. Falls back to the frozen static crop when no path was persisted.
-  const sampled =
-    cropPath && Array.isArray(cropPath.keyframes) && cropPath.keyframes.length > 0
-      ? sampleCameraPathRuntime(cropPath, frame / fps)
-      : null;
+  // A.2 parity — the SAME predicate the T13 reprojection uses.
+  const sampled = isDynamicPathRuntime(cropPath) ? sampleCameraPathRuntime(cropPath, frame / fps) : null;
   const cx = sampled ? sampled.x : cropX;
   const cy = sampled ? sampled.y : cropY;
   const cSize = sampled && sampled.size > 0 ? sampled.size : cropSize;
