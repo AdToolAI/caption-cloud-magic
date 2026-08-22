@@ -5710,6 +5710,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             size: preclipResult.crop.size,
             outputSize: preclipResult.crop.outputSize,
           };
+          // V450 §2 — immutable crop snapshot so a later NOOP retry can prove
+          // the frozen geometry even if `preclip_crop` was cleared meanwhile.
+          (pass as any)._v450_frozen_preclip_crop = (pass as any).preclip_crop;
+
           (pass as any).preclip_start_sec = Number(unionStart.toFixed(3));
           (pass as any).preclip_end_sec = Number(unionEnd.toFixed(3));
           // v163 — persist the exact Remotion render frame count. Sync.so
