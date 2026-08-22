@@ -70,8 +70,19 @@ import {
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 import { enforceMinFaceSize } from "../_shared/anchor-min-face-size.ts";
+import { classifySplitScreenLayout } from "../_shared/split-screen-layout.ts";
 import { resolveIdentityViaRekognition } from "../_shared/resolveIdentityViaRekognition.ts";
 import { buildAnchorLayoutFromV274 } from "../_shared/plateFaceSlotRouter.ts";
+
+/**
+ * V446 — corrective anti-panel directive for the anchor re-compose. The base
+ * SINGLE CONTINUOUS PHOTOGRAPH clause did not stop Nano Banana / Gemini from
+ * emitting a 4-column strip collage for a portrait-format 4-cast anchor
+ * (S11, 2026-08-22). This suffix is appended only after a panel verdict.
+ */
+const V446_ANTI_PANEL_SUFFIX =
+  "PANEL REJECTION RETRY — the previous attempt returned a SPLIT-SCREEN STRIP: the people were pasted side by side as separate vertical panels with visible seams, mismatched backgrounds and different scales. That output is unusable. Re-shoot the scene as ONE single photograph from ONE camera position: all people stand together in the SAME physical room, on the SAME floor, in front of ONE continuous background that runs unbroken from the left edge to the right edge of the image. There are NO vertical or horizontal dividing lines, NO seams, NO panel borders, NO collage tiles, NO stitched columns, NO video-call tiles. Perspective, horizon line, lighting direction and depth of field are identical for every person, people may slightly overlap in depth like real people standing in a room, and the background objects continue naturally behind all of them.";
+
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { sanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
@@ -2303,6 +2314,13 @@ serve(async (req) => {
           attempted: boolean;
           reason: string | null;
         } = { portraitCount: 0, attempted: false, reason: null };
+        // V446 — panel/split-screen verdict on the composed ANCHOR STILL.
+        // Set inside the anchor safety net, consumed by the hard gate below
+        // so a panel collage never reaches a paid provider dispatch.
+        let v446PanelBlock:
+          | { metrics: Record<string, unknown> | null; reason: string; retried: boolean }
+          | null = null;
+
         try {
           // Two-Shot prep: if this scene has a multi-speaker dialog_script,
           // synthesize a merged voiceover (one WAV with all speakers in
@@ -3143,6 +3161,130 @@ serve(async (req) => {
                 }
                 (scene as any).__minFaceCheck = minFaceCheck;
 
+                // ── V446 ANCHOR PANEL GATE ─────────────────────────────
+                // The split-screen failure of S11 (2026-08-22) did not
+                // start in the rendered clip — the ANCHOR STILL was
+                // already a 4-column strip collage. The v445 plate gate
+                // caught it only after 6/6 clips had been rendered and
+                // refunded. We classify the anchor with the very same
+                // pure classifier BEFORE any video spend, re-compose once
+                // with an anti-panel directive, and hard-fail otherwise.
+                let panelVerdictMeta: Record<string, unknown> | null = null;
+                if (composedUrl && expectedFaces >= 3) {
+                  const classifyAnchorLayout = async (url: string) => {
+                    const det = await detectFacesMediaPipe({
+                      videoUrl: url,
+                      plateWidth: 1000,
+                      plateHeight: 1000,
+                      durationSec: 0,
+                      prebuiltFrameUrls: [url],
+                    });
+                    if (!det.ok || det.faces.length < 3) return null;
+                    const boxes = det.faces.map((f) => ({
+                      x: f.bbox[0],
+                      y: f.bbox[1],
+                      width: f.bbox[2] - f.bbox[0],
+                      height: f.bbox[3] - f.bbox[1],
+                    }));
+                    return classifySplitScreenLayout(boxes, 1000, 1000);
+                  };
+                  try {
+                    const v1 = await classifyAnchorLayout(composedUrl);
+                    console.log(
+                      `[compose-video-clips] v446_anchor_panel_verdict scene=${scene.id} ` +
+                      `panel=${v1?.isSplitScreen ? 1 : 0} reason=${v1?.reason ?? "none"} ` +
+                      `metrics=${JSON.stringify(v1?.metrics ?? null)}`,
+                    );
+                    if (v1?.isSplitScreen) {
+                      panelVerdictMeta = {
+                        panel: true,
+                        stage: "attempt-1",
+                        reason: v1.reason,
+                        metrics: v1.metrics,
+                      };
+                      await invalidateCache();
+                      const retryUrl = await composeAnchor(
+                        "attempt-5-panel",
+                        true,
+                        false,
+                        [],
+                        false,
+                        V446_ANTI_PANEL_SUFFIX,
+                      );
+                      if (retryUrl) {
+                        const v2 = await classifyAnchorLayout(retryUrl);
+                        console.log(
+                          `[compose-video-clips] v446_anchor_panel_retry scene=${scene.id} ` +
+                          `panel=${v2?.isSplitScreen ? 1 : 0} reason=${v2?.reason ?? "none"}`,
+                        );
+                        if (!v2?.isSplitScreen) {
+                          const eRetry = await evaluate(retryUrl, "attempt-5-panel");
+                          composedUrl = retryUrl;
+                          faceCount = eRetry.faceCount;
+                          humanCount = eRetry.humanCount;
+                          identityFailure = eRetry.identity;
+                          identityNotes = eRetry.notes;
+                          identityMismatched = eRetry.mismatched ?? [];
+                          identityMissing = eRetry.missing ?? [];
+                          identityDuplicated = eRetry.duplicated ?? [];
+                          panelVerdictMeta = {
+                            panel: false,
+                            stage: "attempt-5-panel",
+                            reason: null,
+                            metrics: v2?.metrics ?? null,
+                            recovered: true,
+                          };
+                        } else {
+                          panelVerdictMeta = {
+                            panel: true,
+                            stage: "attempt-5-panel",
+                            reason: v2.reason,
+                            metrics: v2.metrics,
+                            recovered: false,
+                          };
+                          v446PanelBlock = {
+                            metrics: (v2.metrics ?? null) as Record<string, unknown> | null,
+                            reason: v2.reason ?? "panel_layout",
+                            retried: true,
+                          };
+                        }
+                      } else {
+                        v446PanelBlock = {
+                          metrics: (v1.metrics ?? null) as Record<string, unknown> | null,
+                          reason: v1.reason ?? "panel_layout",
+                          retried: true,
+                        };
+                      }
+                      const attempts =
+                        ((scene as any).__anchorAttempts as Array<Record<string, unknown>>) ?? [];
+                      attempts.push({
+                        attempt: attempts.length + 1,
+                        mode: "panel-retry",
+                        panel_blocked: !!v446PanelBlock,
+                        at: new Date().toISOString(),
+                      });
+                      (scene as any).__anchorAttempts = attempts;
+                    } else if (v1) {
+                      panelVerdictMeta = {
+                        panel: false,
+                        stage: "attempt-1",
+                        reason: null,
+                        metrics: v1.metrics,
+                      };
+                    }
+                  } catch (e) {
+                    // Detection infrastructure errors are telemetry, never a
+                    // verdict (v443 contract) — the v445 plate gate stays as
+                    // the downstream backstop.
+                    console.warn(
+                      `[compose-video-clips] v446_anchor_panel_probe_unavailable scene=${scene.id}: ${(e as Error).message}`,
+                    );
+                  }
+                }
+                (scene as any).__panelVerdict = panelVerdictMeta;
+
+
+
                 if (composedUrl) {
                   scene.referenceImageUrl = composedUrl;
                   if (!skipAuditPersist) {
@@ -3159,7 +3301,9 @@ serve(async (req) => {
                         identityFailure,
                         notes: identityNotes || undefined,
                         min_face_check: minFaceCheck ?? undefined,
+                        panel_layout: panelVerdictMeta ?? undefined,
                         at: new Date().toISOString(),
+
                       },
                       // v131.6 — forensic trail per compose attempt.
                       anchor_attempts:
@@ -3701,6 +3845,30 @@ serve(async (req) => {
             extErr,
           );
         }
+
+        // ── V446 ANCHOR PANEL HARD-GATE (zero spend) ───────────────────────
+        // A panel/split-screen anchor can only produce a panel plate. Stop
+        // here, before any provider dispatch, instead of paying for 6 clips
+        // that the v445 plate gate will discard afterwards.
+        if (v446PanelBlock) {
+          const msg = tl({
+            de: "anchor_split_screen_detected: Das Anker-Bild dieser Szene ist eine Split-Screen-/Panel-Collage (getrennte Streifen statt einer gemeinsamen Aufnahme). Lip-Sync ist darauf nicht möglich. Es wurde kein Clip gerendert (keine Kosten). Bitte die Szene neu erzeugen — alle Personen müssen in einem gemeinsamen Raum in einer durchgehenden Kameraeinstellung stehen.",
+            en: "anchor_split_screen_detected: The anchor image of this scene is a split-screen/panel collage (separate strips instead of one shared shot). Lip-sync is impossible on that. No clip was rendered (no cost). Please regenerate the scene — all people must stand in one shared room in a single continuous camera frame.",
+            es: "anchor_split_screen_detected: La imagen ancla de esta escena es un collage de pantalla dividida (tiras separadas en lugar de una toma común). El lip-sync no es posible. No se renderizó ningún clip (sin coste). Regenere la escena: todas las personas deben estar en la misma sala en un único encuadre continuo.",
+          });
+          console.warn(
+            `[compose-video-clips] v446_anchor_panel_block scene=${scene.id} ` +
+            `reason=${v446PanelBlock.reason} retried=${v446PanelBlock.retried ? 1 : 0} ` +
+            `metrics=${JSON.stringify(v446PanelBlock.metrics)} → hard-fail before provider dispatch (zero spend)`,
+          );
+          await safeMarkSceneFailed(scene.id, msg, {
+            isCinematicSyncScene: true,
+            extra: { twoshot_stage: "failed" },
+          });
+          results.push({ sceneId: scene.id, status: "failed", error: msg });
+          continue;
+        }
+
 
         // ── v195/v440 HARD-GUARD: cinematic-sync needs a VERIFIED anchor ───
         // Regressions kept slipping through when the anchor safety net threw
