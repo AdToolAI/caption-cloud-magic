@@ -5655,9 +5655,41 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               bytes: v434Pin.bytes,
               status: v434Pin.status,
             };
+            // V435 — mirror the pin into the evidence table so the offline
+            // cross-test harness can find pre-clips without parsing scene JSON.
+            // Telemetry-only insert; never throws into the dispatch path.
+            try {
+              const { error: pinRowErr } = await supabase.from("v434_artifact_pins").insert({
+                scene_id: sceneId,
+                run_id: String((scene as any)?.active_run_id ?? "") || null,
+                generation: Number.isFinite(Number((scene as any)?.plate_generation))
+                  ? Number((scene as any).plate_generation)
+                  : null,
+                pass_idx: currentPassIdx,
+                attempt: Number((pass as any)?.attempt ?? 0) || 0,
+                kind: "preclip",
+                purpose: "production",
+                source_url: preclipResult.preclipUrl,
+                object_key: v434Pin.key,
+                pinned_url: v434Pin.url,
+                sha256: v434Pin.sha256,
+                byte_size: v434Pin.bytes,
+                status: v434Pin.status,
+              });
+              if (pinRowErr) {
+                console.warn(
+                  `[compose-dialog-segments] v434_pin_log_failed scene=${sceneId}: ${pinRowErr.message}`,
+                );
+              }
+            } catch (e) {
+              console.warn(
+                `[compose-dialog-segments] v434_pin_log_crash scene=${sceneId}: ${(e as Error).message}`,
+              );
+            }
             console.log(
               `[compose-dialog-segments] v434_pin scene=${sceneId} pass=${currentPassIdx} kind=preclip status=${v434Pin.status} sha256=${v434Pin.sha256 ?? "n/a"}`,
             );
+
           } catch (e) {
             console.warn(`[compose-dialog-segments] v434_pin_crash scene=${sceneId}: ${(e as Error).message}`);
           }
