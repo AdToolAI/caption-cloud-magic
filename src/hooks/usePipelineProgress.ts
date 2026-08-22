@@ -986,16 +986,19 @@ export function usePipelineProgress({
 
   // v440 — a fresh plate run is a new epoch: drop the inherited run floor once,
   // so progress restarts from the real plate phase instead of the old ceiling.
+  // V442 — the reset is now unconditional for the epoch. Gating it on
+  // `lipsyncTerminal` meant a rerun started while the previous lipsync phase
+  // was still non-terminal kept the old ~99 % floor and the bar jumped
+  // straight back to 99 % (S11).
   const clipsEpochRef = useRef<boolean>(false);
   if (clipsRunning && !clipsEpochRef.current) {
     clipsEpochRef.current = true;
-    if (lipsyncTerminal) {
-      runFloorRef.current = 0;
-      floorRef.current.lipsync = 0;
-      floorRef.current.export = 0;
-      realProgressRef.current = { value: 0, at: Date.now() };
-    }
+    runFloorRef.current = 0;
+    floorRef.current.lipsync = 0;
+    floorRef.current.export = 0;
+    realProgressRef.current = { value: 0, at: Date.now() };
   } else if (!clipsRunning && clipsEpochRef.current) {
+
     clipsEpochRef.current = false;
   }
 
@@ -1014,7 +1017,10 @@ export function usePipelineProgress({
       : isActive
         ? runSoftPercent
         : hasFailure
-          ? runFloorRef.current
+          // V442 — a failed run must report where it actually stopped. Holding
+          // the inherited run floor painted a red bar at 99 % for a scene that
+          // died in the plate phase.
+          ? Math.min(runFloorRef.current, Math.max(phaseOverall, 0))
           : phaseOverall;
   runFloorRef.current = isActive && !waitingForExport && !isStalled
     ? Math.max(runFloorRef.current, currentOverall)
