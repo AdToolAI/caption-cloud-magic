@@ -18085,14 +18085,18 @@ export type Database = {
       }
       v434_artifact_pins: {
         Row: {
+          attempt: number | null
           byte_size: number | null
+          cell: string | null
           created_at: string
           generation: number | null
           id: string
           kind: string
+          notes: Json | null
           object_key: string | null
           pass_idx: number | null
           pinned_url: string | null
+          purpose: string
           run_id: string | null
           scene_id: string | null
           sha256: string | null
@@ -18100,14 +18104,18 @@ export type Database = {
           status: string
         }
         Insert: {
+          attempt?: number | null
           byte_size?: number | null
+          cell?: string | null
           created_at?: string
           generation?: number | null
           id?: string
           kind: string
+          notes?: Json | null
           object_key?: string | null
           pass_idx?: number | null
           pinned_url?: string | null
+          purpose?: string
           run_id?: string | null
           scene_id?: string | null
           sha256?: string | null
@@ -18115,14 +18123,18 @@ export type Database = {
           status: string
         }
         Update: {
+          attempt?: number | null
           byte_size?: number | null
+          cell?: string | null
           created_at?: string
           generation?: number | null
           id?: string
           kind?: string
+          notes?: Json | null
           object_key?: string | null
           pass_idx?: number | null
           pinned_url?: string | null
+          purpose?: string
           run_id?: string | null
           scene_id?: string | null
           sha256?: string | null
