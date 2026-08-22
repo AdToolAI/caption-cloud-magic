@@ -7,7 +7,7 @@
    powershell -Command "irm bun.sh/install.ps1 | iex"
    ```
 
-2. CMD-Fenster schließen und ein neues CMD-Fenster öffnen.
+2. **Das aktuelle CMD-Fenster vollständig schließen** (`exit` eingeben) und danach über das Startmenü ein neues CMD-Fenster öffnen. Die Installation war bereits erfolgreich; nur das alte Fenster kennt den neuen Pfad noch nicht.
 
 3. Installation prüfen:
    ```bat
