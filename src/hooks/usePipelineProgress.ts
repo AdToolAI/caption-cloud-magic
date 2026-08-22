@@ -974,9 +974,30 @@ export function usePipelineProgress({
   // Cap at the actual weighted-phase total instead.
   const lipsyncPhase = phases.find((p) => p.id === 'lipsync');
   const exportPhase = phases.find((p) => p.id === 'export');
+  const clipsPhase = phases.find((p) => p.id === 'clips');
   const lipsyncTerminal = !!lipsyncPhase && (lipsyncPhase.status === 'done' || lipsyncPhase.status === 'failed');
   const exportIdleOrDone = !exportPhase || exportPhase.status === 'idle' || exportPhase.status === 'done';
-  const waitingForExport = lipsyncTerminal && exportIdleOrDone && !renderRunning;
+  // v440 — "waiting for export" is only true for the CURRENT run. After a
+  // re-render the plate phase restarts while lipsync/export still carry the
+  // terminal status of the previous run; without this guard the bar snapped
+  // straight back to the old ~99% floor instead of restarting at the plate.
+  const clipsRunning = !!clipsPhase && (clipsPhase.status === 'running' || clipsPhase.status === 'pending');
+  const waitingForExport = lipsyncTerminal && exportIdleOrDone && !renderRunning && !clipsRunning;
+
+  // v440 — a fresh plate run is a new epoch: drop the inherited run floor once,
+  // so progress restarts from the real plate phase instead of the old ceiling.
+  const clipsEpochRef = useRef<boolean>(false);
+  if (clipsRunning && !clipsEpochRef.current) {
+    clipsEpochRef.current = true;
+    if (lipsyncTerminal) {
+      runFloorRef.current = 0;
+      floorRef.current.lipsync = 0;
+      floorRef.current.export = 0;
+      realProgressRef.current = { value: 0, at: Date.now() };
+    }
+  } else if (!clipsRunning && clipsEpochRef.current) {
+    clipsEpochRef.current = false;
+  }
 
   const runSoftPercent = isActive && pipelineStartRef.current && !waitingForExport && !isStalled
     ? Math.min(95, Math.max(1, (elapsedSeconds / RUN_NOMINAL_SECONDS) * 95))
