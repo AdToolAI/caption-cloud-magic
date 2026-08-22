@@ -56,9 +56,23 @@ export function sampleCameraPathRuntime(
   return { x: last.x, y: last.y, size: last.size };
 }
 
-/** True when the path is worth rendering dynamically. */
+/**
+ * True when the path is used at all — the runtime mirror of
+ * `shouldUseCameraPath` in `dynamic-camera-path.ts`. Preclip render and T13
+ * reprojection MUST evaluate this identically (V452 A.2 parity contract).
+ */
 export function isDynamicPathRuntime(
-  path: { keyframes?: CameraPathKeyframeRuntime[]; moving?: boolean } | null | undefined,
+  path:
+    | { keyframes?: CameraPathKeyframeRuntime[]; moving?: boolean; signature?: string }
+    | null
+    | undefined,
 ): boolean {
-  return !!path && Array.isArray(path.keyframes) && path.keyframes.length > 1 && path.moving === true;
+  return (
+    !!path &&
+    path.moving === true &&
+    Array.isArray(path.keyframes) &&
+    path.keyframes.length > 1 &&
+    typeof path.signature === "string" &&
+    path.signature.length > 0
+  );
 }
