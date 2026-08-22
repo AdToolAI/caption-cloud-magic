@@ -103,7 +103,7 @@ import {
 } from "../_shared/asset-ref.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { isLipSyncIntentionalPayload } from "../_shared/lipSyncIntent.ts";
-const ANCHOR_AUDIT_VERSION = 15;
+const ANCHOR_AUDIT_VERSION = 16;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
