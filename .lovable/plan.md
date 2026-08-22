@@ -1,52 +1,71 @@
-# V435 Phase 2 — Samuel A/B/C/D Cross-Test (startet nach deinem GO)
+# V436 — v117 Plate-Gate False-Positive: RCA-Abschluss + minimaler Fix
 
-Verstanden: Der Reset wird von dir als Owner manuell ausgelöst, genau einmal, ohne weitere Änderungen an der Szene und ohne zweiten Retry. Ich fasse die Szene bis zu deinem GO nicht an.
+Der von dir ausgelöste Referenzlauf für V435 ist nicht am Render gescheitert, sondern an einem Gate,
+das gegen seinen eigenen dokumentierten Vertrag blockt. Belegte Fakten aus diesem Lauf:
 
-**So findest du die Szene** (dein erster Screenshot zeigte ein frisch angelegtes, leeres Projekt — deshalb "0 Scenes"):
-- Konto: `bestofproducts4u@gmail.com`
-- Projekt: **v431-g322-resmoke** (ID `035273d7-ae9b-44e0-89e7-f9e28703530d`)
-- Direkt öffnen: `https://useadtool.ai/video-composer?projectId=035273d7-ae9b-44e0-89e7-f9e28703530d`
-- Zielszene: **S11 — die letzte Szene in der Liste** (`e658509d-…`, order_index 10, Status „Generated", die mit den vier Charakteren auf der Dachterrasse). Nicht S08/S09/S10 — das sind fehlgeschlagene Szenen und nicht Teil dieses Gates.
-- Dort genau einmal „Reset & retry lip-sync" klicken, danach nichts weiter ändern.
+| Zeitpunkt (UTC) | Ereignis |
+|---|---|
+| 00:24:54 | Harter Reset, `plate_generation` 3 → 4, Artefakte gepurgt |
+| 00:24:54 → 00:30:40 | `base_video` (HappyHorse, Job `1mbs4fwq…`) → `succeeded` |
+| 00:31:02 | `compose-dialog-segments` startet, `plateDims` per mp4_probe = 1284×718 |
+| 00:31:13 | `v158_plate_hydration … speakers=4 boxes=4/4 mouths=0/4` |
+| 00:31:13 | `plate-identity unavailable — using anchor-rescale coords` |
+| 00:31:13 | `v117_plate_quality_gate_BLOCK plate_identity_unavailable` → 960 Credits erstattet |
 
-Stand 22.08. 00:31 UTC: Der Reset ist ausgelöst und war ein harter Reset — `plate_generation` 3 → 4, Artefakte gepurgt, `clip_url` leer. Der neue Plate-Render (HappyHorse, Job `1mbs4fwq…`) lief 00:24:54 → 00:30:40 und ist `succeeded`. Die Lip-Sync-Pässe starten erst jetzt; die UI-Karte zeigte „Starting lip-sync…" bereits während der Plate-Phase, weil `lip_sync_status` schon beim Reset auf `pending` gesetzt wird — reines Anzeigethema, kein Pipeline-Fehler, und außerhalb dieses Gates.
+Ergebnis in der DB: `lip_sync_status=failed`, `pipeline_substate=lipsync_failed`, `clip_url` leer,
+`plate_ready_generation=NULL`. **Null Sync-Pässe → null V435-Pins.**
 
-`v434_artifact_pins` wird von der deployten Instrumentierung (Preclip-Pin + Provider-Output-Pin inkl. `attempt`/`purpose`) automatisch befüllt, sobald die Sync-Pässe laufen. Phase 2 startet erst nach deinem GO, wenn der Lauf vollständig durch ist.
+## Zwei belegte Defekte
 
-## Was nach GO passiert
+**D1 — Gate widerspricht dem v117-Vertrag.**
+Der Codekommentar über dem Gate hält ausdrücklich fest, dass nur *physisch fehlende Gesichter*
+blocken dürfen und ein Identity-Resolution-Ausfall über den Slot-Order-Fallback abgedeckt ist.
+Die Bedingung enthält aber zusätzlich `!plateIdentityMap` — genau der Fall, der hier eintrat,
+während die Box-Hydration 4 von 4 Gesichtern hatte.
 
-**1. Phase-1-Abnahme (read-only)**
-- Pins der neuen `run_id`/`generation` auslesen und prüfen: pro Pass genau ein `preclip` und ein `provider-output`, mit immutabler Objekt-Key, `sha256`, `byte_size`, `attempt`.
-- Samuel T2 (Pass 2) und T6 (Pass 3) über die characterId `483f9cdc…` und den gelockten Slot 1 erneut strukturell zuordnen — kein Namens-Matching.
-- Jede gepinnte Datei erneut laden und den Hash gegenprüfen. Jede Abweichung führt zur Verweigerung dieser Zelle, nicht zu einer Messung.
-- Fehlt eine Pin-Sorte, endet der Gate hier mit BLOCKED statt mit einem Ersatzweg über mutable Artefakte.
+**D2 — Fehlermeldung passt nicht zum reason-Zweig.**
+Bei `reason = plate_identity_unavailable` wird trotzdem der Text „recognized: 0 of 4" gerendert.
+Das hat die Diagnose in die falsche Richtung geschickt (vermeintlicher Render-Fehler).
 
-**2. A/B/C/D-Matrix auf exakt diesen Pins**
+Nicht belegt und deshalb kein Teil einer Behauptung: *warum* `resolvePlateFaceIdentities` `null`
+lieferte. Ein `resolve threw`-Warning steht nicht im Log, ein stiller Null-Rückweg ist also
+wahrscheinlicher — das wird gemessen, nicht geraten.
 
-| Zelle | Video-Input | Audio-Input |
-|---|---|---|
-| A | Samuel T2 Preclip-Pin | T2-Audio (Baseline-Reproduktion) |
-| B | Samuel T2 Preclip-Pin | Audio des erfolgreichen Samuel-Turns (T6) |
-| C | Preclip-Pin des erfolgreichen Turns (T6) | T2-Audio |
-| D | Samuel T2 Preclip-Pin | T2-Audio, zweiter Provider-Versuch |
+## Umfang des Fix-Gates
 
-Pro Zelle festgehalten: Input-/Output-Keys mit Hash, tatsächlich verwendete geometrie-gekoppelte Mund-ROI, MAD-Ratio, Alt-Metrik ΔMean (nur Telemetrie), Provider-Job-/Attempt-ID, Mundstreifen-Kontaktbogen, menschliches Label. Alle Cross-Test-Ausgaben werden mit `purpose='calibration'` und gesetzter `cell` gepinnt, damit sie nie mit Produktionsevidenz verwechselt werden.
+**Schritt 1 — Diagnose scharfstellen (read-then-fix)**
+`resolvePlateFaceIdentities` bekommt an jedem Rückweg, der kein Ergebnis liefert, einen expliziten
+Grundcode im Log (`no_anchor`, `provider_empty`, `provider_error`, `expected_count_mismatch`, …).
+Ohne diesen Grund wird D1 nicht angefasst — sonst tauschen wir einen False-Positive gegen einen
+stillen Fehlstart.
 
-**3. Auswertung nach vordeklarierten Regeln** (bereits im Harness verankert, wird nicht nachträglich angepasst)
-- A ≠ D → PROVIDER-SPORADIC, hat Vorrang vor allen Input-Schlüssen.
-- A+B no-op, C Bewegung → PRECLIP / Face-Window.
-- A+C no-op, B Bewegung → AUDIO/TURN.
-- Alles andere oder ein unklares Label → UNDECIDED.
+**Schritt 2 — D1 korrigieren, eng begrenzt**
+`!plateIdentityMap` allein blockt nicht mehr. Geblockt wird künftig nur noch, wenn
+- die hydrierten Box-Koordinaten weniger Sprecher abdecken als erwartet (`boxes < speakers`), oder
+- der Split-Screen-Detektor anschlägt.
+Liegt eine vollständige Box-Hydration vor (`boxes = speakers`), läuft der Dispatch mit
+Slot-Order-Koordinaten weiter und protokolliert `v117_soft_pass_identity_unavailable`.
+Keine Änderung an Schwellwerten, Provider-Auswahl, Retry-Stufen, Mux oder State-Machine.
 
-**4. Kalibrierung bleibt nicht-autoritativ**
-Neue Samples werden als reproduzierbar erfasst, aber es wird kein Schwellwert abgeleitet und kein Produktions-Gate umgestellt, solange nicht mindestens drei saubere Samples pro Klasse über mehrere Sprecher, Cropgrößen und Turn-Längen vorliegen. MAD-Ratio bleibt `telemetry_only`.
+**Schritt 3 — D2 korrigieren**
+Die Nutzermeldung wird pro reason-Zweig korrekt gewählt, dreisprachig (EN/DE/ES), und nennt bei
+Identity-Ausfall den tatsächlichen Grund statt einer erfundenen Gesichtszählung.
 
-## Grenzen dieses Gates
+**Schritt 4 — Regressionstests**
+Tests für die Gate-Entscheidungstabelle: `boxes<speakers` → BLOCK, Split-Screen → BLOCK,
+`identityMap=null` bei `boxes=speakers` → PASS, `identityMap` vorhanden aber `resolved<speakers`
+→ PASS. Plus ein Test, dass die Meldung zum reason-Zweig passt.
 
-Keine Änderung an Gate-Logik, Schwellwerten, Provider-Auswahl, Retry-Stufen, Dispatch, Mux, State-Machine oder Continuity. Kein Frontend-Publish. Die einzigen Aufrufe an den Provider sind die vier Zellen — falls dafür ein Key im Sandbox-Kontext fehlt, melde ich das offen, statt Ergebnisse zu schätzen.
+## Außerhalb dieses Gates
 
-## Ergebnis
+- Kein zweiter Samuel-Lauf. Der V435-Referenzlauf wird erst nach deinem separaten GO neu gestartet,
+  weil jeder Lauf einen echten Plate-Render kostet.
+- Der falsche UI-Text „Starting lip-sync…" während der Plate-Phase bleibt vorerst stehen; er ist
+  kosmetisch und wird separat behandelt.
+- Keine Anpassung der V435-Kalibrierung. MAD-Ratio bleibt `telemetry_only`.
+
+## Abschluss
 
 Ein Urteil in der Form:
-`V435 = PASS — PHASE-1 PINS COMPLETE + PRIMARY CAUSE <PRECLIP|AUDIO/TURN|PROVIDER-SPORADIC|UNDECIDED>, MAD-RATIO EVIDENCE <summary>, CALIBRATION STILL NON-AUTHORITATIVE`
+`V436 = PASS — v117 GATE CONTRACT RESTORED, IDENTITY-NULL REASON INSTRUMENTED, MESSAGE/REASON PARITY, <n> TESTS GREEN → V435 PHASE 1 BEREIT FÜR NEUSTART`
 oder ein ehrliches BLOCKED mit Begründung.
