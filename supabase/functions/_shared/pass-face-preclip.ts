@@ -153,6 +153,33 @@ function evenDimension(value: number, fallback: number): number {
 }
 
 /**
+ * V447 — vollständige Artefakt-Signatur eines Preclips. `null` bedeutet:
+ * keine Run-Identität vorhanden ⇒ kein Reuse, kein Signatur-Stempel.
+ */
+export function buildPreclipSignature(args: {
+  runId: string | null;
+  generation: number | null;
+  plateKey: string;
+  crop: { x: number; y: number; size: number; outputSize: number };
+  bbox: [number, number, number, number] | null;
+  startSec: number;
+  endSec: number;
+}): string | null {
+  if (!args.runId || args.generation === null || !Number.isFinite(args.generation)) return null;
+  if (!args.plateKey) return null;
+  const bboxSig = args.bbox ? args.bbox.map((n) => Math.round(n)).join(",") : "nobbox";
+  return [
+    `r=${args.runId}`,
+    `g=${args.generation}`,
+    `p=${args.plateKey}`,
+    `c=${args.crop.x},${args.crop.y},${args.crop.size},${args.crop.outputSize}`,
+    `b=${bboxSig}`,
+    `w=${Number(args.startSec).toFixed(3)}-${Number(args.endSec).toFixed(3)}`,
+  ].join("|");
+}
+
+
+/**
  * Render a single-face preclip via Remotion Lambda and wait for it to finish.
  * Caller should already have stored `preclip_url` + `preclip_crop` on the
  * pass if a prior call succeeded (idempotency lives at the call site so we
