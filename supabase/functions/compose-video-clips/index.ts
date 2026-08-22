@@ -16,6 +16,8 @@ import { materializeCompatibilityOutput } from "../_shared/materialize-scene-out
 import { resolveSceneOutput } from "../_shared/resolve-scene-output.ts";
 import { isSceneOutputFinal } from "../_shared/continuity-state.ts";
 import { sceneState as sceneStateOf, legacyClipReadyEquivalentRow, transitionSceneV2 } from "../_shared/scene-state.ts";
+import { verifyAnchorObject, blocksProviderDispatch, isResetOwnedGeneratedAnchor } from "../_shared/generated-anchor.ts";
+import { failPlateAttemptForRun } from "../_shared/plate-attempt.ts";
 
 import {
   countDialogSpeakers,
