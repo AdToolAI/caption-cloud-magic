@@ -19,7 +19,7 @@
 import React from 'react';
 import { AbsoluteFill, Video, useCurrentFrame, useVideoConfig } from 'remotion';
 import { z } from 'zod';
-import { sampleCameraPathRuntime } from '@/lib/composer/cameraPathRuntime';
+import { sampleCameraPathRuntime } from '../../lib/composer/cameraPathRuntime';
 
 export const CameraPathKeyframeSchema = z.object({
   t: z.number().min(0),
