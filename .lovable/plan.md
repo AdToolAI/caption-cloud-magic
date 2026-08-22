@@ -2,6 +2,12 @@
 
 Verstanden: Der Reset wird von dir als Owner manuell ausgelöst, genau einmal, ohne weitere Änderungen an der Szene und ohne zweiten Retry. Ich fasse die Szene bis zu deinem GO nicht an.
 
+**So findest du die Szene** (dein Screenshot zeigt ein frisch angelegtes, leeres Projekt — deshalb "0 Scenes"):
+- Konto: `bestofproducts4u@gmail.com`
+- Projekt: **v431-g322-resmoke** (ID `035273d7-ae9b-44e0-89e7-f9e28703530d`), Szene `e658509d-…`, Lip-Sync-Status `done`, zuletzt geändert 19.08.2026
+- Direkt öffnen: `https://useadtool.ai/video-composer?projectId=035273d7-ae9b-44e0-89e7-f9e28703530d`
+- Dort die Samuel-Szene öffnen und genau einmal „Reset & retry lip-sync" klicken.
+
 Stand jetzt: `v434_artifact_pins` enthält weiterhin **0 Zeilen** — der Lauf hat also noch keine Evidenz erzeugt. Die Instrumentierung (Preclip-Pin + Provider-Output-Pin inkl. `attempt`/`purpose`) ist deployt und schreibt die Zeilen automatisch, sobald der Lauf durchläuft.
 
 ## Was nach GO passiert
