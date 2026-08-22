@@ -5,7 +5,11 @@ import Replicate from "npm:replicate@0.25.2";
 import { verifyWebhookRequest, appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { CLIP_COSTS } from "../_shared/clip-costs.ts";
 import { countDialogSpeakers as detectSpeakerCount } from "../_shared/dialog-speakers.ts";
-import { isGreenNetRejection } from "../_shared/happyhorse-green-net.ts";
+import {
+  isGreenNetRejection,
+  classifyProviderRejection,
+  PROVIDER_INPUT_FILTER_CLASS,
+} from "../_shared/happyhorse-green-net.ts";
 import { isAmbientAudioRow, runAmbientSpeechGate } from "../_shared/ambient-audio.ts";
 
 
