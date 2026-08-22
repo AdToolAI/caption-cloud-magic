@@ -25,6 +25,7 @@
 import { failLipSync } from "./lipsync-fail.ts";
 import { supersedeOpenPlateAttempts } from "./plate-attempt.ts";
 import { materializeCompatibilityOutput } from "./materialize-scene-output.ts";
+import { resetOwnedAnchorPatch } from "./generated-anchor.ts";
 
 type SupabaseLike = {
   from: (t: string) => any;
@@ -436,7 +437,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     const { data } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, plate_generation, plate_ready_generation, clip_url, clip_status, dialog_shots, audio_plan, scene_assets, replicate_prediction_id, lip_sync_applied_at",
+        "id, project_id, plate_generation, plate_ready_generation, clip_url, clip_status, dialog_shots, audio_plan, scene_assets, replicate_prediction_id, lip_sync_applied_at, reference_image_url, lock_reference_url",
       )
       .eq("id", sceneId)
       .maybeSingle();
@@ -589,12 +590,26 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
   );
 
 
+  // v440 — the purge above physically deleted the generated scene anchor of
+  // this scene (`…/scene-anchors/<sceneId>-<hash>.png`). Its DB pointers must
+  // die in the same teardown, otherwise the next run dispatches a paid
+  // provider call against a `NoSuchKey` object (observed 2026-08-22, S11).
+  // Persistent references (cast portraits, brand characters, user uploads,
+  // anchors of other scenes) are NOT reset-owned and stay untouched.
+  const anchorPatch = resetOwnedAnchorPatch(scene, sceneId);
+  if (Object.keys(anchorPatch).length > 0) {
+    console.log(
+      `[v440_anchor_lifecycle] scene=${sceneId} clearing reset-owned anchor pointers: ${Object.keys(anchorPatch).join(",")}`,
+    );
+  }
+
   try {
     // v382 — NOT-NULL-Spalten dürfen im Reset niemals `null` bekommen.
     // `dialog_takes` (default '{}') und `scene_assets` (default '[]') sind
     // NOT NULL; ein `null` hier ließ den kompletten Reset — und damit jeden
     // Regenerate einer Dialogszene — an einer Constraint scheitern.
     const patch = coerceNotNullResetColumns({
+      ...anchorPatch,
       // v385 — der Hard-Reset setzt den Zustand direkt (Purge, keine
       // Transition): `pipeline_state` ist die Wahrheit, `clip_status` wird im
       // selben Statement mitgeschrieben, weil die Spalte NOT NULL ist.

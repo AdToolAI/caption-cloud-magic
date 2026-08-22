@@ -16,6 +16,8 @@ import { materializeCompatibilityOutput } from "../_shared/materialize-scene-out
 import { resolveSceneOutput } from "../_shared/resolve-scene-output.ts";
 import { isSceneOutputFinal } from "../_shared/continuity-state.ts";
 import { sceneState as sceneStateOf, legacyClipReadyEquivalentRow, transitionSceneV2 } from "../_shared/scene-state.ts";
+import { verifyAnchorObject, blocksProviderDispatch, isResetOwnedGeneratedAnchor } from "../_shared/generated-anchor.ts";
+import { failPlateAttemptForRun } from "../_shared/plate-attempt.ts";
 
 import {
   countDialogSpeakers,
@@ -2644,6 +2646,38 @@ serve(async (req) => {
                     .eq("id", scene.id);
                 } catch (_) { /* non-fatal */ }
 
+                // ── v440 ANCHOR LIFECYCLE — pointer vs. object ─────────────
+                // A pinned generated anchor whose object was purged (hard
+                // reset) must be treated as ABSENT here, so the normal
+                // recomposition path below runs instead of reusing a dead
+                // link. Persistent/external references are not storage-backed
+                // by us and are left alone.
+                {
+                  const pinned = String(scene.referenceImageUrl ?? "");
+                  if (pinned) {
+                    const verdict = await verifyAnchorObject(supabaseAdmin as any, pinned);
+                    if (verdict === "anchor_object_missing") {
+                      console.warn(
+                        `[compose-video-clips] v440_anchor_object_missing scene=${scene.id} pointer=${pinned.slice(-64)} → treating pinned anchor as absent, re-composing`,
+                      );
+                      scene.referenceImageUrl = undefined;
+                      const clearPatch: Record<string, unknown> = {
+                        reference_image_url: null,
+                        updated_at: new Date().toISOString(),
+                      };
+                      if (isResetOwnedGeneratedAnchor((scene as any).lockReferenceUrl ?? pinned, scene.id)) {
+                        clearPatch.lock_reference_url = null;
+                      }
+                      try {
+                        await supabaseAdmin
+                          .from("composer_scenes")
+                          .update(clearPatch)
+                          .eq("id", scene.id);
+                      } catch (_) { /* non-fatal — the in-memory clear already protects dispatch */ }
+                    }
+                  }
+                }
+
                 // Has the currently-pinned anchor passed the current audit version?
                 const prevAuditRaw =
                   (scene as any).audioPlan?.twoshot?.anchor_face_audit ?? null;
@@ -3647,18 +3681,30 @@ serve(async (req) => {
           );
         }
 
-        // ── v195 HARD-GUARD: cinematic-sync must have a composed anchor ────
+        // ── v195/v440 HARD-GUARD: cinematic-sync needs a VERIFIED anchor ───
         // Regressions kept slipping through when the anchor safety net threw
         // or when portraits were absent — the provider then rendered generic
         // strangers and the whole Sync.so pipeline chewed cycles on faces
         // that don't belong to any brand character. Fail loud here BEFORE
         // any provider credits are spent, so the user sees a clear error
         // instead of an "endless lip-sync".
-        if (!scene.referenceImageUrl) {
-          const msg =
-            tl({ de: "cinematic_sync_anchor_missing: Für Cinematic-Sync konnte kein Charakter-Anchor komponiert werden (keine Portraits aufgelöst). Bitte einen Brand Character mit Portrait dem Cast zuweisen und erneut versuchen.", en: "cinematic_sync_anchor_missing: No character anchor could be composed for Cinematic-Sync (no portraits resolved). Please assign a Brand Character with a portrait to the cast and try again.", es: "cinematic_sync_anchor_missing: No se pudo componer un ancla de personaje para Cinematic-Sync (no se resolvieron retratos). Por favor, asigne un Personaje de Marca con un retrato al elenco e intente de nuevo." });
+        //
+        // v440 — truthiness is not existence. A purged generated anchor left a
+        // dangling pointer that passed this gate and cost a paid HappyHorse
+        // dispatch that could only answer 400/NoSuchKey (S11, 2026-08-22).
+        // Storage-backed anchors are therefore proven to exist here; external
+        // / non-storage references keep their existing validation contract.
+        const v440AnchorVerdict = await verifyAnchorObject(
+          supabaseAdmin as any,
+          scene.referenceImageUrl ?? null,
+        );
+        if (blocksProviderDispatch(v440AnchorVerdict)) {
+          const pointerless = v440AnchorVerdict === "anchor_pointer_missing";
+          const msg = pointerless
+            ? tl({ de: "cinematic_sync_anchor_missing: Für Cinematic-Sync konnte kein Charakter-Anchor komponiert werden (keine Portraits aufgelöst). Bitte einen Brand Character mit Portrait dem Cast zuweisen und erneut versuchen.", en: "cinematic_sync_anchor_missing: No character anchor could be composed for Cinematic-Sync (no portraits resolved). Please assign a Brand Character with a portrait to the cast and try again.", es: "cinematic_sync_anchor_missing: No se pudo componer un ancla de personaje para Cinematic-Sync (no se resolvieron retratos). Por favor, asigne un Personaje de Marca con un retrato al elenco e intente de nuevo." })
+            : tl({ de: "anchor_recompose_failed: Der Szenen-Anchor existiert nicht mehr im Speicher und konnte nicht neu komponiert werden. Es wurde kein Render gestartet (keine Kosten). Bitte erneut versuchen.", en: "anchor_recompose_failed: The scene anchor no longer exists in storage and could not be re-composed. No render was started (no cost). Please try again.", es: "anchor_recompose_failed: El ancla de escena ya no existe en el almacenamiento y no se pudo recomponer. No se inició ningún renderizado (sin coste). Inténtalo de nuevo." });
           console.warn(
-            `[compose-video-clips] scene ${scene.id}: v195_cinematic_sync_anchor_missing → hard-fail before provider dispatch`,
+            `[compose-video-clips] scene ${scene.id}: v440_anchor_gate verdict=${v440AnchorVerdict} → hard-fail before provider dispatch (zero spend)`,
           );
           await safeMarkSceneFailed(scene.id, msg, {
             isCinematicSyncScene: true,
@@ -3666,6 +3712,11 @@ serve(async (req) => {
           });
           results.push({ sceneId: scene.id, status: "failed", error: msg });
           continue;
+        }
+        if (v440AnchorVerdict === "anchor_verified") {
+          console.log(
+            `[compose-video-clips] v440_anchor_verified scene=${scene.id}`,
+          );
         }
       }
 
@@ -5208,6 +5259,24 @@ serve(async (req) => {
             ),
           )
           .eq("id", scene.id);
+        // v440 — the provider rejected this dispatch (e.g. HappyHorse 400 on a
+        // dead anchor object). The attempt ledger must not keep a zombie
+        // `rendering` row while `composer_pipeline_jobs` already says failed.
+        // Fenced on scene + run + generation, idempotent, never closes an
+        // attempt of another run.
+        try {
+          const stamp = sceneRunStamps.get(scene.id);
+          const closed = await failPlateAttemptForRun(supabaseAdmin, {
+            sceneId: scene.id,
+            runId: stamp?.runId ?? null,
+            expectedGeneration: stamp?.generation ?? null,
+          });
+          if (closed > 0) {
+            console.log(
+              `[compose-video-clips] v440_attempt_terminalized scene=${scene.id} run=${stamp?.runId ?? "-"} gen=${stamp?.generation ?? "-"} rows=${closed}`,
+            );
+          }
+        } catch (_) { /* bookkeeping is best-effort */ }
         results.push({ sceneId: scene.id, status: "failed", error: errMsg });
       }
     }
@@ -5235,6 +5304,17 @@ serve(async (req) => {
           errorCode: String(r.error ?? "dispatch_failed"),
           outcome: classifyDispatchFailure(r.error),
         });
+        // v440 — keep the attempt ledger in lockstep with the job ledger: a
+        // scene that never reached (or was rejected by) the provider must not
+        // leave an open `rendering` attempt behind. Idempotent + run-fenced.
+        try {
+          const stamp = sceneRunStamps.get(r.sceneId);
+          await failPlateAttemptForRun(supabaseAdmin, {
+            sceneId: r.sceneId,
+            runId: stamp?.runId ?? null,
+            expectedGeneration: stamp?.generation ?? null,
+          });
+        } catch (_) { /* best-effort */ }
       }
     }
 

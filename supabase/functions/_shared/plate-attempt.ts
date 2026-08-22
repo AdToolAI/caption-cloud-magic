@@ -241,6 +241,59 @@ export async function failPlateAttempt(
 }
 
 /**
+ * v440 — terminalize the attempt of a run whose provider dispatch was REJECTED.
+ *
+ * The V439 forensic (S11, 2026-08-22) showed a `plate_attempts` row parked at
+ * `rendering` forever: HappyHorse answered the dispatch with a 400, so no
+ * provider job id was ever bound and `failPlateAttempt()` — which keys on that
+ * id — could not match anything. The ledger then disagreed with
+ * `composer_pipeline_jobs`, which already said `failed`.
+ *
+ * The write is fenced on the exact run identity (scene + run_id + expected
+ * generation) and on `status = 'rendering'`, so:
+ *   - an attempt of another run/generation is never closed,
+ *   - a late duplicate callback is a no-op (idempotent),
+ *   - a tombstoned (`superseded`) or delivered (`completed`) row is untouched.
+ *
+ * Returns the number of rows terminalized (0 or 1 in practice).
+ */
+export async function failPlateAttemptForRun(
+  supabase: SupabaseLike,
+  args: {
+    sceneId: string;
+    runId?: string | null;
+    expectedGeneration?: number | null;
+    /** Bind additionally to a provider job id when one was already minted. */
+    providerJobId?: string | null;
+  },
+): Promise<number> {
+  if (!args.sceneId) return 0;
+  // Without a run fence we cannot prove the row belongs to THIS dispatch —
+  // refuse rather than risk closing a foreign attempt.
+  if (!args.runId && !args.providerJobId) return 0;
+  try {
+    let q = supabase
+      .from("plate_attempts")
+      .update({ status: "failed", completed_at: new Date().toISOString() })
+      .eq("scene_id", args.sceneId)
+      .eq("status", "rendering");
+    if (args.runId) q = q.eq("run_id", args.runId);
+    if (
+      args.expectedGeneration !== null &&
+      args.expectedGeneration !== undefined
+    ) {
+      q = q.eq("expected_plate_generation", Number(args.expectedGeneration));
+    }
+    if (args.providerJobId) q = q.eq("provider_job_id", args.providerJobId);
+    const { data } = await q.select("id");
+    return Array.isArray(data) ? data.length : 0;
+  } catch {
+    /* non-fatal — bookkeeping must never break the failure path */
+    return 0;
+  }
+}
+
+/**
  * v376 — logical invalidation for the hard reset. Runs BEFORE any provider
  * cancel or storage purge, so a cancel that silently fails can no longer let a
  * stale result through: the tombstone, not the cancel call, is the wall.
