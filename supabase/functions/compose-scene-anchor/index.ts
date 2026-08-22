@@ -832,12 +832,27 @@ serve(async (req) => {
       }
     } else if (useNanoBananaFirst) {
       // v276 — NB2 first with Gemini 3 Pro auto-fallback.
+      // V442 — exactly ONE extra NB2 attempt when the first failure was a
+      // timeout / provider URL-crawl failure AND our refs are inline-capable
+      // (the retry then carries bytes instead of links). Bounded: max 2 NB2
+      // attempts, then the existing gemini fallback. No other retry policy.
       const r = await callNanoBanana2();
       if (r) { bytes = r.bytes; mime = r.mime; ext = r.ext; anchorProvider = "nano_banana_2"; }
       else {
-        console.warn(`[compose-scene-anchor] v276 nano_banana_2 failed → fallback gemini3pro sceneId=${body.sceneId}`);
-        const r2 = await callGemini3ProImage();
-        if (r2) { bytes = r2.bytes; mime = r2.mime; ext = r2.ext; anchorProvider = "gemini3pro"; }
+        const retryable = inlinedCount > 0 && !!lastFailureReason &&
+          /(timeout|url_fetch_failed|network)/.test(lastFailureReason);
+        if (retryable) {
+          console.warn(
+            `[compose-scene-anchor] v442_nano_inline_retry sceneId=${body.sceneId} reason=${lastFailureReason} inlined=${inlinedCount}`,
+          );
+          const rr = await callNanoBanana2();
+          if (rr) { bytes = rr.bytes; mime = rr.mime; ext = rr.ext; anchorProvider = "nano_banana_2"; }
+        }
+        if (!bytes) {
+          console.warn(`[compose-scene-anchor] v276 nano_banana_2 failed → fallback gemini3pro sceneId=${body.sceneId} reason=${lastFailureReason ?? "unknown"}`);
+          const r2 = await callGemini3ProImage();
+          if (r2) { bytes = r2.bytes; mime = r2.mime; ext = r2.ext; anchorProvider = "gemini3pro"; }
+        }
       }
     } else {
       const r = await callNanoBanana2();
@@ -846,8 +861,22 @@ serve(async (req) => {
 
 
     if (!bytes) {
+      // V442 — the caller must be able to tell "portraits were missing" apart
+      // from "composition failed". Portraits are guaranteed non-empty here
+      // (validated above), so this is always a composition failure.
+      const reason = sanitizeAnchorReason(lastFailureReason ?? "anchor_provider_failed");
+      console.warn(
+        `[compose-scene-anchor] v442_recompose_failed sceneId=${body.sceneId} portraits=${portraits.length} inlined=${inlinedCount} reason=${reason}`,
+      );
       return new Response(
-        JSON.stringify({ strategy: "text-only", error: "anchor_provider_failed" }),
+        JSON.stringify({
+          strategy: "text-only",
+          error: "anchor_provider_failed",
+          failureKind: "anchor_recompose_failed",
+          reason,
+          portraitCount: portraits.length,
+          inlinedCount,
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
