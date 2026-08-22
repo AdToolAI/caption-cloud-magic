@@ -20,6 +20,15 @@
  *     byte-identical path and signature.
  */
 
+// V452 uses the PROVEN v359 planner as the authoritative movement planner.
+// Only the trajectory is taken from it; the crop SIZE stays frozen (V445/V450).
+import {
+  type Box as PlannerBox,
+  boxCenter as plannerBoxCenter,
+  type CropWindow,
+  planCameraPath,
+} from "./camera-path.ts";
+
 export const CAMERA_PATH_VERSION = "v452";
 
 /** Vertical target of the mouth inside the crop (v400 framing target). */
@@ -83,6 +92,10 @@ export interface DynamicCameraPath {
   reason: string;
   /** Stable hash over the geometry — bound into the preclip signature. */
   signature: string;
+  /** v359 planner telemetry (evidence only, never a gate). */
+  plannerFrames?: number;
+  plannerContainedRatio?: number;
+  plannerMaxJump?: number;
 }
 
 export interface TrackSample {
@@ -199,6 +212,8 @@ export interface BuildCameraPathInput {
   srcHeight: number;
   startSec: number;
   endSec: number;
+  /** Preclip frame rate; the planner works per frame. Defaults to PATH_FPS. */
+  fps?: number;
 }
 
 /** Static single-keyframe path — behaviourally identical to the fixed crop. */
@@ -222,102 +237,198 @@ export function staticCameraPath(input: Omit<BuildCameraPathInput, "samples">): 
   return path;
 }
 
+/** Frame cadence the preclip is rendered at (Remotion Lambda dialog preclip). */
+export const PATH_FPS = 30;
+
+/** Keyframe decimation tolerance in plate pixels (visually lossless). */
+export const KEYFRAME_TOLERANCE_PX = 0.75;
+
+/** Hard cap on persisted keyframes per pass. */
+export const MAX_KEYFRAMES = 240;
+
 /**
- * Builds the dynamic path. Size is taken verbatim from the frozen static crop;
- * only the window position varies. Never switches identity — the caller has
- * already resolved every sample to the ONE assigned face.
+ * Deterministic densification: the bounded Rekognition samples become the
+ * per-frame box series `planCameraPath` expects. Linear between measured
+ * samples, hold at both ends. No new identity decision happens here — the
+ * caller already resolved every sample to the ONE assigned face.
+ */
+export function densifySamplesToFrames(
+  samples: TrackSample[],
+  startSec: number,
+  endSec: number,
+  fps: number,
+): { boxes: Array<PlannerBox | null>; mouths: Array<[number, number] | null>; measured: boolean[] } {
+  const dur = Math.max(0, endSec - startSec);
+  const n = Math.max(2, Math.round(dur * fps));
+  const valid = samples.filter((s) => !!s.box);
+  const boxes: Array<PlannerBox | null> = new Array(n).fill(null);
+  const mouths: Array<[number, number] | null> = new Array(n).fill(null);
+  const measured: boolean[] = new Array(n).fill(false);
+  if (valid.length === 0) return { boxes, mouths, measured };
+
+  for (let i = 0; i < n; i++) {
+    const t = startSec + (dur * i) / (n - 1);
+    let a = valid[0];
+    let b = valid[valid.length - 1];
+    for (let k = 0; k < valid.length; k++) {
+      if (valid[k].t <= t) a = valid[k];
+      if (valid[k].t >= t) {
+        b = valid[k];
+        break;
+      }
+    }
+    const span = b.t - a.t;
+    const f = span > 0 ? clamp((t - a.t) / span, 0, 1) : 0;
+    const ab = a.box!;
+    const bb = b.box!;
+    boxes[i] = [
+      ab[0] + (bb[0] - ab[0]) * f,
+      ab[1] + (bb[1] - ab[1]) * f,
+      ab[2] + (bb[2] - ab[2]) * f,
+      ab[3] + (bb[3] - ab[3]) * f,
+    ];
+    const am = a.mouth;
+    const bm = b.mouth;
+    mouths[i] = am && bm ? [am[0] + (bm[0] - am[0]) * f, am[1] + (bm[1] - am[1]) * f] : (am ?? bm ?? null);
+    measured[i] = valid.some((s) => Math.abs(s.t - t) < 0.5 / fps);
+  }
+  return { boxes, mouths, measured };
+}
+
+/** Ramer–Douglas–Peucker over the (t, x, y) polyline — deterministic. */
+function decimateIndices(xs: number[], ys: number[], tol: number): number[] {
+  const n = xs.length;
+  if (n <= 2) return xs.map((_, i) => i);
+  const keep = new Set<number>([0, n - 1]);
+  const stack: Array<[number, number]> = [[0, n - 1]];
+  while (stack.length > 0) {
+    const [lo, hi] = stack.pop()!;
+    if (hi - lo < 2) continue;
+    let worst = -1;
+    let worstErr = tol;
+    for (let i = lo + 1; i < hi; i++) {
+      const f = (i - lo) / (hi - lo);
+      const ex = Math.abs(xs[i] - (xs[lo] + (xs[hi] - xs[lo]) * f));
+      const ey = Math.abs(ys[i] - (ys[lo] + (ys[hi] - ys[lo]) * f));
+      const err = Math.max(ex, ey);
+      if (err > worstErr) {
+        worstErr = err;
+        worst = i;
+      }
+    }
+    if (worst >= 0) {
+      keep.add(worst);
+      stack.push([lo, worst], [worst, hi]);
+    }
+  }
+  return [...keep].sort((a, b) => a - b);
+}
+
+/**
+ * Builds the dynamic path.
+ *
+ * AUTHORITATIVE PLANNER: `planCameraPath` (v359) — gap handling, constant
+ * zoom, median + forward/backward smoothing, LOOK_AHEAD_FRAMES, dead zone,
+ * pan/acceleration limits and containment metrics all come from there. This
+ * function is a bounded ADAPTER around it:
+ *
+ *   1. densify the bounded samples to a per-frame box series (deterministic);
+ *   2. let `planCameraPath` produce the trajectory;
+ *   3. take ONLY its per-frame centre trajectory and re-window it with the
+ *      FROZEN static crop size — v359's constant-zoom result would change the
+ *      crop size, which V445 (geometry signature) and V450 (frozen wire)
+ *      forbid. Framing policy stays with `computeMouthCenteredCrop`;
+ *   4. re-assert containment against the frozen size;
+ *   5. decimate to keyframes and decide static equivalence.
+ *
+ * If the resulting travel is within `STATIC_TRAVEL_EPSILON`, the EXACT frozen
+ * static crop is returned — never a mouth-derived alternative — so a
+ * non-moving track is byte-identical to the legacy fixed crop.
  */
 export function buildDynamicCameraPath(input: BuildCameraPathInput): DynamicCameraPath {
   const { staticCrop, srcWidth, srcHeight } = input;
   const size = staticCrop.size;
   const half = size / 2;
+  const fps = input.fps && input.fps > 0 ? input.fps : PATH_FPS;
   const validCount = input.samples.filter((s) => !!s.box).length;
 
-  if (size <= 0 || validCount === 0) {
-    return staticCameraPath(input);
-  }
+  if (size <= 0 || validCount === 0) return staticCameraPath(input);
 
-  const filled = interpolateSamples(input.samples);
+  const dense = densifySamplesToFrames(input.samples, input.startSec, input.endSec, fps);
+  if (!dense.boxes.some((b) => !!b)) return staticCameraPath(input);
+
+  // ── v359 planner: the authoritative trajectory ──────────────────────────
+  const planned = planCameraPath({
+    boxes: dense.boxes,
+    plateWidth: srcWidth,
+    plateHeight: srcHeight,
+    minSize: size,
+  });
+
+  // ── Re-window on the FROZEN size, then re-assert containment ────────────
   const pad = size * CONTAINMENT_PAD_RATIO;
   const maxX = Math.max(0, srcWidth - size);
   const maxY = Math.max(0, srcHeight - size);
+  const n = planned.path.length;
+  const xs: number[] = new Array(n);
+  const ys: number[] = new Array(n);
 
-  // ── 1. Desired centers: mouth at (0.5, MOUTH_TARGET_Y) of the crop ──────
-  const rawCx: number[] = [];
-  const rawCy: number[] = [];
-  const mouths: Array<[number, number] | null> = [];
-  const sources: KeyframeSource[] = [];
-
-  for (let i = 0; i < filled.length; i++) {
-    const s = filled[i];
-    const box = s.box!;
-    const hadBox = !!input.samples[i]?.box;
-    let mouth: [number, number] | null = s.mouth ?? null;
-    let src: KeyframeSource = mouth ? "mouth" : "face_estimate";
-    if (!mouth) mouth = estimateMouthFromFace(box);
-    if (!hadBox) src = "interpolated";
-    mouths.push(mouth);
-    sources.push(src);
-    rawCx.push(mouth[0]);
-    rawCy.push(mouth[1] + (0.5 - MOUTH_TARGET_Y) * size);
-  }
-
-  // ── 2. Outlier suppression + zero-phase smoothing ───────────────────────
-  let cx = forwardBackward(medianOf3(rawCx));
-  let cy = forwardBackward(medianOf3(rawCy));
-
-  // ── 3. Dead zone + bounded step (anti-jitter, no snap) ──────────────────
-  const dead = size * KEYFRAME_DEAD_ZONE;
-  const maxStep = size * MAX_KEYFRAME_STEP;
-  const stepLimit = (vals: number[]): number[] => {
-    const out = [vals[0]];
-    for (let i = 1; i < vals.length; i++) {
-      const prev = out[i - 1];
-      const err = vals[i] - prev;
-      const eff = Math.abs(err) <= dead ? 0 : err - Math.sign(err) * dead;
-      out.push(prev + clamp(eff, -maxStep, maxStep));
+  for (let i = 0; i < n; i++) {
+    const w: CropWindow = planned.path[i];
+    let ccx = w.x + w.size / 2;
+    let ccy = w.y + w.size / 2;
+    const b = dense.boxes[i];
+    if (b) {
+      const loX = b[2] + pad - half;
+      const hiX = b[0] - pad + half;
+      const loY = b[3] + pad - half;
+      const hiY = b[1] - pad + half;
+      if (loX <= hiX) ccx = clamp(ccx, loX, hiX);
+      if (loY <= hiY) ccy = clamp(ccy, loY, hiY);
     }
-    return out;
-  };
-  cx = stepLimit(cx);
-  cy = stepLimit(cy);
-
-  // ── 4. Containment: the assigned face may never leave the window ────────
-  const keyframes: CameraPathKeyframe[] = [];
-  for (let i = 0; i < filled.length; i++) {
-    const b = filled[i].box!;
-    let ccx = cx[i];
-    let ccy = cy[i];
-    const loX = b[2] + pad - half;
-    const hiX = b[0] - pad + half;
-    const loY = b[3] + pad - half;
-    const hiY = b[1] - pad + half;
-    if (loX <= hiX) ccx = clamp(ccx, loX, hiX);
-    if (loY <= hiY) ccy = clamp(ccy, loY, hiY);
-
     const x = clamp(Math.round(ccx - half), 0, maxX);
     const y = clamp(Math.round(ccy - half), 0, maxY);
-    const m = mouths[i];
-    keyframes.push({
-      t: Number(Math.max(0, filled[i].t - input.startSec).toFixed(4)),
-      x: x % 2 === 0 ? x : Math.max(0, x - 1),
-      y: y % 2 === 0 ? y : Math.max(0, y - 1),
-      size,
-      mx: m ? Math.round(m[0]) : null,
-      my: m ? Math.round(m[1]) : null,
-      src: sources[i],
-    });
+    xs[i] = x % 2 === 0 ? x : Math.max(0, x - 1);
+    ys[i] = y % 2 === 0 ? y : Math.max(0, y - 1);
   }
 
-  // ── 5. Travel metric → static equivalence ───────────────────────────────
+  // ── Static equivalence BEFORE materialising anything ────────────────────
   let travel = 0;
-  for (let i = 1; i < keyframes.length; i++) {
-    travel = Math.max(
-      travel,
-      Math.hypot(keyframes[i].x - keyframes[0].x, keyframes[i].y - keyframes[0].y) / size,
-    );
+  for (let i = 1; i < n; i++) {
+    travel = Math.max(travel, Math.hypot(xs[i] - xs[0], ys[i] - ys[0]) / size);
   }
-  const moving = travel > STATIC_TRAVEL_EPSILON;
+  if (!(travel > STATIC_TRAVEL_EPSILON)) {
+    // Static-equivalent → the EXACT frozen crop, at every time.
+    const flat = staticCameraPath(input);
+    flat.sampleCount = input.samples.length;
+    flat.validSamples = validCount;
+    flat.reason = "static_equivalent";
+    flat.signature = cameraPathSignature(flat);
+    return flat;
+  }
+
+  // ── Decimate to keyframes (visually lossless, deterministic) ────────────
+  let idx = decimateIndices(xs, ys, KEYFRAME_TOLERANCE_PX);
+  if (idx.length > MAX_KEYFRAMES) {
+    const stride = Math.ceil(idx.length / MAX_KEYFRAMES);
+    idx = idx.filter((_, k) => k % stride === 0 || k === idx.length - 1);
+  }
+  const dur = Math.max(0, input.endSec - input.startSec);
+  const keyframes: CameraPathKeyframe[] = idx.map((i) => {
+    const m = dense.mouths[i];
+    const b = dense.boxes[i];
+    const mouth = m ?? (b ? estimateMouthFromFace(b as Box) : null);
+    const src: KeyframeSource = dense.measured[i] ? (m ? "mouth" : "face_estimate") : "interpolated";
+    return {
+      t: Number(((dur * i) / Math.max(1, n - 1)).toFixed(4)),
+      x: xs[i],
+      y: ys[i],
+      size,
+      mx: mouth ? Math.round(mouth[0]) : null,
+      my: mouth ? Math.round(mouth[1]) : null,
+      src,
+    };
+  });
 
   const path: DynamicCameraPath = {
     version: CAMERA_PATH_VERSION,
@@ -327,11 +438,14 @@ export function buildDynamicCameraPath(input: BuildCameraPathInput): DynamicCame
     endSec: Number(input.endSec.toFixed(3)),
     outputSize: staticCrop.outputSize,
     keyframes,
-    moving,
+    moving: true,
     sampleCount: input.samples.length,
     validSamples: validCount,
     reason: validCount === input.samples.length ? "tracked" : "partial_track",
     signature: "",
+    plannerFrames: n,
+    plannerContainedRatio: Number(planned.containedRatio.toFixed(4)),
+    plannerMaxJump: Number(planned.maxJump.toFixed(4)),
   };
   path.signature = cameraPathSignature(path);
   return path;
@@ -383,10 +497,27 @@ export function sampleCameraPath(
   return { x: last.x, y: last.y, size: last.size };
 }
 
-/** True when the path carries real movement worth rendering dynamically. */
-export function isDynamicCameraPath(path: DynamicCameraPath | null | undefined): boolean {
-  return !!path && Array.isArray(path.keyframes) && path.keyframes.length > 1 && path.moving === true;
+/**
+ * THE single predicate deciding whether a path is used at all.
+ *
+ * Preclip render (`DialogTurnFaceCropVideo`) and T13 reprojection
+ * (`DialogStitchVideo`) MUST agree bit for bit: either both follow the path or
+ * both use the frozen static crop. Anything else would render the preclip with
+ * one geometry and paste it back with another.
+ */
+export function shouldUseCameraPath(path: DynamicCameraPath | null | undefined): boolean {
+  return (
+    !!path &&
+    path.moving === true &&
+    Array.isArray(path.keyframes) &&
+    path.keyframes.length > 1 &&
+    typeof path.signature === "string" &&
+    path.signature.length > 0
+  );
 }
+
+/** Alias kept for readability at call sites. */
+export const isDynamicCameraPath = shouldUseCameraPath;
 
 /**
  * Per-sample mouth ROI in PRECLIP-normalized coordinates. Telemetry/evidence
