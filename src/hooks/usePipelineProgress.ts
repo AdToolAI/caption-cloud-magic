@@ -1017,7 +1017,10 @@ export function usePipelineProgress({
       : isActive
         ? runSoftPercent
         : hasFailure
-          ? runFloorRef.current
+          // V442 — a failed run must report where it actually stopped. Holding
+          // the inherited run floor painted a red bar at 99 % for a scene that
+          // died in the plate phase.
+          ? Math.min(runFloorRef.current, Math.max(phaseOverall, 0))
           : phaseOverall;
   runFloorRef.current = isActive && !waitingForExport && !isStalled
     ? Math.max(runFloorRef.current, currentOverall)
