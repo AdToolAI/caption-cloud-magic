@@ -660,7 +660,8 @@ serve(async (req) => {
               return Number.isFinite(sa) ? (now - sa) : Infinity;
             }),
           );
-      const polledThisTick = polled.some((p) => p.scene_id === d.id);
+      // v441 — nur ANGEWANDTE Callbacks unterdrücken die Eskalation.
+      const polledThisTick = progressed.some((p) => p.scene_id === d.id);
       if (renderingPasses.length === 0) {
         // Kein lebender Pass mehr — alter Pfad ist okay, aber wir geben uns
         // dem v5-Fanout-Branch (unten) den Vortritt, der den dispatch_log
