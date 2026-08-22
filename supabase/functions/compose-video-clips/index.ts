@@ -5259,6 +5259,24 @@ serve(async (req) => {
             ),
           )
           .eq("id", scene.id);
+        // v440 — the provider rejected this dispatch (e.g. HappyHorse 400 on a
+        // dead anchor object). The attempt ledger must not keep a zombie
+        // `rendering` row while `composer_pipeline_jobs` already says failed.
+        // Fenced on scene + run + generation, idempotent, never closes an
+        // attempt of another run.
+        try {
+          const stamp = sceneRunStamps.get(scene.id);
+          const closed = await failPlateAttemptForRun(supabaseAdmin, {
+            sceneId: scene.id,
+            runId: stamp?.runId ?? null,
+            expectedGeneration: stamp?.generation ?? null,
+          });
+          if (closed > 0) {
+            console.log(
+              `[compose-video-clips] v440_attempt_terminalized scene=${scene.id} run=${stamp?.runId ?? "-"} gen=${stamp?.generation ?? "-"} rows=${closed}`,
+            );
+          }
+        } catch (_) { /* bookkeeping is best-effort */ }
         results.push({ sceneId: scene.id, status: "failed", error: errMsg });
       }
     }
