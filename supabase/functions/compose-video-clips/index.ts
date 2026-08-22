@@ -3681,18 +3681,30 @@ serve(async (req) => {
           );
         }
 
-        // ── v195 HARD-GUARD: cinematic-sync must have a composed anchor ────
+        // ── v195/v440 HARD-GUARD: cinematic-sync needs a VERIFIED anchor ───
         // Regressions kept slipping through when the anchor safety net threw
         // or when portraits were absent — the provider then rendered generic
         // strangers and the whole Sync.so pipeline chewed cycles on faces
         // that don't belong to any brand character. Fail loud here BEFORE
         // any provider credits are spent, so the user sees a clear error
         // instead of an "endless lip-sync".
-        if (!scene.referenceImageUrl) {
-          const msg =
-            tl({ de: "cinematic_sync_anchor_missing: Für Cinematic-Sync konnte kein Charakter-Anchor komponiert werden (keine Portraits aufgelöst). Bitte einen Brand Character mit Portrait dem Cast zuweisen und erneut versuchen.", en: "cinematic_sync_anchor_missing: No character anchor could be composed for Cinematic-Sync (no portraits resolved). Please assign a Brand Character with a portrait to the cast and try again.", es: "cinematic_sync_anchor_missing: No se pudo componer un ancla de personaje para Cinematic-Sync (no se resolvieron retratos). Por favor, asigne un Personaje de Marca con un retrato al elenco e intente de nuevo." });
+        //
+        // v440 — truthiness is not existence. A purged generated anchor left a
+        // dangling pointer that passed this gate and cost a paid HappyHorse
+        // dispatch that could only answer 400/NoSuchKey (S11, 2026-08-22).
+        // Storage-backed anchors are therefore proven to exist here; external
+        // / non-storage references keep their existing validation contract.
+        const v440AnchorVerdict = await verifyAnchorObject(
+          supabaseAdmin as any,
+          scene.referenceImageUrl ?? null,
+        );
+        if (blocksProviderDispatch(v440AnchorVerdict)) {
+          const pointerless = v440AnchorVerdict === "anchor_pointer_missing";
+          const msg = pointerless
+            ? tl({ de: "cinematic_sync_anchor_missing: Für Cinematic-Sync konnte kein Charakter-Anchor komponiert werden (keine Portraits aufgelöst). Bitte einen Brand Character mit Portrait dem Cast zuweisen und erneut versuchen.", en: "cinematic_sync_anchor_missing: No character anchor could be composed for Cinematic-Sync (no portraits resolved). Please assign a Brand Character with a portrait to the cast and try again.", es: "cinematic_sync_anchor_missing: No se pudo componer un ancla de personaje para Cinematic-Sync (no se resolvieron retratos). Por favor, asigne un Personaje de Marca con un retrato al elenco e intente de nuevo." })
+            : tl({ de: "anchor_recompose_failed: Der Szenen-Anchor existiert nicht mehr im Speicher und konnte nicht neu komponiert werden. Es wurde kein Render gestartet (keine Kosten). Bitte erneut versuchen.", en: "anchor_recompose_failed: The scene anchor no longer exists in storage and could not be re-composed. No render was started (no cost). Please try again.", es: "anchor_recompose_failed: El ancla de escena ya no existe en el almacenamiento y no se pudo recomponer. No se inició ningún renderizado (sin coste). Inténtalo de nuevo." });
           console.warn(
-            `[compose-video-clips] scene ${scene.id}: v195_cinematic_sync_anchor_missing → hard-fail before provider dispatch`,
+            `[compose-video-clips] scene ${scene.id}: v440_anchor_gate verdict=${v440AnchorVerdict} → hard-fail before provider dispatch (zero spend)`,
           );
           await safeMarkSceneFailed(scene.id, msg, {
             isCinematicSyncScene: true,
@@ -3700,6 +3712,11 @@ serve(async (req) => {
           });
           results.push({ sceneId: scene.id, status: "failed", error: msg });
           continue;
+        }
+        if (v440AnchorVerdict === "anchor_verified") {
+          console.log(
+            `[compose-video-clips] v440_anchor_verified scene=${scene.id}`,
+          );
         }
       }
 
