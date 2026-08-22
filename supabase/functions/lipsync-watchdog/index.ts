@@ -436,6 +436,11 @@ serve(async (req) => {
     }
 
     // ── (1) v25 Polling fallback: forward terminal Sync.so jobs we missed ──
+    // v441 — Apply-Rejection-Guard: ein Provider-COMPLETED, das der Webhook
+    // wiederholt NICHT anwenden kann (z. B. `write_id_mismatch`), ist kein
+    // Fortschritt. Ohne diesen Guard re-forwardet der Watchdog denselben
+    // abgelehnten Callback im Minutentakt endlos weiter.
+    let applyRejectedStuck = false;
     if (isV5Fanout && syncApiKey) {
       const renderingPasses = (ds.passes as any[])
         .map((p, i) => ({ p, i }))
@@ -447,7 +452,18 @@ serve(async (req) => {
         });
         if (r.terminal) {
           polled.push({ scene_id: d.id, job_id: p.job_id, status: r.status ?? "?" });
-          await releaseInflightSyncJob(supabase, p.job_id);
+          if (r.applied === false) {
+            const startedMs = typeof p?.started_at === "string" ? Date.parse(p.started_at) : NaN;
+            const passAge = Number.isFinite(startedMs) ? now - startedMs : Infinity;
+            console.warn(
+              `[lipsync-watchdog] v441 apply_rejected scene=${d.id} pass=${i} job=${p.job_id} ` +
+                `reason=${r.applyReason ?? "-"} age=${Math.round(passAge / 1000)}s`,
+            );
+            if (passAge > STALE_PROVIDER_MS) applyRejectedStuck = true;
+          } else {
+            progressed.push({ scene_id: d.id, job_id: p.job_id });
+            await releaseInflightSyncJob(supabase, p.job_id);
+          }
         }
         void i;
       }
