@@ -373,6 +373,30 @@ export async function renderPassFacePreclip(
     ? Number(input.plateGeneration)
     : null;
   const v447PlateKey = String(masterVideoUrl).split("?")[0];
+
+  // ── V452 — dynamic camera path ────────────────────────────────────────
+  // Order matters: the static crop is the SIZE authority, the path only
+  // moves the window. A frozen path (V450 NOOP retry) is used verbatim and
+  // never re-tracked. Any tracking failure degrades to the static crop.
+  let cameraPath: DynamicCameraPath | null = null;
+  if (input.frozenCameraPath && Array.isArray(input.frozenCameraPath.keyframes)) {
+    cameraPath = input.frozenCameraPath;
+    console.log(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v452_camera_path_frozen sig=${cameraPath.signature} keys=${cameraPath.keyframes.length}`,
+    );
+  } else if (typeof input.buildCameraPath === "function") {
+    try {
+      cameraPath = await input.buildCameraPath({ ...crop });
+    } catch (pathErr) {
+      cameraPath = null;
+      console.warn(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v452_camera_path_failed: ${(pathErr as Error)?.message ?? String(pathErr)} → static crop`,
+      );
+    }
+  }
+  const useDynamicPath = isDynamicCameraPath(cameraPath);
+  const cameraPathSig = cameraPath?.signature ?? null;
+
   const v447Signature = buildPreclipSignature({
     runId: v447RunId,
     generation: v447Generation,
@@ -381,6 +405,7 @@ export async function renderPassFacePreclip(
     bbox: cropFromBbox,
     startSec,
     endSec,
+    cameraPathSig,
   });
 
   const t0 = Date.now();
@@ -430,6 +455,7 @@ export async function renderPassFacePreclip(
         cropMeasureSrc: measureSrc,
         bboxMeasureSrc: measureSrc,
         cropFromBbox,
+        cameraPath,
       };
     }
   } catch (reuseErr) {
@@ -452,6 +478,9 @@ export async function renderPassFacePreclip(
     cropX: crop.x,
     cropY: crop.y,
     cropSize: crop.size,
+    // V452 — the renderer follows this path per frame; the static crop above
+    // stays as the compatibility fallback for pathless preclips.
+    cropPath: useDynamicPath ? cameraPath : null,
   };
 
   const { error: insertErr } = await supabase
@@ -474,6 +503,7 @@ export async function renderPassFacePreclip(
         composer_scene_id: sceneId,
         pass_idx: passIdx,
         face_crop: { x: crop.x, y: crop.y, size: crop.size, outputSize: crop.outputSize },
+        ...(cameraPath ? { v452_camera_path: cameraPath, v452_camera_path_sig: cameraPathSig } : {}),
         // V447 — Run-Identität des Artefakts. Nur Zeilen mit identischer
         // Signatur dürfen später wiederverwendet werden.
         ...(v447Signature
