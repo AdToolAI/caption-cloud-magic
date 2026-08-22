@@ -590,13 +590,61 @@ serve(async (req) => {
     let anchorProvider: "seedream4" | "nano_banana_2" | "gemini3pro" = "nano_banana_2";
     const t0 = Date.now();
 
+    // V442 — inline reference images. Provider-side URL crawling killed S11
+    // (nano timeout + gemini 400 "cannot fetch content from the provided URL").
+    // Internal storage objects are read here with the service role and passed
+    // as data URIs; external refs keep their URL. Order is preserved 1:1.
+    const inlineOrder: string[] = [
+      ...portraits,
+      ...locationUrls,
+      ...buildingUrls,
+      ...propUrls,
+      ...identityPortraits,
+    ];
+    const inlineResult = await buildInlineImageParts(inlineOrder, {
+      supabaseUrl: SUPABASE_URL,
+      fetchImpl: (input: any, init?: any) =>
+        fetch(input, {
+          ...(init ?? {}),
+          headers: {
+            ...((init?.headers as Record<string, string>) ?? {}),
+            apikey: SUPABASE_SERVICE_ROLE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+        }),
+    });
+    const inlineByUrl = new Map<string, string>();
+    for (const p of inlineResult.parts) {
+      if (p.inlined) inlineByUrl.set(p.sourceUrl, p.url);
+    }
+    const inlinedCount = inlineResult.parts.filter((p) => p.inlined).length;
+    if (inlineResult.failures.length > 0) {
+      console.warn(
+        `[compose-scene-anchor] v442_inline_failures sceneId=${body.sceneId} count=${inlineResult.failures.length} reasons=${
+          inlineResult.failures.map((f) => `${f.reason}:${f.detail ?? ""}`).join(",")
+        }`,
+      );
+    }
+    console.log(
+      `[compose-scene-anchor] v442_inline_refs sceneId=${body.sceneId} inlined=${inlinedCount}/${inlineOrder.length}`,
+    );
+    /** Structured, sanitized reason of the last provider failure. */
+    let lastFailureReason: string | null =
+      inlineResult.failures.length > 0
+        ? sanitizeAnchorReason(inlineResult.failures[0].reason)
+        : null;
+
+    const pushRef = (list: any[], url: string) =>
+      list.push({ type: "image_url", image_url: { url: inlineByUrl.get(url) ?? url } });
+
     const callNanoBanana2 = async (): Promise<{ bytes: Uint8Array; mime: string; ext: string } | null> => {
       const userContent: any[] = [{ type: "text", text: editInstruction }];
-      for (const url of portraits) userContent.push({ type: "image_url", image_url: { url } });
-      for (const url of locationUrls) userContent.push({ type: "image_url", image_url: { url } });
-      for (const url of buildingUrls) userContent.push({ type: "image_url", image_url: { url } });
-      for (const url of propUrls) userContent.push({ type: "image_url", image_url: { url } });
-      for (const url of identityPortraits) userContent.push({ type: "image_url", image_url: { url } });
+      for (const url of portraits) pushRef(userContent, url);
+      for (const url of locationUrls) pushRef(userContent, url);
+      for (const url of buildingUrls) pushRef(userContent, url);
+      for (const url of propUrls) pushRef(userContent, url);
+      for (const url of identityPortraits) pushRef(userContent, url);
+
 
       const ac = new AbortController();
       const timeoutId = setTimeout(() => ac.abort(), 45_000);
