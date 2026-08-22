@@ -88,6 +88,7 @@ import {
 } from "../_shared/twoshot-face-map.ts";
 import { detectPlateFaces, validatePlateFacesGeometry } from "../_shared/plate-face-detect.ts";
 import { resolvePlateFaceIdentities, PlateIdentityFace } from "../_shared/plate-face-identity.ts";
+import { evaluateV117Gate } from "../_shared/v436-plate-gate.ts";
 import { buildAnchorLayoutFromV274, routePlateFacesToAnchor, type AnchorFaceLayout } from "../_shared/plateFaceSlotRouter.ts";
 // FA-4 Contract E — deterministic preclip crop containment gate.
 import { evaluatePreclipCropContainment } from "../_shared/preclip-crop-containment.ts";
@@ -1631,6 +1632,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const speakerPlateMouths: Array<[number, number] | null> =
       new Array(speakers.length).fill(null);
     let plateIdentityMap: Awaited<ReturnType<typeof resolvePlateFaceIdentities>> | null = null;
+    // v436 — explicit reason for every "no usable identity map" outcome.
+    const plateIdentityDiag: { reason?: string | null } = { reason: null };
     let plateHydrationSource: "persisted" | "live" | "missing" = "missing";
     const persistedBboxes = Array.isArray(persistedPlateIdentity?.bboxes) && persistedPlateIdentity.bboxes.length > 0
       ? persistedPlateIdentity.bboxes
@@ -2045,6 +2048,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           characters,
           anchorUrl, // v156 — Anchor-First: AWS Rekognition runs on this image
           expectedFaceCount: speakers.length, // v184 — decouple from portrait resolver
+          diag: plateIdentityDiag, // v436 — explicit null-reason instrumentation
         });
       } catch (err) {
         console.warn(
@@ -3095,21 +3099,35 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         return null;
       };
       const splitScreenReason = detectSplitScreenLayout();
-      const gateFails =
-        !plateIdentityMap ||
-        detectedFaces < speakers.length ||
-        !!splitScreenReason;
-      if (resolvedFaces < speakers.length && detectedFaces >= speakers.length && !splitScreenReason) {
+      // v436 — restored contract: physical face coverage is authoritative.
+      // `!plateIdentityMap` alone no longer blocks; the slot-order /
+      // anchor-rescale fallback covers identity-resolution failures as long
+      // as box hydration is complete.
+      const hydratedBoxes = speakerPlateBboxes.filter(Boolean).length;
+      const v117 = evaluateV117Gate({
+        speakers: speakers.length,
+        detectedFaces,
+        resolvedFaces,
+        hydratedBoxes,
+        identityMapPresent: !!plateIdentityMap,
+        splitScreenReason,
+        identityNullReason: plateIdentityDiag.reason ?? null,
+      });
+      if (v117.softPass) {
         console.warn(
-          `[compose-dialog-segments] scene=${sceneId} v117_plate_quality_gate_SOFT_WARN detected=${detectedFaces}/${speakers.length} resolved=${resolvedFaces}/${speakers.length} — dispatch proceeds with slot-order coords`,
+          `[compose-dialog-segments] scene=${sceneId} ` +
+          (plateIdentityMap
+            ? `v117_soft_pass_identity_partial`
+            : `v117_soft_pass_identity_unavailable`) +
+          ` reason=${v117.reason} detected=${detectedFaces}/${speakers.length} ` +
+          `resolved=${resolvedFaces}/${speakers.length} boxes=${hydratedBoxes}/${speakers.length} ` +
+          `hydration=${plateHydrationSource} — dispatch proceeds with slot-order coords`,
         );
       }
+      const gateFails = v117.block;
       if (gateFails) {
-        const reason = splitScreenReason
-          ? splitScreenReason
-          : !plateIdentityMap
-          ? "plate_identity_unavailable"
-          : `plate_faces_missing(detected=${detectedFaces}, expected=${speakers.length})`;
+        const reason = v117.reason;
+        const detectedForMessage = v117.detectedForMessage;
         console.error(
           `[compose-dialog-segments] scene=${sceneId} v117_plate_quality_gate_BLOCK ${reason} — refunding ${totalCost} credits and forcing plate re-render`,
         );
@@ -3149,7 +3167,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             lip_sync_source_clip_url: null,
             clip_error: splitScreenReason
               ? tl({ de: `Plate-Quality-Gate (v9): Der gerenderte Scene-Clip ist ein Split-Screen/Panel-Layout (${speakers.length} isolierte Einzel-Panels statt einer gemeinsamen Group-Composition). Sync.so kann Einzel-Panels nicht lipsyncen. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen im selben Raum stehen, in einem durchgehenden Kamera-Frame. Credits wurden zurückerstattet.`, en: `Plate-Quality-Gate (v9): The rendered scene clip is a split-screen/panel layout (${speakers.length} isolated individual panels instead of a common group composition). Sync.so cannot lipsync individual panels. Please re-render the scene — all ${speakers.length} people must be in the same room, in a continuous camera frame. Credits have been refunded.`, es: `Plate-Quality-Gate (v9): El clip de escena renderizado es un diseño de pantalla dividida/panel (${speakers.length} paneles individuales aislados en lugar de una composición de grupo común). Sync.so no puede sincronizar los labios de paneles individuales. Por favor, vuelve a renderizar la escena — las ${speakers.length} personas deben estar en la misma habitación, en un encuadre de cámara continuo. Los créditos han sido reembolsados.` })
-              : tl({ de: `Plate-Quality-Gate (v117): Auf dem aktuellen Scene-Clip sind nicht alle ${speakers.length} Charaktere als Gesichter erkennbar (erkannt: ${detectedFaces} von ${speakers.length}). Sync.so kann fehlende Personen nicht animieren. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe. Credits wurden zurückerstattet.`, en: `Plate-Quality-Gate (v117): Not all ${speakers.length} characters are recognizable as faces in the current scene clip (recognized: ${detectedFaces} of ${speakers.length}). Sync.so cannot animate missing people. Please re-render the scene — all ${speakers.length} people must be visibly frontal in the image, no cropped heads. Credits have been refunded.`, es: `Plate-Quality-Gate (v117): No todos los ${speakers.length} personajes son reconocibles como caras en el clip de escena actual (reconocidos: ${detectedFaces} de ${speakers.length}). Sync.so no puede animar a personas que faltan. Por favor, vuelve a renderizar la escena — las ${speakers.length} personas deben estar frontalmente visibles en la imagen, sin cabezas cortadas. Los créditos han sido reembolsados.` }),
+              : tl({ de: `Plate-Quality-Gate (v117): Auf dem aktuellen Scene-Clip sind nicht alle ${speakers.length} Charaktere als Gesichter erkennbar (erkannt: ${detectedForMessage} von ${speakers.length}). Sync.so kann fehlende Personen nicht animieren. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe. Credits wurden zurückerstattet.`, en: `Plate-Quality-Gate (v117): Not all ${speakers.length} characters are recognizable as faces in the current scene clip (recognized: ${detectedForMessage} of ${speakers.length}). Sync.so cannot animate missing people. Please re-render the scene — all ${speakers.length} people must be visibly frontal in the image, no cropped heads. Credits have been refunded.`, es: `Plate-Quality-Gate (v117): No todos los ${speakers.length} personajes son reconocibles como caras en el clip de escena actual (reconocidos: ${detectedForMessage} de ${speakers.length}). Sync.so no puede animar a personas que faltan. Por favor, vuelve a renderizar la escena — las ${speakers.length} personas deben estar frontalmente visibles en la imagen, sin cabezas cortadas. Los créditos han sido reembolsados.` }),
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
