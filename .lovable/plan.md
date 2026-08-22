@@ -1,43 +1,38 @@
-# Remotion-Ordner sauber zusammenführen
+# Remotion sicher fertigstellen
 
-## Ausgangslage
+## Warum ist das passiert?
 
-- **Neu (behalten):** `C:\Users\dusat\caption-cloud-magic\remotion\` — 10 Einträge, kam per `git pull`. Versionierte, gültige Fassung.
-- **Alt (Backup):** `...\Desktop\AdTool AI Markenrechte\remotion\` — 16 Einträge, enthält zusätzlich `node_modules`, `build`, `nvm`, `.env`, `package-lock.json`, `.prettierrc`, `eslint.config.mjs`, `check-env.cjs`, `remotion.config.ts`.
-- `git pull` und `git stash pop` sind erledigt. Offen: `bun` ist auf dem Rechner nicht installiert (`Der Befehl "bun" ... konnte nicht gefunden werden`).
+Der alte `remotion`-Ordner lag nur lokal auf deinem PC und war für Git „untracked“. Inzwischen enthält auch der heruntergeladene Stand einen offiziellen `remotion`-Ordner. Git hat den Pull zunächst gestoppt, damit deine lokalen Dateien nicht überschrieben werden. Das Verschieben als Backup war deshalb richtig.
 
-## Regel
+## Wichtigste Antwort
 
-Den Backup-Ordner **nicht** zurückkopieren. Aus dem Backup wird nur übernommen, was Git bewusst nicht enthält.
+**Den alten Backup-Ordner nicht komplett in den neuen `remotion`-Ordner kopieren.** Sonst können die gerade von Git geladenen, neueren Dateien wieder durch alte Dateien ersetzt werden.
 
-| Datei/Ordner | Aktion |
-|---|---|
-| `node_modules`, `build`, `nvm` | Nicht kopieren — werden neu erzeugt |
-| `package-lock.json` | Nicht kopieren — Repo nutzt `bun.lock` |
-| `.env` | **Ja, kopieren.** Enthält die Remotion-GCP-Zugangsdaten, die im neuen Ordner fehlen. Per `.gitignore` geschützt. |
-| `remotion.config.ts`, `eslint.config.mjs`, `.prettierrc`, `check-env.cjs` | Erst öffnen und prüfen; nur kopieren, wenn im neuen Ordner nicht vorhanden und noch gebraucht |
-| Rest (`src`, `public`, `package.json`, `tsconfig.json`, `index.ts`, `README.md`) | Nicht kopieren — neue Version ist maßgeblich |
+## Jetzt genau so vorgehen
 
-## Schritte
-
-1. Desktop-Backup unangetastet liegen lassen (Sicherheitsnetz).
-2. `.env` aus dem Backup nach `caption-cloud-magic\remotion\` kopieren.
-3. Prüfen, dass `remotion\.gitignore` den Eintrag `.env` enthält; sonst ergänzen.
-4. Optionale Konfigdateien aus der Tabelle vergleichen und nur bei Bedarf kopieren.
-5. **Bun installieren** (fehlt aktuell). In PowerShell:
+1. Den alten Backup-Ordner vorerst unverändert auf dem Desktop lassen.
+2. Nichts aus `src`, `public`, `node_modules`, `build`, `nvm`, `package.json`, `package-lock.json` oder den Konfigdateien zurückkopieren.
+3. Die alte `.env` ebenfalls **noch nicht kopieren**: Der private Schlüssel war im Screenshot sichtbar und muss deshalb als offengelegt gelten. Den alten Schlüssel zuerst beim Anbieter sperren/ersetzen und danach eine neue `.env` im neuen Ordner anlegen.
+4. Die Meldung bei `bun install` bedeutet nur, dass Bun auf deinem Windows-PC noch nicht installiert ist. Bun zuerst in PowerShell installieren:
    ```powershell
    powershell -c "irm bun.sh/install.ps1 | iex"
    ```
-   Danach das Terminal neu öffnen und `bun --version` prüfen.
-6. Abhängigkeiten installieren:
+5. Alle Terminalfenster schließen, ein neues öffnen und prüfen:
+   ```bat
+   bun --version
+   ```
+6. Danach installieren:
    ```bat
    cd C:\Users\dusat\caption-cloud-magic\remotion
    bun install
    ```
-   Alternative ohne Bun: `npm install` — erzeugt allerdings ein zusätzliches `package-lock.json`, das nicht committet werden sollte.
-7. `git status` prüfen — außer der ignorierten `.env` sollten keine unerwarteten Dateien auftauchen. Der bereits sichtbare untracked Ordner `npx` und die geänderte `package-lock.json` im Projektstamm gehören nicht ins Repo.
-8. Wenn alles läuft, Desktop-Backup nach ein paar Tagen löschen.
+7. Anschließend im Projektstamm prüfen:
+   ```bat
+   cd C:\Users\dusat\caption-cloud-magic
+   git status
+   ```
+8. Das Backup erst löschen, wenn Remotion nach dem Installieren und mit dem erneuerten Schlüssel funktioniert.
 
-## Sicherheitshinweis
+## Ergebnis
 
-Der private GCP-Service-Account-Key aus `remotion/.env` war im Screenshot vollständig sichtbar. Empfehlung: den Key in der Google Cloud Console für den Service Account `remotion-sa@captiongenie-integration...` löschen, einen neuen erzeugen und die `.env` damit aktualisieren.
+Der neue Git-Ordner bleibt maßgeblich; das Backup bleibt nur als Sicherheitskopie. Es wird nicht pauschal zurückkopiert.
