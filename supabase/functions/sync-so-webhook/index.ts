@@ -90,6 +90,7 @@ async function recordV434Pin(
     run_id: string | null;
     generation: number | null;
     pass_idx: number;
+    attempt?: number | null;
     kind: string;
     source_url: string | null;
     pin: PinnedArtifact;
@@ -101,7 +102,9 @@ async function recordV434Pin(
       run_id: row.run_id,
       generation: row.generation,
       pass_idx: row.pass_idx,
+      attempt: row.attempt ?? 0,
       kind: row.kind,
+      purpose: "production",
       source_url: row.source_url,
       object_key: row.pin.key,
       pinned_url: row.pin.url,
@@ -109,6 +112,7 @@ async function recordV434Pin(
       byte_size: row.pin.bytes,
       status: row.pin.status,
     });
+
     if (error) {
       console.warn(`[sync-so-webhook] v434_pin_log_failed scene=${row.scene_id}: ${error.message}`);
     }
