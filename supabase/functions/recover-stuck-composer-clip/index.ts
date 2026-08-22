@@ -403,6 +403,13 @@ Deno.serve(async (req) => {
     const sceneIds: string[] = Array.isArray(body?.scene_ids)
       ? body.scene_ids.filter((x: unknown) => typeof x === "string")
       : [];
+    // v455 — optionale Tupel-Kandidaten (scene/run/gen/job/external).
+    const candidateByScene = new Map<string, Candidate>();
+    if (Array.isArray(body?.candidates)) {
+      for (const c of body.candidates) {
+        if (c && typeof c.scene_id === "string") candidateByScene.set(c.scene_id, c as Candidate);
+      }
+    }
 
     if (sceneIds.length === 0) {
       return new Response(
