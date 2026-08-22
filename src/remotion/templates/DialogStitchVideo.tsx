@@ -39,6 +39,8 @@ import {
   useVideoConfig,
 } from 'remotion';
 import { z } from 'zod';
+import { sampleCameraPathRuntime } from '../../lib/composer/cameraPathRuntime';
+
 
 /** V452 — one keyframe of the shared dynamic camera path (plate pixels). */
 const CameraPathKeyframeSchema = z.object({
