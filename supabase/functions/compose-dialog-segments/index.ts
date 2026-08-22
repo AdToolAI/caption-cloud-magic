@@ -117,6 +117,7 @@ import {
 } from "../_shared/asd-strategy.ts";
 // FA-4 v404 §9 — NOOP-Retry darf den Preclip nie entfernen (v148/v204).
 import { shouldPreserveNoopRetryPreclip, isFrozenNoopRetryPass } from "../_shared/noop-retry-preclip.ts";
+import { decideCachedPreclipDrop, recoverFrozenPreclip } from "../_shared/v450-noop-retry-geometry.ts";
 // FA-4 v406/v407 — Frozen Provider Input Snapshot / Retry-Wire-Parität.
 import {
   buildProviderWire,
