@@ -21,6 +21,7 @@
  *   N==2 and N==1 keep the old behaviour: cheap & already-reliable.
  */
 import { detectPlateFaces, PlateFaceBox, PlateFaceMap } from "./plate-face-detect.ts";
+import { classifyIdentityNullReason } from "./v436-plate-gate.ts";
 
 const LOVABLE_GW = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const GEMINI_TIMEOUT_MS = 25_000;
@@ -346,11 +347,14 @@ export async function resolvePlateFaceIdentities(params: {
    * to `max(1, characters.length)`.
    */
   expectedFaceCount?: number;
+  /** v436 — optional out-param filled with an explicit reason on every null return. */
+  diag?: { reason?: string | null };
 }): Promise<PlateIdentityMap | null> {
   const expected = Math.max(
     1,
     params.expectedFaceCount ?? params.characters.length ?? 1,
   );
+  const detectDiag: { reason?: string | null } = { reason: null };
   const plateMap: PlateFaceMap | null = await detectPlateFaces({
     supabase: params.supabase,
     plateUrl: params.plateUrl,
@@ -361,8 +365,24 @@ export async function resolvePlateFaceIdentities(params: {
     projectId: params.projectId,
     midDurationSec: params.midDurationSec,
     anchorUrl: params.anchorUrl ?? null,
+    diag: detectDiag,
   });
-  if (!plateMap || plateMap.faces.length === 0) return null;
+  if (!plateMap || plateMap.faces.length === 0) {
+    const reason = classifyIdentityNullReason({
+      detectReason: detectDiag.reason,
+      plateMapPresent: !!plateMap,
+      faceCount: plateMap?.faces?.length ?? 0,
+      anchorPresent: !!(params.anchorUrl ?? "").trim(),
+    });
+    if (params.diag) params.diag.reason = reason;
+    console.warn(
+      `[plate-face-identity] scene=${params.sceneId} v436_identity_null reason=${reason} ` +
+      `expected=${expected} characters=${params.characters.length} ` +
+      `anchor=${(params.anchorUrl ?? "").trim() ? "present" : "missing"} ` +
+      `plate_map=${plateMap ? "present" : "null"} plate_faces=${plateMap?.faces?.length ?? 0}`,
+    );
+    return null;
+  }
 
   const N = params.characters.length;
   let identityBySlot = new Map<number, { characterId: string; confidence: number }>();
