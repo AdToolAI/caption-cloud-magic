@@ -83,10 +83,28 @@ Freigabe als eng begrenzte Ausnahme.
 - Deploy ausschließlich von `compose-dialog-segments`.
 - **Kein** Render, kein S01/S11-Rerender in diesem Gate.
 
-## Offener Punkt (bewusst nicht in diesem Gate)
+## Danach: V451 — Read-Only Motion Geometry Diagnosis (eigenes Gate)
 
-Das `delta_mean = -63.4` ist auffällig stark negativ — der Provider-Output
-bewegt sich messbar weniger als der Preclip. Das kann ein echter Provider-NOOP
-sein oder ein Messfehler durch abweichende Crop-Geometrie. Das gehört in ein
-eigenes, nachgelagertes Read-Only-Diagnose-Gate, sobald der Retry-Pfad
-überhaupt wieder durchläuft.
+Nicht Teil von V450, keine Änderung an der Motion-Metrik in diesem Gate.
+
+`deltaMean = provider.mean − preclip.mean`; bei Schwelle 3.6827 ist `−63.4`
+zwangsläufig NOOP. Der produktive v404-Verdict misst in
+`_shared/measure-provider-motion-sync.ts` weiterhin über ein festes
+normalisiertes ROI (centerX .5, centerY .6, width .28, height .12); die
+V434-Geometrie-ROI läuft nur als Telemetrie, `useGeometryRoiForVerdict` ist im
+Webhook nicht aktiv. Bei bewegter Szene kann das feste ROI in Preclip und
+Provider-Output unterschiedliche anatomische Regionen treffen — ein falscher
+NOOP ist damit real möglich.
+
+V451 vergleicht read-only für exakt denselben Pass: V434-Pin des Preclips,
+immutable Provider-Output, dieselben sechs Sample-Zeitpunkte, v404-Fixed-ROI
+`deltaMean`, V434 geometry-coupled ROI / MAD-Ratio, die sechs Stillframes
+visuell, und — sofern V450 den Retry ermöglicht — First Output gegen
+`coords-pro-box`-Retry mit identischem Frozen Input.
+
+Entscheidungsmatrix:
+- beide Metriken NOOP + visuell kein Lippenbild → echter Provider-NOOP
+- v404 NOOP, geometry-coupled zeigt Motion → ROI-Drift / Messfehler
+- beide Outputs bewegen Lippen, `deltaMean` bleibt negativ → v404-Klassifikator
+  ist für bewegte Szenen nicht mehr geeignet
+
