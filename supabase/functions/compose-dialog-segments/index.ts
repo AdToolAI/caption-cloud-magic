@@ -118,6 +118,15 @@ import {
 // FA-4 v404 §9 — NOOP-Retry darf den Preclip nie entfernen (v148/v204).
 import { shouldPreserveNoopRetryPreclip, isFrozenNoopRetryPass } from "../_shared/noop-retry-preclip.ts";
 import { decideCachedPreclipDrop, recoverFrozenPreclip } from "../_shared/v450-noop-retry-geometry.ts";
+// V452 — dynamic face tracking (identity static, geometry dynamic).
+import {
+  buildDynamicCameraPath,
+  type DynamicCameraPath,
+  isDynamicCameraPath,
+  mouthRoiSamples,
+  TRACK_SAMPLE_COUNT,
+} from "../_shared/dynamic-camera-path.ts";
+import { trackAssignedFaceAcrossTurn } from "../_shared/plate-face-track.ts";
 // FA-4 v406/v407 — Frozen Provider Input Snapshot / Retry-Wire-Parität.
 import {
   buildProviderWire,
@@ -5631,6 +5640,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         usePassPreclip = true;
         (pass as any).preclip_url = recovery.url;
         (pass as any).preclip_crop = recovery.crop;
+        // V452 — the frozen camera path travels with the frozen wire. It is
+        // never recomputed here; without it the recovered preclip would be
+        // reprojected along a different geometry than it was rendered with.
+        const frozenPath = (pass as any)._v450_frozen_camera_path ?? (pass as any).preclip_camera_path ?? null;
+        if (frozenPath) (pass as any).preclip_camera_path = frozenPath;
         console.warn(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v450_frozen_preclip_recovered source=${recovery.source}`,
         );
@@ -5697,6 +5711,43 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
             startSec: unionStart,
             endSec: unionEnd,
+            // ── V452 — dynamic face tracking ─────────────────────────────
+            // Fresh dispatch only (this whole block is unreachable on a NOOP
+            // retry, see `v161PreclipEligible`). Identity is already locked;
+            // we only follow THAT face. Any failure degrades to the static
+            // crop — never to another face.
+            buildCameraPath: async (staticCrop) => {
+              if (!platePassBoxForPreclip) return null;
+              const track = await trackAssignedFaceAcrossTurn({
+                plateVideoUrl: sourceClipUrl,
+                totalSec,
+                plateWidth: plateDims.width,
+                plateHeight: plateDims.height,
+                startSec: unionStart,
+                endSec: unionEnd,
+                anchorBox: platePassBoxForPreclip as [number, number, number, number],
+                siblingCenters: siblingCoords,
+                sampleCount: TRACK_SAMPLE_COUNT,
+                budgetMs: 70_000,
+              });
+              console.log(
+                `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v452_face_track ok=${track.ok} reason=${track.reason} ` +
+                  `valid=${track.samples.filter((x) => x.box).length}/${track.samples.length} ms=${track.latencyMs}`,
+              );
+              if (!track.ok) return null;
+              const path = buildDynamicCameraPath({
+                samples: track.samples,
+                staticCrop,
+                srcWidth: plateDims.width,
+                srcHeight: plateDims.height,
+                startSec: unionStart,
+                endSec: unionEnd,
+              });
+              console.log(
+                `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v452_camera_path sig=${path.signature} moving=${path.moving} keys=${path.keyframes.length} reason=${path.reason}`,
+              );
+              return path;
+            },
           },
           300_000,
         );
@@ -5714,6 +5765,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           // V450 §2 — immutable crop snapshot so a later NOOP retry can prove
           // the frozen geometry even if `preclip_crop` was cleared meanwhile.
           (pass as any)._v450_frozen_preclip_crop = (pass as any).preclip_crop;
+          // V452 — freeze the exact camera path with the wire. The mux
+          // reprojects along this identical path (T13), and a NOOP retry
+          // reuses it verbatim instead of re-tracking.
+          const v452Path: DynamicCameraPath | null = preclipResult.cameraPath ?? null;
+          (pass as any).preclip_camera_path = v452Path;
+          (pass as any)._v450_frozen_camera_path = v452Path;
+          (pass as any).preclip_camera_path_sig = v452Path?.signature ?? null;
+          (pass as any).preclip_camera_path_dynamic = isDynamicCameraPath(v452Path);
+          // V452 §7 — per-sample mouth geometry. EVIDENCE/TELEMETRY ONLY:
+          // the frozen v404 ROI, thresholds and NOOP ladder are untouched.
+          (pass as any).preclip_mouth_roi_samples = v452Path ? mouthRoiSamples(v452Path) : null;
 
           (pass as any).preclip_start_sec = Number(unionStart.toFixed(3));
           (pass as any).preclip_end_sec = Number(unionEnd.toFixed(3));
