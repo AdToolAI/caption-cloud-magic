@@ -6266,7 +6266,15 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               plate_box: box,
               preclip_crop: v161PreclipCrop,
               other_speaker_centers: otherCenters,
+              // V445 — provenance so a future mismatch is diagnosable without
+              // re-deriving geometry: which measurement produced the crop and
+              // which produced the dispatch bbox.
+              v445_crop_measure_src: (pass as any).preclip_crop_measure_src ?? null,
+              v445_bbox_measure_src: (pass as any).preclip_bbox_measure_src ?? v445MeasureSrc,
+              v445_crop_from_bbox: (pass as any).preclip_from_bbox ?? null,
+              v445_final_bbox_sig: v445FinalBoxSig,
             },
+
           };
           console.error(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} fa4_preclip_containment_fail_closed ` +
