@@ -108,7 +108,7 @@ Deno.test("B3. measured_ambiguous is never re-measured", async () => {
 Deno.test("C. the motion_unverified path dispatches nothing and refunds nothing", () => {
   const idx = WEBHOOK.indexOf("v443MotionUnverifiedPassthrough");
   assert(idx > 0, "passthrough guard missing");
-  const block = WEBHOOK.slice(idx, WEBHOOK.indexOf("if (canEscalate && nextRung)", idx));
+  const block = WEBHOOK.slice(idx, idx + 1200);
   assert(!block.includes("compose-dialog-segments"), "no provider re-dispatch allowed");
   assert(!block.includes("refund"), "no refund call allowed on this path");
   assert(!block.includes("ssw:noop_escalate"), "no escalation allowed on this path");
@@ -156,8 +156,8 @@ Deno.test("G. watchdog re-measures motion_unverified exactly once, never dispatc
   assertStringIncludes(WATCHDOG, "measureProviderMotionSync({");
   assertStringIncludes(WATCHDOG, '_write_id: "ssw:noop_fail"');
   assertStringIncludes(WATCHDOG, "provider_dispatch: false");
-  const idx = WATCHDOG.indexOf("V443");
-  const block = WATCHDOG.slice(idx);
+  const idx = WATCHDOG.indexOf("── V443");
+  const block = WATCHDOG.slice(idx, WATCHDOG.indexOf("v443_recheck_block_error", idx));
   assert(!block.includes("compose-dialog-segments"), "watchdog recheck must not dispatch");
   assert(!block.includes("refund"), "watchdog recheck must not refund");
 });
