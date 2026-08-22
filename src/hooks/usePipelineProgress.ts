@@ -981,7 +981,7 @@ export function usePipelineProgress({
   // re-render the plate phase restarts while lipsync/export still carry the
   // terminal status of the previous run; without this guard the bar snapped
   // straight back to the old ~99% floor instead of restarting at the plate.
-  const clipsRunning = !!clipsPhase && (clipsPhase.status === 'running' || clipsPhase.status === 'pending');
+  const clipsRunning = !!clipsPhase && (clipsPhase.status === 'running');
   const waitingForExport = lipsyncTerminal && exportIdleOrDone && !renderRunning && !clipsRunning;
 
   // v440 — a fresh plate run is a new epoch: drop the inherited run floor once,
