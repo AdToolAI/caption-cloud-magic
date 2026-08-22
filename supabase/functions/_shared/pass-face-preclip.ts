@@ -36,6 +36,11 @@ import { computeFaceCrop, FaceCropRegion } from "./face-crop.ts";
 import { appendWebhookToken } from "./webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
 import { computeMouthCenteredCrop } from "./compute-mouth-centered-crop.ts";
+// V452 — dynamic crop geometry (identity static, geometry dynamic).
+import {
+  type DynamicCameraPath,
+  isDynamicCameraPath,
+} from "./dynamic-camera-path.ts";
 // v400 Freeze: alle Tuning-Werte kommen aus dem eingefrorenen Vertrag.
 import { PRECLIP } from "./lipsync-frozen-contract.ts";
 // FA-4/P0 — exactly-once dispatch resume decisions (pure, unit-tested).
@@ -96,6 +101,20 @@ export interface PassPreclipInput {
    */
   runId?: string | null;
   plateGeneration?: number | null;
+  /**
+   * V452 — builds the dynamic camera path for THIS pass. Invoked after the
+   * static crop is known (the crop stays the authority for SIZE) and before
+   * the reuse signature is computed, so a changed path can never reuse an
+   * old preclip. Returning `null` keeps the legacy fixed crop.
+   */
+  buildCameraPath?:
+    | ((staticCrop: { x: number; y: number; size: number; outputSize: number }) => Promise<DynamicCameraPath | null>)
+    | null;
+  /**
+   * V452/V450 — an already frozen path (NOOP retry / recovery). When present
+   * it is used verbatim and `buildCameraPath` is NEVER called: no retracking.
+   */
+  frozenCameraPath?: DynamicCameraPath | null;
 }
 
 
@@ -123,6 +142,8 @@ export interface PassPreclipResult {
   bboxMeasureSrc?: string | null;
   /** V445 — the exact face bbox the crop was computed from. */
   cropFromBbox?: [number, number, number, number] | null;
+  /** V452 — the exact dynamic camera path the preclip was rendered with. */
+  cameraPath?: DynamicCameraPath | null;
 
   error?: string;
   /**
@@ -164,6 +185,8 @@ export function buildPreclipSignature(args: {
   bbox: [number, number, number, number] | null;
   startSec: number;
   endSec: number;
+  /** V452 — camera-path signature; `null` = legacy static crop. */
+  cameraPathSig?: string | null;
 }): string | null {
   if (!args.runId || args.generation === null || !Number.isFinite(args.generation)) return null;
   if (!args.plateKey) return null;
@@ -175,6 +198,7 @@ export function buildPreclipSignature(args: {
     `c=${args.crop.x},${args.crop.y},${args.crop.size},${args.crop.outputSize}`,
     `b=${bboxSig}`,
     `w=${Number(args.startSec).toFixed(3)}-${Number(args.endSec).toFixed(3)}`,
+    `cp=${args.cameraPathSig ?? "static"}`,
   ].join("|");
 }
 
