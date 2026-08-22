@@ -101,6 +101,13 @@ import { withDialogLock } from "../_shared/dialog-lock.ts";
 // bbox-url-pro pipeline (1..N speakers). v187 makes this fail-closed for
 // multi-speaker: no full-plate fallback after a preclip timeout/failure.
 import { renderPassFacePreclip } from "../_shared/pass-face-preclip.ts";
+import { classifySplitScreenLayout } from "../_shared/split-screen-layout.ts";
+import {
+  buildDispatchFaceBox,
+  faceBoxSignature,
+  sanitizeMeasureSource,
+} from "../_shared/plate-face-dispatch-box.ts";
+
 import { assertSafeDispatchEntry } from "../_shared/dialogPassTransition.ts";
 import { verifyFaceBeforeDispatch } from "../_shared/syncso-face-gate.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
@@ -3071,33 +3078,29 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // (same y, equal x-spacing, identical box height) the plate is a
       // quad/triptych split-screen layout. Sync.so cannot lipsync isolated
       // panels — block before dispatch with a clear error.
+      // V445 — detector logic lives in the pure shared module
+      // `_shared/split-screen-layout.ts` (testable, single source of truth).
+      // The old conjunction (y<=5% AND gap<=8% AND h<=10%) missed the
+      // production S11 panel plate; the V445 rule is
+      // y<=5% AND (gap<=15% OR h<=15%).
       const detectSplitScreenLayout = (): string | null => {
         if (!plateDims || !plateIdentityMap?.faces || plateIdentityMap.faces.length < 3) return null;
-        const faces = plateIdentityMap.faces as Array<{ bbox?: { x: number; y: number; width: number; height: number } }>;
-        const boxes = faces.map((f) => f.bbox).filter((b): b is { x: number; y: number; width: number; height: number } => !!b);
-        if (boxes.length < 3 || boxes.length !== faces.length) return null;
-        const W = plateDims.width;
-        const H = plateDims.height;
-        const centers = boxes.map((b) => ({ cx: b.x + b.width / 2, cy: b.y + b.height / 2, h: b.height }));
-        // Sort left-to-right by cx
-        centers.sort((a, b) => a.cx - b.cx);
-        const ys = centers.map((c) => c.cy);
-        const yMean = ys.reduce((a, b) => a + b, 0) / ys.length;
-        const ySpreadPct = Math.max(...ys.map((y) => Math.abs(y - yMean))) / H;
-        // Equal x-spacing: gaps between consecutive centers within ±8% of mean gap
-        const gaps: number[] = [];
-        for (let i = 1; i < centers.length; i++) gaps.push(centers[i].cx - centers[i - 1].cx);
-        const gapMean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
-        const gapSpreadPct = gapMean > 0 ? Math.max(...gaps.map((g) => Math.abs(g - gapMean))) / gapMean : 1;
-        // Identical box heights: ±10% of mean
-        const hs = centers.map((c) => c.h);
-        const hMean = hs.reduce((a, b) => a + b, 0) / hs.length;
-        const hSpreadPct = hMean > 0 ? Math.max(...hs.map((h) => Math.abs(h - hMean))) / hMean : 1;
-        if (ySpreadPct <= 0.05 && gapSpreadPct <= 0.08 && hSpreadPct <= 0.10) {
-          return `split_screen_layout(faces=${centers.length}, y_spread=${(ySpreadPct * 100).toFixed(1)}%, gap_spread=${(gapSpreadPct * 100).toFixed(1)}%, h_spread=${(hSpreadPct * 100).toFixed(1)}%)`;
-        }
-        return null;
+        // Plate identity faces carry bbox as [x1, y1, x2, y2] pixel tuples.
+        const verdict = classifySplitScreenLayout(
+          plateIdentityMap.faces.map((f) => {
+            const b = (f as { bbox?: unknown }).bbox;
+            if (!Array.isArray(b) || b.length !== 4) return null;
+            const [x1, y1, x2, y2] = b.map((n) => Number(n));
+            if (![x1, y1, x2, y2].every((n) => Number.isFinite(n))) return null;
+            return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
+          }),
+          plateDims.width,
+          plateDims.height,
+        );
+
+        return verdict.isSplitScreen ? verdict.reason : null;
       };
+
       const splitScreenReason = detectSplitScreenLayout();
       // v436 — restored contract: physical face coverage is authoritative.
       // `!plateIdentityMap` alone no longer blocks; the slot-order /
@@ -5561,6 +5564,35 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     let passPreclipUrl: string | null = ((pass as any).preclip_url ?? null);
     let usePassPreclip: boolean = !!passPreclipUrl && !!(pass as any).preclip_crop;
 
+    // ── V445 — geometry-coherence guard for cached pre-clips ─────────────
+    // A crop measured on OTHER geometry (earlier anchor / earlier plate
+    // generation) can never satisfy the fail-closed containment gate.
+    // Drop such a cache so the crop is recomputed from the FINAL assigned
+    // plate bbox of this run. Assignment lock and run identity untouched.
+    const v445FinalDispatchBox = buildDispatchFaceBox(
+      speakerPlateBboxes?.[pass.speaker_idx] ?? null,
+      plateDims ?? null,
+    );
+    const v445FinalBoxSig = faceBoxSignature(v445FinalDispatchBox);
+    const v445MeasureSrc = [
+      sanitizeMeasureSource(sourceClipUrl) ?? "unknown-plate",
+      `hydration=${plateHydrationSource ?? "unknown"}`,
+    ].join("#");
+    if (usePassPreclip && v445FinalBoxSig) {
+      const cachedSig = faceBoxSignature((pass as any).preclip_from_bbox ?? null);
+      if (cachedSig !== v445FinalBoxSig) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v445_cached_crop_geometry_mismatch ` +
+            `cached_bbox=${cachedSig ?? "none"} final_bbox=${v445FinalBoxSig} → recompute crop from final plate measurement`,
+        );
+        usePassPreclip = false;
+        passPreclipUrl = null;
+        (pass as any).preclip_url = null;
+        (pass as any).preclip_crop = null;
+      }
+    }
+
+
     const v161PreclipEligible =
       !usePassPreclip &&
       !!tightAudioInfo &&
@@ -5607,6 +5639,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             coords: [Number(pass.coords[0]), Number(pass.coords[1])],
             bbox: platePassBoxForPreclip,
             mouth: speakerPlateMouths?.[pass.speaker_idx] ?? null,
+            // V445 — same measurement label as the dispatch face box.
+            bboxMeasureSrc: v445MeasureSrc,
             siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
             startSec: unionStart,
             endSec: unionEnd,
@@ -5647,6 +5681,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             ? Number(preclipResult.mouthOffsetPx)
             : null;
           (pass as any).preclip_clamped = !!preclipResult.clamped;
+          // V445 — geometry provenance: which measurement the crop came from
+          // and the exact face bbox it was computed on. Enables the cache
+          // invalidation above and the diagnostic tags on mismatch failures.
+          (pass as any).preclip_from_bbox = preclipResult.cropFromBbox ?? platePassBoxForPreclip ?? null;
+          (pass as any).preclip_crop_measure_src = preclipResult.cropMeasureSrc ?? v445MeasureSrc;
+          (pass as any).preclip_bbox_measure_src = preclipResult.bboxMeasureSrc ?? v445MeasureSrc;
           // ── V434 Step 1 — IMMUTABLE PRE-CLIP EVIDENCE COPY ──────────────
           // Calibration ground truth may only be built from bytes that cannot
           // be overwritten by a later run (docs/v433-motion-studio-rca.md).
@@ -6044,15 +6084,14 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           {
             const anchorX = useMouth ? platePassMouth![0] : Math.round((bx1 + bx2) / 2);
             const anchorY = useMouth ? platePassMouth![1] : Math.round(by1 + h * 0.66);
-            const padX = Math.max(2, Math.round(w * 0.08));
-            const padTop = Math.max(2, Math.round(h * 0.06));
-            const padBottom = Math.max(2, Math.round(h * 0.04));
-            const x1 = Math.max(0, Math.round(bx1 - padX));
-            const y1 = Math.max(0, Math.round(by1 - padTop));
-            const x2 = Math.min(dims.width, Math.round(bx2 + padX));
-            const y2 = Math.min(dims.height, Math.round(by2 + padBottom));
-            if (x2 > x1 + 4 && y2 > y1 + 4) {
+            // V445 — identical padding math as the preclip crop source
+            // (`buildDispatchFaceBox`), so crop and dispatch box are one
+            // measurement. Values unchanged: 8% / 6% / 4%.
+            const padded = buildDispatchFaceBox(platePassBox, dims);
+            const [x1, y1, x2, y2] = padded ?? [0, 0, 0, 0];
+            if (padded) {
               box = [x1, y1, x2, y2];
+
               bboxSource = useMouth
                 ? "plate-native:v160-face-mouth-verified"
                 : "plate-native:v280-face-bbox-derived";
@@ -6234,7 +6273,15 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               plate_box: box,
               preclip_crop: v161PreclipCrop,
               other_speaker_centers: otherCenters,
+              // V445 — provenance so a future mismatch is diagnosable without
+              // re-deriving geometry: which measurement produced the crop and
+              // which produced the dispatch bbox.
+              v445_crop_measure_src: (pass as any).preclip_crop_measure_src ?? null,
+              v445_bbox_measure_src: (pass as any).preclip_bbox_measure_src ?? v445MeasureSrc,
+              v445_crop_from_bbox: (pass as any).preclip_from_bbox ?? null,
+              v445_final_bbox_sig: v445FinalBoxSig,
             },
+
           };
           console.error(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} fa4_preclip_containment_fail_closed ` +

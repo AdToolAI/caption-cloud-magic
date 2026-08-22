@@ -126,7 +126,22 @@ export function computeMouthCenteredCrop(
     y = Math.max(0, Math.min(plateHeight - size, Math.round(ay - size / 2)));
   }
 
+  // V445 — hard lower bound: the crop must be able to CONTAIN the face bbox.
+  // Without this, an anchor close to a plate edge shrank the crop below the
+  // face height (production S11: face 212x281 vs. crop 272x272), which makes
+  // the fail-closed containment gate arithmetically impossible to pass.
+  const faceFloor = Math.min(Math.min(plateWidth, plateHeight), Math.max(faceW, faceH));
+  if (size < faceFloor) {
+    size = Math.round(faceFloor);
+    // Re-center on the face bbox so the whole face fits, then clamp to plate.
+    const faceCx = (x1 + x2) / 2;
+    const faceCy = (y1 + y2) / 2;
+    x = Math.max(0, Math.min(plateWidth - size, Math.round(faceCx - size / 2)));
+    y = Math.max(0, Math.min(plateHeight - size, Math.round(faceCy - size / 2)));
+  }
+
   const clamped = x !== rawX || y !== rawY;
+
 
   // Report metrics.
   const cropArea = size * size;

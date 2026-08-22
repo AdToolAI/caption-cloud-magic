@@ -82,7 +82,15 @@ export interface PassPreclipInput {
    *  enforce faceShareInCrop ≥ ~42%. Falls back to the legacy
    *  computeFaceCrop path when unset. */
   mouth?: [number, number] | null;
+  /**
+   * V445 — stable, sanitized label of the measurement the `bbox`/`mouth`
+   * geometry came from (plate URL without signature + hydration source).
+   * Echoed back so the caller can persist `crop_measure_src` /
+   * `bbox_measure_src` and prove both share one measurement.
+   */
+  bboxMeasureSrc?: string | null;
 }
+
 
 export interface PassPreclipResult {
   ok: boolean;
@@ -99,8 +107,15 @@ export interface PassPreclipResult {
   faceShareInCrop?: number;
   /** v247 — distance (px) between mouth and crop center. */
   mouthOffsetPx?: number;
-  /** v247 — true when clamping forced the crop off the ideal anchor. */
+  /** V445 — true when clamping forced the crop off the ideal anchor. */
   clamped?: boolean;
+  /** V445 — measurement source the crop geometry was computed from. */
+  cropMeasureSrc?: string | null;
+  /** V445 — measurement source of the face bbox handed in by the caller. */
+  bboxMeasureSrc?: string | null;
+  /** V445 — the exact face bbox the crop was computed from. */
+  cropFromBbox?: [number, number, number, number] | null;
+
   error?: string;
   /**
    * `dispatch_uncertain` (FA-4/P0): 5xx / network failure where it is unknown
@@ -157,7 +172,25 @@ export async function renderPassFacePreclip(
     endSec,
     cropExpansionFactor,
     mouth,
+    bboxMeasureSrc,
   } = input;
+
+  // V445 — crop and dispatch bbox must share one measurement. We echo the
+  // caller's sanitized source label back as BOTH tags; the crop is computed
+  // from exactly the `bbox` handed in here, never from cached geometry.
+  const measureSrc: string | null = typeof bboxMeasureSrc === "string" && bboxMeasureSrc.length > 0
+    ? bboxMeasureSrc
+    : null;
+  const cropFromBbox: [number, number, number, number] | null =
+    Array.isArray(bbox) && bbox.length === 4 && bbox.every((n) => Number.isFinite(Number(n)))
+      ? [
+        Math.round(Number(bbox[0])),
+        Math.round(Number(bbox[1])),
+        Math.round(Number(bbox[2])),
+        Math.round(Number(bbox[3])),
+      ]
+      : null;
+
 
   if (!masterVideoUrl || !Number.isFinite(srcWidth) || !Number.isFinite(srcHeight)) {
     return { ok: false, error: "invalid_master_dims", errorClass: "invalid_input" };
@@ -311,6 +344,9 @@ export async function renderPassFacePreclip(
         faceShareInCrop,
         mouthOffsetPx,
         clamped: clampedAnchor,
+        cropMeasureSrc: measureSrc,
+        bboxMeasureSrc: measureSrc,
+        cropFromBbox,
       };
     }
   } catch (reuseErr) {
@@ -573,6 +609,9 @@ export async function renderPassFacePreclip(
         faceShareInCrop,
         mouthOffsetPx,
         clamped: clampedAnchor,
+        cropMeasureSrc: measureSrc,
+        bboxMeasureSrc: measureSrc,
+        cropFromBbox,
       };
     }
     if (status === "failed") {
