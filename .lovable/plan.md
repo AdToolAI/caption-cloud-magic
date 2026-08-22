@@ -1,83 +1,63 @@
-# Read-only Audit: Motion Studio Rerender vs. Lip-Sync-Only Reset
+# V438 — Pipeline State Contract: Current-Generation Plate Authority
 
-No code, DB, storage, provider or credit state was touched. All statements below come from the current sources named in each line.
+Scope: close the state contract that V437 exposed. No progress-percentage cosmetics until the contract holds. V435 Phase 1 stays paused until V438 is green.
 
-## Verdicts
+## Confirmed starting point
 
-- **Full scene rerender: PARTIAL** — logical invalidation is sound and race-safe; physical purge and continuity-frame clearing are incomplete.
-- **Lip-sync-only retry: PARTIAL** — plate/run are correctly preserved and callbacks are fenced, but it also drops identity/geometry context and leaves dispatch locks behind; one caller path is dead.
+- `public.composer_state_from_legacy(...)` evaluates `twoshot_stage = 'master_clip' → audio_ready` and `= 'audio' → audio_prep` **before** any `clip_status` branch. The client mirror `deriveStateFromLegacy` in `src/lib/composer/sceneState.ts` has the same order. Neither receives `plate_generation` / `plate_ready_generation`, so neither can tell whether the plate belongs to the current run.
+- `composer_substate_from_legacy` maps `twoshot_stage='failed' AND lip_sync_status='failed' → 'lipsync_failed'` unconditionally, with no plate-readiness precondition. Scene `e658509d` currently carries exactly that substate although it failed in the v117 plate gate with `plate_ready_generation = NULL`.
+- `useTwoShotAutoTrigger` selects `clip_url, clip_status, twoshot_stage, …` but **not** `plate_generation` / `plate_ready_generation`; its audio-prep and lip-sync candidate filters gate on "a `clip_url` exists and the row is ready-equivalent" only.
+- `usePipelineProgress` counts clip readiness via `legacyClipReadyEquivalentRow`, which returns `true` for `failed` scenes that still carry an output URL.
 
----
+## What changes
 
-## 1) Full scene rerender
+### 1. Current-generation plate authority (core invariant)
 
-Path: `SceneCard.handleFullSceneRegenerateAction` → `src/lib/composer/startSceneGeneration.ts` → `composer-start-scene-generation/index.ts` → `startSceneRun()` (`_shared/scene-run.ts` → RPC `composer_start_scene_run`) → `hardResetScene()` (`_shared/scene-hard-reset.ts`, `generationOverride`) → `transitionScene('plate_queued')` → `compose-video-clips` with `run_context`.
+Both derivation functions (SQL `composer_state_from_legacy` + TS mirror `deriveStateFromLegacy`) additionally take `plate_generation` and `plate_ready_generation`.
 
-What happens (evidence: `composer_start_scene_run` DB function, `_shared/scene-hard-reset.ts` L470–650):
+Rule: a scene may only reach `audio_prep`, `audio_ready`, `lipsync_dispatched`, `lipsync_running`, `lipsync_muxing` or `complete` when the plate of the **current** generation is proven ready — `plate_ready_generation = plate_generation` and a non-empty output URL. If it is not, stale `twoshot_stage` / `lip_sync_status` values are ignored for phase purposes and the state falls back to the plate phase derived from `clip_status` + `active_run_id` (`plate_queued` / `plate_rendering` / `idle`). `canceled` and `failed` keep their precedence; they are not phase-forward states.
 
-| Item | Effect |
-| --- | --- |
-| Scene row | kept; no delete |
-| `plate_generation` / `active_run_id` | bumped + fresh UUID **inside one row-locked transaction, before any teardown** (`composer_start_scene_run`) |
-| `plate_ready_generation`, `plate_ready_at` | nulled |
-| `clip_url` / `base_video_url` / `processed_video_url` | cleared as one triple via `materializeCompatibilityOutput('clear')` |
-| `preview_clip_url`, `clip_error`, `replicate_prediction_id`, `retry_count` | cleared |
-| `first_frame_url`, `last_frame_url` | **NOT cleared** (only `beginSceneRun` clears them) — gap |
-| `dialog_shots`, `dialog_takes`, `twoshot_stage`, `lip_sync_status/_source_clip_url/_applied_at` | cleared |
-| `audio_plan` / `scene_assets` | user-authored keys kept, derived keys stripped (`stripDerivedAudioPlan`, `stripDerivedSceneAssets`) |
-| Dispatch locks | `dialog_dispatch_locks` + `syncso_inflight_jobs` deleted for the scene |
-| Provider jobs | `failLipSync()` cancels collected Sync.so ids best-effort; `replicate_prediction_id` cleared |
-| Plate attempts / renders | superseded by trigger + `supersedeOpenPlateAttempts`; open `video_renders` of older generations marked `failed:v380_superseded_*` |
-| Storage | `purgeArtifacts()` deletes matching objects in 8 bucket/prefix pairs |
-| V434 pins | untouched (`ai-videos/<uid>/v434/...` is outside the purge prefixes) — correct, evidence stays immutable |
-| Credits | `decideRefund()`: refund only for an open, undelivered job; `skipped_delivered` / `skipped_already_refunded` / `nothing_open` otherwise |
-| Continuity | `propagate_continuity_staleness(scene, null)` called only here |
+The bridge trigger passes the two new columns through, so old-path legacy writes can no longer pull a fresh run forward.
 
-Race analysis: the generation bump is committed **before** cancels, so an old plate callback is inert regardless of cancel success — `compose-clip-webhook` L130–148 rejects any callback whose `run_id`/`generation` do not match the live row. Old Sync.so callbacks are fenced in `sync-so-webhook` L634–664 by "`dialog_shots` purged or job id not in the current run".
+### 2. Auto-trigger gets the same guard
 
-### Concrete gaps
+`useTwoShotAutoTrigger` selects `plate_generation, plate_ready_generation, active_run_id` and applies one shared predicate — `isCurrentGenerationPlateReady(row)` — in the audio-prep filter, the lip-sync candidate filter and the self-heal branches. A `clip_url` alone no longer qualifies a scene; a URL from a previous generation is treated as absent. The same predicate is exported from `src/lib/composer/sceneState.ts` so client and hook cannot drift.
 
-1. `first_frame_url` / `last_frame_url` survive the hard reset. `_shared/transition-frame.ts` L71–75 reuses the previous scene's `last_frame_url`, which can now point to bytes the purge deleted or to the previous generation's look.
-2. `purgeArtifacts()` uses a non-recursive `storage.list(prefix, {limit:1000})` and filters names containing the scene id, so objects nested one level deeper (e.g. `composer/<projectId>/<sceneId>/...`) are never listed and never deleted. Physical purge is therefore partial; logical invalidation still holds.
-3. Purge/cancel errors set `ok:false` but `composer-start-scene-generation` aborts only on `update:` errors — a partially failed teardown still dispatches (deliberate, but it means "deleted_objects" is not a guarantee).
-4. Direct `composer-hard-reset-scene` (abandon path, `hardResetSceneJob`) bumps the generation but leaves `active_run_id` pointing at the old run; the webhook guard is an AND over run+generation so nothing leaks, but the row is inconsistent.
-5. Open question, not verified in this audit: whether a v427 credit reservation is released on the hard-reset path (`_shared/v427-credit-contract.ts` holds the settle/release helpers; no call site found in `scene-hard-reset.ts`).
+### 3. Failure substate reflects the real failing phase
 
----
+`composer_substate_from_legacy` (and the TS mirror) only yields `lipsync_failed` when the current-generation plate was ready. A failure while the plate is not ready yields a plate-phase substate (`plate_failed`), which the UI labels as a clip/plate failure. Terminal states stop carrying progress-flavoured substates such as `anchor`.
 
-## 2) Lip-sync-only retry
+### 4. Global progress honest about failures and run changes
 
-Path: `SceneCard.cleanRestartLipSync({force:true})` / `useResetLipSync` / `lipsyncReset.resetSceneLipSync` → `reset-lipsync-scene` → RPC `composer_reset_lipsync_with_attempt_cancellation` → auto-trigger (`useTwoShotAutoTrigger`, 2.5 s poll) → `compose-dialog-segments`.
+- `legacyClipReadyEquivalentRow` keeps its ready/failed exclusivity, but `usePipelineProgress` counts a scene as a *ready clip* only when it is not in a failed state; failed-with-output counts as settled-failed, not as a successful clip phase.
+- On a run/generation change, derived progress uses only artifacts of that run. 100 → 0 at run start is correct and stays; the fixed defect is the later jump back to a stale 65 %.
 
-Cleared by the RPC (single commit, advisory scene lock): `dialog_shots`, `twoshot_stage`, `replicate_prediction_id`, `processed_video_url`, `lip_sync_source_clip_url`, `lip_sync_applied_at`, `clip_error`; `lip_sync_status → 'pending'`; open `sync_segment` / `audio_mux` ledger attempts → `cancelled` / `error_code='user_reset'` with callback claim tokens nulled.
+### 5. Copy pass (last, after the contract holds)
 
-Preserved: `plate_generation` and `active_run_id` are **unchanged** (guarded: mismatch returns `stale_reset`); `clip_url`/`base_video_url` are restored to the base plate (`lip_sync_source_clip_url` when `force`, else current `clip_url`), `clip_status → 'ready'`; `reference_image_url`, `scene_assets`, `first_frame_url`, `last_frame_url` untouched; no storage purge at all, so plate, preclips and anchors physically survive; `propagate_continuity_staleness` is deliberately **not** called.
+- `plate_rendering`: "Generating clip" / "Clip wird generiert" / "Generando clip".
+- `audio_prep`: "Generating voiceover" / "Voiceover wird erzeugt" / "Generando voz en off".
+- `scene.status.failed` ES: "Fallido".
+- New `plate_failed` detail label in all three locales.
 
-Fencing: the `audio_plan.twoshot.rs3_reset` marker (reset_id, run_id, plate_generation, authorized segments, `mux_rearm_allowed`) authorizes exactly one successor per stage/segment and makes every pre-reset attempt identifiable (`composer_rs3_is_pre_reset_attempt`); late Sync.so callbacks additionally hit the purged-`dialog_shots` guard.
+## Invariant tests (permanent regression guard)
 
-Plate reuse: `compose-dialog-segments` reads `clip_url` / `lip_sync_source_clip_url` and never starts a plate render (no `startSceneRun`/plate dispatch in that function) — the same plate is reused.
+New test file next to the existing composer state tests:
 
-Refund: claimed exactly once inside the commit (`refund_claimed`), paid out afterwards by the edge function.
+1. `current plate not ready ⇒ derived state ∉ {audio_prep, audio_ready, lipsync_dispatched, lipsync_running, lipsync_muxing, complete}` — table-driven over every legacy `twoshot_stage` / `lip_sync_status` combination.
+2. `plate_ready_generation ≠ plate_generation ⇒ auto-trigger predicate is false`, even with a non-empty `clip_url`.
+3. `substate 'lipsync_failed' requires a ready current-generation plate`.
+4. TS ↔ SQL parity: the mirror in `src/lib/composer/sceneState.ts` and `supabase/functions/_shared/scene-state.ts` produce identical results for the full case matrix.
+5. Progress: a failed-with-output scene does not increase the clips-ready count.
 
-### Concrete gaps
+## Technical notes
 
-1. The RPC strips `faceMap` **and** `anchor_face_audit` from `audio_plan.twoshot`. Identity/geometry context is therefore *not* preserved and must be re-derived on the next pass — exactly the surface where the v117 plate gate previously tripped. This contradicts the intended contract.
-2. `dialog_dispatch_locks` are not deleted on this path (only in `scene-hard-reset.ts` L532), so a stale lease can defer the rearm until the watchdog reclaims it.
-3. `beginSceneRun()` (`_shared/scene-run-begin.ts` L60–80) calls `reset-lipsync-scene` with the **service-role key** as Bearer, while the function requires a real user JWT (`auth.getUser()` → 401). That cancel-inflight step is a permanent no-op on the legacy `compose-video-clips` path.
-4. Refund durability: if the function crashes between the commit (`refund_claimed = true`, `dialog_shots = NULL`) and the wallet update, the claim is consumed but no credits land, and a retry sees `cost = 0`.
-5. `syncso_inflight_jobs` rows are removed only for job ids discoverable from the pre-reset `dialog_shots` / RPC output; unknown ids stay until the watchdog cleans up.
+- Files: `src/lib/composer/sceneState.ts`, `supabase/functions/_shared/scene-state.ts`, `src/hooks/useTwoShotAutoTrigger.ts`, `src/hooks/usePipelineProgress.ts`, `src/lib/composer/status/sceneStatusPresenter.ts`, `src/components/video-composer/SceneStatusBadge.tsx`.
+- One migration: replaces `composer_state_from_legacy` (new signature with the two generation args), `composer_substate_from_legacy`, and `composer_scene_state_bridge` to pass `NEW.plate_generation` / `NEW.plate_ready_generation`. The old function signature is dropped only after the bridge is updated in the same migration.
+- No backfill of historical rows; derivation is read-time, and existing `pipeline_state` values keep priority over the legacy mirror.
+- No pipeline behaviour beyond phase gating changes — no new renders, no provider calls, no credit paths touched.
 
----
+## Out of scope
 
-## Contract check
-
-- "Full rerender invalidates the old final scene and creates a new run/generation" — satisfied logically and atomically; deviations are the surviving continuity frames and the shallow storage purge.
-- "Lip-sync-only preserves plate + identity/geometry and replaces only lip-sync-derived artifacts" — plate/run/generation preservation is exact; the identity/geometry part (`faceMap`, `anchor_face_audit`) is violated by design of the current reset field set.
-
-## Suggested follow-up gate (not executed here)
-
-1. Clear `first_frame_url`/`last_frame_url` in `hardResetScene` and make `purgeArtifacts` recursive.
-2. Keep `faceMap`/`anchor_face_audit` across an RS3 lip-sync reset (or re-pin them to the plate generation) and drop `dialog_dispatch_locks` on that path.
-3. Fix or remove the service-key call to `reset-lipsync-scene` in `beginSceneRun`.
-4. Make the RS3 refund payout durable (ledger row instead of a consumed in-place claim).
-5. Verify v427 reservation release on the hard-reset path.
+- V435 Phase 1 reference run (resumes only after V438 passes).
+- Lip-sync-only reset preserving `faceMap` (V436 follow-up, separate gate).
+- `v434_artifact_pins` accumulation cleanup.
