@@ -802,7 +802,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const seg = Array.isArray(measurePass?.segments) ? measurePass.segments[0] : null;
       const duration = Number(measurePass?.preclip_duration_sec ?? NaN) ||
         (seg ? Number(seg.endTime) - Number(seg.startTime) : NaN);
-      v404MotionMeasurement = await measureProviderMotionSync({
+      // V443 — the measurement inputs are IMMUTABLE for the whole bounded
+      // re-measure: same pinned provider output, same pre-clip, same duration,
+      // same run/generation/pass identity. No provider call, no new spend.
+      const v443MeasureArgs = {
         preclipUrl,
         providerOutputUrl: v404RehostedUrl ?? outputUrl!,
         durationSeconds: duration,
@@ -816,7 +819,24 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           mouthOffsetPx: (measurePass as any)?.preclip_mouth_offset_px ?? null,
           mouthOffset: (measurePass as any)?.preclip_mouth_offset_xy ?? null,
         },
-      });
+      };
+      const v443Bounded = await measureWithBoundedReMeasure(
+        () => measureProviderMotionSync(v443MeasureArgs),
+        {
+          maxRetries: PROBE_INFRA_MAX_RETRIES,
+          onRetry: ({ attempt, reason, waitMs }) => {
+            console.warn(
+              `[sync-so-webhook] v443_probe_infra_remeasure scene=${sceneId} pass=${measurePassIdx} ` +
+                `attempt=${attempt}/${PROBE_INFRA_MAX_RETRIES + 1} wait_ms=${waitMs} ` +
+                `class=probe_infra_error reason=${reason} — same immutable pinned output, no provider call`,
+            );
+          },
+        },
+      );
+      v404MotionMeasurement = v443Bounded.result;
+      v443MeasureAttempts = v443Bounded.attempts;
+      v443MotionUnverified = v443Bounded.infraExhausted;
+      v443LastInfraReason = v443Bounded.infraExhausted ? v404MotionMeasurement.reason : null;
       v404MotionProbe = v404MotionMeasurement.measurement_status === "measured" &&
           v404MotionMeasurement.preclip_metric && v404MotionMeasurement.provider_metric
         ? classifyMotionProbe({
