@@ -37,6 +37,10 @@ export const TRACK_MIN_IOU = 0.15;
 /** Alternative acceptance: center distance below this fraction of ref side. */
 export const TRACK_MAX_CENTER_DRIFT = 0.7;
 
+/** Two candidates this similar are ambiguous — we refuse rather than switch. */
+export const TRACK_AMBIGUITY_DIST_RATIO = 1.15;
+export const TRACK_AMBIGUITY_IOU_DELTA = 0.05;
+
 export interface TrackedSampleDebug {
   t: number;
   accepted: boolean;
@@ -154,6 +158,19 @@ export function pickAssignedFace(
     }
   }
   if (!best) return null;
+  // Crossing/ambiguity veto: if a second candidate is essentially as good as
+  // the best one, no continuation is PROVABLE. Returning null keeps identity
+  // static (the sample is interpolated) instead of risking a speaker switch.
+  for (const c of candidates) {
+    if (c.bbox === best.bbox) continue;
+    const iou = boxIoU(c.bbox, reference);
+    const [ccx, ccy] = centerOf(c.bbox);
+    const dist = Math.hypot(ccx - rcx, ccy - rcy);
+    if (iou < TRACK_MIN_IOU && dist > rSide * TRACK_MAX_CENTER_DRIFT) continue;
+    const distClose = dist <= best.dist * TRACK_AMBIGUITY_DIST_RATIO;
+    const iouClose = Math.abs(iou - best.iou) < TRACK_AMBIGUITY_IOU_DELTA;
+    if (distClose && iouClose) return null;
+  }
   return { bbox: best.bbox, mouth: best.mouth, iou: best.iou };
 }
 
