@@ -115,6 +115,29 @@ Deno.test("V452 A.2 — the runtime mirror uses the identical predicate", async 
   assert(mux.includes("shouldUseCameraPath(cp)"), "mux must gate on the shared predicate");
 });
 
+Deno.test("V452 A.2 — Deno sampler and runtime sampler agree frame by frame", async () => {
+  const { sampleCameraPathRuntime, isDynamicPathRuntime } = await import(
+    "../../../src/lib/composer/cameraPathRuntime.ts"
+  );
+  const samples = [0, 1, 2, 3, 4].map((i) => sample(i, 600 + i * 120, 380 + i * 20));
+  const path = buildDynamicCameraPath({
+    samples,
+    staticCrop: STATIC_CROP,
+    ...SRC,
+    startSec: 0,
+    endSec: 4,
+  });
+  assertEquals(isDynamicPathRuntime(path as never), shouldUseCameraPath(path));
+  for (let f = 0; f <= 120; f++) {
+    const t = f / 30;
+    const a = sampleCameraPath(path, t)!;
+    const b = sampleCameraPathRuntime(path as never, t)!;
+    assertEquals(Number(a.x.toFixed(6)), Number(b.x.toFixed(6)), `x mismatch at t=${t}`);
+    assertEquals(Number(a.y.toFixed(6)), Number(b.y.toFixed(6)), `y mismatch at t=${t}`);
+    assertEquals(a.size, b.size);
+  }
+});
+
 // ── movement + frozen size authority ───────────────────────────────────────
 
 Deno.test("V452 — a walking face produces a moving path with UNCHANGED crop size", () => {

@@ -3,7 +3,7 @@
  * path sampler in `supabase/functions/_shared/dynamic-camera-path.ts`.
  *
  * The Remotion bundle cannot import Deno edge modules, so the sampler is
- * mirrored here. `src/lib/composer/__tests__/v452CameraPathParity.test.ts`
+ * mirrored here. `supabase/functions/_shared/v452-dynamic-tracking.test.ts`
  * proves both implementations return identical geometry for identical paths —
  * that parity is the guarantee that preclip and reprojection (T13) walk the
  * exact same path.
