@@ -35,24 +35,34 @@ Beim NOOP-Retry greift V445, wirft den Preclip weg — und das Neu-Rendern ist i
 selben Lauf verboten. Ergebnis ist ein garantierter Hard-Fail. Das trifft jede
 Mehrsprecher-Szene, die einmal in die NOOP-Eskalation läuft.
 
-## Fix (minimal, exakt eine Verzweigung)
+## Fix (minimal, exakt zwei Verzweigungen)
 
 In `supabase/functions/compose-dialog-segments/index.ts`:
 
-1. Den V445-Cache-Drop **nicht** ausführen, wenn `body.noop_auto_escalation === true`
-   ist. Beim NOOP-Retry ist der eingefrorene Snapshot die Authority; die
-   Geometrie darf nicht neu gemessen werden. Statt zu verwerfen wird die
-   Abweichung nur als Telemetrie geloggt
-   (`v450_noop_retry_geometry_drift_ignored` mit beiden Box-Signaturen).
-2. Zweiter Riegel gegen dieselbe Klasse von Fehlern: Wenn der Preclip in einem
-   Multi-Speaker-Pass fehlt **und** das Neu-Rendern gesperrt ist, darf der Pass
-   nicht mit `v204_preclip_required` die ganze Szene killen, sondern muss den
-   Preclip aus dem V434-Pin bzw. `_v105_probe.payload_video_url` des Passes
-   rekonstruieren. Nur wenn auch das fehlt, bleibt der bestehende
-   Fail-Closed-Pfad inklusive idempotentem Refund unverändert.
+**1. V445-Cache-Drop beim NOOP-Retry aussetzen.**
+Wenn `body.noop_auto_escalation === true`, ist der eingefrorene Wire-Snapshot
+die Authority. Verbindlich festgeschrieben: `preclip_url`, `preclip_crop`,
+Audio-URL, BBox/Coords sowie Run-/Generation-/Pass-Identität werden beim
+NOOP-Retry **weder neu berechnet noch ersetzt**. Eine erkannte
+Geometrieabweichung wird ausschliesslich protokolliert
+(`v450_noop_retry_geometry_drift_ignored`, mit beiden Box-Signaturen).
+
+**2. Beweisgebundene Recovery, wenn der Preclip bereits fehlt.**
+Eine Rekonstruktion aus dem V434-Pin bzw. `_v105_probe.payload_video_url` ist
+nur zulässig, wenn alle vier Bedingungen nachweisbar erfüllt sind:
+gleiche `run_id`, gleiche `plate_generation`, gleicher Pass (Index +
+`speaker_idx`/`segment_id`) und die originale Crop-Geometrie ist ebenfalls
+rekonstruierbar. Eine blosse MP4-URL ohne zugehörigen Crop reicht
+ausdrücklich **nicht**. Ist der Snapshot nicht vollständig beweisbar, bleibt
+`v204_preclip_required` unverändert fail-closed inklusive idempotentem Refund.
+
+Damit gilt der Vertrag scharf:
+Fresh dispatch → aktuelle V445-Geometrie.
+NOOP-Retry → exakt eingefrorener vorheriger Wire.
 
 Nicht angefasst: Gates, Schwellenwerte, Framing, Kamerapfad, Maskengeometrie,
 Provider-Liste, Zustandsmaschine, Assignment-Lock, Refund-Logik.
+
 
 ## Freeze-Einordnung
 
