@@ -82,7 +82,15 @@ export interface PassPreclipInput {
    *  enforce faceShareInCrop ≥ ~42%. Falls back to the legacy
    *  computeFaceCrop path when unset. */
   mouth?: [number, number] | null;
+  /**
+   * V445 — stable, sanitized label of the measurement the `bbox`/`mouth`
+   * geometry came from (plate URL without signature + hydration source).
+   * Echoed back so the caller can persist `crop_measure_src` /
+   * `bbox_measure_src` and prove both share one measurement.
+   */
+  bboxMeasureSrc?: string | null;
 }
+
 
 export interface PassPreclipResult {
   ok: boolean;
