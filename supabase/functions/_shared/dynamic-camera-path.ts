@@ -24,7 +24,6 @@
 // Only the trajectory is taken from it; the crop SIZE stays frozen (V445/V450).
 import {
   type Box as PlannerBox,
-  boxCenter as plannerBoxCenter,
   type CropWindow,
   planCameraPath,
 } from "./camera-path.ts";
@@ -149,25 +148,9 @@ export function boxIoU(a: Box, b: Box): number {
   return union > 0 ? inter / union : 0;
 }
 
-function medianOf3(values: number[]): number[] {
-  return values.map((_, i) => {
-    const slice = [values[Math.max(0, i - 1)], values[i], values[Math.min(values.length - 1, i + 1)]];
-    slice.sort((a, b) => a - b);
-    return slice[1];
-  });
-}
-
-function forwardBackward(values: number[], alpha = 0.5): number[] {
-  const n = values.length;
-  if (n === 0) return [];
-  const fwd = new Array<number>(n);
-  fwd[0] = values[0];
-  for (let i = 1; i < n; i++) fwd[i] = alpha * values[i] + (1 - alpha) * fwd[i - 1];
-  const bwd = new Array<number>(n);
-  bwd[n - 1] = values[n - 1];
-  for (let i = n - 2; i >= 0; i--) bwd[i] = alpha * values[i] + (1 - alpha) * bwd[i + 1];
-  return values.map((_, i) => (fwd[i] + bwd[i]) / 2);
-}
+// NOTE: no second smoothing system lives here. Median filtering, zero-phase
+// forward/backward smoothing, look-ahead, dead zone and pan/acceleration
+// limits are all owned by the v359 planner (`camera-path.ts`).
 
 /** Fills null samples by bounded linear interpolation between valid neighbours. */
 export function interpolateSamples(samples: TrackSample[]): TrackSample[] {
