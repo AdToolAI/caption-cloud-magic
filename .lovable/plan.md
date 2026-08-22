@@ -1,53 +1,46 @@
-# V449 — Provider-Rejection sofort sichtbar machen + Plate-Prompt entdoppeln
+# V449 — Rooftop-Test als frisches Motion-Studio-Projekt
 
-## Was tatsächlich passiert ist (belegt, nicht vermutet)
+## Ausgangslage (geprüft)
 
-Die Szene, die du siehst, ist **S11 im alten Projekt `v431-g322-resmoke`** (nicht das neue V448-Rooftop-Projekt — das steht unangetastet auf `pending`).
+- Das Projekt **V448 — Rooftop Movement Lipsync Test** existiert weiterhin in der Datenbank, mit genau einer Szene (`4015394d-…`), Status `draft`, Clip-Status `pending` — es wurde nie gerendert.
+- Es gehört bereits dem Account **bestofproducts4u@gmail.com** (`8948d3d9-…`), demselben Account, dem auch die vier Cast-Charaktere Sarah, Samuel, Matthew und Kay gehören.
+- Der Grund, warum du es nie gesehen hast: Das Motion Studio öffnet beim Aufruf ohne Projekt-Parameter den zuletzt lokal gespeicherten Entwurf, nicht die Projektliste. Nach dem Löschen des alten Projekts ist dieser Entwurf leer — daher „0 Scenes".
 
-Ablauf laut Datenbank und Provider-API:
+## Was gemacht wird
 
-```text
-20:16:11  Plate-Dispatch Versuch 1 (HappyHorse)  -> 20:18:56 FAILED
-20:18:59  Prompt-Repair-Retry Versuch 2          -> 20:19:12 FAILED
-20:19:00  letzte DB-Aktualisierung der Szene     -> seitdem "Scene is being built…"
-```
+**1. Ein frisches Projekt anlegen: `V449 — Rooftop Movement Lipsync Test`**
+- Besitzer: bestofproducts4u@gmail.com
+- Sprache Deutsch, Status `draft`, als Testlauf markiert, kein Auto-Render
 
-Beide Versuche wurden **vom Provider abgelehnt**, identischer Fehler:
+**2. Genau eine Szene übernehmen — 1:1 aus V448**
+- `S01 — Rooftop Movement Dialogue Test`, `order_index = 0`, 15 s, Provider HappyHorse
+- Lip-Sync aktiv, Dialogmodus aktiv, Engine `cinematic-sync`
+- Identischer Szenen-Prompt, identische Blocking-Beschreibung (Sarah links, Samuel wandert nach rechts, Matthew dahinter am Tablet, Kay im Dreiviertelprofil)
+- Dieselben vier Cast-Einträge mit denselben Charakter-IDs
+- Dieselben sechs Dialog-Turns in derselben Reihenfolge, dieselben deutschen ElevenLabs-Stimmen
+- Keine Laufzeit-Felder werden mitkopiert (kein Run, kein Anker, keine Plate) — die Szene startet garantiert sauber
 
-> `DataInspectionFailed – Green net check failed for text (input)`
+**3. Altes V448-Projekt entfernen**
+- Damit nicht zwei identische Testprojekte in der Liste stehen. Es enthält keine Renderdaten, es geht nichts verloren.
 
-Das ist die HappyHorse-Textprüfung, kein Render-Fehler und kein Lip-Sync-Problem. Der Clip war also schon nach 3 Minuten tot — die Oberfläche zeigt trotzdem weiter „Szene wird gebaut", weil nach dem zweiten Fehlschlag **kein Callback in der Datenbank angekommen ist**. Die Szene steht deshalb bis zum Watchdog-Zeitfenster (10 Minuten Stille) auf `generating`.
+**4. Direkter Öffnungslink**
+- Nach dem Anlegen bekommst du die Projekt-ID und die fertige URL im Format
+  `https://useadtool.ai/video-composer?projectId=<neue-id>`
+- Dieser Link umgeht den lokalen Entwurf und lädt das Projekt direkt aus der Datenbank.
 
-Der abgelehnte Prompt ist zusätzlich sichtbar kaputt: der Block `[2 ACTION] Lip-ready neutral master plate: Exactly 4 distinct people…` steht **dreimal hintereinander**, gefolgt von vier `[8 NEGATIVE]`-Fragmenten. Ein solcher Text ist ein typischer Auslöser für die Green-Net-Textprüfung.
+## Was NICHT passiert
 
-## Was der Gate repariert
-
-**1. Ehrliches Scheitern statt stiller Wartezeit**
-- Nach einem Dispatch prüft die Kette den Provider-Status aktiv nach (kurzes, begrenztes Nachfassen), statt ausschließlich auf den Callback zu warten.
-- Eine erkannte Provider-Ablehnung terminalisiert die Szene sofort: Status `failed`, klare deutsche Fehlermeldung („Der Video-Anbieter hat den Szenentext abgelehnt"), automatische Gutschrift wie bisher.
-- Ziel: sichtbarer Fehler in unter einer Minute statt 10 Minuten Scheinfortschritt.
-
-**2. Prompt-Entdopplung vor dem Dispatch**
-- Im Prompt-Layer-Composer eine Dedup-Stufe, die identische bzw. nahezu identische Sätze und wiederholte `[2 ACTION]` / `[8 NEGATIVE]`-Blöcke zusammenführt, bevor der Text zum Provider geht.
-- Harte Längenobergrenze für den Plate-Prompt; überschüssige Wiederholungen fallen zuerst weg, die Kern-Klauseln (Identität, Lip-Ready, Kamera-Lock, Anti-Panel) bleiben erhalten.
-
-**3. Sanitizer-Ergänzung**
-- Der bestehende `hardSanitizeForHappyHorse` bekommt die Entdopplung als festen Bestandteil, damit der eine erlaubte Repair-Retry sich vom ersten Versuch tatsächlich unterscheidet — heute wurde derselbe abgelehnte Text zweimal geschickt und zweimal abgelehnt.
-
-## Was der Gate NICHT anfasst
-
-- Keine Änderung an der Lip-Sync-Kette (v400-Freeze bleibt), keine Provider-Migration (v176 bleibt), keine Anker-Logik.
-- Kein Render, kein Owner-Rerender in diesem Gate.
-- Das V448-Rooftop-Projekt bleibt unverändert auf „bereit für genau einen manuellen Render".
+- Kein Render, kein Provider-Aufruf, keine Credits.
+- Keine Änderung an der Lip-Sync-Pipeline, an Edge Functions oder am Frontend-Code.
+- Keine anderen Projekte, Charaktere oder Renderdaten werden angefasst.
 
 ## Technische Details
 
-- `supabase/functions/_shared/happyhorse-green-net.ts`: Dedup-Helfer ergänzen, in `hardSanitizeForHappyHorse` einhängen.
-- Prompt-Layer-Composer (`compose-video-clips` Plate-Pfad): Dedup + Längenobergrenze vor dem Dispatch, axis-aware wie bereits dokumentiert.
-- `compose-video-clips`: nach dem Dispatch ein begrenztes Nachfassen beim Provider (wenige Versuche, kurzes Fenster); bei `failed` mit `classifyProviderRejection() != none` → sofort `clip_status='failed'`, `clip_error='[prompt_rejected] …'`, Refund über den bestehenden Pfad, Cinematic-Sync-Felder aufräumen wie im Webhook-Fail-Pfad.
-- `recover-stuck-composer-clip` / `qa-watchdog` bleiben unverändert als Sicherheitsnetz.
-- Tests: Erweiterung von `supabase/functions/_shared/happyhorse-rejection.test.ts` um Dedup- und Terminalisierungsfälle.
+- `INSERT` in `composer_projects` (title, `user_id = 8948d3d9-…`, `language = 'de'`, `status = 'draft'`, `is_test_run = true`).
+- `INSERT` in `composer_scenes` per `SELECT` aus der bestehenden V448-Zeile, mit neuer `id` und neuer `project_id`; ausgenommen bleiben `active_run_id`, `clip_url`, `reference_image_url`, `lock_reference_url`, `dialog_shots`, `replicate_prediction_id`, `clip_status` (wird `pending`), `twoshot_stage`, `lip_sync_status`.
+- Anschließend `DELETE` der V448-Zeilen (Szene, dann Projekt).
+- Verifikation per Query: neues Projekt hat genau 1 Szene, 6 Dialog-Turns, 4 Cast-Einträge, `clip_status = 'pending'`, kein aktiver Run.
 
-## Erwartetes Ergebnis
+## Rückgabe
 
-S11 lässt sich danach erneut starten; entweder läuft der entdoppelte Prompt durch, oder du siehst binnen Sekunden einen klaren, verständlichen Fehler statt sieben Minuten Ladebalken.
+Projekt-ID, Szenen-ID, Öffnungs-URL, die vier Cast-IDs, die sechs Dialog-Turns und die Bestätigung „bereit für genau einen manuellen Render".
