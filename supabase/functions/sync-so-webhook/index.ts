@@ -859,6 +859,39 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           `delta_mean=${v404MotionMeasurement.deltaMean ?? "n/a"} ` +
           `verdict=${v404MotionProbe.verdict} reason=${v404MotionProbe.reason}`,
       );
+      // V443 — bounded re-measure exhausted for INFRASTRUCTURE reasons only.
+      // Persist everything the watchdog needs for exactly ONE re-measure of the
+      // very same immutable provider output. No provider job is referenced.
+      if (v443MotionUnverified) {
+        console.warn(
+          `[sync-so-webhook] v443_motion_unverified scene=${sceneId} pass=${measurePassIdx} ` +
+            `attempts=${v443MeasureAttempts} class=probe_infra_error reason=${v443LastInfraReason} ` +
+            `→ pass-through as success (no terminalization, no refund, no provider call)`,
+        );
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          job_id: jobId,
+          engine: "sync-segments",
+          turn_idx: measurePassIdx,
+          sync_status: "MOTION_UNVERIFIED",
+          error_class: "motion_probe_infra_error",
+          error_message: String(v443LastInfraReason ?? "").slice(0, 500),
+          meta: {
+            v443: true,
+            telemetry_state: MOTION_UNVERIFIED_STATE,
+            failure_class: "probe_infra_error",
+            measure_attempts: v443MeasureAttempts,
+            max_remeasure: PROBE_INFRA_MAX_RETRIES,
+            pass_idx: measurePassIdx,
+            phase,
+            pipeline_job_id: v431CallbackJobId ?? null,
+            preclip_url: preclipUrl,
+            provider_output_url: v404RehostedUrl ?? outputUrl,
+            duration_sec: Number.isFinite(duration) ? duration : null,
+            preclip_geometry: v443MeasureArgs.preclipGeometry,
+          },
+        });
+      }
       // V434 Step 3/4 — scale-free outcome telemetry, printed next to (never
       // instead of) the authoritative v404 verdict.
       const v434 = (v404MotionMeasurement as any)?.v434;
