@@ -245,23 +245,61 @@ Deno.serve((req: Request) => withLang(req, () => (withSentryCron("qa-watchdog", 
     // Replicate occasionally drops webhook callbacks for Hailuo/HappyHorse/Kling
     // master plates. Without a watchdog the scene stays on
     // `clip_status='generating'` forever and lipsync never starts.
-    // Dispatch the recovery worker which polls Replicate directly and either
-    // replays the webhook (success) or fails+refunds the scene.
-    const { data: stuckClips } = await sb
-      .from("composer_scenes")
+    //
+    // v455 — ZEITAUTORITÄT: Das Alter wird am aktiven `composer_pipeline_jobs`
+    // Base-Video-Job gemessen (`updated_at`; Dispatch/Bindung/Callback fassen
+    // genau diese Zeile an), NICHT an `composer_scenes.updated_at`. Beliebige
+    // Szenen-Metadatenschreibvorgänge dürfen die 10-Minuten-Frist nicht
+    // zurücksetzen. Die 10-Minuten-Policy selbst bleibt unverändert.
+    const { data: staleJobs } = await sb
+      .from("composer_pipeline_jobs")
       .select(
-        "id, project_id, replicate_prediction_id, updated_at, engine_override, clip_source",
+        "id, scene_id, run_id, plate_generation, external_job_id, status, created_at, updated_at",
       )
-      .eq("clip_status", "generating")
-      .is("clip_url", null)
+      .eq("stage", "base_video")
+      .eq("status", "dispatched")
       .lt("updated_at", tenMinAgo)
       .limit(50);
 
-    if (stuckClips && stuckClips.length > 0) {
-      const ids = stuckClips.map((s: any) => s.id);
+    const jobByScene = new Map<string, any>();
+    for (const j of staleJobs ?? []) {
+      const prev = jobByScene.get((j as any).scene_id);
+      if (!prev || String((j as any).updated_at) > String(prev.updated_at)) {
+        jobByScene.set((j as any).scene_id, j);
+      }
+    }
+
+    let stuckClips: any[] = [];
+    if (jobByScene.size > 0) {
+      const { data: sceneRows } = await sb
+        .from("composer_scenes")
+        .select(
+          "id, project_id, active_run_id, plate_generation, replicate_prediction_id, updated_at, engine_override, clip_source",
+        )
+        .in("id", Array.from(jobByScene.keys()))
+        .eq("clip_status", "generating")
+        .is("clip_url", null);
+      stuckClips = sceneRows ?? [];
+    }
+
+    if (stuckClips.length > 0) {
+      // v455 — Der Kandidat trägt das vollständige Tupel; der Recovery-Worker
+      // verwirft ihn, sobald die Szene inzwischen auf einen neueren Run/Job
+      // gewechselt ist (Stale-Watchdog vs. neuer Run).
+      const candidates = stuckClips.map((s: any) => {
+        const job = jobByScene.get(s.id);
+        return {
+          scene_id: s.id,
+          run_id: job?.run_id ?? null,
+          plate_generation: job?.plate_generation ?? null,
+          pipeline_job_id: job?.id ?? null,
+          external_job_id: job?.external_job_id ?? null,
+        };
+      });
+      const ids = candidates.map((c) => c.scene_id);
       try {
         await sb.functions.invoke("recover-stuck-composer-clip", {
-          body: { scene_ids: ids },
+          body: { scene_ids: ids, candidates },
         });
       } catch (recoverErr) {
         console.error(
@@ -276,12 +314,13 @@ Deno.serve((req: Request) => withLang(req, () => (withSentryCron("qa-watchdog", 
         description: `Dispatched recover-stuck-composer-clip for:\n${stuckClips
           .map(
             (s: any) =>
-              `- ${s.id} engine=${s.engine_override ?? "none"} src=${s.clip_source} pred=${s.replicate_prediction_id ?? "null"} updated=${s.updated_at}`,
+              `- ${s.id} engine=${s.engine_override ?? "none"} src=${s.clip_source} pred=${s.replicate_prediction_id ?? "null"} job=${jobByScene.get(s.id)?.id ?? "null"} job_updated=${jobByScene.get(s.id)?.updated_at ?? "null"}`,
           )
           .join("\n")}`,
         fingerprint: "composer-clip-stale",
       });
     }
+
 
     // ─── 4c. Never-dispatched composer scenes (pending/queued >60min) ───
     // Root cause of the July 2026 zombie backlog: 2.6k scenes stuck in
