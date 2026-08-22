@@ -49,7 +49,16 @@ export const SPLIT_SCREEN_THRESHOLDS = {
   hSpreadPct: 0.15,
   /** V447 — N=2: maximale Abweichung von den Spaltenmitten W/4 bzw. 3W/4. */
   twoPanelColumnTolerancePct: 0.06,
+  /** V453 — Raster: maximale y-Streuung innerhalb einer Zeile (Anteil der Höhe). */
+  gridRowBandPct: 0.05,
+  /** V453 — Raster: Abweichung des Zeilenabstands vom Ideal H/R. */
+  gridPitchTolerancePct: 0.2,
+  /** V453 — Raster: Spaltenversatz zwischen den Zeilen (Anteil der Breite). */
+  gridColumnTolerancePct: 0.1,
+  /** V453 — Raster: Höhenstreuung über alle Kacheln. */
+  gridHeightSpreadPct: 0.35,
 } as const;
+
 
 export function classifySplitScreenLayout(
   boxes: Array<SplitScreenBox | null | undefined>,
@@ -141,5 +150,82 @@ export function classifySplitScreenLayout(
         `h_spread=${(hSpreadPct * 100).toFixed(1)}%)`,
     };
   }
+
+  // V453 — Raster-Collage (2x2, 2x3, 3x2 …). Der Einreihen-Test oben scheitert
+  // hier zwangsläufig, weil die Gesichter auf mehreren Baselines sitzen. Ein
+  // Raster erkennt sich an: saubere Zeilenbänder, gleich viele Kacheln pro
+  // Zeile, Zeilenabstand ~ H/R und wiederkehrende Spaltenpositionen.
+  const grid = classifyGridCollage(centers, plateWidth, plateHeight);
+  if (grid) {
+    return { isSplitScreen: true, metrics, reason: grid };
+  }
+
   return { isSplitScreen: false, metrics, reason: null };
 }
+
+interface GridCenter {
+  cx: number;
+  cy: number;
+  h: number;
+}
+
+function classifyGridCollage(
+  centers: GridCenter[],
+  plateWidth: number,
+  plateHeight: number,
+): string | null {
+  if (centers.length < 3) return null;
+
+  // 1. Zeilen-Cluster über die y-Mitten.
+  const byY = [...centers].sort((a, b) => a.cy - b.cy);
+  const band = plateHeight * SPLIT_SCREEN_THRESHOLDS.gridRowBandPct;
+  const rows: GridCenter[][] = [];
+  for (const c of byY) {
+    const current = rows[rows.length - 1];
+    if (current && Math.abs(c.cy - current[0].cy) <= band) current.push(c);
+    else rows.push([c]);
+  }
+  const R = rows.length;
+  if (R < 2) return null;
+
+  // 2. Gleich viele Kacheln pro Zeile, mindestens zwei Spalten.
+  const C = rows[0].length;
+  if (C < 2) return null;
+  if (!rows.every((r) => r.length === C)) return null;
+  if (R * C !== centers.length) return null;
+
+  // 3. Zeilenabstand entspricht dem idealen Rasterabstand H/R.
+  const rowCenters = rows.map((r) => r.reduce((a, b) => a + b.cy, 0) / r.length);
+  const pitches: number[] = [];
+  for (let i = 1; i < rowCenters.length; i++) pitches.push(rowCenters[i] - rowCenters[i - 1]);
+  const idealPitch = plateHeight / R;
+  const pitchOff = Math.max(
+    ...pitches.map((p) => Math.abs(p - idealPitch) / idealPitch),
+  );
+  if (!(pitchOff <= SPLIT_SCREEN_THRESHOLDS.gridPitchTolerancePct)) return null;
+
+  // 4. Spaltenpositionen wiederholen sich über alle Zeilen.
+  const sortedRows = rows.map((r) => [...r].sort((a, b) => a.cx - b.cx));
+  let colOff = 0;
+  for (let col = 0; col < C; col++) {
+    const xs = sortedRows.map((r) => r[col].cx);
+    const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+    colOff = Math.max(colOff, Math.max(...xs.map((x) => Math.abs(x - mean))) / plateWidth);
+  }
+  if (!(colOff <= SPLIT_SCREEN_THRESHOLDS.gridColumnTolerancePct)) return null;
+
+  // 5. Vergleichbare Kachelgrößen.
+  const hs = centers.map((c) => c.h);
+  const hMean = hs.reduce((a, b) => a + b, 0) / hs.length;
+  if (hMean <= 0) return null;
+  const gridHSpread = Math.max(...hs.map((h) => Math.abs(h - hMean))) / hMean;
+  if (!(gridHSpread <= SPLIT_SCREEN_THRESHOLDS.gridHeightSpreadPct)) return null;
+
+  return (
+    `split_screen_grid(rows=${R}, cols=${C}, ` +
+    `pitch_off=${(pitchOff * 100).toFixed(1)}%, ` +
+    `col_off=${(colOff * 100).toFixed(1)}%, ` +
+    `h_spread=${(gridHSpread * 100).toFixed(1)}%)`
+  );
+}
+
