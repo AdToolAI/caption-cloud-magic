@@ -5632,6 +5632,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             coords: [Number(pass.coords[0]), Number(pass.coords[1])],
             bbox: platePassBoxForPreclip,
             mouth: speakerPlateMouths?.[pass.speaker_idx] ?? null,
+            // V445 — same measurement label as the dispatch face box.
+            bboxMeasureSrc: v445MeasureSrc,
             siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
             startSec: unionStart,
             endSec: unionEnd,
@@ -5672,6 +5674,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             ? Number(preclipResult.mouthOffsetPx)
             : null;
           (pass as any).preclip_clamped = !!preclipResult.clamped;
+          // V445 — geometry provenance: which measurement the crop came from
+          // and the exact face bbox it was computed on. Enables the cache
+          // invalidation above and the diagnostic tags on mismatch failures.
+          (pass as any).preclip_from_bbox = preclipResult.cropFromBbox ?? platePassBoxForPreclip ?? null;
+          (pass as any).preclip_crop_measure_src = preclipResult.cropMeasureSrc ?? v445MeasureSrc;
+          (pass as any).preclip_bbox_measure_src = preclipResult.bboxMeasureSrc ?? v445MeasureSrc;
           // ── V434 Step 1 — IMMUTABLE PRE-CLIP EVIDENCE COPY ──────────────
           // Calibration ground truth may only be built from bytes that cannot
           // be overwritten by a later run (docs/v433-motion-studio-rca.md).
