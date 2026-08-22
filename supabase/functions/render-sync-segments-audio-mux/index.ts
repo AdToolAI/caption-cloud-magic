@@ -547,6 +547,17 @@ serve(async (req) => {
                   x: Number(preclipCrop.x),
                   y: Number(preclipCrop.y),
                   size: Number(preclipCrop.size),
+                  // V452/T13 — reproject along the SAME path the preclip was
+                  // rendered with. Pathless passes keep the fixed rect.
+                  path: (() => {
+                    const cp = (p as any)?.preclip_camera_path;
+                    const kf = cp?.keyframes;
+                    if (!cp || !Array.isArray(kf) || kf.length === 0) return null;
+                    console.log(
+                      `[render-sync-segments-audio-mux] scene=${sceneId} speaker=${(p as any).speaker_idx} v452_dynamic_reprojection sig=${cp.signature} keys=${kf.length}`,
+                    );
+                    return cp;
+                  })(),
                 },
               }
             : {
