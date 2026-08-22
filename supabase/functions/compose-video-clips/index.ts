@@ -2292,6 +2292,16 @@ serve(async (req) => {
       const __dialogEngine = scene.engineOverride ?? "auto";
       if (__dialogEngine === "cinematic-sync" || __dialogEngine === "sync-segments") {
         __stage = `cinematic_sync_prep:${scene.id}`;
+        // V442 — truthful anchor failure classification. The v440 gate below
+        // used to blame "no portraits resolved" for every dead pointer, even
+        // when 4 valid portraits went into a composition that the image model
+        // failed to produce (S11, 2026-08-22). We record what actually
+        // happened here and let the gate pick the honest message.
+        const anchorAttempt: {
+          portraitCount: number;
+          attempted: boolean;
+          reason: string | null;
+        } = { portraitCount: 0, attempted: false, reason: null };
         try {
           // Two-Shot prep: if this scene has a multi-speaker dialog_script,
           // synthesize a merged voiceover (one WAV with all speakers in
