@@ -83,8 +83,16 @@ export const PROVIDER = {
 export const INVARIANTS = {
   /** Geometry is measured on `reference_image_url`, never on a stale anchor. */
   geometryAnchorField: "reference_image_url",
-  /** Every run starts through `beginSceneRun()`. */
+  /**
+   * Every run starts through `beginSceneRun()` (legacy in-function path) or,
+   * canonically since v427, through `startSceneRun()` in `scene-run.ts`, which
+   * wraps the atomic `composer_start_scene_run` RPC. Both stamp
+   * `active_run_id` + `plate_generation`; the RPC path is the one new callers
+   * must use.
+   */
   runEntrypoint: "beginSceneRun",
+  /** V447 — kanonischer, atomarer Startpfad (RPC `composer_start_scene_run`). */
+  canonicalRunEntrypoint: "startSceneRun",
   /** Webhook results are only accepted for the current run. */
   runGuardDiscardCode: "run_guard_discarded",
   /** Speaker → face slot ordering. */

@@ -953,6 +953,24 @@ serve(async (req) => {
             console.warn(
               `[lipsync-watchdog] v443_recheck_apply_failed scene=${cand.scene_id} job=${cand.job_id}: ${applyErr.message}`,
             );
+            // V447 — der stille Fehlschlag der Terminalisierung war bisher nur
+            // ein Log. Er wird jetzt als Telemetrie persistiert, damit ein
+            // nicht terminalisierter Proven-Noop nachweisbar bleibt.
+            await logSyncDispatch(supabase, {
+              scene_id: cand.scene_id,
+              job_id: cand.job_id,
+              engine: "sync-segments",
+              turn_idx: cand.turn_idx,
+              sync_status: "MOTION_RECHECKED",
+              error_class: "recheck_terminalization_failed",
+              error_message: String(applyErr.message).slice(0, 500),
+              meta: {
+                v447_recheck_terminalization_failed: true,
+                recheck_verdict: verdict,
+                pipeline_job_id: meta.pipeline_job_id ?? null,
+                provider_dispatch: false,
+              },
+            });
           }
         }
 
