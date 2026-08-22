@@ -22,24 +22,42 @@ export interface GridIntent {
   gridStyle?: GridStyle;
 }
 
-const RE_2x2 = /\b2\s*[x×]\s*2\b/i;
-const RE_GRID = /\b(grid|photo\s*grid|panel\s*grid|four[-\s]?panel|vier\s+panels?|brady\s+bunch|zoom(?:[-\s]?call)?\s+grid|videocall\s+grid|teams\s+grid|meet\s+grid)\b/i;
-const RE_SPLIT = /\b(split[-\s]?screen|split[-\s]?view|splitscreen|interview[-\s]?split)\b/i;
-const RE_COLLAGE = /\b(collage|mosaic|mosaik)\b/i;
-const RE_TILES = /\b(kachel(?:n|ansicht)?|tiled?\s+portraits?|tiles?\s+layout)\b/i;
-const RE_PIP = /\b(picture[-\s]?in[-\s]?picture|pip\s+layout)\b/i;
+const GRID_TERM = String.raw`(?:2\s*[x×]\s*2|grid|photo\s*grid|panel\s*grid|four[-\s]?panel|vier\s+panels?|brady\s+bunch|zoom(?:[-\s]?call)?\s+grid|videocall\s+grid|teams\s+grid|meet\s+grid|split[-\s]?screen|split[-\s]?view|splitscreen|interview[-\s]?split|collage|mosaic|mosaik|kachel(?:n|ansicht)?|tiled?\s+portraits?|tiles?\s+layout|picture[-\s]?in[-\s]?picture|pip\s+layout)`;
+
+// v454 — Grid mode is an explicit opt-in. The old detector matched a bare
+// "grid" anywhere in the enriched prompt, including the system's own
+// "NO 2x2 grid" clauses. Require affirmative layout language instead.
+const RE_POSITIVE_PREFIX = new RegExp(
+  String.raw`\b(?:create|make|render|compose|arrange|show|use|display|format|layout|as|in|into|als|erstelle|erzeuge|rendere|komponiere|ordne|zeige|verwende|im|como|crear|crea|renderiza|compone|organiza|muestra|usa|en)\b[^.!?\n]{0,48}\b${GRID_TERM}\b`,
+  "i",
+);
+const RE_POSITIVE_SUFFIX = new RegExp(
+  String.raw`\b${GRID_TERM}\b[^.!?\n]{0,32}\b(?:layout|composition|view|format|style|anordnung|ansicht|komposition|formato|composición|vista)\b`,
+  "i",
+);
+const RE_NEGATED = new RegExp(
+  String.raw`\b(?:no|not|never|without|avoid|forbid(?:den)?|kein(?:e[rmns]?)?|nie|ohne|vermeide|verboten|sin|nunca|evita|prohibid[oa])\b[^.!?\n]{0,36}\b${GRID_TERM}\b`,
+  "i",
+);
 
 export function detectGridIntent(text: string | null | undefined): GridIntent {
   if (!text) return { gridRequested: false };
-  const s = String(text);
+  const s = String(text)
+    .split(/(?<=[.!?\n])/)
+    .filter((clause) => !RE_NEGATED.test(clause))
+    .join(" ");
 
-  if (RE_2x2.test(s) || RE_GRID.test(s)) {
+  if (!RE_POSITIVE_PREFIX.test(s) && !RE_POSITIVE_SUFFIX.test(s)) {
+    return { gridRequested: false };
+  }
+
+  if (/\b(?:2\s*[x×]\s*2|grid|four[-\s]?panel|vier\s+panels?|brady\s+bunch)\b/i.test(s)) {
     return { gridRequested: true, gridStyle: "2x2" };
   }
-  if (RE_SPLIT.test(s) || RE_PIP.test(s)) {
+  if (/\b(?:split[-\s]?screen|split[-\s]?view|splitscreen|interview[-\s]?split|picture[-\s]?in[-\s]?picture|pip\s+layout)\b/i.test(s)) {
     return { gridRequested: true, gridStyle: "split" };
   }
-  if (RE_COLLAGE.test(s) || RE_TILES.test(s)) {
+  if (/\b(?:collage|mosaic|mosaik|kachel(?:n|ansicht)?|tiled?\s+portraits?|tiles?\s+layout)\b/i.test(s)) {
     return { gridRequested: true, gridStyle: "collage" };
   }
   return { gridRequested: false };

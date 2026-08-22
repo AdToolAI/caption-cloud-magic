@@ -88,6 +88,9 @@ interface Body {
    *  attempt produced faces too small for lip-sync to be visible in the
    *  final composited output. */
   framingSuffix?: string;
+  /** v454 — explicit layout decision from trusted callers. False prevents
+   *  anti-grid system clauses from being reinterpreted as positive intent. */
+  gridLayoutRequested?: boolean;
 }
 
 
@@ -177,7 +180,8 @@ serve(async (req) => {
     // v273 — Grid-Intent-Detection. Detect on the RAW user prompt (before
     // dialog/quotes stripping) so keywords like "als 2x2 Grid" survive.
     const gridIntent = detectGridIntent(body.scenePrompt || "");
-    const gridRequested = gridIntent.gridRequested === true;
+    const gridRequested = body.gridLayoutRequested === true ||
+      (body.gridLayoutRequested === undefined && gridIntent.gridRequested === true);
     const gridStyle = gridIntent.gridStyle ?? "2x2";
     if (gridRequested) {
       console.log(`[compose-scene-anchor] grid intent detected (style=${gridStyle}) scene=${body.sceneId}`);

@@ -27,7 +27,7 @@ export interface AnchorFaceLike {
   bbox: [number, number, number, number];
 }
 
-export type FramingSuggestion = "medium_shot" | "tight_grid" | "closeup";
+export type FramingSuggestion = "medium_shot" | "tight_ensemble" | "closeup";
 
 export interface MinFaceSizeInput {
   faces: AnchorFaceLike[];
@@ -72,14 +72,14 @@ export function framingSuffixFor(
         "chest visible, face fully readable, mouth clearly visible for lip-sync. " +
         "No wide shots, no environmental establishing views."
       );
-    case "tight_grid":
+    case "tight_ensemble":
       return (
-        `\n[FRAMING RETRY] Re-compose as a TIGHT ${n === 4 ? "2×2 grid" : "compact multi-shot"}: ` +
-        `each of the ${n} subjects occupies ≥ 30 % of the frame width in their ` +
-        `own quadrant/cell. Chest-up medium shot per subject. Faces large, mouths ` +
-        `clearly visible for lip-sync. No wide environmental shot. No small figures. ` +
-        `The scene setting is only suggested by lighting/color, not by making the ` +
-        `subjects small in a large environment.`
+        `\n[FRAMING RETRY] Re-compose as a TIGHT ENSEMBLE SHOT in one shared physical space: ` +
+        `move the single camera closer while keeping all ${n} subjects together in the same continuous ` +
+        `environment. Use natural foreground, midground and background staging with slight shoulder overlap ` +
+        `and varied eye-lines; preserve every assigned action and position. Each face fills at least 15 % ` +
+        `of the frame width and every mouth remains clearly visible for lip-sync. No wide environmental shot, ` +
+        `no small figures and no isolated portrait arrangement.`
       );
     case "medium_shot":
     default:
@@ -108,7 +108,7 @@ export function enforceMinFaceSize(
   const n = Math.max(1, input.expectedSpeakers);
 
   const suggestion: FramingSuggestion =
-    n <= 1 ? "closeup" : n === 4 ? "tight_grid" : "medium_shot";
+    n <= 1 ? "closeup" : n === 4 ? "tight_ensemble" : "medium_shot";
 
   const framingSuffix = framingSuffixFor(suggestion, n);
 
