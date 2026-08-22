@@ -14,6 +14,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { detectGridIntent } from "../_shared/detectGridIntent.ts";
+import {
+  buildInlineImageParts,
+  sanitizeAnchorReason,
+} from "../_shared/anchor-inline-images.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
