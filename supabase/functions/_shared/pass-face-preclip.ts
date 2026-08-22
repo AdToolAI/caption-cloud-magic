@@ -450,6 +450,17 @@ export async function renderPassFacePreclip(
         composer_scene_id: sceneId,
         pass_idx: passIdx,
         face_crop: { x: crop.x, y: crop.y, size: crop.size, outputSize: crop.outputSize },
+        // V447 — Run-Identität des Artefakts. Nur Zeilen mit identischer
+        // Signatur dürfen später wiederverwendet werden.
+        ...(v447Signature
+          ? {
+            v447_signature: v447Signature,
+            run_id: v447RunId,
+            plate_generation: v447Generation,
+            plate_key: v447PlateKey,
+          }
+          : {}),
+
       },
       subtitle_config: {},
     });
