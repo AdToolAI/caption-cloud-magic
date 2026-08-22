@@ -469,6 +469,8 @@ export async function detectPlateFaces(params: {
   midDurationSec: number;
   /** v156 — Anchor frame (PNG/JPG) used as i2v input. AWS runs on this. */
   anchorUrl?: string | null;
+  /** v436 — optional out-param: explicit reason for every null return. */
+  diag?: { reason?: string | null };
 }): Promise<PlateFaceMap | null> {
   const tag = `[plate-face-detect] scene=${params.sceneId}`;
   const cacheKey = await hashUrl(params.plateUrl);
@@ -582,6 +584,7 @@ export async function detectPlateFaces(params: {
       `${tag} v156_aws_partial faces=${mpFaces.length} expected=${expectedN} → HARD_FAIL ` +
       `(no gemini rescue — would hallucinate missing speakers)`,
     );
+    if (params.diag) params.diag.reason = `expected_count_mismatch(detected=${mpFaces.length},expected=${expectedN})`;
     return null;
   } else if (mpFaces && mpFaces.length > expectedN) {
     // More faces detected than expected (e.g. background extra). Take the
@@ -611,6 +614,7 @@ export async function detectPlateFaces(params: {
     );
     if (rawPro.length === 0) {
       console.warn(`${tag} v156_cartoon_rescue_fail reason=gemini_zero_faces`);
+      if (params.diag) params.diag.reason = `provider_empty(gemini_zero_faces,aws=${awsError ?? "unknown"})`;
       return null;
     }
     const proFaces = normalizedFacesToPlateBoxes(rawPro, params.plateWidth, params.plateHeight);
@@ -619,12 +623,14 @@ export async function detectPlateFaces(params: {
       console.warn(
         `${tag} v156_cartoon_rescue_fail reason=geometry_gate:${gate.reason} detail=${gate.detail ?? "-"}`,
       );
+      if (params.diag) params.diag.reason = `invalid_result(geometry_gate:${gate.reason})`;
       return null;
     }
     if (proFaces.length !== expectedN) {
       console.warn(
         `${tag} v156_cartoon_rescue_fail reason=count_mismatch got=${proFaces.length} expected=${expectedN}`,
       );
+      if (params.diag) params.diag.reason = `expected_count_mismatch(rescue_got=${proFaces.length},expected=${expectedN})`;
       return null;
     }
     faces = proFaces;
@@ -639,6 +645,7 @@ export async function detectPlateFaces(params: {
 
   if (!faces || faces.length === 0) {
     console.warn(`${tag} v156_no_faces — caller hard-fails`);
+    if (params.diag) params.diag.reason = `no_faces(aws=${awsError ?? "unknown"})`;
     return null;
   }
 
@@ -714,6 +721,7 @@ export async function detectPlateFaces(params: {
           `hRatio_in=${hRatioIn.toFixed(3)} tightHRatio=${tightHRatio.toFixed(3)} ` +
           `single=${isSingleSpeaker} mouth=false — HARD_FAIL`,
         );
+        if (params.diag) params.diag.reason = "invalid_result(geometry_tighten_failed)";
         return null;
       }
       const newBbox: [number, number, number, number] = [nx1, ny1, nx2, ny2];
