@@ -782,6 +782,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // FA-4 v409 Residual — merkt sich, dass die Pre-Lock-Messung NUR wegen
     // eines unvollständigen Pass-Sets (Fan-Out-Race) aufgeschoben wurde.
     let v404MeasurementDeferred = false;
+    // V443 — true when EVERY bounded re-measure attempt failed for pure
+    // infrastructure reasons. The pass then passes through as success with
+    // telemetry state `motion_unverified`; it never terminalizes the scene.
+    let v443MotionUnverified = false;
+    let v443MeasureAttempts = 0;
+    let v443LastInfraReason: string | null = null;
 
     // Eine einzige Messroutine (gleiche Metrik/Threshold/Deadline/ROI/N=6,
     // gleiche rehostete Output-URL) — pre-lock ODER nachgeholt unter Lock.
