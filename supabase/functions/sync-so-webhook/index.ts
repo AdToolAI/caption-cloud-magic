@@ -47,6 +47,13 @@ import {
   measureProviderMotionSync,
   type MeasureProviderMotionSyncResult,
 } from "../_shared/measure-provider-motion-sync.ts";
+// V443 — probe-infrastructure failures are not verdicts about the clip.
+import {
+  classifyMeasurementFailure,
+  measureWithBoundedReMeasure,
+  MOTION_UNVERIFIED_STATE,
+  PROBE_INFRA_MAX_RETRIES,
+} from "../_shared/motion-probe-infra.ts";
 // FA-4 v409 — PURE Speaker-Cardinality (distinct speaker_idx, NOT pass count).
 import {
   classifySpeakerCardinality,
@@ -775,6 +782,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // FA-4 v409 Residual — merkt sich, dass die Pre-Lock-Messung NUR wegen
     // eines unvollständigen Pass-Sets (Fan-Out-Race) aufgeschoben wurde.
     let v404MeasurementDeferred = false;
+    // V443 — true when EVERY bounded re-measure attempt failed for pure
+    // infrastructure reasons. The pass then passes through as success with
+    // telemetry state `motion_unverified`; it never terminalizes the scene.
+    let v443MotionUnverified = false;
+    let v443MeasureAttempts = 0;
+    let v443LastInfraReason: string | null = null;
 
     // Eine einzige Messroutine (gleiche Metrik/Threshold/Deadline/ROI/N=6,
     // gleiche rehostete Output-URL) — pre-lock ODER nachgeholt unter Lock.
@@ -789,7 +802,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const seg = Array.isArray(measurePass?.segments) ? measurePass.segments[0] : null;
       const duration = Number(measurePass?.preclip_duration_sec ?? NaN) ||
         (seg ? Number(seg.endTime) - Number(seg.startTime) : NaN);
-      v404MotionMeasurement = await measureProviderMotionSync({
+      // V443 — the measurement inputs are IMMUTABLE for the whole bounded
+      // re-measure: same pinned provider output, same pre-clip, same duration,
+      // same run/generation/pass identity. No provider call, no new spend.
+      const v443MeasureArgs = {
         preclipUrl,
         providerOutputUrl: v404RehostedUrl ?? outputUrl!,
         durationSeconds: duration,
@@ -803,7 +819,24 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           mouthOffsetPx: (measurePass as any)?.preclip_mouth_offset_px ?? null,
           mouthOffset: (measurePass as any)?.preclip_mouth_offset_xy ?? null,
         },
-      });
+      };
+      const v443Bounded = await measureWithBoundedReMeasure(
+        () => measureProviderMotionSync(v443MeasureArgs),
+        {
+          maxRetries: PROBE_INFRA_MAX_RETRIES,
+          onRetry: ({ attempt, reason, waitMs }) => {
+            console.warn(
+              `[sync-so-webhook] v443_probe_infra_remeasure scene=${sceneId} pass=${measurePassIdx} ` +
+                `attempt=${attempt}/${PROBE_INFRA_MAX_RETRIES + 1} wait_ms=${waitMs} ` +
+                `class=probe_infra_error reason=${reason} — same immutable pinned output, no provider call`,
+            );
+          },
+        },
+      );
+      v404MotionMeasurement = v443Bounded.result;
+      v443MeasureAttempts = v443Bounded.attempts;
+      v443MotionUnverified = v443Bounded.infraExhausted;
+      v443LastInfraReason = v443Bounded.infraExhausted ? v404MotionMeasurement.reason : null;
       v404MotionProbe = v404MotionMeasurement.measurement_status === "measured" &&
           v404MotionMeasurement.preclip_metric && v404MotionMeasurement.provider_metric
         ? classifyMotionProbe({
@@ -826,6 +859,39 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           `delta_mean=${v404MotionMeasurement.deltaMean ?? "n/a"} ` +
           `verdict=${v404MotionProbe.verdict} reason=${v404MotionProbe.reason}`,
       );
+      // V443 — bounded re-measure exhausted for INFRASTRUCTURE reasons only.
+      // Persist everything the watchdog needs for exactly ONE re-measure of the
+      // very same immutable provider output. No provider job is referenced.
+      if (v443MotionUnverified) {
+        console.warn(
+          `[sync-so-webhook] v443_motion_unverified scene=${sceneId} pass=${measurePassIdx} ` +
+            `attempts=${v443MeasureAttempts} class=probe_infra_error reason=${v443LastInfraReason} ` +
+            `→ pass-through as success (no terminalization, no refund, no provider call)`,
+        );
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          job_id: jobId,
+          engine: "sync-segments",
+          turn_idx: measurePassIdx,
+          sync_status: "MOTION_UNVERIFIED",
+          error_class: "motion_probe_infra_error",
+          error_message: String(v443LastInfraReason ?? "").slice(0, 500),
+          meta: {
+            v443: true,
+            telemetry_state: MOTION_UNVERIFIED_STATE,
+            failure_class: "probe_infra_error",
+            measure_attempts: v443MeasureAttempts,
+            max_remeasure: PROBE_INFRA_MAX_RETRIES,
+            pass_idx: measurePassIdx,
+            phase,
+            pipeline_job_id: v431CallbackJobId ?? null,
+            preclip_url: preclipUrl,
+            provider_output_url: v404RehostedUrl ?? outputUrl,
+            duration_sec: Number.isFinite(duration) ? duration : null,
+            preclip_geometry: v443MeasureArgs.preclipGeometry,
+          },
+        });
+      }
       // V434 Step 3/4 — scale-free outcome telemetry, printed next to (never
       // instead of) the authoritative v404 verdict.
       const v434 = (v404MotionMeasurement as any)?.v434;
@@ -1399,7 +1465,31 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         });
       }
 
-      if (!isSingleSpeakerScene && motionVerdictForMultiSpeaker === "indeterminate") {
+      // V443 — split the single `indeterminate` outcome:
+      //   probe_infra_error (bounded re-measure exhausted) → pass-through as
+      //     success with telemetry state `motion_unverified`; the watchdog
+      //     re-measures the SAME immutable output exactly once.
+      //   measured_ambiguous (gray zone / unusable metric) → fail-closed as before.
+      const v443FailureClass = !isSingleSpeakerScene &&
+          motionVerdictForMultiSpeaker === "indeterminate"
+        ? classifyMeasurementFailure(motionProbeResult?.reason ?? "")
+        : null;
+      const v443MotionUnverifiedPassthrough = !isSingleSpeakerScene &&
+        motionVerdictForMultiSpeaker === "indeterminate" &&
+        v443MotionUnverified &&
+        v443FailureClass === "probe_infra_error";
+      if (v443MotionUnverifiedPassthrough) {
+        console.warn(
+          `[sync-so-webhook] v443 scene=${sceneId} pass=${currentPass} speaker="${passSpeakerName}" ` +
+            `MOTION_UNVERIFIED (probe_infra_error, attempts=${v443MeasureAttempts}) → success pass-through, ` +
+            `watchdog re-measure pending — no terminalization, no refund, no provider dispatch`,
+        );
+      }
+
+      if (
+        !isSingleSpeakerScene && motionVerdictForMultiSpeaker === "indeterminate" &&
+        !v443MotionUnverifiedPassthrough
+      ) {
         // v403 — Fail-closed: an unclassified multi-speaker pass must never be
         // muxed as success. The existing G3.2.2 failure-apply owns the terminal
         // state and refund/scene-verdict.
@@ -1552,6 +1642,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       return await settleVerdict(successRes, {
         rehosted: !!rehostedUrl,
         noop_suspect: noopSuspect || undefined,
+        motion_unverified: v443MotionUnverifiedPassthrough || undefined,
       });
 
     } else {

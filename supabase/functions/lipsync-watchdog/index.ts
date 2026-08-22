@@ -23,7 +23,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
-import { getSyncApiKey, releaseInflightSyncJob } from "../_shared/syncso-preflight.ts";
+import { getSyncApiKey, releaseInflightSyncJob, logSyncDispatch } from "../_shared/syncso-preflight.ts";
+// V443 — exactly-once re-measure of `motion_unverified` passes. Measurement
+// only: same immutable provider output, never a new provider job.
+import { measureProviderMotionSync } from "../_shared/measure-provider-motion-sync.ts";
+import { classifyMotionProbe } from "../_shared/motion-probe-classifier.ts";
+import {
+  classifyMeasurementFailure,
+  MOTION_UNVERIFIED_STATE,
+} from "../_shared/motion-probe-infra.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { logMissingReinjectPointer } from "../_shared/v431-ledger.ts";
@@ -844,11 +852,127 @@ serve(async (req) => {
     }, { ttlSeconds: 30, maxAttempts: 3 });
   }
 
+  // ── V443 — re-measure `motion_unverified` passes EXACTLY ONCE ───────────
+  // A pass reaches this state only when every bounded measurement attempt in
+  // the webhook failed for infrastructure reasons. We re-measure the SAME
+  // immutable provider output. Measurement only:
+  //   motion            → success stays success
+  //   noop              → existing proven-Noop terminalization (ssw:noop_fail)
+  //   infra fails again → stays `motion_unverified`, NO provider job
+  const remeasured: Array<{ scene_id: string; job_id: string; verdict: string }> = [];
+  try {
+    const sinceIso = new Date(now - 6 * 60 * 60_000).toISOString();
+    const { data: unverifiedRows } = await supabase
+      .from("syncso_dispatch_log")
+      .select("id, scene_id, job_id, turn_idx, meta, created_at")
+      .eq("sync_status", "MOTION_UNVERIFIED")
+      .gte("created_at", sinceIso)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    const candidates = (unverifiedRows ?? []) as any[];
+    if (candidates.length > 0) {
+      const { data: recheckRows } = await supabase
+        .from("syncso_dispatch_log")
+        .select("job_id, turn_idx")
+        .eq("sync_status", "MOTION_RECHECKED")
+        .gte("created_at", sinceIso)
+        .limit(500);
+      const alreadyRechecked = new Set(
+        ((recheckRows ?? []) as any[]).map((r) => `${r.job_id}#${r.turn_idx}`),
+      );
+
+      for (const cand of candidates) {
+        const key = `${cand.job_id}#${cand.turn_idx}`;
+        if (alreadyRechecked.has(key)) continue;
+        alreadyRechecked.add(key); // exactly-once, also within this tick
+        const meta = (cand.meta ?? {}) as any;
+        const preclipUrl = String(meta.preclip_url ?? "");
+        const providerOutputUrl = String(meta.provider_output_url ?? "");
+        const durationSeconds = Number(meta.duration_sec ?? NaN);
+        if (!preclipUrl || !providerOutputUrl || !Number.isFinite(durationSeconds)) {
+          continue;
+        }
+
+        const measurement = await measureProviderMotionSync({
+          preclipUrl,
+          providerOutputUrl,
+          durationSeconds,
+          preclipGeometry: meta.preclip_geometry ?? null,
+        });
+
+        let verdict: string;
+        let reason: string;
+        if (
+          measurement.measurement_status === "measured" &&
+          measurement.preclip_metric && measurement.provider_metric
+        ) {
+          const probe = classifyMotionProbe({
+            preclip: measurement.preclip_metric,
+            provider: measurement.provider_metric,
+          });
+          verdict = probe.verdict;
+          reason = probe.reason;
+        } else {
+          verdict = classifyMeasurementFailure(measurement.reason) === "probe_infra_error"
+            ? MOTION_UNVERIFIED_STATE
+            : "measured_ambiguous";
+          reason = measurement.reason;
+        }
+
+        await logSyncDispatch(supabase, {
+          scene_id: cand.scene_id,
+          job_id: cand.job_id,
+          engine: "sync-segments",
+          turn_idx: cand.turn_idx,
+          sync_status: "MOTION_RECHECKED",
+          error_class: verdict === "noop" ? "sync_noop_unrecoverable" : "motion_probe_recheck",
+          error_message: String(reason).slice(0, 500),
+          meta: {
+            v443_recheck: true,
+            recheck_verdict: verdict,
+            delta_mean: measurement.deltaMean ?? null,
+            pass_idx: cand.turn_idx,
+            pipeline_job_id: meta.pipeline_job_id ?? null,
+            provider_output_url: providerOutputUrl,
+            provider_dispatch: false,
+          },
+        });
+
+        if (verdict === "noop" && meta.pipeline_job_id) {
+          // Proven Noop — existing terminalization path, unchanged semantics.
+          const { error: applyErr } = await supabase.rpc("composer_apply_sync_segment_result", {
+            _pipeline_job_id: meta.pipeline_job_id,
+            _external_job_id: cand.job_id,
+            _write_id: "ssw:noop_fail",
+            _provider_status: "COMPLETED",
+            _output_url: null,
+            _error_text: "motion_probe_noop_confirmed_by_recheck",
+          });
+          if (applyErr) {
+            console.warn(
+              `[lipsync-watchdog] v443_recheck_apply_failed scene=${cand.scene_id} job=${cand.job_id}: ${applyErr.message}`,
+            );
+          }
+        }
+
+        console.log(
+          `[lipsync-watchdog] v443_motion_recheck scene=${cand.scene_id} job=${cand.job_id} ` +
+            `pass=${cand.turn_idx} verdict=${verdict} delta_mean=${measurement.deltaMean ?? "n/a"} ` +
+            `provider_dispatch=false`,
+        );
+        remeasured.push({ scene_id: cand.scene_id, job_id: cand.job_id, verdict });
+      }
+    }
+  } catch (e) {
+    console.warn(`[lipsync-watchdog] v443_recheck_block_error: ${(e as Error).message}`);
+  }
+
   console.log(
-    `[lipsync-watchdog] scanned=${rows?.length ?? 0} polled=${polled.length} advanced=${advanced.length} failed=${failed.length}`,
+    `[lipsync-watchdog] scanned=${rows?.length ?? 0} polled=${polled.length} advanced=${advanced.length} failed=${failed.length} v443_remeasured=${remeasured.length}`,
   );
   return new Response(
-    JSON.stringify({ ok: true, scanned: rows?.length ?? 0, polled, advanced, failed }),
+    JSON.stringify({ ok: true, scanned: rows?.length ?? 0, polled, advanced, failed, remeasured }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });
