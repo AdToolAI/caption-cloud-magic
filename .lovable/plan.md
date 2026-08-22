@@ -1,63 +1,85 @@
-# V438 — Pipeline State Contract: Current-Generation Plate Authority
+# V441 — Terminalization Contract Fix + Watchdog Escalation + Frontend Publish
 
-Scope: close the state contract that V437 exposed. No progress-percentage cosmetics until the contract holds. V435 Phase 1 stays paused until V438 is green.
+Closes the live P1 found on S11 (`e658509d`, run `03f62e08`, generation 7): the provider
+finished all passes, but the webhook's write is rejected by the database, so four passes
+stay `rendering` and the watchdog re-forwards the same rejected result every minute.
 
-## Confirmed starting point
+## Confirmed evidence (live, read-only)
 
-- `public.composer_state_from_legacy(...)` evaluates `twoshot_stage = 'master_clip' → audio_ready` and `= 'audio' → audio_prep` **before** any `clip_status` branch. The client mirror `deriveStateFromLegacy` in `src/lib/composer/sceneState.ts` has the same order. Neither receives `plate_generation` / `plate_ready_generation`, so neither can tell whether the plate belongs to the current run.
-- `composer_substate_from_legacy` maps `twoshot_stage='failed' AND lip_sync_status='failed' → 'lipsync_failed'` unconditionally, with no plate-readiness precondition. Scene `e658509d` currently carries exactly that substate although it failed in the v117 plate gate with `plate_ready_generation = NULL`.
-- `useTwoShotAutoTrigger` selects `clip_url, clip_status, twoshot_stage, …` but **not** `plate_generation` / `plate_ready_generation`; its audio-prep and lip-sync candidate filters gate on "a `clip_url` exists and the row is ready-equivalent" only.
-- `usePipelineProgress` counts clip readiness via `legacyClipReadyEquivalentRow`, which returns `true` for `failed` scenes that still carry an output URL.
+- `sync-so-webhook` logs: motion gate `verdict=indeterminate` (delta_mean 9.79 / 10.86,
+  between `noop=3.68` and `motion=15.41`) → apply called with
+  `writeId="ssw:failed"`, `providerStatus="COMPLETED"`, `outputUrl=null`
+  → `g322_apply … verdict=rejected reason=write_id_mismatch`.
+- The RPC matrix (`composer_apply_sync_segment_result`) only accepts `ssw:failed` for
+  `provider_status ∈ (FAILED, REJECTED, CANCELED)` **and** `output_url IS NULL`.
+  The `ssw:noop_fail` / `ssw:noop_escalate` branch already accepts
+  `COMPLETED + output_url NULL` — exactly the shape this path produces.
+- `lipsync-watchdog` logs: `polled … status=COMPLETED → forwarded`, then
+  `scanned=1 polled=4 advanced=0 failed=0`, once per minute for ~20 minutes.
+- Watchdog escalation is suppressed by design in this situation: the
+  `watchdog_provider_timeout` branch is skipped whenever `polledThisTick` is true, and
+  polling succeeds on every tick. Only the 25-minute `STALE_HARD_MS` branch can ever
+  break the loop — a whole-scene hard fail, not a pass-level terminalization.
+- Production bundle `assets/js/index.CRrrFFh3.js` contains none of the V438 state
+  literals (`plate_queued`, `plate_rendering`, `plate_failed`, `lipsync_muxing`), so the
+  V438/V440 frontend is not served yet. The 99 % bar is old code, not a browser cache.
 
-## What changes
+## Scope — exactly three changes
 
-### 1. Current-generation plate authority (core invariant)
+### 1. Webhook write contract (root cause)
 
-Both derivation functions (SQL `composer_state_from_legacy` + TS mirror `deriveStateFromLegacy`) additionally take `plate_generation` and `plate_ready_generation`.
+In `supabase/functions/sync-so-webhook/index.ts`, the multi-speaker fail-closed
+`indeterminate` branch (~line 1402) currently emits `ssw:failed` with
+`providerStatus:"COMPLETED"`. Route it through the write-id the matrix already accepts
+for a completed provider with no usable output — `ssw:noop_fail` — keeping
+`errorText: "motion_probe_indeterminate"` so the reason stays visible in the ledger and
+the existing refund/scene-verdict handling of that path applies.
 
-Rule: a scene may only reach `audio_prep`, `audio_ready`, `lipsync_dispatched`, `lipsync_running`, `lipsync_muxing` or `complete` when the plate of the **current** generation is proven ready — `plate_ready_generation = plate_generation` and a non-empty output URL. If it is not, stale `twoshot_stage` / `lip_sync_status` values are ignored for phase purposes and the state falls back to the plate phase derived from `clip_status` + `active_run_id` (`plate_queued` / `plate_rendering` / `idle`). `canceled` and `failed` keep their precedence; they are not phase-forward states.
+Audit the sibling fail-closed emitters for the same defect and fix them consistently:
+- speaker-cardinality indeterminate (`_shared/fa4-speaker-cardinality.ts`, webhook ~1103)
+- `_shared/fa4-lock-phase-orchestration.ts` `fail_closed` write id
+- webhook line ~1604 (real provider failure path — verify it always carries a genuine
+  FAILED/REJECTED/CANCELED status; leave it alone if it does)
 
-The bridge trigger passes the two new columns through, so old-path legacy writes can no longer pull a fresh run forward.
+No change to the database matrix: the RPC is the contract, the callers were wrong.
 
-### 2. Auto-trigger gets the same guard
+### 2. Watchdog hard terminalization for repeated apply rejection
 
-`useTwoShotAutoTrigger` selects `plate_generation, plate_ready_generation, active_run_id` and applies one shared predicate — `isCurrentGenerationPlateReady(row)` — in the audio-prep filter, the lip-sync candidate filter and the self-heal branches. A `clip_url` alone no longer qualifies a scene; a URL from a previous generation is treated as absent. The same predicate is exported from `src/lib/composer/sceneState.ts` so client and hook cannot drift.
+In `supabase/functions/lipsync-watchdog/index.ts`:
+- Make `pollAndForward` report whether the forwarded callback was actually **applied**
+  (the webhook response already distinguishes applied vs. rejected/skipped), instead of
+  only whether the provider status was terminal.
+- Treat a forward that returns a non-applied verdict as *no progress*: it must not set
+  `polledThisTick` for the suppression check, so the existing
+  `watchdog_provider_timeout` escalation can fire.
+- Add an explicit pass-level cap: a `sync_segment` job that has been `dispatched` for
+  more than 10 minutes and produced repeated non-applied verdicts is terminalized as
+  failed with the standard refund/cleanup path (`failLipSync`), instead of being
+  re-forwarded forever.
 
-### 3. Failure substate reflects the real failing phase
+### 3. Publish the frontend
 
-`composer_substate_from_legacy` (and the TS mirror) only yields `lipsync_failed` when the current-generation plate was ready. A failure while the plate is not ready yields a plate-phase substate (`plate_failed`), which the UI labels as a clip/plate failure. Terminal states stop carrying progress-flavoured substates such as `anchor`.
+After 1 and 2 are green, publish so the already-implemented V438/V440 progress contract
+(current-generation plate authority, clips-epoch progress floor reset) is actually
+served. This is what removes the stuck 99 % bar.
 
-### 4. Global progress honest about failures and run changes
+## Explicitly out of scope
 
-- `legacyClipReadyEquivalentRow` keeps its ready/failed exclusivity, but `usePipelineProgress` counts a scene as a *ready clip* only when it is not in a failed state; failed-with-output counts as settled-failed, not as a successful clip phase.
-- On a run/generation change, derived progress uses only artifacts of that run. 100 → 0 at run start is correct and stays; the fixed defect is the later jump back to a stale 65 %.
+- No new Samuel render is triggered as part of this gate.
+- No change to the frozen lip-sync processing chain (preclip → plate → sync → mask → mux).
+- No change to motion thresholds or calibration authority — `indeterminate` stays
+  fail-closed; only the *write shape* of that outcome is corrected.
+- No manual DB surgery on the currently stuck run; once the fix is deployed the watchdog
+  terminalizes it on its own (or the existing 25-minute hard cap does).
 
-### 5. Copy pass (last, after the contract holds)
+## Verification
 
-- `plate_rendering`: "Generating clip" / "Clip wird generiert" / "Generando clip".
-- `audio_prep`: "Generating voiceover" / "Voiceover wird erzeugt" / "Generando voz en off".
-- `scene.status.failed` ES: "Fallido".
-- New `plate_failed` detail label in all three locales.
-
-## Invariant tests (permanent regression guard)
-
-New test file next to the existing composer state tests:
-
-1. `current plate not ready ⇒ derived state ∉ {audio_prep, audio_ready, lipsync_dispatched, lipsync_running, lipsync_muxing, complete}` — table-driven over every legacy `twoshot_stage` / `lip_sync_status` combination.
-2. `plate_ready_generation ≠ plate_generation ⇒ auto-trigger predicate is false`, even with a non-empty `clip_url`.
-3. `substate 'lipsync_failed' requires a ready current-generation plate`.
-4. TS ↔ SQL parity: the mirror in `src/lib/composer/sceneState.ts` and `supabase/functions/_shared/scene-state.ts` produce identical results for the full case matrix.
-5. Progress: a failed-with-output scene does not increase the clips-ready count.
-
-## Technical notes
-
-- Files: `src/lib/composer/sceneState.ts`, `supabase/functions/_shared/scene-state.ts`, `src/hooks/useTwoShotAutoTrigger.ts`, `src/hooks/usePipelineProgress.ts`, `src/lib/composer/status/sceneStatusPresenter.ts`, `src/components/video-composer/SceneStatusBadge.tsx`.
-- One migration: replaces `composer_state_from_legacy` (new signature with the two generation args), `composer_substate_from_legacy`, and `composer_scene_state_bridge` to pass `NEW.plate_generation` / `NEW.plate_ready_generation`. The old function signature is dropped only after the bridge is updated in the same migration.
-- No backfill of historical rows; derivation is read-time, and existing `pipeline_state` values keep priority over the legacy mirror.
-- No pipeline behaviour beyond phase gating changes — no new renders, no provider calls, no credit paths touched.
-
-## Out of scope
-
-- V435 Phase 1 reference run (resumes only after V438 passes).
-- Lip-sync-only reset preserving `faceMap` (V436 follow-up, separate gate).
-- `v434_artifact_pins` accumulation cleanup.
+- Unit/contract tests: extend `supabase/functions/_shared/fa4-v405-matrix.test.ts`
+  (case D currently asserts the *wrong* mapping — it pins `ssw:failed` for
+  indeterminate) and add a guard test that no caller may emit `ssw:failed` together with
+  `providerStatus="COMPLETED"`.
+- Deploy `sync-so-webhook` and `lipsync-watchdog` only.
+- Read logs for the next watchdog ticks on S11: expect `g322_apply … verdict=applied`
+  (or a terminal `failed` with refund) instead of `reason=write_id_mismatch`, and the
+  scene leaving `lip_sync_status=running`.
+- Confirm the newly served bundle contains the V438 state literals.
