@@ -715,7 +715,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const isGreenNet =
         isGreenNetRejection(enrichedError) &&
         String((scene as any)?.clip_source ?? '') === 'ai-happyhorse';
-      const taggedError = (isGreenNet ? '[green_net_rejected] ' : '') +
+      // v455 — stabile interne Klasse + ungekürzter (nur längenbegrenzter)
+      // Providergrund. Es wird KEIN auslösendes Wort erfunden.
+      const rejectionClass = classifyProviderRejection(enrichedError);
+      const classTag = rejectionClass !== 'none'
+        ? `[${PROVIDER_INPUT_FILTER_CLASS}:${rejectionClass}] `
+        : '';
+      const taggedError = classTag + (isGreenNet ? '[green_net_rejected] ' : '') +
         (String(enrichedError ?? '').slice(0, 480) || 'unknown_error');
 
       // v431 G3.2.1 — RPC D (`ccw:failed`): Scene-Fail, Legacy-Spiegel,
