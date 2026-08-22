@@ -40,11 +40,33 @@ import {
 } from 'remotion';
 import { z } from 'zod';
 
+/** V452 — one keyframe of the shared dynamic camera path (plate pixels). */
+const CameraPathKeyframeSchema = z.object({
+  t: z.number().min(0),
+  x: z.number(),
+  y: z.number(),
+  size: z.number().positive(),
+  mx: z.number().nullable().optional(),
+  my: z.number().nullable().optional(),
+  src: z.string().optional(),
+});
+
 const CropSchema = z.object({
   x: z.number().min(0),
   y: z.number().min(0),
   size: z.number().positive(),
+  /** V452 — the EXACT path the preclip was rendered with. When present the
+   *  overlay is reprojected frame-by-frame along this same path (T13). */
+  path: z
+    .object({
+      keyframes: z.array(CameraPathKeyframeSchema).min(1),
+      moving: z.boolean().optional(),
+      signature: z.string().optional(),
+    })
+    .optional()
+    .nullable(),
 });
+
 
 const MouthMatteSchema = z.object({
   x: z.number().min(0),
