@@ -53,11 +53,14 @@ Deno.test("v445: crop always contains the face bbox (S11 212x281 vs 272x272)", (
   const r = computeMouthCenteredCrop({
     plateWidth: 1280,
     plateHeight: 720,
-    faceBbox: [x1, y1, x1 + faceW, y1 + faceH],
-    mouth: [x1 + faceW / 2, y1 + faceH * 0.75],
+    face: {
+      bbox: [x1, y1, x1 + faceW, y1 + faceH],
+      center: [x1 + faceW / 2, y1 + faceH / 2],
+      mouth: [x1 + faceW / 2, y1 + faceH * 0.75],
+    },
   });
-  if (r.size < Math.max(faceW, faceH)) {
-    throw new Error(`crop size ${r.size} smaller than face ${faceW}x${faceH}`);
+  if (r.crop.size < Math.max(faceW, faceH)) {
+    throw new Error(`crop size ${r.crop.size} smaller than face ${faceW}x${faceH}`);
   }
 });
 
