@@ -143,13 +143,18 @@ export type CompletedSpeakerBranch =
   | {
     branch: "fail_closed";
     runMotionMeasurement: false;
-    writeId: "ssw:failed";
+    writeId: "ssw:noop_fail";
     errorText: typeof SPEAKER_CARDINALITY_INDETERMINATE_ERROR;
   };
 
 /**
  * Entscheidung für den COMPLETED-Zweig des Webhooks. `unknown` failt closed
- * über den bestehenden G3.2.2-Apply (`ssw:failed`) — kein Retry, kein Mux.
+ * über den bestehenden G3.2.2-Apply — kein Retry, kein Mux.
+ *
+ * v441: write_id ist `ssw:noop_fail`, nicht `ssw:failed`. Die RPC-Matrix
+ * akzeptiert `ssw:failed` ausschließlich für echte Provider-Fehler
+ * (FAILED/REJECTED/CANCELED); dieser Zweig läuft immer mit
+ * provider_status='COMPLETED' und output_url=null.
  */
 export function decideCompletedSpeakerBranch(
   cardinality: SpeakerCardinality,
@@ -159,7 +164,7 @@ export function decideCompletedSpeakerBranch(
   return {
     branch: "fail_closed",
     runMotionMeasurement: false,
-    writeId: "ssw:failed",
+    writeId: "ssw:noop_fail",
     errorText: SPEAKER_CARDINALITY_INDETERMINATE_ERROR,
   };
 }

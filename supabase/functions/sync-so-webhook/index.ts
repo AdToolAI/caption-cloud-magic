@@ -1403,10 +1403,15 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         // v403 — Fail-closed: an unclassified multi-speaker pass must never be
         // muxed as success. The existing G3.2.2 failure-apply owns the terminal
         // state and refund/scene-verdict.
+        // v441 — Write-Contract-Fix: `ssw:failed` akzeptiert im RPC NUR echte
+        // Provider-Fehler (FAILED/REJECTED/CANCELED). Ein COMPLETED-Provider
+        // ohne verwertbaren Output gehört auf `ssw:noop_fail` — sonst kommt
+        // `write_id_mismatch` zurück, der Pass bleibt `rendering` und der
+        // Watchdog re-forwardet endlos.
         const indeterminateRes = await applySyncSegmentResult(supabase, {
           pipelineJobId: v431CallbackJobId,
           externalJobId: jobId,
-          writeId: "ssw:failed",
+          writeId: "ssw:noop_fail",
           providerStatus: "COMPLETED",
           outputUrl: null,
           errorText: "motion_probe_indeterminate",
