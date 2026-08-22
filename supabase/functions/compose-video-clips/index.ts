@@ -3150,6 +3150,130 @@ serve(async (req) => {
                 }
                 (scene as any).__minFaceCheck = minFaceCheck;
 
+                // ── V446 ANCHOR PANEL GATE ─────────────────────────────
+                // The split-screen failure of S11 (2026-08-22) did not
+                // start in the rendered clip — the ANCHOR STILL was
+                // already a 4-column strip collage. The v445 plate gate
+                // caught it only after 6/6 clips had been rendered and
+                // refunded. We classify the anchor with the very same
+                // pure classifier BEFORE any video spend, re-compose once
+                // with an anti-panel directive, and hard-fail otherwise.
+                let panelVerdictMeta: Record<string, unknown> | null = null;
+                if (composedUrl && expectedFaces >= 3) {
+                  const classifyAnchorLayout = async (url: string) => {
+                    const det = await detectFacesMediaPipe({
+                      videoUrl: url,
+                      plateWidth: 1000,
+                      plateHeight: 1000,
+                      durationSec: 0,
+                      prebuiltFrameUrls: [url],
+                    });
+                    if (!det.ok || det.faces.length < 3) return null;
+                    const boxes = det.faces.map((f) => ({
+                      x: f.bbox[0],
+                      y: f.bbox[1],
+                      width: f.bbox[2] - f.bbox[0],
+                      height: f.bbox[3] - f.bbox[1],
+                    }));
+                    return classifySplitScreenLayout(boxes, 1000, 1000);
+                  };
+                  try {
+                    const v1 = await classifyAnchorLayout(composedUrl);
+                    console.log(
+                      `[compose-video-clips] v446_anchor_panel_verdict scene=${scene.id} ` +
+                      `panel=${v1?.isSplitScreen ? 1 : 0} reason=${v1?.reason ?? "none"} ` +
+                      `metrics=${JSON.stringify(v1?.metrics ?? null)}`,
+                    );
+                    if (v1?.isSplitScreen) {
+                      panelVerdictMeta = {
+                        panel: true,
+                        stage: "attempt-1",
+                        reason: v1.reason,
+                        metrics: v1.metrics,
+                      };
+                      await invalidateCache();
+                      const retryUrl = await composeAnchor(
+                        "attempt-5-panel",
+                        true,
+                        false,
+                        [],
+                        false,
+                        V446_ANTI_PANEL_SUFFIX,
+                      );
+                      if (retryUrl) {
+                        const v2 = await classifyAnchorLayout(retryUrl);
+                        console.log(
+                          `[compose-video-clips] v446_anchor_panel_retry scene=${scene.id} ` +
+                          `panel=${v2?.isSplitScreen ? 1 : 0} reason=${v2?.reason ?? "none"}`,
+                        );
+                        if (!v2?.isSplitScreen) {
+                          const eRetry = await evaluate(retryUrl, "attempt-5-panel");
+                          composedUrl = retryUrl;
+                          faceCount = eRetry.faceCount;
+                          humanCount = eRetry.humanCount;
+                          identityFailure = eRetry.identity;
+                          identityNotes = eRetry.notes;
+                          identityMismatched = eRetry.mismatched ?? [];
+                          identityMissing = eRetry.missing ?? [];
+                          identityDuplicated = eRetry.duplicated ?? [];
+                          panelVerdictMeta = {
+                            panel: false,
+                            stage: "attempt-5-panel",
+                            reason: null,
+                            metrics: v2?.metrics ?? null,
+                            recovered: true,
+                          };
+                        } else {
+                          panelVerdictMeta = {
+                            panel: true,
+                            stage: "attempt-5-panel",
+                            reason: v2.reason,
+                            metrics: v2.metrics,
+                            recovered: false,
+                          };
+                          v446PanelBlock = {
+                            metrics: (v2.metrics ?? null) as Record<string, unknown> | null,
+                            reason: v2.reason ?? "panel_layout",
+                            retried: true,
+                          };
+                        }
+                      } else {
+                        v446PanelBlock = {
+                          metrics: (v1.metrics ?? null) as Record<string, unknown> | null,
+                          reason: v1.reason ?? "panel_layout",
+                          retried: true,
+                        };
+                      }
+                      const attempts =
+                        ((scene as any).__anchorAttempts as Array<Record<string, unknown>>) ?? [];
+                      attempts.push({
+                        attempt: attempts.length + 1,
+                        mode: "panel-retry",
+                        panel_blocked: !!v446PanelBlock,
+                        at: new Date().toISOString(),
+                      });
+                      (scene as any).__anchorAttempts = attempts;
+                    } else if (v1) {
+                      panelVerdictMeta = {
+                        panel: false,
+                        stage: "attempt-1",
+                        reason: null,
+                        metrics: v1.metrics,
+                      };
+                    }
+                  } catch (e) {
+                    // Detection infrastructure errors are telemetry, never a
+                    // verdict (v443 contract) — the v445 plate gate stays as
+                    // the downstream backstop.
+                    console.warn(
+                      `[compose-video-clips] v446_anchor_panel_probe_unavailable scene=${scene.id}: ${(e as Error).message}`,
+                    );
+                  }
+                }
+                (scene as any).__panelVerdict = panelVerdictMeta;
+
+
+
                 if (composedUrl) {
                   scene.referenceImageUrl = composedUrl;
                   if (!skipAuditPersist) {
