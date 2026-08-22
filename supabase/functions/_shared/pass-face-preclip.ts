@@ -89,7 +89,15 @@ export interface PassPreclipInput {
    * `bbox_measure_src` and prove both share one measurement.
    */
   bboxMeasureSrc?: string | null;
+  /**
+   * V447 — Run-Identität des laufenden Durchgangs. Ohne beide Felder wird
+   * KEIN fertiger Preclip wiederverwendet (fail-closed): ein Artefakt aus
+   * einem früheren Lauf darf einen neuen Lauf nie betreten.
+   */
+  runId?: string | null;
+  plateGeneration?: number | null;
 }
+
 
 
 export interface PassPreclipResult {
