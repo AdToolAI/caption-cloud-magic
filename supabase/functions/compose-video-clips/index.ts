@@ -70,8 +70,19 @@ import {
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 import { enforceMinFaceSize } from "../_shared/anchor-min-face-size.ts";
+import { classifySplitScreenLayout } from "../_shared/split-screen-layout.ts";
 import { resolveIdentityViaRekognition } from "../_shared/resolveIdentityViaRekognition.ts";
 import { buildAnchorLayoutFromV274 } from "../_shared/plateFaceSlotRouter.ts";
+
+/**
+ * V446 — corrective anti-panel directive for the anchor re-compose. The base
+ * SINGLE CONTINUOUS PHOTOGRAPH clause did not stop Nano Banana / Gemini from
+ * emitting a 4-column strip collage for a portrait-format 4-cast anchor
+ * (S11, 2026-08-22). This suffix is appended only after a panel verdict.
+ */
+const V446_ANTI_PANEL_SUFFIX =
+  "PANEL REJECTION RETRY — the previous attempt returned a SPLIT-SCREEN STRIP: the people were pasted side by side as separate vertical panels with visible seams, mismatched backgrounds and different scales. That output is unusable. Re-shoot the scene as ONE single photograph from ONE camera position: all people stand together in the SAME physical room, on the SAME floor, in front of ONE continuous background that runs unbroken from the left edge to the right edge of the image. There are NO vertical or horizontal dividing lines, NO seams, NO panel borders, NO collage tiles, NO stitched columns, NO video-call tiles. Perspective, horizon line, lighting direction and depth of field are identical for every person, people may slightly overlap in depth like real people standing in a room, and the background objects continue naturally behind all of them.";
+
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { sanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
