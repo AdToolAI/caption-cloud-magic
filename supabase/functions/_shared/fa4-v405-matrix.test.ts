@@ -87,7 +87,7 @@ Deno.test("D. indeterminate maps to ssw:noop_fail with motion_probe_indeterminat
 
 // ── D2. v441 permanenter Guard — kein `ssw:failed` mit COMPLETED ──────────
 Deno.test("D2. no caller emits ssw:failed together with providerStatus COMPLETED", () => {
-  const blocks = WEBHOOK.match(/writeId:[\s\S]{0,200}?providerStatus:\s*"[A-Z]+"/g) ?? [];
+  const blocks = WEBHOOK_CODE.match(/writeId:[\s\S]{0,240}?providerStatus:\s*"[A-Z]+"/g) ?? [];
   for (const b of blocks) {
     if (/writeId:\s*"ssw:failed"/.test(b)) {
       assert(
@@ -96,10 +96,14 @@ Deno.test("D2. no caller emits ssw:failed together with providerStatus COMPLETED
       );
     }
   }
-  // Der dynamische Cardinality-Zweig darf ebenfalls kein `ssw:failed` liefern.
+  // Die fail-closed-Zweige dürfen ebenfalls kein `ssw:failed` liefern.
   assert(
     !/writeId:\s*"ssw:failed"/.test(SPEAKER_CARDINALITY_SRC),
     "fa4-speaker-cardinality must not emit ssw:failed (COMPLETED + null output)",
+  );
+  assert(
+    !/writeId:\s*"ssw:failed"/.test(LOCK_PHASE_SRC),
+    "fa4-lock-phase-orchestration must not emit ssw:failed (COMPLETED + null output)",
   );
 });
 
