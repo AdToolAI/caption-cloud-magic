@@ -1,52 +1,36 @@
-# Sicherer Git-Pull trotz untracker remotion/-Dateien
+# Remotion-Ordner sauber zusammenführen
 
-## Problem
-`git pull origin main` bricht ab, weil im lokalen Ordner `remotion/` untracked Dateien liegen, die auf dem Remote-Branch jetzt ebenfalls existieren. Git überschreibt unversionierte Dateien nicht automatisch.
+## Ausgangslage
 
-## Ziel
-Sichern der lokalen remotion/-Dateien, den Pull sauber durchführen und anschließend entscheiden, ob die gesicherten Dateien wiederhergestellt werden müssen.
+- **Neu (behalten):** `C:\Users\dusat\caption-cloud-magic\remotion\` — 10 Einträge, kam gerade per `git pull`. Das ist die versionierte, gültige Fassung.
+- **Alt (Backup):** `...\Desktop\AdTool AI Markenrechte\remotion\` — 16 Einträge. Enthält zusätzlich `node_modules`, `build`, `nvm`, `.env`, `package-lock.json`, `.prettierrc`, `eslint.config.mjs`, `check-env.cjs`, `remotion.config.ts`.
+
+## Regel
+
+Den Backup-Ordner **nicht** zurückkopieren. Aus dem Backup wird nur übernommen, was Git bewusst nicht enthält.
+
+| Datei/Ordner | Aktion |
+|---|---|
+| `node_modules`, `build`, `nvm` | Nicht kopieren — werden neu erzeugt |
+| `package-lock.json` | Nicht kopieren — Repo nutzt `bun.lock` |
+| `.env` | Nur kopieren, wenn eigene Keys drin stehen |
+| `remotion.config.ts`, `eslint.config.mjs`, `.prettierrc`, `check-env.cjs` | Erst öffnen und prüfen; nur kopieren, wenn sie noch gebraucht werden und im neuen Ordner fehlen |
+| Rest (`src`, `public`, `package.json`, `tsconfig.json`, `index.ts`, `README.md`) | Nicht kopieren — neue Version ist maßgeblich |
 
 ## Schritte
 
-1. **Sicherheits-Backup erstellen**
-   - Kopiere den gesamten lokalen `remotion/`-Ordner an einen Ort außerhalb des Repositories, z. B. `C:\Users\dusat\Desktop\remotion-backup-<datum>`.
-   - Damit ist garantiert nichts verloren, egal was danach passiert.
+1. Backup-Ordner unangetastet auf dem Desktop liegen lassen (Sicherheitsnetz).
+2. Im Backup `.env` öffnen. Wenn dort echte Werte stehen, die Datei nach `caption-cloud-magic\remotion\` kopieren. Sie ist per `.gitignore` geschützt und landet nicht im Repo.
+3. Die vier Konfigdateien aus der Tabelle öffnen und mit dem neuen Ordner vergleichen. Nur kopieren, was fehlt und inhaltlich noch passt.
+4. Im Projekt-Terminal Abhängigkeiten neu installieren:
+   ```bat
+   cd C:\Users\dusat\caption-cloud-magic\remotion
+   bun install
+   ```
+   (falls kein Bun vorhanden: `npm install`)
+5. `git status` prüfen — es sollten keine unerwarteten neuen Dateien auftauchen außer ggf. `.env` (ignoriert).
+6. Wenn alles läuft, das Desktop-Backup nach ein paar Tagen löschen.
 
-2. **Den lokalen Ordner aus dem Repository verschieben**
-   - `git clean -fd remotion/` hat nichts entfernt, sehr wahrscheinlich weil `remotion/` durch eine Ignore-Regel geschützt ist.
-   - Im aktuell geöffneten Ordner `C:\Users\dusat\caption-cloud-magic` exakt ausführen:
-     ```bat
-     move remotion ..\remotion-backup
-     ```
-   - Das verschiebt ihn sicher nach `C:\Users\dusat\remotion-backup`; es wird nichts gelöscht.
-   - Falls Windows meldet, dass `remotion-backup` bereits existiert, stattdessen einen neuen Namen verwenden:
-     ```bat
-     move remotion ..\remotion-backup-2
-     ```
+## Hinweis
 
-3. **Pull durchführen**
-   - Danach ausführen:
-     ```bat
-     git pull origin main
-     ```
-   - Der Pull sollte nun durchlaufen, weil der störende lokale Ordner nicht mehr im Repository liegt.
-
-4. **Erst danach den Stash zurückholen**
-   - Wenn der Pull erfolgreich war:
-     ```bat
-     git stash pop
-     ```
-   - Falls dabei Konflikte gemeldet werden, nichts löschen und die Meldung prüfen.
-
-5. **Vergleichen und ggf. wiederherstellen**
-   - Nach dem Pull den neuen `remotion/`-Stand mit `C:\Users\dusat\remotion-backup` vergleichen.
-   - Falls die lokalen Dateien wichtige eigene Änderungen enthielten, diese manuell übertragen oder wieder einspielen.
-   - Falls der Remote-Stand identisch oder besser ist, Backup verwerfen.
-
-6. **Abschluss prüfen**
-   - `git status` sollte keinen unerwarteten Datenverlust zeigen.
-   - Projekt lokal starten/builden, um sicherzustellen, dass alles funktioniert.
-
-## Risiken
-- Ohne Backup besteht die Gefahr, lokal erstellte Remotion-Kompositionen, Assets oder Konfigurationen zu verlieren.
-- Nicht `git clean -fdx` verwenden: Das würde auch ignorierte Dateien endgültig löschen.
+Falls `git stash pop` noch aussteht: erst das ausführen und `git status` prüfen, bevor Schritt 2 startet.
