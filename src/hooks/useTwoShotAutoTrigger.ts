@@ -22,7 +22,7 @@ import { toast } from '@/hooks/use-toast';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { isRealizedScene } from '@/lib/composer/isRealizedScene';
-import { legacyClipReadyEquivalentRow } from '@/lib/composer/sceneState';
+import { legacyClipReadyEquivalentRow, isCurrentGenerationPlateReady } from '@/lib/composer/sceneState';
 import { isLipSyncIntentionalRow } from '@/lib/video-composer/lipSyncIntent';
 import { tx } from '@/lib/i18nText';
 
@@ -89,7 +89,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
       try {
         const { data, error } = await supabase
           .from('composer_scenes')
-          .select('id, clip_url, clip_status, engine_override, lip_sync_status, lip_sync_applied_at, lip_sync_source_clip_url, lip_sync_with_voiceover, dialog_mode, dialog_script, audio_plan, dialog_shots, updated_at, clip_error, twoshot_stage, replicate_prediction_id')
+          .select('id, clip_url, clip_status, plate_generation, plate_ready_generation, active_run_id, engine_override, lip_sync_status, lip_sync_applied_at, lip_sync_source_clip_url, lip_sync_with_voiceover, dialog_mode, dialog_script, audio_plan, dialog_shots, updated_at, clip_error, twoshot_stage, replicate_prediction_id')
           .eq('project_id', projectId);
         if (error || !data) return;
 
@@ -238,8 +238,8 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
             // lipsync-legacy-read: v425 — Orphan-Re-Run-Marker der Lip-Sync-Substage.
             d.lip_sync_status === 'pending' &&
             d.lip_sync_applied_at &&
-            typeof d.clip_url === 'string' &&
-            d.clip_url.length > 0,
+            // v438: nur die Plate des AKTUELLEN Laufs zählt.
+            isCurrentGenerationPlateReady(d),
         );
         if (orphanReruns.length > 0) {
           console.warn(
@@ -304,7 +304,8 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           if (!isLipSyncCandidate(d)) return false;
           // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
-          if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
+          // v438: Plate des aktuellen Laufs muss fertig sein.
+          if (!isCurrentGenerationPlateReady(d)) return false;
           if (!legacyClipReadyEquivalentRow(d)) return false;
           if (!d.audio_plan?.twoshot?.url) return false;
           // lipsync-legacy-read: v425 — Substage bereits über Audio hinaus.
@@ -343,7 +344,9 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           if (!isLipSyncCandidate(d)) return false;
           // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
-          if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
+          // v438: Plate des aktuellen Laufs muss fertig sein — ein clip_url
+          // aus einer vorherigen plate_generation gilt als nicht vorhanden.
+          if (!isCurrentGenerationPlateReady(d)) return false;
           if (!legacyClipReadyEquivalentRow(d)) return false;
           if (d.audio_plan?.twoshot?.url) return false; // schon da
           // lipsync-legacy-read: v425 — Audio-Prep läuft gerade.
@@ -447,7 +450,8 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         const candidates = (data as any[]).filter((d) => {
           if (!isRealizedScene(d)) return false;
           if (!isLipSyncCandidate(d)) return false;
-          if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
+          // v438: Master-Plate muss aus dem AKTUELLEN Lauf stammen und fertig sein.
+          if (!isCurrentGenerationPlateReady(d)) return false;
           // Master clip must be READY — never try lip-sync on a failed/generating master.
           if (!legacyClipReadyEquivalentRow(d)) return false;
           if (d.lip_sync_applied_at) return false;

@@ -321,7 +321,7 @@ export function usePipelineProgress({
           { done: 0, total: 0 },
         );
         baselineRef.current = {
-          clipsReady: ai.filter((s) => legacyClipReadyEquivalentRow(s)).length,
+          clipsReady: ai.filter((s) => legacyClipReadyEquivalentRow(s) && sceneState(s) !== 'failed').length,
           clipsTotal: ai.length,
           lipsyncDone: lipTargets.filter(
             (s) =>
@@ -394,7 +394,7 @@ export function usePipelineProgress({
       { done: 0, total: 0 },
     );
     baselineRef.current = {
-      clipsReady: ai.filter((s) => legacyClipReadyEquivalentRow(s)).length,
+      clipsReady: ai.filter((s) => legacyClipReadyEquivalentRow(s) && sceneState(s) !== 'failed').length,
       clipsTotal: ai.length,
       lipsyncDone: lipTargets.filter(
         (s) =>
@@ -466,8 +466,13 @@ export function usePipelineProgress({
       const expected = clipScope?.runIds?.[s.id];
       return !expected || s.activeRunId === expected || s.active_run_id === expected;
     };
+    // v438: eine gescheiterte Szene mit (altem) Output-URL ist SETTLED-FAILED,
+    // nie eine erfolgreiche Clip-Phase.
     const isReadyOrLipsynced = (s: any) =>
-      belongsToCurrentRun(s) && (
+      belongsToCurrentRun(s) &&
+      !legacyClipFailedEquivalentRow(s) &&
+      sceneState(s) !== 'failed' &&
+      (
       legacyClipReadyEquivalentRow(s) ||
       (!!s.clipUrl && (
         // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)

@@ -89,6 +89,28 @@ export function isSceneState(v: unknown): v is SceneState {
 }
 
 /**
+ * v438 — CURRENT-GENERATION PLATE AUTHORITY.
+ * Spiegel von `src/lib/composer/sceneState.ts` und
+ * `public.composer_state_from_legacy()`.
+ */
+export function isCurrentGenerationPlateReady(row: any): boolean {
+  if (!row) return false;
+  const clipUrl = row.clip_url ?? row.clipUrl ?? null;
+  if (typeof clipUrl !== "string" || clipUrl.length === 0) return false;
+
+  const gen = row.plate_generation ?? row.plateGeneration ?? null;
+  if (gen == null) return true;
+
+  const readyGenProvided =
+    row.plate_ready_generation !== undefined || row.plateReadyGeneration !== undefined;
+  if (!readyGenProvided) return true;
+
+  const readyGen = row.plate_ready_generation ?? row.plateReadyGeneration ?? null;
+  if (readyGen == null) return false;
+  return Number(readyGen) === Number(gen);
+}
+
+/**
  * Legacy-Ableitung — identisch zu `public.composer_state_from_legacy()`.
  * Nur nötig für Zeilen, die (noch) kein `pipeline_state` mitliefern.
  */
@@ -96,22 +118,23 @@ export function deriveStateFromLegacy(row: any): SceneState {
   const clipStatus = row?.clip_status ?? row?.clipStatus ?? null;
   const stage = row?.twoshot_stage ?? row?.twoshotStage ?? null;
   const ls = row?.lip_sync_status ?? row?.lipSyncStatus ?? null;
-  const clipUrl = row?.clip_url ?? row?.clipUrl ?? null;
   const runId = row?.active_run_id ?? row?.activeRunId ?? null;
+  const plateReady = isCurrentGenerationPlateReady(row);
 
   if (clipStatus === "canceled" || ls === "canceled") return "canceled";
   if (clipStatus === "failed" || stage === "failed" || stage === "audio_mux_failed" || ls === "failed") {
     return "failed";
   }
-  if (ls === "done" || ls === "applied" || stage === "done" || stage === "complete" || stage === "applied") {
-    return "complete";
-  }
-  if (ls === "stitching") return "lipsync_muxing";
-  if (ls === "running" || stage === "lipsync") return "lipsync_running";
-  if (stage === "master_clip") return "audio_ready";
-  if (stage === "audio") return "audio_prep";
-  if ((clipStatus === "ready" || clipStatus === "completed") && typeof clipUrl === "string" && clipUrl.length > 0) {
-    return "plate_ready";
+  if (plateReady) {
+    if (ls === "done" || ls === "applied" || stage === "done" || stage === "complete" || stage === "applied") {
+      return "complete";
+    }
+    if (ls === "stitching") return "lipsync_muxing";
+    if (ls === "audio_muxing" || stage === "audio_muxing") return "lipsync_running";
+    if (ls === "running" || stage === "lipsync") return "lipsync_running";
+    if (stage === "master_clip") return "audio_ready";
+    if (stage === "audio") return "audio_prep";
+    if (clipStatus === "ready" || clipStatus === "completed") return "plate_ready";
   }
   if (clipStatus === "generating" || clipStatus === "rendering" || clipStatus === "processing") {
     return "plate_rendering";
@@ -134,9 +157,21 @@ export function deriveSubstateFromLegacy(row: any): SceneSubstate {
   const clipStatus = row?.clip_status ?? row?.clipStatus ?? null;
   const stage = row?.twoshot_stage ?? row?.twoshotStage ?? null;
   const ls = row?.lip_sync_status ?? row?.lipSyncStatus ?? null;
+  const plateReady = isCurrentGenerationPlateReady(row);
 
   if (clipStatus === "awaiting_manual_face_map") return "awaiting_manual_face_map";
   if (clipStatus === "awaiting_confirmation" && stage === "preview") return "awaiting_confirmation";
+
+  if (clipStatus === "canceled" || ls === "canceled") return null;
+  const isFailed =
+    clipStatus === "failed" || stage === "failed" || stage === "audio_mux_failed" || ls === "failed";
+  if (isFailed) {
+    if (!plateReady) return "plate_failed";
+    if (stage === "audio_mux_failed") return "audio_mux_failed";
+    if (stage === "failed" && ls === "failed") return "lipsync_failed";
+    return null;
+  }
+
   if (typeof stage === "string" && stage.startsWith("syncso_pass_")) return stage;
   if (typeof stage === "string" && stage.startsWith("syncso_fanout_")) return stage;
   if (typeof stage === "string" && stage.startsWith("syncso_retry_")) return stage;
@@ -146,8 +181,6 @@ export function deriveSubstateFromLegacy(row: any): SceneSubstate {
   if (stage === "anchor") return "anchor";
   if (stage === "anchor_soft_pass") return "anchor_soft_pass";
   if (stage === "preview") return "preview";
-  if (stage === "audio_mux_failed") return "audio_mux_failed";
-  if (stage === "failed" && ls === "failed") return "lipsync_failed";
   return null;
 }
 
