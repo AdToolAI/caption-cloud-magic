@@ -172,7 +172,25 @@ export async function renderPassFacePreclip(
     endSec,
     cropExpansionFactor,
     mouth,
+    bboxMeasureSrc,
   } = input;
+
+  // V445 — crop and dispatch bbox must share one measurement. We echo the
+  // caller's sanitized source label back as BOTH tags; the crop is computed
+  // from exactly the `bbox` handed in here, never from cached geometry.
+  const measureSrc: string | null = typeof bboxMeasureSrc === "string" && bboxMeasureSrc.length > 0
+    ? bboxMeasureSrc
+    : null;
+  const cropFromBbox: [number, number, number, number] | null =
+    Array.isArray(bbox) && bbox.length === 4 && bbox.every((n) => Number.isFinite(Number(n)))
+      ? [
+        Math.round(Number(bbox[0])),
+        Math.round(Number(bbox[1])),
+        Math.round(Number(bbox[2])),
+        Math.round(Number(bbox[3])),
+      ]
+      : null;
+
 
   if (!masterVideoUrl || !Number.isFinite(srcWidth) || !Number.isFinite(srcHeight)) {
     return { ok: false, error: "invalid_master_dims", errorClass: "invalid_input" };
