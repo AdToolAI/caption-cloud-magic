@@ -6040,15 +6040,14 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           {
             const anchorX = useMouth ? platePassMouth![0] : Math.round((bx1 + bx2) / 2);
             const anchorY = useMouth ? platePassMouth![1] : Math.round(by1 + h * 0.66);
-            const padX = Math.max(2, Math.round(w * 0.08));
-            const padTop = Math.max(2, Math.round(h * 0.06));
-            const padBottom = Math.max(2, Math.round(h * 0.04));
-            const x1 = Math.max(0, Math.round(bx1 - padX));
-            const y1 = Math.max(0, Math.round(by1 - padTop));
-            const x2 = Math.min(dims.width, Math.round(bx2 + padX));
-            const y2 = Math.min(dims.height, Math.round(by2 + padBottom));
-            if (x2 > x1 + 4 && y2 > y1 + 4) {
+            // V445 — identical padding math as the preclip crop source
+            // (`buildDispatchFaceBox`), so crop and dispatch box are one
+            // measurement. Values unchanged: 8% / 6% / 4%.
+            const padded = buildDispatchFaceBox(platePassBox, dims);
+            const [x1, y1, x2, y2] = padded ?? [0, 0, 0, 0];
+            if (padded) {
               box = [x1, y1, x2, y2];
+
               bboxSource = useMouth
                 ? "plate-native:v160-face-mouth-verified"
                 : "plate-native:v280-face-bbox-derived";
