@@ -74,6 +74,8 @@ const SUBSTATE_DETAIL: Record<string, { detailKey: string; tone?: SceneStatusTon
   preview: { detailKey: 'scene.status.detail.preview' },
   audio_mux_failed: { detailKey: 'scene.status.detail.audio_mux_failed', tone: 'error' },
   lipsync_failed: { detailKey: 'scene.status.detail.lipsync_failed', tone: 'error' },
+  // v438 — Fehler VOR fertiger Plate des aktuellen Laufs.
+  plate_failed: { detailKey: 'scene.status.detail.plate_failed', tone: 'error' },
 };
 
 /** Dynamische Substates (`syncso_pass_2`, …) → neutrale Kundentexte. */
