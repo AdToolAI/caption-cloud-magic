@@ -698,11 +698,11 @@ serve(async (req) => {
     // preservation + better environment retention for multi-speaker scenes.
     const callGemini3ProImage = async (): Promise<{ bytes: Uint8Array; mime: string; ext: string } | null> => {
       const userContent: any[] = [{ type: "text", text: editInstruction }];
-      for (const url of portraits) userContent.push({ type: "image_url", image_url: { url } });
-      for (const url of locationUrls) userContent.push({ type: "image_url", image_url: { url } });
-      for (const url of buildingUrls) userContent.push({ type: "image_url", image_url: { url } });
-      for (const url of propUrls) userContent.push({ type: "image_url", image_url: { url } });
-      for (const url of identityPortraits) userContent.push({ type: "image_url", image_url: { url } });
+      for (const url of portraits) pushRef(userContent, url);
+      for (const url of locationUrls) pushRef(userContent, url);
+      for (const url of buildingUrls) pushRef(userContent, url);
+      for (const url of propUrls) pushRef(userContent, url);
+      for (const url of identityPortraits) pushRef(userContent, url);
 
       const ac = new AbortController();
       const timeoutId = setTimeout(() => ac.abort(), 90_000);
