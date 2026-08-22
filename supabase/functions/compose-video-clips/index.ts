@@ -2646,6 +2646,38 @@ serve(async (req) => {
                     .eq("id", scene.id);
                 } catch (_) { /* non-fatal */ }
 
+                // ── v440 ANCHOR LIFECYCLE — pointer vs. object ─────────────
+                // A pinned generated anchor whose object was purged (hard
+                // reset) must be treated as ABSENT here, so the normal
+                // recomposition path below runs instead of reusing a dead
+                // link. Persistent/external references are not storage-backed
+                // by us and are left alone.
+                {
+                  const pinned = String(scene.referenceImageUrl ?? "");
+                  if (pinned) {
+                    const verdict = await verifyAnchorObject(supabaseAdmin as any, pinned);
+                    if (verdict === "anchor_object_missing") {
+                      console.warn(
+                        `[compose-video-clips] v440_anchor_object_missing scene=${scene.id} pointer=${pinned.slice(-64)} → treating pinned anchor as absent, re-composing`,
+                      );
+                      scene.referenceImageUrl = undefined;
+                      const clearPatch: Record<string, unknown> = {
+                        reference_image_url: null,
+                        updated_at: new Date().toISOString(),
+                      };
+                      if (isResetOwnedGeneratedAnchor((scene as any).lockReferenceUrl ?? pinned, scene.id)) {
+                        clearPatch.lock_reference_url = null;
+                      }
+                      try {
+                        await supabaseAdmin
+                          .from("composer_scenes")
+                          .update(clearPatch)
+                          .eq("id", scene.id);
+                      } catch (_) { /* non-fatal — the in-memory clear already protects dispatch */ }
+                    }
+                  }
+                }
+
                 // Has the currently-pinned anchor passed the current audit version?
                 const prevAuditRaw =
                   (scene as any).audioPlan?.twoshot?.anchor_face_audit ?? null;
