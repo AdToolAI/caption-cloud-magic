@@ -2303,6 +2303,13 @@ serve(async (req) => {
           attempted: boolean;
           reason: string | null;
         } = { portraitCount: 0, attempted: false, reason: null };
+        // V446 — panel/split-screen verdict on the composed ANCHOR STILL.
+        // Set inside the anchor safety net, consumed by the hard gate below
+        // so a panel collage never reaches a paid provider dispatch.
+        let v446PanelBlock:
+          | { metrics: Record<string, unknown> | null; reason: string; retried: boolean }
+          | null = null;
+
         try {
           // Two-Shot prep: if this scene has a multi-speaker dialog_script,
           // synthesize a merged voiceover (one WAV with all speakers in
