@@ -107,8 +107,15 @@ export interface PassPreclipResult {
   faceShareInCrop?: number;
   /** v247 — distance (px) between mouth and crop center. */
   mouthOffsetPx?: number;
-  /** v247 — true when clamping forced the crop off the ideal anchor. */
+  /** V445 — true when clamping forced the crop off the ideal anchor. */
   clamped?: boolean;
+  /** V445 — measurement source the crop geometry was computed from. */
+  cropMeasureSrc?: string | null;
+  /** V445 — measurement source of the face bbox handed in by the caller. */
+  bboxMeasureSrc?: string | null;
+  /** V445 — the exact face bbox the crop was computed from. */
+  cropFromBbox?: [number, number, number, number] | null;
+
   error?: string;
   /**
    * `dispatch_uncertain` (FA-4/P0): 5xx / network failure where it is unknown
