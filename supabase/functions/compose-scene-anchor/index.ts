@@ -724,12 +724,19 @@ serve(async (req) => {
         });
       } catch (e) {
         clearTimeout(timeoutId);
-        console.warn(`[compose-scene-anchor] gemini3pro ${(e as any)?.name === "AbortError" ? "timeout" : "network"} sceneId=${body.sceneId}`);
+        const kind = (e as any)?.name === "AbortError" ? "timeout" : "network";
+        lastFailureReason = `gemini3pro_${kind}`;
+        console.warn(`[compose-scene-anchor] gemini3pro ${kind} sceneId=${body.sceneId}`);
         return null;
       }
       clearTimeout(timeoutId);
       if (!aiResp.ok) {
-        console.error("[compose-scene-anchor] gemini3pro error", aiResp.status, (await aiResp.text()).slice(0, 300));
+        const txt = (await aiResp.text()).slice(0, 300);
+        lastFailureReason = `gemini3pro_provider_${aiResp.status}`;
+        if (/crawl|fetch content from the provided URL/i.test(txt)) {
+          lastFailureReason = "gemini3pro_url_fetch_failed";
+        }
+        console.error("[compose-scene-anchor] gemini3pro error", aiResp.status, txt);
         return null;
       }
       const aiJson = await aiResp.json();
