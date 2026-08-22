@@ -49,7 +49,16 @@ export const SPLIT_SCREEN_THRESHOLDS = {
   hSpreadPct: 0.15,
   /** V447 — N=2: maximale Abweichung von den Spaltenmitten W/4 bzw. 3W/4. */
   twoPanelColumnTolerancePct: 0.06,
+  /** V453 — Raster: maximale y-Streuung innerhalb einer Zeile (Anteil der Höhe). */
+  gridRowBandPct: 0.05,
+  /** V453 — Raster: Abweichung des Zeilenabstands vom Ideal H/R. */
+  gridPitchTolerancePct: 0.2,
+  /** V453 — Raster: Spaltenversatz zwischen den Zeilen (Anteil der Breite). */
+  gridColumnTolerancePct: 0.1,
+  /** V453 — Raster: Höhenstreuung über alle Kacheln. */
+  gridHeightSpreadPct: 0.35,
 } as const;
+
 
 export function classifySplitScreenLayout(
   boxes: Array<SplitScreenBox | null | undefined>,
