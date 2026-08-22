@@ -9,7 +9,9 @@ Verstanden: Der Reset wird von dir als Owner manuell ausgelöst, genau einmal, o
 - Zielszene: **S11 — die letzte Szene in der Liste** (`e658509d-…`, order_index 10, Status „Generated", die mit den vier Charakteren auf der Dachterrasse). Nicht S08/S09/S10 — das sind fehlgeschlagene Szenen und nicht Teil dieses Gates.
 - Dort genau einmal „Reset & retry lip-sync" klicken, danach nichts weiter ändern.
 
-Stand jetzt: `v434_artifact_pins` enthält weiterhin **0 Zeilen** — der Lauf hat also noch keine Evidenz erzeugt. Die Instrumentierung (Preclip-Pin + Provider-Output-Pin inkl. `attempt`/`purpose`) ist deployt und schreibt die Zeilen automatisch, sobald der Lauf durchläuft.
+Stand 22.08. 00:31 UTC: Der Reset ist ausgelöst und war ein harter Reset — `plate_generation` 3 → 4, Artefakte gepurgt, `clip_url` leer. Der neue Plate-Render (HappyHorse, Job `1mbs4fwq…`) lief 00:24:54 → 00:30:40 und ist `succeeded`. Die Lip-Sync-Pässe starten erst jetzt; die UI-Karte zeigte „Starting lip-sync…" bereits während der Plate-Phase, weil `lip_sync_status` schon beim Reset auf `pending` gesetzt wird — reines Anzeigethema, kein Pipeline-Fehler, und außerhalb dieses Gates.
+
+`v434_artifact_pins` wird von der deployten Instrumentierung (Preclip-Pin + Provider-Output-Pin inkl. `attempt`/`purpose`) automatisch befüllt, sobald die Sync-Pässe laufen. Phase 2 startet erst nach deinem GO, wenn der Lauf vollständig durch ist.
 
 ## Was nach GO passiert
 
