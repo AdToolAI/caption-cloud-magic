@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
-// @ts-expect-error — plain ESM harness, no type declarations by design.
+// @ts-ignore — plain ESM harness, no type declarations by design.
 import {
   V435_STATUS,
   V435_CELLS,
