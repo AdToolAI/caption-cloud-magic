@@ -1465,7 +1465,31 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         });
       }
 
-      if (!isSingleSpeakerScene && motionVerdictForMultiSpeaker === "indeterminate") {
+      // V443 — split the single `indeterminate` outcome:
+      //   probe_infra_error (bounded re-measure exhausted) → pass-through as
+      //     success with telemetry state `motion_unverified`; the watchdog
+      //     re-measures the SAME immutable output exactly once.
+      //   measured_ambiguous (gray zone / unusable metric) → fail-closed as before.
+      const v443FailureClass = !isSingleSpeakerScene &&
+          motionVerdictForMultiSpeaker === "indeterminate"
+        ? classifyMeasurementFailure(motionProbeResult?.reason ?? "")
+        : null;
+      const v443MotionUnverifiedPassthrough = !isSingleSpeakerScene &&
+        motionVerdictForMultiSpeaker === "indeterminate" &&
+        v443MotionUnverified &&
+        v443FailureClass === "probe_infra_error";
+      if (v443MotionUnverifiedPassthrough) {
+        console.warn(
+          `[sync-so-webhook] v443 scene=${sceneId} pass=${currentPass} speaker="${passSpeakerName}" ` +
+            `MOTION_UNVERIFIED (probe_infra_error, attempts=${v443MeasureAttempts}) → success pass-through, ` +
+            `watchdog re-measure pending — no terminalization, no refund, no provider dispatch`,
+        );
+      }
+
+      if (
+        !isSingleSpeakerScene && motionVerdictForMultiSpeaker === "indeterminate" &&
+        !v443MotionUnverifiedPassthrough
+      ) {
         // v403 — Fail-closed: an unclassified multi-speaker pass must never be
         // muxed as success. The existing G3.2.2 failure-apply owns the terminal
         // state and refund/scene-verdict.
