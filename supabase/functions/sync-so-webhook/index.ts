@@ -895,6 +895,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             ? Number((scene as any).plate_generation)
             : null,
           pass_idx: snapPassIdx,
+          attempt: pinAttempt,
+
           kind: "provider-output",
           source_url: v404RehostedUrl ?? outputUrl,
           pin,
