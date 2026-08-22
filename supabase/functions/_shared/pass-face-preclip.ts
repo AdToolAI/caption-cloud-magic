@@ -736,6 +736,8 @@ export async function renderPassFacePreclip(
         cropMeasureSrc: measureSrc,
         bboxMeasureSrc: measureSrc,
         cropFromBbox,
+        cameraPath,
+
       };
     }
     if (status === "failed") {
