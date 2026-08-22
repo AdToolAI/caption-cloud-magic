@@ -341,9 +341,19 @@ export default function VideoComposerDashboard() {
             ...prev,
             title: (projRow as any).title ?? prev.title,
             category: ((projRow as any).category as ComposerCategory) ?? prev.category,
-            briefing: ((projRow as any).briefing as ComposerBriefing) ?? prev.briefing,
+            // Merge over defaults — a partial/empty `{}` from the DB must never
+            // strip required fields (crashes like `productName.trim()`).
+            briefing: {
+              ...DEFAULT_BRIEFING,
+              ...(prev.briefing ?? {}),
+              ...(((projRow as any).briefing as Partial<ComposerBriefing>) ?? {}),
+            } as ComposerBriefing,
             language: (projRow as any).language ?? prev.language,
-            assemblyConfig: ((projRow as any).assembly_config as AssemblyConfig) ?? prev.assemblyConfig,
+            assemblyConfig: {
+              ...DEFAULT_ASSEMBLY_CONFIG,
+              ...(prev.assemblyConfig ?? {}),
+              ...(((projRow as any).assembly_config as Partial<AssemblyConfig>) ?? {}),
+            } as AssemblyConfig,
             outputUrl: projRow.output_url ?? prev.outputUrl,
             status: (projRow.status as ComposerStatus) ?? prev.status,
             adMeta: ((projRow as any).ad_meta as AdCampaignMeta | null) ?? prev.adMeta ?? null,
