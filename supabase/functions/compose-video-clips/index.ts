@@ -2760,15 +2760,21 @@ serve(async (req) => {
                   );
                   if (!r.ok) {
                     const errTxt = await r.text().catch(() => "");
+                    anchorAttempt.reason = `anchor_http_${r.status}`;
                     console.warn(
                       `[compose-video-clips] cinematic-sync scene ${scene.id}: compose-scene-anchor failed ${r.status} ${errTxt.slice(0, 200)}`,
                     );
                     return null;
                   }
                   const aj = await r.json().catch(() => ({}));
-                  return typeof aj?.composedUrl === "string"
-                    ? aj.composedUrl
-                    : null;
+                  if (typeof aj?.composedUrl === "string") {
+                    anchorAttempt.reason = null;
+                    return aj.composedUrl;
+                  }
+                  anchorAttempt.reason = typeof aj?.reason === "string"
+                    ? aj.reason
+                    : (typeof aj?.error === "string" ? aj.error : "anchor_provider_failed");
+                  return null;
                 };
 
                 const invalidateCache = async () => {
