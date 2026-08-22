@@ -3071,33 +3071,22 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // (same y, equal x-spacing, identical box height) the plate is a
       // quad/triptych split-screen layout. Sync.so cannot lipsync isolated
       // panels — block before dispatch with a clear error.
+      // V445 — detector logic lives in the pure shared module
+      // `_shared/split-screen-layout.ts` (testable, single source of truth).
+      // The old conjunction (y<=5% AND gap<=8% AND h<=10%) missed the
+      // production S11 panel plate; the V445 rule is
+      // y<=5% AND (gap<=15% OR h<=15%).
       const detectSplitScreenLayout = (): string | null => {
         if (!plateDims || !plateIdentityMap?.faces || plateIdentityMap.faces.length < 3) return null;
         const faces = plateIdentityMap.faces as Array<{ bbox?: { x: number; y: number; width: number; height: number } }>;
-        const boxes = faces.map((f) => f.bbox).filter((b): b is { x: number; y: number; width: number; height: number } => !!b);
-        if (boxes.length < 3 || boxes.length !== faces.length) return null;
-        const W = plateDims.width;
-        const H = plateDims.height;
-        const centers = boxes.map((b) => ({ cx: b.x + b.width / 2, cy: b.y + b.height / 2, h: b.height }));
-        // Sort left-to-right by cx
-        centers.sort((a, b) => a.cx - b.cx);
-        const ys = centers.map((c) => c.cy);
-        const yMean = ys.reduce((a, b) => a + b, 0) / ys.length;
-        const ySpreadPct = Math.max(...ys.map((y) => Math.abs(y - yMean))) / H;
-        // Equal x-spacing: gaps between consecutive centers within ±8% of mean gap
-        const gaps: number[] = [];
-        for (let i = 1; i < centers.length; i++) gaps.push(centers[i].cx - centers[i - 1].cx);
-        const gapMean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
-        const gapSpreadPct = gapMean > 0 ? Math.max(...gaps.map((g) => Math.abs(g - gapMean))) / gapMean : 1;
-        // Identical box heights: ±10% of mean
-        const hs = centers.map((c) => c.h);
-        const hMean = hs.reduce((a, b) => a + b, 0) / hs.length;
-        const hSpreadPct = hMean > 0 ? Math.max(...hs.map((h) => Math.abs(h - hMean))) / hMean : 1;
-        if (ySpreadPct <= 0.05 && gapSpreadPct <= 0.08 && hSpreadPct <= 0.10) {
-          return `split_screen_layout(faces=${centers.length}, y_spread=${(ySpreadPct * 100).toFixed(1)}%, gap_spread=${(gapSpreadPct * 100).toFixed(1)}%, h_spread=${(hSpreadPct * 100).toFixed(1)}%)`;
-        }
-        return null;
+        const verdict = classifySplitScreenLayout(
+          faces.map((f) => f.bbox ?? null),
+          plateDims.width,
+          plateDims.height,
+        );
+        return verdict.isSplitScreen ? verdict.reason : null;
       };
+
       const splitScreenReason = detectSplitScreenLayout();
       // v436 — restored contract: physical face coverage is authoritative.
       // `!plateIdentityMap` alone no longer blocks; the slot-order /
