@@ -47,6 +47,13 @@ import {
   measureProviderMotionSync,
   type MeasureProviderMotionSyncResult,
 } from "../_shared/measure-provider-motion-sync.ts";
+// V443 — probe-infrastructure failures are not verdicts about the clip.
+import {
+  classifyMeasurementFailure,
+  measureWithBoundedReMeasure,
+  MOTION_UNVERIFIED_STATE,
+  PROBE_INFRA_MAX_RETRIES,
+} from "../_shared/motion-probe-infra.ts";
 // FA-4 v409 — PURE Speaker-Cardinality (distinct speaker_idx, NOT pass count).
 import {
   classifySpeakerCardinality,
