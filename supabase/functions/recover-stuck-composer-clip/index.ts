@@ -427,7 +427,7 @@ Deno.serve(async (req) => {
     const results: Result[] = [];
     for (const id of sceneIds.slice(0, 50)) {
       try {
-        results.push(await processScene(sb, id));
+        results.push(await processScene(sb, id, candidateByScene.get(id)));
       } catch (err) {
         console.error(
           `[recover-stuck-composer-clip] processScene threw scene=${id}`,
