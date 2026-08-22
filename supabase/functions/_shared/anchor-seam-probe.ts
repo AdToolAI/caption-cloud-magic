@@ -1,5 +1,3 @@
-import { Image } from "npm:imagescript@1.3.0";
-
 export interface AnchorSeamVerdict {
   isPanel: boolean;
   score: number;
@@ -68,6 +66,7 @@ export async function probeAnchorSeams(url: string): Promise<AnchorSeamVerdict> 
     const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
     if (!response.ok) return { isPanel: false, score: 0, reason: null };
     const bytes = new Uint8Array(await response.arrayBuffer());
+    const { Image } = await import("npm:imagescript@1.3.0");
     const image = await Image.decode(bytes) as unknown as RgbaImage;
     return classifyAnchorSeams(image);
   } catch {
