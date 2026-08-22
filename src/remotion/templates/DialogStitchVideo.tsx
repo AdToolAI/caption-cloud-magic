@@ -252,6 +252,14 @@ interface CroppedOverlayProps {
   top: number;
   size: number;
   holdToEnd?: boolean;
+  /** V452 — the exact camera path the preclip was rendered with (plate px). */
+  path?: { keyframes: Array<{ t: number; x: number; y: number; size: number }> } | null;
+  /** Source-master → composition scale factors for the inverse projection. */
+  scaleX?: number;
+  scaleY?: number;
+  /** Preclip-relative seconds already consumed before this shot's frame 0. */
+  pathOffsetSec?: number;
+  fps?: number;
 }
 const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   src,
@@ -261,6 +269,11 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   top,
   size,
   holdToEnd,
+  path,
+  scaleX,
+  scaleY,
+  pathOffsetSec,
+  fps,
 }) => {
   const frame = useCurrentFrame();
   const fadeIn = Math.min(CROSSFADE_FRAMES, Math.max(1, Math.floor(segDuration / 2)));
@@ -281,15 +294,30 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   // 22% and the identity change is invisible.
   const mask = 'radial-gradient(circle at center, #000 0%, #000 30%, rgba(0,0,0,0) 78%)';
 
+  // V452/T13 — reproject along the SAME path that produced the preclip. The
+  // path is authoritative whenever present; only a pathless shot keeps the
+  // legacy fixed rect. Mask contract is untouched.
+  const sampled =
+    path && Array.isArray(path.keyframes) && path.keyframes.length > 0 && fps
+      ? sampleCameraPathRuntime(path, (pathOffsetSec ?? 0) + frame / fps)
+      : null;
+  const sX = Number.isFinite(Number(scaleX)) ? Number(scaleX) : 1;
+  const sY = Number.isFinite(Number(scaleY)) ? Number(scaleY) : 1;
+  const overlayScale = Math.max(sX, sY);
+  const curLeft = sampled ? sampled.x * sX : left;
+  const curTop = sampled ? sampled.y * sY : top;
+  const curSize = sampled && sampled.size > 0 ? sampled.size * overlayScale : size;
+
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       <div
         style={{
           position: 'absolute',
-          left,
-          top,
-          width: size,
-          height: size,
+          left: curLeft,
+          top: curTop,
+          width: curSize,
+          height: curSize,
+
           opacity,
           WebkitMaskImage: mask,
           maskImage: mask,
