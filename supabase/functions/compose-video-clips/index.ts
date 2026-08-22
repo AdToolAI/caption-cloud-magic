@@ -3846,6 +3846,30 @@ serve(async (req) => {
           );
         }
 
+        // ── V446 ANCHOR PANEL HARD-GATE (zero spend) ───────────────────────
+        // A panel/split-screen anchor can only produce a panel plate. Stop
+        // here, before any provider dispatch, instead of paying for 6 clips
+        // that the v445 plate gate will discard afterwards.
+        if (v446PanelBlock) {
+          const msg = tl({
+            de: "anchor_split_screen_detected: Das Anker-Bild dieser Szene ist eine Split-Screen-/Panel-Collage (getrennte Streifen statt einer gemeinsamen Aufnahme). Lip-Sync ist darauf nicht möglich. Es wurde kein Clip gerendert (keine Kosten). Bitte die Szene neu erzeugen — alle Personen müssen in einem gemeinsamen Raum in einer durchgehenden Kameraeinstellung stehen.",
+            en: "anchor_split_screen_detected: The anchor image of this scene is a split-screen/panel collage (separate strips instead of one shared shot). Lip-sync is impossible on that. No clip was rendered (no cost). Please regenerate the scene — all people must stand in one shared room in a single continuous camera frame.",
+            es: "anchor_split_screen_detected: La imagen ancla de esta escena es un collage de pantalla dividida (tiras separadas en lugar de una toma común). El lip-sync no es posible. No se renderizó ningún clip (sin coste). Regenere la escena: todas las personas deben estar en la misma sala en un único encuadre continuo.",
+          });
+          console.warn(
+            `[compose-video-clips] v446_anchor_panel_block scene=${scene.id} ` +
+            `reason=${v446PanelBlock.reason} retried=${v446PanelBlock.retried ? 1 : 0} ` +
+            `metrics=${JSON.stringify(v446PanelBlock.metrics)} → hard-fail before provider dispatch (zero spend)`,
+          );
+          await safeMarkSceneFailed(scene.id, msg, {
+            isCinematicSyncScene: true,
+            extra: { twoshot_stage: "failed" },
+          });
+          results.push({ sceneId: scene.id, status: "failed", error: msg });
+          continue;
+        }
+
+
         // ── v195/v440 HARD-GUARD: cinematic-sync needs a VERIFIED anchor ───
         // Regressions kept slipping through when the anchor safety net threw
         // or when portraits were absent — the provider then rendered generic
