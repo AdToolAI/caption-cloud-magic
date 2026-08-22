@@ -1,41 +1,54 @@
-# V443 — Szene starb an einer kaputten Messung, nicht an schlechtem Lip-Sync
+# V443 — Messfehler von Messergebnis trennen (bounded Re-Measure)
 
-## Was wirklich passierte (belegt aus Logs + DB, Lauf 16:00–16:06 UTC, S11, Plate-Generation 9)
+Belegte Ursache auf S11, Plate-Generation 9: Pass 0 hatte einen guten Provider-Output. Die Bewegungsmessung starb an einem Transportfehler (`Unexpected end of JSON input`), das Webhook wertete das als `indeterminate` und terminalisierte über `ssw:noop_fail`. Vier Minuten später ergab dieselbe unveränderliche Datei `delta_mean=130.7` → klar Motion. Die Szene starb also an der Messinfrastruktur, nicht am Lip-Sync.
 
-Die Kette war fast fertig: Platte fertig (15:58), alle 6 Sync-Pässe rausgeschickt, **5 von 6 erfolgreich**. Gescheitert ist nur Pass 1 (Sarah) — und zwar nicht, weil der Lip-Sync schlecht war:
+## Scope
 
-```text
-16:00:03  Pass 0 (Sarah) an Sync.so dispatcht
-16:01:32  Bewegungsmessung schlaegt fehl:
-          status=unmeasurable verdict=indeterminate
-          reason=motion_probe_indeterminate:provider_"Unexpected end of JSON input"
-16:01:34  v403-Regel: INDETERMINATE -> ssw:noop_fail  (harter, endgueltiger Fehlschlag)
-16:05:41  Szene terminal: lip_sync_status=failed, Refund 960 Credits
-16:05:44  Re-Messung DERSELBEN gepinnten Ausgabe von Pass 0:
-          delta_mean=130.7 > Schwelle 15.4  -> verdict=motion  (also GUT)
-16:05:45  zu spaet: "conflicting_duplicate" / ignored_due_scene_failed
-```
+### 1. Zwei getrennte Ausgänge statt einem `indeterminate`
+In `_shared/motion-probe-classifier.ts` / `_shared/measure-provider-motion-sync.ts`:
+- `probe_infra_error` — leere/abgeschnittene Antwort, JSON-Parse-Fehler, HTTP-/Extraktions-Fehler, Timeout, Transportfehler.
+- `measured_ambiguous` — Messung lief durch, Wert liegt in der bestehenden Grauzone. Verhalten unverändert fail-closed.
 
-Kurz: Der Pass war in Ordnung. Nur die *Messung* ist an einem Transportfehler (leere/abgeschnittene Antwort der Frame-Extraktion) gestorben, und V441 wertet „nicht messbar" seit dem letzten Gate als „kaputt" — ohne Wiederholung. Vier Minuten später hat dieselbe Datei die Messung sauber bestanden.
+Schwellenwerte werden nicht angefasst.
 
-Ein Infrastruktur-Fehler der Messung ist kein Beweis für einen schlechten Lip-Sync. Genau das ist der Defekt.
+### 2. Bounded Re-Measure bei `probe_infra_error`
+Erneutes Messen auf demselben v434-gepinnten, unveränderlichen Provider-Output: maximal 2 Versuche mit kurzem Backoff. Keine neue Sync.so-Generierung, kein Provider-Rerender, keine zusätzlichen Credits. Run-/Generation-/Pass-Identität und Artefakt-SHA bleiben identisch.
 
-## Fix (V443)
+### 3. `motion_unverified` statt Terminalisierung
+Schlägt die Messung auch nach den Wiederholungen aus Infrastrukturgründen fehl:
+- Szene wird **nicht** terminalisiert,
+- das Segment geht als erfolgreich durch, Telemetriezustand `motion_unverified`,
+- Grund wird in `syncso_dispatch_log` persistiert.
 
-1. **Messfehler von Messergebnis trennen.** `indeterminate` wird aufgeteilt:
-   - `probe_infra_error` (leere Antwort, JSON-Abbruch, HTTP-/Extract-Fehler, Timeout) — kein Urteil über den Clip.
-   - `measured_ambiguous` (Messung lief, Wert liegt im Graubereich) — bleibt wie heute.
-2. **Bounded Re-Measure statt Sofort-Fail.** Bei `probe_infra_error` wird die Messung auf dem bereits unveränderlich gepinnten Provider-Output (v434-Pin, existiert nachweislich) bis zu 2-mal mit kurzem Backoff wiederholt. Kein neuer Provider-Call, keine zusätzlichen Kosten.
-3. **Fail-open nach erschöpfter Messung.** Bleibt die Messung nach den Wiederholungen unmöglich, wird der Pass als `succeeded (motion_unverified)` durchgelassen statt die ganze Szene zu töten. Der Grund landet als Telemetrie in `syncso_dispatch_log`. Nur ein *gemessenes* Noop-Ergebnis darf noch terminalisieren.
-4. **Watchdog-Nachmessung.** `lipsync-watchdog` misst Pässe mit `motion_unverified` einmal nach; ergibt die Messung dann echtes Noop, greift der bestehende Noop-Pfad — jetzt aber mit Beweis.
-5. **Refund bleibt idempotent** — keine Änderung an Beträgen oder Buchungslogik.
+Nur ein **gemessenes** Noop darf weiterhin über den bestehenden Noop-Pfad terminalisieren.
 
-## Warum das eine Freigabe braucht
+### 4. Watchdog-Nachmessung
+`lipsync-watchdog` misst einen `motion_unverified`-Pass genau einmal aus demselben unveränderlichen Output nach:
+- Motion → Erfolg bleibt,
+- Noop → bestehender bewiesener Noop-Terminalisierungspfad,
+- erneut Infra-Fehler → bleibt `motion_unverified`, kein neuer Provider-Job.
 
-`sync-so-webhook` und `lipsync-watchdog` stehen unter dem Lip-Sync-Feature-Freeze (v400). Diese Änderung fällt in die Kategorie „Datenverlust/P0": ein vollständiger, bezahlter 6-Pass-Lauf wird durch einen einzelnen Messfehler vernichtet. Ich brauche dafür deine ausdrückliche Freigabe für genau diesen Scope — die vier Invarianten (Anchor-Kohärenz, Run-Identität, Run-Guard, Assignment-Lock) und alle Schwellenwerte bleiben unangetastet.
+### 5. Credits
+Refund-Logik, Beträge und Idempotenz unverändert.
 
-## Verifikation
+## Unangetastet (Freeze-Invarianten)
+Anchor-Kohärenz, Run-/Generation-Identität, Webhook-Run-Guard, Assignment-Lock, Provider-Vertrag und Dispatch-Semantik, Motion-Schwellen, alle Retry-Schwellen ausserhalb der Mess-Infrastruktur, Mux-Logik, Storage-Policies, Credit-Beträge.
 
-- Ein Lauf mit erzwungenem Probe-Fehler terminalisiert die Szene nicht mehr, sondern liefert `motion_unverified` mit Nachmessung.
-- Ein Lauf mit echtem Noop (gemessen) failt weiterhin wie heute.
-- S11 danach genau einmal neu rendern; erwartet: 6/6 Pässe, Mux, fertiger Clip.
+## Regressionstests (permanent)
+1. `probe_infra_error` failt die Szene nicht sofort.
+2. Genau maximal 2 gebundene Re-Measure-Versuche auf demselben Pin.
+3. Erschöpfte Infra-Messung ergibt `motion_unverified`.
+4. Kein neuer Provider-Dispatch auf diesem Pfad.
+5. Gemessenes Noop failt exakt wie bisher.
+6. Gemessenes Motion bleibt Erfolg.
+7. Watchdog misst `motion_unverified` genau einmal nach.
+8. Refund bleibt idempotent.
+9. Bestehende V441-Write-Contract-Tests bleiben grün.
+
+Ausgeführt werden die betroffenen Deno- und vitest-Suites plus Typecheck/Build.
+
+## Deployment
+Nur `sync-so-webhook` und `lipsync-watchdog` samt ihrer statisch importierten Shared-Module.
+
+## Ausdrücklich nicht in diesem Gate
+Kein S11-Rerender, kein Owner-Render. Der Rerender erfolgt danach genau einmal manuell durch dich.
