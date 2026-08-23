@@ -30,6 +30,7 @@ import { refundRunCharge } from "./refund-provenance.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { logMissingReinjectPointer } from "../_shared/v431-ledger.ts";
+import { classifyProviderRejection } from "../_shared/happyhorse-green-net.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -419,6 +420,9 @@ async function processScene(
       );
       // On 404 from Replicate: prediction lost — refund + fail.
       if (r.status === 404 && !alreadyRefunded) {
+        // v455 (C) — kein terminaler Providerstatus darf den Ledger-Job
+        // `dispatched` hinterlassen.
+        await terminalizeLedgerJobDirect(sb, await resolveAuthoritativeJob(sb, sceneId, candidate), "provider_prediction_404");
         const refunded = await refundScene(sb, scene);
         await markFailed(
           sb,
