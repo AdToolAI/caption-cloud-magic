@@ -642,6 +642,8 @@ export async function measureProviderMotionSync(
       },
       // V465-B2a — telemetry only. Authority flips in V465-B2b, not here.
       v465,
+      // V467-A — speech coupling telemetry. Never a verdict input.
+      v467,
     };
 
   } finally {
