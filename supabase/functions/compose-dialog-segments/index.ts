@@ -97,6 +97,7 @@ import { plateFaceSanity } from "../_shared/plate-face-candidates.ts";
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
+import { isFanoutClosed } from "../_shared/v459-fanout-aggregation.ts";
 // v161 — renderPassFacePreclip re-enabled for the unified single-face
 // bbox-url-pro pipeline (1..N speakers). v187 makes this fail-closed for
 // multi-speaker: no full-plate fallback after a preclip timeout/failure.
