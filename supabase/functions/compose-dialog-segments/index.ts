@@ -4766,13 +4766,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         } catch { /* best-effort */ }
         return json({ ok: true, skipped: "v193_pass_already_active", pass_idx: currentPassIdx, status: liveStatus }, 202);
       }
+      const v459ClaimAt = new Date().toISOString();
       try {
         await supabase.rpc("update_dialog_pass_slot", {
           _scene_id: sceneId,
           _pass_idx: currentPassIdx,
           _patch: {
             status: "rendering_preflight",
-            preflight_started_at: new Date().toISOString(),
+            preflight_started_at: v459ClaimAt,
+            // V459 — expliziter Zombie-Zeitanker. Die Watchdog-Uhr läuft NIE
+            // auf `started_at`, sondern ausschliesslich auf diesem Feld.
+            v459_preflight_started_at: v459ClaimAt,
             preflight_claim_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
           },
         });
@@ -4781,8 +4785,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v193_pass_claim_failed: ${(claimErr as Error)?.message ?? claimErr}`,
         );
       }
-      (pass as any).preflight_started_at = new Date().toISOString();
+      (pass as any).preflight_started_at = v459ClaimAt;
+      (pass as any).v459_preflight_started_at = v459ClaimAt;
       pass.status = "rendering_preflight";
+
     }
 
     // ── v193 — Batch preclip all sibling passes immediately ──────────────
