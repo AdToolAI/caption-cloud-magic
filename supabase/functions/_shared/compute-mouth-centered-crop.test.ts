@@ -3,7 +3,7 @@
  * unit tests in src/lib/composer/__tests__).
  */
 import { assertEquals, assert } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { computeMouthCenteredCrop } from "./compute-mouth-centered-crop.ts";
+import { computeMouthCenteredCrop, projectCropToContain } from "./compute-mouth-centered-crop.ts";
 
 Deno.test("centers on mouth when present", () => {
   const r = computeMouthCenteredCrop({
@@ -30,4 +30,21 @@ Deno.test("v247 regression: small face reaches ≥35% face share", () => {
     r.faceShareInCrop >= 0.35,
     `expected faceShareInCrop ≥ 0.35, got ${r.faceShareInCrop}`,
   );
+});
+
+Deno.test("V457: crop wird auf den gepaddeten Dispatch-Kasten projiziert", () => {
+  const target: [number, number, number, number] = [219, 149, 302, 258];
+  const r = projectCropToContain({ x: 185, y: 156, size: 153 }, target, 1284, 718);
+  assertEquals(r.containsTarget, true);
+  assertEquals(r.shiftPx, { x: 0, y: -7 });
+  assertEquals(r.sizeGrown, false);
+  const again = projectCropToContain(r.crop, target, 1284, 718);
+  assertEquals(again.crop, r.crop);
+  assertEquals(again.reason, "already_contained");
+});
+
+Deno.test("V457: Impossible-Case wird nicht maskiert", () => {
+  const r = projectCropToContain({ x: 500, y: 100, size: 200 }, [600, 100, 900, 300], 800, 400);
+  assertEquals(r.containsTarget, false);
+  assertEquals(r.reason, "contain_box_outside_plate");
 });
