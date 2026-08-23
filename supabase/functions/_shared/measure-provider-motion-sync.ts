@@ -40,6 +40,8 @@ import {
   type MouthRoiNormalized,
   type PreclipRoiGeometry,
 } from "./v434-motion-roi.ts";
+// V456 Gate 2 — validated, anchor-coherent geometry contract.
+import type { V456RoiContract } from "./v456-roi-contract.ts";
 
 /** Frozen production constants — no rounding, no heuristics. */
 export const MOTION_SAMPLE_COUNT = 6;
@@ -65,6 +67,12 @@ export interface MotionMetricValue {
   stillHeight: number;
   /** V434 telemetry — consecutive-frame MAD inside the geometry-coupled band. */
   mad?: MadSummary | null;
+  /**
+   * V456 — the FROZEN v404 band measured on the very same stills. Kept as
+   * regression evidence ("legacy ROI → cheek → noop") whenever the geometry
+   * ROI is the authority. Never used for a verdict.
+   */
+  legacy_roi_metric?: { mean: number; peak: number; roi: { bx: number; by: number; bw: number; bh: number } } | null;
 }
 
 export type MeasurementStatus = "measured" | "unmeasurable";
@@ -119,6 +127,16 @@ export interface MeasureProviderMotionSyncArgs {
    * metric and the geometry ROI is reported as telemetry only.
    */
   useGeometryRoiForVerdict?: boolean;
+  /**
+   * V456 Gate 2 — the validated ROI contract. When supplied it is the ONLY
+   * authority on the measurement band:
+   *   `authoritative` → the geometry mouth ROI drives the verdict and the
+   *                     frozen v404 band is measured as telemetry.
+   *   `unresolved`    → NOTHING is measured; the caller receives
+   *                     `mouth_roi_unresolved` and must treat the pass as
+   *                     `motion_unverified` (never as a NOOP).
+   */
+  roiContract?: V456RoiContract | null;
 }
 
 
@@ -129,6 +147,13 @@ export interface MeasureProviderMotionSyncResult {
   deltaPeak: number | null;
   measurement_status: MeasurementStatus;
   reason: string;
+  /** V456 — which band produced the authoritative metric. */
+  v456?: {
+    roi_authority: "geometry" | "legacy_frozen";
+    contract_status: "authoritative" | "unresolved" | "absent";
+    contract_reason: string;
+    failed_check: string | null;
+  };
   /** V434 telemetry — never authoritative. */
   v434?: {
     roi: DerivedMouthRoi;
@@ -401,9 +426,17 @@ export async function measureProviderMotionSync(
 
     // V434 Step 4 — derived ONCE per run so both assets share one band.
     const derivedRoi = deriveMouthRoi(args.preclipGeometry ?? null);
-    const applyGeometryRoi = args.useGeometryRoiForVerdict === true &&
-      derivedRoi.source === "geometry";
-    const verdictRoi: MouthRoiNormalized = applyGeometryRoi ? derivedRoi.roi : MOTION_ROI;
+    // ── V456 Gate 2 — the contract, when present, owns the band ────────────
+    const contract = args.roiContract ?? null;
+    if (contract && contract.status === "unresolved") {
+      return unmeasurable(contract.reason);
+    }
+    const applyGeometryRoi = contract
+      ? contract.status === "authoritative"
+      : (args.useGeometryRoiForVerdict === true && derivedRoi.source === "geometry");
+    const verdictRoi: MouthRoiNormalized = applyGeometryRoi
+      ? (contract?.roi ?? derivedRoi.roi)
+      : MOTION_ROI;
 
     const measureOne = async (
       url: string,
@@ -451,15 +484,28 @@ export async function measureProviderMotionSync(
         derivedRoi.roi,
       );
       const mad = madRoi.bw > 0 && madRoi.bh > 0 ? computeMadSummary(decoded, madRoi) : null;
+      // V456 — keep the frozen v404 band as regression evidence. It is measured
+      // on the SAME decoded stills (no extra Lambda invoke) and is telemetry.
+      let legacyRoiMetric: MotionMetricValue["legacy_roi_metric"] = null;
+      if (applyGeometryRoi) {
+        const legacyBox = stillRoiForSource(dims.width, dims.height, stillWidth, stillHeight, MOTION_ROI);
+        if (legacyBox.bw > 0 && legacyBox.bh > 0) {
+          const legacy = computeMotionMetric(decoded, legacyBox);
+          legacyRoiMetric = { mean: legacy.mean, peak: legacy.peak, roi: legacyBox };
+        }
+      }
       return {
         mean,
         peak,
         frames: decoded.length,
-        method: "server-remotion-still-mouthband-v404",
+        method: applyGeometryRoi
+          ? "server-remotion-still-mouthband-v456-geometry"
+          : "server-remotion-still-mouthband-v404",
         roi,
         stillWidth,
         stillHeight,
         mad,
+        legacy_roi_metric: legacyRoiMetric,
       };
     };
 
@@ -486,6 +532,12 @@ export async function measureProviderMotionSync(
       deltaPeak: provider.peak - preclip.peak,
       measurement_status: "measured",
       reason: "measured",
+      v456: {
+        roi_authority: applyGeometryRoi ? "geometry" : "legacy_frozen",
+        contract_status: contract ? contract.status : "absent",
+        contract_reason: contract ? contract.reason : "contract_absent",
+        failed_check: contract?.failedCheck ?? null,
+      },
       // V434 — reported alongside, never instead of, the frozen v404 verdict.
       v434: {
         roi: derivedRoi,
