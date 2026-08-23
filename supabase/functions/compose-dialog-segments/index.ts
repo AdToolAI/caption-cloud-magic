@@ -6767,17 +6767,49 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     ) => {
       const costCredits = Number(prevState?.cost_credits ?? totalCost);
       const alreadyRefunded = !!(prevState as any)?.refunded;
+      // V461 Stufe 0 — Refund IMMER in der Kasse, die belastet wurde: dem
+      // Euro-Wallet (`ai_video_wallets.balance_euros`) via
+      // `v459_refund_lipsync_euros`. Der Credit-Ledger (`wallets.balance`) ist
+      // ausdrücklich NICHT mehr der Refund-Pfad — ein Gate-Block ist finanziell
+      // identisch zu jedem anderen Lip-Sync-Fehlschlag (failLipSync). Die RPC
+      // findet die Quell-Belastung über run_id → scene_id und ist idempotent
+      // (refund_key = lipsync_refund:<run_id>:<source_transaction_id>).
+      const refundRunId = String((scene as any)?.active_run_id ?? "") || null;
+      let refundInfo: Record<string, unknown> | null = null;
+      let didRefund = false;
       if (!alreadyRefunded) {
-        const { data: w2 } = await supabase
-          .from("wallets").select("balance").eq("user_id", userId).single();
-        await supabase
-          .from("wallets")
-          .update({
-            balance: Number(w2?.balance ?? 0) + costCredits,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("user_id", userId);
+        try {
+          const { data: refundRes, error: refundErr } = await supabase.rpc(
+            "v459_refund_lipsync_euros",
+            {
+              p_user_id: userId,
+              p_scene_id: sceneId,
+              p_run_id: refundRunId,
+              p_source_transaction_id: null,
+              p_reason: reason,
+            },
+          );
+          if (refundErr) {
+            console.warn(
+              `[compose-dialog-segments] v459 euro refund rpc error: ${refundErr.message ?? refundErr}`,
+            );
+          } else {
+            refundInfo = (refundRes ?? null) as Record<string, unknown> | null;
+            didRefund = (refundInfo as any)?.refunded === true;
+            console.log(
+              `[compose-dialog-segments] v459 euro_refund scene=${sceneId} run=${refundRunId ?? "-"} ` +
+                `reason=${reason} refunded=${didRefund} detail=${JSON.stringify(refundInfo ?? {})}`,
+            );
+          }
+        } catch (e) {
+          console.warn(
+            `[compose-dialog-segments] v459 euro refund crash: ${(e as Error).message}`,
+          );
+        }
       }
+      const refundSettled = alreadyRefunded || didRefund ||
+        (refundInfo as any)?.reason === "already_refunded";
+
       pass.status = "failed";
       pass.error = reason;
       (pass as any).last_error = reason;
