@@ -6676,6 +6676,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           dispatch_fps: dispatchFps ?? ASSUMED_FPS,
           voiced_windows: v124VoicedWindows,
           wants_url_transport: v406WantsUrlTransport,
+          // V464-B — Registrierungs-Provenienz der Box-Sequenz.
+          v464_registration: v464Built?.registration ?? "legacy_constant",
+          v464_crop_source: v464Built?.cropSource ?? null,
+          v464_track_source: v464Built?.trackSource ?? null,
+          v464_varying: v464Built?.varying ?? false,
+          v464_verdict: v464Verdict ?? null,
+
         };
         console.log(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v406_canonical_boxes_frozen speaker=${pass.speaker_name} space=${v161UsingPreclipForBbox ? "clip" : "plate"} box=${JSON.stringify(dispatchBox)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} transport=${v406WantsUrlTransport ? "url" : "inline"} windows=${JSON.stringify(v124VoicedWindows)}`,
