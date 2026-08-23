@@ -282,14 +282,16 @@ export function computeMouthCenteredCrop(
   const clamped = x !== rawX || y !== rawY;
 
 
-  // Report metrics.
+  // Report metrics — all derived from the FINAL (post-V457) geometry.
   const cropArea = size * size;
   const faceArea = faceW * faceH;
   const faceShareInCrop = Math.min(1, faceArea / cropArea);
   const cropCx = x + size / 2;
   const cropCy = y + size / 2;
-  const mouthOffsetPx = usingMouth
-    ? Math.round(Math.hypot(ax - cropCx, ay - cropCy))
+  // V458 — SIGNED plate-pixel vector; components are never rounded.
+  const mouthOffsetXy = usingMouth ? { dx: ax - cropCx, dy: ay - cropCy } : null;
+  const mouthOffsetPx = mouthOffsetXy
+    ? Math.round(Math.hypot(mouthOffsetXy.dx, mouthOffsetXy.dy))
     : 0;
 
   return {
@@ -297,6 +299,8 @@ export function computeMouthCenteredCrop(
     anchor,
     faceShareInCrop,
     mouthOffsetPx,
+    mouthOffsetXy,
+    mouthOffsetSpace: V458_MOUTH_OFFSET_SPACE,
     clamped,
     containsTarget,
     containReason,
