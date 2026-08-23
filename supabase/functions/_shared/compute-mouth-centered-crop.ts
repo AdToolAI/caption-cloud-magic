@@ -251,10 +251,15 @@ export function computeMouthCenteredCrop(
   const cropArea = size * size;
   const faceArea = faceW * faceH;
   const faceShareInCrop = Math.min(1, faceArea / cropArea);
+  // V458 — everything below is derived from the FINAL (post-V457) geometry.
   const cropCx = x + size / 2;
   const cropCy = y + size / 2;
-  const mouthOffsetPx = usingMouth
-    ? Math.round(Math.hypot(ax - cropCx, ay - cropCy))
+  // SIGNED plate-pixel vector. NEVER round the components (odd crop sizes
+  // legitimately produce half-pixel centers).
+  const mouthOffsetXy = usingMouth ? { dx: ax - cropCx, dy: ay - cropCy } : null;
+  // Legacy scalar stays coherent with the vector it is derived from.
+  const mouthOffsetPx = mouthOffsetXy
+    ? Math.round(Math.hypot(mouthOffsetXy.dx, mouthOffsetXy.dy))
     : 0;
 
   return {
@@ -262,6 +267,8 @@ export function computeMouthCenteredCrop(
     anchor,
     faceShareInCrop,
     mouthOffsetPx,
+    mouthOffsetXy,
+    mouthOffsetSpace: V458_MOUTH_OFFSET_SPACE,
     clamped,
     containsTarget,
     containReason,
