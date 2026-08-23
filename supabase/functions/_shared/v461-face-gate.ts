@@ -1,0 +1,263 @@
+/**
+ * V461 A — v400 FACE-GATE (restored, hard, pre-dispatch)
+ * ---------------------------------------------------------------------------
+ * V460 evidence (scene be60d106…, pass 4): a pre-clip with
+ * `preclip_face_share = 0.218` was dispatched to the provider although the
+ * v400 input contract (T8) requires ≥ 0.24. The value was computed and logged
+ * — but never gated. The pass then burned the full NOOP ladder.
+ *
+ * This module is the ONE place that decides whether a pre-clip may be sent to
+ * the provider. It is PURE (no I/O, no thresholds elsewhere).
+ *
+ * HARD RULES
+ *   - `face_share ≥ 0.24` and `face_size_provider_px ≥ 144` are TWO
+ *     INDEPENDENT guards. The normalized share is NEVER used as a substitute
+ *     for the pixel size: the pixel size is derived from the real face bbox
+ *     scaled by `outputSize / crop.size`.
+ *   - The mouth ROI must lie fully inside the crop (unclamped check).
+ *   - The frozen geometry identity must match the pass being dispatched.
+ *   - A pure pose estimate (no mouth landmark) is NOT forbidden — V461 has no
+ *     evidence for that. The ROI check is then reported as `unchecked`.
+ *   - Full-plate dispatches (single speaker, no pre-clip) are out of scope.
+ *   - Missing geometry on a pre-clip dispatch is fail-closed: an input that
+ *     cannot be verified is not sent.
+ */
+
+import { V434_MOUTH_BAND } from "./v434-motion-roi.ts";
+
+export const V461_FACE_GATE_VERSION = "v461";
+
+/** v400 T8 — face area / crop area. */
+export const V461_FACE_SHARE_FLOOR = 0.24;
+/** v400 T9 — face side length in PROVIDER pixels (post-scale). */
+export const V461_FACE_SIZE_PROVIDER_PX_FLOOR = 144;
+
+export type V461GateCheck =
+  | "geometry"
+  | "face_share"
+  | "face_size_px"
+  | "mouth_roi"
+  | "identity";
+
+export interface V461Identity {
+  runId?: string | null;
+  generation?: number | null;
+  passIdx?: number | null;
+  speakerIdx?: number | null;
+}
+
+export interface V461FaceGateInput {
+  /** false → full-plate dispatch, gate is not applicable. */
+  usePreclip: boolean;
+  /** `preclip_face_share` */
+  faceShare?: number | null;
+  /** `preclip_from_bbox` — face box in PLATE pixels. */
+  faceBbox?: number[] | null;
+  /** `preclip_crop` — plate-pixel square crop + provider output size. */
+  crop?: { size?: number | null; outputSize?: number | null } | null;
+  /** `preclip_anchor` — `mouth` when a real mouth landmark drove the crop. */
+  anchor?: string | null;
+  /** `preclip_mouth_offset_xy` — SIGNED plate-pixel vector to the crop centre. */
+  mouthOffsetXy?: { dx?: number | null; dy?: number | null } | null;
+  /** `preclip_geometry_identity` — identity the geometry was frozen with. */
+  identity?: V461Identity | null;
+  /** Identity of the pass being dispatched right now. */
+  expectedIdentity?: V461Identity | null;
+}
+
+export interface V461FaceGateMetrics {
+  face_share: number | null;
+  face_share_floor: number;
+  face_size_provider_px: number | null;
+  face_size_floor_px: number;
+  mouth_roi: { centerX: number; centerY: number; width: number; height: number } | null;
+  mouth_roi_checked: boolean;
+  scale_provider_per_plate: number | null;
+}
+
+export interface V461FaceGateResult {
+  ok: boolean;
+  /** `skipped` when the gate is not applicable (full-plate dispatch). */
+  status: "pass" | "block" | "skipped";
+  code: string;
+  reason: string;
+  failedCheck: V461GateCheck | null;
+  checks: Record<V461GateCheck, boolean | null>;
+  metrics: V461FaceGateMetrics;
+  version: string;
+}
+
+const num = (v: unknown): number | null => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+function identityMatches(a?: V461Identity | null, b?: V461Identity | null): boolean {
+  if (!a || !b) return false;
+  const cmp = (x: unknown, y: unknown): boolean => {
+    if (x === null || x === undefined || y === null || y === undefined) return true;
+    return String(x) === String(y);
+  };
+  return cmp(a.runId, b.runId) &&
+    cmp(a.generation, b.generation) &&
+    cmp(a.passIdx, b.passIdx) &&
+    cmp(a.speakerIdx, b.speakerIdx);
+}
+
+/**
+ * PURE — unclamped mouth band in provider-normalized coordinates. Unlike
+ * `deriveMouthRoi` (which clamps the band into frame for MEASUREMENT), the
+ * gate needs to know whether the band would have to be clamped at all: a
+ * clamped band means the mouth is not fully inside the crop.
+ */
+export function unclampedMouthRoi(
+  faceShare: number,
+  mouthOffsetXy: { dx: number; dy: number } | null,
+  cropSizePlatePx: number,
+): { centerX: number; centerY: number; width: number; height: number } {
+  const faceSideFrac = clamp(Math.sqrt(faceShare), 0.05, 1);
+  const width = clamp(
+    V434_MOUTH_BAND.widthOfFaceSide * faceSideFrac,
+    V434_MOUTH_BAND.minWidth,
+    V434_MOUTH_BAND.maxWidth,
+  );
+  const height = clamp(
+    V434_MOUTH_BAND.heightOfFaceSide * faceSideFrac,
+    V434_MOUTH_BAND.minHeight,
+    V434_MOUTH_BAND.maxHeight,
+  );
+  const centerX = mouthOffsetXy ? 0.5 + mouthOffsetXy.dx / cropSizePlatePx : 0.5;
+  const centerY = mouthOffsetXy ? 0.5 + mouthOffsetXy.dy / cropSizePlatePx : 0.5;
+  return { centerX, centerY, width, height };
+}
+
+/** PURE — the v400 input contract, evaluated immediately before dispatch. */
+export function evaluateV461FaceGate(input: V461FaceGateInput): V461FaceGateResult {
+  const checks: Record<V461GateCheck, boolean | null> = {
+    geometry: null,
+    face_share: null,
+    face_size_px: null,
+    mouth_roi: null,
+    identity: null,
+  };
+  const metrics: V461FaceGateMetrics = {
+    face_share: null,
+    face_share_floor: V461_FACE_SHARE_FLOOR,
+    face_size_provider_px: null,
+    face_size_floor_px: V461_FACE_SIZE_PROVIDER_PX_FLOOR,
+    mouth_roi: null,
+    mouth_roi_checked: false,
+    scale_provider_per_plate: null,
+  };
+
+  const done = (
+    status: V461FaceGateResult["status"],
+    code: string,
+    reason: string,
+    failedCheck: V461GateCheck | null,
+  ): V461FaceGateResult => ({
+    ok: status !== "block",
+    status,
+    code,
+    reason,
+    failedCheck,
+    checks,
+    metrics,
+    version: V461_FACE_GATE_VERSION,
+  });
+
+  if (!input?.usePreclip) {
+    return done("skipped", "gate_not_applicable", "full_plate_dispatch", null);
+  }
+
+  // ── 1. Geometry present and coherent ─────────────────────────────────────
+  const cropSize = num(input.crop?.size);
+  const outputSize = num(input.crop?.outputSize);
+  const bbox = Array.isArray(input.faceBbox) ? input.faceBbox.map(num) : null;
+  const bboxOk = !!bbox && bbox.length === 4 && bbox.every((v) => v !== null);
+  if (!cropSize || cropSize <= 0 || !outputSize || outputSize <= 0) {
+    checks.geometry = false;
+    return done("block", "preclip_geometry_unavailable", "crop_geometry_missing", "geometry");
+  }
+  if (!bboxOk) {
+    checks.geometry = false;
+    return done("block", "preclip_geometry_unavailable", "face_bbox_missing", "geometry");
+  }
+  const [x1, y1, x2, y2] = bbox as number[];
+  const faceW = x2 - x1;
+  const faceH = y2 - y1;
+  if (!(faceW > 1) || !(faceH > 1)) {
+    checks.geometry = false;
+    return done("block", "preclip_geometry_unavailable", "face_bbox_degenerate", "geometry");
+  }
+  checks.geometry = true;
+  const scale = outputSize / cropSize;
+  metrics.scale_provider_per_plate = scale;
+
+  // ── 2. face_share ≥ 0.24 (v400 T8) ───────────────────────────────────────
+  const share = num(input.faceShare);
+  metrics.face_share = share;
+  if (share === null || share <= 0 || share > 1) {
+    checks.face_share = false;
+    return done("block", "preclip_face_share_invalid", "face_share_missing_or_invalid", "face_share");
+  }
+  if (share < V461_FACE_SHARE_FLOOR) {
+    checks.face_share = false;
+    return done(
+      "block",
+      "preclip_face_share_below_floor",
+      `face_share ${share.toFixed(3)} < ${V461_FACE_SHARE_FLOOR}`,
+      "face_share",
+    );
+  }
+  checks.face_share = true;
+
+  // ── 3. face size in PROVIDER pixels ≥ 144 (independent guard) ────────────
+  const faceSizeProviderPx = Math.max(faceW, faceH) * scale;
+  metrics.face_size_provider_px = faceSizeProviderPx;
+  if (faceSizeProviderPx < V461_FACE_SIZE_PROVIDER_PX_FLOOR) {
+    checks.face_size_px = false;
+    return done(
+      "block",
+      "preclip_face_size_below_floor",
+      `face_size_provider_px ${faceSizeProviderPx.toFixed(1)} < ${V461_FACE_SIZE_PROVIDER_PX_FLOOR}`,
+      "face_size_px",
+    );
+  }
+  checks.face_size_px = true;
+
+  // ── 4. Mouth ROI fully inside the crop ───────────────────────────────────
+  // A pure pose estimate (no signed mouth vector) is explicitly NOT a block.
+  const dx = num(input.mouthOffsetXy?.dx);
+  const dy = num(input.mouthOffsetXy?.dy);
+  const hasMouthVector = input.anchor === "mouth" && dx !== null && dy !== null;
+  if (hasMouthVector) {
+    const roi = unclampedMouthRoi(share, { dx: dx as number, dy: dy as number }, cropSize);
+    metrics.mouth_roi = roi;
+    metrics.mouth_roi_checked = true;
+    const inside = roi.centerX - roi.width / 2 >= 0 &&
+      roi.centerX + roi.width / 2 <= 1 &&
+      roi.centerY - roi.height / 2 >= 0 &&
+      roi.centerY + roi.height / 2 <= 1;
+    if (!inside) {
+      checks.mouth_roi = false;
+      return done("block", "preclip_mouth_roi_outside_crop", "mouth_roi_out_of_bounds", "mouth_roi");
+    }
+    checks.mouth_roi = true;
+  } else {
+    checks.mouth_roi = null; // unchecked — pose estimate stays allowed
+  }
+
+  // ── 5. Identity / assignment contract ────────────────────────────────────
+  if (input.expectedIdentity) {
+    if (!identityMatches(input.identity, input.expectedIdentity)) {
+      checks.identity = false;
+      return done("block", "preclip_identity_mismatch", "geometry_identity_mismatch", "identity");
+    }
+    checks.identity = true;
+  }
+
+  return done("pass", "face_gate_ok", "v400_input_contract_satisfied", null);
+}

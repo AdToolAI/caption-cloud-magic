@@ -33,6 +33,8 @@ import {
 import { probeMp4Dims } from "../_shared/twoshot-face-map.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
+// V461 B — semantic input fingerprint: refuse transport-only re-dispatches.
+import { evaluateNoopRedispatch } from "../_shared/v461-input-fingerprint.ts";
 // v431 G3.2.2 — B11 gelöscht: kein Complete-Pfad im Sync-Apply mehr,
 // `materializeCompatibilityOutput` gehört ausschließlich dem Finalizer.
 
@@ -1444,6 +1446,25 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       ];
       const nextRung = NOOP_LADDER.find((r) => r.step === noopEscalationStep);
 
+      // ══ V461 B — no semantically identical re-dispatch ══════════════════
+      // Stufe 1 (docs/v461-stage1-dispatch-parity.md) proved: `coords-pro-box`
+      // ships the SAME video, the SAME audio and the SAME box coordinates as
+      // `bbox-url-pro` — only the transport differs. The rung stays (it is not
+      // the root cause), but repeating an unchanged semantic input is refused:
+      // it cannot change the provider's answer, it only costs time and money.
+      const v461Redispatch = evaluateNoopRedispatch({
+        nextVariant: nextRung?.variant ?? null,
+        plannedSemanticFingerprint: String(passBeforeDone?.semantic_input_fingerprint ?? ""),
+        seenSemanticFingerprints: Array.isArray(passBeforeDone?.noop_semantic_fingerprints)
+          ? passBeforeDone.noop_semantic_fingerprints
+          : [],
+      });
+      if (!v461Redispatch.allow) {
+        console.log(
+          `[sync-so-webhook] scene=${sceneId} pass=${currentPass + 1} v461_semantic_dedup — escalation refused (${v461Redispatch.reason})`,
+        );
+      }
+
       // Single-speaker: keep legacy byte-based noopSuspect gate.
       // Multi-speaker: motion classifier is authoritative.
       const canEscalateSingleSpeaker = isSingleSpeakerScene &&
@@ -1452,7 +1473,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const canEscalateMultiSpeaker = !isSingleSpeakerScene &&
         motionVerdictForMultiSpeaker === "noop" && !!nextRung && havePlateCoords && havePreclipCrop &&
         Number.isFinite(Number(passBeforeDone?.reference_frame_number));
-      const canEscalate = canEscalateSingleSpeaker || canEscalateMultiSpeaker;
+      const canEscalate = (canEscalateSingleSpeaker || canEscalateMultiSpeaker) &&
+        v461Redispatch.allow;
 
       // Single-speaker: hard-fail when byte-based NOOP suspect and no ladder rung.
       // Multi-speaker: ladder-exhausted motion noop also hard-fails.
@@ -1491,6 +1513,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             noop_escalation_step: noopEscalationStep,
             noop_reason: noopReasonHard,
             ladder_size: NOOP_LADDER.length,
+            v461_semantic_dedup: !v461Redispatch.allow,
+            v461_dedup_code: v461Redispatch.code,
+            v461_dedup_reason: v461Redispatch.reason,
             previous_noop_output_url: rehostedUrl ?? outputUrl,
             size_ratio: sizeRatio,
             ...(isSingleSpeakerScene

@@ -111,6 +111,14 @@ import {
 
 import { assertSafeDispatchEntry } from "../_shared/dialogPassTransition.ts";
 import { verifyFaceBeforeDispatch } from "../_shared/syncso-face-gate.ts";
+// V461 A — v400 Face-Gate (hard, pre-dispatch). V461 B/C — semantic input
+// fingerprint + honest dispatch telemetry.
+import { evaluateV461FaceGate } from "../_shared/v461-face-gate.ts";
+import {
+  buildDispatchVideoTelemetry,
+  computeInputFingerprint,
+  evaluateNoopRedispatch,
+} from "../_shared/v461-input-fingerprint.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 import {
   buildAsdStrategy,
@@ -5813,6 +5821,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             size: preclipResult.crop.size,
             outputSize: preclipResult.crop.outputSize,
           };
+          // V461 C — the real provider-facing dimensions of THIS pre-clip.
+          // Telemetry must never fall back to plate dims again.
+          (pass as any).preclip_dims = {
+            width: Number(preclipResult.crop.outputSize),
+            height: Number(preclipResult.crop.outputSize),
+          };
           // V450 §2 — immutable crop snapshot so a later NOOP retry can prove
           // the frozen geometry even if `preclip_crop` was cleared meanwhile.
           (pass as any)._v450_frozen_preclip_crop = (pass as any).preclip_crop;
@@ -7255,6 +7269,62 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         },
       );
     }
+
+    // ══════════════════ V461 A — v400 FACE-GATE (hard, pre-dispatch) ══════
+    // V460 evidence: pass 4 of scene be60d106… went to the provider with
+    // face_share 0.218 (< 0.24) and then burned the whole NOOP ladder. The
+    // value was measured but never gated. From here on an input that breaks
+    // the v400 input contract is a CONTRACT BREACH before the provider call —
+    // not a provider NOOP. Refund happens on the pre-dispatch path.
+    const v461Gate = evaluateV461FaceGate({
+      usePreclip: usePassPreclip,
+      faceShare: (pass as any).preclip_face_share ?? null,
+      faceBbox: (pass as any).preclip_from_bbox ?? null,
+      crop: (pass as any).preclip_crop ?? (pass as any)._v450_frozen_preclip_crop ?? null,
+      anchor: typeof (pass as any).preclip_anchor === "string"
+        ? String((pass as any).preclip_anchor).startsWith("mouth") ? "mouth" : (pass as any).preclip_anchor
+        : null,
+      mouthOffsetXy: (pass as any).preclip_mouth_offset_xy ?? null,
+      identity: (pass as any).preclip_geometry_identity ?? null,
+      expectedIdentity: (pass as any).preclip_geometry_identity
+        ? {
+          runId: String((scene as any).active_run_id ?? "") || null,
+          generation: Number.isFinite(Number((scene as any).plate_generation))
+            ? Number((scene as any).plate_generation)
+            : null,
+          passIdx: currentPassIdx,
+          speakerIdx: Number(pass.speaker_idx),
+        }
+        : null,
+    });
+    (pass as any).v461_face_gate = {
+      status: v461Gate.status,
+      code: v461Gate.code,
+      checks: v461Gate.checks,
+      metrics: v461Gate.metrics,
+    };
+    console.log(
+      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v461_face_gate=${v461Gate.status} code=${v461Gate.code} share=${v461Gate.metrics.face_share ?? "?"} size_px=${v461Gate.metrics.face_size_provider_px?.toFixed?.(1) ?? "?"}`,
+    );
+    if (!v461Gate.ok) {
+      return await failBeforeProviderDispatch(
+        v461Gate.code,
+        "lipsync_input_contract_violation",
+        tl({
+          de: `Der Bildausschnitt dieses Sprechers erfüllt den Lip-Sync-Eingangsvertrag nicht (${v461Gate.reason}). Es wurde kein Provider-Lauf gestartet, die Kosten wurden erstattet.`,
+          en: `This speaker's crop does not satisfy the lip-sync input contract (${v461Gate.reason}). No provider run was started; the cost was refunded.`,
+          es: `El encuadre de este hablante no cumple el contrato de entrada de lip-sync (${v461Gate.reason}). No se inició ninguna ejecución del proveedor; el coste fue reembolsado.`,
+        }),
+        422,
+        {
+          v461_face_gate: v461Gate,
+          provider_call_made: false,
+          pass_idx: currentPassIdx,
+          speaker: pass.speaker_name ?? null,
+        },
+      );
+    }
+
     const dispatchVideoKind = usePassPreclip ? "preclip" : "full_plate";
     const dispatchInputSpace = usePassPreclip ? "clip" : "plate";
     const rawDispatchVideoUrl = v406FrozenInput
@@ -7441,6 +7511,72 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const wireVideoUrl = v406Wire?.video_url ?? dispatchVideoUrl;
     const wireAudioUrl = v406Wire?.audio_url ??
       String((pass as any).sync_audio_url ?? pass.audio_url ?? "");
+
+    // ══ V461 B — SEMANTIC INPUT FINGERPRINT (dedup source of truth) ═══════
+    // Stufe 1 proved that the NOOP ladder ships identical semantics with a
+    // different box TRANSPORT. The fingerprint separates both axes so a
+    // transport-only re-dispatch can be refused instead of repeated.
+    const v461Asd: any = (syncOptions as any).active_speaker_detection ?? {};
+    const v461Fingerprint = computeInputFingerprint(
+      {
+        videoUrl: wireVideoUrl,
+        audioUrl: wireAudioUrl,
+        audioDurSec: Number((pass as any).audio_dur_sec ?? 0) || null,
+        frameCount: Number((pass as any).preclip_frame_count ?? v406Snapshot?.frame_count ?? 0),
+        dispatchFps: Number((pass as any).preclip_fps ?? v406Snapshot?.dispatch_fps ?? 0),
+        boundingBoxes: v406Snapshot?.bounding_boxes ??
+          (Array.isArray(v461Asd.bounding_boxes) ? v461Asd.bounding_boxes : null),
+        bbox: v406Snapshot?.bbox ??
+          (Array.isArray(v461Asd.coordinates) ? v461Asd.coordinates : null),
+        coordinateSpace: dispatchInputSpace,
+        voicedWindows: v406Snapshot?.voiced_windows ?? null,
+        model: wireModel,
+        syncMode: String((syncOptions as any).sync_mode ?? ""),
+        speakerIdx: Number(pass.speaker_idx),
+      },
+      {
+        asdTransport: v461Asd.bounding_boxes_url
+          ? "url"
+          : Array.isArray(v461Asd.bounding_boxes)
+            ? "inline"
+            : "coords",
+        retryVariant,
+      },
+    );
+    // Backstop for B: if the NOOP ladder ever re-arms a transport-only rung
+    // with an unchanged semantic input, refuse here too — the webhook gate is
+    // the primary, this is the last line before money is spent.
+    const v461SeenFingerprints: string[] = Array.isArray((pass as any).noop_semantic_fingerprints)
+      ? (pass as any).noop_semantic_fingerprints.map(String)
+      : [];
+    const v461Redispatch = evaluateNoopRedispatch({
+      nextVariant: retryVariant,
+      plannedSemanticFingerprint: v461Fingerprint.semantic,
+      seenSemanticFingerprints: v461SeenFingerprints,
+    });
+    if (!v461Redispatch.allow) {
+      return await failBeforeProviderDispatch(
+        "sync_noop_semantic_input_unchanged",
+        "sync_noop_semantic_input_unchanged",
+        tl({
+          de: "Der Wiederholversuch hätte exakt denselben Eingang an den Provider geschickt — nur in anderer Transportform. Der Lauf wurde vorher gestoppt und die Kosten erstattet.",
+          en: "The retry would have sent the provider exactly the same input, only in a different transport form. The run was stopped beforehand and the cost refunded.",
+          es: "El reintento habría enviado al proveedor exactamente la misma entrada, solo con otro transporte. La ejecución se detuvo antes y el coste fue reembolsado.",
+        }),
+        422,
+        {
+          v461_semantic_fingerprint: v461Fingerprint.semantic,
+          v461_seen_fingerprints: v461SeenFingerprints,
+          provider_call_made: false,
+          pass_idx: currentPassIdx,
+        },
+      );
+    }
+    (pass as any).semantic_input_fingerprint = v461Fingerprint.semantic;
+    (pass as any).noop_semantic_fingerprints = Array.from(
+      new Set([...v461SeenFingerprints, v461Fingerprint.semantic]),
+    ).slice(-8);
+
 
     const videoInput: Record<string, unknown> = { type: "video", url: wireVideoUrl };
     // v124 — Hard whitelist sanitizer + ASD mutex. Supersedes the partial
@@ -8234,11 +8370,33 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const fpVideoDurSec = typeof (pass as any).preclip_duration_sec === "number"
       ? Number((pass as any).preclip_duration_sec)
       : null;
-    const fpVideoDims = (pass as any).preclip_dims ?? plateDims ?? videoDims ?? null;
-    const fpVideoFps = 30;
-    const fpVideoFrameCount = fpVideoDurSec != null
-      ? Math.max(1, Math.ceil(fpVideoDurSec * fpVideoFps))
+    // ── V461 C — the telemetry must describe the file that was ACTUALLY
+    // dispatched. Pre-clip dispatches used to inherit the plate probe
+    // (1284×718 / 4.8 MB) although 720×720 / ~470 kB went over the wire.
+    // Unknown is now reported as `null` — never as a plate value.
+    const v461DispatchProbe = usePassPreclip
+      ? await probeAsset(dispatchVideoUrl, "video", 10_000).catch(() => null)
+      : videoProbe;
+    const v461VideoTelemetry = buildDispatchVideoTelemetry({
+      url: dispatchVideoUrl,
+      probeBytes: v461DispatchProbe?.bytes ?? null,
+      probeContentType: v461DispatchProbe?.contentType ?? null,
+      preclipOutputSize: usePassPreclip
+        ? Number((pass as any).preclip_crop?.outputSize ?? 0) || null
+        : null,
+      width: usePassPreclip
+        ? ((pass as any).preclip_dims?.width ?? null)
+        : (plateDims?.width ?? videoDims?.width ?? null),
+      height: usePassPreclip
+        ? ((pass as any).preclip_dims?.height ?? null)
+        : (plateDims?.height ?? videoDims?.height ?? null),
+    });
+    const fpVideoDims = v461VideoTelemetry.width && v461VideoTelemetry.height
+      ? { width: v461VideoTelemetry.width, height: v461VideoTelemetry.height }
       : null;
+    const fpVideoFps = Number((pass as any).preclip_fps ?? 30) || 30;
+    const fpVideoFrameCount = Number((pass as any).preclip_frame_count ?? 0) ||
+      (fpVideoDurSec != null ? Math.max(1, Math.ceil(fpVideoDurSec * fpVideoFps)) : null);
     const fpAsdCoords = Array.isArray(fpAsd.coordinates) ? fpAsd.coordinates : null;
     const fpAsdInBounds = (() => {
       if (!fpAsdCoords || !fpVideoDims) return null;
@@ -8252,15 +8410,23 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       model: payload.model,
       sync_mode: (syncOptions as any).sync_mode ?? null,
       dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
+      // V461 B — semantic vs. transport identity of this dispatch.
+      semantic_fingerprint: v461Fingerprint.semantic,
+      transport_fingerprint: v461Fingerprint.transport,
+      fingerprint_version: v461Fingerprint.version,
+      fingerprint_parts: v461Fingerprint.parts,
+      face_gate: (pass as any).v461_face_gate ?? null,
       video: {
         url_hash: await hashUrl(fpVideoUrl),
+        object_path: v461VideoTelemetry.object_path,
         duration_sec: fpVideoDurSec,
-        width: fpVideoDims?.width ?? null,
-        height: fpVideoDims?.height ?? null,
+        width: v461VideoTelemetry.width,
+        height: v461VideoTelemetry.height,
+        dims_source: v461VideoTelemetry.source,
         fps: fpVideoFps,
         frame_count: fpVideoFrameCount,
-        bytes: videoProbe?.bytes ?? null,
-        content_type: videoProbe?.contentType ?? null,
+        bytes: v461VideoTelemetry.bytes,
+        content_type: v461VideoTelemetry.content_type,
       },
       audio: {
         url_hash: await hashUrl(fpAudioUrl),
