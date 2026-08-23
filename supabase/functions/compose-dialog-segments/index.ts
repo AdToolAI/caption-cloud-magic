@@ -5830,6 +5830,18 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           (pass as any).preclip_mouth_offset_px = Number.isFinite(Number(preclipResult.mouthOffsetPx))
             ? Number(preclipResult.mouthOffsetPx)
             : null;
+          // V458 — SIGNED mouth offset vector in PLATE pixels, relative to the
+          // FINAL (post-V457) crop center. The V456 ROI contract normalizes it
+          // with `preclip_crop.size` (also plate pixels). `null` whenever no
+          // trustworthy mouth anchor exists → contract stays honest/unresolved.
+          {
+            const xy = (preclipResult as any).mouthOffsetXy;
+            (pass as any).preclip_mouth_offset_xy =
+              xy && Number.isFinite(Number(xy.dx)) && Number.isFinite(Number(xy.dy))
+                ? { dx: Number(xy.dx), dy: Number(xy.dy) }
+                : null;
+            (pass as any).preclip_mouth_offset_space = "plate";
+          }
           (pass as any).preclip_clamped = !!preclipResult.clamped;
           // V445 — geometry provenance: which measurement the crop came from
           // and the exact face bbox it was computed on. Enables the cache
