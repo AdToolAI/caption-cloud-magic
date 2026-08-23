@@ -1066,6 +1066,7 @@ serve(async (req) => {
       userId: uid,
       reason,
       refundCredits,
+      runId: (d.dialog_shots?.run_id ?? (d as any)?.active_run_id ?? null) as string | null,
       syncApiKey,
     });
     failed.push({ scene_id: d.id, reason });
