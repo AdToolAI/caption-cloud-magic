@@ -30,6 +30,7 @@ import { measureProviderMotionSync } from "../_shared/measure-provider-motion-sy
 import { classifyMotionProbe } from "../_shared/motion-probe-classifier.ts";
 import {
   classifyMeasurementFailure,
+  isMouthRoiUnresolved,
   MOTION_UNVERIFIED_STATE,
 } from "../_shared/motion-probe-infra.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
