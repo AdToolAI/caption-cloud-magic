@@ -424,6 +424,24 @@ export async function renderPassFacePreclip(
   const nativeOut = Math.min(PRECLIP.nativeOutputMaxPx, Math.max(PRECLIP.nativeOutputMinPx, expandedSize));
   const evenNative = nativeOut % 2 === 0 ? nativeOut : nativeOut - 1;
   const crop = { x: expandedX, y: expandedY, size: expandedSize, outputSize: evenNative };
+  // ── V458 — mouth offset MUST describe the FINAL crop ──────────────────
+  // The repair-expansion (v116) and its V457 re-projection move/grow the
+  // window after the initial computation. The signed vector (PLATE pixels)
+  // and the legacy scalar are therefore recomputed here, on `crop`, so the
+  // V456 ROI contract can normalize with the very same plate-pixel size.
+  if (mouthPointPlate) {
+    const finalCx = crop.x + crop.size / 2;
+    const finalCy = crop.y + crop.size / 2;
+    mouthOffsetXy = { dx: mouthPointPlate.x - finalCx, dy: mouthPointPlate.y - finalCy };
+    mouthOffsetPx = Math.round(Math.hypot(mouthOffsetXy.dx, mouthOffsetXy.dy));
+  } else {
+    mouthOffsetXy = null;
+  }
+  console.log(
+    `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v458_mouth_offset space=plate ` +
+      `xy=${mouthOffsetXy ? `${mouthOffsetXy.dx},${mouthOffsetXy.dy}` : "null"} px=${mouthOffsetPx} ` +
+      `final_crop=${crop.x},${crop.y},${crop.size}`,
+  );
   const outW = crop.outputSize;
   const outH = crop.outputSize;
   const durationInFrames = Math.max(6, Math.ceil(dur * FPS));
