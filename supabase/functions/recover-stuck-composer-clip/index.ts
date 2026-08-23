@@ -422,7 +422,7 @@ async function processScene(
       if (r.status === 404 && !alreadyRefunded) {
         // v455 (C) — kein terminaler Providerstatus darf den Ledger-Job
         // `dispatched` hinterlassen.
-        await terminalizeLedgerJobDirect(sb, await resolveAuthoritativeJob(sb, sceneId, candidate), "provider_prediction_404");
+        await terminalizeLedgerJobDirect(sb, job, "provider_prediction_404");
         const refunded = await refundScene(sb, scene);
         await markFailed(
           sb,
