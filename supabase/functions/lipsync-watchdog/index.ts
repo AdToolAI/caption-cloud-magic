@@ -43,6 +43,7 @@ import {
   isFanoutClosed,
   V459_FANOUT_CLOSED_KEY,
   V459_TERMINALIZING_STATUS,
+  closeBlockedPasses,
 } from "../_shared/v459-fanout-aggregation.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { logMissingReinjectPointer } from "../_shared/v431-ledger.ts";
