@@ -30,6 +30,7 @@ import { refundRunCharge } from "./refund-provenance.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { logMissingReinjectPointer } from "../_shared/v431-ledger.ts";
+import { classifyProviderRejection } from "../_shared/happyhorse-green-net.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -179,10 +180,71 @@ interface Candidate {
   external_job_id?: string | null;
 }
 
+export interface LedgerJobRow {
+  id: string;
+  stage: string;
+  status: string;
+  external_job_id: string | null;
+  run_id: string | null;
+  plate_generation: number | null;
+  updated_at: string | null;
+  completed_at?: string | null;
+}
+
+const JOB_COLS =
+  "id, stage, status, external_job_id, run_id, plate_generation, updated_at, completed_at";
+
+/**
+ * v455 (A) — Zeitautorität: der aktive Base-Video-Ledger-Job. Kandidaten-Job
+ * hat Vorrang; für Legacy-/Manual-Aufrufe wird der aktuelle dispatchte
+ * Base-Video-Job der Szene aufgelöst. `composer_scenes.updated_at` ist nur
+ * noch Fallback, wenn KEIN Ledger-Job existiert.
+ */
+export async function resolveAuthoritativeJob(
+  sb: ReturnType<typeof createClient>,
+  sceneId: string,
+  candidate: Candidate | undefined,
+): Promise<LedgerJobRow | null> {
+  if (candidate?.pipeline_job_id) {
+    const { data } = await sb
+      .from("composer_pipeline_jobs")
+      .select(JOB_COLS)
+      .eq("id", candidate.pipeline_job_id)
+      .maybeSingle();
+    return (data as unknown as LedgerJobRow) ?? null;
+  }
+  const { data } = await sb
+    .from("composer_pipeline_jobs")
+    .select(JOB_COLS)
+    .eq("scene_id", sceneId)
+    .eq("stage", "base_video")
+    .eq("status", "dispatched")
+    .order("updated_at", { ascending: false })
+    .limit(1);
+  const row = Array.isArray(data) ? data[0] : null;
+  return (row as unknown as LedgerJobRow) ?? null;
+}
+
+/** v455 (A) — Alter kommt aus dem Ledger-Job, sobald einer existiert. */
+export function authoritativeAgeMs(
+  job: { updated_at?: string | null } | null,
+  scene: { updated_at?: string | null },
+  now = Date.now(),
+): { ageMs: number; source: "pipeline_job" | "scene" } {
+  const stamp = job?.updated_at ?? null;
+  if (stamp) return { ageMs: now - new Date(String(stamp)).getTime(), source: "pipeline_job" };
+  return {
+    ageMs: now - new Date(String(scene.updated_at ?? new Date(0).toISOString())).getTime(),
+    source: "scene",
+  };
+}
+
+/** v455 (D) — vollständige Tupel-Validierung gegen Szene UND Ledger-Job. */
 async function candidateStillCurrent(
   sb: ReturnType<typeof createClient>,
   scene: any,
   candidate: Candidate | undefined,
+  job: LedgerJobRow | null,
 ): Promise<boolean> {
   if (!candidate) return true;
   if (candidate.run_id && String(scene.active_run_id ?? "") !== String(candidate.run_id)) {
@@ -201,15 +263,68 @@ async function candidateStillCurrent(
     return false;
   }
   if (candidate.pipeline_job_id) {
-    const { data: job } = await sb
-      .from("composer_pipeline_jobs")
-      .select("id, status, external_job_id")
-      .eq("id", candidate.pipeline_job_id)
-      .maybeSingle();
-    if (!job || String((job as any).status) !== "dispatched") return false;
+    if (!job) return false;
+    if (String(job.stage) !== "base_video") return false;
+    if (String(job.status) !== "dispatched") return false;
+    if (candidate.run_id && String(job.run_id ?? "") !== String(candidate.run_id)) return false;
+    if (
+      candidate.plate_generation != null &&
+      Number(job.plate_generation ?? -1) !== Number(candidate.plate_generation)
+    ) {
+      return false;
+    }
+    if (
+      candidate.external_job_id &&
+      String(job.external_job_id ?? "") !== String(candidate.external_job_id)
+    ) {
+      return false;
+    }
+    // Ledger und Szene müssen auf dieselbe Provider-Prediction zeigen.
+    if (
+      job.external_job_id &&
+      String(scene.replicate_prediction_id ?? "") !== String(job.external_job_id)
+    ) {
+      return false;
+    }
   }
   return true;
 }
+
+/**
+ * v455 (C) — Fallback-Terminalisierung: markiert AUSSCHLIESSLICH den validierten
+ * Base-Video-Job terminal (idempotent, gefenced auf run/gen/prediction/stage).
+ * Kein Provider-Dispatch, kein Eingriff in Run/Gen/Prediction-Felder.
+ */
+export async function terminalizeLedgerJobDirect(
+  sb: ReturnType<typeof createClient>,
+  job: LedgerJobRow | null,
+  errorCode: string,
+): Promise<"terminalized" | "already_terminal" | "no_job"> {
+  if (!job?.id) return "no_job";
+  if (String(job.status) !== "dispatched") {
+    if (!job.completed_at) {
+      await sb
+        .from("composer_pipeline_jobs")
+        .update({ completed_at: new Date().toISOString() })
+        .eq("id", job.id)
+        .is("completed_at", null);
+    }
+    return "already_terminal";
+  }
+  await sb
+    .from("composer_pipeline_jobs")
+    .update({
+      status: "failed",
+      error_code: errorCode,
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", job.id)
+    .eq("stage", "base_video")
+    .eq("status", "dispatched");
+  return "terminalized";
+}
+
 
 async function processScene(
   sb: ReturnType<typeof createClient>,
@@ -236,9 +351,12 @@ async function processScene(
     return { scene_id: sceneId, outcome: "skipped_already_resolved" };
   }
 
+  // v455 (A) — Zeitautorität + Transport-Pointer kommen aus dem Ledger-Job.
+  const job = await resolveAuthoritativeJob(sb, sceneId, candidate);
+
   // v455 — Race-Guard: Szene ist inzwischen auf einen neueren Run/Job/
   // Prediction gewechselt → dieser Kandidat ist veraltet, kein No-Op-Schaden.
-  if (!(await candidateStillCurrent(sb, scene, candidate))) {
+  if (!(await candidateStillCurrent(sb, scene, candidate, job))) {
     console.log(
       `[recover-stuck-composer-clip] v455_stale_candidate_discarded scene=${sceneId} run=${candidate?.run_id ?? "null"} job=${candidate?.pipeline_job_id ?? "null"}`,
     );
@@ -248,6 +366,7 @@ async function processScene(
       detail: "v455_stale_candidate_discarded",
     };
   }
+
 
 
   const isCinematicSync =
@@ -302,6 +421,9 @@ async function processScene(
       );
       // On 404 from Replicate: prediction lost — refund + fail.
       if (r.status === 404 && !alreadyRefunded) {
+        // v455 (C) — kein terminaler Providerstatus darf den Ledger-Job
+        // `dispatched` hinterlassen.
+        await terminalizeLedgerJobDirect(sb, job, "provider_prediction_404");
         const refunded = await refundScene(sb, scene);
         await markFailed(
           sb,
@@ -327,12 +449,18 @@ async function processScene(
   }
 
   const status = String(prediction?.status ?? "");
-  const ageMs =
-    Date.now() - new Date(String((scene as any).updated_at)).getTime();
+  // v455 (A) — 30-Minuten-Alter aus dem Ledger-Job; `composer_scenes.updated_at`
+  // nur, wenn gar kein Base-Video-Job existiert (Legacy).
+  const { ageMs, source: ageSource } = authoritativeAgeMs(job, scene as any);
   const ageMin = Math.round(ageMs / 60_000);
 
+  // v455 (B) — validierter Kandidaten-/Ledger-Job ist der autoritative
+  // Transport-Pointer; der Szenen-Pointer ist nur Legacy-Fallback.
+  const transportPointer =
+    job?.id ?? ((scene as any).plate_pipeline_job_id as string | null) ?? null;
+
   console.log(
-    `[recover-stuck-composer-clip] scene=${sceneId} pred=${predictionId} status=${status} age=${ageMin}min`,
+    `[recover-stuck-composer-clip] scene=${sceneId} pred=${predictionId} status=${status} age=${ageMin}min age_source=${ageSource} job=${job?.id ?? "null"}`,
   );
 
   if (status === "succeeded" && prediction.output) {
@@ -340,7 +468,7 @@ async function processScene(
       prediction,
       sceneId,
       scene.project_id,
-      ((scene as any).plate_pipeline_job_id as string | null) ?? null,
+      transportPointer,
     );
     if (ok) {
       console.log(
@@ -356,20 +484,47 @@ async function processScene(
   }
 
   if (status === "failed" || status === "canceled") {
-    if (!alreadyRefunded) {
-      const refunded = await refundScene(sb, scene);
-      const reason =
-        `watchdog_replicate_${status}: ${String(prediction?.error ?? "unknown").slice(0, 200)} ${refunded === null ? "(no refund: no proven charge)" : `(refunded €${refunded.toFixed(2)})`}`;
-      await markFailed(sb, sceneId, reason, isCinematicSync);
+    // v455 (C) — bevorzugt: kanonischer Replay der Fehler-Payload in
+    // `compose-clip-webhook` mit validiertem Pointer → v431-Ledger,
+    // Result-Zeile und idempotenter Refund laufen dort. Kein neuer Dispatch:
+    // der Replay wird nur genutzt, wenn der Providergrund terminal ist
+    // (Eingabefilter) — sonst würde der Webhook einen Auto-Retry auslösen.
+    const rejectionClass = classifyProviderRejection(prediction?.error);
+    const errorCode =
+      rejectionClass !== "none" ? "provider_input_filter" : `provider_${status}`;
+    let canonical = false;
+    if (transportPointer && rejectionClass !== "none") {
+      canonical = await replayWebhook(
+        prediction,
+        sceneId,
+        scene.project_id,
+        transportPointer,
+      );
+    }
+    if (!canonical) {
+      // Fallback-Direktpfad: NUR der validierte Base-Video-Job wird terminal.
+      await terminalizeLedgerJobDirect(sb, job, errorCode);
+      if (!alreadyRefunded) {
+        const refunded = await refundScene(sb, scene);
+        const reason =
+          `watchdog_replicate_${status}: ${String(prediction?.error ?? "unknown").slice(0, 200)} ${refunded === null ? "(no refund: no proven charge)" : `(refunded €${refunded.toFixed(2)})`}`;
+        await markFailed(sb, sceneId, reason, isCinematicSync);
+      }
     }
     console.log(
-      `[recover-stuck-composer-clip] v149_clip_failed_refunded scene=${sceneId} pred=${predictionId} status=${status}`,
+      `[recover-stuck-composer-clip] v149_clip_failed_refunded scene=${sceneId} pred=${predictionId} status=${status} canonical=${canonical} job=${job?.id ?? "null"}`,
     );
-    return { scene_id: sceneId, outcome: "clip_failed_refunded" };
+    return {
+      scene_id: sceneId,
+      outcome: "clip_failed_refunded",
+      detail: canonical ? "canonical_ledger_replay" : `direct_terminalized:${errorCode}`,
+    };
   }
 
   // processing / starting / queued
   if (ageMs > HARD_KILL_AGE_MS) {
+    await terminalizeLedgerJobDirect(sb, job, "watchdog_hard_kill");
+
     if (!alreadyRefunded) {
       const refunded = await refundScene(sb, scene);
       await markFailed(

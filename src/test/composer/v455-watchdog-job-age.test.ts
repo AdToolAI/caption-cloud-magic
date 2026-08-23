@@ -46,7 +46,7 @@ describe('V455 — Recovery-Race-Guard', () => {
   });
 
   it('führt den Guard vor Refund/Fail aus', () => {
-    const guardIdx = src.indexOf('candidateStillCurrent(sb, scene, candidate)');
+    const guardIdx = src.indexOf('candidateStillCurrent(sb, scene, candidate, job)');
     const refundIdx = src.indexOf('await refundScene(sb, scene)');
     expect(guardIdx).toBeGreaterThan(0);
     expect(guardIdx).toBeLessThan(refundIdx);
