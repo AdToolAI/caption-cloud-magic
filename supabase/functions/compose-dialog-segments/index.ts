@@ -136,6 +136,12 @@ import {
   TRACK_SAMPLE_COUNT,
 } from "../_shared/dynamic-camera-path.ts";
 import { trackAssignedFaceAcrossTurn } from "../_shared/plate-face-track.ts";
+import {
+  buildPerFrameAsdBoxes,
+  validateAsdRegistration,
+  type PlateTrackSample as V464TrackSample,
+} from "../_shared/v464-asd-projection.ts";
+
 // V456 Gate 2 — pose-aware mouth anchor (no colour heuristics).
 import { resolveMouthAnchorPoseAware } from "../_shared/v456-roi-contract.ts";
 // FA-4 v406/v407 — Frozen Provider Input Snapshot / Retry-Wire-Parität.
@@ -5743,7 +5749,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       }
       const v456MouthForPreclip = v456MouthResolved?.mouth ?? null;
 
+      // V464-B — the plate face track is persisted with the pass so the ASD
+      // sequence can be registered per frame (and a retry reuses it verbatim).
+      let v464TrackSamples: V464TrackSample[] | null = null;
+
       try {
+
         const preclipResult = await renderPassFacePreclip(
           supabase,
           serviceKey,
@@ -5794,10 +5805,21 @@ serve((req: Request) => withLang(req, () => (async (req) => {
                   `valid=${track.samples.filter((x) => x.box).length}/${track.samples.length} ms=${track.latencyMs}`,
               );
               if (!track.ok) return null;
+              // V464-B — freeze the measured plate-space track (PLATE-absolute
+              // seconds). It is the per-frame source for the ASD boxes.
+              v464TrackSamples = track.samples
+                .filter((s) => Array.isArray(s.box))
+                .map((s) => ({
+                  t: Number(Number(s.t).toFixed(4)),
+                  box: (s.box as [number, number, number, number]).map((v) => Math.round(v)) as
+                    [number, number, number, number],
+                  mouth: s.mouth ? [Math.round(s.mouth[0]), Math.round(s.mouth[1])] as [number, number] : null,
+                }));
               const path = buildDynamicCameraPath({
                 samples: track.samples,
                 staticCrop,
                 srcWidth: plateDims.width,
+
                 srcHeight: plateDims.height,
                 startSec: unionStart,
                 endSec: unionEnd,
@@ -5841,6 +5863,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           // V452 §7 — per-sample mouth geometry. EVIDENCE/TELEMETRY ONLY:
           // the frozen v404 ROI, thresholds and NOOP ladder are untouched.
           (pass as any).preclip_mouth_roi_samples = v452Path ? mouthRoiSamples(v452Path) : null;
+          // V464-B — plate face track (plate-absolute seconds) frozen with the
+          // pass. Source of truth for per-frame ASD registration.
+          (pass as any).preclip_face_track = v464TrackSamples;
+          (pass as any)._v450_frozen_face_track = v464TrackSamples;
+
 
           (pass as any).preclip_start_sec = Number(unionStart.toFixed(3));
           (pass as any).preclip_end_sec = Number(unionEnd.toFixed(3));
@@ -6527,17 +6554,95 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // Die Box-Sequenz ist ab hier eingefroren. Der Fresh-Upload schreibt
       // exakt DIESES Array als JSON; der NOOP-Retry sendet exakt DIESES Array
       // inline. Kein zweiter Build, keine zweite Quelle.
-      const v406CanonicalBoxes: ([number, number, number, number] | null)[] = dispatchBox
-        ? (v124VoicedWindows.length > 0
-            ? buildPerFrameBoxes({
-                box: dispatchBox,
-                frameCount,
-                fps: dispatchFps ?? ASSUMED_FPS,
-                voicedWindowsSec: v124VoicedWindows,
-              })
-            : new Array(frameCount).fill(dispatchBox))
-        : [];
+      //
+      // V464-B — die Sequenz entsteht pro Frame aus Face-Track(t) und
+      // Crop-Transform(t) desselben Frames. Die konstante Anchor-Box ist nur
+      // noch der Fallback für "statischer Kopf + statischer Crop" (und für
+      // Nicht-Preclip-Dispatch), niemals mehr die Quelle bei Bewegung.
+      const v464FaceTrack = (pass as any).preclip_face_track ??
+        (pass as any)._v450_frozen_face_track ?? null;
+      const v464CameraPath = (pass as any).preclip_camera_path ??
+        (pass as any)._v450_frozen_camera_path ?? null;
+      const v464Eligible = v161UsingPreclipForBbox && !!v161PreclipCrop && !!dispatchBox && !!box;
+      const v464Built = v464Eligible
+        ? buildPerFrameAsdBoxes({
+            frameCount,
+            fps: dispatchFps ?? ASSUMED_FPS,
+            staticCrop: v161PreclipCrop!,
+            cameraPath: v464CameraPath,
+            faceTrack: v464FaceTrack,
+            preclipStartSec: v161PreclipStartSec,
+            anchorPlateBox: box as [number, number, number, number],
+            anchorDispatchBox: dispatchBox as [number, number, number, number],
+            voicedWindowsSec: v124VoicedWindows,
+          })
+        : null;
+      const v464Verdict = v464Built
+        ? validateAsdRegistration({
+            built: v464Built,
+            frameCount,
+            outputSize: v161PreclipCrop!.outputSize,
+          })
+        : null;
+      if (v464Built && v464Verdict) {
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v464_asd_registration ` +
+            `registration=${v464Built.registration} crop_src=${v464Built.cropSource} track_src=${v464Built.trackSource} ` +
+            `varying=${v464Built.varying} track_travel=${v464Built.trackTravelPx}px box_travel=${v464Built.boxTravelPx}px ` +
+            `mouth_in_box=${v464Verdict.containedFrames}/${v464Verdict.checkedFrames} rate=${v464Verdict.containmentRate} ` +
+            `worst_margin=${v464Verdict.worstMarginPx}px ok=${v464Verdict.ok} reason=${v464Verdict.reason}`,
+        );
+        (pass as any)._v464AsdRegistration = {
+          registration: v464Built.registration,
+          crop_source: v464Built.cropSource,
+          track_source: v464Built.trackSource,
+          varying: v464Built.varying,
+          track_travel_px: v464Built.trackTravelPx,
+          box_travel_px: v464Built.boxTravelPx,
+          verdict: v464Verdict,
+        };
+      }
+      // Invariante 4 — semantisch falsche Registrierung blockiert den Dispatch.
+      if (v464Built && v464Verdict && !v464Verdict.ok) {
+        (pass as any)._v152HardFail = {
+          reason: `asd_contract_invalid:${v464Verdict.reason}`,
+          errorClass: "v464_asd_contract_invalid",
+          message:
+            `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde vor Sync.so abgebrochen: ` +
+            tl({
+              de: "die Sprecher-Box konnte für diese Bewegung nicht framegenau registriert werden. Credits wurden zurückerstattet.",
+              en: "the speaker box could not be registered frame-accurately for this movement. Credits have been refunded.",
+              es: "no se pudo registrar la caja del hablante con precisión de fotograma para este movimiento. Los créditos han sido reembolsados.",
+            }),
+          meta: {
+            v464_verdict: v464Verdict,
+            v464_registration: v464Built.registration,
+            v464_crop_source: v464Built.cropSource,
+            v464_track_source: v464Built.trackSource,
+            v464_track_travel_px: v464Built.trackTravelPx,
+            v464_box_travel_px: v464Built.boxTravelPx,
+            preclip_crop: v161PreclipCrop,
+            plate_box: box,
+          },
+        };
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v464_ASD_CONTRACT_INVALID reason=${v464Verdict.reason} rate=${v464Verdict.containmentRate} — refund + abort`,
+        );
+      }
+      const v406CanonicalBoxes: ([number, number, number, number] | null)[] = v464Built
+        ? v464Built.boxes as ([number, number, number, number] | null)[]
+        : (dispatchBox
+          ? (v124VoicedWindows.length > 0
+              ? buildPerFrameBoxes({
+                  box: dispatchBox,
+                  frameCount,
+                  fps: dispatchFps ?? ASSUMED_FPS,
+                  voicedWindowsSec: v124VoicedWindows,
+                })
+              : new Array(frameCount).fill(dispatchBox))
+          : []);
       const nonNullFrames = v406CanonicalBoxes.reduce((a, v) => a + (v ? 1 : 0), 0);
+
       // Der Upload passiert NACH der Snapshot-Persistenz (Contract-Reihenfolge
       // 8→9→10). Hier wird nur der gewünschte Transport festgehalten.
       const v406WantsUrlTransport = retryVariant === "bbox-url-pro" && !!dispatchBox;
@@ -6571,6 +6676,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           dispatch_fps: dispatchFps ?? ASSUMED_FPS,
           voiced_windows: v124VoicedWindows,
           wants_url_transport: v406WantsUrlTransport,
+          // V464-B — Registrierungs-Provenienz der Box-Sequenz.
+          v464_registration: v464Built?.registration ?? "legacy_constant",
+          v464_crop_source: v464Built?.cropSource ?? null,
+          v464_track_source: v464Built?.trackSource ?? null,
+          v464_varying: v464Built?.varying ?? false,
+          v464_verdict: v464Verdict ?? null,
+
         };
         console.log(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v406_canonical_boxes_frozen speaker=${pass.speaker_name} space=${v161UsingPreclipForBbox ? "clip" : "plate"} box=${JSON.stringify(dispatchBox)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} transport=${v406WantsUrlTransport ? "url" : "inline"} windows=${JSON.stringify(v124VoicedWindows)}`,
