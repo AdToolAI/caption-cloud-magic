@@ -147,6 +147,20 @@ export interface MeasureProviderMotionSyncArgs {
    *                     `motion_unverified` (never as a NOOP).
    */
   roiContract?: V456RoiContract | null;
+  /**
+   * V467-A — the dispatched voice track of THIS pass. When present the
+   * speech-lock telemetry is computed on the stills that were decoded anyway;
+   * no additional Lambda still is ever rendered for it. Absent, unreachable or
+   * unreadable audio simply omits the telemetry — it can never change
+   * `measurement_status`, the reason string or any verdict.
+   */
+  speechLockAudio?: {
+    audioUrl: string;
+    /** t_audio = t_video + audioOffsetSec. 0 = shared timeline (identity). */
+    audioOffsetSec?: number;
+    /** Injected for tests. */
+    fetchAudio?: (url: string, budget: MeasurementBudget) => Promise<Uint8Array>;
+  } | null;
 }
 
 
