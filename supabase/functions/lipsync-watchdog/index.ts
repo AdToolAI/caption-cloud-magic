@@ -34,6 +34,16 @@ import {
   MOTION_UNVERIFIED_STATE,
 } from "../_shared/motion-probe-infra.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
+// V459 — Preflight-Zombie-Recovery + Terminal Fan-out Aggregation.
+import {
+  evaluateRunAggregation,
+  isPreflightZombieCandidate,
+  decideZombieAction,
+  preflightRecoveryCount,
+  isFanoutClosed,
+  V459_FANOUT_CLOSED_KEY,
+  V459_TERMINALIZING_STATUS,
+} from "../_shared/v459-fanout-aggregation.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { logMissingReinjectPointer } from "../_shared/v431-ledger.ts";
 
