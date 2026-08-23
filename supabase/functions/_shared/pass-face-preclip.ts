@@ -823,6 +823,7 @@ export async function renderPassFacePreclip(
         anchor,
         faceShareInCrop,
         mouthOffsetPx,
+        mouthOffsetXy,
         clamped: clampedAnchor,
         cropMeasureSrc: measureSrc,
         bboxMeasureSrc: measureSrc,
