@@ -1,37 +1,43 @@
-# V465 — ASD Box-Semantik und kontrollierter Provider-A/B-Fix
+# V466 — Gray-Band-Terminalisierung stoppen + echte NOOPs isolieren
 
-## Bestätigter Ist-Zustand
+## Was der Lauf tatsächlich zeigt (verifiziert, Szene be60d106, 23.08. 22:01 UTC)
 
-- Der kontrollierte S01-Lauf `6739f73e-9f40-4382-89fc-2562ff99444b` endete mit `v459_terminal_required_pass_failure`.
-- V464 war auf allen sechs Passes aktiv: `registration=per_frame`, variable Boxen und jeweils `12/12` geprüfte Mundpunkte innerhalb der Box.
-- Sync‑3 lieferte trotzdem bei Pass 1, 2, 4 und 5 einen echten NOOP; Pass 3 zeigte klare zusätzliche Bewegung.
-- Die V461-Fingerprints sind für alle Passes vorhanden und verschieden. Eine semantisch identische Transport-Eskalation wurde korrekt verhindert.
-- Der V459-Euro-Refund wurde einmalig mit 4,50 € gebucht; der Wallet-Saldo blieb bei 500 €.
+Die neue V465-Metrik ist live und misst sauber (`still_source=remotion_lambda`, `authority=v465_mouth_over_frame`):
 
-## Umsetzung
+| Pass | mouth_over_frame | Verdict |
+|---|---|---|
+| 0 (Sarah) | 1.299 | NOOP |
+| 1 (Sarah) | 1.817 | NOOP |
+| 2 | 2.950 | MOVED |
+| 3 | 2.537 | INDETERMINATE (Grauband) |
+| 4 | 3.075 | MOVED |
+| 5 | — | canceled_by_scene_failure |
 
-1. **Gefrorene Artefakte auswerten**
-   - Für je einen NOOP- und den erfolgreichen Pass exakt die bereits gepinnten Preclips, Audios, Provider-Ausgaben und ASD-JSONs verwenden.
-   - Boxgröße, Face-Abdeckung, Mundposition, zeitliche Boxbewegung und ROI-Motion frameweise gegenüberstellen.
-   - Prüfen, ob die aktuell aus der großen Legacy-Dispatch-Box abgeleiteten ASD-Boxen trotz korrekter Registrierung zu breit oder vertikal falsch gewichtet sind.
+Die Szene ist also **nicht** an der Metrik gescheitert, sondern an der Nachbehandlung:
+- Pass 3 lag im Grauband (2.00–2.65) und wurde über den v403-Pfad sofort `ssw:noop_fail` terminalisiert — obwohl der Vertrag lautet: INDETERMINATE darf nicht grün behaupten, aber auch nicht als bewiesener NOOP gelten.
+- Pass 0/1 sind echte NOOPs unterhalb der Bandgrenze; sie haben die NOOP-Ladder erschöpft.
+- Jede Messung basiert auf nur `frames: 6` Stillpaaren — dünn für ein Verdict nahe der Bandgrenze.
 
-2. **Minimalen Provider-A/B-Test durchführen**
-   - Gleicher Preclip, gleiches Audio, gleiches Sync‑3-Modell und `cut_off`; nur die ASD-Semantik variiert.
-   - Varianten: aktuelles V464-ASD, engere gesichtsproportionale per-frame ASD-Box und kein ASD als Kontrollarm.
-   - Keine neue Szene und kein kompletter 6-Pass-Lauf; nur gepinnte Einzelpass-Artefakte.
+Ergebnis: `v459_terminal_required_pass_failure`, Szene rot, obwohl 2 von 5 Pässen bewiesen bewegt und 1 unentschieden war.
 
-3. **Nur den belegten Fix implementieren**
-   - Wenn die engere per-frame Box gewinnt: V464-Projektion auf eine klar definierte gesichtsproportionale Box umstellen, Frame-/Crop-Kohärenz und 100-%-Mund-Containment beibehalten.
-   - Wenn ausschließlich „kein ASD“ gewinnt: für nachweislich single-face Preclips ASD weglassen; Multi-Face-/Full-Plate-Pfade bleiben unverändert geschützt.
-   - Keine Provider-Umschaltung, keine Lockerung des V461-Face-Gates und keine Änderung an V459-Refunds.
+## Umfang V466 (zwei getrennte Teile)
 
-4. **Regression und Deployment**
-   - Fixture-Tests für dynamischen S01-Track, statischen GOLD-Fall, Boxgrenzen, Framezahl und Mouth-Containment ergänzen.
-   - Betroffene Edge Function testen und deployen.
-   - Danach STOP vor einem weiteren vollständigen S01-Rerender; zuerst A/B-Ergebnis, Payload-Diff und Refund-Sicherheit berichten.
+### Teil A — Grauband nicht mehr terminalisieren (Code-Fix, eng)
+1. Grauband-INDETERMINATE mit gültiger Messung löst **eine** Re-Messung derselben eingefrorenen Ausgabe mit höherer Stillzahl aus (6 → 16 Frames), statt sofort zu terminalisieren.
+2. Bleibt es danach im Grauband: Pass läuft als `motion_unverified` durch (gemuxt, kein Refund, kein Grün-Anspruch in der Telemetrie) — derselbe schmale Gate wie v443/v458, nicht als neuer Erfolgsanspruch.
+3. Nur bewiesenes NOOP (< 2.00) bleibt terminal. `measured_ambiguous` außerhalb des Graubands (degenerierter Nenner, zu wenig Frames, fehlende Stills) bleibt unverändert fail-closed.
+4. `frames`, `roi_pixels` und `remeasure_count` landen in `syncso_dispatch_log.meta.v465`.
 
-## Akzeptanz
+### Teil B — echte NOOPs read-only isolieren
+Pass 0/1 (Sarah, 1.30 / 1.82) gegen Pass 2/4 (2.95 / 3.08) derselben Szene und desselben Plates differenzieren: Preclip-Geometrie, Face-Share, Yaw, Audiodauer (Pass 0 = 2.3 s), ASD-Boxbewegung. Kein Code-Fix in diesem Schritt — nur ein Befundbericht unter `docs/v466-noop-vs-moved-same-scene.md`.
 
-- Der gewählte Einzelpass erzeugt gegenüber seinem Preclip messbare zusätzliche Mundbewegung und kein NOOP-Verdikt.
-- ASD bleibt bei dynamischer Bewegung framevariabel, im finalen 720×720-Preclip-Raum und vollständig bounds-valid.
-- Kein bestehender Gate-, Fingerprint-, Fence- oder Euro-Refund-Vertrag wird abgeschwächt.
+## Technische Details
+- `supabase/functions/sync-so-webhook/index.ts`: Zweig ab Zeile 1647 (`motionVerdictForMultiSpeaker === "indeterminate"`) bekommt vor dem `ssw:noop_fail`-Apply die Grauband-Unterscheidung; Re-Measure-Zähler analog zum bestehenden v443-`measure_attempts`-Muster.
+- `supabase/functions/_shared/v465-verdict.ts`: neues Feld `in_gray_band` im Result, damit der Webhook nicht auf Reason-Strings parsen muss. Band-Grenzen bleiben 2.00 / 2.65 unverändert.
+- `supabase/functions/_shared/measure-provider-motion-sync.ts`: Stillzahl parametrierbar (Default 6, Re-Measure 16).
+- `supabase/functions/lipsync-watchdog/index.ts`: identische Grauband-Regel im Re-Check, damit Webhook und Watchdog nicht divergieren.
+- Regressionstests in `v465-verdict.test.ts`: 2.54 → INDETERMINATE + `in_gray_band=true`; 1.99 → NOOP terminal; degenerierter Nenner → INDETERMINATE ohne Passthrough.
+
+## Nicht in diesem Gate
+- Keine Änderung der Bandgrenzen, der ASD-Projektion (V464) oder der Provider-Wahl.
+- Kein neuer S01-Lauf ohne dein GO nach Teil A.
