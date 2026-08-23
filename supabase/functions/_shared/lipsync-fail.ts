@@ -149,29 +149,45 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
     }
   }
 
-  // 4. Refund credits exactly once.
+  // 4. V459 — Refund IMMER in der Kasse, die belastet wurde: dem Euro-Wallet
+  //    (`ai_video_wallets.balance_euros`). Der Credit-Ledger (`wallets.balance`)
+  //    ist ausdrücklich NICHT mehr der Refund-Pfad — genau diese Fehlbuchung hat
+  //    beim Run a3b5541b 960 Credits gegen eine €4,50-Belastung gestellt.
+  //    Idempotenz haengt an der Quell-Belastung, nicht an (scene, run) allein:
+  //    refund_key = lipsync_refund:<run_id>:<source_transaction_id>.
   let didRefund = false;
-  if (!alreadyRefunded && refundAmount > 0 && args.userId) {
+  let refundInfo: Record<string, unknown> | null = null;
+  const runIdForRefund =
+    args.runId ??
+    (typeof state?.run_id === "string" ? state.run_id : null) ??
+    ((existing as any)?.active_run_id ?? null);
+  if (!alreadyRefunded && refundAmount > 0 && args.userId && typeof supabase.rpc === "function") {
     try {
-      const { data: wallet } = await supabase
-        .from("wallets")
-        .select("balance")
-        .eq("user_id", args.userId)
-        .single();
-      if (wallet) {
-        await supabase
-          .from("wallets")
-          .update({
-            balance: Number(wallet.balance ?? 0) + refundAmount,
-            updated_at: nowIso,
-          })
-          .eq("user_id", args.userId);
-        didRefund = true;
+      const { data: refundRes, error: refundErr } = await supabase.rpc(
+        "v459_refund_lipsync_euros",
+        {
+          p_user_id: args.userId,
+          p_scene_id: sceneId,
+          p_run_id: runIdForRefund ? String(runIdForRefund) : null,
+          p_source_transaction_id: args.sourceTransactionId ?? null,
+          p_reason: safeReason,
+        },
+      );
+      if (refundErr) {
+        console.warn(`[failLipSync] euro refund rpc error: ${refundErr.message ?? refundErr}`);
+      } else {
+        refundInfo = (refundRes ?? null) as Record<string, unknown> | null;
+        didRefund = (refundInfo as any)?.refunded === true;
+        console.log(
+          `[failLipSync] v459 euro_refund scene=${sceneId} run=${runIdForRefund ?? "-"} ` +
+            `refunded=${didRefund} detail=${JSON.stringify(refundInfo ?? {})}`,
+        );
       }
     } catch (e) {
       console.warn(`[failLipSync] refund crash: ${(e as Error).message}`);
     }
   }
+
 
   // 5. Patch dialog_shots (mark failed/refunded) and the scene row.
   const patchedState = state
