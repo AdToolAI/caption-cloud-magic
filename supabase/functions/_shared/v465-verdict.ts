@@ -65,6 +65,15 @@ export const V465_MIN_ROI_PIXELS = 64;
  */
 export const V465_FRAME_EDIT_FLOOR = 0.4;
 
+/**
+ * V466-A — gray-band re-measure sampling. A near-boundary ratio on N=6 stills
+ * is a sampling question, not a verdict: exactly ONE re-measure of the same
+ * immutable pinned output at N=16 stills. Parity-verified on the 32 frozen
+ * pairs (0 hard NOOP<->MOVED flips; gray cases resolve towards their true
+ * class) — see docs/v465b2a-lambda-still-parity.md.
+ */
+export const V466_GRAY_BAND_SAMPLES = 16;
+
 export type V465Verdict = "motion" | "noop" | "indeterminate";
 
 export interface V465VerdictResult {
