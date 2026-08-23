@@ -19,6 +19,7 @@
 
 type SupabaseLike = {
   from: (t: string) => any;
+  rpc?: (fn: string, args: Record<string, unknown>) => any;
 };
 
 export interface FailLipSyncArgs {
@@ -31,9 +32,17 @@ export interface FailLipSyncArgs {
   extraSyncJobIds?: string[];
   /** Credits to refund (0 / undefined skips refund). */
   refundCredits?: number;
+  /**
+   * V459 — Run des fehlgeschlagenen Laufs. Der Euro-Refund wird an die
+   * Belastung dieses Runs gebunden (`metadata.run_id`).
+   */
+  runId?: string | null;
+  /** V459 — konkrete Quell-Belastung (`ai_video_transactions.id`), falls bekannt. */
+  sourceTransactionId?: string | null;
   /** Best-effort sync.so DELETE for the listed job ids. */
   syncApiKey?: string | null;
 }
+
 
 export interface FailLipSyncResult {
   ok: boolean;
