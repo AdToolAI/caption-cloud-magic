@@ -38,7 +38,19 @@ export interface MouthCenteredCropInput {
   minSize?: number;
   /** Output resolution the preclip will be resampled to. Default 720. */
   outputSize?: number;
+  /**
+   * V457 — the padded dispatch face box [x1,y1,x2,y2] the downstream
+   * fail-closed gate validates against. When present, the crop MUST
+   * contain it (hard invariant, deterministic projection).
+   */
+  containBox?: [number, number, number, number] | null;
 }
+
+export type ContainReason =
+  | "no_contain_box"
+  | "already_contained"
+  | "projected"
+  | "contain_box_outside_plate";
 
 export interface MouthCenteredCropResult {
   /** Preclip crop rectangle on the source plate. */
@@ -51,7 +63,98 @@ export interface MouthCenteredCropResult {
   mouthOffsetPx: number;
   /** True when clamping forced the crop away from the ideal center. */
   clamped: boolean;
+  /** V457 — null when no containBox was supplied. */
+  containsTarget: boolean | null;
+  containReason: ContainReason;
+  shiftPx: { x: number; y: number };
+  sizeGrown: boolean;
+  sizeGrownPx: number;
 }
+
+export function normalizeContainBox(
+  b?: [number, number, number, number] | null,
+): [number, number, number, number] | null {
+  if (!Array.isArray(b) || b.length !== 4) return null;
+  if (!b.every((n) => Number.isFinite(Number(n)))) return null;
+  const x1 = Math.round(Number(b[0]));
+  const y1 = Math.round(Number(b[1]));
+  const x2 = Math.round(Number(b[2]));
+  const y2 = Math.round(Number(b[3]));
+  if (x2 <= x1 || y2 <= y1) return null;
+  return [x1, y1, x2, y2];
+}
+
+/**
+ * V457 — deterministic interval projection: grow the square crop at most
+ * once (never above the plate cap) and move it to the admissible interval
+ * value closest to the mouth-centered position. No iteration, no silent
+ * repair of an upstream box that cannot fit.
+ */
+export function projectCropToContain(
+  crop: { x: number; y: number; size: number },
+  box: [number, number, number, number],
+  plateWidth: number,
+  plateHeight: number,
+): {
+  crop: { x: number; y: number; size: number };
+  containsTarget: boolean;
+  reason: ContainReason;
+  shiftPx: { x: number; y: number };
+  sizeGrown: boolean;
+  sizeGrownPx: number;
+} {
+  const baseX = Math.round(crop.x);
+  const baseY = Math.round(crop.y);
+  const baseSize = Math.round(crop.size);
+  const fail = (reason: ContainReason) => ({
+    crop: { x: baseX, y: baseY, size: baseSize },
+    containsTarget: false,
+    reason,
+    shiftPx: { x: 0, y: 0 },
+    sizeGrown: false,
+    sizeGrownPx: 0,
+  });
+
+  const [bx1, by1, bx2, by2] = box;
+  const bw = bx2 - bx1;
+  const bh = by2 - by1;
+  const cap = Math.min(plateWidth, plateHeight);
+  if (bx1 < 0 || by1 < 0 || bx2 > plateWidth || by2 > plateHeight) {
+    return fail("contain_box_outside_plate");
+  }
+  const need = Math.max(bw, bh);
+  if (need > cap) return fail("contain_box_outside_plate");
+
+  const size = Math.min(cap, Math.max(baseSize, need));
+  const loX = Math.max(0, bx2 - size);
+  const hiX = Math.min(bx1, plateWidth - size);
+  const loY = Math.max(0, by2 - size);
+  const hiY = Math.min(by1, plateHeight - size);
+  if (loX > hiX || loY > hiY) return fail("contain_box_outside_plate");
+
+  const x = Math.min(hiX, Math.max(loX, baseX));
+  const y = Math.min(hiY, Math.max(loY, baseY));
+
+  // Verify on the FINAL integer geometry (FFmpeg level), not before.
+  const containsTarget =
+    x >= 0 && y >= 0 &&
+    x + size <= plateWidth && y + size <= plateHeight &&
+    x <= bx1 && y <= by1 && x + size >= bx2 && y + size >= by2;
+  if (!containsTarget) return fail("contain_box_outside_plate");
+
+  const sizeGrownPx = Math.max(0, size - baseSize);
+  const shiftPx = { x: x - baseX, y: y - baseY };
+  const untouched = shiftPx.x === 0 && shiftPx.y === 0 && sizeGrownPx === 0;
+  return {
+    crop: { x, y, size },
+    containsTarget: true,
+    reason: untouched ? "already_contained" : "projected",
+    shiftPx,
+    sizeGrown: sizeGrownPx > 0,
+    sizeGrownPx,
+  };
+}
+
 
 /**
  * Compute a mouth-centered square crop for lip-sync preclip.
