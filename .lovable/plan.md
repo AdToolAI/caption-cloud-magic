@@ -124,9 +124,9 @@ Verspätete Callbacks eines alten Attempts bleiben unverändert `run_guard_disca
 
 Deploy exakt: `lipsync-watchdog`, `compose-dialog-segments`, `sync-so-webhook`.
 
-Danach Bereinigung von Run `3ca7e6c7…` **über die neue kanonische Aggregationslogik** (ein Watchdog-Durchlauf), nicht über zusammengesetzte Einzel-DB-Updates. Zielzustand: Run/Scene eindeutig terminal, keine offenen Locks, keine neuen Provider-Dispatches, kein pending Pass kann später anspringen, genau ein Refund-Pfad, keine Doppel-Refunds. Danach Health-Check und STOP — kein neuer S01-Lauf ohne separate Freigabe.
+Danach Bereinigung von Run `3ca7e6c7…` **ausschließlich über die neue kanonische Aggregationslogik** (ein einmaliger Watchdog-Lauf), nicht über zusammengesetzte Einzel-DB-Updates. Erwartung: keine Wiederbelebung von Pass 0, sondern direkt terminale Aggregation. Zielzustand: Scene/Run terminal failed, P5 nie dispatcht, P0 kann nicht erneut anspringen, keine offenen Locks, keine unreconcilten Provider-Jobs, genau ein kanonischer Refund, keine weiteren `NOOP_LADDER_EXHAUSTED`-Reentries. Danach Health-Check und STOP — kein S01-Rerender ohne separate Freigabe.
 
 ## Nicht Teil von V459
 
-Der eigentliche Lip-Sync-Fehlschlag (`sync_noop_unrecoverable`: Provider liefert unbewegten Mund) bleibt unberührt. V458 liefert jetzt korrekten Plate-Space und echte Provider-NOOPs — das ist ein Qualitätsproblem für ein separates Gate, kein Geometrie-/Messfehler mehr.
+Der eigentliche Provider-NOOP (`sync_noop_unrecoverable`: unbewegter Mund trotz korrektem Plate-Space aus V458) bleibt ein separates V460-/Qualitäts-Gate.
 
