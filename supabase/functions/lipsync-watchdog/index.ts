@@ -1159,6 +1159,13 @@ serve(async (req) => {
           providerOutputUrl,
           durationSeconds,
           preclipGeometry: meta.preclip_geometry ?? null,
+          // V467-A — same timeline as the webhook measured; telemetry only.
+          speechLockAudio: meta.audio_url
+            ? {
+              audioUrl: String(meta.audio_url),
+              audioOffsetSec: Number(meta.audio_offset_sec ?? 0) || 0,
+            }
+            : null,
         };
         let measurement = await measureProviderMotionSync(measureArgs);
         // V466-A — mirror the webhook contract: exactly ONE gray-band
@@ -1226,6 +1233,10 @@ serve(async (req) => {
             pipeline_job_id: meta.pipeline_job_id ?? null,
             provider_output_url: providerOutputUrl,
             provider_dispatch: false,
+            // V467-A — speech-coupling telemetry. Never read by any branch.
+            v467: (measurement as any)?.v467
+              ? { ...(measurement as any).v467, authority: "telemetry_only" }
+              : { available: false, authority: "telemetry_only" },
           },
         });
 

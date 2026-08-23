@@ -44,6 +44,14 @@ import {
 import type { V456RoiContract } from "./v456-roi-contract.ts";
 // V465-B2a — paired mouth-over-frame telemetry (pure, same stills).
 import { computeMouthOverFrame, type V465PairedMetric } from "./v465-mouth-over-frame.ts";
+// V467-A — speech-locked mouth edit. TELEMETRY ONLY, same stills, no verdict.
+import {
+  buildSpeechEnvelope,
+  computeSpeechLock,
+  decodeWavMono,
+  perSampleMouthEdit,
+  type V467SpeechLock,
+} from "./v467-speech-lock.ts";
 
 /** Frozen production constants — no rounding, no heuristics. */
 export const MOTION_SAMPLE_COUNT = 6;
@@ -139,6 +147,20 @@ export interface MeasureProviderMotionSyncArgs {
    *                     `motion_unverified` (never as a NOOP).
    */
   roiContract?: V456RoiContract | null;
+  /**
+   * V467-A — the dispatched voice track of THIS pass. When present the
+   * speech-lock telemetry is computed on the stills that were decoded anyway;
+   * no additional Lambda still is ever rendered for it. Absent, unreachable or
+   * unreadable audio simply omits the telemetry — it can never change
+   * `measurement_status`, the reason string or any verdict.
+   */
+  speechLockAudio?: {
+    audioUrl: string;
+    /** t_audio = t_video + audioOffsetSec. 0 = shared timeline (identity). */
+    audioOffsetSec?: number;
+    /** Injected for tests. */
+    fetchAudio?: (url: string, budget: MeasurementBudget) => Promise<Uint8Array>;
+  } | null;
 }
 
 
@@ -169,6 +191,12 @@ export interface MeasureProviderMotionSyncResult {
    * production stills. Telemetry until V465-B2b; never a verdict here.
    */
   v465?: V465PairedMetric;
+  /**
+   * V467-A — speech-locked mouth edit. TELEMETRY ONLY: no caller may branch on
+   * it, and with the production default of N=6 stills it is always
+   * `low_confidence`.
+   */
+  v467?: V467SpeechLock;
 }
 
 
@@ -556,6 +584,41 @@ export async function measureProviderMotionSync(
         providerRoi: { bx: 0, by: 0, bw: 0, bh: 0 },
       });
 
+    // ── V467-A — speech-locked mouth edit (TELEMETRY ONLY) ────────────────
+    // Rides on the very same decoded stills. Any failure here is swallowed:
+    // the measurement result, its status and every verdict stay untouched.
+    let v467: V467SpeechLock | undefined;
+    try {
+      const audio = args.speechLockAudio ?? null;
+      if (audio?.audioUrl && pairedFrames.preclip && pairedFrames.provider) {
+        const fetchAudio = audio.fetchAudio ??
+          (async (url: string, b: MeasurementBudget) => {
+            const res = await fetch(url, { signal: linkedSignal(b, b.remainingMs) });
+            if (!res.ok) throw new Error(`audio_download_${res.status}`);
+            return new Uint8Array(await res.arrayBuffer());
+          });
+        const bytes = await fetchAudio(audio.audioUrl, budget());
+        const pcm = decodeWavMono(bytes);
+        const envelope = pcm ? buildSpeechEnvelope(pcm.samples, pcm.sampleRateHz) : null;
+        v467 = computeSpeechLock({
+          mouthEdits: perSampleMouthEdit(
+            pairedFrames.preclip.stills,
+            pairedFrames.provider.stills,
+            pairedFrames.preclip.roi,
+          ),
+          sampleTimesVideoSec: frames.map((f) => f / MOTION_FPS),
+          envelope,
+          audioOffsetSec: audio.audioOffsetSec ?? 0,
+          fps: MOTION_FPS,
+        });
+      }
+    } catch (e) {
+      console.warn(
+        `[v467] speech_lock telemetry skipped — ${(e as Error)?.message ?? String(e)}`,
+      );
+      v467 = undefined;
+    }
+
     return {
       preclip_metric: preclip,
       provider_metric: provider,
@@ -579,6 +642,8 @@ export async function measureProviderMotionSync(
       },
       // V465-B2a — telemetry only. Authority flips in V465-B2b, not here.
       v465,
+      // V467-A — speech coupling telemetry. Never a verdict input.
+      v467,
     };
 
   } finally {

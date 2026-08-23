@@ -854,6 +854,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         preclipGeometry: v456Geometry,
         // V456 — validated contract; frozen v404 band stays as telemetry.
         roiContract: v456Contract,
+        // V467-A — TELEMETRY ONLY. The dispatched voice track of this pass, on
+        // the same timeline as the pre-clip (identity mapping, offset 0). No
+        // extra stills are rendered for it and no verdict may read it.
+        speechLockAudio: (measurePass as any)?.audio_url
+          ? { audioUrl: String((measurePass as any).audio_url), audioOffsetSec: 0 }
+          : null,
       };
       const runBounded = async (sampleCount?: number) =>
         await measureWithBoundedReMeasure(
@@ -924,6 +930,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           : v404MotionMeasurement.reason)
         : null;
       const v465Metric = (v404MotionMeasurement as any)?.v465 ?? null;
+      // V467-A — telemetry only; read nowhere except the log/persist calls.
+      const v467Metric = (v404MotionMeasurement as any)?.v467 ?? null;
       const legacyProbe: MotionProbeResult | null =
         v404MotionMeasurement.measurement_status === "measured" &&
           v404MotionMeasurement.preclip_metric && v404MotionMeasurement.provider_metric
@@ -1001,6 +1009,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             provider_output_url: v404RehostedUrl ?? outputUrl,
             duration_sec: Number.isFinite(duration) ? duration : null,
             preclip_geometry: v443MeasureArgs.preclipGeometry,
+            // V467-A — so the watchdog re-check measures the SAME timeline.
+            audio_url: v443MeasureArgs.speechLockAudio?.audioUrl ?? null,
+            audio_offset_sec: v443MeasureArgs.speechLockAudio?.audioOffsetSec ?? null,
           },
         });
       }
@@ -1041,9 +1052,38 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               phase,
               pass_idx: measurePassIdx,
             },
+            // ── V467-A — speech-coupling telemetry, NEVER a verdict input ──
+            // With the production default of N=6 stills this is always
+            // `low_confidence`; only a V466-A gray-band re-measure (N=16) can
+            // produce `high_confidence`. Nothing branches on these numbers.
+            v467: v467Metric
+              ? {
+                ...v467Metric,
+                authority: "telemetry_only",
+                pass_idx: measurePassIdx,
+                phase,
+                v465_mouth_over_frame: v465Verdict.mouth_over_frame,
+                v465_verdict: v465Verdict.verdict,
+                v466_remeasured: v466ReMeasured,
+              }
+              : { available: false, authority: "telemetry_only", pass_idx: measurePassIdx },
           },
         });
       }
+      if (v467Metric) {
+        console.log(
+          `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} v467_speech_lock scene=${sceneId} ` +
+            `pass=${measurePassIdx} v_over_u=${v467Metric.v_over_u ?? "n/a"} ` +
+            `corr_zero=${v467Metric.corr_rms_zero_lag ?? "n/a"} ` +
+            `corr_best=${v467Metric.corr_rms_best_lag ?? "n/a"} ` +
+            `best_lag_ms=${v467Metric.best_lag_ms ?? "n/a"} samples=${v467Metric.samples} ` +
+            `voiced=${v467Metric.voiced_samples} unvoiced=${v467Metric.unvoiced_samples} ` +
+            `confidence=${v467Metric.confidence} guards=${v467Metric.guards.join("|") || "none"} ` +
+            `timeline=${v467Metric.timeline_mapping} offset=${v467Metric.audio_offset_sec} ` +
+            `authority=telemetry_only`,
+        );
+      }
+
 
       // V434 Step 3/4 — scale-free outcome telemetry, printed next to (never
       // instead of) the authoritative v404 verdict.
