@@ -55,3 +55,33 @@ describe("V459 — Fence-Abschluss ohne Billing-Race", () => {
     expect(second.passes[1].status).toBe(V459_CANCELED_STATUS);
   });
 });
+
+describe("V459.1 — NOOP-Ladder-Rearm-Luecke", () => {
+  it("terminalisiert NICHT, waehrend ein Pass in aktiver NOOP-Eskalation steht", () => {
+    // Genau der Zustand von Pass 5 (Run a3b5541b) um 17:50:33:
+    // webhook hat job_id geloescht und status auf pending gesetzt,
+    // der Re-Dispatch war noch unterwegs.
+    const passes = [
+      { idx: 0, status: "failed", last_error_class: "sync_noop_unrecoverable" },
+      { idx: 5, status: "pending", job_id: null, noop_retry_attempt_id: "att-5", noop_escalation_step: 2 },
+    ];
+    const verdict = evaluateRunAggregation(passes);
+    expect(verdict.runIrrecoverable).toBe(true);
+    expect(verdict.canTerminalizeNow).toBe(false);
+    expect(verdict.unreconciledPassIdxs).toEqual([1]);
+
+    const res = closeBlockedPasses(passes, [1], { nowIso: NOW, reason: "r" });
+    expect(res.canceledIdxs).toEqual([]);
+    expect(res.skippedInflightIdxs).toEqual([1]);
+  });
+
+  it("ein pending-Pass OHNE Ladder-Marker bleibt blockiert (nicht in-flight)", () => {
+    const passes = [
+      { idx: 0, status: "failed" },
+      { idx: 1, status: "pending", job_id: null, noop_escalation_step: 0 },
+    ];
+    const verdict = evaluateRunAggregation(passes);
+    expect(verdict.canTerminalizeNow).toBe(true);
+    expect(verdict.blockedPassIdxs).toEqual([1]);
+  });
+});
