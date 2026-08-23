@@ -1513,17 +1513,27 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           motionVerdictForMultiSpeaker === "indeterminate"
         ? classifyMeasurementFailure(motionProbeResult?.reason ?? "")
         : null;
+      // V458 — a structurally unresolved mouth ROI is NOT a verdict about the
+      // clip either. It is admitted through the SAME narrow gate as a probe
+      // infra exhaustion (indeterminate + motion_unverified). No other
+      // `measured_ambiguous` reason is ever passed through.
+      const v458RoiUnresolvedPassthrough = !isSingleSpeakerScene &&
+        motionVerdictForMultiSpeaker === "indeterminate" &&
+        v443MotionUnverified &&
+        isMouthRoiUnresolved(motionProbeResult?.reason ?? "");
       const v443MotionUnverifiedPassthrough = !isSingleSpeakerScene &&
         motionVerdictForMultiSpeaker === "indeterminate" &&
         v443MotionUnverified &&
-        v443FailureClass === "probe_infra_error";
+        (v443FailureClass === "probe_infra_error" || v458RoiUnresolvedPassthrough);
       if (v443MotionUnverifiedPassthrough) {
         console.warn(
           `[sync-so-webhook] v443 scene=${sceneId} pass=${currentPass} speaker="${passSpeakerName}" ` +
-            `MOTION_UNVERIFIED (probe_infra_error, attempts=${v443MeasureAttempts}) → success pass-through, ` +
-            `watchdog re-measure pending — no terminalization, no refund, no provider dispatch`,
+            `MOTION_UNVERIFIED (${v458RoiUnresolvedPassthrough ? "mouth_roi_unresolved" : "probe_infra_error"}, ` +
+            `attempts=${v443MeasureAttempts}) → success pass-through, telemetry stays motion_unverified ` +
+            `(never motion_verified) — no terminalization, no refund, no provider dispatch`,
         );
       }
+
 
       if (
         !isSingleSpeakerScene && motionVerdictForMultiSpeaker === "indeterminate" &&
