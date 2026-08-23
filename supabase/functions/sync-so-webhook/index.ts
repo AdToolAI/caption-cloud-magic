@@ -930,6 +930,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           : v404MotionMeasurement.reason)
         : null;
       const v465Metric = (v404MotionMeasurement as any)?.v465 ?? null;
+      // V467-A — telemetry only; read nowhere except the log/persist calls.
+      const v467Metric = (v404MotionMeasurement as any)?.v467 ?? null;
       const legacyProbe: MotionProbeResult | null =
         v404MotionMeasurement.measurement_status === "measured" &&
           v404MotionMeasurement.preclip_metric && v404MotionMeasurement.provider_metric
