@@ -35,6 +35,7 @@ import {
   type PreclipRoiGeometry,
   V434_LEGACY_ROI,
 } from "./v434-motion-roi.ts";
+import { resolveV471MouthRoi, type V471MouthRoi } from "./v471-mouth-roi.ts";
 
 export const V456_ROI_CONTRACT_VERSION = "v456";
 
@@ -70,6 +71,13 @@ export interface V456RoiContractInput extends PreclipRoiGeometry {
   identity?: V456Identity | null;
   /** Identity of the pass being measured right now. */
   expectedIdentity?: V456Identity | null;
+  /**
+   * V471-B — pre-clip crop in PLATE pixels (`preclip_crop`). Supplying it (with
+   * `mouthSource`) activates the authoritative V471 mouth ROI.
+   */
+  crop?: { x?: number | null; y?: number | null; size?: number | null } | null;
+  /** V471-B — `preclip_geometry_mouth_source` (`landmark` | `pose_estimate`). */
+  mouthSource?: string | null;
 }
 
 export interface V456RoiContract {
@@ -84,6 +92,8 @@ export interface V456RoiContract {
   failedCheck: V456CheckName | null;
   checks: Record<V456CheckName, boolean>;
   version: string;
+  /** V471-B — the authoritative mouth ROI resolution (telemetry + authority). */
+  v471?: V471MouthRoi | null;
 }
 
 const PLATE_SOURCE_HINTS = [".mp4", "hydration=", "/plates/", "plate-"];
@@ -241,14 +251,42 @@ export function evaluateMouthRoiContract(
   }
   checks.identity = true;
 
+  // ── 7. V471-B — the ONE authoritative mouth ROI ──────────────────────────
+  // The V434 geometry band inherits the upstream 0.78 pose estimate and is
+  // ~70–90 px too high / ~1.7× too large (docs/v471a-roi-sampling-parity.md).
+  // When the V471 inputs are supplied, its ROI is the authority; when it cannot
+  // place the mouth, the pass is `mouth_roi_unresolved` — never a false NOOP.
+  // Activated only for passes that carry BOTH a crop and a tracked face box —
+  // legacy passes without a persisted face box keep the frozen V434 behaviour
+  // instead of degrading into `mouth_roi_unresolved`.
+  const v471Requested = Number(input.crop?.size ?? NaN) > 0 &&
+    Array.isArray(input.faceBbox) && input.faceBbox.length === 4;
+  const v471 = v471Requested
+    ? resolveV471MouthRoi({
+      faceBbox: input.faceBbox ?? null,
+      crop: input.crop ?? null,
+      faceShareInCrop: input.faceShareInCrop ?? null,
+      mouthOffset: input.mouthOffset ?? null,
+      mouthSource: input.mouthSource ?? null,
+    })
+    : null;
+  if (v471Requested && (!v471 || !v471.roi)) {
+    return {
+      ...fail("roi_bounds", (v471?.reason ?? "v471_unavailable").replace(/^v471_mouth_roi_unresolved:/, "v471_")),
+      checks: { ...checks, roi_bounds: false },
+      v471,
+    };
+  }
+
   return {
     status: "authoritative",
-    roi: { ...derived.roi },
+    roi: v471?.roi ? { ...v471.roi } : { ...derived.roi },
     legacyRoi: { ...V434_LEGACY_ROI },
     derived,
-    reason: "roi_geometry_authoritative",
+    reason: v471?.roi ? `roi_geometry_authoritative:${v471.reason}` : "roi_geometry_authoritative",
     failedCheck: null,
     checks,
     version: V456_ROI_CONTRACT_VERSION,
+    v471,
   };
 }
