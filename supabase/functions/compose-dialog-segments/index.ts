@@ -136,6 +136,12 @@ import {
   TRACK_SAMPLE_COUNT,
 } from "../_shared/dynamic-camera-path.ts";
 import { trackAssignedFaceAcrossTurn } from "../_shared/plate-face-track.ts";
+import {
+  buildPerFrameAsdBoxes,
+  validateAsdRegistration,
+  type PlateTrackSample as V464TrackSample,
+} from "../_shared/v464-asd-projection.ts";
+
 // V456 Gate 2 — pose-aware mouth anchor (no colour heuristics).
 import { resolveMouthAnchorPoseAware } from "../_shared/v456-roi-contract.ts";
 // FA-4 v406/v407 — Frozen Provider Input Snapshot / Retry-Wire-Parität.
