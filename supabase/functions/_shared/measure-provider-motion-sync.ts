@@ -191,6 +191,12 @@ export interface MeasureProviderMotionSyncResult {
    * production stills. Telemetry until V465-B2b; never a verdict here.
    */
   v465?: V465PairedMetric;
+  /**
+   * V467-A — speech-locked mouth edit. TELEMETRY ONLY: no caller may branch on
+   * it, and with the production default of N=6 stills it is always
+   * `low_confidence`.
+   */
+  v467?: V467SpeechLock;
 }
 
 
