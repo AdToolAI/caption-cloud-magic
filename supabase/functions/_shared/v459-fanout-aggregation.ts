@@ -38,6 +38,9 @@ export interface V459Pass {
   v459_preflight_recovery_count?: number | null;
   v459_preflight_recovery_run_id?: string | null;
   last_error_class?: string | null;
+  /** V459.1 — Marker der aktiven NOOP-Eskalation (siehe `hasActiveNoopRetry`). */
+  noop_retry_attempt_id?: string | null;
+  noop_escalation_step?: number | null;
   error?: string | null;
   [k: string]: unknown;
 }
@@ -54,14 +57,32 @@ export function isTerminalPassFailure(p: V459Pass | null | undefined): boolean {
 }
 
 /**
- * Echter, noch nicht abgeschlossener Provider-Job. NUR `rendering`/`retrying`
- * MIT `job_id` zaehlt — ein Pass ohne job_id hat den Provider nie erreicht.
+ * V459.1 — Aktive NOOP-Eskalation: `sync-so-webhook` setzt beim Armen einer
+ * Ladder-Runde `status="pending"` und loescht `sync_job_id`, BEVOR der neue
+ * Dispatch eine job_id vom Provider zurueckbekommt. In diesem Fenster laeuft
+ * sehr wohl echte Provider-Arbeit — der Watchdog kennt das in seinem
+ * Dispatch-Guard bereits als `inActiveNoopRetry`.
+ */
+export function hasActiveNoopRetry(p: V459Pass | null | undefined): boolean {
+  if (!p) return false;
+  const attempt = p.noop_retry_attempt_id;
+  const hasAttempt = typeof attempt === "string" && attempt.length > 0;
+  const step = Number(p.noop_escalation_step ?? 0);
+  return hasAttempt && step > 0 && String(p.status ?? "") === "pending";
+}
+
+/**
+ * Echter, noch nicht abgeschlossener Provider-Job. `rendering`/`retrying`/
+ * `rendering_preflight` MIT `job_id` — oder ein Pass mitten in der
+ * NOOP-Ladder-Rearm-Luecke (V459.1), der kurzzeitig keine job_id traegt.
+ * Ohne diese zweite Bedingung terminalisiert der Fence einen Pass, dessen
+ * Callback eine Sekunde spaeter noch eintrifft.
  */
 export function hasUnreconciledProviderJob(p: V459Pass | null | undefined): boolean {
   if (!p) return false;
   const st = String(p.status ?? "");
   const hasJob = typeof p.job_id === "string" && p.job_id.length > 0;
-  if (!hasJob) return false;
+  if (!hasJob) return hasActiveNoopRetry(p);
   return st === "rendering" || st === "retrying" || st === "rendering_preflight";
 }
 
@@ -176,3 +197,48 @@ export function isTerminalNoopPass(p: V459Pass | null | undefined): boolean {
   const cls = String(p.last_error_class ?? p.error ?? "");
   return cls.includes("sync_noop_unrecoverable") || cls.includes("noop_ladder_exhausted");
 }
+
+export const V459_CANCELED_STATUS = "canceled_by_scene_failure";
+
+/**
+ * V459 — Fence-Abschluss: Pässe, die nie mehr dispatcht werden, dürfen nicht
+ * als `pending`/`rendering_preflight` in einem terminalen Run zurückbleiben.
+ *
+ * Harte Regel (Billing-Race): Ein Pass mit echtem Provider-Job in flight wird
+ * NICHT gecancelt. Er muss erst reconciliiert werden; erst danach schliesst der
+ * Fence ab. Deshalb prüft diese Funktion jeden Kandidaten noch einmal selbst
+ * gegen `hasUnreconciledProviderJob` — auch wenn die Aggregation ihn schon
+ * ausgeschlossen hat.
+ */
+export function closeBlockedPasses(
+  passes: Array<V459Pass | null | undefined>,
+  blockedIdxs: number[],
+  opts: { nowIso: string; reason: string },
+): { passes: V459Pass[]; canceledIdxs: number[]; skippedInflightIdxs: number[] } {
+  const list = Array.isArray(passes) ? passes : [];
+  const blocked = new Set(blockedIdxs ?? []);
+  const canceled: number[] = [];
+  const skipped: number[] = [];
+
+  const next = list.map((p, i) => {
+    const pass = (p ?? {}) as V459Pass;
+    if (!blocked.has(i)) return pass;
+    if (isTerminalPassFailure(pass)) return pass;
+    if (hasUnreconciledProviderJob(pass)) {
+      skipped.push(i);
+      return pass;
+    }
+    canceled.push(i);
+    return {
+      ...pass,
+      status: V459_CANCELED_STATUS,
+      error: pass.error ?? opts.reason,
+      last_error_class: V459_CANCELED_STATUS,
+      v459_canceled_at: opts.nowIso,
+      v459_canceled_reason: opts.reason,
+    };
+  });
+
+  return { passes: next, canceledIdxs: canceled, skippedInflightIdxs: skipped };
+}
+

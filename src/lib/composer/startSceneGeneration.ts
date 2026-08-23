@@ -26,11 +26,31 @@ export interface StartSceneGenerationResult {
 
 export class SceneGenerationStartError extends Error {
   readonly code: string;
-  constructor(code: string, message: string) {
+  /** V459 — nur bei `INSUFFICIENT_CREDITS` gesetzt. */
+  readonly requiredEuros?: number;
+  readonly availableEuros?: number;
+  constructor(
+    code: string,
+    message: string,
+    extra?: { requiredEuros?: number; availableEuros?: number },
+  ) {
     super(message);
     this.name = 'SceneGenerationStartError';
     this.code = code;
+    this.requiredEuros = extra?.requiredEuros;
+    this.availableEuros = extra?.availableEuros;
   }
+}
+
+/** V459 — Backend liefert Zahlen + Code, die UI lokalisiert. */
+function insufficientCreditsMessage(required: number, available: number): string {
+  const fmt = (n: number) =>
+    new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR' }).format(n);
+  return tx({
+    de: `Guthaben reicht nicht: ${fmt(required)} nötig, ${fmt(available)} verfügbar.`,
+    en: `Not enough credit: ${fmt(required)} required, ${fmt(available)} available.`,
+    es: `Saldo insuficiente: se necesitan ${fmt(required)}, disponibles ${fmt(available)}.`,
+  });
 }
 
 function requireIds(sceneIds: string[]): string[] {
@@ -70,9 +90,19 @@ export async function startSceneGeneration(params: {
   }
 
   if (data?.ok === false) {
+    const code = String(data.code ?? data.error ?? 'start_failed');
+    if (code === 'INSUFFICIENT_CREDITS' || code === 'NO_WALLET') {
+      const required = Number(data.required_euros ?? 0) || 0;
+      const available = Number(data.available_euros ?? 0) || 0;
+      throw new SceneGenerationStartError(
+        'INSUFFICIENT_CREDITS',
+        insufficientCreditsMessage(required, available),
+        { requiredEuros: required, availableEuros: available },
+      );
+    }
     throw new SceneGenerationStartError(
       String(data.error ?? 'start_failed'),
-      String(data.message ?? data.error ?? tx({ de: tx({ de: "Der Render konnte nicht gestartet werden.", en: "The render could not be started.", es: "No se pudo iniciar el renderizado." }), en: 'The render could not be started.', es: 'No se pudo iniciar el renderizado.' })),
+      String(data.message ?? data.error ?? tx({ de: 'Der Render konnte nicht gestartet werden.', en: 'The render could not be started.', es: 'No se pudo iniciar el renderizado.' })),
     );
   }
 

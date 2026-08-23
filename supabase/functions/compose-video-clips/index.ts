@@ -439,6 +439,8 @@ serve(async (req) => {
             error: "No AI Video wallet found",
             code: "NO_WALLET",
             needsPurchase: true,
+            required_euros: Number(totalCost.toFixed(2)),
+            available_euros: 0,
           }),
           {
             status: 402,
@@ -448,13 +450,17 @@ serve(async (req) => {
       }
 
       if (wallet.balance_euros < totalCost) {
+        // V459 — strukturierter Vertrag: die UI lokalisiert, die Business-Logik
+        // haengt an `code` + Zahlen, nie an uebersetzten Strings.
         return new Response(
           JSON.stringify({
-            error: `Insufficient credits. Need €${totalCost.toFixed(2)}, have €${wallet.balance_euros.toFixed(2)}`,
+            error: `Insufficient credits. Need €${totalCost.toFixed(2)}, have €${Number(wallet.balance_euros).toFixed(2)}`,
             code: "INSUFFICIENT_CREDITS",
             needsPurchase: true,
             required: totalCost,
             available: wallet.balance_euros,
+            required_euros: Number(totalCost.toFixed(2)),
+            available_euros: Number(Number(wallet.balance_euros ?? 0).toFixed(2)),
           }),
           {
             status: 402,
@@ -609,6 +615,8 @@ serve(async (req) => {
               code: "INSUFFICIENT_CREDITS",
               needsPurchase: true,
               required: resErr.required,
+              required_euros: Number(resErr.required.toFixed(2)),
+              available_euros: Number(Number(resErr.available ?? 0).toFixed(2)),
             }),
             { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
@@ -5601,11 +5609,30 @@ serve(async (req) => {
       );
     } else if (billableResults.length > 0 && actualCost > 0) {
       try {
-        await supabaseAdmin.rpc("deduct_ai_video_credits", {
-          p_user_id: user.id,
-          p_amount: actualCost,
-          p_generation_id: projectId,
-        });
+        // V459 — jede Belastung ist ab hier eindeutig einem Run/einer Szene
+        // zuordenbar. Ohne diese Metadaten kann ein Refund die Quell-Buchung
+        // nicht finden und landet im Zweifel in der falschen Kasse.
+        const billedSceneIds = billableResults.map((r) => r.sceneId);
+        const billedRunIds = billedSceneIds
+          .map((sid) => sceneRunStamps.get(sid)?.runId)
+          .filter((v): v is string => Boolean(v));
+        const { error: deductErr } = await supabaseAdmin.rpc(
+          "v459_deduct_ai_video_credits",
+          {
+            p_user_id: user.id,
+            p_amount: actualCost,
+            p_generation_id: projectId,
+            p_metadata: {
+              project_id: projectId,
+              scene_id: billedSceneIds[0] ?? null,
+              scene_ids: billedSceneIds,
+              run_id: billedRunIds[0] ?? null,
+              run_ids: billedRunIds,
+              source: "compose-video-clips",
+            },
+          },
+        );
+        if (deductErr) throw deductErr;
         console.log(
           `[compose-video-clips] Deducted €${actualCost.toFixed(2)} for ${billableResults.length} AI scenes (${generatingCount} async)`,
         );

@@ -19,6 +19,7 @@
 
 type SupabaseLike = {
   from: (t: string) => any;
+  rpc?: (fn: string, args: Record<string, unknown>) => any;
 };
 
 export interface FailLipSyncArgs {
@@ -31,15 +32,25 @@ export interface FailLipSyncArgs {
   extraSyncJobIds?: string[];
   /** Credits to refund (0 / undefined skips refund). */
   refundCredits?: number;
+  /**
+   * V459 — Run des fehlgeschlagenen Laufs. Der Euro-Refund wird an die
+   * Belastung dieses Runs gebunden (`metadata.run_id`).
+   */
+  runId?: string | null;
+  /** V459 — konkrete Quell-Belastung (`ai_video_transactions.id`), falls bekannt. */
+  sourceTransactionId?: string | null;
   /** Best-effort sync.so DELETE for the listed job ids. */
   syncApiKey?: string | null;
 }
+
 
 export interface FailLipSyncResult {
   ok: boolean;
   refunded: boolean;
   scene_id: string;
   reason: string;
+  /** V459 — Rohantwort von `v459_refund_lipsync_euros` (Kasse: Euro-Wallet). */
+  refund?: Record<string, unknown> | null;
 }
 
 export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncResult> {
@@ -54,7 +65,7 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
     const { data } = await supabase
       .from("composer_scenes")
       .select(
-        "id, dialog_shots, lip_sync_applied_at, replicate_prediction_id, audio_plan, project_id",
+        "id, dialog_shots, lip_sync_applied_at, replicate_prediction_id, audio_plan, project_id, active_run_id",
       )
       .eq("id", sceneId)
       .maybeSingle();
@@ -138,40 +149,62 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
     }
   }
 
-  // 4. Refund credits exactly once.
+  // 4. V459 — Refund IMMER in der Kasse, die belastet wurde: dem Euro-Wallet
+  //    (`ai_video_wallets.balance_euros`). Der Credit-Ledger (`wallets.balance`)
+  //    ist ausdrücklich NICHT mehr der Refund-Pfad — genau diese Fehlbuchung hat
+  //    beim Run a3b5541b 960 Credits gegen eine €4,50-Belastung gestellt.
+  //    Idempotenz haengt an der Quell-Belastung, nicht an (scene, run) allein:
+  //    refund_key = lipsync_refund:<run_id>:<source_transaction_id>.
   let didRefund = false;
-  if (!alreadyRefunded && refundAmount > 0 && args.userId) {
+  let refundInfo: Record<string, unknown> | null = null;
+  const runIdForRefund =
+    args.runId ??
+    (typeof state?.run_id === "string" ? state.run_id : null) ??
+    ((existing as any)?.active_run_id ?? null);
+  if (!alreadyRefunded && refundAmount > 0 && args.userId && typeof supabase.rpc === "function") {
     try {
-      const { data: wallet } = await supabase
-        .from("wallets")
-        .select("balance")
-        .eq("user_id", args.userId)
-        .single();
-      if (wallet) {
-        await supabase
-          .from("wallets")
-          .update({
-            balance: Number(wallet.balance ?? 0) + refundAmount,
-            updated_at: nowIso,
-          })
-          .eq("user_id", args.userId);
-        didRefund = true;
+      const { data: refundRes, error: refundErr } = await supabase.rpc(
+        "v459_refund_lipsync_euros",
+        {
+          p_user_id: args.userId,
+          p_scene_id: sceneId,
+          p_run_id: runIdForRefund ? String(runIdForRefund) : null,
+          p_source_transaction_id: args.sourceTransactionId ?? null,
+          p_reason: safeReason,
+        },
+      );
+      if (refundErr) {
+        console.warn(`[failLipSync] euro refund rpc error: ${refundErr.message ?? refundErr}`);
+      } else {
+        refundInfo = (refundRes ?? null) as Record<string, unknown> | null;
+        didRefund = (refundInfo as any)?.refunded === true;
+        console.log(
+          `[failLipSync] v459 euro_refund scene=${sceneId} run=${runIdForRefund ?? "-"} ` +
+            `refunded=${didRefund} detail=${JSON.stringify(refundInfo ?? {})}`,
+        );
       }
     } catch (e) {
       console.warn(`[failLipSync] refund crash: ${(e as Error).message}`);
     }
   }
 
+
   // 5. Patch dialog_shots (mark failed/refunded) and the scene row.
+  // Ein bereits gebuchter Refund (`already_refunded`) gilt als erledigt und
+  // darf keinen zweiten Versuch ausloesen.
+  const refundSettled =
+    didRefund || (refundInfo as any)?.reason === "already_refunded";
   const patchedState = state
     ? {
         ...state,
         status: "failed",
         error: safeReason,
         finished_at: state.finished_at ?? nowIso,
-        refunded: alreadyRefunded || didRefund || refundAmount === 0,
+        refunded: alreadyRefunded || refundSettled || refundAmount === 0,
+        v459_refund: refundInfo ?? (state as any)?.v459_refund ?? null,
       }
     : { version: 5, status: "failed", error: safeReason, refunded: refundAmount === 0 };
+
 
   try {
     await supabase
@@ -187,11 +220,11 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
       .eq("id", sceneId);
   } catch (e) {
     console.warn(`[failLipSync] scene update crash: ${(e as Error).message}`);
-    return { ok: false, refunded: didRefund, scene_id: sceneId, reason: safeReason };
+    return { ok: false, refunded: didRefund, scene_id: sceneId, reason: safeReason, refund: refundInfo };
   }
 
   console.log(
     `[failLipSync] scene=${sceneId} reason="${safeReason}" jobs=${ids.length} refunded=${didRefund}/${refundAmount}`,
   );
-  return { ok: true, refunded: didRefund, scene_id: sceneId, reason: safeReason };
+  return { ok: true, refunded: didRefund, scene_id: sceneId, reason: safeReason, refund: refundInfo };
 }
