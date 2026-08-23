@@ -4,72 +4,82 @@ V461 ist geschlossen und wird nicht mehr angefasst. Die Pipeline entscheidet
 ehrlich; offen bleibt nur noch die Provider-Frage: Warum erzeugt Sync.so bei
 technisch gültigen Inputs keine Lippenbewegung?
 
-## Kontrollgruppe ist vorhanden
+Neu und vorgezogen: **V462-A — Known-Good Homepage Control**. Der 4-Sprecher-Clip
+auf der Startseite (`public/videos/proof-clip.mp4`, eingebunden in
+`src/components/landing/ProofMoment.tsx`) liegt heute nur als kopierte Datei vor —
+ohne Verweis auf den erzeugenden Run. Bevor irgendetwas verglichen wird, muss
+dieser Run erst identifiziert und die Identität belegt werden.
 
-Der Dispatch-Log enthält eine echte Erfolgsgruppe: 51 Passes mit
-`MOTION_VERDICT_MOVED` (01.–02.08.) und dazu 24 `MOTION_VERDICT_PASSTHROUGH`.
-Dem stehen 81 `NOOP_LADDER_EXHAUSTED`-Passes gegenüber, darunter die vier
-Passes des letzten kontrollierten Laufs, die das V461-Face-Gate sauber
-passiert haben. Damit ist ein Differenzvergleich ohne neuen Lauf möglich.
+## Stufe A1 — Herkunft des Homepage-Clips belegen
 
-## Was verglichen wird
+1. Technische Signatur der Datei bestimmen (Dauer, Auflösung, FPS, Codec,
+   Audiospur, Bytes).
+2. Kandidaten in `composer_scenes` suchen: abgeschlossene Lip-Sync-Szenen mit
+   ~8 s, 4 Sprechern, deutscher Sprache. Der dokumentierte v400-Golden-Run
+   `c934a823-47de-49b7-a62e-a116b49ca3b2` (8,0 s, 4 Sprecher, `complete`) ist der
+   erste Kandidat, gilt aber ausdrücklich als **unbestätigte Vermutung**.
+3. Identität nur akzeptieren, wenn Ausgabe-URL bzw. Datei-Signatur und
+   Frame-Stichproben übereinstimmen. Lässt sich der Run nicht eindeutig
+   zuordnen, wird das so berichtet — dann fällt V462-A weg und es bleibt beim
+   statistischen Vergleich (Stufe B).
 
-Pro Pass wird ein Merkmalsvektor aus bereits gespeicherten Daten gebildet —
-keine neuen Dispatches, keine Provider-Kosten:
+## Stufe A2 — Pass-gegen-Pass-Vergleich (nur bei bestätigter Herkunft)
 
-```text
-Gruppe SUCCESS : motion_verdict = moved
-Gruppe NOOP    : NOOP_LADDER_EXHAUSTED mit bestandenem Face-Gate
-```
+Ein erfolgreicher Homepage-Pass gegen einen NOOP-Pass des letzten S01-Laufs, mit
+identischer Merkmalsliste. Bevorzugt wird der Homepage-Sprecher gewählt, dessen
+Bildsituation dem S01-Fall am ähnlichsten ist (3/4-Profil, kleines Gesicht,
+mehrere Personen in der Plate).
 
-Merkmale je Pass:
+Verglichen wird:
 
-- Geometrie: face_share, Face-Größe in Provider-Pixeln, Crop-Größe,
-  Output-Größe, Mund-ROI-Position und -Höhe, Mund-Offset-Vektor
-- Kopf/Blick: Anchor-Quelle (Mund-Landmark vs. Bbox-Ableitung),
-  Bbox-Seitenverhältnis als Profil-Indikator, Bewegung der Box über die
-  Frames (Box-Sequenz-Streuung)
-- Video: Dauer, Framecount, FPS, Bytes, Bytes pro Frame als grober Proxy für
-  Bildbewegung im Ausgangsclip
-- Audio: Dauer, Lead-in bis zum ersten Sprachanteil, Voiced-Anteil,
-  Peak-dBFS, Sample-Rate, ob normalisiert
-- Provider-Parameter: Modell, sync_mode, ASD-Transport, auto_detect,
-  Sprecheranzahl, Koordinatenraum
-- Ergebnis: delta_mean des Motion-Gates, mad_ratio-Telemetrie
+- **Tatsächlich gesendetes Preclip-MP4** (nicht Plate, nicht DB-Metadaten):
+  Dauer, Größe, Framecount, FPS, Bytes.
+- **Mundzustand im Eingangsvideo**: Wie stark bewegt sich der Mund schon vor
+  Sync.so? Hypothese: Plates mit bereits natürlicher Mundbewegung sind schwerer
+  zu überschreiben als ruhige Preclips.
+- **Bewegung und Timing vor Sprachbeginn**: Lead-in bis zur ersten Stimme,
+  Bildbewegung in diesem Vorlauf.
+- **Crop-Verhalten**: statisch vs. dynamisch, Box-Streuung über die Frames,
+  Kopfbewegung. Funktioniert die Homepage-Szene ohne dynamisches Tracking, ist
+  Tracking nicht der Hauptschlüssel.
+- **Audio**: Dauer, Stille vorn/hinten, Voiced-Anteil, Lautheit, Sample-Rate,
+  Kanäle, Codec/Container, Normalisierung.
+- **Provider-Parameter**: Modell/Modellversion, `sync_mode`, ASD-Verfahren und
+  Transport, `auto_detect`, Koordinatenraum, Sprecheranzahl.
+- **Geometrie**: face_share, Face-Größe in Provider-Pixeln, Mund-ROI und Offset.
+- **Preclip-Technik damals vs. heute**: wurde überhaupt dasselbe Verfahren
+  benutzt?
 
-## Auswertung
+## Stufe B — Statistischer Rückhalt
 
-1. Verteilungsvergleich je Merkmal zwischen SUCCESS und NOOP; benannt werden
-   nur Merkmale, die die Gruppen tatsächlich trennen.
-2. Gegenprobe an genau den vier Passes des letzten Laufs: Für jeden wird
-   gesagt, welches Merkmal ihn in die NOOP-Region legt — inklusive des
-   frontalen Falls, der aktuell am wenigsten erklärt ist.
-3. Prüfung, ob sich zwischen der Erfolgsperiode (Anfang August) und heute ein
-   Provider-Parameter oder ein Preclip-Merkmal systematisch geändert hat
-   (z. B. Preclip-Dauer, Lead-in, ASD-Transport, Modell).
-4. Wenn die vorhandenen Daten den frontalen Fall nicht erklären, wird das
-   ausdrücklich als offen benannt statt eine Hypothese als Befund zu
-   verkaufen; dann folgt ein Vorschlag für die kleinstmögliche zusätzliche
-   Messung.
+Zusätzlich, aber nachrangig: 51 Passes mit `MOTION_VERDICT_MOVED` (01.–02.08.)
+gegen 81 `NOOP_LADDER_EXHAUSTED`-Passes. Benannt werden nur Merkmale, die die
+Gruppen tatsächlich trennen. Diese Gruppe dient der Absicherung des A2-Befunds,
+nicht als Hauptbeweis.
 
 ## Ergebnis dieses Gates
 
-Ein schriftlicher Befund mit:
+- Beleg oder klare Absage zur Herkunft des Homepage-Clips.
+- Merkmalstabelle Homepage-SUCCESS vs. S01-NOOP mit markierten Abweichungen.
+- Benennung der Achse, die den Unterschied erklärt — oder die ausdrückliche
+  Feststellung, dass die vorhandenen Daten ihn nicht erklären, plus Vorschlag
+  für die kleinstmögliche zusätzliche Messung.
+- Genau eine eng begrenzte Empfehlung für V463 (eine Achse: Preclip-Struktur,
+  Audio-Timing, Ausgangs-Mundbewegung oder Provider-Parameter).
 
-- Trennmerkmal(en) zwischen erfolgreichen Provider-Syncs und echten NOOPs
-- Einordnung der vier aktuellen Passes
-- einer konkreten, eng begrenzten Empfehlung für V463 (Framing, Preclip-Struktur,
-  Audio-Aufbereitung oder Provider-Parameter — genau eine Achse)
-
-Kein Code, keine Schwellen, keine Deploys, kein Provider-Call. Danach STOP.
+Kein Code, keine Schwellen, keine Deploys, kein Provider-Call, kein Rerender.
+Danach STOP.
 
 ## Technische Details
 
 - Quellen: `syncso_dispatch_log` (`meta.provider_input_fingerprint`,
   `meta.preclip_crop`, `face_share_in_preclip`, `motion_verdict`,
   `motion_probe_meta`), `composer_scenes.dialog_shots->'passes'`
-  (`v461_face_gate`, `preclip_dims`, `semantic_input_fingerprint`).
-- Auswertung erfolgt rein per SQL-Leseabfragen; Ergebnisse werden als
-  `docs/v462-provider-suitability-audit.md` abgelegt.
+  (`v461_face_gate`, `preclip_dims`, `semantic_input_fingerprint`),
+  `docs/lipsync-golden-run-v400.md`.
+- Medienanalyse per ffprobe/ffmpeg auf den bereits vorhandenen Dateien
+  (Homepage-Clip lokal, Preclips/VO über gespeicherte Storage-URLs). Reine
+  Lesezugriffe, keine Neuerzeugung.
+- Ergebnis wird als `docs/v462-provider-suitability-audit.md` abgelegt.
 - Eingefroren: Motion-Detektor, Motion-Schwellen, Face-Gate, Dedup, Refunds,
   Provider-Zertifizierung, Preclip-Geometrie.
