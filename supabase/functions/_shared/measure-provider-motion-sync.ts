@@ -42,6 +42,8 @@ import {
 } from "./v434-motion-roi.ts";
 // V456 Gate 2 — validated, anchor-coherent geometry contract.
 import type { V456RoiContract } from "./v456-roi-contract.ts";
+// V465-B2a — paired mouth-over-frame telemetry (pure, same stills).
+import { computeMouthOverFrame, type V465PairedMetric } from "./v465-mouth-over-frame.ts";
 
 /** Frozen production constants — no rounding, no heuristics. */
 export const MOTION_SAMPLE_COUNT = 6;
@@ -162,7 +164,13 @@ export interface MeasureProviderMotionSyncResult {
     provider_mad: MadSummary | null;
     mad_ratio: MadRatioTelemetry;
   };
+  /**
+   * V465-B2a — paired mouth-over-frame telemetry, measured on the very same
+   * production stills. Telemetry until V465-B2b; never a verdict here.
+   */
+  v465?: V465PairedMetric;
 }
+
 
 /**
  * Per-asset SOURCE→STILL transform (frozen proof: DialogStitchVideo renders the
@@ -438,9 +446,16 @@ export async function measureProviderMotionSync(
       ? (contract?.roi ?? derivedRoi.roi)
       : MOTION_ROI;
 
+    /** V465-B2a — decoded stills + verdict box, retained for the paired metric. */
+    const pairedFrames: Record<"preclip" | "provider", {
+      stills: DecodedFrame[];
+      roi: { bx: number; by: number; bw: number; bh: number };
+    } | null> = { preclip: null, provider: null };
+
     const measureOne = async (
       url: string,
       dimHint: { width: number; height: number } | null | undefined,
+      slot: "preclip" | "provider",
     ): Promise<MotionMetricValue> => {
       const dims = dimHint && dimHint.width > 0 && dimHint.height > 0
         ? dimHint
@@ -471,6 +486,7 @@ export async function measureProviderMotionSync(
         verdictRoi,
       );
       if (!(roi.bw > 0) || !(roi.bh > 0) || roi.bx < 0 || roi.by < 0) throw new Error("roi_invalid");
+      pairedFrames[slot] = { stills: decoded, roi };
       const { mean, peak } = computeMotionMetric(decoded, roi);
       if (!Number.isFinite(mean) || !Number.isFinite(peak)) throw new Error("metric_not_finite");
       // V434 Step 3/4 — the scale-free MAD is computed on the SAME already
@@ -512,18 +528,33 @@ export async function measureProviderMotionSync(
     let preclip: MotionMetricValue;
     let provider: MotionMetricValue;
     try {
-      preclip = await measureOne(args.preclipUrl, args.preclipDims);
+      preclip = await measureOne(args.preclipUrl, args.preclipDims, "preclip");
     } catch (e) {
       return deadlineAwareUnmeasurable(e, "preclip");
     }
     try {
-      provider = await measureOne(args.providerOutputUrl, args.providerDims);
+      provider = await measureOne(args.providerOutputUrl, args.providerDims, "provider");
     } catch (e) {
       return deadlineAwareUnmeasurable(e, "provider");
     }
     if (remaining() <= 0) {
       return unmeasurable("motion_probe_indeterminate:measurement_deadline_exceeded");
     }
+
+    // ── V465-B2a — paired mouth-over-frame on the SAME production stills ──
+    const v465: V465PairedMetric = pairedFrames.preclip && pairedFrames.provider
+      ? computeMouthOverFrame({
+        preclipStills: pairedFrames.preclip.stills,
+        providerStills: pairedFrames.provider.stills,
+        preclipRoi: pairedFrames.preclip.roi,
+        providerRoi: pairedFrames.provider.roi,
+      })
+      : computeMouthOverFrame({
+        preclipStills: [],
+        providerStills: [],
+        preclipRoi: { bx: 0, by: 0, bw: 0, bh: 0 },
+        providerRoi: { bx: 0, by: 0, bw: 0, bh: 0 },
+      });
 
     return {
       preclip_metric: preclip,
@@ -546,6 +577,8 @@ export async function measureProviderMotionSync(
         provider_mad: provider.mad ?? null,
         mad_ratio: buildMadRatioTelemetry(preclip.mad ?? null, provider.mad ?? null),
       },
+      // V465-B2a — telemetry only. Authority flips in V465-B2b, not here.
+      v465,
     };
 
   } finally {

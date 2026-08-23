@@ -88,6 +88,7 @@ console.log(
 import {
   buildImmutableArtifactKey,
   pinImmutableArtifact,
+  resolveArtifactAttempt,
   type PinnedArtifact,
 } from "../_shared/v434-immutable-artifact.ts";
 import { isTerminalNoopPass } from "../_shared/v459-fanout-aggregation.ts";
@@ -934,6 +935,38 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           },
         });
       }
+      // ── V465-B2a — paired mouth-over-frame telemetry ──────────────────
+      // Measured on the SAME production Lambda stills, printed and persisted
+      // next to (never instead of) the authoritative v404 verdict.
+      const v465 = (v404MotionMeasurement as any)?.v465;
+      if (v465) {
+        console.log(
+          `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} v465_telemetry scene=${sceneId} pass=${measurePassIdx} ` +
+            `mouth_over_frame=${v465.mouth_over_frame ?? "unknown"} mouth_edit=${v465.mouth_edit ?? "unknown"} ` +
+            `frame_edit=${v465.frame_edit ?? "unknown"} class=${v465.classification} ` +
+            `band=${v465.band?.noop_below}/${v465.band?.moved_above} reason=${v465.reason} authority=telemetry_only`,
+        );
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          job_id: jobId,
+          engine: "sync-segments",
+          turn_idx: measurePassIdx,
+          sync_status: "V465_TELEMETRY",
+          error_class: null,
+          error_message: null,
+          meta: {
+            v465: {
+              ...v465,
+              legacy_delta_mean: v404MotionMeasurement?.deltaMean ?? null,
+              legacy_verdict: v404MotionProbe?.verdict ?? null,
+              still_source: "remotion_lambda",
+              authority: "telemetry_only",
+              phase,
+              pass_idx: measurePassIdx,
+            },
+          },
+        });
+      }
       // V434 Step 3/4 — scale-free outcome telemetry, printed next to (never
       // instead of) the authoritative v404 verdict.
       const v434 = (v404MotionMeasurement as any)?.v434;
@@ -977,7 +1010,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           "unknown";
         const pinRunId = String((scene as any)?.active_run_id ?? "") || "unknown-run";
         const pinGeneration = Number((scene as any)?.plate_generation ?? 0) || 0;
-        const pinAttempt = Number((snapPass as any)?.attempt ?? 0) || 0;
+        // V465-B2a — real attempt qualifier: a NOOP-ladder retry must never
+        // collide with the first attempt's key and be silently dropped.
+        const pinAttempt = resolveArtifactAttempt(snapPass);
         const key = buildImmutableArtifactKey({
           userId: pinUserId,
           sceneId,

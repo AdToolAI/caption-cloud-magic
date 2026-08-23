@@ -178,6 +178,7 @@ import { evaluateTurnPassBinding, isStabilizerPass, type TurnPassCandidate } fro
 import {
   buildImmutableArtifactKey,
   pinImmutableArtifact,
+  resolveArtifactAttempt,
 } from "../_shared/v434-immutable-artifact.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -5945,7 +5946,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               generation: Number((scene as any)?.plate_generation ?? 0) || 0,
               passIdx: currentPassIdx,
               kind: "preclip",
-              attempt: Number((pass as any)?.attempt ?? 0) || 0,
+              attempt: resolveArtifactAttempt(pass),
             });
             const v434Pin = await pinImmutableArtifact({
               supabase,

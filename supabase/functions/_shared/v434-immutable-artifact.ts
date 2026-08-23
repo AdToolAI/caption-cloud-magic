@@ -76,9 +76,45 @@ export function buildImmutableArtifactKey(args: ImmutableArtifactKeyArgs): strin
 
 /** PURE. True when the key carries a run + generation + attempt qualifier. */
 export function isImmutableArtifactKey(key: string): boolean {
-  return /\/v434\/[^/]+\/run-[^/]+\/gen-\d+\/pass-\d+\/[a-z0-9-]+-a\d+\.[a-z0-9]+$/.test(
+  return /\/v434\/[^/]+\/run-[^/]+\/gen-\d+\/pass-\d+\/[a-z0-9-]+-a\d+(-[0-9a-f]{8})?\.[a-z0-9]+$/.test(
     String(key ?? ""),
   );
+}
+
+/**
+ * V465-B2a — PURE. The attempt qualifier of a pass.
+ *
+ * The old `pass.attempt ?? 0` was always 0 in production, so every NOOP-ladder
+ * retry of the same pass mapped onto ONE immutable key. With `upsert: false`
+ * the second and later provider outputs were silently DROPPED — which is
+ * exactly why the S01 grey cases had no evidence. We therefore derive the
+ * attempt from every counter the pass actually carries.
+ */
+export function resolveArtifactAttempt(pass: unknown): number {
+  const p = (pass ?? {}) as Record<string, unknown>;
+  const candidates: unknown[] = [
+    p.attempt,
+    p.attempt_idx,
+    Array.isArray(p.attempts) ? p.attempts.length - 1 : undefined,
+    p.noop_attempts,
+    p.provider_attempts,
+    p.retry_count,
+    p.retries,
+  ];
+  let best = 0;
+  for (const c of candidates) {
+    const n = Number(c);
+    if (Number.isFinite(n) && n > best) best = Math.trunc(n);
+  }
+  return best;
+}
+
+/** PURE. Content-qualified sibling key used when an attempt key collides. */
+export function variantArtifactKey(key: string, sha256: string): string {
+  const dot = key.lastIndexOf(".");
+  const base = dot > 0 ? key.slice(0, dot) : key;
+  const ext = dot > 0 ? key.slice(dot) : "";
+  return `${base}-${String(sha256 ?? "").slice(0, 8)}${ext}`;
 }
 
 /** PURE. Lowercase hex sha256 of raw bytes (Web Crypto). */
@@ -154,13 +190,52 @@ export async function pinImmutableArtifact(args: PinArtifactArgs): Promise<Pinne
       const msg = String(up.error?.message ?? "");
       const exists = /exist/i.test(msg) || Number(up.error?.statusCode) === 409;
       if (!exists) return fail(`pin_failed:upload_${msg.slice(0, 80) || "unknown"}`);
+
+      // ── V465-B2a — never lose evidence on a key collision ───────────────
+      // A pre-existing object with the SAME sha is a genuine idempotent
+      // re-delivery. A pre-existing object with DIFFERENT bytes means a second
+      // provider output for the same (run, gen, pass, attempt) tuple — that
+      // one used to be silently dropped. It is now pinned under a
+      // content-qualified sibling key instead.
+      let existingDigest: string | null = null;
+      try {
+        const cur = await args.supabase.storage.from(bucket).download(args.key);
+        if (cur?.data) {
+          existingDigest = await sha256Hex(new Uint8Array(await cur.data.arrayBuffer()));
+        }
+      } catch { /* treat as unknown */ }
+
+      if (existingDigest && existingDigest !== digest) {
+        const altKey = variantArtifactKey(args.key, digest);
+        const alt = await args.supabase.storage.from(bucket).upload(altKey, bytes, {
+          contentType: args.contentType ?? "video/mp4",
+          upsert: false,
+        });
+        const altErr = String(alt?.error?.message ?? "");
+        if (alt?.error && !/exist/i.test(altErr) && Number(alt?.error?.statusCode) !== 409) {
+          return fail(`pin_failed:variant_upload_${altErr.slice(0, 60) || "unknown"}`);
+        }
+        let altUrl: string | null = null;
+        try {
+          altUrl = args.supabase.storage.from(bucket).getPublicUrl(altKey)?.data?.publicUrl ?? null;
+        } catch { /* noop */ }
+        return {
+          ok: true,
+          key: altKey,
+          url: altUrl,
+          sha256: digest,
+          bytes: bytes.byteLength,
+          status: "pinned_variant",
+        };
+      }
+
       return {
         ok: true,
         key: args.key,
         url: publicUrlOf(),
         sha256: digest,
         bytes: bytes.byteLength,
-        status: "already_pinned",
+        status: existingDigest ? "already_pinned" : "already_pinned_unverified",
       };
     }
     return {
