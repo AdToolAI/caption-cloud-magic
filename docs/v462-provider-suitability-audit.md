@@ -244,3 +244,26 @@ vom Provider tatsächlich veränderte Bildregion.
 | COH21 | c7b895f4 | NOOP | 0.15 | 10 | 3 | True | 0.1 | 1.505 | 1.217 | 1.468 | 1.875 | 0.924 | 2.67 | 13.43 | 0.6 |
 | COH22 | c7b895f4 | NOOP | 0.12 | 20 | 2 | True | 0.14 | 2.608 | 1.226 | 2.814 | 2.648 | 0.605 | 3.37 | 10.98 | 0.32 |
 | COH04 | f663b958 | NOOP | 0.012 | -58.42398452758789 | 2 | False | 0.08 | 44.083 | 34.684 | 13.165 | 9.756 | 0.733 | 1.77 | 7.96 | 0.52 |
+
+## V463 — Provider-Differentialtest (READ-ONLY, abgeschlossen)
+
+**Setup.** Vier eingefrorene Assetpaare (exakt die in Produktion dispatchten Pre-Clips + WAVs), öffentlich gehostet unter `composer-frames/v463/`:
+`S01_1` (Yaw 75°, NOOP), `S01_3` (Yaw 45°, NOOP), `COH01` (frontal, sauber, NOOP), `GOLD_2` (Homepage-Golden, SUCCESS-Kontrolle).
+Dispatch an drei Modelle: **sync-3** (direkt, ohne ASD-Payload), **kling-lip-sync**, **latentsync**.
+
+**Detektor-Neuaufbau.** Der Pixel-Block-Diff war nicht vertrauenswürdig (Zeitversatz/Reencode kippten Labels). Ersetzt durch ein Vision-Urteil auf Input/Output-Kontaktbögen (6 identische Zeitstempel, oben Input, unten Output). Kalibrierung gegen bekannte Wahrheit: GOLD_0/GOLD_2 Produktions-Output = MOVED, COH01 Produktions-Output = NOOP — beides reproduziert (conf ≥ 0.95). Stichproben zusätzlich visuell bestätigt.
+
+**Ergebnismatrix (MOVED = Lippen verändert):**
+
+| Case | sync-3 PROD (mit ASD-Boxen) | sync-3 FRESH (ohne ASD) | kling | latentsync |
+|---|---|---|---|---|
+| COH01 (frontal) | NOOP | **MOVED** | – | MOVED |
+| S01_3 (Yaw 45°) | NOOP | **MOVED** | NOOP | MOVED |
+| S01_1 (Yaw 75°) | NOOP | **MOVED** | Dispatch-Fehler | MOVED |
+| GOLD_2 (Kontrolle) | MOVED | unklar/NOOP | MOVED | NOOP |
+
+**Kernbefund.** Mit **byte-identischen** Video- und Audio-Assets liefert sync-3 auf allen drei bisherigen NOOP-Fällen sauberen Lip-Sync — sobald der Request **ohne** unseren `active_speaker_detection`-Block (`auto_detect:false` + `bounding_boxes[_url]`) gestellt wird. Damit sind widerlegt: Plate-Qualität, Framing/Face-Share, Pose/Yaw, Audio-Lead-in, Preclip-Geometrie. Übrig bleibt als einzige verbliebene Differenz unser **ASD-/Bounding-Box-Payload**.
+
+**Nebenbefund (Vorsicht).** GOLD_2 bewegte sich ohne ASD *nicht* eindeutig (Mehrpersonen-Plate) — plain autodetect ist also kein pauschaler Ersatz, sondern eine Fallgruppen-Entscheidung. Ebenso ist kein Alternativprovider universell: latentsync bestand alle S01/COH01-Fälle, scheiterte aber an GOLD_2; kling scheiterte an S01_3.
+
+**Empfehlung für V464 (noch nicht freigegeben).** Genau ein A/B-Gate auf der ASD-Achse: identische Assets, Variante A = heutiger ASD-Block, Variante B = `auto_detect:true` bzw. kein ASD, jeweils für Einzelsprecher-Pre-Clips (N=1 im Crop) — plus Prüfung, ob unsere Boxen im Pre-Clip-Koordinatenraum statt im Plate-Raum gesendet werden. Kein Produktionslauf bis dahin.
