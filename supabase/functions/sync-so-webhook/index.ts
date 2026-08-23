@@ -39,11 +39,14 @@ import { evaluateNoopRedispatch } from "../_shared/v461-input-fingerprint.ts";
 // `materializeCompatibilityOutput` gehört ausschließlich dem Finalizer.
 
 import { acquireLedgerJob, observeCallbackProvenance, readPipelineJobId } from "../_shared/v431-ledger.ts";
-// FA-4 Provider-No-op Fix Contract C′ — PURE motion classifier.
+// FA-4 Provider-No-op Fix Contract C′ — PURE motion classifier (LEGACY
+// TELEMETRY since V465-B2b; never authoritative).
 import {
   classifyMotionProbe,
   type MotionProbeResult,
 } from "../_shared/motion-probe-classifier.ts";
+// V465-B2b — authoritative paired mouth-over-frame verdict.
+import { resolveV465Verdict } from "../_shared/v465-verdict.ts";
 // FA-4 v404 — server-side synchronous measurement owner (Remotion stills).
 import {
   measureProviderMotionSync,
@@ -874,28 +877,46 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         isMouthRoiUnresolved(v404MotionMeasurement.reason);
       v443MotionUnverified = v443Bounded.infraExhausted || v456Unresolved;
       v443LastInfraReason = v443MotionUnverified ? v404MotionMeasurement.reason : null;
-      v404MotionProbe = v404MotionMeasurement.measurement_status === "measured" &&
+      // ── V465-B2b — AUTHORITY FLIP ────────────────────────────────────────
+      // The authoritative outcome scalar is the paired `mouth_over_frame`
+      // ratio (docs/v465b2a-lambda-still-parity.md). The frozen v404
+      // `delta_mean` and the V434 `mad_ratio` are computed and logged as LEGACY
+      // TELEMETRY only and may never override the verdict below.
+      const v465Metric = (v404MotionMeasurement as any)?.v465 ?? null;
+      const legacyProbe: MotionProbeResult | null =
+        v404MotionMeasurement.measurement_status === "measured" &&
           v404MotionMeasurement.preclip_metric && v404MotionMeasurement.provider_metric
-        ? classifyMotionProbe({
-          preclip: v404MotionMeasurement.preclip_metric,
-          provider: v404MotionMeasurement.provider_metric,
-        })
-        : {
-          verdict: "indeterminate",
-          deltaMean: v404MotionMeasurement.deltaMean ?? 0,
-          deltaPeak: v404MotionMeasurement.deltaPeak ?? 0,
-          preclipMean: v404MotionMeasurement.preclip_metric?.mean ?? 0,
-          preclipPeak: v404MotionMeasurement.preclip_metric?.peak ?? 0,
-          providerMean: v404MotionMeasurement.provider_metric?.mean ?? 0,
-          providerPeak: v404MotionMeasurement.provider_metric?.peak ?? 0,
-          reason: v404MotionMeasurement.reason,
-        };
+          ? classifyMotionProbe({
+            preclip: v404MotionMeasurement.preclip_metric,
+            provider: v404MotionMeasurement.provider_metric,
+          })
+          : null;
+      const v465Verdict = v404MotionMeasurement.measurement_status === "measured"
+        ? resolveV465Verdict(v465Metric)
+        : resolveV465Verdict(null);
+      v404MotionProbe = {
+        verdict: v465Verdict.verdict,
+        // Reason of the measurement failure wins so that V443/V456 pass-through
+        // classification keeps working on unmeasurable runs.
+        reason: v404MotionMeasurement.measurement_status === "measured"
+          ? v465Verdict.reason
+          : v404MotionMeasurement.reason,
+        deltaMean: legacyProbe?.deltaMean ?? v404MotionMeasurement.deltaMean ?? 0,
+        deltaPeak: legacyProbe?.deltaPeak ?? v404MotionMeasurement.deltaPeak ?? 0,
+        preclipMean: v404MotionMeasurement.preclip_metric?.mean ?? 0,
+        preclipPeak: v404MotionMeasurement.preclip_metric?.peak ?? 0,
+        providerMean: v404MotionMeasurement.provider_metric?.mean ?? 0,
+        providerPeak: v404MotionMeasurement.provider_metric?.peak ?? 0,
+      };
       console.log(
         `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} server_motion_measure scene=${sceneId} pass=${measurePassIdx} ` +
           `phase=${phase} status=${v404MotionMeasurement.measurement_status} ` +
-          `delta_mean=${v404MotionMeasurement.deltaMean ?? "n/a"} ` +
-          `verdict=${v404MotionProbe.verdict} reason=${v404MotionProbe.reason}`,
+          `authority=v465_mouth_over_frame mouth_over_frame=${v465Verdict.mouth_over_frame ?? "n/a"} ` +
+          `guard=${v465Verdict.guard ?? "none"} verdict=${v404MotionProbe.verdict} reason=${v404MotionProbe.reason} ` +
+          `legacy_delta_mean=${v404MotionMeasurement.deltaMean ?? "n/a"} ` +
+          `legacy_verdict=${legacyProbe?.verdict ?? "n/a"} (legacy telemetry only)`,
       );
+
       // V443 — bounded re-measure exhausted for INFRASTRUCTURE reasons only.
       // Persist everything the watchdog needs for exactly ONE re-measure of the
       // very same immutable provider output. No provider job is referenced.
@@ -935,38 +956,47 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           },
         });
       }
-      // ── V465-B2a — paired mouth-over-frame telemetry ──────────────────
-      // Measured on the SAME production Lambda stills, printed and persisted
-      // next to (never instead of) the authoritative v404 verdict.
-      const v465 = (v404MotionMeasurement as any)?.v465;
+      // ── V465-B2b — AUTHORITATIVE paired mouth-over-frame record ────────
+      // Measured on the production Lambda stills; this is now the verdict
+      // owner. `delta_mean` / `mad_ratio` ride along as legacy telemetry.
+      const v465 = v465Metric;
       if (v465) {
         console.log(
-          `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} v465_telemetry scene=${sceneId} pass=${measurePassIdx} ` +
+          `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} v465_verdict scene=${sceneId} pass=${measurePassIdx} ` +
             `mouth_over_frame=${v465.mouth_over_frame ?? "unknown"} mouth_edit=${v465.mouth_edit ?? "unknown"} ` +
-            `frame_edit=${v465.frame_edit ?? "unknown"} class=${v465.classification} ` +
-            `band=${v465.band?.noop_below}/${v465.band?.moved_above} reason=${v465.reason} authority=telemetry_only`,
+            `frame_edit=${v465.frame_edit ?? "unknown"} roi_px=${v465.roi_pixels ?? "unknown"} ` +
+            `verdict=${v465Verdict.verdict} guard=${v465Verdict.guard ?? "none"} ` +
+            `band=${v465Verdict.band.noop_below}/${v465Verdict.band.moved_above} reason=${v465Verdict.reason} ` +
+            `authority=authoritative`,
         );
         await logSyncDispatch(supabase, {
           scene_id: sceneId,
           job_id: jobId,
           engine: "sync-segments",
           turn_idx: measurePassIdx,
-          sync_status: "V465_TELEMETRY",
+          sync_status: "V465_VERDICT",
           error_class: null,
           error_message: null,
           meta: {
             v465: {
               ...v465,
+              verdict: v465Verdict.verdict,
+              verdict_reason: v465Verdict.reason,
+              guard: v465Verdict.guard,
+              verdict_band: v465Verdict.band,
               legacy_delta_mean: v404MotionMeasurement?.deltaMean ?? null,
-              legacy_verdict: v404MotionProbe?.verdict ?? null,
+              legacy_verdict: legacyProbe?.verdict ?? null,
+              legacy_mad_ratio:
+                (v404MotionMeasurement as any)?.v434?.mad_ratio?.mad_ratio ?? null,
               still_source: "remotion_lambda",
-              authority: "telemetry_only",
+              authority: "v465_mouth_over_frame",
               phase,
               pass_idx: measurePassIdx,
             },
           },
         });
       }
+
       // V434 Step 3/4 — scale-free outcome telemetry, printed next to (never
       // instead of) the authoritative v404 verdict.
       const v434 = (v404MotionMeasurement as any)?.v434;

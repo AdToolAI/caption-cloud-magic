@@ -22,9 +22,13 @@
  * nothing here may terminalize a pass, trigger a refund or start a retry.
  */
 
-/** Frozen conservative band from V465-B1 (0 FP / 0 FN on 32 frozen passes). */
+/**
+ * Lambda-calibrated band (V465-B2a, frozen as the authoritative contract in
+ * V465-B2b): 0 FP / 0 FN on the 32 frozen passes measured through the exact
+ * production still path. Boundaries themselves are INDETERMINATE.
+ */
 export const V465_NOOP_BELOW = 2.0;
-export const V465_MOVED_ABOVE = 3.1;
+export const V465_MOVED_ABOVE = 2.65;
 
 export type V465Classification = "noop" | "indeterminate" | "moved" | "unavailable";
 
@@ -47,9 +51,12 @@ export interface V465PairedMetric {
   mouth_over_frame: number | null;
   classification: V465Classification;
   frames: number;
+  /** Pixel count of the measured mouth ROI — degeneracy guard input. */
+  roi_pixels: number;
   reason: string;
   band: { noop_below: number; moved_above: number };
 }
+
 
 const EPS = 1e-6;
 
@@ -97,9 +104,11 @@ const UNAVAILABLE = (reason: string): V465PairedMetric => ({
   mouth_over_frame: null,
   classification: "unavailable",
   frames: 0,
+  roi_pixels: 0,
   reason,
   band: { noop_below: V465_NOOP_BELOW, moved_above: V465_MOVED_ABOVE },
 });
+
 
 /**
  * PURE — the paired metric on the SAME already-decoded production stills.
@@ -140,7 +149,9 @@ export function computeMouthOverFrame(args: {
     mouth_over_frame: ratio,
     classification: classifyMouthOverFrame(ratio),
     frames: A.length,
+    roi_pixels: Math.max(0, preclipRoi.bw) * Math.max(0, preclipRoi.bh),
     reason: "measured",
     band: { noop_below: V465_NOOP_BELOW, moved_above: V465_MOVED_ABOVE },
+
   };
 }
