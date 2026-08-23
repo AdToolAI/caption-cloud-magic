@@ -615,6 +615,8 @@ serve(async (req) => {
               code: "INSUFFICIENT_CREDITS",
               needsPurchase: true,
               required: resErr.required,
+              required_euros: Number(resErr.required.toFixed(2)),
+              available_euros: Number(Number(resErr.available ?? 0).toFixed(2)),
             }),
             { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
