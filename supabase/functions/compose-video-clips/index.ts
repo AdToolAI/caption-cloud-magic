@@ -439,6 +439,8 @@ serve(async (req) => {
             error: "No AI Video wallet found",
             code: "NO_WALLET",
             needsPurchase: true,
+            required_euros: Number(totalCost.toFixed(2)),
+            available_euros: 0,
           }),
           {
             status: 402,
@@ -448,13 +450,17 @@ serve(async (req) => {
       }
 
       if (wallet.balance_euros < totalCost) {
+        // V459 — strukturierter Vertrag: die UI lokalisiert, die Business-Logik
+        // haengt an `code` + Zahlen, nie an uebersetzten Strings.
         return new Response(
           JSON.stringify({
-            error: `Insufficient credits. Need €${totalCost.toFixed(2)}, have €${wallet.balance_euros.toFixed(2)}`,
+            error: `Insufficient credits. Need €${totalCost.toFixed(2)}, have €${Number(wallet.balance_euros).toFixed(2)}`,
             code: "INSUFFICIENT_CREDITS",
             needsPurchase: true,
             required: totalCost,
             available: wallet.balance_euros,
+            required_euros: Number(totalCost.toFixed(2)),
+            available_euros: Number(Number(wallet.balance_euros ?? 0).toFixed(2)),
           }),
           {
             status: 402,
