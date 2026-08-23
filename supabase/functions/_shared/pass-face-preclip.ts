@@ -342,6 +342,13 @@ export async function renderPassFacePreclip(
     anchor = r.anchor;
     faceShareInCrop = r.faceShareInCrop;
     mouthOffsetPx = r.mouthOffsetPx;
+    mouthOffsetXy = r.mouthOffsetXy;
+    if (r.anchor === "mouth") {
+      mouthPointPlate = {
+        x: Math.round(Number((mouth as number[])[0])),
+        y: Math.round(Number((mouth as number[])[1])),
+      };
+    }
     clampedAnchor = r.clamped;
     v457ContainsTarget = r.containsTarget;
     v457ContainReason = r.containReason;
