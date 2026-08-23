@@ -5743,7 +5743,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       }
       const v456MouthForPreclip = v456MouthResolved?.mouth ?? null;
 
+      // V464-B — the plate face track is persisted with the pass so the ASD
+      // sequence can be registered per frame (and a retry reuses it verbatim).
+      let v464TrackSamples: V464TrackSample[] | null = null;
+
       try {
+
         const preclipResult = await renderPassFacePreclip(
           supabase,
           serviceKey,
