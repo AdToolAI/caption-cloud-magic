@@ -5857,6 +5857,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           // V452 §7 — per-sample mouth geometry. EVIDENCE/TELEMETRY ONLY:
           // the frozen v404 ROI, thresholds and NOOP ladder are untouched.
           (pass as any).preclip_mouth_roi_samples = v452Path ? mouthRoiSamples(v452Path) : null;
+          // V464-B — plate face track (plate-absolute seconds) frozen with the
+          // pass. Source of truth for per-frame ASD registration.
+          (pass as any).preclip_face_track = v464TrackSamples;
+          (pass as any)._v450_frozen_face_track = v464TrackSamples;
+
 
           (pass as any).preclip_start_sec = Number(unionStart.toFixed(3));
           (pass as any).preclip_end_sec = Number(unionEnd.toFixed(3));
