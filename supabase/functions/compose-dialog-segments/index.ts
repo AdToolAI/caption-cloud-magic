@@ -4711,9 +4711,22 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         .eq("id", sceneId)
         .maybeSingle();
       const freshClaimState: any = (freshClaimRow as any)?.dialog_shots ?? null;
+      // V459 — Fan-out-Fence. Hat der Watchdog den Run bereits terminalisiert,
+      // darf ab hier KEIN Provider-Call mehr entstehen (sonst Geld für Arbeit,
+      // die nie reconciled wird).
+      if (isFanoutClosed(freshClaimState)) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v459_fanout_closed — dispatch aborted`,
+        );
+        return json(
+          { ok: true, skipped: "v459_fanout_closed", scene_id: sceneId, pass_idx: currentPassIdx },
+          202,
+        );
+      }
       const freshClaimPasses: any[] = Array.isArray(freshClaimState?.passes) ? freshClaimState.passes : [];
       const livePass = freshClaimPasses[currentPassIdx] ?? null;
       const liveStatus = String(livePass?.status ?? "");
+
       const liveHasJob = typeof livePass?.job_id === "string" && livePass.job_id.length > 0;
       const preflightStartedMs = livePass?.preflight_started_at
         ? Date.parse(String(livePass.preflight_started_at))
