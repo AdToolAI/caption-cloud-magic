@@ -35,6 +35,7 @@ import {
   type PreclipRoiGeometry,
   V434_LEGACY_ROI,
 } from "./v434-motion-roi.ts";
+import { resolveV471MouthRoi, type V471MouthRoi } from "./v471-mouth-roi.ts";
 
 export const V456_ROI_CONTRACT_VERSION = "v456";
 
