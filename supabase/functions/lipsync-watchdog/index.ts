@@ -549,12 +549,38 @@ serve(async (req) => {
         }
         const aggUid = await userIdForProject(supabase, d.project_id);
         const aggRefund = Number(postState?.cost_credits ?? ds?.cost_credits) || 0;
+
+        // V459 — Fence-Abschluss VOR dem Refund: blockierte Pässe ohne
+        // Provider-Job werden terminal `canceled_by_scene_failure`, damit kein
+        // Pass in einem terminalen Run auf `pending` hängen bleibt. Pässe mit
+        // echtem Provider-Job werden bewusst nicht gecancelt — die kommen hier
+        // gar nicht an, weil `canTerminalizeNow` sie vorher blockiert.
+        const closure = closeBlockedPasses(postPasses, postVerdict.blockedPassIdxs, {
+          nowIso: new Date().toISOString(),
+          reason: "v459_terminal_required_pass_failure",
+        });
+        if (closure.canceledIdxs.length > 0) {
+          await supabase
+            .from("composer_scenes")
+            .update({
+              dialog_shots: { ...postState, passes: closure.passes },
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", d.id);
+        }
+        console.log(
+          `[lipsync-watchdog] v459 fence_closure scene=${d.id} ` +
+            `canceled=[${closure.canceledIdxs.join(",")}] ` +
+            `skipped_inflight=[${closure.skippedInflightIdxs.join(",")}]`,
+        );
+
         await failLipSync({
           supabase,
           sceneId: d.id,
           userId: aggUid,
           reason: "v459_terminal_required_pass_failure",
           refundCredits: aggRefund,
+          runId: (postState?.run_id ?? (d as any)?.active_run_id ?? null) as string | null,
           syncApiKey,
         });
         console.log(
