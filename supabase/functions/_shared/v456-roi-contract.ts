@@ -91,6 +91,8 @@ export interface V456RoiContract {
   failedCheck: V456CheckName | null;
   checks: Record<V456CheckName, boolean>;
   version: string;
+  /** V471-B — the authoritative mouth ROI resolution (telemetry + authority). */
+  v471?: V471MouthRoi | null;
 }
 
 const PLATE_SOURCE_HINTS = [".mp4", "hydration=", "/plates/", "plate-"];
