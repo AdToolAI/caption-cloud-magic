@@ -38,6 +38,9 @@ export interface V459Pass {
   v459_preflight_recovery_count?: number | null;
   v459_preflight_recovery_run_id?: string | null;
   last_error_class?: string | null;
+  /** V459.1 — Marker der aktiven NOOP-Eskalation (siehe `hasActiveNoopRetry`). */
+  noop_retry_attempt_id?: string | null;
+  noop_escalation_step?: number | null;
   error?: string | null;
   [k: string]: unknown;
 }
