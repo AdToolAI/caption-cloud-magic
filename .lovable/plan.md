@@ -24,25 +24,29 @@ Die V445-Vereinheitlichung deckt damit nur den Größen-, nicht den Positions- u
 
 ## Der Fix (eng begrenzt)
 
-1. `compute-mouth-centered-crop.ts` bekommt einen optionalen Parameter `containBox` (der gepaddete Dispatch-Kasten):
-   - Mindest-Seitenlänge = `max(containBox.width, containBox.height)` statt der ungepaddeten Gesichtsmaße.
-   - Nach Mund-Anker und Plate-Clamping wird der Crop so verschoben, dass `containBox` vollständig innerhalb liegt (reines Verschieben, Mund bleibt so nah wie möglich an der Mitte).
-   - Passt es durch Plate-Ränder nicht, wächst `size` schrittweise bis zur Plate-Kante; erst wenn auch das nicht reicht, bleibt es beim heutigen Verhalten.
-   - Rückgabe zusätzlich: `containsTarget: boolean` + `shiftPx` für die Telemetrie.
+1. `compute-mouth-centered-crop.ts` bekommt einen optionalen Parameter `containBox` (der gepaddete Dispatch-Kasten). Ablauf strikt deterministisch, keine Iteration:
+   - **Impossible-Case zuerst** (kein stilles Reparieren eines fehlerhaften Upstream-Kastens): liegt `containBox` nicht vollständig innerhalb der Plate, oder ist `containBox.width > plateWidth` / `containBox.height > plateHeight`, oder wäre die nötige `size > min(plateWidth, plateHeight)` → Rückgabe `containsTarget = false`, `reason = "contain_box_outside_plate"`. Der Crop bleibt wie heute, das bestehende Fail-Closed-Gate entscheidet.
+   - **Größe** wächst genau einmal und nur wenn nötig: `size = max(size, max(containBox.width, containBox.height))`, gedeckelt auf `min(plateWidth, plateHeight)`.
+   - **Position per Intervallprojektion** statt Verschieben-bis-es-passt:
+     `cropX ∈ [max(0, x2 - size), min(x1, plateWidth - size)]`, analog für Y. Innerhalb des zulässigen Intervalls wird der Wert genommen, der dem ursprünglich mundzentrierten `cropX`/`cropY` am nächsten liegt — Mundzentrierung bleibt maximal erhalten, Containment ist harte Invariante. Ist ein Intervall leer, greift der Impossible-Case.
+   - **Verifikation nach der finalen Integer-/Clamp-Geometrie**: `containsTarget` wird erst nach allen `round`/`clamp`-Schritten geprüft, nicht davor.
+   - Rückgabe zusätzlich: `containsTarget`, `reason`, `shiftPx: { x, y }`, `sizeGrown: boolean`, `sizeGrownPx: number`.
 2. `pass-face-preclip.ts` reicht den über `buildDispatchFaceBox` erzeugten Kasten als `containBox` durch — dieselbe Messung wie beim Dispatch, keine zweite Quelle.
-3. `compose-dialog-segments/index.ts`: unverändertes Fail-Closed-Gate (kein Aufweichen, keine Toleranz), aber die Fehler-Meta bekommt `v457_contain_box`, `v457_crop_shift_px`, `v457_size_grown` für die Diagnose.
+3. `compose-dialog-segments/index.ts`: unverändertes Fail-Closed-Gate (kein Aufweichen, keine Toleranz). Telemetrie/Fehler-Meta bekommt `v457_contain_box`, `v457_crop_shift_px = {x,y}`, `v457_size_grown`, `v457_size_grown_px`, `v457_contain_reason`.
 4. Der Node-Zwilling `src/lib/composer/computeMouthCenteredCrop.ts` wird 1:1 mitgezogen (Spiegel-Pflicht).
 
 ## Tests
 
 - Neue Fälle in `preclip-crop-containment.test.ts` bzw. neben `compute-mouth-centered-crop.ts`:
-  - exakte Produktions-Geometrie der Szene `be60d106…` → Crop enthält `[219,149,302,258]`.
+  - exakte Produktions-Geometrie der Szene `be60d106…`: `target = [219,149,302,258]`, alter Crop `[185,156,338,309]`, `size = 153` → neuer Crop enthält das Target, `shiftPx = { x: 0, y: -7 }`, `sizeGrown = false`.
+  - **Idempotenz**: enthält der ursprüngliche Crop das Target bereits, gilt `shiftPx = {0,0}`, `sizeGrown = false` — bestehende gute Szenen wandern geometrisch nicht.
+  - **Containment nach Rundung**: Prüfung auf den finalen Integer-Koordinaten (FFmpeg-Ebene), nicht auf Float-Ebene.
   - Mund-Anker am oberen/unteren/seitlichen Plate-Rand → weiterhin gültiger Crop.
-  - Gesicht größer als Plate-Kurzseite → Verhalten wie heute, kein Absturz.
+  - Impossible-Case: `containBox` ragt über die Plate hinaus → `containsTarget = false`, `reason = contain_box_outside_plate`, kein Maskieren.
 - Bestehende Preclip-/Containment-Tests müssen unverändert grün bleiben.
 
 ## Nicht Teil dieses Gates
 
 - Keine Änderung an Sync.so-Payload, Thresholds, NOOP-Ladder oder V456-ROI-Vertrag.
 - Keine Migration, kein automatischer Rerender.
-- Deploy-Umfang nach Freigabe: `compose-dialog-segments` (bündelt die `_shared`-Dateien). Rerender startest du danach manuell.
+- Deploy-Umfang nach Freigabe: nur `compose-dialog-segments` (bündelt die geänderten `_shared`-Module). Danach STOP: erst Revision/Health kontrollieren, dann genau ein manueller Testlauf der S01-Szene.
