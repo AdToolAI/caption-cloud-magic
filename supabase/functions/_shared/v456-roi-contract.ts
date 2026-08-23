@@ -256,7 +256,11 @@ export function evaluateMouthRoiContract(
   // ~70–90 px too high / ~1.7× too large (docs/v471a-roi-sampling-parity.md).
   // When the V471 inputs are supplied, its ROI is the authority; when it cannot
   // place the mouth, the pass is `mouth_roi_unresolved` — never a false NOOP.
-  const v471Requested = input.crop != null || input.mouthSource != null;
+  // Activated only for passes that carry BOTH a crop and a tracked face box —
+  // legacy passes without a persisted face box keep the frozen V434 behaviour
+  // instead of degrading into `mouth_roi_unresolved`.
+  const v471Requested = Number(input.crop?.size ?? NaN) > 0 &&
+    Array.isArray(input.faceBbox) && input.faceBbox.length === 4;
   const v471 = v471Requested
     ? resolveV471MouthRoi({
       faceBbox: input.faceBbox ?? null,

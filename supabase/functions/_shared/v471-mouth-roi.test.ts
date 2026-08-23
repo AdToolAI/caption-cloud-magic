@@ -92,7 +92,7 @@ Deno.test("V456 contract adopts the V471 ROI as the authority", () => {
   assertAlmostEquals(withV471.roi!.centerY, 0.61, 0.01);
 
   // Legacy callers (no V471 inputs) keep the frozen V434 behaviour.
-  const legacy = evaluateMouthRoiContract(base);
+  const legacy = evaluateMouthRoiContract({ ...base, faceBbox: base.faceBbox });
   assertEquals(legacy.status, "authoritative");
   assertEquals(legacy.v471 ?? null, null);
   assertAlmostEquals(legacy.roi!.centerY, 0.5426, 0.01);
@@ -107,7 +107,7 @@ Deno.test("V456 — V471 requested but unresolvable → mouth_roi_unresolved, no
     mouthOffset: P1.mouthOffset,
     geometryMeasureSrc: "https://cdn.example.com/anchors/scene-a.png",
     expectedAnchorSrc: "https://cdn.example.com/anchors/scene-a.png",
-    faceBbox: null,
+    faceBbox: [10, 10, 11, 11],
     crop: P1.crop,
     mouthSource: "pose_estimate",
   });
