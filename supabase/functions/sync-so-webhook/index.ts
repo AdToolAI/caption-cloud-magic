@@ -1007,6 +1007,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             provider_output_url: v404RehostedUrl ?? outputUrl,
             duration_sec: Number.isFinite(duration) ? duration : null,
             preclip_geometry: v443MeasureArgs.preclipGeometry,
+            // V467-A — so the watchdog re-check measures the SAME timeline.
+            audio_url: v443MeasureArgs.speechLockAudio?.audioUrl ?? null,
+            audio_offset_sec: v443MeasureArgs.speechLockAudio?.audioOffsetSec ?? null,
           },
         });
       }
