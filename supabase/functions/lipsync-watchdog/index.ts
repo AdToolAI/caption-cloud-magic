@@ -28,6 +28,9 @@ import { getSyncApiKey, releaseInflightSyncJob, logSyncDispatch } from "../_shar
 // only: same immutable provider output, never a new provider job.
 import { measureProviderMotionSync } from "../_shared/measure-provider-motion-sync.ts";
 import { classifyMotionProbe } from "../_shared/motion-probe-classifier.ts";
+// V465-B2b — authoritative paired mouth-over-frame verdict (same contract as
+// the webhook). `delta_mean` stays legacy telemetry.
+import { resolveV465Verdict } from "../_shared/v465-verdict.ts";
 import {
   classifyMeasurementFailure,
   isMouthRoiUnresolved,
@@ -1160,16 +1163,21 @@ serve(async (req) => {
 
         let verdict: string;
         let reason: string;
+        // V465-B2b — the re-check uses the SAME authoritative contract as the
+        // webhook: paired `mouth_over_frame`. The v404 delta is legacy only.
+        let legacyVerdict: string | null = null;
+        let v465Verdict: ReturnType<typeof resolveV465Verdict> | null = null;
         if (
           measurement.measurement_status === "measured" &&
           measurement.preclip_metric && measurement.provider_metric
         ) {
-          const probe = classifyMotionProbe({
+          legacyVerdict = classifyMotionProbe({
             preclip: measurement.preclip_metric,
             provider: measurement.provider_metric,
-          });
-          verdict = probe.verdict;
-          reason = probe.reason;
+          }).verdict;
+          v465Verdict = resolveV465Verdict((measurement as any)?.v465 ?? null);
+          verdict = v465Verdict.verdict;
+          reason = v465Verdict.reason;
         } else {
           verdict = classifyMeasurementFailure(measurement.reason) === "probe_infra_error"
             ? MOTION_UNVERIFIED_STATE
@@ -1188,6 +1196,10 @@ serve(async (req) => {
           meta: {
             v443_recheck: true,
             recheck_verdict: verdict,
+            authority: "v465_mouth_over_frame",
+            mouth_over_frame: v465Verdict?.mouth_over_frame ?? null,
+            v465_guard: v465Verdict?.guard ?? null,
+            legacy_verdict: legacyVerdict,
             delta_mean: measurement.deltaMean ?? null,
             pass_idx: cand.turn_idx,
             pipeline_job_id: meta.pipeline_job_id ?? null,
@@ -1195,6 +1207,7 @@ serve(async (req) => {
             provider_dispatch: false,
           },
         });
+
 
         if (verdict === "noop" && meta.pipeline_job_id) {
           // Proven Noop — existing terminalization path, unchanged semantics.
