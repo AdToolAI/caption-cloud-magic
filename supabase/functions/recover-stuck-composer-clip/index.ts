@@ -349,9 +349,12 @@ async function processScene(
     return { scene_id: sceneId, outcome: "skipped_already_resolved" };
   }
 
+  // v455 (A) — Zeitautorität + Transport-Pointer kommen aus dem Ledger-Job.
+  const job = await resolveAuthoritativeJob(sb, sceneId, candidate);
+
   // v455 — Race-Guard: Szene ist inzwischen auf einen neueren Run/Job/
   // Prediction gewechselt → dieser Kandidat ist veraltet, kein No-Op-Schaden.
-  if (!(await candidateStillCurrent(sb, scene, candidate))) {
+  if (!(await candidateStillCurrent(sb, scene, candidate, job))) {
     console.log(
       `[recover-stuck-composer-clip] v455_stale_candidate_discarded scene=${sceneId} run=${candidate?.run_id ?? "null"} job=${candidate?.pipeline_job_id ?? "null"}`,
     );
@@ -361,6 +364,7 @@ async function processScene(
       detail: "v455_stale_candidate_discarded",
     };
   }
+
 
 
   const isCinematicSync =
