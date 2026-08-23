@@ -35,7 +35,8 @@
 import { computeFaceCrop, FaceCropRegion } from "./face-crop.ts";
 import { appendWebhookToken } from "./webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
-import { computeMouthCenteredCrop } from "./compute-mouth-centered-crop.ts";
+import { computeMouthCenteredCrop, projectCropToContain, normalizeContainBox, type ContainReason } from "./compute-mouth-centered-crop.ts";
+import { buildDispatchFaceBox } from "./plate-face-dispatch-box.ts";
 // V452 — dynamic crop geometry (identity static, geometry dynamic).
 import {
   type DynamicCameraPath,
