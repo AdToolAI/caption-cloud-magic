@@ -7,85 +7,133 @@ bewiesen ist, dass ein eingefrorener Provider-Output sichtbare Lippenbewegung ha
 
 - Pass 0 (Sarah) und Pass 4 (Matthew) sind mit `sync_noop_unrecoverable` terminal
   gescheitert; Pass 5 (Kay Mark) hat um 17:50:34 die NOOP-Ladder erschöpft, während der
-  Watchdog eine Sekunde vorher den Fan-out geschlossen hat. Pass 5 steht deshalb bis heute
-  auf `pending` in einem terminalen Run.
-- Die Motion-Deltas der Fehlläufe: Pass 0 = −29.04, Pass 4 = −1.29, Pass 5 = −0.78
-  (NOOP-Schwelle 3.68). Alle drei sind **negativ** — der Provider-Output hat im gemessenen
-  Mundband weniger Bewegung als der Eingang.
-- Framing der sechs Pässe: `cam_dynamic` ist bei **fünf von sechs** Pässen `false`;
-  nur Pass 2 hat einen dynamischen Kamerapfad. Beide NOOP-Fehlläufe sind statisch.
-- `face_share`: Pass 4 = **0.218** — unter dem v400-Floor von 0.24, trotzdem dispatcht.
-  Die Crop-Grösse dieses Passes ist 128 px, also exakt der `minCropSizePx`-Boden.
-- Refund: Der Watchdog hat 960 Credits erstattet — in den Credit-Ledger. Belastet wurden
-  4,50 € im Euro-Ledger (`ai_video_wallets`). Die Erstattung landet weiterhin in der
-  falschen Kasse.
+  Watchdog eine Sekunde vorher den Fan-out geschlossen hat. Pass 5 steht seitdem auf
+  `pending` in einem terminalen Run.
+- Motion-Deltas der Fehlläufe: Pass 0 = −29.04, Pass 4 = −1.29, Pass 5 = −0.78
+  (NOOP-Schwelle 3.68). Alle drei **negativ** — der Output hat im gemessenen Mundband
+  weniger Bewegung als der Eingang.
+- Framing: `cam_dynamic` ist bei **fünf von sechs** Pässen `false`; nur Pass 2 hat einen
+  dynamischen Pfad. Beide NOOP-Fehlläufe sind statisch. Das allein ist noch kein
+  Vertragsbruch — es zählt, ob sich der Kopf im Turn relevant bewegt. Das muss V460 an
+  den eingefrorenen Frames zeigen.
+- **Bereits objektiv verletzt:** Pass 4 hat `face_share = 0.218` bei einem v400-Floor von
+  0.24 und Crop-Grösse 128 px (= `minCropSizePx`-Boden) — und wurde trotzdem dispatcht.
+  Sofern `face_share` heute dieselbe Semantik trägt wie im v400-Contract, ist T9 für
+  Pass 4 keine Hypothese mehr. Offen bleibt nur, ob die Verletzung kausal für den NOOP war.
+- Refund: Der Watchdog hat 960 **Credits** erstattet. Belastet wurden 4,50 € im
+  **Euro**-Ledger (`ai_video_wallets`). Die Erstattung liegt in der falschen Kasse.
 
-Das genügt, um die Reihenfolge festzulegen — es genügt **nicht**, um die Ursache des NOOP
-zu benennen. Genau das klärt V460.
+## Schritt 1 — V459 vollständig schliessen
 
-## Schritt 1 — V459 sauber zu Ende bringen (Determinismus, kein Qualitätsthema)
+### 1a. Fan-out-Fence vs. laufende NOOP-Ladder
 
-1. **Callback/Fence-Race schliessen.** Ein Pass, dessen Ladder-Eskalation bereits läuft,
-   darf nicht durch einen parallel gesetzten Fan-out-Fence in `pending` zurückbleiben.
-   Der Fence prüft künftig auch laufende Ladder-Attempts; ein Pass wird beim Schliessen
-   terminal (`canceled_by_scene_failure`) statt `pending`.
-2. **Refund in die richtige Kasse.** `failLipSync` erstattet gegen den Ledger, aus dem
-   belastet wurde: `ai_video_wallets.balance_euros` plus `ai_video_transactions`-Zeile vom
-   Typ `refund`, Betrag aus der Run-Belastung. Ein Refund je (Szene, Run), idempotent.
-3. **Belastung zuordenbar machen.** Die Deduction bekommt `metadata.scene_id` und
-   `metadata.run_id`, damit Refund und Belastung ohne Zeitstempel-Raten zusammenfinden.
-4. **402 ehrlich anzeigen.** `INSUFFICIENT_CREDITS` wird als „Guthaben reicht nicht:
-   4,50 € nötig, X € verfügbar" (EN/DE/ES) angezeigt statt „Edge Function returned a
-   non-2xx status code".
+Der Fence darf einen Pass nicht mehr auf `pending` zurücklassen. Aber die Behandlung
+hängt daran, ob providerseitig noch etwas läuft:
 
-Keine Gates, keine Schwellen, kein Provider-Payload. Das bleibt im Rahmen des Freeze.
+```text
+Pass hat KEINEN Provider-Job in flight
+   → canceled_by_scene_failure, Terminalisierung, ein Refund
 
-## Schritt 2 — V460: v400 T8–T12 Contract Parity Audit (READ-ONLY, keine Provider-Kosten)
+Pass HAT einen Provider-Job in flight
+   → fan-out closed: keine weiteren Attempts
+   → vorhandenen Job zuerst reconciliieren
+   → erst danach terminalisieren und refunden
+```
 
-Untersucht werden ausschliesslich die bereits vorhandenen, eingefrorenen Artefakte der
-Pässe 0, 4 und 5 (Preclip-MP4s und Provider-Outputs liegen alle vor). Kein neuer Dispatch,
-keine Credits, keine Codeänderung an der Kette in diesem Schritt.
+Kein „Job läuft → Pass sofort canceled → Refund". Genau diese Billing-Race soll V459
+beseitigen, nicht neu erzeugen.
 
-Je Pass wird gegen den v400-T8-Vertrag geprüft und protokolliert:
+Vorab zu rekonstruieren: War der Ladder-Attempt von Pass 5 um 17:50:34 providerseitig
+bereits terminal, als der Watchdog um 17:50:33 den Fence setzte? Der Ledger zeigt für
+denselben Zeitstempel einen Job auf `stale` und einen neu erzeugten auf `dispatching` —
+welcher davon providerseitig gültig war, klärt die Rekonstruktion vor dem Fix.
 
-1. Ist über die gesamte Preclip-Dauer **physisch nur ein Gesicht** sichtbar?
-2. Bleibt exakt der zugewiesene Sprecher im Crop (kein Identitätswechsel)?
-3. Folgt der Crop der Kopfbewegung dynamisch — oder steht er (heute: 5/6 statisch)?
-4. Wo liegt der Mund im finalen 720×720-Preclip? Zielwert v400 ≈ 62 % Höhe.
-5. Wie gross ist das Gesicht in **Provider-Pixeln**, nicht nur als normalisierter
-   `face_share`?
-6. Wird das Gesicht beim Gehen oder im 3/4-Profil zeitweise zu klein, verdeckt oder
-   nahezu seitlich?
-7. Bleibt der Mund über **alle** Frames vollständig im Crop?
-8. Zeigt der eingefrorene Provider-Output visuell wirklich keinen zusätzlichen
-   Mouth-Motion? (Frame-Gegenüberstellung Input/Output, mehrere Zeitpunkte.)
+### 1b. Euro-Refund, gebunden an die Quell-Belastung
 
-Ergebnis ist ein Befundbericht mit Frame-Belegen pro Pass und genau einer Einordnung:
+- Erstattet wird gegen `ai_video_wallets.balance_euros` plus `ai_video_transactions`-Zeile
+  vom Typ `refund`.
+- Idempotenzanker ist nicht nur (Szene, Run), sondern die konkrete Belastung:
+  `source_transaction_id` = `id` der ursprünglichen Deduction, plus
+  `refund_key = lipsync_refund:<run_id>:<source_transaction_id>`.
+- Damit steht buchhalterisch sauber Debit −4,50 € gegen Refund +4,50 €, und ein Refund
+  kann nicht gegen eine fremde Run-Belastung laufen.
+- Neue Deductions bekommen `metadata.scene_id` und `metadata.run_id`.
 
-- **Fall A — Provider-Output hat wirklich keinen Lip-Sync.** Detector bleibt unangetastet.
-  Der Fehler liegt vor dem Outcome-Gate: Preclip/Framing/Tracking oder Provider-Parameter.
-  → V461 repariert T8/T9.
-- **Fall B — Output hat sichtbaren Lip-Sync, der Detector sagt NOOP.** Erst dann darf die
-  Messmethode beziehungsweise die Kalibrierung geändert werden — mit dem sichtbaren
-  Beweis als Referenzfall.
-- **Fall C — der Preclip verletzt v400** (mehr als ein Gesicht, statischer Crop bei
-  bewegtem Kopf, Mund ausserhalb 62 %, Gesicht zu klein). → Wiederherstellung des
-  T8-Vertrags: ein sichtbares Gesicht, dynamisches Tracking, Mund ≈ 62 %, ausreichende
-  Gesichtsgrösse, Gate vor dem Provider. Danach ein kontrollierter Lauf.
+### 1c. 402-Vertrag strukturiert, Lokalisierung nur im UI
 
-Der bereits gemessene Befund (5/6 statisch, `face_share` 0.218 unter dem Floor) macht
-Fall C zur wahrscheinlichsten Einordnung — bewiesen ist er noch nicht.
+Backend liefert `code = INSUFFICIENT_CREDITS`, `required_euros`, `available_euros`.
+Die UI formuliert daraus „Guthaben reicht nicht: 4,50 € nötig, 2,13 € verfügbar"
+(EN/DE/ES). Die Business-Logik hängt an keinem übersetzten String.
+
+## Schritt 2 — Einmalige Bereinigung des bestehenden Runs, dann STOP
+
+Für Run a3b5541b liegen bereits eine Belastung von 4,50 € (Euro) und eine Erstattung von
+960 Credits (falsche Kasse) vor. Es wird genau eine der beiden Varianten ausgeführt und
+im Buchungstext begründet:
+
+1. Die 960-Credit-Erstattung exakt zurücknehmen und stattdessen 4,50 € korrekt erstatten —
+   sofern sie eindeutig dieser Run-Buchung zuordenbar und sicher reversibel ist, **oder**
+2. die 960 Credits bewusst als historischen Ausgleich stehen lassen und denselben Run
+   **nicht** zusätzlich monetär erstatten.
+
+Niemals still beides. Ab V459 gilt für neue Runs ausschliesslich der Euro-Ledger-Pfad.
+
+Danach STOP: Kontostand und Buchungen verifizieren, bevor irgendetwas Weiteres läuft.
+
+## Schritt 3 — V460: v400 T8–T12 Parity Audit, strikt READ-ONLY
+
+Untersucht werden ausschliesslich die eingefrorenen Artefakte der Pässe 0, 4 und 5
+(Preclips und Provider-Outputs liegen vor). Kein Dispatch, keine Credits, keine
+Codeänderung an der Kette, kein neuer S01-Lauf.
+
+### Messungen
+
+1. **Contact-Sheets über den gesamten Turn**, nicht nur eine Gesichtszählung. Ein zweites
+   Gesicht, das nur 20 % des Clips auftaucht, zählt trotzdem gegen T8.
+2. **Mund-Y pro Sample-Frame in Provider-Space** als Serie `mouthY / 720`
+   (z. B. 0.61, 0.63, 0.68, 0.74 …). Das zeigt Drift eines statischen Crops bei bewegtem
+   Kopf, statt nur „ungefähr 62 %".
+3. **Gesichtsgrösse absolut**: Breite px, Höhe px, Fläche / 720², Yaw-/Profil-Schätzung —
+   nicht nur normalisierter `face_share`. Pass 4 (Crop 128 px, share 0.218) ist der
+   interessanteste Fall.
+4. **Input/Output-Vergleich unabhängig von der bestehenden Motion-Metrik**: Frame-Paare
+   und, wo möglich, ein bewegungskompensierter Mund-Track. Das Gate soll gerade nicht
+   von derselben Metrik abhängen, die zur Debatte steht.
+
+Zusätzlich je Pass: bleibt der zugewiesene Sprecher durchgehend im Crop, folgt der Crop
+der Kopfbewegung, bleibt der Mund über **alle** Frames vollständig im Crop.
+
+### Auswertung — zwei Achsen, nicht drei Schubladen
+
+| Frage | Ergebnis |
+| --- | --- |
+| Hat der Provider-Output sichtbar zusätzliche Mundbewegung? | JA → **B** · NEIN → **A** |
+| Erfüllt der Input-Preclip v400 T8/T9? | NEIN → **C**-Verletzung(en), einzeln benannt |
+
+A und C können gleichzeitig wahr sein. Ein Befund lautet dann z. B.: „Output = echter
+NOOP (A); Preclip verletzt T8/T9 (C): Face-Share unter Floor, kein Dynamic Tracking.
+Primäre Massnahme: Input-Contract wiederherstellen, Detector unverändert."
+
+### Entscheidungslogik danach
+
+```text
+Output zeigt Lippenbewegung, Detector meldet NOOP
+   → Detector/Messmethode öffnen. Erst dann Schwellen anfassen.
+
+Output ohne Lip-Sync UND T8/T9 verletzt
+   → V461: Preclip-Framing, Dynamic Tracking, Face-Gate-Parität.
+     Detector bleibt eingefroren.
+
+Output ohne Lip-Sync OBWOHL T8/T9 vollständig eingehalten
+   → Provider-Payload und Provider-Verhalten als nächste Ebene.
+     Nicht weiter am Preclip drehen.
+```
 
 ## Freeze-Status
 
-- Schritt 1 liegt vollständig innerhalb der erlaubten Änderungen (Determinismus,
+- Schritt 1 und 2 liegen innerhalb der erlaubten Änderungen (Determinismus,
   Refund-Korrektur, Copy).
-- Schritt 2 ist read-only und braucht keinen Unfreeze.
-- Der Unfreeze wird **erst** beantragt, wenn der Befund vorliegt, und dann mit dem
-  konkreten Scope, den der Befund benennt — Preclip-Framing und Dynamic Tracking
-  ausdrücklich eingeschlossen, Detector-Schwellen ausdrücklich nur bei Fall B.
-
-## Danach
-
-STOP vor jedem neuen S01-Lauf. Erst Befundbericht, dann Entscheidung, dann genau ein
-kontrollierter Lauf.
+- Schritt 3 ist read-only und braucht keinen Unfreeze.
+- Ein Unfreeze wird erst nach dem Befund beantragt, mit dem Scope, den der Befund
+  benennt — Preclip-Framing und Dynamic Tracking eingeschlossen, Detector-Schwellen
+  ausschliesslich im Fall B.
