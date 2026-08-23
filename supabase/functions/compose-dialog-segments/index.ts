@@ -5937,7 +5937,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             console.warn(`[compose-dialog-segments] v434_pin_crash scene=${sceneId}: ${(e as Error).message}`);
           }
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} mouth_off_px=${(pass as any).preclip_mouth_offset_px}`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} mouth_off_px=${(pass as any).preclip_mouth_offset_px} v458_mouth_off_xy=${JSON.stringify((pass as any).preclip_mouth_offset_xy)} space=plate`,
           );
 
         } else {
