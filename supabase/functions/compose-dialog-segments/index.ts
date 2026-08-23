@@ -114,6 +114,8 @@ import { verifyFaceBeforeDispatch } from "../_shared/syncso-face-gate.ts";
 // V461 A — v400 Face-Gate (hard, pre-dispatch). V461 B/C — semantic input
 // fingerprint + honest dispatch telemetry.
 import { evaluateV461FaceGate } from "../_shared/v461-face-gate.ts";
+// V469 — pre-dispatch mouth-visibility / pose-suitability gate (NOT a yaw cut).
+import { evaluateV469MouthVisibility } from "../_shared/v469-mouth-visibility-gate.ts";
 import {
   buildDispatchVideoTelemetry,
   computeInputFingerprint,
@@ -7488,6 +7490,59 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         },
       );
     }
+
+    // ══════ V469 — MOUTH-VISIBILITY / POSE-SUITABILITY GATE (pre-dispatch) ══
+    // V468 evidence: within one identical request contract, pass 0 (~90°
+    // profile, mouth practically not visible) NOOP'd while the frontal /
+    // moderate passes were edited. This gate asks whether the MOUTH is usably
+    // visible over enough frames — it is deliberately NOT a `yaw >= X°` cut
+    // (V463 produced MOVED at ~75° yaw). Yaw is a risk signal / telemetry.
+    // Missing evidence is fail-open; only positive evidence blocks.
+    const v469Gate = evaluateV469MouthVisibility({
+      usePreclip: usePassPreclip,
+      faceTrack: (pass as any).preclip_face_track ??
+        (pass as any)._v450_frozen_face_track ?? null,
+      turnStartSec: Number.isFinite(Number((pass as any).preclip_start_sec))
+        ? Number((pass as any).preclip_start_sec)
+        : null,
+      turnEndSec: Number.isFinite(Number((pass as any).preclip_end_sec))
+        ? Number((pass as any).preclip_end_sec)
+        : null,
+      anchor: (pass as any).preclip_anchor ?? null,
+      yawDeg: Number.isFinite(Number((pass as any).plate_yaw_deg))
+        ? Number((pass as any).plate_yaw_deg)
+        : null,
+    });
+    (pass as any).v469_mouth_visibility = {
+      status: v469Gate.status,
+      code: v469Gate.code,
+      metrics: v469Gate.metrics,
+    };
+    console.log(
+      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v469_mouth_visibility=${v469Gate.status} code=${v469Gate.code} ` +
+        `usable_rate=${v469Gate.metrics.usable_frame_rate?.toFixed?.(2) ?? "?"} aspect=${v469Gate.metrics.median_face_aspect?.toFixed?.(2) ?? "?"} ` +
+        `landmark_rate=${v469Gate.metrics.mouth_landmark_rate?.toFixed?.(2) ?? "?"} yaw=${v469Gate.metrics.yaw_deg ?? "?"}`,
+    );
+    if (!v469Gate.ok) {
+      return await failBeforeProviderDispatch(
+        v469Gate.code,
+        "lipsync_input_contract_violation",
+        tl({
+          de: `Der Mund dieses Sprechers ist im Ausschnitt nicht ausreichend sichtbar/bearbeitbar (${v469Gate.reason}). Es wurde kein Provider-Lauf gestartet, die Kosten wurden erstattet.`,
+          en: `This speaker's mouth is not sufficiently visible/editable in the crop (${v469Gate.reason}). No provider run was started; the cost was refunded.`,
+          es: `La boca de este hablante no es suficientemente visible/editable en el encuadre (${v469Gate.reason}). No se inició ninguna ejecución del proveedor; el coste fue reembolsado.`,
+        }),
+        422,
+        {
+          v469_mouth_visibility: v469Gate,
+          provider_call_made: false,
+          pass_idx: currentPassIdx,
+          speaker: pass.speaker_name ?? null,
+        },
+      );
+    }
+
+
 
     const dispatchVideoKind = usePassPreclip ? "preclip" : "full_plate";
     const dispatchInputSpace = usePassPreclip ? "clip" : "plate";
