@@ -584,6 +584,41 @@ export async function measureProviderMotionSync(
         providerRoi: { bx: 0, by: 0, bw: 0, bh: 0 },
       });
 
+    // ── V467-A — speech-locked mouth edit (TELEMETRY ONLY) ────────────────
+    // Rides on the very same decoded stills. Any failure here is swallowed:
+    // the measurement result, its status and every verdict stay untouched.
+    let v467: V467SpeechLock | undefined;
+    try {
+      const audio = args.speechLockAudio ?? null;
+      if (audio?.audioUrl && pairedFrames.preclip && pairedFrames.provider) {
+        const fetchAudio = audio.fetchAudio ??
+          (async (url: string, b: MeasurementBudget) => {
+            const res = await fetch(url, { signal: linkedSignal(b, b.remainingMs) });
+            if (!res.ok) throw new Error(`audio_download_${res.status}`);
+            return new Uint8Array(await res.arrayBuffer());
+          });
+        const bytes = await fetchAudio(audio.audioUrl, budget());
+        const pcm = decodeWavMono(bytes);
+        const envelope = pcm ? buildSpeechEnvelope(pcm.samples, pcm.sampleRateHz) : null;
+        v467 = computeSpeechLock({
+          mouthEdits: perSampleMouthEdit(
+            pairedFrames.preclip.stills,
+            pairedFrames.provider.stills,
+            pairedFrames.preclip.roi,
+          ),
+          sampleTimesVideoSec: frames.map((f) => f / MOTION_FPS),
+          envelope,
+          audioOffsetSec: audio.audioOffsetSec ?? 0,
+          fps: MOTION_FPS,
+        });
+      }
+    } catch (e) {
+      console.warn(
+        `[v467] speech_lock telemetry skipped — ${(e as Error)?.message ?? String(e)}`,
+      );
+      v467 = undefined;
+    }
+
     return {
       preclip_metric: preclip,
       provider_metric: provider,
