@@ -88,7 +88,20 @@ export async function reserveRunCredits(
 
   if (error) {
     const msg = String((error as any)?.message ?? error);
-    if (msg.includes("insufficient_credits")) throw new InsufficientCreditsError(amount);
+    if (msg.includes("insufficient_credits")) {
+      // V459 — echtes Guthaben nachlesen, damit der 402-Vertrag beide Zahlen
+      // liefert (`required_euros` / `available_euros`).
+      let available = 0;
+      try {
+        const { data: w } = await admin
+          .from("ai_video_wallets")
+          .select("balance_euros")
+          .eq("user_id", params.userId)
+          .maybeSingle();
+        available = Number((w as any)?.balance_euros ?? 0) || 0;
+      } catch { /* best effort */ }
+      throw new InsufficientCreditsError(amount, available);
+    }
     throw new Error(`reservation_failed: ${msg.slice(0, 200)}`);
   }
   const reservationId = typeof data === "string" ? data : (data as any)?.id;
