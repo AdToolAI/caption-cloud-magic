@@ -1184,6 +1184,24 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         ? freshDoneState.passes.map((p: any) => ({ ...p }))
         : passes;
 
+      // ── V459 — Idempotenz VOR Logging und Writes ────────────────────────
+      // Der Pass ist bereits terminal NOOP-gescheitert und der Callback gehört
+      // zum validierten Attempt-Job-Tupel: reiner No-Op, kein Re-Apply, kein
+      // zweiter Ladder-Schritt, keine doppelte Verdict-Zeile.
+      if (isTerminalNoopPass(freshDonePasses[currentPass] ?? null)) {
+        console.log(
+          `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} v459_idempotent_noop_callback ` +
+            `scene=${sceneId} pass=${currentPass} job=${jobId} — no-op`,
+        );
+        return ok({
+          ok: true,
+          skipped: "v459_idempotent_terminal_noop",
+          scene_id: sceneId,
+          pass_idx: currentPass,
+          job_id: jobId,
+        });
+      }
+
       // ── FA-4 v409 — kanonische Sprecher-Kardinalität ────────────────────
       // Klassifikation IMMER auf dem frischesten Pass-Set UNTER dem Dialog-
       // Lock: der Pre-Lock-Snapshot kann durch das Fan-Out-Race (Pass 0 +
