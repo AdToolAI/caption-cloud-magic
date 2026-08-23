@@ -34,6 +34,16 @@ import {
   MOTION_UNVERIFIED_STATE,
 } from "../_shared/motion-probe-infra.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
+// V459 — Preflight-Zombie-Recovery + Terminal Fan-out Aggregation.
+import {
+  evaluateRunAggregation,
+  isPreflightZombieCandidate,
+  decideZombieAction,
+  preflightRecoveryCount,
+  isFanoutClosed,
+  V459_FANOUT_CLOSED_KEY,
+  V459_TERMINALIZING_STATUS,
+} from "../_shared/v459-fanout-aggregation.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { logMissingReinjectPointer } from "../_shared/v431-ledger.ts";
 
@@ -478,7 +488,86 @@ serve(async (req) => {
       }
     }
 
+    // ── (1.5) V459 — Terminal Fan-out Aggregation (VOR jedem Dispatch) ────
+    // Alle Pässe sind für ein vollständiges Resultat erforderlich. Ein terminal
+    // gescheiterter Required-Pass macht den Run unrettbar. Reihenfolge ist
+    // race-kritisch: Fence zuerst, Ledger danach, Refund zuletzt.
+    if (isV5Fanout) {
+      const { data: aggRow } = await supabase
+        .from("composer_scenes")
+        .select("dialog_shots")
+        .eq("id", d.id)
+        .maybeSingle();
+      const aggState: any = (aggRow as any)?.dialog_shots ?? ds;
+      const aggPasses: any[] = Array.isArray(aggState?.passes) ? aggState.passes : [];
+      const verdict = evaluateRunAggregation(aggPasses);
+
+      if (verdict.runIrrecoverable && !isFanoutClosed(aggState)) {
+        // Fence: CAS auf dem aktuellen dialog_shots.status. Ab hier bricht der
+        // Pre-Dispatch-Recheck in compose-dialog-segments jeden Provider-Call ab.
+        const fencedStatus = String(aggState?.status ?? "");
+        const { data: fenced } = await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...aggState,
+              status: V459_TERMINALIZING_STATUS,
+              [V459_FANOUT_CLOSED_KEY]: true,
+              v459_fanout_closed_at: new Date().toISOString(),
+              v459_prev_status: fencedStatus,
+            },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", d.id)
+          .eq("dialog_shots->>status", fencedStatus)
+          .select("id");
+        const fenceWon = Array.isArray(fenced) && fenced.length > 0;
+        console.log(
+          `[lipsync-watchdog] v459 fanout_fence scene=${d.id} won=${fenceWon} ` +
+            `prev_status=${fencedStatus} reason=${verdict.reason} ` +
+            `blocked=[${verdict.blockedPassIdxs.join(",")}]`,
+        );
+        if (!fenceWon) return; // jemand anders hat den Zustand gerade geändert
+      }
+
+      if (verdict.runIrrecoverable) {
+        // Nach dem Fence: Ledger/Provider-Jobs ERNEUT prüfen.
+        const { data: postRow } = await supabase
+          .from("composer_scenes")
+          .select("dialog_shots")
+          .eq("id", d.id)
+          .maybeSingle();
+        const postState: any = (postRow as any)?.dialog_shots ?? aggState;
+        const postPasses: any[] = Array.isArray(postState?.passes) ? postState.passes : [];
+        const postVerdict = evaluateRunAggregation(postPasses);
+        if (!postVerdict.canTerminalizeNow) {
+          console.log(
+            `[lipsync-watchdog] v459 terminalize_deferred scene=${d.id} ` +
+              `inflight=[${postVerdict.unreconciledPassIdxs.join(",")}] — kein Refund, warte auf Reconciliation`,
+          );
+          return; // kein Dispatch, keine Zombie-Recovery, kein Refund
+        }
+        const aggUid = await userIdForProject(supabase, d.project_id);
+        const aggRefund = Number(postState?.cost_credits ?? ds?.cost_credits) || 0;
+        await failLipSync({
+          supabase,
+          sceneId: d.id,
+          userId: aggUid,
+          reason: "v459_terminal_required_pass_failure",
+          refundCredits: aggRefund,
+          syncApiKey,
+        });
+        console.log(
+          `[lipsync-watchdog] v459 terminalized scene=${d.id} refund=${aggRefund} ` +
+            `blocked_passes=[${postVerdict.blockedPassIdxs.join(",")}]`,
+        );
+        failed.push({ scene_id: d.id, reason: "v459_terminal_required_pass_failure" });
+        return;
+      }
+    }
+
     // ── (2) Dispatch deferred-pending fan-out passes ─────────────────────
+
     // Skip dispatching while we're parked on circuit_open — re-triggering
     // compose-dialog-segments would just hit the circuit again and reset
     // updated_at, masking the real TTL.
@@ -509,6 +598,10 @@ serve(async (req) => {
             Number(p?.noop_escalation_step ?? 0) > 0 &&
             st === "pending";
           if (inActiveNoopRetry) return -1;
+          // V459 — ein Pass in `rendering_preflight` ist geclaimt. Er gehört
+          // der Zombie-Recovery unten, nicht dem Advance-Dispatch (der sonst
+          // nur im Minutentakt gegen den Per-Pass-Lock läuft).
+          if (st === "rendering_preflight") return -1;
           if (st === "pending" || !p?.job_id) return i;
           if (st === "retrying" && !p?.job_id) return i;
           return -1;
@@ -533,6 +626,105 @@ serve(async (req) => {
         }
       }
     }
+
+    // ── (2.6) V459 — Preflight-Zombie-Recovery (nur für rettbare Runs) ────
+    // Ein Dispatcher hat den Per-Pass-Lock geholt, ist gestorben und hat den
+    // Pass in `rendering_preflight` ohne job_id zurückgelassen. Exklusivität
+    // wird NICHT per SELECT geprüft (TOCTOU), sondern über denselben fenced
+    // `try_acquire_dialog_lock` erworben.
+    if (isV5Fanout) {
+      const zPasses: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
+      for (let zi = 0; zi < zPasses.length; zi++) {
+        if (!isPreflightZombieCandidate({ pass: zPasses[zi], activeRunId: d.active_run_id, nowMs: now })) {
+          continue;
+        }
+        const wdToken = `lipsync-watchdog-v459-${crypto.randomUUID()}`;
+        let wdAcquired = false;
+        try {
+          const { data: acq } = await supabase.rpc("try_acquire_dialog_lock", {
+            _scene_id: d.id,
+            _holder: wdToken,
+            _ttl_seconds: 60,
+            _pass_idx: zi,
+          });
+          wdAcquired = acq === true;
+          if (!wdAcquired) {
+            console.log(`[lipsync-watchdog] v459 zombie_lock_busy scene=${d.id} pass=${zi} — skipping`);
+            continue;
+          }
+          // Nach dem Lock: Zustand ERNEUT lesen und validieren.
+          const { data: reRow } = await supabase
+            .from("composer_scenes")
+            .select("dialog_shots, active_run_id")
+            .eq("id", d.id)
+            .maybeSingle();
+          const reState: any = (reRow as any)?.dialog_shots ?? null;
+          const rePass: any = Array.isArray(reState?.passes) ? reState.passes[zi] : null;
+          const reRunId = (reRow as any)?.active_run_id ?? d.active_run_id;
+          if (isFanoutClosed(reState)) continue;
+          if (!isPreflightZombieCandidate({ pass: rePass, activeRunId: reRunId, nowMs: Date.now() })) {
+            continue;
+          }
+          const action = decideZombieAction(rePass, reRunId);
+          if (action === "reset_to_pending") {
+            await supabase.rpc("update_dialog_pass_slot", {
+              _scene_id: d.id,
+              _pass_idx: zi,
+              _patch: {
+                status: "pending",
+                job_id: null,
+                v459_preflight_started_at: null,
+                preflight_started_at: null,
+                v459_preflight_recovery_count: preflightRecoveryCount(rePass, reRunId) + 1,
+                v459_preflight_recovery_run_id: reRunId ?? null,
+                v459_preflight_recovered_at: new Date().toISOString(),
+              },
+            });
+            console.log(`[lipsync-watchdog] v459_preflight_zombie_recovered scene=${d.id} pass=${zi}`);
+            try {
+              await logSyncDispatch(supabase, {
+                scene_id: d.id,
+                engine: "sync-segments",
+                turn_idx: zi,
+                sync_status: "PREFLIGHT_ZOMBIE_RECOVERED",
+                error_class: "v459_preflight_zombie",
+                meta: { pass_idx: zi, run_id: reRunId ?? null, recovery_count: preflightRecoveryCount(rePass, reRunId) + 1 },
+              });
+            } catch { /* best-effort */ }
+          } else {
+            // Budget erschöpft → Pass terminal. KEIN eigener Refund-Pfad:
+            // die Geldbewegung gehört der kanonischen Aggregation (nächster Tick).
+            await supabase.rpc("update_dialog_pass_slot", {
+              _scene_id: d.id,
+              _pass_idx: zi,
+              _patch: {
+                status: "failed",
+                last_error_class: "v459_preflight_zombie_unrecoverable",
+                error: "v459_preflight_zombie_unrecoverable",
+                finished_at: new Date().toISOString(),
+              },
+            });
+            console.warn(
+              `[lipsync-watchdog] v459 zombie_budget_exhausted scene=${d.id} pass=${zi} → pass failed, aggregation follows`,
+            );
+          }
+        } catch (e) {
+          console.warn(`[lipsync-watchdog] v459 zombie recovery crash scene=${d.id} pass=${zi}: ${(e as Error).message}`);
+        } finally {
+          if (wdAcquired) {
+            try {
+              await supabase.rpc("release_dialog_lock", {
+                _scene_id: d.id,
+                _holder: wdToken, // fenced: löscht ausschliesslich den eigenen Lock
+                _pass_idx: zi,
+              });
+            } catch { /* best-effort */ }
+          }
+        }
+      }
+    }
+
+
 
     // ── (2.5) Dispatch-recovery: master_clip never reached Sync.so ────────
     // Plan v71 root cause: scene has clip_url + audio_plan.twoshot.url but

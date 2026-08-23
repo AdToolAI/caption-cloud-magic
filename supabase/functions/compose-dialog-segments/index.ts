@@ -97,6 +97,7 @@ import { plateFaceSanity } from "../_shared/plate-face-candidates.ts";
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
+import { isFanoutClosed } from "../_shared/v459-fanout-aggregation.ts";
 // v161 — renderPassFacePreclip re-enabled for the unified single-face
 // bbox-url-pro pipeline (1..N speakers). v187 makes this fail-closed for
 // multi-speaker: no full-plate fallback after a preclip timeout/failure.
@@ -4711,9 +4712,22 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         .eq("id", sceneId)
         .maybeSingle();
       const freshClaimState: any = (freshClaimRow as any)?.dialog_shots ?? null;
+      // V459 — Fan-out-Fence. Hat der Watchdog den Run bereits terminalisiert,
+      // darf ab hier KEIN Provider-Call mehr entstehen (sonst Geld für Arbeit,
+      // die nie reconciled wird).
+      if (isFanoutClosed(freshClaimState)) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v459_fanout_closed — dispatch aborted`,
+        );
+        return json(
+          { ok: true, skipped: "v459_fanout_closed", scene_id: sceneId, pass_idx: currentPassIdx },
+          202,
+        );
+      }
       const freshClaimPasses: any[] = Array.isArray(freshClaimState?.passes) ? freshClaimState.passes : [];
       const livePass = freshClaimPasses[currentPassIdx] ?? null;
       const liveStatus = String(livePass?.status ?? "");
+
       const liveHasJob = typeof livePass?.job_id === "string" && livePass.job_id.length > 0;
       const preflightStartedMs = livePass?.preflight_started_at
         ? Date.parse(String(livePass.preflight_started_at))
@@ -4753,13 +4767,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         } catch { /* best-effort */ }
         return json({ ok: true, skipped: "v193_pass_already_active", pass_idx: currentPassIdx, status: liveStatus }, 202);
       }
+      const v459ClaimAt = new Date().toISOString();
       try {
         await supabase.rpc("update_dialog_pass_slot", {
           _scene_id: sceneId,
           _pass_idx: currentPassIdx,
           _patch: {
             status: "rendering_preflight",
-            preflight_started_at: new Date().toISOString(),
+            preflight_started_at: v459ClaimAt,
+            // V459 — expliziter Zombie-Zeitanker. Die Watchdog-Uhr läuft NIE
+            // auf `started_at`, sondern ausschliesslich auf diesem Feld.
+            v459_preflight_started_at: v459ClaimAt,
             preflight_claim_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
           },
         });
@@ -4768,8 +4786,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v193_pass_claim_failed: ${(claimErr as Error)?.message ?? claimErr}`,
         );
       }
-      (pass as any).preflight_started_at = new Date().toISOString();
+      (pass as any).preflight_started_at = v459ClaimAt;
+      (pass as any).v459_preflight_started_at = v459ClaimAt;
       pass.status = "rendering_preflight";
+
     }
 
     // ── v193 — Batch preclip all sibling passes immediately ──────────────
