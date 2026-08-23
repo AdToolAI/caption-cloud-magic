@@ -135,6 +135,12 @@ export interface PassPreclipResult {
   faceShareInCrop?: number;
   /** v247 — distance (px) between mouth and crop center. */
   mouthOffsetPx?: number;
+  /**
+   * V458 — SIGNED mouth offset in PLATE pixels relative to the FINAL crop
+   * center (post-V457 projection / repair-expansion). `null` when no
+   * trustworthy mouth anchor exists. Consumers normalize with `crop.size`.
+   */
+  mouthOffsetXy?: { dx: number; dy: number } | null;
   /** V445 — true when clamping forced the crop off the ideal anchor. */
   clamped?: boolean;
   /** V445 — measurement source the crop geometry was computed from. */
