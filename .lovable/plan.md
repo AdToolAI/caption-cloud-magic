@@ -76,15 +76,29 @@ weiterhin genau einmal nach. Für `mouth_roi_unresolved` wird die Nachmessung
 `motion_unverified`, kein Retry, keine Blockade.
 
 
-## Tests
+## Kernregressionen
 
-- `v456-roi-contract.test.ts`: neuer Fall — vollständige Geometrie **inklusive**
-  `mouthOffsetXy` ⇒ Status `resolved`; fehlender Vektor ⇒ `mouth_offset_direction_unknown`.
-- Neuer Webhook-Vertragstest: `indeterminate` + `mouth_roi_unresolved` führt
-  **nicht** zu `ssw:noop_fail`; `indeterminate` + `measured_ambiguous` (Grauzone)
-  führt weiterhin zu `ssw:noop_fail`.
-- Crop-Test: `mouthOffsetXy` entspricht exakt Mundpunkt − Crop-Mittelpunkt, bei
-  `face_center`-Anker `null`. Bestehende V457-Tests bleiben unverändert grün.
+Geometrie:
+- Vektor stammt aus dem finalen V457-Crop (Produktionsfall `shift = {0,-7}`).
+- `mouthOffsetPx ≈ hypot(mouthOffsetXy)` — Vektor und Skalar konsistent.
+- `face_center`-Fallback ⇒ `null`; pose-geschätzter Anker ⇒ Vektor.
+
+V456-Vertrag:
+- vollständige Geometrie inkl. Vektor ⇒ `resolved`.
+- fehlender Vektor ⇒ `mouth_offset_direction_unknown`.
+
+Webhook (end-to-end, nicht nur „kein `ssw:noop_fail`"):
+- ROI-unresolved ⇒ Pass **nicht** `failed`, kein Refund, kein NOOP-Retry, kein
+  neuer Provider-Dispatch, Output für den Mux akzeptiert, `motion_unverified`
+  persistiert, Szenen-Aggregation läuft weiter.
+- `measured_ambiguous` bleibt fail-closed.
+- echtes `noop`/`static` bleibt terminal, auch mit ROI-Text im Reason.
+
+Watchdog:
+- `probe_infra_error` ⇒ genau eine Nachmessung erlaubt.
+- `mouth_roi_unresolved` ⇒ keine Nachmessung.
+
+Bestehende V457- und Contract-Tests bleiben unverändert grün.
 
 ## Nicht Teil dieses Gates
 
