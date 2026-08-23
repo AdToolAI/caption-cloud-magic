@@ -5836,6 +5836,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           // invalidation above and the diagnostic tags on mismatch failures.
           (pass as any).preclip_from_bbox = preclipResult.cropFromBbox ?? platePassBoxForPreclip ?? null;
           (pass as any).preclip_crop_measure_src = preclipResult.cropMeasureSrc ?? v445MeasureSrc;
+          // V457 — containment provenance (crop MUST contain the padded dispatch box).
+          (pass as any).v457_contain_box = (preclipResult as any).containBox ?? null;
+          (pass as any).v457_contains_target = (preclipResult as any).containsTarget ?? null;
+          (pass as any).v457_contain_reason = (preclipResult as any).containReason ?? null;
+          (pass as any).v457_crop_shift_px = (preclipResult as any).cropShiftPx ?? null;
+          (pass as any).v457_size_grown = (preclipResult as any).cropSizeGrown ?? null;
+          (pass as any).v457_size_grown_px = (preclipResult as any).cropSizeGrownPx ?? null;
           (pass as any).preclip_bbox_measure_src = preclipResult.bboxMeasureSrc ?? v445MeasureSrc;
           // ── V456 — geometry provenance for the mouth-ROI contract ────────
           // `preclip_*_measure_src` stay as-is (they honestly describe the
@@ -6446,6 +6453,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               v445_bbox_measure_src: (pass as any).preclip_bbox_measure_src ?? v445MeasureSrc,
               v445_crop_from_bbox: (pass as any).preclip_from_bbox ?? null,
               v445_final_bbox_sig: v445FinalBoxSig,
+              // V457 — containment projection evidence.
+              v457_contain_box: (pass as any).v457_contain_box ?? null,
+              v457_contains_target: (pass as any).v457_contains_target ?? null,
+              v457_contain_reason: (pass as any).v457_contain_reason ?? null,
+              v457_crop_shift_px: (pass as any).v457_crop_shift_px ?? null,
+              v457_size_grown: (pass as any).v457_size_grown ?? null,
+              v457_size_grown_px: (pass as any).v457_size_grown_px ?? null,
             },
 
           };

@@ -35,7 +35,8 @@
 import { computeFaceCrop, FaceCropRegion } from "./face-crop.ts";
 import { appendWebhookToken } from "./webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
-import { computeMouthCenteredCrop } from "./compute-mouth-centered-crop.ts";
+import { computeMouthCenteredCrop, projectCropToContain, normalizeContainBox, type ContainReason } from "./compute-mouth-centered-crop.ts";
+import { buildDispatchFaceBox } from "./plate-face-dispatch-box.ts";
 // V452 — dynamic crop geometry (identity static, geometry dynamic).
 import {
   type DynamicCameraPath,
@@ -144,6 +145,14 @@ export interface PassPreclipResult {
   cropFromBbox?: [number, number, number, number] | null;
   /** V452 — the exact dynamic camera path the preclip was rendered with. */
   cameraPath?: DynamicCameraPath | null;
+  /** V457 — padded dispatch box the crop was projected to contain. */
+  containBox?: [number, number, number, number] | null;
+  /** V457 — containment verdict on the final integer crop geometry. */
+  containsTarget?: boolean | null;
+  containReason?: string;
+  cropShiftPx?: { x: number; y: number };
+  cropSizeGrown?: boolean;
+  cropSizeGrownPx?: number;
 
   error?: string;
   /**
@@ -284,6 +293,19 @@ export async function renderPassFacePreclip(
   let faceShareInCrop = 0;
   let mouthOffsetPx = 0;
   let clampedAnchor = false;
+  // ── V457 — padded dispatch box the containment gate validates against.
+  // Same measurement, same plate: derived here from the SAME bbox that is
+  // sent to the provider, so crop and target can never diverge.
+  const v457ContainBox = normalizeContainBox(
+    buildDispatchFaceBox(bbox ?? null, { width: sW, height: sH }) as
+      | [number, number, number, number]
+      | null,
+  );
+  let v457ContainsTarget: boolean | null = null;
+  let v457ContainReason: ContainReason = "no_contain_box";
+  let v457ShiftPx = { x: 0, y: 0 };
+  let v457SizeGrown = false;
+  let v457SizeGrownPx = 0;
 
   if (useMouthAnchor) {
     const r = computeMouthCenteredCrop({
@@ -302,6 +324,7 @@ export async function renderPassFacePreclip(
       targetFaceShare: PRECLIP.targetFaceShare,
       minSize: PRECLIP.minCropSizePx,
       outputSize: PRECLIP.outputSizePx,
+      containBox: v457ContainBox,
     });
     crop0X = r.crop.x;
     crop0Y = r.crop.y;
@@ -310,6 +333,14 @@ export async function renderPassFacePreclip(
     faceShareInCrop = r.faceShareInCrop;
     mouthOffsetPx = r.mouthOffsetPx;
     clampedAnchor = r.clamped;
+    v457ContainsTarget = r.containsTarget;
+    v457ContainReason = r.containReason;
+    v457ShiftPx = r.shiftPx;
+    v457SizeGrown = r.sizeGrown;
+    v457SizeGrownPx = r.sizeGrownPx;
+    console.log(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v457_contain box=${v457ContainBox ? v457ContainBox.join(",") : "null"} contains=${v457ContainsTarget} reason=${v457ContainReason} shift=${v457ShiftPx.x},${v457ShiftPx.y} size_grown=${v457SizeGrown}(${v457SizeGrownPx})`,
+    );
     console.log(
       `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v247_mouth_anchor_preclip anchor=${anchor} face_share=${faceShareInCrop.toFixed(3)} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size}`,
     );
@@ -343,6 +374,24 @@ export async function renderPassFacePreclip(
     expandedY = Math.max(0, Math.min(sH - expandedSize, Math.round(centerY - expandedSize / 2)));
     expandedX = expandedX % 2 === 0 ? expandedX : Math.max(0, expandedX - 1);
     expandedY = expandedY % 2 === 0 ? expandedY : Math.max(0, expandedY - 1);
+    // V457 — the expansion re-centers the window; containment is a hard
+    // invariant and must therefore be re-established on the FINAL geometry.
+    if (v457ContainBox) {
+      const pe = projectCropToContain(
+        { x: expandedX, y: expandedY, size: expandedSize },
+        v457ContainBox,
+        sW,
+        sH,
+      );
+      expandedX = pe.crop.x;
+      expandedY = pe.crop.y;
+      expandedSize = pe.crop.size;
+      v457ContainsTarget = pe.containsTarget;
+      v457ContainReason = pe.reason;
+      v457ShiftPx = { x: v457ShiftPx.x + pe.shiftPx.x, y: v457ShiftPx.y + pe.shiftPx.y };
+      v457SizeGrown = v457SizeGrown || pe.sizeGrown;
+      v457SizeGrownPx = v457SizeGrownPx + pe.sizeGrownPx;
+    }
   }
 
   // v112 — Sync.so docs explicitly require ≥480p for reliable face detection
@@ -456,6 +505,12 @@ export async function renderPassFacePreclip(
         bboxMeasureSrc: measureSrc,
         cropFromBbox,
         cameraPath,
+        containBox: v457ContainBox,
+        containsTarget: v457ContainsTarget,
+        containReason: v457ContainReason,
+        cropShiftPx: v457ShiftPx,
+        cropSizeGrown: v457SizeGrown,
+        cropSizeGrownPx: v457SizeGrownPx,
       };
     }
   } catch (reuseErr) {
@@ -737,6 +792,12 @@ export async function renderPassFacePreclip(
         bboxMeasureSrc: measureSrc,
         cropFromBbox,
         cameraPath,
+        containBox: v457ContainBox,
+        containsTarget: v457ContainsTarget,
+        containReason: v457ContainReason,
+        cropShiftPx: v457ShiftPx,
+        cropSizeGrown: v457SizeGrown,
+        cropSizeGrownPx: v457SizeGrownPx,
 
       };
     }
