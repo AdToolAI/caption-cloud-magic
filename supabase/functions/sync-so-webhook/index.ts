@@ -833,6 +833,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         expectedAnchorSrc: (measurePass as any)?.preclip_geometry_anchor_expected ?? null,
         faceBbox: (measurePass as any)?.preclip_from_bbox ?? null,
         identity: (measurePass as any)?.preclip_geometry_identity ?? null,
+        // V471-B — activates the authoritative mouth ROI (landmark first,
+        // calibrated face-ratio fallback). Verdict side only.
+        crop: (measurePass as any)?.preclip_crop ?? null,
+        mouthSource: (measurePass as any)?.preclip_geometry_mouth_source ?? null,
         expectedIdentity: {
           runId: String((scene as any)?.active_run_id ?? "") || null,
           generation: Number((scene as any)?.plate_generation ?? NaN),
@@ -844,7 +848,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         `[sync-so-webhook] v456_roi_contract scene=${sceneId} pass=${measurePassIdx} ` +
           `status=${v456Contract.status} reason=${v456Contract.reason} ` +
           `failed_check=${v456Contract.failedCheck ?? "none"} ` +
-          `checks=${JSON.stringify(v456Contract.checks)}`,
+          `checks=${JSON.stringify(v456Contract.checks)} ` +
+          `v471_anchor=${v456Contract.v471?.anchorSource ?? "n/a"} ` +
+          `v471_roi=${v456Contract.v471?.roi ? JSON.stringify(v456Contract.v471.roi) : "null"} ` +
+          `v471_reason=${v456Contract.v471?.reason ?? "n/a"}`,
       );
       const v443MeasureArgs = {
         preclipUrl,
