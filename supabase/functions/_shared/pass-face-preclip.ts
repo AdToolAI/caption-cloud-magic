@@ -298,6 +298,10 @@ export async function renderPassFacePreclip(
   let anchor: "mouth" | "face_center" = "face_center";
   let faceShareInCrop = 0;
   let mouthOffsetPx = 0;
+  // V458 — SIGNED plate-pixel mouth offset, recomputed on the FINAL crop.
+  let mouthOffsetXy: { dx: number; dy: number } | null = null;
+  // V458 — the plate-space mouth point the offset is measured from.
+  let mouthPointPlate: { x: number; y: number } | null = null;
   let clampedAnchor = false;
   // ── V457 — padded dispatch box the containment gate validates against.
   // Same measurement, same plate: derived here from the SAME bbox that is
