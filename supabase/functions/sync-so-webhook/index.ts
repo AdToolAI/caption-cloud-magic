@@ -854,6 +854,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         preclipGeometry: v456Geometry,
         // V456 — validated contract; frozen v404 band stays as telemetry.
         roiContract: v456Contract,
+        // V467-A — TELEMETRY ONLY. The dispatched voice track of this pass, on
+        // the same timeline as the pre-clip (identity mapping, offset 0). No
+        // extra stills are rendered for it and no verdict may read it.
+        speechLockAudio: (measurePass as any)?.audio_url
+          ? { audioUrl: String((measurePass as any).audio_url), audioOffsetSec: 0 }
+          : null,
       };
       const runBounded = async (sampleCount?: number) =>
         await measureWithBoundedReMeasure(
