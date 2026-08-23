@@ -52,10 +52,13 @@ export type ReservationHandle = { reservationId: string; reservedEuros: number }
 
 export class InsufficientCreditsError extends Error {
   readonly required: number;
-  constructor(required: number) {
+  /** V459 — tatsaechlich verfuegbares Euro-Guthaben (fuer den 402-Vertrag). */
+  readonly available: number;
+  constructor(required: number, available = 0) {
     super("insufficient_credits");
     this.name = "InsufficientCreditsError";
     this.required = required;
+    this.available = Number.isFinite(available) ? available : 0;
   }
 }
 
