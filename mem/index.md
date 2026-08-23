@@ -230,3 +230,4 @@ Updated: today
 - [Briefing-Übernahme v414](mem://features/briefing-apply-v414) — Dialogzeilen wandern wieder ins Storyboard (nur mit auflösbarem Sprecher, Checkbox im Plan-Sheet); Parallel-Fire der Deep-Analyse entfernt.
 - [Briefing-Blocklabels v420](mem://features/briefing-structure-labels-v420) — DAUER/ORT/CAST/AKTION werden nie mehr als Sprecher geparst; Ensemble-Mindestbesetzung aus der Cast-&-World-Auswahl; Warnfeld zählt nur echte Sprecher-Turns.
 - [Dialog-Extraktor v421](mem://features/deterministic-dialog-extractor-v421) — `extractDialog.ts` ist alleinige Quelle für dialogTurns (inline `@mention: "Text"`), LLM raus aus dem Sprecher-Feld, Slot = Mention.
+- [V465 Verdict-Metrik & NOOP-Observability](mem://architecture/lipsync/v465-verdict-metric-and-observability) — `mouth_over_frame` ersetzt die widerlegte v404-Delta-Metrik (Lambda-kalibriert 2.00/2.65); NOOP-Provider-Outputs müssen vor dem Verdikt eingefroren werden.
