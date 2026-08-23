@@ -220,11 +220,11 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
       .eq("id", sceneId);
   } catch (e) {
     console.warn(`[failLipSync] scene update crash: ${(e as Error).message}`);
-    return { ok: false, refunded: didRefund, scene_id: sceneId, reason: safeReason };
+    return { ok: false, refunded: didRefund, scene_id: sceneId, reason: safeReason, refund: refundInfo };
   }
 
   console.log(
     `[failLipSync] scene=${sceneId} reason="${safeReason}" jobs=${ids.length} refunded=${didRefund}/${refundAmount}`,
   );
-  return { ok: true, refunded: didRefund, scene_id: sceneId, reason: safeReason };
+  return { ok: true, refunded: didRefund, scene_id: sceneId, reason: safeReason, refund: refundInfo };
 }
