@@ -6851,15 +6851,32 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         sync_source_kind: "segments", video_url: passInputUrl,
         sync_status: "PRE_DISPATCH_FAILED", error_class: errorClass,
         error_message: message,
-        meta: { diagnostic_id: diagnosticId, retry_variant: retryVariant, pass_idx: currentPassIdx, total_passes: passes.length, ...meta },
+        meta: {
+          diagnostic_id: diagnosticId,
+          retry_variant: retryVariant,
+          pass_idx: currentPassIdx,
+          total_passes: passes.length,
+          v459_refund: refundInfo,
+          refund_ledger: "euro",
+          run_id: refundRunId,
+          ...meta,
+        },
       });
       // v431 G3.1b — Abbruch VOR dem Provider-Call: beweisbar nicht angenommen.
       await settleLedgerDispatchFailure(supabase, v431SyncLedgerJob?.id ?? null, {
         errorCode: reason,
         outcome: "rejected",
       });
-      return json({ error: reason, message, refunded: alreadyRefunded ? 0 : costCredits, ...meta }, status);
+      return json({
+        error: reason,
+        message,
+        refunded: didRefund,
+        refunded_euros: Number((refundInfo as any)?.amount_euros ?? 0),
+        refund: refundInfo,
+        ...meta,
+      }, status);
     };
+
 
     // FA-4/P0 — fail-closed: Sync-Segment ohne kanonische `segment_id`
     // (= dialog_turns.id bzw. deterministische Stabilizer-UUID) darf niemals
