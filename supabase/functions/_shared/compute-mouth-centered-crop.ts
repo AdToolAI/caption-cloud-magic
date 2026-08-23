@@ -39,11 +39,27 @@ export type ContainReason =
   | "projected"
   | "contain_box_outside_plate";
 
+/**
+ * V458 — coordinate space of `mouthOffsetXy`.
+ * The stored vector is `mouthPoint_plate - finalCropCenter_plate`, i.e. PLATE
+ * pixels of the FINAL (post-V457) crop geometry. Consumers MUST normalize it
+ * with the plate-pixel `crop.size` before using it in preclip/provider space.
+ */
+export const V458_MOUTH_OFFSET_SPACE = "plate" as const;
+
 export interface MouthCenteredCropResult {
   crop: { x: number; y: number; size: number; outputSize: number };
   anchor: "mouth" | "face_center";
   faceShareInCrop: number;
   mouthOffsetPx: number;
+  /**
+   * V458 — SIGNED mouth offset in PLATE pixels relative to the FINAL crop
+   * center. May contain half-pixels (odd crop sizes) — never round the
+   * components. `null` when the anchor is not a trustworthy mouth landmark.
+   */
+  mouthOffsetXy: { dx: number; dy: number } | null;
+  /** V458 — coordinate-space tag of `mouthOffsetXy` (always `plate`). */
+  mouthOffsetSpace: typeof V458_MOUTH_OFFSET_SPACE;
   clamped: boolean;
   /** V457 — null when no containBox was supplied. */
   containsTarget: boolean | null;
@@ -52,6 +68,7 @@ export interface MouthCenteredCropResult {
   sizeGrown: boolean;
   sizeGrownPx: number;
 }
+
 
 export function normalizeContainBox(
   b?: [number, number, number, number] | null,
