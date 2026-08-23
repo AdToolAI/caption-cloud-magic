@@ -188,6 +188,7 @@ export interface LedgerJobRow {
   run_id: string | null;
   plate_generation: number | null;
   updated_at: string | null;
+  completed_at?: string | null;
 }
 
 const JOB_COLS =
