@@ -38,9 +38,11 @@ Die V445-Vereinheitlichung deckt damit nur den Größen-, nicht den Positions- u
 ## Tests
 
 - Neue Fälle in `preclip-crop-containment.test.ts` bzw. neben `compute-mouth-centered-crop.ts`:
-  - exakte Produktions-Geometrie der Szene `be60d106…` → Crop enthält `[219,149,302,258]`.
+  - exakte Produktions-Geometrie der Szene `be60d106…`: `target = [219,149,302,258]`, alter Crop `[185,156,338,309]`, `size = 153` → neuer Crop enthält das Target, `shiftPx = { x: 0, y: -7 }`, `sizeGrown = false`.
+  - **Idempotenz**: enthält der ursprüngliche Crop das Target bereits, gilt `shiftPx = {0,0}`, `sizeGrown = false` — bestehende gute Szenen wandern geometrisch nicht.
+  - **Containment nach Rundung**: Prüfung auf den finalen Integer-Koordinaten (FFmpeg-Ebene), nicht auf Float-Ebene.
   - Mund-Anker am oberen/unteren/seitlichen Plate-Rand → weiterhin gültiger Crop.
-  - Gesicht größer als Plate-Kurzseite → Verhalten wie heute, kein Absturz.
+  - Impossible-Case: `containBox` ragt über die Plate hinaus → `containsTarget = false`, `reason = contain_box_outside_plate`, kein Maskieren.
 - Bestehende Preclip-/Containment-Tests müssen unverändert grün bleiben.
 
 ## Nicht Teil dieses Gates
