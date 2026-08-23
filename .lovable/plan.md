@@ -49,4 +49,4 @@ Die V445-Vereinheitlichung deckt damit nur den Größen-, nicht den Positions- u
 
 - Keine Änderung an Sync.so-Payload, Thresholds, NOOP-Ladder oder V456-ROI-Vertrag.
 - Keine Migration, kein automatischer Rerender.
-- Deploy-Umfang nach Freigabe: `compose-dialog-segments` (bündelt die `_shared`-Dateien). Rerender startest du danach manuell.
+- Deploy-Umfang nach Freigabe: nur `compose-dialog-segments` (bündelt die geänderten `_shared`-Module). Danach STOP: erst Revision/Health kontrollieren, dann genau ein manueller Testlauf der S01-Szene.
