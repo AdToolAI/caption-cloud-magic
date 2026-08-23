@@ -90,9 +90,19 @@ export async function startSceneGeneration(params: {
   }
 
   if (data?.ok === false) {
+    const code = String(data.code ?? data.error ?? 'start_failed');
+    if (code === 'INSUFFICIENT_CREDITS' || code === 'NO_WALLET') {
+      const required = Number(data.required_euros ?? 0) || 0;
+      const available = Number(data.available_euros ?? 0) || 0;
+      throw new SceneGenerationStartError(
+        'INSUFFICIENT_CREDITS',
+        insufficientCreditsMessage(required, available),
+        { requiredEuros: required, availableEuros: available },
+      );
+    }
     throw new SceneGenerationStartError(
       String(data.error ?? 'start_failed'),
-      String(data.message ?? data.error ?? tx({ de: tx({ de: "Der Render konnte nicht gestartet werden.", en: "The render could not be started.", es: "No se pudo iniciar el renderizado." }), en: 'The render could not be started.', es: 'No se pudo iniciar el renderizado.' })),
+      String(data.message ?? data.error ?? tx({ de: 'Der Render konnte nicht gestartet werden.', en: 'The render could not be started.', es: 'No se pudo iniciar el renderizado.' })),
     );
   }
 
