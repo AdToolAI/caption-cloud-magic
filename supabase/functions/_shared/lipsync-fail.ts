@@ -49,6 +49,8 @@ export interface FailLipSyncResult {
   refunded: boolean;
   scene_id: string;
   reason: string;
+  /** V459 — Rohantwort von `v459_refund_lipsync_euros` (Kasse: Euro-Wallet). */
+  refund?: Record<string, unknown> | null;
 }
 
 export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncResult> {
@@ -63,7 +65,7 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
     const { data } = await supabase
       .from("composer_scenes")
       .select(
-        "id, dialog_shots, lip_sync_applied_at, replicate_prediction_id, audio_plan, project_id",
+        "id, dialog_shots, lip_sync_applied_at, replicate_prediction_id, audio_plan, project_id, active_run_id",
       )
       .eq("id", sceneId)
       .maybeSingle();
