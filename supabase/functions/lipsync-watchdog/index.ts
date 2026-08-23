@@ -1233,6 +1233,10 @@ serve(async (req) => {
             pipeline_job_id: meta.pipeline_job_id ?? null,
             provider_output_url: providerOutputUrl,
             provider_dispatch: false,
+            // V467-A — speech-coupling telemetry. Never read by any branch.
+            v467: (measurement as any)?.v467
+              ? { ...(measurement as any).v467, authority: "telemetry_only" }
+              : { available: false, authority: "telemetry_only" },
           },
         });
 
