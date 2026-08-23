@@ -114,6 +114,8 @@ import { verifyFaceBeforeDispatch } from "../_shared/syncso-face-gate.ts";
 // V461 A — v400 Face-Gate (hard, pre-dispatch). V461 B/C — semantic input
 // fingerprint + honest dispatch telemetry.
 import { evaluateV461FaceGate } from "../_shared/v461-face-gate.ts";
+// V469 — pre-dispatch mouth-visibility / pose-suitability gate (NOT a yaw cut).
+import { evaluateV469MouthVisibility } from "../_shared/v469-mouth-visibility-gate.ts";
 import {
   buildDispatchVideoTelemetry,
   computeInputFingerprint,
