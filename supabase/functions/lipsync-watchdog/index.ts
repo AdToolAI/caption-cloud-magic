@@ -478,7 +478,86 @@ serve(async (req) => {
       }
     }
 
+    // ── (1.5) V459 — Terminal Fan-out Aggregation (VOR jedem Dispatch) ────
+    // Alle Pässe sind für ein vollständiges Resultat erforderlich. Ein terminal
+    // gescheiterter Required-Pass macht den Run unrettbar. Reihenfolge ist
+    // race-kritisch: Fence zuerst, Ledger danach, Refund zuletzt.
+    if (isV5Fanout) {
+      const { data: aggRow } = await supabase
+        .from("composer_scenes")
+        .select("dialog_shots")
+        .eq("id", d.id)
+        .maybeSingle();
+      const aggState: any = (aggRow as any)?.dialog_shots ?? ds;
+      const aggPasses: any[] = Array.isArray(aggState?.passes) ? aggState.passes : [];
+      const verdict = evaluateRunAggregation(aggPasses);
+
+      if (verdict.runIrrecoverable && !isFanoutClosed(aggState)) {
+        // Fence: CAS auf dem aktuellen dialog_shots.status. Ab hier bricht der
+        // Pre-Dispatch-Recheck in compose-dialog-segments jeden Provider-Call ab.
+        const fencedStatus = String(aggState?.status ?? "");
+        const { data: fenced } = await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...aggState,
+              status: V459_TERMINALIZING_STATUS,
+              [V459_FANOUT_CLOSED_KEY]: true,
+              v459_fanout_closed_at: new Date().toISOString(),
+              v459_prev_status: fencedStatus,
+            },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", d.id)
+          .eq("dialog_shots->>status", fencedStatus)
+          .select("id");
+        const fenceWon = Array.isArray(fenced) && fenced.length > 0;
+        console.log(
+          `[lipsync-watchdog] v459 fanout_fence scene=${d.id} won=${fenceWon} ` +
+            `prev_status=${fencedStatus} reason=${verdict.reason} ` +
+            `blocked=[${verdict.blockedPassIdxs.join(",")}]`,
+        );
+        if (!fenceWon) return; // jemand anders hat den Zustand gerade geändert
+      }
+
+      if (verdict.runIrrecoverable) {
+        // Nach dem Fence: Ledger/Provider-Jobs ERNEUT prüfen.
+        const { data: postRow } = await supabase
+          .from("composer_scenes")
+          .select("dialog_shots")
+          .eq("id", d.id)
+          .maybeSingle();
+        const postState: any = (postRow as any)?.dialog_shots ?? aggState;
+        const postPasses: any[] = Array.isArray(postState?.passes) ? postState.passes : [];
+        const postVerdict = evaluateRunAggregation(postPasses);
+        if (!postVerdict.canTerminalizeNow) {
+          console.log(
+            `[lipsync-watchdog] v459 terminalize_deferred scene=${d.id} ` +
+              `inflight=[${postVerdict.unreconciledPassIdxs.join(",")}] — kein Refund, warte auf Reconciliation`,
+          );
+          return; // kein Dispatch, keine Zombie-Recovery, kein Refund
+        }
+        const aggUid = await userIdForProject(supabase, d.project_id);
+        const aggRefund = Number(postState?.cost_credits ?? ds?.cost_credits) || 0;
+        await failLipSync({
+          supabase,
+          sceneId: d.id,
+          userId: aggUid,
+          reason: "v459_terminal_required_pass_failure",
+          refundCredits: aggRefund,
+          syncApiKey,
+        });
+        console.log(
+          `[lipsync-watchdog] v459 terminalized scene=${d.id} refund=${aggRefund} ` +
+            `blocked_passes=[${postVerdict.blockedPassIdxs.join(",")}]`,
+        );
+        failed.push({ scene_id: d.id, reason: "v459_terminal_required_pass_failure" });
+        return;
+      }
+    }
+
     // ── (2) Dispatch deferred-pending fan-out passes ─────────────────────
+
     // Skip dispatching while we're parked on circuit_open — re-triggering
     // compose-dialog-segments would just hit the circuit again and reset
     // updated_at, masking the real TTL.
