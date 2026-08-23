@@ -44,6 +44,14 @@ import {
 import type { V456RoiContract } from "./v456-roi-contract.ts";
 // V465-B2a — paired mouth-over-frame telemetry (pure, same stills).
 import { computeMouthOverFrame, type V465PairedMetric } from "./v465-mouth-over-frame.ts";
+// V467-A — speech-locked mouth edit. TELEMETRY ONLY, same stills, no verdict.
+import {
+  buildSpeechEnvelope,
+  computeSpeechLock,
+  decodeWavMono,
+  perSampleMouthEdit,
+  type V467SpeechLock,
+} from "./v467-speech-lock.ts";
 
 /** Frozen production constants — no rounding, no heuristics. */
 export const MOTION_SAMPLE_COUNT = 6;
