@@ -88,6 +88,7 @@ import {
   pinImmutableArtifact,
   type PinnedArtifact,
 } from "../_shared/v434-immutable-artifact.ts";
+import { isTerminalNoopPass } from "../_shared/v459-fanout-aggregation.ts";
 
 /**
  * V434 Step 1 — records an immutable artifact pin. Never throws, never touches
