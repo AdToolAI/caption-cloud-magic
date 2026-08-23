@@ -6834,8 +6834,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             total_sec: totalSec,
             segments: pass.segments,
             cost_credits: costCredits,
-            refunded: !alreadyRefunded,
+            refunded: refundSettled,
+            v459_refund: refundInfo ?? (prevState as any)?.v459_refund ?? null,
             plate_identity: v153PlateIdentitySnapshot,
+
             error: reason,
             finished_at: new Date().toISOString(),
           }),
