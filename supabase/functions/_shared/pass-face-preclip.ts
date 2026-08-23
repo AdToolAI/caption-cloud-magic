@@ -145,6 +145,14 @@ export interface PassPreclipResult {
   cropFromBbox?: [number, number, number, number] | null;
   /** V452 — the exact dynamic camera path the preclip was rendered with. */
   cameraPath?: DynamicCameraPath | null;
+  /** V457 — padded dispatch box the crop was projected to contain. */
+  containBox?: [number, number, number, number] | null;
+  /** V457 — containment verdict on the final integer crop geometry. */
+  containsTarget?: boolean | null;
+  containReason?: string;
+  cropShiftPx?: { x: number; y: number };
+  cropSizeGrown?: boolean;
+  cropSizeGrownPx?: number;
 
   error?: string;
   /**
@@ -366,6 +374,24 @@ export async function renderPassFacePreclip(
     expandedY = Math.max(0, Math.min(sH - expandedSize, Math.round(centerY - expandedSize / 2)));
     expandedX = expandedX % 2 === 0 ? expandedX : Math.max(0, expandedX - 1);
     expandedY = expandedY % 2 === 0 ? expandedY : Math.max(0, expandedY - 1);
+    // V457 — the expansion re-centers the window; containment is a hard
+    // invariant and must therefore be re-established on the FINAL geometry.
+    if (v457ContainBox) {
+      const pe = projectCropToContain(
+        { x: expandedX, y: expandedY, size: expandedSize },
+        v457ContainBox,
+        sW,
+        sH,
+      );
+      expandedX = pe.crop.x;
+      expandedY = pe.crop.y;
+      expandedSize = pe.crop.size;
+      v457ContainsTarget = pe.containsTarget;
+      v457ContainReason = pe.reason;
+      v457ShiftPx = { x: v457ShiftPx.x + pe.shiftPx.x, y: v457ShiftPx.y + pe.shiftPx.y };
+      v457SizeGrown = v457SizeGrown || pe.sizeGrown;
+      v457SizeGrownPx = v457SizeGrownPx + pe.sizeGrownPx;
+    }
   }
 
   // v112 — Sync.so docs explicitly require ≥480p for reliable face detection
@@ -479,6 +505,12 @@ export async function renderPassFacePreclip(
         bboxMeasureSrc: measureSrc,
         cropFromBbox,
         cameraPath,
+        containBox: v457ContainBox,
+        containsTarget: v457ContainsTarget,
+        containReason: v457ContainReason,
+        cropShiftPx: v457ShiftPx,
+        cropSizeGrown: v457SizeGrown,
+        cropSizeGrownPx: v457SizeGrownPx,
       };
     }
   } catch (reuseErr) {
@@ -760,6 +792,12 @@ export async function renderPassFacePreclip(
         bboxMeasureSrc: measureSrc,
         cropFromBbox,
         cameraPath,
+        containBox: v457ContainBox,
+        containsTarget: v457ContainsTarget,
+        containReason: v457ContainReason,
+        cropShiftPx: v457ShiftPx,
+        cropSizeGrown: v457SizeGrown,
+        cropSizeGrownPx: v457SizeGrownPx,
 
       };
     }
