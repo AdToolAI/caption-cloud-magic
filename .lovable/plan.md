@@ -1,114 +1,60 @@
-# V458 — Mouth-ROI-Vektor persistieren + `mouth_roi_unresolved` nicht mehr terminalisieren
+# V458 — Mouth-ROI Vector Persistence + Non-Terminal ROI-Unresolved
 
-## Belegter Befund (Szene `be60d106…`, Run `c03ef959…`, 16:14–16:23 UTC)
+Ziel: Der V456-ROI-Contract soll im ehemaligen Produktionsfall tatsächlich `resolved + authoritative` erreichen — nicht nur „nicht mehr rot". Zweiter Pfad bleibt das ehrliche Sicherheitsnetz ohne Fail/Refund/Retry.
 
-Der Lauf ist technisch bis 6/6 durchgelaufen. Alle sechs Pässe wurden danach mit
-demselben Grund verworfen:
+## Beweiskette, die nach dem Fix nachvollziehbar sein muss
 
 ```text
-server_motion_measure  status=unmeasurable  verdict=indeterminate
-reason = mouth_roi_unresolved:mouth_offset_direction_unknown
-v403/g322 … INDETERMINATE → ssw:failed
+finale V457-Crop-Geometrie
+  -> Mund-Anker (plate px)
+  -> signierter mouthOffsetXy (plate px, ungerundet)
+  -> V456 ROI-Contract = authoritative
+  -> Geometry-ROI autoritativ
+  -> Server-Motion-Messung mit echtem Verdikt
 ```
 
-V457 hat sauber gearbeitet: `v457_contains_target = true`, `contain_reason = projected`,
-Shift −6…−8 px, keine Vergrößerung, Face-Share 0.24–0.30. Der Abbruch liegt also
-**nach** dem Provider, in der Messung.
+Fallback-Pfad (unverändert non-terminal):
 
-Zwei bestätigte Ursachen:
+```text
+kein vertrauenswürdiger Mundanker
+  -> mouthOffsetXy = null
+  -> mouth_roi_unresolved -> indeterminate
+  -> motion_unverified (NICHT motion_verified)
+  -> kein Fail, kein Refund, kein Retry, kein neuer Dispatch
+```
 
-1. **Der Richtungsvektor des Mundes wird nie gespeichert.** Der V456-Vertrag liest
-   `preclip_mouth_offset_xy`. Diese Eigenschaft wird an keiner Stelle im Code
-   geschrieben — persistiert wird ausschließlich der vorzeichenlose Skalar
-   `preclip_mouth_offset_px`. Damit ist der Vertrag für **jede** Szene
-   strukturell unerfüllbar, nicht nur für diese.
-2. **Der Nicht-Terminalisierungs-Pfad greift nicht.** Der Webhook berechnet zwar
-   `v443MotionUnverified = true` für `mouth_roi_unresolved`, verlangt für den
-   Durchlass zusätzlich aber `classifyMeasurementFailure(...) === "probe_infra_error"`.
-   `mouth_roi_unresolved` steht bewusst in der Nicht-Infra-Liste und liefert
-   `measured_ambiguous` — die beiden Regeln widersprechen sich, der Pass fällt in
-   den Fail-Closed-Zweig. Der bestehende Test prüft nur `isMouthRoiUnresolved`,
-   nicht diesen Zweig, deshalb blieb es unentdeckt.
+## Änderungen
 
-## Umsetzung (Scope: Shared-Producer + Node-Spiegel, `pass-face-preclip`, Composer-Persistenz, Webhook, Watchdog, Tests)
+1. `supabase/functions/_shared/compute-mouth-centered-crop.ts` (+ Node-Mirror `src/lib/composer/computeMouthCenteredCrop.ts`)
+   - Neu: `mouthOffsetXy = { dx, dy }` = `mouthPoint_plate − finalCropCenter_plate`, berechnet auf der FINALEN Geometrie (nach Projection/Clamp), **ungerundet** (Halb-Pixel bei ungeraden Crop-Größen bleiben erhalten).
+   - `mouthOffsetXy = null` bei Anker `face_center`.
+   - Neue Konstante/Feld `mouthOffsetSpace = "plate"` als Code-Invariante für den Koordinatenraum.
+   - `mouthOffsetPx = round(hypot(dx, dy))` bleibt der skalare Legacy-Wert, abgeleitet aus demselben finalen Vektor (Skalar/Vektor-Kohärenz).
 
-### 1. Signierten Mundversatz aus der FINALEN V457-Geometrie ableiten
+2. `supabase/functions/_shared/pass-face-preclip.ts`
+   - Mundpunkt merken und Vektor/Skalar **nach** der Repair-Expansion + erneuter V457-Projektion auf der finalen Crop-Geometrie neu berechnen.
+   - `mouthOffsetXy` in `PassPreclipResult` und in allen Return-Pfaden (Reuse-Hit und Frisch-Render) mitgeben.
 
-- `compute-mouth-centered-crop.ts` liefert zusätzlich `mouthOffsetXy: { x, y }`.
-  Berechnet wird der Vektor **erst nach** `projectCropToContain`, nach der
-  Integer-Rundung und nach dem finalen Clamp:
+3. `supabase/functions/compose-dialog-segments/index.ts`
+   - Persistiert `preclip_mouth_offset_xy = { dx, dy }` (plate px) im Pass-JSONB neben dem bestehenden `preclip_mouth_offset_px`; Logzeile ergänzt.
 
-  ```text
-  finalCropCenter = { x: crop.x + crop.size/2, y: crop.y + crop.size/2 }
-  mouthOffsetXy   = { x: mouth.x - finalCropCenter.x, y: mouth.y - finalCropCenter.y }
-  ```
+4. `supabase/functions/sync-so-webhook/index.ts`
+   - Passthrough-Bedingung eng erweitern: `indeterminate` + `v443MotionUnverified` + (`probe_infra_error` **oder** `mouth_roi_unresolved`). Kein anderer `measured_ambiguous`-Fall wird durchgelassen.
+   - Telemetrie behält die Unterscheidung `failure_class: mouth_roi_unresolved` vs. `probe_infra_error`; Zustand bleibt `motion_unverified`.
 
-- Der Skalar `mouthOffsetPx` wird auf dieselbe finale Geometrie umgestellt, damit
-  `mouthOffsetPx === round(hypot(mouthOffsetXy.x, mouthOffsetXy.y))` gilt. Feld und
-  Semantik bleiben, nur die Bezugsgeometrie wird kohärent (bisher vor der
-  V457-Projektion berechnet — genau die −6…−8 px Differenz).
-- Anchor-Provenienz entscheidet: echter **oder** pose-geschätzter Mund-Anker ⇒
-  signierter Vektor; `face_center`-Fallback ⇒ `mouthOffsetXy = null`, damit
-  `mouth_offset_direction_unknown` ein ehrlicher Vertragsfehler bleibt.
-- Node-Zwilling `src/lib/composer/computeMouthCenteredCrop.ts` 1:1 mitziehen.
-- `pass-face-preclip.ts` reicht den Wert durch; `compose-dialog-segments` schreibt
-  ihn als `preclip_mouth_offset_xy` in das **JSONB-Feld** `dialog_shots.passes[i]` —
-  dieselbe Ablage, aus der der V456-Vertrag heute schon liest. Keine Migration.
+5. `supabase/functions/lipsync-watchdog/index.ts`
+   - Kandidaten mit `meta.failure_class === "mouth_roi_unresolved"` werden **nicht** neu gemessen (Geometrie ist statisch), sondern einmalig als `MOTION_RECHECKED` mit `recheck_skipped: roi_unresolved_structural` gebucht. Echte Infra-Fälle behalten das genau-einmal-Reprobe.
 
-### 2. `mouth_roi_unresolved` bleibt nicht-terminal — eng begrenzt
+## Tests (müssen grün sein vor Deploy)
 
-- Durchlass nur im Pfad `measurement_status = unmeasurable` **und**
-  `verdict = indeterminate`, dann:
-  `v443MotionUnverified && (failureClass === "probe_infra_error" || isMouthRoiUnresolved(reason))`.
-- Priorität unverändert: echtes `noop`/`static` terminalisiert **immer** zuerst.
-  Ein `noop`-Verdict, dessen Reason zufällig `mouth_roi_unresolved` enthält, darf
-  nie zu `motion_unverified` werden — die NOOP-Ladder wird nicht aufgeweicht.
-- Gewöhnliches `measured_ambiguous` (Grauzone, unbrauchbare Metrik) bleibt
-  fail-closed wie heute.
-- Telemetrie trennt weiterhin `failure_class = mouth_roi_unresolved` vs.
-  `probe_infra_error`.
+- Koordinatenraum-Invariante: gespeicherter Vektor ist Plate-Pixel; Consumer (`deriveMouthRoi`) normalisiert mit der Plate-Pixel-`cropSize` — Regressionstest, der einen skalierten Provider-/Preclip-Raum simuliert und beweist, dass der Vektor nicht ungeprüft als Preclip-Pixel benutzt wird.
+- Halb-Pixel-Fall (`size = 153`) → `dx/dy` behalten `.5`, nur `mouthOffsetPx` wird gerundet.
+- Produktionsfall `be60d106`: finale V457-Geometrie → Contract `authoritative`, `failedCheck = null`.
+- `face_center`-Fallback → `mouthOffsetXy = null` → Contract `unresolved:mouth_offset_direction_unknown`.
+- End-to-End: ROI-unresolved-Pass wird für Mux akzeptiert, ohne Refund, ohne Retry, ohne Provider-Dispatch; Telemetrie bleibt `motion_unverified` (nicht `motion_verified`).
+- Watchdog: strukturell unresolved → kein Re-Measure; Infra → genau ein Re-Measure.
 
-### 3. Watchdog
+## Deploy & Stop
 
-`lipsync-watchdog` misst `motion_unverified` bei echten `probe_infra_error`-Fällen
-weiterhin genau einmal nach. Für `mouth_roi_unresolved` wird die Nachmessung
-übersprungen — dieselbe Geometrie liefert kein neues Ergebnis. Status bleibt
-`motion_unverified`, kein Retry, keine Blockade.
-
-
-## Kernregressionen
-
-Geometrie:
-- Vektor stammt aus dem finalen V457-Crop (Produktionsfall `shift = {0,-7}`).
-- `mouthOffsetPx ≈ hypot(mouthOffsetXy)` — Vektor und Skalar konsistent.
-- `face_center`-Fallback ⇒ `null`; pose-geschätzter Anker ⇒ Vektor.
-
-V456-Vertrag:
-- vollständige Geometrie inkl. Vektor ⇒ `resolved`.
-- fehlender Vektor ⇒ `mouth_offset_direction_unknown`.
-
-Webhook (end-to-end, nicht nur „kein `ssw:noop_fail`"):
-- ROI-unresolved ⇒ Pass **nicht** `failed`, kein Refund, kein NOOP-Retry, kein
-  neuer Provider-Dispatch, Output für den Mux akzeptiert, `motion_unverified`
-  persistiert, Szenen-Aggregation läuft weiter.
-- `measured_ambiguous` bleibt fail-closed.
-- echtes `noop`/`static` bleibt terminal, auch mit ROI-Text im Reason.
-
-Watchdog:
-- `probe_infra_error` ⇒ genau eine Nachmessung erlaubt.
-- `mouth_roi_unresolved` ⇒ keine Nachmessung.
-
-Bestehende V457- und Contract-Tests bleiben unverändert grün.
-
-## Nicht Teil dieses Gates
-
-- Keine Änderung an Thresholds, Sync.so-Payload, NOOP-Ladder, V457-Geometrie.
-- Keine Migration, kein automatischer Rerender.
-- Deploy-Scope: `compose-dialog-segments`, `sync-so-webhook`, `lipsync-watchdog`.
-  Danach STOP — erst Health prüfen, dann auf Ansage genau ein S01-Testlauf.
-
-## Zur Bildwirkung („man sieht nicht viel")
-
-Das ist eine getrennte Frage von Framing und Prompt (Totale, Nebentätigkeiten,
-Kameradistanz) und kein Pipeline-Fehler. Ich fasse sie bewusst nicht in dieses
-Gate; sag Bescheid, wenn ich sie als eigenen Schritt aufsetzen soll.
+Nach grünen Tests genau: `compose-dialog-segments`, `sync-so-webhook`, `lipsync-watchdog`.
+Danach STOP vor S01 — nur Revision/Health und Prüfung auf unerwartete Jobs/Dispatches. Der kontrollierte S01-Lauf erfolgt erst nach separater Freigabe.
