@@ -250,14 +250,38 @@ export function evaluateMouthRoiContract(
   }
   checks.identity = true;
 
+  // ── 7. V471-B — the ONE authoritative mouth ROI ──────────────────────────
+  // The V434 geometry band inherits the upstream 0.78 pose estimate and is
+  // ~70–90 px too high / ~1.7× too large (docs/v471a-roi-sampling-parity.md).
+  // When the V471 inputs are supplied, its ROI is the authority; when it cannot
+  // place the mouth, the pass is `mouth_roi_unresolved` — never a false NOOP.
+  const v471Requested = input.crop != null || input.mouthSource != null;
+  const v471 = v471Requested
+    ? resolveV471MouthRoi({
+      faceBbox: input.faceBbox ?? null,
+      crop: input.crop ?? null,
+      faceShareInCrop: input.faceShareInCrop ?? null,
+      mouthOffset: input.mouthOffset ?? null,
+      mouthSource: input.mouthSource ?? null,
+    })
+    : null;
+  if (v471Requested && (!v471 || !v471.roi)) {
+    return {
+      ...fail("roi_bounds", (v471?.reason ?? "v471_unavailable").replace(/^v471_mouth_roi_unresolved:/, "v471_")),
+      checks: { ...checks, roi_bounds: false },
+      v471,
+    };
+  }
+
   return {
     status: "authoritative",
-    roi: { ...derived.roi },
+    roi: v471?.roi ? { ...v471.roi } : { ...derived.roi },
     legacyRoi: { ...V434_LEGACY_ROI },
     derived,
-    reason: "roi_geometry_authoritative",
+    reason: v471?.roi ? `roi_geometry_authoritative:${v471.reason}` : "roi_geometry_authoritative",
     failedCheck: null,
     checks,
     version: V456_ROI_CONTRACT_VERSION,
+    v471,
   };
 }
