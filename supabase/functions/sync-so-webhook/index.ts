@@ -46,7 +46,7 @@ import {
   type MotionProbeResult,
 } from "../_shared/motion-probe-classifier.ts";
 // V465-B2b — authoritative paired mouth-over-frame verdict.
-import { resolveV465Verdict } from "../_shared/v465-verdict.ts";
+import { resolveV465Verdict, V466_GRAY_BAND_SAMPLES } from "../_shared/v465-verdict.ts";
 // FA-4 v404 — server-side synchronous measurement owner (Remotion stills).
 import {
   measureProviderMotionSync,
@@ -977,7 +977,15 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           meta: {
             v443: true,
             telemetry_state: MOTION_UNVERIFIED_STATE,
-            failure_class: v456Unresolved ? "mouth_roi_unresolved" : "probe_infra_error",
+            failure_class: v456Unresolved
+              ? "mouth_roi_unresolved"
+              : (v466StillGray && !v443Bounded.infraExhausted
+                ? "v466_gray_band_unresolved"
+                : "probe_infra_error"),
+            v466_gray_band: v466StillGray,
+            v466_remeasured: v466ReMeasured,
+            v466_remeasure_samples: v466ReMeasured ? V466_GRAY_BAND_SAMPLES : null,
+            mouth_over_frame: v465Verdict.mouth_over_frame,
             v456_roi_contract: {
               status: v456Contract.status,
               reason: v456Contract.reason,
