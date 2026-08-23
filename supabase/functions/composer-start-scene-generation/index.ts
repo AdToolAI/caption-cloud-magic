@@ -258,6 +258,27 @@ serve(async (req) => {
           generation: r.generation,
         });
       }
+
+      // V459 — Guthaben-Fehler sind kein Infrastrukturfehler. Der strukturierte
+      // Vertrag (code + required_euros + available_euros) muss die UI erreichen,
+      // statt als "non-2xx status code" zu verschwinden. Deshalb 200 + ok:false.
+      const p = (payload ?? {}) as Record<string, unknown>;
+      const code = String(p.code ?? "");
+      if (resp.status === 402 || code === "INSUFFICIENT_CREDITS" || code === "NO_WALLET") {
+        return json(
+          {
+            ok: false,
+            error: code || "INSUFFICIENT_CREDITS",
+            code: code || "INSUFFICIENT_CREDITS",
+            required_euros: Number(p.required_euros ?? p.required ?? 0) || 0,
+            available_euros: Number(p.available_euros ?? p.available ?? 0) || 0,
+            needs_purchase: true,
+            payload,
+          },
+          200,
+        );
+      }
+
       return json(
         { ok: false, error: "dispatch_failed", status: resp.status, payload },
         502,
