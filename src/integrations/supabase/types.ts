@@ -20581,6 +20581,25 @@ export type Database = {
         Returns: Json
       }
       user_owns_comment: { Args: { _comment_id: string }; Returns: boolean }
+      v459_deduct_ai_video_credits: {
+        Args: {
+          p_amount: number
+          p_generation_id: string
+          p_metadata?: Json
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      v459_refund_lipsync_euros: {
+        Args: {
+          p_reason?: string
+          p_run_id?: string
+          p_scene_id: string
+          p_source_transaction_id?: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       verify_license_certificate: {
         Args: { _token: string }
         Returns: {
