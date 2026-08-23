@@ -135,6 +135,12 @@ export interface PassPreclipResult {
   faceShareInCrop?: number;
   /** v247 — distance (px) between mouth and crop center. */
   mouthOffsetPx?: number;
+  /**
+   * V458 — SIGNED mouth offset in PLATE pixels relative to the FINAL crop
+   * center (post-V457 projection / repair-expansion). `null` when no
+   * trustworthy mouth anchor exists. Consumers normalize with `crop.size`.
+   */
+  mouthOffsetXy?: { dx: number; dy: number } | null;
   /** V445 — true when clamping forced the crop off the ideal anchor. */
   clamped?: boolean;
   /** V445 — measurement source the crop geometry was computed from. */
@@ -292,6 +298,10 @@ export async function renderPassFacePreclip(
   let anchor: "mouth" | "face_center" = "face_center";
   let faceShareInCrop = 0;
   let mouthOffsetPx = 0;
+  // V458 — SIGNED plate-pixel mouth offset, recomputed on the FINAL crop.
+  let mouthOffsetXy: { dx: number; dy: number } | null = null;
+  // V458 — the plate-space mouth point the offset is measured from.
+  let mouthPointPlate: { x: number; y: number } | null = null;
   let clampedAnchor = false;
   // ── V457 — padded dispatch box the containment gate validates against.
   // Same measurement, same plate: derived here from the SAME bbox that is
@@ -332,6 +342,13 @@ export async function renderPassFacePreclip(
     anchor = r.anchor;
     faceShareInCrop = r.faceShareInCrop;
     mouthOffsetPx = r.mouthOffsetPx;
+    mouthOffsetXy = r.mouthOffsetXy;
+    if (r.anchor === "mouth") {
+      mouthPointPlate = {
+        x: Math.round(Number((mouth as number[])[0])),
+        y: Math.round(Number((mouth as number[])[1])),
+      };
+    }
     clampedAnchor = r.clamped;
     v457ContainsTarget = r.containsTarget;
     v457ContainReason = r.containReason;
@@ -407,6 +424,24 @@ export async function renderPassFacePreclip(
   const nativeOut = Math.min(PRECLIP.nativeOutputMaxPx, Math.max(PRECLIP.nativeOutputMinPx, expandedSize));
   const evenNative = nativeOut % 2 === 0 ? nativeOut : nativeOut - 1;
   const crop = { x: expandedX, y: expandedY, size: expandedSize, outputSize: evenNative };
+  // ── V458 — mouth offset MUST describe the FINAL crop ──────────────────
+  // The repair-expansion (v116) and its V457 re-projection move/grow the
+  // window after the initial computation. The signed vector (PLATE pixels)
+  // and the legacy scalar are therefore recomputed here, on `crop`, so the
+  // V456 ROI contract can normalize with the very same plate-pixel size.
+  if (mouthPointPlate) {
+    const finalCx = crop.x + crop.size / 2;
+    const finalCy = crop.y + crop.size / 2;
+    mouthOffsetXy = { dx: mouthPointPlate.x - finalCx, dy: mouthPointPlate.y - finalCy };
+    mouthOffsetPx = Math.round(Math.hypot(mouthOffsetXy.dx, mouthOffsetXy.dy));
+  } else {
+    mouthOffsetXy = null;
+  }
+  console.log(
+    `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v458_mouth_offset space=plate ` +
+      `xy=${mouthOffsetXy ? `${mouthOffsetXy.dx},${mouthOffsetXy.dy}` : "null"} px=${mouthOffsetPx} ` +
+      `final_crop=${crop.x},${crop.y},${crop.size}`,
+  );
   const outW = crop.outputSize;
   const outH = crop.outputSize;
   const durationInFrames = Math.max(6, Math.ceil(dur * FPS));
@@ -500,6 +535,7 @@ export async function renderPassFacePreclip(
         anchor,
         faceShareInCrop,
         mouthOffsetPx,
+        mouthOffsetXy,
         clamped: clampedAnchor,
         cropMeasureSrc: measureSrc,
         bboxMeasureSrc: measureSrc,
@@ -787,6 +823,7 @@ export async function renderPassFacePreclip(
         anchor,
         faceShareInCrop,
         mouthOffsetPx,
+        mouthOffsetXy,
         clamped: clampedAnchor,
         cropMeasureSrc: measureSrc,
         bboxMeasureSrc: measureSrc,

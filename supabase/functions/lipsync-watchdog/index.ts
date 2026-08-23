@@ -30,6 +30,7 @@ import { measureProviderMotionSync } from "../_shared/measure-provider-motion-sy
 import { classifyMotionProbe } from "../_shared/motion-probe-classifier.ts";
 import {
   classifyMeasurementFailure,
+  isMouthRoiUnresolved,
   MOTION_UNVERIFIED_STATE,
 } from "../_shared/motion-probe-infra.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
@@ -887,12 +888,48 @@ serve(async (req) => {
         if (alreadyRechecked.has(key)) continue;
         alreadyRechecked.add(key); // exactly-once, also within this tick
         const meta = (cand.meta ?? {}) as any;
+        // ── V458 — structurally unresolved mouth ROI is NOT re-measurable ──
+        // The geometry is static: re-running the identical measurement on the
+        // identical pinned output would return the identical `unresolved`.
+        // Book it once as recheck-skipped and never dispatch anything.
+        const roiUnresolved = String(meta.failure_class ?? "") === "mouth_roi_unresolved" ||
+          isMouthRoiUnresolved(meta.v456_roi_contract?.reason ?? null);
+        if (roiUnresolved) {
+          await logSyncDispatch(supabase, {
+            scene_id: cand.scene_id,
+            job_id: cand.job_id,
+            engine: "sync-segments",
+            turn_idx: cand.turn_idx,
+            sync_status: "MOTION_RECHECKED",
+            error_class: "motion_probe_recheck",
+            error_message: String(meta.v456_roi_contract?.reason ?? "mouth_roi_unresolved").slice(0, 500),
+            meta: {
+              v458_recheck_skipped: true,
+              recheck_skipped: "roi_unresolved_structural",
+              recheck_verdict: MOTION_UNVERIFIED_STATE,
+              pass_idx: cand.turn_idx,
+              pipeline_job_id: meta.pipeline_job_id ?? null,
+              provider_dispatch: false,
+            },
+          });
+          console.log(
+            `[lipsync-watchdog] v458_recheck_skipped scene=${cand.scene_id} job=${cand.job_id} ` +
+              `pass=${cand.turn_idx} reason=roi_unresolved_structural provider_dispatch=false`,
+          );
+          remeasured.push({
+            scene_id: cand.scene_id,
+            job_id: cand.job_id,
+            verdict: MOTION_UNVERIFIED_STATE,
+          });
+          continue;
+        }
         const preclipUrl = String(meta.preclip_url ?? "");
         const providerOutputUrl = String(meta.provider_output_url ?? "");
         const durationSeconds = Number(meta.duration_sec ?? NaN);
         if (!preclipUrl || !providerOutputUrl || !Number.isFinite(durationSeconds)) {
           continue;
         }
+
 
         const measurement = await measureProviderMotionSync({
           preclipUrl,

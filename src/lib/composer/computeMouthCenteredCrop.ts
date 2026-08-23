@@ -52,6 +52,14 @@ export type ContainReason =
   | "projected"
   | "contain_box_outside_plate";
 
+/**
+ * V458 — coordinate space of `mouthOffsetXy`.
+ * The stored vector is `mouthPoint_plate - finalCropCenter_plate`, i.e. PLATE
+ * pixels of the FINAL (post-V457) crop geometry. Consumers MUST normalize it
+ * with the plate-pixel `crop.size` before using it in preclip/provider space.
+ */
+export const V458_MOUTH_OFFSET_SPACE = "plate" as const;
+
 export interface MouthCenteredCropResult {
   /** Preclip crop rectangle on the source plate. */
   crop: { x: number; y: number; size: number; outputSize: number };
@@ -61,6 +69,14 @@ export interface MouthCenteredCropResult {
   faceShareInCrop: number;
   /** Distance in pixels between mouth and crop center (0 when anchor=mouth and no clamp). */
   mouthOffsetPx: number;
+  /**
+   * V458 — SIGNED mouth offset in PLATE pixels relative to the FINAL crop
+   * center. May contain half-pixels — never round the components.
+   * `null` when the anchor is not a trustworthy mouth landmark.
+   */
+  mouthOffsetXy: { dx: number; dy: number } | null;
+  /** V458 — coordinate-space tag of `mouthOffsetXy` (always `plate`). */
+  mouthOffsetSpace: typeof V458_MOUTH_OFFSET_SPACE;
   /** True when clamping forced the crop away from the ideal center. */
   clamped: boolean;
   /** V457 — null when no containBox was supplied. */
@@ -70,6 +86,7 @@ export interface MouthCenteredCropResult {
   sizeGrown: boolean;
   sizeGrownPx: number;
 }
+
 
 export function normalizeContainBox(
   b?: [number, number, number, number] | null,
@@ -265,14 +282,16 @@ export function computeMouthCenteredCrop(
   const clamped = x !== rawX || y !== rawY;
 
 
-  // Report metrics.
+  // Report metrics — all derived from the FINAL (post-V457) geometry.
   const cropArea = size * size;
   const faceArea = faceW * faceH;
   const faceShareInCrop = Math.min(1, faceArea / cropArea);
   const cropCx = x + size / 2;
   const cropCy = y + size / 2;
-  const mouthOffsetPx = usingMouth
-    ? Math.round(Math.hypot(ax - cropCx, ay - cropCy))
+  // V458 — SIGNED plate-pixel vector; components are never rounded.
+  const mouthOffsetXy = usingMouth ? { dx: ax - cropCx, dy: ay - cropCy } : null;
+  const mouthOffsetPx = mouthOffsetXy
+    ? Math.round(Math.hypot(mouthOffsetXy.dx, mouthOffsetXy.dy))
     : 0;
 
   return {
@@ -280,6 +299,8 @@ export function computeMouthCenteredCrop(
     anchor,
     faceShareInCrop,
     mouthOffsetPx,
+    mouthOffsetXy,
+    mouthOffsetSpace: V458_MOUTH_OFFSET_SPACE,
     clamped,
     containsTarget,
     containReason,

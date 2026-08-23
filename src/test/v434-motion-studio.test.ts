@@ -210,8 +210,11 @@ describe("V434 — measurement helper stays backwards compatible", () => {
   });
 
   it("the geometry ROI is opt-in only and never silently authoritative", () => {
+    // V456 Gate 2 made an authoritative ROI contract the primary opt-in; the
+    // legacy explicit flag remains the only other way in.
     expect(src).toContain("args.useGeometryRoiForVerdict === true");
-    expect(src).toContain("const verdictRoi: MouthRoiNormalized = applyGeometryRoi ? derivedRoi.roi : MOTION_ROI");
+    expect(src).toContain("const verdictRoi: MouthRoiNormalized = applyGeometryRoi");
+    expect(src).toContain(": MOTION_ROI;");
   });
 
   it("the MAD telemetry reuses the already decoded stills (no extra Lambda invokes)", () => {
