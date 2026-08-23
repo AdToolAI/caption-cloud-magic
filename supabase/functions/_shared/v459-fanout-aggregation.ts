@@ -176,3 +176,48 @@ export function isTerminalNoopPass(p: V459Pass | null | undefined): boolean {
   const cls = String(p.last_error_class ?? p.error ?? "");
   return cls.includes("sync_noop_unrecoverable") || cls.includes("noop_ladder_exhausted");
 }
+
+export const V459_CANCELED_STATUS = "canceled_by_scene_failure";
+
+/**
+ * V459 — Fence-Abschluss: Pässe, die nie mehr dispatcht werden, dürfen nicht
+ * als `pending`/`rendering_preflight` in einem terminalen Run zurückbleiben.
+ *
+ * Harte Regel (Billing-Race): Ein Pass mit echtem Provider-Job in flight wird
+ * NICHT gecancelt. Er muss erst reconciliiert werden; erst danach schliesst der
+ * Fence ab. Deshalb prüft diese Funktion jeden Kandidaten noch einmal selbst
+ * gegen `hasUnreconciledProviderJob` — auch wenn die Aggregation ihn schon
+ * ausgeschlossen hat.
+ */
+export function closeBlockedPasses(
+  passes: Array<V459Pass | null | undefined>,
+  blockedIdxs: number[],
+  opts: { nowIso: string; reason: string },
+): { passes: V459Pass[]; canceledIdxs: number[]; skippedInflightIdxs: number[] } {
+  const list = Array.isArray(passes) ? passes : [];
+  const blocked = new Set(blockedIdxs ?? []);
+  const canceled: number[] = [];
+  const skipped: number[] = [];
+
+  const next = list.map((p, i) => {
+    const pass = (p ?? {}) as V459Pass;
+    if (!blocked.has(i)) return pass;
+    if (isTerminalPassFailure(pass)) return pass;
+    if (hasUnreconciledProviderJob(pass)) {
+      skipped.push(i);
+      return pass;
+    }
+    canceled.push(i);
+    return {
+      ...pass,
+      status: V459_CANCELED_STATUS,
+      error: pass.error ?? opts.reason,
+      last_error_class: V459_CANCELED_STATUS,
+      v459_canceled_at: opts.nowIso,
+      v459_canceled_reason: opts.reason,
+    };
+  });
+
+  return { passes: next, canceledIdxs: canceled, skippedInflightIdxs: skipped };
+}
+
