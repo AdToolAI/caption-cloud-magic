@@ -1678,18 +1678,33 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         motionVerdictForMultiSpeaker === "indeterminate" &&
         v443MotionUnverified &&
         isMouthRoiUnresolved(motionProbeResult?.reason ?? "");
+      // V466-A — the V465 gray band is a SAMPLING statement, not a verdict.
+      // After the one bounded 16-still re-measure it passes through the same
+      // narrow gate: `motion_unverified` (never green, never terminal).
+      const v466GrayPassthrough = !isSingleSpeakerScene &&
+        motionVerdictForMultiSpeaker === "indeterminate" &&
+        v443MotionUnverified &&
+        /v465_gray_band/.test(String(motionProbeResult?.reason ?? ""));
       const v443MotionUnverifiedPassthrough = !isSingleSpeakerScene &&
         motionVerdictForMultiSpeaker === "indeterminate" &&
         v443MotionUnverified &&
-        (v443FailureClass === "probe_infra_error" || v458RoiUnresolvedPassthrough);
+        (v443FailureClass === "probe_infra_error" || v458RoiUnresolvedPassthrough ||
+          v466GrayPassthrough);
       if (v443MotionUnverifiedPassthrough) {
         console.warn(
           `[sync-so-webhook] v443 scene=${sceneId} pass=${currentPass} speaker="${passSpeakerName}" ` +
-            `MOTION_UNVERIFIED (${v458RoiUnresolvedPassthrough ? "mouth_roi_unresolved" : "probe_infra_error"}, ` +
+            `MOTION_UNVERIFIED (${
+              v466GrayPassthrough
+                ? "v466_gray_band"
+                : v458RoiUnresolvedPassthrough
+                ? "mouth_roi_unresolved"
+                : "probe_infra_error"
+            }, ` +
             `attempts=${v443MeasureAttempts}) → success pass-through, telemetry stays motion_unverified ` +
             `(never motion_verified) — no terminalization, no refund, no provider dispatch`,
         );
       }
+
 
 
       if (
