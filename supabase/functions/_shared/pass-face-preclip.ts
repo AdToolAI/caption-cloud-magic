@@ -285,6 +285,19 @@ export async function renderPassFacePreclip(
   let faceShareInCrop = 0;
   let mouthOffsetPx = 0;
   let clampedAnchor = false;
+  // ── V457 — padded dispatch box the containment gate validates against.
+  // Same measurement, same plate: derived here from the SAME bbox that is
+  // sent to the provider, so crop and target can never diverge.
+  const v457ContainBox = normalizeContainBox(
+    buildDispatchFaceBox(bbox ?? null, { width: sW, height: sH }) as
+      | [number, number, number, number]
+      | null,
+  );
+  let v457ContainsTarget: boolean | null = null;
+  let v457ContainReason: ContainReason = "no_contain_box";
+  let v457ShiftPx = { x: 0, y: 0 };
+  let v457SizeGrown = false;
+  let v457SizeGrownPx = 0;
 
   if (useMouthAnchor) {
     const r = computeMouthCenteredCrop({
@@ -303,6 +316,7 @@ export async function renderPassFacePreclip(
       targetFaceShare: PRECLIP.targetFaceShare,
       minSize: PRECLIP.minCropSizePx,
       outputSize: PRECLIP.outputSizePx,
+      containBox: v457ContainBox,
     });
     crop0X = r.crop.x;
     crop0Y = r.crop.y;
@@ -311,6 +325,14 @@ export async function renderPassFacePreclip(
     faceShareInCrop = r.faceShareInCrop;
     mouthOffsetPx = r.mouthOffsetPx;
     clampedAnchor = r.clamped;
+    v457ContainsTarget = r.containsTarget;
+    v457ContainReason = r.containReason;
+    v457ShiftPx = r.shiftPx;
+    v457SizeGrown = r.sizeGrown;
+    v457SizeGrownPx = r.sizeGrownPx;
+    console.log(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v457_contain box=${v457ContainBox ? v457ContainBox.join(",") : "null"} contains=${v457ContainsTarget} reason=${v457ContainReason} shift=${v457ShiftPx.x},${v457ShiftPx.y} size_grown=${v457SizeGrown}(${v457SizeGrownPx})`,
+    );
     console.log(
       `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v247_mouth_anchor_preclip anchor=${anchor} face_share=${faceShareInCrop.toFixed(3)} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size}`,
     );
