@@ -70,6 +70,13 @@ export interface V456RoiContractInput extends PreclipRoiGeometry {
   identity?: V456Identity | null;
   /** Identity of the pass being measured right now. */
   expectedIdentity?: V456Identity | null;
+  /**
+   * V471-B — pre-clip crop in PLATE pixels (`preclip_crop`). Supplying it (with
+   * `mouthSource`) activates the authoritative V471 mouth ROI.
+   */
+  crop?: { x?: number | null; y?: number | null; size?: number | null } | null;
+  /** V471-B — `preclip_geometry_mouth_source` (`landmark` | `pose_estimate`). */
+  mouthSource?: string | null;
 }
 
 export interface V456RoiContract {
