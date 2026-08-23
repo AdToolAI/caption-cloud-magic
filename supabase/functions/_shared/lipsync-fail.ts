@@ -190,15 +190,21 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
 
 
   // 5. Patch dialog_shots (mark failed/refunded) and the scene row.
+  // Ein bereits gebuchter Refund (`already_refunded`) gilt als erledigt und
+  // darf keinen zweiten Versuch ausloesen.
+  const refundSettled =
+    didRefund || (refundInfo as any)?.reason === "already_refunded";
   const patchedState = state
     ? {
         ...state,
         status: "failed",
         error: safeReason,
         finished_at: state.finished_at ?? nowIso,
-        refunded: alreadyRefunded || didRefund || refundAmount === 0,
+        refunded: alreadyRefunded || refundSettled || refundAmount === 0,
+        v459_refund: refundInfo ?? (state as any)?.v459_refund ?? null,
       }
     : { version: 5, status: "failed", error: safeReason, refunded: refundAmount === 0 };
+
 
   try {
     await supabase
