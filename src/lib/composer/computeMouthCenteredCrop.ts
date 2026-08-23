@@ -243,6 +243,25 @@ export function computeMouthCenteredCrop(
     y = Math.max(0, Math.min(plateHeight - size, Math.round(faceCy - size / 2)));
   }
 
+  // ── V457 — the crop MUST contain the padded dispatch box ─────────────
+  let containsTarget: boolean | null = null;
+  let containReason: ContainReason = "no_contain_box";
+  let shiftPx = { x: 0, y: 0 };
+  let sizeGrown = false;
+  let sizeGrownPx = 0;
+  const containBox = normalizeContainBox(input.containBox);
+  if (containBox) {
+    const p = projectCropToContain({ x, y, size }, containBox, plateWidth, plateHeight);
+    containsTarget = p.containsTarget;
+    containReason = p.reason;
+    shiftPx = p.shiftPx;
+    sizeGrown = p.sizeGrown;
+    sizeGrownPx = p.sizeGrownPx;
+    x = p.crop.x;
+    y = p.crop.y;
+    size = p.crop.size;
+  }
+
   const clamped = x !== rawX || y !== rawY;
 
 
@@ -262,5 +281,11 @@ export function computeMouthCenteredCrop(
     faceShareInCrop,
     mouthOffsetPx,
     clamped,
+    containsTarget,
+    containReason,
+    shiftPx,
+    sizeGrown,
+    sizeGrownPx,
   };
 }
+
