@@ -35,6 +35,20 @@ export const PROBE_INFRA_BACKOFF_MS: readonly number[] = [750, 2000];
 export const MOTION_UNVERIFIED_STATE = "motion_unverified";
 
 /**
+ * V456 — the geometry contract for the mouth ROI could not be satisfied. This
+ * is NOT a statement about the clip either: measuring the frozen v404 cheek
+ * band would produce a false NOOP verdict, so the pass is reported as
+ * `motion_unverified` instead (non-terminal, no retry, no refund).
+ */
+export const MOUTH_ROI_UNRESOLVED_REASON = "mouth_roi_unresolved";
+
+/** PURE — true when a measurement failed because the ROI contract did not hold. */
+export function isMouthRoiUnresolved(reason: string | null | undefined): boolean {
+  return String(reason ?? "").toLowerCase().includes(MOUTH_ROI_UNRESOLVED_REASON);
+}
+
+
+/**
  * Substrings that identify an INFRASTRUCTURE/TRANSPORT failure of the probe.
  * Everything not listed here is treated as `measured_ambiguous` (fail-closed).
  */
@@ -82,6 +96,9 @@ const NON_INFRA_PATTERNS: readonly string[] = [
   "still_dimensions_invalid",
   "measurement_missing",
   "between noop_threshold",
+  // V456 — geometry contract failure: no retry (the geometry will not change
+  // by re-measuring); handled by the dedicated `motion_unverified` path.
+  "mouth_roi_unresolved",
 ];
 
 /** PURE — classifies a failed/unusable measurement reason. */

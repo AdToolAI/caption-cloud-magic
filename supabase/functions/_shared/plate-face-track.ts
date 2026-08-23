@@ -40,6 +40,8 @@ export const TRACK_MAX_CENTER_DRIFT = 0.7;
 /** Two candidates this similar are ambiguous — we refuse rather than switch. */
 export const TRACK_AMBIGUITY_DIST_RATIO = 1.15;
 export const TRACK_AMBIGUITY_IOU_DELTA = 0.05;
+/** V456 — mouth-distance margin (× reference face side) that resolves a tie. */
+export const TRACK_MOUTH_TIEBREAK_MARGIN = 0.25;
 
 export interface TrackedSampleDebug {
   t: number;
@@ -68,6 +70,12 @@ export interface PlateFaceTrackInput {
   endSec: number;
   /** Assignment-locked face box of THIS speaker in plate pixels. */
   anchorBox: Box;
+  /**
+   * V456 — assignment-locked MOUTH landmark of this speaker in plate pixels.
+   * Used ONLY as an identity-safe tiebreak when two candidates are otherwise
+   * equally plausible (side profiles / movement). Never selects a new face.
+   */
+  anchorMouth?: [number, number] | null;
   /** Face centers of the other cast members — used as a veto, never a target. */
   siblingCenters?: Array<[number, number]> | null;
   sampleCount?: number;
@@ -136,6 +144,8 @@ export function pickAssignedFace(
   candidates: Array<{ bbox: Box; mouth: [number, number] | null }>,
   reference: Box,
   siblingCenters: Array<[number, number]>,
+  /** V456 — reference mouth in the SAME pixel space (optional tiebreak). */
+  referenceMouth?: [number, number] | null,
 ): { bbox: Box; mouth: [number, number] | null; iou: number } | null {
   if (candidates.length === 0) return null;
   const [rcx, rcy] = centerOf(reference);
@@ -169,7 +179,21 @@ export function pickAssignedFace(
     if (iou < TRACK_MIN_IOU && dist > rSide * TRACK_MAX_CENTER_DRIFT) continue;
     const distClose = dist <= best.dist * TRACK_AMBIGUITY_DIST_RATIO;
     const iouClose = Math.abs(iou - best.iou) < TRACK_AMBIGUITY_IOU_DELTA;
-    if (distClose && iouClose) return null;
+    if (!distClose || !iouClose) continue;
+    // V456 — mouth-landmark tiebreak. On 3/4 profiles and lateral movement the
+    // box IoU of two cast members can be equally plausible while the MOUTH
+    // landmarks are far apart. Only a CLEAR margin (best mouth at least 25%
+    // closer, relative to the reference face side) resolves the ambiguity;
+    // anything less still returns null (identity stays unproven).
+    if (
+      referenceMouth && best.mouth && c.mouth &&
+      Number.isFinite(referenceMouth[0]) && Number.isFinite(referenceMouth[1])
+    ) {
+      const dBest = Math.hypot(best.mouth[0] - referenceMouth[0], best.mouth[1] - referenceMouth[1]);
+      const dOther = Math.hypot(c.mouth[0] - referenceMouth[0], c.mouth[1] - referenceMouth[1]);
+      if (dOther - dBest > rSide * TRACK_MOUTH_TIEBREAK_MARGIN) continue;
+    }
+    return null;
   }
   return { bbox: best.bbox, mouth: best.mouth, iou: best.iou };
 }
@@ -338,6 +362,10 @@ export async function trackAssignedFaceAcrossTurn(
   // Sequential on purpose: the reference box walks forward with the face, so
   // identity continuity is preserved sample by sample.
   let reference: Box = input.anchorBox;
+  let referenceMouth: [number, number] | null = Array.isArray(input.anchorMouth) &&
+      Number.isFinite(Number(input.anchorMouth[0])) && Number.isFinite(Number(input.anchorMouth[1]))
+    ? [Number(input.anchorMouth[0]), Number(input.anchorMouth[1])]
+    : null;
   for (let i = 0; i < times.length; i++) {
     const remaining = deadline - Date.now();
     if (remaining <= 1_000) {
@@ -363,13 +391,14 @@ export async function trackAssignedFaceAcrossTurn(
           ) as [number, number])
           : null,
       }));
-      const picked = pickAssignedFace(mapped, reference, siblings);
+      const picked = pickAssignedFace(mapped, reference, siblings, referenceMouth);
       if (!picked) {
         debug.push({ t: times[i], accepted: false, reason: "no_identity_safe_match", faces: mapped.length });
         continue;
       }
       samples[i] = { t: times[i], box: picked.bbox, mouth: picked.mouth };
       reference = picked.bbox;
+      if (picked.mouth) referenceMouth = picked.mouth;
       debug.push({ t: times[i], accepted: true, reason: "ok", iou: Number(picked.iou.toFixed(3)), faces: mapped.length });
     } catch (e) {
       debug.push({ t: times[i], accepted: false, reason: `sample_error:${(e as Error)?.message ?? String(e)}` });

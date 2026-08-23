@@ -127,6 +127,8 @@ import {
   TRACK_SAMPLE_COUNT,
 } from "../_shared/dynamic-camera-path.ts";
 import { trackAssignedFaceAcrossTurn } from "../_shared/plate-face-track.ts";
+// V456 Gate 2 — pose-aware mouth anchor (no colour heuristics).
+import { resolveMouthAnchorPoseAware } from "../_shared/v456-roi-contract.ts";
 // FA-4 v406/v407 — Frozen Provider Input Snapshot / Retry-Wire-Parität.
 import {
   buildProviderWire,
@@ -5687,6 +5689,32 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       console.log(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render START speaker=${pass.speaker_name} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] speakers=${speakers.length} plate_box=${platePassBoxForPreclip ? "yes" : "no"} siblings=${siblingCoords.length}`,
       );
+      // ── V456 Gate 2 — ANCHOR COHERENCE (v400 T5) ────────────────────────
+      // The geometry (face box + mouth) is validated against the ANCHOR image
+      // by the v185 anchor-first sanity gate, so the ANCHOR — not the plate
+      // video — is the authoritative geometry source. Gate 1 proved we labelled
+      // it with the plate URL, which made the measurement contract unverifiable.
+      const v456AnchorSrc = sanitizeMeasureSource(
+        ((scene as any).reference_image_url || "").trim() || null,
+      );
+      // V456 — robust, pose-aware mouth fallback. No skin/lip COLOR heuristic:
+      // when the detector returns no mouth landmark we estimate it from the
+      // assignment-locked face box (yaw-shifted), so profile speakers keep a
+      // mouth anchor instead of degrading to the legacy face-center crop.
+      const v456DetectedMouth = speakerPlateMouths?.[pass.speaker_idx] ?? null;
+      const v456MouthResolved = resolveMouthAnchorPoseAware({
+        bbox: platePassBoxForPreclip ?? null,
+        landmark: v456DetectedMouth,
+        yawDeg: Number((pass as any).plate_yaw_deg ?? 0) || 0,
+      });
+      if (!v456DetectedMouth) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v456_mouth_landmark_fallback ` +
+            `source=${v456MouthResolved?.source ?? "none"} bbox=${JSON.stringify(platePassBoxForPreclip ?? null)}`,
+        );
+      }
+      const v456MouthForPreclip = v456MouthResolved?.mouth ?? null;
+
       try {
         const preclipResult = await renderPassFacePreclip(
           supabase,
@@ -5705,7 +5733,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             srcHeight: plateDims.height,
             coords: [Number(pass.coords[0]), Number(pass.coords[1])],
             bbox: platePassBoxForPreclip,
-            mouth: speakerPlateMouths?.[pass.speaker_idx] ?? null,
+            mouth: v456MouthForPreclip,
             // V445 — same measurement label as the dispatch face box.
             bboxMeasureSrc: v445MeasureSrc,
             siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
@@ -5726,6 +5754,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
                 startSec: unionStart,
                 endSec: unionEnd,
                 anchorBox: platePassBoxForPreclip as [number, number, number, number],
+                // V456 — identity-safe mouth tiebreak keeps the track alive on
+                // 3/4 profiles and lateral movement (Gate 1: cam_dynamic=false).
+                anchorMouth: v456MouthForPreclip,
                 siblingCenters: siblingCoords,
                 sampleCount: TRACK_SAMPLE_COUNT,
                 budgetMs: 70_000,
@@ -5806,6 +5837,22 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           (pass as any).preclip_from_bbox = preclipResult.cropFromBbox ?? platePassBoxForPreclip ?? null;
           (pass as any).preclip_crop_measure_src = preclipResult.cropMeasureSrc ?? v445MeasureSrc;
           (pass as any).preclip_bbox_measure_src = preclipResult.bboxMeasureSrc ?? v445MeasureSrc;
+          // ── V456 — geometry provenance for the mouth-ROI contract ────────
+          // `preclip_*_measure_src` stay as-is (they honestly describe the
+          // plate the crop was cut from). These fields carry the ANCHOR the
+          // geometry was validated against (v400 T5) plus the identity the
+          // geometry is frozen with, so the webhook can prove coherence.
+          (pass as any).preclip_geometry_anchor_src = v456AnchorSrc;
+          (pass as any).preclip_geometry_anchor_expected = v456AnchorSrc;
+          (pass as any).preclip_geometry_mouth_source = v456MouthResolved?.source ?? null;
+          (pass as any).preclip_geometry_identity = {
+            runId: String((scene as any).active_run_id ?? "") || null,
+            generation: Number.isFinite(Number((scene as any).plate_generation))
+              ? Number((scene as any).plate_generation)
+              : null,
+            passIdx: currentPassIdx,
+            speakerIdx: Number(pass.speaker_idx),
+          };
           // ── V434 Step 1 — IMMUTABLE PRE-CLIP EVIDENCE COPY ──────────────
           // Calibration ground truth may only be built from bytes that cannot
           // be overwritten by a later run (docs/v433-motion-studio-rca.md).

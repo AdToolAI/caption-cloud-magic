@@ -50,10 +50,13 @@ import {
 // V443 — probe-infrastructure failures are not verdicts about the clip.
 import {
   classifyMeasurementFailure,
+  isMouthRoiUnresolved,
   measureWithBoundedReMeasure,
   MOTION_UNVERIFIED_STATE,
   PROBE_INFRA_MAX_RETRIES,
 } from "../_shared/motion-probe-infra.ts";
+// V456 Gate 2 — anchor-coherent, validated mouth-ROI contract.
+import { evaluateMouthRoiContract } from "../_shared/v456-roi-contract.ts";
 // FA-4 v409 — PURE Speaker-Cardinality (distinct speaker_idx, NOT pass count).
 import {
   classifySpeakerCardinality,
@@ -805,20 +808,45 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // V443 — the measurement inputs are IMMUTABLE for the whole bounded
       // re-measure: same pinned provider output, same pre-clip, same duration,
       // same run/generation/pass identity. No provider call, no new spend.
+      const v456Geometry = {
+        anchor: (measurePass as any)?.preclip_anchor ?? null,
+        faceShareInCrop: (measurePass as any)?.preclip_face_share ?? null,
+        cropSize: (measurePass as any)?.preclip_crop?.size ?? null,
+        mouthOffsetPx: (measurePass as any)?.preclip_mouth_offset_px ?? null,
+        mouthOffset: (measurePass as any)?.preclip_mouth_offset_xy ?? null,
+      };
+      // ── V456 Gate 2 — the ROI contract decides the measurement band ───────
+      // The geometry ROI becomes authoritative ONLY when the anchor source,
+      // face bbox, mouth anchor, ROI bounds and identity all hold. Otherwise
+      // the pass is `mouth_roi_unresolved` → motion_unverified. We never fall
+      // back to the frozen v404 cheek band as an authority again.
+      const v456Contract = evaluateMouthRoiContract({
+        ...v456Geometry,
+        geometryMeasureSrc: (measurePass as any)?.preclip_geometry_anchor_src ?? null,
+        expectedAnchorSrc: (measurePass as any)?.preclip_geometry_anchor_expected ?? null,
+        faceBbox: (measurePass as any)?.preclip_from_bbox ?? null,
+        identity: (measurePass as any)?.preclip_geometry_identity ?? null,
+        expectedIdentity: {
+          runId: String((scene as any)?.active_run_id ?? "") || null,
+          generation: Number((scene as any)?.plate_generation ?? NaN),
+          passIdx: measurePassIdx,
+          speakerIdx: Number((measurePass as any)?.speaker_idx ?? NaN),
+        },
+      });
+      console.log(
+        `[sync-so-webhook] v456_roi_contract scene=${sceneId} pass=${measurePassIdx} ` +
+          `status=${v456Contract.status} reason=${v456Contract.reason} ` +
+          `failed_check=${v456Contract.failedCheck ?? "none"} ` +
+          `checks=${JSON.stringify(v456Contract.checks)}`,
+      );
       const v443MeasureArgs = {
         preclipUrl,
         providerOutputUrl: v404RehostedUrl ?? outputUrl!,
         durationSeconds: duration,
-        // V434 Step 4 — geometry the pre-clip renderer already persisted. The
-        // derived mouth band drives the SCALE-FREE TELEMETRY only; the frozen
-        // v404 ROI still produces the authoritative verdict.
-        preclipGeometry: {
-          anchor: (measurePass as any)?.preclip_anchor ?? null,
-          faceShareInCrop: (measurePass as any)?.preclip_face_share ?? null,
-          cropSize: (measurePass as any)?.preclip_crop?.size ?? null,
-          mouthOffsetPx: (measurePass as any)?.preclip_mouth_offset_px ?? null,
-          mouthOffset: (measurePass as any)?.preclip_mouth_offset_xy ?? null,
-        },
+        // V434 Step 4 — geometry the pre-clip renderer already persisted.
+        preclipGeometry: v456Geometry,
+        // V456 — validated contract; frozen v404 band stays as telemetry.
+        roiContract: v456Contract,
       };
       const v443Bounded = await measureWithBoundedReMeasure(
         () => measureProviderMotionSync(v443MeasureArgs),
@@ -835,8 +863,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       );
       v404MotionMeasurement = v443Bounded.result;
       v443MeasureAttempts = v443Bounded.attempts;
-      v443MotionUnverified = v443Bounded.infraExhausted;
-      v443LastInfraReason = v443Bounded.infraExhausted ? v404MotionMeasurement.reason : null;
+      // V456 — an unresolved ROI contract is NOT a verdict about the clip:
+      // it passes through as `motion_unverified` exactly like a probe-infra
+      // exhaustion (non-terminal, no retry, no refund, no provider call).
+      const v456Unresolved = v404MotionMeasurement.measurement_status !== "measured" &&
+        isMouthRoiUnresolved(v404MotionMeasurement.reason);
+      v443MotionUnverified = v443Bounded.infraExhausted || v456Unresolved;
+      v443LastInfraReason = v443MotionUnverified ? v404MotionMeasurement.reason : null;
       v404MotionProbe = v404MotionMeasurement.measurement_status === "measured" &&
           v404MotionMeasurement.preclip_metric && v404MotionMeasurement.provider_metric
         ? classifyMotionProbe({
@@ -879,7 +912,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           meta: {
             v443: true,
             telemetry_state: MOTION_UNVERIFIED_STATE,
-            failure_class: "probe_infra_error",
+            failure_class: v456Unresolved ? "mouth_roi_unresolved" : "probe_infra_error",
+            v456_roi_contract: {
+              status: v456Contract.status,
+              reason: v456Contract.reason,
+              failed_check: v456Contract.failedCheck,
+              checks: v456Contract.checks,
+            },
             measure_attempts: v443MeasureAttempts,
             max_remeasure: PROBE_INFRA_MAX_RETRIES,
             pass_idx: measurePassIdx,
