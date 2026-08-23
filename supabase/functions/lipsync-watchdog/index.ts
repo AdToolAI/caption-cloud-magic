@@ -30,7 +30,7 @@ import { measureProviderMotionSync } from "../_shared/measure-provider-motion-sy
 import { classifyMotionProbe } from "../_shared/motion-probe-classifier.ts";
 // V465-B2b — authoritative paired mouth-over-frame verdict (same contract as
 // the webhook). `delta_mean` stays legacy telemetry.
-import { resolveV465Verdict } from "../_shared/v465-verdict.ts";
+import { resolveV465Verdict, V466_GRAY_BAND_SAMPLES } from "../_shared/v465-verdict.ts";
 import {
   classifyMeasurementFailure,
   isMouthRoiUnresolved,
@@ -1154,12 +1154,28 @@ serve(async (req) => {
         }
 
 
-        const measurement = await measureProviderMotionSync({
+        const measureArgs = {
           preclipUrl,
           providerOutputUrl,
           durationSeconds,
           preclipGeometry: meta.preclip_geometry ?? null,
-        });
+        };
+        let measurement = await measureProviderMotionSync(measureArgs);
+        // V466-A — mirror the webhook contract: exactly ONE gray-band
+        // re-measure at N=16 stills on the same pinned output, then fall
+        // through as `motion_unverified` instead of terminalizing.
+        let v466ReMeasured = false;
+        if (
+          measurement.measurement_status === "measured" &&
+          resolveV465Verdict((measurement as any)?.v465 ?? null).verdict === "indeterminate"
+        ) {
+          const retry = await measureProviderMotionSync({
+            ...measureArgs,
+            sampleCount: V466_GRAY_BAND_SAMPLES,
+          });
+          v466ReMeasured = true;
+          if (retry.measurement_status === "measured") measurement = retry;
+        }
 
         let verdict: string;
         let reason: string;
@@ -1176,7 +1192,10 @@ serve(async (req) => {
             provider: measurement.provider_metric,
           }).verdict;
           v465Verdict = resolveV465Verdict((measurement as any)?.v465 ?? null);
-          verdict = v465Verdict.verdict;
+          // V466-A — a still-gray verdict is never terminal and never green.
+          verdict = v465Verdict.verdict === "indeterminate"
+            ? MOTION_UNVERIFIED_STATE
+            : v465Verdict.verdict;
           reason = v465Verdict.reason;
         } else {
           verdict = classifyMeasurementFailure(measurement.reason) === "probe_infra_error"
@@ -1199,6 +1218,8 @@ serve(async (req) => {
             authority: "v465_mouth_over_frame",
             mouth_over_frame: v465Verdict?.mouth_over_frame ?? null,
             v465_guard: v465Verdict?.guard ?? null,
+            v466_remeasured: v466ReMeasured,
+            v466_gray_band: v465Verdict?.verdict === "indeterminate",
             legacy_verdict: legacyVerdict,
             delta_mean: measurement.deltaMean ?? null,
             pass_idx: cand.turn_idx,

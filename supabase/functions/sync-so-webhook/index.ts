@@ -46,7 +46,7 @@ import {
   type MotionProbeResult,
 } from "../_shared/motion-probe-classifier.ts";
 // V465-B2b — authoritative paired mouth-over-frame verdict.
-import { resolveV465Verdict } from "../_shared/v465-verdict.ts";
+import { resolveV465Verdict, V466_GRAY_BAND_SAMPLES } from "../_shared/v465-verdict.ts";
 // FA-4 v404 — server-side synchronous measurement owner (Remotion stills).
 import {
   measureProviderMotionSync,
@@ -855,33 +855,74 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         // V456 — validated contract; frozen v404 band stays as telemetry.
         roiContract: v456Contract,
       };
-      const v443Bounded = await measureWithBoundedReMeasure(
-        () => measureProviderMotionSync(v443MeasureArgs),
-        {
-          maxRetries: PROBE_INFRA_MAX_RETRIES,
-          onRetry: ({ attempt, reason, waitMs }) => {
-            console.warn(
-              `[sync-so-webhook] v443_probe_infra_remeasure scene=${sceneId} pass=${measurePassIdx} ` +
-                `attempt=${attempt}/${PROBE_INFRA_MAX_RETRIES + 1} wait_ms=${waitMs} ` +
-                `class=probe_infra_error reason=${reason} — same immutable pinned output, no provider call`,
-            );
+      const runBounded = async (sampleCount?: number) =>
+        await measureWithBoundedReMeasure(
+          () =>
+            measureProviderMotionSync(
+              sampleCount ? { ...v443MeasureArgs, sampleCount } : v443MeasureArgs,
+            ),
+          {
+            maxRetries: PROBE_INFRA_MAX_RETRIES,
+            onRetry: ({ attempt, reason, waitMs }) => {
+              console.warn(
+                `[sync-so-webhook] v443_probe_infra_remeasure scene=${sceneId} pass=${measurePassIdx} ` +
+                  `attempt=${attempt}/${PROBE_INFRA_MAX_RETRIES + 1} wait_ms=${waitMs} ` +
+                  `class=probe_infra_error reason=${reason} — same immutable pinned output, no provider call`,
+              );
+            },
           },
-        },
-      );
+        );
+      let v443Bounded = await runBounded();
       v404MotionMeasurement = v443Bounded.result;
+      // ── V465-B2b — AUTHORITY FLIP ────────────────────────────────────────
+      // The authoritative outcome scalar is the paired `mouth_over_frame`
+      // ratio (docs/v465b2a-lambda-still-parity.md). The frozen v404
+      // `delta_mean` and the V434 `mad_ratio` are computed and logged as LEGACY
+      // TELEMETRY only and may never override the verdict below.
+      const verdictOf = (m: MeasureProviderMotionSyncResult) =>
+        m.measurement_status === "measured"
+          ? resolveV465Verdict((m as any)?.v465 ?? null)
+          : resolveV465Verdict(null);
+      let v465Verdict = verdictOf(v404MotionMeasurement);
+      // ── V466-A — GRAY BAND IS NOT A FAILURE ──────────────────────────────
+      // A near-boundary ratio measured on only N=6 stills is a SAMPLING
+      // question, not a verdict. Exactly ONE re-measure of the very same
+      // immutable pinned output at N=16 stills (parity-verified: 0 hard
+      // NOOP<->MOVED flips on the 32 frozen pairs, gray cases resolve towards
+      // their true class). No provider call, no spend, no new artifact.
+      let v466ReMeasured = false;
+      if (
+        v404MotionMeasurement.measurement_status === "measured" &&
+        v465Verdict.verdict === "indeterminate"
+      ) {
+        console.warn(
+          `[sync-so-webhook] v466_gray_band_remeasure scene=${sceneId} pass=${measurePassIdx} ` +
+            `mouth_over_frame=${v465Verdict.mouth_over_frame ?? "n/a"} guard=${v465Verdict.guard ?? "none"} ` +
+            `frames=${v465Verdict.frames} → one re-measure at ${V466_GRAY_BAND_SAMPLES} stills (same pinned output)`,
+        );
+        const retry = await runBounded(V466_GRAY_BAND_SAMPLES);
+        v466ReMeasured = true;
+        if (retry.result.measurement_status === "measured") {
+          v443Bounded = retry;
+          v404MotionMeasurement = retry.result;
+          v465Verdict = verdictOf(v404MotionMeasurement);
+        }
+      }
       v443MeasureAttempts = v443Bounded.attempts;
       // V456 — an unresolved ROI contract is NOT a verdict about the clip:
       // it passes through as `motion_unverified` exactly like a probe-infra
       // exhaustion (non-terminal, no retry, no refund, no provider call).
       const v456Unresolved = v404MotionMeasurement.measurement_status !== "measured" &&
         isMouthRoiUnresolved(v404MotionMeasurement.reason);
-      v443MotionUnverified = v443Bounded.infraExhausted || v456Unresolved;
-      v443LastInfraReason = v443MotionUnverified ? v404MotionMeasurement.reason : null;
-      // ── V465-B2b — AUTHORITY FLIP ────────────────────────────────────────
-      // The authoritative outcome scalar is the paired `mouth_over_frame`
-      // ratio (docs/v465b2a-lambda-still-parity.md). The frozen v404
-      // `delta_mean` and the V434 `mad_ratio` are computed and logged as LEGACY
-      // TELEMETRY only and may never override the verdict below.
+      // V466-A — a still-gray verdict after the bounded re-measure falls
+      // through as `motion_unverified`: never green, never a hard failure.
+      const v466StillGray = v465Verdict.verdict === "indeterminate";
+      v443MotionUnverified = v443Bounded.infraExhausted || v456Unresolved || v466StillGray;
+      v443LastInfraReason = v443MotionUnverified
+        ? (v466StillGray && !v456Unresolved && !v443Bounded.infraExhausted
+          ? v465Verdict.reason
+          : v404MotionMeasurement.reason)
+        : null;
       const v465Metric = (v404MotionMeasurement as any)?.v465 ?? null;
       const legacyProbe: MotionProbeResult | null =
         v404MotionMeasurement.measurement_status === "measured" &&
@@ -891,9 +932,6 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             provider: v404MotionMeasurement.provider_metric,
           })
           : null;
-      const v465Verdict = v404MotionMeasurement.measurement_status === "measured"
-        ? resolveV465Verdict(v465Metric)
-        : resolveV465Verdict(null);
       v404MotionProbe = {
         verdict: v465Verdict.verdict,
         // Reason of the measurement failure wins so that V443/V456 pass-through
@@ -913,9 +951,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           `phase=${phase} status=${v404MotionMeasurement.measurement_status} ` +
           `authority=v465_mouth_over_frame mouth_over_frame=${v465Verdict.mouth_over_frame ?? "n/a"} ` +
           `guard=${v465Verdict.guard ?? "none"} verdict=${v404MotionProbe.verdict} reason=${v404MotionProbe.reason} ` +
+          `v466_remeasured=${v466ReMeasured} frames=${v465Verdict.frames} ` +
           `legacy_delta_mean=${v404MotionMeasurement.deltaMean ?? "n/a"} ` +
           `legacy_verdict=${legacyProbe?.verdict ?? "n/a"} (legacy telemetry only)`,
       );
+
 
       // V443 — bounded re-measure exhausted for INFRASTRUCTURE reasons only.
       // Persist everything the watchdog needs for exactly ONE re-measure of the
@@ -937,7 +977,15 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           meta: {
             v443: true,
             telemetry_state: MOTION_UNVERIFIED_STATE,
-            failure_class: v456Unresolved ? "mouth_roi_unresolved" : "probe_infra_error",
+            failure_class: v456Unresolved
+              ? "mouth_roi_unresolved"
+              : (v466StillGray && !v443Bounded.infraExhausted
+                ? "v466_gray_band_unresolved"
+                : "probe_infra_error"),
+            v466_gray_band: v466StillGray,
+            v466_remeasured: v466ReMeasured,
+            v466_remeasure_samples: v466ReMeasured ? V466_GRAY_BAND_SAMPLES : null,
+            mouth_over_frame: v465Verdict.mouth_over_frame,
             v456_roi_contract: {
               status: v456Contract.status,
               reason: v456Contract.reason,
@@ -1630,18 +1678,33 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         motionVerdictForMultiSpeaker === "indeterminate" &&
         v443MotionUnverified &&
         isMouthRoiUnresolved(motionProbeResult?.reason ?? "");
+      // V466-A — the V465 gray band is a SAMPLING statement, not a verdict.
+      // After the one bounded 16-still re-measure it passes through the same
+      // narrow gate: `motion_unverified` (never green, never terminal).
+      const v466GrayPassthrough = !isSingleSpeakerScene &&
+        motionVerdictForMultiSpeaker === "indeterminate" &&
+        v443MotionUnverified &&
+        /v465_gray_band/.test(String(motionProbeResult?.reason ?? ""));
       const v443MotionUnverifiedPassthrough = !isSingleSpeakerScene &&
         motionVerdictForMultiSpeaker === "indeterminate" &&
         v443MotionUnverified &&
-        (v443FailureClass === "probe_infra_error" || v458RoiUnresolvedPassthrough);
+        (v443FailureClass === "probe_infra_error" || v458RoiUnresolvedPassthrough ||
+          v466GrayPassthrough);
       if (v443MotionUnverifiedPassthrough) {
         console.warn(
           `[sync-so-webhook] v443 scene=${sceneId} pass=${currentPass} speaker="${passSpeakerName}" ` +
-            `MOTION_UNVERIFIED (${v458RoiUnresolvedPassthrough ? "mouth_roi_unresolved" : "probe_infra_error"}, ` +
+            `MOTION_UNVERIFIED (${
+              v466GrayPassthrough
+                ? "v466_gray_band"
+                : v458RoiUnresolvedPassthrough
+                ? "mouth_roi_unresolved"
+                : "probe_infra_error"
+            }, ` +
             `attempts=${v443MeasureAttempts}) → success pass-through, telemetry stays motion_unverified ` +
             `(never motion_verified) — no terminalization, no refund, no provider dispatch`,
         );
       }
+
 
 
       if (
