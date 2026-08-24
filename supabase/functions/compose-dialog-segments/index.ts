@@ -2089,14 +2089,6 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             `[compose-dialog-segments] scene=${sceneId} v507_preview_audit_write_failed: ${(e as Error)?.message}`,
           );
         }
-        await failLipSync({
-          supabase,
-          sceneId,
-          reason: fa4ContractualFailure.reason,
-          userId,
-          refundCredits: totalCost,
-          syncApiKey,
-        });
         const failMessage = fa4ContractualFailure.faceSizeLimited
           ? tl({
             de: "Die Gesichter sind in dieser Aufnahme zu klein für Lip-Sync. Bitte die Szene enger kadrieren (Halbtotale statt Totale) und neu erzeugen. Es wurde nichts gerendert, die Credits wurden zurückerstattet.",
@@ -2108,6 +2100,19 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             en: "The faces on the plate cannot be assigned unambiguously to the speakers. Lip-sync was aborted before dispatch and credits have been refunded.",
             es: "Las caras del plano no se pueden asignar de forma inequívoca a los hablantes. El lip-sync se canceló antes de iniciarse y los créditos han sido reembolsados.",
           });
+        await failLipSync({
+          supabase,
+          sceneId,
+          // V507 — the customer-visible field is `clip_error`; give it the
+          // actionable sentence instead of the raw router code.
+          reason: fa4ContractualFailure.faceSizeLimited
+            ? failMessage
+            : fa4ContractualFailure.reason,
+          userId,
+          refundCredits: totalCost,
+          syncApiKey,
+        });
+
         return json(
           {
             error: fa4ContractualFailure.faceSizeLimited
