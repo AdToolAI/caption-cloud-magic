@@ -24,10 +24,24 @@
  */
 
 export const PLATE_FACE_SANITY = {
+  /**
+   * V507 — WARN-ONLY. The percentage floor was tuned on close-up plates and
+   * scales wrongly with resolution: on a 1920x1080 four-person wide shot
+   * 0.003 demands a ~79x79 px face, which legitimately framed medium shots
+   * miss. Kept as telemetry so historical measurements stay comparable.
+   */
   minAreaRatio: 0.003,
   maxAreaRatio: 0.25,
   minAspect: 0.4,
   maxAspect: 2.5,
+  /**
+   * V507 — AUTHORITATIVE size gate: shorter face side in plate pixels.
+   * Derived from what mouth-ROI tracking actually needs: below ~40 px the
+   * mouth region is a handful of pixels and lip-sync cannot be verified.
+   * Scale-free (absolute pixels), so it behaves identically on 720p / 1080p
+   * plates and does not punish wide multi-speaker framing.
+   */
+  minFaceShortSidePx: 40,
   /** Fraction of min(plate dim) used as in-plate tolerance (min 8px). */
   inPlateTolPct: 0.05,
 } as const;
@@ -37,38 +51,61 @@ export type SanityReason =
   | "degenerate"
   | "out_of_plate"
   | "area_too_small"
+  | "face_too_small_for_lipsync"
   | "area_too_large"
   | "aspect_invalid";
 
+/** Reasons that mean "the face itself is too small to lip-sync" (V507). */
+export const FACE_SIZE_REJECTIONS: SanityReason[] = ["face_too_small_for_lipsync"];
+
 export interface PlateDims { width: number; height: number }
+
+export interface PlateFaceSanityResult {
+  ok: boolean;
+  reason: SanityReason;
+  areaRatio: number;
+  aspect: number;
+  /** Shorter side of the bbox in plate pixels (V507 gate input). */
+  shortSidePx: number;
+  /** Non-blocking observations (e.g. legacy `area_too_small`). */
+  warnings: SanityReason[];
+}
 
 export function plateFaceSanity(
   bbox: [number, number, number, number],
   dims: PlateDims,
-): { ok: boolean; reason: SanityReason; areaRatio: number; aspect: number } {
+): PlateFaceSanityResult {
   const [x1, y1, x2, y2] = bbox ?? ([0, 0, 0, 0] as any);
   const w = x2 - x1;
   const h = y2 - y1;
   const plateArea = Math.max(1, dims.width * dims.height);
   const areaRatio = (Math.max(0, w) * Math.max(0, h)) / plateArea;
   const aspect = h > 0 ? w / h : 0;
+  const shortSidePx = Math.min(Math.max(0, w), Math.max(0, h));
+  const warnings: SanityReason[] = [];
+  const out = (ok: boolean, reason: SanityReason): PlateFaceSanityResult =>
+    ({ ok, reason, areaRatio, aspect, shortSidePx, warnings });
+
   if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
-    return { ok: false, reason: "degenerate", areaRatio, aspect };
+    return out(false, "degenerate");
   }
   const tol = Math.max(8, Math.round(Math.min(dims.width, dims.height) * PLATE_FACE_SANITY.inPlateTolPct));
   if (x1 < -tol || y1 < -tol || x2 > dims.width + tol || y2 > dims.height + tol) {
-    return { ok: false, reason: "out_of_plate", areaRatio, aspect };
+    return out(false, "out_of_plate");
   }
-  if (areaRatio < PLATE_FACE_SANITY.minAreaRatio) {
-    return { ok: false, reason: "area_too_small", areaRatio, aspect };
+  // V507 — percentage floor is telemetry only …
+  if (areaRatio < PLATE_FACE_SANITY.minAreaRatio) warnings.push("area_too_small");
+  // … the absolute pixel floor is the gate.
+  if (shortSidePx < PLATE_FACE_SANITY.minFaceShortSidePx) {
+    return out(false, "face_too_small_for_lipsync");
   }
   if (areaRatio > PLATE_FACE_SANITY.maxAreaRatio) {
-    return { ok: false, reason: "area_too_large", areaRatio, aspect };
+    return out(false, "area_too_large");
   }
   if (aspect < PLATE_FACE_SANITY.minAspect || aspect > PLATE_FACE_SANITY.maxAspect) {
-    return { ok: false, reason: "aspect_invalid", areaRatio, aspect };
+    return out(false, "aspect_invalid");
   }
-  return { ok: true, reason: "ok", areaRatio, aspect };
+  return out(true, "ok");
 }
 
 export interface CandidateFace {
@@ -80,19 +117,41 @@ export interface CandidateFace {
   cy: number;
 }
 
+export interface CandidateMeasurement {
+  index: number;
+  reason: SanityReason;
+  shortSidePx: number;
+  areaRatio: number;
+  aspect: number;
+}
+
 export function filterPlausibleCandidates<T extends CandidateFace>(
   candidates: T[],
   dims: PlateDims,
-): { plausible: T[]; rejected: Array<{ index: number; reason: SanityReason }> } {
+): {
+  plausible: T[];
+  rejected: Array<{ index: number; reason: SanityReason }>;
+  /** V507 — per-candidate measurements for telemetry / customer messaging. */
+  measurements: CandidateMeasurement[];
+} {
   const plausible: T[] = [];
   const rejected: Array<{ index: number; reason: SanityReason }> = [];
+  const measurements: CandidateMeasurement[] = [];
   for (const c of candidates) {
     const s = plateFaceSanity(c.bbox, dims);
+    measurements.push({
+      index: c.index,
+      reason: s.reason,
+      shortSidePx: Math.round(s.shortSidePx),
+      areaRatio: Number(s.areaRatio.toFixed(5)),
+      aspect: Number(s.aspect.toFixed(2)),
+    });
     if (s.ok) plausible.push(c);
     else rejected.push({ index: c.index, reason: s.reason });
   }
-  return { plausible, rejected };
+  return { plausible, rejected, measurements };
 }
+
 
 export interface AnchorPoint { cx: number; cy: number }
 
