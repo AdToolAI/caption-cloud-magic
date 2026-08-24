@@ -20,6 +20,8 @@ export interface MuxDispatchState {
     mux_dispatch_requested_at?: string | null;
     dispatched_at?: string | null;
     render_id?: string | null;
+    /** Zeitstempel des einen Watchdog-Re-Dispatch-Versuchs (V501). */
+    v501_redispatch_at?: string | null;
   } | null | undefined;
   nowMs: number;
 }
@@ -60,9 +62,15 @@ export function classifyMuxDispatch(state: MuxDispatchState): MuxDispatchVerdict
     return { action: "none", reason: "no_mux_claim" };
   }
   const age = state.nowMs - requestedAt;
-  if (age >= MUX_DISPATCH_LOST_MS) {
-    return { action: "hard_fail", ageMs: age, reason: "audio_mux_dispatch_lost" };
+  const alreadyRedispatched = !!mux.v501_redispatch_at;
+  if (alreadyRedispatched) {
+    const since = Date.parse(String(mux.v501_redispatch_at));
+    const sinceAge = Number.isNaN(since) ? age : state.nowMs - since;
+    return sinceAge >= MUX_DISPATCH_LOST_MS
+      ? { action: "hard_fail", ageMs: age, reason: "audio_mux_dispatch_lost" }
+      : { action: "none", reason: "redispatch_in_flight" };
   }
+  // Ein Re-Dispatch steht IMMER vor dem Hard-Fail — auch bei alten Claims.
   if (age >= MUX_REDISPATCH_MS) {
     return { action: "redispatch", ageMs: age };
   }

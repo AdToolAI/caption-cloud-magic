@@ -37,10 +37,34 @@ Deno.test("V501: reserviert ohne Dispatch → genau ein Re-Dispatch", () => {
   assertEquals(v.action, "redispatch");
 });
 
-Deno.test("V501: reserviert ohne Dispatch > 6min → terminal", () => {
+Deno.test("V501: alter Claim ohne Re-Dispatch bekommt trotzdem erst einen Versuch", () => {
   const v = classifyMuxDispatch({
     lipSyncStatus: "audio_muxing",
     audioMux: { mux_dispatch_requested_at: ago(MUX_DISPATCH_LOST_MS + 1_000) },
+    nowMs: NOW,
+  });
+  assertEquals(v.action, "redispatch");
+});
+
+Deno.test("V501: Re-Dispatch frisch → abwarten", () => {
+  const v = classifyMuxDispatch({
+    lipSyncStatus: "audio_muxing",
+    audioMux: {
+      mux_dispatch_requested_at: ago(MUX_DISPATCH_LOST_MS + 60_000),
+      v501_redispatch_at: ago(30_000),
+    },
+    nowMs: NOW,
+  });
+  assertEquals(v.action, "none");
+});
+
+Deno.test("V501: Re-Dispatch ohne Erfolg > 6min → terminal", () => {
+  const v = classifyMuxDispatch({
+    lipSyncStatus: "audio_muxing",
+    audioMux: {
+      mux_dispatch_requested_at: ago(MUX_DISPATCH_LOST_MS * 2),
+      v501_redispatch_at: ago(MUX_DISPATCH_LOST_MS + 1_000),
+    },
     nowMs: NOW,
   });
   assertEquals(v.action, "hard_fail");
