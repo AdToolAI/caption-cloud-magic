@@ -76,9 +76,12 @@ Deno.test("V471 — unresolvable geometry never guesses", () => {
   assertEquals(resolveV471MouthRoi(null).anchorSource, "unresolved");
 });
 
-Deno.test("V471 — ratio constant matches the calibrated edit-map value", () => {
-  assertEquals(V471_FACE_MOUTH_Y_RATIO, 0.88);
+Deno.test("V477 — exactly one mouth ratio exists in the pipeline", () => {
+  assertEquals(V471_FACE_MOUTH_Y_RATIO, 0.78);
+  // Geometry side and verdict side must never diverge again.
+  assertEquals(V471_FACE_MOUTH_Y_RATIO, FACE_MOUTH_Y_RATIO);
 });
+
 
 Deno.test("V456 contract adopts the V471 ROI as the authority", () => {
   const base = {
