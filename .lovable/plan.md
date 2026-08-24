@@ -65,15 +65,18 @@ face_center_x/y (im Preclip) | mouth_center_x/y (im Preclip) | mouth_y/720
   fehlt ein Landmark, wird die Zeile als `unmeasured` markiert, nicht geschätzt.
 
 Zusätzlich je Pass festgehalten: `preclip_camera_path_dynamic` (das frühere
-`cam_dynamic = false`), Anzahl Keyframes, Travel in px.
+`cam_dynamic = false`), Anzahl Keyframes, Travel in px sowie die
+**Keyframe-Quellenverteilung** `mouth` / `face_estimate` / `interpolated` und
+`preclip_geometry_mouth_source`.
 
-## Auswertung — genau drei mögliche Verdikte
+## Auswertung — vier mögliche Verdikte
 
 | Beobachtung | Verdikt |
 |---|---|
 | Mund bleibt über den Turn bei ≈ 0.62 ± 0.04, Crop folgt dem Track | T8 konform — Fehler liegt allein im Outcome-Anchor |
 | Track wandert, Crop steht (`dynamic=false` / Travel ≈ 0) | camera-path.ts ist nicht angeschlossen — T8 gebrochen |
 | Crop folgt, Mund liegt aber konstant bei ≈ 0.68–0.72 | T8-Zentrierung nutzt die falsche Ratio (0.78 statt 0.88) |
+| Anteil `src="mouth"` nahe null, obwohl Rekognition Landmarks liefert | Der echte Mund-Track wird gar nicht verwendet — der Fix ist Durchreichen, nicht Nachkalibrieren |
 
 Zusätzlich wird die Differenz Golden Run ↔ S01 in derselben Tabelle ausgewiesen:
 Falls beide dieselbe Mundhöhe zeigen, ist die Preclip-Geometrie als Ursache für die
@@ -82,9 +85,11 @@ S01-NOOPs endgültig ausgeschlossen.
 ## Ergebnis des Gates
 
 - Report `docs/v476-t8-conformance-measurement.md` mit beiden Volltabellen (2 × 4 × 16 Zeilen),
-  Pro-Pass-Zusammenfassung und einem der drei Verdikte.
-- Kein Fix in diesem Gate. Falls Fall 2 oder 3 eintritt, folgt der Fix als eigenes,
-  separat freizugebendes Gate (V477) mit Regressionsnachweis gegen den Golden Run.
+  Pro-Pass-Zusammenfassung, Landmark-Quotenübersicht und einem der vier Verdikte.
+- Kein Fix in diesem Gate. Der Folgefix (V477) wird durch das Verdikt bestimmt:
+  entweder Landmark-Durchreichung (bevorzugt) oder Ratio-Nachkalibrierung — jeweils
+  mit Regressionsnachweis gegen den Golden Run.
+
 
 ## Technische Notizen
 
