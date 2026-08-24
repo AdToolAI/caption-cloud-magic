@@ -177,15 +177,16 @@ Umsetzung in diesem Gate.
 
 ---
 
-# V475 — v400-Konformitätsaudit der heutigen Pipeline (READ-ONLY)
+# V475 — MASTER-AUDIT: v400-Konformität der heutigen Pipeline (READ-ONLY)
 
-Deine Frage „ist v400 überhaupt richtig umgesetzt?" wird nicht mit einer Meinung
-beantwortet, sondern als Vertrag-für-Vertrag-Abgleich gegen den Code. Grundlage ist die
-von dir gelieferte Vollspezifikation (T1–T16 plus die vier Grundverträge, Fehlercode-
-Referenz und Nachbau-Checkliste).
+Wird **zuerst** ausgeführt. Vertrag-für-Vertrag-Abgleich der v400-Vollspezifikation
+(T1–T16, vier Grundverträge, Fehlercode-Referenz, Nachbau-Checkliste) gegen den Code.
 
-Für **jeden** Punkt genau ein Urteil, jeweils mit Codebeleg (Datei + Stelle) oder
-Gegenbeleg:
+Tabelle mit fünf Spalten, eine Zeile pro v400-Punkt:
+
+| v400-Vertrag | Status heute | Beleg (Datei/Stelle) | Abweichung beabsichtigt? | Kann Ausfall erklären? |
+
+Statuswerte:
 
 ```text
 ERFÜLLT           Code tut genau das, was v400 fordert
@@ -194,29 +195,41 @@ FEHLT             kein Codepfad vorhanden
 ÜBERSCHRIEBEN     durch ein späteres Gate (V441–V472) bewusst ersetzt
 ```
 
-Besonderes Augenmerk auf die Stellen, an denen spätere Gates v400 verändert haben:
+Die Spalte „beabsichtigt?" trennt validierten Ersatz von unbeabsichtigtem Contract-Drift.
+Der Drift ist das eigentliche Ziel dieses Gates.
 
-- **Outcome-Gate (Grundvertrag 4 / T12):** v400 kennt `moving / static / unknown` mit
-  „static = Passthrough". Heute entscheidet `mouth_over_frame` mit Schwellen 2.00/2.65
-  plus Grauband. Das ist eine andere Definition von Fehlschlag — das Audit hält fest, ob
-  das eine Verschärfung gegenüber v400 ist und ob sie den ursprünglichen Zweck
-  (stille Passthroughs verhindern) noch trifft oder darüber hinausschießt.
-- **Face-Gate (T9):** Schwellen 0.24 / 144 px / Mund nicht am Rand — steht V461 dazu deckungsgleich?
-- **Preclip-Framing (T8):** fordert Mund bei 62 % Höhe; heute liefert V471 den Mund-Anker
-  bei Face-Ratio 0.88. Beides ist derselbe Zweck, aber in unterschiedlichen Bezugsrahmen —
-  wird explizit gegeneinander gerechnet.
+## Fünf priorisierte Prüfpunkte
+
+1. **T8 Mouth-Priority-Framing.** v400 fordert den Mund bei ~62 % der Preclip-Höhe.
+   V471-B betrifft ausdrücklich nur die **Verdict-ROI**, nicht das Preclip-Framing.
+   Gemessen wird deshalb unabhängig davon an den tatsächlich versendeten Preclips:
+   liegt der Mund heute noch bei ~62 % Höhe?
+2. **T9 Face-Gate.** V461 (`face_share ≥ 0.24`, Größe ≥ 144 px, Mund nicht am Rand) gegen
+   v400 abgleichen; V469 als zusätzliche Verschärfung getrennt ausweisen.
+3. **T12 Outcome-Gate.** Größter konzeptioneller Drift: v400 = „Output ≈ Input → static /
+   Passthrough", heute = `mouth_over_frame < 2.00 → NOOP`. Das ist nicht dasselbe. Wird
+   als Drift dokumentiert und in V473 empirisch geprüft.
+4. **T4 Prompt-/Action-Propagation.** Erreichen Scene-/Cast-Actions den I2V-Plate-Prompt?
+   Hier nur Markierung mit Codebeleg — die vollständige Kette fährt V474.
+5. **Watchdog.** v400 war simpel (>6 min non-terminal → schließen + Refund). Heute:
+   Ladder-States, virtual in-flight, Preflight-Recovery, Fan-out-Fence,
+   `motion_unverified`, Reconciliation. Zulässig, solange die v400-Invariante hält:
+   **kein Run kann dauerhaft hängen bleiben.** Genau diese Invariante wird geprüft.
+
+## Weitere Punkte (vollständig, aber knapp)
+
 - **Anchor-Kohärenz (Grundvertrag 2 / T3/T5):** Geometrie ausschließlich auf
   `reference_image_url`, Rekognition auf dem Anchor-Standbild, nicht auf Video-Frames.
-- **Run-Identität, Assignment-Lock, Run-Guard, Watchdog, Refund-Idempotenz** je einzeln.
-- **Fehlercode-Referenz (Abschnitt 17):** existiert jeder Code noch, und feuert er an der
-  von v400 vorgesehenen Stelle? Neue Codes (`ssw:noop_fail`,
+- **Run-Identität (T2), Assignment-Lock (T6), Run-Guard (T11), Refund-Idempotenz.**
+- **Fehlercode-Referenz (Abschnitt 17):** existiert jeder Code noch, feuert er an der von
+  v400 vorgesehenen Stelle? Neue Codes (`ssw:noop_fail`,
   `lipsync_input_contract_violation`, `preclip_mouth_not_visible`) werden zugeordnet.
 
 ## Ergebnis dieses Gates
 
-Bericht `docs/v475-v400-conformance.md`: eine Zeile pro v400-Punkt mit Urteil und Beleg,
-darunter eine kurze Liste „Abweichungen, die den Ausfall erklären können" —
-nach Wirkung sortiert, ohne Codeänderung in diesem Gate.
+Bericht `docs/v475-v400-conformance.md`: vollständige Fünf-Spalten-Tabelle, darunter die
+Liste „unbeabsichtigter Contract-Drift, der den Ausfall erklären kann" — nach Wirkung
+sortiert, ohne Codeänderung in diesem Gate.
 
 ---
 
