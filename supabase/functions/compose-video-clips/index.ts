@@ -68,6 +68,11 @@ import {
   countHumansInImage,
 } from "../_shared/face-count.ts";
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
+import {
+  buildGenderConstraint,
+  classifyIdentityVerdict,
+  normalizeGender,
+} from "../_shared/v506-identity-verdict.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 import { enforceMinFaceSize } from "../_shared/anchor-min-face-size.ts";
 import { classifySplitScreenLayout } from "../_shared/split-screen-layout.ts";
@@ -2713,6 +2718,41 @@ serve(async (req) => {
                 .filter(
                   (n): n is string => typeof n === "string" && n.length > 0,
                 );
+              // ── V506 CAST-GENDER-LOCK ──────────────────────────────────
+              // Nano Banana hat am 24.08.2026 (S02) für einen Cast aus
+              // 1 Frau + 3 Männern zwei fremde Frauen + zwei fremde Männer
+              // gerendert. Das Geschlecht pro Slot kommt jetzt als
+              // verbindliche Prompt-Klausel mit UND wird im Audit geprüft.
+              const castSlotIds = effectiveShots
+                .slice(0, portraitUrls.length)
+                .map((cs) => String((cs as any).characterId ?? ""))
+                .filter((id) => id.length > 0);
+              const genderById = new Map<string, string | null>();
+              if (castSlotIds.length > 0) {
+                try {
+                  const { data: gRows } = await supabaseAdmin
+                    .from("brand_characters")
+                    .select("id, gender")
+                    .in("id", castSlotIds);
+                  for (const row of gRows ?? []) {
+                    genderById.set(String((row as any).id), (row as any).gender ?? null);
+                  }
+                } catch (e) {
+                  console.warn(
+                    `[compose-video-clips] v506 gender lookup failed for scene ${scene.id}`,
+                    e,
+                  );
+                }
+              }
+              const castGenderMembers = castSlotIds.map((id, i) => ({
+                name: charById.get(id)?.name ?? characterNames[i] ?? "",
+                gender: genderById.get(id) ?? null,
+              }));
+              const castGenders = castGenderMembers.map((m) => normalizeGender(m.gender));
+              const genderConstraint = buildGenderConstraint(castGenderMembers);
+              console.log(
+                `[compose-video-clips] v506_gender_lock scene=${scene.id} known=${castGenders.filter(Boolean).length}/${castSlotIds.length} clause=${genderConstraint ? 1 : 0}`,
+              );
               // Wardrobe-Lock: which cast members have a user-picked outfit?
               // Their wardrobe must override the scene description (e.g. Roman
               // armor inside a "business meeting").
@@ -2823,9 +2863,13 @@ serve(async (req) => {
                     portraitUrls.length,
                     { asymmetric: asymmetricAnchor },
                   );
-                  const anchorPrompt = sceneDesc
+                  const anchorPromptBase = sceneDesc
                     ? `${framing} Visual setting: ${sceneDesc}. Keep all selected outfits intact; do not change clothing.`
                     : framing;
+                  // V506 — Cast-Gender-Lock als verbindliche Klausel.
+                  const anchorPrompt = genderConstraint
+                    ? `${anchorPromptBase} ${genderConstraint}`
+                    : anchorPromptBase;
                   const r = await fetch(
                     `${Deno.env.get("SUPABASE_URL")}/functions/v1/compose-scene-anchor`,
                     {
@@ -2884,6 +2928,8 @@ serve(async (req) => {
                 // v170 — headcount checks (countFaces/countHumans) are kept as
                 // pure telemetry; they no longer block. Bystanders, crowd, and
                 // depicted persons (screens/posters/photos/mirrors) are allowed.
+                // V506 — Gender-Lock-Ergebnis des letzten Audits.
+                let lastGenderMismatched: string[] = [];
                 const evaluate = async (url: string, label: string) => {
                   const [fc, hc] = await Promise.all([
                     countFacesInImage(url, LOVABLE_API_KEY!, { kind: "image" }),
@@ -2900,6 +2946,7 @@ serve(async (req) => {
                   let mismatched: string[] = [];
                   let missingCast: string[] = [];
                   let duplicatedCast: string[] = [];
+                  let genderMismatchedCast: string[] = [];
                   if (portraitUrls.length >= 1) {
                     // v170 — audit runs for N=1 too (extras ignored, clones/swap/missing still caught).
                     const auditRefs = identityPortraitUrls.length === portraitUrls.length
@@ -2910,6 +2957,8 @@ serve(async (req) => {
                       auditRefs,
                       characterNames,
                       LOVABLE_API_KEY!,
+                      25_000,
+                      castGenders,
                     );
                     if (audit && !audit.ok) {
                       identity = (audit.reason as typeof identity) ?? "ambiguous";
@@ -2922,13 +2971,20 @@ serve(async (req) => {
                       // "character actually absent" (unsafe, must hard-fail).
                       if (Array.isArray(audit.missing)) missingCast = audit.missing;
                       if (Array.isArray(audit.duplicated)) duplicatedCast = audit.duplicated;
+                      // V506 — Gender-Lock-Verstöße getrennt führen.
+                      if (Array.isArray(audit.genderMismatched)) {
+                        genderMismatchedCast = audit.genderMismatched;
+                      }
                     }
                   }
+                  // V506 — letzter Audit-Stand für den Verdict-Gate unten.
+                  lastGenderMismatched = genderMismatchedCast;
                   console.log(
-                    `[compose-video-clips] anchor audit scene ${scene.id} ${label}: cast=${identity ?? "ok"} mismatched=[${mismatched.join(",")}] missing=[${missingCast.join(",")}] duplicated=[${duplicatedCast.join(",")}] telemetry(faces=${fc} humans=${hc}/${expectedFaces}) notes="${notes.slice(0, 120)}"`,
+                    `[compose-video-clips] anchor audit scene ${scene.id} ${label}: cast=${identity ?? "ok"} mismatched=[${mismatched.join(",")}] missing=[${missingCast.join(",")}] duplicated=[${duplicatedCast.join(",")}] gender=[${genderMismatchedCast.join(",")}] telemetry(faces=${fc} humans=${hc}/${expectedFaces}) notes="${notes.slice(0, 120)}"`,
                   );
-                  return { faceCount: fc, humanCount: hc, identity, notes, mismatched, missing: missingCast, duplicated: duplicatedCast };
+                  return { faceCount: fc, humanCount: hc, identity, notes, mismatched, missing: missingCast, duplicated: duplicatedCast, genderMismatched: genderMismatchedCast };
                 };
+
 
 
 
@@ -3739,9 +3795,13 @@ serve(async (req) => {
                             portraitUrls.length,
                             { asymmetric: true },
                           );
-                          const spfPrompt = sceneDesc
+                          const spfPromptBase = sceneDesc
                             ? `${framing} Visual setting: ${sceneDesc}. Keep all selected outfits intact; do not change clothing.`
                             : framing;
+                          // V506 — Gender-Lock auch im Single-Portrait-Fanout.
+                          const spfPrompt = genderConstraint
+                            ? `${spfPromptBase} ${genderConstraint}`
+                            : spfPromptBase;
                           const r = await fetch(
                             `${Deno.env.get("SUPABASE_URL")}/functions/v1/compose-scene-anchor`,
                             {
