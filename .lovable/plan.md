@@ -135,20 +135,44 @@ Steht `[SceneAction]` mit dem englischen Satz im gesendeten Prompt — ja oder n
 nein, wird der Punkt der Kette benannt, an dem er verloren geht (Persistenz, Prompt-Rebuild
 oder Backend-Strip).
 
-## Frage 3 — Kann diese Regie im Lip-Sync-Pfad überhaupt wirken?
+## Frage 3 — Erreicht die Regie den I2V-Prompt der T4-Plate-Generierung?
 
-Zentrale Hypothese, die dieses Gate belegen oder widerlegen soll: Bei einer Lip-Sync-Szene
-entsteht das Bild aus dem **Anker-Standbild** plus Sync-Pässen. Bewegungsregie wie
-„geht während der Szene nach rechts" oder „dreht sich zur Gruppe zurück" ist in einem
-Standbild nicht darstellbar; ob und wo der Clip-Provider die Marker noch sieht, ist der
-entscheidende Punkt. Geprüft wird, welcher Prompt an den Anker-Renderer und welcher an den
-Clip-Provider geht, und ob Bewegungsregie darin überlebt.
+Korrigierte Fragestellung. Die frühere Annahme „Lip-Sync-Bild entsteht aus dem Standbild"
+widerspricht v400 und ist gestrichen. v400 sagt:
+
+```text
+Anchor-Bild → T4 Image-to-Video → bewegte Plate → Preclips → Lip-Sync
+```
+
+Körperbewegung (gehen, drehen, Tablet prüfen) muss also in **T4** entstehen. Sync.so soll
+Bewegung nicht nachträglich erfinden, es synchronisiert nur den Mund auf einer bereits
+bewegten Plate.
+
+Verfolgt wird deshalb genau diese Kette, Station für Station, mit Beleg an jeder Stelle:
+
+```text
+UI SceneAction / characterActions
+  → persistierter Scene State
+  → applyActionsToPrompt
+  → finaler aiPrompt
+  → compose-video-clips
+  → T4-Provider-Prompt
+  → HappyHorse / Kling / Seedance Request
+```
+
+Und erst getrennt davon: Plate → Preclip → Sync.so.
+
+Ergebnis ist binär:
+
+- **Action-Block erreicht T4, Bewegung entsteht trotzdem nicht** → Prompt-Formulierungs-
+  bzw. Provider-Befolgungsproblem (Modellgrenze), kein Pipelinefehler.
+- **Action-Block erreicht T4 nicht** → unser Pipelinefehler, exakte Verlustkante wird benannt.
 
 ## Ergebnis dieses Gates
 
 Bericht `docs/v474-action-directive-trace.md` mit einer klaren Zuordnung pro Frage:
-UI-Fehler (Feld wird nie befüllt) / Persistenz-Fehler / Prompt-Fehler / Architektur-Grenze
-(Standbild kann keine Bewegung) — plus konkretem Fix-Vorschlag je Ursache, aber ohne
+UI-Fehler (Feld wird nie befüllt) / Persistenz-Fehler / Prompt-Verlust vor T4 /
+Provider-Befolgung — plus konkretem Fix-Vorschlag je Ursache, aber ohne
 Umsetzung in diesem Gate.
 
 ---
