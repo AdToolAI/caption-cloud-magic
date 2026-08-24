@@ -2400,6 +2400,12 @@ serve(async (req) => {
         let v446PanelBlock:
           | { metrics: Record<string, unknown> | null; reason: string; retried: boolean }
           | null = null;
+        // V506 — grobe Fehlbesetzung des Ankers (falsches Geschlecht / kein
+        // Cast-Treffer) blockt vor dem bezahlten Provider-Dispatch.
+        let v506IdentityBlock:
+          | { code: string; reasons: string[]; detail: string }
+          | null = null;
+
 
         try {
           // Two-Shot prep: if this scene has a multi-speaker dialog_script,
