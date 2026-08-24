@@ -3961,32 +3961,75 @@ serve(async (req) => {
                   } else if (identityFailure && identityFailure !== "extra") {
                     const code =
                       reasonMap[identityFailure] ?? "anchor_identity_failed";
-                    // v267 — Soft-Warn für ALLE identity failures. Der
-                    // Anker wird trotzdem als reference_image_url an den
-                    // Provider gegeben, die Pipeline läuft weiter. Der
-                    // User sieht die Warnung in `clip_error` und kann
-                    // via Preview-Gate / "Neu rendern" reagieren.
+                    // V506 — zweistufiger Verdict: grobe Fehlbesetzung
+                    // (falsches Geschlecht, kein einziger Cast-Treffer)
+                    // blockt hart vor dem bezahlten Dispatch; unsichere
+                    // Fälle bleiben beim v267-Soft-Warn.
+                    const verdict = classifyIdentityVerdict({
+                      identityFailure,
+                      expectedFaces,
+                      missing: identityMissing,
+                      duplicated: identityDuplicated,
+                      mismatched: identityMismatched,
+                      genderMismatched: lastGenderMismatched,
+                    });
                     const missingSuffix = identityMissing.length > 0
                       ? ` — Möglicherweise fehlend: ${identityMissing.join(", ")}.`
                       : "";
                     const duplicatedSuffix = identityDuplicated.length > 0
                       ? ` Doppelt: ${identityDuplicated.join(", ")}.`
                       : "";
-                    const warn = tl({ de: `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Anchor-Identity-Check unsicher (Cast mit ähnlichen Gesichtern / gleichem Nachnamen?). Render läuft trotzdem weiter. Bitte Ergebnis prüfen und ggf. neu rendern.`, en: `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Anchor identity check uncertain (cast with similar faces / same last name?). Render still proceeds. Please check result and re-render if necessary.`, es: `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Verificación de identidad del ancla incierta (¿elenco con caras similares / mismo apellido?). El renderizado continúa. Por favor, verifique el resultado y vuelva a renderizar si es necesario.` });
-                    console.log(
-                      `[compose-video-clips] v267_anchor_soft_warn scene=${scene.id} reason=${identityFailure} faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces} missing=[${identityMissing.join(",")}] duplicated=[${identityDuplicated.join(",")}]`,
-                    );
                     try {
                       await supabaseAdmin
                         .from("composer_scenes")
                         .update({
-                          twoshot_stage: "anchor_soft_pass",
-                          clip_error: warn,
+                          preview_audit: {
+                            v506_severity: verdict.severity,
+                            v506_code: verdict.code,
+                            v506_reasons: verdict.reasons,
+                            broken_slots: verdict.brokenSlots,
+                            expected_faces: expectedFaces,
+                            gender_mismatched: lastGenderMismatched,
+                            missing: identityMissing,
+                            duplicated: identityDuplicated,
+                            checked_at: new Date().toISOString(),
+                          },
                           updated_at: new Date().toISOString(),
                         })
                         .eq("id", scene.id);
-                    } catch (_) { /* non-fatal */ }
-                    // Fall through — never block on identity audit alone.
+                    } catch (_) { /* non-fatal telemetry */ }
+
+                    if (verdict.severity === "gross") {
+                      const genderSuffix = lastGenderMismatched.length > 0
+                        ? ` Falsches Geschlecht: ${lastGenderMismatched.join(", ")}.`
+                        : "";
+                      console.warn(
+                        `[compose-video-clips] v506_anchor_identity_block scene=${scene.id} code=${verdict.code} reasons=[${verdict.reasons.join("|")}] broken=${verdict.brokenSlots}/${expectedFaces} gender=[${lastGenderMismatched.join(",")}]`,
+                      );
+                      v506IdentityBlock = {
+                        code: verdict.code,
+                        reasons: verdict.reasons,
+                        detail: `${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix}${genderSuffix}`,
+                      };
+                    } else {
+                      // v267 — Soft-Warn für unsichere Fälle. Der Anker wird
+                      // trotzdem als reference_image_url an den Provider
+                      // gegeben, die Pipeline läuft weiter.
+                      const warn = tl({ de: `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Anchor-Identity-Check unsicher (Cast mit ähnlichen Gesichtern / gleichem Nachnamen?). Render läuft trotzdem weiter. Bitte Ergebnis prüfen und ggf. neu rendern.`, en: `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Anchor identity check uncertain (cast with similar faces / same last name?). Render still proceeds. Please check result and re-render if necessary.`, es: `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Verificación de identidad del ancla incierta (¿elenco con caras similares / mismo apellido?). El renderizado continúa. Por favor, verifique el resultado y vuelva a renderizar si es necesario.` });
+                      console.log(
+                        `[compose-video-clips] v267_anchor_soft_warn scene=${scene.id} reason=${identityFailure} faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces} missing=[${identityMissing.join(",")}] duplicated=[${identityDuplicated.join(",")}]`,
+                      );
+                      try {
+                        await supabaseAdmin
+                          .from("composer_scenes")
+                          .update({
+                            twoshot_stage: "anchor_soft_pass",
+                            clip_error: warn,
+                            updated_at: new Date().toISOString(),
+                          })
+                          .eq("id", scene.id);
+                      } catch (_) { /* non-fatal */ }
+                    }
                   }
                 }
               }
