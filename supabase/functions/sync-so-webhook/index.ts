@@ -47,6 +47,7 @@ import {
 } from "../_shared/motion-probe-classifier.ts";
 // V465-B2b — authoritative paired mouth-over-frame verdict.
 import { resolveV465Verdict, V466_GRAY_BAND_SAMPLES } from "../_shared/v465-verdict.ts";
+import { resolveV500Outcome } from "../_shared/v500-passthrough-gate.ts";
 // FA-4 v404 — server-side synchronous measurement owner (Remotion stills).
 import {
   measureProviderMotionSync,
@@ -969,11 +970,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           })
           : null;
       v404MotionProbe = {
-        verdict: v465Verdict.verdict,
+        // V500-B2 — a `noop` without a verified mouth anchor is downgraded to
+        // `indeterminate` here so no downstream branch can terminalize it.
+        verdict: v500NoopUnverified ? "indeterminate" : v465Verdict.verdict,
         // Reason of the measurement failure wins so that V443/V456 pass-through
         // classification keeps working on unmeasurable runs.
         reason: v404MotionMeasurement.measurement_status === "measured"
-          ? v465Verdict.reason
+          ? (v500NoopUnverified ? v500Gate.reason : v465Verdict.reason)
           : v404MotionMeasurement.reason,
         deltaMean: legacyProbe?.deltaMean ?? v404MotionMeasurement.deltaMean ?? 0,
         deltaPeak: legacyProbe?.deltaPeak ?? v404MotionMeasurement.deltaPeak ?? 0,
