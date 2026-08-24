@@ -437,16 +437,33 @@ async function dispatchAudioMux(
     return acquisition.outcome;
   }
   const muxJob = acquisition.outcome === "acquired" ? acquisition.job : null;
+  // V501 — der Mux-Dispatch wird BESTÄTIGT, nicht gehofft. Ein
+  // fire-and-forget-`fetch` ging verloren, sobald die Webhook-Isolate vor dem
+  // Verbindungsaufbau endete: Ledger-Zeile reserviert, Render nie angestoßen,
+  // Szene bleibt für immer in `audio_muxing`.
   try {
-    fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
+    const res = await fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
       body: JSON.stringify({
         scene_id: sceneId,
         ...(muxJob ? { pipeline_job_id: muxJob.id } : {}),
       }),
-    }).catch(() => {});
-  } catch { /* ignore */ }
+      signal: AbortSignal.timeout(20_000),
+    });
+    try { await res.text(); } catch { /* body drain best-effort */ }
+    if (!res.ok) {
+      console.warn(
+        `[sync-so-webhook] scene=${sceneId} v501_mux_dispatch_unconfirmed status=${res.status} — watchdog re-dispatch`,
+      );
+      return "dispatch_uncertain";
+    }
+  } catch (e) {
+    console.warn(
+      `[sync-so-webhook] scene=${sceneId} v501_mux_dispatch_failed ${(e as Error).message} — watchdog re-dispatch`,
+    );
+    return "dispatch_uncertain";
+  }
   return "dispatched";
 }
 
