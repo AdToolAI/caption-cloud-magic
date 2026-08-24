@@ -470,7 +470,7 @@ serve(async (req) => {
           .from("video_renders")
           .update({
             status: "failed",
-            error_message: "watchdog_audio_mux_stall: no webhook after 6min",
+            error_message: muxFailReason,
             completed_at: new Date().toISOString(),
           })
           .eq("render_id", muxRenderId)
@@ -481,20 +481,23 @@ serve(async (req) => {
         .update({
           lip_sync_status: "failed",
           twoshot_stage: "audio_mux_failed",
-          clip_error: "watchdog_audio_mux_stall: no webhook after 6min",
+          clip_error: muxFailReason,
           dialog_shots: {
             ...(ds as any),
             status: "failed",
-            error: "watchdog_audio_mux_stall",
+            error: v501HardFail ? "audio_mux_dispatch_lost" : "watchdog_audio_mux_stall",
             refunded: refundedFlag,
           },
           updated_at: new Date().toISOString(),
         })
         .eq("id", d.id);
       console.log(
-        `[lipsync-watchdog] scene=${d.id} audio_mux_stall killed after ${Math.round(muxAge / 1000)}s (refunded=${refundedFlag})`,
+        `[lipsync-watchdog] scene=${d.id} ${v501HardFail ? "audio_mux_dispatch_lost" : "audio_mux_stall"} killed after ${Math.round(muxAge / 1000)}s (refunded=${refundedFlag})`,
       );
-      failed.push({ scene_id: d.id, reason: "audio_mux_stall" });
+      failed.push({
+        scene_id: d.id,
+        reason: v501HardFail ? "audio_mux_dispatch_lost" : "audio_mux_stall",
+      });
       return;
     }
 
