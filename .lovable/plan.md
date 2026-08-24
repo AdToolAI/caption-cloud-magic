@@ -135,3 +135,53 @@ Bericht `docs/v474-action-directive-trace.md` mit einer klaren Zuordnung pro Fra
 UI-Fehler (Feld wird nie befüllt) / Persistenz-Fehler / Prompt-Fehler / Architektur-Grenze
 (Standbild kann keine Bewegung) — plus konkretem Fix-Vorschlag je Ursache, aber ohne
 Umsetzung in diesem Gate.
+
+---
+
+# V475 — v400-Konformitätsaudit der heutigen Pipeline (READ-ONLY)
+
+Deine Frage „ist v400 überhaupt richtig umgesetzt?" wird nicht mit einer Meinung
+beantwortet, sondern als Vertrag-für-Vertrag-Abgleich gegen den Code. Grundlage ist die
+von dir gelieferte Vollspezifikation (T1–T16 plus die vier Grundverträge, Fehlercode-
+Referenz und Nachbau-Checkliste).
+
+Für **jeden** Punkt genau ein Urteil, jeweils mit Codebeleg (Datei + Stelle) oder
+Gegenbeleg:
+
+```text
+ERFÜLLT           Code tut genau das, was v400 fordert
+ABGEWICHEN        Verhalten existiert, aber mit anderem Schwellenwert/anderer Quelle
+FEHLT             kein Codepfad vorhanden
+ÜBERSCHRIEBEN     durch ein späteres Gate (V441–V472) bewusst ersetzt
+```
+
+Besonderes Augenmerk auf die Stellen, an denen spätere Gates v400 verändert haben:
+
+- **Outcome-Gate (Grundvertrag 4 / T12):** v400 kennt `moving / static / unknown` mit
+  „static = Passthrough". Heute entscheidet `mouth_over_frame` mit Schwellen 2.00/2.65
+  plus Grauband. Das ist eine andere Definition von Fehlschlag — das Audit hält fest, ob
+  das eine Verschärfung gegenüber v400 ist und ob sie den ursprünglichen Zweck
+  (stille Passthroughs verhindern) noch trifft oder darüber hinausschießt.
+- **Face-Gate (T9):** Schwellen 0.24 / 144 px / Mund nicht am Rand — steht V461 dazu deckungsgleich?
+- **Preclip-Framing (T8):** fordert Mund bei 62 % Höhe; heute liefert V471 den Mund-Anker
+  bei Face-Ratio 0.88. Beides ist derselbe Zweck, aber in unterschiedlichen Bezugsrahmen —
+  wird explizit gegeneinander gerechnet.
+- **Anchor-Kohärenz (Grundvertrag 2 / T3/T5):** Geometrie ausschließlich auf
+  `reference_image_url`, Rekognition auf dem Anchor-Standbild, nicht auf Video-Frames.
+- **Run-Identität, Assignment-Lock, Run-Guard, Watchdog, Refund-Idempotenz** je einzeln.
+- **Fehlercode-Referenz (Abschnitt 17):** existiert jeder Code noch, und feuert er an der
+  von v400 vorgesehenen Stelle? Neue Codes (`ssw:noop_fail`,
+  `lipsync_input_contract_violation`, `preclip_mouth_not_visible`) werden zugeordnet.
+
+## Ergebnis dieses Gates
+
+Bericht `docs/v475-v400-conformance.md`: eine Zeile pro v400-Punkt mit Urteil und Beleg,
+darunter eine kurze Liste „Abweichungen, die den Ausfall erklären können" —
+nach Wirkung sortiert, ohne Codeänderung in diesem Gate.
+
+---
+
+# Reihenfolge
+
+V475 zuerst (beantwortet deine Grundfrage), dann V473 (Detektor-Gültigkeit),
+dann V474 (Aktions-Durchreichung). Alle drei read-only, kein Rerender.
