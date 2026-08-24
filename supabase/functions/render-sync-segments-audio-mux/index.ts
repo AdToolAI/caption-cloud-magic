@@ -33,6 +33,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { shouldUseCameraPath } from "../_shared/dynamic-camera-path.ts";
 import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 import { resolveMuxOverlayContract } from "../_shared/v503-mux-overlay-contract.ts";
+import { isReusableAudioMuxLedgerCandidate } from "../_shared/v504-audio-mux-provenance.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { bindLedgerExternalJob, readRetryContext, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
@@ -113,7 +114,7 @@ serve(async (req) => {
     const sceneId: string | undefined = body?.sceneId ?? body?.scene_id;
     const forceRemux = body?.force === true || body?.force_remux === true;
     // v431 G3.1 — Provenienz aus dem Dispatcher-Body (Observe-Phase).
-    const v431IncomingLedgerJobId: string | null =
+    const v431RawIncomingLedgerJobId: string | null =
       typeof body?.pipeline_job_id === "string" && body.pipeline_job_id.length > 0
         ? body.pipeline_job_id
         : null;
@@ -134,7 +135,7 @@ serve(async (req) => {
     // v431 RS3 §6 — Pre-Reset-Fence. Ein Mux-Auftrag aus der Epoche vor einem
     // Lip-Sync-Reset darf die zurückgesetzte Szene nicht wiederbeleben.
     {
-      const fence = await rs3FenceVerdict(supabase, sceneId, v431IncomingLedgerJobId);
+      const fence = await rs3FenceVerdict(supabase, sceneId, v431RawIncomingLedgerJobId);
       if (fence.fenced) {
         return json({ ok: true, skipped: fence.reason, scene_id: sceneId });
       }
@@ -830,11 +831,60 @@ serve(async (req) => {
       return json({ error: `insert render: ${insertErr.message}` }, 500);
     }
 
+    // V504 — Treat an incoming pipeline_job_id as untrusted transport data.
+    // It may be inherited from the preceding sync_segment stage. Reuse only an
+    // unbound audio_mux attempt from this exact scene epoch; otherwise recover
+    // the current matching audio_mux attempt before considering a new acquire.
+    const sceneProvenance = {
+      id: sceneId,
+      activeRunId: (scene as any).active_run_id ? String((scene as any).active_run_id) : null,
+      plateGeneration: typeof (scene as any).plate_generation === "number"
+        ? (scene as any).plate_generation
+        : null,
+    };
+    let v431MuxLedgerJobId: string | null = null;
+    if (v431RawIncomingLedgerJobId) {
+      const { data: incomingCandidate } = await supabase
+        .from("composer_pipeline_jobs")
+        .select("id, scene_id, run_id, stage, plate_generation, status, external_job_id")
+        .eq("id", v431RawIncomingLedgerJobId)
+        .maybeSingle();
+      if (isReusableAudioMuxLedgerCandidate(incomingCandidate, sceneProvenance)) {
+        v431MuxLedgerJobId = incomingCandidate.id;
+      } else {
+        console.warn("[render-sync-segments-audio-mux] v504_rejected_incoming_provenance", JSON.stringify({
+          scene_id: sceneId,
+          incoming_pipeline_job_id: v431RawIncomingLedgerJobId,
+          incoming_stage: incomingCandidate?.stage ?? null,
+        }));
+      }
+    }
+    if (!v431MuxLedgerJobId) {
+      const { data: recoverableCandidates } = await supabase
+        .from("composer_pipeline_jobs")
+        .select("id, scene_id, run_id, stage, plate_generation, status, external_job_id")
+        .eq("scene_id", sceneId)
+        .eq("stage", "audio_mux")
+        .eq("run_id", sceneProvenance.activeRunId)
+        .eq("plate_generation", sceneProvenance.plateGeneration)
+        .is("external_job_id", null)
+        .in("status", ["pending", "dispatching", "dispatch_uncertain"])
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const recovered = recoverableCandidates?.[0] ?? null;
+      if (isReusableAudioMuxLedgerCandidate(recovered, sceneProvenance)) {
+        v431MuxLedgerJobId = recovered.id;
+        console.log("[render-sync-segments-audio-mux] v504_recovered_audio_mux_provenance", JSON.stringify({
+          scene_id: sceneId,
+          pipeline_job_id: recovered.id,
+        }));
+      }
+    }
+
     // v431 G3.1b — Ledger-Zeile der Mux-Stage. Übergibt der Dispatcher keine
     // `pipeline_job_id`, entscheidet der Vertrag: ohne Retry-Kontext eine
     // Initial-Akquise (Attempt 1), mit `retry_of_pipeline_job_id` +
     // `retry_reason` ein atomarer Replace des genannten Vorgängers.
-    let v431MuxLedgerJobId: string | null = v431IncomingLedgerJobId;
     if (!v431MuxLedgerJobId) {
       const decision = await resolveLedgerDispatch(
         supabase,
