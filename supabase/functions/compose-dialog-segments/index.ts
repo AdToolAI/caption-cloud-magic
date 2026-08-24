@@ -148,6 +148,8 @@ import {
 import { resolveMouthAnchorPoseAware } from "../_shared/v456-roi-contract.ts";
 // V477 — measured track landmark becomes the authoritative mouth anchor.
 import { resolveTrackMouthAuthority } from "../_shared/v477-mouth-authority.ts";
+// V502 — Coords müssen aus DEMSELBEN Crop-Transform stammen wie der Preclip.
+import { resolveCoordsContract } from "../_shared/v502-coords-contract.ts";
 
 // FA-4 v406/v407 — Frozen Provider Input Snapshot / Retry-Wire-Parität.
 import {
@@ -6283,6 +6285,46 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       );
     }
 
+    // ── V502 — Coords ↔ Crop-Kohärenz ───────────────────────────────────
+    // `pass.coords` ist ein Legacy-Plate-Punkt aus der Sprecher-Zuordnung; die
+    // dispatchte Geometrie stammt seit V456/V457 aus `preclip_crop`. Beide
+    // Räume driften auseinander (S01 Pass 0: coords 26 px ausserhalb des
+    // eigenen Crops). Für `bbox-url-pro` ist das Telemetrie — für die
+    // Coords-Varianten wandert der Punkt in den Provider-Payload und MUSS im
+    // Raum des dispatchten Videos liegen. Wir leiten ihn deshalb aus demselben
+    // Crop-Transform ab und projizieren ihn in den Clip-Raum.
+    const v502Crop = usePassPreclip ? (pass as any).preclip_crop ?? null : null;
+    const v502Contract = v502Crop
+      ? resolveCoordsContract({
+        crop: v502Crop,
+        legacyCoords: Array.isArray(pass.coords)
+          ? [Number(pass.coords[0]), Number(pass.coords[1])]
+          : null,
+        mouthOffsetXy: (pass as any).preclip_mouth_offset_xy ?? null,
+      })
+      : null;
+    if (v502Contract) {
+      (pass as any)._v502_coords_contract = {
+        anchor_plate: v502Contract.anchorPlate,
+        anchor_clip: v502Contract.anchorClip,
+        legacy_coords: Array.isArray(pass.coords) ? pass.coords : null,
+        legacy_inside_crop: v502Contract.legacyInsideCrop,
+        legacy_outside_px: v502Contract.legacyOutsidePx,
+        source: v502Contract.source,
+        reason: v502Contract.reason,
+        crop: v502Crop,
+      };
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v502_coords_contract ` +
+          `source=${v502Contract.source} legacy_inside=${v502Contract.legacyInsideCrop} ` +
+          `outside_px=${v502Contract.legacyOutsidePx} anchor_plate=${JSON.stringify(v502Contract.anchorPlate)} ` +
+          `anchor_clip=${JSON.stringify(v502Contract.anchorClip)} crop=${JSON.stringify(v502Crop)}`,
+      );
+    }
+    /** Coords im Raum des tatsächlich dispatchten Videos (Preclip → Clip-Raum). */
+    const v502DispatchCoords: [number, number] | null = v502Contract
+      ? v502Contract.anchorClip
+      : clampSyncCoords(pass.coords);
 
 
 
@@ -6332,7 +6374,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       syncOptions.active_speaker_detection = {
         auto_detect: false,
         frame_number: referenceFrameNumber,
-        coordinates: clampSyncCoords(pass.coords),
+        // V502 — bei Preclip-Dispatch niemals den Plate-Punkt senden.
+        coordinates: (v502DispatchCoords ?? clampSyncCoords(pass.coords))!,
+
       };
     } else if (retryVariant === "coords-pro-box" || retryVariant === "bbox-url-pro") {
       // v31 / v82 — Build the same plate-space face box from faceMap; for
@@ -6802,7 +6846,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       syncOptions.active_speaker_detection = {
         auto_detect: false,
         frame_number: referenceFrameNumber,
-        coordinates: clampSyncCoords(pass.coords) ?? [Math.round(videoDims.width / 2), Math.round(videoDims.height / 2)],
+        coordinates: v502DispatchCoords ?? clampSyncCoords(pass.coords) ?? [Math.round(videoDims.width / 2), Math.round(videoDims.height / 2)],
       };
     }
 
@@ -7115,6 +7159,29 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         hf.meta ?? {},
       );
     }
+
+    // V502 — Coords-Varianten dürfen nur mit einem Punkt im Raum des
+    // dispatchten Videos feuern. Ohne projizierbaren Anker: fail closed VOR
+    // dem Provider-Call statt einen Plate-Punkt gegen einen 720er-Preclip.
+    if (
+      (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") &&
+      usePassPreclip &&
+      !v502DispatchCoords
+    ) {
+      return await failBeforeProviderDispatch(
+        "preclip_coords_out_of_crop",
+        "v502_coords_contract_invalid",
+        "V502: coords dispatch variant on a pre-clip without a crop-consistent anchor.",
+        422,
+        {
+          retry_variant: retryVariant,
+          v502: (pass as any)._v502_coords_contract ?? null,
+          preclip_crop: (pass as any).preclip_crop ?? null,
+        },
+      );
+    }
+
+
 
 
     // v169.1 — Gate nur scharf schalten wenn Tight-Slicing tatsächlich versucht
