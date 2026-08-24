@@ -1,9 +1,10 @@
-# V473 / V474 — Zwei READ-ONLY-Gates: Detektor-Gültigkeit + Aktions-Durchreichung
+# V475 → V473 → V474 — drei READ-ONLY-Gates
 
-Zwei getrennte Befunde, zwei getrennte Gates. Beide ohne Provider-Call, ohne Rerender,
-ohne Codeänderung.
+Reihenfolge: V475 (Master-Audit v400-Konformität) → V473 (Detektor-Gültigkeit) →
+V474 (Aktions-Durchreichung). Kein Provider-Call, kein Rerender, keine Codeänderung.
+V475 steht weiter unten ausführlich, wird aber zuerst ausgeführt.
 
-# V473 — Ist der NOOP-Detektor überhaupt gültig? (READ-ONLY)
+# V473 — Kann die heutige Kette guten Lip-Sync von Passthrough unterscheiden? (READ-ONLY)
 
 Dein Einwand trifft einen wunden Punkt, und die eigenen Daten stützen ihn:
 
@@ -18,54 +19,68 @@ Dein Einwand trifft einen wunden Punkt, und die eigenen Daten stützen ihn:
   nicht *nichts passiert*.
 - V470/V471 haben für Pass 1 einen **belegten Fehlalarm** nachgewiesen (Mess-ROI zu hoch).
 
-Damit ist die naheliegende Lesart nicht mehr „schwieriges Video", sondern:
-**unser Verdikt bestraft genau den einfachen Fall.** `mouth_over_frame` normiert die
-Mundänderung gegen die Gesamtbildbewegung. Bei ruhigen, frontalen Sprechern ist der Nenner
-klein und das Bild ruhig — der Quotient kippt nach unten, obwohl der Lip-Sync visuell sitzt.
-Der anspruchsvollere Startseiten-Clip lief nie gegen dieses Verdikt: es existierte damals
-nicht.
+Korrektur der Arbeitshypothese: `mouth_over_frame = mouth_edit / frame_edit`. Ein
+**kleiner** Nenner erhöht den Quotienten. Die frühere Formulierung „ruhiger Sprecher →
+kleiner Nenner → niedriger Score" war mathematisch falsch und ist gestrichen. Die einzig
+zulässige Hypothese lautet:
 
-Dieses Gate beweist oder widerlegt genau das. Kein Provider-Call, kein Rerender, keine
-Codeänderung.
+> Starke globale Plate-/Kamerabewegung **erhöht** den Nenner und kann echte lokale
+> Mundbearbeitung unter die Schwelle drücken.
 
-## Schritt 1 — Visuelle Evidenz gegen die Pose-Behauptung
+Die Fragestellung ist neutral, nicht falsifizierend gemeint:
+
+> Kann die heutige Kette (V469 → V471-ROI → V465 → V466) einen historisch visuell
+> bestätigten Lip-Sync korrekt von einem Passthrough unterscheiden?
+
+Ergebnis darf in beide Richtungen ausfallen.
+
+## Schritt 1 — Visuelle Evidenz gegen die Pose-Behauptung + V469 empirisch nachrechnen
 
 Aus den gepinnten Preclips P0–P4 (`v434_artifact_pins`, Run `95b11254`, Gen 15) Kontaktbögen
 neu ziehen und pro Pass festhalten: Yaw-Eindruck, Mundsichtbarkeit, Kopfbewegung.
-Ergebnis wird schriftlich gegen die V468-Behauptung gestellt und diese, falls widerlegt,
-in `docs/v468-pass-contract-differential.md` ausdrücklich als **zurückgezogen** markiert
-(Doku-Korrektur, keine Logikänderung).
+Die V468-Behauptung „P0 ≈ 90° Silhouette" wird bei Widerlegung in
+`docs/v468-pass-contract-differential.md` als **zurückgezogen** markiert (Doku-Korrektur).
 
-## Schritt 2 — Der entscheidende Kontrolltest: Startseiten-Clip gegen heutige Metrik
+Wichtig: Daraus folgt **nicht**, dass V469 falsch ist. V469 prüft heute Mouth-Visibility
+(Landmarks, Face-Aspect, Mund-Margin, usable frames), nicht Yaw. V469 wird deshalb
+**empirisch** re-evaluiert:
+
+- V469 lässt P0 trotz `mouth_landmark_rate = 1.00` / `usable_frame_rate = 1.00` durch
+  → V469 verhält sich korrekt, keine Entschärfung.
+- V469 würde ihn trotz dieser Werte blocken → echter Gegenbeweis, dann Handlungsbedarf.
+
+## Schritt 2 — Kontrolltest: Startseiten-Clip gegen die heutige Kette
 
 Der bekannte gute 4-Sprecher-Clip der deutschen Startseite ist die härteste Kontrollgruppe.
 Geprüft wird:
 
-1. Welche Verdikt-Logik dieser Lauf damals durchlaufen hat (Erwartung, zu belegen: gar keine
-   `mouth_over_frame`-Bewertung, weil vor V465 entstanden).
+1. Welche Verdikt-Logik dieser Lauf damals durchlaufen hat (zu belegen, nicht anzunehmen).
 2. Seine Pässe werden mit der **heutigen** Kette nachgerechnet: V469 → V471-ROI → V465 N=6
-   → V466 Grauband.
+   → V466 Grauband inklusive einmaliger N=16-Nachmessung.
 
-Entscheidungsregel:
+Entscheidungsregel — die Messlatte ist **Terminalität**, nicht MOVED:
 
 ```text
-Startseiten-Clip erhält heute für einen oder mehrere Turns NOOP
-  → Metrik ist als Terminal-Gate falsifiziert. Sie klassifiziert einen
-    nachweislich guten Clip als Fehler.
+Visuell + artefaktseitig bestätigter Lip-Sync erhält nach vollständigem
+V466-Pfad ein TERMINALES NOOP
+  → Terminalitätsautorität von mouth_over_frame ist falsifiziert.
 
-Startseiten-Clip bleibt durchgehend MOVED
-  → Metrik hält, und der Unterschied liegt wirklich im S01-Material.
-    Dann wird S01 Turn für Turn gegen den Startseiten-Clip gestellt.
+Ergebnis MOVED oder INDETERMINATE → motion_unverified
+  → keine Falsifikation. Grauband ist erlaubtes, nicht-terminales Verhalten.
+  Beispiel: 3 MOVED + 1 motion_unverified = Metrik hält.
+           2 MOVED + 2 terminale NOOP bei sichtbar gutem Lip-Sync = falsifiziert.
 ```
 
 ## Schritt 3 — Konsequenz benennen (noch nicht implementieren)
 
-Fällt Schritt 2 gegen die Metrik aus, lautet die Empfehlung für das Folge-Gate:
+Nur falls Schritt 2 die Terminalität falsifiziert:
 
-- `mouth_over_frame` verliert die **Terminalitäts**-Autorität und wird Telemetrie/Warnung.
-- Ein Pass scheitert nur noch bei echtem Passthrough (Output bit-nah am Input) oder
-  Provider-Fehler — nicht mehr wegen eines Schwellenwerts, den auch guter Lip-Sync reißt.
-- V469 wird entsprechend entschärft, weil sein Auslöseanlass (die Profil-These) entfällt.
+- `mouth_over_frame` verliert die **Terminalitäts**-Autorität und wird Telemetrie/Warnung
+  bzw. schlimmstenfalls Grauband — es bleibt als Ranking-Metrik gültig (AUC 0.980).
+- Ein Pass scheitert dann nur noch bei echtem Passthrough (Output nahezu identisch zum
+  Input, im Sinne des v400-Vertrags) oder bei Provider-Fehler.
+- V469 wird **nicht** pauschal mit entschärft; über V469 entscheidet allein das empirische
+  Ergebnis aus Schritt 1.
 
 Das ist bewusst nur die Empfehlung. Umsetzung erst in einem eigenen, freigegebenen Gate.
 
@@ -120,33 +135,58 @@ Steht `[SceneAction]` mit dem englischen Satz im gesendeten Prompt — ja oder n
 nein, wird der Punkt der Kette benannt, an dem er verloren geht (Persistenz, Prompt-Rebuild
 oder Backend-Strip).
 
-## Frage 3 — Kann diese Regie im Lip-Sync-Pfad überhaupt wirken?
+## Frage 3 — Erreicht die Regie den I2V-Prompt der T4-Plate-Generierung?
 
-Zentrale Hypothese, die dieses Gate belegen oder widerlegen soll: Bei einer Lip-Sync-Szene
-entsteht das Bild aus dem **Anker-Standbild** plus Sync-Pässen. Bewegungsregie wie
-„geht während der Szene nach rechts" oder „dreht sich zur Gruppe zurück" ist in einem
-Standbild nicht darstellbar; ob und wo der Clip-Provider die Marker noch sieht, ist der
-entscheidende Punkt. Geprüft wird, welcher Prompt an den Anker-Renderer und welcher an den
-Clip-Provider geht, und ob Bewegungsregie darin überlebt.
+Korrigierte Fragestellung. Die frühere Annahme „Lip-Sync-Bild entsteht aus dem Standbild"
+widerspricht v400 und ist gestrichen. v400 sagt:
+
+```text
+Anchor-Bild → T4 Image-to-Video → bewegte Plate → Preclips → Lip-Sync
+```
+
+Körperbewegung (gehen, drehen, Tablet prüfen) muss also in **T4** entstehen. Sync.so soll
+Bewegung nicht nachträglich erfinden, es synchronisiert nur den Mund auf einer bereits
+bewegten Plate.
+
+Verfolgt wird deshalb genau diese Kette, Station für Station, mit Beleg an jeder Stelle:
+
+```text
+UI SceneAction / characterActions
+  → persistierter Scene State
+  → applyActionsToPrompt
+  → finaler aiPrompt
+  → compose-video-clips
+  → T4-Provider-Prompt
+  → HappyHorse / Kling / Seedance Request
+```
+
+Und erst getrennt davon: Plate → Preclip → Sync.so.
+
+Ergebnis ist binär:
+
+- **Action-Block erreicht T4, Bewegung entsteht trotzdem nicht** → Prompt-Formulierungs-
+  bzw. Provider-Befolgungsproblem (Modellgrenze), kein Pipelinefehler.
+- **Action-Block erreicht T4 nicht** → unser Pipelinefehler, exakte Verlustkante wird benannt.
 
 ## Ergebnis dieses Gates
 
 Bericht `docs/v474-action-directive-trace.md` mit einer klaren Zuordnung pro Frage:
-UI-Fehler (Feld wird nie befüllt) / Persistenz-Fehler / Prompt-Fehler / Architektur-Grenze
-(Standbild kann keine Bewegung) — plus konkretem Fix-Vorschlag je Ursache, aber ohne
+UI-Fehler (Feld wird nie befüllt) / Persistenz-Fehler / Prompt-Verlust vor T4 /
+Provider-Befolgung — plus konkretem Fix-Vorschlag je Ursache, aber ohne
 Umsetzung in diesem Gate.
 
 ---
 
-# V475 — v400-Konformitätsaudit der heutigen Pipeline (READ-ONLY)
+# V475 — MASTER-AUDIT: v400-Konformität der heutigen Pipeline (READ-ONLY)
 
-Deine Frage „ist v400 überhaupt richtig umgesetzt?" wird nicht mit einer Meinung
-beantwortet, sondern als Vertrag-für-Vertrag-Abgleich gegen den Code. Grundlage ist die
-von dir gelieferte Vollspezifikation (T1–T16 plus die vier Grundverträge, Fehlercode-
-Referenz und Nachbau-Checkliste).
+Wird **zuerst** ausgeführt. Vertrag-für-Vertrag-Abgleich der v400-Vollspezifikation
+(T1–T16, vier Grundverträge, Fehlercode-Referenz, Nachbau-Checkliste) gegen den Code.
 
-Für **jeden** Punkt genau ein Urteil, jeweils mit Codebeleg (Datei + Stelle) oder
-Gegenbeleg:
+Tabelle mit fünf Spalten, eine Zeile pro v400-Punkt:
+
+| v400-Vertrag | Status heute | Beleg (Datei/Stelle) | Abweichung beabsichtigt? | Kann Ausfall erklären? |
+
+Statuswerte:
 
 ```text
 ERFÜLLT           Code tut genau das, was v400 fordert
@@ -155,29 +195,41 @@ FEHLT             kein Codepfad vorhanden
 ÜBERSCHRIEBEN     durch ein späteres Gate (V441–V472) bewusst ersetzt
 ```
 
-Besonderes Augenmerk auf die Stellen, an denen spätere Gates v400 verändert haben:
+Die Spalte „beabsichtigt?" trennt validierten Ersatz von unbeabsichtigtem Contract-Drift.
+Der Drift ist das eigentliche Ziel dieses Gates.
 
-- **Outcome-Gate (Grundvertrag 4 / T12):** v400 kennt `moving / static / unknown` mit
-  „static = Passthrough". Heute entscheidet `mouth_over_frame` mit Schwellen 2.00/2.65
-  plus Grauband. Das ist eine andere Definition von Fehlschlag — das Audit hält fest, ob
-  das eine Verschärfung gegenüber v400 ist und ob sie den ursprünglichen Zweck
-  (stille Passthroughs verhindern) noch trifft oder darüber hinausschießt.
-- **Face-Gate (T9):** Schwellen 0.24 / 144 px / Mund nicht am Rand — steht V461 dazu deckungsgleich?
-- **Preclip-Framing (T8):** fordert Mund bei 62 % Höhe; heute liefert V471 den Mund-Anker
-  bei Face-Ratio 0.88. Beides ist derselbe Zweck, aber in unterschiedlichen Bezugsrahmen —
-  wird explizit gegeneinander gerechnet.
+## Fünf priorisierte Prüfpunkte
+
+1. **T8 Mouth-Priority-Framing.** v400 fordert den Mund bei ~62 % der Preclip-Höhe.
+   V471-B betrifft ausdrücklich nur die **Verdict-ROI**, nicht das Preclip-Framing.
+   Gemessen wird deshalb unabhängig davon an den tatsächlich versendeten Preclips:
+   liegt der Mund heute noch bei ~62 % Höhe?
+2. **T9 Face-Gate.** V461 (`face_share ≥ 0.24`, Größe ≥ 144 px, Mund nicht am Rand) gegen
+   v400 abgleichen; V469 als zusätzliche Verschärfung getrennt ausweisen.
+3. **T12 Outcome-Gate.** Größter konzeptioneller Drift: v400 = „Output ≈ Input → static /
+   Passthrough", heute = `mouth_over_frame < 2.00 → NOOP`. Das ist nicht dasselbe. Wird
+   als Drift dokumentiert und in V473 empirisch geprüft.
+4. **T4 Prompt-/Action-Propagation.** Erreichen Scene-/Cast-Actions den I2V-Plate-Prompt?
+   Hier nur Markierung mit Codebeleg — die vollständige Kette fährt V474.
+5. **Watchdog.** v400 war simpel (>6 min non-terminal → schließen + Refund). Heute:
+   Ladder-States, virtual in-flight, Preflight-Recovery, Fan-out-Fence,
+   `motion_unverified`, Reconciliation. Zulässig, solange die v400-Invariante hält:
+   **kein Run kann dauerhaft hängen bleiben.** Genau diese Invariante wird geprüft.
+
+## Weitere Punkte (vollständig, aber knapp)
+
 - **Anchor-Kohärenz (Grundvertrag 2 / T3/T5):** Geometrie ausschließlich auf
   `reference_image_url`, Rekognition auf dem Anchor-Standbild, nicht auf Video-Frames.
-- **Run-Identität, Assignment-Lock, Run-Guard, Watchdog, Refund-Idempotenz** je einzeln.
-- **Fehlercode-Referenz (Abschnitt 17):** existiert jeder Code noch, und feuert er an der
-  von v400 vorgesehenen Stelle? Neue Codes (`ssw:noop_fail`,
+- **Run-Identität (T2), Assignment-Lock (T6), Run-Guard (T11), Refund-Idempotenz.**
+- **Fehlercode-Referenz (Abschnitt 17):** existiert jeder Code noch, feuert er an der von
+  v400 vorgesehenen Stelle? Neue Codes (`ssw:noop_fail`,
   `lipsync_input_contract_violation`, `preclip_mouth_not_visible`) werden zugeordnet.
 
 ## Ergebnis dieses Gates
 
-Bericht `docs/v475-v400-conformance.md`: eine Zeile pro v400-Punkt mit Urteil und Beleg,
-darunter eine kurze Liste „Abweichungen, die den Ausfall erklären können" —
-nach Wirkung sortiert, ohne Codeänderung in diesem Gate.
+Bericht `docs/v475-v400-conformance.md`: vollständige Fünf-Spalten-Tabelle, darunter die
+Liste „unbeabsichtigter Contract-Drift, der den Ausfall erklären kann" — nach Wirkung
+sortiert, ohne Codeänderung in diesem Gate.
 
 ---
 
