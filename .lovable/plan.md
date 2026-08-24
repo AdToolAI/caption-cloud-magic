@@ -1,68 +1,35 @@
-# Warum die neue 4-Sprecher-Szene fehlgeschlagen ist — und der Fix
+# V506 — Identitäts-Gate für Anker (falsche Personen / falsches Geschlecht)
 
-## Befund (aus DB + Edge-Logs, nicht geraten)
+## Was ich nachgewiesen habe
 
-Szene `67b392b1` (S02, HappyHorse, Dialog & Lip-Sync an) ist terminal gescheitert mit:
+- Cast von S02 ist korrekt konfiguriert: Sarah (w), Samuel (m), Matthew (m), Kay (m) — alle mit `portrait_url`, `reference_image_url`, `identity_lock_strength: strict`.
+- Der Anker von **S01** (`be60d106`) zeigt exakt diesen Cast: 1 Frau, 3 Männer, Dachterrasse. Identitätsinjektion funktioniert also grundsätzlich.
+- Der Anker von **S02** (`67b392b1`) zeigt 2 fremde Frauen und 2 fremde Männer in einer Büroküche — keine der vier Portrait-Identitäten, falsches Geschlechterverhältnis.
+- Im Code ist der Gemini-Identity-Audit seit v267 **kein Hard-Gate mehr**: bei `swap`, `missing`, `clone`, `ambiguous` wird nur `twoshot_stage: anchor_soft_pass` plus Warntext geschrieben und der Anker trotzdem an den Provider gegeben (`compose-video-clips/index.ts` ~3870–3925). Ein komplett falsch besetzter Anker kann die Pipeline also nie stoppen.
+- Der Nutzer sieht dadurch nicht den echten Grund, sondern erst den Folgefehler `fa4_fail_closed:count_mismatch` am Ende der Kette.
+- Nicht verifizierbar: was der Audit für S02 konkret gemeldet hat. `preview_audit` ist leer und die Edge-Logs für diese Szene sind nicht mehr abrufbar. Telemetrie fehlt — das ist Teil des Fixes.
 
-```text
-fa4_fail_closed:count_mismatch:anchor=4/plausible=3/detected=4
-[plateFaceSlotRouter] fa4_candidate_sanity detected=4 plausible=3 rejected=1
-  reasons=[{"index":3,"reason":"area_too_small"}]
-```
+## Was gebaut wird
 
-Übersetzt: Auf der Plate wurden **alle 4 Gesichter gefunden**. Der Plausibilitätsfilter vor der
-Slot-Zuordnung hat aber ein Gesicht verworfen, weil seine Fläche unter dem absoluten Mindestmaß
-liegt (`minAreaRatio = 0.003`, also < 0,3 % der Plate-Fläche ≈ < 76×76 px bei 1920×1080). Damit
-gab es nur noch 3 plausible Kandidaten für 4 Anker-Slots → `count_mismatch` → Fail-Closed. Das ist
-kein Zufallsfehler: In einer weiten 4-Personen-Totale ist die hinterste Person systematisch zu
-klein für diese absolute Schwelle.
+### A. Zweistufiger Identity-Verdict statt "alles soft"
+Der Audit wird in zwei Klassen getrennt:
 
-## Zwei Teile — der Fix und der Schutz
+- **grob falsch** (kein einziges Cast-Gesicht erkannt, oder Geschlechterverhältnis weicht vom Cast ab, oder `swap` über mehrere Slots): Anker wird verworfen, **eine** erneute Komposition mit Face-Lock + explizitem Geschlechter-/Namens-Constraint. Bleibt es grob falsch → harter Abbruch **vor** jedem Provider-Dispatch (null Kosten) mit klarer Meldung: "Der Anker zeigt nicht deinen Cast".
+- **unsicher** (`ambiguous`, ähnliche Gesichter, einzelner unklarer Slot): bleibt Soft-Pass wie heute, damit falsch-positive Audits keine Szene blockieren.
 
-### 1) Plausibilitätsschwelle skalenrelativ machen (Kern-Fix)
+### B. Geschlechts-Constraint in der Anker-Komposition
+Aus den Brand-Characters wird die Geschlechterverteilung des Casts abgeleitet und als verbindliche Klausel in den Anker-Prompt gehängt (z. B. "exactly 1 woman and 3 men, one per reference portrait, no substitutions"). Zusätzlich als Prüfkriterium im Audit.
 
-Der Fail-Closed-Vertrag bleibt vollständig erhalten. Geändert wird nur die Definition von
-„plausibler Kandidat":
+### C. Ort-Konsistenz prüfen
+Vor dem Fix wird geprüft, ob S02 im Prompt überhaupt die Szenen-Location mitbekommt oder ob der Ort aus der Szenenbeschreibung verloren geht. Falls die Location nicht durchgereicht wird, wird sie als Pflichtklausel ergänzt — ansonsten unverändert lassen.
 
-- Zusätzlich zum absoluten Boden ein **relativer Boden**: ein Gesicht gilt als plausibel, wenn
-  seine Fläche mindestens ein festes Verhältnis (Vorschlag: 25 %) der **Median-Fläche** der
-  übrigen erkannten Gesichter erreicht — auch wenn es unter 0,3 % der Plate liegt.
-- Der absolute Boden wird auf einen echten Detektionsboden gesenkt (Vorschlag: 0,0012 ≈ 48×48 px
-  bei 1920×1080), unter dem kein Mund mehr auflösbar ist.
-- Alles andere (Aspect, In-Plate, degeneriert, Bijektion, Tie-Ambiguität) bleibt unverändert.
-- Damit kommen weite Gruppen-Plates durch, während echte Fehl-Detektionen (Spiegelung, Poster,
-  Gesicht im Hintergrund) weiterhin sicher rausfallen — die sind klein **und** weit unter dem
-  Median.
-
-### 2) Die zu weite Plate vor dem Rendern abfangen
-
-Ein 4. Gesicht bei ~0,3 % Plate-Fläche übersteht später die Mund-Gates ohnehin nur knapp. Deshalb
-zusätzlich, rein präventiv:
-
-- Nach der Anker-Messung eine **Framing-Warnung**, wenn das kleinste Gesicht deutlich unter dem
-  Median liegt: Hinweis in der Szene, dass die Gruppe enger gestaffelt werden soll
-  (halbnah statt Totale), inkl. konkreter Empfehlung.
-- Die Fehlermeldung in der Szenenkarte bekommt statt „Details unter Details" eine klare Ursache:
-  „Ein Gesicht war auf dem Bild zu klein für Lip-Sync (zu weite Kadrierung)" — lokalisiert
-  DE/EN/ES.
-
-## Ablauf danach
-
-Kein neuer teurer Lauf im selben Schritt: erst Fix + Unit-Tests, dann genau ein kontrollierter
-Re-Render dieser Szene, dann Auswertung der `fa4_candidate_sanity`-Zeile (erwartet:
-`detected=4 plausible=4`).
+### D. Telemetrie persistieren
+Audit-Ergebnis (Verdict, gefundene/fehlende Namen, Face-Count, Anker-URL, Attempt-Nummer) wird nach `composer_scenes.preview_audit` geschrieben, damit künftige Triage nicht von Edge-Logs abhängt.
 
 ## Technische Details
 
-- `supabase/functions/_shared/plate-face-candidates.ts`: `plateFaceSanity` erhält den relativen
-  Median-Boden (neue Signatur mit Kontext der übrigen Kandidaten), `filterPlausibleCandidates`
-  berechnet den Median vorab; Konstanten in `PLATE_FACE_SANITY` dokumentiert.
-- `supabase/functions/_shared/plate-face-candidates.test.ts`: Fälle für „kleines echtes 4.
-  Gesicht akzeptiert" und „Mini-Fehldetektion weiter verworfen".
-- `supabase/functions/_shared/plateFaceSlotRouter.ts`: Telemetrie-Zeile um `areaRatios` und
-  `medianArea` erweitern, damit künftige Fälle ohne Rätselraten lesbar sind.
-- Fehlertext-Mapping in der Szenenkarte (`src/components/video-composer/…`) für
-  `fa4_fail_closed:count_mismatch` + Framing-Hinweis; keine Änderung an Pipeline-Reihenfolge,
-  Retry-Logik oder Credit-/Refund-Pfad.
-- Offen aus dem vorherigen Plan (nicht Teil dieses Gates): Skript-Studio-Platzhalter und
-  Entschärfung des Director-Score-Blocks.
+- `supabase/functions/compose-video-clips/index.ts`: Verdict-Klassifizierung (`grossIdentityFailure` vs. `uncertain`), Hard-Block-Zweig vor dem Provider-Dispatch, `preview_audit`-Write.
+- `supabase/functions/_shared/`: neues Modul `v506-identity-verdict.ts` mit reiner Klassifizierungsfunktion + Geschlechter-Constraint-Builder (unit-testbar).
+- Anker-Prompt-Erweiterung im bestehenden Kompositionsaufruf (kein neuer Provider, keine Kostenänderung).
+- Test: `src/test/composer/v506-identity-verdict.test.ts` — grobe vs. unsichere Verdicts, Geschlechter-Constraint, kein Block bei `extra`.
+- Kein Rerender-Automatismus, keine Änderung an der Lip-Sync-Kette.
