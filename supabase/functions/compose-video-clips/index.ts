@@ -4071,6 +4071,28 @@ serve(async (req) => {
           continue;
         }
 
+        // ── V506 IDENTITY HARD-GATE (zero spend) ───────────────────────────
+        // Ein grob fehlbesetzter Anker (falsches Geschlecht, kein einziger
+        // Cast-Treffer) kann nie den bestellten Cast zeigen. Vor dem
+        // bezahlten Provider-Dispatch stoppen statt später auf Headcount
+        // scheitern.
+        if (v506IdentityBlock) {
+          const msg = tl({
+            de: `${v506IdentityBlock.code}: Das Anker-Bild zeigt nicht den gewählten Cast (${v506IdentityBlock.detail}). Es wurde kein Clip gerendert (keine Kosten). Bitte die Szene neu erzeugen oder die Referenz-Porträts der Charaktere prüfen.`,
+            en: `${v506IdentityBlock.code}: The anchor image does not show the selected cast (${v506IdentityBlock.detail}). No clip was rendered (no cost). Please regenerate the scene or check the characters' reference portraits.`,
+            es: `${v506IdentityBlock.code}: La imagen ancla no muestra el elenco seleccionado (${v506IdentityBlock.detail}). No se renderizó ningún clip (sin coste). Regenere la escena o revise los retratos de referencia de los personajes.`,
+          });
+          console.warn(
+            `[compose-video-clips] v506_identity_hard_gate scene=${scene.id} code=${v506IdentityBlock.code} reasons=[${v506IdentityBlock.reasons.join("|")}] → hard-fail before provider dispatch (zero spend)`,
+          );
+          await safeMarkSceneFailed(scene.id, msg, {
+            isCinematicSyncScene: true,
+            extra: { twoshot_stage: "failed" },
+          });
+          results.push({ sceneId: scene.id, status: "failed", error: msg });
+          continue;
+        }
+
 
         // ── v195/v440 HARD-GUARD: cinematic-sync needs a VERIFIED anchor ───
         // Regressions kept slipping through when the anchor safety net threw
