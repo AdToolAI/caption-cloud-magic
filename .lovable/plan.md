@@ -1,42 +1,80 @@
-# V467 — Verdict gegen die Sprachhüllkurve normalisieren
+# V473 — Ist der NOOP-Detektor überhaupt gültig? (READ-ONLY)
 
-## Status
+Dein Einwand trifft einen wunden Punkt, und die eigenen Daten stützen ihn:
 
-- **V467-A = PASS / CLOSED**
-- **V467-B = REJECTED BY DATA**
-- **V465 bleibt die autoritative Verdict-Metrik.**
-- **V466 Gray-Band-Regel bleibt bestehen.**
-- **Keine weiteren Änderungen / kein S01-Rerender — STOP.**
+- Die V468-Aussage „Pass 0 = ~90° Profil, Mund nur Silhouette" stammt aus einer visuellen
+  Betrachtung von Kontaktbögen, **nicht** aus Messdaten. Der eingefrorene Face-Track
+  desselben Passes sagt das Gegenteil: `usable_frame_rate = 1.00`, `median_face_aspect = 0.687`,
+  `mouth_landmark_rate = 1.00`, kein Silhouetten-Randtreffer. Das ist bereits in V472
+  (Befund 1) dokumentiert und widerspricht der Profil-These.
+- V466-B hat gezeigt: **kein einziger Pass ist unbearbeitet.** Auch die „NOOP"-Pässe
+  editieren exakt das Mundband (Edit-Schwerpunkt 0.65–0.72 der Boxhöhe, identisch mit den
+  grünen Pässen). „NOOP" heißt in unserer Messung *schwach relativ zur Bildbewegung*,
+  nicht *nichts passiert*.
+- V470/V471 haben für Pass 1 einen **belegten Fehlalarm** nachgewiesen (Mess-ROI zu hoch).
 
-## Finale Hierarchie der untersuchten Kennzahlen
+Damit ist die naheliegende Lesart nicht mehr „schwieriges Video", sondern:
+**unser Verdikt bestraft genau den einfachen Fall.** `mouth_over_frame` normiert die
+Mundänderung gegen die Gesamtbildbewegung. Bei ruhigen, frontalen Sprechern ist der Nenner
+klein und das Bild ruhig — der Quotient kippt nach unten, obwohl der Lip-Sync visuell sitzt.
+Der anspruchsvollere Startseiten-Clip lief nie gegen dieses Verdikt: es existierte damals
+nicht.
 
-| Kennzahl | Status | AUC (unabhängige Kohorte) | Bemerkung |
-|---|---|---|---|
-| `mouth_over_frame` | **autoritativ** | **0.980** | Verdict-Metrik seit V465-B2b. |
-| `corr_rms_best_lag` | Telemetrie | 0.853 | Nützlich für Diagnose, nicht für Verdict. |
-| `v_over_u` | Telemetrie | 0.806 | Nützlich für Diagnose, nicht für Verdict. |
-| `corr_zero` | Telemetrie | 0.754 | Nützlich für Diagnose, nicht für Verdict. |
-| `old_delta` / V434-MAD | Legacy/Diagnose | — | Nicht autoritativ. |
+Dieses Gate beweist oder widerlegt genau das. Kein Provider-Call, kein Rerender, keine
+Codeänderung.
 
-## Warum V467-B abgelehnt wurde
+## Schritt 1 — Visuelle Evidenz gegen die Pose-Behauptung
 
-Die Hypothese aus V466-B — dass `speech_locked_mouth_edit` Szenenbewegungs-Unsicherheit
-aufheben könnte — hat sich auf der unabhängigen Kohorte **nicht generalisiert**:
+Aus den gepinnten Preclips P0–P4 (`v434_artifact_pins`, Run `95b11254`, Gen 15) Kontaktbögen
+neu ziehen und pro Pass festhalten: Yaw-Eindruck, Mundsichtbarkeit, Kopfbewegung.
+Ergebnis wird schriftlich gegen die V468-Behauptung gestellt und diese, falls widerlegt,
+in `docs/v468-pass-contract-differential.md` ausdrücklich als **zurückgezogen** markiert
+(Doku-Korrektur, keine Logikänderung).
 
-- `mouth_over_frame` bleibt die stärkste robuste Trennung (AUC 0.980).
-- Die saubere V466-B-Trennung innerhalb von S01 war ein Einzelszenen-Effekt.
-- Gegenbeispiele: GOLD0 und COH19 zeigen `v/u ≈ 0.98` trotz bestätigtem MOVED;
-  COH23 zeigt `v/u = 1.32` trotz echtem NOOP.
+## Schritt 2 — Der entscheidende Kontrolltest: Startseiten-Clip gegen heutige Metrik
 
-Eine Promotion von V467-A zu V467-B wäre Overfitting auf S01 gewesen.
+Der bekannte gute 4-Sprecher-Clip der deutschen Startseite ist die härteste Kontrollgruppe.
+Geprüft wird:
 
-## Verbleibender Sachverhalt
+1. Welche Verdikt-Logik dieser Lauf damals durchlaufen hat (Erwartung, zu belegen: gar keine
+   `mouth_over_frame`-Bewertung, weil vor V465 entstanden).
+2. Seine Pässe werden mit der **heutigen** Kette nachgerechnet: V469 → V471-ROI → V465 N=6
+   → V466 Grauband.
 
-- Einige Provider-Outputs sind echte mundspezifische Edits und werden von V465 korrekt erkannt.
-- Andere sind echte bzw. sehr schwache Passthroughs.
-- Eine zusätzliche Audio-Hüllkurven-Korrelation erklärt diese Unterschiede über
-  verschiedene Szenen hinweg nicht zuverlässig.
+Entscheidungsregel:
 
-## Nächste Untersuchung (wenn wieder geöffnet)
+```text
+Startseiten-Clip erhält heute für einen oder mehrere Turns NOOP
+  → Metrik ist als Terminal-Gate falsifiziert. Sie klassifiziert einen
+    nachweislich guten Clip als Fehler.
 
-Sollte später wieder angegangen werden, sollte die nächste Untersuchung **nicht nochmals am Verdict ansetzen**, sondern an den tatsächlich verbleibenden echten NOOP-Fällen.
+Startseiten-Clip bleibt durchgehend MOVED
+  → Metrik hält, und der Unterschied liegt wirklich im S01-Material.
+    Dann wird S01 Turn für Turn gegen den Startseiten-Clip gestellt.
+```
+
+## Schritt 3 — Konsequenz benennen (noch nicht implementieren)
+
+Fällt Schritt 2 gegen die Metrik aus, lautet die Empfehlung für das Folge-Gate:
+
+- `mouth_over_frame` verliert die **Terminalitäts**-Autorität und wird Telemetrie/Warnung.
+- Ein Pass scheitert nur noch bei echtem Passthrough (Output bit-nah am Input) oder
+  Provider-Fehler — nicht mehr wegen eines Schwellenwerts, den auch guter Lip-Sync reißt.
+- V469 wird entsprechend entschärft, weil sein Auslöseanlass (die Profil-These) entfällt.
+
+Das ist bewusst nur die Empfehlung. Umsetzung erst in einem eigenen, freigegebenen Gate.
+
+## Ergebnis dieses Gates
+
+Ein Bericht `docs/v473-detector-validity.md` mit: Kontaktbögen-Befund pro Pass, Nachrechnung
+des Startseiten-Clips mit heutiger Kette, klarer Aussage „Metrik falsifiziert" oder
+„Metrik hält" — und keiner Codeänderung.
+
+## Technische Details
+
+- Quellen: `v434_artifact_pins` (S01 Gen 15), Storage-Artefakte des Startseiten-Clips,
+  `composer_pipeline_jobs` / Attempt-Telemetrie für die historischen Verdikte.
+- Nachrechnung mit dem bestehenden Harness aus V471/V472 (Produktions-Still-Pfad,
+  V471-ROI-Port, V465-Schwellen 2.00 / 2.65), read-only.
+- Betroffene Doku bei Widerlegung: `docs/v468-pass-contract-differential.md`,
+  `docs/v469-mouth-visibility-gate.md`, `mem/architecture/lipsync/v469-mouth-visibility-gate.md`.
