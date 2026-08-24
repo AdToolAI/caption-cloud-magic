@@ -73,6 +73,10 @@ const STALE_DISPATCH_RECOVERY_MS = 30_000;
 // own timeout is now 300 s (see render-sync-segments-audio-mux), so 6 min
 // gives one extra retry cycle before we hard-fail the scene.
 const STALE_AUDIO_MUX_MS = 6 * 60_000;
+// V501 — Mux reserviert (`mux_dispatch_requested_at`), aber nie abgeschickt
+// (kein `render_id`/`dispatched_at`). Diese Lücke deckte bisher kein Wächter
+// ab; die Szene blieb unbegrenzt in `audio_muxing`.
+const MUX_REDISPATCH_MS = 90_000;
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
 
