@@ -288,12 +288,16 @@ export interface RouterFailureInput {
   threw?: boolean;
 }
 
-const CONTRACTUAL_GEOMETRY_REASONS: AssignmentFailReason[] = [
+const CONTRACTUAL_GEOMETRY_REASONS: string[] = [
   "count_mismatch",
   "incomplete_bijection",
   "equal_cost_ambiguity",
   "degenerate_candidate_centers",
+  // V507 — "faces too small for lip-sync" is a confirmed measurement of the
+  // plate, not an infrastructure hiccup → fail closed, no legacy fallback.
+  "faces_too_small_for_lipsync",
 ];
+
 
 export function classifyRouterFailure(input: RouterFailureInput): RouterFailureClass {
   if (input.threw) return "infrastructure";
