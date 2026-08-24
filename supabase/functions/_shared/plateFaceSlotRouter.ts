@@ -183,8 +183,20 @@ export interface PlateFaceSlotRouterResult {
   detectedCount?: number;
   /** True when the DetectFaces call itself completed without error. */
   detectSucceeded?: boolean;
+  /**
+   * V507 — per-candidate size/shape measurements (px + ratios) so the
+   * customer-facing reason and `preview_audit` do not depend on edge logs.
+   */
+  sanityMeasurements?: CandidateMeasurement[];
+  /**
+   * V507 — true when the ONLY thing that removed candidates was the face
+   * size gate. Distinguishes "faces too small for lip-sync" from a real
+   * geometric count mismatch.
+   */
+  faceSizeLimited?: boolean;
   msTotal: number;
 }
+
 
 // ── Public helpers ──────────────────────────────────────────────────
 
