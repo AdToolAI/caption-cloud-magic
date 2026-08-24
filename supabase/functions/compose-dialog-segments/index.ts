@@ -1987,7 +1987,15 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // confirmed statement about the plate. The legacy identity resolver must
       // NOT take over in that case (it is exactly the path that produced the
       // wrong-face runs). Infrastructure failures keep the legacy recovery.
-      let fa4ContractualFailure: { reason: string; detail: string } | null = null;
+      let fa4ContractualFailure: {
+        reason: string;
+        detail: string;
+        // V507 — face-size specific telemetry for the customer message.
+        faceSizeLimited?: boolean;
+        measurements?: unknown;
+        dims?: { width: number; height: number };
+      } | null = null;
+
       if (
         hasCompleteV278AnchorLayout &&
         anchorLayoutRaw
@@ -2040,6 +2048,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               detail:
                 `anchor=${routed.expectedCount} detected=${routed.detectedCount ?? routed.faces.length} ` +
                 `resolved=${routed.resolvedCount}`,
+              faceSizeLimited: Boolean(routed.faceSizeLimited) &&
+                String(routed.reason ?? "").includes("faces_too_small_for_lipsync"),
+              measurements: routed.sanityMeasurements,
+              dims: routed.dims,
             };
           }
         } catch (err) {
@@ -2055,29 +2067,66 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           `reason=${fa4ContractualFailure.reason} ${fa4ContractualFailure.detail} — ` +
           `legacy resolvePlateFaceIdentities suppressed, no provider dispatch`,
         );
+        // V507 — persist the measurement so triage no longer depends on logs.
+        try {
+          await supabase
+            .from("composer_scenes")
+            .update({
+              preview_audit: {
+                v507_face_size_gate: {
+                  reason: fa4ContractualFailure.reason,
+                  detail: fa4ContractualFailure.detail,
+                  face_size_limited: Boolean(fa4ContractualFailure.faceSizeLimited),
+                  plate_dims: fa4ContractualFailure.dims ?? null,
+                  measurements: fa4ContractualFailure.measurements ?? null,
+                  at: new Date().toISOString(),
+                },
+              },
+            })
+            .eq("id", sceneId);
+        } catch (e) {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v507_preview_audit_write_failed: ${(e as Error)?.message}`,
+          );
+        }
+        const failMessage = fa4ContractualFailure.faceSizeLimited
+          ? tl({
+            de: "Die Gesichter sind in dieser Aufnahme zu klein für Lip-Sync. Bitte die Szene enger kadrieren (Halbtotale statt Totale) und neu erzeugen. Es wurde nichts gerendert, die Credits wurden zurückerstattet.",
+            en: "The faces in this shot are too small for lip-sync. Please frame the scene tighter (medium shot instead of a wide shot) and regenerate. Nothing was rendered and the credits have been refunded.",
+            es: "Las caras de esta toma son demasiado pequeñas para el lip-sync. Encuadra la escena más cerca (plano medio en lugar de plano general) y vuelve a generarla. No se renderizó nada y los créditos han sido reembolsados.",
+          })
+          : tl({
+            de: "Die Gesichter im Plate lassen sich den Sprechern nicht eindeutig zuordnen. Der Lip-Sync wurde vor dem Start abgebrochen und die Credits wurden zurückerstattet.",
+            en: "The faces on the plate cannot be assigned unambiguously to the speakers. Lip-sync was aborted before dispatch and credits have been refunded.",
+            es: "Las caras del plano no se pueden asignar de forma inequívoca a los hablantes. El lip-sync se canceló antes de iniciarse y los créditos han sido reembolsados.",
+          });
         await failLipSync({
           supabase,
           sceneId,
-          reason: fa4ContractualFailure.reason,
+          // V507 — the customer-visible field is `clip_error`; give it the
+          // actionable sentence instead of the raw router code.
+          reason: fa4ContractualFailure.faceSizeLimited
+            ? failMessage
+            : fa4ContractualFailure.reason,
           userId,
           refundCredits: totalCost,
           syncApiKey,
         });
+
         return json(
           {
-            error: "plate_identity_geometry_fail_closed",
+            error: fa4ContractualFailure.faceSizeLimited
+              ? "plate_faces_too_small_for_lipsync"
+              : "plate_identity_geometry_fail_closed",
             reason: fa4ContractualFailure.reason,
             detail: fa4ContractualFailure.detail,
-            message: tl({
-              de: "Die Gesichter im Plate lassen sich den Sprechern nicht eindeutig zuordnen. Der Lip-Sync wurde vor dem Start abgebrochen und die Credits wurden zurückerstattet.",
-              en: "The faces on the plate cannot be assigned unambiguously to the speakers. Lip-sync was aborted before dispatch and credits have been refunded.",
-              es: "Las caras del plano no se pueden asignar de forma inequívoca a los hablantes. El lip-sync se canceló antes de iniciarse y los créditos han sido reembolsados.",
-            }),
+            message: failMessage,
             refunded: totalCost,
           },
           422,
         );
       }
+
       if (!plateIdentityMap) try {
         plateIdentityMap = await resolvePlateFaceIdentities({
           supabase,

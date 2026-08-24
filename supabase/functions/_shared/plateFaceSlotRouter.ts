@@ -25,9 +25,13 @@
 import {
   assignAnchorsToCandidatesBijective,
   classifyRouterFailure,
+  FACE_SIZE_REJECTIONS,
   filterPlausibleCandidates,
+  PLATE_FACE_SANITY,
+  type CandidateMeasurement,
   type RouterFailureClass,
 } from "./plate-face-candidates.ts";
+
 
 // ── AWS Rekognition config (duplicated for auditability) ────────────
 const AWS_REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;
@@ -183,8 +187,20 @@ export interface PlateFaceSlotRouterResult {
   detectedCount?: number;
   /** True when the DetectFaces call itself completed without error. */
   detectSucceeded?: boolean;
+  /**
+   * V507 — per-candidate size/shape measurements (px + ratios) so the
+   * customer-facing reason and `preview_audit` do not depend on edge logs.
+   */
+  sanityMeasurements?: CandidateMeasurement[];
+  /**
+   * V507 — true when the ONLY thing that removed candidates was the face
+   * size gate. Distinguishes "faces too small for lip-sync" from a real
+   * geometric count mismatch.
+   */
+  faceSizeLimited?: boolean;
   msTotal: number;
 }
+
 
 // ── Public helpers ──────────────────────────────────────────────────
 
@@ -374,7 +390,7 @@ export async function routePlateFacesToAnchor(params: {
 
 
   // ── Contract A — candidate sanity BEFORE any assignment ────────────
-  const { plausible, rejected } = filterPlausibleCandidates(
+  const { plausible, rejected, measurements } = filterPlausibleCandidates(
     detected.map((d, i) => ({ index: i, bbox: d.bbox, cx: d.cx, cy: d.cy })),
     dims,
   );
@@ -382,10 +398,17 @@ export async function routePlateFacesToAnchor(params: {
     const f = faces[r.index];
     if (f) (f as any).sanityRejected = r.reason;
   }
+  // V507 — was the candidate loss caused ONLY by the face size gate?
+  const faceSizeLimited =
+    rejected.length > 0 &&
+    rejected.every((r) => FACE_SIZE_REJECTIONS.includes(r.reason));
   console.log(
     `[plateFaceSlotRouter] fa4_candidate_sanity detected=${detected.length} ` +
     `plausible=${plausible.length} rejected=${rejected.length} ` +
-    `reasons=${JSON.stringify(rejected)}`,
+    `reasons=${JSON.stringify(rejected)} ` +
+    `v507_face_size_limited=${faceSizeLimited ? 1 : 0} ` +
+    `min_short_side_px=${PLATE_FACE_SANITY.minFaceShortSidePx} ` +
+    `plate=${dims.width}x${dims.height} measurements=${JSON.stringify(measurements)}`,
   );
 
   // ── Contract B — global bijective geometry assignment ──────────────
@@ -396,7 +419,12 @@ export async function routePlateFacesToAnchor(params: {
 
   if (!assignment.ok) {
     const countMismatch = assignment.reason === "count_mismatch";
-    const reason = `fa4_fail_closed:${assignment.reason}:anchor=${rows}/plausible=${plausible.length}/detected=${detected.length}`;
+    // V507 — name the real cause instead of the downstream symptom.
+    const bare =
+      countMismatch && faceSizeLimited && plausible.length < rows
+        ? "faces_too_small_for_lipsync"
+        : assignment.reason;
+    const reason = `fa4_fail_closed:${bare}:anchor=${rows}/plausible=${plausible.length}/detected=${detected.length}`;
     return {
       ok: false,
       method: "v278_hungarian_plate_router",
@@ -410,6 +438,8 @@ export async function routePlateFacesToAnchor(params: {
       reason,
       detectSucceeded: true,
       detectedCount: detected.length,
+      sanityMeasurements: measurements,
+      faceSizeLimited,
       failureClass: classifyRouterFailure({
         reason,
         detectSucceeded: true,
@@ -419,6 +449,7 @@ export async function routePlateFacesToAnchor(params: {
       msTotal: Date.now() - t0,
     };
   }
+
 
 
   const assignmentLock: Record<string, string> = {};
