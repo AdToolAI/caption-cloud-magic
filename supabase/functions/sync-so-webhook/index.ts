@@ -951,9 +951,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       v443MotionUnverified = v443Bounded.infraExhausted || v456Unresolved || v466StillGray ||
         v500NoopUnverified;
       v443LastInfraReason = v443MotionUnverified
-        ? (v466StillGray && !v456Unresolved && !v443Bounded.infraExhausted
-          ? v465Verdict.reason
-          : v404MotionMeasurement.reason)
+        ? (v500NoopUnverified
+          ? v500Gate.reason
+          : (v466StillGray && !v456Unresolved && !v443Bounded.infraExhausted
+            ? v465Verdict.reason
+            : v404MotionMeasurement.reason))
         : null;
       const v465Metric = (v404MotionMeasurement as any)?.v465 ?? null;
       // V467-A — telemetry only; read nowhere except the log/persist calls.
