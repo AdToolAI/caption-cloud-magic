@@ -113,6 +113,9 @@ serve(async (req) => {
     }
     const sceneId: string | undefined = body?.sceneId ?? body?.scene_id;
     const forceRemux = body?.force === true || body?.force_remux === true;
+    const adoptCompletedRenderId = typeof body?.adopt_completed_render_id === "string"
+      ? body.adopt_completed_render_id
+      : null;
     // v431 G3.1 — Provenienz aus dem Dispatcher-Body (Observe-Phase).
     const v431RawIncomingLedgerJobId: string | null =
       typeof body?.pipeline_job_id === "string" && body.pipeline_job_id.length > 0
@@ -152,6 +155,61 @@ serve(async (req) => {
         { error: "not_sync_segments", message: "scene is not a sync-segments scene" },
         400,
       );
+    }
+
+    // V504 one-way recovery: adopt an already completed mux without rendering
+    // again. Every provenance field is verified before the same atomic
+    // finalizer used by remotion-webhook is called.
+    if (adoptCompletedRenderId) {
+      const { data: completedRender } = await supabase
+        .from("video_renders")
+        .select("render_id, status, video_url, content_config")
+        .eq("render_id", adoptCompletedRenderId)
+        .maybeSingle();
+      const renderSceneId = String((completedRender as any)?.content_config?.composer_scene_id ?? "");
+      const renderStage = String((completedRender as any)?.content_config?.stage ?? "");
+      const finalUrl = String((completedRender as any)?.video_url ?? "");
+      if (
+        (completedRender as any)?.status !== "completed" ||
+        renderSceneId !== sceneId ||
+        renderStage !== "sync_segments_audio_mux" ||
+        !finalUrl
+      ) {
+        return json({ error: "completed_mux_render_provenance_invalid" }, 409);
+      }
+
+      const { data: muxJob } = await supabase
+        .from("composer_pipeline_jobs")
+        .select("id, scene_id, run_id, stage, plate_generation, status, external_job_id")
+        .eq("scene_id", sceneId)
+        .eq("stage", "audio_mux")
+        .eq("run_id", (scene as any).active_run_id)
+        .eq("plate_generation", (scene as any).plate_generation)
+        .eq("external_job_id", adoptCompletedRenderId)
+        .in("status", ["dispatched", "dispatch_uncertain", "succeeded"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!muxJob?.id) {
+        return json({ error: "completed_mux_ledger_provenance_missing" }, 409);
+      }
+
+      const { data: finalizeResult, error: finalizeError } = await supabase.rpc(
+        "composer_finalize_lipsync_scene",
+        {
+          _pipeline_job_id: muxJob.id,
+          _external_job_id: adoptCompletedRenderId,
+          _scene_id: sceneId,
+          _final_url: finalUrl,
+          _write_id: "stitch:done",
+        },
+      );
+      if (finalizeError) return json({ error: finalizeError.message }, 500);
+      const verdict = String((finalizeResult as any)?.verdict ?? "unknown");
+      if (verdict !== "finalized" && verdict !== "already_completed") {
+        return json({ ok: false, verdict, scene_id: sceneId }, 409);
+      }
+      return json({ ok: true, adopted: true, verdict, scene_id: sceneId });
     }
     const finalLipsyncUrl = String(state.final_url ?? (scene as any).clip_url ?? "");
     if (!finalLipsyncUrl) {
