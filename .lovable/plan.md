@@ -19,15 +19,20 @@ Dein Einwand trifft einen wunden Punkt, und die eigenen Daten stützen ihn:
   nicht *nichts passiert*.
 - V470/V471 haben für Pass 1 einen **belegten Fehlalarm** nachgewiesen (Mess-ROI zu hoch).
 
-Damit ist die naheliegende Lesart nicht mehr „schwieriges Video", sondern:
-**unser Verdikt bestraft genau den einfachen Fall.** `mouth_over_frame` normiert die
-Mundänderung gegen die Gesamtbildbewegung. Bei ruhigen, frontalen Sprechern ist der Nenner
-klein und das Bild ruhig — der Quotient kippt nach unten, obwohl der Lip-Sync visuell sitzt.
-Der anspruchsvollere Startseiten-Clip lief nie gegen dieses Verdikt: es existierte damals
-nicht.
+Korrektur der Arbeitshypothese: `mouth_over_frame = mouth_edit / frame_edit`. Ein
+**kleiner** Nenner erhöht den Quotienten. Die frühere Formulierung „ruhiger Sprecher →
+kleiner Nenner → niedriger Score" war mathematisch falsch und ist gestrichen. Die einzig
+zulässige Hypothese lautet:
 
-Dieses Gate beweist oder widerlegt genau das. Kein Provider-Call, kein Rerender, keine
-Codeänderung.
+> Starke globale Plate-/Kamerabewegung **erhöht** den Nenner und kann echte lokale
+> Mundbearbeitung unter die Schwelle drücken.
+
+Die Fragestellung ist neutral, nicht falsifizierend gemeint:
+
+> Kann die heutige Kette (V469 → V471-ROI → V465 → V466) einen historisch visuell
+> bestätigten Lip-Sync korrekt von einem Passthrough unterscheiden?
+
+Ergebnis darf in beide Richtungen ausfallen.
 
 ## Schritt 1 — Visuelle Evidenz gegen die Pose-Behauptung
 
