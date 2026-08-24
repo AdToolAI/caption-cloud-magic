@@ -146,6 +146,9 @@ import {
 
 // V456 Gate 2 — pose-aware mouth anchor (no colour heuristics).
 import { resolveMouthAnchorPoseAware } from "../_shared/v456-roi-contract.ts";
+// V477 — measured track landmark becomes the authoritative mouth anchor.
+import { resolveTrackMouthAuthority } from "../_shared/v477-mouth-authority.ts";
+
 // FA-4 v406/v407 — Frozen Provider Input Snapshot / Retry-Wire-Parität.
 import {
   buildProviderWire,
