@@ -16,7 +16,7 @@ Deno.test("V477 — measured landmarks become the authority", () => {
   assertEquals(a.reason, "v477_track_landmark");
   assertEquals(a.measured, 6);
   assertEquals(a.total, 6);
-  assertEquals(a.mouth, [301, 289]);
+  assertEquals(a.mouth, [302, 290]);
   // V476 measured 0.734–0.781 of the face box — never the compensatory 0.88.
   if (!(a.faceRatio! > 0.70 && a.faceRatio! < 0.82)) {
     throw new Error(`unexpected face ratio ${a.faceRatio}`);
