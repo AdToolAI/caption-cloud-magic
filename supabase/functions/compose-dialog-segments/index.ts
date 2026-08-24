@@ -5842,26 +5842,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             // crop — never to another face.
             buildCameraPath: async (staticCrop) => {
               if (!platePassBoxForPreclip) return null;
-              const track = await trackAssignedFaceAcrossTurn({
-                plateVideoUrl: sourceClipUrl,
-                totalSec,
-                plateWidth: plateDims.width,
-                plateHeight: plateDims.height,
-                startSec: unionStart,
-                endSec: unionEnd,
-                anchorBox: platePassBoxForPreclip as [number, number, number, number],
-                // V456 — identity-safe mouth tiebreak keeps the track alive on
-                // 3/4 profiles and lateral movement (Gate 1: cam_dynamic=false).
-                anchorMouth: v456MouthForPreclip,
-                siblingCenters: siblingCoords,
-                sampleCount: TRACK_SAMPLE_COUNT,
-                budgetMs: 70_000,
-              });
+              // V477 — reuse the SAME track that already produced the mouth
+              // authority above. No second Rekognition pass, and the camera
+              // path receives byte-identical inputs to the pre-V477 behaviour.
+              const track = v477PreTrack;
+              if (!track) return null;
               console.log(
                 `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v452_face_track ok=${track.ok} reason=${track.reason} ` +
-                  `valid=${track.samples.filter((x) => x.box).length}/${track.samples.length} ms=${track.latencyMs}`,
+                  `valid=${track.samples.filter((x: any) => x.box).length}/${track.samples.length} ms=${track.latencyMs} reused=v477`,
               );
               if (!track.ok) return null;
+
               // V464-B — freeze the measured plate-space track (PLATE-absolute
               // seconds). It is the per-frame source for the ASD boxes.
               v464TrackSamples = track.samples
