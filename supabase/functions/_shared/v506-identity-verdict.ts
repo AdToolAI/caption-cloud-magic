@@ -91,11 +91,11 @@ export function buildGenderConstraint(cast: CastGenderMember[]): string {
   const parts: string[] = [];
   if (women.length > 0) {
     parts.push(
-      `${women.length} woman${women.length === 1 ? "" : "en"} (${women.map((c) => c.name).join(", ")})`,
+      `${women.length} ${women.length === 1 ? "woman" : "women"} (${women.map((c) => c.name).join(", ")})`,
     );
   }
   if (men.length > 0) {
-    parts.push(`${men.length} man${men.length === 1 ? "" : "men"} (${men.map((c) => c.name).join(", ")})`);
+    parts.push(`${men.length} ${men.length === 1 ? "man" : "men"} (${men.map((c) => c.name).join(", ")})`);
   }
   return (
     `MANDATORY CAST GENDER LOCK: the frame must contain exactly ${parts.join(" and ")}. ` +
