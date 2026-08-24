@@ -18,15 +18,24 @@ const P2 = {
   mouthSource: "pose_estimate",
 };
 
-Deno.test("V471 — pose_estimate passes are re-anchored onto the real mouth (cy ≈ 0.61)", () => {
+// V477 — the pose-estimate path is now a pure LAST-RESORT fallback: V476 proved
+// the 0.88 ratio only existed to compensate for the crop being centred on the
+// pose estimate instead of the measured landmark. With the landmark authority
+// in place the fallback returns to the single validated ratio (0.78).
+Deno.test("V477 — pose_estimate fallback uses the one validated ratio (0.78)", () => {
+  const expected = {
+    // (195 + 0.78 × 122 − 188) / 188
+    P1: (195 + V471_FACE_MOUTH_Y_RATIO * (317 - 195) - 188) / 188,
+    // (177 + 0.78 × 109 − 170) / 168
+    P2: (177 + V471_FACE_MOUTH_Y_RATIO * (286 - 177) - 170) / 168,
+  };
   for (const [label, g] of [["P1", P1], ["P2", P2]] as const) {
     const r = resolveV471MouthRoi(g);
     assertEquals(r.anchorSource, "face_ratio", label);
-    assertAlmostEquals(r.roi!.centerY, 0.61, 0.01, label);
-    // The frozen production band sat at 0.5426 / 0.5476 — clearly above.
-    if (!(r.roi!.centerY > 0.59)) throw new Error(`${label} still too high`);
+    assertAlmostEquals(r.roi!.centerY, expected[label], 1e-6, label);
   }
 });
+
 
 Deno.test("V471 — band is tightened to the edit-map size (~0.28 × 0.12)", () => {
   const r = resolveV471MouthRoi(P1);
