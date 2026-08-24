@@ -30,9 +30,6 @@
  */
 
 import type { MouthRoiNormalized } from "./v434-motion-roi.ts";
-// V477 — ONE mouth ratio in the whole pipeline. The verdict side must never
-// reconstruct a second mouth position of its own.
-import { FACE_MOUTH_Y_RATIO } from "./v456-roi-contract.ts";
 
 export const V471_MOUTH_ROI_VERSION = "v471b+v477";
 
@@ -44,10 +41,13 @@ export const V471_MOUTH_ROI_VERSION = "v471b+v477";
  * geometry always ran on the 0.78 pose estimate because the measured mouth
  * landmarks (real ratio 0.734–0.781) were produced after the crop and thrown
  * away. With V477 the tracked landmark is authoritative, so this module keeps
- * exactly ONE fallback — the shared, validated `FACE_MOUTH_Y_RATIO` (0.78) —
- * and only for passes that carry no landmark at all.
+ * exactly ONE fallback — the same validated ratio the geometry side uses
+ * (`FACE_MOUTH_Y_RATIO` in `v456-roi-contract.ts`, asserted equal in the
+ * tests; duplicated as a literal here only to avoid an import cycle) — and
+ * only for passes that carry no landmark at all.
  */
-export const V471_FACE_MOUTH_Y_RATIO = FACE_MOUTH_Y_RATIO;
+export const V471_FACE_MOUTH_Y_RATIO = 0.78;
+
 
 
 /**
