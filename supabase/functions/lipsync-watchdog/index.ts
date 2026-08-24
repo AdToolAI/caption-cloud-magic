@@ -31,6 +31,7 @@ import { classifyMotionProbe } from "../_shared/motion-probe-classifier.ts";
 // V465-B2b — authoritative paired mouth-over-frame verdict (same contract as
 // the webhook). `delta_mean` stays legacy telemetry.
 import { resolveV465Verdict, V466_GRAY_BAND_SAMPLES } from "../_shared/v465-verdict.ts";
+import { resolveV500Outcome } from "../_shared/v500-passthrough-gate.ts";
 import {
   classifyMeasurementFailure,
   isMouthRoiUnresolved,
@@ -1199,11 +1200,20 @@ serve(async (req) => {
             provider: measurement.provider_metric,
           }).verdict;
           v465Verdict = resolveV465Verdict((measurement as any)?.v465 ?? null);
+          // V500-B2 — the re-check mirrors the webhook contract: terminality
+          // requires an OBSERVED mouth anchor. The watchdog has no ROI
+          // contract of its own, so a derived/unknown anchor can only produce
+          // `motion_unverified` — never `ssw:noop_fail`.
+          const v500Gate = resolveV500Outcome({
+            verdict: v465Verdict,
+            mouthAnchorSource: (measurement as any)?.roi_contract?.v471?.anchorSource ??
+              meta.mouth_anchor_source ?? null,
+          });
           // V466-A — a still-gray verdict is never terminal and never green.
-          verdict = v465Verdict.verdict === "indeterminate"
-            ? MOTION_UNVERIFIED_STATE
-            : v465Verdict.verdict;
-          reason = v465Verdict.reason;
+          verdict = v500Gate.terminal
+            ? "noop"
+            : (v500Gate.outcome === "accept" ? "motion" : MOTION_UNVERIFIED_STATE);
+          reason = v500Gate.reason;
         } else {
           verdict = classifyMeasurementFailure(measurement.reason) === "probe_infra_error"
             ? MOTION_UNVERIFIED_STATE

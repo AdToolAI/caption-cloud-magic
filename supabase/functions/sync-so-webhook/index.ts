@@ -47,6 +47,7 @@ import {
 } from "../_shared/motion-probe-classifier.ts";
 // V465-B2b — authoritative paired mouth-over-frame verdict.
 import { resolveV465Verdict, V466_GRAY_BAND_SAMPLES } from "../_shared/v465-verdict.ts";
+import { resolveV500Outcome } from "../_shared/v500-passthrough-gate.ts";
 // FA-4 v404 — server-side synchronous measurement owner (Remotion stills).
 import {
   measureProviderMotionSync,
@@ -930,11 +931,32 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // V466-A — a still-gray verdict after the bounded re-measure falls
       // through as `motion_unverified`: never green, never a hard failure.
       const v466StillGray = v465Verdict.verdict === "indeterminate";
-      v443MotionUnverified = v443Bounded.infraExhausted || v456Unresolved || v466StillGray;
+      // ── V500-B2 — TERMINALITY BELONGS TO PROVEN PASSTHROUGH ONLY ─────────
+      // A `noop` scalar is only terminal when it was measured inside an
+      // OBSERVED mouth (V471 landmark). Measured inside a derived face-ratio
+      // band the very same scalar terminalizes the known-good golden run
+      // (docs/v473-detector-validity-audit.md) — so it falls through as
+      // `motion_unverified` instead.
+      const v500Gate = resolveV500Outcome({
+        verdict: v465Verdict,
+        mouthAnchorSource: v456Contract.v471?.anchorSource ?? null,
+      });
+      const v500NoopUnverified = v465Verdict.verdict === "noop" && !v500Gate.terminal;
+      if (v500NoopUnverified) {
+        console.warn(
+          `[sync-so-webhook] v500_noop_unverified_anchor scene=${sceneId} pass=${measurePassIdx} ` +
+            `mouth_over_frame=${v465Verdict.mouth_over_frame ?? "n/a"} ` +
+            `anchor=${v500Gate.anchorSource} → motion_unverified (no terminalization, no refund)`,
+        );
+      }
+      v443MotionUnverified = v443Bounded.infraExhausted || v456Unresolved || v466StillGray ||
+        v500NoopUnverified;
       v443LastInfraReason = v443MotionUnverified
-        ? (v466StillGray && !v456Unresolved && !v443Bounded.infraExhausted
-          ? v465Verdict.reason
-          : v404MotionMeasurement.reason)
+        ? (v500NoopUnverified
+          ? v500Gate.reason
+          : (v466StillGray && !v456Unresolved && !v443Bounded.infraExhausted
+            ? v465Verdict.reason
+            : v404MotionMeasurement.reason))
         : null;
       const v465Metric = (v404MotionMeasurement as any)?.v465 ?? null;
       // V467-A — telemetry only; read nowhere except the log/persist calls.
@@ -948,11 +970,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           })
           : null;
       v404MotionProbe = {
-        verdict: v465Verdict.verdict,
+        // V500-B2 — a `noop` without a verified mouth anchor is downgraded to
+        // `indeterminate` here so no downstream branch can terminalize it.
+        verdict: v500NoopUnverified ? "indeterminate" : v465Verdict.verdict,
         // Reason of the measurement failure wins so that V443/V456 pass-through
         // classification keeps working on unmeasurable runs.
         reason: v404MotionMeasurement.measurement_status === "measured"
-          ? v465Verdict.reason
+          ? (v500NoopUnverified ? v500Gate.reason : v465Verdict.reason)
           : v404MotionMeasurement.reason,
         deltaMean: legacyProbe?.deltaMean ?? v404MotionMeasurement.deltaMean ?? 0,
         deltaPeak: legacyProbe?.deltaPeak ?? v404MotionMeasurement.deltaPeak ?? 0,
