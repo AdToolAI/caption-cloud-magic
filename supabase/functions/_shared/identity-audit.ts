@@ -34,6 +34,8 @@ export interface IdentityAuditResult {
   missing?: string[];
   duplicated?: string[];
   mismatched?: string[];
+  /** V506 — cast members whose rendered sex contradicts the cast record. */
+  genderMismatched?: string[];
   totalPeople?: number;
   extraPeople?: number;
   detail?: string;
@@ -52,6 +54,7 @@ type RawAudit = {
   missing: string[];
   duplicated: string[];
   mismatched: string[];
+  genderMismatched: string[];
   totalPeople?: number;
   extraPeople?: number;
 };
@@ -63,10 +66,16 @@ async function runAuditOnce(
   lovableKey: string,
   model: string,
   timeoutMs: number,
+  genders: Array<"male" | "female" | null> = [],
 ): Promise<RawAudit | null> {
   const N = portraitUrls.length;
   const refLabel = portraitUrls
     .map((_, i) => `reference #${i + 1}${names[i] ? ` = ${names[i]}` : ""}`)
+    .join(", ");
+  // V506 — expected sex per cast slot (only where the cast record knows it).
+  const genderExpectation = genders
+    .map((g, i) => (g ? `reference #${i + 1}${names[i] ? ` (${names[i]})` : ""} = ${g}` : null))
+    .filter((s): s is string => !!s)
     .join(", ");
   // v170 + v171 — Cast-Integrity audit with hardened "mismatch" gate.
   const text =
@@ -78,9 +87,12 @@ async function runAuditOnce(
     `IMPORTANT — these are NOT failures and must be IGNORED: background pedestrians, bystanders, crowd, coworkers, people walking by, unknown additional humans that do not match any CAST reference, AND any depicted persons on laptop screens, phones, TVs, posters, framed photos, mirrors, statues, mannequins, paintings. Treat depicted persons as scene props, not as humans, and do NOT count them in "appearances". ` +
     `STRICT "mismatch" RULE (v171): If the rendered person is the same sex, similar age range, similar hair, and a plausible same-person under different lighting/angle/expression/wardrobe, you MUST return faceMatch="match". Only return "mismatch" when you are HIGHLY CONFIDENT it is a clearly different human (different sex, very different age, completely different facial structure, completely different hair color). When in doubt → "uncertain", NEVER "mismatch". ` +
     `For each CAST reference, count appearances as a REAL physically present human (not screen/photo) and rate faceMatch. ` +
+    (genderExpectation
+      ? `Additionally report "renderedSex" per reference ("male"|"female"|"unclear") — the apparent sex of the person occupying that cast slot in the scene image. Expected sexes: ${genderExpectation}. Only answer "male"/"female" when unmistakable, otherwise "unclear". `
+      : "") +
     `Reply with STRICT JSON only, no prose:\n` +
     `{` +
-    `"perReference": [{"ref": 1, "appearances": <0|1|2|...>, "faceMatch": "match"|"mismatch"|"uncertain", "mismatchNotes": "<short>"}, ...],` +
+    `"perReference": [{"ref": 1, "appearances": <0|1|2|...>, "faceMatch": "match"|"mismatch"|"uncertain", "renderedSex": "male"|"female"|"unclear", "mismatchNotes": "<short>"}, ...],` +
     `"reason": "ok|clone|missing|swap|ambiguous",` +
     `"notes": "<short>"` +
     `}.`;
@@ -108,11 +120,12 @@ async function runAuditOnce(
     const detail = String(parsed?.notes ?? "").slice(0, 240);
     const totalPeople = Number.isFinite(Number(parsed?.totalPeople)) ? Number(parsed.totalPeople) : undefined;
     const extraPeople = Number.isFinite(Number(parsed?.extraPeople)) ? Number(parsed.extraPeople) : undefined;
-    const perRef: Array<{ ref: number; appearances?: number; faceMatch?: string }> = Array.isArray(parsed?.perReference) ? parsed.perReference : [];
+    const perRef: Array<{ ref: number; appearances?: number; faceMatch?: string; renderedSex?: string }> = Array.isArray(parsed?.perReference) ? parsed.perReference : [];
 
     const missing: string[] = [];
     const duplicated: string[] = [];
     const mismatched: string[] = [];
+    const genderMismatched: string[] = [];
     for (const entry of perRef) {
       const idx = Number(entry?.ref);
       if (!Number.isFinite(idx) || idx < 1 || idx > N) continue;
@@ -123,8 +136,19 @@ async function runAuditOnce(
       if (appearances >= 1 && String(entry?.faceMatch ?? "").toLowerCase() === "mismatch") {
         mismatched.push(name);
       }
+      // V506 — cast gender lock. Only an unmistakable, opposite verdict counts.
+      const expectedSex = genders[idx - 1] ?? null;
+      const renderedSex = String(entry?.renderedSex ?? "").toLowerCase();
+      if (
+        appearances >= 1 &&
+        expectedSex &&
+        (renderedSex === "male" || renderedSex === "female") &&
+        renderedSex !== expectedSex
+      ) {
+        genderMismatched.push(name);
+      }
     }
-    return { reason, detail, missing, duplicated, mismatched, totalPeople, extraPeople };
+    return { reason, detail, missing, duplicated, mismatched, genderMismatched, totalPeople, extraPeople };
   } catch {
     return null;
   }
@@ -136,14 +160,35 @@ export async function auditAnchorIdentity(
   names: string[],
   lovableKey: string,
   timeoutMs = 25_000,
+  /** V506 — expected sex per cast slot, aligned 1:1 with portraitUrls. */
+  genders: Array<"male" | "female" | null> = [],
 ): Promise<IdentityAuditResult | null> {
   if (!anchorUrl || portraitUrls.length < 1 || !lovableKey) return null;
   const N = portraitUrls.length;
 
-  const pass1 = await runAuditOnce(anchorUrl, portraitUrls, names, lovableKey, "google/gemini-2.5-flash", timeoutMs);
+  const pass1 = await runAuditOnce(anchorUrl, portraitUrls, names, lovableKey, "google/gemini-2.5-flash", timeoutMs, genders);
   if (!pass1) return null;
 
-  const { reason, detail, missing, duplicated, mismatched, totalPeople, extraPeople } = pass1;
+  const { reason, detail, missing, duplicated, mismatched, genderMismatched, totalPeople, extraPeople } = pass1;
+
+  // V506 — a violated cast gender lock is never a soft signal.
+  if (genderMismatched.length > 0) {
+    console.log(
+      `[identity-audit] v506_gender_lock_violation: ${genderMismatched.join(",")} (N=${N})`,
+    );
+    return {
+      ok: false,
+      reason: "swap",
+      mismatched: mismatched.length > 0 ? mismatched : genderMismatched,
+      genderMismatched,
+      missing: missing.length > 0 ? missing : undefined,
+      duplicated: duplicated.length > 0 ? duplicated : undefined,
+      totalPeople,
+      extraPeople,
+      detail: detail || `cast gender mismatch: ${genderMismatched.join(", ")}`,
+    };
+  }
+
 
   // Priority: swap > clone > missing > ambiguous.
   const flashSaysSwap = mismatched.length > 0 || reason === "swap";
@@ -152,7 +197,7 @@ export async function auditAnchorIdentity(
     // v171.1 — N=1 confirmation with Gemini 2.5 Pro before hard-blocking.
     if (N === 1) {
       console.log(`[identity-audit] v171 N=1 swap flagged by Flash (mismatched=${mismatched.join(",") || "—"}, reason=${reason}); confirming with Pro…`);
-      const pass2 = await runAuditOnce(anchorUrl, portraitUrls, names, lovableKey, "google/gemini-2.5-pro", Math.max(timeoutMs, 30_000));
+      const pass2 = await runAuditOnce(anchorUrl, portraitUrls, names, lovableKey, "google/gemini-2.5-pro", Math.max(timeoutMs, 30_000), genders);
       const proSaysSwap = !!pass2 && (pass2.mismatched.length > 0 || pass2.reason === "swap");
       if (!proSaysSwap) {
         console.log(`[identity-audit] v171_n1_swap_softpass: flash=mismatch, pro=${pass2 ? "match" : "null"} → ok`);
@@ -215,6 +260,7 @@ export async function auditAnchorIdentity(
         lovableKey,
         "google/gemini-2.5-pro",
         Math.max(timeoutMs, 30_000),
+        genders,
       );
       const proSaysSwap = !!pass2 && (pass2.mismatched.length > 0 || pass2.reason === "swap");
       if (!proSaysSwap) {

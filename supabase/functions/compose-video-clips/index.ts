@@ -68,6 +68,11 @@ import {
   countHumansInImage,
 } from "../_shared/face-count.ts";
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
+import {
+  buildGenderConstraint,
+  classifyIdentityVerdict,
+  normalizeGender,
+} from "../_shared/v506-identity-verdict.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 import { enforceMinFaceSize } from "../_shared/anchor-min-face-size.ts";
 import { classifySplitScreenLayout } from "../_shared/split-screen-layout.ts";
@@ -2395,6 +2400,12 @@ serve(async (req) => {
         let v446PanelBlock:
           | { metrics: Record<string, unknown> | null; reason: string; retried: boolean }
           | null = null;
+        // V506 — grobe Fehlbesetzung des Ankers (falsches Geschlecht / kein
+        // Cast-Treffer) blockt vor dem bezahlten Provider-Dispatch.
+        let v506IdentityBlock:
+          | { code: string; reasons: string[]; detail: string }
+          | null = null;
+
 
         try {
           // Two-Shot prep: if this scene has a multi-speaker dialog_script,
@@ -2713,6 +2724,41 @@ serve(async (req) => {
                 .filter(
                   (n): n is string => typeof n === "string" && n.length > 0,
                 );
+              // ── V506 CAST-GENDER-LOCK ──────────────────────────────────
+              // Nano Banana hat am 24.08.2026 (S02) für einen Cast aus
+              // 1 Frau + 3 Männern zwei fremde Frauen + zwei fremde Männer
+              // gerendert. Das Geschlecht pro Slot kommt jetzt als
+              // verbindliche Prompt-Klausel mit UND wird im Audit geprüft.
+              const castSlotIds = effectiveShots
+                .slice(0, portraitUrls.length)
+                .map((cs) => String((cs as any).characterId ?? ""))
+                .filter((id) => id.length > 0);
+              const genderById = new Map<string, string | null>();
+              if (castSlotIds.length > 0) {
+                try {
+                  const { data: gRows } = await supabaseAdmin
+                    .from("brand_characters")
+                    .select("id, gender")
+                    .in("id", castSlotIds);
+                  for (const row of gRows ?? []) {
+                    genderById.set(String((row as any).id), (row as any).gender ?? null);
+                  }
+                } catch (e) {
+                  console.warn(
+                    `[compose-video-clips] v506 gender lookup failed for scene ${scene.id}`,
+                    e,
+                  );
+                }
+              }
+              const castGenderMembers = castSlotIds.map((id, i) => ({
+                name: charById.get(id)?.name ?? characterNames[i] ?? "",
+                gender: genderById.get(id) ?? null,
+              }));
+              const castGenders = castGenderMembers.map((m) => normalizeGender(m.gender));
+              const genderConstraint = buildGenderConstraint(castGenderMembers);
+              console.log(
+                `[compose-video-clips] v506_gender_lock scene=${scene.id} known=${castGenders.filter(Boolean).length}/${castSlotIds.length} clause=${genderConstraint ? 1 : 0}`,
+              );
               // Wardrobe-Lock: which cast members have a user-picked outfit?
               // Their wardrobe must override the scene description (e.g. Roman
               // armor inside a "business meeting").
@@ -2823,9 +2869,13 @@ serve(async (req) => {
                     portraitUrls.length,
                     { asymmetric: asymmetricAnchor },
                   );
-                  const anchorPrompt = sceneDesc
+                  const anchorPromptBase = sceneDesc
                     ? `${framing} Visual setting: ${sceneDesc}. Keep all selected outfits intact; do not change clothing.`
                     : framing;
+                  // V506 — Cast-Gender-Lock als verbindliche Klausel.
+                  const anchorPrompt = genderConstraint
+                    ? `${anchorPromptBase} ${genderConstraint}`
+                    : anchorPromptBase;
                   const r = await fetch(
                     `${Deno.env.get("SUPABASE_URL")}/functions/v1/compose-scene-anchor`,
                     {
@@ -2884,6 +2934,8 @@ serve(async (req) => {
                 // v170 — headcount checks (countFaces/countHumans) are kept as
                 // pure telemetry; they no longer block. Bystanders, crowd, and
                 // depicted persons (screens/posters/photos/mirrors) are allowed.
+                // V506 — Gender-Lock-Ergebnis des letzten Audits.
+                let lastGenderMismatched: string[] = [];
                 const evaluate = async (url: string, label: string) => {
                   const [fc, hc] = await Promise.all([
                     countFacesInImage(url, LOVABLE_API_KEY!, { kind: "image" }),
@@ -2900,6 +2952,7 @@ serve(async (req) => {
                   let mismatched: string[] = [];
                   let missingCast: string[] = [];
                   let duplicatedCast: string[] = [];
+                  let genderMismatchedCast: string[] = [];
                   if (portraitUrls.length >= 1) {
                     // v170 — audit runs for N=1 too (extras ignored, clones/swap/missing still caught).
                     const auditRefs = identityPortraitUrls.length === portraitUrls.length
@@ -2910,6 +2963,8 @@ serve(async (req) => {
                       auditRefs,
                       characterNames,
                       LOVABLE_API_KEY!,
+                      25_000,
+                      castGenders,
                     );
                     if (audit && !audit.ok) {
                       identity = (audit.reason as typeof identity) ?? "ambiguous";
@@ -2922,13 +2977,20 @@ serve(async (req) => {
                       // "character actually absent" (unsafe, must hard-fail).
                       if (Array.isArray(audit.missing)) missingCast = audit.missing;
                       if (Array.isArray(audit.duplicated)) duplicatedCast = audit.duplicated;
+                      // V506 — Gender-Lock-Verstöße getrennt führen.
+                      if (Array.isArray(audit.genderMismatched)) {
+                        genderMismatchedCast = audit.genderMismatched;
+                      }
                     }
                   }
+                  // V506 — letzter Audit-Stand für den Verdict-Gate unten.
+                  lastGenderMismatched = genderMismatchedCast;
                   console.log(
-                    `[compose-video-clips] anchor audit scene ${scene.id} ${label}: cast=${identity ?? "ok"} mismatched=[${mismatched.join(",")}] missing=[${missingCast.join(",")}] duplicated=[${duplicatedCast.join(",")}] telemetry(faces=${fc} humans=${hc}/${expectedFaces}) notes="${notes.slice(0, 120)}"`,
+                    `[compose-video-clips] anchor audit scene ${scene.id} ${label}: cast=${identity ?? "ok"} mismatched=[${mismatched.join(",")}] missing=[${missingCast.join(",")}] duplicated=[${duplicatedCast.join(",")}] gender=[${genderMismatchedCast.join(",")}] telemetry(faces=${fc} humans=${hc}/${expectedFaces}) notes="${notes.slice(0, 120)}"`,
                   );
-                  return { faceCount: fc, humanCount: hc, identity, notes, mismatched, missing: missingCast, duplicated: duplicatedCast };
+                  return { faceCount: fc, humanCount: hc, identity, notes, mismatched, missing: missingCast, duplicated: duplicatedCast, genderMismatched: genderMismatchedCast };
                 };
+
 
 
 
@@ -3739,9 +3801,13 @@ serve(async (req) => {
                             portraitUrls.length,
                             { asymmetric: true },
                           );
-                          const spfPrompt = sceneDesc
+                          const spfPromptBase = sceneDesc
                             ? `${framing} Visual setting: ${sceneDesc}. Keep all selected outfits intact; do not change clothing.`
                             : framing;
+                          // V506 — Gender-Lock auch im Single-Portrait-Fanout.
+                          const spfPrompt = genderConstraint
+                            ? `${spfPromptBase} ${genderConstraint}`
+                            : spfPromptBase;
                           const r = await fetch(
                             `${Deno.env.get("SUPABASE_URL")}/functions/v1/compose-scene-anchor`,
                             {
@@ -3895,32 +3961,75 @@ serve(async (req) => {
                   } else if (identityFailure && identityFailure !== "extra") {
                     const code =
                       reasonMap[identityFailure] ?? "anchor_identity_failed";
-                    // v267 — Soft-Warn für ALLE identity failures. Der
-                    // Anker wird trotzdem als reference_image_url an den
-                    // Provider gegeben, die Pipeline läuft weiter. Der
-                    // User sieht die Warnung in `clip_error` und kann
-                    // via Preview-Gate / "Neu rendern" reagieren.
+                    // V506 — zweistufiger Verdict: grobe Fehlbesetzung
+                    // (falsches Geschlecht, kein einziger Cast-Treffer)
+                    // blockt hart vor dem bezahlten Dispatch; unsichere
+                    // Fälle bleiben beim v267-Soft-Warn.
+                    const verdict = classifyIdentityVerdict({
+                      identityFailure,
+                      expectedFaces,
+                      missing: identityMissing,
+                      duplicated: identityDuplicated,
+                      mismatched: identityMismatched,
+                      genderMismatched: lastGenderMismatched,
+                    });
                     const missingSuffix = identityMissing.length > 0
                       ? ` — Möglicherweise fehlend: ${identityMissing.join(", ")}.`
                       : "";
                     const duplicatedSuffix = identityDuplicated.length > 0
                       ? ` Doppelt: ${identityDuplicated.join(", ")}.`
                       : "";
-                    const warn = tl({ de: `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Anchor-Identity-Check unsicher (Cast mit ähnlichen Gesichtern / gleichem Nachnamen?). Render läuft trotzdem weiter. Bitte Ergebnis prüfen und ggf. neu rendern.`, en: `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Anchor identity check uncertain (cast with similar faces / same last name?). Render still proceeds. Please check result and re-render if necessary.`, es: `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Verificación de identidad del ancla incierta (¿elenco con caras similares / mismo apellido?). El renderizado continúa. Por favor, verifique el resultado y vuelva a renderizar si es necesario.` });
-                    console.log(
-                      `[compose-video-clips] v267_anchor_soft_warn scene=${scene.id} reason=${identityFailure} faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces} missing=[${identityMissing.join(",")}] duplicated=[${identityDuplicated.join(",")}]`,
-                    );
                     try {
                       await supabaseAdmin
                         .from("composer_scenes")
                         .update({
-                          twoshot_stage: "anchor_soft_pass",
-                          clip_error: warn,
+                          preview_audit: {
+                            v506_severity: verdict.severity,
+                            v506_code: verdict.code,
+                            v506_reasons: verdict.reasons,
+                            broken_slots: verdict.brokenSlots,
+                            expected_faces: expectedFaces,
+                            gender_mismatched: lastGenderMismatched,
+                            missing: identityMissing,
+                            duplicated: identityDuplicated,
+                            checked_at: new Date().toISOString(),
+                          },
                           updated_at: new Date().toISOString(),
                         })
                         .eq("id", scene.id);
-                    } catch (_) { /* non-fatal */ }
-                    // Fall through — never block on identity audit alone.
+                    } catch (_) { /* non-fatal telemetry */ }
+
+                    if (verdict.severity === "gross") {
+                      const genderSuffix = lastGenderMismatched.length > 0
+                        ? ` Falsches Geschlecht: ${lastGenderMismatched.join(", ")}.`
+                        : "";
+                      console.warn(
+                        `[compose-video-clips] v506_anchor_identity_block scene=${scene.id} code=${verdict.code} reasons=[${verdict.reasons.join("|")}] broken=${verdict.brokenSlots}/${expectedFaces} gender=[${lastGenderMismatched.join(",")}]`,
+                      );
+                      v506IdentityBlock = {
+                        code: verdict.code,
+                        reasons: verdict.reasons,
+                        detail: `${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix}${genderSuffix}`,
+                      };
+                    } else {
+                      // v267 — Soft-Warn für unsichere Fälle. Der Anker wird
+                      // trotzdem als reference_image_url an den Provider
+                      // gegeben, die Pipeline läuft weiter.
+                      const warn = tl({ de: `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Anchor-Identity-Check unsicher (Cast mit ähnlichen Gesichtern / gleichem Nachnamen?). Render läuft trotzdem weiter. Bitte Ergebnis prüfen und ggf. neu rendern.`, en: `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Anchor identity check uncertain (cast with similar faces / same last name?). Render still proceeds. Please check result and re-render if necessary.`, es: `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Verificación de identidad del ancla incierta (¿elenco con caras similares / mismo apellido?). El renderizado continúa. Por favor, verifique el resultado y vuelva a renderizar si es necesario.` });
+                      console.log(
+                        `[compose-video-clips] v267_anchor_soft_warn scene=${scene.id} reason=${identityFailure} faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces} missing=[${identityMissing.join(",")}] duplicated=[${identityDuplicated.join(",")}]`,
+                      );
+                      try {
+                        await supabaseAdmin
+                          .from("composer_scenes")
+                          .update({
+                            twoshot_stage: "anchor_soft_pass",
+                            clip_error: warn,
+                            updated_at: new Date().toISOString(),
+                          })
+                          .eq("id", scene.id);
+                      } catch (_) { /* non-fatal */ }
+                    }
                   }
                 }
               }
@@ -3953,6 +4062,28 @@ serve(async (req) => {
             `[compose-video-clips] v446_anchor_panel_block scene=${scene.id} ` +
             `reason=${v446PanelBlock.reason} retried=${v446PanelBlock.retried ? 1 : 0} ` +
             `metrics=${JSON.stringify(v446PanelBlock.metrics)} → hard-fail before provider dispatch (zero spend)`,
+          );
+          await safeMarkSceneFailed(scene.id, msg, {
+            isCinematicSyncScene: true,
+            extra: { twoshot_stage: "failed" },
+          });
+          results.push({ sceneId: scene.id, status: "failed", error: msg });
+          continue;
+        }
+
+        // ── V506 IDENTITY HARD-GATE (zero spend) ───────────────────────────
+        // Ein grob fehlbesetzter Anker (falsches Geschlecht, kein einziger
+        // Cast-Treffer) kann nie den bestellten Cast zeigen. Vor dem
+        // bezahlten Provider-Dispatch stoppen statt später auf Headcount
+        // scheitern.
+        if (v506IdentityBlock) {
+          const msg = tl({
+            de: `${v506IdentityBlock.code}: Das Anker-Bild zeigt nicht den gewählten Cast (${v506IdentityBlock.detail}). Es wurde kein Clip gerendert (keine Kosten). Bitte die Szene neu erzeugen oder die Referenz-Porträts der Charaktere prüfen.`,
+            en: `${v506IdentityBlock.code}: The anchor image does not show the selected cast (${v506IdentityBlock.detail}). No clip was rendered (no cost). Please regenerate the scene or check the characters' reference portraits.`,
+            es: `${v506IdentityBlock.code}: La imagen ancla no muestra el elenco seleccionado (${v506IdentityBlock.detail}). No se renderizó ningún clip (sin coste). Regenere la escena o revise los retratos de referencia de los personajes.`,
+          });
+          console.warn(
+            `[compose-video-clips] v506_identity_hard_gate scene=${scene.id} code=${v506IdentityBlock.code} reasons=[${v506IdentityBlock.reasons.join("|")}] → hard-fail before provider dispatch (zero spend)`,
           );
           await safeMarkSceneFailed(scene.id, msg, {
             isCinematicSyncScene: true,
