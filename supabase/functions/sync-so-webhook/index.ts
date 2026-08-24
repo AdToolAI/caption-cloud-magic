@@ -930,7 +930,26 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // V466-A — a still-gray verdict after the bounded re-measure falls
       // through as `motion_unverified`: never green, never a hard failure.
       const v466StillGray = v465Verdict.verdict === "indeterminate";
-      v443MotionUnverified = v443Bounded.infraExhausted || v456Unresolved || v466StillGray;
+      // ── V500-B2 — TERMINALITY BELONGS TO PROVEN PASSTHROUGH ONLY ─────────
+      // A `noop` scalar is only terminal when it was measured inside an
+      // OBSERVED mouth (V471 landmark). Measured inside a derived face-ratio
+      // band the very same scalar terminalizes the known-good golden run
+      // (docs/v473-detector-validity-audit.md) — so it falls through as
+      // `motion_unverified` instead.
+      const v500Gate = resolveV500Outcome({
+        verdict: v465Verdict,
+        mouthAnchorSource: v456Contract.v471?.anchorSource ?? null,
+      });
+      const v500NoopUnverified = v465Verdict.verdict === "noop" && !v500Gate.terminal;
+      if (v500NoopUnverified) {
+        console.warn(
+          `[sync-so-webhook] v500_noop_unverified_anchor scene=${sceneId} pass=${measurePassIdx} ` +
+            `mouth_over_frame=${v465Verdict.mouth_over_frame ?? "n/a"} ` +
+            `anchor=${v500Gate.anchorSource} → motion_unverified (no terminalization, no refund)`,
+        );
+      }
+      v443MotionUnverified = v443Bounded.infraExhausted || v456Unresolved || v466StillGray ||
+        v500NoopUnverified;
       v443LastInfraReason = v443MotionUnverified
         ? (v466StillGray && !v456Unresolved && !v443Bounded.infraExhausted
           ? v465Verdict.reason
