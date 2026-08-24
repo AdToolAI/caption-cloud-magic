@@ -21,6 +21,28 @@ sondern systematisch tiefer (grob 0.68–0.72) — der Crop wäre also formal "k
 zentriert" und trotzdem gegenüber v400 verschoben. Bis zur Messung ist das eine
 Hypothese, kein Befund.
 
+## Wichtig: ein echter Mund-Track existiert bereits
+
+Der Mund muss nicht neu erfunden werden. `_shared/plate-face-track.ts` liest aus
+demselben Rekognition-Aufruf, der die Face-Box liefert, die Landmarks
+`mouthLeft` / `mouthRight` / `mouthDown` und speichert pro Sample einen echten
+Mundpunkt. `dynamic-camera-path.ts` kennzeichnet jeden Keyframe entsprechend mit
+`src = "mouth"` (gemessen), `"face_estimate"` (Ratio 0.78) oder `"interpolated"`.
+
+Die 0.78-Ratio ist also nur der **Notpfad** — und der Verdacht ist, dass genau
+dieser Notpfad in Produktion dominiert: V471-A fand an allen S01-Pässen
+`preclip_geometry_mouth_source = "pose_estimate"`, und die eingefrorene Fixture
+`src/test/fixtures/v464-s01-pass0-camera-path.json` trägt in 19 von 20 Keyframes
+`src: "interpolated"` und nur einmal `"mouth"`.
+
+Deshalb bekommt die Messung eine vierte, entscheidende Frage:
+**Wie viele Keyframes pro Pass sind wirklich `src="mouth"`, und warum sind die
+übrigen es nicht** (kein Landmark geliefert, Sample verworfen, oder nur zu grobe
+Abtastung mit anschließender Interpolation)? Erst diese Zahl entscheidet, ob der
+Fix "Ratio nachkalibrieren" oder "gemessenen Landmark endlich durchreichen" heißt —
+das zweite wäre deutlich robuster und näher an v400.
+
+
 ## Messung
 
 Zwei Kohorten, dieselbe Prozedur, dieselben Spalten:
@@ -43,15 +65,18 @@ face_center_x/y (im Preclip) | mouth_center_x/y (im Preclip) | mouth_y/720
   fehlt ein Landmark, wird die Zeile als `unmeasured` markiert, nicht geschätzt.
 
 Zusätzlich je Pass festgehalten: `preclip_camera_path_dynamic` (das frühere
-`cam_dynamic = false`), Anzahl Keyframes, Travel in px.
+`cam_dynamic = false`), Anzahl Keyframes, Travel in px sowie die
+**Keyframe-Quellenverteilung** `mouth` / `face_estimate` / `interpolated` und
+`preclip_geometry_mouth_source`.
 
-## Auswertung — genau drei mögliche Verdikte
+## Auswertung — vier mögliche Verdikte
 
 | Beobachtung | Verdikt |
 |---|---|
 | Mund bleibt über den Turn bei ≈ 0.62 ± 0.04, Crop folgt dem Track | T8 konform — Fehler liegt allein im Outcome-Anchor |
 | Track wandert, Crop steht (`dynamic=false` / Travel ≈ 0) | camera-path.ts ist nicht angeschlossen — T8 gebrochen |
 | Crop folgt, Mund liegt aber konstant bei ≈ 0.68–0.72 | T8-Zentrierung nutzt die falsche Ratio (0.78 statt 0.88) |
+| Anteil `src="mouth"` nahe null, obwohl Rekognition Landmarks liefert | Der echte Mund-Track wird gar nicht verwendet — der Fix ist Durchreichen, nicht Nachkalibrieren |
 
 Zusätzlich wird die Differenz Golden Run ↔ S01 in derselben Tabelle ausgewiesen:
 Falls beide dieselbe Mundhöhe zeigen, ist die Preclip-Geometrie als Ursache für die
@@ -60,9 +85,11 @@ S01-NOOPs endgültig ausgeschlossen.
 ## Ergebnis des Gates
 
 - Report `docs/v476-t8-conformance-measurement.md` mit beiden Volltabellen (2 × 4 × 16 Zeilen),
-  Pro-Pass-Zusammenfassung und einem der drei Verdikte.
-- Kein Fix in diesem Gate. Falls Fall 2 oder 3 eintritt, folgt der Fix als eigenes,
-  separat freizugebendes Gate (V477) mit Regressionsnachweis gegen den Golden Run.
+  Pro-Pass-Zusammenfassung, Landmark-Quotenübersicht und einem der vier Verdikte.
+- Kein Fix in diesem Gate. Der Folgefix (V477) wird durch das Verdikt bestimmt:
+  entweder Landmark-Durchreichung (bevorzugt) oder Ratio-Nachkalibrierung — jeweils
+  mit Regressionsnachweis gegen den Golden Run.
+
 
 ## Technische Notizen
 
