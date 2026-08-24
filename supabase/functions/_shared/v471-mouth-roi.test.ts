@@ -1,6 +1,6 @@
 import { assertAlmostEquals, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { resolveV471MouthRoi, V471_FACE_MOUTH_Y_RATIO } from "./v471-mouth-roi.ts";
-import { evaluateMouthRoiContract } from "./v456-roi-contract.ts";
+import { evaluateMouthRoiContract, FACE_MOUTH_Y_RATIO } from "./v456-roi-contract.ts";
 
 // Real persisted geometry of scene be60d106… run 95b11254… gen-15.
 const P1 = {
