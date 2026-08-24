@@ -1987,7 +1987,15 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // confirmed statement about the plate. The legacy identity resolver must
       // NOT take over in that case (it is exactly the path that produced the
       // wrong-face runs). Infrastructure failures keep the legacy recovery.
-      let fa4ContractualFailure: { reason: string; detail: string } | null = null;
+      let fa4ContractualFailure: {
+        reason: string;
+        detail: string;
+        // V507 — face-size specific telemetry for the customer message.
+        faceSizeLimited?: boolean;
+        measurements?: unknown;
+        dims?: { width: number; height: number };
+      } | null = null;
+
       if (
         hasCompleteV278AnchorLayout &&
         anchorLayoutRaw
