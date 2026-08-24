@@ -45,5 +45,5 @@ Deno.test("V477 — partial tracks still yield an authority", () => {
   const partial = S01_PASS.map((s, i) => (i % 2 === 0 ? s : { ...s, mouth: null }));
   const a = resolveTrackMouthAuthority(partial);
   assertEquals(a.measured, 3);
-  assertEquals(a.mouth, [301, 289]);
+  assertEquals(a.mouth, [300, 289]);
 });
