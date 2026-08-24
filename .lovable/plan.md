@@ -21,6 +21,28 @@ sondern systematisch tiefer (grob 0.68–0.72) — der Crop wäre also formal "k
 zentriert" und trotzdem gegenüber v400 verschoben. Bis zur Messung ist das eine
 Hypothese, kein Befund.
 
+## Wichtig: ein echter Mund-Track existiert bereits
+
+Der Mund muss nicht neu erfunden werden. `_shared/plate-face-track.ts` liest aus
+demselben Rekognition-Aufruf, der die Face-Box liefert, die Landmarks
+`mouthLeft` / `mouthRight` / `mouthDown` und speichert pro Sample einen echten
+Mundpunkt. `dynamic-camera-path.ts` kennzeichnet jeden Keyframe entsprechend mit
+`src = "mouth"` (gemessen), `"face_estimate"` (Ratio 0.78) oder `"interpolated"`.
+
+Die 0.78-Ratio ist also nur der **Notpfad** — und der Verdacht ist, dass genau
+dieser Notpfad in Produktion dominiert: V471-A fand an allen S01-Pässen
+`preclip_geometry_mouth_source = "pose_estimate"`, und die eingefrorene Fixture
+`src/test/fixtures/v464-s01-pass0-camera-path.json` trägt in 19 von 20 Keyframes
+`src: "interpolated"` und nur einmal `"mouth"`.
+
+Deshalb bekommt die Messung eine vierte, entscheidende Frage:
+**Wie viele Keyframes pro Pass sind wirklich `src="mouth"`, und warum sind die
+übrigen es nicht** (kein Landmark geliefert, Sample verworfen, oder nur zu grobe
+Abtastung mit anschließender Interpolation)? Erst diese Zahl entscheidet, ob der
+Fix "Ratio nachkalibrieren" oder "gemessenen Landmark endlich durchreichen" heißt —
+das zweite wäre deutlich robuster und näher an v400.
+
+
 ## Messung
 
 Zwei Kohorten, dieselbe Prozedur, dieselben Spalten:
