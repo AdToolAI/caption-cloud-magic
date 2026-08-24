@@ -252,7 +252,10 @@ export async function bindLedgerExternalJob(
       .from("composer_pipeline_jobs")
       .update(patch)
       .eq("id", jobId)
-      .in("status", ["pending", "dispatching"]);
+      // A confirmed external id is exactly how a previously uncertain
+      // transport is reconciled. The immutable external_job_id trigger still
+      // prevents rebinding an attempt that was already linked elsewhere.
+      .in("status", ["pending", "dispatching", "dispatch_uncertain"]);
   } catch (e) {
     console.warn(`${V431_OBSERVE_TAG} ledger_bind_failed`, JSON.stringify({
       pipeline_job_id: jobId,
