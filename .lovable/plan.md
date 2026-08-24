@@ -1,9 +1,10 @@
-# V473 / V474 — Zwei READ-ONLY-Gates: Detektor-Gültigkeit + Aktions-Durchreichung
+# V475 → V473 → V474 — drei READ-ONLY-Gates
 
-Zwei getrennte Befunde, zwei getrennte Gates. Beide ohne Provider-Call, ohne Rerender,
-ohne Codeänderung.
+Reihenfolge: V475 (Master-Audit v400-Konformität) → V473 (Detektor-Gültigkeit) →
+V474 (Aktions-Durchreichung). Kein Provider-Call, kein Rerender, keine Codeänderung.
+V475 steht weiter unten ausführlich, wird aber zuerst ausgeführt.
 
-# V473 — Ist der NOOP-Detektor überhaupt gültig? (READ-ONLY)
+# V473 — Kann die heutige Kette guten Lip-Sync von Passthrough unterscheiden? (READ-ONLY)
 
 Dein Einwand trifft einen wunden Punkt, und die eigenen Daten stützen ihn:
 
