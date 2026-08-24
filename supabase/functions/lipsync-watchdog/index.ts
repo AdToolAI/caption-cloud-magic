@@ -367,6 +367,58 @@ serve(async (req) => {
       ds?.engine === "sync-segments" &&
       Array.isArray(ds?.passes);
 
+    // ── V501 mux dispatch guard ───────────────────────────────────────────
+    // Der Mux kann im Ledger reserviert sein (`mux_dispatch_requested_at`),
+    // ohne dass `render-sync-segments-audio-mux` je aufgerufen wurde. Dann
+    // fehlen `render_id` und `dispatched_at`, und der v252-Guard unten greift
+    // nie. Genau ein Re-Dispatch, danach terminal.
+    const v501 = classifyMuxDispatch({
+      lipSyncStatus: d.lip_sync_status,
+      audioMux: ds?.audio_mux ?? null,
+      nowMs: now,
+    });
+    if (v501.action === "redispatch") {
+      const alreadyRedispatched = !!ds?.audio_mux?.v501_redispatch_at;
+      if (!alreadyRedispatched) {
+        const retryCtx = await buildRetryContext(supabase, d.id, d.active_run_id, "audio_mux");
+        const stampedAt = new Date().toISOString();
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...(ds as any),
+              audio_mux: { ...(ds?.audio_mux ?? {}), v501_redispatch_at: stampedAt },
+            },
+          })
+          .eq("id", d.id);
+        try {
+          const res = await fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${serviceKey}`,
+            },
+            body: JSON.stringify({
+              scene_id: d.id,
+              ...retryCtx,
+              retry_reason: "mux_redispatch",
+            }),
+            signal: AbortSignal.timeout(20_000),
+          });
+          try { await res.text(); } catch { /* drain */ }
+          console.log(
+            `[lipsync-watchdog] scene=${d.id} v501_mux_redispatch status=${res.status} age=${Math.round(v501.ageMs / 1000)}s`,
+          );
+        } catch (e) {
+          console.warn(
+            `[lipsync-watchdog] scene=${d.id} v501_mux_redispatch_failed ${(e as Error).message}`,
+          );
+        }
+        return;
+      }
+    }
+    const v501HardFail = v501.action === "hard_fail";
+
     // ── v252 audio-mux stall guard ────────────────────────────────────────
     // `render-sync-segments-audio-mux` dispatches the final DialogStitchVideo
     // Lambda and persists `dialog_shots.audio_mux = { render_id, dispatched_at }`.
@@ -377,11 +429,13 @@ serve(async (req) => {
     const muxDispatchedAt = ds?.audio_mux?.dispatched_at
       ? Date.parse(String(ds.audio_mux.dispatched_at))
       : null;
-    const muxAge = muxDispatchedAt ? now - muxDispatchedAt : 0;
+    const muxAge = muxDispatchedAt ? now - muxDispatchedAt : v501.action === "none" ? 0 : v501.ageMs;
+    const muxFailReason = v501HardFail
+      ? "audio_mux_dispatch_lost: mux claimed but never dispatched"
+      : "watchdog_audio_mux_stall: no webhook after 6min";
     if (
       d.lip_sync_status === "audio_muxing" &&
-      muxDispatchedAt &&
-      muxAge >= STALE_AUDIO_MUX_MS
+      ((muxDispatchedAt && muxAge >= STALE_AUDIO_MUX_MS) || v501HardFail)
     ) {
       const refundCredits = Number(ds?.cost_credits) || 0;
       let refundedFlag = !!ds?.refunded;
