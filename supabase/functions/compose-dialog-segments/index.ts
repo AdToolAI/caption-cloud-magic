@@ -6374,7 +6374,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       syncOptions.active_speaker_detection = {
         auto_detect: false,
         frame_number: referenceFrameNumber,
-        coordinates: clampSyncCoords(pass.coords),
+        // V502 — bei Preclip-Dispatch niemals den Plate-Punkt senden.
+        coordinates: (v502DispatchCoords ?? clampSyncCoords(pass.coords))!,
+
       };
     } else if (retryVariant === "coords-pro-box" || retryVariant === "bbox-url-pro") {
       // v31 / v82 — Build the same plate-space face box from faceMap; for
