@@ -5855,14 +5855,15 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
               // V464-B — freeze the measured plate-space track (PLATE-absolute
               // seconds). It is the per-frame source for the ASD boxes.
-              v464TrackSamples = track.samples
-                .filter((s) => Array.isArray(s.box))
-                .map((s) => ({
+              v464TrackSamples = (track.samples as any[])
+                .filter((s: any) => Array.isArray(s.box))
+                .map((s: any) => ({
                   t: Number(Number(s.t).toFixed(4)),
-                  box: (s.box as [number, number, number, number]).map((v) => Math.round(v)) as
+                  box: (s.box as [number, number, number, number]).map((v: number) => Math.round(v)) as
                     [number, number, number, number],
                   mouth: s.mouth ? [Math.round(s.mouth[0]), Math.round(s.mouth[1])] as [number, number] : null,
                 }));
+
               const path = buildDynamicCameraPath({
                 samples: track.samples,
                 staticCrop,
