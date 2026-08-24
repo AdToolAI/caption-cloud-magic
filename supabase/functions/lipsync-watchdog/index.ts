@@ -51,6 +51,7 @@ import {
 } from "../_shared/v459-fanout-aggregation.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { logMissingReinjectPointer } from "../_shared/v431-ledger.ts";
+import { classifyMuxDispatch } from "../_shared/v501-mux-dispatch-guard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
