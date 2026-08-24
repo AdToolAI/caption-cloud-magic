@@ -1,3 +1,8 @@
+# V473 / V474 — Zwei READ-ONLY-Gates: Detektor-Gültigkeit + Aktions-Durchreichung
+
+Zwei getrennte Befunde, zwei getrennte Gates. Beide ohne Provider-Call, ohne Rerender,
+ohne Codeänderung.
+
 # V473 — Ist der NOOP-Detektor überhaupt gültig? (READ-ONLY)
 
 Dein Einwand trifft einen wunden Punkt, und die eigenen Daten stützen ihn:
@@ -78,3 +83,55 @@ des Startseiten-Clips mit heutiger Kette, klarer Aussage „Metrik falsifiziert"
   V471-ROI-Port, V465-Schwellen 2.00 / 2.65), read-only.
 - Betroffene Doku bei Widerlegung: `docs/v468-pass-contract-differential.md`,
   `docs/v469-mouth-visibility-gate.md`, `mem/architecture/lipsync/v469-mouth-visibility-gate.md`.
+
+---
+
+# V474 — Warum landet die Regie nicht im Clip? (READ-ONLY)
+
+Zweiter, davon unabhängiger Befund aus deinen Screenshots: Das Feld
+„WAS PASSIERT IN DER SZENE? (ÜBERSCHREIBT DIRECTOR)" ist ausgefüllt (inkl. Auto-EN-
+Übersetzung), aber die vier Felder „AKTION — WAS TUT <Name>?" sind leer (nur Platzhalter),
+und im fertigen Clip tun die Figuren nichts davon.
+
+Was der Code heute tut (belegt):
+
+- `src/lib/motion-studio/applyActionsToPrompt.ts` schreibt Regie als zwei Markerblöcke
+  `[SceneAction] … [/SceneAction]` und `[CastActions] - Name: … [/CastActions]` an den
+  **Anfang** des `aiPrompt`.
+- Diese Marker sind serverseitig nur in `compose-video-clips`, `compose-scene-anchor`,
+  `compose-dialog-segments` und `happyhorse-green-net` bekannt.
+- Leere Cast-Actions werden gefiltert; sind **alle** leer, entfällt der `[CastActions]`-Block
+  vollständig. Es bleibt nur der Szenensatz.
+
+Das Gate prüft genau drei Fragen an der realen Szene, entlang der gespeicherten Daten und
+des tatsächlich gesendeten Payloads:
+
+## Frage 1 — Werden die Aktionsfelder überhaupt jemals befüllt?
+
+Wer schreibt `characterActions`: Briefing-Apply, Scene-Director oder nur manuelle Eingabe?
+Geprüft wird der Persistenzpfad (`useComposerPersistence`, `useApplyProductionPlan`,
+`scene-director`) und der DB-Stand der Szene. Ergebnis: entweder „es gibt keinen Autor,
+das Feld ist reine Handeingabe" oder „es gibt einen Autor, der hier nicht gelaufen ist".
+
+## Frage 2 — Kommt der Szenensatz im Provider-Prompt an?
+
+Der eingefrorene Request der Szene wird ausgelesen und wörtlich gegen den UI-Text gestellt:
+Steht `[SceneAction]` mit dem englischen Satz im gesendeten Prompt — ja oder nein? Falls
+nein, wird der Punkt der Kette benannt, an dem er verloren geht (Persistenz, Prompt-Rebuild
+oder Backend-Strip).
+
+## Frage 3 — Kann diese Regie im Lip-Sync-Pfad überhaupt wirken?
+
+Zentrale Hypothese, die dieses Gate belegen oder widerlegen soll: Bei einer Lip-Sync-Szene
+entsteht das Bild aus dem **Anker-Standbild** plus Sync-Pässen. Bewegungsregie wie
+„geht während der Szene nach rechts" oder „dreht sich zur Gruppe zurück" ist in einem
+Standbild nicht darstellbar; ob und wo der Clip-Provider die Marker noch sieht, ist der
+entscheidende Punkt. Geprüft wird, welcher Prompt an den Anker-Renderer und welcher an den
+Clip-Provider geht, und ob Bewegungsregie darin überlebt.
+
+## Ergebnis dieses Gates
+
+Bericht `docs/v474-action-directive-trace.md` mit einer klaren Zuordnung pro Frage:
+UI-Fehler (Feld wird nie befüllt) / Persistenz-Fehler / Prompt-Fehler / Architektur-Grenze
+(Standbild kann keine Bewegung) — plus konkretem Fix-Vorschlag je Ursache, aber ohne
+Umsetzung in diesem Gate.
