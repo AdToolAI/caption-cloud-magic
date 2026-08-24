@@ -25,9 +25,13 @@
 import {
   assignAnchorsToCandidatesBijective,
   classifyRouterFailure,
+  FACE_SIZE_REJECTIONS,
   filterPlausibleCandidates,
+  PLATE_FACE_SANITY,
+  type CandidateMeasurement,
   type RouterFailureClass,
 } from "./plate-face-candidates.ts";
+
 
 // ── AWS Rekognition config (duplicated for auditability) ────────────
 const AWS_REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;
