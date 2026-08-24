@@ -177,7 +177,9 @@ Deno.test("unlabeled correct geometry wins over labeled wrong geometry", () => {
 Deno.test("sanity limits match the production thresholds", () => {
   assertEquals(plateFaceSanity([0, 0, 0, 0], DIMS).reason, "degenerate");
   assertEquals(plateFaceSanity([0, 0, 1284, 718], DIMS).reason, "area_too_large");
-  assertEquals(plateFaceSanity([10, 10, 20, 18], DIMS).reason, "area_too_small");
+  // V507 — tiny boxes are rejected by the pixel floor, not by the ratio.
+  assertEquals(plateFaceSanity([10, 10, 20, 18], DIMS).reason, "face_too_small_for_lipsync");
+
   assertEquals(plateFaceSanity([100, 100, 400, 180], DIMS).reason, "aspect_invalid");
   assertEquals(plateFaceSanity([1280, 700, 1600, 1100], DIMS).reason, "out_of_plate");
   assertEquals(plateFaceSanity(SARAH, DIMS).ok, true);
