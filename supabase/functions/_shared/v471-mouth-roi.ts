@@ -31,16 +31,24 @@
 
 import type { MouthRoiNormalized } from "./v434-motion-roi.ts";
 
-export const V471_MOUTH_ROI_VERSION = "v471b";
+export const V471_MOUTH_ROI_VERSION = "v471b+v477";
 
 /**
- * Mouth height inside the tracked face box, as a fraction of the face box
- * height. Calibrated on the S01 edit maps (scene be60d106…, run 95b11254…):
- *   P1 real mouth  plate y ≈ 302.7, face box [195, 317] → 0.883
- *   P2 real mouth  plate y ≈ 272.5, face box [177, 286] → 0.876
- * The frozen upstream pose estimate (0.78) lands on the nose / upper lip.
+ * V477 — the compensatory ratio 0.88 is GONE.
+ *
+ * V476 (`docs/v476-t8-conformance-measurement.md`) proved that 0.88 was not a
+ * geometric truth but a compensation for a broken data source: the pre-clip
+ * geometry always ran on the 0.78 pose estimate because the measured mouth
+ * landmarks (real ratio 0.734–0.781) were produced after the crop and thrown
+ * away. With V477 the tracked landmark is authoritative, so this module keeps
+ * exactly ONE fallback — the same validated ratio the geometry side uses
+ * (`FACE_MOUTH_Y_RATIO` in `v456-roi-contract.ts`, asserted equal in the
+ * tests; duplicated as a literal here only to avoid an import cycle) — and
+ * only for passes that carry no landmark at all.
  */
-export const V471_FACE_MOUTH_Y_RATIO = 0.88;
+export const V471_FACE_MOUTH_Y_RATIO = 0.78;
+
+
 
 /**
  * Mouth band relative to the face side length in the crop. Calibrated so that

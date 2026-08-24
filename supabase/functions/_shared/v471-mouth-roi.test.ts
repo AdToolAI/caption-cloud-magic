@@ -1,6 +1,6 @@
 import { assertAlmostEquals, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { resolveV471MouthRoi, V471_FACE_MOUTH_Y_RATIO } from "./v471-mouth-roi.ts";
-import { evaluateMouthRoiContract } from "./v456-roi-contract.ts";
+import { evaluateMouthRoiContract, FACE_MOUTH_Y_RATIO } from "./v456-roi-contract.ts";
 
 // Real persisted geometry of scene be60d106… run 95b11254… gen-15.
 const P1 = {
@@ -18,15 +18,24 @@ const P2 = {
   mouthSource: "pose_estimate",
 };
 
-Deno.test("V471 — pose_estimate passes are re-anchored onto the real mouth (cy ≈ 0.61)", () => {
+// V477 — the pose-estimate path is now a pure LAST-RESORT fallback: V476 proved
+// the 0.88 ratio only existed to compensate for the crop being centred on the
+// pose estimate instead of the measured landmark. With the landmark authority
+// in place the fallback returns to the single validated ratio (0.78).
+Deno.test("V477 — pose_estimate fallback uses the one validated ratio (0.78)", () => {
+  const expected = {
+    // (195 + 0.78 × 122 − 188) / 188
+    P1: (195 + V471_FACE_MOUTH_Y_RATIO * (317 - 195) - 188) / 188,
+    // (177 + 0.78 × 109 − 170) / 168
+    P2: (177 + V471_FACE_MOUTH_Y_RATIO * (286 - 177) - 170) / 168,
+  };
   for (const [label, g] of [["P1", P1], ["P2", P2]] as const) {
     const r = resolveV471MouthRoi(g);
     assertEquals(r.anchorSource, "face_ratio", label);
-    assertAlmostEquals(r.roi!.centerY, 0.61, 0.01, label);
-    // The frozen production band sat at 0.5426 / 0.5476 — clearly above.
-    if (!(r.roi!.centerY > 0.59)) throw new Error(`${label} still too high`);
+    assertAlmostEquals(r.roi!.centerY, expected[label], 1e-6, label);
   }
 });
+
 
 Deno.test("V471 — band is tightened to the edit-map size (~0.28 × 0.12)", () => {
   const r = resolveV471MouthRoi(P1);
@@ -67,9 +76,12 @@ Deno.test("V471 — unresolvable geometry never guesses", () => {
   assertEquals(resolveV471MouthRoi(null).anchorSource, "unresolved");
 });
 
-Deno.test("V471 — ratio constant matches the calibrated edit-map value", () => {
-  assertEquals(V471_FACE_MOUTH_Y_RATIO, 0.88);
+Deno.test("V477 — exactly one mouth ratio exists in the pipeline", () => {
+  assertEquals(V471_FACE_MOUTH_Y_RATIO, 0.78);
+  // Geometry side and verdict side must never diverge again.
+  assertEquals(V471_FACE_MOUTH_Y_RATIO, FACE_MOUTH_Y_RATIO);
 });
+
 
 Deno.test("V456 contract adopts the V471 ROI as the authority", () => {
   const base = {
@@ -89,7 +101,12 @@ Deno.test("V456 contract adopts the V471 ROI as the authority", () => {
   });
   assertEquals(withV471.status, "authoritative");
   assertEquals(withV471.v471?.anchorSource, "face_ratio");
-  assertAlmostEquals(withV471.roi!.centerY, 0.61, 0.01);
+  assertAlmostEquals(
+    withV471.roi!.centerY,
+    (195 + V471_FACE_MOUTH_Y_RATIO * (317 - 195) - 188) / 188,
+    1e-6,
+  );
+
 
   // Legacy callers (no V471 inputs) keep the frozen V434 behaviour.
   const legacy = evaluateMouthRoiContract({ ...base, faceBbox: base.faceBbox });

@@ -146,6 +146,9 @@ import {
 
 // V456 Gate 2 — pose-aware mouth anchor (no colour heuristics).
 import { resolveMouthAnchorPoseAware } from "../_shared/v456-roi-contract.ts";
+// V477 — measured track landmark becomes the authoritative mouth anchor.
+import { resolveTrackMouthAuthority } from "../_shared/v477-mouth-authority.ts";
+
 // FA-4 v406/v407 — Frozen Provider Input Snapshot / Retry-Wire-Parität.
 import {
   buildProviderWire,
@@ -5739,12 +5742,65 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // assignment-locked face box (yaw-shifted), so profile speakers keep a
       // mouth anchor instead of degrading to the legacy face-center crop.
       const v456DetectedMouth = speakerPlateMouths?.[pass.speaker_idx] ?? null;
-      const v456MouthResolved = resolveMouthAnchorPoseAware({
+      // Preliminary anchor (identical to the pre-V477 behaviour) — used only as
+      // the identity tiebreak for the face track below.
+      const v456MouthPreliminary = resolveMouthAnchorPoseAware({
         bbox: platePassBoxForPreclip ?? null,
         landmark: v456DetectedMouth,
         yawDeg: Number((pass as any).plate_yaw_deg ?? 0) || 0,
+      })?.mouth ?? null;
+
+      // ── V477 — LANDMARK AUTHORITY (docs/v476-t8-conformance-measurement.md)
+      // The plate identity snapshot carries no mouth landmarks, while the
+      // per-pass face track measures the real mouth in every sample. Until now
+      // that track ran INSIDE `buildCameraPath`, i.e. after the crop had been
+      // computed from the 0.78 pose estimate, so the better measurement was
+      // discarded. V477 hoists the SAME single track in front of the crop:
+      // no extra Rekognition cost, and `buildCameraPath` reuses these exact
+      // samples so the camera path itself is unchanged (that is V478 scope).
+      let v477PreTrack: { ok: boolean; reason?: string; samples: any[]; latencyMs?: number } | null = null;
+      if (platePassBoxForPreclip) {
+        try {
+          v477PreTrack = await trackAssignedFaceAcrossTurn({
+            plateVideoUrl: sourceClipUrl,
+            totalSec,
+            plateWidth: plateDims.width,
+            plateHeight: plateDims.height,
+            startSec: unionStart,
+            endSec: unionEnd,
+            anchorBox: platePassBoxForPreclip as [number, number, number, number],
+            // V456 — identity-safe mouth tiebreak keeps the track alive on
+            // 3/4 profiles and lateral movement.
+            anchorMouth: v456MouthPreliminary,
+            siblingCenters: siblingCoords,
+            sampleCount: TRACK_SAMPLE_COUNT,
+            budgetMs: 70_000,
+          }) as any;
+        } catch (err) {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v477_track_failed ` +
+              `${err instanceof Error ? err.message : String(err)}`,
+          );
+          v477PreTrack = null;
+        }
+      }
+      const v477Authority = resolveTrackMouthAuthority(
+        v477PreTrack?.ok ? (v477PreTrack.samples as any[]) : null,
+      );
+      const v456MouthResolved = resolveMouthAnchorPoseAware({
+        bbox: platePassBoxForPreclip ?? null,
+        // V477 — measured track landmark first, plate-identity landmark second,
+        // validated 0.78 face-ratio fallback last.
+        landmark: v477Authority.mouth ?? v456DetectedMouth,
+        yawDeg: Number((pass as any).plate_yaw_deg ?? 0) || 0,
       });
-      if (!v456DetectedMouth) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v477_mouth_authority ` +
+          `source=${v456MouthResolved?.source ?? "none"} track_ok=${v477PreTrack?.ok ?? false} ` +
+          `measured=${v477Authority.measured}/${v477Authority.total} face_ratio=${v477Authority.faceRatio ?? "n/a"} ` +
+          `reason=${v477Authority.reason}`,
+      );
+      if (!v477Authority.mouth && !v456DetectedMouth) {
         console.warn(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v456_mouth_landmark_fallback ` +
             `source=${v456MouthResolved?.source ?? "none"} bbox=${JSON.stringify(platePassBoxForPreclip ?? null)}`,
@@ -5755,6 +5811,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // V464-B — the plate face track is persisted with the pass so the ASD
       // sequence can be registered per frame (and a retry reuses it verbatim).
       let v464TrackSamples: V464TrackSample[] | null = null;
+
 
       try {
 
@@ -5788,36 +5845,28 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             // crop — never to another face.
             buildCameraPath: async (staticCrop) => {
               if (!platePassBoxForPreclip) return null;
-              const track = await trackAssignedFaceAcrossTurn({
-                plateVideoUrl: sourceClipUrl,
-                totalSec,
-                plateWidth: plateDims.width,
-                plateHeight: plateDims.height,
-                startSec: unionStart,
-                endSec: unionEnd,
-                anchorBox: platePassBoxForPreclip as [number, number, number, number],
-                // V456 — identity-safe mouth tiebreak keeps the track alive on
-                // 3/4 profiles and lateral movement (Gate 1: cam_dynamic=false).
-                anchorMouth: v456MouthForPreclip,
-                siblingCenters: siblingCoords,
-                sampleCount: TRACK_SAMPLE_COUNT,
-                budgetMs: 70_000,
-              });
+              // V477 — reuse the SAME track that already produced the mouth
+              // authority above. No second Rekognition pass, and the camera
+              // path receives byte-identical inputs to the pre-V477 behaviour.
+              const track = v477PreTrack;
+              if (!track) return null;
               console.log(
                 `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v452_face_track ok=${track.ok} reason=${track.reason} ` +
-                  `valid=${track.samples.filter((x) => x.box).length}/${track.samples.length} ms=${track.latencyMs}`,
+                  `valid=${track.samples.filter((x: any) => x.box).length}/${track.samples.length} ms=${track.latencyMs} reused=v477`,
               );
               if (!track.ok) return null;
+
               // V464-B — freeze the measured plate-space track (PLATE-absolute
               // seconds). It is the per-frame source for the ASD boxes.
-              v464TrackSamples = track.samples
-                .filter((s) => Array.isArray(s.box))
-                .map((s) => ({
+              v464TrackSamples = (track.samples as any[])
+                .filter((s: any) => Array.isArray(s.box))
+                .map((s: any) => ({
                   t: Number(Number(s.t).toFixed(4)),
-                  box: (s.box as [number, number, number, number]).map((v) => Math.round(v)) as
+                  box: (s.box as [number, number, number, number]).map((v: number) => Math.round(v)) as
                     [number, number, number, number],
                   mouth: s.mouth ? [Math.round(s.mouth[0]), Math.round(s.mouth[1])] as [number, number] : null,
                 }));
+
               const path = buildDynamicCameraPath({
                 samples: track.samples,
                 staticCrop,
