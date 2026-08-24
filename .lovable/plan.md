@@ -34,44 +34,53 @@ Die Fragestellung ist neutral, nicht falsifizierend gemeint:
 
 Ergebnis darf in beide Richtungen ausfallen.
 
-## Schritt 1 — Visuelle Evidenz gegen die Pose-Behauptung
+## Schritt 1 — Visuelle Evidenz gegen die Pose-Behauptung + V469 empirisch nachrechnen
 
 Aus den gepinnten Preclips P0–P4 (`v434_artifact_pins`, Run `95b11254`, Gen 15) Kontaktbögen
 neu ziehen und pro Pass festhalten: Yaw-Eindruck, Mundsichtbarkeit, Kopfbewegung.
-Ergebnis wird schriftlich gegen die V468-Behauptung gestellt und diese, falls widerlegt,
-in `docs/v468-pass-contract-differential.md` ausdrücklich als **zurückgezogen** markiert
-(Doku-Korrektur, keine Logikänderung).
+Die V468-Behauptung „P0 ≈ 90° Silhouette" wird bei Widerlegung in
+`docs/v468-pass-contract-differential.md` als **zurückgezogen** markiert (Doku-Korrektur).
 
-## Schritt 2 — Der entscheidende Kontrolltest: Startseiten-Clip gegen heutige Metrik
+Wichtig: Daraus folgt **nicht**, dass V469 falsch ist. V469 prüft heute Mouth-Visibility
+(Landmarks, Face-Aspect, Mund-Margin, usable frames), nicht Yaw. V469 wird deshalb
+**empirisch** re-evaluiert:
+
+- V469 lässt P0 trotz `mouth_landmark_rate = 1.00` / `usable_frame_rate = 1.00` durch
+  → V469 verhält sich korrekt, keine Entschärfung.
+- V469 würde ihn trotz dieser Werte blocken → echter Gegenbeweis, dann Handlungsbedarf.
+
+## Schritt 2 — Kontrolltest: Startseiten-Clip gegen die heutige Kette
 
 Der bekannte gute 4-Sprecher-Clip der deutschen Startseite ist die härteste Kontrollgruppe.
 Geprüft wird:
 
-1. Welche Verdikt-Logik dieser Lauf damals durchlaufen hat (Erwartung, zu belegen: gar keine
-   `mouth_over_frame`-Bewertung, weil vor V465 entstanden).
+1. Welche Verdikt-Logik dieser Lauf damals durchlaufen hat (zu belegen, nicht anzunehmen).
 2. Seine Pässe werden mit der **heutigen** Kette nachgerechnet: V469 → V471-ROI → V465 N=6
-   → V466 Grauband.
+   → V466 Grauband inklusive einmaliger N=16-Nachmessung.
 
-Entscheidungsregel:
+Entscheidungsregel — die Messlatte ist **Terminalität**, nicht MOVED:
 
 ```text
-Startseiten-Clip erhält heute für einen oder mehrere Turns NOOP
-  → Metrik ist als Terminal-Gate falsifiziert. Sie klassifiziert einen
-    nachweislich guten Clip als Fehler.
+Visuell + artefaktseitig bestätigter Lip-Sync erhält nach vollständigem
+V466-Pfad ein TERMINALES NOOP
+  → Terminalitätsautorität von mouth_over_frame ist falsifiziert.
 
-Startseiten-Clip bleibt durchgehend MOVED
-  → Metrik hält, und der Unterschied liegt wirklich im S01-Material.
-    Dann wird S01 Turn für Turn gegen den Startseiten-Clip gestellt.
+Ergebnis MOVED oder INDETERMINATE → motion_unverified
+  → keine Falsifikation. Grauband ist erlaubtes, nicht-terminales Verhalten.
+  Beispiel: 3 MOVED + 1 motion_unverified = Metrik hält.
+           2 MOVED + 2 terminale NOOP bei sichtbar gutem Lip-Sync = falsifiziert.
 ```
 
 ## Schritt 3 — Konsequenz benennen (noch nicht implementieren)
 
-Fällt Schritt 2 gegen die Metrik aus, lautet die Empfehlung für das Folge-Gate:
+Nur falls Schritt 2 die Terminalität falsifiziert:
 
-- `mouth_over_frame` verliert die **Terminalitäts**-Autorität und wird Telemetrie/Warnung.
-- Ein Pass scheitert nur noch bei echtem Passthrough (Output bit-nah am Input) oder
-  Provider-Fehler — nicht mehr wegen eines Schwellenwerts, den auch guter Lip-Sync reißt.
-- V469 wird entsprechend entschärft, weil sein Auslöseanlass (die Profil-These) entfällt.
+- `mouth_over_frame` verliert die **Terminalitäts**-Autorität und wird Telemetrie/Warnung
+  bzw. schlimmstenfalls Grauband — es bleibt als Ranking-Metrik gültig (AUC 0.980).
+- Ein Pass scheitert dann nur noch bei echtem Passthrough (Output nahezu identisch zum
+  Input, im Sinne des v400-Vertrags) oder bei Provider-Fehler.
+- V469 wird **nicht** pauschal mit entschärft; über V469 entscheidet allein das empirische
+  Ergebnis aus Schritt 1.
 
 Das ist bewusst nur die Empfehlung. Umsetzung erst in einem eigenen, freigegebenen Gate.
 
