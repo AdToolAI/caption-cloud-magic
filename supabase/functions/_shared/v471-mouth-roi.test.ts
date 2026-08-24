@@ -101,7 +101,12 @@ Deno.test("V456 contract adopts the V471 ROI as the authority", () => {
   });
   assertEquals(withV471.status, "authoritative");
   assertEquals(withV471.v471?.anchorSource, "face_ratio");
-  assertAlmostEquals(withV471.roi!.centerY, 0.61, 0.01);
+  assertAlmostEquals(
+    withV471.roi!.centerY,
+    (195 + V471_FACE_MOUTH_Y_RATIO * (317 - 195) - 188) / 188,
+    1e-6,
+  );
+
 
   // Legacy callers (no V471 inputs) keep the frozen V434 behaviour.
   const legacy = evaluateMouthRoiContract({ ...base, faceBbox: base.faceBbox });
