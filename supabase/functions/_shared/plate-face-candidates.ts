@@ -305,7 +305,7 @@ export function classifyRouterFailure(input: RouterFailureInput): RouterFailureC
   const bare = reason.startsWith("fa4_fail_closed:")
     ? reason.slice("fa4_fail_closed:".length).split(":")[0]
     : reason.split(":")[0];
-  if (CONTRACTUAL_GEOMETRY_REASONS.includes(bare as AssignmentFailReason)) {
+  if (CONTRACTUAL_GEOMETRY_REASONS.includes(bare)) {
     return "contractual";
   }
   if (bare === "no_faces_detected") {
