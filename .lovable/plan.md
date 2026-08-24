@@ -10,7 +10,7 @@ Der Lip-Sync-Plate-Prompt wird **nicht** aus den Motion-Studio-Prompt-Layern geb
 - Per-Turn-Regieanweisungen (`shotDirection`, Dialog-Director) werden im Plate-Prompt überhaupt nicht gelesen — sie gehen für das Plate verloren.
 - `characterShots[].actionEn` landet als `[CastActions]`-Block im Prompt, wird aber danach von den beiden genannten Sperrklauseln praktisch wieder aufgehoben.
 
-Ergebnis: Die Figuren stehen bewusst still. Das war die Absicht der alten Statik-Kette (statischer Crop). Seit V452 verfolgt der Preclip das Gesicht dynamisch und die Rückprojektion nutzt denselben Pfad — die harte Körper-/Kopf-Stille ist damit nicht mehr nötig.
+Ergebnis: Die Figuren stehen bewusst still. Konkret am Beispiel der Szenenbeschreibung („Samuel … geht während der Szene natürlich nach rechts", „Kay … dreht sich zur Gruppe zurück"): Die Gehbewegung wird vom Kamera-Stripper bzw. der Stille-Klausel neutralisiert, das Zurückdrehen von „heads stay steady — no nodding" aufgehoben. Das war die Absicht der alten Statik-Kette (statischer Crop). Seit V452 verfolgt der Preclip das Gesicht dynamisch und die Rückprojektion nutzt denselben Pfad — die harte Körper-/Kopf-Stille ist damit nicht mehr nötig.
 
 ## Umsetzung
 
