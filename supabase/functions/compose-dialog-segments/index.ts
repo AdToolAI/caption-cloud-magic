@@ -6285,6 +6285,46 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       );
     }
 
+    // ── V502 — Coords ↔ Crop-Kohärenz ───────────────────────────────────
+    // `pass.coords` ist ein Legacy-Plate-Punkt aus der Sprecher-Zuordnung; die
+    // dispatchte Geometrie stammt seit V456/V457 aus `preclip_crop`. Beide
+    // Räume driften auseinander (S01 Pass 0: coords 26 px ausserhalb des
+    // eigenen Crops). Für `bbox-url-pro` ist das Telemetrie — für die
+    // Coords-Varianten wandert der Punkt in den Provider-Payload und MUSS im
+    // Raum des dispatchten Videos liegen. Wir leiten ihn deshalb aus demselben
+    // Crop-Transform ab und projizieren ihn in den Clip-Raum.
+    const v502Crop = usePassPreclip ? (pass as any).preclip_crop ?? null : null;
+    const v502Contract = v502Crop
+      ? resolveCoordsContract({
+        crop: v502Crop,
+        legacyCoords: Array.isArray(pass.coords)
+          ? [Number(pass.coords[0]), Number(pass.coords[1])]
+          : null,
+        mouthOffsetXy: (pass as any).preclip_mouth_offset_xy ?? null,
+      })
+      : null;
+    if (v502Contract) {
+      (pass as any)._v502_coords_contract = {
+        anchor_plate: v502Contract.anchorPlate,
+        anchor_clip: v502Contract.anchorClip,
+        legacy_coords: Array.isArray(pass.coords) ? pass.coords : null,
+        legacy_inside_crop: v502Contract.legacyInsideCrop,
+        legacy_outside_px: v502Contract.legacyOutsidePx,
+        source: v502Contract.source,
+        reason: v502Contract.reason,
+        crop: v502Crop,
+      };
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v502_coords_contract ` +
+          `source=${v502Contract.source} legacy_inside=${v502Contract.legacyInsideCrop} ` +
+          `outside_px=${v502Contract.legacyOutsidePx} anchor_plate=${JSON.stringify(v502Contract.anchorPlate)} ` +
+          `anchor_clip=${JSON.stringify(v502Contract.anchorClip)} crop=${JSON.stringify(v502Crop)}`,
+      );
+    }
+    /** Coords im Raum des tatsächlich dispatchten Videos (Preclip → Clip-Raum). */
+    const v502DispatchCoords: [number, number] | null = v502Contract
+      ? v502Contract.anchorClip
+      : clampSyncCoords(pass.coords);
 
 
 
