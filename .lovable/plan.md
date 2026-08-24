@@ -1,3 +1,8 @@
+# V473 / V474 — Zwei READ-ONLY-Gates: Detektor-Gültigkeit + Aktions-Durchreichung
+
+Zwei getrennte Befunde, zwei getrennte Gates. Beide ohne Provider-Call, ohne Rerender,
+ohne Codeänderung.
+
 # V473 — Ist der NOOP-Detektor überhaupt gültig? (READ-ONLY)
 
 Dein Einwand trifft einen wunden Punkt, und die eigenen Daten stützen ihn:
