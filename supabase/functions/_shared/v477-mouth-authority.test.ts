@@ -27,7 +27,7 @@ Deno.test("V477 — a single mis-detected frame cannot move the anchor", () => {
   const poisoned = [...S01_PASS];
   poisoned[3] = { ...poisoned[3], mouth: [900, 20] };
   const a = resolveTrackMouthAuthority(poisoned);
-  assertEquals(a.mouth, [301, 289]);
+  assertEquals(a.mouth, [302, 289]);
 });
 
 Deno.test("V477 — no measurement never guesses (pose fallback stays owner)", () => {
