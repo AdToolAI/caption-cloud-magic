@@ -52,8 +52,56 @@ function route(detected: Box[], anchors: Box[]) {
 Deno.test("S11: tiny false positives are dropped before assignment", () => {
   const { plausible, rejected } = route(S11_DETECTED, [SARAH, SAMUEL, MATTHEW, KAY]);
   assertEquals(plausible.map((p) => p.index), [0, 1, 2, 3]);
-  assertEquals(rejected.every((r) => r.reason === "area_too_small"), true);
+  // V507 — the authoritative rejection is now the absolute pixel floor.
+  assertEquals(rejected.every((r) => r.reason === "face_too_small_for_lipsync"), true);
 });
+
+// ── V507 — scale-free face size gate ─────────────────────────────────
+Deno.test("V507: four-person wide shot with 50px faces passes (S02 regression)", () => {
+  const D = { width: 1920, height: 1080 };
+  // Faces ~52x68 px → areaRatio ≈ 0.0017 (below the legacy 0.003 floor) but
+  // clearly trackable. These must NOT be filtered any more.
+  const faces: Box[] = [
+    [380, 420, 432, 488],
+    [700, 415, 752, 483],
+    [1040, 418, 1092, 486],
+    [1380, 422, 1432, 490],
+  ];
+  const cands = faces.map((b, i) => ({
+    index: i,
+    bbox: b,
+    cx: (b[0] + b[2]) / 2 / D.width,
+    cy: (b[1] + b[3]) / 2 / D.height,
+  }));
+  const { plausible, rejected, measurements } = filterPlausibleCandidates(cands, D);
+  assertEquals(plausible.length, 4);
+  assertEquals(rejected.length, 0);
+  // Legacy percentage floor is reported as a warning only.
+  assertEquals(plateFaceSanity(faces[0], D).warnings, ["area_too_small"]);
+  assertEquals(measurements.length, 4);
+  assertEquals(measurements[0].shortSidePx, 52);
+});
+
+Deno.test("V507: sub-40px faces still fail closed", () => {
+  const D = { width: 1920, height: 1080 };
+  const tiny: Box = [900, 500, 934, 546]; // short side 34 px
+  const s = plateFaceSanity(tiny, D);
+  assertEquals(s.ok, false);
+  assertEquals(s.reason, "face_too_small_for_lipsync");
+});
+
+Deno.test("V507: face-size failure is contractual, not infrastructure", () => {
+  assertEquals(
+    classifyRouterFailure({
+      reason: "fa4_fail_closed:faces_too_small_for_lipsync:anchor=4/plausible=1/detected=4",
+      detectSucceeded: true,
+      detectedCount: 4,
+      expectedCount: 4,
+    }),
+    "contractual",
+  );
+});
+
 
 Deno.test("S11: bijective geometry assignment picks the four real faces", () => {
   const anchors = [SARAH, SAMUEL, MATTHEW, KAY];
