@@ -7160,6 +7160,29 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       );
     }
 
+    // V502 — Coords-Varianten dürfen nur mit einem Punkt im Raum des
+    // dispatchten Videos feuern. Ohne projizierbaren Anker: fail closed VOR
+    // dem Provider-Call statt einen Plate-Punkt gegen einen 720er-Preclip.
+    if (
+      (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") &&
+      usePassPreclip &&
+      !v502DispatchCoords
+    ) {
+      return await failBeforeProviderDispatch(
+        "preclip_coords_out_of_crop",
+        "v502_coords_contract_invalid",
+        "V502: coords dispatch variant on a pre-clip without a crop-consistent anchor.",
+        422,
+        {
+          retry_variant: retryVariant,
+          v502: (pass as any)._v502_coords_contract ?? null,
+          preclip_crop: (pass as any).preclip_crop ?? null,
+        },
+      );
+    }
+
+
+
 
     // v169.1 — Gate nur scharf schalten wenn Tight-Slicing tatsächlich versucht
     // wurde (N≥2). Bei N=1 ist `allowTightSlice=false` und die volle VO geht
