@@ -6846,7 +6846,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       syncOptions.active_speaker_detection = {
         auto_detect: false,
         frame_number: referenceFrameNumber,
-        coordinates: clampSyncCoords(pass.coords) ?? [Math.round(videoDims.width / 2), Math.round(videoDims.height / 2)],
+        coordinates: v502DispatchCoords ?? clampSyncCoords(pass.coords) ?? [Math.round(videoDims.width / 2), Math.round(videoDims.height / 2)],
       };
     }
 
