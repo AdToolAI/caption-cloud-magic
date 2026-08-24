@@ -32,6 +32,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { shouldUseCameraPath } from "../_shared/dynamic-camera-path.ts";
 import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
+import { resolveMuxOverlayContract } from "../_shared/v503-mux-overlay-contract.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { bindLedgerExternalJob, readRetryContext, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
@@ -512,31 +513,20 @@ serve(async (req) => {
           const outputOffsets: number[] = Array.isArray((p as any).audio_tight?.output_offsets_sec)
             ? ((p as any).audio_tight.output_offsets_sec as number[])
             : [];
-          const preclipCrop = (p as any).preclip_crop;
-          const preclipCropValid =
-            preclipCrop &&
-            Number.isFinite(Number(preclipCrop.x)) &&
-            Number.isFinite(Number(preclipCrop.y)) &&
-            Number.isFinite(Number(preclipCrop.size));
-          // v122 — Defense in depth: if `coords` falls outside the stored
-          // preclip_crop (drifted bbox at dispatch time), ignore the crop
-          // overlay and fall back to the coords-centered circular faceMask.
-          // This keeps historical scenes recoverable on re-mux without
-          // re-rendering all preclips.
-          const coordsInsidePreclipCrop = preclipCropValid && (() => {
-            const cx = Number(p.coords?.[0]);
-            const cy = Number(p.coords?.[1]);
-            if (!Number.isFinite(cx) || !Number.isFinite(cy)) return true;
-            const x = Number(preclipCrop.x);
-            const y = Number(preclipCrop.y);
-            const s = Number(preclipCrop.size);
-            return cx >= x && cx <= x + s && cy >= y && cy <= y + s;
-          })();
-          const hasPreclipCrop = preclipCropValid && coordsInsidePreclipCrop;
-          if (preclipCropValid && !coordsInsidePreclipCrop) {
+          const overlayContract = resolveMuxOverlayContract({
+            preclipCrop: (p as any).preclip_crop,
+            legacyCoords: (p as any).coords,
+          });
+          const preclipCrop = overlayContract.crop;
+          const hasPreclipCrop = !!preclipCrop;
+          // V503 — the persisted crop describes how this already-rendered
+          // preclip maps back onto the master plate. Legacy assignment coords
+          // are telemetry only and cannot invalidate that transform.
+          if (preclipCrop && overlayContract.legacyCoordsInsideCrop === false) {
             console.warn(
-              `[render-sync-segments-audio-mux] scene=${sceneId} pass speaker=${(p as any).speaker_idx} v122_preclip_coords_outside_crop ` +
-              `coords=[${Number(p.coords?.[0])},${Number(p.coords?.[1])}] crop={x:${preclipCrop.x},y:${preclipCrop.y},size:${preclipCrop.size}} — using faceMask fallback`,
+              `[render-sync-segments-audio-mux] scene=${sceneId} pass speaker=${(p as any).speaker_idx} ` +
+              `v503_legacy_coords_ignored coords=[${Number(p.coords?.[0])},${Number(p.coords?.[1])}] ` +
+              `crop={x:${preclipCrop.x},y:${preclipCrop.y},size:${preclipCrop.size}}`,
             );
           }
           // v190 — per-shot silent slots removed. Silent-face anchors are
