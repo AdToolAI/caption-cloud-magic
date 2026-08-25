@@ -116,6 +116,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    // A single character is an incomplete live-typing draft, not a useful
+    // translation unit. Sending it to the model can produce either an empty
+    // reasoning-only completion or a refusal, so pass it through immediately.
+    if (Array.from(text).length < 2) {
+      return new Response(JSON.stringify({ english: text, cached: false, skipped: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Short-circuit: source already English.
     if (sourceLang === 'en') {
       return new Response(JSON.stringify({ english: text, cached: false, skipped: true }), {
