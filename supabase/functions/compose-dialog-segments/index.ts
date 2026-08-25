@@ -150,6 +150,8 @@ import { resolveMouthAnchorPoseAware } from "../_shared/v456-roi-contract.ts";
 import { resolveTrackMouthAuthority } from "../_shared/v477-mouth-authority.ts";
 // V502 — Coords müssen aus DEMSELBEN Crop-Transform stammen wie der Preclip.
 import { resolveCoordsContract } from "../_shared/v502-coords-contract.ts";
+// V513-T0 — shadow motion telemetry (observation only, zero runtime consumers).
+import { buildV513MotionTelemetry } from "../_shared/v513-motion-telemetry.ts";
 
 // FA-4 v406/v407 — Frozen Provider Input Snapshot / Retry-Wire-Parität.
 import {
