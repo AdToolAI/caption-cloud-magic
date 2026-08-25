@@ -11,7 +11,12 @@ import {
 
 type Box = [number, number, number, number];
 
-const s = (t: number, box: Box): V513MotionSample => ({ t, box });
+type FixtureSample = {
+  t: number;
+  box: Box;
+};
+
+const s = (t: number, box: Box): FixtureSample => ({ t, box });
 
 const metric = (value: number | null): number => {
   assert(typeof value === "number");
@@ -35,7 +40,7 @@ const assertUnavailableMetrics = (out: V513MotionTelemetry): void => {
 };
 
 // Golden A — near-static: path ≈ 0.044, net ≈ 0.042 (median face side = 100 px).
-const GOLDEN_A: V513MotionSample[] = [
+const GOLDEN_A: FixtureSample[] = [
   s(0.0, [750.0, 350, 850.0, 450]),
   s(0.25, [752.3, 350, 852.3, 450]),
   s(0.5, [752.2, 350, 852.2, 450]),
@@ -43,7 +48,7 @@ const GOLDEN_A: V513MotionSample[] = [
 ];
 
 // Moving B — path ≈ 1.537, net ≈ 0.623 (median face side = 100 px).
-const MOVING_B: V513MotionSample[] = [
+const MOVING_B: FixtureSample[] = [
   s(0.0, [750.0, 350.0, 850.0, 450.0]),
   s(0.25, [820.0, 350.0, 920.0, 450.0]),
   s(0.5, [820.0, 401.0, 920.0, 501.0]),
