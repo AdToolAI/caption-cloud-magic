@@ -5812,6 +5812,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // no extra Rekognition cost, and `buildCameraPath` reuses these exact
       // samples so the camera path itself is unchanged (that is V478 scope).
       let v477PreTrack: { ok: boolean; reason?: string; samples: any[]; latencyMs?: number } | null = null;
+      // V513-T0 — shadow telemetry only: remember whether the SAME track threw.
+      let v513TrackThrew = false;
+      let v513ThrewReason: string | null = null;
       if (platePassBoxForPreclip) {
         try {
           v477PreTrack = await trackAssignedFaceAcrossTurn({
@@ -5835,7 +5838,32 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               `${err instanceof Error ? err.message : String(err)}`,
           );
           v477PreTrack = null;
+          v513TrackThrew = true;
+          v513ThrewReason = err instanceof Error ? err.message : String(err);
         }
+      }
+      // ── V513-T0 — SHADOW MOTION TELEMETRY ───────────────────────────────
+      // Derived purely from the EXISTING v477 track. No extra provider calls,
+      // no thresholds, no gates, no consumers. Attached additively to the pass
+      // so it rides along with the existing pass write.
+      try {
+        const v513Telemetry = buildV513MotionTelemetry({
+          plateBox: (platePassBoxForPreclip ?? null) as any,
+          track: v477PreTrack,
+          threw: v513TrackThrew,
+          threwReason: v513ThrewReason,
+          plateWidth: plateDims.width,
+          plateHeight: plateDims.height,
+        });
+        (pass as any)._v513_motion_telemetry = v513Telemetry;
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v513_motion_telemetry ` +
+            `status=${v513Telemetry.status} valid=${v513Telemetry.samples_valid}/${v513Telemetry.samples_total} ` +
+            `centroid=${v513Telemetry.centroid_travel_norm} mouth=${v513Telemetry.mouth_travel_norm} ` +
+            `reason=${v513Telemetry.reason ?? "none"}`,
+        );
+      } catch (_v513Err) {
+        // Shadow telemetry must never affect the pipeline.
       }
       const v477Authority = resolveTrackMouthAuthority(
         v477PreTrack?.ok ? (v477PreTrack.samples as any[]) : null,
