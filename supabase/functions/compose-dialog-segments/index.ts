@@ -151,7 +151,7 @@ import { resolveTrackMouthAuthority } from "../_shared/v477-mouth-authority.ts";
 // V502 — Coords müssen aus DEMSELBEN Crop-Transform stammen wie der Preclip.
 import { resolveCoordsContract } from "../_shared/v502-coords-contract.ts";
 // V513-T0 — shadow motion telemetry (observation only, zero runtime consumers).
-import { buildV513MotionTelemetry } from "../_shared/v513-motion-telemetry.ts";
+import { computeV513MotionTelemetry } from "../_shared/v513-motion-telemetry.ts";
 
 // FA-4 v406/v407 — Frozen Provider Input Snapshot / Retry-Wire-Parität.
 import {
@@ -5813,8 +5813,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // samples so the camera path itself is unchanged (that is V478 scope).
       let v477PreTrack: { ok: boolean; reason?: string; samples: any[]; latencyMs?: number } | null = null;
       // V513-T0 — shadow telemetry only: remember whether the SAME track threw.
-      let v513TrackThrew = false;
-      let v513ThrewReason: string | null = null;
+      let v477TrackThrewReason: string | null = null;
       if (platePassBoxForPreclip) {
         try {
           v477PreTrack = await trackAssignedFaceAcrossTurn({
@@ -5838,8 +5837,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               `${err instanceof Error ? err.message : String(err)}`,
           );
           v477PreTrack = null;
-          v513TrackThrew = true;
-          v513ThrewReason = err instanceof Error ? err.message : String(err);
+          v477TrackThrewReason =
+            `track_threw:${err instanceof Error ? err.message : String(err)}`;
         }
       }
       // ── V513-T0 — SHADOW MOTION TELEMETRY ───────────────────────────────
@@ -5847,21 +5846,15 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // no thresholds, no gates, no consumers. Attached additively to the pass
       // so it rides along with the existing pass write.
       try {
-        const v513Telemetry = buildV513MotionTelemetry({
-          plateBox: (platePassBoxForPreclip ?? null) as any,
-          track: v477PreTrack,
-          threw: v513TrackThrew,
-          threwReason: v513ThrewReason,
-          plateWidth: plateDims.width,
-          plateHeight: plateDims.height,
+        (pass as any)._v513_motion_telemetry = computeV513MotionTelemetry({
+          samples: platePassBoxForPreclip ? (v477PreTrack?.samples ?? []) : null,
+          trackOk: v477TrackThrewReason !== null
+            ? false
+            : v477PreTrack
+              ? v477PreTrack.ok
+              : undefined,
+          reason: v477TrackThrewReason ?? v477PreTrack?.reason ?? null,
         });
-        (pass as any)._v513_motion_telemetry = v513Telemetry;
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v513_motion_telemetry ` +
-            `status=${v513Telemetry.status} valid=${v513Telemetry.samples_valid}/${v513Telemetry.samples_total} ` +
-            `centroid=${v513Telemetry.centroid_travel_norm} mouth=${v513Telemetry.mouth_travel_norm} ` +
-            `reason=${v513Telemetry.reason ?? "none"}`,
-        );
       } catch (_v513Err) {
         // Shadow telemetry must never affect the pipeline.
       }
