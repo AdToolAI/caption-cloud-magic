@@ -816,6 +816,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     let v443MotionUnverified = false;
     let v443MeasureAttempts = 0;
     let v443LastInfraReason: string | null = null;
+    // V500-B2 — der Nicht-Terminal-Entscheid des Gates, gehisted bis zur
+    // Pass-Through-Entscheidung. `v500NoopUnverified` ist block-lokal zur
+    // Messroutine; ohne diese Weitergabe faellt der Entscheid unter den
+    // Tisch und der Fail-Closed-Zweig terminalisiert einen Pass, den das
+    // Gate ausdruecklich als NICHT terminal eingestuft hat.
+    //
+    // BOOL, kein Textmuster: die Gruende der drei aelteren Pass-Through-
+    // Faelle werden per Substring erkannt, und der V500-Grund traegt eine
+    // Fliesskommazahl. Eine Klassifikation, die an den Ziffern eines
+    // Messwerts haengt, waere kein Vertrag.
+    let v443V500NoopUnverified = false;
 
     // Eine einzige Messroutine (gleiche Metrik/Threshold/Deadline/ROI/N=6,
     // gleiche rehostete Output-URL) — pre-lock ODER nachgeholt unter Lock.
@@ -959,6 +970,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         mouthAnchorSource: v456Contract.v471?.anchorSource ?? null,
       });
       const v500NoopUnverified = v465Verdict.verdict === "noop" && !v500Gate.terminal;
+      v443V500NoopUnverified = v500NoopUnverified;
       if (v500NoopUnverified) {
         console.warn(
           `[sync-so-webhook] v500_noop_unverified_anchor scene=${sceneId} pass=${measurePassIdx} ` +
@@ -988,7 +1000,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           : null;
       v404MotionProbe = {
         // V500-B2 — a `noop` without a verified mouth anchor is downgraded to
-        // `indeterminate` here so no downstream branch can terminalize it.
+        // `indeterminate` here. That alone disarms the NOOP ladder (which
+        // requires verdict === "noop"), but it does NOT by itself prevent
+        // terminalization: the fail-closed branch below terminalizes every
+        // `indeterminate` that is not on the pass-through allow-list. The
+        // non-terminal decision therefore travels explicitly, via
+        // `v443V500NoopUnverified`.
         verdict: v500NoopUnverified ? "indeterminate" : v465Verdict.verdict,
         // Reason of the measurement failure wins so that V443/V456 pass-through
         // classification keeps working on unmeasurable runs.
@@ -1773,11 +1790,28 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         motionVerdictForMultiSpeaker === "indeterminate" &&
         v443MotionUnverified &&
         /v465_gray_band/.test(String(motionProbeResult?.reason ?? ""));
+      // V500-B2 — a `noop` measured inside a DERIVED mouth band is not a
+      // verdict about the clip. The gate already decided `terminal: false`;
+      // it rides the same narrow gate as the three cases above.
+      //
+      // Re-measuring cannot promote a derived anchor to an observed one, so
+      // there is no exhaustion condition that would make this terminal later
+      // — exactly the reasoning `NON_INFRA_PATTERNS` already records for the
+      // V456 geometry-contract failure.
+      //
+      // Without this disjunct the golden run scores 1.43-2.42 at production
+      // ROI centring (docs/v473-detector-validity-audit.md) and would
+      // terminalize here — the very outcome the V500 release guardrail
+      // exists to prevent.
+      const v500UnverifiedPassthrough = !isSingleSpeakerScene &&
+        motionVerdictForMultiSpeaker === "indeterminate" &&
+        v443MotionUnverified &&
+        v443V500NoopUnverified;
       const v443MotionUnverifiedPassthrough = !isSingleSpeakerScene &&
         motionVerdictForMultiSpeaker === "indeterminate" &&
         v443MotionUnverified &&
         (v443FailureClass === "probe_infra_error" || v458RoiUnresolvedPassthrough ||
-          v466GrayPassthrough);
+          v466GrayPassthrough || v443V500NoopUnverified);
       if (v443MotionUnverifiedPassthrough) {
         console.warn(
           `[sync-so-webhook] v443 scene=${sceneId} pass=${currentPass} speaker="${passSpeakerName}" ` +
@@ -1786,6 +1820,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
                 ? "v466_gray_band"
                 : v458RoiUnresolvedPassthrough
                 ? "mouth_roi_unresolved"
+                : v500UnverifiedPassthrough
+                ? "v500_noop_unverified_anchor"
                 : "probe_infra_error"
             }, ` +
             `attempts=${v443MeasureAttempts}) → success pass-through, telemetry stays motion_unverified ` +
