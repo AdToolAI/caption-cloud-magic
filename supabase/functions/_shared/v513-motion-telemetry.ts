@@ -1,14 +1,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // V513-T0 — SHADOW MOTION TELEMETRY (observation only)
 //
-// Derives motion descriptors from the EXISTING v477 pre-track samples.
-// Hard constraints of this gate:
-//   • No provider / Rekognition / Lambda calls — pure function over samples.
-//   • No thresholds, no gates, no selectors, no adaptive sampling.
-//   • Zero runtime consumers: the result is attached additively to the pass as
-//     `_v513_motion_telemetry` and read by nobody.
-//   • Every persisted number is a finite JSON value; `reason` is capped at 200
-//     characters.
+// Contract (audited):
+//   • Track box semantics are [x1, y1, x2, y2].
+//   • center = [(x1+x2)/2, (y1+y2)/2]
+//   • face side = max(x2-x1, y2-y1)
+//   • ALL normalized translation features are normalized by the MEDIAN FACE
+//     SIDE — never by plate width/height/short side. The helper therefore does
+//     not receive and must not depend on plate dimensions.
+//   • Minimum usable sample count = 3.
+//   • No score, no moving boolean, no thresholds, no gates, no consumers.
+//   • `reason` is capped at 200 characters; every numeric field is a finite,
+//     JSON-safe value. The function never throws.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type V513TelemetryStatus =
@@ -18,39 +21,42 @@ export type V513TelemetryStatus =
   | "insufficient_samples";
 
 export interface V513MotionTelemetry {
-  v: 513;
+  version: 513;
   status: V513TelemetryStatus;
   reason: string | null;
-  /** Total samples returned by the v477 track (0 when unavailable). */
-  samples_total: number;
-  /** Samples carrying a usable face box. */
-  samples_valid: number;
-  /** Samples carrying a mouth landmark. */
-  samples_with_mouth: number;
-  /** Observed track window in plate-absolute seconds. */
-  window_sec: number;
-  /** Face-box centroid travel, normalised by the plate short side. */
-  centroid_travel_norm: number;
-  centroid_max_step_norm: number;
-  /** Mouth landmark travel, normalised by the plate short side. */
-  mouth_travel_norm: number;
-  mouth_max_step_norm: number;
-  /** Face short-side size, normalised by the plate short side. */
-  face_size_norm_min: number;
-  face_size_norm_max: number;
-  face_size_norm_mean: number;
-  /** Measurement latency reported by the track, in ms. */
-  track_latency_ms: number;
+  sample_count: number;
+  median_side_px: number;
+  center_x_range_norm: number;
+  center_y_range_norm: number;
+  center_range_norm: number;
+  net_displacement_norm: number;
+  path_length_norm: number;
+  max_step_norm: number;
+  mean_step_norm: number;
+  side_range_norm: number;
+  side_change_pct: number;
+  heading_changes_gt_90: number;
+  max_heading_change_deg: number;
+  second_difference_norm_diagnostic: number;
+}
+
+export interface V513Input {
+  /** v477 track samples, or null when there was no plate box at all. */
+  samples: unknown[] | null | undefined;
+  /** true/false from the v477 track; undefined when the track never ran. */
+  trackOk: boolean | undefined;
+  /** Track reason, or the `track_threw:` marker. */
+  reason: string | null | undefined;
 }
 
 const REASON_MAX = 200;
+const MIN_SAMPLES = 3;
 
 function cap(reason: unknown): string | null {
   if (reason === null || reason === undefined) return null;
-  const s = typeof reason === "string" ? reason : String(reason);
-  const t = s.trim();
-  if (!t) return null;
-  return t.length > REASON_MAX ? t.slice(0, REASON_MAX) : t;
+  const s = (typeof reason === "string" ? reason : String(reason)).trim();
+  if (!s) return null;
+  return s.length > REASON_MAX ? s.slice(0, REASON_MAX) : s;
 }
 
 /** Coerce to a finite, JSON-safe number rounded to 4 decimals. */
@@ -60,170 +66,155 @@ function fin(value: unknown, fallback = 0): number {
   return Number(n.toFixed(4));
 }
 
-function base(status: V513TelemetryStatus, reason: unknown): V513MotionTelemetry {
+function empty(status: V513TelemetryStatus, reason: unknown): V513MotionTelemetry {
   return {
-    v: 513,
+    version: 513,
     status,
     reason: cap(reason),
-    samples_total: 0,
-    samples_valid: 0,
-    samples_with_mouth: 0,
-    window_sec: 0,
-    centroid_travel_norm: 0,
-    centroid_max_step_norm: 0,
-    mouth_travel_norm: 0,
-    mouth_max_step_norm: 0,
-    face_size_norm_min: 0,
-    face_size_norm_max: 0,
-    face_size_norm_mean: 0,
-    track_latency_ms: 0,
+    sample_count: 0,
+    median_side_px: 0,
+    center_x_range_norm: 0,
+    center_y_range_norm: 0,
+    center_range_norm: 0,
+    net_displacement_norm: 0,
+    path_length_norm: 0,
+    max_step_norm: 0,
+    mean_step_norm: 0,
+    side_range_norm: 0,
+    side_change_pct: 0,
+    heading_changes_gt_90: 0,
+    max_heading_change_deg: 0,
+    second_difference_norm_diagnostic: 0,
   };
-}
-
-export interface V513Input {
-  /** The assignment-locked plate face box, or null when none was available. */
-  plateBox: [number, number, number, number] | null | undefined;
-  /** The EXISTING v477 pre-track result (null when it threw or was skipped). */
-  track:
-    | { ok?: boolean; reason?: string; samples?: unknown[]; latencyMs?: number }
-    | null
-    | undefined;
-  /** True when the v477 track call threw. */
-  threw?: boolean;
-  /** Error text when the v477 track call threw. */
-  threwReason?: string | null;
-  plateWidth: number;
-  plateHeight: number;
 }
 
 type Box = [number, number, number, number];
 
+/** Parse [x1, y1, x2, y2]; rejects degenerate or non-finite boxes. */
 function asBox(value: unknown): Box | null {
   if (!Array.isArray(value) || value.length < 4) return null;
   const b = value.slice(0, 4).map((v) => Number(v));
   if (!b.every((v) => Number.isFinite(v))) return null;
-  if (!(b[2] > 0) || !(b[3] > 0)) return null;
+  if (!(b[2] > b[0]) || !(b[3] > b[1])) return null;
   return b as Box;
 }
 
-function asPoint(value: unknown): [number, number] | null {
-  if (!Array.isArray(value) || value.length < 2) return null;
-  const x = Number(value[0]);
-  const y = Number(value[1]);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-  return [x, y];
+function median(values: number[]): number {
+  const s = [...values].sort((a, b) => a - b);
+  const mid = s.length >> 1;
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
-/**
- * Pure, side-effect-free shadow telemetry. Never throws.
- */
-export function buildV513MotionTelemetry(input: V513Input): V513MotionTelemetry {
+export function computeV513MotionTelemetry(input: V513Input): V513MotionTelemetry {
   try {
-    if (input.threw) {
-      return base("track_failed", input.threwReason ?? "v477_track_threw");
+    if (input.samples === null || input.samples === undefined) {
+      return empty("no_plate_box", input.reason ?? "no_plate_box");
     }
-    if (!asBox(input.plateBox ?? null)) {
-      return base("no_plate_box", "no_assignment_locked_plate_box");
-    }
-    const track = input.track ?? null;
-    if (!track || track.ok !== true) {
-      return base("track_failed", track?.reason ?? "track_unavailable");
+    if (input.trackOk !== true) {
+      return empty("track_failed", input.reason ?? "track_unavailable");
     }
 
-    const rawSamples = Array.isArray(track.samples) ? track.samples : [];
-    const total = rawSamples.length;
-    const latency = fin(track.latencyMs, 0);
-
-    const shortSide = Math.min(
-      Number(input.plateWidth) || 0,
-      Number(input.plateHeight) || 0,
-    );
-    const norm = Number.isFinite(shortSide) && shortSide > 0 ? shortSide : 0;
-
-    const valid: Array<{ t: number; box: Box; mouth: [number, number] | null }> = [];
-    for (const s of rawSamples) {
+    const raw = Array.isArray(input.samples) ? input.samples : [];
+    const parsed: Array<{ t: number; box: Box }> = [];
+    for (const s of raw) {
       const rec = s as Record<string, unknown> | null;
       if (!rec) continue;
       const box = asBox(rec.box);
       if (!box) continue;
       const t = Number(rec.t);
-      valid.push({
-        t: Number.isFinite(t) ? t : 0,
-        box,
-        mouth: asPoint(rec.mouth),
-      });
+      parsed.push({ t: Number.isFinite(t) ? t : parsed.length, box });
     }
-    valid.sort((a, b) => a.t - b.t);
+    parsed.sort((a, b) => a.t - b.t);
 
-    if (valid.length < 2 || norm <= 0) {
-      const out = base(
-        "insufficient_samples",
-        valid.length < 2 ? `valid_samples=${valid.length}` : "plate_dims_invalid",
-      );
-      out.samples_total = fin(total);
-      out.samples_valid = fin(valid.length);
-      out.samples_with_mouth = fin(valid.filter((v) => v.mouth).length);
-      out.track_latency_ms = latency;
+    if (parsed.length < MIN_SAMPLES) {
+      const out = empty("insufficient_samples", `usable_samples=${parsed.length}`);
+      out.sample_count = fin(parsed.length);
       return out;
     }
 
-    let centroidTravel = 0;
-    let centroidMaxStep = 0;
-    let mouthTravel = 0;
-    let mouthMaxStep = 0;
-    let sizeMin = Number.POSITIVE_INFINITY;
-    let sizeMax = 0;
-    let sizeSum = 0;
-    let prevCentroid: [number, number] | null = null;
-    let prevMouth: [number, number] | null = null;
-    let mouthCount = 0;
+    const centers = parsed.map(
+      (p) =>
+        [(p.box[0] + p.box[2]) / 2, (p.box[1] + p.box[3]) / 2] as [number, number],
+    );
+    const sides = parsed.map((p) => Math.max(p.box[2] - p.box[0], p.box[3] - p.box[1]));
 
-    for (const s of valid) {
-      const cx = s.box[0] + s.box[2] / 2;
-      const cy = s.box[1] + s.box[3] / 2;
-      if (prevCentroid) {
-        const d = Math.hypot(cx - prevCentroid[0], cy - prevCentroid[1]) / norm;
-        centroidTravel += d;
-        if (d > centroidMaxStep) centroidMaxStep = d;
-      }
-      prevCentroid = [cx, cy];
-
-      if (s.mouth) {
-        mouthCount += 1;
-        if (prevMouth) {
-          const d = Math.hypot(s.mouth[0] - prevMouth[0], s.mouth[1] - prevMouth[1]) / norm;
-          mouthTravel += d;
-          if (d > mouthMaxStep) mouthMaxStep = d;
-        }
-        prevMouth = s.mouth;
-      }
-
-      const faceShort = Math.min(s.box[2], s.box[3]) / norm;
-      if (faceShort < sizeMin) sizeMin = faceShort;
-      if (faceShort > sizeMax) sizeMax = faceShort;
-      sizeSum += faceShort;
+    const medianSide = median(sides);
+    if (!(medianSide > 0)) {
+      const out = empty("insufficient_samples", "median_side_invalid");
+      out.sample_count = fin(parsed.length);
+      return out;
     }
 
-    const windowSec = Math.max(0, valid[valid.length - 1].t - valid[0].t);
+    const xs = centers.map((c) => c[0]);
+    const ys = centers.map((c) => c[1]);
+    const xRange = (Math.max(...xs) - Math.min(...xs)) / medianSide;
+    const yRange = (Math.max(...ys) - Math.min(...ys)) / medianSide;
+
+    const first = centers[0];
+    const last = centers[centers.length - 1];
+    const netDisplacement = Math.hypot(last[0] - first[0], last[1] - first[1]) / medianSide;
+
+    let pathLength = 0;
+    let maxStep = 0;
+    const steps: Array<[number, number]> = [];
+    for (let i = 1; i < centers.length; i++) {
+      const dx = centers[i][0] - centers[i - 1][0];
+      const dy = centers[i][1] - centers[i - 1][1];
+      steps.push([dx, dy]);
+      const d = Math.hypot(dx, dy) / medianSide;
+      pathLength += d;
+      if (d > maxStep) maxStep = d;
+    }
+    const meanStep = steps.length ? pathLength / steps.length : 0;
+
+    let headingChangesGt90 = 0;
+    let maxHeadingChange = 0;
+    for (let i = 1; i < steps.length; i++) {
+      const [ax, ay] = steps[i - 1];
+      const [bx, by] = steps[i];
+      const na = Math.hypot(ax, ay);
+      const nb = Math.hypot(bx, by);
+      if (na === 0 || nb === 0) continue;
+      const cos = Math.min(1, Math.max(-1, (ax * bx + ay * by) / (na * nb)));
+      const deg = (Math.acos(cos) * 180) / Math.PI;
+      if (deg > 90) headingChangesGt90 += 1;
+      if (deg > maxHeadingChange) maxHeadingChange = deg;
+    }
+
+    let secondDiffSum = 0;
+    let secondDiffCount = 0;
+    for (let i = 1; i < centers.length - 1; i++) {
+      const dx = centers[i + 1][0] - 2 * centers[i][0] + centers[i - 1][0];
+      const dy = centers[i + 1][1] - 2 * centers[i][1] + centers[i - 1][1];
+      secondDiffSum += Math.hypot(dx, dy) / medianSide;
+      secondDiffCount += 1;
+    }
+    const secondDiff = secondDiffCount ? secondDiffSum / secondDiffCount : 0;
+
+    const minSide = Math.min(...sides);
+    const maxSide = Math.max(...sides);
+    const sideRange = (maxSide - minSide) / medianSide;
 
     return {
-      v: 513,
+      version: 513,
       status: "ok",
-      reason: cap(track.reason),
-      samples_total: fin(total),
-      samples_valid: fin(valid.length),
-      samples_with_mouth: fin(mouthCount),
-      window_sec: fin(windowSec),
-      centroid_travel_norm: fin(centroidTravel),
-      centroid_max_step_norm: fin(centroidMaxStep),
-      mouth_travel_norm: fin(mouthTravel),
-      mouth_max_step_norm: fin(mouthMaxStep),
-      face_size_norm_min: fin(Number.isFinite(sizeMin) ? sizeMin : 0),
-      face_size_norm_max: fin(sizeMax),
-      face_size_norm_mean: fin(sizeSum / valid.length),
-      track_latency_ms: latency,
+      reason: cap(input.reason),
+      sample_count: fin(parsed.length),
+      median_side_px: fin(medianSide),
+      center_x_range_norm: fin(xRange),
+      center_y_range_norm: fin(yRange),
+      center_range_norm: fin(Math.hypot(xRange, yRange)),
+      net_displacement_norm: fin(netDisplacement),
+      path_length_norm: fin(pathLength),
+      max_step_norm: fin(maxStep),
+      mean_step_norm: fin(meanStep),
+      side_range_norm: fin(sideRange),
+      side_change_pct: fin(sideRange * 100),
+      heading_changes_gt_90: fin(headingChangesGt90),
+      max_heading_change_deg: fin(maxHeadingChange),
+      second_difference_norm_diagnostic: fin(secondDiff),
     };
   } catch (err) {
-    return base("track_failed", err instanceof Error ? err.message : String(err));
+    return empty("track_failed", err instanceof Error ? err.message : String(err));
   }
 }
