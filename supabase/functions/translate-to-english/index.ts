@@ -35,7 +35,12 @@ async function sha1(s: string): Promise<string> {
     .join('');
 }
 
-async function translateViaGateway(text: string, sourceLang: Lang): Promise<string> {
+interface GatewayTranslation {
+  english: string;
+  generated: boolean;
+}
+
+async function translateViaGateway(text: string, sourceLang: Lang): Promise<GatewayTranslation> {
   const langWord = sourceLang === 'de' ? 'German' : sourceLang === 'es' ? 'Spanish' : 'English';
   const sys =
     `You translate short cinematic scene-action descriptions from ${langWord} to natural cinematic English. ` +
@@ -64,9 +69,21 @@ async function translateViaGateway(text: string, sourceLang: Lang): Promise<stri
     throw err;
   }
   const json = await res.json();
-  const out = json?.choices?.[0]?.message?.content?.trim() ?? '';
-  if (!out) throw new Error('empty translation');
-  return out;
+  const choice = json?.choices?.[0];
+  const out = choice?.message?.content?.trim() ?? '';
+  if (!out) {
+    // Gemini can spend its completion entirely on internal reasoning for very
+    // short/incomplete live-typing input (for example "s") and still return
+    // HTTP 200 with blank content. This is not a function failure: preserve the
+    // source until the next debounced request contains enough text to translate.
+    console.warn('[translate-to-english] gateway returned no visible text', {
+      finishReason: choice?.finish_reason ?? null,
+      nativeFinishReason: choice?.native_finish_reason ?? null,
+      sourceLength: text.length,
+    });
+    return { english: text, generated: false };
+  }
+  return { english: out, generated: true };
 }
 
 Deno.serve(async (req) => {
@@ -121,9 +138,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    let english: string;
+    let translation: GatewayTranslation;
     try {
-      english = await translateViaGateway(text, sourceLang);
+      translation = await translateViaGateway(text, sourceLang);
     } catch (e: any) {
       if (e.status === 429 || e.status === 402) {
         return new Response(
@@ -140,11 +157,17 @@ Deno.serve(async (req) => {
       throw e;
     }
 
-    await svc
-      .from('translation_cache')
-      .upsert({ hash: key, source_lang: sourceLang, target_lang: 'en', source: text, target: english });
+    const { english, generated } = translation;
 
-    return new Response(JSON.stringify({ english, cached: false }), {
+    // Never cache a passthrough caused by an empty model response. A later
+    // request for the same input should still be able to obtain a translation.
+    if (generated) {
+      await svc
+        .from('translation_cache')
+        .upsert({ hash: key, source_lang: sourceLang, target_lang: 'en', source: text, target: english });
+    }
+
+    return new Response(JSON.stringify({ english, cached: false, fallback: !generated }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e: any) {
