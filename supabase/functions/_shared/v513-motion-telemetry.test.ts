@@ -47,7 +47,7 @@ Deno.test("A2) center is the midpoint, not origin + half of x2/y2", () => {
   // the helper used [x, y, w, h] semantics.
   const out = ok([
     s(0, [800, 400, 900, 500]),
-    s(1, [810, 400, 890, 500]),
+    s(1, [810, 410, 890, 490]),
     s(2, [800, 400, 900, 500]),
   ]);
   // Midpoints: 850, 850, 850 → no translation.
