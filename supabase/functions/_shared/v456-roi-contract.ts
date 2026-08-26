@@ -42,12 +42,23 @@ export const V456_ROI_CONTRACT_VERSION = "v456";
 /** Reason prefix emitted whenever the geometry contract is not satisfied. */
 export const MOUTH_ROI_UNRESOLVED = "mouth_roi_unresolved";
 
+/**
+ * V461 C / Step 2 — how far the verdict band may be pushed back into frame
+ * before it stops describing the mouth.
+ *
+ * NOT a new verdict threshold. It is the same numeric slack that
+ * `roiInsideBounds` already uses below, applied to the question clamping
+ * hides.
+ */
+export const V456_ROI_CLAMP_TOLERANCE = 1e-6;
+
 export type V456CheckName =
   | "anchor_source"
   | "face_bbox"
   | "face_share"
   | "mouth_anchor"
   | "roi_bounds"
+  | "roi_clamped"
   | "identity";
 
 export interface V456Identity {
@@ -190,6 +201,7 @@ export function evaluateMouthRoiContract(
     face_share: false,
     mouth_anchor: false,
     roi_bounds: false,
+    roi_clamped: false,
     identity: false,
   };
   const derived = deriveMouthRoi(input ?? null);
@@ -276,6 +288,44 @@ export function evaluateMouthRoiContract(
       checks: { ...checks, roi_bounds: false },
       v471,
     };
+  }
+
+  // ── 8. V461 C / Step 2 — a CLAMPED band is not a measurement region ───
+  //
+  // `resolveV471MouthRoi` clamps its centre into frame
+  // (`clamp(cx, width/2, 1 - width/2)`) and returns the UNCLAMPED centre
+  // separately. Clamping is right for rendering a box; it silently moves
+  // the MEASUREMENT window off the mouth. Scene 67b392b1 pass 2 sits at
+  // cx 0.9583 with a V471 band of 0.4105, so the centre is shoved to
+  // 0.7947 — the measurement window moves 0.1636 of the frame width off
+  // the mouth, which is the documented false-NOOP mechanism
+  // (docs/v471a-roi-sampling-parity.md).
+  //
+  // The frozen V465 chain, its band and its thresholds are untouched. What
+  // changes is only whether such a measurement may become a TERMINAL
+  // verdict: it may not. `mouth_roi_unresolved` is the state this file
+  // already owns for exactly that, and it rides the existing
+  // `motion_unverified` path — never green, never terminal.
+  //
+  // Scoped to the V471 authority. Legacy passes without a persisted face
+  // box keep the frozen V434 behaviour (see 7); for them the check is not
+  // applicable and therefore PASSES — a `false` would read as failed and
+  // break every `checks` consumer that folds with `every(Boolean)`.
+  checks.roi_clamped = true;
+  if (v471?.roi && v471.center) {
+    const overhang = Math.max(
+      v471.roi.width / 2 - v471.center.cx,
+      v471.center.cx - (1 - v471.roi.width / 2),
+      v471.roi.height / 2 - v471.center.cy,
+      v471.center.cy - (1 - v471.roi.height / 2),
+    );
+    if (overhang > V456_ROI_CLAMP_TOLERANCE) {
+      return {
+        ...fail("roi_clamped", `v471_roi_clamped:overhang=${overhang.toFixed(4)}`),
+        checks: { ...checks, roi_clamped: false },
+        v471,
+      };
+    }
   }
 
   return {

@@ -63,6 +63,31 @@ export interface V461FaceGateInput {
   identity?: V461Identity | null;
   /** Identity of the pass being dispatched right now. */
   expectedIdentity?: V461Identity | null;
+  /**
+   * `preclip_camera_path_dynamic` — the renderer followed a MOVING crop.
+   * The static `crop` + `mouthOffsetXy` pair then describes a geometry that
+   * was never rendered.
+   */
+  cameraPathDynamic?: boolean | null;
+  /**
+   * `preclip_camera_path.keyframes` — the FROZEN geometry the renderer
+   * actually consumed, in PLATE pixels.
+   *
+   * NOT `preclip_mouth_roi_samples`: those are clamped to [0,1] and can
+   * therefore never express a mouth that left the crop. A gate fed clamped
+   * values is a gate that cannot fail.
+   */
+  cameraPathKeyframes?: Array<V461CameraKeyframe | null | undefined> | null;
+}
+
+/** Subset of `CameraPathKeyframe` this gate needs. Plate pixels. */
+export interface V461CameraKeyframe {
+  t?: number | null;
+  x?: number | null;
+  y?: number | null;
+  size?: number | null;
+  mx?: number | null;
+  my?: number | null;
 }
 
 export interface V461FaceGateMetrics {
@@ -73,6 +98,17 @@ export interface V461FaceGateMetrics {
   mouth_roi: { centerX: number; centerY: number; width: number; height: number } | null;
   mouth_roi_checked: boolean;
   scale_provider_per_plate: number | null;
+  /** Which geometry the ROI decision was taken on. */
+  mouth_roi_source: "static" | "camera_path" | null;
+  /** Keyframes actually evaluated (0 on the static branch). */
+  mouth_roi_keyframes_checked: number;
+  /** `t` of the tightest keyframe, seconds relative to the preclip start. */
+  mouth_roi_worst_t: number | null;
+  /**
+   * Smallest normalized distance from the band edge to the frame edge.
+   * Negative = overhang, i.e. the band does not fit.
+   */
+  mouth_roi_worst_margin: number | null;
 }
 
 export interface V461FaceGateResult {
@@ -94,6 +130,10 @@ const num = (v: unknown): number | null => {
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+/** `num`, but an ABSENT value stays absent instead of coercing to 0. */
+const strictNum = (v: unknown): number | null =>
+  v === null || v === undefined || v === "" ? null : num(v);
+
 function identityMatches(a?: V461Identity | null, b?: V461Identity | null): boolean {
   if (!a || !b) return false;
   const cmp = (x: unknown, y: unknown): boolean => {
@@ -107,6 +147,98 @@ function identityMatches(a?: V461Identity | null, b?: V461Identity | null): bool
 }
 
 /**
+ * PURE — is the band fully inside the frame?
+ *
+ * Extracted verbatim from the original inline expression so the static and
+ * the dynamic branch cannot drift apart: same operators, same order, so the
+ * static decision stays bit-identical.
+ */
+function roiFullyInside(roi: { centerX: number; centerY: number; width: number; height: number }): boolean {
+  return roi.centerX - roi.width / 2 >= 0 &&
+    roi.centerX + roi.width / 2 <= 1 &&
+    roi.centerY - roi.height / 2 >= 0 &&
+    roi.centerY + roi.height / 2 <= 1;
+}
+
+/** PURE — DIAGNOSTIC distance to the frame edge. Negative = overhang. */
+function roiMargin(roi: { centerX: number; centerY: number; width: number; height: number }): number {
+  return Math.min(
+    roi.centerX - roi.width / 2,
+    1 - (roi.centerX + roi.width / 2),
+    roi.centerY - roi.height / 2,
+    1 - (roi.centerY + roi.height / 2),
+  );
+}
+
+/** PURE — the mouth band size. Unchanged V434 constants and derivation. */
+function mouthBand(faceShare: number): { width: number; height: number } {
+  const faceSideFrac = clamp(Math.sqrt(faceShare), 0.05, 1);
+  return {
+    width: clamp(
+      V434_MOUTH_BAND.widthOfFaceSide * faceSideFrac,
+      V434_MOUTH_BAND.minWidth,
+      V434_MOUTH_BAND.maxWidth,
+    ),
+    height: clamp(
+      V434_MOUTH_BAND.heightOfFaceSide * faceSideFrac,
+      V434_MOUTH_BAND.minHeight,
+      V434_MOUTH_BAND.maxHeight,
+    ),
+  };
+}
+
+/** A keyframe that can actually place a mouth inside a crop. */
+export interface V461UsableKeyframe {
+  t: number;
+  x: number;
+  y: number;
+  size: number;
+  mx: number;
+  my: number;
+}
+
+/**
+ * PURE — keyframes that carry a crop AND a mouth. Everything else cannot
+ * support a containment statement and is dropped; if nothing survives, the
+ * caller falls back to the static contract.
+ */
+export function usableCameraKeyframes(
+  keyframes: Array<V461CameraKeyframe | null | undefined> | null | undefined,
+): V461UsableKeyframe[] {
+  if (!Array.isArray(keyframes)) return [];
+  const out: V461UsableKeyframe[] = [];
+  for (const k of keyframes) {
+    if (!k) continue;
+    // `num` alone is NOT enough: `Number(null)` is 0 and `Number("")` is 0,
+    // so a keyframe with NO mouth (`mx: null` is a legal CameraPathKeyframe)
+    // would read as a mouth at plate x=0 and fabricate an escape.
+    const x = strictNum(k.x), y = strictNum(k.y), size = strictNum(k.size);
+    const mx = strictNum(k.mx), my = strictNum(k.my);
+    if (x === null || y === null || size === null || size <= 0) continue;
+    if (mx === null || my === null) continue;
+    out.push({ t: num(k.t) ?? 0, x, y, size, mx, my });
+  }
+  return out;
+}
+
+/**
+ * PURE — the mouth band at ONE rendered keyframe, inside that keyframe own
+ * crop. UNCLAMPED on purpose: a clamped centre cannot express an escape.
+ */
+export function unclampedMouthRoiAtKeyframe(
+  faceShare: number,
+  k: V461UsableKeyframe,
+): { centerX: number; centerY: number; width: number; height: number } {
+  const { width, height } = mouthBand(faceShare);
+  return {
+    centerX: (k.mx - k.x) / k.size,
+    centerY: (k.my - k.y) / k.size,
+    width,
+    height,
+  };
+}
+
+/**
  * PURE — unclamped mouth band in provider-normalized coordinates. Unlike
  * `deriveMouthRoi` (which clamps the band into frame for MEASUREMENT), the
  * gate needs to know whether the band would have to be clamped at all: a
@@ -117,17 +249,7 @@ export function unclampedMouthRoi(
   mouthOffsetXy: { dx: number; dy: number } | null,
   cropSizePlatePx: number,
 ): { centerX: number; centerY: number; width: number; height: number } {
-  const faceSideFrac = clamp(Math.sqrt(faceShare), 0.05, 1);
-  const width = clamp(
-    V434_MOUTH_BAND.widthOfFaceSide * faceSideFrac,
-    V434_MOUTH_BAND.minWidth,
-    V434_MOUTH_BAND.maxWidth,
-  );
-  const height = clamp(
-    V434_MOUTH_BAND.heightOfFaceSide * faceSideFrac,
-    V434_MOUTH_BAND.minHeight,
-    V434_MOUTH_BAND.maxHeight,
-  );
+  const { width, height } = mouthBand(faceShare);
   const centerX = mouthOffsetXy ? 0.5 + mouthOffsetXy.dx / cropSizePlatePx : 0.5;
   const centerY = mouthOffsetXy ? 0.5 + mouthOffsetXy.dy / cropSizePlatePx : 0.5;
   return { centerX, centerY, width, height };
@@ -150,6 +272,10 @@ export function evaluateV461FaceGate(input: V461FaceGateInput): V461FaceGateResu
     mouth_roi: null,
     mouth_roi_checked: false,
     scale_provider_per_plate: null,
+    mouth_roi_source: null,
+    mouth_roi_keyframes_checked: 0,
+    mouth_roi_worst_t: null,
+    mouth_roi_worst_margin: null,
   };
 
   const done = (
@@ -234,18 +360,65 @@ export function evaluateV461FaceGate(input: V461FaceGateInput): V461FaceGateResu
   const dy = num(input.mouthOffsetXy?.dy);
   const hasMouthVector = input.anchor === "mouth" && dx !== null && dy !== null;
   if (hasMouthVector) {
-    const roi = unclampedMouthRoi(share, { dx: dx as number, dy: dy as number }, cropSize);
-    metrics.mouth_roi = roi;
-    metrics.mouth_roi_checked = true;
-    const inside = roi.centerX - roi.width / 2 >= 0 &&
-      roi.centerX + roi.width / 2 <= 1 &&
-      roi.centerY - roi.height / 2 >= 0 &&
-      roi.centerY + roi.height / 2 <= 1;
-    if (!inside) {
-      checks.mouth_roi = false;
-      return done("block", "preclip_mouth_roi_outside_crop", "mouth_roi_out_of_bounds", "mouth_roi");
+    // V461 C — WHICH geometry is authoritative here.
+    //
+    // On a dynamic path the renderer consumed `preclip_camera_path`, while
+    // `crop` + `mouthOffsetXy` describe a single static base crop and ONE
+    // collapsed median mouth. Scene 67b392b1 pass 2 blocked at
+    // `0.5 + 66/144 = 0.9583` although every rendered frame contained the
+    // mouth: the gate was evaluating a geometry that was never rendered.
+    //
+    // The band derivation, its constants and the containment predicate are
+    // unchanged. Only the CENTRE moves per keyframe.
+    const dynamicKeyframes = input.cameraPathDynamic === true
+      ? usableCameraKeyframes(input.cameraPathKeyframes)
+      : [];
+
+    if (dynamicKeyframes.length > 0) {
+      // Conservative: EVERY rendered keyframe must contain the band. The
+      // tightest one decides and is the one reported.
+      metrics.mouth_roi_source = "camera_path";
+      metrics.mouth_roi_keyframes_checked = dynamicKeyframes.length;
+      let worstRoi = unclampedMouthRoiAtKeyframe(share, dynamicKeyframes[0]);
+      let worstMargin = roiMargin(worstRoi);
+      let worstT = dynamicKeyframes[0].t;
+      for (let i = 1; i < dynamicKeyframes.length; i++) {
+        const roiI = unclampedMouthRoiAtKeyframe(share, dynamicKeyframes[i]);
+        const marginI = roiMargin(roiI);
+        if (marginI < worstMargin) {
+          worstMargin = marginI;
+          worstRoi = roiI;
+          worstT = dynamicKeyframes[i].t;
+        }
+      }
+      metrics.mouth_roi = worstRoi;
+      metrics.mouth_roi_checked = true;
+      metrics.mouth_roi_worst_t = worstT;
+      metrics.mouth_roi_worst_margin = worstMargin;
+      if (!roiFullyInside(worstRoi)) {
+        checks.mouth_roi = false;
+        return done(
+          "block",
+          "preclip_mouth_roi_outside_crop",
+          `mouth_roi_out_of_bounds:camera_path t=${worstT} margin=${worstMargin.toFixed(4)}`,
+          "mouth_roi",
+        );
+      }
+      checks.mouth_roi = true;
+    } else {
+      // Static contract — unchanged. Also the fallback whenever the path is
+      // not dynamic or carries no usable keyframe.
+      const roi = unclampedMouthRoi(share, { dx: dx as number, dy: dy as number }, cropSize);
+      metrics.mouth_roi = roi;
+      metrics.mouth_roi_checked = true;
+      metrics.mouth_roi_source = "static";
+      metrics.mouth_roi_worst_margin = roiMargin(roi);
+      if (!roiFullyInside(roi)) {
+        checks.mouth_roi = false;
+        return done("block", "preclip_mouth_roi_outside_crop", "mouth_roi_out_of_bounds", "mouth_roi");
+      }
+      checks.mouth_roi = true;
     }
-    checks.mouth_roi = true;
   } else {
     checks.mouth_roi = null; // unchecked — pose estimate stays allowed
   }

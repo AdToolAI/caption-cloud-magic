@@ -7639,6 +7639,19 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         ? String((pass as any).preclip_anchor).startsWith("mouth") ? "mouth" : (pass as any).preclip_anchor
         : null,
       mouthOffsetXy: (pass as any).preclip_mouth_offset_xy ?? null,
+      // V461 C — the geometry the renderer ACTUALLY consumed.
+      //
+      // `preclip_crop` + `preclip_mouth_offset_xy` above describe the static
+      // base crop and one collapsed median mouth. When the pre-clip was
+      // rendered along a moving camera path, that pair is not the geometry
+      // that exists on disk, and gating on it blocks passes whose every
+      // rendered frame contains the mouth (scene 67b392b1 pass 2).
+      //
+      // The frozen path is passed, NOT `preclip_mouth_roi_samples`: those
+      // are clamped to [0,1] and could never express an escape.
+      cameraPathDynamic: (pass as any).preclip_camera_path_dynamic === true,
+      cameraPathKeyframes:
+        ((pass as any).preclip_camera_path ?? (pass as any)._v450_frozen_camera_path)?.keyframes ?? null,
       identity: (pass as any).preclip_geometry_identity ?? null,
       expectedIdentity: (pass as any).preclip_geometry_identity
         ? {
@@ -7658,7 +7671,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       metrics: v461Gate.metrics,
     };
     console.log(
-      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v461_face_gate=${v461Gate.status} code=${v461Gate.code} share=${v461Gate.metrics.face_share ?? "?"} size_px=${v461Gate.metrics.face_size_provider_px?.toFixed?.(1) ?? "?"}`,
+      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v461_face_gate=${v461Gate.status} code=${v461Gate.code} share=${v461Gate.metrics.face_share ?? "?"} size_px=${v461Gate.metrics.face_size_provider_px?.toFixed?.(1) ?? "?"} ` +
+        `roi_src=${v461Gate.metrics.mouth_roi_source ?? "n/a"} ` +
+        `kf=${v461Gate.metrics.mouth_roi_keyframes_checked} ` +
+        `worst_t=${v461Gate.metrics.mouth_roi_worst_t ?? "n/a"} ` +
+        `worst_margin=${v461Gate.metrics.mouth_roi_worst_margin?.toFixed?.(4) ?? "n/a"}`,
     );
     if (!v461Gate.ok) {
       return await failBeforeProviderDispatch(
