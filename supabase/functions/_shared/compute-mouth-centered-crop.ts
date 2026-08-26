@@ -43,22 +43,6 @@ export interface MouthCenteredCropInput {
    * `null`/omitted keeps the historical behaviour: no upper bound.
    */
   faceShareFloor?: number | null;
-  /**
-   * V461 E — smallest crop side that can hold the face at ANY SINGLE
-   * sample of the turn, already expressed in the camera planner's own
-   * containment contract.
-   *
-   * Supplying it switches the feasibility model from STATIC to DYNAMIC:
-   * a moving crop never has to contain the whole time-union at once, so
-   * the union is not a valid lower bound for it. Production 67b392b1 run
-   * 811da925 pass 0 was refused at `min_crop_243px` derived from a
-   * 157x221 union while every individual box needed only ~171 px and the
-   * cap allowed 235.
-   *
-   * The caller derives this with the planner's `CONTAINMENT_PAD_RATIO` so
-   * the number has one authority. `null`/omitted keeps the static model.
-   */
-  perFrameMinCropPx?: number | null;
 }
 
 export type ContainReason =
@@ -118,12 +102,6 @@ export interface MouthCenteredCropResult {
   infeasibleReason: string | null;
   /** True when the preferred `minSize` floor yielded to the share cap. */
   preferredFloorYielded: boolean;
-  /** Which feasibility model decided the lower bound. */
-  feasibilityMode: "static" | "dynamic";
-  /** Union-based lower bound. Reported in BOTH modes, authoritative only in static. */
-  minCropStaticPx: number;
-  /** Per-sample lower bound. `null` when the caller supplied no turn geometry. */
-  minCropDynamicPx: number | null;
 }
 
 
@@ -223,7 +201,6 @@ export function computeMouthCenteredCrop(
     minSize = 96,
     outputSize = 720,
     faceShareFloor = null,
-    perFrameMinCropPx = null,
   } = input;
 
   if (plateWidth <= 0 || plateHeight <= 0) {
@@ -262,11 +239,6 @@ export function computeMouthCenteredCrop(
   const preferredFloorYielded = effectiveMinSize < minSize;
 
   let size = Math.round(Math.min(maxSide, Math.max(effectiveMinSize, idealSide)));
-  // V461 E — a moving crop must still hold the face at every single sample.
-  const perFrameFloor = Number(perFrameMinCropPx);
-  if (Number.isFinite(perFrameFloor) && perFrameFloor > 0) {
-    size = Math.max(size, Math.ceil(perFrameFloor));
-  }
   // A face large enough that `idealSide` alone overshoots the cap.
   if (shareCap !== null && size > shareCap) size = shareCap;
 
@@ -313,16 +285,6 @@ export function computeMouthCenteredCrop(
     y = Math.max(0, Math.min(plateHeight - size, Math.round(faceCy - size / 2)));
   }
 
-  // ── V461 E — which feasibility model applies to THIS render ──────────
-  //
-  // A moving crop is not required to contain the whole turn at once. When
-  // the caller supplied a per-sample bound, the union stops being a size
-  // authority: it may still be reported, but it must not grow the crop and
-  // it must not decide feasibility. Position is the camera path's job.
-  const perFrameMin = Number(perFrameMinCropPx);
-  const dynamicFeasibility = Number.isFinite(perFrameMin) && perFrameMin > 0;
-  const feasibilityMode: "static" | "dynamic" = dynamicFeasibility ? "dynamic" : "static";
-
   // ── V457 — the crop MUST contain the padded dispatch box ─────────────
   let containsTarget: boolean | null = null;
   let containReason: ContainReason = "no_contain_box";
@@ -334,26 +296,12 @@ export function computeMouthCenteredCrop(
     const p = projectCropToContain({ x, y, size }, containBox, plateWidth, plateHeight);
     containsTarget = p.containsTarget;
     containReason = p.reason;
-    if (!dynamicFeasibility) {
-      // STATIC — unchanged: the projection owns position AND size.
-      shiftPx = p.shiftPx;
-      sizeGrown = p.sizeGrown;
-      sizeGrownPx = p.sizeGrownPx;
-      x = p.crop.x;
-      y = p.crop.y;
-      size = p.crop.size;
-    } else if (!p.sizeGrown) {
-      // DYNAMIC, and the union happens to FIT at the chosen size: take
-      // the shift. Repositioning is free and strictly helps — it is what
-      // lets a static-equivalent path still cover the whole turn.
-      shiftPx = p.shiftPx;
-      x = p.crop.x;
-      y = p.crop.y;
-    }
-    // DYNAMIC and the union would have to GROW the crop: discard the
-    // projection entirely. Growing to the time-union is exactly the false
-    // constraint this mode exists to remove; the camera path re-windows
-    // per frame and the planner confirmation decides.
+    shiftPx = p.shiftPx;
+    sizeGrown = p.sizeGrown;
+    sizeGrownPx = p.sizeGrownPx;
+    x = p.crop.x;
+    y = p.crop.y;
+    size = p.crop.size;
   }
 
   const clamped = x !== rawX || y !== rawY;
@@ -367,11 +315,7 @@ export function computeMouthCenteredCrop(
   const containSide = containBox
     ? Math.max(containBox[2] - containBox[0], containBox[3] - containBox[1])
     : 0;
-  const minCropStaticPx = Math.ceil(Math.max(faceFloor, containSide));
-  const minCropDynamicPx = dynamicFeasibility
-    ? Math.ceil(Math.max(faceFloor, perFrameMin))
-    : null;
-  const minCropRequiredPx = dynamicFeasibility ? minCropDynamicPx! : minCropStaticPx;
+  const minCropRequiredPx = Math.ceil(Math.max(faceFloor, containSide));
   const feasible = shareCap === null ? true : minCropRequiredPx <= shareCap;
   const infeasibleReason = feasible
     ? null
@@ -408,8 +352,5 @@ export function computeMouthCenteredCrop(
     feasible,
     infeasibleReason,
     preferredFloorYielded,
-    feasibilityMode,
-    minCropStaticPx,
-    minCropDynamicPx,
   };
 }
