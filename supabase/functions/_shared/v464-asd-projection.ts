@@ -196,6 +196,23 @@ export interface BuildAsdBoxesResult {
   trackTravelPx: number;
   /** Preclip-space centre travel of the emitted boxes. */
   boxTravelPx: number;
+
+  // ── V509 — framing-margin provenance (diagnostic only) ──────────────
+  /**
+   * `legacy_anchor`  the anchor pair IS the complete framing authority
+   *                  (no usable track) — raw margins, unchanged.
+   * `track_expansion_only`  a real Track(t) is the geometric authority;
+   *                  anchor margins may only PAD it, never shrink it.
+   */
+  marginPolicy: "legacy_anchor" | "track_expansion_only";
+  /** Margins as derived from the anchor pair, before any clamping. */
+  rawAnchorMargins: [number, number, number, number];
+  /** Margins actually applied per frame. */
+  appliedMargins: [number, number, number, number];
+  /** True when a tracked frame had at least one negative raw margin. */
+  negativeMarginsClamped: boolean;
+  /** The anchor face in preclip space — the other half of the margin pair. */
+  anchorFaceProjected: Box;
 }
 
 /**
@@ -211,7 +228,40 @@ export function buildPerFrameAsdBoxes(input: BuildAsdBoxesInput): BuildAsdBoxesR
     input.cameraPath.keyframes.length > 1;
 
   const anchorFaceProjected = projectPlateBoxToPreclip(input.anchorPlateBox, input.staticCrop);
-  const margins = marginsOf(anchorFaceProjected, input.anchorDispatchBox);
+
+  // ── V509 — the framing margin must not fight the track ───────────────
+  //
+  // `marginsOf` encodes how the anchor DISPATCH box was framed around the
+  // anchor FACE. Reapplying that ratio per frame preserves the framing
+  // policy — but only while both sides describe the same face.
+  //
+  // Production 67b392b1 generation 9, pass 0: `anchorPlateBox` and
+  // `anchorDispatchBox` were numerically equal, yet the first is PLATE
+  // space and the second is already PRECLIP space. Projecting the plate
+  // box blew it up to ~[11,0,387,502] against a [260,125,358,259]
+  // reference, so every raw margin came out strongly negative. Applied to
+  // each tracked frame, that collapsed a correctly projected face box
+  // ([65,31,383,494]) down to [276,146,358,270] while the mouth ([303,387])
+  // was projected without any margin — 0/12 containment, worst margin -121.
+  //
+  // With a real track, Track(t) is the geometric authority. Anchor framing
+  // may PAD it; a negative margin would mean the historical framing wants
+  // the current tracked face to be smaller than itself, which cannot be
+  // useful padding. Without a track the anchor pair IS the whole framing
+  // authority and its raw margins stay exactly as before.
+  const rawAnchorMargins = marginsOf(anchorFaceProjected, input.anchorDispatchBox);
+  const marginPolicy: "legacy_anchor" | "track_expansion_only" = hasTrack
+    ? "track_expansion_only"
+    : "legacy_anchor";
+  const margins: [number, number, number, number] = hasTrack
+    ? [
+      Math.max(0, rawAnchorMargins[0]),
+      Math.max(0, rawAnchorMargins[1]),
+      Math.max(0, rawAnchorMargins[2]),
+      Math.max(0, rawAnchorMargins[3]),
+    ]
+    : rawAnchorMargins;
+  const negativeMarginsClamped = hasTrack && rawAnchorMargins.some((m) => m < 0);
 
   const frameBoxes: Box[] = [];
   const frameMouths: Array<[number, number]> = [];
@@ -284,6 +334,11 @@ export function buildPerFrameAsdBoxes(input: BuildAsdBoxesInput): BuildAsdBoxesR
     varying,
     trackTravelPx: Number(trackTravelPx.toFixed(2)),
     boxTravelPx: Number(boxTravelPx.toFixed(2)),
+    marginPolicy,
+    rawAnchorMargins,
+    appliedMargins: margins,
+    negativeMarginsClamped,
+    anchorFaceProjected,
   };
 }
 

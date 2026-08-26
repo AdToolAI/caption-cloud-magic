@@ -6783,6 +6783,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           varying: v464Built.varying,
           track_travel_px: v464Built.trackTravelPx,
           box_travel_px: v464Built.boxTravelPx,
+          // V509 — framing-margin provenance. Diagnostic only: nothing
+          // branches on it, and no new refusal condition exists.
+          margin_policy: v464Built.marginPolicy,
+          raw_anchor_margins: v464Built.rawAnchorMargins.map((m) => Number(m.toFixed(4))),
+          applied_margins: v464Built.appliedMargins.map((m) => Number(m.toFixed(4))),
+          negative_margins_clamped: v464Built.negativeMarginsClamped,
+          anchor_face_projected: v464Built.anchorFaceProjected,
           verdict: v464Verdict,
         };
       }
