@@ -31,6 +31,18 @@ export interface MouthCenteredCropInput {
    * contain it (hard invariant, deterministic projection).
    */
   containBox?: [number, number, number, number] | null;
+  /**
+   * V461 D — the downstream face-share floor this crop must be able to
+   * satisfy (`V461_FACE_SHARE_FLOOR`).
+   *
+   * Passed IN rather than imported so this module stays a pure leaf with
+   * no dependencies, and so the value has exactly ONE definition — in the
+   * gate that enforces it. Two independently maintained copies of 0.24 is
+   * the failure mode this parameter exists to avoid.
+   *
+   * `null`/omitted keeps the historical behaviour: no upper bound.
+   */
+  faceShareFloor?: number | null;
 }
 
 export type ContainReason =
@@ -67,6 +79,29 @@ export interface MouthCenteredCropResult {
   shiftPx: { x: number; y: number };
   sizeGrown: boolean;
   sizeGrownPx: number;
+
+  // ── V461 D — the feasible crop interval, reported explicitly ────────
+  /**
+   * Largest crop side whose area still lets the face reach the downstream
+   * share floor: `sqrt(faceW * faceH / faceShareFloor)`.
+   * `null` when no floor was supplied.
+   */
+  maxCropByFaceShare: number | null;
+  /**
+   * Smallest crop side that can still hold the geometry: the face bbox and,
+   * when supplied, the padded contain box.
+   */
+  minCropRequiredPx: number;
+  /**
+   * `false` when `minCropRequiredPx > maxCropByFaceShare`, i.e. no crop can
+   * satisfy containment AND the share floor at the same time. The caller
+   * must then refuse to render rather than produce a doomed pre-clip.
+   */
+  feasible: boolean;
+  /** Named reason when `feasible` is false. */
+  infeasibleReason: string | null;
+  /** True when the preferred `minSize` floor yielded to the share cap. */
+  preferredFloorYielded: boolean;
 }
 
 
@@ -165,6 +200,7 @@ export function computeMouthCenteredCrop(
     targetFaceShare = 0.42,
     minSize = 96,
     outputSize = 720,
+    faceShareFloor = null,
   } = input;
 
   if (plateWidth <= 0 || plateHeight <= 0) {
@@ -181,7 +217,30 @@ export function computeMouthCenteredCrop(
 
   const idealSide = faceSide / Math.sqrt(targetFaceShare);
   const maxSide = Math.min(plateWidth, plateHeight);
-  let size = Math.round(Math.min(maxSide, Math.max(minSize, idealSide)));
+
+  // ── V461 D — the crop must be able to satisfy the downstream contract ─
+  //
+  // Production 67b392b1 run 3255bfe3 pass 2: face 46x61 = 2806 px^2. The
+  // planner asked for 94 px (share 0.318). `minCropSizePx = 128` overrode
+  // it, and the gate then measured 2806/128^2 = 0.171 against the crop the
+  // floor had imposed. The largest crop that can reach 0.24 is 108, so the
+  // feasible interval was empty and no planner choice could have helped.
+  //
+  // 128 stays the PREFERRED floor. It yields — per pass, never globally —
+  // exactly when honouring it would make the pass arithmetically
+  // impossible.
+  const faceArea = faceW * faceH;
+  const shareFloor = Number(faceShareFloor);
+  const maxCropByFaceShare = Number.isFinite(shareFloor) && shareFloor > 0
+    ? Math.sqrt(faceArea / shareFloor)
+    : null;
+  const shareCap = maxCropByFaceShare === null ? null : Math.floor(maxCropByFaceShare);
+  const effectiveMinSize = shareCap === null ? minSize : Math.min(minSize, shareCap);
+  const preferredFloorYielded = effectiveMinSize < minSize;
+
+  let size = Math.round(Math.min(maxSide, Math.max(effectiveMinSize, idealSide)));
+  // A face large enough that `idealSide` alone overshoots the cap.
+  if (shareCap !== null && size > shareCap) size = shareCap;
 
   const usingMouth =
     Array.isArray(face.mouth) &&
@@ -247,9 +306,22 @@ export function computeMouthCenteredCrop(
 
   const clamped = x !== rawX || y !== rawY;
 
+  // ── V461 D — prove the interval, do not assume it ────────────────────
+  //
+  // Lower bound: the crop must hold the face bbox and, when supplied, the
+  // padded contain box. Upper bound: the share cap. When the lower bound
+  // exceeds the upper one there is genuinely NO admissible crop, and the
+  // caller must refuse to render instead of shipping a doomed pre-clip.
+  const containSide = containBox
+    ? Math.max(containBox[2] - containBox[0], containBox[3] - containBox[1])
+    : 0;
+  const minCropRequiredPx = Math.ceil(Math.max(faceFloor, containSide));
+  const feasible = shareCap === null ? true : minCropRequiredPx <= shareCap;
+  const infeasibleReason = feasible
+    ? null
+    : `min_crop_${minCropRequiredPx}px_exceeds_face_share_cap_${shareCap}px`;
 
   const cropArea = size * size;
-  const faceArea = faceW * faceH;
   const faceShareInCrop = Math.min(1, faceArea / cropArea);
   // V458 — everything below is derived from the FINAL (post-V457) geometry.
   const cropCx = x + size / 2;
@@ -275,5 +347,10 @@ export function computeMouthCenteredCrop(
     shiftPx,
     sizeGrown,
     sizeGrownPx,
+    maxCropByFaceShare,
+    minCropRequiredPx,
+    feasible,
+    infeasibleReason,
+    preferredFloorYielded,
   };
 }

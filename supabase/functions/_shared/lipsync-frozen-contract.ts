@@ -24,7 +24,15 @@ export const LIPSYNC_CONTRACT_VERSION = "v400";
 export const PRECLIP = {
   /** Target share of the crop area covered by the face bbox. */
   targetFaceShare: 0.42,
-  /** Hard floor for the crop side in source-plate pixels (preclip path). */
+  /**
+   * PREFERRED floor for the crop side in source-plate pixels (preclip path).
+   *
+   * V461 D — no longer inviolable. It yields PER PASS, never globally, when
+   * honouring it would make the downstream `V461_FACE_SHARE_FLOOR` contract
+   * arithmetically unsatisfiable: a face of 46x61 planned at 128 reaches only
+   * share 0.171, and no crop >= 128 can ever reach 0.24. The value itself is
+   * unchanged and still wins whenever the two are compatible.
+   */
   minCropSizePx: 128,
   /** Default floor inside the crop util when no caller override is given. */
   minCropSizeDefaultPx: 96,
