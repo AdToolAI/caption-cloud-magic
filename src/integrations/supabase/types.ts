@@ -19839,6 +19839,14 @@ export type Database = {
           status: string
         }[]
       }
+      composer_adopt_sync_callback_binding: {
+        Args: {
+          _external_job_id: string
+          _pipeline_job_id: string
+          _scene_id: string
+        }
+        Returns: Json
+      }
       composer_apply_sync_segment_result: {
         Args: {
           _error_text: string
@@ -20003,6 +20011,16 @@ export type Database = {
       composer_reap_orphaned_dispatches: {
         Args: { p_older_than_minutes?: number }
         Returns: number
+      }
+      composer_reconcile_terminal_sync_result: {
+        Args: {
+          _error_text: string
+          _external_job_id: string
+          _output_url: string
+          _pipeline_job_id: string
+          _provider_status: string
+        }
+        Returns: Json
       }
       composer_record_callback_observation: {
         Args: {
@@ -20242,6 +20260,27 @@ export type Database = {
           _twoshot_stage: string
         }
         Returns: string
+      }
+      composer_terminalize_dialog_run: {
+        Args: {
+          _pass_idx: number
+          _pass_patch: Json
+          _root_patch: Json
+          _run_id: string
+          _scene_id: string
+          _scene_patch: Json
+          _terminal_reason: string
+        }
+        Returns: Json
+      }
+      composer_touch_dialog_run_progress: {
+        Args: {
+          _root_patch: Json
+          _run_id: string
+          _scene_id: string
+          _scene_patch: Json
+        }
+        Returns: Json
       }
       composer_touch_lipsync_progress: {
         Args: {

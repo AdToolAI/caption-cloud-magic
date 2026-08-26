@@ -98,6 +98,12 @@ import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
 import { isFanoutClosed } from "../_shared/v459-fanout-aggregation.ts";
+import {
+  assertRootPatchSafe,
+  buildTerminalPassPatch,
+  isRunTerminal,
+  mayDispatchProvider,
+} from "../_shared/v510-terminal-fence.ts";
 // v161 — renderPassFacePreclip re-enabled for the unified single-face
 // bbox-url-pro pipeline (1..N speakers). v187 makes this fail-closed for
 // multi-speaker: no full-plate fallback after a preclip timeout/failure.
@@ -1191,6 +1197,157 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           : {}),
       };
     };
+    // ══ V510-P0 — MONOTONIC TERMINALIZATION ════════════════════════════
+    //
+    // Generation 10, run 58a103cc: passes 0/2/3 dispatched and wrote their
+    // job ids per slot; pass 4 failed pre-dispatch and wrote its stale local
+    // `passes[]` snapshot back wholesale, erasing passes[2].job_id and
+    // passes[3].job_id; pass 1 then dispatched and reset the root to
+    // `running` with clip_error=null — resurrecting a run that had already
+    // terminalized AND refunded.
+    //
+    // Both defects are one property: a terminal decision that is neither
+    // atomic nor monotonic. `mergeDialogShots` is a shallow spread and the
+    // write is a full-column overwrite, so EVERY dialog_shots UPDATE carries
+    // this invocation snapshot of `passes` back over its sibling slots.
+    //
+    // Every terminal write in the per-pass scope now goes through ONE
+    // transaction that patches only its own slot; every progress write goes
+    // through a monotonic touch that a terminal run refuses.
+    const v510RunId = String((scene as any)?.active_run_id ?? "") || null;
+
+    /**
+     * Atomic terminalization. `passIdx: null` for failures that happen
+     * before any pass owns a slot. `rootPatch` must never contain `passes`;
+     * `assertRootPatchSafe` throws rather than let it through silently.
+     */
+    const v510Terminalize = async (args: {
+      passIdx: number | null;
+      passPatch: Record<string, unknown> | null;
+      rootPatch: Record<string, unknown>;
+      scenePatch: Record<string, unknown>;
+      reason: string;
+    }): Promise<{ ok: boolean; firstTerminal: boolean }> => {
+      const rootPatch = assertRootPatchSafe(args.rootPatch);
+      const { data, error } = await supabase.rpc("composer_terminalize_dialog_run", {
+        _scene_id: sceneId,
+        _run_id: v510RunId,
+        _pass_idx: args.passIdx,
+        _pass_patch: args.passPatch ?? {},
+        _root_patch: rootPatch,
+        _scene_patch: args.scenePatch,
+        _terminal_reason: args.reason,
+      });
+      if (!error) {
+        const firstTerminal = (data as any)?.first_terminal !== false;
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} v510_terminalized run=${v510RunId ?? "-"} ` +
+            `pass=${args.passIdx ?? "-"} reason=${args.reason} first_terminal=${firstTerminal}`,
+        );
+        return { ok: true, firstTerminal };
+      }
+      // DEGRADED PATH — the atomic RPC is unreachable. Never fall back to a
+      // full-row `passes[]` write: that is the defect. Two sequential
+      // server-side merges are not a transaction, but neither of them can
+      // carry a stale sibling slot, so this is strictly safer than the
+      // behaviour it replaces.
+      console.error(
+        `[compose-dialog-segments] scene=${sceneId} v510_terminalize_rpc_error reason=${args.reason} ` +
+          `err=${error.message ?? error} — degrading to per-slot + root-merge`,
+      );
+      if (args.passIdx != null && args.passPatch) {
+        await supabase.rpc("update_dialog_pass_slot", {
+          _scene_id: sceneId, _pass_idx: args.passIdx, _patch: args.passPatch,
+        });
+      }
+      await supabase.rpc("update_dialog_shots_root_merge", {
+        _scene_id: sceneId,
+        _patch: { ...rootPatch, v510_terminal_degraded: true },
+      });
+      await supabase.from("composer_scenes").update({
+        ...args.scenePatch, updated_at: new Date().toISOString(),
+      }).eq("id", sceneId);
+      return { ok: false, firstTerminal: true };
+    };
+
+    /**
+     * Monotonic progress write. Returns `applied: false` when this run has
+     * already terminalized — that is the normal, non-error outcome of the
+     * generation-10 race, not a failure to report upward.
+     */
+    const v510TouchProgress = async (
+      rootPatch: Record<string, unknown>,
+      scenePatch: Record<string, unknown>,
+      passLabel: string,
+    ): Promise<{ applied: boolean; reason: string }> => {
+      const safeRoot = assertRootPatchSafe(rootPatch);
+      const { data, error } = await supabase.rpc("composer_touch_dialog_run_progress", {
+        _scene_id: sceneId,
+        _run_id: v510RunId,
+        _root_patch: safeRoot,
+        _scene_patch: scenePatch,
+      });
+      if (!error) {
+        const applied = (data as any)?.applied === true;
+        const reason = String((data as any)?.reason ?? (applied ? "ok" : "blocked"));
+        if (!applied) {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} pass=${passLabel} ` +
+              `v510_progress_blocked reason=${reason} — root stays terminal`,
+          );
+        }
+        return { applied, reason };
+      }
+      // DEGRADED PATH — re-read and decide client-side. Narrower than the
+      // unconditional write it replaces, but NOT atomic; the RPC is the
+      // contract and this exists only so an undeployed migration cannot
+      // strand a healthy dispatch.
+      console.error(
+        `[compose-dialog-segments] scene=${sceneId} v510_progress_rpc_error err=${error.message ?? error}`,
+      );
+      const { data: reRow } = await supabase
+        .from("composer_scenes").select("dialog_shots").eq("id", sceneId).maybeSingle();
+      const reState: any = (reRow as any)?.dialog_shots ?? null;
+      if (isRunTerminal(reState, v510RunId) || isFanoutClosed(reState)) {
+        return { applied: false, reason: "run_terminal_degraded" };
+      }
+      await supabase.rpc("update_dialog_shots_root_merge", { _scene_id: sceneId, _patch: safeRoot });
+      await supabase.from("composer_scenes").update({
+        ...scenePatch, updated_at: new Date().toISOString(),
+      }).eq("id", sceneId);
+      return { applied: true, reason: "ok_degraded" };
+    };
+
+    /**
+     * Non-terminal root write that must not carry `passes`.
+     *
+     * A `mergeDialogShots` root patch plus a full-column UPDATE looks
+     * root-only at the call site but ships the entry snapshot of `passes`
+     * with every write. On an `advance`/`retry` invocation siblings already
+     * hold bound job ids, so that snapshot is a lost update waiting for the
+     * right interleaving. The RPC merges server-side and strips `passes`.
+     */
+    const v510RootMerge = async (
+      rootPatch: Record<string, unknown>,
+      scenePatch: Record<string, unknown>,
+    ): Promise<void> => {
+      const safeRoot = assertRootPatchSafe(rootPatch);
+      const { error } = await supabase.rpc("update_dialog_shots_root_merge", {
+        _scene_id: sceneId,
+        _patch: safeRoot,
+      });
+      if (error) {
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} v510_root_merge_rpc_error err=${error.message ?? error}`,
+        );
+      }
+      if (Object.keys(scenePatch).length > 0) {
+        await supabase.from("composer_scenes").update({
+          ...scenePatch, updated_at: new Date().toISOString(),
+        }).eq("id", sceneId);
+      }
+    };
+
     const isStaleFailedState =
       !isRetry &&
       !isAdvance &&
@@ -1540,24 +1697,32 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           .update({ balance: Number(w0?.balance ?? 0) + totalCost, updated_at: new Date().toISOString() })
           .eq("user_id", userId);
       }
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: mergeDialogShots(existing, {
-            version: 5,
-            engine: "sync-segments",
-            status: "failed",
-            cost_credits: Number((existing as any)?.cost_credits ?? totalCost),
-            refunded: !alreadyRefunded,
-            error: "plate_probe_failed_3plus_speakers",
-            finished_at: new Date().toISOString(),
-          }),
+      // ── V510-P0 — a preflight gate, re-entered by every `advance` and
+      // `retry` invocation. The write looked root-only, but
+      // `mergeDialogShots` is a shallow spread over the scene read at
+      // entry, so the full-column UPDATE shipped `existing.passes` with
+      // it — and on a re-entrant invocation the siblings in that snapshot
+      // already hold bound job ids. The root merge now happens server-side.
+      const v510Root0: Record<string, unknown> = {
+        version: 5,
+        engine: "sync-segments",
+        status: "failed",
+        cost_credits: Number((existing as any)?.cost_credits ?? totalCost),
+        refunded: !alreadyRefunded,
+        error: "plate_probe_failed_3plus_speakers",
+        finished_at: new Date().toISOString(),
+      };
+      await v510Terminalize({
+        passIdx: null,
+        passPatch: null,
+        rootPatch: v510Root0,
+        scenePatch: {
           lip_sync_status: "failed",
           twoshot_stage: "failed",
           clip_error: 'plate_probe_failed_3plus_speakers: Video-Geometrie konnte nicht gelesen werden. Bitte "Sauber neu starten" drücken — beim erneuten Versuch nutzt das System die Anchor-Dimensionen als Fallback.',
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", sceneId);
+        },
+        reason: String(v510Root0.error ?? "terminal"),
+      });
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_status: "PREFLIGHT_BLOCKED", error_class: "plate_probe_failed",
@@ -1760,17 +1925,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             `[compose-dialog-segments] scene=${sceneId} v278_anchor_layout_recovered_from_facemap ` +
             `slots=${recoveredLayout.slots.length}/${speakers.length} dims=${recoveredLayout.dims.width}x${recoveredLayout.dims.height}`,
           );
-          await supabase
-            .from("composer_scenes")
-            .update({
-              dialog_shots: mergeDialogShots(existing, {
-                anchor_face_layout: recoveredLayout,
-                v278_anchor_layout_source: "facemap_recovery",
-                v278_anchor_layout_recovered_at: new Date().toISOString(),
-              }),
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", sceneId);
+          // ── V510-P0 — root-only patch, but the full-column write carried
+          // `existing.passes` with it. The merge now happens server-side.
+          await v510RootMerge(
+            {
+              anchor_face_layout: recoveredLayout,
+              v278_anchor_layout_source: "facemap_recovery",
+              v278_anchor_layout_recovered_at: new Date().toISOString(),
+            },
+            {
+            },
+          );
         } else {
           console.warn(
             `[compose-dialog-segments] scene=${sceneId} v278_anchor_layout_facemap_recovery_rejected ` +
@@ -2736,24 +2901,32 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             );
           }
         }
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: mergeDialogShots(existing, {
-              version: 5,
-              engine: "sync-segments",
-              status: "failed",
-              cost_credits: Number((existing as any)?.cost_credits ?? totalCost),
-              refunded: true,
-              error: "v183_cast_duplicate_character_id",
-              finished_at: new Date().toISOString(),
-            }),
+        // ── V510-P0 — a preflight gate, re-entered by every `advance` and
+        // `retry` invocation. The write looked root-only, but
+        // `mergeDialogShots` is a shallow spread over the scene read at
+        // entry, so the full-column UPDATE shipped `existing.passes` with
+        // it — and on a re-entrant invocation the siblings in that snapshot
+        // already hold bound job ids. The root merge now happens server-side.
+        const v510Root2: Record<string, unknown> = {
+          version: 5,
+          engine: "sync-segments",
+          status: "failed",
+          cost_credits: Number((existing as any)?.cost_credits ?? totalCost),
+          refunded: true,
+          error: "v183_cast_duplicate_character_id",
+          finished_at: new Date().toISOString(),
+        };
+        await v510Terminalize({
+          passIdx: null,
+          passPatch: null,
+          rootPatch: v510Root2,
+          scenePatch: {
             lip_sync_status: "failed",
             twoshot_stage: "failed",
             clip_error: msg,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", sceneId);
+          },
+          reason: String(v510Root2.error ?? "terminal"),
+        });
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-segments",
           sync_status: "PREFLIGHT_BLOCKED", error_class: "v183_cast_duplicate_character_id",
@@ -2938,65 +3111,73 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             );
           }
         }
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: mergeDialogShots(existing, {
-              version: 5,
-              engine: "sync-segments",
-              status: "failed",
-              cost_credits: Number((existing as any)?.cost_credits ?? totalCost),
-              refunded: true,
-              error: reason,
-              finished_at: new Date().toISOString(),
-            }),
+        // ── V510-P0 — a preflight gate, re-entered by every `advance` and
+        // `retry` invocation. The write looked root-only, but
+        // `mergeDialogShots` is a shallow spread over the scene read at
+        // entry, so the full-column UPDATE shipped `existing.passes` with
+        // it — and on a re-entrant invocation the siblings in that snapshot
+        // already hold bound job ids. The root merge now happens server-side.
+        const v510Root3: Record<string, unknown> = {
+          version: 5,
+          engine: "sync-segments",
+          status: "failed",
+          cost_credits: Number((existing as any)?.cost_credits ?? totalCost),
+          refunded: true,
+          error: reason,
+          finished_at: new Date().toISOString(),
+        };
+        await v510Terminalize({
+          passIdx: null,
+          passPatch: null,
+          rootPatch: v510Root3,
+          scenePatch: {
             lip_sync_status: "failed",
             twoshot_stage: "failed",
             clip_error: (() => {
-              if (speakers.length === 1) {
-                return "Lip-Sync abgebrochen: für den Sprecher konnte kein eindeutiges Gesicht in der Szene gefunden werden. " +
-                  "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass der Sprecher frontal und unverdeckt sichtbar ist.";
-              }
-              // v183 — Sprecher-Namen einsetzen wenn Dup-Kollision.
-              if (dupeIdx.length >= 1) {
-                const primaryIdx = boxes.find((_, a) =>
-                  boxes.some((__, c) =>
-                    c > a &&
-                    Math.hypot(
-                      (boxes[a].b[0] + boxes[a].b[2]) / 2 - (boxes[c].b[0] + boxes[c].b[2]) / 2,
-                      (boxes[a].b[1] + boxes[a].b[3]) / 2 - (boxes[c].b[1] + boxes[c].b[3]) / 2,
-                    ) < 8,
-                  ),
-                )?.i ?? dupeIdx[0];
-                const nameA =
-                  (speakers[primaryIdx] as any)?.speaker_name ??
-                  speakers[primaryIdx]?.speaker ??
-                  `Speaker ${primaryIdx + 1}`;
-                const nameB =
-                  (speakers[dupeIdx[0]] as any)?.speaker_name ??
-                  speakers[dupeIdx[0]]?.speaker ??
-                  `Speaker ${dupeIdx[0] + 1}`;
-                return `Lip-Sync abgebrochen: ${nameA} und ${nameB} wurden auf dasselbe Gesicht in der Szene gemappt. ` +
-                  `Bitte prüfen, ob im Cast identische Basis-Charaktere oder Saved-Outfit-Look-Varianten desselben Chars mehrfach vertreten sind — ` +
-                  `oder die Szene neu rendern, sodass alle Sprecher visuell klar getrennt und frontal sichtbar sind. Credits wurden zurückerstattet.`;
-              }
-              if (missingBoxIdx.length >= 1) {
-                const names = missingBoxIdx.map(
-                  (i) =>
-                    (speakers[i] as any)?.speaker_name ??
-                    speakers[i]?.speaker ??
-                    `Speaker ${i + 1}`,
-                );
-                return `Lip-Sync abgebrochen: für ${names.join(", ")} konnte kein eindeutiges Gesicht in der Szene gefunden werden. ` +
-                  `Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass alle Sprecher frontal und unverdeckt sichtbar sind.`;
-              }
-              return "Lip-Sync abgebrochen: die einzelnen Sprecher konnten auf dem Video nicht eindeutig unterschieden werden " +
-                "(jeder Sprecher braucht ein klar getrenntes Gesicht in der Szene). " +
-                "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass alle Sprecher frontal und getrennt sichtbar sind.";
+            if (speakers.length === 1) {
+            return "Lip-Sync abgebrochen: für den Sprecher konnte kein eindeutiges Gesicht in der Szene gefunden werden. " +
+            "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass der Sprecher frontal und unverdeckt sichtbar ist.";
+            }
+            // v183 — Sprecher-Namen einsetzen wenn Dup-Kollision.
+            if (dupeIdx.length >= 1) {
+            const primaryIdx = boxes.find((_, a) =>
+            boxes.some((__, c) =>
+            c > a &&
+            Math.hypot(
+            (boxes[a].b[0] + boxes[a].b[2]) / 2 - (boxes[c].b[0] + boxes[c].b[2]) / 2,
+            (boxes[a].b[1] + boxes[a].b[3]) / 2 - (boxes[c].b[1] + boxes[c].b[3]) / 2,
+            ) < 8,
+            ),
+            )?.i ?? dupeIdx[0];
+            const nameA =
+            (speakers[primaryIdx] as any)?.speaker_name ??
+            speakers[primaryIdx]?.speaker ??
+            `Speaker ${primaryIdx + 1}`;
+            const nameB =
+            (speakers[dupeIdx[0]] as any)?.speaker_name ??
+            speakers[dupeIdx[0]]?.speaker ??
+            `Speaker ${dupeIdx[0] + 1}`;
+            return `Lip-Sync abgebrochen: ${nameA} und ${nameB} wurden auf dasselbe Gesicht in der Szene gemappt. ` +
+            `Bitte prüfen, ob im Cast identische Basis-Charaktere oder Saved-Outfit-Look-Varianten desselben Chars mehrfach vertreten sind — ` +
+            `oder die Szene neu rendern, sodass alle Sprecher visuell klar getrennt und frontal sichtbar sind. Credits wurden zurückerstattet.`;
+            }
+            if (missingBoxIdx.length >= 1) {
+            const names = missingBoxIdx.map(
+            (i) =>
+            (speakers[i] as any)?.speaker_name ??
+            speakers[i]?.speaker ??
+            `Speaker ${i + 1}`,
+            );
+            return `Lip-Sync abgebrochen: für ${names.join(", ")} konnte kein eindeutiges Gesicht in der Szene gefunden werden. ` +
+            `Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass alle Sprecher frontal und unverdeckt sichtbar sind.`;
+            }
+            return "Lip-Sync abgebrochen: die einzelnen Sprecher konnten auf dem Video nicht eindeutig unterschieden werden " +
+            "(jeder Sprecher braucht ein klar getrenntes Gesicht in der Szene). " +
+            "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass alle Sprecher frontal und getrennt sichtbar sind.";
             })(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", sceneId);
+          },
+          reason: String(v510Root3.error ?? "terminal"),
+        });
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-segments",
           sync_status: "PREFLIGHT_BLOCKED", error_class: "v153_preflight_block",
@@ -3061,36 +3242,44 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         tl({ de: `Bitte die Szene neu rendern — mit deutlich unterschiedlichen Posen, Kleidung oder Kamera-Winkeln pro Charakter, sodass jede Person klar identifizierbar ist. `, en: `Please re-render the scene — with distinctly different poses, clothing, or camera angles per character, so that each person is clearly identifiable.`, es: `Por favor, vuelve a renderizar la escena — con poses, ropa o ángulos de cámara claramente diferentes por personaje, para que cada persona sea claramente identificable.` }) +
         `Credits wurden vollständig zurückerstattet.`;
       try {
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: mergeDialogShots(existing, {
-              version: 5,
-              engine: "sync-segments",
-              status: "failed",
-              cost_credits: 0,
-              refunded: true,
-              error: `v133_identity_ambiguous:method=${method},minConf=${minConf.toFixed(2)},minMargin=${minMar.toFixed(2)},crossCheck=${xc}`,
-              v133_identity_audit: {
-                method,
-                minConfidence: minConf,
-                minMargin: minMar,
-                crossCheck: xc,
-                resolvedCount: plateIdentityMap.resolvedCount,
-                faces: plateIdentityMap.faces.length,
-                scoreMatrix: (plateIdentityMap as any).scoreMatrix ?? null,
-              },
-              finished_at: new Date().toISOString(),
-            }),
+        // ── V510-P0 — a preflight gate, re-entered by every `advance` and
+        // `retry` invocation. The write looked root-only, but
+        // `mergeDialogShots` is a shallow spread over the scene read at
+        // entry, so the full-column UPDATE shipped `existing.passes` with
+        // it — and on a re-entrant invocation the siblings in that snapshot
+        // already hold bound job ids. The root merge now happens server-side.
+        const v510Root4: Record<string, unknown> = {
+          version: 5,
+          engine: "sync-segments",
+          status: "failed",
+          cost_credits: 0,
+          refunded: true,
+          error: `v133_identity_ambiguous:method=${method},minConf=${minConf.toFixed(2)},minMargin=${minMar.toFixed(2)},crossCheck=${xc}`,
+          v133_identity_audit: {
+          method,
+          minConfidence: minConf,
+          minMargin: minMar,
+          crossCheck: xc,
+          resolvedCount: plateIdentityMap.resolvedCount,
+          faces: plateIdentityMap.faces.length,
+          scoreMatrix: (plateIdentityMap as any).scoreMatrix ?? null,
+          },
+          finished_at: new Date().toISOString(),
+        };
+        await v510Terminalize({
+          passIdx: null,
+          passPatch: null,
+          rootPatch: v510Root4,
+          scenePatch: {
             lip_sync_status: "failed",
             twoshot_stage: "needs_clip_rerender",
             clip_status: "pending",
             clip_url: null,
             lip_sync_source_clip_url: null,
             clip_error: userMsg,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", sceneId);
+          },
+          reason: String(v510Root4.error ?? "terminal"),
+        });
       } catch (_) { /* best-effort */ }
       try {
         await logSyncDispatch(supabase, {
@@ -3237,29 +3426,37 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           );
         }
         // Reset clip so the user / Composer re-renders the plate.
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: mergeDialogShots(existing, {
-              version: 5,
-              engine: "sync-segments",
-              status: "failed",
-              cost_credits: 0,
-              refunded: true,
-              error: `v117_plate_quality_gate:${reason}`,
-              finished_at: new Date().toISOString(),
-            }),
+        // ── V510-P0 — a preflight gate, re-entered by every `advance` and
+        // `retry` invocation. The write looked root-only, but
+        // `mergeDialogShots` is a shallow spread over the scene read at
+        // entry, so the full-column UPDATE shipped `existing.passes` with
+        // it — and on a re-entrant invocation the siblings in that snapshot
+        // already hold bound job ids. The root merge now happens server-side.
+        const v510Root5: Record<string, unknown> = {
+          version: 5,
+          engine: "sync-segments",
+          status: "failed",
+          cost_credits: 0,
+          refunded: true,
+          error: `v117_plate_quality_gate:${reason}`,
+          finished_at: new Date().toISOString(),
+        };
+        await v510Terminalize({
+          passIdx: null,
+          passPatch: null,
+          rootPatch: v510Root5,
+          scenePatch: {
             lip_sync_status: "failed",
             twoshot_stage: "failed",
             clip_status: "pending",
             clip_url: null,
             lip_sync_source_clip_url: null,
             clip_error: splitScreenReason
-              ? tl({ de: `Plate-Quality-Gate (v9): Der gerenderte Scene-Clip ist ein Split-Screen/Panel-Layout (${speakers.length} isolierte Einzel-Panels statt einer gemeinsamen Group-Composition). Sync.so kann Einzel-Panels nicht lipsyncen. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen im selben Raum stehen, in einem durchgehenden Kamera-Frame. Credits wurden zurückerstattet.`, en: `Plate-Quality-Gate (v9): The rendered scene clip is a split-screen/panel layout (${speakers.length} isolated individual panels instead of a common group composition). Sync.so cannot lipsync individual panels. Please re-render the scene — all ${speakers.length} people must be in the same room, in a continuous camera frame. Credits have been refunded.`, es: `Plate-Quality-Gate (v9): El clip de escena renderizado es un diseño de pantalla dividida/panel (${speakers.length} paneles individuales aislados en lugar de una composición de grupo común). Sync.so no puede sincronizar los labios de paneles individuales. Por favor, vuelve a renderizar la escena — las ${speakers.length} personas deben estar en la misma habitación, en un encuadre de cámara continuo. Los créditos han sido reembolsados.` })
-              : tl({ de: `Plate-Quality-Gate (v117): Auf dem aktuellen Scene-Clip sind nicht alle ${speakers.length} Charaktere als Gesichter erkennbar (erkannt: ${detectedForMessage} von ${speakers.length}). Sync.so kann fehlende Personen nicht animieren. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe. Credits wurden zurückerstattet.`, en: `Plate-Quality-Gate (v117): Not all ${speakers.length} characters are recognizable as faces in the current scene clip (recognized: ${detectedForMessage} of ${speakers.length}). Sync.so cannot animate missing people. Please re-render the scene — all ${speakers.length} people must be visibly frontal in the image, no cropped heads. Credits have been refunded.`, es: `Plate-Quality-Gate (v117): No todos los ${speakers.length} personajes son reconocibles como caras en el clip de escena actual (reconocidos: ${detectedForMessage} de ${speakers.length}). Sync.so no puede animar a personas que faltan. Por favor, vuelve a renderizar la escena — las ${speakers.length} personas deben estar frontalmente visibles en la imagen, sin cabezas cortadas. Los créditos han sido reembolsados.` }),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", sceneId);
+            ? tl({ de: `Plate-Quality-Gate (v9): Der gerenderte Scene-Clip ist ein Split-Screen/Panel-Layout (${speakers.length} isolierte Einzel-Panels statt einer gemeinsamen Group-Composition). Sync.so kann Einzel-Panels nicht lipsyncen. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen im selben Raum stehen, in einem durchgehenden Kamera-Frame. Credits wurden zurückerstattet.`, en: `Plate-Quality-Gate (v9): The rendered scene clip is a split-screen/panel layout (${speakers.length} isolated individual panels instead of a common group composition). Sync.so cannot lipsync individual panels. Please re-render the scene — all ${speakers.length} people must be in the same room, in a continuous camera frame. Credits have been refunded.`, es: `Plate-Quality-Gate (v9): El clip de escena renderizado es un diseño de pantalla dividida/panel (${speakers.length} paneles individuales aislados en lugar de una composición de grupo común). Sync.so no puede sincronizar los labios de paneles individuales. Por favor, vuelve a renderizar la escena — las ${speakers.length} personas deben estar en la misma habitación, en un encuadre de cámara continuo. Los créditos han sido reembolsados.` })
+            : tl({ de: `Plate-Quality-Gate (v117): Auf dem aktuellen Scene-Clip sind nicht alle ${speakers.length} Charaktere als Gesichter erkennbar (erkannt: ${detectedForMessage} von ${speakers.length}). Sync.so kann fehlende Personen nicht animieren. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe. Credits wurden zurückerstattet.`, en: `Plate-Quality-Gate (v117): Not all ${speakers.length} characters are recognizable as faces in the current scene clip (recognized: ${detectedForMessage} of ${speakers.length}). Sync.so cannot animate missing people. Please re-render the scene — all ${speakers.length} people must be visibly frontal in the image, no cropped heads. Credits have been refunded.`, es: `Plate-Quality-Gate (v117): No todos los ${speakers.length} personajes son reconocibles como caras en el clip de escena actual (reconocidos: ${detectedForMessage} de ${speakers.length}). Sync.so no puede animar a personas que faltan. Por favor, vuelve a renderizar la escena — las ${speakers.length} personas deben estar frontalmente visibles en la imagen, sin cabezas cortadas. Los créditos han sido reembolsados.` }),
+          },
+          reason: String(v510Root5.error ?? "terminal"),
+        });
         try {
           await logSyncDispatch(supabase, {
             scene_id: sceneId, user_id: userId, engine: "sync-segments",
@@ -3479,28 +3676,36 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           tl({ de: `Sync.so kann ein Gesicht nur animieren, wenn es in genau diesem Moment sichtbar ist. `, en: `Sync.so can only animate a face if it is visible at that exact moment.`, es: `Sync.so solo puede animar una cara si es visible en ese preciso momento.` }) +
           tl({ de: `Bitte die Szene neu rendern — alle Sprecher müssen während ihres Dialog-Turns frontal und unverdeckt im Bild sein (keine Kameraschwenks weg, keine Cuts, keine angeschnittenen Köpfe). `, en: `Please re-render the scene — all speakers must be frontal and uncovered in the picture during their dialog turn (no camera pans away, no cuts, no cropped heads).`, es: `Por favor, vuelve a renderizar la escena — todos los oradores deben estar frontales y descubiertos en la imagen durante su turno de diálogo (sin movimientos de cámara, sin cortes, sin cabezas cortadas).` }) +
           `Credits wurden vollständig zurückerstattet.`;
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: mergeDialogShots(existing, {
-              version: 5,
-              engine: "sync-segments",
-              status: "failed",
-              cost_credits: 0,
-              refunded: true,
-              error: `v132_turn_visibility:${detail}`,
-              v132_turn_gate: { failures, probes },
-              finished_at: new Date().toISOString(),
-            }),
+        // ── V510-P0 — a preflight gate, re-entered by every `advance` and
+        // `retry` invocation. The write looked root-only, but
+        // `mergeDialogShots` is a shallow spread over the scene read at
+        // entry, so the full-column UPDATE shipped `existing.passes` with
+        // it — and on a re-entrant invocation the siblings in that snapshot
+        // already hold bound job ids. The root merge now happens server-side.
+        const v510Root6: Record<string, unknown> = {
+          version: 5,
+          engine: "sync-segments",
+          status: "failed",
+          cost_credits: 0,
+          refunded: true,
+          error: `v132_turn_visibility:${detail}`,
+          v132_turn_gate: { failures, probes },
+          finished_at: new Date().toISOString(),
+        };
+        await v510Terminalize({
+          passIdx: null,
+          passPatch: null,
+          rootPatch: v510Root6,
+          scenePatch: {
             lip_sync_status: "failed",
             twoshot_stage: "needs_clip_rerender",
             clip_status: "pending",
             clip_url: null,
             lip_sync_source_clip_url: null,
             clip_error: userMsg,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", sceneId);
+          },
+          reason: String(v510Root6.error ?? "terminal"),
+        });
         try {
           await logSyncDispatch(supabase, {
             scene_id: sceneId,
@@ -4258,25 +4463,33 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           .update({ balance: Number(w0?.balance ?? 0) + totalCost, updated_at: new Date().toISOString() })
           .eq("user_id", userId);
       }
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: mergeDialogShots(existing, {
-            version: 5,
-            engine: "sync-segments",
-            status: "failed",
-            cost_credits: Number((existing as any)?.cost_credits ?? totalCost),
-            refunded: !alreadyRefunded,
-            error: reason,
-            audio_diagnostics: audioDiagnostics,
-            finished_at: new Date().toISOString(),
-          }),
+      // ── V510-P0 — a preflight gate, re-entered by every `advance` and
+      // `retry` invocation. The write looked root-only, but
+      // `mergeDialogShots` is a shallow spread over the scene read at
+      // entry, so the full-column UPDATE shipped `existing.passes` with
+      // it — and on a re-entrant invocation the siblings in that snapshot
+      // already hold bound job ids. The root merge now happens server-side.
+      const v510Root7: Record<string, unknown> = {
+        version: 5,
+        engine: "sync-segments",
+        status: "failed",
+        cost_credits: Number((existing as any)?.cost_credits ?? totalCost),
+        refunded: !alreadyRefunded,
+        error: reason,
+        audio_diagnostics: audioDiagnostics,
+        finished_at: new Date().toISOString(),
+      };
+      await v510Terminalize({
+        passIdx: null,
+        passPatch: null,
+        rootPatch: v510Root7,
+        scenePatch: {
           lip_sync_status: "failed",
           twoshot_stage: "failed",
           clip_error: `syncso_audio_preflight_${reason}`,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", sceneId);
+        },
+        reason: String(v510Root7.error ?? "terminal"),
+      });
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_status: "PREFLIGHT_BLOCKED", error_class: "audio_invalid",
@@ -5135,25 +5348,35 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             );
           }
         }
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: mergeDialogShots(existing, {
-              version: 5,
-              engine: "sync-segments",
-              status: "failed",
-              cost_credits: 0,
-              refunded: true,
-              error: `v118_circuit_breaker:${reason}`,
-              finished_at: new Date().toISOString(),
-            }),
+        // ── V510-P0 — implicit stale-passes carry ────────────────────
+        // `mergeDialogShots` is a shallow spread over the read-at-entry
+        // scene, so this write shipped `existing.passes` even though no
+        // `passes` key appears in the patch. Terminalize atomically; the
+        // root merge happens server-side and never carries a slot.
+        await v510Terminalize({
+          passIdx: currentPassIdx,
+          passPatch: buildTerminalPassPatch({
+            reason: `v118_circuit_breaker:${reason}`,
+            errorClass: "v118_pass_circuit_breaker",
+            diagnostics: { v510_terminalized_by: "v118_circuit_breaker" },
+          }),
+          rootPatch: {
+            version: 5,
+            engine: "sync-segments",
+            status: "failed",
+            cost_credits: 0,
+            refunded: true,
+            error: `v118_circuit_breaker:${reason}`,
+            finished_at: new Date().toISOString(),
+          },
+          reason: `v118_circuit_breaker:${reason}`,
+          scenePatch: {
             lip_sync_status: "failed",
             twoshot_stage: "failed",
             clip_status: "failed",
             clip_error: `Lip-Sync abgebrochen: Sync.so hat für Sprecher „${pass.speaker_name ?? `Pass ${currentPassIdx + 1}`}" ${passFailCount}× hintereinander mit „provider_unknown_error" abgebrochen. Credits wurden zurückerstattet. Bitte drücke „Sauber neu starten" oder render die Plate neu, falls das Gesicht nicht klar erkennbar ist.`,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", sceneId);
+          },
+        });
         try {
           await logSyncDispatch(supabase, {
             scene_id: sceneId, user_id: userId, engine: "sync-segments",
@@ -6294,11 +6517,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           })
           .eq("user_id", userId);
       }
-      const passesPatched = passes.map((p, i) =>
-        i === currentPassIdx
-          ? { ...p, status: "failed" as const, last_error: failReason, last_error_class: "v153_plate_bbox_required" }
-          : p,
-      );
+      // ── V510-P0 — the sibling-preserving map was still a full write ──
+      // `passes.map(…)` faithfully preserved every sibling AS THIS
+      // INVOCATION LAST SAW IT, which is precisely the stale state that
+      // erased two live job ids in generation 10. Preserving siblings
+      // correctly is not the same as not writing them.
       const failedSpeakerName = String(
         (pass as any)?.speaker_name ?? `Sprecher ${currentPassIdx + 1}`,
       );
@@ -6315,36 +6538,40 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         tl({ de: `Lip-Sync abgebrochen: „${failedSpeakerName}"${turnLabel} konnte im Scene-Clip nicht eindeutig zugeordnet werden `, en: `Lip-sync aborted: "${failedSpeakerName}"${turnLabel} could not be uniquely assigned in the scene clip `, es: `Sincronización labial abortada: "${failedSpeakerName}"${turnLabel} no pudo asignarse de forma única en el clip de escena ` }) +
         tl({ de: `(${failReason}). Bitte Szene neu rendern — alle Sprecher müssen während ihres Turns frontal und unverdeckt im Bild sein. `, en: `(${failReason}). Please re-render scene — all speakers must be frontal and uncovered in the picture during their turn. `, es: `(${failReason}). Por favor, vuelve a renderizar la escena — todos los oradores deben estar frontales y descubiertos en la imagen durante su turno. ` }) +
         `Credits wurden zurückerstattet.`;
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: mergeDialogShots(existingDsLocal, {
-            version: 5,
-            engine: "sync-segments",
-            passes: passesPatched,
-            status: "failed",
-            cost_credits: Number(existingDsLocal?.cost_credits ?? totalCost ?? 0),
-            refunded: !alreadyRefunded,
-            error: `v153_plate_bbox_required_pass_${currentPassIdx + 1}`,
-            v153_failed_speaker: {
-              speaker: failedSpeakerName,
-              character_id: (pass as any)?.character_id ?? null,
-              pass_idx: currentPassIdx,
-              turn_start_sec: turnStartSec,
-              turn_end_sec: turnEndSec,
-              resolved_count: plateIdentityMap?.resolvedCount ?? 0,
-            },
-            finished_at: new Date().toISOString(),
-          }),
+      await v510Terminalize({
+        passIdx: currentPassIdx,
+        passPatch: buildTerminalPassPatch({
+          reason: failReason,
+          errorClass: "v153_plate_bbox_required",
+          diagnostics: { v510_terminalized_by: "v153_plate_bbox_preflight" },
+        }),
+        rootPatch: {
+          version: 5,
+          engine: "sync-segments",
+          status: "failed",
+          cost_credits: Number(existingDsLocal?.cost_credits ?? totalCost ?? 0),
+          refunded: !alreadyRefunded,
+          error: `v153_plate_bbox_required_pass_${currentPassIdx + 1}`,
+          v153_failed_speaker: {
+            speaker: failedSpeakerName,
+            character_id: (pass as any)?.character_id ?? null,
+            pass_idx: currentPassIdx,
+            turn_start_sec: turnStartSec,
+            turn_end_sec: turnEndSec,
+            resolved_count: plateIdentityMap?.resolvedCount ?? 0,
+          },
+          finished_at: new Date().toISOString(),
+        },
+        scenePatch: {
           lip_sync_status: "failed",
           twoshot_stage: "needs_clip_rerender",
           clip_status: "pending",
           clip_url: null,
           lip_sync_source_clip_url: null,
           clip_error: friendlyClipError,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", sceneId);
+        },
+        reason: `v153_plate_bbox_required_pass_${currentPassIdx + 1}`,
+      });
 
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
@@ -7119,36 +7346,57 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       (pass as any).last_error_class = errorClass;
       (pass as any).sync_error_bucket = errorClass;
       passes[currentPassIdx] = pass;
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: mergeDialogShots(prevState, {
-            canonical_lipsync_pipeline: passes.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
-            input_space: passes.length >= 2 ? "plate" : undefined,
-            preclip_used: passes.length >= 2 ? false : undefined,
-            version: 5,
-            engine: "sync-segments",
-            status: "failed",
-            passes,
-            current_pass: currentPassIdx,
-            total_passes: passes.length,
-            multi_pass: passes.length > 1,
-            source_clip_url: sourceClipUrl,
-            total_sec: totalSec,
-            segments: pass.segments,
-            cost_credits: costCredits,
-            refunded: refundSettled,
-            v459_refund: refundInfo ?? (prevState as any)?.v459_refund ?? null,
-            plate_identity: v153PlateIdentitySnapshot,
-
-            error: reason,
-            finished_at: new Date().toISOString(),
-          }),
+      // ── V510-P0 — atomic, monotonic terminalization ──────────────────
+      //
+      // WAS: a full-row dialog_shots UPDATE carrying THIS invocation
+      // snapshot of `passes`. In generation 10 pass 4 reached here with a
+      // snapshot taken ~2500 lines earlier and erased passes[2].job_id
+      // (cf76aa2c) and passes[3].job_id (0fba3717) — two provider jobs that
+      // had already been accepted and paid for.
+      //
+      // NOW: the failing pass patches ONLY its own slot. Sibling slots are
+      // never sent to the database, so they cannot be overwritten — not
+      // merely unlikely to be, but structurally absent from the write. Slot,
+      // root and scene columns move in one transaction under the row lock.
+      const v510TerminalPassPatch = buildTerminalPassPatch({
+        reason,
+        errorClass,
+        diagnostics: {
+          diagnostic_id: diagnosticId,
+          retry_variant: retryVariant,
+          v510_terminalized_by: "fail_before_provider_dispatch",
+        },
+      });
+      await v510Terminalize({
+        passIdx: currentPassIdx,
+        passPatch: v510TerminalPassPatch,
+        rootPatch: {
+          canonical_lipsync_pipeline: passes.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
+          input_space: passes.length >= 2 ? "plate" : undefined,
+          preclip_used: passes.length >= 2 ? false : undefined,
+          version: 5,
+          engine: "sync-segments",
+          status: "failed",
+          current_pass: currentPassIdx,
+          total_passes: passes.length,
+          multi_pass: passes.length > 1,
+          source_clip_url: sourceClipUrl,
+          total_sec: totalSec,
+          segments: pass.segments,
+          cost_credits: costCredits,
+          refunded: refundSettled,
+          v459_refund: refundInfo ?? (prevState as any)?.v459_refund ?? null,
+          plate_identity: v153PlateIdentitySnapshot,
+          error: reason,
+          finished_at: new Date().toISOString(),
+        },
+        scenePatch: {
           lip_sync_status: "failed",
           twoshot_stage: "failed",
           clip_error: reason,
-        })
-        .eq("id", sceneId);
+        },
+        reason,
+      });
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_source_kind: "segments", video_url: passInputUrl,
@@ -8587,6 +8835,79 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // transient (other passes in this scene or a parallel scene). Retry
     // identical payload up to 3× with exponential backoff + jitter before
     // falling through to the existing dispatch-failure path.
+    // ══ V510-P0 — LATE FAN-OUT FENCE ═══════════════════════════════════
+    //
+    // The V459 fence sits ~3800 lines and dozens of awaits earlier, before
+    // preclip rendering, Rekognition, Lambda and every upload. It saves
+    // work; it cannot prevent payment. In generation 10 pass 1 cleared that
+    // fence while the run was healthy, spent minutes in preflight, and
+    // dispatched into a run that had terminalized AND refunded in between.
+    //
+    // This is the last statement before money is spent, so the question it
+    // asks is the only one that matters here: is the run STILL open?
+    {
+      const { data: lateRow } = await supabase
+        .from("composer_scenes").select("dialog_shots").eq("id", sceneId).maybeSingle();
+      const lateState: any = (lateRow as any)?.dialog_shots ?? null;
+      const lateGate = mayDispatchProvider({
+        dialogShots: lateState,
+        runId: v510RunId,
+        fanoutClosed: isFanoutClosed(lateState),
+      });
+      if (!lateGate.ok) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} ` +
+            `v510_late_fanout_fence blocked reason=${lateGate.reason} — no provider call`,
+        );
+        // Own slot only, and no refund: the pass that terminalized the run
+        // already settled the money. Leaving this slot `rendering_preflight`
+        // would make the watchdog re-kick a dead run forever.
+        await supabase.rpc("update_dialog_pass_slot", {
+          _scene_id: sceneId,
+          _pass_idx: currentPassIdx,
+          _patch: {
+            status: "failed",
+            late_fanout_fence: "blocked",
+            late_fanout_fence_reason: lateGate.reason,
+            last_error: `v510_${lateGate.reason}`,
+            last_error_class: "v510_late_fanout_fence",
+            finished_at: new Date().toISOString(),
+          },
+        });
+        // Provably never sent to the provider — the same certainty the
+        // v431 G3.1b pre-dispatch path claims, and therefore the same
+        // ledger outcome. "uncertain" here would leak a phantom job.
+        await settleLedgerDispatchFailure(supabase, v431SyncLedgerJob?.id ?? null, {
+          errorCode: `v510_${lateGate.reason}`,
+          outcome: "rejected",
+        });
+        try {
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId, user_id: userId, engine: "sync-segments",
+            sync_source_kind: "segments", video_url: dispatchVideoUrl,
+            sync_status: "LATE_FANOUT_FENCE_BLOCKED",
+            error_class: "v510_late_fanout_fence",
+            error_message: String(lateGate.reason),
+            meta: {
+              diagnostic_id: diagnosticId,
+              retry_variant: retryVariant,
+              pass_idx: currentPassIdx,
+              total_passes: passes.length,
+              run_id: v510RunId,
+              late_fanout_fence: "blocked",
+            },
+          });
+        } catch { /* never block the fence on logging */ }
+        return json({
+          ok: true,
+          skipped: lateGate.reason,
+          late_fanout_fence: "blocked",
+          scene_id: sceneId,
+          pass_idx: currentPassIdx,
+        }, 202);
+      }
+    }
+
     const BACKOFFS_MS = [4_000, 10_000, 22_000];
     let resp: Response;
     // v253 — `attempt` is hoisted above the face-gate block; reset here.
@@ -8634,32 +8955,44 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       }
       pass.status = "failed";
       pass.error = `dispatch_${resp.status}:${errTxt.slice(0, 200)}`;
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: mergeDialogShots(prevState, {
-            version: 5,
-            engine: "sync-segments",
-            status: "failed",
-            passes,
-            current_pass: currentPassIdx,
-            total_passes: passes.length,
-            multi_pass: passes.length > 1,
-            source_clip_url: sourceClipUrl,
-            total_sec: totalSec,
-            segments: pass.segments,
-            cost_credits: totalCost,
-            refunded: !alreadyRefunded,
-            error: pass.error,
-            finished_at: new Date().toISOString(),
-          }),
+      // ── V510-P0 — same lost-update class as the pre-dispatch failure ──
+      // This site runs AFTER the provider call, so by construction siblings
+      // have had even longer to write their job ids. Own slot only.
+      await v510Terminalize({
+        passIdx: currentPassIdx,
+        passPatch: buildTerminalPassPatch({
+          reason: String(pass.error),
+          errorClass: classifySyncError(errTxt),
+          diagnostics: {
+            diagnostic_id: diagnosticId,
+            http_status: resp.status,
+            v510_terminalized_by: "provider_dispatch_http_failure",
+          },
+        }),
+        rootPatch: {
+          version: 5,
+          engine: "sync-segments",
+          status: "failed",
+          current_pass: currentPassIdx,
+          total_passes: passes.length,
+          multi_pass: passes.length > 1,
+          source_clip_url: sourceClipUrl,
+          total_sec: totalSec,
+          segments: pass.segments,
+          cost_credits: totalCost,
+          refunded: !alreadyRefunded,
+          error: pass.error,
+          finished_at: new Date().toISOString(),
+        },
+        scenePatch: {
           lip_sync_status: "failed",
           twoshot_stage: "failed",
           clip_error: resp.status === 429
             ? "syncso_concurrency_exhausted"
             : `syncso_segments_dispatch_${resp.status}`,
-        })
-        .eq("id", sceneId);
+        },
+        reason: String(pass.error),
+      });
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_source_kind: "segments", video_url: dispatchVideoUrl,
@@ -8730,6 +9063,35 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
     pass.job_id = jobId;
     passes[currentPassIdx] = pass;
+
+    // ── V510-P0 — provider accepted DURING terminalization ─────────────
+    //
+    // The late fence closes the window; it does not make it zero. If a
+    // sibling terminalized between the fence and this 201, the job is real
+    // and billable, so the correct move is the opposite of discarding it:
+    // record it. The slot write below and the ledger binding above are what
+    // let the webhook reconcile it and the watchdog cancel it — dropping
+    // the id here would create exactly the unreconcilable phantom job the
+    // fence exists to prevent.
+    //
+    // What must NOT happen is the root going back to `running`. That is
+    // refused inside composer_touch_dialog_run_progress, under the row
+    // lock — not by this check, which only records why.
+    let v510AcceptedAfterTerminal = false;
+    {
+      const { data: raceRow } = await supabase
+        .from("composer_scenes").select("dialog_shots").eq("id", sceneId).maybeSingle();
+      const raceState: any = (raceRow as any)?.dialog_shots ?? null;
+      if (isRunTerminal(raceState, v510RunId) || isFanoutClosed(raceState)) {
+        v510AcceptedAfterTerminal = true;
+        (pass as any).v510_accepted_after_terminal = true;
+        (pass as any).v510_accepted_after_terminal_at = new Date().toISOString();
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} ` +
+            `v510_accepted_after_terminal job=${jobId} — job id recorded, root stays terminal`,
+        );
+      }
+    }
 
 
     const nowIso = new Date().toISOString();
@@ -9071,68 +9433,83 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     //      twoshot_stage, …) — these are idempotent across passes (latest
     //      writer's value is fine for status/diagnostic fields).
     {
+      const v510SlotPatch = { ...passRunStamp, ...(pass as Record<string, unknown>) };
       const { error: slotErr } = await supabase.rpc("update_dialog_pass_slot", {
         _scene_id: sceneId,
         _pass_idx: currentPassIdx,
-        _patch: { ...passRunStamp, ...(pass as Record<string, unknown>) },
+        _patch: v510SlotPatch,
       });
       if (slotErr) {
+        // ── V510-P0 — the full-row fallback IS the lost update ──────────
+        //
+        // The old fallback re-read and re-merged, which narrows the window
+        // but does not close it: between the SELECT and the UPDATE a
+        // sibling can still land, and its slot is then overwritten from a
+        // snapshot that never saw it. A read-modify-write on the same
+        // column the RPC exists to protect cannot be the RPC failure path.
+        //
+        // Retry the atomic write instead. If it still fails, the job id is
+        // NOT lost: registerInflightSyncJob recorded it above, and the",
+        // ledger binding (pipeline_job_id ↔ external_job_id) is the
+        // authoritative reconciliation key the webhook actually uses —
+        // `dialog_shots.passes[i].job_id` is a convenience mirror, not the
+        // source of truth. Losing the mirror is recoverable; overwriting a
+        // sibling job id is not.
         console.warn(
-          `[compose-dialog-segments] scene=${sceneId} v168_per_slot_write pass=${currentPassIdx + 1} rpc_error=${slotErr.message} — falling back to full-row UPDATE`,
+          `[compose-dialog-segments] scene=${sceneId} v168_per_slot_write pass=${currentPassIdx + 1} rpc_error=${slotErr.message} — retrying atomic slot write`,
         );
-        // Fallback: read-modify-write merge (legacy behavior for safety).
-        const { data: freshRow } = await supabase
-          .from("composer_scenes")
-          .select("dialog_shots")
-          .eq("id", sceneId)
-          .maybeSingle();
-        const freshState: any = (freshRow as any)?.dialog_shots ?? state;
-        const freshPasses: any[] = Array.isArray(freshState?.passes)
-          ? freshState.passes.map((p: any) => ({ ...p }))
-          : passes;
-        freshPasses[currentPassIdx] = pass;
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: mergeDialogShots(freshState, {
-              ...state,
-              canonical_lipsync_pipeline: passes.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
-              input_space: passes.length >= 2 ? "plate" : undefined,
-              preclip_used: passes.length >= 2 ? false : undefined,
-              passes: freshPasses,
-            }),
-          })
-          .eq("id", sceneId);
-      } else {
-        // Root merge: write ALL root-level state fields (sync_job_id, status,
-        // total_sec, video_width, etc.) WITHOUT touching `passes[]`. The RPC
-        // strips `passes` defensively. Last-writer-wins on root scalars is
-        // the legacy behavior and is tolerable because authoritative per-pass
-        // job IDs live in `passes[i].sync_job_id`.
-        const { passes: _drop, ...rootOnly } = state as any;
-        await supabase.rpc("update_dialog_shots_root_merge", {
+        const { error: slotRetryErr } = await supabase.rpc("update_dialog_pass_slot", {
           _scene_id: sceneId,
-          _patch: {
-            ...rootOnly,
-            canonical_lipsync_pipeline: passes.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
-            input_space: passes.length >= 2 ? "plate" : undefined,
-            preclip_used: passes.length >= 2 ? false : undefined,
-          },
+          _pass_idx: currentPassIdx,
+          _patch: v510SlotPatch,
         });
+        if (slotRetryErr) {
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} v510_slot_write_unrecoverable pass=${currentPassIdx + 1} ` +
+              `job=${jobId} pipeline_job=${v431SyncLedgerJob?.id ?? "none"} err=${slotRetryErr.message} — ` +
+              `slot mirror not written; reconcile via ledger`,
+          );
+        }
       }
 
-      // Top-level scene columns (idempotent across parallel passes).
-      await supabase
-        .from("composer_scenes")
-        .update({
+      // ── V510-P0 — monotonic root + scene write ─────────────────────────
+      //
+      // WAS: an unconditional root merge plus an unconditional scene-column
+      // UPDATE setting lip_sync_status="running" and clip_error=null. The
+      // comment above them said last-writer-wins was "tolerable" — true
+      // among running siblings, false once one of them has terminalized.
+      // That is precisely how generation 10 came back to life after it had
+      // already failed and refunded.
+      //
+      // Both writes now go through one RPC that refuses when THIS run is
+      // terminal. The decision is taken under the row lock, so it cannot be
+      // raced the way a caller-side SELECT-then-UPDATE could.
+      const { passes: _drop, ...rootOnly } = state as any;
+      const v510Progress = await v510TouchProgress(
+        {
+          ...rootOnly,
+          canonical_lipsync_pipeline: passes.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
+          input_space: passes.length >= 2 ? "plate" : undefined,
+          preclip_used: passes.length >= 2 ? false : undefined,
+        },
+        {
           lip_sync_status: "running",
           twoshot_stage: passes.length > 1 ? `syncso_pass_${currentPassIdx + 1}_of_${passes.length}` : "syncso_segments",
           lip_sync_source_clip_url: sourceClipUrl,
           replicate_prediction_id: `sync:${jobId}`,
           clip_error: null,
-          updated_at: nowIso,
-        })
-        .eq("id", sceneId);
+        },
+        String(currentPassIdx + 1),
+      );
+      if (!v510Progress.applied) {
+        // The run ended while this pass was in flight. The provider job is
+        // recorded and the ledger will reconcile it; the run stays terminal.
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} ` +
+            `v510_root_resurrection_prevented reason=${v510Progress.reason} job=${jobId} ` +
+            `accepted_after_terminal=${v510AcceptedAfterTerminal}`,
+        );
+      }
     }
 
     // ── Plan D (v93) — flag-gated parallel fan-out, supersedes hard `false`.

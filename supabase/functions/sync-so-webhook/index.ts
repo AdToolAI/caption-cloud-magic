@@ -370,6 +370,122 @@ async function applySyncSegmentResult(
   return res;
 }
 
+/**
+ * V510-P0 — reconciliation of provider work accepted before terminalization.
+ *
+ * `composer_apply_sync_segment_result` owns aggregation, NOOP escalation,
+ * mux dispatch and retry. None of those may run after a V510
+ * terminalization, so this is a separate contract rather than a relaxed
+ * guard on that one: the RPC records the outcome and settles the ledger,
+ * and is structurally incapable of touching the root (it contains no
+ * UPDATE on composer_scenes at all).
+ */
+/**
+ * V510-P0 — LEDGER-FIRST CALLBACK PROVENANCE, TRANSACTIONALLY
+ *
+ * The v431 contract is explicit about who owns callback identity:
+ * `composer_pipeline_jobs` is authoritative, and the job ids mirrored into
+ * `dialog_shots` are compatibility/visibility state. The legacy run guard
+ * inverted that — it rejected on the mirror before anyone consulted the
+ * ledger, which is safe only while the mirror is complete.
+ *
+ * Under parallel fan-out it is not. Pass 0 binds its job id; pass 2 gets
+ * HTTP 201 and Sync.so fires a terminal webhook before
+ * `composer_bind_sync_pass_attempt` has run. The mirror then holds exactly
+ * one id — pass 0's — and the guard reads `knownJobIds.length > 0 &&
+ * !includes(JOB_B)` as `stale_run_result`.
+ *
+ * The first fix for that pre-bind window answered 409 and relied on Sync.so
+ * redelivering. That was wrong, and the source says so: lipsync-watchdog's
+ * own header states "Sync.so does NOT retry missed webhook deliveries", and
+ * its scan filter is lip_sync_status IN (running, audio_muxing) plus
+ * specific `pending` shapes — a V510-terminalized scene is `failed` and
+ * therefore in no branch of it. A dropped fast callback on such a scene was
+ * dropped permanently.
+ *
+ * So the webhook completes the binding itself. It has everything required:
+ * the pipeline_job_id from its own URL, the external id from the payload,
+ * and the authoritative pass_idx from the locked ledger row. The RPC below
+ * does that under one lock pair, verifying the scene epoch in the same
+ * transaction — so this is provenance resolution, not positional guessing.
+ */
+type AdoptOutcome = "bound" | "already_bound" | "rejected" | "no_ledger" | "unavailable";
+
+interface AdoptResult {
+  outcome: AdoptOutcome;
+  reason?: string;
+  passIdx: number | null;
+}
+
+async function adoptSyncCallbackBinding(
+  supabase: any,
+  params: { pipelineJobId: string | null; externalJobId: string; sceneId: string },
+): Promise<AdoptResult> {
+  // No pointer means no ledger authority to appeal to. The legacy mirror
+  // guard stays in charge for those callbacks, exactly as before.
+  if (!params.pipelineJobId) return { outcome: "no_ledger", passIdx: null };
+
+  const { data, error } = await supabase.rpc("composer_adopt_sync_callback_binding", {
+    _pipeline_job_id: params.pipelineJobId,
+    _external_job_id: params.externalJobId,
+    _scene_id: params.sceneId,
+  });
+  if (error) {
+    // A transport failure is not evidence of staleness. Fall through to the
+    // legacy guard rather than inventing a verdict from a failed call.
+    console.error(
+      `[sync-so-webhook] v510_adopt_rpc_failed job=${params.externalJobId} ` +
+        `pipeline_job=${params.pipelineJobId}: ${error.message}`,
+    );
+    return { outcome: "unavailable", passIdx: null };
+  }
+  const res = (data ?? {}) as Record<string, unknown>;
+  const outcome = String(res.outcome ?? "rejected") as AdoptOutcome;
+  const passIdx = Number.isInteger(Number(res.pass_idx)) ? Number(res.pass_idx) : null;
+  if (outcome !== "already_bound") {
+    console.log(
+      `[sync-so-webhook] v510_callback_binding job=${params.externalJobId} ` +
+        `outcome=${outcome} reason=${res.reason ?? "-"} pass=${passIdx ?? "-"}`,
+    );
+  }
+  return { outcome, reason: res.reason ? String(res.reason) : undefined, passIdx };
+}
+
+async function reconcileTerminalSyncResult(
+  supabase: any,
+  params: {
+    pipelineJobId: string | null;
+    externalJobId: string;
+    providerStatus: string;
+    outputUrl: string | null;
+    errorText: string | null;
+  },
+): Promise<Record<string, unknown> | null> {
+  // Same fail-closed rule as the normal apply: without the ledger pointer
+  // there is no provenance, and positional matching is never a substitute.
+  if (!params.pipelineJobId) return null;
+  const { data, error } = await supabase.rpc("composer_reconcile_terminal_sync_result", {
+    _pipeline_job_id: params.pipelineJobId,
+    _external_job_id: params.externalJobId,
+    _provider_status: params.providerStatus,
+    _output_url: params.outputUrl,
+    _error_text: params.errorText,
+  });
+  if (error) {
+    console.error(
+      `[sync-so-webhook] v510_terminal_reconcile_failed job=${params.externalJobId}: ${error.message}`,
+    );
+    return null;
+  }
+  const res = (data ?? {}) as Record<string, unknown>;
+  console.log(
+    `[sync-so-webhook] v510_terminal_reconcile job=${params.externalJobId} ` +
+      `verdict=${res.verdict ?? "-"} applied=${res.applied === true} ` +
+      `pass=${res.pass_idx ?? "-"} reason=${res.reason ?? "-"}`,
+  );
+  return res;
+}
+
 // v404 — `readMotionProbeMetrics()` (client-persisted `meta_yavg_probe` poll)
 // ist ersatzlos entfallen. Die Motion-Metrik wird ausschließlich serverseitig
 // und synchron von `measureProviderMotionSync()` erzeugt; der Client hat keine
@@ -666,13 +782,86 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     return ok({ ok: true, skipped: "no_scene_match", job_id: jobId });
   }
 
+  // ── v431 G3.1 — Ledger-Observe (schreibt nichts, blockiert nichts) ─────────
+  // G3.1b: dieselbe Job-ID ist zugleich der Vorgänger jedes Retry-Dispatch,
+  // der aus diesem Callback heraus ausgelöst wird.
+  //
+  // V510-P0 — moved ABOVE the legacy run guard. The pointer has to be read
+  // before anything is allowed to reject on the compatibility mirror.
+  const v431CallbackJobId = readPipelineJobId(url, payload as Record<string, unknown>);
+  await observeCallbackProvenance(supabase, {
+    handler: "sync-so-webhook",
+    pipelineJobId: v431CallbackJobId,
+    sceneId,
+    stage: "sync_segment",
+    externalJobId: jobId ? String(jobId) : null,
+  });
+
+  // ── V510-P0 — LEDGER-FIRST PROVENANCE + PRE-BIND ADOPTION ─────────────
+  // One transactional call decides everything the old read-only validator
+  // decided, and additionally CLOSES the pre-bind window instead of asking
+  // the provider to come back later.
+  const v510Binding = await adoptSyncCallbackBinding(supabase, {
+    pipelineJobId: v431CallbackJobId,
+    externalJobId: String(jobId),
+    sceneId,
+  });
+
+  if (v510Binding.outcome === "rejected") {
+    // The ledger says this callback does not belong here — wrong scene,
+    // wrong stage, a previous run or generation, or an attempt already bound
+    // to a different external job. That is a stronger statement than the
+    // mirror could ever make, and the only one allowed to discard outright.
+    // Nothing was written: every rejection returns before the UPDATEs.
+    console.warn(
+      `[sync-so-webhook] v510_ledger_stale scene=${sceneId} job=${jobId} ` +
+        `pipeline_job=${v431CallbackJobId} reason=${v510Binding.reason ?? "-"}`,
+    );
+    return ok({
+      ok: true,
+      skipped: "stale_run_result",
+      reason: v510Binding.reason ?? null,
+      scene_id: sceneId,
+      job_id: jobId,
+    });
+  }
+
+  if (v510Binding.outcome === "bound") {
+    // The callback beat the dispatcher's own bind. The transport pointers
+    // now exist, written from the locked ledger row's pass_idx, so the rest
+    // of this function proceeds exactly as it would have if the dispatcher
+    // had got there first. compose-dialog-segments will call
+    // composer_bind_sync_pass_attempt with the identical triple moments
+    // later and get 'noop' — it is written to short-circuit on exactly the
+    // three fields adoption sets.
+    console.log(
+      `[sync-so-webhook] v510_prebind_adopted scene=${sceneId} job=${jobId} ` +
+        `pass=${v510Binding.passIdx ?? "-"} — binding completed by the callback`,
+    );
+    // The scene row was read before the adoption wrote the pointers; refresh
+    // it so every downstream branch sees the slot it just bound.
+    const { data: rebound } = await supabase
+      .from("composer_scenes")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status, active_run_id, plate_generation")
+      .eq("id", sceneId)
+      .maybeSingle();
+    if (rebound) scene = rebound;
+  }
   // ── Run-Guard (2026-08-03) ────────────────────────────────────────────────
   // A restart purges `dialog_shots`. Any result that arrives afterwards
   // belongs to the PREVIOUS run and must never touch the new one. We only
   // discard when the scene actually tracks job ids and this one is not among
   // them — a webhook that races the initial `dialog_shots` write (no job ids
   // recorded yet) is still accepted, exactly as before.
-  {
+  //
+  // V510-P0 — this now runs ONLY when there is no ledger authority to
+  // consult: either the callback carries no pipeline_job_id, or the RPC
+  // itself was unreachable. `dialog_shots` job ids are compatibility state,
+  // not provenance; letting them veto a ledger-valid callback is what
+  // discarded paid-for results under parallel fan-out. With a binding —
+  // adopted or pre-existing — we skip straight past, even if the mirror has
+  // not caught up yet.
+  if (v510Binding.outcome === "no_ledger" || v510Binding.outcome === "unavailable") {
     const ds: any = scene.dialog_shots ?? null;
     const shots = Array.isArray(ds?.shots) ? ds.shots : [];
     const passes = Array.isArray(ds?.passes) ? ds.passes : [];
@@ -698,18 +887,6 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       });
     }
   }
-
-  // ── v431 G3.1 — Ledger-Observe (schreibt nichts, blockiert nichts) ─────────
-  // G3.1b: dieselbe Job-ID ist zugleich der Vorgänger jedes Retry-Dispatch,
-  // der aus diesem Callback heraus ausgelöst wird.
-  const v431CallbackJobId = readPipelineJobId(url, payload as Record<string, unknown>);
-  await observeCallbackProvenance(supabase, {
-    handler: "sync-so-webhook",
-    pipelineJobId: v431CallbackJobId,
-    sceneId,
-    stage: "sync_segment",
-    externalJobId: jobId ? String(jobId) : null,
-  });
 
 
 
@@ -741,7 +918,21 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       (scene.dialog_shots as any)?.status === "failed") &&
     typeof (scene as any).clip_error === "string" &&
     /^watchdog_(provider_timeout|auto_retry_|hard_timeout)/.test((scene as any).clip_error ?? "");
+  // Read AFTER any pre-bind adoption, so a callback that just bound its own
+  // pointers still sees the current terminal marker.
   const dsForRecover: any = scene.dialog_shots ?? {};
+  // V510-P0 — the run-scoped terminal marker written by
+  // composer_terminalize_dialog_run. Its presence is what distinguishes a
+  // run THIS codebase terminalized from a historical failed scene, and its
+  // run_id is what stops an old-run callback reaching a new run.
+  const v510TerminalMarker: any = dsForRecover?.v510_terminal ?? null;
+  const v510TerminalRunId: string | null =
+    v510TerminalMarker && typeof v510TerminalMarker === "object" &&
+      !Array.isArray(v510TerminalMarker) &&
+      typeof v510TerminalMarker.run_id === "string" &&
+      v510TerminalMarker.run_id.trim().length > 0
+      ? v510TerminalMarker.run_id.trim()
+      : null;
   const passesForRecover: any[] = Array.isArray(dsForRecover?.passes) ? dsForRecover.passes : [];
   const jobKnown = passesForRecover.some((p: any) => p?.job_id === jobId) ||
     dsForRecover?.sync_job_id === jobId;
@@ -762,6 +953,59 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       (scene.dialog_shots as any).status = "rendering";
       // fall through into the normal v5 success branch below
 
+    } else if (
+      // ── V510-P0 — TERMINAL RECONCILIATION ────────────────────────────
+      //
+      // V510 made the root monotonic, which is correct and which also
+      // means a provider job accepted (HTTP 201) just before a sibling
+      // terminalized would otherwise die here — its slot never settled,
+      // its ledger row never closed, its output never pointed at. The run
+      // is over and stays over; the WORK still has to be booked.
+      //
+      // Three conditions, all required, all narrow:
+      //   · the scene carries a V510 terminal marker — so a historical
+      //     failed scene, which has none, keeps its legacy ignore
+      //   · that marker names the CURRENT active_run_id — so an old-run
+      //     callback can never reach into a new run
+      //   · the callback carries a pipeline_job_id — provenance or nothing
+      v510TerminalRunId !== null &&
+      v510TerminalRunId === String((scene as any)?.active_run_id ?? "") &&
+      v431CallbackJobId !== null &&
+      (status === "COMPLETED" || status === "FAILED" || status === "REJECTED" || status === "CANCELED")
+    ) {
+      // Re-host BEFORE the RPC: it downloads ~MB over the network and must
+      // never happen while a row lock is held.
+      let terminalOutputUrl: string | null = null;
+      if (status === "COMPLETED" && outputUrl) {
+        // The pass index came from the locked ledger row during adoption —
+        // never from array position — and the re-hosted object path is named
+        // after it. A null index means no ledger authority, so nothing is
+        // re-hosted and the provider URL is used as-is.
+        const ledgerPassIdx = v510Binding.passIdx;
+        const rehosted = ledgerPassIdx !== null
+          ? await rehostSyncOutput(supabase, sceneId, ledgerPassIdx, outputUrl)
+          : null;
+        terminalOutputUrl = rehosted ?? outputUrl;
+      }
+      // No motion measurement, no V465/V500 verdict, no NOOP ladder, no mux,
+      // no advance, no refund. The run is already terminal and already
+      // settled; this books already-paid accepted work and nothing else.
+      const reconciled = await reconcileTerminalSyncResult(supabase, {
+        pipelineJobId: v431CallbackJobId,
+        externalJobId: String(jobId),
+        providerStatus: String(status),
+        outputUrl: terminalOutputUrl,
+        errorText: errorMsg ?? null,
+      });
+      return ok({
+        ok: true,
+        skipped: reconciled?.applied === true ? undefined : "terminal_reconcile_not_applied",
+        verdict: reconciled?.verdict ?? "terminal_reconcile_unavailable",
+        terminal_reconciled: reconciled?.applied === true,
+        pass_idx: reconciled?.pass_idx ?? null,
+        scene_id: sceneId,
+        job_id: jobId,
+      });
     } else {
       console.log(
         `[sync-so-webhook] v129.4a ignored_due_scene_failed scene=${sceneId} job=${jobId} status=${status}`,
