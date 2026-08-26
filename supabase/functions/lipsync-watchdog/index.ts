@@ -38,6 +38,11 @@ import {
   MOTION_UNVERIFIED_STATE,
 } from "../_shared/motion-probe-infra.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
+import {
+  type ApplyAck,
+  buildApplyAckTelemetry,
+  classifyWebhookApplyAck,
+} from "../_shared/v511-apply-ack.ts";
 // V459 — Preflight-Zombie-Recovery + Terminal Fan-out Aggregation.
 import {
   evaluateRunAggregation,
@@ -63,6 +68,12 @@ const corsHeaders = {
 const STALE_PROVIDER_MS = 10 * 60_000;   // Sync.so jobs in flight w/o update
 const STALE_PREFLIGHT_MS = 4 * 60_000;   // running but never produced a provider job
 const STALE_HARD_MS = 25 * 60_000;       // v126: 20→25 min — one extra cron tick for recovery
+// V511 F2 — the forward is bounded, but generously: sync-so-webhook legally
+// rehosts the provider output and runs a server-side motion measurement
+// (~27 s deadline of its own) before it applies. A tight timeout would turn
+// healthy slow work into `unknown` and re-forward it forever. 90 s is longer
+// than any observed successful forward and still finite, which is the point.
+const WEBHOOK_FORWARD_TIMEOUT_MS = 90_000;
 // Plan v71: `pending + master_clip + clip_url + audio_plan` with NO dispatch yet
 // means compose-dialog-segments was never called (lost client invoke / 202 race).
 // v94: 90s → 30s. Sync.so normal render is 25-45s; with the cron also tightened
@@ -200,7 +211,15 @@ async function pollAndForward(opts: {
   supabaseUrl: string;
   serviceKey: string;
   pipelineJobId: string | null;
-}): Promise<{ terminal: boolean; status?: string; applied?: boolean; applyReason?: string | null }> {
+  passIdx?: number | null;
+}): Promise<{
+  terminal: boolean;
+  status?: string;
+  /** V511 — the ONLY progress predicate. Never derived from HTTP 200. */
+  progressed: boolean;
+  ack?: ApplyAck;
+  applyReason?: string | null;
+}> {
   const { syncApiKey, jobId, sceneId, supabaseUrl, serviceKey, pipelineJobId } = opts;
   try {
     const r = await fetch(`${SYNC_API_BASE}/generate/${jobId}`, {
@@ -210,12 +229,12 @@ async function pollAndForward(opts: {
     });
     if (!r.ok) {
       console.warn(`[lipsync-watchdog] poll job=${jobId} HTTP ${r.status}`);
-      return { terminal: false };
+      return { terminal: false, progressed: false };
     }
     const body: any = await r.json().catch(() => ({}));
     const status = String(body?.status ?? "").toUpperCase();
     if (!["COMPLETED", "FAILED", "REJECTED", "CANCELED"].includes(status)) {
-      return { terminal: false, status };
+      return { terminal: false, status, progressed: false };
     }
     // Forward to our own webhook so the v25 branch (re-host, pass advance,
     // compositor dispatch, retry/refund) runs unchanged. Include the
@@ -230,15 +249,22 @@ async function pollAndForward(opts: {
         stage: "sync_segment",
         externalJobId: jobId,
       });
-      return { terminal: false };
+      return { terminal: false, progressed: false };
     }
     const sharedSecret = Deno.env.get("WEBHOOK_SHARED_SECRET") ?? "";
     const webhookUrl =
       `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}` +
       `&pipeline_job_id=${encodeURIComponent(pipelineJobId)}` +
       (sharedSecret ? `&token=${encodeURIComponent(sharedSecret)}` : "");
-    let applied: boolean | undefined = undefined;
-    let applyReason: string | null = null;
+    // ── V511 F1/F2 — bounded forward, strictly classified ──────────────
+    //
+    // The forward had no timeout at all. Combined with the watchdog holding
+    // this scene's dialog lock across the round trip, a slow webhook pinned
+    // the lease open for as long as it ran. The budget below is generous on
+    // purpose: the webhook legitimately rehosts and measures, and cutting it
+    // short would manufacture the very `unknown` this fix is about. It only
+    // has to be finite.
+    let ack: ApplyAck;
     try {
       const wr = await fetch(webhookUrl, {
         method: "POST",
@@ -247,23 +273,30 @@ async function pollAndForward(opts: {
           Authorization: `Bearer ${serviceKey}`,
         },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(WEBHOOK_FORWARD_TIMEOUT_MS),
       });
-      // v441 — der Webhook meldet `applied` + `reason` (settleVerdict). Nur ein
-      // angewandter Callback ist echter Fortschritt.
-      const wb: any = await wr.json().catch(() => ({}));
-      if (typeof wb?.applied === "boolean") applied = wb.applied;
-      applyReason = (wb?.reason as string | null) ?? (wb?.skipped as string | null) ?? null;
+      let parsed: Record<string, unknown> | null = null;
+      try {
+        parsed = (await wr.json()) as Record<string, unknown>;
+      } catch {
+        parsed = null;
+      }
+      ack = classifyWebhookApplyAck({ httpStatus: wr.status, body: parsed });
     } catch (e) {
+      // A timeout or a thrown fetch says nothing about whether the apply
+      // happened. `unknown` is the honest answer, and it does not suppress
+      // the next tick's retry.
       console.warn(`[lipsync-watchdog] forward webhook crash: ${(e as Error).message}`);
+      ack = classifyWebhookApplyAck({ transportError: true });
     }
     console.log(
       `[lipsync-watchdog] polled job=${jobId} status=${status} → forwarded to webhook scene=${sceneId} ` +
-        `applied=${applied ?? "?"} reason=${applyReason ?? "-"}`,
+        `${JSON.stringify(buildApplyAckTelemetry(ack, { pipelineJobId, passIdx: opts.passIdx ?? null }))}`,
     );
-    return { terminal: true, status, applied, applyReason };
+    return { terminal: true, status, progressed: ack.progressed, ack, applyReason: ack.reason };
   } catch (e) {
     console.warn(`[lipsync-watchdog] poll crash job=${jobId}: ${(e as Error).message}`);
-    return { terminal: false };
+    return { terminal: false, progressed: false };
   }
 }
 
@@ -334,7 +367,11 @@ serve(async (req) => {
     // segments (already locked) and either clobber a freshly-set pass
     // status OR re-dispatch a pass that the webhook had just marked
     // terminal in the same window.
-    await withDialogLock(supabase, d.id, "lipsync-watchdog", async () => {
+    // V511 F2 — the tick keeps its lock for state work, but every blocking
+    // provider/webhook round trip now runs through `lockCtx.runUnlocked`,
+    // which RELEASES the lease first. Holding it across the forward is what
+    // made sync-so-webhook fight this function for the same scene.
+    await withDialogLock(supabase, d.id, "lipsync-watchdog", async (lockCtx) => {
     const ds: any = d.dialog_shots ?? {};
 
     // v129.4a — Terminal no-op guard.
@@ -383,15 +420,15 @@ serve(async (req) => {
       if (!alreadyRedispatched) {
         const retryCtx = await buildRetryContext(supabase, d.id, d.active_run_id, "audio_mux");
         const stampedAt = new Date().toISOString();
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: {
-              ...(ds as any),
-              audio_mux: { ...(ds?.audio_mux ?? {}), v501_redispatch_at: stampedAt },
-            },
-          })
-          .eq("id", d.id);
+        // V511 — a one-key stamp does not need to ship the whole document.
+        // The spread carried `ds.passes` — the top-of-tick snapshot — with
+        // every write. The RPC merges server-side and strips `passes`.
+        await supabase.rpc("update_dialog_shots_root_merge", {
+          _scene_id: d.id,
+          _patch: {
+            audio_mux: { ...(ds?.audio_mux ?? {}), v501_redispatch_at: stampedAt },
+          },
+        });
         try {
           const res = await fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
             method: "POST",
@@ -440,8 +477,17 @@ serve(async (req) => {
     ) {
       const refundCredits = Number(ds?.cost_credits) || 0;
       let refundedFlag = !!ds?.refunded;
-      // Best-effort refund via increment_balance RPC (same path used by the
-      // dialog-stitch webhook fail branch).
+      // V509 — Refund nur bei BESTAETIGTEM RPC.
+      //
+      // `supabase.rpc()` wirft bei DB-Fehlern NICHT, es liefert
+      // `{ data, error }`. Vorher wurde `refundedFlag = true` unabhaengig vom
+      // Ergebnis gesetzt und anschliessend als `dialog_shots.refunded`
+      // persistiert — ein fehlgeschlagener Refund galt damit dauerhaft als
+      // erledigt und der Nutzer verlor die Credits still.
+      //
+      // Bleibt `refundedFlag` false, greift der naechste Watchdog-Tick erneut;
+      // der Fehlschlag wird deshalb laut geloggt, damit die Ursache
+      // diagnostizierbar bleibt und nicht nur der Retry sichtbar ist.
       if (!refundedFlag && refundCredits > 0) {
         const { data: sceneUser } = await supabase
           .from("composer_scenes")
@@ -451,16 +497,31 @@ serve(async (req) => {
         const userId = (sceneUser as any)?.created_by;
         if (userId) {
           try {
-            await supabase.rpc("increment_balance", {
+            const { error: refundError } = await supabase.rpc("increment_balance", {
               p_user_id: userId,
               p_amount: refundCredits,
             });
-            refundedFlag = true;
+            if (refundError) {
+              console.error(
+                `[lipsync-watchdog] scene=${d.id} audio_mux refund rpc_failed ` +
+                  `user=${userId} credits=${refundCredits} — NOT refunded, will retry: ` +
+                  `${refundError.message}`,
+              );
+            } else {
+              refundedFlag = true;
+            }
           } catch (e) {
-            console.warn(
-              `[lipsync-watchdog] scene=${d.id} audio_mux refund failed: ${(e as Error).message}`,
+            console.error(
+              `[lipsync-watchdog] scene=${d.id} audio_mux refund threw ` +
+                `user=${userId} credits=${refundCredits} — NOT refunded, will retry: ` +
+                `${(e as Error).message}`,
             );
           }
+        } else {
+          console.error(
+            `[lipsync-watchdog] scene=${d.id} audio_mux refund skipped — ` +
+              `no created_by on scene, credits=${refundCredits} NOT refunded`,
+          );
         }
       }
       // Flip the pending video_renders row for this render_id to failed so
@@ -477,21 +538,29 @@ serve(async (req) => {
           .eq("render_id", muxRenderId)
           .in("status", ["pending", "rendering"]);
       }
-      await supabase
-        .from("composer_scenes")
-        .update({
+      // ── V511 — terminal watchdog paths enter the V510 contract ────────
+      // This wrote a whole `dialog_shots` from the top-of-tick snapshot AND
+      // never stamped `v510_terminal`, so a late accepted callback could not
+      // reach terminal reconciliation — the same defect F4 closed in
+      // failLipSync. The root patch below carries no `passes`.
+      const muxTerminalReason = v501HardFail ? "audio_mux_dispatch_lost" : "watchdog_audio_mux_stall";
+      await supabase.rpc("composer_terminalize_dialog_run", {
+        _scene_id: d.id,
+        _run_id: String((d as any)?.active_run_id ?? "") || null,
+        _pass_idx: null,
+        _pass_patch: {},
+        _root_patch: {
+          status: "failed",
+          error: muxTerminalReason,
+          refunded: refundedFlag,
+        },
+        _scene_patch: {
           lip_sync_status: "failed",
           twoshot_stage: "audio_mux_failed",
           clip_error: muxFailReason,
-          dialog_shots: {
-            ...(ds as any),
-            status: "failed",
-            error: v501HardFail ? "audio_mux_dispatch_lost" : "watchdog_audio_mux_stall",
-            refunded: refundedFlag,
-          },
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", d.id);
+        },
+        _terminal_reason: muxTerminalReason,
+      });
       console.log(
         `[lipsync-watchdog] scene=${d.id} ${v501HardFail ? "audio_mux_dispatch_lost" : "audio_mux_stall"} killed after ${Math.round(muxAge / 1000)}s (refunded=${refundedFlag})`,
       );
@@ -528,30 +597,70 @@ serve(async (req) => {
     // abgelehnten Callback im Minutentakt endlos weiter.
     let applyRejectedStuck = false;
     if (isV5Fanout && syncApiKey) {
+      // ── V511 C1 — Phase A: snapshot the reconciliation descriptors under
+      // the lock. This loop used to poll the provider and POST to
+      // sync-so-webhook while holding the scene lease, which forced the
+      // webhook into its lockless fallback for the same scene.
       const renderingPasses = (ds.passes as any[])
-        .map((p, i) => ({ p, i }))
-        .filter(({ p }) => p?.status === "rendering" && typeof p?.job_id === "string");
-      for (const { p, i } of renderingPasses) {
-        const r = await pollAndForward({
-          syncApiKey, jobId: p.job_id, sceneId: d.id, supabaseUrl, serviceKey,
+        .map((p, i) => ({
+          passIdx: i,
+          jobId: String(p?.job_id ?? ""),
           pipelineJobId: (p?.pipeline_job_id as string | null) ?? null,
+          startedAt: typeof p?.started_at === "string" ? p.started_at : null,
+          status: String(p?.status ?? ""),
+        }))
+        .filter((t) => t.status === "rendering" && t.jobId.length > 0);
+      if (renderingPasses.length > 0) {
+        // ── Phase B: provider GET + webhook forward, lease RELEASED.
+        const { result: pollResults, reacquired } = await lockCtx.runUnlocked(async () => {
+          const out: Array<{
+            t: typeof renderingPasses[number];
+            r: Awaited<ReturnType<typeof pollAndForward>>;
+          }> = [];
+          for (const t of renderingPasses) {
+            out.push({
+              t,
+              r: await pollAndForward({
+                syncApiKey, jobId: t.jobId, sceneId: d.id, supabaseUrl, serviceKey,
+                pipelineJobId: t.pipelineJobId, passIdx: t.passIdx,
+              }),
+            });
+          }
+          return out;
         });
-        if (r.terminal) {
-          polled.push({ scene_id: d.id, job_id: p.job_id, status: r.status ?? "?" });
-          if (r.applied === false) {
-            const startedMs = typeof p?.started_at === "string" ? Date.parse(p.started_at) : NaN;
+        // ── Phase C: without the lease back, this tick may not mutate the
+        // scene. The webhook may have committed while we were unlocked and
+        // there is no longer anything ordering us against it. The next tick
+        // starts from fresh state; nothing is lost by waiting.
+        if (!reacquired) {
+          console.warn(
+            `[lipsync-watchdog] v511 lock_reacquire_failed scene=${d.id} phase=poll_fallback ` +
+              `polled=${pollResults.length} — abandoning tick, no scene mutation`,
+          );
+          return;
+        }
+        for (const { t, r } of pollResults) {
+          if (!r.terminal) continue;
+          polled.push({ scene_id: d.id, job_id: t.jobId, status: r.status ?? "?" });
+          // V511 F1 — only an explicit `applied: true` is progress. `unknown`
+          // now falls into the same branch as `rejected`: it must not release
+          // the inflight slot, must not count as progress, and must not
+          // suppress the staleness escalation below.
+          if (!r.progressed) {
+            const startedMs = t.startedAt ? Date.parse(t.startedAt) : NaN;
             const passAge = Number.isFinite(startedMs) ? now - startedMs : Infinity;
             console.warn(
-              `[lipsync-watchdog] v441 apply_rejected scene=${d.id} pass=${i} job=${p.job_id} ` +
-                `reason=${r.applyReason ?? "-"} age=${Math.round(passAge / 1000)}s`,
+              `[lipsync-watchdog] v511 apply_not_confirmed scene=${d.id} pass=${t.passIdx} ` +
+                `job=${t.jobId} state=${r.ack?.state ?? "unknown"} ` +
+                `cause=${r.ack?.unknownCause ?? "-"} reason=${r.applyReason ?? "-"} ` +
+                `age=${Math.round(passAge / 1000)}s`,
             );
             if (passAge > STALE_PROVIDER_MS) applyRejectedStuck = true;
           } else {
-            progressed.push({ scene_id: d.id, job_id: p.job_id });
-            await releaseInflightSyncJob(supabase, p.job_id);
+            progressed.push({ scene_id: d.id, job_id: t.jobId });
+            await releaseInflightSyncJob(supabase, t.jobId);
           }
         }
-        void i;
       }
     }
 
@@ -627,13 +736,31 @@ serve(async (req) => {
           reason: "v459_terminal_required_pass_failure",
         });
         if (closure.canceledIdxs.length > 0) {
-          await supabase
-            .from("composer_scenes")
-            .update({
-              dialog_shots: { ...postState, passes: closure.passes },
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", d.id);
+          // V511 — `closeBlockedPasses` is pure and already refuses to touch a
+          // pass with an unreconciled provider job. What was unsafe is the
+          // PERSISTENCE: a whole-array read-modify-write, from a read taken
+          // moments earlier, on a path the unlocked forward can precede. Each
+          // closed pass now writes only its own fenced slot.
+          for (const ci of closure.canceledIdxs) {
+            const closedSlot = (closure.passes as any[])[ci] ?? null;
+            if (!closedSlot) continue;
+            const { error: slotErr } = await supabase.rpc("update_dialog_pass_slot", {
+              _scene_id: d.id,
+              _pass_idx: ci,
+              _patch: {
+                status: closedSlot.status,
+                error: closedSlot.error ?? null,
+                last_error: closedSlot.last_error ?? null,
+                last_error_class: closedSlot.last_error_class ?? null,
+                finished_at: closedSlot.finished_at ?? null,
+              },
+            });
+            if (slotErr) {
+              console.warn(
+                `[lipsync-watchdog] v511 v459_close_slot_failed scene=${d.id} pass=${ci}: ${slotErr.message}`,
+              );
+            }
+          }
         }
         console.log(
           `[lipsync-watchdog] v459 fence_closure scene=${d.id} ` +
@@ -864,13 +991,15 @@ serve(async (req) => {
         `last_recovery=${Number.isFinite(lastRecovery) ? new Date(lastRecovery).toISOString() : "never"}`,
       );
       try {
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: { ...(ds || {}), recovery_dispatched_at: new Date().toISOString() },
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", d.id);
+        // V511 C2-class — this sits AFTER the unlocked forward phase and
+        // spread `ds`, the top-of-tick snapshot, over the live document. A
+        // webhook that committed while the lease was released would have been
+        // erased by a one-key stamp. Root merge, server-side, `passes`
+        // stripped.
+        await supabase.rpc("update_dialog_shots_root_merge", {
+          _scene_id: d.id,
+          _patch: { recovery_dispatched_at: new Date().toISOString() },
+        });
         const recoveryRetryCtx = await buildRetryContext(
           supabase,
           d.id,
@@ -1012,20 +1141,78 @@ serve(async (req) => {
           // of destroyed by a wrongful retry. This was the root cause of
           // the 2026-06-20 "stuck at 95% for 24 min" hang: pass 2 was
           // reset to pending while its provider job was already done.
+          // ── V511 F2 — Phase A: snapshot the reconciliation descriptors
+          // under the lock. Nothing here does I/O.
           const passesProbe: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
+          const probeTargets = passesProbe
+            .map((p: any, idx: number) => ({
+              passIdx: idx,
+              jobId: String(p?.job_id ?? ""),
+              pipelineJobId: (p?.pipeline_job_id as string | null) ?? null,
+              status: String(p?.status ?? ""),
+            }))
+            .filter((t) => t.status === "rendering" && t.jobId.length > 0);
           let liveCompletedRecovered = false;
-          if (syncApiKey) {
-            for (const p of passesProbe) {
-              if (String(p?.status ?? "") !== "rendering" || !p?.job_id) continue;
-              const r = await pollAndForward({
-                syncApiKey, jobId: String(p.job_id), sceneId: d.id, supabaseUrl, serviceKey,
-                pipelineJobId: (p?.pipeline_job_id as string | null) ?? null,
-              });
-              // v441 — ein abgelehnter Apply ist keine Rettung.
-              if (r.terminal && r.status === "COMPLETED" && r.applied !== false) {
+          if (syncApiKey && probeTargets.length > 0) {
+            // ── Phase B: provider GET + webhook forward with the lease
+            // RELEASED. The webhook takes this scene's lock itself; holding
+            // it here is what forced it into its lockless fallback on every
+            // one of Kay's 27 forwards.
+            const { result: probeResults, reacquired: probeReacquired } = await lockCtx.runUnlocked(async () => {
+              const out: Array<{ target: typeof probeTargets[number]; r: Awaited<ReturnType<typeof pollAndForward>> }> = [];
+              for (const t of probeTargets) {
+                out.push({
+                  target: t,
+                  r: await pollAndForward({
+                    syncApiKey, jobId: t.jobId, sceneId: d.id, supabaseUrl, serviceKey,
+                    pipelineJobId: t.pipelineJobId, passIdx: t.passIdx,
+                  }),
+                });
+              }
+              return out;
+            });
+            // ── Phase C: back under the lock — if we got it back. Without
+            // the lease there is nothing ordering this tick against the
+            // webhook that may have committed while we were unlocked, so no
+            // scene mutation may follow.
+            if (!probeReacquired) {
+              console.warn(
+                `[lipsync-watchdog] v511 lock_reacquire_failed scene=${d.id} phase=pre_cancel_probe ` +
+                  `— abandoning tick, no scene mutation`,
+              );
+              return;
+            }
+            // The snapshot above is stale now. Re-read before deciding, and
+            // abandon the tick if the run moved on underneath us.
+            const { data: freshRow } = await supabase
+              .from("composer_scenes")
+              .select("lip_sync_status, lip_sync_applied_at, active_run_id")
+              .eq("id", d.id)
+              .maybeSingle();
+            const freshRun = String((freshRow as any)?.active_run_id ?? "");
+            const snapRun = String((d as any)?.active_run_id ?? "");
+            if (freshRun !== snapRun || (freshRow as any)?.lip_sync_applied_at) {
+              console.log(
+                `[lipsync-watchdog] v511 scene=${d.id} state moved during unlocked forward ` +
+                  `(run ${snapRun || "-"} → ${freshRun || "-"}) — abandoning this tick`,
+              );
+              return;
+            }
+            for (const { target, r } of probeResults) {
+              // V511 F1 — `progressed` is `applied === true` and nothing else.
+              // Previously `undefined` landed here as a recovery and silently
+              // cancelled the escalation for 22 minutes.
+              if (r.terminal && r.status === "COMPLETED" && r.progressed) {
                 liveCompletedRecovered = true;
-                polled.push({ scene_id: d.id, job_id: String(p.job_id), status: "COMPLETED" });
-                await releaseInflightSyncJob(supabase, String(p.job_id)).catch(() => {});
+                polled.push({ scene_id: d.id, job_id: target.jobId, status: "COMPLETED" });
+                await releaseInflightSyncJob(supabase, target.jobId).catch(() => {});
+              } else if (r.terminal && r.status === "COMPLETED") {
+                console.warn(
+                  `[lipsync-watchdog] v511 completed_not_applied scene=${d.id} pass=${target.passIdx} ` +
+                    `${JSON.stringify(buildApplyAckTelemetry(r.ack ?? classifyWebhookApplyAck({ transportError: true }), {
+                      pipelineJobId: target.pipelineJobId, passIdx: target.passIdx,
+                    }))} — NOT treated as recovery`,
+                );
               }
             }
           }
@@ -1061,53 +1248,112 @@ serve(async (req) => {
           // erfolgreich abgeschlossene `done`-Passes bleiben unverändert.
           // v141 — Auch keine Passes mit bereits vorhandenem output_url
           // anfassen (auch wenn sie noch fälschlich "rendering" stehen).
-          const passesNow: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
-          const passesPatched = passesNow.map((p: any, i: number) => {
-            const st = String(p?.status ?? "");
-            if (st === "done" || st === "done_suspect" || st === "failed" || st === "canceled_by_scene_failure") return p;
-            if (typeof p?.output_url === "string" && p.output_url.length > 0) return p;
-            if (st !== "rendering") return p;
-            return {
-              ...p,
-              status: "pending",
-              job_id: null,
-              output_url: null,
-              started_at: null,
-              finished_at: null,
-              watchdog_retry_attempted: true,
-              watchdog_retry_at: new Date().toISOString(),
-              error: `retrying_after_watchdog_provider_timeout`,
-              _retry_idx: i,
-            };
-          });
-          const hasStuckPass = passesPatched.some(
-            (p: any, i: number) => p?.watchdog_retry_attempted && passesNow[i]?.status === "rendering",
-          );
-          // Wenn nichts mehr "rendering" war, gibt es nichts zu retryen — falle
-          // auf den ursprünglichen Re-Dispatch-Pfad zurück (passes leer lassen).
-          const newPasses = hasStuckPass ? passesPatched : passesNow;
+          // ── V511 C2 — CONDITIONAL, PER-SLOT, AT THE ROW ─────────────────
+          //
+          // This block used to rebuild `passes[]` from `ds` — the snapshot
+          // taken at the top of the tick — and persist a whole `dialog_shots`
+          // object. V511's own lock split made that strictly more dangerous:
+          // the lease is genuinely released for the provider GET and the
+          // webhook forward, so sync-so-webhook can commit a completion in
+          // between, and this write would erase it from a snapshot that never
+          // saw it. The generation-10 lost update, relocated here.
+          //
+          // A fresh SELECT before the UPDATE would not fix it either: that is
+          // still check-then-act. The snapshot may decide WHICH passes look
+          // stuck, but the mutation is conditional at the row, against the
+          // exact attempt that decision was made about.
+          //
+          // `update_dialog_pass_slot` cannot serve here: its demotion guard
+          // strips status/output_url/finished_at/error from a terminal slot
+          // but NOT `job_id`, and the pairing rule turns a null job_id into a
+          // null pipeline_job_id — so a retry patch would strip both transport
+          // pointers off a pass the webhook had just completed.
+          const retryCandidates = (Array.isArray(ds?.passes) ? ds.passes : [])
+            .map((p: any, i: number) => ({
+              passIdx: i,
+              status: String(p?.status ?? ""),
+              jobId: typeof p?.job_id === "string" ? p.job_id : null,
+              pipelineJobId: typeof p?.pipeline_job_id === "string" ? p.pipeline_job_id : null,
+              hasOutput: typeof p?.output_url === "string" && p.output_url.length > 0,
+            }))
+            .filter((t: { status: string; hasOutput: boolean; jobId: string | null }) =>
+              t.status === "rendering" && !t.hasOutput && t.jobId !== null
+            );
 
-          await supabase
-            .from("composer_scenes")
-            .update({
-              lip_sync_status: "pending",
-              twoshot_stage: hasStuckPass ? (d.twoshot_stage ?? "master_clip") : "master_clip",
-              clip_error: `watchdog_auto_retry_${prevRetries + 1}_of_1`,
-              dialog_shots: {
-                ...(ds || {}),
-                passes: newPasses,
+          const retryPatch = {
+            status: "pending",
+            job_id: null,
+            output_url: null,
+            started_at: null,
+            finished_at: null,
+            watchdog_retry_attempted: true,
+            watchdog_retry_at: new Date().toISOString(),
+            error: `retrying_after_watchdog_provider_timeout`,
+          };
+
+          let resetCount = 0;
+          const resetRefusals: Array<{ pass: number; reason: string }> = [];
+          for (const t of retryCandidates) {
+            const { data: resetRes, error: resetErr } = await supabase.rpc(
+              "composer_reset_sync_pass_for_watchdog_retry",
+              {
+                _scene_id: d.id,
+                _run_id: (d as any)?.active_run_id ?? null,
+                _plate_generation: Number.isFinite(Number((d as any)?.plate_generation))
+                  ? Number((d as any).plate_generation)
+                  : null,
+                _pass_idx: t.passIdx,
+                _expected_external_job_id: t.jobId,
+                _expected_pipeline_job_id: t.pipelineJobId,
+                _pass_patch: retryPatch,
+              },
+            );
+            if (resetErr) {
+              resetRefusals.push({ pass: t.passIdx, reason: `rpc_error:${resetErr.message}` });
+              continue;
+            }
+            if ((resetRes as any)?.applied === true) resetCount++;
+            else {
+              resetRefusals.push({ pass: t.passIdx, reason: String((resetRes as any)?.reason ?? "refused") });
+            }
+          }
+          const hasStuckPass = resetCount > 0;
+          if (resetRefusals.length > 0) {
+            // A refusal is the contract working: the pass moved on while we
+            // were unlocked. It is not an error, but it must be visible.
+            console.log(
+              `[lipsync-watchdog] v511 retry_reset scene=${d.id} applied=${resetCount} ` +
+                `refused=${JSON.stringify(resetRefusals)}`,
+            );
+          }
+
+          // ── Root progress through the monotonic primitive ───────────────
+          // No reconstructed `dialog_shots`: the RPC strips `passes`, honours
+          // a same-run V510 terminal marker, and lets a genuinely new run
+          // through. Sibling slots are unreachable from here.
+          const { data: retryTouch } = await supabase.rpc(
+            "composer_touch_dialog_run_progress",
+            {
+              _scene_id: d.id,
+              _run_id: String((d as any)?.active_run_id ?? "") || null,
+              _root_patch: {
                 watchdog_retries: prevRetries + 1,
                 watchdog_retry_at: new Date().toISOString(),
                 recovery_dispatched_at: null,
               },
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", d.id);
+              _scene_patch: {
+                lip_sync_status: "pending",
+                twoshot_stage: hasStuckPass ? ((d as any).twoshot_stage ?? "master_clip") : "master_clip",
+                clip_error: `watchdog_auto_retry_${prevRetries + 1}_of_1`,
+              },
+            },
+          );
 
           console.log(
-            `[lipsync-watchdog] v131.8 auto-retry scene=${d.id} ` +
+            `[lipsync-watchdog] v131.8/v511 auto-retry scene=${d.id} ` +
             `prev_retries=${prevRetries} mode=${hasStuckPass ? "per-pass" : "full-redispatch"} ` +
-            `→ reset to pending`,
+            `reset=${resetCount}/${retryCandidates.length} ` +
+            `root_applied=${(retryTouch as any)?.applied === true} → reset to pending`,
           );
           advanced.push({ scene_id: d.id, pass_idx: -2 });
           return; // skip failLipSync
