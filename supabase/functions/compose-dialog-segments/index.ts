@@ -92,6 +92,10 @@ import { evaluateV117Gate } from "../_shared/v436-plate-gate.ts";
 import { buildAnchorLayoutFromV274, routePlateFacesToAnchor, type AnchorFaceLayout } from "../_shared/plateFaceSlotRouter.ts";
 // FA-4 Contract E — deterministic preclip crop containment gate.
 import { evaluatePreclipCropContainment } from "../_shared/preclip-crop-containment.ts";
+import {
+  buildGeometryAuthorityTelemetry,
+  resolvePreclipContainmentAuthority,
+} from "../_shared/preclip-geometry-authority.ts";
 // FA-4 Contract A/D — single canonical owner of the plate-face sanity limits.
 import { plateFaceSanity } from "../_shared/plate-face-candidates.ts";
 import { validateCast } from "../_shared/cast-validation.ts";
@@ -6272,6 +6276,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           (pass as any).preclip_crop_measure_src = preclipResult.cropMeasureSrc ?? v445MeasureSrc;
           // V457 — containment provenance (crop MUST contain the padded dispatch box).
           (pass as any).v457_contain_box = (preclipResult as any).containBox ?? null;
+          // V510-P1 — WHICH measurement that box came from. Contract E needs
+          // it to judge the same object the planner proved, instead of
+          // re-deriving a static target of its own.
+          (pass as any).v457_contain_source = (preclipResult as any).containSource ?? null;
           (pass as any).v457_contains_target = (preclipResult as any).containsTarget ?? null;
           (pass as any).v457_contain_reason = (preclipResult as any).containReason ?? null;
           (pass as any).v457_crop_shift_px = (preclipResult as any).cropShiftPx ?? null;
@@ -6892,6 +6900,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
       // Box in the dispatched video's pixel space.
       let dispatchBox: [number, number, number, number] | null = box;
+      // V510-P1 — the plate-space half of the V464 anchor pair. Defaults to
+      // the static box and is replaced only when Contract E judged a
+      // track-derived target, so the non-preclip and no-track paths keep
+      // exactly the geometry they had.
+      let v510p1AnchorPlateBox: [number, number, number, number] | null = box;
       if (v161UsingPreclipForBbox && box && v161PreclipCrop) {
         // FA-4 Contract E — deterministic crop containment gate. The final
         // target bbox must lie fully inside the crop, transform bounds-valid
@@ -6908,9 +6921,48 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             ]);
           }
         }
+        // ── V510-P1 — ONE GEOMETRY AUTHORITY ────────────────────────────
+        //
+        // The planner has proved containment against ITS target since
+        // V461 D: with a measured turn that target is the track union
+        // (`containSource === "turn_track"`), not the anchor. Contract E
+        // then re-derived a target from the static assignment bbox and
+        // tested the same crop against it — so both could be right about
+        // different boxes.
+        //
+        // Generation 10, Matthew: planner [474,528,541,602] inside crop
+        // [446,528,550,632]; static [465,522,517,588] overhangs the top by
+        // 6 px. Generation 11, Sarah: planner [230,103,387,321] inside
+        // [201,103,473,375]; static [227,99,368,293] overhangs by 4 px.
+        // Both runs terminalized on preclip_identity_geometry_mismatch
+        // while the rendered crop did contain the tracked face.
+        //
+        // Nothing is loosened. The gate keeps every check, every threshold
+        // and zero tolerance; it just stops testing a box nobody rendered.
+        // Without a track the authority IS the static box, byte for byte.
+        const v510p1Authority = resolvePreclipContainmentAuthority({
+          plannerContainBox: (pass as any).v457_contain_box ?? null,
+          plannerContainSource: (pass as any).v457_contain_source ?? null,
+          staticDispatchBox: box,
+        });
+        const v510p1Telemetry = buildGeometryAuthorityTelemetry(v510p1Authority);
+        (pass as any).v510p1_geometry_authority = v510p1Telemetry;
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} ` +
+            `v510p1_geometry_authority source=${v510p1Authority.source} ` +
+            `target=${JSON.stringify(v510p1Authority.targetBox)} ` +
+            `static=${JSON.stringify(v510p1Authority.staticDispatchBox)} ` +
+            `match=${v510p1Authority.authorityMatch}`,
+        );
+        // IDENTITY STAYS STATIC. `otherCenters` above is built from
+        // `speakerPlateBboxes` — the assignment-locked identity map — and is
+        // untouched by this change. The track answers WHERE the assigned
+        // face is, never WHO it is. E.3 therefore keeps testing
+        // assignment-locked sibling centres, now against the region that is
+        // actually dispatched rather than one that is not.
         const containment = evaluatePreclipCropContainment({
           crop: v161PreclipCrop,
-          targetBbox: box,
+          targetBbox: v510p1Authority.targetBox,
           otherSpeakerCenters: otherCenters,
         });
         if (!containment.ok) {
@@ -6928,6 +6980,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               fa4_containment_reason: containment.reason,
               fa4_containment_detail: containment.detail ?? null,
               plate_box: box,
+              // V510-P1 — which box was actually judged, so a future
+              // mismatch names its referent instead of leaving it to be
+              // re-derived from the surrounding fields.
+              ...v510p1Telemetry,
               preclip_crop: v161PreclipCrop,
               other_speaker_centers: otherCenters,
               // V445 — provenance so a future mismatch is diagnosable without
@@ -6954,6 +7010,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         } else {
           // Contract E.5 — the wire box IS the transformed target bbox.
           dispatchBox = containment.clipBox!;
+          // …and the plate-space original of that same box is the anchor.
+          v510p1AnchorPlateBox = v510p1Authority.targetBox;
           console.log(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_bbox_clip_space plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)} → clip_box=${JSON.stringify(dispatchBox)} windows_clip=${JSON.stringify(v124VoicedWindows)} fa4_containment=ok`,
           );
@@ -6983,7 +7041,20 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             cameraPath: v464CameraPath,
             faceTrack: v464FaceTrack,
             preclipStartSec: v161PreclipStartSec,
-            anchorPlateBox: box as [number, number, number, number],
+            // ── V510-P1 — the anchor pair must describe ONE face ─────────
+            //
+            // `anchorDispatchBox` is Contract E's transform of the
+            // authority box. If `anchorPlateBox` stayed on the static bbox,
+            // `marginsOf` would again compare two different faces — the
+            // exact referent split V509 was written to close, just smaller.
+            //
+            // Anchoring both on the authority makes the pair one object:
+            // the plate-space box and its own projection, so every raw
+            // margin is 0 and the per-frame box follows Track(t) with no
+            // anchor-derived distortion. V509's clamp stays a no-op because
+            // there is nothing negative to clamp. Without a track the
+            // authority IS `box`, so this line is literally unchanged.
+            anchorPlateBox: v510p1AnchorPlateBox as [number, number, number, number],
             anchorDispatchBox: dispatchBox as [number, number, number, number],
             voicedWindowsSec: v124VoicedWindows,
           })
