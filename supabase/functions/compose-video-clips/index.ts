@@ -78,6 +78,16 @@ import { enforceMinFaceSize } from "../_shared/anchor-min-face-size.ts";
 import { classifySplitScreenLayout } from "../_shared/split-screen-layout.ts";
 import { probeAnchorSeams } from "../_shared/anchor-seam-probe.ts";
 import { resolveIdentityViaRekognition } from "../_shared/resolveIdentityViaRekognition.ts";
+// V508 — strict multi-character anchor identity. Conditioning /
+// verification / routing are separated; routing never creates identity.
+import {
+  buildAnchorConditioningTelemetry,
+  buildAnchorImagePlan,
+  buildCanonicalCastRecords,
+  evaluateStrictConditioning,
+  evaluateStrictVerification,
+  strictRecoveryTargets,
+} from "../_shared/v508-strict-identity.ts";
 import { buildAnchorLayoutFromV274 } from "../_shared/plateFaceSlotRouter.ts";
 
 /**
@@ -2709,31 +2719,79 @@ serve(async (req) => {
                   );
                 }
               }
-              const portraitUrls = effectiveShots
-                .map((cs) => {
-                  const outfitId = (cs as any).outfitLookId as string | undefined;
-                  const outfitUrl = outfitId ? outfitUrlById.get(outfitId) : undefined;
-                  return (
-                    outfitUrl || charById.get(cs.characterId)?.referenceImageUrl
+              // ── V508 — ONE aligned record list owns the cast geometry ──
+              //
+              // Previously portraitUrls / identityPortraitUrls / characterNames
+              // were three independent `.map().filter()` chains over the same
+              // source. A missing lookup shrank one but not the others, and the
+              // anchor generator reads them BY INDEX — so a gap at slot 1
+              // handed slot 2's face to slot 1 as "GROUND TRUTH".
+              //
+              // The DB row is the identity authority. The client payload is
+              // presentation state and has been seen to omit referenceImageUrl
+              // entirely while brand_characters carried it: `charById` is filled
+              // from the client first and only hydrates IDs that are MISSING, so
+              // an incomplete-but-present entry never reached the database.
+              const v508CastIds = Array.from(
+                new Set(
+                  effectiveShots
+                    .map((cs) => cs.characterId)
+                    .filter((id): id is string => typeof id === "string" && id.length > 0),
+                ),
+              );
+              const v508DbById = new Map<string, Record<string, unknown>>();
+              if (v508CastIds.length > 0) {
+                try {
+                  const { data: v508Rows } = await supabaseAdmin
+                    .from("brand_characters")
+                    .select("id, name, reference_image_url, portrait_url, identity_lock_strength")
+                    .in("id", v508CastIds);
+                  for (const row of v508Rows ?? []) {
+                    if ((row as any)?.id) v508DbById.set(String((row as any).id), row as any);
+                  }
+                } catch (e) {
+                  console.warn(
+                    `[compose-video-clips] v508_cast_lookup_failed scene=${scene.id}: ${(e as Error)?.message ?? String(e)}`,
                   );
-                })
-                .filter(
-                  (u): u is string => typeof u === "string" && u.length > 0,
-                )
-                .slice(0, 4);
+                }
+              }
+              const v508Wardrobe = effectiveShots.map((cs) => {
+                const outfitId = (cs as any).outfitLookId as string | undefined;
+                return (outfitId ? outfitUrlById.get(outfitId) : undefined) ??
+                  charById.get(cs.characterId)?.referenceImageUrl ?? null;
+              });
+              const v508Records = buildCanonicalCastRecords(
+                effectiveShots as Array<{ characterId?: unknown }>,
+                v508DbById as never,
+                charById as never,
+                v508Wardrobe,
+              );
+              const v508Plan = buildAnchorImagePlan(v508Records, 4);
+              const v508Conditioning = evaluateStrictConditioning(v508Records);
+              const v508ConditioningTelemetry = buildAnchorConditioningTelemetry(
+                v508Records,
+                v508Plan,
+                { anchorModelRoute: Deno.env.get("ANCHOR_MODEL_MULTI") ?? null, generatedAt: new Date().toISOString() },
+              );
+              console.log(
+                `[compose-video-clips] v508_conditioning scene=${scene.id} ` +
+                  `chars=${v508ConditioningTelemetry.character_count} portraits=${v508ConditioningTelemetry.portrait_count} ` +
+                  `identityRefs=${v508ConditioningTelemetry.identity_ref_count} complete=${v508ConditioningTelemetry.identity_refs_complete} ` +
+                  `strict=${v508ConditioningTelemetry.strict_identity_ref_count}/${v508ConditioningTelemetry.strict_count} ` +
+                  `sources=${JSON.stringify(v508ConditioningTelemetry.identity_ref_source_by_slot)}`,
+              );
+
+              const portraitUrls = v508Plan.portraitUrls;
               // v111 — canonical face-only identity refs, aligned 1:1 with
               // portraitUrls. When the primary slot is an outfit cover (which
               // sometimes drifts in identity), this gives Nano Banana 2 the
               // real face as a separate ground-truth image.
-              const identityPortraitUrls = effectiveShots
-                .slice(0, portraitUrls.length)
-                .map((cs) => charById.get(cs.characterId)?.referenceImageUrl)
-                .filter((u): u is string => typeof u === "string" && u.length > 0);
-              const characterNames = effectiveShots
-                .map((cs) => charById.get(cs.characterId)?.name)
-                .filter(
-                  (n): n is string => typeof n === "string" && n.length > 0,
-                );
+              // V508 — derived from the SAME aligned list. Identity refs are
+              // all-or-nothing across the emitted slots: a gap suppresses the
+              // whole identity clause rather than shifting later characters
+              // left. The per-slot gap is still reported in telemetry.
+              const identityPortraitUrls = v508Plan.identityPortraitUrls;
+              const characterNames = v508Plan.characterNames;
               // ── V506 CAST-GENDER-LOCK ──────────────────────────────────
               // Nano Banana hat am 24.08.2026 (S02) für einen Cast aus
               // 1 Frau + 3 Männern zwei fremde Frauen + zwei fremde Männer
@@ -2898,6 +2956,11 @@ serve(async (req) => {
                         sceneId: scene.id,
                         portraitUrl: portraitUrls[0],
                         portraitUrls,
+                        // V508 — slot-bound and SPARSE. A cast member without
+                        // a headshot is simply absent here; everyone else keeps
+                        // their own portrait slot, so an optional gap never
+                        // removes a valid strict reference.
+                        identityReferences: v508Plan.identityReferences,
                         identityPortraitUrls,
                         characterNames,
                         scenePrompt: anchorPrompt,
@@ -3041,6 +3104,53 @@ serve(async (req) => {
                   }
                   await invalidateCache();
                   const anchorAttempts: Array<Record<string, unknown>> = [];
+
+                  // ── V508 STEP 2 — CONDITIONING FAIL-CLOSED ──────────────
+                  //
+                  // A strict character without its own identity reference
+                  // cannot be conditioned at all: the generator would receive
+                  // only a name in prose. Refuse BEFORE the anchor provider so
+                  // no strict cast is ever rendered on hope, and no base-video,
+                  // pre-clip or Sync.so spend follows. Non-strict casts are
+                  // untouched.
+                  if (!v508Conditioning.ok) {
+                    console.error(
+                      `[compose-video-clips] v508_conditioning_refused scene=${scene.id} ` +
+                        `strict=${v508Conditioning.strictWithReference}/${v508Conditioning.strictCount} ` +
+                        `missing=${v508Conditioning.missing.map((m) => m.characterId).join(",")} — no anchor provider call`,
+                    );
+                    try {
+                      const { data: condRow } = await supabaseAdmin
+                        .from("composer_scenes").select("audio_plan").eq("id", scene.id).single();
+                      const condPlan = (condRow?.audio_plan ?? {}) as Record<string, any>;
+                      await supabaseAdmin.from("composer_scenes").update({
+                        audio_plan: {
+                          ...condPlan,
+                          twoshot: {
+                            ...((condPlan.twoshot ?? {}) as Record<string, any>),
+                            anchor_conditioning: v508ConditioningTelemetry,
+                            strict_identity: {
+                              stage: "conditioning",
+                              ok: false,
+                              reason: v508Conditioning.reason,
+                              expected_strict: v508Conditioning.strictCount,
+                              resolved_strict: v508Conditioning.strictWithReference,
+                              missing: v508Conditioning.missing,
+                              repair_attempted: false,
+                            },
+                          },
+                        },
+                        clip_status: "failed",
+                        clip_error: v508Conditioning.reason,
+                        updated_at: new Date().toISOString(),
+                      }).eq("id", scene.id);
+                    } catch (e) {
+                      console.warn(`[compose-video-clips] v508_conditioning_persist_failed: ${(e as Error)?.message ?? String(e)}`);
+                    }
+                    results.push({ sceneId: scene.id, status: "failed", error: v508Conditioning.reason });
+                    continue;
+                  }
+
                   composedUrl = await composeAnchor("attempt-1");
 
                   if (composedUrl && LOVABLE_API_KEY) {
@@ -3650,11 +3760,76 @@ serve(async (req) => {
                               v278AnchorLayoutComplete: anchorLayoutComplete,
                             },
                           };
+                          // ── V508 STEP 6-8 — STRICT BIOMETRIC CONTRACT ────
+                          //
+                          // For a strict character a positional or inferred slot
+                          // is not identity. Only presence in the resolver's
+                          // ACCEPTED assignment counts. MIN_SIMILARITY 55/45 are
+                          // untouched and are NOT reinterpreted here.
+                          //
+                          // One targeted repair first: the unresolved strict names
+                          // are fed into the EXISTING face-lock retry with the same
+                          // aligned identity references — anchor image only, no
+                          // video regeneration. Then Rekognition runs again.
+                          let v508Verify = evaluateStrictVerification(
+                            v508Records,
+                            idResolved.assignmentLock as Record<string, unknown> | null,
+                          );
+                          let v508RepairAttempted = false;
+                          if (!v508Verify.ok && composedUrl) {
+                            const targets = strictRecoveryTargets(v508Verify);
+                            console.warn(
+                              `[compose-video-clips] v508_strict_recovery scene=${scene.id} ` +
+                                `resolved=${v508Verify.resolvedStrict}/${v508Verify.expectedStrict} ` +
+                                `targets=${targets.join(",")} — one targeted face-lock attempt`,
+                            );
+                            v508RepairAttempted = true;
+                            try {
+                              const repairedUrl = await composeAnchor("v508-strict-recovery", true, true, targets, true);
+                              if (repairedUrl) {
+                                const reResolved = await resolveIdentityViaRekognition({
+                                  anchorUrl: repairedUrl,
+                                  characters: rekChars,
+                                });
+                                const reVerify = evaluateStrictVerification(
+                                  v508Records,
+                                  reResolved.assignmentLock as Record<string, unknown> | null,
+                                );
+                                console.log(
+                                  `[compose-video-clips] v508_strict_recovery_result scene=${scene.id} ` +
+                                    `resolved=${reVerify.resolvedStrict}/${reVerify.expectedStrict} ok=${reVerify.ok ? 1 : 0}`,
+                                );
+                                if (reVerify.ok) {
+                                  composedUrl = repairedUrl;
+                                  v508Verify = reVerify;
+                                }
+                              }
+                            } catch (e) {
+                              console.warn(`[compose-video-clips] v508_strict_recovery_failed: ${(e as Error)?.message ?? String(e)}`);
+                            }
+                          }
+                          const v508StrictBlock = !v508Verify.ok;
+                          const v508StrictPayload = {
+                            stage: "verification",
+                            ok: v508Verify.ok,
+                            reason: v508Verify.reason,
+                            expected_strict: v508Verify.expectedStrict,
+                            resolved_strict: v508Verify.resolvedStrict,
+                            unresolved: v508Verify.unresolved,
+                            evidence: v508Verify.evidence,
+                            confidence_semantics: v508Verify.confidenceSemantics,
+                            repair_attempted: v508RepairAttempted,
+                          };
+
                           // v276: hard-block only on total miss (0/N) when soft-gate enabled.
                           // Legacy hard-gate (any partial for N>=3) restored via V276_SOFT_GATE=false.
-                          const needsManualReview = softGateEnabled
+                          //
+                          // V508 — the strict contract is ADDITIVE and owns its own
+                          // slots only. Global multi-character semantics and the
+                          // V276 env default are unchanged for non-strict casts.
+                          const needsManualReview = v508StrictBlock || (softGateEnabled
                             ? isTotalMiss
-                            : (expected >= 3 && (!idResolved.ok || resolved < expected));
+                            : (expected >= 3 && (!idResolved.ok || resolved < expected)));
                           await supabaseAdmin
                             .from("composer_scenes")
                             .update({
@@ -3663,6 +3838,8 @@ serve(async (req) => {
                                 twoshot: {
                                   ...baseTwoshot,
                                   anchor_identity: anchorIdentityPayload,
+                                  anchor_conditioning: v508ConditioningTelemetry,
+                                  strict_identity: v508StrictPayload,
                                 },
                               },
                               dialog_shots: nextDialogShots,
@@ -3676,6 +3853,14 @@ serve(async (req) => {
                               updated_at: new Date().toISOString(),
                             })
                             .eq("id", scene.id);
+                          if (v508StrictBlock) {
+                            console.error(
+                              `[compose-video-clips] v508_strict_anchor_identity_unverified scene=${scene.id} ` +
+                                `resolved=${v508Verify.resolvedStrict}/${v508Verify.expectedStrict} ` +
+                                `unresolved=${v508Verify.unresolved.map((u) => u.characterId).join(",")} ` +
+                                `repair_attempted=${v508RepairAttempted} — no base-video, no preclip, no Sync.so`,
+                            );
+                          }
                           if (needsManualReview) {
                             console.log(
                               `[compose-video-clips] v276_awaiting_manual_face_map scene=${scene.id} resolved=${resolved}/${expected} softGate=${softGateEnabled} — skipping provider dispatch`,

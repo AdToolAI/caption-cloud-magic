@@ -32,6 +32,19 @@ interface Body {
   portraitUrl?: string;
   /** Multi-portrait array — preferred. Up to 4 characters in one composed frame. */
   portraitUrls?: string[];
+  /**
+   * V508 — SLOT-BOUND identity references. Preferred over the positional
+   * `identityPortraitUrls` pair, because a SPARSE set of face references
+   * cannot be read by position: each entry carries the portrait slot it
+   * belongs to, so a cast member without a headshot simply has none
+   * instead of shifting everyone after them.
+   */
+  identityReferences?: Array<{
+    slot: number;
+    characterId?: string;
+    characterName?: string;
+    url: string;
+  }>;
   /** Optional character names matched 1:1 with portraitUrls (used in prompt). */
   characterNames?: string[];
   /** v111 — canonical face-only reference portraits aligned 1:1 with
@@ -133,10 +146,34 @@ serve(async (req) => {
       : (body.portraitUrl ? [body.portraitUrl] : []);
     const names = (body.characterNames ?? []).slice(0, portraits.length);
 
-    // v111 — canonical identity refs (face-only headshots), 1:1 with portraits.
-    const identityPortraits = (body.identityPortraitUrls ?? [])
-      .filter((u) => typeof u === "string" && u.length > 0)
-      .slice(0, portraits.length);
+    // v111 — canonical identity refs (face-only headshots).
+    //
+    // V508 — the STRUCTURED form wins when supplied: it survives a sparse
+    // cast because every entry names its own portrait slot. The legacy
+    // positional pair stays for callers that do not send it, and behaves
+    // exactly as before.
+    const v508Refs = (body.identityReferences ?? [])
+      .filter((r) =>
+        r && typeof r.url === "string" && r.url.length > 0 &&
+        Number.isInteger(Number(r.slot)) && Number(r.slot) >= 0 &&
+        Number(r.slot) < portraits.length
+      )
+      .map((r) => ({
+        slot: Number(r.slot),
+        characterId: typeof r.characterId === "string" ? r.characterId : "",
+        characterName: typeof r.characterName === "string" && r.characterName.length > 0
+          ? r.characterName
+          : (names[Number(r.slot)] ?? `Character #${Number(r.slot) + 1}`),
+        url: r.url,
+      }))
+      .sort((a, b) => a.slot - b.slot);
+    const useStructuredIdentity = v508Refs.length > 0;
+
+    const identityPortraits = useStructuredIdentity
+      ? v508Refs.map((r) => r.url)
+      : (body.identityPortraitUrls ?? [])
+        .filter((u) => typeof u === "string" && u.length > 0)
+        .slice(0, portraits.length);
 
     // Stage A — World refs. Hard caps: 1 location, 1 building, 3 props.
     const locationUrls = (body.locationUrls ?? []).filter((u) => typeof u === "string" && u.length > 0).slice(0, 1);
@@ -498,8 +535,14 @@ serve(async (req) => {
     const identityLines: string[] = [];
     for (let i = 0; i < identityPortraits.length; i++) {
       imgIdx += 1;
-      const nm = names[i] ?? `Character #${i + 1}`;
-      identityLines.push(`Image #${imgIdx} = IDENTITY reference for ${nm} (face-only headshot — this is the GROUND TRUTH for ${nm}'s face: sex, age, hair, skin tone, jawline, eyes, nose. Use the body/wardrobe from Image #${i + 1} for ${nm}, but the FACE from this image.).`);
+      // V508 — the primary-image pointer comes from the reference's own
+      // slot, never from its compressed position in this list. With a
+      // sparse set the two differ, and using `i` would send the model back
+      // to the wrong person's body.
+      const ref = useStructuredIdentity ? v508Refs[i] : null;
+      const primarySlot = ref ? ref.slot : i;
+      const nm = ref ? ref.characterName : (names[i] ?? `Character #${i + 1}`);
+      identityLines.push(`Image #${imgIdx} = IDENTITY reference for ${nm} (face-only headshot — this is the GROUND TRUTH for ${nm}'s face: sex, age, hair, skin tone, jawline, eyes, nose. Use the body/wardrobe from Image #${primarySlot + 1} for ${nm}, but the FACE from this image.).`);
     }
     if (identityLines.length > 0) {
       identityClause =
