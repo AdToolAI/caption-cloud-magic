@@ -96,6 +96,11 @@ import {
   type PinnedArtifact,
 } from "../_shared/v434-immutable-artifact.ts";
 import { isTerminalNoopPass } from "../_shared/v459-fanout-aggregation.ts";
+import {
+  buildRehostMarker,
+  decideRehost,
+  V511_REHOST_MARKER_KEY,
+} from "../_shared/v511-apply-ack.ts";
 
 /**
  * V434 Step 1 — records an immutable artifact pin. Never throws, never touches
@@ -982,9 +987,47 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         // after it. A null index means no ledger authority, so nothing is
         // re-hosted and the provider URL is used as-is.
         const ledgerPassIdx = v510Binding.passIdx;
-        const rehosted = ledgerPassIdx !== null
-          ? await rehostSyncOutput(supabase, sceneId, ledgerPassIdx, outputUrl)
-          : null;
+        // V511 F3 — the same epoch-qualified cache as the main COMPLETED
+        // path. A terminal callback is re-forwarded by the watchdog just like
+        // any other, and re-downloading megabytes to book already-paid work is
+        // exactly the waste that starved generation 12 of invocation.
+        let rehosted: string | null = null;
+        if (ledgerPassIdx !== null) {
+          const termEpoch = {
+            runId: String((scene as any)?.active_run_id ?? "") || null,
+            plateGeneration: Number.isFinite(Number((scene as any)?.plate_generation))
+              ? Number((scene as any).plate_generation)
+              : null,
+            externalJobId: jobId ? String(jobId) : null,
+          };
+          const termSlot = (scene as any)?.dialog_shots?.passes?.[ledgerPassIdx] ?? null;
+          const termDecision = decideRehost({
+            marker: termSlot?.[V511_REHOST_MARKER_KEY] ?? null,
+            epoch: termEpoch,
+          });
+          if (termDecision.cache === "hit") {
+            rehosted = termDecision.url;
+          } else {
+            rehosted = await rehostSyncOutput(supabase, sceneId, ledgerPassIdx, outputUrl);
+            if (rehosted && termEpoch.runId && termEpoch.externalJobId) {
+              try {
+                await supabase.rpc("update_dialog_pass_slot", {
+                  _scene_id: sceneId,
+                  _pass_idx: ledgerPassIdx,
+                  _patch: {
+                    [V511_REHOST_MARKER_KEY]: buildRehostMarker({
+                      epoch: termEpoch, url: rehosted, at: new Date().toISOString(),
+                    }),
+                  },
+                });
+              } catch { /* a missing marker only costs a future re-download */ }
+            }
+          }
+          console.log(
+            `[sync-so-webhook] v511_rehost_cache scene=${sceneId} pass=${ledgerPassIdx} ` +
+              `${termDecision.cache} cause=${termDecision.missCause ?? "-"} (terminal_reconcile)`,
+          );
+        }
         terminalOutputUrl = rehosted ?? outputUrl;
       }
       // No motion measurement, no V465/V500 verdict, no NOOP ladder, no mux,
@@ -1423,7 +1466,72 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         : Number((state as any).current_pass ?? 0);
       const snapPass = snapPasses[snapPassIdx] ?? null;
 
-      v404RehostedUrl = await rehostSyncOutput(supabase, sceneId, snapPassIdx, outputUrl);
+      // ── V511 F3 — do not re-download an output we already rehosted ──────
+      //
+      // Generation 12, Kay: 27 forwards, 27 full download-and-upload cycles
+      // of the identical MP4, each one ahead of a measurement with its own
+      // ~27 s deadline. The invocation ran out before the authoritative apply
+      // every single time — `composer_scene_transition_log` holds ZERO rows
+      // for that pipeline job, which only happens if the apply was never
+      // called.
+      //
+      // The destination key is deliberately unchanged: it is the URL that
+      // reaches the pass slot and the mux. But that key is scene+pass only,
+      // so its existence proves nothing about WHICH attempt wrote it — a
+      // generation-11 object lives at the identical path. The cache decision
+      // is therefore qualified by a marker on the pass slot recording the
+      // run, generation and external job the object came from; a mismatch on
+      // any of the three is a miss.
+      const v511RehostEpoch = {
+        runId: String((scene as any)?.active_run_id ?? "") || null,
+        plateGeneration: Number.isFinite(Number((scene as any)?.plate_generation))
+          ? Number((scene as any).plate_generation)
+          : null,
+        externalJobId: jobId ? String(jobId) : null,
+      };
+      const v511RehostDecision = decideRehost({
+        marker: (snapPass as any)?.[V511_REHOST_MARKER_KEY] ?? null,
+        epoch: v511RehostEpoch,
+      });
+      if (v511RehostDecision.cache === "hit") {
+        v404RehostedUrl = v511RehostDecision.url;
+        console.log(
+          `[sync-so-webhook] v511_rehost_cache scene=${sceneId} pass=${snapPassIdx} hit ` +
+            `run=${v511RehostEpoch.runId ?? "-"} gen=${v511RehostEpoch.plateGeneration ?? "-"} ` +
+            `— no provider download, no upload`,
+        );
+      } else {
+        console.log(
+          `[sync-so-webhook] v511_rehost_cache scene=${sceneId} pass=${snapPassIdx} miss ` +
+            `cause=${v511RehostDecision.missCause}`,
+        );
+        v404RehostedUrl = await rehostSyncOutput(supabase, sceneId, snapPassIdx, outputUrl);
+        // Stamp the epoch onto THIS pass slot only. `update_dialog_pass_slot`
+        // is the fenced per-slot primitive — no sibling is reachable from it,
+        // and it refuses to demote a terminal slot.
+        if (v404RehostedUrl && v511RehostEpoch.runId && v511RehostEpoch.externalJobId) {
+          try {
+            await supabase.rpc("update_dialog_pass_slot", {
+              _scene_id: sceneId,
+              _pass_idx: snapPassIdx,
+              _patch: {
+                [V511_REHOST_MARKER_KEY]: buildRehostMarker({
+                  epoch: v511RehostEpoch,
+                  url: v404RehostedUrl,
+                  at: new Date().toISOString(),
+                }),
+              },
+            });
+          } catch (e) {
+            // A missing marker only costs a future re-download. It must never
+            // block the callback that is trying to finish this pass.
+            console.warn(
+              `[sync-so-webhook] v511_rehost_marker_write_failed scene=${sceneId} ` +
+                `pass=${snapPassIdx}: ${(e as Error).message}`,
+            );
+          }
+        }
+      }
 
       // ── V434 Step 1 — IMMUTABLE EVIDENCE COPY ──────────────────────────
       // The legacy re-host key above is MUTABLE (scene+pass only) and was the

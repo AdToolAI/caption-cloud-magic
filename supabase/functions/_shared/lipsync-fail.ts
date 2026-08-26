@@ -194,29 +194,101 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
   // darf keinen zweiten Versuch ausloesen.
   const refundSettled =
     didRefund || (refundInfo as any)?.reason === "already_refunded";
-  const patchedState = state
-    ? {
-        ...state,
-        status: "failed",
-        error: safeReason,
-        finished_at: state.finished_at ?? nowIso,
-        refunded: alreadyRefunded || refundSettled || refundAmount === 0,
-        v459_refund: refundInfo ?? (state as any)?.v459_refund ?? null,
-      }
-    : { version: 5, status: "failed", error: safeReason, refunded: refundAmount === 0 };
+  // ── V511 F4 — terminalize through the V510 contract ───────────────────
+  //
+  // This used to be a full-column UPDATE carrying `{...state}` — the
+  // read-at-entry `dialog_shots`, `passes[]` and all. Two defects in one
+  // statement:
+  //
+  //   · it is the last stale-`passes[]` overwrite outside compose. A sibling
+  //     that bound a job id between the read at the top of this function and
+  //     this write lost its pointer — exactly the generation-10 lost update
+  //     V510-P0 removed everywhere else.
+  //   · it never wrote `v510_terminal`. Generation 12 proved the cost: after
+  //     `watchdog_hard_timeout` the scene was failed with NO marker, so a
+  //     late COMPLETED callback could not reach
+  //     `composer_reconcile_terminal_sync_result` and the finished provider
+  //     output stayed unbookable.
+  //
+  // The root patch below therefore carries NO `passes` key at all; the RPC
+  // merges it server-side, leaves every sibling slot untouched, and stamps
+  // the run-scoped marker.
+  //
+  // `_pass_idx` is null on purpose. This helper terminalizes a SCENE; it is
+  // called from preflight aborts, circuit breakers, resets and the watchdog,
+  // and none of them owns a single failing pass. A null index patches no slot.
+  //
+  // The run id comes from the FRESH scene read above, never from the caller.
+  // `args.runId` is the refund's binding and may name a historical run; using
+  // it here could fence a run that is no longer current. A null
+  // `active_run_id` yields a marker with a null run id, which
+  // `isRunTerminal` and the RPC's own guard both refuse to match — it fails
+  // open rather than fencing an unknown run.
+  const v511TerminalRunId = String((existing as any)?.active_run_id ?? "") || null;
+  const v511RootPatch: Record<string, unknown> = {
+    version: 5,
+    status: "failed",
+    error: safeReason,
+    finished_at: (state as any)?.finished_at ?? nowIso,
+    refunded: alreadyRefunded || refundSettled || refundAmount === 0,
+    v459_refund: refundInfo ?? (state as any)?.v459_refund ?? null,
+  };
+  const v511ScenePatch: Record<string, unknown> = {
+    lip_sync_status: "failed",
+    twoshot_stage: "failed",
+    clip_error: safeReason,
+  };
 
+  let v511Terminalized = false;
+  try {
+    if (typeof supabase.rpc === "function") {
+      const { error: termErr } = await supabase.rpc("composer_terminalize_dialog_run", {
+        _scene_id: sceneId,
+        _run_id: v511TerminalRunId,
+        _pass_idx: null,
+        _pass_patch: {},
+        _root_patch: v511RootPatch,
+        _scene_patch: v511ScenePatch,
+        _terminal_reason: safeReason,
+      });
+      if (termErr) {
+        console.error(
+          `[failLipSync] v511 terminalize rpc error scene=${sceneId}: ${termErr.message ?? termErr}`,
+        );
+      } else {
+        v511Terminalized = true;
+      }
+    }
+  } catch (e) {
+    console.error(`[failLipSync] v511 terminalize crash: ${(e as Error).message}`);
+  }
 
   try {
+    if (!v511Terminalized) {
+      // DEGRADED PATH — the RPC is unreachable. Merge the root server-side
+      // anyway rather than shipping a stale snapshot: `passes` is absent from
+      // the patch, so no sibling slot can be overwritten even here. What is
+      // lost is the terminal marker, and that is logged, not hidden.
+      console.error(
+        `[failLipSync] v511 terminalize unavailable scene=${sceneId} — root-merge fallback, NO v510_terminal marker`,
+      );
+      if (typeof supabase.rpc === "function") {
+        await supabase.rpc("update_dialog_shots_root_merge", {
+          _scene_id: sceneId,
+          _patch: { ...v511RootPatch, v511_terminal_degraded: true },
+        });
+      }
+      await supabase
+        .from("composer_scenes")
+        .update({ ...v511ScenePatch, updated_at: nowIso })
+        .eq("id", sceneId);
+    }
+    // `replicate_prediction_id` is a transport pointer, not part of the
+    // monotonic terminal contract, and the RPC does not carry it. Clearing it
+    // is a narrow column write that touches no `dialog_shots` at all.
     await supabase
       .from("composer_scenes")
-      .update({
-        dialog_shots: patchedState,
-        lip_sync_status: "failed",
-        twoshot_stage: "failed",
-        clip_error: safeReason,
-        replicate_prediction_id: null,
-        updated_at: nowIso,
-      })
+      .update({ replicate_prediction_id: null, updated_at: nowIso })
       .eq("id", sceneId);
   } catch (e) {
     console.warn(`[failLipSync] scene update crash: ${(e as Error).message}`);

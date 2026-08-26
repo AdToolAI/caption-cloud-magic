@@ -20102,6 +20102,18 @@ export type Database = {
         }
         Returns: Json
       }
+      composer_reset_sync_pass_for_watchdog_retry: {
+        Args: {
+          _expected_external_job_id: string
+          _expected_pipeline_job_id: string
+          _pass_idx: number
+          _pass_patch: Json
+          _plate_generation: number
+          _run_id: string
+          _scene_id: string
+        }
+        Returns: Json
+      }
       composer_retryable_failure_reasons: { Args: never; Returns: string[] }
       composer_rs3_acquire_core: {
         Args: {
