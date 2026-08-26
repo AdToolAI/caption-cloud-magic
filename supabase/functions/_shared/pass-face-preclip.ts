@@ -179,6 +179,18 @@ export interface PassPreclipResult {
   cameraPath?: DynamicCameraPath | null;
   /** V457 — padded dispatch box the crop was projected to contain. */
   containBox?: [number, number, number, number] | null;
+  /**
+   * V510-P1 — WHICH measurement `containBox` was built from.
+   *
+   * `v461ContainSource` has decided this since V461 D, but it never left
+   * this module, so the caller could not tell a track-derived target from
+   * an anchor-derived one and re-derived a static target of its own. That
+   * second derivation is the Contract-E geometry split.
+   *
+   * Exposure only: nothing about the planner's behaviour changes here.
+   * The value already governed `containBox`; now it is legible downstream.
+   */
+  containSource?: "turn_track" | "anchor" | null;
   /** V457 — containment verdict on the final integer crop geometry. */
   containsTarget?: boolean | null;
   containReason?: string;
@@ -816,6 +828,7 @@ export async function renderPassFacePreclip(
         cropFromBbox,
         cameraPath,
         containBox: v457ContainBox,
+        containSource: v461ContainSource,
         containsTarget: v457ContainsTarget,
         containReason: v457ContainReason,
         cropShiftPx: v457ShiftPx,
@@ -1104,6 +1117,7 @@ export async function renderPassFacePreclip(
         cropFromBbox,
         cameraPath,
         containBox: v457ContainBox,
+        containSource: v461ContainSource,
         containsTarget: v457ContainsTarget,
         containReason: v457ContainReason,
         cropShiftPx: v457ShiftPx,
