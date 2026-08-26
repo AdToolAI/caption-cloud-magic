@@ -5912,6 +5912,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
             startSec: unionStart,
             endSec: unionEnd,
+            // V461 D — GEOMETRY from the already-measured V477 track, so the
+            // crop is sized to contain where the face ACTUALLY was during this
+            // turn instead of a stale anchor. Identity stays with the
+            // assignment lock: this list never chooses a face.
+            turnFaceBoxes: v477PreTrack?.ok
+              ? (v477PreTrack.samples as any[]).map((sample) => sample?.box ?? null)
+              : null,
             // ── V452 — dynamic face tracking ─────────────────────────────
             // Fresh dispatch only (this whole block is unreachable on a NOOP
             // retry, see `v161PreclipEligible`). Identity is already locked;

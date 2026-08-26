@@ -44,6 +44,9 @@ import {
 } from "./dynamic-camera-path.ts";
 // v400 Freeze: alle Tuning-Werte kommen aus dem eingefrorenen Vertrag.
 import { PRECLIP } from "./lipsync-frozen-contract.ts";
+// V461 D — the crop must be able to satisfy the gate that will judge it.
+// Imported from the gate itself so 0.24 has exactly ONE definition.
+import { V461_FACE_SHARE_FLOOR } from "./v461-face-gate.ts";
 // FA-4/P0 — exactly-once dispatch resume decisions (pure, unit-tested).
 import {
   classifyDispatchOutcome,
@@ -116,6 +119,19 @@ export interface PassPreclipInput {
    * it is used verbatim and `buildCameraPath` is NEVER called: no retracking.
    */
   frozenCameraPath?: DynamicCameraPath | null;
+  /**
+   * V461 D — face boxes MEASURED across this turn (the identity-safe V477
+   * track), in plate pixels.
+   *
+   * GEOMETRY ONLY. Identity stays with the anchor/assignment contract: this
+   * list never decides WHICH face, only WHERE that face actually was. The
+   * anchor bbox can sit far from the turn — production 67b392b1 pass 2 had
+   * it ~40 px above every measured sample — and sizing the crop to contain
+   * a union with that stale box defeats an otherwise feasible smaller crop.
+   *
+   * Absent or empty keeps the historical anchor-based containment.
+   */
+  turnFaceBoxes?: Array<number[] | null | undefined> | null;
 }
 
 
@@ -224,6 +240,32 @@ export function buildPreclipSignature(args: {
  * pass if a prior call succeeded (idempotency lives at the call site so we
  * don't have to re-read composer_scenes here).
  */
+/**
+ * V461 D — PURE. Bounding union of the MEASURED turn face boxes.
+ *
+ * Returns `null` when nothing usable was measured, so the caller falls back
+ * to the historical anchor-based containment. Geometry only — this never
+ * decides which face the pass belongs to.
+ */
+export function unionOfTurnBoxes(
+  boxes: Array<number[] | null | undefined> | null | undefined,
+): [number, number, number, number] | null {
+  if (!Array.isArray(boxes)) return null;
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  let n = 0;
+  for (const b of boxes) {
+    if (!Array.isArray(b) || b.length !== 4) continue;
+    const v = b.map((k) => Number(k));
+    if (!v.every((k) => Number.isFinite(k))) continue;
+    if (!(v[2] > v[0]) || !(v[3] > v[1])) continue;
+    x1 = Math.min(x1, v[0]); y1 = Math.min(y1, v[1]);
+    x2 = Math.max(x2, v[2]); y2 = Math.max(y2, v[3]);
+    n++;
+  }
+  if (n === 0) return null;
+  return [Math.round(x1), Math.round(y1), Math.round(x2), Math.round(y2)];
+}
+
 export async function renderPassFacePreclip(
   supabase: any,
   serviceKey: string,
@@ -306,8 +348,15 @@ export async function renderPassFacePreclip(
   // ── V457 — padded dispatch box the containment gate validates against.
   // Same measurement, same plate: derived here from the SAME bbox that is
   // sent to the provider, so crop and target can never diverge.
+  //
+  // V461 D — when the turn was actually measured, the containment target is
+  // WHERE THE FACE WAS, not where the anchor says it should be. Identity is
+  // unaffected: `bbox` remains the assignment-locked reference everywhere
+  // else, including the geometry identity persisted for V461/V456.
+  const v461TurnUnion = unionOfTurnBoxes(input.turnFaceBoxes);
+  const v461ContainSource: "turn_track" | "anchor" = v461TurnUnion ? "turn_track" : "anchor";
   const v457ContainBox = normalizeContainBox(
-    buildDispatchFaceBox(bbox ?? null, { width: sW, height: sH }) as
+    buildDispatchFaceBox(v461TurnUnion ?? bbox ?? null, { width: sW, height: sH }) as
       | [number, number, number, number]
       | null,
   );
@@ -332,10 +381,34 @@ export async function renderPassFacePreclip(
       plateWidth: sW,
       plateHeight: sH,
       targetFaceShare: PRECLIP.targetFaceShare,
+      // PREFERRED floor. It yields per pass when honouring it would make
+      // the downstream face-share contract unsatisfiable — never globally.
       minSize: PRECLIP.minCropSizePx,
       outputSize: PRECLIP.outputSizePx,
       containBox: v457ContainBox,
+      faceShareFloor: V461_FACE_SHARE_FLOOR,
     });
+
+    // ── V461 D — plan-time contract check (defense in depth) ────────────
+    //
+    // The pre-dispatch V461 gate stays the final authority on the FROZEN
+    // geometry. This check only refuses to spend a Lambda render on a crop
+    // that the very same arithmetic already proves impossible: containment
+    // needs more pixels than the share floor permits. It can never be laxer
+    // than V461 — it uses V461's own constant on the same face box.
+    if (!r.feasible) {
+      console.error(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v461d_crop_contract_unsatisfiable ` +
+          `face=${Math.round(Number((bbox as number[])[2]) - Number((bbox as number[])[0]))}x${Math.round(Number((bbox as number[])[3]) - Number((bbox as number[])[1]))} min_crop=${r.minCropRequiredPx}px ` +
+          `max_by_share=${r.maxCropByFaceShare?.toFixed(1) ?? "n/a"}px ` +
+          `share_floor=${V461_FACE_SHARE_FLOOR} contain_source=${v461ContainSource} — refusing render`,
+      );
+      return {
+        ok: false,
+        error: `preclip_crop_contract_unsatisfiable:${r.infeasibleReason}`,
+        errorClass: "invalid_input",
+      };
+    }
     crop0X = r.crop.x;
     crop0Y = r.crop.y;
     crop0Size = r.crop.size;
