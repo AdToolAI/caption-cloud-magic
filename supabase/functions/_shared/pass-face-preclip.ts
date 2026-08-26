@@ -47,6 +47,10 @@ import { PRECLIP } from "./lipsync-frozen-contract.ts";
 // V461 D — the crop must be able to satisfy the gate that will judge it.
 // Imported from the gate itself so 0.24 has exactly ONE definition.
 import { V461_FACE_SHARE_FLOOR } from "./v461-face-gate.ts";
+// V461 E — the planner's own containment margin. Imported, never copied:
+// the per-sample lower bound must be expressed in the SAME contract the
+// camera path will later enforce.
+import { CONTAINMENT_PAD_RATIO } from "./dynamic-camera-path.ts";
 // FA-4/P0 — exactly-once dispatch resume decisions (pure, unit-tested).
 import {
   classifyDispatchOutcome,
@@ -132,6 +136,12 @@ export interface PassPreclipInput {
    * Absent or empty keeps the historical anchor-based containment.
    */
   turnFaceBoxes?: Array<number[] | null | undefined> | null;
+  /**
+   * V461 E — the same boxes WITH their sample times, when the caller has
+   * them. Lets the planner confirmation test the window that will actually
+   * be rendered at that instant instead of any keyframe.
+   */
+  turnFaceSamples?: Array<{ t?: number | null; box?: number[] | null } | null | undefined> | null;
 }
 
 
@@ -175,6 +185,12 @@ export interface PassPreclipResult {
   cropShiftPx?: { x: number; y: number };
   cropSizeGrown?: boolean;
   cropSizeGrownPx?: number;
+  /**
+   * V461 E — structured feasibility evidence. Present on a refusal so the
+   * caller can attach it to the pass BEFORE terminalization; the previous
+   * refusal returned too early to persist anything diagnosable.
+   */
+  cropFeasibility?: Record<string, unknown> | null;
 
   error?: string;
   /**
@@ -266,6 +282,108 @@ export function unionOfTurnBoxes(
   return [Math.round(x1), Math.round(y1), Math.round(x2), Math.round(y2)];
 }
 
+/**
+ * V461 E — PURE. Smallest crop side that lets the camera planner hold the
+ * face at EVERY single sample.
+ *
+ * The planner keeps a margin of `CONTAINMENT_PAD_RATIO` on each side, so a
+ * box of side `b` needs `b / (1 - 2*ratio)`. This is a per-sample maximum,
+ * NOT a union: a moving crop never has to hold the whole turn at once.
+ *
+ * `null` when nothing usable was measured -> the caller keeps the static
+ * union model.
+ */
+export function perFrameMinCropPx(
+  boxes: Array<number[] | null | undefined> | null | undefined,
+): number | null {
+  if (!Array.isArray(boxes)) return null;
+  const usable = 1 - 2 * CONTAINMENT_PAD_RATIO;
+  if (!(usable > 0)) return null;
+  let worst = 0;
+  let n = 0;
+  for (const b of boxes) {
+    if (!Array.isArray(b) || b.length !== 4) continue;
+    const v = b.map((k) => Number(k));
+    if (!v.every((k) => Number.isFinite(k))) continue;
+    const w = v[2] - v[0];
+    const h = v[3] - v[1];
+    if (!(w > 0) || !(h > 0)) continue;
+    worst = Math.max(worst, Math.max(w, h) / usable);
+    n++;
+  }
+  return n === 0 ? null : worst;
+}
+
+/**
+ * V461 E — PURE. Does the frozen path hold every measured box?
+ *
+ * This is the OBSERVED containment verdict that replaces the arithmetic
+ * prediction. A path is accepted only if the planner actually solved it.
+ */
+export function cameraPathContainsAll(
+  path: { keyframes?: Array<{ t: number; x: number; y: number; size: number }> } | null | undefined,
+  samples: Array<{ t?: number | null; box?: number[] | null } | number[] | null | undefined> | null | undefined,
+): { ok: boolean; checked: number; failedBox: number[] | null; failedT: number | null } {
+  const kfs = (Array.isArray(path?.keyframes) ? path!.keyframes! : [])
+    .filter((k) => k && [k.t, k.x, k.y, k.size].every((n) => Number.isFinite(Number(n))) && k.size > 0)
+    .slice()
+    .sort((a, b) => a.t - b.t);
+  if (kfs.length === 0 || !Array.isArray(samples)) {
+    return { ok: true, checked: 0, failedBox: null, failedT: null };
+  }
+
+  /**
+   * The rendered window at time `t`. Keyframes are a DECIMATED sample of a
+   * continuous path, so a box between two of them is held by the
+   * interpolated window — testing keyframes alone would reject paths the
+   * renderer handles perfectly well.
+   */
+  const windowAt = (t: number) => {
+    if (t <= kfs[0].t) return kfs[0];
+    if (t >= kfs[kfs.length - 1].t) return kfs[kfs.length - 1];
+    let i = 1;
+    while (i < kfs.length && kfs[i].t < t) i++;
+    const a = kfs[i - 1];
+    const b = kfs[i];
+    const span = b.t - a.t;
+    const f = span > 0 ? (t - a.t) / span : 0;
+    return {
+      t,
+      x: a.x + (b.x - a.x) * f,
+      y: a.y + (b.y - a.y) * f,
+      size: a.size + (b.size - a.size) * f,
+    };
+  };
+
+  let checked = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const s = samples[i];
+    const raw = Array.isArray(s) ? s : (s?.box ?? null);
+    if (!Array.isArray(raw) || raw.length !== 4) continue;
+    const v = raw.map((k) => Number(k));
+    if (!v.every((k) => Number.isFinite(k))) continue;
+    if (!(v[2] > v[0]) || !(v[3] > v[1])) continue;
+    const tRaw = Array.isArray(s) ? NaN : Number(s?.t);
+    checked++;
+
+    // With a time, test the window that will actually be rendered there.
+    // Without one, any window that holds the box is enough.
+    let held: boolean;
+    let tUsed: number | null = null;
+    if (Number.isFinite(tRaw)) {
+      tUsed = tRaw;
+      const w = windowAt(tRaw);
+      held = v[0] >= w.x && v[2] <= w.x + w.size && v[1] >= w.y && v[3] <= w.y + w.size;
+    } else {
+      held = kfs.some((k) =>
+        v[0] >= k.x && v[2] <= k.x + k.size && v[1] >= k.y && v[3] <= k.y + k.size
+      );
+    }
+    if (!held) return { ok: false, checked, failedBox: v, failedT: tUsed };
+  }
+  return { ok: true, checked, failedBox: null, failedT: null };
+}
+
 export async function renderPassFacePreclip(
   supabase: any,
   serviceKey: string,
@@ -354,6 +472,12 @@ export async function renderPassFacePreclip(
   // unaffected: `bbox` remains the assignment-locked reference everywhere
   // else, including the geometry identity persisted for V461/V456.
   const v461TurnUnion = unionOfTurnBoxes(input.turnFaceBoxes);
+  const v461PerFrameMin = perFrameMinCropPx(input.turnFaceBoxes);
+  // V461 E — evidence hoisted so the planner-confirmation refusal below can
+  // report the same numbers the plan-time screen used.
+  let v461FaceShareCapPx: number | null = null;
+  let v461MinCropStaticPx: number | null = null;
+  let v461PreferredFloorYielded = false;
   const v461ContainSource: "turn_track" | "anchor" = v461TurnUnion ? "turn_track" : "anchor";
   const v457ContainBox = normalizeContainBox(
     buildDispatchFaceBox(v461TurnUnion ?? bbox ?? null, { width: sW, height: sH }) as
@@ -387,6 +511,9 @@ export async function renderPassFacePreclip(
       outputSize: PRECLIP.outputSizePx,
       containBox: v457ContainBox,
       faceShareFloor: V461_FACE_SHARE_FLOOR,
+      // V461 E — with a measured turn the lower bound is PER SAMPLE, not
+      // the time-union: a moving crop never holds the whole turn at once.
+      perFrameMinCropPx: v461PerFrameMin,
     });
 
     // ── V461 D — plan-time contract check (defense in depth) ────────────
@@ -407,8 +534,27 @@ export async function renderPassFacePreclip(
         ok: false,
         error: `preclip_crop_contract_unsatisfiable:${r.infeasibleReason}`,
         errorClass: "invalid_input",
+        cropFeasibility: {
+          feasibility_mode: r.feasibilityMode,
+          refused_at: "plan_time",
+          reason: r.infeasibleReason,
+          turn_box_count: Array.isArray(input.turnFaceBoxes) ? input.turnFaceBoxes.length : 0,
+          contain_source: v461ContainSource,
+          turn_union: v461TurnUnion,
+          anchor_face_bbox: (bbox as number[] | null) ?? null,
+          face_share_floor: V461_FACE_SHARE_FLOOR,
+          face_share_cap_px: r.maxCropByFaceShare,
+          min_crop_static_px: r.minCropStaticPx,
+          min_crop_dynamic_px: r.minCropDynamicPx,
+          chosen_crop_size: null,
+          preferred_floor_yielded: r.preferredFloorYielded,
+          planner_containment: null,
+        },
       };
     }
+    v461FaceShareCapPx = r.maxCropByFaceShare;
+    v461MinCropStaticPx = r.minCropStaticPx;
+    v461PreferredFloorYielded = r.preferredFloorYielded;
     crop0X = r.crop.x;
     crop0Y = r.crop.y;
     crop0Size = r.crop.size;
@@ -553,6 +699,61 @@ export async function renderPassFacePreclip(
   }
   const useDynamicPath = isDynamicCameraPath(cameraPath);
   const cameraPathSig = cameraPath?.signature ?? null;
+
+  // ── V461 E — the PLANNER confirms, the arithmetic only pre-screened ──
+  //
+  // The lower bound above says a crop of this size COULD hold the face at
+  // every sample. Whether the planner actually solved it — inside its own
+  // jump, bounds and parity rules — is a different question, and it is the
+  // one that decides. Only a path that demonstrably holds every measured
+  // box may reach the renderer.
+  if (v461PerFrameMin !== null && cameraPath) {
+    // Keyframe times are RELATIVE to the preclip start; track samples are
+    // plate-absolute. Convert, or the interpolation would sample the wrong
+    // instant.
+    const relSamples = Array.isArray(input.turnFaceSamples) && input.turnFaceSamples.length > 0
+      ? input.turnFaceSamples.map((sm) => ({
+        t: Number.isFinite(Number(sm?.t)) ? Number(sm!.t) - startSec : null,
+        box: sm?.box ?? null,
+      }))
+      : input.turnFaceBoxes;
+    const held = cameraPathContainsAll(cameraPath, relSamples);
+    if (!held.ok) {
+      console.error(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v461e_camera_path_cannot_contain ` +
+          `crop=${crop.size}px checked=${held.checked} failed_box=${held.failedBox?.join(",") ?? "n/a"} ` +
+          `dynamic=${useDynamicPath} reason=${cameraPath.reason} — refusing render`,
+      );
+      return {
+        ok: false,
+        error:
+          `preclip_crop_contract_unsatisfiable:camera_path_cannot_contain_track_at_${crop.size}px`,
+        errorClass: "invalid_input",
+        cropFeasibility: {
+          feasibility_mode: "dynamic",
+          refused_at: "planner",
+          reason: `camera_path_cannot_contain_track_at_${crop.size}px`,
+          turn_box_count: Array.isArray(input.turnFaceBoxes) ? input.turnFaceBoxes.length : 0,
+          contain_source: v461ContainSource,
+          turn_union: v461TurnUnion,
+          anchor_face_bbox: (bbox as number[] | null) ?? null,
+          face_share_floor: V461_FACE_SHARE_FLOOR,
+          face_share_cap_px: v461FaceShareCapPx,
+          min_crop_static_px: v461MinCropStaticPx,
+          min_crop_dynamic_px: Math.ceil(v461PerFrameMin),
+          chosen_crop_size: crop.size,
+          preferred_floor_yielded: v461PreferredFloorYielded,
+          planner_containment: {
+            ok: false,
+            checked: held.checked,
+            failed_box: held.failedBox,
+            dynamic: useDynamicPath,
+            reason: cameraPath.reason,
+          },
+        },
+      };
+    }
+  }
 
   const v447Signature = buildPreclipSignature({
     runId: v447RunId,

@@ -5919,6 +5919,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             turnFaceBoxes: v477PreTrack?.ok
               ? (v477PreTrack.samples as any[]).map((sample) => sample?.box ?? null)
               : null,
+            // V461 E — with times, the planner confirmation can test the window
+            // that will actually be rendered at that instant.
+            turnFaceSamples: v477PreTrack?.ok
+              ? (v477PreTrack.samples as any[]).map((sample) => ({ t: sample?.t ?? null, box: sample?.box ?? null }))
+              : null,
             // ── V452 — dynamic face tracking ─────────────────────────────
             // Fresh dispatch only (this whole block is unreachable on a NOOP
             // retry, see `v161PreclipEligible`). Identity is already locked;
@@ -6137,6 +6142,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         } else {
           (pass as any).preclip_error = preclipResult.error ?? "preclip_unknown";
           (pass as any).preclip_error_class = preclipResult.errorClass ?? null;
+          // V461 E — structured feasibility evidence, attached BEFORE the pass
+          // terminalizes. The previous refusal path persisted only
+          // `rendering_preflight` and left the geometry unreconstructable.
+          (pass as any)._v461_crop_feasibility = (preclipResult as any).cropFeasibility ?? null;
           if (speakers.length >= 2) {
             // FA-4/P0 — presenter only: an infrastructure/dispatch problem is NOT a
             // timeout. `dispatch_uncertain` keeps its own diagnosis class.
