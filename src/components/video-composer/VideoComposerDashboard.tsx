@@ -418,6 +418,8 @@ export default function VideoComposerDashboard() {
             // legacy-mapping-allowed: DB-Zeile -> Client-Modell (Spiegelfeld)
             twoshotStage: (row as any).twoshot_stage ?? null,
             previewClipUrl: (row as any).preview_clip_url ?? null,
+            lastGoodOutputUrl: (row as any).last_good_output_url ?? null,
+            lastGoodOutputGeneration: (row as any).last_good_output_generation ?? null,
             previewStatus: (row as any).preview_status ?? null,
             // ── Non-lifecycle fields below: DB-first with local fallback ──
             aiPrompt: pickText(row.id, 'aiPrompt', row.ai_prompt as any, local?.aiPrompt),
@@ -693,6 +695,8 @@ export default function VideoComposerDashboard() {
             audioPlan: ((row as any).audio_plan as any) ?? local?.audioPlan,
             dialogLockedAt: ((row as any).dialog_locked_at as any) ?? local?.dialogLockedAt ?? null,
             previewClipUrl: ((row as any).preview_clip_url as any) ?? local?.previewClipUrl ?? null,
+            lastGoodOutputUrl: ((row as any).last_good_output_url as any) ?? local?.lastGoodOutputUrl ?? null,
+            lastGoodOutputGeneration: ((row as any).last_good_output_generation as any) ?? local?.lastGoodOutputGeneration ?? null,
             previewStatus: ((row as any).preview_status as any) ?? local?.previewStatus ?? null,
             seed: ((row as any).seed as any) ?? local?.seed ?? null,
             seedVariations: Array.isArray((row as any).seed_variations)

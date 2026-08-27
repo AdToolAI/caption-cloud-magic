@@ -667,6 +667,14 @@ export interface ComposerScene {
    * ready = playable proxy available, failed = LTX errored (button re-enables).
    */
   previewClipUrl?: string | null;
+
+  /**
+   * V517-B — display-only fallback to the previous run’s durable output.
+   * Never current-run authority: see `resolveSceneDisplayOutput`.
+   * Maps to `composer_scenes.last_good_output_url` / `_generation`.
+   */
+  lastGoodOutputUrl?: string | null;
+  lastGoodOutputGeneration?: number | null;
   previewStatus?: 'idle' | 'generating' | 'ready' | 'failed' | null;
   /**
    * Phase 5.3 — Reroll Pro: Seed-Lock + Variant-Grid.
