@@ -85,7 +85,10 @@ import {
   buildAnchorImagePlan,
   buildCanonicalCastRecords,
   evaluateStrictConditioning,
+  buildStrictRecoveryFraming,
+  evaluateRecoveryAcceptance,
   evaluateStrictVerification,
+  buildRecoveryAcceptanceTelemetry,
   strictRecoveryTargets,
 } from "../_shared/v508-strict-identity.ts";
 import { buildAnchorLayoutFromV274 } from "../_shared/plateFaceSlotRouter.ts";
@@ -2918,6 +2921,9 @@ serve(async (req) => {
                   swapMismatches: string[] = [],
                   faceLock = false,
                   framingSuffix = "",
+                  // V514 — routes this ONE call through the stronger model.
+                  // Separate from `faceLock`, which describes a prompt mode.
+                  strictIdentityRecovery = false,
                 ): Promise<string | null> => {
                   anchorAttempt.attempted = true;
                   anchorAttempt.portraitCount = portraitUrls.length;
@@ -2970,6 +2976,7 @@ serve(async (req) => {
                         strictSwapMode: swap || faceLock,
                         swapMismatches,
                         faceLockMode: faceLock,
+                        strictIdentityRecovery,
                         wardrobeLock: wardrobeLockNamesCS.length > 0,
                         wardrobeLockNames: wardrobeLockNamesCS,
                         framingSuffix,
@@ -3671,6 +3678,92 @@ serve(async (req) => {
                           `resolved=${idResolved.resolvedCount}/${idResolved.expectedCount} ` +
                           `minSim=${idResolved.minSimilarity ?? "-"} reason=${idResolved.reason ?? "-"} ms=${idResolved.msTotal}`,
                         );
+
+                        // ══ V514 — ONE AUTHORITATIVE IDENTITY RESULT ══════════
+                        //
+                        // The strict recovery used to run AFTER the persisted
+                        // structures had already been built from the initial
+                        // resolution, and on success it updated only the URL
+                        // variable and the verdict. A winning repair therefore
+                        // left `anchor_identity`, `assignmentLock`, `faces`,
+                        // `dims` and `anchor_face_layout` describing the OLD
+                        // anchor — new reference image, old geometry and old
+                        // identity. Generation 13 never hit it only because its
+                        // repair also failed; a successful one would have.
+                        //
+                        // So the recovery decision happens HERE, before anything
+                        // is derived, and everything downstream reads one object.
+                        let v514Authority = {
+                          anchorUrl: composedUrl,
+                          resolution: idResolved,
+                          verification: evaluateStrictVerification(
+                            v508Records,
+                            idResolved.assignmentLock as Record<string, unknown> | null,
+                          ),
+                        };
+                        let v508RepairAttempted = false;
+                        let v514Acceptance: ReturnType<typeof evaluateRecoveryAcceptance> | null = null;
+
+                        if (!v514Authority.verification.ok && composedUrl) {
+                          const targets = strictRecoveryTargets(v514Authority.verification);
+                          console.warn(
+                            `[compose-video-clips] v508_strict_recovery scene=${scene.id} ` +
+                              `resolved=${v514Authority.verification.resolvedStrict}/${v514Authority.verification.expectedStrict} ` +
+                              `targets=${targets.join(",")} — one targeted face-lock attempt (v514: stronger model + ensemble framing)`,
+                          );
+                          v508RepairAttempted = true;
+                          try {
+                            const repairedUrl = await composeAnchor(
+                              "v508-strict-recovery",
+                              true,
+                              true,
+                              targets,
+                              true,
+                              buildStrictRecoveryFraming(targets),
+                              true,
+                            );
+                            if (repairedUrl) {
+                              const reResolved = await resolveIdentityViaRekognition({
+                                anchorUrl: repairedUrl,
+                                characters: rekChars,
+                              });
+                              const reVerify = evaluateStrictVerification(
+                                v508Records,
+                                reResolved.assignmentLock as Record<string, unknown> | null,
+                              );
+                              // V514 — a higher count is not automatically better.
+                              // The recovery must strictly improve AND keep every
+                              // already-verified character verified as the SAME
+                              // person; a rebind is the worst outcome available.
+                              v514Acceptance = evaluateRecoveryAcceptance(
+                                v514Authority.verification,
+                                reVerify,
+                              );
+                              console.log(
+                                `[compose-video-clips] v508_strict_recovery_result scene=${scene.id} ` +
+                                  `resolved=${reVerify.resolvedStrict}/${reVerify.expectedStrict} ok=${reVerify.ok ? 1 : 0} ` +
+                                  `accepted=${v514Acceptance.accept ? 1 : 0} reason=${v514Acceptance.reason}`,
+                              );
+                              if (v514Acceptance.accept) {
+                                v514Authority = {
+                                  anchorUrl: repairedUrl,
+                                  resolution: reResolved,
+                                  verification: reVerify,
+                                };
+                                // Pointer coherence: everything downstream that
+                                // reads `composedUrl` now reads the winner too.
+                                composedUrl = repairedUrl;
+                              }
+                            }
+                          } catch (e) {
+                            console.warn(`[compose-video-clips] v508_strict_recovery_failed: ${(e as Error)?.message ?? String(e)}`);
+                          }
+                        }
+
+                        // From here on the initial resolution is history. Every
+                        // persisted structure below derives from the authority.
+                        const idAuthoritative = v514Authority.resolution;
+                        const v508Verify = v514Authority.verification;
                         // Persist to audio_plan.twoshot.anchor_identity — this
                         // becomes the fallback source for
                         // dialog_shots.plate_identity in compose-dialog-segments.
@@ -3687,16 +3780,16 @@ serve(async (req) => {
                           // unresolved slots falling back to v242 row-major order.
                           const softGateEnabled = (Deno.env.get("V276_SOFT_GATE") ?? "true").toLowerCase() !== "false";
                           const expected = portraitUrls.length;
-                          const resolved = idResolved.resolvedCount ?? 0;
+                          const resolved = idAuthoritative.resolvedCount ?? 0;
                           const isPartial = expected >= 2 && resolved > 0 && resolved < expected;
-                          const isTotalMiss = expected >= 2 && (!idResolved.ok || resolved === 0);
+                          const isTotalMiss = expected >= 2 && (!idAuthoritative.ok || resolved === 0);
                           const identityStatus = isTotalMiss
                             ? "unresolved"
                             : isPartial
                               ? "partial"
                               : "ok";
-                          const matchedSlots = idResolved.assignmentLock
-                            ? Object.keys(idResolved.assignmentLock)
+                          const matchedSlots = idAuthoritative.assignmentLock
+                            ? Object.keys(idAuthoritative.assignmentLock)
                             : [];
                           const assignmentLockSource = resolved >= expected
                             ? "v274_anchor_rekognition_complete"
@@ -3704,19 +3797,19 @@ serve(async (req) => {
                               ? "v274_anchor_rekognition_partial"
                               : "v274_anchor_rekognition_unresolved";
                           const anchorIdentityPayload = {
-                            method: idResolved.method,
-                            ok: idResolved.ok,
+                            method: idAuthoritative.method,
+                            ok: idAuthoritative.ok,
                             status: identityStatus,
                             assignmentLockSource,
                             partial: isPartial,
                             matched: matchedSlots,
-                            dims: idResolved.dims,
-                            faces: idResolved.faces,
-                            assignmentLock: idResolved.assignmentLock,
+                            dims: idAuthoritative.dims,
+                            faces: idAuthoritative.faces,
+                            assignmentLock: idAuthoritative.assignmentLock,
                             resolvedCount: resolved,
                             expectedCount: expected,
-                            minSimilarity: idResolved.minSimilarity,
-                            reason: idResolved.reason ?? null,
+                            minSimilarity: idAuthoritative.minSimilarity,
+                            reason: idAuthoritative.reason ?? null,
                             anchor_url: composedUrl,
                             resolved_at: new Date().toISOString(),
                           };
@@ -3733,8 +3826,8 @@ serve(async (req) => {
                           // overwritten later by the real plate detector.
                           const anchorFaceLayout = buildAnchorLayoutFromV274(
                             composedUrl,
-                            idResolved.dims,
-                            idResolved.faces,
+                            idAuthoritative.dims,
+                            idAuthoritative.faces,
                             characterIds.filter((cid): cid is string => typeof cid === "string" && cid.length > 0),
                           );
                           const anchorLayoutComplete = anchorFaceLayout.slots.length >= expected;
@@ -3748,12 +3841,12 @@ serve(async (req) => {
                             anchor_face_layout: anchorFaceLayout,
                             plate_identity: {
                               ...(nextDialogShotsBase.plate_identity ?? {}),
-                              method: idResolved.method,
+                              method: idAuthoritative.method,
                               status: identityStatus,
                               assignmentLockSource,
-                              dims: idResolved.dims,
-                              faces: idResolved.faces,
-                              assignmentLock: idResolved.assignmentLock,
+                              dims: idAuthoritative.dims,
+                              faces: idAuthoritative.faces,
+                              assignmentLock: idAuthoritative.assignmentLock,
                               resolvedCount: resolved,
                               expectedCount: expected,
                               v278AnchorLayoutSlots: anchorFaceLayout.slots.length,
@@ -3771,43 +3864,6 @@ serve(async (req) => {
                           // are fed into the EXISTING face-lock retry with the same
                           // aligned identity references — anchor image only, no
                           // video regeneration. Then Rekognition runs again.
-                          let v508Verify = evaluateStrictVerification(
-                            v508Records,
-                            idResolved.assignmentLock as Record<string, unknown> | null,
-                          );
-                          let v508RepairAttempted = false;
-                          if (!v508Verify.ok && composedUrl) {
-                            const targets = strictRecoveryTargets(v508Verify);
-                            console.warn(
-                              `[compose-video-clips] v508_strict_recovery scene=${scene.id} ` +
-                                `resolved=${v508Verify.resolvedStrict}/${v508Verify.expectedStrict} ` +
-                                `targets=${targets.join(",")} — one targeted face-lock attempt`,
-                            );
-                            v508RepairAttempted = true;
-                            try {
-                              const repairedUrl = await composeAnchor("v508-strict-recovery", true, true, targets, true);
-                              if (repairedUrl) {
-                                const reResolved = await resolveIdentityViaRekognition({
-                                  anchorUrl: repairedUrl,
-                                  characters: rekChars,
-                                });
-                                const reVerify = evaluateStrictVerification(
-                                  v508Records,
-                                  reResolved.assignmentLock as Record<string, unknown> | null,
-                                );
-                                console.log(
-                                  `[compose-video-clips] v508_strict_recovery_result scene=${scene.id} ` +
-                                    `resolved=${reVerify.resolvedStrict}/${reVerify.expectedStrict} ok=${reVerify.ok ? 1 : 0}`,
-                                );
-                                if (reVerify.ok) {
-                                  composedUrl = repairedUrl;
-                                  v508Verify = reVerify;
-                                }
-                              }
-                            } catch (e) {
-                              console.warn(`[compose-video-clips] v508_strict_recovery_failed: ${(e as Error)?.message ?? String(e)}`);
-                            }
-                          }
                           const v508StrictBlock = !v508Verify.ok;
                           const v508StrictPayload = {
                             stage: "verification",
@@ -3829,7 +3885,7 @@ serve(async (req) => {
                           // V276 env default are unchanged for non-strict casts.
                           const needsManualReview = v508StrictBlock || (softGateEnabled
                             ? isTotalMiss
-                            : (expected >= 3 && (!idResolved.ok || resolved < expected)));
+                            : (expected >= 3 && (!idAuthoritative.ok || resolved < expected)));
                           await supabaseAdmin
                             .from("composer_scenes")
                             .update({

@@ -443,3 +443,169 @@ export function buildIdentityTelemetry(input: {
     evidence: input.evidence ?? [],
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// V514 — MONOTONIC RECOVERY ACCEPTANCE
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Scene 67b392b1, generation 13: strict verification resolved 3/4 (Samuel
+// unresolved), the targeted recovery ran and produced a second anchor, and
+// `reVerify` was still not ok — so the run correctly stopped for manual
+// review.
+//
+// The acceptance test at the time was `if (reVerify.ok)`. That is right for a
+// full pass and silent about everything else, which leaves the interesting
+// cases undecided: a recovery that resolves four characters but rebinds one of
+// them to the wrong person, or that trades Samuel for Kay and stays at 3/4.
+// Both "look" like progress from a count alone.
+//
+// So the rule is not "did it improve the number" but "did it improve WITHOUT
+// losing anything already proven". A recovery replaces authority only when it
+// strictly increases the resolved strict count AND every character that was
+// already biometrically verified stays verified AS THE SAME PERSON.
+//
+// Geometry never participates. A strict character is resolved by biometric
+// evidence or not at all — see STRICT_EVIDENCE_CLASSES.
+
+export type RecoveryRejectionReason =
+  | "no_improvement"
+  | "regressed_count"
+  | "lost_verified_character"
+  | "rebound_verified_character"
+  | "expected_mismatch";
+
+export interface RecoveryAcceptance {
+  accept: boolean;
+  reason: RecoveryRejectionReason | "improved";
+  beforeResolved: number;
+  afterResolved: number;
+  expected: number;
+  /** Characters verified before that are no longer verified after. */
+  lost: string[];
+  /** Characters verified before whose slot now names a DIFFERENT character. */
+  rebound: Array<{ characterId: string; fromSlot: number; toCharacterId: string }>;
+}
+
+/** Slot -> characterId, for the strict characters that are biometrically verified. */
+function verifiedSlotsOf(v: StrictVerificationVerdict): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const e of v.evidence ?? []) {
+    if (!e || e.strict !== true) continue;
+    if (!evidenceSatisfiesStrict(e.evidenceClass)) continue;
+    if (typeof e.slot !== "number" || !e.characterId) continue;
+    out.set(String(e.characterId), e.slot);
+  }
+  return out;
+}
+
+/**
+ * PURE — may the recovery result replace the current authority?
+ *
+ * Fails closed: anything it cannot prove is an improvement is a rejection,
+ * because the cost of a wrong accept is a rendered scene with a mis-identified
+ * face, while the cost of a wrong reject is the manual review gate the user
+ * already has.
+ */
+export function evaluateRecoveryAcceptance(
+  before: StrictVerificationVerdict,
+  after: StrictVerificationVerdict,
+): RecoveryAcceptance {
+  const beforeResolved = Number(before?.resolvedStrict ?? 0);
+  const afterResolved = Number(after?.resolvedStrict ?? 0);
+  const expected = Number(before?.expectedStrict ?? 0);
+
+  const beforeVerified = verifiedSlotsOf(before);
+  const afterVerified = verifiedSlotsOf(after);
+
+  const lost: string[] = [];
+  const rebound: RecoveryAcceptance["rebound"] = [];
+  for (const [cid, slot] of beforeVerified) {
+    if (!afterVerified.has(cid)) {
+      lost.push(cid);
+      // The slot this character held may now name someone else. That is a
+      // rebind, not merely a loss, and it is the more dangerous of the two.
+      for (const [otherCid, otherSlot] of afterVerified) {
+        if (otherSlot === slot && otherCid !== cid) {
+          rebound.push({ characterId: cid, fromSlot: slot, toCharacterId: otherCid });
+        }
+      }
+    }
+  }
+
+  const base = { beforeResolved, afterResolved, expected, lost, rebound };
+
+  // The two casts must describe the same thing at all, or the comparison is
+  // meaningless and there is nothing to accept.
+  if (Number(after?.expectedStrict ?? -1) !== expected) {
+    return { accept: false, reason: "expected_mismatch", ...base };
+  }
+  // A verified character rebound to a different identity is the worst outcome
+  // available and is reported as such even when the count went up.
+  if (rebound.length > 0) {
+    return { accept: false, reason: "rebound_verified_character", ...base };
+  }
+  if (lost.length > 0) {
+    return { accept: false, reason: "lost_verified_character", ...base };
+  }
+  if (afterResolved < beforeResolved) {
+    return { accept: false, reason: "regressed_count", ...base };
+  }
+  if (afterResolved === beforeResolved) {
+    // Same count, nobody lost — a lateral move. Not worth replacing a proven
+    // authority for, and 3/4 → a different 3/4 lands here.
+    return { accept: false, reason: "no_improvement", ...base };
+  }
+  return { accept: true, reason: "improved", ...base };
+}
+
+/** PURE — bounded telemetry for the recovery decision. No URLs. */
+export function buildRecoveryAcceptanceTelemetry(a: RecoveryAcceptance): Record<string, unknown> {
+  return {
+    v514_recovery_accepted: a.accept,
+    v514_recovery_reason: a.reason,
+    v514_resolved_before: a.beforeResolved,
+    v514_resolved_after: a.afterResolved,
+    v514_expected_strict: a.expected,
+    v514_lost_characters: a.lost,
+    v514_rebound_characters: a.rebound,
+  };
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// V514 — STRICT RECOVERY FRAMING
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Generation 13's framing retry reported `faces=4 humans=4` but
+// `minFaceRatio=0.059, sizeOk=false` — every cast member was present and
+// every face was too small for Rekognition to match at >= 55 similarity.
+// The strict recovery that followed asked for face-lock but said nothing
+// about how large those faces had to be, so it inherited the same staging.
+//
+// This directive fixes readability, not composition. It must NOT turn the
+// scene into portraits: the anchor is the geometric ground truth for the
+// whole downstream pipeline (V461 crop feasibility, V464 per-frame
+// registration), and four mugshots would break the scene it is meant to
+// anchor. Same cast, same world, same locked camera — tighter ensemble.
+//
+// Targets are named so the model knows which faces failed, but the
+// requirement applies to EVERY cast member: fixing one face by hiding
+// another would trade one unresolved character for the next.
+export function buildStrictRecoveryFraming(unresolvedNames: string[]): string {
+  const named = (unresolvedNames ?? []).map((n) => String(n).trim()).filter((n) => n.length > 0);
+  const who = named.length > 0
+    ? `The previous attempt rendered ${named.join(" and ")} too small or too obscured to identify. `
+    : "The previous attempt rendered at least one cast member too small or too obscured to identify. ";
+  return (
+    ` STRICT IDENTITY FRAMING — ${who}` +
+    "Keep the SAME scene, the SAME location, the SAME cast and the SAME actions. " +
+    "Do NOT produce portraits, headshots or a photo montage. Restage the group " +
+    "tighter: a waist-up medium ensemble shot in which EVERY cast member's face " +
+    "is fully visible, frontal or near-frontal, and large enough to recognise. " +
+    "No face may be hidden behind another person, turned away from camera, cropped " +
+    "by the frame edge, or covered by a hand, hair or a prop. Every head must be " +
+    "clearly separated from the others. The characters keep performing their " +
+    "described actions — move them closer together and bring the camera in rather " +
+    "than freezing them into a line-up."
+  );
+}

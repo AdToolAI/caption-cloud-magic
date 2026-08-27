@@ -70,6 +70,17 @@ interface Body {
    *  pixel-copy-from-identity-headshot clause and forces deterministic
    *  generation (temperature: 0). Implies strictSwapMode. */
   faceLockMode?: boolean;
+  /**
+   * V514 — this call is the ONE bounded strict-identity recovery attempt.
+   *
+   * Deliberately separate from `faceLockMode`. Today that flag has exactly
+   * one caller (compose-video-clips' V508 recovery), so routing on it would
+   * work — but it describes a PROMPT mode, and a future caller could set it
+   * for its own reasons and silently inherit a different model and a
+   * different cost. This flag describes the SITUATION, so the routing
+   * decision cannot be acquired by accident.
+   */
+  strictIdentityRecovery?: boolean;
   /** Stage A — World Assets as Visual References. */
   locationUrls?: string[];
   buildingUrls?: string[];
@@ -295,6 +306,22 @@ serve(async (req) => {
       ? body.swapMismatches.filter((s) => typeof s === "string" && s.length > 0)
       : [];
     const faceLockMode = body.faceLockMode === true;
+    // V514 — only compose-video-clips' V508 recovery sets this.
+    const strictIdentityRecovery = body.strictIdentityRecovery === true;
+    // V514 — the route is part of the cache identity, so it has to be known
+    // before the signature is built. Hoisted here and consumed unchanged by
+    // the provider block further down; an explicit ANCHOR_MODEL_MULTI still
+    // wins so the env flag keeps its rollback power.
+    const V514_ANCHOR_MODEL_MULTI = (Deno.env.get("ANCHOR_MODEL_MULTI") ?? "nano_banana_2").toLowerCase();
+    const v514ModelPinned = V514_ANCHOR_MODEL_MULTI !== "nano_banana_2";
+    const v514PreferGeminiRecovery = strictIdentityRecovery && !v514ModelPinned;
+    const v514RouteToken = v514PreferGeminiRecovery
+      ? "g3p"
+      : V514_ANCHOR_MODEL_MULTI === "gemini3pro"
+      ? "g3p"
+      : V514_ANCHOR_MODEL_MULTI === "seedream4"
+      ? "sd4"
+      : "nb2";
     // v260 Speaker Priority Framing — normalise the focus index into range.
     const speakerFocusIdxRaw = Number.isFinite(body.speakerFocusIdx as number)
       ? Math.trunc(body.speakerFocusIdx as number)
@@ -345,7 +372,7 @@ serve(async (req) => {
       ? await sha1(framingSuffix)
       : "none";
     const promptHash = await sha1(
-      `v20|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|fl=${faceLockMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}|fam=${familyHash}|spf=${speakerFocusIdx}:${speakerFocusName.toLowerCase()}|fs=${framingSuffixHash}|grid=${gridRequested ? gridStyle : 0}`,
+      `v20|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|fl=${faceLockMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}|fam=${familyHash}|spf=${speakerFocusIdx}:${speakerFocusName.toLowerCase()}|fs=${framingSuffixHash}|grid=${gridRequested ? gridStyle : 0}|sir=${strictIdentityRecovery ? 1 : 0}|route=${v514RouteToken}`,
     );
 
 
@@ -615,9 +642,37 @@ serve(async (req) => {
     //   Werte: "nano_banana_2" (Default) | "gemini3pro" | "seedream4"
     const ANCHOR_MODEL_MULTI = (Deno.env.get("ANCHOR_MODEL_MULTI") ?? "nano_banana_2").toLowerCase();
     const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY") ?? "";
+
+    // ── V514 — the recovery attempt gets the stronger model ─────────────
+    //
+    // Generation 13 stopped at 3/4 strict identity, and the targeted
+    // recovery asked the SAME default model that had just failed to render
+    // a recognisable Samuel. A second draw from the same distribution is a
+    // weak recovery: it produced a second anchor and Rekognition still
+    // found nothing at >= 55 similarity.
+    //
+    // The comment above already records why Gemini 3 Pro is not the default
+    // — it is 2-3x slower — and that reasoning is about the FIRST attempt,
+    // which happens on every scene. The recovery happens only after strict
+    // verification has already failed, at most once, on a run that is
+    // otherwise heading for manual review. Latency is the right thing to
+    // spend there.
+    //
+    // Scope is narrow on purpose: the normal default is untouched, and an
+    // explicit ANCHOR_MODEL_MULTI override still wins so the env flag keeps
+    // its rollback power.
+    const v514RecoveryPrefersGemini = isMulti && v514PreferGeminiRecovery;
+
     const useSeedream = isMulti && ANCHOR_MODEL_MULTI === "seedream4" && REPLICATE_API_KEY.length > 0;
-    const useGemini3Pro = isMulti && ANCHOR_MODEL_MULTI === "gemini3pro";
-    const useNanoBananaFirst = isMulti && ANCHOR_MODEL_MULTI === "nano_banana_2";
+    const useGemini3Pro = (isMulti && ANCHOR_MODEL_MULTI === "gemini3pro") || v514RecoveryPrefersGemini;
+    const useNanoBananaFirst = isMulti && ANCHOR_MODEL_MULTI === "nano_banana_2" &&
+      !v514RecoveryPrefersGemini;
+    if (v514RecoveryPrefersGemini) {
+      console.log(
+        `[compose-scene-anchor] v514_strict_recovery_route sceneId=${body.sceneId} ` +
+          `model=gemini3pro (normal default nano_banana_2 unchanged)`,
+      );
+    }
 
 
     // Reference image URLs, in strict order: portraits → identity headshots →
