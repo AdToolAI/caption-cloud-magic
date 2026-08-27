@@ -140,6 +140,14 @@ const EXACT_CODES: Record<string, Entry> = {
     headline: { de: 'Die Lippensynchronisation blieb stehen — die Credits wurden zurückerstattet.', en: 'Lip-sync got stuck — your credits were refunded.', es: 'La sincronización labial se bloqueó — se reembolsaron tus créditos.' },
     hint: RERENDER_LIPSYNC,
   },
+  // V515 — generation 14 died here: the mouth ROI of one speaker fell
+  // outside the computed crop, so the pre-clip could not be built. The
+  // geometry itself is a separate RCA; this entry only stops the code from
+  // reaching the customer as a neutral "unknown error".
+  preclip_mouth_roi_outside_crop: {
+    headline: { de: 'Ein Gesicht lag außerhalb des berechneten Bildausschnitts — die Lippensynchronisation konnte nicht gebaut werden.', en: 'A face fell outside the computed crop — lip-sync could not be built.', es: 'Un rostro quedó fuera del recorte calculado — no se pudo crear la sincronización labial.' },
+    hint: RERENDER_LIPSYNC,
+  },
   lipsync_canceled_by_user: {
     headline: { de: 'Die Lippensynchronisation wurde abgebrochen.', en: 'Lip-sync was canceled.', es: 'La sincronización labial se canceló.' },
   },

@@ -211,12 +211,25 @@ export function sceneSubstate(row: any): SceneSubstate {
   return typeof sub === 'string' && sub.length > 0 ? sub : null;
 }
 
+/**
+ * V515 — SETTLED: der Lauf dieser Szene ist vorbei, in welcher Richtung auch
+ * immer. `TERMINAL` ist enger (nur Fehlerabschluesse) und bleibt unveraendert;
+ * fuer die Frage "darf die Oberflaeche noch Fortschritt zeigen?" ist
+ * `complete` genauso endgueltig wie `failed`.
+ *
+ * Das ist bewusst KEINE zweite Zustandsmaschine, sondern eine weitere
+ * Projektion derselben: Quelle bleibt `sceneState(row)`.
+ */
+const SETTLED: ReadonlySet<SceneState> = new Set<SceneState>(['complete', 'failed', 'canceled']);
+
 export const isTerminalState = (s: SceneState) => TERMINAL.has(s);
+export const isSettledState = (s: SceneState) => SETTLED.has(s);
 export const isRealizedState = (s: SceneState) => REALIZED.has(s);
 export const isInFlightState = (s: SceneState) => IN_FLIGHT.has(s);
 export const stateProgress = (s: SceneState) => PROGRESS[s] ?? 0;
 
 export const isSceneTerminal = (row: any) => isTerminalState(sceneState(row));
+export const isSceneSettled = (row: any) => isSettledState(sceneState(row));
 export const isSceneInFlight = (row: any) => isInFlightState(sceneState(row));
 export const sceneProgressPercent = (row: any) => stateProgress(sceneState(row));
 
