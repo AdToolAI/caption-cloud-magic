@@ -91,7 +91,12 @@ import { resolvePlateFaceIdentities, PlateIdentityFace } from "../_shared/plate-
 import { evaluateV117Gate } from "../_shared/v436-plate-gate.ts";
 import { buildAnchorLayoutFromV274, routePlateFacesToAnchor, type AnchorFaceLayout } from "../_shared/plateFaceSlotRouter.ts";
 // FA-4 Contract E — deterministic preclip crop containment gate.
-import { evaluatePreclipCropContainment } from "../_shared/preclip-crop-containment.ts";
+import {
+  evaluateDynamicPreclipContainment,
+  evaluatePreclipCropContainment,
+  isDynamicContainmentRegime,
+} from "../_shared/preclip-crop-containment.ts";
+import { cameraPathContainsAll } from "../_shared/pass-face-preclip.ts";
 import {
   buildGeometryAuthorityTelemetry,
   resolvePreclipContainmentAuthority,
@@ -6318,6 +6323,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           // re-deriving a static target of its own.
           (pass as any).v457_contain_source = (preclipResult as any).containSource ?? null;
           (pass as any).v457_contains_target = (preclipResult as any).containsTarget ?? null;
+          // V519 — the planner may compute a projection and then discard it.
+          // Which of the two the verdict describes is now explicit.
+          (pass as any).v457_projection_applied = (preclipResult as any).projectionApplied ?? null;
+          (pass as any).v457_projection_discarded = (preclipResult as any).projectionDiscarded ?? null;
+          (pass as any).v457_projection_required_growth = (preclipResult as any).projectionRequiredGrowth ?? null;
           (pass as any).v457_contain_reason = (preclipResult as any).containReason ?? null;
           (pass as any).v457_crop_shift_px = (preclipResult as any).cropShiftPx ?? null;
           (pass as any).v457_size_grown = (preclipResult as any).cropSizeGrown ?? null;
@@ -6997,11 +7007,81 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         // face is, never WHO it is. E.3 therefore keeps testing
         // assignment-locked sibling centres, now against the region that is
         // actually dispatched rather than one that is not.
-        const containment = evaluatePreclipCropContainment({
+        // ══ V519 — CONTAINMENT REGIME ═════════════════════════════════
+        //
+        // Generation 16, Matthew: the union target [757,339,884,525] is
+        // 127x186 and the applied crop was 128x128. Contract E was right
+        // that the box does not fit — and wrong to ask. The renderer
+        // followed a moving camera path, and the planner had already
+        // proven with `cameraPathContainsAll` that every measured face box
+        // is held by the window rendered at its OWN instant.
+        //
+        // The union is the correct target for a crop that never moves. For
+        // one that does, it is a box nobody rendered.
+        //
+        // Nothing is loosened: dynamic mode is entered only on a proven
+        // path with usable samples, every sample is paired with its own
+        // window, and missing or unprovable evidence FAILS. Identity is
+        // untouched — E.3 still tests the assignment-locked sibling
+        // centres against the actually dispatched region below.
+        const v519Path = (pass as any).preclip_camera_path ??
+          (pass as any)._v450_frozen_camera_path ?? null;
+        const v519Track = (pass as any).preclip_face_track ??
+          (pass as any)._v450_frozen_face_track ?? null;
+        const v519Regime = isDynamicContainmentRegime({
+          cameraPathDynamic: (pass as any).preclip_camera_path_dynamic === true,
+          keyframes: (v519Path as any)?.keyframes ?? null,
+          trackSamples: v519Track,
+        });
+        const v519Dynamic = v519Regime
+          ? evaluateDynamicPreclipContainment({
+            cameraPathDynamic: true,
+            keyframes: (v519Path as any)?.keyframes ?? null,
+            trackSamples: v519Track,
+            startSec: Number((pass as any).preclip_start_sec),
+            containsAll: cameraPathContainsAll,
+          })
+          : null;
+        // The static proof always runs: it is the only regime's authority
+        // when there is no path, and its verdict stays visible either way.
+        const v519Static = evaluatePreclipCropContainment({
           crop: v161PreclipCrop,
           targetBbox: v510p1Authority.targetBox,
           otherSpeakerCenters: otherCenters,
         });
+        // A dynamic pass still owes E.3/E.4 on the geometry it dispatches;
+        // only the E.1 union-vs-static-crop question is answered by the
+        // path instead. So a static failure for any OTHER reason still
+        // fails the pass.
+        const v519StaticNonContainment = !v519Static.ok &&
+          v519Static.reason !== "target_not_contained_in_crop";
+        const containment = v519Dynamic
+          ? (v519Dynamic.ok && !v519StaticNonContainment
+            ? { ...v519Static, ok: true, reason: undefined }
+            : (v519StaticNonContainment
+              ? v519Static
+              : {
+                ok: false as const,
+                reason: "target_not_contained_in_crop" as const,
+                detail: `dynamic:${v519Dynamic.reason ?? "unknown"} ${v519Dynamic.detail ?? ""}`.trim(),
+              }))
+          : v519Static;
+        (pass as any)._v519_containment = {
+          regime: v519Regime ? "dynamic_camera_path" : "static",
+          static_ok: v519Static.ok,
+          static_reason: v519Static.reason ?? null,
+          dynamic_ok: v519Dynamic?.ok ?? null,
+          dynamic_reason: v519Dynamic?.reason ?? null,
+          dynamic_checked: v519Dynamic?.checked ?? null,
+          projection_discarded: (pass as any).v457_projection_discarded ?? null,
+          final_crop_contains_target: (pass as any).v457_contains_target ?? null,
+        };
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} ` +
+            `v519_containment regime=${v519Regime ? "dynamic" : "static"} ` +
+            `static=${v519Static.ok ? "ok" : v519Static.reason} ` +
+            `dynamic=${v519Dynamic ? (v519Dynamic.ok ? `ok:${v519Dynamic.checked}` : v519Dynamic.reason) : "n/a"}`,
+        );
         if (!containment.ok) {
           (pass as any)._v152HardFail = {
             reason: "preclip_identity_geometry_mismatch",
