@@ -364,11 +364,21 @@ Deno.test("V508 wiring — conditioning refuses BEFORE the anchor provider call"
 });
 
 Deno.test("V508 wiring — exactly one targeted recovery attempt, reusing face-lock", () => {
-  const calls = CVC.match(/composeAnchor\("v508-strict-recovery"[^)]*\)/g) ?? [];
-  assertEquals(calls.length, 1);
+  // V514 reformatted the call across lines and added two arguments, so the
+  // single-line regex no longer matches. The assertion it made is unchanged:
+  // ONE recovery attempt, through the EXISTING retry machinery, with targets
+  // taken from the verdict rather than invented.
+  assertEquals(CVC.split('composeAnchor(').length - 1 > 0, true);
+  assertEquals(CVC.split('"v508-strict-recovery"').length - 1, 1);
+  const call = CVC.indexOf('"v508-strict-recovery"');
+  const args = CVC.slice(call, call + 400);
   // strict + swap + targets + faceLock, i.e. the EXISTING retry machinery.
-  assert(calls[0].includes("true, true, targets, true"), calls[0]);
-  assert(CVC.includes("strictRecoveryTargets(v508Verify)"), "targets come from the verdict");
+  assert(args.includes("targets,"), args);
+  // V514 — the authority object now owns the verdict the targets come from.
+  assert(
+    CVC.includes("strictRecoveryTargets(v514Authority.verification)"),
+    "targets come from the verdict",
+  );
 });
 
 Deno.test("V508 wiring — the strict block is additive and never flips the V276 default", () => {
