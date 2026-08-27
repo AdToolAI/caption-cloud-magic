@@ -158,7 +158,14 @@ import {
   mouthRoiSamples,
   TRACK_SAMPLE_COUNT,
 } from "../_shared/dynamic-camera-path.ts";
-import { trackAssignedFaceAcrossTurn } from "../_shared/plate-face-track.ts";
+import { pickAssignedFace, trackAssignedFaceAcrossTurn } from "../_shared/plate-face-track.ts";
+import {
+  centerOfBox,
+  resolveIdentityLockedRepair,
+  resolveLockedIdentityReference,
+  type IdentityReference,
+  type IdentityRepairResult,
+} from "../_shared/v523-identity-repair.ts";
 import {
   buildPerFrameAsdBoxes,
   evaluatePerFrameSiblingExclusion,
@@ -4550,7 +4557,18 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // identische Frames automatisch) → ~12-15 s wallclock.
       type GateOutcome =
         | { ok: true; pass: any }
-        | { ok: false; pass: any; reason: string; strict: boolean; hadFaces: boolean; frames: number[]; lastValidationFrame?: number };
+        | {
+          ok: false;
+          pass: any;
+          reason: string;
+          strict: boolean;
+          hadFaces: boolean;
+          frames: number[];
+          lastValidationFrame?: number;
+          // V523 — an identity refusal is never demoted to a soft pass.
+          identityHardFail?: boolean;
+          identityDetail?: Record<string, unknown> | null;
+        };
 
       const gateOne = async (pass: any): Promise<GateOutcome> => {
         const firstTurn = pass.segments[0];
@@ -4560,6 +4578,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           : uniqueSortedFrames([((firstTurn.startTime + firstTurn.endTime) / 2) * ASSUMED_FPS]);
         let accepted = false;
         let lastValidation: any = null;
+        // V523 — the last identity refusal, kept so a block can name the
+        // real cause instead of a generic validation failure.
+        let v523LastRefusal: {
+          frame: number;
+          reference: IdentityReference | null;
+          repair: IdentityRepairResult | null;
+        } | null = null;
         for (const frame of frames) {
           let targetCoordsForCheck: [number, number] | null = null;
           if (strictTargetCheck && plateDims) {
@@ -4590,6 +4615,69 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           const slot = canRepair ? pass.speaker_idx : -1;
           const box = slot >= 0 ? sortedBoxes[slot] : null;
 
+          // ══ V523 — IDENTITY IS THE REPAIR AUTHORITY ══════════════════
+          //
+          // `sortedBoxes[speaker_idx]` above is a left-to-right ordinal.
+          // It answers WHERE a face is standing on this frame, never WHO
+          // it is. Generation 19, Sarah: the ordinal picked a face at
+          // [91,471] while her assignment-locked identity sat at
+          // [108,280,178,386] — 52 px left and 138 px down. The tracker
+          // followed that region, V520 rejected all six samples as
+          // scale-incoherent, and the scene terminalized on
+          // `no_coherent_track_samples`. Every gate downstream was right
+          // about a face that was never hers.
+          //
+          // For 3+ speakers the ordinal is now telemetry. The face is
+          // chosen by the SAME continuation rule the turn tracker uses,
+          // against the characterId-locked reference — IoU floor, centre
+          // drift, sibling veto, ambiguity refusal, all pre-existing. If
+          // no candidate is a provable continuation, there is no repair.
+          //
+          // 1- and 2-speaker scenes keep the legacy path byte for byte.
+          const v523NeedsIdentity = speakers.length >= 3 && !!plateDims;
+          let v523Ref: IdentityReference | null = null;
+          let v523Repair: IdentityRepairResult | null = null;
+          if (v523NeedsIdentity && box && plateDims) {
+            v523Ref = resolveLockedIdentityReference({
+              speakerIdx: pass.speaker_idx,
+              assignmentLock: finalAssignmentLock,
+              speakerCharacterId: speakers[pass.speaker_idx]?.character_id ?? null,
+              plateFaces: (plateIdentityMap?.faces ??
+                (persistedPlateIdentity as any)?.faces ?? null) as any,
+              hydratedBbox: speakerPlateBboxes[pass.speaker_idx],
+              hydratedMouth: speakerPlateMouths[pass.speaker_idx],
+              hydratedSource: coordSources[pass.speaker_idx] ?? null,
+            });
+            // The sibling veto tests the assignment-locked cast, the same
+            // identity map Contract E.3 uses. Identity outranks proximity.
+            const v523Siblings: Array<[number, number]> = [];
+            const v523SiblingRefs: Array<[number, number, number, number]> = [];
+            for (let si = 0; si < speakers.length; si++) {
+              if (si === pass.speaker_idx) continue;
+              const sb = speakerPlateBboxes[si];
+              if (Array.isArray(sb) && sb.length === 4) {
+                v523Siblings.push(centerOfBox(sb as [number, number, number, number]));
+                v523SiblingRefs.push(sb as [number, number, number, number]);
+              }
+            }
+            v523Repair = resolveIdentityLockedRepair({
+              reference: v523Ref,
+              candidates: sortedBoxes.map((b: any) => ({
+                bbox: [
+                  Math.round(Number(b.x) * plateDims!.width),
+                  Math.round(Number(b.y) * plateDims!.height),
+                  Math.round((Number(b.x) + Number(b.w)) * plateDims!.width),
+                  Math.round((Number(b.y) + Number(b.h)) * plateDims!.height),
+                ] as [number, number, number, number],
+                mouth: null,
+              })),
+              siblingCenters: v523Siblings,
+              siblingReferences: v523SiblingRefs,
+              pick: pickAssignedFace,
+              positionalSlot: slot >= 0 ? slot : null,
+            });
+          }
+
           // v96 — Multi-speaker: prefer plate-derived coords over anchor rescale.
           const shouldForceRepair =
             speakers.length >= 3 && !!plateDims && !!box && enoughFaces;
@@ -4600,15 +4688,41 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             break;
           }
           if (box && plateDims) {
-            const repaired: [number, number] = [
-              Math.round((Number(box.x) + Number(box.w) / 2) * plateDims.width),
-              Math.round((Number(box.y) + Number(box.h) * 0.45) * plateDims.height),
-            ];
+            // V523 — for 3+ speakers the face is whichever candidate the
+            // continuation rule PROVES is this character. No proof, no
+            // repair: the next candidate frame gets a turn, and if none
+            // resolves the pass is refused rather than relocated.
+            if (v523NeedsIdentity && !v523Repair?.ok) {
+              v523LastRefusal = { frame, reference: v523Ref, repair: v523Repair };
+              console.warn(
+                `[compose-dialog-segments] scene=${sceneId} v523_repair_identity_unresolved ` +
+                  `pass=${pass.idx} speaker=${pass.speaker_name} frame=${frame} ` +
+                  `reason=${v523Repair?.reason ?? "no_result"} detail=${v523Repair?.detail ?? "-"} ` +
+                  `ref=${v523Ref?.ok ? v523Ref.source : (v523Ref?.reason ?? "none")} ` +
+                  `candidates=${v523Repair?.candidatesConsidered ?? 0} ` +
+                  `positional_would_have=${JSON.stringify(v523Repair?.positionalWouldHavePicked ?? null)}`,
+              );
+              continue;
+            }
+            const v523Box = v523Repair?.bbox ?? null;
+            // Same 0.45 face-height mouth ratio as before; only the box it
+            // is measured on changed, from an ordinal to an identity.
+            const repaired: [number, number] = v523Box
+              ? [
+                Math.round((v523Box[0] + v523Box[2]) / 2),
+                Math.round(v523Box[1] + (v523Box[3] - v523Box[1]) * 0.45),
+              ]
+              : [
+                Math.round((Number(box.x) + Number(box.w) / 2) * plateDims.width),
+                Math.round((Number(box.y) + Number(box.h) * 0.45) * plateDims.height),
+              ];
             const original = pass.coords;
             pass.coords = clampSyncCoords(repaired);
             pass.reference_frame_number = frame;
             pass.face_repair = {
-              source: shouldForceRepair
+              source: v523Box
+                ? "v523_identity_locked_repair"
+                : shouldForceRepair
                 ? "v96_plate_frame_force_repair"
                 : "plate_frame_left_to_right",
               frame_number: frame,
@@ -4617,6 +4731,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               face_count: sortedBoxes.length,
               slot,
               strict_gate: strictTargetCheck,
+              // V523 — identity provenance, and what the retired
+              // left-to-right rule would have answered instead.
+              v523_character_id: v523Ref?.characterId ?? null,
+              v523_reference_source: v523Ref?.ok ? v523Ref.source : null,
+              v523_reference_bbox: v523Ref?.bbox ?? null,
+              v523_iou: v523Repair?.iou ?? null,
+              v523_positional_would_have: v523Repair?.positionalWouldHavePicked ?? null,
             };
             console.warn(
               `[compose-dialog-segments] scene=${sceneId} FACE-GATE REPAIR (${shouldForceRepair ? "v96-force" : "strict"}) pass=${pass.idx} speaker=${pass.speaker_name} frame=${frame} original=${JSON.stringify(original)} repaired=${JSON.stringify(pass.coords)} faces=${sortedBoxes.length}`,
@@ -4632,6 +4753,46 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         }
         if (!accepted) {
           const hadFaces = !!lastValidation?.faceVisible;
+          // V523 — when every candidate frame refused on identity, that IS
+          // the cause. Reporting `face_validation_failed` would repeat the
+          // generation-18 mistake of letting a consequence name the fault.
+          if (v523LastRefusal) {
+            console.error(
+              `[compose-dialog-segments] scene=${sceneId} v523_FACE_REPAIR_IDENTITY_UNRESOLVED ` +
+                `pass=${pass.idx} speaker=${pass.speaker_name} ` +
+                `character=${v523LastRefusal.reference?.characterId ?? "unknown"} ` +
+                `reason=${v523LastRefusal.repair?.reason ?? "no_result"} ` +
+                `ref=${v523LastRefusal.reference?.ok ? v523LastRefusal.reference.source : (v523LastRefusal.reference?.reason ?? "none")} ` +
+                `frames=${frames.join(",")} — refund + block, no provider dispatch`,
+            );
+            return {
+              ok: false,
+              pass,
+              reason:
+                `face_repair_identity_unresolved_pass_${pass.idx}_speaker_${pass.speaker_name}`,
+              strict: strictTargetCheck,
+              hadFaces: true,
+              frames,
+              lastValidationFrame: v523LastRefusal.frame,
+              identityHardFail: true,
+              identityDetail: {
+                character_id: v523LastRefusal.reference?.characterId ?? null,
+                reference_ok: v523LastRefusal.reference?.ok ?? false,
+                reference_source: v523LastRefusal.reference?.ok
+                  ? v523LastRefusal.reference.source
+                  : null,
+                reference_reason: v523LastRefusal.reference?.ok
+                  ? null
+                  : (v523LastRefusal.reference?.reason ?? null),
+                reference_bbox: v523LastRefusal.reference?.bbox ?? null,
+                repair_reason: v523LastRefusal.repair?.reason ?? null,
+                repair_detail: v523LastRefusal.repair?.detail ?? null,
+                candidates_considered: v523LastRefusal.repair?.candidatesConsidered ?? 0,
+                positional_would_have: v523LastRefusal.repair?.positionalWouldHavePicked ?? null,
+                frame: v523LastRefusal.frame,
+              },
+            };
+          }
           const reason = strictTargetCheck && hadFaces
             ? `plate_target_face_missing_pass_${pass.idx}_speaker_${pass.speaker_name}`
             : `face_validation_failed_pass_${pass.idx}_frame_${lastValidation?.frame ?? frames[0] ?? 0}`;
@@ -4666,8 +4827,21 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const plateIdentityAuthoritative =
         !!plateIdentityMap &&
         (plateIdentityMap.resolvedCount ?? 0) >= 1;
-      const firstReject = gateResults.find((r) => !r.ok) as Extract<GateOutcome, { ok: false }> | undefined;
-      if (firstReject && plateIdentityAuthoritative) {
+      // ══ V523 — AN IDENTITY REFUSAL IS NOT SOFT-PASSABLE ═══════════════
+      //
+      // v119/v283 demote a gate rejection when plate identity is
+      // authoritative, because a speaker briefly turning their head is not
+      // a reason to burn a scene. An unprovable repair is a different
+      // statement: the pipeline could not establish WHICH face belongs to
+      // this character on any candidate frame. Dispatching past that is
+      // exactly how generation 19 put Sarah's voice on someone else's
+      // geometry. It surfaces first, and it blocks.
+      const v523IdentityReject = gateResults.find(
+        (r) => !r.ok && (r as Extract<GateOutcome, { ok: false }>).identityHardFail,
+      ) as Extract<GateOutcome, { ok: false }> | undefined;
+      const firstReject = (v523IdentityReject ??
+        gateResults.find((r) => !r.ok)) as Extract<GateOutcome, { ok: false }> | undefined;
+      if (firstReject && plateIdentityAuthoritative && !v523IdentityReject) {
         const blockedNames = gateResults
           .filter((r) => !r.ok)
           .map((r) => (r as Extract<GateOutcome, { ok: false }>).pass.speaker_name);
@@ -4697,6 +4871,24 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           `[compose-dialog-segments] scene=${sceneId} FACE-GATE BLOCK (hard) pass=${firstReject.pass.idx} speaker=${firstReject.pass.speaker_name} reason=${blockReason}`,
         );
         const { pass, reason, strict, hadFaces } = firstReject;
+        // V523 — the identity refusal carries its own class and its own
+        // evidence, so an operator sees WHICH character could not be
+        // resolved instead of a generic face-validation message.
+        const v523Block = firstReject.identityHardFail === true;
+        if (v523Block) {
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId, user_id: userId, engine: "sync-segments",
+            sync_status: "PREFLIGHT_BLOCKED",
+            error_class: "face_repair_identity_unresolved",
+            error_message: reason,
+            meta: {
+              v523: firstReject.identityDetail ?? null,
+              speaker_name: pass.speaker_name,
+              speaker_idx: pass.speaker_idx,
+              pass_idx: pass.idx,
+            },
+          });
+        }
         const { data: w0 } = await supabase
           .from("wallets").select("balance").eq("user_id", userId).single();
         await supabase
@@ -4716,12 +4908,23 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           .eq("id", sceneId);
         return json(
           {
-            error: strict && hadFaces ? "plate_target_face_missing" : "face_validation_failed",
-            details: strict && hadFaces
+            error: v523Block
+              ? "face_repair_identity_unresolved"
+              : strict && hadFaces
+              ? "plate_target_face_missing"
+              : "face_validation_failed",
+            details: v523Block
+              ? `the face belonging to ${pass.speaker_name} could not be identified on any tested frame — no substitute face was used, credits have been refunded`
+              : strict && hadFaces
               ? `target face for ${pass.speaker_name} is not reliably visible on the final scene plate — re-render with all faces in frame`
               : `no face for ${pass.speaker_name} in tested frames`,
             refunded: totalCost,
-            hint: strict && hadFaces ? "re_render_scene_clip" : "switch_to_cinematic_sync_engine",
+            hint: v523Block
+              ? "re_render_scene_clip"
+              : strict && hadFaces
+              ? "re_render_scene_clip"
+              : "switch_to_cinematic_sync_engine",
+            ...(v523Block ? { v523: firstReject.identityDetail ?? null } : {}),
           },
           422,
         );
