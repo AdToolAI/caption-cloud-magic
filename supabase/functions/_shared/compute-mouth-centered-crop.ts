@@ -59,6 +59,21 @@ export interface MouthCenteredCropInput {
    * the number has one authority. `null`/omitted keeps the static model.
    */
   perFrameMinCropPx?: number | null;
+  /**
+   * V520 — the face-share cap derived from the SAME turn-track samples
+   * that produced `perFrameMinCropPx`.
+   *
+   * Generation 17, Sarah: the lower bound came from a ~247 px track
+   * sample (269 px required) and the upper from the 87x124 assignment
+   * snapshot (212 px cap). `269 > 212` compared an anchor-scale face
+   * against a track-scale one and refused a pass whose own other turn in
+   * the same generation planned a 191 px crop and was dispatched.
+   *
+   * Supplying this makes the dynamic interval single-authority: both ends
+   * are measured on the same samples. `null` keeps the historical
+   * behaviour, which is also what the static regime uses.
+   */
+  dynamicShareCapPx?: number | null;
 }
 
 export type ContainReason =
@@ -137,6 +152,10 @@ export interface MouthCenteredCropResult {
   preferredFloorYielded: boolean;
   /** Which feasibility model decided the lower bound. */
   feasibilityMode: "static" | "dynamic";
+  /** V520 — which measurement produced the face-share cap that decided. */
+  shareCapAuthority: "anchor_snapshot" | "turn_track";
+  /** V520 — the cap actually used by the feasibility verdict. */
+  effectiveShareCapPx: number | null;
   /** Union-based lower bound. Reported in BOTH modes, authoritative only in static. */
   minCropStaticPx: number;
   /** Per-sample lower bound. `null` when the caller supplied no turn geometry. */
@@ -241,6 +260,7 @@ export function computeMouthCenteredCrop(
     outputSize = 720,
     faceShareFloor = null,
     perFrameMinCropPx = null,
+    dynamicShareCapPx = null,
   } = input;
 
   if (plateWidth <= 0 || plateHeight <= 0) {
@@ -403,10 +423,27 @@ export function computeMouthCenteredCrop(
     ? Math.ceil(Math.max(faceFloor, perFrameMin))
     : null;
   const minCropRequiredPx = dynamicFeasibility ? minCropDynamicPx! : minCropStaticPx;
-  const feasible = shareCap === null ? true : minCropRequiredPx <= shareCap;
+
+  // ── V520 — ONE AUTHORITY DECIDES BOTH ENDS ─────────────────────────
+  //
+  // In the dynamic regime the lower bound is measured on the turn track.
+  // The upper bound must be measured there too, or the interval compares
+  // two different faces at two different scales and refuses a pass that
+  // is perfectly renderable. When the caller supplied no track cap the
+  // behaviour is unchanged, which is also the static regime.
+  const trackCap = Number(dynamicShareCapPx);
+  const useTrackCap = dynamicFeasibility && Number.isFinite(trackCap) && trackCap > 0;
+  const shareCapAuthority: "anchor_snapshot" | "turn_track" = useTrackCap
+    ? "turn_track"
+    : "anchor_snapshot";
+  const effectiveShareCapPx = useTrackCap ? Math.floor(trackCap) : shareCap;
+  const feasible = effectiveShareCapPx === null
+    ? true
+    : minCropRequiredPx <= effectiveShareCapPx;
   const infeasibleReason = feasible
     ? null
-    : `min_crop_${minCropRequiredPx}px_exceeds_face_share_cap_${shareCap}px`;
+    : `min_crop_${minCropRequiredPx}px_exceeds_face_share_cap_${effectiveShareCapPx}px` +
+      (useTrackCap ? ":track_authority" : "");
 
   const cropArea = size * size;
   const faceShareInCrop = Math.min(1, faceArea / cropArea);
@@ -443,6 +480,8 @@ export function computeMouthCenteredCrop(
     infeasibleReason,
     preferredFloorYielded,
     feasibilityMode,
+    shareCapAuthority,
+    effectiveShareCapPx,
     minCropStaticPx,
     minCropDynamicPx,
   };

@@ -5014,12 +5014,38 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // V459 — Fan-out-Fence. Hat der Watchdog den Run bereits terminalisiert,
       // darf ab hier KEIN Provider-Call mehr entstehen (sonst Geld für Arbeit,
       // die nie reconciled wird).
-      if (isFanoutClosed(freshClaimState)) {
+      //
+      // ══ V520 P1-A — THE SAME AUTHORITY THE LATE GATE USES ═══════════════
+      //
+      // This checkpoint asked only `isFanoutClosed`. The late gate before the
+      // provider call asks `mayDispatchProvider`, which ALSO consults
+      // `isRunTerminal` — so a run terminalized by a sibling pass, before the
+      // fan-out flag is visible, passed here and did the whole preflight.
+      // Generation 17: Sarah terminalized at 15:12:10 and Samuel still spent
+      // preflight time, only to fail on `bbox_zero_voiced_frames`.
+      //
+      // Same helper, same evidence, earliest safe point. Already-dispatched
+      // provider jobs are untouched and still reconcile; this only stops work
+      // that has not yet reached the provider.
+      const v520EarlyGate = mayDispatchProvider({
+        dialogShots: freshClaimState,
+        runId: v510RunId,
+        fanoutClosed: isFanoutClosed(freshClaimState),
+      });
+      if (!v520EarlyGate.ok) {
         console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v459_fanout_closed — dispatch aborted`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} ` +
+            `v520_early_terminal_fence reason=${v520EarlyGate.reason} — preflight aborted`,
         );
         return json(
-          { ok: true, skipped: "v459_fanout_closed", scene_id: sceneId, pass_idx: currentPassIdx },
+          {
+            ok: true,
+            skipped: v520EarlyGate.reason === "v459_fanout_closed"
+              ? "v459_fanout_closed"
+              : "v520_early_run_terminal",
+            scene_id: sceneId,
+            pass_idx: currentPassIdx,
+          },
           202,
         );
       }
