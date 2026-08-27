@@ -23,6 +23,10 @@ import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useResetLipSync } from '@/hooks/useResetLipSync';
 import type { ComposerScene } from '@/types/video-composer';
+import {
+  PREVIOUS_RESULT_LABEL,
+  resolveSceneDisplayOutput,
+} from '@/lib/composer/output/resolveSceneDisplayOutput';
 import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
 import { clipStatusFromState, isInFlightState, sceneState } from '@/lib/composer/sceneState';
@@ -65,6 +69,11 @@ export default function SceneInlinePlayer({
   // `lockReferenceUrl` are the *anchor* / front image and would otherwise
   // bleed into every not-yet-rendered scene, faking a render result.
   const posterUrl = scene.firstFrameUrl || scene.lastFrameUrl || undefined;
+  // V517-B — the previous run's durable result. Shown ONLY when this run is
+  // not working: the rule above (a running re-render must never look like
+  // nothing is happening) stays intact. It applies exactly where the card
+  // used to go black — a run paused at manual review, or failed.
+  const v517bDisplay = resolveSceneDisplayOutput(scene as any);
   const status = clipStatusFromState(sceneState(scene));
   const pipelineState = sceneState(scene);
 
@@ -246,6 +255,21 @@ export default function SceneInlinePlayer({
             preload="metadata"
             className="absolute inset-0 w-full h-full object-cover"
           />
+        ) : v517bDisplay.isLastKnownGood && !isWorking ? (
+          <>
+            <video
+              src={v517bDisplay.url!}
+              poster={posterUrl}
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              className="absolute inset-0 w-full h-full object-cover opacity-70"
+            />
+            <span className="absolute left-2 top-2 z-10 rounded-md border border-border/50 bg-background/80 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground backdrop-blur-sm">
+              {tx(PREVIOUS_RESULT_LABEL)}
+            </span>
+          </>
         ) : posterUrl && !isWorking ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

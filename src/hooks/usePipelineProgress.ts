@@ -21,6 +21,7 @@ import {
   legacyClipReadyEquivalentRow,
   legacyClipFailedEquivalentRow,
   isSceneSettled,
+  isSceneWorkQuiescent,
 } from '@/lib/composer/sceneState';
 import { tx } from '@/lib/i18nText';
 
@@ -509,6 +510,11 @@ export function usePipelineProgress({
       if (!belongsToCurrentRun(sa)) return false;
       if (isSceneTerminalFailure(sa)) return false;
       if (isCanceledLipsyncScene(sa)) return false;
+      // V517 — a scene waiting for the user is not backend activity. The
+      // authoritative substate outranks the legacy `twoshot_stage` below:
+      // generation 15 halted at `awaiting_manual_face_map` with a leftover
+      // `anchor` stage, and that stage alone kept this phase "running".
+      if (isSceneWorkQuiescent(sa)) return false;
       if (isReadyOrLipsynced(sa)) return false;
       // legacy-mapping-allowed: Lip-Sync-Substage
       // legacy-mapping-allowed: Lip-Sync-Substage
@@ -656,12 +662,15 @@ export function usePipelineProgress({
     const running = targets.some(
       (s) =>
         !isTerminalScene(s) &&
+        !isSceneWorkQuiescent(s) &&
         // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
         (s as any).lipSyncStatus === 'running' &&
         hasRealJob(s),
     ) || targets.some(
       (s) => {
         if (isTerminalScene(s)) return false;
+        // V517 — paused beats a leftover stage.
+        if (isSceneWorkQuiescent(s)) return false;
         // legacy-mapping-allowed: Lip-Sync-Substage
         const stage = (s as any).twoshotStage;
         if (!isActiveTwoshotStage(stage)) return false;
@@ -685,6 +694,7 @@ export function usePipelineProgress({
       },
     ) || targets.some((s) => {
       if (isTerminalScene(s)) return false;
+      if (isSceneWorkQuiescent(s)) return false;
       const ds = getDialogShots(s);
       return isActiveDialogShots(ds);
     });
@@ -841,8 +851,17 @@ export function usePipelineProgress({
   // Scene-driven phases ONLY. `export` is the master render and `music` is
   // assembly config — both legitimately run after every scene is complete,
   // so clearing them here would cut off work that is genuinely in flight.
+  // V517 — the rule is now QUIESCENCE, not settlement. A run paused for a
+  // manual face map is neither complete nor failed, and V515's settled-only
+  // test therefore left the optimistic flags standing: the bar walked to
+  // ~95 %, the timer ran for minutes and the Sync.so slot chip kept polling
+  // for a dispatch that will never happen until the user acts.
+  //
+  // Still scene-driven phases ONLY: `export` is the master render and
+  // `music` is assembly config, and both may legitimately run while scene
+  // generation waits.
   const sceneWorkSettled =
-    aiScenes.length > 0 && aiScenes.every((s) => isSceneSettled(s));
+    aiScenes.length > 0 && aiScenes.every((s) => isSceneWorkQuiescent(s));
   useEffect(() => {
     if (!sceneWorkSettled) return;
     setEventFlags((prev) =>
@@ -970,6 +989,8 @@ export function usePipelineProgress({
   const hasActiveLipsyncEvidence = (scenes ?? []).some((s: any) => {
     if (isSceneTerminalFailure(s)) return false;
     if (isCanceledLipsyncScene(s)) return false;
+    // V517 — waiting for the user is not evidence of a live run.
+    if (isSceneWorkQuiescent(s)) return false;
     // legacy-mapping-allowed: Lip-Sync-Substage (v425-Vertrag unverändert)
     if (s.lipSyncStatus === 'running' || s.lipSyncStatus === 'audio_muxing') return true;
     if (isLipSyncIntentional(s) && clipStatusFromState(sceneState(s)) === 'generating') return true;

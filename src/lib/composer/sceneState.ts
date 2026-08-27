@@ -230,6 +230,46 @@ export const stateProgress = (s: SceneState) => PROGRESS[s] ?? 0;
 
 export const isSceneTerminal = (row: any) => isTerminalState(sceneState(row));
 export const isSceneSettled = (row: any) => isSettledState(sceneState(row));
+
+/**
+ * V517 — SUBSTATES, DIE AUF EINE BENUTZEREINGABE WARTEN.
+ *
+ * Weder `complete` noch `failed`: die Szene ist absichtlich angehalten und
+ * wartet auf eine Entscheidung des Nutzers. Im Backend laeuft dabei nichts —
+ * `awaiting_manual_face_map` haelt VOR dem Provider-Dispatch, und
+ * `awaiting_confirmation` haelt laut compose-video-clips ausdruecklich
+ * "before any Hailuo/Sync.so" work.
+ *
+ * BEWUSST NICHT enthalten: `circuit_open`, `deferred` und
+ * `needs_clip_rerender`. Die ersten beiden warten auf den Server, nicht auf
+ * den Nutzer — dort laeuft die Pipeline weiter. Der dritte ist bereits ein
+ * terminaler Fehlerzustand und wird von `TERMINAL_TWOSHOT_STAGES` erfasst.
+ */
+const AWAITING_USER_INPUT: ReadonlySet<string> = new Set<string>([
+  'awaiting_manual_face_map',
+  'awaiting_confirmation',
+]);
+
+export const isAwaitingUserInputSubstate = (s: SceneSubstate): boolean =>
+  typeof s === 'string' && AWAITING_USER_INPUT.has(s);
+
+/**
+ * V517 — RUHT DIE ARBEIT AN DIESER SZENE?
+ *
+ * `isSceneSettled` beantwortet "ist der Lauf vorbei". Das ist fuer die Frage
+ * "darf die Oberflaeche noch Fortschritt zeigen" zu eng: eine Szene, die auf
+ * eine manuelle Gesichtszuordnung wartet, ist weder fertig noch gescheitert
+ * — aber es laeuft nichts, was Fortschritt machen koennte.
+ *
+ * Produktion 67b392b1 Generation 15: `pipeline_state = idle`,
+ * `pipeline_substate = awaiting_manual_face_map`, dazu ein zurueckgebliebenes
+ * `twoshot_stage = anchor`. Die Legacy-Ableitung las das `anchor` als
+ * Aktivitaet und liess Balken, Timer und Slot-Polling ~95 % lang weiterlaufen.
+ *
+ * Dritte Projektion derselben Zustandsmaschine, keine vierte Maschine.
+ */
+export const isSceneWorkQuiescent = (row: any): boolean =>
+  isSceneSettled(row) || isAwaitingUserInputSubstate(sceneSubstate(row));
 export const isSceneInFlight = (row: any) => isInFlightState(sceneState(row));
 export const sceneProgressPercent = (row: any) => stateProgress(sceneState(row));
 
