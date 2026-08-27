@@ -36,6 +36,11 @@ import { computeFaceCrop, FaceCropRegion } from "./face-crop.ts";
 import { appendWebhookToken } from "./webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
 import { computeMouthCenteredCrop, projectCropToContain, normalizeContainBox, type ContainReason } from "./compute-mouth-centered-crop.ts";
+import {
+  buildTrackFeasibilityTelemetry,
+  evaluateTrackFeasibility,
+  sanitizeTurnTrackSamples,
+} from "./v520-track-feasibility.ts";
 import { buildDispatchFaceBox } from "./plate-face-dispatch-box.ts";
 // V452 — dynamic crop geometry (identity static, geometry dynamic).
 import {
@@ -488,7 +493,59 @@ export async function renderPassFacePreclip(
   // unaffected: `bbox` remains the assignment-locked reference everywhere
   // else, including the geometry identity persisted for V461/V456.
   const v461TurnUnion = unionOfTurnBoxes(input.turnFaceBoxes);
-  const v461PerFrameMin = perFrameMinCropPx(input.turnFaceBoxes);
+  // ══ V520 — SINGLE-AUTHORITY FEASIBILITY ═════════════════════════════════
+  //
+  // The dynamic lower bound is measured on the turn track. Until V520 the
+  // upper bound was measured on the assignment snapshot, so the interval
+  // compared two faces at two scales. Generation 17, Sarah: 269 px required
+  // against a 212 px cap, while her other turn in the same generation planned
+  // 191 px and was dispatched.
+  //
+  // Both ends now come from the same accepted samples, and a sample only
+  // qualifies if it is a usable measurement of THIS locked face.
+  const v520Track = sanitizeTurnTrackSamples({
+    samples: (Array.isArray(input.turnFaceSamples) && input.turnFaceSamples.length > 0
+      ? input.turnFaceSamples
+      : input.turnFaceBoxes) as any,
+    anchorBox: (cropFromBbox as [number, number, number, number] | null) ?? null,
+    faceShareFloor: V461_FACE_SHARE_FLOOR,
+    padRatio: CONTAINMENT_PAD_RATIO,
+  });
+  const v520Feasibility = evaluateTrackFeasibility({
+    accepted: v520Track.accepted,
+    faceShareFloor: V461_FACE_SHARE_FLOOR,
+    padRatio: CONTAINMENT_PAD_RATIO,
+  });
+  const v520ClaimedTrack = Array.isArray(input.turnFaceBoxes)
+    ? input.turnFaceBoxes.some((b) => Array.isArray(b) && b.length === 4)
+    : false;
+  // A track that claimed samples and lost every one of them to sanitization
+  // is contamination, not a static pass. Fail closed rather than quietly
+  // reverting to the mixed-authority arithmetic this fix exists to remove.
+  if (v520ClaimedTrack && v520Track.accepted.length === 0) {
+    console.error(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v520_track_all_rejected ` +
+        JSON.stringify(buildTrackFeasibilityTelemetry(v520Track, v520Feasibility)),
+    );
+    return {
+      ok: false,
+      error: "preclip_crop_contract_unsatisfiable:no_coherent_track_samples",
+      errorClass: "invalid_input",
+      cropFeasibility: {
+        feasibility_mode: "dynamic",
+        refused_at: "track_sanitization",
+        reason: "no_coherent_track_samples",
+        v520: buildTrackFeasibilityTelemetry(v520Track, v520Feasibility),
+      },
+    };
+  }
+  // Accepted samples only — the same set that produces the cap below.
+  const v461PerFrameMin = v520Track.accepted.length > 0
+    ? perFrameMinCropPx(v520Track.accepted.map((a) => a.box))
+    : perFrameMinCropPx(input.turnFaceBoxes);
+  const v520ShareCapPx = v520Track.accepted.length > 0
+    ? v520Feasibility.maxCropByFaceSharePx
+    : null;
   // V461 E — evidence hoisted so the planner-confirmation refusal below can
   // report the same numbers the plan-time screen used.
   let v461FaceShareCapPx: number | null = null;
@@ -535,6 +592,8 @@ export async function renderPassFacePreclip(
       // V461 E — with a measured turn the lower bound is PER SAMPLE, not
       // the time-union: a moving crop never holds the whole turn at once.
       perFrameMinCropPx: v461PerFrameMin,
+      // V520 — the cap from the SAME accepted samples.
+      dynamicShareCapPx: v520ShareCapPx,
     });
 
     // ── V461 D — plan-time contract check (defense in depth) ────────────
