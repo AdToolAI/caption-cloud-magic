@@ -173,6 +173,9 @@ serve(async (req) => {
         }
 
         const reset = await hardResetScene({
+          // V517-B — a new take, not a deletion: the previous durable
+          // output becomes the last-known-good display fallback.
+          mode: "rerender",
           supabase: admin as any,
           sceneId: scene.id,
           userId,

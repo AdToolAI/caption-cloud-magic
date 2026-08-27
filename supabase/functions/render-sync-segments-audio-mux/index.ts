@@ -38,6 +38,11 @@ import { isReusableAudioMuxLedgerCandidate } from "../_shared/v504-audio-mux-pro
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { bindLedgerExternalJob, readRetryContext, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
 import { rs3FenceVerdict } from "../_shared/v431-rs3-fence.ts";
+import {
+  buildDurableOutputTelemetry,
+  DurableOutputError,
+  materializeDurableSceneOutput,
+} from "../_shared/durable-scene-output.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -194,13 +199,50 @@ serve(async (req) => {
         return json({ error: "completed_mux_ledger_provenance_missing" }, 409);
       }
 
+      // ══ V518 — same durable contract as the Remotion callback ════════
+      // The adopted render carries an external `video_url`. It becomes the
+      // scene authority only after it is an object we own, at a
+      // generation-scoped key. Same shared helper, no bespoke rehost.
+      let v518FinalUrl: string;
+      try {
+        const durable = await materializeDurableSceneOutput({
+          supabaseAdmin: supabase,
+          projectId: String((scene as any).project_id ?? ""),
+          sceneId,
+          generation: Number((scene as any).plate_generation),
+          sourceUrl: finalUrl,
+          outputKind: "final",
+        });
+        v518FinalUrl = durable.url;
+        console.log(
+          `[render-sync-segments-audio-mux] v518_durable_output scene=${sceneId} ` +
+            JSON.stringify(buildDurableOutputTelemetry(durable, null, {
+              generation: Number((scene as any).plate_generation),
+              outputKind: "final",
+              sourceUrl: finalUrl,
+            })),
+        );
+      } catch (durableErr) {
+        const e = durableErr instanceof DurableOutputError
+          ? durableErr
+          : new DurableOutputError("upload_failed", (durableErr as Error)?.message ?? String(durableErr));
+        console.error(
+          `[render-sync-segments-audio-mux] v518_durable_output_failed scene=${sceneId} ` +
+            JSON.stringify(buildDurableOutputTelemetry(null, e, {
+              generation: Number((scene as any).plate_generation),
+              outputKind: "final",
+              sourceUrl: finalUrl,
+            })),
+        );
+        return json({ error: "durable_output_unavailable", failure_class: e.failureClass }, 503);
+      }
       const { data: finalizeResult, error: finalizeError } = await supabase.rpc(
         "composer_finalize_lipsync_scene",
         {
           _pipeline_job_id: muxJob.id,
           _external_job_id: adoptCompletedRenderId,
           _scene_id: sceneId,
-          _final_url: finalUrl,
+          _final_url: v518FinalUrl,
           _write_id: "stitch:done",
         },
       );

@@ -4,6 +4,11 @@ import { verifyWebhookRequest } from "../_shared/webhook-auth.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
+import {
+  buildDurableOutputTelemetry,
+  DurableOutputError,
+  materializeDurableSceneOutput,
+} from "../_shared/durable-scene-output.ts";
 import { observeCallbackProvenance } from "../_shared/v431-ledger.ts";
 import { rs3FenceVerdict } from "../_shared/v431-rs3-fence.ts";
 
@@ -318,13 +323,66 @@ serve(async (req) => {
             externalJobId: (pendingRenderId ?? renderId) ? String(pendingRenderId ?? renderId) : null,
           });
         } else {
+          // ══ V518 — the final output must be OURS before it is the
+          // scene's authority ═══════════════════════════════════════
+          //
+          // `finalOutputUrl` is Remotion's own AWS S3 URL (or a mux /
+          // Sync.so URL). It was written verbatim into
+          // `processed_video_url` and `clip_url`: we displayed it, built
+          // continuity on it and called the scene complete, while its
+          // lifetime belonged to someone else's retention policy.
+          //
+          // The RPC keeps its atomic run/generation fencing untouched;
+          // only the URL it receives changes. On failure the RPC is NOT
+          // called — an output we cannot store is not a finalization.
+          const { data: v518Scene } = await supabaseAdmin
+            .from('composer_scenes')
+            .select('project_id, plate_generation')
+            .eq('id', composerSceneId)
+            .maybeSingle();
+          let durableFinalUrl: string;
+          try {
+            const durable = await materializeDurableSceneOutput({
+              supabaseAdmin,
+              projectId: String((v518Scene as any)?.project_id ?? ''),
+              sceneId: composerSceneId,
+              generation: Number((v518Scene as any)?.plate_generation),
+              sourceUrl: String(finalOutputUrl ?? ''),
+              outputKind: 'final',
+            });
+            durableFinalUrl = durable.url;
+            console.log(
+              `💋 [dialog-stitch] v518_durable_output scene=${composerSceneId} ` +
+                JSON.stringify(buildDurableOutputTelemetry(durable, null, {
+                  generation: Number((v518Scene as any)?.plate_generation),
+                  outputKind: 'final',
+                  sourceUrl: String(finalOutputUrl ?? ''),
+                })),
+            );
+          } catch (durableErr) {
+            const e = durableErr instanceof DurableOutputError
+              ? durableErr
+              : new DurableOutputError('upload_failed', (durableErr as Error)?.message ?? String(durableErr));
+            console.error(
+              `💋 [dialog-stitch] v518_durable_output_failed scene=${composerSceneId} ` +
+                JSON.stringify(buildDurableOutputTelemetry(null, e, {
+                  generation: Number((v518Scene as any)?.plate_generation),
+                  outputKind: 'final',
+                  sourceUrl: String(finalOutputUrl ?? ''),
+                })),
+            );
+            return new Response(
+              JSON.stringify({ ok: false, applied: false, reason: 'durable_output_unavailable', failure_class: e.failureClass }),
+              { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+            );
+          }
           const { data: finalizeResult, error: finalizeError } = await supabaseAdmin.rpc(
             'composer_finalize_lipsync_scene',
             {
               _pipeline_job_id: pipelineJobId,
               _external_job_id: String(pendingRenderId ?? renderId),
               _scene_id: composerSceneId,
-              _final_url: finalOutputUrl,
+              _final_url: durableFinalUrl,
               _write_id: 'stitch:done',
             },
           );

@@ -18,6 +18,11 @@ import { tl, withLang } from "../_shared/i18n.ts";
 import { resumeContinuityChain, sweepContinuityQueue } from "../_shared/continuity-chain.ts";
 import { guardCallback } from "../_shared/v427-callback-guard.ts";
 import { bindLedgerExternalJob, classifyDispatchFailure, observeCallbackProvenance, readPipelineJobId, replaceLedgerAttempt, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
+import {
+  buildDurableOutputTelemetry,
+  DurableOutputError,
+  materializeDurableSceneOutput,
+} from "../_shared/durable-scene-output.ts";
 import { continuityRenderedPatch } from "../_shared/continuity-run-snapshot.ts";
 import { legacyClipReadyEquivalentRow, legacyClipFailedEquivalentRow } from "../_shared/scene-state.ts";
 
@@ -201,26 +206,55 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const videoUrl = Array.isArray(output) ? output[0] : output;
       console.log(`[compose-clip-webhook] Clip ready: ${videoUrl}`);
 
-      // Download and store permanently
-      let permanentUrl = videoUrl;
+      // ══ V518 — DURABLE PLATE BEFORE THE SCENE MAY BECOME READY ══════
+      //
+      // The previous version was fail-OPEN: any fetch or upload error
+      // left `permanentUrl` as the raw provider URL, and the scene still
+      // went to `plate_ready` / `clip_status = ready` on it. We displayed
+      // a URL we do not own and built continuity on it.
+      //
+      // It also wrote a FIXED key (`composer/{project}/{scene}.mp4`,
+      // upsert) — so a later generation overwrote the previous one's
+      // bytes in place. The destination is generation-scoped now.
+      //
+      // Failure is fail-CLOSED and retryable: no RPC call, no state
+      // change, 503 so the sender redelivers. The scene stays in
+      // `plate_rendering` where the existing watchdog can see it. This
+      // is deliberately NOT the Replicate auto-retry path below — the
+      // provider succeeded; re-dispatching it would burn credits for a
+      // storage problem.
+      let permanentUrl: string;
       try {
-        const videoResponse = await fetch(videoUrl);
-        if (videoResponse.ok) {
-          const videoBuffer = await videoResponse.arrayBuffer();
-          const fileName = `composer/${projectId}/${sceneId}.mp4`;
-
-          const { error: uploadError } = await supabase.storage
-            .from('ai-videos')
-            .upload(fileName, videoBuffer, { contentType: 'video/mp4', upsert: true });
-
-          if (!uploadError) {
-            const { data: urlData } = supabase.storage.from('ai-videos').getPublicUrl(fileName);
-            permanentUrl = urlData.publicUrl;
-            console.log(`[compose-clip-webhook] Stored at: ${permanentUrl}`);
-          }
-        }
-      } catch (storageErr) {
-        console.error('[compose-clip-webhook] Storage failed, using temporary URL:', storageErr);
+        const durable = await materializeDurableSceneOutput({
+          supabaseAdmin: supabase,
+          projectId,
+          sceneId,
+          generation,
+          sourceUrl: videoUrl,
+          outputKind: "base",
+        });
+        permanentUrl = durable.url;
+        console.log(
+          `[compose-clip-webhook] v518_durable_output scene=${sceneId} ` +
+            JSON.stringify(buildDurableOutputTelemetry(durable, null, { generation, outputKind: "base", sourceUrl: videoUrl })),
+        );
+      } catch (durableErr) {
+        const e = durableErr instanceof DurableOutputError
+          ? durableErr
+          : new DurableOutputError("upload_failed", (durableErr as Error)?.message ?? String(durableErr));
+        console.error(
+          `[compose-clip-webhook] v518_durable_output_failed scene=${sceneId} ` +
+            JSON.stringify(buildDurableOutputTelemetry(null, e, { generation, outputKind: "base", sourceUrl: videoUrl })),
+        );
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            applied: false,
+            reason: "durable_output_unavailable",
+            failure_class: e.failureClass,
+          }),
+          { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
       }
 
       // Update scene — also clear any stale clip_error from a previous failed
