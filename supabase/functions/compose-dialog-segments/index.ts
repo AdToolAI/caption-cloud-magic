@@ -124,6 +124,10 @@ import { verifyFaceBeforeDispatch } from "../_shared/syncso-face-gate.ts";
 // V461 A — v400 Face-Gate (hard, pre-dispatch). V461 B/C — semantic input
 // fingerprint + honest dispatch telemetry.
 import { evaluateV461FaceGate } from "../_shared/v461-face-gate.ts";
+import {
+  buildV516MouthAuthorityTelemetry,
+  chooseCoherentMouthAuthority,
+} from "../_shared/v516-mouth-coherence.ts";
 // V469 — pre-dispatch mouth-visibility / pose-suitability gate (NOT a yaw cut).
 import { evaluateV469MouthVisibility } from "../_shared/v469-mouth-visibility-gate.ts";
 import {
@@ -6088,16 +6092,49 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const v477Authority = resolveTrackMouthAuthority(
         v477PreTrack?.ok ? (v477PreTrack.samples as any[]) : null,
       );
+      // ══ V516 — AUTHORITY COHERENCE BEFORE PAIRING ═══════════════════════
+      //
+      // `landmark: v477Authority.mouth ?? v456DetectedMouth` paired a
+      // TURN-AGGREGATE mouth with a SNAPSHOT bbox and never asked whether the
+      // two describe the same face. Generation 14 pass 5: the box ended at
+      // x=637, the tracked median mouth sat at x=641, and the resolver passes
+      // a supplied landmark through verbatim. The planner then sized the crop
+      // from the box (165 px) and positioned it on the mouth — 15 px from the
+      // plate edge — so the crop clamped to its only admissible x and the
+      // mouth band overhung by 10.85 px. Size-independent: no crop could have
+      // held it.
+      //
+      // V477 keeps its authority whenever it is coherent. This rejects the
+      // PAIRING, not the aggregate — and never the pass: an incoherent
+      // landmark degrades to the same-snapshot landmark, then to the existing
+      // pose estimate, both measured against this very box.
+      const v516Mouth = chooseCoherentMouthAuthority({
+        bbox: platePassBoxForPreclip ?? null,
+        trackMouth: v477Authority.mouth ?? null,
+        snapshotMouth: v456DetectedMouth ?? null,
+      });
+      (pass as any)._v516_mouth_authority = buildV516MouthAuthorityTelemetry(v516Mouth);
+      if (v516Mouth.rejectedReason) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v516_mouth_incoherent ` +
+            `reason=${v516Mouth.rejectedReason} requested=${v516Mouth.requestedSource} ` +
+            `selected=${v516Mouth.selectedSource} track=${JSON.stringify(v516Mouth.trackMouth)} ` +
+            `bbox=${JSON.stringify(v516Mouth.bbox)}`,
+        );
+      }
       const v456MouthResolved = resolveMouthAnchorPoseAware({
         bbox: platePassBoxForPreclip ?? null,
         // V477 — measured track landmark first, plate-identity landmark second,
-        // validated 0.78 face-ratio fallback last.
-        landmark: v477Authority.mouth ?? v456DetectedMouth,
+        // validated 0.78 face-ratio fallback last. V516 decides which of the
+        // two may be paired with THIS bbox; the resolver itself is unchanged.
+        landmark: v516Mouth.landmark,
         yawDeg: Number((pass as any).plate_yaw_deg ?? 0) || 0,
       });
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v477_mouth_authority ` +
-          `source=${v456MouthResolved?.source ?? "none"} track_ok=${v477PreTrack?.ok ?? false} ` +
+          `source=${v456MouthResolved?.source ?? "none"} ` +
+          `v516=${v516Mouth.selectedSource}${v516Mouth.rejectedReason ? `:${v516Mouth.rejectedReason}` : ""} ` +
+          `track_ok=${v477PreTrack?.ok ?? false} ` +
           `measured=${v477Authority.measured}/${v477Authority.total} face_ratio=${v477Authority.faceRatio ?? "n/a"} ` +
           `reason=${v477Authority.reason}`,
       );
