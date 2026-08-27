@@ -20,6 +20,7 @@ import {
   clipStatusFromState,
   legacyClipReadyEquivalentRow,
   legacyClipFailedEquivalentRow,
+  isSceneSettled,
 } from '@/lib/composer/sceneState';
 import { tx } from '@/lib/i18nText';
 
@@ -486,7 +487,18 @@ export function usePipelineProgress({
     const generating = aiScenes.filter(
       (s) => belongsToCurrentRun(s) && clipStatusFromState(sceneState(s)) === 'generating' && !isReadyOrLipsynced(s) && !isSceneTerminalFailure(s),
     ).length;
-    const failed = aiScenes.filter((s) => belongsToCurrentRun(s) && legacyClipFailedEquivalentRow(s)).length;
+    // V515 — the exclusion above and the settlement below MUST use one
+    // predicate. They did not: `backendActive` excluded a scene via
+    // `isSceneTerminalFailure`, while `failed` counted it via
+    // `legacyClipFailedEquivalentRow` — and that one returns FALSE for a
+    // failed scene which still owns an older output URL (a plate from the
+    // clip phase that succeeded before lip-sync died). Generation 14 was
+    // exactly that shape, so it was neither ready nor failed nor active:
+    // the phase could never settle, `clipsReal.done|failed` stayed false,
+    // and the optimistic `clips` event flag was never cleared. The bar ran
+    // for 109 minutes on a run that had been dead since minute one.
+    const isSettledFailure = (s: any) => belongsToCurrentRun(s) && isSceneTerminalFailure(s);
+    const failed = aiScenes.filter(isSettledFailure).length;
     // Stage 7: a scene with an active backend handle (Replicate prediction,
     // dialog-shot pipeline, lipsync stage) also counts as "running" — even
     // when clipStatus momentarily reverts to 'pending' between the optimistic
@@ -525,7 +537,7 @@ export function usePipelineProgress({
     const running = generating > 0 || backendActive > 0;
     // Terminal as soon as every AI scene is ready or failed.
     const allTerminal = aiScenes.every(
-      (s) => isReadyOrLipsynced(s) || (belongsToCurrentRun(s) && legacyClipFailedEquivalentRow(s)),
+      (s) => isReadyOrLipsynced(s) || isSettledFailure(s),
     );
     const terminal = !running && (allTerminal || progress >= 1);
     return {
@@ -677,7 +689,23 @@ export function usePipelineProgress({
       return isActiveDialogShots(ds);
     });
 
-    const failed = targets.some((s) => {
+    // V515 — the target filter above drops terminally-failed scenes so they
+    // can never read as "lip-sync running" (v182). The failure verdict must
+    // therefore be taken BEFORE that filter, or a run whose only lip-sync
+    // scene failed leaves `targets` empty — and an empty set satisfies
+    // `settled >= targets.length`, which forced progress to 1 and reported
+    // the phase as DONE. The phase that died was being called finished.
+    // Intent comes from the canonical helper only — no direct legacy read
+    // (v430 5E). A legacy row that carries a twoshot stage without an intent
+    // flag is still caught: `clipsReal` counts it as a settled failure and
+    // the settled-scope effect clears the optimistic flags either way.
+    const scopeFailed = scenes.some(
+      (s) =>
+        isLipSyncIntentional(s as any) &&
+        !isCanceledLipsyncScene(s) &&
+        isSceneTerminalFailure(s),
+    );
+    const failed = scopeFailed || targets.some((s) => {
       const ds = getDialogShots(s);
       if (ds?.status === 'failed') return true;
       // Ignore scenes mid auto-retry (clip_error starts with "auto-retry:" and
@@ -801,6 +829,26 @@ export function usePipelineProgress({
       return next;
     });
   }, [clipsReal.done, clipsReal.failed, voiceoverReal.done, lipsyncReal.done, lipsyncReal.failed, musicReal.done, exportReal.done]);
+
+  // ══ V515 — AUTHORITATIVE TERMINAL PRECEDENCE ═════════════════════════
+  //
+  // The clears above are all phrased as "this phase reported itself
+  // finished". That is derived state, and the two defects fixed above both
+  // came from it being derivable to the wrong answer. The server state is
+  // not derived: if every scene in scope is settled, no scene-driven phase
+  // can still be running, whatever the phase arithmetic concluded.
+  //
+  // Scene-driven phases ONLY. `export` is the master render and `music` is
+  // assembly config — both legitimately run after every scene is complete,
+  // so clearing them here would cut off work that is genuinely in flight.
+  const sceneWorkSettled =
+    aiScenes.length > 0 && aiScenes.every((s) => isSceneSettled(s));
+  useEffect(() => {
+    if (!sceneWorkSettled) return;
+    setEventFlags((prev) =>
+      prev.clips || prev.lipsync ? { ...prev, clips: false, lipsync: false } : prev,
+    );
+  }, [sceneWorkSettled]);
 
   const phases: PipelinePhaseState[] = useMemo(() => {
     const list: { id: PipelinePhaseId; real: { progress: number; running: boolean; done: boolean; applicable?: boolean; failed?: boolean } }[] = [
