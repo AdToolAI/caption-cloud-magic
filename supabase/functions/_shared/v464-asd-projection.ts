@@ -29,6 +29,7 @@
  */
 
 import { sampleCameraPath } from "./dynamic-camera-path.ts";
+import { findSiblingCenterInBox } from "./preclip-crop-containment.ts";
 
 export type Box = [number, number, number, number];
 
@@ -135,6 +136,25 @@ export function projectPlateBoxToPreclip(box: Box, crop: PreclipCropRect): Box {
   ];
 }
 
+/**
+ * V522 — plate → preclip for a point that may legitimately lie OUTSIDE the
+ * frame.
+ *
+ * `projectPlatePointToPreclip` clamps, which is right for the mouth (it is
+ * inside the crop by construction) and wrong for a sibling speaker's centre:
+ * clamping would slide a speaker standing well outside the crop onto the
+ * frame border, where any box touching that border would "contain" them and
+ * E.3 would fail a pass that never showed a second face. The static gate
+ * does not clamp either — this keeps the two projections the same rule.
+ */
+export function projectPlatePointToPreclipUnclamped(
+  p: [number, number],
+  crop: PreclipCropRect,
+): [number, number] {
+  const s = crop.outputSize / Math.max(1e-6, crop.size);
+  return [Math.round((p[0] - crop.x) * s), Math.round((p[1] - crop.y) * s)];
+}
+
 export function projectPlatePointToPreclip(
   p: [number, number],
   crop: PreclipCropRect,
@@ -173,8 +193,21 @@ export interface BuildAsdBoxesInput {
   preclipStartSec: number;
   /** Anchor face box in PLATE space (the legacy single source). */
   anchorPlateBox: Box;
-  /** Anchor box already projected + grown by the containment gate. */
-  anchorDispatchBox: Box;
+  /**
+   * Anchor box already projected + grown by the containment gate.
+   *
+   * V522 — OPTIONAL. In the dynamic regime no single transformed box is
+   * valid for the whole pass (that is what makes the regime dynamic), so
+   * Contract E produces none. Absent means: no historical framing policy
+   * to reapply — zero margins, and no constant box to fall back to.
+   */
+  anchorDispatchBox?: Box | null;
+  /**
+   * V522 — centres of the OTHER assignment-locked speakers, PLATE pixels.
+   * Projected with the crop of each frame so Contract E.3 can be asked
+   * about the region actually dispatched at that instant.
+   */
+  otherSpeakerPlateCenters?: Array<[number, number]> | null;
   /** Voiced windows in PRECLIP time base. */
   voicedWindowsSec: Array<[number, number]>;
   padFrames?: number;
@@ -187,6 +220,13 @@ export interface BuildAsdBoxesResult {
   frameBoxes: Box[];
   /** Projected mouth per frame (measured or face-estimated). */
   frameMouths: Array<[number, number]>;
+  /**
+   * V522 — the other speakers' centres in the clip space of EACH frame.
+   * Same index, same instant, same crop as `frameBoxes[i]`.
+   */
+  frameOtherCenters: Array<Array<[number, number]>>;
+  /** V522 — false when the caller had no static dispatch box to anchor on. */
+  anchorDispatchProvided: boolean;
   registration: "per_frame" | "anchor_constant";
   cropSource: "camera_path" | "static";
   trackSource: "face_track" | "anchor";
@@ -249,7 +289,19 @@ export function buildPerFrameAsdBoxes(input: BuildAsdBoxesInput): BuildAsdBoxesR
   // the current tracked face to be smaller than itself, which cannot be
   // useful padding. Without a track the anchor pair IS the whole framing
   // authority and its raw margins stay exactly as before.
-  const rawAnchorMargins = marginsOf(anchorFaceProjected, input.anchorDispatchBox);
+  //
+  // V522 — with no anchor dispatch box there is no historical framing to
+  // preserve, so the margins are explicitly zero and Track(t) is the whole
+  // authority. That is not a new policy: V510-P1 already anchors both
+  // halves of the pair on the SAME object, which makes every raw margin 0
+  // whenever a track exists. This just stops requiring a box in order to
+  // compute the zero.
+  const anchorDispatch: Box | null = Array.isArray(input.anchorDispatchBox)
+    ? input.anchorDispatchBox
+    : null;
+  const rawAnchorMargins: [number, number, number, number] = anchorDispatch
+    ? marginsOf(anchorFaceProjected, anchorDispatch)
+    : [0, 0, 0, 0];
   const marginPolicy: "legacy_anchor" | "track_expansion_only" = hasTrack
     ? "track_expansion_only"
     : "legacy_anchor";
@@ -265,6 +317,11 @@ export function buildPerFrameAsdBoxes(input: BuildAsdBoxesInput): BuildAsdBoxesR
 
   const frameBoxes: Box[] = [];
   const frameMouths: Array<[number, number]> = [];
+  const frameOtherCenters: Array<Array<[number, number]>> = [];
+  const otherPlateCenters = (input.otherSpeakerPlateCenters ?? []).filter((c) =>
+    Array.isArray(c) && c.length === 2 &&
+    Number.isFinite(Number(c[0])) && Number.isFinite(Number(c[1]))
+  );
   let trackMin: [number, number] = [Infinity, Infinity];
   let trackMax: [number, number] = [-Infinity, -Infinity];
 
@@ -290,12 +347,25 @@ export function buildPerFrameAsdBoxes(input: BuildAsdBoxesInput): BuildAsdBoxesR
       Math.round(clamp(face[3] + margins[3] * h, 0, o)),
     ];
     // Degenerate guard — never emit an empty box.
+    //
+    // V522 — the static anchor box is a legitimate substitute only while it
+    // describes something the renderer showed for the whole pass. In the
+    // dynamic regime it describes a union nobody rendered, so there is
+    // nothing safe to substitute: the degenerate box is emitted as-is and
+    // `validateAsdRegistration` rejects the sequence on `boundsValid`.
+    // Fail closed, never a different face.
     if (grown[2] - grown[0] < 2 || grown[3] - grown[1] < 2) {
-      frameBoxes.push(input.anchorDispatchBox.slice() as Box);
+      frameBoxes.push(anchorDispatch ? anchorDispatch.slice() as Box : grown);
     } else {
       frameBoxes.push(grown);
     }
     frameMouths.push(projectPlatePointToPreclip(plateMouth, crop));
+    // Same instant, same crop, same projection as the box above.
+    frameOtherCenters.push(
+      otherPlateCenters.map((c) =>
+        projectPlatePointToPreclipUnclamped([Number(c[0]), Number(c[1])], crop)
+      ),
+    );
   }
 
   const trackTravelPx = Number.isFinite(trackMin[0])
@@ -328,6 +398,8 @@ export function buildPerFrameAsdBoxes(input: BuildAsdBoxesInput): BuildAsdBoxesR
     boxes,
     frameBoxes,
     frameMouths,
+    frameOtherCenters,
+    anchorDispatchProvided: !!anchorDispatch,
     registration: hasTrack || hasPath ? "per_frame" : "anchor_constant",
     cropSource: hasPath ? "camera_path" : "static",
     trackSource: hasTrack ? "face_track" : "anchor",
@@ -406,5 +478,68 @@ export function validateAsdRegistration(params: {
     boundsValid,
     lengthValid,
     constantBoxOnMovingTrack,
+  };
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * V522 — CONTRACT E.3, PER FRAME
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * The static gate asks the identity question once, about one box. When the
+ * camera moves, the pass dispatches a different box in every frame, and the
+ * union of them is not what any frame showed. Asking about the union is the
+ * same referent split as asking about a box nobody rendered — it can accuse a
+ * pass of a violation no frame committed, and it can miss one a single frame
+ * does commit.
+ *
+ * So the question is asked of every box that is actually sent: the non-null
+ * entries of `boxes`, against the sibling centres projected through THAT
+ * frame's crop. The membership rule itself is imported, not reimplemented.
+ *
+ * No tolerance, no padding, no exemption. One violating frame fails the pass.
+ */
+export interface PerFrameSiblingVerdict {
+  ok: boolean;
+  /** Dispatched (non-null) frames actually examined. */
+  checkedFrames: number;
+  /** Sibling centres carried per frame. Zero means E.3 is vacuous here. */
+  centersPerFrame: number;
+  failedFrame: number | null;
+  failedCenter: [number, number] | null;
+  failedBox: Box | null;
+}
+
+export function evaluatePerFrameSiblingExclusion(
+  built: BuildAsdBoxesResult,
+): PerFrameSiblingVerdict {
+  const centersPerFrame = built.frameOtherCenters?.[0]?.length ?? 0;
+  let checkedFrames = 0;
+  for (let i = 0; i < built.boxes.length; i++) {
+    const b = built.boxes[i];
+    // A null entry is a silent frame: nothing is dispatched, so there is no
+    // region to claim an identity for.
+    if (!b) continue;
+    checkedFrames++;
+    const centers = built.frameOtherCenters?.[i] ?? [];
+    const hit = findSiblingCenterInBox(b, centers);
+    if (hit) {
+      return {
+        ok: false,
+        checkedFrames,
+        centersPerFrame,
+        failedFrame: i,
+        failedCenter: hit,
+        failedBox: b.slice() as Box,
+      };
+    }
+  }
+  return {
+    ok: true,
+    checkedFrames,
+    centersPerFrame,
+    failedFrame: null,
+    failedCenter: null,
+    failedBox: null,
   };
 }
