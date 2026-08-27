@@ -3753,6 +3753,83 @@ serve(async (req) => {
                                 // Pointer coherence: everything downstream that
                                 // reads `composedUrl` now reads the winner too.
                                 composedUrl = repairedUrl;
+
+                                // ══ V514-P1 — ONE ANCHOR EPOCH ══════════════
+                                //
+                                // `composedUrl` was not the only pointer. The
+                                // scene reference was pinned to the PRE-recovery
+                                // anchor further up (`scene.referenceImageUrl =
+                                // composedUrl`, and the row write beside it), and
+                                // that variable — not `composedUrl` — is what the
+                                // provider planner reads:
+                                //
+                                //   scene.referenceImageUrl
+                                //     → planSceneVisualInputs({ anchorImageUrl })
+                                //     → visualPlan.firstFrameUrl
+                                //     → planImageUrl
+                                //     → hhInput.image / first_frame_image / …
+                                //
+                                // Without these two writes an accepted repair
+                                // rewrote the identity structures and then
+                                // dispatched the base video from the very anchor
+                                // that had just failed strict verification. The
+                                // repair would have been paid for and discarded
+                                // at the only place it mattered.
+                                scene.referenceImageUrl = repairedUrl;
+
+                                // The row pointer, re-aimed at the winner and
+                                // fenced on the run this dispatch belongs to. A
+                                // scene that was reset or regenerated while the
+                                // recovery was in flight belongs to a newer epoch
+                                // and must not inherit this run's anchor. Both
+                                // conditions sit in the WHERE clause of the single
+                                // UPDATE, so this is not check-then-act.
+                                //
+                                // `lock_reference_url` is deliberately NOT written
+                                // here. compose-scene-anchor owns that pointer and
+                                // has already written the repaired URL as part of
+                                // this very request (portraits >= 2 and
+                                // speakerFocusIdx < 0 both hold for the recovery
+                                // call), and V400 makes `reference_image_url` the
+                                // geometry authority with the lock only a fallback
+                                // that compose-dialog-segments already warns about
+                                // on divergence. A second, unfenced writer here
+                                // would buy symmetry and nothing else.
+                                const v514p1Stamp = sceneRunStamps.get(scene.id);
+                                if (!v514p1Stamp) {
+                                  // No provenance means no safe write: an
+                                  // unfenced pointer update is exactly the stale
+                                  // overwrite this fence exists to prevent. The
+                                  // in-memory pointer above still keeps THIS
+                                  // dispatch coherent.
+                                  console.warn(
+                                    `[compose-video-clips] v514p1_pointer_unstamped scene=${scene.id} — repaired anchor not persisted`,
+                                  );
+                                } else {
+                                  try {
+                                    const { data: v514p1Rows, error: v514p1Err } = await supabaseAdmin
+                                      .from("composer_scenes")
+                                      .update({
+                                        reference_image_url: repairedUrl,
+                                        updated_at: new Date().toISOString(),
+                                      })
+                                      .eq("id", scene.id)
+                                      .eq("active_run_id", v514p1Stamp.runId)
+                                      .eq("plate_generation", v514p1Stamp.generation)
+                                      .select("id");
+                                    const v514p1Applied = !v514p1Err && (v514p1Rows?.length ?? 0) > 0;
+                                    console.log(
+                                      `[compose-video-clips] v514p1_pointer scene=${scene.id} ` +
+                                        `run=${v514p1Stamp.runId} gen=${v514p1Stamp.generation} ` +
+                                        `applied=${v514p1Applied ? 1 : 0}` +
+                                        (v514p1Applied ? "" : " reason=stale_run_or_generation"),
+                                    );
+                                  } catch (e) {
+                                    console.warn(
+                                      `[compose-video-clips] v514p1_pointer_failed: ${(e as Error)?.message ?? String(e)}`,
+                                    );
+                                  }
+                                }
                               }
                             }
                           } catch (e) {

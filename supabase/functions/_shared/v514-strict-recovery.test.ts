@@ -271,3 +271,145 @@ Deno.test("CONTRACT — the identity source contract is unchanged", () => {
   assert(V508.includes('str(row?.portrait_url) ?? identityReferenceUrl'));
   assertEquals(V508.split("identityReferenceUrl = str(row?.portrait_url)").length - 1, 0);
 });
+
+// ═══ V514-P1 — WINNING ANCHOR POINTER COHERENCE ══════════════════════════
+//
+// V514 gave the repaired anchor authority over every persisted identity
+// structure, and over `composedUrl`. It missed the one pointer the provider
+// actually reads. `scene.referenceImageUrl` is pinned to the pre-recovery
+// anchor ~130 lines earlier and never re-aimed, so an ACCEPTED repair changed
+// the identity structures, changed the row pointer's sibling — and then still
+// dispatched the base video from the anchor that had failed verification.
+//
+// These are CONTRACT tests: the accept branch sits inside a ~3000-line request
+// handler behind `Deno.serve`, so no unit test can import it. What is provable
+// from the source is the wiring, and the wiring is where the defect lived.
+
+/** Body of the innermost `{…}` block opened by `open`, by brace depth. */
+function blockAfter(src: string, open: string): string {
+  const at = src.indexOf(open);
+  assert(at >= 0, `anchor not found: ${open}`);
+  let i = src.indexOf("{", at + open.length - 1);
+  assert(i >= 0, `no block after: ${open}`);
+  const start = i;
+  let depth = 0;
+  for (; i < src.length; i++) {
+    if (src[i] === "{") depth++;
+    else if (src[i] === "}") {
+      depth--;
+      if (depth === 0) return src.slice(start + 1, i);
+    }
+  }
+  throw new Error(`unbalanced block after: ${open}`);
+}
+
+/** Line comments removed — an assertion about code must not match prose. */
+function codeOnly(src: string): string {
+  return src.split(/\r?\n/).map((l) => (l.trim().startsWith("//") ? "" : l)).join("\n");
+}
+
+const ACCEPT_BRANCH = codeOnly(blockAfter(CLIPS, "if (v514Acceptance.accept) {"));
+
+Deno.test("CONTRACT — P1/1. an accepted recovery re-aims the in-memory scene reference", () => {
+  // The assignment must be INSIDE the accept branch, not merely present in the
+  // file — brace depth, not `indexOf`. A line that sits after the branch would
+  // apply the repaired anchor to a rejected repair as well.
+  assert(
+    ACCEPT_BRANCH.includes("scene.referenceImageUrl = repairedUrl;"),
+    "the winning anchor must claim scene.referenceImageUrl inside the accept branch",
+  );
+  assert(ACCEPT_BRANCH.includes("composedUrl = repairedUrl;"));
+  // And it must be the repaired URL, never a re-read of the stale variable.
+  assertEquals(ACCEPT_BRANCH.split("scene.referenceImageUrl =").length - 1, 1);
+});
+
+Deno.test("CONTRACT — P1/2. an accepted recovery persists the winning reference_image_url", () => {
+  assert(ACCEPT_BRANCH.includes("reference_image_url: repairedUrl,"));
+  assert(ACCEPT_BRANCH.includes('.from("composer_scenes")'));
+  // The pre-recovery write pinned the OLD anchor and it happens earlier in the
+  // file; this one must be its own statement, not a moved copy of it.
+  assert(CLIPS.includes("reference_image_url: composedUrl,"), "the initial pin stays");
+});
+
+Deno.test("CONTRACT — P1/3. lock_reference_url stays with its owner", () => {
+  // compose-scene-anchor owns the continuity lock and writes it for exactly the
+  // shape the recovery call has: multi-portrait, no speaker focus. The recovery
+  // request therefore already leaves the lock on the repaired anchor.
+  assert(ANCHOR.includes("if (portraits.length >= 2 && speakerFocusIdx < 0) {"));
+  assert(ANCHOR.includes("lock_reference_url: composedUrl,"));
+  // P1 must NOT add a second writer for symmetry — that would be an unfenced
+  // owner for a pointer that is already correct.
+  assertEquals(ACCEPT_BRANCH.split("lock_reference_url").length - 1, 0);
+  // …and the divergence that a REJECTED recovery leaves behind (lock on the
+  // rejected anchor, reference on the accepted one) is already resolved by the
+  // V400 contract: the plate anchor wins and the divergence is logged.
+  const DIALOG = Deno.readTextFileSync(
+    new URL("../compose-dialog-segments/index.ts", import.meta.url),
+  );
+  assert(DIALOG.includes("const anchorUrl = refAnchorUrl || lockAnchorUrl;"));
+  assert(DIALOG.includes("v400_anchor_divergence"));
+});
+
+Deno.test("CONTRACT — P1/4-5. the repaired anchor reaches the provider input", () => {
+  // scene.referenceImageUrl → planSceneVisualInputs → firstFrameUrl →
+  // planImageUrl → the provider's image field. Every link, from source.
+  assert(CLIPS.includes("anchorImageUrl: scene.referenceImageUrl ?? null,"));
+  assert(CLIPS.includes("const planImageUrl = visualPlan.firstFrameUrl;"));
+  assert(CLIPS.includes("hhInput.image = planImageUrl;"));
+  const VI = Deno.readTextFileSync(new URL("./visual-inputs.ts", import.meta.url));
+  assert(/firstFrameUrl\s*=\s*requirements\.lipSync/.test(VI));
+  assert(VI.includes("anchorImageUrl: ctx.anchorImageUrl ?? undefined,"));
+  // The planner call must come AFTER the recovery decision, or the in-memory
+  // re-aim above would arrive too late to matter.
+  assert(
+    CLIPS.indexOf("if (v514Acceptance.accept) {") <
+      CLIPS.indexOf("const visualPlan = planSceneVisualInputs("),
+    "the recovery must be decided before the provider inputs are planned",
+  );
+  // Every provider start-image reads planImageUrl — no branch keeps its own
+  // copy of the pre-recovery anchor.
+  for (
+    const field of [
+      "hailuoInput.first_frame_image = planImageUrl;",
+      "klingInput.start_image = planImageUrl;",
+      "wanInput.image = planImageUrl;",
+      "seedInput.image = planImageUrl;",
+      "lumaInput.start_image = planImageUrl;",
+      "veoInput.image = planImageUrl;",
+    ]
+  ) {
+    assert(CLIPS.includes(field), `provider input not fed from planImageUrl: ${field}`);
+  }
+});
+
+Deno.test("CONTRACT — P1/6. a rejected recovery keeps the initial anchor", () => {
+  // Nothing outside the accept branch may assign the repaired URL to a pointer.
+  // `repairedUrl` may only be READ (re-verified, logged) elsewhere.
+  const assignments = [...CLIPS.matchAll(/=\s*repairedUrl\b/g)].length;
+  const insideAccept = [...ACCEPT_BRANCH.matchAll(/=\s*repairedUrl\b/g)].length;
+  assertEquals(
+    assignments - insideAccept,
+    0,
+    "a repaired-but-rejected anchor must never be assigned to any pointer",
+  );
+  // The reject path still ends at manual review, unchanged.
+  assert(CLIPS.includes("const v508StrictBlock = !v508Verify.ok;"));
+  assert(CLIPS.includes('clip_status: "awaiting_manual_face_map"'));
+});
+
+Deno.test("CONTRACT — P1/7. the pointer write is fenced on the run epoch", () => {
+  // Both fences in the WHERE clause of the single UPDATE — check-then-act on a
+  // fresh SELECT would still lose to a reset committed inside the window.
+  assert(ACCEPT_BRANCH.includes('.eq("id", scene.id)'));
+  assert(ACCEPT_BRANCH.includes('.eq("active_run_id", v514p1Stamp.runId)'));
+  assert(ACCEPT_BRANCH.includes('.eq("plate_generation", v514p1Stamp.generation)'));
+  // Provenance comes from the dispatch snapshot, never from a re-read.
+  assert(ACCEPT_BRANCH.includes("sceneRunStamps.get(scene.id)"));
+  // No stamp means no write: an unfenced pointer update is the exact stale
+  // overwrite the fence exists to prevent.
+  assert(ACCEPT_BRANCH.includes("v514p1_pointer_unstamped"));
+  const guard = blockAfter(ACCEPT_BRANCH, "if (!v514p1Stamp) {");
+  assertEquals(guard.split("composer_scenes").length - 1, 0, "the unstamped path must not write");
+  // The result is observable — a fenced-out write is reported, not silent.
+  assert(ACCEPT_BRANCH.includes("reason=stale_run_or_generation"));
+});
