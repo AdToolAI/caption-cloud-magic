@@ -25,6 +25,11 @@
 import { failLipSync } from "./lipsync-fail.ts";
 import { supersedeOpenPlateAttempts } from "./plate-attempt.ts";
 import { materializeCompatibilityOutput } from "./materialize-scene-output.ts";
+import {
+  decideLkgPromotion,
+  durableScenePrefix,
+  selectDeletableGenerationFolders,
+} from "./lkg-output.ts";
 import { resetOwnedAnchorPatch } from "./generated-anchor.ts";
 
 type SupabaseLike = {
@@ -40,6 +45,21 @@ type SupabaseLike = {
   };
 };
 
+/**
+ * V517-B — what the caller actually means.
+ *
+ * Ordinary generation and explicit deletion have shared one primitive
+ * since the beginning, which is why starting a rerender destroyed the
+ * previous result. An enum rather than a boolean: `preserveOutput: false`
+ * at a call site does not read as "the user pressed delete".
+ *
+ *   rerender    — a new take. The previous durable output survives and
+ *                 becomes the last-known-good display fallback.
+ *   destructive — the user asked for it to be gone. Every durable
+ *                 generation is removed and the pointer is cleared.
+ */
+export type SceneResetMode = "rerender" | "destructive";
+
 export interface HardResetArgs {
   supabase: SupabaseLike;
   sceneId: string;
@@ -47,6 +67,11 @@ export interface HardResetArgs {
   projectId: string;
   /** Sync.so API key so still-billing generations are actually cancelled. */
   syncApiKey?: string | null;
+  /**
+   * V517-B — REQUIRED, no default. Every caller states its intent, and a
+   * new caller cannot inherit the wrong one by omission.
+   */
+  mode: SceneResetMode;
   /** Reason string for the audit log. */
   reason?: string;
   /**
@@ -427,7 +452,7 @@ function collectSyncJobIds(scene: Record<string, any> | null): string[] {
  * in a clean state and the new generation number has been written.
  */
 export async function hardResetScene(args: HardResetArgs): Promise<HardResetResult> {
-  const { supabase, sceneId, userId, projectId } = args;
+  const { supabase, sceneId, userId, projectId, mode } = args;
   const errors: string[] = [];
   const nowIso = new Date().toISOString();
 
@@ -437,7 +462,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     const { data } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, plate_generation, plate_ready_generation, clip_url, clip_status, dialog_shots, audio_plan, scene_assets, replicate_prediction_id, lip_sync_applied_at, reference_image_url, lock_reference_url",
+        "id, project_id, plate_generation, plate_ready_generation, clip_url, clip_status, dialog_shots, audio_plan, scene_assets, replicate_prediction_id, lip_sync_applied_at, reference_image_url, lock_reference_url, base_video_url, processed_video_url, last_good_output_url, last_good_output_generation",
       )
       .eq("id", sceneId)
       .maybeSingle();
@@ -608,8 +633,39 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     // `dialog_takes` (default '{}') und `scene_assets` (default '[]') sind
     // NOT NULL; ein `null` hier ließ den kompletten Reset — und damit jeden
     // Regenerate einer Dialogszene — an einer Constraint scheitern.
+    // ══ V517-B — LAST-KNOWN-GOOD PROMOTION ═══════════════════════════
+    //
+    // Same statement as the clear, so there is no window in which the
+    // current output is gone and the pointer does not yet exist. No
+    // storage copy: after V518 the previous output already lives at an
+    // immutable `gen-N` key the new generation cannot address.
+    //
+    // The generation is parsed from that key rather than read from a
+    // column, because `composer_start_scene_run` has already bumped
+    // `plate_generation` and nulled `plate_ready_generation` by the time
+    // this runs — neither can name the output being cleared.
+    const lkg = mode === "rerender"
+      ? decideLkgPromotion({
+        processedVideoUrl: (scene as any)?.processed_video_url,
+        baseVideoUrl: (scene as any)?.base_video_url,
+        clipUrl: (scene as any)?.clip_url,
+        existingLkgUrl: (scene as any)?.last_good_output_url,
+      })
+      : null;
+    const lkgPatch = mode === "destructive"
+      // Explicit deletion: nothing may come back through the fallback.
+      ? { last_good_output_url: null, last_good_output_generation: null }
+      // `null` patch means KEEP what is there — a paused or failed run
+      // produced nothing, and the older fallback must survive it.
+      : (lkg?.patch ?? {});
+    console.log(
+      `[v517b_lkg] scene=${sceneId} mode=${mode} reason=${lkg?.reason ?? "destructive"} ` +
+        `generation=${lkg?.generation ?? "-"}`,
+    );
+
     const patch = coerceNotNullResetColumns({
       ...anchorPatch,
+      ...lkgPatch,
       // v385 — der Hard-Reset setzt den Zustand direkt (Purge, keine
       // Transition): `pipeline_state` ist die Wahrheit, `clip_status` wird im
       // selben Statement mitgeschrieben, weil die Spalte NOT NULL ist.
@@ -646,6 +702,50 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     if (error) errors.push(`update:${(error as any).message ?? "unknown"}`);
   } catch (e) {
     errors.push(`update:${(e as Error).message}`.slice(0, 120));
+  }
+
+  // ══ V517-B — DURABLE GENERATION CLEANUP ════════════════════════════════
+  //
+  // `purgeArtifacts` above lists ONE prefix level and removes exact object
+  // paths, so it cannot reach `…/{sceneId}/gen-N/final.mp4`. On a rerender
+  // that is exactly right and is what makes the pointer above worth having.
+  // On an explicit deletion it is a data-retention hole: the user asked for
+  // the media to be gone and the bytes stayed.
+  //
+  // Bounded and exact: one prefix, one level of generation folders, one
+  // listing each. Never a substring match — a sibling scene whose id merely
+  // contains this one's would be reachable by `includes()`, and deleting
+  // another scene's video is not cleanup.
+  if (mode === "destructive") {
+    try {
+      const prefix = durableScenePrefix(projectId, sceneId);
+      const { data: gens } = await supabase.storage
+        .from("ai-videos")
+        .list(prefix, { limit: 1000 });
+      const folders = selectDeletableGenerationFolders(
+        (gens ?? []).map((g: any) => g?.name ?? null),
+        [],
+      );
+      const paths: string[] = [];
+      for (const folder of folders) {
+        const { data: objects } = await supabase.storage
+          .from("ai-videos")
+          .list(`${prefix}/${folder}`, { limit: 1000 });
+        for (const o of objects ?? []) {
+          const name = (o as any)?.name ?? "";
+          if (name) paths.push(`${prefix}/${folder}/${name}`);
+        }
+      }
+      for (let i = 0; i < paths.length; i += 100) {
+        const { error: rmErr } = await supabase.storage.from("ai-videos").remove(paths.slice(i, i + 100));
+        if (rmErr) errors.push(`remove:durable:${(rmErr as any)?.message ?? "unknown"}`.slice(0, 120));
+      }
+      console.log(
+        `[v517b_durable_purge] scene=${sceneId} generations=${folders.length} objects=${paths.length}`,
+      );
+    } catch (e) {
+      errors.push(`durable_purge:${(e as Error).message}`.slice(0, 120));
+    }
   }
 
   // ── v430 Step 4: the output is really gone → dependents are stale ───────
