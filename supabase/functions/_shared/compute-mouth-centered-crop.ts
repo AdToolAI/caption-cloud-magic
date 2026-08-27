@@ -89,8 +89,25 @@ export interface MouthCenteredCropResult {
   /** V458 — coordinate-space tag of `mouthOffsetXy` (always `plate`). */
   mouthOffsetSpace: typeof V458_MOUTH_OFFSET_SPACE;
   clamped: boolean;
-  /** V457 — null when no containBox was supplied. */
+  /**
+   * V457 — does the FINAL APPLIED crop contain the contain box?
+   *
+   * V519: this used to be copied from `projectCropToContain`, which
+   * answers about the crop the projection WOULD have produced. In dynamic
+   * mode a projection that requires growth is deliberately discarded, and
+   * the flag then described a crop that was never rendered. Generation 16,
+   * Matthew: target 127x186, applied crop 128x128, `containsTarget = true`.
+   *
+   * It is now computed on the final geometry, always. `null` only when no
+   * containBox was supplied.
+   */
   containsTarget: boolean | null;
+  /** V519 — the projection was actually applied to the returned crop. */
+  projectionApplied: boolean;
+  /** V519 — the projection was computed and then deliberately discarded. */
+  projectionDiscarded: boolean;
+  /** V519 — the projection could only succeed by growing the crop. */
+  projectionRequiredGrowth: boolean;
   containReason: ContainReason;
   shiftPx: { x: number; y: number };
   sizeGrown: boolean;
@@ -329,11 +346,14 @@ export function computeMouthCenteredCrop(
   let shiftPx = { x: 0, y: 0 };
   let sizeGrown = false;
   let sizeGrownPx = 0;
+  let projectionApplied = false;
+  let projectionDiscarded = false;
+  let projectionRequiredGrowth = false;
   const containBox = normalizeContainBox(input.containBox);
   if (containBox) {
     const p = projectCropToContain({ x, y, size }, containBox, plateWidth, plateHeight);
-    containsTarget = p.containsTarget;
     containReason = p.reason;
+    projectionRequiredGrowth = p.sizeGrown;
     if (!dynamicFeasibility) {
       // STATIC — unchanged: the projection owns position AND size.
       shiftPx = p.shiftPx;
@@ -342,6 +362,7 @@ export function computeMouthCenteredCrop(
       x = p.crop.x;
       y = p.crop.y;
       size = p.crop.size;
+      projectionApplied = true;
     } else if (!p.sizeGrown) {
       // DYNAMIC, and the union happens to FIT at the chosen size: take
       // the shift. Repositioning is free and strictly helps — it is what
@@ -349,11 +370,21 @@ export function computeMouthCenteredCrop(
       shiftPx = p.shiftPx;
       x = p.crop.x;
       y = p.crop.y;
+      projectionApplied = true;
+    } else {
+      projectionDiscarded = true;
     }
     // DYNAMIC and the union would have to GROW the crop: discard the
     // projection entirely. Growing to the time-union is exactly the false
     // constraint this mode exists to remove; the camera path re-windows
     // per frame and the planner confirmation decides.
+
+    // V519 — the verdict describes the crop that is RETURNED, never the
+    // one that was discarded. Downstream (Contract E, V464, telemetry)
+    // reads this as a statement about the rendered geometry, and for a
+    // discarded projection the two answers differ.
+    containsTarget = x <= containBox[0] && y <= containBox[1] &&
+      x + size >= containBox[2] && y + size >= containBox[3];
   }
 
   const clamped = x !== rawX || y !== rawY;
@@ -399,6 +430,9 @@ export function computeMouthCenteredCrop(
     mouthOffsetSpace: V458_MOUTH_OFFSET_SPACE,
     clamped,
     containsTarget,
+    projectionApplied,
+    projectionDiscarded,
+    projectionRequiredGrowth,
     containReason,
     shiftPx,
     sizeGrown,

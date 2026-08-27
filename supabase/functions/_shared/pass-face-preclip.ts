@@ -193,6 +193,10 @@ export interface PassPreclipResult {
   containSource?: "turn_track" | "anchor" | null;
   /** V457 — containment verdict on the final integer crop geometry. */
   containsTarget?: boolean | null;
+  /** V519 — was the V457 projection actually applied to the returned crop? */
+  projectionApplied?: boolean;
+  projectionDiscarded?: boolean;
+  projectionRequiredGrowth?: boolean;
   containReason?: string;
   cropShiftPx?: { x: number; y: number };
   cropSizeGrown?: boolean;
@@ -497,6 +501,11 @@ export async function renderPassFacePreclip(
       | null,
   );
   let v457ContainsTarget: boolean | null = null;
+  // V519 — provenance of the containment verdict, so Contract E knows
+  // whether the projection it describes was actually applied.
+  let v519ProjectionApplied = false;
+  let v519ProjectionDiscarded = false;
+  let v519ProjectionRequiredGrowth = false;
   let v457ContainReason: ContainReason = "no_contain_box";
   let v457ShiftPx = { x: 0, y: 0 };
   let v457SizeGrown = false;
@@ -582,6 +591,9 @@ export async function renderPassFacePreclip(
     }
     clampedAnchor = r.clamped;
     v457ContainsTarget = r.containsTarget;
+    v519ProjectionApplied = r.projectionApplied;
+    v519ProjectionDiscarded = r.projectionDiscarded;
+    v519ProjectionRequiredGrowth = r.projectionRequiredGrowth;
     v457ContainReason = r.containReason;
     v457ShiftPx = r.shiftPx;
     v457SizeGrown = r.sizeGrown;
@@ -830,6 +842,9 @@ export async function renderPassFacePreclip(
         containBox: v457ContainBox,
         containSource: v461ContainSource,
         containsTarget: v457ContainsTarget,
+        projectionApplied: v519ProjectionApplied,
+        projectionDiscarded: v519ProjectionDiscarded,
+        projectionRequiredGrowth: v519ProjectionRequiredGrowth,
         containReason: v457ContainReason,
         cropShiftPx: v457ShiftPx,
         cropSizeGrown: v457SizeGrown,
@@ -1119,6 +1134,9 @@ export async function renderPassFacePreclip(
         containBox: v457ContainBox,
         containSource: v461ContainSource,
         containsTarget: v457ContainsTarget,
+        projectionApplied: v519ProjectionApplied,
+        projectionDiscarded: v519ProjectionDiscarded,
+        projectionRequiredGrowth: v519ProjectionRequiredGrowth,
         containReason: v457ContainReason,
         cropShiftPx: v457ShiftPx,
         cropSizeGrown: v457SizeGrown,
