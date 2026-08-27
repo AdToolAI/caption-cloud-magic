@@ -135,6 +135,8 @@ serve(async (req) => {
     }
 
     const result = await hardResetScene({
+      // V517-B — the self-test asserts the full teardown.
+      mode: "destructive",
       supabase: admin as any,
       sceneId,
       userId: callerId,

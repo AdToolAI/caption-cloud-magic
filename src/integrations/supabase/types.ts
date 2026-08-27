@@ -6895,6 +6895,8 @@ export type Database = {
           id: string
           last_drift_check_at: string | null
           last_frame_url: string | null
+          last_good_output_generation: number | null
+          last_good_output_url: string | null
           lip_sync_applied_at: string | null
           lip_sync_source_clip_url: string | null
           lip_sync_status: string | null
@@ -7028,6 +7030,8 @@ export type Database = {
           id?: string
           last_drift_check_at?: string | null
           last_frame_url?: string | null
+          last_good_output_generation?: number | null
+          last_good_output_url?: string | null
           lip_sync_applied_at?: string | null
           lip_sync_source_clip_url?: string | null
           lip_sync_status?: string | null
@@ -7161,6 +7165,8 @@ export type Database = {
           id?: string
           last_drift_check_at?: string | null
           last_frame_url?: string | null
+          last_good_output_generation?: number | null
+          last_good_output_url?: string | null
           lip_sync_applied_at?: string | null
           lip_sync_source_clip_url?: string | null
           lip_sync_status?: string | null

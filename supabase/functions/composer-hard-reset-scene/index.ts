@@ -73,6 +73,8 @@ serve(async (req) => {
     if (!proj || (proj as any).user_id !== userId) return json({ error: "forbidden" }, 403);
 
     const result = await hardResetScene({
+      // V517-B — the user explicitly asked for this scene to be cleared.
+      mode: "destructive",
       supabase: admin as any,
       sceneId,
       userId,
