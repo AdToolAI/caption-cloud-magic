@@ -25,11 +25,29 @@ export type CropContainmentFailure =
   | "transform_degenerate"
   | "other_speaker_center_in_target";
 
+/**
+ * V522 — WHICH GEOMETRY A SUCCESS IS CARRYING.
+ *
+ * `static_clip_box`     one transformed box, valid for the whole pass.
+ * `dynamic_per_frame`   no single box is valid, because the crop moves. The
+ *                       provider authority is V464's per-frame sequence, and
+ *                       a success carrying this value REQUIRES that sequence
+ *                       to be built and validated before dispatch.
+ *
+ * Absent means `static_clip_box` — every pre-V522 result is a static one.
+ */
+export type ContainmentGeometryAuthority = "static_clip_box" | "dynamic_per_frame";
+
 export interface CropContainmentResult {
   ok: boolean;
   reason?: CropContainmentFailure;
   /** Target bbox in crop-output pixel space (only when ok). */
   clipBox?: Box;
+  /**
+   * V522 — which geometry this result's `ok` is a statement about. A result
+   * without a `clipBox` is only valid while this says `dynamic_per_frame`.
+   */
+  geometryAuthority?: ContainmentGeometryAuthority;
   /** Diagnostics: crop-space centers of the other assigned speakers. */
   otherCentersClip?: Array<[number, number]>;
   detail?: string;
@@ -72,6 +90,66 @@ export function evaluatePreclipCropContainment(params: {
     };
   }
 
+  // E.4 + E.3 + the clip-space box. ONE implementation, shared with the
+  // dynamic regime (V521) so identity can never be checked twice, or once.
+  return finalizePreclipContainment({ crop, targetBbox: [tx1, ty1, tx2, ty2], otherSpeakerCenters });
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * V521 — THE POST-CONTAINMENT FINALIZER
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Scene 67b392b1, generation 18, pass 0 (Sarah). The dynamic camera path
+ * proved same-time containment over 6/6 samples, the pre-clip rendered, the
+ * face track was 6/6 valid — and the pass still terminalized with
+ * `bbox_zero_voiced_frames` over 82 frames.
+ *
+ * The cause was mine, in V519. The static evaluator returns EARLY at E.1,
+ * and an early return carries no `clipBox` — that field is computed only on
+ * the successful path. V519 then merged a dynamic success as
+ *
+ *     { ...failedStaticResult, ok: true }
+ *
+ * which produced `ok: true` with `clipBox: undefined`. The `!` at
+ * `dispatchBox = containment.clipBox!` is a compile-time assertion, not a
+ * runtime value: the dispatch box became `undefined`, the canonical
+ * per-frame boxes came out empty, and V152 reported zero voiced frames for a
+ * speaker who was visible the whole time.
+ *
+ * Worse than the missing box: because E.1 returned early, E.4 (transform
+ * validity) and E.3 (sibling exclusion) NEVER RAN, and the override then
+ * declared success. A dynamic pass could skip the identity check.
+ *
+ * So the post-E.1 half of Contract E lives here, and both regimes call it:
+ *
+ *   STATIC   E.1 containment  → this finalizer
+ *   DYNAMIC  same-time proof  → this finalizer
+ *
+ * A dynamic success now constructs its own COMPLETE result rather than
+ * inheriting fields from a failure. `ok === true` structurally implies a
+ * valid `clipBox`, because there is exactly one place that can produce it.
+ */
+export function finalizePreclipContainment(params: {
+  crop: PreclipCrop;
+  /** The authoritative target bbox in PLATE pixels. */
+  targetBbox: Box;
+  /** Centers of the OTHER finally assigned speakers, PLATE pixels. */
+  otherSpeakerCenters: Array<[number, number]>;
+}): CropContainmentResult {
+  const { crop, targetBbox, otherSpeakerCenters } = params;
+  if (
+    !crop ||
+    !Number.isFinite(crop.x) || !Number.isFinite(crop.y) ||
+    !Number.isFinite(crop.size) || !Number.isFinite(crop.outputSize) ||
+    crop.size <= 0 || crop.outputSize <= 0
+  ) {
+    return { ok: false, reason: "invalid_crop" };
+  }
+  if (!isFiniteBox(targetBbox)) return { ok: false, reason: "invalid_target_bbox" };
+  const [tx1, ty1, tx2, ty2] = targetBbox.map(Number) as Box;
+  if (tx2 <= tx1 || ty2 <= ty1) return { ok: false, reason: "invalid_target_bbox" };
+
   // E.4 — deterministic plate → crop-output transform.
   const scale = crop.outputSize / crop.size;
   const bx1 = Math.round((tx1 - crop.x) * scale);
@@ -87,7 +165,12 @@ export function evaluatePreclipCropContainment(params: {
     };
   }
 
-  // E.3 — no other assigned speaker center inside exactly this transformed box.
+  // E.3 — no other assigned speaker center inside exactly this transformed
+  // box. Identity, not geometry: it applies in BOTH regimes.
+  //
+  // V522 — the membership test itself now lives in `siblingCenterInBox`,
+  // so the dynamic regime can apply the SAME rule to a per-frame box
+  // without a second implementation of what "inside" means.
   const otherCentersClip: Array<[number, number]> = [];
   for (const c of otherSpeakerCenters ?? []) {
     if (!Array.isArray(c) || c.length !== 2) continue;
@@ -95,7 +178,7 @@ export function evaluatePreclipCropContainment(params: {
     const ox = Math.round((Number(c[0]) - crop.x) * scale);
     const oy = Math.round((Number(c[1]) - crop.y) * scale);
     otherCentersClip.push([ox, oy]);
-    if (ox >= bx1 && ox <= bx2 && oy >= by1 && oy <= by2) {
+    if (siblingCenterInBox([ox, oy], [bx1, by1, bx2, by2])) {
       return {
         ok: false,
         reason: "other_speaker_center_in_target",
@@ -106,6 +189,43 @@ export function evaluatePreclipCropContainment(params: {
   }
 
   return { ok: true, clipBox: [bx1, by1, bx2, by2], otherCentersClip };
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * V522 — CONTRACT E.3, THE ONE MEMBERSHIP RULE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Boundary-inclusive, no tolerance, identical in both regimes. It exists as
+ * its own function for a single reason: the dynamic regime dispatches a
+ * DIFFERENT box in every frame, and each of those boxes owes the same
+ * identity proof as the static one. Two copies of "inside" would be two
+ * chances to disagree — the exact shape of every referent split this
+ * pipeline has produced.
+ *
+ * Both arguments must already be in the SAME clip space. Projecting them
+ * there is the caller's job, because only the caller knows which crop was
+ * rendered at that instant.
+ */
+export function siblingCenterInBox(center: [number, number], box: Box): boolean {
+  return center[0] >= box[0] && center[0] <= box[2] &&
+    center[1] >= box[1] && center[1] <= box[3];
+}
+
+/**
+ * V522 — the first sibling centre that violates E.3 for `box`, or null.
+ * Centres must already be projected into the same clip space as `box`.
+ */
+export function findSiblingCenterInBox(
+  box: Box,
+  centersClip: Array<[number, number]>,
+): [number, number] | null {
+  for (const c of centersClip ?? []) {
+    if (!Array.isArray(c) || c.length !== 2) continue;
+    if (!Number.isFinite(c[0]) || !Number.isFinite(c[1])) continue;
+    if (siblingCenterInBox(c, box)) return [c[0], c[1]];
+  }
+  return null;
 }
 
 /**

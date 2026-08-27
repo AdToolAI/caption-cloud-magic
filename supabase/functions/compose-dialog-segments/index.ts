@@ -94,7 +94,9 @@ import { buildAnchorLayoutFromV274, routePlateFacesToAnchor, type AnchorFaceLayo
 import {
   evaluateDynamicPreclipContainment,
   evaluatePreclipCropContainment,
+  finalizePreclipContainment,
   isDynamicContainmentRegime,
+  type CropContainmentResult,
 } from "../_shared/preclip-crop-containment.ts";
 import { cameraPathContainsAll } from "../_shared/pass-face-preclip.ts";
 import {
@@ -159,6 +161,7 @@ import {
 import { trackAssignedFaceAcrossTurn } from "../_shared/plate-face-track.ts";
 import {
   buildPerFrameAsdBoxes,
+  evaluatePerFrameSiblingExclusion,
   validateAsdRegistration,
   type PlateTrackSample as V464TrackSample,
 } from "../_shared/v464-asd-projection.ts";
@@ -6973,6 +6976,20 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
       // Box in the dispatched video's pixel space.
       let dispatchBox: [number, number, number, number] | null = box;
+      // ── V522 — WHO OWNS THE PROVIDER GEOMETRY FOR THIS PASS ───────
+      //
+      // `dynamicAuthority`  the dynamic proof decided containment. The
+      //                     per-frame boxes are what gets dispatched, so
+      //                     they owe E.3 per frame.
+      // `perFrameOnly`      additionally there is no static clip box at
+      //                     all, because the union is unrenderable in a
+      //                     moving crop. The V464 sequence is then the
+      //                     ONLY geometry, and its absence is fatal.
+      let v522DynamicAuthority = false;
+      let v522PerFrameOnly = false;
+      // Assignment-locked sibling centres in PLATE space, hoisted so the
+      // per-frame gate tests exactly the identity map the static gate did.
+      let v522OtherPlateCenters: Array<[number, number]> = [];
       // V510-P1 — the plate-space half of the V464 anchor pair. Defaults to
       // the static box and is replaced only when Contract E judged a
       // track-derived target, so the non-preclip and no-track paths keep
@@ -6994,6 +7011,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             ]);
           }
         }
+        // V522 — the SAME identity map, handed to the per-frame gate below.
+        v522OtherPlateCenters = otherCenters;
         // ── V510-P1 — ONE GEOMETRY AUTHORITY ────────────────────────────
         //
         // The planner has proved containment against ITS target since
@@ -7079,19 +7098,85 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         // only the E.1 union-vs-static-crop question is answered by the
         // path instead. So a static failure for any OTHER reason still
         // fails the pass.
+        // ══ V521 — A DYNAMIC SUCCESS BUILDS ITS OWN COMPLETE RESULT ═══
+        //
+        // V519 merged a dynamic success as `{ ...v519Static, ok: true }`.
+        // The static evaluator returns EARLY at E.1, and an early return
+        // carries no `clipBox` — so that spread produced `ok: true` with
+        // `clipBox: undefined`, and `containment.clipBox!` below is a
+        // compile-time assertion, not a runtime value.
+        //
+        // Generation 18, Sarah pass 0: dynamic proof ok over 6/6 samples,
+        // pre-clip rendered, track 6/6 valid — and the pass died on
+        // `bbox_zero_voiced_frames` across 82 frames because the dispatch
+        // box had silently become undefined.
+        //
+        // Worse: E.1's early return also skipped E.4 (transform validity)
+        // and E.3 (sibling exclusion), and the override then declared
+        // success — a dynamic pass could bypass the identity check.
+        //
+        // Now the dynamic path runs the SAME finalizer the static success
+        // path runs. One E.3, one transform, one producer of `clipBox`.
+        // ══ V522 — THE UNION IS NOT THE DISPATCHED GEOMETRY ══════════
+        //
+        // V521 made the dynamic path run the finalizer, which was right:
+        // a success must carry E.3, E.4 and a real box. But it still asked
+        // the finalizer to transform the TURN UNION through the static
+        // crop — and in a moving crop the union is, by construction, a box
+        // nobody renders. Generation 18, Sarah: union [118,324,302,451] is
+        // 184 px wide against a 154 px crop. No single clip box exists,
+        // and V521 correctly said so with `transform_out_of_bounds`.
+        //
+        // Correct answer, wrong question. The provider is not sent one box
+        // in this mode — `bounding_boxes_url` carries a per-frame array,
+        // and V464 already builds it from Track(t) through Window(t). The
+        // union's job is planning: feasibility, camera path, movement
+        // envelope. It has no dispatch role.
+        //
+        // So a UNION TRANSFORM failure no longer fails a proven dynamic
+        // pass — it hands authority to the per-frame sequence, which then
+        // owes E.4 (V464 bounds validation) and E.3 (per frame) before
+        // anything is dispatched. Every other finalizer failure still
+        // binds: `invalid_crop`, `invalid_target_bbox` and above all
+        // `other_speaker_center_in_target` are not questions about
+        // renderability, and identity is never traded away.
         const v519StaticNonContainment = !v519Static.ok &&
           v519Static.reason !== "target_not_contained_in_crop";
-        const containment = v519Dynamic
-          ? (v519Dynamic.ok && !v519StaticNonContainment
-            ? { ...v519Static, ok: true, reason: undefined }
-            : (v519StaticNonContainment
-              ? v519Static
-              : {
-                ok: false as const,
-                reason: "target_not_contained_in_crop" as const,
-                detail: `dynamic:${v519Dynamic.reason ?? "unknown"} ${v519Dynamic.detail ?? ""}`.trim(),
-              }))
-          : v519Static;
+        const v522DynamicDecides = !!v519Dynamic?.ok && !v519StaticNonContainment;
+        const v522Finalized = v522DynamicDecides
+          ? finalizePreclipContainment({
+            crop: v161PreclipCrop,
+            targetBbox: v510p1Authority.targetBox,
+            otherSpeakerCenters: otherCenters,
+          })
+          : null;
+        const v522UnionUnrenderable = !!v522Finalized && !v522Finalized.ok &&
+          (v522Finalized.reason === "transform_out_of_bounds" ||
+            v522Finalized.reason === "transform_degenerate");
+        const containment: CropContainmentResult = !v519Dynamic
+          ? v519Static
+          : v519StaticNonContainment
+          // A static failure for any OTHER reason is still authoritative:
+          // the dynamic path answers the union question, nothing else.
+          ? v519Static
+          : v519Dynamic.ok
+          ? (v522UnionUnrenderable
+            ? {
+              ok: true,
+              geometryAuthority: "dynamic_per_frame",
+              detail: `union_unrenderable:${v522Finalized!.reason} ${v522Finalized!.detail ?? ""}`.trim(),
+            }
+            : v522Finalized!)
+          : {
+            ok: false as const,
+            reason: "target_not_contained_in_crop" as const,
+            detail: `dynamic:${v519Dynamic.reason ?? "unknown"} ${v519Dynamic.detail ?? ""}`.trim(),
+          };
+        v522DynamicAuthority = v522DynamicDecides && containment.ok;
+        v522PerFrameOnly = v522DynamicAuthority &&
+          containment.geometryAuthority === "dynamic_per_frame";
+        const v521ClipBox = (containment as { clipBox?: [number, number, number, number] })
+          .clipBox;
         (pass as any)._v519_containment = {
           regime: v519Regime ? "dynamic_camera_path" : "static",
           static_ok: v519Static.ok,
@@ -7099,6 +7184,14 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           dynamic_ok: v519Dynamic?.ok ?? null,
           dynamic_reason: v519Dynamic?.reason ?? null,
           dynamic_checked: v519Dynamic?.checked ?? null,
+          // V521 — the invariant that was silently false in generation 18.
+          clip_box_present: Array.isArray(v521ClipBox),
+          post_containment_validation: v519Dynamic?.ok === true ? "finalizer" : "static",
+          // V522 — which geometry this verdict is about.
+          geometry_authority: containment.geometryAuthority ?? "static_clip_box",
+          union_transform_reason: v522Finalized && !v522Finalized.ok
+            ? v522Finalized.reason ?? null
+            : null,
           projection_discarded: (pass as any).v457_projection_discarded ?? null,
           final_crop_contains_target: (pass as any).v457_contains_target ?? null,
         };
@@ -7150,9 +7243,60 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} fa4_preclip_containment_fail_closed ` +
             `reason=${containment.reason} detail=${containment.detail ?? "-"} plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)}`,
           );
+        } else if (v522PerFrameOnly) {
+          // ══ V522 — THE PER-FRAME SEQUENCE IS THE GEOMETRY ══════════
+          //
+          // No static clip box exists and none is owed. `dispatchBox` is
+          // cleared EXPLICITLY: it still holds the plate-space box it was
+          // initialised with, and letting a plate box travel into a
+          // clip-space payload is the original sin this whole series has
+          // been closing. The V464 sequence is built below and must pass
+          // E.4 and per-frame E.3 before anything is dispatched.
+          dispatchBox = null;
+          v510p1AnchorPlateBox = v510p1Authority.targetBox;
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} ` +
+              `v522_per_frame_authority union=${JSON.stringify(v510p1Authority.targetBox)} ` +
+              `crop=${JSON.stringify(v161PreclipCrop)} ` +
+              `union_reason=${v522Finalized?.reason ?? "-"} dynamic_checked=${v519Dynamic?.checked ?? 0}`,
+          );
+        } else if (!Array.isArray(v521ClipBox)) {
+          // ══ V521 — `ok` MUST imply a clip box ══════════════════════
+          //
+          // A safety net, not a path: the corrected merge above can no
+          // longer produce this. If it ever appears again, the run stops
+          // HERE with a precise cause instead of drifting into an empty
+          // canonical box array and a diagnostic about voiced frames.
+          //
+          // V522 narrows WHICH geometry `ok` implies, not whether it is
+          // owed: a static success still owes a clip box, and a dynamic
+          // one is handled by the branch above rather than exempted here.
+          (pass as any)._v152HardFail = {
+            reason: "containment_ok_without_clip_box",
+            errorClass: "preclip_identity_geometry_mismatch",
+            message:
+              `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde vor Sync.so abgebrochen: ` +
+              tl({
+                de: "die Bildausschnitt-Geometrie konnte nicht vollständig bestimmt werden. Credits wurden zurückerstattet.",
+                en: "the crop geometry could not be fully determined. Credits have been refunded.",
+                es: "no se pudo determinar por completo la geometría del recorte. Los créditos han sido reembolsados.",
+              }),
+            meta: {
+              fa4_containment_reason: "containment_ok_without_clip_box",
+              v521_regime: v519Regime ? "dynamic_camera_path" : "static",
+              v521_static_reason: v519Static.reason ?? null,
+              v521_dynamic_ok: v519Dynamic?.ok ?? null,
+              plate_box: box,
+            },
+          };
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} ` +
+              `v521_containment_ok_without_clip_box regime=${v519Regime ? "dynamic" : "static"} ` +
+              `static=${v519Static.reason ?? "ok"} dynamic=${v519Dynamic?.ok ?? "n/a"}`,
+          );
         } else {
           // Contract E.5 — the wire box IS the transformed target bbox.
-          dispatchBox = containment.clipBox!;
+          dispatchBox = v521ClipBox;
           // …and the plate-space original of that same box is the anchor.
           v510p1AnchorPlateBox = v510p1Authority.targetBox;
           console.log(
@@ -7175,7 +7319,16 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         (pass as any)._v450_frozen_face_track ?? null;
       const v464CameraPath = (pass as any).preclip_camera_path ??
         (pass as any)._v450_frozen_camera_path ?? null;
-      const v464Eligible = v161UsingPreclipForBbox && !!v161PreclipCrop && !!dispatchBox && !!box;
+      // V522 — a static pass is eligible exactly as before. A dynamic one
+      // is eligible on its PROVEN evidence instead of on a box the regime
+      // cannot produce: `v522PerFrameOnly` is set only after
+      // `isDynamicContainmentRegime` (frozen path + usable samples) and
+      // `evaluateDynamicPreclipContainment` (every sample held by its own
+      // window, checked > 0) have both passed. Motion alone is never
+      // eligibility, and the sequence V464 builds still has to survive
+      // validation below.
+      const v464Eligible = v161UsingPreclipForBbox && !!v161PreclipCrop && !!box &&
+        (!!dispatchBox || v522PerFrameOnly);
       const v464Built = v464Eligible
         ? buildPerFrameAsdBoxes({
             frameCount,
@@ -7198,7 +7351,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             // there is nothing negative to clamp. Without a track the
             // authority IS `box`, so this line is literally unchanged.
             anchorPlateBox: v510p1AnchorPlateBox as [number, number, number, number],
-            anchorDispatchBox: dispatchBox as [number, number, number, number],
+            // V522 — absent in the per-frame regime: zero margins, and no
+            // constant box to fall back to. See `buildPerFrameAsdBoxes`.
+            anchorDispatchBox: dispatchBox,
+            // V522 — the identity map, projected per frame so E.3 can be
+            // asked about the region actually dispatched at each instant.
+            otherSpeakerPlateCenters: v522OtherPlateCenters,
             voicedWindowsSec: v124VoicedWindows,
           })
         : null;
@@ -7261,6 +7419,60 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v464_ASD_CONTRACT_INVALID reason=${v464Verdict.reason} rate=${v464Verdict.containmentRate} — refund + abort`,
         );
       }
+      // ══ V522 — CONTRACT E.3, ON THE REGION ACTUALLY DISPATCHED ═══════
+      //
+      // The static gate asks the identity question once, about one box.
+      // A dynamic pass sends a different box every frame, so the union it
+      // was asked about is not what any frame showed — the same referent
+      // split, one level down. The verdict is therefore computed from the
+      // sibling centres projected through EACH frame's own crop.
+      //
+      // It is computed for every V464 build (telemetry, both regimes) and
+      // ENFORCED where the dynamic proof decided containment. On the static
+      // path the union gate is still the authority and nothing changes.
+      const v522SiblingVerdict = v464Built
+        ? evaluatePerFrameSiblingExclusion(v464Built)
+        : null;
+      if (v522SiblingVerdict) {
+        (pass as any)._v522PerFrameIdentity = {
+          enforced: v522DynamicAuthority,
+          geometry_authority: v522PerFrameOnly ? "dynamic_per_frame" : "static_clip_box",
+          ...v522SiblingVerdict,
+        };
+      }
+      if (
+        v522DynamicAuthority && v522SiblingVerdict && !v522SiblingVerdict.ok &&
+        !(pass as any)._v152HardFail
+      ) {
+        (pass as any)._v152HardFail = {
+          reason: "dynamic_sibling_center_in_frame_box",
+          errorClass: "preclip_identity_geometry_mismatch",
+          message:
+            `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde vor Sync.so abgebrochen: ` +
+            tl({
+              de: "der Gesichtsausschnitt lässt sich nicht eindeutig diesem Sprecher zuordnen. Credits wurden zurückerstattet.",
+              en: "the face crop cannot be assigned unambiguously to this speaker. Credits have been refunded.",
+              es: "el recorte facial no se puede asignar de forma inequívoca a este hablante. Los créditos han sido reembolsados.",
+            }),
+          meta: {
+            fa4_containment_reason: "other_speaker_center_in_frame_box",
+            v522_scope: "per_frame",
+            v522_failed_frame: v522SiblingVerdict.failedFrame,
+            v522_failed_center: v522SiblingVerdict.failedCenter,
+            v522_failed_box: v522SiblingVerdict.failedBox,
+            v522_checked_frames: v522SiblingVerdict.checkedFrames,
+            preclip_crop: v161PreclipCrop,
+            other_speaker_centers: v522OtherPlateCenters,
+            plate_box: box,
+          },
+        };
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} ` +
+            `v522_PER_FRAME_IDENTITY_FAIL frame=${v522SiblingVerdict.failedFrame} ` +
+            `center=${JSON.stringify(v522SiblingVerdict.failedCenter)} ` +
+            `box=${JSON.stringify(v522SiblingVerdict.failedBox)} — refund + abort`,
+        );
+      }
       const v406CanonicalBoxes: ([number, number, number, number] | null)[] = v464Built
         ? v464Built.boxes as ([number, number, number, number] | null)[]
         : (dispatchBox
@@ -7277,7 +7489,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
       // Der Upload passiert NACH der Snapshot-Persistenz (Contract-Reihenfolge
       // 8→9→10). Hier wird nur der gewünschte Transport festgehalten.
-      const v406WantsUrlTransport = retryVariant === "bbox-url-pro" && !!dispatchBox;
+      // V522 — a proven per-frame sequence authorizes the same transport a
+      // static box does. The wire schema is untouched: `bounding_boxes_url`
+      // has always carried a per-frame array, and this is the first path
+      // that fills it without also holding a box for the whole pass.
+      const v406WantsUrlTransport = retryVariant === "bbox-url-pro" &&
+        (!!dispatchBox || (v522PerFrameOnly && !!v464Built));
 
       // v147 — Pre-Dispatch Validation: bbox muss mind. 1 voiced frame
       // enthalten.
@@ -7288,7 +7505,20 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const dispatchDimsArea = v161UsingPreclipForBbox && v161PreclipCrop
         ? Math.max(1, v161PreclipCrop.outputSize * v161PreclipCrop.outputSize)
         : Math.max(1, (plateDims?.width ?? 0) * (plateDims?.height ?? 0));
-      const boxArea = dispatchBox ? Math.max(0, (dispatchBox[2] - dispatchBox[0]) * (dispatchBox[3] - dispatchBox[1])) : 0;
+      // V522 — without a static box the sanity question is asked of what is
+      // actually sent: the mean area of the dispatched per-frame boxes,
+      // against the SAME bounds (0.002 … 0.98). No new threshold, no new
+      // face-size rule — only a source that exists in this regime.
+      const v522DispatchedAreas = dispatchBox
+        ? []
+        : v406CanonicalBoxes
+          .filter((b): b is [number, number, number, number] => Array.isArray(b))
+          .map((b) => Math.max(0, (b[2] - b[0]) * (b[3] - b[1])));
+      const boxArea = dispatchBox
+        ? Math.max(0, (dispatchBox[2] - dispatchBox[0]) * (dispatchBox[3] - dispatchBox[1]))
+        : (v522DispatchedAreas.length > 0
+          ? v522DispatchedAreas.reduce((a, v) => a + v, 0) / v522DispatchedAreas.length
+          : 0);
       const boxAreaPct = boxArea / dispatchDimsArea;
       const v152UpperBound = v161UsingPreclipForBbox ? 0.98 : 0.45;
       const v152BboxSane = boxAreaPct >= 0.002 && boxAreaPct <= v152UpperBound;
@@ -7324,10 +7554,21 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         // v152 — Hard-Fail nur noch für echte Datenprobleme (zero voiced frames
         // oder geometrisch unsinnige Boxen). Upload-Fehler werden oben durch
         // v279 Inline-Fallback abgefangen.
-        const v152FailReason = nonNullFrames < 1
-          ? "bbox_zero_voiced_frames"
-          : !dispatchBox
-            ? "plate_face_missing"
+        // V521 — a MISSING dispatch box is not a statement about voiced
+        // frames. Generation 18 reported `bbox_zero_voiced_frames` over 82
+        // frames for a speaker whose face track was 6/6 valid, because an
+        // absent box makes `nonNullFrames` 0 and this ordering let the
+        // consequence mask the cause. The box is now asked about first.
+        // V522 — the missing-geometry diagnostic is regime-specific. A
+        // static pass owes a dispatch box; a dynamic one owes a per-frame
+        // sequence. Neither absence is a statement about voiced frames,
+        // which is what generation 18 was told.
+        const v152FailReason = (!dispatchBox && !v522PerFrameOnly)
+          ? "dispatch_box_missing"
+          : (!dispatchBox && !v464Built)
+            ? "dynamic_bbox_sequence_missing"
+          : nonNullFrames < 1
+            ? "bbox_zero_voiced_frames"
             : !v152BboxSane
               ? `bbox_geometry_insane:area_pct=${(boxAreaPct * 100).toFixed(2)}`
               : "bbox_transport_unavailable";
