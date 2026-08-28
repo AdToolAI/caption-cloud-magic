@@ -29,7 +29,17 @@ import {
 const STILL_COMPOSITION = "DialogStitchVideo";
 const STILL_REMOTION_VERSION = "4.0.462";
 const STILL_JPEG_QUALITY = 85;
-const STILL_FPS = 30;
+/**
+ * V526-A — EXPORTED, value unchanged.
+ *
+ * This is the fps the still renderer actually uses (line ~387:
+ * `Math.round(times[i] * STILL_FPS)`), and therefore the only correct
+ * authority for converting a second into a frame index of this composition.
+ * V524 was converting with ASSUMED_FPS = 24 and asking for a picture ~20%
+ * earlier than it meant. Exported rather than copied so there stays one
+ * definition; nothing else about the renderer changes.
+ */
+export const STILL_FPS = 30;
 const REK_MIN_CONFIDENCE = 80;
 
 /** Minimum IoU with the reference box for a detection to count as "same face". */

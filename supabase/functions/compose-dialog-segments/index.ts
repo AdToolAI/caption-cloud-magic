@@ -161,8 +161,13 @@ import {
 import {
   defaultRenderStill,
   pickAssignedFace,
+  STILL_FPS,
   trackAssignedFaceAcrossTurn,
 } from "../_shared/plate-face-track.ts";
+import {
+  buildSceneFrameTelemetry,
+  selectSceneIdentityFrames,
+} from "../_shared/v526-scene-frame-authority.ts";
 import {
   centerOfBox,
   resolveIdentityLockedRepair,
@@ -4896,9 +4901,45 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // AND geometry on the same actual plate frame. No new detector and
       // no new frame authority — the candidates are frames the gate
       // already probes, capped at three.
-      const v524Frames = builtPasses.length > 0 && builtPasses[0]?.segments?.[0]
-        ? frameCandidatesForTurn(builtPasses[0].segments[0], totalSec, ASSUMED_FPS).slice(0, 3)
-        : [];
+      // ══ V526-A — LOOK AT THE SCENE, NOT AT ONE SECOND OF IT ══════════
+      //
+      // Generation 23: V525 delivered three real stills and V524 resolved
+      // 3/4 on every one — Matthew missing at frames 6 and 8, Kay missing
+      // at 30. The reading that suggests itself is that demanding 4/4 in
+      // one frame is too strict. The measurement says otherwise.
+      //
+      // All three candidates came from `frameCandidatesForTurn` over the
+      // FIRST TURN of the FIRST PASS. At the renderer's real 30 fps that
+      // is 0.20 s, 0.27 s and 1.00 s of a fifteen-second plate: three
+      // looks at the same single second. In a four-person shot with
+      // blocking, nobody should expect all four to be well-posed there.
+      //
+      // That selector answers a per-pass question — "is this speaker
+      // visible around their turn". Registration asks a scene question.
+      // Answering the second with the first is the same shape of error
+      // this pipeline has been closing since V516: correct arithmetic
+      // over the wrong object, here the wrong stretch of time.
+      //
+      // Second defect in the same line: the conversion used
+      // `ASSUMED_FPS = 24` while the still composition runs at 30, so
+      // every requested frame arrived ~20 % earlier than intended.
+      //
+      // Still three frames, still 4/4 in ONE of them, still no
+      // aggregation and no mixed-frame geometry. Only the clock changed.
+      const v526Selection = selectSceneIdentityFrames({
+        totalSec,
+        fps: STILL_FPS,
+        maxFrames: 3,
+        turnLocalFallback: () =>
+          builtPasses.length > 0 && builtPasses[0]?.segments?.[0]
+            ? frameCandidatesForTurn(builtPasses[0].segments[0], totalSec, ASSUMED_FPS)
+            : [],
+      });
+      const v524Frames = v526Selection.frames;
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} v526_scene_frame_authority ` +
+          JSON.stringify(buildSceneFrameTelemetry(v526Selection)),
+      );
       let v524Registration: PlateIdentityRegistration | null = null;
       let v524Records: PlateNativeIdentityRecord[] = [];
       // What the LEGACY identity geometry was measured on. `anchor_native`
@@ -5152,6 +5193,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           reason: v524Registration?.reason ?? null,
           detail: v524Registration?.detail ?? null,
           legacy_space: v524LegacySpace,
+          // V526-A — which stretch of time the candidates came from.
+          frame_authority: buildSceneFrameTelemetry(v526Selection),
           base_video_url: v524BaseVideoUrl,
           plate_generation: v524PlateGeneration,
           run_id: v510RunId,
