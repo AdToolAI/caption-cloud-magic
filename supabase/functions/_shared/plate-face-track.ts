@@ -208,7 +208,17 @@ function awsClient(): AwsClient {
   return new AwsClient({ accessKeyId, secretAccessKey, sessionToken, region: AWS_REGION });
 }
 
-function defaultRenderStill() {
+/**
+ * V525 — EXPORTED, otherwise unchanged.
+ *
+ * This is the pipeline`s only server-side video-to-still path: Remotion
+ * Lambda `type:"still"` on the plate video, AWS-only. V525 needs exactly
+ * this raster and reuses it rather than writing a second Lambda payload —
+ * the duplication `plateFaceSlotRouter` made with the SigV4 signer is the
+ * mistake this avoids. Not one byte of the payload, composition, version,
+ * quality or timeout handling changes.
+ */
+export function defaultRenderStill() {
   const serveUrl = Deno.env.get("REMOTION_SERVE_URL") ?? "";
   if (!serveUrl) throw new Error("remotion_serve_url_missing");
   const aws = awsClient();
