@@ -55,9 +55,30 @@ const BOX_IOU_LINK_MIN = 0.35;
 
 
 // ── SigV4 helpers ───────────────────────────────────────────────────────
+/**
+ * V524-P0 — COMPILE-ONLY BufferSource normalisation.
+ *
+ * `Uint8Array<ArrayBufferLike>` is not assignable to `BufferSource` under
+ * the current lib types, because `ArrayBufferLike` admits
+ * `SharedArrayBuffer`. The two errors this produces are older than V524 and
+ * caller-independent; they only became visible when
+ * `compose-dialog-segments` began importing this module directly.
+ *
+ * This is the SAME helper `plateFaceSlotRouter.ts` already ships in
+ * production, copied verbatim rather than re-invented. It hands WebCrypto
+ * the identical bytes in a freshly allocated (definitely non-shared)
+ * buffer: the digest input, the HMAC key material, the signature and the
+ * request are byte-for-byte unchanged.
+ */
+function asBufferSource(bytes: Uint8Array): BufferSource {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy as unknown as BufferSource;
+}
+
 async function sha256Hex(data: Uint8Array | string): Promise<string> {
   const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
-  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  const hash = await crypto.subtle.digest("SHA-256", asBufferSource(bytes));
   return Array.from(new Uint8Array(hash))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
@@ -66,7 +87,9 @@ async function sha256Hex(data: Uint8Array | string): Promise<string> {
 async function hmac(key: ArrayBuffer | Uint8Array, data: string): Promise<ArrayBuffer> {
   const k = await crypto.subtle.importKey(
     "raw",
-    key instanceof Uint8Array ? key : new Uint8Array(key),
+    key instanceof Uint8Array
+      ? asBufferSource(key)
+      : key as BufferSource,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
