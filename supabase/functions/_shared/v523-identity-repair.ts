@@ -39,6 +39,14 @@
  * with `cameraPathContainsAll`.
  */
 
+/**
+ * V524 — the geometry-space vocabulary lives with the registration module,
+ * imported rather than restated so there is one classification of what a
+ * box is a measurement OF.
+ */
+import type { PlateGeometrySpace } from "./v524-plate-identity-registration.ts";
+export type { PlateGeometrySpace };
+
 export type Box = [number, number, number, number];
 
 /** A plate-identity face record. `characterId` is the only identity key. */
@@ -56,7 +64,15 @@ export type IdentityReferenceFailure =
   /** More than one plate face claims this characterId. */
   | "identity_lock_ambiguous"
   /** A reference exists but only from positional inference. */
-  | "reference_not_identity_locked";
+  | "reference_not_identity_locked"
+  /**
+   * V524 — a reference exists and is identity-bound, but its geometry was
+   * measured on the ANCHOR. Scaling it into plate units does not make it
+   * describe the plate. Distinct from `reference_not_identity_locked`
+   * (identity missing) and from `identity_unresolved` (identity fine,
+   * no candidate matched): here the reference is about another picture.
+   */
+  | "reference_space_mismatch";
 
 export interface IdentityReference {
   ok: boolean;
@@ -65,12 +81,18 @@ export interface IdentityReference {
   bbox?: Box;
   mouth?: [number, number] | null;
   /**
+   * `plate_native`       V524 — measured on an actual frame of the current
+   *                      base video and identity-matched biometrically.
+   *                      The only geometry that describes what will be
+   *                      dispatched.
    * `lock_face`          resolved from plate faces BY characterId.
    * `hydrated_identity`  the per-speaker box, but only while its own
    *                      provenance says it came from the lock or a
    *                      characterId match.
    */
-  source?: "lock_face" | "hydrated_identity";
+  source?: "plate_native" | "lock_face" | "hydrated_identity";
+  /** V524 — which picture the geometry was measured on. */
+  space?: PlateGeometrySpace;
   detail?: string;
 }
 
@@ -186,6 +208,19 @@ export function resolveLockedIdentityReference(params: {
   hydratedMouth?: unknown;
   /** `coordSources[speakerIdx]` — the provenance of `hydratedBbox`. */
   hydratedSource?: string | null;
+  /**
+   * V524 — this character's face as measured on the current plate. When
+   * present it outranks everything below: it is the only reference that
+   * describes the video the repair candidates came from.
+   */
+  plateNativeBbox?: unknown;
+  plateNativeMouth?: unknown;
+  /**
+   * V524 — which picture `plateFaces` / `hydratedBbox` were measured on.
+   * `anchor_native` means they are a different composition wearing plate
+   * units, and no amount of scaling repairs that.
+   */
+  referenceSpace?: PlateGeometrySpace;
 }): IdentityReference {
   const lockedCid = stripCharacterIdPrefix(
     params.assignmentLock?.[String(params.speakerIdx)] ?? null,
@@ -205,6 +240,36 @@ export function resolveLockedIdentityReference(params: {
   const characterId = lockedCid || speakerCid;
   if (!characterId) return { ok: false, reason: "no_character_id" };
 
+  // ══ V524 — PLATE-NATIVE GEOMETRY OUTRANKS EVERYTHING ═══════════════
+  //
+  // Generation 20: the reference was [269,84,343,204] and Sarah's actual
+  // face on the probed frame was [87,192,275,378] — 188 px apart, IoU
+  // 0.002, width 74 against 188. The identity was right and the picture
+  // was wrong, and no continuation rule can bridge that.
+  const plateNative = asBox(params.plateNativeBbox);
+  if (plateNative) {
+    return {
+      ok: true,
+      characterId,
+      bbox: plateNative,
+      mouth: asPoint(params.plateNativeMouth),
+      source: "plate_native",
+      space: "plate_native",
+    };
+  }
+  // No plate-native record, and what we do have was measured on the
+  // anchor. Refusing here is the point of this release: the alternative
+  // is a confident answer about a picture nobody rendered.
+  if (params.referenceSpace === "anchor_native") {
+    return {
+      ok: false,
+      reason: "reference_space_mismatch",
+      characterId,
+      space: "anchor_native",
+      detail: "identity is anchor-native; no plate-native registration for this generation",
+    };
+  }
+
   const claimed = findFacesByCharacterId(params.plateFaces, characterId)
     .filter((f) => !!asBox(f?.bbox));
   if (claimed.length > 1) {
@@ -222,6 +287,7 @@ export function resolveLockedIdentityReference(params: {
       bbox: asBox(claimed[0].bbox)!,
       mouth: asPoint(claimed[0].mouth),
       source: "lock_face",
+      space: params.referenceSpace ?? "unknown",
     };
   }
 
@@ -233,6 +299,7 @@ export function resolveLockedIdentityReference(params: {
       bbox: hydrated,
       mouth: asPoint(params.hydratedMouth),
       source: "hydrated_identity",
+      space: params.referenceSpace ?? "unknown",
     };
   }
   return {

@@ -167,6 +167,18 @@ import {
   type IdentityRepairResult,
 } from "../_shared/v523-identity-repair.ts";
 import {
+  classifyIdentityMapSpace,
+  findPlateNativeRecord,
+  registerPlateNativeIdentities,
+  reuseStoredRegistration,
+  type PlateGeometrySpace,
+  type PlateIdentityRegistration,
+  type PlateNativeFence,
+  type PlateNativeIdentityRecord,
+} from "../_shared/v524-plate-identity-registration.ts";
+import { extractFrameForFaceProbe } from "../_shared/face-frame-extract.ts";
+import { resolveIdentityViaRekognition } from "../_shared/resolveIdentityViaRekognition.ts";
+import {
   buildPerFrameAsdBoxes,
   evaluatePerFrameSiblingExclusion,
   validateAsdRegistration,
@@ -750,6 +762,16 @@ interface SegmentsState {
      */
     assignmentLock?: Record<string, string>;
   };
+}
+
+/**
+ * V524 — the same character-id normalisation the identity helpers use,
+ * available at module scope for the registration block. (Two older local
+ * copies still live inside the handler; they belong to the persisted-
+ * hydration and assignment-lock paths and are reported, not refactored.)
+ */
+function stripIdPrefixLocalV524(id?: string | null): string {
+  return String(id ?? "").toLowerCase().replace(/^(outfit|pose|wardrobe|vibe|prop|look):/, "");
 }
 
 function uniqueSortedFrames(frames: number[]): number[] {
@@ -4638,6 +4660,18 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           let v523Ref: IdentityReference | null = null;
           let v523Repair: IdentityRepairResult | null = null;
           if (v523NeedsIdentity && box && plateDims) {
+            // V524 — this character's face as measured on the actual base
+            // video, found by characterId and fenced to this scene, run,
+            // generation and base-video URL. When it exists it outranks
+            // every anchor-derived box; when it does not and the legacy
+            // geometry is anchor-native, V523 refuses with
+            // `reference_space_mismatch` instead of comparing two
+            // different pictures.
+            const v524Own = findPlateNativeRecord(
+              v524Records,
+              speakers[pass.speaker_idx]?.character_id ?? null,
+              v524Fence,
+            );
             v523Ref = resolveLockedIdentityReference({
               speakerIdx: pass.speaker_idx,
               assignmentLock: finalAssignmentLock,
@@ -4647,14 +4681,29 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               hydratedBbox: speakerPlateBboxes[pass.speaker_idx],
               hydratedMouth: speakerPlateMouths[pass.speaker_idx],
               hydratedSource: coordSources[pass.speaker_idx] ?? null,
+              plateNativeBbox: v524Own?.bbox ?? null,
+              referenceSpace: v524LegacySpace,
             });
             // The sibling veto tests the assignment-locked cast, the same
             // identity map Contract E.3 uses. Identity outranks proximity.
+            // V524 — the exclusivity check compares boxes, so the siblings
+            // must be measured on the same picture as the target. Mixing a
+            // plate-native target with anchor-native siblings would make
+            // the cross-claim test meaningless in exactly the way the
+            // target comparison was.
             const v523Siblings: Array<[number, number]> = [];
             const v523SiblingRefs: Array<[number, number, number, number]> = [];
+            const v524TargetIsPlateNative = v523Ref?.space === "plate_native";
             for (let si = 0; si < speakers.length; si++) {
               if (si === pass.speaker_idx) continue;
-              const sb = speakerPlateBboxes[si];
+              const sibPlate = v524TargetIsPlateNative
+                ? findPlateNativeRecord(
+                  v524Records,
+                  speakers[si]?.character_id ?? null,
+                  v524Fence,
+                )?.bbox ?? null
+                : null;
+              const sb = v524TargetIsPlateNative ? sibPlate : speakerPlateBboxes[si];
               if (Array.isArray(sb) && sb.length === 4) {
                 v523Siblings.push(centerOfBox(sb as [number, number, number, number]));
                 v523SiblingRefs.push(sb as [number, number, number, number]);
@@ -4736,6 +4785,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               v523_character_id: v523Ref?.characterId ?? null,
               v523_reference_source: v523Ref?.ok ? v523Ref.source : null,
               v523_reference_bbox: v523Ref?.bbox ?? null,
+              // V524 — which picture the reference was measured on.
+              v524_reference_space: v523Ref?.space ?? "unknown",
+              v524_registration_frame: v524Registration?.frameNumber ?? null,
+              v524_legacy_space: v524LegacySpace,
               v523_iou: v523Repair?.iou ?? null,
               v523_positional_would_have: v523Repair?.positionalWouldHavePicked ?? null,
             };
@@ -4785,6 +4838,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
                   ? null
                   : (v523LastRefusal.reference?.reason ?? null),
                 reference_bbox: v523LastRefusal.reference?.bbox ?? null,
+                reference_space: v523LastRefusal.reference?.space ?? "unknown",
+                v524_registration_ok: v524Registration?.ok ?? false,
+                v524_registration_reason: v524Registration?.reason ?? null,
+                v524_registration_frame: v524Registration?.frameNumber ?? null,
+                v524_legacy_space: v524LegacySpace,
                 repair_reason: v523LastRefusal.repair?.reason ?? null,
                 repair_detail: v523LastRefusal.repair?.detail ?? null,
                 candidates_considered: v523LastRefusal.repair?.candidatesConsidered ?? 0,
@@ -4809,6 +4867,190 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         }
         return { ok: true, pass };
       };
+
+      // ══ V524 — REGISTER IDENTITY IN PLATE-NATIVE GEOMETRY ════════════
+      //
+      // Generation 20: V523 refused Sarah's repair with
+      // `identity_unresolved`, and it was right to. The reference it was
+      // handed was [269,84,343,204]; her actual face on the probed frame
+      // was [87,192,275,378]. Centre distance 188 px, IoU 0.002, width 74
+      // against 188. The identity was correct and the picture was not.
+      //
+      // The v278 router's own comment says why: Rekognition cannot read
+      // MP4 bytes, so it detects on the ANCHOR STILL and scales the boxes
+      // into plateDims. That is anchor composition wearing plate units,
+      // and it stops being true the moment the generated video reframes.
+      //
+      // Rekognition does read a JPEG. The pipeline already extracts stills
+      // from a video and already matches faces to characters
+      // biometrically; pointing the second at the first measures identity
+      // AND geometry on the same actual plate frame. No new detector and
+      // no new frame authority — the candidates are frames the gate
+      // already probes, capped at three.
+      const v524Frames = builtPasses.length > 0 && builtPasses[0]?.segments?.[0]
+        ? frameCandidatesForTurn(builtPasses[0].segments[0], totalSec, ASSUMED_FPS).slice(0, 3)
+        : [];
+      let v524Registration: PlateIdentityRegistration | null = null;
+      let v524Records: PlateNativeIdentityRecord[] = [];
+      // What the LEGACY identity geometry was measured on. `anchor_native`
+      // is the generation-20 case and is no longer usable as plate
+      // geometry, however cleanly it is scaled.
+      const v524LegacySpace: PlateGeometrySpace = classifyIdentityMapSpace({
+        detector: (plateIdentityMap as any)?.detector ??
+          (persistedPlateIdentity as any)?.detector ?? null,
+        assignmentLockSource: (plateIdentityMap as any)?.assignmentLockSource ??
+          (persistedPlateIdentity as any)?.assignmentLockSource ?? null,
+      });
+      const v524BaseVideoUrl = sourceClipUrl ?? null;
+      const v524PlateGeneration = Number((scene as any)?.plate_generation ?? 0);
+      const v524Fence: PlateNativeFence = {
+        sceneId,
+        runId: v510RunId,
+        plateGeneration: v524PlateGeneration,
+        baseVideoUrl: String(v524BaseVideoUrl ?? ""),
+        plateDims: plateDims ?? { width: 0, height: 0 },
+      };
+      const v524Needed = speakers.length >= 3 && !!plateDims && !!v524BaseVideoUrl &&
+        characters.length > 0 && v524Frames.length > 0;
+      if (v524Needed) {
+        const v524Chars = characters
+          .map((c: any) => ({
+            characterId: String(c.characterId),
+            portraitUrl: String(c.portraitUrl),
+            speakerIdx: speakers.findIndex((sp: any) =>
+              stripIdPrefixLocalV524(sp?.character_id) === stripIdPrefixLocalV524(c.characterId)
+            ),
+          }))
+          .filter((c: any) => c.speakerIdx >= 0 && c.portraitUrl.length > 0);
+        // ── V524-P0 — ONE REGISTRATION PER RUN, NOT PER DISPATCH ───────
+        //
+        // The face gate runs on every non-advance invocation: the initial
+        // dispatch, and every retry or re-dispatch of the same run. The
+        // picture has not changed between them, so neither has the answer
+        // — and repeating it costs a frame extract, a DetectFaces and one
+        // CompareFaces per character each time.
+        //
+        // A hit demands the whole set: the stored attempt succeeded, every
+        // requested character has exactly one record, and each passes the
+        // same scene/run/generation/base-video/dims fence a fresh one
+        // would. A failed, partial or ambiguous attempt is never a hit;
+        // caching a refusal as an answer is how a fail-closed gate stops
+        // being one.
+        const v524Stored = (persistedPlateIdentity as any)?.plateNative ?? null;
+        const v524Reuse = reuseStoredRegistration({
+          stored: v524Stored,
+          characterIds: v524Chars.map((c: any) => c.characterId),
+          fence: v524Fence,
+        });
+        if (v524Reuse.hit) {
+          v524Records = v524Reuse.records;
+          v524Registration = {
+            ok: true,
+            records: v524Reuse.records,
+            frameNumber: v524Reuse.frameNumber ?? -1,
+            frameUrl: null,
+            diagnostics: {
+              requested: v524Chars.length,
+              resolved: v524Reuse.records.length,
+              detected: v524Reuse.records.length,
+              minSimilarity: v524Reuse.records.reduce<number | null>(
+                (m, r) =>
+                  r.similarity == null ? m : (m === null ? r.similarity : Math.min(m, r.similarity)),
+                null,
+              ),
+              detectorDims: plateDims,
+              rescaled: false,
+            },
+          };
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} v524_plate_identity_reuse ` +
+              `run=${v510RunId ?? "-"} gen=${v524PlateGeneration} ` +
+              `frame=${v524Reuse.frameNumber ?? "-"} records=${v524Reuse.records.length} ` +
+              `— no frame extract, no Rekognition call`,
+          );
+        }
+        // Bounded: stop at the first frame that can place EVERY character.
+        // A partial registration is not evidence about where anybody is.
+        for (const frame of v524Reuse.hit ? [] : v524Frames) {
+          const reg = await registerPlateNativeIdentities({
+            sceneId,
+            runId: v510RunId,
+            plateGeneration: v524PlateGeneration,
+            baseVideoUrl: v524BaseVideoUrl!,
+            plateDims: plateDims!,
+            frameNumber: frame,
+            registeredAt: new Date().toISOString(),
+            characters: v524Chars,
+            extractFrame: async (i) => {
+              const r = await extractFrameForFaceProbe({
+                videoUrl: i.videoUrl,
+                frameNumber: i.frameNumber,
+                fps: ASSUMED_FPS,
+                userId,
+                projectId: String((scene as any)?.project_id ?? ""),
+                sceneId,
+              });
+              return { ok: r.ok, frameUrl: r.frameUrl ?? null, reason: r.reason ?? null };
+            },
+            detectIdentities: async (i) => {
+              // The SAME biometric matcher v274 already uses on the anchor,
+              // pointed at a still of the actual plate. `anchorUrl` is the
+              // parameter's name, not its meaning: it takes an image URL.
+              const r = await resolveIdentityViaRekognition({
+                anchorUrl: i.imageUrl,
+                characters: i.characters,
+              });
+              return {
+                ok: r.ok,
+                dims: r.dims,
+                faces: r.faces.map((f) => ({
+                  characterId: f.characterId,
+                  bbox: f.bbox,
+                  similarity: f.similarity,
+                })),
+                resolvedCount: r.resolvedCount,
+                reason: r.reason ?? null,
+              };
+            },
+          });
+          v524Registration = reg;
+          if (reg.ok) {
+            v524Records = reg.records;
+            break;
+          }
+        }
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} v524_plate_identity_registration ` +
+            `source=${v524Reuse.hit ? "reused" : "registered"} miss=${v524Reuse.miss ?? "-"} ` +
+            `ok=${v524Registration?.ok ?? false} frame=${v524Registration?.frameNumber ?? "-"} ` +
+            `resolved=${v524Registration?.diagnostics.resolved ?? 0}/${v524Registration?.diagnostics.requested ?? 0} ` +
+            `detected=${v524Registration?.diagnostics.detected ?? 0} ` +
+            `min_similarity=${v524Registration?.diagnostics.minSimilarity ?? "-"} ` +
+            `rescaled=${v524Registration?.diagnostics.rescaled ?? false} ` +
+            `legacy_space=${v524LegacySpace} reason=${v524Registration?.reason ?? "-"} ` +
+            `detail=${v524Registration?.detail ?? "-"}`,
+        );
+        // Bounded persistence into the EXISTING plate_identity JSONB — the
+        // snapshot is written to dialog_shots after this block, so no
+        // schema change and no second write path. Records only: no frames,
+        // no tracks, no images.
+        (v153PlateIdentitySnapshot as any).plateNative = {
+          ok: v524Registration?.ok ?? false,
+          // V524-P0 — a reused set is rewritten unchanged, so a later
+          // dispatch of this run keeps hitting the same record.
+          registration_source: v524Reuse.hit ? "reused" : "registered",
+          reuse_miss: v524Reuse.miss ?? null,
+          frame_number: v524Registration?.frameNumber ?? null,
+          reason: v524Registration?.reason ?? null,
+          detail: v524Registration?.detail ?? null,
+          legacy_space: v524LegacySpace,
+          base_video_url: v524BaseVideoUrl,
+          plate_generation: v524PlateGeneration,
+          run_id: v510RunId,
+          diagnostics: v524Registration?.diagnostics ?? null,
+          records: v524Records,
+        };
+      }
 
       const gateResults = await Promise.all(builtPasses.map((p: any) => gateOne(p)));
 
