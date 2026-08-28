@@ -1,0 +1,11 @@
+# V525-H0 — line endings for the composer dispatcher.
+#
+# `core.autocrlf=true` plus no repository rule let this one file flip from LF
+# to CRLF in commit 10f0438b5: the object grew 10,944 CR bytes and a 137-line
+# change rendered as ~10,900 lines of churn, while `--ignore-cr-at-eol` showed
+# the real diff. Every earlier release stored it with LF.
+#
+# The rule is deliberately narrow. A repository-wide `* text=auto` would
+# renormalize unrelated tracked files in the same commit, which is a much
+# larger and less reviewable change than the problem it fixes.
+supabase/functions/compose-dialog-segments/index.ts text eol=lf

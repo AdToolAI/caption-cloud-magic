@@ -420,8 +420,9 @@ Deno.test("CONTRACT — registration runs on the base video, not the anchor", ()
   assert(DIALOG.includes("baseVideoUrl: v524BaseVideoUrl!,"));
   assert(DIALOG.includes("const v524BaseVideoUrl = sourceClipUrl ?? null;"));
   assert(DIALOG.includes("extractFrame: async (i) => {"));
-  assert(DIALOG.includes("const r = await extractFrameForFaceProbe({"));
-  assert(DIALOG.includes("videoUrl: i.videoUrl,"));
+  // V525 replaced the cache-only probe helper with the real extractor.
+  assert(DIALOG.includes("const r = await extractPlateFrame({"));
+  assert(DIALOG.includes("baseVideoUrl: i.videoUrl,"), "the extractor is given the base video");
   // The biometric matcher is pointed at the extracted still, never at the
   // anchor, for this registration.
   assert(DIALOG.includes("anchorUrl: i.imageUrl,"));
@@ -433,7 +434,9 @@ Deno.test("CONTRACT — the frame authority is the gate's own candidates, bounde
   // skips the loop entirely on a cache hit.
   const at = DIALOG.indexOf("for (const frame of v524Reuse.hit ? [] : v524Frames) {");
   assert(at > 0);
-  const loop = DIALOG.slice(at, at + 3000);
+  // V525 widened the injected extractor body; anchor on the loop, not on a
+  // byte distance that tracks how much code happens to sit inside it.
+  const loop = DIALOG.slice(at, at + 8000);
   assert(loop.includes("if (reg.ok) {"));
   assert(loop.includes("break;"));
 });

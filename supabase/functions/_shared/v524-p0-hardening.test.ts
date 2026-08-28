@@ -313,7 +313,7 @@ Deno.test("CONTRACT — P0-A. the AWS surface is untouched", () => {
 Deno.test("CONTRACT — P0-B. reuse is checked before any network work", () => {
   const reuse = DIALOG.indexOf("const v524Reuse = reuseStoredRegistration({");
   const loop = DIALOG.indexOf("for (const frame of v524Reuse.hit ? [] : v524Frames) {");
-  const extract = DIALOG.indexOf("const r = await extractFrameForFaceProbe({");
+  const extract = DIALOG.indexOf("const r = await extractPlateFrame({");
   const rek = DIALOG.indexOf("const r = await resolveIdentityViaRekognition({");
   assert(reuse > 0 && loop > reuse, "the decision precedes the loop");
   assert(extract > reuse && rek > reuse, "and precedes both provider calls");

@@ -137,6 +137,33 @@ export interface PlateIdentityRegistration {
   };
 }
 
+/**
+ * V525 — one bounded row per attempted registration frame.
+ *
+ * Generation 21 persisted only the LAST attempted frame (30), because the
+ * result variable was overwritten on each iteration of the bounded loop. The
+ * two earlier attempts, and the reason each failed, were simply gone. At most
+ * three rows, each a handful of scalars.
+ */
+export interface RegistrationAttempt {
+  frame: number;
+  extract_ok: boolean;
+  extract_reason: string | null;
+  extract_source: string | null;
+  extract_cache_hit: boolean | null;
+  registration_ok: boolean;
+  registration_reason: string | null;
+  registration_detail: string | null;
+  resolved: number;
+  requested: number;
+}
+
+/** V525 — never keep more than the bounded search itself can produce. */
+export const MAX_REGISTRATION_ATTEMPTS = 3;
+export function boundAttempts(rows: RegistrationAttempt[]): RegistrationAttempt[] {
+  return (rows ?? []).slice(0, MAX_REGISTRATION_ATTEMPTS);
+}
+
 const isFiniteBox = (b: unknown): b is Box =>
   Array.isArray(b) && b.length === 4 && b.every((n) => Number.isFinite(Number(n)));
 

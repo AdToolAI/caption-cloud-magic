@@ -158,7 +158,11 @@ import {
   mouthRoiSamples,
   TRACK_SAMPLE_COUNT,
 } from "../_shared/dynamic-camera-path.ts";
-import { pickAssignedFace, trackAssignedFaceAcrossTurn } from "../_shared/plate-face-track.ts";
+import {
+  defaultRenderStill,
+  pickAssignedFace,
+  trackAssignedFaceAcrossTurn,
+} from "../_shared/plate-face-track.ts";
 import {
   centerOfBox,
   resolveIdentityLockedRepair,
@@ -170,14 +174,19 @@ import {
   classifyIdentityMapSpace,
   findPlateNativeRecord,
   registerPlateNativeIdentities,
+  boundAttempts,
   reuseStoredRegistration,
   type PlateGeometrySpace,
   type PlateIdentityRegistration,
   type PlateNativeFence,
   type PlateNativeIdentityRecord,
+  type RegistrationAttempt,
 } from "../_shared/v524-plate-identity-registration.ts";
-import { extractFrameForFaceProbe } from "../_shared/face-frame-extract.ts";
 import { resolveIdentityViaRekognition } from "../_shared/resolveIdentityViaRekognition.ts";
+import {
+  extractPlateFrame,
+  type PlateFrameExtractResult,
+} from "../_shared/v525-plate-frame-extract.ts";
 import {
   buildPerFrameAsdBoxes,
   evaluatePerFrameSiblingExclusion,
@@ -4969,6 +4978,37 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               `— no frame extract, no Rekognition call`,
           );
         }
+        // ══ V525 — A REAL RASTER FROM THE ACTUAL PLATE ════════════════
+        //
+        // Generation 21 failed all three attempts on `frame_extract_failed`
+        // before identity detection ever ran. V524 had been wired to
+        // `extractFrameForFaceProbe`, which its own header describes as
+        // cache-only — "No Replicate. No lucataco. No ffmpeg calls.
+        // Ever." — and the probe cache for this scene was empty. It could
+        // never have succeeded.
+        //
+        // The renderer that CAN do this already ships: `plate-face-track`
+        // has rendered Remotion Lambda stills against the plate video for
+        // every V452 track sample since V452. V525 reuses it verbatim and
+        // writes the result to a namespace fenced by a fingerprint of the
+        // base-video URL, so a generation-20 frame is unreachable here
+        // rather than merely rejected.
+        const v525Attempts: RegistrationAttempt[] = [];
+        // A holder rather than a bare `let`: the value is written inside the
+        // injected closure and read after it, and narrowing a closure-assigned
+        // local to `never` is a TypeScript artefact, not a real invariant.
+        const v525Extract: { last: PlateFrameExtractResult | null } = { last: null };
+        const v525RenderStill = (() => {
+          try {
+            return defaultRenderStill();
+          } catch (e) {
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} v525_still_renderer_unavailable ` +
+                `reason=${(e as Error)?.message ?? e}`,
+            );
+            return null;
+          }
+        })();
         // Bounded: stop at the first frame that can place EVERY character.
         // A partial registration is not evidence about where anybody is.
         for (const frame of v524Reuse.hit ? [] : v524Frames) {
@@ -4982,15 +5022,68 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             registeredAt: new Date().toISOString(),
             characters: v524Chars,
             extractFrame: async (i) => {
-              const r = await extractFrameForFaceProbe({
-                videoUrl: i.videoUrl,
-                frameNumber: i.frameNumber,
-                fps: ASSUMED_FPS,
+              if (!v525RenderStill) {
+                const r: PlateFrameExtractResult = {
+                  ok: false,
+                  frameNumber: i.frameNumber,
+                  reason: "probe_cache_miss",
+                  detail: "still renderer unavailable",
+                };
+                v525Extract.last = r;
+                return { ok: false, frameUrl: null, reason: r.reason };
+              }
+              const r = await extractPlateFrame({
                 userId,
                 projectId: String((scene as any)?.project_id ?? ""),
                 sceneId,
+                baseVideoUrl: i.videoUrl,
+                totalSec,
+                frameNumber: i.frameNumber,
+                timeoutMs: 30_000,
+                fingerprint: async (value) => {
+                  const d = await crypto.subtle.digest(
+                    "SHA-256",
+                    new TextEncoder().encode(value) as unknown as BufferSource,
+                  );
+                  return Array.from(new Uint8Array(d))
+                    .map((b) => b.toString(16).padStart(2, "0"))
+                    .join("")
+                    .slice(0, 32);
+                },
+                readCache: async (path) => {
+                  const signed = await supabase.storage
+                    .from("composer-frames")
+                    .createSignedUrl(path, 60 * 30);
+                  if (signed.error || !signed.data?.signedUrl) return null;
+                  const head = await fetch(signed.data.signedUrl, {
+                    method: "HEAD",
+                    signal: AbortSignal.timeout(3_000),
+                  }).catch(() => null);
+                  return head?.ok ? signed.data.signedUrl : null;
+                },
+                renderStill: v525RenderStill,
+                writeCache: async (path, bytes) => {
+                  const up = await supabase.storage
+                    .from("composer-frames")
+                    .upload(path, bytes, {
+                      contentType: "image/jpeg",
+                      upsert: true,
+                    });
+                  if (up.error) return null;
+                  const signed = await supabase.storage
+                    .from("composer-frames")
+                    .createSignedUrl(path, 60 * 30);
+                  return signed.data?.signedUrl ?? null;
+                },
               });
-              return { ok: r.ok, frameUrl: r.frameUrl ?? null, reason: r.reason ?? null };
+              v525Extract.last = r;
+              console.log(
+                `[compose-dialog-segments] scene=${sceneId} v525_plate_frame_extract ` +
+                  `frame=${r.frameNumber} ok=${r.ok} source=${r.source ?? "-"} ` +
+                  `cache_hit=${r.cacheHit ?? false} bytes=${r.bytes ?? 0} ` +
+                  `reason=${r.reason ?? "-"} detail=${r.detail ?? "-"}`,
+              );
+              return { ok: r.ok, frameUrl: r.imageUrl ?? null, reason: r.reason ?? null };
             },
             detectIdentities: async (i) => {
               // The SAME biometric matcher v274 already uses on the anchor,
@@ -5014,6 +5107,21 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             },
           });
           v524Registration = reg;
+          // V525 — one row per attempt, so a failure names every frame it
+          // tried instead of only the last one.
+          v525Attempts.push({
+            frame,
+            extract_ok: v525Extract.last?.ok ?? false,
+            extract_reason: v525Extract.last?.reason ?? null,
+            extract_source: v525Extract.last?.source ?? null,
+            extract_cache_hit: v525Extract.last?.cacheHit ?? null,
+            registration_ok: reg.ok,
+            registration_reason: reg.reason ?? null,
+            registration_detail: reg.detail ?? null,
+            resolved: reg.diagnostics.resolved,
+            requested: reg.diagnostics.requested,
+          });
+          v525Extract.last = null;
           if (reg.ok) {
             v524Records = reg.records;
             break;
@@ -5048,6 +5156,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           plate_generation: v524PlateGeneration,
           run_id: v510RunId,
           diagnostics: v524Registration?.diagnostics ?? null,
+          // V525 — bounded, at most three rows.
+          attempts: boundAttempts(v525Attempts),
           records: v524Records,
         };
       }
@@ -5125,6 +5235,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             error_message: reason,
             meta: {
               v523: firstReject.identityDetail ?? null,
+              // V525 — the upstream cause, durably, on the one write that
+              // cannot clobber a sibling's terminal state.
+              v524: (v153PlateIdentitySnapshot as any)?.plateNative ?? null,
               speaker_name: pass.speaker_name,
               speaker_idx: pass.speaker_idx,
               pass_idx: pass.idx,
@@ -5140,6 +5253,23 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq("user_id", userId);
+        // ── V525 — WHERE THE DIAGNOSIS IS PERSISTED, AND WHY NOT HERE ──
+        //
+        // Generation 21 persisted no `plate_identity.plateNative`: the
+        // snapshot is written further down the dispatch path and this
+        // branch returns 422 long before reaching it.
+        //
+        // The obvious repair — merge the record into `dialog_shots` on the
+        // update happening anyway — is the exact pattern V510 removed. A
+        // full write built from the ENTRY snapshot clobbers whatever a
+        // concurrent sibling terminalized in between, which is why the
+        // eight preflight gates that did it are gone and a contract test
+        // counts the survivors.
+        //
+        // So the evidence goes to `syncso_dispatch_log` instead: durable,
+        // append-only, queryable, and incapable of overwriting anybody's
+        // terminal state. See the `v523Block` log above, which now carries
+        // the V524 registration outcome and every V525 attempt.
         await supabase
           .from("composer_scenes")
           .update({
