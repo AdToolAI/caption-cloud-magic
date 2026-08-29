@@ -91,6 +91,24 @@ export function classifyIdentityMapSpace(input: {
   return "unknown";
 }
 
+/**
+ * How a record's identity was established.
+ *
+ * `aws_rekognition_compare_faces`
+ *     CompareFaces matched this character on THIS frame. The original and
+ *     still the default.
+ *
+ * `biometric_seed_plus_identity_locked_track`
+ *     V526-B. CompareFaces matched this character on an EARLIER frame of the
+ *     same plate, and the identity-locked continuity rule carried that face
+ *     forward, step by step, to this one. The geometry is proven here; the
+ *     biometric statement was made there, and `seedFrameNumber` says where.
+ *     Never a substitute for a comparison that did not happen.
+ */
+export type PlateIdentityEvidence =
+  | "aws_rekognition_compare_faces"
+  | "biometric_seed_plus_identity_locked_track";
+
 /** One character's face, measured on an actual frame of the current plate. */
 export interface PlateNativeIdentityRecord {
   characterId: string;
@@ -99,8 +117,21 @@ export interface PlateNativeIdentityRecord {
   frameNumber: number;
   plateDims: { width: number; height: number };
   source: "plate_native";
-  identityEvidence: "aws_rekognition_compare_faces";
+  identityEvidence: PlateIdentityEvidence;
+  /**
+   * CompareFaces score AT `frameNumber`. Null for a propagated record,
+   * because no comparison was made here — the seed's score lives in
+   * `seedSimilarity` under its own name rather than being borrowed.
+   */
   similarity: number | null;
+  // ── V526-B — propagated provenance. Absent on a direct record. ──────
+  /** The frame whose CompareFaces match seeded this one. */
+  seedFrameNumber?: number | null;
+  /** The seed's own CompareFaces score, at the seed frame. */
+  seedSimilarity?: number | null;
+  /** Accepted continuity steps walked from the seed to this frame. */
+  trackStepCount?: number;
+  trackSource?: "identity_locked_continuity";
   /** Fencing — the exact plate this geometry describes. */
   baseVideoUrl: string;
   sceneId: string;
@@ -122,7 +153,26 @@ export type RegistrationFailure =
 export interface PlateIdentityRegistration {
   ok: boolean;
   reason?: RegistrationFailure;
+  /**
+   * The complete cohort, or `[]`. Unchanged: `ok === false` still means
+   * `records` is empty, and every existing caller that reads only `ok`
+   * and `records` keeps its behaviour exactly.
+   */
   records: PlateNativeIdentityRecord[];
+  /**
+   * V526-B — the characters that DID resolve biometrically on this frame,
+   * kept when the registration as a whole failed.
+   *
+   * Generation 24 resolved 3/4 on frame 23 and 3/4 on frame 225, each time
+   * missing a different person, and threw all six accepted matches away.
+   * They are real biometric statements about the current plate and they
+   * are what a common-frame completion needs as a seed.
+   *
+   * Only accepted matches, at most one per requested character, each with
+   * the same full provenance a successful record carries. No unresolved
+   * entries, no detector dump, no score matrix.
+   */
+  partialRecords?: PlateNativeIdentityRecord[];
   frameNumber: number;
   frameUrl: string | null;
   detail?: string;
@@ -353,12 +403,17 @@ export async function registerPlateNativeIdentities(params: {
     });
   }
   if (missing.length > 0) {
-    return fail(
-      "incomplete_registration",
-      `unresolved on the plate: ${missing.join(",")}`,
-      diag,
-      extracted.frameUrl,
-    );
+    // V526-B — `ok:false` and `records: []` are untouched; the accepted
+    // subset rides alongside so a later completion pass has a seed.
+    return {
+      ...fail(
+        "incomplete_registration",
+        `unresolved on the plate: ${missing.join(",")}`,
+        diag,
+        extracted.frameUrl,
+      ),
+      partialRecords: records,
+    };
   }
 
   return {

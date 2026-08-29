@@ -291,7 +291,16 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
-function defaultDetectFaces() {
+/**
+ * V526-B — EXPORTED, body unchanged.
+ *
+ * AWS Rekognition `DetectFaces` on still bytes — anonymous geometry, no
+ * CompareFaces, no identity of its own. A common-frame completion needs
+ * exactly this per tracking step, and reusing it keeps one detector rather
+ * than a second copy with its own drift. Confidence floor, endpoint, region
+ * and payload are untouched.
+ */
+export function defaultDetectFaces() {
   const aws = awsClient();
   const endpoint = `https://rekognition.${AWS_REGION}.amazonaws.com/`;
   return async (
