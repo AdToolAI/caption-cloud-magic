@@ -420,9 +420,13 @@ Deno.test("CONTRACT — registration runs on the base video, not the anchor", ()
   assert(DIALOG.includes("baseVideoUrl: v524BaseVideoUrl!,"));
   assert(DIALOG.includes("const v524BaseVideoUrl = sourceClipUrl ?? null;"));
   assert(DIALOG.includes("extractFrame: async (i) => {"));
-  // V525 replaced the cache-only probe helper with the real extractor.
+  // V525 replaced the cache-only probe helper with the real extractor;
+  // V526-B hoisted the acquisition into one shared function, so the fenced
+  // base-video URL is now named directly instead of threaded through the
+  // callback argument. Same property, one indirection fewer.
   assert(DIALOG.includes("const r = await extractPlateFrame({"));
-  assert(DIALOG.includes("baseVideoUrl: i.videoUrl,"), "the extractor is given the base video");
+  assert(DIALOG.includes("baseVideoUrl: v524BaseVideoUrl,"), "the extractor is given the fenced base video");
+  assert(DIALOG.includes("const v525Acquire = async (frameNumber: number)"));
   // The biometric matcher is pointed at the extracted still, never at the
   // anchor, for this registration.
   assert(DIALOG.includes("anchorUrl: i.imageUrl,"));

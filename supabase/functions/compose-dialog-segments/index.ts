@@ -159,11 +159,22 @@ import {
   TRACK_SAMPLE_COUNT,
 } from "../_shared/dynamic-camera-path.ts";
 import {
+  defaultDetectFaces,
   defaultRenderStill,
   pickAssignedFace,
   STILL_FPS,
+  stillBoxToSource,
   trackAssignedFaceAcrossTurn,
 } from "../_shared/plate-face-track.ts";
+import {
+  buildCommonFrameTelemetry,
+  completeCommonFrameCohort,
+  planCommonFrameCompletion,
+  type FrameAttemptEvidence,
+} from "../_shared/v526b-common-frame-identity.ts";
+import { TRACK_SAMPLE_COUNT_MAX, trackSampleTimes } from "../_shared/dynamic-camera-path.ts";
+// V526-B — the same decoder `plate-face-track` uses for still dimensions.
+import jpegDecodeV526 from "npm:jpeg-js@0.4.4";
 import {
   buildSceneFrameTelemetry,
   selectSceneIdentityFrames,
@@ -5035,6 +5046,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         // base-video URL, so a generation-20 frame is unreachable here
         // rather than merely rejected.
         const v525Attempts: RegistrationAttempt[] = [];
+        // V526-B — accepted biometric records per attempted frame.
+        const v526bEvidence: FrameAttemptEvidence[] = [];
         // A holder rather than a bare `let`: the value is written inside the
         // injected closure and read after it, and narrowing a closure-assigned
         // local to `never` is a TypeScript artefact, not a real invariant.
@@ -5050,6 +5063,71 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             return null;
           }
         })();
+        // V525/V526-B — ONE acquisition path. Both the registration loop and
+        // the common-frame completion go through it, so every still comes
+        // from the same source-fenced cache and a frame already rendered is
+        // never rendered twice.
+        const v525Acquire = async (frameNumber: number): Promise<PlateFrameExtractResult> => {
+          if (!v525RenderStill) {
+            return {
+              ok: false,
+              frameNumber,
+              reason: "probe_cache_miss",
+              detail: "still renderer unavailable",
+            };
+          }
+          const r = await extractPlateFrame({
+            userId,
+            projectId: String((scene as any)?.project_id ?? ""),
+            sceneId,
+            baseVideoUrl: v524BaseVideoUrl,
+            totalSec,
+            frameNumber,
+            timeoutMs: 30_000,
+            fingerprint: async (value) => {
+              const d = await crypto.subtle.digest(
+                "SHA-256",
+                new TextEncoder().encode(value) as unknown as BufferSource,
+              );
+              return Array.from(new Uint8Array(d))
+                .map((b) => b.toString(16).padStart(2, "0"))
+                .join("")
+                .slice(0, 32);
+            },
+            readCache: async (path) => {
+              const signed = await supabase.storage
+                .from("composer-frames")
+                .createSignedUrl(path, 60 * 30);
+              if (signed.error || !signed.data?.signedUrl) return null;
+              const head = await fetch(signed.data.signedUrl, {
+                method: "HEAD",
+                signal: AbortSignal.timeout(3_000),
+              }).catch(() => null);
+              return head?.ok ? signed.data.signedUrl : null;
+            },
+            renderStill: v525RenderStill,
+            writeCache: async (path, bytes) => {
+              const up = await supabase.storage
+                .from("composer-frames")
+                .upload(path, bytes, {
+                  contentType: "image/jpeg",
+                  upsert: true,
+                });
+              if (up.error) return null;
+              const signed = await supabase.storage
+                .from("composer-frames")
+                .createSignedUrl(path, 60 * 30);
+              return signed.data?.signedUrl ?? null;
+            },
+          });
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} v525_plate_frame_extract ` +
+              `frame=${r.frameNumber} ok=${r.ok} source=${r.source ?? "-"} ` +
+              `cache_hit=${r.cacheHit ?? false} bytes=${r.bytes ?? 0} ` +
+              `reason=${r.reason ?? "-"} detail=${r.detail ?? "-"}`,
+          );
+          return r;
+        };
         // Bounded: stop at the first frame that can place EVERY character.
         // A partial registration is not evidence about where anybody is.
         for (const frame of v524Reuse.hit ? [] : v524Frames) {
@@ -5063,67 +5141,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             registeredAt: new Date().toISOString(),
             characters: v524Chars,
             extractFrame: async (i) => {
-              if (!v525RenderStill) {
-                const r: PlateFrameExtractResult = {
-                  ok: false,
-                  frameNumber: i.frameNumber,
-                  reason: "probe_cache_miss",
-                  detail: "still renderer unavailable",
-                };
-                v525Extract.last = r;
-                return { ok: false, frameUrl: null, reason: r.reason };
-              }
-              const r = await extractPlateFrame({
-                userId,
-                projectId: String((scene as any)?.project_id ?? ""),
-                sceneId,
-                baseVideoUrl: i.videoUrl,
-                totalSec,
-                frameNumber: i.frameNumber,
-                timeoutMs: 30_000,
-                fingerprint: async (value) => {
-                  const d = await crypto.subtle.digest(
-                    "SHA-256",
-                    new TextEncoder().encode(value) as unknown as BufferSource,
-                  );
-                  return Array.from(new Uint8Array(d))
-                    .map((b) => b.toString(16).padStart(2, "0"))
-                    .join("")
-                    .slice(0, 32);
-                },
-                readCache: async (path) => {
-                  const signed = await supabase.storage
-                    .from("composer-frames")
-                    .createSignedUrl(path, 60 * 30);
-                  if (signed.error || !signed.data?.signedUrl) return null;
-                  const head = await fetch(signed.data.signedUrl, {
-                    method: "HEAD",
-                    signal: AbortSignal.timeout(3_000),
-                  }).catch(() => null);
-                  return head?.ok ? signed.data.signedUrl : null;
-                },
-                renderStill: v525RenderStill,
-                writeCache: async (path, bytes) => {
-                  const up = await supabase.storage
-                    .from("composer-frames")
-                    .upload(path, bytes, {
-                      contentType: "image/jpeg",
-                      upsert: true,
-                    });
-                  if (up.error) return null;
-                  const signed = await supabase.storage
-                    .from("composer-frames")
-                    .createSignedUrl(path, 60 * 30);
-                  return signed.data?.signedUrl ?? null;
-                },
-              });
+              const r = await v525Acquire(i.frameNumber);
               v525Extract.last = r;
-              console.log(
-                `[compose-dialog-segments] scene=${sceneId} v525_plate_frame_extract ` +
-                  `frame=${r.frameNumber} ok=${r.ok} source=${r.source ?? "-"} ` +
-                  `cache_hit=${r.cacheHit ?? false} bytes=${r.bytes ?? 0} ` +
-                  `reason=${r.reason ?? "-"} detail=${r.detail ?? "-"}`,
-              );
               return { ok: r.ok, frameUrl: r.imageUrl ?? null, reason: r.reason ?? null };
             },
             detectIdentities: async (i) => {
@@ -5148,6 +5167,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             },
           });
           v524Registration = reg;
+          // V526-B — the characters that DID resolve on this frame. They
+          // are real biometric statements about the current plate and,
+          // until now, were discarded the moment the frame failed.
+          if (!reg.ok && Array.isArray(reg.partialRecords) && reg.partialRecords.length > 0) {
+            v526bEvidence.push({ frame, records: reg.partialRecords });
+          }
           // V525 — one row per attempt, so a failure names every frame it
           // tried instead of only the last one.
           v525Attempts.push({
@@ -5179,6 +5204,90 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             `legacy_space=${v524LegacySpace} reason=${v524Registration?.reason ?? "-"} ` +
             `detail=${v524Registration?.detail ?? "-"}`,
         );
+        // ══ V526-B — COMPLETE THE CAST ON ONE COMMON FRAME ═══════════
+        //
+        // Generation 24: every character was biometrically resolvable
+        // somewhere in this plate, and no single sampled frame carried
+        // all four. Frame 23 missed Sarah, frame 225 missed Matthew.
+        //
+        // Unioning those frames would hand V523 a target and siblings
+        // measured six seconds apart — the same referent split V522 and
+        // V524 closed, one level down. So identity evidence may cross
+        // frames and geometry may not: one frame is the target, whoever
+        // is missing there is carried to it by the identity-locked
+        // continuity rule the V452 tracker already uses, and every box
+        // handed on is measured or proven at that one frame.
+        //
+        // No threshold moves. If six seconds cannot be proven under the
+        // existing picker, this fails closed — and that failure is the
+        // first hard measurement of how much this cast actually moves.
+        let v526bPlan: ReturnType<typeof planCommonFrameCompletion> | null = null;
+        let v526bResult: Awaited<ReturnType<typeof completeCommonFrameCohort>> | null = null;
+        if (!v524Registration?.ok && v526bEvidence.length > 0 && plateDims && v524BaseVideoUrl) {
+          v526bPlan = planCommonFrameCompletion({
+            attempts: v526bEvidence,
+            requestedCharacterIds: v524Chars.map((c: any) => c.characterId),
+            fence: v524Fence,
+            fps: STILL_FPS,
+            maxSteps: TRACK_SAMPLE_COUNT_MAX,
+            sampleTimes: trackSampleTimes,
+          });
+          if (v526bPlan.ok && v525RenderStill) {
+            const v526bDetect = defaultDetectFaces();
+            v526bResult = await completeCommonFrameCohort({
+              plan: v526bPlan,
+              fence: v524Fence,
+              registeredAt: new Date().toISOString(),
+              pick: pickAssignedFace,
+              detectAtFrame: async (frame) => {
+                // Through the V525 source-fenced cache, never around it:
+                // the target is already one of the sampled frames and
+                // should normally cost nothing to re-acquire.
+                const got = await v525Acquire(frame);
+                if (!got.ok || !got.imageUrl) {
+                  return { ok: false, candidates: [], reason: got.reason ?? "extract_failed" };
+                }
+                try {
+                  const res = await fetch(got.imageUrl, { signal: AbortSignal.timeout(20_000) });
+                  if (!res.ok) return { ok: false, candidates: [], reason: `still_http_${res.status}` };
+                  const bytes = new Uint8Array(await res.arrayBuffer());
+                  const img = jpegDecodeV526.decode(bytes, { useTArray: true });
+                  const faces = await v526bDetect(bytes, img.width, img.height, 20_000);
+                  return {
+                    ok: true,
+                    candidates: faces.map((f: any) => ({
+                      bbox: stillBoxToSource(f.bbox, plateDims!.width, plateDims!.height, img.width, img.height),
+                      mouth: null,
+                    })),
+                  };
+                } catch (e) {
+                  return { ok: false, candidates: [], reason: (e as Error)?.message ?? "detect_failed" };
+                }
+              },
+            });
+            if (v526bResult.ok) {
+              v524Records = v526bResult.records;
+              v524Registration = {
+                ok: true,
+                records: v526bResult.records,
+                frameNumber: v526bResult.targetFrame ?? -1,
+                frameUrl: null,
+                diagnostics: {
+                  requested: v524Chars.length,
+                  resolved: v526bResult.records.length,
+                  detected: v526bResult.records.length,
+                  minSimilarity: null,
+                  detectorDims: plateDims,
+                  rescaled: false,
+                },
+              };
+            }
+          }
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} v526b_common_frame ` +
+              JSON.stringify(buildCommonFrameTelemetry(v526bPlan, v526bResult)),
+          );
+        }
         // Bounded persistence into the EXISTING plate_identity JSONB — the
         // snapshot is written to dialog_shots after this block, so no
         // schema change and no second write path. Records only: no frames,
@@ -5195,6 +5304,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           legacy_space: v524LegacySpace,
           // V526-A — which stretch of time the candidates came from.
           frame_authority: buildSceneFrameTelemetry(v526Selection),
+          // V526-B — whether the cast had to be completed on one frame.
+          common_frame: v526bPlan
+            ? buildCommonFrameTelemetry(v526bPlan, v526bResult)
+            : null,
           base_video_url: v524BaseVideoUrl,
           plate_generation: v524PlateGeneration,
           run_id: v510RunId,
