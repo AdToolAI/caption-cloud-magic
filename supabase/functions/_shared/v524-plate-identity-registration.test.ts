@@ -433,7 +433,12 @@ Deno.test("CONTRACT — registration runs on the base video, not the anchor", ()
 });
 
 Deno.test("CONTRACT — the frame authority is the gate's own candidates, bounded", () => {
-  assert(DIALOG.includes("frameCandidatesForTurn(builtPasses[0].segments[0], totalSec, ASSUMED_FPS).slice(0, 3)"));
+  // V526-A moved the registration's frame authority from the first turn
+  // of the first pass to a scene-wide sample. The invariant this test
+  // exists for is the BOUND, not which clock supplies the candidates.
+  assert(DIALOG.includes("const v526Selection = selectSceneIdentityFrames({"));
+  assert(DIALOG.includes("maxFrames: 3,"));
+  assert(DIALOG.includes("const v524Frames = v526Selection.frames;"));
   // Stop at the first COMPLETE registration; never scan. V524-P0 also
   // skips the loop entirely on a cache hit.
   const at = DIALOG.indexOf("for (const frame of v524Reuse.hit ? [] : v524Frames) {");
@@ -511,7 +516,9 @@ Deno.test("CONTRACT — no new thresholds, and the frozen layers are untouched",
   const track = read("./plate-face-track.ts");
   assert(track.includes("export const TRACK_MIN_IOU = 0.15;"));
   assert(track.includes("export const TRACK_MAX_CENTER_DRIFT = 0.7;"));
-  assertEquals(track.includes("V524"), false);
+  // V526-A added one comment to that file naming V524 as the caller it
+  // corrected. No executable line does.
+  assertEquals(codeOnly(track).includes("V524"), false);
   for (const f of [
     "./v520-track-feasibility.ts",
     "./compute-mouth-centered-crop.ts",
