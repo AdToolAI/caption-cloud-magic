@@ -198,6 +198,18 @@ export interface PlateFaceSlotRouterResult {
    * geometric count mismatch.
    */
   faceSizeLimited?: boolean;
+  /**
+   * V527 — dimensions of the image bytes DetectFaces actually inspected.
+   * Every pixel-space sanity measurement is expressed in this space.
+   */
+  detectionDims?: { width: number; height: number };
+  /**
+   * V527 — destination dimensions the accepted boxes are projected into
+   * for downstream routing. Equal to `dims`.
+   */
+  projectionDims?: { width: number; height: number };
+  /** V527 — which coordinate space the sanity gate was evaluated in. */
+  sanitySpace?: "anchor_native";
   msTotal: number;
 }
 
@@ -262,6 +274,69 @@ function probeImageDims(bytes: Uint8Array): { width: number; height: number } | 
   return null;
 }
 
+/**
+ * V527 — TWO DIMENSION AUTHORITIES.
+ *
+ * Generation 25 failed a four-face shot with `faces_too_small_for_lipsync`
+ * at 38 px against a 40 px floor. The face was not too small: DetectFaces
+ * had inspected the 704x1510 anchor still, and its normalized boxes were
+ * being denormalized with the 656x1406 base-video dimensions before the
+ * size gate ran. The same face measures ~40.8 px in the raster that was
+ * actually looked at.
+ *
+ * The arithmetic was right; the object was wrong. So the two spaces are now
+ * named and kept apart:
+ *
+ *   detectionDims  — the bytes DetectFaces inspected. ALL pixel-space
+ *                    sanity is measured here, because that is the only
+ *                    raster the measurement is a statement about.
+ *   projectionDims — the destination the accepted boxes are re-expressed
+ *                    in for downstream routing. A later, separate step.
+ *
+ * Returns null when the detection space cannot be established. The caller
+ * fails closed rather than borrowing the projection dims, which would just
+ * reinstate the same false assumption under a different name.
+ */
+export interface DimensionAuthority {
+  detectionDims: { width: number; height: number };
+  projectionDims: { width: number; height: number };
+}
+
+export function resolveDimensionAuthority(
+  detectionDims: { width: number; height: number } | null | undefined,
+  projectionDims?: { width: number; height: number } | null,
+): DimensionAuthority | null {
+  const usable = (d: { width: number; height: number } | null | undefined) =>
+    !!d && Number.isFinite(d.width) && Number.isFinite(d.height) &&
+    d.width > 0 && d.height > 0;
+  if (!usable(detectionDims)) return null;
+  const det = { width: detectionDims!.width, height: detectionDims!.height };
+  return {
+    detectionDims: det,
+    // No projection target supplied → the detection raster IS the
+    // destination. Never the other way round.
+    projectionDims: usable(projectionDims)
+      ? { width: projectionDims!.width, height: projectionDims!.height }
+      : det,
+  };
+}
+
+/**
+ * V527 — the one denormalization formula, so detection space and projection
+ * space cannot drift apart by being written twice. Unchanged arithmetic.
+ */
+export function denormalizeFaceBox(
+  norm: { Left: number; Top: number; Width: number; Height: number },
+  dims: { width: number; height: number },
+): [number, number, number, number] {
+  const { Left, Top, Width, Height } = norm;
+  const x1 = Math.max(0, Math.min(dims.width, Math.round(Left * dims.width)));
+  const y1 = Math.max(0, Math.min(dims.height, Math.round(Top * dims.height)));
+  const x2 = Math.max(0, Math.min(dims.width, Math.round((Left + Width) * dims.width)));
+  const y2 = Math.max(0, Math.min(dims.height, Math.round((Top + Height) * dims.height)));
+  return [x1, y1, x2, y2];
+}
+
 async function detectFacesOnBytes(
   bytes: Uint8Array,
   dims: { width: number; height: number },
@@ -280,14 +355,14 @@ async function detectFacesOnBytes(
     const conf = Number(d.Confidence ?? 0);
     if (conf < 80) continue;
     const { Left, Top, Width, Height } = d.BoundingBox;
-    const x1 = Math.max(0, Math.min(dims.width, Math.round(Left * dims.width)));
-    const y1 = Math.max(0, Math.min(dims.height, Math.round(Top * dims.height)));
-    const x2 = Math.max(0, Math.min(dims.width, Math.round((Left + Width) * dims.width)));
-    const y2 = Math.max(0, Math.min(dims.height, Math.round((Top + Height) * dims.height)));
+    // V527 — `dims` is the DETECTION raster. The 8 px noise floor and the
+    // pixel bbox are both statements about the image that was inspected.
+    const bbox = denormalizeFaceBox({ Left, Top, Width, Height }, dims);
+    const [x1, y1, x2, y2] = bbox;
     if (x2 - x1 < 8 || y2 - y1 < 8) continue;
     raw.push({
       norm: { Left, Top, Width, Height },
-      bbox: [x1, y1, x2, y2],
+      bbox,
       cx: Left + Width / 2,
       cy: Top + Height / 2,
       confidence: conf / 100,
@@ -356,20 +431,32 @@ export async function routePlateFacesToAnchor(params: {
   const bytes = await fetchImageBytes(plateUrl);
   if (!bytes) return emptyResult("plate_fetch_failed");
 
-  const dims = params.plateDims ?? probeImageDims(bytes) ?? { width: 1920, height: 1080 };
+  // V527 — establish the detection space from the bytes themselves. The
+  // caller's `plateDims` describes the destination, not what was looked at,
+  // so it can no longer stand in for the measurement space; the old
+  // 1920x1080 default is gone for the same reason.
+  const authority = resolveDimensionAuthority(probeImageDims(bytes), params.plateDims);
+  if (!authority) {
+    return emptyResult("anchor_detection_dims_unavailable");
+  }
+  const detectionDims = authority.detectionDims;
+  const dims = authority.projectionDims;
 
   let detected: Awaited<ReturnType<typeof detectFacesOnBytes>>;
   try {
-    detected = await detectFacesOnBytes(bytes, dims);
+    detected = await detectFacesOnBytes(bytes, detectionDims);
   } catch (e) {
-    return { ...emptyResult(`detect_failed:${(e as Error).message}`), dims };
+    return { ...emptyResult(`detect_failed:${(e as Error).message}`), dims, detectionDims, projectionDims: dims };
   }
 
   const anchorSlots = [...anchorLayout.slots].sort((a, b) => a.slotIndex - b.slotIndex);
   const rows = anchorSlots.length;
 
+  // V527 — downstream still receives plate-space boxes. Projecting from the
+  // normalized box (not from the detection pixels) keeps this bit-identical
+  // to the pre-V527 output and avoids a second rounding.
   const faces: RoutedPlateFace[] = detected.map((d) => ({
-    slot: d.slot, bbox: d.bbox, cx: d.cx, cy: d.cy,
+    slot: d.slot, bbox: denormalizeFaceBox(d.norm, dims), cx: d.cx, cy: d.cy,
     characterId: null, distance: null, matchConfidence: 0,
   }));
 
@@ -383,6 +470,8 @@ export async function routePlateFacesToAnchor(params: {
         detectedCount: detected.length,
       }),
       dims,
+      detectionDims,
+      projectionDims: dims,
       faces,
       countMismatch: rows !== detected.length,
     };
@@ -390,9 +479,14 @@ export async function routePlateFacesToAnchor(params: {
 
 
   // ── Contract A — candidate sanity BEFORE any assignment ────────────
+  // V527 — measured against the raster DetectFaces inspected. `d.bbox` is
+  // detection-native by construction; pairing it with `detectionDims` is the
+  // whole fix. Every metric in the block travels together: shortSidePx, the
+  // areaRatio denominator and the in-raster tolerance all now refer to one
+  // and the same image.
   const { plausible, rejected, measurements } = filterPlausibleCandidates(
     detected.map((d, i) => ({ index: i, bbox: d.bbox, cx: d.cx, cy: d.cy })),
-    dims,
+    detectionDims,
   );
   for (const r of rejected) {
     const f = faces[r.index];
@@ -408,6 +502,9 @@ export async function routePlateFacesToAnchor(params: {
     `reasons=${JSON.stringify(rejected)} ` +
     `v507_face_size_limited=${faceSizeLimited ? 1 : 0} ` +
     `min_short_side_px=${PLATE_FACE_SANITY.minFaceShortSidePx} ` +
+    `sanity_space=anchor_native ` +
+    `detection_dims=${detectionDims.width}x${detectionDims.height} ` +
+    `projection_dims=${dims.width}x${dims.height} ` +
     `plate=${dims.width}x${dims.height} measurements=${JSON.stringify(measurements)}`,
   );
 
@@ -440,6 +537,9 @@ export async function routePlateFacesToAnchor(params: {
       detectedCount: detected.length,
       sanityMeasurements: measurements,
       faceSizeLimited,
+      detectionDims,
+      projectionDims: dims,
+      sanitySpace: "anchor_native",
       failureClass: classifyRouterFailure({
         reason,
         detectSucceeded: true,
@@ -485,6 +585,9 @@ export async function routePlateFacesToAnchor(params: {
     reason: resolved === rows ? undefined : "incomplete_bijection",
     detectSucceeded: true,
     detectedCount: detected.length,
+    detectionDims,
+    projectionDims: dims,
+    sanitySpace: "anchor_native",
     failureClass: resolved === rows
       ? undefined
       : classifyRouterFailure({
