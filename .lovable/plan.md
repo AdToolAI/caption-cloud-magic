@@ -1,65 +1,91 @@
-# READ-ONLY RCA — `preclip_identity_geometry_mismatch`, pass_idx 4 (Matthew), gen 16
+# GEN26 RCA — Scene 67b392b1 / run 3dd0bdbb / gen-26 (READ-ONLY, no changes made)
 
-No code, DB, deploy, provider or publish action was performed.
+## First true failure
 
-## 1. Exact emitter
+The Remotion still is rendered in a **1280x720 landscape composition** while the plate is
+portrait **656x1406**. V524's raster-coherence guard correctly rejects it.
 
-`supabase/functions/compose-dialog-segments/index.ts`
-- L6945 guard `if (v161UsingPreclipForBbox && box && v161PreclipCrop)` (Contract E block)
-- L6980-6984 `resolvePreclipContainmentAuthority({ plannerContainBox: pass.v457_contain_box, plannerContainSource: pass.v457_contain_source, staticDispatchBox: box })`
-- L7000-7004 `evaluatePreclipCropContainment({ crop: v161PreclipCrop, targetBbox: authority.targetBox, otherSpeakerCenters })`
-- L7005-7040 on `!containment.ok` → `_v152HardFail.reason/errorClass = "preclip_identity_geometry_mismatch"`, console tag `fa4_preclip_containment_fail_closed` (L7044)
+Chain: HappyHorse base OK -> V527 FA-4 OK -> V526-A frames [23,225,428] -> V525 extracted all
+three (`source=remotion_still`) -> V524 `dims_incoherent` on all three -> V526-B not reached ->
+V523 `reference_space_mismatch` -> `identity_unresolved Sarah`.
 
-The failing branch is E.1 in `_shared/preclip-crop-containment.ts` L67-73 → `target_not_contained_in_crop`. This runs strictly before dispatch, which matches `provider_call_made=false` / `external_job_id=null`.
+## Exact source lines
 
-## 2. Where the 128 crop comes from, and the persisted 394 crop
+1. `supabase/functions/_shared/plate-face-track.ts:231-283` — `defaultRenderStill()`.
+   The Lambda payload (L238-266) sends
+   `inputProps.payload = { masterVideoUrl, masterAudioUrl, totalSec, shots: [] }`
+   and `forceWidth: null, forceHeight: null`, `scale: 1`.
+   It never sends `targetWidth` / `targetHeight`.
+2. `src/remotion/Root.tsx:476-509` — composition `DialogStitchVideo` is declared
+   `width={1280} height={720}`, and `calculateMetadata` resolves the raster as
+   `even(props.targetWidth, 1280)` / `even(props.targetHeight, 720)` (L497-498).
+   With those props absent, it falls back to **1280x720** for every V525 still.
+3. `src/remotion/templates/DialogStitchVideo.tsx:719-726` — the master plate is drawn as a
+   full-bleed `<Video style={{width:'100%',height:'100%',objectFit:'cover'}}>`.
+4. `supabase/functions/_shared/v524-plate-identity-registration.ts:319-332` — the guard:
+   `aspectDrift = |dw/dh - W/H| / (W/H)`; `> 0.01` -> `dims_incoherent`.
+   `(1280/720 = 1.7778)` vs `(656/1406 = 0.4666)` -> drift `2.8103`, exactly as logged.
 
-- The 128 crop is the freshly planned in-memory crop of THIS run/generation: `_shared/pass-face-preclip.ts` L503-530 (`computeMouthCenteredCrop`), assigned to `pass.preclip_crop` at `compose-dialog-segments/index.ts` L6243-6248 after a successful preclip render.
-- `{x:576,y:162,size:394}` in the persisted `dialog_shots` pass row is not the box that was judged. The gate fires before the pass row for generation 16 is written through, so the row still carries the geometry of an earlier generation/pass state. It is stale telemetry, not a second authority — the arithmetic in the failure detail uses `[709,317,837,445]` size 128, which is exactly the in-memory `v161PreclipCrop` (L6875).
+## What the still actually is
 
-## 3. How `v457_contains_target=true` coexists with `target_not_contained_in_crop`
+Not letterboxed, not stretched: `object-fit: cover` with
+`s = max(1280/656, 720/1406) = 1.951` scales the portrait plate to 1280x2743 and then
+**center-crops a 720px horizontal band out of 2743px** — roughly the middle 26% of the frame,
+full width. Faces above or below that band are physically absent from the raster, and those
+inside it are heavily zoomed. So it is a landscape raster containing a cropped, magnified
+slice of the portrait video — it is *not* the same picture as the plate, which is precisely
+what V524's guard exists to detect. The guard behaved correctly.
 
-This is the actual defect, in `_shared/compute-mouth-centered-crop.ts` L322-357:
+Note: `plate-face-track` itself survives this because it inverts the cover transform in
+`stillPointToSource` (`plate-face-track.ts:117-131`) — but that inversion cannot recover faces
+that were cropped out, and V524 deliberately does not use it (rescaling is allowed, re-framing
+is not).
 
-- `perFrameMinCropPx` (set by V461 E when a turn track exists) switches the planner into `feasibilityMode = "dynamic"`.
-- `projectCropToContain({x,y,size}, containBox, ...)` is still called (L334) and `containsTarget = p.containsTarget` is taken from the PROJECTED crop (L335).
-- In dynamic mode the projection result is applied only when `!p.sizeGrown` (L344-350). If the union would require growth, the projection is deliberately DISCARDED and the crop stays at the smaller size — but `containsTarget` keeps the value computed for the discarded, grown crop.
+## Why V524 sees detectorDims 1280x720
 
-So `v457_contains_target=true` describes a crop that was never rendered. Numerically: contain box `[757,339,884,525]` is 127x186; the rendered crop is 128px square. 186 > 128 → growth was required → projection discarded → the reported `true` is unreachable for that crop.
+`detected.dims` comes from `resolveIdentityViaRekognition`, which probes the dimensions of the
+bytes it was handed (the V525 still). Those bytes really are 1280x720, so the detector is
+truthful; the defect is upstream in what was rendered, not in measurement.
 
-## 4. Root classification
+## Answers to the specific questions
 
-Not stale telemetry alone, and not a race. It is a genuine authority mismatch introduced by the interaction of two contracts:
+- **V527 worked as intended.** FA-4 anchor-native sanity passed and the run advanced past the
+  gate that terminalized gen-25. The gen-26 failure is a different, later gate.
+- **V526-B was NOT reached.** `compose-dialog-segments/index.ts:5226` requires
+  `v526bEvidence.length > 0`, and evidence is only pushed at L5170-5174 from
+  `reg.partialRecords`. `dims_incoherent` returns through `fail()`
+  (`v524-plate-identity-registration.ts:267-280`), which emits no `partialRecords` — the
+  failure happens before any face is mapped to a character, so `resolved=0` is literal. The
+  V526-B trigger condition is not wrong; there was genuinely nothing to seed it with.
+- **Provider spend:** HappyHorse base video, 3x Remotion Lambda stills (frames 23/225/428,
+  cached under the source-fenced `plate-frames` path so a retry of the same base video will
+  not re-render them), and the Rekognition identity calls per frame. **No Sync.so / lip-sync
+  provider dispatch occurred** — the run terminalized in V523 before dispatch.
 
-- V461 E / V452: in dynamic mode the union is explicitly NOT a size authority; containment is proved per frame by the camera path (`cameraPathContainsAll`, `pass-face-preclip.ts` L722-735 `v461e_camera_path_cannot_contain`).
-- V510-P1 (`_shared/preclip-geometry-authority.ts` L83-107): when `containSource === "turn_track"` Contract E adopts the planner union as its target and tests it against the single static crop — the one containment the planner never claimed in dynamic mode.
+## Smallest root-cause-safe fix direction (not implemented)
 
-Secondary contributor: the dishonest `containsTarget` above, which hides the discarded projection from every downstream consumer.
+Make the still raster equal the plate raster, at the single point where the payload is built:
+add `targetWidth` / `targetHeight` (the known plate dims) to the `inputProps` payload in
+`defaultRenderStill()`. The Remotion side already supports this — `calculateMetadata` reads
+exactly those two props today and only falls back to 1280x720 because they are missing. No
+composition change, no threshold change, no touch to V524's aspect guard, no new Lambda path.
 
-## 5. V516
+Consequences to weigh before doing it:
 
-Not involved and not the cause. `chooseCoherentMouthAuthority` runs earlier at `compose-dialog-segments/index.ts` L6095-6136 and only selects the mouth landmark/authority. The failure is a crop-vs-union containment verdict downstream of it; V516 is correctly bypassed by this path.
+- Plate dims must be threaded into the renderer signature (currently
+  `(videoUrl, totalSec, frame, timeoutMs)`), which touches `plate-face-track`'s V452 tracking
+  loop and V525's injected `renderStill` contract.
+- With coherent dims, `stillPointToSource` becomes an identity transform for the tracking path
+  — correct, but it changes the numbers V452 produces, so the V452 sample path needs its own
+  verification rather than being assumed unaffected.
+- The V525 cache key is fingerprinted on the base-video URL only, not on raster size. Existing
+  1280x720 objects for this scene would be served as cache hits after the change; the key
+  needs a raster component, or the affected prefix has to be considered stale.
+- `transition-frame.ts:101-123` and `measure-provider-motion-sync.ts:329-351` build the same
+  payload shape with the same 1280x720 fallback. They are out of scope for this failure, but
+  they share the defect and should be assessed separately, not silently changed.
 
-## 6. Smallest safe fix point (not weakening the gate)
+Recommended first step is a bounded, dims-aware render variant used only by the V525
+acquisition path, leaving the V452 tracking call untouched until it is separately verified.
 
-Make Contract E judge the object the planner actually proved, per feasibility mode:
-
-- Planner emits its containment regime and proof explicitly (`feasibility_mode`, `projection_discarded`, camera-path proof), and reports `containsTarget` for the FINAL crop only — `null`/`false` when the projection was discarded.
-- Contract E then either (a) tests the union against the per-frame camera-path windows (dynamic regime), or (b) keeps today's exact static-crop test with the static anchor target when there is no proved dynamic path.
-
-Fail-closed identity stays intact: E.3 sibling-center exclusion, zero tolerance, no padding, no thresholds touched; missing or unproved evidence still terminalizes.
-
-## 7. Why Matthew, why 0/2/3 passed
-
-Consistent with movement, not confirmed by an independent run. Matthew's turn track spans a 127x186 union against a 128px crop — a tall, moving trajectory forces `sizeGrown`, which is the only condition that triggers the discard path. Passes 0/2/3 either had no measured track (static regime, projection applied and crop grown normally) or a union that fit inside the chosen crop size (`!p.sizeGrown` branch, shift applied) — both leave crop and target coherent. This should be confirmed by reading the `v457_contain`, `v452_camera_path` and `v461e` log lines of passes 0/2/3 in the same generation before any fix is coded.
-
-## 8. Files/functions a future fix would touch
-
-- `supabase/functions/_shared/compute-mouth-centered-crop.ts` — `computeMouthCenteredCrop` L322-357 (honest `containsTarget`, expose discard + feasibility mode)
-- `supabase/functions/_shared/pass-face-preclip.ts` — L486-530, L696-770, result payload L820-835 / L1110-1125 (propagate mode + camera-path proof)
-- `supabase/functions/_shared/preclip-geometry-authority.ts` — `resolvePreclipContainmentAuthority` (regime-aware authority)
-- `supabase/functions/_shared/preclip-crop-containment.ts` — `evaluatePreclipCropContainment` (per-frame window variant, E.1 only)
-- `supabase/functions/compose-dialog-segments/index.ts` — L6243-6330 (persist new provenance), L6945-7050 (Contract E call + telemetry)
-- Mirrors/tests: `src/lib/composer/computeMouthCenteredCrop.ts`, `src/lib/composer/__tests__/v457PreclipCropContainment.test.ts`
-
-RCA ends here. No fix gate is proposed for execution in this message.
+No code, thresholds, guards or deployments were changed.
