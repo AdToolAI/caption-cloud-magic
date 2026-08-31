@@ -4684,6 +4684,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           const v523NeedsIdentity = speakers.length >= 3 && !!plateDims;
           let v523Ref: IdentityReference | null = null;
           let v523Repair: IdentityRepairResult | null = null;
+          // V530 — which picture, which clock, which detector answered.
+          let v530Telemetry: Record<string, unknown> | null = null;
           if (v523NeedsIdentity && box && plateDims) {
             // V524 — this character's face as measured on the actual base
             // video, found by characterId and fenced to this scene, run,
@@ -4734,22 +4736,65 @@ serve((req: Request) => withLang(req, () => (async (req) => {
                 v523SiblingRefs.push(sb as [number, number, number, number]);
               }
             }
-            v523Repair = resolveIdentityLockedRepair({
-              reference: v523Ref,
-              candidates: sortedBoxes.map((b: any) => ({
-                bbox: [
-                  Math.round(Number(b.x) * plateDims!.width),
-                  Math.round(Number(b.y) * plateDims!.height),
-                  Math.round((Number(b.x) + Number(b.w)) * plateDims!.width),
-                  Math.round((Number(b.y) + Number(b.h)) * plateDims!.height),
-                ] as [number, number, number, number],
-                mouth: null,
-              })),
-              siblingCenters: v523Siblings,
-              siblingReferences: v523SiblingRefs,
-              pick: pickAssignedFace,
-              positionalSlot: slot >= 0 ? slot : null,
-            });
+            // ══ V530 — SAME PICTURE, SAME DETECTOR, SAME CLOCK ═══════════
+            //
+            // `frame` counts in ASSUMED_FPS because the surrounding gate
+            // and its legacy validation still do. The still authority
+            // counts in STILL_FPS. Reinterpreting 54 as a 30-fps frame
+            // would move the sample 0.45 s earlier, so the TIME is carried
+            // across instead and re-quantised with the same rounding
+            // `uniqueSortedFrames` and V526-A already use.
+            const v530SampleSec = frame / ASSUMED_FPS;
+            const v530Frame = Math.max(0, Math.round(v530SampleSec * STILL_FPS));
+            const v530 = await v530TargetFaces(v530Frame);
+            v530Telemetry = {
+              gate_frame: frame,
+              fps_authority: STILL_FPS,
+              sample_time_sec: Number(v530SampleSec.toFixed(3)),
+              still_frame: v530Frame,
+              candidate_source: "plate_native_aws_detect_faces",
+              candidate_count: v530.candidates.length,
+              still_cache_hit: v530.cacheHit ?? false,
+              requested_raster: v530.requestedRaster ?? null,
+              actual_raster: v530.actualRaster ?? null,
+              reason: v530.reason ?? null,
+            };
+            console.log(
+              `[compose-dialog-segments] scene=${sceneId} pass=${pass.idx} v530_target ` +
+                `gate_frame=${frame} fps_authority=${STILL_FPS} sample_sec=${v530SampleSec.toFixed(3)} ` +
+                `still_frame=${v530Frame} ok=${v530.ok} candidates=${v530.candidates.length} ` +
+                `source=plate_native_aws_detect_faces cache_hit=${v530.cacheHit ?? false} ` +
+                `requested_raster=${v530.requestedRaster ?? "-"} actual_raster=${v530.actualRaster ?? "-"} ` +
+                `reason=${v530.reason ?? "-"}`,
+            );
+            if (!v530.ok) {
+              // Fail closed. There is no second measurement to fall back to:
+              // the Gemini/MediaPipe boxes are exactly what V530 removed from
+              // this authority, and a positional slot was never one.
+              v523Repair = {
+                ok: false,
+                reason: "identity_unresolved",
+                candidatesConsidered: 0,
+                positionalWouldHavePicked: null,
+                detail: v530.reason ?? "v530_target_unavailable",
+              };
+            } else {
+              v523Repair = resolveIdentityLockedRepair({
+                reference: v523Ref,
+                // V530 — AWS DetectFaces boxes on the V528 raster-fenced
+                // still, converted by the same `stillBoxToSource` the turn
+                // tracker uses. The same kind of measurement as the
+                // reference, so IoU and centre drift mean something.
+                candidates: v530.candidates,
+                siblingCenters: v523Siblings,
+                siblingReferences: v523SiblingRefs,
+                // The diagnostic now derives from the SAME candidate set it
+                // is compared against; it never sourced authority and now
+                // cannot imply a detector that no longer feeds this path.
+                positionalSlot: slot >= 0 ? slot : null,
+                pick: pickAssignedFace,
+              });
+            }
           }
 
           // v96 — Multi-speaker: prefer plate-derived coords over anchor rescale.
@@ -4815,7 +4860,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               v524_registration_frame: v524Registration?.frameNumber ?? null,
               v524_legacy_space: v524LegacySpace,
               v523_iou: v523Repair?.iou ?? null,
+              // V530 — the diagnostic now derives from the SAME AWS
+              // candidate set V523 judged, not from a different detector.
               v523_positional_would_have: v523Repair?.positionalWouldHavePicked ?? null,
+              v530_target: v530Telemetry,
             };
             console.warn(
               `[compose-dialog-segments] scene=${sceneId} FACE-GATE REPAIR (${shouldForceRepair ? "v96-force" : "strict"}) pass=${pass.idx} speaker=${pass.speaker_name} frame=${frame} original=${JSON.stringify(original)} repaired=${JSON.stringify(pass.coords)} faces=${sortedBoxes.length}`,
@@ -4971,6 +5019,208 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         baseVideoUrl: String(v524BaseVideoUrl ?? ""),
         plateDims: plateDims ?? { width: 0, height: 0 },
       };
+      // ══ V530 — ONE PLATE-NATIVE STILL AUTHORITY FOR THE WHOLE GATE ══
+      //
+      // Generation 28: V528 delivered a 1284x718 plate raster, V529/V524
+      // registered all four characters on frame 23 with AWS CompareFaces —
+      // Sarah at [240,116,335,254], similarity 97.62 — and V523 then
+      // refused her at its repair frame. The reference was an AWS face box
+      // measured on the V528 still. The candidates came from
+      // `validate-frame-face`, whose persisted cache row names the
+      // validator: google/gemini-2.5-flash. Sarah's box is 95x138; the
+      // candidate a language model estimated is 321x431 — 10.55x the area,
+      // IoU 0.0948, centre 152 px away. Both continuation gates refused,
+      // correctly. The arithmetic was right; the two boxes are measurements
+      // of different things.
+      //
+      // So the acquisition moves up one scope and serves the whole gate.
+      // Nothing about it changes: same source-fenced cache, same raster
+      // fence, same single call site into `extractPlateFrame`.
+      // V528 — the raster the identity stills were actually rendered at.
+      // Kept outside the per-attempt holder so the persisted snapshot can
+      // still name it after the bounded loop has cleared `last`.
+      const v528Raster: { requested: string | null; actual: string | null } = {
+        requested: null,
+        actual: null,
+      };
+      const v525RenderStill = (() => {
+        try {
+          return defaultRenderStill();
+        } catch (e) {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v525_still_renderer_unavailable ` +
+              `reason=${(e as Error)?.message ?? e}`,
+          );
+          return null;
+        }
+      })();
+      // V525/V526-B — ONE acquisition path. Both the registration loop and
+      // the common-frame completion go through it, so every still comes
+      // from the same source-fenced cache and a frame already rendered is
+      // never rendered twice.
+      const v525Acquire = async (frameNumber: number): Promise<PlateFrameExtractResult> => {
+        if (!v525RenderStill) {
+          return {
+            ok: false,
+            frameNumber,
+            reason: "probe_cache_miss",
+            detail: "still renderer unavailable",
+          };
+        }
+        const r = await extractPlateFrame({
+          userId,
+          projectId: String((scene as any)?.project_id ?? ""),
+          sceneId,
+          baseVideoUrl: v524BaseVideoUrl,
+          totalSec,
+          // V528 — the raster the still must be rendered at. Same probe
+          // that feeds the V524 fence, so the still and the plate end up
+          // being measurements of one picture rather than two.
+          plateDims,
+          frameNumber,
+          timeoutMs: 30_000,
+          fingerprint: async (value) => {
+            const d = await crypto.subtle.digest(
+              "SHA-256",
+              new TextEncoder().encode(value) as unknown as BufferSource,
+            );
+            return Array.from(new Uint8Array(d))
+              .map((b) => b.toString(16).padStart(2, "0"))
+              .join("")
+              .slice(0, 32);
+          },
+          readCache: async (path) => {
+            const signed = await supabase.storage
+              .from("composer-frames")
+              .createSignedUrl(path, 60 * 30);
+            if (signed.error || !signed.data?.signedUrl) return null;
+            const head = await fetch(signed.data.signedUrl, {
+              method: "HEAD",
+              signal: AbortSignal.timeout(3_000),
+            }).catch(() => null);
+            return head?.ok ? signed.data.signedUrl : null;
+          },
+          renderStill: v525RenderStill,
+          writeCache: async (path, bytes) => {
+            const up = await supabase.storage
+              .from("composer-frames")
+              .upload(path, bytes, {
+                contentType: "image/jpeg",
+                upsert: true,
+              });
+            if (up.error) return null;
+            const signed = await supabase.storage
+              .from("composer-frames")
+              .createSignedUrl(path, 60 * 30);
+            return signed.data?.signedUrl ?? null;
+          },
+        });
+        const rr = r.requestedRaster;
+        const ar = r.actualRaster;
+        if (rr) v528Raster.requested = `${rr.width}x${rr.height}`;
+        if (ar) v528Raster.actual = `${ar.width}x${ar.height}`;
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} v525_plate_frame_extract ` +
+            `frame=${r.frameNumber} ok=${r.ok} source=${r.source ?? "-"} ` +
+            `cache_hit=${r.cacheHit ?? false} bytes=${r.bytes ?? 0} ` +
+            `requested_raster=${rr ? `${rr.width}x${rr.height}` : "-"} ` +
+            `actual_raster=${ar ? `${ar.width}x${ar.height}` : "-"} ` +
+            `reason=${r.reason ?? "-"} detail=${r.detail ?? "-"}`,
+        );
+        return r;
+      };
+
+      /**
+     * V530 — THE REPAIR FRAME, MEASURED THE SAME WAY AS THE REFERENCE.
+     *
+     * The V524 reference is an AWS DetectFaces box on a V528 raster-fenced
+     * still. Until now the V523 candidates came from `validate-frame-face`,
+     * which in generation 28 answered with google/gemini-2.5-flash — a
+     * language model asked to estimate normalized boxes. Comparing the two
+     * by IoU is the referent split V524, V527 and V528 each closed one layer
+     * lower: correct arithmetic on incommensurable measurements.
+     *
+     * So the repair frame is acquired through the SAME `v525Acquire` and
+     * read by the SAME detector, then converted by the SAME
+     * `stillBoxToSource` the turn tracker and V526-B already use. No new
+     * geometry, no second cache, no threshold.
+     *
+     * `mouth` stays null exactly as V526-B leaves it: the V456 tiebreak is
+     * unreachable in this path and V530 does not pretend otherwise.
+     */
+      const v530Detect = (() => {
+        try {
+          return defaultDetectFaces();
+        } catch (e) {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v530_detector_unavailable ` +
+              `reason=${(e as Error)?.message ?? e}`,
+          );
+          return null;
+        }
+      })();
+      type V530Target = {
+        ok: boolean;
+        candidates: Array<{ bbox: [number, number, number, number]; mouth: [number, number] | null }>;
+        reason?: string;
+        cacheHit?: boolean;
+        requestedRaster?: string | null;
+        actualRaster?: string | null;
+        stillDims?: { width: number; height: number } | null;
+      };
+      const v530TargetFaces = async (frameNumber: number): Promise<V530Target> => {
+        if (!plateDims) return { ok: false, candidates: [], reason: "v530_plate_dims_unavailable" };
+        if (!v530Detect) return { ok: false, candidates: [], reason: "v530_detector_unavailable" };
+        const got = await v525Acquire(frameNumber);
+        const rr = got.requestedRaster ? `${got.requestedRaster.width}x${got.requestedRaster.height}` : null;
+        const ar = got.actualRaster ? `${got.actualRaster.width}x${got.actualRaster.height}` : null;
+        if (!got.ok || !got.imageUrl) {
+          return {
+            ok: false,
+            candidates: [],
+            reason: `v530_target_still_failed:${got.reason ?? "no_url"}`,
+            cacheHit: got.cacheHit ?? false,
+            requestedRaster: rr,
+            actualRaster: ar,
+          };
+        }
+        try {
+          const res = await fetch(got.imageUrl, { signal: AbortSignal.timeout(20_000) });
+          if (!res.ok) {
+            return { ok: false, candidates: [], reason: `v530_target_still_http_${res.status}`, cacheHit: got.cacheHit ?? false, requestedRaster: rr, actualRaster: ar };
+          }
+          const bytes = new Uint8Array(await res.arrayBuffer());
+          const img = jpegDecodeV526.decode(bytes, { useTArray: true });
+          const faces = await v530Detect(bytes, img.width, img.height, 20_000);
+          return {
+            ok: true,
+            candidates: faces.map((f: any) => ({
+              bbox: stillBoxToSource(
+                f.bbox,
+                plateDims!.width,
+                plateDims!.height,
+                img.width,
+                img.height,
+              ) as [number, number, number, number],
+              mouth: null,
+            })),
+            cacheHit: got.cacheHit ?? false,
+            requestedRaster: rr,
+            actualRaster: ar,
+            stillDims: { width: img.width, height: img.height },
+          };
+        } catch (e) {
+          return {
+            ok: false,
+            candidates: [],
+            reason: `v530_target_detect_failed:${(e as Error)?.message ?? e}`,
+            cacheHit: got.cacheHit ?? false,
+            requestedRaster: rr,
+            actualRaster: ar,
+          };
+        }
+      };
+
       const v524Needed = speakers.length >= 3 && !!plateDims && !!v524BaseVideoUrl &&
         characters.length > 0 && v524Frames.length > 0;
       if (v524Needed) {
@@ -5052,99 +5302,6 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         // injected closure and read after it, and narrowing a closure-assigned
         // local to `never` is a TypeScript artefact, not a real invariant.
         const v525Extract: { last: PlateFrameExtractResult | null } = { last: null };
-        // V528 — the raster the identity stills were actually rendered at.
-        // Kept outside the per-attempt holder so the persisted snapshot can
-        // still name it after the bounded loop has cleared `last`.
-        const v528Raster: { requested: string | null; actual: string | null } = {
-          requested: null,
-          actual: null,
-        };
-        const v525RenderStill = (() => {
-          try {
-            return defaultRenderStill();
-          } catch (e) {
-            console.warn(
-              `[compose-dialog-segments] scene=${sceneId} v525_still_renderer_unavailable ` +
-                `reason=${(e as Error)?.message ?? e}`,
-            );
-            return null;
-          }
-        })();
-        // V525/V526-B — ONE acquisition path. Both the registration loop and
-        // the common-frame completion go through it, so every still comes
-        // from the same source-fenced cache and a frame already rendered is
-        // never rendered twice.
-        const v525Acquire = async (frameNumber: number): Promise<PlateFrameExtractResult> => {
-          if (!v525RenderStill) {
-            return {
-              ok: false,
-              frameNumber,
-              reason: "probe_cache_miss",
-              detail: "still renderer unavailable",
-            };
-          }
-          const r = await extractPlateFrame({
-            userId,
-            projectId: String((scene as any)?.project_id ?? ""),
-            sceneId,
-            baseVideoUrl: v524BaseVideoUrl,
-            totalSec,
-            // V528 — the raster the still must be rendered at. Same probe
-            // that feeds the V524 fence, so the still and the plate end up
-            // being measurements of one picture rather than two.
-            plateDims,
-            frameNumber,
-            timeoutMs: 30_000,
-            fingerprint: async (value) => {
-              const d = await crypto.subtle.digest(
-                "SHA-256",
-                new TextEncoder().encode(value) as unknown as BufferSource,
-              );
-              return Array.from(new Uint8Array(d))
-                .map((b) => b.toString(16).padStart(2, "0"))
-                .join("")
-                .slice(0, 32);
-            },
-            readCache: async (path) => {
-              const signed = await supabase.storage
-                .from("composer-frames")
-                .createSignedUrl(path, 60 * 30);
-              if (signed.error || !signed.data?.signedUrl) return null;
-              const head = await fetch(signed.data.signedUrl, {
-                method: "HEAD",
-                signal: AbortSignal.timeout(3_000),
-              }).catch(() => null);
-              return head?.ok ? signed.data.signedUrl : null;
-            },
-            renderStill: v525RenderStill,
-            writeCache: async (path, bytes) => {
-              const up = await supabase.storage
-                .from("composer-frames")
-                .upload(path, bytes, {
-                  contentType: "image/jpeg",
-                  upsert: true,
-                });
-              if (up.error) return null;
-              const signed = await supabase.storage
-                .from("composer-frames")
-                .createSignedUrl(path, 60 * 30);
-              return signed.data?.signedUrl ?? null;
-            },
-          });
-          const rr = r.requestedRaster;
-          const ar = r.actualRaster;
-          if (rr) v528Raster.requested = `${rr.width}x${rr.height}`;
-          if (ar) v528Raster.actual = `${ar.width}x${ar.height}`;
-          console.log(
-            `[compose-dialog-segments] scene=${sceneId} v525_plate_frame_extract ` +
-              `frame=${r.frameNumber} ok=${r.ok} source=${r.source ?? "-"} ` +
-              `cache_hit=${r.cacheHit ?? false} bytes=${r.bytes ?? 0} ` +
-              `requested_raster=${rr ? `${rr.width}x${rr.height}` : "-"} ` +
-              `actual_raster=${ar ? `${ar.width}x${ar.height}` : "-"} ` +
-              `reason=${r.reason ?? "-"} detail=${r.detail ?? "-"}`,
-          );
-          return r;
-        };
         // Bounded: stop at the first frame that can place EVERY character.
         // A partial registration is not evidence about where anybody is.
         for (const frame of v524Reuse.hit ? [] : v524Frames) {
