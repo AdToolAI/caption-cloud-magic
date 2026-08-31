@@ -5052,6 +5052,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         // injected closure and read after it, and narrowing a closure-assigned
         // local to `never` is a TypeScript artefact, not a real invariant.
         const v525Extract: { last: PlateFrameExtractResult | null } = { last: null };
+        // V528 — the raster the identity stills were actually rendered at.
+        // Kept outside the per-attempt holder so the persisted snapshot can
+        // still name it after the bounded loop has cleared `last`.
+        const v528Raster: { requested: string | null; actual: string | null } = {
+          requested: null,
+          actual: null,
+        };
         const v525RenderStill = (() => {
           try {
             return defaultRenderStill();
@@ -5082,6 +5089,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             sceneId,
             baseVideoUrl: v524BaseVideoUrl,
             totalSec,
+            // V528 — the raster the still must be rendered at. Same probe
+            // that feeds the V524 fence, so the still and the plate end up
+            // being measurements of one picture rather than two.
+            plateDims,
             frameNumber,
             timeoutMs: 30_000,
             fingerprint: async (value) => {
@@ -5120,10 +5131,16 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               return signed.data?.signedUrl ?? null;
             },
           });
+          const rr = r.requestedRaster;
+          const ar = r.actualRaster;
+          if (rr) v528Raster.requested = `${rr.width}x${rr.height}`;
+          if (ar) v528Raster.actual = `${ar.width}x${ar.height}`;
           console.log(
             `[compose-dialog-segments] scene=${sceneId} v525_plate_frame_extract ` +
               `frame=${r.frameNumber} ok=${r.ok} source=${r.source ?? "-"} ` +
               `cache_hit=${r.cacheHit ?? false} bytes=${r.bytes ?? 0} ` +
+              `requested_raster=${rr ? `${rr.width}x${rr.height}` : "-"} ` +
+              `actual_raster=${ar ? `${ar.width}x${ar.height}` : "-"} ` +
               `reason=${r.reason ?? "-"} detail=${r.detail ?? "-"}`,
           );
           return r;
@@ -5308,6 +5325,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           common_frame: v526bPlan
             ? buildCommonFrameTelemetry(v526bPlan, v526bResult)
             : null,
+          // V528 — the raster the identity stills were rendered at, next
+          // to the plate they must match. Gen26 read 1280x720 vs 656x1406.
+          still_raster: {
+            plate: plateDims ?? null,
+            requested: v528Raster.requested,
+            actual: v528Raster.actual,
+          },
           base_video_url: v524BaseVideoUrl,
           plate_generation: v524PlateGeneration,
           run_id: v510RunId,

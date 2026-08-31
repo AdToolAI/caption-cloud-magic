@@ -235,14 +235,48 @@ export function defaultRenderStill() {
   const lambdaUrl =
     `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${getLambdaFunctionName()}/invocations`;
 
-  return async (videoUrl: string, totalSec: number, frame: number, timeoutMs: number): Promise<Uint8Array> => {
+  /**
+   * V528 — `targetDims` is OPTIONAL and additive.
+   *
+   * Omitted, the serialized props are the exact same four keys in the exact
+   * same order as before, so V452 tracking sends a byte-identical payload
+   * and keeps its historical 1280x720 raster.
+   *
+   * Supplied, the two keys `DialogStitchVideo.calculateMetadata` already
+   * reads are added, and the composition raster becomes the requested one.
+   * That is what V525 plate-identity acquisition needs: generation 26
+   * rendered a 656x1406 portrait plate into the 1280x720 default and
+   * `object-fit: cover` cropped it, so V524 correctly refused all three
+   * frames with `dims_incoherent`.
+   */
+  return async (
+    videoUrl: string,
+    totalSec: number,
+    frame: number,
+    timeoutMs: number,
+    targetDims?: { width: number; height: number } | null,
+  ): Promise<Uint8Array> => {
+    const props: Record<string, unknown> = {
+      masterVideoUrl: videoUrl,
+      masterAudioUrl: "",
+      totalSec,
+      shots: [],
+    };
+    const tw = Number(targetDims?.width);
+    const th = Number(targetDims?.height);
+    if (Number.isFinite(tw) && Number.isFinite(th) && tw > 0 && th > 0) {
+      // `srcWidth`/`srcHeight` are deliberately NOT sent: they only scale
+      // shot overlays, and this payload carries `shots: []`.
+      props.targetWidth = tw;
+      props.targetHeight = th;
+    }
     const payload = {
       type: "still",
       serveUrl,
       composition: STILL_COMPOSITION,
       inputProps: {
         type: "payload",
-        payload: JSON.stringify({ masterVideoUrl: videoUrl, masterAudioUrl: "", totalSec, shots: [] }),
+        payload: JSON.stringify(props),
       },
       version: STILL_REMOTION_VERSION,
       imageFormat: "jpeg",

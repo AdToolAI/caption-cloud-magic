@@ -37,6 +37,12 @@ const SCENE = "67b392b1-aca1-489d-b773-d604deb22623";
 const GEN21 = "https://example.test/composer/67b392b1/gen-21/base.mp4";
 const GEN20 = "https://example.test/composer/67b392b1/gen-20/base.mp4";
 const TOTAL_SEC = 8.4;
+/**
+ * V528 — the extractor now renders at the plate's own raster, so every
+ * fixture states one. Gen26's 656x1406 is used so these cases and the V528
+ * suite describe the same plate.
+ */
+const PLATE = { width: 656, height: 1406 };
 
 /** A deterministic stand-in for SHA-256 over the URL. */
 const fingerprint = async (v: string) => {
@@ -47,7 +53,21 @@ const fingerprint = async (v: string) => {
   return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
 };
 
-const still = (n = 4096) => new Uint8Array(n).fill(0x42);
+/**
+ * V528 — a plausible JPEG rather than a byte blob: the extractor now reads
+ * the raster back out of what the renderer returned.
+ */
+const still = (n = 4096, dims: { width: number; height: number } = PLATE) => {
+  const out = new Uint8Array(n).fill(0x42);
+  if (n >= 24) {
+    out.set([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08]);
+    out[7] = (dims.height >> 8) & 0xff;
+    out[8] = dims.height & 0xff;
+    out[9] = (dims.width >> 8) & 0xff;
+    out[10] = dims.width & 0xff;
+  }
+  return out;
+};
 
 /** A storage double: an object map plus call counters. */
 const storage = (seed: Record<string, Uint8Array> = {}) => {
@@ -65,9 +85,16 @@ const storage = (seed: Record<string, Uint8Array> = {}) => {
       objects[path] = bytes;
       return `https://cdn.test/${path}?signed`;
     },
-    renderStill: async (_v: string, _t: number, _f: number, _ms: number) => {
+    renderStill: async (
+      _v: string,
+      _t: number,
+      _f: number,
+      _ms: number,
+      dims?: { width: number; height: number } | null,
+    ) => {
       calls.render++;
-      return still();
+      // V528 — an obedient renderer: it answers at the requested raster.
+      return still(4096, dims ?? PLATE);
     },
   };
 };
@@ -79,6 +106,7 @@ const run = (over: Record<string, unknown> = {}, s = storage()) =>
     sceneId: SCENE,
     baseVideoUrl: GEN21,
     totalSec: TOTAL_SEC,
+    plateDims: PLATE,
     frameNumber: 30,
     timeoutMs: 30_000,
     fingerprint,
@@ -148,11 +176,11 @@ Deno.test("PURE — 5/6. a different base video cannot reach the cached frame", 
 Deno.test("PURE — 5. the cache path is fenced by the video fingerprint", async () => {
   const a = plateFrameCachePath({
     userId: USER, projectId: PROJECT, sceneId: SCENE,
-    fingerprint: await fingerprint(GEN20), frameNumber: 30,
+    fingerprint: await fingerprint(GEN20), raster: PLATE, frameNumber: 30,
   });
   const b = plateFrameCachePath({
     userId: USER, projectId: PROJECT, sceneId: SCENE,
-    fingerprint: await fingerprint(GEN21), frameNumber: 30,
+    fingerprint: await fingerprint(GEN21), raster: PLATE, frameNumber: 30,
   });
   assert(a !== b, "same scene, same frame, different plate → different object");
   assert(a.startsWith(`${USER}/${PROJECT}/plate-frames/${SCENE}/`), a);
@@ -162,10 +190,12 @@ Deno.test("PURE — 5. the cache path is fenced by the video fingerprint", async
   assertEquals(a.includes("-p1-f30"), false);
   // Path segments are sanitised.
   const dirty = plateFrameCachePath({
-    userId: "../../etc", projectId: "a b/c", sceneId: SCENE, fingerprint: "ff", frameNumber: 7,
+    userId: "../../etc", projectId: "a b/c", sceneId: SCENE, fingerprint: "ff",
+    raster: PLATE, frameNumber: 7,
   });
   assertEquals(dirty.includes(".."), false, dirty);
-  assertEquals(dirty.split("/").length, 6, dirty);
+  // V528 — one segment longer: the raster is part of the object's identity.
+  assertEquals(dirty.split("/").length, 7, dirty);
 });
 
 // ═══ 7/8/9. failures are classified, and fail closed ═════════════════════
@@ -197,7 +227,7 @@ Deno.test("PURE — 8. a timeout is not the same failure as a render error", asy
 
 Deno.test("PURE — 9. an implausible still is refused, not uploaded", async () => {
   const s = storage();
-  const tiny = await run({ renderStill: async () => still(MIN_STILL_BYTES - 1) }, s);
+  const tiny = await run({ renderStill: async () => still(MIN_STILL_BYTES - 1, PLATE) }, s);
   assertEquals(tiny.ok, false);
   assertEquals(tiny.reason, "invalid_still_result");
   assert((tiny.detail ?? "").includes(String(MIN_STILL_BYTES)));
