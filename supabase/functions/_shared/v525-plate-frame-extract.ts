@@ -52,7 +52,13 @@ export type PlateFrameExtractFailure =
   | "still_render_timeout"
   | "still_upload_failed"
   /** Bytes came back, but they are not a usable still. */
-  | "invalid_still_result";
+  | "invalid_still_result"
+  /** V528 — the plate raster itself is unusable, so nothing can be asked for. */
+  | "invalid_plate_dims"
+  /** V528 — the still arrived but its raster could not be read. */
+  | "still_dims_unavailable"
+  /** V528 — the still arrived at a raster other than the plate's. */
+  | "still_dims_mismatch";
 
 export interface PlateFrameExtractResult {
   ok: boolean;
@@ -62,8 +68,97 @@ export interface PlateFrameExtractResult {
   cacheHit?: boolean;
   source?: "probe_cache" | "remotion_still";
   bytes?: number;
+  /** V528 — the raster this attempt asked the renderer for. */
+  requestedRaster?: PlateRaster;
+  /** V528 — the raster actually measured in the returned bytes. */
+  actualRaster?: PlateRaster | null;
   reason?: PlateFrameExtractFailure;
   detail?: string;
+}
+
+export interface PlateRaster { width: number; height: number }
+
+/**
+ * V528 — THE RASTER A STILL MUST BE ASKED FOR.
+ *
+ * Generation 26: the plate probed at 656x1406, V525 rendered every frame
+ * through `DialogStitchVideo` without target dimensions, the composition
+ * fell back to its 1280x720 default, and `object-fit: cover` cropped the
+ * portrait plate into a landscape frame. V524 refused all three frames with
+ * `dims_incoherent` — correctly. The gate was right; it was handed the wrong
+ * picture, the same referent split one layer down from V527.
+ *
+ * This mirrors the composition's own normalization exactly rather than
+ * inventing a tolerance:
+ *
+ *   const even = (value, fallback) => {
+ *     const n = Number(value);
+ *     const safe = Number.isFinite(n) && n >= 64 ? Math.round(n) : fallback;
+ *     return safe % 2 === 0 ? safe : safe - 1;
+ *   };
+ *
+ * Two consequences are load-bearing. A dimension below 64 does not clamp —
+ * it silently becomes the 1280x720 default, i.e. exactly the Gen26 bug — so
+ * it is rejected here BEFORE anything renders. And an odd dimension is
+ * decremented by the composition, so the expected raster is the normalized
+ * one, not the raw plate number. Returns null when no raster can be asked
+ * for at all.
+ */
+export function resolvePlateRaster(
+  dims: { width: number; height: number } | null | undefined,
+): PlateRaster | null {
+  const norm = (v: unknown): number | null => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 64) return null;
+    const r = Math.round(n);
+    return r % 2 === 0 ? r : r - 1;
+  };
+  const width = norm(dims?.width);
+  const height = norm(dims?.height);
+  if (width === null || height === null) return null;
+  return { width, height };
+}
+
+/**
+ * V528 — read the raster out of the bytes that came back.
+ *
+ * Requesting a size is not the same as getting one. Pure JPEG/PNG header
+ * parsing so this module keeps its leaf discipline; returns null when the
+ * bytes are neither, or truncated.
+ */
+export function probeStillDims(bytes: Uint8Array): PlateRaster | null {
+  try {
+    if (!(bytes instanceof Uint8Array) || bytes.byteLength < 24) return null;
+    // PNG: IHDR width/height are big-endian u32 at fixed offsets.
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+      const u32 = (o: number) =>
+        (bytes[o] << 24 | bytes[o + 1] << 16 | bytes[o + 2] << 8 | bytes[o + 3]) >>> 0;
+      const width = u32(16), height = u32(20);
+      return width > 0 && height > 0 ? { width, height } : null;
+    }
+    // JPEG: walk the segment chain to the first SOF marker.
+    if (bytes[0] === 0xff && bytes[1] === 0xd8) {
+      let i = 2;
+      while (i < bytes.length - 8) {
+        if (bytes[i] !== 0xff) { i++; continue; }
+        const marker = bytes[i + 1];
+        // SOF0..SOF3, SOF5..SOF7, SOF9..SOF11, SOF13..SOF15 carry dimensions;
+        // DHT (c4), JPG (c8) and DAC (cc) sit in the same range and do not.
+        if (
+          marker >= 0xc0 && marker <= 0xcf &&
+          marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc
+        ) {
+          const height = (bytes[i + 5] << 8) | bytes[i + 6];
+          const width = (bytes[i + 7] << 8) | bytes[i + 8];
+          return width > 0 && height > 0 ? { width, height } : null;
+        }
+        const segLen = (bytes[i + 2] << 8) | bytes[i + 3];
+        if (segLen < 2) return null;
+        i += 2 + segLen;
+      }
+    }
+  } catch { /* fall through */ }
+  return null;
 }
 
 /**
@@ -86,6 +181,14 @@ export function plateFrameCachePath(params: {
   sceneId: string;
   /** Hex digest of the base-video URL. */
   fingerprint: string;
+  /**
+   * V528 — the raster the object was rendered at. Without it the same URL
+   * and frame name one object for every raster, so a pre-V528 1280x720 hit
+   * would satisfy a 656x1406 request and the Gen26 defect would survive the
+   * deploy. With it, old objects are not rejected — they are unreachable,
+   * and no migration or delete is needed.
+   */
+  raster: { width: number; height: number };
   frameNumber: number;
 }): string {
   // Dot runs are collapsed before the character filter: a storage key is
@@ -103,6 +206,7 @@ export function plateFrameCachePath(params: {
     "plate-frames",
     seg(params.sceneId),
     seg(params.fingerprint),
+    seg(`${Math.round(Number(params.raster?.width) || 0)}x${Math.round(Number(params.raster?.height) || 0)}`),
     `f${Math.max(0, Math.round(Number(params.frameNumber) || 0))}.jpeg`,
   ].join("/");
 }
@@ -133,6 +237,12 @@ export async function extractPlateFrame(params: {
   baseVideoUrl: string | null | undefined;
   /** Plate duration, passed through to the still composition unchanged. */
   totalSec: number;
+  /**
+   * V528 — the CURRENT plate raster, from the same MP4 probe that feeds the
+   * V524 fence. Never inferred from the anchor, a UI aspect ratio, a model
+   * name or a 720p label: those are all descriptions of something else.
+   */
+  plateDims: { width: number; height: number } | null | undefined;
   frameNumber: number;
   timeoutMs: number;
   /** Injected: hex digest of a string (the base-video URL). */
@@ -145,6 +255,7 @@ export async function extractPlateFrame(params: {
     totalSec: number,
     frame: number,
     timeoutMs: number,
+    targetDims?: { width: number; height: number } | null,
   ) => Promise<Uint8Array>;
   /** Injected: persist bytes and return a readable URL. */
   writeCache: (path: string, bytes: Uint8Array) => Promise<string | null>;
@@ -160,6 +271,17 @@ export async function extractPlateFrame(params: {
     return fail("source_video_unavailable", videoUrl ? "not an http url" : "empty");
   }
 
+  // V528 — decide the raster first. Everything downstream, cache identity
+  // included, is fenced by it, so there is no window in which a still exists
+  // without a raster it can be held to.
+  const raster = resolvePlateRaster(params.plateDims);
+  if (!raster) {
+    return fail(
+      "invalid_plate_dims",
+      `plate=${params.plateDims?.width ?? "?"}x${params.plateDims?.height ?? "?"} min=64`,
+    );
+  }
+
   let path: string;
   try {
     path = plateFrameCachePath({
@@ -167,6 +289,7 @@ export async function extractPlateFrame(params: {
       projectId: params.projectId,
       sceneId: params.sceneId,
       fingerprint: await params.fingerprint(videoUrl),
+      raster,
       frameNumber,
     });
   } catch (e) {
@@ -184,6 +307,13 @@ export async function extractPlateFrame(params: {
         sourceVideoUrl: videoUrl,
         cacheHit: true,
         source: "probe_cache",
+        // V528 — the path itself is the provenance: video fingerprint,
+        // raster and frame. An object can only sit here if a V528 render
+        // produced it AND passed the post-render raster check below, so a
+        // hit cannot be a different raster. Pre-V528 objects live one
+        // segment shorter and are not addressable from here at all.
+        requestedRaster: raster,
+        actualRaster: raster,
       };
     }
   } catch {
@@ -194,7 +324,13 @@ export async function extractPlateFrame(params: {
   // ── 2. render ───────────────────────────────────────────────────────
   let bytes: Uint8Array;
   try {
-    bytes = await params.renderStill(videoUrl, Number(params.totalSec) || 0, frameNumber, params.timeoutMs);
+    bytes = await params.renderStill(
+      videoUrl,
+      Number(params.totalSec) || 0,
+      frameNumber,
+      params.timeoutMs,
+      raster,
+    );
   } catch (e) {
     const msg = String((e as Error)?.message ?? e);
     return isTimeout(e)
@@ -206,6 +342,30 @@ export async function extractPlateFrame(params: {
       "invalid_still_result",
       `bytes=${bytes instanceof Uint8Array ? bytes.byteLength : "none"} min=${MIN_STILL_BYTES}`,
     );
+  }
+
+  // ── 2b. V528 — measure what actually came back ──────────────────────
+  //
+  // Asking is not obeying. Gen26 asked for nothing and got 1280x720; a run
+  // that asks for 656x1406 and still gets 1280x720 must fail here rather
+  // than hand V524 an incoherent raster and let the dims gate absorb it.
+  const actual = probeStillDims(bytes);
+  if (!actual) {
+    return {
+      ...fail("still_dims_unavailable", `bytes=${bytes.byteLength}`),
+      requestedRaster: raster,
+      actualRaster: null,
+    };
+  }
+  if (actual.width !== raster.width || actual.height !== raster.height) {
+    return {
+      ...fail(
+        "still_dims_mismatch",
+        `expected=${raster.width}x${raster.height} actual=${actual.width}x${actual.height}`,
+      ),
+      requestedRaster: raster,
+      actualRaster: actual,
+    };
   }
 
   // ── 3. persist ──────────────────────────────────────────────────────
@@ -225,5 +385,7 @@ export async function extractPlateFrame(params: {
     cacheHit: false,
     source: "remotion_still",
     bytes: bytes.byteLength,
+    requestedRaster: raster,
+    actualRaster: actual,
   };
 }
