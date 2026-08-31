@@ -212,12 +212,20 @@ function iou(a: RekBox, b: RekBox): number {
   return union > 0 ? inter / union : 0;
 }
 
+/**
+ * V529 — the caller must be able to tell a failed CompareFaces call from a
+ * successful one that simply matched nothing. Before, both returned an empty
+ * map and both surfaced as `below_threshold`, which is what made generation
+ * 27 undiagnosable.
+ */
+interface ComparePortraitResult { ok: boolean; scores: Map<number, number> }
+
 async function compareOnePortrait(
   portraitBase64: string,
   anchorBase64: string,
   detected: DetectedFace[],
-): Promise<Map<number, number>> {
-  /** Returns Map<detectedSlot, similarity(0..100)>. */
+): Promise<ComparePortraitResult> {
+  /** scores: Map<detectedSlot, similarity(0..100)>. */
   const out = new Map<number, number>();
   const payload = JSON.stringify({
     SourceImage: { Bytes: portraitBase64 },
@@ -234,12 +242,12 @@ async function compareOnePortrait(
     );
   } catch (e) {
     console.warn(`[resolveIdentityViaRekognition] compare failed: ${(e as Error).message}`);
-    return out;
+    return { ok: false, scores: out };
   }
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     console.warn(`[resolveIdentityViaRekognition] compare ${res.status}: ${body.slice(0, 200)}`);
-    return out;
+    return { ok: false, scores: out };
   }
   const json = await res.json().catch(() => ({}));
   const matches: Array<{ Face?: { BoundingBox?: RekBox }; Similarity?: number }> =
@@ -260,33 +268,126 @@ async function compareOnePortrait(
     const prev = out.get(bestSlot) ?? 0;
     if (sim > prev) out.set(bestSlot, sim);
   }
-  return out;
+  return { ok: true, scores: out };
 }
 
-/** Hungarian by brute permutation (N ≤ 6 → ≤720 perms). */
-function optimalAssignment(matrix: number[][]): number[] {
+/**
+ * V529 — RECTANGULAR BIOMETRIC ASSIGNMENT.
+ *
+ * The previous brute-permutation Hungarian assumed at least as many detected
+ * faces as characters. Generation 27 frame 428 detected ONE face for four
+ * characters: the DFS could never reach `r === rows`, `bestPick` stayed null,
+ * and the fallback returned the identity map [0,1,2,3] — columns 1..3 do not
+ * exist, so `matrix[i][col]` was `undefined ?? 0` and three characters were
+ * refused as if they had scored zero. Fail-closed at the registration level,
+ * but not an assignment: the one real face was handed to character 0 by index
+ * rather than by evidence.
+ *
+ * The fix is one unified search over PARTIAL injective maps, maximising
+ * (cardinality, total score) lexicographically. A character may stay
+ * unassigned; no face is shared; no column is fabricated.
+ *
+ * For cols >= rows this is provably the old behaviour: maximum cardinality is
+ * then `rows`, so the search maximises total score over exactly the full
+ * assignments the old DFS enumerated, in the same order, with the same strict
+ * `>` so the same first maximum wins.
+ */
+export interface BiometricAssignment {
+  /** assign[characterIndex] = detected face index, or -1 when unassigned. */
+  assign: number[];
+  /** How many characters received a face. */
+  cardinality: number;
+  /** True when another assignment achieved the same cardinality AND score. */
+  tied: boolean;
+  /**
+   * V529-P0 — the exhaustive search did not finish inside the node budget.
+   * Invariant: when this is true there are NO assigned edges. A solver that
+   * ran out of room has proven nothing, and a heuristic stand-in would be
+   * indistinguishable downstream from a proof.
+   */
+  budgetExceeded: boolean;
+  /** Retained alias of `budgetExceeded` for the existing call sites. */
+  degraded: boolean;
+}
+
+/** Search-node budget. Beyond it the deterministic greedy takes over. */
+const ASSIGN_NODE_BUDGET = 200_000;
+
+export function assignBiometricEdges(matrix: number[][]): BiometricAssignment {
   const rows = matrix.length;
-  if (rows === 0) return [];
+  if (rows === 0) {
+    return { assign: [], cardinality: 0, tied: false, budgetExceeded: false, degraded: false };
+  }
   const cols = matrix[0]?.length ?? 0;
+  if (cols === 0) {
+    return {
+      assign: new Array(rows).fill(-1),
+      cardinality: 0,
+      tied: false,
+      budgetExceeded: false,
+      degraded: false,
+    };
+  }
+
   const pick = new Array(rows).fill(-1);
-  let bestPick: number[] | null = null;
-  let bestScore = -Infinity;
   const used = new Array(cols).fill(false);
-  const dfs = (r: number, sum: number) => {
+  let bestPick: number[] | null = null;
+  let bestCard = -1;
+  let bestScore = -Infinity;
+  let tied = false;
+  let nodes = 0;
+  let exhausted = true;
+
+  const dfs = (r: number, card: number, sum: number) => {
+    if (++nodes > ASSIGN_NODE_BUDGET) { exhausted = false; return; }
     if (r === rows) {
-      if (sum > bestScore) { bestScore = sum; bestPick = pick.slice(); }
+      if (card > bestCard || (card === bestCard && sum > bestScore)) {
+        bestCard = card; bestScore = sum; bestPick = pick.slice(); tied = false;
+      } else if (card === bestCard && sum === bestScore) {
+        tied = true;
+      }
       return;
     }
+    // Assigned branches first, ascending column — the historical order, so a
+    // complete matrix still returns the exact same winner.
     for (let c = 0; c < cols; c++) {
       if (used[c]) continue;
       used[c] = true;
       pick[r] = c;
-      dfs(r + 1, sum + (matrix[r][c] ?? 0));
+      dfs(r + 1, card + 1, sum + (matrix[r][c] ?? 0));
       used[c] = false;
     }
+    // …then the possibility of leaving this character unmatched. Last, so it
+    // can never outrank an assignment of equal cardinality.
+    pick[r] = -1;
+    dfs(r + 1, card, sum);
   };
-  dfs(0, 0);
-  return bestPick ?? pick.map((_, i) => i);
+  dfs(0, 0, 0);
+
+  if (bestPick && exhausted) {
+    return { assign: bestPick, cardinality: bestCard, tied, budgetExceeded: false, degraded: false };
+  }
+
+  // V529-P0 — FAIL CLOSED, NOT GREEDY.
+  //
+  // The first cut of V529 fell back to a deterministic greedy here. With
+  // MAX_SPEAKERS frozen at 4 and no cap on how many faces the detector may
+  // return, the budget is exceeded from 22 detected faces upward — a plate
+  // with background people, posters or reflections reaches that. A greedy
+  // pairing would then have become authoritative biometric evidence, and
+  // downstream nothing could tell it apart from a proven one. Worse, the
+  // pre-V529 solver had no budget at all and was still exact at that shape.
+  //
+  // So an exhausted search returns no edges. Every character stays
+  // unassigned, the caller fails closed, and the reason says the solver ran
+  // out of room rather than blaming the evidence.
+  return {
+    assign: new Array(rows).fill(-1),
+    cardinality: 0,
+    tied: false,
+    budgetExceeded: true,
+    degraded: true,
+  };
 }
 
 export interface ResolvedIdentityFace {
@@ -294,6 +395,42 @@ export interface ResolvedIdentityFace {
   bbox: [number, number, number, number];
   characterId: string | null;
   similarity: number | null;
+}
+
+/**
+ * V529 — one bounded row per REQUESTED character, so an unresolved identity
+ * says why. Generation 27 left Sarah and Kay unresolved on all three sampled
+ * frames and nothing persisted could separate a portrait that never loaded
+ * from a CompareFaces call that failed from a face that was never detected
+ * from a genuinely low score. Those four need different fixes.
+ */
+export type IdentityUnresolvedReason =
+  | "accepted"
+  | "portrait_load_failed"
+  | "compare_failed"
+  | "no_faces_detected"
+  | "below_threshold"
+  | "ambiguous"
+  /**
+   * V529-P0 — the assignment search could not be completed within its node
+   * budget. A solver-capacity failure, never a statement about the faces or
+   * the portraits: neither `below_threshold` nor `compare_failed` would be
+   * true here.
+   */
+  | "assignment_budget_exceeded";
+
+export interface CharacterIdentityDiagnostic {
+  characterId: string;
+  portraitLoaded: boolean;
+  compareAttempted: boolean;
+  compareOk: boolean;
+  /** Best score this character reached against ANY detected face. */
+  bestSimilarity: number | null;
+  bestFaceIndex: number | null;
+  accepted: boolean;
+  acceptedFaceIndex: number | null;
+  acceptedSimilarity: number | null;
+  reason: IdentityUnresolvedReason;
 }
 
 export interface RekognitionIdentityResult {
@@ -306,6 +443,10 @@ export interface RekognitionIdentityResult {
   resolvedCount: number;
   expectedCount: number;
   minSimilarity: number | null;
+  /** V529 — bounded, one entry per requested character. Never a score row. */
+  characterDiagnostics?: CharacterIdentityDiagnostic[];
+  /** V529 — how many faces the detector actually found. */
+  detectedCount?: number;
   reason?: string;
   msTotal: number;
 }
@@ -390,7 +531,26 @@ export async function resolveIdentityViaRekognition(params: {
     return { ...empty, dims: { width: W, height: H }, reason: `detect_failed:${(e as Error).message}`, msTotal: Date.now() - t0 };
   }
   if (detected.length === 0) {
-    return { ...empty, dims: { width: W, height: H }, reason: "detect_zero_faces", msTotal: Date.now() - t0 };
+    return {
+      ...empty,
+      dims: { width: W, height: H },
+      reason: "detect_zero_faces",
+      detectedCount: 0,
+      // V529 — say so per character rather than letting the caller guess.
+      characterDiagnostics: params.characters.map((c) => ({
+        characterId: c.characterId,
+        portraitLoaded: false,
+        compareAttempted: false,
+        compareOk: false,
+        bestSimilarity: null,
+        bestFaceIndex: null,
+        accepted: false,
+        acceptedFaceIndex: null,
+        acceptedSimilarity: null,
+        reason: "no_faces_detected" as const,
+      })),
+      msTotal: Date.now() - t0,
+    };
   }
 
   // Fetch portraits in parallel through the same cache.
@@ -399,15 +559,69 @@ export async function resolveIdentityViaRekognition(params: {
   );
 
   // Score matrix: rows=characters, cols=detected slots.
+  // V529 — the two failure modes that used to vanish into a zero row are now
+  // recorded as they happen. The scores themselves are unchanged.
   const scoreMatrix: number[][] = [];
+  const portraitLoaded: boolean[] = [];
+  const compareAttempted: boolean[] = [];
+  const compareOk: boolean[] = [];
   for (let i = 0; i < params.characters.length; i++) {
     const pc = portraitCachedArr[i];
-    if (!pc) { scoreMatrix.push(new Array(detected.length).fill(0)); continue; }
-    const simMap = await compareOnePortrait(pc.base64, anchorCached.base64, detected);
-    scoreMatrix.push(detected.map((d) => simMap.get(d.slot) ?? 0));
+    if (!pc) {
+      portraitLoaded.push(false); compareAttempted.push(false); compareOk.push(false);
+      scoreMatrix.push(new Array(detected.length).fill(0));
+      continue;
+    }
+    portraitLoaded.push(true); compareAttempted.push(true);
+    const cmp = await compareOnePortrait(pc.base64, anchorCached.base64, detected);
+    compareOk.push(cmp.ok);
+    scoreMatrix.push(detected.map((d) => cmp.scores.get(d.slot) ?? 0));
   }
 
-  const pick = optimalAssignment(scoreMatrix);
+  // V529 — a partial injective assignment, so fewer faces than characters is
+  // a smaller answer rather than a wrong one.
+  const assignment = assignBiometricEdges(scoreMatrix);
+
+  // V529-P0 — an exhausted solver has proven nothing, so nothing is claimed.
+  // No accepted edge, no assignmentLock, no face carrying a characterId: the
+  // caller sees the same fail-closed shape it already handles for every other
+  // resolver failure, with a reason that names the solver rather than the
+  // evidence. The per-character rows keep the scores that WERE measured;
+  // ownership is the only thing withheld, because ownership is the part that
+  // was not proven.
+  if (assignment.budgetExceeded) {
+    return {
+      ...empty,
+      dims: { width: W, height: H },
+      reason: "assignment_budget_exceeded",
+      detectedCount: detected.length,
+      characterDiagnostics: params.characters.map((c, i) => {
+        const row = scoreMatrix[i] ?? [];
+        let bestFaceIndex: number | null = null;
+        let bestSimilarity: number | null = null;
+        for (let j = 0; j < row.length; j++) {
+          if (bestSimilarity === null || row[j] > bestSimilarity) {
+            bestSimilarity = row[j];
+            bestFaceIndex = j;
+          }
+        }
+        return {
+          characterId: c.characterId,
+          portraitLoaded: portraitLoaded[i] ?? false,
+          compareAttempted: compareAttempted[i] ?? false,
+          compareOk: compareOk[i] ?? false,
+          bestSimilarity,
+          bestFaceIndex,
+          accepted: false,
+          acceptedFaceIndex: null,
+          acceptedSimilarity: null,
+          reason: "assignment_budget_exceeded" as const,
+        };
+      }),
+      msTotal: Date.now() - t0,
+    };
+  }
+  const pick = assignment.assign;
 
   const faces: ResolvedIdentityFace[] = detected.map((d) => ({
     slot: d.slot,
@@ -466,13 +680,59 @@ export async function resolveIdentityViaRekognition(params: {
     }
   }
 
+  // ── V529 — bounded per-character diagnostics ──────────────────────
+  const acceptedBy = new Map<number, { faceIndex: number; similarity: number }>();
+  params.characters.forEach((c, i) => {
+    const slot = faces.findIndex((f) => f.characterId === c.characterId);
+    if (slot >= 0 && faces[slot].similarity != null) {
+      acceptedBy.set(i, { faceIndex: slot, similarity: Number(faces[slot].similarity) });
+    }
+  });
+  const characterDiagnostics: CharacterIdentityDiagnostic[] = params.characters.map((c, i) => {
+    const row = scoreMatrix[i] ?? [];
+    let bestFaceIndex: number | null = null;
+    let bestSimilarity: number | null = null;
+    for (let j = 0; j < row.length; j++) {
+      if (bestSimilarity === null || row[j] > bestSimilarity) { bestSimilarity = row[j]; bestFaceIndex = j; }
+    }
+    const acc = acceptedBy.get(i) ?? null;
+    // The order matters: a portrait that never loaded is not a low score, and
+    // a CompareFaces call that failed is not a low score either. Calling
+    // either of them `below_threshold` is what hid generation 27.
+    const reason: IdentityUnresolvedReason = acc
+      ? "accepted"
+      : !portraitLoaded[i]
+      ? "portrait_load_failed"
+      : compareAttempted[i] && !compareOk[i]
+      ? "compare_failed"
+      : assignment.tied && (bestSimilarity ?? 0) >= MIN_SIMILARITY_PASS2
+      ? "ambiguous"
+      : "below_threshold";
+    return {
+      characterId: c.characterId,
+      portraitLoaded: portraitLoaded[i] ?? false,
+      compareAttempted: compareAttempted[i] ?? false,
+      compareOk: compareOk[i] ?? false,
+      bestSimilarity,
+      bestFaceIndex,
+      accepted: !!acc,
+      acceptedFaceIndex: acc?.faceIndex ?? null,
+      acceptedSimilarity: acc?.similarity ?? null,
+      reason,
+    };
+  });
+
   const method: RekognitionIdentityResult["method"] =
     pass2Hits > 0 ? "aws-rekognition-anchor-v274-twopass" : "aws-rekognition-anchor-v274";
   const msTotal = Date.now() - t0;
   console.log(
     `[resolveIdentityViaRekognition] v276 anchor=${params.anchorUrl.slice(-80)} ` +
     `detected=${detected.length} chars=${params.characters.length} ` +
-    `resolved=${resolved}/${params.characters.length} pass2=${pass2Hits} minSim=${minSim ?? "-"} ms=${msTotal}`,
+    `resolved=${resolved}/${params.characters.length} pass2=${pass2Hits} minSim=${minSim ?? "-"} ` +
+    `v529_card=${assignment.cardinality} tied=${assignment.tied ? 1 : 0} ` +
+    `degraded=${assignment.degraded ? 1 : 0} ` +
+    `unresolved=${characterDiagnostics.filter((d) => !d.accepted).map((d) => `${d.characterId.slice(0, 8)}:${d.reason}:${d.bestSimilarity ?? "-"}`).join(",") || "-"} ` +
+    `ms=${msTotal}`,
   );
   return {
     ok: true,
@@ -483,6 +743,8 @@ export async function resolveIdentityViaRekognition(params: {
     resolvedCount: resolved,
     expectedCount: params.characters.length,
     minSimilarity: minSim,
+    characterDiagnostics,
+    detectedCount: detected.length,
     msTotal,
   };
 }
