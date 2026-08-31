@@ -313,12 +313,23 @@ Deno.test("CONTRACT — P0-A. the AWS surface is untouched", () => {
 Deno.test("CONTRACT — P0-B. reuse is checked before any network work", () => {
   const reuse = DIALOG.indexOf("const v524Reuse = reuseStoredRegistration({");
   const loop = DIALOG.indexOf("for (const frame of v524Reuse.hit ? [] : v524Frames) {");
-  const extract = DIALOG.indexOf("const r = await extractPlateFrame({");
+  // V530 — the extractor DEFINITION now sits above this block so the face
+  // gate can reach the same source-fenced cache. A definition performs no
+  // work, so the invariant is anchored on the registration's own
+  // INVOCATION of it, which is what the reuse decision actually guards.
+  const acquire = DIALOG.indexOf("const r = await v525Acquire(i.frameNumber);");
   const rek = DIALOG.indexOf("const r = await resolveIdentityViaRekognition({");
   assert(reuse > 0 && loop > reuse, "the decision precedes the loop");
-  assert(extract > reuse && rek > reuse, "and precedes both provider calls");
+  assert(acquire > loop && rek > loop, "and both provider calls sit inside it");
   // A hit iterates an empty list: no extract, no DetectFaces, no CompareFaces.
   assert(DIALOG.includes("v524Reuse.hit ? [] : v524Frames"));
+  // And the hoisted definition really is inert: it builds a closure and
+  // reads env, nothing more.
+  const def = DIALOG.slice(
+    DIALOG.indexOf("const v525RenderStill = (() => {"),
+    DIALOG.indexOf("const v525Acquire = async (frameNumber: number)"),
+  );
+  assertEquals(def.includes("await "), false, "the renderer probe awaits nothing");
 });
 
 Deno.test("CONTRACT — P0-B. the reuse key is the full fence", () => {
