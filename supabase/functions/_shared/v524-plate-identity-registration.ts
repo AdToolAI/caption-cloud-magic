@@ -173,6 +173,13 @@ export interface PlateIdentityRegistration {
    * entries, no detector dump, no score matrix.
    */
   partialRecords?: PlateNativeIdentityRecord[];
+  /**
+   * V529 — why each requested character did or did not resolve on this
+   * frame. Bounded to one row per character; never a score matrix.
+   */
+  characterDiagnostics?: AttemptCharacterDiagnostic[];
+  /** V529 — the characters this attempt could not resolve. */
+  unresolved?: string[];
   frameNumber: number;
   frameUrl: string | null;
   detail?: string;
@@ -195,6 +202,24 @@ export interface PlateIdentityRegistration {
  * two earlier attempts, and the reason each failed, were simply gone. At most
  * three rows, each a handful of scalars.
  */
+/**
+ * V529 — one bounded diagnostic row per requested character, carried through
+ * from the identity resolver so an attempt says WHY a character failed and
+ * not only that it did.
+ */
+export interface AttemptCharacterDiagnostic {
+  characterId: string;
+  portraitLoaded: boolean;
+  compareAttempted: boolean;
+  compareOk: boolean;
+  bestSimilarity: number | null;
+  bestFaceIndex: number | null;
+  accepted: boolean;
+  acceptedFaceIndex: number | null;
+  acceptedSimilarity: number | null;
+  reason: string;
+}
+
 export interface RegistrationAttempt {
   frame: number;
   extract_ok: boolean;
@@ -206,6 +231,12 @@ export interface RegistrationAttempt {
   registration_detail: string | null;
   resolved: number;
   requested: number;
+  /** V529 — how many faces the detector found on THIS frame. */
+  detected?: number;
+  /** V529 — the characters this frame could not resolve. */
+  unresolved?: string[];
+  /** V529 — bounded, at most one row per requested character. */
+  character_diagnostics?: AttemptCharacterDiagnostic[];
 }
 
 /** V525 — never keep more than the bounded search itself can produce. */
@@ -254,6 +285,8 @@ export async function registerPlateNativeIdentities(params: {
     faces: Array<{ characterId: string | null; bbox: Box; similarity: number | null }>;
     resolvedCount?: number;
     reason?: string | null;
+    /** V529 — bounded per-character diagnostics, passed straight through. */
+    characterDiagnostics?: AttemptCharacterDiagnostic[];
   }>;
 }): Promise<PlateIdentityRegistration> {
   const emptyDiag = {
@@ -304,8 +337,17 @@ export async function registerPlateNativeIdentities(params: {
     detected: detected?.faces?.length ?? 0,
     detectorDims: detected?.dims ?? null,
   };
+  // V529 — bounded, at most one row per requested character. Passed straight
+  // through: this module does not interpret them, it only stops losing them.
+  const characterDiagnostics = Array.isArray(detected?.characterDiagnostics)
+    ? detected.characterDiagnostics.slice(0, characters.length)
+    : undefined;
   if (!detected?.ok) {
-    return fail("identity_detect_failed", String(detected?.reason ?? "detector not ok"), diag, extracted.frameUrl);
+    return {
+      ...fail("identity_detect_failed", String(detected?.reason ?? "detector not ok"), diag, extracted.frameUrl),
+      characterDiagnostics,
+      unresolved: characters.map((c) => stripCharacterIdPrefix(c.characterId)),
+    };
   }
 
   // ── Raster coherence ────────────────────────────────────────────────
@@ -366,16 +408,28 @@ export async function registerPlateNativeIdentities(params: {
   diag.minSimilarity = minSimilarity;
   diag.rescaled = rescaled;
 
+  // V529 — these two are Gen27-shaped failures: the frame was looked at and
+  // nothing usable came back. They must carry the same per-character rows as
+  // the incomplete path, or the next run is as blind as generation 27 was.
+  const allRequested = characters.map((c) => stripCharacterIdPrefix(c.characterId));
   if (duplicates.length > 0) {
-    return fail(
-      "ambiguous_identity",
-      `two plate faces claim ${duplicates.join(",")}`,
-      diag,
-      extracted.frameUrl,
-    );
+    return {
+      ...fail(
+        "ambiguous_identity",
+        `two plate faces claim ${duplicates.join(",")}`,
+        diag,
+        extracted.frameUrl,
+      ),
+      characterDiagnostics,
+      unresolved: allRequested,
+    };
   }
   if (byChar.size === 0) {
-    return fail("no_identity_evidence", "no face carried a characterId", diag, extracted.frameUrl);
+    return {
+      ...fail("no_identity_evidence", "no face carried a characterId", diag, extracted.frameUrl),
+      characterDiagnostics,
+      unresolved: allRequested,
+    };
   }
 
   const records: PlateNativeIdentityRecord[] = [];
@@ -413,6 +467,8 @@ export async function registerPlateNativeIdentities(params: {
         extracted.frameUrl,
       ),
       partialRecords: records,
+      characterDiagnostics,
+      unresolved: missing,
     };
   }
 
@@ -422,6 +478,8 @@ export async function registerPlateNativeIdentities(params: {
     frameNumber: params.frameNumber,
     frameUrl: extracted.frameUrl,
     diagnostics: diag,
+    characterDiagnostics,
+    unresolved: [],
   };
 }
 

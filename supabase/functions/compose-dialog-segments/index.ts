@@ -5180,6 +5180,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
                 })),
                 resolvedCount: r.resolvedCount,
                 reason: r.reason ?? null,
+                // V529 — one bounded row per requested character.
+                characterDiagnostics: r.characterDiagnostics,
               };
             },
           });
@@ -5203,6 +5205,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             registration_detail: reg.detail ?? null,
             resolved: reg.diagnostics.resolved,
             requested: reg.diagnostics.requested,
+            // V529 — generation 27 could say that Sarah and Kay failed on
+            // all three frames and nothing more. These three fields are
+            // the difference between that and knowing why.
+            detected: reg.diagnostics.detected,
+            unresolved: reg.unresolved,
+            character_diagnostics: reg.characterDiagnostics,
           });
           v525Extract.last = null;
           if (reg.ok) {
