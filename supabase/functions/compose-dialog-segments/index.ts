@@ -4926,6 +4926,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
                 candidates_considered: v523LastRefusal.repair?.candidatesConsidered ?? 0,
                 positional_would_have: v523LastRefusal.repair?.positionalWouldHavePicked ?? null,
                 frame: v523LastRefusal.frame,
+                // V532-A — telemetry only, attached to the refusal report.
+                v532a_target_partial: v532aTargetPartial(
+                  v523LastRefusal.reference?.characterId ??
+                    speakers[pass.speaker_idx]?.character_id ?? null,
+                ),
               },
             };
           }
