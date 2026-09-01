@@ -655,6 +655,27 @@ serve(async (req) => {
                 `cause=${r.ack?.unknownCause ?? "-"} reason=${r.applyReason ?? "-"} ` +
                 `age=${Math.round(passAge / 1000)}s`,
             );
+            // V531-OBS — diagnostic only, fail-open, never branches control flow.
+            await recordDiagnosticObservation(supabase, {
+              handler: "lipsync-watchdog",
+              verdict: "apply_not_confirmed",
+              stage: "sync_segment",
+              pipelineJobId: t.pipelineJobId ?? null,
+              sceneId: d.id,
+              runId: (ds?.run_id ?? (d as any)?.active_run_id ?? null) as string | null,
+              plateGeneration: Number.isFinite(Number((ds as any)?.plate_generation))
+                ? Number((ds as any).plate_generation)
+                : null,
+              externalJobId: t.jobId,
+              details: {
+                ack_state: r.ack?.state ?? null,
+                ack_unknown_cause: r.ack?.unknownCause ?? null,
+                ack_reason: r.applyReason ?? null,
+                provider_status: r.status ?? null,
+                pass_idx: t.passIdx,
+                age_ms: Number.isFinite(passAge) ? Math.round(passAge) : null,
+              },
+            });
             if (passAge > STALE_PROVIDER_MS) applyRejectedStuck = true;
           } else {
             progressed.push({ scene_id: d.id, job_id: t.jobId });
