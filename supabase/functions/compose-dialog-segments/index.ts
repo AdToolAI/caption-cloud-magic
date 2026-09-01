@@ -5295,13 +5295,21 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             actualRaster: ar,
           };
         }
+        // V533-OBS — diagnostic only, never read by a business branch.
+        let v533StillBytes: number | null = null;
+        let v533DecodeMs: number | null = null;
+        let v533DecodeCompleted = false;
         try {
           const res = await fetch(got.imageUrl, { signal: AbortSignal.timeout(20_000) });
           if (!res.ok) {
             return { ok: false, candidates: [], reason: `v530_target_still_http_${res.status}`, cacheHit: got.cacheHit ?? false, requestedRaster: rr, actualRaster: ar };
           }
           const bytes = new Uint8Array(await res.arrayBuffer());
+          v533StillBytes = bytes.byteLength;
+          const v533DecodeStart = performance.now();
           const img = jpegDecodeV526.decode(bytes, { useTArray: true });
+          v533DecodeMs = performance.now() - v533DecodeStart;
+          v533DecodeCompleted = true;
           const faces = await v530Detect(bytes, img.width, img.height, 20_000);
           return {
             ok: true,
@@ -5319,6 +5327,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             requestedRaster: rr,
             actualRaster: ar,
             stillDims: { width: img.width, height: img.height },
+            stillBytes: v533StillBytes,
+            decodeMs: v533DecodeMs,
+            decodeCompleted: v533DecodeCompleted,
           };
         } catch (e) {
           return {
@@ -5328,6 +5339,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             cacheHit: got.cacheHit ?? false,
             requestedRaster: rr,
             actualRaster: ar,
+            stillBytes: v533StillBytes,
+            decodeMs: v533DecodeMs,
+            decodeCompleted: v533DecodeCompleted,
           };
         }
       };
