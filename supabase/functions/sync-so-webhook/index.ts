@@ -38,7 +38,7 @@ import { evaluateNoopRedispatch } from "../_shared/v461-input-fingerprint.ts";
 // v431 G3.2.2 — B11 gelöscht: kein Complete-Pfad im Sync-Apply mehr,
 // `materializeCompatibilityOutput` gehört ausschließlich dem Finalizer.
 
-import { acquireLedgerJob, observeCallbackProvenance, readPipelineJobId } from "../_shared/v431-ledger.ts";
+import { acquireLedgerJob, observeCallbackProvenance, readPipelineJobId, recordDiagnosticObservation } from "../_shared/v431-ledger.ts";
 // FA-4 Provider-No-op Fix Contract C′ — PURE motion classifier (LEGACY
 // TELEMETRY since V465-B2b; never authoritative).
 import {
@@ -1103,6 +1103,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     let v443MotionUnverified = false;
     let v443MeasureAttempts = 0;
     let v443LastInfraReason: string | null = null;
+    // V531-OBS — TELEMETRY-ONLY mirrors. Written by the measurement routine,
+    // read exclusively by diagnostic observations. No branch may consume them.
+    let v531ObsV466Remeasured: boolean | null = null;
+    let v531ObsVerdict: string | null = null;
     // V500-B2 — der Nicht-Terminal-Entscheid des Gates, gehisted bis zur
     // Pass-Through-Entscheidung. `v500NoopUnverified` ist block-lokal zur
     // Messroutine; ohne diese Weitergabe faellt der Entscheid unter den
@@ -1238,6 +1242,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         }
       }
       v443MeasureAttempts = v443Bounded.attempts;
+      // V531-OBS — telemetry mirrors only.
+      v531ObsV466Remeasured = v466ReMeasured;
+      v531ObsVerdict = v465Verdict.verdict ?? null;
       // V456 — an unresolved ROI contract is NOT a verdict about the clip:
       // it passes through as `motion_unverified` exactly like a probe-infra
       // exhaustion (non-terminal, no retry, no refund, no provider call).
@@ -1586,7 +1593,58 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const prePlan = planPreLockSpeakerMeasurement(snapSpeakerCardinality);
       v404MeasurementDeferred = prePlan.action === "defer";
       if (prePlan.action === "measure") {
-        await runServerMotionMeasurement(snapPass, snapPassIdx, "pre_lock");
+        // ── V531-OBS — diagnostic telemetry around the PRE-LOCK measurement.
+        // Fail-open, scalar-only, never alters control flow or the error object.
+        const v531ObsBase = {
+          handler: "sync-so-webhook",
+          stage: "sync_segment" as const,
+          pipelineJobId: v431CallbackJobId ?? null,
+          sceneId,
+          runId: ((scene as any)?.active_run_id ?? null) as string | null,
+          plateGeneration: Number.isFinite(Number((scene as any)?.plate_generation))
+            ? Number((scene as any).plate_generation)
+            : null,
+          externalJobId: jobId ? String(jobId) : null,
+        };
+        await recordDiagnosticObservation(supabase, {
+          ...v531ObsBase,
+          verdict: "motion_measure_start",
+          details: {
+            phase: "pre_lock",
+            pass_idx: snapPassIdx,
+            speaker_cardinality: snapSpeakerCardinality.classification,
+            plan_action: prePlan.action,
+          },
+        });
+        try {
+          await runServerMotionMeasurement(snapPass, snapPassIdx, "pre_lock");
+        } catch (e) {
+          await recordDiagnosticObservation(supabase, {
+            ...v531ObsBase,
+            verdict: "motion_measure_error",
+            details: {
+              phase: "pre_lock",
+              pass_idx: snapPassIdx,
+              error_class: e instanceof Error ? e.name : typeof e,
+              reason: (e instanceof Error ? e.message : String(e))
+                .replace(/https?:\/\/\S+/gi, "[url]")
+                .slice(0, 200),
+            },
+          });
+          throw e;
+        }
+        await recordDiagnosticObservation(supabase, {
+          ...v531ObsBase,
+          verdict: "motion_measure_done",
+          details: {
+            phase: "pre_lock",
+            pass_idx: snapPassIdx,
+            measurement_status: (v404MotionMeasurement as any)?.measurement_status ?? null,
+            attempts: v443MeasureAttempts,
+            v466_remeasured: v531ObsV466Remeasured,
+            verdict: v531ObsVerdict,
+          },
+        });
       } else if (v404MeasurementDeferred) {
         console.log(
           `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} motion_measure_deferred scene=${sceneId} ` +
@@ -2417,6 +2475,24 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} lock_phase_io_rounds_exhausted scene=${sceneId} ` +
           `job=${jobId} last_request=${__v5PhaseRun.lastRequest?.kind ?? "none"} — no apply, no mux, no retry`,
       );
+      // V531-OBS — diagnostic only; the response below is unchanged.
+      await recordDiagnosticObservation(supabase, {
+        handler: "sync-so-webhook",
+        verdict: "lock_phase_io_rounds_exhausted",
+        stage: "sync_segment",
+        pipelineJobId: v431CallbackJobId ?? null,
+        sceneId,
+        runId: ((scene as any)?.active_run_id ?? null) as string | null,
+        plateGeneration: Number.isFinite(Number((scene as any)?.plate_generation))
+          ? Number((scene as any).plate_generation)
+          : null,
+        externalJobId: jobId ? String(jobId) : null,
+        details: {
+          rounds: __v5PhaseRun.rounds,
+          last_request_kind: __v5PhaseRun.lastRequest?.kind ?? null,
+          pass_idx: null,
+        },
+      });
       return ok({
         ok: true,
         skipped: "lock_phase_io_rounds_exhausted",
