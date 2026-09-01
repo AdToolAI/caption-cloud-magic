@@ -5006,6 +5006,37 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // ONLY, so the gate can report what earlier attempts saw. Its writes
       // and business reads are unchanged.
       const v526bEvidence: FrameAttemptEvidence[] = [];
+      /**
+       * V532-A — OBSERVABILITY ONLY.
+       *
+       * Did the target speaker resolve biometrically on ANY attempted
+       * registration frame (not just the last one)? Pure read over the
+       * existing V526-B evidence; no branch, guard, dispatch decision,
+       * V523 input, sibling set or candidate selection may consume it.
+       */
+      const v532aTargetPartial = (characterId?: string | null) => {
+        const want = String(characterId ?? "")
+          .toLowerCase()
+          .replace(/^(outfit|pose|wardrobe|vibe|prop|look):/, "");
+        if (!want) {
+          return { target_partial_present: false, target_partial_similarity: null, target_partial_frame: null };
+        }
+        for (const att of v526bEvidence) {
+          for (const rec of att?.records ?? []) {
+            const got = String((rec as any)?.characterId ?? "")
+              .toLowerCase()
+              .replace(/^(outfit|pose|wardrobe|vibe|prop|look):/, "");
+            if (got === want) {
+              return {
+                target_partial_present: true,
+                target_partial_similarity: (rec as any)?.similarity ?? null,
+                target_partial_frame: att?.frame ?? (rec as any)?.frameNumber ?? null,
+              };
+            }
+          }
+        }
+        return { target_partial_present: false, target_partial_similarity: null, target_partial_frame: null };
+      };
       // What the LEGACY identity geometry was measured on. `anchor_native`
       // is the generation-20 case and is no longer usable as plate
       // geometry, however cleanly it is scaled.
