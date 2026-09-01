@@ -1103,6 +1103,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     let v443MotionUnverified = false;
     let v443MeasureAttempts = 0;
     let v443LastInfraReason: string | null = null;
+    // V531-OBS — TELEMETRY-ONLY mirrors. Written by the measurement routine,
+    // read exclusively by diagnostic observations. No branch may consume them.
+    let v531ObsV466Remeasured: boolean | null = null;
+    let v531ObsVerdict: string | null = null;
     // V500-B2 — der Nicht-Terminal-Entscheid des Gates, gehisted bis zur
     // Pass-Through-Entscheidung. `v500NoopUnverified` ist block-lokal zur
     // Messroutine; ohne diese Weitergabe faellt der Entscheid unter den
