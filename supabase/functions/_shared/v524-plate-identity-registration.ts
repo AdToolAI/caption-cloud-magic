@@ -501,6 +501,8 @@ export async function registerPlateNativeIdentities(params: {
       partialRecords: records,
       characterDiagnostics,
       unresolved: missing,
+      // V532-A — telemetry only, on this return alone.
+      unassignedFaceBoxes,
     };
   }
 
