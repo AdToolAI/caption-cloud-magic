@@ -38,7 +38,7 @@ import { evaluateNoopRedispatch } from "../_shared/v461-input-fingerprint.ts";
 // v431 G3.2.2 — B11 gelöscht: kein Complete-Pfad im Sync-Apply mehr,
 // `materializeCompatibilityOutput` gehört ausschließlich dem Finalizer.
 
-import { acquireLedgerJob, observeCallbackProvenance, readPipelineJobId } from "../_shared/v431-ledger.ts";
+import { acquireLedgerJob, observeCallbackProvenance, readPipelineJobId, recordDiagnosticObservation } from "../_shared/v431-ledger.ts";
 // FA-4 Provider-No-op Fix Contract C′ — PURE motion classifier (LEGACY
 // TELEMETRY since V465-B2b; never authoritative).
 import {
