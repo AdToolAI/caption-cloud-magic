@@ -2475,6 +2475,24 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} lock_phase_io_rounds_exhausted scene=${sceneId} ` +
           `job=${jobId} last_request=${__v5PhaseRun.lastRequest?.kind ?? "none"} — no apply, no mux, no retry`,
       );
+      // V531-OBS — diagnostic only; the response below is unchanged.
+      await recordDiagnosticObservation(supabase, {
+        handler: "sync-so-webhook",
+        verdict: "lock_phase_io_rounds_exhausted",
+        stage: "sync_segment",
+        pipelineJobId: v431CallbackJobId ?? null,
+        sceneId,
+        runId: ((scene as any)?.active_run_id ?? null) as string | null,
+        plateGeneration: Number.isFinite(Number((scene as any)?.plate_generation))
+          ? Number((scene as any).plate_generation)
+          : null,
+        externalJobId: jobId ? String(jobId) : null,
+        details: {
+          rounds: __v5PhaseRun.rounds,
+          last_request_kind: __v5PhaseRun.lastRequest?.kind ?? null,
+          pass_idx: null,
+        },
+      });
       return ok({
         ok: true,
         skipped: "lock_phase_io_rounds_exhausted",
