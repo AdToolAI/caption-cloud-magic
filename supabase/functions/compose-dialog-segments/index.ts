@@ -5278,6 +5278,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         requestedRaster?: string | null;
         actualRaster?: string | null;
         stillDims?: { width: number; height: number } | null;
+        /** V533-OBS — diagnostic only; omitted means "unknown", never a business condition. */
+        stillBytes?: number | null;
+        decodeMs?: number | null;
+        decodeCompleted?: boolean;
       };
       const v530TargetFaces = async (frameNumber: number): Promise<V530Target> => {
         if (!plateDims) return { ok: false, candidates: [], reason: "v530_plate_dims_unavailable" };
