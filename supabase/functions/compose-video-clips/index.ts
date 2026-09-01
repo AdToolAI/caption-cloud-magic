@@ -92,6 +92,12 @@ import {
   strictRecoveryTargets,
 } from "../_shared/v508-strict-identity.ts";
 import { buildAnchorLayoutFromV274 } from "../_shared/plateFaceSlotRouter.ts";
+import {
+  applyExhaustiveClosure,
+  buildV534Telemetry,
+  evaluateExhaustiveClosure,
+} from "../_shared/v534-exhaustive-identity-closure.ts";
+
 
 /**
  * V446 — corrective anti-panel directive for the anchor re-compose. The base
@@ -3837,10 +3843,57 @@ serve(async (req) => {
                           }
                         }
 
+                        // ══ V534 — EXHAUSTIVE ANCHOR IDENTITY CLOSURE ═══════
+                        //
+                        // Both flows (initial resolution and V514 recovery)
+                        // have converged. Exactly here, and only here, the ONE
+                        // identity that set arithmetic leaves over in a
+                        // saturated detection may be closed. Everything above
+                        // — including the recovery acceptance comparison — is
+                        // untouched and still sees the pure biometric verdict.
+                        //
+                        // The predicate is fail-closed; every refusal keeps the
+                        // existing `awaiting_manual_face_map` behaviour.
+                        const v534Decision = evaluateExhaustiveClosure(
+                          v514Authority.resolution,
+                          rekChars.map((c) => ({
+                            characterId: c.characterId as string,
+                            speakerIdx: c.speakerIdx,
+                          })),
+                        );
+                        const v534Telemetry = buildV534Telemetry(v534Decision);
+                        if (v534Decision.applied && v534Decision.closure) {
+                          const closed = applyExhaustiveClosure(
+                            v514Authority.resolution,
+                            v534Decision.closure,
+                          );
+                          v514Authority = {
+                            ...v514Authority,
+                            resolution: closed,
+                            verification: evaluateStrictVerification(
+                              v508Records,
+                              closed.assignmentLock as Record<string, unknown> | null,
+                              null,
+                              {
+                                characterId: v534Decision.closure.characterId,
+                                faceIndex: v534Decision.closure.faceIndex,
+                              },
+                            ),
+                          };
+                        }
+                        console.log(
+                          `[compose-video-clips] v534_closure scene=${scene.id} ` +
+                            `applied=${v534Decision.applied ? 1 : 0} reason=${v534Decision.reason} ` +
+                            `expected=${v534Decision.detail.expectedCount} ` +
+                            `detected=${v534Decision.detail.detectedCount ?? "-"} ` +
+                            `biometric=${v534Decision.detail.resolvedCount}`,
+                        );
+
                         // From here on the initial resolution is history. Every
                         // persisted structure below derives from the authority.
                         const idAuthoritative = v514Authority.resolution;
                         const v508Verify = v514Authority.verification;
+
                         // Persist to audio_plan.twoshot.anchor_identity — this
                         // becomes the fallback source for
                         // dialog_shots.plate_identity in compose-dialog-segments.
@@ -3952,6 +4005,11 @@ serve(async (req) => {
                             evidence: v508Verify.evidence,
                             confidence_semantics: v508Verify.confidenceSemantics,
                             repair_attempted: v508RepairAttempted,
+                            // V534 provenance kept separate: the underlying
+                            // authority label stays whatever it was (initial
+                            // resolution vs V514 recovery, complete vs partial).
+                            v534_closure: v534Telemetry,
+
                           };
 
                           // v276: hard-block only on total miss (0/N) when soft-gate enabled.

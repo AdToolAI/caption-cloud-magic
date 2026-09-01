@@ -250,6 +250,16 @@ export type EvidenceClass =
   | "vlm_ambiguous"
   | "positional"
   | "inferred"
+  /**
+   * V534 — the ONE identity left over in a saturated detection where every
+   * other identity is biometrically accepted. It is a set argument, not a
+   * measurement, so it is NEVER a member of `STRICT_EVIDENCE_CLASSES` and
+   * `evidenceSatisfiesStrict` is false for it globally — including in the
+   * V514 recovery comparison. It is honoured only when the final strict
+   * verification is handed an explicit V534 closure for exactly that
+   * character.
+   */
+  | "deduced_closure"
   | "unverified";
 
 /** Which measurement produced a confidence number. Never guessed. */
@@ -261,6 +271,7 @@ export const STRICT_EVIDENCE_CLASSES: readonly EvidenceClass[] = ["biometric"];
 export function evidenceSatisfiesStrict(c: EvidenceClass | null | undefined): boolean {
   return STRICT_EVIDENCE_CLASSES.includes(c as EvidenceClass);
 }
+
 
 /**
  * PURE — name the evidence honestly.
@@ -332,6 +343,12 @@ export function evaluateStrictVerification(
   records: CanonicalCastRecord[],
   assignmentLock: Record<string, unknown> | null | undefined,
   similarityByCharacterId?: Map<string, number | null> | null,
+  /**
+   * V534 — an explicit, single-character exhaustive closure. Only the FINAL
+   * strict verification (after V514 convergence) ever passes this. Omitted
+   * everywhere else, so recovery semantics are byte-for-byte unchanged.
+   */
+  v534Closure?: { characterId: string; faceIndex: number } | null,
 ): StrictVerificationVerdict {
   const lock = assignmentLock && typeof assignmentLock === "object" ? assignmentLock : {};
   const lockedIds = new Set(
@@ -343,22 +360,26 @@ export function evaluateStrictVerification(
     const slot = Number(k);
     if (id && Number.isFinite(slot)) slotByCharacterId.set(id, slot);
   }
+  const closureId = str(v534Closure?.characterId);
 
   const evidence: StrictSlotEvidence[] = (records ?? []).map((r) => {
     const biometricAssigned = lockedIds.has(r.characterId);
+    // A closure never overrides a biometric acceptance and never applies to
+    // more than the one character it names.
+    const closed = !biometricAssigned && closureId !== null && closureId === r.characterId;
     return {
       characterId: r.characterId,
       name: r.name,
       slot: slotByCharacterId.get(r.characterId) ?? r.slot,
       strict: isStrictRecord(r),
-      evidenceClass: classifySlotEvidence({ biometricAssigned }),
+      evidenceClass: closed ? "deduced_closure" : classifySlotEvidence({ biometricAssigned }),
       rekognitionSimilarity: similarityByCharacterId?.get(r.characterId) ?? null,
     };
   });
 
   const strictEvidence = evidence.filter((e) => e.strict);
   const unresolved = strictEvidence
-    .filter((e) => !evidenceSatisfiesStrict(e.evidenceClass))
+    .filter((e) => e.evidenceClass !== "deduced_closure" && !evidenceSatisfiesStrict(e.evidenceClass))
     .map((e) => ({ characterId: e.characterId, name: e.name, slot: e.slot }));
 
   const ok = unresolved.length === 0;
@@ -372,6 +393,7 @@ export function evaluateStrictVerification(
       ? null
       : `strict_anchor_identity_unverified:${unresolved.map((u) => u.name || u.characterId).join(",")}`,
     confidenceSemantics: "biometric",
+
   };
 }
 
