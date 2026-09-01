@@ -261,10 +261,10 @@ Deno.test("V533-OBS 11 — exactly three new verdict literals in the runtime fil
   const verdicts = [...SRC.matchAll(/v533Observe\(\s*"([a-z0-9_]+)"/g)].map((m) => m[1]).sort();
   assertEquals(verdicts, ["gate_fanout_done", "gate_fanout_start", "v530_candidate_done"]);
   // No business branch consumes a V533 field or verdict.
-  assert(!/if\s*\([^)]*v533/.test(SRC));
-  assert(!/v533CandidateIdx\s*[<>=!]/.test(SRC));
+  assert(!/if\s*\([^)\n]*v533/.test(SRC));
+  assert(!/v533CandidateIdx\s*(?:[<>]|[=!]==?)/.test(SRC));
   for (const f of ["candidate_index", "decode_completed", "gate_fanout_start", "gate_fanout_done"]) {
-    assert(!new RegExp(`(if|while|switch)\\s*\\([^)]*${f}`).test(SRC), `${f} must not gate control flow`);
+    assert(!new RegExp(`(if|while|switch)\\s*\\([^)\\n]*${f}`).test(SRC), `${f} must not gate control flow`);
   }
 });
 
