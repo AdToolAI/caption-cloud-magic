@@ -4864,6 +4864,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               // candidate set V523 judged, not from a different detector.
               v523_positional_would_have: v523Repair?.positionalWouldHavePicked ?? null,
               v530_target: v530Telemetry,
+              // V532-A — telemetry only: did this speaker resolve on any
+              // earlier registration attempt? Read by nothing.
+              v532a_target_partial: v532aTargetPartial(
+                v523Ref?.characterId ?? speakers[pass.speaker_idx]?.character_id ?? null,
+              ),
             };
             console.warn(
               `[compose-dialog-segments] scene=${sceneId} FACE-GATE REPAIR (${shouldForceRepair ? "v96-force" : "strict"}) pass=${pass.idx} speaker=${pass.speaker_name} frame=${frame} original=${JSON.stringify(original)} repaired=${JSON.stringify(pass.coords)} faces=${sortedBoxes.length}`,
@@ -4921,6 +4926,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
                 candidates_considered: v523LastRefusal.repair?.candidatesConsidered ?? 0,
                 positional_would_have: v523LastRefusal.repair?.positionalWouldHavePicked ?? null,
                 frame: v523LastRefusal.frame,
+                // V532-A — telemetry only, attached to the refusal report.
+                v532a_target_partial: v532aTargetPartial(
+                  v523LastRefusal.reference?.characterId ??
+                    speakers[pass.speaker_idx]?.character_id ?? null,
+                ),
               },
             };
           }
@@ -5001,6 +5011,42 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       );
       let v524Registration: PlateIdentityRegistration | null = null;
       let v524Records: PlateNativeIdentityRecord[] = [];
+      // V526-B — accepted biometric records per attempted frame.
+      // V532-A — hoisted from the registration block for TELEMETRY SCOPE
+      // ONLY, so the gate can report what earlier attempts saw. Its writes
+      // and business reads are unchanged.
+      const v526bEvidence: FrameAttemptEvidence[] = [];
+      /**
+       * V532-A — OBSERVABILITY ONLY.
+       *
+       * Did the target speaker resolve biometrically on ANY attempted
+       * registration frame (not just the last one)? Pure read over the
+       * existing V526-B evidence; no branch, guard, dispatch decision,
+       * V523 input, sibling set or candidate selection may consume it.
+       */
+      const v532aTargetPartial = (characterId?: string | null) => {
+        const want = String(characterId ?? "")
+          .toLowerCase()
+          .replace(/^(outfit|pose|wardrobe|vibe|prop|look):/, "");
+        if (!want) {
+          return { target_partial_present: false, target_partial_similarity: null, target_partial_frame: null };
+        }
+        for (const att of v526bEvidence) {
+          for (const rec of att?.records ?? []) {
+            const got = String((rec as any)?.characterId ?? "")
+              .toLowerCase()
+              .replace(/^(outfit|pose|wardrobe|vibe|prop|look):/, "");
+            if (got === want) {
+              return {
+                target_partial_present: true,
+                target_partial_similarity: (rec as any)?.similarity ?? null,
+                target_partial_frame: att?.frame ?? (rec as any)?.frameNumber ?? null,
+              };
+            }
+          }
+        }
+        return { target_partial_present: false, target_partial_similarity: null, target_partial_frame: null };
+      };
       // What the LEGACY identity geometry was measured on. `anchor_native`
       // is the generation-20 case and is no longer usable as plate
       // geometry, however cleanly it is scaled.
@@ -5296,8 +5342,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         // base-video URL, so a generation-20 frame is unreachable here
         // rather than merely rejected.
         const v525Attempts: RegistrationAttempt[] = [];
-        // V526-B — accepted biometric records per attempted frame.
-        const v526bEvidence: FrameAttemptEvidence[] = [];
+        // V532-A — `v526bEvidence` is now declared above, at the same scope
+        // as `v524Registration`. Behaviour unchanged.
         // A holder rather than a bare `let`: the value is written inside the
         // injected closure and read after it, and narrowing a closure-assigned
         // local to `never` is a TypeScript artefact, not a real invariant.
@@ -5368,7 +5414,18 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             detected: reg.diagnostics.detected,
             unresolved: reg.unresolved,
             character_diagnostics: reg.characterDiagnostics,
-          });
+            // V532-A — OBSERVABILITY ONLY. How many detector candidates
+            // this attempt carried no character id for, and which
+            // characters DID resolve. Nothing branches on these.
+            unassigned_face_count: Array.isArray((reg as any).unassignedFaceBoxes)
+              ? (reg as any).unassignedFaceBoxes.length
+              : 0,
+            unassigned_face_boxes: (reg as any).unassignedFaceBoxes ?? [],
+            partial_record_count: Array.isArray(reg.partialRecords)
+              ? reg.partialRecords.length
+              : 0,
+            partial_character_ids: (reg.partialRecords ?? []).map((r) => r.characterId),
+          } as RegistrationAttempt);
           v525Extract.last = null;
           if (reg.ok) {
             v524Records = reg.records;

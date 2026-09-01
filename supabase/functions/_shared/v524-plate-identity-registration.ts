@@ -174,6 +174,22 @@ export interface PlateIdentityRegistration {
    */
   partialRecords?: PlateNativeIdentityRecord[];
   /**
+   * V532-A — OBSERVABILITY ONLY.
+   *
+   * DetectFaces candidates that were NOT assigned to any requested
+   * character under the current V524 evidence. This is NOT a biometric
+   * negation: it does not state that these faces belong to nobody, only
+   * that this attempt carried no character id for them.
+   *
+   * Boxes are validated exactly like accepted records (finite, positive
+   * extent) and scaled with the same sx/sy detector→plate transformation,
+   * so they are readable next to `partialRecords` in the same raster.
+   *
+   * Present ONLY on the `incomplete_registration` return. Nothing in the
+   * pipeline may branch on it.
+   */
+  unassignedFaceBoxes?: Box[];
+  /**
    * V529 — why each requested character did or did not resolve on this
    * frame. Bounded to one row per character; never a score matrix.
    */
@@ -379,10 +395,26 @@ export async function registerPlateNativeIdentities(params: {
   // ── Identity → geometry, keyed by characterId only ──────────────────
   const byChar = new Map<string, { bbox: Box; similarity: number | null }>();
   const duplicates: string[] = [];
+  // V532-A — observability only. Candidates skipped here because this
+  // attempt carried no character id for them. Never read by any branch.
+  const unassignedFaceBoxes: Box[] = [];
   let minSimilarity: number | null = null;
   for (const f of detected.faces ?? []) {
     const cid = stripCharacterIdPrefix(f?.characterId);
-    if (!cid) continue;
+    if (!cid) {
+      if (isFiniteBox(f?.bbox)) {
+        const ub = f.bbox.map(Number) as Box;
+        if (ub[2] > ub[0] && ub[3] > ub[1]) {
+          unassignedFaceBoxes.push([
+            Math.round(ub[0] * sx),
+            Math.round(ub[1] * sy),
+            Math.round(ub[2] * sx),
+            Math.round(ub[3] * sy),
+          ]);
+        }
+      }
+      continue;
+    }
     if (!isFiniteBox(f?.bbox)) continue;
     const b = f.bbox.map(Number) as Box;
     if (!(b[2] > b[0]) || !(b[3] > b[1])) continue;
@@ -469,6 +501,8 @@ export async function registerPlateNativeIdentities(params: {
       partialRecords: records,
       characterDiagnostics,
       unresolved: missing,
+      // V532-A — telemetry only, on this return alone.
+      unassignedFaceBoxes,
     };
   }
 
