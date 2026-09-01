@@ -530,6 +530,65 @@ Deno.test("Z. application point: after V514 convergence, before the authority re
   assert(!CLIPS.slice(first, first + 260).includes("characterId: v534Decision"));
 });
 
+Deno.test("Z3. the final strict call receives the PRE-CLOSURE lock, not the closed one", () => {
+  const start = CLIPS.indexOf("if (v534Decision.applied && v534Decision.closure) {");
+  assert(start > 0, "V534 application block must exist");
+  const block = CLIPS.slice(start, CLIPS.indexOf("console.log(", start));
+  // The closed resolution is what gets persisted...
+  assert(block.includes("resolution: closed,"));
+  assert(block.includes("const closed = applyExhaustiveClosure("));
+  assert(block.includes("const preClosureResolution = v514Authority.resolution;"));
+  assert(block.includes("const preClosureLock = preClosureResolution.assignmentLock;"));
+  // ...but the strict verdict is computed on the UNCLOSED lock.
+  assert(
+    block.includes("preClosureLock as Record<string, unknown> | null,"),
+    "strict verification must consume the pre-closure lock",
+  );
+  assert(
+    !block.includes("closed.assignmentLock"),
+    "strict verification must NOT consume closed.assignmentLock",
+  );
+});
+
+Deno.test("Z4. pre-closure lock + explicit closure yields deduced_closure, closed lock does not", () => {
+  const dbById = new Map([SARAH, SAMUEL, MATTHEW, KAY].map((id, i) => [
+    id,
+    { name: `C${i}`, reference_image_url: "x", identity_lock_strength: "strict" },
+  ]));
+  const records = buildCanonicalCastRecords(
+    [{ characterId: SARAH }, { characterId: SAMUEL }, { characterId: MATTHEW }, { characterId: KAY }],
+    dbById as never,
+  );
+  const base = gen33();
+  const decision = evaluateExhaustiveClosure(base, CAST);
+  const closed = applyExhaustiveClosure(base, decision.closure!);
+  const explicit = {
+    characterId: decision.closure!.characterId,
+    faceIndex: decision.closure!.faceIndex,
+  };
+
+  // What the runtime now does.
+  const correct = evaluateStrictVerification(records, base.assignmentLock, null, explicit);
+  assertEquals(correct.ok, true);
+  assertEquals(
+    correct.evidence.find((e) => e.characterId === SAMUEL)!.evidenceClass,
+    "deduced_closure",
+  );
+
+  // What the buggy integration did: the closed lock hides the provenance.
+  const wrong = evaluateStrictVerification(records, closed.assignmentLock, null, explicit);
+  assertEquals(
+    wrong.evidence.find((e) => e.characterId === SAMUEL)!.evidenceClass,
+    "biometric",
+    "regression witness: closed lock mislabels the deduction as a measurement",
+  );
+
+  // Persisted shape is still the closed one.
+  assertEquals(Object.keys(closed.assignmentLock).length, 4);
+  assertEquals(closed.resolvedCount, 3);
+  assertEquals([...STRICT_EVIDENCE_CLASSES], ["biometric"]);
+});
+
 Deno.test("Z2. manual face-map guard and V514 recovery semantics intact", () => {
   assert(CLIPS.includes("const v508StrictBlock = !v508Verify.ok;"));
   assert(CLIPS.includes('clip_status: "awaiting_manual_face_map"'));
