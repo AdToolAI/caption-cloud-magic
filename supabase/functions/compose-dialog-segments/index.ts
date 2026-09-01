@@ -5001,6 +5001,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       );
       let v524Registration: PlateIdentityRegistration | null = null;
       let v524Records: PlateNativeIdentityRecord[] = [];
+      // V526-B — accepted biometric records per attempted frame.
+      // V532-A — hoisted from the registration block for TELEMETRY SCOPE
+      // ONLY, so the gate can report what earlier attempts saw. Its writes
+      // and business reads are unchanged.
+      const v526bEvidence: FrameAttemptEvidence[] = [];
       // What the LEGACY identity geometry was measured on. `anchor_native`
       // is the generation-20 case and is no longer usable as plate
       // geometry, however cleanly it is scaled.
