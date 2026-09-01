@@ -3863,8 +3863,16 @@ serve(async (req) => {
                         );
                         const v534Telemetry = buildV534Telemetry(v534Decision);
                         if (v534Decision.applied && v534Decision.closure) {
+                          // PROVENANCE SEPARATION: the CLOSED resolution is what
+                          // downstream/persisted `anchor_identity` uses, but the
+                          // strict verdict must still be computed against the
+                          // PRE-CLOSURE lock. Otherwise V508 sees the deduced
+                          // character as `biometricAssigned` and silently
+                          // relabels a set argument as a measurement.
+                          const preClosureResolution = v514Authority.resolution;
+                          const preClosureLock = preClosureResolution.assignmentLock;
                           const closed = applyExhaustiveClosure(
-                            v514Authority.resolution,
+                            preClosureResolution,
                             v534Decision.closure,
                           );
                           v514Authority = {
@@ -3872,7 +3880,7 @@ serve(async (req) => {
                             resolution: closed,
                             verification: evaluateStrictVerification(
                               v508Records,
-                              closed.assignmentLock as Record<string, unknown> | null,
+                              preClosureLock as Record<string, unknown> | null,
                               null,
                               {
                                 characterId: v534Decision.closure.characterId,
@@ -3881,6 +3889,7 @@ serve(async (req) => {
                             ),
                           };
                         }
+
                         console.log(
                           `[compose-video-clips] v534_closure scene=${scene.id} ` +
                             `applied=${v534Decision.applied ? 1 : 0} reason=${v534Decision.reason} ` +
