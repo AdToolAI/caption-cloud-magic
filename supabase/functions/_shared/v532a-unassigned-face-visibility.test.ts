@@ -154,3 +154,177 @@ Deno.test("V532-A CONTRACT — unassignedFaceBoxes is never read by a business b
   assert(caller.includes("partial_character_ids"));
   assert(caller.includes("v532a_target_partial"));
 });
+
+/* ------------------------------------------------------------------ *
+ * V532-A — TARGET TELEMETRY REGRESSIONS (Gen30 shape)
+ *
+ * `v532aTargetPartial` lives inline in compose-dialog-segments (it closes
+ * over `v526bEvidence`). To exercise the REAL implementation without
+ * touching the production file, the arrow function is extracted verbatim
+ * from source, de-typed, and evaluated against synthetic evidence.
+ * ------------------------------------------------------------------ */
+
+const CALLER_URL = new URL("../compose-dialog-segments/index.ts", import.meta.url);
+
+async function loadTargetPartial(evidence: unknown[]) {
+  const src = await Deno.readTextFile(CALLER_URL);
+  const start = src.indexOf("const v532aTargetPartial = (");
+  assert(start >= 0, "v532aTargetPartial must exist in compose-dialog-segments");
+  const open = src.indexOf("{", src.indexOf("=>", start));
+  let depth = 0;
+  let end = -1;
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === "{") depth++;
+    else if (src[i] === "}") {
+      depth--;
+      if (depth === 0) {
+        end = i + 1;
+        break;
+      }
+    }
+  }
+  assert(end > 0, "unbalanced v532aTargetPartial body");
+  const fnSrc = src
+    .slice(src.indexOf("(", start), end)
+    .replace(/characterId\?:\s*string\s*\|\s*null/, "characterId")
+    .replace(/\s+as\s+any/g, "");
+  const factory = new Function("v526bEvidence", `return (${fnSrc});`);
+  return factory(evidence) as (
+    id?: string | null,
+  ) => { target_partial_present: boolean; target_partial_similarity: number | null; target_partial_frame: number | null };
+}
+
+Deno.test("V532-A TARGET — Gen30 shape: Sarah accepted on the FIRST attempt only", async () => {
+  const evidence = [
+    { frame: 12, records: [{ characterId: "sarah", similarity: 94.0363 }] },
+    { frame: 48, records: [{ characterId: "matthew", similarity: 91.2 }] },
+    { frame: 96, records: [] },
+  ];
+  const targetPartial = await loadTargetPartial(evidence);
+  assertEquals(targetPartial("sarah"), {
+    target_partial_present: true,
+    target_partial_similarity: 94.0363,
+    target_partial_frame: 12,
+  });
+});
+
+Deno.test("V532-A TARGET — scans ALL V526-B attempts, not only the last one", async () => {
+  const evidence = [
+    { frame: 10, records: [] },
+    { frame: 20, records: [{ characterId: "outfit:sarah", similarity: 88.5 }] },
+    { frame: 30, records: [{ characterId: "matthew", similarity: 99 }] },
+  ];
+  const targetPartial = await loadTargetPartial(evidence);
+  // Present on a MIDDLE attempt — a last-attempt-only reader would say false.
+  assertEquals(targetPartial("sarah"), {
+    target_partial_present: true,
+    target_partial_similarity: 88.5,
+    target_partial_frame: 20,
+  });
+  // Absent everywhere → honest false.
+  assertEquals(targetPartial("kay"), {
+    target_partial_present: false,
+    target_partial_similarity: null,
+    target_partial_frame: null,
+  });
+  // No evidence at all → honest false.
+  const empty = await loadTargetPartial([]);
+  assertEquals(empty("sarah").target_partial_present, false);
+});
+
+Deno.test("V532-A PURE — ambiguous_identity is unchanged and carries no unassigned field", async () => {
+  const reg = await run({
+    requested: ["sarah", "matthew"],
+    faces: [
+      { characterId: "sarah", bbox: [10, 20, 50, 80] },
+      { characterId: "sarah", bbox: [100, 40, 140, 100] },
+      { characterId: null, bbox: [200, 40, 240, 100] },
+    ],
+    detectorDims: { width: 640, height: 360 },
+    plateDims: { width: 640, height: 360 },
+  });
+
+  assertEquals(reg.ok, false);
+  assertEquals(reg.reason, "ambiguous_identity");
+  assertEquals(reg.records.length, 0);
+  assertEquals(reg.unassignedFaceBoxes, undefined);
+  assert(!Object.prototype.hasOwnProperty.call(reg, "unassignedFaceBoxes"));
+});
+
+Deno.test("V532-A PURE — incomplete registration with zero VALID unassigned boxes → []", async () => {
+  const reg = await run({
+    requested: ["sarah", "matthew"],
+    faces: [
+      { characterId: "sarah", bbox: [10, 20, 50, 80] },
+      { characterId: null, bbox: [7, 7, 7, 7] },
+      { characterId: null, bbox: [Number.NaN, Number.NaN, 10, 10] },
+    ],
+    detectorDims: { width: 640, height: 360 },
+    plateDims: { width: 640, height: 360 },
+  });
+
+  assertEquals(reg.reason, "incomplete_registration");
+  assertEquals(reg.unassignedFaceBoxes, []);
+  assertEquals(reg.partialRecords?.length, 1);
+});
+
+Deno.test("V532-A PURE — accepted/assigned boxes never leak into unassignedFaceBoxes", async () => {
+  const reg = await run({
+    requested: ["sarah", "matthew", "kay"],
+    faces: [
+      { characterId: "sarah", bbox: [10, 20, 50, 80] },
+      { characterId: "matthew", bbox: [60, 20, 100, 80] },
+      { characterId: null, bbox: [120, 20, 160, 80] },
+      { characterId: null, bbox: [180, 20, 220, 80] },
+    ],
+    detectorDims: { width: 320, height: 180 },
+    plateDims: { width: 640, height: 360 },
+  });
+
+  assertEquals(reg.reason, "incomplete_registration");
+  const accepted = (reg.partialRecords ?? []).map((r) => JSON.stringify(r.bbox));
+  assertEquals(accepted.length, 2);
+  const unassigned = (reg.unassignedFaceBoxes ?? []).map((b) => JSON.stringify(b));
+  assertEquals(unassigned.length, 2);
+  for (const box of unassigned) {
+    assert(!accepted.includes(box), `assigned box leaked into unassignedFaceBoxes: ${box}`);
+  }
+  assertEquals(reg.unassignedFaceBoxes, [
+    [240, 40, 320, 160],
+    [360, 40, 440, 160],
+  ]);
+});
+
+Deno.test("V532-A CONTRACT — telemetry surface carries no URLs, bytes or provider bodies", async () => {
+  const reg = await run({
+    requested: ["sarah", "matthew"],
+    faces: [
+      { characterId: "sarah", bbox: [10, 20, 50, 80] },
+      { characterId: null, bbox: [100, 40, 140, 100] },
+    ],
+    detectorDims: { width: 640, height: 360 },
+    plateDims: { width: 640, height: 360 },
+  });
+
+  // Only numeric quadruples — no objects, strings, urls, base64 or buffers.
+  for (const box of reg.unassignedFaceBoxes ?? []) {
+    assert(Array.isArray(box));
+    assertEquals(box.length, 4);
+    for (const n of box) assert(typeof n === "number" && Number.isFinite(n));
+  }
+
+  const telemetry = JSON.stringify({
+    unassigned_face_count: reg.unassignedFaceBoxes?.length ?? 0,
+    unassigned_face_boxes: reg.unassignedFaceBoxes ?? [],
+    partial_record_count: reg.partialRecords?.length ?? 0,
+    partial_character_ids: (reg.partialRecords ?? []).map((r) => r.characterId),
+    v532a_target_partial: {
+      target_partial_present: true,
+      target_partial_similarity: 94.0363,
+      target_partial_frame: 12,
+    },
+  });
+  for (const forbidden of ["http://", "https://", "data:", "base64", "portrait", "s3://", ".jpg", ".png", ".mp4"]) {
+    assert(!telemetry.toLowerCase().includes(forbidden), `telemetry leaked ${forbidden}`);
+  }
+});
