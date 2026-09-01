@@ -27,6 +27,13 @@ import {
   type CropWindow,
   planCameraPath,
 } from "./camera-path.ts";
+import {
+  buildInfeasibility,
+  feasibleCropCentre,
+  projectIntoInterval,
+  verifyPathAtRenderCadence,
+  type MouthCropInfeasibility,
+} from "./mouth-crop-feasibility.ts";
 
 export const CAMERA_PATH_VERSION = "v452";
 
@@ -38,6 +45,35 @@ export const FACE_MOUTH_Y_RATIO = 0.78;
 
 /** Safety margin (fraction of crop side) the face box keeps from the edge. */
 export const CONTAINMENT_PAD_RATIO = 0.04;
+
+/**
+ * V536 — planner headroom around the MOUTH feasibility interval, in plate
+ * pixels, applied BEFORE integer and even-pixel snapping.
+ *
+ * This is not a gate tolerance. V461 still requires a true margin >= 0.
+ *
+ * DERIVATION. Let `u` be the exact solved origin and `o` the origin that
+ * ends up rendered. Three deterministic steps run after the solve:
+ *
+ *   Math.round      round(u) - u  ∈ [-0.5, +0.5)
+ *   even-pixel snap subtracts 0 or 1, never adds
+ *                   → o_dense - u ∈ [-1.5, +0.5)
+ *   decimation      |o_render - o_dense| <= KEYFRAME_TOLERANCE_PX = 0.75
+ *                   (Douglas-Peucker, max-norm, proven by decimateIndices)
+ *                   → o_render - u ∈ (-2.25, +1.25)
+ *
+ * The far-edge constraints (`o + size >= mouth + bandHalf` horizontally,
+ * likewise vertically) are hurt by a DECREASING origin, so the adverse
+ * bound is 2.25 px, not 1.75: an earlier revision of this constant read
+ * `round + snap ∈ [-1, +0.5]` and understated the rounding half-pixel.
+ * `ceil(2.25) = 3`.
+ *
+ * With the crop size frozen the containment predicate is linear in the
+ * origin, so this bound is exact rather than empirical. The render-cadence
+ * post-check remains authoritative regardless.
+ */
+export const MOUTH_RESERVE_PX = 3;
+
 
 /** Dead zone (fraction of crop side): below this the camera does not react. */
 export const KEYFRAME_DEAD_ZONE = 0.02;
@@ -91,6 +127,13 @@ export interface DynamicCameraPath {
   reason: string;
   /** Stable hash over the geometry — bound into the preclip signature. */
   signature: string;
+  /**
+   * V536 — set when face + mouth + plate had no common crop centre at some
+   * frame, or when the decimated path failed the render-cadence re-check.
+   * The path then degrades to the static crop and carries this reason; no
+   * dynamic geometry that V461 would reject is ever emitted.
+   */
+  mouthInfeasible?: MouthCropInfeasibility | null;
   /** v359 planner telemetry (evidence only, never a gate). */
   plannerFrames?: number;
   plannerContainedRatio?: number;
@@ -197,6 +240,14 @@ export interface BuildCameraPathInput {
   endSec: number;
   /** Preclip frame rate; the planner works per frame. Defaults to PATH_FPS. */
   fps?: number;
+  /**
+   * V536 — the SAME `faceShareInCrop` the V461 gate will use for the mouth
+   * band. Absent or non-finite leaves the face-only behaviour byte-identical:
+   * the planner never invents a share to constrain itself with.
+   */
+  faceShare?: number | null;
+  /** V536 — override the planner reserve. Defaults to MOUTH_RESERVE_PX. */
+  mouthReservePx?: number;
 }
 
 /** Static single-keyframe path — behaviourally identical to the fixed crop. */
@@ -225,6 +276,12 @@ export const PATH_FPS = 30;
 
 /** Keyframe decimation tolerance in plate pixels (visually lossless). */
 export const KEYFRAME_TOLERANCE_PX = 0.75;
+/**
+ * V536 — the worst adverse origin displacement the post-solve pipeline can
+ * introduce, in plate pixels. Exported so the reserve can be proven against
+ * it rather than asserted.
+ */
+export const MAX_ADVERSE_ORIGIN_SHIFT_PX = 0.5 + 1 + KEYFRAME_TOLERANCE_PX;
 
 /** Hard cap on persisted keyframes per pass. */
 export const MAX_KEYFRAMES = 240;
@@ -328,6 +385,28 @@ function decimateIndices(xs: number[], ys: number[], tol: number): number[] {
  * static crop is returned — never a mouth-derived alternative — so a
  * non-moving track is byte-identical to the legacy fixed crop.
  */
+/**
+ * V536 — the path returned when feasibility was PROVEN empty.
+ *
+ * `moving: false` and a single keyframe are enough to keep every existing
+ * consumer from treating it as a trajectory, but the distinguishing mark is
+ * `mouthInfeasible`: `staticCameraPath` never sets it, so a tracking
+ * failure and a proven infeasibility can never be confused for one another.
+ */
+function infeasiblePath(
+  input: BuildCameraPathInput,
+  validCount: number,
+  verdict: MouthCropInfeasibility,
+): DynamicCameraPath {
+  const p = staticCameraPath(input);
+  p.sampleCount = input.samples.length;
+  p.validSamples = validCount;
+  p.reason = "dynamic_mouth_crop_infeasible";
+  p.mouthInfeasible = verdict;
+  p.signature = cameraPathSignature(p);
+  return p;
+}
+
 export function buildDynamicCameraPath(input: BuildCameraPathInput): DynamicCameraPath {
   const { staticCrop, srcWidth, srcHeight } = input;
   const size = staticCrop.size;
@@ -350,18 +429,76 @@ export function buildDynamicCameraPath(input: BuildCameraPathInput): DynamicCame
 
   // ── Re-window on the FROZEN size, then re-assert containment ────────────
   const pad = size * CONTAINMENT_PAD_RATIO;
+  // V536 — path-relative time of dense frame i, identical to the keyframe
+  // clock below, so an infeasibility names the same instant V461 would.
+  const dur0 = Math.max(0, input.endSec - input.startSec);
   const maxX = Math.max(0, srcWidth - size);
   const maxY = Math.max(0, srcHeight - size);
   const n = planned.path.length;
   const xs: number[] = new Array(n);
   const ys: number[] = new Array(n);
 
+  // ── V536 — the mouth is a CONSTRAINT, not a passenger ──────────────────
+  //
+  // Until now this loop solved the crop centre from the face box alone and
+  // then wrote the frame's mouth onto the keyframe untouched. V461 read back
+  // exactly that mouth, put the full unclamped V434 band around it and
+  // required the band to fit — a contract the planner had never been asked
+  // to satisfy. Acceptance test N1-02 died on a 0.65 % overhang produced
+  // this way.
+  //
+  // The mouth used here is the SAME expression the keyframe will carry
+  // below (`dense.mouths[i]` with the face-ratio estimate as fallback),
+  // because that is the value V461 will gate on. Constraining a different
+  // one would just move the split.
+  //
+  // Without a usable `faceShare` nothing changes: the face-only branch is
+  // byte-identical to what it was.
+  const shareForBand = Number(input.faceShare);
+  const mouthAuthority = Number.isFinite(shareForBand) && shareForBand > 0;
+  const reserve = Number.isFinite(Number(input.mouthReservePx))
+    ? Number(input.mouthReservePx)
+    : MOUTH_RESERVE_PX;
+  const mouthAt = (i: number): [number, number] | null => {
+    const m = dense.mouths[i];
+    if (m) return m;
+    const bb = dense.boxes[i];
+    return bb ? estimateMouthFromFace(bb as Box) : null;
+  };
+  let mouthInfeasible: MouthCropInfeasibility | null = null;
+
   for (let i = 0; i < n; i++) {
     const w: CropWindow = planned.path[i];
     let ccx = w.x + w.size / 2;
     let ccy = w.y + w.size / 2;
     const b = dense.boxes[i];
-    if (b) {
+    const m = mouthAuthority ? mouthAt(i) : null;
+
+    if (m) {
+      const feasInput = {
+        faceBox: (b ?? null) as Box | null,
+        mouth: { x: m[0], y: m[1] },
+        faceShare: shareForBand,
+        size,
+        facePad: pad,
+        plateWidth: srcWidth,
+        plateHeight: srcHeight,
+        mouthReservePx: reserve,
+      };
+      const feas = feasibleCropCentre(feasInput);
+      if (!feas.ok) {
+        mouthInfeasible = buildInfeasibility({
+          axis: feas.emptyAxis!,
+          frame: i,
+          t: n > 1 ? Number(((dur0 * i) / (n - 1)).toFixed(4)) : 0,
+          input: feasInput,
+          feasibility: feas,
+        });
+        break;
+      }
+      ccx = projectIntoInterval(ccx, feas.x);
+      ccy = projectIntoInterval(ccy, feas.y);
+    } else if (b) {
       const loX = b[2] + pad - half;
       const hiX = b[0] - pad + half;
       const loY = b[3] + pad - half;
@@ -373,6 +510,21 @@ export function buildDynamicCameraPath(input: BuildCameraPathInput): DynamicCame
     const y = clamp(Math.round(ccy - half), 0, maxY);
     xs[i] = x % 2 === 0 ? x : Math.max(0, x - 1);
     ys[i] = y % 2 === 0 ? y : Math.max(0, y - 1);
+  }
+
+  // PROVEN infeasible: no crop centre satisfies face + mouth + plate at
+  // this frame, at the frozen size.
+  //
+  // This is deliberately NOT the static fallback. A tracking or evidence
+  // ACQUISITION failure may keep the historical fixed crop — nothing was
+  // proven there, and the static V461 branch verifies it on its own terms.
+  // A proven infeasibility is different in kind: the static branch would
+  // evaluate one collapsed median mouth instead of the per-frame mouth
+  // trajectory that was just shown to escape, so a fallback would HIDE the
+  // very thing the solver established. The path is returned unusable and
+  // `pass-face-preclip` refuses the render.
+  if (mouthInfeasible) {
+    return infeasiblePath(input, validCount, mouthInfeasible);
   }
 
   // ── Static equivalence BEFORE materialising anything ────────────────────
@@ -430,6 +582,51 @@ export function buildDynamicCameraPath(input: BuildCameraPathInput): DynamicCame
     plannerContainedRatio: Number(planned.containedRatio.toFixed(4)),
     plannerMaxJump: Number(planned.maxJump.toFixed(4)),
   };
+  // ── V536 — replay the FROZEN path at render cadence ────────────────────
+  //
+  // The dense solve plus the 2 px reserve already makes this redundant:
+  // decimation is bounded by KEYFRAME_TOLERANCE_PX in max-norm, rounding and
+  // the even snap move the origin within [-1, +0.5] px, and with the size
+  // frozen the containment predicate is linear in the origin. The check runs
+  // anyway because that proof is a statement about the code as written, and
+  // the invariant has to survive the code being changed.
+  //
+  // `sampleCameraPath` is the SAME interpolation the renderer uses, so this
+  // validates the geometry that will actually exist on disk — not the dense
+  // solve that produced it.
+  if (mouthAuthority) {
+    const verdict = verifyPathAtRenderCadence({
+      frames: Array.from({ length: n }, (_, i) => ({
+        t: n > 1 ? Number(((dur0 * i) / (n - 1)).toFixed(4)) : 0,
+        faceBox: (dense.boxes[i] ?? null) as Box | null,
+        mouth: (() => {
+          const mm = mouthAt(i);
+          return mm ? { x: mm[0], y: mm[1] } : null;
+        })(),
+      })),
+      faceShare: shareForBand,
+      facePad: pad,
+      sampleAt: (t) => sampleCameraPath(path, t),
+    });
+    if (!verdict.ok) {
+      return infeasiblePath(input, validCount, {
+        reason: "dynamic_mouth_crop_infeasible",
+        axis: "x",
+        frame: verdict.failedFrame ?? -1,
+        t: verdict.failedT,
+        cropSize: size,
+        faceWidth: null,
+        faceHeight: null,
+        mouthX: null,
+        mouthY: null,
+        bandWidthPx: null,
+        bandHeightPx: null,
+        intervalLo: Number.NaN,
+        intervalHi: Number.NaN,
+      });
+    }
+  }
+
   path.signature = cameraPathSignature(path);
   return path;
 }

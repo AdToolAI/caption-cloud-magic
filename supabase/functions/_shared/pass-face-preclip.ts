@@ -121,7 +121,18 @@ export interface PassPreclipInput {
    * old preclip. Returning `null` keeps the legacy fixed crop.
    */
   buildCameraPath?:
-    | ((staticCrop: { x: number; y: number; size: number; outputSize: number }) => Promise<DynamicCameraPath | null>)
+    | ((staticCrop: {
+      x: number;
+      y: number;
+      size: number;
+      outputSize: number;
+      /**
+       * V536 — the face share this preclip actually measured, forwarded so
+       * the camera-path planner constrains the crop with the SAME V434
+       * mouth band the V461 gate will measure it against.
+       */
+      faceShare?: number | null;
+    }) => Promise<DynamicCameraPath | null>)
     | null;
   /**
    * V452/V450 — an already frozen path (NOOP retry / recovery). When present
@@ -772,7 +783,9 @@ export async function renderPassFacePreclip(
     );
   } else if (typeof input.buildCameraPath === "function") {
     try {
-      cameraPath = await input.buildCameraPath({ ...crop });
+      // V536 — pass the measured share, not a recomputed one: the planner
+      // and the gate must derive the band from one number.
+      cameraPath = await input.buildCameraPath({ ...crop, faceShare: faceShareInCrop });
     } catch (pathErr) {
       cameraPath = null;
       console.warn(
@@ -780,6 +793,52 @@ export async function renderPassFacePreclip(
       );
     }
   }
+  // ── V536 — a PROVEN mouth infeasibility fails closed ──────────────────
+  //
+  // `mouthInfeasible` is only ever set when the pure solver showed that no
+  // crop centre can hold the face box, the complete V434 mouth band and the
+  // plate at once, at the frozen size — or when the decimated path failed
+  // its render-cadence re-check. Neither is a tracking failure, so neither
+  // may take the historical static fallback: that branch measures one
+  // collapsed median mouth and would silently pass geometry whose per-frame
+  // mouth trajectory has already been shown to escape.
+  //
+  // Refusing here is the same shape as the V461-E planner refusal below, so
+  // the existing pre-dispatch handling, telemetry and refund path apply
+  // unchanged. No preclip, no provider call.
+  if (cameraPath?.mouthInfeasible) {
+    const mi = cameraPath.mouthInfeasible;
+    console.error(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v536_mouth_crop_infeasible ` +
+        `axis=${mi.axis} frame=${mi.frame} t=${mi.t ?? "n/a"} crop=${mi.cropSize}px ` +
+        `face=${mi.faceWidth ?? "n/a"}x${mi.faceHeight ?? "n/a"} ` +
+        `band=${mi.bandWidthPx ?? "n/a"}x${mi.bandHeightPx ?? "n/a"} ` +
+        `interval=[${mi.intervalLo},${mi.intervalHi}] — refusing render`,
+    );
+    return {
+      ok: false,
+      error: `preclip_crop_contract_unsatisfiable:${mi.reason}`,
+      errorClass: "invalid_input",
+      cropFeasibility: {
+        feasibility_mode: "dynamic",
+        refused_at: "planner",
+        reason: mi.reason,
+        axis: mi.axis,
+        frame: mi.frame,
+        t: mi.t,
+        crop_size: mi.cropSize,
+        face_width: mi.faceWidth,
+        face_height: mi.faceHeight,
+        mouth_x: mi.mouthX,
+        mouth_y: mi.mouthY,
+        band_width_px: mi.bandWidthPx,
+        band_height_px: mi.bandHeightPx,
+        interval_lo: mi.intervalLo,
+        interval_hi: mi.intervalHi,
+      },
+    };
+  }
+
   const useDynamicPath = isDynamicCameraPath(cameraPath);
   const cameraPathSig = cameraPath?.signature ?? null;
 
