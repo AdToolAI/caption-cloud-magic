@@ -5373,7 +5373,18 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             detected: reg.diagnostics.detected,
             unresolved: reg.unresolved,
             character_diagnostics: reg.characterDiagnostics,
-          });
+            // V532-A — OBSERVABILITY ONLY. How many detector candidates
+            // this attempt carried no character id for, and which
+            // characters DID resolve. Nothing branches on these.
+            unassigned_face_count: Array.isArray((reg as any).unassignedFaceBoxes)
+              ? (reg as any).unassignedFaceBoxes.length
+              : 0,
+            unassigned_face_boxes: (reg as any).unassignedFaceBoxes ?? [],
+            partial_record_count: Array.isArray(reg.partialRecords)
+              ? reg.partialRecords.length
+              : 0,
+            partial_character_ids: (reg.partialRecords ?? []).map((r) => r.characterId),
+          } as RegistrationAttempt);
           v525Extract.last = null;
           if (reg.ok) {
             v524Records = reg.records;
