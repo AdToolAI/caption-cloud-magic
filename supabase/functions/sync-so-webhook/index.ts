@@ -1242,6 +1242,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         }
       }
       v443MeasureAttempts = v443Bounded.attempts;
+      // V531-OBS — telemetry mirrors only.
+      v531ObsV466Remeasured = v466ReMeasured;
+      v531ObsVerdict = v465Verdict.verdict ?? null;
       // V456 — an unresolved ROI contract is NOT a verdict about the clip:
       // it passes through as `motion_unverified` exactly like a probe-infra
       // exhaustion (non-terminal, no retry, no refund, no provider call).
