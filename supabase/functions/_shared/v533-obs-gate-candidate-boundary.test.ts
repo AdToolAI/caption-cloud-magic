@@ -260,6 +260,9 @@ Deno.test("V533-OBS 11 — exactly three new verdict literals in the runtime fil
   }
   const verdicts = [...SRC.matchAll(/v533Observe\(\s*"([a-z0-9_]+)"/g)].map((m) => m[1]).sort();
   assertEquals(verdicts, ["gate_fanout_done", "gate_fanout_start", "v530_candidate_done"]);
+  // Stage label parity: must be the unconstrained text used in the tested reference.
+  assert(SRC.includes('stage: "dialog_dispatch"'), "V533 observations must use stage 'dialog_dispatch'");
+  assert(!SRC.includes('stage: "gate"'), "V533 observations must not use stage 'gate'");
   // No business branch consumes a V533 field or verdict.
   assert(!/if\s*\([^)\n]*v533/.test(SRC));
   assert(!/v533CandidateIdx\s*(?:[<>]|[=!]==?)/.test(SRC));
