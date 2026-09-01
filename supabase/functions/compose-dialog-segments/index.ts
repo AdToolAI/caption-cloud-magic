@@ -248,7 +248,7 @@ import { rehostPlate } from "../_shared/rehostPlate.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
-import { adoptPreAcquiredLedgerJob, bindSyncPassAttempt, readRetryContext, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
+import { adoptPreAcquiredLedgerJob, bindSyncPassAttempt, readRetryContext, recordDiagnosticObservation as recordCallbackObservation, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
 import { evaluateTurnPassBinding, isStabilizerPass, type TurnPassCandidate } from "../_shared/fa4-turn-pass-guard.ts";
 import {
   buildImmutableArtifactKey,
