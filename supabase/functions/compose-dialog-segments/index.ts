@@ -5301,8 +5301,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         // base-video URL, so a generation-20 frame is unreachable here
         // rather than merely rejected.
         const v525Attempts: RegistrationAttempt[] = [];
-        // V526-B — accepted biometric records per attempted frame.
-        const v526bEvidence: FrameAttemptEvidence[] = [];
+        // V532-A — `v526bEvidence` is now declared above, at the same scope
+        // as `v524Registration`. Behaviour unchanged.
         // A holder rather than a bare `let`: the value is written inside the
         // injected closure and read after it, and narrowing a closure-assigned
         // local to `never` is a TypeScript artefact, not a real invariant.
