@@ -4864,6 +4864,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               // candidate set V523 judged, not from a different detector.
               v523_positional_would_have: v523Repair?.positionalWouldHavePicked ?? null,
               v530_target: v530Telemetry,
+              // V532-A — telemetry only: did this speaker resolve on any
+              // earlier registration attempt? Read by nothing.
+              v532a_target_partial: v532aTargetPartial(
+                v523Ref?.characterId ?? speakers[pass.speaker_idx]?.character_id ?? null,
+              ),
             };
             console.warn(
               `[compose-dialog-segments] scene=${sceneId} FACE-GATE REPAIR (${shouldForceRepair ? "v96-force" : "strict"}) pass=${pass.idx} speaker=${pass.speaker_name} frame=${frame} original=${JSON.stringify(original)} repaired=${JSON.stringify(pass.coords)} faces=${sortedBoxes.length}`,
