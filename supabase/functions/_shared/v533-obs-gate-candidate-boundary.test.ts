@@ -100,7 +100,7 @@ async function fanout(passes: Array<{ idx: number; candidates: Candidate[] }>, o
 }
 
 /** Gen31 shape: 6 passes, one of which needs two candidates → 7 candidates. */
-function gen31Passes() {
+function gen31Passes(): Array<{ idx: number; candidates: Candidate[] }> {
   const single = (idx: number, frame: number) => ({ idx, candidates: [{ frame, validation: okVal, v530: { ok: true, decodeCompleted: true, decodeMs: 3, stillBytes: 100, stillDims: { width: 1284, height: 718 } } }] });
   const passes = [0, 1, 2, 3, 5].map((i, n) => single(i, 100 + n));
   passes.splice(4, 0, {
