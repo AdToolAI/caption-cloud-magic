@@ -1593,7 +1593,56 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       const prePlan = planPreLockSpeakerMeasurement(snapSpeakerCardinality);
       v404MeasurementDeferred = prePlan.action === "defer";
       if (prePlan.action === "measure") {
-        await runServerMotionMeasurement(snapPass, snapPassIdx, "pre_lock");
+        // ── V531-OBS — diagnostic telemetry around the PRE-LOCK measurement.
+        // Fail-open, scalar-only, never alters control flow or the error object.
+        const v531ObsBase = {
+          handler: "sync-so-webhook",
+          stage: "sync_segment" as const,
+          pipelineJobId: v431CallbackJobId ?? null,
+          sceneId,
+          runId: ((scene as any)?.active_run_id ?? null) as string | null,
+          plateGeneration: Number.isFinite(Number((scene as any)?.plate_generation))
+            ? Number((scene as any).plate_generation)
+            : null,
+          externalJobId: jobId ? String(jobId) : null,
+        };
+        await recordDiagnosticObservation(supabase, {
+          ...v531ObsBase,
+          verdict: "motion_measure_start",
+          details: {
+            phase: "pre_lock",
+            pass_idx: snapPassIdx,
+            speaker_cardinality: snapSpeakerCardinality.classification,
+            plan_action: prePlan.action,
+          },
+        });
+        try {
+          await runServerMotionMeasurement(snapPass, snapPassIdx, "pre_lock");
+        } catch (e) {
+          await recordDiagnosticObservation(supabase, {
+            ...v531ObsBase,
+            verdict: "motion_measure_error",
+            details: {
+              phase: "pre_lock",
+              pass_idx: snapPassIdx,
+              error_class: e instanceof Error ? e.name : typeof e,
+              reason: e instanceof Error ? e.message : String(e),
+            },
+          });
+          throw e;
+        }
+        await recordDiagnosticObservation(supabase, {
+          ...v531ObsBase,
+          verdict: "motion_measure_done",
+          details: {
+            phase: "pre_lock",
+            pass_idx: snapPassIdx,
+            measurement_status: (v404MotionMeasurement as any)?.measurement_status ?? null,
+            attempts: v443MeasureAttempts,
+            v466_remeasured: v531ObsV466Remeasured,
+            verdict: v531ObsVerdict,
+          },
+        });
       } else if (v404MeasurementDeferred) {
         console.log(
           `[sync-so-webhook] ${SYNC_SO_WEBHOOK_VERSION} motion_measure_deferred scene=${sceneId} ` +
