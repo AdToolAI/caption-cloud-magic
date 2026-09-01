@@ -5647,7 +5647,18 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         };
       }
 
+      // V533-OBS — fan-out boundary markers, telemetry only.
+      await v533Observe("gate_fanout_start", {
+        pass_count: Array.isArray(builtPasses) ? builtPasses.length : null,
+        elapsed_ms: Date.now() - v533T0,
+        ...v533Memory(),
+      });
       const gateResults = await Promise.all(builtPasses.map((p: any) => gateOne(p)));
+      await v533Observe("gate_fanout_done", {
+        pass_count: Array.isArray(builtPasses) ? builtPasses.length : null,
+        elapsed_ms: Date.now() - v533T0,
+        ...v533Memory(),
+      });
 
       // ── v119 — Soft-pass when plate-identity is already authoritative ──
       // If `plateIdentityMap` already resolved >= speakers.length faces, the
