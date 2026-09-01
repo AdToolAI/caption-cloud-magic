@@ -4792,6 +4792,26 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             const v530SampleSec = frame / ASSUMED_FPS;
             const v530Frame = Math.max(0, Math.round(v530SampleSec * STILL_FPS));
             const v530 = await v530TargetFaces(v530Frame);
+            // V533-OBS — bounded scalars only; absence of this row means the
+            // isolate died inside fetch/decode. Never consumed by business code.
+            await v533Observe("v530_candidate_done", {
+              pass_idx: Number.isFinite(pass?.idx) ? Number(pass.idx) : null,
+              candidate_index: v533CandidateIdx,
+              gate_frame: frame,
+              v530_frame: v530Frame,
+              v530_ok: v530.ok === true,
+              decode_completed: (v530 as any).decodeCompleted === true,
+              still_bytes: Number.isFinite((v530 as any).stillBytes)
+                ? Number((v530 as any).stillBytes)
+                : null,
+              still_w: Number.isFinite(v530.stillDims?.width) ? Number(v530.stillDims?.width) : null,
+              still_h: Number.isFinite(v530.stillDims?.height) ? Number(v530.stillDims?.height) : null,
+              decode_ms: Number.isFinite((v530 as any).decodeMs)
+                ? Number((v530 as any).decodeMs)
+                : null,
+              elapsed_ms: Date.now() - v533T0,
+              ...v533Memory(),
+            });
             v530Telemetry = {
               gate_frame: frame,
               fps_authority: STILL_FPS,
