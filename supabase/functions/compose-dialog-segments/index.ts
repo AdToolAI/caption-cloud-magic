@@ -248,7 +248,7 @@ import { rehostPlate } from "../_shared/rehostPlate.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
-import { adoptPreAcquiredLedgerJob, bindSyncPassAttempt, readRetryContext, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
+import { adoptPreAcquiredLedgerJob, bindSyncPassAttempt, readRetryContext, recordDiagnosticObservation as recordCallbackObservation, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
 import { evaluateTurnPassBinding, isStabilizerPass, type TurnPassCandidate } from "../_shared/fa4-turn-pass-guard.ts";
 import {
   buildImmutableArtifactKey,
@@ -4598,6 +4598,48 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         );
       }
 
+      // ══ V533-OBS — GATE / CANDIDATE BOUNDARY TELEMETRY ═══════════════
+      //
+      // Purely additive forensics for the Gen31 WORKER_RESOURCE_LIMIT kill:
+      // the isolate died somewhere inside the gate fan-out with no persisted
+      // marker. These three verdicts bracket the fan-out and every V530
+      // candidate so an absence becomes readable evidence. No business
+      // branch may consume any of these fields.
+      const v533T0 = Date.now();
+      const v533Memory = (): Record<string, number> => {
+        try {
+          const m = (Deno as any)?.memoryUsage?.();
+          if (!m) return {};
+          const out: Record<string, number> = {};
+          if (Number.isFinite(m.rss)) out.rss = Number(m.rss);
+          if (Number.isFinite(m.heapUsed)) out.heap_used = Number(m.heapUsed);
+          if (Number.isFinite(m.external)) out.external = Number(m.external);
+          return out;
+        } catch {
+          return {};
+        }
+      };
+      const v533Observe = async (
+        verdict: string,
+        details: Record<string, unknown>,
+      ): Promise<void> => {
+        try {
+          await recordCallbackObservation(supabase, {
+            handler: "compose-dialog-segments",
+            verdict,
+            stage: "gate",
+            pipelineJobId: null,
+            sceneId: sceneId ?? null,
+            runId: v510RunId ?? null,
+            plateGeneration: Number((scene as any)?.plate_generation ?? 0),
+            externalJobId: null,
+            details,
+          });
+        } catch {
+          // doubly fail-open: telemetry never reaches the dispatcher
+        }
+      };
+
       // v97 (Juni 10 2026) — Face-Gate-Repair PARALLEL statt seriell.
       // Vorher: 4 Sprecher × ~12 s Gemini-Frame-Detect = ~50 s wallclock.
       // Jetzt: alle Passes laufen via Promise.all (frame_face_cache dedupliziert
@@ -4632,7 +4674,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           reference: IdentityReference | null;
           repair: IdentityRepairResult | null;
         } | null = null;
+        // V533-OBS — candidate ordinal, telemetry only.
+        let v533CandidateIdx = -1;
         for (const frame of frames) {
+          v533CandidateIdx++;
           let targetCoordsForCheck: [number, number] | null = null;
           if (strictTargetCheck && plateDims) {
             const c = pass.coords;
@@ -4747,6 +4792,26 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             const v530SampleSec = frame / ASSUMED_FPS;
             const v530Frame = Math.max(0, Math.round(v530SampleSec * STILL_FPS));
             const v530 = await v530TargetFaces(v530Frame);
+            // V533-OBS — bounded scalars only; absence of this row means the
+            // isolate died inside fetch/decode. Never consumed by business code.
+            await v533Observe("v530_candidate_done", {
+              pass_idx: Number.isFinite(pass?.idx) ? Number(pass.idx) : null,
+              candidate_index: v533CandidateIdx,
+              gate_frame: frame,
+              v530_frame: v530Frame,
+              v530_ok: v530.ok === true,
+              decode_completed: (v530 as any).decodeCompleted === true,
+              still_bytes: Number.isFinite((v530 as any).stillBytes)
+                ? Number((v530 as any).stillBytes)
+                : null,
+              still_w: Number.isFinite(v530.stillDims?.width) ? Number(v530.stillDims?.width) : null,
+              still_h: Number.isFinite(v530.stillDims?.height) ? Number(v530.stillDims?.height) : null,
+              decode_ms: Number.isFinite((v530 as any).decodeMs)
+                ? Number((v530 as any).decodeMs)
+                : null,
+              elapsed_ms: Date.now() - v533T0,
+              ...v533Memory(),
+            });
             v530Telemetry = {
               gate_frame: frame,
               fps_authority: STILL_FPS,
@@ -5213,6 +5278,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         requestedRaster?: string | null;
         actualRaster?: string | null;
         stillDims?: { width: number; height: number } | null;
+        /** V533-OBS — diagnostic only; omitted means "unknown", never a business condition. */
+        stillBytes?: number | null;
+        decodeMs?: number | null;
+        decodeCompleted?: boolean;
       };
       const v530TargetFaces = async (frameNumber: number): Promise<V530Target> => {
         if (!plateDims) return { ok: false, candidates: [], reason: "v530_plate_dims_unavailable" };
@@ -5230,13 +5299,21 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             actualRaster: ar,
           };
         }
+        // V533-OBS — diagnostic only, never read by a business branch.
+        let v533StillBytes: number | null = null;
+        let v533DecodeMs: number | null = null;
+        let v533DecodeCompleted = false;
         try {
           const res = await fetch(got.imageUrl, { signal: AbortSignal.timeout(20_000) });
           if (!res.ok) {
             return { ok: false, candidates: [], reason: `v530_target_still_http_${res.status}`, cacheHit: got.cacheHit ?? false, requestedRaster: rr, actualRaster: ar };
           }
           const bytes = new Uint8Array(await res.arrayBuffer());
+          v533StillBytes = bytes.byteLength;
+          const v533DecodeStart = performance.now();
           const img = jpegDecodeV526.decode(bytes, { useTArray: true });
+          v533DecodeMs = performance.now() - v533DecodeStart;
+          v533DecodeCompleted = true;
           const faces = await v530Detect(bytes, img.width, img.height, 20_000);
           return {
             ok: true,
@@ -5254,6 +5331,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             requestedRaster: rr,
             actualRaster: ar,
             stillDims: { width: img.width, height: img.height },
+            stillBytes: v533StillBytes,
+            decodeMs: v533DecodeMs,
+            decodeCompleted: v533DecodeCompleted,
           };
         } catch (e) {
           return {
@@ -5263,6 +5343,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             cacheHit: got.cacheHit ?? false,
             requestedRaster: rr,
             actualRaster: ar,
+            stillBytes: v533StillBytes,
+            decodeMs: v533DecodeMs,
+            decodeCompleted: v533DecodeCompleted,
           };
         }
       };
@@ -5564,7 +5647,18 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         };
       }
 
+      // V533-OBS — fan-out boundary markers, telemetry only.
+      await v533Observe("gate_fanout_start", {
+        pass_count: Array.isArray(builtPasses) ? builtPasses.length : null,
+        elapsed_ms: Date.now() - v533T0,
+        ...v533Memory(),
+      });
       const gateResults = await Promise.all(builtPasses.map((p: any) => gateOne(p)));
+      await v533Observe("gate_fanout_done", {
+        pass_count: Array.isArray(builtPasses) ? builtPasses.length : null,
+        elapsed_ms: Date.now() - v533T0,
+        ...v533Memory(),
+      });
 
       // ── v119 — Soft-pass when plate-identity is already authoritative ──
       // If `plateIdentityMap` already resolved >= speakers.length faces, the
