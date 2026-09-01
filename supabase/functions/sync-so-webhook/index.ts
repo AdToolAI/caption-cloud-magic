@@ -1626,7 +1626,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               phase: "pre_lock",
               pass_idx: snapPassIdx,
               error_class: e instanceof Error ? e.name : typeof e,
-              reason: e instanceof Error ? e.message : String(e),
+              reason: (e instanceof Error ? e.message : String(e))
+                .replace(/https?:\/\/\S+/gi, "[url]")
+                .slice(0, 200),
             },
           });
           throw e;
