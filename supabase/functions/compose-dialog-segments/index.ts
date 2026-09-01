@@ -248,7 +248,7 @@ import { rehostPlate } from "../_shared/rehostPlate.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
-import { adoptPreAcquiredLedgerJob, bindSyncPassAttempt, readRetryContext, recordCallbackObservation, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
+import { adoptPreAcquiredLedgerJob, bindSyncPassAttempt, readRetryContext, recordDiagnosticObservation as recordCallbackObservation, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
 import { evaluateTurnPassBinding, isStabilizerPass, type TurnPassCandidate } from "../_shared/fa4-turn-pass-guard.ts";
 import {
   buildImmutableArtifactKey,
@@ -854,11 +854,6 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, serviceKey);
-
-    // V533-OBS — one wall-clock origin for every observation below, so
-    // `elapsed_ms` is comparable across the whole invocation. Read only by
-    // telemetry.
-    const v533T0 = Date.now();
 
     const body = await req.json().catch(() => ({}));
     const sceneId = body?.scene_id;
@@ -4603,6 +4598,48 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         );
       }
 
+      // ══ V533-OBS — GATE / CANDIDATE BOUNDARY TELEMETRY ═══════════════
+      //
+      // Purely additive forensics for the Gen31 WORKER_RESOURCE_LIMIT kill:
+      // the isolate died somewhere inside the gate fan-out with no persisted
+      // marker. These three verdicts bracket the fan-out and every V530
+      // candidate so an absence becomes readable evidence. No business
+      // branch may consume any of these fields.
+      const v533T0 = Date.now();
+      const v533Memory = (): Record<string, number> => {
+        try {
+          const m = (Deno as any)?.memoryUsage?.();
+          if (!m) return {};
+          const out: Record<string, number> = {};
+          if (Number.isFinite(m.rss)) out.rss = Number(m.rss);
+          if (Number.isFinite(m.heapUsed)) out.heap_used = Number(m.heapUsed);
+          if (Number.isFinite(m.external)) out.external = Number(m.external);
+          return out;
+        } catch {
+          return {};
+        }
+      };
+      const v533Observe = async (
+        verdict: string,
+        details: Record<string, unknown>,
+      ): Promise<void> => {
+        try {
+          await recordCallbackObservation(supabase, {
+            handler: "compose-dialog-segments",
+            verdict,
+            stage: "dialog_dispatch",
+            pipelineJobId: null,
+            sceneId: sceneId ?? null,
+            runId: v510RunId ?? null,
+            plateGeneration: Number((scene as any)?.plate_generation ?? 0),
+            externalJobId: null,
+            details,
+          });
+        } catch {
+          // doubly fail-open: telemetry never reaches the dispatcher
+        }
+      };
+
       // v97 (Juni 10 2026) — Face-Gate-Repair PARALLEL statt seriell.
       // Vorher: 4 Sprecher × ~12 s Gemini-Frame-Detect = ~50 s wallclock.
       // Jetzt: alle Passes laufen via Promise.all (frame_face_cache dedupliziert
@@ -4622,57 +4659,6 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           identityDetail?: Record<string, unknown> | null;
         };
 
-      // ══ V533-OBS — GATE CANDIDATE RESOURCE BOUNDARY ══════════════════════
-      //
-      // Generation 31 died with HTTP 546 (WORKER_RESOURCE_LIMIT) 1.1 s after
-      // the seventh V530 still landed in storage, having persisted nothing at
-      // all past DISPATCH_ATTEMPT_STARTED. Storage proved the V524/AWS phase
-      // had finished ~35 s earlier, so the kill sits inside this gate fan-out
-      // — but no step in it writes anything, so `died in the JPEG decode` and
-      // `died in the DetectFaces round trip` were indistinguishable.
-      //
-      // Three bookings close that. The candidate event is written AFTER
-      // v530TargetFaces returns, so it survives every normal error path of
-      // that function and goes missing ONLY on an abrupt isolate kill — a
-      // still in storage with no matching row is itself the answer.
-      //
-      // Observability only: nothing reads these back, no decision changes.
-      const v533Mem = (): Record<string, unknown> => {
-        try {
-          const m = (Deno as unknown as { memoryUsage?: () => Record<string, number> })
-            ?.memoryUsage?.();
-          if (!m) return {};
-          return {
-            rss: Number.isFinite(m.rss) ? m.rss : null,
-            heap_used: Number.isFinite(m.heapUsed) ? m.heapUsed : null,
-            external: Number.isFinite(m.external) ? m.external : null,
-          };
-        } catch {
-          // Runtime does not expose it — the event is still worth writing.
-          return {};
-        }
-      };
-      const v533Obs = async (verdict: string, details: Record<string, unknown>) => {
-        try {
-          await recordCallbackObservation(supabase, {
-            handler: "compose-dialog-segments",
-            verdict,
-            stage: "dialog_dispatch",
-            pipelineJobId: null,
-            sceneId,
-            runId: ((scene as any)?.active_run_id ?? null) as string | null,
-            plateGeneration: Number.isFinite(Number((scene as any)?.plate_generation))
-              ? Number((scene as any).plate_generation)
-              : null,
-            externalJobId: null,
-            details: { ...details, ...v533Mem() },
-          });
-        } catch {
-          // Fail-open by construction. The observer must never change the run
-          // it is measuring, least of all by throwing inside the gate.
-        }
-      };
-
       const gateOne = async (pass: any): Promise<GateOutcome> => {
         const firstTurn = pass.segments[0];
         if (!firstTurn) return { ok: true, pass };
@@ -4688,9 +4674,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           reference: IdentityReference | null;
           repair: IdentityRepairResult | null;
         } | null = null;
-        // V533-OBS — counts CONSUMED iterations, including the ones that
-        // `continue` at the face-visibility check before any still is made.
-        // A pure counter: no branch, no effect on iteration.
+        // V533-OBS — candidate ordinal, telemetry only.
         let v533CandidateIdx = -1;
         for (const frame of frames) {
           v533CandidateIdx++;
@@ -4808,21 +4792,25 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             const v530SampleSec = frame / ASSUMED_FPS;
             const v530Frame = Math.max(0, Math.round(v530SampleSec * STILL_FPS));
             const v530 = await v530TargetFaces(v530Frame);
-            // V533-OBS — see the header at the gate helpers. Written before any
-            // telemetry is built, so a kill inside v530TargetFaces leaves the
-            // still in storage with no row here.
-            await v533Obs("v530_candidate_done", {
-              pass_idx: Number(pass.idx),
+            // V533-OBS — bounded scalars only; absence of this row means the
+            // isolate died inside fetch/decode. Never consumed by business code.
+            await v533Observe("v530_candidate_done", {
+              pass_idx: Number.isFinite(pass?.idx) ? Number(pass.idx) : null,
               candidate_index: v533CandidateIdx,
               gate_frame: frame,
               v530_frame: v530Frame,
               v530_ok: v530.ok === true,
-              decode_completed: v530.decodeCompleted === true,
-              still_bytes: v530.stillBytes ?? null,
-              still_w: v530.stillDims?.width ?? null,
-              still_h: v530.stillDims?.height ?? null,
-              decode_ms: typeof v530.decodeMs === "number" ? Math.round(v530.decodeMs) : null,
+              decode_completed: (v530 as any).decodeCompleted === true,
+              still_bytes: Number.isFinite((v530 as any).stillBytes)
+                ? Number((v530 as any).stillBytes)
+                : null,
+              still_w: Number.isFinite(v530.stillDims?.width) ? Number(v530.stillDims?.width) : null,
+              still_h: Number.isFinite(v530.stillDims?.height) ? Number(v530.stillDims?.height) : null,
+              decode_ms: Number.isFinite((v530 as any).decodeMs)
+                ? Number((v530 as any).decodeMs)
+                : null,
               elapsed_ms: Date.now() - v533T0,
+              ...v533Memory(),
             });
             v530Telemetry = {
               gate_frame: frame,
@@ -4941,27 +4929,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               // candidate set V523 judged, not from a different detector.
               v523_positional_would_have: v523Repair?.positionalWouldHavePicked ?? null,
               v530_target: v530Telemetry,
-              // V532-A — did THIS speaker have an accepted plate-native record on any
-              // attempted frame, while the cohort as a whole stayed incomplete? That is
-              // the generation-30 question. Reported, never acted on.
-              v532a_target_partial: (() => {
-                const want = stripIdPrefixLocalV524(speakers[pass.speaker_idx]?.character_id ?? null);
-                let best: { frame: number; similarity: number | null } | null = null;
-                if (want) {
-                  for (const ev of v526bEvidence) {
-                    for (const r of ev.records ?? []) {
-                      if (stripIdPrefixLocalV524(r.characterId) !== want) continue;
-                      const sim = typeof r.similarity === "number" ? r.similarity : null;
-                      if (!best || (sim ?? -1) > (best.similarity ?? -1)) best = { frame: ev.frame, similarity: sim };
-                    }
-                  }
-                }
-                return {
-                  target_partial_present: !!best,
-                  target_partial_similarity: best?.similarity ?? null,
-                  target_partial_frame: best?.frame ?? null,
-                };
-              })(),
+              // V532-A — telemetry only: did this speaker resolve on any
+              // earlier registration attempt? Read by nothing.
+              v532a_target_partial: v532aTargetPartial(
+                v523Ref?.characterId ?? speakers[pass.speaker_idx]?.character_id ?? null,
+              ),
             };
             console.warn(
               `[compose-dialog-segments] scene=${sceneId} FACE-GATE REPAIR (${shouldForceRepair ? "v96-force" : "strict"}) pass=${pass.idx} speaker=${pass.speaker_name} frame=${frame} original=${JSON.stringify(original)} repaired=${JSON.stringify(pass.coords)} faces=${sortedBoxes.length}`,
@@ -5019,6 +4991,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
                 candidates_considered: v523LastRefusal.repair?.candidatesConsidered ?? 0,
                 positional_would_have: v523LastRefusal.repair?.positionalWouldHavePicked ?? null,
                 frame: v523LastRefusal.frame,
+                // V532-A — telemetry only, attached to the refusal report.
+                v532a_target_partial: v532aTargetPartial(
+                  v523LastRefusal.reference?.characterId ??
+                    speakers[pass.speaker_idx]?.character_id ?? null,
+                ),
               },
             };
           }
@@ -5100,10 +5077,41 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       let v524Registration: PlateIdentityRegistration | null = null;
       let v524Records: PlateNativeIdentityRecord[] = [];
       // V526-B — accepted biometric records per attempted frame.
-      // V532-A — declared here ONLY so the per-pass gate can report the target's
-      // best accepted partial across ALL attempts instead of the last frame's.
-      // Written and read exactly where it was before.
+      // V532-A — hoisted from the registration block for TELEMETRY SCOPE
+      // ONLY, so the gate can report what earlier attempts saw. Its writes
+      // and business reads are unchanged.
       const v526bEvidence: FrameAttemptEvidence[] = [];
+      /**
+       * V532-A — OBSERVABILITY ONLY.
+       *
+       * Did the target speaker resolve biometrically on ANY attempted
+       * registration frame (not just the last one)? Pure read over the
+       * existing V526-B evidence; no branch, guard, dispatch decision,
+       * V523 input, sibling set or candidate selection may consume it.
+       */
+      const v532aTargetPartial = (characterId?: string | null) => {
+        const want = String(characterId ?? "")
+          .toLowerCase()
+          .replace(/^(outfit|pose|wardrobe|vibe|prop|look):/, "");
+        if (!want) {
+          return { target_partial_present: false, target_partial_similarity: null, target_partial_frame: null };
+        }
+        for (const att of v526bEvidence) {
+          for (const rec of att?.records ?? []) {
+            const got = String((rec as any)?.characterId ?? "")
+              .toLowerCase()
+              .replace(/^(outfit|pose|wardrobe|vibe|prop|look):/, "");
+            if (got === want) {
+              return {
+                target_partial_present: true,
+                target_partial_similarity: (rec as any)?.similarity ?? null,
+                target_partial_frame: att?.frame ?? (rec as any)?.frameNumber ?? null,
+              };
+            }
+          }
+        }
+        return { target_partial_present: false, target_partial_similarity: null, target_partial_frame: null };
+      };
       // What the LEGACY identity geometry was measured on. `anchor_native`
       // is the generation-20 case and is no longer usable as plate
       // geometry, however cleanly it is scaled.
@@ -5270,21 +5278,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         requestedRaster?: string | null;
         actualRaster?: string | null;
         stillDims?: { width: number; height: number } | null;
-        /**
-         * V533-OBS — diagnostic only, read by nothing. `decodeCompleted` is
-         * true ONLY once jpegDecodeV526.decode has actually returned; every
-         * return that precedes a successful decode simply omits these, so
-         * the observer reads them as false/null.
-         */
+        /** V533-OBS — diagnostic only; omitted means "unknown", never a business condition. */
         stillBytes?: number | null;
         decodeMs?: number | null;
         decodeCompleted?: boolean;
       };
       const v530TargetFaces = async (frameNumber: number): Promise<V530Target> => {
-        // V533-OBS — diagnostic accumulators. Never read by any guard.
-        let v533StillBytes: number | null = null;
-        let v533DecodeMs: number | null = null;
-        let v533DecodeCompleted = false;
         if (!plateDims) return { ok: false, candidates: [], reason: "v530_plate_dims_unavailable" };
         if (!v530Detect) return { ok: false, candidates: [], reason: "v530_detector_unavailable" };
         const got = await v525Acquire(frameNumber);
@@ -5300,20 +5299,20 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             actualRaster: ar,
           };
         }
+        // V533-OBS — diagnostic only, never read by a business branch.
+        let v533StillBytes: number | null = null;
+        let v533DecodeMs: number | null = null;
+        let v533DecodeCompleted = false;
         try {
           const res = await fetch(got.imageUrl, { signal: AbortSignal.timeout(20_000) });
           if (!res.ok) {
             return { ok: false, candidates: [], reason: `v530_target_still_http_${res.status}`, cacheHit: got.cacheHit ?? false, requestedRaster: rr, actualRaster: ar };
           }
           const bytes = new Uint8Array(await res.arrayBuffer());
-          // V533-OBS — the only synchronous CPU block on this path, so wall
-          // time IS cpu time here. If the isolate dies inside the decode,
-          // this function never returns and no v530_candidate_done is
-          // written. That absence is the measurement.
           v533StillBytes = bytes.byteLength;
-          const v533DecodeT0 = performance.now();
+          const v533DecodeStart = performance.now();
           const img = jpegDecodeV526.decode(bytes, { useTArray: true });
-          v533DecodeMs = performance.now() - v533DecodeT0;
+          v533DecodeMs = performance.now() - v533DecodeStart;
           v533DecodeCompleted = true;
           const faces = await v530Detect(bytes, img.width, img.height, 20_000);
           return {
@@ -5426,6 +5425,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         // base-video URL, so a generation-20 frame is unreachable here
         // rather than merely rejected.
         const v525Attempts: RegistrationAttempt[] = [];
+        // V532-A — `v526bEvidence` is now declared above, at the same scope
+        // as `v524Registration`. Behaviour unchanged.
         // A holder rather than a bare `let`: the value is written inside the
         // injected closure and read after it, and narrowing a closure-assigned
         // local to `never` is a TypeScript artefact, not a real invariant.
@@ -5496,14 +5497,18 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             detected: reg.diagnostics.detected,
             unresolved: reg.unresolved,
             character_diagnostics: reg.characterDiagnostics,
-            // V532-A — how many detected faces this frame carried that no requested
-            // character was assigned to, next to the accepted subset. Observability
-            // only: no guard reads these back.
-            unassigned_face_count: reg.unassignedFaceBoxes?.length ?? null,
-            unassigned_face_boxes: reg.unassignedFaceBoxes ?? null,
-            partial_record_count: reg.partialRecords?.length ?? null,
-            partial_character_ids: (reg.partialRecords ?? []).map((p: any) => String(p.characterId)),
-          });
+            // V532-A — OBSERVABILITY ONLY. How many detector candidates
+            // this attempt carried no character id for, and which
+            // characters DID resolve. Nothing branches on these.
+            unassigned_face_count: Array.isArray((reg as any).unassignedFaceBoxes)
+              ? (reg as any).unassignedFaceBoxes.length
+              : 0,
+            unassigned_face_boxes: (reg as any).unassignedFaceBoxes ?? [],
+            partial_record_count: Array.isArray(reg.partialRecords)
+              ? reg.partialRecords.length
+              : 0,
+            partial_character_ids: (reg.partialRecords ?? []).map((r) => r.characterId),
+          } as RegistrationAttempt);
           v525Extract.last = null;
           if (reg.ok) {
             v524Records = reg.records;
@@ -5642,16 +5647,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         };
       }
 
-      // V533-OBS — brackets the fan-out. `pass_count` settles the pass-vs-
-      // candidate question the storage timeline could only infer.
-      await v533Obs("gate_fanout_start", {
-        pass_count: builtPasses.length,
+      // V533-OBS — fan-out boundary markers, telemetry only.
+      await v533Observe("gate_fanout_start", {
+        pass_count: Array.isArray(builtPasses) ? builtPasses.length : null,
         elapsed_ms: Date.now() - v533T0,
+        ...v533Memory(),
       });
       const gateResults = await Promise.all(builtPasses.map((p: any) => gateOne(p)));
-      await v533Obs("gate_fanout_done", {
-        pass_count: builtPasses.length,
+      await v533Observe("gate_fanout_done", {
+        pass_count: Array.isArray(builtPasses) ? builtPasses.length : null,
         elapsed_ms: Date.now() - v533T0,
+        ...v533Memory(),
       });
 
       // ── v119 — Soft-pass when plate-identity is already authoritative ──
