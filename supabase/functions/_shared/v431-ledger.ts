@@ -867,6 +867,30 @@ async function recordObservationBestEffort(
 }
 
 /**
+ * V531-OBS — thin exported wrapper around the existing best-effort observation
+ * insert. Adds NO behavior: same RPC, same fail-open semantics, no retry, never
+ * throws. Diagnostic only; no caller may branch on it.
+ */
+export async function recordDiagnosticObservation(
+  admin: any,
+  row: {
+    handler: string;
+    verdict: string;
+    stage: string | null;
+    pipelineJobId: string | null;
+    sceneId: string | null;
+    runId: string | null;
+    plateGeneration: number | null;
+    externalJobId: string | null;
+    details: Record<string, unknown>;
+  },
+): Promise<void> {
+  await recordObservationBestEffort(admin, row);
+}
+
+
+
+/**
  * G3.1 Observe: liest die Ledger-Bindung eines Callbacks und loggt sie.
  *
  * Mutiert keine Produktions-/Orchestrierungsdaten — weder Szene noch Job.
