@@ -4598,6 +4598,48 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         );
       }
 
+      // ══ V533-OBS — GATE / CANDIDATE BOUNDARY TELEMETRY ═══════════════
+      //
+      // Purely additive forensics for the Gen31 WORKER_RESOURCE_LIMIT kill:
+      // the isolate died somewhere inside the gate fan-out with no persisted
+      // marker. These three verdicts bracket the fan-out and every V530
+      // candidate so an absence becomes readable evidence. No business
+      // branch may consume any of these fields.
+      const v533T0 = Date.now();
+      const v533Memory = (): Record<string, number> => {
+        try {
+          const m = (Deno as any)?.memoryUsage?.();
+          if (!m) return {};
+          const out: Record<string, number> = {};
+          if (Number.isFinite(m.rss)) out.rss = Number(m.rss);
+          if (Number.isFinite(m.heapUsed)) out.heap_used = Number(m.heapUsed);
+          if (Number.isFinite(m.external)) out.external = Number(m.external);
+          return out;
+        } catch {
+          return {};
+        }
+      };
+      const v533Observe = async (
+        verdict: string,
+        details: Record<string, unknown>,
+      ): Promise<void> => {
+        try {
+          await recordCallbackObservation(supabase, {
+            handler: "compose-dialog-segments",
+            verdict,
+            stage: "gate",
+            pipelineJobId: null,
+            sceneId: sceneId ?? null,
+            runId: v510RunId ?? null,
+            plateGeneration: Number((scene as any)?.plate_generation ?? 0),
+            externalJobId: null,
+            details,
+          });
+        } catch {
+          // doubly fail-open: telemetry never reaches the dispatcher
+        }
+      };
+
       // v97 (Juni 10 2026) — Face-Gate-Repair PARALLEL statt seriell.
       // Vorher: 4 Sprecher × ~12 s Gemini-Frame-Detect = ~50 s wallclock.
       // Jetzt: alle Passes laufen via Promise.all (frame_face_cache dedupliziert
