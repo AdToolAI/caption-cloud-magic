@@ -23,7 +23,15 @@
  *     cannot be verified is not sent.
  */
 
-import { V434_MOUTH_BAND } from "./v434-motion-roi.ts";
+// V536 — the band derivation, the containment predicate and the signed
+// margin now live in ONE module shared with the camera-path planner. The
+// constants still come from v434-motion-roi.ts; nothing about this gate's
+// acceptance semantics changes.
+import {
+  roiContainmentMargin as sharedRoiMargin,
+  roiFullyInside as sharedRoiFullyInside,
+  v434MouthBand,
+} from "./mouth-crop-feasibility.ts";
 
 export const V461_FACE_GATE_VERSION = "v461";
 
@@ -153,38 +161,26 @@ function identityMatches(a?: V461Identity | null, b?: V461Identity | null): bool
  * the dynamic branch cannot drift apart: same operators, same order, so the
  * static decision stays bit-identical.
  */
+// V536 — delegated, not reimplemented. Boundary-inclusive, no tolerance.
 function roiFullyInside(roi: { centerX: number; centerY: number; width: number; height: number }): boolean {
-  return roi.centerX - roi.width / 2 >= 0 &&
-    roi.centerX + roi.width / 2 <= 1 &&
-    roi.centerY - roi.height / 2 >= 0 &&
-    roi.centerY + roi.height / 2 <= 1;
+  return sharedRoiFullyInside(roi);
 }
 
 /** PURE — DIAGNOSTIC distance to the frame edge. Negative = overhang. */
 function roiMargin(roi: { centerX: number; centerY: number; width: number; height: number }): number {
-  return Math.min(
-    roi.centerX - roi.width / 2,
-    1 - (roi.centerX + roi.width / 2),
-    roi.centerY - roi.height / 2,
-    1 - (roi.centerY + roi.height / 2),
-  );
+  return sharedRoiMargin(roi);
 }
 
-/** PURE — the mouth band size. Unchanged V434 constants and derivation. */
+/**
+ * PURE — the mouth band size. Unchanged V434 constants and derivation.
+ *
+ * V536 — the body moved to `mouth-crop-feasibility.ts` so the camera-path
+ * planner solves against the SAME band this gate measures. Two copies of the
+ * band would be two chances to disagree, which is exactly the split that let
+ * N1-02 through the planner and into a pre-dispatch rejection.
+ */
 function mouthBand(faceShare: number): { width: number; height: number } {
-  const faceSideFrac = clamp(Math.sqrt(faceShare), 0.05, 1);
-  return {
-    width: clamp(
-      V434_MOUTH_BAND.widthOfFaceSide * faceSideFrac,
-      V434_MOUTH_BAND.minWidth,
-      V434_MOUTH_BAND.maxWidth,
-    ),
-    height: clamp(
-      V434_MOUTH_BAND.heightOfFaceSide * faceSideFrac,
-      V434_MOUTH_BAND.minHeight,
-      V434_MOUTH_BAND.maxHeight,
-    ),
-  };
+  return v434MouthBand(faceShare);
 }
 
 /** A keyframe that can actually place a mouth inside a crop. */
