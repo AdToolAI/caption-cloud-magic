@@ -174,6 +174,22 @@ export interface PlateIdentityRegistration {
    */
   partialRecords?: PlateNativeIdentityRecord[];
   /**
+   * V532-A — OBSERVABILITY ONLY.
+   *
+   * DetectFaces candidates that were NOT assigned to any requested
+   * character under the current V524 evidence. This is NOT a biometric
+   * negation: it does not state that these faces belong to nobody, only
+   * that this attempt carried no character id for them.
+   *
+   * Boxes are validated exactly like accepted records (finite, positive
+   * extent) and scaled with the same sx/sy detector→plate transformation,
+   * so they are readable next to `partialRecords` in the same raster.
+   *
+   * Present ONLY on the `incomplete_registration` return. Nothing in the
+   * pipeline may branch on it.
+   */
+  unassignedFaceBoxes?: Box[];
+  /**
    * V529 — why each requested character did or did not resolve on this
    * frame. Bounded to one row per character; never a score matrix.
    */
