@@ -4627,7 +4627,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           await recordCallbackObservation(supabase, {
             handler: "compose-dialog-segments",
             verdict,
-            stage: "gate",
+            stage: "dialog_dispatch",
             pipelineJobId: null,
             sceneId: sceneId ?? null,
             runId: v510RunId ?? null,
