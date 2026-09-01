@@ -4674,7 +4674,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           reference: IdentityReference | null;
           repair: IdentityRepairResult | null;
         } | null = null;
+        // V533-OBS — candidate ordinal, telemetry only.
+        let v533CandidateIdx = -1;
         for (const frame of frames) {
+          v533CandidateIdx++;
           let targetCoordsForCheck: [number, number] | null = null;
           if (strictTargetCheck && plateDims) {
             const c = pass.coords;
