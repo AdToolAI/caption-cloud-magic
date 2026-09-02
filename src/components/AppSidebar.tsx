@@ -69,7 +69,7 @@ export function AppSidebar() {
                       </Link>
                     </SidebarMenuButton>
                   </TooltipTrigger>
-                  <TooltipContent side="right" className="bg-popover text-popover-foreground border-border shadow-xl">
+                  <TooltipContent side="right" sideOffset={8} className="z-[90] bg-popover text-popover-foreground border-border shadow-xl">
                     <p className="font-medium">{t("home")}</p>
                   </TooltipContent>
                 </Tooltip>
@@ -117,7 +117,7 @@ export function AppSidebar() {
                           )}
                         </motion.button>
                       </TooltipTrigger>
-                      <TooltipContent side="right" className="bg-popover text-popover-foreground border-border shadow-xl">
+                      <TooltipContent side="right" sideOffset={8} className="z-[90] bg-popover text-popover-foreground border-border shadow-xl">
                         <p className="font-medium">
                           {t(hub.titleKey)}
                           {comingSoon && <span className="ml-1.5 text-[10px] text-amber-400">· Coming Soon</span>}
