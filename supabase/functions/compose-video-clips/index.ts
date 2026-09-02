@@ -19,6 +19,7 @@ import { sceneState as sceneStateOf, legacyClipReadyEquivalentRow, transitionSce
 import { verifyAnchorObject, blocksProviderDispatch, isResetOwnedGeneratedAnchor } from "../_shared/generated-anchor.ts";
 import { sanitizeAnchorReason } from "../_shared/anchor-inline-images.ts";
 import { failPlateAttemptForRun } from "../_shared/plate-attempt.ts";
+import { v538PlateResolution, v538SpeakerCount } from "../_shared/v538-plate-resolution.ts";
 
 import {
   countDialogSpeakers,
