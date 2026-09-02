@@ -393,17 +393,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   }, [model.id]);
 
   // Canonical per-second price from server catalog (falls back to local config).
-  const { getPricePerSecond } = useVideoPricingCatalog();
+  const { getPricePerSecond, getTotalCost, isReady: catalogReady } = useVideoPricingCatalog();
   const { discountFactor } = useAccountType();
   // Catalog prices are already personalized; the local fallback is a list price.
+  const catalogPricePerSecond = getPricePerSecond(model.id, currency);
+  // Never show a binding price we could not verify against the server catalog —
+  // that was the source of preview/charge mismatches.
+  const priceUnverified = !catalogReady || catalogPricePerSecond == null;
   const pricePerSecond =
-    getPricePerSecond(model.id, currency) ?? model.costPerSecond[currency] * discountFactor;
+    catalogPricePerSecond ?? model.costPerSecond[currency] * discountFactor;
   // Smart duration (-1) is reserved at the model's maximum length; the unused
   // seconds are refunded once the provider reports the real clip length.
   const billedSeconds = duration === -1
     ? Math.max(...model.durations)
     : duration;
-  const cost = billedSeconds * pricePerSecond;
+  // Total is rounded exactly like the backend deduction (once, at the end).
+  const cost = getTotalCost(model.id, currency, billedSeconds)
+    ?? billedSeconds * pricePerSecond;
 
   const symbol = currency === 'USD' ? '$' : '€';
   const isUnlimited = (wallet as any)?.is_unlimited === true;
@@ -1659,19 +1665,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between p-4 rounded-xl bg-gradient-to-r from-primary/5 to-accent/5 border border-primary/20">
         <div>
           <p className="text-xs uppercase tracking-wider text-muted-foreground">
-            {language === 'de' ? 'Geschätzte Kosten' : 'Estimated cost'}
+            {priceUnverified
+              ? tx({ de: 'Preis wird geprüft', en: 'Checking price', es: 'Comprobando precio' })
+              : tx({ de: 'Kosten (verbindlich)', en: 'Cost (binding)', es: 'Costo (vinculante)' })}
           </p>
           <p className="text-2xl font-bold text-primary tabular-nums">
-            {symbol}{cost.toFixed(2)}
+            {priceUnverified ? '—' : `${symbol}${cost.toFixed(2)}`}
           </p>
           <p className="text-[11px] text-muted-foreground">
-            {duration}s × {symbol}{pricePerSecond.toFixed(2)}/s · {model.name}
+            {priceUnverified
+              ? tx({ de: 'Aktueller Tarif wird geladen…', en: 'Loading current rate…', es: 'Cargando la tarifa actual…' })
+              : `${duration}s × ${symbol}${pricePerSecond.toFixed(2)}/s · ${model.name}`}
           </p>
         </div>
         <Button
           size="lg"
           onClick={handleGenerate}
-          disabled={generating || !prompt.trim() || !canAfford}
+          disabled={generating || !prompt.trim() || !canAfford || priceUnverified}
           className="min-w-[200px] bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           {composingScene ? (

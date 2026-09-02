@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
+import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -102,8 +103,11 @@ serve(async (req) => {
     const currency = walletPreview?.currency || 'EUR';
 
     // Calculate cost
-    const modelPricing = MODEL_PRICING[model] || MODEL_PRICING['luma-standard'];
-    const costPerSecond = modelPricing[currency] || modelPricing['EUR'];
+    // Canonical price from the shared catalog (same source as the UI preview,
+    // including the account discount). MODEL_PRICING is only a legacy fallback.
+    const costPerSecond = await resolveAccountCostPerSecond(
+      supabaseAdmin, user.id, model, currency as "EUR" | "USD", 0.21,
+    );
     const totalCost = duration * costPerSecond;
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 

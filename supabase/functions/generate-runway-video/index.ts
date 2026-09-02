@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
+import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -216,7 +217,9 @@ serve(async (req) => {
     }
 
     // Margin policy: exactly 3.00× cost (normalized 14.07.2026). Runway Gen-4 Aleph V2V ~$0.08/s → user €0.24/s.
-    const costPerSecond = 0.24;
+    const costPerSecond = await resolveAccountCostPerSecond(
+      supabaseAdmin, user.id, 'runway-gen4-aleph', (wallet.currency === 'USD' ? 'USD' : 'EUR'), 0.18,
+    );
     const totalCost = duration * costPerSecond;
     const sym = wallet.currency === "USD" ? "$" : "€";
 

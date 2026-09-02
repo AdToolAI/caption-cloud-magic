@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
+import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 
 const corsHeaders = {
@@ -11,6 +12,19 @@ const corsHeaders = {
 };
 
 // Pricing in EUR/USD per second — normalized 14.07.2026 to 3.00× Replicate cost margin
+/** Provider-side capacity errors (Google Veo "code: 8" / RESOURCE_EXHAUSTED,
+ *  Replicate 503 / "high load"). Transient and unrelated to our own load. */
+function isProviderOverload(err: any): boolean {
+  const status = err?.response?.status ?? err?.status;
+  if (status === 503) return true;
+  const msg = `${err?.message ?? ''} ${JSON.stringify(err?.detail ?? err?.response?.data ?? '')}`.toLowerCase();
+  return msg.includes('high load')
+    || msg.includes('resource_exhausted')
+    || msg.includes('overloaded')
+    || msg.includes('capacity')
+    || /"?code"?\s*:\s*8\b/.test(msg);
+}
+
 const MODEL_PRICING: Record<string, Record<string, number>> = {
   'veo-3.1-lite-720p':  { EUR: 0.45, USD: 0.45 },
   'veo-3.1-lite-1080p': { EUR: 0.66, USD: 0.66 },
@@ -132,8 +146,11 @@ serve(async (req) => {
     const currency = walletPreview?.currency || 'EUR';
 
     // Cost
-    const modelPricing = MODEL_PRICING[model];
-    const costPerSecond = modelPricing[currency] || modelPricing['EUR'];
+    // Canonical price from the shared catalog (same source as the UI preview,
+    // including the account discount). MODEL_PRICING is only a legacy fallback.
+    const costPerSecond = await resolveAccountCostPerSecond(
+      supabaseAdmin, user.id, model, currency as "EUR" | "USD", 0.32,
+    );
     const totalCost = duration * costPerSecond;
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 
@@ -265,12 +282,29 @@ serve(async (req) => {
     }));
 
     try {
-      const prediction = await replicate.predictions.create({
-        model: replicateModel,
-        input: replicateInput,
-        webhook: webhookUrl,
-        webhook_events_filter: ['start', 'completed']
-      });
+      // Provider overload (Google Veo capacity, "code: 8" / RESOURCE_EXHAUSTED)
+      // is transient and unrelated to our own traffic — retry a bounded number
+      // of times before giving up. No extra deduction happens here.
+      let prediction: any = null;
+      let lastError: any = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          prediction = await replicate.predictions.create({
+            model: replicateModel,
+            input: replicateInput,
+            webhook: webhookUrl,
+            webhook_events_filter: ['start', 'completed']
+          });
+          break;
+        } catch (err: any) {
+          lastError = err;
+          if (!isProviderOverload(err) || attempt === 2) throw err;
+          const waitMs = 2000 * (attempt + 1);
+          console.warn(`[generate-veo-video] provider overloaded — retry ${attempt + 1}/2 in ${waitMs}ms`);
+          await new Promise((r) => setTimeout(r, waitMs));
+        }
+      }
+      if (!prediction) throw lastError ?? new Error('Prediction creation failed');
 
       console.log(`[generate-veo-video] ✅ Prediction created: ${prediction.id}`);
 
@@ -306,6 +340,16 @@ serve(async (req) => {
         console.error('[generate-veo-video] Refund failed:', refundError);
       } else {
         console.log(`[generate-veo-video] ✅ ${currencySymbol}${totalCost.toFixed(2)} refunded`);
+      }
+
+      if (isProviderOverload(replicateError)) {
+        return new Response(
+          JSON.stringify({
+            error: "The video provider is currently overloaded. Your credits were refunded — please try again in a few minutes.",
+            code: "PROVIDER_OVERLOADED",
+          }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       if (replicateError?.response?.status === 429) {

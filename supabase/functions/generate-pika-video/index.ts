@@ -4,6 +4,7 @@ import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
+import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -204,7 +205,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       );
     }
 
-    const totalCost = duration * costPerSecond;
+    // Canonical catalog price (identical to the UI preview, incl. account discount).
+    const effectiveCps = await resolveAccountCostPerSecond(
+      supabaseAdmin, user.id, model, (wallet.currency === 'USD' ? 'USD' : 'EUR'), costPerSecond,
+    );
+    const totalCost = duration * effectiveCps;
     const sym = wallet.currency === "USD" ? "$" : "€";
     if (wallet.balance_euros < totalCost) {
       await trackBusinessEvent('credit_insufficient', user.id, {
