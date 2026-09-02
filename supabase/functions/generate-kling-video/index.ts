@@ -5,6 +5,7 @@ import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveCostPerSecond, VIDEO_PRICING_CATALOG } from "../_shared/videoPricingCatalog.ts";
+import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -141,7 +142,9 @@ serve(async (req) => {
     const currency = walletPreview?.currency || 'EUR';
 
     // Canonical price from shared pricing catalog — single source of truth.
-    const costPerSecond = resolveCostPerSecond(model, currency as 'EUR' | 'USD') ?? 0.18;
+    const costPerSecond = await resolveAccountCostPerSecond(
+      supabaseAdmin, user.id, model, currency as 'EUR' | 'USD', 0.18,
+    );
     const totalCost = +(duration * costPerSecond).toFixed(4);
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 
