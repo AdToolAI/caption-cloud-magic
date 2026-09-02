@@ -38,4 +38,8 @@ Deno.test("v544: preclip path uses its exact persisted timebase", () => {
     DIALOG.includes('? Number((pass as any).preclip_fps ?? 30)'),
     "preclip fps source must be untouched",
   );
+  assert(
+    DIALOG.includes('if (v161UsingPreclipForBbox && preclipPersistedFrameCount <= 0)'),
+    "a preclip without its exact persisted frame count must fail before provider dispatch",
+  );
 });

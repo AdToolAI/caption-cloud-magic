@@ -7906,9 +7906,6 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               422,
             );
           }
-          console.warn(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render FAILED err=${preclipResult.error} class=${preclipResult.errorClass} — falling back to full-plate dispatch`,
-          );
         }
       } catch (preclipErr) {
         (pass as any).preclip_error = (preclipErr as Error)?.message ?? String(preclipErr);
@@ -7955,9 +7952,6 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             422,
           );
         }
-        console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render THREW: ${(preclipErr as Error)?.message} — falling back to full-plate dispatch`,
-        );
       }
     } else if (usePassPreclip) {
       console.log(
@@ -8350,7 +8344,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_bbox_framecount space=${v161UsingPreclipForBbox ? "clip" : "plate"} source=${frameCountSource} fps=${dispatchFps} preclip_frames=${preclipPersistedFrameCount || "?"} probe_dur=${__probedPlateDurSec ? __probedPlateDurSec.toFixed(3) : "?"} requested_total=${totalSec}s probed_frames=${__probedFrames ?? "?"} used=${frameCount}`,
       );
-      if (v161UsingPreclipForBbox && frameCountSource === "ceil_total_duration") {
+      if (v161UsingPreclipForBbox && preclipPersistedFrameCount <= 0) {
         (pass as any)._v152HardFail = {
           reason: "preclip_frame_count_unavailable",
           errorClass: "v163_preclip_frame_count_unavailable",
