@@ -12,6 +12,19 @@ const corsHeaders = {
 };
 
 // Pricing in EUR/USD per second — normalized 14.07.2026 to 3.00× Replicate cost margin
+/** Provider-side capacity errors (Google Veo "code: 8" / RESOURCE_EXHAUSTED,
+ *  Replicate 503 / "high load"). Transient and unrelated to our own load. */
+function isProviderOverload(err: any): boolean {
+  const status = err?.response?.status ?? err?.status;
+  if (status === 503) return true;
+  const msg = `${err?.message ?? ''} ${JSON.stringify(err?.detail ?? err?.response?.data ?? '')}`.toLowerCase();
+  return msg.includes('high load')
+    || msg.includes('resource_exhausted')
+    || msg.includes('overloaded')
+    || msg.includes('capacity')
+    || /"?code"?\s*:\s*8\b/.test(msg);
+}
+
 const MODEL_PRICING: Record<string, Record<string, number>> = {
   'veo-3.1-lite-720p':  { EUR: 0.45, USD: 0.45 },
   'veo-3.1-lite-1080p': { EUR: 0.66, USD: 0.66 },
