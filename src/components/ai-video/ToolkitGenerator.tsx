@@ -270,10 +270,59 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     [brandCharList],
   );
   const { characters: mentionChars, locations: mentionLocs } = useUnifiedMentionLibrary();
-  const [castCharacterIds, setCastCharacterIds] = useState<string[]>([]);
-  const [castLocationId, setCastLocationId] = useState<string | null>(null);
-  const [castBuildingId, setCastBuildingId] = useState<string | null>(null);
-  const [castPropIds, setCastPropIds] = useState<string[]>([]);
+  const [castCharacterIds, setCastCharacterIds] = useState<string[]>(
+    Array.isArray(setupDraft.castCharacterIds) ? setupDraft.castCharacterIds : [],
+  );
+  const [castLocationId, setCastLocationId] = useState<string | null>(
+    typeof setupDraft.castLocationId === 'string' ? setupDraft.castLocationId : null,
+  );
+  const [castBuildingId, setCastBuildingId] = useState<string | null>(
+    typeof setupDraft.castBuildingId === 'string' ? setupDraft.castBuildingId : null,
+  );
+  const [castPropIds, setCastPropIds] = useState<string[]>(
+    Array.isArray(setupDraft.castPropIds) ? setupDraft.castPropIds : [],
+  );
+
+  /* Setup-Entwurf sichern (debounced) + hart beim Tab-Wechsel/Verlassen. */
+  const setupSnapshot = useMemo(
+    () => ({
+      modelId,
+      duration,
+      aspectRatio,
+      resolution,
+      generateAudio,
+      startImageUrl,
+      referencePlacement,
+      omniLines,
+      castCharacterIds,
+      castLocationId,
+      castBuildingId,
+      castPropIds,
+    }),
+    [
+      modelId, duration, aspectRatio, resolution, generateAudio, startImageUrl,
+      referencePlacement, omniLines, castCharacterIds, castLocationId, castBuildingId, castPropIds,
+    ],
+  );
+  const setupSnapshotRef = useRef(setupSnapshot);
+  useEffect(() => { setupSnapshotRef.current = setupSnapshot; }, [setupSnapshot]);
+  const writeSetupDraft = useCallback(() => {
+    try { localStorage.setItem(SETUP_DRAFT_KEY, JSON.stringify(setupSnapshotRef.current)); } catch { /* noop */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const t = setTimeout(writeSetupDraft, 300);
+    return () => clearTimeout(t);
+  }, [setupSnapshot, writeSetupDraft]);
+  useEffect(() => {
+    const onVisibility = () => { if (document.hidden) writeSetupDraft(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', writeSetupDraft);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', writeSetupDraft);
+    };
+  }, [writeSetupDraft]);
+
 
   const castCharacters = useMemo(
     () => castCharacterIds.map((id) => libCharacters.find((c) => c.id === id)).filter((c): c is NonNullable<typeof c> => !!c),
