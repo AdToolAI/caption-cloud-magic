@@ -7073,7 +7073,21 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const isStabilizerForTight = isStabilizerPass(pass);
     // FA-4 v406 — auf einem frozen NOOP-Retry wird NIE neu tight-gesliced:
     // der Provider-Audio-Input kommt 1:1 aus dem Snapshot.
-    const allowTightSlice = passes.length >= 1 && !isStabilizerForTight && !v406SkipRebuild;
+    // V543-2 — im Full-Shot-Pfad wird NICHT tight-gesliced. Das Video ist die
+    // ganze Platte; das per-Sprecher-WAV ist bereits auf die volle Plate-Länge
+    // stille-gepolstert. Nur so teilen Video, Audio und Box-Array EINE
+    // Zeitachse. Ein tight-Slice würde 2,2 s Audio gegen 15 s Video stellen —
+    // mit `cut_off` liegt der genutzte Bereich dann ausserhalb aller Boxen,
+    // und Sync.so antwortet `generation_input_face_selection_invalid`.
+    const v543FullShotAudio = (pass as any)._v153BboxPrimary === true;
+    const allowTightSlice = passes.length >= 1 && !isStabilizerForTight &&
+      !v406SkipRebuild && !v543FullShotAudio;
+    if (v543FullShotAudio) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v543_fullshot_audio_plate_aligned — tight slice skipped, plate-length WAV kept`,
+      );
+    }
+
     if (v406SkipRebuild) {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v406_skip_tight_slicing frozen=${v406ReuseFrozen}`,
