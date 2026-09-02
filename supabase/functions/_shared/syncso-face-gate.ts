@@ -241,6 +241,30 @@ export async function verifyFaceBeforeDispatch(
 
   if (faceCount > 1) {
     if (input.isMultiSpeakerContext) {
+      // V538 C — when the v400 gate passed, an extra face is only fatal if
+      // Sync.so would prefer it: a face LARGER than the target dominates the
+      // frame and gets lip-synced instead. Everything smaller (background
+      // extra, listener at the edge) is telemetry.
+      if (input.v461Passed) {
+        const dominant = dominantOverTarget(rek.faces as FaceLike[], coord);
+        if (!dominant.dominated) {
+          console.log(
+            `[face-gate] ${GATE_VERSION} multiple_faces=${faceCount} v461_passed → soft pass ` +
+            `(target_area=${Math.round(dominant.targetArea)} max_other_area=${Math.round(dominant.maxOtherArea)})`,
+          );
+          return {
+            ok: true,
+            code: "ok",
+            reason: `v538c_multiple_faces_downgraded:${faceCount}_faces_target_dominant`,
+            raw_reply: rawReply,
+            ...baseMeta,
+          };
+        }
+        console.warn(
+          `[face-gate] ${GATE_VERSION} multiple_faces=${faceCount} v461_passed but a LARGER ` +
+          `face dominates the target (${Math.round(dominant.maxOtherArea)} > ${Math.round(dominant.targetArea)}) → hard fail`,
+        );
+      }
       console.log(`[face-gate] ${GATE_VERSION} multiple_faces=${faceCount} multi_speaker=true → hard fail`);
       return {
         ok: false,
