@@ -41,7 +41,7 @@ export function AppSidebar() {
   });
 
   return (
-    <>
+    <TooltipProvider delayDuration={0}>
       <Sidebar className="w-[68px] min-w-[68px] max-w-[68px] sticky top-0 h-screen max-h-screen self-start overflow-hidden" collapsible="none">
         {/* Brand icon */}
         <div className="flex items-center justify-center h-14 border-b border-border bg-card">
@@ -52,7 +52,6 @@ export function AppSidebar() {
           {/* Home */}
           <SidebarMenu className="w-full px-2">
             <SidebarMenuItem>
-              <TooltipProvider delayDuration={0}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <SidebarMenuButton
@@ -70,11 +69,10 @@ export function AppSidebar() {
                       </Link>
                     </SidebarMenuButton>
                   </TooltipTrigger>
-                  <TooltipContent side="right" className="bg-background/95 backdrop-blur-xl border-border shadow-xl">
+                  <TooltipContent side="right" className="bg-popover text-popover-foreground border-border shadow-xl">
                     <p className="font-medium">{t("home")}</p>
                   </TooltipContent>
                 </Tooltip>
-              </TooltipProvider>
             </SidebarMenuItem>
           </SidebarMenu>
 
@@ -90,7 +88,6 @@ export function AppSidebar() {
 
               return (
                 <SidebarMenuItem key={hub.key}>
-                  <TooltipProvider delayDuration={0}>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <motion.button
@@ -120,14 +117,13 @@ export function AppSidebar() {
                           )}
                         </motion.button>
                       </TooltipTrigger>
-                      <TooltipContent side="right" className="bg-background/95 backdrop-blur-xl border-border shadow-xl">
+                      <TooltipContent side="right" className="bg-popover text-popover-foreground border-border shadow-xl">
                         <p className="font-medium">
                           {t(hub.titleKey)}
                           {comingSoon && <span className="ml-1.5 text-[10px] text-amber-400">· Coming Soon</span>}
                         </p>
                       </TooltipContent>
                     </Tooltip>
-                  </TooltipProvider>
                 </SidebarMenuItem>
               );
             })}
@@ -135,6 +131,6 @@ export function AppSidebar() {
         </div>
 
       </Sidebar>
-    </>
+    </TooltipProvider>
   );
 }
