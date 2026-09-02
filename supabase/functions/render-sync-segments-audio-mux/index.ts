@@ -800,7 +800,17 @@ serve(async (req) => {
     // Multi-speaker fanout MUST use preclip_crop overlays. A faceMask
     // fallback on N≥2 means one of the passes lost its preclip_crop — that
     // resurrects the wide-plate morph artefacts v204 was built to avoid.
-    if (isFanout && donePasses.length >= 2 && facemasksUsed > 0) {
+    //
+    // V543 — Ausnahme: ein bewusst gewählter Full-Shot-Dispatch hat gar
+    // keinen Preclip-Crop, weil sync-3 die volle Platte bearbeitet. Dort ist
+    // die Face-Mask des identitäts-gelockten Sprechers die korrekte Overlay-
+    // Form, kein verlorener Crop. Nur unbeabsichtigte Fallbacks blocken.
+    const v543FullPlatePasses = donePasses.filter(
+      (p: any) => p?._v153BboxPrimary === true || p?._v152BboxPrimary === true,
+    ).length;
+    const v543AllFullPlate =
+      v543FullPlatePasses > 0 && facemasksUsed <= v543FullPlatePasses;
+    if (isFanout && donePasses.length >= 2 && facemasksUsed > 0 && !v543AllFullPlate) {
       const msg =
         `v205 guard: multi-speaker mux for scene=${sceneId} fell back to faceMask on ` +
         `${facemasksUsed}/${fanoutShots.length} shots (expected all preclip_crop). ` +
@@ -808,6 +818,13 @@ serve(async (req) => {
       console.error(`[render-sync-segments-audio-mux] ${msg}`);
       return json({ error: msg, code: "v205_facemask_fallback_on_multispeaker" }, 500);
     }
+    if (isFanout && v543AllFullPlate && facemasksUsed > 0) {
+      console.log(
+        `[render-sync-segments-audio-mux] scene=${sceneId} v543_fullplate_facemask_overlay ` +
+        `full_plate_passes=${v543FullPlatePasses} facemasks=${facemasksUsed} crops=${cropsUsed}`,
+      );
+    }
+
 
     // v194 diagnostic: how many done passes came from silent-stabilizers vs
     // active speakers. Silent stabilizers carry `is_silent_stabilizer=true`
