@@ -61,6 +61,7 @@ export function AppHeader() {
 
         {/* Right: Actions */}
         <div data-tour="header-actions" className="flex items-center gap-1 sm:gap-2 lg:ml-12 shrink-0">
+          {user && <WalletBadge />}
           {user && <StreakBadge />}
           <LanguageSwitcher />
           <ThemeToggle />
