@@ -6480,16 +6480,39 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const v153HasPlateBox =
       Array.isArray(speakerPlateBboxes?.[pass.speaker_idx]) &&
       (speakerPlateBboxes![pass.speaker_idx] as any[]).length === 4;
-    // v201 — block the historical v153 env backdoor completely. Bounding boxes
-    // remain canonical, but through the current per-pass bbox-url builder below
-    // (preferably clip-space on a single-speaker preclip), never via the old
-    // `_v153BboxPrimary` full-plate override toggled by FEATURE_V153_BBOX_PRIMARY.
-    const v153UnifiedBboxEligible = false;
+    // ══ V543 — FULL-SHOT DISPATCH IST WIEDER DER PRIMÄRPFAD ═══════════════
+    //
+    // Gate-0-Befund (Szene 7aa7fc93…, Gen 7, alle 4 Pässe noop):
+    // Der Selbst-Crop wurde aus EINER Snapshot-Box geplant, der Face-Track
+    // lieferte 0 Samples und die Mundposition kam aus `pose_estimate`.
+    // Bewegen sich die Figuren, wandert der Mund aus dem Fenster —
+    // `mouth_over_frame` 1.18–1.81 in der Messung. Sync.so bekam dann einen
+    // Clip ohne verwertbaren Mund → noop.
+    //
+    // sync-3 ist laut Anbieter-Vertrag dafür gebaut, den GANZEN Shot zu
+    // sehen und den Sprecher räumlich selbst zu verfolgen; die Box ist reine
+    // Sprecher-AUSWAHL, kein Bildausschnitt. Der Preclip nahm sync-3 exakt
+    // diese Fähigkeit weg — deshalb waren Bewegung und Lip-Sync unvereinbar.
+    //
+    // Identität bleibt unangetastet: die Box stammt weiterhin aus dem
+    // V524/V530-Lock (`speakerPlateBboxes[speaker_idx]`), `auto_detect`
+    // bleibt aus. Retries und NOOP-Eskalation fallen bewusst auf den
+    // bisherigen Preclip-Pfad zurück (Fallback, nicht Ersatz).
+    const V543_FULLPLATE_ENABLED =
+      (Deno.env.get("FEATURE_V543_FULLPLATE") ?? "1") !== "0";
+    const v153UnifiedBboxEligible =
+      V543_FULLPLATE_ENABLED &&
+      !isRetry &&
+      body?.noop_auto_escalation !== true &&
+      !!plateDims &&
+      v153HasPlateBox &&
+      !(pass as any).preclip_url;
     if (!isRetry) {
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v201_legacy_v153_env_blocked speakers=${speakers.length} plate_box=${v153HasPlateBox} — canonical path is ID + sync-3 + bounding_boxes_url`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v543_fullplate_gate enabled=${V543_FULLPLATE_ENABLED} eligible=${v153UnifiedBboxEligible} speakers=${speakers.length} plate_box=${v153HasPlateBox} cached_preclip=${!!(pass as any).preclip_url} — sync-3 full-shot + bounding_boxes_url`,
       );
     }
+
     if (v153UnifiedBboxEligible) {
       (pass as any).preclip_url = null;
       (pass as any).preclip_render_id = null;
@@ -7186,6 +7209,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
     const v161PreclipEligible =
       !usePassPreclip &&
+      // V543 — im Full-Shot-Pfad gibt es bewusst keinen Selbst-Crop.
+      !(pass as any)._v153BboxPrimary &&
       !!tightAudioInfo &&
       !!plateDims &&
       !!sourceClipUrl &&
@@ -7194,6 +7219,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       Number.isFinite(Number(pass.coords?.[1])) &&
       Array.isArray(speakerWindowsSecs) && speakerWindowsSecs.length > 0 &&
       body?.noop_auto_escalation !== true;
+
 
     if (v161PreclipEligible) {
       const unionStart = Math.max(0, Math.min(...speakerWindowsSecs.map(([s]) => s)));
@@ -9633,7 +9659,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // instead of the full multi-face plate. Sync.so sees one face only →
     // no `provider_unknown_error` ambiguity. The audio-mux Lambda overlays
     // the lipsynced crop back at preclip_crop on the original plate.
-    const v204MultiSpeakerPreclipDispatch = speakers.length >= 2;
+    // V543 — der v204-Preclip-Zwang gilt nur noch für den Fallback-Pfad.
+    // Ein bewusst gewählter Full-Shot-Dispatch (identitäts-gelockte Box,
+    // auto_detect aus) ist kein "Full-Plate-Fallback" im Sinne von v204.
+    const v204MultiSpeakerPreclipDispatch =
+      speakers.length >= 2 && !(pass as any)._v153BboxPrimary;
+
     if (v204MultiSpeakerPreclipDispatch && (!usePassPreclip || !passPreclipUrl)) {
       return await failBeforeProviderDispatch(
         "v204_preclip_required",
