@@ -1146,9 +1146,34 @@ export default function VideoComposerDashboard() {
     icon: t.icon,
   }));
 
+  // Latest project state, readable from event handlers without re-binding
+  // listeners on every keystroke.
+  const projectRef = useRef<LocalProject>(project);
+  useEffect(() => { projectRef.current = project; }, [project]);
+
   useEffect(() => {
     saveDraft(project);
   }, [project]);
+
+  // Tab-Wechsel darf keine Eingaben kosten: beim Verlassen des Tabs bzw. beim
+  // Verlassen der Seite wird der aktuelle Stand hart gesichert. Der reguläre
+  // Effekt oben läuft zwar bei jeder Änderung, ein Wechsel kann ihn aber
+  // zwischen zwei Renders erwischen.
+  useEffect(() => {
+    const persistNow = () => {
+      saveDraft(projectRef.current);
+      try { localStorage.setItem(tabStorageKey(), activeTab); } catch { /* ignore */ }
+    };
+    const onVisibility = () => { if (document.hidden) persistNow(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', persistNow);
+    window.addEventListener('beforeunload', persistNow);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', persistNow);
+      window.removeEventListener('beforeunload', persistNow);
+    };
+  }, [activeTab]);
 
   // Persist active tab so users return to where they left off
   useEffect(() => {
@@ -1159,11 +1184,21 @@ export default function VideoComposerDashboard() {
 
   // Account switch inside a live tab: never keep writing the previous
   // account's draft — drop it and load the new account's own draft.
+  //
+  // WICHTIG: Nur ein ECHTER Kontowechsel (id A → id B) darf zurücksetzen.
+  // `useAuth` liefert beim Token-Refresh nach einem Tab-Wechsel kurzzeitig
+  // `null`, bevor die Session wieder da ist. Vorher hat dieser Effekt genau
+  // dann den Entwurf durch `defaultProject` ersetzt — und der Speicher-Effekt
+  // oben hat den leeren Stand sofort über den echten Entwurf geschrieben.
+  // Das war der gemeldete Datenverlust beim Wechsel zwischen Browser-Tabs.
   const authUserId = useAuth().user?.id ?? null;
   const lastAuthUserIdRef = useRef<string | null>(authUserId);
   useEffect(() => {
-    if (lastAuthUserIdRef.current === authUserId) return;
+    const previous = lastAuthUserIdRef.current;
+    if (previous === authUserId) return;
+    if (!authUserId) return;            // Session gerade nicht aufgelöst
     lastAuthUserIdRef.current = authUserId;
+    if (!previous) return;              // erste Auflösung, kein Wechsel
     setProject(loadDraft() ?? defaultProject);
     setActiveTab(restoreActiveTab());
   }, [authUserId]);
