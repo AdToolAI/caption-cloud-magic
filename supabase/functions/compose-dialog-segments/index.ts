@@ -282,7 +282,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v544-v400-preclip-authority";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v545-fullplate-multispeaker-primary";
 
 // v249 — Slice A: surface v247 mouth-anchor preclip metrics as top-level columns
 // on `syncso_dispatch_log` so v248-Slice-4 ladder in `report-lipsync-motion-probe`
@@ -6573,16 +6573,40 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
 
 
-    // V544 — v400 preclip authority (N=1..4). The V543 full-shot experiment
-    // reached its bounded stop criterion: accepted provider jobs completed
-    // without measurable or visible mouth motion. Clear every legacy marker
-    // before dispatch selection so neither an env flag nor stale pass state can
-    // reopen full-shot. Identity/assignment locks still feed the preclip crop.
+    // V545 — Full-Plate is primary for fresh N>=2 dispatches when the
+    // assignment-locked plate box and exact MP4 timebase are available.
+    // Preclip remains the deterministic pre-dispatch fallback.
     delete (pass as any)._v152BboxPrimary;
     delete (pass as any)._v153BboxPrimary;
     delete (pass as any)._v543PlateMeta;
+    const v545HasPlateBox =
+      Array.isArray(speakerPlateBboxes?.[pass.speaker_idx]) &&
+      (speakerPlateBboxes![pass.speaker_idx] as any[]).length === 4;
+    const v545FullPlateCandidate =
+      speakers.length >= 2 &&
+      !isRetry &&
+      body?.noop_auto_escalation !== true &&
+      !!plateDims &&
+      v545HasPlateBox;
+    const v545PlateMeta = v545FullPlateCandidate
+      ? await getPlateVideoMetaCached(passInputUrl)
+      : null;
+    const v545FullPlatePrimary = v545FullPlateCandidate &&
+      !!v545PlateMeta &&
+      v545PlateMeta.fps > 0 &&
+      v545PlateMeta.frameCount > 0;
+    if (v545FullPlatePrimary) {
+      // A stale cached preclip must not override the selected primary path.
+      (pass as any).preclip_url = null;
+      (pass as any).preclip_render_id = null;
+      (pass as any).preclip_crop = null;
+      (pass as any).preclip_error = null;
+      (pass as any)._v152BboxPrimary = true;
+      (pass as any)._v153BboxPrimary = true;
+      (pass as any)._v543PlateMeta = v545PlateMeta;
+    }
     console.log(
-      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v544_v400_preclip_authority speakers=${speakers.length} — full-shot dispatch disabled`,
+      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v545_fullplate_gate candidate=${v545FullPlateCandidate} primary=${v545FullPlatePrimary} speakers=${speakers.length} plate_box=${v545HasPlateBox} fps=${v545PlateMeta?.fps ?? "n/a"} frames=${v545PlateMeta?.frameCount ?? "n/a"} fallback=${v545FullPlateCandidate && !v545FullPlatePrimary ? "preclip" : "none"}`,
     );
 
 
@@ -9737,16 +9761,15 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // instead of the full multi-face plate. Sync.so sees one face only →
     // no `provider_unknown_error` ambiguity. The audio-mux Lambda overlays
     // the lipsynced crop back at preclip_crop on the original plate.
-    // V544 — the isolated v400 preclip is authoritative for N=1..4. This is
-    // intentionally not count-gated: no speaking pass may reach Sync.so with
-    // the whole plate after the V543 full-shot experiment failed its outcome.
-    const v204MultiSpeakerPreclipDispatch = true;
+    // V545 — Full-Plate is primary for fresh N>=2 passes with exact measured
+    // metadata. Every other path must still have a safe preclip before dispatch.
+    const v204MultiSpeakerPreclipDispatch = !(pass as any)._v153BboxPrimary;
 
     if (v204MultiSpeakerPreclipDispatch && (!usePassPreclip || !passPreclipUrl)) {
       return await failBeforeProviderDispatch(
         "v204_preclip_required",
         "v204_preclip_missing_before_wire",
-        "Refusing to dispatch multi-speaker Sync.so job without a single-face preclip; v204 forbids Full-Plate fallback.",
+        "Refusing to dispatch Sync.so without either an exact Full-Plate contract or a safe single-face preclip.",
         422,
         {
           canonical_lipsync_pipeline: "v204_preclip_bbox_clipspace",
@@ -9890,9 +9913,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const dispatchInputSpace = usePassPreclip ? "clip" : "plate";
     const rawDispatchVideoUrl = v406FrozenInput
       ? v406FrozenInput.video_url
-      : (v204MultiSpeakerPreclipDispatch
-        ? (passPreclipUrl as string)
-        : (usePassPreclip ? (passPreclipUrl as string) : passInputUrl));
+      : ((pass as any)._v153BboxPrimary
+        ? passInputUrl
+        : (passPreclipUrl as string));
     // v143 — Rehost the plate into our own bucket before sending to Sync.so.
     // Presigned Replicate/S3 URLs expire after ~60 min; multi-pass dialogs
     // routinely exceed that window, causing Sync.so to silently return 422
