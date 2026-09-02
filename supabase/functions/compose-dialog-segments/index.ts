@@ -4928,23 +4928,51 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             break;
           }
           if (box && plateDims) {
-            // V523 — for 3+ speakers the face is whichever candidate the
-            // continuation rule PROVES is this character. No proof, no
-            // repair: the next candidate frame gets a turn, and if none
-            // resolves the pass is refused rather than relocated.
+            // ══ V538 B — THE ANCHOR IS THE AUTHORITY AGAIN ═══════════════
+            //
+            // v400's invariant is that geometry is measured on
+            // `reference_image_url`. V524–V530 moved the measurement onto
+            // stills of the GENERATED plate, which makes every dispatch
+            // depend on the i2v result being biometrically resolvable in a
+            // single frame. Any camera move or head turn then terminalizes
+            // the scene (`face_repair_identity_unresolved`) although the
+            // identity itself was never in doubt.
+            //
+            // The V523/V524/V526/V530 chain stays exactly where it is and
+            // keeps measuring — it simply loses its VETO. When it cannot
+            // prove a continuation, the anchor-locked reference box (the
+            // assignment lock, i.e. the v400 authority) drives the repair,
+            // and only if that is missing does the legacy positional slot
+            // answer. The refusal is recorded as telemetry either way.
+            let v538IdentityDowngrade: Record<string, unknown> | null = null;
+            const v538AnchorBox =
+              Array.isArray(v523Ref?.bbox) && (v523Ref!.bbox as number[]).length === 4
+                ? (v523Ref!.bbox as [number, number, number, number])
+                : null;
             if (v523NeedsIdentity && !v523Repair?.ok) {
               v523LastRefusal = { frame, reference: v523Ref, repair: v523Repair };
+              v538IdentityDowngrade = {
+                repair_reason: v523Repair?.reason ?? "no_result",
+                repair_detail: v523Repair?.detail ?? null,
+                candidates_considered: v523Repair?.candidatesConsidered ?? 0,
+                reference_ok: v523Ref?.ok ?? false,
+                reference_space: v523Ref?.space ?? "unknown",
+                fallback: v538AnchorBox ? "anchor_reference_bbox" : "plate_positional_slot",
+                frame,
+              };
               console.warn(
-                `[compose-dialog-segments] scene=${sceneId} v523_repair_identity_unresolved ` +
+                `[compose-dialog-segments] scene=${sceneId} v538_identity_veto_downgraded ` +
                   `pass=${pass.idx} speaker=${pass.speaker_name} frame=${frame} ` +
                   `reason=${v523Repair?.reason ?? "no_result"} detail=${v523Repair?.detail ?? "-"} ` +
                   `ref=${v523Ref?.ok ? v523Ref.source : (v523Ref?.reason ?? "none")} ` +
                   `candidates=${v523Repair?.candidatesConsidered ?? 0} ` +
+                  `fallback=${v538AnchorBox ? "anchor_reference_bbox" : "plate_positional_slot"} ` +
                   `positional_would_have=${JSON.stringify(v523Repair?.positionalWouldHavePicked ?? null)}`,
               );
-              continue;
             }
-            const v523Box = v523Repair?.bbox ?? null;
+            const v523Box = v523Repair?.ok
+              ? (v523Repair.bbox ?? null)
+              : v538AnchorBox;
             // Same 0.45 face-height mouth ratio as before; only the box it
             // is measured on changed, from an ordinal to an identity.
             const repaired: [number, number] = v523Box
@@ -4960,11 +4988,16 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             pass.coords = clampSyncCoords(repaired);
             pass.reference_frame_number = frame;
             pass.face_repair = {
-              source: v523Box
+              source: v538IdentityDowngrade
+                ? (v523Box ? "v538_anchor_reference_repair" : "v538_positional_downgrade")
+                : v523Box
                 ? "v523_identity_locked_repair"
                 : shouldForceRepair
                 ? "v96_plate_frame_force_repair"
                 : "plate_frame_left_to_right",
+              // V538 B — non-null whenever the plate-native chain refused and
+              // the anchor took over. Telemetry; nothing branches on it.
+              v538_identity_downgraded: v538IdentityDowngrade,
               frame_number: frame,
               original_coords: original,
               repaired_coords: pass.coords,
@@ -10110,6 +10143,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         sceneId,
         passIdx: currentPassIdx,
         preclipTrusted: preclipTrustedForGate,
+        // V538 C — the v400 gate (V461 A, ~line 9539) already passed for this
+        // pass; failing it here would terminalize a dispatch that satisfies
+        // the authoritative input contract. Only a LARGER competing face
+        // still fails closed.
+        v461Passed: v461Gate.ok === true,
       });
       if (gate.frame_jpeg_url) {
         (pass as any).probe_frame_url = gate.frame_jpeg_url;

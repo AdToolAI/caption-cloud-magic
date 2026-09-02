@@ -102,6 +102,19 @@ export interface FaceGateInput {
    *  self-healing. */
   plateWidth?: number;
   plateHeight?: number;
+  /**
+   * V538 C — the v400 face gate (`v461-face-gate.ts`) already PASSED for this
+   * dispatch.
+   *
+   * v400 had exactly one face gate. This module was added on top of it and
+   * fails closed on its own evidence, so a scene that satisfies the real v400
+   * input contract can still be killed here — `not_at_coord` on a face that is
+   * plainly visible, or `multiple_faces` on a background extra. When the v400
+   * gate has spoken, this one is demoted to telemetry, with one exception that
+   * is kept because it genuinely breaks Sync.so: another face LARGER than the
+   * target, which the provider will lip-sync instead of the target.
+   */
+  v461Passed?: boolean;
 }
 
 export async function verifyFaceBeforeDispatch(
@@ -228,6 +241,30 @@ export async function verifyFaceBeforeDispatch(
 
   if (faceCount > 1) {
     if (input.isMultiSpeakerContext) {
+      // V538 C — when the v400 gate passed, an extra face is only fatal if
+      // Sync.so would prefer it: a face LARGER than the target dominates the
+      // frame and gets lip-synced instead. Everything smaller (background
+      // extra, listener at the edge) is telemetry.
+      if (input.v461Passed) {
+        const dominant = dominantOverTarget(rek.faces as FaceLike[], coord);
+        if (!dominant.dominated) {
+          console.log(
+            `[face-gate] ${GATE_VERSION} multiple_faces=${faceCount} v461_passed → soft pass ` +
+            `(target_area=${Math.round(dominant.targetArea)} max_other_area=${Math.round(dominant.maxOtherArea)})`,
+          );
+          return {
+            ok: true,
+            code: "ok",
+            reason: `v538c_multiple_faces_downgraded:${faceCount}_faces_target_dominant`,
+            raw_reply: rawReply,
+            ...baseMeta,
+          };
+        }
+        console.warn(
+          `[face-gate] ${GATE_VERSION} multiple_faces=${faceCount} v461_passed but a LARGER ` +
+          `face dominates the target (${Math.round(dominant.maxOtherArea)} > ${Math.round(dominant.targetArea)}) → hard fail`,
+        );
+      }
       console.log(`[face-gate] ${GATE_VERSION} multiple_faces=${faceCount} multi_speaker=true → hard fail`);
       return {
         ok: false,
@@ -283,6 +320,27 @@ export async function verifyFaceBeforeDispatch(
       };
     }
 
+    // V538 C — exactly one face on the plate and the v400 gate passed. There
+    // is nothing to disambiguate; the only real defect is a stale coord, and
+    // that is repaired by snapping, not by killing the pass.
+    if (input.v461Passed) {
+      const snapped: [number, number] = [Math.round(faceCx), Math.round(faceCy)];
+      console.warn(
+        `[face-gate] ${GATE_VERSION} not_at_coord face=[${snapped[0]},${snapped[1]}] ` +
+        `outside safe-zone on plate ${W}x${H} — v461_passed → snap instead of hard fail.`,
+      );
+      return {
+        ok: true,
+        code: "ok_after_snap",
+        reason: `v538c_not_at_coord_downgraded: single face snapped from [${coord[0]},${coord[1]}] ` +
+          `to [${snapped[0]},${snapped[1]}] (${Math.round(dist)}px).`,
+        raw_reply: rawReply,
+        snapped_coord: snapped,
+        original_coord: [coord[0], coord[1]],
+        snap_distance_px: Math.round(dist),
+        ...baseMeta,
+      };
+    }
     console.warn(
       `[face-gate] ${GATE_VERSION} not_at_coord face=[${Math.round(faceCx)},${Math.round(faceCy)}] ` +
       `outside safe-zone on plate ${W}x${H} — hard fail.`,
@@ -300,4 +358,53 @@ export async function verifyFaceBeforeDispatch(
   console.log(`[face-gate] ${GATE_VERSION} ok face_count=1 (no coord check)`);
   return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta };
 
+}
+
+/** Minimal shape of a detected face used by the V538 C dominance test. */
+export interface FaceLike {
+  center: [number, number];
+  bbox?: [number, number, number, number];
+}
+
+/**
+ * V538 C — PURE. Is some OTHER face bigger than the one the coord points at?
+ *
+ * That is the only multi-face condition Sync.so actually mishandles: it
+ * lip-syncs the dominant face. A smaller extra in the background is harmless
+ * once the v400 gate has confirmed the target.
+ *
+ * With no coord, or with no usable boxes, `dominated` is false — the caller
+ * has already passed the v400 gate, so ambiguity must not re-introduce a veto.
+ */
+export function dominantOverTarget(
+  faces: FaceLike[],
+  coord: [number, number] | null | undefined,
+): { dominated: boolean; targetArea: number; maxOtherArea: number } {
+  const area = (f: FaceLike): number => {
+    const b = f?.bbox;
+    if (!Array.isArray(b) || b.length !== 4) return 0;
+    return Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]);
+  };
+  if (!Array.isArray(faces) || faces.length === 0 || !coord) {
+    return { dominated: false, targetArea: 0, maxOtherArea: 0 };
+  }
+  let targetIdx = 0;
+  let best = Infinity;
+  for (let i = 0; i < faces.length; i++) {
+    const c = faces[i]?.center;
+    if (!Array.isArray(c) || c.length !== 2) continue;
+    const d = Math.hypot(c[0] - coord[0], c[1] - coord[1]);
+    if (d < best) {
+      best = d;
+      targetIdx = i;
+    }
+  }
+  const targetArea = area(faces[targetIdx]);
+  let maxOtherArea = 0;
+  for (let i = 0; i < faces.length; i++) {
+    if (i === targetIdx) continue;
+    maxOtherArea = Math.max(maxOtherArea, area(faces[i]));
+  }
+  if (targetArea <= 0) return { dominated: false, targetArea, maxOtherArea };
+  return { dominated: maxOtherArea > targetArea, targetArea, maxOtherArea };
 }
