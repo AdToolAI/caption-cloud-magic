@@ -155,7 +155,7 @@ const CropPreview = ({ label, url, aspectClass }: CropPreviewProps) => {
       a.download = `crop-${label}.jpg`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
       URL.revokeObjectURL(downloadUrl);
     } catch (error) {
       console.error('Download failed:', error);

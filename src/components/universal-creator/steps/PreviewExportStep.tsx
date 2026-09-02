@@ -523,7 +523,7 @@ export function PreviewExportStep({
     link.download = `${projectId}-${platform}.mp4`;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
   };
 
   const formatLabel = (format: FormatConfig) => {

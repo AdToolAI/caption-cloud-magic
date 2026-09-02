@@ -176,7 +176,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
       a.download = `${sound.title}.mp3`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
       URL.revokeObjectURL(url);
       toast.success(tx({ de: 'Download gestartet', en: 'Download started', es: 'Descarga iniciada' }));
     } catch (error) {

@@ -40,7 +40,14 @@ export const ProfileTab = () => {
 
   const loadProfile = async () => {
     if (!user) return;
-    const { data } = await supabase.from("profiles").select("name, phone_number, email_verified").eq("id", user.id).single();
+    // `single()` throws when the row is not there yet (fresh signup, replica
+    // lag). `maybeSingle()` keeps the form usable instead of silently loading
+    // nothing.
+    const { data } = await supabase
+      .from("profiles")
+      .select("name, phone_number, email_verified")
+      .eq("id", user.id)
+      .maybeSingle();
     if (data) {
       form.reset({ name: data.name || "", phone_number: data.phone_number || "" });
       setEmailVerified(data.email_verified || false);
@@ -50,10 +57,29 @@ export const ProfileTab = () => {
   const onSubmit = async (values: ProfileFormValues) => {
     if (!user) return;
     setLoading(true);
-    const { error } = await supabase.from("profiles").update({ name: values.name || null, phone_number: values.phone_number || null, updated_at: new Date().toISOString() }).eq("id", user.id);
+    // Upsert instead of update: testers reported "saving failed" on accounts
+    // whose profile row did not exist yet — the update matched zero rows or the
+    // insert policy was never exercised.
+    const { error } = await supabase
+      .from("profiles")
+      .upsert(
+        {
+          id: user.id,
+          email: user.email ?? "",
+          name: values.name || null,
+          phone_number: values.phone_number || null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" },
+      );
     setLoading(false);
     if (error) {
-      toast({ title: t("account.profile.error"), description: t("account.profile.errorSaving"), variant: "destructive" });
+      // The generic text hid the real cause from testers and from support.
+      toast({
+        title: t("account.profile.error"),
+        description: `${t("account.profile.errorSaving")} (${error.message})`,
+        variant: "destructive",
+      });
     } else {
       toast({ title: t("account.profile.saved"), description: t("account.profile.savedDesc") });
     }

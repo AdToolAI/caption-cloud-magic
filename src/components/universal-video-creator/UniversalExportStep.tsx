@@ -175,7 +175,7 @@ export function UniversalExportStep({ project, category, userId, onBack, onCompl
     link.download = `${categoryName || 'video'}-${formatId}.mp4`;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
     toast.success(t('uvc.exportStartedToast'));
   };
 

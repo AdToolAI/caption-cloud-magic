@@ -13,6 +13,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { SocialConnectionIcons } from "@/components/dashboard/SocialConnectionIcons";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { StreakBadge } from "@/components/streak/StreakBadge";
+import { WalletBadge } from "@/components/layout/WalletBadge";
 import { FounderCrest } from "@/components/founders/FounderCrest";
 
 export function AppHeader() {
@@ -60,6 +61,7 @@ export function AppHeader() {
 
         {/* Right: Actions */}
         <div data-tour="header-actions" className="flex items-center gap-1 sm:gap-2 lg:ml-12 shrink-0">
+          {user && <WalletBadge />}
           {user && <StreakBadge />}
           <LanguageSwitcher />
           <ThemeToggle />

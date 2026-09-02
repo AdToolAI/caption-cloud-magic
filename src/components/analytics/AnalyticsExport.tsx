@@ -45,7 +45,7 @@ export function AnalyticsExport({ data, dateRange }: Props) {
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
 
       toast({
         title: tx({ de: 'CSV Export erfolgreich', en: 'CSV export successful', es: 'Exportación CSV exitosa' }),
@@ -78,7 +78,7 @@ export function AnalyticsExport({ data, dateRange }: Props) {
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
 
       toast({
         title: tx({ de: 'JSON Export erfolgreich', en: 'JSON export successful', es: 'Exportación JSON exitosa' }),

@@ -140,7 +140,7 @@ export function AnalyticsExportButton({ metrics, dateRange, compareEnabled }: Pr
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       URL.revokeObjectURL(url);
 
       toast({

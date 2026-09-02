@@ -67,7 +67,7 @@ export const CSVUploadDialog = ({ open, onOpenChange, onSuccess }: CSVUploadDial
     a.download = 'post_metrics_template.csv';
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
+    a.remove();
     window.URL.revokeObjectURL(url);
   };
 
