@@ -35,9 +35,10 @@ Request-Payloads gegen den dokumentierten Vertrag.
 5. Welche unserer eigenen Gates blocken vor dem Provider, obwohl die Doku den
    Fall gar nicht als Fehler kennt?
 6. **Neu (aus der offiziellen Anleitung):** Was passiert, wenn wir *keinen*
-   eigenen Preclip bauen, sondern die volle Platte plus `active_speaker_detection`
-   an `sync-3` geben? Ein einziger kontrollierter A/B-Lauf, Variante A = heutiger
-   enger Preclip, Variante B = Full-Shot + ASD.
+   eigenen Preclip bauen, sondern die volle Platte plus explizite Ziel-Box
+   (`bounding_boxes_url`, nativer Raum) an `sync-3` geben? Ein kontrollierter
+   A/B-Lauf: Variante A = heutiger enger Preclip, Variante B = Full-Shot +
+   explizite Box. `auto_detect` ist **nicht** Teil des A/B (Begründung unten).
 
 **Ergebnis:** eine Tabelle „unser Payload vs. Doku-Vertrag" mit maximal drei
 belegten Abweichungen. Kein Code, kein Deploy.
@@ -52,12 +53,16 @@ Teilgesichter und stille Lippen — und laut offizieller Anleitung das Modell mi
 Full-Shot-Verarbeitung und räumlichem Verständnis für mehrere Personen. Höherer
 Preis pro Sekunde, dafür verschwindet die Still-Frame-Klasse.
 
-**Änderung 2 — Eingangsbild: Full-Shot + ASD statt engem Preclip.**
-Der offizielle Weg für Mehrsprecher-Videos ist entweder ASD-Auto-Detect oder eine
-explizite Ziel-Box im nativen Raum — nicht ein selbst gerechneter, mundzentrierter
-Ultra-Crop. Falls Gate 0 zeigt, dass Variante B trifft: Preclip wird zur
-Rückfallebene. Falls Variante A gewinnt: nur `targetFaceShare` von 0.42 zurück in
-den Golden-Korridor (0.25–0.40) und Mund garantiert vollständig im Frame.
+**Änderung 2 — Eingangsbild: Full-Shot + explizite Ziel-Box statt engem Preclip.**
+Der dokumentierte Mehrsprecher-Weg ist Methode 2 (explizite Koordinaten im
+nativen Raum), nicht ein selbst gerechneter, mundzentrierter Ultra-Crop.
+`auto_detect` bleibt bewusst aus: Wir kennen pro Pass den Sprecher bereits
+deterministisch (Identitäts-Lock), Auto-Detect würde diese Autorität an das
+Modell zurückgeben und die Fehlbesetzungs-Klasse wieder öffnen — und der
+Golden Run v400 lief nachweislich mit `asd_auto_detect: false`. Falls Gate 0
+zeigt, dass Variante A gewinnt: nur `targetFaceShare` von 0.42 zurück in den
+Golden-Korridor (0.25–0.40) und Mund garantiert vollständig im Frame.
+
 
 
 **Änderung 3 — Ehrlichkeit: gemessener `noop` ist kein Erfolg.**
