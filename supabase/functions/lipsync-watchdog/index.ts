@@ -56,6 +56,12 @@ import {
 } from "../_shared/v459-fanout-aggregation.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { logMissingReinjectPointer, recordDiagnosticObservation } from "../_shared/v431-ledger.ts";
+// V541 — Wahrheits-Gate (gleicher Vertrag wie im Webhook, reine Kennzeichnung).
+import {
+  buildV541ReviewDetails,
+  classifyPassTruth,
+  V541_NEEDS_REVIEW_VERDICT,
+} from "../_shared/v541-truth-gate.ts";
 import { classifyMuxDispatch } from "../_shared/v501-mux-dispatch-guard.ts";
 
 const corsHeaders = {
