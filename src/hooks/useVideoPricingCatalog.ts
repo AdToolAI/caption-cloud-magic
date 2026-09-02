@@ -69,6 +69,9 @@ export function useVideoPricingCatalog() {
   return {
     isLoading: query.isLoading,
     isError: query.isError,
+    /** True once canonical prices are available — only then may a binding
+     *  price be shown / a paid generation be started. */
+    isReady: !query.isLoading && (query.data?.models?.length ?? 0) > 0,
     version: query.data?.version,
     discountPercent: query.data?.discountPercent ?? 0,
     getPricePerSecond,
