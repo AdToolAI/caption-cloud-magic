@@ -14,6 +14,7 @@ const corsHeaders = {
 // Seedance 2.0 pricing is now sourced from the canonical catalog so the UI
 // preview and the deducted amount can never diverge again.
 import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
+import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 
 // Replicate model slug per tier
 // Verified against https://replicate.com/bytedance (2026-07-21).
@@ -102,9 +103,10 @@ serve(async (req) => {
 
     // Calculate cost from the canonical shared catalog (single source of truth
     // shared with the frontend via /functions/v1/pricing-catalog).
-    const costPerSecond = resolveCostPerSecond(model, currency)
-      ?? resolveCostPerSecond('seedance-standard', currency)
-      ?? 0.09;
+    const costPerSecond = await resolveAccountCostPerSecond(
+      supabaseAdmin, user.id, model, currency,
+      resolveCostPerSecond('seedance-standard', currency) ?? 0.09,
+    );
     const totalCost = duration * costPerSecond;
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 

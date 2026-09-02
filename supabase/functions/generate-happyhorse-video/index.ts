@@ -7,6 +7,7 @@ import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { sanitizeForHappyHorse, isGreenNetRejection } from "../_shared/happyhorse-green-net.ts";
+import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -208,7 +209,11 @@ serve(async (req) => {
       );
     }
 
-    const totalCost = +(costPerSecond * duration).toFixed(2);
+    // Canonical catalog price (identical to the UI preview, incl. account discount).
+    const effectiveCps = await resolveAccountCostPerSecond(
+      supabaseAdmin, user.id, model, 'EUR', costPerSecond,
+    );
+    const totalCost = +(effectiveCps * duration).toFixed(2);
 
     // Wallet check
     const { data: wallet, error: walletError } = await supabaseAdmin
