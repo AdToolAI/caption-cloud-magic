@@ -1074,7 +1074,20 @@ export function usePipelineProgress({
   const runSoftPercent = isActive && pipelineStartRef.current && !waitingForExport && !isStalled
     ? Math.min(95, Math.max(1, (elapsedSeconds / RUN_NOMINAL_SECONDS) * 95))
     : 0;
-  const hasFailure = phases.some((p) => p.status === 'failed') || isStalled;
+  // V539 — RUN-SCOPED FAILURE.
+  // `phases` is derived over ALL scenes of the project, so a scene that failed
+  // in an EARLIER run kept a phase at `failed` forever. A freshly started
+  // re-render was therefore painted red from its first frame ("Fehler" instead
+  // of the percentage, "Lip-Sync abgebrochen" instead of the timer), although
+  // the new run was progressing normally.
+  //
+  // Rule: while any phase of the CURRENT run is still running, the run state
+  // wins — percentage + elapsed/ETA stay visible. The failure state only
+  // surfaces once the run itself is terminal (nothing running any more) or the
+  // stall watchdog fires.
+  const anyPhaseFailed = phases.some((p) => p.status === 'failed');
+  const hasFailure = (anyPhaseFailed && !isActive) || isStalled;
+
   const allDone = phases.length > 0 && phases.every((p) => p.status === 'done');
   const completedCleanly = !isActive && !hasFailure && phases.some((p) => p.status === 'done');
   // When lipsync is terminal and we're waiting for the user to trigger the

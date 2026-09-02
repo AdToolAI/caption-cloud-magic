@@ -7266,6 +7266,35 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             `track_threw:${err instanceof Error ? err.message : String(err)}`;
         }
       }
+      // ── V540-OBS — WARUM DER FACE-TRACK LEER BLEIBT ─────────────────────
+      // Beobachtung Produktion (Szene ecb95d2b…): alle Passes tracken 0
+      // Samples → kein Mund-Landmark → `pose_estimate` → V471-Anker
+      // `face_ratio` → V500 kann ein NOOP nie terminalisieren, die Szene
+      // gilt als fertig obwohl kein Mund bewegt wurde. Der Grund pro Sample
+      // ist heute nur im Log, das für diesen Lauf nicht mehr existiert.
+      // Rein additive Telemetrie: kein Branch liest dieses Feld.
+      try {
+        (pass as any)._v540_track_debug = {
+          version: "v540-obs",
+          ok: v477PreTrack?.ok ?? null,
+          reason: v477TrackThrewReason ?? v477PreTrack?.reason ?? null,
+          latency_ms: v477PreTrack?.latencyMs ?? null,
+          sample_count: Array.isArray(v477PreTrack?.samples) ? v477PreTrack!.samples.length : 0,
+          valid_samples: Array.isArray(v477PreTrack?.samples)
+            ? (v477PreTrack!.samples as any[]).filter((s) => s?.box).length
+            : 0,
+          sample_reasons: Array.isArray((v477PreTrack as any)?.debug)
+            ? ((v477PreTrack as any).debug as any[]).slice(0, 12).map((d) => ({
+              t: d?.t ?? null,
+              accepted: d?.accepted ?? null,
+              reason: typeof d?.reason === "string" ? d.reason.slice(0, 180) : null,
+              faces: d?.faces ?? null,
+            }))
+            : null,
+        };
+      } catch (_v540Err) {
+        // Telemetrie darf die Pipeline nie beeinflussen.
+      }
       // ── V513-T0 — SHADOW MOTION TELEMETRY ───────────────────────────────
       // Derived purely from the EXISTING v477 track. No extra provider calls,
       // no thresholds, no gates, no consumers. Attached additively to the pass
