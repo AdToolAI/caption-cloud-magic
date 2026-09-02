@@ -5,6 +5,7 @@ import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { withTimeout, isTimeoutError } from "../_shared/timeout.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
+import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -84,8 +85,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const currency = walletPreview?.currency || 'EUR';
 
     // Calculate cost based on model and currency
-    const modelPricing = MODEL_PRICING[model] || MODEL_PRICING['sora-2-standard'];
-    const costPerSecond = modelPricing[currency] || modelPricing['EUR'];
+    // Canonical price from the shared catalog (same source as the UI preview,
+    // including the account discount). MODEL_PRICING is only a legacy fallback.
+    const costPerSecond = await resolveAccountCostPerSecond(
+      supabaseAdmin, user.id, model, currency as "EUR" | "USD", 0.22,
+    );
     const totalCost = duration * costPerSecond;
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 

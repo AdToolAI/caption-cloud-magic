@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
+import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 
 const corsHeaders = {
@@ -95,8 +96,11 @@ serve(async (req) => {
       .single();
     const currency = walletPreview?.currency || 'EUR';
 
-    const modelPricing = MODEL_PRICING[model] || MODEL_PRICING['ltx-standard'];
-    const costPerSecond = modelPricing[currency] || modelPricing['EUR'];
+    // Canonical price from the shared catalog (same source as the UI preview,
+    // including the account discount). MODEL_PRICING is only a legacy fallback.
+    const costPerSecond = await resolveAccountCostPerSecond(
+      supabaseAdmin, user.id, model, currency as "EUR" | "USD", 0.135,
+    );
     const totalCost = duration * costPerSecond;
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 
