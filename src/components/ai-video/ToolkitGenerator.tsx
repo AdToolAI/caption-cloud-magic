@@ -79,14 +79,30 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
   const currency: Currency = getCurrencyForLanguage(language);
 
+  /* ── Setup-Entwurf: Tab-Wechsel darf keine Eingaben kosten ──
+   * Neben dem Prompt wird auch das komplette Grund-Setup lokal gesichert und
+   * beim Zurückkehren wiederhergestellt. Ungültige Werte werden weiter unten
+   * vom Modell-Guard korrigiert. */
+  const SETUP_DRAFT_KEY = 'ai-video-toolkit:setup-draft';
+  const setupDraft = useMemo<Record<string, any>>(() => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(SETUP_DRAFT_KEY) : null;
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   /* ── Model selection (URL param ?model=… → state) ── */
   const initialModel = useMemo(() => {
     const fromUrl = searchParams.get('model');
-    return getToolkitModelById(fromUrl) ?? getDefaultToolkitModel();
+    return getToolkitModelById(fromUrl) ?? getToolkitModelById(setupDraft.modelId) ?? getDefaultToolkitModel();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [modelId, setModelId] = useState<string>(initialModel.id);
   const model: ToolkitModel = getToolkitModelById(modelId) ?? getDefaultToolkitModel();
+
 
   /* ── Form state ── */
   const PROMPT_DRAFT_KEY = 'ai-video-toolkit:prompt-draft';
