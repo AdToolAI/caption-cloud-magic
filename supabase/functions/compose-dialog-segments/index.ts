@@ -7376,11 +7376,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
       try {
 
-        const preclipResult = await renderPassFacePreclip(
-          supabase,
-          serviceKey,
-          supabaseUrl,
-          {
+        const v542PreclipInput = {
+
             sceneId,
             projectId: String((scene as any).project_id ?? ""),
             // V447 — Run-Identität: bindet den Preclip an Lauf + Generation.
