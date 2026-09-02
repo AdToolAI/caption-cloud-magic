@@ -359,3 +359,52 @@ export async function verifyFaceBeforeDispatch(
   return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta };
 
 }
+
+/** Minimal shape of a detected face used by the V538 C dominance test. */
+export interface FaceLike {
+  center: [number, number];
+  bbox?: [number, number, number, number];
+}
+
+/**
+ * V538 C — PURE. Is some OTHER face bigger than the one the coord points at?
+ *
+ * That is the only multi-face condition Sync.so actually mishandles: it
+ * lip-syncs the dominant face. A smaller extra in the background is harmless
+ * once the v400 gate has confirmed the target.
+ *
+ * With no coord, or with no usable boxes, `dominated` is false — the caller
+ * has already passed the v400 gate, so ambiguity must not re-introduce a veto.
+ */
+export function dominantOverTarget(
+  faces: FaceLike[],
+  coord: [number, number] | null | undefined,
+): { dominated: boolean; targetArea: number; maxOtherArea: number } {
+  const area = (f: FaceLike): number => {
+    const b = f?.bbox;
+    if (!Array.isArray(b) || b.length !== 4) return 0;
+    return Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]);
+  };
+  if (!Array.isArray(faces) || faces.length === 0 || !coord) {
+    return { dominated: false, targetArea: 0, maxOtherArea: 0 };
+  }
+  let targetIdx = 0;
+  let best = Infinity;
+  for (let i = 0; i < faces.length; i++) {
+    const c = faces[i]?.center;
+    if (!Array.isArray(c) || c.length !== 2) continue;
+    const d = Math.hypot(c[0] - coord[0], c[1] - coord[1]);
+    if (d < best) {
+      best = d;
+      targetIdx = i;
+    }
+  }
+  const targetArea = area(faces[targetIdx]);
+  let maxOtherArea = 0;
+  for (let i = 0; i < faces.length; i++) {
+    if (i === targetIdx) continue;
+    maxOtherArea = Math.max(maxOtherArea, area(faces[i]));
+  }
+  if (targetArea <= 0) return { dominated: false, targetArea, maxOtherArea };
+  return { dominated: maxOtherArea > targetArea, targetArea, maxOtherArea };
+}
