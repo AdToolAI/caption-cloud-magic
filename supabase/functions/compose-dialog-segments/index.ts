@@ -7209,6 +7209,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
     const v161PreclipEligible =
       !usePassPreclip &&
+      // V543 — im Full-Shot-Pfad gibt es bewusst keinen Selbst-Crop.
+      !(pass as any)._v153BboxPrimary &&
       !!tightAudioInfo &&
       !!plateDims &&
       !!sourceClipUrl &&
@@ -7217,6 +7219,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       Number.isFinite(Number(pass.coords?.[1])) &&
       Array.isArray(speakerWindowsSecs) && speakerWindowsSecs.length > 0 &&
       body?.noop_auto_escalation !== true;
+
 
     if (v161PreclipEligible) {
       const unionStart = Math.max(0, Math.min(...speakerWindowsSecs.map(([s]) => s)));
