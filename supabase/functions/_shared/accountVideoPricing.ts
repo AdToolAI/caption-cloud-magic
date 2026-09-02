@@ -42,5 +42,6 @@ export async function resolveAccountCostPerSecond(
 ): Promise<number> {
   const base = resolveCostPerSecond(modelId, currency) ?? fallbackPerSecond;
   const factor = await resolveAccountDiscountFactor(supabaseAdmin, userId);
-  return +(base * factor).toFixed(4);
+  // Same rounding as `pricing-catalog`, so the deduction equals the preview.
+  return Math.round(base * factor * 100) / 100;
 }
