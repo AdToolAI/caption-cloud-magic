@@ -378,6 +378,113 @@ async function getPlateDurationSecCached(url: string): Promise<number | null> {
   __plateMetaCache.set(url, { durationSec });
   return durationSec;
 }
+
+// ── V543-2 — GEMESSENE VIDEO-ZEITBASIS (statt ASSUMED_FPS = 24) ──────────
+// Der Full-Shot-Pfad schickt das GANZE Plate-Video. Sync.so verlangt, dass
+// das `bounding_boxes`-Array exakt so viele Einträge hat wie das Video
+// Frames. Bisher wurde die Framezahl aus `ceil(Dauer × 24)` geschätzt —
+// weicht die echte Plate-FPS ab, ist die Länge falsch und der Provider
+// antwortet `generation_input_face_selection_invalid`.
+//
+// Diese Probe liest die WAHRE Framezahl aus der Video-Spur:
+//   moov → trak(hdlr=vide) → mdia/mdhd (timescale, duration)
+//                          → mdia/minf/stbl/stts (Summe sample_count)
+// Kein Treffer ⇒ `null` ⇒ Full-Shot ist für diesen Pass nicht zulässig.
+export interface PlateVideoMeta {
+  durationSec: number;
+  fps: number;
+  frameCount: number;
+}
+const __plateVideoMetaCache = new Map<string, PlateVideoMeta | null>();
+
+function probeVideoMetaFromMp4(buf: Uint8Array): PlateVideoMeta | null {
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const children = (start: number, end: number): Array<{ type: string; start: number; end: number }> => {
+    const out: Array<{ type: string; start: number; end: number }> = [];
+    let p = start;
+    while (p + 8 <= end) {
+      const size = dv.getUint32(p);
+      const type = String.fromCharCode(buf[p + 4], buf[p + 5], buf[p + 6], buf[p + 7]);
+      const boxEnd = size === 0 ? end : p + size;
+      if (size < 8 || boxEnd > end) break;
+      out.push({ type, start: p + 8, end: boxEnd });
+      p = boxEnd;
+    }
+    return out;
+  };
+  const child = (start: number, end: number, name: string) =>
+    children(start, end).find((b) => b.type === name) ?? null;
+
+  const moov = child(0, buf.length, "moov");
+  if (!moov) return null;
+  for (const trak of children(moov.start, moov.end).filter((b) => b.type === "trak")) {
+    const mdia = child(trak.start, trak.end, "mdia");
+    if (!mdia) continue;
+    const hdlr = child(mdia.start, mdia.end, "hdlr");
+    if (!hdlr) continue;
+    const handler = String.fromCharCode(
+      buf[hdlr.start + 8],
+      buf[hdlr.start + 9],
+      buf[hdlr.start + 10],
+      buf[hdlr.start + 11],
+    );
+    if (handler !== "vide") continue;
+
+    const mdhd = child(mdia.start, mdia.end, "mdhd");
+    if (!mdhd) continue;
+    const version = buf[mdhd.start];
+    let timescale: number;
+    let duration: number;
+    if (version === 1) {
+      timescale = dv.getUint32(mdhd.start + 4 + 8 + 8);
+      const high = dv.getUint32(mdhd.start + 4 + 8 + 8 + 4);
+      const low = dv.getUint32(mdhd.start + 4 + 8 + 8 + 8);
+      duration = high * 2 ** 32 + low;
+    } else {
+      timescale = dv.getUint32(mdhd.start + 4 + 4 + 4);
+      duration = dv.getUint32(mdhd.start + 4 + 4 + 4 + 4);
+    }
+    if (!timescale || !duration) continue;
+    const durationSec = duration / timescale;
+
+    const minf = child(mdia.start, mdia.end, "minf");
+    const stbl = minf ? child(minf.start, minf.end, "stbl") : null;
+    const stts = stbl ? child(stbl.start, stbl.end, "stts") : null;
+    if (!stts) continue;
+    const entryCount = dv.getUint32(stts.start + 4);
+    let frameCount = 0;
+    for (let i = 0; i < entryCount; i++) {
+      const off = stts.start + 8 + i * 8;
+      if (off + 8 > stts.end) return null;
+      frameCount += dv.getUint32(off);
+    }
+    if (!(frameCount > 0) || !(durationSec > 0)) continue;
+    const fps = frameCount / durationSec;
+    if (!Number.isFinite(fps) || fps <= 0 || fps > 240) continue;
+    return {
+      durationSec: Number(durationSec.toFixed(4)),
+      fps: Number(fps.toFixed(4)),
+      frameCount,
+    };
+  }
+  return null;
+}
+
+async function getPlateVideoMetaCached(url: string): Promise<PlateVideoMeta | null> {
+  if (__plateVideoMetaCache.has(url)) return __plateVideoMetaCache.get(url)!;
+  let meta: PlateVideoMeta | null = null;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    if (res.ok) {
+      meta = probeVideoMetaFromMp4(new Uint8Array(await res.arrayBuffer()));
+    }
+  } catch {
+    meta = null;
+  }
+  __plateVideoMetaCache.set(url, meta);
+  return meta;
+}
+
 // v139.2 — Module-load boot marker. Proves which build is actually running
 // inside Edge Runtime (vs a stale cached copy). Look for this exact string
 // in logs immediately after any deploy to confirm the new code is live.
