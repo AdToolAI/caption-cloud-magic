@@ -320,6 +320,27 @@ export async function verifyFaceBeforeDispatch(
       };
     }
 
+    // V538 C — exactly one face on the plate and the v400 gate passed. There
+    // is nothing to disambiguate; the only real defect is a stale coord, and
+    // that is repaired by snapping, not by killing the pass.
+    if (input.v461Passed) {
+      const snapped: [number, number] = [Math.round(faceCx), Math.round(faceCy)];
+      console.warn(
+        `[face-gate] ${GATE_VERSION} not_at_coord face=[${snapped[0]},${snapped[1]}] ` +
+        `outside safe-zone on plate ${W}x${H} — v461_passed → snap instead of hard fail.`,
+      );
+      return {
+        ok: true,
+        code: "ok_after_snap",
+        reason: `v538c_not_at_coord_downgraded: single face snapped from [${coord[0]},${coord[1]}] ` +
+          `to [${snapped[0]},${snapped[1]}] (${Math.round(dist)}px).`,
+        raw_reply: rawReply,
+        snapped_coord: snapped,
+        original_coord: [coord[0], coord[1]],
+        snap_distance_px: Math.round(dist),
+        ...baseMeta,
+      };
+    }
     console.warn(
       `[face-gate] ${GATE_VERSION} not_at_coord face=[${Math.round(faceCx)},${Math.round(faceCy)}] ` +
       `outside safe-zone on plate ${W}x${H} — hard fail.`,
