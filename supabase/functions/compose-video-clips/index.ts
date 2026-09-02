@@ -5188,7 +5188,7 @@ serve(async (req) => {
           // 8s/9s scenes up to 10s and triggered Pro+10s API rejections.
           const duration = hailuoBucketFor(scene.durationSeconds, "exact");
           // Hailuo API constraint: 1080p is only accepted for 6s. 10s requires 768p.
-          const resolution =
+          const tierResolution =
             duration === 10 ? "768p" : quality === "pro" ? "1080p" : "768p";
           if (quality === "pro" && duration === 10) {
             console.warn(
@@ -5199,6 +5199,24 @@ serve(async (req) => {
           const isCinematicSyncScene =
             (scene.engineOverride ?? "auto") === "cinematic-sync" ||
             (scene.engineOverride ?? "auto") === "sync-segments";
+          // V538 A — v400 T4: a multi-speaker lip-sync plate is rendered at the
+          // contract raster, independent of the billing tier. Hailuo rejects
+          // 1080p at 10 s, so that case is reported, never forced.
+          const v538 = v538PlateResolution({
+            isLipSyncPlate: isCinematicSyncScene,
+            speakerCount: v538SpeakerCount(scene.characterShots as any, scene.characterShot as any),
+            tierResolution,
+            hiResToken: "1080p",
+            hiResAllowed: duration !== 10,
+          });
+          const resolution = v538.resolution;
+          if (v538.upgraded || v538.blockedByProvider) {
+            console.log(
+              `[compose-video-clips] ${V538_LOG} scene=${scene.id} provider=ai-hailuo ` +
+                `tier=${tierResolution} final=${resolution} upgraded=${v538.upgraded} ` +
+                `blocked=${v538.blockedByProvider} reason=${v538.reason}`,
+            );
+          }
 
           await supabaseAdmin
             .from("composer_scenes")
