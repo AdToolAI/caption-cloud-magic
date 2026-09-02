@@ -1585,6 +1585,34 @@ serve(async (req) => {
           },
         });
 
+        // V541 — Wahrheits-Gate: bleibt der Recheck unbewiesen, wird das
+        // append-only als `v541_needs_review` festgehalten. Kein Apply, kein
+        // Provider-Call, kein Retry, keine Verhaltensänderung.
+        {
+          const v541Truth = classifyPassTruth({
+            motionUnverifiedPassthrough: verdict !== "motion" && verdict !== "noop",
+            reason: String(reason ?? verdict),
+          });
+          if (v541Truth.needsReview) {
+            await recordDiagnosticObservation(supabase, {
+              handler: "lipsync-watchdog",
+              verdict: V541_NEEDS_REVIEW_VERDICT,
+              stage: "sync_segment",
+              pipelineJobId: (meta.pipeline_job_id ?? null) as string | null,
+              sceneId: cand.scene_id,
+              runId: null,
+              plateGeneration: null,
+              externalJobId: cand.job_id ? String(cand.job_id) : null,
+              details: buildV541ReviewDetails({
+                passIdx: Number.isFinite(Number(cand.turn_idx)) ? Number(cand.turn_idx) : null,
+                totalPasses: null,
+                reason: v541Truth.reason,
+                source: "watchdog",
+              }),
+            });
+          }
+        }
+
 
         if (verdict === "noop" && meta.pipeline_job_id) {
           // Proven Noop — existing terminalization path, unchanged semantics.
