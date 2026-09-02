@@ -1,46 +1,59 @@
-# V541 — Clip-1/4-Abbruch und Run-spezifischer Fortschritt
+# Tester-Feedback (Victoria) — Fehlerbehebung
 
-## Bestätigter Produktionsbefund
+Ziel: die konkret gemeldeten Fehler beheben, in der Reihenfolge ihrer Auswirkung auf die Nutzung. Keine Änderungen an der Lip-Sync-Kette.
 
-- Betroffener Lauf: `77aa1f2e-e9ec-4830-ad42-19771e11c1a9`, Szene `7aa7fc93-bfd5-49a1-809e-40f29459b963`, Plate-Generation 5.
-- Pass 1 wurde erfolgreich erstellt und mit HTTP 201 an den Lip-Sync-Anbieter übergeben.
-- Pass 2 und 3 wurden vor jedem Anbieter-Aufruf durch `v536_mouth_crop_infeasible` beendet; deshalb stoppte der Gesamtlauf nach „Clip 1/4“.
-- Der V536-Log enthält `face=n/a`, `band=n/a`, `interval=[NaN,NaN]`. Diese Form entsteht ausschließlich im nachgelagerten Render-Cadence-Recheck, nicht bei einer bewiesenen leeren Face/Mouth/Plate-Schnittmenge.
-- Die Nachprüfung verwirft aktuell nur mit einem generischen Mouth-Infeasible-Verdikt; sie verliert dabei `failedKind` (`face` oder `mouth`) und die gemessene Margin. Damit ist aus dem Produktionsartefakt keine echte geometrische Unmöglichkeit bewiesen.
-- V540 zeigt zusätzlich für Pass 1 sechs erfolgreiche Frame-Extraktionen mit je zwei Gesichtern, aber `no_identity_safe_match` in allen sechs Samples. Dieser Track-Ausfall degradierte dort korrekt auf den statischen Pfad und war nicht der Abbruchgrund.
+## 1. Datenverlust beim Tab-Wechsel (höchste Priorität)
 
-## Umsetzung
+Gemeldet: Beim Wechsel in einen anderen Browser-Tab und zurück sind alle Eingaben im Video-Setup weg.
 
-1. **V536-Recheck reparieren, ohne Sicherheitsgate zu lockern**
-   - Den Render-Cadence-Recheck so korrigieren, dass eine durch Rundung/Even-Snap/Keyframe-Reduktion verletzte Bahn deterministisch auf die bereits berechnete zulässige Geometrie zurückgeführt wird.
-   - Face-, Mouth- und Plate-Containment bleiben unverändert; kein Epsilon, kein Schwellenwert-Absenken und kein Full-Plate-Fallback.
-   - Nur wenn auch die korrigierte Bahn keine zulässige Geometrie besitzt, bleibt der bestehende fail-closed Abbruch aktiv.
+- Der Composer speichert den Entwurf heute nur über einen Effekt beim Ändern des Projekt-Objekts; es gibt keinen Speicherpunkt beim Verlassen bzw. Wiedereintritt des Tabs.
+- Ergänzt wird ein Sicherungspunkt auf `visibilitychange`/`pagehide` sowie eine Wiederherstellung beim Zurückkehren, damit ein zwischenzeitliches Neu-Mounten den Entwurf nicht mit einem leeren Zustand überschreibt.
+- Zusätzlich eine sichtbare Bestätigung („Entwurf gespeichert“), damit Nutzer dem Zustand vertrauen.
 
-2. **Verdikt beweiskräftig machen**
-   - Bei verbleibender Unmöglichkeit `failedKind`, Margin, tatsächliche Face-/Mouth-Werte und Intervalle erhalten statt pauschal `axis=x` plus `NaN` zu schreiben.
-   - Keine URLs, Bilder oder personenbezogenen Daten in die Telemetrie aufnehmen.
+## 2. Guthaben dauerhaft sichtbar
 
-3. **Fortschrittsanzeige vollständig auf den aktuellen Run begrenzen**
-   - Den begonnenen V539-Fix auf Run/Epoche und `clipScope` stützen, damit alte Szenenfehler einen aktiven Re-Render nicht rot färben und Prozent sowie Zeit sichtbar bleiben.
-   - Rot/„Lip-Sync abgebrochen“/„Sauber neu starten“ erst anzeigen, wenn der aktuelle Lauf selbst terminal fehlschlägt.
+Gemeldet: Das Token-/Credit-Guthaben sollte immer sichtbar sein.
 
-4. **V540-Diagnostik beibehalten**
-   - Die additive Track-Diagnostik bleibt fail-open und wird durch einen Redaktions-/Nichtbeeinflussungstest abgesichert.
-   - Die separate Ursache `no_identity_safe_match` wird nicht in diesem Gate durch Lockerung der Identitätslogik behoben.
+- In der Kopfzeile steht aktuell nur die Streak-Flamme; ein Credit-Stand existiert dort nicht.
+- Neu: ein kompakter Guthaben-Chip in der Kopfzeile neben dem Profil-Icon, auf allen Seiten sichtbar, klickbar zur Guthaben-/Kaufansicht, mit Ladezustand und Aktualisierung nach Verbrauch.
 
-## Technische Dateien
+## 3. Buttons reagieren erst beim zweiten Klick / erste zwei Sidebar-Icons unscharf ohne Text
 
-- `supabase/functions/_shared/dynamic-camera-path.ts`
-- `supabase/functions/_shared/mouth-crop-feasibility.ts`
-- `supabase/functions/_shared/v536-mouth-crop-containment.test.ts`
-- `src/hooks/usePipelineProgress.ts`
-- passende fokussierte Progress-Tests
-- `supabase/functions/compose-dialog-segments/index.ts` nur für die bereits additive V540-Telemetrie und deren Test, keine Dispatch-Änderung
+- Die Sidebar-Hub-Buttons und die Kopfzeile werden reproduziert und geprüft (Tooltip-Provider pro Element, Animations- und Fokus-Verhalten, Überlagerungen durch Blur-Ebenen).
+- Ursache wird vor dem Fix im Browser bestätigt; erst danach wird korrigiert (z. B. gemeinsamer Tooltip-Provider, stabile Trefferfläche, keine überlagernde Blur-Schicht über den ersten Einträgen).
+- Kein Umbau des Navigationskonzepts.
+
+## 4. Fehler beim Speichern des Profils
+
+- Der Speicherpfad im Konto-/Profilbereich wird end-to-end geprüft (Feldvalidierung, Berechtigungen, Rückgabefehler).
+- Korrigiert wird die konkrete Ursache; zusätzlich bekommt das Formular verständliche Feldfehler statt einer generischen Fehlermeldung.
+
+## 5. Videoerzeugung schlägt beim ersten Versuch fehl
+
+Beleg aus den Screenshots: `veo-3.1-fast`, Fehler `{'code': 8, 'message': 'The service is currently experiencing high load...'}` — eine Überlastmeldung des Anbieters, kein Eingabefehler.
+
+- Für diese Überlastklasse wird ein begrenzter automatischer Wiederholungsversuch mit Wartezeit eingeführt, bevor der Auftrag als fehlgeschlagen gilt.
+- Bleibt es dabei, erscheint eine klare Meldung („Anbieter überlastet, bitte erneut versuchen“) statt der rohen technischen Fehlermeldung, plus ein Button „Erneut versuchen“, der die Eingaben behält — heute muss der Nutzer die Felder neu ausfüllen.
+- Die Rückerstattung für genau diesen Fehlerfall wird geprüft und, falls sie nicht garantiert greift, abgesichert.
+
+## 6. Falsche Kostenvorschau
+
+- Die Anzeige der geschätzten Kosten wird gegen die tatsächliche Abrechnung pro Modell und Dauer abgeglichen; abweichende Stellen werden korrigiert, sodass Vorschau und Abbuchung übereinstimmen.
+
+## 7. Absturz „Failed to execute 'removeChild' on 'Node'“
+
+- Die Ursache wird zuerst reproduziert (typisch: eine Ebene, die außerhalb von React DOM-Knoten entfernt — Dialoge, Portale, Download-Links, Browser-Übersetzung).
+- Zusätzlich wird die betroffene Ansicht mit einer Fehlergrenze abgesichert, damit ein solcher Fehler nicht die ganze Seite unbenutzbar macht.
+
+## Nicht in diesem Durchgang
+
+Die Wünsche zu „weniger Felder / mehr Minimalismus“ im Erstellungsschritt sind Design-Arbeit und werden getrennt geplant, nachdem die Fehler behoben sind.
 
 ## Verifikation
 
-- Regressionsfixture für den beobachteten Post-Recheck-Fall: zulässige dichte Bahn bleibt nach Materialisierung zulässig und wird nicht als `dynamic_mouth_crop_infeasible` fehlklassifiziert.
-- Echte unmögliche Face/Mouth/Plate-Geometrie bleibt fail-closed und erzeugt keinen Anbieter-Aufruf.
-- Bestehende V536-, V461-, V464- und Frozen-Contract-Suiten bleiben grün.
-- Progress-Tests: alter Szenenfehler + aktiver neuer Run zeigt Prozent/ETA; Fehler des aktuellen Runs zeigt den roten Terminalzustand.
-- Danach genau die betroffenen Backend-Funktionen deployen; kein Frontend-Publish und kein bezahlter Testlauf durch den Agenten. Ein späterer realer 2-Personen-Lauf muss vier Dispatches oder einen beweiskräftigen echten Geometrieabbruch zeigen.
+- Tab-Wechsel-Test: Eingaben ausfüllen, Tab wechseln, zurückkehren — Daten unverändert.
+- Guthaben-Chip auf mehreren Seiten sichtbar und korrekt.
+- Klick-Test auf Sidebar und Kopfzeile ohne Vorfokus; erste Klicks lösen aus.
+- Profil speichern erfolgreich; Fehlerfälle zeigen Feldmeldungen.
+- Erzwungener Anbieter-Überlastfehler: Wiederholung greift, Meldung verständlich, Eingaben bleiben erhalten, Guthaben stimmt danach.
+- Kostenvorschau gegen tatsächliche Abbuchung für mindestens zwei Modelle geprüft.
