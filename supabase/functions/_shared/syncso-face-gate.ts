@@ -102,6 +102,19 @@ export interface FaceGateInput {
    *  self-healing. */
   plateWidth?: number;
   plateHeight?: number;
+  /**
+   * V538 C — the v400 face gate (`v461-face-gate.ts`) already PASSED for this
+   * dispatch.
+   *
+   * v400 had exactly one face gate. This module was added on top of it and
+   * fails closed on its own evidence, so a scene that satisfies the real v400
+   * input contract can still be killed here — `not_at_coord` on a face that is
+   * plainly visible, or `multiple_faces` on a background extra. When the v400
+   * gate has spoken, this one is demoted to telemetry, with one exception that
+   * is kept because it genuinely breaks Sync.so: another face LARGER than the
+   * target, which the provider will lip-sync instead of the target.
+   */
+  v461Passed?: boolean;
 }
 
 export async function verifyFaceBeforeDispatch(
