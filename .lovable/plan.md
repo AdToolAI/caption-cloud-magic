@@ -1,117 +1,175 @@
-# Tiefenanalyse: v400-Rückbau vs. Verallgemeinerung — und wann "gut genug" gilt
+# Read-only Tiefenanalyse: Lip-Sync v400 vs. heutige Pipeline
 
-## Kurzantwort
+## Korrektur
 
-Ein Rückbau auf v400 ist **nicht möglich**, weil v400 als lauffähiger Stand nicht mehr
-existiert — zentrale Bausteine des Dokuments sind seit dem Rollback vom 27.07.2026
-gelöscht oder ersetzt. Und er wäre auch kein Fortschritt: die Pipeline ist heute
-messbar **nicht** kaputt, sondern selektiv fragil. Der richtige Schritt ist keine
-Rückkehr und keine weitere Verallgemeinerung, sondern **Reduktion der Gate-Anzahl vor
-dem Provider-Call**.
+Die zuvor genannten **81 % waren falsch** und werden vollständig verworfen.
 
-## Was die Daten sagen (gemessen, nicht geschätzt)
+Der Fehler hatte zwei Ebenen:
 
-Letzte 30 Tage, Szenen mit Dialog-Turns, `lip_sync_status`:
+1. `composer_scenes.updated_at` misst die letzte Änderung einer Szenenzeile, nicht den
+   Start eines neuen Lip-Sync-Laufs. Dadurch wurden historische Zustände in ein
+   aktuelles Zeitfenster gezogen.
+2. Noch wichtiger: `pipeline_state = complete`, erfolgreiche Jobs oder Pässe beweisen
+   nur einen technischen Abschluss — **nicht**, dass im fertigen Video sichtbarer,
+   korrekter Lip-Sync vorhanden ist.
 
-| Sprecher | done | failed | canceled |
-| --- | --- | --- | --- |
-| 1 | 48 | 13 | 3 |
-| 2 | 3 | 3 | 0 |
-| 3+ | 44 | 10 | 6 |
+Für die letzten zwei Wochen gilt deshalb als Ausgangslage:
 
-Also rund **81 % Erfolg bei 3+ Sprechern** — das ist besser als das Bauchgefühl.
-Bestätigte jüngste Vollerfolge: `be60d106` (6 Turns, alle 6 Pässe `done`),
-`ecb95d2b` (4 Turns, alle 4 Pässe `done`). Die schwächste Klasse ist ausgerechnet
-**2 Sprecher** (3:3) — genau die Klasse, die als einzige weder in den alten
-Einzelsprecher-Pfad noch in die neue 3+-Identitätskette fällt.
+> **0 visuell bestätigte funktionierende 3+-Sprecher-Szenen.**
 
-Die letzten beiden echten Fehler:
-- `7aa7fc93`: Pass 0 `done`, Pass 1 `failed`, Pässe 2–3 hängen in
-  `rendering_preflight` → `dynamic_mouth_crop_infeasible`
-- `67b392b1`: `face_repair_identity_unresolved_pass_5`
+Die technisch als `complete` markierten Runs sind keine Gegenbeweise, sondern mögliche
+**False-Positive-Completions**, bis ihre Endvideos geprüft wurden.
 
-Beides sind **Vorab-Abbrüche vor dem Provider**, keine schlechten Lip-Sync-Ergebnisse.
+## Ziel der Analyse
 
-## Warum "zurück auf v400" nicht geht
+Ohne Code-, Datenbank-, Deployment- oder Konfigurationsänderungen entscheiden:
 
-Die Vollspezifikation im PDF beschreibt einen Zustand, der teils nur noch Erzählung ist:
+1. Ist ein echter Rückbau auf den letzten nachweislich funktionierenden v400-Zustand
+   technisch möglich?
+2. Welche späteren Änderungen sind notwendige Sicherheitsverträge und welche erzeugen
+   die heutigen Ausfälle oder False-Positive-Completions?
+3. Soll die Pipeline auf einen kleinen stabilen Kern reduziert, der heutige Stand
+   repariert oder Lip-Sync für bestimmte Sprecherzahlen vorläufig begrenzt werden?
+4. Welche messbare Definition von „funktioniert“ beendet die viermonatige Iteration?
 
-| v400-Punkt | Realität heute |
-| --- | --- |
-| T12 Passthrough-Verdict, `unknown` blockiert | `mouth-motion-verdict.ts` ist seit 27.07.2026 gelöscht; es gibt kein Verdict-Gate mehr, nur Telemetrie |
-| Mund bei 62 % Höhe | Kein fester Faktor im Code; `computeMouthCenteredCrop` nutzt gesichtsproportionale Marge. Der Golden Run `c934a823` lag bei 0.571–0.612 |
-| Plate ≥ 1080p | Hailuo-10s bleibt 768p (`hiResAllowed: duration !== 10`) |
-| Face-Share 0.24 nur Mehrsprecher | v461 erzwingt 0.24 / 144 px **unabhängig** von der Sprecherzahl |
+## Gate A — Wahrheitsfähiges Run-Inventar der letzten 14 Tage
 
-Ein "Rückbau" wäre also ein Neubau nach einem Dokument, das den eigenen Referenzlauf
-durchgefallen ließe. Die vier v400-**Verträge** dagegen (Run-Identität,
-Anchor-Kohärenz, Assignment-Lock, Run-Guard) sind intakt und bleiben unangetastet.
+Jeden eindeutigen 3+-Sprecher-Run über `run_id` und `plate_generation` erfassen — nicht
+über den aktuellen Szenenstatus. Pro Run festhalten:
 
-## Die eigentliche Ursache: Gate-Inflation
+- Szene, Run-ID, Generation, Start/Ende und Anzahl erwarteter Pässe
+- tatsächlich erzeugte Preclips, Provider-Dispatches, Callbacks und Mux-Ergebnis
+- erster terminaler Fehler oder letzter belegter Zustand
+- Endvideo vorhanden ja/nein
+- sichtbarer Lip-Sync pro Sprecher: korrekt / kein Lip-Sync / falsches Gesicht /
+  nicht prüfbar
+- technischer Status versus tatsächliches Ergebnis
 
-Zwischen Preclip und Provider-Call liegen heute je nach Sprecherzahl geschätzt
-**3–5 (1 Sprecher), 6–8 (2), 10–13 (3+)** eigenständige fail-closed Ausstiege.
-Neu gegenüber v400 sind mindestens sechs:
+Die derzeit sichtbaren technischen Completes werden ausdrücklich als
+False-Positive-Kandidaten geprüft. Ein `complete` zählt erst als Erfolg, wenn das
+Endvideo pro Sprecher sichtbare Mundbewegung auf der richtigen Person zeigt.
 
-| Gate | Sprecherabhängig? |
-| --- | --- |
-| v461 Face-Gate (0.24 / 144 px / Mund-ROI) | nein |
-| v536 `dynamic_mouth_crop_infeasible` | nein |
-| v464 ASD-Projektionsvertrag | nein |
-| v506 Anker-Identitäts-Gate | nur `compose-video-clips` |
-| v523/524/526/530 Identitätskette | ja, `speakers.length >= 3` |
-| v538-Downgrade (lockert v523) | ja, `>= 3` |
+**Ergebnis:** vollständige Run-Matrix; keine Erfolgsquote ohne verifizierbaren
+Endvideo-Beleg.
 
-Jedes Gate ist einzeln begründet. Zusammen multiplizieren sich ihre Falsch-Positiv-Raten:
-bei 6 Pässen genügt **ein** Gate mit 3 % Falsch-Positiv-Rate für ~17 % Szenenausfall.
-Genau das ist das Muster der letzten Wochen — Szenen sterben an *einem* Pass, nicht am
-Provider.
+## Gate B — Schichtweiser Vergleich mit v400
 
-## Vorschlag: V541 — Gate-Konsolidierung statt neuer Features
+Die Pipeline nicht nach Versionsnamen, sondern nach den realen 16 Stufen des
+hochgeladenen v400-Dokuments vergleichen:
 
-Kein Unfreeze der Kette. Drei begrenzte Schritte, jeder einzeln abnehmbar:
+```text
+Run-Start → Anchor → Plate → Face-Layout → Assignment → Voiceover
+→ Preclip → Face-Gate → Provider → Webhook → Outcome-Gate
+→ Reprojektion → Mux → Abschluss → Watchdog
+```
 
-**Schritt 1 — Gate-Autopsie (read-only, kein Codeeingriff)**
-Für die letzten 20 Läufe pro Pass protokollieren: welches Gate hat abgebrochen, mit
-welchen Messwerten, und wäre der Pass ohne dieses Gate durchgelaufen. Ziel ist eine
-Rangliste "Falsch-Positive pro Gate". Ohne diese Liste ist jede Lockerung geraten.
+Für jede Stufe dokumentieren:
 
-**Schritt 2 — Die zwei teuersten Gates entschärfen (nicht löschen)**
-Aktuell aussichtsreichste Kandidaten, endgültig entschieden durch Schritt 1:
-- `v536_mouth_crop_infeasible` mit `face=n/a`, `band=n/a`, `[NaN,NaN]` ist ein
-  Messartefakt, kein Geometriebeweis. Bei fehlender Messung → einmalige Neumessung
-  statt Abbruch; nur bei *bewiesen* unmöglicher Geometrie fail-closed.
-- `face_repair_identity_unresolved`: bei saturierter, eindeutiger Besetzung greift die
-  V534-Ausschluss-Logik; die verbleibende Lücke ist der 3+-Pfad ohne V534.
+- exakter heutiger Codepfad und aktiver Vertrag
+- identisch zu v400 / ersetzt / erweitert / gelöscht
+- Einfluss auf 1, 2 und 3+ Sprecher
+- kann vor Provider blockieren, nach Provider falsch abschließen oder das Endbild
+  sichtbar beschädigen?
+- Produktionsbeleg aus Gate A
 
-**Schritt 3 — Die 2-Sprecher-Lücke schließen**
-2 Sprecher sind die schlechteste Klasse, weil `speakers.length >= 3` sie von der
-Identitätskette ausschließt, die v400-Positionslogik bei zwei Gesichtern aber die
-höchste Verwechslungsgefahr hat. Schwelle auf `>= 2` senken — das ist die einzige
-sinnvolle "Verallgemeinerung", und sie betrifft genau 6 Läufe im Datensatz.
+Besonders zu klären:
 
-**Nicht Teil davon:** neue Provider, neue Schwellenwerte, Retry-Mechanismen,
-Änderungen an Maske, Kamerapfad, Mux, Refunds oder Watchdog.
+- Das v400-Outcome-Gate (`unknown` blockiert) existiert laut aktuellem Code nicht mehr.
+  Damit kann `complete` ohne bewiesene Mundbewegung entstehen.
+- Das feste 62-%-Mundframing aus dem PDF entspricht nicht dem heutigen Code und auch
+  nicht dem gemessenen Golden Run.
+- v461/v464/v536 sowie v506–v530 haben zusätzliche Abbruch- oder Autoritätspfade
+  eingeführt.
+- Der 2-Sprecher-Pfad und der `speakers.length >= 3`-Pfad sind getrennt zu analysieren;
+  eine Verallgemeinerung auf `>= 2` wird **nicht** vorweggenommen.
 
-## Zur Frage "wann ist es gut genug"
+## Gate C — Zwei Fehlerklassen strikt trennen
 
-Ein belastbares Abbruchkriterium statt Bauchgefühl:
+### Klasse 1: Die Szene bricht ab
 
-> **Ziel: 90 % Szenenerfolg über 20 aufeinanderfolgende Läufe, alle Sprecherzahlen.**
-> Wird das erreicht, wird die Pipeline eingefroren und nur noch bei P0-Fehlern angefasst.
+Pro Pass den ersten ursächlichen Blocker bestimmen, unter anderem:
 
-Heute: ~81 % bei 3+, ~75 % bei 1, 50 % bei 2. Der Abstand zum Ziel ist ein bis zwei
-Gates — keine vier weiteren Monate. Wenn Schritt 1 zeigt, dass kein einzelnes Gate
-dominiert, ist das ebenfalls eine Antwort: dann ist der aktuelle Stand das Optimum und
-der ehrliche Umgang damit ist ein sichtbarer "Lip-Sync (Beta)"-Hinweis plus
-verlässlicher Refund — nicht eine weitere Iteration.
+- `dynamic_mouth_crop_infeasible`
+- v461 Face-Share / Face-Size / Mouth-ROI
+- v464 ASD-Vertragsverletzung
+- unresolved identity / Face-Repair
+- FA-4 Turn-/Pass-Mismatch
+- Worker-, Lock- oder Watchdog-Abbruch
 
-## Technische Details
+Folgefehler wie `fanout_closed` werden nicht als Ursache gezählt.
 
-- Belege: `composer_scenes.lip_sync_status` / `dialog_shots.passes` (Abfragen oben),
-  `_shared/v461-face-gate.ts:39,41`, `_shared/mouth-crop-feasibility.ts:206-304`,
-  `compose-dialog-segments/index.ts:4785` (`v523NeedsIdentity`), `:8539-8621` (v464),
-  `_shared/v538-plate-resolution.ts:30,74`, `docs/lipsync-pipeline-v400-errata.md:19-21`.
-- `docs/lipsync-pipeline-v400-errata.md` ist gegenüber v461 veraltet (Face-Share-Scope)
-  und sollte im selben Gate korrigiert werden.
-- Schritt 1 ist rein lesend und erzeugt `docs/v541-gate-autopsy.md`.
+### Klasse 2: Die Szene wird `complete`, aber Lip-Sync fehlt
+
+Für jeden False-Positive-Complete nachvollziehen:
+
+- war der Provider-Output gegenüber dem Preclip tatsächlich verändert?
+- waren Mundbewegungen im Output vorhanden?
+- wurde der richtige Sprecher-Crop reprojiziert?
+- wurde ein `motion_unverified` oder nicht messbarer Probe-Zustand als Erfolg gewertet?
+- enthielt der finale Mux den synchronisierten Output oder wieder die ursprüngliche Plate?
+
+Diese zweite Klasse ist für die Aussage „seit zwei Wochen funktioniert nichts“
+entscheidend und wurde von der vorherigen Analyse fälschlich ignoriert.
+
+## Gate D — Rückbau-Entscheidung
+
+Drei Optionen werden erst nach A–C bewertet:
+
+### Option 1: Exakter Rückbau
+
+Nur möglich, wenn ein konkreter historischer Commit plus damalige Funktionen,
+Datenbankverträge und Provider-Payloads gemeinsam reproduzierbar sind. Das PDF allein
+ist **kein** ausführbarer Baseline-Stand, weil einzelne Angaben vom Golden Run und vom
+heutigen Code abweichen.
+
+### Option 2: v400-Kern auf heutiger Infrastruktur
+
+Die vier Kernverträge behalten:
+
+- Run-Identität
+- Anchor-/Plate-Kohärenz
+- unveränderlicher Assignment-Lock
+- Callback-/Run-Guard
+
+Danach nur die durch Produktionsbelege notwendigen Gates behalten. Das ist kein
+blindes Zurückrollen, sondern ein kontrollierter Abbau späterer Gate-Inflation.
+
+### Option 3: Sprecherzahl begrenzen
+
+Wenn 3+ Sprecher nicht reproduzierbar stabil werden, wird der Modus vorläufig auf die
+nachweislich stabile Sprecherzahl begrenzt, statt weiter bezahlte Beta-Runs als
+Erfolg zu deklarieren. Auch 1 oder 2 Sprecher gelten erst nach visueller Verifikation
+als stabil.
+
+## Definition von „gut genug“
+
+Kein DB-Status gilt als Erfolg. Eine Szene besteht nur, wenn:
+
+1. alle erwarteten Sprecher im richtigen Gesicht synchronisiert sind,
+2. sichtbare Mundbewegung für jeden gesprochenen Turn vorhanden ist,
+3. keine falsche Person spricht und keine stillen Passthroughs vorkommen,
+4. das finale Mux genau diese geprüften Outputs enthält,
+5. Credits und Terminalstatus korrekt abgeschlossen sind.
+
+Vorgeschlagener Freeze-Punkt:
+
+- mindestens 20 aufeinanderfolgende kontrollierte Runs,
+- getrennte Kohorten für 1, 2 und 3+ Sprecher,
+- mindestens 90 % **visuell bestätigte** Szenenerfolge je freigegebener Kohorte,
+- 100 % korrekte Zuordnung von Sprecher zu Gesicht,
+- kein `complete` ohne nachgewiesene Mundbewegung.
+
+Erreicht eine Kohorte das nicht, wird sie nicht als stabil angeboten. Nach Erreichen
+des Ziels wird die Pipeline eingefroren und nur noch für P0-Datenverlust,
+Abrechnungsfehler oder nachgewiesene Regressionen verändert.
+
+## Lieferumfang der Read-only-Analyse
+
+- Run-für-Run-Matrix der letzten 14 Tage
+- v400-vs-heute-Differenzmatrix für alle 16 Stufen
+- Root-Cause-Rangliste, getrennt nach Abbruch und False-Positive-Completion
+- belegte Bewertung der drei Rückbauoptionen
+- kleinster möglicher späterer Reparatur-Scope mit Regressionstest-Matrix
+- klare Empfehlung: Kern reduzieren, gezielt reparieren oder Sprecherzahl begrenzen
+
+Danach **STOP**. Keine Implementierung ohne ein separates ausdrückliches GO.
