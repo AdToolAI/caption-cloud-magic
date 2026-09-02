@@ -239,6 +239,7 @@ import {
   orderedSpeakerIdsFromTurns,
   readIdOnlyEnabled,
 } from "../_shared/scene-dialog-turns.ts";
+import { readFrozenCanonicalTurnIds } from "../_shared/canonical-turn-identity.ts";
 import { rehostPlate } from "../_shared/rehostPlate.ts";
 
 
@@ -1079,6 +1080,42 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     /** FA-4/P0 — kanonische Turn-ID-Menge dieser Szene (Quelle: dialog_turns). */
     let canonicalDialogTurnIds: string[] = [];
 
+    // ══ V537 — THE RUN'S FROZEN TURN IDENTITY ═══════════════════════════
+    //
+    // Every pass identity below comes from `audio_plan.twoshot` — segments,
+    // voiced turn windows, `segment_id`. Deriving the canonical side from
+    // `dialog_turns` instead compared two different moments: a stale client
+    // save, or the id-only flag flipping between audio generation and
+    // dispatch, silently moved one side. Scene 7aa7fc93 is what that looks
+    // like in production.
+    //
+    // When the plan carries the snapshot it IS the authority for this run.
+    // `[]` is a decision, not an absence: it says the run was built without
+    // canonical turn identity, so FA-4 stays skipped consistently with its
+    // own id-less segments. Only a genuinely ABSENT field falls back.
+    const v537Frozen = readFrozenCanonicalTurnIds(
+      ((scene as any)?.audio_plan?.twoshot ?? null) as { canonical_turn_ids?: unknown } | null,
+    );
+    if (v537Frozen.state === "malformed") {
+      console.error(
+        `[compose-dialog-segments] scene=${sceneId} v537_frozen_turn_ids_malformed ${v537Frozen.detail}`,
+      );
+      // Fail closed. Falling back to `dialog_turns` here would answer a
+      // question this plan already answered — wrongly — with a value read
+      // from a different moment. Runs before any wallet debit (~1688), so
+      // no refund path is involved.
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId, user_id: userId, engine: "sync-segments",
+        sync_status: "PREFLIGHT_BLOCKED", error_class: "canonical_turn_snapshot_malformed",
+        error_message: v537Frozen.detail,
+        meta: { detail: v537Frozen.detail },
+      });
+      return json(
+        { error: "canonical_turn_snapshot_malformed", detail: v537Frozen.detail },
+        422,
+      );
+    }
+
     if (await readIdOnlyEnabled(supabase)) {
       const ensuredTurns = await ensureDialogTurnsForScene(supabase, scene as any);
       if (ensuredTurns.ok) {
@@ -1135,6 +1172,25 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           return json({ error: "id_only_dialog_turns_required", reason: ensuredTurns.reason, details: ensuredTurns.details ?? null }, 422);
         }
       }
+    }
+
+    // V537 — the frozen snapshot overrides ONLY the FA-4 canonical set.
+    //
+    // Deliberately narrow: `canonicalSpeakerIds`, `canonicalDialogTurnsCount`
+    // and `speakersSource` keep their existing derivation, because the v202
+    // cast guard pairs the count with the speaker list and would misfire on a
+    // count without its speakers. This fence exists to stop FA-4 comparing
+    // two moments — it is not a speaker-ordering change.
+    if (v537Frozen.state === "present") {
+      const legacyIds = canonicalDialogTurnIds;
+      const same = legacyIds.length === v537Frozen.ids.length &&
+        legacyIds.every((id, i) => id === v537Frozen.ids[i]);
+      canonicalDialogTurnIds = v537Frozen.ids;
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} v537_frozen_turn_ids ` +
+          `frozen=${v537Frozen.ids.length} legacy_would_be=${legacyIds.length} same=${same} ` +
+          `— the audio plan is this run's turn-identity authority`,
+      );
     }
 
     if (!masterAudioUrl || speakers.length === 0 || totalSec <= 0) {

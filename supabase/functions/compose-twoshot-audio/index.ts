@@ -32,6 +32,11 @@ import {
 } from "../_shared/scene-dialog-turns.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { resolveEffectiveDialog } from "../_shared/resolve-effective-dialog.ts";
+import {
+  describeTurnIdViolation,
+  materializeCanonicalTurnIds,
+  validateCanonicalTurnIds,
+} from "../_shared/canonical-turn-identity.ts";
 // v427B — the timing literals below now live in one named place. Values are
 // unchanged (300 ms tail / grace, 5 s cap, 100 ms step, 250 ms pause).
 import {
@@ -653,6 +658,21 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // similar first names, no generic "SPRECHER 1" collision.
     const idOnlyOn = await readIdOnlyEnabled(supabase);
     let rawTurns = normalizeTurns((scene as any).dialog_turns);
+    /**
+     * V537 — the canonical turn identity FROZEN into this audio plan.
+     *
+     * FA-4 used to compare pass identities taken from `audio_plan` against
+     * canonical ids RE-READ from the mutable `dialog_turns` row at dispatch
+     * time — two measurements of two different moments. A stale client save,
+     * or the id-only flag flipping between the two requests, silently changed
+     * one side of that comparison.
+     *
+     * This array is written into the same `audio_plan.twoshot` object as the
+     * segments, from the same in-memory turn set that produced them, in the
+     * same update. An empty array is a MEANINGFUL frozen state: it says this
+     * run carries no canonical turn identity at all.
+     */
+    let v537CanonicalTurnIds: string[] = [];
     if (idOnlyOn && rawTurns.length === 0 && dialogScript.trim()) {
       const ensured = await ensureDialogTurnsForScene(supabase, scene as any);
       if (ensured.ok) {
@@ -749,14 +769,54 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         console.log(
           `[compose-twoshot-audio] v430_dialog_canonicalization scene=${scene_id} reason=${effective.reason} before=${rawTurns.length} after=${effective.turns.length}`,
         );
-        const persistPayload = effective.turns.map((t, i) => ({
-          turnId: t.turnId,
-          characterId: t.characterId,
-          displayName: t.displayName,
-          text: t.text,
-          mood: t.mood,
-          order: i,
-        }));
+        // ══ V537 — CANONICAL TURN IDENTITY MATERIALIZATION ═════════════
+        //
+        // `alignDialogTurnsToScript` returns `turnId: undefined` for every
+        // output turn that may not inherit a prior identity — a line
+        // reassigned to a different speaker, or a line beyond the existing
+        // turns (where `base` is undefined, so `keepsIdentity` is false by
+        // construction). That decision is correct and untouched.
+        //
+        // What was missing is the other half: nothing minted a replacement.
+        // The only randomUUID in the repo sits in `ensureDialogTurnsForScene`
+        // and returns early whenever the scene already has a turn, so
+        // `undefined` reached this write, then `audio_plan.segments[].turn_id`,
+        // then FA-4. Scene 7aa7fc93 persisted 4 turns with 1 id.
+        //
+        // Minting here, BEFORE the write, is what makes the persisted turns
+        // and the audio plan one set: line ~773 re-reads this exact payload
+        // and every block, segment and pass downstream derives from it.
+        const materialized = materializeCanonicalTurnIds(
+          effective.turns.map((t, i) => ({
+            turnId: t.turnId,
+            characterId: t.characterId,
+            displayName: t.displayName,
+            text: t.text,
+            mood: t.mood,
+            order: i,
+          })),
+          () => crypto.randomUUID(),
+        );
+        const persistPayload = materialized.turns;
+        console.log(
+          `[compose-twoshot-audio] v537_turn_identity scene=${scene_id} ` +
+            `turns=${persistPayload.length} preserved=${materialized.preserved} ` +
+            `minted=${materialized.minted} replaced=${materialized.replaced} ` +
+            `minted_idx=[${materialized.mintedIdx.join(",")}]`,
+        );
+        // Fail closed on the invariant rather than writing a state FA-4
+        // would refuse later, after the credit was already spent.
+        const idReport = validateCanonicalTurnIds(persistPayload);
+        if (!idReport.ok) {
+          const detail = describeTurnIdViolation(idReport);
+          console.error(
+            `[compose-twoshot-audio] v537_turn_identity_unsatisfiable scene=${scene_id} ${detail}`,
+          );
+          return json(
+            { error: "canonical_turn_identity_unsatisfiable", reason: effective.reason, detail },
+            500,
+          );
+        }
         const { error: persistErr } = await supabase
           .from("composer_scenes")
           .update({ dialog_turns: persistPayload, updated_at: new Date().toISOString() })
@@ -789,6 +849,53 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         console.warn("[compose-twoshot-audio] v200 turn name fetch failed:", (e as any)?.message);
       }
       idOnlyActive = rawTurns.length > 0;
+    }
+
+    // ══ V537 — ONE IDENTITY SET FOR SEGMENTS AND SNAPSHOT ═══════════════
+    //
+    // `blocksFromDialogTurns` below reads `rawTurns[i].turnId` and carries it
+    // into every segment. The frozen snapshot is derived from the SAME array,
+    // so the two can never describe different turns.
+    //
+    // The materialization above only runs on the diverged path. A row written
+    // before V537 whose script still matches exactly is `in_sync`, so it never
+    // reached it and can still hold id-less turns. Running the materializer
+    // here closes that: it is idempotent, so on the diverged path the
+    // generator is not called even once, and on the legacy path it repairs
+    // lazily — the same lazy repair, at the same boundary, never a backfill.
+    if (idOnlyActive) {
+      const repair = materializeCanonicalTurnIds(rawTurns, () => crypto.randomUUID());
+      if (repair.minted > 0) {
+        console.log(
+          `[compose-twoshot-audio] v537_turn_identity_lazy_repair scene=${scene_id} ` +
+            `turns=${repair.turns.length} preserved=${repair.preserved} minted=${repair.minted} ` +
+            `minted_idx=[${repair.mintedIdx.join(",")}]`,
+        );
+        const { error: repairErr } = await supabase
+          .from("composer_scenes")
+          .update({ dialog_turns: repair.turns, updated_at: new Date().toISOString() })
+          .eq("id", scene_id);
+        if (repairErr) {
+          console.error(
+            `[compose-twoshot-audio] v537_turn_identity_repair_persist_failed scene=${scene_id} err=${repairErr.message}`,
+          );
+          return json(
+            { error: "canonical_turn_identity_persist_failed", detail: repairErr.message },
+            500,
+          );
+        }
+      }
+      rawTurns = repair.turns as typeof rawTurns;
+
+      const idReport = validateCanonicalTurnIds(rawTurns);
+      if (!idReport.ok) {
+        const detail = describeTurnIdViolation(idReport);
+        console.error(
+          `[compose-twoshot-audio] v537_turn_identity_unsatisfiable scene=${scene_id} ${detail}`,
+        );
+        return json({ error: "canonical_turn_identity_unsatisfiable", detail }, 500);
+      }
+      v537CanonicalTurnIds = rawTurns.map((t) => String(t.turnId));
     }
 
     const blocksFromTurns = idOnlyActive ? blocksFromDialogTurns(rawTurns, idOnlyNameById) : null;
@@ -1511,6 +1618,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           // v89 — per-utterance TTS diagnostics + overflow extension marker.
           tts_diagnostics: ttsDiagnostics,
           dialog_overflow_extended: dialogOverflowExtended,
+          // V537 — the run's frozen turn identity. Same array the segments
+          // above were built from, written in the same update. `[]` means
+          // this run has no canonical turn identity and FA-4 must stay
+          // skipped for it; it is NOT an absent field.
+          canonical_turn_ids: v537CanonicalTurnIds,
         },
       },
       updated_at: new Date().toISOString(),

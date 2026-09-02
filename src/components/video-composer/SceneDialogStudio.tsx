@@ -37,6 +37,28 @@ import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
 import { startSceneGeneration } from '@/lib/composer/startSceneGeneration';
 import { resolveEffectiveDialog } from '@/lib/composer/dialog/resolveEffectiveDialog';
+import { materializeCanonicalTurnIds } from '@/lib/composer/dialog/canonicalTurnIdentity';
+
+/**
+ * V537 — never persist a turn without a canonical identity.
+ *
+ * `resolveEffectiveDialog` legitimately returns `turnId: undefined` for any
+ * turn that may not inherit a prior identity: a line reassigned to another
+ * speaker, or a line beyond the existing turns. Persisting that verbatim is
+ * what left scene 7aa7fc93 with four turns and one id, and FA-4 refused the
+ * dispatch. The aligner's decision stays untouched; the missing identity is
+ * minted at the same boundary that writes it.
+ *
+ * Idempotent: an already valid, unique set comes back unchanged and
+ * `crypto.randomUUID` is never called — so an open dispatch or retry never
+ * has its segment identity changed underneath it.
+ */
+function withCanonicalTurnIds(
+  turns: ReadonlyArray<{ turnId?: string }>,
+): ComposerScene['dialogTurns'] {
+  return materializeCanonicalTurnIds(turns, () => crypto.randomUUID())
+    .turns as ComposerScene['dialogTurns'];
+}
 import { dialogPreflight } from '@/lib/composer/dialog/dialogPreflight';
 import { maxSecondsForClipSource } from '@/lib/composer/pickClipSourceForDuration';
 import { parseDialogScript, uniqueSpeakers, type DialogBlock } from '@/lib/talking-head/parseDialogScript';
@@ -718,7 +740,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         { resolveSpeakerId: resolveCastByName },
       );
       if (effective.diverged) {
-        updates.dialogTurns = effective.turns as ComposerScene['dialogTurns'];
+        updates.dialogTurns = withCanonicalTurnIds(effective.turns);
       }
 
       lastPushedScriptRef.current = script;
@@ -872,7 +894,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     if (isUserTypingRef.current) return;
     if (script !== (scene.dialogScript ?? '')) return;
     if (!effectiveDialog.diverged) return;
-    onUpdate({ dialogTurns: effectiveDialog.turns as ComposerScene['dialogTurns'] });
+    onUpdate({ dialogTurns: withCanonicalTurnIds(effectiveDialog.turns) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id, scene.dialogScript, effectiveDialog.diverged, effectiveDialog.reason, canonicalTurnsHash]);
 
