@@ -186,7 +186,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     ? effectiveSpokenLang === 'en'
     : (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang as 'en' | 'de' | 'es');
   const omniNonEnglishSilent = isKlingOmni && effectiveSpokenLang !== 'en';
-  const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
+  const [startImageUrl, setStartImageUrl] = useState<string | null>(
+    typeof setupDraft.startImageUrl === 'string' ? setupDraft.startImageUrl : null,
+  );
+
   /* ── Kling Omni: unified Cast + per-speaker Lip-Sync (max. 4 cast, 2 lip-sync) ── */
   type OmniVoicePreset = 'female-warm' | 'female-bright' | 'male-warm' | 'male-deep' | 'neutral';
   /**
