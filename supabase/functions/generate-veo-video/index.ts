@@ -269,12 +269,29 @@ serve(async (req) => {
     }));
 
     try {
-      const prediction = await replicate.predictions.create({
-        model: replicateModel,
-        input: replicateInput,
-        webhook: webhookUrl,
-        webhook_events_filter: ['start', 'completed']
-      });
+      // Provider overload (Google Veo capacity, "code: 8" / RESOURCE_EXHAUSTED)
+      // is transient and unrelated to our own traffic — retry a bounded number
+      // of times before giving up. No extra deduction happens here.
+      let prediction: any = null;
+      let lastError: any = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          prediction = await replicate.predictions.create({
+            model: replicateModel,
+            input: replicateInput,
+            webhook: webhookUrl,
+            webhook_events_filter: ['start', 'completed']
+          });
+          break;
+        } catch (err: any) {
+          lastError = err;
+          if (!isProviderOverload(err) || attempt === 2) throw err;
+          const waitMs = 2000 * (attempt + 1);
+          console.warn(`[generate-veo-video] provider overloaded — retry ${attempt + 1}/2 in ${waitMs}ms`);
+          await new Promise((r) => setTimeout(r, waitMs));
+        }
+      }
+      if (!prediction) throw lastError ?? new Error('Prediction creation failed');
 
       console.log(`[generate-veo-video] ✅ Prediction created: ${prediction.id}`);
 
@@ -310,6 +327,16 @@ serve(async (req) => {
         console.error('[generate-veo-video] Refund failed:', refundError);
       } else {
         console.log(`[generate-veo-video] ✅ ${currencySymbol}${totalCost.toFixed(2)} refunded`);
+      }
+
+      if (isProviderOverload(replicateError)) {
+        return new Response(
+          JSON.stringify({
+            error: "The video provider is currently overloaded. Your credits were refunded — please try again in a few minutes.",
+            code: "PROVIDER_OVERLOADED",
+          }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       if (replicateError?.response?.status === 429) {
