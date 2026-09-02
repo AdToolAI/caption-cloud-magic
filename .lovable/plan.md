@@ -1,40 +1,41 @@
-# V545 — Lip-Sync sicher stoppen und den echten Preclip-NOOP isolieren
+# Änderung 1 — Full-Plate für bewegte Multi-Speaker-Szenen reaktivieren
 
-## Bestätigter Befund
+## Korrektur des aktuellen Zustands
 
-Der kontrollierte V544-Lauf ist Szene `d63263dc…`, Generation 2, Run `37bd96bf…` mit vier Turns und zwei Sprechern.
+Die gewünschte Änderung wurde **nicht** richtig umgesetzt:
 
-- Alle vier Dispatches liefen tatsächlich über den neuen autoritativen Pfad: `v544-v400-preclip-authority`, `dispatch_video_kind=preclip`, `input_space=clip`, `preclip_used=true`, 30 fps und exakte Framezahlen 53/49/41/38.
-- Tight-Audio und Preclip-Dauer stimmen pro Turn überein; alle vier Face-Gates bestanden. Identität, Sprecherbindung, Zeitbasis und Mux-Crops sind vollständig vorhanden.
-- Sync.so meldete alle vier Jobs technisch erfolgreich, aber die serverseitige Messung ergab bei **jedem Pass NOOP**: `mouth_over_frame` 1,81 / 1,95 / 0,96 / 0,96, jeweils unter der NOOP-Grenze 2,0.
-- Weil die Messregion aus `face_ratio` statt aus einem beobachteten Landmark stammt, stuft V500 diese echten NOOP-Befunde als `motion_unverified` ein. Der Webhook schreibt trotzdem `ssw:success`; V541 markiert nur Telemetrie.
-- Der Mux akzeptiert jeden Pass mit `status=done` und `output_url`, ohne den Bewegungsnachweis zu prüfen. Deshalb wurde die Szene als `done` ausgeliefert, obwohl kein Pass nachweisbare Mundbewegung enthält.
+- Aktueller HEAD ist `v544-v400-preclip-authority`.
+- Er löscht `_v152BboxPrimary`, `_v153BboxPrimary` und `_v543PlateMeta` vor der Dispatch-Auswahl.
+- Der Regressionstest verlangt ausdrücklich, dass `v153UnifiedBboxEligible` nicht existiert und Preclip für jede Sprecherzahl aktiv ist.
+- Preclip-Fehler werden fail-closed behandelt; Full-Plate-Fallback ist ausdrücklich verboten.
 
-Damit ist das vereinbarte STOP-Kriterium aus V544 erfüllt. Es erfolgt kein weiterer kostenpflichtiger Testlauf.
+Hinweis zur Benennung: Der persistierte v400-Golden-Run `c934a823…` verwendete selbst statische Preclips. Full-Plate ist deshalb eine gezielte Korrektur für bewegte Szenen gemäß Gate 0 und Sync.so-Spatial-Tracking — keine wortgetreue Wiederherstellung des gemessenen v400-Payloads.
 
-## Umsetzung
+## Genau ein Umsetzungsgate
 
-1. **Lip-Sync vor weiteren Provider-Kosten stilllegen**
-   - Das bestehende zentrale Lip-Sync-Feature-Flag deaktivieren.
-   - Bereits erzeugte Medien und normale Video-/Voiceover-Erstellung bleiben unangetastet.
-   - Neue Lip-Sync-Anfragen werden vor Preclip- und Provider-Dispatch verständlich abgewiesen; es entstehen keine Sync.so-Kosten.
+1. **Full-Plate als primären Pfad für N≥2 reaktivieren**
+   - Den vorhandenen plate-nativen Pfad wieder dispatch-fähig machen.
+   - Sync.so erhält das vollständige Plate-Video, `model=sync-3`, `auto_detect=false` und eine plate-native `bounding_boxes_url` pro Sprecher.
+   - Boxanzahl, FPS und Framezahl müssen exakt zur vollständigen Plate-Zeitbasis passen.
 
-2. **Falschen Erfolg technisch schließen**
-   - `motion_unverified`/`v541_needs_review` darf nicht mehr in einen auslieferbaren `done`-Pass und nicht mehr in den Mux eingehen.
-   - Der Mux verlangt für jeden aktiven Pass einen persistierten, positiven Bewegungsnachweis; ein technisch erfolgreiches Provider-Ergebnis allein reicht nicht.
-   - Bestehende Run-/Generation-Fences, Identity-Locks, Ledger-Idempotenz und Credit-Refunds bleiben unverändert.
+2. **Preclip nur als klarer Fallback**
+   - Preclip bleibt verfügbar, wird aber für einen frischen, gültigen N≥2-Full-Plate-Dispatch nicht mehr vorgezogen.
+   - Fallback nur, wenn die Full-Plate-Zeitbasis oder plate-native Sprecherbox vor dem Provider-Call nicht sicher hergestellt werden kann.
+   - Kein stiller Wechsel nach einem technisch akzeptierten NOOP; genau ein Pfad pro Versuch.
 
-3. **Ursache ohne Provider-Call isolieren**
-   - Die vier bereits gepinnten Preclip-/Audio-/BBox-/Provider-Output-Artefakte des V544-Laufs offline vergleichen.
-   - Pro Pass prüfen: Mund liegt innerhalb der gesendeten Crop-local Box; Eingangs- und Ausgangsframes zeigen dieselbe Identität; Audio enthält im 0-basierten Preclip-Fenster Sprache; Provider-Output unterscheidet sich im tatsächlichen Mund-ROI vom Preclip.
-   - Ergebnis als eindeutige Kategorie dokumentieren: Provider-Passthrough, falsche ASD-Box, falsche Audio-Zeitlage oder Mess-ROI-Fehler. Keine Schwellenänderung und kein neuer Provider-Versuch in diesem Gate.
+3. **Unveränderte Sicherheitsverträge**
+   - Identity-/Assignment-Lock, kanonische Turn-IDs, Run-/Generation-Fencing, FA-4, V537, Ledger und idempotente Refunds bleiben unverändert.
+   - Keine Provider-, Modell-, Preis-, Schwellenwert- oder Mux-Änderung in diesem Gate.
 
-4. **Regressionen**
-   - Vier `noop`/`motion_unverified`-Pässe können keine Szene mehr als erfolgreich abschließen.
-   - Der Mux verweigert unbewiesene Outputs.
-   - Feature-Off garantiert null Provider-Calls und keine Belastung; bestehende Refund-Idempotenz bleibt grün.
-   - Ein nachweislich `motion_verified`-Pass bleibt vertraglich mux-fähig, damit eine spätere kontrollierte Wiederfreigabe möglich ist.
+4. **Regressionen an den neuen Vertrag anpassen**
+   - N≥2 mit vollständiger Plate-Metadatenlage: `dispatch_video_kind=full_plate`, `input_space=plate`, plate-native Boxen, exakte Plate-FPS/Framezahl.
+   - Ungültige Full-Plate-Metadaten: deterministischer Preclip-Fallback vor dem Provider-Call.
+   - Keine mundzentrierte Crop-Autorität und kein Camera-Path beeinflussen den Full-Plate-Dispatch.
+   - Sprecherzuordnung und Provider-Call-Zahl bleiben unverändert.
 
-## Abschluss
+## Verifikation und STOP
 
-Dieses Gate endet mit deaktiviertem Lip-Sync, geschlossenem False-Success-Pfad und einem artefaktbasierten RCA-Bericht. Eine Wiederfreigabe oder ein weiterer Sync.so-Call ist ausdrücklich nicht Teil dieses Gates.
+- Fokustests für Full-Plate-Payload, Zeitbasis, Boxtransport, Identity-Lock, Fencing, Ledger und Fallback ausführen.
+- Nur die unmittelbar betroffene Dispatch-Funktion deployen.
+- Danach **genau einen kontrollierten 2-Sprecher-Lauf** ausführen und read-only prüfen: Full-Plate wurde versendet, Boxen liegen im plate-nativen Raum, alle Pässe zeigen messbare Mundbewegung und der richtige Sprecher bewegt sich im richtigen Turn.
+- Danach STOP mit Befund. Kein 3- oder 4-Sprecher-Lauf und keine Änderung 2–4 ohne separate Freigabe.
