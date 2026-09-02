@@ -126,12 +126,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     }, 300);
     return () => clearTimeout(t);
   }, [prompt]);
-  const [duration, setDuration] = useState<number>(model.durations[0]);
-  const [aspectRatio, setAspectRatio] = useState<string>(model.aspectRatios[0]);
+  const [duration, setDuration] = useState<number>(
+    typeof setupDraft.duration === 'number' ? setupDraft.duration : model.durations[0],
+  );
+  const [aspectRatio, setAspectRatio] = useState<string>(
+    typeof setupDraft.aspectRatio === 'string' ? setupDraft.aspectRatio : model.aspectRatios[0],
+  );
   // Output resolution — only user-selectable when the provider really offers
   // more than one option for this model (e.g. Seedance 2.5: 720p / 480p).
-  const [resolution, setResolution] = useState<string>(model.resolutions?.[0] ?? model.resolution);
-  const [generateAudio, setGenerateAudio] = useState<boolean>(model.capabilities.audio);
+  const [resolution, setResolution] = useState<string>(
+    typeof setupDraft.resolution === 'string'
+      ? setupDraft.resolution
+      : (model.resolutions?.[0] ?? model.resolution),
+  );
+  const [generateAudio, setGenerateAudio] = useState<boolean>(
+    typeof setupDraft.generateAudio === 'boolean' ? setupDraft.generateAudio : model.capabilities.audio,
+  );
+
   // Provider-side TTS (Kling / Veo / Sora) defaults to English unless the prompt
   // explicitly names a target language. We let the user override the auto-pick
   // (which follows the UI language) so a DE user can force ES/EN audio if desired.
