@@ -7520,7 +7520,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
                 // Golden-Core: statischer, assignment-locked Face-Center-Crop.
                 turnFaceBoxes: null,
                 turnFaceSamples: null,
-                buildCameraPath: null,
+                // Kein Retracking, kein eingefrorener dynamischer Pfad:
+                // der statische Crop IST der Golden-Core.
+                buildCameraPath: undefined,
+                frozenCameraPath: null,
+
               },
               300_000,
             );
