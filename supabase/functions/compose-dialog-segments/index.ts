@@ -9659,7 +9659,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // instead of the full multi-face plate. Sync.so sees one face only →
     // no `provider_unknown_error` ambiguity. The audio-mux Lambda overlays
     // the lipsynced crop back at preclip_crop on the original plate.
-    const v204MultiSpeakerPreclipDispatch = speakers.length >= 2;
+    // V543 — der v204-Preclip-Zwang gilt nur noch für den Fallback-Pfad.
+    // Ein bewusst gewählter Full-Shot-Dispatch (identitäts-gelockte Box,
+    // auto_detect aus) ist kein "Full-Plate-Fallback" im Sinne von v204.
+    const v204MultiSpeakerPreclipDispatch =
+      speakers.length >= 2 && !(pass as any)._v153BboxPrimary;
+
     if (v204MultiSpeakerPreclipDispatch && (!usePassPreclip || !passPreclipUrl)) {
       return await failBeforeProviderDispatch(
         "v204_preclip_required",
