@@ -199,7 +199,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
    * still composed into the anchor image.
    */
   type OmniLine = { characterId: string; lipSync: boolean; line: string; voicePreset: OmniVoicePreset };
-  const [omniLines, setOmniLines] = useState<OmniLine[]>([]);
+  const [omniLines, setOmniLines] = useState<OmniLine[]>(
+    Array.isArray(setupDraft.omniLines) ? (setupDraft.omniLines as OmniLine[]) : [],
+  );
+
   /**
    * Placement of the uploaded reference image within the generated clip:
    *  - 'start'  → i2v startImageUrl (default, image is visible at frame 0)
