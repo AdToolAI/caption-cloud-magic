@@ -39,6 +39,14 @@ import { evaluateNoopRedispatch } from "../_shared/v461-input-fingerprint.ts";
 // `materializeCompatibilityOutput` gehört ausschließlich dem Finalizer.
 
 import { acquireLedgerJob, observeCallbackProvenance, readPipelineJobId, recordDiagnosticObservation } from "../_shared/v431-ledger.ts";
+// V541 — Wahrheits-Gate: ein Pass ohne Bewegungsnachweis darf nicht als
+// bewiesener Erfolg gezählt werden. Reine Kennzeichnung, keine Verhaltens-,
+// Gate-, Provider-, Retry- oder Refund-Änderung.
+import {
+  buildV541ReviewDetails,
+  classifyPassTruth,
+  V541_NEEDS_REVIEW_VERDICT,
+} from "../_shared/v541-truth-gate.ts";
 // FA-4 Provider-No-op Fix Contract C′ — PURE motion classifier (LEGACY
 // TELEMETRY since V465-B2b; never authoritative).
 import {
