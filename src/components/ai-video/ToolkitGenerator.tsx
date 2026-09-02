@@ -1,5 +1,5 @@
 import { tx } from "@/lib/i18nText";
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -79,14 +79,30 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
   const currency: Currency = getCurrencyForLanguage(language);
 
+  /* ── Setup-Entwurf: Tab-Wechsel darf keine Eingaben kosten ──
+   * Neben dem Prompt wird auch das komplette Grund-Setup lokal gesichert und
+   * beim Zurückkehren wiederhergestellt. Ungültige Werte werden weiter unten
+   * vom Modell-Guard korrigiert. */
+  const SETUP_DRAFT_KEY = 'ai-video-toolkit:setup-draft';
+  const setupDraft = useMemo<Record<string, any>>(() => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(SETUP_DRAFT_KEY) : null;
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   /* ── Model selection (URL param ?model=… → state) ── */
   const initialModel = useMemo(() => {
     const fromUrl = searchParams.get('model');
-    return getToolkitModelById(fromUrl) ?? getDefaultToolkitModel();
+    return getToolkitModelById(fromUrl) ?? getToolkitModelById(setupDraft.modelId) ?? getDefaultToolkitModel();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [modelId, setModelId] = useState<string>(initialModel.id);
   const model: ToolkitModel = getToolkitModelById(modelId) ?? getDefaultToolkitModel();
+
 
   /* ── Form state ── */
   const PROMPT_DRAFT_KEY = 'ai-video-toolkit:prompt-draft';
@@ -110,12 +126,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     }, 300);
     return () => clearTimeout(t);
   }, [prompt]);
-  const [duration, setDuration] = useState<number>(model.durations[0]);
-  const [aspectRatio, setAspectRatio] = useState<string>(model.aspectRatios[0]);
+  const [duration, setDuration] = useState<number>(
+    typeof setupDraft.duration === 'number' ? setupDraft.duration : model.durations[0],
+  );
+  const [aspectRatio, setAspectRatio] = useState<string>(
+    typeof setupDraft.aspectRatio === 'string' ? setupDraft.aspectRatio : model.aspectRatios[0],
+  );
   // Output resolution — only user-selectable when the provider really offers
   // more than one option for this model (e.g. Seedance 2.5: 720p / 480p).
-  const [resolution, setResolution] = useState<string>(model.resolutions?.[0] ?? model.resolution);
-  const [generateAudio, setGenerateAudio] = useState<boolean>(model.capabilities.audio);
+  const [resolution, setResolution] = useState<string>(
+    typeof setupDraft.resolution === 'string'
+      ? setupDraft.resolution
+      : (model.resolutions?.[0] ?? model.resolution),
+  );
+  const [generateAudio, setGenerateAudio] = useState<boolean>(
+    typeof setupDraft.generateAudio === 'boolean' ? setupDraft.generateAudio : model.capabilities.audio,
+  );
+
   // Provider-side TTS (Kling / Veo / Sora) defaults to English unless the prompt
   // explicitly names a target language. We let the user override the auto-pick
   // (which follows the UI language) so a DE user can force ES/EN audio if desired.
@@ -159,7 +186,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     ? effectiveSpokenLang === 'en'
     : (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang as 'en' | 'de' | 'es');
   const omniNonEnglishSilent = isKlingOmni && effectiveSpokenLang !== 'en';
-  const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
+  const [startImageUrl, setStartImageUrl] = useState<string | null>(
+    typeof setupDraft.startImageUrl === 'string' ? setupDraft.startImageUrl : null,
+  );
+
   /* ── Kling Omni: unified Cast + per-speaker Lip-Sync (max. 4 cast, 2 lip-sync) ── */
   type OmniVoicePreset = 'female-warm' | 'female-bright' | 'male-warm' | 'male-deep' | 'neutral';
   /**
@@ -169,7 +199,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
    * still composed into the anchor image.
    */
   type OmniLine = { characterId: string; lipSync: boolean; line: string; voicePreset: OmniVoicePreset };
-  const [omniLines, setOmniLines] = useState<OmniLine[]>([]);
+  const [omniLines, setOmniLines] = useState<OmniLine[]>(
+    Array.isArray(setupDraft.omniLines) ? (setupDraft.omniLines as OmniLine[]) : [],
+  );
+
   /**
    * Placement of the uploaded reference image within the generated clip:
    *  - 'start'  → i2v startImageUrl (default, image is visible at frame 0)
@@ -177,7 +210,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
    *  - 'anchor' → identity-only reference; no forced start/end frame
    * If the current model doesn't support the selected placement, it falls back to 'start'.
    */
-  const [referencePlacement, setReferencePlacement] = useState<'start' | 'end' | 'anchor'>('start');
+  const [referencePlacement, setReferencePlacement] = useState<'start' | 'end' | 'anchor'>(
+    setupDraft.referencePlacement === 'end' || setupDraft.referencePlacement === 'anchor'
+      ? setupDraft.referencePlacement
+      : 'start',
+  );
+
   /** Pending placement change awaiting user confirmation to auto-switch model. */
   const [pendingPlacement, setPendingPlacement] = useState<{
     placement: 'end' | 'anchor';
@@ -232,10 +270,59 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     [brandCharList],
   );
   const { characters: mentionChars, locations: mentionLocs } = useUnifiedMentionLibrary();
-  const [castCharacterIds, setCastCharacterIds] = useState<string[]>([]);
-  const [castLocationId, setCastLocationId] = useState<string | null>(null);
-  const [castBuildingId, setCastBuildingId] = useState<string | null>(null);
-  const [castPropIds, setCastPropIds] = useState<string[]>([]);
+  const [castCharacterIds, setCastCharacterIds] = useState<string[]>(
+    Array.isArray(setupDraft.castCharacterIds) ? setupDraft.castCharacterIds : [],
+  );
+  const [castLocationId, setCastLocationId] = useState<string | null>(
+    typeof setupDraft.castLocationId === 'string' ? setupDraft.castLocationId : null,
+  );
+  const [castBuildingId, setCastBuildingId] = useState<string | null>(
+    typeof setupDraft.castBuildingId === 'string' ? setupDraft.castBuildingId : null,
+  );
+  const [castPropIds, setCastPropIds] = useState<string[]>(
+    Array.isArray(setupDraft.castPropIds) ? setupDraft.castPropIds : [],
+  );
+
+  /* Setup-Entwurf sichern (debounced) + hart beim Tab-Wechsel/Verlassen. */
+  const setupSnapshot = useMemo(
+    () => ({
+      modelId,
+      duration,
+      aspectRatio,
+      resolution,
+      generateAudio,
+      startImageUrl,
+      referencePlacement,
+      omniLines,
+      castCharacterIds,
+      castLocationId,
+      castBuildingId,
+      castPropIds,
+    }),
+    [
+      modelId, duration, aspectRatio, resolution, generateAudio, startImageUrl,
+      referencePlacement, omniLines, castCharacterIds, castLocationId, castBuildingId, castPropIds,
+    ],
+  );
+  const setupSnapshotRef = useRef(setupSnapshot);
+  useEffect(() => { setupSnapshotRef.current = setupSnapshot; }, [setupSnapshot]);
+  const writeSetupDraft = useCallback(() => {
+    try { localStorage.setItem(SETUP_DRAFT_KEY, JSON.stringify(setupSnapshotRef.current)); } catch { /* noop */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const t = setTimeout(writeSetupDraft, 300);
+    return () => clearTimeout(t);
+  }, [setupSnapshot, writeSetupDraft]);
+  useEffect(() => {
+    const onVisibility = () => { if (document.hidden) writeSetupDraft(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', writeSetupDraft);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', writeSetupDraft);
+    };
+  }, [writeSetupDraft]);
+
 
   const castCharacters = useMemo(
     () => castCharacterIds.map((id) => libCharacters.find((c) => c.id === id)).filter((c): c is NonNullable<typeof c> => !!c),
