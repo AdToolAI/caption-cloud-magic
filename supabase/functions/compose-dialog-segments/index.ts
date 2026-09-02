@@ -4988,11 +4988,16 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             pass.coords = clampSyncCoords(repaired);
             pass.reference_frame_number = frame;
             pass.face_repair = {
-              source: v523Box
+              source: v538IdentityDowngrade
+                ? (v523Box ? "v538_anchor_reference_repair" : "v538_positional_downgrade")
+                : v523Box
                 ? "v523_identity_locked_repair"
                 : shouldForceRepair
                 ? "v96_plate_frame_force_repair"
                 : "plate_frame_left_to_right",
+              // V538 B — non-null whenever the plate-native chain refused and
+              // the anchor took over. Telemetry; nothing branches on it.
+              v538_identity_downgraded: v538IdentityDowngrade,
               frame_number: frame,
               original_coords: original,
               repaired_coords: pass.coords,
