@@ -210,7 +210,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
    *  - 'anchor' → identity-only reference; no forced start/end frame
    * If the current model doesn't support the selected placement, it falls back to 'start'.
    */
-  const [referencePlacement, setReferencePlacement] = useState<'start' | 'end' | 'anchor'>('start');
+  const [referencePlacement, setReferencePlacement] = useState<'start' | 'end' | 'anchor'>(
+    setupDraft.referencePlacement === 'end' || setupDraft.referencePlacement === 'anchor'
+      ? setupDraft.referencePlacement
+      : 'start',
+  );
+
   /** Pending placement change awaiting user confirmation to auto-switch model. */
   const [pendingPlacement, setPendingPlacement] = useState<{
     placement: 'end' | 'anchor';
