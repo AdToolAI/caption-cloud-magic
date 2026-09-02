@@ -6644,6 +6644,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       (pass as any).preclip_error = null;
       (pass as any)._v152BboxPrimary = true; // legacy flag name kept for downstream gates
       (pass as any)._v153BboxPrimary = true;
+      // V543-2 — die GEMESSENE Zeitbasis des versendeten Videos. Sie ist ab
+      // hier die einzige Quelle für `frameCount`/`fps` im Full-Shot-Pfad.
+      (pass as any)._v543PlateMeta = v543PlateMeta;
+
       // v181 — N=1 Depicted-Face Lock telemetry.
       // When a single-speaker scene has 2+ faces in the FULL plate (phone
       // screen, photo, mirror, background person), the bbox-url-pro path
