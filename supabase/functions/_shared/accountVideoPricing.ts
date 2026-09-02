@@ -30,18 +30,22 @@ export async function resolveAccountDiscountFactor(
 }
 
 /**
- * Effective per-second price for this account.
+ * Canonical LIST per-second price for a model.
+ *
+ * IMPORTANT: the account discount is applied by the `deduct_ai_video_credits`
+ * and `refund_ai_video_credits` RPCs (they multiply by
+ * `get_ai_discount_factor(user)`), so callers must pass the LIST price — a
+ * discount applied here as well would be charged twice over.
  * `fallbackPerSecond` is only used when the model is missing from the catalog.
  */
 export async function resolveAccountCostPerSecond(
-  supabaseAdmin: { from: (t: string) => any },
-  userId: string,
+  _supabaseAdmin: { from: (t: string) => any },
+  _userId: string,
   modelId: string,
   currency: "EUR" | "USD",
   fallbackPerSecond: number,
 ): Promise<number> {
   const base = resolveCostPerSecond(modelId, currency) ?? fallbackPerSecond;
-  const factor = await resolveAccountDiscountFactor(supabaseAdmin, userId);
   // Same rounding as `pricing-catalog`, so the deduction equals the preview.
-  return Math.round(base * factor * 100) / 100;
+  return Math.round(base * 100) / 100;
 }
