@@ -393,11 +393,15 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   }, [model.id]);
 
   // Canonical per-second price from server catalog (falls back to local config).
-  const { getPricePerSecond } = useVideoPricingCatalog();
+  const { getPricePerSecond, isReady: catalogReady } = useVideoPricingCatalog();
   const { discountFactor } = useAccountType();
   // Catalog prices are already personalized; the local fallback is a list price.
+  const catalogPricePerSecond = getPricePerSecond(model.id, currency);
+  // Never show a binding price we could not verify against the server catalog —
+  // that was the source of preview/charge mismatches.
+  const priceUnverified = !catalogReady || catalogPricePerSecond == null;
   const pricePerSecond =
-    getPricePerSecond(model.id, currency) ?? model.costPerSecond[currency] * discountFactor;
+    catalogPricePerSecond ?? model.costPerSecond[currency] * discountFactor;
   // Smart duration (-1) is reserved at the model's maximum length; the unused
   // seconds are refunded once the provider reports the real clip length.
   const billedSeconds = duration === -1
