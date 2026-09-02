@@ -6027,7 +6027,24 @@ serve(async (req) => {
             15,
             Math.max(3, Math.round(scene.durationSeconds)),
           );
-          const hhResolution = quality === "pro" ? "1080p" : "720p";
+          const hhTierResolution = quality === "pro" ? "1080p" : "720p";
+          // V538 A — v400 T4 contract raster for multi-speaker lip-sync plates.
+          // HappyHorse accepts 1080p across its whole 3–15 s range.
+          const hhV538 = v538PlateResolution({
+            isLipSyncPlate: isCinematicSyncHH,
+            speakerCount: v538SpeakerCount(scene.characterShots as any, scene.characterShot as any),
+            tierResolution: hhTierResolution,
+            hiResToken: "1080p",
+            hiResAllowed: true,
+          });
+          const hhResolution = hhV538.resolution;
+          if (hhV538.upgraded || hhV538.blockedByProvider) {
+            console.log(
+              `[compose-video-clips] ${V538_LOG} scene=${scene.id} provider=ai-happyhorse ` +
+                `tier=${hhTierResolution} final=${hhResolution} upgraded=${hhV538.upgraded} ` +
+                `blocked=${hhV538.blockedByProvider} reason=${hhV538.reason}`,
+            );
+          }
           const hhPromptRaw = isCinematicSyncHH
             ? buildCinematicSyncMasterPrompt(scene)
             : scene.aiPrompt;
