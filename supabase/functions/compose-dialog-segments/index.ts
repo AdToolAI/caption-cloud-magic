@@ -7564,6 +7564,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             size: preclipResult.crop.size,
             outputSize: preclipResult.crop.outputSize,
           };
+          // V542 — Herkunft der persistierten Geometrie. Ein statischer
+          // Recovery-Crop darf nie als dynamischer Pfad erscheinen; Mux und
+          // Reprojektion lesen exakt denselben Crop.
+          (pass as any).preclip_crop_source = v542RecoveryApplied
+            ? "v542_static_golden_core"
+            : "v452_dynamic";
+
           // V461 C — the real provider-facing dimensions of THIS pre-clip.
           // Telemetry must never fall back to plate dims again.
           (pass as any).preclip_dims = {
