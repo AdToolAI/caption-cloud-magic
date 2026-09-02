@@ -39,6 +39,14 @@ import { evaluateNoopRedispatch } from "../_shared/v461-input-fingerprint.ts";
 // `materializeCompatibilityOutput` gehört ausschließlich dem Finalizer.
 
 import { acquireLedgerJob, observeCallbackProvenance, readPipelineJobId, recordDiagnosticObservation } from "../_shared/v431-ledger.ts";
+// V541 — Wahrheits-Gate: ein Pass ohne Bewegungsnachweis darf nicht als
+// bewiesener Erfolg gezählt werden. Reine Kennzeichnung, keine Verhaltens-,
+// Gate-, Provider-, Retry- oder Refund-Änderung.
+import {
+  buildV541ReviewDetails,
+  classifyPassTruth,
+  V541_NEEDS_REVIEW_VERDICT,
+} from "../_shared/v541-truth-gate.ts";
 // FA-4 Provider-No-op Fix Contract C′ — PURE motion classifier (LEGACY
 // TELEMETRY since V465-B2b; never authoritative).
 import {
@@ -2391,6 +2399,44 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       if (!successRes) {
         return ok({ ok: true, skipped: "apply_unavailable", scene_id: sceneId, job_id: jobId });
       }
+      // V541 — Wahrheits-Gate. Der Write-Contract bleibt `ssw:success`
+      // (ein abweichender Write-Id erzeugt `write_id_mismatch` und endlosen
+      // Watchdog-Re-Forward). Sichtbar wird die Wahrheit als append-only
+      // Telemetrie: ein Run mit `v541_needs_review` zählt NIE als Erfolg.
+      const v541Truth = classifyPassTruth({
+        motionUnverifiedPassthrough: !!v443MotionUnverifiedPassthrough,
+        reason: v466GrayPassthrough
+          ? "v466_gray_band"
+          : v458RoiUnresolvedPassthrough
+          ? "mouth_roi_unresolved"
+          : v500UnverifiedPassthrough
+          ? "v500_noop_unverified_anchor"
+          : "probe_infra_error",
+      });
+      if (v541Truth.needsReview) {
+        await recordDiagnosticObservation(supabase, {
+          handler: "sync-so-webhook",
+          verdict: V541_NEEDS_REVIEW_VERDICT,
+          stage: "sync_segment",
+          pipelineJobId: v431CallbackJobId ?? null,
+          sceneId,
+          runId: ((scene as any)?.active_run_id ?? null) as string | null,
+          plateGeneration: Number.isFinite(Number((scene as any)?.plate_generation))
+            ? Number((scene as any).plate_generation)
+            : null,
+          externalJobId: jobId ? String(jobId) : null,
+          details: buildV541ReviewDetails({
+            passIdx: successRes.pass_idx ?? currentPass,
+            totalPasses: Number(successRes.total_passes ?? totalPasses) || null,
+            reason: v541Truth.reason,
+            source: "webhook",
+          }),
+        });
+        console.warn(
+          `[sync-so-webhook] v541_needs_review scene=${sceneId} pass=${successRes.pass_idx ?? currentPass} ` +
+            `reason=${v541Truth.reason} — pass läuft weiter, zählt aber NICHT als bewiesener Erfolg`,
+        );
+      }
       console.log(
         `[sync-so-webhook] g322 scene=${sceneId} pass=${successRes.pass_idx ?? currentPass} success → verdict=${successRes.verdict} (${successRes.done_count ?? "?"}/${successRes.total_passes ?? totalPasses} done)`,
       );
@@ -2398,6 +2444,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         rehosted: !!rehostedUrl,
         noop_suspect: noopSuspect || undefined,
         motion_unverified: v443MotionUnverifiedPassthrough || undefined,
+        truth_state: v541Truth.state,
       });
 
     } else {
