@@ -250,6 +250,13 @@ import { rehostPlate } from "../_shared/rehostPlate.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { adoptPreAcquiredLedgerJob, bindSyncPassAttempt, readRetryContext, recordDiagnosticObservation as recordCallbackObservation, resolveLedgerDispatch, settleLedgerDispatchFailure } from "../_shared/v431-ledger.ts";
+// V542 — 2-Sprecher Golden-Core Preclip Recovery (Zulässigkeit + Telemetrie).
+import {
+  buildV542RecoveryDetails,
+  evaluateV542Recovery,
+  V542_RECOVERY_VERDICT,
+} from "../_shared/v542-static-golden-core-recovery.ts";
+
 import { evaluateTurnPassBinding, isStabilizerPass, type TurnPassCandidate } from "../_shared/fa4-turn-pass-guard.ts";
 import {
   buildImmutableArtifactKey,
@@ -7376,11 +7383,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
       try {
 
-        const preclipResult = await renderPassFacePreclip(
-          supabase,
-          serviceKey,
-          supabaseUrl,
-          {
+        const v542PreclipInput = {
+
             sceneId,
             projectId: String((scene as any).project_id ?? ""),
             // V447 — Run-Identität: bindet den Preclip an Lauf + Generation.
@@ -7474,9 +7478,92 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               }
               return path;
             },
-          },
+        };
+        let preclipResult = await renderPassFacePreclip(
+          supabase,
+          serviceKey,
+          supabaseUrl,
+          v542PreclipInput,
           300_000,
         );
+        // ── V542 — 2-Sprecher Golden-Core Preclip Recovery ────────────────
+        //
+        // Die beiden belegten dynamischen Fehlerklassen sind Aussagen über den
+        // TRACK, nicht über eine real unmögliche Geometrie (Produktionsbefund:
+        // 2,24 px Konflikt bei unbewegtem Pfad bzw. sechs verworfene Samples,
+        // bei vollständigem Identity-Lock). Derselbe Turn bekommt genau EINEN
+        // statischen Versuch mit dem gemessenen Golden-Core-Crop.
+        //
+        // Kein Threshold wird gesenkt: der statische Versuch durchläuft den
+        // unveränderten V461-Face-/Containment-Vertrag. Kein Full-Plate,
+        // kein Provider-Call, kein Retry-Zähler, keine Refund-Änderung.
+        let v542RecoveryApplied = false;
+        if (!preclipResult.ok) {
+          const v542Decision = evaluateV542Recovery({
+            speakerCount: speakers.length,
+            preclipError: preclipResult.error ?? null,
+            preclipErrorClass: preclipResult.errorClass ?? null,
+            identityResolvedCount: (plateIdentityMap as any)?.resolvedCount ?? null,
+            dynamicAttempted: true,
+          });
+          if (v542Decision.eligible) {
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v542_static_golden_core_retry ` +
+                `dynamic_reason=${v542Decision.matchedReason} speakers=${speakers.length} — retrying with static crop`,
+            );
+            const staticAttempt = await renderPassFacePreclip(
+              supabase,
+              serviceKey,
+              supabaseUrl,
+              {
+                ...v542PreclipInput,
+                // Golden-Core: statischer, assignment-locked Face-Center-Crop.
+                turnFaceBoxes: null,
+                turnFaceSamples: null,
+                // Kein Retracking, kein eingefrorener dynamischer Pfad:
+                // der statische Crop IST der Golden-Core.
+                buildCameraPath: undefined,
+                frozenCameraPath: null,
+
+              },
+              300_000,
+            );
+            v542RecoveryApplied = !!staticAttempt.ok;
+            await recordCallbackObservation(supabase, {
+              handler: "compose-dialog-segments",
+              verdict: V542_RECOVERY_VERDICT,
+              stage: "dialog_dispatch",
+              pipelineJobId: null,
+              sceneId,
+              runId: ((scene as any)?.active_run_id ?? null) as string | null,
+              plateGeneration: Number.isFinite(Number((scene as any)?.plate_generation))
+                ? Number((scene as any).plate_generation)
+                : null,
+              externalJobId: null,
+              details: buildV542RecoveryDetails({
+                passIdx: currentPassIdx,
+                totalPasses: passes.length,
+                matchedReason: v542Decision.matchedReason,
+                outcome: staticAttempt.ok ? "recovered" : "static_also_refused",
+                speakerCount: speakers.length,
+                identityResolvedCount: (plateIdentityMap as any)?.resolvedCount ?? null,
+              }),
+            });
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v542_static_golden_core_result ` +
+                `ok=${staticAttempt.ok} err=${staticAttempt.error ?? "-"} class=${staticAttempt.errorClass ?? "-"}`,
+            );
+            // Erfolg ersetzt das Ergebnis; ein erneutes Refusal behält die
+            // ursprüngliche dynamische Diagnose als führenden Fehler.
+            if (staticAttempt.ok) preclipResult = staticAttempt;
+          } else {
+            console.log(
+              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v542_recovery_skipped ` +
+                `reason=${v542Decision.reason}`,
+            );
+          }
+        }
+
         if (preclipResult.ok && preclipResult.preclipUrl && preclipResult.crop) {
           passPreclipUrl = preclipResult.preclipUrl;
           usePassPreclip = true;
@@ -7488,6 +7575,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             size: preclipResult.crop.size,
             outputSize: preclipResult.crop.outputSize,
           };
+          // V542 — Herkunft der persistierten Geometrie. Ein statischer
+          // Recovery-Crop darf nie als dynamischer Pfad erscheinen; Mux und
+          // Reprojektion lesen exakt denselben Crop.
+          (pass as any).preclip_crop_source = v542RecoveryApplied
+            ? "v542_static_golden_core"
+            : "v452_dynamic";
+
           // V461 C — the real provider-facing dimensions of THIS pre-clip.
           // Telemetry must never fall back to plate dims again.
           (pass as any).preclip_dims = {
