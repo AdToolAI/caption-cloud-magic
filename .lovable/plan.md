@@ -34,6 +34,10 @@ Request-Payloads gegen den dokumentierten Vertrag.
 4. Nutzen wir `segments[]` oder N einzelne verkettete Generierungen?
 5. Welche unserer eigenen Gates blocken vor dem Provider, obwohl die Doku den
    Fall gar nicht als Fehler kennt?
+6. **Neu (aus der offiziellen Anleitung):** Was passiert, wenn wir *keinen*
+   eigenen Preclip bauen, sondern die volle Platte plus `active_speaker_detection`
+   an `sync-3` geben? Ein einziger kontrollierter A/B-Lauf, Variante A = heutiger
+   enger Preclip, Variante B = Full-Shot + ASD.
 
 **Ergebnis:** eine Tabelle „unser Payload vs. Doku-Vertrag" mit maximal drei
 belegten Abweichungen. Kein Code, kein Deploy.
@@ -44,13 +48,17 @@ Bewusst genau vier, in dieser Reihenfolge, jede einzeln überprüfbar:
 
 **Änderung 1 — Modellvertrag: `sync-3` für alle Lip-Sync-Pässe.**
 Es ist das einzige dokumentierte Modell für bewegte Figuren, Seitenansichten,
-Teilgesichter und stille Lippen. Höherer Preis pro Sekunde, dafür verschwindet
-die Still-Frame-Klasse. Ein zentraler Wert, kein Umbau.
+Teilgesichter und stille Lippen — und laut offizieller Anleitung das Modell mit
+Full-Shot-Verarbeitung und räumlichem Verständnis für mehrere Personen. Höherer
+Preis pro Sekunde, dafür verschwindet die Still-Frame-Klasse.
 
-**Änderung 2 — Crop zurück in den belegten Korridor.**
-`targetFaceShare` von 0.42 auf den Golden-Run-Bereich, Mund garantiert vollständig
-im Frame, statt mundzentriert übertight. Ein Wert im eingefrorenen Contract, wirkt
-auf alle Sprecherzahlen gleich.
+**Änderung 2 — Eingangsbild: Full-Shot + ASD statt engem Preclip.**
+Der offizielle Weg für Mehrsprecher-Videos ist entweder ASD-Auto-Detect oder eine
+explizite Ziel-Box im nativen Raum — nicht ein selbst gerechneter, mundzentrierter
+Ultra-Crop. Falls Gate 0 zeigt, dass Variante B trifft: Preclip wird zur
+Rückfallebene. Falls Variante A gewinnt: nur `targetFaceShare` von 0.42 zurück in
+den Golden-Korridor (0.25–0.40) und Mund garantiert vollständig im Frame.
+
 
 **Änderung 3 — Ehrlichkeit: gemessener `noop` ist kein Erfolg.**
 Läufe, in denen *alle* Pässe messbar `noop` sind, werden nicht als fertige Szene
