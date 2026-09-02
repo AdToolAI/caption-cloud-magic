@@ -38,7 +38,7 @@ export const AdvancedTab = () => {
       a.download = `adtool-data-export-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
       URL.revokeObjectURL(url);
 
       toast({ title: t("accountAdvanced.exportSuccess"), description: t("accountAdvanced.exportSuccessDesc") });

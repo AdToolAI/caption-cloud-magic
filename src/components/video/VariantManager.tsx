@@ -30,7 +30,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
       link.download = filename;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       window.URL.revokeObjectURL(downloadUrl);
       toast.success(tx({ de: "Download gestartet", en: "Download started", es: "Descarga iniciada" }));
     } catch (error) {

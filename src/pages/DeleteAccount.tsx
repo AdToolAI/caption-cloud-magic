@@ -52,7 +52,7 @@ const DeleteAccount = () => {
       a.download = `adtool-data-export-${new Date().toISOString().split("T")[0]}.json`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
       URL.revokeObjectURL(url);
 
       toast({ title: tx({ de: "Export erfolgreich", en: "Export successful", es: "Exportación exitosa" }), description: tx({ de: "Ihre Daten wurden heruntergeladen.", en: "Your data has been downloaded.", es: "Tus datos han sido descargados." }) });

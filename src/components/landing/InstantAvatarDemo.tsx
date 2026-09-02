@@ -155,7 +155,7 @@ export const InstantAvatarDemo = () => {
     link.download = `adtool-ai-avatar-${style}-${f.angle}deg.png`;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
   }, [frames, angleIdx, style]);
 
   const handleDownloadZip = useCallback(async () => {
@@ -171,7 +171,7 @@ export const InstantAvatarDemo = () => {
     link.download = `adtool-ai-avatar-${style}-turnaround.zip`;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }, [availableFrames, style]);
 

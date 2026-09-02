@@ -187,7 +187,7 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      a.remove();
       toast({ title: t('aiVid.videoDownloaded'), description: t('aiVid.videoDownloadedDesc') });
     } catch (error) {
       console.error('Download error:', error);

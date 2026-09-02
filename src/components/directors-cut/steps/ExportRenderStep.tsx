@@ -524,7 +524,7 @@ export function ExportRenderStep({
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      a.remove();
       toast.success(tx({ de: 'Download gestartet', en: 'Download started', es: 'Descarga iniciada' }));
     } catch (error) {
       console.error('Download error:', error);

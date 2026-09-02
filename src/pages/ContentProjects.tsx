@@ -68,7 +68,7 @@ export default function ContentProjects() {
       link.download = filename || "video.mp4";
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       window.URL.revokeObjectURL(downloadUrl);
       toast.success(tx({ de: "Video wird heruntergeladen", en: "Video is downloading", es: "El vídeo se está descargando." }));
     } catch (error) {

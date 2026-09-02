@@ -42,7 +42,7 @@ const triggerDownload = (url: string, filename: string) => {
   a.rel = 'noopener noreferrer';
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
+  a.remove();
 };
 
 export function useNLEExport(projectId?: string) {
