@@ -282,7 +282,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v408-fa4-predeploy-final";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v544-v400-preclip-authority";
 
 // v249 — Slice A: surface v247 mouth-anchor preclip metrics as top-level columns
 // on `syncso_dispatch_log` so v248-Slice-4 ladder in `report-lipsync-motion-probe`
@@ -6573,101 +6573,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
 
 
-    // ── v153.1 — Single-Path bbox-url-pro Pipeline (N=1..4 einheitlich) ──
-    // PRECLIP IS DEAD. Es gibt nur noch einen einzigen Dispatch-Pfad:
-    // Full-Plate + `bounding_boxes_url` mit plate-nativer Box pro Sprecher.
-    //
-    // Aktivierung: jede frische (nicht-noop-escalation) Dispatch braucht
-    //  - plateDims (sonst hat die Scene-Pre-Flight längst hart gefailt)
-    //  - eine plate-native Box für DIESEN Sprecher — gilt einheitlich
-    //    für N=1, 2, 3, 4 (kein synthetic-coords-Fallback mehr für N=1).
-    //
-    // Wenn das nicht erfüllt ist, hat die Scene-Pre-Flight (Z. ~1326)
-    // bereits hart gefailt + refunded. Hier ist es daher ein simples Flag.
-    const v153HasPlateBox =
-      Array.isArray(speakerPlateBboxes?.[pass.speaker_idx]) &&
-      (speakerPlateBboxes![pass.speaker_idx] as any[]).length === 4;
-    // ══ V543 — FULL-SHOT DISPATCH IST WIEDER DER PRIMÄRPFAD ═══════════════
-    //
-    // Gate-0-Befund (Szene 7aa7fc93…, Gen 7, alle 4 Pässe noop):
-    // Der Selbst-Crop wurde aus EINER Snapshot-Box geplant, der Face-Track
-    // lieferte 0 Samples und die Mundposition kam aus `pose_estimate`.
-    // Bewegen sich die Figuren, wandert der Mund aus dem Fenster —
-    // `mouth_over_frame` 1.18–1.81 in der Messung. Sync.so bekam dann einen
-    // Clip ohne verwertbaren Mund → noop.
-    //
-    // sync-3 ist laut Anbieter-Vertrag dafür gebaut, den GANZEN Shot zu
-    // sehen und den Sprecher räumlich selbst zu verfolgen; die Box ist reine
-    // Sprecher-AUSWAHL, kein Bildausschnitt. Der Preclip nahm sync-3 exakt
-    // diese Fähigkeit weg — deshalb waren Bewegung und Lip-Sync unvereinbar.
-    //
-    // Identität bleibt unangetastet: die Box stammt weiterhin aus dem
-    // V524/V530-Lock (`speakerPlateBboxes[speaker_idx]`), `auto_detect`
-    // bleibt aus. Retries und NOOP-Eskalation fallen bewusst auf den
-    // bisherigen Preclip-Pfad zurück (Fallback, nicht Ersatz).
-    const V543_FULLPLATE_ENABLED =
-      (Deno.env.get("FEATURE_V543_FULLPLATE") ?? "1") !== "0";
-    const v543CandidateEligible =
-      V543_FULLPLATE_ENABLED &&
-      !isRetry &&
-      body?.noop_auto_escalation !== true &&
-      !!plateDims &&
-      v153HasPlateBox &&
-      !(pass as any).preclip_url;
-    // V543-2 — Zeitbasis muss GEMESSEN sein, nicht angenommen. Ohne exakte
-    // Framezahl/FPS der versendeten Platte gibt es keinen Full-Shot-Dispatch:
-    // ein falsch langes Box-Array ist genau der Grund, warum Sync.so alle
-    // vier Pässe mit `generation_input_face_selection_invalid` abgelehnt hat.
-    const v543PlateMeta = v543CandidateEligible
-      ? await getPlateVideoMetaCached(passInputUrl)
-      : null;
-    const v153UnifiedBboxEligible = v543CandidateEligible &&
-      !!v543PlateMeta &&
-      v543PlateMeta.fps > 0 &&
-      v543PlateMeta.frameCount > 0;
-    if (!isRetry) {
-      console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v543_fullplate_gate enabled=${V543_FULLPLATE_ENABLED} candidate=${v543CandidateEligible} eligible=${v153UnifiedBboxEligible} speakers=${speakers.length} plate_box=${v153HasPlateBox} cached_preclip=${!!(pass as any).preclip_url} probe_fps=${v543PlateMeta?.fps ?? "n/a"} probe_frames=${v543PlateMeta?.frameCount ?? "n/a"} probe_dur=${v543PlateMeta?.durationSec ?? "n/a"} — sync-3 full-shot + bounding_boxes_url`,
-      );
-      if (v543CandidateEligible && !v153UnifiedBboxEligible) {
-        console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v543_fullplate_declined reason=plate_timebase_unmeasurable — falling back to preclip path`,
-        );
-      }
-    }
-
-
-    if (v153UnifiedBboxEligible) {
-      (pass as any).preclip_url = null;
-      (pass as any).preclip_render_id = null;
-      (pass as any).preclip_crop = null;
-      (pass as any).preclip_error = null;
-      (pass as any)._v152BboxPrimary = true; // legacy flag name kept for downstream gates
-      (pass as any)._v153BboxPrimary = true;
-      // V543-2 — die GEMESSENE Zeitbasis des versendeten Videos. Sie ist ab
-      // hier die einzige Quelle für `frameCount`/`fps` im Full-Shot-Pfad.
-      (pass as any)._v543PlateMeta = v543PlateMeta;
-
-      // v181 — N=1 Depicted-Face Lock telemetry.
-      // When a single-speaker scene has 2+ faces in the FULL plate (phone
-      // screen, photo, mirror, background person), the bbox-url-pro path
-      // already pins Sync.so to the cast speaker box. We surface a clear
-      // log line so QA can verify the lock fired and so future regressions
-      // are visible without re-reading source.
-      const v181PlateFaceCount = Number(plateIdentityMap?.faces?.length ?? 0);
-      const v181CastBox = speakerPlateBboxes?.[pass.speaker_idx] ?? null;
-      if (speakers.length === 1 && v181PlateFaceCount >= 2) {
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v181_n1_depicted_face_lock ` +
-          `plate_face_count=${v181PlateFaceCount} cast_box=${JSON.stringify(v181CastBox)} ` +
-          `speaker=${pass.speaker_name ?? "?"} — forcing strict bbox-url-pro on cast face`,
-        );
-        (pass as any)._v181DepictedFaceLock = true;
-      }
-      console.warn(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v153.2_unified_bbox_primary speakers=${speakers.length} plate_box=yes resolved=${plateIdentityMap?.resolvedCount ?? "?"} speaker=${pass.speaker_name ?? "?"} plate_face_count=${v181PlateFaceCount} — bbox-url-pro SINGLE PATH (no preclip, no auto_detect, no synthetic)`,
-      );
-    }
+    // V544 — v400 preclip authority (N=1..4). The V543 full-shot experiment
+    // reached its bounded stop criterion: accepted provider jobs completed
+    // without measurable or visible mouth motion. Clear every legacy marker
+    // before dispatch selection so neither an env flag nor stale pass state can
+    // reopen full-shot. Identity/assignment locks still feed the preclip crop.
+    delete (pass as any)._v152BboxPrimary;
+    delete (pass as any)._v153BboxPrimary;
+    delete (pass as any)._v543PlateMeta;
+    console.log(
+      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v544_v400_preclip_authority speakers=${speakers.length} — full-shot dispatch disabled`,
+    );
 
 
 
@@ -7924,7 +7840,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           // terminalizes. The previous refusal path persisted only
           // `rendering_preflight` and left the geometry unreconstructable.
           (pass as any)._v461_crop_feasibility = (preclipResult as any).cropFeasibility ?? null;
-          if (speakers.length >= 2) {
+          {
             // FA-4/P0 — presenter only: an infrastructure/dispatch problem is NOT a
             // timeout. `dispatch_uncertain` keeps its own diagnosis class.
             const speakerLabel = pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`;
@@ -7990,13 +7906,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
               422,
             );
           }
-          console.warn(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render FAILED err=${preclipResult.error} class=${preclipResult.errorClass} — falling back to full-plate dispatch`,
-          );
         }
       } catch (preclipErr) {
         (pass as any).preclip_error = (preclipErr as Error)?.message ?? String(preclipErr);
-        if (speakers.length >= 2) {
+        {
           const preclipErrorMessage = (preclipErr as Error)?.message ?? String(preclipErr);
           const reason = `v187_preclip_required_no_fullplate_fallback: Preclip für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" ist fehlgeschlagen (${preclipErrorMessage}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
           console.error(
@@ -8039,9 +7952,6 @@ serve((req: Request) => withLang(req, () => (async (req) => {
             422,
           );
         }
-        console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render THREW: ${(preclipErr as Error)?.message} — falling back to full-plate dispatch`,
-        );
       }
     } else if (usePassPreclip) {
       console.log(
@@ -8434,7 +8344,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_bbox_framecount space=${v161UsingPreclipForBbox ? "clip" : "plate"} source=${frameCountSource} fps=${dispatchFps} preclip_frames=${preclipPersistedFrameCount || "?"} probe_dur=${__probedPlateDurSec ? __probedPlateDurSec.toFixed(3) : "?"} requested_total=${totalSec}s probed_frames=${__probedFrames ?? "?"} used=${frameCount}`,
       );
-      if (v161UsingPreclipForBbox && frameCountSource === "ceil_total_duration") {
+      if (v161UsingPreclipForBbox && preclipPersistedFrameCount <= 0) {
         (pass as any)._v152HardFail = {
           reason: "preclip_frame_count_unavailable",
           errorClass: "v163_preclip_frame_count_unavailable",
@@ -9827,11 +9737,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // instead of the full multi-face plate. Sync.so sees one face only →
     // no `provider_unknown_error` ambiguity. The audio-mux Lambda overlays
     // the lipsynced crop back at preclip_crop on the original plate.
-    // V543 — der v204-Preclip-Zwang gilt nur noch für den Fallback-Pfad.
-    // Ein bewusst gewählter Full-Shot-Dispatch (identitäts-gelockte Box,
-    // auto_detect aus) ist kein "Full-Plate-Fallback" im Sinne von v204.
-    const v204MultiSpeakerPreclipDispatch =
-      speakers.length >= 2 && !(pass as any)._v153BboxPrimary;
+    // V544 — the isolated v400 preclip is authoritative for N=1..4. This is
+    // intentionally not count-gated: no speaking pass may reach Sync.so with
+    // the whole plate after the V543 full-shot experiment failed its outcome.
+    const v204MultiSpeakerPreclipDispatch = true;
 
     if (v204MultiSpeakerPreclipDispatch && (!usePassPreclip || !passPreclipUrl)) {
       return await failBeforeProviderDispatch(
