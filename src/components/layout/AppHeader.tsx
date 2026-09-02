@@ -13,6 +13,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { SocialConnectionIcons } from "@/components/dashboard/SocialConnectionIcons";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { StreakBadge } from "@/components/streak/StreakBadge";
+import { WalletBadge } from "@/components/layout/WalletBadge";
 import { FounderCrest } from "@/components/founders/FounderCrest";
 
 export function AppHeader() {
