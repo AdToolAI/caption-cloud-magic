@@ -393,7 +393,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   }, [model.id]);
 
   // Canonical per-second price from server catalog (falls back to local config).
-  const { getPricePerSecond, isReady: catalogReady } = useVideoPricingCatalog();
+  const { getPricePerSecond, getTotalCost, isReady: catalogReady } = useVideoPricingCatalog();
   const { discountFactor } = useAccountType();
   // Catalog prices are already personalized; the local fallback is a list price.
   const catalogPricePerSecond = getPricePerSecond(model.id, currency);
@@ -407,7 +407,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const billedSeconds = duration === -1
     ? Math.max(...model.durations)
     : duration;
-  const cost = billedSeconds * pricePerSecond;
+  // Total is rounded exactly like the backend deduction (once, at the end).
+  const cost = getTotalCost(model.id, currency, billedSeconds)
+    ?? billedSeconds * pricePerSecond;
 
   const symbol = currency === 'USD' ? '$' : '€';
   const isUnlimited = (wallet as any)?.is_unlimited === true;
