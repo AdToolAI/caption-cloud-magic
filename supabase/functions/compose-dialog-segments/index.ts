@@ -6607,18 +6607,35 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // bisherigen Preclip-Pfad zurück (Fallback, nicht Ersatz).
     const V543_FULLPLATE_ENABLED =
       (Deno.env.get("FEATURE_V543_FULLPLATE") ?? "1") !== "0";
-    const v153UnifiedBboxEligible =
+    const v543CandidateEligible =
       V543_FULLPLATE_ENABLED &&
       !isRetry &&
       body?.noop_auto_escalation !== true &&
       !!plateDims &&
       v153HasPlateBox &&
       !(pass as any).preclip_url;
+    // V543-2 — Zeitbasis muss GEMESSEN sein, nicht angenommen. Ohne exakte
+    // Framezahl/FPS der versendeten Platte gibt es keinen Full-Shot-Dispatch:
+    // ein falsch langes Box-Array ist genau der Grund, warum Sync.so alle
+    // vier Pässe mit `generation_input_face_selection_invalid` abgelehnt hat.
+    const v543PlateMeta = v543CandidateEligible
+      ? await getPlateVideoMetaCached(passInputUrl)
+      : null;
+    const v153UnifiedBboxEligible = v543CandidateEligible &&
+      !!v543PlateMeta &&
+      v543PlateMeta.fps > 0 &&
+      v543PlateMeta.frameCount > 0;
     if (!isRetry) {
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v543_fullplate_gate enabled=${V543_FULLPLATE_ENABLED} eligible=${v153UnifiedBboxEligible} speakers=${speakers.length} plate_box=${v153HasPlateBox} cached_preclip=${!!(pass as any).preclip_url} — sync-3 full-shot + bounding_boxes_url`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v543_fullplate_gate enabled=${V543_FULLPLATE_ENABLED} candidate=${v543CandidateEligible} eligible=${v153UnifiedBboxEligible} speakers=${speakers.length} plate_box=${v153HasPlateBox} cached_preclip=${!!(pass as any).preclip_url} probe_fps=${v543PlateMeta?.fps ?? "n/a"} probe_frames=${v543PlateMeta?.frameCount ?? "n/a"} probe_dur=${v543PlateMeta?.durationSec ?? "n/a"} — sync-3 full-shot + bounding_boxes_url`,
       );
+      if (v543CandidateEligible && !v153UnifiedBboxEligible) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v543_fullplate_declined reason=plate_timebase_unmeasurable — falling back to preclip path`,
+        );
+      }
     }
+
 
     if (v153UnifiedBboxEligible) {
       (pass as any).preclip_url = null;
