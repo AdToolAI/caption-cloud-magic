@@ -9506,7 +9506,20 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v406_skip_audio_normalization frozen_audio=…${v406FrozenInput.audio_url.slice(-60)}`,
       );
+    } else if ((pass as any)._v153BboxPrimary === true) {
+      // V543-2 — Full-Shot: die führende Stille IST die Zeitinformation.
+      // Ein Lead-in-Trim würde das Audio gegen das Plate-Video verschieben und
+      // exakt die Zeitbasis zerstören, die dieser Pfad herstellt.
+      (pass as any).sync_audio_url = pass.audio_url;
+      (pass as any).audio_normalization = {
+        mode: "skipped_v543_fullshot_plate_aligned",
+        used_for: "syncso_input_only",
+      };
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v543_skip_audio_normalization plate_aligned=1`,
+      );
     } else try {
+
       const preclipDurForGate = typeof (pass as any).preclip_duration_sec === "number"
         && Number.isFinite((pass as any).preclip_duration_sec)
         && (pass as any).preclip_duration_sec > 0
