@@ -8397,9 +8397,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       // renderPassFacePreclip. Only legacy cached preclips fall back to
       // ceil(duration*fps); never round, because it produced 73/28 bbox frames
       // for 74/29-frame preclips and Sync.so failed with generation_unknown_error.
+      // V543-2 — im Full-Shot-Pfad kommen fps UND Framezahl aus der Messung
+      // der versendeten Platte (mdhd + stts), nicht aus ASSUMED_FPS = 24.
+      const v543Meta = !v161UsingPreclipForBbox
+        ? ((pass as any)._v543PlateMeta as
+          | { durationSec: number; fps: number; frameCount: number }
+          | null
+          | undefined) ?? null
+        : null;
       const dispatchFps = v161UsingPreclipForBbox
         ? Number((pass as any).preclip_fps ?? 30)
-        : ASSUMED_FPS;
+        : (v543Meta?.fps && v543Meta.fps > 0 ? v543Meta.fps : ASSUMED_FPS);
       const preclipPersistedFrameCount = v161UsingPreclipForBbox
         ? Math.round(Number((pass as any).preclip_frame_count ?? 0))
         : 0;
@@ -8408,16 +8416,21 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         : 0;
       const __probedPlateDurSec = v161UsingPreclipForBbox && preclipPersistedDurSec > 0
         ? preclipPersistedDurSec
-        : await getPlateDurationSecCached(probeUrlForBbox);
+        : (v543Meta?.durationSec ?? await getPlateDurationSecCached(probeUrlForBbox));
       const __probedFrames = __probedPlateDurSec
         ? Math.max(1, Math.ceil(__probedPlateDurSec * dispatchFps))
         : null;
       const frameCount = v161UsingPreclipForBbox && preclipPersistedFrameCount > 0
         ? preclipPersistedFrameCount
-        : (__probedFrames ?? Math.max(1, Math.ceil(totalSec * dispatchFps)));
+        : (v543Meta?.frameCount && v543Meta.frameCount > 0
+          ? v543Meta.frameCount
+          : (__probedFrames ?? Math.max(1, Math.ceil(totalSec * dispatchFps))));
       const frameCountSource = v161UsingPreclipForBbox && preclipPersistedFrameCount > 0
         ? "preclip_frame_count"
-        : (__probedFrames ? "ceil_probe_duration" : "ceil_total_duration");
+        : (v543Meta?.frameCount && v543Meta.frameCount > 0
+          ? "v543_stts_frame_count"
+          : (__probedFrames ? "ceil_probe_duration" : "ceil_total_duration"));
+
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_bbox_framecount space=${v161UsingPreclipForBbox ? "clip" : "plate"} source=${frameCountSource} fps=${dispatchFps} preclip_frames=${preclipPersistedFrameCount || "?"} probe_dur=${__probedPlateDurSec ? __probedPlateDurSec.toFixed(3) : "?"} requested_total=${totalSec}s probed_frames=${__probedFrames ?? "?"} used=${frameCount}`,
       );
