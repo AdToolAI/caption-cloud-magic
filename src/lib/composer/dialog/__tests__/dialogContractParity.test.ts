@@ -29,3 +29,36 @@ describe('resolveEffectiveDialog client/server parity', () => {
     expect(client).not.toMatch(/\bfetch\s*\(/);
   });
 });
+
+/**
+ * V537 — the canonical turn-identity contract is the second twin pair. It is
+ * the module that decides which turn keeps its UUID and which one is minted a
+ * new one; a client/server drift here would mean the editor and
+ * `compose-twoshot-audio` disagreeing about who a turn IS.
+ */
+describe('canonicalTurnIdentity client/server parity', () => {
+  it('mirror file is byte-identical', () => {
+    const root = process.cwd();
+    const client = readFileSync(
+      resolve(root, 'src/lib/composer/dialog/canonicalTurnIdentity.ts'),
+      'utf8',
+    );
+    const server = readFileSync(
+      resolve(root, 'supabase/functions/_shared/canonical-turn-identity.ts'),
+      'utf8',
+    );
+    expect(server).toBe(client);
+  });
+
+  it('contract module stays pure (no imports, no injected nondeterminism)', () => {
+    const src = readFileSync(
+      resolve(process.cwd(), 'src/lib/composer/dialog/canonicalTurnIdentity.ts'),
+      'utf8',
+    );
+    const code = src.replace(/\/\*\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(code).not.toMatch(/^\s*import\s/m);
+    expect(code).not.toMatch(/randomUUID/);
+    expect(code).not.toMatch(/\bfetch\s*\(/);
+    expect(code).not.toMatch(/Date\.now|Math\.random/);
+  });
+});

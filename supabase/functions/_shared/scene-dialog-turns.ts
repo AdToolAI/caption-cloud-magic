@@ -142,7 +142,15 @@ export function normalizeTurns(raw: unknown): DialogTurn[] {
     // dispatch — keep it out to match the "speakers who actually speak" rule.
     if (!text) continue;
     out.push({
-      turnId: (r as any).turnId ? String((r as any).turnId) : undefined,
+      // V537 — accept the legacy snake_case spelling the client-side
+      // normalizer already accepted. Reading only `turnId` here meant a
+      // stored `turn_id` was invisible to the server while visible to the
+      // client: the same row, two different identities.
+      turnId: (r as any).turnId
+        ? String((r as any).turnId)
+        : (r as any).turn_id
+        ? String((r as any).turn_id)
+        : undefined,
       characterId: cid,
       text,
       mood: (r as any).mood ? String((r as any).mood) : undefined,

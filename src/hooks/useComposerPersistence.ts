@@ -1,3 +1,9 @@
+import {
+  classifyCasAttempt,
+  isUsableCasToken,
+  MAX_AUDIO_PLAN_CAS_ATTEMPTS,
+  planAudioPlanWrite,
+} from '@/lib/composer/dialog/audioPlanOwnership';
 import { tx } from "@/lib/i18nText";
 import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -222,7 +228,17 @@ export function useComposerPersistence() {
               last_frame_url: scene.lastFrameUrl ?? null,
               end_reference_image_url: scene.endReferenceImageUrl ?? null,
               hybrid_target_scene_id: scene.hybridTargetSceneId ?? null,
-              audio_plan: (scene.audioPlan ?? null) as any,
+              // V537 — `audio_plan` is deliberately NOT in this payload.
+              //
+              // The column has two owners: the dialog studio authors the root VO timing
+              // fields, the edge functions author `twoshot` (audio url, segments,
+              // anchor_identity and the V537 canonical_turn_ids snapshot). PostgREST
+              // replaces jsonb whole, so sending the local object here erased the server
+              // half — and `SceneDialogStudio` REPLACES `scene.audioPlan` wholesale after
+              // TTS, without a `twoshot` key, so that happened on the ordinary edit path,
+              // not only on a stale one.
+              //
+              // It is merged against a fresh read and CAS-fenced below instead.
               audio_source: (scene as any).audioSource ?? null,
               sound_design: (scene as any).soundDesign ?? null,
               camera_choreography_en: (scene as any).cameraChoreographyEN ?? null,
@@ -241,6 +257,97 @@ export function useComposerPersistence() {
           if (updErr) {
             console.warn('[persistence] Scene update failed:', updErr);
           }
+
+          // ══ V537 — FENCED MERGE OF THE SHARED audio_plan COLUMN ═══════
+          //
+          // A fresh read alone is a TOCTOU: the client can SELECT the old
+          // twoshot, compose-twoshot-audio can write a new one, and the
+          // client can then write the old one back. `composer_scenes` has
+          // `update_composer_scenes_updated_at BEFORE UPDATE ... FOR EACH
+          // ROW`, so every write by anyone stamps `updated_at` — a complete
+          // optimistic token. Read it with the plan, send it back as a
+          // predicate, and an intervening write of any kind costs us the
+          // row instead of costing the server its snapshot.
+          //
+          // Zero rows is NOT an error in supabase-js, so `.select('id')`
+          // is what makes a CAS miss visible at all.
+          // Settled means the column ended in the state this save intended:
+          // written, or deliberately left alone because there was nothing to
+          // say. Anything else must NOT be reported as a persisted scene.
+          let audioPlanSettled = false;
+          let audioPlanFailure: string | null = null;
+          for (let attempt = 1; attempt <= MAX_AUDIO_PLAN_CAS_ATTEMPTS; attempt += 1) {
+            const { data: fresh, error: readErr } = await supabase
+              .from('composer_scenes')
+              .select('audio_plan, updated_at')
+              .eq('id', scene.id)
+              .maybeSingle();
+            if (readErr) {
+              audioPlanFailure = `read_failed:${readErr.message ?? readErr}`;
+              break;
+            }
+
+            const write = planAudioPlanWrite(scene.audioPlan, (fresh as any)?.audio_plan);
+            if (write.kind === 'omit') {
+              // No local plan → no opinion → the column is intentionally
+              // untouched. That is a settled outcome, not a failure.
+              audioPlanSettled = true;
+              break;
+            }
+
+            const token = (fresh as any)?.updated_at;
+            if (!isUsableCasToken(token)) {
+              // `composer_scenes.updated_at` is NOT NULL DEFAULT now(), so a
+              // row without a usable token should not exist. If one somehow
+              // does, the honest answer is that this write cannot be fenced —
+              // and an unfenced write is exactly what would destroy the
+              // server's twoshot snapshot. Fail closed instead.
+              audioPlanFailure = 'cas_token_missing';
+              break;
+            }
+
+            const { data: casRows, error: casErr } = await supabase
+              .from('composer_scenes')
+              .update({ audio_plan: write.audioPlan as any })
+              .eq('id', scene.id)
+              .eq('updated_at', token)
+              .select('id');
+            const outcome = classifyCasAttempt(casErr, casRows);
+            if (outcome === 'error') {
+              audioPlanFailure = `write_failed:${casErr?.message ?? casErr}`;
+              break;
+            }
+            if (outcome === 'applied') {
+              audioPlanSettled = true;
+              break;
+            }
+            // Missed: someone wrote in between. Re-read and re-merge against
+            // the NEWER twoshot, then try again. Bounded, never a spin.
+            if (attempt === MAX_AUDIO_PLAN_CAS_ATTEMPTS) {
+              audioPlanFailure = `cas_exhausted_after_${attempt}_attempts`;
+            }
+          }
+
+          if (!audioPlanSettled) {
+            // The scene's other columns are already written, but the client's
+            // own audio-plan timing fields are not — and reporting success
+            // here would mark the scene persisted while that data only exists
+            // in the browser. Reject truthfully instead.
+            //
+            // Deliberately NOT followed by an unfenced fallback write: losing
+            // one local timing update is recoverable on the next autosave,
+            // destroying the server's twoshot snapshot is not.
+            //
+            // `ensureProjectPersisted` releases its in-flight cache in a
+            // `finally`, so the next attempt is free to retry.
+            console.error(
+              `[persistence] audio_plan_cas_exhausted scene=${scene.id} reason=${audioPlanFailure ?? 'unknown'} — server plan left intact`,
+            );
+            throw new Error(
+              `audio_plan_cas_exhausted:${audioPlanFailure ?? 'unknown'} scene=${scene.id}`,
+            );
+          }
+
           persistedScenes.push({ ...scene, projectId: projectId! });
         } else {
           // Insert new
