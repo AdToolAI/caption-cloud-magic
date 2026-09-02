@@ -20,6 +20,8 @@ import { verifyAnchorObject, blocksProviderDispatch, isResetOwnedGeneratedAnchor
 import { sanitizeAnchorReason } from "../_shared/anchor-inline-images.ts";
 import { failPlateAttemptForRun } from "../_shared/plate-attempt.ts";
 import { v538PlateResolution, v538SpeakerCount } from "../_shared/v538-plate-resolution.ts";
+/** V538 A — one log token so the raster decision is greppable in production. */
+const V538_LOG = "v538_plate_resolution";
 
 import {
   countDialogSpeakers,
