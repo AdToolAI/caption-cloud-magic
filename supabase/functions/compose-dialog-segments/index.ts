@@ -10143,6 +10143,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         sceneId,
         passIdx: currentPassIdx,
         preclipTrusted: preclipTrustedForGate,
+        // V538 C — the v400 gate (V461 A, ~line 9539) already passed for this
+        // pass; failing it here would terminalize a dispatch that satisfies
+        // the authoritative input contract. Only a LARGER competing face
+        // still fails closed.
+        v461Passed: v461Gate.ok === true,
       });
       if (gate.frame_jpeg_url) {
         (pass as any).probe_frame_url = gate.frame_jpeg_url;
