@@ -251,8 +251,19 @@ export function ImageGenerator() {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    // uploadReference calls back twice (local preview, then the storage URL):
+    // append on the first call, replace that slot on every later one.
+    let slot = -1;
     void uploadReference(file, (url) => {
-      setExtraReferences(prev => (url ? [...prev, url].slice(0, Math.max(0, maxSubjectRefs - 1)) : prev));
+      setExtraReferences(prev => {
+        if (slot === -1) {
+          if (!url) return prev;
+          slot = prev.length;
+          return [...prev, url].slice(0, Math.max(0, maxSubjectRefs - 1));
+        }
+        if (!url) return prev.filter((_, i) => i !== slot);
+        return prev.map((u, i) => (i === slot ? url : u));
+      });
     });
   };
 
