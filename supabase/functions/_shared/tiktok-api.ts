@@ -83,15 +83,14 @@ export async function exchangeCodeForTokens(code: string): Promise<TikTokTokenRe
   }
 
   const data = await response.json();
-  
-  // TikTok returns tokens directly in the response body
-  if (data.error) {
-    console.error('TikTok API error:', data);
-    throw new Error(data.error?.message || 'Token exchange failed');
+
+  const parsed = parseTikTokTokenResponse(data);
+  if (!parsed.ok) {
+    console.error('TikTok token exchange rejected:', { code: parsed.code, message: parsed.message });
+    throw new TikTokTokenError(parsed.code, parsed.message);
   }
-  
-  // Return the data directly (not data.data)
-  return data;
+
+  return parsed.tokens;
 }
 
 // Refresh Access Token
@@ -115,17 +114,22 @@ export async function refreshAccessToken(refreshToken: string): Promise<TikTokTo
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Token refresh failed:', { status: response.status, error: errorText });
-    throw new Error(`Token refresh failed: ${response.status}`);
+    throw new TikTokTokenError('HTTP_ERROR', `Token refresh failed: ${response.status}`);
   }
 
   const data = await response.json();
-  
-  if (data.error || !data.data) {
-    throw new Error(data.error?.message || 'Token refresh failed');
+
+  // TikTok OAuth v2 returns the token fields FLAT; older/nested shapes are
+  // still accepted for backward compatibility.
+  const parsed = parseTikTokTokenResponse(data);
+  if (!parsed.ok) {
+    console.error('TikTok token refresh rejected:', { code: parsed.code, message: parsed.message });
+    throw new TikTokTokenError(parsed.code, parsed.message);
   }
-  
-  return data.data;
+
+  return parsed.tokens;
 }
+
 
 // Check if token needs refresh (5min buffer)
 export function needsRefresh(expiresAt: string): boolean {
