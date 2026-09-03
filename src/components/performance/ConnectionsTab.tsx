@@ -26,6 +26,7 @@ import { XConnectionCard } from "./XConnectionCard";
 import { FacebookPageSelectDialog } from "./FacebookPageSelectDialog";
 import { RefreshCw } from "lucide-react";
 import { tx } from '@/lib/i18nText';
+import { classifyConnectionHealth } from '@/lib/socialConnectionHealth';
 
 const PROVIDERS = [
   { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'bg-pink-500' },
