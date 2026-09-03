@@ -137,12 +137,22 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     });
   } catch (error) {
     console.error("Error creating enterprise checkout:", error);
+    const isStripeMethodError = error instanceof Error &&
+      /payment_method|payment method|not available|not supported|currency/i.test(error.message);
+    const status = isStripeMethodError ? 400 : 400;
+    const message = isStripeMethodError
+      ? tl({
+          de: "Die gewählte Zahlungsart ist für diese Währung oder Region nicht verfügbar. Bitte versuche es mit einer anderen Methode.",
+          en: "The selected payment method is not available for this currency or region. Please try another method.",
+          es: "El método de pago seleccionado no está disponible para esta moneda o región. Por favor, prueba con otro método.",
+        })
+      : (error instanceof Error ? error.message : String(error));
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
+      JSON.stringify({ error: message }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
+        status,
       }
     );
   }
-});
+})(req)));
