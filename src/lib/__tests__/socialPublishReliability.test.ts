@@ -169,6 +169,6 @@ describe('classifyConnectionHealth', () => {
   });
 
   it('returns missing for no connection at all', () => {
-    expect(classifyConnectionHealth(null, NOW).health).toBe('missing');
+    expect(classifyConnectionHealth(null, NOW.getTime()).health).toBe('missing');
   });
 });
