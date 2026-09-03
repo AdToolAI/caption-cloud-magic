@@ -122,10 +122,16 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       styleReferenceUrls,
       editMode = false,
       textFree = false,
+      mode = 'create',
     } = await req.json();
 
     if (!prompt) {
       return new Response(JSON.stringify({ ok: false, code: 400, step: 'validation', error: 'Prompt is required' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    if (!['create', 'transform', 'restyle', 'mix'].includes(mode)) {
+      return new Response(JSON.stringify({ ok: false, code: 'MODE_NOT_SUPPORTED', step: 'validation', error: 'Unsupported image mode' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -203,7 +209,12 @@ MANDATORY RULES:
       ...(referenceImageUrl ? [referenceImageUrl] : []),
       ...(Array.isArray(styleReferenceUrls) ? styleReferenceUrls : []),
       ...(styleReferenceUrl ? [styleReferenceUrl] : []),
-    ].filter(Boolean).slice(0, 4);
+    ].filter(Boolean);
+    if (refUrls.length > 4) {
+      return new Response(JSON.stringify({ ok: false, code: 'REFERENCE_LIMIT_EXCEEDED', step: 'validation', error: 'Gemini accepts at most 4 reference images' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     const messages: any[] = [];
     if (refUrls.length) {

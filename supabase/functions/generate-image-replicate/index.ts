@@ -51,6 +51,10 @@ interface GenerateRequest {
   /** Exact pixel size — only honored by models with `sizing.kind === 'exact'`. */
   width?: number;
   height?: number;
+  /** Provider-native output option (for example 2K or optimize_for_quality). */
+  resolution?: string;
+  mode?: 'create' | 'transform' | 'restyle' | 'mix';
+  strength?: number;
   style?: string;
   brandKit?: {
     name?: string;
@@ -133,7 +137,7 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateRequest;
-    const { prompt, tier, aspectRatio = '1:1', referenceImageUrl, styleReferenceUrl, style = 'realistic', brandKit } = body;
+    const { prompt, tier, aspectRatio = '1:1', referenceImageUrl, styleReferenceUrl, style = 'realistic', brandKit, mode = 'create' } = body;
 
     if (!prompt?.trim()) {
       return new Response(
@@ -201,6 +205,12 @@ serve(async (req) => {
 
     // --- Capability-driven reference handling -------------------------------
     const cap = capabilityFor(tier);
+    if (!cap?.modes.includes(mode)) {
+      return new Response(
+        JSON.stringify({ error: `${cap?.model ?? tier} unterstützt den Modus ${mode} nicht.`, code: 'MODE_NOT_SUPPORTED' }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     const requestedSubjects = [
       ...(body.referenceImageUrls ?? []),
       ...(referenceImageUrl ? [referenceImageUrl] : []),
@@ -222,10 +232,14 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    if (requestedSubjects.length > maxSubjects || requestedStyles.length > maxStyles) {
+    if (
+      requestedSubjects.length > maxSubjects ||
+      requestedStyles.length > maxStyles ||
+      requestedSubjects.length + requestedStyles.length > cap.references.total
+    ) {
       return new Response(
         JSON.stringify({
-          error: `${cap?.model ?? tier} erlaubt maximal ${maxSubjects} Motiv- und ${maxStyles} Stil-Referenzen.`,
+          error: `${cap.model} erlaubt maximal ${maxSubjects} Motiv-, ${maxStyles} Stil- und ${cap.references.total} Referenzen insgesamt.`,
           code: 'REFERENCE_LIMIT_EXCEEDED',
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -246,7 +260,7 @@ serve(async (req) => {
     if (safeAspect !== aspectRatio) {
       console.log(`[generate-image-replicate] aspect_ratio ${aspectRatio} not supported by ${tier} → using ${safeAspect}`);
     }
-    const resolvedSize = resolveSize(tier, aspectRatio, { width: body.width, height: body.height });
+    const resolvedSize = resolveSize(tier, aspectRatio, { width: body.width, height: body.height, resolution: body.resolution });
 
     // Provider-side field order: subject references first, style last.
     const imageInputs: string[] = [...subjectRefs, ...styleRefs];
@@ -262,19 +276,35 @@ serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const gptRes = await fetch('https://ai.gateway.lovable.dev/v1/images/generations', {
+      const isEdit = imageInputs.length > 0;
+      let gptBody: BodyInit;
+      let gptHeaders: Record<string, string> = { Authorization: `Bearer ${LOVABLE_API_KEY}` };
+      if (isEdit) {
+        const form = new FormData();
+        form.append('model', 'openai/gpt-image-2');
+        form.append('prompt', enhancedPrompt);
+        form.append('size', resolvedSize.preset ?? '1024x1024');
+        form.append('quality', 'low');
+        for (const [index, url] of imageInputs.entries()) {
+          const source = await fetch(url);
+          if (!source.ok) {
+            return new Response(JSON.stringify({ error: 'Referenzbild konnte nicht geladen werden.', code: 'REFERENCE_FETCH_FAILED' }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+          const blob = await source.blob();
+          form.append('image[]', blob, `reference-${index + 1}.${blob.type.includes('png') ? 'png' : 'jpg'}`);
+        }
+        gptBody = form;
+      } else {
+        gptHeaders = { ...gptHeaders, 'Content-Type': 'application/json' };
+        gptBody = JSON.stringify({
+          model: 'openai/gpt-image-2', prompt: enhancedPrompt,
+          size: resolvedSize.preset ?? '1024x1024', quality: 'low', n: 1,
+        });
+      }
+      const gptRes = await fetch(`https://ai.gateway.lovable.dev/v1/images/${isEdit ? 'edits' : 'generations'}`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'openai/gpt-image-2',
-          prompt: enhancedPrompt,
-          size: resolvedSize.preset ?? '1024x1024',
-          quality: 'low',
-          n: 1,
-        }),
+        headers: gptHeaders,
+        body: gptBody,
       });
       if (!gptRes.ok) {
         const errBody = await gptRes.text();
@@ -323,12 +353,13 @@ serve(async (req) => {
         replicateInput.width = resolvedSize.width;
         replicateInput.height = resolvedSize.height;
       } else {
-        replicateInput.size = '2K';
+        replicateInput.size = resolvedSize.resolution ?? '2K';
       }
       if (imageInputs.length) replicateInput.image_input = imageInputs;
     } else if (tier === 'pro') {
       // Imagen 4 Ultra (no image_input support — style ref only via prompt)
       replicateInput.aspect_ratio = safeAspect;
+      replicateInput.image_size = resolvedSize.resolution ?? '1K';
       replicateInput.output_format = 'jpg';
       replicateInput.safety_filter_level = 'block_only_high';
     } else if (tier === 'flux') {
@@ -337,9 +368,11 @@ serve(async (req) => {
       replicateInput.output_format = 'jpg';
       replicateInput.safety_tolerance = 5;
       if (imageInputs.length) replicateInput.image_prompt = imageInputs[0];
+      if (imageInputs.length && typeof body.strength === 'number') replicateInput.image_prompt_strength = Math.max(0, Math.min(1, body.strength / 100));
     } else if (tier === 'ideogram') {
       // Ideogram v3 Turbo — style references only
-      replicateInput.aspect_ratio = safeAspect;
+      if (resolvedSize.resolution && resolvedSize.resolution !== 'Auto') replicateInput.resolution = resolvedSize.resolution;
+      else replicateInput.aspect_ratio = safeAspect;
       if (styleRefs.length) replicateInput.style_reference_images = styleRefs;
     } else if (tier === 'recraft') {
       // Recraft v3 — fixed pixel presets
@@ -347,8 +380,10 @@ serve(async (req) => {
     } else if (tier === 'qwen') {
       // Qwen Image
       replicateInput.aspect_ratio = safeAspect;
+      replicateInput.image_size = resolvedSize.resolution ?? 'optimize_for_quality';
       replicateInput.output_format = 'jpg';
       if (imageInputs.length) replicateInput.image = imageInputs[0];
+      if (imageInputs.length && typeof body.strength === 'number') replicateInput.strength = Math.max(0, Math.min(1, body.strength / 100));
     } else if (tier === 'ultra') {
       // Nano Banana (ultra) — multi-image edit
       replicateInput.aspect_ratio = safeAspect;
