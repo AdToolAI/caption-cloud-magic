@@ -208,7 +208,7 @@ export function ImageGenerator() {
       setMode('create');
       toast.info(tx({ de: `${capability?.model ?? tier} unterstützt diesen Modus nicht. Modus wurde auf „Neues Bild“ gesetzt.`, en: `${capability?.model ?? tier} does not support this mode. Switched to “New picture”.`, es: `${capability?.model ?? tier} no admite este modo. Se cambió a «Nueva imagen».` }));
     }
-  }, [maxSubjectRefs, supportsExactSize, resolutionOptions, resolution, capability, tier, mode]);
+  }, [maxSubjectRefs, supportsExactSize, resolution, capability, tier, mode]);
 
   useEffect(() => {
     setCachedState({
@@ -971,7 +971,7 @@ export function ImageGenerator() {
               <Select value={resolution || capability?.sizing.defaultResolution} onValueChange={setResolution}>
                 <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {resolutionOptions.map(option => <SelectItem key={option} value={option}>{option === 'Auto' ? tx({ de: 'Automatisch', en: 'Automatic', es: 'Automático' }) : option.replaceAll('_', ' ')}</SelectItem>)}
+                  {resolutionOptions.map(option => <SelectItem key={option} value={option}>{option === 'Auto' ? tx({ de: 'Automatisch', en: 'Automatic', es: 'Automático' }) : option.split('_').join(' ')}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
