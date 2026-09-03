@@ -28,7 +28,7 @@ import { useEffect } from "react";
 
 const Pricing = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, subscribed } = useAuth();
   const { t, language } = useTranslation();
   const [searchParams] = useSearchParams();
   const isReactivation = searchParams.get("reactivate") === "1";
