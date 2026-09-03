@@ -32,6 +32,8 @@ import {
   type PictureMode,
   type QualityTier as ModelTier,
 } from "@/config/pictureStudioModels";
+import { capabilityFor } from "@/config/pictureModelCapabilities";
+import { Input } from "@/components/ui/input";
 
 
 interface GeneratedImage {
