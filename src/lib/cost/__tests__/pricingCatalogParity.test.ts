@@ -42,11 +42,11 @@ function parseSharedSourceMap(): Record<string, { standard: string; pro: string 
   return out;
 }
 
-describe('pricing catalog — 1.75× minimum margin policy', () => {
-  // Seedance 2.5 720p was deliberately repriced to a 10.00 EUR / 30 s headline
-  // price on 03.09.2026, which lands below the 1.75x floor (~1.54x).
-  const MARGIN_FLOOR_EXCEPTIONS = new Set(['seedance-2-5']);
+// Seedance 2.5 720p was deliberately repriced to a 10.00 EUR / 30 s headline
+// price on 03.09.2026, which lands below the 1.75x margin floor (~1.54x).
+const MARGIN_FLOOR_EXCEPTIONS = new Set(['seedance-2-5']);
 
+describe('pricing catalog — 1.75× minimum margin policy', () => {
   it('every model sells at >= 1.75× provider cost (20.08.2026 re-pricing)', () => {
     const offenders: string[] = [];
     for (const entry of Object.values(VIDEO_PRICING_CATALOG)) {
