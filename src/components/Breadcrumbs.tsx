@@ -18,6 +18,15 @@ interface BreadcrumbsProps {
 export function Breadcrumbs({ category, feature }: BreadcrumbsProps) {
   const { t } = useTranslation();
 
+  // Categories are passed as translation keys ("create", "publish", …). If a key
+  // has no entry, render the passed text instead of leaking "category.<x>".
+  const categoryLabel = (() => {
+    if (!category) return '';
+    const translated = t(`category.${category}`);
+    return typeof translated === 'string' && translated !== `category.${category}` ? translated : category;
+  })();
+
+
   return (
     <div className="sticky top-14 z-40 bg-background/60 dark:bg-background/30 backdrop-blur-md border-b border-border/50 py-2">
       <div className="container max-w-full px-4">
@@ -39,7 +48,7 @@ export function Breadcrumbs({ category, feature }: BreadcrumbsProps) {
             </BreadcrumbSeparator>
             <BreadcrumbItem>
               <BreadcrumbLink className="text-muted-foreground hover:text-foreground hover:underline transition-smooth">
-                {t(`category.${category}`)}
+                {categoryLabel}
               </BreadcrumbLink>
             </BreadcrumbItem>
           </>

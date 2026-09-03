@@ -1,7 +1,7 @@
 // AUTO-GENERATED: fills keys that exist in one dictionary but were missing
 // from the others. Deep-merged in useTranslation, so every locale resolves
 // its own copy instead of falling back to another language.
-export const translationsFill: Record<'en' | 'de' | 'es', any> = {
+export const translationsFill: Record<'en' | 'de' | 'es', any> ={
  "en": {
   "calendar": {
    "messages": {
@@ -51,6 +51,12 @@ export const translationsFill: Record<'en' | 'de' | 'es', any> = {
    },
    "actions": {
     "addNote": "Add note"
+   },
+   "advancedFilters": "Advanced filters",
+   "blackoutDates": "Blackout dates",
+   "resetFilters": "Reset filters",
+   "kanban": {
+    "confirmUnpublish": "Unpublish this post?"
    }
   },
   "pricing": {
@@ -200,6 +206,63 @@ export const translationsFill: Record<'en' | 'de' | 'es', any> = {
     "notLoggedIn": "Sign in again to resend",
     "problemsContact": "Need help? Contact our",
     "support": "Support"
+   }
+  },
+  "category": {
+   "publish": "Publish"
+  },
+  "advisor": {
+   "limitMessage": "Upgrade your plan for more time-slot analyses.",
+   "whyWorks": "Why this works"
+  },
+  "composer": {
+   "stockImported": "Stock clip imported"
+  },
+  "dashboard": {
+   "loadingRecommendations": "Loading recommendations…",
+   "personalizedRecs": "Personalized recommendations",
+   "preferredContentType": "Preferred content type",
+   "projectsCreated": "Projects created",
+   "templateSelections": "Template selections",
+   "topTemplates": "Your top templates"
+  },
+  "dc": {
+   "detectingScenes": "Detecting scenes…",
+   "reorderScene": "Drag to reorder",
+   "voiceoverGenerationFailed": "Voiceover generation failed"
+  },
+  "generator": {
+   "btn_upgrade": "Upgrade plan",
+   "limit_reached_title": "Limit reached"
+  },
+  "roles": {
+   "grantedAt": "Granted on",
+   "noPermission": "You do not have permission for this action.",
+   "roleRemoved": "Role removed",
+   "roleRemovedDescription": "The role was removed from this user.",
+   "roleUpdated": "Role updated",
+   "roleUpdatedDescription": "The user role was updated."
+  },
+  "team": {
+   "reject": "Reject"
+  },
+  "uc": {
+   "libraryEmpty": "Your media library is empty.",
+   "libraryPickerDesc": "Pick a video from your media library.",
+   "libraryPickerSearch": "Search media library",
+   "libraryPickerTitle": "Select video from media library",
+   "newProjectStarted": "New project started",
+   "originalAudioMute": "Mute original audio",
+   "originalAudioUnmute": "Unmute original audio",
+   "videoImportedFromLibrary": "Video imported from media library"
+  },
+  "videoComposer": {
+   "resetSuccessTitle": "Scene reset",
+   "stock": {
+    "creditAttribution": "Credit",
+    "favorite": "Favorite",
+    "libraryEmpty": "No stock media found.",
+    "startSearchHint": "Select a category or search above…"
    }
   }
  },
@@ -361,6 +424,12 @@ export const translationsFill: Record<'en' | 'de' | 'es', any> = {
    },
    "actions": {
     "addNote": "Notiz hinzufügen"
+   },
+   "advancedFilters": "Erweiterte Filter",
+   "blackoutDates": "Sperrtermine",
+   "resetFilters": "Filter zurücksetzen",
+   "kanban": {
+    "confirmUnpublish": "Diesen Beitrag zurückziehen?"
    }
   },
   "pricing": {
@@ -515,6 +584,63 @@ export const translationsFill: Record<'en' | 'de' | 'es', any> = {
     "problemsContact": "Brauchst du Hilfe? Kontaktiere unseren",
     "support": "Support"
    }
+  },
+  "category": {
+   "publish": "Veröffentlichen"
+  },
+  "advisor": {
+   "limitMessage": "Für mehr Zeitfenster-Analysen bitte Plan upgraden.",
+   "whyWorks": "Warum das funktioniert"
+  },
+  "composer": {
+   "stockImported": "Stock-Clip importiert"
+  },
+  "dashboard": {
+   "loadingRecommendations": "Empfehlungen werden geladen…",
+   "personalizedRecs": "Personalisierte Empfehlungen",
+   "preferredContentType": "Bevorzugter Inhaltstyp",
+   "projectsCreated": "Erstellte Projekte",
+   "templateSelections": "Vorlagen-Auswahl",
+   "topTemplates": "Deine Top-Vorlagen"
+  },
+  "dc": {
+   "detectingScenes": "Szenen werden erkannt…",
+   "reorderScene": "Ziehen zum Umsortieren",
+   "voiceoverGenerationFailed": "Voiceover-Erstellung fehlgeschlagen"
+  },
+  "generator": {
+   "btn_upgrade": "Plan upgraden",
+   "limit_reached_title": "Limit erreicht"
+  },
+  "roles": {
+   "grantedAt": "Vergeben am",
+   "noPermission": "Dir fehlt die Berechtigung für diese Aktion.",
+   "roleRemoved": "Rolle entfernt",
+   "roleRemovedDescription": "Die Rolle wurde diesem Nutzer entzogen.",
+   "roleUpdated": "Rolle aktualisiert",
+   "roleUpdatedDescription": "Die Nutzerrolle wurde aktualisiert."
+  },
+  "team": {
+   "reject": "Ablehnen"
+  },
+  "uc": {
+   "libraryEmpty": "Deine Mediathek ist leer.",
+   "libraryPickerDesc": "Wähle ein Video aus deiner Mediathek.",
+   "libraryPickerSearch": "Mediathek durchsuchen",
+   "libraryPickerTitle": "Video aus Mediathek wählen",
+   "newProjectStarted": "Neues Projekt gestartet",
+   "originalAudioMute": "Originalton stummschalten",
+   "originalAudioUnmute": "Originalton einschalten",
+   "videoImportedFromLibrary": "Video aus der Mediathek importiert"
+  },
+  "videoComposer": {
+   "resetSuccessTitle": "Szene zurückgesetzt",
+   "stock": {
+    "creditAttribution": "Bildnachweis",
+    "favorite": "Favorit",
+    "libraryEmpty": "Keine Stock-Medien gefunden.",
+    "startSearchHint": "Wähle eine Kategorie oder suche oben…"
+   }
   }
  },
  "es": {
@@ -664,6 +790,12 @@ export const translationsFill: Record<'en' | 'de' | 'es', any> = {
      "BEST_TIME": "Mejor hora",
      "GOOD_TIME": "Buena hora"
     }
+   },
+   "advancedFilters": "Filtros avanzados",
+   "blackoutDates": "Fechas bloqueadas",
+   "resetFilters": "Restablecer filtros",
+   "kanban": {
+    "confirmUnpublish": "¿Retirar esta publicación?"
    }
   },
   "pricingPage": {
@@ -995,6 +1127,63 @@ export const translationsFill: Record<'en' | 'de' | 'es', any> = {
      "description": "Quick Post en el calendario está disponible a partir del plan Pro (2500 créditos/mes)."
     },
     "includedIn": "Incluido en"
+   }
+  },
+  "category": {
+   "publish": "Publicar"
+  },
+  "advisor": {
+   "limitMessage": "Mejora tu plan para más análisis de franjas horarias.",
+   "whyWorks": "Por qué funciona"
+  },
+  "composer": {
+   "stockImported": "Clip de stock importado"
+  },
+  "dashboard": {
+   "loadingRecommendations": "Cargando recomendaciones…",
+   "personalizedRecs": "Recomendaciones personalizadas",
+   "preferredContentType": "Tipo de contenido preferido",
+   "projectsCreated": "Proyectos creados",
+   "templateSelections": "Selecciones de plantilla",
+   "topTemplates": "Tus plantillas principales"
+  },
+  "dc": {
+   "detectingScenes": "Detectando escenas…",
+   "reorderScene": "Arrastra para reordenar",
+   "voiceoverGenerationFailed": "Error al generar la voz en off"
+  },
+  "generator": {
+   "btn_upgrade": "Mejorar plan",
+   "limit_reached_title": "Límite alcanzado"
+  },
+  "roles": {
+   "grantedAt": "Concedido el",
+   "noPermission": "No tienes permiso para esta acción.",
+   "roleRemoved": "Rol eliminado",
+   "roleRemovedDescription": "Se ha retirado el rol a este usuario.",
+   "roleUpdated": "Rol actualizado",
+   "roleUpdatedDescription": "Se ha actualizado el rol del usuario."
+  },
+  "team": {
+   "reject": "Rechazar"
+  },
+  "uc": {
+   "libraryEmpty": "Tu biblioteca multimedia está vacía.",
+   "libraryPickerDesc": "Elige un vídeo de tu biblioteca multimedia.",
+   "libraryPickerSearch": "Buscar en la biblioteca",
+   "libraryPickerTitle": "Seleccionar vídeo de la biblioteca",
+   "newProjectStarted": "Nuevo proyecto iniciado",
+   "originalAudioMute": "Silenciar audio original",
+   "originalAudioUnmute": "Activar audio original",
+   "videoImportedFromLibrary": "Vídeo importado de la biblioteca"
+  },
+  "videoComposer": {
+   "resetSuccessTitle": "Escena restablecida",
+   "stock": {
+    "creditAttribution": "Créditos",
+    "favorite": "Favorito",
+    "libraryEmpty": "No se encontraron medios de stock.",
+    "startSearchHint": "Selecciona una categoría o busca arriba…"
    }
   }
  }

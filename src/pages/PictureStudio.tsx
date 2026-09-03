@@ -39,7 +39,7 @@ export default function PictureStudio() {
   return (
     <div className="bg-background">
       <div className="container mx-auto px-4 py-6 max-w-7xl">
-        <Breadcrumbs feature={t('picStudio.pageTitle')} category={t('picStudio.breadcrumbCategory')} />
+        <Breadcrumbs feature={t('picStudio.pageTitle')} category="create" />
 
         <PictureStudioHeader />
 
