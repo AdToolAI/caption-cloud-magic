@@ -33,9 +33,10 @@ describe('AI Video model registry ↔ pricing catalog', () => {
     }
   });
 
-  it('Seedance 2.5 sells at 13.20 EUR per 30 s clip', () => {
+  it('Seedance 2.5 sells at 10.00 EUR / 11.50 USD per 30 s clip', () => {
     const s25 = AI_VIDEO_TOOLKIT_MODELS.find((m) => m.id === 'seedance-2-5')!;
-    expect(s25.costPerSecond.EUR * 30).toBeCloseTo(13.2, 1);
-    expect(VIDEO_PRICING_CATALOG['seedance-2-5'].sellEUR * 30).toBeCloseTo(13.2, 1);
+    expect(s25.costPerSecond.EUR * 30).toBeCloseTo(10.0, 1);
+    expect(s25.costPerSecond.USD * 30).toBeCloseTo(11.5, 1);
+    expect(VIDEO_PRICING_CATALOG['seedance-2-5'].sellEUR * 30).toBeCloseTo(10.0, 1);
   });
 });

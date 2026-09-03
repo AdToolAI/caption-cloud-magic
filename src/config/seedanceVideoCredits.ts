@@ -59,14 +59,14 @@ export const SEEDANCE_VIDEO_MODELS = {
     provider: 'ByteDance (ModelArk)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.44,
-      USD: 0.44,
+      EUR: 0.3333,
+      USD: 0.3833,
     },
     minDuration: 4,
     maxDuration: 30,
     description: {
-      EUR: tx({ de: 'Seedance 2.5 · bis 30 s pro Szene — 720p 13,20 € / 480p 7,65 € pro 30 Sekunden', en: 'Seedance 2.5 · up to 30 s per scene — 720p €13.20 / 480p €7.65 per 30 seconds', es: 'Seedance 2.5 · hasta 30 s por escena — 720p 13,20 € / 480p 7,65 € por 30 segundos' }),
-      USD: 'Seedance 2.5 · 720p/480p · up to 30 s per scene — $13.20 / $7.65 per 30 seconds',
+      EUR: tx({ de: 'Seedance 2.5 · bis 30 s pro Szene — 720p 10,00 € / 480p 5,80 € pro 30 Sekunden', en: 'Seedance 2.5 · up to 30 s per scene — 720p €10.00 / 480p €5.80 per 30 seconds', es: 'Seedance 2.5 · hasta 30 s por escena — 720p 10,00 € / 480p 5,80 € por 30 segundos' }),
+      USD: 'Seedance 2.5 · 720p/480p · up to 30 s per scene — $11.50 / $6.67 per 30 seconds',
     },
     badge: tx({ de: 'Neu', en: 'New', es: 'Nuevo' }),
   },

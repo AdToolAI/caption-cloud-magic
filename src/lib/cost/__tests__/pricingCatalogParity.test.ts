@@ -42,10 +42,15 @@ function parseSharedSourceMap(): Record<string, { standard: string; pro: string 
   return out;
 }
 
+// Seedance 2.5 720p was deliberately repriced to a 10.00 EUR / 30 s headline
+// price on 03.09.2026, which lands below the 1.75x margin floor (~1.54x).
+const MARGIN_FLOOR_EXCEPTIONS = new Set(['seedance-2-5']);
+
 describe('pricing catalog — 1.75× minimum margin policy', () => {
   it('every model sells at >= 1.75× provider cost (20.08.2026 re-pricing)', () => {
     const offenders: string[] = [];
     for (const entry of Object.values(VIDEO_PRICING_CATALOG)) {
+      if (MARGIN_FLOOR_EXCEPTIONS.has(entry.id)) continue;
       const factor = entry.sellEUR / entry.costEUR;
       if (factor < 1.75) {
         offenders.push(`${entry.id}: ${factor.toFixed(2)}×`);
@@ -54,14 +59,15 @@ describe('pricing catalog — 1.75× minimum margin policy', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('Seedance 2.5 keeps the agreed 30 s price points (720p 13.20 EUR / 480p 7.65 EUR)', () => {
-    expect(VIDEO_PRICING_CATALOG['seedance-2-5'].sellEUR * 30).toBeCloseTo(13.2, 2);
-    expect(VIDEO_PRICING_CATALOG['seedance-2-5-480p'].sellEUR * 30).toBeCloseTo(7.65, 2);
+  it('Seedance 2.5 keeps the agreed 30 s price points (720p 10.00 EUR / 11.50 USD, 480p 5.80 EUR)', () => {
+    expect(VIDEO_PRICING_CATALOG['seedance-2-5'].sellEUR * 30).toBeCloseTo(10.0, 2);
+    expect(VIDEO_PRICING_CATALOG['seedance-2-5'].sellUSD * 30).toBeCloseTo(11.5, 2);
+    expect(VIDEO_PRICING_CATALOG['seedance-2-5-480p'].sellEUR * 30).toBeCloseTo(5.8, 2);
   });
 
   it('sellUSD is derived from sellEUR with the shared FX factor (1 EUR = 1.15 USD)', () => {
     for (const entry of Object.values(VIDEO_PRICING_CATALOG)) {
-      expect(entry.sellUSD).toBe(Math.round(entry.sellEUR * USD_PER_EUR * 100) / 100);
+      expect(entry.sellUSD).toBe(Math.round(entry.sellEUR * USD_PER_EUR * 10000) / 10000);
     }
   });
 });
@@ -138,7 +144,10 @@ describe('admin margin table', () => {
       expect(row.sellEUR).toBe(entry.sellEUR);
       expect(row.costEUR).toBe(entry.costEUR);
       expect(row.tier).toBe(PREMIUM_ENGINE_CATALOG_IDS.has(row.id) ? 'premium-engine' : 'standard');
-      expect(computeMarginPct(row)).toBeGreaterThan(0.42);
+      // Seedance 2.5 720p is the documented low-margin headline price (see above).
+      if (!MARGIN_FLOOR_EXCEPTIONS.has(row.id)) {
+        expect(computeMarginPct(row)).toBeGreaterThan(0.42);
+      }
     }
   });
 });

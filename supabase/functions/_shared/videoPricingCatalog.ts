@@ -56,8 +56,8 @@ const CATALOG_SOURCE: Record<string, CatalogSource> = {
   // long-form scenes up to 30 s. Two resolution tiers (20.08.2026):
   //   720p → 11.95 EUR per 30 s clip (0.3983 EUR/s, ~1.84x provider cost)
   //   480p →  6.95 EUR per 30 s clip (0.2317 EUR/s, ~2.14x provider cost)
-  'seedance-2-5':         { id: 'seedance-2-5',         label: 'Seedance 2.5 (ModelArk)', unit: 'per-second', sellEUR: 0.44, costEUR: 0.217, minDuration: 4,  maxDuration: 30 },
-  'seedance-2-5-480p':    { id: 'seedance-2-5-480p',    label: 'Seedance 2.5 480p (ModelArk)', unit: 'per-second', sellEUR: 0.255, costEUR: 0.1085, minDuration: 4,  maxDuration: 30 },
+  'seedance-2-5':         { id: 'seedance-2-5',         label: 'Seedance 2.5 (ModelArk)', unit: 'per-second', sellEUR: 0.3333, costEUR: 0.217, minDuration: 4,  maxDuration: 30 },
+  'seedance-2-5-480p':    { id: 'seedance-2-5-480p',    label: 'Seedance 2.5 480p (ModelArk)', unit: 'per-second', sellEUR: 0.1932, costEUR: 0.1085, minDuration: 4,  maxDuration: 30 },
 
 
 
