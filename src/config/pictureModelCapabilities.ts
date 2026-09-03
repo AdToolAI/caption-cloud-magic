@@ -10,6 +10,7 @@ export {
   PICTURE_MODEL_CAPABILITIES,
   capabilityFor,
   acceptsReferences,
+  supportsMode,
   closestAspectRatioFor,
   clampExact,
   resolveSize,
@@ -17,6 +18,7 @@ export {
 
 export type {
   PictureTier,
+  PictureMode,
   ReferenceField,
   ExactSizeRange,
   PictureModelCapability,

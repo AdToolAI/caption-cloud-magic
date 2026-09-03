@@ -14,7 +14,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-type PictureMode = 'create' | 'transform' | 'restyle';
+type PictureMode = 'create' | 'transform' | 'restyle' | 'mix';
 type QualityTier = 'standard' | 'fast' | 'pro' | 'ultra';
 type Intent = 'enhance' | 'freeform';
 
@@ -50,18 +50,24 @@ Models available (with strengths):
 - standard = Gemini 2.5 Flash Image (free, fast drafts, weak at photo-real i2i)
 - fast = Seedream 4 (stylised scenes, mood-boards, tolerant content filter)
 - pro = Imagen 4 Ultra (BEST for text→image hero shots, WEAK at i2i with many subjects)
-- ultra = Nano Banana 2 (BEST for i2i, restyle, photo-realism, preserving composition)
+- ultra = Nano Banana (BEST for i2i, restyle, photo-realism, preserving composition)
 
 Modes:
 - create = pure text → image (no reference)
 - transform = reference image is the SCENE TEMPLATE; preserve composition & subjects, change style/details
 - restyle = reference image only donates colour palette + mood for a NEW subject
+- mix = multiple subject references are combined into a NEW coherent image
 
 When a reference image is provided AND the user wants the same scene rendered differently:
 - recommend mode = "transform"
 - recommend tier = "ultra" (Nano Banana 2)
 - recommend strength = 25..45 (low strength = stays close to reference)
 - IN THE PROMPT, explicitly list what to preserve (subjects, composition, lighting, background)
+
+When the user wants to combine people, products, or details from multiple references:
+- recommend mode = "mix"
+- recommend tier = "fast" or "ultra"
+- describe each reference role explicitly in the prompt
 
 When the user wants a fresh image inspired by a reference style:
 - recommend mode = "restyle", tier = "ultra" or "fast", strength = 70
@@ -168,7 +174,7 @@ const TOOL_DEF = {
           description: 'Two shorter alternative prompts.',
         },
         recommendedTier: { type: 'string', enum: ['standard', 'fast', 'pro', 'ultra'] },
-        recommendedMode: { type: 'string', enum: ['create', 'transform', 'restyle'] },
+        recommendedMode: { type: 'string', enum: ['create', 'transform', 'restyle', 'mix'] },
         recommendedStrength: {
           type: 'number',
           minimum: 0,
