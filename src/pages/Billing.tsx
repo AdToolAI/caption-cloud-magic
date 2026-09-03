@@ -163,13 +163,17 @@ const Billing = () => {
       price: "Preis"
     },
     es: {
-      title: "Facturación y suscripción",
-      subtitle: "Gestiona tu suscripción y métodos de pago",
+      title: "Plan y créditos",
+      subtitle: "Tus créditos de IA, tu plan y tus facturas en un solo lugar",
+      creditsCard: "Créditos de IA",
+      creditsDesc: "Tu saldo actual y los paquetes de recarga",
+      balance: "Saldo actual",
       manageCard: "Gestionar suscripción",
       manageDesc: "Actualiza el método de pago, ve facturas, cancela o cambia tu suscripción",
       openPortal: "Abrir portal de facturación",
       invoicesCard: "Facturas",
       invoicesDesc: "Descarga tus facturas e historial de pagos",
+
       noInvoices: "Sin facturas",
       noCustomer: "Sin suscripción activa",
       upgradeMsg: "Aún no tienes una suscripción activa. ¡Elige un plan para comenzar!",
