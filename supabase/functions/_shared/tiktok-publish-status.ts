@@ -83,4 +83,4 @@ export function tiktokPollDelayMs(attempt: number, rateLimited = false): number 
   return Math.min(ceiling, base * Math.pow(2, Math.min(safeAttempt, 5)));
 }
 
-export const TIKTOK_POLL_MAX_MS = 5 * 60 * 1000;
+export const TIKTOK_POLL_MAX_MS = 3 * 60 * 1000;
