@@ -111,13 +111,17 @@ const Billing = () => {
 
   const text = {
     en: {
-      title: "Billing & Subscription",
-      subtitle: "Manage your subscription and payment methods",
+      title: "Plan & Credits",
+      subtitle: "Your AI credits, your plan and your invoices — all in one place",
+      creditsCard: "AI credits",
+      creditsDesc: "Your current balance and top-up packs",
+      balance: "Current balance",
       manageCard: "Manage Subscription",
       manageDesc: "Update payment method, view invoices, cancel or change your subscription",
       openPortal: "Open Billing Portal",
       invoicesCard: "Invoices & Receipts",
       invoicesDesc: "Download your invoices and payment history",
+
       noInvoices: "No invoices yet",
       noCustomer: "No active subscription",
       upgradeMsg: "You don't have an active subscription yet. Choose a plan to get started!",
