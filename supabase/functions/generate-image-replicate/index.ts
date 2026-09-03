@@ -80,58 +80,12 @@ const STYLE_MODIFIERS: Record<string, string> = {
 };
 
 /**
- * Allowed `aspect_ratio` values per Replicate model. Sending anything outside
- * this list makes the model reject the whole request ("input validation"),
- * which surfaced as a silent "Bildgenerierung fehlgeschlagen" in the UI.
+ * Ratios, pixel presets and reference-image limits are NOT maintained here
+ * anymore — `_shared/pictureModelCapabilities.ts` is the single source of
+ * truth shared with the Picture Studio UI.
  */
-const ASPECT_SUPPORT: Record<string, string[]> = {
-  fast: ['1:1', '4:3', '3:4', '16:9', '9:16', '3:2', '2:3', '21:9'],
-  pro: ['1:1', '4:3', '3:4', '16:9', '9:16'],
-  ultra: ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'],
-  gptimage: ['1:1', '3:2', '2:3'],
-  flux: ['1:1', '16:9', '3:2', '2:3', '4:5', '5:4', '9:16', '21:9'],
-  ideogram: ['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16'],
-  recraft: ['1:1', '4:3', '3:4', '16:9', '9:16'],
-  qwen: ['1:1', '16:9', '9:16', '4:3', '3:4'],
-};
-
-/** GPT-Image-2 works with fixed pixel sizes instead of ratio strings. */
-const GPT_IMAGE_SIZES: Record<string, string> = {
-  '1:1': '1024x1024',
-  '3:2': '1536x1024',
-  '2:3': '1024x1536',
-};
-
-/** Recraft v3 works with fixed pixel sizes instead of ratio strings. */
-const RECRAFT_SIZES: Record<string, string> = {
-  '1:1': '1024x1024',
-  '4:3': '1365x1024',
-  '3:4': '1024x1365',
-  '16:9': '1820x1024',
-  '9:16': '1024x1820',
-};
-
-
-/** Maps an unsupported ratio to the closest supported one for that model. */
 function mapAspectRatio(tier: string, requested: string): string {
-  const allowed = ASPECT_SUPPORT[tier] ?? ASPECT_SUPPORT.fast;
-  if (allowed.includes(requested)) return requested;
-
-  const parse = (r: string) => {
-    const [w, h] = r.split(':').map(Number);
-    return w > 0 && h > 0 ? w / h : 1;
-  };
-  const target = parse(requested);
-  let best = allowed[0];
-  let bestDelta = Infinity;
-  for (const cand of allowed) {
-    const delta = Math.abs(parse(cand) - target);
-    if (delta < bestDelta) {
-      best = cand;
-      bestDelta = delta;
-    }
-  }
-  return best;
+  return closestAspectRatioFor(tier, requested);
 }
 
 
