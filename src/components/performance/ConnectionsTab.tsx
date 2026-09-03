@@ -1032,6 +1032,28 @@ export const ConnectionsTab = () => {
 
                     {connected && connection ? (
                       <div className="space-y-2 text-sm">
+                        {/* Token predates the business_management approval → must be re-issued */}
+                        {(provider.id === 'facebook' || provider.id === 'instagram') &&
+                          Array.isArray(connection.account_metadata?.granted_scopes) &&
+                          connection.account_metadata.granted_scopes.length > 0 &&
+                          !(connection.account_metadata.granted_scopes as string[]).includes('business_management') && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-xs text-amber-800 space-y-2 mb-2 dark:bg-amber-950/30 dark:border-amber-800/50 dark:text-amber-200">
+                            <div className="flex items-start gap-2">
+                              <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                              <div className="space-y-1">
+                                <p className="font-medium">{t('socialIntegrations.metaStaleScopeTitle')}</p>
+                                <p>{t('socialIntegrations.metaStaleScopeBody')}</p>
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              onClick={() => handleConnect(provider.id, provider.name, true)}
+                            >
+                              {t('performance.connections.connect')}
+                            </Button>
+                          </div>
+                        )}
+
                         {/* Meta returned no usable Page → honest finding instead of a silent "Connected" */}
                         {provider.id === 'facebook' && (
                           connection.account_metadata?.meta_pages_found_count === 0 ||
