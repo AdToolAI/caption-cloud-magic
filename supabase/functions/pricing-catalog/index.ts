@@ -16,21 +16,23 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-async function resolveDiscountPercent(req: Request): Promise<number> {
+async function resolveAccount(
+  req: Request,
+): Promise<{ discountPercent: number; walletCurrency: "EUR" | "USD" }> {
   const authHeader = req.headers.get("Authorization") ?? "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  if (!token) return 0;
+  if (!token) return { discountPercent: 0, walletCurrency: "EUR" };
 
   const url = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url || !serviceKey) return 0;
+  if (!url || !serviceKey) return { discountPercent: 0, walletCurrency: "EUR" };
 
   try {
     const admin = createClient(url, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
     const { data: userData, error } = await admin.auth.getUser(token);
-    if (error || !userData?.user) return 0;
+    if (error || !userData?.user) return { discountPercent: 0, walletCurrency: "EUR" };
 
     const { data: profile } = await admin
       .from("profiles")
@@ -38,12 +40,23 @@ async function resolveDiscountPercent(req: Request): Promise<number> {
       .eq("id", userData.user.id)
       .maybeSingle();
 
+    const { data: wallet } = await admin
+      .from("ai_video_wallets")
+      .select("currency")
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+
     const pct = Number(profile?.ai_discount_percent ?? 0);
-    if (!Number.isFinite(pct)) return 0;
-    return Math.min(Math.max(Math.round(pct), 0), 100);
+    const discountPercent = Number.isFinite(pct)
+      ? Math.min(Math.max(Math.round(pct), 0), 100)
+      : 0;
+    return {
+      discountPercent,
+      walletCurrency: wallet?.currency === "USD" ? "USD" : "EUR",
+    };
   } catch (_e) {
     // Anon / expired token — fall back to list prices.
-    return 0;
+    return { discountPercent: 0, walletCurrency: "EUR" };
   }
 }
 
@@ -54,7 +67,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const discountPercent = await resolveDiscountPercent(req);
+  const { discountPercent, walletCurrency } = await resolveAccount(req);
   const factor = (100 - discountPercent) / 100;
 
   const models = Object.values(VIDEO_PRICING_CATALOG).map((e) => ({
@@ -71,7 +84,7 @@ serve(async (req) => {
   }));
 
   return new Response(
-    JSON.stringify({ version: CATALOG_VERSION, discountPercent, models }),
+    JSON.stringify({ version: CATALOG_VERSION, discountPercent, walletCurrency, models }),
     {
       headers: {
         ...corsHeaders,
