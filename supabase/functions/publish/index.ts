@@ -1,5 +1,12 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { decryptToken, encryptToken } from '../_shared/crypto.ts';
+import { META_GRAPH_BASE } from '../_shared/meta-graph.ts';
+import {
+  classifyTikTokPublishStatus,
+  tiktokPollDelayMs,
+  TIKTOK_POLL_MAX_MS,
+} from '../_shared/tiktok-publish-status.ts';
+
 import { withTelemetry, trackSocialPublish } from '../_shared/telemetry.ts';
 import { generateContentHash } from '../_shared/content-hash.ts';
 import { withTimeout } from '../_shared/timeout.ts';
