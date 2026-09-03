@@ -137,13 +137,17 @@ const Billing = () => {
       price: "Price"
     },
     de: {
-      title: "Abrechnung & Abo",
-      subtitle: "Verwalten Sie Ihr Abonnement und Ihre Zahlungsmethoden",
+      title: "Plan & Guthaben",
+      subtitle: "Ihr KI-Guthaben, Ihr Abo und Ihre Rechnungen an einem Ort",
+      creditsCard: "KI-Guthaben",
+      creditsDesc: "Ihr aktueller Kontostand und die Aufladepakete",
+      balance: "Aktueller Kontostand",
       manageCard: "Abo verwalten",
       manageDesc: "Zahlungsmethode aktualisieren, Rechnungen anzeigen, Abo kündigen oder wechseln",
       openPortal: "Abrechnungsportal öffnen",
       invoicesCard: "Rechnungen",
       invoicesDesc: "Laden Sie Ihre Rechnungen und Zahlungshistorie herunter",
+
       noInvoices: "Keine Rechnungen",
       noCustomer: "Kein aktives Abo",
       upgradeMsg: "Sie haben noch kein aktives Abonnement. Wählen Sie einen Plan!",
