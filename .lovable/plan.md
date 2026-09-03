@@ -12,11 +12,12 @@ Konsequenz: Der größte Hebel ist **keine Code-Änderung**, sondern die Freisch
 
 Bereits aktiviert: Karten, Apple Pay, Google Pay, Amazon Pay, Link, PayPal, Revolut Pay, Samsung/Kakao/Naver Pay, PAYCO, Klarna, SEPA-Lastschrift, Bancontact, BLIK, EPS, Banküberweisung.
 
-Damit ist die Freischaltung praktisch abgeschlossen. Auffällig fehlt nur **iDEAL** (Niederlande, dort mit Abstand die dominante Methode) — das ist ein Klick unter „Manuelle Integrationsoptionen / Zahlungsmethoden". Optional zusätzlich: Multibanco (Portugal), TWINT (Schweiz), Przelewy24 (Polen), Cash App Pay (USA).
+Damit ist die Freischaltung vollständig abgeschlossen — inklusive iDEAL. Auffällig fehlt nichts mehr; optional könntest du später Multibanco (Portugal), TWINT (Schweiz), Przelewy24 (Polen) oder Cash App Pay (USA) ergänzen, wenn du dort aktiv wirst.
 
 Wichtig: Nicht jede Methode kann Abos. Stripe blendet im Abo-Checkout automatisch nur die abofähigen ein (Karte, PayPal, SEPA, Link, Amazon Pay) — der Rest erscheint nur beim Guthaben-Kauf. Das ist gewollt und braucht keinen Sonderfall im Code.
 
 Dass die Methoden aktiviert sind, heißt aber noch nicht, dass sie im Checkout **erscheinen** — genau da liegt jetzt die eigentliche Arbeit.
+
 
 
 ## Was ich im Code ändere
