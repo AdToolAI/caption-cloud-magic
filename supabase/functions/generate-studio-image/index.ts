@@ -117,6 +117,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       aspectRatio = '1:1',
       quality = 'fast',
       referenceImageUrl,
+      referenceImageUrls,
+      styleReferenceUrl,
+      styleReferenceUrls,
       editMode = false,
       textFree = false,
     } = await req.json();
