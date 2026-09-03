@@ -59,7 +59,7 @@ interface CachedResponse {
 // ============================================================================
 
 async function graphPost(path: string, params: Record<string, string>) {
-  const url = `https://graph.facebook.com/v18.0${path}`;
+  const url = `${META_GRAPH_BASE}${path}`;
   const body = new URLSearchParams(params);
   
   // Log parameters being sent (but hide access_token)
@@ -86,7 +86,7 @@ async function graphPost(path: string, params: Record<string, string>) {
 
 async function graphGet(path: string, token: string) {
   const separator = path.includes('?') ? '&' : '?';
-  const url = `https://graph.facebook.com/v18.0${path}${separator}access_token=${token}`;
+  const url = `${META_GRAPH_BASE}${path}${separator}access_token=${token}`;
   const res = await fetch(url);
   if (!res.ok) {
     const errorData = await res.json();
@@ -94,6 +94,7 @@ async function graphGet(path: string, token: string) {
   }
   return await res.json();
 }
+
 
 async function publishToInstagram(
   userId: string,
