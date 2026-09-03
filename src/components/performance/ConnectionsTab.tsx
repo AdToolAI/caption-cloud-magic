@@ -20,6 +20,8 @@ import { CSVUploadDialog } from "./CSVUploadDialog";
 import { InstagramTokenDialog } from "./InstagramTokenDialog";
 import { InstagramSetupChecklist } from "./InstagramSetupChecklist";
 import { TokenStatusBadge } from "./TokenStatusBadge";
+import { ConnectionHealthBadge } from "./ConnectionHealthBadge";
+
 import { XConnectionCard } from "./XConnectionCard";
 import { FacebookPageSelectDialog } from "./FacebookPageSelectDialog";
 import { RefreshCw } from "lucide-react";
