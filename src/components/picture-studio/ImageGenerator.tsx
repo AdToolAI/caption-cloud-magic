@@ -181,7 +181,21 @@ export function ImageGenerator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableAspectRatios]);
 
+  // Provider capabilities for the selected model (single source of truth,
+  // shared with the Edge Functions).
+  const capability = useMemo(() => capabilityFor(tier), [tier]);
+  const maxSubjectRefs = capability?.references.subject ?? 0;
+  const supportsExactSize = capability?.sizing.kind === 'exact';
+  const exactRange = capability?.sizing.exact;
 
+  // Trim references / exact size when the model doesn't support them.
+  useEffect(() => {
+    setExtraReferences(prev => prev.slice(0, Math.max(0, maxSubjectRefs - 1)));
+    if (!supportsExactSize) {
+      setExactWidth('');
+      setExactHeight('');
+    }
+  }, [maxSubjectRefs, supportsExactSize]);
 
   useEffect(() => {
     setCachedState({
@@ -193,23 +207,28 @@ export function ImageGenerator() {
       mode,
       strength,
       referenceImage,
+      extraReferences,
       styleReference,
+      exactWidth,
+      exactHeight,
       generatedImages,
     });
-  }, [prompt, style, aspectRatio, tier, editMode, mode, strength, referenceImage, styleReference, generatedImages]);
+  }, [prompt, style, aspectRatio, tier, editMode, mode, strength, referenceImage, extraReferences, styleReference, exactWidth, exactHeight, generatedImages]);
 
   // When the mode changes, clean up slots that aren't relevant for it.
   useEffect(() => {
     if (mode === 'create') {
       // create: no reference of any kind
       setReferenceImage(null);
+      setExtraReferences([]);
       setStyleReference(null);
     } else if (mode === 'transform') {
-      // transform: only the i2i slot matters
+      // transform: only the i2i slots matter
       setStyleReference(null);
     } else if (mode === 'restyle') {
       // restyle: only the style reference matters
       setReferenceImage(null);
+      setExtraReferences([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
