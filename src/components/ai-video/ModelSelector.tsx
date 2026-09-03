@@ -46,16 +46,17 @@ export function includeSelectedModel(models: ToolkitModel[], value: string): Too
 export function ModelSelector({ value, onChange, currency, models, className, lockedModelIds, lockedReason }: ModelSelectorProps) {
   const { language } = useTranslation();
   const lang = (['de', 'en', 'es'].includes(language) ? language : 'en') as 'de' | 'en' | 'es';
-  const symbol = currency === 'USD' ? '$' : '€';
+  const { getPricePerSecond, walletCurrency } = useVideoPricingCatalog();
+  // Prices follow the wallet currency (USD carries the FX uplift), not the UI language.
+  const billingCurrency = walletCurrency ?? currency;
+  const symbol = billingCurrency === 'USD' ? '$' : '€';
   const list = useMemo(
     () => includeSelectedModel(models ?? AI_VIDEO_TOOLKIT_MODELS, value),
     [models, value],
   );
-  const { getPricePerSecond } = useVideoPricingCatalog();
-
   // Canonical price (from server catalog) with local-config fallback.
   const priceFor = (m: ToolkitModel) =>
-    getPricePerSecond(m.id, currency) ?? m.costPerSecond[currency];
+    getPricePerSecond(m.id, billingCurrency) ?? m.costPerSecond[billingCurrency];
 
   const grouped = useMemo(() => {
     const map: Record<ToolkitModelGroup, ToolkitModel[]> = {

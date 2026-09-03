@@ -12,6 +12,7 @@ import {
   buildComposerCostTable,
 } from '@/lib/cost/composerSourceToCatalog';
 import { VIDEO_PROVIDER_MARGINS, computeMarginPct } from '@/lib/cost/videoProviderMargins';
+import { USD_PER_EUR } from '@/lib/cost/fx';
 import { CLIP_SOURCE_COSTS } from '@/types/video-composer';
 
 const ROOT = resolve(__dirname, '../../../..');
@@ -58,9 +59,9 @@ describe('pricing catalog — 1.75× minimum margin policy', () => {
     expect(VIDEO_PRICING_CATALOG['seedance-2-5-480p'].sellEUR * 30).toBeCloseTo(7.65, 2);
   });
 
-  it('sellUSD mirrors sellEUR 1:1', () => {
+  it('sellUSD is derived from sellEUR with the shared FX factor (1 EUR = 1.15 USD)', () => {
     for (const entry of Object.values(VIDEO_PRICING_CATALOG)) {
-      expect(entry.sellUSD).toBe(entry.sellEUR);
+      expect(entry.sellUSD).toBe(Math.round(entry.sellEUR * USD_PER_EUR * 100) / 100);
     }
   });
 });

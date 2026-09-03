@@ -2,7 +2,7 @@
 //
 // A Creator account gets:
 //   - a one-time AI wallet credit (default 100 EUR)
-//   - a platform-wide discount on every AI deduction (default 40%)
+//   - a platform-wide discount on every AI deduction (default 25%)
 //   - full platform access (out-of-band plan, no Stripe subscription)
 //
 // Idempotent: calling it twice never grants the credit twice.
@@ -72,7 +72,7 @@ serve(async (req) => {
     : 100;
   const discountPercent = Number.isFinite(Number(body.discount_percent))
     ? Math.min(Math.max(Math.round(Number(body.discount_percent)), 0), 100)
-    : 40;
+    : 25;
 
   // --- Find or create the auth user ----------------------------------------
   let userId: string | null = null;

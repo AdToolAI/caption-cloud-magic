@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { AI_VIDEO_TOOLKIT_MODELS } from '@/config/aiVideoModelRegistry';
+import { USD_PER_EUR } from '@/lib/cost/fx';
 
 function loadBackendCatalog(): Record<string, { sellEUR: number; sellUSD: number }> {
   const src = readFileSync(
@@ -17,10 +18,12 @@ function loadBackendCatalog(): Record<string, { sellEUR: number; sellUSD: number
     'utf8',
   );
   const out: Record<string, { sellEUR: number; sellUSD: number }> = {};
-  const re = /'([^']+)':\s*\{\s*id:\s*'[^']+',[^}]*?sellEUR:\s*([\d.]+),\s*sellUSD:\s*([\d.]+)/g;
+  const re = /'([^']+)':\s*\{\s*id:\s*'[^']+',[^}]*?sellEUR:\s*([\d.]+)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(src))) {
-    out[m[1]] = { sellEUR: Number(m[2]), sellUSD: Number(m[3]) };
+    const sellEUR = Number(m[2]);
+    // USD is derived from EUR in the catalog, never hand-maintained.
+    out[m[1]] = { sellEUR, sellUSD: Math.round(sellEUR * USD_PER_EUR * 100) / 100 };
   }
   return out;
 }

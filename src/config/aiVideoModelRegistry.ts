@@ -11,6 +11,7 @@ import { tx } from '@/lib/i18nText';
  */
 
 import type { Currency } from './pricing';
+import { usdFromEur } from '@/lib/cost/fx';
 import {
   Film, Volume2, Zap, Wand2, Eye, Camera, Video, Sparkles, TrendingUp,
 } from 'lucide-react';
@@ -177,7 +178,7 @@ const happyhorseAspect = ['16:9', '9:16', '1:1', '4:3', '3:4'];
 /** HappyHorse 1.0 `duration` enum: every integer from 3 to 15. */
 const happyhorseDurations = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
-export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
+const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModel[] = [
   /* ─────────── Seedance 2.5 (top model) ─────────── */
   {
     id: 'seedance-2-5',
@@ -877,6 +878,16 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
 
   /* Sora 2 entfernt — OpenAI sunset 2026, Routen migrieren auf Veo 3.1 / Kling 3 Pro. */
 ];
+
+/**
+ * USD prices are DERIVED from the maintained EUR price with the shared FX
+ * factor (1 EUR ≈ 1.15 USD), so a USD wallet is charged exactly what the UI
+ * shows. Never hand-maintain a USD price in the per-provider config files.
+ */
+export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = AI_VIDEO_TOOLKIT_MODELS_RAW.map((m) => ({
+  ...m,
+  costPerSecond: { EUR: m.costPerSecond.EUR, USD: usdFromEur(m.costPerSecond.EUR) },
+}));
 
 export const TOOLKIT_GROUP_LABELS: Record<ToolkitModelGroup, { de: string; en: string; es: string }> = {
   recommended: { de: '⭐ Empfohlen', en: '⭐ Recommended', es: '⭐ Recomendado' },

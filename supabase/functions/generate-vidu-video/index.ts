@@ -6,6 +6,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
+import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -236,7 +237,15 @@ serve(async (req) => {
       Math.max(MIN_DURATION, Math.round(Number(rawDuration) || DEFAULT_DURATION)),
     );
     const resolution = ALLOWED_RESOLUTIONS.has(String(rawResolution)) ? String(rawResolution) : "1080p";
-    const totalCost = Number((perSecond * duration).toFixed(2));
+    // Price in the WALLET currency — USD carries the FX uplift (1 EUR ~ 1.15 USD).
+    const { data: viduWalletCurrencyRow } = await supabaseAdmin
+      .from("ai_video_wallets")
+      .select("currency")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const viduWalletCurrency = viduWalletCurrencyRow?.currency === 'USD' ? 'USD' : 'EUR';
+    const effectivePerSecond = resolveCostPerSecond(model, viduWalletCurrency) ?? perSecond;
+    const totalCost = Number((effectivePerSecond * duration).toFixed(2));
     if (!replicateModel || perSecond === undefined) {
       return new Response(JSON.stringify({ error: `Unknown Vidu model: ${model}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
