@@ -48,7 +48,7 @@ export function Breadcrumbs({ category, feature }: BreadcrumbsProps) {
             </BreadcrumbSeparator>
             <BreadcrumbItem>
               <BreadcrumbLink className="text-muted-foreground hover:text-foreground hover:underline transition-smooth">
-                {t(`category.${category}`)}
+                {categoryLabel}
               </BreadcrumbLink>
             </BreadcrumbItem>
           </>
