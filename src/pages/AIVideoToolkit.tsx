@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -44,23 +44,44 @@ export default function AIVideoToolkit() {
   const { hasFullAccess } = useTrialAccess();
   const { language, t } = useTranslation();
   const { wallet, loading: walletLoading, refetch: refetchWallet } = useAIVideoWallet();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('generate');
   const currency: Currency = getCurrencyForLanguage(language);
 
-  /* Stripe purchase confirmation */
+  /* Stripe purchase confirmation.
+     Wichtig: genau EINMAL pro Checkout-Session bestätigen. Vorher hing der
+     Effekt an `t`/`refetchWallet` (bei jedem Render neu) und die Parameter
+     blieben in der URL — dadurch lief die Bestätigung samt Toast in einer
+     Dauerschleife, obwohl die Gutschrift serverseitig idempotent ist. */
+  const handledSessionRef = useRef<string | null>(null);
   useEffect(() => {
     const payment = searchParams.get('payment');
     const sessionId = searchParams.get('session_id');
+
+    const clearParams = () => {
+      const next = new URLSearchParams(searchParams);
+      next.delete('payment');
+      next.delete('session_id');
+      setSearchParams(next, { replace: true });
+    };
+
     if (payment === 'success' && sessionId) {
+      if (handledSessionRef.current === sessionId) return;
+      handledSessionRef.current = sessionId;
       supabase.functions.invoke('ai-video-verify-purchase', { body: { sessionId } }).then(({ error }) => {
-        if (error) toast.error(t('aiVid.verifyError'));
-        else { toast.success(t('aiVid.creditsAdded')); refetchWallet(); }
+        if (error) toast.error(t('aiVid.verifyError'), { id: `verify-${sessionId}` });
+        else { toast.success(t('aiVid.creditsAdded'), { id: `verify-${sessionId}` }); refetchWallet(); }
+        clearParams();
       });
     } else if (payment === 'canceled') {
-      toast.info(t('aiVid.purchaseCanceled'));
+      if (handledSessionRef.current === 'canceled') return;
+      handledSessionRef.current = 'canceled';
+      toast.info(t('aiVid.purchaseCanceled'), { id: 'purchase-canceled' });
+      clearParams();
     }
-  }, [searchParams, refetchWallet, t]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
 
   const handleAfterGenerate = useCallback(() => setActiveTab('history'), []);
 
