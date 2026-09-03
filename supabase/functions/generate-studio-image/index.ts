@@ -193,14 +193,22 @@ MANDATORY RULES:
       }
     }
 
-    // Build messages
+    // Build messages — Gemini chat shape accepts multiple reference images
+    // (capability matrix: 3 subject + 1 style, see _shared/pictureModelCapabilities.ts).
+    const refUrls: string[] = [
+      ...(Array.isArray(referenceImageUrls) ? referenceImageUrls : []),
+      ...(referenceImageUrl ? [referenceImageUrl] : []),
+      ...(Array.isArray(styleReferenceUrls) ? styleReferenceUrls : []),
+      ...(styleReferenceUrl ? [styleReferenceUrl] : []),
+    ].filter(Boolean).slice(0, 4);
+
     const messages: any[] = [];
-    if (editMode && referenceImageUrl) {
+    if (refUrls.length) {
       messages.push({
         role: 'user',
         content: [
           { type: 'text', text: enhancedPrompt },
-          { type: 'image_url', image_url: { url: referenceImageUrl } }
+          ...refUrls.map((url) => ({ type: 'image_url', image_url: { url } })),
         ]
       });
     } else {
