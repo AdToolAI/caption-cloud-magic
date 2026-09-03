@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { buildPublishPayload } from "../_shared/poster-dispatch-payload.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,15 +49,9 @@ serve(async (req) => {
       try {
         // The publish orchestrator posts as a specific user. Derive that user
         // deterministically from the linked calendar event; never guess.
-        const calendarEvent = Array.isArray(job.calendar_events)
-          ? job.calendar_events[0]
-          : job.calendar_events;
-        const ownerId: string | undefined = calendarEvent?.owner_id ?? undefined;
-
-        if (!job.calendar_event_id || !ownerId) {
-          throw new Error(
-            'Missing calendar event owner — refusing to publish without a verified user identity',
-          );
+        const built = buildPublishPayload(job);
+        if (!built.ok) {
+          throw new Error(built.message);
         }
 
         // Mark as running
@@ -65,16 +61,10 @@ serve(async (req) => {
           .eq("id", job.id);
 
         {
-          const snapshot = job.content_snapshot ?? {};
           const { error: publishError } = await supabase.functions.invoke("publish", {
-            body: {
-              user_id: ownerId,
-              text: snapshot.caption ?? snapshot.text ?? "",
-              media: snapshot.media ?? [],
-              channels: [job.platform],
-              calendar_event_id: job.calendar_event_id,
-            },
+            body: built.payload,
           });
+
 
 
           if (publishError) throw publishError;

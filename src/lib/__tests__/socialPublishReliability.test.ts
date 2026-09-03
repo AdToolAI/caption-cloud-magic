@@ -6,6 +6,7 @@ import {
   tiktokPollDelayMs,
   TIKTOK_POLL_MAX_MS,
 } from '../../../supabase/functions/_shared/tiktok-publish-status';
+import { buildPublishPayload } from '../../../supabase/functions/_shared/poster-dispatch-payload';
 
 const NOW = new Date('2026-05-01T12:00:00Z');
 const iso = (offsetMs: number) => new Date(NOW.getTime() + offsetMs).toISOString();
@@ -170,5 +171,57 @@ describe('classifyConnectionHealth', () => {
 
   it('returns missing for no connection at all', () => {
     expect(classifyConnectionHealth(null, NOW.getTime()).health).toBe('missing');
+  });
+});
+
+describe('buildPublishPayload', () => {
+  const base = {
+    id: 'job-1',
+    platform: 'tiktok',
+    calendar_event_id: 'ev-1',
+    content_snapshot: { caption: 'hello', media: ['https://x/v.mp4'] },
+    calendar_events: { owner_id: 'user-1' },
+  };
+
+  it('derives the owner from the linked calendar event', () => {
+    const result = buildPublishPayload(base as never);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload).toEqual({
+      user_id: 'user-1',
+      text: 'hello',
+      media: ['https://x/v.mp4'],
+      channels: ['tiktok'],
+      calendar_event_id: 'ev-1',
+    });
+  });
+
+  it('accepts the array shape of the joined calendar event', () => {
+    const result = buildPublishPayload({ ...base, calendar_events: [{ owner_id: 'user-2' }] } as never);
+    expect(result.ok && result.payload.user_id).toBe('user-2');
+  });
+
+  it('falls back from caption to text and defaults media', () => {
+    const result = buildPublishPayload({
+      ...base,
+      content_snapshot: { text: 'plain' },
+    } as never);
+    expect(result.ok && result.payload.text).toBe('plain');
+    expect(result.ok && result.payload.media).toEqual([]);
+  });
+
+  it('refuses to publish without a verified owner', () => {
+    expect(buildPublishPayload({ ...base, calendar_events: null } as never)).toMatchObject({
+      ok: false,
+      code: 'MISSING_OWNER',
+    });
+    expect(buildPublishPayload({ ...base, calendar_event_id: null } as never)).toMatchObject({
+      ok: false,
+      code: 'MISSING_CALENDAR_EVENT',
+    });
+    expect(buildPublishPayload({ ...base, platform: '' } as never)).toMatchObject({
+      ok: false,
+      code: 'MISSING_PLATFORM',
+    });
   });
 });
