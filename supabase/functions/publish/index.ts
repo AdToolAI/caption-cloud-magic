@@ -1,5 +1,12 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { decryptToken, encryptToken } from '../_shared/crypto.ts';
+import { META_GRAPH_BASE } from '../_shared/meta-graph.ts';
+import {
+  classifyTikTokPublishStatus,
+  tiktokPollDelayMs,
+  TIKTOK_POLL_MAX_MS,
+} from '../_shared/tiktok-publish-status.ts';
+
 import { withTelemetry, trackSocialPublish } from '../_shared/telemetry.ts';
 import { generateContentHash } from '../_shared/content-hash.ts';
 import { withTimeout } from '../_shared/timeout.ts';
@@ -59,7 +66,7 @@ interface CachedResponse {
 // ============================================================================
 
 async function graphPost(path: string, params: Record<string, string>) {
-  const url = `https://graph.facebook.com/v18.0${path}`;
+  const url = `${META_GRAPH_BASE}${path}`;
   const body = new URLSearchParams(params);
   
   // Log parameters being sent (but hide access_token)
@@ -86,7 +93,7 @@ async function graphPost(path: string, params: Record<string, string>) {
 
 async function graphGet(path: string, token: string) {
   const separator = path.includes('?') ? '&' : '?';
-  const url = `https://graph.facebook.com/v18.0${path}${separator}access_token=${token}`;
+  const url = `${META_GRAPH_BASE}${path}${separator}access_token=${token}`;
   const res = await fetch(url);
   if (!res.ok) {
     const errorData = await res.json();
@@ -94,6 +101,7 @@ async function graphGet(path: string, token: string) {
   }
   return await res.json();
 }
+
 
 async function publishToInstagram(
   userId: string,
@@ -110,7 +118,7 @@ async function publishToInstagram(
     // Get Instagram connection from social_connections (not app_secrets!)
     const { data: connection, error: connectionError } = await supabase
       .from('social_connections')
-      .select('account_id, access_token_hash')
+      .select('account_id, access_token_hash, account_metadata')
       .eq('user_id', userId)
       .eq('provider', 'instagram')
       .maybeSingle();
@@ -125,8 +133,44 @@ async function publishToInstagram(
       };
     }
 
-    // Decrypt token
-    const accessToken = await decryptToken(connection.access_token_hash);
+    // Instagram Content Publishing requires the PAGE access token of the
+    // Facebook page linked to the IG professional account. It is stored
+    // encrypted in account_metadata during OAuth / page selection.
+    const encryptedPageToken =
+      (connection.account_metadata as Record<string, unknown> | null)?.page_access_token_encrypted;
+
+    if (typeof encryptedPageToken !== 'string' || encryptedPageToken.length === 0) {
+      console.error('[Instagram] No page access token stored for this connection');
+      return {
+        provider: 'instagram',
+        ok: false,
+        error_code: 'IG_PAGE_TOKEN_MISSING',
+        error_message:
+          'Instagram page access token missing. Please reconnect Instagram and select the linked Facebook page.',
+      };
+    }
+
+    let accessToken: string;
+    try {
+      accessToken = await decryptToken(encryptedPageToken);
+    } catch (_e) {
+      return {
+        provider: 'instagram',
+        ok: false,
+        error_code: 'IG_PAGE_TOKEN_INVALID',
+        error_message:
+          'Instagram page access token could not be decrypted. Please reconnect Instagram.',
+      };
+    }
+    if (!accessToken) {
+      return {
+        provider: 'instagram',
+        ok: false,
+        error_code: 'IG_PAGE_TOKEN_INVALID',
+        error_message: 'Instagram page access token is empty. Please reconnect Instagram.',
+      };
+    }
+
 
     if (!media || media.length === 0) {
       return {
@@ -648,7 +692,7 @@ async function publishToFacebook(
 
       // Step 1: Initialize resumable upload
       const initResponse = await fetch(
-        `https://graph.facebook.com/v18.0/${pageId}/videos?access_token=${accessToken}`,
+        `${META_GRAPH_BASE}/${pageId}/videos?access_token=${accessToken}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -686,7 +730,7 @@ async function publishToFacebook(
         formData.append('video_file_chunk', new Blob([chunk], { type: 'video/mp4' }));
 
         const uploadResponse = await fetch(
-          `https://graph.facebook.com/v18.0/${pageId}/videos?access_token=${accessToken}`,
+          `${META_GRAPH_BASE}/${pageId}/videos?access_token=${accessToken}`,
           {
             method: 'POST',
             body: formData,
@@ -705,7 +749,7 @@ async function publishToFacebook(
 
       // Step 3: Finalize upload
       const finishResponse = await fetch(
-        `https://graph.facebook.com/v18.0/${pageId}/videos?access_token=${accessToken}`,
+        `${META_GRAPH_BASE}/${pageId}/videos?access_token=${accessToken}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -729,7 +773,7 @@ async function publishToFacebook(
       let videoPermalink: string | undefined;
       try {
         const permalinkRes = await fetch(
-          `https://graph.facebook.com/v18.0/${videoId}?fields=permalink_url&access_token=${accessToken}`
+          `${META_GRAPH_BASE}/${videoId}?fields=permalink_url&access_token=${accessToken}`
         );
         if (permalinkRes.ok) {
           const permalinkData = await permalinkRes.json();
@@ -782,7 +826,7 @@ async function publishToFacebook(
     let postPermalink: string | undefined;
     try {
       const permalinkRes = await fetch(
-        `https://graph.facebook.com/v18.0/${postResponse.id}?fields=permalink_url&access_token=${accessToken}`
+        `${META_GRAPH_BASE}/${postResponse.id}?fields=permalink_url&access_token=${accessToken}`
       );
       if (permalinkRes.ok) {
         const permalinkData = await permalinkRes.json();
@@ -994,16 +1038,81 @@ async function publishToTikTok(
       throw new Error(`Video upload failed: ${uploadResponse.status}`);
     }
 
-    console.log('[TikTok] ✅ Video uploaded successfully');
+    console.log('[TikTok] ✅ Video uploaded, polling publish status...');
+
+    // Step 3: Poll TikTok until it reports a real terminal state. An accepted
+    // upload is NOT a published post.
+    const pollStart = Date.now();
+    let attempt = 0;
+    let lastState = 'unknown';
+    let lastReason: string | undefined;
+
+    while (Date.now() - pollStart < TIKTOK_POLL_MAX_MS) {
+      const statusResponse = await fetch(
+        'https://open.tiktokapis.com/v2/post/publish/status/fetch/',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ publish_id }),
+        },
+      );
+
+      let statusBody: unknown = null;
+      try {
+        statusBody = await statusResponse.json();
+      } catch (_e) {
+        statusBody = null;
+      }
+
+      const classification = classifyTikTokPublishStatus(statusBody, statusResponse.status);
+      lastState = classification.state;
+      lastReason = classification.reason ?? classification.status;
+      console.log('[TikTok] Publish status:', {
+        state: classification.state,
+        status: classification.status,
+        reason: classification.reason,
+        attempt,
+      });
+
+      if (classification.state === 'published') {
+        const postId = classification.publiclyAvailablePostId;
+        return {
+          provider: 'tiktok',
+          ok: true,
+          external_id: publish_id,
+          permalink: postId ? `https://www.tiktok.com/video/${postId}` : undefined,
+          error_code: undefined,
+          error_message: undefined,
+        };
+      }
+
+      if (classification.state === 'failed') {
+        return {
+          provider: 'tiktok',
+          ok: false,
+          external_id: publish_id,
+          error_code: 'TT_PUBLISH_FAILED',
+          error_message: `TikTok rejected the post${classification.reason ? `: ${classification.reason}` : ''}`,
+        };
+      }
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, tiktokPollDelayMs(attempt, classification.state === 'rate_limited')),
+      );
+      attempt++;
+    }
 
     return {
       provider: 'tiktok',
-      ok: true,
+      ok: false,
       external_id: publish_id,
-      permalink: undefined, // TikTok doesn't provide direct permalink until video is processed
-      error_code: undefined,
-      error_message: undefined,
+      error_code: 'TT_PUBLISH_TIMEOUT',
+      error_message: `TikTok did not confirm the publish in time (last state: ${lastState}${lastReason ? `, ${lastReason}` : ''})`,
     };
+
   } catch (error: any) {
     console.error('[TikTok] Error:', error);
     return {

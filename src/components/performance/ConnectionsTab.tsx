@@ -20,10 +20,13 @@ import { CSVUploadDialog } from "./CSVUploadDialog";
 import { InstagramTokenDialog } from "./InstagramTokenDialog";
 import { InstagramSetupChecklist } from "./InstagramSetupChecklist";
 import { TokenStatusBadge } from "./TokenStatusBadge";
+import { ConnectionHealthBadge } from "./ConnectionHealthBadge";
+
 import { XConnectionCard } from "./XConnectionCard";
 import { FacebookPageSelectDialog } from "./FacebookPageSelectDialog";
 import { RefreshCw } from "lucide-react";
 import { tx } from '@/lib/i18nText';
+import { classifyConnectionHealth } from '@/lib/socialConnectionHealth';
 
 const PROVIDERS = [
   { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'bg-pink-500' },
@@ -1020,7 +1023,7 @@ export const ConnectionsTab = () => {
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        {connected && <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Connected</Badge>}
+                        {connected && <ConnectionHealthBadge connection={connection as any} />}
                         {connected && connection && provider.id === 'instagram' && (
                           <TokenStatusBadge 
                             lastSyncAt={connection.last_sync_at} 
@@ -1032,6 +1035,25 @@ export const ConnectionsTab = () => {
 
                     {connected && connection ? (
                       <div className="space-y-2 text-sm">
+                        {/* Expired / reconnect-required token (e.g. TikTok 24h tokens) */}
+                        {classifyConnectionHealth(connection as any).requiresReconnect && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-xs text-amber-800 space-y-2 mb-2 dark:bg-amber-950/30 dark:border-amber-800/50 dark:text-amber-200">
+                            <div className="flex items-start gap-2">
+                              <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                              <p>
+                                {tx({
+                                  de: "Der gespeicherte Zugriff ist abgelaufen oder unvollständig. Bitte verbinde diesen Kanal neu, bevor du veröffentlichst.",
+                                  en: "The stored access has expired or is incomplete. Please reconnect this channel before publishing.",
+                                  es: "El acceso guardado ha caducado o está incompleto. Vuelve a conectar este canal antes de publicar.",
+                                })}
+                              </p>
+                            </div>
+                            <Button size="sm" onClick={() => handleConnect(provider.id, provider.name, true)}>
+                              {tx({ de: "Neu verbinden", en: "Reconnect", es: "Reconectar" })}
+                            </Button>
+                          </div>
+                        )}
+
                         {/* Token predates the business_management approval → must be re-issued */}
                         {(provider.id === 'facebook' || provider.id === 'instagram') &&
                           Array.isArray(connection.account_metadata?.granted_scopes) &&
