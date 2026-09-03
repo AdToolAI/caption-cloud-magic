@@ -118,7 +118,7 @@ async function publishToInstagram(
     // Get Instagram connection from social_connections (not app_secrets!)
     const { data: connection, error: connectionError } = await supabase
       .from('social_connections')
-      .select('account_id, access_token_hash')
+      .select('account_id, access_token_hash, account_metadata')
       .eq('user_id', userId)
       .eq('provider', 'instagram')
       .maybeSingle();
@@ -133,8 +133,44 @@ async function publishToInstagram(
       };
     }
 
-    // Decrypt token
-    const accessToken = await decryptToken(connection.access_token_hash);
+    // Instagram Content Publishing requires the PAGE access token of the
+    // Facebook page linked to the IG professional account. It is stored
+    // encrypted in account_metadata during OAuth / page selection.
+    const encryptedPageToken =
+      (connection.account_metadata as Record<string, unknown> | null)?.page_access_token_encrypted;
+
+    if (typeof encryptedPageToken !== 'string' || encryptedPageToken.length === 0) {
+      console.error('[Instagram] No page access token stored for this connection');
+      return {
+        provider: 'instagram',
+        ok: false,
+        error_code: 'IG_PAGE_TOKEN_MISSING',
+        error_message:
+          'Instagram page access token missing. Please reconnect Instagram and select the linked Facebook page.',
+      };
+    }
+
+    let accessToken: string;
+    try {
+      accessToken = await decryptToken(encryptedPageToken);
+    } catch (_e) {
+      return {
+        provider: 'instagram',
+        ok: false,
+        error_code: 'IG_PAGE_TOKEN_INVALID',
+        error_message:
+          'Instagram page access token could not be decrypted. Please reconnect Instagram.',
+      };
+    }
+    if (!accessToken) {
+      return {
+        provider: 'instagram',
+        ok: false,
+        error_code: 'IG_PAGE_TOKEN_INVALID',
+        error_message: 'Instagram page access token is empty. Please reconnect Instagram.',
+      };
+    }
+
 
     if (!media || media.length === 0) {
       return {
