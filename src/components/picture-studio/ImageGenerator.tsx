@@ -303,6 +303,14 @@ export function ImageGenerator() {
   };
 
   const generateOne = async (): Promise<any | null> => {
+    const subjectRefs = editMode
+      ? [referenceImage, ...extraReferences].filter(Boolean).slice(0, maxSubjectRefs) as string[]
+      : [];
+    const styleRefs = mode === 'restyle' && styleReference ? [styleReference] : [];
+    const exact = supportsExactSize && Number(exactWidth) > 0 && Number(exactHeight) > 0
+      ? { width: Number(exactWidth), height: Number(exactHeight) }
+      : {};
+
     if (tier === 'standard') {
       const { data, error } = await supabase.functions.invoke('generate-studio-image', {
         body: {
@@ -311,7 +319,9 @@ export function ImageGenerator() {
           aspectRatio,
           quality: 'fast',
           editMode,
-          referenceImageUrl: editMode ? referenceImage : undefined,
+          referenceImageUrl: subjectRefs[0],
+          referenceImageUrls: subjectRefs,
+          styleReferenceUrls: styleRefs,
         }
       });
       if (error) throw error;
@@ -327,8 +337,9 @@ export function ImageGenerator() {
         tier,
         aspectRatio,
         style,
-        referenceImageUrl: editMode ? referenceImage : undefined,
-        styleReferenceUrl: mode === 'restyle' ? (styleReference || undefined) : undefined,
+        referenceImageUrls: subjectRefs,
+        styleReferenceUrls: styleRefs,
+        ...exact,
         strength: mode === 'transform' ? strength : undefined,
         brandKit: brandKitPayload,
       }
