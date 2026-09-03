@@ -316,9 +316,15 @@ serve(async (req) => {
     const replicateInput: Record<string, any> = { prompt: enhancedPrompt };
 
     if (tier === 'fast') {
-      // Seedream 4
+      // Seedream 4 — supports exact pixel sizes via size:"custom"
       replicateInput.aspect_ratio = safeAspect;
-      replicateInput.size = '2K';
+      if (resolvedSize.width && resolvedSize.height) {
+        replicateInput.size = 'custom';
+        replicateInput.width = resolvedSize.width;
+        replicateInput.height = resolvedSize.height;
+      } else {
+        replicateInput.size = '2K';
+      }
       if (imageInputs.length) replicateInput.image_input = imageInputs;
     } else if (tier === 'pro') {
       // Imagen 4 Ultra (no image_input support — style ref only via prompt)
@@ -326,18 +332,18 @@ serve(async (req) => {
       replicateInput.output_format = 'jpg';
       replicateInput.safety_filter_level = 'block_only_high';
     } else if (tier === 'flux') {
-      // FLUX 1.1 Pro Ultra
+      // FLUX 1.1 Pro Ultra — exactly one image_prompt
       replicateInput.aspect_ratio = safeAspect;
       replicateInput.output_format = 'jpg';
       replicateInput.safety_tolerance = 5;
       if (imageInputs.length) replicateInput.image_prompt = imageInputs[0];
     } else if (tier === 'ideogram') {
-      // Ideogram v3 Turbo
+      // Ideogram v3 Turbo — style references only
       replicateInput.aspect_ratio = safeAspect;
-      if (imageInputs.length) replicateInput.style_reference_images = imageInputs;
+      if (styleRefs.length) replicateInput.style_reference_images = styleRefs;
     } else if (tier === 'recraft') {
-      // Recraft v3 — fixed sizes
-      replicateInput.size = RECRAFT_SIZES[safeAspect] ?? '1024x1024';
+      // Recraft v3 — fixed pixel presets
+      replicateInput.size = resolvedSize.preset ?? '1024x1024';
     } else if (tier === 'qwen') {
       // Qwen Image
       replicateInput.aspect_ratio = safeAspect;
