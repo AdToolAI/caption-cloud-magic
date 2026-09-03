@@ -3,6 +3,7 @@ import Stripe from "npm:stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { trackBusinessEvent } from "../_shared/telemetry.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl } from "../_shared/i18n.ts";
 import {
   FOUNDERS_CREDIT_COUPON,
   FOUNDERS_SLOT_MARKER,
