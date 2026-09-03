@@ -30,6 +30,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
+import { validateImageForModel } from '@/lib/ai-video/imageRequirements';
+
 import {
   VIDU_REFERENCE_ROLES,
   type ViduReferenceRole,
@@ -48,10 +50,14 @@ interface Props {
   required?: boolean;
   /** Model name shown in the helper copy (defaults to a neutral wording). */
   modelLabel?: string;
+  /** Active model id / family — drives the provider image contract check. */
+  modelId?: string;
+  modelFamily?: string;
   /** Optional: URL of the active Brand Character to offer "Load from Lock". */
   brandCharacterUrl?: string | null;
   brandCharacterName?: string | null;
 }
+
 
 const ROLE_ICON: Record<ViduReferenceRole, typeof UserCircle2> = {
   character: UserCircle2,
@@ -67,6 +73,10 @@ export function MultiReferenceUploader({
   maxReferences = 7,
   required = true,
   modelLabel,
+  modelId,
+  modelFamily,
+
+
   brandCharacterUrl,
   brandCharacterName,
 }: Props) {
@@ -89,6 +99,19 @@ export function MultiReferenceUploader({
       toast.error(language === 'de' ? tx({ de: 'Bild zu groß (max. 10 MB).', en: 'Image too large (max. 10 MB).', es: 'Imagen demasiado grande (máx. 10 MB).' }) : 'Image too large (max 10 MB).');
       return;
     }
+    // Provider image contract (min size / aspect ratio) — reject before the
+    // upload so a bad file can never reach the provider and burn credits.
+    const violation = await validateImageForModel(file, {
+      modelId,
+      family: modelFamily,
+      modelLabel: modelLabel ?? 'This model',
+      locale: (language as 'de' | 'en' | 'es') ?? 'en',
+    });
+    if (violation) {
+      toast.error(violation);
+      return;
+    }
+
     setUploadingIndex(slots.length);
     try {
       const ext = file.name.split('.').pop() ?? 'jpg';

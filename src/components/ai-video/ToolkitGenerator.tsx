@@ -42,6 +42,8 @@ import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix'
 import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
 import { applySceneAssetsToPrompt } from '@/lib/motion-studio/applySceneAssetsToPrompt';
 import { toolkitModelToClipSource } from '@/lib/ai-video/toolkitModelToClipSource';
+import { validateImageForModel } from '@/lib/ai-video/imageRequirements';
+
 import type { MotionStudioCharacter, MotionStudioLocation } from '@/types/motion-studio';
 import type { CharacterShot, ComposerCharacter, ComposerScene } from '@/types/video-composer';
 
@@ -509,7 +511,20 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   /* ── Image upload ── */
   const handleImageUpload = async (file: File) => {
     if (!user) return;
+    // Provider image contract: reject unusable frames before upload/generation
+    // (e.g. 152×515 px, which ModelArk rejects with a raw 400).
+    const violation = await validateImageForModel(file, {
+      modelId: model.id,
+      family: model.family,
+      modelLabel: model.name,
+      locale: (language as 'de' | 'en' | 'es') ?? 'en',
+    });
+    if (violation) {
+      toast.error(violation);
+      return;
+    }
     setUploading(true);
+
     try {
       const ext = file.name.split('.').pop();
       const path = `${user.id}/toolkit-${Date.now()}.${ext}`;
@@ -1120,6 +1135,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             maxReferences={model.capabilities.maxReferences ?? 7}
             required={!!model.capabilities.multiRefRequired}
             modelLabel={model.name}
+            modelId={model.id}
+            modelFamily={model.family}
+
             brandCharacterUrl={brandCharacter?.reference_image_url ?? null}
             brandCharacterName={brandCharacter?.name ?? null}
           />

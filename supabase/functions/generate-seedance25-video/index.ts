@@ -9,6 +9,15 @@ import {
   storeModelArkVideo,
   MODELARK_JOB_PREFIX,
 } from "../_shared/modelark.ts";
+import {
+  checkImageDimensions,
+  describeImageViolation,
+  describeProviderImageError,
+  imageRequirementsFor,
+  probeRemoteImageSize,
+  type ImageLocale,
+} from "../_shared/videoImageRequirements.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -130,6 +139,43 @@ Deno.serve(async (req) => {
       );
     }
     const billedDuration = smartDuration ? MAX_DURATION : duration;
+
+    /**
+     * Image pre-check — runs BEFORE any credit deduction or provider call.
+     * ModelArk rejects images below 300 px width or outside the 1:2.5–2.5:1
+     * ratio band with a raw 400; we catch that here with a readable message
+     * and without charging the user.
+     */
+    const locale = ((req.headers.get("x-locale") ?? "en").slice(0, 2)) as ImageLocale;
+    const requirements = imageRequirementsFor(MODEL_ID, "seedance");
+    const imagesToCheck = [
+      startImageUrl,
+      endImageUrl,
+      ...((referenceImageUrls ?? []) as string[]),
+    ].filter(Boolean) as string[];
+
+    for (const url of imagesToCheck) {
+      const dims = await probeRemoteImageSize(url);
+      if (!dims) continue; // unknown format → let the provider decide
+      const check = checkImageDimensions(dims, requirements);
+      if (!check.ok) {
+        console.warn("[generate-seedance25-video] image rejected pre-flight", {
+          url, dims, violation: check.violation,
+        });
+        return new Response(
+          JSON.stringify({
+            error: describeImageViolation(check, locale, "Seedance 2.5"),
+            code: "IMAGE_REQUIREMENTS_NOT_MET",
+            violation: check.violation,
+            width: dims.width,
+            height: dims.height,
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
+
 
 
     const { data: walletPreview } = await supabaseClient
@@ -278,16 +324,20 @@ Deno.serve(async (req) => {
       });
 
     } catch (providerError: any) {
-      console.error("[generate-seedance25-video] ModelArk error:", providerError);
-      await refund(`ModelArk Error: ${providerError?.message ?? "Unknown error"}`);
+      const rawMessage = String(providerError?.message ?? "Unknown error");
+      console.error("[generate-seedance25-video] ModelArk error:", rawMessage);
+      // Raw provider JSON (incl. request ids) stays in the log and in the
+      // generation row; the user gets one readable, localized sentence.
+      const friendly = describeProviderImageError(rawMessage, locale);
+      await refund(`ModelArk Error: ${rawMessage}`);
       return new Response(
         JSON.stringify({
-          error: "Video generation failed. Credits refunded.",
+          error: friendly,
           code: "MODELARK_ERROR",
-          detail: String(providerError?.message ?? "").slice(0, 300),
         }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+
     }
 
     await supabaseAdmin
