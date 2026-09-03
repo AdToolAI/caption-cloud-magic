@@ -8,28 +8,24 @@ Alle drei Checkout-Funktionen (`create-checkout` für Abos, `create-enterprise-c
 
 Konsequenz: Der größte Hebel ist **keine Code-Änderung**, sondern die Freischaltung im Stripe-Konto. Der Code muss nur an drei Stellen nachziehen.
 
-## Was freigeschaltet wird (Stripe-Konto, Aktion von dir)
+## Stand deines Stripe-Kontos (aus deinen Screenshots)
 
-Weltweiter Verkauf, Abo + Einmalkauf:
+Bereits aktiviert: Karten, Apple Pay, Google Pay, Amazon Pay, Link, PayPal, Revolut Pay, Samsung/Kakao/Naver Pay, PAYCO, Klarna, SEPA-Lastschrift, Bancontact, BLIK, EPS, Banküberweisung.
 
-- **Karten** (bereits aktiv) — inkl. Apple Pay / Google Pay
-- **PayPal** — größter Umsatzhebel in DACH, funktioniert für Abo und Einmalkauf
-- **SEPA-Lastschrift** — EUR, Abo-tauglich, sehr niedrige Gebühren
-- **Klarna** — Einmalkauf (Guthaben-Pakete), EU + US
-- **iDEAL / Bancontact / Blik / P24 / EPS** — lokale EU-Methoden, Einmalkauf
-- **Link** — Stripes One-Click-Checkout, kostenlos aktivierbar
-- **Cash App Pay / Amazon Pay** — US-Abdeckung
-- **Revolut Pay, Multibanco, Twint** — optional, je nach Nachfrage
+Damit ist die Freischaltung praktisch abgeschlossen. Auffällig fehlt nur **iDEAL** (Niederlande, dort mit Abstand die dominante Methode) — das ist ein Klick unter „Manuelle Integrationsoptionen / Zahlungsmethoden". Optional zusätzlich: Multibanco (Portugal), TWINT (Schweiz), Przelewy24 (Polen), Cash App Pay (USA).
 
-Wichtig: Nicht jede Methode kann Abos. Stripe blendet im Abo-Checkout automatisch nur die abofähigen (Karte, PayPal, SEPA, Link, Bancontact-Mandat) ein — die restlichen erscheinen nur beim Guthaben-Kauf. Das ist gewollt und erfordert keinen Sonderfall im Code.
+Wichtig: Nicht jede Methode kann Abos. Stripe blendet im Abo-Checkout automatisch nur die abofähigen ein (Karte, PayPal, SEPA, Link, Amazon Pay) — der Rest erscheint nur beim Guthaben-Kauf. Das ist gewollt und braucht keinen Sonderfall im Code.
+
+Dass die Methoden aktiviert sind, heißt aber noch nicht, dass sie im Checkout **erscheinen** — genau da liegt jetzt die eigentliche Arbeit.
+
 
 ## Was ich im Code ändere
 
-1. **Apple Pay / Google Pay Domain-Verifizierung** absichern: beide Custom-Domains (`captiongenie.app`, `useadtool.ai`) müssen in Stripe registriert sein, sonst zeigt der Checkout die Wallets nicht. Ich prüfe den Status und melde, was in Stripe noch zu bestätigen ist.
-2. **Guthaben-Checkout (`ai-video-purchase-credits`)**: Kunden-Adresse erheben wie beim Abo (`billing_address_collection`), damit Klarna/iDEAL/SEPA nicht an fehlenden Pflichtfeldern scheitern, und die Rechnungserstellung bleibt unverändert.
-3. **Abo-Checkout (`create-checkout`)**: SEPA-/PayPal-Mandate für wiederkehrende Zahlungen sauber setzen, damit Folgebuchungen nicht scheitern. Kein hartes Setzen von `payment_method_types` — der automatische Modus bleibt.
-4. **Fehlerbild verbessern**: Wenn eine Methode für Währung/Land nicht verfügbar ist, aktuell 500 mit Rohtext. Stattdessen eine verständliche, lokalisierte Meldung (EN/DE/ES).
-5. **Sichtbarkeit im Frontend**: Auf Pricing- und Guthaben-Seite eine dezente Zeile „Karte · PayPal · SEPA · Klarna · Apple Pay · Google Pay" im Design-System (keine Fremdlogos in Fremdfarben). Das erhöht die Conversion messbar, weil Nutzer vor dem Klick sehen, dass ihre Methode dabei ist.
+1. **Guthaben-Checkout (`ai-video-purchase-credits`)**: Rechnungsadresse + Name erheben wie beim Abo. Ohne diese Felder blendet Stripe Klarna, SEPA und die lokalen Bank-Methoden im Checkout schlicht aus — das ist der wahrscheinlichste Grund, warum von den vielen aktivierten Methoden bisher wenig sichtbar ist. Rechnungslogik und Steuersatz bleiben unverändert.
+2. **Abo-Checkout (`create-checkout`)**: SEPA-/PayPal-Mandat für wiederkehrende Zahlungen sauber setzen, damit Folgebuchungen nicht scheitern. Kein hartes Setzen von `payment_method_types` — der automatische Modus bleibt (das hatte früher 500er ausgelöst).
+3. **Apple Pay / Google Pay Domain-Verifizierung** prüfen: `captiongenie.app` und `useadtool.ai` müssen in Stripe als Zahlungsmethoden-Domain registriert sein, sonst erscheinen die Wallets trotz Aktivierung nicht. Ich prüfe den Status und registriere fehlende Domains.
+4. **Fehlerbild verbessern**: Wenn eine Methode für Währung/Land nicht verfügbar ist, kommt aktuell ein 500er mit Rohtext. Stattdessen eine verständliche, lokalisierte Meldung (EN/DE/ES).
+5. **Sichtbarkeit im Frontend**: Auf Pricing- und Guthaben-Seite eine dezente Zeile „Karte · PayPal · SEPA · Klarna · Apple Pay · Google Pay" im Design-System (keine Fremdlogos in Fremdfarben). Nutzer sollen vor dem Klick sehen, dass ihre Methode dabei ist.
 
 ## Was ausdrücklich unberührt bleibt
 
@@ -37,8 +33,9 @@ Preise, FX-Faktor 1,15, Creator-Rabatt, Guthaben-Ledger, Refunds, Promo-Codes, F
 
 ## Prüfung
 
-Typecheck, Build, gezielte Tests der Checkout-Funktionen; danach je ein Test-Checkout (Abo + Guthaben) im Stripe-Testmodus mit Kontrolle, welche Methoden angezeigt werden. Deploy nur der berührten Funktionen.
+Typecheck, Build, gezielte Tests der Checkout-Funktionen; danach je ein Test-Checkout (Abo + Guthaben) im Stripe-Testmodus mit Kontrolle, welche Methoden tatsächlich angezeigt werden — einmal mit EUR/DE, einmal mit USD/US. Deploy nur der berührten Funktionen.
 
-## Reihenfolge
+## Deine einzige verbleibende Dashboard-Aufgabe
 
-Ich starte mit der Bestandsaufnahme deines Stripe-Kontos (welche Methoden sind schon aktiv, sind die Domains verifiziert) und liefere dir eine konkrete Klickliste. Parallel gehen die Code-Anpassungen live, damit die Methoden sofort greifen, sobald du sie freischaltest.
+iDEAL aktivieren (und optional Multibanco / TWINT / P24 / Cash App Pay). Alles andere steht.
+
