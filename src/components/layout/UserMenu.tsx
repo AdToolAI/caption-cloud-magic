@@ -90,12 +90,6 @@ export function UserMenu() {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link to="/billing" className="flex items-center gap-2 cursor-pointer">
-            <Tag className="h-4 w-4" />
-            <span>{tx({ de: "Plan & Guthaben", en: "Plan & Credits", es: "Plan y créditos" })}</span>
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
           <Link to="/faq" className="flex items-center gap-2 cursor-pointer">
             <HelpCircle className="h-4 w-4" />
             <span>{t("nav.faq")}</span>
