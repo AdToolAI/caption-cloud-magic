@@ -158,7 +158,7 @@ export function ImageGenerator() {
   const [helperAutoEnhance, setHelperAutoEnhance] = useState(false);
 
   // Derived: legacy editMode = "we have a reference + we want to transform"
-  const editMode = mode === 'transform';
+  const editMode = mode === 'transform' || mode === 'mix';
 
   const loading = replicateLoading;
   const baseCost = TIER_COSTS[tier];
@@ -799,7 +799,7 @@ export function ImageGenerator() {
 
           {/* MODE SWITCH — replaces the old dual-slot UI */}
           <div className="space-y-2">
-            <Label className="text-xs">Modus</Label>
+            <Label className="text-xs">{tx({ de: 'Modus', en: 'Mode', es: 'Modo' })}</Label>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
               {(Object.keys(PICTURE_MODES) as PictureMode[]).map((m) => {
                 const meta = PICTURE_MODES[m];
@@ -842,7 +842,7 @@ export function ImageGenerator() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => mode === 'transform' ? setReferenceImage(null) : setStyleReference(null)}
+                    onClick={() => mode === 'transform' || mode === 'mix' ? setReferenceImage(null) : setStyleReference(null)}
                     className="h-7 text-[10px] text-muted-foreground hover:text-destructive"
                   >
                     {tx({ de: 'Entfernen', en: 'Remove', es: 'Quitar' })}
@@ -932,15 +932,16 @@ export function ImageGenerator() {
               </Label>
               <div className="grid grid-cols-4 gap-2">
                 {extraReferences.map((url, i) => (
-                  <button
+                  <Button
                     key={`${url}-${i}`}
                     type="button"
+                    variant="outline"
                     onClick={() => setExtraReferences(prev => prev.filter((_, idx) => idx !== i))}
-                    className="relative rounded-md overflow-hidden border border-border bg-muted/30 aspect-square"
+                    className="relative h-auto p-0 rounded-md overflow-hidden border-border bg-muted/30 aspect-square"
                     title={tx({ de: 'Entfernen', en: 'Remove', es: 'Quitar' })}
                   >
                     <img src={url} alt={`Reference ${i + 2}`} className="h-full w-full object-cover" />
-                  </button>
+                  </Button>
                 ))}
                 {extraReferences.length < maxSubjectRefs - 1 && (
                   <Button
@@ -983,13 +984,15 @@ export function ImageGenerator() {
                 <Label className="text-xs">
                   {tx({ de: 'Exakte Pixelgröße', en: 'Exact pixel size', es: 'Tamaño exacto en píxeles' })}
                 </Label>
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   type="button"
                   onClick={() => { setExactWidth(''); setExactHeight(''); }}
-                  className="text-[10px] text-muted-foreground hover:text-destructive"
+                  className="h-7 text-[10px] text-muted-foreground hover:text-destructive"
                 >
                   {tx({ de: 'Automatisch', en: 'Automatic', es: 'Automático' })}
-                </button>
+                </Button>
               </div>
               <div className="flex items-center gap-2">
                 <Input
