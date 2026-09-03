@@ -1,28 +1,43 @@
-# Zahlungsarten: Was noch offen ist
+# Ein Bereich für Plan & Guthaben — statt Billing + Pricing doppelt
 
-Kurz: Code-seitig ist alles fertig und deployed. Was fehlt, ist ausschließlich der Nachweis, dass im echten Checkout wirklich die erwarteten Methoden erscheinen.
+Zur Ausgangsfrage: Code-seitig ist bei den Zahlungsarten alles fertig und deployed (automatische Stripe-Methoden, Adress-/Namenserhebung, Apple/Google-Pay-Domains registriert, lokalisierte Fehler). Dein Screenshot vom Live-Checkout bestätigt das — dort greift nur zuerst „Link", weil eine gespeicherte Karte existiert; über „Pay without Link" erscheinen die übrigen Methoden. Was jetzt stört, ist die Navigation drumherum. Genau das räumt dieser Plan auf.
 
-## Bereits erledigt (deployed)
+## Was heute passiert (geprüft)
 
-- Alle drei Checkout-Funktionen (Abo, Enterprise, Guthaben) nutzen Stripes automatische Zahlungsarten — es erscheint genau das, was im Konto aktiviert ist.
-- Rechnungsadresse + Name werden erhoben (`customer_update`), damit Klarna, SEPA und lokale Bank-Methoden überhaupt eingeblendet werden.
-- SEPA-/PayPal-Mandat für Abos gesetzt, Enterprise auf aktuelle Stripe-API gezogen.
-- Apple Pay / Google Pay Domains `captiongenie.app` und `useadtool.ai` in Stripe registriert (Status active).
-- Lokalisierte Fehlermeldung, wenn eine Methode für Land/Währung nicht verfügbar ist.
-- Hinweiszeile mit den Zahlungsarten auf Pricing und im Guthaben-Kauf (EN/DE/ES).
+- Das Guthaben-Icon im Header verlinkt auf `/billing`. Dort stehen Abo, Portal, Rechnungen — aber **kein** Guthaben und kein Credit-Kauf.
+- `/pricing` ist eine öffentliche Marketing-Seite ohne App-Shell. Eingeloggt wirkt sie deshalb wie „ausgeloggt" und zeigt zusätzlich dieselben Plan-Infos plus die Credit-Pakete.
+- Die Credit-Pakete gibt es doppelt: einmal auf `/pricing`, einmal im AI-Video-Studio.
+- Auf `/pricing` fehlt am Credit-Paket-Block der Zahlungsarten-Hinweis (den gibt es nur im Studio-Block), deshalb sieht der Kauf dort „ohne Stripe" aus.
+- Der Checkout öffnet immer in einem neuen Tab (`window.open`) — bei Popup-Blockern passiert scheinbar nichts.
 
-## Was ich als letzten Schritt vorschlage
+## Was ich ändere
 
-Ein Verifikationsdurchlauf im Stripe-Testmodus, rein lesend ausgewertet:
+**1. `/billing` wird der eine Bereich — „Plan & Guthaben"**
+Reihenfolge auf der Seite, Guthaben zuerst:
+1. **KI-Guthaben** — aktueller Kontostand groß, direkt darunter die vier Credit-Pakete mit Kauf-Button (derselbe Baustein wie im Studio, keine zweite Logik).
+2. **Abo** — aktueller Plan, Preis, Portal öffnen, kündigen.
+3. **Rechnungen & Belege** — unverändert.
+Seitentitel/Untertitel entsprechend angepasst (EN/DE/ES).
 
-1. Abo-Checkout einmal mit EUR/Deutschland und einmal mit USD/USA öffnen und protokollieren, welche Methoden Stripe tatsächlich anzeigt.
-2. Guthaben-Checkout (Einmalzahlung) genauso — hier sollten deutlich mehr Methoden erscheinen als beim Abo.
-3. Ergebnis als kurze Tabelle: erwartet vs. tatsächlich sichtbar, inkl. Begründung für jede fehlende Methode.
+**2. `/pricing` bleibt nur noch die öffentliche Verkaufsseite**
+Eingeloggte Nutzer werden von `/pricing` auf `/billing` geleitet. Damit verschwindet die „ausgeloggte" Ansicht und die Doppelung. Der Eintrag „Pricing" im Nutzer-Menü heißt künftig „Plan & Guthaben" und zeigt auf `/billing`; die öffentliche Preisseite bleibt für Besucher und für Footer-Links erreichbar.
 
-## Erwartungsmanagement
+**3. Zahlungsarten überall sichtbar machen**
+- Der Hinweis „Karte · Apple Pay · Google Pay · PayPal · SEPA · Klarna · iDEAL und weitere" steht künftig auch über den Credit-Paketen auf der öffentlichen Preisseite und im neuen Guthaben-Block.
+- Ergänzt um eine kurze Zeile „Sichere Zahlung über Stripe".
 
-Nicht jede aktivierte Methode kann Abos. Stripe blendet im Abo-Checkout nur abofähige Methoden ein (Karte, PayPal, SEPA, Link, Amazon Pay); Klarna, iDEAL, Bancontact, BLIK, EPS und Banküberweisung erscheinen nur beim Guthaben-Kauf. Apple/Google Pay erscheinen nur auf passendem Gerät/Browser — im Test-Browser also ggf. nicht.
+**4. Checkout-Öffnung robuster**
+Wenn der neue Tab vom Browser blockiert wird, wird im selben Tab weitergeleitet statt stillschweigend nichts zu tun.
 
-## Unberührt
+## Was unberührt bleibt
 
-Preise, FX-Faktor 1,15, Creator-Rabatt, Guthaben-Ledger, Refunds, Promo-Codes, Founders-Logik, Video- und Lip-Sync-Pipeline.
+Preise, FX-Faktor 1,15, Creator-Rabatt, Gründer-Rabatt, Guthaben-Ledger, Refunds, Promo-Codes, alle Edge Functions (kein Redeploy nötig), Video- und Lip-Sync-Pipeline.
+
+## Technisch
+
+- `src/pages/Billing.tsx`: neuer Guthaben-Abschnitt oben (`useAIVideoWallet` + `AIVideoCreditPurchase`), bestehende Abschnitte darunter.
+- `src/pages/Pricing.tsx`: Redirect für eingeloggte Nutzer auf `/billing`; Zahlungsarten-/Stripe-Hinweis über dem Paket-Grid.
+- `src/components/layout/UserMenu.tsx`: Menüpunkt auf `/billing` umgestellt und umbenannt.
+- `src/components/ai-video/AIVideoCreditPurchase.tsx`: Popup-Fallback beim Checkout.
+- `roadmap.md`: Aufgabe eintragen.
+- Prüfung: Typecheck, Build, Browser-Check auf `/billing` und `/pricing` (eingeloggt und ausgeloggt).
