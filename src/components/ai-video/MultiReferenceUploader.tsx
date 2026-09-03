@@ -48,10 +48,14 @@ interface Props {
   required?: boolean;
   /** Model name shown in the helper copy (defaults to a neutral wording). */
   modelLabel?: string;
+  /** Active model id / family — drives the provider image contract check. */
+  modelId?: string;
+  modelFamily?: string;
   /** Optional: URL of the active Brand Character to offer "Load from Lock". */
   brandCharacterUrl?: string | null;
   brandCharacterName?: string | null;
 }
+
 
 const ROLE_ICON: Record<ViduReferenceRole, typeof UserCircle2> = {
   character: UserCircle2,
