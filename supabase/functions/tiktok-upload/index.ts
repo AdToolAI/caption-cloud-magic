@@ -54,7 +54,18 @@ serve(async (req) => {
       throw new Error('TikTok account not connected');
     }
 
-    const accessToken = atob(connection.access_token_hash);
+    // Tokens are stored AES-GCM encrypted — never base64/atob.
+    let accessToken: string;
+    try {
+      accessToken = await decryptToken(connection.access_token_hash);
+    } catch (_e) {
+      throw new Error('TikTok access token could not be decrypted. Please reconnect your TikTok account.');
+    }
+    if (!accessToken) {
+      throw new Error('TikTok access token is invalid. Please reconnect your TikTok account.');
+    }
+    console.log('TikTok access token decrypted (length only):', accessToken.length);
+
 
     // 4. Step 1: Initialize upload
     const videoBytes = await videoFile.arrayBuffer();
