@@ -1120,6 +1120,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             maxReferences={model.capabilities.maxReferences ?? 7}
             required={!!model.capabilities.multiRefRequired}
             modelLabel={model.name}
+            modelId={model.id}
+            modelFamily={model.family}
+
             brandCharacterUrl={brandCharacter?.reference_image_url ?? null}
             brandCharacterName={brandCharacter?.name ?? null}
           />
