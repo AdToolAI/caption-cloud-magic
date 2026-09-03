@@ -39,6 +39,7 @@ const Billing = () => {
   const { user, subscribed, productId, refreshSubscription } = useAuth();
   const { language } = useTranslation();
   const navigate = useNavigate();
+  const { wallet, loading: walletLoading } = useAIVideoWallet();
   const [loading, setLoading] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
