@@ -200,6 +200,29 @@ const Billing = () => {
           <p className="text-muted-foreground">{t.subtitle}</p>
         </div>
 
+        {/* KI-Guthaben zuerst — Kunden sollen nicht suchen müssen. */}
+        <Card className="mb-8 border-2 border-primary/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-primary" />
+              {t.creditsCard}
+            </CardTitle>
+            <CardDescription>{t.creditsDesc}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div>
+              <p className="text-sm text-muted-foreground">{t.balance}</p>
+              <p className="text-3xl font-bold tabular-nums">
+                {walletLoading && !wallet
+                  ? "…"
+                  : `${(wallet?.currency ?? "EUR") === "USD" ? "$" : "€"}${(wallet?.balance_euros ?? 0).toFixed(2)}`}
+              </p>
+            </div>
+            <AIVideoCreditPurchase />
+          </CardContent>
+        </Card>
+
+
         {!subscribed ? (
           <Card className="border-2 border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
