@@ -22,8 +22,8 @@ describe('parseTikTokTokenResponse', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.shape).toBe('flat');
-    expect(result.tokens.accessToken).toBe('a');
-    expect(result.tokens.expiresIn).toBe(7200);
+    expect(result.tokens.access_token).toBe('a');
+    expect(result.tokens.expires_in).toBe(7200);
   });
 
   it('accepts the legacy nested shape', () => {
@@ -33,7 +33,7 @@ describe('parseTikTokTokenResponse', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.shape).toBe('nested');
-    expect(result.tokens.expiresIn).toBe(86400);
+    expect(result.tokens.expires_in).toBe(86400);
   });
 
   it('reports provider errors and missing fields distinctly', () => {
@@ -92,9 +92,9 @@ describe('classifyTikTokPublishStatus', () => {
     expect(result.state).toBe('rate_limited');
   });
 
-  it('never guesses on unknown payloads', () => {
+  it('keeps polling on unrecognized statuses and stays unknown on empty bodies', () => {
     expect(classifyTikTokPublishStatus(null).state).toBe('unknown');
-    expect(classifyTikTokPublishStatus({ data: { status: 'WHATEVER' } }).state).toBe('unknown');
+    expect(classifyTikTokPublishStatus({ data: { status: 'WHATEVER' } }).state).toBe('processing');
   });
 
   it('backs off longer when rate limited and stays inside the poll window', () => {
