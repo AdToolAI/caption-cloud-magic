@@ -39,8 +39,13 @@ interface GenerateRequest {
   tier: 'fast' | 'pro' | 'ultra' | 'gptimage' | 'flux' | 'ideogram' | 'recraft' | 'qwen';
 
   aspectRatio?: string;
-  referenceImageUrl?: string;     // Subject reference (image-to-image)
-  styleReferenceUrl?: string;     // Style reference (Phase C)
+  referenceImageUrl?: string;     // Subject reference (image-to-image, legacy single)
+  referenceImageUrls?: string[];  // Subject references (multi-reference models)
+  styleReferenceUrl?: string;     // Style reference (legacy single)
+  styleReferenceUrls?: string[];  // Style references (multi-reference models)
+  /** Exact pixel size — only honored by models with `sizing.kind === 'exact'`. */
+  width?: number;
+  height?: number;
   style?: string;
   brandKit?: {
     name?: string;
