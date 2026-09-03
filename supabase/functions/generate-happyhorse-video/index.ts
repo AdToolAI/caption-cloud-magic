@@ -210,8 +210,15 @@ serve(async (req) => {
     }
 
     // Canonical catalog price (identical to the UI preview, incl. account discount).
+    // Prices must resolve in the WALLET currency — USD carries the FX uplift.
+    const { data: walletCurrencyRow } = await supabaseAdmin
+      .from("ai_video_wallets")
+      .select("currency")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const walletCurrency = walletCurrencyRow?.currency === 'USD' ? 'USD' : 'EUR';
     const effectiveCps = await resolveAccountCostPerSecond(
-      supabaseAdmin, user.id, model, 'EUR', costPerSecond,
+      supabaseAdmin, user.id, model, walletCurrency, costPerSecond,
     );
     const totalCost = +(effectiveCps * duration).toFixed(2);
 
