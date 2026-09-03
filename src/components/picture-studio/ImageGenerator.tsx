@@ -134,7 +134,11 @@ export function ImageGenerator() {
     cached?.mode ?? (cached?.editMode ? 'transform' : 'create');
   const [mode, setMode] = useState<PictureMode>(initialMode);
   const [referenceImage, setReferenceImage] = useState<string | null>(cached?.referenceImage ?? null);
+  const [extraReferences, setExtraReferences] = useState<string[]>(cached?.extraReferences ?? []);
   const [styleReference, setStyleReference] = useState<string | null>(cached?.styleReference ?? null);
+  const [exactWidth, setExactWidth] = useState<string>(cached?.exactWidth ?? '');
+  const [exactHeight, setExactHeight] = useState<string>(cached?.exactHeight ?? '');
+  const extraRefInputRef = useRef<HTMLInputElement>(null);
   const [strength, setStrength] = useState<number>(cached?.strength ?? 70);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(cached?.generatedImages ?? []);
   const [replicateLoading, setReplicateLoading] = useState(false);
