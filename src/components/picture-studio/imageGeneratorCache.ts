@@ -26,6 +26,7 @@ interface ImageGeneratorState {
   /** new: exact pixel size for models with custom sizing (Seedream 4) */
   exactWidth?: string;
   exactHeight?: string;
+  resolution?: string;
   generatedImages: GeneratedImage[];
 }
 
