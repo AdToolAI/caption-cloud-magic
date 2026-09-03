@@ -42,6 +42,8 @@ import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix'
 import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
 import { applySceneAssetsToPrompt } from '@/lib/motion-studio/applySceneAssetsToPrompt';
 import { toolkitModelToClipSource } from '@/lib/ai-video/toolkitModelToClipSource';
+import { validateImageForModel } from '@/lib/ai-video/imageRequirements';
+
 import type { MotionStudioCharacter, MotionStudioLocation } from '@/types/motion-studio';
 import type { CharacterShot, ComposerCharacter, ComposerScene } from '@/types/video-composer';
 
