@@ -229,10 +229,19 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Checkout error:", error);
-    const message = error instanceof Error ? error.message : "Failed to create checkout session";
+    const isStripeMethodError = error instanceof Error &&
+      /payment_method|payment method|not available|not supported|currency/i.test(error.message);
+    const status = isStripeMethodError ? 400 : 500;
+    const message = isStripeMethodError
+      ? tl({
+          de: "Die gewählte Zahlungsart ist für diese Währung oder Region nicht verfügbar. Bitte versuche es mit einer anderen Methode.",
+          en: "The selected payment method is not available for this currency or region. Please try another method.",
+          es: "El método de pago seleccionado no está disponible para esta moneda o región. Por favor, prueba con otro método.",
+        })
+      : (error instanceof Error ? error.message : "Failed to create checkout session");
     return new Response(
       JSON.stringify({ error: message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 },
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status },
     );
   }
 });
