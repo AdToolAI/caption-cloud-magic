@@ -144,7 +144,10 @@ describe('admin margin table', () => {
       expect(row.sellEUR).toBe(entry.sellEUR);
       expect(row.costEUR).toBe(entry.costEUR);
       expect(row.tier).toBe(PREMIUM_ENGINE_CATALOG_IDS.has(row.id) ? 'premium-engine' : 'standard');
-      expect(computeMarginPct(row)).toBeGreaterThan(0.42);
+      // Seedance 2.5 720p is the documented low-margin headline price (see above).
+      if (!MARGIN_FLOOR_EXCEPTIONS.has(row.id)) {
+        expect(computeMarginPct(row)).toBeGreaterThan(0.42);
+      }
     }
   });
 });
