@@ -79,7 +79,7 @@ export function UserMenu() {
         <DropdownMenuItem asChild>
           <Link to="/billing" className="flex items-center gap-2 cursor-pointer">
             <CreditCard className="h-4 w-4" />
-            <span>{t("header.billing")}</span>
+            <span>{tx({ de: "Plan & Guthaben", en: "Plan & Credits", es: "Plan y créditos" })}</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
