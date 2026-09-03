@@ -649,7 +649,7 @@ async function publishToFacebook(
 
       // Step 1: Initialize resumable upload
       const initResponse = await fetch(
-        `https://graph.facebook.com/v18.0/${pageId}/videos?access_token=${accessToken}`,
+        `${META_GRAPH_BASE}/${pageId}/videos?access_token=${accessToken}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -687,7 +687,7 @@ async function publishToFacebook(
         formData.append('video_file_chunk', new Blob([chunk], { type: 'video/mp4' }));
 
         const uploadResponse = await fetch(
-          `https://graph.facebook.com/v18.0/${pageId}/videos?access_token=${accessToken}`,
+          `${META_GRAPH_BASE}/${pageId}/videos?access_token=${accessToken}`,
           {
             method: 'POST',
             body: formData,
@@ -706,7 +706,7 @@ async function publishToFacebook(
 
       // Step 3: Finalize upload
       const finishResponse = await fetch(
-        `https://graph.facebook.com/v18.0/${pageId}/videos?access_token=${accessToken}`,
+        `${META_GRAPH_BASE}/${pageId}/videos?access_token=${accessToken}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -730,7 +730,7 @@ async function publishToFacebook(
       let videoPermalink: string | undefined;
       try {
         const permalinkRes = await fetch(
-          `https://graph.facebook.com/v18.0/${videoId}?fields=permalink_url&access_token=${accessToken}`
+          `${META_GRAPH_BASE}/${videoId}?fields=permalink_url&access_token=${accessToken}`
         );
         if (permalinkRes.ok) {
           const permalinkData = await permalinkRes.json();
@@ -783,7 +783,7 @@ async function publishToFacebook(
     let postPermalink: string | undefined;
     try {
       const permalinkRes = await fetch(
-        `https://graph.facebook.com/v18.0/${postResponse.id}?fields=permalink_url&access_token=${accessToken}`
+        `${META_GRAPH_BASE}/${postResponse.id}?fields=permalink_url&access_token=${accessToken}`
       );
       if (permalinkRes.ok) {
         const permalinkData = await permalinkRes.json();
