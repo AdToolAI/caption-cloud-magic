@@ -26,7 +26,7 @@ export const AIVideoCreditPurchase = () => {
         body: { packId, currency, locale: language }
       });
       if (error) throw error;
-      if (data.url) window.open(data.url, '_blank');
+      if (data.url) openCheckoutUrl(data.url);
     } catch (error) {
       console.error('Purchase error:', error);
       toast.error(t('aiVid.purchaseError'));
@@ -34,6 +34,7 @@ export const AIVideoCreditPurchase = () => {
       setLoading(null);
     }
   };
+
 
   return (
     <div className="space-y-6">
