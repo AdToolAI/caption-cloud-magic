@@ -1038,16 +1038,81 @@ async function publishToTikTok(
       throw new Error(`Video upload failed: ${uploadResponse.status}`);
     }
 
-    console.log('[TikTok] ✅ Video uploaded successfully');
+    console.log('[TikTok] ✅ Video uploaded, polling publish status...');
+
+    // Step 3: Poll TikTok until it reports a real terminal state. An accepted
+    // upload is NOT a published post.
+    const pollStart = Date.now();
+    let attempt = 0;
+    let lastState = 'unknown';
+    let lastReason: string | undefined;
+
+    while (Date.now() - pollStart < TIKTOK_POLL_MAX_MS) {
+      const statusResponse = await fetch(
+        'https://open.tiktokapis.com/v2/post/publish/status/fetch/',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ publish_id }),
+        },
+      );
+
+      let statusBody: unknown = null;
+      try {
+        statusBody = await statusResponse.json();
+      } catch (_e) {
+        statusBody = null;
+      }
+
+      const classification = classifyTikTokPublishStatus(statusBody, statusResponse.status);
+      lastState = classification.state;
+      lastReason = classification.reason ?? classification.status;
+      console.log('[TikTok] Publish status:', {
+        state: classification.state,
+        status: classification.status,
+        reason: classification.reason,
+        attempt,
+      });
+
+      if (classification.state === 'published') {
+        const postId = classification.publiclyAvailablePostId;
+        return {
+          provider: 'tiktok',
+          ok: true,
+          external_id: publish_id,
+          permalink: postId ? `https://www.tiktok.com/video/${postId}` : undefined,
+          error_code: undefined,
+          error_message: undefined,
+        };
+      }
+
+      if (classification.state === 'failed') {
+        return {
+          provider: 'tiktok',
+          ok: false,
+          external_id: publish_id,
+          error_code: 'TT_PUBLISH_FAILED',
+          error_message: `TikTok rejected the post${classification.reason ? `: ${classification.reason}` : ''}`,
+        };
+      }
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, tiktokPollDelayMs(attempt, classification.state === 'rate_limited')),
+      );
+      attempt++;
+    }
 
     return {
       provider: 'tiktok',
-      ok: true,
+      ok: false,
       external_id: publish_id,
-      permalink: undefined, // TikTok doesn't provide direct permalink until video is processed
-      error_code: undefined,
-      error_message: undefined,
+      error_code: 'TT_PUBLISH_TIMEOUT',
+      error_message: `TikTok did not confirm the publish in time (last state: ${lastState}${lastReason ? `, ${lastReason}` : ''})`,
     };
+
   } catch (error: any) {
     console.error('[TikTok] Error:', error);
     return {
