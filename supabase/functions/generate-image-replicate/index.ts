@@ -271,7 +271,7 @@ serve(async (req) => {
         body: JSON.stringify({
           model: 'openai/gpt-image-2',
           prompt: enhancedPrompt,
-          size: GPT_IMAGE_SIZES[safeAspect] ?? '1024x1024',
+          size: resolvedSize.preset ?? '1024x1024',
           quality: 'low',
           n: 1,
         }),
