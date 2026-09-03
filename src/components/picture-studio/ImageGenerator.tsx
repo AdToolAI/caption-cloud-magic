@@ -32,6 +32,8 @@ import {
   type PictureMode,
   type QualityTier as ModelTier,
 } from "@/config/pictureStudioModels";
+import { capabilityFor } from "@/config/pictureModelCapabilities";
+import { Input } from "@/components/ui/input";
 
 
 interface GeneratedImage {
@@ -134,7 +136,11 @@ export function ImageGenerator() {
     cached?.mode ?? (cached?.editMode ? 'transform' : 'create');
   const [mode, setMode] = useState<PictureMode>(initialMode);
   const [referenceImage, setReferenceImage] = useState<string | null>(cached?.referenceImage ?? null);
+  const [extraReferences, setExtraReferences] = useState<string[]>(cached?.extraReferences ?? []);
   const [styleReference, setStyleReference] = useState<string | null>(cached?.styleReference ?? null);
+  const [exactWidth, setExactWidth] = useState<string>(cached?.exactWidth ?? '');
+  const [exactHeight, setExactHeight] = useState<string>(cached?.exactHeight ?? '');
+  const extraRefInputRef = useRef<HTMLInputElement>(null);
   const [strength, setStrength] = useState<number>(cached?.strength ?? 70);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(cached?.generatedImages ?? []);
   const [replicateLoading, setReplicateLoading] = useState(false);
@@ -177,7 +183,21 @@ export function ImageGenerator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableAspectRatios]);
 
+  // Provider capabilities for the selected model (single source of truth,
+  // shared with the Edge Functions).
+  const capability = useMemo(() => capabilityFor(tier), [tier]);
+  const maxSubjectRefs = capability?.references.subject ?? 0;
+  const supportsExactSize = capability?.sizing.kind === 'exact';
+  const exactRange = capability?.sizing.exact;
 
+  // Trim references / exact size when the model doesn't support them.
+  useEffect(() => {
+    setExtraReferences(prev => prev.slice(0, Math.max(0, maxSubjectRefs - 1)));
+    if (!supportsExactSize) {
+      setExactWidth('');
+      setExactHeight('');
+    }
+  }, [maxSubjectRefs, supportsExactSize]);
 
   useEffect(() => {
     setCachedState({
@@ -189,23 +209,28 @@ export function ImageGenerator() {
       mode,
       strength,
       referenceImage,
+      extraReferences,
       styleReference,
+      exactWidth,
+      exactHeight,
       generatedImages,
     });
-  }, [prompt, style, aspectRatio, tier, editMode, mode, strength, referenceImage, styleReference, generatedImages]);
+  }, [prompt, style, aspectRatio, tier, editMode, mode, strength, referenceImage, extraReferences, styleReference, exactWidth, exactHeight, generatedImages]);
 
   // When the mode changes, clean up slots that aren't relevant for it.
   useEffect(() => {
     if (mode === 'create') {
       // create: no reference of any kind
       setReferenceImage(null);
+      setExtraReferences([]);
       setStyleReference(null);
     } else if (mode === 'transform') {
-      // transform: only the i2i slot matters
+      // transform: only the i2i slots matter
       setStyleReference(null);
     } else if (mode === 'restyle') {
       // restyle: only the style reference matters
       setReferenceImage(null);
+      setExtraReferences([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
@@ -245,6 +270,26 @@ export function ImageGenerator() {
     e.target.value = '';
     if (!file) return;
     void uploadReference(file, setReferenceImage);
+  };
+
+  const handleExtraRefUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    // uploadReference calls back twice (local preview, then the storage URL):
+    // append on the first call, replace that slot on every later one.
+    let slot = -1;
+    void uploadReference(file, (url) => {
+      setExtraReferences(prev => {
+        if (slot === -1) {
+          if (!url) return prev;
+          slot = prev.length;
+          return [...prev, url].slice(0, Math.max(0, maxSubjectRefs - 1));
+        }
+        if (!url) return prev.filter((_, i) => i !== slot);
+        return prev.map((u, i) => (i === slot ? url : u));
+      });
+    });
   };
 
   const handleStyleRefUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -303,6 +348,14 @@ export function ImageGenerator() {
   };
 
   const generateOne = async (): Promise<any | null> => {
+    const subjectRefs = editMode
+      ? [referenceImage, ...extraReferences].filter(Boolean).slice(0, maxSubjectRefs) as string[]
+      : [];
+    const styleRefs = mode === 'restyle' && styleReference ? [styleReference] : [];
+    const exact = supportsExactSize && Number(exactWidth) > 0 && Number(exactHeight) > 0
+      ? { width: Number(exactWidth), height: Number(exactHeight) }
+      : {};
+
     if (tier === 'standard') {
       const { data, error } = await supabase.functions.invoke('generate-studio-image', {
         body: {
@@ -311,7 +364,9 @@ export function ImageGenerator() {
           aspectRatio,
           quality: 'fast',
           editMode,
-          referenceImageUrl: editMode ? referenceImage : undefined,
+          referenceImageUrl: subjectRefs[0],
+          referenceImageUrls: subjectRefs,
+          styleReferenceUrls: styleRefs,
         }
       });
       if (error) throw error;
@@ -327,8 +382,9 @@ export function ImageGenerator() {
         tier,
         aspectRatio,
         style,
-        referenceImageUrl: editMode ? referenceImage : undefined,
-        styleReferenceUrl: mode === 'restyle' ? (styleReference || undefined) : undefined,
+        referenceImageUrls: subjectRefs,
+        styleReferenceUrls: styleRefs,
+        ...exact,
         strength: mode === 'transform' ? strength : undefined,
         brandKit: brandKitPayload,
       }
@@ -839,6 +895,91 @@ export function ImageGenerator() {
                   {tx({ de: "📸 Bild realistisch & detailliert reproduzieren", en: "📸 Reproduce image realistically & detailed", es: "📸 Reproducir imagen de forma realista y detallada" })}
                 </Button>
               )}
+            </div>
+          )}
+
+          {/* MULTI-REFERENCE SLOTS — only for models that really accept them */}
+          {PICTURE_MODES[mode].needsReference && maxSubjectRefs > 1 && mode === 'transform' && (
+            <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+              <Label className="text-xs flex items-center gap-1.5">
+                <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                {tx({ de: 'Weitere Referenzbilder', en: 'Additional reference images', es: 'Imágenes de referencia adicionales' })}
+                <span className="text-[10px] text-muted-foreground">
+                  {extraReferences.length}/{maxSubjectRefs - 1}
+                </span>
+              </Label>
+              <div className="grid grid-cols-4 gap-2">
+                {extraReferences.map((url, i) => (
+                  <button
+                    key={`${url}-${i}`}
+                    type="button"
+                    onClick={() => setExtraReferences(prev => prev.filter((_, idx) => idx !== i))}
+                    className="relative rounded-md overflow-hidden border border-border bg-muted/30 aspect-square"
+                    title={tx({ de: 'Entfernen', en: 'Remove', es: 'Quitar' })}
+                  >
+                    <img src={url} alt={`Reference ${i + 2}`} className="h-full w-full object-cover" />
+                  </button>
+                ))}
+                {extraReferences.length < maxSubjectRefs - 1 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="aspect-square h-auto border-dashed"
+                    onClick={() => extraRefInputRef.current?.click()}
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+              <input
+                ref={extraRefInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleExtraRefUpload}
+              />
+            </div>
+          )}
+
+          {/* EXACT PIXEL SIZE — only for models with true custom sizing */}
+          {supportsExactSize && (
+            <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">
+                  {tx({ de: 'Exakte Pixelgröße', en: 'Exact pixel size', es: 'Tamaño exacto en píxeles' })}
+                </Label>
+                <button
+                  type="button"
+                  onClick={() => { setExactWidth(''); setExactHeight(''); }}
+                  className="text-[10px] text-muted-foreground hover:text-destructive"
+                >
+                  {tx({ de: 'Automatisch', en: 'Automatic', es: 'Automático' })}
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="2048"
+                  value={exactWidth}
+                  onChange={(e) => setExactWidth(e.target.value)}
+                  className="h-8 text-xs"
+                />
+                <span className="text-xs text-muted-foreground">×</span>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="2048"
+                  value={exactHeight}
+                  onChange={(e) => setExactHeight(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                {exactRange
+                  ? `${exactRange.minW}–${exactRange.maxW} px, ${tx({ de: 'Schritt', en: 'step', es: 'paso' })} ${exactRange.step}, max ${exactRange.maxMegapixels} MP`
+                  : null}
+              </p>
             </div>
           )}
 

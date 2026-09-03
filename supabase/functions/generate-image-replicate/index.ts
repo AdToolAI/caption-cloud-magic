@@ -2,6 +2,11 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import {
+  capabilityFor,
+  closestAspectRatioFor,
+  resolveSize,
+} from "../_shared/pictureModelCapabilities.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,8 +44,13 @@ interface GenerateRequest {
   tier: 'fast' | 'pro' | 'ultra' | 'gptimage' | 'flux' | 'ideogram' | 'recraft' | 'qwen';
 
   aspectRatio?: string;
-  referenceImageUrl?: string;     // Subject reference (image-to-image)
-  styleReferenceUrl?: string;     // Style reference (Phase C)
+  referenceImageUrl?: string;     // Subject reference (image-to-image, legacy single)
+  referenceImageUrls?: string[];  // Subject references (multi-reference models)
+  styleReferenceUrl?: string;     // Style reference (legacy single)
+  styleReferenceUrls?: string[];  // Style references (multi-reference models)
+  /** Exact pixel size — only honored by models with `sizing.kind === 'exact'`. */
+  width?: number;
+  height?: number;
   style?: string;
   brandKit?: {
     name?: string;
@@ -75,58 +85,12 @@ const STYLE_MODIFIERS: Record<string, string> = {
 };
 
 /**
- * Allowed `aspect_ratio` values per Replicate model. Sending anything outside
- * this list makes the model reject the whole request ("input validation"),
- * which surfaced as a silent "Bildgenerierung fehlgeschlagen" in the UI.
+ * Ratios, pixel presets and reference-image limits are NOT maintained here
+ * anymore — `_shared/pictureModelCapabilities.ts` is the single source of
+ * truth shared with the Picture Studio UI.
  */
-const ASPECT_SUPPORT: Record<string, string[]> = {
-  fast: ['1:1', '4:3', '3:4', '16:9', '9:16', '3:2', '2:3', '21:9'],
-  pro: ['1:1', '4:3', '3:4', '16:9', '9:16'],
-  ultra: ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'],
-  gptimage: ['1:1', '3:2', '2:3'],
-  flux: ['1:1', '16:9', '3:2', '2:3', '4:5', '5:4', '9:16', '21:9'],
-  ideogram: ['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16'],
-  recraft: ['1:1', '4:3', '3:4', '16:9', '9:16'],
-  qwen: ['1:1', '16:9', '9:16', '4:3', '3:4'],
-};
-
-/** GPT-Image-2 works with fixed pixel sizes instead of ratio strings. */
-const GPT_IMAGE_SIZES: Record<string, string> = {
-  '1:1': '1024x1024',
-  '3:2': '1536x1024',
-  '2:3': '1024x1536',
-};
-
-/** Recraft v3 works with fixed pixel sizes instead of ratio strings. */
-const RECRAFT_SIZES: Record<string, string> = {
-  '1:1': '1024x1024',
-  '4:3': '1365x1024',
-  '3:4': '1024x1365',
-  '16:9': '1820x1024',
-  '9:16': '1024x1820',
-};
-
-
-/** Maps an unsupported ratio to the closest supported one for that model. */
 function mapAspectRatio(tier: string, requested: string): string {
-  const allowed = ASPECT_SUPPORT[tier] ?? ASPECT_SUPPORT.fast;
-  if (allowed.includes(requested)) return requested;
-
-  const parse = (r: string) => {
-    const [w, h] = r.split(':').map(Number);
-    return w > 0 && h > 0 ? w / h : 1;
-  };
-  const target = parse(requested);
-  let best = allowed[0];
-  let bestDelta = Infinity;
-  for (const cand of allowed) {
-    const delta = Math.abs(parse(cand) - target);
-    if (delta < bestDelta) {
-      best = cand;
-      bestDelta = delta;
-    }
-  }
-  return best;
+  return closestAspectRatioFor(tier, requested);
 }
 
 
@@ -235,8 +199,44 @@ serve(async (req) => {
     }
     const brandSuffix = brandParts.length ? ` ${brandParts.join('. ')}.` : '';
 
+    // --- Capability-driven reference handling -------------------------------
+    const cap = capabilityFor(tier);
+    const requestedSubjects = [
+      ...(body.referenceImageUrls ?? []),
+      ...(referenceImageUrl ? [referenceImageUrl] : []),
+    ].filter(Boolean);
+    const requestedStyles = [
+      ...(body.styleReferenceUrls ?? []),
+      ...(styleReferenceUrl ? [styleReferenceUrl] : []),
+    ].filter(Boolean);
+
+    const maxSubjects = cap?.references.subject ?? 0;
+    const maxStyles = cap?.references.style ?? 0;
+
+    if ((requestedSubjects.length || requestedStyles.length) && (!cap || cap.references.field === null)) {
+      return new Response(
+        JSON.stringify({
+          error: `${cap?.model ?? tier} akzeptiert keine Referenzbilder.`,
+          code: 'REFERENCE_NOT_SUPPORTED',
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (requestedSubjects.length > maxSubjects || requestedStyles.length > maxStyles) {
+      return new Response(
+        JSON.stringify({
+          error: `${cap?.model ?? tier} erlaubt maximal ${maxSubjects} Motiv- und ${maxStyles} Stil-Referenzen.`,
+          code: 'REFERENCE_LIMIT_EXCEEDED',
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const subjectRefs = requestedSubjects.slice(0, maxSubjects);
+    const styleRefs = requestedStyles.slice(0, maxStyles);
+
     // Style-Reference suffix
-    const styleRefSuffix = styleReferenceUrl
+    const styleRefSuffix = styleRefs.length
       ? ` Match the visual style, color palette, and aesthetic of the provided style reference image.`
       : '';
 
@@ -246,11 +246,10 @@ serve(async (req) => {
     if (safeAspect !== aspectRatio) {
       console.log(`[generate-image-replicate] aspect_ratio ${aspectRatio} not supported by ${tier} → using ${safeAspect}`);
     }
+    const resolvedSize = resolveSize(tier, aspectRatio, { width: body.width, height: body.height });
 
-    // Build image inputs (Subject + Style references)
-    const imageInputs: string[] = [];
-    if (referenceImageUrl) imageInputs.push(referenceImageUrl);
-    if (styleReferenceUrl) imageInputs.push(styleReferenceUrl);
+    // Provider-side field order: subject references first, style last.
+    const imageInputs: string[] = [...subjectRefs, ...styleRefs];
 
     // GPT-Image-2 (the model ChatGPT uses) runs on the Lovable AI Gateway,
     // not on Replicate — fixed pixel sizes instead of ratio strings.
@@ -272,7 +271,7 @@ serve(async (req) => {
         body: JSON.stringify({
           model: 'openai/gpt-image-2',
           prompt: enhancedPrompt,
-          size: GPT_IMAGE_SIZES[safeAspect] ?? '1024x1024',
+          size: resolvedSize.preset ?? '1024x1024',
           quality: 'low',
           n: 1,
         }),
@@ -317,9 +316,15 @@ serve(async (req) => {
     const replicateInput: Record<string, any> = { prompt: enhancedPrompt };
 
     if (tier === 'fast') {
-      // Seedream 4
+      // Seedream 4 — supports exact pixel sizes via size:"custom"
       replicateInput.aspect_ratio = safeAspect;
-      replicateInput.size = '2K';
+      if (resolvedSize.width && resolvedSize.height) {
+        replicateInput.size = 'custom';
+        replicateInput.width = resolvedSize.width;
+        replicateInput.height = resolvedSize.height;
+      } else {
+        replicateInput.size = '2K';
+      }
       if (imageInputs.length) replicateInput.image_input = imageInputs;
     } else if (tier === 'pro') {
       // Imagen 4 Ultra (no image_input support — style ref only via prompt)
@@ -327,18 +332,18 @@ serve(async (req) => {
       replicateInput.output_format = 'jpg';
       replicateInput.safety_filter_level = 'block_only_high';
     } else if (tier === 'flux') {
-      // FLUX 1.1 Pro Ultra
+      // FLUX 1.1 Pro Ultra — exactly one image_prompt
       replicateInput.aspect_ratio = safeAspect;
       replicateInput.output_format = 'jpg';
       replicateInput.safety_tolerance = 5;
       if (imageInputs.length) replicateInput.image_prompt = imageInputs[0];
     } else if (tier === 'ideogram') {
-      // Ideogram v3 Turbo
+      // Ideogram v3 Turbo — style references only
       replicateInput.aspect_ratio = safeAspect;
-      if (imageInputs.length) replicateInput.style_reference_images = imageInputs;
+      if (styleRefs.length) replicateInput.style_reference_images = styleRefs;
     } else if (tier === 'recraft') {
-      // Recraft v3 — fixed sizes
-      replicateInput.size = RECRAFT_SIZES[safeAspect] ?? '1024x1024';
+      // Recraft v3 — fixed pixel presets
+      replicateInput.size = resolvedSize.preset ?? '1024x1024';
     } else if (tier === 'qwen') {
       // Qwen Image
       replicateInput.aspect_ratio = safeAspect;

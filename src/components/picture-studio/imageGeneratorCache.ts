@@ -20,7 +20,12 @@ interface ImageGeneratorState {
   /** new: i2i strength 0..100 (only used in transform mode) */
   strength?: number;
   referenceImage: string | null;
+  /** new: extra subject references for multi-reference models */
+  extraReferences?: string[];
   styleReference?: string | null;
+  /** new: exact pixel size for models with custom sizing (Seedream 4) */
+  exactWidth?: string;
+  exactHeight?: string;
   generatedImages: GeneratedImage[];
 }
 
