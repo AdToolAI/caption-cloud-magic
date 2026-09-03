@@ -48,6 +48,13 @@ export const AIVideoCreditPurchase = () => {
           {tx({ de: 'Alle Preise inkl. 19% MwSt. (Deutschland). Eine Rechnung wird automatisch nach dem Kauf per E-Mail zugestellt und im Billing-Bereich verfügbar.', en: 'All prices include 19% VAT (Germany). An invoice is emailed automatically after purchase and is available in the billing area.', es: 'Todos los precios incluyen el 19% de IVA (Alemania). La factura se envía por correo automáticamente tras la compra y está disponible en el área de facturación.' })}
         </p>
       )}
+      <p className="text-xs text-muted-foreground text-center">
+        {tx({
+          de: 'Zahlungsarten: Karte · Apple Pay · Google Pay · PayPal · SEPA · Klarna · iDEAL und weitere (automatisch je nach Land).',
+          en: 'Payment methods: Card · Apple Pay · Google Pay · PayPal · SEPA · Klarna · iDEAL and more (automatic per country).',
+          es: 'Métodos de pago: Tarjeta · Apple Pay · Google Pay · PayPal · SEPA · Klarna · iDEAL y más (automático según país).'
+        })}
+      </p>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {Object.entries(AI_VIDEO_CREDIT_PACKS).map(([key, pack]) => (
           <Card key={key} className={`p-6 relative ${pack.popular ? 'border-primary border-2' : ''}`}>
