@@ -30,6 +30,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
+import { validateImageForModel } from '@/lib/ai-video/imageRequirements';
+
 import {
   VIDU_REFERENCE_ROLES,
   type ViduReferenceRole,
