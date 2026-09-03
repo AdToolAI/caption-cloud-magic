@@ -199,8 +199,44 @@ serve(async (req) => {
     }
     const brandSuffix = brandParts.length ? ` ${brandParts.join('. ')}.` : '';
 
+    // --- Capability-driven reference handling -------------------------------
+    const cap = capabilityFor(tier);
+    const requestedSubjects = [
+      ...(body.referenceImageUrls ?? []),
+      ...(referenceImageUrl ? [referenceImageUrl] : []),
+    ].filter(Boolean);
+    const requestedStyles = [
+      ...(body.styleReferenceUrls ?? []),
+      ...(styleReferenceUrl ? [styleReferenceUrl] : []),
+    ].filter(Boolean);
+
+    const maxSubjects = cap?.references.subject ?? 0;
+    const maxStyles = cap?.references.style ?? 0;
+
+    if ((requestedSubjects.length || requestedStyles.length) && (!cap || cap.references.field === null)) {
+      return new Response(
+        JSON.stringify({
+          error: `${cap?.model ?? tier} akzeptiert keine Referenzbilder.`,
+          code: 'REFERENCE_NOT_SUPPORTED',
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (requestedSubjects.length > maxSubjects || requestedStyles.length > maxStyles) {
+      return new Response(
+        JSON.stringify({
+          error: `${cap?.model ?? tier} erlaubt maximal ${maxSubjects} Motiv- und ${maxStyles} Stil-Referenzen.`,
+          code: 'REFERENCE_LIMIT_EXCEEDED',
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const subjectRefs = requestedSubjects.slice(0, maxSubjects);
+    const styleRefs = requestedStyles.slice(0, maxStyles);
+
     // Style-Reference suffix
-    const styleRefSuffix = styleReferenceUrl
+    const styleRefSuffix = styleRefs.length
       ? ` Match the visual style, color palette, and aesthetic of the provided style reference image.`
       : '';
 
@@ -210,11 +246,10 @@ serve(async (req) => {
     if (safeAspect !== aspectRatio) {
       console.log(`[generate-image-replicate] aspect_ratio ${aspectRatio} not supported by ${tier} → using ${safeAspect}`);
     }
+    const resolvedSize = resolveSize(tier, aspectRatio, { width: body.width, height: body.height });
 
-    // Build image inputs (Subject + Style references)
-    const imageInputs: string[] = [];
-    if (referenceImageUrl) imageInputs.push(referenceImageUrl);
-    if (styleReferenceUrl) imageInputs.push(styleReferenceUrl);
+    // Provider-side field order: subject references first, style last.
+    const imageInputs: string[] = [...subjectRefs, ...styleRefs];
 
     // GPT-Image-2 (the model ChatGPT uses) runs on the Lovable AI Gateway,
     // not on Replicate — fixed pixel sizes instead of ratio strings.
