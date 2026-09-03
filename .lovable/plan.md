@@ -12,15 +12,16 @@ Zur Ausgangsfrage: Code-seitig ist bei den Zahlungsarten alles fertig und deploy
 
 ## Was ich ändere
 
-**1. `/billing` wird der eine Bereich — „Plan & Guthaben"**
-Reihenfolge auf der Seite, Guthaben zuerst:
-1. **KI-Guthaben** — aktueller Kontostand groß, direkt darunter die vier Credit-Pakete mit Kauf-Button (derselbe Baustein wie im Studio, keine zweite Logik).
+**1. `/billing` wird der eine Bereich**
+Titel vollständig lokalisiert — DE „Plan & Guthaben", EN „Plan & Credits", ES „Plan y créditos" (kein deutscher Begriff in EN/ES). Reihenfolge auf der Seite, Guthaben zuerst:
+1. **KI-Guthaben** (EN „AI credits", ES „Créditos de IA") — aktueller Kontostand groß, direkt darunter die vier Credit-Pakete mit Kauf-Button (derselbe Baustein wie im Studio, keine zweite Logik).
 2. **Abo** — aktueller Plan, Preis, Portal öffnen, kündigen.
 3. **Rechnungen & Belege** — unverändert.
-Seitentitel/Untertitel entsprechend angepasst (EN/DE/ES).
+Alle neuen Texte in EN/DE/ES über die bestehende Übersetzungs-Infrastruktur; die Sprachreinheits-Tests laufen mit.
 
 **2. `/pricing` bleibt nur noch die öffentliche Verkaufsseite**
-Eingeloggte Nutzer werden von `/pricing` auf `/billing` geleitet. Damit verschwindet die „ausgeloggte" Ansicht und die Doppelung. Der Eintrag „Pricing" im Nutzer-Menü heißt künftig „Plan & Guthaben" und zeigt auf `/billing`; die öffentliche Preisseite bleibt für Besucher und für Footer-Links erreichbar.
+Eingeloggte Nutzer werden von `/pricing` auf `/billing` geleitet. Damit verschwindet die „ausgeloggte" Ansicht und die Doppelung. Der Eintrag im Nutzer-Menü heißt künftig sprachabhängig „Plan & Guthaben" / „Plan & Credits" / „Plan y créditos" und zeigt auf `/billing`; die öffentliche Preisseite bleibt für Besucher und Footer-Links erreichbar.
+
 
 **3. Zahlungsarten überall sichtbar machen**
 - Der Hinweis „Karte · Apple Pay · Google Pay · PayPal · SEPA · Klarna · iDEAL und weitere" steht künftig auch über den Credit-Paketen auf der öffentlichen Preisseite und im neuen Guthaben-Block.
