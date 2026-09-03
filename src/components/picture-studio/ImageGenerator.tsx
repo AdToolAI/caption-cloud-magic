@@ -32,7 +32,7 @@ import {
   type PictureMode,
   type QualityTier as ModelTier,
 } from "@/config/pictureStudioModels";
-import { capabilityFor } from "@/config/pictureModelCapabilities";
+import { capabilityFor, supportsMode } from "@/config/pictureModelCapabilities";
 import { Input } from "@/components/ui/input";
 
 
@@ -140,6 +140,7 @@ export function ImageGenerator() {
   const [styleReference, setStyleReference] = useState<string | null>(cached?.styleReference ?? null);
   const [exactWidth, setExactWidth] = useState<string>(cached?.exactWidth ?? '');
   const [exactHeight, setExactHeight] = useState<string>(cached?.exactHeight ?? '');
+  const [resolution, setResolution] = useState<string>(cached?.resolution ?? '');
   const extraRefInputRef = useRef<HTMLInputElement>(null);
   const [strength, setStrength] = useState<number>(cached?.strength ?? 70);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(cached?.generatedImages ?? []);
@@ -187,17 +188,27 @@ export function ImageGenerator() {
   // shared with the Edge Functions).
   const capability = useMemo(() => capabilityFor(tier), [tier]);
   const maxSubjectRefs = capability?.references.subject ?? 0;
+  const maxStyleRefs = capability?.references.style ?? 0;
+  const maxTotalRefs = capability?.references.total ?? 0;
   const supportsExactSize = capability?.sizing.kind === 'exact';
   const exactRange = capability?.sizing.exact;
+  const resolutionOptions = capability?.sizing.resolutions ?? [];
 
-  // Trim references / exact size when the model doesn't support them.
+  // Keep controls valid when the concrete provider contract changes.
   useEffect(() => {
     setExtraReferences(prev => prev.slice(0, Math.max(0, maxSubjectRefs - 1)));
     if (!supportsExactSize) {
       setExactWidth('');
       setExactHeight('');
     }
-  }, [maxSubjectRefs, supportsExactSize]);
+    if (resolutionOptions.length && !resolutionOptions.includes(resolution)) {
+      setResolution(capability?.sizing.defaultResolution ?? resolutionOptions[0]);
+    }
+    if (!supportsMode(tier, mode)) {
+      setMode('create');
+      toast.info(tx({ de: `${capability?.model ?? tier} unterstützt diesen Modus nicht. Modus wurde auf „Neues Bild“ gesetzt.`, en: `${capability?.model ?? tier} does not support this mode. Switched to “New picture”.`, es: `${capability?.model ?? tier} no admite este modo. Se cambió a «Nueva imagen».` }));
+    }
+  }, [maxSubjectRefs, supportsExactSize, resolutionOptions, resolution, capability, tier, mode]);
 
   useEffect(() => {
     setCachedState({
@@ -213,9 +224,10 @@ export function ImageGenerator() {
       styleReference,
       exactWidth,
       exactHeight,
+      resolution,
       generatedImages,
     });
-  }, [prompt, style, aspectRatio, tier, editMode, mode, strength, referenceImage, extraReferences, styleReference, exactWidth, exactHeight, generatedImages]);
+  }, [prompt, style, aspectRatio, tier, editMode, mode, strength, referenceImage, extraReferences, styleReference, exactWidth, exactHeight, resolution, generatedImages]);
 
   // When the mode changes, clean up slots that aren't relevant for it.
   useEffect(() => {
@@ -224,7 +236,7 @@ export function ImageGenerator() {
       setReferenceImage(null);
       setExtraReferences([]);
       setStyleReference(null);
-    } else if (mode === 'transform') {
+    } else if (mode === 'transform' || mode === 'mix') {
       // transform: only the i2i slots matter
       setStyleReference(null);
     } else if (mode === 'restyle') {
@@ -273,21 +285,21 @@ export function ImageGenerator() {
   };
 
   const handleExtraRefUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files ?? []);
     e.target.value = '';
-    if (!file) return;
-    // uploadReference calls back twice (local preview, then the storage URL):
-    // append on the first call, replace that slot on every later one.
-    let slot = -1;
-    void uploadReference(file, (url) => {
-      setExtraReferences(prev => {
-        if (slot === -1) {
-          if (!url) return prev;
-          slot = prev.length;
-          return [...prev, url].slice(0, Math.max(0, maxSubjectRefs - 1));
-        }
-        if (!url) return prev.filter((_, i) => i !== slot);
-        return prev.map((u, i) => (i === slot ? url : u));
+    const remaining = Math.max(0, maxTotalRefs - (referenceImage ? 1 : 0) - extraReferences.length - (styleReference ? 1 : 0));
+    files.slice(0, remaining).forEach((file) => {
+      let slot = -1;
+      void uploadReference(file, (url) => {
+        setExtraReferences(prev => {
+          if (slot === -1) {
+            if (!url) return prev;
+            slot = prev.length;
+            return [...prev, url].slice(0, Math.max(0, maxSubjectRefs - 1));
+          }
+          if (!url) return prev.filter((_, i) => i !== slot);
+          return prev.map((u, i) => (i === slot ? url : u));
+        });
       });
     });
   };
@@ -312,7 +324,7 @@ export function ImageGenerator() {
   // don't expose a numeric "strength" param) honor user intent via language.
   const effectivePrompt = useMemo(() => {
     const base = prompt.trim();
-    if (mode !== 'transform' || !referenceImage) return base;
+    if ((mode !== 'transform' && mode !== 'mix') || !referenceImage) return base;
     if (strength <= 35) {
       return `${base}\n\nPreserve the exact composition, subjects, layout and lighting of the reference image. Only refine style and details — do not move, add, or remove subjects.`;
     }
@@ -348,7 +360,7 @@ export function ImageGenerator() {
   };
 
   const generateOne = async (): Promise<any | null> => {
-    const subjectRefs = editMode
+    const subjectRefs = mode === 'transform' || mode === 'mix'
       ? [referenceImage, ...extraReferences].filter(Boolean).slice(0, maxSubjectRefs) as string[]
       : [];
     const styleRefs = mode === 'restyle' && styleReference ? [styleReference] : [];
@@ -363,7 +375,8 @@ export function ImageGenerator() {
           style,
           aspectRatio,
           quality: 'fast',
-          editMode,
+          editMode: mode === 'transform' || mode === 'mix',
+          mode,
           referenceImageUrl: subjectRefs[0],
           referenceImageUrls: subjectRefs,
           styleReferenceUrls: styleRefs,
@@ -385,7 +398,9 @@ export function ImageGenerator() {
         referenceImageUrls: subjectRefs,
         styleReferenceUrls: styleRefs,
         ...exact,
-        strength: mode === 'transform' ? strength : undefined,
+        resolution: resolution || undefined,
+        mode,
+        strength: mode === 'transform' || mode === 'mix' ? strength : undefined,
         brandKit: brandKitPayload,
       }
     });
@@ -785,57 +800,64 @@ export function ImageGenerator() {
           {/* MODE SWITCH — replaces the old dual-slot UI */}
           <div className="space-y-2">
             <Label className="text-xs">Modus</Label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
               {(Object.keys(PICTURE_MODES) as PictureMode[]).map((m) => {
                 const meta = PICTURE_MODES[m];
                 const active = mode === m;
+                const enabled = supportsMode(tier, m);
                 return (
-                  <button
+                  <Button
                     key={m}
                     type="button"
                     onClick={() => setMode(m)}
-                    className={`p-3 rounded-lg border text-left transition-all ${
+                    disabled={!enabled}
+                    variant="outline"
+                    title={!enabled ? tx({ de: `Nicht unterstützt von ${capability?.model ?? tier}`, en: `Not supported by ${capability?.model ?? tier}`, es: `No compatible con ${capability?.model ?? tier}` }) : undefined}
+                    className={`h-auto min-h-20 p-3 justify-start rounded-lg text-left transition-all whitespace-normal ${
                       active
                         ? 'border-primary bg-primary/10'
-                        : 'border-border/50 bg-background/30 hover:border-border'
+                        : 'border-border/50 bg-background/30'
                     }`}
                   >
-                    <div className="font-semibold text-sm mb-0.5">{meta.label}</div>
-                    <p className="text-[10px] text-muted-foreground leading-snug">{meta.description}</p>
-                  </button>
+                    <span><span className="block font-semibold text-sm mb-0.5">{meta.label}</span>
+                    <span className="block text-[10px] text-muted-foreground leading-snug">{enabled ? meta.description : tx({ de: 'Für dieses Modell nicht verfügbar', en: 'Unavailable for this model', es: 'No disponible para este modelo' })}</span></span>
+                  </Button>
                 );
               })}
             </div>
           </div>
 
           {/* SINGLE REFERENCE SLOT — only shown when the mode needs one */}
-          {PICTURE_MODES[mode].needsReference && (
+          {PICTURE_MODES[mode].needsReference && (maxSubjectRefs > 0 || maxStyleRefs > 0) && (
             <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-xs flex items-center gap-1.5">
-                  {mode === 'transform' ? (
+                  {mode === 'transform' || mode === 'mix' ? (
                     <><ImageIcon className="h-3.5 w-3.5 text-primary" /> {tx({ de: "Vorlage-Bild (wird verwandelt)", en: "Template image (will be transformed)", es: "Imagen de plantilla (se transformará)" })}</>
                   ) : (
                     <><Palette className="h-3.5 w-3.5 text-primary" /> {tx({ de: 'Stil-Referenz (Farben/Mood)', en: 'Style reference (colours/mood)', es: 'Referencia de estilo (colores/ambiente)' })}</>
                   )}
                 </Label>
-                {(mode === 'transform' ? referenceImage : styleReference) && (
-                  <button
+                {(mode === 'transform' || mode === 'mix' ? referenceImage : styleReference) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => mode === 'transform' ? setReferenceImage(null) : setStyleReference(null)}
-                    className="text-[10px] text-muted-foreground hover:text-destructive"
+                    className="h-7 text-[10px] text-muted-foreground hover:text-destructive"
                   >
                     {tx({ de: 'Entfernen', en: 'Remove', es: 'Quitar' })}
-                  </button>
+                  </Button>
                 )}
               </div>
-              {(mode === 'transform' ? referenceImage : styleReference) ? (
-                <button
+              {(mode === 'transform' || mode === 'mix' ? referenceImage : styleReference) ? (
+                <Button
+                  variant="outline"
                   type="button"
-                  onClick={() => mode === 'transform' ? fileInputRef.current?.click() : styleRefInputRef.current?.click()}
-                  className="relative block w-full rounded-md overflow-hidden border border-border bg-muted/30 hover:border-primary transition-colors"
+                  onClick={() => mode === 'transform' || mode === 'mix' ? fileInputRef.current?.click() : styleRefInputRef.current?.click()}
+                  className="relative block w-full h-auto p-0 rounded-md overflow-hidden border-border bg-muted/30 hover:border-primary"
                 >
                   <img
-                    src={mode === 'transform' ? referenceImage! : styleReference!}
+                    src={(mode === 'transform' || mode === 'mix' ? referenceImage : styleReference) ?? ''}
                     className="mx-auto max-h-56 w-auto max-w-full object-contain"
                     alt="Reference"
                   />
@@ -847,13 +869,13 @@ export function ImageGenerator() {
                   <div className="absolute inset-0 bg-background/70 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Upload className="h-4 w-4" />
                   </div>
-                </button>
+                </Button>
               ) : (
                 <Button
                   variant="outline"
                   size="sm"
                   className="w-full h-24 border-dashed"
-                  onClick={() => mode === 'transform' ? fileInputRef.current?.click() : styleRefInputRef.current?.click()}
+                   onClick={() => mode === 'transform' || mode === 'mix' ? fileInputRef.current?.click() : styleRefInputRef.current?.click()}
                 >
                   <Upload className="h-3.5 w-3.5 mr-1.5" />
                   {tx({ de: 'Bild hochladen', en: 'Upload image', es: 'Subir imagen' })}
@@ -863,7 +885,7 @@ export function ImageGenerator() {
               <input ref={styleRefInputRef} type="file" accept="image/*" className="hidden" onChange={handleStyleRefUpload} />
 
               {/* Strength slider — transform mode only */}
-              {mode === 'transform' && referenceImage && (
+              {(mode === 'transform' || mode === 'mix') && referenceImage && capability?.strengthField && (
                 <div className="pt-2 space-y-1.5">
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-muted-foreground">{tx({ de: 'Stärke der Veränderung', en: 'Strength of change', es: 'Intensidad del cambio' })}</span>
@@ -899,7 +921,7 @@ export function ImageGenerator() {
           )}
 
           {/* MULTI-REFERENCE SLOTS — only for models that really accept them */}
-          {PICTURE_MODES[mode].needsReference && maxSubjectRefs > 1 && mode === 'transform' && (
+          {PICTURE_MODES[mode].needsReference && maxSubjectRefs > 1 && (mode === 'transform' || mode === 'mix') && (
             <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
               <Label className="text-xs flex items-center gap-1.5">
                 <ImageIcon className="h-3.5 w-3.5 text-primary" />
@@ -935,14 +957,27 @@ export function ImageGenerator() {
                 ref={extraRefInputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 className="hidden"
                 onChange={handleExtraRefUpload}
               />
             </div>
           )}
 
+          {resolutionOptions.length > 0 && (
+            <div className="space-y-2">
+              <Label>{tx({ de: 'Auflösung', en: 'Resolution', es: 'Resolución' })}</Label>
+              <Select value={resolution || capability?.sizing.defaultResolution} onValueChange={setResolution}>
+                <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {resolutionOptions.map(option => <SelectItem key={option} value={option}>{option === 'Auto' ? tx({ de: 'Automatisch', en: 'Automatic', es: 'Automático' }) : option.replaceAll('_', ' ')}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* EXACT PIXEL SIZE — only for models with true custom sizing */}
-          {supportsExactSize && (
+          {supportsExactSize && resolution === 'custom' && (
             <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-xs">
