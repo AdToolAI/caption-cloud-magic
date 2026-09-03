@@ -140,6 +140,43 @@ Deno.serve(async (req) => {
     }
     const billedDuration = smartDuration ? MAX_DURATION : duration;
 
+    /**
+     * Image pre-check — runs BEFORE any credit deduction or provider call.
+     * ModelArk rejects images below 300 px width or outside the 1:2.5–2.5:1
+     * ratio band with a raw 400; we catch that here with a readable message
+     * and without charging the user.
+     */
+    const locale = ((req.headers.get("x-locale") ?? "en").slice(0, 2)) as ImageLocale;
+    const requirements = imageRequirementsFor(MODEL_ID, "seedance");
+    const imagesToCheck = [
+      startImageUrl,
+      endImageUrl,
+      ...((referenceImageUrls ?? []) as string[]),
+    ].filter(Boolean) as string[];
+
+    for (const url of imagesToCheck) {
+      const dims = await probeRemoteImageSize(url);
+      if (!dims) continue; // unknown format → let the provider decide
+      const check = checkImageDimensions(dims, requirements);
+      if (!check.ok) {
+        console.warn("[generate-seedance25-video] image rejected pre-flight", {
+          url, dims, violation: check.violation,
+        });
+        return new Response(
+          JSON.stringify({
+            error: describeImageViolation(check, locale, "Seedance 2.5"),
+            code: "IMAGE_REQUIREMENTS_NOT_MET",
+            violation: check.violation,
+            width: dims.width,
+            height: dims.height,
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
+
+
 
     const { data: walletPreview } = await supabaseClient
       .from("ai_video_wallets")
