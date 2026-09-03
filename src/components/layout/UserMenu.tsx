@@ -90,9 +90,9 @@ export function UserMenu() {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link to="/pricing" className="flex items-center gap-2 cursor-pointer">
+          <Link to="/billing" className="flex items-center gap-2 cursor-pointer">
             <Tag className="h-4 w-4" />
-            <span>{t("nav.pricing")}</span>
+            <span>{tx({ de: "Plan & Guthaben", en: "Plan & Credits", es: "Plan y créditos" })}</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>

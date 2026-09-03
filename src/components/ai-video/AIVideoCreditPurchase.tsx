@@ -52,10 +52,11 @@ export const AIVideoCreditPurchase = () => {
       )}
       <p className="text-xs text-muted-foreground text-center">
         {tx({
-          de: 'Zahlungsarten: Karte · Apple Pay · Google Pay · PayPal · SEPA · Klarna · iDEAL und weitere (automatisch je nach Land).',
-          en: 'Payment methods: Card · Apple Pay · Google Pay · PayPal · SEPA · Klarna · iDEAL and more (automatic per country).',
-          es: 'Métodos de pago: Tarjeta · Apple Pay · Google Pay · PayPal · SEPA · Klarna · iDEAL y más (automático según país).'
+          de: 'Sichere Zahlung über Stripe. Zahlungsarten: Karte · Apple Pay · Google Pay · PayPal · SEPA · Klarna · iDEAL und weitere (automatisch je nach Land).',
+          en: 'Secure payment via Stripe. Payment methods: Card · Apple Pay · Google Pay · PayPal · SEPA · Klarna · iDEAL and more (automatic per country).',
+          es: 'Pago seguro con Stripe. Métodos de pago: Tarjeta · Apple Pay · Google Pay · PayPal · SEPA · Klarna · iDEAL y más (automático según país).'
         })}
+
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {Object.entries(AI_VIDEO_CREDIT_PACKS).map(([key, pack]) => (
