@@ -17,9 +17,12 @@ export const AI_VIDEO_CREDIT_PACKS = {
       EUR: 0,
       USD: 0,
     },
+    // Fixed payment fees (method fee + cross-border) hit the smallest pack
+    // hardest, so the 10 pack grants 9 units — the entry price stays intact
+    // while the fixed-cost drag is priced in. Larger packs keep their bonus.
     totalCredits: {
-      EUR: 10.00,
-      USD: 10.00,
+      EUR: 9.00,
+      USD: 9.00,
     },
     description: {
       EUR: tx({ de: 'Perfekt zum Ausprobieren', en: 'Perfect to try out', es: 'Perfecto para probar' }),
