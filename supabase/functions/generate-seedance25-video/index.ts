@@ -324,16 +324,20 @@ Deno.serve(async (req) => {
       });
 
     } catch (providerError: any) {
-      console.error("[generate-seedance25-video] ModelArk error:", providerError);
-      await refund(`ModelArk Error: ${providerError?.message ?? "Unknown error"}`);
+      const rawMessage = String(providerError?.message ?? "Unknown error");
+      console.error("[generate-seedance25-video] ModelArk error:", rawMessage);
+      // Raw provider JSON (incl. request ids) stays in the log and in the
+      // generation row; the user gets one readable, localized sentence.
+      const friendly = describeProviderImageError(rawMessage, locale);
+      await refund(`ModelArk Error: ${rawMessage}`);
       return new Response(
         JSON.stringify({
-          error: "Video generation failed. Credits refunded.",
+          error: friendly,
           code: "MODELARK_ERROR",
-          detail: String(providerError?.message ?? "").slice(0, 300),
         }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+
     }
 
     await supabaseAdmin
