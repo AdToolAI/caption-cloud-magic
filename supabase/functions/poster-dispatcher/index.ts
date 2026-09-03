@@ -45,22 +45,37 @@ serve(async (req) => {
 
     for (const job of jobs) {
       try {
+        // The publish orchestrator posts as a specific user. Derive that user
+        // deterministically from the linked calendar event; never guess.
+        const calendarEvent = Array.isArray(job.calendar_events)
+          ? job.calendar_events[0]
+          : job.calendar_events;
+        const ownerId: string | undefined = calendarEvent?.owner_id ?? undefined;
+
+        if (!job.calendar_event_id || !ownerId) {
+          throw new Error(
+            'Missing calendar event owner — refusing to publish without a verified user identity',
+          );
+        }
+
         // Mark as running
         await supabase
           .from("post_jobs")
           .update({ status: "running" })
           .eq("id", job.id);
 
-        // Call existing publish function via calendar_event
-        if (job.calendar_event_id) {
+        {
+          const snapshot = job.content_snapshot ?? {};
           const { error: publishError } = await supabase.functions.invoke("publish", {
             body: {
-              text_content: job.content_snapshot.caption,
-              media: job.content_snapshot.media,
+              user_id: ownerId,
+              text: snapshot.caption ?? snapshot.text ?? "",
+              media: snapshot.media ?? [],
               channels: [job.platform],
               calendar_event_id: job.calendar_event_id,
             },
           });
+
 
           if (publishError) throw publishError;
 
