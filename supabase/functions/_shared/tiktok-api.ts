@@ -1,6 +1,20 @@
+import {
+  parseTikTokTokenResponse,
+  type TikTokTokenErrorCode,
+} from './tiktok-token-response.ts';
+
 const TIKTOK_ENV = Deno.env.get('TIKTOK_ENV') || 'production';
 const OAUTH_BASE = 'https://open.tiktokapis.com/v2/oauth';
 const API_BASE = 'https://open.tiktokapis.com/v2';
+
+/** Structured token error so callers can log a reason code, never a value. */
+export class TikTokTokenError extends Error {
+  constructor(public readonly code: TikTokTokenErrorCode | 'HTTP_ERROR', message: string) {
+    super(message);
+    this.name = 'TikTokTokenError';
+  }
+}
+
 
 /**
  * Single source of truth for TikTok credentials.
