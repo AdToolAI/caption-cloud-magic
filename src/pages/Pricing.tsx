@@ -368,9 +368,18 @@ const Pricing = () => {
                         ? t("landing.pricing.subscribe")
                         : t("landing.pricing.start")}
                   </Button>
-                  <p className="text-xs text-muted-foreground sm:text-right max-w-xs">
-                    {user ? t("landing.pricing.subscribeNote") : t("landing.pricing.trialNote")}
-                  </p>
+                  <div className="text-xs text-muted-foreground sm:text-right max-w-xs space-y-1">
+                    <p>
+                      {user ? t("landing.pricing.subscribeNote") : t("landing.pricing.trialNote")}
+                    </p>
+                    <p>
+                      {tx({
+                        de: "Zahlungsarten: Karte · Apple Pay · Google Pay · PayPal · SEPA · Klarna · iDEAL und weitere.",
+                        en: "Payment methods: Card · Apple Pay · Google Pay · PayPal · SEPA · Klarna · iDEAL and more.",
+                        es: "Métodos de pago: Tarjeta · Apple Pay · Google Pay · PayPal · SEPA · Klarna · iDEAL y más."
+                      })}
+                    </p>
+                  </div>
                 </div>
               </div>
             </motion.div>
