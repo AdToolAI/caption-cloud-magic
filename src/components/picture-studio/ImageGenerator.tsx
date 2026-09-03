@@ -247,6 +247,15 @@ export function ImageGenerator() {
     void uploadReference(file, setReferenceImage);
   };
 
+  const handleExtraRefUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    void uploadReference(file, (url) => {
+      setExtraReferences(prev => (url ? [...prev, url].slice(0, Math.max(0, maxSubjectRefs - 1)) : prev));
+    });
+  };
+
   const handleStyleRefUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
