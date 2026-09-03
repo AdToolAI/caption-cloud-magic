@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useFounderStatus } from '@/hooks/useFounderStatus';
 import { toast } from 'sonner';
+import { openCheckoutUrl } from '@/lib/openCheckout';
 
 export const AIVideoCreditPurchase = () => {
   const { language, t } = useTranslation();
