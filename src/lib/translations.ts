@@ -19976,6 +19976,8 @@ Object.assign(translations.es, {
     metaNoPagesTitle: 'Conectado, pero Meta no devolvió ninguna página',
     metaNoPagesBody: 'Meta no asignó ninguna página a este acceso. Normalmente no se marcaron las páginas en el paso «¿Qué páginas quieres usar?» o no se concedió el permiso para portafolios de empresa.',
     metaMissingScope: 'Permiso faltante: {scopes}',
+    metaStaleScopeTitle: 'Es necesario volver a conectar',
+    metaStaleScopeBody: 'Esta conexión se creó antes de que Meta aprobara business_management. Las páginas de un portafolio de empresa seguirán invisibles hasta que vuelvas a conectar una vez.',
     metaResetConsent: 'Restablecer consentimiento y reconectar',
     metaResetConsentHint: 'Paso 1: en Facebook, en Configuración → Apps y sitios web, elimina «AdTool AI». Paso 2: vuelve y conecta de nuevo — Meta mostrará el diálogo completo con la selección de páginas.',
     metaPageSelectHint: 'Importante: en el diálogo de Meta marca tus páginas en el paso «¿Qué páginas quieres usar?». Continuar sin selección da 0 páginas.',
