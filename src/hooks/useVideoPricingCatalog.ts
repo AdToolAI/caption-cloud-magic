@@ -32,6 +32,8 @@ export type CatalogModel = {
 type CatalogResponse = {
   version: string;
   discountPercent?: number;
+  /** Currency the wallet is denominated in — display MUST follow it. */
+  walletCurrency?: 'EUR' | 'USD';
   models: CatalogModel[];
 };
 
@@ -94,6 +96,8 @@ export function useVideoPricingCatalog() {
     isReady: !query.isLoading && (query.data?.models?.length ?? 0) > 0,
     version: query.data?.version,
     discountPercent: query.data?.discountPercent ?? 0,
+    /** Currency the account is actually charged in (null while loading). */
+    walletCurrency: query.data?.walletCurrency ?? null,
     discountFactor,
     getPricePerSecond,
     getTotalCost,
