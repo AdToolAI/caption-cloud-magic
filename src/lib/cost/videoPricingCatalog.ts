@@ -1,3 +1,4 @@
+import { usdFromEur } from './fx';
 // ============================================================================
 // CLIENT MIRROR of supabase/functions/_shared/videoPricingCatalog.ts
 // ----------------------------------------------------------------------------
@@ -18,6 +19,7 @@ export type CatalogEntry = {
   label: string;
   unit: 'per-second' | 'per-clip';
   sellEUR: number;
+  /** Sell price in USD — DERIVED from sellEUR via USD_PER_EUR, never hand-maintained. */
   sellUSD: number;
   costEUR: number;
   minDuration?: number;
@@ -25,7 +27,9 @@ export type CatalogEntry = {
   fixedClipSeconds?: number;
 };
 
-export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
+type CatalogSource = Omit<CatalogEntry, 'sellUSD'>;
+
+const CATALOG_SOURCE: Record<string, CatalogSource> = {
   'hailuo-standard':      { id: 'hailuo-standard',      label: 'Hailuo 2.3 Std 768p',  unit: 'per-second', sellEUR: 0.1, costEUR: 0.045, minDuration: 3,  maxDuration: 10 },
   'hailuo-pro':           { id: 'hailuo-pro',           label: 'Hailuo 2.3 Pro 1080p', unit: 'per-second', sellEUR: 0.165, costEUR: 0.075, minDuration: 3,  maxDuration: 10 },
 
@@ -76,6 +80,14 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   'sora-2-pro':           { id: 'sora-2-pro',           label: 'Sora 2 Pro (EOL 24.09.2026)',           unit: 'per-second', sellEUR: 1.08, costEUR: 0.50,  minDuration: 4,  maxDuration: 12 },
   'grok-imagine':         { id: 'grok-imagine',         label: 'Grok Imagine',         unit: 'per-second', sellEUR: 0.11, costEUR: 0.05,  minDuration: 1,  maxDuration: 15 },
 };
+
+/**
+ * Canonical catalog. EUR is maintained by hand; USD is derived once with the
+ * shared FX factor so the displayed and the deducted price always match.
+ */
+export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = Object.fromEntries(
+  Object.entries(CATALOG_SOURCE).map(([id, e]) => [id, { ...e, sellUSD: usdFromEur(e.sellEUR) }]),
+) as Record<string, CatalogEntry>;
 
 /** Sell price per second (or per clip for per-clip models). */
 export function resolveCostPerSecond(modelId: string, currency: 'EUR' | 'USD' = 'EUR'): number | null {
