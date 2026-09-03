@@ -23,7 +23,7 @@ function loadBackendCatalog(): Record<string, { sellEUR: number; sellUSD: number
   while ((m = re.exec(src))) {
     const sellEUR = Number(m[2]);
     // USD is derived from EUR in the catalog, never hand-maintained.
-    out[m[1]] = { sellEUR, sellUSD: Math.round(sellEUR * USD_PER_EUR * 100) / 100 };
+    out[m[1]] = { sellEUR, sellUSD: Math.round(sellEUR * USD_PER_EUR * 10000) / 10000 };
   }
   return out;
 }
