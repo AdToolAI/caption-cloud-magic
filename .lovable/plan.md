@@ -8,20 +8,16 @@ Alle drei Checkout-Funktionen (`create-checkout` für Abos, `create-enterprise-c
 
 Konsequenz: Der größte Hebel ist **keine Code-Änderung**, sondern die Freischaltung im Stripe-Konto. Der Code muss nur an drei Stellen nachziehen.
 
-## Was freigeschaltet wird (Stripe-Konto, Aktion von dir)
+## Stand deines Stripe-Kontos (aus deinen Screenshots)
 
-Weltweiter Verkauf, Abo + Einmalkauf:
+Bereits aktiviert: Karten, Apple Pay, Google Pay, Amazon Pay, Link, PayPal, Revolut Pay, Samsung/Kakao/Naver Pay, PAYCO, Klarna, SEPA-Lastschrift, Bancontact, BLIK, EPS, Banküberweisung.
 
-- **Karten** (bereits aktiv) — inkl. Apple Pay / Google Pay
-- **PayPal** — größter Umsatzhebel in DACH, funktioniert für Abo und Einmalkauf
-- **SEPA-Lastschrift** — EUR, Abo-tauglich, sehr niedrige Gebühren
-- **Klarna** — Einmalkauf (Guthaben-Pakete), EU + US
-- **iDEAL / Bancontact / Blik / P24 / EPS** — lokale EU-Methoden, Einmalkauf
-- **Link** — Stripes One-Click-Checkout, kostenlos aktivierbar
-- **Cash App Pay / Amazon Pay** — US-Abdeckung
-- **Revolut Pay, Multibanco, Twint** — optional, je nach Nachfrage
+Damit ist die Freischaltung praktisch abgeschlossen. Auffällig fehlt nur **iDEAL** (Niederlande, dort mit Abstand die dominante Methode) — das ist ein Klick unter „Manuelle Integrationsoptionen / Zahlungsmethoden". Optional zusätzlich: Multibanco (Portugal), TWINT (Schweiz), Przelewy24 (Polen), Cash App Pay (USA).
 
-Wichtig: Nicht jede Methode kann Abos. Stripe blendet im Abo-Checkout automatisch nur die abofähigen (Karte, PayPal, SEPA, Link, Bancontact-Mandat) ein — die restlichen erscheinen nur beim Guthaben-Kauf. Das ist gewollt und erfordert keinen Sonderfall im Code.
+Wichtig: Nicht jede Methode kann Abos. Stripe blendet im Abo-Checkout automatisch nur die abofähigen ein (Karte, PayPal, SEPA, Link, Amazon Pay) — der Rest erscheint nur beim Guthaben-Kauf. Das ist gewollt und braucht keinen Sonderfall im Code.
+
+Dass die Methoden aktiviert sind, heißt aber noch nicht, dass sie im Checkout **erscheinen** — genau da liegt jetzt die eigentliche Arbeit.
+
 
 ## Was ich im Code ändere
 
