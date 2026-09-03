@@ -509,7 +509,20 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   /* ── Image upload ── */
   const handleImageUpload = async (file: File) => {
     if (!user) return;
+    // Provider image contract: reject unusable frames before upload/generation
+    // (e.g. 152×515 px, which ModelArk rejects with a raw 400).
+    const violation = await validateImageForModel(file, {
+      modelId: model.id,
+      family: model.family,
+      modelLabel: model.name,
+      locale: (language as 'de' | 'en' | 'es') ?? 'en',
+    });
+    if (violation) {
+      toast.error(violation);
+      return;
+    }
     setUploading(true);
+
     try {
       const ext = file.name.split('.').pop();
       const path = `${user.id}/toolkit-${Date.now()}.${ext}`;
