@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
-import { User, Settings, CreditCard, HelpCircle, LogOut, Tag, Share2, Link2 } from "lucide-react";
+import { User, Settings, CreditCard, HelpCircle, LogOut, Share2, Link2 } from "lucide-react";
+import { tx } from "@/lib/i18nText";
 import {
   DropdownMenu,
   DropdownMenuContent,
