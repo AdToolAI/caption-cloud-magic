@@ -19796,6 +19796,8 @@ Object.assign(translations.en, {
     metaNoPagesTitle: 'Connected, but Meta returned no Page',
     metaNoPagesBody: 'Meta linked no Page to this access. Usually the Pages were not ticked in the "Which Pages do you want to use?" step, or the permission for business portfolios was not granted.',
     metaMissingScope: 'Missing permission: {scopes}',
+    metaStaleScopeTitle: 'Reconnect required',
+    metaStaleScopeBody: 'This connection was created before Meta approved business_management. Pages inside a business portfolio stay invisible until you reconnect once.',
     metaResetConsent: 'Reset consent and reconnect',
     metaResetConsentHint: 'Step 1: remove "AdTool AI" in Facebook under Settings → Apps and websites. Step 2: come back and connect again — Meta then shows the full dialog including Page selection.',
     metaPageSelectHint: 'Important: in the Meta dialog, tick your Pages in the "Which Pages do you want to use?" step. Clicking Continue without a selection results in 0 Pages.',
