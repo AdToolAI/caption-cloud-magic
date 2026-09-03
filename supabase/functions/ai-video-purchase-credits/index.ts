@@ -16,19 +16,24 @@ interface PurchaseRequest {
   currency: 'EUR' | 'USD';
 }
 
-// Credit packs by currency
+// Credit packs by currency.
+// `price` is what Stripe charges, `credits` is what the wallet receives —
+// they are NOT the same for the starter pack: fixed payment fees (method fee +
+// cross-border surcharge) eat a disproportionate share of a 10 purchase, so it
+// grants 9 units. Never derive the credited amount from the paid amount; it
+// must come from this table (mirror of src/config/aiVideoCredits.ts).
 const CREDIT_PACKS = {
   EUR: {
-    starter: { price: 10.00, bonus: 0, bonusPercent: 0 },
-    standard: { price: 50.00, bonus: 1.00, bonusPercent: 2 },
-    pro: { price: 100.00, bonus: 6.00, bonusPercent: 6 },
-    enterprise: { price: 250.00, bonus: 37.50, bonusPercent: 15 },
+    starter: { price: 10.00, credits: 9.00, bonus: 0, bonusPercent: 0 },
+    standard: { price: 50.00, credits: 50.00, bonus: 1.00, bonusPercent: 2 },
+    pro: { price: 100.00, credits: 100.00, bonus: 6.00, bonusPercent: 6 },
+    enterprise: { price: 250.00, credits: 250.00, bonus: 37.50, bonusPercent: 15 },
   },
   USD: {
-    starter: { price: 10.00, bonus: 0, bonusPercent: 0 },
-    standard: { price: 50.00, bonus: 1.00, bonusPercent: 2 },
-    pro: { price: 100.00, bonus: 6.00, bonusPercent: 6 },
-    enterprise: { price: 250.00, bonus: 37.50, bonusPercent: 15 },
+    starter: { price: 10.00, credits: 9.00, bonus: 0, bonusPercent: 0 },
+    standard: { price: 50.00, credits: 50.00, bonus: 1.00, bonusPercent: 2 },
+    pro: { price: 100.00, credits: 100.00, bonus: 6.00, bonusPercent: 6 },
+    enterprise: { price: 250.00, credits: 250.00, bonus: 37.50, bonusPercent: 15 },
   }
 };
 
@@ -187,7 +192,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         user_id: user.id,
         pack_id: packId,
         currency: currency,
-        base_amount: pack.price.toString(),
+        base_amount: pack.credits.toString(),
         bonus_amount: pack.bonus.toString(),
         bonus_percent: pack.bonusPercent.toString(),
         founders_discount: isFounder ? '20' : '0',

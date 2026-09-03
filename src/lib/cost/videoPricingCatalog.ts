@@ -8,7 +8,8 @@ import { usdFromEur } from './fx';
 // by `src/lib/cost/__tests__/pricingCatalogParity.test.ts`, which parses the
 // shared file at test time and fails the build on any divergence.
 //
-// Margin policy (21.08.2026): sell >= 1.75× provider cost; +10 % USD-parity uplift.
+// Margin policy (03.09.2026): sell x PAYMENT_NET_FACTOR (0.90) >= 1.75 x provider
+// cost — the floor is measured on NET revenue, after payment-processing fees.
 // AI video model (prices cut ~35% vs. the old 3.00× policy).
 // Lip-Sync (Sync.so), ElevenLabs audio, Music and Picture Studio run on
 // separate rails and are intentionally NOT part of this catalog.
