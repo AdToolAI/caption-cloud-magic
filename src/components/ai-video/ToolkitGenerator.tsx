@@ -480,25 +480,29 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   }, [model.id]);
 
   // Canonical per-second price from server catalog (falls back to local config).
-  const { getPricePerSecond, getTotalCost, isReady: catalogReady } = useVideoPricingCatalog();
+  const { getPricePerSecond, getTotalCost, isReady: catalogReady, walletCurrency } =
+    useVideoPricingCatalog();
   const { discountFactor } = useAccountType();
+  // Display currency must follow the WALLET, not the UI language — otherwise a
+  // USD price (incl. FX uplift) could be shown while an EUR wallet is charged.
+  const billingCurrency: Currency = walletCurrency ?? currency;
   // Catalog prices are already personalized; the local fallback is a list price.
-  const catalogPricePerSecond = getPricePerSecond(model.id, currency);
+  const catalogPricePerSecond = getPricePerSecond(model.id, billingCurrency);
   // Never show a binding price we could not verify against the server catalog —
   // that was the source of preview/charge mismatches.
   const priceUnverified = !catalogReady || catalogPricePerSecond == null;
   const pricePerSecond =
-    catalogPricePerSecond ?? model.costPerSecond[currency] * discountFactor;
+    catalogPricePerSecond ?? model.costPerSecond[billingCurrency] * discountFactor;
   // Smart duration (-1) is reserved at the model's maximum length; the unused
   // seconds are refunded once the provider reports the real clip length.
   const billedSeconds = duration === -1
     ? Math.max(...model.durations)
     : duration;
   // Total is rounded exactly like the backend deduction (once, at the end).
-  const cost = getTotalCost(model.id, currency, billedSeconds)
+  const cost = getTotalCost(model.id, billingCurrency, billedSeconds)
     ?? billedSeconds * pricePerSecond;
 
-  const symbol = currency === 'USD' ? '$' : '€';
+  const symbol = billingCurrency === 'USD' ? '$' : '€';
   const isUnlimited = (wallet as any)?.is_unlimited === true;
   const canAfford = isUnlimited || (wallet?.balance_euros ?? 0) >= cost;
 
