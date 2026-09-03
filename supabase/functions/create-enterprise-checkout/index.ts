@@ -69,7 +69,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2023-10-16",
+      apiVersion: "2025-08-27.basil",
     });
 
     // Determine price ID based on currency
@@ -99,19 +99,29 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
+      locale: checkoutLocale,
       line_items: [
         {
           price: priceId,
           quantity: 1,
         },
       ],
-      // Aktive Methoden im Stripe-Dashboard: Card (inkl. Apple/Google Pay), PayPal, Link.
+      // Aktive Methoden im Stripe-Dashboard: Card, PayPal, Link, SEPA, Klarna, iDEAL, etc.
+      // Apple Pay & Google Pay laufen automatisch über 'card' (Domain verifiziert).
       // Zahlungsarten kommen aus den Stripe-Dashboard-Einstellungen (automatic payment methods).
       // Hartes Setzen von "paypal" ließ den Checkout mit 500 fehlschlagen, wenn die Methode
       // für Währung/Land nicht aktiviert ist.
       // Sammle Rechnungsadresse + Name, damit Stripe-Rechnungen korrekt ausgestellt werden
+      // und SEPA-/PayPal-Mandate für wiederkehrende Zahlungen sauber angelegt werden.
       billing_address_collection: "required",
       customer_update: { address: "auto", name: "auto" },
+      subscription_data: {
+        description: "AdTool AI Enterprise Subscription",
+        metadata: {
+          workspace_id: workspaceId,
+          user_id: userData.user.id,
+        },
+      },
       success_url: `${req.headers.get("origin")}/team-workspace?upgrade=success`,
       cancel_url: `${req.headers.get("origin")}/team-workspace?upgrade=cancelled`,
       metadata: {
