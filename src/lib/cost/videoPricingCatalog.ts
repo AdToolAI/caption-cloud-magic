@@ -40,8 +40,8 @@ const CATALOG_SOURCE: Record<string, CatalogSource> = {
   'seedance-mini-1080p':  { id: 'seedance-mini-1080p',  label: 'Seedance 1 Lite 1080p',   unit: 'per-second', sellEUR: 0.1, costEUR: 0.045, minDuration: 3, maxDuration: 15 },
   'seedance-standard':    { id: 'seedance-standard',    label: 'Seedance 2.0 Fast 720p',  unit: 'per-second', sellEUR: 0.32, costEUR: 0.15,  minDuration: 3,  maxDuration: 15 },
   'seedance-pro':         { id: 'seedance-pro',         label: 'Seedance 2.0 720p',       unit: 'per-second', sellEUR: 0.385, costEUR: 0.18,  minDuration: 3,  maxDuration: 15 },
-  'seedance-2-5':         { id: 'seedance-2-5',         label: 'Seedance 2.5 (ModelArk)', unit: 'per-second', sellEUR: 0.44, costEUR: 0.217, minDuration: 4,  maxDuration: 30 },
-  'seedance-2-5-480p':    { id: 'seedance-2-5-480p',    label: 'Seedance 2.5 480p (ModelArk)', unit: 'per-second', sellEUR: 0.255, costEUR: 0.1085, minDuration: 4,  maxDuration: 30 },
+  'seedance-2-5':         { id: 'seedance-2-5',         label: 'Seedance 2.5 (ModelArk)', unit: 'per-second', sellEUR: 0.3333, costEUR: 0.217, minDuration: 4,  maxDuration: 30 },
+  'seedance-2-5-480p':    { id: 'seedance-2-5-480p',    label: 'Seedance 2.5 480p (ModelArk)', unit: 'per-second', sellEUR: 0.1932, costEUR: 0.1085, minDuration: 4,  maxDuration: 30 },
 
   'kling-3':              { id: 'kling-3',              label: 'Kling 3.0 1080p',      unit: 'per-second', sellEUR: 0.135, costEUR: 0.06,  minDuration: 3,  maxDuration: 15 },
   'kling-2.5-turbo':      { id: 'kling-2.5-turbo',      label: 'Kling 2.5 Turbo Pro',  unit: 'per-second', sellEUR: 0.07, costEUR: 0.03,  minDuration: 5,  maxDuration: 10 },
