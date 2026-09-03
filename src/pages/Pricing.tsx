@@ -53,6 +53,13 @@ const Pricing = () => {
     t("landing.pricing.proFeatures.f7"),
   ];
 
+  // Eingeloggte Abonnenten sehen alles gebündelt unter /billing (Plan & Guthaben).
+  useEffect(() => {
+    if (user && subscribed) {
+      navigate("/billing", { replace: true });
+    }
+  }, [user, subscribed, navigate]);
+
   // Detect cancel return from Stripe
   useEffect(() => {
     if (searchParams.get("canceled") === "1" || searchParams.get("canceled") === "true") {
