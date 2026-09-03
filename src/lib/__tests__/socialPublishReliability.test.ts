@@ -112,7 +112,7 @@ describe('classifyConnectionHealth', () => {
         token_expires_at: iso(-1000),
         account_metadata: { granted_scopes: ['video.publish'] },
       } as never,
-      NOW,
+      NOW.getTime(),
     );
     expect(result.health).toBe('expired');
     expect(result.requiresReconnect).toBe(true);
@@ -125,7 +125,7 @@ describe('classifyConnectionHealth', () => {
         token_expires_at: iso(60 * 60 * 1000),
         account_metadata: { granted_scopes: ['video.publish'] },
       } as never,
-      NOW,
+      NOW.getTime(),
     );
     expect(result.health).toBe('attention');
   });
@@ -137,7 +137,7 @@ describe('classifyConnectionHealth', () => {
         token_expires_at: iso(30 * 24 * 60 * 60 * 1000),
         account_metadata: { granted_scopes: ['pages_show_list'] },
       } as never,
-      NOW,
+      NOW.getTime(),
     );
     expect(result.health).toBe('attention');
     expect(result.requiresReconnect).toBe(true);
@@ -147,7 +147,7 @@ describe('classifyConnectionHealth', () => {
   it('marks legacy rows without metadata as unverified, not missing', () => {
     const result = classifyConnectionHealth(
       { provider: 'facebook', token_expires_at: null, account_metadata: null } as never,
-      NOW,
+      NOW.getTime(),
     );
     expect(result.health).toBe('unverified');
   });
@@ -162,7 +162,7 @@ describe('classifyConnectionHealth', () => {
           page_access_token_encrypted: 'x',
         },
       } as never,
-      NOW,
+      NOW.getTime(),
     );
     expect(result.health).toBe('healthy');
     expect(result.requiresReconnect).toBe(false);
