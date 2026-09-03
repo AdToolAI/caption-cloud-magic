@@ -36,7 +36,8 @@ Preise, FX-Faktor 1,15, Creator-Rabatt, Guthaben-Ledger, Refunds, Promo-Codes, F
 
 Typecheck, Build, gezielte Tests der Checkout-Funktionen; danach je ein Test-Checkout (Abo + Guthaben) im Stripe-Testmodus mit Kontrolle, welche Methoden tatsächlich angezeigt werden — einmal mit EUR/DE, einmal mit USD/US. Deploy nur der berührten Funktionen.
 
-## Deine einzige verbleibende Dashboard-Aufgabe
+## Dashboard-Aufgaben
 
-iDEAL aktivieren (und optional Multibanco / TWINT / P24 / Cash App Pay). Alles andere steht.
+Keine — alle Zahlungsmethoden sind bereits aktiviert.
+
 
