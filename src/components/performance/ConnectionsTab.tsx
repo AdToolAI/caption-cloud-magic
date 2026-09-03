@@ -1020,7 +1020,7 @@ export const ConnectionsTab = () => {
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        {connected && <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Connected</Badge>}
+                        {connected && <ConnectionHealthBadge connection={connection as any} />}
                         {connected && connection && provider.id === 'instagram' && (
                           <TokenStatusBadge 
                             lastSyncAt={connection.last_sync_at} 
