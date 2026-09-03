@@ -842,6 +842,91 @@ export function ImageGenerator() {
             </div>
           )}
 
+          {/* MULTI-REFERENCE SLOTS — only for models that really accept them */}
+          {PICTURE_MODES[mode].needsReference && maxSubjectRefs > 1 && mode === 'transform' && (
+            <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+              <Label className="text-xs flex items-center gap-1.5">
+                <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                {tx({ de: 'Weitere Referenzbilder', en: 'Additional reference images', es: 'Imágenes de referencia adicionales' })}
+                <span className="text-[10px] text-muted-foreground">
+                  {extraReferences.length}/{maxSubjectRefs - 1}
+                </span>
+              </Label>
+              <div className="grid grid-cols-4 gap-2">
+                {extraReferences.map((url, i) => (
+                  <button
+                    key={`${url}-${i}`}
+                    type="button"
+                    onClick={() => setExtraReferences(prev => prev.filter((_, idx) => idx !== i))}
+                    className="relative rounded-md overflow-hidden border border-border bg-muted/30 aspect-square"
+                    title={tx({ de: 'Entfernen', en: 'Remove', es: 'Quitar' })}
+                  >
+                    <img src={url} alt={`Reference ${i + 2}`} className="h-full w-full object-cover" />
+                  </button>
+                ))}
+                {extraReferences.length < maxSubjectRefs - 1 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="aspect-square h-auto border-dashed"
+                    onClick={() => extraRefInputRef.current?.click()}
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+              <input
+                ref={extraRefInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleExtraRefUpload}
+              />
+            </div>
+          )}
+
+          {/* EXACT PIXEL SIZE — only for models with true custom sizing */}
+          {supportsExactSize && (
+            <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">
+                  {tx({ de: 'Exakte Pixelgröße', en: 'Exact pixel size', es: 'Tamaño exacto en píxeles' })}
+                </Label>
+                <button
+                  type="button"
+                  onClick={() => { setExactWidth(''); setExactHeight(''); }}
+                  className="text-[10px] text-muted-foreground hover:text-destructive"
+                >
+                  {tx({ de: 'Automatisch', en: 'Automatic', es: 'Automático' })}
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="2048"
+                  value={exactWidth}
+                  onChange={(e) => setExactWidth(e.target.value)}
+                  className="h-8 text-xs"
+                />
+                <span className="text-xs text-muted-foreground">×</span>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="2048"
+                  value={exactHeight}
+                  onChange={(e) => setExactHeight(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                {exactRange
+                  ? `${exactRange.minW}–${exactRange.maxW} px, ${tx({ de: 'Schritt', en: 'step', es: 'paso' })} ${exactRange.step}, max ${exactRange.maxMegapixels} MP`
+                  : null}
+              </p>
+            </div>
+          )}
+
           {/* Brand-Kit Toggle */}
           <div className="p-3 rounded-lg border border-border/50 bg-background/30">
             <div className="flex items-center justify-between mb-2">
