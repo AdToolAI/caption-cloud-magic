@@ -6,7 +6,9 @@ import { getProductInfo } from "@/config/pricing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { ExternalLink, Download, CreditCard, FileText, Crown, Loader2 } from "lucide-react";
+import { ExternalLink, Download, CreditCard, FileText, Crown, Loader2, Wallet } from "lucide-react";
+import { AIVideoCreditPurchase } from "@/components/ai-video/AIVideoCreditPurchase";
+import { useAIVideoWallet } from "@/hooks/useAIVideoWallet";
 import { toast } from "@/hooks/use-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
@@ -37,6 +39,7 @@ const Billing = () => {
   const { user, subscribed, productId, refreshSubscription } = useAuth();
   const { language } = useTranslation();
   const navigate = useNavigate();
+  const { wallet, loading: walletLoading } = useAIVideoWallet();
   const [loading, setLoading] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -111,13 +114,17 @@ const Billing = () => {
 
   const text = {
     en: {
-      title: "Billing & Subscription",
-      subtitle: "Manage your subscription and payment methods",
+      title: "Plan & Credits",
+      subtitle: "Your AI credits, your plan and your invoices — all in one place",
+      creditsCard: "AI credits",
+      creditsDesc: "Your current balance and top-up packs",
+      balance: "Current balance",
       manageCard: "Manage Subscription",
       manageDesc: "Update payment method, view invoices, cancel or change your subscription",
       openPortal: "Open Billing Portal",
       invoicesCard: "Invoices & Receipts",
       invoicesDesc: "Download your invoices and payment history",
+
       noInvoices: "No invoices yet",
       noCustomer: "No active subscription",
       upgradeMsg: "You don't have an active subscription yet. Choose a plan to get started!",
@@ -133,13 +140,17 @@ const Billing = () => {
       price: "Price"
     },
     de: {
-      title: "Abrechnung & Abo",
-      subtitle: "Verwalten Sie Ihr Abonnement und Ihre Zahlungsmethoden",
+      title: "Plan & Guthaben",
+      subtitle: "Ihr KI-Guthaben, Ihr Abo und Ihre Rechnungen an einem Ort",
+      creditsCard: "KI-Guthaben",
+      creditsDesc: "Ihr aktueller Kontostand und die Aufladepakete",
+      balance: "Aktueller Kontostand",
       manageCard: "Abo verwalten",
       manageDesc: "Zahlungsmethode aktualisieren, Rechnungen anzeigen, Abo kündigen oder wechseln",
       openPortal: "Abrechnungsportal öffnen",
       invoicesCard: "Rechnungen",
       invoicesDesc: "Laden Sie Ihre Rechnungen und Zahlungshistorie herunter",
+
       noInvoices: "Keine Rechnungen",
       noCustomer: "Kein aktives Abo",
       upgradeMsg: "Sie haben noch kein aktives Abonnement. Wählen Sie einen Plan!",
@@ -155,13 +166,17 @@ const Billing = () => {
       price: "Preis"
     },
     es: {
-      title: "Facturación y suscripción",
-      subtitle: "Gestiona tu suscripción y métodos de pago",
+      title: "Plan y créditos",
+      subtitle: "Tus créditos de IA, tu plan y tus facturas en un solo lugar",
+      creditsCard: "Créditos de IA",
+      creditsDesc: "Tu saldo actual y los paquetes de recarga",
+      balance: "Saldo actual",
       manageCard: "Gestionar suscripción",
       manageDesc: "Actualiza el método de pago, ve facturas, cancela o cambia tu suscripción",
       openPortal: "Abrir portal de facturación",
       invoicesCard: "Facturas",
       invoicesDesc: "Descarga tus facturas e historial de pagos",
+
       noInvoices: "Sin facturas",
       noCustomer: "Sin suscripción activa",
       upgradeMsg: "Aún no tienes una suscripción activa. ¡Elige un plan para comenzar!",
@@ -187,6 +202,29 @@ const Billing = () => {
           <h1 className="text-4xl font-bold mb-2">{t.title}</h1>
           <p className="text-muted-foreground">{t.subtitle}</p>
         </div>
+
+        {/* KI-Guthaben zuerst — Kunden sollen nicht suchen müssen. */}
+        <Card className="mb-8 border-2 border-primary/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-primary" />
+              {t.creditsCard}
+            </CardTitle>
+            <CardDescription>{t.creditsDesc}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div>
+              <p className="text-sm text-muted-foreground">{t.balance}</p>
+              <p className="text-3xl font-bold tabular-nums">
+                {walletLoading && !wallet
+                  ? "…"
+                  : `${(wallet?.currency ?? "EUR") === "USD" ? "$" : "€"}${(wallet?.balance_euros ?? 0).toFixed(2)}`}
+              </p>
+            </div>
+            <AIVideoCreditPurchase />
+          </CardContent>
+        </Card>
+
 
         {!subscribed ? (
           <Card className="border-2 border-dashed">

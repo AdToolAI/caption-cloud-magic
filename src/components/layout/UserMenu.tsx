@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
-import { User, Settings, CreditCard, HelpCircle, LogOut, Tag, Share2, Link2 } from "lucide-react";
+import { User, Settings, CreditCard, HelpCircle, LogOut, Share2, Link2 } from "lucide-react";
+import { tx } from "@/lib/i18nText";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -79,7 +80,7 @@ export function UserMenu() {
         <DropdownMenuItem asChild>
           <Link to="/billing" className="flex items-center gap-2 cursor-pointer">
             <CreditCard className="h-4 w-4" />
-            <span>{t("header.billing")}</span>
+            <span>{tx({ de: "Plan & Guthaben", en: "Plan & Credits", es: "Plan y créditos" })}</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
@@ -89,12 +90,6 @@ export function UserMenu() {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/pricing" className="flex items-center gap-2 cursor-pointer">
-            <Tag className="h-4 w-4" />
-            <span>{t("nav.pricing")}</span>
-          </Link>
-        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link to="/faq" className="flex items-center gap-2 cursor-pointer">
             <HelpCircle className="h-4 w-4" />

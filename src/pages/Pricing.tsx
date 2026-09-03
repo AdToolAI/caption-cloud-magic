@@ -28,7 +28,7 @@ import { useEffect } from "react";
 
 const Pricing = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, subscribed } = useAuth();
   const { t, language } = useTranslation();
   const [searchParams] = useSearchParams();
   const isReactivation = searchParams.get("reactivate") === "1";
@@ -52,6 +52,13 @@ const Pricing = () => {
     t("landing.pricing.proFeatures.f6"),
     t("landing.pricing.proFeatures.f7"),
   ];
+
+  // Eingeloggte Abonnenten sehen alles gebündelt unter /billing (Plan & Guthaben).
+  useEffect(() => {
+    if (user && subscribed) {
+      navigate("/billing", { replace: true });
+    }
+  }, [user, subscribed, navigate]);
 
   // Detect cancel return from Stripe
   useEffect(() => {
