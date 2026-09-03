@@ -3,6 +3,7 @@ import Stripe from "npm:stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { trackBusinessEvent } from "../_shared/telemetry.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl } from "../_shared/i18n.ts";
 import {
   FOUNDERS_CREDIT_COUPON,
   FOUNDERS_SLOT_MARKER,
@@ -146,16 +147,26 @@ serve(async (req) => {
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
       locale: checkoutLocale,
-      // Aktive Methoden im Stripe-Dashboard: Card, PayPal, Link.
+      // Aktive Methoden im Stripe-Dashboard: Card, PayPal, Link, SEPA, Klarna, iDEAL, etc.
       // Apple Pay & Google Pay laufen automatisch über 'card' (Domain verifiziert).
       // Zahlungsarten kommen aus den Stripe-Dashboard-Einstellungen (automatic payment methods).
       // Hartes Setzen von "paypal" ließ den Checkout mit 500 fehlschlagen, wenn die Methode
       // für Währung/Land nicht aktiviert ist.
-      // Sammle Rechnungsadresse + Name, damit Stripe-Rechnungen korrekt ausgestellt werden.
+      // Sammle Rechnungsadresse + Name, damit Stripe-Rechnungen korrekt ausgestellt werden
+      // und SEPA-/PayPal-Mandate für wiederkehrende Zahlungen sauber angelegt werden.
       // Stripe sendet die finalisierte Rechnung danach automatisch per E-Mail an den Kunden
       // (zusätzlich verschicken wir aus dem Webhook eine gebrandete Quittung).
       billing_address_collection: "required",
       customer_update: { address: "auto", name: "auto" },
+      subscription_data: {
+        description: "AdTool AI Beta-Basic Subscription",
+        metadata: {
+          userId: user.id,
+          ...(couponId ? { applied_coupon: couponId } : {}),
+          ...(foundersSlotReserved ? { founders_slot: "true" } : {}),
+          ...(reservedPromotionCode && reservation ? { promo_redemption_id: reservation.id } : {}),
+        },
+      },
       success_url: `${req.headers.get("origin") || Deno.env.get("SITE_URL")}/welcome?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get("origin") || Deno.env.get("SITE_URL")}/pricing?canceled=true`,
       metadata: {
@@ -218,10 +229,19 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Checkout error:", error);
-    const message = error instanceof Error ? error.message : "Failed to create checkout session";
+    const isStripeMethodError = error instanceof Error &&
+      /payment_method|payment method|not available|not supported|currency/i.test(error.message);
+    const status = isStripeMethodError ? 400 : 500;
+    const message = isStripeMethodError
+      ? tl({
+          de: "Die gewählte Zahlungsart ist für diese Währung oder Region nicht verfügbar. Bitte versuche es mit einer anderen Methode.",
+          en: "The selected payment method is not available for this currency or region. Please try another method.",
+          es: "El método de pago seleccionado no está disponible para esta moneda o región. Por favor, prueba con otro método.",
+        })
+      : (error instanceof Error ? error.message : "Failed to create checkout session");
     return new Response(
       JSON.stringify({ error: message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 },
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status },
     );
   }
 });

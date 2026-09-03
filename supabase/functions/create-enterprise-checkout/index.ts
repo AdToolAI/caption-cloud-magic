@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import Stripe from "npm:stripe@14.21.0";
+import Stripe from "npm:stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,7 +10,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -31,7 +32,10 @@ serve(async (req) => {
       throw new Error("User not authenticated");
     }
 
-    const { workspaceId, currency = "EUR" } = await req.json();
+    const body = await req.json();
+    const { workspaceId, currency = "EUR", locale } = body;
+    const checkoutLocale: "en" | "de" | "es" =
+      locale === "de" ? "de" : locale === "es" ? "es" : "en";
 
     if (!workspaceId) {
       throw new Error("Workspace ID is required");
@@ -65,7 +69,7 @@ serve(async (req) => {
     }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2023-10-16",
+      apiVersion: "2025-08-27.basil",
     });
 
     // Determine price ID based on currency
@@ -95,19 +99,29 @@ serve(async (req) => {
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
+      locale: checkoutLocale,
       line_items: [
         {
           price: priceId,
           quantity: 1,
         },
       ],
-      // Aktive Methoden im Stripe-Dashboard: Card (inkl. Apple/Google Pay), PayPal, Link.
+      // Aktive Methoden im Stripe-Dashboard: Card, PayPal, Link, SEPA, Klarna, iDEAL, etc.
+      // Apple Pay & Google Pay laufen automatisch über 'card' (Domain verifiziert).
       // Zahlungsarten kommen aus den Stripe-Dashboard-Einstellungen (automatic payment methods).
       // Hartes Setzen von "paypal" ließ den Checkout mit 500 fehlschlagen, wenn die Methode
       // für Währung/Land nicht aktiviert ist.
       // Sammle Rechnungsadresse + Name, damit Stripe-Rechnungen korrekt ausgestellt werden
+      // und SEPA-/PayPal-Mandate für wiederkehrende Zahlungen sauber angelegt werden.
       billing_address_collection: "required",
       customer_update: { address: "auto", name: "auto" },
+      subscription_data: {
+        description: "AdTool AI Enterprise Subscription",
+        metadata: {
+          workspace_id: workspaceId,
+          user_id: userData.user.id,
+        },
+      },
       success_url: `${req.headers.get("origin")}/team-workspace?upgrade=success`,
       cancel_url: `${req.headers.get("origin")}/team-workspace?upgrade=cancelled`,
       metadata: {
@@ -123,12 +137,22 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Error creating enterprise checkout:", error);
+    const isStripeMethodError = error instanceof Error &&
+      /payment_method|payment method|not available|not supported|currency/i.test(error.message);
+    const status = isStripeMethodError ? 400 : 400;
+    const message = isStripeMethodError
+      ? tl({
+          de: "Die gewählte Zahlungsart ist für diese Währung oder Region nicht verfügbar. Bitte versuche es mit einer anderen Methode.",
+          en: "The selected payment method is not available for this currency or region. Please try another method.",
+          es: "El método de pago seleccionado no está disponible para esta moneda o región. Por favor, prueba con otro método.",
+        })
+      : (error instanceof Error ? error.message : String(error));
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
+      JSON.stringify({ error: message }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
+        status,
       }
     );
   }
-});
+})(req)));
