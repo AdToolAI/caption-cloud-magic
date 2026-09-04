@@ -4,7 +4,7 @@ Ziel: Aufgabe zuerst, Modelle sichtbar. Vier Bereiche, ein Canvas-first Arbeitsp
 
 ## Navigation
 
-Generate · Edit · Enhance · Background. Keine Alben im Studio — Alben bleiben in der Mediathek; jedes Ergebnis wird automatisch dort gesichert ("Saved to Media Library") mit optionalem "Add to Album" über den bestehenden Album-Picker. Alte Links (`?tab=magic-edit`, `?tab=batch`) leiten sauber um.
+Generate · Edit · Enhance · Background. Keine Alben im Studio — Alben bleiben in der Mediathek; jedes Ergebnis wird automatisch dort gesichert ("Saved to Media Library") mit optionalem "Add to Album" über den bestehenden Album-Picker. Alte Links leiten mit erhaltener Absicht um: `?tab=magic-edit` → `?tab=edit`, `?tab=batch` → `?tab=generate&mode=batch`.
 
 ## Layout (2028-Look)
 
