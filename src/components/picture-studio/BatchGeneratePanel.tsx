@@ -16,6 +16,8 @@ import { useAIVideoWallet } from "@/hooks/useAIVideoWallet";
 import { useActiveBrandKit } from "@/hooks/useActiveBrandKit";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { parseBatchPrompts } from "@/lib/pictureModels/batchPrompts";
+
 
 type QualityTier = 'fast' | 'pro' | 'ultra';
 
@@ -52,10 +54,10 @@ export function BatchGeneratePanel() {
   const [running, setRunning] = useState(false);
   const [items, setItems] = useState<BatchItem[]>([]);
 
-  const prompts = useMemo(
-    () => rawPrompts.split('\n').map(p => p.trim()).filter(Boolean),
-    [rawPrompts]
-  );
+  const [showAllPrompts, setShowAllPrompts] = useState(false);
+
+  const prompts = useMemo(() => parseBatchPrompts(rawPrompts), [rawPrompts]);
+
 
   const currency = wallet?.currency || 'EUR';
   const currencySymbol = currency === 'USD' ? '$' : '€';
@@ -164,7 +166,36 @@ export function BatchGeneratePanel() {
               })}</span>
               {prompts.length > 20 && <span className="text-destructive">{tx({ de: "Max. 20 Prompts erlaubt", en: "Max. 20 prompts allowed", es: "Máx. 20 indicaciones permitidas" })}</span>}
             </div>
+
+            {prompts.length > 0 && (
+              <div className="rounded-lg border border-border/50 bg-muted/20 p-3 space-y-1">
+                {(showAllPrompts ? prompts : prompts.slice(0, 3)).map((p, i) => (
+                  <div key={`${i}-${p.slice(0, 12)}`} className="flex gap-2 text-xs">
+                    <span className="text-muted-foreground tabular-nums">
+                      {String(i + 1).padStart(2, '0')}
+                    </span>
+                    <span className="truncate">{p}</span>
+                  </div>
+                ))}
+                {prompts.length > 3 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllPrompts(!showAllPrompts)}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    {showAllPrompts
+                      ? tx({ de: "Weniger anzeigen", en: "Show less", es: "Mostrar menos" })
+                      : tx({
+                          de: `Alle ${prompts.length} anzeigen`,
+                          en: `Show all ${prompts.length}`,
+                          es: `Mostrar los ${prompts.length}`,
+                        })}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
+
 
           {/* Tier */}
           <div className="space-y-2">
