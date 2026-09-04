@@ -13,7 +13,7 @@ export const FX_RATE_UPDATED_AT = '2026-09-04';
 /** Cushion against FX drift between two rate updates. */
 export const FX_SAFETY_BUFFER = 0.03;
 /** Bumped whenever a rate card changes. */
-export const PROVIDER_PRICING_VERSION = 'rates-2026-09-04';
+export const PROVIDER_PRICING_VERSION = 'rates-2026-09-05';
 /** Admin warns when the maintained FX rate is older than this. */
 export const FX_MAX_AGE_DAYS = 30;
 
