@@ -12,9 +12,9 @@ Dreispaltig und adaptiv: links Eingabe (ca. 320–380 px), Mitte die Canvas mit 
 
 **Sechs Prinzipien:** Canvas first · Progressive Disclosure · Model Transparency · Smart Recommendations · Immediate Feedback (Kosten, Größe, Modell vor dem Lauf) · Context Continuity.
 
-## Aktives Asset (Kernstück)
+## Aktives Asset + Verlauf (Kernstück)
 
-Das Studio ist zustandsbehaftet: das zuletzt erzeugte oder hochgeladene Bild bleibt das aktive Asset über Generate → Edit → Enhance → Background hinweg. Kein Download-und-neu-hochladen. Unter jedem Ergebnis liegen direkt: Edit · Enhance · Background · Add to Album · Download, nach einem Upscale zusätzlich "Enhance again" (öffnet dasselbe Bild z. B. mit dem jeweils anderen Modell).
+Das Studio ist zustandsbehaftet: das zuletzt erzeugte oder hochgeladene Bild bleibt das aktive Asset über Generate → Edit → Enhance → Background hinweg. Kein Download-und-neu-hochladen. Statt nur eines "aktuellen Bildes" führt das Studio eine **Lineage** (Original → Generierung → Edit v1 → Topaz 4× → Hintergrund). Der letzte Schritt ist das aktive Asset, jede frühere Stufe bleibt anklickbar — wer nach einem Topaz-Lauf lieber das Generate-Ergebnis mit Clarity testen will, springt einfach zurück. Damit arbeitet das Studio non-destruktiv. Unter jedem Ergebnis: Edit · Enhance · Background · Add to Album · Download, nach einem Upscale zusätzlich "Enhance again".
 
 
 ## Generate
