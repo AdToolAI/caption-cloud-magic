@@ -257,19 +257,27 @@ serve(async (req) => {
       .from('studio_images')
       .insert({
         user_id: user.id,
-        url: publicUrl,
-        storage_path: storagePath,
+        image_url: publicUrl,
         prompt: `[${mode === 'inpaint' ? 'Magic Edit' : 'Outpaint'}] ${prompt}`,
         style: parentMeta.style || 'realistic',
         aspect_ratio: parentMeta.aspect_ratio || '1:1',
+        source: 'generated',
         album_id: parentMeta.album_id || null,
         parent_id: imageId || null,
+        metadata_json: { storagePath, mode },
       })
       .select()
       .single();
 
-    if (insertError) {
-      console.warn('[magic-edit] studio_images insert warning:', insertError);
+    if (insertError || !studioImage) {
+      console.error('[magic-edit] studio_images insert failed:', insertError?.message);
+      return new Response(
+        JSON.stringify({
+          error: 'The edited image could not be saved to your library. You were not charged.',
+          code: 'PERSIST_FAILED',
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Deduct credits
