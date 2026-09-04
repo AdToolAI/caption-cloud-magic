@@ -1,39 +1,63 @@
-import { getPictureModel, type PictureModelDefinition } from '@/config/pictureModels';
+import { getPictureModel } from '@/config/pictureModels';
+import {
+  marginMetrics,
+  multiplierForCost,
+  PRICING_VERSION,
+  NET_FACTOR,
+  userPriceFromProviderCost,
+} from './marginCurve';
+import {
+  bufferedProviderCostEur,
+  FX_RATE_USD_EUR,
+  FX_SAFETY_BUFFER,
+  outputMegapixels,
+  PROVIDER_PRICING_VERSION,
+  PROVIDER_RATE_CARDS,
+  providerCostUsd,
+} from './providerRates';
 
 /**
- * Picture Studio pricing engine.
- * Provider cost -> margin -> end price. Every surface calls estimatePrice().
+ * Picture Studio pricing engine (display only — the server recalculates the
+ * authoritative price for every run). Returns the complete snapshot so a run
+ * can be explained months later.
  */
 
-/** Payment processing keeps ~10% of the gross. */
-export const PAYMENT_NET_FACTOR = 0.9;
-/** Sell price must be at least 1.75x the real provider cost (net of fees). */
-export const MARGIN_FLOOR_MULTIPLE = 1.75;
+export { NET_FACTOR, NET_FACTOR as PAYMENT_NET_FACTOR };
+
+export type PricingMode = 'curve' | 'legacy_fixed';
 
 export interface PriceConfig {
   modelId: string;
-  /** Source image dimensions (needed for megapixel pricing). */
   inputWidth?: number;
   inputHeight?: number;
   scale?: number;
   /** Number of images in this run (batch). */
   images?: number;
+  values?: Record<string, unknown>;
 }
 
 export interface PriceEstimate {
   modelId: string;
-  unit: PictureModelDefinition['pricing']['unit'];
-  providerCostEUR: number;
-  sellEUR: number;
+  pricingMode: PricingMode;
+  pricingVersion: string;
+  providerPricingVersion: string;
+  providerCostUsdEstimated: number;
+  providerCostEurBuffered: number;
+  fxRateUsed: number;
+  fxSafetyBufferUsed: number;
+  multiplierUsed: number | null;
+  userPriceEur: number;
+  netRevenueEur: number;
+  contributionEur: number;
   marginPct: number;
   outputWidth?: number;
   outputHeight?: number;
   outputMegapixels?: number;
   costUnverified: boolean;
-}
-
-function roundUpCents(value: number): number {
-  return Math.ceil(value * 100 - 1e-9) / 100;
+  /** @deprecated use userPriceEur */
+  sellEUR: number;
+  /** @deprecated use providerCostEurBuffered */
+  providerCostEUR: number;
 }
 
 export function outputDimensions(config: PriceConfig): { width?: number; height?: number } {
@@ -42,48 +66,49 @@ export function outputDimensions(config: PriceConfig): { width?: number; height?
   return { width: config.inputWidth * scale, height: config.inputHeight * scale };
 }
 
+function legacyFixedPrice(modelId: string, scale?: number): number | null {
+  const fixed = getPictureModel(modelId)?.pricing.fixedSellEUR;
+  if (typeof fixed === 'number') return fixed;
+  if (fixed && scale != null && fixed[scale] != null) return fixed[scale] as number;
+  return null;
+}
+
 export function estimatePrice(config: PriceConfig): PriceEstimate | null {
   const model = getPictureModel(config.modelId);
   if (!model) return null;
 
+  const card = PROVIDER_RATE_CARDS[config.modelId];
   const images = Math.max(1, config.images ?? 1);
   const { width, height } = outputDimensions(config);
-  const megapixels = width && height ? (width * height) / 1_000_000 : undefined;
 
-  let providerCost: number;
-  switch (model.pricing.unit) {
-    case 'per_output_megapixel':
-      providerCost = model.pricing.providerCostEUR * (megapixels ?? 1);
-      break;
-    case 'per_image':
-    case 'per_run':
-    default:
-      providerCost = model.pricing.providerCostEUR;
-      break;
-  }
-  providerCost *= images;
+  const costUsd = card ? providerCostUsd(card, { ...config, images }) : 0;
+  const costEur = bufferedProviderCostEur(costUsd);
 
-  const fixed = model.pricing.fixedSellEUR;
-  let sell: number;
-  if (typeof fixed === 'number') {
-    sell = fixed * images;
-  } else if (fixed && config.scale && fixed[config.scale] != null) {
-    sell = (fixed[config.scale] as number) * images;
-  } else {
-    sell = roundUpCents((providerCost * MARGIN_FLOOR_MULTIPLE) / PAYMENT_NET_FACTOR);
-  }
-  sell = Math.max(sell, 0.01);
+  const fixed = legacyFixedPrice(config.modelId, config.scale);
+  const isLegacy = fixed !== null;
+  const price = isLegacy ? fixed! * images : userPriceFromProviderCost(costEur);
+  const metrics = marginMetrics(price, costEur);
 
   return {
     modelId: model.id,
-    unit: model.pricing.unit,
-    providerCostEUR: providerCost,
-    sellEUR: sell,
-    marginPct: sell > 0 ? (sell * PAYMENT_NET_FACTOR - providerCost) / (sell * PAYMENT_NET_FACTOR) : 0,
+    pricingMode: isLegacy ? 'legacy_fixed' : 'curve',
+    pricingVersion: PRICING_VERSION,
+    providerPricingVersion: PROVIDER_PRICING_VERSION,
+    providerCostUsdEstimated: costUsd,
+    providerCostEurBuffered: costEur,
+    fxRateUsed: FX_RATE_USD_EUR,
+    fxSafetyBufferUsed: FX_SAFETY_BUFFER,
+    multiplierUsed: isLegacy ? null : multiplierForCost(costEur),
+    userPriceEur: price,
+    netRevenueEur: metrics.netRevenueEUR,
+    contributionEur: metrics.contributionEUR,
+    marginPct: metrics.marginPct,
     outputWidth: width,
     outputHeight: height,
-    outputMegapixels: megapixels,
-    costUnverified: model.pricing.costUnverified === true,
+    outputMegapixels: width && height ? (width * height) / 1_000_000 : outputMegapixels(config),
+    costUnverified: card?.costUnverified === true || model.pricing.costUnverified === true,
+    sellEUR: price,
+    providerCostEUR: costEur,
   };
 }
 
