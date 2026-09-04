@@ -175,7 +175,8 @@ export const ENHANCE_MODELS: PictureModelDefinition[] = [
     ],
     pricing: {
       unit: 'per_run',
-      providerCostEUR: 0.012,
+      // Replicate hardware billing, published median run $0.016 (2026-09-05).
+      providerCostEUR: 0.015,
       // Live prices — must not change with this refactor.
       fixedSellEUR: { 2: 0.03, 4: 0.06 },
     },
@@ -282,7 +283,8 @@ export const ENHANCE_MODELS: PictureModelDefinition[] = [
     ],
     pricing: {
       unit: 'per_output_megapixel',
-      providerCostEUR: 0.0018,
+      // Official unit table by output MP; first tier $0.05 (2026-09-05).
+      providerCostEUR: 0.046,
       costUnverified: true,
     },
     typicalProcessingSeconds: [20, 45],
@@ -358,7 +360,7 @@ export const ENHANCE_MODELS: PictureModelDefinition[] = [
       },
       FORMAT_CONTROL(['png', 'jpg'], 'png'),
     ],
-    pricing: { unit: 'per_run', providerCostEUR: 0.02, costUnverified: true },
+    pricing: { unit: 'per_run', providerCostEUR: 0.074, costUnverified: true },
     typicalProcessingSeconds: [15, 40],
     enabled: false,
     beta: true,
@@ -399,7 +401,7 @@ export const ENHANCE_MODELS: PictureModelDefinition[] = [
       },
       FORMAT_CONTROL(['png', 'jpg'], 'png'),
     ],
-    pricing: { unit: 'per_run', providerCostEUR: 0.02, costUnverified: true },
+    pricing: { unit: 'per_run', providerCostEUR: 0.148, costUnverified: true },
     typicalProcessingSeconds: [15, 40],
     enabled: false,
     beta: true,
