@@ -8,19 +8,26 @@ Generate · Edit · Enhance · Background. Keine Alben im Studio — Alben bleib
 
 ## Layout (2028-Look)
 
-Dreispaltig: links Eingabe (Prompt bzw. Originalbild), Mitte große Canvas mit dem Ergebnis als wichtigstem Element, rechts ein Context-Inspector mit Modell, Einstellungen, Auflösung, Output. Ruhig, wenig Rahmen, weiche Tiefen, feine Glows nur für aktive Auswahl, Microinteractions 150–250 ms, Steuerelemente erscheinen erst, wenn sie relevant sind. Bestehende Design-Tokens, kein Neon.
+Dreispaltig und adaptiv: links Eingabe (ca. 320–380 px), Mitte die Canvas mit dem gesamten Restplatz, rechts der Inspector (ca. 320–360 px). Beide Seitenspalten sind einklappbar, damit ein Ergebnis fast bildschirmfüllend geprüft werden kann. Der moderne Eindruck entsteht aus großer Arbeitsfläche, kontextabhängigen Controls, guten Empfehlungen und sehr wenig visuellem Rauschen — kein Neon, kein übertriebenes Glas. Microinteractions 150–250 ms, bestehende Design-Tokens.
+
+**Sechs Prinzipien:** Canvas first · Progressive Disclosure · Model Transparency · Smart Recommendations · Immediate Feedback (Kosten, Größe, Modell vor dem Lauf) · Context Continuity.
+
+## Aktives Asset (Kernstück)
+
+Das Studio ist zustandsbehaftet: das zuletzt erzeugte oder hochgeladene Bild bleibt das aktive Asset über Generate → Edit → Enhance → Background hinweg. Kein Download-und-neu-hochladen. Unter jedem Ergebnis liegen direkt: Edit · Enhance · Background · Add to Album · Download, nach einem Upscale zusätzlich "Enhance again" (öffnet dasselbe Bild z. B. mit dem jeweils anderen Modell).
+
 
 ## Generate
 
 - Ein Prompt-Feld mit Umschalter **Single | Batch** oben rechts. Batch zählt korrekt ("12 prompts detected") und zeigt eine aufklappbare nummerierte Vorschau. Der heutige Fehler "0 prompts detected" verschwindet damit.
 - **Start with**-Chips (Product Ad, Portrait, Photorealistic, Social Media, Food, Luxury, Illustration) setzen einen Prompt-Anfang, starten aber nichts.
 - Modellkarten mit dem **Modellnamen zuerst**: Seedream 4, Imagen 4 Ultra, Nano Banana 2 usw., darunter Positionierung, Tempo-/Qualitäts-Badge und Preis pro Bild. Fast/Pro/Ultra bleibt nur noch als Badge.
-- Über den Karten eine Empfehlung "Recommended for your prompt" mit kurzer Begründung — alle Modelle bleiben sichtbar und wählbar.
+- Über den Karten eine Empfehlung "Recommended for your prompt" mit kurzer Begründung und "Use recommendation" — alle Modelle bleiben sichtbar und wählbar. Sie entsteht aus schnellen Regeln und Modell-Metadaten, ausgelöst nach kurzer Tippauspause bzw. beim Verlassen des Feldes — kein KI-Aufruf pro Tastendruck, also keine Zusatzkosten und keine Verzögerung.
 - Danach Style & Format, darunter zusammengeklappt: Reference Images, Brand Kit, Advanced Settings.
 
 ## Edit
 
-"Magic Edit" heißt Edit. Zuerst "What do you want to change?" mit Aktionskacheln — aber ausschließlich Aktionen, die real funktionieren. Was heute angebunden ist, wird angezeigt; Replace/Remove/Inpaint/Expand/Restyle/Face kommen einzeln dazu, sobald sie laufen. Keine Platzhalter-Buttons.
+"Magic Edit" heißt Edit. Zuerst "What do you want to change?" mit Aktionskacheln, die **aus der Capability-Registry** kommen statt fest verdrahtet zu sein: sichtbar ist nur, was ein angebundenes Modell wirklich kann. Kommt später ein Modell mit `object_remove` dazu, erscheint "Remove" automatisch. Keine Platzhalter-Buttons.
 
 ## Enhance (der neue Schwerpunkt)
 
@@ -51,15 +58,16 @@ Bleibt eigener Bereich: entfernen, ersetzen, Studio-Hintergrund, transparentes P
 
 ## Technisch
 
-- **Modell-Registry** `src/config/pictureModels/` mit den Gruppen generation / enhancement / editing. Pro Modell: Name, Anbieter, Replicate-Model-ID, Fähigkeiten, Input-Schema, Preis, Marge, Empfehlungsregeln, Badges, `enabled`, `beta`. UI-Karten und Requestbau werden daraus erzeugt — kein React-Sonderfall pro Modell. Die vorhandene Capability-Matrix für die Generierungsmodelle wird eingehängt, nicht dupliziert.
-- **Preis-Registry** statt if-Ketten: Anbieterkosten, Aufschlag, Endpreis, Abrechnungseinheit, Megapixel-Stufen und Mindestpreis. Topaz rechnet nach Output-Megapixeln, Clarity Pro pro Million Output-Pixel — der Preis wird vor dem Lauf aus der tatsächlichen Zielauflösung berechnet. Bestehende Margenregeln (Net-Factor, Margin-Floor) bleiben gültig; die konkreten Endpreise lege ich dir vor dem Aktivieren zur Freigabe vor.
-- **Einheitlicher Lauf-Lifecycle** für alle Picture-Läufe: created → credits_reserved → provider_started → provider_succeeded → asset_saved → completed, bzw. provider_failed → credits_refunded. Idempotent, damit ein Anbieterfehler immer automatisch zurückerstattet.
+- **Modell-Registry** `src/config/pictureModels/` als einzige Quelle: id, Name, Vendor, Provider, providerModelId, Kategorie, Capabilities (`text_to_image`, `image_edit`, `object_remove`, `inpaint`, `outpaint`, `upscale`, `face_enhance`, `restore`, `colorize`, `background_remove`, `background_replace`), bestFor, Beschreibung, Badges, Input-/Output-Schema, Presets, unterstützte Scales und Formate, Preismodell, Empfehlungsregeln, `enabled`, `beta`, Übersetzungen. Die UI fragt die Registry ("welche Modelle können upscale?") und baut Karten, Aktionskacheln und Requests daraus — kein React-Sonderfall pro Modell. Die vorhandene Capability-Matrix der Generierungsmodelle wird eingehängt, nicht dupliziert.
+- **Preis-Engine** statt verstreuter Berechnungen: Anbieterkosten → Marge → Endpreis → Guthaben-Äquivalent, mit Einheiten pro Bild, pro Output-Megapixel, pro Lauf, nach Auflösung, Scale oder Modellvariante. Der Inspector ruft nur `estimatePrice(config)`. Topaz rechnet nach Output-Megapixeln, Clarity Pro pro Million Output-Pixel — beides aus der tatsächlichen Zielauflösung. Bestehende Margenregeln (Net-Factor, Margin-Floor) gelten weiter; die konkreten Endpreise lege ich dir vor dem Aktivieren zur Freigabe vor.
+- **Einheitlicher Lauf-Lifecycle** für alle Picture-Läufe: created → credits_reserved → submitted → processing → provider_succeeded → asset_persisted → completed, bzw. provider_failed → credits_refunded. Idempotent, damit ein Anbieterfehler immer automatisch zurückerstattet.
 - Neue Edge-Function `enhance-image` für die Topaz/Clarity-Modelle über die vorhandene Replicate-Anbindung; die heutige `upscale-image` (Clarity) wird darauf migriert, ihre bisherigen Aufrufer aus Bildkarte und Lightbox bleiben funktionsfähig.
+- Ergebnisse landen wie bisher in der Mediathek; das Studio führt keine eigene Albumverwaltung mehr.
 - Alle neuen Texte in EN/DE/ES.
 
 ## Reihenfolge
 
-1. Navigation Generate/Edit/Enhance/Background, Alben raus, Redirects.
+1. Navigation Generate/Edit/Enhance/Background, Alben raus, Redirects, Canvas-Grundgerüst mit aktivem Asset und einklappbaren Spalten.
 2. Batch in Generate integriert, Prompt-Zählung und nummerierte Vorschau.
 3. Modell-Registry + neue Generate-Modellkarten mit Empfehlung.
 4. Reference Images, Brand Kit, Advanced Settings zusammenklappbar.
