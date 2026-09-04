@@ -8,7 +8,14 @@ Generate · Edit · Enhance · Background. Keine Alben im Studio — Alben bleib
 
 ## Layout (2028-Look)
 
-Dreispaltig: links Eingabe (Prompt bzw. Originalbild), Mitte große Canvas mit dem Ergebnis als wichtigstem Element, rechts ein Context-Inspector mit Modell, Einstellungen, Auflösung, Output. Ruhig, wenig Rahmen, weiche Tiefen, feine Glows nur für aktive Auswahl, Microinteractions 150–250 ms, Steuerelemente erscheinen erst, wenn sie relevant sind. Bestehende Design-Tokens, kein Neon.
+Dreispaltig und adaptiv: links Eingabe (ca. 320–380 px), Mitte die Canvas mit dem gesamten Restplatz, rechts der Inspector (ca. 320–360 px). Beide Seitenspalten sind einklappbar, damit ein Ergebnis fast bildschirmfüllend geprüft werden kann. Der moderne Eindruck entsteht aus großer Arbeitsfläche, kontextabhängigen Controls, guten Empfehlungen und sehr wenig visuellem Rauschen — kein Neon, kein übertriebenes Glas. Microinteractions 150–250 ms, bestehende Design-Tokens.
+
+**Sechs Prinzipien:** Canvas first · Progressive Disclosure · Model Transparency · Smart Recommendations · Immediate Feedback (Kosten, Größe, Modell vor dem Lauf) · Context Continuity.
+
+## Aktives Asset (Kernstück)
+
+Das Studio ist zustandsbehaftet: das zuletzt erzeugte oder hochgeladene Bild bleibt das aktive Asset über Generate → Edit → Enhance → Background hinweg. Kein Download-und-neu-hochladen. Unter jedem Ergebnis liegen direkt: Edit · Enhance · Background · Add to Album · Download, nach einem Upscale zusätzlich "Enhance again" (öffnet dasselbe Bild z. B. mit dem jeweils anderen Modell).
+
 
 ## Generate
 
