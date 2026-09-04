@@ -132,7 +132,7 @@ export const ENHANCE_MODEL_SPECS: Record<EnhanceModelId, EnhanceModelSpec> = {
     id: 'topaz-image-upscale',
     providerModelId: 'topazlabs/image-upscale',
     supportedScales: [2, 4, 6],
-    pricing: { unit: 'per_output_megapixel', providerCostEUR: 0.0018 },
+    pricing: { unit: 'per_output_megapixel', providerCostEUR: 0.046 },
     requiresFlag: 'PICTURE_TOPAZ_UPSCALE_ENABLED',
     buildInput(config) {
       const v = config.values;
@@ -163,7 +163,7 @@ export const ENHANCE_MODEL_SPECS: Record<EnhanceModelId, EnhanceModelSpec> = {
   'topaz-dust-scratch': {
     id: 'topaz-dust-scratch',
     providerModelId: 'topazlabs/dust-and-scratch-v2',
-    pricing: { unit: 'per_run', providerCostEUR: 0.02 },
+    pricing: { unit: 'per_run', providerCostEUR: 0.074 },
     requiresFlag: 'PICTURE_TOPAZ_RESTORE_ENABLED',
     buildInput(config) {
       const v = config.values;
@@ -185,7 +185,7 @@ export const ENHANCE_MODEL_SPECS: Record<EnhanceModelId, EnhanceModelSpec> = {
   'topaz-colorization': {
     id: 'topaz-colorization',
     providerModelId: 'topazlabs/image-colorization',
-    pricing: { unit: 'per_run', providerCostEUR: 0.02 },
+    pricing: { unit: 'per_run', providerCostEUR: 0.148 },
     requiresFlag: 'PICTURE_TOPAZ_COLORIZE_ENABLED',
     buildInput(config) {
       const v = config.values;
@@ -218,6 +218,10 @@ export function priceForRun(spec: EnhanceModelSpec, config: EnhanceRunInput): nu
 /**
  * A model may run when the backend switch is on, or when the caller is on the
  * explicit test allowlist. The frontend flag alone never unlocks anything.
+ *
+ * Only the exact string "true" enables a feature globally — a present but
+ * empty/"false"/"1" value keeps the model locked for everyone except the
+ * allowlisted test accounts.
  */
 export function isModelUnlocked(
   spec: EnhanceModelSpec,

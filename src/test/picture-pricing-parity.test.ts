@@ -20,6 +20,10 @@ const FIXTURES = [
   { modelId: 'clarity-pro', scale: 4, inputWidth: 1024, inputHeight: 1024 },
   { modelId: 'topaz-image-upscale', scale: 2, inputWidth: 1920, inputHeight: 1080 },
   { modelId: 'topaz-image-upscale', scale: 4, inputWidth: 3000, inputHeight: 2000 },
+  // Tier boundaries of the official unit table (24 / 48 / 96 output MP).
+  { modelId: 'topaz-image-upscale', scale: 2, inputWidth: 3000, inputHeight: 2000 },
+  { modelId: 'topaz-image-upscale', scale: 4, inputWidth: 2000, inputHeight: 1500 },
+  { modelId: 'topaz-image-upscale', scale: 6, inputWidth: 1600, inputHeight: 1667 },
   { modelId: 'topaz-dust-scratch', inputWidth: 1600, inputHeight: 1200 },
   { modelId: 'topaz-colorization', inputWidth: 1600, inputHeight: 1200 },
 ];
@@ -73,5 +77,34 @@ describe('picture studio pricing parity', () => {
     const one = estimatePrice({ modelId: 'topaz-dust-scratch', images: 1 })!;
     const three = estimatePrice({ modelId: 'topaz-dust-scratch', images: 3 })!;
     expect(three.providerCostUsdEstimated).toBeCloseTo(one.providerCostUsdEstimated * 3, 10);
+  });
+});
+
+describe('official provider rate cards (read 2026-09-05)', () => {
+  it('prices Topaz Upscale from the published output-MP unit table', () => {
+    // 3000x2000 @4x = 96 MP -> $0.20 tier
+    expect(
+      priceRun('topaz-image-upscale', { scale: 4, inputWidth: 3000, inputHeight: 2000 })
+        .providerCostUsdEstimated,
+    ).toBe(0.2);
+    // 3000x2000 @2x = 24 MP -> first tier $0.05
+    expect(
+      priceRun('topaz-image-upscale', { scale: 2, inputWidth: 3000, inputHeight: 2000 })
+        .providerCostUsdEstimated,
+    ).toBe(0.05);
+  });
+
+  it('keeps Clarity on hardware billing, not per output megapixel', () => {
+    const a = priceRun('clarity-pro', { scale: 2, inputWidth: 4000, inputHeight: 3000 });
+    const b = priceRun('clarity-pro', { scale: 2, inputWidth: 800, inputHeight: 600 });
+    expect(a.providerCostUsdEstimated).toBe(b.providerCostUsdEstimated);
+    expect(a.providerCostUsdEstimated).toBe(0.016);
+    // Legacy fixed price still covers the provider cost.
+    expect(a.contributionEur).toBeGreaterThan(0);
+  });
+
+  it('prices the Topaz unit models at $0.08 per unit', () => {
+    expect(priceRun('topaz-dust-scratch', {}).providerCostUsdEstimated).toBe(0.08);
+    expect(priceRun('topaz-colorization', {}).providerCostUsdEstimated).toBe(0.16);
   });
 });
