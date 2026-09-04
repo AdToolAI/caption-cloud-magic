@@ -177,23 +177,36 @@ serve(async (req) => {
       if (parent) parentMeta = parent;
     }
 
+    // Media library row is part of the deliverable: no row, no charge.
     const { data: studioImage, error: insertError } = await supabaseAdmin
       .from("studio_images")
       .insert({
         user_id: user.id,
-        url: publicUrl,
-        storage_path: storagePath,
+        image_url: publicUrl,
         prompt: parentMeta.prompt || `Enhanced with ${spec.id}`,
         style: parentMeta.style || "realistic",
+        model_used: spec.id,
         aspect_ratio: parentMeta.aspect_ratio || "1:1",
+        source: "generated",
         album_id: parentMeta.album_id || null,
         parent_id: body.imageId || null,
         upscale_factor: scale ?? null,
+        metadata_json: { storagePath, enhanceModel: input.enhance_model ?? null, scale: scale ?? null },
       })
       .select()
       .single();
 
-    if (insertError) console.warn("[enhance-image] studio_images insert warning:", insertError.message);
+    if (insertError || !studioImage) {
+      console.error("[enhance-image] studio_images insert failed:", insertError?.message);
+      return json(
+        {
+          error: "The enhanced image could not be saved to your library. You were not charged.",
+          code: "PERSIST_FAILED",
+          providerUrl: publicUrl,
+        },
+        500,
+      );
+    }
 
     const { data: newBalance, error: deductError } = await supabaseAdmin.rpc("deduct_ai_video_credits", {
       p_user_id: user.id,
