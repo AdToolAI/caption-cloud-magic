@@ -38,17 +38,41 @@ export interface ProviderCostConfig {
 /** Assumed output size when the source dimensions are unknown. */
 export const FALLBACK_OUTPUT_MEGAPIXELS = 12;
 
+/**
+ * Official Replicate rate cards, read from the model pages on 2026-09-05.
+ *
+ * - topazlabs/image-upscale: unit table by output megapixels
+ *   (12/24 MP $0.05 · 36/48 MP $0.10 · 60 MP $0.15 · 96 MP $0.20 ·
+ *    132 MP $0.24 · 168 MP $0.29 · 336 MP $0.53 · 512 MP $0.82)
+ * - philz1337x/clarity-upscaler: hardware billed, A100 40GB @ $0.00115/s,
+ *   published median run $0.016
+ * - topazlabs/dust-and-scratch-v2 / image-colorization: $0.08 per unit;
+ *   published examples consume 1 resp. 2 units — unit count still unverified.
+ *
+ * `costUnverified` now means: official rate known, not yet reconciled against
+ * a real AdTool run — it does NOT mean the price rule is a guess.
+ */
 export const PROVIDER_RATE_CARDS: Record<string, ProviderRateCard> = {
-  'clarity-pro': { currency: 'USD', type: 'per_run', rateUsd: 0.013 },
+  'clarity-pro': { currency: 'USD', type: 'per_run', rateUsd: 0.016, costUnverified: true },
   'topaz-image-upscale': {
     currency: 'USD',
-    type: 'per_output_mp',
-    rateUsd: 0.002,
-    minMegapixels: 1,
+    type: 'output_mp_tier',
+    tiers: [
+      { maxMegapixels: 24, rateUsd: 0.05 },
+      { maxMegapixels: 48, rateUsd: 0.1 },
+      { maxMegapixels: 60, rateUsd: 0.15 },
+      { maxMegapixels: 96, rateUsd: 0.2 },
+      { maxMegapixels: 132, rateUsd: 0.24 },
+      { maxMegapixels: 168, rateUsd: 0.29 },
+      { maxMegapixels: 336, rateUsd: 0.53 },
+      { maxMegapixels: 512, rateUsd: 0.82 },
+      // Beyond the published table: extrapolated at the top-tier unit rate.
+      { maxMegapixels: 1024, rateUsd: 1.64 },
+    ],
     costUnverified: true,
   },
-  'topaz-dust-scratch': { currency: 'USD', type: 'per_run', rateUsd: 0.022, costUnverified: true },
-  'topaz-colorization': { currency: 'USD', type: 'per_run', rateUsd: 0.022, costUnverified: true },
+  'topaz-dust-scratch': { currency: 'USD', type: 'per_run', rateUsd: 0.08, costUnverified: true },
+  'topaz-colorization': { currency: 'USD', type: 'per_run', rateUsd: 0.16, costUnverified: true },
 };
 
 export function outputMegapixels(config: ProviderCostConfig): number {
