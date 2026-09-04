@@ -52,10 +52,12 @@ export function EnhancePanel() {
 
   const currencySymbol = (wallet?.currency || "EUR") === "USD" ? "$" : "€";
 
+  // Premium models stay visible (that is the USP) but only enabled ones run.
   const models = useMemo(
-    () => modelsWithCapability(TASK_CAPABILITY[task], { enabledFlags: ENABLED_PICTURE_FLAGS }),
+    () => modelsWithCapability(TASK_CAPABILITY[task], { includeDisabled: true }),
     [task],
   );
+
 
   useEffect(() => {
     if (models.length && !models.some((m) => m.id === modelId)) {
