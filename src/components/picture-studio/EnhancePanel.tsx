@@ -5,6 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Upload, Loader2, Sparkles, Wand2, Download, GitCompare, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,6 +76,7 @@ export function EnhancePanel() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [compare, setCompare] = useState<CompareEntry[] | null>(null);
   const [comparing, setComparing] = useState(false);
+  const [compareConfirmOpen, setCompareConfirmOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -255,6 +266,7 @@ export function EnhancePanel() {
 
   const handleCompare = async () => {
     if (!canCompare) return;
+    setCompareConfirmOpen(false);
     setComparing(true);
     setCompare(null);
     try {
