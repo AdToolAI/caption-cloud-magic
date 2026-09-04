@@ -44,13 +44,13 @@ Clarity-Bedienung: Presets Faithful / Balanced / Ultra Detail plus Advanced-Slid
 Restore: Topaz Dust & Scratch v2 mit optionalem Film Grain (Typ, Stärke, Dichte, Größe unter Advanced).
 Colorize: Topaz Image Colorization mit einem Regler Natural…Vivid.
 
-Vor jedem Lauf ein Output-Block: Zielauflösung und Megapixel, laufendes Modell, geschätzter Preis, geschätzte Dauer.
+Vor jedem Lauf ein Output-Block: Zielauflösung und Megapixel, laufendes Modell, exakter Preis. Die Laufzeit wird bewusst nur als Spanne genannt ("Typical processing time: ~20–45 sec"), weil sie mit der Replicate-Auslastung schwankt; die Spanne kommt später aus euren eigenen Run-Daten statt aus Herstellerangaben.
 
 ## Vergleichen und verstehen
 
-- Canvas mit **Before | After**-Schieberegler, Umschaltern Original / Enhanced / Split und Zoom 50 % / 100 % / 200 %; "Hold C to compare" am Desktop, langes Drücken mobil.
+- Canvas mit **Before | After**-Schieberegler, Umschaltern Original / Enhanced / Split und Zoom Fit / 100 % / 200 %; "Hold C to compare" am Desktop, langes Drücken mobil.
 - Ein Smart-Layer nach dem Upload: eine kurze, begründete Empfehlung mit "Apply recommendation" — das empfohlene Modell bleibt namentlich sichtbar.
-- **Compare Models** (Topaz vs. Clarity in einem Lauf, doppelte Kosten, transparent ausgewiesen) kommt als letzter Schritt.
+- **Compare Models** (Topaz vs. Clarity in einem Lauf, doppelte Kosten transparent ausgewiesen) kommt bewusst früh — direkt nachdem beide Upscaler stabil laufen. Es demonstriert das Geschäftsmodell besser als jede Landingpage.
 
 ## Background
 
