@@ -14,7 +14,7 @@ export const PRICING_VERSION = 'pricing-2026-09-04';
 export const FX_RATE_USD_EUR = 0.92;
 export const FX_RATE_UPDATED_AT = '2026-09-04';
 export const FX_SAFETY_BUFFER = 0.03;
-export const PROVIDER_PRICING_VERSION = 'rates-2026-09-05';
+export const PROVIDER_PRICING_VERSION = 'rates-2026-09-05-verified';
 export const FALLBACK_OUTPUT_MEGAPIXELS = 12;
 
 export interface CurvePoint {
@@ -125,10 +125,9 @@ export const PROVIDER_RATE_CARDS: Record<string, ProviderRateCard> = {
       // Beyond the published table: extrapolated at the top-tier unit rate.
       { maxMegapixels: 1024, rateUsd: 1.64 },
     ],
-    costUnverified: true,
   },
-  'topaz-dust-scratch': { currency: 'USD', type: 'per_run', rateUsd: 0.08, costUnverified: true },
-  'topaz-colorization': { currency: 'USD', type: 'per_run', rateUsd: 0.16, costUnverified: true },
+  'topaz-dust-scratch': { currency: 'USD', type: 'per_run', rateUsd: 0.08 },
+  'topaz-colorization': { currency: 'USD', type: 'per_run', rateUsd: 0.08 },
 };
 
 export function outputMegapixels(config: ProviderCostConfig): number {
