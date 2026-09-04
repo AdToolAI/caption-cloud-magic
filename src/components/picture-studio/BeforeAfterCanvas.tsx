@@ -23,7 +23,14 @@ export function BeforeAfterCanvas({ originalUrl, resultUrl, busy }: BeforeAfterC
   const dragging = useRef(false);
 
   useEffect(() => {
+    const isTyping = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null;
+      if (!el) return false;
+      const tag = el.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+    };
     const down = (e: KeyboardEvent) => {
+      if (isTyping(e.target)) return;
       if (e.key.toLowerCase() === "c") setHolding(true);
     };
     const up = (e: KeyboardEvent) => {
