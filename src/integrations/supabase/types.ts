@@ -11097,6 +11097,78 @@ export type Database = {
         }
         Relationships: []
       }
+      picture_enhance_runs: {
+        Row: {
+          contribution_eur: number
+          created_at: string
+          currency: string
+          fx_rate_used: number
+          fx_safety_buffer_used: number
+          id: string
+          margin_pct: number
+          model_id: string
+          multiplier_used: number | null
+          net_revenue_eur: number
+          pricing_mode: string
+          pricing_version: string
+          provider_cost_eur_buffered: number
+          provider_cost_usd_estimated: number
+          provider_pricing_version: string
+          refunded: boolean
+          scale: number | null
+          status: string
+          studio_image_id: string | null
+          user_id: string
+          user_price_eur: number
+        }
+        Insert: {
+          contribution_eur: number
+          created_at?: string
+          currency?: string
+          fx_rate_used: number
+          fx_safety_buffer_used: number
+          id?: string
+          margin_pct: number
+          model_id: string
+          multiplier_used?: number | null
+          net_revenue_eur: number
+          pricing_mode: string
+          pricing_version: string
+          provider_cost_eur_buffered?: number
+          provider_cost_usd_estimated?: number
+          provider_pricing_version: string
+          refunded?: boolean
+          scale?: number | null
+          status?: string
+          studio_image_id?: string | null
+          user_id: string
+          user_price_eur: number
+        }
+        Update: {
+          contribution_eur?: number
+          created_at?: string
+          currency?: string
+          fx_rate_used?: number
+          fx_safety_buffer_used?: number
+          id?: string
+          margin_pct?: number
+          model_id?: string
+          multiplier_used?: number | null
+          net_revenue_eur?: number
+          pricing_mode?: string
+          pricing_version?: string
+          provider_cost_eur_buffered?: number
+          provider_cost_usd_estimated?: number
+          provider_pricing_version?: string
+          refunded?: boolean
+          scale?: number | null
+          status?: string
+          studio_image_id?: string | null
+          user_id?: string
+          user_price_eur?: number
+        }
+        Relationships: []
+      }
       plan_rate_limits: {
         Row: {
           ai_calls_per_minute: number

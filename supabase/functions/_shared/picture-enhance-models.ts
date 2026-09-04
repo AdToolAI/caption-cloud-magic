@@ -12,6 +12,13 @@ export type EnhanceModelId =
   | 'topaz-dust-scratch'
   | 'topaz-colorization';
 
+import {
+  priceRun,
+  type PricingSnapshot,
+} from './picture-pricing.ts';
+
+export type { PricingSnapshot };
+
 export interface EnhanceModelSpec {
   id: EnhanceModelId;
   providerModelId: string;
@@ -191,31 +198,37 @@ export const ENHANCE_MODEL_SPECS: Record<EnhanceModelId, EnhanceModelSpec> = {
   },
 };
 
-function roundUpCents(value: number): number {
-  return Math.ceil(value * 100 - 1e-9) / 100;
+/** Authoritative price + full pricing snapshot for one run. */
+export function priceSnapshotForRun(
+  spec: EnhanceModelSpec,
+  config: EnhanceRunInput,
+): PricingSnapshot {
+  return priceRun(spec.id, {
+    scale: config.scale,
+    inputWidth: config.inputWidth,
+    inputHeight: config.inputHeight,
+  });
 }
 
 /** Price in wallet currency units (EUR/USD are priced 1:1 across the app). */
 export function priceForRun(spec: EnhanceModelSpec, config: EnhanceRunInput): number {
-  const scale = config.scale ?? 1;
-  if (spec.pricing.unit === 'fixed_per_scale') {
-    return spec.pricing.sell[scale] ?? Math.max(...Object.values(spec.pricing.sell));
-  }
-  if (spec.pricing.unit === 'per_run') {
-    return Math.max(
-      0.01,
-      roundUpCents((spec.pricing.providerCostEUR * MARGIN_FLOOR_MULTIPLE) / PAYMENT_NET_FACTOR),
-    );
-  }
-  // per output megapixel — fall back to a 12 MP assumption when dims are unknown
-  const width = (config.inputWidth ?? 0) * scale;
-  const height = (config.inputHeight ?? 0) * scale;
-  const megapixels = width && height ? (width * height) / 1_000_000 : 12;
-  const providerCost = spec.pricing.providerCostEUR * Math.max(1, megapixels);
-  return Math.max(0.01, roundUpCents((providerCost * MARGIN_FLOOR_MULTIPLE) / PAYMENT_NET_FACTOR));
+  return priceSnapshotForRun(spec, config).userPriceEur;
 }
 
-export function isModelUnlocked(spec: EnhanceModelSpec, env: (key: string) => string | undefined): boolean {
+/**
+ * A model may run when the backend switch is on, or when the caller is on the
+ * explicit test allowlist. The frontend flag alone never unlocks anything.
+ */
+export function isModelUnlocked(
+  spec: EnhanceModelSpec,
+  env: (key: string) => string | undefined,
+  userId?: string,
+): boolean {
   if (!spec.requiresFlag) return true;
-  return env(spec.requiresFlag) === 'true';
+  if (env(spec.requiresFlag) === 'true') return true;
+  const allowlist = (env('PICTURE_ENHANCE_TEST_USER_IDS') ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+  return !!userId && allowlist.includes(userId);
 }
