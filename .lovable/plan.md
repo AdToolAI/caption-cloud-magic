@@ -31,7 +31,7 @@ Das Studio ist zustandsbehaftet: das zuletzt erzeugte oder hochgeladene Bild ble
 
 ## Enhance (der neue Schwerpunkt)
 
-Drei Aufgaben: **Upscale**, **Restore**, **Colorize**.
+Ein Bereich "Enhance" mit einer kleinen sekundären Auswahl **Upscale · Restore · Colorize**; Upscale ist Standard — keine drei gleich starken Tabs, weil Upscale der Hauptfall ist. Direkt darunter stehen sofort die beiden Premium-Modelle.
 
 Upscale zeigt zwei Modelle nebeneinander mit klarer Rollenzuweisung:
 - **Topaz Image Upscale** — "Preserve reality": Fotos, Produkte, Gesichter, Text.
