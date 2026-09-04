@@ -102,10 +102,11 @@ export interface ProviderCostConfig {
  * - philz1337x/clarity-upscaler: hardware billed, A100 40GB @ $0.00115/s,
  *   published median run $0.016
  * - topazlabs/dust-and-scratch-v2 / image-colorization: $0.08 per unit;
- *   published examples consume 1 resp. 2 units — unit count still unverified.
+ *   measured on 2026-09-05 — both consume exactly 1 unit per run.
  *
- * `costUnverified` now means: official rate known, not yet reconciled against
- * a real AdTool run — it does NOT mean the price rule is a guess.
+ * Reconciled against real AdTool runs on 2026-09-05 (Replicate prediction
+ * metrics): upscale 16.8 MP = 1 unit, 24.0 MP = 1 unit, 26.0 MP = 2 units,
+ * dust-and-scratch = 1 unit, colorization = 1 unit.
  */
 export const PROVIDER_RATE_CARDS: Record<string, ProviderRateCard> = {
   'clarity-pro': { currency: 'USD', type: 'per_run', rateUsd: 0.016, costUnverified: true },
