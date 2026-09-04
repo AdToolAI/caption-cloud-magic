@@ -59,28 +59,50 @@ Bleibt eigener Bereich: entfernen, ersetzen, Studio-Hintergrund, transparentes P
 ## Technisch
 
 - **Modell-Registry** `src/config/pictureModels/` als einzige Quelle: id, Name, Vendor, Provider, providerModelId, Kategorie, Capabilities (`text_to_image`, `image_edit`, `object_remove`, `inpaint`, `outpaint`, `upscale`, `face_enhance`, `restore`, `colorize`, `background_remove`, `background_replace`), bestFor, Beschreibung, Badges, Input-/Output-Schema, Presets, unterstützte Scales und Formate, Preismodell, Empfehlungsregeln, `enabled`, `beta`, Übersetzungen. Die UI fragt die Registry ("welche Modelle können upscale?") und baut Karten, Aktionskacheln und Requests daraus — kein React-Sonderfall pro Modell. Die vorhandene Capability-Matrix der Generierungsmodelle wird eingehängt, nicht dupliziert.
+- **Provider-Adapter-Schicht** zwischen Registry und Replicate — die Registry beschreibt Fähigkeiten, Preise und UI, erzeugt aber niemals selbst den Provider-Request:
+
+```text
+Picture Model Registry → Capability / Pricing / UI → Provider Adapter → Replicate API
+```
+
+  `src/lib/pictureModels/adapters/` mit `topazImageUpscale.ts`, `clarityPro.ts`, `topazDustScratch.ts`, `topazColorization.ts`. Ändert ein Anbieter sein Schema, ändert sich genau ein Adapter. "Neues Modell = fast nur ein Registry-Eintrag" bleibt realistisch, ohne starre Universal-API.
 - **Preis-Engine** statt verstreuter Berechnungen: Anbieterkosten → Marge → Endpreis → Guthaben-Äquivalent, mit Einheiten pro Bild, pro Output-Megapixel, pro Lauf, nach Auflösung, Scale oder Modellvariante. Der Inspector ruft nur `estimatePrice(config)`. Topaz rechnet nach Output-Megapixeln, Clarity Pro pro Million Output-Pixel — beides aus der tatsächlichen Zielauflösung. Bestehende Margenregeln (Net-Factor, Margin-Floor) gelten weiter; die konkreten Endpreise lege ich dir vor dem Aktivieren zur Freigabe vor.
-- **Einheitlicher Lauf-Lifecycle** für alle Picture-Läufe: created → credits_reserved → submitted → processing → provider_succeeded → asset_persisted → completed, bzw. provider_failed → credits_refunded. Idempotent, damit ein Anbieterfehler immer automatisch zurückerstattet.
+- **Einheitlicher Lauf-Lifecycle** für alle Picture-Läufe:
+
+```text
+created → credits_reserved → submitted → processing
+        → provider_output_ready → asset_persisting → completed
+
+provider_failed        → credits_refunded
+asset_persist_failed   → Persistenz-Retry; Erstattung erst, wenn das Ergebnis
+                         endgültig nicht mehr wiederherstellbar ist
+```
+
+  Ein erfolgreicher Anbieterlauf mit fehlgeschlagener Speicherung führt also nicht sofort zu einer Erstattung bei gleichzeitig getragenen Anbieterkosten. Alles idempotent, keine Doppelerstattungen.
 - Neue Edge-Function `enhance-image` für die Topaz/Clarity-Modelle über die vorhandene Replicate-Anbindung; die heutige `upscale-image` (Clarity) wird darauf migriert, ihre bisherigen Aufrufer aus Bildkarte und Lightbox bleiben funktionsfähig.
 - Ergebnisse landen wie bisher in der Mediathek; das Studio führt keine eigene Albumverwaltung mehr.
 - Alle neuen Texte in EN/DE/ES.
 
+## Freigaberegel
+
+Kein Anbieter und kein Modell wird im Produktions-UI sichtbar, bevor mindestens ein echter End-to-End-Test inklusive Guthabenabbuchung, Erstattung, Mediathek und Download erfolgreich war. Bis dahin läuft es hinter einem Feature-Flag. Keine schöne Modellkarte ohne fertigen Unterbau.
+
 ## Reihenfolge
 
-1. Navigation Generate/Edit/Enhance/Background, Alben raus, Redirects, Canvas-Grundgerüst mit aktivem Asset und einklappbaren Spalten.
+1. Navigation, aktives Asset mit Lineage, Canvas-Grundgerüst, Redirects.
 2. Batch in Generate integriert, Prompt-Zählung und nummerierte Vorschau.
-3. Modell-Registry + neue Generate-Modellkarten mit Empfehlung.
-4. Reference Images, Brand Kit, Advanced Settings zusammenklappbar.
-5. Enhance-Workspace mit Canvas und Before/After.
-6. Clarity Pro migriert, Topaz Image Upscale angebunden (inkl. Modellwahl und Face Controls).
-7. Topaz Dust & Scratch, danach Topaz Colorization.
-8. Preisvorschau vor dem Lauf, Mediathek-Anbindung.
-9. Compare Models als Premium-Funktion.
+3. Modell-Registry + Provider-Adapter-Architektur + Basis der Preis-Engine.
+4. Generate-Modellkarten mit Empfehlung.
+5. Reference Images, Brand Kit, Advanced Settings zusammenklappbar.
+6. Enhance-Workspace mit Before/After-Canvas.
+7. Clarity Pro sauber migriert.
+8. Topaz Image Upscale hinter Feature-Flag integriert.
+9. Echte Kosten- und Qualitätstests → Endpreise freigeben → Topaz aktivieren.
+10. Compare: Topaz vs. Clarity.
+11. Topaz Dust & Scratch.
+12. Topaz Colorization.
+13. UX-Feinschliff, Telemetrie, bessere Empfehlungen.
 
 ## Nicht angefasst
 
 Video, Lip-Sync, Abo-/Checkout-Logik und bestehende Wallet-Buchungen außerhalb der Bild-Läufe.
-
-## Offen vor Schritt 6
-
-Topaz und Clarity Pro laufen über euren Replicate-Zugang. Bevor ich die Modelle scharf schalte, prüfe ich pro Modell einen günstigsten echten Testlauf und lege dir die Endpreise zur Freigabe vor.
