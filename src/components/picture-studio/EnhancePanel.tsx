@@ -508,7 +508,7 @@ export function EnhancePanel() {
             </Button>
 
             {canCompare && (
-              <Button variant="outline" className="w-full" onClick={handleCompare} disabled={busy}>
+              <Button variant="outline" className="w-full" onClick={() => setCompareConfirmOpen(true)} disabled={busy}>
                 {comparing ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
