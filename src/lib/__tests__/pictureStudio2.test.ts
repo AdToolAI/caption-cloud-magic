@@ -98,6 +98,7 @@ describe('pricing engine', () => {
     expect(est).not.toBeNull();
     expect(est!.outputWidth).toBe(8192);
     expect(est!.sellEUR).toBeGreaterThan(est!.providerCostEUR);
-    expect(est!.costUnverified).toBe(true);
+    // Reconciled against real Replicate billing on 2026-09-05.
+    expect(est!.costUnverified).toBeFalsy();
   });
 });

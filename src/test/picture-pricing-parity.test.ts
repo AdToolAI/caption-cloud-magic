@@ -103,8 +103,8 @@ describe('official provider rate cards (read 2026-09-05)', () => {
     expect(a.contributionEur).toBeGreaterThan(0);
   });
 
-  it('prices the Topaz unit models at $0.08 per unit', () => {
+  it('prices the Topaz unit models at $0.08 per unit (1 unit each, measured 2026-09-05)', () => {
     expect(priceRun('topaz-dust-scratch', {}).providerCostUsdEstimated).toBe(0.08);
-    expect(priceRun('topaz-colorization', {}).providerCostUsdEstimated).toBe(0.16);
+    expect(priceRun('topaz-colorization', {}).providerCostUsdEstimated).toBe(0.08);
   });
 });
