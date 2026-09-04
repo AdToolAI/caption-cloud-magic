@@ -7,9 +7,8 @@
  * shown as "coming soon", but it cannot be executed.
  */
 export const ENABLED_PICTURE_FLAGS: string[] = [
-  'picture.enhance.topaz_upscale',
-  'picture.enhance.topaz_restore',
-  'picture.enhance.topaz_colorize',
+  // Topaz stays on the test allowlist until predicted provider cost has been
+  // confirmed against a real run (rate cards are official, not yet validated).
 ];
 
 export function isFlagEnabled(flag?: string): boolean {
