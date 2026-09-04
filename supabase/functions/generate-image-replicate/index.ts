@@ -475,17 +475,25 @@ serve(async (req) => {
       .from('studio_images')
       .insert({
         user_id: user.id,
-        url: publicUrl,
-        storage_path: storagePath,
+        image_url: publicUrl,
         prompt: prompt.trim(),
         style,
         aspect_ratio: aspectRatio,
+        source: 'generated',
+        metadata_json: { storagePath },
       })
       .select()
       .single();
 
-    if (insertError) {
-      console.warn('[generate-image-replicate] studio_images insert warning:', insertError);
+    if (insertError || !studioImage) {
+      console.error('[generate-image-replicate] studio_images insert failed:', insertError?.message);
+      return new Response(
+        JSON.stringify({
+          error: 'The image could not be saved to your library. You were not charged.',
+          code: 'PERSIST_FAILED',
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Deduct credits AFTER successful generation
