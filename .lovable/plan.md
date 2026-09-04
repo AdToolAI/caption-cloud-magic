@@ -67,7 +67,7 @@ Bleibt eigener Bereich: entfernen, ersetzen, Studio-Hintergrund, transparentes P
 
 ## Reihenfolge
 
-1. Navigation Generate/Edit/Enhance/Background, Alben raus, Redirects.
+1. Navigation Generate/Edit/Enhance/Background, Alben raus, Redirects, Canvas-Grundgerüst mit aktivem Asset und einklappbaren Spalten.
 2. Batch in Generate integriert, Prompt-Zählung und nummerierte Vorschau.
 3. Modell-Registry + neue Generate-Modellkarten mit Empfehlung.
 4. Reference Images, Brand Kit, Advanced Settings zusammenklappbar.
