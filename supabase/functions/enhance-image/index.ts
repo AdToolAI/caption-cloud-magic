@@ -5,7 +5,7 @@ import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import {
   ENHANCE_MODEL_SPECS,
   isModelUnlocked,
-  priceForRun,
+  priceSnapshotForRun,
   type EnhanceModelId,
   type EnhanceRunInput,
 } from "../_shared/picture-enhance-models.ts";
@@ -53,7 +53,7 @@ serve(async (req) => {
     if (!spec) return json({ error: "Unknown model", code: "UNKNOWN_MODEL" }, 400);
     if (!body.imageUrl?.trim()) return json({ error: "imageUrl is required" }, 400);
 
-    if (!isModelUnlocked(spec, (key) => Deno.env.get(key) ?? undefined)) {
+    if (!isModelUnlocked(spec, (key) => Deno.env.get(key) ?? undefined, user.id)) {
       return json(
         {
           error: `${body.modelId} is not unlocked yet. Cost and quality tests are still running.`,
@@ -92,7 +92,9 @@ serve(async (req) => {
 
     const currency = wallet.currency || "EUR";
     const symbol = currency === "USD" ? "$" : "€";
-    const cost = priceForRun(spec, runInput);
+    // Authoritative price — a price sent by the browser is never used.
+    const pricing = priceSnapshotForRun(spec, runInput);
+    const cost = pricing.userPriceEur;
 
     if (wallet.balance_euros < cost) {
       return json(
@@ -116,7 +118,7 @@ serve(async (req) => {
     const outputFormat = String(input.output_format ?? "png");
 
     console.log(
-      `[enhance-image] user=${user.id} model=${spec.id} scale=${scale ?? "-"} cost=${symbol}${cost.toFixed(2)}`,
+      `[enhance-image] user=${user.id} model=${spec.id} scale=${scale ?? "-"} cost=${symbol}${cost.toFixed(2)} mode=${pricing.pricingMode} margin=${(pricing.marginPct * 100).toFixed(1)}%`,
       JSON.stringify({ ...input, image: "<url>" }),
     );
 
@@ -200,6 +202,30 @@ serve(async (req) => {
     });
     if (deductError) console.error("[enhance-image] deduct error:", deductError.message);
 
+    // Freeze the pricing inputs so this run stays explainable after rate,
+    // FX or curve changes.
+    const { error: snapshotError } = await supabaseAdmin.from("picture_enhance_runs").insert({
+      user_id: user.id,
+      model_id: spec.id,
+      studio_image_id: studioImage?.id || null,
+      scale: scale ?? null,
+      currency,
+      pricing_mode: pricing.pricingMode,
+      pricing_version: pricing.pricingVersion,
+      provider_pricing_version: pricing.providerPricingVersion,
+      provider_cost_usd_estimated: pricing.providerCostUsdEstimated,
+      provider_cost_eur_buffered: pricing.providerCostEurBuffered,
+      fx_rate_used: pricing.fxRateUsed,
+      fx_safety_buffer_used: pricing.fxSafetyBufferUsed,
+      multiplier_used: pricing.multiplierUsed,
+      user_price_eur: pricing.userPriceEur,
+      net_revenue_eur: pricing.netRevenueEur,
+      contribution_eur: pricing.contributionEur,
+      margin_pct: pricing.marginPct,
+      status: "completed",
+    });
+    if (snapshotError) console.warn("[enhance-image] pricing snapshot warning:", snapshotError.message);
+
     return json({
       success: true,
       image: {
@@ -212,6 +238,7 @@ serve(async (req) => {
         enhanceModel: input.enhance_model ?? null,
       },
       cost,
+      pricing,
       currency,
       newBalance: newBalance ?? Number(wallet.balance_euros) - cost,
     });
