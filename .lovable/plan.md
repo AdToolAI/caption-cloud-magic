@@ -22,12 +22,12 @@ Das Studio ist zustandsbehaftet: das zuletzt erzeugte oder hochgeladene Bild ble
 - Ein Prompt-Feld mit Umschalter **Single | Batch** oben rechts. Batch zählt korrekt ("12 prompts detected") und zeigt eine aufklappbare nummerierte Vorschau. Der heutige Fehler "0 prompts detected" verschwindet damit.
 - **Start with**-Chips (Product Ad, Portrait, Photorealistic, Social Media, Food, Luxury, Illustration) setzen einen Prompt-Anfang, starten aber nichts.
 - Modellkarten mit dem **Modellnamen zuerst**: Seedream 4, Imagen 4 Ultra, Nano Banana 2 usw., darunter Positionierung, Tempo-/Qualitäts-Badge und Preis pro Bild. Fast/Pro/Ultra bleibt nur noch als Badge.
-- Über den Karten eine Empfehlung "Recommended for your prompt" mit kurzer Begründung — alle Modelle bleiben sichtbar und wählbar.
+- Über den Karten eine Empfehlung "Recommended for your prompt" mit kurzer Begründung und "Use recommendation" — alle Modelle bleiben sichtbar und wählbar. Sie entsteht aus schnellen Regeln und Modell-Metadaten, ausgelöst nach kurzer Tippauspause bzw. beim Verlassen des Feldes — kein KI-Aufruf pro Tastendruck, also keine Zusatzkosten und keine Verzögerung.
 - Danach Style & Format, darunter zusammengeklappt: Reference Images, Brand Kit, Advanced Settings.
 
 ## Edit
 
-"Magic Edit" heißt Edit. Zuerst "What do you want to change?" mit Aktionskacheln — aber ausschließlich Aktionen, die real funktionieren. Was heute angebunden ist, wird angezeigt; Replace/Remove/Inpaint/Expand/Restyle/Face kommen einzeln dazu, sobald sie laufen. Keine Platzhalter-Buttons.
+"Magic Edit" heißt Edit. Zuerst "What do you want to change?" mit Aktionskacheln, die **aus der Capability-Registry** kommen statt fest verdrahtet zu sein: sichtbar ist nur, was ein angebundenes Modell wirklich kann. Kommt später ein Modell mit `object_remove` dazu, erscheint "Remove" automatisch. Keine Platzhalter-Buttons.
 
 ## Enhance (der neue Schwerpunkt)
 
