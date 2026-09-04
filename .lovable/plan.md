@@ -1,47 +1,78 @@
-# Picture Studio: Aufgabe zuerst, Modelle sichtbar
+# Picture Studio 2.0 — Multi-Model Image Workspace
 
-Neue Struktur nach Nutzer-Absicht — mit weiterhin sichtbaren Premium-Modellnamen als USP.
+Ziel: Aufgabe zuerst, Modelle sichtbar. Vier Bereiche, ein Canvas-first Arbeitsplatz, eine zentrale Modell- und Preis-Registry, damit jedes weitere Spitzenmodell später nur noch ein Eintrag ist.
 
-## Neue Hauptnavigation
+## Navigation
 
-Generate · Edit · Enhance · Background · Albums (Albums rückt in die Sekundärnavigation des Studios, nicht mehr gleichrangig)
+Generate · Edit · Enhance · Background. Keine Alben im Studio — Alben bleiben in der Mediathek; jedes Ergebnis wird automatisch dort gesichert ("Saved to Media Library") mit optionalem "Add to Album" über den bestehenden Album-Picker. Alte Links (`?tab=magic-edit`, `?tab=batch`) leiten sauber um.
 
-- "Magic Edit" heißt künftig "Edit".
-- "Batch" verschwindet als Haupttab und wird ein Umschalter **Einzeln / Serie** innerhalb von Generate. Bestehende Links mit `?tab=batch` und `?tab=magic-edit` leiten sauber auf die neuen Ziele um.
+## Layout (2028-Look)
+
+Dreispaltig: links Eingabe (Prompt bzw. Originalbild), Mitte große Canvas mit dem Ergebnis als wichtigstem Element, rechts ein Context-Inspector mit Modell, Einstellungen, Auflösung, Output. Ruhig, wenig Rahmen, weiche Tiefen, feine Glows nur für aktive Auswahl, Microinteractions 150–250 ms, Steuerelemente erscheinen erst, wenn sie relevant sind. Bestehende Design-Tokens, kein Neon.
 
 ## Generate
 
-Reihenfolge im Panel:
-1. Prompt-Feld + Prompt-Helfer, darunter Schnellstarts (Produktanzeige, Porträt, Realistische Szene, Social Post, Food, Luxus, Illustration).
-2. Umschalter Einzeln / Serie. In der Serie: saubere Zeilenzählung mit Live-Anzeige "3 Prompts erkannt" und nummerierter Liste. Der heutige Fehler "0 prompts detected" bei gefülltem Feld wird mitbehoben.
-3. Modellkarten statt reiner Preisboxen: Name, "Am besten für", Tempo, Preis pro Bild — Seedream 4, Imagen 4 Ultra, Nano Banana 2 usw. aus der bestehenden Modell-Registry.
-4. Stil und Format wie bisher.
-5. Referenzbilder und Brand Kit als kompakte, ausklappbare Bereiche statt als optische Schwergewichte.
+- Ein Prompt-Feld mit Umschalter **Single | Batch** oben rechts. Batch zählt korrekt ("12 prompts detected") und zeigt eine aufklappbare nummerierte Vorschau. Der heutige Fehler "0 prompts detected" verschwindet damit.
+- **Start with**-Chips (Product Ad, Portrait, Photorealistic, Social Media, Food, Luxury, Illustration) setzen einen Prompt-Anfang, starten aber nichts.
+- Modellkarten mit dem **Modellnamen zuerst**: Seedream 4, Imagen 4 Ultra, Nano Banana 2 usw., darunter Positionierung, Tempo-/Qualitäts-Badge und Preis pro Bild. Fast/Pro/Ultra bleibt nur noch als Badge.
+- Über den Karten eine Empfehlung "Recommended for your prompt" mit kurzer Begründung — alle Modelle bleiben sichtbar und wählbar.
+- Danach Style & Format, darunter zusammengeklappt: Reference Images, Brand Kit, Advanced Settings.
 
 ## Edit
 
-Erst die Aktion wählen, dann arbeiten: Objekt entfernen, Bereich ersetzen, Inpaint, Bild erweitern, Stil ändern, Gesicht verbessern. Die vorhandene Magic-Edit-Logik wird auf diese Aktionsauswahl gehoben; Aktionen ohne bestehende Backend-Unterstützung erscheinen erst, wenn sie angebunden sind — keine Attrappen.
+"Magic Edit" heißt Edit. Zuerst "What do you want to change?" mit Aktionskacheln — aber ausschließlich Aktionen, die real funktionieren. Was heute angebunden ist, wird angezeigt; Replace/Remove/Inpaint/Expand/Restyle/Face kommen einzeln dazu, sobald sie laufen. Keine Platzhalter-Buttons.
 
-## Enhance (neu)
+## Enhance (der neue Schwerpunkt)
 
-Oben das Ziel: Hochskalieren, Schärfen, Entrauschen, Restaurieren, Gesicht, Text/Produkt.
-Darunter Modellkarten mit klarer Positionierung.
+Drei Aufgaben: **Upscale**, **Restore**, **Colorize**.
 
-Wichtig zum Ist-Stand: angebunden ist heute ausschließlich **Clarity** (2× / 4×, aus der Bildvorschau heraus). **Topaz ist im Produkt nirgends integriert.** Dieser Plan baut Enhance als eigenen Bereich mit Clarity Pro als erster Karte und einem vorbereiteten Platz für Topaz. Die echte Topaz-Anbindung (Provider-Zugang, Preis, Marge, Guthaben-Abbuchung und Rückerstattung) ist ein eigener Schritt, den ich nach deiner Freigabe separat umsetze — sonst würde eine Karte etwas versprechen, was nicht rendert.
+Upscale zeigt zwei Modelle nebeneinander mit klarer Rollenzuweisung:
+- **Topaz Image Upscale** — "Preserve reality": Fotos, Produkte, Gesichter, Text.
+- **Clarity Pro** — "Create detail": KI-Bilder, Landschaften, Artwork.
+
+Topaz-Bedienung: Enhance-Modell mit "Auto (Recommended)" plus sichtbarer Angabe, welches echte Modell läuft (Standard V2, Low Resolution V2, High Fidelity V2, CGI, Text Refine); Faktor 2× / 4× / 6× mit konkreter Ausgabegröße darunter (`2048 × 1365 → 8192 × 5460`); Face Enhancement erscheint bei erkanntem Gesicht mit Strength und (unter Advanced) Creativity.
+
+Clarity-Bedienung: Presets Faithful / Balanced / Ultra Detail plus Advanced-Slider −10…+10, mit dem Hinweis, dass negative Werte das Original bewahren und positive Werte Details erfinden.
+
+Restore: Topaz Dust & Scratch v2 mit optionalem Film Grain (Typ, Stärke, Dichte, Größe unter Advanced).
+Colorize: Topaz Image Colorization mit einem Regler Natural…Vivid.
+
+Vor jedem Lauf ein Output-Block: Zielauflösung und Megapixel, laufendes Modell, geschätzter Preis, geschätzte Dauer.
+
+## Vergleichen und verstehen
+
+- Canvas mit **Before | After**-Schieberegler, Umschaltern Original / Enhanced / Split und Zoom 50 % / 100 % / 200 %; "Hold C to compare" am Desktop, langes Drücken mobil.
+- Ein Smart-Layer nach dem Upload: eine kurze, begründete Empfehlung mit "Apply recommendation" — das empfohlene Modell bleibt namentlich sichtbar.
+- **Compare Models** (Topaz vs. Clarity in einem Lauf, doppelte Kosten, transparent ausgewiesen) kommt als letzter Schritt.
 
 ## Background
 
-Bleibt eigener Bereich mit Hintergrund entfernen/ersetzen, Studio-Hintergrund, transparentes PNG.
-
-## Nicht angefasst
-
-Preise, Guthaben-Logik, Abrechnung, Video- und Lip-Sync-Wege. Alle neuen Texte in EN/DE/ES.
+Bleibt eigener Bereich: entfernen, ersetzen, Studio-Hintergrund, transparentes PNG.
 
 ## Technisch
 
-- `src/pages/PictureStudio.tsx`: Tabs neu, Redirect-Mapping alter `tab`-Parameter.
-- `ImageGenerator.tsx`: Modus-Umschalter, Modellkarten, Quick-Presets, kollabierte Referenz-/Brand-Kit-Blöcke.
-- `BatchGeneratePanel.tsx`: wird in Generate eingebettet, Prompt-Zählung korrigiert.
-- `MagicEditPanel.tsx` → Edit mit vorgeschalteter Aktionsauswahl.
-- Neu: `EnhancePanel.tsx`, das `useImageUpscaler` nutzt und Ziel + Modellkarten zeigt.
-- Neue Strings in `src/lib/translations*` in allen drei Sprachen.
+- **Modell-Registry** `src/config/pictureModels/` mit den Gruppen generation / enhancement / editing. Pro Modell: Name, Anbieter, Replicate-Model-ID, Fähigkeiten, Input-Schema, Preis, Marge, Empfehlungsregeln, Badges, `enabled`, `beta`. UI-Karten und Requestbau werden daraus erzeugt — kein React-Sonderfall pro Modell. Die vorhandene Capability-Matrix für die Generierungsmodelle wird eingehängt, nicht dupliziert.
+- **Preis-Registry** statt if-Ketten: Anbieterkosten, Aufschlag, Endpreis, Abrechnungseinheit, Megapixel-Stufen und Mindestpreis. Topaz rechnet nach Output-Megapixeln, Clarity Pro pro Million Output-Pixel — der Preis wird vor dem Lauf aus der tatsächlichen Zielauflösung berechnet. Bestehende Margenregeln (Net-Factor, Margin-Floor) bleiben gültig; die konkreten Endpreise lege ich dir vor dem Aktivieren zur Freigabe vor.
+- **Einheitlicher Lauf-Lifecycle** für alle Picture-Läufe: created → credits_reserved → provider_started → provider_succeeded → asset_saved → completed, bzw. provider_failed → credits_refunded. Idempotent, damit ein Anbieterfehler immer automatisch zurückerstattet.
+- Neue Edge-Function `enhance-image` für die Topaz/Clarity-Modelle über die vorhandene Replicate-Anbindung; die heutige `upscale-image` (Clarity) wird darauf migriert, ihre bisherigen Aufrufer aus Bildkarte und Lightbox bleiben funktionsfähig.
+- Alle neuen Texte in EN/DE/ES.
+
+## Reihenfolge
+
+1. Navigation Generate/Edit/Enhance/Background, Alben raus, Redirects.
+2. Batch in Generate integriert, Prompt-Zählung und nummerierte Vorschau.
+3. Modell-Registry + neue Generate-Modellkarten mit Empfehlung.
+4. Reference Images, Brand Kit, Advanced Settings zusammenklappbar.
+5. Enhance-Workspace mit Canvas und Before/After.
+6. Clarity Pro migriert, Topaz Image Upscale angebunden (inkl. Modellwahl und Face Controls).
+7. Topaz Dust & Scratch, danach Topaz Colorization.
+8. Preisvorschau vor dem Lauf, Mediathek-Anbindung.
+9. Compare Models als Premium-Funktion.
+
+## Nicht angefasst
+
+Video, Lip-Sync, Abo-/Checkout-Logik und bestehende Wallet-Buchungen außerhalb der Bild-Läufe.
+
+## Offen vor Schritt 6
+
+Topaz und Clarity Pro laufen über euren Replicate-Zugang. Bevor ich die Modelle scharf schalte, prüfe ich pro Modell einen günstigsten echten Testlauf und lege dir die Endpreise zur Freigabe vor.
