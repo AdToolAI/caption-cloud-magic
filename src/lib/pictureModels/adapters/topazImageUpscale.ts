@@ -1,22 +1,58 @@
 import { getPictureModel } from '@/config/pictureModels';
-import type { EnhanceRunConfig, ProviderAdapter } from './types';
+import { bool, num, str, type EnhanceRunConfig, type ProviderAdapter } from './types';
 
 const MODEL_ID = 'topaz-image-upscale';
-const ENHANCE_MODELS = [
+
+export const TOPAZ_ENHANCE_MODELS = [
   'Standard V2',
-  'High Fidelity V2',
   'Low Resolution V2',
   'CGI',
+  'High Fidelity V2',
   'Text Refine',
 ] as const;
 
-function resolveEnhanceModel(config: EnhanceRunConfig): string {
+export type TopazEnhanceModel = (typeof TOPAZ_ENHANCE_MODELS)[number];
+
+const SUBJECT_DETECTION = ['None', 'All', 'Foreground', 'Background'] as const;
+const FORMATS = ['png', 'jpg'] as const;
+
+export interface AutoModelHints {
+  inputWidth?: number;
+  inputHeight?: number;
+  /** Image is mostly text/screenshot. */
+  hasText?: boolean;
+  hasFaces?: boolean;
+  isIllustration?: boolean;
+}
+
+/**
+ * Auto never hides its choice — the UI shows "Selected: High Fidelity V2".
+ * Pure heuristic, no AI call per keystroke.
+ */
+export function autoEnhanceModel(hints: AutoModelHints): TopazEnhanceModel {
+  if (hints.hasText) return 'Text Refine';
+  if (hints.isIllustration) return 'CGI';
+  const pixels = (hints.inputWidth ?? 0) * (hints.inputHeight ?? 0);
+  if (pixels > 0 && pixels < 640 * 640) return 'Low Resolution V2';
+  if (hints.hasFaces) return 'High Fidelity V2';
+  return 'Standard V2';
+}
+
+function resolveValues(config: EnhanceRunConfig): Record<string, unknown> {
   const model = getPictureModel(MODEL_ID);
-  const preset = model?.presets?.find((p) => p.id === (config.presetId ?? 'auto'));
-  const value = preset?.values?.enhanceModel;
-  return typeof value === 'string' && (ENHANCE_MODELS as readonly string[]).includes(value)
-    ? value
-    : 'Standard V2';
+  const preset = model?.presets?.find((p) => p.id === config.presetId);
+  return { ...(preset?.values ?? {}), ...(config.values ?? {}) };
+}
+
+export function resolveTopazEnhanceModel(config: EnhanceRunConfig): TopazEnhanceModel {
+  const values = resolveValues(config);
+  const raw = str(values, 'enhanceModel', 'auto');
+  if ((TOPAZ_ENHANCE_MODELS as readonly string[]).includes(raw)) return raw as TopazEnhanceModel;
+  return autoEnhanceModel({
+    inputWidth: config.inputWidth,
+    inputHeight: config.inputHeight,
+    hasFaces: bool(values, 'faceEnhancement', false),
+  });
 }
 
 export const topazImageUpscaleAdapter: ProviderAdapter = {
@@ -33,23 +69,19 @@ export const topazImageUpscaleAdapter: ProviderAdapter = {
   },
 
   buildInput(config) {
+    const values = resolveValues(config);
     const input: Record<string, unknown> = {
       image: config.imageUrl,
-      enhance_model: resolveEnhanceModel(config),
+      enhance_model: resolveTopazEnhanceModel(config),
       upscale_factor: `${config.scale ?? 2}x`,
-      output_format: 'png',
+      subject_detection: str(values, 'subjectDetection', 'None', SUBJECT_DETECTION),
+      output_format: str(values, 'outputFormat', 'png', FORMATS),
+      face_enhancement: bool(values, 'faceEnhancement', false),
     };
-    if (config.faceEnhancement) {
-      input.face_enhancement = true;
-      input.face_enhancement_strength = clamp01(config.faceEnhancementStrength ?? 0.5);
-      input.face_enhancement_creativity = clamp01(config.creativity ?? 0);
+    if (input.face_enhancement) {
+      input.face_enhancement_strength = num(values, 'faceEnhancementStrength', 0.8, 0, 1);
+      input.face_enhancement_creativity = num(values, 'faceEnhancementCreativity', 0, 0, 1);
     }
     return input;
   },
 };
-
-function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, value));
-}
-
-export { ENHANCE_MODELS as TOPAZ_ENHANCE_MODELS };
