@@ -1,7 +1,14 @@
 import { getPictureModel } from '@/config/pictureModels';
-import type { EnhanceRunConfig, ProviderAdapter } from './types';
+import { num, str, type EnhanceRunConfig, type ProviderAdapter } from './types';
 
 const MODEL_ID = 'topaz-colorization';
+const FORMATS = ['png', 'jpg'] as const;
+
+function resolveValues(config: EnhanceRunConfig): Record<string, unknown> {
+  const model = getPictureModel(MODEL_ID);
+  const preset = model?.presets?.find((p) => p.id === config.presetId);
+  return { ...(preset?.values ?? {}), ...(config.values ?? {}) };
+}
 
 export const topazColorizationAdapter: ProviderAdapter = {
   modelId: MODEL_ID,
@@ -13,11 +20,11 @@ export const topazColorizationAdapter: ProviderAdapter = {
   },
 
   buildInput(config) {
+    const values = resolveValues(config);
     return {
       image: config.imageUrl,
-      // Natural (0) .. Vivid (1)
-      saturation: Math.min(1, Math.max(0, config.vividness ?? 0.5)),
-      output_format: 'png',
+      saturation: num(values, 'saturation', 0.2, 0, 1),
+      output_format: str(values, 'outputFormat', 'png', FORMATS),
     };
   },
 };

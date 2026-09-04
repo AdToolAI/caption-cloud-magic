@@ -1,11 +1,32 @@
-import type { PictureModelDefinition } from './types';
+import type { ControlOption, PictureModelControl, PictureModelDefinition } from './types';
 
 /**
  * Enhance models (Upscale / Restore / Colorize).
  *
- * Topaz entries stay `enabled: false` until the real cost + quality test run
- * passed and the final prices were approved.
+ * Every control below was verified against the live Replicate input schema of
+ * the model (parameter name, type, enum values, min/max, default). Topaz entries
+ * stay `enabled: false` until the real cost + quality test run passed and the
+ * final prices were approved.
  */
+
+const t = (en: string, de: string, es: string) => ({ en, de, es });
+
+const FORMAT_CONTROL = (
+  options: string[],
+  fallback: string,
+): PictureModelControl => ({
+  key: 'outputFormat',
+  type: 'select',
+  label: t('Output format', 'Ausgabeformat', 'Formato de salida'),
+  advanced: true,
+  default: fallback,
+  options: options.map((value) => ({ value, label: t(value.toUpperCase(), value.toUpperCase(), value.toUpperCase()) })),
+});
+
+const TILING_OPTIONS: ControlOption[] = [16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256].map(
+  (value) => ({ value, label: t(String(value), String(value), String(value)) }),
+);
+
 export const ENHANCE_MODELS: PictureModelDefinition[] = [
   {
     id: 'clarity-pro',
@@ -17,33 +38,140 @@ export const ENHANCE_MODELS: PictureModelDefinition[] = [
     category: 'enhance',
     capabilities: ['upscale'],
     bestFor: [
-      { en: 'AI images', de: 'KI-Bilder', es: 'Imágenes de IA' },
-      { en: 'Artwork', de: 'Artwork', es: 'Arte' },
-      { en: 'Landscapes', de: 'Landschaften', es: 'Paisajes' },
+      t('AI images', 'KI-Bilder', 'Imágenes de IA'),
+      t('Artwork', 'Artwork', 'Arte'),
+      t('Landscapes', 'Landschaften', 'Paisajes'),
     ],
-    description: {
-      en: 'Create detail — invents plausible texture where the original has none.',
-      de: 'Detail erzeugen — erfindet plausible Textur, wo das Original keine hat.',
-      es: 'Crear detalle: inventa textura plausible donde el original no la tiene.',
-    },
-    badges: [{ en: 'Create detail', de: 'Detail erzeugen', es: 'Crear detalle' }],
+    description: t(
+      'Create detail — invents plausible texture where the original has none.',
+      'Detail erzeugen — erfindet plausible Textur, wo das Original keine hat.',
+      'Crear detalle: inventa textura plausible donde el original no la tiene.',
+    ),
+    badges: [t('Create detail', 'Detail erzeugen', 'Crear detalle')],
     supportedScales: [2, 4],
     presets: [
       {
         id: 'faithful',
-        label: { en: 'Faithful', de: 'Originalgetreu', es: 'Fiel' },
-        values: { creativity: -6 },
+        label: t('Faithful', 'Originalgetreu', 'Fiel'),
+        hint: t('Closest to the original', 'Am nächsten am Original', 'Lo más fiel al original'),
+        values: { creativity: 0.2, resemblance: 1.1, dynamic: 4, sharpen: 0 },
       },
       {
         id: 'balanced',
-        label: { en: 'Balanced', de: 'Ausgewogen', es: 'Equilibrado' },
-        values: { creativity: 0 },
+        label: t('Balanced', 'Ausgewogen', 'Equilibrado'),
+        values: { creativity: 0.35, resemblance: 0.6, dynamic: 6, sharpen: 0 },
       },
       {
         id: 'ultra-detail',
-        label: { en: 'Ultra Detail', de: 'Ultra-Detail', es: 'Ultra detalle' },
-        values: { creativity: 7 },
+        label: t('Ultra Detail', 'Ultra-Detail', 'Ultra detalle'),
+        hint: t('Maximum invented detail', 'Maximal erfundenes Detail', 'Máximo detalle inventado'),
+        values: { creativity: 0.6, resemblance: 0.35, dynamic: 9, sharpen: 1 },
       },
+    ],
+    controls: [
+      {
+        key: 'creativity',
+        type: 'slider',
+        label: t('Detail creativity', 'Detail-Kreativität', 'Creatividad del detalle'),
+        help: t(
+          'How much new texture the model may invent.',
+          'Wie viel neue Textur das Modell erfinden darf.',
+          'Cuánta textura nueva puede inventar el modelo.',
+        ),
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.35,
+      },
+      {
+        key: 'resemblance',
+        type: 'slider',
+        label: t('Resemblance to original', 'Ähnlichkeit zum Original', 'Parecido al original'),
+        min: 0,
+        max: 3,
+        step: 0.05,
+        default: 0.6,
+      },
+      {
+        key: 'dynamic',
+        type: 'slider',
+        label: t('HDR / dynamic range', 'HDR / Dynamik', 'HDR / rango dinámico'),
+        min: 1,
+        max: 50,
+        step: 1,
+        default: 6,
+      },
+      {
+        key: 'sharpen',
+        type: 'slider',
+        label: t('Sharpen', 'Schärfen', 'Enfoque'),
+        min: 0,
+        max: 10,
+        step: 0.5,
+        default: 0,
+        advanced: true,
+      },
+      {
+        key: 'numInferenceSteps',
+        type: 'slider',
+        label: t('Detail steps', 'Detailschritte', 'Pasos de detalle'),
+        min: 1,
+        max: 100,
+        step: 1,
+        default: 18,
+        advanced: true,
+      },
+      {
+        key: 'prompt',
+        type: 'text',
+        label: t('Guidance prompt', 'Führungs-Prompt', 'Prompt de guía'),
+        advanced: true,
+        default: '',
+      },
+      {
+        key: 'negativePrompt',
+        type: 'text',
+        label: t('Negative prompt', 'Negativ-Prompt', 'Prompt negativo'),
+        help: t('e.g. no extra objects', 'z. B. keine zusätzlichen Objekte', 'p. ej. sin objetos extra'),
+        advanced: true,
+        default: '',
+      },
+      {
+        key: 'handfix',
+        type: 'select',
+        label: t('Hand correction', 'Handkorrektur', 'Corrección de manos'),
+        advanced: true,
+        default: 'disabled',
+        options: [
+          { value: 'disabled', label: t('Off', 'Aus', 'Desactivado') },
+          { value: 'hands_only', label: t('Hands only', 'Nur Hände', 'Solo manos') },
+          { value: 'image_and_hands', label: t('Image and hands', 'Bild und Hände', 'Imagen y manos') },
+        ],
+      },
+      {
+        key: 'tilingWidth',
+        type: 'select',
+        label: t('Tile width', 'Kachelbreite', 'Ancho de mosaico'),
+        advanced: true,
+        default: 112,
+        options: TILING_OPTIONS,
+      },
+      {
+        key: 'tilingHeight',
+        type: 'select',
+        label: t('Tile height', 'Kachelhöhe', 'Alto de mosaico'),
+        advanced: true,
+        default: 144,
+        options: TILING_OPTIONS,
+      },
+      {
+        key: 'seed',
+        type: 'number',
+        label: t('Seed', 'Startwert (Seed)', 'Semilla'),
+        advanced: true,
+        default: 1337,
+      },
+      FORMAT_CONTROL(['png', 'jpg', 'webp'], 'png'),
     ],
     pricing: {
       unit: 'per_run',
@@ -63,29 +191,94 @@ export const ENHANCE_MODELS: PictureModelDefinition[] = [
     category: 'enhance',
     capabilities: ['upscale', 'face_enhance'],
     bestFor: [
-      { en: 'Photography', de: 'Fotografie', es: 'Fotografía' },
-      { en: 'Products', de: 'Produkte', es: 'Productos' },
-      { en: 'Faces', de: 'Gesichter', es: 'Rostros' },
-      { en: 'Text', de: 'Text', es: 'Texto' },
+      t('Photography', 'Fotografie', 'Fotografía'),
+      t('Products', 'Produkte', 'Productos'),
+      t('Faces', 'Gesichter', 'Rostros'),
+      t('Text', 'Text', 'Texto'),
     ],
-    description: {
-      en: 'Preserve reality — keeps the original truthful while adding resolution.',
-      de: 'Realität bewahren — bleibt dem Original treu und gewinnt Auflösung.',
-      es: 'Preservar la realidad: fiel al original y con más resolución.',
-    },
-    badges: [{ en: 'Preserve reality', de: 'Realität bewahren', es: 'Preservar la realidad' }],
+    description: t(
+      'Preserve reality — keeps the original truthful while adding resolution.',
+      'Realität bewahren — bleibt dem Original treu und gewinnt Auflösung.',
+      'Preservar la realidad: fiel al original y con más resolución.',
+    ),
+    badges: [t('Preserve reality', 'Realität bewahren', 'Preservar la realidad')],
     supportedScales: [2, 4, 6],
     presets: [
       {
         id: 'auto',
-        label: { en: 'Auto (Recommended)', de: 'Auto (empfohlen)', es: 'Auto (recomendado)' },
-        values: { enhanceModel: 'Standard V2' },
+        label: t('Auto (Recommended)', 'Auto (empfohlen)', 'Auto (recomendado)'),
+        values: { enhanceModel: 'auto' },
       },
-      { id: 'standard-v2', label: { en: 'Standard V2', de: 'Standard V2', es: 'Standard V2' }, values: { enhanceModel: 'Standard V2' } },
-      { id: 'high-fidelity-v2', label: { en: 'High Fidelity V2', de: 'High Fidelity V2', es: 'High Fidelity V2' }, values: { enhanceModel: 'High Fidelity V2' } },
-      { id: 'low-resolution-v2', label: { en: 'Low Resolution V2', de: 'Low Resolution V2', es: 'Low Resolution V2' }, values: { enhanceModel: 'Low Resolution V2' } },
-      { id: 'cgi', label: { en: 'CGI', de: 'CGI', es: 'CGI' }, values: { enhanceModel: 'CGI' } },
-      { id: 'text-refine', label: { en: 'Text Refine', de: 'Text Refine', es: 'Text Refine' }, values: { enhanceModel: 'Text Refine' } },
+      { id: 'standard-v2', label: t('Standard V2', 'Standard V2', 'Standard V2'), values: { enhanceModel: 'Standard V2' } },
+      {
+        id: 'high-fidelity-v2',
+        label: t('High Fidelity V2', 'High Fidelity V2', 'High Fidelity V2'),
+        values: { enhanceModel: 'High Fidelity V2' },
+      },
+      {
+        id: 'low-resolution-v2',
+        label: t('Low Resolution V2', 'Low Resolution V2', 'Low Resolution V2'),
+        values: { enhanceModel: 'Low Resolution V2' },
+      },
+      { id: 'cgi', label: t('CGI', 'CGI', 'CGI'), values: { enhanceModel: 'CGI' } },
+      { id: 'text-refine', label: t('Text Refine', 'Text Refine', 'Text Refine'), values: { enhanceModel: 'Text Refine' } },
+    ],
+    controls: [
+      {
+        key: 'enhanceModel',
+        type: 'select',
+        label: t('Enhance model', 'Enhance-Modell', 'Modelo de mejora'),
+        default: 'auto',
+        options: [
+          { value: 'auto', label: t('Auto', 'Auto', 'Auto') },
+          { value: 'Standard V2', label: t('Standard V2', 'Standard V2', 'Standard V2') },
+          { value: 'High Fidelity V2', label: t('High Fidelity V2', 'High Fidelity V2', 'High Fidelity V2') },
+          { value: 'Low Resolution V2', label: t('Low Resolution V2', 'Low Resolution V2', 'Low Resolution V2') },
+          { value: 'CGI', label: t('CGI', 'CGI', 'CGI') },
+          { value: 'Text Refine', label: t('Text Refine', 'Text Refine', 'Text Refine') },
+        ],
+      },
+      {
+        key: 'faceEnhancement',
+        type: 'toggle',
+        label: t('Face enhancement', 'Gesichts-Verbesserung', 'Mejora de rostros'),
+        default: false,
+      },
+      {
+        key: 'faceEnhancementStrength',
+        type: 'slider',
+        label: t('Face strength', 'Gesichts-Stärke', 'Intensidad de rostro'),
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.8,
+        showIf: { key: 'faceEnhancement', equals: true },
+      },
+      {
+        key: 'faceEnhancementCreativity',
+        type: 'slider',
+        label: t('Face creativity', 'Gesichts-Kreativität', 'Creatividad de rostro'),
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0,
+        advanced: true,
+        showIf: { key: 'faceEnhancement', equals: true },
+      },
+      {
+        key: 'subjectDetection',
+        type: 'select',
+        label: t('Subject detection', 'Motiv-Erkennung', 'Detección de sujeto'),
+        advanced: true,
+        default: 'None',
+        options: [
+          { value: 'None', label: t('None', 'Keine', 'Ninguna') },
+          { value: 'All', label: t('All', 'Alles', 'Todo') },
+          { value: 'Foreground', label: t('Foreground', 'Vordergrund', 'Primer plano') },
+          { value: 'Background', label: t('Background', 'Hintergrund', 'Fondo') },
+        ],
+      },
+      FORMAT_CONTROL(['png', 'jpg'], 'png'),
     ],
     pricing: {
       unit: 'per_output_megapixel',
@@ -102,18 +295,69 @@ export const ENHANCE_MODELS: PictureModelDefinition[] = [
     name: 'Topaz Dust & Scratch v2',
     vendor: 'Topaz Labs',
     provider: 'replicate',
-    providerModelId: 'topazlabs/dust-scratch',
+    providerModelId: 'topazlabs/dust-and-scratch-v2',
     category: 'enhance',
     capabilities: ['restore'],
-    bestFor: [
-      { en: 'Old photos', de: 'Alte Fotos', es: 'Fotos antiguas' },
-      { en: 'Scans', de: 'Scans', es: 'Escaneos' },
+    bestFor: [t('Old photos', 'Alte Fotos', 'Fotos antiguas'), t('Scans', 'Scans', 'Escaneos')],
+    description: t(
+      'Removes dust, scratches and scan damage from old photographs.',
+      'Entfernt Staub, Kratzer und Scanschäden aus alten Fotografien.',
+      'Elimina polvo, arañazos y daños de escaneo de fotos antiguas.',
+    ),
+    badges: [t('Restore', 'Restaurieren', 'Restaurar')],
+    controls: [
+      {
+        key: 'filmGrain',
+        type: 'toggle',
+        label: t('Keep film grain', 'Filmkorn beibehalten', 'Mantener grano'),
+        default: false,
+      },
+      {
+        key: 'grainModel',
+        type: 'select',
+        label: t('Grain type', 'Kornart', 'Tipo de grano'),
+        default: 'silver rich',
+        showIf: { key: 'filmGrain', equals: true },
+        options: [
+          { value: 'silver rich', label: t('Silver rich', 'Silberreich', 'Rico en plata') },
+          { value: 'gaussian', label: t('Gaussian', 'Gauß', 'Gaussiano') },
+          { value: 'grey', label: t('Grey', 'Grau', 'Gris') },
+        ],
+      },
+      {
+        key: 'grainStrength',
+        type: 'slider',
+        label: t('Grain strength', 'Kornstärke', 'Intensidad del grano'),
+        min: 0,
+        max: 60,
+        step: 1,
+        default: 30,
+        showIf: { key: 'filmGrain', equals: true },
+      },
+      {
+        key: 'grainDensity',
+        type: 'slider',
+        label: t('Grain density', 'Korndichte', 'Densidad del grano'),
+        min: 0,
+        max: 60,
+        step: 1,
+        default: 30,
+        advanced: true,
+        showIf: { key: 'filmGrain', equals: true },
+      },
+      {
+        key: 'grainSize',
+        type: 'slider',
+        label: t('Grain size', 'Korngröße', 'Tamaño del grano'),
+        min: 1,
+        max: 5,
+        step: 1,
+        default: 1,
+        advanced: true,
+        showIf: { key: 'filmGrain', equals: true },
+      },
+      FORMAT_CONTROL(['png', 'jpg'], 'png'),
     ],
-    description: {
-      en: 'Removes dust, scratches and scan damage from old photographs.',
-      de: 'Entfernt Staub, Kratzer und Scanschäden aus alten Fotografien.',
-      es: 'Elimina polvo, arañazos y daños de escaneo de fotos antiguas.',
-    },
     pricing: { unit: 'per_run', providerCostEUR: 0.02, costUnverified: true },
     typicalProcessingSeconds: [15, 40],
     enabled: false,
@@ -129,14 +373,32 @@ export const ENHANCE_MODELS: PictureModelDefinition[] = [
     category: 'enhance',
     capabilities: ['colorize'],
     bestFor: [
-      { en: 'Black & white photos', de: 'Schwarz-Weiß-Fotos', es: 'Fotos en blanco y negro' },
-      { en: 'Archive material', de: 'Archivmaterial', es: 'Material de archivo' },
+      t('Black & white photos', 'Schwarz-Weiß-Fotos', 'Fotos en blanco y negro'),
+      t('Archive material', 'Archivmaterial', 'Material de archivo'),
     ],
-    description: {
-      en: 'Colorizes black & white photographs, from natural to vivid.',
-      de: 'Koloriert Schwarz-Weiß-Fotos, von natürlich bis kräftig.',
-      es: 'Colorea fotos en blanco y negro, de natural a vívido.',
-    },
+    description: t(
+      'Colorizes black & white photographs, from natural to vivid.',
+      'Koloriert Schwarz-Weiß-Fotos, von natürlich bis kräftig.',
+      'Colorea fotos en blanco y negro, de natural a vívido.',
+    ),
+    badges: [t('Colorize', 'Kolorieren', 'Colorear')],
+    presets: [
+      { id: 'natural', label: t('Natural', 'Natürlich', 'Natural'), values: { saturation: 0.15 } },
+      { id: 'balanced', label: t('Balanced', 'Ausgewogen', 'Equilibrado'), values: { saturation: 0.35 } },
+      { id: 'vivid', label: t('Vivid', 'Kräftig', 'Vívido'), values: { saturation: 0.7 } },
+    ],
+    controls: [
+      {
+        key: 'saturation',
+        type: 'slider',
+        label: t('Saturation', 'Sättigung', 'Saturación'),
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.2,
+      },
+      FORMAT_CONTROL(['png', 'jpg'], 'png'),
+    ],
     pricing: { unit: 'per_run', providerCostEUR: 0.02, costUnverified: true },
     typicalProcessingSeconds: [15, 40],
     enabled: false,
