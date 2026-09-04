@@ -185,7 +185,7 @@ export const ENHANCE_MODEL_SPECS: Record<EnhanceModelId, EnhanceModelSpec> = {
   'topaz-colorization': {
     id: 'topaz-colorization',
     providerModelId: 'topazlabs/image-colorization',
-    pricing: { unit: 'per_run', providerCostEUR: 0.148 },
+    pricing: { unit: 'per_run', providerCostEUR: 0.074 },
     requiresFlag: 'PICTURE_TOPAZ_COLORIZE_ENABLED',
     buildInput(config) {
       const v = config.values;
