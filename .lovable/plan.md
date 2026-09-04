@@ -5,55 +5,89 @@
 Nein, noch nicht einsatzbereit. Die Oberfläche ist fertig (Upscale · Restaurieren · Kolorieren, echte Modellnamen, alle Regler, Preisvorschau, Vorher/Nachher, Vergleich), aber:
 
 - Die neue Verbesserungs-Funktion im Backend ist geschrieben und noch nicht ausgerollt.
-- Clarity Pro läuft im Studio weiterhin über den alten Weg (0,03 € / 0,06 €) — funktioniert, nutzt die neuen Regler aber noch nicht.
-- Alle drei Topaz-Modelle sind absichtlich gesperrt ("bald verfügbar"), vorne und im Backend, bis echte Testläufe und deine Preisfreigabe vorliegen.
+- Clarity Pro läuft im Studio weiterhin über den alten Weg (0,03 € / 0,06 €).
+- Alle drei Topaz-Modelle sind gesperrt ("bald verfügbar"), vorne und im Backend, bis echte Testläufe und deine Preisfreigabe vorliegen.
 
-## Degressive Margen-Engine (neu, ersetzt die starre 1,75×-Regel)
+## Degressive Margen-Engine (ersetzt die starre 1,75×-Regel)
 
-Preisformel pro Lauf:
+Preisformel pro Lauf — Mindestdeckungsbeitrag korrekt **vor** dem Payment-Abzug hochgerechnet:
 
 ```text
-Endpreis = max( Mindestpreis, Mindestdeckungsbeitrag + Providerkosten, Providerkosten × Multiplikator(Providerkosten) )
+Endpreis = ceilCent( max(
+    MIN_PRICE,
+    (providerCost + MIN_CONTRIBUTION) / NET_FACTOR,
+    providerCost × multiplier(providerCost)
+) )
 ```
 
-Multiplikator sinkt stufenlos mit den Providerkosten:
+mit `NET_FACTOR = 0.90`, `MIN_CONTRIBUTION = 0.02 €`, `MIN_PRICE = 0.03 €`.
 
-| Providerkosten pro Lauf | Multiplikator |
+Multiplikator-Stützpunkte (linear interpoliert, eindeutig bis über 5 €):
+
+| Providerkosten | Multiplikator |
 | --- | --- |
-| bis 0,05 € | 3,0× |
-| 0,05 – 0,30 € | 3,0× → 2,7× |
-| 0,30 – 1,00 € | 2,7× → 2,3× |
-| 1,00 – 3,00 € | 2,3× → 2,0× |
-| ab 3,00 € | 1,8× |
+| 0,00 € | 3,00 |
+| 0,05 € | 3,00 |
+| 0,30 € | 2,70 |
+| 1,00 € | 2,30 |
+| 3,00 € | 2,00 |
+| 5,00 € | 1,80 |
+| > 5,00 € | 1,80 (konstant) |
 
-Zwischen den Stützpunkten wird linear interpoliert, damit es keine Preissprünge gibt.
+Margen-Kennzahlen immer auf Nettoumsatz:
 
-Zusätzlich:
+```text
+Net Revenue    = Endpreis × 0.90
+Contribution € = Net Revenue − Provider Cost
+Gross Margin % = Contribution / Net Revenue
+```
 
-- Mindestdeckungsbeitrag 0,02 € pro Lauf (deckt Payment, Storage, Infrastruktur bei sehr billigen Läufen).
-- Mindestpreis 0,03 € pro Lauf.
-- Payment-Abzug bleibt 10 % (Nettobetrachtung).
-- Ziel-Bruttomarge 55–65 % nach Providerkosten wird berechnet und ist die Kennzahl, die im Admin-Preisreport steht — nicht der Multiplikator.
-- Ergebnis wird auf volle Cent aufgerundet.
+Ziel: 55–65 % Bruttomarge nach Providerkosten — das ist der KPI, nicht der Multiplikator.
 
-Bestandsschutz: Clarity Pro behält seine Festpreise 0,03 € / 0,06 €. Die Video- und Wallet-Preise bleiben unangetastet; die Degression gilt zunächst nur für Picture Studio.
+## Wechselkurs-Schutz
+
+Providerkosten werden zentral in USD geführt und abgesichert umgerechnet, bevor die Margen-Engine greift:
+
+```text
+providerCostEur = providerCostUsd × fxRate × (1 + fxSafetyBuffer)
+```
+
+`fxSafetyBuffer` startet bei 3 %; `fxRate` liegt als eine gepflegte Konstante zentral (kein Live-Kurs pro Anfrage). Registry führt je Modell `providerCostUsd` statt eines heute umgerechneten Eurobetrags.
+
+## Clarity-Bestandsschutz als sichtbare Ausnahme
+
+0,03 € / 0,06 € bleiben. Im Preisreport werden sie als `Pricing mode: Legacy Fixed Price` markiert und trotzdem mit Provider Cost, User Price, Net Revenue, Contribution € und Effective Margin % ausgewiesen — so fällt sofort auf, wenn der Festpreis durch Kostenänderungen unwirtschaftlich wird.
+
+## Server entscheidet, Client zeigt nur an
+
+```text
+Client-Schätzung → Enhance-Anfrage → Server berechnet den verbindlichen Preis
+→ Credits reserviert → Replicate-Aufruf
+```
+
+Ein vom Browser gesendeter Preis wird nie zur Grundlage der Abbuchung. Client und Server laufen in Tests durch dieselben Fixtures (Providerkosten 0,01 / 0,05 / 0,10 / 0,30 / 0,50 / 1 / 3 / 5 €) und müssen exakt dieselben Endpreise liefern.
+
+## Freischaltung dreistufig
+
+- Frontend-Registry-Flag (`picture.enhance.topaz_*`) — nur Sichtbarkeit.
+- Backend-Schalter (`PICTURE_TOPAZ_*_ENABLED`) — maßgeblich; ohne ihn startet kein Lauf, auch bei manipuliertem Frontend.
+- Test-Allowlist (`PICTURE_ENHANCE_TEST_USER_IDS`) — dein Konto kann echte Läufe ausführen, während das Feature global aus bleibt.
 
 ## Reihenfolge
 
-1. Preis-Engine auf die degressive Kurve umstellen (`estimatePrice`), inklusive Server-Spiegel für die Verbesserungs-Funktion; Tests für Kurve, Mindestbetrag, Marge und unveränderte Clarity-Preise.
-2. Backend-Funktion ausrollen und Clarity Pro darüber laufen lassen — Preise bleiben exakt 0,03 € / 0,06 €.
-3. Ein echter Clarity-Durchlauf zur Kontrolle: Abbuchung, Ergebnis in der Mediathek, Download, Rückerstattung im Fehlerfall.
-4. Topaz Image Upscale nur für dein Konto freischalten und je einen günstigsten echten Testlauf starten (2×, Gesichts-Verbesserung an/aus).
-5. Dasselbe für Dust & Scratch (Restaurieren) und Colorization (Kolorieren) mit je einem Testbild.
-6. Kurze Tabelle für dich: tatsächliche Anbieterkosten, Dauer, Qualitätseindruck, resultierender Preis aus der Kurve, Bruttomarge — mit meinem Vorschlag.
-7. Nach deiner Freigabe: Topaz für alle Kunden freischalten, danach "Topaz vs. Clarity vergleichen" aktivieren.
+1. Margen-Engine bauen (Kurve, Floor-Formel, FX-Puffer, Net-Revenue-Kennzahlen) plus geteilte Fixture-Tests Client/Server.
+2. `enhance-image` ausrollen; Clarity darüber laufen lassen, Preise unverändert. `upscale-image` bleibt aktiv.
+3. Voller E2E-Erfolgspfad: Run angelegt → Preis serverseitig → Credits reserviert → Replicate ok → Asset persistiert → in der Mediathek sichtbar → Download → korrekter Run-Status.
+4. Fehlerpfad testen: Provider-Fehler → genau eine Erstattung, kein Doppelrefund bei Retry oder Webhook.
+5. Erst danach `upscale-image` ablösen und `ImageCard`/`StudioLightbox` umstellen.
+6. Topaz Upscale nur über die Allowlist: je ein günstigster echter Testlauf (2×, Gesichts-Verbesserung an/aus); danach Dust & Scratch und Colorization mit je einem Testbild.
+7. Preisreport für dich: Provider Cost (USD/EUR), Dauer, Qualitätseindruck, Endpreis aus der Kurve, Net Revenue, Contribution, Marge — mit Vorschlag.
+8. Nach deiner Freigabe: Topaz global aktivieren, danach "Topaz vs. Clarity vergleichen".
 
 ## Technische Details
 
-- Neue Datei `src/lib/pictureModels/marginCurve.ts`: Stützpunkte, Interpolation, `MIN_CONTRIBUTION_EUR`, `MIN_PRICE_EUR`; `estimatePrice` ruft sie auf und gibt zusätzlich `multiplierUsed` und `marginPct` zurück.
-- Server-Spiegel in `supabase/functions/_shared/picture-enhance-models.ts` nutzt dieselbe Kurve, damit Anzeige und Abbuchung nie auseinanderlaufen (ein Test prüft die Gleichheit).
-- `enhance-image` deployen; `upscale-image` bleibt bis Schritt 3 bestätigt ist unangetastet und wird erst danach abgelöst.
-- `ImageCard`/`StudioLightbox` von `useImageUpscaler` auf `useEnhanceImage` umstellen (gleiche Preise, gleiche Abbuchung).
-- Freischaltung zweistufig: Registry-Flags (`picture.enhance.topaz_*`) im Frontend und `PICTURE_TOPAZ_*_ENABLED` im Backend — beide bleiben aus, bis die Preise freigegeben sind.
-- Testläufe kosten echtes Guthaben (kleinstmögliche Bilder, 2×), keine Kundenkonten betroffen.
+- Neue Datei `src/lib/pictureModels/marginCurve.ts` (Stützpunkte, Interpolation, Floor-Formel, FX-Umrechnung); `estimatePrice` liefert zusätzlich `multiplierUsed`, `netRevenueEUR`, `contributionEUR`, `marginPct`, `pricingMode: 'curve' | 'legacy_fixed'`.
+- Server-Spiegel in `supabase/functions/_shared/picture-enhance-models.ts` nutzt exakt dieselbe Kurve und Formel; ein Test vergleicht beide Implementierungen über die Fixture-Liste.
+- Registry-Preisfelder auf `providerCostUsd` umstellen, EUR nur abgeleitet.
+- Testläufe kosten echtes Guthaben (kleinstmögliche Bilder, 2×); keine Kundenkonten betroffen.
 - Aufgabe wird zu Beginn der Umsetzung in `roadmap.md` eingetragen.
