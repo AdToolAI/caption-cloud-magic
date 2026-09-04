@@ -20,6 +20,10 @@ const FIXTURES = [
   { modelId: 'clarity-pro', scale: 4, inputWidth: 1024, inputHeight: 1024 },
   { modelId: 'topaz-image-upscale', scale: 2, inputWidth: 1920, inputHeight: 1080 },
   { modelId: 'topaz-image-upscale', scale: 4, inputWidth: 3000, inputHeight: 2000 },
+  // Tier boundaries of the official unit table (24 / 48 / 96 output MP).
+  { modelId: 'topaz-image-upscale', scale: 2, inputWidth: 3000, inputHeight: 2000 },
+  { modelId: 'topaz-image-upscale', scale: 4, inputWidth: 2000, inputHeight: 1500 },
+  { modelId: 'topaz-image-upscale', scale: 6, inputWidth: 1600, inputHeight: 1667 },
   { modelId: 'topaz-dust-scratch', inputWidth: 1600, inputHeight: 1200 },
   { modelId: 'topaz-colorization', inputWidth: 1600, inputHeight: 1200 },
 ];
