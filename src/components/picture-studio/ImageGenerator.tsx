@@ -23,6 +23,7 @@ import { SaveToAlbumDialog } from "./SaveToAlbumDialog";
 import { getCachedState, setCachedState } from "./imageGeneratorCache";
 import { PromptHelperDialog, type PromptHelperResult } from "./PromptHelperDialog";
 import { PreflightCheck } from "./PreflightCheck";
+import { useOptionalActiveAsset } from "./ActiveAssetContext";
 import AIVideoCostConfirmDialog from "@/components/ai-video/AIVideoCostConfirmDialog";
 import {
   PICTURE_MODES,
@@ -144,6 +145,7 @@ export function ImageGenerator() {
   const extraRefInputRef = useRef<HTMLInputElement>(null);
   const [strength, setStrength] = useState<number>(cached?.strength ?? 70);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(cached?.generatedImages ?? []);
+  const activeAsset = useOptionalActiveAsset();
   const [replicateLoading, setReplicateLoading] = useState(false);
   const [refUploading, setRefUploading] = useState(false);
 
@@ -532,6 +534,20 @@ export function ImageGenerator() {
   const handleGenerationSuccess = async (image: any) => {
     const imgUrl = image.previewUrl || image.url;
     const imageId = image.id;
+    // Keep the freshly generated image as the workspace's active asset so
+    // Edit / Enhance / Background continue without a download + re-upload.
+    if (imgUrl) {
+      activeAsset?.push({
+        id: imageId || `generate-${Date.now()}`,
+        kind: 'generate',
+        url: imgUrl,
+        label: tx({ de: 'Generiert', en: 'Generated', es: 'Generada' }),
+        modelId: tier,
+        prompt: prompt.trim(),
+        mediaItemId: imageId,
+        parentId: null,
+      });
+    }
     setGeneratedImages(prev => [
       { ...image, url: imgUrl, prompt: prompt.trim(), style, aspectRatio },
       ...prev,

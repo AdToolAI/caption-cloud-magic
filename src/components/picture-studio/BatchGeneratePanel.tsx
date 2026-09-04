@@ -17,6 +17,7 @@ import { useActiveBrandKit } from "@/hooks/useActiveBrandKit";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { parseBatchPrompts } from "@/lib/pictureModels/batchPrompts";
+import { useOptionalActiveAsset } from "./ActiveAssetContext";
 
 
 type QualityTier = 'fast' | 'pro' | 'ultra';
@@ -53,6 +54,7 @@ export function BatchGeneratePanel() {
   const [useBrandKit, setUseBrandKit] = useState(false);
   const [running, setRunning] = useState(false);
   const [items, setItems] = useState<BatchItem[]>([]);
+  const activeAsset = useOptionalActiveAsset();
 
   const [showAllPrompts, setShowAllPrompts] = useState(false);
 
@@ -92,6 +94,18 @@ export function BatchGeneratePanel() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       const url = data?.image?.url;
+      if (url) {
+        activeAsset?.push({
+          id: data?.image?.id || `batch-${idx}-${Date.now()}`,
+          kind: 'generate',
+          url,
+          label: tx({ de: `Batch ${idx + 1}`, en: `Batch ${idx + 1}`, es: `Lote ${idx + 1}` }),
+          modelId: tier,
+          prompt,
+          mediaItemId: data?.image?.id,
+          parentId: null,
+        });
+      }
       setItems(prev => prev.map((it, i) =>
         i === idx ? { ...it, status: 'success', url } : it
       ));
