@@ -163,6 +163,26 @@ export function EnhancePanel() {
     [modelId, sourceSize, scale, model],
   );
 
+  /** Compare runs two paid runs — the combined price is shown before the start. */
+  const compareEstimates = useMemo(
+    () =>
+      models
+        .filter((m) => m.enabled || (m.featureFlag ? ENABLED_PICTURE_FLAGS.includes(m.featureFlag) : false))
+        .slice(0, 2)
+        .map((m) => ({
+          model: m,
+          price:
+            estimatePrice({
+              modelId: m.id,
+              inputWidth: sourceSize?.width,
+              inputHeight: sourceSize?.height,
+              scale: m.supportedScales ? scale : 1,
+            })?.userPriceEur ?? 0,
+        })),
+    [models, sourceSize, scale],
+  );
+  const compareTotal = compareEstimates.reduce((sum, e) => sum + e.price, 0);
+
   const resolvedTopazModel =
     model?.id === "topaz-image-upscale"
       ? resolveTopazEnhanceModel({
@@ -559,6 +579,49 @@ export function EnhancePanel() {
           </Card>
         )}
       </div>
+
+      <AlertDialog open={compareConfirmOpen} onOpenChange={setCompareConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {tx({ de: "Zwei Läufe starten?", en: "Start two runs?", es: "¿Iniciar dos ejecuciones?" })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {tx({
+                de: "Ein Vergleich startet zwei kostenpflichtige Läufe — einen pro Modell.",
+                en: "A comparison starts two paid runs — one per model.",
+                es: "Una comparación inicia dos ejecuciones de pago, una por modelo.",
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-1 text-sm">
+            {compareEstimates.map((entry) => (
+              <div key={entry.model.id} className="flex items-center justify-between">
+                <span>{entry.model.name}</span>
+                <span className="text-muted-foreground">
+                  {currencySymbol}
+                  {entry.price.toFixed(2)}
+                </span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between border-t border-border/50 pt-1 font-semibold">
+              <span>{tx({ de: "Gesamt", en: "Total", es: "Total" })}</span>
+              <span>
+                {currencySymbol}
+                {compareTotal.toFixed(2)}
+              </span>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleCompare()}>
+              {tx({ de: "Vergleich starten", en: "Start comparison", es: "Iniciar comparación" })}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
