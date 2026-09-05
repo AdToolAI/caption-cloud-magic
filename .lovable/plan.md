@@ -76,15 +76,23 @@ Referenzlimits, Modi, Sizing und Preislogik bleiben unverändert.
   keinen Stil gewählt hat, wird kein kreativer Stil-Zusatz erzeugt.
 - **Style = Keep Original** → eigener Wert mit kurzer Anweisung, den Stil der
   Referenz zu erhalten; widersprechender Prompt = Konflikt.
-- `aspectRatio = 'source'` — definiertes Fallback, nie stilles 1:1:
+- `aspectRatio = 'source'` — transparente Best-Effort-Kette, nie stilles 1:1:
   1. nativ unterstützt → Source verwenden
   2. nicht nativ, aber W×H steuerbar → Quellratio in gültige Zielmaße übersetzen
-  3. nur feste Ratios → nächstliegendes vorschlagen und **sichtbar** melden
-  4. keine sinnvolle Erhaltung möglich → Warnung, Nutzer wählt
+  3. nur feste Ratios → nächstliegendes automatisch wählen und klein unter dem
+     Format-Feld anzeigen: „Source ratio 1.43:1 → using closest supported 4:3"
+     mit „Change". Kein Blockierdialog.
+  4. nur bei großer Abweichung oder keiner sinnvollen Erhaltung → deutliche
+     Warnung, der Nutzer entscheidet
 - Reference Influence Close/Balanced/Creative:
   - Modell mit nativem Feld → Preset aus der Registry, `method = native`, kein Prompt-Satz
   - sonst → ein kurzer, unter Prompt Details sichtbarer Leitsatz, `method = prompt_guided`
   - ohne Referenz → `none`
+- **Modellwechsel:** semantische Absicht überlebt (Prompt, Close/Balanced/Creative,
+  Style, gewünschtes Format, Referenzen), provider-spezifische Werte nicht. Ein bei
+  FLUX gesetzter Zahlenwert wird beim Wechsel zu Qwen verworfen und aus `close`
+  neu berechnet. Nach jedem Wechsel werden Capabilities neu ausgewertet und der
+  normalisierte Request neu gebaut.
 - `sanitizePrompt()`: konservativ, kein Regex-Monster. Nur eindeutige
   `--negative …` / `--no …`-Flags am Segment-/Zeilenanfang; Inhalt in das
   Negativ-Feld, falls vorhanden, sonst Warnung `unsupported_syntax`.
@@ -118,6 +126,14 @@ Reference Images · Brand Kit · Advanced
 - Numerischer Strength-Slider verschwindet aus der Hauptansicht (bleibt für
   Modelle mit nativem Feld unter Advanced).
 - Konflikt-Karte mit „Use prompt" / „Keep <Style>", keine Automatik.
+- Kontextabhängige „AdTool adjusted"-Hinweise, nur wenn sie zutreffen:
+  „Format adjusted — this model doesn't support the exact source ratio. Using 4:3.",
+  „Negative prompt unavailable — this model has no separate negative prompt.",
+  „Reference influence is prompt-guided — this model has no native
+  reference-strength control."
+- Style-Tooltip: „Auto — your prompt determines the visual style." Auto heißt
+  ausdrücklich: AdTool fügt **keine** kreative Stilvorgabe hinzu (nicht: AdTool
+  sucht einen Stil aus).
 - Advanced → **Prompt Details**: Your prompt · AdTool additions · Negative prompt ·
   Reference Influence + Method · Style · Format · Model · Sent to model.
 - Alle Texte EN/DE/ES.
