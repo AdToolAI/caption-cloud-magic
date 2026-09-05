@@ -141,7 +141,7 @@ serve(async (req) => {
         await finalizeFailure(admin, run, "PROVIDER_FAILED", String(prediction.error ?? "provider failed"));
         summary.failed++;
       } else if (prediction.status === "canceled") {
-        await finalizeCancelConfirmed(admin, run);
+        await finalizeCancelConfirmed(admin, run, providerCost);
         summary.cancelled++;
       } else if (ageMinutes > horizonMinutes) {
         // Horizon reached without an authoritative verdict: visible to admins,

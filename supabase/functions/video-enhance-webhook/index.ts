@@ -191,7 +191,7 @@ serve(async (req) => {
     }
 
     if (providerStatus === "canceled") {
-      const result = await finalizeCancelConfirmed(admin, run);
+      const result = await finalizeCancelConfirmed(admin, run, providerCost);
       return json(result);
     }
 
