@@ -274,8 +274,10 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
       await supabase.from('studio_images').delete().eq('id', image.id);
       setUnsortedImages(prev => prev.filter(img => img.id !== image.id));
       setAlbumImages(prev => prev.filter(img => img.id !== image.id));
+      setCollectionImages(prev => prev.filter(img => img.id !== image.id));
       toast.success(tx({ de: "Bild gelöscht 🗑️", en: "Image deleted 🗑️", es: "Imagen eliminada 🗑️" }));
       loadAlbums();
+      void refreshCollectionCounts();
     } catch (err) {
       console.error(err);
       toast.error(tx({ de: "Fehler beim Löschen", en: "Error deleting", es: "Error al eliminar" }));
@@ -286,6 +288,68 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Auto collection detail view
+  if (selectedCollection) {
+    const CollectionIcon = selectedCollection.icon;
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => { setSelectedCollection(null); setCollectionImages([]); }}>
+            <ArrowLeft className="h-4 w-4 mr-1" /> {tx({ de: 'Zurück', en: 'Back', es: 'Atrás' })}
+          </Button>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <CollectionIcon className="h-4 w-4 text-primary" />
+            {collectionLabel(selectedCollection, lang)}
+            <Badge variant="secondary" className="text-[10px]">
+              {tx({ de: 'Automatisch', en: 'Automatic', es: 'Automático' })}
+            </Badge>
+          </h3>
+          <span className="text-sm text-muted-foreground">
+            ({collectionCounts[selectedCollection.workflowType] || collectionImages.length})
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {tx({
+            de: 'Automatische Sammlungen werden aus dem Arbeitsschritt abgeleitet und ändern deine Alben nicht.',
+            en: 'Auto collections are derived from the workflow step and never change your albums.',
+            es: 'Las colecciones automáticas se derivan del paso de trabajo y no modifican tus álbumes.',
+          })}
+        </p>
+        {collectionLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : collectionImages.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground">
+            <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-30" />
+            <p>{tx({ de: 'Noch keine Bilder in dieser Sammlung', en: 'No images in this collection yet', es: 'Aún no hay imágenes en esta colección' })}</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {collectionImages.map((img, i) => (
+              <ImageCard
+                key={img.id}
+                image={{ id: img.id, url: img.image_url, prompt: img.prompt || undefined, style: img.style || undefined, aspectRatio: img.aspect_ratio || undefined }}
+                index={i}
+                onSaveToAlbum={handleSaveToAlbum}
+                onOpenLightbox={setLightboxImage}
+                onDelete={handleDeleteImage}
+              />
+            ))}
+          </div>
+        )}
+
+        <StudioLightbox
+          image={lightboxImage}
+          open={!!lightboxImage}
+          onOpenChange={(open) => !open && setLightboxImage(null)}
+          onSaveToAlbum={handleSaveToAlbum}
+          onDelete={handleDeleteImage}
+        />
       </div>
     );
   }
