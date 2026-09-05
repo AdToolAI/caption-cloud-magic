@@ -4,13 +4,20 @@ Keine globale Freischaltung. Zwei Baustellen: (1) eine Zielstufe darf nie unbeme
 
 ## 1. Ausgabegröße vor dem Lauf berechnen — modellspezifisch
 
-Die Geometrie ist eine **Modell-Fähigkeit**, keine globale Regel. Jedes Modell bekommt eine `resolutionProjectionStrategy`:
+Die Geometrie ist eine **Fähigkeit pro Modell UND Ausgabestufe**, keine globale und keine modellweite Regel. Die Registry führt `projectionRules` je Kombination:
 
-- Topaz: `verified_target_height` — im Live-Lauf beobachtet (720×1280 + "1080p" → 608×1080): Stufe = feste Ausgabehöhe, Seitenverhältnis bleibt.
-- ByteDance vCube: `to_be_verified` — dieselbe Semantik wird **nicht** angenommen, bis ein echter Hochformat-Lauf sie bestätigt. Solange gilt sie als unbestätigt und die Anzeige markiert die erwarteten Maße als Schätzung.
+```text
+Topaz  1080p : strategy = target_height, confidence = verified   (Live-Lauf 720×1280 → 608×1080)
+Topaz  4k    : strategy = target_height, confidence = estimated  (bis zum 4K-Hochformat-Retest)
+vCube  alle  : strategy = assumed_target_height, confidence = estimated
+```
 
 Gemeinsame Funktion (Client + Server gespiegelt):
-`projectOutput(modelId, sourceWidth, sourceHeight, targetResolution)` liefert `{ width, height, confidence: "verified" | "estimated", strategy }`. Maße werden auf **gerade** Pixelwerte gerundet (720×1280 → 2160 hoch ergibt 1216×2160, nicht 1215×2160). Topaz startet mit `verified` (Live-Nachweis), ByteDance mit `estimated`; die Strategie wird erst auf `verified` gesetzt, wenn ein passender echter Lauf projizierte und tatsächliche Maße deckungsgleich zeigt. Der Abnahmebericht weist je Modell aus, welche Geometrie-Regel wirklich bewiesen ist.
+`projectOutput(modelId, sourceWidth, sourceHeight, targetResolution)` liefert `{ width, height, confidence: "verified" | "estimated", strategy }`. Maße werden auf **gerade** Pixelwerte gerundet (720×1280 → 2160 hoch ergibt 1216×2160, nicht 1215×2160). Eine Regel wird erst auf `verified` gesetzt, wenn ein echter Lauf **dieser Kombination** projizierte und tatsächliche Maße deckungsgleich zeigt; die verifizierte Regel wird dann in den Fähigkeitsdaten festgeschrieben. Später kann dieselbe Feinheit auf FPS-, Tier- und Modus-Kombinationen ausgeweitet werden, falls die Anbietersemantik dort abweicht.
+
+**Vertrauensgrad steuert die Wirkung:**
+- `verified` → darf als hartes `no_upscale`-Gate produktiv blockieren.
+- `estimated` → Anzeige als Schätzung erlaubt, Testkonten dürfen laufen, aber **keine** autoritative Produktionssperre.
 
 ## 2. Upscale-Gate — nur für räumliches Vergrößern
 
