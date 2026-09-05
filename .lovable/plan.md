@@ -45,6 +45,11 @@ Bereits gespeichert: Modell, Modus/Tier, Quellmodell, Quellmaße/Bildrate/Dauer,
 
 Neue Kalibrierungs-Ansicht je Modell: Läufe gesamt, erfolgreiche Läufe, Fehlerquote, mittlerer und Median-Schätzfehler, Median-Ist-Faktor, Abdeckung echter Kosten in Prozent, Summe und Quote der Gutschriften, Durchschnitts-/Median-Verarbeitungszeit, Verteilung nach Auflösung/Bildrate/Modus. Für Topaz zusätzlich geschätzte vs. tatsächliche Einheiten je Dauer, Ausgabemaß und Bildrate, damit die echte Einheitenformel ableitbar wird.
 
+**Zwei getrennte Blöcke, optisch klar unterschieden:**
+
+- „Kalibrierung" — Abrechnung verifiziert, Schätzer kalibrierend, Kostenabdeckung in Prozent, Schätzfehler. Reine Beobachtung.
+- „Betriebsstatus" — 🟢 Live oder 🔴 Not-Aus aktiv. Nur dieser Block sagt aus, ob ein Modell für Nutzer läuft.
+
 ## 8. Re-Kalibrierung
 
 Historische Preise werden nie rückwirkend geändert. Bei 25, 50, 100 und danach fortlaufend je 100 erfolgreichen Läufen pro Modell entsteht ein Pricing-/Estimator-Report im Admin; ab 50–100 Läufen wird der Schätzer aus echten Daten neu gesetzt (bewusste Entscheidung, kein Automatismus auf den Preis).
@@ -55,12 +60,19 @@ Server-autoritative Preisbildung, 3×-Deckel, True-up, Idempotenzschlüssel, Wal
 
 ## 10. Abnahme nach Aktivierung
 
-- Je ein echter Lauf Topaz und ByteDance als normaler Produktionsnutzer (nicht auf der Allowlist), Nachweis dass kein Allowlist-Gate greift.
-- **Negativfall:** normaler Nutzer mit zu wenig Guthaben — der Lauf wird vor dem Provider-Start abgewiesen, es entsteht keine Prediction und das Guthaben wird nie negativ.
-- Prüfung von Wallet, Speicherung, Mediathek und Download, dazu Typprüfung, relevante Tests und Produktions-Build.
-- Abschlussbericht: „Topaz Video Upscale — GLOBAL LIVE, Ist-Kosten VERIFIZIERT, Schätzer KALIBRIEREND" und „ByteDance vCube — GLOBAL LIVE, funktional BEREIT, Ist-Kosten-Abdeckung TEILWEISE/KALIBRIEREND".
+„GLOBAL LIVE" wird erst gemeldet, wenn diese drei Nachweise vorliegen — Flags setzen und grüner Build genügen nicht.
 
-Kalibrierung ist ab jetzt Beobachtung, kein Freigabe-Tor. Kein Zurückdrehen wegen laufender Kalibrierung — nur echter P0-Fehler, falsche Abrechnung oder kritischer Providerfehler rechtfertigen den Not-Aus.
+1. **Topaz-Volllauf** mit einem normalen, nicht auf der Allowlist stehenden Produktionsnutzer: Modell in der Oberfläche sichtbar → Preisvorschau → Start → Provider-Prediction → Wallet-Buchung → Provider-Erfolg → eigener AdTool-Speicher → `video_creations` → Mediathek → Download.
+2. **ByteDance-Volllauf** mit derselben Kette und ebenfalls ohne Allowlist.
+3. **Negativtest zu wenig Guthaben:** Abweisung vor Reservierung und Provider-Start, keine Prediction, Kontostand nie negativ.
+
+Zusätzlich nach dem Deployment gezielt nachweisen, dass `cost_unverified` und `estimator_calibrating` nirgends mehr einen Lauf verhindern — weder im Client, noch in `video-enhance/index.ts`, noch in den geteilten Modulen. Nur abgeschaltetes Modell, ungültige Kombination, fehlendes Guthaben, verifiziertes Downscale oder ein Provider-/Sicherheitsproblem dürfen blocken.
+
+Dazu Typprüfung, die Video-Enhance-Tests und der Produktions-Build.
+
+Abschlussbericht: „Topaz Video Upscale — GLOBAL LIVE, Ist-Kosten VERIFIZIERT, Schätzer KALIBRIEREND" und „ByteDance vCube — GLOBAL LIVE, funktional VERIFIZIERT, Ist-Kosten-Abdeckung SAMMELND", jeweils mit den offenen, nicht blockierenden Kalibrierungspunkten.
+
+Kalibrierung ist ab jetzt Beobachtung, kein Freigabe-Tor. Kein Zurückdrehen wegen laufender Kalibrierung — nur echter P0-Fehler, ein Defekt der finanziellen Integrität oder ein kritischer Providerfehler rechtfertigen den Not-Aus.
 
 ## Technische Details
 
