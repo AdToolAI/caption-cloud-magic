@@ -142,34 +142,9 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
     );
   };
 
-  const getFriendlyErrorMessage = (errorMessage: string | null): string => {
-    if (!errorMessage) return t('aiVid.errorUnknown');
-    const raw = errorMessage.toLowerCase();
-    // Providers (Veo/Sora) return a raw JSON blob with `"code": 8` when their
-    // capacity is saturated. Testers only saw the blob and assumed their input
-    // was broken — it is a temporary provider condition and always refunded.
-    if (
-      raw.includes('high load') ||
-      raw.includes('high demand') ||
-      raw.includes('(e003)') ||
-      raw.includes('resource_exhausted') ||
-      /"?code"?\s*[:=]\s*8\b/.test(raw) ||
-      raw.includes('overloaded')
-    ) {
-      return tx({
-        de: 'Der Video-Anbieter ist aktuell überlastet. Dein Guthaben wurde zurückerstattet – bitte starte die Generierung in ein paar Minuten erneut.',
-        en: 'The video provider is currently overloaded. Your balance has been refunded — please start the generation again in a few minutes.',
-        es: 'El proveedor de vídeo está sobrecargado. Se te ha reembolsado el saldo: vuelve a iniciar la generación en unos minutos.',
-      });
-    }
-    if (errorMessage.includes('Service is temporarily unavailable') || errorMessage.includes('(E004)') || errorMessage.includes('internal error')) {
-      return t('aiVid.errorProviderUnavail');
-    }
-    if (errorMessage.includes('Rate limit exceeded')) return t('aiVid.errorRateLimit');
-    if (errorMessage.includes('Invalid input')) return t('aiVid.errorInvalidInput');
-    if (errorMessage.length > 150) return errorMessage.substring(0, 147) + '...';
-    return errorMessage;
-  };
+  const getFriendlyErrorMessage = (errorMessage: string | null): string =>
+    friendlyVideoErrorMessage(errorMessage);
+
 
   const handleRetry = (gen: VideoGeneration) => {
     if (onRetryGeneration) {
