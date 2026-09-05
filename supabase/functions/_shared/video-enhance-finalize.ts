@@ -153,7 +153,6 @@ export async function finalizeSuccess(
       status: 'completed',
       credits_used: Number(run.user_price_eur),
       framerate: Number(run.fps),
-      parent_video_id: run.source_asset_id,
       metadata: {
         videoEnhance: true,
         runId: run.id,
