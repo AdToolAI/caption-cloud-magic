@@ -211,5 +211,33 @@ export async function probeRemoteVideo(url: string): Promise<ProbedVideoMetadata
     }
     offset += box.size;
   }
+
+  // moov is often at the end of the file; scan backwards from the end.
+  const tailStart = Math.max(0, sizeBytes - 1024 * 1024);
+  const tail = await rangeFetch(url, tailStart, sizeBytes - 1);
+  for (let guard = 0, tailOffset = tail.byteLength - 1; guard < 64 && tailOffset >= 8; guard++) {
+    // Search backwards for the 'moov' type signature.
+    let idx = -1;
+    for (let i = tailOffset - 4; i >= 0; i--) {
+      if (tail[i] === 0x6d && tail[i + 1] === 0x6f && tail[i + 2] === 0x6f && tail[i + 3] === 0x76) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx < 0) break;
+    const boxOffsetInTail = idx - 4;
+    if (boxOffsetInTail < 0) break;
+    const sizeView = new DataView(tail.buffer, tail.byteOffset + boxOffsetInTail, 4);
+    const boxSize = sizeView.getUint32(0);
+    if (boxSize < 8 || boxOffsetInTail + boxSize > tail.byteLength) {
+      tailOffset = boxOffsetInTail;
+      continue;
+    }
+    const moov = tail.subarray(boxOffsetInTail, boxOffsetInTail + boxSize);
+    const parsed = parseMoov(moov, sizeBytes, container);
+    if (parsed) return parsed;
+    tailOffset = boxOffsetInTail;
+  }
+
   throw new Error('moov box not found');
 }
