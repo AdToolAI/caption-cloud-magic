@@ -55,7 +55,9 @@ export type PictureNoticeCode =
   | 'TRANSPARENCY_UNSUPPORTED'
   | 'TRANSPARENCY_NATIVE'
   | 'NEGATIVE_AS_LANGUAGE'
-  | 'REFERENCES_IGNORED';
+  | 'REFERENCES_IGNORED'
+  | 'FORMAT_ADJUSTED'
+  | 'FORMAT_SOURCE_UNAVAILABLE';
 
 export interface PictureNotice {
   code: PictureNoticeCode;
