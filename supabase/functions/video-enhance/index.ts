@@ -52,6 +52,8 @@ const env = (key: string) => Deno.env.get(key) ?? undefined;
 interface RequestBody {
   action?: "estimate" | "start" | "status" | "cancel";
   idempotencyKey?: string;
+  /** Validation-only switch, honoured for allowlisted test accounts only. */
+  testFailPersistOnce?: boolean;
   runId?: string;
   sourceAssetId?: string;
   sourceUrl?: string;
