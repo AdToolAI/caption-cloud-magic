@@ -29,10 +29,8 @@ export const GoogleSignInButton = ({ disabled }: { disabled?: boolean }) => {
       if (!("redirected" in result && result.redirected)) setLoading(false);
       return;
     }
-
-
-    if (error) {
-      setLoading(false);
+    setLoading(false);
+    {
       toast.error(
         tx({
           de: "Google-Anmeldung fehlgeschlagen",
