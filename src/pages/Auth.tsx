@@ -28,6 +28,7 @@ const Auth = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [capsLockOn, setCapsLockOn] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -207,6 +208,9 @@ const Auth = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={loading}
+                    autoComplete="email"
+                    inputMode="email"
+                    name="email"
                     className="h-11 rounded-xl bg-muted/30 border-border/50 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-300"
                   />
                 </motion.div>
@@ -227,8 +231,12 @@ const Auth = () => {
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      onKeyUp={(e) => setCapsLockOn(e.getModifierState?.("CapsLock") ?? false)}
+                      onKeyDown={(e) => setCapsLockOn(e.getModifierState?.("CapsLock") ?? false)}
+                      onBlur={() => setCapsLockOn(false)}
                       required
                       disabled={loading}
+                      name="password"
                       minLength={isLogin ? undefined : PASSWORD_MIN_LENGTH}
                       autoComplete={isLogin ? "current-password" : "new-password"}
                       className="h-11 rounded-xl bg-muted/30 border-border/50 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 pr-10 transition-all duration-300"
@@ -247,6 +255,15 @@ const Auth = () => {
                       )}
                     </button>
                   </div>
+                  {capsLockOn && (
+                    <p className="text-xs text-warning" aria-live="polite">
+                      {tx({
+                        de: "Feststelltaste ist aktiv",
+                        en: "Caps Lock is on",
+                        es: "Bloq Mayús está activado",
+                      })}
+                    </p>
+                  )}
                   {!isLogin && <PasswordStrength password={password} />}
                 </motion.div>
 

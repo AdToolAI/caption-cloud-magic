@@ -22,6 +22,50 @@ interface FriendlyAuthError {
  * Convert a raw Supabase auth error (or generic Error) into a friendly,
  * user-facing message. Always returns a value — never throws.
  */
+const leakedPasswordError = (): FriendlyAuthError => ({
+  code: "password_leaked",
+  title: tx({ de: "Passwort in Datenlecks bekannt", en: "Password found in data breaches", es: "Contraseña filtrada en brechas" }),
+  description: tx({
+    de: "Dieses Passwort taucht in bekannten Datenlecks auf. Bitte wähle ein anderes — Länge und Sonderzeichen sind nicht das Problem.",
+    en: "This password appears in known data breaches. Please choose a different one — length and symbols are not the issue.",
+    es: "Esta contraseña aparece en brechas de datos conocidas. Elige otra distinta; la longitud y los símbolos no son el problema.",
+  }),
+});
+
+const shortPasswordError = (): FriendlyAuthError => ({
+  code: "password_too_short",
+  title: tx({ de: "Passwort zu kurz", en: "Password too short", es: "Contraseña demasiado corta" }),
+  description: tx({ de: "Mindestens 8 Zeichen erforderlich.", en: "At least 8 characters required.", es: "Se requieren al menos 8 caracteres." }),
+});
+
+const weakPasswordError = (): FriendlyAuthError => ({
+  code: "weak_password",
+  title: tx({ de: "Passwort erfüllt die Anforderungen nicht", en: "Password doesn't meet the requirements", es: "La contraseña no cumple los requisitos" }),
+  description: tx({
+    de: "Mindestens 8 Zeichen und eine Zahl oder ein Sonderzeichen.",
+    en: "At least 8 characters plus a number or symbol.",
+    es: "Al menos 8 caracteres más un número o símbolo.",
+  }),
+});
+
+/**
+ * Supabase reports HIBP hits as `error_code: weak_password` with
+ * `reasons: ["pwned"]`. The human-readable message says only "weak and easy to
+ * guess" — so the structured reasons are the ONLY reliable signal. Never infer
+ * a breach from the message text alone.
+ */
+function extractWeakPasswordReasons(err: unknown): string[] {
+  const anyErr = err as
+    | { reasons?: unknown; weak_password?: { reasons?: unknown }; weakPassword?: { reasons?: unknown } }
+    | null
+    | undefined;
+  const candidates = [anyErr?.reasons, anyErr?.weak_password?.reasons, anyErr?.weakPassword?.reasons];
+  for (const c of candidates) {
+    if (Array.isArray(c)) return c.filter((r): r is string => typeof r === "string").map((r) => r.toLowerCase());
+  }
+  return [];
+}
+
 export function mapAuthError(
   err: unknown,
   context: AuthErrorContext
@@ -34,6 +78,15 @@ export function mapAuthError(
         : (err as { message?: string })?.message ?? "";
 
   const msg = raw.toLowerCase();
+
+  // ── Structured weak-password reasons (authoritative) ─────────
+  const reasons = extractWeakPasswordReasons(err);
+  if (reasons.length > 0) {
+    if (reasons.includes("pwned")) return leakedPasswordError();
+    if (reasons.includes("length")) return shortPasswordError();
+    return weakPasswordError();
+  }
+
 
   // ── Credentials ──────────────────────────────────────────────
   if (msg.includes("invalid login credentials") || msg.includes("invalid_grant")) {
@@ -75,38 +128,55 @@ export function mapAuthError(
     };
   }
 
-  // ── Leaked password (HIBP) ───────────────────────────────────
+  // ── Leaked password (HIBP) — only on explicit breach wording ─
   if (msg.includes("pwned") || msg.includes("compromised") || msg.includes("data breach") || msg.includes("leaked")) {
+    return leakedPasswordError();
+  }
+
+  // ── Password too short ───────────────────────────────────────
+  if (msg.includes("password") && (msg.includes("6 characters") || msg.includes("8 characters") || msg.includes("should be at least"))) {
+    return shortPasswordError();
+  }
+
+  // ── Generic weakness (never claim a breach here) ─────────────
+  if (msg.includes("password") && msg.includes("weak")) {
+    return weakPasswordError();
+  }
+
+  // ── OAuth: user aborted the provider window ──────────────────
+  if (
+    msg.includes("popup closed") ||
+    msg.includes("window closed") ||
+    msg.includes("user cancelled") ||
+    msg.includes("user canceled") ||
+    msg.includes("access_denied") ||
+    msg.includes("cancelled by user") ||
+    msg.includes("aborted")
+  ) {
     return {
-      code: "password_leaked",
-      title: tx({ de: "Passwort in Datenlecks bekannt", en: "Password found in data breaches", es: "Contraseña filtrada en brechas" }),
+      code: "oauth_cancelled",
+      title: tx({ de: "Anmeldung abgebrochen", en: "Sign-in cancelled", es: "Acceso cancelado" }),
       description: tx({
-        de: "Dieses Passwort taucht in bekannten Datenlecks auf. Bitte wähle ein anderes — Länge und Sonderzeichen sind nicht das Problem.",
-        en: "This password appears in known data breaches. Please choose a different one — length and symbols are not the issue.",
-        es: "Esta contraseña aparece en brechas de datos conocidas. Elige otra distinta; la longitud y los símbolos no son el problema.",
+        de: "Du hast das Google-Fenster geschlossen. Versuche es erneut oder nutze E-Mail und Passwort.",
+        en: "You closed the Google window. Try again or use email and password.",
+        es: "Cerraste la ventana de Google. Inténtalo de nuevo o usa correo y contraseña.",
       }),
     };
   }
 
-  // ── Password weakness ────────────────────────────────────────
-  if (msg.includes("password") && msg.includes("weak")) {
+  // ── OAuth: provider-side failure ─────────────────────────────
+  if (msg.includes("oauth") || msg.includes("id token") || msg.includes("server_error") || msg.includes("bad_oauth")) {
     return {
-      code: "weak_password",
-      title: tx({ de: "Passwort erfüllt die Anforderungen nicht", en: "Password doesn't meet the requirements", es: "La contraseña no cumple los requisitos" }),
+      code: "oauth_provider_error",
+      title: tx({ de: "Google-Anmeldung fehlgeschlagen", en: "Google sign-in failed", es: "Error al iniciar sesión con Google" }),
       description: tx({
-        de: "Mindestens 8 Zeichen und eine Zahl oder ein Sonderzeichen.",
-        en: "At least 8 characters plus a number or symbol.",
-        es: "Al menos 8 caracteres más un número o símbolo.",
+        de: "Google hat die Anmeldung abgelehnt. Versuche es erneut oder melde dich mit E-Mail und Passwort an.",
+        en: "Google rejected the sign-in. Try again or sign in with email and password.",
+        es: "Google rechazó el acceso. Inténtalo de nuevo o usa correo y contraseña.",
       }),
     };
   }
-  if (msg.includes("password") && (msg.includes("6 characters") || msg.includes("8 characters") || msg.includes("should be at least"))) {
-    return {
-      code: "password_too_short",
-      title: tx({ de: "Passwort zu kurz", en: "Password too short", es: "Contraseña demasiado corta" }),
-      description: tx({ de: "Mindestens 8 Zeichen erforderlich.", en: "At least 8 characters required.", es: "Se requieren al menos 8 caracteres." }),
-    };
-  }
+
 
 
   // ── Recovery / reset links ───────────────────────────────────

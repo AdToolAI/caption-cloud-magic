@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { tx } from "@/lib/i18nText";
+import { mapAuthError, trackAuthError } from "@/lib/authErrors";
 import { lovable } from "@/integrations/lovable";
 
 const GoogleLogo = () => (
@@ -19,33 +20,31 @@ export const GoogleSignInButton = ({ disabled }: { disabled?: boolean }) => {
 
   const handleClick = async () => {
     setLoading(true);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-      extraParams: { prompt: "select_account" },
-    });
+    let result: Awaited<ReturnType<typeof lovable.auth.signInWithOAuth>> | undefined;
+    try {
+      result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+        extraParams: { prompt: "select_account" },
+      });
+    } catch (thrown) {
+      setLoading(false);
+      const friendly = mapAuthError(thrown, "signin");
+      trackAuthError(friendly, "signin");
+      toast.error(friendly.title, { description: friendly.description });
+      return;
+    }
 
-    const error = "error" in result ? result.error : undefined;
+    const error = result && "error" in result ? result.error : undefined;
     if (!error) {
-      if (!("redirected" in result && result.redirected)) setLoading(false);
+      if (!(result && "redirected" in result && result.redirected)) setLoading(false);
       return;
     }
     setLoading(false);
-    
-      toast.error(
-        tx({
-          de: "Google-Anmeldung fehlgeschlagen",
-          en: "Google sign-in failed",
-          es: "Error al iniciar sesión con Google",
-        }),
-        {
-          description: tx({
-            de: "Bitte versuche es erneut oder nutze E-Mail und Passwort.",
-            en: "Please try again or use email and password.",
-            es: "Inténtalo de nuevo o usa correo y contraseña.",
-          }),
-        },
-      );
+    const friendly = mapAuthError(error, "signin");
+    trackAuthError(friendly, "signin");
+    toast.error(friendly.title, { description: friendly.description });
   };
+
 
 
   return (
