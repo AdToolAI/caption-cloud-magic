@@ -18,6 +18,10 @@ interface Row {
   status: string;
   provider_cost_usd_estimated: number | null;
   provider_cost_usd_actual: number | null;
+  pricing_gate: string | null;
+  calibration_status: string | null;
+  calibration_reason: string | null;
+  cost_closed_at: string | null;
 }
 
 interface Stats {
@@ -25,6 +29,9 @@ interface Stats {
   withActualCost: number;
   coverage: number;
   meanAbsErrorPct: number | null;
+  belowCorridor: number;
+  pricingGateReview: number;
+  openCostChecks: number;
 }
 
 const CALIBRATION_SAMPLE_TARGET = 25;
@@ -46,6 +53,11 @@ function summarise(rows: Row[]): Stats {
     total,
     withActualCost: verified.length,
     coverage: total === 0 ? 0 : verified.length / total,
+    belowCorridor: rows.filter((r) => r.calibration_reason === 'below_target_corridor').length,
+    pricingGateReview: rows.filter((r) => r.pricing_gate === 'review_required').length,
+    openCostChecks: rows.filter(
+      (r) => r.provider_cost_usd_actual === null && !r.cost_closed_at,
+    ).length,
     meanAbsErrorPct:
       errors.length === 0 ? null : (errors.reduce((a, b) => a + b, 0) / errors.length) * 100,
   };
@@ -60,7 +72,9 @@ export function VideoEnhanceCalibrationCard() {
     void (async () => {
       const { data } = await supabase
         .from('video_enhance_runs')
-        .select('model_id, status, provider_cost_usd_estimated, provider_cost_usd_actual')
+        .select(
+          'model_id, status, provider_cost_usd_estimated, provider_cost_usd_actual, pricing_gate, calibration_status, calibration_reason, cost_closed_at',
+        )
         .eq('status', 'completed')
         .order('created_at', { ascending: false })
         .limit(500);
@@ -126,6 +140,22 @@ export function VideoEnhanceCalibrationCard() {
                   )}
                 </div>
 
+                {/* Pricing gate — separate from calibration on purpose. */}
+                <div className="mb-3">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                    {tx({ de: 'Preis-Gate', en: 'Pricing gate', es: 'Control de precio' })}
+                  </div>
+                  {stats.pricingGateReview > 0 ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-500/15 px-2 py-1 text-[11px] font-semibold text-amber-300">
+                      {tx({ de: 'Prüfung', en: 'Review', es: 'Revisión' })} ({stats.pricingGateReview})
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-300">
+                      OK
+                    </span>
+                  )}
+                </div>
+
                 {/* Calibration — telemetry, never a gate. */}
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
                   {tx({ de: 'Kalibrierung', en: 'Calibration', es: 'Calibración' })}
@@ -161,6 +191,28 @@ export function VideoEnhanceCalibrationCard() {
                   <li className="tabular-nums">
                     {tx({ de: 'Schätzfehler', en: 'Estimate error', es: 'Error de estimación' })}:{' '}
                     {stats.meanAbsErrorPct === null ? '—' : `${stats.meanAbsErrorPct.toFixed(0)}%`}
+                  </li>
+                  <li className="tabular-nums">
+                    {stats.belowCorridor > 0
+                      ? tx({
+                          de: 'Prüfung — unter Zielkorridor',
+                          en: 'Review — below target corridor',
+                          es: 'Revisión — bajo el corredor objetivo',
+                        })
+                      : tx({
+                          de: 'Im Zielkorridor',
+                          en: 'Within target corridor',
+                          es: 'Dentro del corredor objetivo',
+                        })}
+                    {stats.belowCorridor > 0 ? ` (${stats.belowCorridor})` : ''}
+                  </li>
+                  <li className="tabular-nums">
+                    {tx({
+                      de: 'Offene Kostenprüfungen',
+                      en: 'Open cost checks',
+                      es: 'Comprobaciones de coste abiertas',
+                    })}
+                    : {stats.openCostChecks}
                   </li>
                 </ul>
               </div>
