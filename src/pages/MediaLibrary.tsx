@@ -76,6 +76,8 @@ export default function MediaLibrary() {
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [importUrl, setImportUrl] = useState("");
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
+  const [enhanceSourceUrl, setEnhanceSourceUrl] = useState<string | null>(null);
+  const [enhanceSourceAssetId, setEnhanceSourceAssetId] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [studioImageCount, setStudioImageCount] = useState(0);
   const [saveToAlbumImageId, setSaveToAlbumImageId] = useState<string | null>(null);
