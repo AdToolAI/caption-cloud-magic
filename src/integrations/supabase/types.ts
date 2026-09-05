@@ -18509,6 +18509,7 @@ export type Database = {
           created_at: string
           credits_reserved: number
           currency: string
+          effective_multiplier: number | null
           error_code: string | null
           error_message: string | null
           estimated_units: number | null
@@ -18521,12 +18522,17 @@ export type Database = {
           margin_pct: number | null
           mode: string
           model_id: string
+          multiplier_cap: number | null
           multiplier_used: number | null
           net_revenue_eur: number | null
           next_reconcile_at: string | null
           output_asset_id: string | null
           output_url: string | null
+          overcharge_refund_amount_eur: number | null
+          overcharge_refund_at: string | null
           persist_attempts: number
+          pricing_gate: string | null
+          pricing_gate_reason: string | null
           pricing_version: string
           projected_height: number | null
           projected_width: number | null
@@ -18567,6 +18573,7 @@ export type Database = {
           updated_at: string
           user_id: string
           user_price_eur: number
+          verified_effective_multiplier: number | null
         }
         Insert: {
           actual_contribution_eur?: number | null
@@ -18580,6 +18587,7 @@ export type Database = {
           created_at?: string
           credits_reserved?: number
           currency?: string
+          effective_multiplier?: number | null
           error_code?: string | null
           error_message?: string | null
           estimated_units?: number | null
@@ -18592,12 +18600,17 @@ export type Database = {
           margin_pct?: number | null
           mode: string
           model_id: string
+          multiplier_cap?: number | null
           multiplier_used?: number | null
           net_revenue_eur?: number | null
           next_reconcile_at?: string | null
           output_asset_id?: string | null
           output_url?: string | null
+          overcharge_refund_amount_eur?: number | null
+          overcharge_refund_at?: string | null
           persist_attempts?: number
+          pricing_gate?: string | null
+          pricing_gate_reason?: string | null
           pricing_version: string
           projected_height?: number | null
           projected_width?: number | null
@@ -18638,6 +18651,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           user_price_eur: number
+          verified_effective_multiplier?: number | null
         }
         Update: {
           actual_contribution_eur?: number | null
@@ -18651,6 +18665,7 @@ export type Database = {
           created_at?: string
           credits_reserved?: number
           currency?: string
+          effective_multiplier?: number | null
           error_code?: string | null
           error_message?: string | null
           estimated_units?: number | null
@@ -18663,12 +18678,17 @@ export type Database = {
           margin_pct?: number | null
           mode?: string
           model_id?: string
+          multiplier_cap?: number | null
           multiplier_used?: number | null
           net_revenue_eur?: number | null
           next_reconcile_at?: string | null
           output_asset_id?: string | null
           output_url?: string | null
+          overcharge_refund_amount_eur?: number | null
+          overcharge_refund_at?: string | null
           persist_attempts?: number
+          pricing_gate?: string | null
+          pricing_gate_reason?: string | null
           pricing_version?: string
           projected_height?: number | null
           projected_width?: number | null
@@ -18709,6 +18729,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           user_price_eur?: number
+          verified_effective_multiplier?: number | null
         }
         Relationships: []
       }

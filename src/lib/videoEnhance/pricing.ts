@@ -5,11 +5,13 @@ import {
   type SourceMetadata,
 } from '@/config/videoEnhanceModels';
 import {
+  evaluatePricing,
+  evaluateTrueUp,
   marginMetrics,
   multiplierForCost,
   NET_FACTOR,
   PRICING_VERSION,
-  userPriceFromProviderCost,
+  type TrueUpEvaluation,
 } from '@/lib/pictureModels/marginCurve';
 import {
   bufferedProviderCostEur,
@@ -18,6 +20,7 @@ import {
 } from '@/lib/pictureModels/providerRates';
 import {
   UnpriceableRunError,
+  VIDEO_PRICING_HARD_MULTIPLIER_CAP,
   VIDEO_PROVIDER_PRICING_VERSION,
   VIDEO_RATE_CARDS,
   videoProviderCostUsd,
@@ -53,6 +56,14 @@ export interface VideoPriceSnapshot {
   contributionEur: number;
   marginPct: number;
   costUnverified: boolean;
+  /** true while the estimator is not calibrated from real billed runs. */
+  estimatorCalibrating: boolean;
+  /** price / buffered estimated provider cost. */
+  effectiveMultiplier: number | null;
+  multiplierCap: number;
+  /** 'review_required' means the config may not be priced as-is. */
+  pricingGate: 'ok' | 'review_required';
+  pricingGateReason: string | null;
 }
 
 /** Effective output frame rate: `null` means "keep the source frame rate". */
@@ -88,7 +99,12 @@ export function priceVideoEnhanceRun(
     outputSeconds,
   });
   const costEur = bufferedProviderCostEur(costUsd);
-  const price = userPriceFromProviderCost(costEur);
+  const evaluation = evaluatePricing(costEur, {
+    hardMultiplierCap: VIDEO_PRICING_HARD_MULTIPLIER_CAP,
+    // A price floor may never silently lift a run above the cap.
+    allowFloorAboveCap: false,
+  });
+  const price = evaluation.priceEur;
   const metrics = marginMetrics(price, costEur);
 
   return {
@@ -111,6 +127,12 @@ export function priceVideoEnhanceRun(
     contributionEur: metrics.contributionEUR,
     marginPct: metrics.marginPct,
     costUnverified: card.costUnverified === true,
+    estimatorCalibrating: card.estimatorCalibrating === true,
+    effectiveMultiplier: evaluation.effectiveMultiplier,
+    multiplierCap: VIDEO_PRICING_HARD_MULTIPLIER_CAP,
+    pricingGate: evaluation.gate,
+    pricingGateReason:
+      evaluation.gateReason ?? (card.estimatorCalibrating === true ? 'estimator_calibrating' : null),
   };
 }
 
@@ -135,4 +157,27 @@ export function actualMargin(userPriceEur: number, providerCostUsdActual: number
     actualContributionEur: metrics.contributionEUR,
     actualMarginPct: metrics.marginPct,
   };
+}
+
+/**
+ * Post-run true-up against the VERIFIED provider cost.
+ *
+ * `providerCostUsdActual` must be the real billed amount; `null` when the
+ * provider reports none (then nothing is refunded and the run counts as
+ * COST UNVERIFIED). The FX safety buffer is not applied here — it protects the
+ * estimate, not the guarantee.
+ */
+export function verifiedPricing(params: {
+  capturedUsageChargeEur: number;
+  providerCostUsdActual: number | null | undefined;
+}): TrueUpEvaluation {
+  const costEur =
+    params.providerCostUsdActual === null || params.providerCostUsdActual === undefined
+      ? null
+      : params.providerCostUsdActual * FX_RATE_USD_EUR;
+  return evaluateTrueUp({
+    capturedUsageChargeEur: params.capturedUsageChargeEur,
+    actualProviderCostEur: costEur,
+    hardMultiplierCap: VIDEO_PRICING_HARD_MULTIPLIER_CAP,
+  });
 }

@@ -53,12 +53,142 @@ export function ceilCent(value: number): number {
   return Math.ceil(value * 100 - 1e-9) / 100;
 }
 
+/** Rounds DOWN to the cent — used wherever a hard cap must never be exceeded. */
+export function floorToCent(value: number): number {
+  return Math.floor(value * 100 + 1e-9) / 100;
+}
+
 export function userPriceFromProviderCost(providerCostEur: number): number {
   const cost = Math.max(0, providerCostEur);
   const contributionFloor = (cost + MIN_CONTRIBUTION_EUR) / NET_FACTOR;
   const curvePrice = cost * multiplierForCost(cost);
   return ceilCent(Math.max(MIN_PRICE_EUR, contributionFloor, curvePrice));
 }
+
+/** Highest price a hard multiplier cap allows for a given provider cost. */
+export function capPriceForCost(providerCostEur: number, hardMultiplierCap: number): number {
+  return floorToCent(Math.max(0, providerCostEur) * hardMultiplierCap);
+}
+
+export interface PricingPolicy {
+  hardMultiplierCap?: number;
+  allowFloorAboveCap?: boolean;
+}
+
+export type PricingGate = 'ok' | 'review_required';
+export type PricingGateReason =
+  | 'estimate_over_cap'
+  | 'actual_cost_drift'
+  | 'cost_unverified'
+  | 'estimator_calibrating'
+  | 'floor_conflict';
+
+export interface PricingEvaluation {
+  providerCostEur: number;
+  priceEur: number;
+  uncappedPriceEur: number;
+  multiplierCap: number | null;
+  capPriceEur: number | null;
+  effectiveMultiplier: number | null;
+  gate: PricingGate;
+  gateReason: PricingGateReason | null;
+}
+
+export function evaluatePricing(
+  providerCostEur: number,
+  policy: PricingPolicy = {},
+): PricingEvaluation {
+  const cost = Math.max(0, providerCostEur);
+  const uncapped = userPriceFromProviderCost(cost);
+  const cap = policy.hardMultiplierCap ?? null;
+
+  if (cap === null) {
+    return {
+      providerCostEur: cost,
+      priceEur: uncapped,
+      uncappedPriceEur: uncapped,
+      multiplierCap: null,
+      capPriceEur: null,
+      effectiveMultiplier: cost > 0 ? uncapped / cost : null,
+      gate: 'ok',
+      gateReason: null,
+    };
+  }
+
+  const capPrice = capPriceForCost(cost, cap);
+  const allowFloor = policy.allowFloorAboveCap ?? true;
+  const overCap = uncapped > capPrice + 1e-9;
+  const price = overCap && !allowFloor ? capPrice : uncapped;
+  const curvePrice = ceilCent(cost * multiplierForCost(cost));
+  const floorDriven = uncapped > curvePrice + 1e-9;
+
+  return {
+    providerCostEur: cost,
+    priceEur: price,
+    uncappedPriceEur: uncapped,
+    multiplierCap: cap,
+    capPriceEur: capPrice,
+    effectiveMultiplier: cost > 0 ? price / cost : null,
+    gate: overCap ? 'review_required' : 'ok',
+    gateReason: overCap ? (floorDriven ? 'floor_conflict' : 'estimate_over_cap') : null,
+  };
+}
+
+export const PRICING_TRUE_UP_TOLERANCE_EUR = 0.01;
+
+export interface TrueUpEvaluation {
+  actualProviderCostEur: number | null;
+  maxAllowedChargeEur: number | null;
+  verifiedMultiplierBeforeTrueUp: number | null;
+  verifiedMultiplierAfterTrueUp: number | null;
+  refundEur: number;
+  netUsageChargeEur: number;
+  gateReason: PricingGateReason | null;
+  driftAlarm: boolean;
+}
+
+/**
+ * Post-run true-up. The FX safety buffer is deliberately NOT part of the
+ * verified cost — it only protects the pre-run estimate. Missing, zero or
+ * invalid cost => no multiplier and no refund.
+ */
+export function evaluateTrueUp(params: {
+  capturedUsageChargeEur: number;
+  actualProviderCostEur: number | null | undefined;
+  hardMultiplierCap: number;
+}): TrueUpEvaluation {
+  const captured = Math.max(0, params.capturedUsageChargeEur);
+  const cost = params.actualProviderCostEur;
+
+  if (cost === null || cost === undefined || !Number.isFinite(cost) || cost <= 0) {
+    return {
+      actualProviderCostEur: null,
+      maxAllowedChargeEur: null,
+      verifiedMultiplierBeforeTrueUp: null,
+      verifiedMultiplierAfterTrueUp: null,
+      refundEur: 0,
+      netUsageChargeEur: captured,
+      gateReason: 'cost_unverified',
+      driftAlarm: false,
+    };
+  }
+
+  const maxAllowed = capPriceForCost(cost, params.hardMultiplierCap);
+  const refund = Math.max(0, Math.round((captured - maxAllowed) * 100) / 100);
+  const net = Math.max(0, Math.round((captured - refund) * 100) / 100);
+
+  return {
+    actualProviderCostEur: cost,
+    maxAllowedChargeEur: maxAllowed,
+    verifiedMultiplierBeforeTrueUp: captured / cost,
+    verifiedMultiplierAfterTrueUp: net / cost,
+    refundEur: refund,
+    netUsageChargeEur: net,
+    gateReason: refund > 0 ? 'actual_cost_drift' : null,
+    driftAlarm: refund > PRICING_TRUE_UP_TOLERANCE_EUR,
+  };
+}
+
 
 export function marginMetrics(userPriceEur: number, providerCostEur: number) {
   const netRevenue = userPriceEur * NET_FACTOR;

@@ -90,7 +90,9 @@ export function extractProviderCost(prediction: any): ProviderCostReading {
   return { source: 'unavailable' };
 }
 
-export function ledgerKey(runId: string, operation: 'reserve' | 'capture' | 'release'): string {
+export type LedgerOperation = 'reserve' | 'capture' | 'release' | 'true_up_refund';
+
+export function ledgerKey(runId: string, operation: LedgerOperation): string {
   return `video_enhance:${runId}:${operation}`;
 }
 
@@ -114,7 +116,7 @@ export async function walletOperation(
   params: {
     runId: string;
     userId: string;
-    operation: 'reserve' | 'capture' | 'release';
+    operation: LedgerOperation;
     amountEur: number;
     note?: string;
   },
@@ -145,7 +147,7 @@ export async function walletOperation(
       p_generation_id: params.runId,
     });
     if (error) return { applied: false, reason: 'wallet_error', error: error.message };
-  } else if (params.operation === 'release') {
+  } else if (params.operation === 'release' || params.operation === 'true_up_refund') {
     const { error } = await admin.rpc('refund_ai_video_credits', {
       p_user_id: params.userId,
       p_amount_euros: params.amountEur,

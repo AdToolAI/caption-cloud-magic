@@ -9,7 +9,12 @@
  */
 
 import { probeRemoteVideo } from './mp4-probe.ts';
-import { RESOLUTION_PIXELS, type VideoResolution } from './video-enhance-models.ts';
+import {
+  RESOLUTION_PIXELS,
+  VIDEO_PRICING_HARD_MULTIPLIER_CAP,
+  verifiedPricing,
+  type VideoResolution,
+} from './video-enhance-models.ts';
 import {
   outputKey,
   outputMatchesOrder,
@@ -195,6 +200,30 @@ export async function finalizeSuccess(
   delete costPatch._warn;
   delete costPatch._block;
 
+  // 5b. Price guarantee: once the provider's REAL cost is known, the customer
+  // never keeps a charge above the hard multiplier cap. Overcharge is refunded;
+  // a higher real cost is never charged back to the customer.
+  const trueUp = verifiedPricing({
+    capturedUsageChargeEur: Number(run.user_price_eur),
+    providerCostUsdActual: providerCost.usd ?? null,
+  });
+  if (trueUp.refundEur > 0) {
+    const refund = await walletOperation(admin, {
+      runId: run.id,
+      userId: run.user_id,
+      operation: 'true_up_refund',
+      amountEur: trueUp.refundEur,
+      note: `pricing cap true-up (${VIDEO_PRICING_HARD_MULTIPLIER_CAP}x verified cost)`,
+    });
+    if (refund.applied) {
+      costPatch.overcharge_refund_amount_eur = trueUp.refundEur;
+      costPatch.overcharge_refund_at = new Date().toISOString();
+    }
+  }
+  costPatch.verified_effective_multiplier = trueUp.verifiedMultiplierAfterTrueUp;
+  costPatch.pricing_gate = trueUp.gateReason ? 'review_required' : 'ok';
+  costPatch.pricing_gate_reason = trueUp.gateReason;
+
   await setStatus(admin, run.id, 'completed', {
     output_asset_id: asset.id,
     output_url: publicUrl,
@@ -206,6 +235,7 @@ export async function finalizeSuccess(
     error_message: null,
     ...costPatch,
   });
+
 
   // 6. cleanup — big video files must not pile up in staging.
   await admin.storage.from(STAGING_BUCKET).remove([staging]).catch(() => undefined);

@@ -10,6 +10,7 @@ import { TopExpensiveFunctionsCard } from '@/components/admin/cost/TopExpensiveF
 import { CostTrendChart } from '@/components/admin/cost/CostTrendChart';
 import { CostAlertsCard } from '@/components/admin/cost/CostAlertsCard';
 import { VideoProviderMarginCard } from '@/components/admin/cost/VideoProviderMarginCard';
+import { VideoEnhanceMultiplierCard } from '@/components/admin/cost/VideoEnhanceMultiplierCard';
 import { toast } from 'sonner';
 import { uiLocale } from '@/lib/uiLocale';
 
@@ -97,6 +98,7 @@ export function CostMonitor() {
             <TopExpensiveFunctionsCard endpoints={data.top_endpoints} />
           </div>
           <VideoProviderMarginCard />
+          <VideoEnhanceMultiplierCard />
           <CostTrendChart trend={data.trend} />
 
           <p className="text-xs text-muted-foreground text-center pt-2">
