@@ -439,6 +439,7 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
       text: `Avoid: ${negativeTerms.join(', ')}.`,
       label: { de: 'Ausschlüsse', en: 'Exclusions', es: 'Exclusiones' },
     });
+    appliedModifiers.push({ source: 'negative', id: 'negative:avoid' });
     notices.push({
       code: 'NEGATIVE_AS_LANGUAGE',
       level: 'warn',
@@ -451,11 +452,36 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
   }
 
   /* 8. aspect ratio — only for chat-shaped providers without a ratio field */
-  if (cap?.provider === 'gateway' && cap.sizing.kind === 'ratio' && input.aspectRatio) {
+  if (cap?.provider === 'gateway' && cap.sizing.kind === 'ratio') {
     segments.push({
       source: 'format',
-      text: `Aspect ratio: ${input.aspectRatio}.`,
+      text: `Aspect ratio: ${resolvedFormat.aspectRatio}.`,
       label: { de: 'Format', en: 'Format', es: 'Formato' },
+    });
+    appliedModifiers.push({ source: 'format', id: 'format:ratio-prompt' });
+  }
+
+  /* 8b. transparent format handling of the semantic choice */
+  if (resolvedFormat.adjustment) {
+    notices.push({
+      code: 'FORMAT_ADJUSTED',
+      level: 'info',
+      message: {
+        de: `AdTool angepasst: ${resolvedFormat.adjustment.from} → ${resolvedFormat.adjustment.to} (${cap?.model ?? input.tier} unterstützt das Ausgangsformat nicht exakt).`,
+        en: `AdTool adjusted: ${resolvedFormat.adjustment.from} → ${resolvedFormat.adjustment.to} (${cap?.model ?? input.tier} does not support the exact source format).`,
+        es: `AdTool ajustó: ${resolvedFormat.adjustment.from} → ${resolvedFormat.adjustment.to} (${cap?.model ?? input.tier} no admite el formato de origen exacto).`,
+      },
+    });
+  }
+  if (resolvedFormat.sourceUnavailable) {
+    notices.push({
+      code: 'FORMAT_SOURCE_UNAVAILABLE',
+      level: 'warn',
+      message: {
+        de: `Kein Referenzbild vorhanden — Format fällt auf ${resolvedFormat.aspectRatio} zurück.`,
+        en: `No reference image available — format falls back to ${resolvedFormat.aspectRatio}.`,
+        es: `No hay imagen de referencia — el formato vuelve a ${resolvedFormat.aspectRatio}.`,
+      },
     });
   }
 
@@ -472,6 +498,27 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
     });
   }
 
+  const referenceInfluence: ReferenceInfluence =
+    usesReference && subjectRefs.length
+      ? strengthField
+        ? { level: strengthBucket(uiStrength), method: 'native', field: strengthField, value: strengthValue }
+        : { level: strengthBucket(uiStrength), method: 'prompt-guided' }
+      : { level: 'none', method: 'none' };
+
+  const normalizedRequest: NormalizedPictureRequest = {
+    tier: input.tier,
+    mode: input.mode,
+    style: modifier ? (input.style as string) : 'auto',
+    requestedFormat,
+    resolvedFormat,
+    referenceInfluence,
+    subjectRefCount: input.mode === 'create' ? 0 : subjectRefs.length,
+    styleRefCount: input.mode === 'create' ? 0 : styleRefs.length,
+    transparentBackground,
+    negativeTerms,
+    appliedModifiers,
+  };
+
   return {
     prompt: segments.map((s) => s.text).join('\n\n').trim(),
     segments,
@@ -480,6 +527,10 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
     strengthField,
     transparentBackground,
     notices,
+    appliedModifiers,
+    resolvedFormat,
+    referenceInfluence,
+    normalizedRequest,
   };
 }
 
