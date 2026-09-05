@@ -12,17 +12,20 @@ import { useTx } from '@/lib/i18nText';
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** The already-stored source video. No download/reupload happens. */
-  sourceUrl?: string;
+  /** Canonical source — preferred over a raw URL. */
   sourceAssetId?: string;
+  sourceAssetType?: 'generation' | 'creation';
+  /** Deprecated fallback for callers that only know the URL. */
+  sourceUrl?: string;
   onCompleted?: (outputUrl: string) => void;
 }
 
 export function EnhanceVideoDialog({
   open,
   onOpenChange,
-  sourceUrl,
   sourceAssetId,
+  sourceAssetType,
+  sourceUrl,
   onCompleted,
 }: Props) {
   const tx = useTx();
@@ -33,8 +36,9 @@ export function EnhanceVideoDialog({
           {tx({ de: 'Video verbessern', en: 'Enhance video', es: 'Mejorar vídeo' })}
         </DialogTitle>
         <EnhanceVideoPanel
-          initialSourceUrl={sourceUrl}
           initialSourceAssetId={sourceAssetId}
+          initialSourceAssetType={sourceAssetType}
+          initialSourceUrl={sourceAssetId ? undefined : sourceUrl}
           onCompleted={onCompleted}
         />
       </DialogContent>
