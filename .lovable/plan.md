@@ -52,16 +52,22 @@ Neue Fälle in `src/test/videoEnhanceParity.test.ts` und `src/test/videoEnhanceL
 
 ## 6. Preisnachweis (getrennt von der Funktionsfreigabe)
 
-- **Topaz:** Kosten = tatsächlich gemeldete Units × aktueller offizieller Unit-Preis (derzeit 0,08 USD). Wenn beides eindeutig vorliegt, gilt der Lauf als **verifiziert** mit `provider_cost_source = official_unit_rate x actual_usage`; Tarifversion und Prüfdatum werden mitgespeichert. Kein Warten auf ein separates Gesamtkostenfeld.
+- **Topaz:** Kosten = tatsächlich gemeldete Units × aktueller offizieller Unit-Preis (derzeit 0,08 USD). Liegen beide eindeutig vor, gilt der Lauf als **verifiziert** (`provider_cost_source = official_unit_rate x actual_usage`) — kein Warten auf ein separates Gesamtkostenfeld. Im Preis-Snapshot eingefroren: `actual_units`, `unit_rate_usd`, `unit_rate_source = replicate_official`, `unit_rate_checked_at`, `actual_provider_cost_usd`. Spätere Preisänderungen des Anbieters bewerten historische Läufe nicht neu.
 - **ByteDance vCube:** Abrechnung nach Ausgabesekunden, abhängig von Tier + Auflösung + FPS. Verifikation nur über die konkrete offizielle Matrix oder Abrechnungsdaten; bis dahin **COST UNVERIFIED**.
 
 Der Bericht nennt je Lauf die tatsächlich verwendete Quelle.
 
 ## 7. Retest und Abschluss
 
-Nach dem Fix zwei kurze echte Läufe über das Testkonto (kürzestmögliche Clips): Topaz im Hochformat und ByteDance im Hochformat zur Verifikation seiner Projektionssemantik. Danach ein aktualisierter Abnahmebericht:
+Genau zwei kurze echte Läufe über das Testkonto (kürzestmögliche Clips), danach keine weiteren Änderungen vor der Auswertung:
+1. **Topaz Hochformat** 720×1280 → 4K, Erwartung ~1216×2160, geprüft gegen den echten Output.
+2. **ByteDance Hochformat**, gleicher Quellclip, nächste echte Upscale-Stufe — damit wird seine Auflösungssemantik bewiesen.
+
+Dokumentiert werden je Lauf: projizierte vs. tatsächliche Maße, `projection_matched`; für Topaz `actual_units`, Unit-Preis, USD-Kosten, Endpreis, echte Marge; für ByteDance Ausgabesekunden, Tier, Auflösung, FPS, offizielle bzw. Abrechnungsrate, USD-Kosten.
+
+Aktualisierter Abnahmebericht:
 - ByteDance vCube: Functional READY, Pricing offen bis Rate-Card-Nachweis, Global release BLOCKED.
-- Topaz: Functional READY erst nach bestandenem Hochformat-Retest; Pricing voraussichtlich verifizierbar über Units × Unit-Preis.
+- Topaz: Functional READY nach bestandenem Hochformat-Retest; Pricing VERIFIED, sobald Units sauber in USD umgerechnet sind.
 - Blindvergleichs-Ergebnisse werden festgehalten; die Festschreibung "KI-Material → vCube / Kameramaterial → Topaz" erfolgt erst nach dem Kameramaterial-Vergleich.
 
 Keine Feature-Flags werden global aktiviert.
