@@ -121,7 +121,6 @@ export interface NormalizedPictureRequest {
   mode: PictureIntent;
   /** `auto` when the user added no style preset. */
   style: string;
-  requestedFormat: string;
   /** Exactly what the customer asked for — never rewritten. */
   requestedFormat: string;
   resolvedFormat: ResolvedFormat;
@@ -147,6 +146,8 @@ export interface BuiltPictureRequest {
   notices: PictureNotice[];
   /** Everything AdTool added — empty means "only the user's words". */
   appliedModifiers: AppliedModifier[];
+  /** Exactly what the customer asked for — never rewritten. */
+  requestedFormat: string;
   /** Model-specific technical resolution of the semantic format choice. */
   resolvedFormat: ResolvedFormat;
   referenceInfluence: ReferenceInfluence;
