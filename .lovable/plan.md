@@ -108,11 +108,9 @@ Verbindlich für alle fünf Einstiegspunkte: Reservierung vor dem Provider-Start
 
 **Quell-Video muss lange genug erreichbar sein:** Provider-Eingaben kommen ausschließlich aus dauerhaftem AdTool-Speicher oder aus serverseitig erzeugten signierten URLs, deren Gültigkeit den maximal erwarteten Warteschlangen- und Startzeitraum deutlich überschreitet. Sonst läuft die URL in der Warteschlange ab und der Job scheitert grundlos.
 
+**Speicherung:** Sobald der Provider fertig ist, wird die Datei **sofort** in einen eigenen Zwischenspeicher (Staging-Key) kopiert — bevor irgendetwas anderes passiert. Provider-Dateien sind ausdrücklich kein dauerhafter Speicher und werden nach begrenzter Zeit entfernt; bei einem längeren Datenbankproblem wäre ein bezahltes Ergebnis sonst verloren. Danach: prüfen → Video-Asset in `video_creations` anlegen → `completed`. Die Provider-URL lebt nur als temporäre Laufdaten für Wiederholversuche, wird nach erfolgreicher Übernahme entfernt und ist niemals die URL eines fertigen Assets.
 
-
-**Speicherung:** Sobald der Provider fertig ist, wird die Datei **sofort** in einen eigenen Zwischenspeicher (Staging-Key) kopiert — bevor irgendetwas anderes passiert. Sonst kann bei einem längeren Datenbank- oder Persistenzproblem die Provider-URL ablaufen und ein bezahltes Ergebnis ist verloren. Danach: prüfen → Video-Asset in `video_creations` anlegen → `completed`. Die Provider-URL lebt nur als temporäre Laufdaten für Wiederholversuche, wird nach erfolgreicher Übernahme entfernt und ist niemals die URL eines fertigen Assets.
-
-**Abgleich mit Ende:** Der Lauf trägt `reconciliation_attempts`, `last_reconciled_at`, `next_reconcile_at` (Backoff). Bleibt ein Lauf nach einem definierten Horizont ohne autoritatives Provider-Ergebnis, geht er in `manual_review` — sichtbar im Admin („3 hängende Video-Verbesserungen"), aber **ohne** automatische Erstattung, weil der echte Providerstatus unbekannt ist.
+**Abgleich mit Ende:** Der Lauf trägt `reconciliation_attempts`, `last_reconciled_at`, `next_reconcile_at` (Backoff). Bleibt ein Lauf nach einem definierten Horizont ohne autoritatives Provider-Ergebnis, geht er in `manual_review` — sichtbar im Admin („3 hängende Video-Verbesserungen"), aber **ohne** automatische Erstattung. Dort gibt es echte Aktionen statt nur einer Anzeige: jetzt abgleichen · Provider-Vorgang ansehen · Speicherung erneut versuchen · Fall manuell finanziell abschließen. Jede manuelle Aktion wird protokolliert.
 
 ### 7. Poll + Webhook von Anfang an, eine verifizierte Finalisierung
 
