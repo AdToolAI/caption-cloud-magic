@@ -9,6 +9,7 @@ import {
   type EnhanceModelId,
   type EnhanceRunInput,
 } from "../_shared/picture-enhance-models.ts";
+import { getWorkflowTypeForEnhanceModel, persistStudioImage } from "../_shared/studio-image-persist.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
