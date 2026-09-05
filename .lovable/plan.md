@@ -22,14 +22,18 @@ Pro bleibt Entitlement-gebunden. Vor der Freigabe prüfe ich das Recht auf unser
 
 ## 4. Preislogik
 
-Unverändert: degressive Kurve 1,8×–3,0×, harter Deckel 3,0×, Preis vor dem Lauf aus der besten Kostenschätzung, keine Nachbelastung, idempotente Gutschrift bis auf 3,0× sobald echte Providerkosten vorliegen. Einzige Änderung: `pricing_gate = review_required` allein aus `estimator_calibrating`/`cost_unverified` verhindert keinen Produktionslauf mehr — es wird als Grund gespeichert und im Admin ausgewiesen. Nach außen wird für ByteDance keine 3×-Garantie behauptet, solange keine autoritative Kostenquelle existiert.
+Unverändert: degressive Kurve 1,8×–3,0×, harter Deckel 3,0×, Preis vor dem Lauf aus der besten Kostenschätzung, keine Nachbelastung, idempotente Gutschrift bis auf 3,0× sobald echte Providerkosten vorliegen. Einzige Änderung: `pricing_gate = review_required` allein aus `estimator_calibrating`/`cost_unverified` verhindert keinen Produktionslauf mehr — es wird als Grund gespeichert und im Admin ausgewiesen.
+
+Für ByteDance ohne autoritative Kostenzahl gilt ausdrücklich: der Kundenlauf wird normal fertig, es wird **keine Ist-Kostenzahl erfunden** und kein True-up gerechnet. Der verifizierte Faktor bleibt leer, der Admin zeigt „Ist-Kosten-Abdeckung: ausstehend/unbestätigt". Sobald eine autoritative Kostenquelle eintrifft, holt der Reconciler den 3×-Check und gegebenenfalls die Gutschrift nach. Nach außen wird für ByteDance bis dahin keine 3×-Garantie behauptet.
 
 ## 5. Nutzeroberfläche
 
-Neues, gemeinsames Enhance-Panel auf Basis des bestehenden Engine-Hooks — eine Oberfläche, von Mediathek und Director's Cut aus erreichbar:
+**AI Video Studio ist der Haupteinstieg und Teil dieses Releases.** Dort entsteht der vollständige Enhance-Bereich; Mediathek und Director's Cut nutzen exakt denselben Dialog und dieselbe Engine. Motion Studio und Universal Content Creator folgen später und blockieren das Release nicht.
 
 - Modellauswahl mit echten Namen: „ByteDance vCube — AI-native video enhancement, besonders geeignet für KI-Material" und „Topaz Video Upscale — High-fidelity professional video upscaling". Kein „Coming Soon".
-- Vor dem Start sichtbar: Ausgangsauflösung/-bildrate, erwartete Ausgabe, Preis, gegebenenfalls Hinweis „AdTool adjusted".
+- Auflösung und Bildrate, für ByteDance zusätzlich Modus und Stufe.
+- Vor dem Start sichtbar: Ausgangsauflösung/-bildrate, erwartete Ausgabemaße, Preis, gegebenenfalls Hinweis „AdTool adjusted".
+- Nach dem Lauf: Vorher/Nachher-Vergleich des Ergebnisses.
 - Kein Kalibrierungs- oder „experimental pricing"-Hinweis in der Nutzeroberfläche; dieser Status lebt nur im Admin.
 - Texte in EN/DE/ES.
 
