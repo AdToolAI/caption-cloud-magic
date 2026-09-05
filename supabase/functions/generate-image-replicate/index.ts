@@ -7,6 +7,8 @@ import {
   closestAspectRatioFor,
   resolveSize,
 } from "../_shared/pictureModelCapabilities.ts";
+import { readImageDimensions } from "../_shared/imageDimensions.ts";
+import { SOURCE_FORMAT } from "../_shared/pictureFormatResolution.ts";
 import { persistStudioImage } from "../_shared/studio-image-persist.ts";
 import {
   buildPictureRequest,
@@ -49,7 +51,12 @@ interface GenerateRequest {
   prompt: string;
   tier: 'fast' | 'pro' | 'ultra' | 'gptimage' | 'flux' | 'ideogram' | 'recraft' | 'qwen';
 
+  /** Legacy field; `requestedFormat` wins when both are present. */
   aspectRatio?: string;
+  /** What the customer asked for — including the sentinel "source". */
+  requestedFormat?: string;
+  /** Browser-reported size of reference #1. Advisory only; never trusted. */
+  sourceDimensions?: { width: number; height: number };
   referenceImageUrl?: string;     // Subject reference (image-to-image, legacy single)
   referenceImageUrls?: string[];  // Subject references (multi-reference models)
   styleReferenceUrl?: string;     // Style reference (legacy single)
