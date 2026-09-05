@@ -15684,11 +15684,13 @@ export type Database = {
           parent_id: string | null
           prompt: string | null
           source: string
+          source_run_id: string | null
           style: string | null
           thumbnail_url: string | null
           upscale_factor: number | null
           user_id: string
           variation_index: number | null
+          workflow_type: string
         }
         Insert: {
           album_id?: string | null
@@ -15701,11 +15703,13 @@ export type Database = {
           parent_id?: string | null
           prompt?: string | null
           source?: string
+          source_run_id?: string | null
           style?: string | null
           thumbnail_url?: string | null
           upscale_factor?: number | null
           user_id: string
           variation_index?: number | null
+          workflow_type: string
         }
         Update: {
           album_id?: string | null
@@ -15718,11 +15722,13 @@ export type Database = {
           parent_id?: string | null
           prompt?: string | null
           source?: string
+          source_run_id?: string | null
           style?: string | null
           thumbnail_url?: string | null
           upscale_factor?: number | null
           user_id?: string
           variation_index?: number | null
+          workflow_type?: string
         }
         Relationships: [
           {
