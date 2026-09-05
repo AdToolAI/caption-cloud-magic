@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Download, Loader2, Sparkles, XCircle } from 'lucide-react';
 
@@ -77,9 +77,13 @@ function tx(key: keyof typeof COPY, lang: Lang): string {
 interface Props {
   /** Preselected source, e.g. when opened from the media library. */
   initialSourceUrl?: string;
+  /** Preselected stored asset — keeps the parent/child lineage intact. */
+  initialSourceAssetId?: string;
+  /** Fired once the enhanced video exists in our own storage. */
+  onCompleted?: (outputUrl: string) => void;
 }
 
-export function EnhanceVideoPanel({ initialSourceUrl }: Props) {
+export function EnhanceVideoPanel({ initialSourceUrl, initialSourceAssetId, onCompleted }: Props) {
   const { user } = useAuth();
   const { language } = useTranslation();
   const lang: Lang = (['en', 'de', 'es'].includes(language) ? language : 'en') as Lang;
@@ -133,16 +137,31 @@ export function EnhanceVideoPanel({ initialSourceUrl }: Props) {
     ? { modelId: model.id, mode, resolution, fps, tier: availableTiers(model)[0] ?? 'standard' }
     : null;
 
+  const source = useMemo(
+    () => ({ url: sourceUrl, assetId: sourceUrl === initialSourceUrl ? initialSourceAssetId : undefined }),
+    [sourceUrl, initialSourceUrl, initialSourceAssetId],
+  );
+
   useEffect(() => {
     if (!config || !sourceUrl) return;
-    void previewPrice({ url: sourceUrl }, config);
+    void previewPrice(source, config);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceUrl, modelId, mode, resolution, fps]);
 
   const onStart = useCallback(() => {
     if (!config || !sourceUrl) return;
-    void startEnhance({ url: sourceUrl }, config);
-  }, [config, sourceUrl, startEnhance]);
+    void startEnhance(source, config);
+  }, [config, sourceUrl, source, startEnhance]);
+
+  // Notify the host surface exactly once per finished run.
+  const notifiedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (run?.status === 'completed' && run.output_url && notifiedRef.current !== run.id) {
+      notifiedRef.current = run.id;
+      onCompleted?.(run.output_url);
+    }
+  }, [run, onCompleted]);
+
 
   if (!model) return null;
 

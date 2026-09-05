@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, Image, Video, FileText, Trash2, Search, ExternalLink, Play, Sparkles, Send, Calendar, Layers, FolderOpen, Download, Cloud, Images, FolderPlus } from "lucide-react";
 import { SaveToAlbumDialog } from "@/components/picture-studio/SaveToAlbumDialog";
+import { EnhanceVideoDialog } from "@/components/ai-video/EnhanceVideoDialog";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -76,6 +77,7 @@ export default function MediaLibrary() {
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [importUrl, setImportUrl] = useState("");
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
+  const [enhanceSourceUrl, setEnhanceSourceUrl] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [studioImageCount, setStudioImageCount] = useState(0);
   const [saveToAlbumImageId, setSaveToAlbumImageId] = useState<string | null>(null);
@@ -1458,17 +1460,38 @@ export default function MediaLibrary() {
         <DialogContent className="max-w-2xl">
           <DialogTitle>Video Preview</DialogTitle>
           {selectedVideo && (
-            <div className="flex justify-center">
-              <video 
-                src={selectedVideo} 
-                controls 
-                autoPlay
-                className="max-h-[70vh] w-auto rounded-lg"
-              />
+            <div className="space-y-4">
+              <div className="flex justify-center">
+                <video
+                  src={selectedVideo}
+                  controls
+                  autoPlay
+                  className="max-h-[70vh] w-auto rounded-lg"
+                />
+              </div>
+              <Button
+                className="w-full gap-2"
+                onClick={() => {
+                  setEnhanceSourceUrl(selectedVideo);
+                  setSelectedVideo(null);
+                }}
+              >
+                <Sparkles className="h-4 w-4" />
+                {tx({ de: 'Video verbessern', en: 'Enhance video', es: 'Mejorar vídeo' })}
+              </Button>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Enhance dialog — same central engine as AI Video Studio */}
+      <EnhanceVideoDialog
+        open={!!enhanceSourceUrl}
+        onOpenChange={(open) => { if (!open) setEnhanceSourceUrl(null); }}
+        sourceUrl={enhanceSourceUrl ?? undefined}
+        onCompleted={() => loadMedia()}
+      />
+
 
       {/* Save to Album Dialog */}
       <SaveToAlbumDialog

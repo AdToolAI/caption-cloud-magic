@@ -305,3 +305,55 @@ export async function finalizeCancelConfirmed(
   }
   return { ok: false, status: 'provider_cancelled_confirmed' };
 }
+
+/**
+ * Late authoritative provider cost for an ALREADY completed run.
+ *
+ * Runs the exact same hard-cap check as finalisation and books at most one
+ * `true_up_refund` — the ledger operation key makes webhook, reconciler and
+ * retries collapse into a single credit. Never charges the customer more.
+ * `cost_unverified` stays a pure admin/telemetry state.
+ */
+export async function applyLateCostTrueUp(
+  admin: Admin,
+  run: Run,
+  providerCost: ProviderCostReading,
+): Promise<{ applied: boolean; reason?: string; verifiedMultiplier?: number | null }> {
+  if (providerCost.usd === undefined || providerCost.usd === null) {
+    return { applied: false, reason: 'cost_unavailable' };
+  }
+  if (run.provider_cost_usd_actual !== null && run.provider_cost_usd_actual !== undefined) {
+    return { applied: false, reason: 'already_verified' };
+  }
+
+  const trueUp = verifiedPricing({
+    capturedUsageChargeEur: Number(run.user_price_eur),
+    providerCostUsdActual: providerCost.usd,
+  });
+
+  const patch: Record<string, unknown> = {
+    provider_cost_usd_actual: providerCost.usd,
+    provider_cost_source: providerCost.source,
+    actual_units: providerCost.units ?? null,
+    verified_effective_multiplier: trueUp.verifiedMultiplierAfterTrueUp,
+    pricing_gate: trueUp.gateReason ? 'review_required' : 'ok',
+    pricing_gate_reason: trueUp.gateReason,
+  };
+
+  if (trueUp.refundEur > 0) {
+    const refund = await walletOperation(admin, {
+      runId: run.id,
+      userId: run.user_id,
+      operation: 'true_up_refund',
+      amountEur: trueUp.refundEur,
+      note: `pricing cap true-up (${VIDEO_PRICING_HARD_MULTIPLIER_CAP}x verified cost)`,
+    });
+    if (refund.applied) {
+      patch.overcharge_refund_amount_eur = trueUp.refundEur;
+      patch.overcharge_refund_at = new Date().toISOString();
+    }
+  }
+
+  await admin.from('video_enhance_runs').update(patch).eq('id', run.id);
+  return { applied: true, verifiedMultiplier: trueUp.verifiedMultiplierAfterTrueUp };
+}

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
+  applyLateCostTrueUp,
   finalizeCancelConfirmed,
   finalizeFailure,
   finalizeSuccess,
@@ -164,6 +165,31 @@ serve(async (req) => {
       }
     }
 
+    // Late provider cost for ALREADY completed runs (e.g. ByteDance, where the
+    // authoritative number can appear after completion). Same 3x check, exactly
+    // one idempotent credit. Missing cost stays telemetry, never a blocker.
+    const lateWindow = new Date(Date.now() - 30 * 24 * 3_600_000).toISOString();
+    const { data: lateRuns } = await admin
+      .from("video_enhance_runs")
+      .select("*")
+      .eq("status", "completed")
+      .is("provider_cost_usd_actual", null)
+      .not("provider_prediction_id", "is", null)
+      .gte("created_at", lateWindow)
+      .limit(BATCH_SIZE);
+
+    let lateCostVerified = 0;
+    for (const run of lateRuns ?? []) {
+      const res = await fetch(`https://api.replicate.com/v1/predictions/${run.provider_prediction_id}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!res.ok) continue;
+      const prediction = await res.json();
+      const cost = extractProviderCost(prediction, run.model_id);
+      const applied = await applyLateCostTrueUp(admin, run, cost);
+      if (applied.applied) lateCostVerified++;
+    }
+
     // Orphaned staging files of abandoned or stuck runs.
     const cleanupBefore = new Date(Date.now() - 24 * 3_600_000).toISOString();
     const { data: orphans } = await admin
@@ -181,8 +207,8 @@ serve(async (req) => {
       cleaned++;
     }
 
-    console.log(`${TAG}`, JSON.stringify({ ...summary, cleaned }));
-    return json({ ...summary, cleaned });
+    console.log(`${TAG}`, JSON.stringify({ ...summary, cleaned, lateCostVerified }));
+    return json({ ...summary, cleaned, lateCostVerified });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`${TAG} unhandled:`, message);
