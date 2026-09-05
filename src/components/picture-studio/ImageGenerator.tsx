@@ -1367,6 +1367,59 @@ export function ImageGenerator() {
             onSetVariants={setVariantsCount}
           />
 
+          {/* ADVANCED -> PROMPT DETAILS — out of the normal flow, always closed by default */}
+          <Collapsible open={showPromptPreview} onOpenChange={setShowPromptPreview}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full justify-between h-8 text-[11px] text-muted-foreground hover:text-foreground">
+                <span className="flex items-center gap-1.5">
+                  <Eye className="h-3.5 w-3.5" />
+                  {tx({
+                    de: 'Erweitert · Prompt-Details',
+                    en: 'Advanced · Prompt details',
+                    es: 'Avanzado · Detalles del prompt',
+                  })}
+                </span>
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showPromptPreview ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2 p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                {tx({ de: 'Das wird genau gesendet', en: 'This is exactly what we send', es: 'Esto es lo que enviamos' })}
+              </p>
+              {built.segments.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">
+                  {tx({ de: 'Noch keine Beschreibung eingegeben.', en: 'No description entered yet.', es: 'Aún no hay descripción.' })}
+                </p>
+              ) : (
+                built.segments.map((segment, i) => (
+                  <div key={`${segment.source}-${i}`} className="space-y-0.5">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{tx(segment.label)}</p>
+                    <p className={`text-[11px] leading-snug whitespace-pre-wrap ${SEGMENT_TONE[segment.source]}`}>{segment.text}</p>
+                  </div>
+                ))
+              )}
+              {built.notices.filter(n => n.level !== 'info').map((notice) => (
+                <p key={notice.code} className="flex items-start gap-1.5 text-[10px] text-amber-400 leading-snug">
+                  <Info className="h-3 w-3 mt-0.5 shrink-0" />
+                  {tx(notice.message)}
+                </p>
+              ))}
+              <p className="text-[10px] text-muted-foreground font-mono">
+                {tx({ de: 'Format angefragt', en: 'Format requested', es: 'Formato solicitado' })}: {built.requestedFormat}
+                {' · '}
+                {tx({ de: 'aufgelöst', en: 'resolved', es: 'resuelto' })}: {built.resolvedFormat.aspectRatio}
+                {built.resolvedFormat.width && built.resolvedFormat.height
+                  ? ` (${built.resolvedFormat.width}×${built.resolvedFormat.height})`
+                  : ''}
+              </p>
+              {built.strengthField && typeof built.strengthValue === 'number' && (
+                <p className="text-[10px] text-muted-foreground font-mono">
+                  {built.strengthField} = {built.strengthValue}
+                </p>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+
 
           <Button
             className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground"
