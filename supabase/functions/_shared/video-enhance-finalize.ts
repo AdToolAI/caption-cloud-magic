@@ -151,7 +151,6 @@ export async function finalizeSuccess(
       user_id: run.user_id,
       output_url: publicUrl,
       status: 'completed',
-      credits_used: Number(run.user_price_eur),
       framerate: Number(run.fps),
       metadata: {
         videoEnhance: true,
@@ -163,6 +162,7 @@ export async function finalizeSuccess(
         fps: run.fps,
         tier: run.tier,
         durationSeconds: Number(run.source_duration_seconds),
+        priceEur: Number(run.user_price_eur),
         label: `Enhanced with ${run.model_id} (${run.resolution}/${run.fps}fps)`,
       },
     })
