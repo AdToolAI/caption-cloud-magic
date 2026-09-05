@@ -1,58 +1,56 @@
-# Video Enhance – Abschluss der vier Abnahmepunkte
+# Video Enhance – offene Abnahmepunkte schließen
 
-Geprüft wurde der Ist-Zustand. Zwei Punkte sind belegt, zwei sind offen und brauchen Arbeit.
+Keine neue Architektur. Nur die vier offenen Punkte plus Abschlusstests.
 
-## Punkt 3 – Topaz True-up: BELEGT
+## Bereits belegt (Punkt 3 der letzten Rückfrage): Topaz True-up
 
-Lauf `344ccc6c-e5a2-4bb8-b3db-6b8587b87637` (Konto bestofproducts4u@gmail.com):
+Lauf `344ccc6c-e5a2-4bb8-b3db-6b8587b87637` (bestofproducts4u@gmail.com):
 
 | Feld | Wert |
 | --- | --- |
-| eingefrorener FX-Kurs (USD→EUR) | 0,92 |
-| echte Providerkosten | 0,24 USD (3 Einheiten) → 0,2208 EUR |
+| eingefrorener FX-Kurs USD→EUR | 0,92 |
+| echte Providerkosten | 0,24 USD (3 Einheiten) = 0,2208 EUR |
 | ursprüngliche Belastung | 1,01 € |
 | True-up-Gutschrift | 0,35 € |
 | finale Belastung | 0,66 € |
 | verifizierter Faktor | 2,9891× |
-| Ledger | genau ein Eintrag `true_up_refund` 0,35 € („pricing cap true-up (3x verified cost)"), daneben je ein `reserve` und ein `capture` |
+| Ledger | genau ein `true_up_refund` 0,35 €, daneben ein `reserve` und ein `capture` |
 
-Hinweis: `pricing_gate = review_required` mit Grund `actual_cost_drift` – reiner Admin-Status, kein Nutzungsblocker.
+`pricing_gate = review_required` (Grund `actual_cost_drift`) ist reiner Admin-Status.
 
-## Punkt 1 – Allowlist: NICHT BEWEISBAR, offen
+## 1. Nicht-Allowlist-Nachweis
 
-Das Secret `VIDEO_ENHANCE_TEST_USER_IDS` existiert weiterhin; sein Wert ist nicht lesbar. Damit lässt sich nicht beweisen, dass die Testkonto-Privilegierung bei den Abnahmeläufen inaktiv war.
+- Parser der Allowlist härten: leerer oder reiner Leerzeichen-Wert ergibt garantiert eine leere Liste (Trim, Leereinträge verwerfen). Test, der `""`, `" "` und `" , "` als leere Liste prüft.
+- `VIDEO_ENHANCE_TEST_USER_IDS` auf leer setzen; die Mechanik bleibt für gezielte Fail-once-Tests erhalten, privilegiert aber niemanden.
+- Nachweis, dass `yaxac88729@watchyio.com` nicht in der Liste steht.
+- Danach je ein minimaler Topaz- und ByteDance-Lauf mit diesem Konto über den kompletten Pfad: sichtbar → Preisanzeige → Start → Provider → Guthaben → fertig → eigener Speicher → Mediathek → Download.
 
-Vorgehen:
-1. Secret `VIDEO_ENHANCE_TEST_USER_IDS` auf leer setzen (Allowlist damit projektweit ohne Wirkung), Funktionen neu ausrollen.
-2. Ein minimaler, kurzer Topaz-Lauf und ein minimaler ByteDance-Lauf mit dem klar nicht gelisteten Konto `yaxac88729@watchyio.com` – Sichtbarkeit, Schätzung, Start, Provider, Speicher, Mediathek, Download.
-3. Ergebnis im Bericht als sauberer Nicht-Allowlist-Nachweis.
+## 2. Mediathek-Einstieg „Video verbessern"
 
-## Punkt 2 – Einstiegspunkte: NUR EINER LIVE
+- Aktion in der Video-Lightbox der Mediathek, die den bestehenden `EnhanceVideoPanel`-Dialog öffnet (`useEnhanceVideo` → `video-enhance`). Keine eigene Enhance-Logik.
+- Das gewählte Video wird direkt als Quelle übernommen, kein Download/Reupload.
+- Nach Erfolg: neues Video-Asset mit Herkunftsverweis auf das Original, Mediathek lädt neu, Original bleibt bestehen.
 
-Ist-Stand im Code:
-- AI Video Studio → Tab „Enhance": nutzt `EnhanceVideoPanel` → `useEnhanceVideo` → `video-enhance`. Live.
-- Mediathek/Video-Lightbox: kein Enhance-Einstieg vorhanden. Fehlt.
-- Director's Cut: `AIVideoUpscaling.tsx` ruft weiterhin die alte Funktion `director-cut-upscale`. Nicht umgestellt.
+## 3. Director's Cut migrieren
 
-Umsetzung:
-- In der Mediathek-Lightbox für Videos eine Aktion „Video verbessern" ergänzen, die `EnhanceVideoPanel` mit der Quelle des Videos öffnet.
-- `AIVideoUpscaling.tsx` auf `useEnhanceVideo` umstellen und dieselbe Auswahl (Modell, Auflösung, FPS, Modus) nutzen; der alte Aufruf `director-cut-upscale` entfällt in der neuen Oberfläche.
-- Beide Einstiege danach je einmal durchspielen.
+- `AIVideoUpscaling.tsx` ruft künftig `useEnhanceVideo` → `video-enhance`; dieselbe Modell-Registry, Kombinationsprüfung, Preis-Engine, Guthaben- und Speicherlogik wie im AI Video Studio.
+- Vereinfachte Auswahl bleibt: Original / Empfohlen / Hohe Qualität / Eigene Einstellung. „Empfohlen" und „Hohe Qualität" sind nur Voreinstellungen auf die zentrale Konfiguration – keine eigene Preislogik.
+- Der alte Pfad `director-cut-upscale` bleibt als Rückfallebene bestehen, wird vom neuen UI aber nicht mehr aufgerufen.
+- Danach Codebase-Suche und Liste aller verbleibenden aktiven Aufrufer von `director-cut-upscale`.
 
-## Punkt 4 – Späte ByteDance-Kostenzahl: HEUTE NICHT MÖGLICH
+## 4. ByteDance Späte Kostenzahl
 
-Der Abgleichdienst liest ausschließlich offene Läufe; ein bereits abgeschlossener Lauf wird nie erneut bewertet. Eine später eintreffende echte Kostenzahl löst also derzeit keinen True-up aus.
+Ist-Stand: Der Abgleichdienst liest nur offene Läufe, ein abgeschlossener Lauf wird nie erneut bewertet. Eine später eintreffende echte Kostenzahl löst heute keinen True-up aus.
 
-Umsetzung:
-- Zweiter Durchlauf im Abgleichdienst: abgeschlossene Läufe der letzten 30 Tage ohne echte Kostenzahl erneut beim Provider abfragen; kommt eine autoritative Zahl, denselben 3×-Check laufen lassen und bei Überschreitung idempotent gutschreiben (gleicher Ledger-Schlüssel, nie doppelt, nie Nachbelastung).
-- `cost_unverified` bleibt reiner Admin-/Kalibrierstatus und blockiert keinen Lauf – das ist im Startpfad bereits so und wird durch einen Test abgesichert.
+Ergänzung:
+- Zweite Schleife im Abgleichdienst: abgeschlossene Läufe der letzten 30 Tage ohne echte Kostenzahl erneut beim Provider abfragen. Kommt eine autoritative Zahl, läuft derselbe 3×-Check; bei Überschreitung genau eine idempotente Gutschrift (gleicher Ledger-Schlüssel; Webhook, Abgleich und Wiederholung erzeugen zusammen nie mehr als eine).
+- Ohne Zahl bleibt der Lauf `completed`, `verified_effective_multiplier` bleibt leer, es wird nichts geschätzt oder erfunden.
+- `cost_unverified` bleibt reiner Admin-/Kalibrierstatus und blockiert keinen neuen Lauf; per Test abgesichert.
+
+## 5. Abschlusstests und Bericht
+
+Topaz- und ByteDance-Smoke ohne Allowlist, alle drei Einstiegspunkte, später eintreffende Kostenzahl, Typecheck, Video-Enhance-Tests, Produktions-Build. Danach ein Abschlussbericht mit „Topaz Video Upscale — GLOBAL LIVE" und „ByteDance vCube — GLOBAL LIVE" samt konkretem Codepfad je Einstiegspunkt.
 
 ## Technische Details
 
-- Betroffen: `supabase/functions/video-enhance-reconcile/index.ts` (neue Nachzieh-Schleife), `supabase/functions/_shared/video-enhance-finalize.ts` (True-up als wiederverwendbare, idempotente Funktion), `src/components/directors-cut/features/AIVideoUpscaling.tsx`, Mediathek-Lightbox in `src/pages/MediaLibrary.tsx`, Übersetzungen EN/DE/ES.
-- Keine Preis-, Wallet- oder Lip-Sync-Logik darüber hinaus.
-- Tests: Nachzieh-True-up idempotent, `cost_unverified` blockiert nicht, alle drei Einstiege rufen `video-enhance`.
-
-## Abschluss
-
-Nach diesen Schritten ein einziger Abschlussbericht mit allen vier Punkten und der Kennzeichnung Topaz GLOBAL LIVE / ByteDance GLOBAL LIVE.
+Betroffen: `supabase/functions/_shared/video-enhance-models.ts` (Allowlist-Parser), `supabase/functions/video-enhance-reconcile/index.ts` (Nachzieh-Schleife), `supabase/functions/_shared/video-enhance-finalize.ts` (True-up als wiederverwendbare idempotente Funktion), `src/pages/MediaLibrary.tsx` bzw. deren Lightbox, `src/components/directors-cut/features/AIVideoUpscaling.tsx`, `src/components/ai-video/EnhanceVideoPanel.tsx` (Dialog-Variante mit Quelle), Übersetzungen EN/DE/ES. Keine Änderungen an Wallet-, Lip-Sync- oder Renderlogik darüber hinaus.
