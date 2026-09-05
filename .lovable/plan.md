@@ -13,21 +13,29 @@ Video Enhance bleibt bewusst günstig. Der Deckel gilt nicht nur auf der Schätz
 
 **Ebene 0 — Berechnungsbasis**
 
-Maßgeblich ist ausschließlich die reine KI-Nutzungsbelastung dieses Laufs: nach modell- bzw. creatorbezogenem Rabatt, **vor** Mehrwertsteuer, ohne Abo-Anteil, ohne Zahlungsgebühren, ohne Promo-Guthaben-Effekte. So ergibt derselbe Provider-Lauf in jedem Land und mit jedem Gutschein denselben Faktor.
+Maßgeblich ist ausschließlich die reine KI-Nutzungsbelastung dieses Laufs (`usage_charge_eur`): nach preisreduzierenden Rabatten, **vor** Mehrwertsteuer, ohne Abo-Anteil, ohne Zahlungsgebühren.
+
+- **Reduziert** die Basis: Creator-Rabatt, Modellrabatt, echter Rabattgutschein — alles, was den Preis senkt.
+- **Reduziert sie nicht**: Startguthaben, Promo-Credits, Wallet-Stand — das sind nur Zahlungsmittel. Ob der Kunde mit gekauftem oder geschenktem Guthaben zahlt, verändert die Modellmarge nicht.
+
+Zwei getrennte Kostenbasen:
+
+- Vor dem Lauf: `gepufferte Schätzkosten = geschätzte USD-Kosten × eingefrorener FX-Kurs × (1 + FX-Sicherheitspuffer)`.
+- Nach dem Lauf: `Ist-Kosten = verifizierte USD-Kosten × eingefrorener FX-Kurs` — **ohne** Sicherheitspuffer. Der Puffer schützt nur die Vorabkalkulation; sonst erlaubte er faktisch 3,09× auf die echten Kosten und bräche die Garantie.
 
 **Ebene 1 — vor dem Lauf**
 
-Kundenpreis = degressive Kurve auf den FX-gepufferten geschätzten Providerkosten, hart gedeckelt bei 3,0×. Der Deckel ist absolut: **kein Mindestpreis und kein Mindestbeitrag darf ihn überschreiben.** Wenn ein Kleinstlauf wirtschaftlich nicht unter den Deckel passt, wird er gebündelt, blockiert oder ausdrücklich als kostenfrei behandelt — aber niemals über dem Deckel berechnet. Es gibt keine stille Boden-Ausnahme.
+Kundenpreis = degressive Kurve auf den gepufferten Schätzkosten, hart gedeckelt bei 3,0×. Der Deckel ist absolut: **kein Mindestpreis und kein Mindestbeitrag darf ihn überschreiben.** Wenn ein Kleinstlauf wirtschaftlich nicht unter den Deckel passt, wird er gebündelt, blockiert oder ausdrücklich als kostenfrei behandelt — aber niemals über dem Deckel berechnet. Es gibt keine stille Boden-Ausnahme.
 
 **Ebene 2 — nach dem Lauf**
 
 Sobald die echten Providerkosten eindeutig vorliegen:
 
-`verifizierter Faktor = tatsächliche Nutzungsbelastung ÷ gepufferte Ist-Providerkosten`
+`verifizierter Faktor = Nutzungsbelastung ÷ ungepufferte Ist-Providerkosten`
 
 - ≤ 3,0× → alles in Ordnung.
 - \> 3,0× → Preis-Drift: die Rate Card des Modells geht für neue Produktionsläufe auf Prüfung, **und** der Kunde erhält die Differenz automatisch als Wallet-Gutschrift.
-- Berechnung: `maxAllowedCharge = auf Cent abgerundet(3,0 × gepufferte Ist-Kosten)`, `Gutschrift = max(0, belasteter Betrag − maxAllowedCharge)`. Abgerundet, damit die Garantie nicht an einem Cent scheitert.
+- Berechnung: `maxAllowedCharge = auf Cent abgerundet(3,0 × ungepufferte Ist-Kosten)`, `Gutschrift = max(0, Nutzungsbelastung − maxAllowedCharge)`. Abgerundet, damit die Garantie nicht an einem Cent scheitert.
 - Der Kunden-Ausgleich läuft centgenau. Die Toleranz `PRICING_TRUE_UP_TOLERANCE_EUR = 0,01` gilt ausschließlich für den internen Drift-Alarm, nie als Abzug bei der Gutschrift.
 - Ist-Kosten höher als geschätzt (Faktor unter 1,8×) → **keine** Nachbelastung. AdTool trägt die Abweichung, die Rate Card wird korrigiert. 1,8× ist Kalkulationsuntergrenze für künftige Läufe, keine rückwirkende Garantie zugunsten AdTool.
 - Der vorab genehmigte Preis wird nie nachträglich erhöht.
@@ -35,7 +43,8 @@ Sobald die echten Providerkosten eindeutig vorliegen:
 
 **Sperrgründe explizit**
 
-`pricing_gate_reason` ist immer einer von: `estimate_over_cap`, `actual_cost_drift`, `cost_unverified`, `floor_conflict`.
+`pricing_gate_reason` ist immer einer von: `estimate_over_cap`, `actual_cost_drift`, `cost_unverified`, `estimator_calibrating`, `floor_conflict`.
+
 
 
 ## Topaz: Ist-Rechnung verifiziert, Schätzer in Kalibrierung
@@ -60,10 +69,11 @@ Pro Modell aggregiert: mittlerer und medianer Schätzfehler, tatsächlicher Fakt
 
 - Produktionspreis überschreitet nie 3,0× der gepufferten Schätzkosten — auch dann nicht, wenn Mindestpreis oder Mindestbeitrag höher lägen (dann greift `floor_conflict`, kein stiller Aufpreis).
 - Verifizierter Faktor > 3,0 setzt die Rate Card auf Prüfung mit Grund `actual_cost_drift`.
-- Nachträglicher Ausgleich senkt die Belastung auf ≤ 3,0× der gepufferten Ist-Kosten.
+- Nachträglicher Ausgleich senkt die Belastung auf ≤ 3,0× der **ungepufferten** Ist-Kosten.
+- Der Nachlauf-Faktor überschreitet nie 3,0× der ungepufferten Ist-Kosten in Euro — auch nach FX-Umrechnung und Cent-Rundung nicht; der FX-Puffer fließt nie in den Nachlauf-Deckel.
 - Race-Test: Webhook, Reconciler und ein Retry gleichzeitig erzeugen zusammen **genau eine** Gutschrift.
 - Späte Kosten: ein bereits abgeschlossener Lauf erhält erst danach die verifizierte Kostenzahl — der Ausgleich läuft trotzdem sicher und genau einmal.
-- Basis des verifizierten Faktors ist die rabattierte Nutzungsbelastung ohne Steuern, Abo- und Zahlungsgebühren.
+- Basis des verifizierten Faktors ist die rabattierte Nutzungsbelastung ohne Steuern, Abo- und Zahlungsgebühren; eingesetztes Promo- oder Startguthaben verändert sie nicht.
 - Höhere Ist-Kosten lösen nie eine Nachbelastung aus, auch unter 1,8× nicht.
 - Client/Server-Parität der gesamten Preisrechnung.
 - Kein Test nagelt einen konkreten Eurobetrag fest — geprüft wird immer gegen Kurve und Deckel, damit FX-Änderungen die Tests nicht brechen.
