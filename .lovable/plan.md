@@ -97,3 +97,4 @@ Stufe 2 in dieser Reihenfolge: AI Video Studio, Mediathek/Lightbox, Ergebnis jed
 - Der Speicherfehler wird deterministisch injiziert: ein Fail-once-Schalter, der ausschließlich für den einen Lauf des Testkontos greift, nach erfolgreichem Anbieterlauf und erfolgreicher Zwischenablage. Geprüft wird danach: eine Prediction, eine Übermittlung, eine Belastung, ein finales Asset, Zwischendatei aufgeräumt. Der reguläre Speicherpfad wird nicht angefasst.
 - Beim Abbruchtest wird „abgebrochen vor Start" von „abgebrochen während des Laufs" unterschieden und die tatsächliche Anbieterabrechnung gegen die vorab festgelegte Policy geprüft.
 - Doppelanfrage über zwei parallele Starts mit demselben Idempotenz-Schlüssel.
+- Modelle bleiben `enabled: false`; freigeschaltet wird nach dem Bericht über die Flags und die verifizierten Berechtigungen.
