@@ -27,7 +27,16 @@ Abschließend: Qualitätstabelle mit 1–5-Punkten, Empfehlung welches Modell f�
 
 - Kein echter Anbieterfehler kontrolliert auslösbar → der Punkt wird als **BLOCKED** geführt, nicht durch eine Anfrage ersetzt, die schon unsere eigene Vorprüfung ablehnt.
 - Pro-Stufe nur, wenn die Anbieterberechtigung wirklich bestätigt ist; sonst bleibt sie ungetestet und gesperrt.
+
+## Abnahmeregeln (verbindlich)
+
+- **Technik und Preis getrennt bewerten**: ein Modell kann `Functional: READY` sein und gleichzeitig `Pricing: COST UNVERIFIED` — dann gilt `Global release: BLOCKED`. Ein fehlender Abrechnungswert entwertet den technischen Test nicht, gibt aber auch keine Preistabelle frei.
+- **Abrechnungs-Verzögerung einplanen**: zuerst `prediction_metric`, dann `provider_usage`, danach — nach angemessener Wartezeit — der Abgleich mit dem Anbieterkonto. Erst dann wird der Kostenstatus final gesetzt; im Bericht steht die tatsächlich verwendete Quelle.
+- **Qualitätsvergleich möglichst blind**: identische Zeitmarken und Ausschnitte, Bewertung intern als A/B/C, Auflösung der Zuordnung erst nach der Punktevergabe.
+- **Globale Freigabe nur bei allen Toren**: technischer Erfolg UND Guthaben-/Wiederherstellungs-Integrität UND Speicher-Integrität UND bestätigte Preistabelle UND bestätigte Kombinationen UND kein offener P0/P1-Punkt. Ein nicht gefahrlos provozierbarer echter Anbieterfehler sperrt ein Modell nicht dauerhaft, wenn der Fehler-/Erstattungspfad deterministisch integriert nachgewiesen ist — er wird aber als Abweichung geführt und nie als „live verifiziert" ausgewiesen.
+
 - Preistabellen bleiben „unbestätigt", solange nicht mindestens ein Lauf je Modell eine echte Kostenzahl geliefert hat.
+
 
 ## Technische Details
 
