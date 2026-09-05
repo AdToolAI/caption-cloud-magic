@@ -1,3 +1,4 @@
+import { getLang } from "@/lib/i18nText";
 import { tx } from "@/lib/i18nText";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, MessageSquare, Send } from "lucide-react";
