@@ -1,6 +1,6 @@
 # Eine Video-Enhance-Engine, viele Einstiegspunkte
 
-Genau wie im Picture Studio: das schwierige Stück (Modelle, Preise, Wallet, Erstattung, Speicherung, Vorher/Nachher) wird **einmal** gebaut. Alle Oberflächen rufen dieselbe Engine auf.
+Genau wie im Picture Studio: das schwierige Stück (Modelle, Preise, Wallet, Erstattung, Speicherung, Vorher/Nachher) wird **einmal** gebaut. Alle Oberflächen rufen dieselbe Engine auf. Stufe 1 ist das Kernstück — die Buttons in den Studios kommen erst danach.
 
 ## Was heute existiert (geprüft)
 
@@ -47,7 +47,11 @@ outputs:
 
 `standard` ist verfügbar; `pro` nur, wenn `providerEntitlementVerified` gesetzt ist — also nach einem echten Pro-Lauf über den AdTool-Replicate-Account. Vorher taucht Pro in keiner Oberfläche auf.
 
-### 3. Preis-Engine mit providerspezifischen Tarifkarten
+### 3. Quell-Metadaten kommen vom Server, nicht vom Client
+
+Dauer, Breite, Höhe, FPS, Codec/Container und Dateigröße werden **nie** aus dem Request übernommen. Vor Preisberechnung, Capability-Prüfung und Provider-Start liest die Engine die Werte aus dem eigenen Asset-Datensatz oder misst sie an der Quelldatei; Abweichungen zum Client-Vorschlag führen zur Ablehnung. Empfehlung, Validierung und Preis hängen unmittelbar daran.
+
+### 4. Preis-Engine mit providerspezifischen Tarifkarten
 
 Keine generische `Sekunden × Auflösungsfaktor × FPS-Faktor`-Formel. Die Registry unterstützt mehrere Tariftypen:
 
@@ -58,41 +62,47 @@ Keine generische `Sekunden × Auflösungsfaktor × FPS-Faktor`-Formel. Die Regis
 
 Danach wie bei Bildern: FX-Kurs mit Sicherheitspuffer → Margen-Kurve → Deckungsbeitrags-Floor → Endpreis. Ein geteilter Fixture-Test beweist: gleiche Konfiguration = gleicher Preis in Studio, Mediathek, Motion Studio, Director's Cut, Content Creator. Jede Tarifkarte trägt Quelle und Prüfdatum; unbestätigte Werte sind als `costUnverified` markiert und blockieren die globale Freischaltung.
 
-**Preis einfrieren:** Der angezeigte Betrag gilt. Vor dem Provider-Start wird der vollständige Snapshot am Lauf gespeichert — `rateCardVersion`, `providerCostEstimatedUsd`, `fxRate`, `fxBuffer`, `marginCurveVersion`, `userPriceEUR`, `creditsReserved`. Nach dem Lauf kommen `providerCostActualUsd`, `actualContributionEUR`, `actualMarginPct` dazu. Ein höherer Ist-Preis beim Provider wird **nie** nachträglich abgebucht — das ist Tarifkarten-Risiko und erscheint als Abweichung im Admin-Preisreport, der die Tarifkarte für künftige Läufe korrigiert.
+**Preis einfrieren:** Der angezeigte Betrag gilt. Vor dem Provider-Start wird der vollständige Snapshot am Lauf gespeichert — `rateCardVersion`, `providerCostEstimatedUsd`, `fxRate`, `fxBuffer`, `marginCurveVersion`, `userPriceEUR`, `creditsReserved`. Nach dem Lauf kommen `providerCostActualUsd`, `actualContributionEUR`, `actualMarginPct` dazu. Ein höherer Ist-Preis beim Provider wird **nie** nachträglich abgebucht.
 
-### 4. Idempotenz beginnt vor dem Provider-Aufruf
+**Abweichungs-Überwachung:** Weichen die Ist-Kosten wiederholt über einen konfigurierbaren Toleranzbereich von der Tarifkarte ab, gibt es eine Admin-Warnung und optional automatisch `costUnverified = true` — ein Notaus für neue Läufe dieses Modells. Kein Abschalten wegen einzelner Cent-Abweichungen; eine unangekündigte Preisänderung beim Provider frisst aber nicht stundenlang die Marge.
 
-`provider_prediction_id` schützt erst, wenn bei Replicate schon ein Job existiert. Deshalb trägt jeder Request einen `idempotency_key` (Client-Request-ID) mit Eindeutigkeitsbedingung in der Datenbank:
+### 5. Idempotenz beginnt vor dem Provider-Aufruf
+
+Jeder Request trägt einen `idempotency_key` (Client-Request-ID) mit Eindeutigkeit **pro Nutzer**: `UNIQUE(user_id, idempotency_key)`.
 
 ```text
-Request → INSERT run (UNIQUE idempotency_key)
+Request → INSERT run (UNIQUE user_id + idempotency_key)
         → Credits reservieren
+        → Submit-Claim (Lease) setzen, Zustand provider_submitting
         → Provider genau einmal starten
         → provider_prediction_id speichern
 ```
 
-Derselbe Schlüssel erneut (Doppelklick, Netz-Retry, zwei parallele Aufrufe): der bestehende Lauf wird zurückgegeben — keine zweite Reservierung, kein zweiter Provider-Job.
+Der Zustand `provider_submitting` schließt das Crash-Fenster: Wenn die Funktion nach der Annahme durch den Provider abstürzt, bevor die Prediction-ID gespeichert ist, darf kein Worker blind erneut absenden. Der atomare Claim/Lease gilt; ein Wiederaufnehmer sucht zunächst beim Provider nach einer bereits existierenden Prediction zu diesem Lauf und übernimmt sie, statt einen zweiten Job zu starten. Derselbe Schlüssel erneut (Doppelklick, Netz-Retry, parallele Aufrufe): der bestehende Lauf wird zurückgegeben — keine zweite Reservierung, kein zweiter Provider-Job.
 
-### 5. Lebenszyklus — lokaler Timeout ist kein Provider-Fehler
+### 6. Lebenszyklus und Wallet-Semantik
 
 ```text
-created → credits_reserved → provider_submitted → provider_processing
-→ provider_output_ready → asset_persisting → completed
+created → credits_reserved → provider_submitting → provider_submitted
+→ provider_processing → provider_output_ready → asset_staging
+→ asset_persisting → completed
 ```
 
-| Ergebnis | Folge |
-| --- | --- |
-| `provider_failed` | Erstattung (genau eine, idempotent) |
-| `provider_cancelled_confirmed` | Erstattung gemäß tatsächlicher Kostenlage |
-| `local_poll_timeout` | **keine** Erstattung; Lauf bleibt offen, Abgleich läuft weiter |
-| `provider_success` | Ausgabe in den eigenen Speicher übernehmen |
-| `asset_persist_failed` | Speicherung erneut versuchen; **kein** zweiter Provider-Lauf, keine automatische Erstattung |
+| Ergebnis | Wallet | Weiteres |
+| --- | --- | --- |
+| `provider_failed` | Reservierung genau einmal freigeben | keine Wiederholung ohne neue Nutzeraktion |
+| `provider_cancelled_confirmed` | Freigabe gemäß tatsächlicher Kostenlage | — |
+| `local_poll_timeout` | **unverändert**, keine Erstattung | Lauf bleibt offen, Abgleich läuft weiter |
+| `provider_success` | Belastung gemäß eingefrorenem Snapshot | Ausgabe übernehmen |
+| `asset_persist_failed` | **unverändert** | Speicherung erneut versuchen; kein zweiter Provider-Lauf |
 
-**Speicherung:** `provider_output_ready → herunterladen → prüfen → eigener Speicher → Video-Asset anlegen → completed`. Die Provider-URL lebt nur als temporäre Laufdaten für Wiederholversuche, wird nach erfolgreicher Übernahme entfernt und ist niemals die URL eines fertigen Assets. Ein abgelaufener oder fehlschlagender Download landet sauber in `asset_persist_failed`.
+Verbindlich für alle fünf Einstiegspunkte: Reservierung vor dem Provider-Start, endgültige Belastung nur bei Provider-Erfolg mit dem eingefrorenen Betrag, genau eine Freigabe bei endgültigem Provider-Fehler, und Persistenz-Wiederholungen berühren die Wallet nie.
+
+**Speicherung:** Sobald der Provider fertig ist, wird die Datei **sofort** in einen eigenen Zwischenspeicher (Staging-Key) kopiert — bevor irgendetwas anderes passiert. Sonst kann bei einem längeren Datenbank- oder Persistenzproblem die Provider-URL ablaufen und ein bezahltes Ergebnis ist verloren. Danach: prüfen → Video-Asset in `video_creations` anlegen → `completed`. Die Provider-URL lebt nur als temporäre Laufdaten für Wiederholversuche, wird nach erfolgreicher Übernahme entfernt und ist niemals die URL eines fertigen Assets.
 
 **Abgleich mit Ende:** Der Lauf trägt `reconciliation_attempts`, `last_reconciled_at`, `next_reconcile_at` (Backoff). Bleibt ein Lauf nach einem definierten Horizont ohne autoritatives Provider-Ergebnis, geht er in `manual_review` — sichtbar im Admin („3 hängende Video-Verbesserungen"), aber **ohne** automatische Erstattung, weil der echte Providerstatus unbekannt ist.
 
-### 6. Poll + Webhook von Anfang an, eine verifizierte Finalisierung
+### 7. Poll + Webhook von Anfang an, eine verifizierte Finalisierung
 
 Persistiert werden `provider_prediction_id`, `provider_status`, `provider_output_url`, `provider_completed_at`. Poller und Webhook laufen in dieselbe idempotente Finalisierung, geschützt über den Prediction-Key.
 
@@ -100,11 +110,11 @@ Ein Webhook wird nie blind übernommen: die Signatur/Authentifizierung des Provi
 
 Garantien (mit Tests): Webhook zuerst + Poll später = genau ein Asset; Poll zuerst + Webhook später = genau ein Asset; Funktions-Retry = keine zweite Abbuchung und kein zweiter Provider-Lauf.
 
-### 7. Nicht-destruktive Lineage
+### 8. Nicht-destruktive Lineage
 
 Quelle bleibt erhalten, der Master ist ein Kind-Asset (`Seedance-Szene → Lip-Sync → Stitch → 4K-Master`). Mediathek zeigt beide, Vorher/Nachher-Vergleich wie im Picture Studio.
 
-### 8. Empfehlung aus Asset-Metadaten
+### 9. Empfehlung aus Asset-Metadaten
 
 `recommendEnhancement({ sourceModel, resolution, fps, duration, destination })`, zentral und für alle Oberflächen gleich:
 
@@ -112,15 +122,17 @@ Quelle bleibt erhalten, der Master ist ein Kind-Asset (`Seedance-Szene → Lip-S
 - Kamera-Upload 1080p → YouTube 4K: „Topaz Video Upscale · 4K/30 empfohlen"
 - bereits 4K/30 auf 4K-Ziel: „Schon optimal — Verbesserung nicht nötig"
 
-### 9. Dreistufige Freischaltung
+### 10. Dreistufige Freischaltung
 
 Frontend-Flag (Sichtbarkeit), Backend-Schalter (maßgeblich), Test-Allowlist für echte Läufe. Beide Modelle starten gesperrt.
 
 ## Freigabekriterien vor globaler Aktivierung
 
-- **Topaz**: kleiner 1080p-Lauf · 4K/60-Lauf mit kürzestmöglicher Dauer · Provider-Fehler mit genau einer Erstattung · Persistenz-Retry
-- **ByteDance**: Standard + AIGC · Pro nur bei bestätigter Freischaltung · mindestens zwei Auflösungs-/FPS-Kombinationen zur Tarifprüfung · Provider-Fehler mit genau einer Erstattung · Persistenz-Retry
+- **Topaz**: kleiner 1080p-Lauf · 4K/60-Lauf mit kürzestmöglicher Dauer · Provider-Fehler mit genau einer Freigabe · Persistenz-Retry
+- **ByteDance**: Standard + AIGC · Pro nur bei bestätigter Freischaltung · mindestens zwei Auflösungs-/FPS-Kombinationen zur Tarifprüfung · Provider-Fehler mit genau einer Freigabe · Persistenz-Retry
 - **Immer**: vorhergesagte gegen tatsächliche Providerkosten; Abweichung = Tarifkarte korrigieren, nicht freischalten. Sehr kurze Clips genügen.
+
+Erst wenn Engine, Preise, Wallet, Abgleich und Speicherung an echten Clips stabil sind, folgt Stufe 2.
 
 ## Stufe 2 — Einstiegspunkte (in dieser Reihenfolge)
 
@@ -143,7 +155,9 @@ Finale Qualität
   Eigene Einstellung  → Modell · Auflösung · FPS · Scene · Tier
 ```
 
-„Empfohlen" und „Hohe Qualität" sind **semantische Absichten**, keine festen Konfigurationen. Modell, Verarbeitungsmodus, Auflösung und FPS werden jedes Mal aus Quell-Metadaten, Zielkanal und aktuellen Fähigkeiten berechnet — bei einem Kamera-Upload kann „Hohe Qualität" Topaz bedeuten, bei Seedance-Material ByteDance. Nichts davon wird global fest verdrahtet. Die gewählte Konfiguration wird immer sichtbar angezeigt.
+„Empfohlen" und „Hohe Qualität" sind **semantische Absichten**, keine festen Konfigurationen. Modell, Verarbeitungsmodus, Auflösung und FPS werden jedes Mal aus Quell-Metadaten, Zielkanal und aktuellen Fähigkeiten berechnet — bei einem Kamera-Upload kann „Hohe Qualität" Topaz bedeuten, bei Seedance-Material ByteDance. Die gewählte Konfiguration wird immer sichtbar angezeigt.
+
+**Reihenfolge:** In Motion Studio und Director's Cut arbeitet die Verbesserung standardmäßig auf dem **fertigen Master** nach Stitch, Übergängen und Lip-Sync — nie versehentlich auf Zwischenassets. Eine Verbesserung einzelner Szenen ist nur über eine ausdrückliche, getrennte Nutzeraktion möglich. Das spart Kosten und verhindert mehrfaches Hochskalieren.
 
 Der Altpfad `director-cut-upscale` wird abgelöst, sobald der Director's-Cut-Einstieg steht.
 
@@ -154,6 +168,6 @@ Keine Änderung an Video-Generierung, Lip-Sync, Rendering, Wallet-Grundlogik ode
 ## Technische Details
 
 - Neue Dateien: `src/config/videoEnhanceModels/{index,types,models,flags}.ts`, `src/lib/videoEnhance/{rates,pricing,lineage,recommend}.ts`, `src/hooks/useEnhanceVideo.ts`, `supabase/functions/video-enhance/index.ts`, `supabase/functions/video-enhance-webhook/index.ts`, `supabase/functions/video-enhance-reconcile/index.ts`, `supabase/functions/_shared/video-enhance-models.ts` (Server-Spiegel mit Parity-Test).
-- Migration `video_enhance_runs` inkl. GRANTs und besitzergebundener RLS: Statusfeld nach obigem Lebenszyklus, `idempotency_key` UNIQUE, `provider_prediction_id` UNIQUE, Erstattungsmarker, Preis-Snapshot (Prognose und Ist getrennt), Abgleichfelder (`reconciliation_attempts`, `last_reconciled_at`, `next_reconcile_at`), temporäre `provider_output_url`, Elternbezug für die Lineage. Ergebnis-Asset in der bestehenden Video-Persistenz (`video_creations`), immer mit AdTool-eigener Speicher-URL.
-- Tests: Registry↔Server-Parität; Kombinationsvalidierung; Preis-Fixtures über alle Einstiegspunkte; eingefrorener Preis bleibt bei abweichenden Ist-Kosten unverändert; doppelter `idempotency_key` erzeugt genau einen Lauf und eine Reservierung; Webhook-vor-Poll / Poll-vor-Webhook / Funktions-Retry = ein Asset; Webhook mit fremder oder nicht passender Prediction wird abgelehnt; `local_poll_timeout` erstattet nie; `asset_persist_failed` startet nie einen zweiten Provider-Lauf; `manual_review` nach Horizont ohne Erstattung; Empfehlungs- und Preset-Matrix (Quelle × Ziel × Kanal); EN/DE/ES-Parität aller neuen Texte.
+- Migration `video_enhance_runs` inkl. GRANTs und besitzergebundener RLS: Statusfeld nach obigem Lebenszyklus, `UNIQUE(user_id, idempotency_key)`, `provider_prediction_id` UNIQUE, Submit-Claim/Lease-Felder, Reservierungs- und Belastungsmarker, Preis-Snapshot (Prognose und Ist getrennt), geprüfte Quell-Metadaten, Abgleichfelder (`reconciliation_attempts`, `last_reconciled_at`, `next_reconcile_at`), temporäre `provider_output_url`, Staging-Key, Elternbezug für die Lineage. Ergebnis-Asset in `video_creations`, immer mit AdTool-eigener Speicher-URL.
+- Tests: Registry↔Server-Parität; Kombinationsvalidierung; Preis-Fixtures über alle Einstiegspunkte; eingefrorener Preis bleibt bei abweichenden Ist-Kosten unverändert; Kostenabweichung löst Warnung/Notaus aus; doppelter `idempotency_key` erzeugt genau einen Lauf und eine Reservierung; **Nebenläufigkeitstests für das Submit-Crash-Fenster** (Absturz nach Provider-Annahme, paralleler Wiederaufnehmer, Lease-Ablauf) erzeugen nie einen zweiten Provider-Job; Client-Metadaten überschreiben nie die serverseitig gemessenen; Webhook-vor-Poll / Poll-vor-Webhook / Funktions-Retry = ein Asset; Webhook mit fremder oder nicht passender Prediction wird abgelehnt; `local_poll_timeout` erstattet nie; `asset_persist_failed` startet nie einen zweiten Provider-Lauf; `manual_review` nach Horizont ohne Erstattung; Empfehlungs- und Preset-Matrix (Quelle × Ziel × Kanal); EN/DE/ES-Parität aller neuen Texte.
 - Aufgabe wird zu Beginn der Umsetzung in `roadmap.md` eingetragen.
