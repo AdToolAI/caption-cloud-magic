@@ -146,7 +146,22 @@ export function ImageGenerator() {
 
   const [prompt, setPrompt] = useState(cached?.prompt ?? "");
   const [style, setStyle] = useState(cached?.style ?? PICTURE_STYLE_NONE);
+  /**
+   * SEMANTIC format choice of the user: `source` or a ratio label.
+   * A model switch never rewrites this — only `resolvedFormat` changes.
+   */
   const [aspectRatio, setAspectRatio] = useState(cached?.aspectRatio ?? "1:1");
+  /**
+   * Lifetime of the "user touched the format" flag:
+   *  - direct user change in the format picker -> true
+   *  - automatic model approximation            -> unchanged
+   *  - model switch                             -> unchanged
+   *  - adding a reference                       -> switches to Source only while false
+   *  - new session / reset                      -> false
+   */
+  const [aspectRatioTouched, setAspectRatioTouched] = useState(false);
+  /** Natural pixel size of reference #1 — the one and only "Source". */
+  const [sourceDimensions, setSourceDimensions] = useState<SourceDimensions | null>(null);
   const [tier, setTier] = useState<QualityTier>('standard');
   
   // New mode model (replaces editMode boolean). Legacy editMode is migrated.
