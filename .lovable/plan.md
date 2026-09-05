@@ -11,17 +11,19 @@ Video Enhance bleibt bewusst günstig. Der Deckel gilt nicht nur auf der Schätz
 
 ## Verbindliche Preisregel
 
+**Ebene 0 — Berechnungsbasis**
+
+Maßgeblich ist ausschließlich die reine KI-Nutzungsbelastung dieses Laufs: nach modell- bzw. creatorbezogenem Rabatt, **vor** Mehrwertsteuer, ohne Abo-Anteil, ohne Zahlungsgebühren, ohne Promo-Guthaben-Effekte. So ergibt derselbe Provider-Lauf in jedem Land und mit jedem Gutschein denselben Faktor.
+
 **Ebene 1 — vor dem Lauf**
 
-Kundenpreis = degressive Kurve auf den FX-gepufferten geschätzten Providerkosten, hart gedeckelt bei 3,0×. Mindestpreis und Mindestbeitrag bleiben; wenn einer davon über den Deckel drücken würde, wird der Lauf als prüfpflichtig markiert statt still teurer verkauft. Einzige Ausnahme: Kleinstläufe, bei denen der Deckel unter dem absoluten Mindestpreis liegt — ausdrücklich als Boden-Ausnahme im Preis-Schnappschuss vermerkt.
+Kundenpreis = degressive Kurve auf den FX-gepufferten geschätzten Providerkosten, hart gedeckelt bei 3,0×. Der Deckel ist absolut: **kein Mindestpreis und kein Mindestbeitrag darf ihn überschreiben.** Wenn ein Kleinstlauf wirtschaftlich nicht unter den Deckel passt, wird er gebündelt, blockiert oder ausdrücklich als kostenfrei behandelt — aber niemals über dem Deckel berechnet. Es gibt keine stille Boden-Ausnahme.
 
 **Ebene 2 — nach dem Lauf**
 
 Sobald die echten Providerkosten eindeutig vorliegen:
 
-`verifizierter Faktor = tatsächlich belasteter Nutzungspreis ÷ gepufferte Ist-Providerkosten`
-
-Basis ist immer der **tatsächlich für diesen Lauf belastete** Betrag nach Creator-Rabatt, Gutschein oder sonstiger Vergünstigung — nie ein theoretischer Listenpreis.
+`verifizierter Faktor = tatsächliche Nutzungsbelastung ÷ gepufferte Ist-Providerkosten`
 
 - ≤ 3,0× → alles in Ordnung.
 - \> 3,0× → Preis-Drift: die Rate Card des Modells geht für neue Produktionsläufe auf Prüfung, **und** der Kunde erhält die Differenz automatisch als Wallet-Gutschrift.
@@ -29,11 +31,12 @@ Basis ist immer der **tatsächlich für diesen Lauf belastete** Betrag nach Crea
 - Der Kunden-Ausgleich läuft centgenau. Die Toleranz `PRICING_TRUE_UP_TOLERANCE_EUR = 0,01` gilt ausschließlich für den internen Drift-Alarm, nie als Abzug bei der Gutschrift.
 - Ist-Kosten höher als geschätzt (Faktor unter 1,8×) → **keine** Nachbelastung. AdTool trägt die Abweichung, die Rate Card wird korrigiert. 1,8× ist Kalkulationsuntergrenze für künftige Läufe, keine rückwirkende Garantie zugunsten AdTool.
 - Der vorab genehmigte Preis wird nie nachträglich erhöht.
-- Die Gutschrift läuft über den eindeutigen Wallet-Schlüssel `video_enhance:{runId}:pricing_true_up` und kann bei Webhook, Reconciler und Wiederholung zusammen höchstens einmal ausgeführt werden.
+- Die Gutschrift läuft über den eindeutigen Wallet-Schlüssel `video_enhance:{runId}:pricing_true_up` und kann bei Webhook, Reconciler und Wiederholung zusammen höchstens einmal ausgeführt werden — auch wenn die echte Kostenzahl erst lange nach Abschluss des Laufs eintrifft.
 
 **Sperrgründe explizit**
 
 `pricing_gate_reason` ist immer einer von: `estimate_over_cap`, `actual_cost_drift`, `cost_unverified`, `floor_conflict`.
+
 
 
 ## Topaz: Architektur jetzt, Formel später
