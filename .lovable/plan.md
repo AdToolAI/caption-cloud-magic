@@ -168,13 +168,27 @@ Modelle, alle anderen bleiben wählbar.
 
 ## 7. Tests
 
-- **Invariant-Test über alle aktiven referenzfähigen Modelle:** bei `style = auto`
-  und unberührten Defaults enthält `appliedModifiers` keinen Style-Suffix, keinen
-  erzwungenen Ratio-Zusatz und keinen versteckten Reference-Strength-Modifier.
+- **Invariant-Test über alle aktiven referenzfähigen Modelle:**
+
+```text
+No active model may receive a creative/style/ratio/reference modifier
+that is not represented by visible UI state or an explicit user instruction.
+
+With reference image:
+- Style Auto  -> no style modifier
+- Source      -> no silent forced ratio
+- Balanced    -> native or prompt-guided influence MAY be applied,
+                 because Balanced is visibly selected
+- No hidden legacy strength/default outside this visible state
+```
+
 - **Golden-/Snapshot-Tests** pro Modell (Gemini, Seedream, Nano Banana, FLUX,
   Qwen — soweit aktiv): feste Eingaben, exakt erwartete Ausgabe plus Snapshot des
   normalisierten Requests.
 - Mapping-Richtungstest je Modell mit nativem Strength-Feld.
+- Modellwechsel-Test: FLUX + Close → Wechsel zu Qwen → semantischer Modus bleibt
+  `close`, der Qwen-Wert wird neu berechnet, der FLUX-Zahlenwert wird **nicht**
+  wiederverwendet.
 - Matrix: Style Auto ohne Suffix · expliziter Stil · Keep Original vs.
   widersprechender Prompt · Source-Fallback-Stufen (nie 1:1) · explizites 9:16 ·
   „watercolor-blue dress" ohne Warnung · kein verstecktes Strength ·
@@ -203,3 +217,8 @@ Modelle, alle anderen bleiben wählbar.
 UI je Modell, erkannte Konfliktfälle, unterstützte/nicht unterstützte
 Prompt-Syntax, geänderte Dateien, neue Tests, exakte Test-/Typecheck-/Build-
 Ausgaben, offene Einschränkungen pro Modell.
+
+**Punkt 11 — Model-switch behavior** für Gemini, Seedream, Nano Banana, FLUX und
+Qwen: welche Nutzerwerte bleiben erhalten, welche Providerwerte werden neu
+berechnet, welche Einstellungen unterstützt das neue Modell nicht, wie wird das
+angezeigt, und der Nachweis, dass kein alter Providerparameter weiterverwendet wird.
