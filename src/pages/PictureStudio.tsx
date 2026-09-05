@@ -50,8 +50,15 @@ export default function PictureStudio() {
       if (next.tab === "generate" && next.mode === "batch") params.mode = "batch";
       setSearchParams(params, { replace: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Follow in-app deep links (e.g. "continue in Background") without a reload.
+  useEffect(() => {
+    const next = resolveTab(searchParams.get("tab"), searchParams.get("mode"));
+    setActiveTab(next.tab);
+    setGenerateMode(next.mode);
+  }, [searchParams]);
+
 
   const TAB_CONFIG = useMemo(
     () => [
