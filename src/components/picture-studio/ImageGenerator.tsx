@@ -34,6 +34,15 @@ import {
   type QualityTier as ModelTier,
 } from "@/config/pictureStudioModels";
 import { capabilityFor, supportsMode } from "@/config/pictureModelCapabilities";
+import {
+  buildPictureRequest,
+  supportsTransparency,
+  strengthBucket,
+  PICTURE_STYLE_NONE,
+  type PromptSegment,
+} from "@/config/picturePromptBuilder";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, Eye, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 
@@ -86,6 +95,7 @@ export function ImageGenerator() {
   const status = { stage: '', message: '' };
 
   const STYLES = useMemo(() => [
+    { value: PICTURE_STYLE_NONE, label: tx({ de: 'Kein Stil (nur mein Text)', en: 'No style (my words only)', es: 'Sin estilo (solo mis palabras)' }) },
     { value: 'realistic', label: t('picStudio.styleRealistic') },
     { value: 'cinematic', label: t('picStudio.styleCinematic') },
     { value: 'watercolor', label: t('picStudio.styleWatercolor') },
@@ -128,7 +138,7 @@ export function ImageGenerator() {
   const cached = getCachedState();
 
   const [prompt, setPrompt] = useState(cached?.prompt ?? "");
-  const [style, setStyle] = useState(cached?.style ?? "realistic");
+  const [style, setStyle] = useState(cached?.style ?? PICTURE_STYLE_NONE);
   const [aspectRatio, setAspectRatio] = useState(cached?.aspectRatio ?? "1:1");
   const [tier, setTier] = useState<QualityTier>('standard');
   
@@ -143,7 +153,9 @@ export function ImageGenerator() {
   const [exactHeight, setExactHeight] = useState<string>(cached?.exactHeight ?? '');
   const [resolution, setResolution] = useState<string>(cached?.resolution ?? '');
   const extraRefInputRef = useRef<HTMLInputElement>(null);
-  const [strength, setStrength] = useState<number>(cached?.strength ?? 70);
+  const [strength, setStrength] = useState<number>(cached?.strength ?? 30);
+  const [transparentBackground, setTransparentBackground] = useState(false);
+  const [showPromptPreview, setShowPromptPreview] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(cached?.generatedImages ?? []);
   const activeAsset = useOptionalActiveAsset();
   const [replicateLoading, setReplicateLoading] = useState(false);
@@ -321,25 +333,50 @@ export function ImageGenerator() {
     mood: activeBrandKit.mood || undefined,
   } : null;
 
-  // Build the effective prompt: for transform-mode, append a preservation
-  // suffix based on the strength slider, so downstream models (which mostly
-  // don't expose a numeric "strength" param) honor user intent via language.
-  const effectivePrompt = useMemo(() => {
-    const base = prompt.trim();
-    if ((mode !== 'transform' && mode !== 'mix') || !referenceImage) return base;
-    if (strength <= 35) {
-      return `${base}\n\nPreserve the exact composition, subjects, layout and lighting of the reference image. Only refine style and details — do not move, add, or remove subjects.`;
-    }
-    if (strength <= 65) {
-      return `${base}\n\nKeep the overall composition and main subjects of the reference image. Adjust style, lighting and atmosphere as described.`;
-    }
-    return `${base}\n\nUse the reference image as loose inspiration only.`;
-  }, [prompt, mode, referenceImage, strength]);
+  // Single source of truth for "what do we actually send": the very module the
+  // Edge Functions run. No hidden modifiers may be added anywhere else.
+  const requestSubjectRefs = useMemo(
+    () => (mode === 'transform' || mode === 'mix'
+      ? ([referenceImage, ...extraReferences].filter(Boolean) as string[]).slice(0, maxSubjectRefs)
+      : []),
+    [mode, referenceImage, extraReferences, maxSubjectRefs],
+  );
+  const requestStyleRefs = useMemo(
+    () => (mode === 'restyle' && styleReference ? [styleReference] : []),
+    [mode, styleReference],
+  );
+
+  const canBeTransparent = supportsTransparency(tier);
+
+  const built = useMemo(() => buildPictureRequest({
+    tier,
+    mode,
+    prompt,
+    style,
+    aspectRatio,
+    subjectRefs: requestSubjectRefs,
+    styleRefs: requestStyleRefs,
+    strength,
+    transparentBackground: transparentBackground && canBeTransparent,
+    brandKit: brandKitPayload,
+  }), [tier, mode, prompt, style, aspectRatio, requestSubjectRefs, requestStyleRefs, strength, transparentBackground, canBeTransparent, brandKitPayload]);
+
+  const effectivePrompt = built.prompt;
+
+  const SEGMENT_TONE: Record<PromptSegment['source'], string> = {
+    user: 'text-foreground',
+    intent: 'text-primary',
+    reference: 'text-primary',
+    style: 'text-amber-400',
+    brand: 'text-cyan-400',
+    negative: 'text-rose-400',
+    format: 'text-muted-foreground',
+  };
 
   /** "Realistic Reproduction" one-click for the transform mode. */
   const handleRealisticReproduction = () => {
     setTier('ultra');
-    setStrength(40);
+    setStrength(15);
     setStyle('realistic');
     setVariantsCount(1);
     setPrompt((p) => {
@@ -382,6 +419,9 @@ export function ImageGenerator() {
           referenceImageUrl: subjectRefs[0],
           referenceImageUrls: subjectRefs,
           styleReferenceUrls: styleRefs,
+          strength: mode === 'transform' || mode === 'mix' ? strength : undefined,
+          transparentBackground: transparentBackground && canBeTransparent,
+          brandKit: brandKitPayload,
         }
       });
       if (error) throw error;
@@ -403,6 +443,7 @@ export function ImageGenerator() {
         resolution: resolution || undefined,
         mode,
         strength: mode === 'transform' || mode === 'mix' ? strength : undefined,
+        transparentBackground: transparentBackground && canBeTransparent,
         brandKit: brandKitPayload,
       }
     });
@@ -900,12 +941,32 @@ export function ImageGenerator() {
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleReferenceUpload} />
               <input ref={styleRefInputRef} type="file" accept="image/*" className="hidden" onChange={handleStyleRefUpload} />
 
-              {/* Strength slider — transform mode only */}
-              {(mode === 'transform' || mode === 'mix') && referenceImage && capability?.strengthField && (
-                <div className="pt-2 space-y-1.5">
+              {/* How much may change — always visible when a template is in play */}
+              {(mode === 'transform' || mode === 'mix') && referenceImage && (
+                <div className="pt-2 space-y-2">
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-muted-foreground">{tx({ de: 'Stärke der Veränderung', en: 'Strength of change', es: 'Intensidad del cambio' })}</span>
+                    <span className="text-muted-foreground">
+                      {tx({ de: 'Wie stark darf das Bild verändert werden?', en: 'How much may the picture change?', es: '¿Cuánto puede cambiar la imagen?' })}
+                    </span>
                     <span className="font-mono">{strength}%</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {([
+                      { value: 15, label: tx({ de: 'Fast gleich', en: 'Almost identical', es: 'Casi idéntica' }) },
+                      { value: 50, label: tx({ de: 'Deutlich anders', en: 'Clearly different', es: 'Claramente distinta' }) },
+                      { value: 85, label: tx({ de: 'Nur Inspiration', en: 'Inspiration only', es: 'Solo inspiración' }) },
+                    ] as const).map((preset) => (
+                      <Button
+                        key={preset.value}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setStrength(preset.value)}
+                        className={`h-8 text-[10px] whitespace-normal leading-tight ${strengthBucket(strength) === strengthBucket(preset.value) ? 'border-primary bg-primary/10' : 'border-border/50'}`}
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
                   </div>
                   <Slider
                     value={[strength]}
@@ -914,10 +975,19 @@ export function ImageGenerator() {
                     max={100}
                     step={5}
                   />
-                  <div className="flex justify-between text-[10px] text-muted-foreground">
-                    <span>{tx({ de: "nah am Original", en: "close to original", es: "cerca del original" })}</span>
-                    <span>{tx({ de: "nur Inspiration", en: "inspiration only", es: "solo inspiración" })}</span>
-                  </div>
+                  <p className="text-[10px] text-muted-foreground leading-snug">
+                    {capability?.strengthField
+                      ? tx({
+                          de: `${capability.model} setzt diesen Wert direkt am Modell um.`,
+                          en: `${capability.model} applies this value directly at the model.`,
+                          es: `${capability.model} aplica este valor directamente en el modelo.`,
+                        })
+                      : tx({
+                          de: `${capability?.model ?? tier} hat keinen echten Regler — der Wunsch wird als Satz im Prompt formuliert und kann abgeschwächt werden.`,
+                          en: `${capability?.model ?? tier} has no real slider — the wish is phrased as a sentence in the prompt and can be softened.`,
+                          es: `${capability?.model ?? tier} no tiene control real: el deseo se formula como frase del prompt y puede suavizarse.`,
+                        })}
+                  </p>
                 </div>
               )}
 
@@ -1036,6 +1106,64 @@ export function ImageGenerator() {
               </p>
             </div>
           )}
+
+          {/* Transparent background — honest capability gate */}
+          <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs flex items-center gap-1.5">
+                <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                {tx({ de: 'Transparenter Hintergrund', en: 'Transparent background', es: 'Fondo transparente' })}
+              </Label>
+              <Switch
+                checked={transparentBackground && canBeTransparent}
+                onCheckedChange={setTransparentBackground}
+                disabled={!canBeTransparent}
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-snug">
+              {canBeTransparent
+                ? tx({ de: 'Wird als PNG mit Alphakanal erzeugt.', en: 'Produced as PNG with an alpha channel.', es: 'Se genera como PNG con canal alfa.' })
+                : tx({ de: `${capability?.model ?? tier} kann das nicht. Nutze dafür den Bereich „Hintergrund" — dort wird sauber freigestellt.`, en: `${capability?.model ?? tier} cannot do this. Use the “Background” section, which cuts out cleanly.`, es: `${capability?.model ?? tier} no puede hacerlo. Usa la sección «Fondo», que recorta limpiamente.` })}
+            </p>
+          </div>
+
+          {/* WHAT WE ACTUALLY SEND — no hidden modifiers */}
+          <Collapsible open={showPromptPreview} onOpenChange={setShowPromptPreview}>
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm" className="w-full justify-between h-9 text-xs">
+                <span className="flex items-center gap-1.5">
+                  <Eye className="h-3.5 w-3.5 text-primary" />
+                  {tx({ de: 'Das wird genau gesendet', en: 'This is exactly what we send', es: 'Esto es lo que enviamos' })}
+                </span>
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showPromptPreview ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2 p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+              {built.segments.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">
+                  {tx({ de: 'Noch keine Beschreibung eingegeben.', en: 'No description entered yet.', es: 'Aún no hay descripción.' })}
+                </p>
+              ) : (
+                built.segments.map((segment, i) => (
+                  <div key={`${segment.source}-${i}`} className="space-y-0.5">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{tx(segment.label)}</p>
+                    <p className={`text-[11px] leading-snug whitespace-pre-wrap ${SEGMENT_TONE[segment.source]}`}>{segment.text}</p>
+                  </div>
+                ))
+              )}
+              {built.notices.filter(n => n.level !== 'info').map((notice) => (
+                <p key={notice.code} className="flex items-start gap-1.5 text-[10px] text-amber-400 leading-snug">
+                  <Info className="h-3 w-3 mt-0.5 shrink-0" />
+                  {tx(notice.message)}
+                </p>
+              ))}
+              {built.strengthField && typeof built.strengthValue === 'number' && (
+                <p className="text-[10px] text-muted-foreground font-mono">
+                  {built.strengthField} = {built.strengthValue}
+                </p>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
 
           {/* Brand-Kit Toggle */}
           <div className="p-3 rounded-lg border border-border/50 bg-background/30">
