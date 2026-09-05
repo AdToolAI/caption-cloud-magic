@@ -38,8 +38,54 @@ export const TERMINAL_STATUSES: RunStatus[] = [
 
 /** Lease held while one worker submits to the provider. */
 export const SUBMIT_LEASE_SECONDS = 120;
-/** After this long without an authoritative provider verdict: manual review. */
+/**
+ * Default horizon without an authoritative provider verdict before a run goes
+ * to manual review. Configurable, because provider queues can get slow and we
+ * must be able to move this line without a deploy.
+ */
 export const RECONCILE_HORIZON_MINUTES = 180;
+
+export function manualReviewAfterMinutes(env: (key: string) => string | undefined): number {
+  const raw = env('VIDEO_ENHANCE_MANUAL_REVIEW_AFTER_MINUTES');
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : RECONCILE_HORIZON_MINUTES;
+}
+
+/**
+ * Where an actual provider cost number came from.
+ *
+ * Replicate documents timing metrics, not a guaranteed cost field, so the
+ * engine must never depend on one. A missing cost is recorded as `unavailable`
+ * and simply skips the drift check — it never fails or unverifies a run.
+ */
+export type ProviderCostSource =
+  | 'prediction_metric'
+  | 'provider_usage'
+  | 'billing_record'
+  | 'manual_verified'
+  | 'unavailable';
+
+export interface ProviderCostReading {
+  usd?: number;
+  source: ProviderCostSource;
+}
+
+// deno-lint-ignore no-explicit-any
+export function extractProviderCost(prediction: any): ProviderCostReading {
+  const metrics = prediction?.metrics ?? {};
+  for (const field of ['total_cost', 'cost', 'predict_cost']) {
+    const value = metrics[field];
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+      return { usd: value, source: 'prediction_metric' };
+    }
+  }
+  // Some models report consumed units instead of money (Topaz style).
+  const units = metrics.units ?? metrics.units_used;
+  if (typeof units === 'number' && Number.isFinite(units) && units > 0) {
+    return { usd: undefined, source: 'provider_usage' };
+  }
+  return { source: 'unavailable' };
+}
 
 export function ledgerKey(runId: string, operation: 'reserve' | 'capture' | 'release'): string {
   return `video_enhance:${runId}:${operation}`;
