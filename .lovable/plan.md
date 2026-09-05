@@ -72,13 +72,16 @@ Jeder Request trägt einen `idempotency_key` (Client-Request-ID) mit Eindeutigke
 
 ```text
 Request → INSERT run (UNIQUE user_id + idempotency_key)
-        → Credits reservieren
+        → Credits reservieren (Ledger-Schlüssel video_enhance:{runId}:reserve)
+        → Callback-Token erzeugen und speichern
         → Submit-Claim (Lease) setzen, Zustand provider_submitting
-        → Provider genau einmal starten
+        → Provider genau einmal starten, Webhook-URL trägt den Token
         → provider_prediction_id speichern
 ```
 
-Der Zustand `provider_submitting` schließt das Crash-Fenster: Wenn die Funktion nach der Annahme durch den Provider abstürzt, bevor die Prediction-ID gespeichert ist, darf kein Worker blind erneut absenden. Der atomare Claim/Lease gilt; ein Wiederaufnehmer sucht zunächst beim Provider nach einer bereits existierenden Prediction zu diesem Lauf und übernimmt sie, statt einen zweiten Job zu starten. Derselbe Schlüssel erneut (Doppelklick, Netz-Retry, parallele Aufrufe): der bestehende Lauf wird zurückgegeben — keine zweite Reservierung, kein zweiter Provider-Job.
+Derselbe Schlüssel erneut (Doppelklick, Netz-Retry, parallele Aufrufe): der bestehende Lauf wird zurückgegeben — keine zweite Reservierung, kein zweiter Provider-Job.
+
+**Absturz-Wiederherstellung über den Callback-Token, nicht über eine Prediction-Suche.** Replicate bietet keinen dokumentierten Weg, Predictions anhand einer internen AdTool-Lauf-ID zu finden — darauf darf sich nichts verlassen. Stattdessen wird **vor** dem Absenden ein undurchsichtiger, signierter Token erzeugt und persistiert; die Webhook-URL lautet `/video-enhance-webhook?callback=<token>`. Kein `run_id` im Klartext, da URL-Parameter nicht Teil der Provider-Signatur sind. Stürzt die Funktion nach der Annahme durch den Provider ab, bevor die Prediction-ID gespeichert ist, trifft der Webhook trotzdem ein: Token → Lauf bestimmen → Provider-Signatur samt Zeitstempel prüfen (Replay-Schutz) → Prediction-ID aus dem verifizierten Ereignis übernehmen → Zustand beim Provider autoritativ nachlesen → Lauf reparieren und fortsetzen. Solange der Lease gilt, sendet kein Worker blind ein zweites Mal ab.
 
 ### 6. Lebenszyklus und Wallet-Semantik
 
@@ -91,16 +94,23 @@ created → credits_reserved → provider_submitting → provider_submitted
 | Ergebnis | Wallet | Weiteres |
 | --- | --- | --- |
 | `provider_failed` | Reservierung genau einmal freigeben | keine Wiederholung ohne neue Nutzeraktion |
-| `provider_cancelled_confirmed` | Freigabe gemäß tatsächlicher Kostenlage | — |
+| `cancel_requested` | **unverändert** | Abbruch an den Provider senden, weiter abgleichen |
+| `provider_cancelled_confirmed` | Freigabe gemäß tatsächlicher Kostenlage | erst hier fällt die Geldentscheidung |
 | `local_poll_timeout` | **unverändert**, keine Erstattung | Lauf bleibt offen, Abgleich läuft weiter |
 | `provider_success` | Belastung gemäß eingefrorenem Snapshot | Ausgabe übernehmen |
 | `asset_persist_failed` | **unverändert** | Speicherung erneut versuchen; kein zweiter Provider-Lauf |
 
+Ein Klick auf „Abbrechen" ist ein Wunsch, kein Ergebnis: `cancel_requested` löst nie eine Erstattung aus. Erst wenn der Provider den Abbruch autoritativ bestätigt und die tatsächliche Kostenlage bekannt ist, wird Geld bewegt.
+
 Verbindlich für alle fünf Einstiegspunkte: Reservierung vor dem Provider-Start, endgültige Belastung nur bei Provider-Erfolg mit dem eingefrorenen Betrag, genau eine Freigabe bei endgültigem Provider-Fehler, und Persistenz-Wiederholungen berühren die Wallet nie.
 
-**Speicherung:** Sobald der Provider fertig ist, wird die Datei **sofort** in einen eigenen Zwischenspeicher (Staging-Key) kopiert — bevor irgendetwas anderes passiert. Sonst kann bei einem längeren Datenbank- oder Persistenzproblem die Provider-URL ablaufen und ein bezahltes Ergebnis ist verloren. Danach: prüfen → Video-Asset in `video_creations` anlegen → `completed`. Die Provider-URL lebt nur als temporäre Laufdaten für Wiederholversuche, wird nach erfolgreicher Übernahme entfernt und ist niemals die URL eines fertigen Assets.
+**Geldbewegungen doppelt gesichert:** Zusätzlich zu den Statusprüfungen ist jede Wallet-Operation selbst idempotent, über eindeutige Ledger-Schlüssel `video_enhance:{runId}:reserve` / `:capture` / `:release`. Selbst wenn Webhook, Poller und Retry gleichzeitig laufen und eine Statusprüfung versagt, kann kein Betrag zweimal bewegt werden.
 
-**Abgleich mit Ende:** Der Lauf trägt `reconciliation_attempts`, `last_reconciled_at`, `next_reconcile_at` (Backoff). Bleibt ein Lauf nach einem definierten Horizont ohne autoritatives Provider-Ergebnis, geht er in `manual_review` — sichtbar im Admin („3 hängende Video-Verbesserungen"), aber **ohne** automatische Erstattung, weil der echte Providerstatus unbekannt ist.
+**Quell-Video muss lange genug erreichbar sein:** Provider-Eingaben kommen ausschließlich aus dauerhaftem AdTool-Speicher oder aus serverseitig erzeugten signierten URLs, deren Gültigkeit den maximal erwarteten Warteschlangen- und Startzeitraum deutlich überschreitet. Sonst läuft die URL in der Warteschlange ab und der Job scheitert grundlos.
+
+**Speicherung:** Sobald der Provider fertig ist, wird die Datei **sofort** in einen eigenen Zwischenspeicher (Staging-Key) kopiert — bevor irgendetwas anderes passiert. Provider-Dateien sind ausdrücklich kein dauerhafter Speicher und werden nach begrenzter Zeit entfernt; bei einem längeren Datenbankproblem wäre ein bezahltes Ergebnis sonst verloren. Danach: prüfen → Video-Asset in `video_creations` anlegen → `completed`. Die Provider-URL lebt nur als temporäre Laufdaten für Wiederholversuche, wird nach erfolgreicher Übernahme entfernt und ist niemals die URL eines fertigen Assets.
+
+**Abgleich mit Ende:** Der Lauf trägt `reconciliation_attempts`, `last_reconciled_at`, `next_reconcile_at` (Backoff). Bleibt ein Lauf nach einem definierten Horizont ohne autoritatives Provider-Ergebnis, geht er in `manual_review` — sichtbar im Admin („3 hängende Video-Verbesserungen"), aber **ohne** automatische Erstattung. Dort gibt es echte Aktionen statt nur einer Anzeige: jetzt abgleichen · Provider-Vorgang ansehen · Speicherung erneut versuchen · Fall manuell finanziell abschließen. Jede manuelle Aktion wird protokolliert.
 
 ### 7. Poll + Webhook von Anfang an, eine verifizierte Finalisierung
 
@@ -168,6 +178,6 @@ Keine Änderung an Video-Generierung, Lip-Sync, Rendering, Wallet-Grundlogik ode
 ## Technische Details
 
 - Neue Dateien: `src/config/videoEnhanceModels/{index,types,models,flags}.ts`, `src/lib/videoEnhance/{rates,pricing,lineage,recommend}.ts`, `src/hooks/useEnhanceVideo.ts`, `supabase/functions/video-enhance/index.ts`, `supabase/functions/video-enhance-webhook/index.ts`, `supabase/functions/video-enhance-reconcile/index.ts`, `supabase/functions/_shared/video-enhance-models.ts` (Server-Spiegel mit Parity-Test).
-- Migration `video_enhance_runs` inkl. GRANTs und besitzergebundener RLS: Statusfeld nach obigem Lebenszyklus, `UNIQUE(user_id, idempotency_key)`, `provider_prediction_id` UNIQUE, Submit-Claim/Lease-Felder, Reservierungs- und Belastungsmarker, Preis-Snapshot (Prognose und Ist getrennt), geprüfte Quell-Metadaten, Abgleichfelder (`reconciliation_attempts`, `last_reconciled_at`, `next_reconcile_at`), temporäre `provider_output_url`, Staging-Key, Elternbezug für die Lineage. Ergebnis-Asset in `video_creations`, immer mit AdTool-eigener Speicher-URL.
-- Tests: Registry↔Server-Parität; Kombinationsvalidierung; Preis-Fixtures über alle Einstiegspunkte; eingefrorener Preis bleibt bei abweichenden Ist-Kosten unverändert; Kostenabweichung löst Warnung/Notaus aus; doppelter `idempotency_key` erzeugt genau einen Lauf und eine Reservierung; **Nebenläufigkeitstests für das Submit-Crash-Fenster** (Absturz nach Provider-Annahme, paralleler Wiederaufnehmer, Lease-Ablauf) erzeugen nie einen zweiten Provider-Job; Client-Metadaten überschreiben nie die serverseitig gemessenen; Webhook-vor-Poll / Poll-vor-Webhook / Funktions-Retry = ein Asset; Webhook mit fremder oder nicht passender Prediction wird abgelehnt; `local_poll_timeout` erstattet nie; `asset_persist_failed` startet nie einen zweiten Provider-Lauf; `manual_review` nach Horizont ohne Erstattung; Empfehlungs- und Preset-Matrix (Quelle × Ziel × Kanal); EN/DE/ES-Parität aller neuen Texte.
+- Migration `video_enhance_runs` inkl. GRANTs und besitzergebundener RLS: Statusfeld nach obigem Lebenszyklus, `UNIQUE(user_id, idempotency_key)`, `provider_prediction_id` UNIQUE, Callback-Token (eindeutig, undurchsichtig), Submit-Claim/Lease-Felder, Reservierungs- und Belastungsmarker, Preis-Snapshot (Prognose und Ist getrennt), geprüfte Quell-Metadaten, Abgleichfelder (`reconciliation_attempts`, `last_reconciled_at`, `next_reconcile_at`), temporäre `provider_output_url`, Staging-Key, Elternbezug für die Lineage. Dazu ein Wallet-Ledger mit eindeutigem Operationsschlüssel (`video_enhance:{runId}:reserve|capture|release`) und ein Audit-Protokoll für manuelle Admin-Aktionen. Ergebnis-Asset in `video_creations`, immer mit AdTool-eigener Speicher-URL.
+- Tests: Registry↔Server-Parität; Kombinationsvalidierung; Preis-Fixtures über alle Einstiegspunkte; eingefrorener Preis bleibt bei abweichenden Ist-Kosten unverändert; Kostenabweichung löst Warnung/Notaus aus; doppelter `idempotency_key` erzeugt genau einen Lauf und eine Reservierung; **Nebenläufigkeitstests für das Submit-Crash-Fenster** (Absturz nach Provider-Annahme, paralleler Wiederaufnehmer, Lease-Ablauf) erzeugen nie einen zweiten Provider-Job; **Wiederherstellung allein über den Callback-Token** (Prediction-ID war nie gespeichert) repariert den Lauf; doppelte Ledger-Operationen bewegen kein Geld zweimal; Abbruchwunsch parallel zum Provider-Erfolg erstattet nie fälschlich; abgelaufene oder ungültige Quell-URL wird vor dem Absenden erkannt; Client-Metadaten überschreiben nie die serverseitig gemessenen; Webhook-vor-Poll / Poll-vor-Webhook / Funktions-Retry = ein Asset; Webhook mit fremder, nicht passender oder wiederholt gesendeter Prediction wird abgelehnt; `local_poll_timeout` erstattet nie; `asset_persist_failed` startet nie einen zweiten Provider-Lauf; `manual_review` nach Horizont ohne Erstattung; Empfehlungs- und Preset-Matrix (Quelle × Ziel × Kanal); EN/DE/ES-Parität aller neuen Texte.
 - Aufgabe wird zu Beginn der Umsetzung in `roadmap.md` eingetragen.
