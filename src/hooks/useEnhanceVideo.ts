@@ -36,6 +36,8 @@ export interface EnhanceEstimate {
 
 export interface EnhanceSource {
   assetId?: string;
+  /** Which table the asset lives in — the server must never have to guess. */
+  assetType?: 'generation' | 'creation';
   url?: string;
 }
 
