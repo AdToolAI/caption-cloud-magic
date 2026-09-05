@@ -64,10 +64,13 @@ Kalibrierung ist ab jetzt Beobachtung, kein Freigabe-Tor. Kein Zurückdrehen weg
 
 ## Technische Details
 
-- `src/config/videoEnhanceModels/models.ts`: `enabled: true` für beide Einträge; `src/config/videoEnhanceModels/flags.ts` bleibt als Mechanik, wird aber nicht mehr benötigt, um die zwei Modelle sichtbar zu machen.
-- Secrets `VIDEO_ENHANCE_TOPAZ_ENABLED=true`, `VIDEO_ENHANCE_BYTEDANCE_ENABLED=true`; `isModelUnlocked()` in `supabase/functions/_shared/video-enhance-models.ts` bleibt unverändert (Backend-Flag hat Vorrang vor Allowlist).
+- `src/config/videoEnhanceModels/models.ts`: `enabled: true` für beide Einträge. `flags.ts` und `isModelUnlocked()` bleiben vollständig erhalten — beide Ebenen sind der Not-Aus und werden nicht entfernt.
+- Secrets `VIDEO_ENHANCE_TOPAZ_ENABLED=true`, `VIDEO_ENHANCE_BYTEDANCE_ENABLED=true`; das Backend-Flag bleibt autoritativ (`false` sperrt sofort, auch wenn das Frontend das Modell zeigt).
 - Projektion: in `video-enhance/index.ts` blockt nur `projection_confidence === 'verified'` mit Downscale-Ergebnis; geschätzte Projektionen schreiben weiter `projected_*` und `projection_matched`, brechen aber nicht ab.
+- True-up-Aufschub: `_shared/video-enhance-finalize.ts` rechnet den verifizierten Faktor nur bei `provider_cost_usd_actual != null`; sonst `verified_effective_multiplier = null`, `pricing_gate_reason = 'cost_unverified'`, und `video-enhance-reconcile` holt den Check bei späterem Kosteneingang idempotent nach.
 - Migration (nur additiv) auf `video_enhance_runs`: `actual_units numeric`, `provider_retry_count integer default 0`, `processing_seconds numeric`; gefüllt in `_shared/video-enhance-finalize.ts` aus der Provider-Metrik bzw. `provider_completed_at - provider_submitted_at`.
 - Admin: neue `VideoEnhanceCalibrationCard.tsx` neben `VideoEnhanceMultiplierCard.tsx` in `src/pages/admin/CostMonitor.tsx`; Aggregation über eine Read-only-SQL-Ansicht bzw. eine RPC mit `has_role(auth.uid(),'admin')`.
-- UI: neues `src/components/video-enhance/EnhanceVideoDialog.tsx` auf `useEnhanceVideo`, eingebunden in Mediathek und Director's Cut. Der Altpfad `director-cut-upscale` bleibt vorerst bestehen und wird erst nach nachgewiesener Migration entfernt.
+- UI: neues `src/components/video-enhance/EnhanceVideoPanel.tsx` + `EnhanceVideoDialog.tsx` auf `useEnhanceVideo`; Vollausbau im AI Video Studio, gleicher Dialog in Mediathek und Director's Cut. Der Altpfad `director-cut-upscale` bleibt vorerst bestehen und wird erst nach nachgewiesener Migration entfernt.
+- Guthaben-Negativfall: die bestehende Wallet-Prüfung in `video-enhance/index.ts` läuft vor Reservierung und Provider-Submit; dazu ein Test, der belegt, dass kein Prediction-Aufruf erfolgt und der Kontostand nie negativ wird.
+- Prüfungen: `bunx tsgo --noEmit`, `bunx vitest run src/test/videoEnhance*.test.ts`, `bun run build`; Edge Functions `video-enhance`, `video-enhance-webhook`, `video-enhance-reconcile` neu deployen.
 - Prüfungen: `bunx tsgo --noEmit`, `bunx vitest run src/test/videoEnhance*.test.ts`, `bun run build`; Edge Functions `video-enhance`, `video-enhance-webhook`, `video-enhance-reconcile` neu deployen.
