@@ -69,10 +69,11 @@ Pro Modell aggregiert: mittlerer und medianer Schätzfehler, tatsächlicher Fakt
 
 - Produktionspreis überschreitet nie 3,0× der gepufferten Schätzkosten — auch dann nicht, wenn Mindestpreis oder Mindestbeitrag höher lägen (dann greift `floor_conflict`, kein stiller Aufpreis).
 - Verifizierter Faktor > 3,0 setzt die Rate Card auf Prüfung mit Grund `actual_cost_drift`.
-- Nachträglicher Ausgleich senkt die Belastung auf ≤ 3,0× der gepufferten Ist-Kosten.
+- Nachträglicher Ausgleich senkt die Belastung auf ≤ 3,0× der **ungepufferten** Ist-Kosten.
+- Der Nachlauf-Faktor überschreitet nie 3,0× der ungepufferten Ist-Kosten in Euro — auch nach FX-Umrechnung und Cent-Rundung nicht; der FX-Puffer fließt nie in den Nachlauf-Deckel.
 - Race-Test: Webhook, Reconciler und ein Retry gleichzeitig erzeugen zusammen **genau eine** Gutschrift.
 - Späte Kosten: ein bereits abgeschlossener Lauf erhält erst danach die verifizierte Kostenzahl — der Ausgleich läuft trotzdem sicher und genau einmal.
-- Basis des verifizierten Faktors ist die rabattierte Nutzungsbelastung ohne Steuern, Abo- und Zahlungsgebühren.
+- Basis des verifizierten Faktors ist die rabattierte Nutzungsbelastung ohne Steuern, Abo- und Zahlungsgebühren; eingesetztes Promo- oder Startguthaben verändert sie nicht.
 - Höhere Ist-Kosten lösen nie eine Nachbelastung aus, auch unter 1,8× nicht.
 - Client/Server-Parität der gesamten Preisrechnung.
 - Kein Test nagelt einen konkreten Eurobetrag fest — geprüft wird immer gegen Kurve und Deckel, damit FX-Änderungen die Tests nicht brechen.
