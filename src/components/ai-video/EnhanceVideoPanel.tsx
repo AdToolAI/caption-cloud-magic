@@ -61,7 +61,7 @@ const COPY = {
   done: { en: 'Your enhanced video is ready.', de: 'Dein verbessertes Video ist fertig.', es: 'Tu vídeo mejorado está listo.' },
   download: { en: 'Download', de: 'Herunterladen', es: 'Descargar' },
   failed: { en: 'The enhancement did not finish.', de: 'Die Verbesserung wurde nicht abgeschlossen.', es: 'La mejora no se completó.' },
-  cancelled: { en: 'The enhancement was cancelled and your credit was returned.', de: 'Die Verbesserung wurde abgebrochen, dein Guthaben ist zurück.', es: 'La mejora se canceló und dein Guthaben ist zurück.' },
+  cancelled: { en: 'The enhancement was cancelled and your credit was returned.', de: 'Die Verbesserung wurde abgebrochen, dein Guthaben ist zurück.', es: 'La mejora se canceló y se devolvió tu saldo.' },
   recommended: { en: 'recommended', de: 'empfohlen', es: 'recomendado' },
   bestForAi: {
     en: 'Best for AI-generated video',
