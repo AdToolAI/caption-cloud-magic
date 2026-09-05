@@ -18499,7 +18499,9 @@ export type Database = {
       video_enhance_runs: {
         Row: {
           actual_contribution_eur: number | null
+          actual_height: number | null
           actual_margin_pct: number | null
+          actual_width: number | null
           callback_token: string
           cancel_requested_at: string | null
           contribution_eur: number | null
@@ -18509,6 +18511,7 @@ export type Database = {
           currency: string
           error_code: string | null
           error_message: string | null
+          estimated_units: number | null
           fps: number
           fx_rate_used: number
           fx_safety_buffer_used: number
@@ -18525,6 +18528,11 @@ export type Database = {
           output_url: string | null
           persist_attempts: number
           pricing_version: string
+          projected_height: number | null
+          projected_width: number | null
+          projection_confidence: string | null
+          projection_matched: boolean | null
+          projection_strategy: string | null
           provider_completed_at: string | null
           provider_cost_eur_buffered: number
           provider_cost_source: string
@@ -18553,13 +18561,18 @@ export type Database = {
           submit_lease_owner: string | null
           test_fail_persist_once: boolean
           tier: string
+          unit_rate_checked_at: string | null
+          unit_rate_source: string | null
+          unit_rate_usd: number | null
           updated_at: string
           user_id: string
           user_price_eur: number
         }
         Insert: {
           actual_contribution_eur?: number | null
+          actual_height?: number | null
           actual_margin_pct?: number | null
+          actual_width?: number | null
           callback_token: string
           cancel_requested_at?: string | null
           contribution_eur?: number | null
@@ -18569,6 +18582,7 @@ export type Database = {
           currency?: string
           error_code?: string | null
           error_message?: string | null
+          estimated_units?: number | null
           fps: number
           fx_rate_used: number
           fx_safety_buffer_used: number
@@ -18585,6 +18599,11 @@ export type Database = {
           output_url?: string | null
           persist_attempts?: number
           pricing_version: string
+          projected_height?: number | null
+          projected_width?: number | null
+          projection_confidence?: string | null
+          projection_matched?: boolean | null
+          projection_strategy?: string | null
           provider_completed_at?: string | null
           provider_cost_eur_buffered: number
           provider_cost_source?: string
@@ -18613,13 +18632,18 @@ export type Database = {
           submit_lease_owner?: string | null
           test_fail_persist_once?: boolean
           tier: string
+          unit_rate_checked_at?: string | null
+          unit_rate_source?: string | null
+          unit_rate_usd?: number | null
           updated_at?: string
           user_id: string
           user_price_eur: number
         }
         Update: {
           actual_contribution_eur?: number | null
+          actual_height?: number | null
           actual_margin_pct?: number | null
+          actual_width?: number | null
           callback_token?: string
           cancel_requested_at?: string | null
           contribution_eur?: number | null
@@ -18629,6 +18653,7 @@ export type Database = {
           currency?: string
           error_code?: string | null
           error_message?: string | null
+          estimated_units?: number | null
           fps?: number
           fx_rate_used?: number
           fx_safety_buffer_used?: number
@@ -18645,6 +18670,11 @@ export type Database = {
           output_url?: string | null
           persist_attempts?: number
           pricing_version?: string
+          projected_height?: number | null
+          projected_width?: number | null
+          projection_confidence?: string | null
+          projection_matched?: boolean | null
+          projection_strategy?: string | null
           provider_completed_at?: string | null
           provider_cost_eur_buffered?: number
           provider_cost_source?: string
@@ -18673,6 +18703,9 @@ export type Database = {
           submit_lease_owner?: string | null
           test_fail_persist_once?: boolean
           tier?: string
+          unit_rate_checked_at?: string | null
+          unit_rate_source?: string | null
+          unit_rate_usd?: number | null
           updated_at?: string
           user_id?: string
           user_price_eur?: number
