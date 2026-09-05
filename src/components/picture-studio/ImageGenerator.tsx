@@ -34,6 +34,14 @@ import {
   type QualityTier as ModelTier,
 } from "@/config/pictureStudioModels";
 import { capabilityFor, supportsMode } from "@/config/pictureModelCapabilities";
+import {
+  buildPictureRequest,
+  supportsTransparency,
+  PICTURE_STYLE_NONE,
+  type PromptSegment,
+} from "@/config/picturePromptBuilder";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, Eye, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 
@@ -86,6 +94,7 @@ export function ImageGenerator() {
   const status = { stage: '', message: '' };
 
   const STYLES = useMemo(() => [
+    { value: PICTURE_STYLE_NONE, label: tx({ de: 'Kein Stil (nur mein Text)', en: 'No style (my words only)', es: 'Sin estilo (solo mis palabras)' }) },
     { value: 'realistic', label: t('picStudio.styleRealistic') },
     { value: 'cinematic', label: t('picStudio.styleCinematic') },
     { value: 'watercolor', label: t('picStudio.styleWatercolor') },
@@ -128,7 +137,7 @@ export function ImageGenerator() {
   const cached = getCachedState();
 
   const [prompt, setPrompt] = useState(cached?.prompt ?? "");
-  const [style, setStyle] = useState(cached?.style ?? "realistic");
+  const [style, setStyle] = useState(cached?.style ?? PICTURE_STYLE_NONE);
   const [aspectRatio, setAspectRatio] = useState(cached?.aspectRatio ?? "1:1");
   const [tier, setTier] = useState<QualityTier>('standard');
   
@@ -143,7 +152,9 @@ export function ImageGenerator() {
   const [exactHeight, setExactHeight] = useState<string>(cached?.exactHeight ?? '');
   const [resolution, setResolution] = useState<string>(cached?.resolution ?? '');
   const extraRefInputRef = useRef<HTMLInputElement>(null);
-  const [strength, setStrength] = useState<number>(cached?.strength ?? 70);
+  const [strength, setStrength] = useState<number>(cached?.strength ?? 30);
+  const [transparentBackground, setTransparentBackground] = useState(false);
+  const [showPromptPreview, setShowPromptPreview] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(cached?.generatedImages ?? []);
   const activeAsset = useOptionalActiveAsset();
   const [replicateLoading, setReplicateLoading] = useState(false);
@@ -321,25 +332,50 @@ export function ImageGenerator() {
     mood: activeBrandKit.mood || undefined,
   } : null;
 
-  // Build the effective prompt: for transform-mode, append a preservation
-  // suffix based on the strength slider, so downstream models (which mostly
-  // don't expose a numeric "strength" param) honor user intent via language.
-  const effectivePrompt = useMemo(() => {
-    const base = prompt.trim();
-    if ((mode !== 'transform' && mode !== 'mix') || !referenceImage) return base;
-    if (strength <= 35) {
-      return `${base}\n\nPreserve the exact composition, subjects, layout and lighting of the reference image. Only refine style and details — do not move, add, or remove subjects.`;
-    }
-    if (strength <= 65) {
-      return `${base}\n\nKeep the overall composition and main subjects of the reference image. Adjust style, lighting and atmosphere as described.`;
-    }
-    return `${base}\n\nUse the reference image as loose inspiration only.`;
-  }, [prompt, mode, referenceImage, strength]);
+  // Single source of truth for "what do we actually send": the very module the
+  // Edge Functions run. No hidden modifiers may be added anywhere else.
+  const requestSubjectRefs = useMemo(
+    () => (mode === 'transform' || mode === 'mix'
+      ? ([referenceImage, ...extraReferences].filter(Boolean) as string[]).slice(0, maxSubjectRefs)
+      : []),
+    [mode, referenceImage, extraReferences, maxSubjectRefs],
+  );
+  const requestStyleRefs = useMemo(
+    () => (mode === 'restyle' && styleReference ? [styleReference] : []),
+    [mode, styleReference],
+  );
+
+  const canBeTransparent = supportsTransparency(tier);
+
+  const built = useMemo(() => buildPictureRequest({
+    tier,
+    mode,
+    prompt,
+    style,
+    aspectRatio,
+    subjectRefs: requestSubjectRefs,
+    styleRefs: requestStyleRefs,
+    strength,
+    transparentBackground: transparentBackground && canBeTransparent,
+    brandKit: brandKitPayload,
+  }), [tier, mode, prompt, style, aspectRatio, requestSubjectRefs, requestStyleRefs, strength, transparentBackground, canBeTransparent, brandKitPayload]);
+
+  const effectivePrompt = built.prompt;
+
+  const SEGMENT_TONE: Record<PromptSegment['source'], string> = {
+    user: 'text-foreground',
+    intent: 'text-primary',
+    reference: 'text-primary',
+    style: 'text-amber-400',
+    brand: 'text-cyan-400',
+    negative: 'text-rose-400',
+    format: 'text-muted-foreground',
+  };
 
   /** "Realistic Reproduction" one-click for the transform mode. */
   const handleRealisticReproduction = () => {
     setTier('ultra');
-    setStrength(40);
+    setStrength(15);
     setStyle('realistic');
     setVariantsCount(1);
     setPrompt((p) => {
@@ -382,6 +418,9 @@ export function ImageGenerator() {
           referenceImageUrl: subjectRefs[0],
           referenceImageUrls: subjectRefs,
           styleReferenceUrls: styleRefs,
+          strength: mode === 'transform' || mode === 'mix' ? strength : undefined,
+          transparentBackground: transparentBackground && canBeTransparent,
+          brandKit: brandKitPayload,
         }
       });
       if (error) throw error;
@@ -403,6 +442,7 @@ export function ImageGenerator() {
         resolution: resolution || undefined,
         mode,
         strength: mode === 'transform' || mode === 'mix' ? strength : undefined,
+        transparentBackground: transparentBackground && canBeTransparent,
         brandKit: brandKitPayload,
       }
     });
