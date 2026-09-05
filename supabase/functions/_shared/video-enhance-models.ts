@@ -11,12 +11,14 @@
 
 import {
   bufferedProviderCostEur,
+  evaluatePricing,
+  evaluateTrueUp,
   FX_RATE_USD_EUR,
   FX_SAFETY_BUFFER,
   marginMetrics,
   multiplierForCost,
   PRICING_VERSION,
-  userPriceFromProviderCost,
+  type TrueUpEvaluation,
 } from './picture-pricing.ts';
 
 export type VideoResolution = '720p' | '1080p' | '2k' | '4k';
@@ -517,4 +519,23 @@ export function actualMargin(userPriceEur: number, providerCostUsdActual: number
     actualContributionEur: metrics.contributionEUR,
     actualMarginPct: metrics.marginPct,
   };
+}
+
+/**
+ * Post-run true-up against the VERIFIED provider cost. Mirror of
+ * `src/lib/videoEnhance/pricing.ts#verifiedPricing`.
+ */
+export function verifiedPricing(params: {
+  capturedUsageChargeEur: number;
+  providerCostUsdActual: number | null | undefined;
+}): TrueUpEvaluation {
+  const costEur =
+    params.providerCostUsdActual === null || params.providerCostUsdActual === undefined
+      ? null
+      : params.providerCostUsdActual * FX_RATE_USD_EUR;
+  return evaluateTrueUp({
+    capturedUsageChargeEur: params.capturedUsageChargeEur,
+    actualProviderCostEur: costEur,
+    hardMultiplierCap: VIDEO_PRICING_HARD_MULTIPLIER_CAP,
+  });
 }
