@@ -20,10 +20,14 @@
 
 ### A. Format-Herkunft (Source) — exakte Ratio, Approximation erst im Capability-Layer
 - Beim Upload wird **nur** die echte Größe gespeichert: `sourceWidth`, `sourceHeight`, `sourceRatio` (z. B. 3100×2100 → 1.476190…). Keine Reduktion auf ein Standardformat beim Upload.
-- Erst das gewählte Modell entscheidet über `resolveSourceFormat(tier, sourceRatio)`:
-  - Modell mit exakter Größe (z. B. Seedream) → Width/Height aus der echten Ratio berechnet, keine Anpassung.
+- **`requestedFormat` und `resolvedFormat` sind strikt getrennt.** Der State hält immer die semantische Nutzerwahl (`source` oder z. B. `9:16`); die modellabhängige Auflösung (`resolvedFormat` / `resolvedWidth` / `resolvedHeight` / `adjustment`) ist ein abgeleiteter Wert und überschreibt die Nutzerwahl nie. Beim Modellwechsel wird aus `requestedFormat` neu aufgelöst.
+- Auflösung über `resolveRequestedFormat(tier, requestedFormat, sourceRatio)`:
+  - Modell, dessen **verifizierte Registry-Capability** exakte Width/Height-Steuerung unterstützt → Width/Height aus der echten Ratio berechnet, `adjustment: none`. Keine Fähigkeit wird je aus dem Modellnamen abgeleitet.
   - Modell mit fester Ratio-Liste → nächstunterstütztes Format, Rückgabe enthält `adjustment: { from: '1.48:1', to: '3:2' }`.
 - Die Anpassung ist immer ein Rückgabewert, nie ein stiller Seiteneffekt, und wird als „AdTool angepasst: Source 1.48:1 → 3:2" angezeigt.
+- **Mehrere Referenzbilder:** Source bezieht sich eindeutig auf das Primary Reference Image; da es in V1 kein Primary-Konzept gibt, deterministisch auf Referenz #1 (das Hauptbild, nicht der letzte Upload). In der UI sichtbar als „Source · aus Referenz 1".
+- **Serverseitige Wahrheit:** `sourceWidth/Height/Ratio` aus dem Browser dienen nur der Vorschau. Der Server bestimmt die Maße aus den persistierten Asset-Metadaten neu (bzw. erfasst sie beim Upload einmalig sauber) und validiert Client-Angaben dagegen. Frei manipulierbare Client-Dimensionen beeinflussen keine Providerparameter.
+
 
 ### B. Stil „Auto"
 - Label wird `Auto` mit Untertext „Dein Prompt bestimmt den Stil" (EN/ES analog). Technischer Wert bleibt `none`, keine Verhaltensänderung.
