@@ -92,6 +92,8 @@ Stufe 2 in dieser Reihenfolge: AI Video Studio, Mediathek/Lightbox, Ergebnis jed
 
 - Neue Umgebungsvariable `VIDEO_ENHANCE_MANUAL_REVIEW_AFTER_MINUTES` ersetzt die Konstante `RECONCILE_HORIZON_MINUTES` im Abgleich-Job (Fallback 180).
 - Läufe werden über die Funktion `video-enhance` (`estimate` → `start` → `status`) mit dem gemünzten Testkonto-Token gestartet, nicht über die Oberfläche; es gibt in Stufe 1 bewusst keinen UI-Einstieg.
-- Tatsächliche Kosten kommen aus `metrics.total_cost` der Replicate-Prediction und landen in `provider_cost_usd_actual` plus `cost_drift_ratio`.
-- Fehler-Szenarien werden erzwungen: Anbieterfehler über eine ungültige Eingabe, Speicherfehler über einen temporär blockierten Ziel-Pfad, Doppelanfrage über zwei parallele Starts mit demselben Idempotenz-Schlüssel.
-- Modelle bleiben `enabled: false`; freigeschaltet wird nach dem Bericht über die Flags und die verifizierten Berechtigungen.
+- Tatsächliche Anbieterkosten werden als `provider_cost_usd_actual` **zusammen mit** `provider_cost_source` gespeichert (`prediction_metric` | `provider_usage` | `billing_record` | `manual_verified` | `unavailable`). Ein Kostenfeld in der Prediction wird genutzt, wenn es vorhanden ist; fehlt es, kommt die Zahl aus dem Replicate-Konto-/Abrechnungsabgleich. Ein fehlendes Kostenfeld darf den Abschluss eines Laufs weder verhindern noch ihn als unverifiziert markieren — es setzt nur die Herkunft und lässt die Abweichungsprüfung aus.
+- Anbieterfehler wird nur gewertet, wenn Reservierung → Übermittlung → echte `provider_prediction_id` → Replicate-Status „failed" durchlaufen wurden; sonst BLOCKED.
+- Der Speicherfehler wird deterministisch injiziert: ein Fail-once-Schalter, der ausschließlich für den einen Lauf des Testkontos greift, nach erfolgreichem Anbieterlauf und erfolgreicher Zwischenablage. Geprüft wird danach: eine Prediction, eine Übermittlung, eine Belastung, ein finales Asset, Zwischendatei aufgeräumt. Der reguläre Speicherpfad wird nicht angefasst.
+- Beim Abbruchtest wird „abgebrochen vor Start" von „abgebrochen während des Laufs" unterschieden und die tatsächliche Anbieterabrechnung gegen die vorab festgelegte Policy geprüft.
+- Doppelanfrage über zwei parallele Starts mit demselben Idempotenz-Schlüssel.
