@@ -22,7 +22,11 @@ export function getVideoEnhanceModel(id: string): VideoEnhanceModelDefinition | 
 
 /** Models a user may actually see. Visibility only — the backend decides runs. */
 export function visibleVideoEnhanceModels(): VideoEnhanceModelDefinition[] {
-  return VIDEO_ENHANCE_MODELS.filter((m) => m.enabled || isVideoEnhanceFlagEnabled(m.featureFlag));
+  return VIDEO_ENHANCE_MODELS.filter(
+    (m) =>
+      !isVideoEnhanceModelKilled(m.id) &&
+      (m.enabled || isVideoEnhanceFlagEnabled(m.featureFlag)),
+  );
 }
 
 /** Combinations valid for one model + processing mode. */
