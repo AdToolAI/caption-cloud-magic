@@ -82,8 +82,14 @@ function parseMvhd(view: DataView, box: Box): { timescale: number; duration: num
 function parseTkhd(view: DataView, box: Box): { width: number; height: number } {
   const p = box.start + box.headerSize;
   const version = view.getUint8(p);
-  const base = version === 1 ? p + 20 + 12 + 60 : p + 12 + 12 + 60;
-  // 16.16 fixed point
+  // tkhd layout:
+  // v0: flags(3) + creation(4) + modification(4) + track_id(4) + reserved(4) +
+  //     duration(4) + reserved(8) + layer(2) + alt_group(2) + volume(2) +
+  //     reserved(2) + matrix(36) + width(4) + height(4)
+  // v1: flags(3) + creation(8) + modification(8) + track_id(4) + reserved(4) +
+  //     duration(8) + reserved(8) + layer(2) + alt_group(2) + volume(2) +
+  //     reserved(2) + matrix(36) + width(4) + height(4)
+  const base = version === 1 ? p + 88 : p + 76;
   const width = view.getUint32(base) / 65536;
   const height = view.getUint32(base + 4) / 65536;
   return { width: Math.round(width), height: Math.round(height) };
