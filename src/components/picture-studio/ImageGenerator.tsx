@@ -204,21 +204,52 @@ export function ImageGenerator() {
   const balance = wallet?.balance_euros ?? 0;
   const hasInsufficientCredits = cost > 0 && balance < cost;
 
-  // Nur Seitenverhältnisse anbieten, die das gewählte Modell wirklich akzeptiert.
+  // Selectable formats. "Source" appears only while a reference image with
+  // known natural size exists — it always means reference #1.
   const availableAspectRatios = useMemo(() => {
     const allowed = aspectRatiosForTier(tier);
-    return allowed ? ASPECT_RATIOS.filter(r => allowed.includes(r.value)) : ASPECT_RATIOS;
+    const presets = allowed ? ASPECT_RATIOS.filter(r => allowed.includes(r.value)) : ASPECT_RATIOS;
+    if (!sourceDimensions) return presets;
+    return [
+      {
+        value: SOURCE_FORMAT,
+        label: `${tx({ de: 'Source · aus Referenz 1', en: 'Source · from reference 1', es: 'Source · de la referencia 1' })} (${formatRatioLabel(sourceDimensions.width / sourceDimensions.height)})`,
+      },
+      ...presets,
+    ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tier, ASPECT_RATIOS]);
+  }, [tier, ASPECT_RATIOS, sourceDimensions]);
 
-  // Beim Modellwechsel auf das nächstliegende erlaubte Verhältnis springen.
+  /**
+   * Direct user change of the format — the ONLY thing that sets `touched`.
+   */
+  const handleFormatChange = (value: string) => {
+    setAspectRatio(value);
+    setAspectRatioTouched(true);
+  };
+
+  // Adding a reference image adopts Source, but only while the user has not
+  // deliberately chosen a format.
   useEffect(() => {
-    if (!availableAspectRatios.some(r => r.value === aspectRatio)) {
-      const next = closestAspectRatio(tier, aspectRatio);
-      setAspectRatio(availableAspectRatios.some(r => r.value === next) ? next : (availableAspectRatios[0]?.value ?? '1:1'));
+    if (sourceDimensions && !aspectRatioTouched && aspectRatio !== SOURCE_FORMAT) {
+      setAspectRatio(SOURCE_FORMAT);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableAspectRatios]);
+  }, [sourceDimensions, aspectRatioTouched]);
+
+  // Last reference gone while Source was active -> visible switch, never silent.
+  useEffect(() => {
+    if (!sourceDimensions && aspectRatio === SOURCE_FORMAT) {
+      setAspectRatio('1:1');
+      toast.info(tx({
+        de: 'Ohne Referenzbild gibt es kein Source-Format — Format steht jetzt auf 1:1.',
+        en: 'Without a reference image there is no Source format — format is now 1:1.',
+        es: 'Sin imagen de referencia no hay formato Source — el formato ahora es 1:1.',
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceDimensions, aspectRatio]);
+
 
   // Provider capabilities for the selected model (single source of truth,
   // shared with the Edge Functions).
