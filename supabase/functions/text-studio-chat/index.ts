@@ -227,7 +227,7 @@ Deno.serve(async (req) => {
           model: route.apiModel,
           max_tokens: outputTokenCap,
           ...(temp !== undefined ? { temperature: Math.min(temp, 1) } : {}),
-          system: systemPrompt || undefined,
+          system: effectiveSystemPrompt,
           messages: anthroMsgs,
           stream: true,
         }),
