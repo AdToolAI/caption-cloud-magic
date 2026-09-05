@@ -117,7 +117,7 @@ serve(async (req) => {
         continue;
       }
       const prediction = await res.json();
-      const providerCost = extractProviderCost(prediction);
+      const providerCost = extractProviderCost(prediction, run.model_id);
 
       if (prediction.status === "succeeded") {
         const output = prediction.output;
