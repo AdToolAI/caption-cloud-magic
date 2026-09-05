@@ -28,7 +28,7 @@ Klar getrennte Rollen, keine doppelte Anzeige:
 
 - **Hauptansicht Mediathek**: eine Filterleiste (All · Generated · Edited · Enhanced · Background · Restored · Colorized · Uploads) mit Anzahl, direkt darunter die Bilder.
 - **Album-Bereich**: Abschnitt „Meine Alben" wie heute, darunter Abschnitt „Auto Collections" als Einstiegskarten mit Cover und Anzahl. Nicht editierbar.
-- Jede Kachel zeigt zwei Badges: echter Modellname und Workflow, z. B. „Topaz Image Upscale · Enhanced" oder „Imagen 4 Ultra · Generated". Bei Uploads nur „Uploaded", kein Modell-Badge.
+- Jede Kachel zeigt ein dezentes Badge-Paar in einer Zeile, z. B. „Topaz · Enhanced" oder „Imagen 4 · Generated"; der vollständige Modellname erscheint beim Hover bzw. in der Detailinfo. Bei Uploads nur „Uploaded", kein Modell-Badge.
 - Alle Zählungen kommen aus einer gruppierten Datenbankabfrage, nicht aus im Browser gezählten Listen.
 
 Im Picture Studio ändert sich am Ablauf nichts: Download bleibt direkt möglich, Speichern passiert automatisch, der Dialog „In Album speichern" bleibt für eigene Alben erhalten.
