@@ -306,6 +306,10 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
                   {formatDistanceToNow(new Date(gen.created_at), { addSuffix: true, locale: dateLocale })}
                 </p>
 
+                {(gen.status === 'processing' || gen.status === 'pending') && (
+                  <VideoRunProgress createdAt={gen.created_at} stat={runtimeStats?.[gen.model]} />
+                )}
+
                 {gen.error_message && (
                   <div className="mb-3">
                     <p className="text-sm text-destructive">{getFriendlyErrorMessage(gen.error_message)}</p>
