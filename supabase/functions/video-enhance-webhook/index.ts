@@ -5,7 +5,7 @@ import {
   finalizeFailure,
   finalizeSuccess,
 } from "../_shared/video-enhance-finalize.ts";
-import { setStatus, backoffMinutes } from "../_shared/video-enhance-runtime.ts";
+import { setStatus, backoffMinutes, extractProviderCost } from "../_shared/video-enhance-runtime.ts";
 import { VIDEO_ENHANCE_SPECS } from "../_shared/video-enhance-models.ts";
 
 /**
