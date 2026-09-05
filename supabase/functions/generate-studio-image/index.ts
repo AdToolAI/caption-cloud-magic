@@ -351,11 +351,12 @@ MANDATORY RULES:
       albumId = newAlbum?.id || null;
     }
 
-    const { data: savedImage, error: saveError } = await supabase
-      .from('studio_images')
-      .insert({
+    const persisted = await persistStudioImage(
+      supabase,
+      {
         user_id: user.id,
         image_url: imageUrl,
+        workflow_type: editMode ? 'edited' : 'generated',
         prompt,
         style,
         model_used: usedModel,
@@ -363,12 +364,13 @@ MANDATORY RULES:
         source: editMode ? 'upload' : 'generated',
         album_id: albumId,
         metadata_json: { quality, editMode, referenceImageUrl: editMode ? referenceImageUrl : null, attemptedModels },
-      })
-      .select()
-      .single();
+      },
+      '[Studio]',
+    );
+    const savedImage = persisted.id ? { id: persisted.id } : null;
 
-    if (saveError) {
-      console.error('[Studio] Save error:', saveError);
+    if (!persisted.ok) {
+      console.error('[Studio] Save error:', persisted.error);
     }
 
     return new Response(JSON.stringify({
