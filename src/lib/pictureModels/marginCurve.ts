@@ -176,6 +176,16 @@ export function evaluatePricing(
  */
 export const PRICING_TRUE_UP_TOLERANCE_EUR = 0.01;
 
+/**
+ * Lower end of the intended margin corridor. A verified multiplier below this
+ * value is a CALIBRATION signal (estimator priced too low), never a pricing
+ * gate and never a reason to charge the customer more.
+ */
+export const PRICING_TARGET_MULTIPLIER_FLOOR = 1.8;
+
+export type CalibrationStatus = 'ok' | 'review';
+export type CalibrationReason = 'below_target_corridor' | 'estimator_drift';
+
 export interface TrueUpEvaluation {
   actualProviderCostEur: number | null;
   maxAllowedChargeEur: number | null;
@@ -184,6 +194,12 @@ export interface TrueUpEvaluation {
   refundEur: number;
   netUsageChargeEur: number;
   gateReason: PricingGateReason | null;
+  /**
+   * Calibration semantics are kept strictly separate from pricing-gate
+   * semantics: `pricing_gate` may be `ok` while calibration asks for review.
+   */
+  calibrationStatus: CalibrationStatus;
+  calibrationReason: CalibrationReason | null;
   /** Internal alarm only — never reduces the customer refund. */
   driftAlarm: boolean;
 }
@@ -207,6 +223,8 @@ export function evaluateTrueUp(params: {
       refundEur: 0,
       netUsageChargeEur: captured,
       gateReason: 'cost_unverified',
+      calibrationStatus: 'ok',
+      calibrationReason: null,
       driftAlarm: false,
     };
   }
@@ -215,15 +233,21 @@ export function evaluateTrueUp(params: {
   // Cent-exact for the customer; the tolerance only gates the internal alarm.
   const refund = Math.max(0, Math.round((captured - maxAllowed) * 100) / 100);
   const net = Math.max(0, Math.round((captured - refund) * 100) / 100);
+  const verifiedMultiplier = net / cost;
+  // Below the corridor the run earned less than planned: calibrate the
+  // estimator. Never a block, never a back-charge.
+  const belowCorridor = verifiedMultiplier < PRICING_TARGET_MULTIPLIER_FLOOR;
 
   return {
     actualProviderCostEur: cost,
     maxAllowedChargeEur: maxAllowed,
     verifiedMultiplierBeforeTrueUp: captured / cost,
-    verifiedMultiplierAfterTrueUp: net / cost,
+    verifiedMultiplierAfterTrueUp: verifiedMultiplier,
     refundEur: refund,
     netUsageChargeEur: net,
     gateReason: refund > 0 ? 'actual_cost_drift' : null,
+    calibrationStatus: belowCorridor ? 'review' : 'ok',
+    calibrationReason: belowCorridor ? 'below_target_corridor' : null,
     driftAlarm: refund > PRICING_TRUE_UP_TOLERANCE_EUR,
   };
 }
