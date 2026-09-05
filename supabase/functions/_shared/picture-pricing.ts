@@ -154,6 +154,9 @@ export interface TrueUpEvaluation {
   refundEur: number;
   netUsageChargeEur: number;
   gateReason: PricingGateReason | null;
+  /** Calibration stays strictly separate from pricing-gate semantics. */
+  calibrationStatus: CalibrationStatus;
+  calibrationReason: CalibrationReason | null;
   driftAlarm: boolean;
 }
 
