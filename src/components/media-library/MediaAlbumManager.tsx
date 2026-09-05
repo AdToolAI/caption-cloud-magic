@@ -411,15 +411,47 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
     );
   }
 
-  // Albums grid + unsorted
+  // Auto collections + albums grid + unsorted
   return (
     <div className="space-y-6">
+      {/* Auto Collections */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <h3 className="text-lg font-semibold">
+            {tx({ de: 'Automatische Sammlungen', en: 'Auto Collections', es: 'Colecciones automáticas' })}
+          </h3>
+          <Badge variant="secondary" className="text-[10px]">
+            {tx({ de: 'Automatisch', en: 'Automatic', es: 'Automático' })}
+          </Badge>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+          {sortedCollections().map((collection) => {
+            const Icon = collection.icon;
+            const count = collectionCounts[collection.workflowType] || 0;
+            return (
+              <Card
+                key={collection.id}
+                className="cursor-pointer hover:border-primary/40 hover:shadow-md transition-all"
+                onClick={() => openCollection(collection)}
+              >
+                <CardContent className="p-3 flex flex-col gap-1">
+                  <Icon className="h-4 w-4 text-primary" />
+                  <p className="font-medium text-sm truncate">{collectionLabel(collection, lang)}</p>
+                  <p className="text-xs text-muted-foreground">{count}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">{tx({ de: 'Meine Alben', en: 'My Albums', es: 'Mis álbumes' })}</h3>
         <Button variant="outline" size="sm" onClick={() => setShowCreateDialog(true)}>
           <FolderPlus className="h-4 w-4 mr-1" /> {tx({ de: 'Neues Album', en: 'New Album', es: 'Nuevo álbum' })}
         </Button>
       </div>
+
 
       {/* Albums */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
