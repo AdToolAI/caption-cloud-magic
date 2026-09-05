@@ -10,6 +10,7 @@ import {
   validateCombination as validateClient,
   type EnhanceConfig,
   type SourceMetadata,
+  DISABLED_VIDEO_ENHANCE_MODELS,
 } from '@/config/videoEnhanceModels';
 import { priceVideoEnhanceRun as priceClient } from '@/lib/videoEnhance/pricing';
 import { VIDEO_RATE_CARDS as CLIENT_CARDS } from '@/lib/videoEnhance/rates';
@@ -162,8 +163,11 @@ describe('provider entitlement', () => {
 });
 
 describe('rollout gates', () => {
-  it('ships both models locked', () => {
-    for (const model of VIDEO_ENHANCE_MODELS) expect(model.enabled).toBe(false);
+  // GLOBAL LIVE: both engines ship enabled. The kill-switch list is the only
+  // way to pull one, and it must be empty in a healthy production build.
+  it('ships both models live with an empty kill-switch list', () => {
+    for (const model of VIDEO_ENHANCE_MODELS) expect(model.enabled).toBe(true);
+    expect(DISABLED_VIDEO_ENHANCE_MODELS).toEqual([]);
   });
 
   it('marks unverified rate cards so they cannot be rolled out silently', () => {

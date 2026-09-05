@@ -11,6 +11,7 @@ import { CostTrendChart } from '@/components/admin/cost/CostTrendChart';
 import { CostAlertsCard } from '@/components/admin/cost/CostAlertsCard';
 import { VideoProviderMarginCard } from '@/components/admin/cost/VideoProviderMarginCard';
 import { VideoEnhanceMultiplierCard } from '@/components/admin/cost/VideoEnhanceMultiplierCard';
+import { VideoEnhanceCalibrationCard } from '@/components/admin/cost/VideoEnhanceCalibrationCard';
 import { toast } from 'sonner';
 import { uiLocale } from '@/lib/uiLocale';
 
@@ -99,6 +100,7 @@ export function CostMonitor() {
           </div>
           <VideoProviderMarginCard />
           <VideoEnhanceMultiplierCard />
+          <VideoEnhanceCalibrationCard />
           <CostTrendChart trend={data.trend} />
 
           <p className="text-xs text-muted-foreground text-center pt-2">

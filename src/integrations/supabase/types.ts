@@ -18501,6 +18501,7 @@ export type Database = {
           actual_contribution_eur: number | null
           actual_height: number | null
           actual_margin_pct: number | null
+          actual_units: number | null
           actual_width: number | null
           callback_token: string
           cancel_requested_at: string | null
@@ -18534,6 +18535,7 @@ export type Database = {
           pricing_gate: string | null
           pricing_gate_reason: string | null
           pricing_version: string
+          processing_seconds: number | null
           projected_height: number | null
           projected_width: number | null
           projection_confidence: string | null
@@ -18547,6 +18549,7 @@ export type Database = {
           provider_output_url: string | null
           provider_prediction_id: string | null
           provider_pricing_version: string
+          provider_retry_count: number
           provider_status: string | null
           provider_submitted_at: string | null
           rate_card_version: string
@@ -18579,6 +18582,7 @@ export type Database = {
           actual_contribution_eur?: number | null
           actual_height?: number | null
           actual_margin_pct?: number | null
+          actual_units?: number | null
           actual_width?: number | null
           callback_token: string
           cancel_requested_at?: string | null
@@ -18612,6 +18616,7 @@ export type Database = {
           pricing_gate?: string | null
           pricing_gate_reason?: string | null
           pricing_version: string
+          processing_seconds?: number | null
           projected_height?: number | null
           projected_width?: number | null
           projection_confidence?: string | null
@@ -18625,6 +18630,7 @@ export type Database = {
           provider_output_url?: string | null
           provider_prediction_id?: string | null
           provider_pricing_version: string
+          provider_retry_count?: number
           provider_status?: string | null
           provider_submitted_at?: string | null
           rate_card_version: string
@@ -18657,6 +18663,7 @@ export type Database = {
           actual_contribution_eur?: number | null
           actual_height?: number | null
           actual_margin_pct?: number | null
+          actual_units?: number | null
           actual_width?: number | null
           callback_token?: string
           cancel_requested_at?: string | null
@@ -18690,6 +18697,7 @@ export type Database = {
           pricing_gate?: string | null
           pricing_gate_reason?: string | null
           pricing_version?: string
+          processing_seconds?: number | null
           projected_height?: number | null
           projected_width?: number | null
           projection_confidence?: string | null
@@ -18703,6 +18711,7 @@ export type Database = {
           provider_output_url?: string | null
           provider_prediction_id?: string | null
           provider_pricing_version?: string
+          provider_retry_count?: number
           provider_status?: string | null
           provider_submitted_at?: string | null
           rate_card_version?: string

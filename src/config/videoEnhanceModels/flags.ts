@@ -1,18 +1,30 @@
 /**
  * Three-stage unlocking for Video Enhance.
  *
- *   1. frontend flag  — visibility only (this file)
+ *   1. frontend flag / kill-switch — visibility only (this file)
  *   2. backend switch — authoritative, lives in the edge function environment
- *   3. test allowlist — real runs before the global rollout
+ *   3. test allowlist — validation-only switches (e.g. fail-once persistence)
  *
- * Both models start locked. A flag is only added here after the release gates
- * in the plan (real provider run, predicted vs. actual cost, exactly one
- * release on failure, persistence retry) passed.
+ * Topaz Video Upscale and ByteDance vCube are GLOBAL LIVE: they no longer
+ * depend on a feature flag or the allowlist. Both switch layers are kept on
+ * purpose as the emergency stop — a model can be pulled instantly by adding it
+ * to `DISABLED_VIDEO_ENHANCE_MODELS` (frontend) and/or by setting its backend
+ * switch to `false` (authoritative). Calibration status is NEVER a reason.
  */
 export const ENABLED_VIDEO_ENHANCE_FLAGS: string[] = [];
 
 export function isVideoEnhanceFlagEnabled(flag?: string): boolean {
   return !!flag && ENABLED_VIDEO_ENHANCE_FLAGS.includes(flag);
+}
+
+/**
+ * Emergency stop. Only a real P0 issue, a financial-integrity defect or a
+ * critical provider failure may put a model id in here.
+ */
+export const DISABLED_VIDEO_ENHANCE_MODELS: string[] = [];
+
+export function isVideoEnhanceModelKilled(modelId: string): boolean {
+  return DISABLED_VIDEO_ENHANCE_MODELS.includes(modelId);
 }
 
 /**

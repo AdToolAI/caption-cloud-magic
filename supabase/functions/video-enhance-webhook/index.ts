@@ -169,7 +169,7 @@ serve(async (req) => {
     const providerStatus: string = prediction.status;
     // The provider does not guarantee a cost field; record what is there and
     // where it came from, and finalise either way.
-    const providerCost = extractProviderCost(prediction);
+    const providerCost = extractProviderCost(prediction, run.model_id);
 
     if (providerStatus === "succeeded") {
       const output = prediction.output;

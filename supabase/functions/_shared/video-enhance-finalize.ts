@@ -200,6 +200,18 @@ export async function finalizeSuccess(
   delete costPatch._warn;
   delete costPatch._block;
 
+  // Calibration telemetry — observation only, never a gate.
+  if (providerCost.units !== undefined) costPatch.actual_units = providerCost.units;
+  const processingSeconds = providerCost.processingSeconds ??
+    (run.provider_submitted_at
+      ? (Date.now() - new Date(run.provider_submitted_at).getTime()) / 1000
+      : undefined);
+  if (processingSeconds !== undefined && Number.isFinite(processingSeconds)) {
+    costPatch.processing_seconds = Math.round(processingSeconds);
+  }
+  costPatch.provider_retry_count = Number(run.persist_attempts ?? 1) - 1;
+
+
   // 5b. Price guarantee: once the provider's REAL cost is known, the customer
   // never keeps a charge above the hard multiplier cap. Overcharge is refunded;
   // a higher real cost is never charged back to the customer.
