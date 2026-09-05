@@ -272,3 +272,61 @@ describe('source is bound to reference #1', () => {
     expect(withThree.resolvedFormat).toEqual(withOne.resolvedFormat);
   });
 });
+
+describe('reference guidance never contradicts the requested change', () => {
+  // A prompt-guided tier: no native strength field.
+  const promptGuidedTier = (Object.keys(PICTURE_MODEL_CAPABILITIES) as Array<keyof typeof PICTURE_MODEL_CAPABILITIES>)
+    .find((t) => !PICTURE_MODEL_CAPABILITIES[t].strengthField && PICTURE_MODEL_CAPABILITIES[t].references.subject > 0)!;
+
+  const FORBIDDEN = [
+    /exactly as it is/i,
+    /\bunchanged\b/i,
+    /do not change/i,
+    /\bidentical\b/i,
+    /apply only the changes/i,
+    /keep the reference image exactly/i,
+  ];
+
+  const levels: Array<[number, string]> = [[20, 'close'], [50, 'balanced'], [90, 'free']];
+
+  for (const [strength, level] of levels) {
+    it(`${level}: no absolute preservation wording, change is stated as fully applied`, () => {
+      const built = buildPictureRequest({
+        tier: promptGuidedTier,
+        mode: 'transform',
+        prompt: 'make the trunk much smaller and darker',
+        style: 'none',
+        strength,
+        requestedFormat: PICTURE_MODEL_CAPABILITIES[promptGuidedTier].aspectRatios[0],
+        subjectRefs: ['https://example.com/tree.png'],
+        styleRefs: [],
+      });
+
+      const intent = built.segments.find((s) => s.source === 'intent');
+      expect(intent).toBeDefined();
+      for (const pattern of FORBIDDEN) expect(intent!.text).not.toMatch(pattern);
+      expect(intent!.text).toMatch(/changes described above/i);
+
+      // the user's own words stay first and verbatim
+      expect(built.segments[0].source).toBe('user');
+      expect(built.segments[0].text).toContain('make the trunk much smaller and darker');
+      expect(built.prompt).toContain('make the trunk much smaller and darker');
+    });
+  }
+
+  it('close explicitly demands the change be applied in full', () => {
+    const built = buildPictureRequest({
+      tier: promptGuidedTier,
+      mode: 'transform',
+      prompt: 'make the trunk much smaller and darker',
+      style: 'none',
+      strength: 10,
+      requestedFormat: PICTURE_MODEL_CAPABILITIES[promptGuidedTier].aspectRatios[0],
+      subjectRefs: ['https://example.com/tree.png'],
+      styleRefs: [],
+    });
+    const intent = built.segments.find((s) => s.source === 'intent')!;
+    expect(intent.text).toMatch(/fully applying the changes described above/i);
+    expect(built.appliedModifiers.some((m) => m.id === 'intent:close')).toBe(true);
+  });
+});
