@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { tx } from "@/lib/i18nText";
+import { mapAuthError, trackAuthError } from "@/lib/authErrors";
 import { lovable } from "@/integrations/lovable";
 
 const GoogleLogo = () => (
