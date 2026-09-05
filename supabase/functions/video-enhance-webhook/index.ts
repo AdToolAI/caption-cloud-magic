@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
+  applyLateCostTrueUp,
   finalizeCancelConfirmed,
   finalizeFailure,
   finalizeSuccess,
@@ -140,13 +141,30 @@ serve(async (req) => {
       run.provider_prediction_id = predictionId;
     }
 
-    if (["completed", "provider_failed", "provider_cancelled_confirmed"].includes(run.status)) {
-      return json({ ok: true, deduplicated: true, status: run.status });
-    }
-
     // Authoritative re-read: the webhook body alone never decides.
     const apiKey = Deno.env.get("REPLICATE_API_KEY");
     if (!apiKey) return json({ error: "REPLICATE_API_KEY not configured" }, 500);
+
+    if (["completed", "provider_failed", "provider_cancelled_confirmed"].includes(run.status)) {
+      // Already terminal — but an authoritative cost arriving late must be
+      // trued up IMMEDIATELY, not at the next scheduled scan.
+      if (
+        run.status === "completed" &&
+        (run.provider_cost_usd_actual === null || run.provider_cost_usd_actual === undefined) &&
+        !run.cost_closed_at
+      ) {
+        const late = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (late.ok) {
+          const latePrediction = await late.json();
+          const lateCost = extractProviderCost(latePrediction, run.model_id);
+          const applied = await applyLateCostTrueUp(admin, run, lateCost);
+          return json({ ok: true, deduplicated: true, status: run.status, lateTrueUp: applied });
+        }
+      }
+      return json({ ok: true, deduplicated: true, status: run.status });
+    }
     const res = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
     });

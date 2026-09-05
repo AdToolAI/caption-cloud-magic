@@ -168,18 +168,40 @@ serve(async (req) => {
     // Late provider cost for ALREADY completed runs (e.g. ByteDance, where the
     // authoritative number can appear after completion). Same 3x check, exactly
     // one idempotent credit. Missing cost stays telemetry, never a blocker.
-    const lateWindow = new Date(Date.now() - 30 * 24 * 3_600_000).toISOString();
-    const { data: lateRuns } = await admin
-      .from("video_enhance_runs")
-      .select("*")
-      .eq("status", "completed")
-      .is("provider_cost_usd_actual", null)
-      .not("provider_prediction_id", "is", null)
-      .gte("created_at", lateWindow)
+    // Late provider cost for ALREADY completed runs (e.g. ByteDance, where the
+    // authoritative number can appear after completion). This scanner is only
+    // the FALLBACK — an authoritative cost arriving through the webhook or any
+    // other active path is trued up immediately. A run stays eligible forever:
+    // until its cost is verified or it is administratively closed. Same 3x
+    // check, exactly one idempotent credit. Missing cost stays telemetry.
+    const nowMs = Date.now();
+    const freshWindow = new Date(nowMs - 30 * 24 * 3_600_000).toISOString();
+
+    const baseLate = () =>
+      admin
+        .from("video_enhance_runs")
+        .select("*")
+        .eq("status", "completed")
+        .is("provider_cost_usd_actual", null)
+        .is("cost_closed_at", null)
+        .not("provider_prediction_id", "is", null);
+
+    // 1. preferred window: recently completed runs.
+    const { data: freshRuns } = await baseLate()
+      .gte("created_at", freshWindow)
       .limit(BATCH_SIZE);
 
+    // 2. stragglers: older runs, in small portions, on a growing backoff.
+    const { data: staleRuns } = await baseLate()
+      .lt("created_at", freshWindow)
+      .or(`next_late_check_at.is.null,next_late_check_at.lte.${new Date(nowMs).toISOString()}`)
+      .order("next_late_check_at", { ascending: true, nullsFirst: true })
+      .limit(BATCH_SIZE);
+
+    const lateRuns = [...(freshRuns ?? []), ...(staleRuns ?? [])];
+
     let lateCostVerified = 0;
-    for (const run of lateRuns ?? []) {
+    for (const run of lateRuns) {
       const res = await fetch(`https://api.replicate.com/v1/predictions/${run.provider_prediction_id}`, {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
