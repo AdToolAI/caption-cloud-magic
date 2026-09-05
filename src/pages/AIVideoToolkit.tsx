@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
-  Sparkles, CreditCard, History, Clapperboard, ShieldAlert, Wand2, Lock,
+  Sparkles, CreditCard, History, Clapperboard, ShieldAlert, Wand2, Lock, Film,
 } from 'lucide-react';
 
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
@@ -26,6 +26,7 @@ import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHis
 import { AIVideoDisclaimer } from '@/components/ai-video/AIVideoDisclaimer';
 import { FirstVideoGuide } from '@/components/ai-video/FirstVideoGuide';
 import { SystemLoadPill } from '@/components/render/SystemLoadPill';
+import { EnhanceVideoPanel } from '@/components/ai-video/EnhanceVideoPanel';
 
 const particles = [
   { x: '10%', y: '20%', size: 4, delay: 0,    dur: 6 },
@@ -214,10 +215,14 @@ export default function AIVideoToolkit() {
 
         {/* Main tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 bg-card/60 backdrop-blur-sm border border-border">
+          <TabsList className="grid w-full grid-cols-4 bg-card/60 backdrop-blur-sm border border-border">
             <TabsTrigger value="generate">
               <Wand2 className="w-4 h-4 mr-2" />
               {t('aiVid.tabGenerate')}
+            </TabsTrigger>
+            <TabsTrigger value="enhance">
+              <Film className="w-4 h-4 mr-2" />
+              {t('aiVid.tabEnhance')}
             </TabsTrigger>
             <TabsTrigger value="history">
               <History className="w-4 h-4 mr-2" />
@@ -258,6 +263,10 @@ export default function AIVideoToolkit() {
                 <AIVideoDisclaimer />
               </div>
             </details>
+          </TabsContent>
+
+          <TabsContent value="enhance">
+            <EnhanceVideoPanel />
           </TabsContent>
 
           <TabsContent value="history">
