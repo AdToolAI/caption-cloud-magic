@@ -90,16 +90,28 @@ async function resolveSource(
   let sourceModel: string | undefined;
 
   if (body.sourceAssetId) {
-    const { data: asset } = await admin
-      .from("video_creations")
-      .select("id, user_id, video_url, model_used")
+    // Generated clips live in ai_video_generations, rendered ones in video_creations.
+    const { data: generated } = await admin
+      .from("ai_video_generations")
+      .select("id, video_url, model")
       .eq("id", body.sourceAssetId)
       .eq("user_id", userId)
       .maybeSingle();
-    if (!asset?.video_url) return { error: "Source video not found", code: "SOURCE_NOT_FOUND" };
-    url = asset.video_url;
-    assetId = asset.id;
-    sourceModel = asset.model_used ?? undefined;
+    if (generated?.video_url) {
+      url = generated.video_url;
+      assetId = generated.id;
+      sourceModel = generated.model ?? undefined;
+    } else {
+      const { data: rendered } = await admin
+        .from("video_creations")
+        .select("id, output_url")
+        .eq("id", body.sourceAssetId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!rendered?.output_url) return { error: "Source video not found", code: "SOURCE_NOT_FOUND" };
+      url = rendered.output_url;
+      assetId = rendered.id;
+    }
   } else if (body.sourceUrl) {
     url = body.sourceUrl;
   } else {

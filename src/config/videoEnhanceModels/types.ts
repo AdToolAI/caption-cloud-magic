@@ -23,16 +23,17 @@ export type VideoEnhanceCapability =
   | 'ugc_enhance'
   | 'restoration';
 
-export type VideoResolution = '1080p' | '2k' | '4k';
+export type VideoResolution = '720p' | '1080p' | '2k' | '4k';
 
 export const RESOLUTION_PIXELS: Record<VideoResolution, { width: number; height: number }> = {
+  '720p': { width: 1280, height: 720 },
   '1080p': { width: 1920, height: 1080 },
   '2k': { width: 2560, height: 1440 },
   '4k': { width: 3840, height: 2160 },
 };
 
 /** Ordered from small to large — used by the recommendation engine. */
-export const RESOLUTION_ORDER: VideoResolution[] = ['1080p', '2k', '4k'];
+export const RESOLUTION_ORDER: VideoResolution[] = ['720p', '1080p', '2k', '4k'];
 
 export type QualityTier = 'standard' | 'pro';
 
