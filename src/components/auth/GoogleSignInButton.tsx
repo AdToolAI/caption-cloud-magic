@@ -19,13 +19,17 @@ export const GoogleSignInButton = ({ disabled }: { disabled?: boolean }) => {
 
   const handleClick = async () => {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/`,
-        queryParams: { prompt: "select_account" },
-      },
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+      extraParams: { prompt: "select_account" },
     });
+
+    const error = "error" in result ? result.error : undefined;
+    if (!error) {
+      if (!("redirected" in result && result.redirected)) setLoading(false);
+      return;
+    }
+
 
     if (error) {
       setLoading(false);
