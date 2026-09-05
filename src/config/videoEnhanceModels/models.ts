@@ -146,7 +146,8 @@ export const VIDEO_ENHANCE_MODELS: VideoEnhanceModelDefinition[] = [
     minDurationSeconds: 1,
     maxDurationSeconds: 120,
     typicalProcessingSeconds: [120, 900],
-    enabled: false,
+    // GLOBAL LIVE. Kill-switch retained (see the ByteDance entry above).
+    enabled: true,
     featureFlag: 'video.enhance.topaz_video_upscale',
     backendFlag: 'VIDEO_ENHANCE_TOPAZ_ENABLED',
   },
