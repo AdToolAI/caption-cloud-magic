@@ -177,12 +177,16 @@ serve(async (req) => {
       if (parent) parentMeta = parent;
     }
 
-    // Media library row is part of the deliverable: no row, no charge.
-    const { data: studioImage, error: insertError } = await supabaseAdmin
-      .from("studio_images")
-      .insert({
+    // The provider already ran successfully at this point. The media library
+    // row is retried; a database hiccup must never turn a paid provider run
+    // into a free run, and it must never trigger a second provider call.
+    const workflowType = getWorkflowTypeForEnhanceModel(spec.id);
+    const persisted = await persistStudioImage(
+      supabaseAdmin,
+      {
         user_id: user.id,
         image_url: publicUrl,
+        workflow_type: workflowType,
         prompt: parentMeta.prompt || `Enhanced with ${spec.id}`,
         style: parentMeta.style || "realistic",
         model_used: spec.id,
@@ -192,63 +196,79 @@ serve(async (req) => {
         parent_id: body.imageId || null,
         upscale_factor: scale ?? null,
         metadata_json: { storagePath, enhanceModel: input.enhance_model ?? null, scale: scale ?? null },
-      })
-      .select()
-      .single();
-
-    if (insertError || !studioImage) {
-      console.error("[enhance-image] studio_images insert failed:", insertError?.message);
-      return json(
-        {
-          error: "The enhanced image could not be saved to your library. You were not charged.",
-          code: "PERSIST_FAILED",
-          providerUrl: publicUrl,
-        },
-        500,
-      );
-    }
+      },
+      "[enhance-image]",
+    );
 
     const { data: newBalance, error: deductError } = await supabaseAdmin.rpc("deduct_ai_video_credits", {
       p_user_id: user.id,
       p_amount: cost,
-      p_generation_id: studioImage?.id || null,
+      p_generation_id: persisted.id,
     });
     if (deductError) console.error("[enhance-image] deduct error:", deductError.message);
 
     // Freeze the pricing inputs so this run stays explainable after rate,
     // FX or curve changes.
-    const { error: snapshotError } = await supabaseAdmin.from("picture_enhance_runs").insert({
-      user_id: user.id,
-      model_id: spec.id,
-      studio_image_id: studioImage?.id || null,
-      scale: scale ?? null,
-      currency,
-      pricing_mode: pricing.pricingMode,
-      pricing_version: pricing.pricingVersion,
-      provider_pricing_version: pricing.providerPricingVersion,
-      provider_cost_usd_estimated: pricing.providerCostUsdEstimated,
-      provider_cost_eur_buffered: pricing.providerCostEurBuffered,
-      fx_rate_used: pricing.fxRateUsed,
-      fx_safety_buffer_used: pricing.fxSafetyBufferUsed,
-      multiplier_used: pricing.multiplierUsed,
-      user_price_eur: pricing.userPriceEur,
-      net_revenue_eur: pricing.netRevenueEur,
-      contribution_eur: pricing.contributionEur,
-      margin_pct: pricing.marginPct,
-      status: "completed",
-    });
+    const { data: runRow, error: snapshotError } = await supabaseAdmin
+      .from("picture_enhance_runs")
+      .insert({
+        user_id: user.id,
+        model_id: spec.id,
+        studio_image_id: persisted.id,
+        scale: scale ?? null,
+        currency,
+        pricing_mode: pricing.pricingMode,
+        pricing_version: pricing.pricingVersion,
+        provider_pricing_version: pricing.providerPricingVersion,
+        provider_cost_usd_estimated: pricing.providerCostUsdEstimated,
+        provider_cost_eur_buffered: pricing.providerCostEurBuffered,
+        fx_rate_used: pricing.fxRateUsed,
+        fx_safety_buffer_used: pricing.fxSafetyBufferUsed,
+        multiplier_used: pricing.multiplierUsed,
+        user_price_eur: pricing.userPriceEur,
+        net_revenue_eur: pricing.netRevenueEur,
+        contribution_eur: pricing.contributionEur,
+        margin_pct: pricing.marginPct,
+        status: persisted.ok ? "completed" : "asset_persist_failed",
+      })
+      .select("id")
+      .maybeSingle();
     if (snapshotError) console.warn("[enhance-image] pricing snapshot warning:", snapshotError.message);
+
+    if (persisted.id && runRow?.id) {
+      const { error: linkError } = await supabaseAdmin
+        .from("studio_images")
+        .update({ source_run_id: runRow.id })
+        .eq("id", persisted.id);
+      if (linkError) console.warn("[enhance-image] run link warning:", linkError.message);
+    }
+
+    if (!persisted.ok) {
+      console.error("[enhance-image] studio_images insert exhausted:", persisted.error);
+      return json(
+        {
+          error:
+            "Your enhanced image is ready and safely stored, but it could not be added to your library yet. We are retrying — the result is not lost.",
+          code: "ASSET_PERSIST_FAILED",
+          providerUrl: publicUrl,
+          cost,
+          currency,
+        },
+        500,
+      );
+    }
 
     return json({
       success: true,
       image: {
-        id: studioImage?.id,
+        id: persisted.id,
         url: publicUrl,
         previewUrl: publicUrl,
         modelId: spec.id,
         scale: scale ?? null,
         parentId: body.imageId || null,
         enhanceModel: input.enhance_model ?? null,
+        workflowType,
       },
       cost,
       pricing,
