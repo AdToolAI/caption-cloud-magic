@@ -40,7 +40,7 @@ export async function finalizeSuccess(
   admin: Admin,
   run: Run,
   providerOutputUrl: string,
-  providerCostUsdActual?: number,
+  providerCost: ProviderCostReading = { source: 'unavailable' },
 ): Promise<FinalizeResult> {
   if (run.status === 'completed' && run.output_url) {
     return { ok: true, status: 'completed', outputUrl: run.output_url, assetId: run.output_asset_id };
