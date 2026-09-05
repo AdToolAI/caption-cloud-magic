@@ -333,10 +333,15 @@ export const VIDEO_RATE_CARDS: Record<string, VideoRateCard> = {
   },
   'topaz-video-upscale': {
     currency: 'USD',
-    type: 'per_second_matrix',
-    source: 'Replicate topazlabs/video-upscale published cost table (per 5 output seconds)',
-    checkedAt: '2026-09-05',
+    type: 'per_unit',
+    unitUsd: TOPAZ_UNIT_USD,
+    unitsPerOutputSecond: TOPAZ_UNITS_PER_SECOND,
+    fpsFactor: { 30: 1, 60: 2 },
+    source:
+      'Unit price $0.08 verified from billed AdTool run 2026-09-06; unit consumption estimated from the published per-5s cost table',
+    checkedAt: '2026-09-06',
     costUnverified: true,
+    estimatorCalibrating: true,
     entries: TOPAZ_ENTRIES,
   },
 };
