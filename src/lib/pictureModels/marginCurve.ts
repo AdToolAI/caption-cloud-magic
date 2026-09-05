@@ -165,6 +165,69 @@ export function evaluatePricing(
   };
 }
 
+/**
+ * Post-run true-up.
+ *
+ * The guarantee is literal: after the provider's real cost is known, the
+ * customer never keeps a charge above `cap x actual provider cost`. The FX
+ * safety buffer is deliberately NOT part of this cost — it only protects the
+ * pre-run estimate. A missing, zero or invalid cost produces no multiplier and
+ * no refund at all.
+ */
+export const PRICING_TRUE_UP_TOLERANCE_EUR = 0.01;
+
+export interface TrueUpEvaluation {
+  actualProviderCostEur: number | null;
+  maxAllowedChargeEur: number | null;
+  verifiedMultiplierBeforeTrueUp: number | null;
+  verifiedMultiplierAfterTrueUp: number | null;
+  refundEur: number;
+  netUsageChargeEur: number;
+  gateReason: PricingGateReason | null;
+  /** Internal alarm only — never reduces the customer refund. */
+  driftAlarm: boolean;
+}
+
+export function evaluateTrueUp(params: {
+  /** Charge actually captured for this run, after price discounts, before VAT. */
+  capturedUsageChargeEur: number;
+  /** Verified provider cost in EUR, WITHOUT the FX safety buffer. */
+  actualProviderCostEur: number | null | undefined;
+  hardMultiplierCap: number;
+}): TrueUpEvaluation {
+  const captured = Math.max(0, params.capturedUsageChargeEur);
+  const cost = params.actualProviderCostEur;
+
+  if (cost === null || cost === undefined || !Number.isFinite(cost) || cost <= 0) {
+    return {
+      actualProviderCostEur: null,
+      maxAllowedChargeEur: null,
+      verifiedMultiplierBeforeTrueUp: null,
+      verifiedMultiplierAfterTrueUp: null,
+      refundEur: 0,
+      netUsageChargeEur: captured,
+      gateReason: 'cost_unverified',
+      driftAlarm: false,
+    };
+  }
+
+  const maxAllowed = capPriceForCost(cost, params.hardMultiplierCap);
+  // Cent-exact for the customer; the tolerance only gates the internal alarm.
+  const refund = Math.max(0, Math.round((captured - maxAllowed) * 100) / 100);
+  const net = Math.max(0, Math.round((captured - refund) * 100) / 100);
+
+  return {
+    actualProviderCostEur: cost,
+    maxAllowedChargeEur: maxAllowed,
+    verifiedMultiplierBeforeTrueUp: captured / cost,
+    verifiedMultiplierAfterTrueUp: net / cost,
+    refundEur: refund,
+    netUsageChargeEur: net,
+    gateReason: refund > 0 ? 'actual_cost_drift' : null,
+    driftAlarm: refund > PRICING_TRUE_UP_TOLERANCE_EUR,
+  };
+}
+
 
 export interface MarginMetrics {
   netRevenueEUR: number;
