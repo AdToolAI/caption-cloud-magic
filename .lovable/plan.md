@@ -70,11 +70,17 @@ Genau zwei kurze echte Läufe über das Testkonto (kürzestmögliche Clips), dan
 1. **Topaz Hochformat** 720×1280 → 4K, Erwartung ~1216×2160, geprüft gegen den echten Output.
 2. **ByteDance Hochformat**, gleicher Quellclip, nächste echte Upscale-Stufe — damit wird seine Auflösungssemantik bewiesen.
 
-Dokumentiert werden je Lauf: projizierte vs. tatsächliche Maße, `projection_matched`; für Topaz `actual_units`, Unit-Preis, USD-Kosten, Endpreis, echte Marge; für ByteDance Ausgabesekunden, Tier, Auflösung, FPS, offizielle bzw. Abrechnungsrate, USD-Kosten.
+Dokumentiert werden je Lauf: projizierte vs. tatsächliche Maße, `projection_matched`; für Topaz `actual_units`, Unit-Preis, USD-Kosten, Endpreis, echte Marge; für ByteDance Ausgabesekunden, Tier, Auflösung, FPS, offizielle bzw. Abrechnungsrate, USD-Kosten. Nach jedem Retest wird die bestätigte Projektionsregel für genau diese Kombination in den Fähigkeitsdaten festgeschrieben.
 
-Aktualisierter Abnahmebericht:
-- ByteDance vCube: Functional READY, Pricing offen bis Rate-Card-Nachweis, Global release BLOCKED.
-- Topaz: Functional READY nach bestandenem Hochformat-Retest; Pricing VERIFIED, sobald Units sauber in USD umgerechnet sind.
-- Blindvergleichs-Ergebnisse werden festgehalten; die Festschreibung "KI-Material → vCube / Kameramaterial → Topaz" erfolgt erst nach dem Kameramaterial-Vergleich.
+Der aktualisierte Abnahmebericht bewertet **vier getrennte Dimensionen** je Modell:
+
+```text
+Modell     | Functional | Geometry            | Pricing          | Global Release
+Topaz      | READY?     | 1080p verified,     | verified über    | Entscheidung
+           |            | 4k nach Retest      | Units × Rate     |
+ByteDance  | READY      | nach Retest         | COST UNVERIFIED  | BLOCKED
+```
+
+Blindvergleichs-Ergebnisse werden festgehalten; die Festschreibung "KI-Material → vCube / Kameramaterial → Topaz" erfolgt erst nach dem Kameramaterial-Vergleich.
 
 Keine Feature-Flags werden global aktiviert.
