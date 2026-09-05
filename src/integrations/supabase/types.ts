@@ -18420,6 +18420,259 @@ export type Database = {
           },
         ]
       }
+      video_enhance_admin_actions: {
+        Row: {
+          action: string
+          admin_user_id: string
+          created_at: string
+          details: Json
+          id: string
+          run_id: string
+        }
+        Insert: {
+          action: string
+          admin_user_id: string
+          created_at?: string
+          details?: Json
+          id?: string
+          run_id: string
+        }
+        Update: {
+          action?: string
+          admin_user_id?: string
+          created_at?: string
+          details?: Json
+          id?: string
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_enhance_admin_actions_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "video_enhance_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_enhance_ledger: {
+        Row: {
+          amount_eur: number
+          created_at: string
+          id: string
+          note: string | null
+          operation: string
+          operation_key: string
+          run_id: string
+          user_id: string
+        }
+        Insert: {
+          amount_eur: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          operation: string
+          operation_key: string
+          run_id: string
+          user_id: string
+        }
+        Update: {
+          amount_eur?: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          operation?: string
+          operation_key?: string
+          run_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_enhance_ledger_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "video_enhance_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_enhance_runs: {
+        Row: {
+          actual_contribution_eur: number | null
+          actual_margin_pct: number | null
+          callback_token: string
+          cancel_requested_at: string | null
+          contribution_eur: number | null
+          cost_drift_ratio: number | null
+          created_at: string
+          credits_reserved: number
+          currency: string
+          error_code: string | null
+          error_message: string | null
+          fps: number
+          fx_rate_used: number
+          fx_safety_buffer_used: number
+          id: string
+          idempotency_key: string
+          last_reconciled_at: string | null
+          margin_pct: number | null
+          mode: string
+          model_id: string
+          multiplier_used: number | null
+          net_revenue_eur: number | null
+          next_reconcile_at: string | null
+          output_asset_id: string | null
+          output_url: string | null
+          persist_attempts: number
+          pricing_version: string
+          provider_completed_at: string | null
+          provider_cost_eur_buffered: number
+          provider_cost_usd_actual: number | null
+          provider_cost_usd_estimated: number
+          provider_output_url: string | null
+          provider_prediction_id: string | null
+          provider_pricing_version: string
+          provider_status: string | null
+          provider_submitted_at: string | null
+          rate_card_version: string
+          reconciliation_attempts: number
+          resolution: string
+          source_asset_id: string | null
+          source_container: string | null
+          source_duration_seconds: number
+          source_fps: number
+          source_height: number
+          source_model: string | null
+          source_size_bytes: number | null
+          source_url: string
+          source_width: number
+          staging_key: string | null
+          status: string
+          submit_lease_expires_at: string | null
+          submit_lease_owner: string | null
+          tier: string
+          updated_at: string
+          user_id: string
+          user_price_eur: number
+        }
+        Insert: {
+          actual_contribution_eur?: number | null
+          actual_margin_pct?: number | null
+          callback_token: string
+          cancel_requested_at?: string | null
+          contribution_eur?: number | null
+          cost_drift_ratio?: number | null
+          created_at?: string
+          credits_reserved?: number
+          currency?: string
+          error_code?: string | null
+          error_message?: string | null
+          fps: number
+          fx_rate_used: number
+          fx_safety_buffer_used: number
+          id?: string
+          idempotency_key: string
+          last_reconciled_at?: string | null
+          margin_pct?: number | null
+          mode: string
+          model_id: string
+          multiplier_used?: number | null
+          net_revenue_eur?: number | null
+          next_reconcile_at?: string | null
+          output_asset_id?: string | null
+          output_url?: string | null
+          persist_attempts?: number
+          pricing_version: string
+          provider_completed_at?: string | null
+          provider_cost_eur_buffered: number
+          provider_cost_usd_actual?: number | null
+          provider_cost_usd_estimated: number
+          provider_output_url?: string | null
+          provider_prediction_id?: string | null
+          provider_pricing_version: string
+          provider_status?: string | null
+          provider_submitted_at?: string | null
+          rate_card_version: string
+          reconciliation_attempts?: number
+          resolution: string
+          source_asset_id?: string | null
+          source_container?: string | null
+          source_duration_seconds: number
+          source_fps: number
+          source_height: number
+          source_model?: string | null
+          source_size_bytes?: number | null
+          source_url: string
+          source_width: number
+          staging_key?: string | null
+          status?: string
+          submit_lease_expires_at?: string | null
+          submit_lease_owner?: string | null
+          tier: string
+          updated_at?: string
+          user_id: string
+          user_price_eur: number
+        }
+        Update: {
+          actual_contribution_eur?: number | null
+          actual_margin_pct?: number | null
+          callback_token?: string
+          cancel_requested_at?: string | null
+          contribution_eur?: number | null
+          cost_drift_ratio?: number | null
+          created_at?: string
+          credits_reserved?: number
+          currency?: string
+          error_code?: string | null
+          error_message?: string | null
+          fps?: number
+          fx_rate_used?: number
+          fx_safety_buffer_used?: number
+          id?: string
+          idempotency_key?: string
+          last_reconciled_at?: string | null
+          margin_pct?: number | null
+          mode?: string
+          model_id?: string
+          multiplier_used?: number | null
+          net_revenue_eur?: number | null
+          next_reconcile_at?: string | null
+          output_asset_id?: string | null
+          output_url?: string | null
+          persist_attempts?: number
+          pricing_version?: string
+          provider_completed_at?: string | null
+          provider_cost_eur_buffered?: number
+          provider_cost_usd_actual?: number | null
+          provider_cost_usd_estimated?: number
+          provider_output_url?: string | null
+          provider_prediction_id?: string | null
+          provider_pricing_version?: string
+          provider_status?: string | null
+          provider_submitted_at?: string | null
+          rate_card_version?: string
+          reconciliation_attempts?: number
+          resolution?: string
+          source_asset_id?: string | null
+          source_container?: string | null
+          source_duration_seconds?: number
+          source_fps?: number
+          source_height?: number
+          source_model?: string | null
+          source_size_bytes?: number | null
+          source_url?: string
+          source_width?: number
+          staging_key?: string | null
+          status?: string
+          submit_lease_expires_at?: string | null
+          submit_lease_owner?: string | null
+          tier?: string
+          updated_at?: string
+          user_id?: string
+          user_price_eur?: number
+        }
+        Relationships: []
+      }
       video_quality_presets: {
         Row: {
           config: Json
