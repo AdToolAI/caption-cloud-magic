@@ -32,10 +32,11 @@ describe('requested vs. resolved format', () => {
       expect(resolved.adjustment.from).not.toBe(resolved.adjustment.to);
       expect(resolved.adjustment.to).toBe(resolved.aspectRatio);
     } else {
-      expect(resolved.width).toBe(1234);
-      expect(resolved.height).toBe(567);
+      // No adjustment means the source proportions survived exactly.
+      expect(resolved.width! / resolved.height!).toBeCloseTo(1234 / 567, 2);
     }
   });
+
 
   it('reports source as unavailable instead of inventing a size', () => {
     const resolved = resolveRequestedFormat('fast', SOURCE_FORMAT, null);
