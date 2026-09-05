@@ -40,10 +40,15 @@ Sobald die echten Providerkosten eindeutig vorliegen:
 - Ist-Kosten höher als geschätzt (Faktor unter 1,8×) → **keine** Nachbelastung. AdTool trägt die Abweichung, die Rate Card wird korrigiert. 1,8× ist Kalkulationsuntergrenze für künftige Läufe, keine rückwirkende Garantie zugunsten AdTool.
 - Der vorab genehmigte Preis wird nie nachträglich erhöht.
 - Die Gutschrift läuft über den eindeutigen Wallet-Schlüssel `video_enhance:{runId}:pricing_true_up` und kann bei Webhook, Reconciler und Wiederholung zusammen höchstens einmal ausgeführt werden — auch wenn die echte Kostenzahl erst lange nach Abschluss des Laufs eintrifft.
+- Die ursprüngliche Belastung bleibt erhalten: `captured_usage_charge_eur` wird nie überschrieben; daneben stehen `true_up_refund_amount` und `net_usage_charge_eur`. Ausgewiesen werden beide Faktoren — vor und nach dem Ausgleich (z. B. „ursprünglich 6,9× → korrigiert → final 3,0×").
+- Fehlen die echten Kosten, sind sie 0 oder widersprüchlich: **kein** Faktor, **keine** automatische Gutschrift. Der Faktor bleibt leer und der Grund `cost_unverified` steht, bis eine autoritative positive Kostenzahl vorliegt.
 
 **Sperrgründe explizit**
 
 `pricing_gate_reason` ist immer einer von: `estimate_over_cap`, `actual_cost_drift`, `cost_unverified`, `estimator_calibrating`, `floor_conflict`.
+
+Eine Sperre gilt immer für die betroffene **Rate-Card-Version** (z. B. `topaz-video-v3`), nicht dauerhaft für das Modell. Eine korrigierte, neu getestete Version kann freigegeben werden, ohne historische Läufe oder ihre Preis-Schnappschüsse zu verändern.
+
 
 
 
