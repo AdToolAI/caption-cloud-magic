@@ -120,6 +120,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       prompt,
       style = 'realistic',
       aspectRatio = '1:1',
+      requestedFormat,
+      sourceDimensions,
       quality = 'fast',
       referenceImageUrl,
       referenceImageUrls,
@@ -167,12 +169,28 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       ...(styleReferenceUrl ? [styleReferenceUrl] : []),
     ].filter(Boolean);
 
+    // Format: the stored asset decides the source size, not the browser.
+    const effectiveRequestedFormat: string = requestedFormat ?? aspectRatio;
+    let serverSource: { width: number; height: number } | null = null;
+    if (effectiveRequestedFormat === SOURCE_FORMAT && subjectRefsIn.length) {
+      serverSource = await readImageDimensions(subjectRefsIn[0]);
+      if (serverSource && sourceDimensions?.width && sourceDimensions?.height) {
+        const drift = Math.abs(
+          sourceDimensions.width / sourceDimensions.height - serverSource.width / serverSource.height,
+        );
+        if (drift > 0.01) {
+          console.warn('[generate-studio-image] client source ratio differs from stored asset — using asset');
+        }
+      }
+    }
+
     const built = buildPictureRequest({
       tier: 'standard',
       mode,
       prompt: userHead,
       style,
-      aspectRatio,
+      requestedFormat: effectiveRequestedFormat,
+      source: serverSource,
       subjectRefs: subjectRefsIn,
       styleRefs: styleRefsIn,
       strength: typeof strength === 'number' ? strength : undefined,
