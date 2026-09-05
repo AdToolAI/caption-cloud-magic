@@ -249,13 +249,18 @@ export function extractNegativeTerms(prompt: string): { text: string; terms: str
 
 /* --------------------------------------------------------------- clauses */
 
+/**
+ * Reference influence never outranks the user's request: every clause states
+ * that the changes described above are applied in full, and only governs how
+ * much of the *unaffected* rest is preserved.
+ */
 const INTENT_CLAUSES: Record<StrengthBucket, string> = {
   close:
-    'Keep the reference image exactly as it is in composition, subject placement, framing and lighting. Apply only the changes described above.',
+    "Stay very close to the reference image's composition, subject identity, framing and unaffected details, while fully applying the changes described above.",
   balanced:
-    'Keep the main subject and the overall composition of the reference image. Style, lighting and secondary details may change as described above.',
+    'Preserve the main subjects and the overall visual structure of the reference image while applying the changes described above naturally.',
   free:
-    'Treat the reference image as loose inspiration only. Follow the written description first; composition, framing and background may differ.',
+    'Use the reference image as visual guidance while allowing the broader changes described above.',
 };
 
 const MIX_CLAUSE =
