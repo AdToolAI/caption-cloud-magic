@@ -7,6 +7,15 @@ import {
 
 const TEST_USER = '8948d3d9-2c5e-4405-9e9c-1624448e7189';
 const OTHER_USER = '43d88fa6-9341-4094-8cf8-7fc175ffa696';
+/**
+ * Documented allowlist member (internal QA account bestofproducts4u@gmail.com).
+ * The allowlist exists ONLY for controlled test-only behaviour such as the
+ * fail-once persistence test. Regular model access depends on the global
+ * backend switches, never on this list.
+ */
+const DOCUMENTED_ALLOWLIST = [TEST_USER];
+/** Normal production user used for the non-allowlisted smoke runs. */
+const SMOKE_USER = 'ee1f91c5-b61d-4188-8e95-da419e376c59';
 
 /** Mirrors production: both backend switches off, only the allowlist is set. */
 function envWith(allowlist: string) {
@@ -58,7 +67,8 @@ Deno.test('live environment: the deployed allowlist contains exactly the test ac
   const raw = Deno.env.get('VIDEO_ENHANCE_TEST_USER_IDS');
   if (raw === undefined) return; // not available in the local runner
   const ids = raw.split(',').map((v) => v.trim()).filter(Boolean);
-  assertEquals(ids, [TEST_USER]);
+  assertEquals(ids, DOCUMENTED_ALLOWLIST);
+  assertEquals(ids.includes(SMOKE_USER), false, 'smoke user must never be allowlisted');
 });
 
 Deno.test('empty or whitespace-only allowlist privileges nobody', () => {
@@ -69,4 +79,15 @@ Deno.test('empty or whitespace-only allowlist privileges nobody', () => {
   }
   const missing = (_key: string) => undefined;
   assertEquals(isTestAllowlisted(missing, TEST_USER), false);
+});
+
+Deno.test('live environment: global switches unlock both models for a NON-allowlisted user', () => {
+  const raw = Deno.env.get('VIDEO_ENHANCE_TEST_USER_IDS');
+  if (raw === undefined) return; // not available in the local runner
+  const env = (key: string) => Deno.env.get(key);
+  assertEquals(isTestAllowlisted(env, SMOKE_USER), false);
+  for (const [id, spec] of Object.entries(VIDEO_ENHANCE_SPECS)) {
+    assertEquals(env(spec.backendFlag), 'true', `${id}: global switch must be on`);
+    assertEquals(isModelUnlocked(spec, env, SMOKE_USER), true, `${id}: must run without the allowlist`);
+  }
 });
