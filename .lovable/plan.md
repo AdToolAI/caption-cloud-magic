@@ -38,11 +38,6 @@ Sobald die echten Providerkosten eindeutig vorliegen:
 `pricing_gate_reason` ist immer einer von: `estimate_over_cap`, `actual_cost_drift`, `cost_unverified`, `floor_conflict`.
 
 
-
-## Topaz: Architektur jetzt, Formel später
-
-- Preis-Typ wird jetzt auf `per_unit` umgestellt, Einheitspreis 0,08 $ eingefroren.
-- Verifizierte Kosten = tatsächlich abgerechnete Einheiten × eingefrorener Einheitspreis (aus der Provider-Metrik).
 ## Topaz: Ist-Rechnung verifiziert, Schätzer in Kalibrierung
 
 Zwei getrennte Statuswerte statt eines pauschalen „Kosten unbestätigt":
