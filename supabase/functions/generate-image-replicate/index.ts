@@ -518,9 +518,13 @@ serve(async (req) => {
         workflow_type: 'generated',
         prompt: prompt.trim(),
         style,
-        aspect_ratio: aspectRatio,
+        aspect_ratio: built.resolvedFormat.aspectRatio,
         source: 'generated',
-        metadata_json: { storagePath },
+        metadata_json: {
+          storagePath,
+          requestedFormat: built.requestedFormat,
+          resolvedFormat: built.resolvedFormat,
+        },
       },
       '[generate-image-replicate]',
     );
