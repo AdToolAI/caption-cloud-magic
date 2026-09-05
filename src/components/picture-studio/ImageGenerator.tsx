@@ -29,7 +29,7 @@ import {
   PICTURE_MODES,
   PICTURE_MODELS,
   aspectRatiosForTier,
-  closestAspectRatio,
+  
   type PictureMode,
   type QualityTier as ModelTier,
 } from "@/config/pictureStudioModels";
