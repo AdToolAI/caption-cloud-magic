@@ -238,7 +238,13 @@ export async function finalizeFailure(
 }
 
 /** Provider CONFIRMED the cancellation — only here money moves back. */
-export async function finalizeCancelConfirmed(admin: Admin, run: Run): Promise<FinalizeResult> {
+export async function finalizeCancelConfirmed(
+  admin: Admin,
+  run: Run,
+  providerCost: ProviderCostReading = { source: 'unavailable' },
+): Promise<FinalizeResult> {
+  // Cancel policy: the customer gets the full reservation back; provider cost
+  // already incurred is booked internally only.
   await walletOperation(admin, {
     runId: run.id,
     userId: run.user_id,
@@ -246,7 +252,11 @@ export async function finalizeCancelConfirmed(admin: Admin, run: Run): Promise<F
     amountEur: Number(run.user_price_eur),
     note: 'provider cancel confirmed',
   });
-  await setStatus(admin, run.id, 'provider_cancelled_confirmed', { next_reconcile_at: null });
+  await setStatus(admin, run.id, 'provider_cancelled_confirmed', {
+    next_reconcile_at: null,
+    provider_cost_usd_actual: providerCost.usd ?? null,
+    provider_cost_source: providerCost.source,
+  });
   if (run.staging_key) {
     await admin.storage.from(STAGING_BUCKET).remove([run.staging_key]).catch(() => undefined);
   }
