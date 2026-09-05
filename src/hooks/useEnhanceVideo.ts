@@ -57,9 +57,21 @@ async function callEngine(body: Record<string, unknown>) {
   return data;
 }
 
+/** Server-measured facts, authoritative over anything the client read. */
+export interface ServerSourceMeta {
+  durationSeconds: number;
+  width: number;
+  height: number;
+  fps: number;
+  container?: string;
+  sizeBytes?: number;
+  sourceModel?: string;
+}
+
 export function useEnhanceVideo() {
   const [run, setRun] = useState<EnhanceRunRow | null>(null);
   const [estimate, setEstimate] = useState<EnhanceEstimate | null>(null);
+  const [sourceMeta, setSourceMeta] = useState<ServerSourceMeta | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
@@ -81,9 +93,11 @@ export function useEnhanceVideo() {
         const data = await callEngine({
           action: 'estimate',
           sourceAssetId: source.assetId,
+          sourceAssetType: source.assetType,
           sourceUrl: source.url,
           ...config,
         });
+        if (data?.source) setSourceMeta(data.source as ServerSourceMeta);
         const pricing = data?.pricing;
         if (!pricing) return null;
         const next: EnhanceEstimate = {
@@ -135,6 +149,7 @@ export function useEnhanceVideo() {
           action: 'start',
           idempotencyKey: key,
           sourceAssetId: source.assetId,
+          sourceAssetType: source.assetType,
           sourceUrl: source.url,
           ...config,
         });
@@ -168,12 +183,14 @@ export function useEnhanceVideo() {
     stopPolling();
     setRun(null);
     setEstimate(null);
+    setSourceMeta(null);
     setError(null);
   }, [stopPolling]);
 
   return {
     run,
     estimate,
+    sourceMeta,
     isStarting,
     isRunning: !!run && !TERMINAL.includes(run.status),
     error,
