@@ -1,48 +1,65 @@
 # Video Enhance: echte Upscale-Garantie + Kostennachweis
 
-Keine globale Freischaltung. Zwei Baustellen: (1) "1080p" darf nie unbemerkt verkleinern, (2) Preise bleiben unbestätigt, bis eine belastbare Dollarzahl rekonstruierbar ist.
+Keine globale Freischaltung. Zwei Baustellen: (1) eine Zielstufe darf nie unbemerkt verkleinern, (2) Preise bleiben unbestätigt, bis eine belastbare Dollarzahl rekonstruierbar ist.
 
-## 1. Ausgabegröße vor dem Lauf berechnen (Kernstück)
+## 1. Ausgabegröße vor dem Lauf berechnen — modellspezifisch
 
-Neue gemeinsame Geometrie-Funktion (Client + Server, ein Code, gespiegelt):
+Die Geometrie ist eine **Modell-Fähigkeit**, keine globale Regel. Jedes Modell bekommt eine `resolutionProjectionStrategy`:
 
-- Eine Auflösungsstufe ist eine **Ziel-Zeilenzahl** (720/1080/1440/2160), die der Anbieter unter Erhalt des Seitenverhältnisses anwendet.
-- `projectOutput(sourceWidth, sourceHeight, resolution)` liefert die erwarteten Ausgabemaße (gerade Zahlen, aufgerundet auf 2er-Schritte).
-- `isRealUpscale(...)`: gilt nur, wenn **beide** Dimensionen >= Quelle sind **und** die Gesamtpixel echt steigen (Toleranz 1 %).
+- Topaz: `verified_target_height` — im Live-Lauf beobachtet (720×1280 + "1080p" → 608×1080): Stufe = feste Ausgabehöhe, Seitenverhältnis bleibt.
+- ByteDance vCube: `to_be_verified` — dieselbe Semantik wird **nicht** angenommen, bis ein echter Hochformat-Lauf sie bestätigt. Solange gilt sie als unbestätigt und die Anzeige markiert die erwarteten Maße als Schätzung.
 
-Beispiel 720×1280 + "1080p" bei Topaz → 608×1080 → keine echte Vergrößerung → gesperrt.
+Gemeinsame Funktion (Client + Server gespiegelt):
+`projectOutput(modelId, sourceWidth, sourceHeight, targetResolution)` → erwartete Maße, gerundet auf **gerade** Pixelwerte (720×1280 → 2160 hoch ergibt 1216×2160, nicht 1215×2160).
 
-## 2. Serverseitiges Gate
+## 2. Upscale-Gate — nur für räumliches Vergrößern
 
-In `supabase/functions/_shared/video-enhance-models.ts` neuer Validierungsfehler `no_upscale` in `validateCombination` (Quellmaße werden bereits serverseitig gemessen). Der Run wird **vor** Reservierung und Provider-Start abgelehnt, mit lokalisierter Meldung (EN/DE/ES) und einem Vorschlag der nächsten echten Upscale-Stufe. Kein Geldpfad wird angefasst.
+Die Absicht eines Laufs wird getrennt bewertet:
 
-## 3. UI-/Empfehlungslogik
+- `spatialUpscaleRequested` → muss eine echte Vergrößerung sein: beide Dimensionen >= Quelle **und** Gesamtpixel + mehr als 1 %.
+- `fpsInterpolationRequested` (z. B. 1920×1080 24 fps → 1920×1080 60 fps) → gleiche Auflösung ist ausdrücklich erlaubt, wird nie geblockt.
+- `enhancementRequested` (Artefakte, Restauration bei gleicher Größe) → ebenfalls erlaubt.
+- Räumliche Verkleinerung → grundsätzlich blockiert, solange es keinen ausdrücklichen Downscale-Workflow gibt.
 
-- `src/config/videoEnhanceModels/index.ts`: dieselbe Prüfung in der Client-Validierung; `availableResolutions()` bekommt optionale Quellmaße und markiert Stufen, die verkleinern würden, als nicht wählbar (kein stilles Herausfiltern — sie erscheinen mit Hinweis "verkleinert dein Video").
-- `src/lib/videoEnhance/recommend.ts`: Zielstufe wird nicht mehr aus der Zielplattform allein abgeleitet, sondern auf die nächste vom Modell unterstützte Stufe angehoben, die eine echte Vergrößerung ergibt. Findet sich keine, gilt `already_optimal` statt eines sinnlosen Laufs.
-- Anzeige der konkret erwarteten Maße ("720×1280 → 1215×2160") statt nur des Labels.
+Serverseitig neuer Validierungsfehler `no_upscale` in `supabase/functions/_shared/video-enhance-models.ts`, geprüft **vor** Reservierung und Provider-Start, mit Meldung in EN/DE/ES und einem Vorschlag der nächsten echten Upscale-Stufe. Geldpfad bleibt unverändert.
 
-## 4. Tests
+## 3. Erwartete vs. tatsächliche Maße speichern
+
+Auf dem Lauf werden getrennt festgehalten: `projected_width`, `projected_height`, `actual_width`, `actual_height` sowie `projection_matched`. Nach jedem Lauf wird verglichen; häufige Abweichungen führen zur Korrektur der Projektionsstrategie des betroffenen Modells (nicht zu einer globalen Regeländerung).
+
+## 4. Anzeige: Maße statt Labels
+
+Vor dem Start steht nicht mehr nur "1080p", sondern:
+
+```text
+Quelle:    720 × 1280
+Erwartet: ~1216 × 2160
+```
+
+Die Tilde entfällt, sobald die Projektion für dieses Modell durch echte Läufe bestätigt ist. Stufen, die verkleinern würden, bleiben sichtbar, sind aber nicht wählbar und tragen den Hinweis "verkleinert dein Video".
+
+`src/lib/videoEnhance/recommend.ts` hebt die Zielstufe automatisch auf die nächste vom Modell unterstützte Stufe an, die echt vergrößert; gibt es keine, lautet das Ergebnis `already_optimal` statt eines sinnlosen Laufs.
+
+## 5. Tests
 
 Neue Fälle in `src/test/videoEnhanceParity.test.ts` und `src/test/videoEnhanceLifecycle.test.ts` für Hochformat 720×1280, Querformat 1280×720 und Quadrat 1080×1080, je Modell und Stufe:
-- keine angebotene Stufe verkleinert je eine Dimension,
-- Server und Client geben für identische Eingaben identische Entscheidungen (Paritätstest),
-- die Empfehlung liefert für jedes der drei Formate eine echte Vergrößerung oder gar keinen Lauf.
+- keine wählbare Stufe verkleinert je eine Dimension,
+- ein FPS-only-Lauf bei gleicher Auflösung wird **nicht** geblockt,
+- gerade Rundung wird geprüft (1216×2160),
+- Server und Client entscheiden für identische Eingaben identisch.
 
-## 5. Preisnachweis (getrennt von der Funktion)
+## 6. Preisnachweis (getrennt von der Funktionsfreigabe)
 
-Rein prüfend, keine erfundenen Zahlen. Für beide Modelle wird der Reihe nach versucht:
-1. Units × offizieller Unit-Preis (Anbieterseite),
-2. Sekunden × dokumentierte Rate Card,
-3. Abrechnungs-/Nutzungsdaten des Anbieters nach Verzögerung.
+- **Topaz:** Kosten = tatsächlich gemeldete Units × aktueller offizieller Unit-Preis (derzeit 0,08 USD). Wenn beides eindeutig vorliegt, gilt der Lauf als **verifiziert** mit `provider_cost_source = official_unit_rate x actual_usage`; Tarifversion und Prüfdatum werden mitgespeichert. Kein Warten auf ein separates Gesamtkostenfeld.
+- **ByteDance vCube:** Abrechnung nach Ausgabesekunden, abhängig von Tier + Auflösung + FPS. Verifikation nur über die konkrete offizielle Matrix oder Abrechnungsdaten; bis dahin **COST UNVERIFIED**.
 
-Nur wenn eine dieser Quellen die Dollarzahl eindeutig ergibt, wird `provider_cost_source` als verifiziert geführt; sonst bleibt es **COST UNVERIFIED**. Der Bericht nennt die tatsächlich genutzte Quelle.
+Der Bericht nennt je Lauf die tatsächlich verwendete Quelle.
 
-## 6. Retest und Abschluss
+## 7. Retest und Abschluss
 
-Nach dem Fix ein kurzer echter Hochformat-Lauf mit Topaz über das Testkonto (kürzestmöglicher Clip), dann ein aktualisierter Abnahmebericht:
-- ByteDance vCube: Functional READY, Pricing COST UNVERIFIED, Global release BLOCKED.
-- Topaz: erst nach bestandenem Hochformat-Retest Functional READY.
-- Blindvergleichs-Ergebnisse werden im Bericht festgehalten; die endgültige Festschreibung "KI-Material → vCube / Kameramaterial → Topaz" erfolgt erst nach dem Kameramaterial-Vergleich.
+Nach dem Fix zwei kurze echte Läufe über das Testkonto (kürzestmögliche Clips): Topaz im Hochformat und ByteDance im Hochformat zur Verifikation seiner Projektionssemantik. Danach ein aktualisierter Abnahmebericht:
+- ByteDance vCube: Functional READY, Pricing offen bis Rate-Card-Nachweis, Global release BLOCKED.
+- Topaz: Functional READY erst nach bestandenem Hochformat-Retest; Pricing voraussichtlich verifizierbar über Units × Unit-Preis.
+- Blindvergleichs-Ergebnisse werden festgehalten; die Festschreibung "KI-Material → vCube / Kameramaterial → Topaz" erfolgt erst nach dem Kameramaterial-Vergleich.
 
 Keine Feature-Flags werden global aktiviert.
