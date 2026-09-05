@@ -36,12 +36,18 @@ Wenn kein passendes Kameramaterial im Konto liegt, lade bitte einen kurzen Origi
 | B3 | AIGC | echter Seedance-Clip 720p/24 → 1080p/30 |
 | B4 | AIGC | höherwertige Konfiguration |
 | B5 | Pro | nur wenn die Replicate-Berechtigung tatsächlich bestätigt wird |
-| B6 | — | Anbieterfehler |
+| B6 | — | echter Anbieterfehler (gleiche Bedingung wie T3) |
 | B7 | — | Speicherfehler |
+
+Lässt sich ein echter Anbieterfehler nicht kontrolliert auslösen, wird T3/B6 im Bericht als **BLOCKED** geführt; der Geldpfad bleibt dann über den deterministischen Testfall abgesichert. Kein Ersatz durch eine Anfrage, die schon unsere eigene Vorprüfung ablehnt — die beweist nur, dass nichts reserviert wurde.
+
+## 3a. Abbruch-Policy — vorab festlegen
+
+Vor T5 wird schriftlich festgelegt, was „korrekt" heißt: Replicate unterscheidet einen Abbruch **vor** dem Start (keine Anbieterkosten) von einem Abbruch **während** des Laufs (bereits verbrauchte Rechenzeit kann berechnet werden). Vorschlag: AdTool trägt angefangene Anbieterkosten bei Nutzerabbruch selbst und gibt dem Kunden das reservierte Guthaben vollständig frei; die entstandenen Kosten werden nur intern erfasst. Der Test misst dann gegen genau diese Regel.
 
 ## 4. Was pro Lauf festgehalten wird
 
-Eingang (Auflösung / Bildrate / Dauer), Ausgang (Auflösung / Bildrate / Dauer), erwartete Anbieterkosten, tatsächliche Anbieterkosten, Nutzerpreis, reserviertes Guthaben, endgültige Belastung oder Freigabe, Prediction-ID, Laufzeit, Speicher-Asset, Aufräumen der Zwischendatei, Abstammung zum Originalclip, Sichtbarkeit in der Mediathek, Download.
+Eingang (Auflösung / Bildrate / Dauer), Ausgang (Auflösung / Bildrate / Dauer), erwartete Anbieterkosten, tatsächliche Anbieterkosten **plus Herkunft dieser Zahl**, Nutzerpreis, reserviertes Guthaben, endgültige Belastung oder Freigabe, Prediction-ID, Laufzeit, Speicher-Asset, Aufräumen der Zwischendatei, Abstammung zum Originalclip, Sichtbarkeit in der Mediathek, Download.
 
 ## 5. Qualitätsvergleich
 
