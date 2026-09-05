@@ -34,32 +34,33 @@ Alles in EN/DE/ES, responsiv, mit den bestehenden Design-Tokens.
 ### Kanonische Auswahl = Asset-ID (verbindlich)
 
 - Der Picker liefert immer ein `CanonicalVideoAsset`:
-  `assetId, assetSource ('generation' | 'creation'), url, thumbnailUrl, title, width, height, fps, durationSeconds, sourceModel, workflowType, createdAt`.
-- An `video-enhance` geht **`sourceAssetId`**, nie eine freie URL. Der Server löst die ID heute schon gegen `ai_video_generations` bzw. `video_creations` mit `user_id`-Prüfung auf und lehnt Quellen außerhalb des AdTool-Speichers ab — dieser Pfad bleibt der einzige.
-- `EnhanceVideoPanel` bekommt `initialSourceAssetId` als bevorzugte Schnittstelle; `initialSourceUrl` bleibt nur als veralteter Fallback für noch nicht migrierte Aufrufer (Mediathek-Lightbox, Director's Cut, AI Video Studio werden auf die ID umgestellt).
+  `assetId, assetType ('generation' | 'creation'), url, thumbnailUrl, title, width, height, fps, durationSeconds, metadataVerified, sourceModel, workflowType, storageKey, generationId, parentVideoId, createdAt`.
+- An `video-enhance` gehen **`sourceAssetId` + `sourceAssetType`**, nie eine freie URL. Der Server muss die Tabelle damit nicht mehr erraten; die `user_id`-Ownership-Prüfung und die Ablehnung von Quellen außerhalb des AdTool-Speichers bleiben unverändert.
+- `EnhanceVideoPanel` bekommt `initialSourceAssetId`/`initialSourceAssetType` als bevorzugte Schnittstelle; `initialSourceUrl` bleibt nur als veralteter Fallback für noch nicht migrierte Aufrufer (Mediathek-Lightbox, Director's Cut, AI Video Studio werden umgestellt).
 
 ### Upload erzeugt ein echtes Asset
 
-- Datei nach AdTool-Speicher unter `${user.id}/…`, danach **Datensatz in `video_creations`** anlegen (`user_id`, `output_url`, `status: 'completed'`, `metadata: { source_type: 'upload', original_filename, width, height, fps, duration }`) und dessen ID als `assetId` verwenden.
-- Kein Weiterreichen einer rohen Public-URL an Video Enhance — Ownership, Lineage und Wiederauffindbarkeit in der Mediathek bleiben so intakt.
+- Datei nach AdTool-Speicher unter `${user.id}/…`, danach **Datensatz in `video_creations`** anlegen (`user_id`, `output_url`, `status: 'completed'`, `metadata: { source_type: 'upload', original_filename, storage_key, width, height, fps, duration, metadata_verified: false }`) und dessen ID als `assetId` mit `assetType: 'creation'` verwenden.
+- Die Browser-Werte sind ausdrücklich **provisorisch**. Beim ersten Estimate misst `video-enhance` die Datei selbst; die gemessenen Werte ersetzen die provisorischen und setzen `metadata_verified: true`.
+- Kein Weiterreichen einer rohen Public-URL an Video Enhance — Ownership, Lineage und Wiederauffindbarkeit in der Mediathek bleiben intakt.
 - Nur Videodateien, Typ- und Größenprüfung vor dem Upload; Fortschritt und Fehlermeldung in der Dropzone.
 
 ### Ein Listentyp, dedupliziert
 
 - Neuer Hook `src/hooks/useEnhanceSourceVideos.ts` normalisiert `ai_video_generations` und `video_creations` in `CanonicalVideoAsset`.
-- Dedupe-Regel: gleiche zugrundeliegende Datei (identische Video-URL bzw. `video_creations.metadata.generation_id` / `parent_video_id`-Verkettung) erscheint genau einmal; das persistierte `video_creations`-Asset gewinnt gegenüber der Generation.
+- Dedupe-Reihenfolge, stabile Identität zuerst: 1. `generation_id`, 2. Lineage (`parent_video_id`), 3. kanonischer Storage-Key, 4. erst als letzter Fallback normalisierte URL (ohne Query/Signatur). Das persistierte `video_creations`-Asset gewinnt gegenüber der Generation.
 - Verbesserte Ausgaben (`enhance`-Lineage) erscheinen als eigener Eintrag mit Badge "Verbessert", nicht als Dublette der Quelle.
 
 ### Laden und Filtern serverseitig
 
-- Startansicht lädt nur 6–8 Einträge pro Quelle.
-- "Alle Videos anzeigen", Suche und Filter laufen als paginierte Abfragen (Range/Keyset, Suche über Titel/Prompt, Filter über Status/Herkunft) — nie komplette Mediathek laden und im Browser filtern.
+- Startansicht zeigt die **global neuesten 6–8 kanonischen Assets über beide Quellen hinweg** — nicht 6–8 je Tabelle. Der Hook holt aus beiden Tabellen je ein etwas größeres Fenster, mischt nach `createdAt`, dedupliziert und schneidet dann auf 6–8.
+- "Alle Videos anzeigen", Suche und Filter laufen als paginierte Abfragen (Keyset über `createdAt` + ID als Tiebreaker, Suche über Titel/Prompt, Filter über Herkunft/Status) — nie komplette Mediathek laden und im Browser filtern. Die Sortierung bleibt über den gemischten Datensatz hinweg stabil, damit beim Nachladen nichts springt.
 - Vorschaubilder: `thumbnail_url` wenn vorhanden, sonst der bestehende `LazyVideoThumb` mit `preload="metadata"`.
 
 ### Metadaten-Invariante
 
-- Client-seitig aus dem `<video>`-Element gelesene Maße/Bildrate/Dauer sind **ausschließlich Anzeige-Fallback**.
-- Maßgeblich für Preis, Empfehlung, Fähigkeitsprüfung und Provider-Auftrag bleiben die persistierten bzw. serverseitig gemessenen Werte aus `video-enhance`. Weicht die Servermessung ab, aktualisiert die UI die Anzeige nach der Preisvorschau.
+- Client-seitig aus dem `<video>`-Element gelesene oder beim Upload übernommene Maße/Bildrate/Dauer sind **ausschließlich Anzeige-Werte** und gelten als unverifiziert.
+- Maßgeblich für Preis, Empfehlung, Fähigkeitsprüfung und Provider-Auftrag sind allein die serverseitig gemessenen Werte aus `video-enhance`. Weicht die Messung ab, aktualisiert die UI die Anzeige nach der Preisvorschau.
 
 ### Neue und geänderte Dateien
 
