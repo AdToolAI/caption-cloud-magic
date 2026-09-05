@@ -60,3 +60,13 @@ Deno.test('live environment: the deployed allowlist contains exactly the test ac
   const ids = raw.split(',').map((v) => v.trim()).filter(Boolean);
   assertEquals(ids, [TEST_USER]);
 });
+
+Deno.test('empty or whitespace-only allowlist privileges nobody', () => {
+  for (const raw of ['', ' ', ' , ', ',,']) {
+    const env = (key: string) => (key === 'VIDEO_ENHANCE_TEST_USER_IDS' ? raw : undefined);
+    assertEquals(isTestAllowlisted(env, TEST_USER), false, `raw="${raw}"`);
+    assertEquals(isTestAllowlisted(env, OTHER_USER), false, `raw="${raw}"`);
+  }
+  const missing = (_key: string) => undefined;
+  assertEquals(isTestAllowlisted(missing, TEST_USER), false);
+});
