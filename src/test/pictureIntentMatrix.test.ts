@@ -190,9 +190,12 @@ describe('model invariant matrix (all active models)', () => {
           ? r.width > r.height
           : r.aspectRatio !== '1:1' || cap.aspectRatios.every((a) => a === '1:1');
         expect(landscapeOk).toBe(true);
-        if (r.aspectRatio !== SOURCE_FORMAT && !r.width) {
-          // approximation must be disclosed
-          expect(r.adjustment ?? r.sourceUnavailable).toBeTruthy();
+        if (!r.width) {
+          // ratio/preset model: any deviation from the true source ratio is disclosed
+          const resolvedRatio = Number(r.aspectRatio.split(':')[0]) / Number(r.aspectRatio.split(':')[1]);
+          const drift = Math.abs(resolvedRatio - 1800 / 1200);
+          if (drift > 0.005) expect(r.adjustment).toBeDefined();
+          else expect(r.adjustment).toBeUndefined();
         }
       });
 
