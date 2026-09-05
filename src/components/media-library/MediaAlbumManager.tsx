@@ -49,10 +49,16 @@ interface MediaAlbumManagerProps {
 
 export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) {
   const { user } = useAuth();
+  const { i18n } = useTranslation();
+  const lang = i18n.language || 'en';
+  const { counts: collectionCounts, refresh: refreshCollectionCounts } = useCollectionCounts();
   const [albums, setAlbums] = useState<Album[]>([]);
   const [unsortedImages, setUnsortedImages] = useState<StudioImage[]>([]);
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
   const [albumImages, setAlbumImages] = useState<StudioImage[]>([]);
+  const [selectedCollection, setSelectedCollection] = useState<MediaCollection | null>(null);
+  const [collectionImages, setCollectionImages] = useState<StudioImage[]>([]);
+  const [collectionLoading, setCollectionLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newAlbumName, setNewAlbumName] = useState("");
@@ -62,6 +68,25 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<any>(null);
+
+  const openCollection = async (collection: MediaCollection) => {
+    if (!user) return;
+    setSelectedCollection(collection);
+    setCollectionLoading(true);
+    try {
+      const { data } = await supabase
+        .from('studio_images')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('workflow_type', collection.workflowType)
+        .order('created_at', { ascending: false })
+        .limit(200);
+      setCollectionImages((data || []) as StudioImage[]);
+    } finally {
+      setCollectionLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     if (user) initAlbums();
