@@ -30,7 +30,7 @@ export const GoogleSignInButton = ({ disabled }: { disabled?: boolean }) => {
       return;
     }
     setLoading(false);
-    {
+    
       toast.error(
         tx({
           de: "Google-Anmeldung fehlgeschlagen",
