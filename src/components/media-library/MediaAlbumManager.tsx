@@ -13,7 +13,7 @@ import { ImageCard } from "@/components/picture-studio/ImageCard";
 import { StudioLightbox } from "@/components/picture-studio/StudioLightbox";
 import { SaveToAlbumDialog } from "@/components/picture-studio/SaveToAlbumDialog";
 import { Badge } from "@/components/ui/badge";
-import { useTranslation } from "react-i18next";
+import { useTranslation } from "@/hooks/useTranslation";
 import { useCollectionCounts } from "@/hooks/useCollectionCounts";
 import {
   sortedCollections,
