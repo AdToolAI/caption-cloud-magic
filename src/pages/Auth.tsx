@@ -16,6 +16,8 @@ import { TwoFactorChallenge } from "@/components/account/TwoFactorChallenge";
 import { motion } from "framer-motion";
 import { AuthStatusIndicator } from "@/components/system-status/AuthStatusIndicator";
 import { SEO } from "@/components/SEO";
+import { PasswordStrength, evaluatePassword, PASSWORD_MIN_LENGTH } from "@/components/auth/PasswordStrength";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 const Auth = () => {
   const { t } = useTranslation();
