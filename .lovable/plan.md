@@ -55,9 +55,12 @@ Server-autoritative Preisbildung, 3×-Deckel, True-up, Idempotenzschlüssel, Wal
 
 ## 10. Abnahme nach Aktivierung
 
-Je ein echter Lauf Topaz und ByteDance als normaler Produktionsnutzer (nicht auf der Allowlist), Nachweis dass kein Allowlist-Gate greift, Prüfung von Wallet, Speicherung, Mediathek und Download, dazu Typprüfung, relevante Tests und Produktions-Build. Abschlussbericht mit „Topaz: GLOBAL LIVE / ByteDance: GLOBAL LIVE" und den offenen Kalibrierungspunkten.
+- Je ein echter Lauf Topaz und ByteDance als normaler Produktionsnutzer (nicht auf der Allowlist), Nachweis dass kein Allowlist-Gate greift.
+- **Negativfall:** normaler Nutzer mit zu wenig Guthaben — der Lauf wird vor dem Provider-Start abgewiesen, es entsteht keine Prediction und das Guthaben wird nie negativ.
+- Prüfung von Wallet, Speicherung, Mediathek und Download, dazu Typprüfung, relevante Tests und Produktions-Build.
+- Abschlussbericht: „Topaz Video Upscale — GLOBAL LIVE, Ist-Kosten VERIFIZIERT, Schätzer KALIBRIEREND" und „ByteDance vCube — GLOBAL LIVE, funktional BEREIT, Ist-Kosten-Abdeckung TEILWEISE/KALIBRIEREND".
 
-Kein Zurückdrehen wegen laufender Kalibrierung — nur echter P0-Fehler, falsche Abrechnung oder kritischer Providerfehler rechtfertigen einen Kill-Switch.
+Kalibrierung ist ab jetzt Beobachtung, kein Freigabe-Tor. Kein Zurückdrehen wegen laufender Kalibrierung — nur echter P0-Fehler, falsche Abrechnung oder kritischer Providerfehler rechtfertigen den Not-Aus.
 
 ## Technische Details
 
