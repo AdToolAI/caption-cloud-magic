@@ -97,17 +97,27 @@ export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
     },
   },
   'topaz-video-upscale': {
-    currency: 'USD',
-    type: 'per_unit',
-    unitUsd: TOPAZ_UNIT_USD,
-    unitsPerOutputSecond: TOPAZ_UNITS_PER_SECOND,
-    fpsFactor: { 30: 1, 60: 2 },
-    source:
-      'Unit price $0.08 verified from billed AdTool run 2026-09-06; unit consumption estimated from the published per-5s cost table',
-    checkedAt: '2026-09-06',
-    costUnverified: true,
-    estimatorCalibrating: true,
-    entries: TOPAZ_ENTRIES,
+    id: 'topaz-video-upscale',
+    providerModelId: 'topazlabs/video-upscale',
+    providerSchemaRef: 'replicate/topazlabs-video-upscale@972107c4',
+    // The published schema has no model/mode input at all.
+    modes: ['standard'],
+    outputs: [
+      { resolution: '720p', fps: [30, 60] },
+      { resolution: '1080p', fps: [30, 60] },
+      { resolution: '4k', fps: [30, 60] },
+    ],
+    tiers: ['standard'],
+    minDurationSeconds: 1,
+    maxDurationSeconds: 120,
+    backendFlag: 'VIDEO_ENHANCE_TOPAZ_ENABLED',
+    buildInput(config, source, sourceUrl) {
+      return {
+        video: sourceUrl,
+        target_resolution: config.resolution,
+        target_fps: config.fps ?? Math.round(source.fps),
+      };
+    },
   },
 };
 
