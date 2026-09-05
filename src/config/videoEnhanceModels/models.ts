@@ -16,8 +16,8 @@ export const VIDEO_ENHANCE_MODELS: VideoEnhanceModelDefinition[] = [
     name: 'ByteDance vCube',
     vendor: 'ByteDance',
     provider: 'replicate',
-    providerModelId: 'bytedance/vcube',
-    providerSchemaRef: 'replicate/bytedance-vcube@2026-09',
+    providerModelId: 'bytedance/video-upscaler',
+    providerSchemaRef: 'replicate/bytedance-video-upscaler@2026-09-05',
     positioning: {
       en: 'Best for AI-generated and social footage',
       de: 'Am besten für KI-generiertes und Social-Material',
@@ -45,6 +45,16 @@ export const VIDEO_ENHANCE_MODELS: VideoEnhanceModelDefinition[] = [
         suitedFor: ['ai_generated'],
       },
       {
+        id: 'short_series',
+        label: { en: 'Short drama', de: 'Kurzserie', es: 'Serie corta' },
+        hint: {
+          en: 'Tuned for short-form drama',
+          de: 'Abgestimmt auf kurze Serienformate',
+          es: 'Ajustado para series cortas',
+        },
+        suitedFor: ['ai_generated', 'camera'],
+      },
+      {
         id: 'ugc',
         label: { en: 'Phone / social footage', de: 'Handy- und Social-Material', es: 'Material de móvil y redes' },
         hint: {
@@ -55,8 +65,8 @@ export const VIDEO_ENHANCE_MODELS: VideoEnhanceModelDefinition[] = [
         suitedFor: ['ugc', 'camera'],
       },
       {
-        id: 'restoration',
-        label: { en: 'Restoration', de: 'Restaurierung', es: 'Restauración' },
+        id: 'old_film',
+        label: { en: 'Film restoration', de: 'Filmrestaurierung', es: 'Restauración de película' },
         hint: {
           en: 'Old, damaged or very low-quality sources',
           de: 'Alte, beschädigte oder sehr schwache Quellen',
@@ -64,19 +74,23 @@ export const VIDEO_ENHANCE_MODELS: VideoEnhanceModelDefinition[] = [
         },
         suitedFor: ['archive'],
       },
+      {
+        id: 'common',
+        label: { en: 'General', de: 'Allgemein', es: 'General' },
+        hint: {
+          en: 'Everything else',
+          de: 'Alles Übrige',
+          es: 'Todo lo demás',
+        },
+        suitedFor: ['camera', 'ugc'],
+      },
     ],
     outputs: [
+      { resolution: '720p', fps: [24, 30, 60] },
       { resolution: '1080p', fps: [24, 30, 60] },
       { resolution: '2k', fps: [24, 30, 60] },
-      { resolution: '4k', fps: [24, 30] },
+      { resolution: '4k', fps: [24, 30, 60] },
     ],
-    outputsByMode: {
-      // Restoration runs heavier; the published schema caps it below 4K/30.
-      restoration: [
-        { resolution: '1080p', fps: [24, 30] },
-        { resolution: '2k', fps: [24, 30] },
-      ],
-    },
     qualityTiers: ['standard', 'pro'],
     entitlementTiers: ['pro'],
     minDurationSeconds: 1,
@@ -92,7 +106,7 @@ export const VIDEO_ENHANCE_MODELS: VideoEnhanceModelDefinition[] = [
     vendor: 'Topaz Labs',
     provider: 'replicate',
     providerModelId: 'topazlabs/video-upscale',
-    providerSchemaRef: 'replicate/topazlabs-video-upscale@2026-09',
+    providerSchemaRef: 'replicate/topazlabs-video-upscale@972107c4',
     positioning: {
       en: 'Best for camera footage and 4K mastering',
       de: 'Am besten für Kameramaterial und 4K-Mastering',
@@ -112,24 +126,19 @@ export const VIDEO_ENHANCE_MODELS: VideoEnhanceModelDefinition[] = [
       {
         id: 'standard',
         label: { en: 'Standard', de: 'Standard', es: 'Estándar' },
+        hint: {
+          en: 'The model has one processing path; quality follows the target output',
+          de: 'Das Modell hat einen Verarbeitungsweg; die Qualität folgt dem Zielformat',
+          es: 'El modelo tiene una sola vía de procesado; la calidad sigue al formato de salida',
+        },
         suitedFor: ['camera', 'ugc'],
       },
-      {
-        id: 'high_fidelity',
-        label: { en: 'High fidelity', de: 'Hohe Detailtreue', es: 'Alta fidelidad' },
-        hint: {
-          en: 'Clean, well-exposed source material',
-          de: 'Sauberes, gut belichtetes Ausgangsmaterial',
-          es: 'Material limpio y bien expuesto',
-        },
-        suitedFor: ['camera'],
-      },
     ],
-    // Conservative: only what the current official schema documents.
+    // Exactly the documented rows of the official schema and price table.
     outputs: [
-      { resolution: '1080p', fps: [24, 30, 60] },
-      { resolution: '2k', fps: [24, 30, 60] },
-      { resolution: '4k', fps: [24, 30, 60] },
+      { resolution: '720p', fps: [30, 60] },
+      { resolution: '1080p', fps: [30, 60] },
+      { resolution: '4k', fps: [30, 60] },
     ],
     qualityTiers: ['standard'],
     minDurationSeconds: 1,
