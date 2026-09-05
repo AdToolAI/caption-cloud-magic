@@ -266,9 +266,15 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
   const cap = capabilityFor(input.tier);
   const notices: PictureNotice[] = [];
   const segments: PromptSegment[] = [];
+  const appliedModifiers: AppliedModifier[] = [];
 
   const subjectRefs = (input.subjectRefs ?? []).filter(Boolean);
   const styleRefs = (input.styleRefs ?? []).filter(Boolean);
+
+  /* 0. semantic format choice -> model-specific resolution (never mutates it) */
+  const requestedFormat = input.requestedFormat ?? input.aspectRatio ?? '1:1';
+  const resolvedFormat = resolveRequestedFormat(input.tier, requestedFormat, input.source);
+
 
   /* 1. the user's own words — always first, never rewritten */
   const { text: userText, terms: negativeTerms } = extractNegativeTerms(input.prompt ?? '');
