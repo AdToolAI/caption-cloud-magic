@@ -1,4 +1,8 @@
-import { isEntitlementVerified, isVideoEnhanceFlagEnabled } from './flags';
+import {
+  isEntitlementVerified,
+  isVideoEnhanceFlagEnabled,
+  isVideoEnhanceModelKilled,
+} from './flags';
 import { VIDEO_ENHANCE_MODELS } from './models';
 import type {
   EnhanceConfig,
