@@ -13,6 +13,7 @@ import { RESOLUTION_PIXELS, type VideoResolution } from './video-enhance-models.
 import {
   outputKey,
   outputMatchesOrder,
+  type ProviderCostReading,
   reconcileCost,
   setStatus,
   STAGING_BUCKET,
