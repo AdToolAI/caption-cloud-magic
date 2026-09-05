@@ -429,15 +429,26 @@ export function ImageGenerator() {
     mode,
     prompt,
     style,
-    aspectRatio,
+    requestedFormat: aspectRatio,
+    source: sourceDimensions,
     subjectRefs: requestSubjectRefs,
     styleRefs: requestStyleRefs,
     strength,
     transparentBackground: transparentBackground && canBeTransparent,
     brandKit: brandKitPayload,
-  }), [tier, mode, prompt, style, aspectRatio, requestSubjectRefs, requestStyleRefs, strength, transparentBackground, canBeTransparent, brandKitPayload]);
+  }), [tier, mode, prompt, style, aspectRatio, sourceDimensions, requestSubjectRefs, requestStyleRefs, strength, transparentBackground, canBeTransparent, brandKitPayload]);
 
   const effectivePrompt = built.prompt;
+  /** Model-specific technical resolution of the semantic format choice. */
+  const resolvedFormat = built.resolvedFormat;
+
+  // Recommendations only — nothing is redirected or rewritten automatically.
+  const transparencyWish = useMemo(() => detectTransparencyWish(prompt), [prompt]);
+  const editIntent = useMemo(() => detectEditIntent(prompt), [prompt]);
+  const showTransparencyHint = transparencyWish.matched && !canBeTransparent;
+  const showEditHint = editIntent.matched && !!referenceImage && mode !== 'create';
+  const latestAssetUrl = generatedImages[0]?.url ?? null;
+
 
   const SEGMENT_TONE: Record<PromptSegment['source'], string> = {
     user: 'text-foreground',
