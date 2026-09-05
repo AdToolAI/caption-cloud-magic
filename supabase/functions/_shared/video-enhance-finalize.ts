@@ -149,12 +149,9 @@ export async function finalizeSuccess(
     .from('video_creations')
     .insert({
       user_id: run.user_id,
-      video_url: publicUrl,
+      output_url: publicUrl,
       status: 'completed',
-      prompt: `Enhanced with ${run.model_id} (${run.resolution}/${run.fps}fps)`,
-      model_used: run.model_id,
-      duration: Math.round(Number(run.source_duration_seconds)),
-      cost_euros: Number(run.user_price_eur),
+      framerate: Number(run.fps),
       metadata: {
         videoEnhance: true,
         runId: run.id,
@@ -164,8 +161,12 @@ export async function finalizeSuccess(
         resolution: run.resolution,
         fps: run.fps,
         tier: run.tier,
+        durationSeconds: Number(run.source_duration_seconds),
+        priceEur: Number(run.user_price_eur),
+        label: `Enhanced with ${run.model_id} (${run.resolution}/${run.fps}fps)`,
       },
     })
+
     .select('id')
     .maybeSingle();
 

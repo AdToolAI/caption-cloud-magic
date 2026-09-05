@@ -79,8 +79,11 @@ export function extractProviderCost(prediction: any): ProviderCostReading {
       return { usd: value, source: 'prediction_metric' };
     }
   }
-  // Some models report consumed units instead of money (Topaz style).
-  const units = metrics.units ?? metrics.units_used;
+  // Some models report consumed units instead of money: Topaz reports
+  // `unspecified_billing_metric` (billing units), vCube reports the billed
+  // output duration. Usage is known, the money figure is not.
+  const units = metrics.units ?? metrics.units_used ?? metrics.unspecified_billing_metric ??
+    metrics.video_output_duration_seconds;
   if (typeof units === 'number' && Number.isFinite(units) && units > 0) {
     return { usd: undefined, source: 'provider_usage' };
   }
@@ -212,14 +215,24 @@ export function outputMatchesOrder(
   if (ordered.durationSeconds > 0 && durationGap / ordered.durationSeconds > 0.1) {
     return { ok: false, reason: 'duration_mismatch' };
   }
-  if (measured.width < ordered.width * 0.9 || measured.height < ordered.height * 0.9) {
+  // Both providers read a resolution tier as a target LINE COUNT (height), not
+  // as the landscape pixel pair: a portrait source ordered at 1080p comes back
+  // as 608x1080, a landscape one as 1920x1080. The order is therefore validated
+  // against the tier's height and the aspect ratio of the source is preserved.
+  // Width is only sanity-checked against a collapsed frame.
+  if (ordered.height > 0 && measured.height < ordered.height * 0.9) {
     return { ok: false, reason: 'resolution_mismatch' };
   }
+  if (measured.width < 16) {
+    return { ok: false, reason: 'resolution_mismatch' };
+  }
+
   if (ordered.fps > 0 && Math.abs(measured.fps - ordered.fps) / ordered.fps > 0.15) {
     return { ok: false, reason: 'fps_mismatch' };
   }
   return { ok: true };
 }
+
 
 export function stagingKey(userId: string, runId: string): string {
   return `${userId}/video-enhance-staging/${runId}.mp4`;

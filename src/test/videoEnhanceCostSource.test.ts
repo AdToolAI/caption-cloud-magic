@@ -35,6 +35,17 @@ describe('provider cost source', () => {
     expect(reading.usd).toBeUndefined();
   });
 
+  it('recognises the real Topaz and vCube usage metrics', () => {
+    // Observed live on Replicate: Topaz bills in units, vCube in output seconds.
+    expect(extractProviderCost({
+      metrics: { predict_time: 23.49, unspecified_billing_metric: 2 },
+    }).source).toBe('provider_usage');
+    expect(extractProviderCost({
+      metrics: { predict_time: 88.34, video_output_duration_seconds: 12.052 },
+    }).source).toBe('provider_usage');
+  });
+
+
   it('treats a missing cost as unavailable, not as a failure', () => {
     const reading = extractProviderCost({ metrics: { predict_time: 31.2 } });
     expect(reading).toEqual({ source: 'unavailable' });
