@@ -173,7 +173,7 @@ Finale Qualität
 
 **Reihenfolge:** In Motion Studio und Director's Cut arbeitet die Verbesserung standardmäßig auf dem **fertigen Master** nach Stitch, Übergängen und Lip-Sync — nie versehentlich auf Zwischenassets. Eine Verbesserung einzelner Szenen ist nur über eine ausdrückliche, getrennte Nutzeraktion möglich. Das spart Kosten und verhindert mehrfaches Hochskalieren.
 
-Der Altpfad `director-cut-upscale` wird abgelöst, sobald der Director's-Cut-Einstieg steht.
+Der Altpfad `director-cut-upscale` wird erst abgeschaltet, wenn nachgewiesen ist, dass alle Aufrufer auf `video-enhance` umgestellt sind: Codebase-Suche plus Telemetrie ohne aktive Nutzung, danach ein kurzes Rückfallfenster. Erst dann wird er deaktiviert und entfernt.
 
 ## Was in dieser Stufe nicht passiert
 
