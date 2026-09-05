@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { probeRemoteVideo } from "../_shared/mp4-probe.ts";
 import {
   isModelUnlocked,
+  isTestAllowlisted,
   priceVideoEnhanceRun,
   UnpriceableRunError,
   validateCombination,
@@ -275,6 +276,10 @@ serve(async (req) => {
       margin_pct: pricing.marginPct,
       credits_reserved: pricing.userPriceEur,
       callback_token: callbackToken,
+      // Validation-only, allowlisted accounts only: fail persistence exactly
+      // once after a real provider success, then succeed on the retry.
+      test_fail_persist_once:
+        body.testFailPersistOnce === true && isTestAllowlisted(env, user.id),
       status: "created",
     };
 
