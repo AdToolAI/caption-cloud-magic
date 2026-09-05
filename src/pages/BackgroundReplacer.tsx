@@ -313,6 +313,7 @@ export default function BackgroundReplacer() {
         style: category,
         aspect_ratio: '1:1',
         source: 'smart_background',
+        workflow_type: 'background',
       })
       .select('id')
       .single();
