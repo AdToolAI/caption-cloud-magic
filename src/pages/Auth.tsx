@@ -177,6 +177,18 @@ const Auth = () => {
             
             <form onSubmit={handleSubmit}>
               <CardContent className="space-y-5">
+                {/* Google one-click */}
+                <div className="space-y-4">
+                  <GoogleSignInButton disabled={loading} />
+                  <div className="flex items-center gap-3">
+                    <span className="h-px flex-1 bg-border/60" />
+                    <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                      {tx({ de: "oder mit E-Mail", en: "or with email", es: "o con correo" })}
+                    </span>
+                    <span className="h-px flex-1 bg-border/60" />
+                  </div>
+                </div>
+
                 {/* Email Field */}
                 <motion.div 
                   initial={{ opacity: 0, x: -10 }}
