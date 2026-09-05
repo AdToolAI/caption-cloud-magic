@@ -6,8 +6,10 @@ Beide Engines gehen global live. Kalibrierung läuft ab jetzt aus echter Produkt
 
 - `enabled: true` für `topaz-video-upscale` und `bytedance-vcube` in der Modellliste; die beiden Frontend-Flags entfallen als Voraussetzung.
 - Backend-Schalter `VIDEO_ENHANCE_TOPAZ_ENABLED` und `VIDEO_ENHANCE_BYTEDANCE_ENABLED` global auf `true` setzen.
+- **Beide Flag-Ebenen bleiben als Not-Aus erhalten** — Frontend-Sichtbarkeit und der autoritative Backend-Schalter werden nicht ausgebaut. Bei Providerausfall, falscher Abrechnung oder P0-Bug lässt sich jedes Modell sofort einzeln abschalten.
 - Test-Allowlist bleibt bestehen (nur noch für den Fail-once-Testschalter), ist aber für die Nutzung dieser beiden Modelle keine Bedingung mehr.
 - `estimator_calibrating` und `cost_unverified` werden weiter protokolliert, sind aber nie ein Startverbot — nur interner Preis-/Admin-Status.
+
 
 ## 2. ByteDance Pro
 
