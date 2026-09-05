@@ -6,8 +6,10 @@ Beide Engines gehen global live. Kalibrierung läuft ab jetzt aus echter Produkt
 
 - `enabled: true` für `topaz-video-upscale` und `bytedance-vcube` in der Modellliste; die beiden Frontend-Flags entfallen als Voraussetzung.
 - Backend-Schalter `VIDEO_ENHANCE_TOPAZ_ENABLED` und `VIDEO_ENHANCE_BYTEDANCE_ENABLED` global auf `true` setzen.
+- **Beide Flag-Ebenen bleiben als Not-Aus erhalten** — Frontend-Sichtbarkeit und der autoritative Backend-Schalter werden nicht ausgebaut. Bei Providerausfall, falscher Abrechnung oder P0-Bug lässt sich jedes Modell sofort einzeln abschalten.
 - Test-Allowlist bleibt bestehen (nur noch für den Fail-once-Testschalter), ist aber für die Nutzung dieser beiden Modelle keine Bedingung mehr.
 - `estimator_calibrating` und `cost_unverified` werden weiter protokolliert, sind aber nie ein Startverbot — nur interner Preis-/Admin-Status.
+
 
 ## 2. ByteDance Pro
 
@@ -20,14 +22,18 @@ Pro bleibt Entitlement-gebunden. Vor der Freigabe prüfe ich das Recht auf unser
 
 ## 4. Preislogik
 
-Unverändert: degressive Kurve 1,8×–3,0×, harter Deckel 3,0×, Preis vor dem Lauf aus der besten Kostenschätzung, keine Nachbelastung, idempotente Gutschrift bis auf 3,0× sobald echte Providerkosten vorliegen. Einzige Änderung: `pricing_gate = review_required` allein aus `estimator_calibrating`/`cost_unverified` verhindert keinen Produktionslauf mehr — es wird als Grund gespeichert und im Admin ausgewiesen. Nach außen wird für ByteDance keine 3×-Garantie behauptet, solange keine autoritative Kostenquelle existiert.
+Unverändert: degressive Kurve 1,8×–3,0×, harter Deckel 3,0×, Preis vor dem Lauf aus der besten Kostenschätzung, keine Nachbelastung, idempotente Gutschrift bis auf 3,0× sobald echte Providerkosten vorliegen. Einzige Änderung: `pricing_gate = review_required` allein aus `estimator_calibrating`/`cost_unverified` verhindert keinen Produktionslauf mehr — es wird als Grund gespeichert und im Admin ausgewiesen.
+
+Für ByteDance ohne autoritative Kostenzahl gilt ausdrücklich: der Kundenlauf wird normal fertig, es wird **keine Ist-Kostenzahl erfunden** und kein True-up gerechnet. Der verifizierte Faktor bleibt leer, der Admin zeigt „Ist-Kosten-Abdeckung: ausstehend/unbestätigt". Sobald eine autoritative Kostenquelle eintrifft, holt der Reconciler den 3×-Check und gegebenenfalls die Gutschrift nach. Nach außen wird für ByteDance bis dahin keine 3×-Garantie behauptet.
 
 ## 5. Nutzeroberfläche
 
-Neues, gemeinsames Enhance-Panel auf Basis des bestehenden Engine-Hooks — eine Oberfläche, von Mediathek und Director's Cut aus erreichbar:
+**AI Video Studio ist der Haupteinstieg und Teil dieses Releases.** Dort entsteht der vollständige Enhance-Bereich; Mediathek und Director's Cut nutzen exakt denselben Dialog und dieselbe Engine. Motion Studio und Universal Content Creator folgen später und blockieren das Release nicht.
 
 - Modellauswahl mit echten Namen: „ByteDance vCube — AI-native video enhancement, besonders geeignet für KI-Material" und „Topaz Video Upscale — High-fidelity professional video upscaling". Kein „Coming Soon".
-- Vor dem Start sichtbar: Ausgangsauflösung/-bildrate, erwartete Ausgabe, Preis, gegebenenfalls Hinweis „AdTool adjusted".
+- Auflösung und Bildrate, für ByteDance zusätzlich Modus und Stufe.
+- Vor dem Start sichtbar: Ausgangsauflösung/-bildrate, erwartete Ausgabemaße, Preis, gegebenenfalls Hinweis „AdTool adjusted".
+- Nach dem Lauf: Vorher/Nachher-Vergleich des Ergebnisses.
 - Kein Kalibrierungs- oder „experimental pricing"-Hinweis in der Nutzeroberfläche; dieser Status lebt nur im Admin.
 - Texte in EN/DE/ES.
 
@@ -49,16 +55,21 @@ Server-autoritative Preisbildung, 3×-Deckel, True-up, Idempotenzschlüssel, Wal
 
 ## 10. Abnahme nach Aktivierung
 
-Je ein echter Lauf Topaz und ByteDance als normaler Produktionsnutzer (nicht auf der Allowlist), Nachweis dass kein Allowlist-Gate greift, Prüfung von Wallet, Speicherung, Mediathek und Download, dazu Typprüfung, relevante Tests und Produktions-Build. Abschlussbericht mit „Topaz: GLOBAL LIVE / ByteDance: GLOBAL LIVE" und den offenen Kalibrierungspunkten.
+- Je ein echter Lauf Topaz und ByteDance als normaler Produktionsnutzer (nicht auf der Allowlist), Nachweis dass kein Allowlist-Gate greift.
+- **Negativfall:** normaler Nutzer mit zu wenig Guthaben — der Lauf wird vor dem Provider-Start abgewiesen, es entsteht keine Prediction und das Guthaben wird nie negativ.
+- Prüfung von Wallet, Speicherung, Mediathek und Download, dazu Typprüfung, relevante Tests und Produktions-Build.
+- Abschlussbericht: „Topaz Video Upscale — GLOBAL LIVE, Ist-Kosten VERIFIZIERT, Schätzer KALIBRIEREND" und „ByteDance vCube — GLOBAL LIVE, funktional BEREIT, Ist-Kosten-Abdeckung TEILWEISE/KALIBRIEREND".
 
-Kein Zurückdrehen wegen laufender Kalibrierung — nur echter P0-Fehler, falsche Abrechnung oder kritischer Providerfehler rechtfertigen einen Kill-Switch.
+Kalibrierung ist ab jetzt Beobachtung, kein Freigabe-Tor. Kein Zurückdrehen wegen laufender Kalibrierung — nur echter P0-Fehler, falsche Abrechnung oder kritischer Providerfehler rechtfertigen den Not-Aus.
 
 ## Technische Details
 
-- `src/config/videoEnhanceModels/models.ts`: `enabled: true` für beide Einträge; `src/config/videoEnhanceModels/flags.ts` bleibt als Mechanik, wird aber nicht mehr benötigt, um die zwei Modelle sichtbar zu machen.
-- Secrets `VIDEO_ENHANCE_TOPAZ_ENABLED=true`, `VIDEO_ENHANCE_BYTEDANCE_ENABLED=true`; `isModelUnlocked()` in `supabase/functions/_shared/video-enhance-models.ts` bleibt unverändert (Backend-Flag hat Vorrang vor Allowlist).
+- `src/config/videoEnhanceModels/models.ts`: `enabled: true` für beide Einträge. `flags.ts` und `isModelUnlocked()` bleiben vollständig erhalten — beide Ebenen sind der Not-Aus und werden nicht entfernt.
+- Secrets `VIDEO_ENHANCE_TOPAZ_ENABLED=true`, `VIDEO_ENHANCE_BYTEDANCE_ENABLED=true`; das Backend-Flag bleibt autoritativ (`false` sperrt sofort, auch wenn das Frontend das Modell zeigt).
 - Projektion: in `video-enhance/index.ts` blockt nur `projection_confidence === 'verified'` mit Downscale-Ergebnis; geschätzte Projektionen schreiben weiter `projected_*` und `projection_matched`, brechen aber nicht ab.
+- True-up-Aufschub: `_shared/video-enhance-finalize.ts` rechnet den verifizierten Faktor nur bei `provider_cost_usd_actual != null`; sonst `verified_effective_multiplier = null`, `pricing_gate_reason = 'cost_unverified'`, und `video-enhance-reconcile` holt den Check bei späterem Kosteneingang idempotent nach.
 - Migration (nur additiv) auf `video_enhance_runs`: `actual_units numeric`, `provider_retry_count integer default 0`, `processing_seconds numeric`; gefüllt in `_shared/video-enhance-finalize.ts` aus der Provider-Metrik bzw. `provider_completed_at - provider_submitted_at`.
 - Admin: neue `VideoEnhanceCalibrationCard.tsx` neben `VideoEnhanceMultiplierCard.tsx` in `src/pages/admin/CostMonitor.tsx`; Aggregation über eine Read-only-SQL-Ansicht bzw. eine RPC mit `has_role(auth.uid(),'admin')`.
-- UI: neues `src/components/video-enhance/EnhanceVideoDialog.tsx` auf `useEnhanceVideo`, eingebunden in Mediathek und Director's Cut. Der Altpfad `director-cut-upscale` bleibt vorerst bestehen und wird erst nach nachgewiesener Migration entfernt.
+- UI: neues `src/components/video-enhance/EnhanceVideoPanel.tsx` + `EnhanceVideoDialog.tsx` auf `useEnhanceVideo`; Vollausbau im AI Video Studio, gleicher Dialog in Mediathek und Director's Cut. Der Altpfad `director-cut-upscale` bleibt vorerst bestehen und wird erst nach nachgewiesener Migration entfernt.
+- Guthaben-Negativfall: die bestehende Wallet-Prüfung in `video-enhance/index.ts` läuft vor Reservierung und Provider-Submit; dazu ein Test, der belegt, dass kein Prediction-Aufruf erfolgt und der Kontostand nie negativ wird.
 - Prüfungen: `bunx tsgo --noEmit`, `bunx vitest run src/test/videoEnhance*.test.ts`, `bun run build`; Edge Functions `video-enhance`, `video-enhance-webhook`, `video-enhance-reconcile` neu deployen.
