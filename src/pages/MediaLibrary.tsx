@@ -103,7 +103,9 @@ export default function MediaLibrary() {
         user_id: user.id,
         image_url: item.url,
         prompt: item.title || 'Upload',
-        style: 'upload'
+        style: 'upload',
+        source: 'upload',
+        workflow_type: 'uploaded'
       })
       .select('id')
       .single();

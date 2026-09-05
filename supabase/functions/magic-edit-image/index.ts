@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { persistStudioImage } from "../_shared/studio-image-persist.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -253,11 +254,14 @@ serve(async (req) => {
       if (parent) parentMeta = parent;
     }
 
-    const { data: studioImage, error: insertError } = await supabaseAdmin
-      .from('studio_images')
-      .insert({
+    // Provider already ran and was paid for: retry the library row instead of
+    // discarding a paid result.
+    const persisted = await persistStudioImage(
+      supabaseAdmin,
+      {
         user_id: user.id,
         image_url: publicUrl,
+        workflow_type: 'edited',
         prompt: `[${mode === 'inpaint' ? 'Magic Edit' : 'Outpaint'}] ${prompt}`,
         style: parentMeta.style || 'realistic',
         aspect_ratio: parentMeta.aspect_ratio || '1:1',
@@ -265,40 +269,45 @@ serve(async (req) => {
         album_id: parentMeta.album_id || null,
         parent_id: imageId || null,
         metadata_json: { storagePath, mode },
-      })
-      .select()
-      .single();
-
-    if (insertError || !studioImage) {
-      console.error('[magic-edit] studio_images insert failed:', insertError?.message);
-      return new Response(
-        JSON.stringify({
-          error: 'The edited image could not be saved to your library. You were not charged.',
-          code: 'PERSIST_FAILED',
-        }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+      },
+      '[magic-edit]',
+    );
 
     // Deduct credits
     const { data: newBalance, error: deductError } = await supabaseAdmin.rpc(
       'deduct_ai_video_credits',
-      { p_user_id: user.id, p_amount: cost, p_generation_id: studioImage?.id || null }
+      { p_user_id: user.id, p_amount: cost, p_generation_id: persisted.id }
     );
 
     if (deductError) {
       console.error('[magic-edit] Deduct error:', deductError);
     }
 
+    if (!persisted.ok) {
+      console.error('[magic-edit] studio_images insert exhausted:', persisted.error);
+      return new Response(
+        JSON.stringify({
+          error:
+            'Your edited image is ready and safely stored, but it could not be added to your library yet. We are retrying — the result is not lost.',
+          code: 'ASSET_PERSIST_FAILED',
+          providerUrl: publicUrl,
+          cost,
+          currency,
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         image: {
-          id: studioImage?.id,
+          id: persisted.id,
           url: publicUrl,
           previewUrl: publicUrl,
           mode,
           parentId: imageId || null,
+          workflowType: 'edited',
         },
         cost,
         currency,
