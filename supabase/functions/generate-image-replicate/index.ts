@@ -8,6 +8,11 @@ import {
   resolveSize,
 } from "../_shared/pictureModelCapabilities.ts";
 import { persistStudioImage } from "../_shared/studio-image-persist.ts";
+import {
+  buildPictureRequest,
+  blockingNotice,
+  supportsTransparency,
+} from "../_shared/picturePromptBuilder.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -57,6 +62,8 @@ interface GenerateRequest {
   mode?: 'create' | 'transform' | 'restyle' | 'mix';
   strength?: number;
   style?: string;
+  /** Only honoured by models that really return an alpha channel. */
+  transparentBackground?: boolean;
   brandKit?: {
     name?: string;
     primaryColor?: string;
@@ -66,28 +73,11 @@ interface GenerateRequest {
   } | null;
 }
 
-const STYLE_MODIFIERS: Record<string, string> = {
-  realistic: 'photorealistic, 8k, ultra-detailed, natural lighting, professional photography',
-  cinematic: 'cinematic composition, dramatic lighting, anamorphic lens flare, movie still, color graded',
-  watercolor: 'delicate watercolor painting, soft washes, paper texture, artistic brushstrokes',
-  'neon-cyberpunk': 'neon-lit cyberpunk, vibrant glowing lights, futuristic cityscape, synthwave colors',
-  anime: 'anime art style, cel-shaded, vibrant colors, Studio Ghibli inspired',
-  'oil-painting': 'classical oil painting, rich textures, impasto technique, museum quality',
-  'pop-art': 'pop art style, bold colors, halftone dots, Andy Warhol inspired',
-  minimalist: 'minimalist design, clean lines, negative space, simple elegant composition',
-  vintage: 'vintage photograph, film grain, sepia tones, retro 1970s aesthetic',
-  fantasy: 'epic fantasy art, magical atmosphere, ethereal lighting, detailed world-building',
-  'product-photo': 'professional product photography, studio lighting, clean background, commercial quality',
-  abstract: 'abstract art, geometric shapes, bold color palette, contemporary art',
-  sketch: 'detailed pencil sketch, cross-hatching, hand-drawn illustration',
-  '3d-render': '3D rendered, octane render, volumetric lighting, subsurface scattering',
-  noir: 'film noir style, high contrast black and white, dramatic shadows, moody atmosphere',
-  pastel: 'soft pastel colors, dreamy atmosphere, gentle lighting, ethereal mood',
-  comic: 'comic book art style, bold outlines, vibrant panel art, dynamic composition',
-  surreal: 'surrealist art, dreamlike imagery, impossible geometry, Salvador Dalí inspired',
-  architectural: 'architectural visualization, clean lines, modern design, dramatic perspective',
-  editorial: 'editorial fashion photography, high-end magazine style, bold composition',
-};
+/**
+ * Style presets, brand-kit wording and the reference clauses live in
+ * `_shared/picturePromptBuilder.ts` — the exact module the Picture Studio UI
+ * uses for its "what we send" disclosure.
+ */
 
 /**
  * Ratios, pixel presets and reference-image limits are NOT maintained here
@@ -189,21 +179,6 @@ serve(async (req) => {
       );
     }
 
-    // Build enhanced prompt
-    const styleModifier = STYLE_MODIFIERS[style] || STYLE_MODIFIERS.realistic;
-
-    // Brand-Kit injection (Phase C — CI Lock)
-    const brandParts: string[] = [];
-    if (brandKit) {
-      const colors = [brandKit.primaryColor, brandKit.secondaryColor, brandKit.accentColor]
-        .filter(Boolean)
-        .join(', ');
-      if (colors) brandParts.push(`Brand colors: ${colors}`);
-      if (brandKit.mood) brandParts.push(`Brand mood: ${brandKit.mood}`);
-      if (brandKit.name) brandParts.push(`Visual identity aligned with ${brandKit.name}`);
-    }
-    const brandSuffix = brandParts.length ? ` ${brandParts.join('. ')}.` : '';
-
     // --- Capability-driven reference handling -------------------------------
     const cap = capabilityFor(tier);
     if (!cap?.modes.includes(mode)) {
@@ -250,12 +225,29 @@ serve(async (req) => {
     const subjectRefs = requestedSubjects.slice(0, maxSubjects);
     const styleRefs = requestedStyles.slice(0, maxStyles);
 
-    // Style-Reference suffix
-    const styleRefSuffix = styleRefs.length
-      ? ` Match the visual style, color palette, and aesthetic of the provided style reference image.`
-      : '';
+    // --- Deterministic prompt assembly (shared with the UI) ----------------
+    const built = buildPictureRequest({
+      tier,
+      mode,
+      prompt: prompt.trim(),
+      style,
+      aspectRatio,
+      subjectRefs,
+      styleRefs,
+      strength: body.strength,
+      transparentBackground: body.transparentBackground,
+      brandKit,
+    });
 
-    const enhancedPrompt = `${prompt.trim()}. Style: ${styleModifier}.${brandSuffix}${styleRefSuffix}`;
+    const blocker = blockingNotice(built);
+    if (blocker) {
+      return new Response(
+        JSON.stringify({ error: blocker.message.de, message: blocker.message, code: blocker.code }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const enhancedPrompt = built.prompt;
 
     const safeAspect = mapAspectRatio(tier, aspectRatio);
     if (safeAspect !== aspectRatio) {
@@ -286,6 +278,10 @@ serve(async (req) => {
         form.append('prompt', enhancedPrompt);
         form.append('size', resolvedSize.preset ?? '1024x1024');
         form.append('quality', 'low');
+        if (built.transparentBackground) {
+          form.append('background', 'transparent');
+          form.append('output_format', 'png');
+        }
         for (const [index, url] of imageInputs.entries()) {
           const source = await fetch(url);
           if (!source.ok) {
@@ -300,6 +296,7 @@ serve(async (req) => {
         gptBody = JSON.stringify({
           model: 'openai/gpt-image-2', prompt: enhancedPrompt,
           size: resolvedSize.preset ?? '1024x1024', quality: 'low', n: 1,
+          ...(built.transparentBackground ? { background: 'transparent', output_format: 'png' } : {}),
         });
       }
       const gptRes = await fetch(`https://ai.gateway.lovable.dev/v1/images/${isEdit ? 'edits' : 'generations'}`, {
@@ -369,7 +366,11 @@ serve(async (req) => {
       replicateInput.output_format = 'jpg';
       replicateInput.safety_tolerance = 5;
       if (imageInputs.length) replicateInput.image_prompt = imageInputs[0];
-      if (imageInputs.length && typeof body.strength === 'number') replicateInput.image_prompt_strength = Math.max(0, Math.min(1, body.strength / 100));
+      // Polarity note: image_prompt_strength = how much the REFERENCE dominates,
+      // so the builder inverts the UI's "how much may change" slider.
+      if (imageInputs.length && built.strengthField === 'image_prompt_strength' && typeof built.strengthValue === 'number') {
+        replicateInput.image_prompt_strength = built.strengthValue;
+      }
     } else if (tier === 'ideogram') {
       // Ideogram v3 Turbo — style references only
       if (resolvedSize.resolution && resolvedSize.resolution !== 'Auto') replicateInput.resolution = resolvedSize.resolution;
@@ -384,7 +385,10 @@ serve(async (req) => {
       replicateInput.image_size = resolvedSize.resolution ?? 'optimize_for_quality';
       replicateInput.output_format = 'jpg';
       if (imageInputs.length) replicateInput.image = imageInputs[0];
-      if (imageInputs.length && typeof body.strength === 'number') replicateInput.strength = Math.max(0, Math.min(1, body.strength / 100));
+      // Polarity note: qwen `strength` = img2img denoising, i.e. how much CHANGES.
+      if (imageInputs.length && built.strengthField === 'strength' && typeof built.strengthValue === 'number') {
+        replicateInput.strength = built.strengthValue;
+      }
     } else if (tier === 'ultra') {
       // Nano Banana (ultra) — multi-image edit
       replicateInput.aspect_ratio = safeAspect;
@@ -447,13 +451,13 @@ serve(async (req) => {
       );
     }
     const imageBuffer = await imageRes.arrayBuffer();
-    const fileExt = 'jpg';
+    const fileExt = built.transparentBackground && supportsTransparency(tier) ? 'png' : 'jpg';
     const storagePath = `${user.id}/picture-studio/${tier}-${Date.now()}.${fileExt}`;
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from('background-projects')
       .upload(storagePath, imageBuffer, {
-        contentType: 'image/jpeg',
+        contentType: fileExt === 'png' ? 'image/png' : 'image/jpeg',
         upsert: false,
       });
 
