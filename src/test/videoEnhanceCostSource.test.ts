@@ -19,7 +19,7 @@ const envOf = (map: Record<string, string>) => (key: string) => map[key];
 
 describe('provider cost source', () => {
   it('reads a real cost metric', () => {
-    expect(extractProviderCost({ metrics: { total_cost: 0.42 } })).toEqual({
+    expect(extractProviderCost({ metrics: { total_cost: 0.42 } })).toMatchObject({
       usd: 0.42,
       source: 'prediction_metric',
     });
@@ -48,7 +48,18 @@ describe('provider cost source', () => {
 
   it('treats a missing cost as unavailable, not as a failure', () => {
     const reading = extractProviderCost({ metrics: { predict_time: 31.2 } });
-    expect(reading).toEqual({ source: 'unavailable' });
+    expect(reading.source).toBe('unavailable');
+    expect(reading.usd).toBeUndefined();
+    expect(reading.processingSeconds).toBe(31.2);
+  });
+
+  it('derives money from billed units for a per-unit rate card', () => {
+    const reading = extractProviderCost(
+      { metrics: { unspecified_billing_metric: 6 } },
+      'topaz-video-upscale',
+    );
+    expect(reading.units).toBe(6);
+    expect(reading.usd).toBeCloseTo(0.48, 5);
   });
 
   it('ignores nonsense values', () => {
