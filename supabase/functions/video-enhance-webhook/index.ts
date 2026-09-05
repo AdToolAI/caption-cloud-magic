@@ -182,7 +182,7 @@ serve(async (req) => {
               ? output.url
               : null;
       if (!outputUrl) return await asFailure(admin, run, "NO_OUTPUT", "provider returned no video");
-      const result = await finalizeSuccess(admin, run, outputUrl, actualCostUsd);
+      const result = await finalizeSuccess(admin, run, outputUrl, providerCost);
       return json(result, result.ok ? 200 : 500);
     }
 
