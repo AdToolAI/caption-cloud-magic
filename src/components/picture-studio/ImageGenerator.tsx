@@ -102,7 +102,7 @@ export function ImageGenerator() {
   const status = { stage: '', message: '' };
 
   const STYLES = useMemo(() => [
-    { value: PICTURE_STYLE_NONE, label: tx({ de: 'Kein Stil (nur mein Text)', en: 'No style (my words only)', es: 'Sin estilo (solo mis palabras)' }) },
+    { value: PICTURE_STYLE_NONE, label: tx({ de: 'Auto — dein Prompt bestimmt den Stil', en: 'Auto — your prompt sets the style', es: 'Auto — tu prompt define el estilo' }) },
     { value: 'realistic', label: t('picStudio.styleRealistic') },
     { value: 'cinematic', label: t('picStudio.styleCinematic') },
     { value: 'watercolor', label: t('picStudio.styleWatercolor') },
