@@ -58,6 +58,9 @@ export function CoachPanel({ open, onOpenChange }: { open: boolean; onOpenChange
           body: JSON.stringify({
             message: `${question}\n\n--- ${tx({ de: 'Aktueller Entwurf', en: 'Current draft', es: 'Borrador actual' })} ---\n${draftContext()}`,
             messages: messages.map((m) => ({ role: m.role, content: m.content })),
+            // The assistant must always answer in the selected UI language.
+            language: getLang(),
+
           }),
         },
       );
