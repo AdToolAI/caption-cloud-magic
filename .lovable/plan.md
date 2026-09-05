@@ -63,13 +63,15 @@ Neue Datei `src/config/__tests__/pictureIntentMatrix.test.ts`, Matrix über Gemi
 - Zusätzlich String-Snapshots ausschließlich mit neutralem Fixture-Prompt („a red chair").
 Diese Matrix ist der Test, der verhindert, dass wieder unsichtbare Stil-/Ratio-/Strength-Modifier eingeschleust werden.
 
-### G. Live-Verifikation — Client vs. Server vs. Provider
-Ein echter Referenzlauf (ein Bild, günstiges Modell) mit Dreifach-Vergleich:
-1. Client Prompt Details → normalized client intent
-2. Serverseitig neu aufgebauter Request → normalized server intent
-3. Provider-Adapter-Payload → tatsächlich gesendete semantische Parameter
+### G. Live-Verifikation — zwei Läufe, Client vs. Server vs. Provider
+**Zwei** minimale echte Referenzläufe, weil es zwei technisch verschiedene Mechanismen gibt:
+1. günstigstes sinnvolles **prompt-guided** Modell (Gemini/Seedream/Nano Banana)
+2. günstigstes sinnvolles Modell mit **nativem Strength-Parameter** (FLUX oder Qwen)
 
-Bericht als Tabelle: User Prompt · Modell · UI-Influence · Client normalized influence · Server normalized influence · Provider-Umsetzung (nativ/prompt-guided) · Provider-Feld+Wert · Style · Style-Modifier · Requested format · Actual format · Adjustment. Ohne Secrets. Der Workflow gilt erst als verifiziert, wenn Client und Server semantisch übereinstimmen.
+Je Lauf Dreifach-Vergleich: Client Prompt Details → normalized client intent · serverseitig neu aufgebauter Request → normalized server intent · Provider-Adapter-Payload → tatsächlich gesendete semantische Parameter.
+
+Bericht als Tabelle: User Prompt · Modell · UI-Influence · Client normalized influence · Server normalized influence · Provider-Umsetzung (nativ/prompt-guided) · Provider-Feld+Wert · Style · Style-Modifier · Requested format · Resolved format · Adjustment. Ohne Secrets. Der Workflow gilt erst als verifiziert, wenn Client und Server in beiden Läufen semantisch übereinstimmen.
+
 
 ## Technische Notizen
 - `sourceRatio` als Zahl im Generator-State; Auflösung zentral über neue Funktion in `pictureModelCapabilities.ts`, die `{ aspectRatio | width/height, adjustment? }` zurückgibt.
