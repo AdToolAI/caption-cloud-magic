@@ -1458,17 +1458,39 @@ export default function MediaLibrary() {
         <DialogContent className="max-w-2xl">
           <DialogTitle>Video Preview</DialogTitle>
           {selectedVideo && (
-            <div className="flex justify-center">
-              <video 
-                src={selectedVideo} 
-                controls 
-                autoPlay
-                className="max-h-[70vh] w-auto rounded-lg"
-              />
+            <div className="space-y-4">
+              <div className="flex justify-center">
+                <video
+                  src={selectedVideo}
+                  controls
+                  autoPlay
+                  className="max-h-[70vh] w-auto rounded-lg"
+                />
+              </div>
+              <Button
+                className="w-full gap-2"
+                onClick={() => {
+                  setEnhanceSourceUrl(selectedVideo);
+                  setSelectedVideo(null);
+                }}
+              >
+                <Sparkles className="h-4 w-4" />
+                {tx({ de: 'Video verbessern', en: 'Enhance video', es: 'Mejorar vídeo' })}
+              </Button>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Enhance dialog — same central engine as AI Video Studio */}
+      <EnhanceVideoDialog
+        open={!!enhanceSourceUrl}
+        onOpenChange={(open) => { if (!open) setEnhanceSourceUrl(null); }}
+        sourceUrl={enhanceSourceUrl ?? undefined}
+        sourceAssetId={enhanceSourceAssetId ?? undefined}
+        onCompleted={() => loadMedia()}
+      />
+
 
       {/* Save to Album Dialog */}
       <SaveToAlbumDialog
