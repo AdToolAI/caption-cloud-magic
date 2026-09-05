@@ -254,6 +254,15 @@ const Auth = () => {
                       )}
                     </button>
                   </div>
+                  {capsLockOn && (
+                    <p className="text-xs text-warning" aria-live="polite">
+                      {tx({
+                        de: "Feststelltaste ist aktiv",
+                        en: "Caps Lock is on",
+                        es: "Bloq Mayús está activado",
+                      })}
+                    </p>
+                  )}
                   {!isLogin && <PasswordStrength password={password} />}
                 </motion.div>
 
