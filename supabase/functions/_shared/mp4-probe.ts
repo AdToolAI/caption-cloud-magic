@@ -82,8 +82,14 @@ function parseMvhd(view: DataView, box: Box): { timescale: number; duration: num
 function parseTkhd(view: DataView, box: Box): { width: number; height: number } {
   const p = box.start + box.headerSize;
   const version = view.getUint8(p);
-  const base = version === 1 ? p + 20 + 12 + 60 : p + 12 + 12 + 60;
-  // 16.16 fixed point
+  // tkhd layout:
+  // v0: flags(3) + creation(4) + modification(4) + track_id(4) + reserved(4) +
+  //     duration(4) + reserved(8) + layer(2) + alt_group(2) + volume(2) +
+  //     reserved(2) + matrix(36) + width(4) + height(4)
+  // v1: flags(3) + creation(8) + modification(8) + track_id(4) + reserved(4) +
+  //     duration(8) + reserved(8) + layer(2) + alt_group(2) + volume(2) +
+  //     reserved(2) + matrix(36) + width(4) + height(4)
+  const base = version === 1 ? p + 88 : p + 76;
   const width = view.getUint32(base) / 65536;
   const height = view.getUint32(base + 4) / 65536;
   return { width: Math.round(width), height: Math.round(height) };
@@ -211,5 +217,33 @@ export async function probeRemoteVideo(url: string): Promise<ProbedVideoMetadata
     }
     offset += box.size;
   }
+
+  // moov is often at the end of the file; scan backwards from the end.
+  const tailStart = Math.max(0, sizeBytes - 1024 * 1024);
+  const tail = await rangeFetch(url, tailStart, sizeBytes - 1);
+  for (let guard = 0, tailOffset = tail.byteLength - 1; guard < 64 && tailOffset >= 8; guard++) {
+    // Search backwards for the 'moov' type signature.
+    let idx = -1;
+    for (let i = tailOffset - 4; i >= 0; i--) {
+      if (tail[i] === 0x6d && tail[i + 1] === 0x6f && tail[i + 2] === 0x6f && tail[i + 3] === 0x76) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx < 0) break;
+    const boxOffsetInTail = idx - 4;
+    if (boxOffsetInTail < 0) break;
+    const sizeView = new DataView(tail.buffer, tail.byteOffset + boxOffsetInTail, 4);
+    const boxSize = sizeView.getUint32(0);
+    if (boxSize < 8 || boxOffsetInTail + boxSize > tail.byteLength) {
+      tailOffset = boxOffsetInTail;
+      continue;
+    }
+    const moov = tail.subarray(boxOffsetInTail, boxOffsetInTail + boxSize);
+    const parsed = parseMoov(moov, sizeBytes, container);
+    if (parsed) return parsed;
+    tailOffset = boxOffsetInTail;
+  }
+
   throw new Error('moov box not found');
 }
