@@ -9,7 +9,12 @@
  */
 
 import { probeRemoteVideo } from './mp4-probe.ts';
-import { RESOLUTION_PIXELS, type VideoResolution } from './video-enhance-models.ts';
+import {
+  RESOLUTION_PIXELS,
+  VIDEO_PRICING_HARD_MULTIPLIER_CAP,
+  verifiedPricing,
+  type VideoResolution,
+} from './video-enhance-models.ts';
 import {
   outputKey,
   outputMatchesOrder,
