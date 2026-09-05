@@ -13,6 +13,7 @@ import {
 import { ArrowUpCircle, Sparkles, Zap, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useTx } from '@/lib/i18nText';
+import { uiLocale } from '@/lib/uiLocale';
 import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
 import {
   availableFps,
@@ -136,7 +137,7 @@ export function AIVideoUpscaling({
 
   const priceLabel =
     estimate != null
-      ? new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(estimate.userPriceEur)
+      ? new Intl.NumberFormat(uiLocale(), { style: 'currency', currency: 'EUR' }).format(estimate.userPriceEur)
       : '—';
 
   const presetOptions: { value: Preset; label: string; hint: string }[] = [
