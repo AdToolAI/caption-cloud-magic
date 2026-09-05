@@ -183,17 +183,24 @@ export function validateCombination(
  * Three-stage unlock: the backend switch is authoritative, the test allowlist
  * enables real runs before the global rollout.
  */
+export function isTestAllowlisted(
+  env: (key: string) => string | undefined,
+  userId?: string,
+): boolean {
+  const allowlist = (env('VIDEO_ENHANCE_TEST_USER_IDS') ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+  return !!userId && allowlist.includes(userId);
+}
+
 export function isModelUnlocked(
   spec: VideoEnhanceSpec,
   env: (key: string) => string | undefined,
   userId?: string,
 ): boolean {
   if (env(spec.backendFlag) === 'true') return true;
-  const allowlist = (env('VIDEO_ENHANCE_TEST_USER_IDS') ?? '')
-    .split(',')
-    .map((id) => id.trim())
-    .filter(Boolean);
-  return !!userId && allowlist.includes(userId);
+  return isTestAllowlisted(env, userId);
 }
 
 // ---------------------------------------------------------------------------
