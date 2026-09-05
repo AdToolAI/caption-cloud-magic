@@ -7,6 +7,8 @@ import {
   closestAspectRatioFor,
   resolveSize,
 } from "../_shared/pictureModelCapabilities.ts";
+import { readImageDimensions } from "../_shared/imageDimensions.ts";
+import { SOURCE_FORMAT } from "../_shared/pictureFormatResolution.ts";
 import { persistStudioImage } from "../_shared/studio-image-persist.ts";
 import {
   buildPictureRequest,
@@ -49,7 +51,12 @@ interface GenerateRequest {
   prompt: string;
   tier: 'fast' | 'pro' | 'ultra' | 'gptimage' | 'flux' | 'ideogram' | 'recraft' | 'qwen';
 
+  /** Legacy field; `requestedFormat` wins when both are present. */
   aspectRatio?: string;
+  /** What the customer asked for — including the sentinel "source". */
+  requestedFormat?: string;
+  /** Browser-reported size of reference #1. Advisory only; never trusted. */
+  sourceDimensions?: { width: number; height: number };
   referenceImageUrl?: string;     // Subject reference (image-to-image, legacy single)
   referenceImageUrls?: string[];  // Subject references (multi-reference models)
   styleReferenceUrl?: string;     // Style reference (legacy single)
@@ -225,13 +232,32 @@ serve(async (req) => {
     const subjectRefs = requestedSubjects.slice(0, maxSubjects);
     const styleRefs = requestedStyles.slice(0, maxStyles);
 
+    // --- Format: the server decides the source size, not the browser -------
+    const requestedFormat = body.requestedFormat ?? aspectRatio;
+    let serverSource: { width: number; height: number } | null = null;
+    if (requestedFormat === SOURCE_FORMAT && subjectRefs.length) {
+      serverSource = await readImageDimensions(subjectRefs[0]);
+      const claimed = body.sourceDimensions;
+      if (serverSource && claimed?.width && claimed?.height) {
+        const drift = Math.abs(
+          claimed.width / claimed.height - serverSource.width / serverSource.height,
+        );
+        if (drift > 0.01) {
+          console.warn(
+            `[generate-image-replicate] client source ratio ${claimed.width}x${claimed.height} != asset ${serverSource.width}x${serverSource.height} — using asset`,
+          );
+        }
+      }
+    }
+
     // --- Deterministic prompt assembly (shared with the UI) ----------------
     const built = buildPictureRequest({
       tier,
       mode,
       prompt: prompt.trim(),
       style,
-      aspectRatio,
+      requestedFormat,
+      source: serverSource,
       subjectRefs,
       styleRefs,
       strength: body.strength,
@@ -249,11 +275,18 @@ serve(async (req) => {
 
     const enhancedPrompt = built.prompt;
 
-    const safeAspect = mapAspectRatio(tier, aspectRatio);
-    if (safeAspect !== aspectRatio) {
-      console.log(`[generate-image-replicate] aspect_ratio ${aspectRatio} not supported by ${tier} → using ${safeAspect}`);
+    const effectiveAspect = built.resolvedFormat.aspectRatio;
+    const safeAspect = mapAspectRatio(tier, effectiveAspect);
+    if (built.resolvedFormat.adjustment) {
+      console.log(
+        `[generate-image-replicate] format ${built.resolvedFormat.adjustment.from} → ${built.resolvedFormat.adjustment.to} for ${tier}`,
+      );
     }
-    const resolvedSize = resolveSize(tier, aspectRatio, { width: body.width, height: body.height, resolution: body.resolution });
+    const resolvedSize = resolveSize(tier, effectiveAspect, {
+      width: body.width ?? built.resolvedFormat.width,
+      height: body.height ?? built.resolvedFormat.height,
+      resolution: body.resolution,
+    });
 
     // Provider-side field order: subject references first, style last.
     const imageInputs: string[] = [...subjectRefs, ...styleRefs];
@@ -485,9 +518,13 @@ serve(async (req) => {
         workflow_type: 'generated',
         prompt: prompt.trim(),
         style,
-        aspect_ratio: aspectRatio,
+        aspect_ratio: built.resolvedFormat.aspectRatio,
         source: 'generated',
-        metadata_json: { storagePath },
+        metadata_json: {
+          storagePath,
+          requestedFormat: built.requestedFormat,
+          resolvedFormat: built.resolvedFormat,
+        },
       },
       '[generate-image-replicate]',
     );

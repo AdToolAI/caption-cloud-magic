@@ -29,7 +29,7 @@ import {
   PICTURE_MODES,
   PICTURE_MODELS,
   aspectRatiosForTier,
-  closestAspectRatio,
+  
   type PictureMode,
   type QualityTier as ModelTier,
 } from "@/config/pictureStudioModels";
@@ -41,6 +41,13 @@ import {
   PICTURE_STYLE_NONE,
   type PromptSegment,
 } from "@/config/picturePromptBuilder";
+import {
+  SOURCE_FORMAT,
+  resolveRequestedFormat,
+  formatRatioLabel,
+  type SourceDimensions,
+} from "@/config/pictureFormatResolution";
+import { detectTransparencyWish, detectEditIntent } from "@/config/pictureIntentHints";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, Eye, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -95,7 +102,7 @@ export function ImageGenerator() {
   const status = { stage: '', message: '' };
 
   const STYLES = useMemo(() => [
-    { value: PICTURE_STYLE_NONE, label: tx({ de: 'Kein Stil (nur mein Text)', en: 'No style (my words only)', es: 'Sin estilo (solo mis palabras)' }) },
+    { value: PICTURE_STYLE_NONE, label: tx({ de: 'Auto — dein Prompt bestimmt den Stil', en: 'Auto — your prompt sets the style', es: 'Auto — tu prompt define el estilo' }) },
     { value: 'realistic', label: t('picStudio.styleRealistic') },
     { value: 'cinematic', label: t('picStudio.styleCinematic') },
     { value: 'watercolor', label: t('picStudio.styleWatercolor') },
@@ -139,7 +146,22 @@ export function ImageGenerator() {
 
   const [prompt, setPrompt] = useState(cached?.prompt ?? "");
   const [style, setStyle] = useState(cached?.style ?? PICTURE_STYLE_NONE);
+  /**
+   * SEMANTIC format choice of the user: `source` or a ratio label.
+   * A model switch never rewrites this — only `resolvedFormat` changes.
+   */
   const [aspectRatio, setAspectRatio] = useState(cached?.aspectRatio ?? "1:1");
+  /**
+   * Lifetime of the "user touched the format" flag:
+   *  - direct user change in the format picker -> true
+   *  - automatic model approximation            -> unchanged
+   *  - model switch                             -> unchanged
+   *  - adding a reference                       -> switches to Source only while false
+   *  - new session / reset                      -> false
+   */
+  const [aspectRatioTouched, setAspectRatioTouched] = useState(false);
+  /** Natural pixel size of reference #1 — the one and only "Source". */
+  const [sourceDimensions, setSourceDimensions] = useState<SourceDimensions | null>(null);
   const [tier, setTier] = useState<QualityTier>('standard');
   
   // New mode model (replaces editMode boolean). Legacy editMode is migrated.
@@ -182,21 +204,52 @@ export function ImageGenerator() {
   const balance = wallet?.balance_euros ?? 0;
   const hasInsufficientCredits = cost > 0 && balance < cost;
 
-  // Nur Seitenverhältnisse anbieten, die das gewählte Modell wirklich akzeptiert.
+  // Selectable formats. "Source" appears only while a reference image with
+  // known natural size exists — it always means reference #1.
   const availableAspectRatios = useMemo(() => {
     const allowed = aspectRatiosForTier(tier);
-    return allowed ? ASPECT_RATIOS.filter(r => allowed.includes(r.value)) : ASPECT_RATIOS;
+    const presets = allowed ? ASPECT_RATIOS.filter(r => allowed.includes(r.value)) : ASPECT_RATIOS;
+    if (!sourceDimensions) return presets;
+    return [
+      {
+        value: SOURCE_FORMAT,
+        label: `${tx({ de: 'Source · aus Referenz 1', en: 'Source · from reference 1', es: 'Source · de la referencia 1' })} (${formatRatioLabel(sourceDimensions.width / sourceDimensions.height)})`,
+      },
+      ...presets,
+    ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tier, ASPECT_RATIOS]);
+  }, [tier, ASPECT_RATIOS, sourceDimensions]);
 
-  // Beim Modellwechsel auf das nächstliegende erlaubte Verhältnis springen.
+  /**
+   * Direct user change of the format — the ONLY thing that sets `touched`.
+   */
+  const handleFormatChange = (value: string) => {
+    setAspectRatio(value);
+    setAspectRatioTouched(true);
+  };
+
+  // Adding a reference image adopts Source, but only while the user has not
+  // deliberately chosen a format.
   useEffect(() => {
-    if (!availableAspectRatios.some(r => r.value === aspectRatio)) {
-      const next = closestAspectRatio(tier, aspectRatio);
-      setAspectRatio(availableAspectRatios.some(r => r.value === next) ? next : (availableAspectRatios[0]?.value ?? '1:1'));
+    if (sourceDimensions && !aspectRatioTouched && aspectRatio !== SOURCE_FORMAT) {
+      setAspectRatio(SOURCE_FORMAT);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableAspectRatios]);
+  }, [sourceDimensions, aspectRatioTouched]);
+
+  // Last reference gone while Source was active -> visible switch, never silent.
+  useEffect(() => {
+    if (!sourceDimensions && aspectRatio === SOURCE_FORMAT) {
+      setAspectRatio('1:1');
+      toast.info(tx({
+        de: 'Ohne Referenzbild gibt es kein Source-Format — Format steht jetzt auf 1:1.',
+        en: 'Without a reference image there is no Source format — format is now 1:1.',
+        es: 'Sin imagen de referencia no hay formato Source — el formato ahora es 1:1.',
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceDimensions, aspectRatio]);
+
 
   // Provider capabilities for the selected model (single source of truth,
   // shared with the Edge Functions).
@@ -291,12 +344,35 @@ export function ImageGenerator() {
     }
   };
 
+  /**
+   * Read the TRUE natural size of the picked file. Never rounded to a preset
+   * here — approximation is the job of the capability layer, per model.
+   */
+  const measureSource = (file: File) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setSourceDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+      }
+      URL.revokeObjectURL(objectUrl);
+    };
+    img.onerror = () => URL.revokeObjectURL(objectUrl);
+    img.src = objectUrl;
+  };
+
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    measureSource(file);
     void uploadReference(file, setReferenceImage);
   };
+
+  // Reference #1 gone -> no Source dimensions any more.
+  useEffect(() => {
+    if (!referenceImage) setSourceDimensions(null);
+  }, [referenceImage]);
 
   const handleExtraRefUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -353,15 +429,26 @@ export function ImageGenerator() {
     mode,
     prompt,
     style,
-    aspectRatio,
+    requestedFormat: aspectRatio,
+    source: sourceDimensions,
     subjectRefs: requestSubjectRefs,
     styleRefs: requestStyleRefs,
     strength,
     transparentBackground: transparentBackground && canBeTransparent,
     brandKit: brandKitPayload,
-  }), [tier, mode, prompt, style, aspectRatio, requestSubjectRefs, requestStyleRefs, strength, transparentBackground, canBeTransparent, brandKitPayload]);
+  }), [tier, mode, prompt, style, aspectRatio, sourceDimensions, requestSubjectRefs, requestStyleRefs, strength, transparentBackground, canBeTransparent, brandKitPayload]);
 
   const effectivePrompt = built.prompt;
+  /** Model-specific technical resolution of the semantic format choice. */
+  const resolvedFormat = built.resolvedFormat;
+
+  // Recommendations only — nothing is redirected or rewritten automatically.
+  const transparencyWish = useMemo(() => detectTransparencyWish(prompt), [prompt]);
+  const editIntent = useMemo(() => detectEditIntent(prompt), [prompt]);
+  const showTransparencyHint = transparencyWish.matched && !canBeTransparent;
+  const showEditHint = editIntent.matched && !!referenceImage && mode !== 'create';
+  const latestAssetUrl = generatedImages[0]?.url ?? null;
+
 
   const SEGMENT_TONE: Record<PromptSegment['source'], string> = {
     user: 'text-foreground',
@@ -403,16 +490,22 @@ export function ImageGenerator() {
       ? [referenceImage, ...extraReferences].filter(Boolean).slice(0, maxSubjectRefs) as string[]
       : [];
     const styleRefs = mode === 'restyle' && styleReference ? [styleReference] : [];
+    // Manual pixel size wins; otherwise a Source request may supply exact
+    // width/height for models whose registry entry allows it.
     const exact = supportsExactSize && Number(exactWidth) > 0 && Number(exactHeight) > 0
       ? { width: Number(exactWidth), height: Number(exactHeight) }
-      : {};
+      : (resolvedFormat.width && resolvedFormat.height
+        ? { width: resolvedFormat.width, height: resolvedFormat.height }
+        : {});
 
     if (tier === 'standard') {
       const { data, error } = await supabase.functions.invoke('generate-studio-image', {
         body: {
           prompt: effectivePrompt,
           style,
-          aspectRatio,
+          aspectRatio: resolvedFormat.aspectRatio,
+          requestedFormat: aspectRatio,
+          sourceDimensions,
           quality: 'fast',
           editMode: mode === 'transform' || mode === 'mix',
           mode,
@@ -435,7 +528,9 @@ export function ImageGenerator() {
       body: {
         prompt: effectivePrompt,
         tier,
-        aspectRatio,
+        aspectRatio: resolvedFormat.aspectRatio,
+        requestedFormat: aspectRatio,
+        sourceDimensions,
         style,
         referenceImageUrls: subjectRefs,
         styleReferenceUrls: styleRefs,
@@ -843,7 +938,7 @@ export function ImageGenerator() {
             </div>
             <div className="space-y-2">
               <Label>{t('picStudio.aspectRatio')}</Label>
-              <Select value={aspectRatio} onValueChange={setAspectRatio}>
+              <Select value={aspectRatio} onValueChange={handleFormatChange}>
                 <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {availableAspectRatios.map(r => (
@@ -851,6 +946,16 @@ export function ImageGenerator() {
                   ))}
                 </SelectContent>
               </Select>
+              {resolvedFormat.adjustment && (
+                <p className="text-[10px] text-amber-400 leading-snug">
+                  {tx({ de: 'AdTool angepasst', en: 'AdTool adjusted', es: 'AdTool ajustó' })}: {resolvedFormat.adjustment.from} → {resolvedFormat.adjustment.to}
+                </p>
+              )}
+              {!resolvedFormat.adjustment && resolvedFormat.width && resolvedFormat.height && (
+                <p className="text-[10px] text-muted-foreground leading-snug">
+                  {resolvedFormat.width} × {resolvedFormat.height} px
+                </p>
+              )}
             </div>
           </div>
 
@@ -1107,25 +1212,64 @@ export function ImageGenerator() {
             </div>
           )}
 
-          {/* Transparent background — honest capability gate */}
-          <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs flex items-center gap-1.5">
-                <ImageIcon className="h-3.5 w-3.5 text-primary" />
-                {tx({ de: 'Transparenter Hintergrund', en: 'Transparent background', es: 'Fondo transparente' })}
-              </Label>
-              <Switch
-                checked={transparentBackground && canBeTransparent}
-                onCheckedChange={setTransparentBackground}
-                disabled={!canBeTransparent}
-              />
+          {/* Transparency — the switch exists ONLY where alpha really works */}
+          {canBeTransparent && (
+            <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs flex items-center gap-1.5">
+                  <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                  {tx({ de: 'Transparenter Hintergrund', en: 'Transparent background', es: 'Fondo transparente' })}
+                </Label>
+                <Switch checked={transparentBackground} onCheckedChange={setTransparentBackground} />
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                {tx({ de: 'Wird als PNG mit Alphakanal erzeugt.', en: 'Produced as PNG with an alpha channel.', es: 'Se genera como PNG con canal alfa.' })}
+              </p>
             </div>
-            <p className="text-[10px] text-muted-foreground leading-snug">
-              {canBeTransparent
-                ? tx({ de: 'Wird als PNG mit Alphakanal erzeugt.', en: 'Produced as PNG with an alpha channel.', es: 'Se genera como PNG con canal alfa.' })
-                : tx({ de: `${capability?.model ?? tier} kann das nicht. Nutze dafür den Bereich „Hintergrund" — dort wird sauber freigestellt.`, en: `${capability?.model ?? tier} cannot do this. Use the “Background” section, which cuts out cleanly.`, es: `${capability?.model ?? tier} no puede hacerlo. Usa la sección «Fondo», que recorta limpiamente.` })}
-            </p>
-          </div>
+          )}
+
+          {/* Recommendation — never an automatic redirect */}
+          {showTransparencyHint && (
+            <div className="p-3 rounded-lg border border-amber-500/40 bg-amber-500/5 space-y-2">
+              <p className="text-[11px] leading-snug flex items-start gap-1.5">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-400" />
+                {latestAssetUrl
+                  ? tx({ de: `${capability?.model ?? tier} kann keinen transparenten Hintergrund erzeugen. Stelle dein Bild im Bereich „Hintergrund“ sauber frei.`, en: `${capability?.model ?? tier} cannot produce a transparent background. Cut your picture out cleanly in the “Background” section.`, es: `${capability?.model ?? tier} no puede generar un fondo transparente. Recorta tu imagen en la sección «Fondo».` })
+                  : tx({ de: `${capability?.model ?? tier} kann keinen transparenten Hintergrund erzeugen. Erzeuge das Bild zuerst — danach stellst du es im Bereich „Hintergrund“ frei.`, en: `${capability?.model ?? tier} cannot produce a transparent background. Create the picture first, then cut it out in the “Background” section.`, es: `${capability?.model ?? tier} no puede generar un fondo transparente. Crea la imagen primero y luego recórtala en la sección «Fondo».` })}
+              </p>
+              {latestAssetUrl && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-[11px]"
+                  onClick={() => navigate('/picture-studio?tab=background')}
+                >
+                  {tx({ de: 'Im Bereich Hintergrund fortsetzen', en: 'Continue in Background', es: 'Continuar en Fondo' })}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {showEditHint && (
+            <div className="p-3 rounded-lg border border-primary/40 bg-primary/5 space-y-2">
+              <p className="text-[11px] leading-snug flex items-start gap-1.5">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+                {tx({
+                  de: 'Das klingt nach einer gezielten Änderung an deinem Bild. Im Bereich „Bearbeiten“ bleibt der Rest des Bildes unangetastet.',
+                  en: 'That sounds like a targeted change to your picture. In the “Edit” section the rest of the picture stays untouched.',
+                  es: 'Eso suena a un cambio puntual en tu imagen. En la sección «Editar» el resto de la imagen no se toca.',
+                })}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[11px]"
+                onClick={() => navigate('/picture-studio?tab=edit')}
+              >
+                {tx({ de: 'Zu Bearbeiten wechseln', en: 'Switch to Edit', es: 'Cambiar a Editar' })}
+              </Button>
+            </div>
+          )}
 
           {/* WHAT WE ACTUALLY SEND — no hidden modifiers */}
           <Collapsible open={showPromptPreview} onOpenChange={setShowPromptPreview}>

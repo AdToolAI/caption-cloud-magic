@@ -15,6 +15,11 @@
  */
 
 import { capabilityFor, type PictureMode } from './pictureModelCapabilities.ts';
+import {
+  resolveRequestedFormat,
+  type ResolvedFormat,
+  type SourceDimensions,
+} from './pictureFormatResolution.ts';
 
 export type PictureIntent = PictureMode;
 
@@ -49,7 +54,9 @@ export type PictureNoticeCode =
   | 'TRANSPARENCY_UNSUPPORTED'
   | 'TRANSPARENCY_NATIVE'
   | 'NEGATIVE_AS_LANGUAGE'
-  | 'REFERENCES_IGNORED';
+  | 'REFERENCES_IGNORED'
+  | 'FORMAT_ADJUSTED'
+  | 'FORMAT_SOURCE_UNAVAILABLE';
 
 export interface PictureNotice {
   code: PictureNoticeCode;
@@ -64,7 +71,16 @@ export interface PicturePromptInput {
   prompt: string;
   /** `none` (or empty) means: send the user's words unchanged. */
   style?: string;
+  /** Legacy: already-resolved ratio. Prefer `requestedFormat`. */
   aspectRatio?: string;
+  /** Semantic user choice: `source` or a ratio label. Never mutated. */
+  requestedFormat?: string;
+  /**
+   * Natural pixel size of the PRIMARY reference image (reference #1).
+   * Client passes it for the preview; the server re-derives it from trusted
+   * asset metadata before building the real provider request.
+   */
+  source?: SourceDimensions | null;
   subjectRefs?: string[];
   styleRefs?: string[];
   /** UI value 0..100 — "how much may the picture change". 0 = barely, 100 = a lot. */
@@ -79,6 +95,43 @@ export interface PicturePromptInput {
   } | null;
 }
 
+/**
+ * Machine-readable record of everything AdTool added on top of the user's own
+ * words. Invariant tests assert on THIS, never on a word blocklist over the
+ * final prompt (the user may legitimately write "photorealistic" themselves).
+ */
+export interface AppliedModifier {
+  source: PromptSegmentSource;
+  /** Stable identifier, e.g. `style:cinematic`, `ratio-prompt`, `intent:close`. */
+  id: string;
+}
+
+export interface ReferenceInfluence {
+  /** Semantic level the user picked. `none` when no reference is in play. */
+  level: 'close' | 'balanced' | 'free' | 'none';
+  /** How the level reaches the provider. */
+  method: 'none' | 'native' | 'prompt-guided';
+  field?: 'image_prompt_strength' | 'strength';
+  value?: number;
+}
+
+/** Provider-neutral, comparable description of one run. */
+export interface NormalizedPictureRequest {
+  tier: string;
+  mode: PictureIntent;
+  /** `auto` when the user added no style preset. */
+  style: string;
+  /** Exactly what the customer asked for — never rewritten. */
+  requestedFormat: string;
+  resolvedFormat: ResolvedFormat;
+  referenceInfluence: ReferenceInfluence;
+  subjectRefCount: number;
+  styleRefCount: number;
+  transparentBackground: boolean;
+  negativeTerms: string[];
+  appliedModifiers: AppliedModifier[];
+}
+
 export interface BuiltPictureRequest {
   /** Final text handed to the provider. */
   prompt: string;
@@ -91,6 +144,14 @@ export interface BuiltPictureRequest {
   /** Resolved transparency — only ever true when the model really supports it. */
   transparentBackground: boolean;
   notices: PictureNotice[];
+  /** Everything AdTool added — empty means "only the user's words". */
+  appliedModifiers: AppliedModifier[];
+  /** Exactly what the customer asked for — never rewritten. */
+  requestedFormat: string;
+  /** Model-specific technical resolution of the semantic format choice. */
+  resolvedFormat: ResolvedFormat;
+  referenceInfluence: ReferenceInfluence;
+  normalizedRequest: NormalizedPictureRequest;
 }
 
 /* ------------------------------------------------------------------ styles */
@@ -209,9 +270,15 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
   const cap = capabilityFor(input.tier);
   const notices: PictureNotice[] = [];
   const segments: PromptSegment[] = [];
+  const appliedModifiers: AppliedModifier[] = [];
 
   const subjectRefs = (input.subjectRefs ?? []).filter(Boolean);
   const styleRefs = (input.styleRefs ?? []).filter(Boolean);
+
+  /* 0. semantic format choice -> model-specific resolution (never mutates it) */
+  const requestedFormat = input.requestedFormat ?? input.aspectRatio ?? '1:1';
+  const resolvedFormat = resolveRequestedFormat(input.tier, requestedFormat, input.source);
+
 
   /* 1. the user's own words — always first, never rewritten */
   const { text: userText, terms: negativeTerms } = extractNegativeTerms(input.prompt ?? '');
@@ -245,7 +312,8 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
         },
       });
     } else {
-      const clause = input.mode === 'mix' ? MIX_CLAUSE : INTENT_CLAUSES[strengthBucket(uiStrength)];
+      const bucket = strengthBucket(uiStrength);
+      const clause = input.mode === 'mix' ? MIX_CLAUSE : INTENT_CLAUSES[bucket];
       segments.push({
         source: 'intent',
         text: clause,
@@ -255,6 +323,11 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
           es: 'Uso de la imagen de referencia',
         },
       });
+      appliedModifiers.push({
+        source: 'intent',
+        id: input.mode === 'mix' ? 'intent:mix' : `intent:${bucket}`,
+      });
+
       notices.push({
         code: 'STRENGTH_AS_LANGUAGE',
         level: 'info',
@@ -284,6 +357,7 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
       text: STYLE_REF_CLAUSE,
       label: { de: 'Stil-Referenz', en: 'Style reference', es: 'Referencia de estilo' },
     });
+    appliedModifiers.push({ source: 'reference', id: 'reference:style-ref' });
   }
 
   /* 4. style preset — only when the user picked one */
@@ -294,6 +368,7 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
       text: `Style: ${modifier}.`,
       label: { de: 'Stil-Vorgabe', en: 'Style preset', es: 'Preajuste de estilo' },
     });
+    appliedModifiers.push({ source: 'style', id: `style:${input.style}` });
     notices.push({
       code: 'STYLE_PRESET_APPLIED',
       level: 'info',
@@ -330,6 +405,7 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
         text: `${brandParts.join('. ')}.`,
         label: { de: 'Brand-Kit', en: 'Brand kit', es: 'Brand Kit' },
       });
+      appliedModifiers.push({ source: 'brand', id: 'brand:kit' });
     }
   }
 
@@ -367,6 +443,7 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
       text: `Avoid: ${negativeTerms.join(', ')}.`,
       label: { de: 'Ausschlüsse', en: 'Exclusions', es: 'Exclusiones' },
     });
+    appliedModifiers.push({ source: 'negative', id: 'negative:avoid' });
     notices.push({
       code: 'NEGATIVE_AS_LANGUAGE',
       level: 'warn',
@@ -379,11 +456,36 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
   }
 
   /* 8. aspect ratio — only for chat-shaped providers without a ratio field */
-  if (cap?.provider === 'gateway' && cap.sizing.kind === 'ratio' && input.aspectRatio) {
+  if (cap?.provider === 'gateway' && cap.sizing.kind === 'ratio') {
     segments.push({
       source: 'format',
-      text: `Aspect ratio: ${input.aspectRatio}.`,
+      text: `Aspect ratio: ${resolvedFormat.aspectRatio}.`,
       label: { de: 'Format', en: 'Format', es: 'Formato' },
+    });
+    appliedModifiers.push({ source: 'format', id: 'format:ratio-prompt' });
+  }
+
+  /* 8b. transparent format handling of the semantic choice */
+  if (resolvedFormat.adjustment) {
+    notices.push({
+      code: 'FORMAT_ADJUSTED',
+      level: 'info',
+      message: {
+        de: `AdTool angepasst: ${resolvedFormat.adjustment.from} → ${resolvedFormat.adjustment.to} (${cap?.model ?? input.tier} unterstützt das Ausgangsformat nicht exakt).`,
+        en: `AdTool adjusted: ${resolvedFormat.adjustment.from} → ${resolvedFormat.adjustment.to} (${cap?.model ?? input.tier} does not support the exact source format).`,
+        es: `AdTool ajustó: ${resolvedFormat.adjustment.from} → ${resolvedFormat.adjustment.to} (${cap?.model ?? input.tier} no admite el formato de origen exacto).`,
+      },
+    });
+  }
+  if (resolvedFormat.sourceUnavailable) {
+    notices.push({
+      code: 'FORMAT_SOURCE_UNAVAILABLE',
+      level: 'warn',
+      message: {
+        de: `Kein Referenzbild vorhanden — Format fällt auf ${resolvedFormat.aspectRatio} zurück.`,
+        en: `No reference image available — format falls back to ${resolvedFormat.aspectRatio}.`,
+        es: `No hay imagen de referencia — el formato vuelve a ${resolvedFormat.aspectRatio}.`,
+      },
     });
   }
 
@@ -400,6 +502,27 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
     });
   }
 
+  const referenceInfluence: ReferenceInfluence =
+    usesReference && subjectRefs.length
+      ? strengthField
+        ? { level: strengthBucket(uiStrength), method: 'native', field: strengthField, value: strengthValue }
+        : { level: strengthBucket(uiStrength), method: 'prompt-guided' }
+      : { level: 'none', method: 'none' };
+
+  const normalizedRequest: NormalizedPictureRequest = {
+    tier: input.tier,
+    mode: input.mode,
+    style: modifier ? (input.style as string) : 'auto',
+    requestedFormat,
+    resolvedFormat,
+    referenceInfluence,
+    subjectRefCount: input.mode === 'create' ? 0 : subjectRefs.length,
+    styleRefCount: input.mode === 'create' ? 0 : styleRefs.length,
+    transparentBackground,
+    negativeTerms,
+    appliedModifiers,
+  };
+
   return {
     prompt: segments.map((s) => s.text).join('\n\n').trim(),
     segments,
@@ -408,6 +531,11 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
     strengthField,
     transparentBackground,
     notices,
+    appliedModifiers,
+    requestedFormat,
+    resolvedFormat,
+    referenceInfluence,
+    normalizedRequest,
   };
 }
 
