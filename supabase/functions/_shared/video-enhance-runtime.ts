@@ -6,7 +6,7 @@
  * and can safely race each other.
  */
 
-import { actualMargin, costDrift } from './video-enhance-models.ts';
+import { actualMargin, costDrift, VIDEO_RATE_CARDS } from './video-enhance-models.ts';
 
 // deno-lint-ignore no-explicit-any
 type Admin = any;
