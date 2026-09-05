@@ -308,7 +308,8 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
         },
       });
     } else {
-      const clause = input.mode === 'mix' ? MIX_CLAUSE : INTENT_CLAUSES[strengthBucket(uiStrength)];
+      const bucket = strengthBucket(uiStrength);
+      const clause = input.mode === 'mix' ? MIX_CLAUSE : INTENT_CLAUSES[bucket];
       segments.push({
         source: 'intent',
         text: clause,
@@ -318,6 +319,11 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
           es: 'Uso de la imagen de referencia',
         },
       });
+      appliedModifiers.push({
+        source: 'intent',
+        id: input.mode === 'mix' ? 'intent:mix' : `intent:${bucket}`,
+      });
+
       notices.push({
         code: 'STRENGTH_AS_LANGUAGE',
         level: 'info',
