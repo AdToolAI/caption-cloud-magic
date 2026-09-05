@@ -17,7 +17,6 @@
 import { capabilityFor, type PictureMode } from './pictureModelCapabilities.ts';
 import {
   resolveRequestedFormat,
-  SOURCE_FORMAT,
   type ResolvedFormat,
   type SourceDimensions,
 } from './pictureFormatResolution.ts';
