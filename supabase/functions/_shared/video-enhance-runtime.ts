@@ -212,16 +212,18 @@ export function outputMatchesOrder(
   if (ordered.durationSeconds > 0 && durationGap / ordered.durationSeconds > 0.1) {
     return { ok: false, reason: 'duration_mismatch' };
   }
-  // Resolution tiers are expressed landscape (e.g. 1080p = 1920x1080), but a
-  // portrait source stays portrait. Compare orientation-agnostically on the
-  // short and long edge instead of literal width/height.
-  const measuredShort = Math.min(measured.width, measured.height);
-  const measuredLong = Math.max(measured.width, measured.height);
-  const orderedShort = Math.min(ordered.width, ordered.height);
-  const orderedLong = Math.max(ordered.width, ordered.height);
-  if (measuredShort < orderedShort * 0.9 || measuredLong < orderedLong * 0.9) {
+  // Both providers read a resolution tier as a target LINE COUNT (height), not
+  // as the landscape pixel pair: a portrait source ordered at 1080p comes back
+  // as 608x1080, a landscape one as 1920x1080. The order is therefore validated
+  // against the tier's height and the aspect ratio of the source is preserved.
+  // Width is only sanity-checked against a collapsed frame.
+  if (ordered.height > 0 && measured.height < ordered.height * 0.9) {
     return { ok: false, reason: 'resolution_mismatch' };
   }
+  if (measured.width < 16) {
+    return { ok: false, reason: 'resolution_mismatch' };
+  }
+
   if (ordered.fps > 0 && Math.abs(measured.fps - ordered.fps) / ordered.fps > 0.15) {
     return { ok: false, reason: 'fps_mismatch' };
   }
