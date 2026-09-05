@@ -38,7 +38,9 @@ Erwartet: ~1216 × 2160
 
 Die Tilde entfällt, sobald die Projektion für dieses Modell durch echte Läufe bestätigt ist. Stufen, die verkleinern würden, bleiben sichtbar, sind aber nicht wählbar und tragen den Hinweis "verkleinert dein Video".
 
-`src/lib/videoEnhance/recommend.ts` hebt die Zielstufe automatisch auf die nächste vom Modell unterstützte Stufe an, die echt vergrößert; gibt es keine, lautet das Ergebnis `already_optimal` statt eines sinnlosen Laufs.
+`src/lib/videoEnhance/recommend.ts` hebt die Zielstufe automatisch auf die nächste vom Modell unterstützte Stufe an, die echt vergrößert. Gibt es keine, wird unterschieden:
+- `no_valid_upscale_for_model` — dieses Modell hat kein sinnvolles Ziel, ein anderes freigeschaltetes Modell aber schon. Dann wird dieses Modell konkret empfohlen ("Topaz hat für diese Quelle kein passendes Ziel — ByteDance vCube 4K ist möglich").
+- `already_optimal` — nur wenn über alle geeigneten freigeschalteten Modelle hinweg keine echte Verbesserung möglich ist.
 
 ## 5. Tests
 
