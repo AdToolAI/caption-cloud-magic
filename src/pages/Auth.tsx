@@ -58,10 +58,15 @@ const Auth = () => {
       return;
     }
 
-    if (password.length < 6) {
-      toast.error(tx({ de: "Das Passwort muss mindestens 6 Zeichen haben", en: "Password must be at least 6 characters", es: "La contraseña debe tener al menos 6 caracteres" }));
+    if (!isLogin && !evaluatePassword(password).valid) {
+      toast.error(tx({
+        de: `Das Passwort muss mindestens ${PASSWORD_MIN_LENGTH} Zeichen haben und eine Zahl oder ein Sonderzeichen enthalten`,
+        en: `Password must be at least ${PASSWORD_MIN_LENGTH} characters and include a number or symbol`,
+        es: `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres e incluir un número o símbolo`,
+      }));
       return;
     }
+
 
 
     setLoading(true);
