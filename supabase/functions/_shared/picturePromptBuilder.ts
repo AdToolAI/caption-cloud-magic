@@ -353,6 +353,7 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
       text: STYLE_REF_CLAUSE,
       label: { de: 'Stil-Referenz', en: 'Style reference', es: 'Referencia de estilo' },
     });
+    appliedModifiers.push({ source: 'reference', id: 'reference:style-ref' });
   }
 
   /* 4. style preset — only when the user picked one */
@@ -363,6 +364,7 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
       text: `Style: ${modifier}.`,
       label: { de: 'Stil-Vorgabe', en: 'Style preset', es: 'Preajuste de estilo' },
     });
+    appliedModifiers.push({ source: 'style', id: `style:${input.style}` });
     notices.push({
       code: 'STYLE_PRESET_APPLIED',
       level: 'info',
