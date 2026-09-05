@@ -23,9 +23,9 @@ Wenn kein passendes Kameramaterial im Konto liegt, lade bitte einen kurzen Origi
 |---|---|---|
 | T1 | kurzer Clip → 1080p | Basisfall, Kosten gegen Rate Card |
 | T2 | kürzester Clip → 4K/60 | teuerste Kombination, Laufzeit und Kosten |
-| T3 | gezielt erzeugter Anbieterfehler | genau eine Freigabe des reservierten Guthabens |
+| T3 | echter Anbieterfehler | zählt nur, wenn eine echte Prediction existiert und Replicate sie als „failed" meldet → genau eine Freigabe |
 | T4 | Speicherfehler nach erfolgreichem Anbieterlauf | genau ein finales Asset, keine zweite Abrechnung |
-| T5 | Abbruch während der Verarbeitung (falls unterstützt) | keine falsche Rückerstattung |
+| T5 | Abbruch während der Verarbeitung (falls unterstützt) | Auswertung nach Abbruch-Policy, keine falsche Rückerstattung |
 
 ## 3. ByteDance vCube — Live-Läufe
 
@@ -36,12 +36,18 @@ Wenn kein passendes Kameramaterial im Konto liegt, lade bitte einen kurzen Origi
 | B3 | AIGC | echter Seedance-Clip 720p/24 → 1080p/30 |
 | B4 | AIGC | höherwertige Konfiguration |
 | B5 | Pro | nur wenn die Replicate-Berechtigung tatsächlich bestätigt wird |
-| B6 | — | Anbieterfehler |
+| B6 | — | echter Anbieterfehler (gleiche Bedingung wie T3) |
 | B7 | — | Speicherfehler |
+
+Lässt sich ein echter Anbieterfehler nicht kontrolliert auslösen, wird T3/B6 im Bericht als **BLOCKED** geführt; der Geldpfad bleibt dann über den deterministischen Testfall abgesichert. Kein Ersatz durch eine Anfrage, die schon unsere eigene Vorprüfung ablehnt — die beweist nur, dass nichts reserviert wurde.
+
+## 3a. Abbruch-Policy — vorab festlegen
+
+Vor T5 wird schriftlich festgelegt, was „korrekt" heißt: Replicate unterscheidet einen Abbruch **vor** dem Start (keine Anbieterkosten) von einem Abbruch **während** des Laufs (bereits verbrauchte Rechenzeit kann berechnet werden). Vorschlag: AdTool trägt angefangene Anbieterkosten bei Nutzerabbruch selbst und gibt dem Kunden das reservierte Guthaben vollständig frei; die entstandenen Kosten werden nur intern erfasst. Der Test misst dann gegen genau diese Regel.
 
 ## 4. Was pro Lauf festgehalten wird
 
-Eingang (Auflösung / Bildrate / Dauer), Ausgang (Auflösung / Bildrate / Dauer), erwartete Anbieterkosten, tatsächliche Anbieterkosten, Nutzerpreis, reserviertes Guthaben, endgültige Belastung oder Freigabe, Prediction-ID, Laufzeit, Speicher-Asset, Aufräumen der Zwischendatei, Abstammung zum Originalclip, Sichtbarkeit in der Mediathek, Download.
+Eingang (Auflösung / Bildrate / Dauer), Ausgang (Auflösung / Bildrate / Dauer), erwartete Anbieterkosten, tatsächliche Anbieterkosten **plus Herkunft dieser Zahl**, Nutzerpreis, reserviertes Guthaben, endgültige Belastung oder Freigabe, Prediction-ID, Laufzeit, Speicher-Asset, Aufräumen der Zwischendatei, Abstammung zum Originalclip, Sichtbarkeit in der Mediathek, Download.
 
 ## 5. Qualitätsvergleich
 
@@ -50,7 +56,18 @@ Zwei Durchgänge, jeweils Original vs. vCube AIGC vs. Topaz:
 1. KI-Material (Seedance-Clip A)
 2. Kameramaterial (Clip C)
 
-Bewertet werden: Gesichter, Haare, Haut, Texturen, Bewegungsdetails, Flimmern, zeitliche Konsistenz, Überschärfung/Halos, KI-Artefakte, Identitätstreue, Gesamtschärfe. Jeder Punkt bekommt eine kurze Bewertung plus Standbild-Ausschnitte im Bericht.
+Festes Punkteschema 1–5 je Spalte (Original / vCube AIGC / Topaz), immer dieselben Zeitmarken und 100-%-Ausschnitte:
+
+| Kriterium | Original | vCube AIGC | Topaz |
+|---|---|---|---|
+| Gesicht / Identität | 1–5 | 1–5 | 1–5 |
+| Haut | 1–5 | 1–5 | 1–5 |
+| Haare / Feindetail | 1–5 | 1–5 | 1–5 |
+| Zeitliche Stabilität | 1–5 | 1–5 | 1–5 |
+| Flimmern | 1–5 | 1–5 | 1–5 |
+| Artefakte | 1–5 | 1–5 | 1–5 |
+| Überschärfung / Halos | 1–5 | 1–5 | 1–5 |
+| Gesamteindruck | 1–5 | 1–5 | 1–5 |
 
 Erst wenn beide Durchgänge das bestätigen, werden die Empfehlungsregeln festgeschrieben („KI-Material → ByteDance", „Kameramaterial → Topaz"). Fällt das Ergebnis anders aus, wird die Regel dem Material angepasst, nicht dem Bauchgefühl.
 
@@ -75,6 +92,9 @@ Stufe 2 in dieser Reihenfolge: AI Video Studio, Mediathek/Lightbox, Ergebnis jed
 
 - Neue Umgebungsvariable `VIDEO_ENHANCE_MANUAL_REVIEW_AFTER_MINUTES` ersetzt die Konstante `RECONCILE_HORIZON_MINUTES` im Abgleich-Job (Fallback 180).
 - Läufe werden über die Funktion `video-enhance` (`estimate` → `start` → `status`) mit dem gemünzten Testkonto-Token gestartet, nicht über die Oberfläche; es gibt in Stufe 1 bewusst keinen UI-Einstieg.
-- Tatsächliche Kosten kommen aus `metrics.total_cost` der Replicate-Prediction und landen in `provider_cost_usd_actual` plus `cost_drift_ratio`.
-- Fehler-Szenarien werden erzwungen: Anbieterfehler über eine ungültige Eingabe, Speicherfehler über einen temporär blockierten Ziel-Pfad, Doppelanfrage über zwei parallele Starts mit demselben Idempotenz-Schlüssel.
+- Tatsächliche Anbieterkosten werden als `provider_cost_usd_actual` **zusammen mit** `provider_cost_source` gespeichert (`prediction_metric` | `provider_usage` | `billing_record` | `manual_verified` | `unavailable`). Ein Kostenfeld in der Prediction wird genutzt, wenn es vorhanden ist; fehlt es, kommt die Zahl aus dem Replicate-Konto-/Abrechnungsabgleich. Ein fehlendes Kostenfeld darf den Abschluss eines Laufs weder verhindern noch ihn als unverifiziert markieren — es setzt nur die Herkunft und lässt die Abweichungsprüfung aus.
+- Anbieterfehler wird nur gewertet, wenn Reservierung → Übermittlung → echte `provider_prediction_id` → Replicate-Status „failed" durchlaufen wurden; sonst BLOCKED.
+- Der Speicherfehler wird deterministisch injiziert: ein Fail-once-Schalter, der ausschließlich für den einen Lauf des Testkontos greift, nach erfolgreichem Anbieterlauf und erfolgreicher Zwischenablage. Geprüft wird danach: eine Prediction, eine Übermittlung, eine Belastung, ein finales Asset, Zwischendatei aufgeräumt. Der reguläre Speicherpfad wird nicht angefasst.
+- Beim Abbruchtest wird „abgebrochen vor Start" von „abgebrochen während des Laufs" unterschieden und die tatsächliche Anbieterabrechnung gegen die vorab festgelegte Policy geprüft.
+- Doppelanfrage über zwei parallele Starts mit demselben Idempotenz-Schlüssel.
 - Modelle bleiben `enabled: false`; freigeschaltet wird nach dem Bericht über die Flags und die verifizierten Berechtigungen.
