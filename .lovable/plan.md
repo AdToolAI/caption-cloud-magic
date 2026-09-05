@@ -1,5 +1,18 @@
 # Picture Studio Generate: „Die Nutzerabsicht gewinnt"
 
+## Prioritätsregel (wird so im Code kommentiert)
+
+```text
+USER INTENT PRIORITY
+1. Provider capability / hard technical constraint
+2. Explicit user-selected control
+3. Explicit prompt instruction
+4. Reference/source properties
+5. AdTool default
+
+A lower level must never silently override a higher level.
+```
+
 ## Audit — was heute unsichtbar passiert (im Code belegt)
 
 | Fundstelle | Unsichtbarer Eingriff |
@@ -8,126 +21,159 @@
 | `generate-image-replicate/index.ts` Z. 258 | Gleiches Muster: `${prompt}. Style: ${styleModifier}` mit Default `style = 'realistic'`. |
 | `ImageGenerator.tsx` Z. 132 | Seitenverhältnis startet hart auf `1:1`, auch wenn eine Vorlage hochgeladen wird. |
 | `ImageGenerator.tsx` Z. 146 + 327–337 | `strength = 70` als versteckter Default; daraus wird ein Prompt-Satz („Use the reference image as loose inspiration only") erzeugt. Der Regler ist aber nur sichtbar, wenn `capability.strengthField` existiert (nur FLUX, Qwen). |
-| `generate-image-replicate` Z. 372/387 | Nur FLUX (`image_prompt_strength`) und Qwen (`strength`) haben einen echten nativen Parameter; alle anderen bekommen ausschließlich Prompt-Sprache. |
-| beide Functions | `--negative` / `--no` werden unverändert als Prompttext an den Provider geschickt. |
-| beide Functions | Freisteller-Wünsche werden still ignoriert; kein Modell im Generate-Pfad liefert Alpha. |
+| `generate-image-replicate` Z. 372/387 | Nur FLUX (`image_prompt_strength`) und Qwen (`strength`) haben ein echtes natives Feld; alle anderen bekommen ausschließlich Prompt-Sprache. |
+| beide Functions | `--negative` / `--no` gehen unverändert als Prompttext an den Provider. |
+| beide Functions | Freisteller-Wünsche werden still ignoriert; kein Generate-Modell liefert Alpha. |
 
 ## Zielarchitektur
 
 ```text
 User Prompt + Referenzen + explizite UI-Settings
         ↓
-Capability Registry (eine Datei, Client = Server)
+shared/picture/modelCapabilities.ts   (pure TypeScript)
         ↓
-Prompt Builder  → { rawPrompt, finalPrompt, negativePrompt,
-                    providerParams, appliedModifiers, warnings }
+shared/picture/promptBuilder.ts
+   → { rawPrompt, finalPrompt, negativePrompt,
+       providerParams, appliedModifiers, warnings }
         ↓
 Provider Adapter → Request
 ```
 
-Der Client zeigt nur eine Vorschau; der Server baut das Ergebnis mit demselben
-Builder autoritativ neu und ignoriert vom Client mitgeschickte fertige Prompts.
+### Runtime-neutrale Shared-Schicht
+
+Neues Verzeichnis `shared/picture/` mit `promptTypes.ts`, `modelCapabilities.ts`,
+`promptBuilder.ts`. Ausschließlich pures TypeScript — kein Supabase-Client,
+kein `Deno.env`, kein React/DOM, keine Secrets, keine Provider-Calls.
+React-Client und Edge Functions importieren beide von dort; der bisherige
+Cross-Import aus `supabase/functions/_shared/…` in den Frontend-Code entfällt.
+Falls sich `shared/` nicht sauber von beiden Runtimes auflösen lässt, bleibt es
+bei zwei Repräsentationen mit striktem Paritätstest — aber die Regeln existieren
+inhaltlich nur einmal.
 
 ## 1. Capability Registry erweitern
 
-`supabase/functions/_shared/pictureModelCapabilities.ts` (Client re-exportiert)
-bekommt pro Modell zusätzlich:
+Pro Modell zusätzlich:
 
-- `nativeReferenceStrength` (Feld + Wertebereich, sonst `null`)
-- `negativePrompt` (Feld oder `null`)
-- `transparentOutput` (bool)
-- `imageEditing` (echte Bildbearbeitung vs. nur Referenzeinfluss)
-- `sourceAspectRatio` (kann das Modell das Ausgangsformat übernehmen)
+- `nativeReferenceStrength: { field, min, max, presets: { close, balanced, creative } } | null`
+  — **die Zahlen gehören zum Modell**, nicht zur UI. Bei FLUX bedeutet ein hoher
+  `image_prompt_strength` mehr Referenztreue, bei Qwen ist `strength` umgekehrt;
+  jedes Modell definiert sein eigenes Mapping, die UI-Begriffe bleiben identisch.
+- `negativePrompt: { field } | null`
+- `transparentOutput: boolean`
+- `imageEditing: boolean` (echte Bearbeitung vs. reiner Referenzeinfluss)
+- `sourceAspectRatio: boolean`
 
 Bestehende Felder (Referenzlimits, Modi, Sizing, Preislogik) bleiben unverändert.
-Der Paritätstest wird auf die neuen Felder ausgeweitet.
 
-## 2. Prompt Builder (neu, geteilt)
+## 2. Prompt Builder
 
-Neue Datei `supabase/functions/_shared/picturePromptBuilder.ts`, vom Client
-über `src/config/picturePromptBuilder.ts` re-exportiert. Regeln:
+Regeln:
 
-- `style === 'auto'` → **kein** Style-Suffix, kein „photorealistic, 8k …".
-- Style-Suffix nur bei aktiv gewähltem Stil ≠ auto.
-- `aspectRatio === 'source'` → kein Ratio-Text im Prompt; das Ausgangsformat
-  wird — wo unterstützt — als Provider-Parameter gesetzt, sonst Hinweis.
+- **Style = Auto** → gar kein Style-Suffix; der Prompt entscheidet.
+- **Style = Keep Original** → eigener, davon getrennter Wert: kurze Anweisung,
+  den Stil der Referenz zu erhalten. Widerspricht der Prompt ausdrücklich
+  („turn this into a watercolor"), ist das ein Konflikt.
+- **Default bei Referenzbild = Auto** (nicht Keep Original).
+- `aspectRatio = 'source'` → kein Ratio-Text; Quellformat als Provider-Parameter,
+  wo unterstützt, sonst sichtbarer Hinweis. Nie automatisch 1:1.
 - Reference Influence Close/Balanced/Creative:
-  - Modell mit nativem Feld → Zahl in `providerParams` (Close 0.25, Balanced 0.55, Creative 0.85), **kein** Prompt-Satz.
-  - Modell ohne natives Feld → genau ein kurzer, im Advanced-Panel sichtbarer Leitsatz. Balanced ohne Referenz erzeugt gar nichts.
-- `sanitizePrompt()`: entfernt ausschließlich am Wortanfang stehende `--negative …` / `--no …`-Segmente bis Zeilenende; Inhalt wandert in `negativePrompt`, wenn das Modell ein Feld hat, sonst Warnung `unsupported_syntax`.
-- Erkennung + Warnungen: `transparent_unsupported`, `style_conflict`, `edit_intent`, `background_intent`. Konflikt nur, wenn Prompt einen anderen Stil **nennt** und der Nutzer aktiv einen Stil gewählt hat.
-- Rückgabe wie gefordert inkl. `appliedModifiers` und `promptBuilderVersion`.
+  - Modell mit `nativeReferenceStrength` → Preset aus der Registry in `providerParams`, **kein** Prompt-Satz, `reference_influence_method = native`.
+  - Modell ohne natives Feld → genau ein kurzer, im Advanced-Panel sichtbarer Leitsatz, `method = prompt_guided`.
+  - Ohne Referenz → `none`, kein Zusatz.
+- `sanitizePrompt()` entfernt nur eindeutige `--negative …` / `--no …`-Flags am
+  Segmentanfang bis Zeilenende; Inhalt wandert in das Negativ-Feld, wenn das
+  Modell eines hat, sonst Warnung `unsupported_syntax`.
+- **Konservative** Erkennung, precision vor recall:
+  `style_conflict` nur bei eindeutigen Stilformulierungen („in watercolor style",
+  „make it a watercolor", „painted in", „turn this into an illustration",
+  „photorealistic image") — nie bei „a watercolor-blue dress". Im Zweifel keine Warnung.
+  Ebenso `edit_intent`, `background_intent`, `transparent_unsupported`.
 
 ## 3. UI: Generate mit Referenzbild
 
-Sichtbar und in dieser Reihenfolge:
-Reference Image(s) · Prompt · Model · Reference Influence (Close/Balanced/Creative) ·
-Style (Auto + bestehende Stile) · Format (Source/1:1/4:5/9:16/16:9/…) · Generate.
+Sichtbar, in dieser Reihenfolge:
 
-- Sobald eine Referenz da ist: Style springt auf **Auto**, Format auf **Source**,
-  Influence auf **Balanced** — sichtbar, nicht versteckt.
-- Influence-Auswahl erscheint für **alle** referenzfähigen Modelle; ein kleiner
-  Hinweis sagt, ob sie nativ oder über Formulierung wirkt.
-- Der numerische Strength-Slider entfällt aus der Hauptansicht (bleibt für
-  FLUX/Qwen unter Advanced als Feinregler).
-- Progressive Disclosure: weitere Referenzen, Brand Kit, Advanced.
-- Advanced → **Prompt Details**: User Prompt, AdTool Additions, Negative Prompt,
-  Final Prompt, Modell, Reference Mode, Format, Style, Influence.
+```text
+Reference        [Bild]
+Prompt           …
+Model            Nano Banana 2 — Recommended for reference images
+Reference Influence   Close · Balanced · Creative
+Style            Auto
+Format           Source
+[ Generate ]
+Reference Images · Brand Kit · Advanced
+```
+
+- Sobald eine Referenz da ist: Style = **Auto**, Format = **Source**,
+  Influence = **Balanced** — sichtbar gesetzt, nicht versteckt.
+- Influence-Erklärtexte: Close „Stay close to the reference image",
+  Balanced „Preserve key elements while allowing changes",
+  Creative „Use the reference more loosely"; Tooltip: „Close preserves
+  composition, subjects and visual identity more strongly."
+- Der numerische Strength-Slider verschwindet aus der Hauptansicht (bleibt für
+  Modelle mit nativem Feld unter Advanced als Feinregler).
 - Konflikt-Warnung als kleine Inline-Karte mit „Use prompt" / „Keep <Style>".
   Keine automatische Entscheidung, keine Warnungsflut.
+- Advanced → **Prompt Details**: Your prompt, AdTool additions, Negative prompt,
+  Reference Influence (inkl. native/prompt-guided), Style, Format, Model,
+  Sent to model.
+- Alle Texte EN/DE/ES.
 
 ## 4. Transparenz & Edit-Intent
 
-- Freisteller-Wunsch + Modell ohne Alpha → sichtbarer Hinweis
-  „This model cannot generate a true transparent background." mit Angebot
-  **Generate + Remove Background** als ein Ablauf (Generierung → Hintergrund
-  entfernen → transparentes PNG). Vorher wird eine Kostenaufstellung
-  (Generierung + Freisteller + Summe) gezeigt und muss bestätigt werden;
-  die Kosten kommen aus der bestehenden Preis-Engine, es wird keine neue
-  Preislogik eingeführt. Lässt sich der Freisteller-Schritt nicht sauber
-  verketten, wird stattdessen nur „Continue in Background" angeboten.
-- Edit-/Background-Intent (remove, replace, change only, improve this,
-  extend, inpaint, outpaint, freistellen …) → Empfehlungskarte mit
-  „Switch to Edit"/„Switch to Background" und „Generate anyway". Beim Wechsel
-  wandern Bild, Prompt und Format mit (kein erneuter Upload).
+- Freisteller-Wunsch + Modell ohne Alpha → „This model cannot generate a true
+  transparent background." plus Angebot **Generate + Remove Background** als ein
+  Ablauf. Vorher Kostenaufstellung aus der bestehenden Preis-Engine
+  (Generierung + Freisteller + Summe), Bestätigung nötig. Lässt sich die Kette
+  nicht sauber verdrahten, wird nur „Continue in Background" angeboten.
+- Edit-/Background-Intent → Empfehlungskarte
+  „This looks like an edit — Edit can preserve the original more precisely."
+  mit „Switch to Edit"/„Switch to Background" und „Generate anyway".
+  Bild, Prompt und Format wandern mit; nie erzwungen.
 
 ## 5. Modell-Empfehlung
 
-Bei vorhandener Referenz wird aus den Capabilities (echte Bildbearbeitung,
-Referenzlimits, aktiv geschaltet) ein passendes Modell mit echtem Namen
-empfohlen. Rein lokal, kein LLM-Aufruf. Alle Modelle bleiben wählbar.
+Aus Capabilities + Registry, rein lokal, kein LLM-Aufruf. Echter Modellname
+sichtbar, nur aktivierte Modelle, alle anderen bleiben wählbar.
 
-## 6. Metadaten
+## 6. Metadaten je Run (`metadata_json`, keine neue Tabelle)
 
-`metadata_json` jedes Runs erhält zusätzlich: `raw_prompt`, `final_prompt`,
-`negative_prompt`, `style`, `aspect_ratio`, `reference_mode`,
-`reference_influence`, `model_used`, `prompt_builder_version`,
-`applied_modifiers`, `warnings`. Keine neue Tabelle.
+`raw_prompt`, `final_prompt`, `negative_prompt`, `style`, `aspect_ratio`,
+`reference_mode`, `reference_influence`, `reference_influence_method`
+(`native` | `prompt_guided` | `none`), `model_used`, `prompt_builder_version`,
+`applied_modifiers`, `warnings`, `provider_parameters_summary`
+(nur Modellparameter, keine Secrets).
 
 ## 7. Tests
 
-Neue Suite `src/test/picture-prompt-builder.test.ts` mit der geforderten Matrix
-(Style Auto ohne Suffix, expliziter Stil wird angewendet, Source statt 1:1,
-explizites 9:16, watercolor mit/ohne Konflikt, kein verstecktes Strength,
-native vs. nicht-native Influence, `--negative` supported/unsupported,
-Transparenz supported/unsupported, Edit-Intent vs. normale Referenzgenerierung)
-für alle in der Registry aktiven Referenzmodelle. Dazu erweiterte
-Client/Server-Paritätstests.
+- Matrix-Tests: Style Auto ohne Suffix · expliziter Stil wird angewendet ·
+  Keep Original vs. widersprechender Prompt · Source statt 1:1 · explizites 9:16 ·
+  watercolor mit/ohne Konflikt · „watercolor-blue dress" erzeugt **keine** Warnung ·
+  kein verstecktes Strength · native vs. prompt-guided Influence ·
+  `--negative` supported/unsupported · Transparenz supported/unsupported ·
+  Edit-Intent vs. normale Referenzgenerierung.
+- **Golden-/Snapshot-Tests** pro Referenzmodell (Gemini, Seedream, Nano Banana,
+  FLUX, Qwen — soweit in der Registry aktiv): feste Eingaben, exakt erwartete
+  Ausgabe (style modifier NONE, ratio suffix NONE, native strength, prompt
+  guidance, warnings). Damit fällt jeder künftig eingeschleuste Universal-Suffix
+  sofort auf.
+- Paritätstest Client/Server der Capability-Daten.
 
 ## 8. Betroffene Dateien
 
-- neu: `supabase/functions/_shared/picturePromptBuilder.ts`,
-  `src/config/picturePromptBuilder.ts`, Tests
-- geändert: `supabase/functions/_shared/pictureModelCapabilities.ts`,
+- neu: `shared/picture/promptTypes.ts`, `shared/picture/modelCapabilities.ts`,
+  `shared/picture/promptBuilder.ts`, Tests inkl. Golden-Snapshots
+- geändert: `supabase/functions/_shared/pictureModelCapabilities.ts` (wird zur
+  dünnen Re-Export-Schicht), `src/config/pictureModelCapabilities.ts`,
   `generate-studio-image/index.ts`, `generate-image-replicate/index.ts`,
   `src/components/picture-studio/ImageGenerator.tsx`,
-  `imageGeneratorCache.ts`, i18n-Texte (EN/DE/ES)
+  `imageGeneratorCache.ts`, i18n-Texte
 - unberührt: Wallet/Credits, Preis-Engine, Enhance (Topaz/Clarity),
   Auto Collections, Media-Library-Persistenz, Video, Lip-Sync.
 
 ## 9. Abnahme
 
-Nach der Umsetzung liefere ich den geforderten 10-Punkte-Bericht
-(vorherige unsichtbare Modifier, Änderungen, Capability-Matrix, UI je Modell,
-Konfliktfälle, unterstützte Prompt-Syntax, geänderte Dateien, neue Tests,
-exakte Test-/Typecheck-/Build-Ausgaben, offene Einschränkungen pro Modell).
+Danach liefere ich den 10-Punkte-Bericht: bisherige unsichtbare Modifier,
+Änderungen, Capability-Matrix, UI je Modell, erkannte Konfliktfälle,
+unterstützte/nicht unterstützte Prompt-Syntax, geänderte Dateien, neue Tests,
+exakte Test-/Typecheck-/Build-Ausgaben, offene Einschränkungen pro Modell.
