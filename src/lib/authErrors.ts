@@ -75,21 +75,39 @@ export function mapAuthError(
     };
   }
 
-  // ── Password weakness ────────────────────────────────────────
-  if (msg.includes("password") && (msg.includes("weak") || msg.includes("pwned") || msg.includes("compromised"))) {
+  // ── Leaked password (HIBP) ───────────────────────────────────
+  if (msg.includes("pwned") || msg.includes("compromised") || msg.includes("data breach") || msg.includes("leaked")) {
     return {
-      code: "weak_password",
-      title: tx({ de: "Passwort zu schwach", en: "Password too weak", es: "Contraseña demasiado débil" }),
-      description: tx({ de: "Bitte wähle ein längeres, einzigartiges Passwort.", en: "Please choose a longer, unique password.", es: "Elige una contraseña más larga y única." }),
+      code: "password_leaked",
+      title: tx({ de: "Passwort in Datenlecks bekannt", en: "Password found in data breaches", es: "Contraseña filtrada en brechas" }),
+      description: tx({
+        de: "Dieses Passwort taucht in bekannten Datenlecks auf. Bitte wähle ein anderes — Länge und Sonderzeichen sind nicht das Problem.",
+        en: "This password appears in known data breaches. Please choose a different one — length and symbols are not the issue.",
+        es: "Esta contraseña aparece en brechas de datos conocidas. Elige otra distinta; la longitud y los símbolos no son el problema.",
+      }),
     };
   }
-  if (msg.includes("password") && msg.includes("6 characters")) {
+
+  // ── Password weakness ────────────────────────────────────────
+  if (msg.includes("password") && msg.includes("weak")) {
+    return {
+      code: "weak_password",
+      title: tx({ de: "Passwort erfüllt die Anforderungen nicht", en: "Password doesn't meet the requirements", es: "La contraseña no cumple los requisitos" }),
+      description: tx({
+        de: "Mindestens 8 Zeichen und eine Zahl oder ein Sonderzeichen.",
+        en: "At least 8 characters plus a number or symbol.",
+        es: "Al menos 8 caracteres más un número o símbolo.",
+      }),
+    };
+  }
+  if (msg.includes("password") && (msg.includes("6 characters") || msg.includes("8 characters") || msg.includes("should be at least"))) {
     return {
       code: "password_too_short",
       title: tx({ de: "Passwort zu kurz", en: "Password too short", es: "Contraseña demasiado corta" }),
-      description: tx({ de: "Mindestens 6 Zeichen erforderlich.", en: "At least 6 characters required.", es: "Se requieren al menos 6 caracteres." }),
+      description: tx({ de: "Mindestens 8 Zeichen erforderlich.", en: "At least 8 characters required.", es: "Se requieren al menos 8 caracteres." }),
     };
   }
+
 
   // ── Recovery / reset links ───────────────────────────────────
   if (msg.includes("token") || msg.includes("expired") || msg.includes("invalid_token")) {

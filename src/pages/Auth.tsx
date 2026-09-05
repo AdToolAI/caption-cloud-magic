@@ -16,6 +16,8 @@ import { TwoFactorChallenge } from "@/components/account/TwoFactorChallenge";
 import { motion } from "framer-motion";
 import { AuthStatusIndicator } from "@/components/system-status/AuthStatusIndicator";
 import { SEO } from "@/components/SEO";
+import { PasswordStrength, evaluatePassword, PASSWORD_MIN_LENGTH } from "@/components/auth/PasswordStrength";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 const Auth = () => {
   const { t } = useTranslation();
@@ -58,10 +60,15 @@ const Auth = () => {
       return;
     }
 
-    if (password.length < 6) {
-      toast.error(tx({ de: "Das Passwort muss mindestens 6 Zeichen haben", en: "Password must be at least 6 characters", es: "La contraseña debe tener al menos 6 caracteres" }));
+    if (!isLogin && !evaluatePassword(password).valid) {
+      toast.error(tx({
+        de: `Das Passwort muss mindestens ${PASSWORD_MIN_LENGTH} Zeichen haben und eine Zahl oder ein Sonderzeichen enthalten`,
+        en: `Password must be at least ${PASSWORD_MIN_LENGTH} characters and include a number or symbol`,
+        es: `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres e incluir un número o símbolo`,
+      }));
       return;
     }
+
 
 
     setLoading(true);
@@ -170,6 +177,18 @@ const Auth = () => {
             
             <form onSubmit={handleSubmit}>
               <CardContent className="space-y-5">
+                {/* Google one-click */}
+                <div className="space-y-4">
+                  <GoogleSignInButton disabled={loading} />
+                  <div className="flex items-center gap-3">
+                    <span className="h-px flex-1 bg-border/60" />
+                    <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                      {tx({ de: "oder mit E-Mail", en: "or with email", es: "o con correo" })}
+                    </span>
+                    <span className="h-px flex-1 bg-border/60" />
+                  </div>
+                </div>
+
                 {/* Email Field */}
                 <motion.div 
                   initial={{ opacity: 0, x: -10 }}
@@ -210,7 +229,8 @@ const Auth = () => {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       disabled={loading}
-                      minLength={6}
+                      minLength={isLogin ? undefined : PASSWORD_MIN_LENGTH}
+                      autoComplete={isLogin ? "current-password" : "new-password"}
                       className="h-11 rounded-xl bg-muted/30 border-border/50 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 pr-10 transition-all duration-300"
                     />
                     <button
@@ -227,7 +247,9 @@ const Auth = () => {
                       )}
                     </button>
                   </div>
+                  {!isLogin && <PasswordStrength password={password} />}
                 </motion.div>
+
 
                 {/* Confirm Password for Signup */}
                 {!isLogin && (
