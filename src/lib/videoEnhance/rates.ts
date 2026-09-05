@@ -16,6 +16,16 @@ import type { QualityTier, VideoResolution } from '@/config/videoEnhanceModels/t
 export const VIDEO_PROVIDER_PRICING_VERSION = 'video-rates-2026-09-06-topaz-units';
 
 /** Tolerance before an actual/predicted cost gap raises an admin warning. */
+/**
+ * Hard ceiling on the customer price as a multiple of provider cost.
+ * AdTool Video Enhance stays deliberately cheap: the effective multiplier must
+ * always sit inside the degressive band and may NEVER exceed the cap — neither
+ * on the pre-run estimate nor, after the true-up, on verified provider cost.
+ */
+export const VIDEO_PRICING_HARD_MULTIPLIER_CAP = 3.0;
+/** Lower end of the degressive band; informational for admin checks. */
+export const VIDEO_PRICING_TARGET_MIN_MULTIPLIER = 1.8;
+
 export const COST_DRIFT_WARN_RATIO = 0.15;
 /** Above this gap new runs of the model are stopped (`costUnverified`). */
 export const COST_DRIFT_BLOCK_RATIO = 0.4;

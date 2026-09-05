@@ -53,6 +53,14 @@ export interface VideoPriceSnapshot {
   contributionEur: number;
   marginPct: number;
   costUnverified: boolean;
+  /** true while the estimator is not calibrated from real billed runs. */
+  estimatorCalibrating: boolean;
+  /** price / buffered estimated provider cost. */
+  effectiveMultiplier: number | null;
+  multiplierCap: number;
+  /** 'review_required' means the config may not be priced as-is. */
+  pricingGate: 'ok' | 'review_required';
+  pricingGateReason: string | null;
 }
 
 /** Effective output frame rate: `null` means "keep the source frame rate". */
@@ -88,7 +96,12 @@ export function priceVideoEnhanceRun(
     outputSeconds,
   });
   const costEur = bufferedProviderCostEur(costUsd);
-  const price = userPriceFromProviderCost(costEur);
+  const evaluation = evaluatePricing(costEur, {
+    hardMultiplierCap: VIDEO_PRICING_HARD_MULTIPLIER_CAP,
+    // A price floor may never silently lift a run above the cap.
+    allowFloorAboveCap: false,
+  });
+  const price = evaluation.priceEur;
   const metrics = marginMetrics(price, costEur);
 
   return {
@@ -111,6 +124,12 @@ export function priceVideoEnhanceRun(
     contributionEur: metrics.contributionEUR,
     marginPct: metrics.marginPct,
     costUnverified: card.costUnverified === true,
+    estimatorCalibrating: card.estimatorCalibrating === true,
+    effectiveMultiplier: evaluation.effectiveMultiplier,
+    multiplierCap: VIDEO_PRICING_HARD_MULTIPLIER_CAP,
+    pricingGate: evaluation.gate,
+    pricingGateReason:
+      evaluation.gateReason ?? (card.estimatorCalibrating === true ? 'estimator_calibrating' : null),
   };
 }
 

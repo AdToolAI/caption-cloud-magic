@@ -204,6 +204,16 @@ export function isModelUnlocked(
 // ---------------------------------------------------------------------------
 
 export const VIDEO_PROVIDER_PRICING_VERSION = 'video-rates-2026-09-06-topaz-units';
+/**
+ * Hard ceiling on the customer price as a multiple of provider cost.
+ * AdTool Video Enhance stays deliberately cheap: the effective multiplier must
+ * always sit inside the degressive band and may NEVER exceed the cap — neither
+ * on the pre-run estimate nor, after the true-up, on verified provider cost.
+ */
+export const VIDEO_PRICING_HARD_MULTIPLIER_CAP = 3.0;
+/** Lower end of the degressive band; informational for admin checks. */
+export const VIDEO_PRICING_TARGET_MIN_MULTIPLIER = 1.8;
+
 export const COST_DRIFT_WARN_RATIO = 0.15;
 export const COST_DRIFT_BLOCK_RATIO = 0.4;
 
@@ -429,6 +439,14 @@ export interface VideoPriceSnapshot {
   contributionEur: number;
   marginPct: number;
   costUnverified: boolean;
+  /** true while the estimator is not calibrated from real billed runs. */
+  estimatorCalibrating: boolean;
+  /** price / buffered estimated provider cost. */
+  effectiveMultiplier: number | null;
+  multiplierCap: number;
+  /** 'review_required' means the config may not be priced as-is. */
+  pricingGate: 'ok' | 'review_required';
+  pricingGateReason: string | null;
 }
 
 export function effectiveFps(config: EnhanceConfig, source: SourceMetadata): number {
@@ -454,7 +472,12 @@ export function priceVideoEnhanceRun(
     outputSeconds,
   });
   const costEur = bufferedProviderCostEur(costUsd);
-  const price = userPriceFromProviderCost(costEur);
+  const evaluation = evaluatePricing(costEur, {
+    hardMultiplierCap: VIDEO_PRICING_HARD_MULTIPLIER_CAP,
+    // A price floor may never silently lift a run above the cap.
+    allowFloorAboveCap: false,
+  });
+  const price = evaluation.priceEur;
   const metrics = marginMetrics(price, costEur);
 
   return {
@@ -477,6 +500,12 @@ export function priceVideoEnhanceRun(
     contributionEur: metrics.contributionEUR,
     marginPct: metrics.marginPct,
     costUnverified: card.costUnverified === true,
+    estimatorCalibrating: card.estimatorCalibrating === true,
+    effectiveMultiplier: evaluation.effectiveMultiplier,
+    multiplierCap: VIDEO_PRICING_HARD_MULTIPLIER_CAP,
+    pricingGate: evaluation.gate,
+    pricingGateReason:
+      evaluation.gateReason ?? (card.estimatorCalibrating === true ? 'estimator_calibrating' : null),
   };
 }
 
