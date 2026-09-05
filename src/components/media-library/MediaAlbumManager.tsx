@@ -49,8 +49,8 @@ interface MediaAlbumManagerProps {
 
 export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) {
   const { user } = useAuth();
-  const { i18n } = useTranslation();
-  const lang = i18n.language || 'en';
+  const { language } = useTranslation();
+  const lang = language || 'en';
   const { counts: collectionCounts, refresh: refreshCollectionCounts } = useCollectionCounts();
   const [albums, setAlbums] = useState<Album[]>([]);
   const [unsortedImages, setUnsortedImages] = useState<StudioImage[]>([]);
