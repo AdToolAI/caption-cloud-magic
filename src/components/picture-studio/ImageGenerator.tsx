@@ -41,6 +41,13 @@ import {
   PICTURE_STYLE_NONE,
   type PromptSegment,
 } from "@/config/picturePromptBuilder";
+import {
+  SOURCE_FORMAT,
+  resolveRequestedFormat,
+  formatRatioLabel,
+  type SourceDimensions,
+} from "@/config/pictureFormatResolution";
+import { detectTransparencyWish, detectEditIntent } from "@/config/pictureIntentHints";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, Eye, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
