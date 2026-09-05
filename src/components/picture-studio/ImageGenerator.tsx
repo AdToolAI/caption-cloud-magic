@@ -938,7 +938,7 @@ export function ImageGenerator() {
             </div>
             <div className="space-y-2">
               <Label>{t('picStudio.aspectRatio')}</Label>
-              <Select value={aspectRatio} onValueChange={setAspectRatio}>
+              <Select value={aspectRatio} onValueChange={handleFormatChange}>
                 <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {availableAspectRatios.map(r => (
@@ -946,6 +946,16 @@ export function ImageGenerator() {
                   ))}
                 </SelectContent>
               </Select>
+              {resolvedFormat.adjustment && (
+                <p className="text-[10px] text-amber-400 leading-snug">
+                  {tx({ de: 'AdTool angepasst', en: 'AdTool adjusted', es: 'AdTool ajustó' })}: {resolvedFormat.adjustment.from} → {resolvedFormat.adjustment.to}
+                </p>
+              )}
+              {!resolvedFormat.adjustment && resolvedFormat.width && resolvedFormat.height && (
+                <p className="text-[10px] text-muted-foreground leading-snug">
+                  {resolvedFormat.width} × {resolvedFormat.height} px
+                </p>
+              )}
             </div>
           </div>
 
