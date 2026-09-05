@@ -5,11 +5,13 @@ import {
   type SourceMetadata,
 } from '@/config/videoEnhanceModels';
 import {
+  evaluatePricing,
+  evaluateTrueUp,
   marginMetrics,
   multiplierForCost,
   NET_FACTOR,
   PRICING_VERSION,
-  userPriceFromProviderCost,
+  type TrueUpEvaluation,
 } from '@/lib/pictureModels/marginCurve';
 import {
   bufferedProviderCostEur,
@@ -18,6 +20,7 @@ import {
 } from '@/lib/pictureModels/providerRates';
 import {
   UnpriceableRunError,
+  VIDEO_PRICING_HARD_MULTIPLIER_CAP,
   VIDEO_PROVIDER_PRICING_VERSION,
   VIDEO_RATE_CARDS,
   videoProviderCostUsd,
@@ -154,4 +157,27 @@ export function actualMargin(userPriceEur: number, providerCostUsdActual: number
     actualContributionEur: metrics.contributionEUR,
     actualMarginPct: metrics.marginPct,
   };
+}
+
+/**
+ * Post-run true-up against the VERIFIED provider cost.
+ *
+ * `providerCostUsdActual` must be the real billed amount; `null` when the
+ * provider reports none (then nothing is refunded and the run counts as
+ * COST UNVERIFIED). The FX safety buffer is not applied here — it protects the
+ * estimate, not the guarantee.
+ */
+export function verifiedPricing(params: {
+  capturedUsageChargeEur: number;
+  providerCostUsdActual: number | null | undefined;
+}): TrueUpEvaluation {
+  const costEur =
+    params.providerCostUsdActual === null || params.providerCostUsdActual === undefined
+      ? null
+      : params.providerCostUsdActual * FX_RATE_USD_EUR;
+  return evaluateTrueUp({
+    capturedUsageChargeEur: params.capturedUsageChargeEur,
+    actualProviderCostEur: costEur,
+    hardMultiplierCap: VIDEO_PRICING_HARD_MULTIPLIER_CAP,
+  });
 }
