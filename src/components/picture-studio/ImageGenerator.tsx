@@ -1212,25 +1212,64 @@ export function ImageGenerator() {
             </div>
           )}
 
-          {/* Transparent background — honest capability gate */}
-          <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs flex items-center gap-1.5">
-                <ImageIcon className="h-3.5 w-3.5 text-primary" />
-                {tx({ de: 'Transparenter Hintergrund', en: 'Transparent background', es: 'Fondo transparente' })}
-              </Label>
-              <Switch
-                checked={transparentBackground && canBeTransparent}
-                onCheckedChange={setTransparentBackground}
-                disabled={!canBeTransparent}
-              />
+          {/* Transparency — the switch exists ONLY where alpha really works */}
+          {canBeTransparent && (
+            <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs flex items-center gap-1.5">
+                  <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                  {tx({ de: 'Transparenter Hintergrund', en: 'Transparent background', es: 'Fondo transparente' })}
+                </Label>
+                <Switch checked={transparentBackground} onCheckedChange={setTransparentBackground} />
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                {tx({ de: 'Wird als PNG mit Alphakanal erzeugt.', en: 'Produced as PNG with an alpha channel.', es: 'Se genera como PNG con canal alfa.' })}
+              </p>
             </div>
-            <p className="text-[10px] text-muted-foreground leading-snug">
-              {canBeTransparent
-                ? tx({ de: 'Wird als PNG mit Alphakanal erzeugt.', en: 'Produced as PNG with an alpha channel.', es: 'Se genera como PNG con canal alfa.' })
-                : tx({ de: `${capability?.model ?? tier} kann das nicht. Nutze dafür den Bereich „Hintergrund" — dort wird sauber freigestellt.`, en: `${capability?.model ?? tier} cannot do this. Use the “Background” section, which cuts out cleanly.`, es: `${capability?.model ?? tier} no puede hacerlo. Usa la sección «Fondo», que recorta limpiamente.` })}
-            </p>
-          </div>
+          )}
+
+          {/* Recommendation — never an automatic redirect */}
+          {showTransparencyHint && (
+            <div className="p-3 rounded-lg border border-amber-500/40 bg-amber-500/5 space-y-2">
+              <p className="text-[11px] leading-snug flex items-start gap-1.5">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-400" />
+                {latestAssetUrl
+                  ? tx({ de: `${capability?.model ?? tier} kann keinen transparenten Hintergrund erzeugen. Stelle dein Bild im Bereich „Hintergrund“ sauber frei.`, en: `${capability?.model ?? tier} cannot produce a transparent background. Cut your picture out cleanly in the “Background” section.`, es: `${capability?.model ?? tier} no puede generar un fondo transparente. Recorta tu imagen en la sección «Fondo».` })
+                  : tx({ de: `${capability?.model ?? tier} kann keinen transparenten Hintergrund erzeugen. Erzeuge das Bild zuerst — danach stellst du es im Bereich „Hintergrund“ frei.`, en: `${capability?.model ?? tier} cannot produce a transparent background. Create the picture first, then cut it out in the “Background” section.`, es: `${capability?.model ?? tier} no puede generar un fondo transparente. Crea la imagen primero y luego recórtala en la sección «Fondo».` })}
+              </p>
+              {latestAssetUrl && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-[11px]"
+                  onClick={() => navigate('/picture-studio?tab=background')}
+                >
+                  {tx({ de: 'Im Bereich Hintergrund fortsetzen', en: 'Continue in Background', es: 'Continuar en Fondo' })}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {showEditHint && (
+            <div className="p-3 rounded-lg border border-primary/40 bg-primary/5 space-y-2">
+              <p className="text-[11px] leading-snug flex items-start gap-1.5">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+                {tx({
+                  de: 'Das klingt nach einer gezielten Änderung an deinem Bild. Im Bereich „Bearbeiten“ bleibt der Rest des Bildes unangetastet.',
+                  en: 'That sounds like a targeted change to your picture. In the “Edit” section the rest of the picture stays untouched.',
+                  es: 'Eso suena a un cambio puntual en tu imagen. En la sección «Editar» el resto de la imagen no se toca.',
+                })}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[11px]"
+                onClick={() => navigate('/picture-studio?tab=edit')}
+              >
+                {tx({ de: 'Zu Bearbeiten wechseln', en: 'Switch to Edit', es: 'Cambiar a Editar' })}
+              </Button>
+            </div>
+          )}
 
           {/* WHAT WE ACTUALLY SEND — no hidden modifiers */}
           <Collapsible open={showPromptPreview} onOpenChange={setShowPromptPreview}>
