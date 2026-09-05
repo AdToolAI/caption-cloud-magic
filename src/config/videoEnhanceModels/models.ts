@@ -96,7 +96,9 @@ export const VIDEO_ENHANCE_MODELS: VideoEnhanceModelDefinition[] = [
     minDurationSeconds: 1,
     maxDurationSeconds: 60,
     typicalProcessingSeconds: [60, 420],
-    enabled: false,
+    // GLOBAL LIVE. `featureFlag` and the backend switch stay in place as the
+    // kill-switch; calibration status never gates a run.
+    enabled: true,
     featureFlag: 'video.enhance.bytedance_vcube',
     backendFlag: 'VIDEO_ENHANCE_BYTEDANCE_ENABLED',
   },
