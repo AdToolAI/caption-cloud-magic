@@ -137,16 +137,31 @@ export function EnhanceVideoPanel({ initialSourceUrl, initialSourceAssetId, onCo
     ? { modelId: model.id, mode, resolution, fps, tier: availableTiers(model)[0] ?? 'standard' }
     : null;
 
+  const source = useMemo(
+    () => ({ url: sourceUrl, assetId: sourceUrl === initialSourceUrl ? initialSourceAssetId : undefined }),
+    [sourceUrl, initialSourceUrl, initialSourceAssetId],
+  );
+
   useEffect(() => {
     if (!config || !sourceUrl) return;
-    void previewPrice({ url: sourceUrl }, config);
+    void previewPrice(source, config);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceUrl, modelId, mode, resolution, fps]);
 
   const onStart = useCallback(() => {
     if (!config || !sourceUrl) return;
-    void startEnhance({ url: sourceUrl }, config);
-  }, [config, sourceUrl, startEnhance]);
+    void startEnhance(source, config);
+  }, [config, sourceUrl, source, startEnhance]);
+
+  // Notify the host surface exactly once per finished run.
+  const notifiedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (run?.status === 'completed' && run.output_url && notifiedRef.current !== run.id) {
+      notifiedRef.current = run.id;
+      onCompleted?.(run.output_url);
+    }
+  }, [run, onCompleted]);
+
 
   if (!model) return null;
 
