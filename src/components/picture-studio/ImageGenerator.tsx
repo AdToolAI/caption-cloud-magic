@@ -344,12 +344,35 @@ export function ImageGenerator() {
     }
   };
 
+  /**
+   * Read the TRUE natural size of the picked file. Never rounded to a preset
+   * here — approximation is the job of the capability layer, per model.
+   */
+  const measureSource = (file: File) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setSourceDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+      }
+      URL.revokeObjectURL(objectUrl);
+    };
+    img.onerror = () => URL.revokeObjectURL(objectUrl);
+    img.src = objectUrl;
+  };
+
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    measureSource(file);
     void uploadReference(file, setReferenceImage);
   };
+
+  // Reference #1 gone -> no Source dimensions any more.
+  useEffect(() => {
+    if (!referenceImage) setSourceDimensions(null);
+  }, [referenceImage]);
 
   const handleExtraRefUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
