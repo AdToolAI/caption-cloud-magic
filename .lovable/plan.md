@@ -10,7 +10,7 @@ Die Geometrie ist eine **Modell-Fähigkeit**, keine globale Regel. Jedes Modell 
 - ByteDance vCube: `to_be_verified` — dieselbe Semantik wird **nicht** angenommen, bis ein echter Hochformat-Lauf sie bestätigt. Solange gilt sie als unbestätigt und die Anzeige markiert die erwarteten Maße als Schätzung.
 
 Gemeinsame Funktion (Client + Server gespiegelt):
-`projectOutput(modelId, sourceWidth, sourceHeight, targetResolution)` → erwartete Maße, gerundet auf **gerade** Pixelwerte (720×1280 → 2160 hoch ergibt 1216×2160, nicht 1215×2160).
+`projectOutput(modelId, sourceWidth, sourceHeight, targetResolution)` liefert `{ width, height, confidence: "verified" | "estimated", strategy }`. Maße werden auf **gerade** Pixelwerte gerundet (720×1280 → 2160 hoch ergibt 1216×2160, nicht 1215×2160). Topaz startet mit `verified` (Live-Nachweis), ByteDance mit `estimated`; die Strategie wird erst auf `verified` gesetzt, wenn ein passender echter Lauf projizierte und tatsächliche Maße deckungsgleich zeigt. Der Abnahmebericht weist je Modell aus, welche Geometrie-Regel wirklich bewiesen ist.
 
 ## 2. Upscale-Gate — nur für räumliches Vergrößern
 
