@@ -1,86 +1,50 @@
-# Video Enhance: echte Upscale-Garantie + Kostennachweis
+# Pricing-Regel: Kundenpreis nie über 3,0× der Providerkosten
 
-Keine globale Freischaltung. Zwei Baustellen: (1) eine Zielstufe darf nie unbemerkt verkleinern, (2) Preise bleiben unbestätigt, bis eine belastbare Dollarzahl rekonstruierbar ist.
+Video Enhance soll bewusst günstig bleiben. Der Kundenpreis darf höchstens das 3,0-fache der (FX-gepufferten) Providerkosten betragen und sinkt bei teuren Läufen bis auf 1,8×.
 
-## 1. Ausgabegröße vor dem Lauf berechnen — modellspezifisch
+## Ausgangslage (geprüft)
 
-Die Geometrie ist eine **Fähigkeit pro Modell UND Ausgabestufe**, keine globale und keine modellweite Regel. Die Registry führt `projectionRules` je Kombination:
+- Die degressive Kurve existiert bereits geteilt für Picture Studio und Video Enhance: 3,0× bis 0,05 € · 2,7× bei 0,30 € · 2,3× bei 1,00 € · 2,0× bei 3,00 € · 1,8× ab 5,00 €, dazwischen linear.
+- Die Kurve wird heute nur als Zielwert benutzt: Der Preis ist das Maximum aus Kurvenpreis, Mindestbeitrag und Mindestpreis — nach oben gibt es keine Grenze.
+- Der Topaz-Testlauf zeigt das Problem: geschätzte Providerkosten 1,50 $ (19 Einheiten), tatsächlich abgerechnet 0,48 $ (6 Einheiten). Kundenpreis 3,18 € = rund 6,9× der echten Kosten.
+- Die Topaz-Preistabelle rechnet aktuell pro Ausgabesekunde (4K/30fps = 0,373 $ je 5 s). Der Provider rechnet real nach Gesamt-Pixelmenge der Ausgabe in Einheiten à 0,08 $.
 
-```text
-Topaz  1080p : strategy = target_height, confidence = verified   (Live-Lauf 720×1280 → 608×1080)
-Topaz  4k    : strategy = target_height, confidence = estimated  (bis zum 4K-Hochformat-Retest)
-vCube  alle  : strategy = assumed_target_height, confidence = estimated
-```
+## Was geändert wird
 
-Gemeinsame Funktion (Client + Server gespiegelt):
-`projectOutput(modelId, sourceWidth, sourceHeight, targetResolution)` liefert `{ width, height, confidence: "verified" | "estimated", strategy }`. Maße werden auf **gerade** Pixelwerte gerundet (720×1280 → 2160 hoch ergibt 1216×2160, nicht 1215×2160). Eine Regel wird erst auf `verified` gesetzt, wenn ein echter Lauf **dieser Kombination** projizierte und tatsächliche Maße deckungsgleich zeigt; die verifizierte Regel wird dann in den Fähigkeitsdaten festgeschrieben. Später kann dieselbe Feinheit auf FPS-, Tier- und Modus-Kombinationen ausgeweitet werden, falls die Anbietersemantik dort abweicht.
+**1. Harte Obergrenze in der Preisberechnung**
 
-**Vertrauensgrad steuert die Wirkung:**
-- `verified` → darf als hartes `no_upscale`-Gate produktiv blockieren.
-- `estimated` → Anzeige als Schätzung erlaubt, Testkonten dürfen laufen, aber **keine** autoritative Produktionssperre.
+Die Kurve wird zum verbindlichen Deckel: Der Endpreis wird zusätzlich gegen `Kurvenfaktor × gepufferte Providerkosten` gedeckelt. Mindestpreis und Mindestbeitrag bleiben erhalten; wenn einer davon rechnerisch über den Deckel drücken würde, wird der Lauf nicht still teurer verkauft, sondern als prüfpflichtig markiert.
 
-## 2. Upscale-Gate — nur für räumliches Vergrößern
+Ausnahme nur für Kleinstläufe: Wenn der Deckel unter dem absoluten Mindestpreis liegt (Centbeträge), gilt der Mindestpreis und der Preis-Schnappschuss vermerkt das ausdrücklich als Boden-Ausnahme — kein stiller Aufschlag bei normalen Läufen.
 
-Die Absicht eines Laufs wird getrennt bewertet:
+**2. Effektiver Faktor wird überall mitgeführt**
 
-- `spatialUpscaleRequested` → muss eine echte Vergrößerung sein: beide Dimensionen >= Quelle **und** Gesamtpixel + mehr als 1 %.
-- `fpsInterpolationRequested` (z. B. 1920×1080 24 fps → 1920×1080 60 fps) → gleiche Auflösung ist ausdrücklich erlaubt, wird nie geblockt.
-- `enhancementRequested` (Artefakte, Restauration bei gleicher Größe) → ebenfalls erlaubt.
-- Räumliche Verkleinerung → grundsätzlich blockiert, solange es keinen ausdrücklichen Downscale-Workflow gibt.
+Jeder Preis-Schnappschuss bekommt `effectiveMultiplier` (Kundenpreis ÷ gepufferte Providerkosten), den Deckelwert und einen Statuswert (`ok`, `floor_exempt`, `review_required`). Nach Abschluss eines Laufs wird zusätzlich der Faktor gegen die **verifizierten** Providerkosten berechnet und gespeichert.
 
-Serverseitig neuer Validierungsfehler `no_upscale` in `supabase/functions/_shared/video-enhance-models.ts`, geprüft **vor** Reservierung und Provider-Start, mit Meldung in EN/DE/ES und einem Vorschlag der nächsten echten Upscale-Stufe. Geldpfad bleibt unverändert.
+**3. Topaz-Schätzer neu kalibrieren**
 
-## 3. Erwartete vs. tatsächliche Maße speichern
+Die Topaz-Preistabelle wird von "pro Ausgabesekunde" auf das reale Abrechnungsmodell umgestellt (Einheiten aus Pixelmenge der Ausgabe × 0,08 $), kalibriert an echten Läufen. Bis mehrere Läufe die Kalibrierung bestätigen, bleibt die Karte als "Kosten unbestätigt" markiert und blockiert die globale Freigabe. Der Testlauf mit 3,18 € bleibt als Audit-Schnappschuss unverändert, gilt aber nicht als zulässiger Produktionspreis.
 
-Auf dem Lauf werden getrennt festgehalten: `projected_width`, `projected_height`, `actual_width`, `actual_height` sowie `projection_matched`. Nach jedem Lauf wird verglichen; häufige Abweichungen führen zur Korrektur der Projektionsstrategie des betroffenen Modells (nicht zu einer globalen Regeländerung).
+**4. Sichtbare Kontrolle im Admin**
 
-## 4. Anzeige: Maße statt Labels
+Im Kostenbereich des Admin wird pro Modell/Konfiguration der effektive Faktor angezeigt — grün innerhalb 1,8×–3,0×, rot mit "Pricing blocked" darüber. Dazu die Spalten Providerkosten, gepufferte Kosten, Kundenpreis, effektiver Faktor.
 
-Vor dem Start steht nicht mehr nur "1080p", sondern:
+**5. Tests**
 
-```text
-Quelle:    720 × 1280
-Erwartet: ~1216 × 2160
-```
+- Für alle Preis-Fixtures: `1.8 ≤ effektiver Faktor ≤ 3.0` (außer ausgewiesene Boden-Ausnahme).
+- Ein Faktor über 3,0 darf nie in einen freigegebenen Produktionspreis münden — er muss `review_required` erzeugen.
+- Client- und Serverberechnung liefern identische Werte (bestehender Paritätstest wird erweitert).
+- Regressionsfall Topaz 4K/30 mit echten 0,48 $: Preis muss im Bereich rund 1,20–1,40 € liegen.
 
-Stufen, die bei **verified** Regeln verkleinern würden, sind nicht wählbar und tragen den Hinweis "verkleinert dein Video". Bei **estimated** Regeln erscheint stattdessen "Vermutlich verkleinernd (geschätzt)"; die Stufe bleibt für Testkonten auswählbar, darf aber keine Produktionssperre auslösen.
+## Technische Details
 
-`src/lib/videoEnhance/recommend.ts` hebt die Zielstufe automatisch auf die nächste vom Modell unterstützte Stufe an, die echt vergrößert. Gibt es keine, wird unterschieden:
-- `no_valid_upscale_for_model` — dieses Modell hat kein sinnvolles Ziel, ein anderes freigeschaltetes Modell aber schon. Dann wird dieses Modell konkret empfohlen ("Topaz hat für diese Quelle kein passendes Ziel — ByteDance vCube 4K ist möglich").
-- `already_optimal` — nur wenn über alle geeigneten freigeschalteten Modelle hinweg keine echte Verbesserung möglich ist.
+- `src/lib/pictureModels/marginCurve.ts` bekommt `capPriceForCost()` und `evaluatePricing()`; `supabase/functions/_shared/picture-pricing.ts` wird byte-gleich gespiegelt.
+- `src/lib/videoEnhance/pricing.ts` und `supabase/functions/_shared/video-enhance-models.ts` erweitern den Snapshot um `effectiveMultiplier`, `multiplierCap`, `pricingGate`.
+- `src/lib/videoEnhance/rates.ts` + Servermirror: Topaz auf `per_unit` mit Pixel-basierten Einheiten; `VIDEO_PROVIDER_PRICING_VERSION` und `PRICING_VERSION` werden hochgezählt.
+- Neue Spalten auf `video_enhance_runs`: `effective_multiplier`, `multiplier_cap`, `pricing_gate`, `verified_effective_multiplier` (Migration, reine Ergänzung).
+- Admin: neue Karte/Spalten in `src/components/admin/cost/` mit EN/DE/ES-Texten.
+- Bereits abgeschlossene Läufe werden nicht rückwirkend umgepreist.
 
-## 5. Tests
+## Offene Entscheidung
 
-Neue Fälle in `src/test/videoEnhanceParity.test.ts` und `src/test/videoEnhanceLifecycle.test.ts` für Hochformat 720×1280, Querformat 1280×720 und Quadrat 1080×1080, je Modell und Stufe:
-- keine wählbare Stufe verkleinert je eine Dimension,
-- ein FPS-only-Lauf bei gleicher Auflösung wird **nicht** geblockt,
-- gerade Rundung wird geprüft (1216×2160),
-- Server und Client entscheiden für identische Eingaben identisch.
-
-## 6. Preisnachweis (getrennt von der Funktionsfreigabe)
-
-- **Topaz:** Kosten = tatsächlich gemeldete Units × aktueller offizieller Unit-Preis (derzeit 0,08 USD). Liegen beide eindeutig vor, gilt der Lauf als **verifiziert** (`provider_cost_source = official_unit_rate x actual_usage`) — kein Warten auf ein separates Gesamtkostenfeld. Im Preis-Snapshot eingefroren: `actual_units`, `unit_rate_usd`, `unit_rate_source = replicate_official`, `unit_rate_checked_at`, `actual_provider_cost_usd`. Spätere Preisänderungen des Anbieters bewerten historische Läufe nicht neu.
-- **ByteDance vCube:** Abrechnung nach Ausgabesekunden, abhängig von Tier + Auflösung + FPS. Verifikation nur über die konkrete offizielle Matrix oder Abrechnungsdaten; bis dahin **COST UNVERIFIED**.
-
-Der Bericht nennt je Lauf die tatsächlich verwendete Quelle.
-
-## 7. Retest und Abschluss
-
-Genau zwei kurze echte Läufe über das Testkonto (kürzestmögliche Clips), danach keine weiteren Änderungen vor der Auswertung:
-1. **Topaz Hochformat** 720×1280 → 4K, Erwartung ~1216×2160, geprüft gegen den echten Output.
-2. **ByteDance Hochformat**, gleicher Quellclip, nächste echte Upscale-Stufe — damit wird seine Auflösungssemantik bewiesen.
-
-Dokumentiert werden je Lauf: projizierte vs. tatsächliche Maße, `projection_matched`; für Topaz `actual_units`, Unit-Preis, USD-Kosten, Endpreis, echte Marge; für ByteDance Ausgabesekunden, Tier, Auflösung, FPS, offizielle bzw. Abrechnungsrate, USD-Kosten. Nach jedem Retest wird die bestätigte Projektionsregel für genau diese Kombination in den Fähigkeitsdaten festgeschrieben.
-
-Der aktualisierte Abnahmebericht bewertet **vier getrennte Dimensionen** je Modell:
-
-```text
-Modell     | Functional | Geometry            | Pricing          | Global Release
-Topaz      | READY?     | 1080p verified,     | verified über    | Entscheidung
-           |            | 4k nach Retest      | Units × Rate     |
-ByteDance  | READY      | nach Retest         | COST UNVERIFIED  | BLOCKED
-```
-
-Blindvergleichs-Ergebnisse werden festgehalten; die Festschreibung "KI-Material → vCube / Kameramaterial → Topaz" erfolgt erst nach dem Kameramaterial-Vergleich.
-
-Keine Feature-Flags werden global aktiviert.
+Die Topaz-Kalibrierung stützt sich bisher auf einen einzigen echten Lauf (6 Einheiten bei 554 Mio. Ausgabepixeln). Vorschlag: Umstellung jetzt konservativ implementieren, Freigabe des Modells aber erst nach zwei bis drei weiteren Läufen mit unterschiedlichen Längen/Auflösungen.
