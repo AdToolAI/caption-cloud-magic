@@ -173,7 +173,19 @@ describe('output validation before asset and capture', () => {
     expect(outputMatchesOrder({ durationSeconds: 10.2, width: 3840, height: 2160, fps: 30 }, ordered).ok)
       .toBe(true);
   });
+
+  it('accepts a portrait output for a landscape-expressed resolution tier', () => {
+    // 1080p is stored as 1920x1080; a 720x1280 portrait source upscaled to
+    // 1080x1920 fulfils the order and must not be rejected.
+    const ordered = { durationSeconds: 12, width: 1920, height: 1080, fps: 30 };
+    expect(outputMatchesOrder({ durationSeconds: 12, width: 1080, height: 1920, fps: 30 }, ordered).ok)
+      .toBe(true);
+    // A genuinely too-small portrait output is still rejected.
+    expect(outputMatchesOrder({ durationSeconds: 12, width: 720, height: 1280, fps: 30 }, ordered).reason)
+      .toBe('resolution_mismatch');
+  });
 });
+
 
 describe('lifecycle guarantees', () => {
   it('treats only provider verdicts as terminal', () => {

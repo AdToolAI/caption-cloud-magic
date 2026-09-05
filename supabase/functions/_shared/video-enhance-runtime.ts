@@ -212,7 +212,14 @@ export function outputMatchesOrder(
   if (ordered.durationSeconds > 0 && durationGap / ordered.durationSeconds > 0.1) {
     return { ok: false, reason: 'duration_mismatch' };
   }
-  if (measured.width < ordered.width * 0.9 || measured.height < ordered.height * 0.9) {
+  // Resolution tiers are expressed landscape (e.g. 1080p = 1920x1080), but a
+  // portrait source stays portrait. Compare orientation-agnostically on the
+  // short and long edge instead of literal width/height.
+  const measuredShort = Math.min(measured.width, measured.height);
+  const measuredLong = Math.max(measured.width, measured.height);
+  const orderedShort = Math.min(ordered.width, ordered.height);
+  const orderedLong = Math.max(ordered.width, ordered.height);
+  if (measuredShort < orderedShort * 0.9 || measuredLong < orderedLong * 0.9) {
     return { ok: false, reason: 'resolution_mismatch' };
   }
   if (ordered.fps > 0 && Math.abs(measured.fps - ordered.fps) / ordered.fps > 0.15) {
@@ -220,6 +227,7 @@ export function outputMatchesOrder(
   }
   return { ok: true };
 }
+
 
 export function stagingKey(userId: string, runId: string): string {
   return `${userId}/video-enhance-staging/${runId}.mp4`;
