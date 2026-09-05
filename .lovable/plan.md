@@ -46,25 +46,27 @@ Basis ist immer der **tatsächlich für diesen Lauf belastete** Betrag nach Crea
 
 ## Sichtbare Kontrolle im Admin
 
-Pro Modell/Konfiguration: Providerkosten, gepufferte Kosten, Kundenpreis, effektiver Faktor und verifizierter Faktor — grün innerhalb 1,8×–3,0×, rot mit „Pricing blocked" darüber. Ausgelöste Gutschriften werden mit Betrag und Lauf-Bezug aufgelistet.
+Pro Modell/Konfiguration: Providerkosten, gepufferte Kosten, belasteter Kundenpreis, effektiver Faktor und verifizierter Faktor. Klar getrennt ausgewiesen: **Zielkorridor 1,8–3,0×** und **hartes Maximum 3,0×** — grün im Korridor, rot mit „Pricing blocked" über 3,0×, ein Lauf unter 1,8× ist nur ein Hinweis zur Rate-Card-Prüfung, kein Kundenfehler. Dazu der Sperrgrund im Klartext und eine Liste der ausgelösten Gutschriften mit Betrag und Lauf-Bezug.
 
 ## Tests
 
 - Produktionspreis überschreitet nie 3,0× der gepufferten Schätzkosten.
-- Verifizierter Faktor > 3,0 setzt die Rate Card auf Prüfung.
-- Nachträglicher Ausgleich senkt die Kundenbelastung auf ≤ 3,0× der gepufferten Ist-Kosten (Gutschrift genau einmal, idempotent).
-- Höhere Ist-Kosten lösen nie eine Nachbelastung aus.
+- Verifizierter Faktor > 3,0 setzt die Rate Card auf Prüfung mit Grund `actual_cost_drift`.
+- Nachträglicher Ausgleich senkt die Belastung auf ≤ 3,0× der gepufferten Ist-Kosten; Gutschrift genau einmal, auch bei Webhook + Reconciler + Wiederholung.
+- Basis des verifizierten Faktors ist der rabattierte Ist-Betrag, nicht der Listenpreis.
+- Höhere Ist-Kosten lösen nie eine Nachbelastung aus, auch unter 1,8× nicht.
 - Boden-Ausnahme nur für ausdrücklich erlaubte Kleinstläufe.
 - Client/Server-Parität der gesamten Preisrechnung.
 - Kein Test nagelt einen konkreten Eurobetrag fest — geprüft wird immer gegen Kurve und Deckel, damit FX-Änderungen die Tests nicht brechen.
 
 ## Technische Details
 
-- `src/lib/pictureModels/marginCurve.ts`: neue `capPriceForCost()` und `evaluatePricing()` (liefert Preis, Deckel, effektiven Faktor, Gate `ok | floor_exempt | review_required`); `supabase/functions/_shared/picture-pricing.ts` wird identisch gespiegelt.
-- `src/lib/videoEnhance/pricing.ts` + `supabase/functions/_shared/video-enhance-models.ts`: Snapshot um `effectiveMultiplier`, `multiplierCap`, `pricingGate` erweitert; Versionsstrings hochgezählt.
-- `src/lib/videoEnhance/rates.ts` + Servermirror: Topaz auf `per_unit`, `costUnverified` bleibt gesetzt.
-- Finalisierung (`_shared/video-enhance-finalize.ts` und Reconciler): berechnet den verifizierten Faktor, schreibt ihn auf den Lauf und löst bei Überschreitung eine idempotente Wallet-Gutschrift über den bestehenden Gutschriftpfad aus (eigener Grund/Referenzschlüssel je Lauf).
-- Migration (nur Ergänzungen): `effective_multiplier`, `multiplier_cap`, `pricing_gate`, `verified_effective_multiplier`, `overcharge_refund_amount`, `overcharge_refund_at` auf `video_enhance_runs`.
+- `src/lib/pictureModels/marginCurve.ts`: neue `capPriceForCost()`, `floorToCent()` und `evaluatePricing()` (liefert Preis, Deckel, effektiven Faktor, Gate plus Grund); `supabase/functions/_shared/picture-pricing.ts` wird identisch gespiegelt.
+- `src/lib/videoEnhance/pricing.ts` + `supabase/functions/_shared/video-enhance-models.ts`: Snapshot um `effectiveMultiplier`, `multiplierCap`, `pricingGate`, `pricingGateReason` erweitert; Versionsstrings hochgezählt.
+- `src/lib/videoEnhance/rates.ts` + Servermirror: Topaz auf `per_unit` mit eingefrorenem Einheitspreis, `costUnverified` bleibt gesetzt.
+- Finalisierung (`_shared/video-enhance-finalize.ts` und Reconciler): berechnet den verifizierten Faktor aus dem belasteten Ist-Betrag, schreibt ihn auf den Lauf und löst bei Überschreitung die Wallet-Gutschrift mit dem eindeutigen Schlüssel `video_enhance:{runId}:pricing_true_up` aus.
+- Migration (nur Ergänzungen): `effective_multiplier`, `multiplier_cap`, `pricing_gate`, `pricing_gate_reason`, `verified_effective_multiplier`, `true_up_refund_amount`, `true_up_refund_at` auf `video_enhance_runs`; eindeutiger Schlüssel auf dem Wallet-Referenzwert.
+
 - Admin-Karte in `src/components/admin/cost/` mit EN/DE/ES-Texten.
 - Abgeschlossene Altläufe werden nicht rückwirkend umgepreist oder gutgeschrieben.
 
