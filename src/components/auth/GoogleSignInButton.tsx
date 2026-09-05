@@ -45,8 +45,8 @@ export const GoogleSignInButton = ({ disabled }: { disabled?: boolean }) => {
           }),
         },
       );
-    }
   };
+
 
   return (
     <Button
