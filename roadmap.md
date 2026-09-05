@@ -1,9 +1,8 @@
 # Roadmap
 
-## Offen
-- Topaz bleibt global aus (`PICTURE_TOPAZ_*_ENABLED=false`, nur String `"true"` aktiviert); Freigabe nur über `PICTURE_ENHANCE_TEST_USER_IDS`. Secrets nicht löschen, nur Werte auf `false`.
-- Echte Validierungsläufe (Upscale, Dust & Scratch, Colorization): erwartete vs. tatsächliche Providerkosten/Units, Parameterübertragung, Ausgabemaße, Wallet, Mediathek, Refund. Danach Preisfreigabe, dann Flags auf `true`.
-
-## Erledigt
-- Zahlungsarten: Stripe automatische Methoden, Apple/Google-Pay-Domains, lokalisierte Fehler, Hinweiszeilen.
-- Ein Bereich für Plan & Guthaben (`/billing`): Guthaben zuerst, Abo und Rechnungen darunter; `/pricing` nur noch öffentlich; lokalisierte Titel EN/DE/ES; Popup-Fallback beim Checkout.
+## In Progress
+- Video Enhance Freigabe-Run mit echten Provider-Läufen (Topaz vs. ByteDance vCube)
+  - Account: bestofproducts4u@gmail.com (8948d3d9-2c5e-4405-9e9c-1624448e7189)
+  - Quellen A/B/C im eigenen Speicher bestätigen
+  - Topaz T1–T5 und ByteDance B1–B7 ausführen
+  - Abnahmebericht nach den vier verbindlichen Regeln erstellen
