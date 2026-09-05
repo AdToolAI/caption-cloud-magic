@@ -79,8 +79,11 @@ export function extractProviderCost(prediction: any): ProviderCostReading {
       return { usd: value, source: 'prediction_metric' };
     }
   }
-  // Some models report consumed units instead of money (Topaz style).
-  const units = metrics.units ?? metrics.units_used;
+  // Some models report consumed units instead of money: Topaz reports
+  // `unspecified_billing_metric` (billing units), vCube reports the billed
+  // output duration. Usage is known, the money figure is not.
+  const units = metrics.units ?? metrics.units_used ?? metrics.unspecified_billing_metric ??
+    metrics.video_output_duration_seconds;
   if (typeof units === 'number' && Number.isFinite(units) && units > 0) {
     return { usd: undefined, source: 'provider_usage' };
   }
