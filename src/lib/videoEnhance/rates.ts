@@ -74,81 +74,75 @@ function matrixRates(
   }));
 }
 
-/** ByteDance vCube: published per-second table, priced by mode/resolution/fps. */
-const VCUBE_ENTRIES: MatrixEntry[] = [
-  ...matrixRates('aigc', 'standard', [
-    ['1080p', 24, 0.012],
-    ['1080p', 30, 0.014],
-    ['1080p', 60, 0.024],
-    ['2k', 24, 0.02],
-    ['2k', 30, 0.024],
-    ['2k', 60, 0.042],
-    ['4k', 24, 0.038],
-    ['4k', 30, 0.046],
-  ]),
-  ...matrixRates('ugc', 'standard', [
-    ['1080p', 24, 0.012],
-    ['1080p', 30, 0.014],
-    ['1080p', 60, 0.024],
-    ['2k', 24, 0.02],
-    ['2k', 30, 0.024],
-    ['2k', 60, 0.042],
-    ['4k', 24, 0.038],
-    ['4k', 30, 0.046],
-  ]),
-  ...matrixRates('restoration', 'standard', [
-    ['1080p', 24, 0.018],
-    ['1080p', 30, 0.021],
-    ['2k', 24, 0.03],
-    ['2k', 30, 0.036],
-  ]),
-  // Pro is an entitlement — priced, but unreachable until verified.
-  ...matrixRates('aigc', 'pro', [
-    ['1080p', 24, 0.024],
-    ['1080p', 30, 0.028],
-    ['1080p', 60, 0.048],
-    ['2k', 24, 0.04],
-    ['2k', 30, 0.048],
-    ['2k', 60, 0.084],
-    ['4k', 24, 0.076],
-    ['4k', 30, 0.092],
-  ]),
-  ...matrixRates('ugc', 'pro', [
-    ['1080p', 24, 0.024],
-    ['1080p', 30, 0.028],
-    ['1080p', 60, 0.048],
-    ['2k', 24, 0.04],
-    ['2k', 30, 0.048],
-    ['2k', 60, 0.084],
-    ['4k', 24, 0.076],
-    ['4k', 30, 0.092],
-  ]),
-  ...matrixRates('restoration', 'pro', [
-    ['1080p', 24, 0.036],
-    ['1080p', 30, 0.042],
-    ['2k', 24, 0.06],
-    ['2k', 30, 0.072],
-  ]),
+/**
+ * ByteDance vCube (`bytedance/video-upscaler`) is billed per second of OUTPUT
+ * video, by processing tier x target resolution x fps band (<=30 / >30).
+ * Numbers below are the provider's published sticker prices.
+ */
+const VCUBE_STANDARD_USD_PER_SECOND: Record<VideoResolution, { low: number; high: number }> = {
+  '720p': { low: 0.003443, high: 0.006887 },
+  '1080p': { low: 0.006887, high: 0.013773 },
+  '2k': { low: 0.013773, high: 0.027548 },
+  '4k': { low: 0.027548, high: 0.055097 },
+};
+/** The Pro model is billed at ten times the Standard rate. */
+const VCUBE_PRO_FACTOR = 10;
+
+const VCUBE_MODES = ['aigc', 'short_series', 'ugc', 'old_film', 'common'];
+const VCUBE_RESOLUTIONS: VideoResolution[] = ['720p', '1080p', '2k', '4k'];
+const VCUBE_FPS = [24, 30, 60];
+
+const VCUBE_ENTRIES: MatrixEntry[] = VCUBE_MODES.flatMap((mode) =>
+  VCUBE_RESOLUTIONS.flatMap((resolution) =>
+    VCUBE_FPS.flatMap((fps) => {
+      const band = fps > 30 ? 'high' : 'low';
+      const base = VCUBE_STANDARD_USD_PER_SECOND[resolution][band];
+      return [
+        { mode, resolution, fps, tier: 'standard' as QualityTier, usdPerSecond: base },
+        { mode, resolution, fps, tier: 'pro' as QualityTier, usdPerSecond: base * VCUBE_PRO_FACTOR },
+      ];
+    }),
+  ),
+);
+
+/**
+ * Topaz (`topazlabs/video-upscale`) publishes cost per 5 seconds of output by
+ * resolution and frame rate. Only documented rows are offered — no derived
+ * frame rates, so nothing is ever priced by guesswork.
+ */
+const TOPAZ_USD_PER_5S: [VideoResolution, number, number][] = [
+  ['720p', 30, 0.027],
+  ['720p', 60, 0.053],
+  ['1080p', 30, 0.093],
+  ['1080p', 60, 0.187],
+  ['4k', 30, 0.373],
+  ['4k', 60, 0.747],
 ];
+
+const TOPAZ_ENTRIES: MatrixEntry[] = TOPAZ_USD_PER_5S.map(([resolution, fps, per5s]) => ({
+  mode: 'standard',
+  resolution,
+  fps,
+  tier: 'standard' as QualityTier,
+  usdPerSecond: per5s / 5,
+}));
 
 export const VIDEO_RATE_CARDS: Record<string, VideoRateCard> = {
   'bytedance-vcube': {
     currency: 'USD',
     type: 'per_second_matrix',
-    source: 'ByteDance vCube published per-second price table (Replicate listing)',
+    source: 'Replicate bytedance/video-upscaler published billing tiers (per output second)',
     checkedAt: '2026-09-05',
     costUnverified: true,
     entries: VCUBE_ENTRIES,
   },
   'topaz-video-upscale': {
     currency: 'USD',
-    type: 'per_unit',
-    source: 'Replicate topazlabs/video-upscale unit pricing',
+    type: 'per_second_matrix',
+    source: 'Replicate topazlabs/video-upscale published cost table (per 5 output seconds)',
     checkedAt: '2026-09-05',
     costUnverified: true,
-    unitUsd: 0.05,
-    unitsPerOutputSecond: { '1080p': 1, '2k': 1.8, '4k': 4 },
-    fpsFactor: { 24: 1, 30: 1.25, 60: 2.5 },
+    entries: TOPAZ_ENTRIES,
   },
 };
 
