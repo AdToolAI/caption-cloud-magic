@@ -229,7 +229,8 @@ const Auth = () => {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       disabled={loading}
-                      minLength={6}
+                      minLength={isLogin ? undefined : PASSWORD_MIN_LENGTH}
+                      autoComplete={isLogin ? "current-password" : "new-password"}
                       className="h-11 rounded-xl bg-muted/30 border-border/50 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 pr-10 transition-all duration-300"
                     />
                     <button
@@ -246,7 +247,9 @@ const Auth = () => {
                       )}
                     </button>
                   </div>
+                  {!isLogin && <PasswordStrength password={password} />}
                 </motion.div>
+
 
                 {/* Confirm Password for Signup */}
                 {!isLogin && (
