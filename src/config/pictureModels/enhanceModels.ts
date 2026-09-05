@@ -143,9 +143,9 @@ export const ENHANCE_MODELS: PictureModelDefinition[] = [
         advanced: true,
         default: 'disabled',
         options: [
-          { value: 'disabled', label: t('Off', 'Aus', 'Desactivado') },
-          { value: 'hands_only', label: t('Hands only', 'Nur Hände', 'Solo manos') },
-          { value: 'image_and_hands', label: t('Image and hands', 'Bild und Hände', 'Imagen y manos') },
+          { value: 'disabled', label: { en: 'Off', de: 'Aus', es: 'Desactivado' } },
+          { value: 'hands_only', label: { en: 'Hands only', de: 'Nur Hände', es: 'Solo manos' } },
+          { value: 'image_and_hands', label: { en: 'Image and hands', de: 'Bild und Hände', es: 'Imagen y manos' } },
         ],
       },
       {
@@ -273,8 +273,8 @@ export const ENHANCE_MODELS: PictureModelDefinition[] = [
         advanced: true,
         default: 'None',
         options: [
-          { value: 'None', label: t('None', 'Keine', 'Ninguna') },
-          { value: 'All', label: t('All', 'Alles', 'Todo') },
+          { value: 'None', label: { en: 'None', de: 'Keine', es: 'Ninguna' } },
+          { value: 'All', label: { en: 'All', de: 'Alles', es: 'Todo' } },
           { value: 'Foreground', label: t('Foreground', 'Vordergrund', 'Primer plano') },
           { value: 'Background', label: t('Background', 'Hintergrund', 'Fondo') },
         ],

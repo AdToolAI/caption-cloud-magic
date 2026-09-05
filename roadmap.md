@@ -1,5 +1,8 @@
 # Roadmap
 
+## Erledigt
+- Video-Enhance Full Production Release: Topaz + ByteDance global live, Kalibrierung vom Preis-Gate getrennt, unbefristete Nachkorrektur später eintreffender Kosten, Admin-Kostenabschluss mit Audit.
+
 ## In Progress
 - Video Enhance Freigabe-Run mit echten Provider-Läufen (Topaz vs. ByteDance vCube)
   - Account: bestofproducts4u@gmail.com (8948d3d9-2c5e-4405-9e9c-1624448e7189)

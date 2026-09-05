@@ -235,6 +235,15 @@ export async function finalizeSuccess(
   costPatch.verified_effective_multiplier = trueUp.verifiedMultiplierAfterTrueUp;
   costPatch.pricing_gate = trueUp.gateReason ? 'review_required' : 'ok';
   costPatch.pricing_gate_reason = trueUp.gateReason;
+  // Calibration is deliberately NOT folded into the pricing gate: a run below
+  // the target corridor is an estimator signal, never a blocker.
+  costPatch.calibration_status = trueUp.calibrationStatus;
+  costPatch.calibration_reason = trueUp.calibrationReason;
+  // Cost still unverified -> stays eligible for a later true-up, forever, until
+  // it is either verified or administratively closed.
+  costPatch.next_late_check_at = providerCost.usd === undefined || providerCost.usd === null
+    ? new Date(Date.now() + lateCostBackoffMinutes(0) * 60_000).toISOString()
+    : null;
 
   await setStatus(admin, run.id, 'completed', {
     output_asset_id: asset.id,
@@ -307,6 +316,16 @@ export async function finalizeCancelConfirmed(
 }
 
 /**
+ * Backoff for the late-cost scanner: hours first, then days, capped at 7 days.
+ * The scanner is only the fallback — an authoritative cost arriving through any
+ * active path is trued up immediately.
+ */
+export function lateCostBackoffMinutes(attempts: number): number {
+  const schedule = [60, 6 * 60, 24 * 60, 3 * 24 * 60, 7 * 24 * 60];
+  return schedule[Math.min(attempts, schedule.length - 1)];
+}
+
+/**
  * Late authoritative provider cost for an ALREADY completed run.
  *
  * Runs the exact same hard-cap check as finalisation and books at most one
@@ -319,11 +338,25 @@ export async function applyLateCostTrueUp(
   run: Run,
   providerCost: ProviderCostReading,
 ): Promise<{ applied: boolean; reason?: string; verifiedMultiplier?: number | null }> {
-  if (providerCost.usd === undefined || providerCost.usd === null) {
-    return { applied: false, reason: 'cost_unavailable' };
+  if (run.cost_closed_at) {
+    return { applied: false, reason: 'administratively_closed' };
   }
   if (run.provider_cost_usd_actual !== null && run.provider_cost_usd_actual !== undefined) {
     return { applied: false, reason: 'already_verified' };
+  }
+  if (providerCost.usd === undefined || providerCost.usd === null) {
+    // No number yet: reschedule the fallback scan, never give up on the run.
+    const attempts = Number(run.late_cost_attempts ?? 0) + 1;
+    await admin
+      .from('video_enhance_runs')
+      .update({
+        late_cost_attempts: attempts,
+        next_late_check_at: new Date(
+          Date.now() + lateCostBackoffMinutes(attempts) * 60_000,
+        ).toISOString(),
+      })
+      .eq('id', run.id);
+    return { applied: false, reason: 'cost_unavailable' };
   }
 
   const trueUp = verifiedPricing({
@@ -338,6 +371,9 @@ export async function applyLateCostTrueUp(
     verified_effective_multiplier: trueUp.verifiedMultiplierAfterTrueUp,
     pricing_gate: trueUp.gateReason ? 'review_required' : 'ok',
     pricing_gate_reason: trueUp.gateReason,
+    calibration_status: trueUp.calibrationStatus,
+    calibration_reason: trueUp.calibrationReason,
+    next_late_check_at: null,
   };
 
   if (trueUp.refundEur > 0) {
