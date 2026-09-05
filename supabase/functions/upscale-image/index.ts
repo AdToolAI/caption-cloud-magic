@@ -216,13 +216,14 @@ serve(async (req) => {
       if (parent) parentMeta = parent;
     }
 
-    // Insert upscaled record — the media library row is part of the
-    // deliverable, so a failed insert aborts the run before any charge.
-    const { data: studioImage, error: insertError } = await supabaseAdmin
-      .from('studio_images')
-      .insert({
+    // Provider already ran and was paid for: the library row is retried and a
+    // database hiccup never re-runs the provider or gifts the run away.
+    const persisted = await persistStudioImage(
+      supabaseAdmin,
+      {
         user_id: user.id,
         image_url: publicUrl,
+        workflow_type: 'enhanced',
         prompt: parentMeta.prompt || prompt || 'Upscaled image',
         style: parentMeta.style || 'realistic',
         model_used: 'clarity-pro',
@@ -232,40 +233,45 @@ serve(async (req) => {
         parent_id: imageId || null,
         upscale_factor: factor,
         metadata_json: { storagePath, factor },
-      })
-      .select()
-      .single();
-
-    if (insertError || !studioImage) {
-      console.error('[upscale-image] studio_images insert failed:', insertError?.message);
-      return new Response(
-        JSON.stringify({
-          error: 'The upscaled image could not be saved to your library. You were not charged.',
-          code: 'PERSIST_FAILED',
-        }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+      },
+      '[upscale-image]',
+    );
 
     // Deduct credits
     const { data: newBalance, error: deductError } = await supabaseAdmin.rpc(
       'deduct_ai_video_credits',
-      { p_user_id: user.id, p_amount: cost, p_generation_id: studioImage?.id || null }
+      { p_user_id: user.id, p_amount: cost, p_generation_id: persisted.id }
     );
 
     if (deductError) {
       console.error('[upscale-image] Deduct error:', deductError);
     }
 
+    if (!persisted.ok) {
+      console.error('[upscale-image] studio_images insert exhausted:', persisted.error);
+      return new Response(
+        JSON.stringify({
+          error:
+            'Your upscaled image is ready and safely stored, but it could not be added to your library yet. We are retrying — the result is not lost.',
+          code: 'ASSET_PERSIST_FAILED',
+          providerUrl: publicUrl,
+          cost,
+          currency,
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         image: {
-          id: studioImage?.id,
+          id: persisted.id,
           url: publicUrl,
           previewUrl: publicUrl,
           factor,
           parentId: imageId || null,
+          workflowType: 'enhanced',
         },
         cost,
         currency,
