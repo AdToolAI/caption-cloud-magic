@@ -18527,6 +18527,7 @@ export type Database = {
           pricing_version: string
           provider_completed_at: string | null
           provider_cost_eur_buffered: number
+          provider_cost_source: string
           provider_cost_usd_actual: number | null
           provider_cost_usd_estimated: number
           provider_output_url: string | null
@@ -18550,6 +18551,7 @@ export type Database = {
           status: string
           submit_lease_expires_at: string | null
           submit_lease_owner: string | null
+          test_fail_persist_once: boolean
           tier: string
           updated_at: string
           user_id: string
@@ -18585,6 +18587,7 @@ export type Database = {
           pricing_version: string
           provider_completed_at?: string | null
           provider_cost_eur_buffered: number
+          provider_cost_source?: string
           provider_cost_usd_actual?: number | null
           provider_cost_usd_estimated: number
           provider_output_url?: string | null
@@ -18608,6 +18611,7 @@ export type Database = {
           status?: string
           submit_lease_expires_at?: string | null
           submit_lease_owner?: string | null
+          test_fail_persist_once?: boolean
           tier: string
           updated_at?: string
           user_id: string
@@ -18643,6 +18647,7 @@ export type Database = {
           pricing_version?: string
           provider_completed_at?: string | null
           provider_cost_eur_buffered?: number
+          provider_cost_source?: string
           provider_cost_usd_actual?: number | null
           provider_cost_usd_estimated?: number
           provider_output_url?: string | null
@@ -18666,6 +18671,7 @@ export type Database = {
           status?: string
           submit_lease_expires_at?: string | null
           submit_lease_owner?: string | null
+          test_fail_persist_once?: boolean
           tier?: string
           updated_at?: string
           user_id?: string

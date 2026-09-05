@@ -13,6 +13,7 @@ import { RESOLUTION_PIXELS, type VideoResolution } from './video-enhance-models.
 import {
   outputKey,
   outputMatchesOrder,
+  type ProviderCostReading,
   reconcileCost,
   setStatus,
   STAGING_BUCKET,
@@ -40,7 +41,7 @@ export async function finalizeSuccess(
   admin: Admin,
   run: Run,
   providerOutputUrl: string,
-  providerCostUsdActual?: number,
+  providerCost: ProviderCostReading = { source: 'unavailable' },
 ): Promise<FinalizeResult> {
   if (run.status === 'completed' && run.output_url) {
     return { ok: true, status: 'completed', outputUrl: run.output_url, assetId: run.output_asset_id };
@@ -83,6 +84,25 @@ export async function finalizeSuccess(
     await setStatus(admin, run.id, 'asset_persist_failed', { error_code: 'STAGING_FAILED', error_message: stageError.message });
     return { ok: false, status: 'asset_persist_failed', error: stageError.message };
   }
+
+  // Validation-only: a run flagged by the allowlisted test account fails
+  // persistence EXACTLY once, after a real provider success and a real staged
+  // file. The flag is cleared here, so the reconciler's retry succeeds without
+  // a second provider job and without touching the normal storage path.
+  if (run.test_fail_persist_once) {
+    await admin
+      .from('video_enhance_runs')
+      .update({ test_fail_persist_once: false })
+      .eq('id', run.id);
+    await setStatus(admin, run.id, 'asset_persist_failed', {
+      error_code: 'TEST_PERSIST_FAILURE',
+      error_message: 'injected persistence failure (validation run)',
+      provider_output_url: providerOutputUrl,
+      staging_key: staging,
+    });
+    return { ok: false, status: 'asset_persist_failed', error: 'TEST_PERSIST_FAILURE' };
+  }
+
 
   // 2. validate the staged file against what the user actually ordered.
   const { data: stagedUrlData } = admin.storage.from(STAGING_BUCKET).getPublicUrl(staging);
@@ -167,10 +187,12 @@ export async function finalizeSuccess(
     note: 'provider success',
   });
 
-  const costPatch =
-    providerCostUsdActual !== undefined ? reconcileCost(run, providerCostUsdActual) : {};
-  delete (costPatch as Record<string, unknown>)._warn;
-  delete (costPatch as Record<string, unknown>)._block;
+  // A missing cost number is recorded, never fatal: only its source changes.
+  const costPatch: Record<string, unknown> =
+    providerCost.usd !== undefined ? reconcileCost(run, providerCost.usd) : {};
+  costPatch.provider_cost_source = providerCost.source;
+  delete costPatch._warn;
+  delete costPatch._block;
 
   await setStatus(admin, run.id, 'completed', {
     output_asset_id: asset.id,
@@ -216,7 +238,13 @@ export async function finalizeFailure(
 }
 
 /** Provider CONFIRMED the cancellation — only here money moves back. */
-export async function finalizeCancelConfirmed(admin: Admin, run: Run): Promise<FinalizeResult> {
+export async function finalizeCancelConfirmed(
+  admin: Admin,
+  run: Run,
+  providerCost: ProviderCostReading = { source: 'unavailable' },
+): Promise<FinalizeResult> {
+  // Cancel policy: the customer gets the full reservation back; provider cost
+  // already incurred is booked internally only.
   await walletOperation(admin, {
     runId: run.id,
     userId: run.user_id,
@@ -224,7 +252,11 @@ export async function finalizeCancelConfirmed(admin: Admin, run: Run): Promise<F
     amountEur: Number(run.user_price_eur),
     note: 'provider cancel confirmed',
   });
-  await setStatus(admin, run.id, 'provider_cancelled_confirmed', { next_reconcile_at: null });
+  await setStatus(admin, run.id, 'provider_cancelled_confirmed', {
+    next_reconcile_at: null,
+    provider_cost_usd_actual: providerCost.usd ?? null,
+    provider_cost_source: providerCost.source,
+  });
   if (run.staging_key) {
     await admin.storage.from(STAGING_BUCKET).remove([run.staging_key]).catch(() => undefined);
   }

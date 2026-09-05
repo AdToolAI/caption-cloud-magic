@@ -5,7 +5,7 @@ import {
   finalizeFailure,
   finalizeSuccess,
 } from "../_shared/video-enhance-finalize.ts";
-import { setStatus, backoffMinutes } from "../_shared/video-enhance-runtime.ts";
+import { setStatus, backoffMinutes, extractProviderCost } from "../_shared/video-enhance-runtime.ts";
 import { VIDEO_ENHANCE_SPECS } from "../_shared/video-enhance-models.ts";
 
 /**
@@ -167,8 +167,9 @@ serve(async (req) => {
     }
 
     const providerStatus: string = prediction.status;
-    const actualCostUsd =
-      typeof prediction?.metrics?.total_cost === "number" ? prediction.metrics.total_cost : undefined;
+    // The provider does not guarantee a cost field; record what is there and
+    // where it came from, and finalise either way.
+    const providerCost = extractProviderCost(prediction);
 
     if (providerStatus === "succeeded") {
       const output = prediction.output;
@@ -181,7 +182,7 @@ serve(async (req) => {
               ? output.url
               : null;
       if (!outputUrl) return await asFailure(admin, run, "NO_OUTPUT", "provider returned no video");
-      const result = await finalizeSuccess(admin, run, outputUrl, actualCostUsd);
+      const result = await finalizeSuccess(admin, run, outputUrl, providerCost);
       return json(result, result.ok ? 200 : 500);
     }
 
@@ -190,7 +191,7 @@ serve(async (req) => {
     }
 
     if (providerStatus === "canceled") {
-      const result = await finalizeCancelConfirmed(admin, run);
+      const result = await finalizeCancelConfirmed(admin, run, providerCost);
       return json(result);
     }
 
