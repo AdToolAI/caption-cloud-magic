@@ -10,6 +10,7 @@ import {
   validateCombination as validateClient,
   type EnhanceConfig,
   type SourceMetadata,
+  DISABLED_VIDEO_ENHANCE_MODELS,
 } from '@/config/videoEnhanceModels';
 import { priceVideoEnhanceRun as priceClient } from '@/lib/videoEnhance/pricing';
 import { VIDEO_RATE_CARDS as CLIENT_CARDS } from '@/lib/videoEnhance/rates';
