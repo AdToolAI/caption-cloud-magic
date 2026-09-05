@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { fetchWithTimeout, isTimeoutError } from "../_shared/timeout.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
+import { persistStudioImage } from "../_shared/studio-image-persist.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
