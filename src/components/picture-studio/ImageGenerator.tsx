@@ -490,16 +490,22 @@ export function ImageGenerator() {
       ? [referenceImage, ...extraReferences].filter(Boolean).slice(0, maxSubjectRefs) as string[]
       : [];
     const styleRefs = mode === 'restyle' && styleReference ? [styleReference] : [];
+    // Manual pixel size wins; otherwise a Source request may supply exact
+    // width/height for models whose registry entry allows it.
     const exact = supportsExactSize && Number(exactWidth) > 0 && Number(exactHeight) > 0
       ? { width: Number(exactWidth), height: Number(exactHeight) }
-      : {};
+      : (resolvedFormat.width && resolvedFormat.height
+        ? { width: resolvedFormat.width, height: resolvedFormat.height }
+        : {});
 
     if (tier === 'standard') {
       const { data, error } = await supabase.functions.invoke('generate-studio-image', {
         body: {
           prompt: effectivePrompt,
           style,
-          aspectRatio,
+          aspectRatio: resolvedFormat.aspectRatio,
+          requestedFormat: aspectRatio,
+          sourceDimensions,
           quality: 'fast',
           editMode: mode === 'transform' || mode === 'mix',
           mode,
@@ -522,7 +528,9 @@ export function ImageGenerator() {
       body: {
         prompt: effectivePrompt,
         tier,
-        aspectRatio,
+        aspectRatio: resolvedFormat.aspectRatio,
+        requestedFormat: aspectRatio,
+        sourceDimensions,
         style,
         referenceImageUrls: subjectRefs,
         styleReferenceUrls: styleRefs,
