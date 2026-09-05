@@ -40,10 +40,15 @@ Sobald die echten Providerkosten eindeutig vorliegen:
 - Ist-Kosten höher als geschätzt (Faktor unter 1,8×) → **keine** Nachbelastung. AdTool trägt die Abweichung, die Rate Card wird korrigiert. 1,8× ist Kalkulationsuntergrenze für künftige Läufe, keine rückwirkende Garantie zugunsten AdTool.
 - Der vorab genehmigte Preis wird nie nachträglich erhöht.
 - Die Gutschrift läuft über den eindeutigen Wallet-Schlüssel `video_enhance:{runId}:pricing_true_up` und kann bei Webhook, Reconciler und Wiederholung zusammen höchstens einmal ausgeführt werden — auch wenn die echte Kostenzahl erst lange nach Abschluss des Laufs eintrifft.
+- Die ursprüngliche Belastung bleibt erhalten: `captured_usage_charge_eur` wird nie überschrieben; daneben stehen `true_up_refund_amount` und `net_usage_charge_eur`. Ausgewiesen werden beide Faktoren — vor und nach dem Ausgleich (z. B. „ursprünglich 6,9× → korrigiert → final 3,0×").
+- Fehlen die echten Kosten, sind sie 0 oder widersprüchlich: **kein** Faktor, **keine** automatische Gutschrift. Der Faktor bleibt leer und der Grund `cost_unverified` steht, bis eine autoritative positive Kostenzahl vorliegt.
 
 **Sperrgründe explizit**
 
 `pricing_gate_reason` ist immer einer von: `estimate_over_cap`, `actual_cost_drift`, `cost_unverified`, `estimator_calibrating`, `floor_conflict`.
+
+Eine Sperre gilt immer für die betroffene **Rate-Card-Version** (z. B. `topaz-video-v3`), nicht dauerhaft für das Modell. Eine korrigierte, neu getestete Version kann freigegeben werden, ohne historische Läufe oder ihre Preis-Schnappschüsse zu verändern.
+
 
 
 
@@ -75,20 +80,22 @@ Pro Modell aggregiert: mittlerer und medianer Schätzfehler, tatsächlicher Fakt
 - Späte Kosten: ein bereits abgeschlossener Lauf erhält erst danach die verifizierte Kostenzahl — der Ausgleich läuft trotzdem sicher und genau einmal.
 - Basis des verifizierten Faktors ist die rabattierte Nutzungsbelastung ohne Steuern, Abo- und Zahlungsgebühren; eingesetztes Promo- oder Startguthaben verändert sie nicht.
 - Höhere Ist-Kosten lösen nie eine Nachbelastung aus, auch unter 1,8× nicht.
+- Kein Faktor und keine Gutschrift bei fehlenden, Null- oder ungültigen Ist-Kosten.
+- Picture-Studio-Preise bleiben unverändert: die harte Deckelregel ist eine ausdrücklich gesetzte Option, kein Seiteneffekt der geteilten Kurve.
 - Client/Server-Parität der gesamten Preisrechnung.
 - Kein Test nagelt einen konkreten Eurobetrag fest — geprüft wird immer gegen Kurve und Deckel, damit FX-Änderungen die Tests nicht brechen.
 
 ## Technische Details
 
-- `src/lib/pictureModels/marginCurve.ts`: neue `capPriceForCost()`, `floorToCent()` und `evaluatePricing()` (liefert Preis, Deckel, effektiven Faktor, Gate plus Grund); `supabase/functions/_shared/picture-pricing.ts` wird identisch gespiegelt.
-- `src/lib/videoEnhance/pricing.ts` + `supabase/functions/_shared/video-enhance-models.ts`: Snapshot um `effectiveMultiplier`, `multiplierCap`, `pricingGate`, `pricingGateReason` erweitert; Versionsstrings hochgezählt.
-- `src/lib/videoEnhance/rates.ts` + Servermirror: Topaz auf `per_unit` mit eingefrorenem Einheitspreis; `costUnverified` wird durch `providerCostAccounting` + `providerCostEstimator` ersetzt.
-- Finalisierung (`_shared/video-enhance-finalize.ts` und Reconciler): berechnet den verifizierten Faktor aus der belasteten Nutzungssumme, schreibt ihn auf den Lauf und löst bei Überschreitung die Wallet-Gutschrift mit dem eindeutigen Schlüssel `video_enhance:{runId}:pricing_true_up` aus.
-- Migration (nur Ergänzungen): `effective_multiplier`, `multiplier_cap`, `pricing_gate`, `pricing_gate_reason`, `verified_effective_multiplier`, `usage_charge_eur`, `max_allowed_charge_eur`, `true_up_refund_amount`, `true_up_refund_at` auf `video_enhance_runs`; eindeutiger Index auf dem Wallet-Referenzschlüssel.
+- `src/lib/pictureModels/marginCurve.ts`: neue `capPriceForCost()`, `floorToCent()` und `evaluatePricing(cost, policy)` mit expliziten Optionen `hardMultiplierCap` und `allowFloorAboveCap`. **Standard = heutiges Verhalten**, damit Picture Studio unverändert bleibt; nur Video Enhance setzt `hardMultiplierCap: 3.0, allowFloorAboveCap: false`. Eine plattformweite Übernahme wäre eine bewusste spätere Produktentscheidung. `supabase/functions/_shared/picture-pricing.ts` wird identisch gespiegelt.
+- `src/lib/videoEnhance/pricing.ts` + `supabase/functions/_shared/video-enhance-models.ts`: Snapshot um `effectiveMultiplier`, `multiplierCap`, `pricingGate`, `pricingGateReason`, `rateCardVersion` erweitert; Versionsstrings hochgezählt.
+- `src/lib/videoEnhance/rates.ts` + Servermirror: Topaz auf `per_unit` mit eingefrorenem Einheitspreis; `costUnverified` wird durch `providerCostAccounting` + `providerCostEstimator` ersetzt; jede Karte trägt eine Versionskennung.
+- Finalisierung (`_shared/video-enhance-finalize.ts` und Reconciler): berechnet die Ist-Kosten ohne FX-Puffer, den Faktor vor und nach Ausgleich, schreibt beide auf den Lauf und löst bei Überschreitung die Wallet-Gutschrift mit dem eindeutigen Schlüssel `video_enhance:{runId}:pricing_true_up` aus.
+- Migration (nur Ergänzungen): `effective_multiplier`, `multiplier_cap`, `pricing_gate`, `pricing_gate_reason`, `rate_card_version`, `verified_effective_multiplier`, `verified_multiplier_after_true_up`, `captured_usage_charge_eur`, `net_usage_charge_eur`, `max_allowed_charge_eur`, `true_up_refund_amount`, `true_up_refund_at` auf `video_enhance_runs`; eindeutiger Index auf dem Wallet-Referenzschlüssel.
 - Admin-Karte in `src/components/admin/cost/` mit EN/DE/ES-Texten.
 - Abgeschlossene Altläufe werden nicht rückwirkend umgepreist oder gutgeschrieben.
-
 
 ## Freigabe
 
 Keine globale Modellfreigabe, solange Topaz nicht über mehrere Einheiten-Datenpunkte kalibriert und ByteDance-Pricing nicht verifiziert ist.
+
