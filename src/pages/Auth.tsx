@@ -207,6 +207,9 @@ const Auth = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={loading}
+                    autoComplete="email"
+                    inputMode="email"
+                    name="email"
                     className="h-11 rounded-xl bg-muted/30 border-border/50 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-300"
                   />
                 </motion.div>
