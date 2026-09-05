@@ -23,9 +23,9 @@ Wenn kein passendes Kameramaterial im Konto liegt, lade bitte einen kurzen Origi
 |---|---|---|
 | T1 | kurzer Clip → 1080p | Basisfall, Kosten gegen Rate Card |
 | T2 | kürzester Clip → 4K/60 | teuerste Kombination, Laufzeit und Kosten |
-| T3 | gezielt erzeugter Anbieterfehler | genau eine Freigabe des reservierten Guthabens |
+| T3 | echter Anbieterfehler | zählt nur, wenn eine echte Prediction existiert und Replicate sie als „failed" meldet → genau eine Freigabe |
 | T4 | Speicherfehler nach erfolgreichem Anbieterlauf | genau ein finales Asset, keine zweite Abrechnung |
-| T5 | Abbruch während der Verarbeitung (falls unterstützt) | keine falsche Rückerstattung |
+| T5 | Abbruch während der Verarbeitung (falls unterstützt) | Auswertung nach Abbruch-Policy, keine falsche Rückerstattung |
 
 ## 3. ByteDance vCube — Live-Läufe
 
