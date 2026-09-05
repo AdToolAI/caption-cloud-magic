@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, Image, Video, FileText, Trash2, Search, ExternalLink, Play, Sparkles, Send, Calendar, Layers, FolderOpen, Download, Cloud, Images, FolderPlus } from "lucide-react";
 import { SaveToAlbumDialog } from "@/components/picture-studio/SaveToAlbumDialog";
+import { resolveAssetByUrl } from '@/lib/videoEnhance/resolveAssetByUrl';
 import { EnhanceVideoDialog } from "@/components/ai-video/EnhanceVideoDialog";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -78,6 +79,7 @@ export default function MediaLibrary() {
   const [importUrl, setImportUrl] = useState("");
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [enhanceSourceUrl, setEnhanceSourceUrl] = useState<string | null>(null);
+  const [enhanceAsset, setEnhanceAsset] = useState<{ assetId: string; assetType: 'generation' | 'creation' } | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [studioImageCount, setStudioImageCount] = useState(0);
   const [saveToAlbumImageId, setSaveToAlbumImageId] = useState<string | null>(null);
@@ -1472,8 +1474,15 @@ export default function MediaLibrary() {
               <Button
                 className="w-full gap-2"
                 onClick={() => {
-                  setEnhanceSourceUrl(selectedVideo);
+                  const url = selectedVideo;
+                  setEnhanceAsset(null);
+                  setEnhanceSourceUrl(url);
                   setSelectedVideo(null);
+                  if (user) {
+                    void resolveAssetByUrl(url, user.id).then((resolved) => {
+                      if (resolved) setEnhanceAsset(resolved);
+                    });
+                  }
                 }}
               >
                 <Sparkles className="h-4 w-4" />
@@ -1487,7 +1496,9 @@ export default function MediaLibrary() {
       {/* Enhance dialog — same central engine as AI Video Studio */}
       <EnhanceVideoDialog
         open={!!enhanceSourceUrl}
-        onOpenChange={(open) => { if (!open) setEnhanceSourceUrl(null); }}
+        onOpenChange={(open) => { if (!open) { setEnhanceSourceUrl(null); setEnhanceAsset(null); } }}
+        sourceAssetId={enhanceAsset?.assetId}
+        sourceAssetType={enhanceAsset?.assetType}
         sourceUrl={enhanceSourceUrl ?? undefined}
         onCompleted={() => loadMedia()}
       />
