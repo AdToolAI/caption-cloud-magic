@@ -173,7 +173,18 @@ Deno.serve(async (req) => {
     }
 
     // --- Build upstream request ---
-    const sysMsg = systemPrompt ? [{ role: "system" as const, content: systemPrompt }] : [];
+    // Reply language is dictated by the caller's UI language (default English),
+    // so the assistant never opens the conversation in a random language.
+    const LANG_NAMES: Record<string, string> = {
+      en: "English",
+      de: "German (Deutsch)",
+      es: "Spanish (Español)",
+    };
+    const replyLang = LANG_NAMES[String((body as { language?: string }).language ?? "en")] ?? "English";
+    const langDirective = `OUTPUT LANGUAGE (ABSOLUTE, HIGHEST PRIORITY): Write every reply in ${replyLang}. Never switch languages or mirror the language of these instructions, unless the user explicitly asks for another language.`;
+    const effectiveSystemPrompt = systemPrompt ? `${langDirective}\n\n${systemPrompt}` : langDirective;
+    const sysMsg = [{ role: "system" as const, content: effectiveSystemPrompt }];
+
 
     let upstream: Response;
     if (route.provider === "gateway") {
@@ -216,7 +227,7 @@ Deno.serve(async (req) => {
           model: route.apiModel,
           max_tokens: outputTokenCap,
           ...(temp !== undefined ? { temperature: Math.min(temp, 1) } : {}),
-          system: systemPrompt || undefined,
+          system: effectiveSystemPrompt,
           messages: anthroMsgs,
           stream: true,
         }),

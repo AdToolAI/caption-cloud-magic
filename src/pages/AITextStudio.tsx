@@ -1,4 +1,4 @@
-import { tx } from '@/lib/i18nText';
+import { tx, getLang } from '@/lib/i18nText';
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
@@ -319,7 +319,7 @@ export default function AITextStudio() {
           systemPrompt: selectedPersona?.system_prompt,
           personaId: personaId && personaId !== "none" ? personaId : undefined,
           isPrivate,
-
+          language: getLang(),
         }),
       });
 

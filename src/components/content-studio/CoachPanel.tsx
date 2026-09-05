@@ -1,3 +1,4 @@
+import { getLang } from "@/lib/i18nText";
 import { tx } from "@/lib/i18nText";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, MessageSquare, Send } from "lucide-react";
@@ -58,6 +59,9 @@ export function CoachPanel({ open, onOpenChange }: { open: boolean; onOpenChange
           body: JSON.stringify({
             message: `${question}\n\n--- ${tx({ de: 'Aktueller Entwurf', en: 'Current draft', es: 'Borrador actual' })} ---\n${draftContext()}`,
             messages: messages.map((m) => ({ role: m.role, content: m.content })),
+            // The assistant must always answer in the selected UI language.
+            language: getLang(),
+
           }),
         },
       );

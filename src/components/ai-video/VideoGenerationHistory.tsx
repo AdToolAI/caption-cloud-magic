@@ -150,6 +150,8 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
     // was broken — it is a temporary provider condition and always refunded.
     if (
       raw.includes('high load') ||
+      raw.includes('high demand') ||
+      raw.includes('(e003)') ||
       raw.includes('resource_exhausted') ||
       /"?code"?\s*[:=]\s*8\b/.test(raw) ||
       raw.includes('overloaded')

@@ -1,4 +1,4 @@
-import { tx } from "@/lib/i18nText";
+import { tx, getLang } from "@/lib/i18nText";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
@@ -180,6 +180,7 @@ export default function PinnedChatWindow() {
           systemPrompt: pinned.systemPrompt,
           personaId: pinned.personaId && pinned.personaId !== "none" ? pinned.personaId : undefined,
           isPrivate: pinned.isPrivate,
+          language: getLang(),
         }),
       });
 
