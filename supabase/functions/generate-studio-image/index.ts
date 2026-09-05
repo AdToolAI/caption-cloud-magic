@@ -364,10 +364,10 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         prompt,
         style,
         model_used: usedModel,
-        aspect_ratio: aspectRatio,
+        aspect_ratio: built.resolvedFormat.aspectRatio,
         source: editMode ? 'upload' : 'generated',
         album_id: albumId,
-        metadata_json: { quality, editMode, referenceImageUrl: editMode ? referenceImageUrl : null, attemptedModels },
+        metadata_json: { quality, editMode, requestedFormat: built.requestedFormat, resolvedFormat: built.resolvedFormat, referenceImageUrl: editMode ? referenceImageUrl : null, attemptedModels },
       },
       '[Studio]',
     );
@@ -385,7 +385,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         previewUrl: imageData,
         prompt,
         style,
-        aspectRatio,
+        aspectRatio: built.resolvedFormat.aspectRatio,
+        requestedFormat: built.requestedFormat,
+        resolvedFormat: built.resolvedFormat,
         model: usedModel,
       }
     }), {
