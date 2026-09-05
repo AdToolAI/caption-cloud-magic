@@ -85,6 +85,25 @@ export async function finalizeSuccess(
     return { ok: false, status: 'asset_persist_failed', error: stageError.message };
   }
 
+  // Validation-only: a run flagged by the allowlisted test account fails
+  // persistence EXACTLY once, after a real provider success and a real staged
+  // file. The flag is cleared here, so the reconciler's retry succeeds without
+  // a second provider job and without touching the normal storage path.
+  if (run.test_fail_persist_once) {
+    await admin
+      .from('video_enhance_runs')
+      .update({ test_fail_persist_once: false })
+      .eq('id', run.id);
+    await setStatus(admin, run.id, 'asset_persist_failed', {
+      error_code: 'TEST_PERSIST_FAILURE',
+      error_message: 'injected persistence failure (validation run)',
+      provider_output_url: providerOutputUrl,
+      staging_key: staging,
+    });
+    return { ok: false, status: 'asset_persist_failed', error: 'TEST_PERSIST_FAILURE' };
+  }
+
+
   // 2. validate the staged file against what the user actually ordered.
   const { data: stagedUrlData } = admin.storage.from(STAGING_BUCKET).getPublicUrl(staging);
   const target = RESOLUTION_PIXELS[run.resolution as VideoResolution];
