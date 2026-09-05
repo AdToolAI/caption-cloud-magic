@@ -68,27 +68,43 @@ export type ProviderCostSource =
 export interface ProviderCostReading {
   usd?: number;
   source: ProviderCostSource;
+  /** Billed provider units, when the provider reports usage instead of money. */
+  units?: number;
+  /** Wall-clock provider processing time, when reported. */
+  processingSeconds?: number;
 }
 
 // deno-lint-ignore no-explicit-any
-export function extractProviderCost(prediction: any): ProviderCostReading {
+export function extractProviderCost(prediction: any, modelId?: string): ProviderCostReading {
   const metrics = prediction?.metrics ?? {};
+  const processingSeconds =
+    typeof metrics.predict_time === 'number' && Number.isFinite(metrics.predict_time)
+      ? metrics.predict_time
+      : undefined;
+
   for (const field of ['total_cost', 'cost', 'predict_cost']) {
     const value = metrics[field];
     if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
-      return { usd: value, source: 'prediction_metric' };
+      return { usd: value, source: 'prediction_metric', processingSeconds };
     }
   }
   // Some models report consumed units instead of money: Topaz reports
   // `unspecified_billing_metric` (billing units), vCube reports the billed
-  // output duration. Usage is known, the money figure is not.
+  // output duration.
   const units = metrics.units ?? metrics.units_used ?? metrics.unspecified_billing_metric ??
     metrics.video_output_duration_seconds;
   if (typeof units === 'number' && Number.isFinite(units) && units > 0) {
-    return { usd: undefined, source: 'provider_usage' };
+    // For a per-unit rate card with a VERIFIED unit price the usage number is
+    // an authoritative cost; for every other card it stays usage-only.
+    const card = modelId ? VIDEO_RATE_CARDS[modelId] : undefined;
+    if (card && card.type === 'per_unit') {
+      return { usd: units * card.unitUsd, source: 'provider_usage', units, processingSeconds };
+    }
+    return { usd: undefined, source: 'provider_usage', units, processingSeconds };
   }
-  return { source: 'unavailable' };
+  return { source: 'unavailable', processingSeconds };
 }
+
 
 export type LedgerOperation = 'reserve' | 'capture' | 'release' | 'true_up_refund';
 
