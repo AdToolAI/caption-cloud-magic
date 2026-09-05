@@ -199,8 +199,8 @@ REMINDER: The entire reply must be written in ${langName}.`;
     if (userPlan === 'pro' || userPlan === 'enterprise') {
       systemPrompt += `
 
-## PRO-MODUS AKTIVIERT
-Du kannst erweiterte Multi-Step-Analysen, personalisierte Wachstums-Roadmaps, detaillierte Content-Audits und tiefgehende Strategie-Beratung liefern. Nutze dein volles Expertenwissen!`;
+## PRO MODE ACTIVE
+You can deliver advanced multi-step analyses, personalized growth roadmaps, detailed content audits and deep strategy consulting. Use your full expert knowledge!`;
     }
 
     // Prepare conversation messages (last 20 for performance)
