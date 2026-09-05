@@ -167,10 +167,12 @@ export async function finalizeSuccess(
     note: 'provider success',
   });
 
-  const costPatch =
-    providerCostUsdActual !== undefined ? reconcileCost(run, providerCostUsdActual) : {};
-  delete (costPatch as Record<string, unknown>)._warn;
-  delete (costPatch as Record<string, unknown>)._block;
+  // A missing cost number is recorded, never fatal: only its source changes.
+  const costPatch: Record<string, unknown> =
+    providerCost.usd !== undefined ? reconcileCost(run, providerCost.usd) : {};
+  costPatch.provider_cost_source = providerCost.source;
+  delete costPatch._warn;
+  delete costPatch._block;
 
   await setStatus(admin, run.id, 'completed', {
     output_asset_id: asset.id,
