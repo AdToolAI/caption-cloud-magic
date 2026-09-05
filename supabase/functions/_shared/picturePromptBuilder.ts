@@ -70,7 +70,16 @@ export interface PicturePromptInput {
   prompt: string;
   /** `none` (or empty) means: send the user's words unchanged. */
   style?: string;
+  /** Legacy: already-resolved ratio. Prefer `requestedFormat`. */
   aspectRatio?: string;
+  /** Semantic user choice: `source` or a ratio label. Never mutated. */
+  requestedFormat?: string;
+  /**
+   * Natural pixel size of the PRIMARY reference image (reference #1).
+   * Client passes it for the preview; the server re-derives it from trusted
+   * asset metadata before building the real provider request.
+   */
+  source?: SourceDimensions | null;
   subjectRefs?: string[];
   styleRefs?: string[];
   /** UI value 0..100 — "how much may the picture change". 0 = barely, 100 = a lot. */
@@ -85,6 +94,42 @@ export interface PicturePromptInput {
   } | null;
 }
 
+/**
+ * Machine-readable record of everything AdTool added on top of the user's own
+ * words. Invariant tests assert on THIS, never on a word blocklist over the
+ * final prompt (the user may legitimately write "photorealistic" themselves).
+ */
+export interface AppliedModifier {
+  source: PromptSegmentSource;
+  /** Stable identifier, e.g. `style:cinematic`, `ratio-prompt`, `intent:close`. */
+  id: string;
+}
+
+export interface ReferenceInfluence {
+  /** Semantic level the user picked. `none` when no reference is in play. */
+  level: 'close' | 'balanced' | 'free' | 'none';
+  /** How the level reaches the provider. */
+  method: 'none' | 'native' | 'prompt-guided';
+  field?: 'image_prompt_strength' | 'strength';
+  value?: number;
+}
+
+/** Provider-neutral, comparable description of one run. */
+export interface NormalizedPictureRequest {
+  tier: string;
+  mode: PictureIntent;
+  /** `auto` when the user added no style preset. */
+  style: string;
+  requestedFormat: string;
+  resolvedFormat: ResolvedFormat;
+  referenceInfluence: ReferenceInfluence;
+  subjectRefCount: number;
+  styleRefCount: number;
+  transparentBackground: boolean;
+  negativeTerms: string[];
+  appliedModifiers: AppliedModifier[];
+}
+
 export interface BuiltPictureRequest {
   /** Final text handed to the provider. */
   prompt: string;
@@ -97,6 +142,12 @@ export interface BuiltPictureRequest {
   /** Resolved transparency — only ever true when the model really supports it. */
   transparentBackground: boolean;
   notices: PictureNotice[];
+  /** Everything AdTool added — empty means "only the user's words". */
+  appliedModifiers: AppliedModifier[];
+  /** Model-specific technical resolution of the semantic format choice. */
+  resolvedFormat: ResolvedFormat;
+  referenceInfluence: ReferenceInfluence;
+  normalizedRequest: NormalizedPictureRequest;
 }
 
 /* ------------------------------------------------------------------ styles */
