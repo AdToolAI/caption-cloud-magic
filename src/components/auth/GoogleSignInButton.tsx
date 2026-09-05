@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { tx } from "@/lib/i18nText";
-import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
 
 const GoogleLogo = () => (
   <svg className="h-4 w-4" viewBox="0 0 48 48" aria-hidden="true">
