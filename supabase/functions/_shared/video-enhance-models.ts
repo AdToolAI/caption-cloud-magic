@@ -71,20 +71,16 @@ export interface VideoEnhanceSpec {
 export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
   'bytedance-vcube': {
     id: 'bytedance-vcube',
-    providerModelId: 'bytedance/vcube',
-    providerSchemaRef: 'replicate/bytedance-vcube@2026-09',
-    modes: ['aigc', 'ugc', 'restoration'],
+    providerModelId: 'bytedance/video-upscaler',
+    providerSchemaRef: 'replicate/bytedance-video-upscaler@2026-09-05',
+    // Exactly the `scene` enum of the published schema.
+    modes: ['aigc', 'short_series', 'ugc', 'old_film', 'common'],
     outputs: [
+      { resolution: '720p', fps: [24, 30, 60] },
       { resolution: '1080p', fps: [24, 30, 60] },
       { resolution: '2k', fps: [24, 30, 60] },
-      { resolution: '4k', fps: [24, 30] },
+      { resolution: '4k', fps: [24, 30, 60] },
     ],
-    outputsByMode: {
-      restoration: [
-        { resolution: '1080p', fps: [24, 30] },
-        { resolution: '2k', fps: [24, 30] },
-      ],
-    },
     tiers: ['standard', 'pro'],
     entitlementTiers: ['pro'],
     minDurationSeconds: 1,
@@ -94,7 +90,7 @@ export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
       return {
         video: sourceUrl,
         scene: config.mode,
-        tier: config.tier,
+        processing_type: config.tier,
         target_resolution: config.resolution,
         target_fps: config.fps ?? Math.round(source.fps),
       };
@@ -103,29 +99,28 @@ export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
   'topaz-video-upscale': {
     id: 'topaz-video-upscale',
     providerModelId: 'topazlabs/video-upscale',
-    providerSchemaRef: 'replicate/topazlabs-video-upscale@2026-09',
-    modes: ['standard', 'high_fidelity'],
+    providerSchemaRef: 'replicate/topazlabs-video-upscale@972107c4',
+    // The published schema has no model/mode input at all.
+    modes: ['standard'],
     outputs: [
-      { resolution: '1080p', fps: [24, 30, 60] },
-      { resolution: '2k', fps: [24, 30, 60] },
-      { resolution: '4k', fps: [24, 30, 60] },
+      { resolution: '720p', fps: [30, 60] },
+      { resolution: '1080p', fps: [30, 60] },
+      { resolution: '4k', fps: [30, 60] },
     ],
     tiers: ['standard'],
     minDurationSeconds: 1,
     maxDurationSeconds: 120,
     backendFlag: 'VIDEO_ENHANCE_TOPAZ_ENABLED',
     buildInput(config, source, sourceUrl) {
-      const target = RESOLUTION_PIXELS[config.resolution];
       return {
         video: sourceUrl,
-        model: config.mode === 'high_fidelity' ? 'High Fidelity' : 'Standard',
-        target_width: target.width,
-        target_height: target.height,
+        target_resolution: config.resolution,
         target_fps: config.fps ?? Math.round(source.fps),
       };
     },
   },
 };
+
 
 // ---------------------------------------------------------------------------
 // Combination validation — mirror of src/config/videoEnhanceModels/index.ts
