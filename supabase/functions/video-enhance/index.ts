@@ -56,6 +56,8 @@ interface RequestBody {
   testFailPersistOnce?: boolean;
   runId?: string;
   sourceAssetId?: string;
+  /** Which table the asset lives in. The server must not have to guess. */
+  sourceAssetType?: "generation" | "creation";
   sourceUrl?: string;
   modelId?: string;
   mode?: string;
@@ -88,30 +90,46 @@ async function resolveSource(
   let url = "";
   let assetId: string | null = null;
   let sourceModel: string | undefined;
+  let creationMetadata: Record<string, unknown> | null = null;
 
   if (body.sourceAssetId) {
-    // Generated clips live in ai_video_generations, rendered ones in video_creations.
-    const { data: generated } = await admin
-      .from("ai_video_generations")
-      .select("id, video_url, model")
-      .eq("id", body.sourceAssetId)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (generated?.video_url) {
-      url = generated.video_url;
-      assetId = generated.id;
-      sourceModel = generated.model ?? undefined;
-    } else {
-      const { data: rendered } = await admin
-        .from("video_creations")
-        .select("id, output_url")
+    // Typed source: generated clips live in ai_video_generations, persisted
+    // ones (renders, uploads, enhanced masters) in video_creations.
+    const wantGeneration = body.sourceAssetType !== "creation";
+    const wantCreation = body.sourceAssetType !== "generation";
+
+    if (wantGeneration) {
+      const { data: generated } = await admin
+        .from("ai_video_generations")
+        .select("id, video_url, model")
         .eq("id", body.sourceAssetId)
         .eq("user_id", userId)
         .maybeSingle();
-      if (!rendered?.output_url) return { error: "Source video not found", code: "SOURCE_NOT_FOUND" };
-      url = rendered.output_url;
-      assetId = rendered.id;
+      if (generated?.video_url) {
+        url = generated.video_url;
+        assetId = generated.id;
+        sourceModel = generated.model ?? undefined;
+      }
     }
+
+    if (!url && wantCreation) {
+      const { data: rendered } = await admin
+        .from("video_creations")
+        .select("id, output_url, metadata")
+        .eq("id", body.sourceAssetId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (rendered?.output_url) {
+        url = rendered.output_url;
+        assetId = rendered.id;
+        const meta = (rendered.metadata ?? {}) as Record<string, unknown>;
+        creationMetadata = meta;
+        const model = meta.model ?? meta.source_model;
+        if (typeof model === "string" && model) sourceModel = model;
+      }
+    }
+
+    if (!url) return { error: "Source video not found", code: "SOURCE_NOT_FOUND" };
   } else if (body.sourceUrl) {
     url = body.sourceUrl;
   } else {
@@ -127,6 +145,27 @@ async function resolveSource(
 
   try {
     const probed = await probeRemoteVideo(url);
+
+    // Client-supplied upload metadata is provisional. Replace it with what we
+    // measured ourselves and mark the asset as verified.
+    if (assetId && creationMetadata && creationMetadata.metadata_verified !== true) {
+      await admin
+        .from("video_creations")
+        .update({
+          framerate: probed.fps ?? null,
+          metadata: {
+            ...creationMetadata,
+            width: probed.width,
+            height: probed.height,
+            fps: probed.fps,
+            duration: probed.durationSeconds,
+            metadata_verified: true,
+          },
+        })
+        .eq("id", assetId)
+        .eq("user_id", userId);
+    }
+
     return { url, assetId, meta: { ...probed, sourceModel } };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
