@@ -122,6 +122,8 @@ export interface NormalizedPictureRequest {
   /** `auto` when the user added no style preset. */
   style: string;
   requestedFormat: string;
+  /** Exactly what the customer asked for — never rewritten. */
+  requestedFormat: string;
   resolvedFormat: ResolvedFormat;
   referenceInfluence: ReferenceInfluence;
   subjectRefCount: number;
@@ -529,6 +531,7 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
     transparentBackground,
     notices,
     appliedModifiers,
+    requestedFormat,
     resolvedFormat,
     referenceInfluence,
     normalizedRequest,
