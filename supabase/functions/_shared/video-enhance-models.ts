@@ -97,27 +97,17 @@ export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
     },
   },
   'topaz-video-upscale': {
-    id: 'topaz-video-upscale',
-    providerModelId: 'topazlabs/video-upscale',
-    providerSchemaRef: 'replicate/topazlabs-video-upscale@972107c4',
-    // The published schema has no model/mode input at all.
-    modes: ['standard'],
-    outputs: [
-      { resolution: '720p', fps: [30, 60] },
-      { resolution: '1080p', fps: [30, 60] },
-      { resolution: '4k', fps: [30, 60] },
-    ],
-    tiers: ['standard'],
-    minDurationSeconds: 1,
-    maxDurationSeconds: 120,
-    backendFlag: 'VIDEO_ENHANCE_TOPAZ_ENABLED',
-    buildInput(config, source, sourceUrl) {
-      return {
-        video: sourceUrl,
-        target_resolution: config.resolution,
-        target_fps: config.fps ?? Math.round(source.fps),
-      };
-    },
+    currency: 'USD',
+    type: 'per_unit',
+    unitUsd: TOPAZ_UNIT_USD,
+    unitsPerOutputSecond: TOPAZ_UNITS_PER_SECOND,
+    fpsFactor: { 30: 1, 60: 2 },
+    source:
+      'Unit price $0.08 verified from billed AdTool run 2026-09-06; unit consumption estimated from the published per-5s cost table',
+    checkedAt: '2026-09-06',
+    costUnverified: true,
+    estimatorCalibrating: true,
+    entries: TOPAZ_ENTRIES,
   },
 };
 
@@ -203,7 +193,7 @@ export function isModelUnlocked(
 // Rate cards — mirror of src/lib/videoEnhance/rates.ts
 // ---------------------------------------------------------------------------
 
-export const VIDEO_PROVIDER_PRICING_VERSION = 'video-rates-2026-09-05-unverified';
+export const VIDEO_PROVIDER_PRICING_VERSION = 'video-rates-2026-09-06-topaz-units';
 export const COST_DRIFT_WARN_RATIO = 0.15;
 export const COST_DRIFT_BLOCK_RATIO = 0.4;
 
@@ -220,6 +210,8 @@ interface RateCardMeta {
   source: string;
   checkedAt: string;
   costUnverified?: boolean;
+  /** true while the units/seconds estimator is not calibrated from real runs. */
+  estimatorCalibrating?: boolean;
 }
 
 export type VideoRateCard = RateCardMeta &
@@ -231,6 +223,7 @@ export type VideoRateCard = RateCardMeta &
         unitUsd: number;
         unitsPerOutputSecond: Partial<Record<VideoResolution, number>>;
         fpsFactor?: Record<number, number>;
+        entries?: MatrixEntry[];
       }
     | { type: 'tiered'; tiers: { maxOutputSeconds: number; usd: number }[] }
   );
@@ -273,6 +266,29 @@ const VCUBE_ENTRIES: MatrixEntry[] = VCUBE_MODES.flatMap((mode) =>
     }),
   ),
 );
+
+/**
+ * Topaz (`topazlabs/video-upscale`) is NOT billed per second: Replicate bills
+ * it in UNITS at a fixed unit price. The unit price is verified from a real
+ * AdTool run (2026-09-06, prediction cs3ez5g395rmt0d0eb7btzyrkr: 6 units
+ * billed at $0.08 = $0.48).
+ *
+ * The units-per-second estimator is NOT calibrated yet: the published
+ * per-5-second cost table implies ~19 units for that run while Replicate
+ * billed 6. The table below therefore stays deliberately conservative (it
+ * reproduces the published table) and the card is flagged
+ * `estimatorCalibrating` until several real runs across 1080p/30, 4K/30 and
+ * 4K/60 pin the real unit consumption down. The hard multiplier cap plus the
+ * post-run true-up make sure this over-estimate can never reach the customer.
+ */
+export const TOPAZ_UNIT_USD = 0.08;
+
+/** Published cost per 5 output seconds, converted to units at $0.08/unit. */
+const TOPAZ_UNITS_PER_SECOND: Partial<Record<VideoResolution, number>> = {
+  '720p': 0.027 / 5 / TOPAZ_UNIT_USD,
+  '1080p': 0.093 / 5 / TOPAZ_UNIT_USD,
+  '4k': 0.373 / 5 / TOPAZ_UNIT_USD,
+};
 
 /**
  * Topaz (`topazlabs/video-upscale`) publishes cost per 5 seconds of output by
