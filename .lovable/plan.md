@@ -5,7 +5,7 @@ Genau wie im Picture Studio: das schwierige Stück (Modelle, Preise, Wallet, Ers
 ## Was heute existiert (geprüft)
 
 - `director-cut-upscale` ist ein Altpfad: fester Credit-Tarif (15/25/50), veraltete Replicate-Version, ein Simulationsmodus ohne echtes Ergebnis, direkte Wallet-Abbuchung ohne Erstattung und ohne Speicherung des Ergebnisses. Der wird ersetzt, nicht erweitert.
-- Die Bild-Seite hat bereits alles Richtige: Registry + Flags (`src/config/pictureModels`), Rate Cards/FX/Margen-Kurve (`src/lib/pictureModels`), Server-Spiegel (`_shared/picture-enhance-models.ts`), Lineage, Erstattungslogik. Die Video-Engine wird 1:1 nach diesem Muster gebaut.
+- Die Bild-Seite hat bereits alles Richtige: Registry + Flags (`src/config/pictureModels`), Rate Cards/FX/Margen-Kurve (`src/lib/pictureModels`), Server-Spiegel (`_shared/picture-enhance-models.ts`), Lineage, Erstattungslogik. Die Video-Engine folgt diesem Muster — mit den video-spezifischen Verschärfungen unten.
 
 ## Architektur
 
@@ -26,29 +26,105 @@ Content Creator ┘
 
 Keine `MotionTopazService` / `DirectorsCutTopazService`. Ein Hook, eine Funktion, eine Registry, eine Preis-Engine.
 
-## Stufe 1 — Engine (das eigentliche Stück Arbeit)
+## Stufe 1 — Engine
 
-1. **Capability-Registry** `src/config/videoEnhanceModels/` — pro Modell: Fähigkeiten (`upscale`, `fps_interpolation`, `aigc_enhance`, `restoration`), maximale Auflösung/FPS, maximale Clip-Länge, Parameter (Scene, Quality Tier), Label + Positionierung ("Empfohlen" / "Professionelle Detailtreue"), Flag.
-   - `bytedance-vcube` — AI-Material, Upscale + FPS, bis 4K.
-   - `topaz-video-upscale` — echtes Filmmaterial, Detailtreue, bis 4K/60.
-   - Crystal/SeedVR2 nur als Einträge mit `comingSoon`, nicht ausführbar.
-   Die UI aller Oberflächen entsteht aus der Frage „welche aktiven Modelle können `upscale`?" — keine fest verdrahteten Modelllisten in Komponenten.
-2. **Preis-Engine** `src/lib/videoEnhance/` mit Server-Spiegel: Rate Card pro Modell (pro Sekunde × Auflösungs-/FPS-Faktor), FX-Kurs + Sicherheitspuffer, dieselbe Margen-Kurve und derselbe Deckungsbeitrags-Floor wie bei Bildern. Ein geteilter Fixture-Test beweist: gleiche Konfiguration = gleicher Preis in Studio, Motion Studio, Director's Cut, Content Creator.
-3. **Edge Function `video-enhance`** — Auth, serverseitige Modell-/Parameterprüfung (Frontend nie vertrauen), Flag- und Test-Allowlist-Gate, Preis serverseitig, Reservierung, Provider-Job, Poller, Persistenz des Ergebnisses als **neues** Video-Asset, genau eine idempotente Erstattung bei Provider-Fehler oder Timeout.
-4. **Nicht-destruktive Lineage**: Quelle bleibt erhalten, der Master ist ein Kind-Asset (`Seedance-Szene → Lip-Sync → Stitch → 4K-Master`). Mediathek zeigt beide, Vorher/Nachher-Vergleich wie im Picture Studio.
-5. **Empfehlungslogik** `recommendEnhancement(source, target)` — zentral, nicht pro Oberfläche: bereits 4K auf 4K-Ziel → „Schon optimal, zusätzliche Verbesserung bringt kaum etwas"; 720p/24 aus Seedance → „4K empfohlen"; Reels/TikTok → „1080p reicht, 4K kostet ohne Nutzen mehr".
-6. **Freischaltung dreistufig** wie bei Topaz-Bild: Frontend-Flag (Sichtbarkeit), Backend-Schalter (maßgeblich), Test-Allowlist für echte Läufe. Beide Modelle starten gesperrt als „bald verfügbar", bis zwei echte Läufe je Modell bestanden sind (Erfolg + absichtlicher Fehler mit genau einer Erstattung).
+### 1. Capability-Registry mit gültigen Kombinationen
+
+`src/config/videoEnhanceModels/`. Kein `maxResolution` + `maxFps` als unabhängige Obergrenzen — die UI würde daraus unzulässige Paare ableiten. Stattdessen eine explizite Ausgabetabelle pro Modell und Verarbeitungsmodus:
+
+```text
+outputs:
+  1080p: [24, 30, 60, 120]
+  4k:    [30, 60]
+```
+
+- `bytedance-vcube` — Modi (u. a. AIGC, UGC, Restoration), Kombinationen exakt nach dem **aktuell verwendeten** Replicate-Endpoint-Schema.
+- `topaz-video-upscale` — zunächst bis 60 FPS gemäß aktuellem offiziellem Schema. Werte aus älteren Modellversionen werden nicht vermischt; die Registry hält fest, auf welche Endpoint-Version/Schema-Fassung sie sich bezieht.
+- Jede Einschränkung ist serverseitig verbindlich; eine ungültige Kombination wird abgelehnt, nicht stillschweigend korrigiert.
+- Crystal/SeedVR2: existieren als `enabled = false`, werden aber **nicht** in der produktiven Modellauswahl angezeigt. Keine Karte verspricht etwas, was nicht rendert.
+
+### 2. ByteDance Pro als Berechtigung, nicht als Auswahl
+
+`standard` ist verfügbar; `pro` nur, wenn `providerEntitlementVerified` gesetzt ist — also nach einem echten Pro-Lauf über den AdTool-Replicate-Account. Vorher taucht Pro in keiner Oberfläche auf.
+
+### 3. Preis-Engine mit providerspezifischen Tarifkarten
+
+Keine generische `Sekunden × Auflösungsfaktor × FPS-Faktor`-Formel. Die Registry unterstützt mehrere Tariftypen:
+
+- `per_second_matrix` — `processingType × resolution × fps → USD/sec` (ByteDance, explizite Matrix aus der veröffentlichten Preistabelle)
+- `per_output_second`
+- `per_unit` (Topaz auf Replicate)
+- `tiered`
+
+Danach wie bei Bildern: FX-Kurs mit Sicherheitspuffer → Margen-Kurve → Deckungsbeitrags-Floor → Endpreis, plus vollständiger Preis-Snapshot am Lauf. Ein geteilter Fixture-Test beweist: gleiche Konfiguration = gleicher Preis in Studio, Mediathek, Motion Studio, Director's Cut, Content Creator. Jede Tarifkarte trägt Quelle und Prüfdatum; unbestätigte Werte sind als `costUnverified` markiert und blockieren die globale Freischaltung.
+
+### 4. Lebenszyklus — lokaler Timeout ist kein Provider-Fehler
+
+```text
+created → credits_reserved → provider_submitted → provider_processing
+→ provider_output_ready → asset_persisting → completed
+```
+
+Ergebnisklassen und ihre Folgen:
+
+| Ergebnis | Folge |
+| --- | --- |
+| `provider_failed` | Erstattung (genau eine, idempotent) |
+| `provider_cancelled_confirmed` | Erstattung gemäß tatsächlicher Kostenlage |
+| `local_poll_timeout` | **keine** Erstattung; Lauf bleibt offen, Abgleich läuft weiter |
+| `provider_success` | Ausgabe in den eigenen Speicher übernehmen |
+| `asset_persist_failed` | Speicherung erneut versuchen; **kein** zweiter Provider-Lauf, keine automatische Erstattung |
+
+Ein Abgleich-Job prüft offene Läufe später erneut beim Provider, bis ein autoritatives Ergebnis vorliegt. `completed` wird erst gesetzt, wenn die Datei im eigenen Speicher liegt — eine Provider-URL wird nie als dauerhafte Asset-Adresse gespeichert.
+
+### 5. Poll + Webhook von Anfang an, eine idempotente Finalisierung
+
+Persistiert werden `provider_prediction_id`, `provider_status`, `provider_output_url`, `provider_completed_at`. Poller und Webhook laufen in dieselbe Finalisierungsfunktion, geschützt über den Prediction-Key. Garantien (mit Tests): Webhook zuerst + Poll später = genau ein Asset; Poll zuerst + Webhook später = genau ein Asset; Funktions-Retry = keine zweite Abbuchung und kein zweiter Provider-Lauf.
+
+### 6. Nicht-destruktive Lineage
+
+Quelle bleibt erhalten, der Master ist ein Kind-Asset (`Seedance-Szene → Lip-Sync → Stitch → 4K-Master`). Mediathek zeigt beide, Vorher/Nachher-Vergleich wie im Picture Studio.
+
+### 7. Empfehlung aus Asset-Metadaten
+
+`recommendEnhancement({ sourceModel, resolution, fps, duration, destination })`, zentral und für alle Oberflächen gleich:
+
+- Seedance 720p/24 → Reels: „ByteDance vCube · AIGC · 1080p/30 empfohlen" (nicht 4K/60 verkaufen)
+- Kamera-Upload 1080p → YouTube 4K: „Topaz Video Upscale · 4K/30 empfohlen"
+- bereits 4K/30 auf 4K-Ziel: „Schon optimal — Verbesserung nicht nötig"
+
+### 8. Dreistufige Freischaltung
+
+Frontend-Flag (Sichtbarkeit), Backend-Schalter (maßgeblich), Test-Allowlist für echte Läufe. Beide Modelle starten gesperrt.
+
+## Freigabekriterien vor globaler Aktivierung
+
+Pro Modell mehr als nur Erfolg + Fehler:
+
+- **Topaz**: kleiner 1080p-Lauf · 4K/60-Lauf mit kürzestmöglicher Dauer · Provider-Fehler mit genau einer Erstattung · Persistenz-Retry
+- **ByteDance**: Standard + AIGC · Pro nur bei bestätigter Freischaltung · mindestens zwei Auflösungs-/FPS-Kombinationen zur Tarifprüfung · Provider-Fehler mit genau einer Erstattung · Persistenz-Retry
+- **Immer**: vorhergesagte Providerkosten gegen die tatsächliche Replicate-Abrechnung; Abweichung = Tarifkarte korrigieren, nicht freischalten. Sehr kurze Clips genügen.
 
 ## Stufe 2 — Einstiegspunkte (in dieser Reihenfolge)
 
 | Ort | Umfang |
 | --- | --- |
-| AI Video Studio | Voller Enhance-Bereich: Modellkarten, Auflösung 1080p/2K/4K, FPS Original/24/30/60, ByteDance-Zusatz (Scene, Quality), Preisvorschau, Vergleich |
+| AI Video Studio | Voller Enhance-Bereich: Modellkarten, Auflösung/FPS nur in gültigen Kombinationen, ByteDance-Zusatz (Scene, Tier), Preisvorschau, Vergleich |
 | Mediathek / Video-Lightbox | Schnellaktion „Video verbessern" auf jedem vorhandenen Video |
-| Nach jeder Generierung | Ergebnis-Aktion „Auf 4K verbessern" neben Download/Posten |
-| Motion Studio | Optionaler Schritt vor dem Export: Ausgabequalität Original / 1080p / 4K + Modell, mit Vorher-Nachher-Zeile und Zusatzkosten |
-| Director's Cut | Finaler Mastering-Schritt: Aus / Empfohlen / Eigene Einstellungen; „Empfohlen" wählt anhand der Projekt-Metadaten (überwiegend Seedance → ByteDance, echtes Uploadmaterial → Topaz) |
-| Universal Content Creator | Nur „Qualität verbessern" mit Empfehlungszeile und „Ändern" für Details; kanalabhängige Empfehlung |
+| Nach jeder Generierung | Ergebnis-Aktion „Verbessern" neben Download/Posten |
+| Motion Studio | Optionaler Schritt vor dem Export, vereinfacht (siehe unten) |
+| Director's Cut | Finaler Mastering-Schritt, gleiche vereinfachte Auswahl |
+| Universal Content Creator | Nur „Qualität verbessern" mit Empfehlungszeile und „Ändern" |
+
+**Vereinfachte Auswahl in Motion Studio und Director's Cut** — Auflösung ist nicht die erste Entscheidung:
+
+```text
+Finale Qualität
+  Original            keine Verbesserung
+  Empfohlen           ByteDance vCube · 1080p/30 — bestes Verhältnis für dieses Projekt
+  Hohe Qualität       ByteDance vCube · 4K/30
+  Eigene Einstellung  → Modell · Auflösung · FPS · Scene · Tier
+```
 
 Der Altpfad `director-cut-upscale` wird abgelöst, sobald der Director's-Cut-Einstieg steht.
 
@@ -58,8 +134,7 @@ Keine Änderung an Video-Generierung, Lip-Sync, Rendering, Wallet-Grundlogik ode
 
 ## Technische Details
 
-- Neue Dateien: `src/config/videoEnhanceModels/{index,types,models,flags}.ts`, `src/lib/videoEnhance/{rates,pricing,lineage,recommend}.ts`, `src/hooks/useEnhanceVideo.ts`, `supabase/functions/video-enhance/index.ts`, `supabase/functions/_shared/video-enhance-models.ts` (Server-Spiegel, Parity-Test).
-- Migration für die Enhance-Läufe inkl. GRANTs und besitzergebundener RLS; Ergebnis-Asset in der bestehenden Video-Persistenz (`video_creations`), Elternbezug über die Lineage-Spalte.
-- Verarbeitung ist asynchron: Job anlegen → Client pollt → bei Fertigstellung Datei in den eigenen Speicher übernehmen, nie eine ablaufende Provider-URL persistieren.
-- Tests: Registry↔Server-Parität, Preis-Fixtures über alle Einstiegspunkte, Erstattungs-Idempotenz, Empfehlungs-Matrix (Quelle × Ziel × Kanal), EN/DE/ES-Parität aller neuen Texte.
+- Neue Dateien: `src/config/videoEnhanceModels/{index,types,models,flags}.ts`, `src/lib/videoEnhance/{rates,pricing,lineage,recommend}.ts`, `src/hooks/useEnhanceVideo.ts`, `supabase/functions/video-enhance/index.ts`, `supabase/functions/video-enhance-webhook/index.ts`, `supabase/functions/video-enhance-reconcile/index.ts`, `supabase/functions/_shared/video-enhance-models.ts` (Server-Spiegel mit Parity-Test).
+- Migration für `video_enhance_runs` inkl. GRANTs und besitzergebundener RLS: Statusfeld nach obigem Lebenszyklus, Prediction-Key mit Eindeutigkeitsbedingung (Idempotenz), Erstattungsmarker, Preis-Snapshot, Elternbezug für die Lineage. Ergebnis-Asset in der bestehenden Video-Persistenz (`video_creations`).
+- Tests: Registry↔Server-Parität, Kombinationsvalidierung (ungültige Auflösungs-/FPS-Paare abgelehnt), Preis-Fixtures über alle Einstiegspunkte, Idempotenz für Webhook-vor-Poll / Poll-vor-Webhook / Funktions-Retry, `local_poll_timeout` erstattet nie, `asset_persist_failed` startet nie einen zweiten Provider-Lauf, Empfehlungs-Matrix (Quelle × Ziel × Kanal), EN/DE/ES-Parität aller neuen Texte.
 - Aufgabe wird zu Beginn in `roadmap.md` eingetragen.
