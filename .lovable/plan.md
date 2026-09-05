@@ -56,7 +56,18 @@ Zwei Durchgänge, jeweils Original vs. vCube AIGC vs. Topaz:
 1. KI-Material (Seedance-Clip A)
 2. Kameramaterial (Clip C)
 
-Bewertet werden: Gesichter, Haare, Haut, Texturen, Bewegungsdetails, Flimmern, zeitliche Konsistenz, Überschärfung/Halos, KI-Artefakte, Identitätstreue, Gesamtschärfe. Jeder Punkt bekommt eine kurze Bewertung plus Standbild-Ausschnitte im Bericht.
+Festes Punkteschema 1–5 je Spalte (Original / vCube AIGC / Topaz), immer dieselben Zeitmarken und 100-%-Ausschnitte:
+
+| Kriterium | Original | vCube AIGC | Topaz |
+|---|---|---|---|
+| Gesicht / Identität | 1–5 | 1–5 | 1–5 |
+| Haut | 1–5 | 1–5 | 1–5 |
+| Haare / Feindetail | 1–5 | 1–5 | 1–5 |
+| Zeitliche Stabilität | 1–5 | 1–5 | 1–5 |
+| Flimmern | 1–5 | 1–5 | 1–5 |
+| Artefakte | 1–5 | 1–5 | 1–5 |
+| Überschärfung / Halos | 1–5 | 1–5 | 1–5 |
+| Gesamteindruck | 1–5 | 1–5 | 1–5 |
 
 Erst wenn beide Durchgänge das bestätigen, werden die Empfehlungsregeln festgeschrieben („KI-Material → ByteDance", „Kameramaterial → Topaz"). Fällt das Ergebnis anders aus, wird die Regel dem Material angepasst, nicht dem Bauchgefühl.
 
