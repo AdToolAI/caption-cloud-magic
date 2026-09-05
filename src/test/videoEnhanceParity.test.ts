@@ -117,7 +117,7 @@ describe('combination validation parity', () => {
     });
   }
 
-  it('rejects an invalid combination instead of silently correcting it', () => {
+  it('rejects an invalid combination instead of silently correcting or guessing a price', () => {
     const config: EnhanceConfig = {
       modelId: 'bytedance-vcube',
       mode: 'restoration',
@@ -125,8 +125,9 @@ describe('combination validation parity', () => {
       fps: 30,
       tier: 'standard',
     };
-    expect(() => priceServer(config, source)).not.toThrow();
     expect(validateServer(config, 8, noEnv).ok).toBe(false);
+    // No rate card entry means no run — never a fallback price.
+    expect(() => priceServer(config, source)).toThrow(/no rate/i);
   });
 });
 
