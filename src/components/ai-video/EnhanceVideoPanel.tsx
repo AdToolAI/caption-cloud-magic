@@ -77,9 +77,13 @@ function tx(key: keyof typeof COPY, lang: Lang): string {
 interface Props {
   /** Preselected source, e.g. when opened from the media library. */
   initialSourceUrl?: string;
+  /** Preselected stored asset — keeps the parent/child lineage intact. */
+  initialSourceAssetId?: string;
+  /** Fired once the enhanced video exists in our own storage. */
+  onCompleted?: (outputUrl: string) => void;
 }
 
-export function EnhanceVideoPanel({ initialSourceUrl }: Props) {
+export function EnhanceVideoPanel({ initialSourceUrl, initialSourceAssetId, onCompleted }: Props) {
   const { user } = useAuth();
   const { language } = useTranslation();
   const lang: Lang = (['en', 'de', 'es'].includes(language) ? language : 'en') as Lang;
