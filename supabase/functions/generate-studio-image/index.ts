@@ -7,6 +7,8 @@ import {
   buildPictureRequest,
   blockingNotice,
 } from "../_shared/picturePromptBuilder.ts";
+import { readImageDimensions } from "../_shared/imageDimensions.ts";
+import { SOURCE_FORMAT } from "../_shared/pictureFormatResolution.ts";
 import { persistStudioImage } from "../_shared/studio-image-persist.ts";
 
 const corsHeaders = {
