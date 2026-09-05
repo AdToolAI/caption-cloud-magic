@@ -7,6 +7,7 @@ import {
   closestAspectRatioFor,
   resolveSize,
 } from "../_shared/pictureModelCapabilities.ts";
+import { persistStudioImage } from "../_shared/studio-image-persist.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
