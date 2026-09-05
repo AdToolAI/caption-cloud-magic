@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Download, Loader2, Sparkles, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -12,10 +11,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
+import { VideoSourcePicker } from '@/components/ai-video/VideoSourcePicker';
+import type { CanonicalVideoAsset } from '@/lib/videoEnhance/canonicalVideoAsset';
+import { isAiGeneratedSource } from '@/lib/videoEnhance/recommend';
 import {
   availableFps,
   availableResolutions,
@@ -31,6 +31,9 @@ import {
  *
  * Deliberately free of internal vocabulary: no rate cards, no cost
  * verification state, no calibration status. Those live in the admin area.
+ *
+ * Source identity is always a canonical asset ({ assetId, assetType }); the
+ * settings only appear once a source exists (progressive disclosure).
  */
 
 type Lang = 'en' | 'de' | 'es';
@@ -42,19 +45,10 @@ const COPY = {
     de: 'Ein fertiges Video schärfen und hochskalieren.',
     es: 'Nitidez y escalado de un vídeo terminado.',
   },
-  pickVideo: { en: 'Video', de: 'Video', es: 'Vídeo' },
-  pickVideoPlaceholder: {
-    en: 'Choose one of your videos',
-    de: 'Eines deiner Videos wählen',
-    es: 'Elige uno de tus vídeos',
-  },
-  noVideos: {
-    en: 'You have no finished videos yet.',
-    de: 'Du hast noch keine fertigen Videos.',
-    es: 'Todavía no tienes vídeos terminados.',
-  },
   engine: { en: 'Engine', de: 'Engine', es: 'Motor' },
   style: { en: 'Footage type', de: 'Materialart', es: 'Tipo de material' },
+  detectedFrom: { en: 'Detected from', de: 'Erkannt aus', es: 'Detectado de' },
+  change: { en: 'Change', de: 'Ändern', es: 'Cambiar' },
   resolution: { en: 'Resolution', de: 'Auflösung', es: 'Resolución' },
   fps: { en: 'Frames per second', de: 'Bilder pro Sekunde', es: 'Fotogramas por segundo' },
   keepFps: { en: 'Keep original', de: 'Original behalten', es: 'Mantener original' },
@@ -67,7 +61,23 @@ const COPY = {
   done: { en: 'Your enhanced video is ready.', de: 'Dein verbessertes Video ist fertig.', es: 'Tu vídeo mejorado está listo.' },
   download: { en: 'Download', de: 'Herunterladen', es: 'Descargar' },
   failed: { en: 'The enhancement did not finish.', de: 'Die Verbesserung wurde nicht abgeschlossen.', es: 'La mejora no se completó.' },
-  cancelled: { en: 'The enhancement was cancelled and your credit was returned.', de: 'Die Verbesserung wurde abgebrochen, dein Guthaben ist zurück.', es: 'La mejora se canceló y se devolvió tu saldo.' },
+  cancelled: { en: 'The enhancement was cancelled and your credit was returned.', de: 'Die Verbesserung wurde abgebrochen, dein Guthaben ist zurück.', es: 'La mejora se canceló und dein Guthaben ist zurück.' },
+  recommended: { en: 'recommended', de: 'empfohlen', es: 'recomendado' },
+  bestForAi: {
+    en: 'Best for AI-generated video',
+    de: 'Am besten für KI-generiertes Material',
+    es: 'Ideal para vídeo generado por IA',
+  },
+  bestForCamera: {
+    en: 'Best for camera and uploaded footage',
+    de: 'Am besten für Kamera- und Upload-Material',
+    es: 'Ideal para material de cámara y subidas',
+  },
+  alreadyHigh: {
+    en: 'Already high resolution · enhancement may provide limited benefit',
+    de: 'Bereits hohe Auflösung · Verbesserung bringt vermutlich wenig',
+    es: 'Ya es de alta resolución · la mejora puede aportar poco',
+  },
 } as const;
 
 function tx(key: keyof typeof COPY, lang: Lang): string {
@@ -75,16 +85,21 @@ function tx(key: keyof typeof COPY, lang: Lang): string {
 }
 
 interface Props {
-  /** Preselected source, e.g. when opened from the media library. */
-  initialSourceUrl?: string;
   /** Preselected stored asset — keeps the parent/child lineage intact. */
   initialSourceAssetId?: string;
+  initialSourceAssetType?: 'generation' | 'creation';
+  /** Deprecated fallback for surfaces not yet migrated to asset IDs. */
+  initialSourceUrl?: string;
   /** Fired once the enhanced video exists in our own storage. */
   onCompleted?: (outputUrl: string) => void;
 }
 
-export function EnhanceVideoPanel({ initialSourceUrl, initialSourceAssetId, onCompleted }: Props) {
-  const { user } = useAuth();
+export function EnhanceVideoPanel({
+  initialSourceAssetId,
+  initialSourceAssetType,
+  initialSourceUrl,
+  onCompleted,
+}: Props) {
   const { language } = useTranslation();
   const lang: Lang = (['en', 'de', 'es'].includes(language) ? language : 'en') as Lang;
 
@@ -93,40 +108,53 @@ export function EnhanceVideoPanel({ initialSourceUrl, initialSourceAssetId, onCo
   const model = getVideoEnhanceModel(modelId);
 
   const [mode, setMode] = useState(model?.processingModes[0]?.id ?? 'standard');
+  const [modeTouched, setModeTouched] = useState(false);
   const [resolution, setResolution] = useState<VideoResolution>('1080p');
   const [fps, setFps] = useState<number | null>(null);
-  const [sourceUrl, setSourceUrl] = useState<string | undefined>(initialSourceUrl);
+  const [asset, setAsset] = useState<CanonicalVideoAsset | null>(null);
 
-  const { run, estimate, isStarting, isRunning, error, previewPrice, startEnhance, cancelEnhance } =
+  const { run, estimate, sourceMeta, isStarting, isRunning, error, previewPrice, startEnhance, cancelEnhance } =
     useEnhanceVideo();
 
-  const { data: videos = [] } = useQuery({
-    queryKey: ['enhance-source-videos', user?.id],
-    enabled: !!user && !initialSourceUrl,
-    queryFn: async () => {
-      const { data, error: qErr } = await supabase
-        .from('ai_video_generations')
-        .select('id, video_url, prompt, created_at')
-        .eq('user_id', user!.id)
-        .eq('status', 'completed')
-        .not('video_url', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(30);
-      if (qErr) throw qErr;
-      return (data ?? []) as { id: string; video_url: string; prompt: string | null }[];
-    },
-  });
+  const legacySource = !asset && !!initialSourceAssetId;
+  const hasSource = !!asset || legacySource || (!asset && !!initialSourceUrl);
+
+  const source = useMemo(
+    () =>
+      asset
+        ? { assetId: asset.assetId, assetType: asset.assetType }
+        : { assetId: initialSourceAssetId, assetType: initialSourceAssetType, url: initialSourceUrl },
+    [asset, initialSourceAssetId, initialSourceAssetType, initialSourceUrl],
+  );
+
+  const aiSource = useMemo(() => {
+    const model = sourceMeta?.sourceModel ?? asset?.sourceModel ?? undefined;
+    if (asset?.origin === 'uploaded') return false;
+    return isAiGeneratedSource(model) || asset?.origin === 'generated';
+  }, [asset, sourceMeta]);
+
+  // Preselect the engine and the footage type from what we already know.
+  useEffect(() => {
+    if (!asset) return;
+    const preferred = aiSource ? 'bytedance-vcube' : 'topaz-video-upscale';
+    if (models.some((m) => m.id === preferred)) setModelId(preferred);
+    setModeTouched(false);
+  }, [asset, aiSource, models]);
 
   // Keep the configuration inside what the selected engine really supports.
   useEffect(() => {
     if (!model) return;
-    const nextMode = model.processingModes.some((m) => m.id === mode)
-      ? mode
+    const preferredMode =
+      !modeTouched && aiSource && model.processingModes.some((m) => m.id === 'aigc')
+        ? 'aigc'
+        : mode;
+    const nextMode = model.processingModes.some((m) => m.id === preferredMode)
+      ? preferredMode
       : model.processingModes[0].id;
     if (nextMode !== mode) setMode(nextMode);
     const resolutions = availableResolutions(model, nextMode);
     if (!resolutions.includes(resolution)) setResolution(resolutions[0]);
-  }, [model, mode, resolution]);
+  }, [model, mode, modeTouched, aiSource, resolution]);
 
   const fpsChoices = model ? availableFps(model, mode, resolution) : [];
   useEffect(() => {
@@ -137,21 +165,16 @@ export function EnhanceVideoPanel({ initialSourceUrl, initialSourceAssetId, onCo
     ? { modelId: model.id, mode, resolution, fps, tier: availableTiers(model)[0] ?? 'standard' }
     : null;
 
-  const source = useMemo(
-    () => ({ url: sourceUrl, assetId: sourceUrl === initialSourceUrl ? initialSourceAssetId : undefined }),
-    [sourceUrl, initialSourceUrl, initialSourceAssetId],
-  );
-
   useEffect(() => {
-    if (!config || !sourceUrl) return;
+    if (!config || !hasSource) return;
     void previewPrice(source, config);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceUrl, modelId, mode, resolution, fps]);
+  }, [source, modelId, mode, resolution, fps, hasSource]);
 
   const onStart = useCallback(() => {
-    if (!config || !sourceUrl) return;
+    if (!config || !hasSource) return;
     void startEnhance(source, config);
-  }, [config, sourceUrl, source, startEnhance]);
+  }, [config, hasSource, source, startEnhance]);
 
   // Notify the host surface exactly once per finished run.
   const notifiedRef = useRef<string | null>(null);
@@ -161,7 +184,6 @@ export function EnhanceVideoPanel({ initialSourceUrl, initialSourceAssetId, onCo
       onCompleted?.(run.output_url);
     }
   }, [run, onCompleted]);
-
 
   if (!model) return null;
 
@@ -173,6 +195,13 @@ export function EnhanceVideoPanel({ initialSourceUrl, initialSourceAssetId, onCo
         }).format(estimate.userPriceEur)
       : tx('calculating', lang);
 
+  // Server-measured facts win over anything the browser read.
+  const sourceHeight = sourceMeta?.height ?? asset?.height ?? null;
+  const alreadyHigh = !!sourceHeight && sourceHeight >= 2000;
+  const recommendedModel = aiSource ? 'ByteDance vCube' : 'Topaz Video Upscale';
+
+  const autoDetectedFootage = !modeTouched && !!asset && model.processingModes.length > 1;
+
   return (
     <Card className="p-6 space-y-6 bg-card/60 backdrop-blur-sm border-border">
       <div>
@@ -180,98 +209,107 @@ export function EnhanceVideoPanel({ initialSourceUrl, initialSourceAssetId, onCo
         <p className="text-sm text-muted-foreground">{tx('subtitle', lang)}</p>
       </div>
 
-      {!initialSourceUrl && (
-        <div className="space-y-2">
-          <Label>{tx('pickVideo', lang)}</Label>
-          {videos.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{tx('noVideos', lang)}</p>
-          ) : (
-            <Select value={sourceUrl} onValueChange={setSourceUrl}>
-              <SelectTrigger>
-                <SelectValue placeholder={tx('pickVideoPlaceholder', lang)} />
-              </SelectTrigger>
-              <SelectContent>
-                {videos.map((v) => (
-                  <SelectItem key={v.id} value={v.video_url}>
-                    {(v.prompt ?? v.id).slice(0, 60)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
+      {!initialSourceUrl && !initialSourceAssetId && (
+        <VideoSourcePicker selected={asset} onSelect={setAsset} />
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label>{tx('engine', lang)}</Label>
-          <Select value={modelId} onValueChange={setModelId}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {models.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.name} — {m.positioning[lang]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      {hasSource && (
+        <p className="text-sm text-primary/90">
+          {alreadyHigh
+            ? `✓ ${tx('alreadyHigh', lang)}`
+            : `✦ ${recommendedModel} ${tx('recommended', lang)} · ${aiSource ? tx('bestForAi', lang) : tx('bestForCamera', lang)}`}
+        </p>
+      )}
 
-        {model.processingModes.length > 1 && (
-          <div className="space-y-2">
-            <Label>{tx('style', lang)}</Label>
-            <Select value={mode} onValueChange={setMode}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {model.processingModes.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>{m.label[lang]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      {hasSource && (
+        <>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>{tx('engine', lang)}</Label>
+              <Select value={modelId} onValueChange={setModelId}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {models.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.name} — {m.positioning[lang]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {model.processingModes.length > 1 && (
+              <div className="space-y-2">
+                <Label>{tx('style', lang)}</Label>
+                <Select
+                  value={mode}
+                  onValueChange={(v) => {
+                    setModeTouched(true);
+                    setMode(v);
+                  }}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {model.processingModes.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>{m.label[lang]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {autoDetectedFootage && (asset?.sourceModel || asset?.origin) && (
+                  <p className="text-xs text-muted-foreground">
+                    {tx('detectedFrom', lang)}{' '}
+                    {asset?.sourceModel ??
+                      (asset?.origin === 'uploaded'
+                        ? tx('style', lang)
+                        : recommendedModel)}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>{tx('resolution', lang)}</Label>
+              <Select value={resolution} onValueChange={(v) => setResolution(v as VideoResolution)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {availableResolutions(model, mode).map((r) => (
+                    <SelectItem key={r} value={r}>{r.toUpperCase()}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>{tx('fps', lang)}</Label>
+              <Select
+                value={fps === null ? 'source' : String(fps)}
+                onValueChange={(v) => setFps(v === 'source' ? null : Number(v))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="source">{tx('keepFps', lang)}</SelectItem>
+                  {fpsChoices.map((f) => (
+                    <SelectItem key={f} value={String(f)}>{f} FPS</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        )}
 
-        <div className="space-y-2">
-          <Label>{tx('resolution', lang)}</Label>
-          <Select value={resolution} onValueChange={(v) => setResolution(v as VideoResolution)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {availableResolutions(model, mode).map((r) => (
-                <SelectItem key={r} value={r}>{r.toUpperCase()}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label>{tx('fps', lang)}</Label>
-          <Select
-            value={fps === null ? 'source' : String(fps)}
-            onValueChange={(v) => setFps(v === 'source' ? null : Number(v))}
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="source">{tx('keepFps', lang)}</SelectItem>
-              {fpsChoices.map((f) => (
-                <SelectItem key={f} value={String(f)}>{f} FPS</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 p-4">
-        <div className="text-sm">
-          <p className="text-muted-foreground">{tx('output', lang)}</p>
-          <p className="font-medium">
-            {resolution.toUpperCase()} · {fps === null ? tx('keepFps', lang) : `${fps} FPS`}
-          </p>
-        </div>
-        <div className="text-right text-sm">
-          <p className="text-muted-foreground">{tx('price', lang)}</p>
-          <p className="font-bold text-lg">{sourceUrl ? priceLabel : '—'}</p>
-        </div>
-      </div>
+          <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 p-4">
+            <div className="text-sm">
+              <p className="text-muted-foreground">{tx('output', lang)}</p>
+              <p className="font-medium">
+                {resolution.toUpperCase()} · {fps === null ? tx('keepFps', lang) : `${fps} FPS`}
+              </p>
+            </div>
+            <div className="text-right text-sm">
+              <p className="text-muted-foreground">{tx('price', lang)}</p>
+              <p className="font-bold text-lg">{priceLabel}</p>
+            </div>
+          </div>
+        </>
+      )}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -292,21 +330,23 @@ export function EnhanceVideoPanel({ initialSourceUrl, initialSourceAssetId, onCo
         <p className="text-sm text-muted-foreground">{tx('cancelled', lang)}</p>
       ) : null}
 
-      <div className="flex gap-3">
-        <Button onClick={onStart} disabled={!sourceUrl || isStarting || isRunning} className="flex-1">
-          {isStarting || isRunning ? (
-            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{tx('running', lang)}</>
-          ) : (
-            <><Sparkles className="w-4 h-4 mr-2" />{tx('start', lang)}</>
-          )}
-        </Button>
-        {isRunning && run && (
-          <Button variant="outline" onClick={() => void cancelEnhance(run.id)}>
-            <XCircle className="w-4 h-4 mr-2" />
-            {tx('cancel', lang)}
+      {hasSource && (
+        <div className="flex gap-3">
+          <Button onClick={onStart} disabled={isStarting || isRunning} className="flex-1">
+            {isStarting || isRunning ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{tx('running', lang)}</>
+            ) : (
+              <><Sparkles className="w-4 h-4 mr-2" />{tx('start', lang)}</>
+            )}
           </Button>
-        )}
-      </div>
+          {isRunning && run && (
+            <Button variant="outline" onClick={() => void cancelEnhance(run.id)}>
+              <XCircle className="w-4 h-4 mr-2" />
+              {tx('cancel', lang)}
+            </Button>
+          )}
+        </div>
+      )}
     </Card>
   );
 }
