@@ -7,7 +7,8 @@ import {
 } from "../_shared/video-enhance-finalize.ts";
 import {
   backoffMinutes,
-  RECONCILE_HORIZON_MINUTES,
+  extractProviderCost,
+  manualReviewAfterMinutes,
   setStatus,
   STAGING_BUCKET,
 } from "../_shared/video-enhance-runtime.ts";
@@ -63,6 +64,8 @@ serve(async (req) => {
     if (!apiKey) return json({ error: "REPLICATE_API_KEY not configured" }, 500);
 
     const nowIso = new Date().toISOString();
+    // Configurable, so a slow provider queue can be absorbed without a deploy.
+    const horizonMinutes = manualReviewAfterMinutes((key) => Deno.env.get(key));
     const { data: runs } = await admin
       .from("video_enhance_runs")
       .select("*")
@@ -89,7 +92,7 @@ serve(async (req) => {
 
       if (!run.provider_prediction_id) {
         // No prediction id and no webhook yet: nothing authoritative to read.
-        if (ageMinutes > RECONCILE_HORIZON_MINUTES) {
+        if (ageMinutes > horizonMinutes) {
           await setStatus(admin, run.id, "manual_review", {
             error_code: "NO_PROVIDER_REFERENCE",
             reconciliation_attempts: attempts,
@@ -114,8 +117,7 @@ serve(async (req) => {
         continue;
       }
       const prediction = await res.json();
-      const actualCostUsd =
-        typeof prediction?.metrics?.total_cost === "number" ? prediction.metrics.total_cost : undefined;
+      const providerCost = extractProviderCost(prediction);
 
       if (prediction.status === "succeeded") {
         const output = prediction.output;
@@ -128,7 +130,7 @@ serve(async (req) => {
                 ? output.url
                 : null;
         if (outputUrl) {
-          const result = await finalizeSuccess(admin, run, outputUrl, actualCostUsd);
+          const result = await finalizeSuccess(admin, run, outputUrl, providerCost);
           if (result.ok) summary.completed++;
           else summary.pending++;
         } else {
@@ -141,7 +143,7 @@ serve(async (req) => {
       } else if (prediction.status === "canceled") {
         await finalizeCancelConfirmed(admin, run);
         summary.cancelled++;
-      } else if (ageMinutes > RECONCILE_HORIZON_MINUTES) {
+      } else if (ageMinutes > horizonMinutes) {
         // Horizon reached without an authoritative verdict: visible to admins,
         // never an automatic refund.
         await setStatus(admin, run.id, "manual_review", {
