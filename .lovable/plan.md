@@ -45,6 +45,11 @@ Bereits gespeichert: Modell, Modus/Tier, Quellmodell, Quellmaße/Bildrate/Dauer,
 
 Neue Kalibrierungs-Ansicht je Modell: Läufe gesamt, erfolgreiche Läufe, Fehlerquote, mittlerer und Median-Schätzfehler, Median-Ist-Faktor, Abdeckung echter Kosten in Prozent, Summe und Quote der Gutschriften, Durchschnitts-/Median-Verarbeitungszeit, Verteilung nach Auflösung/Bildrate/Modus. Für Topaz zusätzlich geschätzte vs. tatsächliche Einheiten je Dauer, Ausgabemaß und Bildrate, damit die echte Einheitenformel ableitbar wird.
 
+**Zwei getrennte Blöcke, optisch klar unterschieden:**
+
+- „Kalibrierung" — Abrechnung verifiziert, Schätzer kalibrierend, Kostenabdeckung in Prozent, Schätzfehler. Reine Beobachtung.
+- „Betriebsstatus" — 🟢 Live oder 🔴 Not-Aus aktiv. Nur dieser Block sagt aus, ob ein Modell für Nutzer läuft.
+
 ## 8. Re-Kalibrierung
 
 Historische Preise werden nie rückwirkend geändert. Bei 25, 50, 100 und danach fortlaufend je 100 erfolgreichen Läufen pro Modell entsteht ein Pricing-/Estimator-Report im Admin; ab 50–100 Läufen wird der Schätzer aus echten Daten neu gesetzt (bewusste Entscheidung, kein Automatismus auf den Preis).
