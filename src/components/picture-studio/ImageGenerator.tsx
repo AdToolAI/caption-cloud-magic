@@ -369,10 +369,31 @@ export function ImageGenerator() {
     void uploadReference(file, setReferenceImage);
   };
 
-  // Reference #1 gone -> no Source dimensions any more.
+  /**
+   * Source is bound to reference #1 and to nothing else:
+   *  - reference #1 gone            -> no Source dimensions
+   *  - reference #1 from a URL       -> measure that URL (restored session,
+   *    media library, active asset). Additional references never measure.
+   */
   useEffect(() => {
-    if (!referenceImage) setSourceDimensions(null);
+    if (!referenceImage) {
+      setSourceDimensions(null);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      if (cancelled) return;
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setSourceDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+      }
+    };
+    img.onerror = () => { /* keep whatever we measured from the file itself */ };
+    img.src = referenceImage;
+    return () => { cancelled = true; };
   }, [referenceImage]);
+
 
   const handleExtraRefUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
