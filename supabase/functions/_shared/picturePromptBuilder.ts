@@ -401,6 +401,7 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
         text: `${brandParts.join('. ')}.`,
         label: { de: 'Brand-Kit', en: 'Brand kit', es: 'Brand Kit' },
       });
+      appliedModifiers.push({ source: 'brand', id: 'brand:kit' });
     }
   }
 
