@@ -29,4 +29,7 @@ export type {
   PicturePromptInput,
   BuiltPictureRequest,
   StrengthBucket,
+  AppliedModifier,
+  ReferenceInfluence,
+  NormalizedPictureRequest,
 } from '../../supabase/functions/_shared/picturePromptBuilder';
