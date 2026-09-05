@@ -18455,6 +18455,41 @@ export type Database = {
           },
         ]
       }
+      video_enhance_cost_closure_audit: {
+        Row: {
+          action: string
+          admin_user_id: string
+          created_at: string
+          id: string
+          reason: string
+          run_id: string
+        }
+        Insert: {
+          action: string
+          admin_user_id: string
+          created_at?: string
+          id?: string
+          reason: string
+          run_id: string
+        }
+        Update: {
+          action?: string
+          admin_user_id?: string
+          created_at?: string
+          id?: string
+          reason?: string
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_enhance_cost_closure_audit_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "video_enhance_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_enhance_ledger: {
         Row: {
           amount_eur: number
@@ -18503,9 +18538,14 @@ export type Database = {
           actual_margin_pct: number | null
           actual_units: number | null
           actual_width: number | null
+          calibration_reason: string | null
+          calibration_status: string
           callback_token: string
           cancel_requested_at: string | null
           contribution_eur: number | null
+          cost_closed_at: string | null
+          cost_closed_by: string | null
+          cost_closure_reason: string | null
           cost_drift_ratio: number | null
           created_at: string
           credits_reserved: number
@@ -18520,12 +18560,14 @@ export type Database = {
           id: string
           idempotency_key: string
           last_reconciled_at: string | null
+          late_cost_attempts: number
           margin_pct: number | null
           mode: string
           model_id: string
           multiplier_cap: number | null
           multiplier_used: number | null
           net_revenue_eur: number | null
+          next_late_check_at: string | null
           next_reconcile_at: string | null
           output_asset_id: string | null
           output_url: string | null
@@ -18584,9 +18626,14 @@ export type Database = {
           actual_margin_pct?: number | null
           actual_units?: number | null
           actual_width?: number | null
+          calibration_reason?: string | null
+          calibration_status?: string
           callback_token: string
           cancel_requested_at?: string | null
           contribution_eur?: number | null
+          cost_closed_at?: string | null
+          cost_closed_by?: string | null
+          cost_closure_reason?: string | null
           cost_drift_ratio?: number | null
           created_at?: string
           credits_reserved?: number
@@ -18601,12 +18648,14 @@ export type Database = {
           id?: string
           idempotency_key: string
           last_reconciled_at?: string | null
+          late_cost_attempts?: number
           margin_pct?: number | null
           mode: string
           model_id: string
           multiplier_cap?: number | null
           multiplier_used?: number | null
           net_revenue_eur?: number | null
+          next_late_check_at?: string | null
           next_reconcile_at?: string | null
           output_asset_id?: string | null
           output_url?: string | null
@@ -18665,9 +18714,14 @@ export type Database = {
           actual_margin_pct?: number | null
           actual_units?: number | null
           actual_width?: number | null
+          calibration_reason?: string | null
+          calibration_status?: string
           callback_token?: string
           cancel_requested_at?: string | null
           contribution_eur?: number | null
+          cost_closed_at?: string | null
+          cost_closed_by?: string | null
+          cost_closure_reason?: string | null
           cost_drift_ratio?: number | null
           created_at?: string
           credits_reserved?: number
@@ -18682,12 +18736,14 @@ export type Database = {
           id?: string
           idempotency_key?: string
           last_reconciled_at?: string | null
+          late_cost_attempts?: number
           margin_pct?: number | null
           mode?: string
           model_id?: string
           multiplier_cap?: number | null
           multiplier_used?: number | null
           net_revenue_eur?: number | null
+          next_late_check_at?: string | null
           next_reconcile_at?: string | null
           output_asset_id?: string | null
           output_url?: string | null
