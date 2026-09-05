@@ -13,6 +13,13 @@ import { ImageCard } from "@/components/picture-studio/ImageCard";
 import { StudioLightbox } from "@/components/picture-studio/StudioLightbox";
 import { SaveToAlbumDialog } from "@/components/picture-studio/SaveToAlbumDialog";
 import { Badge } from "@/components/ui/badge";
+import { useTranslation } from "react-i18next";
+import { useCollectionCounts } from "@/hooks/useCollectionCounts";
+import {
+  sortedCollections,
+  collectionLabel,
+  type MediaCollection,
+} from "@/config/mediaCollections";
 
 const SYSTEM_ALBUM_NAME = "KI Picture Studio";
 
