@@ -21132,6 +21132,15 @@ export type Database = {
           source_provider: string
         }[]
       }
+      video_model_runtime_stats: {
+        Args: never
+        Returns: {
+          model: string
+          p50_seconds: number
+          p90_seconds: number
+          sample_size: number
+        }[]
+      }
       voice_library_facets: {
         Args: { _language?: string; _native_only?: boolean; _search?: string }
         Returns: Json
