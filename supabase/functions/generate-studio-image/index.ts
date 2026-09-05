@@ -3,6 +3,10 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { fetchWithTimeout, isTimeoutError } from "../_shared/timeout.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
+import {
+  buildPictureRequest,
+  blockingNotice,
+} from "../_shared/picturePromptBuilder.ts";
 import { persistStudioImage } from "../_shared/studio-image-persist.ts";
 
 const corsHeaders = {
@@ -124,6 +128,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       editMode = false,
       textFree = false,
       mode = 'create',
+      strength,
+      transparentBackground = false,
+      brandKit = null,
     } = await req.json();
 
     if (!prompt) {
@@ -144,73 +151,49 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       });
     }
 
-    // Style modifiers
-    const styleModifiers: Record<string, string> = {
-      realistic: 'photorealistic, 8k, ultra-detailed, natural lighting, professional photography',
-      cinematic: 'cinematic composition, dramatic lighting, anamorphic lens flare, movie still, color graded',
-      watercolor: 'delicate watercolor painting, soft washes, paper texture, artistic brushstrokes',
-      'neon-cyberpunk': 'neon-lit cyberpunk, vibrant glowing lights, futuristic cityscape, synthwave colors',
-      anime: 'anime art style, cel-shaded, vibrant colors, Studio Ghibli inspired',
-      'oil-painting': 'classical oil painting, rich textures, impasto technique, museum quality',
-      'pop-art': 'pop art style, bold colors, halftone dots, Andy Warhol inspired',
-      minimalist: 'minimalist design, clean lines, negative space, simple elegant composition',
-      vintage: 'vintage photograph, film grain, sepia tones, retro 1970s aesthetic',
-      fantasy: 'epic fantasy art, magical atmosphere, ethereal lighting, detailed world-building',
-      'product-photo': 'professional product photography, studio lighting, clean background, commercial quality',
-      abstract: 'abstract art, geometric shapes, bold color palette, contemporary art',
-      sketch: 'detailed pencil sketch, cross-hatching, hand-drawn illustration',
-      '3d-render': '3D rendered, octane render, volumetric lighting, subsurface scattering',
-      noir: 'film noir style, high contrast black and white, dramatic shadows, moody atmosphere',
-      pastel: 'soft pastel colors, dreamy atmosphere, gentle lighting, ethereal mood',
-      comic: 'comic book art style, bold outlines, vibrant panel art, dynamic composition',
-      surreal: 'surrealist art, dreamlike imagery, impossible geometry, Salvador Dalí inspired',
-      architectural: 'architectural visualization, clean lines, modern design, dramatic perspective',
-      editorial: 'editorial fashion photography, high-end magazine style, bold composition',
-    };
+    // --- Deterministic prompt assembly (shared with the Picture Studio UI) --
+    // The caller's TEXT-FREE MANDATE block (used by other studios) must stay
+    // the last paragraph, so it is split off before the builder runs.
+    const textFreeIdx = textFree ? prompt.indexOf('TEXT-FREE MANDATE') : -1;
+    const userHead = textFreeIdx > 0 ? prompt.slice(0, textFreeIdx).trim() : String(prompt).trim();
+    const textFreeTail = textFreeIdx > 0 ? prompt.slice(textFreeIdx).trim() : '';
 
-    const isBrandLogo = style === 'brand-logo';
-    let enhancedPrompt: string;
-
-    if (isBrandLogo) {
-      enhancedPrompt = `Create ONLY a flat, 2D logo design. The logo must fill 70-90% of the image area and be perfectly centered.
-
-SUBJECT: ${prompt}
-
-MANDATORY RULES:
-- Output ONLY the logo/logomark/wordmark itself
-- The logo must be a clean, flat, vector-style graphic
-- Use bold, simple, iconic shapes with clear negative space
-- NO background elements, NO gradients behind the logo
-- NO mockups, NO products, NO cameras, NO tables, NO scenes
-- NO 3D rendering, NO photographic elements, NO realistic textures
-- NO business cards, NO letterheads, NO branding collateral
-- NO decorative frames or borders around the logo
-- Place the logo on a plain solid white background (#FFFFFF)
-- The logo should look like it was designed in Adobe Illustrator
-- Professional corporate identity quality, scalable design
-- Aspect ratio: ${aspectRatio}`;
-    } else {
-      const stylePrompt = styleModifiers[style] || styleModifiers.realistic;
-      if (textFree) {
-        // Der Textverbots-Block des Aufrufers muss der letzte Absatz bleiben —
-        // Stil und Seitenverhältnis werden deshalb davor eingefügt.
-        const idx = prompt.indexOf('TEXT-FREE MANDATE');
-        const head = idx > 0 ? prompt.slice(0, idx).trim() : prompt.trim();
-        const tail = idx > 0 ? prompt.slice(idx).trim() : '';
-        enhancedPrompt = `${head}\nStyle: ${stylePrompt}. Aspect ratio: ${aspectRatio}.\n\n${tail}\nDo not render any text of any kind.`.trim();
-      } else {
-        enhancedPrompt = `${prompt}. Style: ${stylePrompt}. Aspect ratio: ${aspectRatio}.`;
-      }
-    }
-
-    // Build messages — Gemini chat shape accepts multiple reference images
-    // (capability matrix: 3 subject + 1 style, see _shared/pictureModelCapabilities.ts).
-    const refUrls: string[] = [
+    const subjectRefsIn = [
       ...(Array.isArray(referenceImageUrls) ? referenceImageUrls : []),
       ...(referenceImageUrl ? [referenceImageUrl] : []),
+    ].filter(Boolean);
+    const styleRefsIn = [
       ...(Array.isArray(styleReferenceUrls) ? styleReferenceUrls : []),
       ...(styleReferenceUrl ? [styleReferenceUrl] : []),
     ].filter(Boolean);
+
+    const built = buildPictureRequest({
+      tier: 'standard',
+      mode,
+      prompt: userHead,
+      style,
+      aspectRatio,
+      subjectRefs: subjectRefsIn,
+      styleRefs: styleRefsIn,
+      strength: typeof strength === 'number' ? strength : undefined,
+      transparentBackground,
+      brandKit,
+    });
+
+    const blocker = blockingNotice(built);
+    if (blocker) {
+      return new Response(JSON.stringify({ ok: false, code: blocker.code, step: 'validation', error: tl(blocker.message) }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const enhancedPrompt = textFreeTail
+      ? `${built.prompt}\n\n${textFreeTail}\nDo not render any text of any kind.`.trim()
+      : built.prompt;
+
+    // Build messages — Gemini chat shape accepts multiple reference images
+    // (capability matrix: 3 subject + 1 style, see _shared/pictureModelCapabilities.ts).
+    const refUrls: string[] = mode === 'create' ? [] : [...subjectRefsIn, ...styleRefsIn];
     if (refUrls.length > 4) {
       return new Response(JSON.stringify({ ok: false, code: 'REFERENCE_LIMIT_EXCEEDED', step: 'validation', error: 'Gemini accepts at most 4 reference images' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
