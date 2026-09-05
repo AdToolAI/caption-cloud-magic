@@ -61,6 +61,7 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [savingVideo, setSavingVideo] = useState<string | null>(null);
   const currency = getCurrencyForLanguage(language);
+  const { data: runtimeStats } = useVideoModelRuntimeStats();
   const dateLocale = dateFnsLocales[language as keyof typeof dateFnsLocales] || enUS;
 
   const { data: generations, isLoading, refetch } = useQuery({
