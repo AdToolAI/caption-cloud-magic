@@ -20,13 +20,17 @@ import {
 import { getVideoEnhanceModel } from '@/config/videoEnhanceModels';
 import type { EnhanceConfig, SourceMetadata } from '@/config/videoEnhanceModels';
 
-const source = (over: Partial<SourceMetadata> = {}): SourceMetadata => ({
-  durationSeconds: 20,
-  width: 1080,
-  height: 1920,
-  fps: 30,
-  ...over,
-});
+const source = (over: Partial<SourceMetadata> = {}): SourceMetadata =>
+  ({
+    durationSeconds: 20,
+    width: 1080,
+    height: 1920,
+    fps: 30,
+    container: 'mp4',
+    sizeBytes: 8_000_000,
+    sourceModel: 'test',
+    ...over,
+  }) as SourceMetadata;
 
 /** Every combination each model really offers — no hand-picked happy path. */
 function allCombinations(): EnhanceConfig[] {

@@ -90,7 +90,9 @@ export function extractProviderCost(prediction: any): ProviderCostReading {
   return { source: 'unavailable' };
 }
 
-export function ledgerKey(runId: string, operation: 'reserve' | 'capture' | 'release'): string {
+export type LedgerOperation = 'reserve' | 'capture' | 'release' | 'true_up_refund';
+
+export function ledgerKey(runId: string, operation: LedgerOperation): string {
   return `video_enhance:${runId}:${operation}`;
 }
 
@@ -114,7 +116,7 @@ export async function walletOperation(
   params: {
     runId: string;
     userId: string;
-    operation: 'reserve' | 'capture' | 'release' | 'true_up_refund';
+    operation: LedgerOperation;
     amountEur: number;
     note?: string;
   },
