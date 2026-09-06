@@ -9627,6 +9627,8 @@ export const translations: Record<Language, any> = {
       completed: "Video fertig!",
       renderFailed: "Fehler beim Rendering",
       estimatedRemaining: "Geschätzte Restzeit: {time}",
+      elapsedTime: "{time} vergangen",
+      typicalDuration: "Üblich für {quality}: {range} Min",
       downloadVideo: "Video herunterladen",
       backToEditor: "Zurück zum Editor",
       retryRender: "Erneut versuchen",
