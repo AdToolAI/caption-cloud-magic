@@ -52,9 +52,10 @@ function direct(overrides: Partial<EnhanceConfig> = {}): EnhanceConfig {
 
 /** Mirrors the server: adapt to the executing spec, then resolve the mode. */
 function serverPayload(requested: EnhanceConfig, source: SourceMetadata, modeExplicit: boolean) {
-  const spec = VIDEO_ENHANCE_SPECS[requested.modelId];
+  // `vcube` is the EXECUTING spec (after routing); the flag only counts when
+  // the customer chose the mode for that very engine.
   const adapted = adaptConfigToSpec(requested, vcube, source);
-  const explicit = modeExplicit && spec.id === requested.modelId && spec.id === vcube.id;
+  const explicit = modeExplicit && vcube.id === requested.modelId;
   const mode = resolveExecutionMode(adapted, vcube, source, explicit);
   const config: EnhanceConfig = { ...adapted, mode: mode.mode };
   return { config, mode, payload: vcube.buildInput(config, source, SOURCE_URL) };
