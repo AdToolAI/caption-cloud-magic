@@ -51,6 +51,8 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
 }) => {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
+  const [enhanceOpen, setEnhanceOpen] = useState(false);
+
 
   const isRunning = isVisible && status !== 'completed' && status !== 'failed';
 
