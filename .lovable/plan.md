@@ -17,13 +17,25 @@ Nicht aus dem Code belegbar sind Existenz und Fähigkeiten der neuen Generatione
 
 ## Phase 1 — Zentrale Video Capability Registry
 
-Neu: `supabase/functions/_shared/videoModelSpecs.ts` als alleinige Wahrheit, gespiegelt über `src/config/videoModelSpecs.ts` (Muster wie `pictureModelCapabilities.ts`).
+Neu: `supabase/functions/_shared/videoModelSpecs.ts` als **kanonische, einzig manuell gepflegte** Quelle. `src/config/videoModelSpecs.ts` ist kein zweiter Spiegel, sondern wird per Skript daraus **generiert** (Header „generated — do not edit"), und ein Hash-/Parity-Test im CI schlägt fehl, sobald der generierte Client-Stand vom Server-Stand abweicht.
 
-Modell-Ebene: interne ID, Anzeigename, Familie, Generation, Provider, echter Provider-Slug, API-Route, API-Version, Release-Status, `deprecated`, `supersededBy`, `lastVerifiedAt`, `providerDocsVersion`, `available`.
+Modell-Ebene: interne ID, Anzeigename, Familie, Generation, Provider, echter Provider-Slug, **API-Route und Region**, API-Version, Release-Status, `deprecated`, `supersededBy`, `lastVerifiedAt`, `providerDocsVersion`, `available`, `parityStatus`. Ein Modell, das über mehrere Routen erreichbar ist (z. B. MiniMax direkt vs. Runway-hosted), bekommt **pro Route eine eigene Spec** — Fähigkeiten und Auflösungen werden nie routenübergreifend behauptet.
 
 Capability-Ebene **pro Modus** (T2V, I2V, FirstLast, Reference, V2V, Edit, Extend, Reframe, AudioToVideo): Auflösungen inkl. `maxNative`, Dauern, Aspect Ratios, FPS, Audio, max. Referenzbilder/-videos/-audios, First-/Last-Frame, Seed, Negativ-Prompt, Kamera- und Motion-Controls, HDR, Output-Formate, Smart Duration, plus `constraints` als maschinenlesbare Regeln (z. B. „4K ⇒ Dauer = 8 s", „Extension ⇒ 720p").
 
+**Keine Auflösungszahl ohne exakte Definition.** Jeder Eintrag führt `width`, `height`, `resolutionLabel` und `orientationBehavior` (z. B. „long edge" vs. „orientation-aware"), also nicht „4K", sondern 3840×2160 Landscape bzw. 2160×3840 Portrait — und nur, wenn der Provider genau das liefert. Genau hier lag der Topaz-Portrait-Fehler.
+
 Damit lässt sich Veo 3.1 korrekt abbilden: 720p bei 4/6/8 s, 1080p und 4K ausschließlich bei 8 s, Lite ohne 4K.
+
+### Freigabe-Kette (verbindlich für jede Fähigkeit)
+
+```text
+Provider-Doku → konkrete API-Route → Capability Spec → Pricing → automatischer Validation-Test
+→ echter Max-Quality-Testlauf → Output-Probe → FULL_PARITY → available: true → UI-Badge
+```
+
+Vor `available: true` für eine Maximalauflösung ist ein **echter Smoke-Test** Pflicht: Job in maximaler Auflösung starten, Ausgabedatei laden und proben, Pixelmaße, Dauer, FPS und Audio messen, Test-Run-ID plus Messwerte in der Spec bzw. einer Verifikationstabelle speichern. Erst danach darf ein Badge wie „4K Native" erscheinen.
+
 
 ## Phase 2 — Provider-Audit je Familie
 
