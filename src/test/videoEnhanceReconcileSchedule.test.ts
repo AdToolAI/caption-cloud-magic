@@ -82,6 +82,10 @@ describe('reconcile endpoint — caller guard', () => {
     const userJwt = 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYXV0aGVudGljYXRlZCJ9.sig';
     expect(isInternalCaller(new Headers({ Authorization: `Bearer ${userJwt}` }), env())).toBe(false);
     expect(isInternalCaller(new Headers({ Authorization: `Bearer ${userJwt}`, apikey: userJwt }), env())).toBe(false);
+    // A browser client always sends the public apikey alongside its user JWT.
+    expect(isInternalCaller(new Headers({ Authorization: `Bearer ${userJwt}`, apikey: ANON }), env())).toBe(false);
+    const subJwt = `eyJhbGciOiJIUzI1NiJ9.${btoa(JSON.stringify({ sub: 'u-1', role: 'authenticated' }))}.sig`;
+    expect(isInternalCaller(new Headers({ Authorization: `Bearer ${subJwt}`, apikey: ANON }), env())).toBe(false);
     expect(isInternalCaller(new Headers({ Authorization: 'Bearer ' }), env())).toBe(false);
     expect(isInternalCaller(new Headers(), env())).toBe(false);
     // no keys configured at all -> nothing is accepted
