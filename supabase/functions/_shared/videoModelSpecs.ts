@@ -220,6 +220,58 @@ const FRAMES: Record<number, { long: number }> = {
   4320: { long: 7680 },
 };
 
+/**
+ * Aspect ratios we expose anywhere in the product. Every tier must resolve an
+ * exact frame for each ratio its mode advertises.
+ */
+export const STANDARD_ASPECT_RATIOS = [
+  '16:9',
+  '9:16',
+  '1:1',
+  '4:3',
+  '3:4',
+  '21:9',
+  '9:21',
+  '3:2',
+  '2:3',
+] as const;
+
+function evenSize(value: number): number {
+  const rounded = Math.round(value);
+  return rounded % 2 === 0 ? rounded : rounded + 1;
+}
+
+/**
+ * Derives the frame table for a documented sizing rule. Used ONLY when the
+ * provider docs state the rule explicitly (`sizingRule` + `sizingRuleSource`);
+ * a route with per-ratio frame tables in its docs must list them verbatim in
+ * `framesByAspectRatio` instead of inheriting a generic 16:9 assumption.
+ */
+export function framesFromSizingRule(
+  shortEdge: number,
+  rule: SizingRule,
+  ratios: readonly string[] = STANDARD_ASPECT_RATIOS,
+): Record<string, PixelFrame> {
+  const long = FRAMES[shortEdge]?.long ?? evenSize((shortEdge * 16) / 9);
+  const table: Record<string, PixelFrame> = {};
+  for (const ratio of ratios) {
+    const [w, h] = ratio.split(':').map(Number);
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) continue;
+    if (rule === 'fixed-frame') {
+      table[ratio] = { width: long, height: shortEdge };
+    } else if (rule === 'long-edge') {
+      table[ratio] = w >= h
+        ? { width: shortEdge, height: evenSize((shortEdge * h) / w) }
+        : { width: evenSize((shortEdge * w) / h), height: shortEdge };
+    } else {
+      table[ratio] = w >= h
+        ? { width: evenSize((shortEdge * w) / h), height: shortEdge }
+        : { width: shortEdge, height: evenSize((shortEdge * h) / w) };
+    }
+  }
+  return table;
+}
+
 /** Builds an exactly defined resolution entry. Never emit a bare label. */
 export function res(
   label: string,
@@ -234,16 +286,38 @@ export function res(
     available?: boolean;
     parityStatus?: ParityStatus;
     smokeTest?: SmokeTestRecord;
+    /** Provider-documented exact frames, keyed by aspect ratio. Wins over the rule. */
+    framesByAspectRatio?: Record<string, PixelFrame>;
+    sizingRule?: SizingRule;
+    sizingRuleSource?: string;
   } = {},
 ): ResolutionSpec {
   const long = FRAMES[shortEdge]?.long ?? Math.round((shortEdge * 16) / 9);
   const grandfathered = opts.grandfathered ?? true;
+  const orientationBehavior = opts.orientationBehavior ?? 'orientation-aware';
+  const sizingRule: SizingRule =
+    opts.sizingRule ??
+    (orientationBehavior === 'long-edge'
+      ? 'long-edge'
+      : orientationBehavior === 'fixed'
+        ? 'fixed-frame'
+        : 'short-edge');
+  const derived = framesFromSizingRule(shortEdge, sizingRule);
   return {
     label,
     shortEdge,
     landscape: { width: long, height: shortEdge },
     portrait: { width: shortEdge, height: long },
-    orientationBehavior: opts.orientationBehavior ?? 'orientation-aware',
+    orientationBehavior,
+    sizingRule,
+    sizingRuleSource:
+      opts.sizingRuleSource ??
+      (sizingRule === 'long-edge'
+        ? 'Provider zählt die Label-Zeilen auf der LANGEN Kante (Topaz-Portrait-Falle).'
+        : sizingRule === 'fixed-frame'
+          ? 'Provider rendert unabhängig vom Request ein festes Bildformat.'
+          : 'Provider hält die kurze Kante des Labels; Portrait ist damit echtes Hochkant.'),
+    framesByAspectRatio: { ...derived, ...(opts.framesByAspectRatio ?? {}) },
     native: opts.native ?? true,
     pricingId,
     ...(opts.durations ? { durations: opts.durations } : {}),
@@ -253,6 +327,7 @@ export function res(
     ...(opts.smokeTest ? { smokeTest: opts.smokeTest } : {}),
   };
 }
+
 
 /**
  * A resolution tier that did NOT ship before the parity upgrade. It is locked
