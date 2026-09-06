@@ -3,20 +3,27 @@
  * really run through `POST /video/express`.
  *
  * Every entry below was taken from the published Topaz OpenAPI schema of the
- * create-request endpoint (`UpscaleFilter.model` / `FrameInterpolationFilter.model`
- * enums) and the per-model documentation pages, checked 2026-09-07.
+ * create-express-request endpoint (`UpscaleFilter.model` /
+ * `FrameInterpolationFilter.model` enums) and the per-model documentation
+ * pages, re-verified against the live docs on 2026-09-07.
  *
- * DELIBERATELY ABSENT — these models exist at Topaz but are NOT part of the
- * express filter enum, so offering them would produce a provider rejection:
- *   Starlight (`slp-2.6`, `slf-2`), Astra (`ast-2`), Gaia 2 Animation
- *   (`ganim-1`), Video Colorization (`color-1`), Nyx High Fidelity (`nxhf-1`).
- * They are re-evaluated when Topaz adds them to the express enum. Nothing here
- * is hidden for pricing convenience: a model is either runnable and listed, or
- * not runnable and named right here with the reason.
+ * DELIBERATELY ABSENT — and why:
+ *   • Starlight (`slhq-1`, `slp-2.6`), Astra (`ast-2`), Gaia 2 Animation
+ *     (`ganim-1`), Video Colorization (`color-1`): these are NOT part of the
+ *     express `UpscaleFilter` enum. They run through Topaz's separate
+ *     per-model `/video/{model}` endpoint with their own parameter schema, so
+ *     offering them here would produce a provider rejection.
+ *   • Hyperion (`hyp-1`) and Stabilization (`stab-1`): in the express enum,
+ *     but they are not upscalers. `stab-1` additionally REQUIRES
+ *     `rollingShutterCorrection` or the request 400s. They are out of scope
+ *     for "enhance/upscale" and are not offered as a fake upscale mode.
+ * Nothing here is hidden for pricing convenience: a model is either runnable
+ * and listed, or not runnable and named right here with the reason.
  *
  * A mirror of this file lives at `src/config/videoEnhanceModels/topazCatalog.ts`
  * and a parity test asserts both sides describe the same models.
  */
+
 
 export type TopazSpecialty =
   | 'general'
