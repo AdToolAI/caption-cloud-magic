@@ -294,7 +294,7 @@ describe('hardening pass — explicit tiers, kill switch, per-route parity', () 
   });
 
   it('every offered tier documents an exact frame per aspect ratio of its mode', () => {
-    for (const spec of ALL_VIDEO_MODEL_SPECS) {
+    for (const spec of VIDEO_MODEL_SPECS) {
       for (const mode of spec.modes) {
         for (const tier of mode.resolutions) {
           for (const ratio of mode.aspectRatios) {
@@ -321,7 +321,7 @@ describe('hardening pass — explicit tiers, kill switch, per-route parity', () 
 
   it('the same model on two routes keeps two independent parity keys', () => {
     const routes = new Map<string, string[]>();
-    for (const spec of ALL_VIDEO_MODEL_SPECS) {
+    for (const spec of VIDEO_MODEL_SPECS) {
       const list = routes.get(spec.family) ?? [];
       list.push(spec.apiRoute);
       routes.set(spec.family, list);
