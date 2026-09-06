@@ -52,8 +52,8 @@ const SPEED_PRESETS = [0.25, 0.5, 1, 1.5, 2, 3];
 export const FXPanel: React.FC<FXPanelProps> = ({
   chromaKey,
   onChromaKeyChange,
-  upscaling,
-  onUpscalingChange,
+  videoUrl,
+  onUpscaledVideo,
   interpolation,
   onInterpolationChange,
   restoration,
@@ -65,7 +65,9 @@ export const FXPanel: React.FC<FXPanelProps> = ({
   onScenePlaybackRateChange,
 }) => {
   const { t } = useTranslation();
+  const [enhanceOpen, setEnhanceOpen] = useState(false);
   const selectedScene = scenes.find(s => s.id === selectedSceneId);
+
   const currentAnimation = selectedSceneId ? sceneEffects[selectedSceneId]?.animation?.type || 'none' : 'none';
   const currentAnimIntensity = selectedSceneId ? sceneEffects[selectedSceneId]?.animation?.intensity ?? 50 : 50;
   const currentSpeed = selectedScene?.playbackRate ?? sceneEffects[selectedSceneId || '']?.speed ?? 1;
