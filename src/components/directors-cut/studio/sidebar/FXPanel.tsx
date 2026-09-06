@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -8,13 +8,20 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { SceneAnalysis, SceneEffects } from '@/types/directors-cut';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
+import { EnhanceVideoDialog } from '@/components/ai-video/EnhanceVideoDialog';
 import { SceneAnimationPreviewTile, type SceneAnimationId } from '@/components/studio-visual/SceneAnimationPreviewTile';
 
 interface FXPanelProps {
   chromaKey: { enabled: boolean; color: string; tolerance: number; backgroundUrl?: string };
   onChromaKeyChange: (ck: { enabled: boolean; color: string; tolerance: number; backgroundUrl?: string }) => void;
+  /** @deprecated legacy flag — real upscaling runs through the enhance engine. */
   upscaling: { enabled: boolean; targetResolution: string };
+  /** @deprecated legacy flag — real upscaling runs through the enhance engine. */
   onUpscalingChange: (enabled: boolean, resolution: string) => void;
+  /** Current source clip — input for AI upscaling. */
+  videoUrl?: string;
+  /** Called with the upscaled clip so the studio can swap the source. */
+  onUpscaledVideo?: (url: string) => void;
   interpolation: { enabled: boolean; targetFps: number };
   onInterpolationChange: (enabled: boolean, fps: number) => void;
   restoration: { enabled: boolean; level: string };
@@ -26,6 +33,7 @@ interface FXPanelProps {
   onSceneEffectsChange?: (sceneEffects: Record<string, SceneEffects>) => void;
   onScenePlaybackRateChange?: (sceneId: string, rate: number) => void;
 }
+
 
 const ANIMATION_OPTIONS = [
   { type: 'none' as const, label: 'animNone', icon: RotateCcw },
