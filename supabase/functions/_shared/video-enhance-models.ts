@@ -539,3 +539,37 @@ export function verifiedPricing(params: {
     hardMultiplierCap: VIDEO_PRICING_HARD_MULTIPLIER_CAP,
   });
 }
+
+/**
+ * Adapt a customer configuration to a DIFFERENT engine.
+ *
+ * Used when the requested engine cannot deliver the promised target frame and
+ * the run is routed to an engine that can (see `video-enhance-frame.ts`).
+ * Mode, fps and tier are mapped onto what the executing engine really offers —
+ * never invented, always taken from its own published combination table.
+ */
+export function adaptConfigToSpec(
+  config: EnhanceConfig,
+  spec: VideoEnhanceSpec,
+  source: SourceMetadata,
+): EnhanceConfig {
+  if (config.modelId === spec.id) return config;
+
+  const mode = spec.modes.includes(config.mode)
+    ? config.mode
+    : (spec.modes.includes('common') ? 'common' : spec.modes[0]);
+
+  const combo = outputsFor(spec, mode).find((c) => c.resolution === config.resolution);
+  const allowedFps = combo?.fps ?? [];
+  const wanted = config.fps ?? Math.round(source.fps);
+  const fps = allowedFps.length === 0
+    ? config.fps
+    : (allowedFps.includes(wanted)
+      ? wanted
+      : allowedFps.reduce((best, value) =>
+        Math.abs(value - wanted) < Math.abs(best - wanted) ? value : best, allowedFps[0]));
+
+  const tier: QualityTier = spec.tiers.includes(config.tier) ? config.tier : spec.tiers[0];
+
+  return { modelId: spec.id, mode, resolution: config.resolution, fps, tier };
+}

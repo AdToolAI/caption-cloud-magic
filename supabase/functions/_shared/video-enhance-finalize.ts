@@ -9,12 +9,13 @@
  */
 
 import { probeRemoteVideo } from './mp4-probe.ts';
+import { frameMeetsTarget, resolveTargetFrame } from './video-enhance-frame.ts';
 import {
-  RESOLUTION_PIXELS,
   VIDEO_PRICING_HARD_MULTIPLIER_CAP,
   verifiedPricing,
   type VideoResolution,
 } from './video-enhance-models.ts';
+
 import {
   outputKey,
   outputMatchesOrder,
@@ -109,11 +110,34 @@ export async function finalizeSuccess(
   }
 
 
-  // 2. validate the staged file against what the user actually ordered.
+  // 2. validate the staged file against what the user actually ordered, and
+  //    RECORD what was really delivered. The promised frame is orientation
+  //    aware: a portrait clip ordered at 4K owes 2160x3840.
   const { data: stagedUrlData } = admin.storage.from(STAGING_BUCKET).getPublicUrl(staging);
-  const target = RESOLUTION_PIXELS[run.resolution as VideoResolution];
+  const target = run.target_width && run.target_height
+    ? { width: Number(run.target_width), height: Number(run.target_height) }
+    : resolveTargetFrame(
+      run.resolution as VideoResolution,
+      Number(run.source_width) || 0,
+      Number(run.source_height) || 0,
+    );
+  const measurement: Record<string, unknown> = {};
   try {
     const measured = await probeRemoteVideo(stagedUrlData.publicUrl);
+    measurement.actual_width = measured.width;
+    measurement.actual_height = measured.height;
+    measurement.output_size_bytes = measured.sizeBytes || buffer.byteLength;
+    measurement.output_codec = contentType;
+    const seconds = measured.durationSeconds || Number(run.source_duration_seconds) || 0;
+    const bytes = Number(measurement.output_size_bytes) || 0;
+    if (seconds > 0 && bytes > 0) {
+      measurement.output_bitrate_kbps = Math.round((bytes * 8) / seconds / 1000);
+    }
+    measurement.projection_matched = frameMeetsTarget(
+      { width: measured.width, height: measured.height },
+      target,
+    );
+
     const match = outputMatchesOrder(measured, {
       durationSeconds: Number(run.source_duration_seconds),
       width: target.width,
@@ -124,6 +148,7 @@ export async function finalizeSuccess(
       await setStatus(admin, run.id, 'asset_persist_failed', {
         error_code: 'OUTPUT_MISMATCH',
         error_message: match.reason ?? 'output does not match order',
+        ...measurement,
       });
       return { ok: false, status: 'asset_persist_failed', error: match.reason };
     }
@@ -132,6 +157,7 @@ export async function finalizeSuccess(
     // staged file and let the reconciler retry instead of failing the run.
     console.warn(`${TAG} staged probe unavailable for ${run.id}:`, error);
   }
+
 
   // 3. promote the staged file to its final key.
   const finalKey = outputKey(run.user_id, run.id);
@@ -254,8 +280,10 @@ export async function finalizeSuccess(
     next_reconcile_at: null,
     error_code: null,
     error_message: null,
+    ...measurement,
     ...costPatch,
   });
+
 
 
   // 6. cleanup — big video files must not pile up in staging.

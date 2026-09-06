@@ -18550,6 +18550,7 @@ export type Database = {
           created_at: string
           credits_reserved: number
           currency: string
+          delivery_strategy: string | null
           effective_multiplier: number | null
           error_code: string | null
           error_message: string | null
@@ -18570,6 +18571,9 @@ export type Database = {
           next_late_check_at: string | null
           next_reconcile_at: string | null
           output_asset_id: string | null
+          output_bitrate_kbps: number | null
+          output_codec: string | null
+          output_size_bytes: number | null
           output_url: string | null
           overcharge_refund_amount_eur: number | null
           overcharge_refund_at: string | null
@@ -18596,6 +18600,7 @@ export type Database = {
           provider_submitted_at: string | null
           rate_card_version: string
           reconciliation_attempts: number
+          requested_model_id: string | null
           resolution: string
           source_asset_id: string | null
           source_container: string | null
@@ -18610,6 +18615,8 @@ export type Database = {
           status: string
           submit_lease_expires_at: string | null
           submit_lease_owner: string | null
+          target_height: number | null
+          target_width: number | null
           test_fail_persist_once: boolean
           tier: string
           unit_rate_checked_at: string | null
@@ -18638,6 +18645,7 @@ export type Database = {
           created_at?: string
           credits_reserved?: number
           currency?: string
+          delivery_strategy?: string | null
           effective_multiplier?: number | null
           error_code?: string | null
           error_message?: string | null
@@ -18658,6 +18666,9 @@ export type Database = {
           next_late_check_at?: string | null
           next_reconcile_at?: string | null
           output_asset_id?: string | null
+          output_bitrate_kbps?: number | null
+          output_codec?: string | null
+          output_size_bytes?: number | null
           output_url?: string | null
           overcharge_refund_amount_eur?: number | null
           overcharge_refund_at?: string | null
@@ -18684,6 +18695,7 @@ export type Database = {
           provider_submitted_at?: string | null
           rate_card_version: string
           reconciliation_attempts?: number
+          requested_model_id?: string | null
           resolution: string
           source_asset_id?: string | null
           source_container?: string | null
@@ -18698,6 +18710,8 @@ export type Database = {
           status?: string
           submit_lease_expires_at?: string | null
           submit_lease_owner?: string | null
+          target_height?: number | null
+          target_width?: number | null
           test_fail_persist_once?: boolean
           tier: string
           unit_rate_checked_at?: string | null
@@ -18726,6 +18740,7 @@ export type Database = {
           created_at?: string
           credits_reserved?: number
           currency?: string
+          delivery_strategy?: string | null
           effective_multiplier?: number | null
           error_code?: string | null
           error_message?: string | null
@@ -18746,6 +18761,9 @@ export type Database = {
           next_late_check_at?: string | null
           next_reconcile_at?: string | null
           output_asset_id?: string | null
+          output_bitrate_kbps?: number | null
+          output_codec?: string | null
+          output_size_bytes?: number | null
           output_url?: string | null
           overcharge_refund_amount_eur?: number | null
           overcharge_refund_at?: string | null
@@ -18772,6 +18790,7 @@ export type Database = {
           provider_submitted_at?: string | null
           rate_card_version?: string
           reconciliation_attempts?: number
+          requested_model_id?: string | null
           resolution?: string
           source_asset_id?: string | null
           source_container?: string | null
@@ -18786,6 +18805,8 @@ export type Database = {
           status?: string
           submit_lease_expires_at?: string | null
           submit_lease_owner?: string | null
+          target_height?: number | null
+          target_width?: number | null
           test_fail_persist_once?: boolean
           tier?: string
           unit_rate_checked_at?: string | null
