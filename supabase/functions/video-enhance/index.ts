@@ -321,11 +321,8 @@ serve(async (req) => {
       throw error;
     }
 
-    if (action === "estimate") {
-      return json({ pricing, source: source.meta, delivery, upscale, executionModelId: spec.id, executionMode: config.mode });
-    }
-
-    // ---- start --------------------------------------------------------------
+    // No truthful route to the promised frame: reject instead of quietly
+    // delivering a smaller video. This applies to the price preview too.
     if (delivery.strategy === "unreachable") {
       return json(
         {
@@ -336,6 +333,12 @@ serve(async (req) => {
         409,
       );
     }
+
+    if (action === "estimate") {
+      return json({ pricing, source: source.meta, delivery, upscale, executionModelId: spec.id, executionMode: config.mode });
+    }
+
+    // ---- start --------------------------------------------------------------
     if (!isModelUnlocked(spec, env, user.id)) {
       return json(
         { error: `${config.modelId} is not unlocked yet.`, code: "MODEL_LOCKED" },
