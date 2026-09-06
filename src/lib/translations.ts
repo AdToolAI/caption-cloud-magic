@@ -17176,6 +17176,8 @@ translations.es.dc = {
   fhdStandard: "Calidad estándar",
   fourKUltra: "Calidad ultra alta",
   eightKMax: "Calidad máxima",
+  fourKTimeWarning: "4K tarda bastante más que HD: unos 2–5 minutos para un clip de 10 segundos.",
+  eightKTimeWarning: "8K es la máxima calidad y, con diferencia, la más lenta: cuenta con unos 8–11 minutos para un clip de 10 segundos y un archivo muy grande. Solo para clips de hasta 30 segundos; los más largos se exportan en 4K.",
   widescreenLabel: "Panorámico",
   portraitLabel: "Vertical",
   squareLabel: "Cuadrado",
