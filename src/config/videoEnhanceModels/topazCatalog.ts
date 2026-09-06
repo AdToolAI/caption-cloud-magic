@@ -81,12 +81,27 @@ export const TOPAZ_VIDEO_MODEL_VIEWS: TopazVideoModelView[] = [
     },
   },
   {
+    id: 'theia',
+    slug: 'thd-3',
+    name: 'Theia',
+    specialty: 'clarity',
+    creditFamily: 'precision',
+    manualParameters: true,
+    costVerified: false,
+    label: { en: 'Theia', de: 'Theia', es: 'Theia' },
+    hint: {
+      en: 'Extra clarity and crisp edges, without adding noise',
+      de: 'Mehr Klarheit und klare Kanten, ohne neues Rauschen',
+      es: 'Más claridad y bordes nítidos, sin añadir ruido',
+    },
+  },
+  {
     id: 'iris',
     slug: 'iris-3',
     name: 'Iris',
     specialty: 'faces',
     creditFamily: 'precision',
-    manualParameters: true,
+    manualParameters: false,
     costVerified: false,
     label: { en: 'Iris', de: 'Iris', es: 'Iris' },
     hint: {
@@ -101,7 +116,7 @@ export const TOPAZ_VIDEO_MODEL_VIEWS: TopazVideoModelView[] = [
     name: 'Artemis',
     specialty: 'general',
     creditFamily: 'precision',
-    manualParameters: true,
+    manualParameters: false,
     costVerified: false,
     label: { en: 'Artemis', de: 'Artemis', es: 'Artemis' },
     hint: {
@@ -116,7 +131,7 @@ export const TOPAZ_VIDEO_MODEL_VIEWS: TopazVideoModelView[] = [
     name: 'Gaia',
     specialty: 'cgi',
     creditFamily: 'precision',
-    manualParameters: true,
+    manualParameters: false,
     costVerified: false,
     label: { en: 'Gaia', de: 'Gaia', es: 'Gaia' },
     hint: {
@@ -146,7 +161,7 @@ export const TOPAZ_VIDEO_MODEL_VIEWS: TopazVideoModelView[] = [
     name: 'Themis 2',
     specialty: 'deblur',
     creditFamily: 'restoration',
-    manualParameters: true,
+    manualParameters: false,
     costVerified: false,
     label: { en: 'Themis', de: 'Themis', es: 'Themis' },
     hint: {
@@ -161,7 +176,7 @@ export const TOPAZ_VIDEO_MODEL_VIEWS: TopazVideoModelView[] = [
     name: 'Dione',
     specialty: 'legacy',
     creditFamily: 'precision',
-    manualParameters: true,
+    manualParameters: false,
     costVerified: false,
     label: { en: 'Dione', de: 'Dione', es: 'Dione' },
     hint: {
@@ -171,6 +186,7 @@ export const TOPAZ_VIDEO_MODEL_VIEWS: TopazVideoModelView[] = [
     },
   },
 ];
+
 
 export const TOPAZ_DEFAULT_MODEL_ID = 'proteus';
 
