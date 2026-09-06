@@ -52,6 +52,8 @@ export interface SourceMetadata {
   container?: string;
   sizeBytes?: number;
   sourceModel?: string;
+  /** Where the clip came from — drives the ByteDance `scene` preset. */
+  origin?: 'generated' | 'uploaded' | 'unknown';
 }
 
 export interface VideoEnhanceSpec {
