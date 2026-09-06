@@ -72,13 +72,32 @@ export interface VideoEnhanceSpec {
   buildInput(config: EnhanceConfig, source: SourceMetadata, sourceUrl: string): Record<string, unknown>;
 }
 
+/**
+ * Exactly the `scene` enum of the published `bytedance/video-upscaler` schema.
+ * `scene` is a QUALITY PRESET, not a style: it must always be one of these.
+ */
+export const VCUBE_SCENES = ['aigc', 'short_series', 'ugc', 'old_film', 'common'] as const;
+export type VcubeScene = (typeof VCUBE_SCENES)[number];
+
+export function isVcubeScene(value: unknown): value is VcubeScene {
+  return typeof value === 'string' && (VCUBE_SCENES as readonly string[]).includes(value);
+}
+
+/**
+ * `processing_type` of the published schema. Pro is priced at 10x and stays
+ * intentionally unavailable until the provider entitlement is verified
+ * (`isEntitled`), so every run that reaches the provider today is `standard`.
+ */
+export function vcubeProcessingType(tier: QualityTier): 'standard' | 'pro' {
+  return tier === 'pro' ? 'pro' : 'standard';
+}
+
 export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
   'bytedance-vcube': {
     id: 'bytedance-vcube',
     providerModelId: 'bytedance/video-upscaler',
     providerSchemaRef: 'replicate/bytedance-video-upscaler@2026-09-05',
-    // Exactly the `scene` enum of the published schema.
-    modes: ['aigc', 'short_series', 'ugc', 'old_film', 'common'],
+    modes: [...VCUBE_SCENES],
     outputs: [
       { resolution: '720p', fps: [24, 30, 60] },
       { resolution: '1080p', fps: [24, 30, 60] },
@@ -91,10 +110,16 @@ export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
     maxDurationSeconds: 60,
     backendFlag: 'VIDEO_ENHANCE_BYTEDANCE_ENABLED',
     buildInput(config, source, sourceUrl) {
+      // The provider payload NEVER carries an invalid scene: a mode that is not
+      // part of the published enum (e.g. a leftover from another engine) falls
+      // back to the deterministic provenance preset.
+      const scene: VcubeScene = isVcubeScene(config.mode)
+        ? config.mode
+        : sceneForSource(source, [...VCUBE_SCENES]);
       return {
         video: sourceUrl,
-        scene: config.mode,
-        processing_type: config.tier,
+        scene,
+        processing_type: vcubeProcessingType(config.tier),
         target_resolution: config.resolution,
         target_fps: config.fps ?? Math.round(source.fps),
       };
@@ -274,7 +299,7 @@ const VCUBE_STANDARD_USD_PER_SECOND: Record<VideoResolution, { low: number; high
 /** The Pro model is billed at ten times the Standard rate. */
 const VCUBE_PRO_FACTOR = 10;
 
-const VCUBE_MODES = ['aigc', 'short_series', 'ugc', 'old_film', 'common'];
+const VCUBE_MODES: string[] = [...VCUBE_SCENES];
 const VCUBE_RESOLUTIONS: VideoResolution[] = ['720p', '1080p', '2k', '4k'];
 const VCUBE_FPS = [24, 30, 60];
 
@@ -543,14 +568,6 @@ export function verifiedPricing(params: {
 }
 
 /**
- * Adapt a customer configuration to a DIFFERENT engine.
- *
- * Used when the requested engine cannot deliver the promised target frame and
- * the run is routed to an engine that can (see `video-enhance-frame.ts`).
- * Mode, fps and tier are mapped onto what the executing engine really offers —
- * never invented, always taken from its own published combination table.
- */
-/**
  * ByteDance `scene` is a QUALITY preset, so it must follow the real provenance
  * of the clip and never a leftover value from another engine:
  *   aigc   — the clip came out of one of our AI video models
@@ -558,7 +575,7 @@ export function verifiedPricing(params: {
  *   common — provenance unknown
  */
 export function sceneForSource(source: SourceMetadata, available: string[]): string {
-  const preferred = source.sourceModel
+  const preferred = source.sourceModel || source.origin === 'generated'
     ? 'aigc'
     : source.origin === 'uploaded'
       ? 'ugc'
@@ -566,6 +583,45 @@ export function sceneForSource(source: SourceMetadata, available: string[]): str
   if (available.includes(preferred)) return preferred;
   return available.includes('common') ? 'common' : available[0];
 }
+
+/** Where the executing mode came from — recorded for the estimate response. */
+export type ExecutionModeSource = 'explicit' | 'provenance' | 'engine_default';
+
+/**
+ * The mode that really reaches the provider.
+ *
+ * For ByteDance the `scene` preset is derived deterministically from the
+ * clip's provenance UNLESS the customer explicitly chose a footage type
+ * (`modeExplicit`). This applies to DIRECT ByteDance requests exactly as it
+ * applies to runs routed from another engine — the client default is never
+ * mistaken for a choice. Single-mode engines (Topaz) keep their only mode.
+ */
+export function resolveExecutionMode(
+  config: EnhanceConfig,
+  spec: VideoEnhanceSpec,
+  source: SourceMetadata,
+  modeExplicit: boolean,
+): { mode: string; source: ExecutionModeSource } {
+  if (spec.modes.length === 1) {
+    return {
+      mode: spec.modes[0],
+      source: config.mode === spec.modes[0] ? 'explicit' : 'engine_default',
+    };
+  }
+  if (modeExplicit && spec.modes.includes(config.mode)) {
+    return { mode: config.mode, source: 'explicit' };
+  }
+  return { mode: sceneForSource(source, spec.modes), source: 'provenance' };
+}
+
+/**
+ * Adapt a customer configuration to a DIFFERENT engine.
+ *
+ * Used when the requested engine cannot deliver the promised target frame and
+ * the run is routed to an engine that can (see `video-enhance-frame.ts`).
+ * Mode, fps and tier are mapped onto what the executing engine really offers —
+ * never invented, always taken from its own published combination table.
+ */
 
 export function adaptConfigToSpec(
   config: EnhanceConfig,
