@@ -20,7 +20,13 @@ export interface ProbedVideoMetadata {
   fps: number;
   container: string;
   sizeBytes: number;
+  /**
+   * Real video codec read from the sample description (`stsd`), e.g. `h264`,
+   * `hevc`, `av1`. NEVER a MIME type — the container/MIME is a separate fact.
+   */
+  codec?: string;
 }
+
 
 interface Box {
   type: string;
