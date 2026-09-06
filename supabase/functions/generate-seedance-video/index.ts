@@ -76,13 +76,15 @@ serve(async (req) => {
     const { prompt, model, duration: requestedDuration, aspectRatio, startImageUrl, endImageUrl } = body;
 
     const duration = Number(requestedDuration);
+    // 'seedance-mini' maps to bytedance/seedance-1-lite — the only tier with 480p.
+    const isLite = model === 'seedance-mini';
 
     // Capability gate — before wallet, before provider. Seedance 1 Lite's
     // 5/10 s enum is enforced, never snapped.
     const gate = capabilityGate(
       {
         modelId: model,
-        resolution: (model === 'seedance-1-lite' && body.resolution === '480p') ? '480p' : '720p',
+        resolution: (isLite && body.resolution === '480p') ? '480p' : '720p',
         mode: inferMode({ startImageUrl, endImageUrl }),
         durationSeconds: duration,
         aspectRatio,
