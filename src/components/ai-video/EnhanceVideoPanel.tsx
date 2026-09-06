@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Download, Loader2, Sparkles, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, HelpCircle, Loader2, Sparkles, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -14,16 +14,24 @@ import {
 import { useTranslation } from '@/hooks/useTranslation';
 import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
 import { VideoSourcePicker } from '@/components/ai-video/VideoSourcePicker';
+import { EnhanceRunProgress } from '@/components/ai-video/EnhanceRunProgress';
 import type { CanonicalVideoAsset } from '@/lib/videoEnhance/canonicalVideoAsset';
 import { isAiGeneratedSource } from '@/lib/videoEnhance/recommend';
 import { engineErrorText } from '@/lib/videoEnhance/engineErrors';
 import {
-  evaluateUpscale,
+  describeResolutionChoices,
+  firstUpscaleResolution,
   formatFrame,
-  frameMeetsTarget,
-  projectProviderOutput,
+  resolveExecutionEngine,
   resolveTargetFrame,
 } from '@/lib/videoEnhance/targetFrame';
+import {
+  deliveredFacts,
+  engineDisplayName,
+  targetMatchDetail,
+  targetMatchLabel,
+  targetMatchOf,
+} from '@/lib/videoEnhance/runPresentation';
 
 import {
   availableFps,
@@ -43,6 +51,11 @@ import {
  *
  * Source identity is always a canonical asset ({ assetId, assetType }); the
  * settings only appear once a source exists (progressive disclosure).
+ *
+ * Before the start the panel states, in pixels and engine names, exactly what
+ * will be delivered and by whom. While a run is in flight it shows the engine
+ * that is REALLY executing and a live clock. After completion it says whether
+ * the promised frame was met — measured on the finished file, not assumed.
  */
 
 type Lang = 'en' | 'de' | 'es';
@@ -57,6 +70,12 @@ const COPY = {
   engine: { en: 'Engine', de: 'Engine', es: 'Motor' },
   style: { en: 'Footage type', de: 'Materialart', es: 'Tipo de material' },
   detectedFrom: { en: 'Detected from', de: 'Erkannt aus', es: 'Detectado de' },
+  fromOrigin: {
+    en: 'Set automatically from where the clip comes from',
+    de: 'Automatisch aus der Herkunft des Clips gesetzt',
+    es: 'Definido automáticamente según el origen del clip',
+  },
+  chosenByYou: { en: 'Chosen by you', de: 'Von dir gewählt', es: 'Elegido por ti' },
   change: { en: 'Change', de: 'Ändern', es: 'Cambiar' },
   resolution: { en: 'Resolution', de: 'Auflösung', es: 'Resolución' },
   fps: { en: 'Frames per second', de: 'Bilder pro Sekunde', es: 'Fotogramas por segundo' },
@@ -89,6 +108,13 @@ const COPY = {
   },
   pixels: { en: 'pixels', de: 'Pixel', es: 'píxeles' },
   delivered: { en: 'Delivered', de: 'Geliefert', es: 'Entregado' },
+  sourcePixels: { en: 'Source', de: 'Quelle', es: 'Origen' },
+  targetPixels: { en: 'Target', de: 'Ziel', es: 'Objetivo' },
+  requestedEngine: { en: 'Requested engine', de: 'Gewählte Engine', es: 'Motor solicitado' },
+  executingEngine: { en: 'Executing engine', de: 'Ausführende Engine', es: 'Motor que ejecuta' },
+  measuring: { en: 'Measuring the source…', de: 'Quelle wird vermessen …', es: 'Midiendo el origen…' },
+  noGain: { en: 'no gain', de: 'kein Gewinn', es: 'sin ganancia' },
+  smaller: { en: 'smaller than source', de: 'kleiner als Quelle', es: 'menor que el origen' },
   noUpscale: {
     en: 'This setting would not enlarge your video. Pick a higher resolution.',
     de: 'Diese Einstellung vergrößert dein Video nicht. Wähle eine höhere Auflösung.',
@@ -100,9 +126,9 @@ const COPY = {
     es: 'Esta opción haría tu vídeo más pequeño de lo que ya es.',
   },
   routed: {
-    en: 'Runs on the engine that can really deliver this frame:',
-    de: 'Läuft auf der Engine, die dieses Format wirklich liefern kann:',
-    es: 'Se ejecuta en el motor que sí puede entregar este formato:',
+    en: 'Different from the requested engine: only this engine can deliver the target frame for your clip.',
+    de: 'Weicht von der gewählten Engine ab: Nur diese Engine kann das Zielformat für deinen Clip liefern.',
+    es: 'Distinto del motor solicitado: solo este motor puede entregar el formato objetivo para tu clip.',
   },
   unreachable: {
     en: 'No engine can deliver this frame for your video right now.',
@@ -115,7 +141,6 @@ const COPY = {
     es: 'Los mensajeros como WhatsApp reducen los vídeos al enviarlos. Descarga el archivo y envíalo como documento para conservar toda la calidad.',
   },
 } as const;
-
 
 function tx(key: keyof typeof COPY, lang: Lang): string {
   return COPY[key][lang] ?? COPY[key].en;
@@ -153,6 +178,7 @@ export function EnhanceVideoPanel({
   const {
     run,
     estimate,
+    plan,
     sourceMeta,
     isStarting,
     isRunning,
@@ -209,15 +235,53 @@ export function EnhanceVideoPanel({
     if (fps !== null && !fpsChoices.includes(fps)) setFps(null);
   }, [fps, fpsChoices]);
 
+  // Server-measured facts win over anything the browser read.
+  const sourceHeight = sourceMeta?.height ?? asset?.height ?? null;
+  const sourceWidth = sourceMeta?.width ?? asset?.width ?? null;
+  const sourceKnown = !!sourceWidth && !!sourceHeight;
+
+  // Every offered tier, described against THIS source: exact target frame and
+  // whether it would really add pixels. Tiers that would be a no-op or a
+  // downscale are disabled in the picker itself.
+  const tierChoices = useMemo(
+    () =>
+      model && sourceKnown
+        ? describeResolutionChoices(availableResolutions(model, mode), sourceWidth!, sourceHeight!)
+        : null,
+    [model, mode, sourceKnown, sourceWidth, sourceHeight],
+  );
+
+  // When the source is measured and the current tier is not an upscale, move
+  // to the smallest tier that is — once per source, never against a choice
+  // the customer made afterwards.
+  const autoTierRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!model || !sourceKnown) return;
+    const key = `${sourceWidth}x${sourceHeight}:${model.id}`;
+    if (autoTierRef.current === key) return;
+    autoTierRef.current = key;
+    const current = tierChoices?.find((c) => c.resolution === resolution);
+    if (current && current.verdict.ok) return;
+    const next = firstUpscaleResolution(availableResolutions(model, mode), sourceWidth!, sourceHeight!);
+    if (next && next !== resolution) setResolution(next);
+  }, [model, mode, sourceKnown, sourceWidth, sourceHeight, tierChoices, resolution]);
+
   const config: EnhanceConfig | null = model
-    ? { modelId: model.id, mode, resolution, fps, tier: availableTiers(model)[0] ?? 'standard' }
+    ? {
+        modelId: model.id,
+        mode,
+        modeExplicit: modeTouched,
+        resolution,
+        fps,
+        tier: availableTiers(model)[0] ?? 'standard',
+      }
     : null;
 
   useEffect(() => {
     if (!config || !hasSource) return;
     void previewPrice(source, config);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, modelId, mode, resolution, fps, hasSource]);
+  }, [source, modelId, mode, modeTouched, resolution, fps, hasSource]);
 
   const onStart = useCallback(() => {
     if (!config || !hasSource) return;
@@ -243,43 +307,34 @@ export function EnhanceVideoPanel({
         }).format(estimate.userPriceEur)
       : tx('calculating', lang);
 
-  // Server-measured facts win over anything the browser read.
-  const sourceHeight = sourceMeta?.height ?? asset?.height ?? null;
-  const sourceWidth = sourceMeta?.width ?? asset?.width ?? null;
   const alreadyHigh = !!sourceHeight && sourceHeight >= 2000;
   const recommendedModel = aiSource ? 'ByteDance vCube' : 'Topaz Video Upscale';
 
   // Promise the delivered pixel frame up front. Portrait clips get the full
   // frame on the short side (4K portrait = 2160x3840), whatever engine runs.
-  const targetFrame = sourceWidth && sourceHeight
-    ? resolveTargetFrame(resolution, sourceWidth, sourceHeight)
-    : null;
-  const sourceFrameLabel = sourceWidth && sourceHeight
-    ? formatFrame({ width: sourceWidth, height: sourceHeight })
-    : null;
+  const targetFrame = sourceKnown ? resolveTargetFrame(resolution, sourceWidth!, sourceHeight!) : null;
+  const sourceFrameLabel = sourceKnown ? formatFrame({ width: sourceWidth!, height: sourceHeight! }) : null;
 
   // A paid enhancement must actually add pixels — same rule as the server.
-  const upscale = targetFrame && sourceWidth && sourceHeight
-    ? evaluateUpscale(targetFrame, { width: sourceWidth, height: sourceHeight })
-    : null;
+  const currentChoice = tierChoices?.find((c) => c.resolution === resolution) ?? null;
+  const upscale = currentChoice?.verdict ?? null;
 
-  // Which engine really delivers this frame (portrait 4K only ByteDance).
-  const executionModelId = targetFrame && sourceWidth && sourceHeight
-    ? (frameMeetsTarget(
-        projectProviderOutput(model.id, resolution, sourceWidth, sourceHeight),
-        targetFrame,
-      )
-        ? model.id
-        : models.find((m) =>
-            frameMeetsTarget(
-              projectProviderOutput(m.id, resolution, sourceWidth, sourceHeight),
-              targetFrame,
-            ),
-          )?.id ?? null)
-    : model.id;
-  const routedModel = executionModelId && executionModelId !== model.id
-    ? models.find((m) => m.id === executionModelId) ?? null
-    : null;
+  // Which engine really delivers this frame. The server's plan (from the
+  // estimate) is the authority; the client mirror only bridges the moment
+  // before it arrives or when it belongs to a previous configuration.
+  const planIsCurrent =
+    !!plan &&
+    plan.requestedModelId === model.id &&
+    !!targetFrame &&
+    plan.target.width === targetFrame.width &&
+    plan.target.height === targetFrame.height;
+  const mirror = sourceKnown
+    ? resolveExecutionEngine(model.id, models.map((m) => m.id), resolution, sourceWidth!, sourceHeight!)
+    : { executionModelId: model.id, routed: false };
+  const executionModelId = planIsCurrent
+    ? (plan!.strategy === 'unreachable' ? null : plan!.executionModelId)
+    : mirror.executionModelId;
+  const routed = !!executionModelId && executionModelId !== model.id;
   const frameUnreachable = targetFrame != null && executionModelId === null;
 
   const blockedReason = upscale && !upscale.ok
@@ -289,7 +344,24 @@ export function EnhanceVideoPanel({
       : null;
 
   const autoDetectedFootage = !modeTouched && !!asset && model.processingModes.length > 1;
+  // The footage type that really reaches the engine: the server derives it
+  // from the clip's provenance unless the customer picked one.
+  const executionMode = planIsCurrent ? plan!.executionMode : mode;
+  const executionModeLabel =
+    getVideoEnhanceModel(executionModelId ?? model.id)?.processingModes.find((m) => m.id === executionMode)
+      ?.label[lang] ?? executionMode;
+  const showFootageRow =
+    !!executionModelId && (getVideoEnhanceModel(executionModelId)?.processingModes.length ?? 0) > 1;
 
+  const completed = run?.status === 'completed' && !!run.output_url;
+  const match = completed && run ? targetMatchOf(run) : null;
+  const MatchIcon = match === 'matched' ? CheckCircle2 : match === 'mismatch' ? AlertTriangle : HelpCircle;
+  const matchTone =
+    match === 'matched'
+      ? 'text-primary'
+      : match === 'mismatch'
+        ? 'text-destructive'
+        : 'text-muted-foreground';
 
   return (
     <Card className="p-6 space-y-6 bg-card/60 backdrop-blur-sm border-border">
@@ -361,9 +433,30 @@ export function EnhanceVideoPanel({
               <Select value={resolution} onValueChange={(v) => setResolution(v as VideoResolution)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {availableResolutions(model, mode).map((r) => (
-                    <SelectItem key={r} value={r}>{r.toUpperCase()}</SelectItem>
-                  ))}
+                  {availableResolutions(model, mode).map((r) => {
+                    const choice = tierChoices?.find((c) => c.resolution === r) ?? null;
+                    const blocked = !!choice && !choice.verdict.ok;
+                    const note = !choice
+                      ? ''
+                      : choice.verdict.ok
+                        ? ''
+                        : choice.verdict.reason === 'downscale'
+                          ? ` · ${tx('smaller', lang)}`
+                          : ` · ${tx('noGain', lang)}`;
+                    return (
+                      <SelectItem
+                        key={r}
+                        value={r}
+                        disabled={blocked}
+                        data-testid={`enhance-tier-${r}`}
+                        data-blocked={blocked ? 'true' : 'false'}
+                      >
+                        {r.toUpperCase()}
+                        {choice ? ` · ${formatFrame(choice.frame)}` : ''}
+                        {note}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -385,32 +478,60 @@ export function EnhanceVideoPanel({
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 p-4">
-            <div className="text-sm">
-              <p className="text-muted-foreground">{tx('output', lang)}</p>
-              <p className="font-medium">
-                {resolution.toUpperCase()} · {fps === null ? tx('keepFps', lang) : `${fps} FPS`}
+          {/* What will be delivered and by whom — stated before the start. */}
+          <div
+            className="rounded-lg border border-border/60 bg-background/40 p-4 space-y-3"
+            data-testid="enhance-delivery-plan"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="text-sm">
+                <p className="text-muted-foreground">{tx('output', lang)}</p>
+                <p className="font-medium">
+                  {resolution.toUpperCase()} · {fps === null ? tx('keepFps', lang) : `${fps} FPS`}
+                </p>
+              </div>
+              <div className="text-right text-sm">
+                <p className="text-muted-foreground">{tx('price', lang)}</p>
+                <p className="font-bold text-lg">{priceLabel}</p>
+              </div>
+            </div>
+
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+              <dt className="text-muted-foreground">{tx('sourcePixels', lang)}</dt>
+              <dd className="tabular-nums">
+                {sourceFrameLabel ? `${sourceFrameLabel} ${tx('pixels', lang)}` : tx('measuring', lang)}
+              </dd>
+              <dt className="text-muted-foreground">{tx('targetPixels', lang)}</dt>
+              <dd className="tabular-nums font-medium">
+                {targetFrame ? `${formatFrame(targetFrame)} ${tx('pixels', lang)}` : '—'}
+              </dd>
+              <dt className="text-muted-foreground">{tx('requestedEngine', lang)}</dt>
+              <dd>{model.name}</dd>
+              <dt className="text-muted-foreground">{tx('executingEngine', lang)}</dt>
+              <dd className={routed ? 'text-primary/90 font-medium' : ''}>
+                {executionModelId ? engineDisplayName(executionModelId) : '—'}
+              </dd>
+              {showFootageRow && (
+                <>
+                  <dt className="text-muted-foreground">{tx('style', lang)}</dt>
+                  <dd>
+                    {executionModeLabel}
+                    <span className="text-muted-foreground">
+                      {' '}· {modeTouched && !routed ? tx('chosenByYou', lang) : tx('fromOrigin', lang)}
+                    </span>
+                  </dd>
+                </>
+              )}
+            </dl>
+
+            {routed && !blockedReason && (
+              <p className="text-xs text-primary/90" data-testid="enhance-routed-note">
+                {tx('routed', lang)}
               </p>
-              {targetFrame && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {sourceFrameLabel ? `${sourceFrameLabel} → ` : ''}
-                  {formatFrame(targetFrame)} {tx('pixels', lang)}
-                </p>
-              )}
-              {routedModel && !blockedReason && (
-                <p className="text-xs text-primary/90 mt-1">
-                  {tx('routed', lang)} {routedModel.name}
-                </p>
-              )}
-            </div>
-            <div className="text-right text-sm">
-              <p className="text-muted-foreground">{tx('price', lang)}</p>
-              <p className="font-bold text-lg">{priceLabel}</p>
-            </div>
+            )}
           </div>
 
           {blockedReason && <p className="text-sm text-destructive">{blockedReason}</p>}
-
         </>
       )}
 
@@ -420,30 +541,32 @@ export function EnhanceVideoPanel({
         </p>
       )}
 
-      {run?.status === 'completed' && run.output_url ? (
+      {isRunning && run && <EnhanceRunProgress run={run} lang={lang} />}
+
+      {completed && run ? (
         <div className="space-y-3">
           <p className="text-sm text-primary">{tx('done', lang)}</p>
-          <video src={run.output_url} controls className="w-full rounded-lg" />
-          {run.actual_width && run.actual_height && (
-            <p className="text-xs text-muted-foreground">
+          <video src={run.output_url ?? undefined} controls className="w-full rounded-lg" />
+          <p
+            className={`text-sm flex items-center gap-2 ${matchTone}`}
+            data-testid="enhance-target-match"
+            data-match={match ?? 'unverified'}
+          >
+            <MatchIcon className="w-4 h-4" aria-hidden="true" />
+            <span className="font-medium">{targetMatchLabel(match ?? 'unverified', lang)}</span>
+            {targetMatchDetail(run) && (
+              <span className="text-muted-foreground tabular-nums">· {targetMatchDetail(run)}</span>
+            )}
+          </p>
+          {deliveredFacts(run, lang).length > 0 && (
+            <p className="text-xs text-muted-foreground" data-testid="enhance-delivered-facts">
               {tx('delivered', lang)}:{' '}
               {sourceFrameLabel ? `${sourceFrameLabel} → ` : ''}
-              {run.actual_width}×{run.actual_height} {tx('pixels', lang)}
-              {run.output_bitrate_kbps
-                ? ` · ${(run.output_bitrate_kbps / 1000).toFixed(1)} Mbit/s`
-                : ''}
-              {run.output_size_bytes
-                ? ` · ${(run.output_size_bytes / (1024 * 1024)).toFixed(1)} MB`
-                : ''}
-              {run.output_fps ? ` · ${Math.round(run.output_fps)} FPS` : ''}
-              {run.output_duration_seconds
-                ? ` · ${run.output_duration_seconds.toFixed(1)} s`
-                : ''}
-              {run.output_codec ? ` · ${run.output_codec.toUpperCase()}` : ''}
+              {deliveredFacts(run, lang).join(' · ')}
             </p>
           )}
           <Button asChild variant="secondary">
-            <a href={run.output_url} download target="_blank" rel="noreferrer">
+            <a href={run.output_url ?? undefined} download target="_blank" rel="noreferrer">
               <Download className="w-4 h-4 mr-2" />
               {tx('download', lang)}
             </a>
