@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 
@@ -189,12 +190,17 @@ serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    // Gen-4 Aleph processes at most 5 s of the source clip per call.
-    if (![5].includes(duration)) {
-      return new Response(JSON.stringify({ error: "Duration must be 5 or 10 seconds." }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Capability gate — before wallet, before provider.
+    const gate = capabilityGate(
+      {
+        modelId: model,
+        mode: inferMode({ videoUrl: referenceVideoUrl }),
+        durationSeconds: Number(duration),
+        aspectRatio,
+      },
+      corsHeaders,
+    );
+    if (gate.response) return gate.response;
     const ratio = RATIO_MAP[aspectRatio];
     if (!ratio) {
       return new Response(JSON.stringify({ error: `Unsupported aspect ratio: ${aspectRatio}` }), {

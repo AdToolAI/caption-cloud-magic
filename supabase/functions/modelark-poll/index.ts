@@ -24,6 +24,7 @@ import {
 } from "../_shared/modelark.ts";
 import { heartbeatPipelineJob } from "../_shared/v427-callback-guard.ts";
 import { logMissingReinjectPointer } from "../_shared/v431-ledger.ts";
+import { recordGenerationOutput } from "../_shared/videoOutputMeasurement.ts";
 
 
 const corsHeaders = {
@@ -47,7 +48,7 @@ async function scan(sceneFilterId: string | null) {
     /* ── 1. AI Video Studio generations ─────────────────────────────── */
     const { data: generations } = await supabase
       .from("ai_video_generations")
-      .select("id, user_id, artlist_job_id, started_at, total_cost_euros")
+      .select("id, user_id, artlist_job_id, started_at, total_cost_euros, model, resolution, aspect_ratio")
       .eq("status", "processing")
       .like("artlist_job_id", `${MODELARK_JOB_PREFIX}%`)
       .limit(50);
@@ -92,6 +93,13 @@ async function scan(sceneFilterId: string | null) {
               error_message: null,
             })
             .eq("id", gen.id);
+          await recordGenerationOutput(supabase, {
+            id: gen.id,
+            model: gen.model,
+            resolution: gen.resolution,
+            aspect_ratio: gen.aspect_ratio,
+            video_url: permanentUrl,
+          });
           summary.completed++;
         } else if (task.status === "failed" || task.status === "cancelled") {
           await failGeneration(task.error ?? "ModelArk task failed");

@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
@@ -99,6 +100,24 @@ Deno.serve(async (req) => {
       suppressDialogue = false,
       seed,
     } = body;
+
+    // Capability gate — before wallet, before provider.
+    const gate = capabilityGate(
+      {
+        modelId: "seedance-2-5",
+        mode: inferMode({
+          startImageUrl,
+          endImageUrl,
+          referenceImageUrls: Array.isArray(referenceImageUrls) ? referenceImageUrls : null,
+          videoUrl: referenceVideoUrl ?? (referenceVideoUrls?.[0] ?? null),
+        }),
+        resolution,
+        durationSeconds: Number(duration),
+        aspectRatio,
+      },
+      corsHeaders,
+    );
+    if (gate.response) return gate.response;
 
     const refVideos = [
       ...(referenceVideoUrls ?? []),

@@ -41,11 +41,51 @@ Wirtschaftlichkeitsdaten (`estimatedProviderCost`, `actualProviderCost`,
 wurden: sie dürfen ohne Smoke-Test `available` bleiben. **Jede neue Auflösungsstufe
 braucht einen bestandenen Smoke-Test, bevor sie eingeschaltet wird.**
 
+## Freigabe gilt pro Auflösungsstufe
+
+`available`, `parityStatus`, `grandfathered` und `smokeTest` stehen **auf der
+Stufe** (`ResolutionSpec`), nicht nur am Modell. Eine neue Stufe wird mit
+`newTier(...)` angelegt: sie ist `grandfathered: false` und bleibt gesperrt, bis
+ein `smokeTest` mit gemessenen Pixeln eingetragen ist — sie erbt die Freigabe
+eines grandfathered Modells NICHT. `isResolutionTierAvailable()` ist die einzige
+Prüfung; `validateCapability()` lehnt eine gesperrte Stufe mit
+`INVALID_MODEL_CAPABILITY` ab.
+
+## Laufzeit-Gate in den Edge Functions
+
+Jede `generate-*-video`-Function ruft `capabilityGate()` aus
+`supabase/functions/_shared/videoCapabilityGate.ts` als erste Prüfung nach dem
+Parsen des Bodys auf — **vor** Wallet-Abfrage, Abbuchung und Provider-Dispatch.
+Verstoß = HTTP 400 mit `code: INVALID_MODEL_CAPABILITY` und dem verletzten Feld;
+kein Credit wird abgebucht, kein Provider-Request geht raus.
+
+Entfernte stille Clamps: LTX `snapDuration()` und `duration > 10 ? '1080p'`,
+Wan-Nächstwert-Snap, Hailuo `10s + 1080p → 768p`, Veo „ungültige Dauer → 4 s",
+Grok `Math.min/max`, Seedance-Lite-Snap, Vidu-Clamp, Aspect-Ratio-Rückfall auf
+16:9. Der Test `src/test/videoCapabilityGateOrdering.test.ts` liest die Quellen
+und bricht ab, sobald ein Clamp zurückkehrt oder das Gate nicht zuerst läuft.
+
+## Zielbild und Nachmessung
+
+`projectTargetFrame(tier, aspectRatio)` ist aspektgenau für 16:9, 9:16, 1:1,
+4:3, 3:4, 21:9, 9:21, 3:2, 2:3 — die kurze Kante des Labels liegt immer auf der
+kurzen Bildseite. `long-edge`-Provider (Topaz-Falle) werden exakt so projiziert,
+wie sie sich verhalten (4K hochkant = 1216×2160), nicht wie erhofft.
+
+Nach jedem abgeschlossenen Lauf misst `recordGenerationOutput()`
+(`_shared/videoOutputMeasurement.ts`) die Datei mit `probeRemoteVideo` und
+schreibt `measured_width/height`, `target_width/height` und `output_verdict`
+(`TARGET_MATCHED` | `PROVIDER_OUTPUT_MISMATCH`) an den Lauf. Aufgerufen wird sie
+in `replicate-webhook` und `modelark-poll`.
+
 ## Automatische Rückstufung
 
 Liefert eine Auflösungsstufe drei Läufe in Folge weniger Pixel als angefordert,
-wird `parityStatus` von `FULL_PARITY` auf `VERIFY` gesetzt und im Health-Report
-gelb gemeldet.
+setzt `applyOutputMeasurement()` `parityStatus` von `FULL_PARITY` auf `VERIFY`.
+Der Zustand je Stufe liegt in `public.video_model_tier_parity`
+(`consecutive_mismatches`, `tier_disabled`, `last_verdict`); ein
+`TARGET_MATCHED` setzt den Zähler zurück.
+
 
 ## Bekannte Provider-Fallen (in den Specs kodiert)
 
@@ -71,6 +111,14 @@ DE/EN/ES stehen in `SPEC_GROUP_LABELS` (`src/config/aiVideoModelRegistry.ts`).
 `VIDEO_MODEL_ALIASES` hält persistierte Alt-IDs am Leben (`kling-3-standard`,
 `kling-3-pro`, `sora-2-standard`, `sora-2-pro`, `wan-pro`). **Nie einen Eintrag
 löschen** — sonst brechen gespeicherte Läufe.
+
+Ein Alias darf **nur innerhalb derselben Familie** zeigen. `sora-2-*` zeigte auf
+Veo 3.1 — das hätte einen gespeicherten Sora-Lauf in ein fremdes Produkt
+umbenannt. Beide zeigen jetzt auf die historische Spec `sora-2`
+(`releaseStatus: 'removed'`, `available: false`): auflösbar für alte Läufe,
+nicht neu startbar. `ALIAS_SOURCE_FAMILY` deklariert die Herkunftsfamilie, der
+Test erzwingt die Übereinstimmung.
+
 
 ## Neues Modell aufnehmen
 

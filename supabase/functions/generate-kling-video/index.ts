@@ -3,6 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveCostPerSecond, VIDEO_PRICING_CATALOG } from "../_shared/videoPricingCatalog.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
@@ -114,6 +115,23 @@ serve(async (req) => {
     if (forceOmniSilent) {
       console.log(`[generate-kling-video] Kling Omni non-English native speech blocked (lang=${spokenLanguageKey ?? 'unset'})`);
     }
+
+    // Capability gate — before wallet, before provider. No silent clamping.
+    const klingGate = capabilityGate(
+      {
+        modelId: model,
+        mode: inferMode({
+          startImageUrl,
+          endImageUrl,
+          referenceImageUrls: Array.isArray(referenceImageUrls) ? referenceImageUrls : null,
+          videoUrl: referenceVideoUrl ?? null,
+        }),
+        durationSeconds: Number(duration),
+        aspectRatio,
+      },
+      corsHeaders,
+    );
+    if (klingGate.response) return klingGate.response;
 
     // Validate duration against catalog (per-model maxDuration).
     const catalogEntry = VIDEO_PRICING_CATALOG[model];

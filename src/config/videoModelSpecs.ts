@@ -4,7 +4,7 @@
 // Regenerate with: node scripts/generate-video-model-specs.mjs
 // =============================================================================
 
-export const SPECS_SOURCE_HASH = '988b624e40dc2ac46e20d833637f59477bc59dd50dc89bc8829c19f60ad51f1c';
+export const SPECS_SOURCE_HASH = '97e1653f6b88991429f60a5911585d7f4fd7770f518ac2d2c8ebd7789ac33f78';
 
 // ============================================================================
 // CANONICAL VIDEO MODEL CAPABILITY REGISTRY
@@ -84,7 +84,26 @@ export interface ResolutionSpec {
   pricingId: string;
   /** Durations allowed at THIS resolution when narrower than the mode default. */
   durations?: number[];
+  /**
+   * Availability and verification are per TIER, never per model. A new tier on
+   * an otherwise grandfathered model does NOT inherit its availability.
+   */
+  available: boolean;
+  parityStatus: ParityStatus;
+  /** Shipping before the parity upgrade — may stay available without a smoke test. */
+  grandfathered: boolean;
+  smokeTest?: SmokeTestRecord;
 }
+
+/**
+ * A tier may only be offered when it is either grandfathered (already shipping
+ * before the upgrade) or backed by a passing smoke test on this exact route.
+ */
+export function isResolutionTierAvailable(tier: ResolutionSpec): boolean {
+  if (!tier.available) return false;
+  return tier.grandfathered || !!tier.smokeTest;
+}
+
 
 export interface ModeControls {
   seed?: boolean;
@@ -218,9 +237,15 @@ export function res(
     orientationBehavior?: OrientationBehavior;
     native?: boolean;
     durations?: number[];
+    /** Set false for a NEW tier — it stays locked until a smoke test passes. */
+    grandfathered?: boolean;
+    available?: boolean;
+    parityStatus?: ParityStatus;
+    smokeTest?: SmokeTestRecord;
   } = {},
 ): ResolutionSpec {
   const long = FRAMES[shortEdge]?.long ?? Math.round((shortEdge * 16) / 9);
+  const grandfathered = opts.grandfathered ?? true;
   return {
     label,
     shortEdge,
@@ -230,8 +255,35 @@ export function res(
     native: opts.native ?? true,
     pricingId,
     ...(opts.durations ? { durations: opts.durations } : {}),
+    available: opts.available ?? true,
+    parityStatus: opts.parityStatus ?? (opts.smokeTest ? 'FULL_PARITY' : 'UNVERIFIED'),
+    grandfathered,
+    ...(opts.smokeTest ? { smokeTest: opts.smokeTest } : {}),
   };
 }
+
+/**
+ * A resolution tier that did NOT ship before the parity upgrade. It is locked
+ * (`available: false`) until a smoke test with measured pixels is recorded.
+ */
+export function newTier(
+  label: string,
+  shortEdge: number,
+  pricingId: string,
+  opts: {
+    orientationBehavior?: OrientationBehavior;
+    native?: boolean;
+    durations?: number[];
+    smokeTest?: SmokeTestRecord;
+  } = {},
+): ResolutionSpec {
+  return res(label, shortEdge, pricingId, {
+    ...opts,
+    grandfathered: false,
+    available: !!opts.smokeTest,
+  });
+}
+
 
 const NO_CONTROLS: ModeControls = {};
 
@@ -1716,19 +1768,58 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
       }),
     ],
   },
+  /* ───────────────── Historical / removed (ids stay resolvable) ──────────── */
+  {
+    id: 'sora-2',
+    displayName: 'Sora 2 (nicht mehr verfügbar)',
+    family: 'sora',
+    generation: '2',
+    provider: 'OpenAI',
+    providerModelSlug: 'openai/sora-2',
+    apiRoute: 'removed',
+    region: 'global',
+    apiVersion: 'n/a',
+    edgeFunction: 'none',
+    releaseStatus: 'removed',
+    deprecated: true,
+    supersededBy: 'veo-3.1-pro',
+    uiGroup: 'legacy',
+    available: false,
+    parityStatus: 'UNVERIFIED',
+    grandfathered: true,
+    lastVerifiedAt: '2026-08-11',
+    verifiedBy: 'registry-import',
+    providerDocsVersion: 'n/a',
+    verificationSourceUrl: 'https://openai.com/sora',
+    verificationNotes:
+      'Historischer Eintrag. Sora 2 wird nicht mehr angeboten; persistierte Läufe müssen weiter auflösbar bleiben, dürfen aber nicht neu startbar sein. Kein Alias auf Veo — das wäre eine falsche Modellbehauptung.',
+    modes: [],
+  },
 ];
 
 // ---------------------------------------------------------------------------
 // Aliases — persisted legacy ids keep resolving. Never delete an entry here.
+// An alias MUST point at the same model family; a cross-family alias would
+// silently rename a user's run into a different product.
 // ---------------------------------------------------------------------------
 
 export const VIDEO_MODEL_ALIASES: Record<string, string> = {
   'kling-3-standard': 'kling-3',
   'kling-3-pro': 'kling-3',
-  'sora-2-standard': 'veo-3.1-fast',
-  'sora-2-pro': 'veo-3.1-pro',
+  'sora-2-standard': 'sora-2',
+  'sora-2-pro': 'sora-2',
   'wan-pro': 'wan-2-7-pro',
 };
+
+/** Family a legacy id belonged to — asserted against the alias target. */
+export const ALIAS_SOURCE_FAMILY: Record<string, string> = {
+  'kling-3-standard': 'kling',
+  'kling-3-pro': 'kling',
+  'sora-2-standard': 'sora',
+  'sora-2-pro': 'sora',
+  'wan-pro': 'wan',
+};
+
 
 // ---------------------------------------------------------------------------
 // Lookup + validation
@@ -1813,11 +1904,22 @@ export function validateCapability(req: CapabilityRequest): CapabilityViolation 
         code: 'INVALID_MODEL_CAPABILITY',
         field: 'resolution',
         message: `${spec.displayName} (${req.mode}) does not render ${req.resolution}. Available: ${modeSpec.resolutions
+          .filter(isResolutionTierAvailable)
           .map((r) => r.label)
           .join(', ')}.`,
       };
     }
   }
+
+  // Availability is per TIER: a new tier never inherits the model's grandfathering.
+  if (resolution && !isResolutionTierAvailable(resolution)) {
+    return {
+      code: 'INVALID_MODEL_CAPABILITY',
+      field: 'resolution',
+      message: `${spec.displayName}: the ${resolution.label} tier is locked until a smoke test verifies it on route ${spec.apiRoute}.`,
+    };
+  }
+
 
   if (req.durationSeconds != null) {
     const allowed = resolution?.durations ?? modeSpec.durations;
@@ -1861,16 +1963,96 @@ export function validateCapability(req: CapabilityRequest): CapabilityViolation 
   return null;
 }
 
-/** Exact target frame for a request — the promise the smoke test verifies. */
+function even(value: number): number {
+  const rounded = Math.round(value);
+  return rounded % 2 === 0 ? rounded : rounded + 1;
+}
+
+/**
+ * Exact target frame for a request — the promise the smoke test verifies.
+ * Aspect-ratio aware for EVERY ratio we expose (16:9, 9:16, 1:1, 4:3, 3:4,
+ * 21:9, 9:21, 3:2, 2:3): the short edge of the label is held on the short side
+ * of the frame, so a "4K" portrait clip really is 2160x3840.
+ *
+ * `long-edge` providers (the Topaz trap) count the label's lines on the LONG
+ * side instead — projected here exactly as they behave, never as we wish.
+ */
 export function projectTargetFrame(
   resolution: ResolutionSpec,
   aspectRatio: string,
 ): PixelFrame {
-  const [w, h] = aspectRatio.split(':').map(Number);
-  if (!w || !h) return resolution.landscape;
-  if (h > w) return resolution.portrait;
-  if (w === h) return { width: resolution.shortEdge, height: resolution.shortEdge };
-  return resolution.landscape;
+  const [rawW, rawH] = aspectRatio.split(':').map(Number);
+  const w = Number.isFinite(rawW) && rawW > 0 ? rawW : 16;
+  const h = Number.isFinite(rawH) && rawH > 0 ? rawH : 9;
+
+  if (resolution.orientationBehavior === 'fixed') {
+    return resolution.landscape;
+  }
+
+  if (resolution.orientationBehavior === 'long-edge') {
+    // The label counts lines on the long edge.
+    const longEdge = resolution.shortEdge;
+    return w >= h
+      ? { width: longEdge, height: even((longEdge * h) / w) }
+      : { width: even((longEdge * w) / h), height: longEdge };
+  }
+
+  const short = resolution.shortEdge;
+  return w >= h
+    ? { width: even((short * w) / h), height: short }
+    : { width: short, height: even((short * h) / w) };
+}
+
+/** Measured output vs. promised frame. */
+export type OutputVerdict = 'TARGET_MATCHED' | 'PROVIDER_OUTPUT_MISMATCH';
+
+/** A run counts as matched when it delivers at least 98 % of both target edges. */
+export const OUTPUT_FRAME_TOLERANCE = 0.02;
+
+export function classifyMeasuredOutput(
+  target: PixelFrame,
+  measured: PixelFrame,
+): OutputVerdict {
+  const ok =
+    measured.width >= target.width * (1 - OUTPUT_FRAME_TOLERANCE) &&
+    measured.height >= target.height * (1 - OUTPUT_FRAME_TOLERANCE);
+  return ok ? 'TARGET_MATCHED' : 'PROVIDER_OUTPUT_MISMATCH';
+}
+
+/** Three consecutive mismatches downgrade a tier from FULL_PARITY to VERIFY. */
+export const PARITY_REGRESSION_THRESHOLD = 3;
+
+export interface TierParityState {
+  parityStatus: ParityStatus;
+  consecutiveMismatches: number;
+  /** Set when a downgraded tier must stop being offered. */
+  tierDisabled: boolean;
+}
+
+/**
+ * Pure regression state machine. A matched run resets the counter; the third
+ * consecutive mismatch downgrades FULL_PARITY to VERIFY and reports yellow.
+ */
+export function applyOutputMeasurement(
+  state: TierParityState,
+  verdict: OutputVerdict,
+): TierParityState & { downgraded: boolean } {
+  if (verdict === 'TARGET_MATCHED') {
+    return {
+      parityStatus: state.parityStatus,
+      consecutiveMismatches: 0,
+      tierDisabled: state.tierDisabled,
+      downgraded: false,
+    };
+  }
+  const consecutiveMismatches = state.consecutiveMismatches + 1;
+  const hit = consecutiveMismatches >= PARITY_REGRESSION_THRESHOLD;
+  return {
+    parityStatus: hit ? 'VERIFY' : state.parityStatus,
+    consecutiveMismatches,
+    tierDisabled: state.tierDisabled,
+    downgraded: hit && state.parityStatus === 'FULL_PARITY',
+  };
 }
 
 export const UI_GROUP_ORDER: UiGroup[] = [
@@ -1883,3 +2065,4 @@ export const UI_GROUP_ORDER: UiGroup[] = [
 ];
 
 export const VIDEO_SPECS_VERSION = '2026-09-06';
+

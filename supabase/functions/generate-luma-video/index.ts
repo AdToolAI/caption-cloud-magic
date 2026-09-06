@@ -3,6 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 
@@ -81,13 +82,23 @@ serve(async (req) => {
     const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl, endImageUrl, loop, hdr, cameraConcept } = body;
 
     const isRay32 = model === 'luma-ray32-5s' || model === 'luma-ray32-10s';
-    // Ray 3.2: fixed 5 s / 10 s per tier. Ray 2: enum [5, 9].
-    const duration = isRay32
-      ? (model === 'luma-ray32-10s' ? 10 : 5)
-      : (rawDuration >= 7 ? 9 : 5);
+    // Ray 3.2 tiers are fixed-length by product definition (5 s / 10 s tier).
+    const duration = isRay32 ? (model === 'luma-ray32-10s' ? 10 : 5) : Number(rawDuration);
+    const requestedResolution = isRay32 ? (body.resolution ?? '720p') : '720p';
 
-    // Ray 2 (`luma/ray-2-720p`) has no resolution input — it is 720p only.
-    const resolution = isRay32 ? (body.resolution ?? '720p') : '720p';
+    // Capability gate — before wallet, before provider. No nearest-value snap.
+    const gate = capabilityGate(
+      {
+        modelId: model,
+        mode: inferMode({ startImageUrl, endImageUrl }),
+        resolution: requestedResolution,
+        durationSeconds: duration,
+        aspectRatio,
+      },
+      corsHeaders,
+    );
+    if (gate.response) return gate.response;
+    const resolution = gate.resolutionLabel ?? requestedResolution;
 
     const isImageToVideo = !!startImageUrl;
     const mode = isImageToVideo ? 'Image-to-Video' : 'Text-to-Video';

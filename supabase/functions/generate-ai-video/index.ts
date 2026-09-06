@@ -3,6 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { withTimeout, isTimeoutError } from "../_shared/timeout.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
@@ -62,6 +63,20 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // Parse request
     const body = await req.json() as GenerateRequest;
     const { prompt, model, duration, aspectRatio, resolution, imageUrl } = body;
+
+    // Capability gate — Sora 2 is a removed model; this returns 400 before any
+    // wallet or provider interaction.
+    const gate = capabilityGate(
+      {
+        modelId: model,
+        mode: inferMode({ startImageUrl: imageUrl ?? null }),
+        resolution,
+        durationSeconds: Number(duration),
+        aspectRatio,
+      },
+      corsHeaders,
+    );
+    if (gate.response) return gate.response;
 
     // Determine generation mode
     const isImageToVideo = !!imageUrl;
