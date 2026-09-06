@@ -96,6 +96,7 @@ export function AIVideoUpscaling({
     isRunning,
     error,
     errorCode,
+    errorReason,
     previewPrice,
     startEnhance,
   } = useEnhanceVideo();
@@ -370,7 +371,7 @@ export function AIVideoUpscaling({
               {error && !blockedReason && (
                 <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg" role="alert">
                   <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm">{engineErrorText(errorCode, error, lang)}</span>
+                  <span className="text-sm">{engineErrorText(errorCode, error, lang, errorReason)}</span>
                 </div>
               )}
 

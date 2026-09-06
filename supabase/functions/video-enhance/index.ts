@@ -296,7 +296,7 @@ serve(async (req) => {
             : `This target (${delivery.target.width}x${delivery.target.height}) does not enlarge your video (${source.meta.width}x${source.meta.height}).`,
           code: "VIDEO_ENHANCE_NOT_AN_UPSCALE",
           reason: upscale.reason,
-          source: { width: source.meta.width, height: source.meta.height },
+          source: source.meta,
           target: delivery.target,
         },
         400,

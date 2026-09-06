@@ -116,8 +116,9 @@ export function engineErrorText(
   code: string | null | undefined,
   fallback: string,
   lang: EnhanceLang,
+  reason?: string | null,
 ): string {
-  const key = enhanceErrorKeyForCode(code);
+  const key = enhanceErrorKeyForCode(code, reason);
   return key ? enhanceCopy(key, lang) : fallback;
 }
 

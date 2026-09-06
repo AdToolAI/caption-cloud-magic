@@ -415,7 +415,7 @@ export function EnhanceVideoPanel({
 
       {error && (
         <p className="text-sm text-destructive" role="alert">
-          {engineErrorText(errorCode, error, lang)}
+          {engineErrorText(errorCode, error, lang, errorReason)}
         </p>
       )}
 
