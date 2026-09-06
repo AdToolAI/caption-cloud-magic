@@ -160,6 +160,16 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
                   <Download className="h-5 w-5 mr-2" />
                   {t('dc.downloadVideo')}
                 </Button>
+                {videoUrl && (
+                  <Button
+                    onClick={() => setEnhanceOpen(true)}
+                    className="w-full bg-white/10 hover:bg-white/20 text-white"
+                    size="lg"
+                  >
+                    <ArrowUpCircle className="h-5 w-5 mr-2" />
+                    {t('dc.aiUpscaleResultCta')}
+                  </Button>
+                )}
                 {onOpenLibrary && (
                   <Button
                     onClick={onOpenLibrary}
@@ -170,6 +180,7 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
                     {t('dc.toMediaLibrary')}
                   </Button>
                 )}
+
                 <Button
                   onClick={onClose}
                   variant="outline"
