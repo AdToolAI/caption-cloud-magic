@@ -266,21 +266,18 @@ describe('promised frame and measured output', () => {
 
 describe('hardening pass — explicit tiers, kill switch, per-route parity', () => {
   it('a multi-tier model must name its resolution — no silent first-tier default', () => {
-    const spec = getVideoModelSpec('veo-3.1-fast')!;
-    const mode = getModeSpec(spec, 't2v')!;
-    expect(mode.resolutions.length).toBeGreaterThan(1);
-    const v = validateCapability({ modelId: 'veo-3.1-fast', mode: 't2v', durationSeconds: 8, aspectRatio: '16:9' });
-    expect(v?.field).toBe('resolution');
-    // With the tier named the very same request passes.
-    expect(
-      validateCapability({
-        modelId: 'veo-3.1-fast',
-        mode: 't2v',
-        resolution: mode.resolutions[0].label,
-        durationSeconds: 8,
-        aspectRatio: '16:9',
-      }),
-    ).toBeNull();
+    // Any model whose mode offers more than one tier must be asked explicitly.
+    let checked = 0;
+    for (const spec of VIDEO_MODEL_SPECS) {
+      if (!spec.available) continue;
+      for (const mode of spec.modes) {
+        if (mode.resolutions.length < 2) continue;
+        const v = validateCapability({ modelId: spec.id, mode: mode.mode });
+        expect(v?.field, `${spec.id} ${mode.mode} silently defaulted a tier`).toBe('resolution');
+        checked++;
+      }
+    }
+    expect(checked, 'no multi-tier mode found to verify').toBeGreaterThan(0);
   });
 
   it('a tier disabled by measured regressions is rejected', () => {
