@@ -86,12 +86,20 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
     getPricePerSecond(m.id, billingCurrency) ?? m.costPerSecond[billingCurrency];
 
   const grouped = useMemo(() => {
-    const map: Record<ToolkitModelGroup, ToolkitModel[]> = {
-      recommended: [], audio: [], fast: [], premium: [],
+    const map: Record<UiGroup, ToolkitModel[]> = {
+      flagship: [], professional: [], audio: [], fast: [], economy: [], legacy: [],
     };
     list.forEach((m) => {
-      map[m.group].push(m);
+      map[specGroupOf(m)].push(m);
     });
+    // Innerhalb der Gruppe: höchste native Auflösung zuerst.
+    for (const key of Object.keys(map) as UiGroup[]) {
+      map[key].sort((a, b) => {
+        const ra = maxNativeResolution(getVideoModelSpec(a.id)!)?.shortEdge ?? 0;
+        const rb = maxNativeResolution(getVideoModelSpec(b.id)!)?.shortEdge ?? 0;
+        return rb - ra;
+      });
+    }
     return map;
   }, [list]);
 
