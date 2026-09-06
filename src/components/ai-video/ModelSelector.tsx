@@ -7,9 +7,18 @@ import { Badge } from '@/components/ui/badge';
 import {
   AI_VIDEO_TOOLKIT_MODELS,
   TOOLKIT_GROUP_LABELS,
+  SPEC_GROUP_LABELS,
+  LEGACY_GROUP_TO_SPEC_GROUP,
   type ToolkitModel,
   type ToolkitModelGroup,
 } from '@/config/aiVideoModelRegistry';
+import {
+  UI_GROUP_ORDER,
+  getVideoModelSpec,
+  maxNativeResolution,
+  nativeResolutionLabels,
+  type UiGroup,
+} from '@/config/videoModelSpecs';
 import type { Currency } from '@/config/pricing';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Lock, Wrench, Crown } from 'lucide-react';
