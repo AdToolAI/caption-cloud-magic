@@ -1,4 +1,23 @@
-import type { VideoEnhanceModelDefinition } from './types';
+import { TOPAZ_VIDEO_MODEL_VIEWS } from './topazCatalog';
+import type { ProcessingModeDefinition, VideoEnhanceModelDefinition } from './types';
+
+/**
+ * Topaz "processing modes" are real MODELS, not presets. The catalogue mirror
+ * is the single source of truth for which ones the express endpoint accepts.
+ */
+const TOPAZ_MODES: ProcessingModeDefinition[] = TOPAZ_VIDEO_MODEL_VIEWS.map((model) => ({
+  id: model.id,
+  label: model.label,
+  hint: model.hint,
+  suitedFor:
+    model.specialty === 'cgi'
+      ? ['ai_generated']
+      : model.specialty === 'legacy'
+        ? ['archive']
+        : model.specialty === 'denoise' || model.specialty === 'deblur'
+          ? ['ugc']
+          : ['camera', 'ugc'],
+}));
 
 /**
  * Video Enhance registry — V1 ships exactly two engines.
@@ -104,7 +123,7 @@ export const VIDEO_ENHANCE_MODELS: VideoEnhanceModelDefinition[] = [
   },
   {
     id: 'topaz-video-upscale',
-    name: 'Topaz Proteus',
+    name: 'Topaz Video AI',
     vendor: 'Topaz Labs',
     // Direct Topaz Labs API — no reseller in between. That is what unlocks the
     // explicit output geometry (true portrait 4K) and the full parameter set.
@@ -126,18 +145,7 @@ export const VIDEO_ENHANCE_MODELS: VideoEnhanceModelDefinition[] = [
       { en: 'YouTube 4K masters', de: 'YouTube-4K-Master', es: 'Másteres 4K para YouTube' },
     ],
     capabilities: ['upscale', 'fps_interpolation', 'restoration'],
-    processingModes: [
-      {
-        id: 'standard',
-        label: { en: 'Standard', de: 'Standard', es: 'Estándar' },
-        hint: {
-          en: 'The model has one processing path; quality follows the target output',
-          de: 'Das Modell hat einen Verarbeitungsweg; die Qualität folgt dem Zielformat',
-          es: 'El modelo tiene una sola vía de procesado; la calidad sigue al formato de salida',
-        },
-        suitedFor: ['camera', 'ugc'],
-      },
-    ],
+    processingModes: TOPAZ_MODES,
     // The direct API takes an explicit output width/height, so every label and
     // every documented frame rate is reachable in both orientations.
     outputs: [

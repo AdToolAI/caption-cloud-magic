@@ -22,6 +22,21 @@ import {
 } from './picture-pricing.ts';
 import { resolveTargetFrame } from './video-enhance-frame.ts';
 import { topazContainer, TOPAZ_CREDIT_USD_DEFAULT } from './topaz-client.ts';
+import {
+  TOPAZ_CREDITS_PER_SECOND as TOPAZ_FAMILY_CREDITS,
+  TOPAZ_DEFAULT_MODEL_ID,
+  TOPAZ_OUTPUT_QUALITY,
+  TOPAZ_VIDEO_MODEL_IDS,
+  TOPAZ_VIDEO_MODELS,
+  topazInterpolationModel,
+  topazManualFilterParams,
+  topazOutputQuality,
+  topazVideoModelOrDefault,
+  type TopazCreditFamily,
+} from './topaz-video-catalog.ts';
+
+export * from './topaz-video-catalog.ts';
+
 
 export type VideoResolution = '720p' | '1080p' | '2k' | '4k';
 export type QualityTier = 'standard' | 'pro';
@@ -44,7 +59,14 @@ export interface EnhanceConfig {
   resolution: VideoResolution;
   fps: number | null;
   tier: QualityTier;
+  /** Topaz encoder contract. Ignored by engines that publish no encoder choice. */
+  outputQuality?: string;
+  /** Topaz frame-interpolation model id; only used when the fps really changes. */
+  interpolationModel?: string;
+  /** Whitelisted, clamped manual filter parameters (Topaz manual models only). */
+  params?: Record<string, number>;
 }
+
 
 export interface SourceMetadata {
   durationSeconds: number;
@@ -100,15 +122,11 @@ export function vcubeProcessingType(tier: QualityTier): 'standard' | 'pro' {
 }
 
 /**
- * Topaz video model codes we run.
- *
- * `prob-4` (Proteus v4) is the general-purpose precision upscaler and the
- * documented default for camera footage. `apo-8` (Apollo) is Topaz' frame
- * interpolation model and is only added when the customer asks for a frame
- * rate the source does not already have.
+ * Legacy single-model constants. The runnable set now lives in
+ * `topaz-video-catalog.ts`; these remain as the documented defaults.
  */
 export const TOPAZ_VIDEO_UPSCALE_MODEL = 'prob-4';
-export const TOPAZ_FRAME_INTERPOLATION_MODEL = 'apo-8';
+
 
 /** Encoder contract of our masters: H.265 Main10 in an MP4 container. */
 export const TOPAZ_VIDEO_ENCODER = 'H265';
@@ -157,8 +175,10 @@ export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
     // the explicit output geometry below possible.
     provider: 'topaz',
     providerModelId: TOPAZ_VIDEO_UPSCALE_MODEL,
-    providerSchemaRef: 'topaz/video-express@2026-09-06',
-    modes: ['standard'],
+    providerSchemaRef: 'topaz/video-express@2026-09-07',
+    // One mode per runnable Topaz model. The catalogue is the single source of
+    // truth for which codes the express endpoint really accepts.
+    modes: [...TOPAZ_VIDEO_MODEL_IDS],
     // The direct API takes an explicit output width/height, so every label and
     // every documented frame rate is reachable in both orientations.
     outputs: [
@@ -179,14 +199,22 @@ export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
       const target = resolveTargetFrame(config.resolution, source.width, source.height);
       const sourceFps = Math.round(source.fps) || 30;
       const fps = config.fps ?? sourceFps;
+      const model = topazVideoModelOrDefault(config.mode);
+      const encoder = TOPAZ_OUTPUT_QUALITY[topazOutputQuality(config.outputQuality)];
 
-      const filters: Record<string, unknown>[] = [
-        { model: TOPAZ_VIDEO_UPSCALE_MODEL, auto: 'Auto' },
-      ];
+      // `auto: 'Auto'` lets Topaz derive the filter parameters. Manual values
+      // are only sent for models that document them, and only the whitelisted,
+      // clamped keys ever reach the provider.
+      const manual = model.manualParameters ? topazManualFilterParams(config.params) : {};
+      const upscale: Record<string, unknown> = Object.keys(manual).length
+        ? { model: model.slug, auto: 'Manual', ...manual }
+        : { model: model.slug, auto: 'Auto' };
+
+      const filters: Record<string, unknown>[] = [upscale];
       // Frame interpolation is only requested when the frame rate really
       // changes — otherwise Topaz would re-time a clip that is already right.
       if (fps !== sourceFps) {
-        filters.push({ model: TOPAZ_FRAME_INTERPOLATION_MODEL, fps });
+        filters.push({ model: topazInterpolationModel(config.interpolationModel).slug, fps });
       }
 
       return {
@@ -199,14 +227,18 @@ export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
           // Topaz rounds the frame to a multiple of 4; our labels already are.
           resolution: { width: target.width, height: target.height },
           frameRate: fps,
-          videoEncoder: TOPAZ_VIDEO_ENCODER,
-          videoProfile: TOPAZ_VIDEO_PROFILE,
-          container: 'mp4',
+          videoEncoder: encoder.videoEncoder,
+          videoProfile: encoder.videoProfile,
+          // Topaz defaults this to `High` — the most compressed variant. We
+          // always state it so a master is never silently downgraded.
+          dynamicCompressionLevel: encoder.dynamicCompressionLevel,
+          container: encoder.container,
           audioTransfer: 'Copy',
           audioCodec: 'AAC',
         },
       };
     },
+
   },
 };
 
@@ -332,6 +364,8 @@ export type VideoRateCard = RateCardMeta &
         type: 'per_unit';
         unitUsd: number;
         unitsPerOutputSecond: Partial<Record<VideoResolution, number>>;
+        /** Per-mode override; a mode missing here falls back to the table above. */
+        unitsPerOutputSecondByMode?: Record<string, Partial<Record<VideoResolution, number>>>;
         fpsFactor?: Record<number, number>;
         entries?: MatrixEntry[];
       }
@@ -391,28 +425,39 @@ const VCUBE_ENTRIES: MatrixEntry[] = VCUBE_MODES.flatMap((mode) =>
  */
 export const TOPAZ_CREDIT_USD = TOPAZ_CREDIT_USD_DEFAULT;
 
-/** Credits per second of OUTPUT at 30 fps, from the published Proteus table. */
-const TOPAZ_CREDITS_PER_SECOND: Partial<Record<VideoResolution, number>> = {
-  '720p': 0.1,
-  '1080p': 0.2,
-  '2k': 0.35,
-  '4k': 0.6,
-};
+/**
+ * Credits per second of OUTPUT at 30 fps, per credit FAMILY.
+ *
+ * Topaz does not bill every model alike: the Proteus-class models follow the
+ * published credit table, while the restoration models (Nyx, Themis) are
+ * billed per frame and land far cheaper per second. Charging the Proteus rate
+ * for a Nyx run would push the customer price above the multiplier cap, so the
+ * family — not the engine — decides the rate.
+ */
+const TOPAZ_CREDITS_PER_SECOND: Partial<Record<VideoResolution, number>> =
+  TOPAZ_FAMILY_CREDITS.precision;
+
+const TOPAZ_CREDITS_BY_MODE: Record<string, Partial<Record<VideoResolution, number>>> =
+  Object.fromEntries(
+    TOPAZ_VIDEO_MODELS.map((m) => [m.id, TOPAZ_FAMILY_CREDITS[m.creditFamily]]),
+  );
 
 const TOPAZ_FPS_FACTOR: Record<number, number> = { 24: 0.8, 30: 1, 60: 2 };
 
-const TOPAZ_ENTRIES: MatrixEntry[] = (
-  Object.keys(TOPAZ_CREDITS_PER_SECOND) as VideoResolution[]
-).flatMap((resolution) =>
-  [24, 30, 60].map((fps) => ({
-    mode: 'standard',
-    resolution,
-    fps,
-    tier: 'standard' as QualityTier,
-    usdPerSecond:
-      (TOPAZ_CREDITS_PER_SECOND[resolution] ?? 0) * (TOPAZ_FPS_FACTOR[fps] ?? 1) * TOPAZ_CREDIT_USD,
-  })),
-);
+const TOPAZ_ENTRIES: MatrixEntry[] = TOPAZ_VIDEO_MODELS.flatMap((model) => {
+  const family: TopazCreditFamily = model.creditFamily;
+  const credits = TOPAZ_FAMILY_CREDITS[family];
+  return (Object.keys(credits) as VideoResolution[]).flatMap((resolution) =>
+    [24, 30, 60].map((fps) => ({
+      mode: model.id,
+      resolution,
+      fps,
+      tier: 'standard' as QualityTier,
+      usdPerSecond: credits[resolution] * (TOPAZ_FPS_FACTOR[fps] ?? 1) * TOPAZ_CREDIT_USD,
+    })),
+  );
+});
+
 
 export const VIDEO_RATE_CARDS: Record<string, VideoRateCard> = {
   'bytedance-vcube': {
@@ -428,10 +473,11 @@ export const VIDEO_RATE_CARDS: Record<string, VideoRateCard> = {
     type: 'per_unit',
     unitUsd: TOPAZ_CREDIT_USD,
     unitsPerOutputSecond: TOPAZ_CREDITS_PER_SECOND,
+    unitsPerOutputSecondByMode: TOPAZ_CREDITS_BY_MODE,
     fpsFactor: TOPAZ_FPS_FACTOR,
     source:
-      'Topaz direct API credit pricing (published Proteus credit table); credit USD value from TOPAZ_CREDIT_USD',
-    checkedAt: '2026-09-06',
+      'Topaz direct API credit pricing (published Proteus + Nyx/Themis credit tables); credit USD value from TOPAZ_CREDIT_USD',
+    checkedAt: '2026-09-07',
     costUnverified: true,
     estimatorCalibrating: true,
     entries: TOPAZ_ENTRIES,
@@ -475,7 +521,8 @@ export function videoProviderCostUsd(card: VideoRateCard, config: VideoCostConfi
     case 'per_output_second':
       return card.usdPerSecond * seconds;
     case 'per_unit': {
-      const perSecond = card.unitsPerOutputSecond[config.resolution];
+      const table = card.unitsPerOutputSecondByMode?.[config.mode] ?? card.unitsPerOutputSecond;
+      const perSecond = table[config.resolution];
       if (perSecond === undefined) throw new UnpriceableRunError(`no unit rate for ${config.resolution}`);
       const fpsFactor = card.fpsFactor?.[config.fps] ?? 1;
       const units = Math.ceil(perSecond * fpsFactor * seconds);
@@ -635,6 +682,9 @@ export function sceneForSource(source: SourceMetadata, available: string[]): str
       ? 'ugc'
       : 'common';
   if (available.includes(preferred)) return preferred;
+  // Topaz modes are MODELS, not provenance presets: the documented
+  // general-purpose model is the honest default, never an arbitrary first row.
+  if (available.includes(TOPAZ_DEFAULT_MODEL_ID)) return TOPAZ_DEFAULT_MODEL_ID;
   return available.includes('common') ? 'common' : available[0];
 }
 
@@ -702,6 +752,17 @@ export function adaptConfigToSpec(
 
   const tier: QualityTier = spec.tiers.includes(config.tier) ? config.tier : spec.tiers[0];
 
-  return { modelId: spec.id, mode, resolution: config.resolution, fps, tier };
+  return {
+    modelId: spec.id,
+    mode,
+    resolution: config.resolution,
+    fps,
+    tier,
+    // Encoder / interpolation / manual parameters are Topaz-only concepts; they
+    // travel with the run and are simply ignored by an engine without them.
+    outputQuality: config.outputQuality,
+    interpolationModel: config.interpolationModel,
+    params: config.params,
+  };
 }
 

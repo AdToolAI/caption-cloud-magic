@@ -10,11 +10,14 @@ import {
   UnpriceableRunError,
   validateCombination,
   VIDEO_ENHANCE_SPECS,
+  topazScaleFits,
+  topazVideoModelOrDefault,
   type EnhanceConfig,
   type QualityTier,
   type SourceMetadata,
   type VideoResolution,
 } from "../_shared/video-enhance-models.ts";
+
 import { evaluateUpscale, planDelivery } from "../_shared/video-enhance-frame.ts";
 import { toClientPricing, toClientRun } from "../_shared/video-enhance-client-view.ts";
 import {
@@ -82,6 +85,12 @@ interface RequestBody {
   resolution?: VideoResolution;
   fps?: number | null;
   tier?: QualityTier;
+  /** Topaz encoder contract: 'efficient' | 'high' | 'master'. */
+  outputQuality?: string;
+  /** Topaz frame-interpolation model id. */
+  interpolationModel?: string;
+  /** Manual filter parameters; whitelisted and clamped server-side. */
+  params?: Record<string, number>;
 }
 
 function parseConfig(body: RequestBody): EnhanceConfig | null {
@@ -92,6 +101,11 @@ function parseConfig(body: RequestBody): EnhanceConfig | null {
     resolution: body.resolution,
     fps: body.fps === undefined ? null : body.fps,
     tier: body.tier,
+    outputQuality: body.outputQuality,
+    interpolationModel: body.interpolationModel,
+    // Values are never trusted as sent: the catalogue whitelists and clamps
+    // them before anything reaches the provider.
+    params: body.params && typeof body.params === "object" ? body.params : undefined,
   };
 }
 
@@ -380,6 +394,31 @@ serve(async (req) => {
       return json({ error: `Invalid combination: ${combination.error}`, code: combination.error }, 400);
     }
 
+    // ---- fixed-factor model contract ----------------------------------------
+    // Proteus Natural is a 2x model, Rhea a 4x model. Off-factor they do not
+    // fail at the provider, they silently deliver a result the model was never
+    // trained for — so the order is rejected with a truthful alternative.
+    if (spec.provider === "topaz") {
+      const topazModel = topazVideoModelOrDefault(config.mode);
+      const fit = topazScaleFits(topazModel, source.meta, delivery.target);
+      if (!fit.ok) {
+        return json(
+          {
+            error:
+              `${topazModel.name} only works at ${fit.requiredFactor}x the original size ` +
+              `(this order is about ${(fit.actualFactor ?? 0).toFixed(1)}x). ` +
+              `Pick another target size or another model.`,
+            code: "TOPAZ_MODEL_SCALE_MISMATCH",
+            requiredFactor: fit.requiredFactor,
+            actualFactor: fit.actualFactor,
+            source: { width: source.meta.width, height: source.meta.height },
+            target: delivery.target,
+          },
+          400,
+        );
+      }
+    }
+
     let pricing;
     try {
       pricing = priceVideoEnhanceRun(config, source.meta);
@@ -458,6 +497,11 @@ serve(async (req) => {
       resolution: config.resolution,
       fps: pricing.fps,
       tier: config.tier,
+      requested_output_quality: config.outputQuality ?? null,
+      executing_topaz_model: spec.provider === "topaz"
+        ? topazVideoModelOrDefault(config.mode).slug
+        : null,
+      interpolation_model: config.interpolationModel ?? null,
       source_asset_id: source.assetId,
       source_url: source.url,
       source_duration_seconds: source.meta.durationSeconds,

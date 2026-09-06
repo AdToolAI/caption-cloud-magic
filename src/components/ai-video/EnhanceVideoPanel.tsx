@@ -34,6 +34,15 @@ import {
 } from '@/lib/videoEnhance/runPresentation';
 
 import {
+  TOPAZ_DEFAULT_INTERPOLATION_ID,
+  TOPAZ_DEFAULT_OUTPUT_QUALITY,
+  TOPAZ_INTERPOLATION_VIEWS,
+  TOPAZ_OUTPUT_QUALITY_VIEWS,
+  topazModelView,
+  topazScaleFitsView,
+  type TopazOutputQuality,
+} from '@/config/videoEnhanceModels/topazCatalog';
+import {
   availableFps,
   availableResolutions,
   availableTiers,
@@ -69,6 +78,24 @@ const COPY = {
   },
   engine: { en: 'Engine', de: 'Engine', es: 'Motor' },
   style: { en: 'Footage type', de: 'Materialart', es: 'Tipo de material' },
+  topazModel: { en: 'Model', de: 'Modell', es: 'Modelo' },
+  outputQuality: { en: 'File quality', de: 'Dateiqualität', es: 'Calidad del archivo' },
+  motionModel: { en: 'Motion smoothing', de: 'Bewegungsglättung', es: 'Suavizado de movimiento' },
+  motionOnlyWhenFps: {
+    en: 'Only used because you changed the frames per second.',
+    de: 'Wird nur genutzt, weil du die Bilder pro Sekunde änderst.',
+    es: 'Solo se usa porque cambiaste los fotogramas por segundo.',
+  },
+  scaleLocked: {
+    en: 'needs a different target size',
+    de: 'braucht eine andere Zielgröße',
+    es: 'necesita otro tamaño de destino',
+  },
+  onlyFactor: {
+    en: 'only works at',
+    de: 'funktioniert nur bei',
+    es: 'solo funciona a',
+  },
   detectedFrom: { en: 'Detected from', de: 'Erkannt aus', es: 'Detectado de' },
   fromOrigin: {
     en: 'Set automatically from where the clip comes from',
@@ -173,6 +200,10 @@ export function EnhanceVideoPanel({
   const [modeTouched, setModeTouched] = useState(false);
   const [resolution, setResolution] = useState<VideoResolution>('1080p');
   const [fps, setFps] = useState<number | null>(null);
+  const [outputQuality, setOutputQuality] = useState<TopazOutputQuality>(
+    TOPAZ_DEFAULT_OUTPUT_QUALITY,
+  );
+  const [interpolationModel, setInterpolationModel] = useState(TOPAZ_DEFAULT_INTERPOLATION_ID);
   const [asset, setAsset] = useState<CanonicalVideoAsset | null>(null);
 
   const {
@@ -274,6 +305,10 @@ export function EnhanceVideoPanel({
         resolution,
         fps,
         tier: availableTiers(model)[0] ?? 'standard',
+        // Topaz-only settings; harmless for an engine that has no encoder or
+        // interpolation choice of its own.
+        outputQuality,
+        interpolationModel,
       }
     : null;
 
@@ -281,7 +316,7 @@ export function EnhanceVideoPanel({
     if (!config || !hasSource) return;
     void previewPrice(source, config);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, modelId, mode, modeTouched, resolution, fps, hasSource]);
+  }, [source, modelId, mode, modeTouched, resolution, fps, outputQuality, interpolationModel, hasSource]);
 
   const onStart = useCallback(() => {
     if (!config || !hasSource) return;
@@ -401,7 +436,7 @@ export function EnhanceVideoPanel({
 
             {model.processingModes.length > 1 && (
               <div className="space-y-2">
-                <Label>{tx('style', lang)}</Label>
+                <Label>{isTopaz ? tx('topazModel', lang) : tx('style', lang)}</Label>
                 <Select
                   value={mode}
                   onValueChange={(v) => {
@@ -411,22 +446,81 @@ export function EnhanceVideoPanel({
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {model.processingModes.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>{m.label[lang]}</SelectItem>
-                    ))}
+                    {model.processingModes.map((m) => {
+                      // A fixed-factor model that cannot reach the chosen
+                      // target size is shown, but disabled with the reason —
+                      // never silently run at a factor it was not trained for.
+                      const fits = !isTopaz || modeFits(m.id);
+                      const view = isTopaz ? topazModelView(m.id) : null;
+                      return (
+                        <SelectItem
+                          key={m.id}
+                          value={m.id}
+                          disabled={!fits}
+                          data-testid={`enhance-mode-${m.id}`}
+                        >
+                          {m.label[lang]}
+                          {!fits && view?.fixedUpscale
+                            ? ` · ${tx('onlyFactor', lang)} ${view.fixedUpscale}×`
+                            : ''}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
-                {autoDetectedFootage && (asset?.sourceModel || asset?.origin) && (
-                  <p className="text-xs text-muted-foreground">
-                    {tx('detectedFrom', lang)}{' '}
-                    {asset?.sourceModel ??
-                      (asset?.origin === 'uploaded'
-                        ? tx('style', lang)
-                        : recommendedModel)}
-                  </p>
+                {isTopaz ? (
+                  <p className="text-xs text-muted-foreground">{topazModelView(mode).hint[lang]}</p>
+                ) : (
+                  autoDetectedFootage && (asset?.sourceModel || asset?.origin) && (
+                    <p className="text-xs text-muted-foreground">
+                      {tx('detectedFrom', lang)}{' '}
+                      {asset?.sourceModel ??
+                        (asset?.origin === 'uploaded'
+                          ? tx('style', lang)
+                          : recommendedModel)}
+                    </p>
+                  )
                 )}
               </div>
             )}
+
+            {isTopaz && (
+              <div className="space-y-2">
+                <Label>{tx('outputQuality', lang)}</Label>
+                <Select
+                  value={outputQuality}
+                  onValueChange={(v) => setOutputQuality(v as TopazOutputQuality)}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TOPAZ_OUTPUT_QUALITY_VIEWS.map((q) => (
+                      <SelectItem key={q.id} value={q.id}>{q.label[lang]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {TOPAZ_OUTPUT_QUALITY_VIEWS.find((q) => q.id === outputQuality)?.hint[lang]}
+                </p>
+              </div>
+            )}
+
+            {isTopaz && fps !== null && (
+              <div className="space-y-2">
+                <Label>{tx('motionModel', lang)}</Label>
+                <Select value={interpolationModel} onValueChange={setInterpolationModel}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TOPAZ_INTERPOLATION_VIEWS.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name} — {m.hint[lang]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">{tx('motionOnlyWhenFps', lang)}</p>
+              </div>
+            )}
+
 
             <div className="space-y-2">
               <Label>{tx('resolution', lang)}</Label>
