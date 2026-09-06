@@ -247,9 +247,17 @@ export function topazInterpolationModel(id: string | undefined): TopazInterpolat
 // ---------------------------------------------------------------------------
 
 /**
- * How much the master is compressed. Topaz defaults `dynamicCompressionLevel`
- * to `High` — the SMALLEST file and the weakest quality — so leaving it out
- * means silently shipping the most compressed variant. AdTool always sends it.
+ * How much the master is compressed.
+ *
+ * IMPORTANT — the provider naming reads the opposite way round to intuition.
+ * `dynamicCompressionLevel` names the QUALITY level, not the compression
+ * strength: per Topaz, `High` scores ~98.4 VMAF at the largest file size,
+ * `Mid` ~88.3 and `Low` ~79.3 at the smallest. The provider default is `High`
+ * (best quality) whenever neither this field nor `videoBitrate` is sent, and
+ * the field is mutually exclusive with `videoBitrate`. It applies to the AV1 /
+ * H264 / H265 encoders only.
+ *
+ * Source: OpenAPI schema of POST /video/express, checked 2026-09-07.
  */
 export type TopazOutputQuality = 'efficient' | 'high' | 'master';
 
@@ -261,20 +269,23 @@ export interface TopazEncoderContract {
 }
 
 export const TOPAZ_OUTPUT_QUALITY: Record<TopazOutputQuality, TopazEncoderContract> = {
+  // Smallest file — provider level `Low` (~79 VMAF).
   efficient: {
-    dynamicCompressionLevel: 'High',
+    dynamicCompressionLevel: 'Low',
     videoEncoder: 'H265',
     videoProfile: 'Main10',
     container: 'mp4',
   },
+  // Balanced — provider level `Mid` (~88 VMAF).
   high: {
     dynamicCompressionLevel: 'Mid',
     videoEncoder: 'H265',
     videoProfile: 'Main10',
     container: 'mp4',
   },
+  // Maximum quality, largest file — provider level `High` (~98 VMAF).
   master: {
-    dynamicCompressionLevel: 'Low',
+    dynamicCompressionLevel: 'High',
     videoEncoder: 'H265',
     videoProfile: 'Main10',
     container: 'mp4',
@@ -283,11 +294,18 @@ export const TOPAZ_OUTPUT_QUALITY: Record<TopazOutputQuality, TopazEncoderContra
 
 export const TOPAZ_DEFAULT_OUTPUT_QUALITY: TopazOutputQuality = 'high';
 
-export function topazOutputQuality(value: string | undefined): TopazOutputQuality {
-  return value === 'efficient' || value === 'high' || value === 'master'
-    ? value
-    : TOPAZ_DEFAULT_OUTPUT_QUALITY;
+export function isTopazOutputQuality(value: unknown): value is TopazOutputQuality {
+  return value === 'efficient' || value === 'high' || value === 'master';
 }
+
+/**
+ * Read a STORED value. Never used to sanitise client input — an unknown value
+ * coming from a request is rejected in `validateCombination`, not rewritten.
+ */
+export function topazOutputQuality(value: string | undefined): TopazOutputQuality {
+  return isTopazOutputQuality(value) ? value : TOPAZ_DEFAULT_OUTPUT_QUALITY;
+}
+
 
 // ---------------------------------------------------------------------------
 // Manual parameters
