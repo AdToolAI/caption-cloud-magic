@@ -9,6 +9,7 @@ import {
   VIDEO_MODEL_ALIASES,
   VIDEO_MODEL_SPECS,
   applyOutputMeasurement,
+  applySmokeTestPass,
   classifyMeasuredOutput,
   getModeSpec,
   getVideoModelSpec,
@@ -246,6 +247,88 @@ describe('promised frame and measured output', () => {
     const target = { width: 2160, height: 3840 };
     expect(classifyMeasuredOutput(target, { width: 2160, height: 3840 })).toBe('TARGET_MATCHED');
     expect(classifyMeasuredOutput(target, { width: 1216, height: 2160 })).toBe('PROVIDER_OUTPUT_MISMATCH');
+  });
+
+  it('three mismatches on a FULL_PARITY tier downgrade AND disable it', () => {
+    let state = { parityStatus: 'FULL_PARITY' as const, consecutiveMismatches: 0, tierDisabled: false };
+    let next = applyOutputMeasurement(state, 'PROVIDER_OUTPUT_MISMATCH');
+    next = applyOutputMeasurement(next, 'PROVIDER_OUTPUT_MISMATCH');
+    expect(next.tierDisabled).toBe(false);
+    next = applyOutputMeasurement(next, 'PROVIDER_OUTPUT_MISMATCH');
+    expect(next.parityStatus).toBe('VERIFY');
+    expect(next.tierDisabled).toBe(true);
+    expect(next.downgraded).toBe(true);
+  });
+
+  it('never auto-disables a grandfathered UNVERIFIED tier — the target is an assumption', () => {
+    let next = { parityStatus: 'UNVERIFIED' as const, consecutiveMismatches: 0, tierDisabled: false } as ReturnType<typeof applyOutputMeasurement>;
+    for (let i = 0; i < 5; i++) next = applyOutputMeasurement(next, 'PROVIDER_OUTPUT_MISMATCH');
+    expect(next.parityStatus).toBe('UNVERIFIED');
+    expect(next.tierDisabled).toBe(false);
+    expect(next.downgraded).toBe(false);
+  });
+
+  it('never auto-disables an already-VERIFY tier', () => {
+    let next = { parityStatus: 'VERIFY' as const, consecutiveMismatches: 0, tierDisabled: false } as ReturnType<typeof applyOutputMeasurement>;
+    for (let i = 0; i < 4; i++) next = applyOutputMeasurement(next, 'PROVIDER_OUTPUT_MISMATCH');
+    expect(next.parityStatus).toBe('VERIFY');
+    expect(next.tierDisabled).toBe(false);
+    expect(next.downgraded).toBe(false);
+  });
+
+  it('a passing smoke test resets the counter, re-enables the tier and restores FULL_PARITY', () => {
+    const disabled = { parityStatus: 'VERIFY' as const, consecutiveMismatches: 3, tierDisabled: true };
+    const restored = applySmokeTestPass(disabled);
+    expect(restored.parityStatus).toBe('FULL_PARITY');
+    expect(restored.consecutiveMismatches).toBe(0);
+    expect(restored.tierDisabled).toBe(false);
+  });
+
+  it('only provider-verified sizing may carry FULL_PARITY', () => {
+    const assumed = res('1080p', 1080, 'x', {
+      smokeTest: { runId: 'r1', measuredWidth: 1080, measuredHeight: 1920, at: '2026-09-06' } as never,
+    });
+    expect(assumed.sizingRuleVerified).toBe(false);
+    expect(assumed.parityStatus).toBe('UNVERIFIED');
+
+    const verified = res('1080p', 1080, 'x', {
+      sizingRuleSource: 'Provider docs v2026-09: short edge is held (see provider sizing table).',
+      smokeTest: { runId: 'r1', measuredWidth: 1080, measuredHeight: 1920, at: '2026-09-06' } as never,
+    });
+    expect(verified.sizingRuleVerified).toBe(true);
+    expect(verified.parityStatus).toBe('FULL_PARITY');
+  });
+
+  it('seedance-mini + 1080p is a 400 and never becomes 720p', () => {
+    const v = validateCapability({
+      modelId: 'seedance-mini',
+      mode: 't2v',
+      resolution: '1080p',
+      durationSeconds: 5,
+      aspectRatio: '16:9',
+    });
+    expect(v, 'seedance-mini 1080p was accepted').toBeTruthy();
+    expect(v?.field).toBe('resolution');
+    const gated = evaluateCapabilityGate({
+      modelId: 'seedance-mini',
+      mode: 't2v',
+      resolution: '1080p',
+      durationSeconds: 5,
+      aspectRatio: '16:9',
+    });
+    expect(gated.violation).toBeTruthy();
+    expect(gated.resolutionLabel).toBeNull();
+    // 480p and 720p stay valid, each as ITSELF.
+    for (const label of ['480p', '720p']) {
+      const ok = evaluateCapabilityGate({
+        modelId: 'seedance-mini',
+        mode: 't2v',
+        resolution: label,
+        durationSeconds: 5,
+        aspectRatio: '16:9',
+      });
+      if (!ok.violation) expect(ok.resolutionLabel).toBe(label);
+    }
   });
 
   it('downgrades a tier after three consecutive mismatches and resets on a match', () => {
