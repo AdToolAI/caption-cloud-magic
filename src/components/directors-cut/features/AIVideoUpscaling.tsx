@@ -393,7 +393,27 @@ export function AIVideoUpscaling({
               </Button>
 
               {run?.status === 'completed' && run.output_url && (
-                <video src={run.output_url} controls className="w-full rounded-lg" />
+                <div className="space-y-2">
+                  <video src={run.output_url} controls className="w-full rounded-lg" />
+                  {/* After the run: the measured facts of the delivered file. */}
+                  {run.actual_width && run.actual_height && (
+                    <p className="text-xs text-muted-foreground">
+                      {tx({ de: 'Geliefert', en: 'Delivered', es: 'Entregado' })}:{' '}
+                      <span className="text-foreground font-medium">
+                        {run.actual_width}×{run.actual_height}
+                      </span>{' '}
+                      {tx({ de: 'Pixel', en: 'pixels', es: 'píxeles' })}
+                      {run.output_size_bytes
+                        ? ` · ${(run.output_size_bytes / (1024 * 1024)).toFixed(1)} MB`
+                        : ''}
+                      {run.output_fps ? ` · ${Math.round(run.output_fps)} FPS` : ''}
+                      {run.output_duration_seconds
+                        ? ` · ${run.output_duration_seconds.toFixed(1)} s`
+                        : ''}
+                      {run.output_codec ? ` · ${run.output_codec.toUpperCase()}` : ''}
+                    </p>
+                  )}
+                </div>
               )}
             </>
           )}
