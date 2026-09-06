@@ -437,7 +437,11 @@ export function EnhanceVideoPanel({
 
       {hasSource && (
         <div className="flex gap-3">
-          <Button onClick={onStart} disabled={isStarting || isRunning} className="flex-1">
+          <Button
+            onClick={onStart}
+            disabled={isStarting || isRunning || !!blockedReason}
+            className="flex-1"
+          >
             {isStarting || isRunning ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{tx('running', lang)}</>
             ) : (
