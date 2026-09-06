@@ -357,7 +357,7 @@ export function res(
     pricingId,
     ...(opts.durations ? { durations: opts.durations } : {}),
     available: opts.available ?? true,
-    parityStatus: opts.parityStatus ?? (opts.smokeTest ? 'FULL_PARITY' : 'UNVERIFIED'),
+    parityStatus,
     grandfathered,
     ...(opts.smokeTest ? { smokeTest: opts.smokeTest } : {}),
   };
