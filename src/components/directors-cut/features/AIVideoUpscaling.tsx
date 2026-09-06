@@ -100,12 +100,17 @@ export function AIVideoUpscaling({
   const [modelId, setModelId] = useState(models[0]?.id ?? '');
   const model = getVideoEnhanceModel(modelId);
   const [mode, setMode] = useState(model?.processingModes[0]?.id ?? 'standard');
+  // true only after the customer picked a footage type themselves; a default
+  // is not a choice — the server then derives the ByteDance scene from the
+  // clip's provenance.
+  const [modeTouched, setModeTouched] = useState(false);
   const [resolution, setResolution] = useState<VideoResolution>('1080p');
   const [fps, setFps] = useState<number | null>(null);
 
   const {
     run,
     estimate,
+    plan,
     sourceMeta,
     isStarting,
     isRunning,
@@ -121,28 +126,37 @@ export function AIVideoUpscaling({
   // as the engine run here so the user sees the verdict BEFORE paying.
   const sourceWidth = sourceMeta?.width ?? 0;
   const sourceHeight = sourceMeta?.height ?? 0;
-  const targetFrame = model && sourceWidth && sourceHeight
+  const sourceKnown = sourceWidth > 0 && sourceHeight > 0;
+  const targetFrame = model && sourceKnown
     ? resolveTargetFrame(resolution, sourceWidth, sourceHeight)
     : null;
-  const upscale = targetFrame
-    ? evaluateUpscale(targetFrame, { width: sourceWidth, height: sourceHeight })
-    : null;
-  const executionModelId = model && targetFrame
-    ? (frameMeetsTarget(
-        projectProviderOutput(model.id, resolution, sourceWidth, sourceHeight),
-        targetFrame,
-      )
-        ? model.id
-        : models.find((m) =>
-            frameMeetsTarget(
-              projectProviderOutput(m.id, resolution, sourceWidth, sourceHeight),
-              targetFrame,
-            ),
-          )?.id ?? null)
-    : model?.id ?? null;
-  const routedModel = model && executionModelId && executionModelId !== model.id
-    ? models.find((m) => m.id === executionModelId) ?? null
-    : null;
+  // Every offered tier against THIS source — exact frame + upscale verdict —
+  // so the picker can disable no-op / downscale tiers itself.
+  const tierChoices = useMemo(
+    () =>
+      model && sourceKnown
+        ? describeResolutionChoices(availableResolutions(model, mode), sourceWidth, sourceHeight)
+        : null,
+    [model, mode, sourceKnown, sourceWidth, sourceHeight],
+  );
+  const upscale = tierChoices?.find((c) => c.resolution === resolution)?.verdict ?? null;
+
+  // The server's delivery plan (from the estimate) is the authority for the
+  // executing engine; the client mirror only bridges until it arrives.
+  const planIsCurrent =
+    !!plan &&
+    !!model &&
+    plan.requestedModelId === model.id &&
+    !!targetFrame &&
+    plan.target.width === targetFrame.width &&
+    plan.target.height === targetFrame.height;
+  const mirror = model && sourceKnown
+    ? resolveExecutionEngine(model.id, models.map((m) => m.id), resolution, sourceWidth, sourceHeight)
+    : { executionModelId: model?.id ?? null, routed: false };
+  const executionModelId = planIsCurrent
+    ? (plan!.strategy === 'unreachable' ? null : plan!.executionModelId)
+    : mirror.executionModelId;
+  const routed = !!model && !!executionModelId && executionModelId !== model.id;
   const frameUnreachable = targetFrame != null && executionModelId === null;
   const blockedReason = upscale && !upscale.ok
     ? enhanceCopy(upscale.reason === 'downscale' ? 'downscale' : 'notAnUpscale', lang)
@@ -153,6 +167,14 @@ export function AIVideoUpscaling({
   // start button — the server would refuse anyway, but the user should not
   // have to click to learn that.
   const orderRejected = !!errorCode && ORDER_REJECTION_CODES.has(errorCode);
+
+  // The footage type that really reaches the engine.
+  const executionMode = planIsCurrent ? plan!.executionMode : mode;
+  const executionModeLabel =
+    getVideoEnhanceModel(executionModelId ?? modelId)?.processingModes.find((m) => m.id === executionMode)
+      ?.label[lang] ?? executionMode;
+  const showFootageRow =
+    !!executionModelId && (getVideoEnhanceModel(executionModelId)?.processingModes.length ?? 0) > 1;
 
   // Presets simply preselect the central configuration.
   useEffect(() => {
@@ -179,14 +201,21 @@ export function AIVideoUpscaling({
   }, [fps, fpsChoices]);
 
   const config: EnhanceConfig | null = model
-    ? { modelId: model.id, mode, resolution, fps, tier: availableTiers(model)[0] ?? 'standard' }
+    ? {
+        modelId: model.id,
+        mode,
+        modeExplicit: modeTouched,
+        resolution,
+        fps,
+        tier: availableTiers(model)[0] ?? 'standard',
+      }
     : null;
 
   useEffect(() => {
     if (!config || !videoUrl || !settings.enabled || preset === 'original') return;
     void previewPrice({ url: videoUrl }, config);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoUrl, modelId, mode, resolution, fps, settings.enabled, preset]);
+  }, [videoUrl, modelId, mode, modeTouched, resolution, fps, settings.enabled, preset]);
 
   useEffect(() => {
     if (run?.status === 'completed' && run.output_url) {
