@@ -360,7 +360,11 @@ export function newTier(
     native?: boolean;
     durations?: number[];
     smokeTest?: SmokeTestRecord;
+    framesByAspectRatio?: Record<string, PixelFrame>;
+    sizingRule?: SizingRule;
+    sizingRuleSource?: string;
   } = {},
+
 ): ResolutionSpec {
   return res(label, shortEdge, pricingId, {
     ...opts,
