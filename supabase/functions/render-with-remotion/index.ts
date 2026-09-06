@@ -777,9 +777,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         const hasExternalVideos = externalVideoCount > 0;
 
         if (hasExternalVideos) {
-          // Distributed mode: recompute framesPerLambda from tier target for
-          // small parallel chunks. Cap workers to tier.maxWorkers.
-          const fpl = Math.max(120, Math.min(200, Math.ceil(durationInFrames / tier.maxWorkers)));
+          // Distributed mode: use the tier's framesPerLambda so short clips
+          // actually fan out to 12 workers (cap chunk size at 200 frames).
+          const fpl = Math.min(200, tier.framesPerLambda);
           console.log(`🎞️ External video scenes (${externalVideoCount}) — tier=${tier.label}, maxWorkers=${tier.maxWorkers}, framesPerLambda=${fpl}`);
           return {
             _schedulingMode: 'distributed' as const,
