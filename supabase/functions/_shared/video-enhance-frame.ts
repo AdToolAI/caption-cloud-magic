@@ -9,12 +9,13 @@
  * A portrait source ordered at 4K must come back as 2160x3840 — the same
  * pixel count a landscape source gets, only turned.
  *
- * The engines do NOT agree on this:
+ * Both engines deliver this today:
  *   - ByteDance vCube reads the label orientation-aware (measured run
  *     014661bc: 1080x1920 -> 2160x3840).
- *   - Topaz reads the label as a target LINE COUNT and therefore puts 2160 on
- *     the height whatever the orientation (measured runs ee9fdb0e and
- *     b9b479d4: 1080x1920 and 720x1280 both -> 1216x2160).
+ *   - Topaz is called through its DIRECT API, which takes an explicit output
+ *     width/height, so it delivers the same orientation-aware frame. (The old
+ *     Replicate route read the label as a line count and returned 1216x2160
+ *     for portrait sources — that route is gone.)
  *
  * This module is the single place that knows both facts. It is pure, so the
  * client mirror (src/lib/videoEnhance/targetFrame.ts) can assert parity.
@@ -61,7 +62,7 @@ export type LabelReading = 'orientation_aware' | 'line_count';
 
 export const ENGINE_LABEL_READING: Record<string, LabelReading> = {
   'bytedance-vcube': 'orientation_aware',
-  'topaz-video-upscale': 'line_count',
+  'topaz-video-upscale': 'orientation_aware',
 };
 
 /** The frame this engine will really return for this source. */

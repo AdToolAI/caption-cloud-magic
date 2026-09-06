@@ -52,12 +52,12 @@ describe('video enhance — a paid run must add pixels', () => {
 });
 
 describe('video enhance — portrait 4K routes to the engine that can deliver it', () => {
-  it('projects Topaz as a line-count engine that misses portrait 4K', () => {
+  it('projects Topaz as orientation aware on the direct API', () => {
     const target = resolveTargetFrame('4k', 1080, 1920);
     expect(target).toEqual({ width: 2160, height: 3840 });
     const topaz = projectProviderOutput('topaz-video-upscale', '4k', 1080, 1920);
-    expect(topaz.height).toBe(2160);
-    expect(frameMeetsTarget(topaz, target)).toBe(false);
+    expect(topaz).toEqual(target);
+    expect(frameMeetsTarget(topaz, target)).toBe(true);
   });
 
   it('projects ByteDance as orientation aware and meeting portrait 4K', () => {

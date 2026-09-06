@@ -19,16 +19,16 @@ describe('target frame contract', () => {
     expect(isPortrait(1080, 1920)).toBe(true);
   });
 
-  it('reproduces the measured Topaz portrait shortfall', () => {
-    // run ee9fdb0e: 1080x1920 ordered at 4K -> measured 1216x2160
+  it('reaches true portrait 4K on Topaz through the direct API', () => {
+    // The direct Topaz API takes an explicit output width/height, so the old
+    // Replicate line-count shortfall (1216x2160) cannot happen any more.
     const projected = projectProviderOutput('topaz-video-upscale', '4k', 1080, 1920);
-    expect(projected).toEqual({ width: 1216, height: 2160 });
-    expect(frameMeetsTarget(projected, resolveTargetFrame('4k', 1080, 1920))).toBe(false);
+    expect(projected).toEqual({ width: 2160, height: 3840 });
+    expect(frameMeetsTarget(projected, resolveTargetFrame('4k', 1080, 1920))).toBe(true);
 
-    // run b9b479d4: 720x1280 ordered at 4K -> measured 1216x2160
     expect(projectProviderOutput('topaz-video-upscale', '4k', 720, 1280)).toEqual({
-      width: 1216,
-      height: 2160,
+      width: 2160,
+      height: 3840,
     });
   });
 

@@ -153,15 +153,15 @@ describe('resolution choices — per tier, before the start', () => {
     expect(firstUpscaleResolution(['720p', '1080p'], 1080, 1920)).toBeNull();
   });
 
-  it('routes portrait 4K from Topaz to ByteDance and keeps landscape native', () => {
+  it('keeps portrait AND landscape 4K native on Topaz via the direct API', () => {
     const engines = ['bytedance-vcube', 'topaz-video-upscale'];
     const portrait = resolveExecutionEngine('topaz-video-upscale', engines, '4k', 1080, 1920);
-    expect(portrait).toEqual({ executionModelId: 'bytedance-vcube', routed: true });
+    expect(portrait).toEqual({ executionModelId: 'topaz-video-upscale', routed: false });
     const landscape = resolveExecutionEngine('topaz-video-upscale', engines, '4k', 1920, 1080);
     expect(landscape).toEqual({ executionModelId: 'topaz-video-upscale', routed: false });
     const direct = resolveExecutionEngine('bytedance-vcube', engines, '4k', 1080, 1920);
     expect(direct).toEqual({ executionModelId: 'bytedance-vcube', routed: false });
-    const nothing = resolveExecutionEngine('topaz-video-upscale', ['topaz-video-upscale'], '4k', 1080, 1920);
-    expect(nothing).toEqual({ executionModelId: null, routed: false });
+    // Both engines read the label orientation-aware now, so no 4K order is
+    // unreachable any more — nothing is ever silently downgraded either.
   });
 });

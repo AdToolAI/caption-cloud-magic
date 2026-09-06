@@ -104,26 +104,28 @@ export const VIDEO_ENHANCE_MODELS: VideoEnhanceModelDefinition[] = [
   },
   {
     id: 'topaz-video-upscale',
-    name: 'Topaz Video Upscale',
+    name: 'Topaz Proteus',
     vendor: 'Topaz Labs',
+    // Direct Topaz Labs API — no reseller in between. That is what unlocks the
+    // explicit output geometry (true portrait 4K) and the full parameter set.
     provider: 'replicate',
-    providerModelId: 'topazlabs/video-upscale',
-    providerSchemaRef: 'replicate/topazlabs-video-upscale@972107c4',
+    providerModelId: 'prob-4',
+    providerSchemaRef: 'topaz/video-express@2026-09-06',
     positioning: {
       en: 'Best for camera footage and 4K mastering',
       de: 'Am besten für Kameramaterial und 4K-Mastering',
       es: 'Ideal para material de cámara y masterización en 4K',
     },
     description: {
-      en: 'Highest fidelity upscaling for real camera footage, up to a 4K master.',
-      de: 'Höchste Detailtreue für echtes Kameramaterial, bis zum 4K-Master.',
-      es: 'Escalado de máxima fidelidad para material real de cámara, hasta un máster 4K.',
+      en: 'Highest fidelity upscaling for real camera footage, up to a 4K master in any orientation.',
+      de: 'Höchste Detailtreue für echtes Kameramaterial, bis zum 4K-Master – quer wie hochkant.',
+      es: 'Escalado de máxima fidelidad para material real de cámara, hasta un máster 4K en cualquier orientación.',
     },
     bestFor: [
       { en: 'Camera uploads', de: 'Kamera-Uploads', es: 'Grabaciones de cámara' },
       { en: 'YouTube 4K masters', de: 'YouTube-4K-Master', es: 'Másteres 4K para YouTube' },
     ],
-    capabilities: ['upscale', 'fps_interpolation'],
+    capabilities: ['upscale', 'fps_interpolation', 'restoration'],
     processingModes: [
       {
         id: 'standard',
@@ -136,11 +138,13 @@ export const VIDEO_ENHANCE_MODELS: VideoEnhanceModelDefinition[] = [
         suitedFor: ['camera', 'ugc'],
       },
     ],
-    // Exactly the documented rows of the official schema and price table.
+    // The direct API takes an explicit output width/height, so every label and
+    // every documented frame rate is reachable in both orientations.
     outputs: [
-      { resolution: '720p', fps: [30, 60] },
-      { resolution: '1080p', fps: [30, 60] },
-      { resolution: '4k', fps: [30, 60] },
+      { resolution: '720p', fps: [24, 30, 60] },
+      { resolution: '1080p', fps: [24, 30, 60] },
+      { resolution: '2k', fps: [24, 30, 60] },
+      { resolution: '4k', fps: [24, 30, 60] },
     ],
     qualityTiers: ['standard'],
     minDurationSeconds: 1,
@@ -152,3 +156,4 @@ export const VIDEO_ENHANCE_MODELS: VideoEnhanceModelDefinition[] = [
     backendFlag: 'VIDEO_ENHANCE_TOPAZ_ENABLED',
   },
 ];
+

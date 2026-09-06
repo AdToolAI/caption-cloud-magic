@@ -20,6 +20,8 @@ import {
   PRICING_VERSION,
   type TrueUpEvaluation,
 } from './picture-pricing.ts';
+import { resolveTargetFrame } from './video-enhance-frame.ts';
+import { topazContainer, TOPAZ_CREDIT_USD_DEFAULT } from './topaz-client.ts';
 
 export type VideoResolution = '720p' | '1080p' | '2k' | '4k';
 export type QualityTier = 'standard' | 'pro';
@@ -56,8 +58,12 @@ export interface SourceMetadata {
   origin?: 'generated' | 'uploaded' | 'unknown';
 }
 
+/** Which API actually runs the job. Topaz is called DIRECTLY, not via Replicate. */
+export type VideoEnhanceProvider = 'replicate' | 'topaz';
+
 export interface VideoEnhanceSpec {
   id: string;
+  provider: VideoEnhanceProvider;
   providerModelId: string;
   providerSchemaRef: string;
   modes: string[];
@@ -71,6 +77,7 @@ export interface VideoEnhanceSpec {
   backendFlag: string;
   buildInput(config: EnhanceConfig, source: SourceMetadata, sourceUrl: string): Record<string, unknown>;
 }
+
 
 /**
  * Exactly the `scene` enum of the published `bytedance/video-upscaler` schema.
@@ -92,9 +99,25 @@ export function vcubeProcessingType(tier: QualityTier): 'standard' | 'pro' {
   return tier === 'pro' ? 'pro' : 'standard';
 }
 
+/**
+ * Topaz video model codes we run.
+ *
+ * `prob-4` (Proteus v4) is the general-purpose precision upscaler and the
+ * documented default for camera footage. `apo-8` (Apollo) is Topaz' frame
+ * interpolation model and is only added when the customer asks for a frame
+ * rate the source does not already have.
+ */
+export const TOPAZ_VIDEO_UPSCALE_MODEL = 'prob-4';
+export const TOPAZ_FRAME_INTERPOLATION_MODEL = 'apo-8';
+
+/** Encoder contract of our masters: H.265 Main10 in an MP4 container. */
+export const TOPAZ_VIDEO_ENCODER = 'H265';
+export const TOPAZ_VIDEO_PROFILE = 'Main10';
+
 export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
   'bytedance-vcube': {
     id: 'bytedance-vcube',
+    provider: 'replicate',
     providerModelId: 'bytedance/video-upscaler',
     providerSchemaRef: 'replicate/bytedance-video-upscaler@2026-09-05',
     modes: [...VCUBE_SCENES],
@@ -130,28 +153,63 @@ export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
   },
   'topaz-video-upscale': {
     id: 'topaz-video-upscale',
-    providerModelId: 'topazlabs/video-upscale',
-    providerSchemaRef: 'replicate/topazlabs-video-upscale@972107c4',
-    // The published schema has no model/mode input at all.
+    // DIRECT Topaz API (api.topazlabs.com), not Replicate. That is what makes
+    // the explicit output geometry below possible.
+    provider: 'topaz',
+    providerModelId: TOPAZ_VIDEO_UPSCALE_MODEL,
+    providerSchemaRef: 'topaz/video-express@2026-09-06',
     modes: ['standard'],
+    // The direct API takes an explicit output width/height, so every label and
+    // every documented frame rate is reachable in both orientations.
     outputs: [
-      { resolution: '720p', fps: [30, 60] },
-      { resolution: '1080p', fps: [30, 60] },
-      { resolution: '4k', fps: [30, 60] },
+      { resolution: '720p', fps: [24, 30, 60] },
+      { resolution: '1080p', fps: [24, 30, 60] },
+      { resolution: '2k', fps: [24, 30, 60] },
+      { resolution: '4k', fps: [24, 30, 60] },
     ],
     tiers: ['standard'],
     minDurationSeconds: 1,
     maxDurationSeconds: 120,
     backendFlag: 'VIDEO_ENHANCE_TOPAZ_ENABLED',
+    /**
+     * Body of `POST /video/express`. `source.external` lets Topaz pull the
+     * clip from our storage; the caller only adds `notifications.webhookUrl`.
+     */
     buildInput(config, source, sourceUrl) {
+      const target = resolveTargetFrame(config.resolution, source.width, source.height);
+      const sourceFps = Math.round(source.fps) || 30;
+      const fps = config.fps ?? sourceFps;
+
+      const filters: Record<string, unknown>[] = [
+        { model: TOPAZ_VIDEO_UPSCALE_MODEL, auto: 'Auto' },
+      ];
+      // Frame interpolation is only requested when the frame rate really
+      // changes — otherwise Topaz would re-time a clip that is already right.
+      if (fps !== sourceFps) {
+        filters.push({ model: TOPAZ_FRAME_INTERPOLATION_MODEL, fps });
+      }
+
       return {
-        video: sourceUrl,
-        target_resolution: config.resolution,
-        target_fps: config.fps ?? Math.round(source.fps),
+        source: {
+          container: topazContainer(source.container),
+          external: { provider: 's3', presignedUrl: sourceUrl },
+        },
+        filters,
+        output: {
+          // Topaz rounds the frame to a multiple of 4; our labels already are.
+          resolution: { width: target.width, height: target.height },
+          frameRate: fps,
+          videoEncoder: TOPAZ_VIDEO_ENCODER,
+          videoProfile: TOPAZ_VIDEO_PROFILE,
+          container: 'mp4',
+          audioTransfer: 'Copy',
+          audioCodec: 'AAC',
+        },
       };
     },
   },
 };
+
 
 
 // ---------------------------------------------------------------------------
@@ -235,7 +293,7 @@ export function isModelUnlocked(
 // Rate cards — mirror of src/lib/videoEnhance/rates.ts
 // ---------------------------------------------------------------------------
 
-export const VIDEO_PROVIDER_PRICING_VERSION = 'video-rates-2026-09-06-topaz-units';
+export const VIDEO_PROVIDER_PRICING_VERSION = 'video-rates-2026-09-06-topaz-direct-credits';
 /**
  * Hard ceiling on the customer price as a multiple of provider cost.
  * AdTool Video Enhance stays deliberately cheap: the effective multiplier must
@@ -320,49 +378,41 @@ const VCUBE_ENTRIES: MatrixEntry[] = VCUBE_MODES.flatMap((mode) =>
 );
 
 /**
- * Topaz (`topazlabs/video-upscale`) is NOT billed per second: Replicate bills
- * it in UNITS at a fixed unit price. The unit price is verified from a real
- * AdTool run (2026-09-06, prediction cs3ez5g395rmt0d0eb7btzyrkr: 6 units
- * billed at $0.08 = $0.48).
+ * Topaz is now called DIRECTLY (api.topazlabs.com) and bills in CREDITS, not
+ * in Replicate units. The USD value of one credit is an account number, not an
+ * API field, so it lives in `TOPAZ_CREDIT_USD` (default below) and every
+ * recorded cost is `credits x TOPAZ_CREDIT_USD`.
  *
- * The units-per-second estimator is NOT calibrated yet: the published
- * per-5-second cost table implies ~19 units for that run while Replicate
- * billed 6. The table below therefore stays deliberately conservative (it
- * reproduces the published table) and the card is flagged
- * `estimatorCalibrating` until several real runs across 1080p/30, 4K/30 and
- * 4K/60 pin the real unit consumption down. The hard multiplier cap plus the
- * post-run true-up make sure this over-estimate can never reach the customer.
+ * Credit consumption comes from the published Proteus table (estimates at
+ * 30 fps): 720p 1 credit / 10 s, 1080p 2 / 10 s, 4K 6 / 10 s. 2K sits between
+ * 1080p and 4K. The card stays `estimatorCalibrating` until real billed runs
+ * confirm the consumption; the hard multiplier cap plus the post-run true-up
+ * keep an over-estimate away from the customer.
  */
-export const TOPAZ_UNIT_USD = 0.08;
+export const TOPAZ_CREDIT_USD = TOPAZ_CREDIT_USD_DEFAULT;
 
-/** Published cost per 5 output seconds, converted to units at $0.08/unit. */
-const TOPAZ_UNITS_PER_SECOND: Partial<Record<VideoResolution, number>> = {
-  '720p': 0.027 / 5 / TOPAZ_UNIT_USD,
-  '1080p': 0.093 / 5 / TOPAZ_UNIT_USD,
-  '4k': 0.373 / 5 / TOPAZ_UNIT_USD,
+/** Credits per second of OUTPUT at 30 fps, from the published Proteus table. */
+const TOPAZ_CREDITS_PER_SECOND: Partial<Record<VideoResolution, number>> = {
+  '720p': 0.1,
+  '1080p': 0.2,
+  '2k': 0.35,
+  '4k': 0.6,
 };
 
-/**
- * Topaz (`topazlabs/video-upscale`) publishes cost per 5 seconds of output by
- * resolution and frame rate. Only documented rows are offered — no derived
- * frame rates, so nothing is ever priced by guesswork.
- */
-const TOPAZ_USD_PER_5S: [VideoResolution, number, number][] = [
-  ['720p', 30, 0.027],
-  ['720p', 60, 0.053],
-  ['1080p', 30, 0.093],
-  ['1080p', 60, 0.187],
-  ['4k', 30, 0.373],
-  ['4k', 60, 0.747],
-];
+const TOPAZ_FPS_FACTOR: Record<number, number> = { 24: 0.8, 30: 1, 60: 2 };
 
-const TOPAZ_ENTRIES: MatrixEntry[] = TOPAZ_USD_PER_5S.map(([resolution, fps, per5s]) => ({
-  mode: 'standard',
-  resolution,
-  fps,
-  tier: 'standard' as QualityTier,
-  usdPerSecond: per5s / 5,
-}));
+const TOPAZ_ENTRIES: MatrixEntry[] = (
+  Object.keys(TOPAZ_CREDITS_PER_SECOND) as VideoResolution[]
+).flatMap((resolution) =>
+  [24, 30, 60].map((fps) => ({
+    mode: 'standard',
+    resolution,
+    fps,
+    tier: 'standard' as QualityTier,
+    usdPerSecond:
+      (TOPAZ_CREDITS_PER_SECOND[resolution] ?? 0) * (TOPAZ_FPS_FACTOR[fps] ?? 1) * TOPAZ_CREDIT_USD,
+  })),
+);
 
 export const VIDEO_RATE_CARDS: Record<string, VideoRateCard> = {
   'bytedance-vcube': {
@@ -376,17 +426,18 @@ export const VIDEO_RATE_CARDS: Record<string, VideoRateCard> = {
   'topaz-video-upscale': {
     currency: 'USD',
     type: 'per_unit',
-    unitUsd: TOPAZ_UNIT_USD,
-    unitsPerOutputSecond: TOPAZ_UNITS_PER_SECOND,
-    fpsFactor: { 30: 1, 60: 2 },
+    unitUsd: TOPAZ_CREDIT_USD,
+    unitsPerOutputSecond: TOPAZ_CREDITS_PER_SECOND,
+    fpsFactor: TOPAZ_FPS_FACTOR,
     source:
-      'Unit price $0.08 verified from billed AdTool run 2026-09-06; unit consumption estimated from the published per-5s cost table',
+      'Topaz direct API credit pricing (published Proteus credit table); credit USD value from TOPAZ_CREDIT_USD',
     checkedAt: '2026-09-06',
     costUnverified: true,
     estimatorCalibrating: true,
     entries: TOPAZ_ENTRIES,
   },
 };
+
 
 export class UnpriceableRunError extends Error {
   constructor(public readonly reason: string) {

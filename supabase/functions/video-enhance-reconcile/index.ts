@@ -14,6 +14,12 @@ import {
   STAGING_BUCKET,
 } from "../_shared/video-enhance-runtime.ts";
 import { decideCycle, isInternalCaller } from "../_shared/video-enhance-reconcile-guard.ts";
+import {
+  getTopazVideoStatus,
+  topazBilledCredits,
+  topazDownloadUrl,
+  topazVideoOutcome,
+} from "../_shared/topaz-client.ts";
 
 /**
  * Reconciler for Video Enhance.
@@ -56,6 +62,48 @@ const BATCH_SIZE = 25;
  */
 const DETERMINISTIC_OUTPUT_FAILURES = new Set(["OUTPUT_MISMATCH", "OUTPUT_INVALID"]);
 const OUTPUT_VERDICT_CONFIRM_ATTEMPTS = 2;
+
+/**
+ * One provider read, normalised to the Replicate prediction shape the rest of
+ * this function already understands.
+ *
+ * Topaz runs are marked by a `topaz:` prefix on the stored provider id and are
+ * read from the DIRECT Topaz API. Their billed credits are mapped onto
+ * `metrics.units`, which the per-unit rate card converts into real USD.
+ */
+async function readProvider(
+  providerId: string,
+  replicateKey: string | undefined,
+): Promise<any | null> {
+  if (providerId.startsWith("topaz:")) {
+    const topazKey = Deno.env.get("TOPAZ_API_KEY");
+    if (!topazKey) return null;
+    try {
+      const status = await getTopazVideoStatus(topazKey, providerId.slice("topaz:".length));
+      const outcome = topazVideoOutcome(status.status);
+      const credits = topazBilledCredits(status.estimates);
+      return {
+        status:
+          outcome === "complete" ? "succeeded" : outcome === "canceled" ? "canceled" : outcome,
+        output: topazDownloadUrl(status),
+        error: status.errorCode ?? status.message ?? null,
+        metrics: credits !== undefined ? { units: credits } : {},
+      };
+    } catch (error) {
+      console.error(`${TAG} topaz read failed for ${providerId}:`, error);
+      return null;
+    }
+  }
+  if (!replicateKey) return null;
+  const res = await fetch(`https://api.replicate.com/v1/predictions/${providerId}`, {
+    headers: { Authorization: `Bearer ${replicateKey}` },
+  });
+  if (!res.ok) {
+    console.error(`${TAG} provider read failed [${res.status}] for ${providerId}`);
+    return null;
+  }
+  return await res.json();
+}
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -100,8 +148,11 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
+    // Either key alone is enough: runs are read from the API that owns them.
     const apiKey = Deno.env.get("REPLICATE_API_KEY");
-    if (!apiKey) return json({ error: "REPLICATE_API_KEY not configured" }, 500);
+    if (!apiKey && !Deno.env.get("TOPAZ_API_KEY")) {
+      return json({ error: "no provider API key configured" }, 500);
+    }
 
     const nowIso = new Date().toISOString();
     // Configurable, so a slow provider queue can be absorbed without a deploy.
@@ -176,16 +227,12 @@ serve(async (req) => {
         continue;
       }
 
-      const res = await fetch(`https://api.replicate.com/v1/predictions/${run.provider_prediction_id}`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
-      if (!res.ok) {
-        console.error(`${TAG} provider read failed [${res.status}] for run ${run.id}`);
+      const prediction = await readProvider(run.provider_prediction_id, apiKey);
+      if (!prediction) {
         await bump(admin, run.id, attempts);
         summary.pending++;
         continue;
       }
-      const prediction = await res.json();
       const providerCost = extractProviderCost(prediction, run.model_id);
 
       if (prediction.status === "succeeded") {
@@ -274,16 +321,13 @@ serve(async (req) => {
 
     let lateCostVerified = 0;
     for (const run of lateRuns) {
-      const res = await fetch(`https://api.replicate.com/v1/predictions/${run.provider_prediction_id}`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
-      if (!res.ok) {
+      const prediction = await readProvider(run.provider_prediction_id, apiKey);
+      if (!prediction) {
         // Provider unreachable: still advance the run's own backoff so a
         // flapping provider cannot turn every cycle into a full re-poll.
         await applyLateCostTrueUp(admin, run, { source: "unavailable" });
         continue;
       }
-      const prediction = await res.json();
       const cost = extractProviderCost(prediction, run.model_id);
       const applied = await applyLateCostTrueUp(admin, run, cost);
       if (applied.applied) lateCostVerified++;

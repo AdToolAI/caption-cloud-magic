@@ -104,7 +104,7 @@ describe('combination validation parity', () => {
   const cases: { config: EnhanceConfig; duration?: number; expected: string | true }[] = [
     { config: { modelId: 'bytedance-vcube', mode: 'aigc', resolution: '1080p', fps: 24, tier: 'standard' }, expected: true },
     { config: { modelId: 'bytedance-vcube', mode: 'aigc', resolution: '4k', fps: 120, tier: 'standard' }, expected: 'unsupported_fps' },
-    { config: { modelId: 'topaz-video-upscale', mode: 'standard', resolution: '2k', fps: 30, tier: 'standard' }, expected: 'unsupported_resolution' },
+    { config: { modelId: 'topaz-video-upscale', mode: 'standard', resolution: '2k', fps: 30, tier: 'standard' }, expected: true },
     { config: { modelId: 'bytedance-vcube', mode: 'nope', resolution: '1080p', fps: 24, tier: 'standard' }, expected: 'unknown_mode' },
     { config: { modelId: 'bytedance-vcube', mode: 'aigc', resolution: '1080p', fps: 24, tier: 'pro' }, expected: 'tier_not_entitled' },
     { config: { modelId: 'topaz-video-upscale', mode: 'standard', resolution: '4k', fps: 60, tier: 'standard' }, expected: true },

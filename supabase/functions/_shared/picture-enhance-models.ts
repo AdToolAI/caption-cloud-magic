@@ -19,9 +19,15 @@ import {
 
 export type { PricingSnapshot };
 
+/** Which API runs the job. Topaz image upscaling goes DIRECT to Topaz. */
+export type PictureProvider = 'replicate' | 'topaz';
+
 export interface EnhanceModelSpec {
   id: EnhanceModelId;
+  provider: PictureProvider;
   providerModelId: string;
+  /** Intent endpoint of the direct Topaz image API (`provider: 'topaz'`). */
+  topazIntent?: 'enhance' | 'restore-gen' | 'lighting' | 'denoise' | 'sharpen';
   supportedScales?: number[];
   pricing:
     | { unit: 'fixed_per_scale'; sell: Record<number, number> }
@@ -94,6 +100,9 @@ export function autoTopazEnhanceModel(config: EnhanceRunInput): string {
 export const ENHANCE_MODEL_SPECS: Record<EnhanceModelId, EnhanceModelSpec> = {
   'clarity-pro': {
     id: 'clarity-pro',
+    // Stays on Replicate: the direct Topaz image API publishes no equivalent
+    // intent endpoint for this operation.
+    provider: 'replicate',
     providerModelId:
       'philz1337x/clarity-upscaler:dfad41707589d68ecdccd1dfa600d55a208f9310748e44bfe35b4a6291453d5e',
     supportedScales: [2, 4],
@@ -130,38 +139,48 @@ export const ENHANCE_MODEL_SPECS: Record<EnhanceModelId, EnhanceModelSpec> = {
   },
   'topaz-image-upscale': {
     id: 'topaz-image-upscale',
-    providerModelId: 'topazlabs/image-upscale',
+    // DIRECT Topaz image API. `providerModelId` is the Topaz model name that
+    // travels in the multipart `model` field.
+    provider: 'topaz',
+    topazIntent: 'enhance',
+    providerModelId: 'Standard V2',
     supportedScales: [2, 4, 6],
     pricing: { unit: 'per_output_megapixel', providerCostEUR: 0.046 },
     requiresFlag: 'PICTURE_TOPAZ_UPSCALE_ENABLED',
+    /**
+     * Multipart fields of `POST /image/v1/enhance/async`. Only documented
+     * fields are sent: an undocumented extra makes Topaz reject the whole job.
+     */
     buildInput(config) {
       const v = config.values;
       const requested = str(v, 'enhanceModel', 'auto');
       const enhanceModel = (TOPAZ_ENHANCE_MODELS as readonly string[]).includes(requested)
         ? requested
         : autoTopazEnhanceModel(config);
+      const scale = config.scale ?? 2;
       const input: Record<string, unknown> = {
         image: config.imageUrl,
-        enhance_model: enhanceModel,
-        upscale_factor: `${config.scale ?? 2}x`,
-        subject_detection: str(v, 'subjectDetection', 'None', [
-          'None',
-          'All',
-          'Foreground',
-          'Background',
-        ]),
+        model: enhanceModel,
         output_format: str(v, 'outputFormat', 'png', ['png', 'jpg']),
+        // Topaz takes the target geometry, not a factor.
+        output_width: Math.round((config.inputWidth ?? 0) * scale) || undefined,
+        output_height: Math.round((config.inputHeight ?? 0) * scale) || undefined,
         face_enhancement: bool(v, 'faceEnhancement', false),
       };
       if (input.face_enhancement) {
         input.face_enhancement_strength = num(v, 'faceEnhancementStrength', 0.8, 0, 1);
-        input.face_enhancement_creativity = num(v, 'faceEnhancementCreativity', 0, 0, 1);
+      }
+      for (const key of Object.keys(input)) {
+        if (input[key] === undefined) delete input[key];
       }
       return input;
     },
   },
   'topaz-dust-scratch': {
     id: 'topaz-dust-scratch',
+    // Stays on Replicate: the direct Topaz image API publishes no equivalent
+    // intent endpoint for this operation.
+    provider: 'replicate',
     providerModelId: 'topazlabs/dust-and-scratch-v2',
     pricing: { unit: 'per_run', providerCostEUR: 0.074 },
     requiresFlag: 'PICTURE_TOPAZ_RESTORE_ENABLED',
@@ -184,6 +203,9 @@ export const ENHANCE_MODEL_SPECS: Record<EnhanceModelId, EnhanceModelSpec> = {
   },
   'topaz-colorization': {
     id: 'topaz-colorization',
+    // Stays on Replicate: the direct Topaz image API publishes no equivalent
+    // intent endpoint for this operation.
+    provider: 'replicate',
     providerModelId: 'topazlabs/image-colorization',
     pricing: { unit: 'per_run', providerCostEUR: 0.074 },
     requiresFlag: 'PICTURE_TOPAZ_COLORIZE_ENABLED',
