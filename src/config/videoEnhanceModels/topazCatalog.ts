@@ -298,13 +298,18 @@ export const TOPAZ_OUTPUT_QUALITY_VIEWS: {
   },
   {
     id: 'master',
-    label: { en: 'Master', de: 'Master', es: 'Máster' },
+    label: {
+      en: 'Maximum quality',
+      de: 'Maximale Qualität',
+      es: 'Calidad máxima',
+    },
     hint: {
       en: 'Largest file, for further editing',
       de: 'Größte Datei, für die Weiterbearbeitung',
       es: 'Archivo más grande, para seguir editando',
     },
   },
+
 ];
 
 export const TOPAZ_DEFAULT_OUTPUT_QUALITY: TopazOutputQuality = 'high';
