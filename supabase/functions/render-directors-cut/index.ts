@@ -508,8 +508,24 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // Calculate dimensions based on aspect ratio and quality
     let width: number, height: number;
     const aspectRatio = export_settings?.aspect_ratio || '16:9';
-    
-    if (quality === '4k') {
+
+    // 8K is only viable for short clips — beyond that a single lambda chunk
+    // runs into the 600s timeout. Fall back to 4K instead of failing.
+    const requestedQuality = quality;
+    const effectiveQuality = (quality === '8k' && duration > 30) ? '4k' : quality;
+    if (effectiveQuality !== requestedQuality) {
+      console.warn(`[RenderDirectorsCut] 8K requested for ${duration}s clip — downgrading to 4K`);
+    }
+
+    if (effectiveQuality === '8k') {
+      if (aspectRatio === '9:16') {
+        width = 4320; height = 7680;
+      } else if (aspectRatio === '1:1') {
+        width = 4320; height = 4320;
+      } else {
+        width = 7680; height = 4320;
+      }
+    } else if (effectiveQuality === '4k') {
       if (aspectRatio === '9:16') {
         width = 2160; height = 3840;
       } else if (aspectRatio === '1:1') {
