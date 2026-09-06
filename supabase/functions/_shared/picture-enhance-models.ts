@@ -147,28 +147,31 @@ export const ENHANCE_MODEL_SPECS: Record<EnhanceModelId, EnhanceModelSpec> = {
     supportedScales: [2, 4, 6],
     pricing: { unit: 'per_output_megapixel', providerCostEUR: 0.046 },
     requiresFlag: 'PICTURE_TOPAZ_UPSCALE_ENABLED',
+    /**
+     * Multipart fields of `POST /image/v1/enhance/async`. Only documented
+     * fields are sent: an undocumented extra makes Topaz reject the whole job.
+     */
     buildInput(config) {
       const v = config.values;
       const requested = str(v, 'enhanceModel', 'auto');
       const enhanceModel = (TOPAZ_ENHANCE_MODELS as readonly string[]).includes(requested)
         ? requested
         : autoTopazEnhanceModel(config);
+      const scale = config.scale ?? 2;
       const input: Record<string, unknown> = {
         image: config.imageUrl,
-        enhance_model: enhanceModel,
-        upscale_factor: `${config.scale ?? 2}x`,
-        subject_detection: str(v, 'subjectDetection', 'None', [
-          'None',
-          'All',
-          'Foreground',
-          'Background',
-        ]),
+        model: enhanceModel,
         output_format: str(v, 'outputFormat', 'png', ['png', 'jpg']),
+        // Topaz takes the target geometry, not a factor.
+        output_width: Math.round((config.inputWidth ?? 0) * scale) || undefined,
+        output_height: Math.round((config.inputHeight ?? 0) * scale) || undefined,
         face_enhancement: bool(v, 'faceEnhancement', false),
       };
       if (input.face_enhancement) {
         input.face_enhancement_strength = num(v, 'faceEnhancementStrength', 0.8, 0, 1);
-        input.face_enhancement_creativity = num(v, 'faceEnhancementCreativity', 0, 0, 1);
+      }
+      for (const key of Object.keys(input)) {
+        if (input[key] === undefined) delete input[key];
       }
       return input;
     },
