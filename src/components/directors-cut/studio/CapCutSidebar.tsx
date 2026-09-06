@@ -652,6 +652,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onChromaKeyChange,
   upscaling,
   onUpscalingChange,
+  onUpscaledVideo,
+
   interpolation,
   onInterpolationChange,
   restoration,
