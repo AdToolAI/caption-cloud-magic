@@ -127,7 +127,14 @@ export async function finalizeSuccess(
     measurement.actual_width = measured.width;
     measurement.actual_height = measured.height;
     measurement.output_size_bytes = measured.sizeBytes || buffer.byteLength;
-    measurement.output_codec = contentType;
+    // codec, container and MIME type are three different facts. The codec
+    // comes from the probed sample entry (h264 / hevc / av1) and is NEVER the
+    // MIME type of the download.
+    measurement.output_codec = measured.codec ?? null;
+    measurement.output_container = measured.container ?? 'mp4';
+    measurement.output_mime_type = contentType || 'video/mp4';
+    measurement.output_fps = measured.fps || null;
+    measurement.output_duration_seconds = measured.durationSeconds || null;
     const seconds = measured.durationSeconds || Number(run.source_duration_seconds) || 0;
     const bytes = Number(measurement.output_size_bytes) || 0;
     if (seconds > 0 && bytes > 0) {
