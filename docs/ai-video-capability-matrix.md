@@ -112,6 +112,14 @@ DE/EN/ES stehen in `SPEC_GROUP_LABELS` (`src/config/aiVideoModelRegistry.ts`).
 `kling-3-pro`, `sora-2-standard`, `sora-2-pro`, `wan-pro`). **Nie einen Eintrag
 löschen** — sonst brechen gespeicherte Läufe.
 
+Ein Alias darf **nur innerhalb derselben Familie** zeigen. `sora-2-*` zeigte auf
+Veo 3.1 — das hätte einen gespeicherten Sora-Lauf in ein fremdes Produkt
+umbenannt. Beide zeigen jetzt auf die historische Spec `sora-2`
+(`releaseStatus: 'removed'`, `available: false`): auflösbar für alte Läufe,
+nicht neu startbar. `ALIAS_SOURCE_FAMILY` deklariert die Herkunftsfamilie, der
+Test erzwingt die Übereinstimmung.
+
+
 ## Neues Modell aufnehmen
 
 1. Provider-Doku **für unsere konkrete Route** lesen, `verificationSourceUrl`,
