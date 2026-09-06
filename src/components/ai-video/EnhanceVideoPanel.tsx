@@ -35,6 +35,7 @@ import {
 
 import {
   TOPAZ_DEFAULT_INTERPOLATION_ID,
+  TOPAZ_DEFAULT_MODEL_ID,
   TOPAZ_DEFAULT_OUTPUT_QUALITY,
   TOPAZ_INTERPOLATION_VIEWS,
   TOPAZ_OUTPUT_QUALITY_VIEWS,
@@ -260,6 +261,20 @@ export function EnhanceVideoPanel({
     const resolutions = availableResolutions(model, nextMode);
     if (!resolutions.includes(resolution)) setResolution(resolutions[0]);
   }, [model, mode, modeTouched, aiSource, resolution]);
+
+  // A fixed-factor Topaz model stops fitting as soon as the target size
+  // changes. Fall back to the general-purpose model instead of leaving a
+  // selection the server would have to reject.
+  useEffect(() => {
+    if (!model || model.id !== 'topaz-video-upscale') return;
+    const width = sourceMeta?.width ?? asset?.width ?? null;
+    const height = sourceMeta?.height ?? asset?.height ?? null;
+    if (!width || !height) return;
+    const target = resolveTargetFrame(resolution, width, height);
+    if (topazScaleFitsView(topazModelView(mode), { width, height }, target)) return;
+    setMode(TOPAZ_DEFAULT_MODEL_ID);
+    setModeTouched(false);
+  }, [model, mode, resolution, sourceMeta, asset]);
 
   const fpsChoices = model ? availableFps(model, mode, resolution) : [];
   useEffect(() => {
