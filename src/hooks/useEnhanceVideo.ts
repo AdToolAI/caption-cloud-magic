@@ -198,6 +198,7 @@ export interface ServerSourceMeta {
 export function useEnhanceVideo() {
   const [run, setRun] = useState<EnhanceRunRow | null>(null);
   const [estimate, setEstimate] = useState<EnhanceEstimate | null>(null);
+  const [plan, setPlan] = useState<EnhancePlan | null>(null);
   const [sourceMeta, setSourceMeta] = useState<ServerSourceMeta | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
