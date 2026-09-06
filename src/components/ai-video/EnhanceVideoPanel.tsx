@@ -668,7 +668,26 @@ export function EnhanceVideoPanel({
                   </dd>
                 </>
               )}
+              {isTopaz && (
+                <>
+                  <dt className="text-muted-foreground">{tx('topazModel', lang)}</dt>
+                  <dd>{topazModelView(mode).name}</dd>
+                  <dt className="text-muted-foreground">{tx('outputQuality', lang)}</dt>
+                  <dd>{TOPAZ_OUTPUT_QUALITY_VIEWS.find((q) => q.id === outputQuality)?.label[lang]}</dd>
+                </>
+              )}
+              <dt className="text-muted-foreground">{tx('frameRate', lang)}</dt>
+              <dd className="tabular-nums">
+                {fps ? `${fps} fps` : sourceFps ? `${Math.round(sourceFps)} fps` : '—'}
+              </dd>
+              {interpolationApplies && (
+                <>
+                  <dt className="text-muted-foreground">{tx('motionModel', lang)}</dt>
+                  <dd>{TOPAZ_INTERPOLATION_VIEWS.find((m) => m.id === interpolationModel)?.name}</dd>
+                </>
+              )}
             </dl>
+
 
             {routed && !blockedReason && (
               <p className="text-xs text-primary/90" data-testid="enhance-routed-note">
