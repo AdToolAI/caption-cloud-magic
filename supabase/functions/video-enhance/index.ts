@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { probeRemoteVideo } from "../_shared/mp4-probe.ts";
 import {
+  adaptConfigToSpec,
   isModelUnlocked,
   isTestAllowlisted,
   priceVideoEnhanceRun,
@@ -13,6 +14,8 @@ import {
   type SourceMetadata,
   type VideoResolution,
 } from "../_shared/video-enhance-models.ts";
+import { planDelivery } from "../_shared/video-enhance-frame.ts";
+
 import {
   newCallbackToken,
   setStatus,
@@ -237,14 +240,42 @@ serve(async (req) => {
       return json({ ok: true, status: "cancel_requested", refunded: false });
     }
 
-    const config = parseConfig(body);
-    if (!config) return json({ error: "modelId, mode, resolution and tier are required" }, 400);
+    const requestedConfig = parseConfig(body);
+    if (!requestedConfig) return json({ error: "modelId, mode, resolution and tier are required" }, 400);
 
-    const spec = VIDEO_ENHANCE_SPECS[config.modelId];
-    if (!spec) return json({ error: "Unknown model", code: "UNKNOWN_MODEL" }, 400);
+    const requestedSpec = VIDEO_ENHANCE_SPECS[requestedConfig.modelId];
+    if (!requestedSpec) return json({ error: "Unknown model", code: "UNKNOWN_MODEL" }, 400);
 
     const source = await resolveSource(admin, user.id, body);
     if ("error" in source) return json({ error: source.error, code: source.code }, 400);
+
+    const requestedCombination = validateCombination(requestedConfig, source.meta.durationSeconds, env);
+    if (!requestedCombination.ok) {
+      return json(
+        { error: `Invalid combination: ${requestedCombination.error}`, code: requestedCombination.error },
+        400,
+      );
+    }
+
+    // ---- target frame contract ----------------------------------------------
+    // The resolution label is a promise about delivered pixels. A portrait clip
+    // ordered at 4K gets 2160x3840 — if the requested engine reads the label as
+    // a line count it cannot do that, so the run is routed to an engine that
+    // can. No manual switch, no silently smaller frame.
+    const availableModelIds = Object.values(VIDEO_ENHANCE_SPECS)
+      .filter((candidate) => isModelUnlocked(candidate, env, user.id))
+      .map((candidate) => candidate.id);
+
+    const delivery = planDelivery({
+      requestedModelId: requestedConfig.modelId,
+      resolution: requestedConfig.resolution,
+      sourceWidth: source.meta.width,
+      sourceHeight: source.meta.height,
+      availableModelIds,
+    });
+
+    const spec = VIDEO_ENHANCE_SPECS[delivery.executionModelId] ?? requestedSpec;
+    const config = adaptConfigToSpec(requestedConfig, spec, source.meta);
 
     const combination = validateCombination(config, source.meta.durationSeconds, env);
     if (!combination.ok) {
@@ -262,16 +293,27 @@ serve(async (req) => {
     }
 
     if (action === "estimate") {
-      return json({ pricing, source: source.meta });
+      return json({ pricing, source: source.meta, delivery });
     }
 
     // ---- start --------------------------------------------------------------
+    if (delivery.strategy === "unreachable") {
+      return json(
+        {
+          error: `No available engine can deliver ${delivery.target.width}x${delivery.target.height}.`,
+          code: "TARGET_FRAME_UNREACHABLE",
+          delivery,
+        },
+        409,
+      );
+    }
     if (!isModelUnlocked(spec, env, user.id)) {
       return json(
         { error: `${config.modelId} is not unlocked yet.`, code: "MODEL_LOCKED" },
         403,
       );
     }
+
     if (!body.idempotencyKey) return json({ error: "idempotencyKey required" }, 400);
 
     const { data: wallet } = await admin
@@ -332,7 +374,20 @@ serve(async (req) => {
       contribution_eur: pricing.contributionEur,
       margin_pct: pricing.marginPct,
       credits_reserved: pricing.userPriceEur,
+      // Target frame contract: what was ordered, what will really be delivered
+      // and which engine had to run for it.
+      requested_model_id: delivery.requestedModelId,
+      delivery_strategy: delivery.strategy,
+      target_width: delivery.target.width,
+      target_height: delivery.target.height,
+      projected_width: delivery.projected.width,
+      projected_height: delivery.projected.height,
+      projection_strategy: delivery.strategy === "engine_routed"
+        ? `routed:${delivery.executionModelId}`
+        : "native",
+      projection_confidence: "engine_contract",
       callback_token: callbackToken,
+
       // Validation-only, allowlisted accounts only: fail persistence exactly
       // once after a real provider success, then succeed on the retry.
       test_fail_persist_once:

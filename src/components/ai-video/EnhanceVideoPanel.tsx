@@ -16,6 +16,8 @@ import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
 import { VideoSourcePicker } from '@/components/ai-video/VideoSourcePicker';
 import type { CanonicalVideoAsset } from '@/lib/videoEnhance/canonicalVideoAsset';
 import { isAiGeneratedSource } from '@/lib/videoEnhance/recommend';
+import { formatFrame, resolveTargetFrame } from '@/lib/videoEnhance/targetFrame';
+
 import {
   availableFps,
   availableResolutions,
@@ -78,7 +80,9 @@ const COPY = {
     de: 'Bereits hohe Auflösung · Verbesserung bringt vermutlich wenig',
     es: 'Ya es de alta resolución · la mejora puede aportar poco',
   },
+  pixels: { en: 'pixels', de: 'Pixel', es: 'píxeles' },
 } as const;
+
 
 function tx(key: keyof typeof COPY, lang: Lang): string {
   return COPY[key][lang] ?? COPY[key].en;
@@ -197,10 +201,21 @@ export function EnhanceVideoPanel({
 
   // Server-measured facts win over anything the browser read.
   const sourceHeight = sourceMeta?.height ?? asset?.height ?? null;
+  const sourceWidth = sourceMeta?.width ?? asset?.width ?? null;
   const alreadyHigh = !!sourceHeight && sourceHeight >= 2000;
   const recommendedModel = aiSource ? 'ByteDance vCube' : 'Topaz Video Upscale';
 
+  // Promise the delivered pixel frame up front. Portrait clips get the full
+  // frame on the short side (4K portrait = 2160x3840), whatever engine runs.
+  const targetFrame = sourceWidth && sourceHeight
+    ? resolveTargetFrame(resolution, sourceWidth, sourceHeight)
+    : null;
+  const sourceFrameLabel = sourceWidth && sourceHeight
+    ? formatFrame({ width: sourceWidth, height: sourceHeight })
+    : null;
+
   const autoDetectedFootage = !modeTouched && !!asset && model.processingModes.length > 1;
+
 
   return (
     <Card className="p-6 space-y-6 bg-card/60 backdrop-blur-sm border-border">
@@ -302,12 +317,19 @@ export function EnhanceVideoPanel({
               <p className="font-medium">
                 {resolution.toUpperCase()} · {fps === null ? tx('keepFps', lang) : `${fps} FPS`}
               </p>
+              {targetFrame && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {sourceFrameLabel ? `${sourceFrameLabel} → ` : ''}
+                  {formatFrame(targetFrame)} {tx('pixels', lang)}
+                </p>
+              )}
             </div>
             <div className="text-right text-sm">
               <p className="text-muted-foreground">{tx('price', lang)}</p>
               <p className="font-bold text-lg">{priceLabel}</p>
             </div>
           </div>
+
         </>
       )}
 
