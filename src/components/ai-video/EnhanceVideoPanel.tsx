@@ -81,6 +81,12 @@ const COPY = {
     es: 'Ya es de alta resolución · la mejora puede aportar poco',
   },
   pixels: { en: 'pixels', de: 'Pixel', es: 'píxeles' },
+  delivered: { en: 'Delivered', de: 'Geliefert', es: 'Entregado' },
+  messengerHint: {
+    en: 'Messengers like WhatsApp shrink videos when you send them. Download the file and send it as a document to keep the full quality.',
+    de: 'Messenger wie WhatsApp rechnen Videos beim Versenden stark herunter. Lade die Datei herunter und verschicke sie als Dokument, um die volle Qualität zu behalten.',
+    es: 'Los mensajeros como WhatsApp reducen los vídeos al enviarlos. Descarga el archivo y envíalo como documento para conservar toda la calidad.',
+  },
 } as const;
 
 
