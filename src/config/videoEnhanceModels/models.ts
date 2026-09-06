@@ -129,7 +129,7 @@ export const VIDEO_ENHANCE_MODELS: VideoEnhanceModelDefinition[] = [
     // explicit output geometry (true portrait 4K) and the full parameter set.
     provider: 'replicate',
     providerModelId: 'prob-4',
-    providerSchemaRef: 'topaz/video-express@2026-09-06',
+    providerSchemaRef: 'topaz/video-express@2026-09-07',
     positioning: {
       en: 'Best for camera footage and 4K mastering',
       de: 'Am besten für Kameramaterial und 4K-Mastering',
