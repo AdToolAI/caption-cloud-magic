@@ -183,6 +183,7 @@ export function parseMoov(moov: Uint8Array, sizeBytes = 0, container = 'mp4'): P
 
     const mdia = findBox(view, trakStart, trakEnd, 'mdia');
     let fps = 0;
+    let codec: string | undefined;
     let trackDuration = movieDuration;
     if (mdia) {
       const mdiaStart = mdia.start + mdia.headerSize;
@@ -202,6 +203,10 @@ export function parseMoov(moov: Uint8Array, sizeBytes = 0, container = 'mp4'): P
         const { samples, totalDelta } = parseStts(view, stts);
         if (samples > 0 && totalDelta > 0) fps = samples / (totalDelta / media.timescale);
       }
+      const stsd = stbl
+        ? findBox(view, stbl.start + stbl.headerSize, stbl.start + stbl.size, 'stsd')
+        : null;
+      if (stsd) codec = parseStsdCodec(view, stsd);
     }
     if (!fps && trackDuration > 0) fps = 0;
 
@@ -212,7 +217,9 @@ export function parseMoov(moov: Uint8Array, sizeBytes = 0, container = 'mp4'): P
       fps: Number(fps.toFixed(3)),
       container,
       sizeBytes,
+      codec,
     };
+
     if (!best || candidate.width * candidate.height > best.width * best.height) best = candidate;
   }
   return best;
