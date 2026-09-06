@@ -40,6 +40,20 @@ export function timingSafeEqual(a: string, b: string): boolean {
  *      sends. It is public, which is exactly why the work itself is bounded.
  * A user JWT or an empty header is rejected.
  */
+export function isUserJwt(token: string): boolean {
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  try {
+    const json = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
+    const claims = JSON.parse(json) as { role?: string; sub?: string };
+    if (typeof claims.sub === 'string' && claims.sub.length > 0) return true;
+    return typeof claims.role === 'string' && claims.role !== 'anon' &&
+      claims.role !== 'service_role';
+  } catch {
+    return false;
+  }
+}
+
 export function isInternalCaller(
   headers: Headers,
   env: (key: string) => string | undefined,
@@ -50,6 +64,9 @@ export function isInternalCaller(
 
   const bearer = (headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
   const apikey = (headers.get('apikey') ?? '').trim();
+  // A signed-in caller is rejected even when the request also carries the
+  // public apikey header — every browser client sends that header.
+  if (bearer.length > 0 && isUserJwt(bearer)) return false;
   const accepted = [env('SUPABASE_SERVICE_ROLE_KEY'), env('SUPABASE_ANON_KEY')]
     .filter((key): key is string => typeof key === 'string' && key.length > 0);
   return accepted.some((key) =>
@@ -57,6 +74,7 @@ export function isInternalCaller(
     (apikey.length > 0 && timingSafeEqual(apikey, key))
   );
 }
+
 
 export type CycleDecision =
   | { run: true }
