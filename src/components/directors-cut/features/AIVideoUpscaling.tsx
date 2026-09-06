@@ -10,12 +10,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowUpCircle, Sparkles, Zap, AlertCircle } from 'lucide-react';
+import {
+  ArrowUpCircle,
+  Sparkles,
+  Zap,
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  HelpCircle,
+} from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useTx } from '@/lib/i18nText';
 import { useTranslation } from '@/hooks/useTranslation';
 import { uiLocale } from '@/lib/uiLocale';
 import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
+import { EnhanceRunProgress } from '@/components/ai-video/EnhanceRunProgress';
 import {
   ORDER_REJECTION_CODES,
   enhanceCopy,
@@ -23,12 +32,18 @@ import {
   toEnhanceLang,
 } from '@/lib/videoEnhance/engineErrors';
 import {
-  evaluateUpscale,
+  describeResolutionChoices,
   formatFrame,
-  frameMeetsTarget,
-  projectProviderOutput,
+  resolveExecutionEngine,
   resolveTargetFrame,
 } from '@/lib/videoEnhance/targetFrame';
+import {
+  deliveredFacts,
+  engineDisplayName,
+  targetMatchDetail,
+  targetMatchLabel,
+  targetMatchOf,
+} from '@/lib/videoEnhance/runPresentation';
 import {
   availableFps,
   availableResolutions,
