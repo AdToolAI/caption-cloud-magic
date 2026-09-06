@@ -88,6 +88,26 @@ const COPY = {
   },
   pixels: { en: 'pixels', de: 'Pixel', es: 'píxeles' },
   delivered: { en: 'Delivered', de: 'Geliefert', es: 'Entregado' },
+  noUpscale: {
+    en: 'This setting would not enlarge your video. Pick a higher resolution.',
+    de: 'Diese Einstellung vergrößert dein Video nicht. Wähle eine höhere Auflösung.',
+    es: 'Esta opción no ampliaría tu vídeo. Elige una resolución mayor.',
+  },
+  downscale: {
+    en: 'This setting would make your video smaller than it already is.',
+    de: 'Diese Einstellung würde dein Video kleiner machen, als es schon ist.',
+    es: 'Esta opción haría tu vídeo más pequeño de lo que ya es.',
+  },
+  routed: {
+    en: 'Runs on the engine that can really deliver this frame:',
+    de: 'Läuft auf der Engine, die dieses Format wirklich liefern kann:',
+    es: 'Se ejecuta en el motor que sí puede entregar este formato:',
+  },
+  unreachable: {
+    en: 'No engine can deliver this frame for your video right now.',
+    de: 'Keine Engine kann dieses Format für dein Video derzeit liefern.',
+    es: 'Ningún motor puede entregar este formato para tu vídeo ahora mismo.',
+  },
   messengerHint: {
     en: 'Messengers like WhatsApp shrink videos when you send them. Download the file and send it as a document to keep the full quality.',
     de: 'Messenger wie WhatsApp rechnen Videos beim Versenden stark herunter. Lade die Datei herunter und verschicke sie als Dokument, um die volle Qualität zu behalten.',
