@@ -83,6 +83,12 @@ export interface ResolutionSpec {
   /** Where that rule is documented / how it was verified. */
   sizingRuleSource: string;
   /**
+   * TRUE only when the tier carries a provider-backed frame table OR a concrete
+   * provider-documented sizing reference. The generic default wording is an
+   * ASSUMPTION, never verification — such tiers stay UNVERIFIED.
+   */
+  sizingRuleVerified: boolean;
+  /**
    * Exact target frame per aspect ratio — provider-backed. A ratio missing here
    * is NOT derivable and is rejected by the capability gate.
    */
