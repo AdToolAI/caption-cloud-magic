@@ -247,6 +247,7 @@ export function useEnhanceVideo() {
   const previewPrice = useCallback(
     async (source: EnhanceSource, config: EnhanceConfig) => {
       clearFailure();
+      setPlan(null);
       try {
         const data = await callEngine({
           action: 'estimate',
@@ -258,6 +259,19 @@ export function useEnhanceVideo() {
         if (data?.source) setSourceMeta(data.source as ServerSourceMeta);
         const pricing = data?.pricing;
         if (!pricing) return null;
+        const delivery = data?.delivery;
+        if (delivery?.target && delivery?.projected && data?.executionModelId) {
+          setPlan({
+            requestedModelId: data.requestedModelId ?? config.modelId,
+            executionModelId: data.executionModelId,
+            strategy: delivery.strategy,
+            target: delivery.target,
+            projected: delivery.projected,
+            requestedMode: data.requestedMode ?? config.mode,
+            executionMode: data.executionMode ?? config.mode,
+            modeSource: data.modeSource ?? 'engine_default',
+          });
+        }
         const next: EnhanceEstimate = {
           userPriceEur: pricing.userPriceEur,
           fps: pricing.fps,
