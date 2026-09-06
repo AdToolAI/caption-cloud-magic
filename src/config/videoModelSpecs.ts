@@ -357,10 +357,10 @@ export function res(
     sizingRuleSource:
       opts.sizingRuleSource ??
       (sizingRule === 'long-edge'
-        ? 'Provider zählt die Label-Zeilen auf der LANGEN Kante (Topaz-Portrait-Falle).'
+        ? 'Provider counts the label lines on the LONG edge (the Topaz portrait trap).'
         : sizingRule === 'fixed-frame'
-          ? 'Provider rendert unabhängig vom Request ein festes Bildformat.'
-          : 'Provider hält die kurze Kante des Labels; Portrait ist damit echtes Hochkant.'),
+          ? 'Provider renders one fixed frame size regardless of the request.'
+          : 'Provider holds the label on the short edge, so portrait istrue portrait.'),
     sizingRuleVerified,
     framesByAspectRatio: { ...derived, ...(opts.framesByAspectRatio ?? {}) },
     native: opts.native ?? true,
@@ -1887,7 +1887,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
   /* ───────────────── Historical / removed (ids stay resolvable) ──────────── */
   {
     id: 'sora-2',
-    displayName: 'Sora 2 (nicht mehr verfügbar)',
+    displayName: 'Sora 2 (no longer available)',
     family: 'sora',
     generation: '2',
     provider: 'OpenAI',
