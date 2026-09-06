@@ -12,10 +12,12 @@ import {
  * The reconcile schedule and its endpoint guard.
  *
  * The schedule is a piece of project setup that used to live only in the
- * database. It now lives in the repo twice — as documentation and as a
- * migration — and this suite pins both: the job must be idempotent, target
- * the reconciler, and carry no privileged key. The guard is exercised as
- * code, not as text.
+ * database. Its canonical definition now lives in the repo
+ * (docs/video-enhance-reconcile-schedule.md — not a migration, because it
+ * embeds the project URL and key, which must not replay on remixes). This
+ * suite pins it: the statement must be idempotent, target the reconciler, and
+ * carry no privileged key. Should a migration ever touch the job, it is held
+ * to the same shape. The guard is exercised as code, not as text.
  */
 
 const JOB = 'video-enhance-reconcile-5min';
@@ -59,12 +61,7 @@ describe('reconcile schedule — repository definition', () => {
     for (const file of touching) {
       assertScheduleStatement(readFileSync(`${dir}/${file}`, 'utf8'), file);
     }
-    // The schedule is part of project setup; exactly one migration must own
-    // it once the pending migration has been approved and written.
-    if (touching.length === 0) {
-      // eslint-disable-next-line no-console
-      console.warn(`[reconcile-schedule] no migration owns "${JOB}" yet — docs/video-enhance-reconcile-schedule.md is the canonical statement until it lands`);
-    }
+    // At most one migration may own the job; the docs statement is canonical.
     expect(touching.length).toBeLessThanOrEqual(1);
   });
 });

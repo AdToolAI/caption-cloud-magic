@@ -3,8 +3,19 @@
 The edge function `video-enhance-reconcile` finishes runs that lost their
 client (poll timeouts, late provider output, late cost readings). It is
 invoked every five minutes by a pg_cron job. This file is the canonical,
-re-runnable definition of that job; the repository migration
-`video-enhance-reconcile-5min` carries the identical statement.
+re-runnable definition of that job.
+
+It is deliberately NOT a schema migration: the statement embeds this
+project's function URL and publishable key, and migrations are replayed on
+remixes, which must never call this project's function with this project's
+key. Apply it through the backend SQL tool of this project (it is idempotent
+and can be re-run at any time). The live job (`jobid 671`) was verified to be
+byte-identical to the statement below on 2026-09-06.
+
+Cadence trade-off: 288 runs/day. Each run costs a handful of indexed queries
+and keeps the database awake; in return a run that lost its client is
+finished, refunded or cost-trued within at most five minutes. A lower cadence
+would only lengthen that maximum delay.
 
 ## Why the publishable key, and why that is safe
 
