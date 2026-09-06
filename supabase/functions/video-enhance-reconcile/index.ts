@@ -86,7 +86,7 @@ async function readProvider(
         status:
           outcome === "complete" ? "succeeded" : outcome === "canceled" ? "canceled" : outcome,
         output: topazDownloadUrl(status),
-        error: status.error ?? null,
+        error: status.errorCode ?? status.message ?? null,
         metrics: credits !== undefined ? { units: credits } : {},
       };
     } catch (error) {
