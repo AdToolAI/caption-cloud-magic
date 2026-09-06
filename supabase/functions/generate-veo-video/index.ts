@@ -4,7 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
-import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
+import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -133,7 +133,8 @@ serve(async (req) => {
 
     // Capability gate — before wallet, before provider. Reference images on
     // Veo 3.1 are 16:9 / 8 s only; that is now a 400, not a silent rewrite.
-    const gate = capabilityGate(
+    const gate = await gateVideoCapability(
+      supabaseAdmin,
       {
         modelId: model,
         mode: inferMode({

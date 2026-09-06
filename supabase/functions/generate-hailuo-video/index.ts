@@ -4,7 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { getVisualStyleHint, type ComposerVisualStyle } from "../_shared/composer-visual-styles.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
-import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
+import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 
@@ -69,7 +69,8 @@ serve(async (req) => {
 
     // Capability gate — before wallet, before provider. 1080p x 10 s is now a
     // clean 400 instead of a silent downgrade to 768p.
-    const gate = capabilityGate(
+    const gate = await gateVideoCapability(
+      supabaseAdmin,
       {
         modelId: model,
         mode: inferMode({ startImageUrl, endImageUrl }),

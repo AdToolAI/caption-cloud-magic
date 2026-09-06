@@ -3,7 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
-import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
+import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 
 const corsHeaders = {
@@ -81,7 +81,8 @@ serve(async (req) => {
 
     // Capability gate — before wallet, before provider. Seedance 1 Lite's
     // 5/10 s enum is enforced, never snapped.
-    const gate = capabilityGate(
+    const gate = await gateVideoCapability(
+      supabaseAdmin,
       {
         modelId: model,
         resolution: (isLite && body.resolution === '480p') ? '480p' : '720p',

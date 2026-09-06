@@ -3,7 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
-import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
+import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 
@@ -114,7 +114,8 @@ serve(async (req) => {
     const duration = Number(rawDuration);
 
     // Capability gate — before wallet, before provider. No nearest-value snap.
-    const gate = capabilityGate(
+    const gate = await gateVideoCapability(
+      supabaseAdmin,
       {
         modelId: model,
         resolution: WAN_RESOLUTION[model],
