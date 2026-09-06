@@ -17192,6 +17192,13 @@ translations.es.dc = {
   eightKMax: "Calidad máxima",
   fourKTimeWarning: "4K tarda bastante más que HD: unos 2–5 minutos para un clip de 10 segundos.",
   eightKTimeWarning: "8K es la máxima calidad y, con diferencia, la más lenta: cuenta con unos 8–11 minutos para un clip de 10 segundos y un archivo muy grande. Solo para clips de hasta 30 segundos; los más largos se exportan en 4K.",
+  resolutionIsCanvasNote: "La resolución solo define el tamaño de salida: no inventa detalle. Un clip de móvil en 1080p exportado en 4K sigue teniendo nitidez de 1080p. Para detalle real, usa el escalado con IA en la pestaña FX.",
+  aiUpscaleSourceTitle: "Escalado con IA",
+  aiUpscaleSourceDesc: "Escala primero tu clip original con IA y edita después sobre el material más nítido.",
+  aiUpscaleSourceCta: "Escalar original con IA",
+  aiUpscaleResultCta: "Escalar resultado con IA",
+  aiUpscaleApplied: "El clip escalado es ahora la fuente",
+
   widescreenLabel: "Panorámico",
   portraitLabel: "Vertical",
   squareLabel: "Cuadrado",
