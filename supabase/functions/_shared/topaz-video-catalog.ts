@@ -213,6 +213,19 @@ export function topazVideoModelOrDefault(id: string | undefined): TopazVideoMode
   return topazVideoModel(id ?? '') ?? TOPAZ_VIDEO_MODELS[0];
 }
 
+/**
+ * A model whose credit consumption has not been confirmed by a billed AdTool
+ * run may only be started by a validation account. It stays VISIBLE with a
+ * beta marker — hiding it would be the same silent narrowing we reject
+ * elsewhere — but the start is blocked for everyone else.
+ */
+export function isTopazModelStartable(id: string | undefined, isTestUser: boolean): boolean {
+  const model = topazVideoModel(id ?? '');
+  if (!model) return false;
+  return model.costVerified || isTestUser;
+}
+
+
 // ---------------------------------------------------------------------------
 // Frame interpolation
 // ---------------------------------------------------------------------------
