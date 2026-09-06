@@ -1,126 +1,94 @@
-# Video-Modelle: Vollausbau der Provider-Fähigkeiten (Flagship-First)
+# Full Video Model & Provider Parity Upgrade
 
-Ziel: Jedes Modell im AI Video Studio bietet genau das, was der Provider wirklich kann — mit der höchsten nativ verfügbaren Auflösung pro Modus, klar getrennt von nachträglichem KI-Upscaling. Die Auswahl wird nach echter Spezifikation sortiert (Flaggschiff oben), nicht nach Preis.
+Ziel: Für jeden integrierten Provider die neueste sinnvolle Modellgeneration, die maximale **native** API-Auflösung und alle professionellen Steuerungen anbieten — mit klarer Trennung von nativer Generierung und nachträglichem Upscaling, ohne stille Clamps, und mit Preisen für jede wählbare Kombination.
 
-## Befund: warum es immer wieder driftet
+Fünf Grundregeln gelten in allen Phasen:
+1. Maximale native Auflösung der tatsächlich genutzten API-Route anbieten.
+2. Nativ und Enhance/Upscale nie vermischen.
+3. Alle stabil verfügbaren API-Funktionen exponieren.
+4. Keine stillen Einschränkungen: gilt 4K nur bei 8 s, bietet die UI bei 4K nur 8 s an.
+5. Source of Truth ist die Provider-Doku **zur konkret genutzten Route** plus ein bestandener Testlauf — nicht der Modellname.
 
-Das Audit hat fünf strukturelle Ursachen gezeigt, nicht nur veraltete Werte:
+## Vorbemerkung zur Verifikation
 
-1. **Vier parallele Wahrheiten pro Modell.** `src/config/aiVideoModelRegistry.ts` (UI-Fähigkeiten), `src/config/*VideoCredits.ts` (Dauern/Auflösungen/Preise je Familie), `src/lib/cost/videoPricingCatalog.ts` + `supabase/functions/_shared/videoPricingCatalog.ts` (Abrechnung, doppelt) und die Model-Tabellen **in** den Edge Functions (z. B. `generate-kling-video/index.ts:20-40`). Keine dieser Quellen wird aus einer anderen abgeleitet.
-2. **Die Edge Function ist die faktische Wahrheit, wird aber nicht gelesen.** Kling 2.5 Turbo rendert laut Function 1080p, die UI schreibt 720p. LTX erzwingt ab 10 s still 1080p und macht 2k/4k unerreichbar — ohne dass die Registry das weiß.
-3. **`resolution` ist ein Anzeige-String, kein Vertrag.** Nur wo jemand zusätzlich `resolutions[]` gepflegt hat, gibt es überhaupt eine Auswahl. Hailuo hat `allowedResolutions: ['768p','1080p']` in der Credits-Datei — die UI zeigt trotzdem keine Wahl.
-4. **Fähigkeiten sind Flags ohne Modus-Bezug.** `i2v: true` sagt nichts darüber, dass ein Modell im i2v-Modus andere Dauern, Ratios oder Auflösungen erlaubt als im t2v-Modus (Veo: Referenzbilder nur bei 16:9/8 s; Luma Ray 3.2: Start/Endbild nur bei 5 s; Hailuo Pro: 1080p nur bei 6 s).
-5. **Nichts erzwingt Vollständigkeit.** Ein neues Modell kann mit halb gepflegten Feldern live gehen; der einzige Test (`src/config/__tests__/aiVideoModelCapabilities.test.ts`) überspringt Modelle, die im Katalog fehlen (`if (!entry) continue;`).
+Belegt aus dem Code sind: die vier parallelen Wahrheitsquellen, die Modell-Tabellen in den Edge Functions, die fehlende Auflösungswahl bei Hailuo, Kling 2.5 Turbo mit 720p in der UI und 1080p im Backend, der stille LTX-Clamp ab 10 s, fehlende Seed-/Negativ-Prompt-/Kamera-Felder in der UI und die Katalog-Drift bei `kling-2.6` und `seedance-mini`.
 
-Ohne 1–5 zu beheben, veraltet jede Aktualisierung innerhalb weniger Provider-Releases wieder.
+Nicht aus dem Code belegbar sind Existenz und Fähigkeiten der neuen Generationen (LTX 2.5, Wan 3.0, Vidu Q3 Pro/Turbo/Mix/Ad, Grok Imagine 1.5, Runway Gen-4.5 / Aleph 2.0, MiniMax-Direct vs. Runway-hosted, Kling-Topmodell, Pika-Spezialwerkzeuge, HappyHorse-Stand). Für jede dieser Familien ist Schritt 1 ein Routen-Audit: Doku der genutzten Route lesen, Slug und Auflösungsstufen mit einem echten Testlauf bestätigen, erst dann freischalten. Kein 4K wird auf Marketing-Basis aktiviert.
 
-## 1. Neues Capability-Schema
+## Phase 1 — Zentrale Video Capability Registry
 
-Eine einzige Quelle: `supabase/functions/_shared/videoModelSpecs.ts`, re-exportiert von `src/config/videoModelSpecs.ts` (dasselbe Muster wie `pictureModelCapabilities.ts`, das im Picture Studio bereits funktioniert). Kernidee: **Fähigkeiten hängen am Modus, nicht am Modell.**
+Neu: `supabase/functions/_shared/videoModelSpecs.ts` als alleinige Wahrheit, gespiegelt über `src/config/videoModelSpecs.ts` (Muster wie `pictureModelCapabilities.ts`).
 
-```text
-VideoModelSpec
-  id, displayName, generation, family, providerRoute, providerModelSlug, apiVersion
-  status: live | beta | deprecated | maintenance | removed
-  supersededBy?: id
-  modes: {
-    t2v | i2v | firstLast | reference | v2v | edit | extend | reframe : ModeSpec
-  }
+Modell-Ebene: interne ID, Anzeigename, Familie, Generation, Provider, echter Provider-Slug, API-Route, API-Version, Release-Status, `deprecated`, `supersededBy`, `lastVerifiedAt`, `providerDocsVersion`, `available`.
 
-ModeSpec
-  resolutions: [{ label, width?, height?, longEdge?, native: true|false, pricingId }]
-  durations: number[] | { min, max, step } | 'smart'
-  aspectRatios: string[]
-  fps?: number[]           hdr?: boolean
-  audio: 'none' | 'optional' | 'always'
-  controls: { seed?, negativePrompt?, cameraPresets?, motionStrength?, promptEnhance? }
-  inputs:  { images: {min,max}, video: {min,max}, audio: {min,max} }
-  constraints: Rule[]      // z. B. "1080p nur bei duration<=10"
-```
+Capability-Ebene **pro Modus** (T2V, I2V, FirstLast, Reference, V2V, Edit, Extend, Reframe, AudioToVideo): Auflösungen inkl. `maxNative`, Dauern, Aspect Ratios, FPS, Audio, max. Referenzbilder/-videos/-audios, First-/Last-Frame, Seed, Negativ-Prompt, Kamera- und Motion-Controls, HDR, Output-Formate, Smart Duration, plus `constraints` als maschinenlesbare Regeln (z. B. „4K ⇒ Dauer = 8 s", „Extension ⇒ 720p").
 
-Wichtig für die Kundenanfrage: `native: true` heißt „der Provider rendert diese Pixelgröße". Alles darüber ist **kein** Modell-Feature, sondern der bestehende Video-Enhance-Pfad (Topaz/ByteDance) — die UI zeigt das getrennt als „Nativ bis X · KI-Upscaling bis Y".
+Damit lässt sich Veo 3.1 korrekt abbilden: 720p bei 4/6/8 s, 1080p und 4K ausschließlich bei 8 s, Lite ohne 4K.
 
-`constraints` ersetzt das heutige `refRequires` und macht die stillen Backend-Clamps sichtbar statt überraschend.
+## Phase 2 — Provider-Audit je Familie
 
-## 2. Provider-Routing und Versionierung
+Pro Familie: Doku der genutzten Route → Spec → Adapter → Test → Testlauf in Maximalauflösung. Erwartete Ergebnisse laut Vorgabe, jeweils vor Freischaltung zu bestätigen:
 
-- `providerRoute` (Edge Function) und `providerModelSlug` (z. B. `kwaivgi/kling-v3-video`) werden Teil der Spec. Die Edge Function liest den Slug aus der Spec, statt eine eigene Tabelle zu führen — die Tabellen in `generate-kling-video`, `generate-veo-video`, `generate-wan-video` usw. entfallen.
-- `apiVersion` pro Modell; ein Provider-Upgrade ist dann ein Spec-Eintrag plus ein neuer Slug, nicht eine Code-Änderung an fünf Stellen.
-- **Aliase** werden ein eigenes, explizites Feld `aliasOf`: `kling-3-standard`/`kling-3-pro` → `kling-3`; `vidu-q2-*` bleibt als ID (persistierte Läufe), Anzeigename wird korrekt „Vidu Q3". Unbekannte IDs fallen nicht mehr still auf ein anderes Modell zurück, sondern werfen einen klaren Fehler.
-- Sora-2-Reste (`src/config/aiVideoCredits.ts:152-175`, beide Preiskataloge, `LEGACY_ROUTE_TO_MODEL`) und die nie erreichbare SKU `wan-pro` werden als `status: 'removed'` geführt und aus der Auswahl entfernt.
+- **Seedance**: 2.5 als bestes multimodales Modell (T2V, I2V, First+Last, Bild-/Video-/Audio-Referenzen, Editing, Generate Audio, Smart Duration, bis 30 Referenzbilder), native Obergrenze über die genutzte Route 720p. **Seedance 2.0 bleibt** und wird als Hochauflösungspfad geführt (480p/720p/1080p/4K). Die UI erklärt ausdrücklich: neuer heißt nicht höher aufgelöst.
+- **Veo 3.1**: 720p/1080p/4K, I2V, First+Last, bis 3 Referenzbilder, Extension, natives Audio, Seed, 16:9 und 9:16, mit den Dauer-Constraints oben.
+- **LTX**: 2.5 Fast und Pro integrieren (720p bis 4K, 24/25/48/50 FPS je Kombination, Audio-to-Video, First+Last, Camera Motion, Auto-Dauer, Multi-Shot). 2.3 bleibt nur als Legacy.
+- **Wan**: 3.0 aufnehmen, solange Preview mit Wan 2.7 als stabilem Fallback; 2.5 nicht mehr prominent.
+- **Vidu**: Q3 Pro/Turbo/Mix/Ad (optional Drama); Q3 Ad prominent, da für Werbung gebaut. Upscale bis 8K erscheint ausschließlich als Enhance, nie als natives Q3.
+- **Grok**: Imagine Video 1.5, Auflösung pro Modus (T2V/I2V bis 1080p, Reference bis 720p).
+- **Luma**: Ray 3.2 als Produktionspfad (1080p, V2V bis 20 s, bis 16 Keyframes, HDR, 16-bit EXR, Reframe, Edit) inkl. der bereits vorhandenen, bislang ungenutzten Kamera-Presets; Ray 2 wird Legacy.
+- **Runway**: Gen-4.5 und Aleph 2.0 ergänzen, mit ProRes, PNG-Sequence, 10-bit SDR und HDR im eigenen Bereich „Professional Output".
+- **MiniMax/Hailuo**: MiniMax-Direct und Runway-hosted als **zwei getrennte Routen** modellieren; Fähigkeiten immer routenbezogen (768p/1080p, 6/10 s je Auflösung, Subject Reference, Kamerakommandos).
+- **Kling**: vollständiger Routen-Audit; 4K nur nach bestätigtem Testlauf auf genau unserem Endpoint.
+- **Pika**: 720p/1080p prüfen; Spezialwerkzeuge nur bei zuverlässigem Zugang, sonst nicht als Flagship führen.
+- **HappyHorse**: Stand und Route gegen unseren Endpoint abgleichen (720p/1080p).
 
-## 3. Fähigkeiten je Familie (Recherche → Spec → Function → UI)
+## Phase 3 — Provider-Adapter statt Sonderlogik
 
-Pro Familie derselbe Vierschritt, je Familie ein abgeschlossener Block: Provider-Doku lesen → Spec schreiben → Edge Function auf die Spec heben → Test. Was heute schon als Lücke bekannt ist:
+Edge Functions verlieren ihr Modellwissen: sie erhalten Modell-ID, Modus und Optionen, validieren gegen die Spec und bauen daraus den Provider-Request. Die Tabellen in `generate-kling-video`, `generate-veo-video`, `generate-wan-video` usw. entfallen. Ungültige Kombinationen werden nicht mehr still korrigiert, sondern mit `400 INVALID_MODEL_CAPABILITY` und verständlicher Begründung abgelehnt; die UI lässt sie gar nicht erst zu.
 
-| Familie | Bekannte Lücken heute |
-|---|---|
-| Seedance 2.5 (ModelArk) | Default 720p, obwohl höhere Stufe verfügbar; 480p-SKU nur intern gemappt |
-| Seedance 1/2.0 (Replicate) | Keine Referenz-Flags, keine `resolutions[]`, 1080p-SKU existiert nur im Katalog |
-| Kling | 2.5 Turbo real 1080p, UI sagt 720p; Seed + Negativ-Prompt serverseitig unterstützt, kein UI-Feld; Kamerasteuerung ungenutzt |
-| Veo 3.1 | Seed + Negativ-Prompt serverseitig, kein UI-Feld; Lite/Fast teilen denselben Slug bei zwei Preisstufen |
-| Grok | 480p/720p vorhanden, keine höhere Stufe geprüft |
-| LTX | 2k/4k gelistet, ab 10 s still auf 1080p geklemmt |
-| Wan | 2.5 veraltet neben 2.6/2.7; Seed + Negativ-Prompt ohne UI |
-| Hailuo | `allowedResolutions` 768p/1080p vorhanden, keine Auswahl in der UI; Pro künstlich auf 6 s |
-| Luma | 11 Kamera-Presets (`lumaVideoCredits.ts:81-93`) nirgends importiert; Ray 2 neben Ray 3.2 ohne Kennzeichnung |
-| Runway Aleph | Reiner V2V, 5 s Deckel — Edit/Reframe-Fähigkeiten des Providers nicht geprüft |
-| Pika | Beide Varianten dauerhaft in Wartung — Reaktivierung oder Entfernung entscheiden |
-| Vidu | Läuft real auf Q3, heißt Q2; Seed ohne UI |
-| HappyHorse | Keine Auflösungswahl, keine Regler |
+## Phase 4 — Professionelle UI
 
-**Neue UI-Bausteine** (alle nur sichtbar, wenn die Spec sie für den aktiven Modus meldet):
-Auflösungs-Selector mit nativem Maximum · Modus-Umschalter (t2v/i2v/First-Last/Referenz/V2V/Edit/Extend/Reframe) · Dauer inkl. Auto-Dauer · Seitenverhältnis · Audio-Schalter · **Block „Erweiterte Steuerung"** mit Seed, Negativ-Prompt, Kamerapreset, Motion-Strength · Upload-Slots für Start-/Endbild, Referenzbilder (mit echter Maximalzahl), Referenzvideo/-audio · FPS/HDR nur dort, wo der Provider sie führt.
-
-## 4. Preise und Margensicherheit
-
-- Jede Auflösungsstufe wird eine eigene Katalogzeile mit `pricingId` — keine impliziten Umbiegungen mehr wie `pricingModelId = resolution === '480p' ? …` in `generate-seedance25-video/index.ts:190`.
-- Freischaltung nur mit geprüftem Einkaufspreis; Margenuntergrenze bleibt 1,75× (`src/test/pricing-net-margin.test.ts`). Ohne geprüften Preis bleibt die Stufe dokumentiert gesperrt statt offen.
-- Bestehende Drift wird geschlossen: `kling-2.6` maxDuration 15 (Client) vs. 10 (Server) vs. [5,10] (Registry); `seedance-mini` minDuration 3 vs. 5.
-- Preisanzeige bleibt „pro Sekunde" und folgt weiterhin der Wallet-Währung.
-
-## 5. Rückwärtskompatibilität
-
-- Alle heutigen Modell-IDs bleiben gültig; persistierte Läufe, `video_creations`, Composer-Szenen und Autopilot-Presets brechen nicht.
-- Entfernte Modelle (Sora 2, ggf. Pika) werden in bestehenden Datensätzen weiterhin korrekt benannt, sind aber nicht mehr wählbar.
-- Wo ein Default sich ändert (z. B. Seedance 2.5 auf die höchste native Stufe), gilt das nur für neue Läufe; laufende Jobs und gespeicherte Szenen behalten ihre Werte.
-- Eine Migration schreibt nichts in der Datenbank um; die Zuordnung alter IDs passiert über `aliasOf` im Code.
-
-## 6. Automatisierte Paritätstests
-
-Ein Testblock, der ein unvollständiges Modell blockiert:
-- Jede Spec-ID hat eine Katalogzeile pro `pricingId` und umgekehrt (keine Waisen, kein `continue`-Schlupfloch mehr).
-- Client-Katalog ↔ Server-Katalog Feld für Feld identisch.
-- Jede in der Spec angebotene Dauer/Ratio/Auflösung liegt im dokumentierten Provider-Enum der zugehörigen Edge Function.
-- Jede `constraint` ist im Backend tatsächlich implementiert (Clamp-Test pro Regel).
-- Jedes Modell hat mindestens einen Modus, jeder Modus mindestens eine Auflösung und eine Dauer.
-- Kein Modell ohne `status`; `deprecated` erfordert `supersededBy`.
-
-## 7. Nachmessen statt behaupten
-
-Der vorhandene Messpfad aus dem Video-Enhance-Umbau (`probeRemoteVideo`) wird auf alle Generierungen ausgeweitet: nach Fertigstellung werden Breite, Höhe, Codec, Bitrate und Dateigröße gemessen, gespeichert und am Ergebnis angezeigt („versprochen 1920×1080 · geliefert 1920×1080, H.264, 12 Mbit/s"). Weicht das Ergebnis von der Zusage ab, wird der Lauf markiert und die Abweichung protokolliert, damit Provider-Regressionen sofort auffallen statt erst beim Kunden.
-
-## 8. UI-Gruppierung
-
-Neue Reihenfolge in `ModelSelector.tsx` (heute `recommended → audio → fast → premium`, also Draft zuerst):
+Neue Gruppen statt „Recommended/Audio/Fast/Premium":
 
 ```text
-Flaggschiff (nativ 1080p+)  →  Native Audio & Dialog  →  Spezialisten (V2V, Referenz, Edit)  →  Entwurf & Günstig
+⭐ Flagship / Best Quality → 🎬 Professional Production → 🔊 Native Audio & Dialogue → ⚡ Fast → 💰 Economy / Draft → Legacy (aufklappbar)
 ```
 
-Innerhalb der Gruppe nach nativer Auflösung, dann Generation. Jede Zeile zeigt native Auflösung, Modi-Kürzel und Preis; Vorgänger-Generationen tragen „Vorgänger von X". Nichts wird versteckt, nur richtig einsortiert.
+Pro Modell direkt sichtbar: `Native: 720p | 1080p | 4K` bzw. `Native max: 1080p · Enhance: 2K | 4K | 8K` — visuell klar getrennt. Ein einklappbarer Bereich „Advanced Controls" rendert rein aus der Spec: Seed, Negativ-Prompt, Kamerabewegung, Motion Strength, Prompt Enhancement, FPS, HDR, Output-Format, Audio, Smart Duration, Referenzstärke, Start-/Endbild, Referenzbilder/-video/-audio. Keine anbieterspezifischen UI-Sonderfälle mehr.
 
-## 9. Rollout-Reihenfolge (Kundenwirkung ↔ Risiko)
+## Phase 5 — Pricing an Auflösung gekoppelt
 
-1. **Sofortwirkung, kein Risiko:** Gruppen-Reihenfolge, Flaggschiff-Sortierung, korrekte Auflösungs-Labels (Kling 2.5 Turbo), Vorgänger-Kennzeichnung, Sora-/`wan-pro`-Bereinigung.
-2. **Hoher Nutzen, klein:** Block „Erweiterte Steuerung" mit Seed und Negativ-Prompt für Kling, Veo, Wan, Vidu; Luma-Kamerapresets.
-3. **Auflösungen freischalten:** Hailuo 1080p-Wahl, Seedance-2.5-Default, LTX-Constraint sichtbar, Seedance 1/2.0 `resolutions[]` — je mit geprüfter Preiszeile.
-4. **Schema-Migration:** `videoModelSpecs.ts` einführen, Registry als Adapter, Edge-Function-Tabellen abbauen, Paritätstests scharf schalten.
-5. **Familienweiser Vollausbau:** Kling → Wan/Hailuo → Veo/Luma → Seedance/Vidu → Runway/Pika/HappyHorse/LTX/Grok, je Familie ein Block inkl. neuer Modi (Edit/Extend/Reframe) wo der Provider sie führt.
-6. **Nachmessung** aller Generierungen plus Abweichungs-Alarm.
+Jede kostenrelevante Kombination erhält eine eigene `pricingId` (z. B. `veo-3.1-4k`, bei komplexen Providern Modell+Modus+Auflösung+Audio). Implizite Umbiegungen wie in `generate-seedance25-video` entfallen. Vor Aktivierung müssen Einkaufspreis, FX, Marge, Mindestmarge (1,75×) und Endpreis feststehen; sonst bleibt die Capability dokumentiert, aber `available: false`. Die bestehende Drift (`kling-2.6`, `seedance-mini`) wird geschlossen.
 
-## Technische Details
+## Phase 6 — Output nachmessen
 
-Betroffen: `src/config/aiVideoModelRegistry.ts`, alle `src/config/*VideoCredits.ts`, neu `supabase/functions/_shared/videoModelSpecs.ts` + `src/config/videoModelSpecs.ts`, `src/components/ai-video/ModelSelector.tsx` und `ToolkitGenerator.tsx`, alle `supabase/functions/generate-*-video/index.ts`, `src/lib/cost/videoPricingCatalog.ts` + `supabase/functions/_shared/videoPricingCatalog.ts`, `src/lib/composer/providerMatrix.ts` (Composer liest künftig aus der Spec), `src/lib/video-composer/providerCapabilities.ts` (bleibt Adapter), Tests unter `src/config/__tests__/` und `src/test/`, neue Doku `docs/ai-video-capability-matrix.md`.
+Nach jeder Generierung werden Breite, Höhe, FPS, Dauer, Codec, Bitrate, Dateigröße, Audio-Codec und — wo verfügbar — Farbtiefe und HDR-Metadaten gemessen und als `requestedResolution` vs. `actualResolution` gespeichert. Anzeige „✅ Target matched" oder „⚠ Provider output mismatch"; Abweichungen werden protokolliert, damit Provider-Änderungen sofort auffallen.
 
-Nicht angefasst: Lip-Sync-Kette und deren Zertifizierungsvertrag, Wallet-/Abrechnungslogik (außer neuen Preiszeilen), Director's Cut, Render-Pipeline, Video-Enhance-Preisdeckel. Alle Texte EN/DE/ES; Prompts an die Modelle bleiben englisch.
+## Phase 7 — Harte Tests
+
+Deployment scheitert bei: Registry↔Server-Abweichung, fehlender Preiszeile für eine wählbare Kombination, Auflösung ohne Adapter-Unterstützung, abweichenden Dauern, verletzter Constraint (z. B. Veo 4K + 6 s), Alias ohne Ziel, `deprecated` ohne `supersededBy`, sowie einem Test, der ein stilles Herunterschreiben von 4K auf 1080p ausschließt.
+
+## Phase 8 — Rückwärtskompatibilität
+
+Alte IDs bleiben als Aliase (`oldId → currentId`). Gespeicherte Projekte zeigen weiter ihren historischen Modellnamen; neue Läufe nutzen die neue Spec. Legacy-Modelle bleiben anzeigbar und duplizierbar, auch wenn sie nicht mehr neu wählbar sind. Keine Datenbank-Migration bestehender Generierungen.
+
+## Phase 9 — Rollout
+
+- **Wave 1 (Architektur):** Capability Registry, Pricing-Parität, Constraints, kein stilles Clamping, Output-Messung, Flagship-first-UI.
+- **Wave 2 (Qualitätssprünge):** Veo 3.1 4K · LTX 2.5 Fast/Pro inkl. 4K · Seedance 2.0 4K erhalten · Seedance 2.5 multimodal · Wan 3.0 · Vidu Q3 · Grok 1.5 · Luma Ray 3.2 Full API.
+- **Wave 3 (Professional):** Runway Gen-4.5, Aleph 2.0, ProRes, PNG-Sequence, HDR, 10-bit, EXR, V2V, Reframe, Extend, Multi-Keyframes.
+- **Wave 4:** Kling-Audit, MiniMax/Hailuo-Routen-Audit, Pika, HappyHorse, Legacy-Bereinigung.
+
+## Phase 10 — Nicht wieder veralten
+
+Jede Spec trägt `lastVerifiedAt`, `providerDocsVersion`, `providerModelId`, `releaseStatus`. Ein Admin-Report „Video Provider Health" listet Provider, Modell, aktuelles natives Maximum und Prüfdatum mit Ampel 🟢 Current / 🟡 Verify / 🔴 Outdated, wenn die Prüfung zu lange zurückliegt.
+
+## Definition of Done je Familie
+
+`FULL_PARITY` erst, wenn: neueste sinnvolle Generation geprüft, maximale native Auflösung verfügbar, alle Auflösungsstufen, Modi, Dauern, Ratios, Audio-Fähigkeiten, Referenzen, First/Last, Seed, Negativ-Prompt, Kamera-Controls und HDR/Pro-Outputs abgebildet sind, jede wählbare Kombination einen Preis hat, Backend und UI dieselben Regeln nutzen, der Output nachgemessen wird und mindestens ein echter Testlauf in maximaler Auflösung erfolgreich war.
+
+## Betroffene Dateien
+
+Bestehend: `src/config/aiVideoModelRegistry.ts`, alle `src/config/*VideoCredits.ts`, `src/components/ai-video/ModelSelector.tsx`, `src/components/ai-video/ToolkitGenerator.tsx`, `src/lib/cost/videoPricingCatalog.ts`, `supabase/functions/_shared/videoPricingCatalog.ts`, alle `supabase/functions/generate-*-video/index.ts`, `src/lib/video-composer/providerCapabilities.ts`, `src/lib/composer/providerMatrix.ts`, Video-Tests.
+Neu: `supabase/functions/_shared/videoModelSpecs.ts`, `src/config/videoModelSpecs.ts`, `docs/ai-video-capability-matrix.md`.
+Unangetastet: Lip-Sync-Kette, Wallet-/Abrechnungslogik außerhalb neuer Preiszeilen, Director's Cut, Render-Pipeline. Alle Texte EN/DE/ES.
