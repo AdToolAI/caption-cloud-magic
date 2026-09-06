@@ -356,6 +356,7 @@ export function useEnhanceVideo() {
     stopPolling();
     setRun(null);
     setEstimate(null);
+    setPlan(null);
     setSourceMeta(null);
     clearFailure();
   }, [stopPolling, clearFailure]);
@@ -363,6 +364,7 @@ export function useEnhanceVideo() {
   return {
     run,
     estimate,
+    plan,
     sourceMeta,
     isStarting,
     isRunning: !!run && !TERMINAL.includes(run.status),
