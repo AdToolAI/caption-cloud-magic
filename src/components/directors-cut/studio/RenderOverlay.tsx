@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download, RotateCcw, Film, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,22 @@ interface RenderOverlayProps {
   onClose: () => void;
   onOpenLibrary?: () => void;
   startedAt?: number;
+  quality?: string;
+  durationSeconds?: number;
 }
+
+/** Typical wall-clock render time per 10s of output, in seconds (min/max). */
+const TYPICAL_SECONDS_PER_10S: Record<string, [number, number]> = {
+  hd: [45, 90],
+  fhd: [45, 90],
+  '4k': [150, 320],
+  '8k': [480, 660],
+};
+
+const formatClock = (totalSeconds: number) => {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+};
 
 export const RenderOverlay: React.FC<RenderOverlayProps> = ({
   isVisible,
@@ -29,8 +44,19 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
   onClose,
   onOpenLibrary,
   startedAt,
+  quality,
+  durationSeconds,
 }) => {
   const { t } = useTranslation();
+  const [now, setNow] = useState(() => Date.now());
+
+  const isRunning = isVisible && status !== 'completed' && status !== 'failed';
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [isRunning]);
 
   const STATUS_LABELS: Record<string, string> = {
     preparing: t('dc.preparing'),
@@ -40,17 +66,23 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
     failed: t('dc.renderFailed'),
   };
 
-  const estimatedRemaining = useMemo(() => {
-    if (!startedAt || progress <= 2 || status === 'completed' || status === 'failed') return null;
-    const elapsed = (Date.now() - startedAt) / 1000;
-    const rate = progress / elapsed;
-    if (rate <= 0) return null;
-    const remaining = (100 - progress) / rate;
-    const mins = Math.floor(remaining / 60);
-    const secs = Math.floor(remaining % 60);
-    const timeStr = mins > 0 ? `~${mins}:${secs.toString().padStart(2, '0')} Min` : `~${secs}s`;
-    return t('dc.estimatedRemaining', { time: timeStr });
-  }, [startedAt, progress, status, t]);
+  // Honest waiting info: elapsed time + typical range for the chosen quality.
+  // No synthetic "<1s" estimate derived from a progress bar that jumps.
+  const elapsedLabel = useMemo(() => {
+    if (!startedAt || !isRunning) return null;
+    return t('dc.elapsedTime', { time: formatClock((now - startedAt) / 1000) });
+  }, [startedAt, isRunning, now, t]);
+
+  const typicalLabel = useMemo(() => {
+    if (!isRunning) return null;
+    const range = TYPICAL_SECONDS_PER_10S[(quality || 'hd').toLowerCase()];
+    if (!range) return null;
+    const factor = Math.max(1, (durationSeconds || 10) / 10);
+    const lo = formatClock(range[0] * factor);
+    const hi = formatClock(range[1] * factor);
+    return t('dc.typicalDuration', { quality: (quality || 'hd').toUpperCase(), range: `${lo}–${hi}` });
+  }, [isRunning, quality, durationSeconds, t]);
+
 
   return (
     <AnimatePresence>
@@ -103,10 +135,13 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
                 <Progress value={progress} className="h-3 bg-white/10" />
                 <div className="flex justify-between text-sm">
                   <span className="text-white/50">{Math.round(progress)}%</span>
-                  {estimatedRemaining && (
-                    <span className="text-white/40">{estimatedRemaining}</span>
+                  {elapsedLabel && (
+                    <span className="text-white/40">{elapsedLabel}</span>
                   )}
                 </div>
+                {typicalLabel && (
+                  <p className="text-xs text-white/40 text-center">{typicalLabel}</p>
+                )}
               </div>
             )}
 

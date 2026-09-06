@@ -25,8 +25,11 @@ export interface RenderTier {
 export function pickRenderTier(durationInFrames: number): RenderTier {
   const frames = Math.max(1, Math.floor(durationInFrames || 0));
 
+  // Short clips: split as wide as the tier allows (6 workers) instead of
+  // honouring the 120-frame floor — a 10s/24fps export (241 frames) used to
+  // run as 3 chunks of 120 and was the bottleneck for 4K/8K exports.
   if (frames < 300) {
-    return { label: 'short', maxWorkers: 3, framesPerLambda: Math.max(FRAMES_PER_LAMBDA_MIN, Math.ceil(frames / 3)) };
+    return { label: 'short', maxWorkers: 6, framesPerLambda: Math.max(40, Math.ceil(frames / 6)) };
   }
   if (frames < 900) {
     return { label: 'standard', maxWorkers: 5, framesPerLambda: Math.max(FRAMES_PER_LAMBDA_MIN, Math.ceil(frames / 5)) };

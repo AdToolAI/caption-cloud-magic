@@ -508,8 +508,24 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     // Calculate dimensions based on aspect ratio and quality
     let width: number, height: number;
     const aspectRatio = export_settings?.aspect_ratio || '16:9';
-    
-    if (quality === '4k') {
+
+    // 8K is only viable for short clips — beyond that a single lambda chunk
+    // runs into the 600s timeout. Fall back to 4K instead of failing.
+    const requestedQuality = quality;
+    const effectiveQuality = (quality === '8k' && duration > 30) ? '4k' : quality;
+    if (effectiveQuality !== requestedQuality) {
+      console.warn(`[RenderDirectorsCut] 8K requested for ${duration}s clip — downgrading to 4K`);
+    }
+
+    if (effectiveQuality === '8k') {
+      if (aspectRatio === '9:16') {
+        width = 4320; height = 7680;
+      } else if (aspectRatio === '1:1') {
+        width = 4320; height = 4320;
+      } else {
+        width = 7680; height = 4320;
+      }
+    } else if (effectiveQuality === '4k') {
       if (aspectRatio === '9:16') {
         width = 2160; height = 3840;
       } else if (aspectRatio === '1:1') {
@@ -740,6 +756,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           console.log(`[RenderDirectorsCut] 🎬 tier=${tier.label}, maxWorkers=${tier.maxWorkers}, framesPerLambda=${effectiveFpl}`);
         }
 
+        // Encoder speed scales with resolution: at 4K/8K the 'slow' preset is
+        // the dominant cost per frame. Quality intermediates (lossless PNG,
+        // BT.709, crf 16) stay untouched — Raw-Media-Invariant holds.
+        const x264Preset = height >= 4320 || width >= 7680
+          ? 'faster'
+          : (height >= 2160 || width >= 3840 ? 'medium' : 'slow');
+        const videoBitrate = height >= 4320 || width >= 7680
+          ? '100M'
+          : (height >= 2160 || width >= 3840 ? '40M' : '10M');
+        console.log(`[RenderDirectorsCut] 🎚️ ${width}x${height} → x264Preset=${x264Preset}, videoBitrate=${videoBitrate}`);
+
         const lambdaPayload = normalizeStartPayload({
           type: 'start',
           serveUrl: REMOTION_SERVE_URL,
@@ -751,8 +778,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           imageFormat: 'png',
           colorSpace: 'bt709',
           crf: 16,
-          x264Preset: 'slow',
-          videoBitrate: '10M',
+          x264Preset,
+          videoBitrate,
           maxRetries: 1,
           ...(effectiveFpl ? { framesPerLambda: effectiveFpl } : {}),
           privacy: 'public',
