@@ -1,4 +1,8 @@
 import type { QualityTier, VideoResolution } from '@/config/videoEnhanceModels/types';
+import {
+  TOPAZ_VIDEO_MODEL_VIEWS,
+  type TopazCreditFamily,
+} from '@/config/videoEnhanceModels/topazCatalog';
 
 /**
  * Provider rate cards for Video Enhance.
@@ -57,6 +61,8 @@ export type VideoRateCard = RateCardMeta &
         type: 'per_unit';
         unitUsd: number;
         unitsPerOutputSecond: Partial<Record<VideoResolution, number>>;
+        /** Per-mode override; a mode missing here falls back to the table above. */
+        unitsPerOutputSecondByMode?: Record<string, Partial<Record<VideoResolution, number>>>;
         /** Multiplier applied on top for higher frame rates. */
         fpsFactor?: Record<number, number>;
         /** Published reference table, kept for admin comparison only. */
@@ -129,28 +135,42 @@ const VCUBE_ENTRIES: MatrixEntry[] = VCUBE_MODES.flatMap((mode) =>
  */
 export const TOPAZ_CREDIT_USD = 0.1;
 
-/** Credits per second of OUTPUT at 30 fps, from the published Proteus table. */
-const TOPAZ_CREDITS_PER_SECOND: Partial<Record<VideoResolution, number>> = {
-  '720p': 0.1,
-  '1080p': 0.2,
-  '2k': 0.35,
-  '4k': 0.6,
+/**
+ * Credits per second of OUTPUT at 30 fps, per credit FAMILY. Mirror of
+ * `supabase/functions/_shared/topaz-video-catalog.ts`. Topaz bills the
+ * restoration models (Nyx, Themis) per frame — far cheaper per second than the
+ * Proteus-class table — so the family, not the engine, picks the rate.
+ */
+export const TOPAZ_CREDITS_PER_SECOND_BY_FAMILY: Record<
+  TopazCreditFamily,
+  Record<VideoResolution, number>
+> = {
+  precision: { '720p': 0.1, '1080p': 0.2, '2k': 0.35, '4k': 0.6 },
+  restoration: { '720p': 0.026, '1080p': 0.058, '2k': 0.103, '4k': 0.233 },
 };
+
+const TOPAZ_CREDITS_PER_SECOND: Partial<Record<VideoResolution, number>> =
+  TOPAZ_CREDITS_PER_SECOND_BY_FAMILY.precision;
+
+const TOPAZ_CREDITS_BY_MODE: Record<string, Partial<Record<VideoResolution, number>>> =
+  Object.fromEntries(
+    TOPAZ_VIDEO_MODEL_VIEWS.map((m) => [m.id, TOPAZ_CREDITS_PER_SECOND_BY_FAMILY[m.creditFamily]]),
+  );
 
 const TOPAZ_FPS_FACTOR: Record<number, number> = { 24: 0.8, 30: 1, 60: 2 };
 
-const TOPAZ_ENTRIES: MatrixEntry[] = (
-  Object.keys(TOPAZ_CREDITS_PER_SECOND) as VideoResolution[]
-).flatMap((resolution) =>
-  [24, 30, 60].map((fps) => ({
-    mode: 'standard',
-    resolution,
-    fps,
-    tier: 'standard' as QualityTier,
-    usdPerSecond:
-      (TOPAZ_CREDITS_PER_SECOND[resolution] ?? 0) * (TOPAZ_FPS_FACTOR[fps] ?? 1) * TOPAZ_CREDIT_USD,
-  })),
-);
+const TOPAZ_ENTRIES: MatrixEntry[] = TOPAZ_VIDEO_MODEL_VIEWS.flatMap((model) => {
+  const credits = TOPAZ_CREDITS_PER_SECOND_BY_FAMILY[model.creditFamily];
+  return (Object.keys(credits) as VideoResolution[]).flatMap((resolution) =>
+    [24, 30, 60].map((fps) => ({
+      mode: model.id,
+      resolution,
+      fps,
+      tier: 'standard' as QualityTier,
+      usdPerSecond: credits[resolution] * (TOPAZ_FPS_FACTOR[fps] ?? 1) * TOPAZ_CREDIT_USD,
+    })),
+  );
+});
 
 export const VIDEO_RATE_CARDS: Record<string, VideoRateCard> = {
   'bytedance-vcube': {
@@ -166,10 +186,11 @@ export const VIDEO_RATE_CARDS: Record<string, VideoRateCard> = {
     type: 'per_unit',
     unitUsd: TOPAZ_CREDIT_USD,
     unitsPerOutputSecond: TOPAZ_CREDITS_PER_SECOND,
+    unitsPerOutputSecondByMode: TOPAZ_CREDITS_BY_MODE,
     fpsFactor: TOPAZ_FPS_FACTOR,
     source:
-      'Topaz direct API credit pricing (published Proteus credit table); credit USD value from TOPAZ_CREDIT_USD',
-    checkedAt: '2026-09-06',
+      'Topaz direct API credit pricing (published Proteus + Nyx/Themis credit tables); credit USD value from TOPAZ_CREDIT_USD',
+    checkedAt: '2026-09-07',
     costUnverified: true,
     estimatorCalibrating: true,
     entries: TOPAZ_ENTRIES,
@@ -206,7 +227,8 @@ export function videoProviderCostUsd(card: VideoRateCard, config: VideoCostConfi
     case 'per_output_second':
       return card.usdPerSecond * seconds;
     case 'per_unit': {
-      const perSecond = card.unitsPerOutputSecond[config.resolution];
+      const table = card.unitsPerOutputSecondByMode?.[config.mode] ?? card.unitsPerOutputSecond;
+      const perSecond = table[config.resolution];
       if (perSecond === undefined) {
         throw new UnpriceableRunError(`no unit rate for ${config.resolution}`);
       }

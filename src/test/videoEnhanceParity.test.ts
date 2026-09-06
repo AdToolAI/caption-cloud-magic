@@ -68,8 +68,8 @@ describe('video enhance pricing parity', () => {
     { config: { modelId: 'bytedance-vcube', mode: 'aigc', resolution: '4k', fps: 30, tier: 'standard' }, seconds: 12 },
     { config: { modelId: 'bytedance-vcube', mode: 'ugc', resolution: '2k', fps: 60, tier: 'standard' }, seconds: 5 },
     { config: { modelId: 'bytedance-vcube', mode: 'old_film', resolution: '1080p', fps: 30, tier: 'standard' }, seconds: 20 },
-    { config: { modelId: 'topaz-video-upscale', mode: 'standard', resolution: '1080p', fps: 30, tier: 'standard' }, seconds: 10 },
-    { config: { modelId: 'topaz-video-upscale', mode: 'standard', resolution: '4k', fps: 60, tier: 'standard' }, seconds: 6 },
+    { config: { modelId: 'topaz-video-upscale', mode: 'proteus', resolution: '1080p', fps: 30, tier: 'standard' }, seconds: 10 },
+    { config: { modelId: 'topaz-video-upscale', mode: 'proteus', resolution: '4k', fps: 60, tier: 'standard' }, seconds: 6 },
   ];
 
   for (const { config, seconds } of fixtures) {
@@ -104,12 +104,12 @@ describe('combination validation parity', () => {
   const cases: { config: EnhanceConfig; duration?: number; expected: string | true }[] = [
     { config: { modelId: 'bytedance-vcube', mode: 'aigc', resolution: '1080p', fps: 24, tier: 'standard' }, expected: true },
     { config: { modelId: 'bytedance-vcube', mode: 'aigc', resolution: '4k', fps: 120, tier: 'standard' }, expected: 'unsupported_fps' },
-    { config: { modelId: 'topaz-video-upscale', mode: 'standard', resolution: '2k', fps: 30, tier: 'standard' }, expected: true },
+    { config: { modelId: 'topaz-video-upscale', mode: 'proteus', resolution: '2k', fps: 30, tier: 'standard' }, expected: true },
     { config: { modelId: 'bytedance-vcube', mode: 'nope', resolution: '1080p', fps: 24, tier: 'standard' }, expected: 'unknown_mode' },
     { config: { modelId: 'bytedance-vcube', mode: 'aigc', resolution: '1080p', fps: 24, tier: 'pro' }, expected: 'tier_not_entitled' },
-    { config: { modelId: 'topaz-video-upscale', mode: 'standard', resolution: '4k', fps: 60, tier: 'standard' }, expected: true },
-    { config: { modelId: 'topaz-video-upscale', mode: 'standard', resolution: '1080p', fps: 30, tier: 'standard' }, duration: 900, expected: 'duration_too_long' },
-    { config: { modelId: 'unknown-model', mode: 'standard', resolution: '1080p', fps: 24, tier: 'standard' }, expected: 'unknown_model' },
+    { config: { modelId: 'topaz-video-upscale', mode: 'proteus', resolution: '4k', fps: 60, tier: 'standard' }, expected: true },
+    { config: { modelId: 'topaz-video-upscale', mode: 'proteus', resolution: '1080p', fps: 30, tier: 'standard' }, duration: 900, expected: 'duration_too_long' },
+    { config: { modelId: 'unknown-model', mode: 'proteus', resolution: '1080p', fps: 24, tier: 'standard' }, expected: 'unknown_model' },
   ];
 
   for (const { config, duration, expected } of cases) {

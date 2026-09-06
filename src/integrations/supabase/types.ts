@@ -18639,11 +18639,13 @@ export type Database = {
           error_code: string | null
           error_message: string | null
           estimated_units: number | null
+          executing_topaz_model: string | null
           fps: number
           fx_rate_used: number
           fx_safety_buffer_used: number
           id: string
           idempotency_key: string
+          interpolation_model: string | null
           last_reconciled_at: string | null
           late_cost_attempts: number
           margin_pct: number | null
@@ -18689,6 +18691,7 @@ export type Database = {
           rate_card_version: string
           reconciliation_attempts: number
           requested_model_id: string | null
+          requested_output_quality: string | null
           resolution: string
           source_asset_id: string | null
           source_container: string | null
@@ -18738,11 +18741,13 @@ export type Database = {
           error_code?: string | null
           error_message?: string | null
           estimated_units?: number | null
+          executing_topaz_model?: string | null
           fps: number
           fx_rate_used: number
           fx_safety_buffer_used: number
           id?: string
           idempotency_key: string
+          interpolation_model?: string | null
           last_reconciled_at?: string | null
           late_cost_attempts?: number
           margin_pct?: number | null
@@ -18788,6 +18793,7 @@ export type Database = {
           rate_card_version: string
           reconciliation_attempts?: number
           requested_model_id?: string | null
+          requested_output_quality?: string | null
           resolution: string
           source_asset_id?: string | null
           source_container?: string | null
@@ -18837,11 +18843,13 @@ export type Database = {
           error_code?: string | null
           error_message?: string | null
           estimated_units?: number | null
+          executing_topaz_model?: string | null
           fps?: number
           fx_rate_used?: number
           fx_safety_buffer_used?: number
           id?: string
           idempotency_key?: string
+          interpolation_model?: string | null
           last_reconciled_at?: string | null
           late_cost_attempts?: number
           margin_pct?: number | null
@@ -18887,6 +18895,7 @@ export type Database = {
           rate_card_version?: string
           reconciliation_attempts?: number
           requested_model_id?: string | null
+          requested_output_quality?: string | null
           resolution?: string
           source_asset_id?: string | null
           source_container?: string | null

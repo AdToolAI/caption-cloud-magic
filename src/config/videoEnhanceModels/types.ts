@@ -101,6 +101,12 @@ export interface EnhanceConfig {
   /** `null` keeps the source frame rate. */
   fps: number | null;
   tier: QualityTier;
+  /** Topaz encoder contract: 'efficient' | 'high' | 'master'. */
+  outputQuality?: string;
+  /** Topaz frame-interpolation model id; only used when the fps changes. */
+  interpolationModel?: string;
+  /** Whitelisted manual filter parameters (Topaz manual models only). */
+  params?: Record<string, number>;
 }
 
 /** Server-measured source facts. Never taken from the client payload. */

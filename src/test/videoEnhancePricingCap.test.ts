@@ -230,7 +230,7 @@ describe('Topaz rate card', () => {
 
   it('surfaces the calibration state on the price snapshot', () => {
     const snapshot = priceVideoEnhanceRun(
-      { modelId: 'topaz-video-upscale', mode: 'standard', resolution: '4k', fps: 30, tier: 'standard' },
+      { modelId: 'topaz-video-upscale', mode: 'proteus', resolution: '4k', fps: 30, tier: 'standard' },
       source(),
     );
     expect(snapshot.estimatorCalibrating).toBe(true);
