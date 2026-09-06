@@ -18,6 +18,7 @@ import {
 import { evaluateUpscale, planDelivery } from "../_shared/video-enhance-frame.ts";
 import { toClientPricing, toClientRun } from "../_shared/video-enhance-client-view.ts";
 import {
+  cancelTopazVideoRequest,
   createTopazVideoRequest,
   topazBilledCredits,
   TopazApiError,
