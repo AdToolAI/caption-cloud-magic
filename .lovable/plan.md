@@ -76,6 +76,8 @@ Jede kostenrelevante Kombination erhält eine eigene `pricingId` (z. B. `veo-3.1
 
 Nach jeder Generierung werden Breite, Höhe, FPS, Dauer, Codec, Bitrate, Dateigröße, Audio-Codec und — wo verfügbar — Farbtiefe und HDR-Metadaten gemessen und als `requestedResolution` vs. `actualResolution` gespeichert. Anzeige „✅ Target matched" oder „⚠ Provider output mismatch"; Abweichungen werden protokolliert, damit Provider-Änderungen sofort auffallen.
 
+**Automatische Rückstufung bei Provider-Regression:** Liefert eine Auflösungsstufe mehrfach hintereinander (Schwelle: 3 Läufe) weniger als angefordert, setzt das System `parityStatus` von `FULL_PARITY` auf `VERIFY`, meldet es im Health-Report (🟡) und deaktiviert die betroffene Stufe optional vorübergehend (`available: false`), bis ein neuer Smoke-Test besteht. Dasselbe gilt, wenn die gemessenen Providerkosten die Mindestmarge unterschreiten.
+
 ## Phase 7 — Harte Tests
 
 Deployment scheitert bei: Registry↔Server-Abweichung, Hash-Abweichung zwischen kanonischer Server-Spec und generiertem Client-Stand, fehlender Preiszeile für eine wählbare Kombination, Auflösung ohne Adapter-Unterstützung, abweichenden Dauern, verletzter Constraint (z. B. Veo 4K + 6 s), Alias ohne Ziel, `deprecated` ohne `supersededBy`, fehlender Pixelangabe (`width`/`height`) an einer Auflösung, `available: true` ohne hinterlegte Smoke-Test-Run-ID, sowie einem Test, der ein stilles Herunterschreiben von 4K auf 1080p ausschließt.
