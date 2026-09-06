@@ -327,16 +327,41 @@ export function AIVideoUpscaling({
                     <Select value={resolution} onValueChange={(v) => setResolution(v as VideoResolution)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {availableResolutions(model, mode).map((r) => (
-                          <SelectItem key={r} value={r}>{r.toUpperCase()}</SelectItem>
-                        ))}
+                        {availableResolutions(model, mode).map((r) => {
+                          const choice = tierChoices?.find((c) => c.resolution === r) ?? null;
+                          const blocked = !!choice && !choice.verdict.ok;
+                          const note = !choice || choice.verdict.ok
+                            ? ''
+                            : choice.verdict.reason === 'downscale'
+                              ? ` · ${tx({ de: 'kleiner als Quelle', en: 'smaller than source', es: 'menor que el origen' })}`
+                              : ` · ${tx({ de: 'kein Gewinn', en: 'no gain', es: 'sin ganancia' })}`;
+                          return (
+                            <SelectItem
+                              key={r}
+                              value={r}
+                              disabled={blocked}
+                              data-testid={`dc-enhance-tier-${r}`}
+                              data-blocked={blocked ? 'true' : 'false'}
+                            >
+                              {r.toUpperCase()}
+                              {choice ? ` · ${formatFrame(choice.frame)}` : ''}
+                              {note}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
                   {model.processingModes.length > 1 && (
                     <div className="space-y-2">
                       <Label>{tx({ de: 'Materialart', en: 'Footage type', es: 'Tipo de material' })}</Label>
-                      <Select value={mode} onValueChange={setMode}>
+                      <Select
+                        value={mode}
+                        onValueChange={(v) => {
+                          setModeTouched(true);
+                          setMode(v);
+                        }}
+                      >
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {model.processingModes.map((m) => (
