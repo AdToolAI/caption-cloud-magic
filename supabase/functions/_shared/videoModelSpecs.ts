@@ -60,6 +60,14 @@ export interface PixelFrame {
   height: number;
 }
 
+/**
+ * How the exact output frame of a tier is defined.
+ *  - `exact-frames`: the provider documents a frame table; we list it verbatim.
+ *  - `short-edge` / `long-edge` / `fixed-frame`: a DOCUMENTED provider rule the
+ *    frame may be derived from. `sizingRuleSource` names where that is stated.
+ */
+export type SizingRule = 'exact-frames' | 'short-edge' | 'long-edge' | 'fixed-frame';
+
 export interface ResolutionSpec {
   /** Human label exactly as shown in the UI ("1080p", "4K"). */
   label: string;
@@ -70,12 +78,22 @@ export interface ResolutionSpec {
   /** Exact frame at 9:16 portrait. */
   portrait: PixelFrame;
   orientationBehavior: OrientationBehavior;
+  /** Documented rule the frames follow. Never a generic 16:9 assumption. */
+  sizingRule: SizingRule;
+  /** Where that rule is documented / how it was verified. */
+  sizingRuleSource: string;
+  /**
+   * Exact target frame per aspect ratio — provider-backed. A ratio missing here
+   * is NOT derivable and is rejected by the capability gate.
+   */
+  framesByAspectRatio: Record<string, PixelFrame>;
   /** True = the provider renders these pixels. False = post-generation upscale. */
   native: boolean;
   /** Catalog id used for billing this exact tier. */
   pricingId: string;
   /** Durations allowed at THIS resolution when narrower than the mode default. */
   durations?: number[];
+
   /**
    * Availability and verification are per TIER, never per model. A new tier on
    * an otherwise grandfathered model does NOT inherit its availability.
