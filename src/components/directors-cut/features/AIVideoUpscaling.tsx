@@ -13,8 +13,22 @@ import {
 import { ArrowUpCircle, Sparkles, Zap, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useTx } from '@/lib/i18nText';
+import { useTranslation } from '@/hooks/useTranslation';
 import { uiLocale } from '@/lib/uiLocale';
 import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
+import {
+  ORDER_REJECTION_CODES,
+  enhanceCopy,
+  engineErrorText,
+  toEnhanceLang,
+} from '@/lib/videoEnhance/engineErrors';
+import {
+  evaluateUpscale,
+  formatFrame,
+  frameMeetsTarget,
+  projectProviderOutput,
+  resolveTargetFrame,
+} from '@/lib/videoEnhance/targetFrame';
 import {
   availableFps,
   availableResolutions,
