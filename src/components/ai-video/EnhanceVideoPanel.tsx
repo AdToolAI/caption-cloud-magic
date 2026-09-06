@@ -263,18 +263,9 @@ export function EnhanceVideoPanel({
   }, [model, mode, modeTouched, aiSource, resolution]);
 
   // A fixed-factor Topaz model stops fitting as soon as the target size
-  // changes. Fall back to the general-purpose model instead of leaving a
-  // selection the server would have to reject.
-  useEffect(() => {
-    if (!model || model.id !== 'topaz-video-upscale') return;
-    const width = sourceMeta?.width ?? asset?.width ?? null;
-    const height = sourceMeta?.height ?? asset?.height ?? null;
-    if (!width || !height) return;
-    const target = resolveTargetFrame(resolution, width, height);
-    if (topazScaleFitsView(topazModelView(mode), { width, height }, target)) return;
-    setMode(TOPAZ_DEFAULT_MODEL_ID);
-    setModeTouched(false);
-  }, [model, mode, resolution, sourceMeta, asset]);
+  // changes. The selection is NOT rewritten behind the customer's back — the
+  // mismatch is named and the start is blocked until they resolve it.
+
 
   const fpsChoices = model ? availableFps(model, mode, resolution) : [];
   useEffect(() => {
