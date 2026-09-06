@@ -10,12 +10,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowUpCircle, Sparkles, Zap, AlertCircle } from 'lucide-react';
+import {
+  ArrowUpCircle,
+  Sparkles,
+  Zap,
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  HelpCircle,
+} from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useTx } from '@/lib/i18nText';
 import { useTranslation } from '@/hooks/useTranslation';
 import { uiLocale } from '@/lib/uiLocale';
 import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
+import { EnhanceRunProgress } from '@/components/ai-video/EnhanceRunProgress';
 import {
   ORDER_REJECTION_CODES,
   enhanceCopy,
@@ -23,12 +32,18 @@ import {
   toEnhanceLang,
 } from '@/lib/videoEnhance/engineErrors';
 import {
-  evaluateUpscale,
+  describeResolutionChoices,
   formatFrame,
-  frameMeetsTarget,
-  projectProviderOutput,
+  resolveExecutionEngine,
   resolveTargetFrame,
 } from '@/lib/videoEnhance/targetFrame';
+import {
+  deliveredFacts,
+  engineDisplayName,
+  targetMatchDetail,
+  targetMatchLabel,
+  targetMatchOf,
+} from '@/lib/videoEnhance/runPresentation';
 import {
   availableFps,
   availableResolutions,
@@ -85,12 +100,17 @@ export function AIVideoUpscaling({
   const [modelId, setModelId] = useState(models[0]?.id ?? '');
   const model = getVideoEnhanceModel(modelId);
   const [mode, setMode] = useState(model?.processingModes[0]?.id ?? 'standard');
+  // true only after the customer picked a footage type themselves; a default
+  // is not a choice — the server then derives the ByteDance scene from the
+  // clip's provenance.
+  const [modeTouched, setModeTouched] = useState(false);
   const [resolution, setResolution] = useState<VideoResolution>('1080p');
   const [fps, setFps] = useState<number | null>(null);
 
   const {
     run,
     estimate,
+    plan,
     sourceMeta,
     isStarting,
     isRunning,
@@ -106,28 +126,37 @@ export function AIVideoUpscaling({
   // as the engine run here so the user sees the verdict BEFORE paying.
   const sourceWidth = sourceMeta?.width ?? 0;
   const sourceHeight = sourceMeta?.height ?? 0;
-  const targetFrame = model && sourceWidth && sourceHeight
+  const sourceKnown = sourceWidth > 0 && sourceHeight > 0;
+  const targetFrame = model && sourceKnown
     ? resolveTargetFrame(resolution, sourceWidth, sourceHeight)
     : null;
-  const upscale = targetFrame
-    ? evaluateUpscale(targetFrame, { width: sourceWidth, height: sourceHeight })
-    : null;
-  const executionModelId = model && targetFrame
-    ? (frameMeetsTarget(
-        projectProviderOutput(model.id, resolution, sourceWidth, sourceHeight),
-        targetFrame,
-      )
-        ? model.id
-        : models.find((m) =>
-            frameMeetsTarget(
-              projectProviderOutput(m.id, resolution, sourceWidth, sourceHeight),
-              targetFrame,
-            ),
-          )?.id ?? null)
-    : model?.id ?? null;
-  const routedModel = model && executionModelId && executionModelId !== model.id
-    ? models.find((m) => m.id === executionModelId) ?? null
-    : null;
+  // Every offered tier against THIS source — exact frame + upscale verdict —
+  // so the picker can disable no-op / downscale tiers itself.
+  const tierChoices = useMemo(
+    () =>
+      model && sourceKnown
+        ? describeResolutionChoices(availableResolutions(model, mode), sourceWidth, sourceHeight)
+        : null,
+    [model, mode, sourceKnown, sourceWidth, sourceHeight],
+  );
+  const upscale = tierChoices?.find((c) => c.resolution === resolution)?.verdict ?? null;
+
+  // The server's delivery plan (from the estimate) is the authority for the
+  // executing engine; the client mirror only bridges until it arrives.
+  const planIsCurrent =
+    !!plan &&
+    !!model &&
+    plan.requestedModelId === model.id &&
+    !!targetFrame &&
+    plan.target.width === targetFrame.width &&
+    plan.target.height === targetFrame.height;
+  const mirror = model && sourceKnown
+    ? resolveExecutionEngine(model.id, models.map((m) => m.id), resolution, sourceWidth, sourceHeight)
+    : { executionModelId: model?.id ?? null, routed: false };
+  const executionModelId = planIsCurrent
+    ? (plan!.strategy === 'unreachable' ? null : plan!.executionModelId)
+    : mirror.executionModelId;
+  const routed = !!model && !!executionModelId && executionModelId !== model.id;
   const frameUnreachable = targetFrame != null && executionModelId === null;
   const blockedReason = upscale && !upscale.ok
     ? enhanceCopy(upscale.reason === 'downscale' ? 'downscale' : 'notAnUpscale', lang)
@@ -138,6 +167,14 @@ export function AIVideoUpscaling({
   // start button — the server would refuse anyway, but the user should not
   // have to click to learn that.
   const orderRejected = !!errorCode && ORDER_REJECTION_CODES.has(errorCode);
+
+  // The footage type that really reaches the engine.
+  const executionMode = planIsCurrent ? plan!.executionMode : mode;
+  const executionModeLabel =
+    getVideoEnhanceModel(executionModelId ?? modelId)?.processingModes.find((m) => m.id === executionMode)
+      ?.label[lang] ?? executionMode;
+  const showFootageRow =
+    !!executionModelId && (getVideoEnhanceModel(executionModelId)?.processingModes.length ?? 0) > 1;
 
   // Presets simply preselect the central configuration.
   useEffect(() => {
@@ -164,14 +201,21 @@ export function AIVideoUpscaling({
   }, [fps, fpsChoices]);
 
   const config: EnhanceConfig | null = model
-    ? { modelId: model.id, mode, resolution, fps, tier: availableTiers(model)[0] ?? 'standard' }
+    ? {
+        modelId: model.id,
+        mode,
+        modeExplicit: modeTouched,
+        resolution,
+        fps,
+        tier: availableTiers(model)[0] ?? 'standard',
+      }
     : null;
 
   useEffect(() => {
     if (!config || !videoUrl || !settings.enabled || preset === 'original') return;
     void previewPrice({ url: videoUrl }, config);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoUrl, modelId, mode, resolution, fps, settings.enabled, preset]);
+  }, [videoUrl, modelId, mode, modeTouched, resolution, fps, settings.enabled, preset]);
 
   useEffect(() => {
     if (run?.status === 'completed' && run.output_url) {
@@ -283,16 +327,41 @@ export function AIVideoUpscaling({
                     <Select value={resolution} onValueChange={(v) => setResolution(v as VideoResolution)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {availableResolutions(model, mode).map((r) => (
-                          <SelectItem key={r} value={r}>{r.toUpperCase()}</SelectItem>
-                        ))}
+                        {availableResolutions(model, mode).map((r) => {
+                          const choice = tierChoices?.find((c) => c.resolution === r) ?? null;
+                          const blocked = !!choice && !choice.verdict.ok;
+                          const note = !choice || choice.verdict.ok
+                            ? ''
+                            : choice.verdict.reason === 'downscale'
+                              ? ` · ${tx({ de: 'kleiner als Quelle', en: 'smaller than source', es: 'menor que el origen' })}`
+                              : ` · ${tx({ de: 'kein Gewinn', en: 'no gain', es: 'sin ganancia' })}`;
+                          return (
+                            <SelectItem
+                              key={r}
+                              value={r}
+                              disabled={blocked}
+                              data-testid={`dc-enhance-tier-${r}`}
+                              data-blocked={blocked ? 'true' : 'false'}
+                            >
+                              {r.toUpperCase()}
+                              {choice ? ` · ${formatFrame(choice.frame)}` : ''}
+                              {note}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
                   {model.processingModes.length > 1 && (
                     <div className="space-y-2">
                       <Label>{tx({ de: 'Materialart', en: 'Footage type', es: 'Tipo de material' })}</Label>
-                      <Select value={mode} onValueChange={setMode}>
+                      <Select
+                        value={mode}
+                        onValueChange={(v) => {
+                          setModeTouched(true);
+                          setMode(v);
+                        }}
+                      >
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {model.processingModes.map((m) => (
@@ -322,7 +391,10 @@ export function AIVideoUpscaling({
                 </div>
               )}
 
-              <div className="rounded-lg border border-border/60 bg-background/40 p-3 text-sm space-y-1">
+              <div
+                className="rounded-lg border border-border/60 bg-background/40 p-3 text-sm space-y-2"
+                data-testid="dc-enhance-delivery-plan"
+              >
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">
                     {resolution.toUpperCase()} ·{' '}
@@ -332,33 +404,62 @@ export function AIVideoUpscaling({
                   </span>
                   <span className="font-bold">{videoUrl ? priceLabel : '—'}</span>
                 </div>
-                {/* Before the run: what the file is and what will really be delivered. */}
-                {targetFrame && (
-                  <p className="text-xs text-muted-foreground">
-                    {formatFrame({ width: sourceWidth, height: sourceHeight })} →{' '}
-                    <span className="text-foreground font-medium">{formatFrame(targetFrame)}</span>{' '}
-                    {tx({ de: 'Pixel', en: 'pixels', es: 'píxeles' })}
-                    {sourceMeta?.durationSeconds
-                      ? ` · ${sourceMeta.durationSeconds.toFixed(1)} s`
-                      : ''}
-                  </p>
-                )}
-                {routedModel && !blockedReason && (
-                  <p className="text-xs text-primary/90">
+                {/* Before the run: source, target, requested and executing engine. */}
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+                  <dt className="text-muted-foreground">{tx({ de: 'Quelle', en: 'Source', es: 'Origen' })}</dt>
+                  <dd className="tabular-nums">
+                    {sourceKnown
+                      ? `${formatFrame({ width: sourceWidth, height: sourceHeight })} ${tx({ de: 'Pixel', en: 'pixels', es: 'píxeles' })}${
+                          sourceMeta?.durationSeconds ? ` · ${sourceMeta.durationSeconds.toFixed(1)} s` : ''
+                        }`
+                      : tx({ de: 'Quelle wird vermessen …', en: 'Measuring the source…', es: 'Midiendo el origen…' })}
+                  </dd>
+                  <dt className="text-muted-foreground">{tx({ de: 'Ziel', en: 'Target', es: 'Objetivo' })}</dt>
+                  <dd className="tabular-nums text-foreground font-medium">
+                    {targetFrame ? `${formatFrame(targetFrame)} ${tx({ de: 'Pixel', en: 'pixels', es: 'píxeles' })}` : '—'}
+                  </dd>
+                  <dt className="text-muted-foreground">
+                    {tx({ de: 'Gewählte Engine', en: 'Requested engine', es: 'Motor solicitado' })}
+                  </dt>
+                  <dd>{model.name}</dd>
+                  <dt className="text-muted-foreground">
+                    {tx({ de: 'Ausführende Engine', en: 'Executing engine', es: 'Motor que ejecuta' })}
+                  </dt>
+                  <dd className={routed ? 'text-primary/90 font-medium' : ''}>
+                    {executionModelId ? engineDisplayName(executionModelId) : '—'}
+                  </dd>
+                  {showFootageRow && (
+                    <>
+                      <dt className="text-muted-foreground">
+                        {tx({ de: 'Materialart', en: 'Footage type', es: 'Tipo de material' })}
+                      </dt>
+                      <dd>
+                        {executionModeLabel}
+                        <span className="text-muted-foreground">
+                          {' '}·{' '}
+                          {modeTouched && !routed
+                            ? tx({ de: 'Von dir gewählt', en: 'Chosen by you', es: 'Elegido por ti' })
+                            : tx({
+                                de: 'Automatisch aus der Herkunft des Clips',
+                                en: 'Set automatically from the clip origin',
+                                es: 'Definido automáticamente según el origen del clip',
+                              })}
+                        </span>
+                      </dd>
+                    </>
+                  )}
+                </dl>
+                {routed && !blockedReason && (
+                  <p className="text-xs text-primary/90" data-testid="dc-enhance-routed-note">
                     {tx({
-                      de: 'Läuft auf der Engine, die dieses Format wirklich liefern kann:',
-                      en: 'Runs on the engine that can really deliver this frame:',
-                      es: 'Se ejecuta en el motor que sí puede entregar este formato:',
-                    })}{' '}
-                    {routedModel.name}
+                      de: 'Weicht von der gewählten Engine ab: Nur diese Engine kann das Zielformat für deinen Clip liefern.',
+                      en: 'Different from the requested engine: only this engine can deliver the target frame for your clip.',
+                      es: 'Distinto del motor solicitado: solo este motor puede entregar el formato objetivo para tu clip.',
+                    })}
                   </p>
                 )}
-                {/* During the run: the live status of the job. */}
-                {run && run.status !== 'completed' && (
-                  <p className="text-xs text-muted-foreground" aria-live="polite">
-                    {tx({ de: 'Status', en: 'Status', es: 'Estado' })}: {run.status.replace(/_/g, ' ')}
-                  </p>
-                )}
+                {/* During the run: the engine that really executes, phase and elapsed time. */}
+                {isRunning && run && <EnhanceRunProgress run={run} lang={lang} />}
               </div>
 
               {blockedReason && (
@@ -393,29 +494,41 @@ export function AIVideoUpscaling({
                 )}
               </Button>
 
-              {run?.status === 'completed' && run.output_url && (
-                <div className="space-y-2">
-                  <video src={run.output_url} controls className="w-full rounded-lg" />
-                  {/* After the run: the measured facts of the delivered file. */}
-                  {run.actual_width && run.actual_height && (
-                    <p className="text-xs text-muted-foreground">
-                      {tx({ de: 'Geliefert', en: 'Delivered', es: 'Entregado' })}:{' '}
-                      <span className="text-foreground font-medium">
-                        {run.actual_width}×{run.actual_height}
-                      </span>{' '}
-                      {tx({ de: 'Pixel', en: 'pixels', es: 'píxeles' })}
-                      {run.output_size_bytes
-                        ? ` · ${(run.output_size_bytes / (1024 * 1024)).toFixed(1)} MB`
-                        : ''}
-                      {run.output_fps ? ` · ${Math.round(run.output_fps)} FPS` : ''}
-                      {run.output_duration_seconds
-                        ? ` · ${run.output_duration_seconds.toFixed(1)} s`
-                        : ''}
-                      {run.output_codec ? ` · ${run.output_codec.toUpperCase()}` : ''}
+              {run?.status === 'completed' && run.output_url && (() => {
+                const match = targetMatchOf(run);
+                const MatchIcon =
+                  match === 'matched' ? CheckCircle2 : match === 'mismatch' ? AlertTriangle : HelpCircle;
+                const tone =
+                  match === 'matched'
+                    ? 'text-primary'
+                    : match === 'mismatch'
+                      ? 'text-destructive'
+                      : 'text-muted-foreground';
+                const facts = deliveredFacts(run, lang);
+                return (
+                  <div className="space-y-2">
+                    <video src={run.output_url} controls className="w-full rounded-lg" />
+                    {/* After the run: did the file meet the promised frame? Measured, not assumed. */}
+                    <p
+                      className={`text-sm flex items-center gap-2 ${tone}`}
+                      data-testid="dc-enhance-target-match"
+                      data-match={match}
+                    >
+                      <MatchIcon className="h-4 w-4" aria-hidden="true" />
+                      <span className="font-medium">{targetMatchLabel(match, lang)}</span>
+                      {targetMatchDetail(run) && (
+                        <span className="text-muted-foreground tabular-nums">· {targetMatchDetail(run)}</span>
+                      )}
                     </p>
-                  )}
-                </div>
-              )}
+                    {/* The measured facts of the delivered file; codec and container stay separate. */}
+                    {facts.length > 0 && (
+                      <p className="text-xs text-muted-foreground" data-testid="dc-enhance-delivered-facts">
+                        {tx({ de: 'Geliefert', en: 'Delivered', es: 'Entregado' })}: {facts.join(' · ')}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>

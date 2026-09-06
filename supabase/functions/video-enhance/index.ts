@@ -6,6 +6,7 @@ import {
   isModelUnlocked,
   isTestAllowlisted,
   priceVideoEnhanceRun,
+  resolveExecutionMode,
   UnpriceableRunError,
   validateCombination,
   VIDEO_ENHANCE_SPECS,
@@ -15,6 +16,7 @@ import {
   type VideoResolution,
 } from "../_shared/video-enhance-models.ts";
 import { evaluateUpscale, planDelivery } from "../_shared/video-enhance-frame.ts";
+import { toClientPricing, toClientRun } from "../_shared/video-enhance-client-view.ts";
 
 import {
   newCallbackToken,
@@ -64,6 +66,12 @@ interface RequestBody {
   sourceUrl?: string;
   modelId?: string;
   mode?: string;
+  /**
+   * true only when the customer actively picked the footage type. A client
+   * default is NOT a choice: without this flag the ByteDance scene is derived
+   * from the clip's provenance on the server.
+   */
+  modeExplicit?: boolean;
   resolution?: VideoResolution;
   fps?: number | null;
   tier?: QualityTier;
@@ -141,6 +149,40 @@ async function resolveSource(
     if (!url) return { error: "Source video not found", code: "SOURCE_NOT_FOUND" };
   } else if (body.sourceUrl) {
     url = body.sourceUrl;
+    // URL-only callers (Director's Cut, legacy surfaces) still get real
+    // provenance when the URL is one of the caller's own assets: the scene
+    // preset and the parent/child lineage then match a typed request.
+    const { data: generated } = await admin
+      .from("ai_video_generations")
+      .select("id, model")
+      .eq("user_id", userId)
+      .eq("video_url", url)
+      .limit(1)
+      .maybeSingle();
+    if (generated?.id) {
+      assetId = generated.id;
+      sourceModel = generated.model ?? undefined;
+      origin = "generated";
+    } else {
+      const { data: rendered } = await admin
+        .from("video_creations")
+        .select("id, metadata")
+        .eq("user_id", userId)
+        .eq("output_url", url)
+        .limit(1)
+        .maybeSingle();
+      if (rendered?.id) {
+        assetId = rendered.id;
+        const meta = (rendered.metadata ?? {}) as Record<string, unknown>;
+        creationMetadata = meta;
+        const model = meta.model ?? meta.source_model;
+        if (typeof model === "string" && model) sourceModel = model;
+        const kind = meta.source ?? meta.origin;
+        origin = typeof model === "string" && model
+          ? "generated"
+          : (kind === "upload" || kind === "uploaded" ? "uploaded" : "unknown");
+      }
+    }
   } else {
     return { error: "sourceAssetId or sourceUrl is required", code: "NO_SOURCE" };
   }
@@ -216,7 +258,8 @@ serve(async (req) => {
         .eq("user_id", user.id)
         .maybeSingle();
       if (!run) return json({ error: "Run not found" }, 404);
-      return json({ run });
+      // Customer projection only: measured output facts in, internals out.
+      return json({ run: toClientRun(run) });
     }
 
     // ---- cancel (a wish, never a refund) ------------------------------------
@@ -304,7 +347,16 @@ serve(async (req) => {
     }
 
     const spec = VIDEO_ENHANCE_SPECS[delivery.executionModelId] ?? requestedSpec;
-    const config = adaptConfigToSpec(requestedConfig, spec, source.meta);
+    const adapted = adaptConfigToSpec(requestedConfig, spec, source.meta);
+
+    // ---- execution mode ------------------------------------------------------
+    // The ByteDance `scene` preset follows the clip's provenance (generated ->
+    // aigc, uploaded -> ugc, unknown -> common) unless the customer explicitly
+    // picked a footage type for THIS engine. A choice made for another engine
+    // does not survive routing.
+    const modeExplicit = body.modeExplicit === true && spec.id === requestedConfig.modelId;
+    const executionMode = resolveExecutionMode(adapted, spec, source.meta, modeExplicit);
+    const config: EnhanceConfig = { ...adapted, mode: executionMode.mode };
 
     const combination = validateCombination(config, source.meta.durationSeconds, env);
     if (!combination.ok) {
@@ -335,7 +387,17 @@ serve(async (req) => {
     }
 
     if (action === "estimate") {
-      return json({ pricing, source: source.meta, delivery, upscale, executionModelId: spec.id, executionMode: config.mode });
+      return json({
+        pricing: toClientPricing(pricing),
+        source: source.meta,
+        delivery,
+        upscale,
+        requestedModelId: requestedConfig.modelId,
+        executionModelId: spec.id,
+        requestedMode: requestedConfig.mode,
+        executionMode: config.mode,
+        modeSource: executionMode.source,
+      });
     }
 
     // ---- start --------------------------------------------------------------
@@ -448,7 +510,7 @@ serve(async (req) => {
         .eq("idempotency_key", body.idempotencyKey)
         .maybeSingle();
       if (!existing) return json({ error: "Run conflict", code: "RUN_CONFLICT" }, 409);
-      return json({ run: existing, deduplicated: true, pricing });
+      return json({ run: toClientRun(existing), deduplicated: true, pricing: toClientPricing(pricing) });
     }
 
     const reservation = await walletOperation(admin, {
@@ -484,7 +546,7 @@ serve(async (req) => {
     if (!leased) {
       const { data: current } = await admin
         .from("video_enhance_runs").select("*").eq("id", run.id).maybeSingle();
-      return json({ run: current, deduplicated: true, pricing });
+      return json({ run: toClientRun(current), deduplicated: true, pricing: toClientPricing(pricing) });
     }
 
     const apiKey = Deno.env.get("REPLICATE_API_KEY");
@@ -549,7 +611,7 @@ serve(async (req) => {
       });
       const { data: current } = await admin
         .from("video_enhance_runs").select("*").eq("id", run.id).maybeSingle();
-      return json({ run: current, pricing, pending: true });
+      return json({ run: toClientRun(current), pricing: toClientPricing(pricing), pending: true });
     }
 
     await setStatus(admin, run.id, "provider_submitted", {
@@ -564,7 +626,7 @@ serve(async (req) => {
     const { data: finalRun } = await admin
       .from("video_enhance_runs").select("*").eq("id", run.id).maybeSingle();
 
-    return json({ run: finalRun, pricing });
+    return json({ run: toClientRun(finalRun), pricing: toClientPricing(pricing) });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`${TAG} unhandled:`, message);

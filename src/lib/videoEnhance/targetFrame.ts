@@ -107,3 +107,71 @@ export function evaluateUpscale(target: Frame, source: Frame): UpscaleVerdict {
   }
   return { ok: true, reason: null, shortSideGain, pixelGain };
 }
+
+// ---------------------------------------------------------------------------
+// Resolution choices — what each tier means for THIS source, before the start
+// ---------------------------------------------------------------------------
+
+export interface ResolutionChoice {
+  resolution: VideoResolution;
+  /** Exact frame this tier promises for the source orientation. */
+  frame: Frame;
+  /** Whether ordering this tier would actually add pixels. */
+  verdict: UpscaleVerdict;
+}
+
+/**
+ * Describes every offered tier against the measured source, so a picker can
+ * print the exact target frame next to each label and disable tiers that
+ * would be a no-op or a downscale — instead of only disabling the start
+ * button after the fact.
+ */
+export function describeResolutionChoices(
+  resolutions: VideoResolution[],
+  sourceWidth: number,
+  sourceHeight: number,
+): ResolutionChoice[] {
+  const source = { width: sourceWidth, height: sourceHeight };
+  return resolutions.map((resolution) => {
+    const frame = resolveTargetFrame(resolution, sourceWidth, sourceHeight);
+    return { resolution, frame, verdict: evaluateUpscale(frame, source) };
+  });
+}
+
+/** Smallest offered tier that is a real upscale for the source, if any. */
+export function firstUpscaleResolution(
+  resolutions: VideoResolution[],
+  sourceWidth: number,
+  sourceHeight: number,
+): VideoResolution | null {
+  const ordered = [...resolutions].sort(
+    (a, b) => RESOLUTION_FRAME[a].short - RESOLUTION_FRAME[b].short,
+  );
+  return describeResolutionChoices(ordered, sourceWidth, sourceHeight)
+    .find((choice) => choice.verdict.ok)?.resolution ?? null;
+}
+
+/**
+ * Which engine really runs for a tier: the requested one when it meets the
+ * promised frame, otherwise the first offered engine that does, else `null`
+ * (no engine can deliver the frame). Mirror of the server's `planDelivery`.
+ */
+export function resolveExecutionEngine(
+  requestedModelId: string,
+  candidateModelIds: string[],
+  resolution: VideoResolution,
+  sourceWidth: number,
+  sourceHeight: number,
+): { executionModelId: string | null; routed: boolean } {
+  const target = resolveTargetFrame(resolution, sourceWidth, sourceHeight);
+  if (frameMeetsTarget(projectProviderOutput(requestedModelId, resolution, sourceWidth, sourceHeight), target)) {
+    return { executionModelId: requestedModelId, routed: false };
+  }
+  for (const candidate of candidateModelIds) {
+    if (candidate === requestedModelId) continue;
+    if (frameMeetsTarget(projectProviderOutput(candidate, resolution, sourceWidth, sourceHeight), target)) {
+      return { executionModelId: candidate, routed: true };
+    }
+  }
+  return { executionModelId: null, routed: false };
+}

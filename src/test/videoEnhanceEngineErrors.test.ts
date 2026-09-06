@@ -81,9 +81,14 @@ describe('video enhance — every surface goes through the same copy', () => {
     for (const file of surfaces) {
       const source = read(file);
       expect(source).toContain('resolveTargetFrame(');
-      expect(source).toContain('evaluateUpscale(');
-      expect(source).toContain('actual_width');
-      expect(source).toContain('actual_height');
+      // every tier is judged against the source before the start (the picker
+      // disables no-op / downscale tiers), not only the final start button
+      expect(source).toContain('describeResolutionChoices(');
+      // after the run: delivered pixels + target verdict come from the run's
+      // measured columns through the shared presenter (actual_width/height)
+      expect(source).toContain('deliveredFacts(');
+      expect(source).toContain('targetMatchDetail(');
+      expect(source).toContain('enhance-target-match');
     }
   });
 

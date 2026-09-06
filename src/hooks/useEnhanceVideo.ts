@@ -10,29 +10,53 @@ import type { EnhanceConfig } from '@/config/videoEnhanceModels';
  * service and no second pricing path.
  */
 
+/**
+ * The customer projection of a run, exactly as `video-enhance` returns it
+ * (`_shared/video-enhance-client-view.ts#CLIENT_RUN_FIELDS`). Internals such
+ * as the callback token or margin columns never arrive here.
+ */
 export interface EnhanceRunRow {
   id: string;
   status: string;
+  /** Engine that is REALLY executing this run. */
   model_id: string;
+  /** Engine the customer asked for; equals `model_id` unless routed. */
+  requested_model_id?: string | null;
+  delivery_strategy?: 'native' | 'engine_routed' | 'unreachable' | string | null;
   mode: string;
   resolution: string;
   fps: number;
   tier: string;
   user_price_eur: number;
+  currency?: string | null;
   output_url: string | null;
   output_asset_id: string | null;
   source_url: string;
+  source_width?: number | null;
+  source_height?: number | null;
+  source_duration_seconds?: number | null;
   error_code: string | null;
   error_message: string | null;
+  created_at?: string;
+  updated_at?: string;
+  provider_status?: string | null;
+  provider_submitted_at?: string | null;
+  provider_completed_at?: string | null;
+  /** Promised frame for this run's source orientation. */
+  target_width?: number | null;
+  target_height?: number | null;
   /** Measured on the finished file — authoritative over any projection. */
+  projection_matched?: boolean | null;
   actual_width?: number | null;
   actual_height?: number | null;
   output_codec?: string | null;
+  output_container?: string | null;
+  output_mime_type?: string | null;
   output_bitrate_kbps?: number | null;
   output_size_bytes?: number | null;
-  output_container?: string | null;
   output_fps?: number | null;
   output_duration_seconds?: number | null;
+  overcharge_refund_amount_eur?: number | null;
 }
 
 export interface EnhanceEstimate {
@@ -41,6 +65,22 @@ export interface EnhanceEstimate {
   outputSeconds: number;
   costUnverified: boolean;
   rateCardVersion: string;
+}
+
+/**
+ * The server's delivery decision for the current order — the authority the
+ * panels show BEFORE the start (requested vs. executing engine, promised
+ * frame, the ByteDance scene that will really be sent).
+ */
+export interface EnhancePlan {
+  requestedModelId: string;
+  executionModelId: string;
+  strategy: 'native' | 'engine_routed' | 'unreachable';
+  target: { width: number; height: number };
+  projected: { width: number; height: number };
+  requestedMode: string;
+  executionMode: string;
+  modeSource: 'explicit' | 'provenance' | 'engine_default';
 }
 
 export interface EnhanceSource {
@@ -158,6 +198,7 @@ export interface ServerSourceMeta {
 export function useEnhanceVideo() {
   const [run, setRun] = useState<EnhanceRunRow | null>(null);
   const [estimate, setEstimate] = useState<EnhanceEstimate | null>(null);
+  const [plan, setPlan] = useState<EnhancePlan | null>(null);
   const [sourceMeta, setSourceMeta] = useState<ServerSourceMeta | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -207,6 +248,7 @@ export function useEnhanceVideo() {
   const previewPrice = useCallback(
     async (source: EnhanceSource, config: EnhanceConfig) => {
       clearFailure();
+      setPlan(null);
       try {
         const data = await callEngine({
           action: 'estimate',
@@ -218,6 +260,19 @@ export function useEnhanceVideo() {
         if (data?.source) setSourceMeta(data.source as ServerSourceMeta);
         const pricing = data?.pricing;
         if (!pricing) return null;
+        const delivery = data?.delivery;
+        if (delivery?.target && delivery?.projected && data?.executionModelId) {
+          setPlan({
+            requestedModelId: data.requestedModelId ?? config.modelId,
+            executionModelId: data.executionModelId,
+            strategy: delivery.strategy,
+            target: delivery.target,
+            projected: delivery.projected,
+            requestedMode: data.requestedMode ?? config.mode,
+            executionMode: data.executionMode ?? config.mode,
+            modeSource: data.modeSource ?? 'engine_default',
+          });
+        }
         const next: EnhanceEstimate = {
           userPriceEur: pricing.userPriceEur,
           fps: pricing.fps,
@@ -301,6 +356,7 @@ export function useEnhanceVideo() {
     stopPolling();
     setRun(null);
     setEstimate(null);
+    setPlan(null);
     setSourceMeta(null);
     clearFailure();
   }, [stopPolling, clearFailure]);
@@ -308,6 +364,7 @@ export function useEnhanceVideo() {
   return {
     run,
     estimate,
+    plan,
     sourceMeta,
     isStarting,
     isRunning: !!run && !TERMINAL.includes(run.status),

@@ -28,7 +28,7 @@ export interface ProbedVideoMetadata {
 }
 
 
-interface Box {
+export interface Box {
   type: string;
   start: number;
   headerSize: number;
@@ -147,12 +147,24 @@ export function codecNameFromSampleEntry(fourcc: string): string | undefined {
   return CODEC_NAMES[fourcc] ?? (fourcc.trim() ? fourcc.trim().toLowerCase() : undefined);
 }
 
-/** First sample entry type of a `stsd` box — the real codec of the track. */
-function parseStsdCodec(view: DataView, stsd: Box): string | undefined {
-  // stsd: 4 bytes version/flags, 4 bytes entry count, then sample entries.
-  const first = stsd.start + stsd.headerSize + 8;
+/**
+ * First sample entry type of a `stsd` box — the real codec of the track.
+ *
+ * stsd is a FullBox: version(1) + flags(3), then entry_count(4), then the
+ * sample entries, each a regular box whose type is the codec fourcc
+ * (`avc1`, `hvc1`, …). Never reads past the stsd box: an empty or truncated
+ * table yields `undefined` instead of the type of whatever box follows.
+ */
+export function parseStsdCodec(view: DataView, stsd: Box): string | undefined {
+  const body = stsd.start + stsd.headerSize;
+  const end = stsd.start + stsd.size;
+  if (body + 8 > end) return undefined;
+  const entryCount = view.getUint32(body + 4);
+  if (entryCount === 0) return undefined;
+  const first = body + 8;
+  if (first + 8 > end) return undefined;
   const entry = readBox(view, first);
-  if (!entry) return undefined;
+  if (!entry || entry.start + entry.size > end) return undefined;
   return codecNameFromSampleEntry(entry.type);
 }
 

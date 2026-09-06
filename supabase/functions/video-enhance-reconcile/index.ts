@@ -13,22 +13,37 @@ import {
   setStatus,
   STAGING_BUCKET,
 } from "../_shared/video-enhance-runtime.ts";
+import { decideCycle, isInternalCaller } from "../_shared/video-enhance-reconcile-guard.ts";
 
 /**
  * Reconciler for Video Enhance.
  *
- * Runs on a schedule and does three things:
+ * Runs on a schedule (pg_cron `video-enhance-reconcile-5min`, see the
+ * migration `video_enhance_reconcile_schedule`) and does three things:
  *   1. re-reads open runs from the provider and finalises them idempotently,
  *   2. retries persistence for runs whose provider result already exists,
  *   3. sends runs past the horizon to `manual_review` — WITHOUT refunding.
  *
  * It also removes orphaned staging files so large videos do not pile up.
+ *
+ * Abuse model. The scheduler authenticates with the project's PUBLISHABLE key
+ * (no privileged secret lives in the cron command or in the repo), so the
+ * endpoint is treated as reachable by anyone who has the app bundle:
+ *   - the request body is never read — no caller can pick rows;
+ *   - the response carries counters only — never run or user data;
+ *   - EVERY unit of work is gated by a per-run timestamp the reconciler
+ *     advances itself (`next_reconcile_at`, `next_late_check_at`, `updated_at`
+ *     for orphans), so a second call right after the first finds nothing due
+ *     and costs a handful of indexed queries — no provider traffic;
+ *   - an in-isolate throttle and in-flight guard collapse bursts on top.
+ * Callers with the service role key or the optional `CRON_SECRET` header are
+ * accepted as internal; a user JWT is rejected — no surface calls this.
  */
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, content-type",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-cron-secret",
 };
 
 const TAG = "[video-enhance-reconcile]";
@@ -61,8 +76,24 @@ const OPEN_STATUSES = [
   "local_poll_timeout",
 ];
 
+// Per-isolate burst protection. Not a distributed lock — the per-run
+// timestamps below are what make concurrent cycles harmless; this only keeps
+// a hammering caller from burning CPU on empty cycles.
+const cycle = { inFlight: false, lastStartedAt: 0 };
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
+
+  if (!isInternalCaller(req.headers, (key) => Deno.env.get(key))) {
+    return json({ error: "Unauthorized" }, 401);
+  }
+
+  // The body is intentionally never read: no caller can steer the cycle.
+  const decision = decideCycle(cycle, Date.now());
+  if (!decision.run) return json(decision, 202);
+  cycle.inFlight = true;
+  cycle.lastStartedAt = Date.now();
 
   try {
     const admin = createClient(
@@ -203,16 +234,19 @@ serve(async (req) => {
     }
 
     // Late provider cost for ALREADY completed runs (e.g. ByteDance, where the
-    // authoritative number can appear after completion). Same 3x check, exactly
-    // one idempotent credit. Missing cost stays telemetry, never a blocker.
-    // Late provider cost for ALREADY completed runs (e.g. ByteDance, where the
     // authoritative number can appear after completion). This scanner is only
     // the FALLBACK — an authoritative cost arriving through the webhook or any
     // other active path is trued up immediately. A run stays eligible forever:
     // until its cost is verified or it is administratively closed. Same 3x
     // check, exactly one idempotent credit. Missing cost stays telemetry.
+    //
+    // Both windows honour `next_late_check_at`: `finalizeSuccess` sets the
+    // first check one hour after completion and `applyLateCostTrueUp` grows
+    // the interval from there, so a run is never polled at the provider more
+    // often than its own backoff allows — whoever triggers the cycle.
     const nowMs = Date.now();
     const freshWindow = new Date(nowMs - 30 * 24 * 3_600_000).toISOString();
+    const dueFilter = `next_late_check_at.is.null,next_late_check_at.lte.${new Date(nowMs).toISOString()}`;
 
     const baseLate = () =>
       admin
@@ -221,17 +255,18 @@ serve(async (req) => {
         .eq("status", "completed")
         .is("provider_cost_usd_actual", null)
         .is("cost_closed_at", null)
-        .not("provider_prediction_id", "is", null);
+        .not("provider_prediction_id", "is", null)
+        .or(dueFilter);
 
     // 1. preferred window: recently completed runs.
     const { data: freshRuns } = await baseLate()
       .gte("created_at", freshWindow)
+      .order("next_late_check_at", { ascending: true, nullsFirst: true })
       .limit(BATCH_SIZE);
 
     // 2. stragglers: older runs, in small portions, on a growing backoff.
     const { data: staleRuns } = await baseLate()
       .lt("created_at", freshWindow)
-      .or(`next_late_check_at.is.null,next_late_check_at.lte.${new Date(nowMs).toISOString()}`)
       .order("next_late_check_at", { ascending: true, nullsFirst: true })
       .limit(BATCH_SIZE);
 
@@ -242,14 +277,21 @@ serve(async (req) => {
       const res = await fetch(`https://api.replicate.com/v1/predictions/${run.provider_prediction_id}`, {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
-      if (!res.ok) continue;
+      if (!res.ok) {
+        // Provider unreachable: still advance the run's own backoff so a
+        // flapping provider cannot turn every cycle into a full re-poll.
+        await applyLateCostTrueUp(admin, run, { source: "unavailable" });
+        continue;
+      }
       const prediction = await res.json();
       const cost = extractProviderCost(prediction, run.model_id);
       const applied = await applyLateCostTrueUp(admin, run, cost);
       if (applied.applied) lateCostVerified++;
     }
 
-    // Orphaned staging files of abandoned or stuck runs.
+    // Orphaned staging files of abandoned or stuck runs. Clearing
+    // `staging_key` is what takes a row out of this query, so the sweep is
+    // idempotent and each orphan costs exactly one storage call ever.
     const cleanupBefore = new Date(Date.now() - 24 * 3_600_000).toISOString();
     const { data: orphans } = await admin
       .from("video_enhance_runs")
@@ -272,6 +314,8 @@ serve(async (req) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`${TAG} unhandled:`, message);
     return json({ error: message }, 500);
+  } finally {
+    cycle.inFlight = false;
   }
 });
 
