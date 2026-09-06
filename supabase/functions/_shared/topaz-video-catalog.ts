@@ -363,8 +363,14 @@ export function topazManualFilterParams(
 // Scale contract
 // ---------------------------------------------------------------------------
 
-/** Deviation tolerated before a fixed-factor model is considered mis-used. */
-export const TOPAZ_SCALE_TOLERANCE = 0.2;
+/**
+ * The Topaz docs state the fixed factors as absolutes and document NO
+ * tolerance window. The only slack we allow is the provider's own pixel
+ * alignment rule (output width/height rounded to a multiple of 4), which can
+ * move the factor by well under one percent on small frames.
+ */
+export const TOPAZ_SCALE_TOLERANCE = 0.02;
+
 
 export interface TopazScaleVerdict {
   ok: boolean;
