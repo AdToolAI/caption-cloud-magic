@@ -4705,6 +4705,13 @@ export const translations: Record<Language, any> = {
       eightKMax: "Maximum quality",
       fourKTimeWarning: "4K takes noticeably longer than HD — roughly 2–5 minutes for a 10-second clip.",
       eightKTimeWarning: "8K is the highest quality and by far the slowest: expect roughly 8–11 minutes for a 10-second clip, with a very large file. Only available for clips up to 30 seconds; longer clips are exported in 4K.",
+      resolutionIsCanvasNote: "Resolution sets the output size only — it does not invent detail. A 1080p phone clip exported at 4K stays 1080p sharp. For real added detail, use AI upscaling in the FX tab.",
+      aiUpscaleSourceTitle: "AI upscaling",
+      aiUpscaleSourceDesc: "Upscale your source clip with AI first, then edit on the sharper material.",
+      aiUpscaleSourceCta: "Upscale source with AI",
+      aiUpscaleResultCta: "Upscale result with AI",
+      aiUpscaleApplied: "Upscaled clip is now the source",
+
       widescreenLabel: "Widescreen",
       portraitLabel: "Portrait",
       squareLabel: "Square",
