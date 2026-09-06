@@ -47,24 +47,30 @@ export interface TopazVideoModel {
   specialty: TopazSpecialty;
   creditFamily: TopazCreditFamily;
   /**
-   * Whether the model documents the manual parameter set (`auto: 'Manual'`).
-   * Models without it accept the model code only — offering sliders there
-   * would be a fake control.
+   * true ONLY for models whose own documentation page lists the full manual
+   * parameter block (`auto: 'Manual'` + compression/details/noise/blur/halo):
+   * Proteus, Rhea, Nyx and Theia. Every other model is model-code only here —
+   * their parameter surface is not documented for the express route, and a
+   * slider we cannot map to a documented field would be a fake control.
    */
   manualParameters: boolean;
   /**
-   * Upscale factor the model is trained for. When set, a target frame that
-   * asks for a different factor is REJECTED instead of silently mis-run.
+   * Upscale factor the model is trained for. The Topaz docs state these as
+   * absolutes ("pnat-1 is a 2x upscale only model", Rhea "operates natively at
+   * a 4x scale") with no tolerance window — so a target frame that asks for a
+   * different factor is REJECTED instead of silently mis-run.
    */
   fixedUpscale?: number;
   /** Same family, different training. Available to the adapter, not the UI. */
   variants?: { slug: string; label: string }[];
   /**
    * false while no billed AdTool run has confirmed the credit consumption for
-   * this model. Such a model is offered with a visible "beta" marker; the hard
-   * multiplier cap and the post-run true-up protect the customer.
+   * this model. Such a model is visible with a "beta" marker but CANNOT be
+   * started by a normal customer (see `isTopazModelStartable`); the hard
+   * multiplier cap and the post-run true-up protect the test runs.
    */
   costVerified: boolean;
+
 }
 
 export const TOPAZ_VIDEO_MODELS: TopazVideoModel[] = [
