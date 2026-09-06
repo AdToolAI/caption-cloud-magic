@@ -500,20 +500,23 @@ export function EnhanceVideoPanel({
                       // target size is shown, but disabled with the reason —
                       // never silently run at a factor it was not trained for.
                       const fits = !isTopaz || modeFits(m.id);
+                      const startable = modeStartable(m.id);
                       const view = isTopaz ? topazModelView(m.id) : null;
                       return (
                         <SelectItem
                           key={m.id}
                           value={m.id}
-                          disabled={!fits}
+                          disabled={!fits || !startable}
                           data-testid={`enhance-mode-${m.id}`}
                         >
                           {m.label[lang]}
+                          {!startable ? ` · ${tx('betaTag', lang)}` : ''}
                           {!fits && view?.fixedUpscale
                             ? ` · ${tx('onlyFactor', lang)} ${view.fixedUpscale}×`
                             : ''}
                         </SelectItem>
                       );
+
                     })}
                   </SelectContent>
                 </Select>
