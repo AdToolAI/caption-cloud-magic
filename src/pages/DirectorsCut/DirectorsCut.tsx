@@ -1130,7 +1130,7 @@ export function DirectorsCut() {
           // The AI-upscaled clip becomes the new source; scenes/cuts are
           // time-based and therefore stay valid.
           setSelectedVideo(prev => (prev ? { ...prev, url } : prev));
-          toast({ title: t('dc.aiUpscaleApplied') });
+          toast.success(t('dc.aiUpscaleApplied'));
         }}
 
         interpolation={interpolation}
