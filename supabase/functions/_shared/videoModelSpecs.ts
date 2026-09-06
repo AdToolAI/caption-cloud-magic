@@ -2188,8 +2188,14 @@ export interface TierParityState {
 }
 
 /**
- * Pure regression state machine. A matched run resets the counter; the third
- * consecutive mismatch downgrades FULL_PARITY to VERIFY and reports yellow.
+ * Pure regression state machine.
+ *
+ *  - A matched run resets the mismatch counter (status untouched).
+ *  - The third consecutive mismatch on a tier that was FULL_PARITY (its target
+ *    frame is provider-verified, so a mismatch is a real provider regression)
+ *    downgrades it to VERIFY AND disables it.
+ *  - A grandfathered UNVERIFIED or already-VERIFY tier is NEVER auto-disabled:
+ *    its target frame is an assumption, so a mismatch is not proof of anything.
  */
 export function applyOutputMeasurement(
   state: TierParityState,
@@ -2204,12 +2210,13 @@ export function applyOutputMeasurement(
     };
   }
   const consecutiveMismatches = state.consecutiveMismatches + 1;
-  const hit = consecutiveMismatches >= PARITY_REGRESSION_THRESHOLD;
+  const wasFullParity = state.parityStatus === 'FULL_PARITY';
+  const downgraded = wasFullParity && consecutiveMismatches >= PARITY_REGRESSION_THRESHOLD;
   return {
-    parityStatus: hit ? 'VERIFY' : state.parityStatus,
+    parityStatus: downgraded ? 'VERIFY' : state.parityStatus,
     consecutiveMismatches,
-    tierDisabled: state.tierDisabled,
-    downgraded: hit && state.parityStatus === 'FULL_PARITY',
+    tierDisabled: downgraded ? true : state.tierDisabled,
+    downgraded,
   };
 }
 
