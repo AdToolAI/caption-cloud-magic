@@ -141,6 +141,7 @@ serve(async (req) => {
           endImageUrl,
           referenceImageUrls: Array.isArray(referenceImageUrls) ? referenceImageUrls : null,
         }),
+        resolution: MODEL_RESOLUTION[model] || '720p',
         durationSeconds: duration,
         aspectRatio,
       },

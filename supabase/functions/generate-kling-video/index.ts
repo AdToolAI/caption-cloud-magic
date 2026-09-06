@@ -126,6 +126,7 @@ serve(async (req) => {
           referenceImageUrls: Array.isArray(referenceImageUrls) ? referenceImageUrls : null,
           videoUrl: referenceVideoUrl ?? null,
         }),
+        resolution: modelConfig.resolution,
         durationSeconds: Number(duration),
         aspectRatio,
       },

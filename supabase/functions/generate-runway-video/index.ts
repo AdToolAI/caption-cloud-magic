@@ -195,6 +195,7 @@ serve(async (req) => {
       {
         modelId: model,
         mode: inferMode({ videoUrl: referenceVideoUrl }),
+        resolution: '720p',
         durationSeconds: Number(duration),
         aspectRatio,
       },
