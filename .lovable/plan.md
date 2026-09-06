@@ -36,7 +36,7 @@ Zusätzlich: Der Fortschrittsbalken stand laut Screenshot bei 85 % mit "Estimate
 
 ## Technische Details
 
-- `supabase/functions/_shared/render-concurrency.ts`: `FRAMES_PER_LAMBDA_MIN` gilt nicht mehr für die Stufe `short`; stattdessen `ceil(frames / maxWorkers)` mit Untergrenze 40. Andere Stufen unverändert.
+- `supabase/functions/_shared/render-concurrency.ts`: Stufe `short` → `maxWorkers: 6`, `framesPerLambda = max(40, ceil(frames / 6))`; `FRAMES_PER_LAMBDA_MIN` gilt für diese Stufe nicht mehr. Andere Stufen unverändert. `estimateWorkersFromDuration` folgt automatisch, damit die Warteschlange richtig rechnet.
 - `supabase/functions/render-directors-cut/index.ts`: `x264Preset` abhängig von der Zielhöhe (`>= 2160` → `medium`, sonst `slow`); `imageFormat: 'png'`, `colorSpace: 'bt709'`, `crf: 16` bleiben. Auflösungs-Mapping um `8k` ergänzt oder die Option clientseitig entfernen.
 - Fortschritt/ETA im Director's-Cut-Export-Dialog: verstrichene Zeit + qualitätsabhängige Erwartung, kein synthetischer Prozentsprung mehr; Texte in EN/DE/ES.
 - Nicht angefasst: Abrechnung (DC-Renders sind kostenfrei), Wallet, Video-Generierung, Lip-Sync, Sensor-Baseline.
