@@ -234,12 +234,11 @@ interface ModeInit extends Omit<ModeSpec, 'mode' | 'controls' | 'inputs'> {
 
 function mode(m: VideoMode, init: ModeInit): ModeSpec {
   return {
+    ...init,
     mode: m,
     controls: init.controls ?? NO_CONTROLS,
     inputs: init.inputs ?? {},
-    ...init,
-    mode_: undefined,
-  } as unknown as ModeSpec;
+  };
 }
 
 // ---------------------------------------------------------------------------
