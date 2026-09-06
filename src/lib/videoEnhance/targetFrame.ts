@@ -76,3 +76,34 @@ export function frameMeetsTarget(projected: Frame, target: Frame): boolean {
 export function formatFrame(frame: Frame): string {
   return `${frame.width}×${frame.height}`;
 }
+
+// ---------------------------------------------------------------------------
+// Upscale gate — mirror of supabase/functions/_shared/video-enhance-frame.ts
+// ---------------------------------------------------------------------------
+
+export const MIN_UPSCALE_GAIN = 1.15;
+
+export type UpscaleRejection = 'downscale' | 'no_op';
+
+export interface UpscaleVerdict {
+  ok: boolean;
+  reason: UpscaleRejection | null;
+  shortSideGain: number;
+  pixelGain: number;
+}
+
+export function evaluateUpscale(target: Frame, source: Frame): UpscaleVerdict {
+  const sourceShort = Math.min(source.width, source.height) || 1;
+  const targetShort = Math.min(target.width, target.height);
+  const shortSideGain = targetShort / sourceShort;
+  const sourcePixels = Math.max(1, source.width * source.height);
+  const pixelGain = (target.width * target.height) / sourcePixels;
+
+  if (target.width < source.width || target.height < source.height) {
+    return { ok: false, reason: 'downscale', shortSideGain, pixelGain };
+  }
+  if (shortSideGain < MIN_UPSCALE_GAIN) {
+    return { ok: false, reason: 'no_op', shortSideGain, pixelGain };
+  }
+  return { ok: true, reason: null, shortSideGain, pixelGain };
+}
