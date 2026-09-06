@@ -549,8 +549,11 @@ serve(async (req) => {
       return json({ run: toClientRun(current), deduplicated: true, pricing: toClientPricing(pricing) });
     }
 
-    const apiKey = Deno.env.get("REPLICATE_API_KEY");
-    if (!apiKey) return json({ error: "REPLICATE_API_KEY not configured" }, 500);
+    const isTopaz = spec.provider === "topaz";
+    const apiKey = Deno.env.get(isTopaz ? "TOPAZ_API_KEY" : "REPLICATE_API_KEY");
+    if (!apiKey) {
+      return json({ error: `${isTopaz ? "TOPAZ_API_KEY" : "REPLICATE_API_KEY"} not configured` }, 500);
+    }
 
     const projectUrl = Deno.env.get("SUPABASE_URL") ?? "";
     // The token identifies the run; a plain run id in the query string would
@@ -559,45 +562,69 @@ serve(async (req) => {
     const input = spec.buildInput(config, source.meta, source.url);
 
     console.log(
-      `${TAG} submit user=${user.id} run=${run.id} model=${spec.id} ${config.resolution}/${pricing.fps}fps price=${pricing.userPriceEur}`,
+      `${TAG} submit user=${user.id} run=${run.id} provider=${spec.provider} model=${spec.id} ${config.resolution}/${pricing.fps}fps price=${pricing.userPriceEur}`,
     );
 
     let predictionId: string | null = null;
     let providerStatus = "starting";
+    /** Refund + fail on a provider REJECTION (a definite, cost-free outcome). */
+    const rejectSubmit = async (message: string, status: number) => {
+      console.error(`${TAG} provider rejected run ${run.id}: ${message}`);
+      await walletOperation(admin, {
+        runId: run.id,
+        userId: user.id,
+        operation: "release",
+        amountEur: pricing.userPriceEur,
+        note: "provider rejected submit",
+      });
+      await setStatus(admin, run.id, "provider_failed", {
+        error_code: "PROVIDER_REJECTED",
+        error_message: message,
+        submit_lease_owner: null,
+      });
+      return json({ error: message, code: "PROVIDER_REJECTED", status }, 502);
+    };
+
     try {
-      const res = await fetch(
-        `https://api.replicate.com/v1/models/${spec.providerModelId}/predictions`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            input,
-            webhook: webhookUrl,
-            webhook_events_filter: ["completed"],
-          }),
-        },
-      );
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const message = typeof payload?.detail === "string" ? payload.detail : `provider ${res.status}`;
-        console.error(`${TAG} provider rejected run ${run.id}: ${message}`);
-        await walletOperation(admin, {
-          runId: run.id,
-          userId: user.id,
-          operation: "release",
-          amountEur: pricing.userPriceEur,
-          note: "provider rejected submit",
-        });
-        await setStatus(admin, run.id, "provider_failed", {
-          error_code: "PROVIDER_REJECTED",
-          error_message: message,
-          submit_lease_owner: null,
-        });
-        return json({ error: message, code: "PROVIDER_REJECTED", status: res.status }, 502);
+      if (isTopaz) {
+        // DIRECT Topaz API. The source is handed over as an external presigned
+        // URL, so there is no upload round-trip; Topaz has no signed webhook,
+        // the reconciler owns the terminal transition.
+        const created = await createTopazVideoRequest(apiKey, input as TopazVideoRequestBody);
+        // `topaz:` marks which API owns the id — the reconciler routes on it.
+        predictionId = `topaz:${created.requestId}`;
+        providerStatus = "queued";
+        const estimatedCredits = topazBilledCredits(created.estimates);
+        if (estimatedCredits !== undefined) {
+          console.log(`${TAG} run ${run.id} topaz estimated credits=${estimatedCredits}`);
+        }
+      } else {
+        const res = await fetch(
+          `https://api.replicate.com/v1/models/${spec.providerModelId}/predictions`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              input,
+              webhook: webhookUrl,
+              webhook_events_filter: ["completed"],
+            }),
+          },
+        );
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const message = typeof payload?.detail === "string" ? payload.detail : `provider ${res.status}`;
+          return await rejectSubmit(message, res.status);
+        }
+        predictionId = payload?.id ?? null;
+        providerStatus = payload?.status ?? providerStatus;
       }
-      predictionId = payload?.id ?? null;
-      providerStatus = payload?.status ?? providerStatus;
     } catch (error) {
+      // A Topaz 4xx is a definite rejection: nothing was queued, so the money
+      // goes back immediately. Everything else stays uncertain.
+      if (error instanceof TopazApiError && error.status >= 400 && error.status < 500) {
+        return await rejectSubmit(error.message, error.status);
+      }
       // Network failure with an unknown provider outcome: keep the money
       // reserved, keep the run open — the webhook (via the callback token) or
       // the reconciler decides. Never refund on a local uncertainty.
@@ -613,6 +640,7 @@ serve(async (req) => {
         .from("video_enhance_runs").select("*").eq("id", run.id).maybeSingle();
       return json({ run: toClientRun(current), pricing: toClientPricing(pricing), pending: true });
     }
+
 
     await setStatus(admin, run.id, "provider_submitted", {
       provider_prediction_id: predictionId,
