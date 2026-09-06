@@ -756,6 +756,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           console.log(`[RenderDirectorsCut] 🎬 tier=${tier.label}, maxWorkers=${tier.maxWorkers}, framesPerLambda=${effectiveFpl}`);
         }
 
+        // Encoder speed scales with resolution: at 4K/8K the 'slow' preset is
+        // the dominant cost per frame. Quality intermediates (lossless PNG,
+        // BT.709, crf 16) stay untouched — Raw-Media-Invariant holds.
+        const x264Preset = height >= 4320 || width >= 7680
+          ? 'faster'
+          : (height >= 2160 || width >= 3840 ? 'medium' : 'slow');
+        const videoBitrate = height >= 4320 || width >= 7680
+          ? '100M'
+          : (height >= 2160 || width >= 3840 ? '40M' : '10M');
+        console.log(`[RenderDirectorsCut] 🎚️ ${width}x${height} → x264Preset=${x264Preset}, videoBitrate=${videoBitrate}`);
+
         const lambdaPayload = normalizeStartPayload({
           type: 'start',
           serveUrl: REMOTION_SERVE_URL,
@@ -767,8 +778,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           imageFormat: 'png',
           colorSpace: 'bt709',
           crf: 16,
-          x264Preset: 'slow',
-          videoBitrate: '10M',
+          x264Preset,
+          videoBitrate,
           maxRetries: 1,
           ...(effectiveFpl ? { framesPerLambda: effectiveFpl } : {}),
           privacy: 'public',
