@@ -1952,6 +1952,12 @@ export interface CapabilityRequest {
   durationSeconds?: number;
   aspectRatio?: string;
   fps?: number;
+  /**
+   * Operational state of the exact tier, loaded from `video_model_tier_parity`
+   * for THIS (model x route x region x mode x tier) key. A disabled tier can
+   * never be submitted until a new passing smoke test re-enables it.
+   */
+  tierDisabled?: boolean;
 }
 
 export interface CapabilityViolation {
@@ -1985,8 +1991,21 @@ export function validateCapability(req: CapabilityRequest): CapabilityViolation 
     };
   }
 
+  // Multi-tier models MUST state the tier. Validating the first tier for an
+  // ambiguous request is exactly the silent-default bug this gate exists for.
+  if (!req.resolution && modeSpec.resolutions.length > 1) {
+    return {
+      code: 'INVALID_MODEL_CAPABILITY',
+      field: 'resolution',
+      message: `${spec.displayName} (${req.mode}) renders ${modeSpec.resolutions
+        .map((r) => r.label)
+        .join(', ')} — the request must name the resolution explicitly.`,
+    };
+  }
+
   let resolution: ResolutionSpec | undefined = modeSpec.resolutions[0];
   if (req.resolution) {
+
     resolution = modeSpec.resolutions.find((r) => r.label.toLowerCase() === req.resolution!.toLowerCase());
     if (!resolution) {
       return {
