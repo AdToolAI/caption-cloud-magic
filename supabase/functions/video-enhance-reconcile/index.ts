@@ -148,8 +148,11 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
+    // Either key alone is enough: runs are read from the API that owns them.
     const apiKey = Deno.env.get("REPLICATE_API_KEY");
-    if (!apiKey) return json({ error: "REPLICATE_API_KEY not configured" }, 500);
+    if (!apiKey && !Deno.env.get("TOPAZ_API_KEY")) {
+      return json({ error: "no provider API key configured" }, 500);
+    }
 
     const nowIso = new Date().toISOString();
     // Configurable, so a slow provider queue can be absorbed without a deploy.
