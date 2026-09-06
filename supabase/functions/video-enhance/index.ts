@@ -17,6 +17,12 @@ import {
 } from "../_shared/video-enhance-models.ts";
 import { evaluateUpscale, planDelivery } from "../_shared/video-enhance-frame.ts";
 import { toClientPricing, toClientRun } from "../_shared/video-enhance-client-view.ts";
+import {
+  createTopazVideoRequest,
+  topazBilledCredits,
+  TopazApiError,
+  type TopazVideoRequestBody,
+} from "../_shared/topaz-client.ts";
 
 import {
   newCallbackToken,
