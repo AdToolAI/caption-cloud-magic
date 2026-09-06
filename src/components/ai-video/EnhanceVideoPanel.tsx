@@ -303,38 +303,12 @@ export function EnhanceVideoPanel({
     if (next && next !== resolution) setResolution(next);
   }, [model, mode, sourceKnown, sourceWidth, sourceHeight, tierChoices, resolution]);
 
-  const isTopaz = model?.provider === 'topaz';
+  const topazEngine = model?.provider === 'topaz';
   const sourceFps = sourceMeta?.fps ?? null;
   // The frame-rate filter is only part of the order when the frame rate really
-  // changes — so it is only offered, priced and shown in that case.
-  const interpolationApplies = isTopaz && topazInterpolationAppliesView(sourceFps, fps);
+  // changes — so it is only offered, priced and sent in that case.
+  const interpolationApplies = topazEngine && topazInterpolationAppliesView(sourceFps, fps);
 
-  const target = useMemo(
-    () => (sourceKnown ? resolveTargetFrame(resolution, sourceWidth!, sourceHeight!) : null),
-    [resolution, sourceKnown, sourceWidth, sourceHeight],
-  );
-
-  // Fixed-factor models (Proteus Natural 2x, Rhea 4x) and models still in
-  // validation block the start with a named reason instead of a silent swap.
-  const selectedTopazModel = isTopaz ? topazModelView(mode) : null;
-  const scaleMismatch =
-    selectedTopazModel && target && sourceKnown
-      ? !topazScaleFitsView(selectedTopazModel, { width: sourceWidth!, height: sourceHeight! }, target)
-      : false;
-  const modelUnverified = isTopaz ? !isTopazModelStartableView(mode, isTestUser) : false;
-  const blockedReason = scaleMismatch
-    ? t(
-        'enhance.blocked.scale',
-        '{model} only works at {factor}x the original size. Pick another target size or another model.',
-        { model: selectedTopazModel!.name, factor: String(selectedTopazModel!.fixedUpscale ?? '') },
-      )
-    : modelUnverified
-      ? t(
-          'enhance.blocked.unverified',
-          '{model} is still in validation and cannot be started yet.',
-          { model: selectedTopazModel!.name },
-        )
-      : null;
 
   const config: EnhanceConfig | null = model
     ? {
