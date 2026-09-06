@@ -19,7 +19,7 @@ Nicht aus dem Code belegbar sind Existenz und Fähigkeiten der neuen Generatione
 
 Neu: `supabase/functions/_shared/videoModelSpecs.ts` als **kanonische, einzig manuell gepflegte** Quelle. `src/config/videoModelSpecs.ts` ist kein zweiter Spiegel, sondern wird per Skript daraus **generiert** (Header „generated — do not edit"), und ein Hash-/Parity-Test im CI schlägt fehl, sobald der generierte Client-Stand vom Server-Stand abweicht.
 
-Modell-Ebene: interne ID, Anzeigename, Familie, Generation, Provider, echter Provider-Slug, **API-Route und Region**, API-Version, Release-Status, `deprecated`, `supersededBy`, `lastVerifiedAt`, `providerDocsVersion`, `available`, `parityStatus`. Ein Modell, das über mehrere Routen erreichbar ist (z. B. MiniMax direkt vs. Runway-hosted), bekommt **pro Route eine eigene Spec** — Fähigkeiten und Auflösungen werden nie routenübergreifend behauptet.
+Modell-Ebene: interne ID, Anzeigename, Familie, Generation, Provider, echter Provider-Slug, **API-Route und Region**, API-Version, Release-Status, `deprecated`, `supersededBy`, `lastVerifiedAt`, `providerDocsVersion`, `verificationSourceUrl`, `verificationNotes`, `verifiedBy`, `available`, `parityStatus`. Damit ist später nachvollziehbar, welche konkrete Provider-Seite oder API-Spezifikation Grundlage einer Fähigkeit war. Ein Modell, das über mehrere Routen erreichbar ist (z. B. MiniMax direkt vs. Runway-hosted), bekommt **pro Route eine eigene Spec** — Fähigkeiten und Auflösungen werden nie routenübergreifend behauptet.
 
 Capability-Ebene **pro Modus** (T2V, I2V, FirstLast, Reference, V2V, Edit, Extend, Reframe, AudioToVideo): Auflösungen inkl. `maxNative`, Dauern, Aspect Ratios, FPS, Audio, max. Referenzbilder/-videos/-audios, First-/Last-Frame, Seed, Negativ-Prompt, Kamera- und Motion-Controls, HDR, Output-Formate, Smart Duration, plus `constraints` als maschinenlesbare Regeln (z. B. „4K ⇒ Dauer = 8 s", „Extension ⇒ 720p").
 
@@ -34,7 +34,7 @@ Provider-Doku → konkrete API-Route → Capability Spec → Pricing → automat
 → echter Max-Quality-Testlauf → Output-Probe → FULL_PARITY → available: true → UI-Badge
 ```
 
-Vor `available: true` für eine Maximalauflösung ist ein **echter Smoke-Test** Pflicht: Job in maximaler Auflösung starten, Ausgabedatei laden und proben, Pixelmaße, Dauer, FPS und Audio messen, Test-Run-ID plus Messwerte in der Spec bzw. einer Verifikationstabelle speichern. Erst danach darf ein Badge wie „4K Native" erscheinen.
+Vor `available: true` für eine Maximalauflösung ist ein **echter Smoke-Test** Pflicht: Job in maximaler Auflösung starten, Ausgabedatei laden und proben, Pixelmaße, Dauer, FPS und Audio messen, Test-Run-ID plus Messwerte in der Spec bzw. einer Verifikationstabelle speichern. Der Smoke-Test prüft zusätzlich die **Wirtschaftlichkeit**: `estimatedProviderCost`, `actualProviderCost`, `chargedCredits` und `effectiveMargin` werden mitgeschrieben und gegen die Mindestmarge geprüft — so fällt sofort auf, wenn ein Provider Preise oder Abrechnungseinheiten geändert hat. Erst danach darf ein Badge wie „4K Native" erscheinen.
 
 
 ## Phase 2 — Provider-Audit je Familie
@@ -75,6 +75,8 @@ Jede kostenrelevante Kombination erhält eine eigene `pricingId` (z. B. `veo-3.1
 ## Phase 6 — Output nachmessen
 
 Nach jeder Generierung werden Breite, Höhe, FPS, Dauer, Codec, Bitrate, Dateigröße, Audio-Codec und — wo verfügbar — Farbtiefe und HDR-Metadaten gemessen und als `requestedResolution` vs. `actualResolution` gespeichert. Anzeige „✅ Target matched" oder „⚠ Provider output mismatch"; Abweichungen werden protokolliert, damit Provider-Änderungen sofort auffallen.
+
+**Automatische Rückstufung bei Provider-Regression:** Liefert eine Auflösungsstufe mehrfach hintereinander (Schwelle: 3 Läufe) weniger als angefordert, setzt das System `parityStatus` von `FULL_PARITY` auf `VERIFY`, meldet es im Health-Report (🟡) und deaktiviert die betroffene Stufe optional vorübergehend (`available: false`), bis ein neuer Smoke-Test besteht. Dasselbe gilt, wenn die gemessenen Providerkosten die Mindestmarge unterschreiten.
 
 ## Phase 7 — Harte Tests
 
