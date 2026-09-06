@@ -9615,6 +9615,8 @@ export const translations: Record<Language, any> = {
       fhdStandard: "Standard-Qualität",
       fourKUltra: "Ultra-hohe Qualität",
       eightKMax: "Maximum Qualität",
+      fourKTimeWarning: "4K dauert deutlich länger als HD — rund 2–5 Minuten für einen 10-Sekunden-Clip.",
+      eightKTimeWarning: "8K ist die höchste Qualität und mit Abstand die langsamste: rechne mit rund 8–11 Minuten für einen 10-Sekunden-Clip und einer sehr großen Datei. Nur für Clips bis 30 Sekunden; längere Clips werden in 4K exportiert.",
       widescreenLabel: "Widescreen",
       portraitLabel: "Portrait",
       squareLabel: "Quadrat",
