@@ -174,19 +174,29 @@ describe('output validation before asset and capture', () => {
       .toBe(true);
   });
 
-  it('accepts a portrait output measured against the ordered line count', () => {
-    // Both providers read "1080p" as 1080 lines: a 720x1280 portrait source
-    // comes back as 608x1080 and fulfils the order.
-    const ordered = { durationSeconds: 12, width: 1920, height: 1080, fps: 30 };
-    expect(outputMatchesOrder({ durationSeconds: 12, width: 608, height: 1080, fps: 30 }, ordered).ok)
+  it('measures a portrait output against the orientation-aware promised frame', () => {
+    // The order is the exact target frame (finalize passes `target`, not the
+    // label): a 720x1280 portrait source ordered at 1080p owes 1080x1920.
+    const portraitOrder = { durationSeconds: 12, width: 1080, height: 1920, fps: 30 };
+    expect(outputMatchesOrder({ durationSeconds: 12, width: 1080, height: 1920, fps: 30 }, portraitOrder).ok)
       .toBe(true);
-    expect(outputMatchesOrder({ durationSeconds: 12, width: 1080, height: 1920, fps: 30 }, ordered).ok)
-      .toBe(true);
-    // Too few lines is still rejected.
-    expect(outputMatchesOrder({ durationSeconds: 12, width: 720, height: 720, fps: 30 }, ordered).reason)
+    // The line-count reading (608x1080) is the Topaz portrait shortfall and is
+    // a mismatch — the router keeps such orders away from that engine, and the
+    // check here is the last line of defence.
+    expect(outputMatchesOrder({ durationSeconds: 12, width: 608, height: 1080, fps: 30 }, portraitOrder).reason)
       .toBe('resolution_mismatch');
+    // 4K portrait: 1216x2160 against 2160x3840 is the measured real-world case.
+    const portrait4k = { durationSeconds: 8, width: 2160, height: 3840, fps: 30 };
+    expect(outputMatchesOrder({ durationSeconds: 8, width: 1216, height: 2160, fps: 30 }, portrait4k).reason)
+      .toBe('resolution_mismatch');
+    expect(outputMatchesOrder({ durationSeconds: 8, width: 2160, height: 3840, fps: 30 }, portrait4k).ok)
+      .toBe(true);
+    // Landscape orders are unaffected.
+    const landscapeOrder = { durationSeconds: 12, width: 1920, height: 1080, fps: 30 };
+    expect(outputMatchesOrder({ durationSeconds: 12, width: 1920, height: 1080, fps: 30 }, landscapeOrder).ok)
+      .toBe(true);
     // A collapsed frame is rejected.
-    expect(outputMatchesOrder({ durationSeconds: 12, width: 2, height: 1080, fps: 30 }, ordered).reason)
+    expect(outputMatchesOrder({ durationSeconds: 12, width: 2, height: 1080, fps: 30 }, landscapeOrder).reason)
       .toBe('resolution_mismatch');
   });
 });
