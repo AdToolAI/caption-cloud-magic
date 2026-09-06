@@ -66,7 +66,7 @@ export function pickPriority(isFounder: boolean, override?: number | null): numb
 /**
  * Founders reserve band: when >= this share of the slot budget is in use,
  * only Founders are admitted. Non-founders get a 429 with a retry hint.
- * Default: at 50/60 slots (~83%) reserve the last 10 for Founders.
+ * Default: at 68/80 slots (~85%) reserve the last 12 for Founders.
  */
 export const FOUNDER_RESERVE_HIGH_WATER = 68;
 
