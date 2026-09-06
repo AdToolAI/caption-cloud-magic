@@ -2097,39 +2097,54 @@ function even(value: number): number {
 }
 
 /**
- * Exact target frame for a request — the promise the smoke test verifies.
- * Aspect-ratio aware for EVERY ratio we expose (16:9, 9:16, 1:1, 4:3, 3:4,
- * 21:9, 9:21, 3:2, 2:3): the short edge of the label is held on the short side
- * of the frame, so a "4K" portrait clip really is 2160x3840.
- *
- * `long-edge` providers (the Topaz trap) count the label's lines on the LONG
- * side instead — projected here exactly as they behave, never as we wish.
+ * Exact target frame for a request. The provider-backed frame table wins; only
+ * when the ratio is absent there do we fall back to the tier's DOCUMENTED
+ * sizing rule (`sizingRule` + `sizingRuleSource`). 4:3, 3:4, 21:9, 3:2 and 2:3
+ * are never guessed from a generic 16:9 short-edge assumption.
  */
 export function projectTargetFrame(
   resolution: ResolutionSpec,
   aspectRatio: string,
 ): PixelFrame {
-  const [rawW, rawH] = aspectRatio.split(':').map(Number);
-  const w = Number.isFinite(rawW) && rawW > 0 ? rawW : 16;
-  const h = Number.isFinite(rawH) && rawH > 0 ? rawH : 9;
+  const exact = resolution.framesByAspectRatio?.[aspectRatio];
+  if (exact) return exact;
 
-  if (resolution.orientationBehavior === 'fixed') {
-    return resolution.landscape;
-  }
-
-  if (resolution.orientationBehavior === 'long-edge') {
-    // The label counts lines on the long edge.
-    const longEdge = resolution.shortEdge;
-    return w >= h
-      ? { width: longEdge, height: even((longEdge * h) / w) }
-      : { width: even((longEdge * w) / h), height: longEdge };
-  }
-
-  const short = resolution.shortEdge;
-  return w >= h
-    ? { width: even((short * w) / h), height: short }
-    : { width: short, height: even((short * h) / w) };
+  const derived = framesFromSizingRule(resolution.shortEdge, resolution.sizingRule, [aspectRatio]);
+  return derived[aspectRatio] ?? resolution.landscape;
 }
+
+/**
+ * Identity of a verified resolution tier. Parity and regressions are ALWAYS
+ * scoped to model x route x region x mode x tier: a mismatch in t2v must never
+ * downgrade i2v, and a Replicate-route mismatch must never downgrade the same
+ * model on a direct-provider route.
+ */
+export interface ParityKey {
+  modelId: string;
+  apiRoute: string;
+  region: string;
+  mode: VideoMode;
+  resolutionLabel: string;
+}
+
+export function parityKeyOf(
+  spec: VideoModelSpec,
+  mode: VideoMode,
+  resolutionLabel: string,
+): ParityKey {
+  return {
+    modelId: spec.id,
+    apiRoute: spec.apiRoute,
+    region: spec.region,
+    mode,
+    resolutionLabel,
+  };
+}
+
+export function parityKeyString(key: ParityKey): string {
+  return [key.modelId, key.apiRoute, key.region, key.mode, key.resolutionLabel].join('|');
+}
+
 
 /** Measured output vs. promised frame. */
 export type OutputVerdict = 'TARGET_MATCHED' | 'PROVIDER_OUTPUT_MISMATCH';
