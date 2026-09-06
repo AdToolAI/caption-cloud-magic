@@ -187,7 +187,7 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
                           )}
                         </div>
                         <p className="text-[10px] text-muted-foreground truncate">
-                          {locked && m.statusReason ? m.statusReason : `${m.tagline} · ${m.resolution}`}
+                          {locked && m.statusReason ? m.statusReason : `${m.tagline} · ${resolutionLine(m)}`}
                         </p>
                       </div>
                       <span className="text-[11px] tabular-nums text-primary font-medium shrink-0">
