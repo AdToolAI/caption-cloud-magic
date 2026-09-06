@@ -67,6 +67,22 @@ export interface EnhanceEstimate {
   rateCardVersion: string;
 }
 
+/**
+ * The server's delivery decision for the current order — the authority the
+ * panels show BEFORE the start (requested vs. executing engine, promised
+ * frame, the ByteDance scene that will really be sent).
+ */
+export interface EnhancePlan {
+  requestedModelId: string;
+  executionModelId: string;
+  strategy: 'native' | 'engine_routed' | 'unreachable';
+  target: { width: number; height: number };
+  projected: { width: number; height: number };
+  requestedMode: string;
+  executionMode: string;
+  modeSource: 'explicit' | 'provenance' | 'engine_default';
+}
+
 export interface EnhanceSource {
   assetId?: string;
   /** Which table the asset lives in — the server must never have to guess. */
