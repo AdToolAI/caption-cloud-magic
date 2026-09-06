@@ -16,7 +16,13 @@ import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
 import { VideoSourcePicker } from '@/components/ai-video/VideoSourcePicker';
 import type { CanonicalVideoAsset } from '@/lib/videoEnhance/canonicalVideoAsset';
 import { isAiGeneratedSource } from '@/lib/videoEnhance/recommend';
-import { formatFrame, resolveTargetFrame } from '@/lib/videoEnhance/targetFrame';
+import {
+  evaluateUpscale,
+  formatFrame,
+  frameMeetsTarget,
+  projectProviderOutput,
+  resolveTargetFrame,
+} from '@/lib/videoEnhance/targetFrame';
 
 import {
   availableFps,
