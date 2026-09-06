@@ -676,7 +676,7 @@ export function EnhanceVideoPanel({
                   <dd>{TOPAZ_OUTPUT_QUALITY_VIEWS.find((q) => q.id === outputQuality)?.label[lang]}</dd>
                 </>
               )}
-              <dt className="text-muted-foreground">{tx('frameRate', lang)}</dt>
+              <dt className="text-muted-foreground">{tx('fps', lang)}</dt>
               <dd className="tabular-nums">
                 {fps ? `${fps} fps` : sourceFps ? `${Math.round(sourceFps)} fps` : '—'}
               </dd>
