@@ -224,8 +224,14 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
               </p>
             )}
           </motion.div>
+          <EnhanceVideoDialog
+            open={enhanceOpen}
+            onOpenChange={setEnhanceOpen}
+            sourceUrl={videoUrl || undefined}
+          />
         </motion.div>
       )}
     </AnimatePresence>
   );
 };
+
