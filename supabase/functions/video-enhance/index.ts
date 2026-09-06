@@ -607,7 +607,7 @@ serve(async (req) => {
         // DIRECT Topaz API. The source is handed over as an external presigned
         // URL, so there is no upload round-trip; Topaz has no signed webhook,
         // the reconciler owns the terminal transition.
-        const created = await createTopazVideoRequest(apiKey, input as TopazVideoRequestBody);
+        const created = await createTopazVideoRequest(apiKey, input as unknown as TopazVideoRequestBody);
         // `topaz:` marks which API owns the id — the reconciler routes on it.
         predictionId = `topaz:${created.requestId}`;
         providerStatus = "queued";
