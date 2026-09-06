@@ -172,3 +172,43 @@ export function planDelivery(params: {
     reason: 'no_engine_reaches_target_frame',
   };
 }
+
+// ---------------------------------------------------------------------------
+// Upscale gate — a paid enhancement must actually add pixels
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimum growth on the short side before an order counts as an upscale.
+ * Below this the customer would pay for a re-encode of their own file.
+ */
+export const MIN_UPSCALE_GAIN = 1.15;
+
+export type UpscaleRejection = 'downscale' | 'no_op';
+
+export interface UpscaleVerdict {
+  ok: boolean;
+  reason: UpscaleRejection | null;
+  shortSideGain: number;
+  pixelGain: number;
+}
+
+/**
+ * Compares the PROMISED target frame with the measured source frame.
+ * 1080x1920 -> 1080x1920 is a no-op, 1080x1920 -> 720p is a downscale; both are
+ * rejected before any money moves, in the estimate path and in the start path.
+ */
+export function evaluateUpscale(target: Frame, source: Frame): UpscaleVerdict {
+  const sourceShort = Math.min(source.width, source.height) || 1;
+  const targetShort = Math.min(target.width, target.height);
+  const shortSideGain = targetShort / sourceShort;
+  const sourcePixels = Math.max(1, source.width * source.height);
+  const pixelGain = (target.width * target.height) / sourcePixels;
+
+  if (target.width < source.width || target.height < source.height) {
+    return { ok: false, reason: 'downscale', shortSideGain, pixelGain };
+  }
+  if (shortSideGain < MIN_UPSCALE_GAIN) {
+    return { ok: false, reason: 'no_op', shortSideGain, pixelGain };
+  }
+  return { ok: true, reason: null, shortSideGain, pixelGain };
+}
