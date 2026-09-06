@@ -90,6 +90,13 @@ export interface VideoEnhanceModelDefinition {
 export interface EnhanceConfig {
   modelId: string;
   mode: string;
+  /**
+   * true only when the customer actively picked the footage type. A UI
+   * default is not a choice: without this flag the server derives the
+   * ByteDance scene from the clip's provenance (generated → aigc,
+   * uploaded → ugc, unknown → common).
+   */
+  modeExplicit?: boolean;
   resolution: VideoResolution;
   /** `null` keeps the source frame rate. */
   fps: number | null;

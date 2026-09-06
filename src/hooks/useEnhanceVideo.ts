@@ -10,29 +10,53 @@ import type { EnhanceConfig } from '@/config/videoEnhanceModels';
  * service and no second pricing path.
  */
 
+/**
+ * The customer projection of a run, exactly as `video-enhance` returns it
+ * (`_shared/video-enhance-client-view.ts#CLIENT_RUN_FIELDS`). Internals such
+ * as the callback token or margin columns never arrive here.
+ */
 export interface EnhanceRunRow {
   id: string;
   status: string;
+  /** Engine that is REALLY executing this run. */
   model_id: string;
+  /** Engine the customer asked for; equals `model_id` unless routed. */
+  requested_model_id?: string | null;
+  delivery_strategy?: 'native' | 'engine_routed' | 'unreachable' | string | null;
   mode: string;
   resolution: string;
   fps: number;
   tier: string;
   user_price_eur: number;
+  currency?: string | null;
   output_url: string | null;
   output_asset_id: string | null;
   source_url: string;
+  source_width?: number | null;
+  source_height?: number | null;
+  source_duration_seconds?: number | null;
   error_code: string | null;
   error_message: string | null;
+  created_at?: string;
+  updated_at?: string;
+  provider_status?: string | null;
+  provider_submitted_at?: string | null;
+  provider_completed_at?: string | null;
+  /** Promised frame for this run's source orientation. */
+  target_width?: number | null;
+  target_height?: number | null;
   /** Measured on the finished file — authoritative over any projection. */
+  projection_matched?: boolean | null;
   actual_width?: number | null;
   actual_height?: number | null;
   output_codec?: string | null;
+  output_container?: string | null;
+  output_mime_type?: string | null;
   output_bitrate_kbps?: number | null;
   output_size_bytes?: number | null;
-  output_container?: string | null;
   output_fps?: number | null;
   output_duration_seconds?: number | null;
+  overcharge_refund_amount_eur?: number | null;
 }
 
 export interface EnhanceEstimate {
