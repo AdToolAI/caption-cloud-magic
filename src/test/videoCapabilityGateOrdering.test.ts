@@ -53,7 +53,8 @@ describe('every video generator runs the capability gate first', () => {
 
     it(`${fn}: names the resolution tier explicitly`, () => {
       const src = source(fn);
-      const call = src.slice(src.indexOf('gateVideoCapability('), src.indexOf('gateVideoCapability(') + 900);
+      const start = src.indexOf('gateVideoCapability(\n');
+      const call = src.slice(start, start + 900);
       expect(/resolution:/.test(call), `${fn}: gate call omits the resolution tier`).toBe(true);
     });
 
