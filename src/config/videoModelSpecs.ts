@@ -4,7 +4,7 @@
 // Regenerate with: node scripts/generate-video-model-specs.mjs
 // =============================================================================
 
-export const SPECS_SOURCE_HASH = 'cd056cffa9f16cf9be55c18e560527ecac06c366425c7550814cd776c68299c1';
+export const SPECS_SOURCE_HASH = '73f26aa5fa0773fb7ebac13cce0e7570ef7eeeaa48f78ff97eeff455f2f8e3ba';
 
 // ============================================================================
 // CANONICAL VIDEO MODEL CAPABILITY REGISTRY
@@ -90,6 +90,12 @@ export interface ResolutionSpec {
   sizingRule: SizingRule;
   /** Where that rule is documented / how it was verified. */
   sizingRuleSource: string;
+  /**
+   * TRUE only when the tier carries a provider-backed frame table OR a concrete
+   * provider-documented sizing reference. The generic default wording is an
+   * ASSUMPTION, never verification — such tiers stay UNVERIFIED.
+   */
+  sizingRuleVerified: boolean;
   /**
    * Exact target frame per aspect ratio — provider-backed. A ratio missing here
    * is NOT derivable and is rejected by the capability gate.
@@ -331,6 +337,16 @@ export function res(
         ? 'fixed-frame'
         : 'short-edge');
   const derived = framesFromSizingRule(shortEdge, sizingRule);
+  // Provenance: only an explicit provider frame table or an explicit provider
+  // reference counts. The generic default wording below is an assumption.
+  // A measured smoke test on this exact route counts as verification too.
+  const sizingRuleVerified =
+    !!opts.framesByAspectRatio || !!opts.sizingRuleSource || !!opts.smokeTest;
+  const requested = opts.parityStatus ?? (opts.smokeTest ? 'FULL_PARITY' : 'UNVERIFIED');
+  // An unverified sizing rule can never carry FULL_PARITY: the kill switch may
+  // only act on tiers whose target frame is provider-backed.
+  const parityStatus: ParityStatus =
+    requested === 'FULL_PARITY' && !sizingRuleVerified ? 'UNVERIFIED' : requested;
   return {
     label,
     shortEdge,
@@ -345,12 +361,13 @@ export function res(
         : sizingRule === 'fixed-frame'
           ? 'Provider rendert unabhängig vom Request ein festes Bildformat.'
           : 'Provider hält die kurze Kante des Labels; Portrait ist damit echtes Hochkant.'),
+    sizingRuleVerified,
     framesByAspectRatio: { ...derived, ...(opts.framesByAspectRatio ?? {}) },
     native: opts.native ?? true,
     pricingId,
     ...(opts.durations ? { durations: opts.durations } : {}),
     available: opts.available ?? true,
-    parityStatus: opts.parityStatus ?? (opts.smokeTest ? 'FULL_PARITY' : 'UNVERIFIED'),
+    parityStatus,
     grandfathered,
     ...(opts.smokeTest ? { smokeTest: opts.smokeTest } : {}),
   };
@@ -2181,8 +2198,14 @@ export interface TierParityState {
 }
 
 /**
- * Pure regression state machine. A matched run resets the counter; the third
- * consecutive mismatch downgrades FULL_PARITY to VERIFY and reports yellow.
+ * Pure regression state machine.
+ *
+ *  - A matched run resets the mismatch counter (status untouched).
+ *  - The third consecutive mismatch on a tier that was FULL_PARITY (its target
+ *    frame is provider-verified, so a mismatch is a real provider regression)
+ *    downgrades it to VERIFY AND disables it.
+ *  - A grandfathered UNVERIFIED or already-VERIFY tier is NEVER auto-disabled:
+ *    its target frame is an assumption, so a mismatch is not proof of anything.
  */
 export function applyOutputMeasurement(
   state: TierParityState,
@@ -2197,12 +2220,25 @@ export function applyOutputMeasurement(
     };
   }
   const consecutiveMismatches = state.consecutiveMismatches + 1;
-  const hit = consecutiveMismatches >= PARITY_REGRESSION_THRESHOLD;
+  const wasFullParity = state.parityStatus === 'FULL_PARITY';
+  const downgraded = wasFullParity && consecutiveMismatches >= PARITY_REGRESSION_THRESHOLD;
   return {
-    parityStatus: hit ? 'VERIFY' : state.parityStatus,
+    parityStatus: downgraded ? 'VERIFY' : state.parityStatus,
     consecutiveMismatches,
-    tierDisabled: state.tierDisabled,
-    downgraded: hit && state.parityStatus === 'FULL_PARITY',
+    tierDisabled: downgraded ? true : state.tierDisabled,
+    downgraded,
+  };
+}
+
+/**
+ * The ONLY way back: a passing smoke test on this exact route clears the
+ * mismatch counter, re-enables the tier and restores FULL_PARITY.
+ */
+export function applySmokeTestPass(_state: TierParityState): TierParityState {
+  return {
+    parityStatus: 'FULL_PARITY',
+    consecutiveMismatches: 0,
+    tierDisabled: false,
   };
 }
 

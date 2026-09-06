@@ -42,6 +42,31 @@ export interface MeasurableGeneration {
   requested_height?: number | null;
 }
 
+/**
+ * Type-safe row -> measurement input. Callers MUST pass the single row object
+ * they are iterating; the parity context can therefore never be read off a
+ * different (or undefined) variable — that class of bug is a compile error now.
+ */
+export function measurableFromRow(
+  row: MeasurableGeneration,
+  patch: { video_url: string },
+): MeasurableGeneration {
+  return {
+    id: row.id,
+    model: row.model,
+    resolution: row.resolution ?? null,
+    aspect_ratio: row.aspect_ratio ?? null,
+    video_url: patch.video_url,
+    parity_model_id: row.parity_model_id ?? null,
+    parity_api_route: row.parity_api_route ?? null,
+    parity_region: row.parity_region ?? null,
+    parity_mode: row.parity_mode ?? null,
+    parity_resolution_label: row.parity_resolution_label ?? null,
+    requested_width: row.requested_width ?? null,
+    requested_height: row.requested_height ?? null,
+  };
+}
+
 function findTier(
   modelId: string,
   mode: VideoMode,

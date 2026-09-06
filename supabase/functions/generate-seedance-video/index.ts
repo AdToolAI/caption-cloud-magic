@@ -36,8 +36,12 @@ interface GenerateRequest {
   startImageUrl?: string;
   /** seedance-1-lite (mini): last frame, requires startImageUrl. */
   endImageUrl?: string;
-  /** seedance-1-lite (mini): 480p or 720p. Other tiers render 720p. */
-  resolution?: '480p' | '720p';
+  /**
+   * seedance-1-lite (mini): 480p or 720p. Other tiers render 720p.
+   * Typed wide on purpose: an unsupported value must reach the capability gate
+   * and be rejected with 400, never be rewritten to a supported tier.
+   */
+  resolution?: string;
   cameraFixed?: boolean;
   seed?: number;
 }
@@ -85,7 +89,9 @@ serve(async (req) => {
       supabaseAdmin,
       {
         modelId: model,
-        resolution: (isLite && body.resolution === '480p') ? '480p' : '720p',
+        // The REQUESTED tier, verbatim. No rewrite: seedance-mini + 1080p is a
+        // 400 INVALID_MODEL_CAPABILITY, never a silent downgrade to 720p.
+        resolution: body.resolution,
         mode: inferMode({ startImageUrl, endImageUrl }),
         durationSeconds: duration,
         aspectRatio,
@@ -149,8 +155,8 @@ serve(async (req) => {
     console.log(`[generate-seedance-video] Cost: ${currencySymbol}${totalCost.toFixed(2)}, Balance: ${currencySymbol}${wallet.balance_euros.toFixed(2)}`);
 
     // Create generation record
-    // seedance-1-lite additionally offers 480p; 2.0 tiers are priced at 720p.
-    const resolution = (isLite && body.resolution === '480p') ? '480p' : '720p';
+    // Gate-approved tier label — the gate already rejected anything else.
+    const resolution = gate.resolutionLabel ?? body.resolution ?? '720p';
     const { data: generation, error: genError } = await supabaseAdmin
       .from('ai_video_generations')
       .insert({

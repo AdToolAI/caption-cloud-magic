@@ -24,7 +24,7 @@ import {
 } from "../_shared/modelark.ts";
 import { heartbeatPipelineJob } from "../_shared/v427-callback-guard.ts";
 import { logMissingReinjectPointer } from "../_shared/v431-ledger.ts";
-import { recordGenerationOutput } from "../_shared/videoOutputMeasurement.ts";
+import { measurableFromRow, recordGenerationOutput } from "../_shared/videoOutputMeasurement.ts";
 
 
 const corsHeaders = {
@@ -93,20 +93,10 @@ async function scan(sceneFilterId: string | null) {
               error_message: null,
             })
             .eq("id", gen.id);
-          await recordGenerationOutput(supabase, {
-            id: gen.id,
-            model: gen.model,
-            resolution: gen.resolution,
-            aspect_ratio: gen.aspect_ratio,
-            video_url: permanentUrl,
-            parity_model_id: generation.parity_model_id,
-            parity_api_route: generation.parity_api_route,
-            parity_region: generation.parity_region,
-            parity_mode: generation.parity_mode,
-            parity_resolution_label: generation.parity_resolution_label,
-            requested_width: generation.requested_width,
-            requested_height: generation.requested_height,
-          });
+          await recordGenerationOutput(
+            supabase,
+            measurableFromRow(gen, { video_url: permanentUrl }),
+          );
           summary.completed++;
         } else if (task.status === "failed" || task.status === "cancelled") {
           await failGeneration(task.error ?? "ModelArk task failed");
