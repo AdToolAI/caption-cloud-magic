@@ -13,6 +13,7 @@ import {
   setStatus,
   STAGING_BUCKET,
 } from "../_shared/video-enhance-runtime.ts";
+import { decideCycle, isInternalCaller } from "../_shared/video-enhance-reconcile-guard.ts";
 
 /**
  * Reconciler for Video Enhance.
@@ -47,12 +48,6 @@ const corsHeaders = {
 
 const TAG = "[video-enhance-reconcile]";
 const BATCH_SIZE = 25;
-
-/**
- * A full cycle is worth running at most this often. The schedule fires every
- * five minutes; anything denser is a burst and is answered without work.
- */
-export const MIN_CYCLE_INTERVAL_MS = 30_000;
 
 /**
  * Error codes that describe the provider FILE itself, not our infrastructure.
@@ -320,7 +315,7 @@ serve(async (req) => {
     console.error(`${TAG} unhandled:`, message);
     return json({ error: message }, 500);
   } finally {
-    cycleInFlight = false;
+    cycle.inFlight = false;
   }
 });
 
