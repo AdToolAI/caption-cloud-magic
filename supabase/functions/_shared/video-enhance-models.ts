@@ -20,6 +20,8 @@ import {
   PRICING_VERSION,
   type TrueUpEvaluation,
 } from './picture-pricing.ts';
+import { resolveTargetFrame } from './video-enhance-frame.ts';
+import { topazContainer, TOPAZ_CREDIT_USD_DEFAULT } from './topaz-client.ts';
 
 export type VideoResolution = '720p' | '1080p' | '2k' | '4k';
 export type QualityTier = 'standard' | 'pro';
