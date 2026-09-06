@@ -252,6 +252,8 @@ export const STANDARD_ASPECT_RATIOS = [
   '9:21',
   '3:2',
   '2:3',
+  '4:5',
+  '5:4',
 ] as const;
 
 function evenSize(value: number): number {

@@ -266,15 +266,15 @@ describe('promised frame and measured output', () => {
 
 describe('hardening pass — explicit tiers, kill switch, per-route parity', () => {
   it('a multi-tier model must name its resolution — no silent first-tier default', () => {
-    const spec = getVideoModelSpec('veo-3.1')!;
+    const spec = getVideoModelSpec('veo-3.1-fast')!;
     const mode = getModeSpec(spec, 't2v')!;
     expect(mode.resolutions.length).toBeGreaterThan(1);
-    const v = validateCapability({ modelId: 'veo-3.1', mode: 't2v', durationSeconds: 8, aspectRatio: '16:9' });
+    const v = validateCapability({ modelId: 'veo-3.1-fast', mode: 't2v', durationSeconds: 8, aspectRatio: '16:9' });
     expect(v?.field).toBe('resolution');
     // With the tier named the very same request passes.
     expect(
       validateCapability({
-        modelId: 'veo-3.1',
+        modelId: 'veo-3.1-fast',
         mode: 't2v',
         resolution: mode.resolutions[0].label,
         durationSeconds: 8,
@@ -284,9 +284,9 @@ describe('hardening pass — explicit tiers, kill switch, per-route parity', () 
   });
 
   it('a tier disabled by measured regressions is rejected', () => {
-    const spec = getVideoModelSpec('veo-3.1')!;
+    const spec = getVideoModelSpec('veo-3.1-fast')!;
     const label = getModeSpec(spec, 't2v')!.resolutions[0].label;
-    const base = { modelId: 'veo-3.1', mode: 't2v' as const, resolution: label, durationSeconds: 8, aspectRatio: '16:9' };
+    const base = { modelId: 'veo-3.1-fast', mode: 't2v' as const, resolution: label, durationSeconds: 8, aspectRatio: '16:9' };
     expect(validateCapability(base)).toBeNull();
     const v = validateCapability({ ...base, tierDisabled: true });
     expect(v?.field).toBe('resolution');
@@ -310,7 +310,7 @@ describe('hardening pass — explicit tiers, kill switch, per-route parity', () 
   });
 
   it('parity keys separate mode and route — a t2v mismatch cannot touch i2v', () => {
-    const spec = getVideoModelSpec('veo-3.1')!;
+    const spec = getVideoModelSpec('veo-3.1-fast')!;
     const label = getModeSpec(spec, 't2v')!.resolutions[0].label;
     const t2v = parityKeyString(parityKeyOf(spec, 't2v', label));
     const i2v = parityKeyString(parityKeyOf(spec, 'i2v', label));

@@ -55,7 +55,7 @@ describe('every video generator runs the capability gate first', () => {
       const src = source(fn);
       const start = src.indexOf('gateVideoCapability(\n');
       const call = src.slice(start, start + 900);
-      expect(/resolution:/.test(call), `${fn}: gate call omits the resolution tier`).toBe(true);
+      expect(/resolution[:,]/.test(call), `${fn}: gate call omits the resolution tier`).toBe(true);
     });
 
     it(`${fn}: persists the parity context with the generation`, () => {

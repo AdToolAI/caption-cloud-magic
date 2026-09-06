@@ -4,7 +4,7 @@
 // Regenerate with: node scripts/generate-video-model-specs.mjs
 // =============================================================================
 
-export const SPECS_SOURCE_HASH = '37f5498513956aecf6fe10cd553fcb3a1642f1253240881a291b8d6feabe2dd5';
+export const SPECS_SOURCE_HASH = 'cd056cffa9f16cf9be55c18e560527ecac06c366425c7550814cd776c68299c1';
 
 // ============================================================================
 // CANONICAL VIDEO MODEL CAPABILITY REGISTRY
@@ -260,6 +260,8 @@ export const STANDARD_ASPECT_RATIOS = [
   '9:21',
   '3:2',
   '2:3',
+  '4:5',
+  '5:4',
 ] as const;
 
 function evenSize(value: number): number {
