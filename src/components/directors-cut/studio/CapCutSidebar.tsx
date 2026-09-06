@@ -105,6 +105,8 @@ interface CapCutSidebarProps {
   onChromaKeyChange?: (ck: any) => void;
   upscaling?: { enabled: boolean; targetResolution: string };
   onUpscalingChange?: (enabled: boolean, resolution: string) => void;
+  onUpscaledVideo?: (url: string) => void;
+
   interpolation?: { enabled: boolean; targetFps: number };
   onInterpolationChange?: (enabled: boolean, fps: number) => void;
   restoration?: { enabled: boolean; level: string };
