@@ -127,7 +127,8 @@ export const VIDEO_ENHANCE_MODELS: VideoEnhanceModelDefinition[] = [
     vendor: 'Topaz Labs',
     // Direct Topaz Labs API — no reseller in between. That is what unlocks the
     // explicit output geometry (true portrait 4K) and the full parameter set.
-    provider: 'replicate',
+    provider: 'topaz',
+
     providerModelId: 'prob-4',
     providerSchemaRef: 'topaz/video-express@2026-09-07',
     positioning: {
