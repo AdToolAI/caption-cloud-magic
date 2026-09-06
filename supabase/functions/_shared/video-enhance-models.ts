@@ -113,9 +113,12 @@ export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
       // The provider payload NEVER carries an invalid scene: a mode that is not
       // part of the published enum (e.g. a leftover from another engine) falls
       // back to the deterministic provenance preset.
+      const provenance = sceneForSource(source, [...VCUBE_SCENES]);
       const scene: VcubeScene = isVcubeScene(config.mode)
         ? config.mode
-        : sceneForSource(source, [...VCUBE_SCENES]);
+        : isVcubeScene(provenance)
+          ? provenance
+          : 'common';
       return {
         video: sourceUrl,
         scene,

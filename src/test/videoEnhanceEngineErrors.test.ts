@@ -84,8 +84,11 @@ describe('video enhance — every surface goes through the same copy', () => {
       // every tier is judged against the source before the start (the picker
       // disables no-op / downscale tiers), not only the final start button
       expect(source).toContain('describeResolutionChoices(');
-      expect(source).toContain('actual_width');
-      expect(source).toContain('actual_height');
+      // after the run: delivered pixels + target verdict come from the run's
+      // measured columns through the shared presenter (actual_width/height)
+      expect(source).toContain('deliveredFacts(');
+      expect(source).toContain('targetMatchDetail(');
+      expect(source).toContain('enhance-target-match');
     }
   });
 
