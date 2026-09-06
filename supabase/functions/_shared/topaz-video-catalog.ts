@@ -235,12 +235,31 @@ export const TOPAZ_INTERPOLATION_MODELS: TopazInterpolationModel[] = [
 
 export const TOPAZ_DEFAULT_INTERPOLATION_ID = 'apollo';
 
+export function isTopazInterpolationId(value: unknown): boolean {
+  return typeof value === 'string' && TOPAZ_INTERPOLATION_MODELS.some((m) => m.id === value);
+}
+
+/**
+ * A frame-interpolation filter is only sent when the frame rate really
+ * changes. Per the provider schema `frameRate` is forced to the source rate
+ * when no interpolation model is present, so adding one at an unchanged rate
+ * would bill an extra model for a no-op.
+ */
+export function topazInterpolationApplies(
+  sourceFps: number,
+  targetFps: number | null | undefined,
+): boolean {
+  if (targetFps === null || targetFps === undefined) return false;
+  return Math.round(targetFps) !== (Math.round(sourceFps) || 30);
+}
+
 export function topazInterpolationModel(id: string | undefined): TopazInterpolationModel {
   return (
     TOPAZ_INTERPOLATION_MODELS.find((m) => m.id === id) ??
     TOPAZ_INTERPOLATION_MODELS.find((m) => m.id === TOPAZ_DEFAULT_INTERPOLATION_ID)!
   );
 }
+
 
 // ---------------------------------------------------------------------------
 // Output quality (encoder contract)
