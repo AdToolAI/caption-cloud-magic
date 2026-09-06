@@ -16,6 +16,7 @@ import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
 import { VideoSourcePicker } from '@/components/ai-video/VideoSourcePicker';
 import type { CanonicalVideoAsset } from '@/lib/videoEnhance/canonicalVideoAsset';
 import { isAiGeneratedSource } from '@/lib/videoEnhance/recommend';
+import { engineErrorText } from '@/lib/videoEnhance/engineErrors';
 import {
   evaluateUpscale,
   formatFrame,
@@ -149,8 +150,19 @@ export function EnhanceVideoPanel({
   const [fps, setFps] = useState<number | null>(null);
   const [asset, setAsset] = useState<CanonicalVideoAsset | null>(null);
 
-  const { run, estimate, sourceMeta, isStarting, isRunning, error, previewPrice, startEnhance, cancelEnhance } =
-    useEnhanceVideo();
+  const {
+    run,
+    estimate,
+    sourceMeta,
+    isStarting,
+    isRunning,
+    error,
+    errorCode,
+    errorReason,
+    previewPrice,
+    startEnhance,
+    cancelEnhance,
+  } = useEnhanceVideo();
 
   const legacySource = !asset && !!initialSourceAssetId;
   const hasSource = !!asset || legacySource || (!asset && !!initialSourceUrl);
@@ -402,7 +414,11 @@ export function EnhanceVideoPanel({
         </>
       )}
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <p className="text-sm text-destructive" role="alert">
+          {engineErrorText(errorCode, error, lang, errorReason)}
+        </p>
+      )}
 
       {run?.status === 'completed' && run.output_url ? (
         <div className="space-y-3">

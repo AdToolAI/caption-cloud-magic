@@ -13,8 +13,22 @@ import {
 import { ArrowUpCircle, Sparkles, Zap, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useTx } from '@/lib/i18nText';
+import { useTranslation } from '@/hooks/useTranslation';
 import { uiLocale } from '@/lib/uiLocale';
 import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
+import {
+  ORDER_REJECTION_CODES,
+  enhanceCopy,
+  engineErrorText,
+  toEnhanceLang,
+} from '@/lib/videoEnhance/engineErrors';
+import {
+  evaluateUpscale,
+  formatFrame,
+  frameMeetsTarget,
+  projectProviderOutput,
+  resolveTargetFrame,
+} from '@/lib/videoEnhance/targetFrame';
 import {
   availableFps,
   availableResolutions,
@@ -63,6 +77,8 @@ export function AIVideoUpscaling({
   onUpscaleComplete,
 }: AIVideoUpscalingProps) {
   const tx = useTx();
+  const { language } = useTranslation();
+  const lang = toEnhanceLang(language);
   const [preset, setPreset] = useState<Preset>('recommended');
 
   const models = useMemo(() => visibleVideoEnhanceModels(), []);
@@ -72,8 +88,56 @@ export function AIVideoUpscaling({
   const [resolution, setResolution] = useState<VideoResolution>('1080p');
   const [fps, setFps] = useState<number | null>(null);
 
-  const { run, estimate, isStarting, isRunning, error, previewPrice, startEnhance } =
-    useEnhanceVideo();
+  const {
+    run,
+    estimate,
+    sourceMeta,
+    isStarting,
+    isRunning,
+    error,
+    errorCode,
+    errorReason,
+    previewPrice,
+    startEnhance,
+  } = useEnhanceVideo();
+
+  // ---- promised frame, upscale rule and executing engine -------------------
+  // The server measured the source during the price preview; the same rules
+  // as the engine run here so the user sees the verdict BEFORE paying.
+  const sourceWidth = sourceMeta?.width ?? 0;
+  const sourceHeight = sourceMeta?.height ?? 0;
+  const targetFrame = model && sourceWidth && sourceHeight
+    ? resolveTargetFrame(resolution, sourceWidth, sourceHeight)
+    : null;
+  const upscale = targetFrame
+    ? evaluateUpscale(targetFrame, { width: sourceWidth, height: sourceHeight })
+    : null;
+  const executionModelId = model && targetFrame
+    ? (frameMeetsTarget(
+        projectProviderOutput(model.id, resolution, sourceWidth, sourceHeight),
+        targetFrame,
+      )
+        ? model.id
+        : models.find((m) =>
+            frameMeetsTarget(
+              projectProviderOutput(m.id, resolution, sourceWidth, sourceHeight),
+              targetFrame,
+            ),
+          )?.id ?? null)
+    : model?.id ?? null;
+  const routedModel = model && executionModelId && executionModelId !== model.id
+    ? models.find((m) => m.id === executionModelId) ?? null
+    : null;
+  const frameUnreachable = targetFrame != null && executionModelId === null;
+  const blockedReason = upscale && !upscale.ok
+    ? enhanceCopy(upscale.reason === 'downscale' ? 'downscale' : 'notAnUpscale', lang)
+    : frameUnreachable
+      ? enhanceCopy('unreachable', lang)
+      : null;
+  // A rejected price preview (e.g. the server's upscale gate) also blocks the
+  // start button — the server would refuse anyway, but the user should not
+  // have to click to learn that.
+  const orderRejected = !!errorCode && ORDER_REJECTION_CODES.has(errorCode);
 
   // Presets simply preselect the central configuration.
   useEffect(() => {
@@ -232,7 +296,7 @@ export function AIVideoUpscaling({
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {model.processingModes.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>{m.label.de}</SelectItem>
+                            <SelectItem key={m.id} value={m.id}>{m.label[lang] ?? m.label.en}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -258,26 +322,62 @@ export function AIVideoUpscaling({
                 </div>
               )}
 
-              <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 p-3 text-sm">
-                <span className="text-muted-foreground">
-                  {resolution.toUpperCase()} ·{' '}
-                  {fps === null
-                    ? tx({ de: 'Original-FPS', en: 'Source FPS', es: 'FPS original' })
-                    : `${fps} FPS`}
-                </span>
-                <span className="font-bold">{videoUrl ? priceLabel : '—'}</span>
+              <div className="rounded-lg border border-border/60 bg-background/40 p-3 text-sm space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">
+                    {resolution.toUpperCase()} ·{' '}
+                    {fps === null
+                      ? tx({ de: 'Original-FPS', en: 'Source FPS', es: 'FPS original' })
+                      : `${fps} FPS`}
+                  </span>
+                  <span className="font-bold">{videoUrl ? priceLabel : '—'}</span>
+                </div>
+                {/* Before the run: what the file is and what will really be delivered. */}
+                {targetFrame && (
+                  <p className="text-xs text-muted-foreground">
+                    {formatFrame({ width: sourceWidth, height: sourceHeight })} →{' '}
+                    <span className="text-foreground font-medium">{formatFrame(targetFrame)}</span>{' '}
+                    {tx({ de: 'Pixel', en: 'pixels', es: 'píxeles' })}
+                    {sourceMeta?.durationSeconds
+                      ? ` · ${sourceMeta.durationSeconds.toFixed(1)} s`
+                      : ''}
+                  </p>
+                )}
+                {routedModel && !blockedReason && (
+                  <p className="text-xs text-primary/90">
+                    {tx({
+                      de: 'Läuft auf der Engine, die dieses Format wirklich liefern kann:',
+                      en: 'Runs on the engine that can really deliver this frame:',
+                      es: 'Se ejecuta en el motor que sí puede entregar este formato:',
+                    })}{' '}
+                    {routedModel.name}
+                  </p>
+                )}
+                {/* During the run: the live status of the job. */}
+                {run && run.status !== 'completed' && (
+                  <p className="text-xs text-muted-foreground" aria-live="polite">
+                    {tx({ de: 'Status', en: 'Status', es: 'Estado' })}: {run.status.replace(/_/g, ' ')}
+                  </p>
+                )}
               </div>
 
-              {error && (
+              {blockedReason && (
                 <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg">
                   <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm">{error}</span>
+                  <span className="text-sm">{blockedReason}</span>
+                </div>
+              )}
+
+              {error && !blockedReason && (
+                <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg" role="alert">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-sm">{engineErrorText(errorCode, error, lang, errorReason)}</span>
                 </div>
               )}
 
               <Button
                 onClick={() => void handleEnhance()}
-                disabled={isStarting || isRunning || !videoUrl}
+                disabled={isStarting || isRunning || !videoUrl || !!blockedReason || orderRejected}
                 className="w-full gap-2"
               >
                 {isStarting || isRunning ? (
@@ -294,7 +394,27 @@ export function AIVideoUpscaling({
               </Button>
 
               {run?.status === 'completed' && run.output_url && (
-                <video src={run.output_url} controls className="w-full rounded-lg" />
+                <div className="space-y-2">
+                  <video src={run.output_url} controls className="w-full rounded-lg" />
+                  {/* After the run: the measured facts of the delivered file. */}
+                  {run.actual_width && run.actual_height && (
+                    <p className="text-xs text-muted-foreground">
+                      {tx({ de: 'Geliefert', en: 'Delivered', es: 'Entregado' })}:{' '}
+                      <span className="text-foreground font-medium">
+                        {run.actual_width}×{run.actual_height}
+                      </span>{' '}
+                      {tx({ de: 'Pixel', en: 'pixels', es: 'píxeles' })}
+                      {run.output_size_bytes
+                        ? ` · ${(run.output_size_bytes / (1024 * 1024)).toFixed(1)} MB`
+                        : ''}
+                      {run.output_fps ? ` · ${Math.round(run.output_fps)} FPS` : ''}
+                      {run.output_duration_seconds
+                        ? ` · ${run.output_duration_seconds.toFixed(1)} s`
+                        : ''}
+                      {run.output_codec ? ` · ${run.output_codec.toUpperCase()}` : ''}
+                    </p>
+                  )}
+                </div>
               )}
             </>
           )}

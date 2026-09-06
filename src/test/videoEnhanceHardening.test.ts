@@ -130,4 +130,42 @@ describe('video enhance — stuck runs finish by themselves', () => {
     expect(reconcile).toContain('last_reconciled_at');
     expect(reconcile).toContain('backoffMinutes');
   });
+
+  it('closes deterministic output verdicts instead of re-downloading forever', () => {
+    const reconcile = fn('video-enhance-reconcile');
+    // The verdict on the provider file is terminal after one confirming re-measure …
+    expect(reconcile).toMatch(/DETERMINISTIC_OUTPUT_FAILURES\s*=\s*new Set\(\[[^\]]*"OUTPUT_MISMATCH"/);
+    expect(reconcile).toMatch(/DETERMINISTIC_OUTPUT_FAILURES\s*=\s*new Set\(\[[^\]]*"OUTPUT_INVALID"/);
+    expect(reconcile).toMatch(/OUTPUT_VERDICT_CONFIRM_ATTEMPTS\s*=\s*2/);
+    // … and it is closed through the failure path, which releases the reservation.
+    const branch = reconcile.slice(
+      reconcile.indexOf('run.status === "asset_persist_failed"'),
+      reconcile.indexOf('if (!run.provider_prediction_id)'),
+    );
+    expect(branch).toContain('DETERMINISTIC_OUTPUT_FAILURES.has(run.error_code)');
+    expect(branch).toContain('finalizeFailure(');
+    expect(branch.indexOf('finalizeFailure(')).toBeLessThan(branch.indexOf('finalizeSuccess('));
+  });
+
+  it('sends transient persistence retries to manual review after the horizon', () => {
+    const reconcile = fn('video-enhance-reconcile');
+    const branch = reconcile.slice(
+      reconcile.indexOf('run.status === "asset_persist_failed"'),
+      reconcile.indexOf('if (!run.provider_prediction_id)'),
+    );
+    expect(branch).toContain('ageMinutes > horizonMinutes');
+    expect(branch).toContain('"manual_review"');
+    // The horizon check sits before the retry, so a retry never bypasses it.
+    expect(branch.indexOf('ageMinutes > horizonMinutes')).toBeLessThan(branch.indexOf('finalizeSuccess('));
+  });
+
+  it('refunds on a closed output verdict through the existing release ledger', () => {
+    const finalize = shared('video-enhance-finalize.ts');
+    const failure = finalize.slice(
+      finalize.indexOf('export async function finalizeFailure'),
+      finalize.indexOf('export async function finalizeCancelConfirmed'),
+    );
+    expect(failure).toContain("operation: 'release'");
+    expect(failure).toContain("'provider_failed'");
+  });
 });

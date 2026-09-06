@@ -66,9 +66,11 @@ export async function verifySignature(
   const age = Math.abs(Date.now() / 1000 - Number(timestamp));
   if (!Number.isFinite(age) || age > REPLAY_WINDOW_SECONDS) return { ok: false, reason: "stale_timestamp" };
 
+  // Type-only cast: the newer Deno lib types `Uint8Array<ArrayBufferLike>`
+  // more strictly than WebCrypto's `BufferSource`; the bytes are unchanged.
   const key = await crypto.subtle.importKey(
     "raw",
-    base64ToBytes(secret.split("_").pop() ?? secret),
+    base64ToBytes(secret.split("_").pop() ?? secret) as unknown as BufferSource,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
