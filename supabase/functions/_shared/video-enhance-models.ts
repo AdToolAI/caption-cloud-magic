@@ -293,7 +293,7 @@ export function isModelUnlocked(
 // Rate cards — mirror of src/lib/videoEnhance/rates.ts
 // ---------------------------------------------------------------------------
 
-export const VIDEO_PROVIDER_PRICING_VERSION = 'video-rates-2026-09-06-topaz-units';
+export const VIDEO_PROVIDER_PRICING_VERSION = 'video-rates-2026-09-06-topaz-direct-credits';
 /**
  * Hard ceiling on the customer price as a multiple of provider cost.
  * AdTool Video Enhance stays deliberately cheap: the effective multiplier must

@@ -13,7 +13,7 @@ import type { QualityTier, VideoResolution } from '@/config/videoEnhanceModels/t
  */
 
 /** Bumped whenever any video rate card below changes. */
-export const VIDEO_PROVIDER_PRICING_VERSION = 'video-rates-2026-09-06-topaz-units';
+export const VIDEO_PROVIDER_PRICING_VERSION = 'video-rates-2026-09-06-topaz-direct-credits';
 
 /** Tolerance before an actual/predicted cost gap raises an admin warning. */
 /**

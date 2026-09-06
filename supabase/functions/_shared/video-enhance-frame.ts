@@ -61,7 +61,7 @@ export type LabelReading = 'orientation_aware' | 'line_count';
 
 export const ENGINE_LABEL_READING: Record<string, LabelReading> = {
   'bytedance-vcube': 'orientation_aware',
-  'topaz-video-upscale': 'line_count',
+  'topaz-video-upscale': 'orientation_aware',
 };
 
 /** The frame this engine will really return for this source. */
