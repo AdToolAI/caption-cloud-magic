@@ -17185,6 +17185,8 @@ translations.es.dc = {
   completed: "¡Vídeo listo!",
   renderFailed: "Error de renderizado",
   estimatedRemaining: "Tiempo restante: {time}",
+  elapsedTime: "{time} transcurrido",
+  typicalDuration: "Habitual para {quality}: {range} min",
   downloadVideo: "Descargar video",
   backToEditor: "Volver al editor",
   retryRender: "Reintentar",
