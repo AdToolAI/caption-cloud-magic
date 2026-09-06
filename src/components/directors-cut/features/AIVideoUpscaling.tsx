@@ -77,6 +77,8 @@ export function AIVideoUpscaling({
   onUpscaleComplete,
 }: AIVideoUpscalingProps) {
   const tx = useTx();
+  const { language } = useTranslation();
+  const lang = toEnhanceLang(language);
   const [preset, setPreset] = useState<Preset>('recommended');
 
   const models = useMemo(() => visibleVideoEnhanceModels(), []);
@@ -86,8 +88,55 @@ export function AIVideoUpscaling({
   const [resolution, setResolution] = useState<VideoResolution>('1080p');
   const [fps, setFps] = useState<number | null>(null);
 
-  const { run, estimate, isStarting, isRunning, error, previewPrice, startEnhance } =
-    useEnhanceVideo();
+  const {
+    run,
+    estimate,
+    sourceMeta,
+    isStarting,
+    isRunning,
+    error,
+    errorCode,
+    previewPrice,
+    startEnhance,
+  } = useEnhanceVideo();
+
+  // ---- promised frame, upscale rule and executing engine -------------------
+  // The server measured the source during the price preview; the same rules
+  // as the engine run here so the user sees the verdict BEFORE paying.
+  const sourceWidth = sourceMeta?.width ?? 0;
+  const sourceHeight = sourceMeta?.height ?? 0;
+  const targetFrame = model && sourceWidth && sourceHeight
+    ? resolveTargetFrame(resolution, sourceWidth, sourceHeight)
+    : null;
+  const upscale = targetFrame
+    ? evaluateUpscale(targetFrame, { width: sourceWidth, height: sourceHeight })
+    : null;
+  const executionModelId = model && targetFrame
+    ? (frameMeetsTarget(
+        projectProviderOutput(model.id, resolution, sourceWidth, sourceHeight),
+        targetFrame,
+      )
+        ? model.id
+        : models.find((m) =>
+            frameMeetsTarget(
+              projectProviderOutput(m.id, resolution, sourceWidth, sourceHeight),
+              targetFrame,
+            ),
+          )?.id ?? null)
+    : model?.id ?? null;
+  const routedModel = model && executionModelId && executionModelId !== model.id
+    ? models.find((m) => m.id === executionModelId) ?? null
+    : null;
+  const frameUnreachable = targetFrame != null && executionModelId === null;
+  const blockedReason = upscale && !upscale.ok
+    ? enhanceCopy(upscale.reason === 'downscale' ? 'downscale' : 'notAnUpscale', lang)
+    : frameUnreachable
+      ? enhanceCopy('unreachable', lang)
+      : null;
+  // A rejected price preview (e.g. the server's upscale gate) also blocks the
+  // start button — the server would refuse anyway, but the user should not
+  // have to click to learn that.
+  const orderRejected = !!errorCode && ORDER_REJECTION_CODES.has(errorCode);
 
   // Presets simply preselect the central configuration.
   useEffect(() => {
