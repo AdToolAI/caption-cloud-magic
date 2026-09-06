@@ -373,3 +373,32 @@ export function topazScaleFitsView(
     factor <= model.fixedUpscale * (1 + TOPAZ_SCALE_TOLERANCE)
   );
 }
+
+/**
+ * Mirror of the server rule: a model whose credit consumption is not yet
+ * confirmed stays VISIBLE (with a beta marker) but cannot be started by a
+ * normal customer. The server is the authority; this only keeps the UI honest.
+ */
+export function isTopazModelStartableView(id: string | undefined, isTestUser: boolean): boolean {
+  const model = TOPAZ_VIDEO_MODEL_VIEWS.find((m) => m.id === id);
+  if (!model) return false;
+  return model.costVerified || isTestUser;
+}
+
+export function isTopazInterpolationIdView(value: unknown): boolean {
+  return typeof value === 'string' && TOPAZ_INTERPOLATION_VIEWS.some((m) => m.id === value);
+}
+
+export function isTopazOutputQualityView(value: unknown): value is TopazOutputQuality {
+  return value === 'efficient' || value === 'high' || value === 'master';
+}
+
+/** Interpolation is only part of the order when the frame rate really changes. */
+export function topazInterpolationAppliesView(
+  sourceFps: number | null | undefined,
+  targetFps: number | null | undefined,
+): boolean {
+  if (targetFps === null || targetFps === undefined) return false;
+  if (!sourceFps) return true;
+  return Math.round(targetFps) !== Math.round(sourceFps);
+}
