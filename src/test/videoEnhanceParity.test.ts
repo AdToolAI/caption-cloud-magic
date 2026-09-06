@@ -174,3 +174,47 @@ describe('rollout gates', () => {
     for (const card of Object.values(SERVER_CARDS)) expect(card.costUnverified).toBe(true);
   });
 });
+
+describe('Topaz order contract parity', () => {
+  const base: EnhanceConfig = {
+    modelId: 'topaz-video-upscale',
+    mode: 'proteus',
+    resolution: '1080p',
+    fps: null,
+    tier: 'standard',
+  };
+
+  // An unknown encoder, interpolation model or parameter block must be
+  // REJECTED on both sides — never quietly replaced with a default, or the
+  // customer pays for something other than what the interface promised.
+  const cases: { name: string; config: EnhanceConfig; error: string }[] = [
+    {
+      name: 'unknown output quality',
+      config: { ...base, outputQuality: 'ultra' as never },
+      error: 'unsupported_output_quality',
+    },
+    {
+      name: 'unknown interpolation model',
+      config: { ...base, fps: 60, interpolationModel: 'nope' },
+      error: 'unsupported_interpolation_model',
+    },
+    {
+      name: 'manual parameters on a model without a parameter block',
+      config: { ...base, mode: 'iris', params: { sharpen: 40 } },
+      error: 'manual_params_not_supported',
+    },
+  ];
+
+  for (const c of cases) {
+    it(`${c.name}: both sides reject with the same code`, () => {
+      expect(validateClient(c.config, 8, entitled).error).toBe(c.error);
+      expect(validateServer(c.config, 8, noEnv).error).toBe(c.error);
+    });
+  }
+
+  it('accepts a well-formed Topaz order on both sides', () => {
+    const config: EnhanceConfig = { ...base, outputQuality: 'master' };
+    expect(validateClient(config, 8, entitled).ok).toBe(true);
+    expect(validateServer(config, 8, noEnv).ok).toBe(true);
+  });
+});
