@@ -391,7 +391,10 @@ export function AIVideoUpscaling({
                 </div>
               )}
 
-              <div className="rounded-lg border border-border/60 bg-background/40 p-3 text-sm space-y-1">
+              <div
+                className="rounded-lg border border-border/60 bg-background/40 p-3 text-sm space-y-2"
+                data-testid="dc-enhance-delivery-plan"
+              >
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">
                     {resolution.toUpperCase()} ·{' '}
@@ -401,33 +404,62 @@ export function AIVideoUpscaling({
                   </span>
                   <span className="font-bold">{videoUrl ? priceLabel : '—'}</span>
                 </div>
-                {/* Before the run: what the file is and what will really be delivered. */}
-                {targetFrame && (
-                  <p className="text-xs text-muted-foreground">
-                    {formatFrame({ width: sourceWidth, height: sourceHeight })} →{' '}
-                    <span className="text-foreground font-medium">{formatFrame(targetFrame)}</span>{' '}
-                    {tx({ de: 'Pixel', en: 'pixels', es: 'píxeles' })}
-                    {sourceMeta?.durationSeconds
-                      ? ` · ${sourceMeta.durationSeconds.toFixed(1)} s`
-                      : ''}
-                  </p>
-                )}
-                {routedModel && !blockedReason && (
-                  <p className="text-xs text-primary/90">
+                {/* Before the run: source, target, requested and executing engine. */}
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+                  <dt className="text-muted-foreground">{tx({ de: 'Quelle', en: 'Source', es: 'Origen' })}</dt>
+                  <dd className="tabular-nums">
+                    {sourceKnown
+                      ? `${formatFrame({ width: sourceWidth, height: sourceHeight })} ${tx({ de: 'Pixel', en: 'pixels', es: 'píxeles' })}${
+                          sourceMeta?.durationSeconds ? ` · ${sourceMeta.durationSeconds.toFixed(1)} s` : ''
+                        }`
+                      : tx({ de: 'Quelle wird vermessen …', en: 'Measuring the source…', es: 'Midiendo el origen…' })}
+                  </dd>
+                  <dt className="text-muted-foreground">{tx({ de: 'Ziel', en: 'Target', es: 'Objetivo' })}</dt>
+                  <dd className="tabular-nums text-foreground font-medium">
+                    {targetFrame ? `${formatFrame(targetFrame)} ${tx({ de: 'Pixel', en: 'pixels', es: 'píxeles' })}` : '—'}
+                  </dd>
+                  <dt className="text-muted-foreground">
+                    {tx({ de: 'Gewählte Engine', en: 'Requested engine', es: 'Motor solicitado' })}
+                  </dt>
+                  <dd>{model.name}</dd>
+                  <dt className="text-muted-foreground">
+                    {tx({ de: 'Ausführende Engine', en: 'Executing engine', es: 'Motor que ejecuta' })}
+                  </dt>
+                  <dd className={routed ? 'text-primary/90 font-medium' : ''}>
+                    {executionModelId ? engineDisplayName(executionModelId) : '—'}
+                  </dd>
+                  {showFootageRow && (
+                    <>
+                      <dt className="text-muted-foreground">
+                        {tx({ de: 'Materialart', en: 'Footage type', es: 'Tipo de material' })}
+                      </dt>
+                      <dd>
+                        {executionModeLabel}
+                        <span className="text-muted-foreground">
+                          {' '}·{' '}
+                          {modeTouched && !routed
+                            ? tx({ de: 'Von dir gewählt', en: 'Chosen by you', es: 'Elegido por ti' })
+                            : tx({
+                                de: 'Automatisch aus der Herkunft des Clips',
+                                en: 'Set automatically from the clip origin',
+                                es: 'Definido automáticamente según el origen del clip',
+                              })}
+                        </span>
+                      </dd>
+                    </>
+                  )}
+                </dl>
+                {routed && !blockedReason && (
+                  <p className="text-xs text-primary/90" data-testid="dc-enhance-routed-note">
                     {tx({
-                      de: 'Läuft auf der Engine, die dieses Format wirklich liefern kann:',
-                      en: 'Runs on the engine that can really deliver this frame:',
-                      es: 'Se ejecuta en el motor que sí puede entregar este formato:',
-                    })}{' '}
-                    {routedModel.name}
+                      de: 'Weicht von der gewählten Engine ab: Nur diese Engine kann das Zielformat für deinen Clip liefern.',
+                      en: 'Different from the requested engine: only this engine can deliver the target frame for your clip.',
+                      es: 'Distinto del motor solicitado: solo este motor puede entregar el formato objetivo para tu clip.',
+                    })}
                   </p>
                 )}
-                {/* During the run: the live status of the job. */}
-                {run && run.status !== 'completed' && (
-                  <p className="text-xs text-muted-foreground" aria-live="polite">
-                    {tx({ de: 'Status', en: 'Status', es: 'Estado' })}: {run.status.replace(/_/g, ' ')}
-                  </p>
-                )}
+                {/* During the run: the engine that really executes, phase and elapsed time. */}
+                {isRunning && run && <EnhanceRunProgress run={run} lang={lang} />}
               </div>
 
               {blockedReason && (
