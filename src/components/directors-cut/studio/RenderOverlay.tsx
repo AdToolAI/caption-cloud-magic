@@ -135,10 +135,13 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
                 <Progress value={progress} className="h-3 bg-white/10" />
                 <div className="flex justify-between text-sm">
                   <span className="text-white/50">{Math.round(progress)}%</span>
-                  {estimatedRemaining && (
-                    <span className="text-white/40">{estimatedRemaining}</span>
+                  {elapsedLabel && (
+                    <span className="text-white/40">{elapsedLabel}</span>
                   )}
                 </div>
+                {typicalLabel && (
+                  <p className="text-xs text-white/40 text-center">{typicalLabel}</p>
+                )}
               </div>
             )}
 
