@@ -67,7 +67,11 @@ export type CombinationError =
   | 'unknown_tier'
   | 'tier_not_entitled'
   | 'duration_too_short'
-  | 'duration_too_long';
+  | 'duration_too_long'
+  | 'unsupported_output_quality'
+  | 'unsupported_interpolation_model'
+  | 'manual_params_not_supported';
+
 
 export interface CombinationResult {
   ok: boolean;
