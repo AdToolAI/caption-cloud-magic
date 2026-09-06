@@ -132,13 +132,13 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
         </SelectValue>
       </SelectTrigger>
       <SelectContent className="max-h-[480px] bg-card/95 backdrop-blur-xl border-border/60">
-        {GROUP_ORDER.map((g) => {
+        {UI_GROUP_ORDER.map((g) => {
           const models = grouped[g];
           if (!models.length) return null;
           return (
             <SelectGroup key={g}>
               <SelectLabel className="text-[11px] uppercase tracking-wider text-primary/80">
-                {TOOLKIT_GROUP_LABELS[g][lang]}
+                {SPEC_GROUP_LABELS[g][lang]}
               </SelectLabel>
               {models.map((m) => {
                 const isMaintenance = m.status === 'maintenance';
