@@ -11,7 +11,10 @@ import {
   validateCombination,
   VIDEO_ENHANCE_SPECS,
   topazScaleFits,
+  topazInterpolationApplies,
+  isTopazModelStartable,
   topazVideoModelOrDefault,
+
   type EnhanceConfig,
   type QualityTier,
   type SourceMetadata,
@@ -417,7 +420,30 @@ serve(async (req) => {
           400,
         );
       }
+
+      // ---- unconfirmed credit consumption ----------------------------------
+      // A Topaz model whose credit table no billed AdTool run has confirmed
+      // may only be started by a validation account. It stays visible in the
+      // interface as beta; the start is what is blocked.
+      if (!isTopazModelStartable(config.mode, isTestAllowlisted(env, user.id))) {
+        return json(
+          {
+            error:
+              `${topazModel.name} is still in validation and cannot be started yet. ` +
+              `Pick another model.`,
+            code: "TOPAZ_MODEL_NOT_VERIFIED",
+            mode: config.mode,
+          },
+          403,
+        );
+      }
     }
+
+    // Does a frame-interpolation filter really travel with this order? Same
+    // rule the provider payload uses — never persist a model that never ran.
+    const interpolationInOrder =
+      spec.provider === "topaz" && topazInterpolationApplies(source.meta.fps, config.fps);
+
 
     let pricing;
     try {
@@ -501,7 +527,10 @@ serve(async (req) => {
       executing_topaz_model: spec.provider === "topaz"
         ? topazVideoModelOrDefault(config.mode).slug
         : null,
-      interpolation_model: config.interpolationModel ?? null,
+      // Only stored when a frame-interpolation filter really travels with the
+      // order — otherwise the run row would claim a model that never ran.
+      interpolation_model: interpolationInOrder ? config.interpolationModel ?? null : null,
+
       source_asset_id: source.assetId,
       source_url: source.url,
       source_duration_seconds: source.meta.durationSeconds,

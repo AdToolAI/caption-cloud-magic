@@ -15,7 +15,9 @@ export type TopazSpecialty =
   | 'cgi'
   | 'denoise'
   | 'deblur'
+  | 'clarity'
   | 'legacy';
+
 
 export type TopazCreditFamily = 'precision' | 'restoration';
 
@@ -81,12 +83,27 @@ export const TOPAZ_VIDEO_MODEL_VIEWS: TopazVideoModelView[] = [
     },
   },
   {
+    id: 'theia',
+    slug: 'thd-3',
+    name: 'Theia',
+    specialty: 'clarity',
+    creditFamily: 'precision',
+    manualParameters: true,
+    costVerified: false,
+    label: { en: 'Theia', de: 'Theia', es: 'Theia' },
+    hint: {
+      en: 'Extra clarity and crisp edges, without adding noise',
+      de: 'Mehr Klarheit und klare Kanten, ohne neues Rauschen',
+      es: 'Más claridad y bordes nítidos, sin añadir ruido',
+    },
+  },
+  {
     id: 'iris',
     slug: 'iris-3',
     name: 'Iris',
     specialty: 'faces',
     creditFamily: 'precision',
-    manualParameters: true,
+    manualParameters: false,
     costVerified: false,
     label: { en: 'Iris', de: 'Iris', es: 'Iris' },
     hint: {
@@ -101,7 +118,7 @@ export const TOPAZ_VIDEO_MODEL_VIEWS: TopazVideoModelView[] = [
     name: 'Artemis',
     specialty: 'general',
     creditFamily: 'precision',
-    manualParameters: true,
+    manualParameters: false,
     costVerified: false,
     label: { en: 'Artemis', de: 'Artemis', es: 'Artemis' },
     hint: {
@@ -116,7 +133,7 @@ export const TOPAZ_VIDEO_MODEL_VIEWS: TopazVideoModelView[] = [
     name: 'Gaia',
     specialty: 'cgi',
     creditFamily: 'precision',
-    manualParameters: true,
+    manualParameters: false,
     costVerified: false,
     label: { en: 'Gaia', de: 'Gaia', es: 'Gaia' },
     hint: {
@@ -146,7 +163,7 @@ export const TOPAZ_VIDEO_MODEL_VIEWS: TopazVideoModelView[] = [
     name: 'Themis 2',
     specialty: 'deblur',
     creditFamily: 'restoration',
-    manualParameters: true,
+    manualParameters: false,
     costVerified: false,
     label: { en: 'Themis', de: 'Themis', es: 'Themis' },
     hint: {
@@ -161,7 +178,7 @@ export const TOPAZ_VIDEO_MODEL_VIEWS: TopazVideoModelView[] = [
     name: 'Dione',
     specialty: 'legacy',
     creditFamily: 'precision',
-    manualParameters: true,
+    manualParameters: false,
     costVerified: false,
     label: { en: 'Dione', de: 'Dione', es: 'Dione' },
     hint: {
@@ -171,6 +188,7 @@ export const TOPAZ_VIDEO_MODEL_VIEWS: TopazVideoModelView[] = [
     },
   },
 ];
+
 
 export const TOPAZ_DEFAULT_MODEL_ID = 'proteus';
 
@@ -280,13 +298,18 @@ export const TOPAZ_OUTPUT_QUALITY_VIEWS: {
   },
   {
     id: 'master',
-    label: { en: 'Master', de: 'Master', es: 'Máster' },
+    label: {
+      en: 'Maximum quality',
+      de: 'Maximale Qualität',
+      es: 'Calidad máxima',
+    },
     hint: {
       en: 'Largest file, for further editing',
       de: 'Größte Datei, für die Weiterbearbeitung',
       es: 'Archivo más grande, para seguir editando',
     },
   },
+
 ];
 
 export const TOPAZ_DEFAULT_OUTPUT_QUALITY: TopazOutputQuality = 'high';
@@ -330,7 +353,12 @@ export const TOPAZ_MANUAL_PARAM_VIEWS: {
   },
 ];
 
-export const TOPAZ_SCALE_TOLERANCE = 0.2;
+/**
+ * The provider documents the fixed factors as absolutes with no tolerance
+ * window; the only slack is its pixel alignment to a multiple of 4.
+ */
+export const TOPAZ_SCALE_TOLERANCE = 0.02;
+
 
 /** Mirror of the server rule: a fixed-factor model may not run off-factor. */
 export function topazScaleFitsView(
@@ -344,4 +372,33 @@ export function topazScaleFitsView(
     factor >= model.fixedUpscale * (1 - TOPAZ_SCALE_TOLERANCE) &&
     factor <= model.fixedUpscale * (1 + TOPAZ_SCALE_TOLERANCE)
   );
+}
+
+/**
+ * Mirror of the server rule: a model whose credit consumption is not yet
+ * confirmed stays VISIBLE (with a beta marker) but cannot be started by a
+ * normal customer. The server is the authority; this only keeps the UI honest.
+ */
+export function isTopazModelStartableView(id: string | undefined, isTestUser: boolean): boolean {
+  const model = TOPAZ_VIDEO_MODEL_VIEWS.find((m) => m.id === id);
+  if (!model) return false;
+  return model.costVerified || isTestUser;
+}
+
+export function isTopazInterpolationIdView(value: unknown): boolean {
+  return typeof value === 'string' && TOPAZ_INTERPOLATION_VIEWS.some((m) => m.id === value);
+}
+
+export function isTopazOutputQualityView(value: unknown): value is TopazOutputQuality {
+  return value === 'efficient' || value === 'high' || value === 'master';
+}
+
+/** Interpolation is only part of the order when the frame rate really changes. */
+export function topazInterpolationAppliesView(
+  sourceFps: number | null | undefined,
+  targetFps: number | null | undefined,
+): boolean {
+  if (targetFps === null || targetFps === undefined) return false;
+  if (!sourceFps) return true;
+  return Math.round(targetFps) !== Math.round(sourceFps);
 }

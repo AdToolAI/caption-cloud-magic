@@ -28,12 +28,16 @@ import {
   TOPAZ_OUTPUT_QUALITY,
   TOPAZ_VIDEO_MODEL_IDS,
   TOPAZ_VIDEO_MODELS,
+  isTopazInterpolationId,
+  isTopazOutputQuality,
+  topazInterpolationApplies,
   topazInterpolationModel,
   topazManualFilterParams,
   topazOutputQuality,
   topazVideoModelOrDefault,
   type TopazCreditFamily,
 } from './topaz-video-catalog.ts';
+
 
 export * from './topaz-video-catalog.ts';
 
@@ -212,10 +216,12 @@ export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
 
       const filters: Record<string, unknown>[] = [upscale];
       // Frame interpolation is only requested when the frame rate really
-      // changes — otherwise Topaz would re-time a clip that is already right.
-      if (fps !== sourceFps) {
+      // changes — otherwise Topaz would re-time a clip that is already right
+      // and bill a second model for a no-op.
+      if (topazInterpolationApplies(sourceFps, config.fps)) {
         filters.push({ model: topazInterpolationModel(config.interpolationModel).slug, fps });
       }
+
 
       return {
         source: {
@@ -256,7 +262,10 @@ export type CombinationError =
   | 'unknown_tier'
   | 'tier_not_entitled'
   | 'duration_too_short'
-  | 'duration_too_long';
+  | 'duration_too_long'
+  | 'unsupported_output_quality'
+  | 'unsupported_interpolation_model'
+  | 'manual_params_not_supported';
 
 export function outputsFor(spec: VideoEnhanceSpec, mode: string): OutputCombination[] {
   return spec.outputsByMode?.[mode] ?? spec.outputs;
@@ -290,12 +299,34 @@ export function validateCombination(
   }
   if (!spec.tiers.includes(config.tier)) return { ok: false, error: 'unknown_tier' };
   if (!isEntitled(spec, config.tier, env)) return { ok: false, error: 'tier_not_entitled' };
+  // Topaz-only encoder / interpolation / parameter contract. An unknown value
+  // is REJECTED, never quietly replaced by a default: the customer would
+  // otherwise pay for something other than what the interface promised.
+  if (spec.provider === 'topaz') {
+    if (config.outputQuality !== undefined && !isTopazOutputQuality(config.outputQuality)) {
+      return { ok: false, error: 'unsupported_output_quality' };
+    }
+    if (
+      config.interpolationModel !== undefined &&
+      !isTopazInterpolationId(config.interpolationModel)
+    ) {
+      return { ok: false, error: 'unsupported_interpolation_model' };
+    }
+    if (
+      config.params &&
+      Object.keys(config.params).length > 0 &&
+      !topazVideoModelOrDefault(config.mode).manualParameters
+    ) {
+      return { ok: false, error: 'manual_params_not_supported' };
+    }
+  }
   if (durationSeconds !== undefined) {
     if (durationSeconds < spec.minDurationSeconds) return { ok: false, error: 'duration_too_short' };
     if (durationSeconds > spec.maxDurationSeconds) return { ok: false, error: 'duration_too_long' };
   }
   return { ok: true };
 }
+
 
 /**
  * Three-stage unlock: the backend switch is authoritative, the test allowlist

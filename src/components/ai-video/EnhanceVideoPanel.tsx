@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useUserRoles } from '@/hooks/useUserRoles';
 import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
 import { VideoSourcePicker } from '@/components/ai-video/VideoSourcePicker';
 import { EnhanceRunProgress } from '@/components/ai-video/EnhanceRunProgress';
@@ -39,6 +40,8 @@ import {
   TOPAZ_DEFAULT_OUTPUT_QUALITY,
   TOPAZ_INTERPOLATION_VIEWS,
   TOPAZ_OUTPUT_QUALITY_VIEWS,
+  isTopazModelStartableView,
+  topazInterpolationAppliesView,
   topazModelView,
   topazScaleFitsView,
   type TopazOutputQuality,
@@ -98,6 +101,12 @@ const COPY = {
     es: 'solo funciona a',
   },
   detectedFrom: { en: 'Detected from', de: 'Erkannt aus', es: 'Detectado de' },
+  betaBlocked: {
+    en: 'in validation, not startable yet',
+    de: 'in Prüfung, noch nicht startbar',
+    es: 'en validación, aún no iniciable',
+  },
+  betaTag: { en: 'beta', de: 'Beta', es: 'beta' },
   fromOrigin: {
     en: 'Set automatically from where the clip comes from',
     de: 'Automatisch aus der Herkunft des Clips gesetzt',
@@ -191,6 +200,9 @@ export function EnhanceVideoPanel({
   onCompleted,
 }: Props) {
   const { language } = useTranslation();
+  // Only validation accounts may start a model whose credit consumption is
+  // still unconfirmed; the server enforces the same rule.
+  const { isAdmin: isEnhanceTestUser } = useUserRoles();
   const lang: Lang = (['en', 'de', 'es'].includes(language) ? language : 'en') as Lang;
 
   const models = useMemo(() => visibleVideoEnhanceModels(), []);
@@ -263,18 +275,9 @@ export function EnhanceVideoPanel({
   }, [model, mode, modeTouched, aiSource, resolution]);
 
   // A fixed-factor Topaz model stops fitting as soon as the target size
-  // changes. Fall back to the general-purpose model instead of leaving a
-  // selection the server would have to reject.
-  useEffect(() => {
-    if (!model || model.id !== 'topaz-video-upscale') return;
-    const width = sourceMeta?.width ?? asset?.width ?? null;
-    const height = sourceMeta?.height ?? asset?.height ?? null;
-    if (!width || !height) return;
-    const target = resolveTargetFrame(resolution, width, height);
-    if (topazScaleFitsView(topazModelView(mode), { width, height }, target)) return;
-    setMode(TOPAZ_DEFAULT_MODEL_ID);
-    setModeTouched(false);
-  }, [model, mode, resolution, sourceMeta, asset]);
+  // changes. The selection is NOT rewritten behind the customer's back — the
+  // mismatch is named and the start is blocked until they resolve it.
+
 
   const fpsChoices = model ? availableFps(model, mode, resolution) : [];
   useEffect(() => {
@@ -312,6 +315,13 @@ export function EnhanceVideoPanel({
     if (next && next !== resolution) setResolution(next);
   }, [model, mode, sourceKnown, sourceWidth, sourceHeight, tierChoices, resolution]);
 
+  const topazEngine = model?.provider === 'topaz';
+  const sourceFps = sourceMeta?.fps ?? null;
+  // The frame-rate filter is only part of the order when the frame rate really
+  // changes — so it is only offered, priced and sent in that case.
+  const interpolationApplies = topazEngine && topazInterpolationAppliesView(sourceFps, fps);
+
+
   const config: EnhanceConfig | null = model
     ? {
         modelId: model.id,
@@ -320,12 +330,14 @@ export function EnhanceVideoPanel({
         resolution,
         fps,
         tier: availableTiers(model)[0] ?? 'standard',
-        // Topaz-only settings; harmless for an engine that has no encoder or
-        // interpolation choice of its own.
-        outputQuality,
-        interpolationModel,
+        // Topaz-only settings; an engine without an encoder or interpolation
+        // choice must not receive them at all.
+        ...(topazEngine ? { outputQuality } : {}),
+        ...(interpolationApplies ? { interpolationModel } : {}),
+
       }
     : null;
+
 
   useEffect(() => {
     if (!config || !hasSource) return;
@@ -387,12 +399,6 @@ export function EnhanceVideoPanel({
   const routed = !!executionModelId && executionModelId !== model.id;
   const frameUnreachable = targetFrame != null && executionModelId === null;
 
-  const blockedReason = upscale && !upscale.ok
-    ? (upscale.reason === 'downscale' ? tx('downscale', lang) : tx('noUpscale', lang))
-    : frameUnreachable
-      ? tx('unreachable', lang)
-      : null;
-
   const isTopaz = model.id === 'topaz-video-upscale';
   // Fixed-factor Topaz models (Proteus Natural 2x, Rhea 4x) are only offered
   // for a target size they are really trained for.
@@ -405,6 +411,21 @@ export function EnhanceVideoPanel({
       target,
     );
   };
+  // A model whose credit consumption we have not confirmed yet stays visible
+  // as beta, but cannot be started — the server enforces the same rule.
+  const modeStartable = (modeId: string): boolean =>
+    !isTopaz || isTopazModelStartableView(modeId, isEnhanceTestUser);
+
+  const blockedReason = upscale && !upscale.ok
+    ? (upscale.reason === 'downscale' ? tx('downscale', lang) : tx('noUpscale', lang))
+    : frameUnreachable
+      ? tx('unreachable', lang)
+      : !modeFits(mode)
+        ? `${topazModelView(mode).name} · ${tx('onlyFactor', lang)} ${topazModelView(mode).fixedUpscale}×`
+        : !modeStartable(mode)
+          ? `${topazModelView(mode).name} · ${tx('betaBlocked', lang)}`
+          : null;
+
 
   const autoDetectedFootage = !modeTouched && !!asset && model.processingModes.length > 1;
   // The footage type that really reaches the engine: the server derives it
@@ -479,20 +500,23 @@ export function EnhanceVideoPanel({
                       // target size is shown, but disabled with the reason —
                       // never silently run at a factor it was not trained for.
                       const fits = !isTopaz || modeFits(m.id);
+                      const startable = modeStartable(m.id);
                       const view = isTopaz ? topazModelView(m.id) : null;
                       return (
                         <SelectItem
                           key={m.id}
                           value={m.id}
-                          disabled={!fits}
+                          disabled={!fits || !startable}
                           data-testid={`enhance-mode-${m.id}`}
                         >
                           {m.label[lang]}
+                          {!startable ? ` · ${tx('betaTag', lang)}` : ''}
                           {!fits && view?.fixedUpscale
                             ? ` · ${tx('onlyFactor', lang)} ${view.fixedUpscale}×`
                             : ''}
                         </SelectItem>
                       );
+
                     })}
                   </SelectContent>
                 </Select>
@@ -532,7 +556,7 @@ export function EnhanceVideoPanel({
               </div>
             )}
 
-            {isTopaz && fps !== null && (
+            {interpolationApplies && (
               <div className="space-y-2">
                 <Label>{tx('motionModel', lang)}</Label>
                 <Select value={interpolationModel} onValueChange={setInterpolationModel}>
@@ -644,7 +668,26 @@ export function EnhanceVideoPanel({
                   </dd>
                 </>
               )}
+              {isTopaz && (
+                <>
+                  <dt className="text-muted-foreground">{tx('topazModel', lang)}</dt>
+                  <dd>{topazModelView(mode).name}</dd>
+                  <dt className="text-muted-foreground">{tx('outputQuality', lang)}</dt>
+                  <dd>{TOPAZ_OUTPUT_QUALITY_VIEWS.find((q) => q.id === outputQuality)?.label[lang]}</dd>
+                </>
+              )}
+              <dt className="text-muted-foreground">{tx('fps', lang)}</dt>
+              <dd className="tabular-nums">
+                {fps ? `${fps} fps` : sourceFps ? `${Math.round(sourceFps)} fps` : '—'}
+              </dd>
+              {interpolationApplies && (
+                <>
+                  <dt className="text-muted-foreground">{tx('motionModel', lang)}</dt>
+                  <dd>{TOPAZ_INTERPOLATION_VIEWS.find((m) => m.id === interpolationModel)?.name}</dd>
+                </>
+              )}
             </dl>
+
 
             {routed && !blockedReason && (
               <p className="text-xs text-primary/90" data-testid="enhance-routed-note">

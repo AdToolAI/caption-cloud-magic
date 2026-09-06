@@ -56,7 +56,7 @@ export interface VideoEnhanceModelDefinition {
   /** Real model name — always visible in the UI. No black box. */
   name: string;
   vendor: string;
-  provider: 'replicate';
+  provider: 'replicate' | 'topaz';
   /** Provider-side identifier, consumed only by the adapter. */
   providerModelId: string;
   /**

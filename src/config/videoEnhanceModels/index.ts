@@ -4,6 +4,12 @@ import {
   isVideoEnhanceModelKilled,
 } from './flags';
 import { VIDEO_ENHANCE_MODELS } from './models';
+import {
+  isTopazInterpolationIdView,
+  isTopazOutputQualityView,
+  topazModelView,
+} from './topazCatalog';
+
 import type {
   EnhanceConfig,
   OutputCombination,
@@ -67,7 +73,11 @@ export type CombinationError =
   | 'unknown_tier'
   | 'tier_not_entitled'
   | 'duration_too_short'
-  | 'duration_too_long';
+  | 'duration_too_long'
+  | 'unsupported_output_quality'
+  | 'unsupported_interpolation_model'
+  | 'manual_params_not_supported';
+
 
 export interface CombinationResult {
   ok: boolean;
@@ -99,6 +109,27 @@ export function validateCombination(
   if (model.entitlementTiers?.includes(config.tier) && !entitled(model.id, config.tier)) {
     return { ok: false, error: 'tier_not_entitled' };
   }
+  // Mirror of the server's Topaz contract: an unknown encoder, interpolation
+  // model or parameter set is rejected, never silently replaced.
+  if (model.provider === 'topaz') {
+    if (config.outputQuality !== undefined && !isTopazOutputQualityView(config.outputQuality)) {
+      return { ok: false, error: 'unsupported_output_quality' };
+    }
+    if (
+      config.interpolationModel !== undefined &&
+      !isTopazInterpolationIdView(config.interpolationModel)
+    ) {
+      return { ok: false, error: 'unsupported_interpolation_model' };
+    }
+    if (
+      config.params &&
+      Object.keys(config.params).length > 0 &&
+      !topazModelView(config.mode).manualParameters
+    ) {
+      return { ok: false, error: 'manual_params_not_supported' };
+    }
+  }
+
   if (durationSeconds !== undefined) {
     if (durationSeconds < model.minDurationSeconds) return { ok: false, error: 'duration_too_short' };
     if (durationSeconds > model.maxDurationSeconds) return { ok: false, error: 'duration_too_long' };
