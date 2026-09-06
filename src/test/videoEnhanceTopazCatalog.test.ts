@@ -23,16 +23,42 @@ const serverSource = readFileSync(
   'utf8',
 );
 
-function serverEntries(): { id: string; slug: string; family: string; fixed?: number }[] {
-  const out: { id: string; slug: string; family: string; fixed?: number }[] = [];
-  const re =
-    /id:\s*'([a-z0-9-]+)',\s*\n\s*slug:\s*'([a-z0-9-]+)',\s*\n\s*name:[^\n]*\n\s*specialty:[^\n]*\n\s*creditFamily:\s*'(precision|restoration)',\s*\n\s*manualParameters:\s*(?:true|false),\s*\n(?:\s*fixedUpscale:\s*(\d+),\s*\n)?/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(serverSource))) {
-    out.push({ id: m[1], slug: m[2], family: m[3], fixed: m[4] ? Number(m[4]) : undefined });
+interface ServerEntry {
+  id: string;
+  slug: string;
+  family: string;
+  fixed?: number;
+  manual: boolean;
+  verified: boolean;
+}
+
+/**
+ * Field-scan rather than one long pattern: the catalogue gains fields over
+ * time, and a positional regex would silently stop matching entries instead
+ * of failing loudly.
+ */
+function serverEntries(): ServerEntry[] {
+  const body = serverSource.slice(serverSource.indexOf('TOPAZ_VIDEO_MODELS'));
+  const blocks = body.split(/\n\s*\{\s*\n/).slice(1);
+  const out: ServerEntry[] = [];
+  for (const block of blocks) {
+    const id = /\bid:\s*'([a-z0-9-]+)'/.exec(block)?.[1];
+    const slug = /\bslug:\s*'([a-z0-9-]+)'/.exec(block)?.[1];
+    const family = /\bcreditFamily:\s*'(precision|restoration)'/.exec(block)?.[1];
+    if (!id || !slug || !family) continue;
+    const fixed = /\bfixedUpscale:\s*(\d+)/.exec(block)?.[1];
+    out.push({
+      id,
+      slug,
+      family,
+      fixed: fixed ? Number(fixed) : undefined,
+      manual: /\bmanualParameters:\s*true/.test(block),
+      verified: /\bcostVerified:\s*true/.test(block),
+    });
   }
   return out;
 }
+
 
 describe('Topaz video catalogue parity', () => {
   const server = serverEntries();
