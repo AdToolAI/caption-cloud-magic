@@ -117,6 +117,7 @@ serve(async (req) => {
     const gate = capabilityGate(
       {
         modelId: model,
+        resolution: WAN_RESOLUTION[model],
         mode: inferMode({ startImageUrl, endImageUrl }),
         durationSeconds: duration,
         aspectRatio,

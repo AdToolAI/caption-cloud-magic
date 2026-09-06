@@ -82,6 +82,7 @@ serve(async (req) => {
     const gate = capabilityGate(
       {
         modelId: model,
+        resolution: (model === 'seedance-1-lite' && body.resolution === '480p') ? '480p' : '720p',
         mode: inferMode({ startImageUrl, endImageUrl }),
         durationSeconds: duration,
         aspectRatio,

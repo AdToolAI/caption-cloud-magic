@@ -185,6 +185,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const gate = capabilityGate(
       {
         modelId: model,
+        resolution: model === 'pika-2-2-pro' ? '1080p' : '720p',
         mode: inferMode({ startImageUrl, endImageUrl }),
         durationSeconds: Number(duration),
         aspectRatio,

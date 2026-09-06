@@ -184,6 +184,7 @@ serve(async (req) => {
     const gate = capabilityGate(
       {
         modelId: model,
+        resolution: RESOLUTIONS[model],
         mode: inferMode({ startImageUrl: typeof image === "string" && image ? image : null }),
         durationSeconds: Number(duration),
         aspectRatio,
