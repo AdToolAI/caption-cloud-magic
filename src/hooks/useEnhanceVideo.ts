@@ -53,17 +53,61 @@ export interface EnhanceSource {
 const TERMINAL = ['completed', 'provider_failed', 'provider_cancelled_confirmed', 'manual_review'];
 const POLL_INTERVAL_MS = 5_000;
 
+/**
+ * Engine rejection with its machine-readable code, so surfaces can show a
+ * localized sentence instead of the raw server text (or raw JSON).
+ */
+export class EnhanceEngineError extends Error {
+  code: string | null;
+  constructor(message: string, code: string | null) {
+    super(message);
+    this.name = 'EnhanceEngineError';
+    this.code = code;
+  }
+}
+
+function parseEngineFailure(text: string): { message: string; code: string | null } {
+  try {
+    const parsed = JSON.parse(text) as { error?: unknown; code?: unknown };
+    if (parsed && typeof parsed === 'object') {
+      return {
+        message: typeof parsed.error === 'string' && parsed.error ? parsed.error : text,
+        code: typeof parsed.code === 'string' ? parsed.code : null,
+      };
+    }
+  } catch {
+    // plain text body
+  }
+  return { message: text, code: null };
+}
+
 async function callEngine(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('video-enhance', { body });
   if (error) {
-    const details =
-      typeof (error as { context?: { text?: () => Promise<string> } }).context?.text === 'function'
-        ? await (error as { context: { text: () => Promise<string> } }).context.text()
-        : error.message;
-    throw new Error(details);
+    let text = error.message;
+    const ctx = (error as { context?: { text?: () => Promise<string> } }).context;
+    if (typeof ctx?.text === 'function') {
+      try {
+        text = await ctx.text();
+      } catch {
+        // keep the client message
+      }
+    }
+    const failure = parseEngineFailure(text);
+    throw new EnhanceEngineError(failure.message, failure.code);
   }
-  if (data?.error) throw new Error(data.error);
+  if (data?.error) {
+    throw new EnhanceEngineError(
+      String(data.error),
+      typeof data.code === 'string' ? data.code : null,
+    );
+  }
   return data;
+}
+
+function failureOf(e: unknown): { message: string; code: string | null } {
+  if (e instanceof EnhanceEngineError) return { message: e.message, code: e.code };
+  return { message: e instanceof Error ? e.message : String(e), code: null };
 }
 
 /** Server-measured facts, authoritative over anything the client read. */
@@ -83,7 +127,20 @@ export function useEnhanceVideo() {
   const [sourceMeta, setSourceMeta] = useState<ServerSourceMeta | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Machine-readable engine code (e.g. VIDEO_ENHANCE_NOT_AN_UPSCALE) for localized copy. */
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
+
+  const clearFailure = useCallback(() => {
+    setError(null);
+    setErrorCode(null);
+  }, []);
+
+  const recordFailure = useCallback((e: unknown) => {
+    const failure = failureOf(e);
+    setError(failure.message);
+    setErrorCode(failure.code);
+  }, []);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
@@ -97,7 +154,7 @@ export function useEnhanceVideo() {
   /** Authoritative price preview — the server measures the source itself. */
   const previewPrice = useCallback(
     async (source: EnhanceSource, config: EnhanceConfig) => {
-      setError(null);
+      clearFailure();
       try {
         const data = await callEngine({
           action: 'estimate',
@@ -119,11 +176,11 @@ export function useEnhanceVideo() {
         setEstimate(next);
         return next;
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        recordFailure(e);
         return null;
       }
     },
-    [],
+    [clearFailure, recordFailure],
   );
 
   const pollUntilDone = useCallback(
@@ -151,7 +208,7 @@ export function useEnhanceVideo() {
   const startEnhance = useCallback(
     async (source: EnhanceSource, config: EnhanceConfig, idempotencyKey?: string) => {
       setIsStarting(true);
-      setError(null);
+      clearFailure();
       try {
         const key = idempotencyKey ?? crypto.randomUUID();
         const data = await callEngine({
@@ -168,13 +225,13 @@ export function useEnhanceVideo() {
         }
         return data?.run as EnhanceRunRow | undefined;
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        recordFailure(e);
         return undefined;
       } finally {
         setIsStarting(false);
       }
     },
-    [pollUntilDone],
+    [pollUntilDone, clearFailure, recordFailure],
   );
 
   /** Records a cancel wish. Money only moves when the provider confirms. */
@@ -184,17 +241,17 @@ export function useEnhanceVideo() {
       const data = await callEngine({ action: 'status', runId });
       if (data?.run) setRun(data.run);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      recordFailure(e);
     }
-  }, []);
+  }, [recordFailure]);
 
   const reset = useCallback(() => {
     stopPolling();
     setRun(null);
     setEstimate(null);
     setSourceMeta(null);
-    setError(null);
-  }, [stopPolling]);
+    clearFailure();
+  }, [stopPolling, clearFailure]);
 
   return {
     run,
@@ -203,6 +260,7 @@ export function useEnhanceVideo() {
     isStarting,
     isRunning: !!run && !TERMINAL.includes(run.status),
     error,
+    errorCode,
     previewPrice,
     startEnhance,
     cancelEnhance,

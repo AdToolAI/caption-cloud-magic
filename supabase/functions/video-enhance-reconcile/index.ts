@@ -34,6 +34,14 @@ const corsHeaders = {
 const TAG = "[video-enhance-reconcile]";
 const BATCH_SIZE = 25;
 
+/**
+ * Error codes that describe the provider FILE itself, not our infrastructure.
+ * Re-fetching the same file can never change them, so they are terminal after
+ * one confirming re-measure (`OUTPUT_VERDICT_CONFIRM_ATTEMPTS`).
+ */
+const DETERMINISTIC_OUTPUT_FAILURES = new Set(["OUTPUT_MISMATCH", "OUTPUT_INVALID"]);
+const OUTPUT_VERDICT_CONFIRM_ATTEMPTS = 2;
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -84,6 +92,35 @@ serve(async (req) => {
 
       // Persistence retry — the provider already succeeded, no second job.
       if (run.status === "asset_persist_failed" && run.provider_output_url) {
+        // A verdict on the provider FILE is deterministic: the same bytes give
+        // the same measurement on every retry. After one confirming re-measure
+        // such a run is closed as a provider failure (reservation released),
+        // instead of re-downloading the file every cycle forever.
+        if (
+          DETERMINISTIC_OUTPUT_FAILURES.has(run.error_code) &&
+          (run.persist_attempts ?? 0) >= OUTPUT_VERDICT_CONFIRM_ATTEMPTS
+        ) {
+          await finalizeFailure(
+            admin,
+            run,
+            run.error_code,
+            run.error_message ?? "provider output does not match the order",
+          );
+          summary.failed++;
+          continue;
+        }
+        // Transient persistence problems (fetch, staging, asset row) are
+        // retried with backoff — but only up to the horizon. Past it the run
+        // becomes visible to admins instead of looping silently.
+        if (ageMinutes > horizonMinutes) {
+          await setStatus(admin, run.id, "manual_review", {
+            reconciliation_attempts: attempts,
+            last_reconciled_at: nowIso,
+            next_reconcile_at: null,
+          });
+          summary.manualReview++;
+          continue;
+        }
         const result = await finalizeSuccess(admin, run, run.provider_output_url);
         if (result.ok) summary.completed++;
         else summary.pending++;

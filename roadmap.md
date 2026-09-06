@@ -2,6 +2,11 @@
 
 ## Erledigt
 - Video-Enhance Full Production Release: Topaz + ByteDance global live, Kalibrierung vom Preis-Gate getrennt, unbefristete Nachkorrektur später eintreffender Kosten, Admin-Kostenabschluss mit Audit.
+- Video-Enhance Härtung (06.09.): Upscale-Gate (kein Downscale/No-op, auch im Preis-Preview), Hochkant-4K nur über ByteDance, Scene nach Herkunft (aigc/ugc/common), beidseitige Output-Prüfung (0.98), Codec/Container/FPS/Dauer getrennt gespeichert, keine Rekodierung (Regressionstest), Reconciler alle 5 min mit terminalem Abschluss deterministischer Output-Verdikte + Horizon → manual_review, Anzeige vor/während/nach dem Lauf.
+
+## Bereit
+- Video Enhance: Live-Nachweis der Härtung mit dem QA-Konto (1 Estimate-Ablehnung 1080p→1080p, 1 Hochkant-4K-Routing-Estimate; keine Provider-Läufe nötig)
+- Video Enhance: einheitliche Fehlertexte EN/DE/ES für Server-Codes `VIDEO_ENHANCE_NOT_AN_UPSCALE` / `TARGET_FRAME_UNREACHABLE` im Panel (derzeit englische Server-Nachricht)
 
 ## In Progress
 - Video Enhance Freigabe-Run mit echten Provider-Läufen (Topaz vs. ByteDance vCube)
