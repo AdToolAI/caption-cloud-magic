@@ -351,6 +351,7 @@ export function res(
         : sizingRule === 'fixed-frame'
           ? 'Provider rendert unabhängig vom Request ein festes Bildformat.'
           : 'Provider hält die kurze Kante des Labels; Portrait ist damit echtes Hochkant.'),
+    sizingRuleVerified,
     framesByAspectRatio: { ...derived, ...(opts.framesByAspectRatio ?? {}) },
     native: opts.native ?? true,
     pricingId,
