@@ -48,7 +48,7 @@ export function pickRenderTier(durationInFrames: number): RenderTier {
  * Used by render-queue-add to write render_queue.estimated_workers.
  */
 export function estimateWorkersFromDuration(estimatedDurationSec?: number | null, fps = 30): number {
-  if (!estimatedDurationSec || estimatedDurationSec <= 0) return 5;
+  if (!estimatedDurationSec || estimatedDurationSec <= 0) return MAX_WORKERS_PER_RENDER;
   return pickRenderTier(estimatedDurationSec * fps).maxWorkers;
 }
 
@@ -68,7 +68,7 @@ export function pickPriority(isFounder: boolean, override?: number | null): numb
  * only Founders are admitted. Non-founders get a 429 with a retry hint.
  * Default: at 50/60 slots (~83%) reserve the last 10 for Founders.
  */
-export const FOUNDER_RESERVE_HIGH_WATER = 50;
+export const FOUNDER_RESERVE_HIGH_WATER = 68;
 
 export interface AdmissionResult {
   admitted: boolean;
