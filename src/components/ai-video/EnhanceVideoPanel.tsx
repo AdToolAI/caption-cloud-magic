@@ -387,12 +387,6 @@ export function EnhanceVideoPanel({
   const routed = !!executionModelId && executionModelId !== model.id;
   const frameUnreachable = targetFrame != null && executionModelId === null;
 
-  const blockedReason = upscale && !upscale.ok
-    ? (upscale.reason === 'downscale' ? tx('downscale', lang) : tx('noUpscale', lang))
-    : frameUnreachable
-      ? tx('unreachable', lang)
-      : null;
-
   const isTopaz = model.id === 'topaz-video-upscale';
   // Fixed-factor Topaz models (Proteus Natural 2x, Rhea 4x) are only offered
   // for a target size they are really trained for.
@@ -405,6 +399,21 @@ export function EnhanceVideoPanel({
       target,
     );
   };
+  // A model whose credit consumption we have not confirmed yet stays visible
+  // as beta, but cannot be started — the server enforces the same rule.
+  const modeStartable = (modeId: string): boolean =>
+    !isTopaz || isTopazModelStartableView(modeId, isEnhanceTestUser);
+
+  const blockedReason = upscale && !upscale.ok
+    ? (upscale.reason === 'downscale' ? tx('downscale', lang) : tx('noUpscale', lang))
+    : frameUnreachable
+      ? tx('unreachable', lang)
+      : !modeFits(mode)
+        ? `${topazModelView(mode).name} · ${tx('onlyFactor', lang)} ${topazModelView(mode).fixedUpscale}×`
+        : !modeStartable(mode)
+          ? `${topazModelView(mode).name} · ${tx('betaBlocked', lang)}`
+          : null;
+
 
   const autoDetectedFootage = !modeTouched && !!asset && model.processingModes.length > 1;
   // The footage type that really reaches the engine: the server derives it
