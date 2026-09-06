@@ -320,8 +320,9 @@ export function EnhanceVideoPanel({
         tier: availableTiers(model)[0] ?? 'standard',
         // Topaz-only settings; an engine without an encoder or interpolation
         // choice must not receive them at all.
-        ...(isTopaz ? { outputQuality } : {}),
+        ...(topazEngine ? { outputQuality } : {}),
         ...(interpolationApplies ? { interpolationModel } : {}),
+
       }
     : null;
 
