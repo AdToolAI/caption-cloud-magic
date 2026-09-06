@@ -501,7 +501,10 @@ serve(async (req) => {
       executing_topaz_model: spec.provider === "topaz"
         ? topazVideoModelOrDefault(config.mode).slug
         : null,
-      interpolation_model: config.interpolationModel ?? null,
+      // Only stored when a frame-interpolation filter really travels with the
+      // order — otherwise the run row would claim a model that never ran.
+      interpolation_model: interpolationInOrder ? config.interpolationModel ?? null : null,
+
       source_asset_id: source.assetId,
       source_url: source.url,
       source_duration_seconds: source.meta.durationSeconds,
