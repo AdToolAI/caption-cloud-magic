@@ -4,7 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
-import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
+import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,7 +77,8 @@ serve(async (req) => {
     const requestedResolution = body.resolution ?? '1080p';
 
     // Capability gate — runs BEFORE wallet lookup and BEFORE any provider call.
-    const gate = capabilityGate(
+    const gate = await gateVideoCapability(
+      supabaseAdmin,
       {
         modelId: model,
         mode: inferMode({ startImageUrl, endImageUrl: body.endImageUrl }),
@@ -140,6 +141,7 @@ serve(async (req) => {
     const { data: generation, error: genError } = await supabaseAdmin
       .from('ai_video_generations')
       .insert({
+        ...(gate.parityColumns ?? {}),
         user_id: user.id,
         prompt,
         model,

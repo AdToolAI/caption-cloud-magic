@@ -4,7 +4,7 @@
 // Regenerate with: node scripts/generate-video-model-specs.mjs
 // =============================================================================
 
-export const SPECS_SOURCE_HASH = '97e1653f6b88991429f60a5911585d7f4fd7770f518ac2d2c8ebd7789ac33f78';
+export const SPECS_SOURCE_HASH = 'cd056cffa9f16cf9be55c18e560527ecac06c366425c7550814cd776c68299c1';
 
 // ============================================================================
 // CANONICAL VIDEO MODEL CAPABILITY REGISTRY
@@ -68,6 +68,14 @@ export interface PixelFrame {
   height: number;
 }
 
+/**
+ * How the exact output frame of a tier is defined.
+ *  - `exact-frames`: the provider documents a frame table; we list it verbatim.
+ *  - `short-edge` / `long-edge` / `fixed-frame`: a DOCUMENTED provider rule the
+ *    frame may be derived from. `sizingRuleSource` names where that is stated.
+ */
+export type SizingRule = 'exact-frames' | 'short-edge' | 'long-edge' | 'fixed-frame';
+
 export interface ResolutionSpec {
   /** Human label exactly as shown in the UI ("1080p", "4K"). */
   label: string;
@@ -78,12 +86,22 @@ export interface ResolutionSpec {
   /** Exact frame at 9:16 portrait. */
   portrait: PixelFrame;
   orientationBehavior: OrientationBehavior;
+  /** Documented rule the frames follow. Never a generic 16:9 assumption. */
+  sizingRule: SizingRule;
+  /** Where that rule is documented / how it was verified. */
+  sizingRuleSource: string;
+  /**
+   * Exact target frame per aspect ratio — provider-backed. A ratio missing here
+   * is NOT derivable and is rejected by the capability gate.
+   */
+  framesByAspectRatio: Record<string, PixelFrame>;
   /** True = the provider renders these pixels. False = post-generation upscale. */
   native: boolean;
   /** Catalog id used for billing this exact tier. */
   pricingId: string;
   /** Durations allowed at THIS resolution when narrower than the mode default. */
   durations?: number[];
+
   /**
    * Availability and verification are per TIER, never per model. A new tier on
    * an otherwise grandfathered model does NOT inherit its availability.
@@ -228,6 +246,60 @@ const FRAMES: Record<number, { long: number }> = {
   4320: { long: 7680 },
 };
 
+/**
+ * Aspect ratios we expose anywhere in the product. Every tier must resolve an
+ * exact frame for each ratio its mode advertises.
+ */
+export const STANDARD_ASPECT_RATIOS = [
+  '16:9',
+  '9:16',
+  '1:1',
+  '4:3',
+  '3:4',
+  '21:9',
+  '9:21',
+  '3:2',
+  '2:3',
+  '4:5',
+  '5:4',
+] as const;
+
+function evenSize(value: number): number {
+  const rounded = Math.round(value);
+  return rounded % 2 === 0 ? rounded : rounded + 1;
+}
+
+/**
+ * Derives the frame table for a documented sizing rule. Used ONLY when the
+ * provider docs state the rule explicitly (`sizingRule` + `sizingRuleSource`);
+ * a route with per-ratio frame tables in its docs must list them verbatim in
+ * `framesByAspectRatio` instead of inheriting a generic 16:9 assumption.
+ */
+export function framesFromSizingRule(
+  shortEdge: number,
+  rule: SizingRule,
+  ratios: readonly string[] = STANDARD_ASPECT_RATIOS,
+): Record<string, PixelFrame> {
+  const long = FRAMES[shortEdge]?.long ?? evenSize((shortEdge * 16) / 9);
+  const table: Record<string, PixelFrame> = {};
+  for (const ratio of ratios) {
+    const [w, h] = ratio.split(':').map(Number);
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) continue;
+    if (rule === 'fixed-frame') {
+      table[ratio] = { width: long, height: shortEdge };
+    } else if (rule === 'long-edge') {
+      table[ratio] = w >= h
+        ? { width: shortEdge, height: evenSize((shortEdge * h) / w) }
+        : { width: evenSize((shortEdge * w) / h), height: shortEdge };
+    } else {
+      table[ratio] = w >= h
+        ? { width: evenSize((shortEdge * w) / h), height: shortEdge }
+        : { width: shortEdge, height: evenSize((shortEdge * h) / w) };
+    }
+  }
+  return table;
+}
+
 /** Builds an exactly defined resolution entry. Never emit a bare label. */
 export function res(
   label: string,
@@ -242,16 +314,38 @@ export function res(
     available?: boolean;
     parityStatus?: ParityStatus;
     smokeTest?: SmokeTestRecord;
+    /** Provider-documented exact frames, keyed by aspect ratio. Wins over the rule. */
+    framesByAspectRatio?: Record<string, PixelFrame>;
+    sizingRule?: SizingRule;
+    sizingRuleSource?: string;
   } = {},
 ): ResolutionSpec {
   const long = FRAMES[shortEdge]?.long ?? Math.round((shortEdge * 16) / 9);
   const grandfathered = opts.grandfathered ?? true;
+  const orientationBehavior = opts.orientationBehavior ?? 'orientation-aware';
+  const sizingRule: SizingRule =
+    opts.sizingRule ??
+    (orientationBehavior === 'long-edge'
+      ? 'long-edge'
+      : orientationBehavior === 'fixed'
+        ? 'fixed-frame'
+        : 'short-edge');
+  const derived = framesFromSizingRule(shortEdge, sizingRule);
   return {
     label,
     shortEdge,
     landscape: { width: long, height: shortEdge },
     portrait: { width: shortEdge, height: long },
-    orientationBehavior: opts.orientationBehavior ?? 'orientation-aware',
+    orientationBehavior,
+    sizingRule,
+    sizingRuleSource:
+      opts.sizingRuleSource ??
+      (sizingRule === 'long-edge'
+        ? 'Provider zählt die Label-Zeilen auf der LANGEN Kante (Topaz-Portrait-Falle).'
+        : sizingRule === 'fixed-frame'
+          ? 'Provider rendert unabhängig vom Request ein festes Bildformat.'
+          : 'Provider hält die kurze Kante des Labels; Portrait ist damit echtes Hochkant.'),
+    framesByAspectRatio: { ...derived, ...(opts.framesByAspectRatio ?? {}) },
     native: opts.native ?? true,
     pricingId,
     ...(opts.durations ? { durations: opts.durations } : {}),
@@ -261,6 +355,7 @@ export function res(
     ...(opts.smokeTest ? { smokeTest: opts.smokeTest } : {}),
   };
 }
+
 
 /**
  * A resolution tier that did NOT ship before the parity upgrade. It is locked
@@ -275,7 +370,11 @@ export function newTier(
     native?: boolean;
     durations?: number[];
     smokeTest?: SmokeTestRecord;
+    framesByAspectRatio?: Record<string, PixelFrame>;
+    sizingRule?: SizingRule;
+    sizingRuleSource?: string;
   } = {},
+
 ): ResolutionSpec {
   return res(label, shortEdge, pricingId, {
     ...opts,
@@ -1863,6 +1962,12 @@ export interface CapabilityRequest {
   durationSeconds?: number;
   aspectRatio?: string;
   fps?: number;
+  /**
+   * Operational state of the exact tier, loaded from `video_model_tier_parity`
+   * for THIS (model x route x region x mode x tier) key. A disabled tier can
+   * never be submitted until a new passing smoke test re-enables it.
+   */
+  tierDisabled?: boolean;
 }
 
 export interface CapabilityViolation {
@@ -1896,8 +2001,21 @@ export function validateCapability(req: CapabilityRequest): CapabilityViolation 
     };
   }
 
+  // Multi-tier models MUST state the tier. Validating the first tier for an
+  // ambiguous request is exactly the silent-default bug this gate exists for.
+  if (!req.resolution && modeSpec.resolutions.length > 1) {
+    return {
+      code: 'INVALID_MODEL_CAPABILITY',
+      field: 'resolution',
+      message: `${spec.displayName} (${req.mode}) renders ${modeSpec.resolutions
+        .map((r) => r.label)
+        .join(', ')} — the request must name the resolution explicitly.`,
+    };
+  }
+
   let resolution: ResolutionSpec | undefined = modeSpec.resolutions[0];
   if (req.resolution) {
+
     resolution = modeSpec.resolutions.find((r) => r.label.toLowerCase() === req.resolution!.toLowerCase());
     if (!resolution) {
       return {
@@ -1919,6 +2037,26 @@ export function validateCapability(req: CapabilityRequest): CapabilityViolation 
       message: `${spec.displayName}: the ${resolution.label} tier is locked until a smoke test verifies it on route ${spec.apiRoute}.`,
     };
   }
+
+  // Operational kill switch: a tier downgraded by measured regressions stays
+  // unselectable until a new passing smoke test clears it.
+  if (req.tierDisabled) {
+    return {
+      code: 'INVALID_MODEL_CAPABILITY',
+      field: 'resolution',
+      message: `${spec.displayName}: the ${resolution?.label ?? 'requested'} tier is temporarily disabled after measured output regressions on route ${spec.apiRoute}. A new passing smoke test re-enables it.`,
+    };
+  }
+
+  if (req.aspectRatio && resolution && !resolution.framesByAspectRatio[req.aspectRatio]) {
+    return {
+      code: 'INVALID_MODEL_CAPABILITY',
+      field: 'aspectRatio',
+      message: `${spec.displayName} ${resolution.label}: no provider-backed frame is documented for ${req.aspectRatio} on route ${spec.apiRoute}.`,
+    };
+  }
+
+
 
 
   if (req.durationSeconds != null) {
@@ -1963,45 +2101,58 @@ export function validateCapability(req: CapabilityRequest): CapabilityViolation 
   return null;
 }
 
-function even(value: number): number {
-  const rounded = Math.round(value);
-  return rounded % 2 === 0 ? rounded : rounded + 1;
-}
+
+
 
 /**
- * Exact target frame for a request — the promise the smoke test verifies.
- * Aspect-ratio aware for EVERY ratio we expose (16:9, 9:16, 1:1, 4:3, 3:4,
- * 21:9, 9:21, 3:2, 2:3): the short edge of the label is held on the short side
- * of the frame, so a "4K" portrait clip really is 2160x3840.
- *
- * `long-edge` providers (the Topaz trap) count the label's lines on the LONG
- * side instead — projected here exactly as they behave, never as we wish.
+ * Exact target frame for a request. The provider-backed frame table wins; only
+ * when the ratio is absent there do we fall back to the tier's DOCUMENTED
+ * sizing rule (`sizingRule` + `sizingRuleSource`). 4:3, 3:4, 21:9, 3:2 and 2:3
+ * are never guessed from a generic 16:9 short-edge assumption.
  */
 export function projectTargetFrame(
   resolution: ResolutionSpec,
   aspectRatio: string,
 ): PixelFrame {
-  const [rawW, rawH] = aspectRatio.split(':').map(Number);
-  const w = Number.isFinite(rawW) && rawW > 0 ? rawW : 16;
-  const h = Number.isFinite(rawH) && rawH > 0 ? rawH : 9;
+  const exact = resolution.framesByAspectRatio?.[aspectRatio];
+  if (exact) return exact;
 
-  if (resolution.orientationBehavior === 'fixed') {
-    return resolution.landscape;
-  }
-
-  if (resolution.orientationBehavior === 'long-edge') {
-    // The label counts lines on the long edge.
-    const longEdge = resolution.shortEdge;
-    return w >= h
-      ? { width: longEdge, height: even((longEdge * h) / w) }
-      : { width: even((longEdge * w) / h), height: longEdge };
-  }
-
-  const short = resolution.shortEdge;
-  return w >= h
-    ? { width: even((short * w) / h), height: short }
-    : { width: short, height: even((short * h) / w) };
+  const derived = framesFromSizingRule(resolution.shortEdge, resolution.sizingRule, [aspectRatio]);
+  return derived[aspectRatio] ?? resolution.landscape;
 }
+
+/**
+ * Identity of a verified resolution tier. Parity and regressions are ALWAYS
+ * scoped to model x route x region x mode x tier: a mismatch in t2v must never
+ * downgrade i2v, and a Replicate-route mismatch must never downgrade the same
+ * model on a direct-provider route.
+ */
+export interface ParityKey {
+  modelId: string;
+  apiRoute: string;
+  region: string;
+  mode: VideoMode;
+  resolutionLabel: string;
+}
+
+export function parityKeyOf(
+  spec: VideoModelSpec,
+  mode: VideoMode,
+  resolutionLabel: string,
+): ParityKey {
+  return {
+    modelId: spec.id,
+    apiRoute: spec.apiRoute,
+    region: spec.region,
+    mode,
+    resolutionLabel,
+  };
+}
+
+export function parityKeyString(key: ParityKey): string {
+  return [key.modelId, key.apiRoute, key.region, key.mode, key.resolutionLabel].join('|');
+}
+
 
 /** Measured output vs. promised frame. */
 export type OutputVerdict = 'TARGET_MATCHED' | 'PROVIDER_OUTPUT_MISMATCH';

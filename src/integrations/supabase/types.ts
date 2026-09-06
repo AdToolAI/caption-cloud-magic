@@ -761,11 +761,24 @@ export type Database = {
           failed_at: string | null
           file_size_bytes: number | null
           id: string
+          measured_at: string | null
+          measured_bitrate_bps: number | null
+          measured_container: string | null
+          measured_duration_seconds: number | null
+          measured_fps: number | null
           measured_height: number | null
+          measured_size_bytes: number | null
           measured_width: number | null
           model: string
           output_verdict: string | null
+          parity_api_route: string | null
+          parity_mode: string | null
+          parity_model_id: string | null
+          parity_region: string | null
+          parity_resolution_label: string | null
           prompt: string
+          requested_height: number | null
+          requested_width: number | null
           resolution: string
           retry_count: number | null
           source_image_url: string | null
@@ -790,11 +803,24 @@ export type Database = {
           failed_at?: string | null
           file_size_bytes?: number | null
           id?: string
+          measured_at?: string | null
+          measured_bitrate_bps?: number | null
+          measured_container?: string | null
+          measured_duration_seconds?: number | null
+          measured_fps?: number | null
           measured_height?: number | null
+          measured_size_bytes?: number | null
           measured_width?: number | null
           model?: string
           output_verdict?: string | null
+          parity_api_route?: string | null
+          parity_mode?: string | null
+          parity_model_id?: string | null
+          parity_region?: string | null
+          parity_resolution_label?: string | null
           prompt: string
+          requested_height?: number | null
+          requested_width?: number | null
           resolution?: string
           retry_count?: number | null
           source_image_url?: string | null
@@ -819,11 +845,24 @@ export type Database = {
           failed_at?: string | null
           file_size_bytes?: number | null
           id?: string
+          measured_at?: string | null
+          measured_bitrate_bps?: number | null
+          measured_container?: string | null
+          measured_duration_seconds?: number | null
+          measured_fps?: number | null
           measured_height?: number | null
+          measured_size_bytes?: number | null
           measured_width?: number | null
           model?: string
           output_verdict?: string | null
+          parity_api_route?: string | null
+          parity_mode?: string | null
+          parity_model_id?: string | null
+          parity_region?: string | null
+          parity_resolution_label?: string | null
           prompt?: string
+          requested_height?: number | null
+          requested_width?: number | null
           resolution?: string
           retry_count?: number | null
           source_image_url?: string | null
@@ -18836,28 +18875,37 @@ export type Database = {
       }
       video_model_tier_parity: {
         Row: {
+          api_route: string
           consecutive_mismatches: number
           last_verdict: string | null
+          mode: string
           model_id: string
           parity_status: string
+          region: string
           resolution_label: string
           tier_disabled: boolean
           updated_at: string
         }
         Insert: {
+          api_route?: string
           consecutive_mismatches?: number
           last_verdict?: string | null
+          mode?: string
           model_id: string
           parity_status?: string
+          region?: string
           resolution_label: string
           tier_disabled?: boolean
           updated_at?: string
         }
         Update: {
+          api_route?: string
           consecutive_mismatches?: number
           last_verdict?: string | null
+          mode?: string
           model_id?: string
           parity_status?: string
+          region?: string
           resolution_label?: string
           tier_disabled?: boolean
           updated_at?: string

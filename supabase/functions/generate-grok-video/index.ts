@@ -3,7 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
-import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
+import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 
@@ -68,7 +68,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const requestedResolution = body.resolution ?? '720p';
 
     // Capability gate — before wallet, before provider. No silent clamping.
-    const gate = capabilityGate(
+    const gate = await gateVideoCapability(
+      supabaseAdmin,
       {
         modelId: model,
         mode: inferMode({ startImageUrl }),
@@ -130,6 +131,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const { data: generation, error: genError } = await supabaseAdmin
       .from('ai_video_generations')
       .insert({
+        ...(gate.parityColumns ?? {}),
         user_id: user.id,
         prompt,
         model,

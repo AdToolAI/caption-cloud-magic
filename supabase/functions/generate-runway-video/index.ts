@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
-import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
+import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 
@@ -191,10 +191,12 @@ serve(async (req) => {
       });
     }
     // Capability gate — before wallet, before provider.
-    const gate = capabilityGate(
+    const gate = await gateVideoCapability(
+      supabaseAdmin,
       {
         modelId: model,
         mode: inferMode({ videoUrl: referenceVideoUrl }),
+        resolution: '720p',
         durationSeconds: Number(duration),
         aspectRatio,
       },
@@ -249,6 +251,7 @@ serve(async (req) => {
     const { data: generation, error: genError } = await supabaseAdmin
       .from("ai_video_generations")
       .insert({
+        ...(gate.parityColumns ?? {}),
         user_id: user.id,
         prompt,
         model,

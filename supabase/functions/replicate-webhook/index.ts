@@ -123,6 +123,13 @@ serve(async (req) => {
         resolution: generation.resolution,
         aspect_ratio: generation.aspect_ratio,
         video_url: permanentUrl,
+        parity_model_id: generation.parity_model_id,
+        parity_api_route: generation.parity_api_route,
+        parity_region: generation.parity_region,
+        parity_mode: generation.parity_mode,
+        parity_resolution_label: generation.parity_resolution_label,
+        requested_width: generation.requested_width,
+        requested_height: generation.requested_height,
       });
 
       // 5. Mediathek-Eintrag: wird zentral vom DB-Trigger

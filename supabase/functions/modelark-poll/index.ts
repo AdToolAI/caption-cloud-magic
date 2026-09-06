@@ -48,7 +48,7 @@ async function scan(sceneFilterId: string | null) {
     /* ── 1. AI Video Studio generations ─────────────────────────────── */
     const { data: generations } = await supabase
       .from("ai_video_generations")
-      .select("id, user_id, artlist_job_id, started_at, total_cost_euros, model, resolution, aspect_ratio")
+      .select("id, user_id, artlist_job_id, started_at, total_cost_euros, model, resolution, aspect_ratio, parity_model_id, parity_api_route, parity_region, parity_mode, parity_resolution_label, requested_width, requested_height")
       .eq("status", "processing")
       .like("artlist_job_id", `${MODELARK_JOB_PREFIX}%`)
       .limit(50);
@@ -99,6 +99,13 @@ async function scan(sceneFilterId: string | null) {
             resolution: gen.resolution,
             aspect_ratio: gen.aspect_ratio,
             video_url: permanentUrl,
+            parity_model_id: generation.parity_model_id,
+            parity_api_route: generation.parity_api_route,
+            parity_region: generation.parity_region,
+            parity_mode: generation.parity_mode,
+            parity_resolution_label: generation.parity_resolution_label,
+            requested_width: generation.requested_width,
+            requested_height: generation.requested_height,
           });
           summary.completed++;
         } else if (task.status === "failed" || task.status === "cancelled") {

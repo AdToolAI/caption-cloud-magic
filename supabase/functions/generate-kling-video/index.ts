@@ -3,7 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
-import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
+import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveCostPerSecond, VIDEO_PRICING_CATALOG } from "../_shared/videoPricingCatalog.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
@@ -117,7 +117,8 @@ serve(async (req) => {
     }
 
     // Capability gate — before wallet, before provider. No silent clamping.
-    const klingGate = capabilityGate(
+    const klingGate = await gateVideoCapability(
+      supabaseAdmin,
       {
         modelId: model,
         mode: inferMode({
@@ -126,6 +127,7 @@ serve(async (req) => {
           referenceImageUrls: Array.isArray(referenceImageUrls) ? referenceImageUrls : null,
           videoUrl: referenceVideoUrl ?? null,
         }),
+        resolution: modelConfig.resolution,
         durationSeconds: Number(duration),
         aspectRatio,
       },
@@ -203,6 +205,7 @@ serve(async (req) => {
     const { data: generation, error: genError } = await supabaseAdmin
       .from('ai_video_generations')
       .insert({
+        ...(klingGate.parityColumns ?? {}),
         user_id: user.id,
         prompt,
         model,
