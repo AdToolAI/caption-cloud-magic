@@ -7,9 +7,18 @@ import { Badge } from '@/components/ui/badge';
 import {
   AI_VIDEO_TOOLKIT_MODELS,
   TOOLKIT_GROUP_LABELS,
+  SPEC_GROUP_LABELS,
+  LEGACY_GROUP_TO_SPEC_GROUP,
   type ToolkitModel,
   type ToolkitModelGroup,
 } from '@/config/aiVideoModelRegistry';
+import {
+  UI_GROUP_ORDER,
+  getVideoModelSpec,
+  maxNativeResolution,
+  nativeResolutionLabels,
+  type UiGroup,
+} from '@/config/videoModelSpecs';
 import type { Currency } from '@/config/pricing';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Lock, Wrench, Crown } from 'lucide-react';
@@ -32,7 +41,25 @@ interface ModelSelectorProps {
   lockedReason?: string;
 }
 
+/** Kept for backwards compatibility with callers that still read it. */
 const GROUP_ORDER: ToolkitModelGroup[] = ['recommended', 'audio', 'fast', 'premium'];
+void GROUP_ORDER;
+
+/** Spec group of a model — falls back to the legacy group when no spec exists. */
+function specGroupOf(m: ToolkitModel): UiGroup {
+  const spec = getVideoModelSpec(m.id);
+  if (spec) return spec.uiGroup;
+  return LEGACY_GROUP_TO_SPEC_GROUP[m.group];
+}
+
+/** Exact native resolution line: "1080p · 1920x1080 (quer) / 1080x1920 (hoch)". */
+function resolutionLine(m: ToolkitModel): string {
+  const spec = getVideoModelSpec(m.id);
+  const best = spec && maxNativeResolution(spec);
+  if (!spec || !best) return m.resolution;
+  const labels = nativeResolutionLabels(spec).join(' / ');
+  return `${labels} · ${best.landscape.width}×${best.landscape.height} / ${best.portrait.width}×${best.portrait.height}`;
+}
 
 /** Keep the controlled value visible even while a feature-filtered model list
  * is still resolving. This prevents Radix Select from displaying a stale
@@ -59,12 +86,20 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
     getPricePerSecond(m.id, billingCurrency) ?? m.costPerSecond[billingCurrency];
 
   const grouped = useMemo(() => {
-    const map: Record<ToolkitModelGroup, ToolkitModel[]> = {
-      recommended: [], audio: [], fast: [], premium: [],
+    const map: Record<UiGroup, ToolkitModel[]> = {
+      flagship: [], professional: [], audio: [], fast: [], economy: [], legacy: [],
     };
     list.forEach((m) => {
-      map[m.group].push(m);
+      map[specGroupOf(m)].push(m);
     });
+    // Innerhalb der Gruppe: höchste native Auflösung zuerst.
+    for (const key of Object.keys(map) as UiGroup[]) {
+      const edge = (m: ToolkitModel) => {
+        const spec = getVideoModelSpec(m.id);
+        return (spec && maxNativeResolution(spec)?.shortEdge) || 0;
+      };
+      map[key].sort((a, b) => edge(b) - edge(a));
+    }
     return map;
   }, [list]);
 
@@ -97,13 +132,13 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
         </SelectValue>
       </SelectTrigger>
       <SelectContent className="max-h-[480px] bg-card/95 backdrop-blur-xl border-border/60">
-        {GROUP_ORDER.map((g) => {
+        {UI_GROUP_ORDER.map((g) => {
           const models = grouped[g];
           if (!models.length) return null;
           return (
             <SelectGroup key={g}>
               <SelectLabel className="text-[11px] uppercase tracking-wider text-primary/80">
-                {TOOLKIT_GROUP_LABELS[g][lang]}
+                {SPEC_GROUP_LABELS[g][lang]}
               </SelectLabel>
               {models.map((m) => {
                 const isMaintenance = m.status === 'maintenance';
@@ -152,7 +187,7 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
                           )}
                         </div>
                         <p className="text-[10px] text-muted-foreground truncate">
-                          {locked && m.statusReason ? m.statusReason : `${m.tagline} · ${m.resolution}`}
+                          {locked && m.statusReason ? m.statusReason : `${m.tagline} · ${resolutionLine(m)}`}
                         </p>
                       </div>
                       <span className="text-[11px] tabular-nums text-primary font-medium shrink-0">
