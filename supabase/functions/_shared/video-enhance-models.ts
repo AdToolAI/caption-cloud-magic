@@ -378,49 +378,41 @@ const VCUBE_ENTRIES: MatrixEntry[] = VCUBE_MODES.flatMap((mode) =>
 );
 
 /**
- * Topaz (`topazlabs/video-upscale`) is NOT billed per second: Replicate bills
- * it in UNITS at a fixed unit price. The unit price is verified from a real
- * AdTool run (2026-09-06, prediction cs3ez5g395rmt0d0eb7btzyrkr: 6 units
- * billed at $0.08 = $0.48).
+ * Topaz is now called DIRECTLY (api.topazlabs.com) and bills in CREDITS, not
+ * in Replicate units. The USD value of one credit is an account number, not an
+ * API field, so it lives in `TOPAZ_CREDIT_USD` (default below) and every
+ * recorded cost is `credits x TOPAZ_CREDIT_USD`.
  *
- * The units-per-second estimator is NOT calibrated yet: the published
- * per-5-second cost table implies ~19 units for that run while Replicate
- * billed 6. The table below therefore stays deliberately conservative (it
- * reproduces the published table) and the card is flagged
- * `estimatorCalibrating` until several real runs across 1080p/30, 4K/30 and
- * 4K/60 pin the real unit consumption down. The hard multiplier cap plus the
- * post-run true-up make sure this over-estimate can never reach the customer.
+ * Credit consumption comes from the published Proteus table (estimates at
+ * 30 fps): 720p 1 credit / 10 s, 1080p 2 / 10 s, 4K 6 / 10 s. 2K sits between
+ * 1080p and 4K. The card stays `estimatorCalibrating` until real billed runs
+ * confirm the consumption; the hard multiplier cap plus the post-run true-up
+ * keep an over-estimate away from the customer.
  */
-export const TOPAZ_UNIT_USD = 0.08;
+export const TOPAZ_CREDIT_USD = TOPAZ_CREDIT_USD_DEFAULT;
 
-/** Published cost per 5 output seconds, converted to units at $0.08/unit. */
-const TOPAZ_UNITS_PER_SECOND: Partial<Record<VideoResolution, number>> = {
-  '720p': 0.027 / 5 / TOPAZ_UNIT_USD,
-  '1080p': 0.093 / 5 / TOPAZ_UNIT_USD,
-  '4k': 0.373 / 5 / TOPAZ_UNIT_USD,
+/** Credits per second of OUTPUT at 30 fps, from the published Proteus table. */
+const TOPAZ_CREDITS_PER_SECOND: Partial<Record<VideoResolution, number>> = {
+  '720p': 0.1,
+  '1080p': 0.2,
+  '2k': 0.35,
+  '4k': 0.6,
 };
 
-/**
- * Topaz (`topazlabs/video-upscale`) publishes cost per 5 seconds of output by
- * resolution and frame rate. Only documented rows are offered — no derived
- * frame rates, so nothing is ever priced by guesswork.
- */
-const TOPAZ_USD_PER_5S: [VideoResolution, number, number][] = [
-  ['720p', 30, 0.027],
-  ['720p', 60, 0.053],
-  ['1080p', 30, 0.093],
-  ['1080p', 60, 0.187],
-  ['4k', 30, 0.373],
-  ['4k', 60, 0.747],
-];
+const TOPAZ_FPS_FACTOR: Record<number, number> = { 24: 0.8, 30: 1, 60: 2 };
 
-const TOPAZ_ENTRIES: MatrixEntry[] = TOPAZ_USD_PER_5S.map(([resolution, fps, per5s]) => ({
-  mode: 'standard',
-  resolution,
-  fps,
-  tier: 'standard' as QualityTier,
-  usdPerSecond: per5s / 5,
-}));
+const TOPAZ_ENTRIES: MatrixEntry[] = (
+  Object.keys(TOPAZ_CREDITS_PER_SECOND) as VideoResolution[]
+).flatMap((resolution) =>
+  [24, 30, 60].map((fps) => ({
+    mode: 'standard',
+    resolution,
+    fps,
+    tier: 'standard' as QualityTier,
+    usdPerSecond:
+      (TOPAZ_CREDITS_PER_SECOND[resolution] ?? 0) * (TOPAZ_FPS_FACTOR[fps] ?? 1) * TOPAZ_CREDIT_USD,
+  })),
+);
 
 export const VIDEO_RATE_CARDS: Record<string, VideoRateCard> = {
   'bytedance-vcube': {
@@ -434,17 +426,18 @@ export const VIDEO_RATE_CARDS: Record<string, VideoRateCard> = {
   'topaz-video-upscale': {
     currency: 'USD',
     type: 'per_unit',
-    unitUsd: TOPAZ_UNIT_USD,
-    unitsPerOutputSecond: TOPAZ_UNITS_PER_SECOND,
-    fpsFactor: { 30: 1, 60: 2 },
+    unitUsd: TOPAZ_CREDIT_USD,
+    unitsPerOutputSecond: TOPAZ_CREDITS_PER_SECOND,
+    fpsFactor: TOPAZ_FPS_FACTOR,
     source:
-      'Unit price $0.08 verified from billed AdTool run 2026-09-06; unit consumption estimated from the published per-5s cost table',
+      'Topaz direct API credit pricing (published Proteus credit table); credit USD value from TOPAZ_CREDIT_USD',
     checkedAt: '2026-09-06',
     costUnverified: true,
     estimatorCalibrating: true,
     entries: TOPAZ_ENTRIES,
   },
 };
+
 
 export class UnpriceableRunError extends Error {
   constructor(public readonly reason: string) {
