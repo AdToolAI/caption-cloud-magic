@@ -167,6 +167,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   onChromaKeyChange,
   upscaling,
   onUpscalingChange,
+  onUpscaledVideo,
+
   interpolation,
   onInterpolationChange,
   restoration,
