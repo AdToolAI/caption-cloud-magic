@@ -1,16 +1,18 @@
-// Render Concurrency Policy — Beta-Launch v1 (AWS Lambda quota = 100)
+// Render Concurrency Policy — v2 (AWS Lambda quota = 100)
 //
 // Global slot budget (100 total Lambdas):
-//   - 30 reserved for edge functions (auth, DB, generate-*, etc.)
-//   - 10 burst reserve (never touched by scheduler)
-//   - 60 render pool (this module governs it)
+//   - ~20 reserved for edge functions (auth, DB, generate-*, etc.)
+//   - 80 render pool (this module governs it)
 //
-// Per-render worker cap is tiered by frame count so many users can render in
-// parallel instead of one user monopolising the pool.
+// Every render now fans out to up to 12 workers regardless of clip length —
+// speed per export is prioritised over max parallel renders while the active
+// user base is small. Re-tune once the AWS quota increase lands.
 
-export const RENDER_SLOT_BUDGET_DEFAULT = 60;
+export const RENDER_SLOT_BUDGET_DEFAULT = 80;
 export const FRAMES_PER_LAMBDA_DEFAULT = 200;
 export const FRAMES_PER_LAMBDA_MIN = 120;
+
+export const MAX_WORKERS_PER_RENDER = 12;
 
 export interface RenderTier {
   label: 'short' | 'standard' | 'long' | 'export';
@@ -20,25 +22,26 @@ export interface RenderTier {
 
 /**
  * Choose worker cap + framesPerLambda based on total frames.
- * Lower workers for shorter clips → more parallel renders possible.
+ * All tiers fan out to MAX_WORKERS_PER_RENDER (12). Short/medium clips drop the
+ * 120-frame floor (min 30 frames per chunk) so a 10s/24fps 4K/8K export really
+ * splits 12 ways; from 900 frames up the floor stays to avoid chunk overhead.
  */
 export function pickRenderTier(durationInFrames: number): RenderTier {
   const frames = Math.max(1, Math.floor(durationInFrames || 0));
+  const W = MAX_WORKERS_PER_RENDER;
 
-  // Short clips: split as wide as the tier allows (6 workers) instead of
-  // honouring the 120-frame floor — a 10s/24fps export (241 frames) used to
-  // run as 3 chunks of 120 and was the bottleneck for 4K/8K exports.
   if (frames < 300) {
-    return { label: 'short', maxWorkers: 6, framesPerLambda: Math.max(40, Math.ceil(frames / 6)) };
+    return { label: 'short', maxWorkers: W, framesPerLambda: Math.max(30, Math.ceil(frames / W)) };
   }
   if (frames < 900) {
-    return { label: 'standard', maxWorkers: 5, framesPerLambda: Math.max(FRAMES_PER_LAMBDA_MIN, Math.ceil(frames / 5)) };
+    return { label: 'standard', maxWorkers: W, framesPerLambda: Math.max(30, Math.ceil(frames / W)) };
   }
   if (frames < 1800) {
-    return { label: 'long', maxWorkers: 8, framesPerLambda: Math.max(FRAMES_PER_LAMBDA_MIN, Math.ceil(frames / 8)) };
+    return { label: 'long', maxWorkers: W, framesPerLambda: Math.max(FRAMES_PER_LAMBDA_MIN, Math.ceil(frames / W)) };
   }
-  return { label: 'export', maxWorkers: 12, framesPerLambda: Math.max(FRAMES_PER_LAMBDA_MIN, Math.ceil(frames / 12)) };
+  return { label: 'export', maxWorkers: W, framesPerLambda: Math.max(FRAMES_PER_LAMBDA_MIN, Math.ceil(frames / W)) };
 }
+
 
 /**
  * Estimate slot usage for a queued job before we know exact frames.
