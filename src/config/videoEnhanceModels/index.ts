@@ -4,6 +4,12 @@ import {
   isVideoEnhanceModelKilled,
 } from './flags';
 import { VIDEO_ENHANCE_MODELS } from './models';
+import {
+  isTopazInterpolationIdView,
+  isTopazOutputQualityView,
+  topazModelView,
+} from './topazCatalog';
+
 import type {
   EnhanceConfig,
   OutputCombination,
