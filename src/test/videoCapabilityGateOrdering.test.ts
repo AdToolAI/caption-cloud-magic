@@ -48,12 +48,23 @@ describe('every video generator runs the capability gate first', () => {
     it(`${fn}: imports and calls the shared gate`, () => {
       const src = source(fn);
       expect(src, `${fn} does not import the capability gate`).toContain('videoCapabilityGate.ts');
-      expect(src, `${fn} never calls capabilityGate()`).toMatch(/capabilityGate\(/);
+      expect(src, `${fn} never calls the gate`).toMatch(/gateVideoCapability\(/);
+    });
+
+    it(`${fn}: names the resolution tier explicitly`, () => {
+      const src = source(fn);
+      const call = src.slice(src.indexOf('gateVideoCapability('), src.indexOf('gateVideoCapability(') + 900);
+      expect(/resolution:/.test(call), `${fn}: gate call omits the resolution tier`).toBe(true);
+    });
+
+    it(`${fn}: persists the parity context with the generation`, () => {
+      const src = source(fn);
+      expect(src, `${fn} does not store the parity context`).toMatch(/parityColumns \?\? \{\}/);
     });
 
     it(`${fn}: gate runs before wallet, deduction and provider dispatch`, () => {
       const src = source(fn);
-      const gateIndex = src.indexOf('capabilityGate(\n');
+      const gateIndex = src.indexOf('gateVideoCapability(\n');
       expect(gateIndex, `${fn}: no gate call found`).toBeGreaterThan(0);
 
       const walletIndex = firstIndexOf(src, WALLET_MARKERS);
@@ -65,6 +76,7 @@ describe('every video generator runs the capability gate first', () => {
         expect(gateIndex, `${fn}: provider is called before the gate`).toBeLessThan(providerIndex);
       }
     });
+
 
     it(`${fn}: no silent clamps left`, () => {
       const src = source(fn);
