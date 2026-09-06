@@ -419,6 +419,11 @@ export function EnhanceVideoPanel({
               {run.output_size_bytes
                 ? ` · ${(run.output_size_bytes / (1024 * 1024)).toFixed(1)} MB`
                 : ''}
+              {run.output_fps ? ` · ${Math.round(run.output_fps)} FPS` : ''}
+              {run.output_duration_seconds
+                ? ` · ${run.output_duration_seconds.toFixed(1)} s`
+                : ''}
+              {run.output_codec ? ` · ${run.output_codec.toUpperCase()}` : ''}
             </p>
           )}
           <Button asChild variant="secondary">

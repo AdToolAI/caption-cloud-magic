@@ -30,6 +30,9 @@ export interface EnhanceRunRow {
   output_codec?: string | null;
   output_bitrate_kbps?: number | null;
   output_size_bytes?: number | null;
+  output_container?: string | null;
+  output_fps?: number | null;
+  output_duration_seconds?: number | null;
 }
 
 export interface EnhanceEstimate {
