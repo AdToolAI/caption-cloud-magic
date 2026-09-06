@@ -15,7 +15,9 @@ export type TopazSpecialty =
   | 'cgi'
   | 'denoise'
   | 'deblur'
+  | 'clarity'
   | 'legacy';
+
 
 export type TopazCreditFamily = 'precision' | 'restoration';
 
