@@ -321,26 +321,62 @@ export function AIVideoUpscaling({
                 </div>
               )}
 
-              <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 p-3 text-sm">
-                <span className="text-muted-foreground">
-                  {resolution.toUpperCase()} ·{' '}
-                  {fps === null
-                    ? tx({ de: 'Original-FPS', en: 'Source FPS', es: 'FPS original' })
-                    : `${fps} FPS`}
-                </span>
-                <span className="font-bold">{videoUrl ? priceLabel : '—'}</span>
+              <div className="rounded-lg border border-border/60 bg-background/40 p-3 text-sm space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">
+                    {resolution.toUpperCase()} ·{' '}
+                    {fps === null
+                      ? tx({ de: 'Original-FPS', en: 'Source FPS', es: 'FPS original' })
+                      : `${fps} FPS`}
+                  </span>
+                  <span className="font-bold">{videoUrl ? priceLabel : '—'}</span>
+                </div>
+                {/* Before the run: what the file is and what will really be delivered. */}
+                {targetFrame && (
+                  <p className="text-xs text-muted-foreground">
+                    {formatFrame({ width: sourceWidth, height: sourceHeight })} →{' '}
+                    <span className="text-foreground font-medium">{formatFrame(targetFrame)}</span>{' '}
+                    {tx({ de: 'Pixel', en: 'pixels', es: 'píxeles' })}
+                    {sourceMeta?.durationSeconds
+                      ? ` · ${sourceMeta.durationSeconds.toFixed(1)} s`
+                      : ''}
+                  </p>
+                )}
+                {routedModel && !blockedReason && (
+                  <p className="text-xs text-primary/90">
+                    {tx({
+                      de: 'Läuft auf der Engine, die dieses Format wirklich liefern kann:',
+                      en: 'Runs on the engine that can really deliver this frame:',
+                      es: 'Se ejecuta en el motor que sí puede entregar este formato:',
+                    })}{' '}
+                    {routedModel.name}
+                  </p>
+                )}
+                {/* During the run: the live status of the job. */}
+                {run && run.status !== 'completed' && (
+                  <p className="text-xs text-muted-foreground" aria-live="polite">
+                    {tx({ de: 'Status', en: 'Status', es: 'Estado' })}: {run.status.replace(/_/g, ' ')}
+                  </p>
+                )}
               </div>
 
-              {error && (
+              {blockedReason && (
                 <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg">
                   <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm">{error}</span>
+                  <span className="text-sm">{blockedReason}</span>
+                </div>
+              )}
+
+              {error && !blockedReason && (
+                <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg" role="alert">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-sm">{engineErrorText(errorCode, error, lang)}</span>
                 </div>
               )}
 
               <Button
                 onClick={() => void handleEnhance()}
-                disabled={isStarting || isRunning || !videoUrl}
+                disabled={isStarting || isRunning || !videoUrl || !!blockedReason || orderRejected}
                 className="w-full gap-2"
               >
                 {isStarting || isRunning ? (
