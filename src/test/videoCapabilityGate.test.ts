@@ -78,6 +78,7 @@ describe('runtime capability gate — invalid combinations are rejected, never r
     const v = validateCapability({
       modelId: 'ltx-standard',
       mode: 't2v',
+      resolution: '1080p',
       durationSeconds: 8,
       aspectRatio: '21:9',
     });
@@ -256,5 +257,74 @@ describe('promised frame and measured output', () => {
 
     const recovered = applyOutputMeasurement(next, 'TARGET_MATCHED');
     expect(recovered.consecutiveMismatches).toBe(0);
+  });
+});
+
+
+describe('hardening pass — explicit tiers, kill switch, per-route parity', () => {
+  it('a multi-tier model must name its resolution — no silent first-tier default', () => {
+    const spec = getVideoModelSpec('veo-3.1')!;
+    const mode = getModeSpec(spec, 't2v')!;
+    expect(mode.resolutions.length).toBeGreaterThan(1);
+    const v = validateCapability({ modelId: 'veo-3.1', mode: 't2v', durationSeconds: 8, aspectRatio: '16:9' });
+    expect(v?.field).toBe('resolution');
+    // With the tier named the very same request passes.
+    expect(
+      validateCapability({
+        modelId: 'veo-3.1',
+        mode: 't2v',
+        resolution: mode.resolutions[0].label,
+        durationSeconds: 8,
+        aspectRatio: '16:9',
+      }),
+    ).toBeNull();
+  });
+
+  it('a tier disabled by measured regressions is rejected', () => {
+    const spec = getVideoModelSpec('veo-3.1')!;
+    const label = getModeSpec(spec, 't2v')!.resolutions[0].label;
+    const base = { modelId: 'veo-3.1', mode: 't2v' as const, resolution: label, durationSeconds: 8, aspectRatio: '16:9' };
+    expect(validateCapability(base)).toBeNull();
+    const v = validateCapability({ ...base, tierDisabled: true });
+    expect(v?.field).toBe('resolution');
+    expect(v?.message).toMatch(/disabled/i);
+  });
+
+  it('every offered tier documents an exact frame per aspect ratio of its mode', () => {
+    for (const spec of ALL_VIDEO_MODEL_SPECS) {
+      for (const mode of spec.modes) {
+        for (const tier of mode.resolutions) {
+          for (const ratio of mode.aspectRatios) {
+            const frame = tier.framesByAspectRatio[ratio];
+            expect(frame, `${spec.id} ${mode.mode} ${tier.label} ${ratio}`).toBeTruthy();
+            expect(frame.width % 2, `${spec.id} ${tier.label} ${ratio} width odd`).toBe(0);
+            expect(frame.height % 2, `${spec.id} ${tier.label} ${ratio} height odd`).toBe(0);
+          }
+          expect(tier.sizingRuleSource.length, `${spec.id} ${tier.label}`).toBeGreaterThan(10);
+        }
+      }
+    }
+  });
+
+  it('parity keys separate mode and route — a t2v mismatch cannot touch i2v', () => {
+    const spec = getVideoModelSpec('veo-3.1')!;
+    const label = getModeSpec(spec, 't2v')!.resolutions[0].label;
+    const t2v = parityKeyString(parityKeyOf(spec, 't2v', label));
+    const i2v = parityKeyString(parityKeyOf(spec, 'i2v', label));
+    expect(t2v).not.toBe(i2v);
+    expect(t2v).toContain(spec.apiRoute);
+    expect(t2v).toContain(spec.region);
+  });
+
+  it('the same model on two routes keeps two independent parity keys', () => {
+    const routes = new Map<string, string[]>();
+    for (const spec of ALL_VIDEO_MODEL_SPECS) {
+      const list = routes.get(spec.family) ?? [];
+      list.push(spec.apiRoute);
+      routes.set(spec.family, list);
+    }
+    const a = parityKeyString({ modelId: 'x', apiRoute: 'replicate', region: 'global', mode: 't2v', resolutionLabel: '1080p' });
+    const b = parityKeyString({ modelId: 'x', apiRoute: 'modelark', region: 'global', mode: 't2v', resolutionLabel: '1080p' });
+    expect(a).not.toBe(b);
   });
 });
