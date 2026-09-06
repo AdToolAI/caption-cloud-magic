@@ -33,7 +33,9 @@ export type TopazSpecialty =
   | 'cgi'
   | 'denoise'
   | 'deblur'
+  | 'clarity'
   | 'legacy';
+
 
 /** Credit consumption family — decides which published credit table applies. */
 export type TopazCreditFamily = 'precision' | 'restoration';
