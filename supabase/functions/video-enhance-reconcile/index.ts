@@ -81,43 +81,10 @@ const OPEN_STATUSES = [
   "local_poll_timeout",
 ];
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-/**
- * Internal callers only. Accepted, in this order:
- *   1. `x-cron-secret` matching CRON_SECRET (when that secret is configured),
- *   2. the service role key as Bearer (edge-to-edge / admin tooling),
- *   3. the project's publishable key as Bearer or `apikey` — what pg_cron
- *      sends. It is public, which is exactly why the work itself is bounded.
- * A user JWT or an empty header is rejected.
- */
-export function isInternalCaller(
-  headers: Headers,
-  env: (key: string) => string | undefined,
-): boolean {
-  const cronSecret = env("CRON_SECRET");
-  const providedCron = headers.get("x-cron-secret");
-  if (cronSecret && providedCron && timingSafeEqual(providedCron, cronSecret)) return true;
-
-  const bearer = (headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-  const apikey = (headers.get("apikey") ?? "").trim();
-  const accepted = [env("SUPABASE_SERVICE_ROLE_KEY"), env("SUPABASE_ANON_KEY")]
-    .filter((key): key is string => typeof key === "string" && key.length > 0);
-  return accepted.some((key) =>
-    (bearer && timingSafeEqual(bearer, key)) || (apikey && timingSafeEqual(apikey, key))
-  );
-}
-
 // Per-isolate burst protection. Not a distributed lock — the per-run
 // timestamps below are what make concurrent cycles harmless; this only keeps
 // a hammering caller from burning CPU on empty cycles.
-let lastCycleStartedAt = 0;
-let cycleInFlight = false;
+const cycle = { inFlight: false, lastStartedAt: 0 };
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -127,13 +94,11 @@ serve(async (req) => {
     return json({ error: "Unauthorized" }, 401);
   }
 
-  const sinceLast = Date.now() - lastCycleStartedAt;
-  if (cycleInFlight) return json({ skipped: "in_flight" }, 202);
-  if (sinceLast < MIN_CYCLE_INTERVAL_MS) {
-    return json({ skipped: "throttled", retryInMs: MIN_CYCLE_INTERVAL_MS - sinceLast }, 202);
-  }
-  cycleInFlight = true;
-  lastCycleStartedAt = Date.now();
+  // The body is intentionally never read: no caller can steer the cycle.
+  const decision = decideCycle(cycle, Date.now());
+  if (!decision.run) return json(decision, 202);
+  cycle.inFlight = true;
+  cycle.lastStartedAt = Date.now();
 
   try {
     const admin = createClient(
