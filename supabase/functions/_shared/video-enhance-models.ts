@@ -97,9 +97,25 @@ export function vcubeProcessingType(tier: QualityTier): 'standard' | 'pro' {
   return tier === 'pro' ? 'pro' : 'standard';
 }
 
+/**
+ * Topaz video model codes we run.
+ *
+ * `prob-4` (Proteus v4) is the general-purpose precision upscaler and the
+ * documented default for camera footage. `apo-8` (Apollo) is Topaz' frame
+ * interpolation model and is only added when the customer asks for a frame
+ * rate the source does not already have.
+ */
+export const TOPAZ_VIDEO_UPSCALE_MODEL = 'prob-4';
+export const TOPAZ_FRAME_INTERPOLATION_MODEL = 'apo-8';
+
+/** Encoder contract of our masters: H.265 Main10 in an MP4 container. */
+export const TOPAZ_VIDEO_ENCODER = 'H265';
+export const TOPAZ_VIDEO_PROFILE = 'Main10';
+
 export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
   'bytedance-vcube': {
     id: 'bytedance-vcube',
+    provider: 'replicate',
     providerModelId: 'bytedance/video-upscaler',
     providerSchemaRef: 'replicate/bytedance-video-upscaler@2026-09-05',
     modes: [...VCUBE_SCENES],
@@ -135,28 +151,63 @@ export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
   },
   'topaz-video-upscale': {
     id: 'topaz-video-upscale',
-    providerModelId: 'topazlabs/video-upscale',
-    providerSchemaRef: 'replicate/topazlabs-video-upscale@972107c4',
-    // The published schema has no model/mode input at all.
+    // DIRECT Topaz API (api.topazlabs.com), not Replicate. That is what makes
+    // the explicit output geometry below possible.
+    provider: 'topaz',
+    providerModelId: TOPAZ_VIDEO_UPSCALE_MODEL,
+    providerSchemaRef: 'topaz/video-express@2026-09-06',
     modes: ['standard'],
+    // The direct API takes an explicit output width/height, so every label and
+    // every documented frame rate is reachable in both orientations.
     outputs: [
-      { resolution: '720p', fps: [30, 60] },
-      { resolution: '1080p', fps: [30, 60] },
-      { resolution: '4k', fps: [30, 60] },
+      { resolution: '720p', fps: [24, 30, 60] },
+      { resolution: '1080p', fps: [24, 30, 60] },
+      { resolution: '2k', fps: [24, 30, 60] },
+      { resolution: '4k', fps: [24, 30, 60] },
     ],
     tiers: ['standard'],
     minDurationSeconds: 1,
     maxDurationSeconds: 120,
     backendFlag: 'VIDEO_ENHANCE_TOPAZ_ENABLED',
+    /**
+     * Body of `POST /video/express`. `source.external` lets Topaz pull the
+     * clip from our storage; the caller only adds `notifications.webhookUrl`.
+     */
     buildInput(config, source, sourceUrl) {
+      const target = resolveTargetFrame(config.resolution, source.width, source.height);
+      const sourceFps = Math.round(source.fps) || 30;
+      const fps = config.fps ?? sourceFps;
+
+      const filters: Record<string, unknown>[] = [
+        { model: TOPAZ_VIDEO_UPSCALE_MODEL, auto: 'Auto' },
+      ];
+      // Frame interpolation is only requested when the frame rate really
+      // changes — otherwise Topaz would re-time a clip that is already right.
+      if (fps !== sourceFps) {
+        filters.push({ model: TOPAZ_FRAME_INTERPOLATION_MODEL, fps });
+      }
+
       return {
-        video: sourceUrl,
-        target_resolution: config.resolution,
-        target_fps: config.fps ?? Math.round(source.fps),
+        source: {
+          container: topazContainer(source.container),
+          external: { provider: 's3', presignedUrl: sourceUrl },
+        },
+        filters,
+        output: {
+          // Topaz rounds the frame to a multiple of 4; our labels already are.
+          resolution: { width: target.width, height: target.height },
+          frameRate: fps,
+          videoEncoder: TOPAZ_VIDEO_ENCODER,
+          videoProfile: TOPAZ_VIDEO_PROFILE,
+          container: 'mp4',
+          audioTransfer: 'Copy',
+          audioCodec: 'AAC',
+        },
       };
     },
   },
 };
+
 
 
 // ---------------------------------------------------------------------------
