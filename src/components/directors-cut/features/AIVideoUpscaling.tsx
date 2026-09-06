@@ -494,29 +494,41 @@ export function AIVideoUpscaling({
                 )}
               </Button>
 
-              {run?.status === 'completed' && run.output_url && (
-                <div className="space-y-2">
-                  <video src={run.output_url} controls className="w-full rounded-lg" />
-                  {/* After the run: the measured facts of the delivered file. */}
-                  {run.actual_width && run.actual_height && (
-                    <p className="text-xs text-muted-foreground">
-                      {tx({ de: 'Geliefert', en: 'Delivered', es: 'Entregado' })}:{' '}
-                      <span className="text-foreground font-medium">
-                        {run.actual_width}×{run.actual_height}
-                      </span>{' '}
-                      {tx({ de: 'Pixel', en: 'pixels', es: 'píxeles' })}
-                      {run.output_size_bytes
-                        ? ` · ${(run.output_size_bytes / (1024 * 1024)).toFixed(1)} MB`
-                        : ''}
-                      {run.output_fps ? ` · ${Math.round(run.output_fps)} FPS` : ''}
-                      {run.output_duration_seconds
-                        ? ` · ${run.output_duration_seconds.toFixed(1)} s`
-                        : ''}
-                      {run.output_codec ? ` · ${run.output_codec.toUpperCase()}` : ''}
+              {run?.status === 'completed' && run.output_url && (() => {
+                const match = targetMatchOf(run);
+                const MatchIcon =
+                  match === 'matched' ? CheckCircle2 : match === 'mismatch' ? AlertTriangle : HelpCircle;
+                const tone =
+                  match === 'matched'
+                    ? 'text-primary'
+                    : match === 'mismatch'
+                      ? 'text-destructive'
+                      : 'text-muted-foreground';
+                const facts = deliveredFacts(run, lang);
+                return (
+                  <div className="space-y-2">
+                    <video src={run.output_url} controls className="w-full rounded-lg" />
+                    {/* After the run: did the file meet the promised frame? Measured, not assumed. */}
+                    <p
+                      className={`text-sm flex items-center gap-2 ${tone}`}
+                      data-testid="dc-enhance-target-match"
+                      data-match={match}
+                    >
+                      <MatchIcon className="h-4 w-4" aria-hidden="true" />
+                      <span className="font-medium">{targetMatchLabel(match, lang)}</span>
+                      {targetMatchDetail(run) && (
+                        <span className="text-muted-foreground tabular-nums">· {targetMatchDetail(run)}</span>
+                      )}
                     </p>
-                  )}
-                </div>
-              )}
+                    {/* The measured facts of the delivered file; codec and container stay separate. */}
+                    {facts.length > 0 && (
+                      <p className="text-xs text-muted-foreground" data-testid="dc-enhance-delivered-facts">
+                        {tx({ de: 'Geliefert', en: 'Delivered', es: 'Entregado' })}: {facts.join(' · ')}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>
