@@ -17,13 +17,25 @@ Nicht aus dem Code belegbar sind Existenz und Fähigkeiten der neuen Generatione
 
 ## Phase 1 — Zentrale Video Capability Registry
 
-Neu: `supabase/functions/_shared/videoModelSpecs.ts` als alleinige Wahrheit, gespiegelt über `src/config/videoModelSpecs.ts` (Muster wie `pictureModelCapabilities.ts`).
+Neu: `supabase/functions/_shared/videoModelSpecs.ts` als **kanonische, einzig manuell gepflegte** Quelle. `src/config/videoModelSpecs.ts` ist kein zweiter Spiegel, sondern wird per Skript daraus **generiert** (Header „generated — do not edit"), und ein Hash-/Parity-Test im CI schlägt fehl, sobald der generierte Client-Stand vom Server-Stand abweicht.
 
-Modell-Ebene: interne ID, Anzeigename, Familie, Generation, Provider, echter Provider-Slug, API-Route, API-Version, Release-Status, `deprecated`, `supersededBy`, `lastVerifiedAt`, `providerDocsVersion`, `available`.
+Modell-Ebene: interne ID, Anzeigename, Familie, Generation, Provider, echter Provider-Slug, **API-Route und Region**, API-Version, Release-Status, `deprecated`, `supersededBy`, `lastVerifiedAt`, `providerDocsVersion`, `available`, `parityStatus`. Ein Modell, das über mehrere Routen erreichbar ist (z. B. MiniMax direkt vs. Runway-hosted), bekommt **pro Route eine eigene Spec** — Fähigkeiten und Auflösungen werden nie routenübergreifend behauptet.
 
 Capability-Ebene **pro Modus** (T2V, I2V, FirstLast, Reference, V2V, Edit, Extend, Reframe, AudioToVideo): Auflösungen inkl. `maxNative`, Dauern, Aspect Ratios, FPS, Audio, max. Referenzbilder/-videos/-audios, First-/Last-Frame, Seed, Negativ-Prompt, Kamera- und Motion-Controls, HDR, Output-Formate, Smart Duration, plus `constraints` als maschinenlesbare Regeln (z. B. „4K ⇒ Dauer = 8 s", „Extension ⇒ 720p").
 
+**Keine Auflösungszahl ohne exakte Definition.** Jeder Eintrag führt `width`, `height`, `resolutionLabel` und `orientationBehavior` (z. B. „long edge" vs. „orientation-aware"), also nicht „4K", sondern 3840×2160 Landscape bzw. 2160×3840 Portrait — und nur, wenn der Provider genau das liefert. Genau hier lag der Topaz-Portrait-Fehler.
+
 Damit lässt sich Veo 3.1 korrekt abbilden: 720p bei 4/6/8 s, 1080p und 4K ausschließlich bei 8 s, Lite ohne 4K.
+
+### Freigabe-Kette (verbindlich für jede Fähigkeit)
+
+```text
+Provider-Doku → konkrete API-Route → Capability Spec → Pricing → automatischer Validation-Test
+→ echter Max-Quality-Testlauf → Output-Probe → FULL_PARITY → available: true → UI-Badge
+```
+
+Vor `available: true` für eine Maximalauflösung ist ein **echter Smoke-Test** Pflicht: Job in maximaler Auflösung starten, Ausgabedatei laden und proben, Pixelmaße, Dauer, FPS und Audio messen, Test-Run-ID plus Messwerte in der Spec bzw. einer Verifikationstabelle speichern. Erst danach darf ein Badge wie „4K Native" erscheinen.
+
 
 ## Phase 2 — Provider-Audit je Familie
 
@@ -66,7 +78,7 @@ Nach jeder Generierung werden Breite, Höhe, FPS, Dauer, Codec, Bitrate, Dateigr
 
 ## Phase 7 — Harte Tests
 
-Deployment scheitert bei: Registry↔Server-Abweichung, fehlender Preiszeile für eine wählbare Kombination, Auflösung ohne Adapter-Unterstützung, abweichenden Dauern, verletzter Constraint (z. B. Veo 4K + 6 s), Alias ohne Ziel, `deprecated` ohne `supersededBy`, sowie einem Test, der ein stilles Herunterschreiben von 4K auf 1080p ausschließt.
+Deployment scheitert bei: Registry↔Server-Abweichung, Hash-Abweichung zwischen kanonischer Server-Spec und generiertem Client-Stand, fehlender Preiszeile für eine wählbare Kombination, Auflösung ohne Adapter-Unterstützung, abweichenden Dauern, verletzter Constraint (z. B. Veo 4K + 6 s), Alias ohne Ziel, `deprecated` ohne `supersededBy`, fehlender Pixelangabe (`width`/`height`) an einer Auflösung, `available: true` ohne hinterlegte Smoke-Test-Run-ID, sowie einem Test, der ein stilles Herunterschreiben von 4K auf 1080p ausschließt.
 
 ## Phase 8 — Rückwärtskompatibilität
 
@@ -74,18 +86,24 @@ Alte IDs bleiben als Aliase (`oldId → currentId`). Gespeicherte Projekte zeige
 
 ## Phase 9 — Rollout
 
-- **Wave 1 (Architektur):** Capability Registry, Pricing-Parität, Constraints, kein stilles Clamping, Output-Messung, Flagship-first-UI.
-- **Wave 2 (Qualitätssprünge):** Veo 3.1 4K · LTX 2.5 Fast/Pro inkl. 4K · Seedance 2.0 4K erhalten · Seedance 2.5 multimodal · Wan 3.0 · Vidu Q3 · Grok 1.5 · Luma Ray 3.2 Full API.
-- **Wave 3 (Professional):** Runway Gen-4.5, Aleph 2.0, ProRes, PNG-Sequence, HDR, 10-bit, EXR, V2V, Reframe, Extend, Multi-Keyframes.
-- **Wave 4:** Kling-Audit, MiniMax/Hailuo-Routen-Audit, Pika, HappyHorse, Legacy-Bereinigung.
+Reihenfolge ist bindend: **Phase 1 und die Tests zuerst**, danach Provider für Provider — sonst wird die Modellarbeit nach dem Registry-Umbau ein zweites Mal fällig. Kein Wave-2/3/4-Eintrag setzt eine ungeprüfte Fähigkeit voraus; jeder beginnt mit dem Routen-Audit und schaltet dann das höchste **bestätigte** native Tier frei.
+
+- **Wave 1 (Architektur):** kanonische Capability Registry + generierter Client-Spiegel, Pricing-Parität, Constraints, kein stilles Clamping, Output-Messung, Flagship-first-UI, harte Tests.
+- **Wave 2 (Qualitätssprünge, je Familie: Route Audit → höchstes bestätigtes natives Tier freischalten):** Veo 3.1 · LTX 2.5 Fast/Pro · Seedance 2.0 (bestehendes Hochauflösungs-Tier erhalten) · Seedance 2.5 multimodal · Wan 3.0 (mit 2.7 als Fallback) · Vidu Q3 · Grok Imagine 1.5 · Luma Ray 3.2.
+- **Wave 3 (Professional):** Runway Gen-4.5, Aleph 2.0, ProRes, PNG-Sequence, HDR, 10-bit, EXR, V2V, Reframe, Extend, Multi-Keyframes — jeweils nach Routen-Audit.
+- **Wave 4:** Kling-Audit, MiniMax/Hailuo als zwei getrennte Routen, Pika, HappyHorse, Legacy-Bereinigung.
 
 ## Phase 10 — Nicht wieder veralten
 
-Jede Spec trägt `lastVerifiedAt`, `providerDocsVersion`, `providerModelId`, `releaseStatus`. Ein Admin-Report „Video Provider Health" listet Provider, Modell, aktuelles natives Maximum und Prüfdatum mit Ampel 🟢 Current / 🟡 Verify / 🔴 Outdated, wenn die Prüfung zu lange zurückliegt.
+Jede Spec trägt `lastVerifiedAt`, `providerDocsVersion`, `providerModelId`, `releaseStatus`, Route/Region und die letzte Smoke-Test-Run-ID. Ein Admin-Report „Video Provider Health" listet Provider, Modell, Route, bestätigtes natives Maximum und Prüfdatum mit Ampel 🟢 Current / 🟡 Verify / 🔴 Outdated, wenn die Prüfung zu lange zurückliegt.
 
 ## Definition of Done je Familie
 
-`FULL_PARITY` erst, wenn: neueste sinnvolle Generation geprüft, maximale native Auflösung verfügbar, alle Auflösungsstufen, Modi, Dauern, Ratios, Audio-Fähigkeiten, Referenzen, First/Last, Seed, Negativ-Prompt, Kamera-Controls und HDR/Pro-Outputs abgebildet sind, jede wählbare Kombination einen Preis hat, Backend und UI dieselben Regeln nutzen, der Output nachgemessen wird und mindestens ein echter Testlauf in maximaler Auflösung erfolgreich war.
+`FULL_PARITY` wird **nicht pro Modell**, sondern pro Kombination `Modell × API-Route × Region × Modus` vergeben — dasselbe Modell kann über Google, Runway, Replicate oder einen Aggregator unterschiedliche Fähigkeiten haben.
+
+Vergeben erst, wenn für diese Kombination gilt: neueste sinnvolle Generation geprüft, maximale native Auflösung mit exakten Pixelmaßen verfügbar, alle Auflösungsstufen, Modi, Dauern, Ratios, Audio-Fähigkeiten, Referenzen, First/Last, Seed, Negativ-Prompt, Kamera-Controls und HDR/Pro-Outputs abgebildet, jede wählbare Kombination bepreist, Backend und UI mit denselben Regeln, Output-Nachmessung aktiv, und ein echter Testlauf in maximaler Auflösung mit gespeicherter Run-ID und gemessener Ausgabe bestanden. Erst dann erscheint in der UI eine Kennzeichnung wie „⭐ Flagship · 4K Native · Full Parity".
+
+Kundenaussage, die daraus tragfähig wird: *Every resolution and capability shown in AdTool AI is verified against the exact API route we use and confirmed by an actual output test.*
 
 ## Betroffene Dateien
 
