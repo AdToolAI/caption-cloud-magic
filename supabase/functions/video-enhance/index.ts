@@ -285,13 +285,23 @@ serve(async (req) => {
         .eq("id", run.id)
         .not("status", "in", "(completed,provider_failed,provider_cancelled_confirmed)");
 
-      const apiKey = Deno.env.get("REPLICATE_API_KEY");
-      if (run.provider_prediction_id && apiKey) {
-        await fetch(
-          `https://api.replicate.com/v1/predictions/${run.provider_prediction_id}/cancel`,
-          { method: "POST", headers: { Authorization: `Bearer ${apiKey}` } },
-        ).catch((e) => console.warn(`${TAG} cancel request failed:`, e));
+      const providerId: string | null = run.provider_prediction_id ?? null;
+      if (providerId?.startsWith("topaz:")) {
+        const topazKey = Deno.env.get("TOPAZ_API_KEY");
+        if (topazKey) {
+          await cancelTopazVideoRequest(topazKey, providerId.slice("topaz:".length))
+            .catch((e) => console.warn(`${TAG} topaz cancel request failed:`, e));
+        }
+      } else {
+        const apiKey = Deno.env.get("REPLICATE_API_KEY");
+        if (providerId && apiKey) {
+          await fetch(
+            `https://api.replicate.com/v1/predictions/${providerId}/cancel`,
+            { method: "POST", headers: { Authorization: `Bearer ${apiKey}` } },
+          ).catch((e) => console.warn(`${TAG} cancel request failed:`, e));
+        }
       }
+
       return json({ ok: true, status: "cancel_requested", refunded: false });
     }
 
