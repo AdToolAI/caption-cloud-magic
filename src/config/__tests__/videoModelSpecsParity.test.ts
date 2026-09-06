@@ -14,7 +14,7 @@ import {
   res,
 } from '@/config/videoModelSpecs';
 import { AI_VIDEO_TOOLKIT_MODELS } from '@/config/aiVideoModelRegistry';
-import { CATALOG_SOURCE } from '@/lib/cost/videoPricingCatalog';
+import { VIDEO_PRICING_CATALOG } from '@/lib/cost/videoPricingCatalog';
 
 const SOURCE_PATH = resolve(process.cwd(), 'supabase/functions/_shared/videoModelSpecs.ts');
 
@@ -99,7 +99,7 @@ describe('registry, pricing and alias parity', () => {
       for (const m of spec.modes) {
         for (const r of m.resolutions) {
           expect(
-            CATALOG_SOURCE[r.pricingId],
+            VIDEO_PRICING_CATALOG[r.pricingId],
             `${spec.id}/${m.mode}/${r.label}: unknown pricing id "${r.pricingId}"`,
           ).toBeTruthy();
         }
