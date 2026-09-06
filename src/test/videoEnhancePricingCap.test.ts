@@ -216,10 +216,10 @@ describe('post-run true-up against verified provider cost', () => {
 });
 
 describe('Topaz rate card', () => {
-  it('is billed per unit at the verified $0.08 unit price', () => {
+  it('is billed per credit at the configured credit price', () => {
     const card = VIDEO_RATE_CARDS['topaz-video-upscale'];
     expect(card.type).toBe('per_unit');
-    if (card.type === 'per_unit') expect(card.unitUsd).toBe(0.08);
+    if (card.type === 'per_unit') expect(card.unitUsd).toBe(0.1);
   });
 
   it('stays flagged as calibrating until real unit data exists', () => {

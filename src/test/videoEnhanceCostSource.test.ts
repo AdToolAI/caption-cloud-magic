@@ -54,12 +54,13 @@ describe('provider cost source', () => {
   });
 
   it('derives money from billed units for a per-unit rate card', () => {
+    // Topaz now bills in CREDITS; the card converts them at TOPAZ_CREDIT_USD.
     const reading = extractProviderCost(
       { metrics: { unspecified_billing_metric: 6 } },
       'topaz-video-upscale',
     );
     expect(reading.units).toBe(6);
-    expect(reading.usd).toBeCloseTo(0.48, 5);
+    expect(reading.usd).toBeCloseTo(0.6, 5);
   });
 
   it('ignores nonsense values', () => {
