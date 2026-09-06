@@ -353,7 +353,12 @@ export const TOPAZ_MANUAL_PARAM_VIEWS: {
   },
 ];
 
-export const TOPAZ_SCALE_TOLERANCE = 0.2;
+/**
+ * The provider documents the fixed factors as absolutes with no tolerance
+ * window; the only slack is its pixel alignment to a multiple of 4.
+ */
+export const TOPAZ_SCALE_TOLERANCE = 0.02;
+
 
 /** Mirror of the server rule: a fixed-factor model may not run off-factor. */
 export function topazScaleFitsView(
