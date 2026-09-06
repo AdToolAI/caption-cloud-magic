@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useUserRoles } from '@/hooks/useUserRoles';
 import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
 import { VideoSourcePicker } from '@/components/ai-video/VideoSourcePicker';
 import { EnhanceRunProgress } from '@/components/ai-video/EnhanceRunProgress';
@@ -39,6 +40,8 @@ import {
   TOPAZ_DEFAULT_OUTPUT_QUALITY,
   TOPAZ_INTERPOLATION_VIEWS,
   TOPAZ_OUTPUT_QUALITY_VIEWS,
+  isTopazModelStartableView,
+  topazInterpolationAppliesView,
   topazModelView,
   topazScaleFitsView,
   type TopazOutputQuality,
@@ -98,6 +101,12 @@ const COPY = {
     es: 'solo funciona a',
   },
   detectedFrom: { en: 'Detected from', de: 'Erkannt aus', es: 'Detectado de' },
+  betaBlocked: {
+    en: 'in validation, not startable yet',
+    de: 'in Prüfung, noch nicht startbar',
+    es: 'en validación, aún no iniciable',
+  },
+  betaTag: { en: 'beta', de: 'Beta', es: 'beta' },
   fromOrigin: {
     en: 'Set automatically from where the clip comes from',
     de: 'Automatisch aus der Herkunft des Clips gesetzt',
@@ -191,6 +200,9 @@ export function EnhanceVideoPanel({
   onCompleted,
 }: Props) {
   const { language } = useTranslation();
+  // Only validation accounts may start a model whose credit consumption is
+  // still unconfirmed; the server enforces the same rule.
+  const { isAdmin: isEnhanceTestUser } = useUserRoles();
   const lang: Lang = (['en', 'de', 'es'].includes(language) ? language : 'en') as Lang;
 
   const models = useMemo(() => visibleVideoEnhanceModels(), []);
@@ -541,7 +553,7 @@ export function EnhanceVideoPanel({
               </div>
             )}
 
-            {isTopaz && fps !== null && (
+            {interpolationApplies && (
               <div className="space-y-2">
                 <Label>{tx('motionModel', lang)}</Label>
                 <Select value={interpolationModel} onValueChange={setInterpolationModel}>
