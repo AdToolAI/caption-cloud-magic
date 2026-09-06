@@ -86,7 +86,7 @@ describe('ByteDance scene provenance — direct requests', () => {
   });
 
   it('an explicit choice outside the published enum is ignored, never sent', () => {
-    const { payload } = serverPayload(direct({ mode: 'standard' }), uploaded, true);
+    const { payload } = serverPayload(direct({ mode: 'proteus' }), uploaded, true);
     expect(isVcubeScene(payload.scene)).toBe(true);
     expect(payload.scene).toBe('ugc');
   });
