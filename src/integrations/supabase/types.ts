@@ -15139,6 +15139,36 @@ export type Database = {
           },
         ]
       }
+      staff_wallet_accounts: {
+        Row: {
+          active: boolean
+          created_at: string
+          label: string
+          min_balance: number
+          top_up_to: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          label?: string
+          min_balance?: number
+          top_up_to?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          label?: string
+          min_balance?: number
+          top_up_to?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       starter_week_plans: {
         Row: {
           content_idea: string
@@ -21176,6 +21206,7 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      staff_wallet_topup: { Args: never; Returns: number }
       syncso_recent_failure_count: {
         Args: { _window_min?: number }
         Returns: number
