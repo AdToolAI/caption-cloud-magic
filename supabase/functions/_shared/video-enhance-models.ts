@@ -28,12 +28,16 @@ import {
   TOPAZ_OUTPUT_QUALITY,
   TOPAZ_VIDEO_MODEL_IDS,
   TOPAZ_VIDEO_MODELS,
+  isTopazInterpolationId,
+  isTopazOutputQuality,
+  topazInterpolationApplies,
   topazInterpolationModel,
   topazManualFilterParams,
   topazOutputQuality,
   topazVideoModelOrDefault,
   type TopazCreditFamily,
 } from './topaz-video-catalog.ts';
+
 
 export * from './topaz-video-catalog.ts';
 
