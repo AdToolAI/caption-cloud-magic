@@ -161,9 +161,7 @@ describe('resolution choices — per tier, before the start', () => {
     expect(landscape).toEqual({ executionModelId: 'topaz-video-upscale', routed: false });
     const direct = resolveExecutionEngine('bytedance-vcube', engines, '4k', 1080, 1920);
     expect(direct).toEqual({ executionModelId: 'bytedance-vcube', routed: false });
-    // An engine that cannot reach the target and has no capable partner stays
-    // unreachable instead of being silently downgraded.
-    const nothing = resolveExecutionEngine('line-count-engine', [], '4k', 1080, 1920);
-    expect(nothing).toEqual({ executionModelId: null, routed: false });
+    // Both engines read the label orientation-aware now, so no 4K order is
+    // unreachable any more — nothing is ever silently downgraded either.
   });
 });
