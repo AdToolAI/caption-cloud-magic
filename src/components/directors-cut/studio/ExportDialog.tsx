@@ -92,6 +92,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                 {settings.quality === '8k' ? t('dc.eightKTimeWarning') : t('dc.fourKTimeWarning')}
               </p>
             )}
+            <p className="text-[11px] text-white/40 leading-snug">
+              {t('dc.resolutionIsCanvasNote')}
+            </p>
+
           </div>
 
 
