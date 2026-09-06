@@ -397,6 +397,8 @@ export function EnhanceVideoPanel({
             </div>
           </div>
 
+          {blockedReason && <p className="text-sm text-destructive">{blockedReason}</p>}
+
         </>
       )}
 
