@@ -158,6 +158,7 @@ serve(async (req) => {
     const { data: generation, error: genError } = await supabaseAdmin
       .from('ai_video_generations')
       .insert({
+        ...(gate.parityColumns ?? {}),
         user_id: user.id,
         prompt,
         model,
