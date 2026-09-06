@@ -52,6 +52,8 @@ export interface SourceMetadata {
   container?: string;
   sizeBytes?: number;
   sourceModel?: string;
+  /** Where the clip came from — drives the ByteDance `scene` preset. */
+  origin?: 'generated' | 'uploaded' | 'unknown';
 }
 
 export interface VideoEnhanceSpec {
@@ -548,6 +550,23 @@ export function verifiedPricing(params: {
  * Mode, fps and tier are mapped onto what the executing engine really offers —
  * never invented, always taken from its own published combination table.
  */
+/**
+ * ByteDance `scene` is a QUALITY preset, so it must follow the real provenance
+ * of the clip and never a leftover value from another engine:
+ *   aigc   — the clip came out of one of our AI video models
+ *   ugc    — an ordinary phone / social upload
+ *   common — provenance unknown
+ */
+export function sceneForSource(source: SourceMetadata, available: string[]): string {
+  const preferred = source.sourceModel
+    ? 'aigc'
+    : source.origin === 'uploaded'
+      ? 'ugc'
+      : 'common';
+  if (available.includes(preferred)) return preferred;
+  return available.includes('common') ? 'common' : available[0];
+}
+
 export function adaptConfigToSpec(
   config: EnhanceConfig,
   spec: VideoEnhanceSpec,
@@ -555,9 +574,11 @@ export function adaptConfigToSpec(
 ): EnhanceConfig {
   if (config.modelId === spec.id) return config;
 
+  // A mode from another engine is meaningless here — pick the preset that
+  // matches the source instead of blindly falling back to `common`.
   const mode = spec.modes.includes(config.mode)
     ? config.mode
-    : (spec.modes.includes('common') ? 'common' : spec.modes[0]);
+    : sceneForSource(source, spec.modes);
 
   const combo = outputsFor(spec, mode).find((c) => c.resolution === config.resolution);
   const allowedFps = combo?.fps ?? [];
@@ -573,3 +594,4 @@ export function adaptConfigToSpec(
 
   return { modelId: spec.id, mode, resolution: config.resolution, fps, tier };
 }
+

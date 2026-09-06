@@ -16,7 +16,13 @@ import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
 import { VideoSourcePicker } from '@/components/ai-video/VideoSourcePicker';
 import type { CanonicalVideoAsset } from '@/lib/videoEnhance/canonicalVideoAsset';
 import { isAiGeneratedSource } from '@/lib/videoEnhance/recommend';
-import { formatFrame, resolveTargetFrame } from '@/lib/videoEnhance/targetFrame';
+import {
+  evaluateUpscale,
+  formatFrame,
+  frameMeetsTarget,
+  projectProviderOutput,
+  resolveTargetFrame,
+} from '@/lib/videoEnhance/targetFrame';
 
 import {
   availableFps,
@@ -82,6 +88,26 @@ const COPY = {
   },
   pixels: { en: 'pixels', de: 'Pixel', es: 'píxeles' },
   delivered: { en: 'Delivered', de: 'Geliefert', es: 'Entregado' },
+  noUpscale: {
+    en: 'This setting would not enlarge your video. Pick a higher resolution.',
+    de: 'Diese Einstellung vergrößert dein Video nicht. Wähle eine höhere Auflösung.',
+    es: 'Esta opción no ampliaría tu vídeo. Elige una resolución mayor.',
+  },
+  downscale: {
+    en: 'This setting would make your video smaller than it already is.',
+    de: 'Diese Einstellung würde dein Video kleiner machen, als es schon ist.',
+    es: 'Esta opción haría tu vídeo más pequeño de lo que ya es.',
+  },
+  routed: {
+    en: 'Runs on the engine that can really deliver this frame:',
+    de: 'Läuft auf der Engine, die dieses Format wirklich liefern kann:',
+    es: 'Se ejecuta en el motor que sí puede entregar este formato:',
+  },
+  unreachable: {
+    en: 'No engine can deliver this frame for your video right now.',
+    de: 'Keine Engine kann dieses Format für dein Video derzeit liefern.',
+    es: 'Ningún motor puede entregar este formato para tu vídeo ahora mismo.',
+  },
   messengerHint: {
     en: 'Messengers like WhatsApp shrink videos when you send them. Download the file and send it as a document to keep the full quality.',
     de: 'Messenger wie WhatsApp rechnen Videos beim Versenden stark herunter. Lade die Datei herunter und verschicke sie als Dokument, um die volle Qualität zu behalten.',
@@ -220,6 +246,36 @@ export function EnhanceVideoPanel({
     ? formatFrame({ width: sourceWidth, height: sourceHeight })
     : null;
 
+  // A paid enhancement must actually add pixels — same rule as the server.
+  const upscale = targetFrame && sourceWidth && sourceHeight
+    ? evaluateUpscale(targetFrame, { width: sourceWidth, height: sourceHeight })
+    : null;
+
+  // Which engine really delivers this frame (portrait 4K only ByteDance).
+  const executionModelId = targetFrame && sourceWidth && sourceHeight
+    ? (frameMeetsTarget(
+        projectProviderOutput(model.id, resolution, sourceWidth, sourceHeight),
+        targetFrame,
+      )
+        ? model.id
+        : models.find((m) =>
+            frameMeetsTarget(
+              projectProviderOutput(m.id, resolution, sourceWidth, sourceHeight),
+              targetFrame,
+            ),
+          )?.id ?? null)
+    : model.id;
+  const routedModel = executionModelId && executionModelId !== model.id
+    ? models.find((m) => m.id === executionModelId) ?? null
+    : null;
+  const frameUnreachable = targetFrame != null && executionModelId === null;
+
+  const blockedReason = upscale && !upscale.ok
+    ? (upscale.reason === 'downscale' ? tx('downscale', lang) : tx('noUpscale', lang))
+    : frameUnreachable
+      ? tx('unreachable', lang)
+      : null;
+
   const autoDetectedFootage = !modeTouched && !!asset && model.processingModes.length > 1;
 
 
@@ -329,12 +385,19 @@ export function EnhanceVideoPanel({
                   {formatFrame(targetFrame)} {tx('pixels', lang)}
                 </p>
               )}
+              {routedModel && !blockedReason && (
+                <p className="text-xs text-primary/90 mt-1">
+                  {tx('routed', lang)} {routedModel.name}
+                </p>
+              )}
             </div>
             <div className="text-right text-sm">
               <p className="text-muted-foreground">{tx('price', lang)}</p>
               <p className="font-bold text-lg">{priceLabel}</p>
             </div>
           </div>
+
+          {blockedReason && <p className="text-sm text-destructive">{blockedReason}</p>}
 
         </>
       )}
@@ -356,6 +419,11 @@ export function EnhanceVideoPanel({
               {run.output_size_bytes
                 ? ` · ${(run.output_size_bytes / (1024 * 1024)).toFixed(1)} MB`
                 : ''}
+              {run.output_fps ? ` · ${Math.round(run.output_fps)} FPS` : ''}
+              {run.output_duration_seconds
+                ? ` · ${run.output_duration_seconds.toFixed(1)} s`
+                : ''}
+              {run.output_codec ? ` · ${run.output_codec.toUpperCase()}` : ''}
             </p>
           )}
           <Button asChild variant="secondary">
@@ -374,7 +442,11 @@ export function EnhanceVideoPanel({
 
       {hasSource && (
         <div className="flex gap-3">
-          <Button onClick={onStart} disabled={isStarting || isRunning} className="flex-1">
+          <Button
+            onClick={onStart}
+            disabled={isStarting || isRunning || !!blockedReason}
+            className="flex-1"
+          >
             {isStarting || isRunning ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{tx('running', lang)}</>
             ) : (

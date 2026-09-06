@@ -20,7 +20,13 @@ export interface ProbedVideoMetadata {
   fps: number;
   container: string;
   sizeBytes: number;
+  /**
+   * Real video codec read from the sample description (`stsd`), e.g. `h264`,
+   * `hevc`, `av1`. NEVER a MIME type — the container/MIME is a separate fact.
+   */
+  codec?: string;
 }
+
 
 interface Box {
   type: string;
@@ -123,11 +129,39 @@ function parseStts(view: DataView, box: Box): { samples: number; totalDelta: num
   return { samples, totalDelta };
 }
 
+/** Four-character sample entry codes mapped to the names people recognise. */
+const CODEC_NAMES: Record<string, string> = {
+  avc1: 'h264',
+  avc3: 'h264',
+  hvc1: 'hevc',
+  hev1: 'hevc',
+  av01: 'av1',
+  vp09: 'vp9',
+  vp08: 'vp8',
+  mp4v: 'mpeg4',
+  'ap4h': 'prores',
+  apcn: 'prores',
+};
+
+export function codecNameFromSampleEntry(fourcc: string): string | undefined {
+  return CODEC_NAMES[fourcc] ?? (fourcc.trim() ? fourcc.trim().toLowerCase() : undefined);
+}
+
+/** First sample entry type of a `stsd` box — the real codec of the track. */
+function parseStsdCodec(view: DataView, stsd: Box): string | undefined {
+  // stsd: 4 bytes version/flags, 4 bytes entry count, then sample entries.
+  const first = stsd.start + stsd.headerSize + 8;
+  const entry = readBox(view, first);
+  if (!entry) return undefined;
+  return codecNameFromSampleEntry(entry.type);
+}
+
 /** Parses a complete `moov` box. Returns `null` when it holds no video track. */
 export function parseMoov(moov: Uint8Array, sizeBytes = 0, container = 'mp4'): ProbedVideoMetadata | null {
   const view = new DataView(moov.buffer, moov.byteOffset, moov.byteLength);
   const root = readBox(view, 0);
   if (!root || root.type !== 'moov') return null;
+
   const bodyStart = root.headerSize;
   const bodyEnd = Math.min(root.size, moov.byteLength);
 
@@ -149,6 +183,7 @@ export function parseMoov(moov: Uint8Array, sizeBytes = 0, container = 'mp4'): P
 
     const mdia = findBox(view, trakStart, trakEnd, 'mdia');
     let fps = 0;
+    let codec: string | undefined;
     let trackDuration = movieDuration;
     if (mdia) {
       const mdiaStart = mdia.start + mdia.headerSize;
@@ -168,6 +203,10 @@ export function parseMoov(moov: Uint8Array, sizeBytes = 0, container = 'mp4'): P
         const { samples, totalDelta } = parseStts(view, stts);
         if (samples > 0 && totalDelta > 0) fps = samples / (totalDelta / media.timescale);
       }
+      const stsd = stbl
+        ? findBox(view, stbl.start + stbl.headerSize, stbl.start + stbl.size, 'stsd')
+        : null;
+      if (stsd) codec = parseStsdCodec(view, stsd);
     }
     if (!fps && trackDuration > 0) fps = 0;
 
@@ -178,7 +217,9 @@ export function parseMoov(moov: Uint8Array, sizeBytes = 0, container = 'mp4'): P
       fps: Number(fps.toFixed(3)),
       container,
       sizeBytes,
+      codec,
     };
+
     if (!best || candidate.width * candidate.height > best.width * best.height) best = candidate;
   }
   return best;

@@ -233,17 +233,20 @@ export function outputMatchesOrder(
   if (ordered.durationSeconds > 0 && durationGap / ordered.durationSeconds > 0.1) {
     return { ok: false, reason: 'duration_mismatch' };
   }
-  // Both providers read a resolution tier as a target LINE COUNT (height), not
-  // as the landscape pixel pair: a portrait source ordered at 1080p comes back
-  // as 608x1080, a landscape one as 1920x1080. The order is therefore validated
-  // against the tier's height and the aspect ratio of the source is preserved.
-  // Width is only sanity-checked against a collapsed frame.
-  if (ordered.height > 0 && measured.height < ordered.height * 0.9) {
+  // The promised frame is orientation aware and BOTH sides count: a portrait
+  // clip ordered at 4K owes 2160x3840, so 1216x2160 is a mismatch even though
+  // its height is right. Checking the height alone hid exactly that shortfall.
+  const tolerance = 0.98;
+  if (ordered.height > 0 && measured.height < ordered.height * tolerance) {
+    return { ok: false, reason: 'resolution_mismatch' };
+  }
+  if (ordered.width > 0 && measured.width < ordered.width * tolerance) {
     return { ok: false, reason: 'resolution_mismatch' };
   }
   if (measured.width < 16) {
     return { ok: false, reason: 'resolution_mismatch' };
   }
+
 
   if (ordered.fps > 0 && Math.abs(measured.fps - ordered.fps) / ordered.fps > 0.15) {
     return { ok: false, reason: 'fps_mismatch' };
