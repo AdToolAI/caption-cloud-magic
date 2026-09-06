@@ -14,7 +14,7 @@ import {
   type SourceMetadata,
   type VideoResolution,
 } from "../_shared/video-enhance-models.ts";
-import { planDelivery } from "../_shared/video-enhance-frame.ts";
+import { evaluateUpscale, planDelivery } from "../_shared/video-enhance-frame.ts";
 
 import {
   newCallbackToken,
@@ -93,6 +93,7 @@ async function resolveSource(
   let url = "";
   let assetId: string | null = null;
   let sourceModel: string | undefined;
+  let origin: "generated" | "uploaded" | "unknown" = "unknown";
   let creationMetadata: Record<string, unknown> | null = null;
 
   if (body.sourceAssetId) {
@@ -112,6 +113,7 @@ async function resolveSource(
         url = generated.video_url;
         assetId = generated.id;
         sourceModel = generated.model ?? undefined;
+        origin = "generated";
       }
     }
 
@@ -129,6 +131,10 @@ async function resolveSource(
         creationMetadata = meta;
         const model = meta.model ?? meta.source_model;
         if (typeof model === "string" && model) sourceModel = model;
+        const kind = meta.source ?? meta.origin;
+        origin = typeof model === "string" && model
+          ? "generated"
+          : (kind === "upload" || kind === "uploaded" ? "uploaded" : "unknown");
       }
     }
 
@@ -169,7 +175,7 @@ async function resolveSource(
         .eq("user_id", userId);
     }
 
-    return { url, assetId, meta: { ...probed, sourceModel } };
+    return { url, assetId, meta: { ...probed, sourceModel, origin } };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { error: `Could not read source video: ${message}`, code: "SOURCE_UNREADABLE" };
@@ -274,6 +280,29 @@ serve(async (req) => {
       availableModelIds,
     });
 
+    // ---- upscale gate --------------------------------------------------------
+    // An "enhancement" that does not add pixels is not a product. The promised
+    // frame is compared with the measured source in BOTH the estimate and the
+    // start path, so no downscale and no no-op run is ever paid for.
+    const upscale = evaluateUpscale(delivery.target, {
+      width: source.meta.width,
+      height: source.meta.height,
+    });
+    if (!upscale.ok) {
+      return json(
+        {
+          error: upscale.reason === "downscale"
+            ? `This target (${delivery.target.width}x${delivery.target.height}) is smaller than your video (${source.meta.width}x${source.meta.height}).`
+            : `This target (${delivery.target.width}x${delivery.target.height}) does not enlarge your video (${source.meta.width}x${source.meta.height}).`,
+          code: "VIDEO_ENHANCE_NOT_AN_UPSCALE",
+          reason: upscale.reason,
+          source: { width: source.meta.width, height: source.meta.height },
+          target: delivery.target,
+        },
+        400,
+      );
+    }
+
     const spec = VIDEO_ENHANCE_SPECS[delivery.executionModelId] ?? requestedSpec;
     const config = adaptConfigToSpec(requestedConfig, spec, source.meta);
 
@@ -293,7 +322,7 @@ serve(async (req) => {
     }
 
     if (action === "estimate") {
-      return json({ pricing, source: source.meta, delivery });
+      return json({ pricing, source: source.meta, delivery, upscale, executionModelId: spec.id, executionMode: config.mode });
     }
 
     // ---- start --------------------------------------------------------------
