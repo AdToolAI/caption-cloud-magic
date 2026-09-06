@@ -94,11 +94,11 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
     });
     // Innerhalb der Gruppe: höchste native Auflösung zuerst.
     for (const key of Object.keys(map) as UiGroup[]) {
-      map[key].sort((a, b) => {
-        const ra = maxNativeResolution(getVideoModelSpec(a.id)!)?.shortEdge ?? 0;
-        const rb = maxNativeResolution(getVideoModelSpec(b.id)!)?.shortEdge ?? 0;
-        return rb - ra;
-      });
+      const edge = (m: ToolkitModel) => {
+        const spec = getVideoModelSpec(m.id);
+        return (spec && maxNativeResolution(spec)?.shortEdge) || 0;
+      };
+      map[key].sort((a, b) => edge(b) - edge(a));
     }
     return map;
   }, [list]);
