@@ -2091,10 +2091,8 @@ export function validateCapability(req: CapabilityRequest): CapabilityViolation 
   return null;
 }
 
-function even(value: number): number {
-  const rounded = Math.round(value);
-  return rounded % 2 === 0 ? rounded : rounded + 1;
-}
+
+
 
 /**
  * Exact target frame for a request. The provider-backed frame table wins; only
