@@ -129,11 +129,39 @@ function parseStts(view: DataView, box: Box): { samples: number; totalDelta: num
   return { samples, totalDelta };
 }
 
+/** Four-character sample entry codes mapped to the names people recognise. */
+const CODEC_NAMES: Record<string, string> = {
+  avc1: 'h264',
+  avc3: 'h264',
+  hvc1: 'hevc',
+  hev1: 'hevc',
+  av01: 'av1',
+  vp09: 'vp9',
+  vp08: 'vp8',
+  mp4v: 'mpeg4',
+  'ap4h': 'prores',
+  apcn: 'prores',
+};
+
+export function codecNameFromSampleEntry(fourcc: string): string | undefined {
+  return CODEC_NAMES[fourcc] ?? (fourcc.trim() ? fourcc.trim().toLowerCase() : undefined);
+}
+
+/** First sample entry type of a `stsd` box — the real codec of the track. */
+function parseStsdCodec(view: DataView, stsd: Box): string | undefined {
+  // stsd: 4 bytes version/flags, 4 bytes entry count, then sample entries.
+  const first = stsd.start + stsd.headerSize + 8;
+  const entry = readBox(view, first);
+  if (!entry) return undefined;
+  return codecNameFromSampleEntry(entry.type);
+}
+
 /** Parses a complete `moov` box. Returns `null` when it holds no video track. */
 export function parseMoov(moov: Uint8Array, sizeBytes = 0, container = 'mp4'): ProbedVideoMetadata | null {
   const view = new DataView(moov.buffer, moov.byteOffset, moov.byteLength);
   const root = readBox(view, 0);
   if (!root || root.type !== 'moov') return null;
+
   const bodyStart = root.headerSize;
   const bodyEnd = Math.min(root.size, moov.byteLength);
 
