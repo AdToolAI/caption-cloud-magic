@@ -345,12 +345,26 @@ export function EnhanceVideoPanel({
         <div className="space-y-3">
           <p className="text-sm text-primary">{tx('done', lang)}</p>
           <video src={run.output_url} controls className="w-full rounded-lg" />
+          {run.actual_width && run.actual_height && (
+            <p className="text-xs text-muted-foreground">
+              {tx('delivered', lang)}:{' '}
+              {sourceFrameLabel ? `${sourceFrameLabel} → ` : ''}
+              {run.actual_width}×{run.actual_height} {tx('pixels', lang)}
+              {run.output_bitrate_kbps
+                ? ` · ${(run.output_bitrate_kbps / 1000).toFixed(1)} Mbit/s`
+                : ''}
+              {run.output_size_bytes
+                ? ` · ${(run.output_size_bytes / (1024 * 1024)).toFixed(1)} MB`
+                : ''}
+            </p>
+          )}
           <Button asChild variant="secondary">
             <a href={run.output_url} download target="_blank" rel="noreferrer">
               <Download className="w-4 h-4 mr-2" />
               {tx('download', lang)}
             </a>
           </Button>
+          <p className="text-xs text-muted-foreground">{tx('messengerHint', lang)}</p>
         </div>
       ) : run?.status === 'provider_failed' || run?.status === 'manual_review' ? (
         <p className="text-sm text-destructive">{tx('failed', lang)}</p>
