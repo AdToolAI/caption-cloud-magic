@@ -2727,7 +2727,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         onOpenLibrary={handleOpenLibrary}
         startedAt={renderStartedAt}
         quality={exportSettings?.quality}
-        durationSeconds={totalDuration}
+        durationSeconds={actualTotalDuration}
       />
       <ExportDialog
         isOpen={showExportDialog}
