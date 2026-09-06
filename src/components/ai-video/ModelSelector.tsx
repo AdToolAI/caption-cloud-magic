@@ -41,7 +41,25 @@ interface ModelSelectorProps {
   lockedReason?: string;
 }
 
+/** Kept for backwards compatibility with callers that still read it. */
 const GROUP_ORDER: ToolkitModelGroup[] = ['recommended', 'audio', 'fast', 'premium'];
+void GROUP_ORDER;
+
+/** Spec group of a model — falls back to the legacy group when no spec exists. */
+function specGroupOf(m: ToolkitModel): UiGroup {
+  const spec = getVideoModelSpec(m.id);
+  if (spec) return spec.uiGroup;
+  return LEGACY_GROUP_TO_SPEC_GROUP[m.group];
+}
+
+/** Exact native resolution line: "1080p · 1920x1080 (quer) / 1080x1920 (hoch)". */
+function resolutionLine(m: ToolkitModel): string {
+  const spec = getVideoModelSpec(m.id);
+  const best = spec && maxNativeResolution(spec);
+  if (!spec || !best) return m.resolution;
+  const labels = nativeResolutionLabels(spec).join(' / ');
+  return `${labels} · ${best.landscape.width}×${best.landscape.height} / ${best.portrait.width}×${best.portrait.height}`;
+}
 
 /** Keep the controlled value visible even while a feature-filtered model list
  * is still resolving. This prevents Radix Select from displaying a stale
