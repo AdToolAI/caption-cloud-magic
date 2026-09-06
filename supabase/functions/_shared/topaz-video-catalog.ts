@@ -106,12 +106,25 @@ export const TOPAZ_VIDEO_MODELS: TopazVideoModel[] = [
     costVerified: false,
   },
   {
+    // Theia IS part of the express `UpscaleFilter` enum (thd-3 / thf-4) and
+    // documents the full manual parameter block. Same credit table as Rhea.
+    id: 'theia',
+    slug: 'thd-3',
+    name: 'Theia',
+    specialty: 'clarity',
+    creditFamily: 'precision',
+    manualParameters: true,
+    variants: [{ slug: 'thf-4', label: 'Theia Fine Tune Fidelity' }],
+    costVerified: false,
+  },
+  {
     id: 'iris',
     slug: 'iris-3',
     name: 'Iris',
     specialty: 'faces',
     creditFamily: 'precision',
-    manualParameters: true,
+    // Parameter surface not documented for the express route.
+    manualParameters: false,
     variants: [{ slug: 'iris-2', label: 'Iris Medium Quality' }],
     costVerified: false,
   },
@@ -121,13 +134,16 @@ export const TOPAZ_VIDEO_MODELS: TopazVideoModel[] = [
     name: 'Artemis',
     specialty: 'general',
     creditFamily: 'precision',
-    manualParameters: true,
+    // The Artemis pages document only videoType/auto/fieldOrder — a narrower
+    // set than the shared block, so no manual controls are offered.
+    manualParameters: false,
     variants: [
       { slug: 'alq-13', label: 'Artemis Low Quality' },
       { slug: 'alqs-2', label: 'Artemis Medium Quality' },
       { slug: 'amqs-2', label: 'Artemis Medium Halo' },
       { slug: 'amq-13', label: 'Artemis Strong Halo' },
       { slug: 'aaa-9', label: 'Artemis Aliasing / Moire' },
+      { slug: 'aaa-10', label: 'Artemis Aliasing / Moire v10' },
     ],
     costVerified: false,
   },
@@ -137,7 +153,7 @@ export const TOPAZ_VIDEO_MODELS: TopazVideoModel[] = [
     name: 'Gaia',
     specialty: 'cgi',
     creditFamily: 'precision',
-    manualParameters: true,
+    manualParameters: false,
     variants: [{ slug: 'gcg-5', label: 'Gaia CG' }],
     costVerified: false,
   },
@@ -159,8 +175,11 @@ export const TOPAZ_VIDEO_MODELS: TopazVideoModel[] = [
     slug: 'thm-2',
     name: 'Themis 2',
     specialty: 'deblur',
+    // ASSUMPTION, not a published figure: Topaz leaves the Themis 2 price cell
+    // empty on the individual-model pricing page. It is filed with the
+    // restoration table and stays beta-gated until a billed run confirms it.
     creditFamily: 'restoration',
-    manualParameters: true,
+    manualParameters: false,
     costVerified: false,
   },
   {
@@ -169,7 +188,7 @@ export const TOPAZ_VIDEO_MODELS: TopazVideoModel[] = [
     name: 'Dione',
     specialty: 'legacy',
     creditFamily: 'precision',
-    manualParameters: true,
+    manualParameters: false,
     variants: [
       { slug: 'dtv-4', label: 'Dione TV' },
       { slug: 'dtd-4', label: 'Dione Robust' },
@@ -179,6 +198,8 @@ export const TOPAZ_VIDEO_MODELS: TopazVideoModel[] = [
     costVerified: false,
   },
 ];
+
+
 
 export const TOPAZ_DEFAULT_MODEL_ID = 'proteus';
 
