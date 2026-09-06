@@ -295,7 +295,7 @@ export function AIVideoUpscaling({
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {model.processingModes.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>{m.label.de}</SelectItem>
+                            <SelectItem key={m.id} value={m.id}>{m.label[lang] ?? m.label.en}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
