@@ -48,7 +48,7 @@ async function scan(sceneFilterId: string | null) {
     /* ── 1. AI Video Studio generations ─────────────────────────────── */
     const { data: generations } = await supabase
       .from("ai_video_generations")
-      .select("id, user_id, artlist_job_id, started_at, total_cost_euros, model, resolution, aspect_ratio")
+      .select("id, user_id, artlist_job_id, started_at, total_cost_euros, model, resolution, aspect_ratio, parity_model_id, parity_api_route, parity_region, parity_mode, parity_resolution_label, requested_width, requested_height")
       .eq("status", "processing")
       .like("artlist_job_id", `${MODELARK_JOB_PREFIX}%`)
       .limit(50);
