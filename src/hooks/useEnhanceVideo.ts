@@ -163,17 +163,35 @@ export function useEnhanceVideo() {
   const [error, setError] = useState<string | null>(null);
   /** Machine-readable engine code (e.g. VIDEO_ENHANCE_NOT_AN_UPSCALE) for localized copy. */
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  /** Sub-reason of the code, e.g. `downscale` vs `no_op`. */
+  const [errorReason, setErrorReason] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
 
   const clearFailure = useCallback(() => {
     setError(null);
     setErrorCode(null);
+    setErrorReason(null);
   }, []);
 
   const recordFailure = useCallback((e: unknown) => {
     const failure = failureOf(e);
     setError(failure.message);
     setErrorCode(failure.code);
+    setErrorReason(failure.reason);
+    // A refused order still tells us what the file is — keep the measured
+    // facts so the surface can show "1080×1920 → 1080×1920" next to the reason.
+    const src = failure.source;
+    if (src && typeof src.width === 'number' && typeof src.height === 'number') {
+      setSourceMeta((prev) => ({
+        durationSeconds: src.durationSeconds ?? prev?.durationSeconds ?? 0,
+        width: src.width as number,
+        height: src.height as number,
+        fps: src.fps ?? prev?.fps ?? 0,
+        container: src.container ?? prev?.container,
+        sizeBytes: src.sizeBytes ?? prev?.sizeBytes,
+        sourceModel: src.sourceModel ?? prev?.sourceModel,
+      }));
+    }
   }, []);
 
   const stopPolling = useCallback(() => {
@@ -295,6 +313,7 @@ export function useEnhanceVideo() {
     isRunning: !!run && !TERMINAL.includes(run.status),
     error,
     errorCode,
+    errorReason,
     previewPrice,
     startEnhance,
     cancelEnhance,
