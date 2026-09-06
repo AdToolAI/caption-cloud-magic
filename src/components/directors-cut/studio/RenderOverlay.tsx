@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, RotateCcw, Film, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
+import { Download, RotateCcw, Film, CheckCircle2, AlertTriangle, Loader2, ArrowUpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useTranslation } from '@/hooks/useTranslation';
+import { EnhanceVideoDialog } from '@/components/ai-video/EnhanceVideoDialog';
+
 
 interface RenderOverlayProps {
   isVisible: boolean;
