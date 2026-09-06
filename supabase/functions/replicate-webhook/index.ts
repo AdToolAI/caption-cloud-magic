@@ -3,7 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { trackAIGeneration } from "../_shared/telemetry.ts";
 import { verifyWebhookRequest } from "../_shared/webhook-auth.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
-import { recordGenerationOutput } from '../_shared/videoOutputMeasurement.ts';
+import { measurableFromRow, recordGenerationOutput } from '../_shared/videoOutputMeasurement.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -117,20 +117,10 @@ serve(async (req) => {
       }
 
       // 4b. Measure the delivered file against the promised frame.
-      await recordGenerationOutput(supabase, {
-        id: generation.id,
-        model: generation.model,
-        resolution: generation.resolution,
-        aspect_ratio: generation.aspect_ratio,
-        video_url: permanentUrl,
-        parity_model_id: generation.parity_model_id,
-        parity_api_route: generation.parity_api_route,
-        parity_region: generation.parity_region,
-        parity_mode: generation.parity_mode,
-        parity_resolution_label: generation.parity_resolution_label,
-        requested_width: generation.requested_width,
-        requested_height: generation.requested_height,
-      });
+      await recordGenerationOutput(
+        supabase,
+        measurableFromRow(generation, { video_url: permanentUrl }),
+      );
 
       // 5. Mediathek-Eintrag: wird zentral vom DB-Trigger
       //    auto_save_ai_video_to_library erzeugt (idempotent).
