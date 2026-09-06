@@ -17,22 +17,42 @@ import {
 /**
  * Reconciler for Video Enhance.
  *
- * Runs on a schedule and does three things:
+ * Runs on a schedule (pg_cron `video-enhance-reconcile-5min`, see the
+ * migration `video_enhance_reconcile_schedule`) and does three things:
  *   1. re-reads open runs from the provider and finalises them idempotently,
  *   2. retries persistence for runs whose provider result already exists,
  *   3. sends runs past the horizon to `manual_review` — WITHOUT refunding.
  *
  * It also removes orphaned staging files so large videos do not pile up.
+ *
+ * Abuse model. The scheduler authenticates with the project's PUBLISHABLE key
+ * (no privileged secret lives in the cron command or in the repo), so the
+ * endpoint is treated as reachable by anyone who has the app bundle:
+ *   - the request body is never read — no caller can pick rows;
+ *   - the response carries counters only — never run or user data;
+ *   - EVERY unit of work is gated by a per-run timestamp the reconciler
+ *     advances itself (`next_reconcile_at`, `next_late_check_at`, `updated_at`
+ *     for orphans), so a second call right after the first finds nothing due
+ *     and costs a handful of indexed queries — no provider traffic;
+ *   - an in-isolate throttle and in-flight guard collapse bursts on top.
+ * Callers with the service role key or the optional `CRON_SECRET` header are
+ * accepted as internal; a user JWT is rejected — no surface calls this.
  */
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, content-type",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-cron-secret",
 };
 
 const TAG = "[video-enhance-reconcile]";
 const BATCH_SIZE = 25;
+
+/**
+ * A full cycle is worth running at most this often. The schedule fires every
+ * five minutes; anything denser is a burst and is answered without work.
+ */
+export const MIN_CYCLE_INTERVAL_MS = 30_000;
 
 /**
  * Error codes that describe the provider FILE itself, not our infrastructure.
@@ -61,8 +81,59 @@ const OPEN_STATUSES = [
   "local_poll_timeout",
 ];
 
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+/**
+ * Internal callers only. Accepted, in this order:
+ *   1. `x-cron-secret` matching CRON_SECRET (when that secret is configured),
+ *   2. the service role key as Bearer (edge-to-edge / admin tooling),
+ *   3. the project's publishable key as Bearer or `apikey` — what pg_cron
+ *      sends. It is public, which is exactly why the work itself is bounded.
+ * A user JWT or an empty header is rejected.
+ */
+export function isInternalCaller(
+  headers: Headers,
+  env: (key: string) => string | undefined,
+): boolean {
+  const cronSecret = env("CRON_SECRET");
+  const providedCron = headers.get("x-cron-secret");
+  if (cronSecret && providedCron && timingSafeEqual(providedCron, cronSecret)) return true;
+
+  const bearer = (headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+  const apikey = (headers.get("apikey") ?? "").trim();
+  const accepted = [env("SUPABASE_SERVICE_ROLE_KEY"), env("SUPABASE_ANON_KEY")]
+    .filter((key): key is string => typeof key === "string" && key.length > 0);
+  return accepted.some((key) =>
+    (bearer && timingSafeEqual(bearer, key)) || (apikey && timingSafeEqual(apikey, key))
+  );
+}
+
+// Per-isolate burst protection. Not a distributed lock — the per-run
+// timestamps below are what make concurrent cycles harmless; this only keeps
+// a hammering caller from burning CPU on empty cycles.
+let lastCycleStartedAt = 0;
+let cycleInFlight = false;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
+
+  if (!isInternalCaller(req.headers, (key) => Deno.env.get(key))) {
+    return json({ error: "Unauthorized" }, 401);
+  }
+
+  const sinceLast = Date.now() - lastCycleStartedAt;
+  if (cycleInFlight) return json({ skipped: "in_flight" }, 202);
+  if (sinceLast < MIN_CYCLE_INTERVAL_MS) {
+    return json({ skipped: "throttled", retryInMs: MIN_CYCLE_INTERVAL_MS - sinceLast }, 202);
+  }
+  cycleInFlight = true;
+  lastCycleStartedAt = Date.now();
 
   try {
     const admin = createClient(
