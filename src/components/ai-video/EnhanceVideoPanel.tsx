@@ -16,6 +16,7 @@ import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
 import { VideoSourcePicker } from '@/components/ai-video/VideoSourcePicker';
 import type { CanonicalVideoAsset } from '@/lib/videoEnhance/canonicalVideoAsset';
 import { isAiGeneratedSource } from '@/lib/videoEnhance/recommend';
+import { engineErrorText } from '@/lib/videoEnhance/engineErrors';
 import {
   evaluateUpscale,
   formatFrame,
@@ -113,77 +114,11 @@ const COPY = {
     de: 'Messenger wie WhatsApp rechnen Videos beim Versenden stark herunter. Lade die Datei herunter und verschicke sie als Dokument, um die volle Qualität zu behalten.',
     es: 'Los mensajeros como WhatsApp reducen los vídeos al enviarlos. Descarga el archivo y envíalo como documento para conservar toda la calidad.',
   },
-  // Server rejections — the engine answers with a code, the sentence is ours.
-  errModelLocked: {
-    en: 'This engine is not available for your account yet.',
-    de: 'Diese Engine ist für dein Konto noch nicht freigeschaltet.',
-    es: 'Este motor aún no está disponible para tu cuenta.',
-  },
-  errSource: {
-    en: 'We could not read this video. Please pick another file or upload it again.',
-    de: 'Dieses Video konnte nicht gelesen werden. Wähle eine andere Datei oder lade es erneut hoch.',
-    es: 'No hemos podido leer este vídeo. Elige otro archivo o vuelve a subirlo.',
-  },
-  errCredits: {
-    en: 'Not enough credits for this run. Top up and try again.',
-    de: 'Nicht genug Guthaben für diesen Lauf. Lade auf und versuche es erneut.',
-    es: 'No hay créditos suficientes para esta ejecución. Recarga e inténtalo de nuevo.',
-  },
-  errProvider: {
-    en: 'The engine could not accept this job. Nothing was charged — please try again in a moment.',
-    de: 'Die Engine konnte den Auftrag nicht annehmen. Es wurde nichts berechnet – versuche es gleich noch einmal.',
-    es: 'El motor no pudo aceptar este trabajo. No se ha cobrado nada; inténtalo de nuevo en un momento.',
-  },
-  errConflict: {
-    en: 'This video is already being enhanced. Wait for that run to finish.',
-    de: 'Dieses Video wird bereits verbessert. Warte, bis dieser Lauf fertig ist.',
-    es: 'Este vídeo ya se está mejorando. Espera a que termine esa ejecución.',
-  },
-  errUnpriceable: {
-    en: 'This combination has no verified price yet and cannot be started.',
-    de: 'Für diese Kombination gibt es noch keinen verifizierten Preis; sie kann nicht gestartet werden.',
-    es: 'Esta combinación aún no tiene un precio verificado y no se puede iniciar.',
-  },
 } as const;
 
 
 function tx(key: keyof typeof COPY, lang: Lang): string {
   return COPY[key][lang] ?? COPY[key].en;
-}
-
-/**
- * Maps a machine-readable engine code to a localized sentence. Unknown codes
- * fall back to the server text so nothing is ever swallowed.
- */
-function engineErrorText(code: string | null, fallback: string, lang: Lang): string {
-  switch (code) {
-    case 'VIDEO_ENHANCE_NOT_AN_UPSCALE':
-      return tx('noUpscale', lang);
-    case 'TARGET_FRAME_UNREACHABLE':
-      return tx('unreachable', lang);
-    case 'MODEL_LOCKED':
-    case 'UNKNOWN_MODEL':
-      return tx('errModelLocked', lang);
-    case 'NO_SOURCE':
-    case 'SOURCE_NOT_FOUND':
-    case 'SOURCE_NOT_DURABLE':
-    case 'SOURCE_UNREADABLE':
-      return tx('errSource', lang);
-    case 'INSUFFICIENT_CREDITS':
-    case 'NO_WALLET':
-      return tx('errCredits', lang);
-    case 'PROVIDER_REJECTED':
-    case 'SUBMIT_UNCERTAIN':
-    case 'RESERVATION_FAILED':
-    case 'RUN_CREATE_FAILED':
-      return tx('errProvider', lang);
-    case 'RUN_CONFLICT':
-      return tx('errConflict', lang);
-    case 'UNPRICEABLE':
-      return tx('errUnpriceable', lang);
-    default:
-      return fallback;
-  }
 }
 
 interface Props {
