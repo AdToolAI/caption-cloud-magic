@@ -331,7 +331,9 @@ export function res(
   const derived = framesFromSizingRule(shortEdge, sizingRule);
   // Provenance: only an explicit provider frame table or an explicit provider
   // reference counts. The generic default wording below is an assumption.
-  const sizingRuleVerified = !!opts.framesByAspectRatio || !!opts.sizingRuleSource;
+  // A measured smoke test on this exact route counts as verification too.
+  const sizingRuleVerified =
+    !!opts.framesByAspectRatio || !!opts.sizingRuleSource || !!opts.smokeTest;
   const requested = opts.parityStatus ?? (opts.smokeTest ? 'FULL_PARITY' : 'UNVERIFIED');
   // An unverified sizing rule can never carry FULL_PARITY: the kill switch may
   // only act on tiers whose target frame is provider-backed.

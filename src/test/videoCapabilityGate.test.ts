@@ -285,15 +285,14 @@ describe('promised frame and measured output', () => {
   });
 
   it('only provider-verified sizing may carry FULL_PARITY', () => {
-    const assumed = res('1080p', 1080, 'x', {
-      smokeTest: { runId: 'r1', measuredWidth: 1080, measuredHeight: 1920, at: '2026-09-06' } as never,
-    });
+    // Generic default wording + no measurement = assumption, not verification.
+    const assumed = res('1080p', 1080, 'x', { parityStatus: 'FULL_PARITY' });
     expect(assumed.sizingRuleVerified).toBe(false);
     expect(assumed.parityStatus).toBe('UNVERIFIED');
 
     const verified = res('1080p', 1080, 'x', {
       sizingRuleSource: 'Provider docs v2026-09: short edge is held (see provider sizing table).',
-      smokeTest: { runId: 'r1', measuredWidth: 1080, measuredHeight: 1920, at: '2026-09-06' } as never,
+      parityStatus: 'FULL_PARITY',
     });
     expect(verified.sizingRuleVerified).toBe(true);
     expect(verified.parityStatus).toBe('FULL_PARITY');

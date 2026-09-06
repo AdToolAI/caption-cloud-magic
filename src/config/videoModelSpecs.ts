@@ -4,7 +4,7 @@
 // Regenerate with: node scripts/generate-video-model-specs.mjs
 // =============================================================================
 
-export const SPECS_SOURCE_HASH = '38d03779aac7d9547ef3a0cd29adc9fcbd2fb0b8a35c45d0c7978176b053527e';
+export const SPECS_SOURCE_HASH = '73f26aa5fa0773fb7ebac13cce0e7570ef7eeeaa48f78ff97eeff455f2f8e3ba';
 
 // ============================================================================
 // CANONICAL VIDEO MODEL CAPABILITY REGISTRY
@@ -339,7 +339,9 @@ export function res(
   const derived = framesFromSizingRule(shortEdge, sizingRule);
   // Provenance: only an explicit provider frame table or an explicit provider
   // reference counts. The generic default wording below is an assumption.
-  const sizingRuleVerified = !!opts.framesByAspectRatio || !!opts.sizingRuleSource;
+  // A measured smoke test on this exact route counts as verification too.
+  const sizingRuleVerified =
+    !!opts.framesByAspectRatio || !!opts.sizingRuleSource || !!opts.smokeTest;
   const requested = opts.parityStatus ?? (opts.smokeTest ? 'FULL_PARITY' : 'UNVERIFIED');
   // An unverified sizing rule can never carry FULL_PARITY: the kill switch may
   // only act on tiers whose target frame is provider-backed.
