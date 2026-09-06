@@ -24,6 +24,12 @@ export interface EnhanceRunRow {
   source_url: string;
   error_code: string | null;
   error_message: string | null;
+  /** Measured on the finished file — authoritative over any projection. */
+  actual_width?: number | null;
+  actual_height?: number | null;
+  output_codec?: string | null;
+  output_bitrate_kbps?: number | null;
+  output_size_bytes?: number | null;
 }
 
 export interface EnhanceEstimate {
