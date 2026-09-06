@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, RotateCcw, Film, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
+import { Download, RotateCcw, Film, CheckCircle2, AlertTriangle, Loader2, ArrowUpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useTranslation } from '@/hooks/useTranslation';
+import { EnhanceVideoDialog } from '@/components/ai-video/EnhanceVideoDialog';
+
 
 interface RenderOverlayProps {
   isVisible: boolean;
@@ -49,6 +51,8 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
 }) => {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
+  const [enhanceOpen, setEnhanceOpen] = useState(false);
+
 
   const isRunning = isVisible && status !== 'completed' && status !== 'failed';
 
@@ -156,6 +160,16 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
                   <Download className="h-5 w-5 mr-2" />
                   {t('dc.downloadVideo')}
                 </Button>
+                {videoUrl && (
+                  <Button
+                    onClick={() => setEnhanceOpen(true)}
+                    className="w-full bg-white/10 hover:bg-white/20 text-white"
+                    size="lg"
+                  >
+                    <ArrowUpCircle className="h-5 w-5 mr-2" />
+                    {t('dc.aiUpscaleResultCta')}
+                  </Button>
+                )}
                 {onOpenLibrary && (
                   <Button
                     onClick={onOpenLibrary}
@@ -166,6 +180,7 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
                     {t('dc.toMediaLibrary')}
                   </Button>
                 )}
+
                 <Button
                   onClick={onClose}
                   variant="outline"
@@ -209,8 +224,14 @@ export const RenderOverlay: React.FC<RenderOverlayProps> = ({
               </p>
             )}
           </motion.div>
+          <EnhanceVideoDialog
+            open={enhanceOpen}
+            onOpenChange={setEnhanceOpen}
+            sourceUrl={videoUrl || undefined}
+          />
         </motion.div>
       )}
     </AnimatePresence>
   );
 };
+

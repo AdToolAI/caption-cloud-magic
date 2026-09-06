@@ -94,6 +94,9 @@ interface CapCutEditorProps {
   onChromaKeyChange?: (ck: { enabled: boolean; color: string; tolerance: number; backgroundUrl?: string }) => void;
   upscaling?: { enabled: boolean; targetResolution: string };
   onUpscalingChange?: (enabled: boolean, resolution: string) => void;
+  /** Swap the studio source with an AI-upscaled version of the clip. */
+  onUpscaledVideo?: (url: string) => void;
+
   interpolation?: { enabled: boolean; targetFps: number };
   onInterpolationChange?: (enabled: boolean, fps: number) => void;
   restoration?: { enabled: boolean; level: string };
@@ -164,6 +167,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   onChromaKeyChange,
   upscaling,
   onUpscalingChange,
+  onUpscaledVideo,
+
   interpolation,
   onInterpolationChange,
   restoration,
@@ -2520,6 +2525,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               onChromaKeyChange={onChromaKeyChange}
               upscaling={upscaling}
               onUpscalingChange={onUpscalingChange}
+              onUpscaledVideo={onUpscaledVideo}
+
               interpolation={interpolation}
               onInterpolationChange={onInterpolationChange}
               restoration={restoration}

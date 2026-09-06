@@ -1126,6 +1126,13 @@ export function DirectorsCut() {
         onChromaKeyChange={(ck) => setChromaKey({ ...ck, backgroundUrl: ck.backgroundUrl ?? undefined })}
         upscaling={upscaling}
         onUpscalingChange={(enabled, resolution) => setUpscaling({ enabled, targetResolution: resolution })}
+        onUpscaledVideo={(url) => {
+          // The AI-upscaled clip becomes the new source; scenes/cuts are
+          // time-based and therefore stay valid.
+          setSelectedVideo(prev => (prev ? { ...prev, url } : prev));
+          toast.success(t('dc.aiUpscaleApplied'));
+        }}
+
         interpolation={interpolation}
         onInterpolationChange={(enabled, fps) => setInterpolation({ enabled, targetFps: fps })}
         restoration={restoration}

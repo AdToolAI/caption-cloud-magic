@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -8,13 +8,20 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { SceneAnalysis, SceneEffects } from '@/types/directors-cut';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
+import { EnhanceVideoDialog } from '@/components/ai-video/EnhanceVideoDialog';
 import { SceneAnimationPreviewTile, type SceneAnimationId } from '@/components/studio-visual/SceneAnimationPreviewTile';
 
 interface FXPanelProps {
   chromaKey: { enabled: boolean; color: string; tolerance: number; backgroundUrl?: string };
   onChromaKeyChange: (ck: { enabled: boolean; color: string; tolerance: number; backgroundUrl?: string }) => void;
+  /** @deprecated legacy flag — real upscaling runs through the enhance engine. */
   upscaling: { enabled: boolean; targetResolution: string };
+  /** @deprecated legacy flag — real upscaling runs through the enhance engine. */
   onUpscalingChange: (enabled: boolean, resolution: string) => void;
+  /** Current source clip — input for AI upscaling. */
+  videoUrl?: string;
+  /** Called with the upscaled clip so the studio can swap the source. */
+  onUpscaledVideo?: (url: string) => void;
   interpolation: { enabled: boolean; targetFps: number };
   onInterpolationChange: (enabled: boolean, fps: number) => void;
   restoration: { enabled: boolean; level: string };
@@ -26,6 +33,7 @@ interface FXPanelProps {
   onSceneEffectsChange?: (sceneEffects: Record<string, SceneEffects>) => void;
   onScenePlaybackRateChange?: (sceneId: string, rate: number) => void;
 }
+
 
 const ANIMATION_OPTIONS = [
   { type: 'none' as const, label: 'animNone', icon: RotateCcw },
@@ -44,8 +52,8 @@ const SPEED_PRESETS = [0.25, 0.5, 1, 1.5, 2, 3];
 export const FXPanel: React.FC<FXPanelProps> = ({
   chromaKey,
   onChromaKeyChange,
-  upscaling,
-  onUpscalingChange,
+  videoUrl,
+  onUpscaledVideo,
   interpolation,
   onInterpolationChange,
   restoration,
@@ -57,7 +65,9 @@ export const FXPanel: React.FC<FXPanelProps> = ({
   onScenePlaybackRateChange,
 }) => {
   const { t } = useTranslation();
+  const [enhanceOpen, setEnhanceOpen] = useState(false);
   const selectedScene = scenes.find(s => s.id === selectedSceneId);
+
   const currentAnimation = selectedSceneId ? sceneEffects[selectedSceneId]?.animation?.type || 'none' : 'none';
   const currentAnimIntensity = selectedSceneId ? sceneEffects[selectedSceneId]?.animation?.intensity ?? 50 : 50;
   const currentSpeed = selectedScene?.playbackRate ?? sceneEffects[selectedSceneId || '']?.speed ?? 1;
@@ -236,35 +246,33 @@ export const FXPanel: React.FC<FXPanelProps> = ({
         <div className="border-t border-[#F5C76A]/10 pt-3 space-y-3">
           <span className="text-xs text-[#F5C76A]/60 font-medium uppercase tracking-wider">{t('dc.quality')}</span>
 
-          {/* Upscaling */}
+          {/* AI upscaling — real engine (Topaz / ByteDance) via the shared panel */}
           <div className="space-y-2 p-2.5 rounded-xl backdrop-blur-md bg-[#0a0a1a]/60 border border-white/5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <ArrowUpCircle className="h-3 w-3 text-purple-400 drop-shadow-[0_0_4px_rgba(192,132,252,0.4)]" />
-                <span className="text-[11px] text-white/70">{t('dc.aiUpscaling')}</span>
-              </div>
-              <Switch
-                checked={upscaling.enabled}
-                onCheckedChange={(v) => onUpscalingChange(v, upscaling.targetResolution)}
-                className="scale-75"
-              />
+            <div className="flex items-center gap-1.5">
+              <ArrowUpCircle className="h-3 w-3 text-purple-400 drop-shadow-[0_0_4px_rgba(192,132,252,0.4)]" />
+              <span className="text-[11px] text-white/70">{t('dc.aiUpscaleSourceTitle')}</span>
             </div>
-            {upscaling.enabled && (
-              <Select
-                value={upscaling.targetResolution}
-                onValueChange={(v) => onUpscalingChange(true, v)}
-              >
-                <SelectTrigger className="h-7 text-[10px] bg-[#0a0a1a]/80 border-white/10 text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-[#0a0a1a] border-white/10">
-                  <SelectItem value="1080p" className="text-white text-xs">1080p</SelectItem>
-                  <SelectItem value="2k" className="text-white text-xs">2K</SelectItem>
-                  <SelectItem value="4k" className="text-white text-xs">4K</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
+            <p className="text-[10px] text-white/40 leading-snug">{t('dc.aiUpscaleSourceDesc')}</p>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!videoUrl}
+              onClick={() => setEnhanceOpen(true)}
+              className="w-full h-7 text-[10px] border-white/10 bg-[#0a0a1a]/80 text-white hover:bg-white/10"
+            >
+              {t('dc.aiUpscaleSourceCta')}
+            </Button>
           </div>
+          <EnhanceVideoDialog
+            open={enhanceOpen}
+            onOpenChange={setEnhanceOpen}
+            sourceUrl={videoUrl}
+            onCompleted={(outputUrl) => {
+              onUpscaledVideo?.(outputUrl);
+              setEnhanceOpen(false);
+            }}
+          />
+
 
           {/* Frame Interpolation */}
           <div className="space-y-2 p-2.5 rounded-xl backdrop-blur-md bg-[#0a0a1a]/60 border border-white/5">

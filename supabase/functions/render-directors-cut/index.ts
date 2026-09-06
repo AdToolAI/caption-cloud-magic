@@ -229,7 +229,8 @@ function calculateCredits(
   // Add premium feature costs
   if (premiumFeatures.styleTransfer) totalCredits += PREMIUM_CREDITS.styleTransfer;
   if (premiumFeatures.colorGrading) totalCredits += PREMIUM_CREDITS.colorGrading;
-  if (premiumFeatures.upscaling) totalCredits += PREMIUM_CREDITS.upscaling;
+  // Upscaling is no longer a render feature — real AI upscaling runs through
+  // the `video-enhance` engine and is priced there. No charge here.
   if (premiumFeatures.interpolation) totalCredits += PREMIUM_CREDITS.interpolation;
   if (premiumFeatures.restoration) totalCredits += PREMIUM_CREDITS.restoration;
   if (premiumFeatures.objectRemoval) totalCredits += PREMIUM_CREDITS.objectRemoval;
