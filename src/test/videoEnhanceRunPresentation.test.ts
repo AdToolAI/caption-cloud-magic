@@ -161,7 +161,8 @@ describe('resolution choices — per tier, before the start', () => {
     expect(landscape).toEqual({ executionModelId: 'topaz-video-upscale', routed: false });
     const direct = resolveExecutionEngine('bytedance-vcube', engines, '4k', 1080, 1920);
     expect(direct).toEqual({ executionModelId: 'bytedance-vcube', routed: false });
-    const nothing = resolveExecutionEngine('topaz-video-upscale', ['topaz-video-upscale'], '4k', 1080, 1920);
+    // With only a 1080p-capable engine available, 4K stays unreachable.
+    const nothing = resolveExecutionEngine('topaz-video-upscale', [], '4k', 1080, 1920);
     expect(nothing).toEqual({ executionModelId: null, routed: false });
   });
 });
