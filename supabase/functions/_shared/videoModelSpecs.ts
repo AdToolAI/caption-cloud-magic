@@ -2224,7 +2224,7 @@ export function applyOutputMeasurement(
  * The ONLY way back: a passing smoke test on this exact route clears the
  * mismatch counter, re-enables the tier and restores FULL_PARITY.
  */
-export function applySmokeTestPass(state: TierParityState): TierParityState {
+export function applySmokeTestPass(_state: TierParityState): TierParityState {
   return {
     parityStatus: 'FULL_PARITY',
     consecutiveMismatches: 0,
