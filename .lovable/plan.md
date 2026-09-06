@@ -54,7 +54,7 @@ Echtes 8K, das es bisher nicht gab: Es hat viermal so viele Bildpunkte wie 4K. M
 ## Technische Details
 
 - `supabase/functions/_shared/render-concurrency.ts`: Stufe `short` → `maxWorkers: 6`, `framesPerLambda = max(40, ceil(frames / 6))`; `FRAMES_PER_LAMBDA_MIN` gilt für diese Stufe nicht mehr. Andere Stufen unverändert. `estimateWorkersFromDuration` folgt automatisch, damit die Warteschlange richtig rechnet.
-- `supabase/functions/render-directors-cut/index.ts`: `x264Preset` abhängig von der Zielhöhe (`>= 2160` → `medium`, sonst `slow`); `imageFormat: 'png'`, `colorSpace: 'bt709'`, `crf: 16` bleiben. Auflösungs-Mapping um `8k` ergänzt oder die Option clientseitig entfernen.
+- `supabase/functions/render-directors-cut/index.ts`: `x264Preset` abhängig von der Zielhöhe (`>= 2160` → `medium`, sonst `slow`); `imageFormat: 'png'`, `colorSpace: 'bt709'`, `crf: 16` bleiben. Auflösungs-Mapping um `8k` ergänzt (16:9 7680×4320, 9:16 4320×7680, 1:1 4320×4320) inkl. Längenbegrenzung für 8K; `videoBitrate` skaliert mit der Auflösung (HD 10M, 4K 40M, 8K 100M).
 - Fortschritt/ETA im Director's-Cut-Export-Dialog: verstrichene Zeit + qualitätsabhängige Erwartung, kein synthetischer Prozentsprung mehr; Texte in EN/DE/ES.
 - Nicht angefasst: Abrechnung (DC-Renders sind kostenfrei), Wallet, Video-Generierung, Lip-Sync, Sensor-Baseline.
 
