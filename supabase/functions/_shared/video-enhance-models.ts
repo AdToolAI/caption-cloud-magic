@@ -216,10 +216,12 @@ export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
 
       const filters: Record<string, unknown>[] = [upscale];
       // Frame interpolation is only requested when the frame rate really
-      // changes — otherwise Topaz would re-time a clip that is already right.
-      if (fps !== sourceFps) {
+      // changes — otherwise Topaz would re-time a clip that is already right
+      // and bill a second model for a no-op.
+      if (topazInterpolationApplies(sourceFps, config.fps)) {
         filters.push({ model: topazInterpolationModel(config.interpolationModel).slug, fps });
       }
+
 
       return {
         source: {
