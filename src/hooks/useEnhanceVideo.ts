@@ -57,28 +57,58 @@ const POLL_INTERVAL_MS = 5_000;
  * Engine rejection with its machine-readable code, so surfaces can show a
  * localized sentence instead of the raw server text (or raw JSON).
  */
+export interface EngineFailure {
+  message: string;
+  code: string | null;
+  /** Sub-reason for a code, e.g. `downscale` | `no_op` for a rejected upscale. */
+  reason: string | null;
+  /** Server-measured source facts sent along with a rejection, when present. */
+  source: Partial<ServerSourceMeta> | null;
+}
+
 export class EnhanceEngineError extends Error {
   code: string | null;
-  constructor(message: string, code: string | null) {
+  reason: string | null;
+  source: Partial<ServerSourceMeta> | null;
+  constructor(message: string, code: string | null, reason: string | null = null, source: Partial<ServerSourceMeta> | null = null) {
     super(message);
     this.name = 'EnhanceEngineError';
     this.code = code;
+    this.reason = reason;
+    this.source = source;
   }
 }
 
-function parseEngineFailure(text: string): { message: string; code: string | null } {
+function sourceFromPayload(value: unknown): Partial<ServerSourceMeta> | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.width !== 'number' || typeof v.height !== 'number') return null;
+  return {
+    width: v.width,
+    height: v.height,
+    durationSeconds: typeof v.durationSeconds === 'number' ? v.durationSeconds : undefined,
+    fps: typeof v.fps === 'number' ? v.fps : undefined,
+    container: typeof v.container === 'string' ? v.container : undefined,
+    sizeBytes: typeof v.sizeBytes === 'number' ? v.sizeBytes : undefined,
+    sourceModel: typeof v.sourceModel === 'string' ? v.sourceModel : undefined,
+  };
+}
+
+function parseEngineFailure(text: string): EngineFailure {
   try {
-    const parsed = JSON.parse(text) as { error?: unknown; code?: unknown };
+    const parsed = JSON.parse(text) as { error?: unknown; code?: unknown; reason?: unknown; source?: unknown };
     if (parsed && typeof parsed === 'object') {
       return {
         message: typeof parsed.error === 'string' && parsed.error ? parsed.error : text,
         code: typeof parsed.code === 'string' ? parsed.code : null,
+        reason: typeof parsed.reason === 'string' ? parsed.reason : null,
+        source: sourceFromPayload(parsed.source),
       };
     }
   } catch {
     // plain text body
   }
-  return { message: text, code: null };
+  return { message: text, code: null, reason: null, source: null };
 }
 
 async function callEngine(body: Record<string, unknown>) {
@@ -94,20 +124,24 @@ async function callEngine(body: Record<string, unknown>) {
       }
     }
     const failure = parseEngineFailure(text);
-    throw new EnhanceEngineError(failure.message, failure.code);
+    throw new EnhanceEngineError(failure.message, failure.code, failure.reason, failure.source);
   }
   if (data?.error) {
     throw new EnhanceEngineError(
       String(data.error),
       typeof data.code === 'string' ? data.code : null,
+      typeof data.reason === 'string' ? data.reason : null,
+      sourceFromPayload(data.source),
     );
   }
   return data;
 }
 
-function failureOf(e: unknown): { message: string; code: string | null } {
-  if (e instanceof EnhanceEngineError) return { message: e.message, code: e.code };
-  return { message: e instanceof Error ? e.message : String(e), code: null };
+function failureOf(e: unknown): EngineFailure {
+  if (e instanceof EnhanceEngineError) {
+    return { message: e.message, code: e.code, reason: e.reason, source: e.source };
+  }
+  return { message: e instanceof Error ? e.message : String(e), code: null, reason: null, source: null };
 }
 
 /** Server-measured facts, authoritative over anything the client read. */
