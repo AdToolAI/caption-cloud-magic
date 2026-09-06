@@ -76,6 +76,10 @@ describe('Topaz video catalogue parity', () => {
       expect(view.slug).toBe(entry!.slug);
       expect(view.creditFamily).toBe(entry!.family);
       expect(view.fixedUpscale).toBe(entry!.fixed);
+      // Manual parameters and confirmed credit consumption decide what the UI
+      // may offer and start — a drift here would promise the wrong thing.
+      expect(view.manualParameters).toBe(entry!.manual);
+      expect(view.costVerified).toBe(entry!.verified);
     },
   );
 
