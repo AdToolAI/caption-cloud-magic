@@ -896,6 +896,30 @@ export const TOOLKIT_GROUP_LABELS: Record<ToolkitModelGroup, { de: string; en: s
   premium:     { de: '💎 Premium', en: '💎 Premium', es: '💎 Premium' },
 };
 
+/**
+ * Professionelle Gruppierung nach der Capability-Registry (videoModelSpecs).
+ * Ersetzt die Budget-Optik: Flagship zuerst, Draft/Legacy am Ende.
+ */
+export const SPEC_GROUP_LABELS: Record<
+  'flagship' | 'professional' | 'audio' | 'fast' | 'economy' | 'legacy',
+  { de: string; en: string; es: string }
+> = {
+  flagship:     { de: 'Flagship — höchste native Auflösung', en: 'Flagship — highest native resolution', es: 'Flagship — máxima resolución nativa' },
+  professional: { de: 'Professionelle Produktion', en: 'Professional production', es: 'Producción profesional' },
+  audio:        { de: 'Native Audio & Dialog', en: 'Native audio & dialogue', es: 'Audio y diálogo nativos' },
+  fast:         { de: 'Schnelle Iteration', en: 'Fast iteration', es: 'Iteración rápida' },
+  economy:      { de: 'Sparsam / Entwurf', en: 'Economy / draft', es: 'Económico / borrador' },
+  legacy:       { de: 'Legacy', en: 'Legacy', es: 'Legado' },
+};
+
+/** Fallback, solange ein Modell noch keine Spec hat. */
+export const LEGACY_GROUP_TO_SPEC_GROUP: Record<ToolkitModelGroup, keyof typeof SPEC_GROUP_LABELS> = {
+  recommended: 'flagship',
+  premium: 'professional',
+  audio: 'audio',
+  fast: 'fast',
+};
+
 export function getToolkitModelById(id: string | null | undefined): ToolkitModel | undefined {
   if (!id) return undefined;
   return AI_VIDEO_TOOLKIT_MODELS.find((m) => m.id === id);
