@@ -87,7 +87,13 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                 </button>
               ))}
             </div>
+            {(settings.quality === '4k' || settings.quality === '8k') && (
+              <p className="text-[11px] text-[#F5C76A]/80 leading-snug">
+                {settings.quality === '8k' ? t('dc.eightKTimeWarning') : t('dc.fourKTimeWarning')}
+              </p>
+            )}
           </div>
+
 
           {/* Aspect Ratio */}
           <div className="space-y-2">
