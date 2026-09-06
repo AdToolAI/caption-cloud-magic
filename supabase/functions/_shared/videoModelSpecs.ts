@@ -2028,6 +2028,26 @@ export function validateCapability(req: CapabilityRequest): CapabilityViolation 
     };
   }
 
+  // Operational kill switch: a tier downgraded by measured regressions stays
+  // unselectable until a new passing smoke test clears it.
+  if (req.tierDisabled) {
+    return {
+      code: 'INVALID_MODEL_CAPABILITY',
+      field: 'resolution',
+      message: `${spec.displayName}: the ${resolution?.label ?? 'requested'} tier is temporarily disabled after measured output regressions on route ${spec.apiRoute}. A new passing smoke test re-enables it.`,
+    };
+  }
+
+  if (req.aspectRatio && resolution && !resolution.framesByAspectRatio[req.aspectRatio]) {
+    return {
+      code: 'INVALID_MODEL_CAPABILITY',
+      field: 'aspectRatio',
+      message: `${spec.displayName} ${resolution.label}: no provider-backed frame is documented for ${req.aspectRatio} on route ${spec.apiRoute}.`,
+    };
+  }
+
+
+
 
   if (req.durationSeconds != null) {
     const allowed = resolution?.durations ?? modeSpec.durations;
