@@ -56,8 +56,12 @@ export interface SourceMetadata {
   origin?: 'generated' | 'uploaded' | 'unknown';
 }
 
+/** Which API actually runs the job. Topaz is called DIRECTLY, not via Replicate. */
+export type VideoEnhanceProvider = 'replicate' | 'topaz';
+
 export interface VideoEnhanceSpec {
   id: string;
+  provider: VideoEnhanceProvider;
   providerModelId: string;
   providerSchemaRef: string;
   modes: string[];
@@ -71,6 +75,7 @@ export interface VideoEnhanceSpec {
   backendFlag: string;
   buildInput(config: EnhanceConfig, source: SourceMetadata, sourceUrl: string): Record<string, unknown>;
 }
+
 
 /**
  * Exactly the `scene` enum of the published `bytedance/video-upscaler` schema.
