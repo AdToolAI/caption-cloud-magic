@@ -74,7 +74,7 @@ const OUTPUT_VERDICT_CONFIRM_ATTEMPTS = 2;
 async function readProvider(
   providerId: string,
   replicateKey: string | undefined,
-): Promise<Record<string, unknown> | null> {
+): Promise<any | null> {
   if (providerId.startsWith("topaz:")) {
     const topazKey = Deno.env.get("TOPAZ_API_KEY");
     if (!topazKey) return null;
