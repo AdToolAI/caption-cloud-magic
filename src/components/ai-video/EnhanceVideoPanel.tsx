@@ -378,6 +378,19 @@ export function EnhanceVideoPanel({
       ? tx('unreachable', lang)
       : null;
 
+  const isTopaz = model.id === 'topaz-video-upscale';
+  // Fixed-factor Topaz models (Proteus Natural 2x, Rhea 4x) are only offered
+  // for a target size they are really trained for.
+  const modeFits = (modeId: string): boolean => {
+    if (!isTopaz || !sourceKnown) return true;
+    const target = resolveTargetFrame(resolution, sourceWidth!, sourceHeight!);
+    return topazScaleFitsView(
+      topazModelView(modeId),
+      { width: sourceWidth!, height: sourceHeight! },
+      target,
+    );
+  };
+
   const autoDetectedFootage = !modeTouched && !!asset && model.processingModes.length > 1;
   // The footage type that really reaches the engine: the server derives it
   // from the clip's provenance unless the customer picked one.
