@@ -246,6 +246,36 @@ export function EnhanceVideoPanel({
     ? formatFrame({ width: sourceWidth, height: sourceHeight })
     : null;
 
+  // A paid enhancement must actually add pixels — same rule as the server.
+  const upscale = targetFrame && sourceWidth && sourceHeight
+    ? evaluateUpscale(targetFrame, { width: sourceWidth, height: sourceHeight })
+    : null;
+
+  // Which engine really delivers this frame (portrait 4K only ByteDance).
+  const executionModelId = targetFrame && sourceWidth && sourceHeight
+    ? (frameMeetsTarget(
+        projectProviderOutput(model.id, resolution, sourceWidth, sourceHeight),
+        targetFrame,
+      )
+        ? model.id
+        : models.find((m) =>
+            frameMeetsTarget(
+              projectProviderOutput(m.id, resolution, sourceWidth, sourceHeight),
+              targetFrame,
+            ),
+          )?.id ?? null)
+    : model.id;
+  const routedModel = executionModelId && executionModelId !== model.id
+    ? models.find((m) => m.id === executionModelId) ?? null
+    : null;
+  const frameUnreachable = targetFrame != null && executionModelId === null;
+
+  const blockedReason = upscale && !upscale.ok
+    ? (upscale.reason === 'downscale' ? tx('downscale', lang) : tx('noUpscale', lang))
+    : frameUnreachable
+      ? tx('unreachable', lang)
+      : null;
+
   const autoDetectedFootage = !modeTouched && !!asset && model.processingModes.length > 1;
 
 
