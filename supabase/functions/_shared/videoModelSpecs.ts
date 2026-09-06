@@ -329,6 +329,14 @@ export function res(
         ? 'fixed-frame'
         : 'short-edge');
   const derived = framesFromSizingRule(shortEdge, sizingRule);
+  // Provenance: only an explicit provider frame table or an explicit provider
+  // reference counts. The generic default wording below is an assumption.
+  const sizingRuleVerified = !!opts.framesByAspectRatio || !!opts.sizingRuleSource;
+  const requested = opts.parityStatus ?? (opts.smokeTest ? 'FULL_PARITY' : 'UNVERIFIED');
+  // An unverified sizing rule can never carry FULL_PARITY: the kill switch may
+  // only act on tiers whose target frame is provider-backed.
+  const parityStatus: ParityStatus =
+    requested === 'FULL_PARITY' && !sizingRuleVerified ? 'UNVERIFIED' : requested;
   return {
     label,
     shortEdge,
