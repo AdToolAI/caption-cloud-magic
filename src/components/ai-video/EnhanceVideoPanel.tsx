@@ -158,6 +158,7 @@ export function EnhanceVideoPanel({
     isRunning,
     error,
     errorCode,
+    errorReason,
     previewPrice,
     startEnhance,
     cancelEnhance,
