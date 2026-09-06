@@ -385,6 +385,11 @@ export function EnhanceVideoPanel({
                   {formatFrame(targetFrame)} {tx('pixels', lang)}
                 </p>
               )}
+              {routedModel && !blockedReason && (
+                <p className="text-xs text-primary/90 mt-1">
+                  {tx('routed', lang)} {routedModel.name}
+                </p>
+              )}
             </div>
             <div className="text-right text-sm">
               <p className="text-muted-foreground">{tx('price', lang)}</p>
