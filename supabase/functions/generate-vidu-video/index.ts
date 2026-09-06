@@ -5,6 +5,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
 
@@ -232,11 +233,26 @@ serve(async (req) => {
 
     const replicateModel = REPLICATE_MODELS[model];
     const perSecond = PRICE_PER_SECOND_EUR[model];
-    const duration = Math.min(
-      MAX_DURATION,
-      Math.max(MIN_DURATION, Math.round(Number(rawDuration) || DEFAULT_DURATION)),
+    const duration = Number(rawDuration ?? DEFAULT_DURATION);
+    const requestedResolution = String(rawResolution ?? "1080p");
+
+    // Capability gate — before wallet, before provider. No clamping.
+    const gate = capabilityGate(
+      {
+        modelId: model,
+        mode: inferMode({
+          startImageUrl,
+          endImageUrl,
+          referenceImageUrls: Array.isArray(referenceImages) ? referenceImages : null,
+        }),
+        resolution: requestedResolution,
+        durationSeconds: duration,
+        aspectRatio,
+      },
+      corsHeaders,
     );
-    const resolution = ALLOWED_RESOLUTIONS.has(String(rawResolution)) ? String(rawResolution) : "1080p";
+    if (gate.response) return gate.response;
+    const resolution = gate.resolutionLabel ?? requestedResolution;
     // Price in the WALLET currency — USD carries the FX uplift (1 EUR ~ 1.15 USD).
     const { data: viduWalletCurrencyRow } = await supabaseAdmin
       .from("ai_video_wallets")

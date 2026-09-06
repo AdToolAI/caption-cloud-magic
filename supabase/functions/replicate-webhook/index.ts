@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { trackAIGeneration } from "../_shared/telemetry.ts";
 import { verifyWebhookRequest } from "../_shared/webhook-auth.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { recordGenerationOutput } from '../_shared/videoOutputMeasurement.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -114,6 +115,15 @@ serve(async (req) => {
         console.error('[Replicate Webhook] Failed to update generation:', updateError);
         throw updateError;
       }
+
+      // 4b. Measure the delivered file against the promised frame.
+      await recordGenerationOutput(supabase, {
+        id: generation.id,
+        model: generation.model,
+        resolution: generation.resolution,
+        aspect_ratio: generation.aspect_ratio,
+        video_url: permanentUrl,
+      });
 
       // 5. Mediathek-Eintrag: wird zentral vom DB-Trigger
       //    auto_save_ai_video_to_library erzeugt (idempotent).

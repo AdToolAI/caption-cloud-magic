@@ -5,6 +5,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { sanitizeForHappyHorse, isGreenNetRejection } from "../_shared/happyhorse-green-net.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
@@ -179,8 +180,20 @@ serve(async (req) => {
       seed,
     } = body;
 
+    // Capability gate — before wallet, before provider.
+    const gate = capabilityGate(
+      {
+        modelId: model,
+        mode: inferMode({ startImageUrl: typeof image === "string" && image ? image : null }),
+        durationSeconds: Number(duration),
+        aspectRatio,
+      },
+      corsHeaders,
+    );
+    if (gate.response) return gate.response;
+
     const costPerSecond = COST_PER_SECOND_EUR[model];
-    const resolution = RESOLUTIONS[model];
+    const resolution = gate.resolutionLabel ?? RESOLUTIONS[model];
     if (!costPerSecond || !resolution) {
       return new Response(
         JSON.stringify({ error: `Unknown HappyHorse model: ${model}` }),

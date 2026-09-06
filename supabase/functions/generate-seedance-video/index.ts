@@ -3,6 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 
 const corsHeaders = {
@@ -74,19 +75,20 @@ serve(async (req) => {
     const body = await req.json() as GenerateRequest;
     const { prompt, model, duration: requestedDuration, aspectRatio, startImageUrl, endImageUrl } = body;
 
-    // seedance-1-lite only renders 5 s or 10 s clips — snap to the nearest.
-    const isLite = model === 'seedance-mini';
-    const duration = isLite
-      ? (Math.abs(requestedDuration - 10) < Math.abs(requestedDuration - 5) ? 10 : 5)
-      : requestedDuration;
+    const duration = Number(requestedDuration);
 
-    // Validate duration (3-15 seconds)
-    if (duration < 3 || duration > 15) {
-      return new Response(
-        JSON.stringify({ error: "Duration must be between 3 and 15 seconds for Seedance 2.0" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Capability gate — before wallet, before provider. Seedance 1 Lite's
+    // 5/10 s enum is enforced, never snapped.
+    const gate = capabilityGate(
+      {
+        modelId: model,
+        mode: inferMode({ startImageUrl, endImageUrl }),
+        durationSeconds: duration,
+        aspectRatio,
+      },
+      corsHeaders,
+    );
+    if (gate.response) return gate.response;
 
     const isImageToVideo = !!startImageUrl;
     const mode = isImageToVideo ? 'Image-to-Video' : 'Text-to-Video';
@@ -194,7 +196,7 @@ serve(async (req) => {
     // Build Seedance input — Seedance 2.0 supports 3–15s across all tiers.
     const replicateInput: Record<string, any> = {
       prompt,
-      duration: Math.min(Math.max(duration, 3), 15),
+      duration, // gate-approved
       aspect_ratio: aspectRatio,
       resolution,
     };

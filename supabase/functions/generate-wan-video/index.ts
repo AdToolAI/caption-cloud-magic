@@ -3,6 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 
@@ -108,13 +109,21 @@ serve(async (req) => {
     const body = await req.json() as GenerateRequest;
     const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl, endImageUrl, negativePrompt, seed } = body;
 
-    // Wan 2.5 supports 5 or 10 s; Wan 2.6/2.7 additionally allow 15 s.
     const isWan27 = model === 'wan-2-7-standard' || model === 'wan-2-7-pro';
     const isWan26 = model === 'wan-2-6-standard' || model === 'wan-2-6-pro';
-    const allowedDurations = isWan27 || isWan26 ? [5, 10, 15] : [5, 10];
-    const duration = allowedDurations.reduce((best, value) =>
-      Math.abs(value - (rawDuration || 5)) < Math.abs(best - (rawDuration || 5)) ? value : best,
-      allowedDurations[0]);
+    const duration = Number(rawDuration);
+
+    // Capability gate — before wallet, before provider. No nearest-value snap.
+    const gate = capabilityGate(
+      {
+        modelId: model,
+        mode: inferMode({ startImageUrl, endImageUrl }),
+        durationSeconds: duration,
+        aspectRatio,
+      },
+      corsHeaders,
+    );
+    if (gate.response) return gate.response;
 
     const isImageToVideo = !!startImageUrl;
     const mode = isImageToVideo ? 'Image-to-Video' : 'Text-to-Video';
@@ -242,7 +251,7 @@ serve(async (req) => {
         replicateInput.first_frame = startImageUrl;
         if (endImageUrl) replicateInput.last_frame = endImageUrl;
       } else {
-        replicateInput.aspect_ratio = aspectRatio || '16:9';
+        replicateInput.aspect_ratio = aspectRatio; // gate-approved
       }
     } else if (isImageToVideo) {
       replicateInput.image = startImageUrl;

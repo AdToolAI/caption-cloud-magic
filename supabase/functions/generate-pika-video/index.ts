@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
@@ -180,11 +181,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (![5, 10].includes(duration)) {
-      return new Response(JSON.stringify({ error: "Duration must be 5 or 10 seconds." }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Capability gate — before wallet, before provider.
+    const gate = capabilityGate(
+      {
+        modelId: model,
+        mode: inferMode({ startImageUrl, endImageUrl }),
+        durationSeconds: Number(duration),
+        aspectRatio,
+      },
+      corsHeaders,
+    );
+    if (gate.response) return gate.response;
     if (!prompt || prompt.trim().length < 3) {
       return new Response(JSON.stringify({ error: "Prompt is required (min 3 chars)." }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -268,7 +275,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const pikaInput: Record<string, unknown> = {
       prompt,
       seed: Math.floor(Math.random() * 1_000_000),
-      aspect_ratio: aspectRatio === '9:16' ? '9:16' : aspectRatio === '1:1' ? '1:1' : '16:9',
+      aspect_ratio: aspectRatio, // gate-approved
       // duration is generally 5 or 10s on Pika 2.2
       duration,
     };

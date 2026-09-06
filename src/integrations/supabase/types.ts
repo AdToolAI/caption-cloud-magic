@@ -761,7 +761,10 @@ export type Database = {
           failed_at: string | null
           file_size_bytes: number | null
           id: string
+          measured_height: number | null
+          measured_width: number | null
           model: string
+          output_verdict: string | null
           prompt: string
           resolution: string
           retry_count: number | null
@@ -769,6 +772,8 @@ export type Database = {
           started_at: string | null
           status: string
           storage_path: string | null
+          target_height: number | null
+          target_width: number | null
           thumbnail_url: string | null
           total_cost_euros: number
           user_id: string
@@ -785,7 +790,10 @@ export type Database = {
           failed_at?: string | null
           file_size_bytes?: number | null
           id?: string
+          measured_height?: number | null
+          measured_width?: number | null
           model?: string
+          output_verdict?: string | null
           prompt: string
           resolution?: string
           retry_count?: number | null
@@ -793,6 +801,8 @@ export type Database = {
           started_at?: string | null
           status?: string
           storage_path?: string | null
+          target_height?: number | null
+          target_width?: number | null
           thumbnail_url?: string | null
           total_cost_euros: number
           user_id: string
@@ -809,7 +819,10 @@ export type Database = {
           failed_at?: string | null
           file_size_bytes?: number | null
           id?: string
+          measured_height?: number | null
+          measured_width?: number | null
           model?: string
+          output_verdict?: string | null
           prompt?: string
           resolution?: string
           retry_count?: number | null
@@ -817,6 +830,8 @@ export type Database = {
           started_at?: string | null
           status?: string
           storage_path?: string | null
+          target_height?: number | null
+          target_width?: number | null
           thumbnail_url?: string | null
           total_cost_euros?: number
           user_id?: string
@@ -18816,6 +18831,36 @@ export type Database = {
           user_id?: string
           user_price_eur?: number
           verified_effective_multiplier?: number | null
+        }
+        Relationships: []
+      }
+      video_model_tier_parity: {
+        Row: {
+          consecutive_mismatches: number
+          last_verdict: string | null
+          model_id: string
+          parity_status: string
+          resolution_label: string
+          tier_disabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          consecutive_mismatches?: number
+          last_verdict?: string | null
+          model_id: string
+          parity_status?: string
+          resolution_label: string
+          tier_disabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          consecutive_mismatches?: number
+          last_verdict?: string | null
+          model_id?: string
+          parity_status?: string
+          resolution_label?: string
+          tier_disabled?: boolean
+          updated_at?: string
         }
         Relationships: []
       }

@@ -3,6 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 
@@ -20,7 +21,7 @@ const MODEL_PRICING: Record<string, Record<string, number>> = {
 const REPLICATE_MODEL_SLUG = 'xai/grok-imagine-video';
 
 // Provider aspect_ratio enum (plus "auto", which we never send).
-const SUPPORTED_ASPECT_RATIOS = ['16:9', '9:16', '1:1', '4:3', '3:4', '3:2', '2:3'];
+// Aspect ratios are validated by the capability gate (videoModelSpecs.ts).
 
 interface GenerateRequest {
   prompt: string;
@@ -63,9 +64,22 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const body = await req.json() as GenerateRequest;
     const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl, enableAudio = true } = body;
 
-    // Provider (xAI Grok Imagine) accepts any integer duration from 1-15 s.
-    const duration = Math.min(15, Math.max(1, Math.round(rawDuration || 6)));
-    const resolution: '480p' | '720p' = body.resolution === '480p' ? '480p' : '720p';
+    const duration = Number(rawDuration);
+    const requestedResolution = body.resolution ?? '720p';
+
+    // Capability gate — before wallet, before provider. No silent clamping.
+    const gate = capabilityGate(
+      {
+        modelId: model,
+        mode: inferMode({ startImageUrl }),
+        resolution: requestedResolution,
+        durationSeconds: duration,
+        aspectRatio,
+      },
+      corsHeaders,
+    );
+    if (gate.response) return gate.response;
+    const resolution = (gate.resolutionLabel ?? requestedResolution) as '480p' | '720p';
 
     const isImageToVideo = !!startImageUrl;
     console.log(`[generate-grok-video] Mode: ${isImageToVideo ? 'I2V' : 'T2V'}, Duration: ${duration}s, Audio: ${enableAudio}`);
@@ -155,7 +169,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const webhookUrl = appendWebhookToken(`${SUPABASE_URL}/functions/v1/replicate-webhook`);
 
-    const ratio = SUPPORTED_ASPECT_RATIOS.includes(aspectRatio) ? aspectRatio : '16:9';
+    const ratio = aspectRatio; // gate-approved
 
     const replicateInput: Record<string, any> = {
       prompt,

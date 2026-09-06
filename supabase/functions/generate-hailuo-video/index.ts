@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { getVisualStyleHint, type ComposerVisualStyle } from "../_shared/composer-visual-styles.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 
@@ -63,12 +64,23 @@ serve(async (req) => {
     const body = await req.json() as GenerateRequest;
     const { prompt, model, duration: rawDuration, resolution, startImageUrl, endImageUrl, promptOptimizer, visualStyle } = body;
 
-    // Hailuo 2.3 only supports 6 or 10 seconds.
-    // STRICT (June 26 2026): only an EXACT 10 stays 10; everything else → 6.
-    // Prevents silent 7/8/9s → 10s upgrades that crash Pro/1080p renders.
-    const duration = Number(rawDuration) === 10 ? 10 : 6;
-    // 1080p only available for 6s
-    const finalResolution = (duration === 10 && resolution === '1080p') ? '768p' : resolution;
+    const duration = Number(rawDuration);
+    const requestedResolution = resolution ?? (model === 'hailuo-pro' ? '1080p' : '768p');
+
+    // Capability gate — before wallet, before provider. 1080p x 10 s is now a
+    // clean 400 instead of a silent downgrade to 768p.
+    const gate = capabilityGate(
+      {
+        modelId: model,
+        mode: inferMode({ startImageUrl, endImageUrl }),
+        resolution: requestedResolution,
+        durationSeconds: duration,
+        aspectRatio: '16:9',
+      },
+      corsHeaders,
+    );
+    if (gate.response) return gate.response;
+    const finalResolution = gate.resolutionLabel ?? requestedResolution;
 
     // Inject visual style hint into the prompt (if a style was selected)
     const styleHint = getVisualStyleHint(visualStyle ?? undefined);

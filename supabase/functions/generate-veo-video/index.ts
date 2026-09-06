@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -128,9 +129,24 @@ serve(async (req) => {
       );
     }
 
-    // Veo 3.1 supports 4, 6 or 8 seconds
-    const allowed = [4, 6, 8];
-    const duration = allowed.includes(rawDuration) ? rawDuration : 4;
+    const duration = Number(rawDuration);
+
+    // Capability gate — before wallet, before provider. Reference images on
+    // Veo 3.1 are 16:9 / 8 s only; that is now a 400, not a silent rewrite.
+    const gate = capabilityGate(
+      {
+        modelId: model,
+        mode: inferMode({
+          startImageUrl,
+          endImageUrl,
+          referenceImageUrls: Array.isArray(referenceImageUrls) ? referenceImageUrls : null,
+        }),
+        durationSeconds: duration,
+        aspectRatio,
+      },
+      corsHeaders,
+    );
+    if (gate.response) return gate.response;
 
     const isImageToVideo = !!startImageUrl;
     const mode = isImageToVideo ? 'Image-to-Video' : 'Text-to-Video';

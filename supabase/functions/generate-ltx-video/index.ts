@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { capabilityGate, inferMode } from "../_shared/videoCapabilityGate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,19 +24,9 @@ const REPLICATE_MODELS: Record<string, string> = {
   'ltx-pro': 'lightricks/ltx-2.3-pro',
 };
 
-// LTX 2.3 only exposes 16:9 and 9:16 — anything else snaps to landscape.
-const SUPPORTED_ASPECT_RATIOS = ['16:9', '9:16'];
-// Duration enums: fast [6..20 step 2], pro [6, 8, 10].
-const ALLOWED_DURATIONS: Record<string, number[]> = {
-  'ltx-standard': [6, 8, 10, 12, 14, 16, 18, 20],
-  'ltx-pro': [6, 8, 10],
-};
+// Capability truth lives in _shared/videoModelSpecs.ts. No local clamping:
+// an unsupported duration / aspect ratio / resolution is rejected with 400.
 
-const snapDuration = (model: string, requested: number): number => {
-  const allowed = ALLOWED_DURATIONS[model] ?? ALLOWED_DURATIONS['ltx-standard'];
-  return allowed.reduce((best, value) =>
-    Math.abs(value - requested) < Math.abs(best - requested) ? value : best, allowed[0]);
-};
 
 interface GenerateRequest {
   prompt: string;
@@ -81,12 +72,26 @@ serve(async (req) => {
     const body = await req.json() as GenerateRequest;
     const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl, generateAudio } = body;
 
-    // LTX 2.3 duration enums start at 6 s — snap to the closest allowed value.
-    const duration = snapDuration(model, Number(rawDuration) || 6);
-
+    const duration = Number(rawDuration);
     const isImageToVideo = !!startImageUrl;
+    const requestedResolution = body.resolution ?? '1080p';
+
+    // Capability gate — runs BEFORE wallet lookup and BEFORE any provider call.
+    const gate = capabilityGate(
+      {
+        modelId: model,
+        mode: inferMode({ startImageUrl, endImageUrl: body.endImageUrl }),
+        resolution: requestedResolution,
+        durationSeconds: duration,
+        aspectRatio,
+      },
+      corsHeaders,
+    );
+    if (gate.response) return gate.response;
+
     const mode = isImageToVideo ? 'Image-to-Video' : 'Text-to-Video';
     console.log(`[generate-ltx-video] Mode: ${mode}, Duration: ${duration}s, Model: ${model}`);
+
 
     // Wallet currency
     const { data: walletPreview } = await supabaseClient
@@ -131,7 +136,7 @@ serve(async (req) => {
     }
 
     // Create generation record
-    const resolution = model === 'ltx-pro' ? '1080p' : '720p';
+    const resolution = gate.resolutionLabel ?? requestedResolution;
     const { data: generation, error: genError } = await supabaseAdmin
       .from('ai_video_generations')
       .insert({
@@ -177,11 +182,9 @@ serve(async (req) => {
     const webhookUrl = appendWebhookToken(`${SUPABASE_URL}/functions/v1/replicate-webhook`);
 
     const replicateModel = REPLICATE_MODELS[model];
-    const ratio = SUPPORTED_ASPECT_RATIOS.includes(aspectRatio) ? aspectRatio : '16:9';
-
-    // Provider constraint: durations above 10 s are only rendered at 1080p.
-    const requestedResolution = body.resolution ?? '1080p';
-    const ltxResolution = duration > 10 ? '1080p' : requestedResolution;
+    // Gate-approved values only — no snapping, no fallback rewriting.
+    const ratio = aspectRatio;
+    const ltxResolution = (gate.resolutionLabel ?? requestedResolution).toLowerCase();
 
     const replicateInput: Record<string, any> = {
       prompt,
