@@ -10,6 +10,7 @@ import {
   type EnhanceRunInput,
 } from "../_shared/picture-enhance-models.ts";
 import { getWorkflowTypeForEnhanceModel, persistStudioImage } from "../_shared/studio-image-persist.ts";
+import { awaitTopazImage, submitTopazImage } from "../_shared/topaz-client.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -111,10 +112,15 @@ serve(async (req) => {
       );
     }
 
-    const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY");
-    if (!REPLICATE_API_KEY) return json({ error: "REPLICATE_API_KEY not configured" }, 500);
+    const isTopaz = spec.provider === "topaz";
+    const providerKey = Deno.env.get(isTopaz ? "TOPAZ_API_KEY" : "REPLICATE_API_KEY");
+    if (!providerKey) {
+      return json(
+        { error: `${isTopaz ? "TOPAZ_API_KEY" : "REPLICATE_API_KEY"} not configured` },
+        500,
+      );
+    }
 
-    const replicate = new Replicate({ auth: REPLICATE_API_KEY });
     const input = spec.buildInput(runInput);
     const outputFormat = String(input.output_format ?? "png");
 
@@ -125,7 +131,32 @@ serve(async (req) => {
 
     let output: unknown;
     try {
-      output = await replicate.run(spec.providerModelId as never, { input });
+      if (isTopaz) {
+        // DIRECT Topaz image API: the source is uploaded as multipart, the job
+        // is polled to a terminal state and returns a signed download URL.
+        const sourceRes = await fetch(runInput.imageUrl);
+        if (!sourceRes.ok) {
+          return json({ error: "Could not read the source image", code: "SOURCE_UNREADABLE" }, 400);
+        }
+        const sourceBytes = await sourceRes.arrayBuffer();
+        const fields: Record<string, string> = {};
+        for (const [key, value] of Object.entries(input)) {
+          if (key === "image" || value === undefined || value === null) continue;
+          fields[key] = String(value);
+        }
+        const processId = await submitTopazImage({
+          apiKey: providerKey,
+          intent: spec.topazIntent ?? "enhance",
+          fields,
+          bytes: sourceBytes,
+          filename: `source.${outputFormat === "jpg" ? "jpg" : "png"}`,
+          contentType: sourceRes.headers.get("content-type") ?? "image/png",
+        });
+        output = await awaitTopazImage({ apiKey: providerKey, processId });
+      } else {
+        const replicate = new Replicate({ auth: providerKey });
+        output = await replicate.run(spec.providerModelId as never, { input });
+      }
     } catch (providerError) {
       const message = providerError instanceof Error ? providerError.message : String(providerError);
       console.error("[enhance-image] provider failed:", message);
