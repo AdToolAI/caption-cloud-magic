@@ -34,7 +34,7 @@ Provider-Doku → konkrete API-Route → Capability Spec → Pricing → automat
 → echter Max-Quality-Testlauf → Output-Probe → FULL_PARITY → available: true → UI-Badge
 ```
 
-Vor `available: true` für eine Maximalauflösung ist ein **echter Smoke-Test** Pflicht: Job in maximaler Auflösung starten, Ausgabedatei laden und proben, Pixelmaße, Dauer, FPS und Audio messen, Test-Run-ID plus Messwerte in der Spec bzw. einer Verifikationstabelle speichern. Erst danach darf ein Badge wie „4K Native" erscheinen.
+Vor `available: true` für eine Maximalauflösung ist ein **echter Smoke-Test** Pflicht: Job in maximaler Auflösung starten, Ausgabedatei laden und proben, Pixelmaße, Dauer, FPS und Audio messen, Test-Run-ID plus Messwerte in der Spec bzw. einer Verifikationstabelle speichern. Der Smoke-Test prüft zusätzlich die **Wirtschaftlichkeit**: `estimatedProviderCost`, `actualProviderCost`, `chargedCredits` und `effectiveMargin` werden mitgeschrieben und gegen die Mindestmarge geprüft — so fällt sofort auf, wenn ein Provider Preise oder Abrechnungseinheiten geändert hat. Erst danach darf ein Badge wie „4K Native" erscheinen.
 
 
 ## Phase 2 — Provider-Audit je Familie
