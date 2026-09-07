@@ -34,6 +34,10 @@ interface RefineInput {
   name: string;
   description?: string;
   extraPrompt?: string;
+  /** Cut the subject out onto transparency. Default true for character/prop/
+   *  building. When false the refined image keeps its clean white backdrop —
+   *  useful when the cutout eats hair/edges. */
+  cutout?: boolean;
 }
 
 interface RefineResult {
@@ -83,7 +87,7 @@ export function useRefineAssetPhoto() {
       const asset = (data as any).asset;
       const bucket = (data as any).bucket as string;
       const refinedUrl = (data as any).refined_url as string;
-      const needsCutout = Boolean((data as any).needs_client_cutout);
+      const needsCutout = Boolean((data as any).needs_client_cutout) && input.cutout !== false;
 
       // 3) For cutout kinds, run client-side background removal on the
       //    solid-white refined image and overwrite the stored file with a
@@ -120,6 +124,22 @@ export function useRefineAssetPhoto() {
           if (rpcErr) throw rpcErr;
           finalUrl = cutoutUrl;
           finalPath = cutoutPath;
+
+          // Keep the un-cut refined image reachable as a variant so a bad
+          // cutout never destroys the usable reference sheet.
+          if (input.kind === 'character') {
+            try {
+              await (supabase as any).from('avatar_pose_variants').insert({
+                avatar_id: asset.id,
+                pose_id: 'original-refined',
+                label: 'Original (with background)',
+                image_url: refinedUrl,
+                storage_path: (data as any).storage_path ?? null,
+              });
+            } catch (e) {
+              console.warn('[useRefineAssetPhoto] could not keep original variant:', e);
+            }
+          }
         } catch (e) {
           console.warn(
             '[useRefineAssetPhoto] background removal failed, keeping white-bg refined image:',
