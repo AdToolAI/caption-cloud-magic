@@ -158,9 +158,9 @@ const Legal = () => {
                 <div className="space-y-3">
                   <p>
                     {tx({
-                      de: 'Es besteht genau ein kostenpflichtiges Abomodell zu € 14,99 pro Monat (inkl. USt., monatlich kündbar). Auf die Abogebühr wird kein Rabatt gewährt. Der Founders-Vorteil bezieht sich ausschließlich auf den Kauf von KI-Credits.',
-                      en: 'There is exactly one paid subscription plan at $14.99 per month (incl. tax, cancellable monthly). No discount is granted on the subscription fee. The Founders benefit applies exclusively to the purchase of AI credits.',
-                      es: 'Existe exactamente un plan de suscripción de pago por € 14,99 al mes (impuestos incluidos, cancelable mensualmente). No se concede ningún descuento sobre la cuota de suscripción. La ventaja Founders se aplica exclusivamente a la compra de créditos de IA.',
+                      de: 'Es besteht genau ein kostenpflichtiges Abomodell zu € 14,95 pro Monat (inkl. USt., monatlich kündbar). Auf die Abogebühr wird kein Rabatt gewährt. Der Founders-Vorteil bezieht sich ausschließlich auf den Kauf von KI-Credits.',
+                      en: 'There is exactly one paid subscription plan at $14.95 per month (incl. tax, cancellable monthly). No discount is granted on the subscription fee. The Founders benefit applies exclusively to the purchase of AI credits.',
+                      es: 'Existe exactamente un plan de suscripción de pago por € 14,95 al mes (impuestos incluidos, cancelable mensualmente). No se concede ningún descuento sobre la cuota de suscripción. La ventaja Founders se aplica exclusivamente a la compra de créditos de IA.',
                     })}
                   </p>
                   <ul className="list-disc list-inside space-y-2 text-muted-foreground">
