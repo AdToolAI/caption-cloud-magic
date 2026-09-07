@@ -13,7 +13,7 @@ import { tx } from '@/lib/i18nText';
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { User, MapPin, AtSign, Building2, Package } from 'lucide-react';
+import { User, MapPin, AtSign, Building2, Package, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import {
@@ -35,14 +35,26 @@ interface PromptMentionEditorProps {
   /** Notifies parent when the field is focused/blurred so parent sync-effects
    *  can skip work while the user is actively editing. */
   onEditingChange?: (editing: boolean) => void;
+  /** Session-local mentionables (e.g. images the user just uploaded) that are
+   *  not part of the persisted library but should still be taggable with @. */
+  extraMentions?: ExtraMention[];
+}
+
+export interface ExtraMention {
+  token: string;
+  name: string;
+  description?: string;
+  thumbnail?: string | null;
 }
 
 interface Suggestion {
-  kind: 'character' | 'location' | 'building' | 'prop';
+  kind: 'character' | 'location' | 'building' | 'prop' | 'upload';
   id: string;
   name: string;
   description: string;
   thumbnail: string | null;
+  /** Explicit @token; falls back to a slug of `name` when omitted. */
+  token?: string;
 }
 
 const MAX_SUGGESTIONS = 8;
@@ -66,7 +78,8 @@ function subKindOf(tags: string[] | undefined): 'building' | 'prop' | 'location'
 function buildSuggestions(
   query: string,
   characters: MotionStudioCharacter[],
-  locations: MotionStudioLocation[]
+  locations: MotionStudioLocation[],
+  extras: ExtraMention[] = []
 ): Suggestion[] {
   const q = query.toLowerCase();
   const charSugg: Suggestion[] = characters
@@ -87,7 +100,17 @@ function buildSuggestions(
       description: l.description || l.lighting_notes || '',
       thumbnail: l.reference_image_url,
     }));
-  return [...charSugg, ...locSugg].slice(0, MAX_SUGGESTIONS);
+  const extraSugg: Suggestion[] = extras
+    .filter((e) => q === '' || e.token.toLowerCase().includes(q) || e.name.toLowerCase().includes(q))
+    .map((e) => ({
+      kind: 'upload' as const,
+      id: e.token,
+      name: e.name,
+      description: e.description ?? '',
+      thumbnail: e.thumbnail ?? null,
+      token: e.token,
+    }));
+  return [...extraSugg, ...charSugg, ...locSugg].slice(0, MAX_SUGGESTIONS);
 }
 
 export default function PromptMentionEditor({
@@ -98,6 +121,7 @@ export default function PromptMentionEditor({
   className,
   disabled,
   onEditingChange,
+  extraMentions,
 }: PromptMentionEditorProps) {
   const { characters, locations } = useUnifiedMentionLibrary();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -137,8 +161,8 @@ export default function PromptMentionEditor({
 
   const suggestions = useMemo(() => {
     if (!trigger) return [];
-    return buildSuggestions(trigger.query, characters, locations);
-  }, [trigger, characters, locations]);
+    return buildSuggestions(trigger.query, characters, locations, extraMentions ?? []);
+  }, [trigger, characters, locations, extraMentions]);
 
   // Reset highlight when suggestions change
   useEffect(() => {
@@ -159,7 +183,7 @@ export default function PromptMentionEditor({
 
   const insertSuggestion = (s: Suggestion) => {
     if (!trigger) return;
-    const token = nameToToken(s.name);
+    const token = s.token ?? nameToToken(s.name);
     const before = draft.slice(0, trigger.start);
     const afterStart = trigger.start + 1 + trigger.query.length;
     const after = draft.slice(afterStart);
@@ -297,7 +321,9 @@ export default function PromptMentionEditor({
                   ? Building2
                   : s.kind === 'prop'
                     ? Package
-                    : MapPin;
+                    : s.kind === 'upload'
+                      ? ImageIcon
+                      : MapPin;
             const isActive = i === activeIndex;
             const badgeTone =
               s.kind === 'character'
