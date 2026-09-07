@@ -1247,11 +1247,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           <span>
             <span className="font-medium">
               {tx({
-                de: 'Diese Kombination kann dieses Modell nicht rendern:',
-                en: 'This model cannot render this combination:',
-                es: 'Este modelo no puede renderizar esta combinación:',
+                de: 'Start blockiert:',
+                en: 'Start blocked:',
+                es: 'Inicio bloqueado:',
               })}
             </span>{' '}
+
             {blockingIssue}
           </span>
         </div>
