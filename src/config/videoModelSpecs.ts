@@ -4,7 +4,7 @@
 // Regenerate with: node scripts/generate-video-model-specs.mjs
 // =============================================================================
 
-export const SPECS_SOURCE_HASH = '188c2f16434743fb7e5e662dbf549364d0d97f5634a02a6c4e7cfc6959837b26';
+export const SPECS_SOURCE_HASH = 'e57abc00b7a6990d182aae04c9e8da0de2e87e5e8e9da025324a266c3b01c15f';
 
 // ============================================================================
 // CANONICAL VIDEO MODEL CAPABILITY REGISTRY
@@ -1301,7 +1301,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     family: 'wan',
     generation: '2.6',
     provider: 'Wan Video',
-    providerModelSlug: 'wan-video/wan-2.6',
+    providerModelSlug: 'wan-video/wan-2.6-t2v',
     apiRoute: 'replicate:/v1/predictions',
     region: 'global',
     apiVersion: 'v1',
@@ -1312,7 +1312,8 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     available: true,
     providerDocsVersion: 'Replicate 11.08.2026',
     verificationSourceUrl: 'https://replicate.com/wan-video',
-    verificationNotes: 'Vorgänger-Generation, bewusst als günstige Alternative erhalten.',
+    verificationNotes:
+      'Vorgänger-Generation, bewusst als günstige Alternative erhalten. Route-scoped 07.09.2026: t2v und i2v sind auf Replicate getrennte Modelle (wan-video/wan-2.6-t2v bzw. -i2v) — genau diese Slugs führt die Edge Function aus.',
     ...UNAUDITED,
     modes: [
       mode('t2v', {
@@ -1324,6 +1325,8 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         inputs: {},
       }),
       mode('i2v', {
+        // Route-scoped: the i2v task is a SEPARATE Replicate model.
+        providerModelSlug: 'wan-video/wan-2.6-i2v',
         resolutions: [res('720p', 720, 'wan-2-6-standard')],
         durations: [5, 10, 15],
         aspectRatios: ['16:9', '9:16'],
@@ -1339,7 +1342,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     family: 'wan',
     generation: '2.6',
     provider: 'Wan Video',
-    providerModelSlug: 'wan-video/wan-2.6-pro',
+    providerModelSlug: 'wan-video/wan-2.6-t2v',
     apiRoute: 'replicate:/v1/predictions',
     region: 'global',
     apiVersion: 'v1',
@@ -1350,7 +1353,8 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     available: true,
     providerDocsVersion: 'Replicate 11.08.2026',
     verificationSourceUrl: 'https://replicate.com/wan-video',
-    verificationNotes: 'Vorgänger-Generation mit 1080p.',
+    verificationNotes:
+      'Vorgänger-Generation mit 1080p — dieselben task-getrennten Routen wie Wan 2.6 Standard (wan-video/wan-2.6-t2v bzw. -i2v), nur mit resolution=1080p. Ein Slug "wan-video/wan-2.6-pro" existiert nicht.',
     ...UNAUDITED,
     modes: [
       mode('t2v', {
@@ -1362,6 +1366,8 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         inputs: {},
       }),
       mode('i2v', {
+        // Route-scoped: the i2v task is a SEPARATE Replicate model.
+        providerModelSlug: 'wan-video/wan-2.6-i2v',
         resolutions: [res('1080p', 1080, 'wan-2-6-pro')],
         durations: [5, 10, 15],
         aspectRatios: ['16:9', '9:16'],
@@ -1377,7 +1383,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     family: 'wan',
     generation: '2.5',
     provider: 'Wan Video',
-    providerModelSlug: 'wan-video/wan-2.5',
+    providerModelSlug: 'wan-video/wan-2.5-t2v',
     apiRoute: 'replicate:/v1/predictions',
     region: 'global',
     apiVersion: 'v1',
@@ -1389,7 +1395,8 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     available: true,
     providerDocsVersion: 'Replicate 11.08.2026',
     verificationSourceUrl: 'https://replicate.com/wan-video',
-    verificationNotes: 'Legacy — nicht mehr prominent, bleibt für bestehende Projekte wählbar.',
+    verificationNotes:
+      'Legacy — nicht mehr prominent, bleibt für bestehende Projekte wählbar. Route-scoped 07.09.2026: die Edge Function ruft wan-video/wan-2.5-t2v bzw. wan-video/wan-2.5-i2v; ein Slug "wan-video/wan-2.5" existiert nicht.',
     ...UNAUDITED,
     modes: [
       mode('t2v', {
@@ -1401,6 +1408,8 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         inputs: {},
       }),
       mode('i2v', {
+        // Route-scoped: the i2v task is a SEPARATE Replicate model.
+        providerModelSlug: 'wan-video/wan-2.5-i2v',
         resolutions: [res('720p', 720, 'wan-standard')],
         durations: [5, 10],
         aspectRatios: ['16:9', '9:16'],
@@ -1856,7 +1865,8 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     providerDocsVersion: 'Replicate 11.08.2026',
     verificationSourceUrl: 'https://replicate.com/vidu',
     verificationNotes:
-      'Interne ID bleibt q2-* (persistierte Läufe), das Label nennt korrekt Q3. 2K/4K/8K existieren nur als Vidu-Upscale, nie als natives Q3.',
+      'Interne ID bleibt q2-* (persistierte Läufe), das Label nennt korrekt Q3. 2K/4K/8K existieren nur als Vidu-Upscale, nie als natives Q3. ' +
+      'KEIN nativer Multi-Reference-Input: vidu/q3-pro akzeptiert genau ein start_image (+ optional end_image). Weitere hochgeladene Bilder sind reine AdTool-Prompt-Assistenz und gehen NICHT als Provider-Referenzen raus — deshalb existiert hier bewusst kein reference-Modus.',
     ...UNAUDITED,
     enhanceUpscaleTiers: ['2K', '4K', '8K'],
     modes: [
@@ -1892,7 +1902,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     family: 'vidu',
     generation: 'Q3',
     provider: 'Shengshu AI',
-    providerModelSlug: 'vidu/q3-i2v',
+    providerModelSlug: 'vidu/q3-pro',
     apiRoute: 'replicate:/v1/predictions',
     region: 'global',
     apiVersion: 'v1',
@@ -1903,7 +1913,8 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     available: true,
     providerDocsVersion: 'Replicate 11.08.2026',
     verificationSourceUrl: 'https://replicate.com/vidu',
-    verificationNotes: 'Reiner Bild-zu-Video-Pfad der Q3-Familie.',
+    verificationNotes:
+      'Reiner Bild-zu-Video-Pfad der Q3-Familie. Slug-Drift 07.09.2026 geschlossen: die Edge Function ruft real vidu/q3-pro auf; ein Slug "vidu/q3-i2v" existiert auf Replicate NICHT.',
     ...UNAUDITED,
     enhanceUpscaleTiers: ['2K', '4K', '8K'],
     modes: [
@@ -2564,8 +2575,25 @@ export function parityKeyOf(
   };
 }
 
+/**
+ * DIAGNOSTIC / IN-MEMORY identity string.
+ *
+ * `providerModelSlug` is part of the runtime parity identity but is NOT
+ * persisted: `ParityContextColumns` and `video_model_tier_parity` key on
+ * (model x api_route x region x mode x resolution) only. Persisting the slug
+ * would need a nullable column migration (see
+ * docs/video-provider-freshness-2026-09-07.md) — deliberately not applied.
+ * Never fold the slug into `apiRoute` to fake persistence.
+ */
 export function parityKeyString(key: ParityKey): string {
-  return [key.modelId, key.apiRoute, key.region, key.mode, key.resolutionLabel].join('|');
+  return [
+    key.modelId,
+    key.apiRoute,
+    key.region,
+    key.mode,
+    key.resolutionLabel,
+    key.providerModelSlug ?? '',
+  ].join('|');
 }
 
 
