@@ -1380,92 +1380,20 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </Card>
       )}
 
-      {/* ── Settings ── */}
-      <Card className="p-5 bg-card/60 backdrop-blur-xl border-border/60 grid gap-4 sm:grid-cols-3">
-        <div className="space-y-2">
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-            {language === 'de' ? 'Dauer' : 'Duration'}
-          </Label>
-          <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v))}>
-            <SelectTrigger className="bg-background/40 border-border/40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {model.durations.map((d) => (
-                <SelectItem key={d} value={String(d)}>{d}s</SelectItem>
-              ))}
-              {model.capabilities.smartDuration && (
-                <SelectItem value="-1">
-                  {tx({
-                    de: `Auto (Modell entscheidet, max. ${Math.max(...model.durations)}s)`,
-                    en: `Auto (model decides, max ${Math.max(...model.durations)}s)`,
-                    es: `Auto (el modelo decide, máx. ${Math.max(...model.durations)}s)`,
-                  })}
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
-        </div>
+      {/* ── Ton im Detail — Sprache & Modell-Hinweise (Schalter liegt in der Chip-Leiste) ── */}
+      {model.capabilities.audio && (
+        <GenerateSection
+          id="audio-detail"
+          title={tx({ de: 'Ton im Detail', en: 'Sound details', es: 'Sonido en detalle' })}
+          icon={generateAudio && !omniNonEnglishSilent ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          summary={
+            generateAudio && !omniNonEnglishSilent
+              ? tx({ de: 'Ton an', en: 'Sound on', es: 'Sonido activado' })
+              : tx({ de: 'Ton aus', en: 'Sound off', es: 'Sonido desactivado' })
+          }
+        >
+          <div className="space-y-2">
 
-        <div className="space-y-2">
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-            {language === 'de' ? 'Format' : 'Aspect Ratio'}
-          </Label>
-          <Select value={aspectRatio} onValueChange={setAspectRatio}>
-            <SelectTrigger className="bg-background/40 border-border/40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {model.aspectRatios.map((a) => (
-                <SelectItem key={a} value={a}>{a}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-            {language === 'de' ? 'Qualität' : 'Quality'}
-          </Label>
-          {(model.resolutions?.length ?? 0) > 1 ? (
-            <Select value={resolution} onValueChange={setResolution}>
-              <SelectTrigger className="bg-background/40 border-border/40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {model.resolutions!.map((r) => (
-                  <SelectItem key={r} value={r}>{r}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <div className="h-9 flex items-center px-3 rounded-md bg-background/40 border border-border/40">
-              <Badge variant="outline" className="border-primary/30 text-primary">
-                {model.resolution}
-              </Badge>
-            </div>
-          )}
-        </div>
-
-        {model.capabilities.audio && (
-          <div className="sm:col-span-3 space-y-2 p-3 rounded-md bg-background/40 border border-border/40">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {generateAudio
-                  ? <Volume2 className="h-4 w-4 text-primary" />
-                  : <VolumeX className="h-4 w-4 text-muted-foreground" />
-                }
-                <Label className="text-sm cursor-pointer" htmlFor="audio-switch">
-                  {language === 'de' ? 'Native Audio generieren' : language === 'es' ? 'Generar audio nativo' : 'Generate native audio'}
-                </Label>
-              </div>
-              <Switch
-                id="audio-switch"
-                checked={generateAudio && !omniNonEnglishSilent}
-                disabled={omniNonEnglishSilent}
-                onCheckedChange={setGenerateAudio}
-              />
-            </div>
             {generateAudio && modelSpeaks && (
               <div className="flex items-center justify-between gap-3 pt-1 border-t border-border/30">
                 <Label className="text-xs text-muted-foreground">
