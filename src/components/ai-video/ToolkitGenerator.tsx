@@ -37,7 +37,6 @@ import {
   durationsFor,
   exactFrameLabel,
   getStudioCapabilities,
-  resolveSupportedMode,
   validateStudioSelection,
 } from '@/lib/videoCapabilities/studioCapabilities';
 import { GenerateSection } from './generate/GenerateSection';
@@ -677,8 +676,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
   /* ── Generate dispatch ── */
   const runGenerate = async () => {
-    if (capabilityViolation) {
-      toast.error(capabilityViolation.message);
+    if (blockingIssue) {
+      toast.error(blockingIssue);
       return;
     }
     if (!prompt.trim()) {
@@ -901,21 +900,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       //   • Any user-uploaded reference image or @-mention fallback follows
       //     the selected placement (start / end / anchor) as before, but only
       //     when no composed anchor exists.
-      const effectivePlacement: 'start' | 'end' | 'anchor' =
-        referencePlacement === 'end' && !model.capabilities.endFrame ? 'start'
-        : referencePlacement === 'anchor' && !model.capabilities.anchorOnly ? 'start'
-        : referencePlacement;
-
-      // Safety-net: block invalid end-placement submissions (UI should already prevent this)
-      if (referencePlacement === 'end' && !model.capabilities.endFrame) {
-        toast.error(
-          language === 'de'
-            ? tx({ de: `${model.name} unterstützt keinen Endframe. Bitte Luma Ray 2 wählen.`, en: `${model.name} does not support an end frame. Please select Luma Ray 2.`, es: `${model.name} no admite un fotograma final. Por favor, selecciona Luma Ray 2.` })
-            : `${model.name} does not support end-frame. Please switch to Luma Ray 2.`,
-        );
+      // No silent routing: an unsupported placement blocks the run, it is never
+      // rewritten to 'start'. `placementViolation` mirrors this in the UI.
+      if (placementViolation) {
+        toast.error(placementViolation);
         setGenerating(false);
         return;
       }
+      const effectivePlacement: 'start' | 'end' | 'anchor' = referencePlacement;
 
       // Route the composed character anchor first (highest priority).
       let anchorRoute: 'start' | 'anchor' | 'text-only' | 'none' = 'none';
@@ -1072,8 +1064,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
   /* Gate: opens cost-confirm dialog unless user suppressed it within 24 h. */
   const handleGenerate = () => {
-    if (capabilityViolation) {
-      toast.error(capabilityViolation.message);
+    if (blockingIssue) {
+      toast.error(blockingIssue);
       return;
     }
     if (!prompt.trim()) {
@@ -1249,7 +1241,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       {/* ── Capability gate mirror — an invalid combination is shown, never
        *  silently rewritten. The start stays blocked until the user picks a
        *  startable option. The server remains authoritative. */}
-      {capabilityViolation && (
+      {blockingIssue && (
         <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive-foreground">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
@@ -1260,7 +1252,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 es: 'Este modelo no puede renderizar esta combinación:',
               })}
             </span>{' '}
-            {capabilityViolation.message}
+            {blockingIssue}
           </span>
         </div>
       )}
@@ -1285,7 +1277,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         <Button
           size="lg"
           onClick={handleGenerate}
-          disabled={generating || !prompt.trim() || !canAfford || priceUnverified || !!capabilityViolation}
+          disabled={generating || !prompt.trim() || !canAfford || priceUnverified || !!blockingIssue}
           className="min-w-[200px] bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           {composingScene ? (
