@@ -286,7 +286,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     icon: Film,
     // kwaivgi/kling-v3-omni-video: duration 3-15, generate_audio + dialog,
     // reference_images (max 7, max 4 with a reference_video) and reference_video.
-    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: true, anchorOnly: true, maxReferences: 7 },
+    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: true, anchorOnly: true },
     costPerSecond: KLING_VIDEO_MODELS['kling-omni'].costPerSecond,
     badge: 'Lip-Sync EN',
     tagline: 'Native Lip-Sync EN · DE/ES silent-only',
@@ -371,7 +371,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     icon: Zap,
     // lightricks/ltx-2.3-fast: duration enum 6-20 (step 2), 1080p/2k/4k,
     // 16:9/9:16, native audio, last frame + camera motion.
-    capabilities: { t2v: true, i2v: true, audio: true, endFrame: true },
+    capabilities: { t2v: true, i2v: true, audio: true },
     costPerSecond: LTX_VIDEO_MODELS['ltx-standard'].costPerSecond,
     badge: tx({ de: "Schnell & Günstig", en: "Fast & Affordable", es: "Rápido y Económico" }),
     tagline: tx({ de: 'Schnellster Generator', en: 'Fastest generator', es: 'Generador más rápido' }),
@@ -503,7 +503,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     edgeFunction: 'generate-luma-video',
     group: 'recommended',
     icon: Camera,
-    capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
+    capabilities: { t2v: true, i2v: true, audio: false },
     costPerSecond: LUMA_VIDEO_MODELS['luma-standard'].costPerSecond,
     tagline: 'Cinematic · Camera Concepts',
     legacyRoute: '/luma-video-studio',
@@ -516,7 +516,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     edgeFunction: 'generate-luma-video',
     group: 'premium',
     icon: Camera,
-    capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
+    capabilities: { t2v: true, i2v: true, audio: false },
     // luma/ray-2-720p has no resolution input — the model renders 720p only.
     costPerSecond: LUMA_VIDEO_MODELS['luma-pro'].costPerSecond,
     badge: 'Premium',
@@ -531,7 +531,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     edgeFunction: 'generate-luma-video',
     group: 'recommended',
     icon: Camera,
-    capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
+    capabilities: { t2v: true, i2v: true, audio: false },
     // luma/ray-3.2: resolution enum 540p/720p/1080p; start/end frame only at 5 s.
     costPerSecond: LUMA_VIDEO_MODELS['luma-ray32-5s'].costPerSecond,
     badge: 'New',
@@ -548,7 +548,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     icon: Camera,
     // Ray 3.2 accepts start/end frames only at 5 s — the 10 s tier is text-only
     // plus optional prompt guidance, and `loop` is rejected at 10 s.
-    capabilities: { t2v: true, i2v: false, audio: false, endFrame: false },
+    capabilities: { t2v: true, i2v: false, audio: false },
     costPerSecond: LUMA_VIDEO_MODELS['luma-ray32-10s'].costPerSecond,
     badge: 'Neu · 10s',
     tagline: tx({ de: `Ray 3.2 ${'Langclip'} · 10 ${'Sekunden am Stück'}`, en: `Ray 3.2 ${'long clip'} · 10 ${'seconds straight'}`, es: `Ray 3.2 ${'clip largo'} · 10 ${'segundos seguidos'}` }),
@@ -563,7 +563,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     group: 'fast',
     icon: Video,
     // bytedance/seedance-1-lite: 5 s or 10 s, 480p/720p, start + last frame.
-    capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
+    capabilities: { t2v: true, i2v: true, audio: false },
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-mini'].costPerSecond,
     badge: 'Draft',
     tagline: tx({ de: "Seedance 1 Lite · günstigster Draft-Renderer", en: "Seedance 1 Lite · cheapest draft renderer", es: "Seedance 1 Lite · renderizador de borrador más económico" }),
@@ -610,7 +610,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     icon: Film,
     // Runway Gen-4 Aleph consumes at most 5 s of the source clip per call and
     // accepts one optional reference image.
-    capabilities: { t2v: false, i2v: false, v2v: true, audio: false, maxReferences: 1 },
+    capabilities: { t2v: false, i2v: false, v2v: true, audio: false },
     costPerSecond: { EUR: 0.18, USD: 0.18 },
     badge: 'V2V Specialist',
     tagline: 'Restyle & transform existing clips',
@@ -672,7 +672,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     edgeFunction: 'generate-vidu-video',
     group: 'recommended',
     icon: Eye,
-    capabilities: { t2v: true, i2v: true, audio: true, endFrame: true },
+    capabilities: { t2v: true, i2v: true, audio: true },
     costPerSecond: { EUR: 0.265, USD: 0.265 },
     badge: 'Start+End',
     tagline: tx({ de: 'Q3 Pro: Start- und Endframe, natives Audio, bis 16s', en: 'Q3 Pro: start + end frame, native audio, up to 16s', es: 'Q3 Pro: fotograma inicial y final, audio nativo, hasta 16s' }),
@@ -686,7 +686,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     edgeFunction: 'generate-vidu-video',
     group: 'fast',
     icon: Eye,
-    capabilities: { t2v: false, i2v: true, audio: true, endFrame: true },
+    capabilities: { t2v: false, i2v: true, audio: true },
     costPerSecond: { EUR: 0.265, USD: 0.265 },
     badge: 'I2V',
     tagline: tx({ de: 'Animiert ein Standbild zu bis zu 16s Video', en: 'Animates a still image into up to 16s of video', es: 'Anima una imagen fija en un vídeo de hasta 16s' }),
