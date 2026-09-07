@@ -765,15 +765,28 @@ function deriveTechnicalCapabilities(m: ToolkitModelMeta): ToolkitModel {
     );
   }
   const resolutionLabels = union.resolutionLabels;
+  const maxRefImages = union.inputs.images?.max ?? 0;
+  const refRequirement = referenceModeRequirement(m.id);
   return {
     ...m,
     capabilities: {
       ...m.capabilities,
       t2v: union.modes.includes('t2v'),
       i2v: union.modes.includes('i2v'),
-      v2v: union.modes.includes('v2v'),
+      v2v: (union.inputs.videos?.max ?? 0) > 0,
       audio: union.audio,
       smartDuration: union.smartDuration,
+      // Canonical input slots — no second hand-maintained mirror.
+      endFrame: !!union.inputs.lastFrame,
+      ...(maxRefImages > 0 ? { multiRef: true, maxReferences: maxRefImages } : { multiRef: false }),
+      ...(refRequirement
+        ? {
+            refRequires: {
+              ...(refRequirement.aspectRatios ? { aspectRatios: refRequirement.aspectRatios } : {}),
+              ...(refRequirement.durations ? { durations: refRequirement.durations } : {}),
+            },
+          }
+        : {}),
     },
     durations: union.durations,
     resolution: resolutionLabels[0] ?? union.resolutions[0]?.label ?? '',
@@ -782,6 +795,7 @@ function deriveTechnicalCapabilities(m: ToolkitModelMeta): ToolkitModel {
     costPerSecond: { EUR: m.costPerSecond.EUR, USD: usdFromEur(m.costPerSecond.EUR) },
   };
 }
+
 
 export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] =
   AI_VIDEO_TOOLKIT_MODELS_RAW.map(deriveTechnicalCapabilities);
