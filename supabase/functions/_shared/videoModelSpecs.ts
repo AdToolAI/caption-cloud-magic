@@ -1206,7 +1206,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     family: 'wan',
     generation: '2.7',
     provider: 'Alibaba Wan',
-    providerModelSlug: 'wan-video/wan-2.7-t2v|wan-video/wan-2.7-i2v',
+    providerModelSlug: 'wan-video/wan-2.7-t2v',
     apiRoute: 'replicate:/v1/predictions',
     region: 'global',
     apiVersion: 'v1',
@@ -1231,6 +1231,8 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         inputs: {},
       }),
       mode('i2v', {
+        // Route-scoped: the i2v task is a SEPARATE Replicate model.
+        providerModelSlug: 'wan-video/wan-2.7-i2v',
         resolutions: [res('720p', 720, 'wan-2-7-standard')],
         durations: [5, 10, 15],
         aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
@@ -1246,7 +1248,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     family: 'wan',
     generation: '2.7',
     provider: 'Alibaba Wan',
-    providerModelSlug: 'wan-video/wan-2.7-t2v|wan-video/wan-2.7-i2v',
+    providerModelSlug: 'wan-video/wan-2.7-t2v',
     apiRoute: 'replicate:/v1/predictions',
     region: 'global',
     apiVersion: 'v1',
@@ -1270,6 +1272,8 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         inputs: {},
       }),
       mode('i2v', {
+        // Route-scoped: the i2v task is a SEPARATE Replicate model.
+        providerModelSlug: 'wan-video/wan-2.7-i2v',
         resolutions: [res('1080p', 1080, 'wan-2-7-pro')],
         durations: [5, 10, 15],
         aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
