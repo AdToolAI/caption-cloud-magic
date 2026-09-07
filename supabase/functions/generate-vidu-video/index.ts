@@ -26,20 +26,15 @@ const PRICE_PER_SECOND_EUR: Record<ViduModel, number> = {
   "vidu-q2-t2v":       0.195,
 };
 
-// Replicate slugs. The original `vidu/q2-*` models were retired by Replicate
-// and now return HTTP 404. Only `vidu/q3-pro` and `vidu/q3-turbo` are hosted.
-// We map our q2-* identifiers (kept for backward compat across the codebase)
-// onto the q3 family:
-//   - reference / i2v → q3-pro (highest fidelity, supports start_image)
-//   - t2v             → q3-turbo (faster, cheaper, text-only)
-// Native multi-reference is not exposed by q3 — first reference image is sent
-// as `start_image`, the remaining references are folded into the prompt via
-// buildReferenceSuffix() (already implemented).
-const REPLICATE_MODELS: Record<ViduModel, string> = {
-  "vidu-q2-reference": "vidu/q3-pro",
-  "vidu-q2-i2v": "vidu/q3-pro",
-  "vidu-q2-t2v": "vidu/q3-turbo",
-};
+// NOTE: no hand-written provider-slug map here. The concrete Replicate
+// contract per (model x mode) is canonical truth
+// (supabase/functions/_shared/videoModelSpecs.ts) and is resolved by the
+// capability gate via `resolveRouteIdentity`. Our q2-* identifiers (kept for
+// backward compat across persisted runs) map onto the hosted q3 family;
+// `vidu/q2-*` was retired by Replicate and returns 404.
+// Native multi-reference does NOT exist on q3: the first image is sent as
+// `start_image`, any further uploads are prompt-assistance only
+// (buildReferenceSuffix) and are NOT provider reference inputs.
 
 // Verified Replicate input schema for `vidu/q3-pro` / `vidu/q3-turbo` (11.08.2026):
 //   duration 1–16 (default 5) · resolution 540p|720p|1080p ·
@@ -231,7 +226,6 @@ serve(async (req) => {
       seed,
     } = body;
 
-    const replicateModel = REPLICATE_MODELS[model];
     const perSecond = PRICE_PER_SECOND_EUR[model];
     const duration = Number(rawDuration ?? DEFAULT_DURATION);
     const requestedResolution = String(rawResolution ?? "1080p");
@@ -241,10 +235,13 @@ serve(async (req) => {
       supabaseAdmin,
       {
         modelId: model,
+        // Route truth: q3-pro/q3-turbo accept exactly ONE image input
+        // (`start_image`, optionally paired with `end_image`). Extra uploads are
+        // AdTool prompt-assistance, never provider references — so the mode is
+        // resolved from the image that is really sent, not from the upload count.
         mode: inferMode({ modelId: model,
-          startImageUrl,
+          startImageUrl: startImageUrl ?? (Array.isArray(referenceImages) ? referenceImages[0] : undefined),
           endImageUrl,
-          referenceImageUrls: Array.isArray(referenceImages) ? referenceImages : null,
         }),
         resolution: requestedResolution,
         durationSeconds: duration,
@@ -253,6 +250,8 @@ serve(async (req) => {
       corsHeaders,
     );
     if (gate.response) return gate.response;
+    // Provider contract from canonical — never a second inferred slug.
+    const replicateModel = gate.routeIdentity?.providerModelSlug;
     const resolution = gate.resolutionLabel ?? requestedResolution;
     // Price in the WALLET currency — USD carries the FX uplift (1 EUR ~ 1.15 USD).
     const { data: viduWalletCurrencyRow } = await supabaseAdmin

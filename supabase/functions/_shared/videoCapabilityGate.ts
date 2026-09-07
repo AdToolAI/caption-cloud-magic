@@ -19,12 +19,14 @@ import {
   getVideoModelSpec,
   parityKeyOf,
   projectTargetFrame,
+  resolveRouteIdentity,
   resolveGenerationMode,
   validateCapability,
   type CapabilityRequest,
   type CapabilityViolation,
   type ParityKey,
   type PixelFrame,
+  type RouteIdentity,
   type VideoMode,
 } from './videoModelSpecs.ts';
 
@@ -48,6 +50,12 @@ export interface CapabilityGateResult {
   resolutionLabel: string | null;
   /** Route/mode/tier identity of this run. */
   parityKey: ParityKey | null;
+  /**
+   * The CONCRETE provider contract this run must dispatch to (route-scoped).
+   * Edge functions MUST use `routeIdentity.providerModelSlug` instead of a
+   * second hand-written slug map.
+   */
+  routeIdentity: RouteIdentity | null;
   /** Ready-to-insert columns for `ai_video_generations`. */
   parityColumns: ParityContextColumns | null;
 }
@@ -80,7 +88,14 @@ export function inferMode(input: {
 export function evaluateCapabilityGate(req: CapabilityRequest): CapabilityGateResult {
   const violation = validateCapability(req);
   if (violation) {
-    return { violation, targetFrame: null, resolutionLabel: null, parityKey: null, parityColumns: null };
+    return {
+      violation,
+      targetFrame: null,
+      resolutionLabel: null,
+      parityKey: null,
+      routeIdentity: null,
+      parityColumns: null,
+    };
   }
 
   const spec = getVideoModelSpec(req.modelId)!;
@@ -100,6 +115,7 @@ export function evaluateCapabilityGate(req: CapabilityRequest): CapabilityGateRe
     targetFrame,
     resolutionLabel: resolution?.label ?? null,
     parityKey,
+    routeIdentity: resolveRouteIdentity(spec, req.mode),
     parityColumns: parityKey
       ? {
           parity_model_id: parityKey.modelId,
@@ -134,6 +150,7 @@ export interface CapabilityGatePass {
   targetFrame: PixelFrame | null;
   resolutionLabel: string | null;
   parityKey: ParityKey | null;
+  routeIdentity: RouteIdentity | null;
   parityColumns: ParityContextColumns | null;
 }
 
@@ -153,6 +170,7 @@ export function capabilityGate(
     targetFrame: result.targetFrame,
     resolutionLabel: result.resolutionLabel,
     parityKey: result.parityKey,
+    routeIdentity: result.routeIdentity,
     parityColumns: result.parityColumns,
   };
 }

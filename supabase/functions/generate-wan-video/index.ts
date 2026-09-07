@@ -23,33 +23,10 @@ const MODEL_PRICING: Record<string, Record<string, number>> = {
   'wan-2-7-pro':       { EUR: 0.45, USD: 0.45 },
 };
 
-const REPLICATE_MODELS: Record<string, { t2v: string; i2v: string }> = {
-  'wan-standard': {
-    t2v: 'wan-video/wan-2.5-t2v',
-    i2v: 'wan-video/wan-2.5-i2v',
-  },
-  'wan-pro': {
-    t2v: 'wan-video/wan-2.5-t2v',
-    i2v: 'wan-video/wan-2.5-i2v',
-  },
-  'wan-2-6-standard': {
-    t2v: 'wan-video/wan-2.6-t2v',
-    i2v: 'wan-video/wan-2.6-i2v',
-  },
-  'wan-2-6-pro': {
-    t2v: 'wan-video/wan-2.6-t2v',
-    i2v: 'wan-video/wan-2.6-i2v',
-  },
-  // Wan 2.7 — 27B MoE, natives Audio, 2–15s, 720p/1080p
-  'wan-2-7-standard': {
-    t2v: 'wan-video/wan-2.7-t2v',
-    i2v: 'wan-video/wan-2.7-i2v',
-  },
-  'wan-2-7-pro': {
-    t2v: 'wan-video/wan-2.7-t2v',
-    i2v: 'wan-video/wan-2.7-i2v',
-  },
-};
+// NOTE: there is deliberately NO second provider-slug map here. The concrete
+// Replicate contract per (model x mode) lives in the canonical registry
+// (supabase/functions/_shared/videoModelSpecs.ts) and is resolved by the
+// capability gate via `resolveRouteIdentity`.
 
 /** Resolution passed to Wan 2.7 (the 2.5/2.6 slugs ignore this input). */
 const WAN_RESOLUTION: Record<string, string> = {
@@ -113,13 +90,16 @@ serve(async (req) => {
     const isWan26 = model === 'wan-2-6-standard' || model === 'wan-2-6-pro';
     const duration = Number(rawDuration);
 
+    // Canonical mode — one resolution, reused for the gate AND for dispatch.
+    const generationMode = inferMode({ modelId: model, startImageUrl, endImageUrl });
+
     // Capability gate — before wallet, before provider. No nearest-value snap.
     const gate = await gateVideoCapability(
       supabaseAdmin,
       {
         modelId: model,
         resolution: WAN_RESOLUTION[model],
-        mode: inferMode({ modelId: model, startImageUrl, endImageUrl }),
+        mode: generationMode,
         durationSeconds: duration,
         aspectRatio,
       },
@@ -231,9 +211,12 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const webhookUrl = appendWebhookToken(`${SUPABASE_URL}/functions/v1/replicate-webhook`);
 
-    // Select model
-    const modelConfig = REPLICATE_MODELS[model] || REPLICATE_MODELS['wan-standard'];
-    const replicateModel = isImageToVideo ? modelConfig.i2v : modelConfig.t2v;
+    // Provider contract = canonical route identity for the gate-resolved mode.
+    // Never a second, independently inferred slug.
+    const replicateModel = gate.routeIdentity?.providerModelSlug;
+    if (!replicateModel) {
+      throw new Error(`No canonical provider route for ${model}/${generationMode}`);
+    }
 
     // Build input — Wan 2.5 uses different params than WaveSpeed
     const replicateInput: Record<string, any> = {
