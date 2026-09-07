@@ -508,6 +508,54 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
    * capability violation below names the real `mode` conflict.
    */
   const placedEndImage = !!startImageUrl && referencePlacement === 'end';
+
+  /* ── @-mentionable uploads ────────────────────────────────────────────
+   * The images the user just attached are taggable in the prompt so they can
+   * say *which* upload a sentence refers to. Tokens are replaced with a plain
+   * English phrase before the prompt leaves the client — providers never see
+   * a raw `@token`.
+   */
+  const uploadMentions = useMemo(() => {
+    const list: { token: string; name: string; phrase: string; thumbnail: string | null }[] = [];
+    if (startImageUrl) {
+      const end = referencePlacement === 'end';
+      list.push({
+        token: end ? 'end-image' : 'start-image',
+        name: end
+          ? tx({ de: 'Endbild', en: 'End image', es: 'Imagen final' })
+          : tx({ de: 'Startbild', en: 'Start image', es: 'Imagen inicial' }),
+        phrase: end ? 'the uploaded end image' : 'the uploaded start image',
+        thumbnail: startImageUrl,
+      });
+    }
+    viduReferences.forEach((slot, i) => {
+      list.push({
+        token: `ref-${i + 1}`,
+        name: tx({ de: `Referenz ${i + 1}`, en: `Reference ${i + 1}`, es: `Referencia ${i + 1}` }),
+        phrase: `reference image ${i + 1}`,
+        thumbnail: slot.url,
+      });
+    });
+    if (referenceVideoUrl) {
+      list.push({
+        token: 'ref-video',
+        name: tx({ de: 'Referenzvideo', en: 'Reference video', es: 'Vídeo de referencia' }),
+        phrase: 'the uploaded reference video',
+        thumbnail: null,
+      });
+    }
+    return list;
+  }, [startImageUrl, referencePlacement, viduReferences, referenceVideoUrl]);
+
+  const resolveUploadMentions = useCallback(
+    (text: string): string =>
+      uploadMentions.reduce(
+        (acc, m) => acc.replace(new RegExp(`@${m.token}\\b`, 'gi'), m.phrase),
+        text,
+      ),
+    [uploadMentions],
+  );
+
   const studioMode = useMemo(
     () => deriveStudioMode({
       modelId: model.id,
