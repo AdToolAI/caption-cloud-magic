@@ -734,9 +734,11 @@ serve(withTelemetry('stripe-webhook', async (req) => {
             });
           }
           refundId = refund.id;
-          refundedMinor = refund.amount ?? 0;
           const chargeId = typeof refund.charge === 'string' ? refund.charge : refund.charge?.id;
           if (chargeId) charge = await stripe.charges.retrieve(chargeId);
+          // Immer der KUMULATIVE Erstattungsbetrag der Zahlung, nie der Einzelbetrag:
+          // die RPC verrechnet gegen bereits zurückgebuchte Beträge.
+          refundedMinor = charge?.amount_refunded ?? refund.amount ?? 0;
         }
 
         const paymentIntentId = typeof charge?.payment_intent === 'string'
