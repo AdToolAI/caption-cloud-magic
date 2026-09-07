@@ -163,6 +163,10 @@ export async function finalizeSuccess(
       offset = 0;
     }
 
+    if (!uploadUrl) {
+      return await persistFailure(admin, run, attempts, 'STAGING_FAILED', 'no upload session');
+    }
+
     await admin.from('video_enhance_runs').update({
       resumable_upload_url: uploadUrl,
       resumable_upload_offset: offset,
