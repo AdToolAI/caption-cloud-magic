@@ -260,3 +260,21 @@ modes and input schema documented; every tier locked until a smoke test.
   die alte Replicate-Route bleibt als historischer Contract stehen). Alle anderen Generatoren
   halten pro Modell genau einen Slug, der mit canonical übereinstimmt — abgesichert durch
   `src/test/videoRuntimeRouteDrift.test.ts`.
+
+## Phase 3A — Anbieter-Vertrag persistiert (07.09.2026, angewendet)
+
+Formale Paritäts-Identität ist ab jetzt
+`model_id × provider_model_slug × api_route × region × mode × resolution_label`.
+
+- `ai_video_generations.parity_provider_model_slug` (nullable) hält fest, welcher
+  Anbieter-Vertrag wirklich ausgeführt wurde. Die Messung liest genau diesen Wert und
+  rekonstruiert ihn NICHT aus der aktuellen Registry.
+- `video_model_tier_parity.provider_model_slug` (nullable) + generierte Spalte
+  `provider_slug_key = coalesce(provider_model_slug,'')`; Primärschlüssel jetzt über die
+  6-Tupel-Identität. Legacy-Zeilen (Slug NULL) behalten ihre eigene Identität, sind weiter
+  lesbar und können nie als Nachweis für einen konkreten Slug gelten. Kein Backfill: die
+  historischen Routen der 7 Alt-Zeilen sind nicht deterministisch rekonstruierbar
+  (`api_route=replicate:/v1/predictions` sagt nichts über den ausgeführten Slug).
+- Kill-Switch, Paritäts-Lookup und Upsert sind slug-scoped; der Upsert ist bewusst durch
+  select→update/insert ersetzt, damit die Identität nicht über eine generierte Spalte
+  inferiert werden muss.
