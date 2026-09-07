@@ -849,7 +849,10 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     ...UNAUDITED,
     modes: [
       mode('t2v', {
-        resolutions: [res('1080p', 1080, 'kling-omni')],
+        resolutions: [
+          res('1080p', 1080, 'kling-omni'),
+          newTier('4K', 2160, 'kling-omni-4k'),
+        ],
         durations: [3, 5, 8, 10, 15],
         aspectRatios: ['16:9', '9:16', '1:1'],
         audio: true,
@@ -857,7 +860,10 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         inputs: {},
       }),
       mode('i2v', {
-        resolutions: [res('1080p', 1080, 'kling-omni')],
+        resolutions: [
+          res('1080p', 1080, 'kling-omni'),
+          newTier('4K', 2160, 'kling-omni-4k'),
+        ],
         durations: [3, 5, 8, 10, 15],
         aspectRatios: ['16:9', '9:16', '1:1'],
         audio: true,
@@ -865,13 +871,17 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         inputs: { firstFrame: true },
       }),
       mode('reference', {
-        resolutions: [res('1080p', 1080, 'kling-omni')],
+        resolutions: [
+          res('1080p', 1080, 'kling-omni'),
+          newTier('4K', 2160, 'kling-omni-4k'),
+        ],
         durations: [3, 5, 8, 10, 15],
         aspectRatios: ['16:9', '9:16', '1:1'],
         audio: true,
         controls: { seed: true, negativePrompt: true },
         inputs: { images: { min: 1, max: 7 } },
       }),
+
       /**
        * V2V (reference_video). Der Provider dokumentiert eine harte
        * Ausschluss-Regel: `generate_audio` ist NICHT mit `reference_video`
