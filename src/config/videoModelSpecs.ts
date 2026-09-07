@@ -4,7 +4,7 @@
 // Regenerate with: node scripts/generate-video-model-specs.mjs
 // =============================================================================
 
-export const SPECS_SOURCE_HASH = 'ac8a69caee0500552b70456179afc3993a34fd6f26a133fece217b7740c7266c';
+export const SPECS_SOURCE_HASH = '188c2f16434743fb7e5e662dbf549364d0d97f5634a02a6c4e7cfc6959837b26';
 
 // ============================================================================
 // CANONICAL VIDEO MODEL CAPABILITY REGISTRY
@@ -2290,12 +2290,6 @@ export function resolveRouteIdentity(spec: VideoModelSpec, m: VideoMode): RouteI
   return identity;
 }
 
-/** Stable parity key for one executed contract. */
-export function routeParityKey(spec: VideoModelSpec, m: VideoMode, resolutionLabel?: string): string {
-  const r = resolveRouteIdentity(spec, m);
-  return [spec.id, r.providerModelSlug, r.apiRoute, r.region, m, resolutionLabel ?? '-'].join('::');
-}
-
 /** Highest NATIVE resolution across all modes — never an upscale tier. */
 /**
  * INPUT SIGNALS a caller actually holds — the canonical resolver turns them
@@ -2550,6 +2544,8 @@ export interface ParityKey {
   region: string;
   mode: VideoMode;
   resolutionLabel: string;
+  /** The provider contract really executed for this key (route-scoped). */
+  providerModelSlug?: string;
 }
 
 export function parityKeyOf(
@@ -2557,12 +2553,14 @@ export function parityKeyOf(
   mode: VideoMode,
   resolutionLabel: string,
 ): ParityKey {
+  const route = resolveRouteIdentity(spec, mode);
   return {
     modelId: spec.id,
-    apiRoute: spec.apiRoute,
-    region: spec.region,
+    apiRoute: route.apiRoute,
+    region: route.region,
     mode,
     resolutionLabel,
+    providerModelSlug: route.providerModelSlug,
   };
 }
 

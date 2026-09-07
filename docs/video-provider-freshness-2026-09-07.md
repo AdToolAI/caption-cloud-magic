@@ -131,7 +131,7 @@ this audit.
 | Route actually called | `wan-video/wan-2.7-t2v` and `wan-video/wan-2.7-i2v` |
 | Finding | neither `wan-video/wan-2.7` nor `wan-video/wan-2.7-pro` exists; Wan 2.7 is split into task-specific routes. `wan-2.7-r2v` (reference-to-video) and `wan-2.7-videoedit` are separate routes and therefore separate capability identities. |
 | Status | `CAPABILITY_UPDATE` |
-| Code change | done: slugs corrected. 2026-09-07 cleanup: the composite string `…-t2v|…-i2v` is gone — capabilities are route-scoped, the model-level slug is `wan-video/wan-2.7-t2v` and the `i2v` ModeSpec carries its own `providerModelSlug: 'wan-video/wan-2.7-i2v'`. `resolveRouteIdentity(spec, mode)` returns the contract actually executed; `routeParityKey()` builds the parity identity from it. No capability transferred from the r2v/edit routes. |
+| Code change | done: slugs corrected. 2026-09-07 cleanup: the composite string `…-t2v|…-i2v` is gone — capabilities are route-scoped, the model-level slug is `wan-video/wan-2.7-t2v` and the `i2v` ModeSpec carries its own `providerModelSlug: 'wan-video/wan-2.7-i2v'`. `resolveRouteIdentity(spec, mode)` returns the contract actually executed; No capability transferred from the r2v/edit routes. |
 | Paid smoke test | no |
 
 | Field | Value |

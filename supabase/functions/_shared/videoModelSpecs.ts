@@ -2282,12 +2282,6 @@ export function resolveRouteIdentity(spec: VideoModelSpec, m: VideoMode): RouteI
   return identity;
 }
 
-/** Stable parity key for one executed contract. */
-export function routeParityKey(spec: VideoModelSpec, m: VideoMode, resolutionLabel?: string): string {
-  const r = resolveRouteIdentity(spec, m);
-  return [spec.id, r.providerModelSlug, r.apiRoute, r.region, m, resolutionLabel ?? '-'].join('::');
-}
-
 /** Highest NATIVE resolution across all modes — never an upscale tier. */
 /**
  * INPUT SIGNALS a caller actually holds — the canonical resolver turns them
@@ -2542,6 +2536,8 @@ export interface ParityKey {
   region: string;
   mode: VideoMode;
   resolutionLabel: string;
+  /** The provider contract really executed for this key (route-scoped). */
+  providerModelSlug?: string;
 }
 
 export function parityKeyOf(
@@ -2549,12 +2545,14 @@ export function parityKeyOf(
   mode: VideoMode,
   resolutionLabel: string,
 ): ParityKey {
+  const route = resolveRouteIdentity(spec, mode);
   return {
     modelId: spec.id,
-    apiRoute: spec.apiRoute,
-    region: spec.region,
+    apiRoute: route.apiRoute,
+    region: route.region,
     mode,
     resolutionLabel,
+    providerModelSlug: route.providerModelSlug,
   };
 }
 
