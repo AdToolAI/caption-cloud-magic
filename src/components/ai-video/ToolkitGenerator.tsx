@@ -32,6 +32,9 @@ import {
 import { ShotDirectorPanel } from './ShotDirectorPanel';
 import CinematicStylePresets from './CinematicStylePresets';
 import { MultiReferenceUploader, type ViduReferenceSlot } from './MultiReferenceUploader';
+import { GenerateSection } from './generate/GenerateSection';
+import { QuickSettingsBar } from './generate/QuickSettingsBar';
+
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import { resolveMentions } from '@/lib/motion-studio/mentionParser';
@@ -1058,34 +1061,26 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </p>
       </Card>
 
-      {/* ── Cinematic Style Presets (one-click director looks) ── */}
-      <Card className="p-4 bg-card/60 backdrop-blur-xl border-border/60">
-        <CinematicStylePresets value={shotSelection} onApply={(sel) => setShotSelection(sel)} />
-      </Card>
-
-      {/* ── Shot Director (cinematic prompt builder) ── */}
-      <ShotDirectorPanel
-        value={shotSelection}
-        onChange={setShotSelection}
-        basePrompt={prompt}
+      {/* ── Kompakte Einstellungsleiste (Dauer · Format · Qualität · Ton) ── */}
+      <QuickSettingsBar
+        duration={duration}
+        onDurationChange={setDuration}
+        durations={model.durations}
+        smartDuration={!!model.capabilities.smartDuration}
+        aspectRatio={aspectRatio}
+        onAspectRatioChange={setAspectRatio}
+        aspectRatios={model.aspectRatios}
+        resolution={resolution}
+        onResolutionChange={setResolution}
+        resolutions={model.resolutions}
+        fixedResolution={model.resolution}
+        audioSupported={!!model.capabilities.audio}
+        audioEnabled={generateAudio && !omniNonEnglishSilent}
+        audioDisabled={omniNonEnglishSilent}
+        onAudioChange={setGenerateAudio}
       />
 
-      {/* Character selection lives exclusively in Cast & World below. */}
-
-      <ToolkitCastWorldPicker
-        characterIds={castCharacterIds}
-        locationId={castLocationId}
-        buildingId={castBuildingId}
-        propIds={castPropIds}
-        onCharacterIdsChange={setCastCharacterIds}
-        onLocationIdChange={setCastLocationId}
-        onBuildingIdChange={setCastBuildingId}
-        onPropIdsChange={setCastPropIds}
-        consistencyKey={consistencyKey}
-        supportsImageInput={model.capabilities.i2v}
-        hideCharacters={isKlingOmni}
-      />
-
+      {/* ── Hinweise & Sperren — bleiben immer sichtbar, nie eingeklappt ── */}
       {/* v241 — text-only warning: model can't accept image reference at all */}
       {castCharacterIds.length > 0 &&
         !model.capabilities.i2v &&
@@ -1125,7 +1120,109 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </Card>
       )}
 
+      {/* ── Generate CTA ── */}
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between p-4 rounded-xl bg-gradient-to-r from-primary/5 to-accent/5 border border-primary/20">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">
+            {priceUnverified
+              ? tx({ de: 'Preis wird geprüft', en: 'Checking price', es: 'Comprobando precio' })
+              : tx({ de: 'Kosten (verbindlich)', en: 'Cost (binding)', es: 'Costo (vinculante)' })}
+          </p>
+          <p className="text-2xl font-bold text-primary tabular-nums">
+            {priceUnverified ? '—' : `${symbol}${cost.toFixed(2)}`}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {priceUnverified
+              ? tx({ de: 'Aktueller Tarif wird geladen…', en: 'Loading current rate…', es: 'Cargando la tarifa actual…' })
+              : `${duration}s × ${symbol}${pricePerSecond.toFixed(2)}/s · ${model.name}`}
+          </p>
+        </div>
+        <Button
+          size="lg"
+          onClick={handleGenerate}
+          disabled={generating || !prompt.trim() || !canAfford || priceUnverified}
+          className="min-w-[200px] bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 disabled:opacity-50"
+        >
+          {composingScene ? (
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {tx({ de: 'Szene komponieren…', en: 'Composing scene…', es: 'Componiendo escena…' })}</>
+          ) : generating ? (
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {language === 'de' ? 'Generiere…' : 'Generating…'}</>
+          ) : (
+            <><Sparkles className="h-4 w-4 mr-2" /> {tx({ de: 'Video generieren', en: 'Generate video', es: 'Generar video' })}</>
+          )}
+        </Button>
+      </div>
+
+      <div className="flex justify-end -mt-1">
+        <FounderPriorityChip />
+      </div>
+
+      {/* ── Look & Kamera ── */}
+      <GenerateSection
+        id="look"
+        title={tx({ de: 'Look & Kamera', en: 'Look & camera', es: 'Estilo y cámara' })}
+        icon={<Film className="h-4 w-4" />}
+        summary={shotSelection && Object.values(shotSelection).some(Boolean)
+          ? tx({ de: 'gesetzt', en: 'set', es: 'definido' })
+          : null}
+      >
+        <CinematicStylePresets value={shotSelection} onApply={(sel) => setShotSelection(sel)} />
+        <ShotDirectorPanel
+          value={shotSelection}
+          onChange={setShotSelection}
+          basePrompt={prompt}
+        />
+      </GenerateSection>
+
+      {/* Character selection lives exclusively in Cast & World. */}
+      <GenerateSection
+        id="cast-world"
+        title="Cast & World"
+        icon={<Sparkles className="h-4 w-4" />}
+        summary={
+          [
+            castCharacterIds.length ? `${castCharacterIds.length} ${tx({ de: 'Charaktere', en: 'characters', es: 'personajes' })}` : null,
+            castLocationId ? tx({ de: 'Location', en: 'Location', es: 'Ubicación' }) : null,
+            castPropIds.length ? `${castPropIds.length} ${tx({ de: 'Requisiten', en: 'props', es: 'props' })}` : null,
+          ].filter(Boolean).join(' · ') || null
+        }
+        defaultOpen={castCharacterIds.length > 0 || !!castLocationId}
+      >
+        <ToolkitCastWorldPicker
+          characterIds={castCharacterIds}
+          locationId={castLocationId}
+          buildingId={castBuildingId}
+          propIds={castPropIds}
+          onCharacterIdsChange={setCastCharacterIds}
+          onLocationIdChange={setCastLocationId}
+          onBuildingIdChange={setCastBuildingId}
+          onPropIdsChange={setCastPropIds}
+          consistencyKey={consistencyKey}
+          supportsImageInput={model.capabilities.i2v}
+          hideCharacters={isKlingOmni}
+        />
+      </GenerateSection>
+
+
+      {/* ── Referenzen & Medien ── */}
+      <GenerateSection
+        id="references"
+        title={tx({ de: 'Referenzen & Medien', en: 'References & media', es: 'Referencias y medios' })}
+        icon={<ImagePlus className="h-4 w-4" />}
+        summary={
+          [
+            startImageUrl ? tx({ de: 'Startbild', en: 'Start image', es: 'Imagen inicial' }) : null,
+            viduReferences.length ? `${viduReferences.length} Ref.` : null,
+            referenceVideoUrl ? tx({ de: 'Video', en: 'Video', es: 'Vídeo' }) : null,
+          ].filter(Boolean).join(' · ') || null
+        }
+        defaultOpen={
+          !!startImageUrl || viduReferences.length > 0 || !!referenceVideoUrl ||
+          !!model.capabilities.multiRefRequired
+        }
+      >
       {/* ── Multi-Reference (capabilities.multiRef → Vidu Reference2V, Seedance 2.5, Veo 3.1) ── */}
+
       {model.capabilities.multiRef && !omniMediaLock &&
         !(model.capabilities.refExclusive && !!startImageUrl) && (
         refConstraintMet ? (
@@ -1379,93 +1476,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
         </Card>
       )}
+      </GenerateSection>
 
-      {/* ── Settings ── */}
-      <Card className="p-5 bg-card/60 backdrop-blur-xl border-border/60 grid gap-4 sm:grid-cols-3">
-        <div className="space-y-2">
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-            {language === 'de' ? 'Dauer' : 'Duration'}
-          </Label>
-          <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v))}>
-            <SelectTrigger className="bg-background/40 border-border/40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {model.durations.map((d) => (
-                <SelectItem key={d} value={String(d)}>{d}s</SelectItem>
-              ))}
-              {model.capabilities.smartDuration && (
-                <SelectItem value="-1">
-                  {tx({
-                    de: `Auto (Modell entscheidet, max. ${Math.max(...model.durations)}s)`,
-                    en: `Auto (model decides, max ${Math.max(...model.durations)}s)`,
-                    es: `Auto (el modelo decide, máx. ${Math.max(...model.durations)}s)`,
-                  })}
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
-        </div>
 
-        <div className="space-y-2">
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-            {language === 'de' ? 'Format' : 'Aspect Ratio'}
-          </Label>
-          <Select value={aspectRatio} onValueChange={setAspectRatio}>
-            <SelectTrigger className="bg-background/40 border-border/40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {model.aspectRatios.map((a) => (
-                <SelectItem key={a} value={a}>{a}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      {/* ── Ton im Detail — Sprache & Modell-Hinweise (Schalter liegt in der Chip-Leiste) ── */}
+      {model.capabilities.audio && (
+        <GenerateSection
+          id="audio-detail"
+          title={tx({ de: 'Ton im Detail', en: 'Sound details', es: 'Sonido en detalle' })}
+          icon={generateAudio && !omniNonEnglishSilent ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          summary={
+            generateAudio && !omniNonEnglishSilent
+              ? tx({ de: 'Ton an', en: 'Sound on', es: 'Sonido activado' })
+              : tx({ de: 'Ton aus', en: 'Sound off', es: 'Sonido desactivado' })
+          }
+        >
+          <div className="space-y-2">
 
-        <div className="space-y-2">
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-            {language === 'de' ? 'Qualität' : 'Quality'}
-          </Label>
-          {(model.resolutions?.length ?? 0) > 1 ? (
-            <Select value={resolution} onValueChange={setResolution}>
-              <SelectTrigger className="bg-background/40 border-border/40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {model.resolutions!.map((r) => (
-                  <SelectItem key={r} value={r}>{r}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <div className="h-9 flex items-center px-3 rounded-md bg-background/40 border border-border/40">
-              <Badge variant="outline" className="border-primary/30 text-primary">
-                {model.resolution}
-              </Badge>
-            </div>
-          )}
-        </div>
-
-        {model.capabilities.audio && (
-          <div className="sm:col-span-3 space-y-2 p-3 rounded-md bg-background/40 border border-border/40">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {generateAudio
-                  ? <Volume2 className="h-4 w-4 text-primary" />
-                  : <VolumeX className="h-4 w-4 text-muted-foreground" />
-                }
-                <Label className="text-sm cursor-pointer" htmlFor="audio-switch">
-                  {language === 'de' ? 'Native Audio generieren' : language === 'es' ? 'Generar audio nativo' : 'Generate native audio'}
-                </Label>
-              </div>
-              <Switch
-                id="audio-switch"
-                checked={generateAudio && !omniNonEnglishSilent}
-                disabled={omniNonEnglishSilent}
-                onCheckedChange={setGenerateAudio}
-              />
-            </div>
             {generateAudio && modelSpeaks && (
               <div className="flex items-center justify-between gap-3 pt-1 border-t border-border/30">
                 <Label className="text-xs text-muted-foreground">
@@ -1521,10 +1548,22 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               </p>
             )}
           </div>
-        )}
+        </GenerateSection>
 
-        {/* ── Kling 3.0 Omni — Unified Cast + Native Lip-Sync ── */}
-        {isKlingOmni && (() => {
+      )}
+
+
+      {/* ── Sprecher & Lip-Sync — Kling 3.0 Omni (Cast + Native Lip-Sync) ── */}
+      {isKlingOmni && (
+        <GenerateSection
+          id="omni-cast"
+          title={tx({ de: 'Sprecher & Lip-Sync', en: 'Speakers & lip-sync', es: 'Locutores y sincronización labial' })}
+          icon={<Sparkles className="h-4 w-4" />}
+          summary={omniLines.length ? `${omniLines.length} Cast` : null}
+          defaultOpen
+        >
+          {(() => {
+
           const MAX_CAST = 4;
           const LIP_SYNC_MAX = 2;
           const lipSyncCount = omniLines.filter((r) => r.lipSync).length;
@@ -1569,7 +1608,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           };
 
           return (
-            <div className="sm:col-span-3 space-y-3 p-3 rounded-md bg-primary/5 border border-primary/30">
+            <div className="space-y-3">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-primary" />
@@ -1767,45 +1806,13 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               )}
             </div>
           );
-        })()}
-      </Card>
+          })()}
+        </GenerateSection>
+      )}
 
-      {/* ── Generate CTA ── */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between p-4 rounded-xl bg-gradient-to-r from-primary/5 to-accent/5 border border-primary/20">
-        <div>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">
-            {priceUnverified
-              ? tx({ de: 'Preis wird geprüft', en: 'Checking price', es: 'Comprobando precio' })
-              : tx({ de: 'Kosten (verbindlich)', en: 'Cost (binding)', es: 'Costo (vinculante)' })}
-          </p>
-          <p className="text-2xl font-bold text-primary tabular-nums">
-            {priceUnverified ? '—' : `${symbol}${cost.toFixed(2)}`}
-          </p>
-          <p className="text-[11px] text-muted-foreground">
-            {priceUnverified
-              ? tx({ de: 'Aktueller Tarif wird geladen…', en: 'Loading current rate…', es: 'Cargando la tarifa actual…' })
-              : `${duration}s × ${symbol}${pricePerSecond.toFixed(2)}/s · ${model.name}`}
-          </p>
-        </div>
-        <Button
-          size="lg"
-          onClick={handleGenerate}
-          disabled={generating || !prompt.trim() || !canAfford || priceUnverified}
-          className="min-w-[200px] bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 disabled:opacity-50"
-        >
-          {composingScene ? (
-            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {tx({ de: 'Szene komponieren…', en: 'Composing scene…', es: 'Componiendo escena…' })}</>
-          ) : generating ? (
-            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {language === 'de' ? 'Generiere…' : 'Generating…'}</>
-          ) : (
-            <><Sparkles className="h-4 w-4 mr-2" /> {tx({ de: 'Video generieren', en: 'Generate video', es: 'Generar video' })}</>
-          )}
-        </Button>
-      </div>
 
-      <div className="flex justify-end -mt-1">
-        <FounderPriorityChip />
-      </div>
+
+
 
       {lastAnchorComposed && (
         <p className="text-center text-[11px] text-primary/80">
