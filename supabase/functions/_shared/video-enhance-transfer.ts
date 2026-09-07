@@ -22,8 +22,17 @@ type Admin = any;
 
 /** Supabase resumable uploads require chunks that are multiples of 6 MB. */
 export const CHUNK_SIZE = 6 * 1024 * 1024;
-/** Wall-clock budget for one invocation — never race the function timeout. */
-export const TRANSFER_BUDGET_MS = 60_000;
+/**
+ * Wall-clock budget for one invocation — never race the function timeout.
+ * Overridable through `VIDEO_ENHANCE_TRANSFER_BUDGET_MS` so a resume can be
+ * exercised deliberately without touching production behaviour by default.
+ */
+export const TRANSFER_BUDGET_MS = (() => {
+  // deno-lint-ignore no-explicit-any
+  const raw = (globalThis as any).Deno?.env?.get('VIDEO_ENHANCE_TRANSFER_BUDGET_MS');
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 60_000;
+})();
 /** Persistence retry schedule in minutes (attempt 1 runs immediately). */
 export const PERSIST_BACKOFF_MINUTES = [0, 2, 5, 15, 30];
 /** After this many failed persistence attempts a run goes to manual review. */
@@ -54,20 +63,61 @@ export interface ProviderOutputHead {
 }
 
 export async function headProviderOutput(url: string): Promise<ProviderOutputHead> {
-  let res: Response;
+  // Presigned provider links (R2/S3 `x-id=GetObject`) are signed for GET only
+  // and answer HEAD with 403. A HEAD refusal therefore says NOTHING about the
+  // file — only a ranged GET is allowed to decide that the output is gone.
+  let head: Response | null = null;
   try {
-    res = await fetch(url, { method: 'HEAD' });
+    head = await fetch(url, { method: 'HEAD' });
   } catch {
-    return { ok: false, status: 0, acceptsRanges: false, gone: false };
+    head = null;
   }
-  const len = Number(res.headers.get('content-length') ?? '');
+  if (head?.ok) {
+    const len = Number(head.headers.get('content-length') ?? '');
+    return {
+      ok: true,
+      status: head.status,
+      contentLength: Number.isFinite(len) && len > 0 ? len : undefined,
+      contentType: head.headers.get('content-type') ?? undefined,
+      acceptsRanges: (head.headers.get('accept-ranges') ?? '').includes('bytes'),
+      gone: false,
+    };
+  }
+
+  // Probe with a one-byte ranged GET: cheap, signed-URL safe, and it reports
+  // the real total size through `content-range`.
+  let probe: Response;
+  try {
+    probe = await fetch(url, { headers: { range: 'bytes=0-0' } });
+  } catch {
+    return { ok: false, status: head?.status ?? 0, acceptsRanges: false, gone: false };
+  }
+  await probe.body?.cancel().catch(() => undefined);
+
+  if (!probe.ok) {
+    return {
+      ok: false,
+      status: probe.status,
+      acceptsRanges: false,
+      // Only a GET verdict may terminalise a run.
+      gone: probe.status === 404 || probe.status === 410 || probe.status === 403,
+    };
+  }
+
+  const range = probe.headers.get('content-range') ?? '';
+  const total = Number(range.split('/')[1] ?? '');
+  const len = Number(probe.headers.get('content-length') ?? '');
+  const size = Number.isFinite(total) && total > 0
+    ? total
+    : (probe.status === 200 && Number.isFinite(len) && len > 0 ? len : undefined);
+
   return {
-    ok: res.ok,
-    status: res.status,
-    contentLength: Number.isFinite(len) && len > 0 ? len : undefined,
-    contentType: res.headers.get('content-type') ?? undefined,
-    acceptsRanges: (res.headers.get('accept-ranges') ?? '').includes('bytes'),
-    gone: res.status === 404 || res.status === 410 || res.status === 403,
+    ok: true,
+    status: probe.status,
+    contentLength: size,
+    contentType: probe.headers.get('content-type') ?? undefined,
+    acceptsRanges: probe.status === 206,
+    gone: false,
   };
 }
 
