@@ -722,7 +722,13 @@ export function EnhanceVideoPanel({
       {completed && run ? (
         <div className="space-y-3">
           <p className="text-sm text-primary">{tx('done', lang)}</p>
-          <video src={run.output_url ?? undefined} controls className="w-full rounded-lg" />
+          <div className="flex justify-center rounded-lg bg-black/40 p-2">
+            <video
+              src={run.output_url ?? undefined}
+              controls
+              className="max-h-[min(60vh,480px)] w-auto max-w-full rounded-lg object-contain"
+            />
+          </div>
           <p
             className={`text-sm flex items-center gap-2 ${matchTone}`}
             data-testid="enhance-target-match"
