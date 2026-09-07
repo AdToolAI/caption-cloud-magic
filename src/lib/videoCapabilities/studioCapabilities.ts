@@ -261,7 +261,15 @@ export function durationsFor(modelId: string, mode: VideoMode, resolutionLabel?:
 
 /**
  * Exact provider-backed frame for a (model x mode x tier x ratio).
- * Returns null when the registry documents no frame — never a guess.
+ *
+ * Returns a frame ONLY when
+ *   a) the tier is startable (model available + tier available/smoke-tested),
+ *   b) `sizingRuleVerified === true` — a provider frame table, an explicit
+ *      provider sizing reference or a measured smoke test, and
+ *   c) the aspect ratio is documented in `framesByAspectRatio`.
+ *
+ * A grandfathered/UNVERIFIED tier only carries a generically derived frame
+ * table. That is an assumption, never "exact pixels", so it returns null.
  */
 export function exactFrame(
   modelId: string,
@@ -270,17 +278,19 @@ export function exactFrame(
   aspectRatio: string,
 ): PixelFrame | null {
   const spec = getVideoModelSpec(modelId);
-  if (!spec) return null;
+  if (!spec || !spec.available) return null;
   const modeSpec = getModeSpec(spec, mode);
   const tier = modeSpec?.resolutions.find(
     (r) => r.native && r.label.toLowerCase() === resolutionLabel.toLowerCase(),
   );
   if (!tier) return null;
+  if (!isResolutionTierAvailable(tier)) return null;
+  if (!tier.sizingRuleVerified) return null;
   if (!tier.framesByAspectRatio[aspectRatio]) return null;
   return projectTargetFrame(tier, aspectRatio);
 }
 
-/** "3840×2160" — exact pixel truth for the UI, or null when undocumented. */
+/** "3840×2160" — exact pixel truth for the UI, or null when unverified. */
 export function exactFrameLabel(
   modelId: string,
   mode: VideoMode,
@@ -290,6 +300,7 @@ export function exactFrameLabel(
   const frame = exactFrame(modelId, mode, resolutionLabel, aspectRatio);
   return frame ? `${frame.width}×${frame.height}` : null;
 }
+
 
 export interface StudioSelection {
   modelId: string;
