@@ -10,11 +10,12 @@ DECLARE
   bal numeric;
   cnt int;
   s text;
+  us uuid[] := '{}';
 BEGIN
   -- helper-less inline fixtures; each case uses its own synthetic user + session
 
   ---------------------------------------------------------------- C1 full refund, unused
-  u := gen_random_uuid(); s := 'cs_test_c1';
+  u := gen_random_uuid(); us := us || u; s := 'cs_test_c1';
   INSERT INTO ai_video_wallets(user_id, balance_euros, total_purchased_euros, total_spent_euros, currency)
   VALUES (u, 106, 106, 0, 'EUR');
   INSERT INTO ai_video_transactions(user_id, currency, type, amount_euros, balance_after, stripe_checkout_session_id)
@@ -26,7 +27,7 @@ BEGIN
     r::text || ' balance=' || bal);
 
   ---------------------------------------------------------------- C2 partial refund
-  u := gen_random_uuid(); s := 'cs_test_c2';
+  u := gen_random_uuid(); us := us || u; s := 'cs_test_c2';
   INSERT INTO ai_video_wallets(user_id, balance_euros, total_purchased_euros, total_spent_euros, currency)
   VALUES (u, 106, 106, 0, 'EUR');
   INSERT INTO ai_video_transactions(user_id, currency, type, amount_euros, balance_after, stripe_checkout_session_id)
@@ -37,7 +38,7 @@ BEGIN
     (r->>'reversed_euros')::numeric = 21.2 AND bal = 84.8, r::text || ' balance=' || bal);
 
   ---------------------------------------------------------------- C3 refund after spending
-  u := gen_random_uuid(); s := 'cs_test_c3';
+  u := gen_random_uuid(); us := us || u; s := 'cs_test_c3';
   INSERT INTO ai_video_wallets(user_id, balance_euros, total_purchased_euros, total_spent_euros, currency)
   VALUES (u, 30, 106, 76, 'EUR');
   INSERT INTO ai_video_transactions(user_id, currency, type, amount_euros, balance_after, stripe_checkout_session_id)
@@ -49,7 +50,7 @@ BEGIN
     r::text || ' balance=' || bal);
 
   ---------------------------------------------------------------- C4 duplicate event
-  u := gen_random_uuid(); s := 'cs_test_c4';
+  u := gen_random_uuid(); us := us || u; s := 'cs_test_c4';
   INSERT INTO ai_video_wallets(user_id, balance_euros, total_purchased_euros, total_spent_euros, currency)
   VALUES (u, 51, 51, 0, 'EUR');
   INSERT INTO ai_video_transactions(user_id, currency, type, amount_euros, balance_after, stripe_checkout_session_id)
@@ -62,7 +63,7 @@ BEGIN
     r->>'reason' = 'already_reversed' AND cnt = 1 AND bal = 0, r::text || ' refunds=' || cnt || ' balance=' || bal);
 
   ---------------------------------------------------------------- C5 two partial refunds, cumulative
-  u := gen_random_uuid(); s := 'cs_test_c5';
+  u := gen_random_uuid(); us := us || u; s := 'cs_test_c5';
   INSERT INTO ai_video_wallets(user_id, balance_euros, total_purchased_euros, total_spent_euros, currency)
   VALUES (u, 106, 106, 0, 'EUR');
   INSERT INTO ai_video_transactions(user_id, currency, type, amount_euros, balance_after, stripe_checkout_session_id)
@@ -74,7 +75,7 @@ BEGIN
     (r->>'reversed_euros')::numeric = 31.8 AND bal = 53, r::text || ' balance=' || bal);
 
   ---------------------------------------------------------------- C6 refund larger than balance
-  u := gen_random_uuid(); s := 'cs_test_c6';
+  u := gen_random_uuid(); us := us || u; s := 'cs_test_c6';
   INSERT INTO ai_video_wallets(user_id, balance_euros, total_purchased_euros, total_spent_euros, currency)
   VALUES (u, 5, 106, 101, 'EUR');
   INSERT INTO ai_video_transactions(user_id, currency, type, amount_euros, balance_after, stripe_checkout_session_id)
@@ -86,7 +87,7 @@ BEGIN
     r::text || ' balance=' || bal);
 
   ---------------------------------------------------------------- C7 subscription payment (no credit purchase)
-  u := gen_random_uuid(); s := 'cs_test_c7_sub';
+  u := gen_random_uuid(); us := us || u; s := 'cs_test_c7_sub';
   INSERT INTO ai_video_wallets(user_id, balance_euros, total_purchased_euros, total_spent_euros, currency)
   VALUES (u, 20, 20, 0, 'EUR');
   r := stripe_revoke_ai_video_credits_for_refund(s,'re_c7',1495,1495);
@@ -95,7 +96,7 @@ BEGIN
     r->>'reason' = 'no_purchase_found' AND bal = 20, r::text || ' balance=' || bal);
 
   ---------------------------------------------------------------- C8 founder-discounted purchase
-  u := gen_random_uuid(); s := 'cs_test_c8';
+  u := gen_random_uuid(); us := us || u; s := 'cs_test_c8';
   INSERT INTO ai_video_wallets(user_id, balance_euros, total_purchased_euros, total_spent_euros, currency)
   VALUES (u, 9, 9, 0, 'EUR');
   INSERT INTO ai_video_transactions(user_id, currency, type, amount_euros, balance_after, stripe_checkout_session_id)
@@ -106,7 +107,7 @@ BEGIN
     (r->>'reversed_euros')::numeric = 9 AND bal = 0, r::text || ' balance=' || bal);
 
   ---------------------------------------------------------------- C9 bonus pack partial, ledger reference
-  u := gen_random_uuid(); s := 'cs_test_c9';
+  u := gen_random_uuid(); us := us || u; s := 'cs_test_c9';
   INSERT INTO ai_video_wallets(user_id, balance_euros, total_purchased_euros, total_spent_euros, currency)
   VALUES (u, 287.5, 287.5, 0, 'EUR');
   INSERT INTO ai_video_transactions(user_id, currency, type, amount_euros, balance_after, stripe_checkout_session_id)
@@ -119,7 +120,7 @@ BEGIN
     (r->>'reversed_euros')::numeric = 143.75 AND cnt = 1, r::text);
 
   ---------------------------------------------------------------- C10 same payment, second webhook event, same cumulative total
-  u := gen_random_uuid(); s := 'cs_test_c10';
+  u := gen_random_uuid(); us := us || u; s := 'cs_test_c10';
   INSERT INTO ai_video_wallets(user_id, balance_euros, total_purchased_euros, total_spent_euros, currency)
   VALUES (u, 106, 106, 0, 'EUR');
   INSERT INTO ai_video_transactions(user_id, currency, type, amount_euros, balance_after, stripe_checkout_session_id)
@@ -132,10 +133,8 @@ BEGIN
     r->>'reason' = 'nothing_outstanding' AND bal = 74.2 AND cnt = 1, r::text || ' balance=' || bal);
 
   -- cleanup
-  DELETE FROM ai_video_transactions WHERE stripe_checkout_session_id LIKE 'cs_test_c%';
-  DELETE FROM ai_video_wallets w WHERE NOT EXISTS (
-    SELECT 1 FROM ai_video_transactions t WHERE t.user_id = w.user_id
-  ) AND w.created_at > now() - interval '5 minutes';
+  DELETE FROM ai_video_transactions WHERE user_id = ANY(us);
+  DELETE FROM ai_video_wallets WHERE user_id = ANY(us);
 END $$;
 
 SELECT case_name, ok, detail FROM t_results ORDER BY case_name;
