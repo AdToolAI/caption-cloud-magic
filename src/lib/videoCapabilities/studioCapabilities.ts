@@ -29,6 +29,9 @@ import {
   projectTargetFrame,
   validateCapability,
   type CapabilityViolation,
+  type ModeConstraint,
+  type ModeControls,
+  type ModeInputs,
   type ModeSpec,
   type PixelFrame,
   type ResolutionSpec,
@@ -36,7 +39,7 @@ import {
   type VideoModelSpec,
 } from '@/config/videoModelSpecs';
 
-export type { VideoMode, PixelFrame, CapabilityViolation };
+export type { VideoMode, PixelFrame, CapabilityViolation, ModeInputs, ModeConstraint };
 
 export interface ResolutionOption {
   /** Provider label exactly as the registry spells it ("1080p", "4K"). */
@@ -49,6 +52,12 @@ export interface ResolutionOption {
   durations: number[];
   native: boolean;
   parityStatus: ResolutionSpec['parityStatus'];
+  /**
+   * True only when the exact target frame of this tier is provider-backed.
+   * A generically derived frame table is an ASSUMPTION and must never be shown
+   * as exact pixels.
+   */
+  pixelsVerified: boolean;
 }
 
 export interface StudioCapabilities {
@@ -65,6 +74,10 @@ export interface StudioCapabilities {
   fps: number[];
   audio: boolean;
   smartDuration: boolean;
+  /** Canonical input slots of this mode (first/last frame, images, videos, audios). */
+  inputs: ModeInputs;
+  controls: ModeControls;
+  constraints: ModeConstraint[];
 }
 
 const EMPTY: StudioCapabilities = {
@@ -78,9 +91,17 @@ const EMPTY: StudioCapabilities = {
   fps: [],
   audio: false,
   smartDuration: false,
+  inputs: {},
+  controls: {},
+  constraints: [],
 };
 
 function lockedReasonFor(spec: VideoModelSpec, tier: ResolutionSpec): string {
+  // Rule 3a: a model-level outage is NOT a missing smoke test — name the real
+  // release status instead of inventing a tier-level reason.
+  if (!spec.available) {
+    return `${spec.displayName}: Modell ist aktuell nicht startbar (Status: ${spec.releaseStatus}).`;
+  }
   if (!tier.available) {
     return `${tier.label}: Tier ist gesperrt, bis ein Smoke-Test auf ${spec.apiRoute} die echten Pixel misst.`;
   }
@@ -88,7 +109,8 @@ function lockedReasonFor(spec: VideoModelSpec, tier: ResolutionSpec): string {
 }
 
 function toResolutionOption(spec: VideoModelSpec, mode: ModeSpec, tier: ResolutionSpec): ResolutionOption {
-  const startable = isResolutionTierAvailable(tier);
+  // Rule 3: an unavailable MODEL can never have a startable tier.
+  const startable = spec.available && isResolutionTierAvailable(tier);
   return {
     label: tier.label,
     shortEdge: tier.shortEdge,
@@ -97,6 +119,7 @@ function toResolutionOption(spec: VideoModelSpec, mode: ModeSpec, tier: Resoluti
     durations: tier.durations ?? mode.durations,
     native: tier.native,
     parityStatus: tier.parityStatus,
+    pixelsVerified: startable && tier.sizingRuleVerified,
   };
 }
 
@@ -106,6 +129,7 @@ export function getStudioCapabilities(modelId: string, mode: VideoMode): StudioC
   if (!spec) return EMPTY;
   const modeSpec = getModeSpec(spec, mode);
   if (!modeSpec) {
+    // Rule 4: an unsupported mode stays unsupported — never resolved to another.
     return { ...EMPTY, modelAvailable: spec.available, modes: spec.modes.map((m) => m.mode) };
   }
   // Rule 2: native tiers only — enhanceUpscaleTiers live on a different axis.
@@ -124,8 +148,12 @@ export function getStudioCapabilities(modelId: string, mode: VideoMode): StudioC
     fps: [...(modeSpec.fps ?? [])],
     audio: modeSpec.audio,
     smartDuration: !!modeSpec.controls.smartDuration,
+    inputs: { ...modeSpec.inputs },
+    controls: { ...modeSpec.controls },
+    constraints: [...(modeSpec.constraints ?? [])],
   };
 }
+
 
 /**
  * Union of the technical options across all modes of a model. Used where the
