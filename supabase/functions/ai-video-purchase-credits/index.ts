@@ -116,7 +116,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const checkoutLocale: 'en' | 'de' | 'es' =
       body.locale === 'de' ? 'de' : body.locale === 'es' ? 'es' : 'en';
 
-    const validCurrency = currency === 'EUR' || currency === 'USD';
+    const validCurrency = currency === 'EUR' || currency === 'USD' || currency === 'GBP';
     const validPack = !!packId && ['starter', 'standard', 'pro', 'enterprise'].includes(packId);
     if (!validCurrency || !validPack) {
       return new Response(
@@ -125,7 +125,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       );
     }
 
-    const pack = CREDIT_PACKS[currency][packId];
+    // Gutschrift kommt aus dem Paket, nicht aus der Zahlungswährung.
+    const pack = CREDIT_PACKS[packId];
     const priceId = STRIPE_PRICE_IDS[packId][currency];
 
 
