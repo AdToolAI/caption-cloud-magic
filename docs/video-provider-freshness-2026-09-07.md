@@ -232,3 +232,31 @@ not verified. They assert nothing executable and cannot resolve through
 
 Route-verified locked canonical spec: `hailuo-h3` (`minimax/h3`) — slug, route,
 modes and input schema documented; every tier locked until a smoke test.
+
+## Runtime ↔ canonical consistency pass (07.09.2026, kostenlos)
+
+- **Wan**: `generate-wan-video` hat keine `REPLICATE_MODELS`-Karte mehr. Der Slug kommt aus
+  `gate.routeIdentity.providerModelSlug` für den gate-aufgelösten Modus. Wan 2.5/2.6 sind jetzt
+  ebenfalls route-scoped (`wan-video/wan-2.{5,6}-t2v` bzw. `-i2v`).
+- **Vidu**: `vidu-q2-i2v` zeigte canonical auf den nicht existierenden Slug `vidu/q3-i2v` →
+  korrigiert auf `vidu/q3-pro` (real ausgeführt). Die Slug-Karte in der Edge Function ist entfernt.
+  Multi-Reference ist **keine** Provider-Fähigkeit: q3 nimmt genau ein `start_image` (+ optional
+  `end_image`); weitere Uploads sind AdTool-Prompt-Assistenz. Der Modus wird deshalb aus dem
+  tatsächlich gesendeten Bild abgeleitet (`referenceImages[0]` → `firstFrame`), nie aus `reference`.
+- **Parity-Slug**: `providerModelSlug` ist Teil der Laufzeit-Identität (`parityKeyOf`,
+  `parityKeyString`), aber **nicht persistiert**. `ParityContextColumns` /
+  `video_model_tier_parity` keyen weiter auf (model × api_route × region × mode × resolution).
+  Falls der Slug später persistiert werden soll, wäre genau diese Migration nötig — **in diesem
+  Turn bewusst NICHT angewendet**:
+
+  ```sql
+  ALTER TABLE public.ai_video_generations
+    ADD COLUMN IF NOT EXISTS parity_provider_model_slug text;
+  ALTER TABLE public.video_model_tier_parity
+    ADD COLUMN IF NOT EXISTS provider_model_slug text;
+  ```
+
+- **Verbleibende bewusste Slug-Karten**: `generate-pika-video` (Pika ist auf Wartung/unavailable,
+  die alte Replicate-Route bleibt als historischer Contract stehen). Alle anderen Generatoren
+  halten pro Modell genau einen Slug, der mit canonical übereinstimmt — abgesichert durch
+  `src/test/videoRuntimeRouteDrift.test.ts`.
