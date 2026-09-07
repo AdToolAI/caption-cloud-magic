@@ -1770,42 +1770,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         })()}
       </Card>
 
-      {/* ── Generate CTA ── */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between p-4 rounded-xl bg-gradient-to-r from-primary/5 to-accent/5 border border-primary/20">
-        <div>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">
-            {priceUnverified
-              ? tx({ de: 'Preis wird geprüft', en: 'Checking price', es: 'Comprobando precio' })
-              : tx({ de: 'Kosten (verbindlich)', en: 'Cost (binding)', es: 'Costo (vinculante)' })}
-          </p>
-          <p className="text-2xl font-bold text-primary tabular-nums">
-            {priceUnverified ? '—' : `${symbol}${cost.toFixed(2)}`}
-          </p>
-          <p className="text-[11px] text-muted-foreground">
-            {priceUnverified
-              ? tx({ de: 'Aktueller Tarif wird geladen…', en: 'Loading current rate…', es: 'Cargando la tarifa actual…' })
-              : `${duration}s × ${symbol}${pricePerSecond.toFixed(2)}/s · ${model.name}`}
-          </p>
-        </div>
-        <Button
-          size="lg"
-          onClick={handleGenerate}
-          disabled={generating || !prompt.trim() || !canAfford || priceUnverified}
-          className="min-w-[200px] bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 disabled:opacity-50"
-        >
-          {composingScene ? (
-            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {tx({ de: 'Szene komponieren…', en: 'Composing scene…', es: 'Componiendo escena…' })}</>
-          ) : generating ? (
-            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {language === 'de' ? 'Generiere…' : 'Generating…'}</>
-          ) : (
-            <><Sparkles className="h-4 w-4 mr-2" /> {tx({ de: 'Video generieren', en: 'Generate video', es: 'Generar video' })}</>
-          )}
-        </Button>
-      </div>
 
-      <div className="flex justify-end -mt-1">
-        <FounderPriorityChip />
-      </div>
+
 
       {lastAnchorComposed && (
         <p className="text-center text-[11px] text-primary/80">
