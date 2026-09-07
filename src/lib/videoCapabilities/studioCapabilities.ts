@@ -179,6 +179,17 @@ export function getModelCapabilityUnion(modelId: string): StudioCapabilities {
   resolutions.sort((a, b) => b.shortEdge - a.shortEdge);
   const uniqNum = (arr: number[]) => [...new Set(arr)].sort((a, b) => a - b);
   const uniqStr = (arr: string[]) => [...new Set(arr)];
+  const maxOf = (pick: (i: ModeInputs) => { min: number; max: number } | undefined) => {
+    const found = merged.map((c) => pick(c.inputs)).filter((x): x is { min: number; max: number } => !!x);
+    return found.length ? { min: Math.min(...found.map((f) => f.min)), max: Math.max(...found.map((f) => f.max)) } : undefined;
+  };
+  const inputs: ModeInputs = {
+    ...(merged.some((c) => c.inputs.firstFrame) ? { firstFrame: true } : {}),
+    ...(merged.some((c) => c.inputs.lastFrame) ? { lastFrame: true } : {}),
+    ...(maxOf((i) => i.images) ? { images: maxOf((i) => i.images)! } : {}),
+    ...(maxOf((i) => i.videos) ? { videos: maxOf((i) => i.videos)! } : {}),
+    ...(maxOf((i) => i.audios) ? { audios: maxOf((i) => i.audios)! } : {}),
+  };
   return {
     supported: true,
     modelAvailable: spec.available,
@@ -190,8 +201,55 @@ export function getModelCapabilityUnion(modelId: string): StudioCapabilities {
     fps: uniqNum(merged.flatMap((c) => c.fps)),
     audio: merged.some((c) => c.audio),
     smartDuration: merged.some((c) => c.smartDuration),
+    inputs,
+    controls: Object.assign({}, ...merged.map((c) => c.controls)) as ModeControls,
+    constraints: merged.flatMap((c) => c.constraints),
   };
 }
+
+/* ─────────────── Canonical input selectors (no hand-maintained mirror) ───────────────
+ * Everything below reads `ModeInputs` / `ModeConstraint` straight from the
+ * canonical registry. The UI must use these instead of re-declaring provider
+ * knowledge in `aiVideoModelRegistry`.
+ */
+
+/** True when ANY mode of the model accepts a last frame (end-frame guidance). */
+export function supportsLastFrame(modelId: string, mode?: VideoMode): boolean {
+  const caps = mode ? getStudioCapabilities(modelId, mode) : getModelCapabilityUnion(modelId);
+  return !!caps.inputs.lastFrame;
+}
+
+/** Max reference images the canonical registry documents (0 = not supported). */
+export function maxReferenceImages(modelId: string, mode?: VideoMode): number {
+  const caps = mode ? getStudioCapabilities(modelId, mode) : getModelCapabilityUnion(modelId);
+  return caps.inputs.images?.max ?? 0;
+}
+
+/** True when the model takes a reference/source video on any mode. */
+export function supportsReferenceVideo(modelId: string, mode?: VideoMode): boolean {
+  const caps = mode ? getStudioCapabilities(modelId, mode) : getModelCapabilityUnion(modelId);
+  return (caps.inputs.videos?.max ?? 0) > 0;
+}
+
+/**
+ * Canonical constraint under which the `reference` mode accepts images
+ * (Veo 3.1: 16:9 + 8 s). Returns null when the model has no reference mode or
+ * the registry documents no constraint.
+ */
+export function referenceModeRequirement(
+  modelId: string,
+): { aspectRatios?: string[]; durations?: number[]; reason: string } | null {
+  const spec = getVideoModelSpec(modelId);
+  const modeSpec = spec ? getModeSpec(spec, 'reference') : undefined;
+  const c = (modeSpec?.constraints ?? []).find((x) => x.aspectRatios || x.durations);
+  if (!c) return null;
+  return {
+    ...(c.aspectRatios ? { aspectRatios: [...c.aspectRatios] } : {}),
+    ...(c.durations ? { durations: [...c.durations] } : {}),
+    reason: c.reason,
+  };
+}
+
 
 /** Durations valid at a concrete tier (tier override wins over the mode list). */
 export function durationsFor(modelId: string, mode: VideoMode, resolutionLabel?: string): number[] {
