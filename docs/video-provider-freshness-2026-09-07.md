@@ -24,18 +24,18 @@ this audit.
 | AdTool capability (before) | live, startable, V2V 720p / 5s |
 | Provider capability (now) | **route removed** — "Gen-3 Alpha Turbo (`gen3a_turbo`) and Gen-4 Aleph (`gen4_aleph`) are no longer available via the Runway API" |
 | Status | `ROUTE_REPLACEMENT` / `PROVIDER_UNAVAILABLE` |
-| Code change | done: `releaseStatus: 'removed'`, `deprecated`, `available: false`, `supersededBy: 'runway-aleph-2'`, `uiGroup: 'legacy'`. Spec kept so historical runs resolve. No alias onto Aleph 2. |
+| Code change | done: `releaseStatus: 'removed'`, `deprecated`, `available: false`, `supersededByCandidate: 'runway-aleph-2'`, `uiGroup: 'legacy'`. Spec kept so historical runs resolve. No alias onto Aleph 2. |
 | Paid smoke test | no (dead route) |
 
 | Field | Value |
 | --- | --- |
-| model id | `runway-aleph-2` (new, locked) |
-| provider / route | Runway, model id `aleph2` |
-| Status | `NEW_MODEL_AVAILABLE` + `SMOKE_TEST_REQUIRED` |
-| Known | documented successor of `gen4_aleph`, video-to-video with prompt + keyframe images |
-| UNKNOWN | exact REST path, resolutions, durations, FPS, pricing |
-| Code change | done: locked spec, `available: false`, all tiers `UNVERIFIED` |
-| Paid smoke test | yes, after route/pricing audit |
+| model id | `runway-aleph-2` (**candidate**, not canonical) |
+| provider / route | Runway, model id `aleph2`, REST path UNKNOWN |
+| Status | `NEW_MODEL_AVAILABLE` + `ROUTE_AUDIT_REQUIRED` |
+| Known | documented successor of `gen4_aleph` |
+| UNKNOWN | exact REST path, modes, resolutions, durations, FPS, pricing |
+| Code change | 2026-09-07 cleanup: removed from `VIDEO_MODEL_SPECS`, now in `VIDEO_MODEL_CANDIDATES`. A spec may not state route/resolution/duration values our own note calls UNKNOWN. |
+| Paid smoke test | only after the route audit |
 
 ## 2. Hailuo / MiniMax
 
@@ -97,11 +97,13 @@ this audit.
 
 | Field | Value |
 | --- | --- |
-| model id | `seedance-2-0-mini` (new, locked) |
+| model id | `seedance-2-0-mini` (**candidate**, not canonical) |
 | Route | `bytedance/seedance-2.0-mini` |
-| Provider capability | T2V/I2V, reference images, native audio, up to 720p |
+| Known | model page exists, "up to 720p", 1080p/4K explicitly pointed at `seedance-2.0` |
+| UNKNOWN | input schema (references / native audio / smart duration unconfirmed on this route), tier labels, durations, aspect ratios, pricing |
 | Note | does **not** replace `seedance-mini` (Seedance 1 Lite); old id stays for historical runs |
-| Paid smoke test | yes |
+| Code change | 2026-09-07 cleanup: moved to `VIDEO_MODEL_CANDIDATES` — the locked spec asserted durations/tiers the route docs do not state |
+| Paid smoke test | only after the route audit |
 
 ## 5. LTX
 
@@ -114,10 +116,12 @@ this audit.
 
 | Field | Value |
 | --- | --- |
-| model id | `ltx-2-5-fast` (new, locked) |
+| model id | `ltx-2-5-fast` (**candidate**, not canonical) |
 | Route | `lightricks/ltx-2.5-fast` |
 | Status | `NEW_MODEL_AVAILABLE` + `DOCS_CONFLICT` |
-| Note | does not replace LTX 2.3; all tiers locked until the resolution/FPS conflict is resolved on the exact route |
+| UNKNOWN | resolutions, FPS set, durations, audio, pricing |
+| Code change | 2026-09-07 cleanup: moved to `VIDEO_MODEL_CANDIDATES`; a conflicted value may not be canonicalised as a partial truth |
+| Note | does not replace LTX 2.3 |
 
 ## 6. Wan
 
@@ -127,12 +131,12 @@ this audit.
 | Route actually called | `wan-video/wan-2.7-t2v` and `wan-video/wan-2.7-i2v` |
 | Finding | neither `wan-video/wan-2.7` nor `wan-video/wan-2.7-pro` exists; Wan 2.7 is split into task-specific routes. `wan-2.7-r2v` (reference-to-video) and `wan-2.7-videoedit` are separate routes and therefore separate capability identities. |
 | Status | `CAPABILITY_UPDATE` |
-| Code change | done: slugs corrected on both specs; no capability transferred from the r2v/edit routes |
+| Code change | done: slugs corrected. 2026-09-07 cleanup: the composite string `…-t2v|…-i2v` is gone — capabilities are route-scoped, the model-level slug is `wan-video/wan-2.7-t2v` and the `i2v` ModeSpec carries its own `providerModelSlug: 'wan-video/wan-2.7-i2v'`. `resolveRouteIdentity(spec, mode)` returns the contract actually executed; No capability transferred from the r2v/edit routes. |
 | Paid smoke test | no |
 
 | Field | Value |
 | --- | --- |
-| Wan 3.0 | `NEW_MODEL_AVAILABLE`, but the exact Replicate slugs could not be verified. **No spec prepared** — a locked spec with a guessed slug would itself be drift. Re-audit required. |
+| Wan 3.0 | `NEW_MODEL_AVAILABLE`, exact Replicate slugs unverified. **Candidate only** (`VIDEO_MODEL_CANDIDATES`) — a locked spec with a guessed slug would itself be drift. Re-audit required. |
 
 ## 7. Grok
 
@@ -178,11 +182,13 @@ this audit.
 
 | Field | Value |
 | --- | --- |
-| model id | `happyhorse-1-1` (new, locked) |
+| model id | `happyhorse-1-1` (**candidate**, not canonical) |
 | Route | `alibaba/happyhorse-1.1` |
-| Provider capability | T2V / I2V / reference-to-video with up to 9 reference images |
-| Note | own spec; HappyHorse 1.0 kept for historical runs |
-| Paid smoke test | yes |
+| Known | model exists; multi-reference with up to 9 reference images |
+| UNKNOWN | modes, resolutions, durations, aspect ratios, audio, pricing |
+| Code change | 2026-09-07 cleanup: moved to `VIDEO_MODEL_CANDIDATES` |
+| Note | HappyHorse 1.0 kept for historical runs |
+| Paid smoke test | only after the route audit |
 
 ---
 
@@ -200,4 +206,29 @@ this audit.
 | Runway Aleph 2 | `aleph2` | v2v | 720p | 5s | 16:9 | only after the REST path + pricing are confirmed | UNKNOWN |
 
 Everything on this list stays locked and unusable for customers until its row
-passes.
+passes. Rows whose model is a **candidate** additionally require a route audit
+before the test can even be specified.
+
+---
+
+## Canonical vs. candidate (2026-09-07 truth cleanup)
+
+`VIDEO_MODEL_SPECS` = route-scoped contracts whose entered technical values are
+backed by a route source. Promotion from candidate requires at minimum:
+concrete provider slug, concrete API route, mode list, input-schema basics.
+New maximum tiers stay locked afterwards until a paid smoke test passes.
+
+`VIDEO_MODEL_CANDIDATES` = models known to exist whose route/schema/pricing is
+not verified. They assert nothing executable and cannot resolve through
+`getVideoModelSpec()`.
+
+| Candidate | Slug | Audit status |
+| --- | --- | --- |
+| `runway-aleph-2` | `aleph2` | ROUTE_AUDIT_REQUIRED |
+| `seedance-2-0-mini` | `bytedance/seedance-2.0-mini` | ROUTE_AUDIT_REQUIRED |
+| `ltx-2-5-fast` | `lightricks/ltx-2.5-fast` | DOCS_CONFLICT |
+| `happyhorse-1-1` | `alibaba/happyhorse-1.1` | ROUTE_AUDIT_REQUIRED |
+| `wan-3-0` | unknown | ROUTE_AUDIT_REQUIRED |
+
+Route-verified locked canonical spec: `hailuo-h3` (`minimax/h3`) — slug, route,
+modes and input schema documented; every tier locked until a smoke test.

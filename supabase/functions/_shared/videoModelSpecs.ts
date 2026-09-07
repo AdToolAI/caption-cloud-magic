@@ -177,7 +177,40 @@ export interface ModeSpec {
   controls: ModeControls;
   inputs: ModeInputs;
   constraints?: ModeConstraint[];
+  /**
+   * ROUTE-SCOPED OVERRIDE. Some providers split one product across task
+   * specific routes (Wan 2.7 = `…-t2v` vs `…-i2v`). Those are DIFFERENT
+   * provider contracts, so the mode carries its own concrete slug/route.
+   * A composite string ("a|b") is never allowed anywhere — see
+   * `assertSingleProviderSlug`.
+   */
+  providerModelSlug?: string;
+  apiRoute?: string;
+  region?: string;
 }
+
+/** The concrete provider contract actually executed for (spec x mode). */
+export interface RouteIdentity {
+  providerModelSlug: string;
+  apiRoute: string;
+  region: string;
+}
+
+const MULTI_SLUG = /[|,;]|\s{2,}/;
+
+/** True when the string names exactly ONE concrete provider slug. */
+export function isSingleProviderSlug(slug: string): boolean {
+  return slug.trim().length > 0 && !MULTI_SLUG.test(slug);
+}
+
+export function assertSingleProviderSlug(slug: string, context: string): void {
+  if (!isSingleProviderSlug(slug)) {
+    throw new Error(
+      `providerModelSlug must name exactly one provider contract (${context}): "${slug}".`,
+    );
+  }
+}
+
 
 export interface SmokeTestRecord {
   runId: string;
@@ -220,8 +253,12 @@ export interface VideoModelSpec {
   edgeFunction: string;
   releaseStatus: ReleaseStatus;
   deprecated: boolean;
-  /** Required whenever `deprecated` is true. */
+  /** Required whenever `deprecated` is true — unless the successor is still a
+   * candidate, in which case `supersededByCandidate` carries the id. */
   supersededBy?: string;
+  /** Successor that exists as a provider model but is NOT yet a canonical
+   * spec (route/schema unverified). Points into `VIDEO_MODEL_CANDIDATES`. */
+  supersededByCandidate?: string;
   /** Set on pure alias ids that resolve to another spec. */
   aliasOf?: string;
   uiGroup: UiGroup;
@@ -1173,7 +1210,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     family: 'wan',
     generation: '2.7',
     provider: 'Alibaba Wan',
-    providerModelSlug: 'wan-video/wan-2.7-t2v|wan-video/wan-2.7-i2v',
+    providerModelSlug: 'wan-video/wan-2.7-t2v',
     apiRoute: 'replicate:/v1/predictions',
     region: 'global',
     apiVersion: 'v1',
@@ -1198,6 +1235,8 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         inputs: {},
       }),
       mode('i2v', {
+        // Route-scoped: the i2v task is a SEPARATE Replicate model.
+        providerModelSlug: 'wan-video/wan-2.7-i2v',
         resolutions: [res('720p', 720, 'wan-2-7-standard')],
         durations: [5, 10, 15],
         aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
@@ -1213,7 +1252,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     family: 'wan',
     generation: '2.7',
     provider: 'Alibaba Wan',
-    providerModelSlug: 'wan-video/wan-2.7-t2v|wan-video/wan-2.7-i2v',
+    providerModelSlug: 'wan-video/wan-2.7-t2v',
     apiRoute: 'replicate:/v1/predictions',
     region: 'global',
     apiVersion: 'v1',
@@ -1237,6 +1276,8 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         inputs: {},
       }),
       mode('i2v', {
+        // Route-scoped: the i2v task is a SEPARATE Replicate model.
+        providerModelSlug: 'wan-video/wan-2.7-i2v',
         resolutions: [res('1080p', 1080, 'wan-2-7-pro')],
         durations: [5, 10, 15],
         aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
@@ -1688,7 +1729,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     edgeFunction: 'generate-runway-video',
     releaseStatus: 'removed',
     deprecated: true,
-    supersededBy: 'runway-aleph-2',
+    supersededByCandidate: 'runway-aleph-2',
     uiGroup: 'legacy',
     available: false,
     providerDocsVersion: 'Runway API Changelog 30.07.2026',
@@ -1704,39 +1745,6 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
         audio: false,
         controls: { seed: true },
-        inputs: { videos: { min: 1, max: 1 }, images: { min: 0, max: 1 } },
-      }),
-    ],
-  },
-  {
-    /** NEU + GESPERRT: Nachfolger laut Runway-Changelog (gen4_aleph -> aleph2). */
-    id: 'runway-aleph-2',
-    displayName: 'Runway Aleph 2.0',
-    family: 'runway',
-    generation: '2.0',
-    provider: 'Runway',
-    providerModelSlug: 'aleph2',
-    apiRoute: 'runway:/v1/video_to_video',
-    region: 'global',
-    apiVersion: 'v1',
-    edgeFunction: 'generate-runway-video',
-    releaseStatus: 'preview',
-    deprecated: false,
-    uiGroup: 'professional',
-    available: false,
-    providerDocsVersion: 'Runway API Changelog 30.07.2026',
-    verificationSourceUrl: 'https://docs.dev.runwayml.com/api-details/api_changelog/',
-    verificationNotes:
-      'Vorbereitet, NICHT startbar. Belegt ist nur: Model-ID "aleph2" als dokumentierter Nachfolger von gen4_aleph, Video-to-Video mit Text-Prompt und Keyframe-Bildern. ' +
-      'UNBEKANNT: exakter REST-Pfad, Auflösungen, Dauern, FPS, Pricing. Freischaltung erst nach Routen-Audit + bezahltem Smoke-Test.',
-    ...UNAUDITED,
-    modes: [
-      mode('v2v', {
-        resolutions: [newTier('720p', 720, 'runway-aleph-2')],
-        durations: [5],
-        aspectRatios: ['16:9', '9:16'],
-        audio: false,
-        controls: {},
         inputs: { videos: { min: 1, max: 1 }, images: { min: 0, max: 1 } },
       }),
     ],
@@ -2021,11 +2029,13 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
   },
 
   /* ──────── Neue Provider-Generationen: vorbereitet, GESPERRT (Phase E) ─────────
-   * Alle folgenden Specs: available = false, alle Tiers via newTier() =>
-   * grandfathered false, parityStatus UNVERIFIED, kein Smoke-Test-Beleg.
-   * Sie sind damit weder in der UI wählbar noch server-seitig startbar und
-   * dienen ausschließlich als maschinenlesbarer Audit-Stand.
+   * Ein Spec steht hier NUR, wenn Slug, Route, Modi und Input-Schema durch die
+   * konkrete Routen-Doku belegt sind. Alles andere gehört in
+   * VIDEO_MODEL_CANDIDATES — locked ist keine Erlaubnis, Werte zu raten.
+   * Alle Tiers via newTier() => grandfathered false, UNVERIFIED, kein
+   * Smoke-Test-Beleg; damit weder in der UI wählbar noch startbar.
    * ------------------------------------------------------------------------- */
+
   {
     id: 'hailuo-h3',
     displayName: 'Hailuo H3',
@@ -2074,133 +2084,6 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
       }),
     ],
   },
-  {
-    id: 'seedance-2-0-mini',
-    displayName: 'Seedance 2.0 Mini',
-    family: 'seedance',
-    generation: '2.0',
-    provider: 'ByteDance',
-    providerModelSlug: 'bytedance/seedance-2.0-mini',
-    apiRoute: 'replicate:/v1/predictions',
-    region: 'global',
-    apiVersion: 'v1',
-    edgeFunction: 'generate-seedance-video',
-    releaseStatus: 'preview',
-    deprecated: false,
-    uiGroup: 'economy',
-    available: false,
-    providerDocsVersion: 'Replicate 07.09.2026',
-    verificationSourceUrl: 'https://replicate.com/bytedance/seedance-2.0-mini',
-    verificationNotes:
-      'Aktuelle günstige Seedance-Generation (löst Seedance 1 Lite NICHT ab — eigener Spec, alte ID bleibt für historische Runs). ' +
-      'Routen-dokumentiert: T2V/I2V, Referenzbilder, native Audio, bis 720p ("for 1080p and 4K use seedance-2.0"). GESPERRT bis Pricing + Smoke-Test.',
-    ...UNAUDITED,
-    modes: [
-      mode('t2v', {
-        resolutions: [newTier('480p', 480, 'seedance-2-0-mini'), newTier('720p', 720, 'seedance-2-0-mini')],
-        durations: [3, 5, 8, 10, 12, 15],
-        aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21'],
-        audio: false,
-        controls: { seed: true },
-        inputs: {},
-      }),
-      mode('i2v', {
-        resolutions: [newTier('480p', 480, 'seedance-2-0-mini'), newTier('720p', 720, 'seedance-2-0-mini')],
-        durations: [3, 5, 8, 10, 12, 15],
-        aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21'],
-        audio: false,
-        controls: { seed: true },
-        inputs: { firstFrame: true },
-      }),
-    ],
-  },
-  {
-    id: 'ltx-2-5-fast',
-    displayName: 'LTX-2.5 Fast',
-    family: 'ltx',
-    generation: '2.5',
-    provider: 'Lightricks',
-    providerModelSlug: 'lightricks/ltx-2.5-fast',
-    apiRoute: 'replicate:/v1/predictions',
-    region: 'global',
-    apiVersion: 'v1',
-    edgeFunction: 'generate-ltx-video',
-    releaseStatus: 'preview',
-    deprecated: false,
-    uiGroup: 'fast',
-    available: false,
-    providerDocsVersion: 'Replicate 07.09.2026',
-    verificationSourceUrl: 'https://replicate.com/lightricks/ltx-2.5-fast',
-    verificationNotes:
-      'Neue LTX-Generation, ersetzt LTX 2.3 NICHT automatisch. DOCS_CONFLICT: die Replicate-Route nennt Auflösungen bis 4K und 25/30/50 fps, die Lightricks-eigene Doku beschreibt für 2.5 abweichende Limits. ' +
-      'Alle Tiers bleiben gesperrt, bis der Konflikt auf der exakten Route geklärt und ein Smoke-Test bestanden ist.',
-    ...UNAUDITED,
-    modes: [
-      mode('t2v', {
-        resolutions: [newTier('1080p', 1080, 'ltx-2-5-fast'), newTier('4K', 2160, 'ltx-2-5-fast')],
-        durations: [6, 8, 10],
-        aspectRatios: ['16:9', '9:16', '1:1'],
-        audio: false,
-        controls: {},
-        inputs: {},
-      }),
-      mode('i2v', {
-        resolutions: [newTier('1080p', 1080, 'ltx-2-5-fast'), newTier('4K', 2160, 'ltx-2-5-fast')],
-        durations: [6, 8, 10],
-        aspectRatios: ['16:9', '9:16', '1:1'],
-        audio: false,
-        controls: {},
-        inputs: { firstFrame: true },
-      }),
-    ],
-  },
-  {
-    id: 'happyhorse-1-1',
-    displayName: 'HappyHorse 1.1',
-    family: 'happyhorse',
-    generation: '1.1',
-    provider: 'Alibaba',
-    providerModelSlug: 'alibaba/happyhorse-1.1',
-    apiRoute: 'replicate:/v1/predictions',
-    region: 'global',
-    apiVersion: 'v1',
-    edgeFunction: 'generate-happyhorse-video',
-    releaseStatus: 'preview',
-    deprecated: false,
-    uiGroup: 'flagship',
-    available: false,
-    providerDocsVersion: 'Replicate 07.09.2026',
-    verificationSourceUrl: 'https://replicate.com/alibaba/happyhorse-1.1',
-    verificationNotes:
-      'Aktuelle HappyHorse-Generation mit Multi-Referenz (bis zu 9 Referenzbildern). Eigener Spec, HappyHorse 1.0 bleibt für historische Runs bestehen. GESPERRT bis Pricing + Smoke-Test.',
-    ...UNAUDITED,
-    modes: [
-      mode('t2v', {
-        resolutions: [newTier('720p', 720, 'happyhorse-1-1'), newTier('1080p', 1080, 'happyhorse-1-1')],
-        durations: [5, 10],
-        aspectRatios: ['16:9', '9:16', '1:1'],
-        audio: false,
-        controls: { seed: true },
-        inputs: {},
-      }),
-      mode('i2v', {
-        resolutions: [newTier('720p', 720, 'happyhorse-1-1'), newTier('1080p', 1080, 'happyhorse-1-1')],
-        durations: [5, 10],
-        aspectRatios: ['16:9', '9:16', '1:1'],
-        audio: false,
-        controls: { seed: true },
-        inputs: { firstFrame: true },
-      }),
-      mode('reference', {
-        resolutions: [newTier('720p', 720, 'happyhorse-1-1'), newTier('1080p', 1080, 'happyhorse-1-1')],
-        durations: [5, 10],
-        aspectRatios: ['16:9', '9:16', '1:1'],
-        audio: false,
-        controls: { seed: true },
-        inputs: { images: { min: 1, max: 9 } },
-      }),
-    ],
-  },
   /* ───────────────── Historical / removed (ids stay resolvable) ──────────── */
   {
     id: 'sora-2',
@@ -2229,6 +2112,117 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     modes: [],
   },
 ];
+
+// ---------------------------------------------------------------------------
+// CANDIDATES — models we know exist at the provider, whose CONCRETE route,
+// schema or pricing is not verified yet. They are deliberately NOT VideoModelSpecs:
+// a spec may only state technical values that a route source backs. A candidate
+// claims nothing executable — no modes, no resolutions, no durations, no fps.
+// Promotion to VIDEO_MODEL_SPECS requires at minimum: concrete provider slug,
+// concrete API route, mode list and input-schema basics from the route docs.
+// New maximum tiers stay locked after promotion until a paid smoke test passes.
+// ---------------------------------------------------------------------------
+
+export interface VideoModelCandidate {
+  id: string;
+  displayName: string;
+  family: string;
+  provider: string;
+  /** Only when the provider names it verbatim; still exactly ONE slug. */
+  providerModelSlug?: string;
+  /** What a source really proves. */
+  knownFacts: string[];
+  /** Everything still unverified — must NOT appear as a structured value. */
+  unknowns: string[];
+  auditStatus: 'NEW_MODEL_AVAILABLE' | 'ROUTE_AUDIT_REQUIRED' | 'DOCS_CONFLICT';
+  sourceUrl: string;
+  notedAt: string;
+}
+
+export const VIDEO_MODEL_CANDIDATES: VideoModelCandidate[] = [
+  {
+    id: 'runway-aleph-2',
+    displayName: 'Runway Aleph 2.0',
+    family: 'runway',
+    provider: 'Runway',
+    providerModelSlug: 'aleph2',
+    knownFacts: [
+      'Runway API changelog names "aleph2" as the successor model id of the removed gen4_aleph.',
+    ],
+    unknowns: ['exact REST path', 'modes', 'resolutions', 'durations', 'fps', 'pricing'],
+    auditStatus: 'ROUTE_AUDIT_REQUIRED',
+    sourceUrl: 'https://docs.dev.runwayml.com/api-details/api_changelog/',
+    notedAt: '2026-09-07',
+  },
+  {
+    id: 'seedance-2-0-mini',
+    displayName: 'Seedance 2.0 Mini',
+    family: 'seedance',
+    provider: 'ByteDance',
+    providerModelSlug: 'bytedance/seedance-2.0-mini',
+    knownFacts: [
+      'Replicate model page exists; description states "up to 720p" and points to seedance-2.0 for 1080p/4K.',
+    ],
+    unknowns: [
+      'exact input schema (references / native audio / smart duration not confirmed on this route)',
+      'resolution tier labels',
+      'durations',
+      'aspect ratios',
+      'pricing',
+    ],
+    auditStatus: 'ROUTE_AUDIT_REQUIRED',
+    sourceUrl: 'https://replicate.com/bytedance/seedance-2.0-mini',
+    notedAt: '2026-09-07',
+  },
+  {
+    id: 'ltx-2-5-fast',
+    displayName: 'LTX-2.5 Fast',
+    family: 'ltx',
+    provider: 'Lightricks',
+    providerModelSlug: 'lightricks/ltx-2.5-fast',
+    knownFacts: ['A LTX 2.5 generation exists and does NOT replace LTX 2.3.'],
+    unknowns: [
+      'resolutions (Replicate route vs. docs.ltx.io contradict each other)',
+      'fps set',
+      'durations',
+      'audio support',
+      'pricing',
+    ],
+    auditStatus: 'DOCS_CONFLICT',
+    sourceUrl: 'https://replicate.com/lightricks/ltx-2.5-fast',
+    notedAt: '2026-09-07',
+  },
+  {
+    id: 'happyhorse-1-1',
+    displayName: 'HappyHorse 1.1',
+    family: 'happyhorse',
+    provider: 'Alibaba',
+    providerModelSlug: 'alibaba/happyhorse-1.1',
+    knownFacts: ['Replicate model exists; multi-reference with up to 9 reference images.'],
+    unknowns: ['modes', 'resolutions', 'durations', 'aspect ratios', 'audio', 'pricing'],
+    auditStatus: 'ROUTE_AUDIT_REQUIRED',
+    sourceUrl: 'https://replicate.com/alibaba/happyhorse-1.1',
+    notedAt: '2026-09-07',
+  },
+  {
+    id: 'wan-3-0',
+    displayName: 'Wan 3.0',
+    family: 'wan',
+    provider: 'Alibaba Wan',
+    knownFacts: ['A Wan 3 generation was announced by the vendor.'],
+    unknowns: ['Replicate slug(s)', 'routes', 'modes', 'resolutions', 'durations', 'pricing'],
+    auditStatus: 'ROUTE_AUDIT_REQUIRED',
+    sourceUrl: 'https://replicate.com/wan-video',
+    notedAt: '2026-09-07',
+  },
+];
+
+const CANDIDATE_BY_ID = new Map(VIDEO_MODEL_CANDIDATES.map((c) => [c.id, c]));
+
+export function getVideoModelCandidate(id: string): VideoModelCandidate | undefined {
+  return CANDIDATE_BY_ID.get(id);
+}
+
 
 // ---------------------------------------------------------------------------
 // Aliases — persisted legacy ids keep resolving. Never delete an entry here.
@@ -2270,6 +2264,22 @@ export function getVideoModelSpec(id: string): VideoModelSpec | undefined {
 
 export function getModeSpec(spec: VideoModelSpec, m: VideoMode): ModeSpec | undefined {
   return spec.modes.find((entry) => entry.mode === m);
+}
+
+/**
+ * The provider contract REALLY executed for (spec x mode). Providers that split
+ * one product into task-specific routes (Wan 2.7 t2v/i2v) override it per mode.
+ * This is the parity identity — never a composite string.
+ */
+export function resolveRouteIdentity(spec: VideoModelSpec, m: VideoMode): RouteIdentity {
+  const modeSpec = getModeSpec(spec, m);
+  const identity: RouteIdentity = {
+    providerModelSlug: modeSpec?.providerModelSlug ?? spec.providerModelSlug,
+    apiRoute: modeSpec?.apiRoute ?? spec.apiRoute,
+    region: modeSpec?.region ?? spec.region,
+  };
+  assertSingleProviderSlug(identity.providerModelSlug, `${spec.id}/${m}`);
+  return identity;
 }
 
 /** Highest NATIVE resolution across all modes — never an upscale tier. */
@@ -2526,6 +2536,8 @@ export interface ParityKey {
   region: string;
   mode: VideoMode;
   resolutionLabel: string;
+  /** The provider contract really executed for this key (route-scoped). */
+  providerModelSlug?: string;
 }
 
 export function parityKeyOf(
@@ -2533,12 +2545,14 @@ export function parityKeyOf(
   mode: VideoMode,
   resolutionLabel: string,
 ): ParityKey {
+  const route = resolveRouteIdentity(spec, mode);
   return {
     modelId: spec.id,
-    apiRoute: spec.apiRoute,
-    region: spec.region,
+    apiRoute: route.apiRoute,
+    region: route.region,
     mode,
     resolutionLabel,
+    providerModelSlug: route.providerModelSlug,
   };
 }
 
