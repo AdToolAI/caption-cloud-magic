@@ -1379,6 +1379,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
         </Card>
       )}
+      </GenerateSection>
+
 
       {/* ── Ton im Detail — Sprache & Modell-Hinweise (Schalter liegt in der Chip-Leiste) ── */}
       {model.capabilities.audio && (
