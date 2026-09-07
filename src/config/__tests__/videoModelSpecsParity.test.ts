@@ -104,6 +104,12 @@ describe('registry, pricing and alias parity', () => {
     for (const spec of VIDEO_MODEL_SPECS) {
       for (const m of spec.modes) {
         for (const r of m.resolutions) {
+          // Locked tiers may not have a price yet — inventing one would be a
+          // pricing assumption. They are unstartable, so billing never sees them.
+          if (!r.grandfathered && !r.smokeTest) {
+            expect(r.available, `${spec.id}/${m.mode}/${r.label}: locked tier must stay unavailable`).toBe(false);
+            continue;
+          }
           expect(
             VIDEO_PRICING_CATALOG[r.pricingId],
             `${spec.id}/${m.mode}/${r.label}: unknown pricing id "${r.pricingId}"`,
@@ -147,8 +153,13 @@ describe('capability validation rejects instead of clamping', () => {
     expect(v?.field).toBe('duration');
   });
 
-  it('rejects an unsupported mode', () => {
-    expect(validateCapability({ modelId: 'runway-gen4-aleph', mode: 't2v' })?.field).toBe('mode');
+  it('rejects an unsupported mode on a live model', () => {
+    expect(validateCapability({ modelId: 'hailuo-standard', mode: 'firstLast' })?.field).toBe('mode');
+  });
+
+  it('a dead route stays resolvable but can never start', () => {
+    expect(getVideoModelSpec('runway-gen4-aleph')).toBeTruthy();
+    expect(validateCapability({ modelId: 'runway-gen4-aleph', mode: 'v2v' })?.field).toBe('availability');
   });
 
   it('rejects a model in maintenance', () => {
